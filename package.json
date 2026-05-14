@@ -7,7 +7,7 @@
     "build": "next build",
     "start": "next start",
     "lint": "eslint",
-    "test:db": "npx tsx --env-file=.env database/test-connection.ts"
+    "test:db": "node scripts/test-db.mjs"
   },
   "dependencies": {
     "class-variance-authority": "^0.7.1",
