@@ -12,7 +12,7 @@ export const signUpWithEmail = async ({ email, password, fullName, country, inve
             await inngest.send({
                 name: 'app/user.created',
                 data: { email, name: fullName, country, investmentGoals, riskTolerance, preferredIndustry }
-            })
+            }).catch((e) => console.log('Failed to queue welcome email', e))
         }
 
         return { success: true, data: response }
