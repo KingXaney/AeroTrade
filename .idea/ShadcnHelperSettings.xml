@@ -2322,6 +2322,78 @@
         <option name="homepage" value="https://www.turbopills.com/ui/docs" />
         <option name="urlTemplate" value="https://ui.turbopills.com/r/{name}.json" />
       </RegistryConfigState>
+      <RegistryConfigState>
+        <option name="id" value="central-corr" />
+        <option name="name" value="Corr" />
+        <option name="namespace" value="@corr" />
+        <option name="baseUrl" value="https://ui.corr.sh/r" />
+        <option name="stylePath" value="/{name}.json" />
+        <option name="type" value="community" />
+        <option name="enabled" value="false" />
+        <option name="description" value="A collection of shadcn-based React components, charts, animated components, and blocks built over time." />
+        <option name="homepage" value="https://ui.corr.sh" />
+        <option name="urlTemplate" value="https://ui.corr.sh/r/{name}.json" />
+      </RegistryConfigState>
+      <RegistryConfigState>
+        <option name="id" value="central-bklit" />
+        <option name="name" value="Bklit" />
+        <option name="namespace" value="@bklit" />
+        <option name="baseUrl" value="https://ui.bklit.com/r" />
+        <option name="stylePath" value="/{name}.json" />
+        <option name="type" value="community" />
+        <option name="enabled" value="false" />
+        <option name="description" value="Open-source composable chart components for React — line, area, bar, pie, radar, maps, and more. Built with Visx, Motion, and shadcn/ui." />
+        <option name="homepage" value="https://ui.bklit.com" />
+        <option name="urlTemplate" value="https://ui.bklit.com/r/{name}.json" />
+      </RegistryConfigState>
+      <RegistryConfigState>
+        <option name="id" value="central-gymnopedies" />
+        <option name="name" value="Gymnopedies" />
+        <option name="namespace" value="@gymnopedies" />
+        <option name="baseUrl" value="https://gymnopedies.shoota.work/r" />
+        <option name="stylePath" value="/{name}.json" />
+        <option name="type" value="community" />
+        <option name="enabled" value="false" />
+        <option name="description" value="A dark, serif, glow-leaning shadcn registry of read-only components for blogs, essays, and long-form reading experiences — inspired by the quiet, candlelit cabaret of Erik Satie's Gymnopédies." />
+        <option name="homepage" value="https://gymnopedies.shoota.work" />
+        <option name="urlTemplate" value="https://gymnopedies.shoota.work/r/{name}.json" />
+      </RegistryConfigState>
+      <RegistryConfigState>
+        <option name="id" value="central-trophy-ui" />
+        <option name="name" value="Trophy-ui" />
+        <option name="namespace" value="@trophy-ui" />
+        <option name="baseUrl" value="https://ui.trophy.so/r" />
+        <option name="stylePath" value="/{name}.json" />
+        <option name="type" value="community" />
+        <option name="enabled" value="false" />
+        <option name="description" value="Open-source gamification UI components for streaks, achievements, leaderboards, points, and more. Built on shadcn/ui and Tailwind CSS." />
+        <option name="homepage" value="https://ui.trophy.so" />
+        <option name="urlTemplate" value="https://ui.trophy.so/r/{name}.json" />
+      </RegistryConfigState>
+      <RegistryConfigState>
+        <option name="id" value="central-nexus-labs" />
+        <option name="name" value="Nexus-labs" />
+        <option name="namespace" value="@nexus-labs" />
+        <option name="baseUrl" value="https://nexus-ui.com/r" />
+        <option name="stylePath" value="/{name}.json" />
+        <option name="type" value="community" />
+        <option name="enabled" value="false" />
+        <option name="description" value="Motion-native animated components for Next.js — backgrounds, heroes, inputs, carousels, and more. Open source. Copy-ready TypeScript." />
+        <option name="homepage" value="https://nexus-ui.com" />
+        <option name="urlTemplate" value="https://nexus-ui.com/r/{name}.json" />
+      </RegistryConfigState>
+      <RegistryConfigState>
+        <option name="id" value="central-wensity" />
+        <option name="name" value="Wensity" />
+        <option name="namespace" value="@wensity" />
+        <option name="baseUrl" value="https://raw.githubusercontent.com/ksparth12/wensity-shadcn-registry/main" />
+        <option name="stylePath" value="/{name}.json" />
+        <option name="type" value="community" />
+        <option name="enabled" value="false" />
+        <option name="description" value="Motion-rich React components for AI interfaces, SaaS blocks, and cinematic interactions. Free Wensity components only." />
+        <option name="homepage" value="https://wensity.com" />
+        <option name="urlTemplate" value="https://raw.githubusercontent.com/ksparth12/wensity-shadcn-registry/main/{name}.json" />
+      </RegistryConfigState>
     </registryConfigs>
   </component>
 </project>
