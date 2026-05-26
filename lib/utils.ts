@@ -85,7 +85,9 @@ export const formatArticle = (
     symbol?: string,
     index: number = 0
 ) => ({
-  id: isCompanyNews ? Date.now() + Math.random() : article.id + index,
+  // Stable id — deterministic so Inngest step replays produce identical output.
+  // Dedup at the call site keeps article.id values distinct within a result set.
+  id: article.id + index,
   headline: article.headline!.trim(),
   summary:
       article.summary!.trim().substring(0, isCompanyNews ? 200 : 150) + '...',

@@ -4,6 +4,15 @@ import {auth} from "@/lib/better-auth/auth";
 import {inngest} from "@/lib/inngest/client";
 import {headers} from "next/headers";
 
+// Better-auth throws APIError-shaped objects with body.message; fall back to .message or a generic string.
+const extractAuthError = (e: unknown, fallback: string): string => {
+    if (e && typeof e === 'object') {
+        const anyErr = e as { body?: {message?: string}; message?: string };
+        return anyErr.body?.message || anyErr.message || fallback;
+    }
+    return fallback;
+}
+
 export const signUpWithEmail = async ({ email, password, fullName, country, investmentGoals, riskTolerance, preferredIndustry }: SignUpFormData) => {
     try {
         const response = await auth.api.signUpEmail({ body: { email, password, name: fullName } })
@@ -18,7 +27,7 @@ export const signUpWithEmail = async ({ email, password, fullName, country, inve
         return { success: true, data: response }
     } catch (e) {
         console.log('Sign up failed', e)
-        return { success: false, error: 'Sign up failed' }
+        return { success: false, error: extractAuthError(e, 'Sign up failed') }
     }
 }
 
@@ -29,7 +38,7 @@ export const signInWithEmail = async ({ email, password }: SignInFormData) => {
         return { success: true, data: response }
     } catch (e) {
         console.log('Sign in failed', e)
-        return { success: false, error: 'Sign in failed' }
+        return { success: false, error: extractAuthError(e, 'Invalid email or password') }
     }
 }
 
