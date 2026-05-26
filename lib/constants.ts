@@ -337,3 +337,14 @@ export const WATCHLIST_TABLE_HEADER = [
     'Alert',
     'Action',
 ];
+
+// --- Chat assistant ---
+export const CHAT_WELCOME_MESSAGE =
+    "Hi — I'm your AlgoTest Advisor. Ask me to look up a stock, summarize the news, or manage your watchlist.";
+
+export const CHAT_SUGGESTIONS = [
+    "What's in my watchlist?",
+    "Should I add NVDA?",
+    "Summarize today's market news",
+    "Compare AAPL vs MSFT valuations",
+];

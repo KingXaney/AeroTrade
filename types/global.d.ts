@@ -175,6 +175,17 @@ declare global {
         addedAt: Date;
     };
 
+    // --- Chat ---
+    type ChatToolName =
+        | 'searchStock'
+        | 'getStockQuote'
+        | 'getStockProfile'
+        | 'getStockFinancials'
+        | 'getWatchlist'
+        | 'addStockToWatchlist'
+        | 'removeStockFromWatchlist'
+        | 'getMarketNews';
+
     type AlertData = {
         symbol: string;
         company: string;

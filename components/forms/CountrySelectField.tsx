@@ -21,7 +21,7 @@ import { Label } from '@/components/ui/label';
 import { Check, ChevronsUpDown } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import countryList from 'react-select-country-list';
-import Flags from 'country-flag-icons/react/3x2';
+import * as Flags from 'country-flag-icons/react/3x2';
 
 type CountrySelectProps = {
     name: string;
