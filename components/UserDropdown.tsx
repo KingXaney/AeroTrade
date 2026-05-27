@@ -1,5 +1,6 @@
 'use client';
 
+import {useState, useEffect, useTransition} from "react";
 import {Avatar, AvatarFallback, AvatarImage} from "@/components/ui/avatar";
 import {
     DropdownMenu,
@@ -9,14 +10,41 @@ import {
     DropdownMenuSeparator,
     DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
+import {Switch} from "@/components/ui/switch";
 
 import {useRouter} from "next/navigation";
-import {LogOut, ChevronDown} from "lucide-react";
+import {LogOut, ChevronDown, Mail} from "lucide-react";
 import NavItems from "@/components/NavItems";
 import {signOut} from "@/lib/actions/auth.actions";
+import {getEmailNotificationPreference, toggleEmailNotifications} from "@/lib/actions/preferences.actions";
+import {toast} from "sonner";
 
 function UserDropdown({user, initialStocks}: {user: User; initialStocks: StockWithWatchlistStatus[]}) {
     const router = useRouter();
+    const [emailEnabled, setEmailEnabled] = useState(true);
+    const [isPending, startTransition] = useTransition();
+    const [hasFetched, setHasFetched] = useState(false);
+
+    useEffect(() => {
+        getEmailNotificationPreference(user.id).then((enabled) => {
+            setEmailEnabled(enabled);
+            setHasFetched(true);
+        });
+    }, [user.id]);
+
+    const handleToggleEmail = (checked: boolean) => {
+        // Optimistic update
+        setEmailEnabled(checked);
+        startTransition(async () => {
+            const result = await toggleEmailNotifications(user.id, checked);
+            if (result.success) {
+                toast.success(checked ? 'Subscribed to email alerts' : 'Unsubscribed from email alerts');
+            } else {
+                setEmailEnabled(!checked);
+                toast.error('Failed to update email preference');
+            }
+        });
+    };
 
     const handleSignOut = async () => {
         await signOut();
@@ -69,6 +97,26 @@ function UserDropdown({user, initialStocks}: {user: User; initialStocks: StockWi
                         </div>
                     </div>
                 </DropdownMenuLabel>
+
+                <DropdownMenuSeparator className="!bg-gray-800 !my-2"/>
+
+                {/* Email notifications toggle */}
+                <div className="flex items-center justify-between rounded-md px-3 py-2.5">
+                    <div className="flex items-center gap-2.5">
+                        <Mail className="size-4 text-gray-400"/>
+                        <div className="flex flex-col">
+                            <span className="text-sm font-medium text-gray-200">Email alerts</span>
+                            <span className="text-[11px] text-gray-500 leading-tight">Daily news & updates</span>
+                        </div>
+                    </div>
+                    <Switch
+                        id="email-notifications-toggle"
+                        checked={emailEnabled}
+                        onCheckedChange={handleToggleEmail}
+                        disabled={isPending || !hasFetched}
+                        className="data-[state=checked]:!bg-yellow-500 data-[state=unchecked]:!bg-gray-600 data-[state=unchecked]:!border data-[state=unchecked]:!border-gray-500 transition-colors duration-200"
+                    />
+                </div>
 
                 <DropdownMenuSeparator className="!bg-gray-800 !my-2"/>
 
