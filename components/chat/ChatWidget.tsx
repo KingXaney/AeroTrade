@@ -1,6 +1,7 @@
 'use client';
 
-import {useCallback, useState} from "react";
+import {useCallback, useEffect, useState} from "react";
+import {createPortal} from "react-dom";
 import type {UIMessage} from "ai";
 import ChatPanel from "@/components/chat/ChatPanel";
 import {cn} from "@/lib/utils";
@@ -30,6 +31,12 @@ const ChatWidget = ({userId}: ChatWidgetProps) => {
     // on server and client, so reading localStorage here causes no hydration mismatch.
     const [initialMessages] = useState<UIMessage[]>(() => loadMessages(userId));
 
+    // Render through a portal to <body> so the widget's fixed position is anchored to the
+    // viewport and can never be displaced by an ancestor's transform/filter/overflow.
+    const [mounted, setMounted] = useState(false);
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- one-time flag to enable the body portal client-side
+    useEffect(() => setMounted(true), []);
+
     const persist = useCallback((messages: UIMessage[]) => {
         if (typeof window === 'undefined') return;
         try {
@@ -39,7 +46,9 @@ const ChatWidget = ({userId}: ChatWidgetProps) => {
         }
     }, [userId]);
 
-    return (
+    if (!mounted) return null;
+
+    return createPortal(
         <>
             {!open && (
                 <button
@@ -47,7 +56,7 @@ const ChatWidget = ({userId}: ChatWidgetProps) => {
                     onClick={() => setOpen(true)}
                     aria-label="Open Aero-AI Assistant"
                     className={cn(
-                        'fixed bottom-4 right-4 z-50 inline-flex size-14 items-center justify-center rounded-full transition-all hover:scale-110 active:scale-95 sm:bottom-6 sm:right-6 group relative',
+                        'fixed bottom-5 right-5 z-[80] inline-flex size-14 items-center justify-center rounded-full transition-all hover:scale-110 active:scale-95 sm:bottom-6 sm:right-6 group',
                     )}
                     style={{
                         backgroundColor: '#00f0ff',
@@ -67,7 +76,8 @@ const ChatWidget = ({userId}: ChatWidgetProps) => {
                     onClose={() => setOpen(false)}
                 />
             )}
-        </>
+        </>,
+        document.body,
     );
 };
 

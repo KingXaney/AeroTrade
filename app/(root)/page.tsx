@@ -37,7 +37,7 @@ const Home = () =>{
                 </section>
 
                 {/* Stock Heatmap */}
-                <section className="xl:col-span-8 glass-panel rounded-xl p-6">
+                <section className="xl:col-span-8 glass-panel rounded-xl p-6 shimmer">
                     <TradingViewWidget
                         title="Stock Heatmap"
                         scriptUrl={`${scriptUrl}stock-heatmap.js`}
@@ -61,7 +61,7 @@ const Home = () =>{
                 </section>
 
                 {/* Market Quotes */}
-                <section className="xl:col-span-8 glass-panel rounded-xl p-6">
+                <section className="xl:col-span-8 glass-panel rounded-xl p-6 shimmer">
                     <TradingViewWidget
                         title="Market Data"
                         scriptUrl={`${scriptUrl}market-quotes.js`}

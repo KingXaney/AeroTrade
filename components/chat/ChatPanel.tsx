@@ -129,7 +129,7 @@ const ChatPanel = ({userId, onClose, initialMessages, onMessagesChange}: ChatPan
 
     return (
         <div
-            className="fixed bottom-4 right-4 z-50 flex max-w-[calc(100vw-2rem)] max-h-[calc(100vh-2rem)] flex-col rounded-2xl shadow-2xl sm:bottom-6 sm:right-6 overflow-hidden"
+            className="fixed bottom-5 right-5 z-[80] flex max-w-[calc(100vw-2rem)] max-h-[calc(100vh-2rem)] flex-col rounded-2xl shadow-2xl sm:bottom-6 sm:right-6 overflow-hidden"
             style={{
                 width: `${size.width}px`,
                 height: `${size.height}px`,

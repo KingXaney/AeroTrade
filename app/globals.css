@@ -237,31 +237,31 @@
   overflow: hidden;
 }
 
-/* Data Shimmer Effect */
+/* Data Shimmer Effect — a clean diagonal light reflection that sweeps across the panel.
+   Rendered above content (z-index 2) so it reads over opaque widgets, and driven by
+   background-position so every .shimmer shares one 8s timeline and sweeps in unison. */
 .shimmer::after {
   content: '';
   position: absolute;
-  top: -100%;
-  left: -100%;
-  width: 300%;
-  height: 300%;
-  background: linear-gradient(
-    45deg,
-    transparent 0%,
-    rgba(125, 244, 255, 0.03) 45%,
-    rgba(125, 244, 255, 0.08) 50%,
-    rgba(125, 244, 255, 0.03) 55%,
-    transparent 100%
+  inset: 0;
+  background-image: linear-gradient(
+    115deg,
+    transparent 38%,
+    rgba(125, 244, 255, 0.05) 47%,
+    rgba(125, 244, 255, 0.11) 50%,
+    rgba(125, 244, 255, 0.05) 53%,
+    transparent 62%
   );
-  transform: rotate(25deg);
-  animation: shimmer-sweep 8s infinite linear;
+  background-size: 220% 220%;
+  background-repeat: no-repeat;
+  animation: shimmer-sweep 8s linear infinite;
   pointer-events: none;
-  z-index: 0;
+  z-index: 2;
 }
 
 @keyframes shimmer-sweep {
-  0% { transform: translate(-30%, -30%) rotate(25deg); }
-  100% { transform: translate(30%, 30%) rotate(25deg); }
+  0% { background-position: 170% 50%; }
+  100% { background-position: -70% 50%; }
 }
 
 /* Breathing Pulse for active elements */
