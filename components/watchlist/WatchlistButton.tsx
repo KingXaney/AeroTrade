@@ -48,12 +48,17 @@ const WatchlistButton = ({
                 onClick={toggle}
                 disabled={isPending}
                 className={cn(
-                    'inline-flex items-center gap-2 rounded-md px-3 py-2 text-sm font-medium transition-colors',
+                    'inline-flex items-center gap-2 rounded-md px-3 py-2 text-sm font-medium transition-all',
                     optimistic
-                        ? 'bg-yellow-500/10 text-yellow-500 hover:bg-yellow-500/20'
-                        : 'bg-gray-800 text-gray-200 hover:bg-gray-700',
+                        ? 'text-[#7df4ff] hover:bg-[rgba(125,244,255,0.15)]'
+                        : 'text-[#e2e2e8] hover:bg-[rgba(40,42,46,0.8)]',
                     isPending && 'opacity-60 cursor-not-allowed',
                 )}
+                style={{
+                    backgroundColor: optimistic ? 'rgba(125, 244, 255, 0.1)' : '#282a2e',
+                    fontFamily: 'var(--font-jetbrains)',
+                    letterSpacing: '0.02em',
+                }}
                 aria-pressed={optimistic}
             >
                 <Star className={cn('size-4', optimistic && 'fill-current')} />
@@ -72,7 +77,11 @@ const WatchlistButton = ({
             aria-label={optimistic ? `Remove ${symbol} from watchlist` : `Add ${symbol} to watchlist`}
             className={cn(
                 'inline-flex size-8 items-center justify-center rounded-md transition-colors',
-                optimistic ? 'text-yellow-500 hover:text-yellow-400' : 'text-gray-500 hover:text-gray-300',
+                showTrashIcon && optimistic
+                    ? 'text-[#b9cacb] hover:text-[#ffb4ab] hover:bg-[rgba(255,180,171,0.1)]'
+                    : optimistic
+                    ? 'text-[#7df4ff] hover:text-[#00dbe9]'
+                    : 'text-[#849495] hover:text-[#b9cacb]',
                 isPending && 'opacity-60 cursor-not-allowed',
             )}
         >

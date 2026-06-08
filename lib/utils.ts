@@ -106,8 +106,8 @@ export const formatChangePercent = (changePercent?: number) => {
 };
 
 export const getChangeColorClass = (changePercent?: number) => {
-  if (!changePercent) return 'text-gray-400';
-  return changePercent > 0 ? 'text-green-500' : 'text-red-500';
+  if (!changePercent) return 'text-[#849495]';
+  return changePercent > 0 ? 'text-[#7df4ff]' : 'text-[#ffb4ab]';
 };
 
 export const formatPrice = (price: number) => {

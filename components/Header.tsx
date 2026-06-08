@@ -1,5 +1,4 @@
 import Link from "next/link";
-import Image from "next/image";
 import NavItems from "@/components/NavItems";
 import UserDropdown from "@/components/UserDropdown";
 
@@ -10,17 +9,29 @@ type HeaderProps = {
 
 function Header({user, initialStocks}: HeaderProps) {
     return (
-        <header className='sticky top-0 header'>
-            <div className='container header-wrapper'>
-                <Link href="/">
-                    <Image src="/assets/icons/logo.png" alt="AlgoTest logo" width={140} height={32} className="h-8 w-auto cursor-pointer"/>
-                </Link>
-                <nav className="hidden sm:block">
-                    <NavItems initialStocks={initialStocks}/>
-                </nav>
+        <header className='header'>
+            <div className='header-wrapper'>
+                {/* Brand */}
+                <div className="flex items-center gap-8">
+                    <Link href="/" className="flex items-center gap-2">
+                        <span className="material-symbols-outlined text-[#00f0ff]"
+                              style={{ fontVariationSettings: "'FILL' 1" }}>
+                            terminal
+                        </span>
+                        <span className="text-xl font-semibold tracking-tighter text-[#7df4ff]"
+                              style={{ fontFamily: 'var(--font-sora)' }}>
+                            AeroTrade
+                        </span>
+                    </Link>
+                    <nav className="hidden sm:block">
+                        <NavItems initialStocks={initialStocks}/>
+                    </nav>
+                </div>
 
-
-                <UserDropdown user={user} initialStocks={initialStocks}/>
+                {/* Right Section */}
+                <div className="flex items-center gap-3">
+                    <UserDropdown user={user} initialStocks={initialStocks}/>
+                </div>
             </div>
         </header>
     )

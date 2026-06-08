@@ -31,6 +31,13 @@ type CountrySelectProps = {
     required?: boolean;
 };
 
+// Declared at module scope so it isn't recreated on every render (which would reset its state).
+const FlagIcon = ({ code }: { code: string }) => {
+    const Flag = Flags[code.toUpperCase() as keyof typeof Flags];
+    if (!Flag) return null;
+    return <Flag className="w-5 h-4 rounded-sm" />;
+};
+
 const CountrySelect = ({
                            value,
                            onChange,
@@ -42,12 +49,6 @@ const CountrySelect = ({
 
     // Get country options with flags
     const countries = countryList().getData();
-
-    const FlagIcon = ({ code }: { code: string }) => {
-        const Flag = Flags[code.toUpperCase() as keyof typeof Flags];
-        if (!Flag) return null;
-        return <Flag className="w-5 h-4 rounded-sm" />;
-    };
 
     return (
         <Popover open={open} onOpenChange={setOpen}>

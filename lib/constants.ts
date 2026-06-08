@@ -1,7 +1,10 @@
 export const NAV_ITEMS = [
     { href: '/', label: 'Dashboard' },
-    { href: '/search', label: 'Search' },
+    { href: '/markets', label: 'Markets' },
+    { href: '/trade', label: 'Trade' },
     { href: '/watchlist', label: 'Watchlist' },
+    { href: '/history', label: 'History' },
+    { href: '/search', label: 'Search' },
 ];
 
 // Sign-up form select options
@@ -44,15 +47,15 @@ export const MARKET_OVERVIEW_WIDGET_CONFIG = {
     largeChartUrl: '', // link to a large chart if needed
     isTransparent: true, // makes background transparent
     showFloatingTooltip: true, // show tooltip on hover
-    plotLineColorGrowing: '#0FEDBE', // line color when price goes up
-    plotLineColorFalling: '#0FEDBE', // line color when price falls
+    plotLineColorGrowing: '#7df4ff', // line color when price goes up
+    plotLineColorFalling: '#ffb4ab', // line color when price falls
     gridLineColor: 'rgba(240, 243, 250, 0)', // grid line color
     scaleFontColor: '#DBDBDB', // font color for scale
     belowLineFillColorGrowing: 'rgba(41, 98, 255, 0.12)', // fill under line when growing
     belowLineFillColorFalling: 'rgba(41, 98, 255, 0.12)', // fill under line when falling
     belowLineFillColorGrowingBottom: 'rgba(41, 98, 255, 0)',
     belowLineFillColorFallingBottom: 'rgba(41, 98, 255, 0)',
-    symbolActiveColor: 'rgba(15, 237, 190, 0.05)', // highlight color for active symbol
+    symbolActiveColor: 'rgba(0, 240, 255, 0.08)', // highlight color for active symbol
     tabs: [
         {
             title: 'Financial',
@@ -88,7 +91,7 @@ export const MARKET_OVERVIEW_WIDGET_CONFIG = {
         },
     ],
     support_host: 'https://www.tradingview.com', // TradingView host
-    backgroundColor: '#141414', // background color
+    backgroundColor: '#111318', // background color
     width: '100%', // full width
     height: 600, // height in px
     showSymbolLogo: true, // show logo next to symbols
@@ -133,7 +136,7 @@ export const MARKET_DATA_WIDGET_CONFIG = {
     showSymbolLogo: true,
     colorTheme: 'dark',
     isTransparent: false,
-    backgroundColor: '#0F0F0F',
+    backgroundColor: '#111318',
     symbolsGroups: [
         {
             name: 'Financial',
@@ -195,8 +198,8 @@ export const CANDLE_CHART_WIDGET_CONFIG = (symbol: string) => ({
     symbol: symbol.toUpperCase(),
     theme: 'dark',
     timezone: 'Etc/UTC',
-    backgroundColor: '#141414',
-    gridColor: '#141414',
+    backgroundColor: '#111318',
+    gridColor: '#111318',
     watchlist: [],
     withdateranges: false,
     compareSymbols: [],
@@ -221,8 +224,8 @@ export const BASELINE_WIDGET_CONFIG = (symbol: string) => ({
     symbol: symbol.toUpperCase(),
     theme: 'dark',
     timezone: 'Etc/UTC',
-    backgroundColor: '#141414',
-    gridColor: '#141414',
+    backgroundColor: '#111318',
+    gridColor: '#111318',
     watchlist: [],
     withdateranges: false,
     compareSymbols: [],
@@ -260,6 +263,84 @@ export const COMPANY_FINANCIALS_WIDGET_CONFIG = (symbol: string) => ({
     height: 464,
     displayMode: 'regular',
     largeChartUrl: '',
+});
+
+// --- Markets page widgets ---
+export const TICKER_TAPE_WIDGET_CONFIG = {
+    symbols: [
+        { proName: 'FOREXCOM:SPXUSD', title: 'S&P 500' },
+        { proName: 'FOREXCOM:NSXUSD', title: 'Nasdaq 100' },
+        { proName: 'NASDAQ:AAPL', title: 'Apple' },
+        { proName: 'NASDAQ:NVDA', title: 'Nvidia' },
+        { proName: 'NASDAQ:TSLA', title: 'Tesla' },
+        { proName: 'BITSTAMP:BTCUSD', title: 'Bitcoin' },
+        { proName: 'BITSTAMP:ETHUSD', title: 'Ethereum' },
+    ],
+    showSymbolLogo: true,
+    isTransparent: true,
+    displayMode: 'adaptive',
+    colorTheme: 'dark',
+    locale: 'en',
+};
+
+export const MARKET_SCREENER_WIDGET_CONFIG = {
+    width: '100%',
+    height: 600,
+    defaultColumn: 'overview',
+    defaultScreen: 'most_capitalized',
+    market: 'america',
+    showToolbar: true,
+    colorTheme: 'dark',
+    locale: 'en',
+    isTransparent: true,
+};
+
+export const CRYPTO_SCREENER_WIDGET_CONFIG = {
+    width: '100%',
+    height: 490,
+    defaultColumn: 'overview',
+    screener_type: 'crypto_mkt',
+    displayCurrency: 'USD',
+    colorTheme: 'dark',
+    locale: 'en',
+    isTransparent: true,
+};
+
+export const FOREX_CROSS_RATES_WIDGET_CONFIG = {
+    width: '100%',
+    height: 490,
+    currencies: ['EUR', 'USD', 'JPY', 'GBP', 'CHF', 'AUD', 'CAD'],
+    isTransparent: true,
+    colorTheme: 'dark',
+    locale: 'en',
+    backgroundColor: '#111318',
+};
+
+// --- Trade page: full advanced chart with symbol search + drawing toolbar enabled ---
+export const TRADE_CHART_WIDGET_CONFIG = (symbol: string) => ({
+    allow_symbol_change: true,
+    calendar: false,
+    details: true,
+    hide_side_toolbar: false,
+    hide_top_toolbar: false,
+    hide_legend: false,
+    hide_volume: false,
+    hotlist: true,
+    interval: 'D',
+    locale: 'en',
+    save_image: true,
+    style: 1,
+    symbol: symbol.toUpperCase(),
+    theme: 'dark',
+    timezone: 'Etc/UTC',
+    backgroundColor: '#111318',
+    gridColor: '#111318',
+    watchlist: [],
+    withdateranges: true,
+    compareSymbols: [],
+    studies: [],
+    width: '100%',
+    height: 640,
 });
 
 export const POPULAR_STOCK_SYMBOLS = [

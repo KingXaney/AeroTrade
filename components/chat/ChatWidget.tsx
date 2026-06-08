@@ -1,7 +1,6 @@
 'use client';
 
-import {useCallback, useEffect, useState} from "react";
-import {MessageSquare} from "lucide-react";
+import {useCallback, useState} from "react";
 import type {UIMessage} from "ai";
 import ChatPanel from "@/components/chat/ChatPanel";
 import {cn} from "@/lib/utils";
@@ -27,14 +26,9 @@ const loadMessages = (userId: string): UIMessage[] => {
 
 const ChatWidget = ({userId}: ChatWidgetProps) => {
     const [open, setOpen] = useState(false);
-    const [hydrated, setHydrated] = useState(false);
-    const [initialMessages, setInitialMessages] = useState<UIMessage[]>([]);
-
-    // Hydrate from localStorage after mount so server/client HTML matches.
-    useEffect(() => {
-        setInitialMessages(loadMessages(userId));
-        setHydrated(true);
-    }, [userId]);
+    // Lazily restore persisted messages on first render. The launcher button renders identically
+    // on server and client, so reading localStorage here causes no hydration mismatch.
+    const [initialMessages] = useState<UIMessage[]>(() => loadMessages(userId));
 
     const persist = useCallback((messages: UIMessage[]) => {
         if (typeof window === 'undefined') return;
@@ -45,20 +39,23 @@ const ChatWidget = ({userId}: ChatWidgetProps) => {
         }
     }, [userId]);
 
-    if (!hydrated) return null;
-
     return (
         <>
             {!open && (
                 <button
                     type="button"
                     onClick={() => setOpen(true)}
-                    aria-label="Open AlgoTest Advisor chat"
+                    aria-label="Open Aero-AI Assistant"
                     className={cn(
-                        'fixed bottom-4 right-4 z-50 inline-flex size-12 items-center justify-center rounded-full bg-yellow-500 text-gray-900 shadow-lg transition-transform hover:scale-105 sm:bottom-6 sm:right-6',
+                        'fixed bottom-4 right-4 z-50 inline-flex size-14 items-center justify-center rounded-full transition-all hover:scale-110 active:scale-95 sm:bottom-6 sm:right-6 group relative',
                     )}
+                    style={{
+                        backgroundColor: '#00f0ff',
+                        color: '#006970',
+                        boxShadow: '0 0 20px rgba(0, 240, 255, 0.4)',
+                    }}
                 >
-                    <MessageSquare className="size-5" />
+                    <span className="material-symbols-outlined text-3xl">smart_toy</span>
                 </button>
             )}
 

@@ -4,7 +4,7 @@ import {useCallback, useEffect, useRef, useState, type FormEvent, type PointerEv
 import {useChat} from "@ai-sdk/react";
 import {DefaultChatTransport, type UIMessage} from "ai";
 import {useRouter} from "next/navigation";
-import {X, Trash2, Send, Loader2} from "lucide-react";
+import {X, Trash2} from "lucide-react";
 import ChatMessage from "@/components/chat/ChatMessage";
 import {CHAT_WELCOME_MESSAGE, CHAT_SUGGESTIONS} from "@/lib/constants";
 import {cn} from "@/lib/utils";
@@ -20,6 +20,22 @@ const SIZE_KEY = (userId: string) => `algotest:chat:size:${userId}`;
 const DEFAULT_SIZE = {width: 380, height: 560};
 const MIN = {width: 320, height: 400};
 
+// Restore the saved panel size from localStorage, falling back to the default on miss or corrupt data.
+const loadSize = (userId: string): {width: number; height: number} => {
+    if (typeof window === 'undefined') return DEFAULT_SIZE;
+    try {
+        const raw = window.localStorage.getItem(SIZE_KEY(userId));
+        if (!raw) return DEFAULT_SIZE;
+        const parsed = JSON.parse(raw) as {width?: number; height?: number};
+        if (typeof parsed.width === 'number' && typeof parsed.height === 'number') {
+            return {width: parsed.width, height: parsed.height};
+        }
+    } catch {
+        // Ignore corrupt data.
+    }
+    return DEFAULT_SIZE;
+};
+
 type ResizeEdge = 'top' | 'left' | 'corner';
 
 const ChatPanel = ({userId, onClose, initialMessages, onMessagesChange}: ChatPanelProps) => {
@@ -27,21 +43,9 @@ const ChatPanel = ({userId, onClose, initialMessages, onMessagesChange}: ChatPan
     const [input, setInput] = useState('');
     const listRef = useRef<HTMLDivElement>(null);
 
-    // Resizable size — restore from localStorage post-mount, persist on change.
-    const [size, setSize] = useState(DEFAULT_SIZE);
-    useEffect(() => {
-        if (typeof window === 'undefined') return;
-        try {
-            const raw = window.localStorage.getItem(SIZE_KEY(userId));
-            if (!raw) return;
-            const parsed = JSON.parse(raw) as {width?: number; height?: number};
-            if (typeof parsed.width === 'number' && typeof parsed.height === 'number') {
-                setSize({width: parsed.width, height: parsed.height});
-            }
-        } catch {
-            // Ignore corrupt data.
-        }
-    }, [userId]);
+    // Resizable size — restore from localStorage on first render (panel only mounts client-side),
+    // persist on change.
+    const [size, setSize] = useState(() => loadSize(userId));
     useEffect(() => {
         if (typeof window === 'undefined') return;
         try {
@@ -61,8 +65,6 @@ const ChatPanel = ({userId, onClose, initialMessages, onMessagesChange}: ChatPan
     const onResizeMove = useCallback((e: ReactPointerEvent<HTMLDivElement>) => {
         const drag = dragRef.current;
         if (!drag) return;
-        // Panel is anchored bottom-right, so growing toward the top-left means: width up as cursor moves left,
-        // height up as cursor moves up.
         const dx = drag.startX - e.clientX;
         const dy = drag.startY - e.clientY;
         const maxW = Math.max(MIN.width, window.innerWidth - 32);
@@ -85,7 +87,6 @@ const ChatPanel = ({userId, onClose, initialMessages, onMessagesChange}: ChatPan
         messages: initialMessages,
         transport: new DefaultChatTransport({api: '/api/chat'}),
         onFinish: ({message}) => {
-            // After the assistant settles, if any tool mutated the watchlist, refresh server components.
             const hasMutation = message.parts.some((p) => {
                 if (!p.type.startsWith('tool-')) return false;
                 const name = p.type.slice(5);
@@ -128,11 +129,18 @@ const ChatPanel = ({userId, onClose, initialMessages, onMessagesChange}: ChatPan
 
     return (
         <div
-            className="fixed bottom-4 right-4 z-50 flex max-w-[calc(100vw-2rem)] max-h-[calc(100vh-2rem)] flex-col rounded-xl border border-gray-700 bg-gray-900 shadow-2xl sm:bottom-6 sm:right-6"
-            style={{width: `${size.width}px`, height: `${size.height}px`}}
+            className="fixed bottom-4 right-4 z-50 flex max-w-[calc(100vw-2rem)] max-h-[calc(100vh-2rem)] flex-col rounded-2xl shadow-2xl sm:bottom-6 sm:right-6 overflow-hidden"
+            style={{
+                width: `${size.width}px`,
+                height: `${size.height}px`,
+                backgroundColor: 'rgba(17, 19, 24, 0.95)',
+                backdropFilter: 'blur(24px)',
+                WebkitBackdropFilter: 'blur(24px)',
+                border: '1px solid rgba(125, 244, 255, 0.15)',
+                boxShadow: '0 0 40px rgba(0, 240, 255, 0.08)',
+            }}
         >
-            {/* Resize handles — top edge, left edge, and top-left corner. Anchored bottom-right so
-                dragging away from those edges grows the panel. */}
+            {/* Resize handles */}
             <div
                 onPointerDown={beginResize('top')}
                 onPointerMove={onResizeMove}
@@ -149,22 +157,29 @@ const ChatPanel = ({userId, onClose, initialMessages, onMessagesChange}: ChatPan
                 onPointerDown={beginResize('corner')}
                 onPointerMove={onResizeMove}
                 onPointerUp={endResize}
-                className="absolute -top-1 -left-1 size-4 cursor-nwse-resize rounded-tl-xl"
+                className="absolute -top-1 -left-1 size-4 cursor-nwse-resize rounded-tl-2xl"
                 title="Drag to resize"
             />
 
             {/* Header */}
-            <div className="flex items-center justify-between border-b border-gray-800 px-4 py-3">
-                <div>
-                    <h3 className="text-sm font-semibold text-gray-100">AlgoTest Advisor</h3>
-                    <p className="text-xs text-gray-500">Financial assistant</p>
+            <div className="flex items-center justify-between px-4 py-3"
+                 style={{
+                     backgroundColor: 'rgba(0, 240, 255, 0.08)',
+                     borderBottom: '1px solid rgba(59, 73, 75, 0.3)',
+                 }}>
+                <div className="flex items-center gap-2">
+                    <span className="material-symbols-outlined text-[#7df4ff] animate-pulse">smart_toy</span>
+                    <span className="text-xs font-bold tracking-[0.1em] uppercase text-[#7df4ff]"
+                          style={{ fontFamily: 'var(--font-jetbrains)' }}>
+                        Aero-AI Assistant
+                    </span>
                 </div>
                 <div className="flex items-center gap-1">
                     <button
                         type="button"
                         onClick={onClear}
                         title="Clear chat"
-                        className="rounded p-1.5 text-gray-500 hover:bg-gray-800 hover:text-gray-300"
+                        className="rounded p-1.5 text-[#b9cacb] hover:bg-[rgba(40,42,46,0.8)] hover:text-[#e2e2e8] transition-colors"
                     >
                         <Trash2 className="size-4" />
                     </button>
@@ -172,7 +187,7 @@ const ChatPanel = ({userId, onClose, initialMessages, onMessagesChange}: ChatPan
                         type="button"
                         onClick={onClose}
                         title="Close"
-                        className="rounded p-1.5 text-gray-500 hover:bg-gray-800 hover:text-gray-300"
+                        className="rounded p-1.5 text-[#b9cacb] hover:bg-[rgba(40,42,46,0.8)] hover:text-[#e2e2e8] transition-colors"
                     >
                         <X className="size-4" />
                     </button>
@@ -180,10 +195,11 @@ const ChatPanel = ({userId, onClose, initialMessages, onMessagesChange}: ChatPan
             </div>
 
             {/* Message list */}
-            <div ref={listRef} className="flex-1 overflow-y-auto px-4 py-3 space-y-3">
+            <div ref={listRef} className="flex-1 overflow-y-auto px-4 py-3 space-y-3 scrollbar-hide">
                 {messages.length === 0 && (
                     <div className="space-y-3">
-                        <div className="rounded-lg bg-gray-800 px-3 py-2 text-sm text-gray-100">
+                        <div className="rounded-xl rounded-tl-none px-3 py-2 text-sm text-[#e2e2e8] max-w-[85%]"
+                             style={{ backgroundColor: '#282a2e' }}>
                             {CHAT_WELCOME_MESSAGE}
                         </div>
                         <div className="flex flex-col gap-2">
@@ -192,7 +208,13 @@ const ChatPanel = ({userId, onClose, initialMessages, onMessagesChange}: ChatPan
                                     key={s}
                                     type="button"
                                     onClick={() => onSuggestion(s)}
-                                    className="text-left rounded-md border border-gray-700 bg-gray-800/40 px-3 py-1.5 text-xs text-gray-300 hover:bg-gray-800 hover:text-gray-100 transition-colors"
+                                    className="text-left rounded-md px-3 py-1.5 text-xs text-[#b9cacb] hover:text-[#e2e2e8] transition-colors"
+                                    style={{
+                                        backgroundColor: 'rgba(30, 32, 36, 0.4)',
+                                        border: '1px solid rgba(59, 73, 75, 0.3)',
+                                    }}
+                                    onMouseEnter={(e) => { e.currentTarget.style.backgroundColor = 'rgba(30, 32, 36, 0.8)'; }}
+                                    onMouseLeave={(e) => { e.currentTarget.style.backgroundColor = 'rgba(30, 32, 36, 0.4)'; }}
                                 >
                                     {s}
                                 </button>
@@ -206,37 +228,54 @@ const ChatPanel = ({userId, onClose, initialMessages, onMessagesChange}: ChatPan
                 ))}
 
                 {isBusy && messages[messages.length - 1]?.role === 'user' && (
-                    <div className="flex items-center gap-2 text-xs text-gray-500 px-1">
-                        <Loader2 className="size-3 animate-spin" /> thinking…
+                    <div className="flex items-center gap-1.5 p-3 rounded-xl rounded-tl-none w-fit text-[rgba(125,244,255,0.6)]"
+                         style={{ backgroundColor: '#282a2e' }}>
+                        <div className="typing-dot"></div>
+                        <div className="typing-dot"></div>
+                        <div className="typing-dot"></div>
                     </div>
                 )}
 
                 {error && (
-                    <div className="rounded-md border border-red-500/40 bg-red-500/10 px-3 py-2 text-xs text-red-300">
+                    <div className="rounded-md px-3 py-2 text-xs"
+                         style={{
+                             backgroundColor: 'rgba(147, 0, 10, 0.15)',
+                             border: '1px solid rgba(255, 180, 171, 0.3)',
+                             color: '#ffb4ab',
+                         }}>
                         Something went wrong. {error.message}
                     </div>
                 )}
             </div>
 
             {/* Input */}
-            <form onSubmit={onSubmit} className="flex items-center gap-2 border-t border-gray-800 px-3 py-3">
+            <form onSubmit={onSubmit} className="flex items-center gap-2 px-3 py-3"
+                  style={{ borderTop: '1px solid rgba(59, 73, 75, 0.3)' }}>
                 <input
                     value={input}
                     onChange={(e) => setInput(e.target.value)}
-                    placeholder="Ask about a stock…"
+                    placeholder="Query market data..."
                     disabled={isBusy}
-                    className="flex-1 rounded-md bg-gray-800 px-3 py-2 text-sm text-gray-100 placeholder:text-gray-500 outline-none focus:ring-1 focus:ring-yellow-500"
+                    className="flex-1 rounded-lg px-3 py-2 text-sm text-[#e2e2e8] outline-none border-none"
+                    style={{
+                        backgroundColor: '#1e2024',
+                        fontFamily: 'var(--font-hanken)',
+                    }}
                 />
                 <button
                     type="submit"
                     disabled={isBusy || !input.trim()}
                     className={cn(
-                        'inline-flex size-9 items-center justify-center rounded-md bg-yellow-500 text-gray-900 transition-colors hover:bg-yellow-400',
+                        'inline-flex size-9 items-center justify-center rounded-md transition-colors',
                         (isBusy || !input.trim()) && 'opacity-50 cursor-not-allowed',
                     )}
+                    style={{
+                        backgroundColor: '#00f0ff',
+                        color: '#002022',
+                    }}
                     aria-label="Send message"
                 >
-                    <Send className="size-4" />
+                    <span className="material-symbols-outlined text-lg">send</span>
                 </button>
             </form>
         </div>

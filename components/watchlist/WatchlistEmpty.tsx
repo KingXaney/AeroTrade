@@ -1,15 +1,26 @@
-import {Star} from "lucide-react";
-
 const WatchlistEmpty = () => {
     return (
-        <div className="flex flex-col items-center justify-center rounded-lg border border-dashed border-gray-800 bg-gray-900/30 px-6 py-16 text-center">
-            <Star className="size-10 text-yellow-500 mb-4" />
-            <h2 className="text-xl font-semibold text-gray-100">Your watchlist is empty</h2>
-            <p className="mt-2 text-sm text-gray-500 max-w-md">
-                Use <kbd className="rounded border border-gray-700 bg-gray-800 px-1.5 py-0.5 text-xs">⌘K</kbd> or
-                click <span className="text-gray-300">Search</span> in the nav to find stocks, then tap the star
-                to start tracking them here.
+        <div className="glass-panel rounded-xl p-12 flex flex-col items-center justify-center text-center">
+            <div className="w-16 h-16 rounded-full flex items-center justify-center mb-6"
+                 style={{
+                     backgroundColor: 'rgba(0, 240, 255, 0.08)',
+                     border: '1px solid rgba(125, 244, 255, 0.15)',
+                 }}>
+                <span className="material-symbols-outlined text-3xl text-[#7df4ff]">bookmark</span>
+            </div>
+            <h3 className="text-xl font-semibold text-[#e2e2e8] mb-2"
+                style={{ fontFamily: 'var(--font-sora)' }}>
+                No Assets Tracked
+            </h3>
+            <p className="text-[#849495] mb-6 max-w-md"
+               style={{ fontFamily: 'var(--font-hanken)' }}>
+                Search for stocks to add them to your watchlist. Track real-time prices, set alerts, and monitor market movements.
             </p>
+            <div className="flex items-center gap-2 text-[10px] text-[#849495]"
+                 style={{ fontFamily: 'var(--font-jetbrains)', letterSpacing: '0.1em', textTransform: 'uppercase' }}>
+                <span className="material-symbols-outlined text-sm text-[#00f0ff]">search</span>
+                USE SEARCH TO ADD ASSETS
+            </div>
         </div>
     );
 };

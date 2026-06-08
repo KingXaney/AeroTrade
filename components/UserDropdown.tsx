@@ -56,23 +56,34 @@ function UserDropdown({user, initialStocks}: {user: User; initialStocks: StockWi
     return (
         <DropdownMenu>
             <DropdownMenuTrigger asChild>
-                {/* Plain <button> instead of <Button> — the ui Button primitive forces h-8 + nowrap
-                    which crops the stacked text and chevron. */}
                 <button
                     type="button"
-                    className="group inline-flex items-center gap-3 rounded-full px-2 py-1.5 text-gray-300 hover:bg-gray-800/60 hover:text-gray-100 transition-colors outline-none focus-visible:ring-2 focus-visible:ring-yellow-500"
+                    className="group inline-flex items-center gap-3 rounded-full px-2 py-1.5 text-[#b9cacb] hover:bg-[#282a2e]/60 hover:text-[#e2e2e8] transition-colors outline-none focus-visible:ring-2 focus-visible:ring-[#00f0ff]"
                 >
-                    <Avatar className="h-9 w-9 ring-1 ring-gray-700 group-hover:ring-yellow-500 transition-all">
+                    <Avatar className="h-9 w-9 ring-1 ring-[#3b494b] group-hover:ring-[#00f0ff] transition-all">
                         <AvatarImage src="https://example.com/avatar.jpg" alt={user.name}/>
-                        <AvatarFallback className="bg-yellow-500 text-gray-900 text-sm font-bold">
+                        <AvatarFallback
+                            className="text-sm font-bold"
+                            style={{
+                                backgroundColor: '#00f0ff',
+                                color: '#002022',
+                                fontFamily: 'var(--font-sora)',
+                            }}
+                        >
                             {initial}
                         </AvatarFallback>
                     </Avatar>
                     <div className="hidden md:flex flex-col items-start leading-tight">
-                        <span className="text-sm font-medium text-gray-100">{user.name}</span>
-                        <span className="text-xs text-gray-500">Account</span>
+                        <span className="text-sm font-medium text-[#e2e2e8]"
+                              style={{ fontFamily: 'var(--font-sora)' }}>
+                            {user.name}
+                        </span>
+                        <span className="text-[10px] text-[#849495]"
+                              style={{ fontFamily: 'var(--font-jetbrains)', letterSpacing: '0.02em' }}>
+                            Verified Node
+                        </span>
                     </div>
-                    <ChevronDown className="hidden md:block size-4 text-gray-500 group-hover:text-gray-300 transition-transform group-data-[state=open]:rotate-180"/>
+                    <ChevronDown className="hidden md:block size-4 text-[#849495] group-hover:text-[#b9cacb] transition-transform group-data-[state=open]:rotate-180"/>
                 </button>
             </DropdownMenuTrigger>
 
@@ -80,33 +91,50 @@ function UserDropdown({user, initialStocks}: {user: User; initialStocks: StockWi
                 align="end"
                 side="bottom"
                 sideOffset={10}
-                className="w-64 !bg-gray-900 !border !border-gray-700 !text-gray-200 !shadow-2xl !p-2"
+                className="w-64 !shadow-2xl !p-2"
+                style={{
+                    backgroundColor: 'rgba(12, 14, 18, 0.95)',
+                    backdropFilter: 'blur(24px)',
+                    WebkitBackdropFilter: 'blur(24px)',
+                    border: '1px solid rgba(59, 73, 75, 0.4)',
+                    color: '#e2e2e8',
+                }}
             >
                 {/* Profile card */}
                 <DropdownMenuLabel className="!p-0">
-                    <div className="flex items-center gap-3 rounded-md bg-gray-800/50 p-3">
-                        <Avatar className="h-11 w-11 ring-1 ring-gray-700">
+                    <div className="flex items-center gap-3 rounded-md p-3"
+                         style={{ backgroundColor: 'rgba(30, 32, 36, 0.5)' }}>
+                        <Avatar className="h-11 w-11 ring-1 ring-[#3b494b]">
                             <AvatarImage src="https://example.com/avatar.jpg" alt={user.name}/>
-                            <AvatarFallback className="bg-yellow-500 text-gray-900 text-base font-bold">
+                            <AvatarFallback
+                                className="text-base font-bold"
+                                style={{ backgroundColor: '#00f0ff', color: '#002022', fontFamily: 'var(--font-sora)' }}
+                            >
                                 {initial}
                             </AvatarFallback>
                         </Avatar>
                         <div className="flex flex-col min-w-0">
-                            <span className="text-sm font-semibold text-gray-100 truncate">{user.name}</span>
-                            <span className="text-xs text-gray-400 truncate">{user.email}</span>
+                            <span className="text-sm font-semibold text-[#e2e2e8] truncate"
+                                  style={{ fontFamily: 'var(--font-sora)' }}>
+                                {user.name}
+                            </span>
+                            <span className="text-xs text-[#849495] truncate"
+                                  style={{ fontFamily: 'var(--font-jetbrains)' }}>
+                                {user.email}
+                            </span>
                         </div>
                     </div>
                 </DropdownMenuLabel>
 
-                <DropdownMenuSeparator className="!bg-gray-800 !my-2"/>
+                <DropdownMenuSeparator style={{ backgroundColor: '#1e2024', margin: '8px 0' }}/>
 
                 {/* Email notifications toggle */}
                 <div className="flex items-center justify-between rounded-md px-3 py-2.5">
                     <div className="flex items-center gap-2.5">
-                        <Mail className="size-4 text-gray-400"/>
+                        <Mail className="size-4 text-[#b9cacb]"/>
                         <div className="flex flex-col">
-                            <span className="text-sm font-medium text-gray-200">Email alerts</span>
-                            <span className="text-[11px] text-gray-500 leading-tight">Daily news & updates</span>
+                            <span className="text-sm font-medium text-[#e2e2e8]">Email alerts</span>
+                            <span className="text-[11px] text-[#849495] leading-tight">Daily news & updates</span>
                         </div>
                     </div>
                     <Switch
@@ -114,25 +142,28 @@ function UserDropdown({user, initialStocks}: {user: User; initialStocks: StockWi
                         checked={emailEnabled}
                         onCheckedChange={handleToggleEmail}
                         disabled={isPending || !hasFetched}
-                        className="data-[state=checked]:!bg-yellow-500 data-[state=unchecked]:!bg-gray-600 data-[state=unchecked]:!border data-[state=unchecked]:!border-gray-500 transition-colors duration-200"
+                        className="data-[state=checked]:!bg-[#00f0ff] data-[state=unchecked]:!bg-[#333539] data-[state=unchecked]:!border data-[state=unchecked]:!border-[#3b494b] transition-colors duration-200"
                     />
                 </div>
 
-                <DropdownMenuSeparator className="!bg-gray-800 !my-2"/>
+                <DropdownMenuSeparator style={{ backgroundColor: '#1e2024', margin: '8px 0' }}/>
 
                 {/* Logout — destructive intent */}
                 <DropdownMenuItem
                     onClick={handleSignOut}
-                    className="group cursor-pointer rounded-md px-3 py-2 text-sm font-medium text-gray-200 focus:!bg-red-500/10 focus:!text-red-300 transition-colors"
+                    className="group cursor-pointer rounded-md px-3 py-2 text-sm font-medium text-[#e2e2e8] focus:!bg-[rgba(255,180,171,0.1)] focus:!text-[#ffb4ab] transition-colors"
                 >
-                    <LogOut className="size-4 text-gray-400 group-focus:text-red-300 transition-colors"/>
+                    <LogOut className="size-4 text-[#b9cacb] group-focus:text-[#ffb4ab] transition-colors"/>
                     Log out
                 </DropdownMenuItem>
 
                 {/* Mobile-only nav (visible <sm) */}
                 <div className="sm:hidden">
-                    <DropdownMenuSeparator className="!bg-gray-800 !my-2"/>
-                    <div className="px-3 pb-1 text-[10px] uppercase tracking-wider text-gray-500">Menu</div>
+                    <DropdownMenuSeparator style={{ backgroundColor: '#1e2024', margin: '8px 0' }}/>
+                    <div className="px-3 pb-1 text-[10px] uppercase tracking-wider text-[#849495]"
+                         style={{ fontFamily: 'var(--font-jetbrains)' }}>
+                        Menu
+                    </div>
                     <div className="px-1 pb-1">
                         <NavItems initialStocks={initialStocks}/>
                     </div>

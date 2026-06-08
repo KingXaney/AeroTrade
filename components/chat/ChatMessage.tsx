@@ -37,11 +37,16 @@ const ChatMessage = ({message}: ChatMessageProps) => {
         <div className={cn('flex gap-2', isUser ? 'justify-end' : 'justify-start')}>
             <div
                 className={cn(
-                    'max-w-[85%] rounded-lg px-3 py-2 text-sm leading-relaxed',
+                    'max-w-[85%] rounded-xl px-3 py-2 text-sm leading-relaxed',
                     isUser
-                        ? 'bg-yellow-500 text-gray-900'
-                        : 'bg-gray-800 text-gray-100',
+                        ? 'rounded-tr-none'
+                        : 'rounded-tl-none',
                 )}
+                style={{
+                    backgroundColor: isUser ? 'rgba(0, 240, 255, 0.15)' : '#282a2e',
+                    color: isUser ? '#7df4ff' : '#e2e2e8',
+                    border: isUser ? '1px solid rgba(0, 240, 255, 0.2)' : 'none',
+                }}
             >
                 {message.parts.map((part, idx) => {
                     if (part.type === 'text') {

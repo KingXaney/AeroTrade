@@ -99,12 +99,13 @@ export default function SearchCommand({
                                         onClick={handleSelectStock}
                                         className="search-item-link"
                                     >
-                                        <TrendingUp className="h-4 w-4 text-gray-500" />
+                                        <TrendingUp className="h-4 w-4 text-[#00dbe9]" />
                                         <div className="flex-1">
                                             <div className="search-item-name">
                                                 {stock.name}
                                             </div>
-                                            <div className="text-sm text-gray-500">
+                                            <div className="text-sm text-[#849495]"
+                                                 style={{ fontFamily: 'var(--font-jetbrains)', fontSize: '11px', letterSpacing: '0.02em' }}>
                                                 {stock.symbol} | {stock.exchange} | {stock.type}
                                             </div>
                                         </div>
