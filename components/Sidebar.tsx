@@ -10,6 +10,7 @@ const sidebarNavItems = [
     { href: '/markets', label: 'Markets', icon: 'query_stats' },
     { href: '/trade', label: 'Trade', icon: 'candlestick_chart' },
     { href: '/watchlist', label: 'Watchlist', icon: 'bookmark' },
+    { href: '/friends', label: 'Friends', icon: 'group' },
     { href: '/history', label: 'History', icon: 'history' },
 ];
 

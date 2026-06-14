@@ -224,6 +224,81 @@ declare global {
         threshold: number;
         changePercent?: number;
     };
+
+    // --- Paper trading ---
+    type PaperPosition = {
+        symbol: string;
+        company: string;
+        quantity: number;
+        avgCost: number;
+    };
+
+    type EnrichedPosition = PaperPosition & {
+        currentPrice?: number;
+        changePercent?: number;
+        costBasis: number;        // avgCost * quantity
+        marketValue: number;      // currentPrice * quantity (0 if price unknown)
+        unrealizedPnl: number;    // marketValue - costBasis
+        unrealizedPnlPct: number; // unrealizedPnl / costBasis * 100
+    };
+
+    type PortfolioSummary = {
+        startingBalance: number;
+        cash: number;
+        positions: EnrichedPosition[];
+        holdingsValue: number;
+        totalValue: number;       // cash + holdingsValue
+        totalReturnAbs: number;   // totalValue - startingBalance
+        totalReturnPct: number;   // totalReturnAbs / startingBalance * 100
+    };
+
+    type PaperTradeRecord = {
+        id: string;
+        symbol: string;
+        company: string;
+        side: 'buy' | 'sell';
+        quantity: number;
+        price: number;
+        total: number;
+        realizedPnl?: number;
+        createdAt: number;        // epoch milliseconds
+    };
+
+    type OrderResult = {
+        success: boolean;
+        message?: string;
+    };
+
+    // --- Friends / competition ---
+    type FriendSummary = {
+        friendshipId: string;
+        id: string;
+        name: string;
+        email: string;
+    };
+
+    type FriendRequest = {
+        friendshipId: string;
+        requesterId: string;
+        name: string;
+        email: string;
+        createdAt: number;
+    };
+
+    type LeaderboardEntry = {
+        id: string;
+        name: string;
+        isYou: boolean;
+        totalValue: number;
+        totalReturnPct: number;
+    };
+
+    type FriendProfile = {
+        id: string;
+        name: string;
+        email: string;
+        portfolio: PortfolioSummary;
+    };
 }
 
 export {};

@@ -3,9 +3,13 @@ export const NAV_ITEMS = [
     { href: '/markets', label: 'Markets' },
     { href: '/trade', label: 'Trade' },
     { href: '/watchlist', label: 'Watchlist' },
+    { href: '/friends', label: 'Friends' },
     { href: '/history', label: 'History' },
     { href: '/search', label: 'Search' },
 ];
+
+// Paper-trading: starting virtual cash every account begins with.
+export const PAPER_STARTING_BALANCE = 100_000;
 
 // Sign-up form select options
 export const INVESTMENT_GOALS = [
