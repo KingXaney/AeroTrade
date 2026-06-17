@@ -82,7 +82,7 @@ function Sidebar({ watchlistCount, portfolio }: SidebarProps) {
                                 className={cn(
                                     "flex items-center gap-4 px-4 py-3 transition-all text-xs font-bold tracking-[0.1em] uppercase",
                                     isActive
-                                        ? "text-[#d1bcff] border-l-4 border-[#d1bcff]"
+                                        ? "text-[#7df4ff] border-l-4 border-[#7df4ff]"
                                         : "text-[#b9cacb] hover:text-[#e2e2e8] hover:bg-[#282a2e]"
                                 )}
                                 style={{ fontFamily: 'var(--font-jetbrains)' }}

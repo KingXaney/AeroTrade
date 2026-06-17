@@ -7,7 +7,6 @@ import {searchStocks} from "@/lib/actions/finnhub.actions";
 import {getWatchlistSymbolsByUserId} from "@/lib/actions/watchlist.actions";
 import {getPortfolio} from "@/lib/trading/account";
 import ChatWidget from "@/components/chat/ChatWidget";
-import ParticleBackground from "@/components/ParticleBackground";
 
 // Every page under (root) reads the session from request headers, so they can never be
 // statically prerendered. Declaring this avoids a build-time dynamic-usage error.
@@ -45,7 +44,6 @@ const Layout = async ({children}: {children: React.ReactNode}) => {
 
     return (
         <main className="min-h-screen" style={{ color: '#b9cacb' }}>
-            <ParticleBackground />
             <Header user={user} initialStocks={initialStocks}/>
             <Sidebar watchlistCount={watchlistSymbols.length} portfolio={sidebarPortfolio} />
             <div className="pt-20 lg:ml-64 px-6 pb-8 min-h-screen">

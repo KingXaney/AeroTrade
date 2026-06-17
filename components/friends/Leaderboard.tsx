@@ -12,7 +12,7 @@ const Leaderboard = ({entries}: {entries: LeaderboardEntry[]}) => {
     return (
         <div className="glass-panel rounded-xl p-5 shimmer">
             <div className="flex items-center gap-2 mb-4">
-                <span className="material-symbols-outlined text-[#d1bcff]">emoji_events</span>
+                <span className="material-symbols-outlined text-[#7df4ff]">emoji_events</span>
                 <h2 className="text-sm font-bold uppercase tracking-[0.1em] text-[#7df4ff]" style={{fontFamily: 'var(--font-jetbrains)'}}>
                     Leaderboard
                 </h2>

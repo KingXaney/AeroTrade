@@ -29,7 +29,7 @@ const FriendRequests = ({requests}: {requests: FriendRequest[]}) => {
 
     return (
         <div className="glass-panel rounded-xl p-5">
-            <h2 className="text-sm font-bold uppercase tracking-[0.1em] text-[#d1bcff] mb-3" style={{fontFamily: 'var(--font-jetbrains)'}}>
+            <h2 className="text-sm font-bold uppercase tracking-[0.1em] text-[#7df4ff] mb-3" style={{fontFamily: 'var(--font-jetbrains)'}}>
                 Pending Requests ({requests.length})
             </h2>
             <div className="space-y-2">

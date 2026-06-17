@@ -80,7 +80,7 @@ const Layout = async ({children}:{children : React.ReactNode}) => {
                             <p style={{ fontFamily: 'var(--font-jetbrains)', fontSize: '11px', color: '#849495' }}>
                                 &gt; Portfolio sync: COMPLETE
                             </p>
-                            <p style={{ fontFamily: 'var(--font-jetbrains)', fontSize: '11px', color: '#d1bcff' }}>
+                            <p style={{ fontFamily: 'var(--font-jetbrains)', fontSize: '11px', color: '#7df4ff' }}>
                                 &gt; AI Assistant: READY
                             </p>
                         </div>

@@ -229,60 +229,18 @@
 
 /* Core Glass Panel */
 .glass-panel {
-  backdrop-filter: blur(12px);
-  -webkit-backdrop-filter: blur(12px);
-  background-color: rgba(17, 19, 24, 0.7);
-  border: 1px solid rgba(255, 255, 255, 0.08);
+  background-color: #14171b;
+  border: 1px solid rgba(255, 255, 255, 0.06);
   position: relative;
   overflow: hidden;
 }
 
-/* Data Shimmer Effect — a clean diagonal light reflection that sweeps across the panel.
-   Rendered above content (z-index 2) so it reads over opaque widgets, and driven by
-   background-position so every .shimmer shares one 8s timeline and sweeps in unison. */
-.shimmer::after {
-  content: '';
-  position: absolute;
-  inset: 0;
-  background-image: linear-gradient(
-    115deg,
-    transparent 38%,
-    rgba(125, 244, 255, 0.05) 47%,
-    rgba(125, 244, 255, 0.11) 50%,
-    rgba(125, 244, 255, 0.05) 53%,
-    transparent 62%
-  );
-  background-size: 220% 220%;
-  background-repeat: no-repeat;
-  animation: shimmer-sweep 8s linear infinite;
-  pointer-events: none;
-  z-index: 2;
-}
-
-@keyframes shimmer-sweep {
-  0% { background-position: 170% 50%; }
-  100% { background-position: -70% 50%; }
-}
-
-/* Breathing Pulse for active elements */
-.node-pulse {
-  animation: breathing 4s ease-in-out infinite;
-}
-
-@keyframes breathing {
-  0%, 100% { transform: scale(1); opacity: 1; }
-  50% { transform: scale(1.02); opacity: 0.85; }
-}
-
-/* Subtle Glow Pulse for buttons */
-@keyframes subtle-glow {
-  0% { box-shadow: 0 0 0 0 rgba(0, 240, 255, 0.15); }
-  70% { box-shadow: 0 0 15px 0 rgba(0, 240, 255, 0.25); }
-  100% { box-shadow: 0 0 0 0 rgba(0, 240, 255, 0); }
-}
-.animate-glow {
-  animation: subtle-glow 3s infinite;
-}
+/* Quiet Cyber redesign: shimmer, breathing pulse, and glow pulse are disabled.
+   Kept as no-ops so existing .shimmer / .node-pulse / .animate-glow usages render
+   flat and calm without having to edit every consumer component. */
+.shimmer::after { content: none; }
+.node-pulse { animation: none; }
+.animate-glow { animation: none; }
 
 /* Typing Indicator Animation */
 .typing-dot {
@@ -345,14 +303,12 @@
 
   /* ─── PRIMARY CTA BUTTON ─── */
   .yellow-btn {
-    @apply h-12 cursor-pointer font-medium text-base rounded-lg shadow-lg disabled:opacity-50;
-    background: linear-gradient(135deg, #00f0ff, #00dbe9);
-    color: #002022;
-    box-shadow: 0 0 15px rgba(0, 240, 255, 0.3);
+    @apply h-12 cursor-pointer font-medium text-base rounded-lg disabled:opacity-50;
+    background: #7df4ff;
+    color: #04212a;
   }
   .yellow-btn:hover {
-    filter: brightness(1.1);
-    box-shadow: 0 0 20px rgba(0, 240, 255, 0.4);
+    filter: brightness(1.08);
   }
 
   /* ─── HOME / DASHBOARD ─── */
@@ -367,10 +323,8 @@
   /* ─── HEADER ─── */
   .header {
     @apply z-50 w-full h-16 fixed top-0;
-    background: rgba(17, 19, 24, 0.8);
-    backdrop-filter: blur(16px);
-    -webkit-backdrop-filter: blur(16px);
-    border-bottom: 1px solid rgba(59, 73, 75, 0.3);
+    background: #0d1014;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.06);
   }
   .header-wrapper {
     @apply flex justify-between items-center px-6 py-3;
@@ -502,11 +456,8 @@
   }
   .search-dialog {
     @apply lg:min-w-[800px] fixed top-10 left-1/2 -translate-x-1/2 translate-y-10;
-    background-color: rgba(17, 19, 24, 0.95) !important;
-    backdrop-filter: blur(24px);
-    -webkit-backdrop-filter: blur(24px);
-    border: 1px solid rgba(59, 73, 75, 0.4) !important;
-    box-shadow: 0 0 40px rgba(0, 240, 255, 0.08);
+    background-color: #0d1014 !important;
+    border: 1px solid rgba(255, 255, 255, 0.08) !important;
   }
   .search-field {
     @apply relative;
@@ -576,13 +527,11 @@
   /* ─── WATCHLIST ─── */
   .watchlist-btn {
     @apply text-base w-full rounded h-11 font-semibold cursor-pointer;
-    background-color: #00f0ff;
-    color: #002022;
-    box-shadow: 0 0 10px rgba(0, 240, 255, 0.2);
+    background-color: #7df4ff;
+    color: #04212a;
   }
   .watchlist-btn:hover {
     background-color: #00dbe9;
-    box-shadow: 0 0 15px rgba(0, 240, 255, 0.3);
   }
   .watchlist-remove {
     background-color: #ffb4ab !important;
@@ -776,8 +725,7 @@
     border: 1px solid rgba(255, 255, 255, 0.08);
   }
   .news-item:hover {
-    border-color: rgba(0, 219, 233, 0.3);
-    box-shadow: 0 0 15px rgba(0, 240, 255, 0.05);
+    border-color: rgba(125, 244, 255, 0.25);
   }
   .news-tag {
     @apply inline-block w-fit px-2 py-1 mb-5 rounded text-sm font-mono font-medium;

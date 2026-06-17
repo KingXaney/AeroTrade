@@ -18,16 +18,16 @@ const PortfolioSidebarCard = ({portfolio}: {portfolio: SidebarPortfolio}) => {
             href="/portfolio"
             className="relative block rounded-xl p-4 mb-6 shimmer overflow-hidden transition-all hover:brightness-110"
             style={{
-                backgroundColor: 'rgba(209, 188, 255, 0.06)',
-                border: '1px solid rgba(209, 188, 255, 0.15)',
+                backgroundColor: 'rgba(125, 244, 255, 0.06)',
+                border: '1px solid rgba(125, 244, 255, 0.15)',
             }}
         >
             <div className="relative z-10">
                 <div className="flex items-center gap-3 mb-2">
-                    <span className="material-symbols-outlined text-[#d1bcff]"
+                    <span className="material-symbols-outlined text-[#7df4ff]"
                           style={{fontVariationSettings: "'FILL' 1"}}
                     >account_balance_wallet</span>
-                    <span className="text-[#d1bcff] text-xs font-bold tracking-[0.1em] uppercase"
+                    <span className="text-[#7df4ff] text-xs font-bold tracking-[0.1em] uppercase"
                           style={{fontFamily: 'var(--font-jetbrains)'}}
                     >Portfolio</span>
                 </div>
@@ -42,7 +42,7 @@ const PortfolioSidebarCard = ({portfolio}: {portfolio: SidebarPortfolio}) => {
                     <span className="text-[#849495] text-xs"> total return</span>
                 </p>
 
-                <div className="mt-3 pt-3 border-t border-[rgba(209,188,255,0.12)] flex items-center justify-between">
+                <div className="mt-3 pt-3 border-t border-[rgba(125,244,255,0.12)] flex items-center justify-between">
                     <span className="text-[10px] uppercase tracking-[0.1em] text-[#849495]"
                           style={{fontFamily: 'var(--font-jetbrains)'}}>Cash</span>
                     <span className="text-xs text-[#b9cacb]"

@@ -1,13 +1,11 @@
 import {redirect} from "next/navigation";
+import Link from "next/link";
 import TradingViewWidget from "@/components/TradingViewWidget";
-import {TRADE_CHART_WIDGET_CONFIG, SYMBOL_INFO_WIDGET_CONFIG} from "@/lib/constants";
+import {TRADE_CHART_WIDGET_CONFIG} from "@/lib/constants";
 import {getCurrentUserId} from "@/lib/actions/watchlist.actions";
-import {getPortfolio, getTradeHistory} from "@/lib/trading/account";
-import AccountSummary from "@/components/trade/AccountSummary";
+import {getPortfolio} from "@/lib/trading/account";
 import OrderPanel from "@/components/trade/OrderPanel";
-import PositionsTable from "@/components/trade/PositionsTable";
-import TradeHistory from "@/components/trade/TradeHistory";
-import ResetAccountButton from "@/components/trade/ResetAccountButton";
+import OpenPositionsStrip from "@/components/trade/OpenPositionsStrip";
 
 const scriptUrl = 'https://s3.tradingview.com/external-embedding/embed-widget-';
 
@@ -24,10 +22,7 @@ const TradePage = async ({searchParams}: TradePageProps) => {
     // Bare ticker (drop exchange prefix) seeds the order panel.
     const orderSymbol = chartSymbol.includes(':') ? chartSymbol.split(':').pop()! : chartSymbol;
 
-    const [portfolio, trades] = await Promise.all([
-        getPortfolio(userId),
-        getTradeHistory(userId),
-    ]);
+    const portfolio = await getPortfolio(userId);
 
     return (
         <div className="min-h-screen space-y-4">
@@ -37,28 +32,16 @@ const TradePage = async ({searchParams}: TradePageProps) => {
                     <h1 className="text-2xl font-semibold text-[#e2e2e8] mb-1" style={{fontFamily: 'var(--font-sora)'}}>
                         Trade Desk
                     </h1>
-                    <p className="text-sm text-[#849495]" style={{fontFamily: 'var(--font-jetbrains)', letterSpacing: '0.02em'}}>
-                        Paper trading · $100k virtual cash · live prices
-                    </p>
+                    <p className="text-sm text-[#849495]">Paper trading · live prices</p>
                 </div>
-                <ResetAccountButton />
+                <Link href="/portfolio" className="text-xs text-[#7df4ff] hover:underline" style={{fontFamily: 'var(--font-jetbrains)'}}>
+                    View full portfolio →
+                </Link>
             </div>
 
-            {/* Account summary */}
-            <AccountSummary portfolio={portfolio} />
-
-            {/* Symbol info */}
-            <section className="glass-panel rounded-xl p-4 shimmer">
-                <TradingViewWidget
-                    scriptUrl={`${scriptUrl}symbol-info.js`}
-                    config={SYMBOL_INFO_WIDGET_CONFIG(chartSymbol)}
-                    height={170}
-                />
-            </section>
-
-            {/* Chart + order entry */}
+            {/* Chart + order entry — the focus of this page */}
             <div className="grid gap-4 xl:grid-cols-3">
-                <section className="xl:col-span-2 glass-panel rounded-xl p-4 shimmer">
+                <section className="xl:col-span-2 glass-panel rounded-xl p-4">
                     <TradingViewWidget
                         title="Advanced Chart"
                         scriptUrl={`${scriptUrl}advanced-chart.js`}
@@ -71,20 +54,17 @@ const TradePage = async ({searchParams}: TradePageProps) => {
                 </div>
             </div>
 
-            {/* Positions */}
+            {/* Open positions — compact quick-sell; full holdings & history live on /portfolio */}
             <section className="glass-panel rounded-xl p-5">
-                <h2 className="text-sm font-bold uppercase tracking-[0.1em] text-[#7df4ff] mb-4" style={{fontFamily: 'var(--font-jetbrains)'}}>
-                    Open Positions
-                </h2>
-                <PositionsTable positions={portfolio.positions} />
-            </section>
-
-            {/* Trade history */}
-            <section className="glass-panel rounded-xl p-5">
-                <h2 className="text-sm font-bold uppercase tracking-[0.1em] text-[#7df4ff] mb-4" style={{fontFamily: 'var(--font-jetbrains)'}}>
-                    Trade History
-                </h2>
-                <TradeHistory trades={trades} />
+                <div className="flex items-center justify-between mb-4">
+                    <h2 className="text-sm font-bold uppercase tracking-[0.1em] text-[#7df4ff]" style={{fontFamily: 'var(--font-jetbrains)'}}>
+                        Open Positions
+                    </h2>
+                    <Link href="/portfolio" className="text-xs text-[#849495] hover:text-[#7df4ff]" style={{fontFamily: 'var(--font-jetbrains)'}}>
+                        Full holdings &amp; history →
+                    </Link>
+                </div>
+                <OpenPositionsStrip positions={portfolio.positions} />
             </section>
         </div>
     );
