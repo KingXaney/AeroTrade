@@ -16,6 +16,13 @@ function createAuthInstance(db: Parameters<typeof mongodbAdapter>[0]) {
             maxPasswordLength: 128,
             autoSignIn: true,
         },
+        session: {
+            // Keep users signed in for 30 days...
+            expiresIn: 60 * 60 * 24 * 30,
+            // ...and slide that expiry forward at most once per day of activity,
+            // so anyone who visits regularly effectively never gets logged out.
+            updateAge: 60 * 60 * 24,
+        },
         plugins: [nextCookies()],
     });
 }
