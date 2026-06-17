@@ -58,7 +58,7 @@ const MarketsPage = () => {
                 <section className="glass-panel rounded-xl p-6 shimmer">
                     <TradingViewWidget
                         title="Crypto Market"
-                        scriptUrl={`${scriptUrl}crypto-mkt-screener.js`}
+                        scriptUrl={`${scriptUrl}screener.js`}
                         config={CRYPTO_SCREENER_WIDGET_CONFIG}
                         height={490}
                     />

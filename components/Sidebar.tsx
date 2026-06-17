@@ -4,11 +4,13 @@ import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import { cn } from "@/lib/utils";
 import { signOut } from "@/lib/actions/auth.actions";
+import PortfolioSidebarCard, { type SidebarPortfolio } from "@/components/PortfolioSidebarCard";
 
 const sidebarNavItems = [
     { href: '/', label: 'Dashboard', icon: 'space_dashboard' },
     { href: '/markets', label: 'Markets', icon: 'query_stats' },
     { href: '/trade', label: 'Trade', icon: 'candlestick_chart' },
+    { href: '/portfolio', label: 'Portfolio', icon: 'account_balance_wallet' },
     { href: '/watchlist', label: 'Watchlist', icon: 'bookmark' },
     { href: '/friends', label: 'Friends', icon: 'group' },
     { href: '/history', label: 'History', icon: 'history' },
@@ -16,9 +18,10 @@ const sidebarNavItems = [
 
 type SidebarProps = {
     watchlistCount: number;
+    portfolio: SidebarPortfolio | null;
 };
 
-function Sidebar({ watchlistCount }: SidebarProps) {
+function Sidebar({ watchlistCount, portfolio }: SidebarProps) {
     const pathname = usePathname();
     const router = useRouter();
 
@@ -36,7 +39,7 @@ function Sidebar({ watchlistCount }: SidebarProps) {
                }}
         >
             {/* Watchlist Summary Card */}
-            <div className="p-6">
+            <div className="p-6 flex-1 overflow-y-auto">
                 <Link
                     href="/watchlist"
                     className="relative block rounded-xl p-4 mb-6 shimmer overflow-hidden transition-all hover:brightness-110"
@@ -62,6 +65,9 @@ function Sidebar({ watchlistCount }: SidebarProps) {
                         >{watchlistCount === 1 ? 'symbol' : 'symbols'} <span className="text-[#849495] text-xs">on watchlist</span></p>
                     </div>
                 </Link>
+
+                {/* Portfolio Summary Card */}
+                {portfolio && <PortfolioSidebarCard portfolio={portfolio} />}
 
                 {/* Navigation Items */}
                 <nav className="space-y-1">

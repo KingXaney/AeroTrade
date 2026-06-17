@@ -52,7 +52,7 @@ const stepIdFor = (user: { id: string; email: string }) =>
     (user.id || user.email).replace(/[^a-zA-Z0-9_-]/g, '_');
 
 export const sendDailyNewsSummary = inngest.createFunction(
-    { id: 'daily-news-summary', triggers: [{ event: 'app/send.daily.news' }, { cron: '0 12 * * *' }] },
+    { id: 'daily-news-summary', triggers: [{ event: 'app/send.daily.news' }, { cron: 'TZ=America/New_York 0 12 * * *' }] },
     async ({ step }) => {
         // Step #1: Get all users for news delivery
         const users = await step.run('get-all-users', getAllUsersForNewsEmail)
@@ -71,7 +71,10 @@ export const sendDailyNewsSummary = inngest.createFunction(
                     return await getNews(symbols.length > 0 ? symbols : undefined);
                 });
 
-                if (!news || news.length === 0) continue;
+                if (!news || news.length === 0) {
+                    console.warn(`Skipping ${user.email}: no news returned (check Finnhub key / watchlist)`);
+                    continue;
+                }
 
                 const prompt = NEWS_SUMMARY_EMAIL_PROMPT.replace('{{newsData}}', JSON.stringify(news, null, 2));
 
@@ -84,7 +87,10 @@ export const sendDailyNewsSummary = inngest.createFunction(
 
                 const part = response.candidates?.[0]?.content?.parts?.[0];
                 const newsContent = (part && 'text' in part ? part.text : null);
-                if (!newsContent) continue;
+                if (!newsContent) {
+                    console.warn(`Skipping ${user.email}: Gemini returned no summary text`);
+                    continue;
+                }
 
                 await step.run(`send-news-email-${safeId}`, async () => {
                     await sendNewsSummaryEmail({

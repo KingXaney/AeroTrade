@@ -5,6 +5,7 @@ import {headers} from "next/headers";
 import {redirect} from "next/navigation";
 import {searchStocks} from "@/lib/actions/finnhub.actions";
 import {getWatchlistSymbolsByUserId} from "@/lib/actions/watchlist.actions";
+import {getPortfolio} from "@/lib/trading/account";
 import ChatWidget from "@/components/chat/ChatWidget";
 import ParticleBackground from "@/components/ParticleBackground";
 
@@ -24,16 +25,29 @@ const Layout = async ({children}: {children: React.ReactNode}) => {
     }
 
     // Pre-load the popular-stocks list once for the SearchCommand fallback, joined with this user's watchlist.
-    const [initialStocks, watchlistSymbols] = await Promise.all([
+    // Portfolio powers the compact sidebar card (getQuote caches 30s, so this stays cheap across navigations).
+    const [initialStocks, watchlistSymbols, portfolio] = await Promise.all([
         searchStocks(undefined, user.id),
         getWatchlistSymbolsByUserId(user.id),
+        getPortfolio(user.id),
     ]);
+
+    const sidebarPortfolio = {
+        totalValue: portfolio.totalValue,
+        totalReturnPct: portfolio.totalReturnPct,
+        cash: portfolio.cash,
+        top: portfolio.positions.slice(0, 3).map((p) => ({
+            symbol: p.symbol,
+            quantity: p.quantity,
+            unrealizedPnlPct: p.unrealizedPnlPct,
+        })),
+    };
 
     return (
         <main className="min-h-screen" style={{ color: '#b9cacb' }}>
             <ParticleBackground />
             <Header user={user} initialStocks={initialStocks}/>
-            <Sidebar watchlistCount={watchlistSymbols.length} />
+            <Sidebar watchlistCount={watchlistSymbols.length} portfolio={sidebarPortfolio} />
             <div className="pt-20 lg:ml-64 px-6 pb-8 min-h-screen">
                 {children}
             </div>
