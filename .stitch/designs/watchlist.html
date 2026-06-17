@@ -1,0 +1,446 @@
+<!DOCTYPE html>
+
+<html class="dark" lang="en"><head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<title>AeroTrade - Watchlist</title>
+<!-- Fonts -->
+<link href="https://fonts.googleapis.com" rel="preconnect"/>
+<link crossorigin="" href="https://fonts.gstatic.com" rel="preconnect"/>
+<link href="https://fonts.googleapis.com/css2?family=Hanken+Grotesk:wght@400&amp;family=JetBrains+Mono:wght@500;700&amp;family=Sora:wght@600;700&amp;display=swap" rel="stylesheet"/>
+<!-- Material Symbols -->
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<style>
+        .material-symbols-outlined {
+            font-variation-settings: 'FILL' 0, 'wght' 300, 'GRAD' 0, 'opsz' 24;
+        }
+        /* Custom scrollbar for cyber aesthetic */
+        ::-webkit-scrollbar {
+            width: 6px;
+        }
+        ::-webkit-scrollbar-track {
+            background: transparent;
+        }
+        ::-webkit-scrollbar-thumb {
+            background: #3b494b; 
+            border-radius: 4px;
+        }
+        ::-webkit-scrollbar-thumb:hover {
+            background: #849495;
+        }
+        
+        /* Subtle glow animation for active elements */
+        @keyframes subtlePulse {
+            0% { box-shadow: 0 0 0 0 rgba(125, 244, 255, 0.1); }
+            70% { box-shadow: 0 0 10px 0 rgba(125, 244, 255, 0.2); }
+            100% { box-shadow: 0 0 0 0 rgba(125, 244, 255, 0); }
+        }
+        .animate-glow {
+            animation: subtlePulse 3s infinite;
+        }
+    </style>
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<script id="tailwind-config">
+        tailwind.config = {
+            darkMode: "class",
+            theme: {
+                extend: {
+                    "colors": {
+                        "on-tertiary-fixed": "#3f0019",
+                        "on-secondary-fixed-variant": "#5700c9",
+                        "secondary": "#d1bcff",
+                        "surface-variant": "#333539",
+                        "secondary-fixed": "#e9ddff",
+                        "on-primary": "#00363a",
+                        "surface-dim": "#111318",
+                        "on-secondary-container": "#ddcdff",
+                        "tertiary-fixed-dim": "#ffb1c3",
+                        "surface-container-highest": "#333539",
+                        "on-surface-variant": "#b9cacb",
+                        "error": "#ffb4ab",
+                        "primary-container": "#00f0ff",
+                        "outline": "#849495",
+                        "on-error-container": "#ffdad6",
+                        "outline-variant": "#3b494b",
+                        "on-tertiary": "#66002c",
+                        "on-secondary-fixed": "#23005b",
+                        "on-primary-fixed": "#002022",
+                        "on-background": "#e2e2e8",
+                        "surface-bright": "#37393e",
+                        "on-primary-fixed-variant": "#004f54",
+                        "on-error": "#690005",
+                        "inverse-surface": "#e2e2e8",
+                        "tertiary-fixed": "#ffd9e0",
+                        "error-container": "#93000a",
+                        "on-surface": "#e2e2e8",
+                        "surface-container-lowest": "#0c0e12",
+                        "surface": "#111318",
+                        "secondary-fixed-dim": "#d1bcff",
+                        "on-tertiary-fixed-variant": "#8f0041",
+                        "inverse-primary": "#006970",
+                        "surface-container-low": "#1a1c20",
+                        "tertiary": "#fff3f4",
+                        "inverse-on-surface": "#2f3035",
+                        "background": "#111318",
+                        "surface-container": "#1e2024",
+                        "primary": "#dbfcff",
+                        "secondary-container": "#7000ff",
+                        "on-secondary": "#3c0090",
+                        "primary-fixed-dim": "#00dbe9",
+                        "primary-fixed": "#7df4ff",
+                        "on-tertiary-container": "#bb0058",
+                        "surface-tint": "#00dbe9",
+                        "tertiary-container": "#ffccd6",
+                        "on-primary-container": "#006970",
+                        "surface-container-high": "#282a2e"
+                    },
+                    "borderRadius": {
+                        "DEFAULT": "0.125rem",
+                        "lg": "0.25rem",
+                        "xl": "0.5rem",
+                        "full": "0.75rem"
+                    },
+                    "spacing": {
+                        "gutter": "16px",
+                        "stack-md": "16px",
+                        "stack-sm": "8px",
+                        "stack-lg": "32px",
+                        "container-padding": "24px",
+                        "unit": "4px"
+                    },
+                    "fontFamily": {
+                        "data-mono": ["JetBrains Mono"],
+                        "body-lg": ["Hanken Grotesk"],
+                        "body-md": ["Hanken Grotesk"],
+                        "label-caps": ["JetBrains Mono"],
+                        "headline-md": ["Sora"],
+                        "display-lg": ["Sora"],
+                        "headline-lg": ["Sora"]
+                    },
+                    "fontSize": {
+                        "data-mono": ["14px", { "lineHeight": "20px", "letterSpacing": "0.02em", "fontWeight": "500" }],
+                        "body-lg": ["18px", { "lineHeight": "28px", "fontWeight": "400" }],
+                        "body-md": ["16px", { "lineHeight": "24px", "fontWeight": "400" }],
+                        "label-caps": ["12px", { "lineHeight": "16px", "letterSpacing": "0.1em", "fontWeight": "700" }],
+                        "headline-md": ["24px", { "lineHeight": "32px", "fontWeight": "600" }],
+                        "display-lg": ["48px", { "lineHeight": "56px", "letterSpacing": "-0.02em", "fontWeight": "700" }],
+                        "headline-lg": ["32px", { "lineHeight": "40px", "letterSpacing": "-0.01em", "fontWeight": "600" }]
+                    }
+                }
+            }
+        }
+    </script>
+</head>
+<body class="bg-background text-on-surface min-h-screen overflow-x-hidden selection:bg-primary-fixed selection:text-on-primary-fixed">
+<!-- TopNavBar (Shared Component) -->
+<header class="fixed top-0 w-full z-50 flex justify-between items-center px-container-padding h-16 bg-surface/80 backdrop-blur-xl dark:bg-surface/80 shadow-sm border-b border-outline-variant/30">
+<div class="flex items-center gap-gutter">
+<!-- Brand Logo -->
+<div class="text-headline-md font-headline-md text-primary-fixed tracking-tighter flex items-center gap-2">
+<span class="material-symbols-outlined text-primary-fixed" style="font-variation-settings: 'FILL' 1;">terminal</span>
+                AeroTrade
+            </div>
+<!-- Navigation Links (Web) -->
+<nav class="hidden md:flex gap-6 ml-8">
+<a class="text-on-surface-variant hover:text-on-surface transition-colors font-label-caps text-label-caps py-5" href="#">Dashboard</a>
+<a class="text-on-surface-variant hover:text-on-surface transition-colors font-label-caps text-label-caps py-5" href="#">Heatmap</a>
+<!-- Active Item: Watchlist -->
+<a class="text-primary-fixed border-b-2 border-primary-fixed pb-1 font-label-caps text-label-caps py-5 flex items-center gap-2" href="#">Watchlist</a>
+<a class="text-on-surface-variant hover:text-on-surface transition-colors font-label-caps text-label-caps py-5" href="#">Analytics</a>
+</nav>
+</div>
+<div class="flex items-center gap-4">
+<!-- Search Bar (on_right) -->
+<div class="relative hidden sm:block">
+<span class="material-symbols-outlined absolute left-3 top-1/2 -translate-y-1/2 text-on-surface-variant text-sm">search</span>
+<input class="bg-surface-container-low border-b border-outline-variant/30 focus:border-primary-fixed focus:ring-0 text-on-surface font-data-mono text-data-mono pl-9 py-1 text-sm outline-none transition-all w-48 focus:w-64" placeholder="Search ticker..." type="text"/>
+</div>
+<!-- Trailing Icon Actions -->
+<button class="text-on-surface-variant hover:text-on-surface transition-colors hover:bg-surface-container-highest/50 p-2 rounded-full duration-300">
+<span class="material-symbols-outlined">notifications</span>
+</button>
+<button class="text-on-surface-variant hover:text-on-surface transition-colors hover:bg-surface-container-highest/50 p-2 rounded-full duration-300">
+<span class="material-symbols-outlined">settings</span>
+</button>
+<!-- Trailing Secondary Action / Profile -->
+<button class="font-label-caps text-label-caps text-primary-fixed border border-primary-fixed/30 px-4 py-1.5 rounded hover:bg-primary-fixed/10 transition-colors">
+                Sign In
+            </button>
+</div>
+</header>
+<!-- SideNavBar (Shared Component) -->
+<aside class="hidden md:flex fixed left-0 top-16 bottom-0 z-40 flex-col w-64 bg-surface-container-low/90 backdrop-blur-lg dark:bg-surface-container-low/90 border-r border-outline-variant/20">
+<!-- Header area -->
+<div class="p-container-padding border-b border-outline-variant/20 flex items-center gap-4">
+<div class="w-10 h-10 rounded-full bg-surface-container-high flex items-center justify-center border border-outline-variant/30 overflow-hidden">
+<span class="material-symbols-outlined text-on-surface-variant">account_balance_wallet</span>
+</div>
+<div>
+<div class="font-headline-md text-headline-md text-primary-fixed text-sm">Alpha Terminal</div>
+<div class="font-data-mono text-data-mono text-on-surface-variant text-xs opacity-70">Verified Node 072</div>
+</div>
+</div>
+<!-- Main Nav Tabs -->
+<nav class="flex-1 overflow-y-auto py-4">
+<!-- Active state conceptually maps to 'Markets' since it's the closest parent, but we will leave them inactive visually to let TopNav 'Watchlist' shine, or highlight 'Markets' slightly. Let's highlight 'Markets'. -->
+<a class="flex items-center gap-3 text-on-surface-variant px-4 py-3 hover:text-on-surface hover:bg-surface-container-high transition-all font-label-caps text-label-caps" href="#">
+<span class="material-symbols-outlined">account_balance_wallet</span>
+                Portfolio
+            </a>
+<a class="flex items-center gap-3 bg-secondary-container/20 text-secondary-fixed-dim border-l-4 border-secondary-fixed-dim px-4 py-3 font-label-caps text-label-caps hover:bg-surface-container-high transition-all" href="#">
+<span class="material-symbols-outlined" style="font-variation-settings: 'FILL' 1;">query_stats</span>
+                Markets
+            </a>
+<a class="flex items-center gap-3 text-on-surface-variant px-4 py-3 hover:text-on-surface hover:bg-surface-container-high transition-all font-label-caps text-label-caps" href="#">
+<span class="material-symbols-outlined">swap_horiz</span>
+                Trade
+            </a>
+<a class="flex items-center gap-3 text-on-surface-variant px-4 py-3 hover:text-on-surface hover:bg-surface-container-high transition-all font-label-caps text-label-caps" href="#">
+<span class="material-symbols-outlined">lightbulb</span>
+                Insights
+            </a>
+<a class="flex items-center gap-3 text-on-surface-variant px-4 py-3 hover:text-on-surface hover:bg-surface-container-high transition-all font-label-caps text-label-caps" href="#">
+<span class="material-symbols-outlined">history</span>
+                History
+            </a>
+<a class="flex items-center gap-3 text-on-surface-variant px-4 py-3 hover:text-on-surface hover:bg-surface-container-high transition-all font-label-caps text-label-caps" href="#">
+<span class="material-symbols-outlined">help_outline</span>
+                Support
+            </a>
+</nav>
+<!-- CTA & Footer Tabs -->
+<div class="p-4 border-t border-outline-variant/20">
+<button class="w-full bg-primary-fixed/10 border border-primary-fixed/50 text-primary-fixed font-label-caps text-label-caps py-2 rounded mb-4 hover:bg-primary-fixed/20 transition-all flex justify-center items-center gap-2 animate-glow">
+                Trade Now
+            </button>
+<a class="flex items-center gap-3 text-on-surface-variant px-4 py-2 hover:text-on-surface transition-all font-label-caps text-label-caps text-xs" href="#">
+<span class="material-symbols-outlined text-sm">settings</span>
+                Settings
+            </a>
+<a class="flex items-center gap-3 text-on-surface-variant px-4 py-2 hover:text-on-surface transition-all font-label-caps text-label-caps text-xs" href="#">
+<span class="material-symbols-outlined text-sm">logout</span>
+                Logout
+            </a>
+</div>
+</aside>
+<!-- Main Content Area -->
+<main class="pt-24 pb-12 px-4 md:pl-72 md:pr-8 min-h-screen">
+<!-- Page Header -->
+<div class="flex flex-col md:flex-row justify-between items-start md:items-end mb-stack-lg gap-4">
+<div>
+<h1 class="font-headline-lg text-headline-lg text-on-surface mb-2 tracking-tight">Active Watchlist</h1>
+<p class="font-body-md text-body-md text-on-surface-variant max-w-2xl">
+                    Drag to prioritize high-volatility assets. Real-time telemetry linked to Alpha Node 072.
+                </p>
+</div>
+<div class="flex items-center gap-3">
+<div class="bg-surface-container-high rounded flex p-1 border border-outline-variant/30">
+<button class="px-3 py-1 bg-surface-variant rounded text-on-surface font-label-caps text-label-caps text-xs shadow-sm">Grid</button>
+<button class="px-3 py-1 text-on-surface-variant hover:text-on-surface font-label-caps text-label-caps text-xs transition-colors">List</button>
+</div>
+<button class="bg-primary-fixed text-on-primary-fixed font-label-caps text-label-caps px-4 py-2 rounded flex items-center gap-2 hover:bg-primary-fixed-dim transition-colors shadow-[0_0_15px_rgba(125,244,255,0.2)]">
+<span class="material-symbols-outlined text-sm">add</span>
+                    Add Asset
+                </button>
+</div>
+</div>
+<!-- Grid Layout for Content -->
+<div class="grid grid-cols-1 xl:grid-cols-12 gap-gutter items-start">
+<!-- Left Col: Asset Grid (Spans 8 cols) -->
+<div class="xl:col-span-8 flex flex-col gap-unit">
+<!-- List Header -->
+<div class="grid grid-cols-[40px_2fr_1fr_1fr_2fr_80px] gap-4 px-4 py-2 border-b border-outline-variant/30 text-on-surface-variant font-label-caps text-label-caps text-[10px] uppercase opacity-70">
+<div>Ord</div>
+<div>Asset / Protocol</div>
+<div class="text-right">Price (USD)</div>
+<div class="text-right">24h Chg</div>
+<div class="text-center">Trend (7d)</div>
+<div class="text-right">Actions</div>
+</div>
+<!-- Asset Item 1 -->
+<div class="group grid grid-cols-[40px_2fr_1fr_1fr_2fr_80px] gap-4 items-center px-4 py-4 bg-surface-container/40 backdrop-blur-md border border-outline-variant/20 rounded-lg hover:border-outline-variant/60 hover:bg-surface-container/60 transition-all cursor-move relative overflow-hidden">
+<!-- Subtle active edge glow -->
+<div class="absolute left-0 top-0 bottom-0 w-[2px] bg-gradient-to-b from-transparent via-primary-fixed/50 to-transparent opacity-0 group-hover:opacity-100 transition-opacity"></div>
+<div class="text-on-surface-variant/50 cursor-grab active:cursor-grabbing">
+<span class="material-symbols-outlined text-lg">drag_indicator</span>
+</div>
+<div class="flex items-center gap-3">
+<div class="w-8 h-8 rounded bg-surface-variant flex items-center justify-center font-headline-md text-headline-md text-xs text-primary-fixed border border-primary-fixed/20">TS</div>
+<div>
+<div class="font-data-mono text-data-mono text-on-surface font-bold text-sm">TSLA</div>
+<div class="font-body-md text-body-md text-on-surface-variant text-[11px] leading-tight mt-0.5">Tesla Inc.</div>
+</div>
+</div>
+<div class="text-right font-data-mono text-data-mono text-on-surface">174.52</div>
+<div class="text-right">
+<span class="inline-block bg-primary-fixed/10 text-primary-fixed font-data-mono text-data-mono text-xs px-2 py-0.5 rounded border border-primary-fixed/20">+2.45%</span>
+</div>
+<div class="px-2 h-8 w-full flex items-center">
+<!-- Sparkline SVG (Positive) -->
+<svg class="w-full h-full overflow-visible" preserveaspectratio="none" viewbox="0 0 100 20">
+<path d="M0,15 L10,12 L20,16 L30,8 L40,10 L50,4 L60,6 L70,2 L80,5 L90,1 L100,0" fill="none" stroke="#7df4ff" stroke-width="1.5" vector-effect="non-scaling-stroke"></path>
+<!-- Gradient fill under line -->
+<path d="M0,15 L10,12 L20,16 L30,8 L40,10 L50,4 L60,6 L70,2 L80,5 L90,1 L100,0 L100,20 L0,20 Z" fill="url(#sparkGlow1)" opacity="0.2"></path>
+<defs>
+<lineargradient id="sparkGlow1" x1="0" x2="0" y1="0" y2="1">
+<stop offset="0%" stop-color="#7df4ff" stop-opacity="1"></stop>
+<stop offset="100%" stop-color="#7df4ff" stop-opacity="0"></stop>
+</lineargradient>
+</defs>
+</svg>
+</div>
+<div class="flex items-center justify-end gap-1 opacity-50 group-hover:opacity-100 transition-opacity">
+<button class="p-1.5 text-primary-fixed hover:bg-primary-fixed/10 rounded transition-colors"><span class="material-symbols-outlined text-[18px]">notifications_active</span></button>
+<button class="p-1.5 text-on-surface-variant hover:text-error hover:bg-error/10 rounded transition-colors"><span class="material-symbols-outlined text-[18px]">delete</span></button>
+</div>
+</div>
+<!-- Asset Item 2 -->
+<div class="group grid grid-cols-[40px_2fr_1fr_1fr_2fr_80px] gap-4 items-center px-4 py-4 bg-surface-container/40 backdrop-blur-md border border-outline-variant/20 rounded-lg hover:border-outline-variant/60 hover:bg-surface-container/60 transition-all cursor-move">
+<div class="text-on-surface-variant/50 cursor-grab active:cursor-grabbing">
+<span class="material-symbols-outlined text-lg">drag_indicator</span>
+</div>
+<div class="flex items-center gap-3">
+<div class="w-8 h-8 rounded bg-surface-variant flex items-center justify-center font-headline-md text-headline-md text-xs text-secondary-fixed border border-secondary-fixed/20">NV</div>
+<div>
+<div class="font-data-mono text-data-mono text-on-surface font-bold text-sm">NVDA</div>
+<div class="font-body-md text-body-md text-on-surface-variant text-[11px] leading-tight mt-0.5">NVIDIA Corp</div>
+</div>
+</div>
+<div class="text-right font-data-mono text-data-mono text-on-surface">884.20</div>
+<div class="text-right">
+<span class="inline-block bg-error/10 text-error font-data-mono text-data-mono text-xs px-2 py-0.5 rounded border border-error/20">-1.12%</span>
+</div>
+<div class="px-2 h-8 w-full flex items-center">
+<!-- Sparkline SVG (Negative) -->
+<svg class="w-full h-full overflow-visible" preserveaspectratio="none" viewbox="0 0 100 20">
+<path d="M0,2 L10,5 L20,3 L30,9 L40,8 L50,14 L60,12 L70,18 L80,15 L90,19 L100,20" fill="none" stroke="#ffb4ab" stroke-width="1.5" vector-effect="non-scaling-stroke"></path>
+<path d="M0,2 L10,5 L20,3 L30,9 L40,8 L50,14 L60,12 L70,18 L80,15 L90,19 L100,20 L100,20 L0,20 Z" fill="url(#sparkGlow2)" opacity="0.15"></path>
+<defs>
+<lineargradient id="sparkGlow2" x1="0" x2="0" y1="0" y2="1">
+<stop offset="0%" stop-color="#ffb4ab" stop-opacity="1"></stop>
+<stop offset="100%" stop-color="#ffb4ab" stop-opacity="0"></stop>
+</lineargradient>
+</defs>
+</svg>
+</div>
+<div class="flex items-center justify-end gap-1 opacity-50 group-hover:opacity-100 transition-opacity">
+<button class="p-1.5 text-on-surface-variant hover:text-primary-fixed hover:bg-primary-fixed/10 rounded transition-colors"><span class="material-symbols-outlined text-[18px]">notifications</span></button>
+<button class="p-1.5 text-on-surface-variant hover:text-error hover:bg-error/10 rounded transition-colors"><span class="material-symbols-outlined text-[18px]">delete</span></button>
+</div>
+</div>
+<!-- Asset Item 3 -->
+<div class="group grid grid-cols-[40px_2fr_1fr_1fr_2fr_80px] gap-4 items-center px-4 py-4 bg-surface-container/40 backdrop-blur-md border border-outline-variant/20 rounded-lg hover:border-outline-variant/60 hover:bg-surface-container/60 transition-all cursor-move">
+<div class="text-on-surface-variant/50 cursor-grab active:cursor-grabbing">
+<span class="material-symbols-outlined text-lg">drag_indicator</span>
+</div>
+<div class="flex items-center gap-3">
+<div class="w-8 h-8 rounded bg-surface-variant flex items-center justify-center font-headline-md text-headline-md text-xs text-primary-fixed border border-primary-fixed/20">BT</div>
+<div>
+<div class="font-data-mono text-data-mono text-on-surface font-bold text-sm">BTC-USD</div>
+<div class="font-body-md text-body-md text-on-surface-variant text-[11px] leading-tight mt-0.5">Bitcoin</div>
+</div>
+</div>
+<div class="text-right font-data-mono text-data-mono text-on-surface">63,421.00</div>
+<div class="text-right">
+<span class="inline-block bg-primary-fixed/10 text-primary-fixed font-data-mono text-data-mono text-xs px-2 py-0.5 rounded border border-primary-fixed/20">+5.67%</span>
+</div>
+<div class="px-2 h-8 w-full flex items-center">
+<svg class="w-full h-full overflow-visible" preserveaspectratio="none" viewbox="0 0 100 20">
+<path d="M0,18 L10,19 L20,15 L30,16 L40,10 L50,12 L60,8 L70,9 L80,4 L90,2 L100,0" fill="none" stroke="#7df4ff" stroke-width="1.5" vector-effect="non-scaling-stroke"></path>
+<path d="M0,18 L10,19 L20,15 L30,16 L40,10 L50,12 L60,8 L70,9 L80,4 L90,2 L100,0 L100,20 L0,20 Z" fill="url(#sparkGlow1)" opacity="0.2"></path>
+</svg>
+</div>
+<div class="flex items-center justify-end gap-1 opacity-50 group-hover:opacity-100 transition-opacity">
+<button class="p-1.5 text-on-surface-variant hover:text-primary-fixed hover:bg-primary-fixed/10 rounded transition-colors"><span class="material-symbols-outlined text-[18px]">notifications</span></button>
+<button class="p-1.5 text-on-surface-variant hover:text-error hover:bg-error/10 rounded transition-colors"><span class="material-symbols-outlined text-[18px]">delete</span></button>
+</div>
+</div>
+</div>
+<!-- Right Col: Alerts & News (Spans 4 cols) -->
+<div class="xl:col-span-4 flex flex-col gap-gutter">
+<!-- Alerts Settings Panel -->
+<div class="bg-surface-container-low/80 backdrop-blur-xl border border-outline-variant/30 rounded-xl p-6 relative overflow-hidden">
+<!-- Tech decoration -->
+<div class="absolute top-0 right-0 w-16 h-16 bg-primary-fixed/5 blur-2xl rounded-full"></div>
+<div class="flex justify-between items-center mb-4">
+<h3 class="font-headline-md text-headline-md text-on-surface text-lg">Active Triggers</h3>
+<button class="text-primary-fixed hover:bg-primary-fixed/10 p-1 rounded transition-colors">
+<span class="material-symbols-outlined text-sm">add</span>
+</button>
+</div>
+<div class="space-y-3">
+<!-- Alert Item -->
+<div class="p-3 bg-surface border-l-2 border-primary-fixed rounded shadow-sm flex justify-between items-center group">
+<div>
+<div class="font-data-mono text-data-mono text-sm text-on-surface">BTC-USD <span class="text-on-surface-variant">crosses</span> 65,000</div>
+<div class="font-label-caps text-label-caps text-[10px] text-on-surface-variant mt-1 flex items-center gap-1">
+<span class="w-1.5 h-1.5 rounded-full bg-primary-fixed animate-pulse"></span> Armed
+                                </div>
+</div>
+<label class="relative inline-flex items-center cursor-pointer">
+<input checked="" class="sr-only peer" type="checkbox" value=""/>
+<div class="w-9 h-5 bg-surface-variant peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:bg-primary-fixed"></div>
+</label>
+</div>
+<!-- Alert Item -->
+<div class="p-3 bg-surface border-l-2 border-error rounded shadow-sm flex justify-between items-center">
+<div>
+<div class="font-data-mono text-data-mono text-sm text-on-surface">NVDA <span class="text-on-surface-variant">drops</span> 5% (1h)</div>
+<div class="font-label-caps text-label-caps text-[10px] text-on-surface-variant mt-1 flex items-center gap-1">
+<span class="w-1.5 h-1.5 rounded-full bg-error"></span> Armed
+                                </div>
+</div>
+<label class="relative inline-flex items-center cursor-pointer">
+<input checked="" class="sr-only peer" type="checkbox" value=""/>
+<div class="w-9 h-5 bg-surface-variant peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:bg-error"></div>
+</label>
+</div>
+</div>
+</div>
+<!-- Watchlist News Feed -->
+<div class="bg-surface-container-low/80 backdrop-blur-xl border border-outline-variant/30 rounded-xl p-6 flex-1 min-h-[300px]">
+<div class="flex justify-between items-center mb-6 pb-2 border-b border-outline-variant/20">
+<h3 class="font-headline-md text-headline-md text-on-surface text-lg">Filtered Intel</h3>
+<span class="font-data-mono text-data-mono text-on-surface-variant text-xs">Live</span>
+</div>
+<div class="space-y-4">
+<!-- News Item -->
+<div class="group cursor-pointer">
+<div class="flex gap-2 items-center mb-1">
+<span class="font-label-caps text-label-caps text-[10px] bg-surface-variant text-primary-fixed px-1.5 py-0.5 rounded">TSLA</span>
+<span class="font-data-mono text-data-mono text-on-surface-variant text-[10px]">12 mins ago</span>
+</div>
+<p class="font-body-md text-body-md text-sm text-on-surface group-hover:text-primary-fixed transition-colors line-clamp-2">
+                                Autonomous vehicle regulatory filing indicates potential Q3 roll-out in key urban zones.
+                            </p>
+</div>
+<!-- News Item -->
+<div class="group cursor-pointer">
+<div class="flex gap-2 items-center mb-1">
+<span class="font-label-caps text-label-caps text-[10px] bg-surface-variant text-secondary-fixed px-1.5 py-0.5 rounded">NVDA</span>
+<span class="font-data-mono text-data-mono text-on-surface-variant text-[10px]">45 mins ago</span>
+</div>
+<p class="font-body-md text-body-md text-sm text-on-surface group-hover:text-primary-fixed transition-colors line-clamp-2">
+                                Sector rotation analysis shows heavy institutional accumulation ahead of earnings report.
+                            </p>
+</div>
+<!-- News Item -->
+<div class="group cursor-pointer">
+<div class="flex gap-2 items-center mb-1">
+<span class="font-label-caps text-label-caps text-[10px] bg-surface-variant text-primary-fixed px-1.5 py-0.5 rounded">MACRO</span>
+<span class="font-data-mono text-data-mono text-on-surface-variant text-[10px]">1 hr ago</span>
+</div>
+<p class="font-body-md text-body-md text-sm text-on-surface group-hover:text-primary-fixed transition-colors line-clamp-2">
+                                CPI data prints slightly below consensus, sparking pre-market rally in growth sectors.
+                            </p>
+</div>
+</div>
+<button class="w-full mt-6 py-2 border border-outline-variant/30 text-on-surface-variant font-label-caps text-label-caps text-xs hover:bg-surface-variant transition-colors rounded">
+                        Load More Intel
+                    </button>
+</div>
+</div>
+</div>
+</main>
+</body></html>

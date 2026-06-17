@@ -1,0 +1,598 @@
+<!DOCTYPE html><html class="dark" lang="en"><head>
+<meta charset="utf-8">
+<meta content="width=device-width, initial-scale=1.0" name="viewport">
+<title>AeroTrade | Precision-Futurism Terminal</title>
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<link href="https://fonts.googleapis.com/css2?family=Sora:wght@400;600;700&amp;family=Hanken+Grotesk:wght@400;600&amp;family=JetBrains+Mono:wght@500;700&amp;display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet">
+<script id="tailwind-config">
+        tailwind.config = {
+            darkMode: "class",
+            theme: {
+                extend: {
+                    "colors": {
+                        "primary-fixed": "#7df4ff",
+                        "surface-container-lowest": "#0c0e12",
+                        "tertiary-container": "#ffccd6",
+                        "secondary-fixed-dim": "#d1bcff",
+                        "on-background": "#e2e2e8",
+                        "tertiary": "#fff3f4",
+                        "inverse-primary": "#006970",
+                        "primary": "#dbfcff",
+                        "tertiary-fixed-dim": "#ffb1c3",
+                        "secondary": "#d1bcff",
+                        "outline": "#849495",
+                        "on-tertiary-fixed-variant": "#8f0041",
+                        "secondary-fixed": "#e9ddff",
+                        "on-primary-container": "#006970",
+                        "on-secondary-fixed-variant": "#5700c9",
+                        "on-tertiary": "#66002c",
+                        "inverse-on-surface": "#2f3035",
+                        "on-surface-variant": "#b9cacb",
+                        "primary-container": "#00f0ff",
+                        "outline-variant": "#3b494b",
+                        "surface": "#111318",
+                        "surface-container": "#1e2024",
+                        "on-tertiary-fixed": "#3f0019",
+                        "error-container": "#93000a",
+                        "on-primary-fixed": "#002022",
+                        "background": "#111318",
+                        "surface-container-low": "#1a1c20",
+                        "inverse-surface": "#e2e2e8",
+                        "secondary-container": "#7000ff",
+                        "on-secondary": "#3c0090",
+                        "on-error": "#690005",
+                        "on-secondary-fixed": "#23005b",
+                        "surface-dim": "#111318",
+                        "tertiary-fixed": "#ffd9e0",
+                        "surface-bright": "#37393e",
+                        "surface-container-highest": "#333539",
+                        "on-error-container": "#ffdad6",
+                        "surface-tint": "#00dbe9",
+                        "primary-fixed-dim": "#00dbe9",
+                        "on-tertiary-container": "#bb0058",
+                        "error": "#ffb4ab",
+                        "on-primary": "#00363a",
+                        "on-surface": "#e2e2e8",
+                        "surface-container-high": "#282a2e",
+                        "on-secondary-container": "#ddcdff",
+                        "on-primary-fixed-variant": "#004f54",
+                        "surface-variant": "#333539"
+                    },
+                    "borderRadius": {
+                        "DEFAULT": "0.125rem",
+                        "lg": "0.25rem",
+                        "xl": "0.5rem",
+                        "full": "0.75rem"
+                    },
+                    "spacing": {
+                        "unit": "4px",
+                        "container-padding": "24px",
+                        "stack-md": "16px",
+                        "stack-sm": "8px",
+                        "gutter": "16px",
+                        "stack-lg": "32px"
+                    },
+                    "fontFamily": {
+                        "data-mono": ["JetBrains Mono"],
+                        "headline-md": ["Sora"],
+                        "display-lg": ["Sora"],
+                        "body-lg": ["Hanken Grotesk"],
+                        "body-md": ["Hanken Grotesk"],
+                        "label-caps": ["JetBrains Mono"],
+                        "headline-lg": ["Sora"]
+                    },
+                    "fontSize": {
+                        "data-mono": ["14px", {"lineHeight": "20px", "letterSpacing": "0.02em", "fontWeight": "500"}],
+                        "headline-md": ["24px", {"lineHeight": "32px", "fontWeight": "600"}],
+                        "display-lg": ["48px", {"lineHeight": "56px", "letterSpacing": "-0.02em", "fontWeight": "700"}],
+                        "body-lg": ["18px", {"lineHeight": "28px", "fontWeight": "400"}],
+                        "body-md": ["16px", {"lineHeight": "24px", "fontWeight": "400"}],
+                        "label-caps": ["12px", {"lineHeight": "16px", "letterSpacing": "0.1em", "fontWeight": "700"}],
+                        "headline-lg": ["32px", {"lineHeight": "40px", "letterSpacing": "-0.01em", "fontWeight": "600"}]
+                    }
+                },
+            },
+        }
+    </script>
+<style>
+        body {
+            background-color: #050608;
+            color: #e2e2e8;
+            overflow-x: hidden;
+            position: relative;
+        }
+
+        /* Animated Background Particles */
+        #bg-canvas {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            z-index: -1;
+            pointer-events: none;
+            opacity: 0.4;
+        }
+
+        .glass-panel {
+            backdrop-filter: blur(12px);
+            background-color: rgba(17, 19, 24, 0.7);
+            border: 1px solid rgba(255, 255, 255, 0.08);
+            position: relative;
+            overflow: hidden;
+        }
+
+        /* Data Shimmer Effect */
+        .shimmer::after {
+            content: '';
+            position: absolute;
+            top: -100%;
+            left: -100%;
+            width: 300%;
+            height: 300%;
+            background: linear-gradient(
+                45deg,
+                transparent 0%,
+                rgba(125, 244, 255, 0.03) 45%,
+                rgba(125, 244, 255, 0.08) 50%,
+                rgba(125, 244, 255, 0.03) 55%,
+                transparent 100%
+            );
+            transform: rotate(25deg);
+            animation: shimmer-sweep 8s infinite linear;
+            pointer-events: none;
+        }
+
+        @keyframes shimmer-sweep {
+            0% { transform: translate(-30%, -30%) rotate(25deg); }
+            100% { transform: translate(30%, 30%) rotate(25deg); }
+        }
+
+        /* Breathing Pulse for active nodes */
+        .node-pulse {
+            animation: breathing 4s ease-in-out infinite;
+        }
+
+        @keyframes breathing {
+            0%, 100% { transform: scale(1); opacity: 1; }
+            50% { transform: scale(1.02); opacity: 0.85; }
+        }
+
+        /* Heatmap Hover Effect */
+        .heatmap-node {
+            transition: all 0.4s cubic-bezier(0.16, 1, 0.3, 1);
+            position: relative;
+            z-index: 1;
+        }
+        .heatmap-node:hover {
+            transform: translateY(-4px) scale(1.01);
+            z-index: 10;
+            box-shadow: 0 0 25px rgba(0, 219, 233, 0.2);
+            border-color: rgba(0, 219, 233, 0.5);
+        }
+
+        .heatmap-grid {
+            display: grid;
+            grid-template-columns: repeat(12, 1fr);
+            grid-template-rows: repeat(8, 1fr);
+            gap: 2px;
+        }
+
+        /* Chat Entrance Animation */
+        #ai-chat {
+            transition: transform 0.5s cubic-bezier(0.34, 1.56, 0.64, 1), opacity 0.3s ease;
+            transform-origin: bottom right;
+        }
+        #ai-chat.hidden-chat {
+            transform: translateY(100px) scale(0.9);
+            opacity: 0;
+            pointer-events: none;
+        }
+
+        /* Typing Indicator Animation */
+        .typing-dot {
+            width: 4px;
+            height: 4px;
+            background: currentColor;
+            border-radius: 50%;
+            animation: typing-bounce 1.4s infinite ease-in-out both;
+        }
+        .typing-dot:nth-child(1) { animation-delay: -0.32s; }
+        .typing-dot:nth-child(2) { animation-delay: -0.16s; }
+
+        @keyframes typing-bounce {
+            0%, 80%, 100% { transform: scale(0); }
+            40% { transform: scale(1); }
+        }
+
+        .scrollbar-hide::-webkit-scrollbar { display: none; }
+
+        @media (prefers-reduced-motion: reduce) {
+            .shimmer::after, .node-pulse, .typing-dot, #ai-chat, .heatmap-node, .search-bar-expand {
+                animation: none !important;
+                transition: none !important;
+            }
+        }
+    </style>
+</head>
+<body class="font-body-md text-body-md selection:bg-primary-fixed/30">
+<canvas id="bg-canvas" width="1280" height="1161"></canvas>
+<!-- TopNavBar -->
+<header class="fixed top-0 w-full z-50 flex justify-between items-center px-container-padding h-16 bg-surface/80 backdrop-blur-xl dark:bg-surface/80 border-b border-outline-variant/30 shadow-sm">
+<div class="flex items-center gap-stack-lg">
+<span class="text-headline-md font-headline-md text-primary-fixed tracking-tighter">AeroTrade</span>
+<nav class="hidden md:flex items-center gap-stack-md ml-stack-lg">
+<a class="font-label-caps text-label-caps text-primary-fixed border-b-2 border-primary-fixed pb-1" href="#">Dashboard</a>
+<a class="font-label-caps text-label-caps text-on-surface-variant hover:text-on-surface transition-colors" href="#">Trade</a>
+<a class="font-label-caps text-label-caps text-on-surface-variant hover:text-on-surface transition-colors" href="#">Watchlist</a>
+<a class="font-label-caps text-label-caps text-on-surface-variant hover:text-on-surface transition-colors" href="#">Friends</a>
+</nav>
+</div>
+<div class="flex items-center gap-stack-md flex-1 justify-end max-w-xl">
+<div class="relative w-full max-w-sm group">
+<span class="material-symbols-outlined absolute left-3 top-1/2 -translate-y-1/2 text-outline group-focus-within:text-primary-fixed transition-colors">search</span>
+<input class="w-full bg-surface-container-high/50 border border-transparent rounded-xl pl-10 pr-4 py-2 text-body-md focus:ring-2 focus:ring-primary-fixed/30 focus:border-primary-fixed focus:max-w-[110%] transition-all duration-300 search-bar-expand" placeholder="Search markets, assets, or nodes..." type="text">
+</div>
+<div class="flex items-center gap-stack-sm ml-stack-md">
+<button class="p-2 hover:bg-surface-container-highest/50 rounded-full transition-all text-on-surface-variant">
+<span class="material-symbols-outlined">notifications</span>
+</button>
+<button class="p-2 hover:bg-surface-container-highest/50 rounded-full transition-all text-on-surface-variant">
+<span class="material-symbols-outlined">settings</span>
+</button>
+<div class="flex items-center gap-3 pl-stack-md border-l border-outline-variant/30">
+<div class="text-right hidden sm:block">
+<p class="font-label-caps text-label-caps text-on-surface leading-tight">Xinnan Huang</p>
+<p class="font-data-mono text-[10px] text-outline">Verified Node 072</p>
+</div>
+<img alt="User avatar" class="w-8 h-8 rounded-full border border-primary-fixed/20 bg-surface-container-highest" src="https://lh3.googleusercontent.com/aida-public/AB6AXuCSgHNzaUxfojURKzMFcQhc1Kg92CYuylLccjYp--Orau1Avk4LecJC5lYKc50eUQ-ULasvMax1-E2Bu0KVtiF4O2poVp2btR8MfhkSG_tGcUFUlwpQhmQoi75DbpsLV6BJMbU8wNa_UBO7mY687JRjWVNjms8F3giGqNbQdtvUCbTrgqKV_f-mu7nBOhAK76beHG-16t6drm5ea0AMcJkG0NDcP2GAFLDTB95w781b6bfOg230_Ba9k_iaDJmIf8Q06Yef954y0yE">
+</div>
+</div>
+</div>
+</header>
+<!-- SideNavBar -->
+<aside class="fixed left-0 top-16 bottom-0 z-40 w-64 flex flex-col bg-surface-container-low/90 backdrop-blur-lg dark:bg-surface-container-low/90 border-r border-outline-variant/20 hidden lg:flex">
+<div class="p-container-padding">
+<div class="bg-primary-container/10 border border-primary-fixed/20 rounded-xl p-4 mb-stack-lg shimmer">
+<div class="flex items-center gap-3 mb-2">
+<span class="material-symbols-outlined text-primary-fixed" style="font-variation-settings: 'FILL' 1;">account_balance_wallet</span>
+<span class="font-label-caps text-label-caps text-primary-fixed">Portfolio Value</span>
+</div>
+<p class="font-display-lg text-headline-lg text-on-surface">$2.48M</p>
+<p class="font-data-mono text-data-mono text-primary-fixed-dim">+12.4% <span class="text-outline text-xs">24h</span></p>
+</div>
+<nav class="space-y-1">
+<a class="flex items-center gap-4 bg-secondary-container/20 text-secondary-fixed-dim border-l-4 border-secondary-fixed-dim px-4 py-3 font-label-caps text-label-caps" href="#">
+<span class="material-symbols-outlined">dashboard</span>
+<span class="">Portfolio</span>
+</a>
+<a class="flex items-center gap-4 text-on-surface-variant px-4 py-3 hover:text-on-surface hover:bg-surface-container-high transition-all font-label-caps text-label-caps" href="#">
+<span class="material-symbols-outlined">query_stats</span>
+<span class="">Markets</span>
+</a>
+<a class="flex items-center gap-4 text-on-surface-variant px-4 py-3 hover:text-on-surface hover:bg-surface-container-high transition-all font-label-caps text-label-caps" href="#">
+<span class="material-symbols-outlined">swap_horiz</span>
+<span class="">Trade</span>
+</a>
+<a class="flex items-center gap-4 text-on-surface-variant px-4 py-3 hover:text-on-surface hover:bg-surface-container-high transition-all font-label-caps text-label-caps" href="#"><span class="material-symbols-outlined">group</span><span class="">Friends</span></a>
+<a class="flex items-center gap-4 text-on-surface-variant px-4 py-3 hover:text-on-surface hover:bg-surface-container-high transition-all font-label-caps text-label-caps" href="#">
+<span class="material-symbols-outlined">history</span>
+<span class="">History</span>
+</a>
+</nav>
+</div>
+<div class="mt-auto p-container-padding border-t border-outline-variant/10">
+<button class="w-full bg-primary-fixed text-on-primary-fixed font-label-caps text-label-caps py-3 rounded-lg mb-stack-md hover:brightness-110 transition-all shadow-[0_0_15px_rgba(125,244,255,0.3)] active:scale-[0.98]">
+                Trade Now
+            </button>
+<div class="space-y-1">
+<a class="flex items-center gap-4 text-on-surface-variant px-4 py-2 hover:text-on-surface font-label-caps text-label-caps transition-colors" href="#">
+<span class="material-symbols-outlined text-sm">settings</span>
+<span class="">Settings</span>
+</a>
+<a class="flex items-center gap-4 text-on-surface-variant px-4 py-2 hover:text-on-surface font-label-caps text-label-caps transition-colors" href="#">
+<span class="material-symbols-outlined text-sm">logout</span>
+<span class="">Logout</span>
+</a>
+</div>
+</div>
+</aside>
+<!-- Main Content Canvas -->
+<main class="pt-24 lg:ml-64 px-container-padding pb-stack-lg min-h-screen">
+<div class="grid grid-cols-12 gap-gutter">
+<!-- Market Overview Chart -->
+<section class="col-span-12 xl:col-span-4 glass-panel rounded-xl p-container-padding flex flex-col shimmer">
+<div class="flex justify-between items-center mb-stack-lg">
+<div>
+<h2 class="font-headline-md text-headline-md text-on-surface">Market Overview</h2>
+<p class="font-data-mono text-xs text-outline">Last updated: <span id="timestamp" class="">16:51:03 UTC</span></p>
+</div>
+<div class="flex bg-surface-container-highest rounded-lg p-1">
+<button class="px-3 py-1 bg-surface text-primary-fixed rounded-md text-xs font-label-caps">Financial</button>
+<button class="px-3 py-1 text-on-surface-variant text-xs font-label-caps">Tech</button>
+</div>
+</div>
+<div class="relative h-48 mb-stack-lg">
+<!-- SVG Chart Mockup -->
+<svg class="w-full h-full" viewBox="0 0 400 150">
+<defs>
+<linearGradient id="chart-grad" x1="0%" x2="0%" y1="0%" y2="100%">
+<stop offset="0%" style="stop-color:rgb(125, 244, 255);stop-opacity:0.2"></stop>
+<stop offset="100%" style="stop-color:rgb(125, 244, 255);stop-opacity:0"></stop>
+</linearGradient>
+</defs>
+<path class="chart-path" d="M0,100 L40,80 L80,110 L120,60 L160,90 L200,40 L240,70 L280,30 L320,50 L360,20 L400,40" fill="none" stroke="#7df4ff" stroke-width="2"></path>
+<path d="M0,100 L40,80 L80,110 L120,60 L160,90 L200,40 L240,70 L280,30 L320,50 L360,20 L400,40 L400,150 L0,150 Z" fill="url(#chart-grad)"></path>
+<line stroke="rgba(255,255,255,0.05)" stroke-width="1" x1="0" x2="400" y1="20" y2="20"></line>
+<line stroke="rgba(255,255,255,0.05)" stroke-width="1" x1="0" x2="400" y1="50" y2="50"></line>
+<line stroke="rgba(255,255,255,0.05)" stroke-width="1" x1="0" x2="400" y1="80" y2="80"></line>
+</svg>
+</div>
+<div class="space-y-stack-sm flex-1 overflow-y-auto scrollbar-hide">
+<div class="flex items-center justify-between p-3 rounded-lg hover:bg-surface-container-highest/30 transition-all border border-transparent hover:border-outline-variant/30">
+<div class="flex items-center gap-3">
+<div class="w-8 h-8 rounded bg-surface-container-highest flex items-center justify-center font-bold text-xs">JPM</div>
+<div>
+<p class="font-body-md text-on-surface">JPMorgan Chase</p>
+<p class="font-data-mono text-[10px] text-outline">NYSE</p>
+</div>
+</div>
+<div class="text-right">
+<p class="font-data-mono text-body-md text-on-surface">312.62</p>
+<p class="font-data-mono text-xs text-primary-fixed">+0.25 (0.08%)</p>
+</div>
+</div>
+<!-- Other items... -->
+</div>
+</section>
+<!-- Stock Heatmap Container -->
+<section class="col-span-12 xl:col-span-8 glass-panel rounded-xl p-container-padding flex flex-col">
+<div class="flex justify-between items-center mb-stack-lg">
+<h2 class="font-headline-md text-headline-md text-on-surface">Stock Heatmap</h2>
+<div class="flex items-center gap-stack-sm">
+<span class="font-data-mono text-[10px] text-outline">MAP_ENGINE: V2.44</span>
+<div class="w-2 h-2 rounded-full bg-primary-fixed animate-pulse"></div>
+</div>
+</div>
+<div class="heatmap-grid flex-1 min-h-[500px]">
+<!-- Large Sector: Tech -->
+<div class="col-span-6 row-span-5 bg-error-container/40 border border-error/20 flex flex-col items-center justify-center relative node-pulse heatmap-node overflow-hidden p-4 group cursor-pointer">
+<div class="absolute inset-0 bg-gradient-to-br from-error/5 to-transparent"></div>
+<img alt="NVDA" class="w-16 h-16 rounded-full mb-2 border border-error/40 bg-surface shadow-2xl transition-transform group-hover:scale-110" src="https://lh3.googleusercontent.com/aida-public/AB6AXuCGZ_79KzJGYuaVuvs5KMuwyatIEOk_SncLkn0HU-EDUETURVpnl19SKkTnpH-vUQ5q9Q-52xx42V0I1jSgWEbafRfcZuJwEVYKKTy_wDvUuxEnK0GmABT1kM8eugg-3azfIK1QFImcdxYT53hYgufbALTvLOGlSRPfPICUXfAVRS0U3hisPeBTIUFhmXuUwwZyiKOp805aRoBZkzRvqIyrJwfIGC56PDDhVflDItX4qUlgbO9VCq0x57M2aHyyT7cqE-InutLdlsY">
+<h3 class="font-headline-md text-on-surface">NVDA</h3>
+<p class="font-data-mono text-headline-md text-error">-6.20%</p>
+<div class="absolute bottom-2 right-2 text-[10px] font-data-mono text-error/60">TECH_SECTOR</div>
+</div>
+<!-- Sector: Tech Service -->
+<div class="col-span-3 row-span-4 bg-error-container/20 border border-error/10 flex flex-col items-center justify-center p-4 heatmap-node cursor-pointer">
+<img alt="GOOGL" class="w-10 h-10 rounded-full mb-1" src="https://lh3.googleusercontent.com/aida-public/AB6AXuDK4n5bzjxAb_5Pexw0E6lu8MrRVmZcTLZN-_558m8xtV22CikOxrXYM4pL2Am28rvbQ-2wUoxMdkLlyR494Mla_6omAIKCzyFPDa0He_jAehMuNlnwuiIOKh9irz_Z6nkdU4ZGXPvf4vN8n8SOvedmLMSH2uHOd83qsbFGfBz01poflV-XYoNUu8-Xwat5pBw71XeHqgG3AbHWfPTF8QRoA3Sl3lX7EFNH6cJExwRkCz9rAdwPDRX41P5tQndCG6G5nmLj2C9nNXw">
+<p class="font-body-md text-on-surface">GOOGL</p>
+<p class="font-data-mono text-error">-0.98%</p>
+</div>
+<!-- Sector: Retail -->
+<div class="col-span-3 row-span-3 bg-error-container/30 border border-error/20 flex flex-col items-center justify-center p-4 heatmap-node cursor-pointer node-pulse">
+<img alt="AMZN" class="w-10 h-10 rounded-full mb-1" src="https://lh3.googleusercontent.com/aida-public/AB6AXuCUYqEsqbuVjDAa3msQlLCbJTHANhtbl3qJyyeqhGfEaVgKEUW3fx6NPYMZVGkoSywnRym7BgPVUUKgsW2eNh01RsOUU66Mxsb23OnG0m6zcdGEGywj2H8gpiXBYVAzpixkSJ0XXlYPpPr6b3OXm9EfjsevsCtqElHiZjvh8cII7BNoCejCAexkeL-icYQLYX8jekQ9Q7JiOo4qG7GkDJwq31rWolxH830fOmfWrOn-iyuZS4j0ZjPbqn5ll2Fstl4L1emSMQofeGw">
+<p class="font-body-md text-on-surface">AMZN</p>
+<p class="font-data-mono text-error">-3.06%</p>
+</div>
+<!-- Sector: Healthcare -->
+<div class="col-span-3 row-span-2 bg-primary-container/10 border border-primary-fixed/20 flex flex-col items-center justify-center p-2 heatmap-node cursor-pointer">
+<p class="font-label-caps text-[10px] text-primary-fixed">LLY</p>
+<p class="font-data-mono text-xs text-primary-fixed">+0.55%</p>
+</div>
+<!-- Finance Group -->
+<div class="col-span-3 row-span-4 bg-primary-container/20 border border-primary-fixed/30 flex flex-col items-center justify-center p-4 relative heatmap-node cursor-pointer shimmer">
+<div class="absolute top-2 left-2 text-[8px] font-data-mono text-primary-fixed">FINANCE</div>
+<span class="material-symbols-outlined text-primary-fixed text-4xl mb-2" style="font-variation-settings: 'FILL' 1;">currency_exchange</span>
+<p class="font-headline-md text-primary-fixed">+2.1%</p>
+<p class="font-data-mono text-[10px] text-outline">SECTOR_AVG</p>
+</div>
+<!-- Tiny Grid Elements -->
+<div class="col-span-1 row-span-1 bg-surface-container-highest border border-outline-variant/20"></div>
+<div class="col-span-1 row-span-1 bg-primary-container/5 border border-primary-fixed/10"></div>
+<div class="col-span-1 row-span-1 bg-error-container/5 border border-error/10"></div>
+<div class="col-span-3 row-span-1 bg-surface-container-highest/50 border border-outline-variant/10 flex items-center justify-center">
+<span class="font-data-mono text-[10px] text-outline">OTHER_ASSETS</span>
+</div>
+</div>
+<!-- Legend -->
+<div class="mt-stack-md flex items-center justify-between">
+<div class="flex items-center gap-1">
+<div class="w-24 h-2 bg-gradient-to-r from-error via-surface-container-highest to-primary-fixed rounded-full"></div>
+<span class="font-data-mono text-[10px] text-outline ml-2">-7% to +7%</span>
+</div>
+<button class="text-on-surface-variant hover:text-primary-fixed transition-colors">
+<span class="material-symbols-outlined text-sm">open_in_full</span>
+</button>
+</div>
+</section>
+</div>
+<!-- Secondary Section -->
+<div class="grid grid-cols-12 gap-gutter mt-gutter">
+<!-- News Feed -->
+<section class="col-span-12 lg:col-span-8 glass-panel rounded-xl p-container-padding shimmer">
+<div class="flex justify-between items-center mb-stack-lg">
+<h2 class="font-headline-md text-headline-md text-on-surface">Top Stories</h2>
+<button class="text-primary-fixed font-label-caps text-label-caps hover:underline transition-all">View Intelligence</button>
+</div>
+<div class="space-y-gutter">
+<div class="flex gap-gutter group cursor-pointer">
+<div class="w-24 h-24 rounded-lg bg-surface-container-highest overflow-hidden flex-shrink-0">
+<img alt="Server room" class="w-full h-full object-cover group-hover:scale-110 transition-transform duration-500" src="https://lh3.googleusercontent.com/aida-public/AB6AXuCVW7tPHjzMFEkVtzZ41YingnNu7onb20e5g2WKuD9RJ8iEwiYVO6tMLG5tUDGwAf_j8eHo_Sudidvwg82VHddK4l-YC_VrhTrt-kyTEq93E8AFORNLBas0_myWdfE746qzHQ0taN__shsl8fmLb3F9KSIpTFhevwdU-29NKpJbnJnA0ZethcYDAUxaAQt11lV0z-Jj9okwqfn0ZYnkD4nvKV1qUD2HyfAl2DFj6vP7dOnrPqPpEkoLEOJyNx0oTAaKuKUK4BhrTTc">
+</div>
+<div class="flex-1 border-b border-outline-variant/20 pb-gutter">
+<div class="flex items-center gap-2 mb-1">
+<span class="px-2 py-0.5 bg-primary-container/20 text-primary-fixed rounded text-[10px] font-label-caps">CRYPTO</span>
+<span class="font-data-mono text-[10px] text-outline">3 MIN AGO</span>
+</div>
+<h3 class="font-body-lg text-body-lg text-on-surface group-hover:text-primary-fixed transition-colors">Quantum-Resistant Protocols Deployed Across Major Exchanges</h3>
+<p class="text-on-surface-variant line-clamp-2 text-sm mt-1">Global financial nodes transition to post-quantum cryptography to secure assets against next-gen compute clusters.</p>
+</div>
+</div>
+</div>
+</section>
+<!-- Quick Trade -->
+<section class="col-span-12 lg:col-span-4 glass-panel rounded-xl p-container-padding shimmer">
+<div class="mb-stack-lg">
+<h2 class="font-headline-md text-headline-md text-on-surface">Terminal Focus</h2>
+<p class="font-data-mono text-xs text-outline">Asset: TSLA.NODE</p>
+</div>
+<div class="p-4 bg-surface-container-high/40 rounded-xl border border-outline-variant/30 mb-stack-lg">
+<div class="flex justify-between items-start mb-4">
+<div class="flex items-center gap-3">
+<div class="w-10 h-10 rounded-full bg-red-600 flex items-center justify-center font-bold">T</div>
+<div>
+<p class="font-headline-md text-on-surface">Tesla Inc.</p>
+<p class="font-data-mono text-xs text-error">VOLATILE_HIGH</p>
+</div>
+</div>
+<div class="text-right">
+<p class="font-headline-md text-on-surface">$172.48</p>
+<p class="font-data-mono text-xs text-error">-6.56%</p>
+</div>
+</div>
+<div class="h-2 w-full bg-surface-container-highest rounded-full overflow-hidden mb-4">
+<div class="h-full bg-error w-[65%] shadow-[0_0_8px_rgba(239,68,68,0.5)]"></div>
+</div>
+<div class="grid grid-cols-2 gap-2">
+<button class="py-2 bg-error-container/30 text-error border border-error/20 font-label-caps text-label-caps rounded hover:bg-error-container/50 transition-all active:scale-95">Sell Short</button>
+<button class="py-2 bg-primary-container/20 text-primary-fixed border border-primary-fixed/20 font-label-caps text-label-caps rounded hover:bg-primary-container/30 transition-all active:scale-95">Buy Dip</button>
+</div>
+</div>
+</section>
+</div>
+</main>
+<!-- Footer -->
+<footer class="lg:ml-64 w-[calc(100%-16rem)] py-stack-md px-container-padding flex flex-col sm:flex-row justify-between items-center border-t border-outline-variant/10 bg-surface-container-lowest">
+<div class="flex items-center gap-4 mb-4 sm:mb-0">
+<span class="text-label-caps font-label-caps text-primary-fixed">AeroTrade Terminal</span>
+<span class="text-data-mono font-data-mono text-outline text-[10px]">© 2024 Precision-Futurism Systems</span>
+</div>
+<div class="flex gap-stack-lg">
+<a class="font-data-mono text-data-mono text-on-surface-variant hover:text-primary-fixed transition-colors" href="#">Legal</a>
+<a class="font-data-mono text-data-mono text-on-surface-variant hover:text-primary-fixed transition-colors" href="#">Privacy</a>
+<a class="font-data-mono text-data-mono text-on-surface-variant hover:text-primary-fixed transition-colors" href="#">API Docs</a>
+</div>
+</footer>
+<!-- Chatbot Assistant -->
+<div class="fixed bottom-6 right-6 z-[60] flex flex-col items-end gap-4">
+<!-- Chat Window (Slide Entrance) -->
+<div class="hidden-chat w-80 h-96 glass-panel rounded-2xl flex flex-col overflow-hidden shadow-2xl border-primary-fixed/20" id="ai-chat">
+<div class="bg-primary-container/20 p-4 border-b border-outline-variant/30 flex justify-between items-center">
+<div class="flex items-center gap-2">
+<span class="material-symbols-outlined text-primary-fixed animate-pulse">smart_toy</span>
+<span class="font-label-caps text-label-caps text-primary-fixed">Aero-AI Assistant</span>
+</div>
+<button class="text-on-surface-variant hover:text-on-surface" onclick="toggleChat()">
+<span class="material-symbols-outlined">close</span>
+</button>
+</div>
+<div class="flex-1 p-4 overflow-y-auto space-y-4 scrollbar-hide" id="chat-content">
+<div class="bg-surface-container-high rounded-xl rounded-tl-none p-3 max-w-[85%]">
+<p class="text-xs text-on-surface">Welcome, Xinnan. Looking for arbitrage opportunities or market sentiment analysis?</p>
+</div>
+<!-- Typing Indicator -->
+<div class="flex items-center gap-1.5 p-3 bg-surface-container-high rounded-xl rounded-tl-none w-fit text-primary-fixed/60" id="typing-indicator">
+<div class="typing-dot"></div>
+<div class="typing-dot"></div>
+<div class="typing-dot"></div>
+</div>
+</div>
+<div class="p-3 border-t border-outline-variant/30">
+<div class="relative">
+<input class="w-full bg-surface-container rounded-lg border-none text-xs focus:ring-1 focus:ring-primary-fixed py-2 pl-3 pr-8" placeholder="Query market data..." type="text">
+<span class="material-symbols-outlined absolute right-2 top-1/2 -translate-y-1/2 text-primary-fixed text-lg cursor-pointer">send</span>
+</div>
+</div>
+</div>
+<!-- FAB -->
+<button class="w-14 h-14 bg-primary-container text-on-primary-container rounded-full flex items-center justify-center shadow-[0_0_20px_rgba(0,240,255,0.4)] hover:scale-110 transition-all active:scale-95 group relative" onclick="toggleChat()">
+<span class="material-symbols-outlined text-3xl">smart_toy</span>
+<span class="absolute -top-1 -right-1 w-4 h-4 bg-error rounded-full border-2 border-surface flex items-center justify-center text-[8px] font-bold">1</span>
+</button>
+</div>
+<script>
+        // Particle Background
+        const canvas = document.getElementById('bg-canvas');
+        const ctx = canvas.getContext('2d');
+        let particles = [];
+
+        function resize() {
+            canvas.width = window.innerWidth;
+            canvas.height = window.innerHeight;
+        }
+
+        class Particle {
+            constructor() {
+                this.reset();
+            }
+            reset() {
+                this.x = Math.random() * canvas.width;
+                this.y = Math.random() * canvas.height;
+                this.vx = (Math.random() - 0.5) * 0.5;
+                this.vy = (Math.random() - 0.5) * 0.5;
+                this.size = Math.random() * 2;
+                this.life = Math.random() * 0.5 + 0.2;
+            }
+            update() {
+                this.x += this.vx;
+                this.y += this.vy;
+                if (this.x < 0 || this.x > canvas.width || this.y < 0 || this.y > canvas.height) this.reset();
+            }
+            draw() {
+                ctx.fillStyle = `rgba(125, 244, 255, ${this.life})`;
+                ctx.beginPath();
+                ctx.arc(this.x, this.y, this.size, 0, Math.PI * 2);
+                ctx.fill();
+            }
+        }
+
+        function initParticles() {
+            particles = Array.from({ length: 50 }, () => new Particle());
+        }
+
+        function animate() {
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+            particles.forEach(p => {
+                p.update();
+                p.draw();
+            });
+            requestAnimationFrame(animate);
+        }
+
+        window.addEventListener('resize', resize);
+        resize();
+        initParticles();
+        animate();
+
+        // UI Logic
+        function toggleChat() {
+            const chat = document.getElementById('ai-chat');
+            chat.classList.toggle('hidden-chat');
+            
+            // Simulating typing effect when opened
+            if(!chat.classList.contains('hidden-chat')) {
+                const indicator = document.getElementById('typing-indicator');
+                indicator.style.display = 'flex';
+                setTimeout(() => {
+                    indicator.style.display = 'none';
+                }, 2000);
+            }
+        }
+
+        // Live Clock
+        function updateClock() {
+            const now = new Date();
+            const timeStr = now.toISOString().split('T')[1].split('.')[0] + ' UTC';
+            document.getElementById('timestamp').innerText = timeStr;
+        }
+        setInterval(updateClock, 1000);
+        updateClock();
+
+        // Subtle shimmer trigger simulation (adding class dynamically if needed, 
+        // though CSS animation handles the loop)
+    </script>
+
+
+</body></html>

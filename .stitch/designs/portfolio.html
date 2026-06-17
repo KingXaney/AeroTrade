@@ -1,0 +1,400 @@
+<!DOCTYPE html>
+
+<html class="dark" lang="en"><head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<title>AeroTrade - Portfolio</title>
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<script id="tailwind-config">
+        tailwind.config = {
+            darkMode: "class",
+            theme: {
+                extend: {
+                    "colors": {
+                        "primary": "#dbfcff",
+                        "on-tertiary": "#66002c",
+                        "on-surface-variant": "#b9cacb",
+                        "on-secondary-fixed-variant": "#5700c9",
+                        "on-secondary": "#3c0090",
+                        "primary-fixed-dim": "#00dbe9",
+                        "on-error": "#690005",
+                        "secondary-fixed-dim": "#d1bcff",
+                        "on-primary": "#00363a",
+                        "primary-container": "#00f0ff",
+                        "on-primary-container": "#006970",
+                        "inverse-surface": "#e2e2e8",
+                        "surface-container-lowest": "#0c0e12",
+                        "error-container": "#93000a",
+                        "error": "#ffb4ab",
+                        "on-secondary-container": "#ddcdff",
+                        "on-secondary-fixed": "#23005b",
+                        "surface-container-low": "#1a1c20",
+                        "inverse-primary": "#006970",
+                        "background": "#111318",
+                        "surface": "#111318",
+                        "inverse-on-surface": "#2f3035",
+                        "surface-bright": "#37393e",
+                        "surface-container-high": "#282a2e",
+                        "on-tertiary-fixed": "#3f0019",
+                        "secondary": "#d1bcff",
+                        "on-surface": "#e2e2e8",
+                        "surface-container": "#1e2024",
+                        "on-background": "#e2e2e8",
+                        "surface-dim": "#111318",
+                        "secondary-fixed": "#e9ddff",
+                        "primary-fixed": "#7df4ff",
+                        "outline": "#849495",
+                        "secondary-container": "#7000ff",
+                        "on-tertiary-fixed-variant": "#8f0041",
+                        "on-tertiary-container": "#bb0058",
+                        "tertiary-container": "#ffccd6",
+                        "surface-variant": "#333539",
+                        "surface-container-highest": "#333539",
+                        "on-error-container": "#ffdad6",
+                        "on-primary-fixed-variant": "#004f54",
+                        "tertiary": "#fff3f4",
+                        "on-primary-fixed": "#002022",
+                        "outline-variant": "#3b494b",
+                        "tertiary-fixed": "#ffd9e0",
+                        "tertiary-fixed-dim": "#ffb1c3",
+                        "surface-tint": "#00dbe9"
+                    },
+                    "borderRadius": {
+                        "DEFAULT": "0.125rem",
+                        "lg": "0.25rem",
+                        "xl": "0.5rem",
+                        "full": "0.75rem"
+                    },
+                    "spacing": {
+                        "stack-md": "16px",
+                        "unit": "4px",
+                        "stack-sm": "8px",
+                        "container-padding": "24px",
+                        "stack-lg": "32px",
+                        "gutter": "16px"
+                    },
+                    "fontFamily": {
+                        "headline-lg": ["Sora", "sans-serif"],
+                        "body-md": ["Hanken Grotesk", "sans-serif"],
+                        "body-lg": ["Hanken Grotesk", "sans-serif"],
+                        "label-caps": ["JetBrains Mono", "monospace"],
+                        "display-lg": ["Sora", "sans-serif"],
+                        "data-mono": ["JetBrains Mono", "monospace"],
+                        "headline-md": ["Sora", "sans-serif"]
+                    },
+                    "fontSize": {
+                        "headline-lg": ["32px", {"lineHeight": "40px", "letterSpacing": "-0.01em", "fontWeight": "600"}],
+                        "body-md": ["16px", {"lineHeight": "24px", "fontWeight": "400"}],
+                        "body-lg": ["18px", {"lineHeight": "28px", "fontWeight": "400"}],
+                        "label-caps": ["12px", {"lineHeight": "16px", "letterSpacing": "0.1em", "fontWeight": "700"}],
+                        "display-lg": ["48px", {"lineHeight": "56px", "letterSpacing": "-0.02em", "fontWeight": "700"}],
+                        "data-mono": ["14px", {"lineHeight": "20px", "letterSpacing": "0.02em", "fontWeight": "500"}],
+                        "headline-md": ["24px", {"lineHeight": "32px", "fontWeight": "600"}]
+                    }
+                }
+            }
+        }
+    </script>
+<link href="https://fonts.googleapis.com/css2?family=Hanken+Grotesk:wght@400&amp;family=JetBrains+Mono:wght@500;700&amp;family=Sora:wght@600;700&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<style>
+        body {
+            background-color: #050608; /* Obsidian base level 0 */
+            color: #e2e2e8;
+        }
+        
+        .glass-panel {
+            background-color: rgba(17, 19, 24, 0.6); /* surface */
+            backdrop-filter: blur(12px);
+            -webkit-backdrop-filter: blur(12px);
+            border: 1px solid rgba(255, 255, 255, 0.1);
+        }
+
+        .glass-panel:hover {
+            background-color: rgba(26, 28, 32, 0.8); /* surface-container-low */
+            border-color: rgba(255, 255, 255, 0.15);
+        }
+
+        .glow-border-active {
+            position: relative;
+        }
+        .glow-border-active::after {
+            content: '';
+            position: absolute;
+            inset: -1px;
+            background: linear-gradient(135deg, #7df4ff 0%, transparent 100%);
+            z-index: -1;
+            border-radius: inherit;
+            opacity: 0.5;
+        }
+
+        .btn-primary {
+            background-color: #7df4ff; /* primary-fixed */
+            color: #002022; /* on-primary-fixed */
+            box-shadow: 0 0 15px rgba(125, 244, 255, 0.3);
+            transition: all 0.3s ease;
+        }
+        .btn-primary:hover {
+            box-shadow: 0 0 20px rgba(125, 244, 255, 0.5);
+            background-color: #00dbe9; /* primary-fixed-dim */
+        }
+
+        .btn-ghost {
+            border: 1px solid #00dbe9; /* primary-fixed-dim / neon teal */
+            color: #00dbe9;
+            background-color: transparent;
+            transition: all 0.3s ease;
+        }
+        .btn-ghost:hover {
+            background-color: rgba(0, 219, 233, 0.1);
+        }
+
+        .chart-gradient {
+            background: linear-gradient(180deg, rgba(125,244,255,0.2) 0%, rgba(125,244,255,0) 100%);
+        }
+    </style>
+</head>
+<body class="font-body-md text-on-surface antialiased overflow-x-hidden min-h-screen flex flex-col md:flex-row">
+<!-- TopNavBar (Web Mobile / Web Hidden Desktop - Assuming SideNav takes over for this layout context, but keeping TopNavBar for strict compliance if needed. Will use SideNav as primary given the JSON rules for desktop 'docked left-0 h-screen w-64') -->
+<!-- SideNavBar -->
+<aside class="hidden md:flex bg-surface-container-low/90 backdrop-blur-lg dark:bg-surface-container-low/90 text-primary-fixed font-label-caps text-label-caps docked left-0 h-screen w-64 border-r border-outline-variant/20 flat no shadows fixed top-0 bottom-0 z-40 flex-col">
+<div class="p-container-padding flex items-center space-x-3 border-b border-outline-variant/20">
+<div class="w-10 h-10 rounded-full bg-surface-container-highest flex items-center justify-center overflow-hidden shrink-0">
+<img alt="Portfolio manager icon" class="w-full h-full object-cover" src="https://lh3.googleusercontent.com/aida-public/AB6AXuDwFKTZNYvR4zHEKvzUlugrPDXeXGuqD-bzcCHbaw_FKrVHLe_VABwjF1QuXehWwW8cD3URcz4pnI8BYQbmZr2yMl9BM7fqx4sKkC33lUT4dWn3NqWtHk_5HXgshxD4ivs25p22PkifP-0DYgUFclu1crFDfP6UtvSJAqZ3k8t5WCj5xiZLYKuRF4sNv8t3bU3QeNK9lDJ9ppxXg3oxrh4hQHbP11uh_MbmRPxH4DJdxf6JC2ohhcCrKtDwd2_uoO950UX453PUxzQ"/>
+</div>
+<div>
+<h2 class="font-headline-md text-headline-md text-primary-fixed leading-none">Alpha Terminal</h2>
+<p class="font-data-mono text-[10px] text-on-surface-variant mt-1">Verified Node 072</p>
+</div>
+</div>
+<nav class="flex-1 py-4 overflow-y-auto">
+<ul class="space-y-1">
+<!-- Active Item: Portfolio -->
+<li>
+<a class="flex items-center space-x-3 bg-secondary-container/20 text-secondary-fixed-dim border-l-4 border-secondary-fixed-dim px-4 py-3 hover:bg-surface-container-high transition-all" href="#">
+<span class="material-symbols-outlined" style="font-variation-settings: 'FILL' 1;">account_balance_wallet</span>
+<span>Portfolio</span>
+</a>
+</li>
+<li>
+<a class="flex items-center space-x-3 text-on-surface-variant px-4 py-3 hover:text-on-surface hover:bg-surface-container-high transition-all" href="#">
+<span class="material-symbols-outlined">query_stats</span>
+<span>Markets</span>
+</a>
+</li>
+<li>
+<a class="flex items-center space-x-3 text-on-surface-variant px-4 py-3 hover:text-on-surface hover:bg-surface-container-high transition-all" href="#">
+<span class="material-symbols-outlined">swap_horiz</span>
+<span>Trade</span>
+</a>
+</li>
+<li>
+<a class="flex items-center space-x-3 text-on-surface-variant px-4 py-3 hover:text-on-surface hover:bg-surface-container-high transition-all" href="#">
+<span class="material-symbols-outlined">lightbulb</span>
+<span>Insights</span>
+</a>
+</li>
+<li>
+<a class="flex items-center space-x-3 text-on-surface-variant px-4 py-3 hover:text-on-surface hover:bg-surface-container-high transition-all" href="#">
+<span class="material-symbols-outlined">history</span>
+<span>History</span>
+</a>
+</li>
+<li>
+<a class="flex items-center space-x-3 text-on-surface-variant px-4 py-3 hover:text-on-surface hover:bg-surface-container-high transition-all" href="#">
+<span class="material-symbols-outlined">help_outline</span>
+<span>Support</span>
+</a>
+</li>
+</ul>
+</nav>
+<div class="p-container-padding border-t border-outline-variant/20">
+<button class="w-full btn-primary font-label-caps text-label-caps py-3 rounded uppercase tracking-widest mb-4">Trade Now</button>
+<ul class="space-y-2">
+<li>
+<a class="flex items-center space-x-3 text-on-surface-variant hover:text-on-surface transition-colors py-1" href="#">
+<span class="material-symbols-outlined text-[18px]">settings</span>
+<span>Settings</span>
+</a>
+</li>
+<li>
+<a class="flex items-center space-x-3 text-on-surface-variant hover:text-on-surface transition-colors py-1" href="#">
+<span class="material-symbols-outlined text-[18px]">logout</span>
+<span>Logout</span>
+</a>
+</li>
+</ul>
+</div>
+</aside>
+<!-- Main Content Canvas -->
+<main class="flex-1 md:ml-64 p-4 md:p-container-padding flex flex-col min-h-screen">
+<!-- Header Section -->
+<header class="mb-stack-lg flex flex-col md:flex-row md:justify-between md:items-end gap-4">
+<div>
+<h1 class="font-headline-lg text-headline-lg text-on-surface mb-2">Portfolio Overview</h1>
+<p class="font-data-mono text-data-mono text-on-surface-variant flex items-center">
+<span class="w-2 h-2 rounded-full bg-primary-fixed mr-2 animate-pulse"></span>
+                    Live Sync • Last Updated 14:02:45 UTC
+                </p>
+</div>
+<div class="flex items-center gap-3">
+<button class="btn-ghost font-label-caps text-label-caps px-4 py-2 rounded flex items-center gap-2">
+<span class="material-symbols-outlined text-[16px]">download</span> Export Report
+                </button>
+</div>
+</header>
+<!-- Bento Grid Layout -->
+<div class="grid grid-cols-1 md:grid-cols-12 gap-gutter mb-stack-lg flex-1">
+<!-- Total Balance Widget (Spans 8 columns on desktop) -->
+<section class="glass-panel rounded-xl p-container-padding md:col-span-8 flex flex-col justify-between glow-border-active">
+<div class="flex justify-between items-start mb-stack-lg">
+<div>
+<h3 class="font-label-caps text-label-caps text-on-surface-variant mb-2">Net Liquidity Value</h3>
+<div class="font-display-lg text-display-lg text-primary-fixed">$2,458,932.<span class="text-primary-fixed/50 text-headline-lg">45</span></div>
+</div>
+<div class="flex flex-col items-end">
+<span class="px-2 py-1 bg-primary-fixed/10 text-primary-fixed font-data-mono text-[12px] rounded border border-primary-fixed/20 flex items-center gap-1">
+<span class="material-symbols-outlined text-[14px]">trending_up</span> +4.2% (24h)
+                        </span>
+<span class="font-data-mono text-data-mono text-outline mt-1">+$103,275.12</span>
+</div>
+</div>
+<!-- Mini Line Graph for Balance -->
+<div class="h-32 w-full mt-auto relative chart-gradient border-b border-primary-fixed/30 rounded-b-lg">
+<!-- SVG Path placeholder for graph -->
+<svg class="absolute bottom-0 w-full h-full stroke-primary-fixed fill-none" preserveaspectratio="none" style="stroke-width: 1.5; filter: drop-shadow(0 2px 4px rgba(125,244,255,0.2));" viewbox="0 0 100 30">
+<path d="M0,25 C10,20 20,28 30,15 C40,5 50,22 60,10 C70,2 80,18 90,8 L100,5"></path>
+</svg>
+<!-- Grid lines -->
+<div class="absolute inset-0 flex flex-col justify-between opacity-10 pointer-events-none">
+<div class="w-full border-t border-white"></div>
+<div class="w-full border-t border-white"></div>
+<div class="w-full border-t border-white"></div>
+</div>
+</div>
+</section>
+<!-- Allocation Pie/Donut Chart Widget (Spans 4 columns) -->
+<section class="glass-panel rounded-xl p-container-padding md:col-span-4 flex flex-col">
+<div class="flex justify-between items-center mb-stack-md">
+<h3 class="font-headline-md text-headline-md text-on-surface">Asset Allocation</h3>
+<span class="material-symbols-outlined text-outline">pie_chart</span>
+</div>
+<div class="flex-1 flex items-center justify-center py-4 relative">
+<!-- CSS Donut Chart representation -->
+<div class="w-40 h-40 rounded-full border-8 border-surface-container-high relative overflow-hidden flex items-center justify-center shadow-[0_0_20px_rgba(125,244,255,0.1)]" style="background: conic-gradient(#7df4ff 0% 45%, #d1bcff 45% 75%, #ffb4ab 75% 100%);">
+<!-- Inner dark circle to make it a donut -->
+<div class="w-32 h-32 rounded-full bg-surface-container-lowest absolute z-10 flex flex-col items-center justify-center">
+<span class="font-data-mono text-data-mono text-outline">Total Assets</span>
+<span class="font-headline-md text-headline-md text-on-surface">3</span>
+</div>
+</div>
+</div>
+<div class="space-y-3 mt-4">
+<div class="flex items-center justify-between font-data-mono text-data-mono">
+<div class="flex items-center gap-2">
+<span class="w-3 h-3 rounded-full bg-primary-fixed"></span>
+<span class="text-on-surface-variant">Crypto</span>
+</div>
+<span class="text-on-surface">45%</span>
+</div>
+<div class="flex items-center justify-between font-data-mono text-data-mono">
+<div class="flex items-center gap-2">
+<span class="w-3 h-3 rounded-full bg-secondary-fixed-dim"></span>
+<span class="text-on-surface-variant">Stocks</span>
+</div>
+<span class="text-on-surface">30%</span>
+</div>
+<div class="flex items-center justify-between font-data-mono text-data-mono">
+<div class="flex items-center gap-2">
+<span class="w-3 h-3 rounded-full bg-error"></span>
+<span class="text-on-surface-variant">Nodes</span>
+</div>
+<span class="text-on-surface">25%</span>
+</div>
+</div>
+</section>
+<!-- Holdings Table Widget (Spans 12 columns) -->
+<section class="glass-panel rounded-xl p-container-padding md:col-span-12 overflow-hidden">
+<div class="flex justify-between items-center mb-stack-md">
+<h3 class="font-headline-md text-headline-md text-on-surface">Current Holdings</h3>
+<div class="flex gap-2">
+<button class="p-2 rounded bg-surface-container hover:bg-surface-container-high text-on-surface-variant transition-colors">
+<span class="material-symbols-outlined text-[20px]">filter_list</span>
+</button>
+</div>
+</div>
+<div class="overflow-x-auto">
+<table class="w-full text-left border-collapse">
+<thead>
+<tr class="border-b border-outline-variant/30 font-label-caps text-label-caps text-on-surface-variant">
+<th class="py-3 px-4 font-normal">Asset</th>
+<th class="py-3 px-4 font-normal">Type</th>
+<th class="py-3 px-4 font-normal text-right">Amount</th>
+<th class="py-3 px-4 font-normal text-right">Value (USD)</th>
+<th class="py-3 px-4 font-normal text-right">P/L (24h)</th>
+<th class="py-3 px-4 font-normal text-center">Action</th>
+</tr>
+</thead>
+<tbody class="font-data-mono text-data-mono">
+<tr class="border-b border-outline-variant/10 hover:bg-surface-container-highest/30 transition-colors">
+<td class="py-4 px-4 flex items-center gap-3">
+<div class="w-8 h-8 rounded-full bg-surface-bright flex items-center justify-center text-primary-fixed">
+<span class="material-symbols-outlined text-[18px]">currency_bitcoin</span>
+</div>
+<div>
+<div class="text-on-surface font-headline-md text-[16px] leading-tight">BTC</div>
+<div class="text-outline text-[12px]">Bitcoin</div>
+</div>
+</td>
+<td class="py-4 px-4 text-outline">Crypto</td>
+<td class="py-4 px-4 text-right text-on-surface">12.450</td>
+<td class="py-4 px-4 text-right text-on-surface">$821,700.00</td>
+<td class="py-4 px-4 text-right text-primary-fixed">+2.4%</td>
+<td class="py-4 px-4 text-center">
+<button class="btn-ghost px-3 py-1 text-[12px] rounded font-label-caps">Rebalance</button>
+</td>
+</tr>
+<tr class="border-b border-outline-variant/10 hover:bg-surface-container-highest/30 transition-colors">
+<td class="py-4 px-4 flex items-center gap-3">
+<div class="w-8 h-8 rounded-full bg-surface-bright flex items-center justify-center text-secondary-fixed-dim">
+<span class="material-symbols-outlined text-[18px]">precision_manufacturing</span>
+</div>
+<div>
+<div class="text-on-surface font-headline-md text-[16px] leading-tight">NVDA</div>
+<div class="text-outline text-[12px]">NVIDIA Corp</div>
+</div>
+</td>
+<td class="py-4 px-4 text-outline">Stock</td>
+<td class="py-4 px-4 text-right text-on-surface">4,500</td>
+<td class="py-4 px-4 text-right text-on-surface">$540,000.00</td>
+<td class="py-4 px-4 text-right text-primary-fixed">+1.8%</td>
+<td class="py-4 px-4 text-center">
+<button class="btn-ghost px-3 py-1 text-[12px] rounded font-label-caps">Rebalance</button>
+</td>
+</tr>
+<tr class="hover:bg-surface-container-highest/30 transition-colors">
+<td class="py-4 px-4 flex items-center gap-3">
+<div class="w-8 h-8 rounded-full bg-surface-bright flex items-center justify-center text-error">
+<span class="material-symbols-outlined text-[18px]">dns</span>
+</div>
+<div>
+<div class="text-on-surface font-headline-md text-[16px] leading-tight">ETH-Validator</div>
+<div class="text-outline text-[12px]">Node Ops</div>
+</div>
+</td>
+<td class="py-4 px-4 text-outline">Node</td>
+<td class="py-4 px-4 text-right text-on-surface">32.00</td>
+<td class="py-4 px-4 text-right text-on-surface">$112,000.00</td>
+<td class="py-4 px-4 text-right text-error">-0.5%</td>
+<td class="py-4 px-4 text-center">
+<button class="btn-ghost px-3 py-1 text-[12px] rounded font-label-caps opacity-50 cursor-not-allowed">Locked</button>
+</td>
+</tr>
+</tbody>
+</table>
+</div>
+</section>
+</div>
+</main>
+</body></html>

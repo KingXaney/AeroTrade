@@ -1,0 +1,114 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "description": "Master registry of all installed agent skills",
+  "lastUpdated": "2026-06-08",
+  "source": "https://github.com/google-labs-code/stitch-skills",
+  "totalInstalled": 14,
+  "plugins": {
+    "stitch-design": {
+      "displayName": "Google Stitch — Design",
+      "description": "Core design workflows for creating, managing, and optimizing designs within Stitch",
+      "source": "google-labs-code/stitch-skills",
+      "skills": {
+        "generate-design": {
+          "status": "✅ installed",
+          "name": "stitch::generate-design",
+          "description": "Generate new screens from text prompts or images, edit existing screens, generate design variants",
+          "path": "stitch-design/generate-design/SKILL.md"
+        },
+        "extract-design-md": {
+          "status": "✅ installed",
+          "name": "stitch::extract-design-md",
+          "description": "Extract design systems from frontend source code (React, Vue, Svelte, Angular, etc.)",
+          "path": "stitch-design/extract-design-md/SKILL.md"
+        },
+        "manage-design-system": {
+          "status": "✅ installed",
+          "name": "stitch::manage-design-system",
+          "description": "Create/update design systems in Stitch, apply to screens",
+          "path": "stitch-design/manage-design-system/SKILL.md"
+        },
+        "code-to-design": {
+          "status": "✅ installed",
+          "name": "stitch::code-to-design",
+          "description": "Convert frontend code to Stitch Design via HTML extraction + design system + upload",
+          "path": "stitch-design/code-to-design/SKILL.md"
+        },
+        "upload-to-stitch": {
+          "status": "✅ installed",
+          "name": "stitch::upload-to-stitch",
+          "description": "Upload local assets (images, mockups, HTML) to a Stitch project",
+          "path": "stitch-design/upload-to-stitch/SKILL.md"
+        },
+        "extract-static-html": {
+          "status": "✅ installed",
+          "name": "stitch::extract-static-html",
+          "description": "Extract self-contained static HTML from web applications",
+          "path": "stitch-design/extract-static-html/SKILL.md"
+        }
+      }
+    },
+    "stitch-build": {
+      "displayName": "Google Stitch — Build",
+      "description": "Build and component skills for converting Stitch designs into production code",
+      "source": "google-labs-code/stitch-skills",
+      "skills": {
+        "react-components": {
+          "status": "✅ installed",
+          "name": "react:components",
+          "description": "Convert Stitch designs into modular Vite + React components",
+          "path": "stitch-build/react-components/SKILL.md"
+        },
+        "react-native": {
+          "status": "✅ installed",
+          "name": "stitch::react-native",
+          "description": "Convert Stitch designs to React Native components with StyleSheet",
+          "path": "stitch-build/react-native/SKILL.md"
+        },
+        "remotion": {
+          "status": "✅ installed",
+          "name": "remotion",
+          "description": "Generate walkthrough videos from Stitch projects using Remotion",
+          "path": "stitch-build/remotion/SKILL.md"
+        },
+        "shadcn-ui": {
+          "status": "✅ installed",
+          "name": "shadcn-ui",
+          "description": "Expert guidance for building with shadcn/ui components",
+          "path": "stitch-build/shadcn-ui/SKILL.md"
+        }
+      }
+    },
+    "stitch-utilities": {
+      "displayName": "Google Stitch — Utilities",
+      "description": "Utility and helper skills for prompt enhancement, design analysis, and autonomous building",
+      "source": "google-labs-code/stitch-skills",
+      "skills": {
+        "design-md": {
+          "status": "✅ installed",
+          "name": "design-md",
+          "description": "Analyze Stitch projects and synthesize semantic design systems into DESIGN.md",
+          "path": "stitch-utilities/design-md/SKILL.md"
+        },
+        "enhance-prompt": {
+          "status": "✅ installed",
+          "name": "enhance-prompt",
+          "description": "Transform vague UI ideas into polished, Stitch-optimized prompts",
+          "path": "stitch-utilities/enhance-prompt/SKILL.md"
+        },
+        "stitch-loop": {
+          "status": "✅ installed",
+          "name": "stitch-loop",
+          "description": "Autonomous iterative website building with baton-passing loop pattern",
+          "path": "stitch-utilities/stitch-loop/SKILL.md"
+        },
+        "taste-design": {
+          "status": "✅ installed",
+          "name": "taste-design",
+          "description": "Premium anti-generic DESIGN.md generation with strict typography, color, and layout standards",
+          "path": "stitch-utilities/taste-design/SKILL.md"
+        }
+      }
+    }
+  }
+}

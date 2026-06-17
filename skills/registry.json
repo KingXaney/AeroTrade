@@ -1,0 +1,46 @@
+{
+  "description": "Master registry of all installed agent skills",
+  "lastUpdated": "2026-06-08",
+  "totalInstalled": 37,
+  "providers": {
+    "stitch": {
+      "displayName": "Google Stitch",
+      "source": "google-labs-code/stitch-skills",
+      "path": "stitch/",
+      "skillCount": 14,
+      "plugins": ["stitch-design (6)", "stitch-build (4)", "stitch-utilities (4)"],
+      "registry": "stitch/registry.json"
+    },
+    "engineering": {
+      "displayName": "Engineering Workflows (Addy Osmani)",
+      "source": "addyosmani/agent-skills",
+      "path": "engineering/",
+      "skillCount": 23,
+      "skills": {
+        "spec-driven-development":        { "status": "✅ installed", "description": "Define specs before code — requirements, acceptance criteria, edge cases" },
+        "planning-and-task-breakdown":     { "status": "✅ installed", "description": "Break work into atomic, testable chunks with dependency ordering" },
+        "incremental-implementation":      { "status": "✅ installed", "description": "Build in small verified steps, never giant diffs" },
+        "test-driven-development":         { "status": "✅ installed", "description": "Write tests first, code second" },
+        "code-review-and-quality":         { "status": "✅ installed", "description": "Self-review checklist — security, perf, types" },
+        "shipping-and-launch":             { "status": "✅ installed", "description": "Pre-launch verification, rollback plans, monitoring" },
+        "security-and-hardening":          { "status": "✅ installed", "description": "Security audit — XSS, injection, secrets, auth vulnerabilities" },
+        "performance-optimization":        { "status": "✅ installed", "description": "Bundle analysis, lazy loading, Core Web Vitals" },
+        "debugging-and-error-recovery":    { "status": "✅ installed", "description": "Systematic debugging methodology with hypothesis testing" },
+        "api-and-interface-design":        { "status": "✅ installed", "description": "RESTful best practices, error handling, pagination" },
+        "documentation-and-adrs":          { "status": "✅ installed", "description": "Auto-generate README, API docs, Architecture Decision Records" },
+        "frontend-ui-engineering":         { "status": "✅ installed", "description": "Component architecture, state management, accessibility" },
+        "git-workflow-and-versioning":     { "status": "✅ installed", "description": "Branch strategy, commit messages, versioning, changelogs" },
+        "code-simplification":            { "status": "✅ installed", "description": "Reduce complexity — extract, inline, flatten, dedup" },
+        "ci-cd-and-automation":           { "status": "✅ installed", "description": "GitHub Actions, deployment pipelines, automated checks" },
+        "deprecation-and-migration":      { "status": "✅ installed", "description": "Safe API deprecation, migration guides, codemods" },
+        "context-engineering":            { "status": "✅ installed", "description": "Optimize context window usage, progressive disclosure" },
+        "doubt-driven-development":       { "status": "✅ installed", "description": "Question assumptions, verify before proceeding" },
+        "source-driven-development":      { "status": "✅ installed", "description": "Read docs and source code before writing, avoid hallucination" },
+        "idea-refine":                    { "status": "✅ installed", "description": "Transform vague ideas into actionable specs" },
+        "interview-me":                   { "status": "✅ installed", "description": "Ask clarifying questions before starting work" },
+        "browser-testing-with-devtools":  { "status": "✅ installed", "description": "Visual verification with DevTools and screenshots" },
+        "using-agent-skills":             { "status": "✅ installed", "description": "Meta-skill: how to discover and use other skills" }
+      }
+    }
+  }
+}
