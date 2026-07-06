@@ -2,35 +2,17 @@
 
 import {useState} from "react";
 import Link from "next/link";
-import {useRouter} from "next/navigation";
-import {toast} from "sonner";
 import {cn, formatPrice, formatChangePercent, getChangeColorClass} from "@/lib/utils";
-import {placeOrder} from "@/lib/actions/trading.actions";
+import SellPositionDialog from "@/components/trade/SellPositionDialog";
 
-// Interactive holdings table for the trade page — each row can be sold to close.
+// Interactive holdings table for the trade page — each row opens a sell
+// dialog where the user picks how many shares to sell.
 const PositionsTable = ({positions}: {positions: EnrichedPosition[]}) => {
-    const router = useRouter();
-    const [closing, setClosing] = useState<string | null>(null);
+    const [sellTarget, setSellTarget] = useState<EnrichedPosition | null>(null);
 
     if (positions.length === 0) {
         return <p className="text-sm text-[#849495] p-4">No open positions. Use the order panel to buy your first stock.</p>;
     }
-
-    const sellAll = async (p: EnrichedPosition) => {
-        if (closing) return;
-        setClosing(p.symbol);
-        try {
-            const result = await placeOrder({symbol: p.symbol, side: 'sell', quantity: p.quantity});
-            if (result.success) {
-                toast.success(result.message || `Closed ${p.symbol}`);
-                router.refresh();
-            } else {
-                toast.error(result.message || 'Sell failed');
-            }
-        } finally {
-            setClosing(null);
-        }
-    };
 
     return (
         <div className="space-y-2">
@@ -75,16 +57,17 @@ const PositionsTable = ({positions}: {positions: EnrichedPosition[]}) => {
                     <div className="flex md:justify-end">
                         <button
                             type="button"
-                            onClick={() => sellAll(p)}
-                            disabled={closing === p.symbol}
-                            className="px-3 py-1.5 rounded text-xs font-bold uppercase tracking-wider transition-colors disabled:opacity-50"
+                            onClick={() => setSellTarget(p)}
+                            className="px-3 py-1.5 rounded text-xs font-bold uppercase tracking-wider transition-colors"
                             style={{color: '#ffb4ab', border: '1px solid rgba(255,180,171,0.3)', backgroundColor: 'rgba(255,180,171,0.06)', fontFamily: 'var(--font-jetbrains)'}}
                         >
-                            {closing === p.symbol ? '…' : 'Sell'}
+                            Sell
                         </button>
                     </div>
                 </div>
             ))}
+
+            {sellTarget && <SellPositionDialog position={sellTarget} onClose={() => setSellTarget(null)} />}
         </div>
     );
 };
