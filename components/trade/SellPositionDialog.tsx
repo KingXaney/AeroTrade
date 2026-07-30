@@ -10,7 +10,7 @@ import {Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle} fro
 // Sell dialog for one open position — pick how many shares to sell via free
 // entry or 25/50/75/Max presets. Parents mount it conditionally per selected
 // position, so every open starts with fresh state (qty defaults to Max).
-const SellPositionDialog = ({position, onClose}: {position: EnrichedPosition; onClose: () => void}) => {
+const SellPositionDialog = ({position, accountId, onClose}: {position: EnrichedPosition; accountId: string; onClose: () => void}) => {
     const router = useRouter();
     const [qty, setQty] = useState(String(position.quantity));
     const [submitting, setSubmitting] = useState(false);
@@ -32,7 +32,7 @@ const SellPositionDialog = ({position, onClose}: {position: EnrichedPosition; on
         if (submitting || !valid) return;
         setSubmitting(true);
         try {
-            const result = await placeOrder({symbol: position.symbol, side: 'sell', quantity: qtyNum});
+            const result = await placeOrder({symbol: position.symbol, side: 'sell', quantity: qtyNum, accountId});
             if (result.success) {
                 toast.success(result.message || `Sold ${qtyNum} ${position.symbol}`);
                 onClose();

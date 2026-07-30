@@ -7,7 +7,7 @@ import SellPositionDialog from "@/components/trade/SellPositionDialog";
 // Compact, horizontally-scrolling open-positions strip for the Trade page.
 // Each chip shows symbol · qty · P&L%; Sell opens the shared partial-sell
 // dialog. The full positions table + trade history live on /portfolio.
-const OpenPositionsStrip = ({positions}: {positions: EnrichedPosition[]}) => {
+const OpenPositionsStrip = ({positions, accountId}: {positions: EnrichedPosition[]; accountId: string}) => {
     const [sellTarget, setSellTarget] = useState<EnrichedPosition | null>(null);
 
     if (positions.length === 0) {
@@ -39,7 +39,7 @@ const OpenPositionsStrip = ({positions}: {positions: EnrichedPosition[]}) => {
                 </div>
             ))}
 
-            {sellTarget && <SellPositionDialog position={sellTarget} onClose={() => setSellTarget(null)} />}
+            {sellTarget && <SellPositionDialog position={sellTarget} accountId={accountId} onClose={() => setSellTarget(null)} />}
         </div>
     );
 };

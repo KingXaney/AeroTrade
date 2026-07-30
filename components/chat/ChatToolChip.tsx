@@ -19,6 +19,8 @@ const LABELS: Record<string, string> = {
     addStockToWatchlist: 'Adding to watchlist',
     removeStockFromWatchlist: 'Removing from watchlist',
     getMarketNews: 'Fetching market news',
+    getBrainDigest: 'Reading the news brain',
+    getAiSuggestions: 'Fetching AI suggestions',
 };
 
 const ChatToolChip = ({toolName, state, summary}: ChatToolChipProps) => {

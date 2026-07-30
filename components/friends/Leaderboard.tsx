@@ -37,9 +37,14 @@ const Leaderboard = ({entries}: {entries: LeaderboardEntry[]}) => {
                                     <span className={cn('w-5 text-center font-bold', rankColor(rank))} style={{fontFamily: 'var(--font-jetbrains)'}}>
                                         {rank}
                                     </span>
-                                    <span className="text-sm font-semibold text-[#e2e2e8]" style={{fontFamily: 'var(--font-sora)'}}>
-                                        {e.name}
-                                    </span>
+                                    <div>
+                                        <span className="text-sm font-semibold text-[#e2e2e8]" style={{fontFamily: 'var(--font-sora)'}}>
+                                            {e.name}
+                                        </span>
+                                        <div className="text-[10px] text-[#849495] uppercase tracking-[0.08em]" style={{fontFamily: 'var(--font-jetbrains)'}}>
+                                            {e.accountName}
+                                        </div>
+                                    </div>
                                     {!e.isYou && <span className="material-symbols-outlined text-sm text-[#849495]">chevron_right</span>}
                                 </div>
                                 <div className="text-right" style={{fontFamily: 'var(--font-jetbrains)'}}>

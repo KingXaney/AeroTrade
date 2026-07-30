@@ -146,6 +146,8 @@ declare global {
         alertData: Alert[] | undefined;
     };
 
+    type NewsSourceType = 'finance' | 'rss' | 'reddit' | 'sec';
+
     type MarketNewsArticle = {
         id: number;
         headline: string;
@@ -156,6 +158,8 @@ declare global {
         category: string;
         related: string;
         image?: string;
+        sourceType?: NewsSourceType;
+        fullSummary?: string;     // untruncated text for the news brain
     };
 
     type WatchlistNewsProps = {
@@ -184,7 +188,9 @@ declare global {
         | 'getWatchlist'
         | 'addStockToWatchlist'
         | 'removeStockFromWatchlist'
-        | 'getMarketNews';
+        | 'getMarketNews'
+        | 'getBrainDigest'
+        | 'getAiSuggestions';
 
     type AlertData = {
         symbol: string;
@@ -291,13 +297,91 @@ declare global {
         isYou: boolean;
         totalValue: number;
         totalReturnPct: number;
+        accountName: string;      // name of the user's best strategy account
     };
 
     type FriendProfile = {
         id: string;
         name: string;
         email: string;
-        portfolio: PortfolioSummary;
+        portfolio: PortfolioSummary;  // the friend's best strategy account
+        accountName: string;
+        accounts: {name: string; totalValue: number; totalReturnPct: number}[];
+    };
+
+    // --- Multi-account strategies & analytics ---
+    type PaperAccountSummary = {
+        id: string;
+        name: string;
+        inceptionAt: number;      // epoch ms; anchors the performance chart
+        createdAt: number;        // epoch ms
+    };
+
+    type AccountWithPortfolio = {
+        account: PaperAccountSummary;
+        summary: PortfolioSummary;
+    };
+
+    type SnapshotPoint = {
+        date: string;             // 'YYYY-MM-DD' in America/New_York
+        value: number;
+    };
+
+    type PerfPoint = {
+        date: string;
+        accountPct: number;           // % return since account inception
+        benchmarkPct: number | null;  // % return of SPY over the same window (null before first benchmark point)
+    };
+
+    type AccountAnalytics = {
+        account: PaperAccountSummary;
+        summary: PortfolioSummary;
+        series: PerfPoint[];
+        maxDrawdownPct: number | null;  // null until enough snapshots exist
+        winRatePct: number | null;      // null until a closed (sell) trade exists
+        wins: number;
+        losses: number;
+        realizedPnl: number;
+        tradeCount: number;
+    };
+
+    // --- News brain & AI navigator ---
+    type BrainEntityType = 'ticker' | 'sector' | 'theme';
+
+    type BrainEntitySummary = {
+        key: string;
+        type: BrainEntityType;
+        displayName: string;
+        weightFast: number;
+        weightSlow: number;
+        sentimentFast: number;        // derived avg, −1..1
+        sentimentSlow: number;
+        thesisSince: number | null;   // epoch ms when the slow weight sustained above threshold
+        lastSeenAt: number;           // epoch ms
+    };
+
+    type SuggestionAction = 'buy' | 'sell' | 'hold';
+
+    type SuggestionItem = {
+        symbol: string;
+        action: SuggestionAction;
+        quantity?: number;            // planned whole shares (absent on global/hold items)
+        targetWeight: number;
+        currentWeight: number;
+        score: number;
+        reasons: string[];            // deterministic strings from scoring — never LLM output
+        executed: boolean;
+        executionPrice?: number;
+        error?: string;
+    };
+
+    type NavigatorStatus = {
+        enrolled: boolean;
+        status?: 'active' | 'paused';
+        accountId?: string;
+        enrolledAt?: number;          // epoch ms
+        lastRunDate?: string;         // 'YYYY-MM-DD' ET
+        lastError?: string;
     };
 }
 

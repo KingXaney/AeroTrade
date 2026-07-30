@@ -1,28 +1,41 @@
 import {redirect} from "next/navigation";
+import {cookies} from "next/headers";
 import Link from "next/link";
 import TradingViewWidget from "@/components/TradingViewWidget";
-import {TRADE_CHART_WIDGET_CONFIG} from "@/lib/constants";
+import {ACTIVE_ACCOUNT_COOKIE, TRADE_CHART_WIDGET_CONFIG} from "@/lib/constants";
 import {getCurrentUserId} from "@/lib/actions/watchlist.actions";
-import {getPortfolio} from "@/lib/trading/account";
+import {getAccountsForUser, getPortfolio, toAccountSummary} from "@/lib/trading/account";
 import OrderPanel from "@/components/trade/OrderPanel";
 import OpenPositionsStrip from "@/components/trade/OpenPositionsStrip";
+import AccountSwitcher from "@/components/trade/AccountSwitcher";
 
 const scriptUrl = 'https://s3.tradingview.com/external-embedding/embed-widget-';
 
 type TradePageProps = {
-    searchParams: Promise<{symbol?: string}>;
+    searchParams: Promise<{symbol?: string; account?: string}>;
 };
 
 const TradePage = async ({searchParams}: TradePageProps) => {
     const userId = await getCurrentUserId();
     if (!userId) redirect('/sign-in');
 
-    const {symbol: raw} = await searchParams;
+    const {symbol: raw, account: accountParam} = await searchParams;
     const chartSymbol = (raw || 'NASDAQ:AAPL').toUpperCase();
     // Bare ticker (drop exchange prefix) seeds the order panel.
     const orderSymbol = chartSymbol.includes(':') ? chartSymbol.split(':').pop()! : chartSymbol;
 
-    const portfolio = await getPortfolio(userId);
+    // Active strategy account: ?account= wins, then the cookie, then the first account.
+    const cookieStore = await cookies();
+    const preferredId = accountParam ?? cookieStore.get(ACTIVE_ACCOUNT_COOKIE)?.value;
+    const accounts = await getAccountsForUser(userId);
+    const active = (preferredId && accounts.find((a) => String(a._id) === preferredId)) || accounts[0];
+    const activeId = String(active._id);
+
+    const portfolio = await getPortfolio(userId, activeId);
+    const switcherAccounts = accounts.map((a) => {
+        const s = toAccountSummary(a);
+        return {id: s.id, name: s.name};
+    });
 
     return (
         <div className="min-h-screen space-y-4">
@@ -34,9 +47,12 @@ const TradePage = async ({searchParams}: TradePageProps) => {
                     </h1>
                     <p className="text-sm text-[#849495]">Paper trading · live prices</p>
                 </div>
-                <Link href="/portfolio" className="text-xs text-[#7df4ff] hover:underline" style={{fontFamily: 'var(--font-jetbrains)'}}>
-                    View full portfolio →
-                </Link>
+                <div className="flex items-center gap-3">
+                    <AccountSwitcher accounts={switcherAccounts} activeId={activeId} />
+                    <Link href="/portfolio" className="text-xs text-[#7df4ff] hover:underline" style={{fontFamily: 'var(--font-jetbrains)'}}>
+                        View full portfolio →
+                    </Link>
+                </div>
             </div>
 
             {/* Chart + order entry — the focus of this page */}
@@ -50,7 +66,7 @@ const TradePage = async ({searchParams}: TradePageProps) => {
                     />
                 </section>
                 <div className="xl:col-span-1">
-                    <OrderPanel defaultSymbol={orderSymbol} cash={portfolio.cash} />
+                    <OrderPanel defaultSymbol={orderSymbol} cash={portfolio.cash} accountId={activeId} />
                 </div>
             </div>
 
@@ -64,7 +80,7 @@ const TradePage = async ({searchParams}: TradePageProps) => {
                         Full holdings &amp; history →
                     </Link>
                 </div>
-                <OpenPositionsStrip positions={portfolio.positions} />
+                <OpenPositionsStrip positions={portfolio.positions} accountId={activeId} />
             </section>
         </div>
     );

@@ -7,6 +7,7 @@ export type SidebarPortfolio = {
     totalValue: number;
     totalReturnPct: number;
     cash: number;
+    strategiesCount: number;
     top: {symbol: string; quantity: number; unrealizedPnlPct: number}[];
 };
 
@@ -41,6 +42,11 @@ const PortfolioSidebarCard = ({portfolio}: {portfolio: SidebarPortfolio}) => {
                     </span>
                     <span className="text-[#849495] text-xs"> total return</span>
                 </p>
+                {portfolio.strategiesCount > 1 && (
+                    <p className="text-[10px] uppercase tracking-[0.08em] text-[#849495] mt-1" style={{fontFamily: 'var(--font-jetbrains)'}}>
+                        All accounts · {portfolio.strategiesCount} strategies
+                    </p>
+                )}
 
                 <div className="mt-3 pt-3 border-t border-[rgba(125,244,255,0.12)] flex items-center justify-between">
                     <span className="text-[10px] uppercase tracking-[0.1em] text-[#849495]"

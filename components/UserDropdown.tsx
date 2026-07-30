@@ -13,21 +13,23 @@ import {
 import {Switch} from "@/components/ui/switch";
 
 import {useRouter} from "next/navigation";
-import {LogOut, ChevronDown, Mail} from "lucide-react";
+import {LogOut, ChevronDown, Mail, Newspaper} from "lucide-react";
 import NavItems from "@/components/NavItems";
 import {signOut} from "@/lib/actions/auth.actions";
-import {getEmailNotificationPreference, toggleEmailNotifications} from "@/lib/actions/preferences.actions";
+import {getDigestMode, getEmailNotificationPreference, setDigestMode, toggleEmailNotifications} from "@/lib/actions/preferences.actions";
 import {toast} from "sonner";
 
 function UserDropdown({user, initialStocks}: {user: User; initialStocks: StockWithWatchlistStatus[]}) {
     const router = useRouter();
     const [emailEnabled, setEmailEnabled] = useState(true);
+    const [personalizedDigest, setPersonalizedDigest] = useState(true);
     const [isPending, startTransition] = useTransition();
     const [hasFetched, setHasFetched] = useState(false);
 
     useEffect(() => {
-        getEmailNotificationPreference(user.id).then((enabled) => {
+        Promise.all([getEmailNotificationPreference(user.id), getDigestMode(user.id)]).then(([enabled, mode]) => {
             setEmailEnabled(enabled);
+            setPersonalizedDigest(mode === 'personalized');
             setHasFetched(true);
         });
     }, [user.id]);
@@ -42,6 +44,20 @@ function UserDropdown({user, initialStocks}: {user: User; initialStocks: StockWi
             } else {
                 setEmailEnabled(!checked);
                 toast.error('Failed to update email preference');
+            }
+        });
+    };
+
+    const handleToggleDigestMode = (checked: boolean) => {
+        // Optimistic update — on = holdings-aware, off = general market digest
+        setPersonalizedDigest(checked);
+        startTransition(async () => {
+            const result = await setDigestMode(user.id, checked ? 'personalized' : 'general');
+            if (result.success) {
+                toast.success(checked ? 'Digest now follows your holdings' : 'Switched to the general market digest');
+            } else {
+                setPersonalizedDigest(!checked);
+                toast.error('Failed to update digest preference');
             }
         });
     };
@@ -142,6 +158,26 @@ function UserDropdown({user, initialStocks}: {user: User; initialStocks: StockWi
                         checked={emailEnabled}
                         onCheckedChange={handleToggleEmail}
                         disabled={isPending || !hasFetched}
+                        className="data-[state=checked]:!bg-[#00f0ff] data-[state=unchecked]:!bg-[#333539] data-[state=unchecked]:!border data-[state=unchecked]:!border-[#3b494b] transition-colors duration-200"
+                    />
+                </div>
+
+                {/* Digest mode toggle — only meaningful while subscribed */}
+                <div className="flex items-center justify-between rounded-md px-3 py-2.5">
+                    <div className="flex items-center gap-2.5">
+                        <Newspaper className="size-4 text-[#b9cacb]"/>
+                        <div className="flex flex-col">
+                            <span className="text-sm font-medium text-[#e2e2e8]">Holdings-aware digest</span>
+                            <span className="text-[11px] text-[#849495] leading-tight">
+                                {personalizedDigest ? 'News follows your positions & watchlist' : 'General market news for everyone'}
+                            </span>
+                        </div>
+                    </div>
+                    <Switch
+                        id="digest-mode-toggle"
+                        checked={personalizedDigest}
+                        onCheckedChange={handleToggleDigestMode}
+                        disabled={isPending || !hasFetched || !emailEnabled}
                         className="data-[state=checked]:!bg-[#00f0ff] data-[state=unchecked]:!bg-[#333539] data-[state=unchecked]:!border data-[state=unchecked]:!border-[#3b494b] transition-colors duration-200"
                     />
                 </div>

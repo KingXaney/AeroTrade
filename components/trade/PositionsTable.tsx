@@ -7,7 +7,7 @@ import SellPositionDialog from "@/components/trade/SellPositionDialog";
 
 // Interactive holdings table for the trade page — each row opens a sell
 // dialog where the user picks how many shares to sell.
-const PositionsTable = ({positions}: {positions: EnrichedPosition[]}) => {
+const PositionsTable = ({positions, accountId}: {positions: EnrichedPosition[]; accountId: string}) => {
     const [sellTarget, setSellTarget] = useState<EnrichedPosition | null>(null);
 
     if (positions.length === 0) {
@@ -67,7 +67,7 @@ const PositionsTable = ({positions}: {positions: EnrichedPosition[]}) => {
                 </div>
             ))}
 
-            {sellTarget && <SellPositionDialog position={sellTarget} onClose={() => setSellTarget(null)} />}
+            {sellTarget && <SellPositionDialog position={sellTarget} accountId={accountId} onClose={() => setSellTarget(null)} />}
         </div>
     );
 };

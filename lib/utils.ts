@@ -79,6 +79,14 @@ export const validateArticle = (article: RawNewsArticle) =>
 // Get today's date string in YYYY-MM-DD format
 export const getTodayString = () => new Date().toISOString().split('T')[0];
 
+// Today's date in America/New_York as 'YYYY-MM-DD' (en-CA locale formats ISO-style).
+// Snapshot rows are keyed on market days, not server-timezone days.
+export const getEasternDateString = (date: Date = new Date()) =>
+    new Intl.DateTimeFormat('en-CA', {timeZone: 'America/New_York'}).format(date);
+
+// The news brain persists articles and wants more context than the email needs.
+export const FULL_SUMMARY_MAX_CHARS = 1500;
+
 export const formatArticle = (
     article: RawNewsArticle,
     isCompanyNews: boolean,
@@ -91,6 +99,8 @@ export const formatArticle = (
   headline: article.headline!.trim(),
   summary:
       article.summary!.trim().substring(0, isCompanyNews ? 200 : 150) + '...',
+  // Untruncated text for the news brain; the email path strips this before prompting.
+  fullSummary: article.summary!.trim().substring(0, FULL_SUMMARY_MAX_CHARS),
   source: article.source || (isCompanyNews ? 'Company News' : 'Market News'),
   url: article.url!,
   datetime: article.datetime!,

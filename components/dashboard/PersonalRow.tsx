@@ -5,7 +5,8 @@ import {cn, formatPrice, formatChangePercent, getChangeColorClass} from "@/lib/u
 // The dashboard's "your data first" row: portfolio snapshot, watchlist movers,
 // and friends rank. Plain presentational component fed by existing server actions.
 type Props = {
-    portfolio: PortfolioSummary;
+    portfolio: PortfolioSummary;                          // aggregate across all strategy accounts
+    best?: {name: string; totalReturnPct: number};        // best strategy, when the user has more than one
     movers: StockWithData[];
     leaderboard: LeaderboardEntry[];
 };
@@ -19,7 +20,7 @@ const Card = ({href, label, children}: {href: string; label: string; children: R
     </Link>
 );
 
-const PersonalRow = ({portfolio, movers, leaderboard}: Props) => {
+const PersonalRow = ({portfolio, best, movers, leaderboard}: Props) => {
     const sign = portfolio.totalReturnPct >= 0 ? '+' : '';
     const myRank = leaderboard.findIndex((e) => e.isYou) + 1;
     const hasFriends = leaderboard.length > 1;
@@ -42,6 +43,15 @@ const PersonalRow = ({portfolio, movers, leaderboard}: Props) => {
                 <div className="text-xs text-[#849495] mt-3" style={{fontFamily: 'var(--font-jetbrains)'}}>
                     Cash {formatPrice(portfolio.cash)}
                 </div>
+                {best && (
+                    <div className="text-xs mt-1" style={{fontFamily: 'var(--font-jetbrains)'}}>
+                        <span className="text-[#849495]">Best strategy: </span>
+                        <span className="text-[#e2e2e8]">{best.name}</span>{' '}
+                        <span className={getChangeColorClass(best.totalReturnPct || undefined)}>
+                            {best.totalReturnPct >= 0 ? '+' : ''}{best.totalReturnPct.toFixed(2)}%
+                        </span>
+                    </div>
+                )}
             </Card>
 
             <Card href="/watchlist" label="Watchlist movers">

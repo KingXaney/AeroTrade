@@ -2,6 +2,7 @@ import {Document, model, models, Schema} from "mongoose";
 
 export interface PaperTradeDoc extends Document {
     userId: string;
+    accountId?: string;  // String(_id) of the owning PaperAccount; absent only on pre-migration rows
     symbol: string;
     company: string;
     side: 'buy' | 'sell';
@@ -14,6 +15,7 @@ export interface PaperTradeDoc extends Document {
 
 const PaperTradeSchema = new Schema<PaperTradeDoc>({
     userId: {type: String, required: true, index: true},
+    accountId: {type: String, index: true},
     symbol: {type: String, required: true, uppercase: true, trim: true},
     company: {type: String, default: ''},
     side: {type: String, required: true, enum: ['buy', 'sell']},
@@ -23,6 +25,8 @@ const PaperTradeSchema = new Schema<PaperTradeDoc>({
     realizedPnl: {type: Number},
     createdAt: {type: Date, default: Date.now, index: true},
 });
+
+PaperTradeSchema.index({accountId: 1, createdAt: -1});
 
 const PaperTrade = models?.PaperTrade || model<PaperTradeDoc>('PaperTrade', PaperTradeSchema);
 

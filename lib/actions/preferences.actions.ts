@@ -32,3 +32,36 @@ export const toggleEmailNotifications = async (userId: string, enabled: boolean)
         return {success: false, enabled: !enabled}; // return the opposite to indicate failure
     }
 };
+
+export const getDigestMode = async (userId: string): Promise<'personalized' | 'general'> => {
+    try {
+        await connectToDatabase();
+
+        const prefs = await UserPreferencesModel.findOne({userId});
+        // Default to the holdings-aware digest if no record exists
+        return prefs?.digestMode === 'general' ? 'general' : 'personalized';
+    } catch (e) {
+        console.error('Error fetching digest mode:', e);
+        return 'personalized';
+    }
+};
+
+export const setDigestMode = async (
+    userId: string,
+    mode: 'personalized' | 'general',
+): Promise<{ success: boolean; mode: 'personalized' | 'general' }> => {
+    try {
+        await connectToDatabase();
+
+        await UserPreferencesModel.findOneAndUpdate(
+            {userId},
+            {digestMode: mode, updatedAt: new Date()},
+            {upsert: true, new: true}
+        );
+
+        return {success: true, mode};
+    } catch (e) {
+        console.error('Error setting digest mode:', e);
+        return {success: false, mode: mode === 'personalized' ? 'general' : 'personalized'};
+    }
+};

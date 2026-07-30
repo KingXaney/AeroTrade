@@ -8,7 +8,13 @@ import Friendship from "@/database/models/friendship.model";
 import PaperAccount from "@/database/models/paper-account.model";
 import {PAPER_STARTING_BALANCE} from "@/lib/constants";
 import {getCurrentUserId} from "@/lib/actions/watchlist.actions";
-import {buildPriceMap, computePortfolio, getPortfolio, type AccountLike} from "@/lib/trading/account";
+import {
+    buildPriceMap,
+    computePortfolio,
+    getPortfoliosForUser,
+    DEFAULT_ACCOUNT_NAME,
+    type AccountLike,
+} from "@/lib/trading/account";
 
 // ============================================================================
 // --- Internal helpers (not exported — free to be non-async / return non-plain) ---
@@ -204,7 +210,10 @@ export const getFriends = async (userId: string): Promise<FriendSummary[]> => {
     }
 };
 
-// You + accepted friends, ranked by total return %. Prices all accounts from one shared map.
+// You + accepted friends, each ranked by their BEST strategy account's return %
+// (one account = one strategy — the competition is "whose best strategy wins",
+// so experimenting with a throwaway account never drags your ranking down).
+// Prices every account of every user from one shared quote map.
 export const getLeaderboard = async (userId: string): Promise<LeaderboardEntry[]> => {
     try {
         const db = await getDb();
@@ -215,27 +224,45 @@ export const getLeaderboard = async (userId: string): Promise<LeaderboardEntry[]
             PaperAccount.find({userId: {$in: allIds}}).lean(),
             getProfilesByIds(db, allIds),
         ]);
-        const accountByUser = new Map(accounts.map((a) => [a.userId, a]));
+        const accountsByUser = new Map<string, typeof accounts>();
+        for (const a of accounts) {
+            const list = accountsByUser.get(a.userId) ?? [];
+            list.push(a);
+            accountsByUser.set(a.userId, list);
+        }
 
         const allSymbols = accounts.flatMap((a) => a.positions.map((p: PaperPosition) => p.symbol));
         const priceMap = await buildPriceMap(allSymbols);
 
         const rows: LeaderboardEntry[] = allIds.map((id) => {
-            const stored = accountByUser.get(id);
-            const account: AccountLike = stored
-                ? {
-                    cash: stored.cash,
-                    startingBalance: stored.startingBalance,
-                    positions: stored.positions.map((p: PaperPosition) => ({symbol: p.symbol, company: p.company, quantity: p.quantity, avgCost: p.avgCost})),
-                }
-                : {cash: PAPER_STARTING_BALANCE, startingBalance: PAPER_STARTING_BALANCE, positions: []};
-            const portfolio = computePortfolio(account, priceMap);
+            const stored = accountsByUser.get(id) ?? [];
+            const candidates = stored.length > 0
+                ? stored.map((a) => ({
+                    name: a.name || DEFAULT_ACCOUNT_NAME,
+                    portfolio: computePortfolio(
+                        {
+                            cash: a.cash,
+                            startingBalance: a.startingBalance,
+                            positions: a.positions.map((p: PaperPosition) => ({symbol: p.symbol, company: p.company, quantity: p.quantity, avgCost: p.avgCost})),
+                        } satisfies AccountLike,
+                        priceMap,
+                    ),
+                }))
+                : [{
+                    name: DEFAULT_ACCOUNT_NAME,
+                    portfolio: computePortfolio(
+                        {cash: PAPER_STARTING_BALANCE, startingBalance: PAPER_STARTING_BALANCE, positions: []},
+                        priceMap,
+                    ),
+                }];
+            const best = candidates.reduce((top, c) => (c.portfolio.totalReturnPct > top.portfolio.totalReturnPct ? c : top));
             return {
                 id,
                 name: id === userId ? 'You' : profiles.get(id)?.name || 'Unknown',
                 isYou: id === userId,
-                totalValue: portfolio.totalValue,
-                totalReturnPct: portfolio.totalReturnPct,
+                totalValue: best.portfolio.totalValue,
+                totalReturnPct: best.portfolio.totalReturnPct,
+                accountName: best.name,
             };
         });
 
@@ -257,8 +284,21 @@ export const getFriendProfile = async (friendId: string, viewerId: string): Prom
         const profile = profiles.get(friendId);
         if (!profile) return null;
 
-        const portfolio = await getPortfolio(friendId);
-        return {id: friendId, name: profile.name, email: profile.email, portfolio};
+        // Show the friend's best strategy in full, plus a compact list of all their strategies.
+        const all = await getPortfoliosForUser(friendId);
+        const best = all.reduce((top, x) => (x.summary.totalReturnPct > top.summary.totalReturnPct ? x : top));
+        return {
+            id: friendId,
+            name: profile.name,
+            email: profile.email,
+            portfolio: best.summary,
+            accountName: best.account.name,
+            accounts: all.map((x) => ({
+                name: x.account.name,
+                totalValue: x.summary.totalValue,
+                totalReturnPct: x.summary.totalReturnPct,
+            })),
+        };
     } catch (error) {
         console.error('Error fetching friend profile:', error);
         return null;

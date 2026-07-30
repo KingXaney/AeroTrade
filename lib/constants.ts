@@ -3,6 +3,7 @@ export const NAV_ITEMS = [
     { href: '/markets', label: 'Markets' },
     { href: '/trade', label: 'Trade' },
     { href: '/portfolio', label: 'Portfolio' },
+    { href: '/brain', label: 'Brain' },
     { href: '/watchlist', label: 'Watchlist' },
     { href: '/friends', label: 'Friends' },
     { href: '/history', label: 'History' },
@@ -11,6 +12,15 @@ export const NAV_ITEMS = [
 
 // Paper-trading: starting virtual cash every account begins with.
 export const PAPER_STARTING_BALANCE = 100_000;
+
+// Paper-trading: max strategy accounts per user.
+export const MAX_PAPER_ACCOUNTS = 10;
+
+// Benchmark ETF snapshotted daily for the performance comparison chart.
+export const BENCHMARK_SYMBOL = 'SPY';
+
+// HTTP-only cookie holding the id of the strategy account the UI operates on.
+export const ACTIVE_ACCOUNT_COOKIE = 'aero-active-account';
 
 // Sign-up form select options
 export const INVESTMENT_GOALS = [

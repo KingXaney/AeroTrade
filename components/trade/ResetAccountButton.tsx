@@ -5,8 +5,9 @@ import {useRouter} from "next/navigation";
 import {toast} from "sonner";
 import {resetPaperAccount} from "@/lib/actions/trading.actions";
 
-// Resets the paper account back to the $100k starting balance (clears positions + history).
-const ResetAccountButton = () => {
+// Resets one strategy account back to the $100k starting balance
+// (clears its positions, trade history and performance snapshots).
+const ResetAccountButton = ({accountId}: {accountId: string}) => {
     const router = useRouter();
     const [busy, setBusy] = useState(false);
     const [confirming, setConfirming] = useState(false);
@@ -15,9 +16,9 @@ const ResetAccountButton = () => {
         if (!confirming) { setConfirming(true); return; }
         setBusy(true);
         try {
-            const result = await resetPaperAccount();
+            const result = await resetPaperAccount(accountId);
             if (result.success) {
-                toast.success(result.message || 'Account reset');
+                toast.success(result.message || 'Strategy reset');
                 router.refresh();
             } else {
                 toast.error(result.message || 'Reset failed');
@@ -37,7 +38,7 @@ const ResetAccountButton = () => {
             className="px-3 py-2 rounded-lg text-xs font-bold uppercase tracking-wider text-[#b9cacb] hover:text-[#ffb4ab] transition-colors disabled:opacity-50"
             style={{border: '1px solid rgba(59,73,75,0.4)', fontFamily: 'var(--font-jetbrains)'}}
         >
-            {busy ? 'Resetting…' : confirming ? 'Click to confirm' : 'Reset Account'}
+            {busy ? 'Resetting…' : confirming ? 'Click to confirm' : 'Reset Strategy'}
         </button>
     );
 };

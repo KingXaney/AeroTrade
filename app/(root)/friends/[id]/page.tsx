@@ -1,5 +1,6 @@
 import Link from "next/link";
 import {notFound, redirect} from "next/navigation";
+import {cn, formatPrice, getChangeColorClass} from "@/lib/utils";
 import {getCurrentUserId} from "@/lib/actions/watchlist.actions";
 import {getFriendProfile} from "@/lib/actions/friends.actions";
 import AccountSummary from "@/components/trade/AccountSummary";
@@ -38,7 +39,37 @@ const FriendProfilePage = async ({params}: FriendProfilePageProps) => {
                 </div>
             </div>
 
+            {/* Best strategy, shown in full */}
+            <div className="flex items-center gap-2">
+                <span className="material-symbols-outlined text-base text-[#7df4ff]">account_tree</span>
+                <span className="text-xs uppercase tracking-[0.1em] text-[#849495]" style={{fontFamily: 'var(--font-jetbrains)'}}>
+                    Best strategy · <span className="text-[#e2e2e8]">{profile.accountName}</span>
+                </span>
+            </div>
             <AccountSummary portfolio={profile.portfolio} />
+
+            {/* All strategies at a glance */}
+            {profile.accounts.length > 1 && (
+                <section className="glass-panel rounded-xl p-5">
+                    <h2 className="text-sm font-bold uppercase tracking-[0.1em] text-[#7df4ff] mb-4" style={{fontFamily: 'var(--font-jetbrains)'}}>
+                        Strategies
+                    </h2>
+                    <div className="space-y-1.5">
+                        {profile.accounts.map((a) => (
+                            <div key={a.name}
+                                 className="flex items-center justify-between px-4 py-3 rounded-lg border bg-[rgba(30,32,36,0.4)] border-[rgba(59,73,75,0.2)]">
+                                <span className="text-sm text-[#e2e2e8]" style={{fontFamily: 'var(--font-jetbrains)'}}>{a.name}</span>
+                                <div className="text-right" style={{fontFamily: 'var(--font-jetbrains)'}}>
+                                    <span className="text-sm text-[#e2e2e8] mr-3">{formatPrice(a.totalValue)}</span>
+                                    <span className={cn('text-xs', getChangeColorClass(a.totalReturnPct || undefined))}>
+                                        {a.totalReturnPct >= 0 ? '+' : ''}{a.totalReturnPct.toFixed(2)}%
+                                    </span>
+                                </div>
+                            </div>
+                        ))}
+                    </div>
+                </section>
+            )}
 
             <section className="glass-panel rounded-xl p-5">
                 <h2 className="text-sm font-bold uppercase tracking-[0.1em] text-[#7df4ff] mb-4" style={{fontFamily: 'var(--font-jetbrains)'}}>

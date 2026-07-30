@@ -12,6 +12,9 @@ import {
     removeFromWatchlist,
     getWatchlistForUser,
 } from "@/lib/actions/watchlist.actions";
+import {connectToDatabase} from "@/database/mongoose";
+import SuggestionSet, {GLOBAL_SUGGESTIONS_USER} from "@/database/models/suggestion-set.model";
+import {getActiveTheses, getBrainDigestData} from "@/lib/brain/queries";
 
 // Tool definitions for the chat assistant. Each one wraps an existing server action.
 // The userId closure keeps auth off the LLM — it never sees or supplies a user id.
@@ -118,6 +121,50 @@ export const buildTools = (userId: string) => ({
                 url: a.url,
                 related: a.related,
             }));
+        },
+    }),
+
+    getBrainDigest: tool({
+        description: 'Read the news brain: the strongest current market narratives (tickers, sectors, themes) with persistent-attention weight, sentiment and whether each is an active long-term thesis. Use when the user asks what the market cares about, which themes are building, or what the AI is watching.',
+        inputSchema: z.object({}),
+        execute: async () => {
+            const [digest, theses] = await Promise.all([getBrainDigestData(), getActiveTheses()]);
+            return {
+                topNarratives: digest,
+                activeTheses: theses.map((t) => ({
+                    name: t.displayName,
+                    key: t.key,
+                    weightSlow: Number(t.weightSlow.toFixed(2)),
+                    sentiment: Number(t.sentimentSlow.toFixed(2)),
+                    activeSince: t.thesisSince ? new Date(t.thesisSince).toISOString().slice(0, 10) : null,
+                })),
+            };
+        },
+    }),
+
+    getAiSuggestions: tool({
+        description: "Fetch the AI Navigator's latest weekly portfolio decisions: the global model portfolio plus this user's own executed decisions if they are enrolled. Use when the user asks what the AI suggests, holds, or traded. Always present these as an automated paper-trading experiment, never as financial advice.",
+        inputSchema: z.object({}),
+        execute: async () => {
+            await connectToDatabase();
+            type LeanSet = {date: string; items: SuggestionItem[]; rationaleMd?: string} | null;
+            const [globalSet, userSet] = await Promise.all([
+                SuggestionSet.findOne({userId: GLOBAL_SUGGESTIONS_USER}).sort({date: -1}).lean<LeanSet>(),
+                SuggestionSet.findOne({userId}).sort({date: -1}).lean<LeanSet>(),
+            ]);
+            const shape = (set: LeanSet) =>
+                set ? {
+                    date: set.date,
+                    items: set.items.map((i) => ({
+                        action: i.action,
+                        symbol: i.symbol,
+                        targetWeightPct: Math.round(i.targetWeight * 100),
+                        executed: i.executed,
+                        reasons: i.reasons,
+                    })),
+                    rationale: set.rationaleMd ?? null,
+                } : null;
+            return {global: shape(globalSet), yours: shape(userSet)};
         },
     }),
 });

@@ -11,9 +11,10 @@ import {placeOrder} from "@/lib/actions/trading.actions";
 type OrderPanelProps = {
     defaultSymbol?: string;
     cash: number;
+    accountId: string;
 };
 
-const OrderPanel = ({defaultSymbol = '', cash}: OrderPanelProps) => {
+const OrderPanel = ({defaultSymbol = '', cash, accountId}: OrderPanelProps) => {
     const router = useRouter();
     const [symbol, setSymbol] = useState(defaultSymbol.toUpperCase());
     const [side, setSide] = useState<'buy' | 'sell'>('buy');
@@ -79,7 +80,7 @@ const OrderPanel = ({defaultSymbol = '', cash}: OrderPanelProps) => {
 
         setSubmitting(true);
         try {
-            const result = await placeOrder({symbol, side, quantity: qtyNum});
+            const result = await placeOrder({symbol, side, quantity: qtyNum, accountId});
             if (result.success) {
                 toast.success(result.message || 'Order filled');
                 router.refresh();
