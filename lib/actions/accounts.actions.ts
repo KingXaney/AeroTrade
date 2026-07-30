@@ -5,6 +5,7 @@ import {cookies} from "next/headers";
 import PaperAccount from "@/database/models/paper-account.model";
 import PaperTrade from "@/database/models/paper-trade.model";
 import AccountSnapshot from "@/database/models/account-snapshot.model";
+import {connectToDatabase} from "@/database/mongoose";
 import {ACTIVE_ACCOUNT_COOKIE, MAX_PAPER_ACCOUNTS, PAPER_STARTING_BALANCE} from "@/lib/constants";
 import {getCurrentUserId} from "@/lib/actions/watchlist.actions";
 import {getAccountsForUser, getOwnedAccount, seedDayZeroSnapshot} from "@/lib/trading/account";
@@ -39,6 +40,30 @@ const validateName = (name: string): string | null => {
 const isDuplicateKeyError = (error: unknown): boolean =>
     typeof error === 'object' && error !== null && (error as {code?: number}).code === 11000;
 
+// Pre-migration databases still carry the old ONE-account-per-user unique index
+// (userId_1). A second-account create then throws E11000 on {userId} alone —
+// distinguishable from a real duplicate NAME, whose index key is {userId, name}.
+const isLegacySingleAccountIndexError = (error: unknown): boolean => {
+    if (!isDuplicateKeyError(error)) return false;
+    const e = error as {keyPattern?: Record<string, unknown>; message?: string};
+    if (e.keyPattern) return 'userId' in e.keyPattern && !('name' in e.keyPattern);
+    return /index:\s*userId_1\b/.test(e.message ?? '');
+};
+
+// Self-heal: dropping the legacy index is exactly what scripts/migrate-multi-account.mjs
+// does — doing it lazily here removes the deploy-order dependency on the script.
+const dropLegacySingleAccountIndex = async (): Promise<boolean> => {
+    try {
+        const mongoose = await connectToDatabase();
+        await mongoose.connection.db?.collection('paperaccounts').dropIndex('userId_1');
+        console.warn('Dropped legacy userId_1 unique index (lazy migration)');
+        return true;
+    } catch (error) {
+        console.error('Could not drop legacy userId_1 index:', error);
+        return false;
+    }
+};
+
 // Create a new strategy account with the standard starting balance and make it active.
 export const createPaperAccount = async ({name}: {name: string}): Promise<OrderResult & {accountId?: string}> => {
     try {
@@ -56,20 +81,34 @@ export const createPaperAccount = async ({name}: {name: string}): Promise<OrderR
             return {success: false, message: `You already have a strategy named "${clean}"`};
         }
 
-        const created = await PaperAccount.create({
-            userId,
-            name: clean,
-            cash: PAPER_STARTING_BALANCE,
-            startingBalance: PAPER_STARTING_BALANCE,
-            inceptionAt: new Date(),
-            positions: [],
-        });
-        await seedDayZeroSnapshot(created);
-        await setActiveAccountCookie(String(created._id));
+        const insertAndActivate = async (): Promise<OrderResult & {accountId?: string}> => {
+            const created = await PaperAccount.create({
+                userId,
+                name: clean,
+                cash: PAPER_STARTING_BALANCE,
+                startingBalance: PAPER_STARTING_BALANCE,
+                inceptionAt: new Date(),
+                positions: [],
+            });
+            await seedDayZeroSnapshot(created);
+            await setActiveAccountCookie(String(created._id));
+            revalidateAccountPaths();
+            return {success: true, message: `Created "${clean}"`, accountId: String(created._id)};
+        };
 
-        revalidateAccountPaths();
-        return {success: true, message: `Created "${clean}"`, accountId: String(created._id)};
+        try {
+            return await insertAndActivate();
+        } catch (error) {
+            if (isLegacySingleAccountIndexError(error) && await dropLegacySingleAccountIndex()) {
+                return await insertAndActivate();
+            }
+            throw error;
+        }
     } catch (error) {
+        if (isLegacySingleAccountIndexError(error)) {
+            console.error('Legacy single-account index still blocking creates:', error);
+            return {success: false, message: 'A database migration is pending — run `npm run migrate:accounts`, then try again'};
+        }
         if (isDuplicateKeyError(error)) {
             return {success: false, message: 'You already have a strategy with that name'};
         }
