@@ -681,6 +681,18 @@ export const bootstrapAiNavigator = inngest.createFunction(
         });
         if (!nav) return {success: true, message: 'Skipped: already ran this week, paused, or not enrolled'};
 
+        // Fresh deployment: an empty brain would degrade this first build to pure
+        // ETF momentum. Run one brain update inline so the decisions have news to
+        // read. Only fires when the graph has NO entities at all (≈ once per
+        // deployment lifetime), so the extra LLM budget is a one-off.
+        const brainEmpty = await step.run('check-brain-empty', async () => {
+            await connectToDatabase();
+            return (await BrainEntity.exists({})) === null;
+        });
+        if (brainEmpty) {
+            await step.invoke('bootstrap-brain-update', {function: updateNewsBrain, data: {}});
+        }
+
         const universe = await step.run('bootstrap-universe', async () => buildNavigatorUniverse());
         await step.run('bootstrap-price-bars', async () => ensureBars(universe.symbols));
         const scored = await step.run('bootstrap-scores', async () => computeNavigatorScores(universe.symbols));
