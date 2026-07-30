@@ -1,5 +1,3 @@
-﻿---
-
 ---
 name: source-driven-development
 description: Grounds every implementation decision in official documentation. Use when you want authoritative, source-cited code free from outdated patterns. Use when building with any framework or library where correctness matters.
@@ -9,7 +7,7 @@ description: Grounds every implementation decision in official documentation. Us
 
 ## Overview
 
-Every framework-specific code decision must be backed by official documentation. Don't implement from memory â€” verify, cite, and let the user see your sources. Training data goes stale, APIs get deprecated, best practices evolve. This skill ensures the user gets code they can trust because every pattern traces back to an authoritative source they can check.
+Every framework-specific code decision must be backed by official documentation. Don't implement from memory — verify, cite, and let the user see your sources. Training data goes stale, APIs get deprecated, best practices evolve. This skill ensures the user gets code they can trust because every pattern traces back to an authoritative source they can check.
 
 ## When to Use
 
@@ -29,9 +27,9 @@ Every framework-specific code decision must be backed by official documentation.
 ## The Process
 
 ```
-DETECT â”€â”€â†’ FETCH â”€â”€â†’ IMPLEMENT â”€â”€â†’ CITE
-  â”‚          â”‚           â”‚            â”‚
-  â–¼          â–¼           â–¼            â–¼
+DETECT ──→ FETCH ──→ IMPLEMENT ──→ CITE
+  │          │           │            │
+  ▼          ▼           ▼            ▼
  What       Get the    Follow the   Show your
  stack?     relevant   documented   sources
             docs       patterns
@@ -42,12 +40,12 @@ DETECT â”€â”€â†’ FETCH â”€â”€â†’ IMPLEMENT â”�
 Read the project's dependency file to identify exact versions:
 
 ```
-package.json    â†’ Node/React/Vue/Angular/Svelte
-composer.json   â†’ PHP/Symfony/Laravel
-requirements.txt / pyproject.toml â†’ Python/Django/Flask
-go.mod          â†’ Go
-Cargo.toml      â†’ Rust
-Gemfile         â†’ Ruby/Rails
+package.json    → Node/React/Vue/Angular/Svelte
+composer.json   → PHP/Symfony/Laravel
+requirements.txt / pyproject.toml → Python/Django/Flask
+go.mod          → Go
+Cargo.toml      → Rust
+Gemfile         → Ruby/Rails
 ```
 
 State what you found explicitly:
@@ -57,14 +55,14 @@ STACK DETECTED:
 - React 19.1.0 (from package.json)
 - Vite 6.2.0
 - Tailwind CSS 4.0.3
-â†’ Fetching official docs for the relevant patterns.
+→ Fetching official docs for the relevant patterns.
 ```
 
-If versions are missing or ambiguous, **ask the user**. Don't guess â€” the version determines which patterns are correct.
+If versions are missing or ambiguous, **ask the user**. Don't guess — the version determines which patterns are correct.
 
 ### Step 2: Fetch Official Documentation
 
-Fetch the specific documentation page for the feature you're implementing. Not the homepage, not the full docs â€” the relevant page.
+Fetch the specific documentation page for the feature you're implementing. Not the homepage, not the full docs — the relevant page.
 
 **Source hierarchy (in order of authority):**
 
@@ -75,12 +73,12 @@ Fetch the specific documentation page for the feature you're implementing. Not t
 | 3 | Web standards references | MDN, web.dev, html.spec.whatwg.org |
 | 4 | Browser/runtime compatibility | caniuse.com, node.green |
 
-**Not authoritative â€” never cite as primary sources:**
+**Not authoritative — never cite as primary sources:**
 
 - Stack Overflow answers
 - Blog posts or tutorials (even popular ones)
 - AI-generated documentation or summaries
-- Your own training data (that is the whole point â€” verify it)
+- Your own training data (that is the whole point — verify it)
 
 **Be precise with what you fetch:**
 

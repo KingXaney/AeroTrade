@@ -1,5 +1,3 @@
-﻿---
-
 ---
 name: performance-optimization
 description: Optimizes application performance. Use when performance requirements exist, when you suspect performance regressions, or when Core Web Vitals or load times need improvement. Use when profiling reveals bottlenecks that need fixing.
@@ -9,7 +7,7 @@ description: Optimizes application performance. Use when performance requirement
 
 ## Overview
 
-Measure before optimizing. Performance work without measurement is guessing â€” and guessing leads to premature optimization that adds complexity without improving what matters. Profile first, identify the actual bottleneck, fix it, measure again. Optimize only what measurements prove matters.
+Measure before optimizing. Performance work without measurement is guessing — and guessing leads to premature optimization that adds complexity without improving what matters. Profile first, identify the actual bottleneck, fix it, measure again. Optimize only what measurements prove matters.
 
 ## When to Use
 
@@ -25,23 +23,23 @@ Measure before optimizing. Performance work without measurement is guessing â�
 
 | Metric | Good | Needs Improvement | Poor |
 |--------|------|-------------------|------|
-| **LCP** (Largest Contentful Paint) | â‰¤ 2.5s | â‰¤ 4.0s | > 4.0s |
-| **INP** (Interaction to Next Paint) | â‰¤ 200ms | â‰¤ 500ms | > 500ms |
-| **CLS** (Cumulative Layout Shift) | â‰¤ 0.1 | â‰¤ 0.25 | > 0.25 |
+| **LCP** (Largest Contentful Paint) | ≤ 2.5s | ≤ 4.0s | > 4.0s |
+| **INP** (Interaction to Next Paint) | ≤ 200ms | ≤ 500ms | > 500ms |
+| **CLS** (Cumulative Layout Shift) | ≤ 0.1 | ≤ 0.25 | > 0.25 |
 
 ## The Optimization Workflow
 
 ```
-1. MEASURE  â†’ Establish baseline with real data
-2. IDENTIFY â†’ Find the actual bottleneck (not assumed)
-3. FIX      â†’ Address the specific bottleneck
-4. VERIFY   â†’ Measure again, confirm improvement
-5. GUARD    â†’ Add monitoring or tests to prevent regression
+1. MEASURE  → Establish baseline with real data
+2. IDENTIFY → Find the actual bottleneck (not assumed)
+3. FIX      → Address the specific bottleneck
+4. VERIFY   → Measure again, confirm improvement
+5. GUARD    → Add monitoring or tests to prevent regression
 ```
 
 ### Step 1: Measure
 
-Two complementary approaches â€” use both:
+Two complementary approaches — use both:
 
 - **Synthetic (Lighthouse, DevTools Performance tab):** Controlled conditions, reproducible. Best for CI regression detection and isolating specific issues.
 - **RUM (web-vitals library, CrUX):** Real user data in real conditions. Required to validate that a fix actually improved user experience.
@@ -49,8 +47,8 @@ Two complementary approaches â€” use both:
 **Frontend:**
 ```bash
 # Synthetic: Lighthouse in Chrome DevTools (or CI)
-# Chrome DevTools â†’ Performance tab â†’ Record
-# Chrome DevTools MCP â†’ Performance trace
+# Chrome DevTools → Performance tab → Record
+# Chrome DevTools MCP → Performance trace
 
 # RUM: Web Vitals library in code
 import { onLCP, onINP, onCLS } from 'web-vitals';
@@ -78,24 +76,24 @@ Use the symptom to decide what to measure first:
 
 ```
 What is slow?
-â”œâ”€â”€ First page load
-â”‚   â”œâ”€â”€ Large bundle? --> Measure bundle size, check code splitting
-â”‚   â”œâ”€â”€ Slow server response? --> Measure TTFB in DevTools Network waterfall
-â”‚   â”‚   â”œâ”€â”€ DNS long? --> Add dns-prefetch / preconnect for known origins
-â”‚   â”‚   â”œâ”€â”€ TCP/TLS long? --> Enable HTTP/2, check edge deployment, keep-alive
-â”‚   â”‚   â””â”€â”€ Waiting (server) long? --> Profile backend, check queries and caching
-â”‚   â””â”€â”€ Render-blocking resources? --> Check network waterfall for CSS/JS blocking
-â”œâ”€â”€ Interaction feels sluggish
-â”‚   â”œâ”€â”€ UI freezes on click? --> Profile main thread, look for long tasks (>50ms)
-â”‚   â”œâ”€â”€ Form input lag? --> Check re-renders, controlled component overhead
-â”‚   â””â”€â”€ Animation jank? --> Check layout thrashing, forced reflows
-â”œâ”€â”€ Page after navigation
-â”‚   â”œâ”€â”€ Data loading? --> Measure API response times, check for waterfalls
-â”‚   â””â”€â”€ Client rendering? --> Profile component render time, check for N+1 fetches
-â””â”€â”€ Backend / API
-    â”œâ”€â”€ Single endpoint slow? --> Profile database queries, check indexes
-    â”œâ”€â”€ All endpoints slow? --> Check connection pool, memory, CPU
-    â””â”€â”€ Intermittent slowness? --> Check for lock contention, GC pauses, external deps
+├── First page load
+│   ├── Large bundle? --> Measure bundle size, check code splitting
+│   ├── Slow server response? --> Measure TTFB in DevTools Network waterfall
+│   │   ├── DNS long? --> Add dns-prefetch / preconnect for known origins
+│   │   ├── TCP/TLS long? --> Enable HTTP/2, check edge deployment, keep-alive
+│   │   └── Waiting (server) long? --> Profile backend, check queries and caching
+│   └── Render-blocking resources? --> Check network waterfall for CSS/JS blocking
+├── Interaction feels sluggish
+│   ├── UI freezes on click? --> Profile main thread, look for long tasks (>50ms)
+│   ├── Form input lag? --> Check re-renders, controlled component overhead
+│   └── Animation jank? --> Check layout thrashing, forced reflows
+├── Page after navigation
+│   ├── Data loading? --> Measure API response times, check for waterfalls
+│   └── Client rendering? --> Profile component render time, check for N+1 fetches
+└── Backend / API
+    ├── Single endpoint slow? --> Profile database queries, check indexes
+    ├── All endpoints slow? --> Check connection pool, memory, CPU
+    └── Intermittent slowness? --> Check for lock contention, GC pauses, external deps
 ```
 
 ### Step 2: Identify the Bottleneck

@@ -1,5 +1,3 @@
-﻿---
-
 ---
 name: doubt-driven-development
 description: Subjects every non-trivial decision to a fresh-context adversarial review before it stands. Use when correctness matters more than speed, when working in unfamiliar code, when stakes are high (production, security-sensitive logic, irreversible operations), or any time a confident output would be cheaper to verify now than to debug later.
@@ -9,7 +7,7 @@ description: Subjects every non-trivial decision to a fresh-context adversarial 
 
 ## Overview
 
-A confident answer is not a correct one. Long sessions accumulate context that quietly turns assumptions into "facts" without anyone noticing. Doubt-driven development is the discipline of materializing a fresh-context reviewer â€” biased to **disprove**, not approve â€” before any non-trivial output stands.
+A confident answer is not a correct one. Long sessions accumulate context that quietly turns assumptions into "facts" without anyone noticing. Doubt-driven development is the discipline of materializing a fresh-context reviewer — biased to **disprove**, not approve — before any non-trivial output stands.
 
 This is not `/review`. `/review` is a verdict on a finished artifact. This is an in-flight posture: non-trivial decisions get cross-examined while course-correction is still cheap.
 
@@ -45,8 +43,8 @@ If you doubt every keystroke, you ship nothing. The skill applies only to non-tr
 
 This skill is designed for the **main-session orchestrator**, where Step 3 (DOUBT, detailed below) can spawn a fresh-context reviewer.
 
-- **Do NOT add this skill to a persona's `skills:` frontmatter.** A persona that follows Step 3 would spawn another persona â€” the orchestration anti-pattern explicitly forbidden by `references/orchestration-patterns.md` ("personas do not invoke other personas").
-- **If you find yourself applying this skill from inside a subagent context** (where Claude Code prevents nested subagent spawn): the preferred path is to surface to the user that doubt-driven cannot run nested and let the main session handle it. As a last resort only, a degraded self-questioning fallback exists â€” rewrite ARTIFACT + CONTRACT as a fresh self-prompt with a hard mental separator from your prior reasoning, and walk Steps 1â€“5. This is **not fresh-context review** (you carry your own context with you), so flag the result as degraded and prefer escalation whenever the user is reachable.
+- **Do NOT add this skill to a persona's `skills:` frontmatter.** A persona that follows Step 3 would spawn another persona — the orchestration anti-pattern explicitly forbidden by `references/orchestration-patterns.md` ("personas do not invoke other personas").
+- **If you find yourself applying this skill from inside a subagent context** (where Claude Code prevents nested subagent spawn): the preferred path is to surface to the user that doubt-driven cannot run nested and let the main session handle it. As a last resort only, a degraded self-questioning fallback exists — rewrite ARTIFACT + CONTRACT as a fresh self-prompt with a hard mental separator from your prior reasoning, and walk Steps 1–5. This is **not fresh-context review** (you carry your own context with you), so flag the result as degraded and prefer escalation whenever the user is reachable.
 
 ## The Process
 
@@ -54,14 +52,14 @@ Copy this checklist when applying the skill:
 
 ```
 Doubt cycle:
-- [ ] Step 1: CLAIM â€” wrote the claim + why-it-matters
-- [ ] Step 2: EXTRACT â€” isolated artifact + contract, stripped reasoning
-- [ ] Step 3: DOUBT â€” invoked fresh-context reviewer with adversarial prompt
-- [ ] Step 4: RECONCILE â€” classified every finding against the artifact text
-- [ ] Step 5: STOP â€” met stop condition (trivial findings, 3 cycles, or user override)
+- [ ] Step 1: CLAIM — wrote the claim + why-it-matters
+- [ ] Step 2: EXTRACT — isolated artifact + contract, stripped reasoning
+- [ ] Step 3: DOUBT — invoked fresh-context reviewer with adversarial prompt
+- [ ] Step 4: RECONCILE — classified every finding against the artifact text
+- [ ] Step 5: STOP — met stop condition (trivial findings, 3 cycles, or user override)
 ```
 
-### Step 1: CLAIM â€” Surface what stands
+### Step 1: CLAIM — Surface what stands
 
 Name the decision in two or three lines:
 
@@ -74,17 +72,17 @@ WHY THIS MATTERS: a race here corrupts user data and is
 
 If you can't write the claim that compactly, you have a vibe, not a decision. Surface it before scrutinizing it.
 
-### Step 2: EXTRACT â€” Smallest reviewable unit
+### Step 2: EXTRACT — Smallest reviewable unit
 
 A fresh-context reviewer needs the **artifact** and the **contract**, not the journey.
 
-- Code: the diff or the function â€” not the whole file
-- Decision: the proposal in 3â€“5 sentences plus the constraints it has to satisfy
+- Code: the diff or the function — not the whole file
+- Decision: the proposal in 3–5 sentences plus the constraints it has to satisfy
 - Assertion: the claim plus the evidence that supposedly supports it (kept distinct from the Step 1 CLAIM block, which is the orchestrator's hypothesis under scrutiny)
 
-Strip your reasoning. If you hand over conclusions, you'll get back validation of your conclusions. The unit must be small enough that a reviewer can hold it in mind in one read â€” if it's a 500-line PR, decompose first.
+Strip your reasoning. If you hand over conclusions, you'll get back validation of your conclusions. The unit must be small enough that a reviewer can hold it in mind in one read — if it's a 500-line PR, decompose first.
 
-### Step 3: DOUBT â€” Invoke the fresh-context reviewer
+### Step 3: DOUBT — Invoke the fresh-context reviewer
 
 The reviewer's prompt **must be adversarial**. Framing decides the answer.
 
@@ -107,13 +105,13 @@ CONTRACT: <paste contract>
 
 **Pass ARTIFACT + CONTRACT only. Do NOT pass the CLAIM.** Handing the reviewer your conclusion biases it toward agreement. The reviewer must independently determine whether the artifact satisfies the contract.
 
-In Claude Code, the role-based reviewers in `agents/` start with isolated context by design and are usable here â€” see `agents/` for the roster and per-domain match.
+In Claude Code, the role-based reviewers in `agents/` start with isolated context by design and are usable here — see `agents/` for the roster and per-domain match.
 
 **The adversarial prompt above takes precedence over the persona's default response shape.** Personas like `code-reviewer` are written to produce balanced verdicts with both strengths and weaknesses; doubt-driven needs issues-only output. Paste the adversarial prompt verbatim into the invocation so it overrides the persona's default. If a persona's response shape can't be overridden cleanly, fall back to a generic subagent with the adversarial prompt.
 
 #### Cross-model escalation
 
-A single-model reviewer shares blind spots with the original author â€” a colder, different-architecture model catches them. Doubt-driven is already opt-in for non-trivial decisions, so within that scope offering cross-model is part of the skill's value, not optional friction.
+A single-model reviewer shares blind spots with the original author — a colder, different-architecture model catches them. Doubt-driven is already opt-in for non-trivial decisions, so within that scope offering cross-model is part of the skill's value, not optional friction.
 
 **Interactive sessions: always offer. Never silently skip.**
 

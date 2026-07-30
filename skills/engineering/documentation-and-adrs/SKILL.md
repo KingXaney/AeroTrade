@@ -1,5 +1,3 @@
-﻿---
-
 ---
 name: documentation-and-adrs
 description: Records decisions and documentation. Use when making architectural decisions, changing public APIs, shipping features, or when you need to record context that future engineers and agents will need to understand the codebase.
@@ -9,7 +7,7 @@ description: Records decisions and documentation. Use when making architectural 
 
 ## Overview
 
-Document decisions, not just code. The most valuable documentation captures the *why* â€” the context, constraints, and trade-offs that led to a decision. Code shows *what* was built; documentation explains *why it was built this way* and *what alternatives were considered*. This context is essential for future humans and agents working in the codebase.
+Document decisions, not just code. The most valuable documentation captures the *why* — the context, constraints, and trade-offs that led to a decision. Code shows *what* was built; documentation explains *why it was built this way* and *what alternatives were considered*. This context is essential for future humans and agents working in the codebase.
 
 ## When to Use
 
@@ -85,7 +83,7 @@ Use PostgreSQL with Prisma ORM.
 ### ADR Lifecycle
 
 ```
-PROPOSED â†’ ACCEPTED â†’ (SUPERSEDED or DEPRECATED)
+PROPOSED → ACCEPTED → (SUPERSEDED or DEPRECATED)
 ```
 
 - **Don't delete old ADRs.** They capture historical context.
@@ -103,7 +101,7 @@ Comment the *why*, not the *what*:
 counter += 1;
 
 // GOOD: Explains non-obvious intent
-// Rate limit uses a sliding window â€” reset counter at window boundary,
+// Rate limit uses a sliding window — reset counter at window boundary,
 // not on a fixed schedule, to prevent burst attacks at window edges
 if (now - windowStart > WINDOW_SIZE_MS) {
   counter = 0;

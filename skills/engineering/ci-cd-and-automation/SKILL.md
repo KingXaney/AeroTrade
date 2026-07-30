@@ -1,5 +1,3 @@
-﻿---
-
 ---
 name: ci-cd-and-automation
 description: Automates CI/CD pipeline setup. Use when setting up or modifying build and deployment pipelines. Use when you need to automate quality gates, configure test runners in CI, or establish deployment strategies.
@@ -9,9 +7,9 @@ description: Automates CI/CD pipeline setup. Use when setting up or modifying bu
 
 ## Overview
 
-Automate quality gates so that no change reaches production without passing tests, lint, type checking, and build. CI/CD is the enforcement mechanism for every other skill â€” it catches what humans and agents miss, and it does so consistently on every single change.
+Automate quality gates so that no change reaches production without passing tests, lint, type checking, and build. CI/CD is the enforcement mechanism for every other skill — it catches what humans and agents miss, and it does so consistently on every single change.
 
-**Shift Left:** Catch problems as early in the pipeline as possible. A bug caught in linting costs minutes; the same bug caught in production costs hours. Move checks upstream â€” static analysis before tests, tests before staging, staging before production.
+**Shift Left:** Catch problems as early in the pipeline as possible. A bug caught in linting costs minutes; the same bug caught in production costs hours. Move checks upstream — static analysis before tests, tests before staging, staging before production.
 
 **Faster is Safer:** Smaller batches and more frequent releases reduce risk, not increase it. A deployment with 3 changes is easier to debug than one with 30. Frequent releases build confidence in the release process itself.
 
@@ -29,31 +27,31 @@ Every change goes through these gates before merge:
 
 ```
 Pull Request Opened
-    â”‚
-    â–¼
-â”Œâ”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”
-â”‚   LINT CHECK     â”‚  eslint, prettier
-â”‚   â†“ pass         â”‚
-â”‚   TYPE CHECK     â”‚  tsc --noEmit
-â”‚   â†“ pass         â”‚
-â”‚   UNIT TESTS     â”‚  jest/vitest
-â”‚   â†“ pass         â”‚
-â”‚   BUILD          â”‚  npm run build
-â”‚   â†“ pass         â”‚
-â”‚   INTEGRATION    â”‚  API/DB tests
-â”‚   â†“ pass         â”‚
-â”‚   E2E (optional) â”‚  Playwright/Cypress
-â”‚   â†“ pass         â”‚
-â”‚   SECURITY AUDIT â”‚  npm audit
-â”‚   â†“ pass         â”‚
-â”‚   BUNDLE SIZE    â”‚  bundlesize check
-â””â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”˜
-    â”‚
-    â–¼
+    │
+    ▼
+┌─────────────────┐
+│   LINT CHECK     │  eslint, prettier
+│   ↓ pass         │
+│   TYPE CHECK     │  tsc --noEmit
+│   ↓ pass         │
+│   UNIT TESTS     │  jest/vitest
+│   ↓ pass         │
+│   BUILD          │  npm run build
+│   ↓ pass         │
+│   INTEGRATION    │  API/DB tests
+│   ↓ pass         │
+│   E2E (optional) │  Playwright/Cypress
+│   ↓ pass         │
+│   SECURITY AUDIT │  npm audit
+│   ↓ pass         │
+│   BUNDLE SIZE    │  bundlesize check
+└─────────────────┘
+    │
+    ▼
   Ready for review
 ```
 
-**No gate can be skipped.** If lint fails, fix lint â€” don't disable the rule. If a test fails, fix the code â€” don't skip the test.
+**No gate can be skipped.** If lint fails, fix lint — don't disable the rule. If a test fails, fix the code — don't skip the test.
 
 ## GitHub Actions Configuration
 

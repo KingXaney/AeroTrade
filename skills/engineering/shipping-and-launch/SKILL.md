@@ -1,5 +1,3 @@
-﻿---
-
 ---
 name: shipping-and-launch
 description: Prepares production launches. Use when preparing to deploy to production. Use when you need a pre-launch checklist, when setting up monitoring, when planning a staged rollout, or when you need a rollback strategy.
@@ -9,7 +7,7 @@ description: Prepares production launches. Use when preparing to deploy to produ
 
 ## Overview
 
-Ship with confidence. The goal is not just to deploy â€” it's to deploy safely, with monitoring in place, a rollback plan ready, and a clear understanding of what success looks like. Every launch should be reversible, observable, and incremental.
+Ship with confidence. The goal is not just to deploy — it's to deploy safely, with monitoring in place, a rollback plan ready, and a clear understanding of what success looks like. Every launch should be reversible, observable, and incremental.
 
 ## When to Use
 
@@ -96,11 +94,11 @@ return null;
 **Feature flag lifecycle:**
 
 ```
-1. DEPLOY with flag OFF     â†’ Code is in production but inactive
-2. ENABLE for team/beta     â†’ Internal testing in production environment
-3. GRADUAL ROLLOUT          â†’ 5% â†’ 25% â†’ 50% â†’ 100% of users
-4. MONITOR at each stage    â†’ Watch error rates, performance, user feedback
-5. CLEAN UP                 â†’ Remove flag and dead code path after full rollout
+1. DEPLOY with flag OFF     → Code is in production but inactive
+2. ENABLE for team/beta     → Internal testing in production environment
+3. GRADUAL ROLLOUT          → 5% → 25% → 50% → 100% of users
+4. MONITOR at each stage    → Watch error rates, performance, user feedback
+5. CLEAN UP                 → Remove flag and dead code path after full rollout
 ```
 
 **Rules:**
@@ -115,16 +113,16 @@ return null;
 
 ```
 1. DEPLOY to staging
-   â””â”€â”€ Full test suite in staging environment
-   â””â”€â”€ Manual smoke test of critical flows
+   └── Full test suite in staging environment
+   └── Manual smoke test of critical flows
 
 2. DEPLOY to production (feature flag OFF)
-   â””â”€â”€ Verify deployment succeeded (health check)
-   â””â”€â”€ Check error monitoring (no new errors)
+   └── Verify deployment succeeded (health check)
+   └── Check error monitoring (no new errors)
 
 3. ENABLE for team (flag ON for internal users)
-   â””â”€â”€ Team uses the feature in production
-   â””â”€â”€ 24-hour monitoring window
+   └── Team uses the feature in production
+   └── 24-hour monitoring window
 
 4. CANARY rollout (flag ON for 5% of users)
-   â””â”€â”€ Monitor error rates, latency, user
+   └── Monitor error rates, latency, user

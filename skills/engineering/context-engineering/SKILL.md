@@ -1,5 +1,3 @@
-﻿---
-
 ---
 name: context-engineering
 description: Optimizes agent context setup. Use when starting a new session, when agent output quality degrades, when switching between tasks, or when you need to configure rules files and context for a project.
@@ -9,7 +7,7 @@ description: Optimizes agent context setup. Use when starting a new session, whe
 
 ## Overview
 
-Feed agents the right information at the right time. Context is the single biggest lever for agent output quality â€” too little and the agent hallucinates, too much and it loses focus. Context engineering is the practice of deliberately curating what the agent sees, when it sees it, and how it's structured.
+Feed agents the right information at the right time. Context is the single biggest lever for agent output quality — too little and the agent hallucinates, too much and it loses focus. Context engineering is the practice of deliberately curating what the agent sees, when it sees it, and how it's structured.
 
 ## When to Use
 
@@ -24,17 +22,17 @@ Feed agents the right information at the right time. Context is the single bigge
 Structure context from most persistent to most transient:
 
 ```
-â”Œâ”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”
-â”‚  1. Rules Files (CLAUDE.md, etc.)   â”‚ â† Always loaded, project-wide
-â”œâ”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”¤
-â”‚  2. Spec / Architecture Docs        â”‚ â† Loaded per feature/session
-â”œâ”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”¤
-â”‚  3. Relevant Source Files            â”‚ â† Loaded per task
-â”œâ”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”¤
-â”‚  4. Error Output / Test Results      â”‚ â† Loaded per iteration
-â”œâ”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”¤
-â”‚  5. Conversation History             â”‚ â† Accumulates, compacts
-â””â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”˜
+┌─────────────────────────────────────┐
+│  1. Rules Files (CLAUDE.md, etc.)   │ ← Always loaded, project-wide
+├─────────────────────────────────────┤
+│  2. Spec / Architecture Docs        │ ← Loaded per feature/session
+├─────────────────────────────────────┤
+│  3. Relevant Source Files            │ ← Loaded per task
+├─────────────────────────────────────┤
+│  4. Error Output / Test Results      │ ← Loaded per iteration
+├─────────────────────────────────────┤
+│  5. Conversation History             │ ← Accumulates, compacts
+└─────────────────────────────────────┘
 ```
 
 ### Level 1: Rules Files
@@ -59,7 +57,7 @@ Create a rules file that persists across sessions. This is the highest-leverage 
 ## Code Conventions
 - Functional components with hooks (no class components)
 - Named exports (no default exports)
-- colocate tests next to source: `Button.tsx` â†’ `Button.test.tsx`
+- colocate tests next to source: `Button.tsx` → `Button.test.tsx`
 - Use `cn()` utility for conditional classNames
 - Error boundaries at route level
 
