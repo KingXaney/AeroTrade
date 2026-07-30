@@ -6,7 +6,7 @@ import PaperTrade from "@/database/models/paper-trade.model";
 import AccountSnapshot from "@/database/models/account-snapshot.model";
 import {PAPER_STARTING_BALANCE} from "@/lib/constants";
 import {getCurrentUserId} from "@/lib/actions/watchlist.actions";
-import {getOwnedAccount, seedDayZeroSnapshot} from "@/lib/trading/account";
+import {getOwnedAccount, resolveStartingBalance, seedDayZeroSnapshot} from "@/lib/trading/account";
 import {executeOrder} from "@/lib/trading/orders";
 
 // Every surface that shows account data — trade desk, portfolio hub, dashboard, friends.
@@ -32,8 +32,9 @@ export const placeOrder = async (
 };
 
 // Reset one strategy account: back to starting cash, no positions, cleared trade log
-// and performance history, with inception re-anchored to now.
-export const resetPaperAccount = async (accountId: string): Promise<OrderResult> => {
+// and performance history, with inception re-anchored to now. Preserves the account's
+// own starting balance unless a new one is passed.
+export const resetPaperAccount = async (accountId: string, startingBalance?: number): Promise<OrderResult> => {
     try {
         const userId = await getCurrentUserId();
         if (!userId) return {success: false, message: 'Not authenticated'};
@@ -41,9 +42,14 @@ export const resetPaperAccount = async (accountId: string): Promise<OrderResult>
         const account = await getOwnedAccount(userId, accountId);
         if (!account) return {success: false, message: 'Strategy account not found'};
 
+        const balance = startingBalance === undefined
+            ? (account.startingBalance || PAPER_STARTING_BALANCE)
+            : resolveStartingBalance(startingBalance);
+        if (balance === null) return {success: false, message: 'Invalid starting balance'};
+
         await PaperAccount.updateOne(
             {_id: account._id, userId},
-            {$set: {cash: PAPER_STARTING_BALANCE, startingBalance: PAPER_STARTING_BALANCE, positions: [], inceptionAt: new Date()}},
+            {$set: {cash: balance, startingBalance: balance, positions: [], inceptionAt: new Date()}},
         );
         // Also sweep pre-migration trades with no accountId: pre-migration this user had
         // exactly one account (old unique index), so they all belong here — otherwise the
@@ -59,7 +65,7 @@ export const resetPaperAccount = async (accountId: string): Promise<OrderResult>
         if (fresh) await seedDayZeroSnapshot(fresh);
 
         revalidateTradingPaths();
-        return {success: true, message: `${account.name || 'Strategy'} reset to $${PAPER_STARTING_BALANCE.toLocaleString('en-US')}`};
+        return {success: true, message: `${account.name || 'Strategy'} reset to $${balance.toLocaleString('en-US')}`};
     } catch (error) {
         console.error('Error resetting account:', error);
         return {success: false, message: 'Reset failed'};

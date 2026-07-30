@@ -5,12 +5,17 @@ import {useRouter} from "next/navigation";
 import Link from "next/link";
 import {toast} from "sonner";
 import {enrollAiNavigator, pauseAiNavigator, resumeAiNavigator, unenrollAiNavigator} from "@/lib/actions/navigator.actions";
+import {MAX_STARTING_BALANCE, MIN_STARTING_BALANCE, PAPER_STARTING_BALANCE} from "@/lib/constants";
 
 // Enrollment + kill switch for the AI-managed paper account.
 const NavigatorCard = ({status}: {status: NavigatorStatus}) => {
     const router = useRouter();
     const [busy, setBusy] = useState(false);
     const [confirmingUnenroll, setConfirmingUnenroll] = useState(false);
+    const [startBalance, setStartBalance] = useState(String(PAPER_STARTING_BALANCE));
+
+    const balanceNum = startBalance === '' ? 0 : parseInt(startBalance, 10);
+    const balanceValid = balanceNum >= MIN_STARTING_BALANCE && balanceNum <= MAX_STARTING_BALANCE;
 
     const run = async (action: () => Promise<OrderResult>) => {
         if (busy) return;
@@ -47,21 +52,42 @@ const NavigatorCard = ({status}: {status: NavigatorStatus}) => {
             </div>
 
             <p className="text-sm text-[#849495] mb-4">
-                A dedicated $100k paper account traded weekly by the news brain — long-horizon
+                A dedicated paper account traded weekly by the news brain — long-horizon
                 theses, strict rails, measured honestly against the S&amp;P 500. An experiment,
                 not financial advice.
             </p>
 
             {!status.enrolled ? (
-                <button
-                    type="button"
-                    onClick={() => void run(enrollAiNavigator)}
-                    disabled={busy}
-                    className="w-full py-3 rounded-lg text-sm font-bold uppercase tracking-wider transition-all active:scale-[0.98] disabled:opacity-50 text-[#002022]"
-                    style={{fontFamily: 'var(--font-jetbrains)', backgroundColor: '#00f0ff', boxShadow: '0 0 15px rgba(0,240,255,0.3)'}}
-                >
-                    {busy ? 'Enrolling…' : 'Enroll — create the AI account'}
-                </button>
+                <div className="flex flex-col gap-3">
+                    <div>
+                        <label htmlFor="navigator-balance" className="text-[10px] uppercase tracking-[0.1em] text-[#849495]" style={{fontFamily: 'var(--font-jetbrains)'}}>
+                            The AI starts with ($)
+                        </label>
+                        <input
+                            id="navigator-balance"
+                            value={startBalance}
+                            onChange={(e) => setStartBalance(e.target.value.replace(/[^0-9]/g, ''))}
+                            inputMode="numeric"
+                            autoComplete="off"
+                            className="w-full mt-1 rounded-lg px-3 py-2 text-sm text-[#e2e2e8] outline-none"
+                            style={{backgroundColor: '#111318', border: '1px solid rgba(59,73,75,0.4)', fontFamily: 'var(--font-jetbrains)'}}
+                        />
+                        {!balanceValid && startBalance !== '' && (
+                            <p className="mt-1 text-xs text-[#ffb4ab]">
+                                Between ${MIN_STARTING_BALANCE.toLocaleString('en-US')} and ${MAX_STARTING_BALANCE.toLocaleString('en-US')}
+                            </p>
+                        )}
+                    </div>
+                    <button
+                        type="button"
+                        onClick={() => void run(() => enrollAiNavigator({startingBalance: balanceNum}))}
+                        disabled={busy || !balanceValid}
+                        className="w-full py-3 rounded-lg text-sm font-bold uppercase tracking-wider transition-all active:scale-[0.98] disabled:opacity-50 text-[#002022]"
+                        style={{fontFamily: 'var(--font-jetbrains)', backgroundColor: '#00f0ff', boxShadow: '0 0 15px rgba(0,240,255,0.3)'}}
+                    >
+                        {busy ? 'Enrolling…' : `Enroll — AI trades $${(balanceNum || 0).toLocaleString('en-US')}`}
+                    </button>
+                </div>
             ) : (
                 <div className="flex flex-wrap items-center gap-2">
                     {status.status === 'active' ? (

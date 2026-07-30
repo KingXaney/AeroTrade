@@ -5,7 +5,10 @@ import AiNavigator from "@/database/models/ai-navigator.model";
 import {connectToDatabase} from "@/database/mongoose";
 import {getCurrentUserId} from "@/lib/actions/watchlist.actions";
 import {createPaperAccount} from "@/lib/actions/accounts.actions";
-import {getAccountsForUser, getOwnedAccount, getPortfolio} from "@/lib/trading/account";
+import PaperAccount from "@/database/models/paper-account.model";
+import PaperTrade from "@/database/models/paper-trade.model";
+import AccountSnapshot from "@/database/models/account-snapshot.model";
+import {getAccountsForUser, getOwnedAccount, getPortfolio, resolveStartingBalance, seedDayZeroSnapshot} from "@/lib/trading/account";
 import {executeOrder} from "@/lib/trading/orders";
 import {getQuote} from "@/lib/actions/finnhub.actions";
 import {AI_NAVIGATOR_ACCOUNT_NAME} from "@/lib/navigator/config";
@@ -36,8 +39,11 @@ export const getNavigatorStatus = async (userId: string): Promise<NavigatorStatu
 };
 
 // Opt in: the AI gets its own dedicated paper account, created (or reclaimed on
-// re-enrollment) through the normal account flow so caps/seeding all apply.
-export const enrollAiNavigator = async (): Promise<OrderResult> => {
+// re-enrollment) through the normal account flow so caps/seeding all apply. The
+// user picks how much the AI starts with (default $100k).
+export const enrollAiNavigator = async (
+    {startingBalance}: {startingBalance?: number} = {},
+): Promise<OrderResult> => {
     try {
         const userId = await getCurrentUserId();
         if (!userId) return {success: false, message: 'Not authenticated'};
@@ -58,8 +64,22 @@ export const enrollAiNavigator = async (): Promise<OrderResult> => {
             };
         }
         let accountId = reusable ? String(reusable._id) : undefined;
+        if (accountId && reusable && startingBalance !== undefined) {
+            // Re-enrollment with a chosen balance: the reclaimed account is empty
+            // (guarded above), so restart it cleanly at the requested amount.
+            const balance = resolveStartingBalance(startingBalance);
+            if (balance === null) return {success: false, message: 'Invalid starting balance'};
+            await PaperAccount.updateOne(
+                {_id: reusable._id, userId},
+                {$set: {cash: balance, startingBalance: balance, positions: [], inceptionAt: new Date()}},
+            );
+            await PaperTrade.deleteMany({accountId});
+            await AccountSnapshot.deleteMany({accountId});
+            const fresh = await getOwnedAccount(userId, accountId);
+            if (fresh) await seedDayZeroSnapshot(fresh);
+        }
         if (!accountId) {
-            const created = await createPaperAccount({name: AI_NAVIGATOR_ACCOUNT_NAME});
+            const created = await createPaperAccount({name: AI_NAVIGATOR_ACCOUNT_NAME, startingBalance});
             if (!created.success || !created.accountId) {
                 return {success: false, message: created.message || 'Could not create the AI account'};
             }

@@ -10,8 +10,11 @@ export const NAV_ITEMS = [
     { href: '/search', label: 'Search' },
 ];
 
-// Paper-trading: starting virtual cash every account begins with.
+// Paper-trading: default starting virtual cash; users may pick a custom amount
+// at account creation / AI enrollment within these bounds.
 export const PAPER_STARTING_BALANCE = 100_000;
+export const MIN_STARTING_BALANCE = 1_000;
+export const MAX_STARTING_BALANCE = 10_000_000;
 
 // Paper-trading: max strategy accounts per user.
 export const MAX_PAPER_ACCOUNTS = 10;

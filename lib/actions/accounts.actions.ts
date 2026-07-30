@@ -6,9 +6,14 @@ import PaperAccount from "@/database/models/paper-account.model";
 import PaperTrade from "@/database/models/paper-trade.model";
 import AccountSnapshot from "@/database/models/account-snapshot.model";
 import {connectToDatabase} from "@/database/mongoose";
-import {ACTIVE_ACCOUNT_COOKIE, MAX_PAPER_ACCOUNTS, PAPER_STARTING_BALANCE} from "@/lib/constants";
+import {
+    ACTIVE_ACCOUNT_COOKIE,
+    MAX_PAPER_ACCOUNTS,
+    MAX_STARTING_BALANCE,
+    MIN_STARTING_BALANCE,
+} from "@/lib/constants";
 import {getCurrentUserId} from "@/lib/actions/watchlist.actions";
-import {getAccountsForUser, getOwnedAccount, seedDayZeroSnapshot} from "@/lib/trading/account";
+import {getAccountsForUser, getOwnedAccount, resolveStartingBalance, seedDayZeroSnapshot} from "@/lib/trading/account";
 
 const ACCOUNT_NAME_MAX_LENGTH = 40;
 const ACTIVE_COOKIE_MAX_AGE_SECONDS = 60 * 60 * 24 * 365;
@@ -37,6 +42,7 @@ const validateName = (name: string): string | null => {
     return clean;
 };
 
+
 const isDuplicateKeyError = (error: unknown): boolean =>
     typeof error === 'object' && error !== null && (error as {code?: number}).code === 11000;
 
@@ -64,14 +70,21 @@ const dropLegacySingleAccountIndex = async (): Promise<boolean> => {
     }
 };
 
-// Create a new strategy account with the standard starting balance and make it active.
-export const createPaperAccount = async ({name}: {name: string}): Promise<OrderResult & {accountId?: string}> => {
+// Create a new strategy account (default or custom starting balance) and make it active.
+export const createPaperAccount = async (
+    {name, startingBalance}: {name: string; startingBalance?: number},
+): Promise<OrderResult & {accountId?: string}> => {
     try {
         const userId = await getCurrentUserId();
         if (!userId) return {success: false, message: 'Not authenticated'};
 
         const clean = validateName(name);
         if (!clean) return {success: false, message: `Name must be 1–${ACCOUNT_NAME_MAX_LENGTH} characters`};
+
+        const balance = resolveStartingBalance(startingBalance);
+        if (balance === null) {
+            return {success: false, message: `Starting balance must be between $${MIN_STARTING_BALANCE.toLocaleString('en-US')} and $${MAX_STARTING_BALANCE.toLocaleString('en-US')}`};
+        }
 
         const accounts = await getAccountsForUser(userId);
         if (accounts.length >= MAX_PAPER_ACCOUNTS) {
@@ -85,15 +98,15 @@ export const createPaperAccount = async ({name}: {name: string}): Promise<OrderR
             const created = await PaperAccount.create({
                 userId,
                 name: clean,
-                cash: PAPER_STARTING_BALANCE,
-                startingBalance: PAPER_STARTING_BALANCE,
+                cash: balance,
+                startingBalance: balance,
                 inceptionAt: new Date(),
                 positions: [],
             });
             await seedDayZeroSnapshot(created);
             await setActiveAccountCookie(String(created._id));
             revalidateAccountPaths();
-            return {success: true, message: `Created "${clean}"`, accountId: String(created._id)};
+            return {success: true, message: `Created "${clean}" with $${balance.toLocaleString('en-US')}`, accountId: String(created._id)};
         };
 
         try {

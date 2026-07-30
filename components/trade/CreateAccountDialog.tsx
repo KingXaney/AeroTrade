@@ -4,22 +4,27 @@ import {useState} from "react";
 import {useRouter} from "next/navigation";
 import {toast} from "sonner";
 import {createPaperAccount} from "@/lib/actions/accounts.actions";
+import {MAX_STARTING_BALANCE, MIN_STARTING_BALANCE, PAPER_STARTING_BALANCE} from "@/lib/constants";
 import {Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle} from "@/components/ui/dialog";
 
-// Name a new strategy account. Mounted conditionally by AccountSwitcher so every
-// open starts with fresh state (same pattern as SellPositionDialog).
+// Name a new strategy account and pick its starting balance. Mounted conditionally
+// by AccountSwitcher so every open starts with fresh state (same pattern as
+// SellPositionDialog).
 const CreateAccountDialog = ({onClose}: {onClose: () => void}) => {
     const router = useRouter();
     const [name, setName] = useState('');
+    const [balance, setBalance] = useState(String(PAPER_STARTING_BALANCE));
     const [submitting, setSubmitting] = useState(false);
 
-    const valid = name.trim().length > 0 && name.trim().length <= 40;
+    const balanceNum = balance === '' ? 0 : parseInt(balance, 10);
+    const balanceValid = balanceNum >= MIN_STARTING_BALANCE && balanceNum <= MAX_STARTING_BALANCE;
+    const valid = name.trim().length > 0 && name.trim().length <= 40 && balanceValid;
 
     const onConfirm = async () => {
         if (submitting || !valid) return;
         setSubmitting(true);
         try {
-            const result = await createPaperAccount({name});
+            const result = await createPaperAccount({name, startingBalance: balanceNum});
             if (result.success) {
                 toast.success(result.message || 'Strategy created');
                 onClose();
@@ -40,7 +45,7 @@ const CreateAccountDialog = ({onClose}: {onClose: () => void}) => {
                         New Strategy Account
                     </DialogTitle>
                     <DialogDescription className="text-[#849495]">
-                        Each strategy gets its own $100,000 paper account so you can compare how they perform.
+                        Each strategy gets its own paper account so you can compare how they perform. Returns are tracked in %, so any starting balance stays comparable.
                     </DialogDescription>
                 </DialogHeader>
 
@@ -62,6 +67,26 @@ const CreateAccountDialog = ({onClose}: {onClose: () => void}) => {
                         />
                     </div>
 
+                    <div>
+                        <label htmlFor="account-balance" className="text-[10px] uppercase tracking-[0.1em] text-[#849495]" style={{fontFamily: 'var(--font-jetbrains)'}}>
+                            Starting balance ($)
+                        </label>
+                        <input
+                            id="account-balance"
+                            value={balance}
+                            onChange={(e) => setBalance(e.target.value.replace(/[^0-9]/g, ''))}
+                            inputMode="numeric"
+                            autoComplete="off"
+                            className="w-full mt-1 rounded-lg px-3 py-2 text-sm text-[#e2e2e8] outline-none"
+                            style={{backgroundColor: '#111318', border: '1px solid rgba(59,73,75,0.4)', fontFamily: 'var(--font-jetbrains)'}}
+                        />
+                        {!balanceValid && balance !== '' && (
+                            <p className="mt-1 text-xs text-[#ffb4ab]">
+                                Between ${MIN_STARTING_BALANCE.toLocaleString('en-US')} and ${MAX_STARTING_BALANCE.toLocaleString('en-US')}
+                            </p>
+                        )}
+                    </div>
+
                     <button
                         type="submit"
                         disabled={submitting || !valid}
@@ -72,7 +97,7 @@ const CreateAccountDialog = ({onClose}: {onClose: () => void}) => {
                             boxShadow: '0 0 15px rgba(0,240,255,0.3)',
                         }}
                     >
-                        {submitting ? 'Creating…' : 'Create Strategy'}
+                        {submitting ? 'Creating…' : `Create with $${(balanceNum || 0).toLocaleString('en-US')}`}
                     </button>
                 </form>
             </DialogContent>
