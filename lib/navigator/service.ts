@@ -19,6 +19,7 @@ import {getEasternDateString} from "@/lib/utils";
 
 export type SuggestionSetView = {
     date: string;
+    kind: 'executed' | 'preview';
     items: SuggestionItem[];
     rationaleMd: string | null;
 };
@@ -27,6 +28,7 @@ const toView = (set: SuggestionSetDoc | null): SuggestionSetView | null => {
     if (!set) return null;
     return {
         date: set.date,
+        kind: set.kind === 'preview' ? 'preview' : 'executed',
         items: set.items.map((i) => ({
             symbol: i.symbol,
             action: i.action,

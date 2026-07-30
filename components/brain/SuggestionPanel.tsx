@@ -7,7 +7,7 @@ import {toast} from "sonner";
 import {cn, formatPrice, getChangeColorClass} from "@/lib/utils";
 import {applySuggestion} from "@/lib/actions/navigator.actions";
 
-type SetView = {date: string; items: SuggestionItem[]; rationaleMd: string | null};
+type SetView = {date: string; kind: 'executed' | 'preview'; items: SuggestionItem[]; rationaleMd: string | null};
 type ApplyAccount = {id: string; name: string};
 
 const ACTION_STYLES: Record<SuggestionAction, string> = {
@@ -101,11 +101,18 @@ const SuggestionPanel = ({userSet, globalSet, accounts}: {userSet: SetView | nul
         );
     }
 
-    const showApply = userSet === null;
+    // Apply buttons show for the global model portfolio and for previews — both
+    // are suggestions the user may act on; executed sets are a record, not advice.
+    const showApply = userSet === null || userSet.kind === 'preview';
     return (
         <div className="space-y-3">
             <p className="text-[11px] text-[#849495]" style={{fontFamily: 'var(--font-jetbrains)'}}>
-                {userSet ? 'Your AI account · decided' : 'Global model portfolio · decided'} {set.date}
+                {userSet ? 'Your AI account' : 'Global model portfolio'} · {set.date}
+                {set.kind === 'preview' && (
+                    <span className="ml-2 px-1.5 py-0.5 rounded text-[10px] font-bold uppercase tracking-[0.08em] text-[#ffd700] bg-[rgba(255,215,0,0.08)]">
+                        Preview — nothing traded
+                    </span>
+                )}
             </p>
             <div className="space-y-2">
                 {set.items.map((item) => (

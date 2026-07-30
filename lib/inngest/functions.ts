@@ -41,7 +41,7 @@ import PaperAccount from "@/database/models/paper-account.model";
 import AccountSnapshot from "@/database/models/account-snapshot.model";
 import BenchmarkSnapshot from "@/database/models/benchmark-snapshot.model";
 import {BENCHMARK_SYMBOL} from "@/lib/constants";
-import {buildPriceMap, computePortfolio, getHeldSymbolsByUserId, type PriceInfo} from "@/lib/trading/account";
+import {buildPriceMap, computePortfolio, getHeldSymbolsByUserId, getOwnedAccount, type PriceInfo} from "@/lib/trading/account";
 
 export const sendSignUpEmail = inngest.createFunction(
     { id: 'sign-up-email', triggers: [{ event: 'app/user.created' }] },
@@ -591,7 +591,8 @@ export const sendDailyNewsSummary = inngest.createFunction(
                 const navigatorData = await step.run(`fetch-navigator-${safeId}`, async () => {
                     try {
                         await connectToDatabase();
-                        const set = await SuggestionSet.findOne({userId: user.id}).sort({date: -1}).lean();
+                        // Previews are analysis-only — the email reports actual AI activity.
+                        const set = await SuggestionSet.findOne({userId: user.id, kind: {$ne: 'preview'}}).sort({date: -1}).lean();
                         if (!set) return null;
                         const theses = await getActiveTheses();
                         return {
@@ -656,12 +657,12 @@ export const sendDailyNewsSummary = inngest.createFunction(
     }
 )
 
-// One-time enrollment bootstrap: build the user's starting AI portfolio right away
-// instead of waiting for Monday. Same shared decision pipeline as the weekly run,
-// with one exception — the trade cap is lifted to MAX_POSITIONS so the initial
-// deployment can complete in a single pass (the weekly cap exists to prevent churn,
-// not to slow a one-time build). Claims the SAME weekly budget slot, so the next
-// Monday cron in the same week skips this user instead of double-trading.
+// On-demand navigator run: fired on enrollment (to build the starting portfolio
+// immediately) and by the "Run AI now" button. If this week's trade budget is
+// still unclaimed it TRADES — it is simply the weekly run happening early, and
+// the Monday cron then skips this user. If the AI already traded this week it
+// produces a PREVIEW instead: full scoring, planned orders and rationale, badged
+// and never executed — analysis without a churn loophole.
 export const bootstrapAiNavigator = inngest.createFunction(
     { id: 'ai-navigator-bootstrap', triggers: [{ event: 'app/bootstrap.ai.navigator' }] },
     async ({ step, event }) => {
@@ -671,20 +672,27 @@ export const bootstrapAiNavigator = inngest.createFunction(
         const today = getEasternDateString();
         const weekKey = getEasternWeekKey(today);
 
-        const nav = await step.run('claim-bootstrap', async () => {
+        const nav = await step.run('load-navigator', async () => {
+            await connectToDatabase();
+            const doc = await AiNavigator.findOne({userId});
+            return doc ? {accountId: doc.accountId, status: doc.status} : null;
+        });
+        if (!nav) return {success: true, message: 'Skipped: not enrolled'};
+        if (nav.status !== 'active') return {success: true, message: 'Skipped: navigator is paused'};
+
+        // Atomic weekly-budget claim decides the mode: won → trade, lost → preview.
+        const claimed = await step.run('claim-bootstrap', async () => {
             await connectToDatabase();
             const doc = await AiNavigator.findOneAndUpdate(
                 {userId, status: 'active', lastRunDate: {$ne: weekKey}},
                 {$set: {lastRunDate: weekKey}},
             );
-            return doc ? {accountId: doc.accountId} : null;
+            return doc !== null;
         });
-        if (!nav) return {success: true, message: 'Skipped: already ran this week, paused, or not enrolled'};
 
-        // Fresh deployment: an empty brain would degrade this first build to pure
-        // ETF momentum. Run one brain update inline so the decisions have news to
-        // read. Only fires when the graph has NO entities at all (≈ once per
-        // deployment lifetime), so the extra LLM budget is a one-off.
+        // Fresh deployment: an empty brain would degrade decisions to pure ETF
+        // momentum. Run one brain update inline so there is news to read. Only
+        // fires when the graph has NO entities (≈ once per deployment lifetime).
         const brainEmpty = await step.run('check-brain-empty', async () => {
             await connectToDatabase();
             return (await BrainEntity.exists({})) === null;
@@ -700,8 +708,18 @@ export const bootstrapAiNavigator = inngest.createFunction(
         const targets = buildTargets(scored);
         const scoreBySymbol = new Map(scored.map((s) => [s.symbol, s]));
 
+        // The lifted MAX_POSITIONS cap is only for an initial deployment of an
+        // empty account; established accounts (and previews) use the weekly cap.
+        const accountEmpty = await step.run('check-account-empty', async () => {
+            const account = await getOwnedAccount(userId, nav.accountId);
+            return account !== null && account.positions.length === 0;
+        });
+
         const orders = await step.run('bootstrap-plan', async () => {
-            const plan = await planAccountOrders(userId, nav.accountId, targets, scoreBySymbol, MAX_POSITIONS);
+            const plan = await planAccountOrders(
+                userId, nav.accountId, targets, scoreBySymbol,
+                claimed && accountEmpty ? MAX_POSITIONS : undefined,
+            );
             if (!plan) {
                 await AiNavigator.updateOne({userId}, {$set: {lastError: 'AI account missing'}});
             }
@@ -709,37 +727,55 @@ export const bootstrapAiNavigator = inngest.createFunction(
         });
         if (!orders) return {success: false, message: 'AI account missing'};
 
-        let sellFailed = false;
         const executed: SuggestionItem[] = [];
-        for (const order of orders.planned) {
-            let result: OrderResult & {price?: number};
-            if (sellFailed && order.side === 'buy') {
-                result = {success: false, message: 'Skipped: a funding sell failed this run'};
-            } else {
-                const orderStepId = `bootstrap-order-${safeId}-${order.side}-${order.symbol}`.replace(/[^a-zA-Z0-9_-]/g, '_');
-                result = await step.run(orderStepId, async () =>
-                    executeOrder(userId, {
-                        accountId: nav.accountId,
-                        symbol: order.symbol,
-                        side: order.side,
-                        quantity: order.quantity,
-                        ...(order.side === 'buy' ? {minCashAfter: MIN_CASH_WEIGHT * orders.totalValue} : {}),
-                    }));
+        if (claimed) {
+            let sellFailed = false;
+            for (const order of orders.planned) {
+                let result: OrderResult & {price?: number};
+                if (sellFailed && order.side === 'buy') {
+                    result = {success: false, message: 'Skipped: a funding sell failed this run'};
+                } else {
+                    const orderStepId = `bootstrap-order-${safeId}-${order.side}-${order.symbol}`.replace(/[^a-zA-Z0-9_-]/g, '_');
+                    result = await step.run(orderStepId, async () =>
+                        executeOrder(userId, {
+                            accountId: nav.accountId,
+                            symbol: order.symbol,
+                            side: order.side,
+                            quantity: order.quantity,
+                            ...(order.side === 'buy' ? {minCashAfter: MIN_CASH_WEIGHT * orders.totalValue} : {}),
+                        }));
+                }
+                if (order.side === 'sell' && !result.success) sellFailed = true;
+                executed.push(buildOrderItem(order, result, targets, orders, scoreBySymbol));
             }
-            if (order.side === 'sell' && !result.success) sellFailed = true;
-            executed.push(buildOrderItem(order, result, targets, orders, scoreBySymbol));
+        } else {
+            // Preview: same items, nothing sent to executeOrder ({success: false}
+            // without a message leaves executed:false and no error text).
+            for (const order of orders.planned) {
+                executed.push(buildOrderItem(order, {success: false}, targets, orders, scoreBySymbol));
+            }
         }
         executed.push(...buildHoldItems(orders, targets, scoreBySymbol));
 
-        await step.run('bootstrap-save-suggestions', async () => {
+        const saved = await step.run('bootstrap-save-suggestions', async () => {
             await connectToDatabase();
+            if (!claimed) {
+                // Never let a preview overwrite the record of trades actually
+                // executed today (e.g. a Monday-afternoon button press).
+                const existing = await SuggestionSet.findOne({userId, date: today}).lean();
+                if (existing && existing.kind !== 'preview') return false;
+            }
             await SuggestionSet.updateOne(
                 {userId, date: today},
-                {$set: {items: executed}},
+                {$set: {items: executed, kind: claimed ? 'executed' : 'preview'}},
                 {upsert: true},
             );
             await AiNavigator.updateOne({userId}, {$unset: {lastError: ''}});
+            return true;
         });
+        if (!saved) {
+            return {success: true, message: 'Preview skipped: today already has executed decisions'};
+        }
 
         const narratives = await step.run('bootstrap-narratives', async () => getBrainDigestData(5));
         const rationalePrompt = RATIONALE_PROMPT
@@ -759,7 +795,9 @@ export const bootstrapAiNavigator = inngest.createFunction(
 
         return {
             success: true,
-            message: `Bootstrap built ${executed.filter((i) => i.executed).length} position(s) for ${userId}`,
+            message: claimed
+                ? `Run traded ${executed.filter((i) => i.executed).length} order(s) for ${userId}`
+                : `Preview saved for ${userId} (nothing traded)`,
         };
     },
 )

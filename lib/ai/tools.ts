@@ -147,7 +147,7 @@ export const buildTools = (userId: string) => ({
         inputSchema: z.object({}),
         execute: async () => {
             await connectToDatabase();
-            type LeanSet = {date: string; items: SuggestionItem[]; rationaleMd?: string} | null;
+            type LeanSet = {date: string; kind?: string; items: SuggestionItem[]; rationaleMd?: string} | null;
             const [globalSet, userSet] = await Promise.all([
                 SuggestionSet.findOne({userId: GLOBAL_SUGGESTIONS_USER}).sort({date: -1}).lean<LeanSet>(),
                 SuggestionSet.findOne({userId}).sort({date: -1}).lean<LeanSet>(),
@@ -155,6 +155,8 @@ export const buildTools = (userId: string) => ({
             const shape = (set: LeanSet) =>
                 set ? {
                     date: set.date,
+                    // Previews are manual analysis runs — nothing was traded.
+                    preview: set.kind === 'preview',
                     items: set.items.map((i) => ({
                         action: i.action,
                         symbol: i.symbol,

@@ -21,6 +21,7 @@ export interface SuggestionItemDoc {
 export interface SuggestionSetDoc extends Document {
     userId: string;               // 'global' or a user id
     date: string;                 // 'YYYY-MM-DD' ET decision date
+    kind: 'executed' | 'preview'; // preview = manual analysis run, nothing traded
     items: SuggestionItemDoc[];
     rationaleMd?: string;
     createdAt: Date;
@@ -45,6 +46,7 @@ const SuggestionItemSchema = new Schema<SuggestionItemDoc>(
 const SuggestionSetSchema = new Schema<SuggestionSetDoc>({
     userId: {type: String, required: true, default: GLOBAL_SUGGESTIONS_USER},
     date: {type: String, required: true},
+    kind: {type: String, required: true, enum: ['executed', 'preview'], default: 'executed'},
     items: {type: [SuggestionItemSchema], default: []},
     rationaleMd: {type: String},
     createdAt: {type: Date, default: Date.now},

@@ -132,6 +132,27 @@ const setNavigatorStatus = async (status: 'active' | 'paused'): Promise<OrderRes
 export const pauseAiNavigator = async (): Promise<OrderResult> => setNavigatorStatus('paused');
 export const resumeAiNavigator = async (): Promise<OrderResult> => setNavigatorStatus('active');
 
+// Manual "Run AI now": trades if this week's budget is still unclaimed (the weekly
+// run happening early), otherwise produces a badged preview analysis — so it's
+// always safe to press for a health check or a point-in-time read.
+export const runAiNavigatorNow = async (): Promise<OrderResult> => {
+    try {
+        const userId = await getCurrentUserId();
+        if (!userId) return {success: false, message: 'Not authenticated'};
+
+        await connectToDatabase();
+        const doc = await AiNavigator.findOne({userId});
+        if (!doc) return {success: false, message: 'Not enrolled'};
+        if (doc.status !== 'active') return {success: false, message: 'AI Navigator is paused — resume it first'};
+
+        await inngest.send({name: 'app/bootstrap.ai.navigator', data: {userId}});
+        return {success: true, message: 'AI run queued — results appear under Weekly Decisions in a few minutes'};
+    } catch (error) {
+        console.error('Error queueing manual navigator run:', error);
+        return {success: false, message: 'Could not queue the run — is the job queue reachable?'};
+    }
+};
+
 // Unenroll keeps the paper account (least destructive) — delete it via the normal
 // account management flow if desired.
 export const unenrollAiNavigator = async (): Promise<OrderResult> => {

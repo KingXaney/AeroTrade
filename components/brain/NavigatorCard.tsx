@@ -4,7 +4,7 @@ import {useState} from "react";
 import {useRouter} from "next/navigation";
 import Link from "next/link";
 import {toast} from "sonner";
-import {enrollAiNavigator, pauseAiNavigator, resumeAiNavigator, unenrollAiNavigator} from "@/lib/actions/navigator.actions";
+import {enrollAiNavigator, pauseAiNavigator, resumeAiNavigator, runAiNavigatorNow, unenrollAiNavigator} from "@/lib/actions/navigator.actions";
 import {MAX_STARTING_BALANCE, MIN_STARTING_BALANCE, PAPER_STARTING_BALANCE} from "@/lib/constants";
 
 // Enrollment + kill switch for the AI-managed paper account.
@@ -90,6 +90,13 @@ const NavigatorCard = ({status}: {status: NavigatorStatus}) => {
                 </div>
             ) : (
                 <div className="flex flex-wrap items-center gap-2">
+                    {status.status === 'active' && (
+                        <button type="button" onClick={() => void run(runAiNavigatorNow)} disabled={busy}
+                                className="px-3 py-2 rounded-lg text-xs font-bold uppercase tracking-wider transition-all active:scale-[0.98] disabled:opacity-50 text-[#002022]"
+                                style={{fontFamily: 'var(--font-jetbrains)', backgroundColor: '#00f0ff'}}>
+                            {busy ? 'Queueing…' : 'Run AI now'}
+                        </button>
+                    )}
                     {status.status === 'active' ? (
                         <button type="button" onClick={() => void run(pauseAiNavigator)} disabled={busy}
                                 className="px-3 py-2 rounded-lg text-xs font-bold uppercase tracking-wider text-[#b9cacb] hover:text-[#ffb4ab] transition-colors disabled:opacity-50"
