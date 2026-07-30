@@ -320,6 +320,29 @@ describe('diffToOrders — ordering, trade cap, and cash floor', () => {
         expect(orders.map((o) => o.symbol)).toEqual(['DDD', 'EEE', 'FFF']);
     });
 
+    it('honors a maxTrades override (enrollment bootstrap deploys the full book)', () => {
+        const input = {
+            totalValue: 100_000,
+            cash: 100_000,
+            positions: [
+                position({symbol: 'DDD', quantity: 0, price: 100}),
+                position({symbol: 'EEE', quantity: 0, price: 100}),
+                position({symbol: 'FFF', quantity: 0, price: 100}),
+                position({symbol: 'GGG', quantity: 0, price: 100}),
+                position({symbol: 'HHH', quantity: 0, price: 100}),
+            ],
+            targets: [
+                targetOf('DDD', 0.18),
+                targetOf('EEE', 0.18),
+                targetOf('FFF', 0.18),
+                targetOf('GGG', 0.18),
+                targetOf('HHH', 0.18),
+            ],
+        };
+        expect(diffToOrders(input)).toHaveLength(MAX_TRADES_PER_WEEK);
+        expect(diffToOrders({...input, maxTrades: MAX_POSITIONS})).toHaveLength(5);
+    });
+
     it('trims a buy so post-buy cash stays at or above the cash floor (exact quantity)', () => {
         const orders = diffToOrders({
             totalValue: 100_000,

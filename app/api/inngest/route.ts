@@ -1,9 +1,16 @@
 import {serve} from "inngest/next";
 import {inngest} from "@/lib/inngest/client";
-import {recordDailySnapshots, runWeeklyNavigator, sendDailyNewsSummary, sendSignUpEmail, updateNewsBrain} from "@/lib/inngest/functions";
+import {
+    bootstrapAiNavigator,
+    recordDailySnapshots,
+    runWeeklyNavigator,
+    sendDailyNewsSummary,
+    sendSignUpEmail,
+    updateNewsBrain,
+} from "@/lib/inngest/functions";
 
 
 export const { GET, POST, PUT } = serve({
     client: inngest,
-    functions: [sendSignUpEmail, sendDailyNewsSummary, recordDailySnapshots, updateNewsBrain, runWeeklyNavigator],
+    functions: [sendSignUpEmail, sendDailyNewsSummary, recordDailySnapshots, updateNewsBrain, runWeeklyNavigator, bootstrapAiNavigator],
 })

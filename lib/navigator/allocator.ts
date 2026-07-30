@@ -103,14 +103,17 @@ const rebalanceReason = (driftValue: number, totalValue: number, targetWeight: n
     return `rebalance ${sign}${driftPct.toFixed(1)}% drift toward ${(targetWeight * PERCENT).toFixed(1)}% target`;
 };
 
-// Diff current holdings against targets and emit at most MAX_TRADES_PER_WEEK
-// orders. Sells run before buys so exits and trims fund the entries in the
-// same batch; a simulated cash walk trims buys against the cash floor.
+// Diff current holdings against targets and emit at most maxTrades orders
+// (default MAX_TRADES_PER_WEEK; the one-time enrollment bootstrap raises it to
+// deploy the full starting portfolio at once). Sells run before buys so exits
+// and trims fund the entries in the same batch; a simulated cash walk trims
+// buys against the cash floor.
 export const diffToOrders = (input: {
     totalValue: number;
     cash: number;
     positions: HeldPosition[];
     targets: TargetWeight[];
+    maxTrades?: number;
 }): PlannedOrder[] => {
     const {totalValue, positions, targets} = input;
     if (totalValue <= 0) {
@@ -212,10 +215,11 @@ export const diffToOrders = (input: {
 
     const orders: PlannedOrder[] = [];
     const cashFloor = MIN_CASH_WEIGHT * totalValue;
+    const tradeCap = input.maxTrades ?? MAX_TRADES_PER_WEEK;
     let cash = input.cash;
 
     for (const candidate of candidates) {
-        if (orders.length >= MAX_TRADES_PER_WEEK) {
+        if (orders.length >= tradeCap) {
             break;
         }
         if (candidate.side === 'sell') {

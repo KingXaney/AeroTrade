@@ -10,7 +10,6 @@ import {BRAIN_SOURCE_CAPS, BRAIN_TOTAL_CAP, hashId} from "@/lib/news/config";
 import SuggestionSet, {GLOBAL_SUGGESTIONS_USER} from "@/database/models/suggestion-set.model";
 import NewsItem from "@/database/models/news-item.model";
 import AiNavigator from "@/database/models/ai-navigator.model";
-import PaperTrade from "@/database/models/paper-trade.model";
 import {getActiveTheses, getBrainDigestData, getTopEntities, getTopVerifiedTickers} from "@/lib/brain/queries";
 import {foldExtractionsIntoBrain, type ArticleFold} from "@/lib/brain/update";
 import {parseExtractionResponse, sanitizeExtraction} from "@/lib/brain/extraction";
@@ -23,21 +22,26 @@ import {
     THEME_REUSE_LIST_SIZE,
     UNEXTRACTED_PICKUP_LIMIT,
 } from "@/lib/brain/config";
-import {ensureBars, getBarsForSymbols} from "@/lib/prices/store";
-import {computeSignals} from "@/lib/prices/signals";
-import {scoreUniverse, type ScoringInput} from "@/lib/navigator/scoring";
-import {buildTargets, diffToOrders, type HeldPosition} from "@/lib/navigator/allocator";
-import {ALWAYS_ELIGIBLE_SYMBOLS, ELIGIBILITY_LOOKBACK_DAYS, MIN_CASH_WEIGHT} from "@/lib/navigator/config";
+import {ensureBars} from "@/lib/prices/store";
+import {buildTargets} from "@/lib/navigator/allocator";
+import {ALWAYS_ELIGIBLE_SYMBOLS, MAX_POSITIONS, MIN_CASH_WEIGHT} from "@/lib/navigator/config";
+import {
+    buildHoldItems,
+    buildNavigatorUniverse,
+    buildOrderItem,
+    computeNavigatorScores,
+    planAccountOrders,
+} from "@/lib/navigator/service";
 import {executeOrder} from "@/lib/trading/orders";
 import BrainEntity from "@/database/models/brain-entity.model";
 import {searchStocks} from "@/lib/actions/finnhub.actions";
-import {getEasternDateString, getFormattedTodayDate} from "@/lib/utils";
+import {getEasternDateString, getEasternWeekKey, getFormattedTodayDate} from "@/lib/utils";
 import {connectToDatabase} from "@/database/mongoose";
 import PaperAccount from "@/database/models/paper-account.model";
 import AccountSnapshot from "@/database/models/account-snapshot.model";
 import BenchmarkSnapshot from "@/database/models/benchmark-snapshot.model";
 import {BENCHMARK_SYMBOL} from "@/lib/constants";
-import {buildPriceMap, computePortfolio, getHeldSymbolsByUserId, getOwnedAccount, type PriceInfo} from "@/lib/trading/account";
+import {buildPriceMap, computePortfolio, getHeldSymbolsByUserId, type PriceInfo} from "@/lib/trading/account";
 
 export const sendSignUpEmail = inngest.createFunction(
     { id: 'sign-up-email', triggers: [{ event: 'app/user.created' }] },
@@ -414,66 +418,12 @@ export const updateNewsBrain = inngest.createFunction(
 export const runWeeklyNavigator = inngest.createFunction(
     { id: 'ai-navigator-weekly', triggers: [{ event: 'app/run.ai.navigator' }, { cron: 'TZ=America/New_York 0 10 * * 1' }] },
     async ({ step }) => {
-        const universe = await step.run('build-universe', async () => {
-            await connectToDatabase();
-            const navigators = (await AiNavigator.find({status: 'active'}).lean())
-                .map((n) => ({userId: n.userId, accountId: n.accountId}));
-            const held = new Set<string>();
-            for (const nav of navigators) {
-                for (const sym of await getHeldSymbolsByUserId(nav.userId)) held.add(sym);
-            }
-            const topTickers = await getTopVerifiedTickers(25);
-            const symbols = Array.from(new Set([...ALWAYS_ELIGIBLE_SYMBOLS, ...topTickers, ...held]));
-            return {symbols, navigators};
-        });
+        const universe = await step.run('build-universe', async () => buildNavigatorUniverse());
 
         await step.run('ensure-price-bars', async () => ensureBars(universe.symbols));
 
         // Deterministic scoring inputs: brain slow layer + eligibility counts + signals.
-        const scored = await step.run('compute-global-scores', async () => {
-            await connectToDatabase();
-            const entities = await BrainEntity.find({key: {$in: universe.symbols}}).lean();
-            const entityByKey = new Map(entities.map((e) => [e.key, e]));
-            const thesisKeys = new Set(
-                (await BrainEntity.find({thesisSince: {$ne: null}}).lean()).map((e) => e.key),
-            );
-
-            const lookbackStart = getEasternDateString(new Date(Date.now() - ELIGIBILITY_LOOKBACK_DAYS * 24 * 60 * 60 * 1000));
-            const counts = await NewsItem.aggregate([
-                {$match: {publishedDate: {$gte: lookbackStart}, 'extraction.entities.key': {$in: universe.symbols}}},
-                {$unwind: '$extraction.entities'},
-                {$match: {'extraction.entities.key': {$in: universe.symbols}}},
-                {$group: {_id: '$extraction.entities.key', articles: {$addToSet: '$contentHash'}, sources: {$addToSet: '$source'}}},
-            ]);
-            const countByKey = new Map<string, {articles: number; sources: number}>(
-                counts.map((c: {_id: string; articles: unknown[]; sources: unknown[]}) => [c._id, {articles: c.articles.length, sources: c.sources.length}]),
-            );
-
-            const barsBySymbol = await getBarsForSymbols(universe.symbols);
-
-            const inputs: ScoringInput[] = universe.symbols.map((symbol) => {
-                const entity = entityByKey.get(symbol);
-                const links: {key: string}[] = entity?.links ?? [];
-                const hasActiveThesis = thesisKeys.has(symbol) || links.some((l) => thesisKeys.has(l.key));
-                const thesisLink = thesisKeys.has(symbol) ? symbol : links.find((l) => thesisKeys.has(l.key))?.key;
-                const bars = barsBySymbol.get(symbol) ?? [];
-                const weight = entity?.weightSlow ?? 0;
-                return {
-                    symbol,
-                    newsWeightSlow: weight,
-                    sentimentSlow: weight > 1e-9 ? (entity?.sentimentSumSlow ?? 0) / weight : 0,
-                    signals: computeSignals(bars),
-                    sectorTilt: 0,
-                    hasActiveThesis,
-                    thesisLabel: thesisLink,
-                    articleCount: countByKey.get(symbol)?.articles ?? 0,
-                    sourceCount: countByKey.get(symbol)?.sources ?? 0,
-                    barsCount: bars.length,
-                    alwaysEligible: ALWAYS_ELIGIBLE_SYMBOLS.includes(symbol),
-                };
-            });
-            return scoreUniverse(inputs);
-        });
+        const scored = await step.run('compute-global-scores', async () => computeNavigatorScores(universe.symbols));
 
         const today = getEasternDateString();
         const targets = buildTargets(scored);
@@ -501,9 +451,7 @@ export const runWeeklyNavigator = inngest.createFunction(
         // Claims are per ET WEEK, not per day: the trade budget (MAX_TRADES_PER_WEEK) is
         // weekly, so a manual re-fire later in the same week must skip users who already
         // ran rather than granting a fresh budget on a new calendar day.
-        const claimDate = new Date(today + 'T00:00:00Z');
-        claimDate.setUTCDate(claimDate.getUTCDate() - ((claimDate.getUTCDay() + 6) % 7));
-        const weekKey = claimDate.toISOString().slice(0, 10);
+        const weekKey = getEasternWeekKey(today);
 
         for (const nav of universe.navigators) {
             const safeId = nav.userId.replace(/[^a-zA-Z0-9_-]/g, '_');
@@ -520,60 +468,11 @@ export const runWeeklyNavigator = inngest.createFunction(
                 if (!claimed) continue;
 
                 const orders = await step.run(`plan-orders-${safeId}`, async () => {
-                    const account = await getOwnedAccount(nav.userId, nav.accountId);
-                    if (!account) {
+                    const plan = await planAccountOrders(nav.userId, nav.accountId, targets, scoreBySymbol);
+                    if (!plan) {
                         await AiNavigator.updateOne({userId: nav.userId}, {$set: {lastError: 'AI account missing'}});
-                        return null;
                     }
-                    const positionSymbols = account.positions.map((p) => p.symbol);
-                    const priceMap = await buildPriceMap([...positionSymbols, ...targets.map((t) => t.symbol)]);
-                    const portfolio = computePortfolio(
-                        {cash: account.cash, startingBalance: account.startingBalance, positions: account.positions.map((p) => ({symbol: p.symbol, company: p.company, quantity: p.quantity, avgCost: p.avgCost}))},
-                        priceMap,
-                    );
-
-                    // Last buy per held symbol → approximate trading days held (5/7 of calendar).
-                    const lastBuys = await PaperTrade.aggregate([
-                        {$match: {accountId: String(account._id), side: 'buy'}},
-                        {$group: {_id: '$symbol', last: {$max: '$createdAt'}}},
-                    ]);
-                    const lastBuyBySymbol = new Map<string, number>(
-                        lastBuys.map((r: {_id: string; last: Date}) => [r._id, new Date(r.last).getTime()]),
-                    );
-
-                    const positions: HeldPosition[] = portfolio.positions.map((p) => {
-                        const lastBuy = lastBuyBySymbol.get(p.symbol);
-                        const calendarDays = lastBuy ? (Date.now() - lastBuy) / (24 * 60 * 60 * 1000) : null;
-                        return {
-                            symbol: p.symbol,
-                            quantity: p.quantity,
-                            avgCost: p.avgCost,
-                            price: typeof p.currentPrice === 'number' ? p.currentPrice : null,
-                            heldTradingDays: calendarDays === null ? null : Math.floor(calendarDays * 5 / 7),
-                            // v1: thesis health is already 20% of the score, so score-based exits
-                            // cover a dying thesis; a dedicated thesis-history trigger is v2.
-                            thesisBroken: false,
-                            score: scoreBySymbol.get(p.symbol)?.score ?? null,
-                        };
-                    });
-                    // diffToOrders resolves entry prices from position rows only — unheld
-                    // targets need quantity-0 quote-carrier rows or they are silently skipped.
-                    const heldSymbols = new Set(positions.map((p) => p.symbol));
-                    for (const t of targets) {
-                        if (heldSymbols.has(t.symbol)) continue;
-                        positions.push({
-                            symbol: t.symbol,
-                            quantity: 0,
-                            avgCost: 0,
-                            price: priceMap.get(t.symbol.toUpperCase())?.price ?? null,
-                            heldTradingDays: null,
-                            thesisBroken: false,
-                            score: scoreBySymbol.get(t.symbol)?.score ?? null,
-                        });
-                    }
-
-                    const planned = diffToOrders({totalValue: portfolio.totalValue, cash: portfolio.cash, positions, targets});
-                    return {planned, positions, totalValue: portfolio.totalValue};
+                    return plan;
                 });
                 if (!orders) continue;
 
@@ -602,38 +501,9 @@ export const runWeeklyNavigator = inngest.createFunction(
                             }));
                     }
                     if (order.side === 'sell' && !result.success) sellFailed = true;
-
-                    const target = targets.find((t) => t.symbol === order.symbol);
-                    const held = orders.positions.find((p) => p.symbol === order.symbol);
-                    executed.push({
-                        symbol: order.symbol,
-                        action: order.side,
-                        quantity: order.quantity,
-                        targetWeight: target?.weight ?? 0,
-                        currentWeight: held && held.price !== null && orders.totalValue > 0
-                            ? (held.quantity * held.price) / orders.totalValue : 0,
-                        score: scoreBySymbol.get(order.symbol)?.score ?? 0,
-                        reasons: [order.reason, ...(scoreBySymbol.get(order.symbol)?.reasons ?? []).slice(0, 3)],
-                        executed: result.success,
-                        ...(result.success && typeof result.price === 'number' ? {executionPrice: result.price} : {}),
-                        ...(!result.success ? {error: result.message} : {}),
-                    });
+                    executed.push(buildOrderItem(order, result, targets, orders, scoreBySymbol));
                 }
-                // Holds: real positions kept this week (skip the quantity-0 quote carriers).
-                const orderedSymbols = new Set(orders.planned.map((o) => o.symbol));
-                for (const p of orders.positions) {
-                    if (p.quantity === 0 || orderedSymbols.has(p.symbol)) continue;
-                    const target = targets.find((t) => t.symbol === p.symbol);
-                    executed.push({
-                        symbol: p.symbol,
-                        action: 'hold',
-                        targetWeight: target?.weight ?? (p.price !== null && orders.totalValue > 0 ? (p.quantity * p.price) / orders.totalValue : 0),
-                        currentWeight: p.price !== null && orders.totalValue > 0 ? (p.quantity * p.price) / orders.totalValue : 0,
-                        score: p.score ?? 0,
-                        reasons: (scoreBySymbol.get(p.symbol)?.reasons ?? ['holding — no exit trigger']).slice(0, 3),
-                        executed: false,
-                    });
-                }
+                executed.push(...buildHoldItems(orders, targets, scoreBySymbol));
                 ordersExecuted += executed.filter((i) => i.executed).length;
 
                 await step.run(`save-suggestions-${safeId}`, async () => {
@@ -784,4 +654,100 @@ export const sendDailyNewsSummary = inngest.createFunction(
             message: `Daily news summary sent to ${sentCount}/${users.length} users`,
         }
     }
+)
+
+// One-time enrollment bootstrap: build the user's starting AI portfolio right away
+// instead of waiting for Monday. Same shared decision pipeline as the weekly run,
+// with one exception — the trade cap is lifted to MAX_POSITIONS so the initial
+// deployment can complete in a single pass (the weekly cap exists to prevent churn,
+// not to slow a one-time build). Claims the SAME weekly budget slot, so the next
+// Monday cron in the same week skips this user instead of double-trading.
+export const bootstrapAiNavigator = inngest.createFunction(
+    { id: 'ai-navigator-bootstrap', triggers: [{ event: 'app/bootstrap.ai.navigator' }] },
+    async ({ step, event }) => {
+        const userId = typeof event.data?.userId === 'string' ? event.data.userId : null;
+        if (!userId) return {success: false, message: 'Missing userId'};
+        const safeId = userId.replace(/[^a-zA-Z0-9_-]/g, '_');
+        const today = getEasternDateString();
+        const weekKey = getEasternWeekKey(today);
+
+        const nav = await step.run('claim-bootstrap', async () => {
+            await connectToDatabase();
+            const doc = await AiNavigator.findOneAndUpdate(
+                {userId, status: 'active', lastRunDate: {$ne: weekKey}},
+                {$set: {lastRunDate: weekKey}},
+            );
+            return doc ? {accountId: doc.accountId} : null;
+        });
+        if (!nav) return {success: true, message: 'Skipped: already ran this week, paused, or not enrolled'};
+
+        const universe = await step.run('bootstrap-universe', async () => buildNavigatorUniverse());
+        await step.run('bootstrap-price-bars', async () => ensureBars(universe.symbols));
+        const scored = await step.run('bootstrap-scores', async () => computeNavigatorScores(universe.symbols));
+
+        const targets = buildTargets(scored);
+        const scoreBySymbol = new Map(scored.map((s) => [s.symbol, s]));
+
+        const orders = await step.run('bootstrap-plan', async () => {
+            const plan = await planAccountOrders(userId, nav.accountId, targets, scoreBySymbol, MAX_POSITIONS);
+            if (!plan) {
+                await AiNavigator.updateOne({userId}, {$set: {lastError: 'AI account missing'}});
+            }
+            return plan;
+        });
+        if (!orders) return {success: false, message: 'AI account missing'};
+
+        let sellFailed = false;
+        const executed: SuggestionItem[] = [];
+        for (const order of orders.planned) {
+            let result: OrderResult & {price?: number};
+            if (sellFailed && order.side === 'buy') {
+                result = {success: false, message: 'Skipped: a funding sell failed this run'};
+            } else {
+                const orderStepId = `bootstrap-order-${safeId}-${order.side}-${order.symbol}`.replace(/[^a-zA-Z0-9_-]/g, '_');
+                result = await step.run(orderStepId, async () =>
+                    executeOrder(userId, {
+                        accountId: nav.accountId,
+                        symbol: order.symbol,
+                        side: order.side,
+                        quantity: order.quantity,
+                        ...(order.side === 'buy' ? {minCashAfter: MIN_CASH_WEIGHT * orders.totalValue} : {}),
+                    }));
+            }
+            if (order.side === 'sell' && !result.success) sellFailed = true;
+            executed.push(buildOrderItem(order, result, targets, orders, scoreBySymbol));
+        }
+        executed.push(...buildHoldItems(orders, targets, scoreBySymbol));
+
+        await step.run('bootstrap-save-suggestions', async () => {
+            await connectToDatabase();
+            await SuggestionSet.updateOne(
+                {userId, date: today},
+                {$set: {items: executed}},
+                {upsert: true},
+            );
+            await AiNavigator.updateOne({userId}, {$unset: {lastError: ''}});
+        });
+
+        const narratives = await step.run('bootstrap-narratives', async () => getBrainDigestData(5));
+        const rationalePrompt = RATIONALE_PROMPT
+            .replace('{{items}}', JSON.stringify(executed.map((i) => ({action: i.action, symbol: i.symbol, targetWeightPct: Math.round(i.targetWeight * 100), reasons: i.reasons})), null, 1))
+            .replace('{{narratives}}', JSON.stringify(narratives, null, 1));
+        const response = await step.ai.infer('bootstrap-rationale', {
+            model: step.ai.models.gemini({ model: EXTRACTION_MODEL }),
+            body: { contents: [{ role: 'user', parts: [{ text: rationalePrompt }] }] },
+        });
+        await step.run('bootstrap-save-rationale', async () => {
+            const part = response.candidates?.[0]?.content?.parts?.[0];
+            const rationale = (part && 'text' in part ? part.text : null);
+            if (!rationale) return;
+            await connectToDatabase();
+            await SuggestionSet.updateOne({userId, date: today}, {$set: {rationaleMd: rationale}});
+        });
+
+        return {
+            success: true,
+            message: `Bootstrap built ${executed.filter((i) => i.executed).length} position(s) for ${userId}`,
+        };
+    },
 )

@@ -12,6 +12,7 @@ import {getAccountsForUser, getOwnedAccount, getPortfolio, resolveStartingBalanc
 import {executeOrder} from "@/lib/trading/orders";
 import {getQuote} from "@/lib/actions/finnhub.actions";
 import {AI_NAVIGATOR_ACCOUNT_NAME} from "@/lib/navigator/config";
+import {inngest} from "@/lib/inngest/client";
 
 const revalidateNavigatorPaths = () => {
     revalidatePath('/brain');
@@ -87,8 +88,24 @@ export const enrollAiNavigator = async (
         }
 
         await AiNavigator.create({userId, accountId, status: 'active', enrolledAt: new Date()});
+
+        // Kick off the one-time bootstrap so the account starts with holdings now
+        // instead of waiting for Monday. Failure to enqueue must not fail enrollment.
+        let bootstrapQueued = false;
+        try {
+            await inngest.send({name: 'app/bootstrap.ai.navigator', data: {userId}});
+            bootstrapQueued = true;
+        } catch (error) {
+            console.error('Could not queue navigator bootstrap:', error);
+        }
+
         revalidateNavigatorPaths();
-        return {success: true, message: 'AI Navigator enrolled — first decisions arrive with the next weekly run'};
+        return {
+            success: true,
+            message: bootstrapQueued
+                ? 'AI Navigator enrolled — building your starting portfolio now, check back in a few minutes'
+                : 'AI Navigator enrolled — first decisions arrive with the next weekly run',
+        };
     } catch (error) {
         console.error('Error enrolling navigator:', error);
         return {success: false, message: 'Could not enroll the AI Navigator'};
