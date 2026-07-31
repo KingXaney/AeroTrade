@@ -23,6 +23,26 @@ describe("sanitizeDigestHtml", () => {
         expect(sanitizeDigestHtml('<iframe src="https://evil.test"></iframe>hi', allowed)).toBe("hi");
     });
 
+    // Requiring quotes in the anchor pattern let this through untouched.
+    it("collapses an off-allowlist link even when the href is unquoted", () => {
+        expect(sanitizeDigestHtml('<a href=https://evil.test/phish>Read Full Story</a>', allowed))
+            .toBe("Read Full Story");
+    });
+
+    it("keeps an allowed link whose href is unquoted", () => {
+        const html = '<a href=https://example.test/real-story>Story</a>';
+        expect(sanitizeDigestHtml(html, allowed)).toBe(html);
+    });
+
+    it("collapses an anchor carrying no href at all", () => {
+        expect(sanitizeDigestHtml('<a name="x">Story</a>', allowed)).toBe("Story");
+    });
+
+    it("reads the real href, not a decoy attribute that merely looks like one", () => {
+        const html = '<a data-href="https://example.test/real-story" href="https://evil.test">Story</a>';
+        expect(sanitizeDigestHtml(html, allowed)).toBe("Story");
+    });
+
     it("matches allowed URLs after normalization, not byte-for-byte", () => {
         // The allowlist entry carries a utm parameter; the model emitted the clean URL.
         const html = '<a href="https://example.test/real-story/">Story</a>';

@@ -9,10 +9,25 @@ export const transporter = nodemailer.createTransport({
     }
 })
 
+// Everything interpolated into these templates becomes HTML in an email sent from
+// this product's own address. `name` comes straight from an unverified signup form
+// and the recipient is whatever address that form was given, so without escaping a
+// signup is enough to mail arbitrary markup — a phishing link, say — to anyone.
+// Replacer functions rather than replacement strings: '$&' in a name would otherwise
+// be expanded by String.replace.
+const escapeHtml = (value: string): string =>
+    String(value ?? '')
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;')
+        .replace(/"/g, '&quot;')
+        .replace(/'/g, '&#39;');
+
 export const sendWelcomeEmail = async ({ email, name, intro }: WelcomeEmailData) => {
     const htmlTemplate = WELCOME_EMAIL_TEMPLATE
-        .replace('{{name}}', name)
-        .replace('{{intro}}', intro);
+        .replace('{{name}}', () => escapeHtml(name))
+        // intro is deliberately HTML — sanitizeWelcomeIntroHtml has already rebuilt it.
+        .replace('{{intro}}', () => intro);
 
     const mailOptions = {
         from: `"AlgoTest" <algotestadvisor@gmail.com>`,
@@ -29,8 +44,9 @@ export const sendNewsSummaryEmail = async (
     { email, date, newsContent }: { email: string; date: string; newsContent: string }
 ): Promise<void> => {
     const htmlTemplate = NEWS_SUMMARY_EMAIL_TEMPLATE
-        .replace('{{date}}', date)
-        .replace('{{newsContent}}', newsContent);
+        .replace('{{date}}', () => escapeHtml(date))
+        // newsContent is deliberately HTML — sanitizeDigestHtml has already run on it.
+        .replace('{{newsContent}}', () => newsContent);
 
     const mailOptions = {
         from: `"AlgoTest News" <algotestadvisor@gmail.com>`,
