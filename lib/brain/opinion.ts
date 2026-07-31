@@ -30,6 +30,12 @@ export const SECOND_OPINION_MODEL = 'claude-opus-5';
 export const SECOND_OPINION_MAX_TOKENS = 16000;
 // Paid API behind a button: refuse regeneration while a fresh opinion exists.
 export const SECOND_OPINION_MIN_INTERVAL_MS = 15 * 60 * 1000;
+// The per-user cool-down bounds one person; it does not bound a deployment with
+// open signup, where every new account brings its own allowance against the same
+// API key. This caps how many distinct users can start a paid run per hour, so
+// the worst case is a known number of Opus calls rather than an open tab.
+export const SECOND_OPINION_GLOBAL_WINDOW_MS = 60 * 60 * 1000;
+export const SECOND_OPINION_GLOBAL_USER_CAP = 8;
 
 export const isSecondOpinionConfigured = (): boolean => Boolean(process.env.ANTHROPIC_API_KEY);
 

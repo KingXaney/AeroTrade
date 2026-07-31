@@ -10,6 +10,8 @@ import {
     isSecondOpinionConfigured,
     MANUAL_MODEL_LABEL,
     saveSecondOpinion,
+    SECOND_OPINION_GLOBAL_USER_CAP,
+    SECOND_OPINION_GLOBAL_WINDOW_MS,
     SECOND_OPINION_MAX_CHARS,
     SECOND_OPINION_MIN_INTERVAL_MS,
 } from "@/lib/brain/opinion";
@@ -28,6 +30,17 @@ export const requestSecondOpinion = async (): Promise<OrderResult> => {
         }
 
         await connectToDatabase();
+        // Deployment-wide ceiling first. Signup is open, so a per-user cool-down
+        // alone lets anyone mint a fresh allowance against the one shared API key.
+        const windowStart = new Date(Date.now() - SECOND_OPINION_GLOBAL_WINDOW_MS);
+        const activeUsers = await SecondOpinion.countDocuments({
+            requestedAt: {$gte: windowStart},
+            scope: {$ne: userId},
+        });
+        if (activeUsers >= SECOND_OPINION_GLOBAL_USER_CAP) {
+            return {success: false, message: 'This app has hit its hourly limit for paid Claude runs — use the claude.ai option below'};
+        }
+
         // Claim the slot atomically on requestedAt, not on the last *completed*
         // opinion: a job takes a minute or two to finish, so a comparison against
         // generatedAt lets every click in that window through and turns one button
