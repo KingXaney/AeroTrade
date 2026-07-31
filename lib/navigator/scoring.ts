@@ -8,6 +8,7 @@ import {
     MIN_PRICE_BARS,
     MOMENTUM_MIX,
     SCORE_WEIGHTS,
+    SECTOR_KEY_PREFIX,
     VOLATILITY_HAIRCUT,
 } from "@/lib/navigator/config";
 import type {Signals} from "@/lib/prices/signals";
@@ -17,7 +18,10 @@ export type ScoringInput = {
     newsWeightSlow: number;
     sentimentSlow: number;
     signals: Signals;
+    // Rank-normalized standing of this symbol's sector across the sector universe,
+    // in [-1, 1]; 0 when the symbol has no sector attribution.
     sectorTilt: number;
+    sectorLabel?: string;
     hasActiveThesis: boolean;
     thesisLabel?: string;
     articleCount: number;
@@ -51,6 +55,17 @@ const REASON_HORIZON_ORDER: MomentumHorizon[] = (Object.keys(MOMENTUM_MIX) as Mo
     .sort((a, b) => MOMENTUM_MIX[b] - MOMENTUM_MIX[a]);
 
 const INSUFFICIENT_MOMENTUM_REASON = "insufficient price history for momentum";
+
+// A single name's sector is the heaviest 'sector:*' co-mention link the brain has
+// drawn for it. Pure so the attribution can be tested without a database.
+export const dominantSectorKey = (links: {key: string; weight: number}[]): string | undefined => {
+    let best: {key: string; weight: number} | undefined;
+    for (const link of links) {
+        if (!link.key.startsWith(SECTOR_KEY_PREFIX)) continue;
+        if (!best || link.weight > best.weight) best = link;
+    }
+    return best?.key;
+};
 
 export const rankNormalize = (values: number[]): number[] => {
     const count = values.length;
@@ -171,11 +186,16 @@ export const scoreUniverse = (inputs: ScoringInput[]): ScoredSymbol[] => {
             reasons.push(`thesis ${input.thesisLabel ?? "active"}`);
         }
 
+        if (input.sectorTilt !== 0 && input.sectorLabel) {
+            reasons.push(`${input.sectorLabel} sector standing ${input.sectorTilt.toFixed(REASON_DECIMALS)}`);
+        }
+
         let score =
             SCORE_WEIGHTS.newsSlow * newsComponents[index] +
             SCORE_WEIGHTS.sentimentSlow * input.sentimentSlow +
             SCORE_WEIGHTS.momentumLong * momentum.component +
-            SCORE_WEIGHTS.thesis * thesisComponent;
+            SCORE_WEIGHTS.thesis * thesisComponent +
+            SCORE_WEIGHTS.sectorSlow * input.sectorTilt;
 
         const {ma200dist, vol63} = input.signals;
         // Never buy a broken trend: a positive composite below the 200d MA is capped

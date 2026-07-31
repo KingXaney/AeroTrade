@@ -11,7 +11,7 @@ import {
     SCORE_WEIGHTS,
     VOLATILITY_HAIRCUT,
 } from "@/lib/navigator/config";
-import {rankNormalize, scoreUniverse, type ScoringInput} from "@/lib/navigator/scoring";
+import {dominantSectorKey, rankNormalize, scoreUniverse, type ScoringInput} from "@/lib/navigator/scoring";
 
 const makeSignals = (overrides: Partial<ScoringInput["signals"]> = {}): ScoringInput["signals"] => ({
     r63: null,
@@ -294,5 +294,71 @@ describe("scoreUniverse reasons", () => {
             expect(entry.reasons.length).toBeGreaterThanOrEqual(2);
             expect(entry.reasons.length).toBeLessThanOrEqual(5);
         }
+    });
+});
+
+// The sector bridge. Sector and theme entities carry most of the brain's weight,
+// but the tradable universe is ETFs and tickers — without this, the heaviest
+// narratives could not reach any symbol the allocator is allowed to buy.
+describe("sector tilt", () => {
+    it("lifts a symbol whose sector is strong", () => {
+        const scored = scoreUniverse([
+            makeInput({symbol: "TILTED", sectorTilt: 1, sectorLabel: "Technology"}),
+            makeInput({symbol: "FLAT"}),
+        ]);
+        expect(bySymbol(scored, "TILTED").score).toBeGreaterThan(bySymbol(scored, "FLAT").score);
+    });
+
+    it("penalises a symbol whose sector is weak", () => {
+        const scored = scoreUniverse([
+            makeInput({symbol: "WEAK", sectorTilt: -1, sectorLabel: "Utilities"}),
+            makeInput({symbol: "FLAT"}),
+        ]);
+        expect(bySymbol(scored, "WEAK").score).toBeLessThan(bySymbol(scored, "FLAT").score);
+    });
+
+    it("contributes exactly its configured weight", () => {
+        const [tilted, flat] = scoreUniverse([
+            makeInput({symbol: "A", sectorTilt: 1, sectorLabel: "Technology"}),
+            makeInput({symbol: "B", sectorTilt: 0}),
+        ]);
+        expect(tilted.score - flat.score).toBeCloseTo(SCORE_WEIGHTS.sectorSlow, 10);
+    });
+
+    it("names the sector in the reasons so the decision is auditable", () => {
+        const [scored] = scoreUniverse([makeInput({sectorTilt: 0.5, sectorLabel: "Technology"})]);
+        expect(scored.reasons.some((r) => r.includes("Technology sector standing"))).toBe(true);
+    });
+
+    it("says nothing when the symbol has no sector attribution", () => {
+        const [scored] = scoreUniverse([makeInput({sectorTilt: 0})]);
+        expect(scored.reasons.some((r) => r.includes("sector standing"))).toBe(false);
+    });
+});
+
+describe("dominantSectorKey", () => {
+    it("picks the heaviest sector link", () => {
+        expect(dominantSectorKey([
+            {key: "sector:energy", weight: 0.4},
+            {key: "sector:technology", weight: 0.9},
+            {key: "theme:ai", weight: 5},
+        ])).toBe("sector:technology");
+    });
+
+    it("ignores non-sector links entirely", () => {
+        expect(dominantSectorKey([{key: "theme:ai", weight: 9}, {key: "NVDA", weight: 8}])).toBeUndefined();
+    });
+
+    it("returns undefined for an entity with no links", () => {
+        expect(dominantSectorKey([])).toBeUndefined();
+    });
+});
+
+// A rebalance that forgets to keep the mix at 1.0 silently rescales every score
+// against the fixed entry threshold.
+describe("score weights", () => {
+    it("sum to one", () => {
+        const total = Object.values(SCORE_WEIGHTS).reduce((sum, weight) => sum + weight, 0);
+        expect(total).toBeCloseTo(1, 10);
     });
 });

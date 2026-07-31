@@ -11,9 +11,14 @@ import PaperTrade from "@/database/models/paper-trade.model";
 import {getTopVerifiedTickers} from "@/lib/brain/queries";
 import {getBarsForSymbols} from "@/lib/prices/store";
 import {computeSignals} from "@/lib/prices/signals";
-import {scoreUniverse, type ScoredSymbol, type ScoringInput} from "@/lib/navigator/scoring";
+import {dominantSectorKey, rankNormalize, scoreUniverse, type ScoredSymbol, type ScoringInput} from "@/lib/navigator/scoring";
 import {diffToOrders, type HeldPosition, type PlannedOrder, type TargetWeight} from "@/lib/navigator/allocator";
-import {ALWAYS_ELIGIBLE_SYMBOLS, ELIGIBILITY_LOOKBACK_DAYS} from "@/lib/navigator/config";
+import {
+    ALWAYS_ELIGIBLE_SYMBOLS,
+    ELIGIBILITY_LOOKBACK_DAYS,
+    ETF_TO_SECTOR_KEY,
+    SECTOR_KEY_PREFIX,
+} from "@/lib/navigator/config";
 import {buildPriceMap, computePortfolio, getHeldSymbolsByUserId, getOwnedAccount} from "@/lib/trading/account";
 import {getEasternDateString} from "@/lib/utils";
 
@@ -65,10 +70,31 @@ export const buildNavigatorUniverse = async (): Promise<{symbols: string[]; navi
 };
 
 // Deterministic scoring inputs: brain slow layer + eligibility counts + signals.
+// Sector standing, shared by both consumers of it: an ETF *is* its sector, and a
+// single name inherits a tilt from whichever sector it is most linked to. Ranked
+// across sectors (not across symbols) so a sector holding five tickers in the
+// universe does not count five times.
+type SectorStanding = {tiltByKey: Map<string, number>; nameByKey: Map<string, string>};
+
+const buildSectorStanding = async (): Promise<SectorStanding> => {
+    const sectors = await BrainEntity.find({type: 'sector'}).lean();
+    const normalized = rankNormalize(sectors.map((s) => s.weightSlow ?? 0));
+    return {
+        tiltByKey: new Map(sectors.map((s, i) => [s.key, normalized[i]])),
+        nameByKey: new Map(sectors.map((s) => [s.key, s.displayName || s.key.replace(SECTOR_KEY_PREFIX, '')])),
+    };
+};
+
 export const computeNavigatorScores = async (symbols: string[]): Promise<ScoredSymbol[]> => {
     await connectToDatabase();
-    const entities = await BrainEntity.find({key: {$in: symbols}}).lean();
+    // Sector entities are fetched alongside the symbols themselves: a sector ETF's
+    // narrative lives under 'sector:<slug>', never under its ticker.
+    const sectorKeysForSymbols = symbols
+        .map((s) => ETF_TO_SECTOR_KEY[s])
+        .filter((k): k is string => Boolean(k));
+    const entities = await BrainEntity.find({key: {$in: [...symbols, ...sectorKeysForSymbols]}}).lean();
     const entityByKey = new Map(entities.map((e) => [e.key, e]));
+    const sectorStanding = await buildSectorStanding();
     const thesisKeys = new Set(
         (await BrainEntity.find({thesisSince: {$ne: null}}).lean()).map((e) => e.key),
     );
@@ -87,10 +113,18 @@ export const computeNavigatorScores = async (symbols: string[]): Promise<ScoredS
     const barsBySymbol = await getBarsForSymbols(symbols);
 
     const inputs: ScoringInput[] = symbols.map((symbol) => {
-        const entity = entityByKey.get(symbol);
-        const links: {key: string}[] = entity?.links ?? [];
-        const hasActiveThesis = thesisKeys.has(symbol) || links.some((l) => thesisKeys.has(l.key));
-        const thesisLink = thesisKeys.has(symbol) ? symbol : links.find((l) => thesisKeys.has(l.key))?.key;
+        // A sector ETF reads its own sector entity; anything else reads its own.
+        const sectorKeyForEtf = ETF_TO_SECTOR_KEY[symbol];
+        const entity = entityByKey.get(sectorKeyForEtf ?? symbol);
+        const links: {key: string; weight: number}[] = entity?.links ?? [];
+        const sectorKey = sectorKeyForEtf ?? dominantSectorKey(links);
+
+        // The ETF inherits its sector's thesis; a single name inherits from any
+        // linked entity with one, including its sector or a theme.
+        const ownKeys = [entity?.key, symbol].filter((k): k is string => Boolean(k));
+        const thesisSelf = ownKeys.find((k) => thesisKeys.has(k));
+        const thesisLink = thesisSelf ?? links.find((l) => thesisKeys.has(l.key))?.key;
+
         const bars = barsBySymbol.get(symbol) ?? [];
         const weight = entity?.weightSlow ?? 0;
         return {
@@ -98,8 +132,9 @@ export const computeNavigatorScores = async (symbols: string[]): Promise<ScoredS
             newsWeightSlow: weight,
             sentimentSlow: weight > 1e-9 ? (entity?.sentimentSumSlow ?? 0) / weight : 0,
             signals: computeSignals(bars),
-            sectorTilt: 0,
-            hasActiveThesis,
+            sectorTilt: sectorKey ? sectorStanding.tiltByKey.get(sectorKey) ?? 0 : 0,
+            sectorLabel: sectorKey ? sectorStanding.nameByKey.get(sectorKey) : undefined,
+            hasActiveThesis: thesisLink !== undefined,
             thesisLabel: thesisLink,
             articleCount: countByKey.get(symbol)?.articles ?? 0,
             sourceCount: countByKey.get(symbol)?.sources ?? 0,
