@@ -82,6 +82,16 @@ describe("sanitizeWelcomeIntroHtml", () => {
         );
     });
 
+    // The restore step turns internal sentinels back into tags, so text that already
+    // contains those bytes must not be able to ride through the escaping as markup.
+    it("cannot be tricked into emitting a tag via sentinel characters", () => {
+        const open = String.fromCharCode(1);
+        const close = String.fromCharCode(2);
+        const out = sanitizeWelcomeIntroHtml(`${open}script${open}alert(1)${close}script${close}`);
+        expect(out).not.toContain("<script>");
+        expect(out).toContain("scriptalert(1)script");
+    });
+
     it("returns empty for nothing usable, so the caller can fall back", () => {
         expect(sanitizeWelcomeIntroHtml("")).toBe("");
         expect(sanitizeWelcomeIntroHtml("<script>steal()</script>")).toBe("");
