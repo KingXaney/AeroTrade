@@ -13,7 +13,7 @@ import AiNavigator from "@/database/models/ai-navigator.model";
 import {getActiveTheses, getBrainDigestData, getTopEntities, getTopVerifiedTickers} from "@/lib/brain/queries";
 import {foldExtractionsIntoBrain, type ArticleFold} from "@/lib/brain/update";
 import {parseExtractionResponse, sanitizeExtraction} from "@/lib/brain/extraction";
-import {buildSecondOpinionPrompt, EXTRACTION_PROMPT, RATIONALE_PROMPT, SECOND_OPINION_SYSTEM} from "@/lib/brain/prompts";
+import {buildSecondOpinionPrompt, EXTRACTION_PROMPT, injectJson, RATIONALE_PROMPT, SECOND_OPINION_SYSTEM} from "@/lib/brain/prompts";
 import {
     gatherOpinionContext,
     isSecondOpinionConfigured,
@@ -320,9 +320,10 @@ export const updateNewsBrain = inngest.createFunction(
             if (b > 0) await step.sleep(`extract-throttle-${b}`, EXTRACTION_THROTTLE_DELAY);
             const batch = queue.articles.slice(b * EXTRACTION_BATCH_SIZE, (b + 1) * EXTRACTION_BATCH_SIZE);
 
-            const prompt = EXTRACTION_PROMPT
-                .replace('{{articles}}', JSON.stringify(batch, null, 1))
-                .replace('{{activeThemes}}', JSON.stringify(queue.activeThemes));
+            const prompt = injectJson(
+                injectJson(EXTRACTION_PROMPT, '{{articles}}', batch),
+                '{{activeThemes}}', queue.activeThemes,
+            );
             const response = await step.ai.infer(`extract-batch-${b}`, {
                 model: step.ai.models.gemini({ model: EXTRACTION_MODEL }),
                 body: {
@@ -624,9 +625,10 @@ export const sendDailyNewsSummary = inngest.createFunction(
                 // fullSummary is for the news brain — JSON.stringify drops undefined values,
                 // keeping the email prompt lean.
                 const promptNews = news.map((article) => ({...article, fullSummary: undefined}));
-                const prompt = NEWS_SUMMARY_EMAIL_PROMPT
-                    .replace('{{newsData}}', JSON.stringify(promptNews, null, 2))
-                    .replace('{{navigatorData}}', JSON.stringify(navigatorData, null, 2));
+                const prompt = injectJson(
+                    injectJson(NEWS_SUMMARY_EMAIL_PROMPT, '{{newsData}}', promptNews, 2),
+                    '{{navigatorData}}', navigatorData, 2,
+                );
 
                 const response = await step.ai.infer(`summarize-news-${safeId}`, {
                     model: step.ai.models.gemini({ model: 'gemini-2.5-flash-lite' }),

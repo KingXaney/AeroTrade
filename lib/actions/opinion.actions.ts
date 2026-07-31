@@ -28,13 +28,23 @@ export const requestSecondOpinion = async (): Promise<OrderResult> => {
         }
 
         await connectToDatabase();
-        const latest = await SecondOpinion.findOne({scope: userId}).lean<{generatedAt: Date}>();
-        if (latest) {
-            const ageMs = Date.now() - new Date(latest.generatedAt).getTime();
-            if (ageMs < SECOND_OPINION_MIN_INTERVAL_MS) {
-                const waitMin = Math.ceil((SECOND_OPINION_MIN_INTERVAL_MS - ageMs) / 60000);
-                return {success: false, message: `The current opinion is fresh — ask again in about ${waitMin} min`};
-            }
+        // Claim the slot atomically on requestedAt, not on the last *completed*
+        // opinion: a job takes a minute or two to finish, so a comparison against
+        // generatedAt lets every click in that window through and turns one button
+        // into an unbounded run of paid Opus calls.
+        const cutoff = new Date(Date.now() - SECOND_OPINION_MIN_INTERVAL_MS);
+        const claim = await SecondOpinion.updateOne(
+            {scope: userId, $or: [{requestedAt: {$exists: false}}, {requestedAt: {$lte: cutoff}}]},
+            {$set: {requestedAt: new Date()}},
+            {upsert: true},
+        ).catch((error: unknown) => {
+            // Losing the upsert race trips the unique index on scope — which is
+            // exactly the "someone already claimed it" answer.
+            if ((error as {code?: number})?.code === 11000) return null;
+            throw error;
+        });
+        if (claim === null || (claim.matchedCount === 0 && claim.upsertedCount === 0)) {
+            return {success: false, message: 'A request is already in flight — give it a few minutes'};
         }
 
         await inngest.send({name: 'app/generate.second.opinion', data: {userId}});
@@ -77,7 +87,14 @@ export const saveManualSecondOpinion = async (opinionMd: string): Promise<OrderR
 
         await saveSecondOpinion({userId, opinionMd: text, modelUsed: MANUAL_MODEL_LABEL, source: 'manual'});
         revalidatePath('/brain');
-        return {success: true, message: 'Saved — it now shows on your Brain page'};
+        // saveSecondOpinion caps what it stores; say so rather than reporting a
+        // clean save for something that got cut off mid-sentence.
+        return {
+            success: true,
+            message: text.length > SECOND_OPINION_MAX_CHARS
+                ? `Saved, trimmed to the first ${SECOND_OPINION_MAX_CHARS.toLocaleString('en-US')} characters`
+                : 'Saved — it now shows on your Brain page',
+        };
     } catch (error) {
         console.error('Error saving pasted second opinion:', error);
         return {success: false, message: 'Could not save the opinion'};

@@ -43,7 +43,11 @@ export const gatherOpinionContext = async (): Promise<SecondOpinionContext> => {
         getBrainDigestData(SECOND_OPINION_NARRATIVE_COUNT),
         SuggestionSet.findOne({userId: GLOBAL_SUGGESTIONS_USER}).sort({date: -1})
             .lean<{date: string; kind?: string; items: SuggestionItem[]}>(),
-        NewsItem.find({}).sort({datetime: -1}).limit(SECOND_OPINION_HEADLINE_COUNT)
+        // datetime is unindexed, so this is a top-K sort over the whole
+        // collection — project narrowly, since the clipboard path runs it inside
+        // a click-synchronous server action.
+        NewsItem.find({}, {headline: 1, source: 1, sourceType: 1, publishedDate: 1, _id: 0})
+            .sort({datetime: -1}).limit(SECOND_OPINION_HEADLINE_COUNT)
             .lean<Array<{headline: string; source: string; sourceType: string; publishedDate: string}>>(),
     ]);
 
@@ -91,11 +95,13 @@ export const getLatestSecondOpinion = async (userId: string): Promise<SecondOpin
     // built the unique index could leave a duplicate, and natural order would
     // then hand back the stale one.
     const doc = await SecondOpinion.findOne({scope: userId}).sort({generatedAt: -1})
-        .lean<{opinionMd: string; modelUsed: string; source?: SecondOpinionSource; generatedAt: Date}>();
-    if (!doc) return null;
+        .lean<{opinionMd?: string; modelUsed?: string; source?: SecondOpinionSource; generatedAt?: Date}>();
+    // A row can exist as a rate-limit claim before any answer has been written;
+    // react-markdown throws on a non-string child, so treat that as "nothing yet".
+    if (!doc || typeof doc.opinionMd !== 'string' || !doc.opinionMd || !doc.generatedAt) return null;
     return {
         opinionMd: doc.opinionMd,
-        model: doc.modelUsed,
+        model: doc.modelUsed ?? 'Claude',
         source: doc.source ?? 'api',
         generatedAt: new Date(doc.generatedAt).getTime(),
     };

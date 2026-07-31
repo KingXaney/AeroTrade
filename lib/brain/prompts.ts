@@ -53,19 +53,30 @@ Give your second opinion.`;
 // (scripts/second-opinion-local.mjs) imports it directly under Node's TypeScript
 // stripping, so every path — API job, Claude Code CLI, clipboard — asks the same
 // question in the same words.
+export type SecondOpinionThesis = {name: string; type: string; weightSlow: number; sentimentSlow: number; activeSinceMs: number | null};
+export type SecondOpinionNarrative = {key: string; type: string; displayName: string; weightSlow: number; sentimentSlow: number; thesisActive: boolean};
+export type SecondOpinionDecisionItem = {symbol: string; action: string; targetWeightPct: number; reasons: string[]};
+export type SecondOpinionHeadline = {headline: string; source: string; kind: string; date: string};
+
 export type SecondOpinionContext = {
-    theses: unknown;
-    narratives: unknown;
-    decisions: unknown;
-    headlines: unknown;
+    theses: SecondOpinionThesis[];
+    narratives: SecondOpinionNarrative[];
+    decisions: {date: string; kind: string; items: SecondOpinionDecisionItem[]} | null;
+    headlines: SecondOpinionHeadline[];
 };
 
-export const buildSecondOpinionPrompt = (context: SecondOpinionContext): string =>
-    SECOND_OPINION_PROMPT
-        .replace('{{theses}}', JSON.stringify(context.theses, null, 1))
-        .replace('{{narratives}}', JSON.stringify(context.narratives, null, 1))
-        .replace('{{decisions}}', JSON.stringify(context.decisions, null, 1))
-        .replace('{{headlines}}', JSON.stringify(context.headlines, null, 1));
+// Substituted through a replacer function rather than a replacement string:
+// scraped headlines reach this JSON, and a "$&" or "$`" in one would otherwise
+// be expanded by String.replace and quietly rewrite the prompt around it.
+export const injectJson = (template: string, token: string, value: unknown, indent = 1): string =>
+    template.replace(token, () => JSON.stringify(value, null, indent));
+
+export const buildSecondOpinionPrompt = (context: SecondOpinionContext): string => {
+    let prompt = injectJson(SECOND_OPINION_PROMPT, '{{theses}}', context.theses);
+    prompt = injectJson(prompt, '{{narratives}}', context.narratives);
+    prompt = injectJson(prompt, '{{decisions}}', context.decisions);
+    return injectJson(prompt, '{{headlines}}', context.headlines);
+};
 
 // Single-message form for surfaces without a separate system prompt (the Claude
 // Code CLI and copy-to-clipboard paths).

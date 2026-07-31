@@ -31,15 +31,27 @@ import 'dotenv/config';
 import mongoose from 'mongoose';
 import {spawn} from 'node:child_process';
 import {tmpdir} from 'node:os';
-import {buildStandaloneSecondOpinionPrompt} from '../lib/brain/prompts.ts';
-import {
+// This script imports the app's TypeScript directly so the prompt and the text
+// rules cannot drift from the server paths. Node strips types natively from
+// 22.18; older versions die at import with an opaque syntax error, so the check
+// runs first and the imports are deferred behind it.
+const MIN_NODE_MAJOR = 22;
+const MIN_NODE_MINOR = 18;
+const [nodeMajor, nodeMinor] = process.versions.node.split('.').map(Number);
+if (nodeMajor < MIN_NODE_MAJOR || (nodeMajor === MIN_NODE_MAJOR && nodeMinor < MIN_NODE_MINOR)) {
+    console.error(`ERROR: Node ${MIN_NODE_MAJOR}.${MIN_NODE_MINOR}+ required (you have ${process.versions.node}) — this script loads the app's TypeScript directly.`);
+    process.exit(1);
+}
+
+const {buildStandaloneSecondOpinionPrompt} = await import('../lib/brain/prompts.ts');
+const {
     CLI_MODEL_LABEL,
     SECOND_OPINION_HEADLINE_COUNT,
     SECOND_OPINION_MAX_CHARS,
     SECOND_OPINION_NARRATIVE_COUNT,
     SECOND_OPINION_THESIS_COUNT,
     stripMarkdownLinks,
-} from '../lib/brain/opinion-text.ts';
+} = await import('../lib/brain/opinion-text.ts');
 
 const JOB_ID = 'claude-second-opinion';
 const CLI_TIMEOUT_MS = 10 * 60 * 1000;
@@ -193,20 +205,25 @@ const flagPlans = (model) => {
 // The JSON envelope is the only reliable success signal: in text mode a run that
 // fails mid-answer prints the partial text followed by an error, which reads as
 // a perfectly plausible opinion.
-const readAnswer = (stdout) => {
+const readAnswer = (stdout, expectJson) => {
+    if (!expectJson) return stdout; // last-resort plan; no envelope was requested
+
+    let parsed;
     try {
-        const parsed = JSON.parse(stdout);
-        if (parsed && typeof parsed === 'object' && 'result' in parsed) {
-            if (parsed.is_error || (parsed.subtype && parsed.subtype !== 'success')) {
-                throw new Error(`Claude Code reported ${parsed.subtype || 'an error'}: ${String(parsed.result).slice(0, 300)}`);
-            }
-            return String(parsed.result ?? '').trim();
-        }
-    } catch (error) {
-        if (error instanceof SyntaxError) return stdout; // plain-text fallback plan
-        throw error;
+        parsed = JSON.parse(stdout);
+    } catch {
+        // JSON was requested and something else arrived — that is a failed run,
+        // not an opinion. Storing stdout here is how a stack trace ends up on
+        // the Brain page over Claude's name.
+        throw new Error(`Claude Code returned unparseable output: ${stdout.slice(0, 300)}`);
     }
-    return stdout;
+    if (!parsed || typeof parsed !== 'object' || !('result' in parsed)) {
+        throw new Error('Claude Code returned JSON without a result field — treating the run as failed.');
+    }
+    if (parsed.is_error || (parsed.subtype && parsed.subtype !== 'success')) {
+        throw new Error(`Claude Code reported ${parsed.subtype || 'an error'}: ${String(parsed.result).slice(0, 300)}`);
+    }
+    return String(parsed.result ?? '').trim();
 };
 
 async function askClaude(prompt) {
@@ -215,7 +232,7 @@ async function askClaude(prompt) {
 
     for (const [index, flags] of plans.entries()) {
         const {code, stdout, stderr} = await runClaude([...flags, prompt], CLI_TIMEOUT_MS);
-        if (code === 0) return readAnswer(stdout);
+        if (code === 0) return readAnswer(stdout, flags.includes('--output-format'));
 
         lastFailure = `exit ${code}${stderr ? `: ${stderr.slice(0, 400)}` : ''}`;
         // Only a flag-compatibility failure is worth retrying — an auth or model

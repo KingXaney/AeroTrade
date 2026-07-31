@@ -14,15 +14,19 @@ export interface SecondOpinionDoc extends Document {
     source: SecondOpinionSource;
     generatedAt: Date;
     requestedBy: string;
+    // Stamped when a paid run is queued, before any answer exists — the row can
+    // therefore hold a claim with no opinion yet, so readers must tolerate that.
+    requestedAt?: Date;
 }
 
 const SecondOpinionSchema = new Schema<SecondOpinionDoc>({
     scope: {type: String, required: true, unique: true, index: true},
-    opinionMd: {type: String, required: true},
-    modelUsed: {type: String, required: true},
+    opinionMd: {type: String},
+    modelUsed: {type: String},
     source: {type: String, enum: ['api', 'cli', 'manual'], default: 'api'},
-    generatedAt: {type: Date, required: true},
+    generatedAt: {type: Date},
     requestedBy: {type: String, default: ''},
+    requestedAt: {type: Date},
 });
 
 const SecondOpinion = models?.SecondOpinion || model<SecondOpinionDoc>('SecondOpinion', SecondOpinionSchema);
