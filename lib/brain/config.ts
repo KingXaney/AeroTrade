@@ -18,7 +18,8 @@ export const ENTITY_STALE_DAYS = 60;
 // this budget is the daily article ceiling, and it is sized to match BRAIN_TOTAL_CAP.
 export const EXTRACTION_BATCH_SIZE = 20;
 export const MAX_EXTRACTION_CALLS_PER_DAY = 8;
-export const EXTRACTION_MODEL = 'gemini-2.5-flash-lite';
+// Model choice now lives in lib/ai/models.ts, keyed by task and tier, so the free
+// tier still resolves to gemini-2.5-flash-lite for every one of these jobs.
 export const UNEXTRACTED_PICKUP_LIMIT = 20;    // yesterday's overflow retried per run
 export const NEW_TICKER_VERIFY_BUDGET = 10;    // Finnhub verifications per run
 export const THEME_REUSE_LIST_SIZE = 30;       // active themes injected into the prompt

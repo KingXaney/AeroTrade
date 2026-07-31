@@ -13,7 +13,8 @@ import AiNavigator from "@/database/models/ai-navigator.model";
 import {getActiveTheses, getBrainDigestData, getTopEntities, getTopVerifiedTickers} from "@/lib/brain/queries";
 import {foldExtractionsIntoBrain, type ArticleFold} from "@/lib/brain/update";
 import {parseExtractionResponse, sanitizeExtraction} from "@/lib/brain/extraction";
-import {buildSecondOpinionPrompt, EXTRACTION_PROMPT, injectJson, RATIONALE_PROMPT, SECOND_OPINION_SYSTEM} from "@/lib/brain/prompts";
+import {buildRationalePrompt, buildSecondOpinionPrompt, EXTRACTION_PROMPT, injectJson, SECOND_OPINION_SYSTEM} from "@/lib/brain/prompts";
+import {inferText} from "@/lib/ai/infer";
 import {
     gatherOpinionContext,
     isSecondOpinionConfigured,
@@ -23,7 +24,6 @@ import {
 } from "@/lib/brain/opinion";
 import {
     EXTRACTION_BATCH_SIZE,
-    EXTRACTION_MODEL,
     MAX_EXTRACTION_CALLS_PER_DAY,
     NEW_TICKER_VERIFY_BUDGET,
     THEME_REUSE_LIST_SIZE,
@@ -62,21 +62,9 @@ export const sendSignUpEmail = inngest.createFunction(
         `
         const prompt = PERSONALIZED_WELCOME_EMAIL_PROMPT.replace('{{userProfile}}', userProfile)
 
-        const response = await step.ai.infer('generate-welcome-intro', {
-            model: step.ai.models.gemini({model: 'gemini-2.5-flash-lite'}),
-            body: {
-                contents: [
-                    {
-                        role: 'user',
-                        parts: [
-                            {text: prompt}
-                        ]
-                    }]
-            }
-        })
+        const response = await inferText(step, {task: 'welcome', stepId: 'generate-welcome-intro', prompt})
         await step.run('send-welcome-email', async () => {
-            const part = response.candidates?.[0]?.content?.parts?.[0];
-            const rawIntro = (part && 'text' in part ? part.text : null);
+            const rawIntro = response.text;
             // The model wrote this from the user's own signup answers and it lands in
             // the template unescaped — sanitize before it becomes email.
             const introText = sanitizeWelcomeIntroHtml(rawIntro || '')
@@ -328,20 +316,13 @@ export const updateNewsBrain = inngest.createFunction(
                 injectJson(EXTRACTION_PROMPT, '{{articles}}', batch),
                 '{{activeThemes}}', queue.activeThemes,
             );
-            const response = await step.ai.infer(`extract-batch-${b}`, {
-                model: step.ai.models.gemini({ model: EXTRACTION_MODEL }),
-                body: {
-                    contents: [{ role: 'user', parts: [{ text: prompt }] }],
-                    generationConfig: { responseMimeType: 'application/json' },
-                },
-            });
+            const response = await inferText(step, {task: 'extraction', stepId: `extract-batch-${b}`, prompt});
 
             // Fold data must flow through the step's RETURN value: on an Inngest replay,
             // memoized steps don't re-execute their callbacks, so anything pushed into
             // function-scope arrays inside the callback would be lost.
             const applied = await step.run(`apply-batch-${b}`, async () => {
-                const part = response.candidates?.[0]?.content?.parts?.[0];
-                const raw = (part && 'text' in part ? part.text : null);
+                const raw = response.text;
                 if (!raw) return {folds: [] as ArticleFold[], ids: [] as string[]};
 
                 const parsed = parseExtractionResponse(raw);
@@ -367,7 +348,11 @@ export const updateNewsBrain = inngest.createFunction(
                             eventType: clean.eventType,
                             importance: clean.importance,
                             entities: clean.entities,
-                            model: EXTRACTION_MODEL,
+                            // The model that actually tagged this article, not a
+                            // constant — otherwise the record lies after any tier
+                            // change and there is no way to tell afterwards whether
+                            // a better model produced a better brain.
+                            model: response.model,
                             extractedAt: new Date(),
                         }}},
                     );
@@ -532,16 +517,10 @@ export const runWeeklyNavigator = inngest.createFunction(
 
                 // The ONE per-user LLM call: paraphrase the deterministic reasons.
                 const narratives = await step.run(`load-narratives-${safeId}`, async () => getBrainDigestData(5));
-                const rationalePrompt = RATIONALE_PROMPT
-                    .replace('{{items}}', JSON.stringify(executed.map((i) => ({action: i.action, symbol: i.symbol, targetWeightPct: Math.round(i.targetWeight * 100), reasons: i.reasons})), null, 1))
-                    .replace('{{narratives}}', JSON.stringify(narratives, null, 1));
-                const response = await step.ai.infer(`rationale-${safeId}`, {
-                    model: step.ai.models.gemini({ model: EXTRACTION_MODEL }),
-                    body: { contents: [{ role: 'user', parts: [{ text: rationalePrompt }] }] },
-                });
+                const rationalePrompt = buildRationalePrompt(executed, narratives);
+                const response = await inferText(step, {task: 'rationale', stepId: `rationale-${safeId}`, prompt: rationalePrompt});
                 await step.run(`save-rationale-${safeId}`, async () => {
-                    const part = response.candidates?.[0]?.content?.parts?.[0];
-                    const rationale = (part && 'text' in part ? part.text : null);
+                    const rationale = response.text;
                     if (!rationale) return;
                     await connectToDatabase();
                     await SuggestionSet.updateOne({userId: nav.userId, date: today}, {$set: {rationaleMd: rationale}});
@@ -634,17 +613,11 @@ export const sendDailyNewsSummary = inngest.createFunction(
                     '{{navigatorData}}', navigatorData, 2,
                 );
 
-                const response = await step.ai.infer(`summarize-news-${safeId}`, {
-                    model: step.ai.models.gemini({ model: 'gemini-2.5-flash-lite' }),
-                    body: {
-                        contents: [{ role: 'user', parts: [{ text: prompt }] }]
-                    }
-                });
+                const response = await inferText(step, {task: 'digest', stepId: `summarize-news-${safeId}`, prompt});
 
-                const part = response.candidates?.[0]?.content?.parts?.[0];
-                const newsContent = (part && 'text' in part ? part.text : null);
+                const newsContent = response.text;
                 if (!newsContent) {
-                    console.warn(`Skipping ${user.email}: Gemini returned no summary text`);
+                    console.warn(`Skipping ${user.email}: ${response.model} returned no summary text (${response.stopReason ?? 'no stop reason'})`);
                     continue;
                 }
 
@@ -791,16 +764,10 @@ export const bootstrapAiNavigator = inngest.createFunction(
         }
 
         const narratives = await step.run('bootstrap-narratives', async () => getBrainDigestData(5));
-        const rationalePrompt = RATIONALE_PROMPT
-            .replace('{{items}}', JSON.stringify(executed.map((i) => ({action: i.action, symbol: i.symbol, targetWeightPct: Math.round(i.targetWeight * 100), reasons: i.reasons})), null, 1))
-            .replace('{{narratives}}', JSON.stringify(narratives, null, 1));
-        const response = await step.ai.infer('bootstrap-rationale', {
-            model: step.ai.models.gemini({ model: EXTRACTION_MODEL }),
-            body: { contents: [{ role: 'user', parts: [{ text: rationalePrompt }] }] },
-        });
+        const rationalePrompt = buildRationalePrompt(executed, narratives);
+        const response = await inferText(step, {task: 'rationale', stepId: 'bootstrap-rationale', prompt: rationalePrompt});
         await step.run('bootstrap-save-rationale', async () => {
-            const part = response.candidates?.[0]?.content?.parts?.[0];
-            const rationale = (part && 'text' in part ? part.text : null);
+            const rationale = response.text;
             if (!rationale) return;
             await connectToDatabase();
             await SuggestionSet.updateOne({userId, date: today}, {$set: {rationaleMd: rationale}});
