@@ -1,7 +1,7 @@
 import {redirect} from "next/navigation";
 import {getCurrentUserId} from "@/lib/actions/watchlist.actions";
 import {getNavigatorStatus} from "@/lib/actions/navigator.actions";
-import {getActiveTheses, getBrainGraph, getEntityEvidence, getTopEntities} from "@/lib/brain/queries";
+import {getActiveTheses, getBrainGraph, getBrainSystemStatus, getEntityEvidence, getTopEntities} from "@/lib/brain/queries";
 import {getLatestSuggestions} from "@/lib/navigator/service";
 import {getAccountsForUser, toAccountSummary} from "@/lib/trading/account";
 import ActiveTheses from "@/components/brain/ActiveTheses";
@@ -10,6 +10,7 @@ import EvidenceList from "@/components/brain/EvidenceList";
 import NarrativeLeaderboard from "@/components/brain/NarrativeLeaderboard";
 import NavigatorCard from "@/components/brain/NavigatorCard";
 import SuggestionPanel from "@/components/brain/SuggestionPanel";
+import SystemStatus from "@/components/brain/SystemStatus";
 
 type BrainPageProps = {
     searchParams: Promise<{entity?: string}>;
@@ -21,13 +22,14 @@ const BrainPage = async ({searchParams}: BrainPageProps) => {
 
     const {entity} = await searchParams;
 
-    const [navigatorStatus, theses, topEntities, graph, suggestions, accounts] = await Promise.all([
+    const [navigatorStatus, theses, topEntities, graph, suggestions, accounts, systemStatus] = await Promise.all([
         getNavigatorStatus(userId),
         getActiveTheses(),
         getTopEntities(),
         getBrainGraph(),
         getLatestSuggestions(userId),
         getAccountsForUser(userId),
+        getBrainSystemStatus(),
     ]);
     const evidence = entity ? await getEntityEvidence(entity) : null;
     const applyAccounts = accounts.map((a) => {
@@ -46,6 +48,9 @@ const BrainPage = async ({searchParams}: BrainPageProps) => {
                     Persistent market narratives from every ingested article — slow-building theses drive the AI Navigator
                 </p>
             </div>
+
+            {/* Is the machinery actually running? */}
+            <SystemStatus status={systemStatus} />
 
             <div className="grid grid-cols-1 xl:grid-cols-2 gap-4">
                 {/* Active theses — the centerpiece */}

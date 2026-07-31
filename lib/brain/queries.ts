@@ -4,6 +4,8 @@
 import {connectToDatabase} from "@/database/mongoose";
 import BrainEntity, {type BrainEntityDoc} from "@/database/models/brain-entity.model";
 import NewsItem from "@/database/models/news-item.model";
+import JobRun from "@/database/models/job-run.model";
+import PriceBar from "@/database/models/price-bar.model";
 import {getEasternDateString} from "@/lib/utils";
 
 const safeAvg = (sum: number, weight: number): number => (Math.abs(weight) < 1e-9 ? 0 : sum / weight);
@@ -97,6 +99,70 @@ export const getBrainDigestData = async (limit = 8) => {
             thesisActive: s.thesisSince !== null,
         };
     });
+};
+
+// System-health snapshot for the /brain status strip: live pipeline counters plus
+// each background job's last completion stamp. Health is derived from staleness —
+// a crashed or never-wired job stops refreshing its stamp.
+export type JobHealth = {
+    jobId: string;
+    label: string;
+    schedule: string;
+    lastRunAt: number | null;     // epoch ms
+    lastMessage: string | null;
+    staleAfterHours: number;
+};
+
+export type BrainSystemStatus = {
+    articlesTotal: number;
+    articlesLast24h: number;
+    articlesExtracted: number;
+    entityCount: number;
+    thesisCount: number;
+    pricedSymbols: number;
+    jobs: JobHealth[];
+};
+
+// Cadence-aware staleness: daily jobs get slack for one miss; snapshots skip
+// weekends (so Monday morning is ~66h after Friday's run); the navigator is weekly.
+const JOB_DEFINITIONS: Array<Omit<JobHealth, 'lastRunAt' | 'lastMessage'>> = [
+    {jobId: 'daily-brain-update', label: 'Brain update', schedule: 'daily 07:30 ET', staleAfterHours: 30},
+    {jobId: 'daily-news-summary', label: 'News email', schedule: 'daily 12:00 ET', staleAfterHours: 30},
+    {jobId: 'daily-account-snapshots', label: 'Account snapshots', schedule: 'weekdays 16:10 ET', staleAfterHours: 80},
+    {jobId: 'ai-navigator-weekly', label: 'AI navigator (weekly)', schedule: 'Mondays 10:00 ET', staleAfterHours: 8 * 24},
+    {jobId: 'ai-navigator-bootstrap', label: 'AI run (manual/enroll)', schedule: 'on demand', staleAfterHours: Number.POSITIVE_INFINITY},
+];
+
+export const getBrainSystemStatus = async (): Promise<BrainSystemStatus> => {
+    await connectToDatabase();
+    const dayAgo = new Date(Date.now() - 24 * 60 * 60 * 1000);
+    const [articlesTotal, articlesLast24h, articlesExtracted, entityCount, thesisCount, pricedSymbols, runs] = await Promise.all([
+        NewsItem.countDocuments({}),
+        NewsItem.countDocuments({createdAt: {$gte: dayAgo}}),
+        NewsItem.countDocuments({extraction: {$exists: true}}),
+        BrainEntity.countDocuments({}),
+        BrainEntity.countDocuments({thesisSince: {$ne: null}}),
+        PriceBar.distinct('symbol').then((symbols) => symbols.length),
+        JobRun.find({}).lean(),
+    ]);
+    const runByJob = new Map(runs.map((r) => [r.jobId, r]));
+
+    return {
+        articlesTotal,
+        articlesLast24h,
+        articlesExtracted,
+        entityCount,
+        thesisCount,
+        pricedSymbols,
+        jobs: JOB_DEFINITIONS.map((def) => {
+            const run = runByJob.get(def.jobId);
+            return {
+                ...def,
+                lastRunAt: run ? new Date(run.lastRunAt).getTime() : null,
+                lastMessage: run?.lastMessage ?? null,
+            };
+        }),
+    };
 };
 
 // Ticker keys the brain currently trusts, by slow weight (feeds the tracked-symbol set).

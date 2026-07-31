@@ -22,6 +22,7 @@ import {
     THEME_REUSE_LIST_SIZE,
     UNEXTRACTED_PICKUP_LIMIT,
 } from "@/lib/brain/config";
+import {recordJobRun} from "@/lib/inngest/job-runs";
 import {ensureBars} from "@/lib/prices/store";
 import {buildTargets} from "@/lib/navigator/allocator";
 import {ALWAYS_ELIGIBLE_SYMBOLS, MAX_POSITIONS, MIN_CASH_WEIGHT} from "@/lib/navigator/config";
@@ -219,7 +220,9 @@ export const recordDailySnapshots = inngest.createFunction(
             return count;
         });
 
-        return {success: true, message: `Snapshotted ${written} account(s) + ${BENCHMARK_SYMBOL}`};
+        const summary = `Snapshotted ${written} account(s) + ${BENCHMARK_SYMBOL}`;
+        await step.run('record-job-run', async () => recordJobRun('daily-account-snapshots', summary));
+        return {success: true, message: summary};
     },
 )
 
@@ -405,10 +408,9 @@ export const updateNewsBrain = inngest.createFunction(
         const foldResult = await step.run('fold-brain', async () =>
             foldExtractionsIntoBrain(folds, new Set(verifiedTickers), runId));
 
-        return {
-            success: true,
-            message: `Brain updated: ${inserted} articles ingested, ${extractedIds.length} extracted, ${foldResult.entitiesTouched} entities touched, ${foldResult.deleted} pruned`,
-        };
+        const summary = `Brain updated: ${inserted} articles ingested, ${extractedIds.length} extracted, ${foldResult.entitiesTouched} entities touched, ${foldResult.deleted} pruned`;
+        await step.run('record-job-run', async () => recordJobRun('daily-brain-update', summary));
+        return {success: true, message: summary};
     },
 )
 
@@ -540,10 +542,9 @@ export const runWeeklyNavigator = inngest.createFunction(
             }
         }
 
-        return {
-            success: true,
-            message: `Navigator ran for ${usersProcessed}/${universe.navigators.length} user(s), ${ordersExecuted} order(s) executed`,
-        };
+        const summary = `Navigator ran for ${usersProcessed}/${universe.navigators.length} user(s), ${ordersExecuted} order(s) executed`;
+        await step.run('record-job-run', async () => recordJobRun('ai-navigator-weekly', summary));
+        return {success: true, message: summary};
     },
 )
 
@@ -650,10 +651,9 @@ export const sendDailyNewsSummary = inngest.createFunction(
             }
         }
 
-        return {
-            success: true,
-            message: `Daily news summary sent to ${sentCount}/${users.length} users`,
-        }
+        const summary = `Daily news summary sent to ${sentCount}/${users.length} users`;
+        await step.run('record-job-run', async () => recordJobRun('daily-news-summary', summary));
+        return {success: true, message: summary}
     }
 )
 
@@ -793,11 +793,10 @@ export const bootstrapAiNavigator = inngest.createFunction(
             await SuggestionSet.updateOne({userId, date: today}, {$set: {rationaleMd: rationale}});
         });
 
-        return {
-            success: true,
-            message: claimed
-                ? `Run traded ${executed.filter((i) => i.executed).length} order(s) for ${userId}`
-                : `Preview saved for ${userId} (nothing traded)`,
-        };
+        const summary = claimed
+            ? `Run traded ${executed.filter((i) => i.executed).length} order(s)`
+            : 'Preview saved (nothing traded)';
+        await step.run('record-job-run', async () => recordJobRun('ai-navigator-bootstrap', summary));
+        return {success: true, message: `${summary} for ${userId}`};
     },
 )
