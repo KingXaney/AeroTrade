@@ -2,6 +2,7 @@ import {redirect} from "next/navigation";
 import {getCurrentUserId} from "@/lib/actions/watchlist.actions";
 import {getNavigatorStatus} from "@/lib/actions/navigator.actions";
 import {getActiveTheses, getBrainGraph, getBrainSystemStatus, getEntityEvidence, getTopEntities} from "@/lib/brain/queries";
+import {getLatestSecondOpinion, isSecondOpinionConfigured} from "@/lib/brain/opinion";
 import {getLatestSuggestions} from "@/lib/navigator/service";
 import {getAccountsForUser, toAccountSummary} from "@/lib/trading/account";
 import ActiveTheses from "@/components/brain/ActiveTheses";
@@ -9,6 +10,7 @@ import BrainGraph from "@/components/brain/BrainGraph";
 import EvidenceList from "@/components/brain/EvidenceList";
 import NarrativeLeaderboard from "@/components/brain/NarrativeLeaderboard";
 import NavigatorCard from "@/components/brain/NavigatorCard";
+import SecondOpinionCard from "@/components/brain/SecondOpinionCard";
 import SuggestionPanel from "@/components/brain/SuggestionPanel";
 import SystemStatus from "@/components/brain/SystemStatus";
 
@@ -22,7 +24,7 @@ const BrainPage = async ({searchParams}: BrainPageProps) => {
 
     const {entity} = await searchParams;
 
-    const [navigatorStatus, theses, topEntities, graph, suggestions, accounts, systemStatus] = await Promise.all([
+    const [navigatorStatus, theses, topEntities, graph, suggestions, accounts, systemStatus, secondOpinion] = await Promise.all([
         getNavigatorStatus(userId),
         getActiveTheses(),
         getTopEntities(),
@@ -30,6 +32,7 @@ const BrainPage = async ({searchParams}: BrainPageProps) => {
         getLatestSuggestions(userId),
         getAccountsForUser(userId),
         getBrainSystemStatus(),
+        getLatestSecondOpinion(),
     ]);
     const evidence = entity ? await getEntityEvidence(entity) : null;
     const applyAccounts = accounts.map((a) => {
@@ -72,6 +75,9 @@ const BrainPage = async ({searchParams}: BrainPageProps) => {
                     </section>
                 </div>
             </div>
+
+            {/* Claude's critique of the brain's current picture */}
+            <SecondOpinionCard configured={isSecondOpinionConfigured()} opinion={secondOpinion} />
 
             {/* Knowledge graph */}
             <section className="glass-panel rounded-xl p-5">

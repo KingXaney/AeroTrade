@@ -13,7 +13,16 @@ import AiNavigator from "@/database/models/ai-navigator.model";
 import {getActiveTheses, getBrainDigestData, getTopEntities, getTopVerifiedTickers} from "@/lib/brain/queries";
 import {foldExtractionsIntoBrain, type ArticleFold} from "@/lib/brain/update";
 import {parseExtractionResponse, sanitizeExtraction} from "@/lib/brain/extraction";
-import {EXTRACTION_PROMPT, RATIONALE_PROMPT} from "@/lib/brain/prompts";
+import {EXTRACTION_PROMPT, RATIONALE_PROMPT, SECOND_OPINION_PROMPT, SECOND_OPINION_SYSTEM} from "@/lib/brain/prompts";
+import {
+    isSecondOpinionConfigured,
+    SECOND_OPINION_HEADLINE_COUNT,
+    SECOND_OPINION_MAX_CHARS,
+    SECOND_OPINION_MAX_TOKENS,
+    SECOND_OPINION_MODEL,
+    stripMarkdownLinks,
+} from "@/lib/brain/opinion";
+import SecondOpinion from "@/database/models/second-opinion.model";
 import {
     EXTRACTION_BATCH_SIZE,
     EXTRACTION_MODEL,
@@ -798,5 +807,115 @@ export const bootstrapAiNavigator = inngest.createFunction(
             : 'Preview saved (nothing traded)';
         await step.run('record-job-run', async () => recordJobRun('ai-navigator-bootstrap', summary));
         return {success: true, message: `${summary} for ${userId}`};
+    },
+)
+
+// On-demand "second opinion": Claude (a stronger model than the extraction
+// pipeline's) reads the same brain digest, theses, decisions and headlines and
+// argues with them. It never trades — the deterministic rails stay in charge;
+// this is a critique layer for the human reading the /brain page.
+export const generateSecondOpinion = inngest.createFunction(
+    { id: 'claude-second-opinion', triggers: [{ event: 'app/generate.second.opinion' }] },
+    async ({ event, step }) => {
+        if (!isSecondOpinionConfigured()) {
+            const message = 'Skipped — ANTHROPIC_API_KEY is not set';
+            await step.run('record-job-run', async () => recordJobRun('claude-second-opinion', message));
+            return {success: false, message};
+        }
+
+        const context = await step.run('gather-context', async () => {
+            await connectToDatabase();
+            const [theses, narratives, latestSet, headlines] = await Promise.all([
+                getActiveTheses(),
+                getBrainDigestData(12),
+                SuggestionSet.findOne({userId: GLOBAL_SUGGESTIONS_USER}).sort({date: -1})
+                    .lean<{date: string; kind?: string; items: SuggestionItem[]}>(),
+                NewsItem.find({}).sort({datetime: -1}).limit(SECOND_OPINION_HEADLINE_COUNT)
+                    .lean<Array<{headline: string; source: string; sourceType: string; publishedDate: string}>>(),
+            ]);
+            return {
+                theses: theses.map((t) => ({
+                    name: t.displayName,
+                    type: t.type,
+                    weightSlow: Number(t.weightSlow.toFixed(2)),
+                    sentimentSlow: Number(t.sentimentSlow.toFixed(2)),
+                    activeSinceMs: t.thesisSince,
+                })),
+                narratives,
+                decisions: latestSet
+                    ? {
+                        date: latestSet.date,
+                        kind: latestSet.kind ?? 'executed',
+                        items: latestSet.items.map((i) => ({
+                            symbol: i.symbol,
+                            action: i.action,
+                            targetWeightPct: Math.round(i.targetWeight * 100),
+                            reasons: i.reasons,
+                        })),
+                    }
+                    : null,
+                headlines: headlines.map((h) => ({
+                    headline: h.headline,
+                    source: h.source,
+                    kind: h.sourceType,
+                    date: h.publishedDate,
+                })),
+            };
+        });
+
+        if (context.narratives.length === 0) {
+            const message = 'Skipped — the brain is empty, run a brain update first';
+            await step.run('record-job-run', async () => recordJobRun('claude-second-opinion', message));
+            return {success: false, message};
+        }
+
+        const prompt = SECOND_OPINION_PROMPT
+            .replace('{{theses}}', JSON.stringify(context.theses, null, 1))
+            .replace('{{narratives}}', JSON.stringify(context.narratives, null, 1))
+            .replace('{{decisions}}', JSON.stringify(context.decisions, null, 1))
+            .replace('{{headlines}}', JSON.stringify(context.headlines, null, 1));
+
+        const response = await step.ai.infer('claude-opinion', {
+            model: step.ai.models.anthropic({
+                model: SECOND_OPINION_MODEL,
+                defaultParameters: {max_tokens: SECOND_OPINION_MAX_TOKENS},
+            }),
+            body: {
+                system: SECOND_OPINION_SYSTEM,
+                messages: [{role: 'user', content: prompt}],
+            },
+        });
+
+        const summary = await step.run('save-opinion', async () => {
+            // Claude Opus 5 can decline via its safety classifiers ('refusal' —
+            // newer than this adapter's stop_reason union, hence the widening).
+            const stopReason: string | null = response.stop_reason;
+            if (stopReason === 'refusal') return 'Claude declined the request';
+            const text = response.content
+                .map((block) => (block.type === 'text' && 'text' in block ? block.text : ''))
+                .filter(Boolean)
+                .join('\n')
+                .trim();
+            if (!text) return 'Claude returned no text';
+
+            const opinionMd = stripMarkdownLinks(text).slice(0, SECOND_OPINION_MAX_CHARS);
+            await connectToDatabase();
+            await SecondOpinion.updateOne(
+                {scope: 'global'},
+                {
+                    $set: {
+                        opinionMd,
+                        modelUsed: SECOND_OPINION_MODEL,
+                        generatedAt: new Date(),
+                        requestedBy: String(event.data?.userId ?? ''),
+                    },
+                },
+                {upsert: true},
+            );
+            return `Second opinion written (${opinionMd.length} chars)`;
+        });
+
+        await step.run('record-job-run', async () => recordJobRun('claude-second-opinion', summary));
+        return {success: true, message: summary};
     },
 )
