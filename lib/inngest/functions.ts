@@ -267,14 +267,17 @@ export const updateNewsBrain = inngest.createFunction(
                 });
             }
             try {
-                await NewsItem.insertMany(docs, {ordered: false});
+                const inserted = await NewsItem.insertMany(docs, {ordered: false});
+                return inserted.length;
             } catch (error) {
                 // Duplicate contentHash rows (already ingested) are expected — everything
                 // else in a bulk-write error still inserted the non-duplicates.
-                const bulkError = error as {code?: number; writeErrors?: unknown[]};
+                const bulkError = error as {code?: number; writeErrors?: unknown[]; insertedDocs?: unknown[]};
                 if (bulkError.code !== 11000 && !bulkError.writeErrors) throw error;
+                // Report what was actually new, not how many were offered: most of a
+                // sweep is already-seen articles, so docs.length overstates ingest badly.
+                return bulkError.insertedDocs?.length ?? 0;
             }
-            return docs.length;
         });
 
         // Extraction queue: newest unextracted articles first, hard daily budget.

@@ -42,6 +42,10 @@ const SEC_ENTRIES_PER_SYMBOL = 10;
 // caps SEC articles well below what ten symbols can return — so bound the spend and
 // let the rest fall back to metadata-only, which is still richer than the old title.
 const SEC_BODY_FETCH_BUDGET = 12;
+// These fetches sit inside one Inngest step alongside the feed requests. Without a
+// deadline a single stalled sec.gov connection hangs the whole brain update; with
+// one it degrades to '' , which every caller already handles.
+const SEC_FETCH_TIMEOUT_MS = 15_000;
 const MILLISECONDS_PER_SECOND = 1000;
 const MILLISECONDS_PER_DAY = 24 * 60 * 60 * MILLISECONDS_PER_SECOND;
 
@@ -138,7 +142,18 @@ export const filingDirectoryUrl = (filingHref: string): string =>
 // XBRL and opens with hundreds of taxonomy identifiers (us-gaap:CommonStockMember,
 // aapl:A1.625NotesDue2026Member) — measured against real filings, its first 400
 // characters carry less information than the title we already had.
-const EXHIBIT_NAME_PATTERN = /ex-?\d/i;
+// "ex" followed by digits appears mid-name in real exhibits (a8-kex991q3…htm), so it
+// cannot be anchored to a word boundary. It also appears in the PRIMARY document of
+// issuers whose ticker ends in "ex" (flex-20260630.htm), which would invert the
+// heuristic for them — those are excluded by name shape instead: EDGAR names the
+// primary inline-XBRL document {prefix}-{YYYYMMDD}.htm.
+const EXHIBIT_NAME_PATTERN = /ex[-_]?\d/i;
+const PRIMARY_DOCUMENT_PATTERN = /^[a-z0-9]+-\d{8}\.html?$/i;
+// Sarbanes-Oxley certifications (31/32) and auditor consents (23/24) are pure
+// boilerplate. On a 10-Q or 10-K they are usually the only exhibits, so without this
+// they beat the quarterly report itself — and they read as prose, so looksInformative
+// cannot catch them either.
+const BOILERPLATE_EXHIBIT_PATTERN = /(^|[^a-z])ex[-_]?(2[34]|3[12])/i;
 const DOCUMENT_NAME_PATTERN = /\.html?$/i;
 
 export const pickFilingDocument = (
@@ -153,7 +168,10 @@ export const pickFilingDocument = (
     if (candidates.length === 0) return undefined;
 
     const largestFirst = (a: {size: number}, b: {size: number}) => b.size - a.size;
-    const exhibits = candidates.filter((file) => EXHIBIT_NAME_PATTERN.test(file.name));
+    const exhibits = candidates.filter((file) =>
+        EXHIBIT_NAME_PATTERN.test(file.name)
+        && !PRIMARY_DOCUMENT_PATTERN.test(file.name)
+        && !BOILERPLATE_EXHIBIT_PATTERN.test(file.name));
     const ranked = exhibits.length > 0 ? exhibits : candidates;
     return [...ranked].sort(largestFirst)[0].name;
 };
@@ -170,13 +188,24 @@ const NAMED_ENTITIES: [RegExp, string][] = [
 // Filings are littered with numeric entities (&#174; for ®, &#8212; for an em dash).
 // Decoding them generically beats maintaining a list that is always one symbol short.
 const NUMERIC_ENTITY = /&#(x[0-9a-f]+|\d+);?/gi;
+const MAX_CODE_POINT = 0x10ffff;
+const SURROGATE_START = 0xd800;
+const SURROGATE_END = 0xdfff;
 
 const decodeEntities = (input: string): string => {
     let text = input.replace(NUMERIC_ENTITY, (_match, code: string) => {
         const point = code.toLowerCase().startsWith("x")
             ? Number.parseInt(code.slice(1), 16)
             : Number.parseInt(code, 10);
-        return Number.isFinite(point) && point > 0 ? String.fromCodePoint(point) : " ";
+        // Filing HTML is issuer-supplied, so a malformed entity like &#1114112; is
+        // reachable. fromCodePoint throws RangeError above the Unicode maximum or in
+        // the surrogate range, and that throw would discard the whole filing body
+        // after both fetches had already been spent.
+        const usable = Number.isFinite(point)
+            && point > 0
+            && point <= MAX_CODE_POINT
+            && !(point >= SURROGATE_START && point <= SURROGATE_END);
+        return usable ? String.fromCodePoint(point) : " ";
     });
     for (const [pattern, replacement] of NAMED_ENTITIES) {
         text = text.replace(pattern, replacement);
@@ -232,7 +261,7 @@ const fetchFilingBody = async (content: EdgarContent | undefined): Promise<strin
     const filingHref = content?.["filing-href"];
     if (!filingHref) return "";
     try {
-        const init = {headers: {"User-Agent": secUserAgent()}, next: {revalidate: FEED_REVALIDATE_SECONDS}};
+        const init = {headers: {"User-Agent": secUserAgent()}, signal: AbortSignal.timeout(SEC_FETCH_TIMEOUT_MS)};
         const dirResponse = await fetch(filingDirectoryUrl(filingHref), init);
         if (!dirResponse.ok) return "";
         const directory = await dirResponse.json() as {directory?: {item?: EdgarDirectoryFile[]}};
@@ -263,6 +292,7 @@ export const fetchSecFilings = async (symbols: string[]): Promise<MarketNewsArti
             const response = await fetch(edgarBrowseUrl(symbol), {
                 headers: {"User-Agent": secUserAgent()},
                 next: {revalidate: FEED_REVALIDATE_SECONDS},
+                signal: AbortSignal.timeout(SEC_FETCH_TIMEOUT_MS),
             });
             if (!response.ok) {
                 throw new Error(`EDGAR responded ${response.status} for ${symbol}`);

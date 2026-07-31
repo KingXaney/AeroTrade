@@ -67,15 +67,22 @@ describe("buildAnthropicBody", () => {
 
 describe("normalizeGeminiResponse", () => {
     it("reads the first text part", () => {
-        expect(normalizeGeminiResponse({candidates: [{content: {parts: [{text: "answer"}]}}]})).toBe("answer");
+        expect(normalizeGeminiResponse({candidates: [{content: {parts: [{text: "answer"}]}}]}).text).toBe("answer");
+    });
+
+    // Carried through so a SAFETY or MAX_TOKENS stop shows up in the logs on the
+    // default tier, not only when Claude refuses.
+    it("carries the finish reason through", () => {
+        expect(normalizeGeminiResponse({candidates: [{content: {parts: [{text: "a"}]}, finishReason: "SAFETY"}]}).stopReason)
+            .toBe("SAFETY");
     });
 
     it("returns empty for every missing shape rather than throwing", () => {
-        expect(normalizeGeminiResponse({})).toBe("");
-        expect(normalizeGeminiResponse({candidates: []})).toBe("");
-        expect(normalizeGeminiResponse({candidates: [{content: {parts: []}}]})).toBe("");
-        expect(normalizeGeminiResponse({candidates: [{content: {parts: [{inlineData: {}}]}}]})).toBe("");
-        expect(normalizeGeminiResponse(undefined)).toBe("");
+        expect(normalizeGeminiResponse({}).text).toBe("");
+        expect(normalizeGeminiResponse({candidates: []}).text).toBe("");
+        expect(normalizeGeminiResponse({candidates: [{content: {parts: []}}]}).text).toBe("");
+        expect(normalizeGeminiResponse({candidates: [{content: {parts: [{inlineData: {}}]}}]}).text).toBe("");
+        expect(normalizeGeminiResponse(undefined).text).toBe("");
     });
 });
 

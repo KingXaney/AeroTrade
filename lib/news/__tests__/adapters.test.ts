@@ -279,6 +279,34 @@ describe("SEC filing enrichment", () => {
             ], "")).toBe("msft-20260630.htm");
         });
 
+        // The only exhibits on a 10-Q/10-K are SOX certifications, and they read as
+        // prose, so looksInformative cannot catch them — the report itself must win.
+        it("prefers the report over certification exhibits on a 10-Q", () => {
+            expect(pickFilingDocument([
+                {name: "msft-20260630.htm", size: 4820000},
+                {name: "ex-311.htm", size: 5300},
+                {name: "ex-312.htm", size: 5200},
+                {name: "ex-321.htm", size: 2100},
+            ], "")).toBe("msft-20260630.htm");
+        });
+
+        it("still prefers a real news exhibit over the primary document", () => {
+            expect(pickFilingDocument([
+                {name: "aapl-20260730.htm", size: 38350},
+                {name: "a8-kex991.htm", size: 173484},
+                {name: "ex-311.htm", size: 5300},
+            ], "")).toBe("a8-kex991.htm");
+        });
+
+        // /ex-?\d/ unanchored also matches flex-, iex-, vrex- primary documents,
+        // which inverted the heuristic for those issuers.
+        it("does not mistake an issuer prefix ending in 'ex' for an exhibit", () => {
+            expect(pickFilingDocument([
+                {name: "flex-20260630.htm", size: 38350},
+                {name: "a8-kex991.htm", size: 9800},
+            ], "")).toBe("a8-kex991.htm");
+        });
+
         it("returns undefined when the directory holds no documents", () => {
             expect(pickFilingDocument([{name: "a.xml", size: 10}], "")).toBeUndefined();
             expect(pickFilingDocument([], "")).toBeUndefined();
@@ -302,6 +330,15 @@ describe("SEC filing enrichment", () => {
             const html = "<script>steal()</script><style>.a{}</style><p>Real prose lives here now</p>";
             const text = extractFilingText(html);
             expect(text).toBe("Real prose lives here now");
+        });
+
+        // Filing HTML is issuer-supplied, so a malformed entity is reachable; throwing
+        // here would discard a body both fetches had already been spent on.
+        it("does not throw on out-of-range or surrogate numeric entities", () => {
+            expect(() => extractFilingText("<p>Apple &#1114112; announced record revenue today</p>")).not.toThrow();
+            expect(() => extractFilingText("<p>Apple &#55296; announced record revenue today</p>")).not.toThrow();
+            expect(extractFilingText("<p>Apple &#1114112; announced record revenue today</p>"))
+                .toContain("announced record revenue today");
         });
 
         it("survives empty and tagless input", () => {

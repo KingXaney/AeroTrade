@@ -18,7 +18,7 @@ export type InferResult = {
 };
 
 type GeminiPart = {text?: string};
-type GeminiResponse = {candidates?: Array<{content?: {parts?: GeminiPart[]}}>};
+type GeminiResponse = {candidates?: Array<{content?: {parts?: GeminiPart[]}; finishReason?: string}>};
 type AnthropicBlock = {type?: string; text?: string};
 type AnthropicResponse = {content?: AnthropicBlock[]; stop_reason?: string | null};
 
@@ -42,9 +42,15 @@ export const buildAnthropicBody = (spec: ModelSpec, prompt: string, system?: str
     ...(spec.effort ? {output_config: {effort: spec.effort}} : {}),
 });
 
-export const normalizeGeminiResponse = (response: unknown): InferResult['text'] => {
-    const part = (response as GeminiResponse)?.candidates?.[0]?.content?.parts?.[0];
-    return part && typeof part.text === 'string' ? part.text : '';
+export const normalizeGeminiResponse = (response: unknown): {text: string; stopReason: string | null} => {
+    const candidate = (response as GeminiResponse)?.candidates?.[0];
+    const part = candidate?.content?.parts?.[0];
+    return {
+        text: part && typeof part.text === 'string' ? part.text : '',
+        // Carried through so a SAFETY or MAX_TOKENS stop is visible in the logs on the
+        // default tier too, not only when Claude refuses.
+        stopReason: candidate?.finishReason ?? null,
+    };
 };
 
 export const normalizeAnthropicResponse = (response: unknown): {text: string; stopReason: string | null} => {
@@ -86,5 +92,6 @@ export const inferText = async (
         model: step.ai.models.gemini({model: spec.model}),
         body: buildGeminiBody(spec, prompt, system),
     });
-    return {text: normalizeGeminiResponse(response), stopReason: null, provider: spec.provider, model: spec.model};
+    const {text, stopReason} = normalizeGeminiResponse(response);
+    return {text, stopReason, provider: spec.provider, model: spec.model};
 };
