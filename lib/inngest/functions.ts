@@ -815,7 +815,16 @@ export const bootstrapAiNavigator = inngest.createFunction(
 // argues with them. It never trades — the deterministic rails stay in charge;
 // this is a critique layer for the human reading the /brain page.
 export const generateSecondOpinion = inngest.createFunction(
-    { id: 'claude-second-opinion', triggers: [{ event: 'app/generate.second.opinion' }] },
+    {
+        id: 'claude-second-opinion',
+        triggers: [{ event: 'app/generate.second.opinion' }],
+        // The action already claims a slot before enqueueing, but that guard lives
+        // outside the queue: a replayed or hand-crafted event would never touch it.
+        // These bound the spend at the only place every run must pass through —
+        // one at a time per user, and a hard ceiling per hour for everyone.
+        concurrency: [{ limit: 1, key: 'event.data.userId' }],
+        rateLimit: { limit: 12, period: '1h' },
+    },
     async ({ event, step }) => {
         // Opinions are stored per requester, so a run without one has nowhere to land.
         const userId = String(event.data?.userId ?? '');

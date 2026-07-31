@@ -43,6 +43,16 @@ if (nodeMajor < MIN_NODE_MAJOR || (nodeMajor === MIN_NODE_MAJOR && nodeMinor < M
     process.exit(1);
 }
 
+// Loading a .ts file from a package.json with no "type" field emits a noisy
+// warning about module-type detection. Silenced here rather than with a CLI flag,
+// because the flag itself is unrecognised on older Node and would abort before
+// the version check above could explain what is wrong.
+const emitWarning = process.emitWarning;
+process.emitWarning = (warning, ...rest) => {
+    if (rest.some((r) => r === 'MODULE_TYPELESS_PACKAGE_JSON') || String(warning).includes('Module type of file')) return;
+    return emitWarning.call(process, warning, ...rest);
+};
+
 const {buildStandaloneSecondOpinionPrompt} = await import('../lib/brain/prompts.ts');
 const {
     CLI_MODEL_LABEL,

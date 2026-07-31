@@ -9,7 +9,7 @@
     "lint": "eslint",
     "test:db": "node scripts/test-db.mjs",
     "migrate:accounts": "node scripts/migrate-multi-account.mjs",
-    "opinion:local": "node --disable-warning=MODULE_TYPELESS_PACKAGE_JSON scripts/second-opinion-local.mjs",
+    "opinion:local": "node scripts/second-opinion-local.mjs",
     "test": "vitest run"
   },
   "dependencies": {
