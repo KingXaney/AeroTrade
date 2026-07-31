@@ -5,7 +5,9 @@ import {fetchFinnhubNews} from "@/lib/news/adapters/finnhub";
 import {fetchRedditNews} from "@/lib/news/adapters/reddit";
 import {fetchRssNews} from "@/lib/news/adapters/rss";
 import {fetchSecFilings} from "@/lib/news/adapters/sec";
-import {SOURCE_CAPS, TOTAL_ARTICLE_CAP} from "@/lib/news/config";
+import {normalizeUrl, SOURCE_CAPS, TOTAL_ARTICLE_CAP} from "@/lib/news/config";
+
+export {normalizeUrl};
 
 // Email sections render in this order — finance wires lead, social chatter closes.
 const SECTION_ORDER: NewsSourceType[] = ["finance", "rss", "sec", "reddit"];
@@ -15,12 +17,6 @@ const TRIM_ORDER: NewsSourceType[] = ["reddit", "rss", "sec", "finance"];
 
 // Articles that predate sourceType stamping are treated as finance so they still render.
 const DEFAULT_SOURCE_TYPE: NewsSourceType = "finance";
-
-export const normalizeUrl = (url: string): string => {
-    // Query strings carry tracking params (utm_*) that make identical stories look distinct.
-    const withoutQuery = url.toLowerCase().split("?")[0];
-    return withoutQuery.replace(/\/+$/, "");
-};
 
 export const dedupeArticles = (articles: MarketNewsArticle[]): MarketNewsArticle[] => {
     const seenUrls = new Set<string>();

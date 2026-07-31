@@ -13,8 +13,11 @@ export const ENTITY_EPSILON = 0.02;
 export const ENTITY_STALE_DAYS = 60;
 
 // LLM extraction budget (Gemini free tier: strictly bounded, batched, sequenced).
+// This is the binding constraint on how much the brain can read: raising the ingest
+// caps without raising this only queues articles that never get tagged. Batch size ×
+// this budget is the daily article ceiling, and it is sized to match BRAIN_TOTAL_CAP.
 export const EXTRACTION_BATCH_SIZE = 20;
-export const MAX_EXTRACTION_CALLS_PER_DAY = 4;
+export const MAX_EXTRACTION_CALLS_PER_DAY = 8;
 export const EXTRACTION_MODEL = 'gemini-2.5-flash-lite';
 export const UNEXTRACTED_PICKUP_LIMIT = 20;    // yesterday's overflow retried per run
 export const NEW_TICKER_VERIFY_BUDGET = 10;    // Finnhub verifications per run

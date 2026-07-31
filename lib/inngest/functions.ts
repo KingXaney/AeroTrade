@@ -5,7 +5,7 @@ import {getAllUsersForNewsEmail} from "@/lib/actions/user.actions";
 import {getWatchlistSymbolsByEmail} from "@/lib/actions/watchlist.actions";
 import {getQuote} from "@/lib/actions/finnhub.actions";
 import {getAggregatedNews, normalizeUrl} from "@/lib/news/aggregate";
-import {sanitizeDigestHtml} from "@/lib/news/sanitize";
+import {sanitizeDigestHtml, sanitizeWelcomeIntroHtml} from "@/lib/news/sanitize";
 import {BRAIN_SOURCE_CAPS, BRAIN_TOTAL_CAP, hashId} from "@/lib/news/config";
 import SuggestionSet, {GLOBAL_SUGGESTIONS_USER} from "@/database/models/suggestion-set.model";
 import NewsItem from "@/database/models/news-item.model";
@@ -76,7 +76,11 @@ export const sendSignUpEmail = inngest.createFunction(
         })
         await step.run('send-welcome-email', async () => {
             const part = response.candidates?.[0]?.content?.parts?.[0];
-            const introText = (part && 'text' in part ? part.text : null) ||'Thanks for joining AlgoTest. You now have the tools to track markets and make smarter moves.'
+            const rawIntro = (part && 'text' in part ? part.text : null);
+            // The model wrote this from the user's own signup answers and it lands in
+            // the template unescaped — sanitize before it becomes email.
+            const introText = sanitizeWelcomeIntroHtml(rawIntro || '')
+                || sanitizeWelcomeIntroHtml('Thanks for joining AlgoTest. You now have the tools to track markets and make smarter moves.');
 
             const { data: { email, name } } = event;
 

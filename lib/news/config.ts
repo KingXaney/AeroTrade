@@ -35,9 +35,11 @@ export const SOURCE_CAPS: Record<NewsSourceType, number> = {finance: 6, rss: 6, 
 
 export const TOTAL_ARTICLE_CAP = 16;
 
-// The news brain ingests with wider caps than the email digest.
-export const BRAIN_SOURCE_CAPS: Record<NewsSourceType, number> = {finance: 18, rss: 18, reddit: 8, sec: 4};
-export const BRAIN_TOTAL_CAP = 40;
+// The news brain ingests with wider caps than the email digest. Sized to match the
+// extraction throughput in lib/brain/config.ts (batch size × daily call budget) —
+// ingesting more than can be tagged just grows a backlog of unread articles.
+export const BRAIN_SOURCE_CAPS: Record<NewsSourceType, number> = {finance: 30, rss: 30, reddit: 12, sec: 8};
+export const BRAIN_TOTAL_CAP = 80;
 
 export const FEED_REVALIDATE_SECONDS = 900;
 
@@ -48,6 +50,15 @@ export const redditUserAgent = (): string => "AeroTrade/1.0 (paper-trading news 
 export const secUserAgent = (): string => "AeroTrade " + contactEmail();
 
 // djb2 constants — named so the hash stays auditable without magic numbers inline.
+// Lives here, not in aggregate.ts, so the sanitizers can reuse it without dragging
+// the fetch adapters (and through them better-auth and mongoose) into their import
+// graph. Pairs with hashId below: together they form the article dedupe key.
+export const normalizeUrl = (url: string): string => {
+    // Query strings carry tracking params (utm_*) that make identical stories look distinct.
+    const withoutQuery = url.toLowerCase().split("?")[0];
+    return withoutQuery.replace(/\/+$/, "");
+};
+
 const DJB2_SEED = 5381;
 const DJB2_SHIFT = 5;
 

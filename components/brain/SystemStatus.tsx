@@ -13,6 +13,14 @@ const jobHealth = (job: JobHealth): Health => {
     return ageHours > job.staleAfterHours ? 'stale' : 'ok';
 };
 
+// Ingest is capped independently of the daily extraction budget, so a persistent
+// backlog is the signal that the budget — not the feeds — is the limiting factor.
+const extractionHint = (status: BrainSystemStatus): string => {
+    if (status.articlesTotal > 0 && status.articlesExtracted === 0) return 'none — check GEMINI_API_KEY';
+    if (status.articlesUnextracted > 0) return `${status.articlesUnextracted} waiting to be read`;
+    return 'all caught up';
+};
+
 const DOT_COLORS: Record<Health, string> = {
     ok: '#7df4ff',
     stale: '#ffd700',
@@ -51,7 +59,7 @@ const SystemStatus = ({status}: {status: BrainSystemStatus}) => {
                 <Stat
                     label="Extracted"
                     value={String(status.articlesExtracted)}
-                    hint={status.articlesTotal > 0 && status.articlesExtracted === 0 ? 'none — check GEMINI_API_KEY' : 'via Gemini'}
+                    hint={extractionHint(status)}
                 />
                 <Stat label="Entities" value={String(status.entityCount)} hint="knowledge graph nodes" />
                 <Stat label="Theses" value={String(status.thesisCount)} hint="sustained narratives" />

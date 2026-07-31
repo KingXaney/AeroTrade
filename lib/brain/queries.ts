@@ -117,6 +117,9 @@ export type BrainSystemStatus = {
     articlesTotal: number;
     articlesLast24h: number;
     articlesExtracted: number;
+    // Ingested but not yet tagged. A backlog that keeps growing means the daily
+    // extraction budget — not the ingest caps — is what limits how much the brain reads.
+    articlesUnextracted: number;
     entityCount: number;
     thesisCount: number;
     pricedSymbols: number;
@@ -137,10 +140,11 @@ const JOB_DEFINITIONS: Array<Omit<JobHealth, 'lastRunAt' | 'lastMessage'>> = [
 export const getBrainSystemStatus = async (): Promise<BrainSystemStatus> => {
     await connectToDatabase();
     const dayAgo = new Date(Date.now() - 24 * 60 * 60 * 1000);
-    const [articlesTotal, articlesLast24h, articlesExtracted, entityCount, thesisCount, pricedSymbols, runs] = await Promise.all([
+    const [articlesTotal, articlesLast24h, articlesExtracted, articlesUnextracted, entityCount, thesisCount, pricedSymbols, runs] = await Promise.all([
         NewsItem.countDocuments({}),
         NewsItem.countDocuments({createdAt: {$gte: dayAgo}}),
         NewsItem.countDocuments({extraction: {$exists: true}}),
+        NewsItem.countDocuments({extraction: {$exists: false}}),
         BrainEntity.countDocuments({}),
         BrainEntity.countDocuments({thesisSince: {$ne: null}}),
         PriceBar.distinct('symbol').then((symbols) => symbols.length),
@@ -152,6 +156,7 @@ export const getBrainSystemStatus = async (): Promise<BrainSystemStatus> => {
         articlesTotal,
         articlesLast24h,
         articlesExtracted,
+        articlesUnextracted,
         entityCount,
         thesisCount,
         pricedSymbols,
