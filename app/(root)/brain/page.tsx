@@ -32,7 +32,7 @@ const BrainPage = async ({searchParams}: BrainPageProps) => {
         getLatestSuggestions(userId),
         getAccountsForUser(userId),
         getBrainSystemStatus(),
-        getLatestSecondOpinion(),
+        getLatestSecondOpinion(userId),
     ]);
     const evidence = entity ? await getEntityEvidence(entity) : null;
     const applyAccounts = accounts.map((a) => {

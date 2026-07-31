@@ -1,13 +1,17 @@
 import {Document, model, models, Schema} from "mongoose";
 
-// Claude's on-demand critique of the brain + latest decisions. One global
-// document — the brain and the model portfolio are shared, so the critique is
-// too; any signed-in user can refresh it. ("modelUsed" because mongoose
-// Documents already have a model() method.)
+// Claude's critique of the brain + latest decisions, stored per user (scope =
+// userId): the brain is shared, but an opinion is something a person requests,
+// and a pasted one is user-authored — nobody should be able to write text onto
+// someone else's page. "modelUsed" because mongoose Documents already have a
+// model() method.
+export type SecondOpinionSource = 'api' | 'cli' | 'manual';
+
 export interface SecondOpinionDoc extends Document {
     scope: string;
     opinionMd: string;
     modelUsed: string;
+    source: SecondOpinionSource;
     generatedAt: Date;
     requestedBy: string;
 }
@@ -16,6 +20,7 @@ const SecondOpinionSchema = new Schema<SecondOpinionDoc>({
     scope: {type: String, required: true, unique: true, index: true},
     opinionMd: {type: String, required: true},
     modelUsed: {type: String, required: true},
+    source: {type: String, enum: ['api', 'cli', 'manual'], default: 'api'},
     generatedAt: {type: Date, required: true},
     requestedBy: {type: String, default: ''},
 });
