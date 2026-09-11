@@ -13,10 +13,11 @@ import {
 
 import {useRouter} from "next/navigation";
 import {LogOut, ChevronDown, Newspaper, Settings} from "lucide-react";
-import NavItems from "@/components/NavItems";
 import {signOut} from "@/lib/actions/auth.actions";
 
-function UserDropdown({user, initialStocks, initialTopics}: {user: User; initialStocks: StockWithWatchlistStatus[]; initialTopics?: TopicLink[]}) {
+// No longer needs the stock/topic lists: it used to render a duplicate NavItems for
+// mobile, which the hamburger drawer replaces.
+function UserDropdown({user}: {user: User}) {
     const router = useRouter();
 
     const handleSignOut = async () => {
@@ -125,17 +126,9 @@ function UserDropdown({user, initialStocks, initialTopics}: {user: User; initial
                     Log out
                 </DropdownMenuItem>
 
-                {/* Mobile-only nav (visible <sm) */}
-                <div className="sm:hidden">
-                    <DropdownMenuSeparator style={{ backgroundColor: 'var(--surface-2)', margin: '8px 0' }}/>
-                    <div className="px-3 pb-1 text-[10px] uppercase tracking-wider text-fg-muted"
-                         style={{ fontFamily: 'var(--type-mono)' }}>
-                        Menu
-                    </div>
-                    <div className="px-1 pb-1">
-                        <NavItems initialStocks={initialStocks} initialTopics={initialTopics}/>
-                    </div>
-                </div>
+                {/* The mobile nav lives in the hamburger drawer now. This block used to
+                    render NavItems here, which made the gap look covered while showing
+                    only the six header routes — never the four the sidebar owned. */}
             </DropdownMenuContent>
         </DropdownMenu>
     );

@@ -35,12 +35,16 @@ function CommandDialog({
   children,
   className,
   showCloseButton = false,
+  shouldFilter,
   ...props
 }: React.ComponentProps<typeof Dialog> & {
   title?: string
   description?: string
   className?: string
   showCloseButton?: boolean
+  /** Pass false when results are already filtered server-side — cmdk's own substring
+   *  filter would otherwise run a second pass and silently hide valid matches. */
+  shouldFilter?: boolean
 }) {
   return (
     <Dialog {...props}>
@@ -55,7 +59,7 @@ function CommandDialog({
         )}
         showCloseButton={showCloseButton}
       >
-        <Command className="rounded-xl! max-h-[inherit] overflow-hidden">{children}</Command>
+        <Command className="rounded-xl! max-h-[inherit] overflow-hidden" shouldFilter={shouldFilter}>{children}</Command>
       </DialogContent>
     </Dialog>
   )

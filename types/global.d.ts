@@ -258,6 +258,15 @@ declare global {
         createdAt: number;
     };
 
+    /** A request this user sent that hasn't been answered yet. */
+    type SentFriendRequest = {
+        friendshipId: string;
+        addresseeId: string;
+        name: string;
+        email: string;
+        createdAt: number;
+    };
+
     type LeaderboardEntry = {
         id: string;
         name: string;

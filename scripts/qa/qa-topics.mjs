@@ -18,6 +18,15 @@ const check = (name, ok, detail = '') => {
 };
 const note = (name, detail) => console.log(`NOTE  ${name} — ${detail}`);
 
+// Toasts render top-center, directly over the header nav — including the search trigger.
+// Sonner also pauses its dismiss timer while the pointer is over a toast, and the theme
+// hover sweep leaves the mouse parked mid-page, so after a navigation it can sit on the
+// toast and hold it open forever. Park the pointer out of the way, then wait it out.
+const settleToasts = async (page) => {
+    await page.mouse.move(5, 700);
+    await page.locator('[data-sonner-toast]').first().waitFor({state: 'detached', timeout: 10000}).catch(() => {});
+};
+
 (async () => {
     const browser = await chromium.launch({channel: 'chrome', headless: true});
     const context = await browser.newContext({viewport: {width: 1440, height: 900}});
@@ -65,8 +74,14 @@ const note = (name, detail) => console.log(`NOTE  ${name} — ${detail}`);
     check('sidebar topics card shows 1 topic followed', /1\s*topic\s*followed/i.test(sideCard), sideCard);
     const sideNav = await page.$$eval('aside nav a', (as) => as.map((a) => a.textContent.trim()));
     check('sidebar nav starts Topics · Dashboard · Brain', sideNav.join(',').startsWith('interestsTopics,space_dashboardDashboard,neurologyBrain'), sideNav.join(','));
-    const headerNav = await page.$$eval('header nav ul li', (lis) => lis.map((li) => (li.querySelector('a, .search-text') || li).textContent.trim()));
-    check('header nav order', headerNav.join(',') === 'Topics,Dashboard,Brain,Portfolio,Trade,Markets,Search', headerNav.join(','));
+    // The sidebar is the surface that owns the account pages; all ten come from lib/navigation.ts.
+    check('sidebar nav lists all ten routes', sideNav.length === 10, String(sideNav.length));
+    const headerHrefs = await page.$$eval('header nav ul li a', (as) => as.map((a) => a.getAttribute('href')));
+    check('header nav order', headerHrefs.join(',') === '/topics,/,/brain,/portfolio,/trade,/markets', headerHrefs.join(','));
+    // Search is a palette trigger, not a route — it used to be a fake '/search' NAV_ITEMS entry.
+    check('header search is a real button with a ⌘K hint',
+        await page.locator('header button.search-text kbd').count() === 1);
+    check('no /search route link anywhere', await page.locator('a[href="/search"]').count() === 0);
 
     // --- dashboard: topics-first default + widgets ---
     await page.goto(`${BASE}/`, {waitUntil: 'load'});
@@ -143,12 +158,17 @@ const note = (name, detail) => console.log(`NOTE  ${name} — ${detail}`);
     await page.waitForTimeout(500);
     await page.keyboard.type('climate policy');
     await page.waitForTimeout(900);
-    const followRow = page.getByRole('button', {name: /Follow topic: “climate policy”/});
+    // Palette rows are cmdk items now (role=option in a listbox), not buttons — that is
+    // what makes arrow keys and Enter work.
+    const followRow = page.getByRole('option', {name: /Follow topic: “climate policy”/});
     check('⌘K shows Follow topic row', await followRow.count() === 1);
-    await followRow.click();
+    // Drive it from the keyboard, which the old raw <li>/<Link> rows could not do.
+    await page.keyboard.press('ArrowDown');
+    await page.keyboard.press('Enter');
     await page.waitForURL(/\/topics\/climate-policy/, {timeout: 60000});
     await page.waitForTimeout(1200);
     check('⌘K follow navigates to the new topic', /climate-policy/.test(page.url()), page.url());
+    await settleToasts(page);
     await page.locator('header .search-text').first().click();
     await page.waitForTimeout(400);
     await page.keyboard.type('AI chips');

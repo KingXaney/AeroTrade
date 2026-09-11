@@ -3,10 +3,9 @@
 import {useEffect, useState, useTransition} from "react";
 import {useRouter} from "next/navigation";
 import {toast} from "sonner";
-import {CommandDialog, CommandEmpty, CommandInput, CommandList} from "@/components/ui/command";
+import {CommandDialog, CommandEmpty, CommandInput, CommandItem, CommandList} from "@/components/ui/command";
 import {Button} from "@/components/ui/button";
-import {Loader2, Sparkles, TrendingUp} from "lucide-react";
-import Link from "next/link";
+import {Loader2, Search, Sparkles, TrendingUp} from "lucide-react";
 import {searchStocks} from "@/lib/actions/finnhub.actions";
 import {createTopic} from "@/lib/actions/topics.actions";
 import {NAME_MAX} from "@/lib/topics/config";
@@ -68,10 +67,15 @@ export default function SearchCommand({
         debouncedSearch();
     }, [searchTerm, debouncedSearch]);
 
-    const handleSelectStock = () => {
+    const closePalette = () => {
         setOpen(false);
         setSearchTerm("");
         setStocks(initialStocks);
+    };
+
+    const goTo = (href: string) => {
+        closePalette();
+        router.push(href);
     };
 
     const handleFollowTopic = () => {
@@ -83,7 +87,7 @@ export default function SearchCommand({
                 return;
             }
             toast.success(`Following "${result.topic.name}"`);
-            handleSelectStock();
+            closePalette();
             router.push(`/topics/${result.topic.slug}`);
         });
     };
@@ -91,15 +95,23 @@ export default function SearchCommand({
     return (
         <>
             {renderAs === 'text' ? (
-                <span onClick={() => setOpen(true)} className="search-text">
+                // Was a bare <span onClick> — Tab skipped it and screen readers announced
+                // it as inert text. The ⌘K hint is the only place the shortcut is advertised.
+                <button type="button" onClick={() => setOpen(true)} className="search-text inline-flex items-center gap-2">
+                    <Search className="size-3.5 opacity-70" aria-hidden="true"/>
                     {label}
-                </span>
+                    <kbd className="hidden md:inline text-[10px] px-1.5 py-0.5 rounded border border-line-strong/40 text-fg-muted"
+                         style={{fontFamily: 'var(--type-mono)'}}>⌘K</kbd>
+                </button>
             ) : (
                 <Button onClick={() => setOpen(true)} className="search-btn">
                     {label}
                 </Button>
             )}
-            <CommandDialog open={open} onOpenChange={setOpen} className="search-dialog">
+            {/* Hits come pre-filtered from searchStocks, so cmdk's own substring filter
+                must be off — otherwise a typed query is filtered twice and valid results
+                silently disappear. */}
+            <CommandDialog open={open} onOpenChange={setOpen} className="search-dialog" shouldFilter={false}>
                 <div className="search-field">
                     <CommandInput
                         value={searchTerm}
@@ -111,32 +123,29 @@ export default function SearchCommand({
                 </div>
                 <CommandList className="search-list">
                     {canFollow && (
-                        <ul>
+                        <>
                             <div className="search-count">Topics</div>
-                            <li className="search-item">
-                                {existingTopic ? (
-                                    <Link href={`/topics/${existingTopic.slug}`} onClick={handleSelectStock} className="search-item-link">
-                                        <Sparkles className="h-4 w-4 text-brand" />
-                                        <div className="flex-1">
-                                            <div className="search-item-name">Open topic: {existingTopic.name}</div>
-                                            <div className="text-sm text-fg-muted" style={{fontFamily: 'var(--type-mono)', fontSize: '11px', letterSpacing: '0.02em'}}>
-                                                You already follow this
-                                            </div>
-                                        </div>
-                                    </Link>
-                                ) : (
-                                    <button type="button" onClick={handleFollowTopic} disabled={following} className="search-item-link w-full text-left disabled:opacity-60">
-                                        {following ? <Loader2 className="h-4 w-4 animate-spin text-brand" /> : <Sparkles className="h-4 w-4 text-brand" />}
-                                        <div className="flex-1">
-                                            <div className="search-item-name">Follow topic: “{topicQuery}”</div>
-                                            <div className="text-sm text-fg-muted" style={{fontFamily: 'var(--type-mono)', fontSize: '11px', letterSpacing: '0.02em'}}>
-                                                News about anything — markets, tech, politics, sport
-                                            </div>
-                                        </div>
-                                    </button>
-                                )}
-                            </li>
-                        </ul>
+                            <CommandItem
+                                value={`topic-${topicQuery}`}
+                                disabled={following}
+                                onSelect={existingTopic
+                                    ? () => goTo(`/topics/${existingTopic.slug}`)
+                                    : handleFollowTopic}
+                                className="search-item-link"
+                            >
+                                {following
+                                    ? <Loader2 className="h-4 w-4 animate-spin text-brand"/>
+                                    : <Sparkles className="h-4 w-4 text-brand"/>}
+                                <div className="flex-1">
+                                    <div className="search-item-name">
+                                        {existingTopic ? `Open topic: ${existingTopic.name}` : `Follow topic: “${topicQuery}”`}
+                                    </div>
+                                    <div className="text-sm text-fg-muted" style={{fontFamily: 'var(--type-mono)', fontSize: '11px', letterSpacing: '0.02em'}}>
+                                        {existingTopic ? 'You already follow this' : 'News about anything — markets, tech, politics, sport'}
+                                    </div>
+                                </div>
+                            </CommandItem>
+                        </>
                     )}
                     {loading ? (
                         <CommandEmpty className="search-list-empty">Loading stocks...</CommandEmpty>
@@ -145,32 +154,31 @@ export default function SearchCommand({
                             {isSearchMode ? 'No stocks found' : 'No stocks available'}
                         </div>
                     ) : (
-                        <ul>
+                        <>
                             <div className="search-count">
                                 {isSearchMode ? 'Stocks' : 'Popular stocks'}
                                 {` `}({displayStocks?.length || 0})
                             </div>
                             {displayStocks?.map((stock) => (
-                                <li key={stock.symbol} className="search-item">
-                                    <Link
-                                        href={`/stocks/${stock.symbol}`}
-                                        onClick={handleSelectStock}
-                                        className="search-item-link"
-                                    >
-                                        <TrendingUp className="h-4 w-4 text-brand-dim" />
-                                        <div className="flex-1">
-                                            <div className="search-item-name">
-                                                {stock.name}
-                                            </div>
-                                            <div className="text-sm text-fg-muted"
-                                                 style={{ fontFamily: 'var(--type-mono)', fontSize: '11px', letterSpacing: '0.02em' }}>
-                                                {stock.symbol} | {stock.exchange} | {stock.type}
-                                            </div>
+                                <CommandItem
+                                    key={stock.symbol}
+                                    value={stock.symbol}
+                                    onSelect={() => goTo(`/stocks/${stock.symbol}`)}
+                                    className="search-item-link"
+                                >
+                                    <TrendingUp className="h-4 w-4 text-brand-dim" />
+                                    <div className="flex-1">
+                                        <div className="search-item-name">
+                                            {stock.name}
                                         </div>
-                                    </Link>
-                                </li>
+                                        <div className="text-sm text-fg-muted"
+                                             style={{ fontFamily: 'var(--type-mono)', fontSize: '11px', letterSpacing: '0.02em' }}>
+                                            {stock.symbol} | {stock.exchange} | {stock.type}
+                                        </div>
+                                    </div>
+                                </CommandItem>
                             ))}
-                        </ul>
+                        </>
                     )}
                 </CommandList>
             </CommandDialog>
