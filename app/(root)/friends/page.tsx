@@ -17,7 +17,7 @@ const FriendsPage = async () => {
     ]);
 
     return (
-        <div className="min-h-screen space-y-6">
+        <div className="space-y-6">
             <div className="mb-2">
                 <h1 className="text-2xl font-semibold text-fg mb-1 tracking-tight" style={{fontFamily: 'var(--type-display)'}}>
                     Friends &amp; Competition

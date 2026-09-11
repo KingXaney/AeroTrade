@@ -6,7 +6,7 @@ import {useEffect} from "react";
 const TopicsError = ({error, reset}: {error: Error & {digest?: string}; reset: () => void}) => {
     useEffect(() => { console.error('Topics page failed:', error); }, [error]);
     return (
-        <div className="min-h-screen space-y-4">
+        <div className="space-y-4">
             <div className="mb-2">
                 <h1 className="text-2xl font-semibold text-fg mb-1" style={{fontFamily: 'var(--type-display)'}}>Topics</h1>
             </div>

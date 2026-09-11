@@ -38,7 +38,7 @@ const TradePage = async ({searchParams}: TradePageProps) => {
     });
 
     return (
-        <div className="min-h-screen space-y-4">
+        <div className="space-y-4">
             {/* Header */}
             <div className="flex flex-col md:flex-row md:items-end md:justify-between gap-4 mb-2">
                 <div>

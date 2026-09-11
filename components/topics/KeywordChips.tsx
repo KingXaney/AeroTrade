@@ -63,7 +63,7 @@ const KeywordChips = ({values, variant = 'include', editable = false, onChange, 
                     maxLength={maxLength}
                     placeholder={placeholder ?? 'Add a keyword…'}
                     aria-label={`Add to ${ariaLabel}`}
-                    className="min-w-[10rem] flex-1 bg-transparent px-2 py-1 text-xs text-fg outline-none placeholder:text-fg-muted"
+                    className="min-w-[10rem] flex-1 bg-transparent px-2 py-1 text-xs text-fg outline-none field-focus placeholder:text-fg-muted"
                     style={{fontFamily: 'var(--type-mono)'}}
                 />
             )}

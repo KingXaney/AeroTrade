@@ -117,7 +117,7 @@ const DashboardGrid = ({initialLayout, bodies, availableIds, headerActions, star
     const activeSpan = activeId ? layout.widgets.find((w) => w.id === activeId)?.span : undefined;
 
     return (
-        <div className="min-h-screen space-y-4">
+        <div className="space-y-4">
             <div className="flex flex-col md:flex-row md:items-end md:justify-between gap-4 mb-2">
                 <div>
                     <h1 className="text-2xl font-semibold text-fg mb-1" style={{fontFamily: 'var(--type-display)'}}>

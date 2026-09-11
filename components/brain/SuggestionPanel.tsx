@@ -62,7 +62,7 @@ const ItemRow = ({item, showApply, accounts}: {item: SuggestionItem; showApply: 
                     {showApply && item.action !== 'hold' && accounts.length > 0 && (
                         <>
                             <select value={accountId} onChange={(e) => setAccountId(e.target.value)}
-                                    className="text-[11px] rounded px-2 py-1 outline-none text-fg-soft"
+                                    className="text-[11px] rounded px-2 py-1 outline-none field-focus text-fg-soft"
                                     style={{backgroundColor: 'var(--surface-0)', border: '1px solid color-mix(in srgb, var(--line-strong) 40%, transparent)', fontFamily: 'var(--type-mono)'}}>
                                 {accounts.map((a) => <option key={a.id} value={a.id}>{a.name}</option>)}
                             </select>
@@ -109,7 +109,7 @@ const SuggestionPanel = ({userSet, globalSet, accounts}: {userSet: SetView | nul
             <p className="text-[11px] text-fg-muted" style={{fontFamily: 'var(--type-mono)'}}>
                 {userSet ? 'Your AI account' : 'Global model portfolio'} · {set.date}
                 {set.kind === 'preview' && (
-                    <span className="ml-2 px-1.5 py-0.5 rounded text-[10px] font-bold uppercase tracking-[0.08em] text-[#ffd700] bg-[rgba(255,215,0,0.08)]">
+                    <span className="ml-2 px-1.5 py-0.5 rounded text-[10px] font-bold uppercase tracking-[0.08em] text-warning bg-warning/10">
                         Preview — nothing traded
                     </span>
                 )}

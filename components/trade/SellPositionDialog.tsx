@@ -68,7 +68,7 @@ const SellPositionDialog = ({position, accountId, onClose}: {position: EnrichedP
                             onChange={(e) => setQty(e.target.value.replace(/[^0-9]/g, ''))}
                             inputMode="numeric"
                             autoComplete="off"
-                            className="w-full mt-1 rounded-lg px-3 py-2 text-sm text-fg outline-none"
+                            className="w-full mt-1 rounded-lg px-3 py-2 text-sm text-fg outline-none field-focus"
                             style={{backgroundColor: 'var(--surface-0)', border: '1px solid color-mix(in srgb, var(--line-strong) 40%, transparent)', fontFamily: 'var(--type-mono)'}}
                         />
                         {qtyNum > owned && (

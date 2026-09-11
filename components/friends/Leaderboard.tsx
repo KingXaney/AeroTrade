@@ -1,12 +1,13 @@
 import Link from "next/link";
 import {cn, formatPrice, getChangeColorClass} from "@/lib/utils";
 
-const rankColor = (rank: number) => {
-    if (rank === 1) return 'text-[#ffd700]';
-    if (rank === 2) return 'text-[#c0c8d0]';
-    if (rank === 3) return 'text-[#cd7f32]';
-    return 'text-fg-muted';
-};
+// Medal colours come from --rank-* in globals.css, not the palette registry: gold is a
+// material, not a semantic role, so it stays gold in every theme (darkened under the
+// light palettes, where #ffd700 is unreadable).
+const rankStyle = (rank: number): React.CSSProperties | undefined =>
+    rank >= 1 && rank <= 3 ? {color: `var(--rank-${rank})`} : undefined;
+
+const rankClass = (rank: number) => (rank >= 1 && rank <= 3 ? '' : 'text-fg-muted');
 
 const Leaderboard = ({entries}: {entries: LeaderboardEntry[]}) => {
     return (
@@ -34,7 +35,7 @@ const Leaderboard = ({entries}: {entries: LeaderboardEntry[]}) => {
                                     : 'bg-surface-2/40 border-line-strong/20 hover:border-brand/30',
                             )}>
                                 <div className="flex items-center gap-3">
-                                    <span className={cn('w-5 text-center font-bold', rankColor(rank))} style={{fontFamily: 'var(--type-mono)'}}>
+                                    <span className={cn('w-5 text-center font-bold', rankClass(rank))} style={{fontFamily: 'var(--type-mono)', ...rankStyle(rank)}}>
                                         {rank}
                                     </span>
                                     <div>

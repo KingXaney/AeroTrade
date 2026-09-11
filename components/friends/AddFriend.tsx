@@ -40,7 +40,7 @@ const AddFriend = () => {
                     value={email}
                     onChange={(e) => setEmail(e.target.value)}
                     placeholder="friend@email.com"
-                    className="flex-1 rounded-lg px-3 py-2 text-sm text-fg outline-none"
+                    className="flex-1 rounded-lg px-3 py-2 text-sm text-fg outline-none field-focus"
                     style={{backgroundColor: 'var(--surface-0)', border: '1px solid color-mix(in srgb, var(--line-strong) 40%, transparent)', fontFamily: 'var(--type-body)'}}
                 />
                 <button

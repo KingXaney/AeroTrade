@@ -66,7 +66,7 @@ const Layout = async ({children}: {children: React.ReactNode}) => {
         <main className="min-h-screen" style={{ color: 'var(--fg-soft)' }}>
             <Header user={user} initialStocks={initialStocks} initialTopics={topicsOverview.topics.map((t) => ({name: t.name, slug: t.slug}))}/>
             <Sidebar watchlistCount={watchlistSymbols.length} portfolio={sidebarPortfolio} topics={sidebarTopics} />
-            <div className="pt-20 lg:ml-64 px-6 pb-8 min-h-screen">
+            <div className="pt-20 lg:ml-64 px-6 pb-8">
                 {children}
             </div>
             <ChatWidget userId={user.id}/>

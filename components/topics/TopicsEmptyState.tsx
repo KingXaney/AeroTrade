@@ -58,7 +58,7 @@ const TopicsEmptyState = ({brainSuggestions}: {brainSuggestions: SuggestedTopic[
     });
 
     return (
-        <div className="min-h-screen space-y-4">
+        <div className="space-y-4">
             <div className="mb-2">
                 <h1 className="text-2xl font-semibold text-fg mb-1" style={{fontFamily: 'var(--type-display)'}}>Topics</h1>
                 <p className="text-sm text-fg-muted">Everything you follow, from every source we read</p>

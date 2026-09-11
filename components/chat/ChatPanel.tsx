@@ -259,7 +259,7 @@ const ChatPanel = ({userId, onClose, initialMessages, onMessagesChange}: ChatPan
                     onChange={(e) => setInput(e.target.value)}
                     placeholder="Query market data..."
                     disabled={isBusy}
-                    className="flex-1 rounded-lg px-3 py-2 text-sm text-fg outline-none border-none"
+                    className="flex-1 rounded-lg px-3 py-2 text-sm text-fg outline-none field-focus border-none"
                     style={{
                         backgroundColor: 'var(--surface-2)',
                         fontFamily: 'var(--type-body)',

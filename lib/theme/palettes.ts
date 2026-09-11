@@ -48,6 +48,12 @@ export type PaletteTokens = {
     positive: string;
     negative: string;
     onNegative: string;
+    // Caution, not loss: stale prices, a closed market, a degraded job. Taken from each
+    // theme's own canonical yellow/orange rather than derived — gruvbox's brand is already
+    // #fabd2f, so any brand-derived yellow would vanish into the accent. Foreground/tint
+    // only (text-warning, bg-warning/10); add onWarning if a filled amber surface is ever
+    // needed, with 12 more hand-picked values.
+    warning: string;
     secondaryTint: string;
 };
 
@@ -85,6 +91,7 @@ export const CSS_VAR_BY_TOKEN: Record<PaletteToken, string> = {
     positive: '--positive',
     negative: '--negative',
     onNegative: '--on-negative',
+    warning: '--warning',
     secondaryTint: '--secondary-tint',
 };
 
@@ -131,6 +138,7 @@ export const PALETTES: Record<PaletteId, Palette> = {
             positive: '#7df4ff',
             negative: '#ffb4ab',
             onNegative: '#690005',
+            warning: '#ffd166',
             secondaryTint: '#7000ff',
         },
     ),
@@ -159,6 +167,7 @@ export const PALETTES: Record<PaletteId, Palette> = {
             positive: '#50fa7b',
             negative: '#ff5555',
             onNegative: '#2b0a0a',
+            warning: '#ffb86c',
             secondaryTint: '#ff79c6',
         },
     ),
@@ -187,6 +196,7 @@ export const PALETTES: Record<PaletteId, Palette> = {
             positive: '#a3be8c',
             negative: '#d2777f',
             onNegative: '#140a0c',
+            warning: '#ebcb8b',
             secondaryTint: '#b48ead',
         },
     ),
@@ -215,6 +225,7 @@ export const PALETTES: Record<PaletteId, Palette> = {
             positive: '#9ece6a',
             negative: '#f7768e',
             onNegative: '#2a0b12',
+            warning: '#e0af68',
             secondaryTint: '#bb9af7',
         },
     ),
@@ -243,6 +254,7 @@ export const PALETTES: Record<PaletteId, Palette> = {
             positive: '#a6e3a1',
             negative: '#f38ba8',
             onNegative: '#11111b',
+            warning: '#f9e2af',
             secondaryTint: '#cba6f7',
         },
     ),
@@ -271,6 +283,7 @@ export const PALETTES: Record<PaletteId, Palette> = {
             positive: '#b8bb26',
             negative: '#fb4934',
             onNegative: '#1d2021',
+            warning: '#fe8019',
             secondaryTint: '#d3869b',
         },
     ),
@@ -299,6 +312,7 @@ export const PALETTES: Record<PaletteId, Palette> = {
             positive: '#98c379',
             negative: '#e06c75',
             onNegative: '#21252b',
+            warning: '#e5c07b',
             secondaryTint: '#c678dd',
         },
     ),
@@ -327,6 +341,8 @@ export const PALETTES: Record<PaletteId, Palette> = {
             positive: '#859900',
             negative: '#e5534b',
             onNegative: '#140505',
+            // Solarized's literal #b58900 only reaches 4.05 on its own surface1; lightened.
+            warning: '#d2a520',
             secondaryTint: '#6c71c4',
         },
     ),
@@ -355,6 +371,7 @@ export const PALETTES: Record<PaletteId, Palette> = {
             positive: '#a6e22e',
             negative: '#f92672',
             onNegative: '#14060b',
+            warning: '#fd971f',
             secondaryTint: '#ae81ff',
         },
     ),
@@ -384,6 +401,8 @@ export const PALETTES: Record<PaletteId, Palette> = {
             positive: '#9ccfd8',
             negative: '#eb6f92',
             onNegative: '#2a0f1a',
+            // Rosé Pine has exactly one warm colour, so warning == secondaryTint here.
+            warning: '#f6c177',
             secondaryTint: '#f6c177',
         },
     ),
@@ -412,6 +431,7 @@ export const PALETTES: Record<PaletteId, Palette> = {
             positive: '#1a7f37',
             negative: '#b42318',
             onNegative: '#ffffff',
+            warning: '#854d0e',
             secondaryTint: '#6d4c9f',
         },
     ),
@@ -440,6 +460,7 @@ export const PALETTES: Record<PaletteId, Palette> = {
             positive: '#15803d',
             negative: '#b91c1c',
             onNegative: '#ffffff',
+            warning: '#854d0e',
             secondaryTint: '#6d28d9',
         },
     ),

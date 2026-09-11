@@ -23,7 +23,7 @@ const extractionHint = (status: BrainSystemStatus): string => {
 
 const DOT_COLORS: Record<Health, string> = {
     ok: 'var(--brand)',
-    stale: '#ffd700',
+    stale: 'var(--warning)',
     never: 'var(--negative)',
 };
 

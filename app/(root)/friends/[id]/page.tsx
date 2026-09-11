@@ -20,7 +20,7 @@ const FriendProfilePage = async ({params}: FriendProfilePageProps) => {
     if (!profile) notFound();
 
     return (
-        <div className="min-h-screen space-y-6">
+        <div className="space-y-6">
             <div className="flex items-center gap-3">
                 <Link href="/friends" className="text-fg-muted hover:text-brand transition-colors">
                     <span className="material-symbols-outlined">arrow_back</span>
