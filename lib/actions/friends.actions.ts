@@ -8,6 +8,7 @@ import Friendship from "@/database/models/friendship.model";
 import PaperAccount from "@/database/models/paper-account.model";
 import {PAPER_STARTING_BALANCE} from "@/lib/constants";
 import {getCurrentUserId} from "@/lib/actions/watchlist.actions";
+import {countUnpriced} from "@/lib/trading/analytics";
 import {
     buildPriceMap,
     computePortfolio,
@@ -302,6 +303,10 @@ export const getLeaderboard = async (userId: string): Promise<LeaderboardEntry[]
                 totalValue: best.portfolio.totalValue,
                 totalReturnPct: best.portfolio.totalReturnPct,
                 accountName: best.name,
+                // Ranked on the same at-cost fallback as everything else; the row says so
+                // rather than pretending a quote-less strategy is exactly flat.
+                unpriced: countUnpriced(best.portfolio.positions),
+                holdings: best.portfolio.positions.length,
             };
         });
 
@@ -336,6 +341,8 @@ export const getFriendProfile = async (friendId: string, viewerId: string): Prom
                 name: x.account.name,
                 totalValue: x.summary.totalValue,
                 totalReturnPct: x.summary.totalReturnPct,
+                unpriced: countUnpriced(x.summary.positions),
+                holdings: x.summary.positions.length,
             })),
         };
     } catch (error) {

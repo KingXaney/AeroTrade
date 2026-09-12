@@ -4,6 +4,7 @@ import {useState} from "react";
 import Link from "next/link";
 import {cn, formatPrice, formatChangePercent, getChangeColorClass} from "@/lib/utils";
 import SellPositionDialog from "@/components/trade/SellPositionDialog";
+import UnpricedNote from "@/components/trade/UnpricedNote";
 
 // Interactive holdings table for the trade page — each row opens a sell
 // dialog where the user picks how many shares to sell.
@@ -50,9 +51,13 @@ const PositionsTable = ({positions, accountId}: {positions: EnrichedPosition[]; 
                     </div>
                     <div className="text-right" style={{fontFamily: 'var(--type-mono)'}}>
                         <div className="text-fg">{formatPrice(p.marketValue)}</div>
-                        <div className={cn('text-xs', getChangeColorClass(p.unrealizedPnl || undefined))}>
-                            {p.unrealizedPnl >= 0 ? '+' : ''}{formatPrice(p.unrealizedPnl)} ({formatChangePercent(p.unrealizedPnlPct) || '0.00%'})
-                        </div>
+                        {p.priceStale ? (
+                            <div className="text-xs text-fg-muted" title="No live quote — value shown at cost">—</div>
+                        ) : (
+                            <div className={cn('text-xs', getChangeColorClass(p.unrealizedPnl || undefined))}>
+                                {p.unrealizedPnl >= 0 ? '+' : ''}{formatPrice(p.unrealizedPnl)} ({formatChangePercent(p.unrealizedPnlPct) || '0.00%'})
+                            </div>
+                        )}
                     </div>
                     <div className="flex md:justify-end">
                         <button
@@ -66,6 +71,8 @@ const PositionsTable = ({positions, accountId}: {positions: EnrichedPosition[]; 
                     </div>
                 </div>
             ))}
+
+            <UnpricedNote positions={positions} className="px-4 pt-1" />
 
             {sellTarget && <SellPositionDialog position={sellTarget} accountId={accountId} onClose={() => setSellTarget(null)} />}
         </div>

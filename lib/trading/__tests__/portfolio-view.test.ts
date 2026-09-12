@@ -22,6 +22,7 @@ const position = (over: Partial<EnrichedPosition> = {}): EnrichedPosition => ({
     marketValue: 1200,
     unrealizedPnl: 200,
     unrealizedPnlPct: 20,
+    priceStale: false,
     ...over,
 });
 
@@ -58,14 +59,24 @@ describe('missing prices', () => {
     it('reports an unpriced position as null, never as zero', () => {
         // computePortfolio falls back marketValue to cost basis when a quote is missing,
         // which reads as a perfectly flat position. currentPrice is the only honest signal.
-        const p = toChatPosition(position({currentPrice: undefined, marketValue: 1000, unrealizedPnl: 0, unrealizedPnlPct: 0}));
+        const p = toChatPosition(position({currentPrice: undefined, marketValue: 1000, unrealizedPnl: 0, unrealizedPnlPct: 0, priceStale: true}));
         expect(p.currentPrice).toBeNull();
+        expect(p.unrealizedPnl).toBeNull();
+        expect(p.unrealizedPnlPct).toBeNull();
+        expect(p.priceStale).toBe(true);
     });
 
     it('counts priced vs unpriced so the prompt can hedge the total', () => {
-        const s = summary({positions: [position(), position({symbol: 'AMD', currentPrice: undefined})]});
+        const s = summary({positions: [position(), position({symbol: 'AMD', currentPrice: undefined, priceStale: true})]});
         const view = toChatPortfolio([entry('Main', s)], s);
         expect(view.valuation).toEqual({pricedSymbols: 1, unpricedSymbols: 1});
+    });
+
+    it('counts by the priceStale flag, not by the presence of a price', () => {
+        // enrichPosition keeps the two in lockstep; the view must key off the flag so a
+        // future producer cannot smuggle a stale position past the hedge with a number.
+        const s = summary({positions: [position({currentPrice: 120, priceStale: true})]});
+        expect(toChatPortfolio([entry('Main', s)], s).valuation).toEqual({pricedSymbols: 0, unpricedSymbols: 1});
     });
 
     it('reports a fully priced portfolio as having nothing unpriced', () => {

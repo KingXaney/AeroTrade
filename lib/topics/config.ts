@@ -24,6 +24,31 @@ export const BRIEF_MIN_AGE_HOURS = 20;
 
 export const REFRESH_COOLDOWN_MS = 10 * 60 * 1000;
 
+// How long a topic's "Refresh now" stays claimed, from the last claim. Missing or
+// unparsable claims count as expired. `now` is injectable so the maths is testable.
+export const refreshCooldownRemainingMs = (requestedAt: number | Date | null | undefined, now: number = Date.now()): number => {
+    if (requestedAt == null) return 0;
+    const at = typeof requestedAt === 'number' ? requestedAt : requestedAt.getTime();
+    if (!Number.isFinite(at)) return 0;
+    return Math.max(0, at + REFRESH_COOLDOWN_MS - now);
+};
+
+// Epoch ms when a claim taken at `requestedAt` lifts, or null with no claim. Pure
+// arithmetic on purpose — no Date.now() — so the server and the client compute the
+// same instant and the refresh button can hydrate from it; consumers clamp at zero.
+export const refreshCooldownUntil = (requestedAt: number | Date | null | undefined): number | null => {
+    if (requestedAt == null) return null;
+    const at = typeof requestedAt === 'number' ? requestedAt : requestedAt.getTime();
+    return Number.isFinite(at) ? at + REFRESH_COOLDOWN_MS : null;
+};
+
+export const refreshCooldownMessage = (remainingMs: number): string => {
+    const minutes = Math.ceil(Math.max(0, remainingMs) / 60_000);
+    return minutes <= 1
+        ? 'Refreshed recently — try again in a minute.'
+        : `Refreshed recently — try again in ${minutes} minutes.`;
+};
+
 // Kill switch for the Google News search adapter. Enabled unless explicitly turned
 // off so a missing env var in a new environment never silently disables topics.
 export const newsSearchEnabled = (): boolean => {

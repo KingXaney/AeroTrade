@@ -55,8 +55,8 @@ import {loadBriefCandidates, loadStaleKeywordGroups, refreshKeywordGroup, saveTo
 import {buildTopicBriefPrompt} from "@/lib/topics/prompts";
 import {parseBriefText} from "@/lib/topics/brief";
 import {MAX_BRIEF_CALLS_PER_RUN, newsSearchEnabled} from "@/lib/topics/config";
-import {TOPIC_BRIEFS_EVENT, TOPIC_FEEDS_EVENT, TOPIC_REFRESH_EVENT} from "@/lib/topics/events";
-import {getTopicsDigestData} from "@/lib/topics/store";
+import {TOPIC_BRIEFS_EVENT, TOPIC_FEEDS_EVENT, TOPIC_FIRST_RUN_EVENT, TOPIC_REFRESH_EVENT} from "@/lib/topics/events";
+import {ensureTopicHasArticles, getTopicsDigestData, getTopicsForUser} from "@/lib/topics/store";
 import {buildTopicsSectionHtml} from "@/lib/topics/digest-section";
 
 // Absolute links in email need the deployment's public URL (the same one better-auth uses).
@@ -928,13 +928,15 @@ export const refreshTopicFeeds = inngest.createFunction(
 );
 
 // Fired when a topic is created/edited or the user presses "Refresh now". The action
-// already took a cooldown claim; these limits bound replayed or hand-crafted events.
+// already took a per-topic cooldown claim on the promise that this will run, so the
+// per-user bound is a *throttle* (excess runs queue) rather than a rateLimit (excess
+// events are dropped — which would make that promise a lie past six an hour).
 export const refreshTopicOnDemand = inngest.createFunction(
     {
         id: 'refresh-topic-on-demand',
         triggers: [{ event: TOPIC_REFRESH_EVENT }],
         concurrency: [{ limit: 1, key: 'event.data.keywordSetHash' }],
-        rateLimit: { limit: 6, period: '1h', key: 'event.data.userId' },
+        throttle: { limit: 6, period: '1h', key: 'event.data.userId' },
     },
     async ({ event, step }) => {
         const keywordSetHash = Number(event.data?.keywordSetHash);
@@ -952,6 +954,46 @@ export const refreshTopicOnDemand = inngest.createFunction(
         const result = await step.run(`refresh-group-${keywordSetHash}`, async () => refreshKeywordGroup(group));
         const summary = `On-demand refresh: ${result.inserted} new of ${result.matched} matched`;
         await step.run('record-job-run', async () => recordJobRun('refresh-topic-on-demand', summary));
+        return {success: true, message: summary};
+    },
+);
+
+// One event per onboarding batch (see followStarterTopics): fills every topic this user
+// has never fetched, spaced like the cron sweep. This is NOT the per-topic on-demand
+// path on purpose — that job is rate-limited per user, and Inngest's rateLimit drops
+// excess events rather than queueing them, so a batch of eight starters lost two.
+export const fillFirstRunTopics = inngest.createFunction(
+    {
+        id: 'fill-first-run-topics',
+        triggers: [{ event: TOPIC_FIRST_RUN_EVENT }],
+        concurrency: [{ limit: 1, key: 'event.data.userId' }],
+        rateLimit: { limit: 3, period: '1h', key: 'event.data.userId' },
+    },
+    async ({ event, step }) => {
+        const userId = String(event.data?.userId ?? '');
+        if (!userId) return {success: false, message: 'Skipped — no user on the event'};
+        if (!newsSearchEnabled()) return {success: false, message: 'Skipped — NEWS_SEARCH_ENABLED is off'};
+
+        const topics = await step.run('load-unfetched-topics', async () =>
+            (await getTopicsForUser(userId)).filter((t) => t.lastFetchedAt === null));
+
+        let filled = 0;
+        let failed = 0;
+        for (let i = 0; i < topics.length; i++) {
+            const topic = topics[i];
+            if (i > 0) await step.sleep(`first-run-throttle-${i}`, TOPIC_GROUP_THROTTLE);
+            try {
+                // Same path as a topic page's first visit: inherit a sibling's articles when
+                // someone already follows this keyword set, search otherwise.
+                if (await step.run(`fill-topic-${topic.id}`, async () => ensureTopicHasArticles(topic))) filled += 1;
+            } catch (error) {
+                failed += 1;
+                console.error(`First-run fill failed for topic ${topic.slug}:`, error);
+            }
+        }
+
+        const summary = `Filled ${filled}/${topics.length} new topics${failed ? `, ${failed} failed` : ''}`;
+        await step.run('record-job-run', async () => recordJobRun('fill-first-run-topics', summary));
         return {success: true, message: summary};
     },
 );

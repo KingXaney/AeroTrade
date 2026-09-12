@@ -19,10 +19,12 @@ import {
     computeMaxDrawdown,
     computeRealizedPnl,
     computeWinStats,
+    enrichPosition,
     mergeLivePoint,
+    type PriceInfo,
 } from "@/lib/trading/analytics";
 
-export type PriceInfo = {price?: number; changePercent?: number};
+export type {PriceInfo};
 
 // Minimal plain shape used to compute a portfolio (works for Mongoose docs after
 // mapping, lean docs, or a synthesized default account).
@@ -141,26 +143,9 @@ export const computePortfolio = (
     account: AccountLike,
     priceMap: Map<string, PriceInfo>,
 ): PortfolioSummary => {
-    const positions: EnrichedPosition[] = account.positions.map((p) => {
-        const info = priceMap.get(p.symbol.toUpperCase());
-        const currentPrice = info?.price;
-        const costBasis = p.avgCost * p.quantity;
-        const marketValue = typeof currentPrice === 'number' ? currentPrice * p.quantity : costBasis;
-        const unrealizedPnl = marketValue - costBasis;
-        const unrealizedPnlPct = costBasis > 0 ? (unrealizedPnl / costBasis) * 100 : 0;
-        return {
-            symbol: p.symbol,
-            quantity: p.quantity,
-            avgCost: p.avgCost,
-            company: p.company || p.symbol,
-            currentPrice,
-            changePercent: info?.changePercent,
-            costBasis,
-            marketValue,
-            unrealizedPnl,
-            unrealizedPnlPct,
-        };
-    });
+    const positions: EnrichedPosition[] = account.positions.map((p) =>
+        enrichPosition(p, priceMap.get(p.symbol.toUpperCase())),
+    );
 
     const holdingsValue = positions.reduce((sum, p) => sum + p.marketValue, 0);
     const totalValue = account.cash + holdingsValue;

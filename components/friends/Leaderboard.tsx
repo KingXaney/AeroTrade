@@ -1,5 +1,6 @@
 import Link from "next/link";
 import {cn, formatPrice, getChangeColorClass} from "@/lib/utils";
+import {unpricedLabel} from "@/lib/trading/analytics";
 
 // Medal colours come from --rank-* in globals.css, not the palette registry: gold is a
 // material, not a semantic role, so it stays gold in every theme (darkened under the
@@ -44,6 +45,9 @@ const Leaderboard = ({entries}: {entries: LeaderboardEntry[]}) => {
                                         </span>
                                         <div className="text-[10px] text-fg-muted uppercase tracking-[0.08em]" style={{fontFamily: 'var(--type-mono)'}}>
                                             {e.accountName}
+                                            {unpricedLabel(e.unpriced, e.holdings) && (
+                                                <span className="text-warning normal-case tracking-normal"> · {unpricedLabel(e.unpriced, e.holdings)}</span>
+                                            )}
                                         </div>
                                     </div>
                                     {!e.isYou && <span className="material-symbols-outlined text-sm text-fg-muted">chevron_right</span>}

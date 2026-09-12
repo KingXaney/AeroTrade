@@ -15,8 +15,9 @@ export type ChatPosition = {
     avgCost: number;
     currentPrice: number | null;
     marketValue: number;
-    unrealizedPnl: number;
-    unrealizedPnlPct: number;
+    unrealizedPnl: number | null;     // null when unpriced — the model must not report "flat"
+    unrealizedPnlPct: number | null;
+    priceStale: boolean;
 };
 
 export type ChatAccount = {
@@ -63,8 +64,9 @@ export const toChatPosition = (p: EnrichedPosition): ChatPosition => ({
     // A missing quote is null, never 0 — the model must not read "it's worth nothing".
     currentPrice: typeof p.currentPrice === 'number' ? money(p.currentPrice) : null,
     marketValue: money(p.marketValue),
-    unrealizedPnl: money(p.unrealizedPnl),
-    unrealizedPnlPct: Math.round(p.unrealizedPnlPct * 100) / 100,
+    unrealizedPnl: p.priceStale ? null : money(p.unrealizedPnl),
+    unrealizedPnlPct: p.priceStale ? null : Math.round(p.unrealizedPnlPct * 100) / 100,
+    priceStale: p.priceStale,
 });
 
 export const toChatAccount = (entry: AccountWithPortfolio): ChatAccount => ({
@@ -110,8 +112,8 @@ export const toChatPortfolio = (
         // quote is missing, computePortfolio falls back to cost basis — which silently
         // reads as a perfectly flat position rather than an unknown one.
         valuation: {
-            pricedSymbols: positions.filter((p) => typeof p.currentPrice === 'number').length,
-            unpricedSymbols: positions.filter((p) => typeof p.currentPrice !== 'number').length,
+            pricedSymbols: positions.filter((p) => !p.priceStale).length,
+            unpricedSymbols: positions.filter((p) => p.priceStale).length,
         },
     };
 };

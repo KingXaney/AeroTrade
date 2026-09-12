@@ -1,5 +1,6 @@
 import Link from "next/link";
 import {cn, formatPrice, formatChangePercent, getChangeColorClass} from "@/lib/utils";
+import UnpricedNote from "@/components/trade/UnpricedNote";
 
 // Read-only holdings table — used on the friend profile page (and as the visual base
 // the interactive PositionsTable mirrors on the trade page).
@@ -43,12 +44,17 @@ const PortfolioHoldings = ({positions, emptyText = 'No open positions.'}: {posit
                     </div>
                     <div className="text-right" style={{fontFamily: 'var(--type-mono)'}}>
                         <div className="text-fg">{formatPrice(p.marketValue)}</div>
-                        <div className={cn('text-xs', getChangeColorClass(p.unrealizedPnl || undefined))}>
-                            {p.unrealizedPnl >= 0 ? '+' : ''}{formatPrice(p.unrealizedPnl)} ({formatChangePercent(p.unrealizedPnlPct) || '0.00%'})
-                        </div>
+                        {p.priceStale ? (
+                            <div className="text-xs text-fg-muted" title="No live quote — value shown at cost">—</div>
+                        ) : (
+                            <div className={cn('text-xs', getChangeColorClass(p.unrealizedPnl || undefined))}>
+                                {p.unrealizedPnl >= 0 ? '+' : ''}{formatPrice(p.unrealizedPnl)} ({formatChangePercent(p.unrealizedPnlPct) || '0.00%'})
+                            </div>
+                        )}
                     </div>
                 </div>
             ))}
+            <UnpricedNote positions={positions} className="px-4 pt-1" />
         </div>
     );
 };

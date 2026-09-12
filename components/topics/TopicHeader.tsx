@@ -1,36 +1,25 @@
 'use client';
 
-import {useState, useTransition} from "react";
+import {useState} from "react";
 import {useRouter} from "next/navigation";
 import {toast} from "sonner";
-import {Loader2, MoreHorizontal, RefreshCw} from "lucide-react";
+import {MoreHorizontal} from "lucide-react";
 import {DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger} from "@/components/ui/dropdown-menu";
 import KeywordChips from "@/components/topics/KeywordChips";
 import ConfirmDialog from "@/components/ui/ConfirmDialog";
+import RefreshTopicButton from "@/components/topics/RefreshTopicButton";
 import {useTopicsUi} from "@/components/topics/TopicsShell";
-import {deleteTopic, requestTopicRefreshAction} from "@/lib/actions/topics.actions";
+import {deleteTopic} from "@/lib/actions/topics.actions";
+import {refreshCooldownUntil} from "@/lib/topics/config";
 import {formatTimeAgo} from "@/lib/utils";
 
-const REFRESH_DISABLE_MS = 30_000;
 const mono = {fontFamily: 'var(--type-mono)'} as const;
 
-const TopicHeader = ({topic}: {topic: TopicOverviewItem}) => {
+// `now` is the server render instant, so the refresh button's cooldown hydrates deterministically.
+const TopicHeader = ({topic, now}: {topic: TopicOverviewItem; now: number}) => {
     const router = useRouter();
     const {openComposer} = useTopicsUi();
-    const [refreshing, startRefresh] = useTransition();
-    const [cooldown, setCooldown] = useState(false);
     const [confirming, setConfirming] = useState(false);
-
-    const refresh = () => startRefresh(async () => {
-        const result = await requestTopicRefreshAction(topic.id);
-        if (!result.success) {
-            toast.error(result.message ?? 'Could not refresh');
-            return;
-        }
-        toast.success(result.message ?? 'Refresh queued');
-        setCooldown(true);
-        setTimeout(() => { setCooldown(false); router.refresh(); }, REFRESH_DISABLE_MS);
-    });
 
     const remove = async () => {
         const result = await deleteTopic(topic.id);
@@ -58,12 +47,7 @@ const TopicHeader = ({topic}: {topic: TopicOverviewItem}) => {
                     </p>
                 </div>
                 <div className="flex items-center gap-1 shrink-0">
-                    <button type="button" onClick={refresh} disabled={refreshing || cooldown}
-                            className="inline-flex items-center gap-2 px-3 py-2 rounded-lg text-xs font-bold uppercase tracking-[0.1em] text-fg-soft hover:text-fg border border-line-strong/40 disabled:opacity-50"
-                            style={mono}>
-                        {refreshing ? <Loader2 className="size-3.5 animate-spin" /> : <RefreshCw className="size-3.5" />}
-                        {refreshing ? 'Refreshing…' : 'Refresh now'}
-                    </button>
+                    <RefreshTopicButton topicId={topic.id} cooldownUntil={refreshCooldownUntil(topic.refreshRequestedAt)} serverNow={now} />
                     <DropdownMenu>
                         <DropdownMenuTrigger asChild>
                             <button type="button" aria-label="Topic actions" className="inline-flex items-center justify-center size-8 rounded-lg text-fg-muted hover:text-fg hover:bg-surface-3">

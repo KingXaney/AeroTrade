@@ -5,6 +5,7 @@ import {usePathname, useRouter, useSearchParams} from "next/navigation";
 import {toast} from "sonner";
 import {cn, formatChangePercent, getChangeColorClass} from "@/lib/utils";
 import {setActiveAccount} from "@/lib/actions/accounts.actions";
+import {unpricedLabel} from "@/lib/trading/analytics";
 import CreateAccountDialog from "@/components/trade/CreateAccountDialog";
 import {
     DropdownMenu,
@@ -18,6 +19,8 @@ export type SwitcherAccount = {
     id: string;
     name: string;
     totalReturnPct?: number;
+    unpriced?: number;        // holdings with no live quote — the return is partly at cost
+    holdings?: number;
 };
 
 // Dropdown to switch between strategy accounts. Lives in the /trade and
@@ -81,9 +84,13 @@ const AccountSwitcher = ({accounts, activeId}: {accounts: SwitcherAccount[]; act
                                 {a.name}
                             </span>
                             {typeof a.totalReturnPct === 'number' && (
-                                <span className={cn('text-xs', getChangeColorClass(a.totalReturnPct || undefined))}
-                                      style={{fontFamily: 'var(--type-mono)'}}>
-                                    {formatChangePercent(a.totalReturnPct) || '0.00%'}
+                                <span className="text-xs text-right" style={{fontFamily: 'var(--type-mono)'}}>
+                                    <span className={getChangeColorClass(a.totalReturnPct || undefined)}>
+                                        {formatChangePercent(a.totalReturnPct) || '0.00%'}
+                                    </span>
+                                    {unpricedLabel(a.unpriced ?? 0, a.holdings ?? 0) && (
+                                        <span className="block text-[10px] text-warning">{unpricedLabel(a.unpriced ?? 0, a.holdings ?? 0)}</span>
+                                    )}
                                 </span>
                             )}
                         </DropdownMenuItem>

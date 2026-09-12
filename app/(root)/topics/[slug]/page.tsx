@@ -28,10 +28,12 @@ const TopicPage = async ({params}: TopicPageProps) => {
         topic = overview.topics.find((t) => t.slug === slug) ?? topic;
     }
     const articles = await getTopicArticles(topic.keywordSetHash, {limit: PAGE_SIZE});
+    // eslint-disable-next-line react-hooks/purity -- server component: the render instant is captured once so the refresh button's cooldown hydrates deterministically
+    const now = Date.now();
 
     return (
         <TopicsShell overview={overview} activeSlug={slug}>
-            <TopicHeader topic={topic} />
+            <TopicHeader topic={topic} now={now} />
             <TopicSeenMarker topicId={topic.id} unseenCount={topic.unseenCount} />
             {topic.brief
                 ? <TopicBrief brief={topic.brief} />
@@ -42,7 +44,7 @@ const TopicPage = async ({params}: TopicPageProps) => {
                 )}
             {articles.length > 0
                 ? <TopicFeed topicId={topic.id} initial={articles} unseenCount={topic.unseenCount} pageSize={PAGE_SIZE} />
-                : <TopicFeedEmpty topic={topic} />}
+                : <TopicFeedEmpty scope="topic" topic={topic} now={now} />}
         </TopicsShell>
     );
 };

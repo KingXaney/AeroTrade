@@ -3,13 +3,14 @@
 // load this without mongoose or React.
 
 import type {SuggestionSetView} from '@/lib/navigator/service';
+import {countUnpriced} from '@/lib/trading/analytics';
 
 export type BestStrategy = {name: string; totalReturnPct: number};
 
 // Shapes consumed by SuggestionPanel / AccountSwitcher / AccountComparisonTable,
 // re-declared here because importing the components would pull React in.
 export type ApplyAccount = {id: string; name: string};
-export type SwitcherAccount = {id: string; name: string; totalReturnPct?: number};
+export type SwitcherAccount = {id: string; name: string; totalReturnPct?: number; unpriced?: number; holdings?: number};
 export type ComparisonRow = {
     id: string;
     name: string;
@@ -17,6 +18,8 @@ export type ComparisonRow = {
     totalReturnPct: number;
     winRatePct: number | null;
     maxDrawdownPct: number | null;
+    unpriced: number;         // holdings with no live quote — the return above is partly at cost
+    holdings: number;
 };
 export type ComparisonStat = {winRatePct: number | null; maxDrawdownPct: number | null};
 
@@ -56,7 +59,13 @@ export const toApplyAccounts = (portfolios: readonly AccountWithPortfolio[]): Ap
     portfolios.map((x) => ({id: x.account.id, name: x.account.name}));
 
 export const toSwitcherAccounts = (portfolios: readonly AccountWithPortfolio[]): SwitcherAccount[] =>
-    portfolios.map((x) => ({id: x.account.id, name: x.account.name, totalReturnPct: x.summary.totalReturnPct}));
+    portfolios.map((x) => ({
+        id: x.account.id,
+        name: x.account.name,
+        totalReturnPct: x.summary.totalReturnPct,
+        unpriced: countUnpriced(x.summary.positions),
+        holdings: x.summary.positions.length,
+    }));
 
 export const toComparisonRows = (
     portfolios: readonly AccountWithPortfolio[],
@@ -69,6 +78,8 @@ export const toComparisonRows = (
         totalReturnPct: x.summary.totalReturnPct,
         winRatePct: stats[x.account.id]?.winRatePct ?? null,
         maxDrawdownPct: stats[x.account.id]?.maxDrawdownPct ?? null,
+        unpriced: countUnpriced(x.summary.positions),
+        holdings: x.summary.positions.length,
     }));
 
 // Theses arrive strongest-first; the user's own suggestion set outranks the

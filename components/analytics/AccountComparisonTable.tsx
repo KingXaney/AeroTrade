@@ -5,6 +5,7 @@ import {usePathname, useRouter, useSearchParams} from "next/navigation";
 import {toast} from "sonner";
 import {cn, formatPrice, getChangeColorClass} from "@/lib/utils";
 import {setActiveAccount} from "@/lib/actions/accounts.actions";
+import {unpricedLabel} from "@/lib/trading/analytics";
 
 export type ComparisonRow = {
     id: string;
@@ -13,6 +14,8 @@ export type ComparisonRow = {
     totalReturnPct: number;
     winRatePct: number | null;
     maxDrawdownPct: number | null;
+    unpriced?: number;        // holdings with no live quote — the return is partly at cost
+    holdings?: number;
 };
 
 // The "which strategy wins" view: every strategy account side by side.
@@ -82,9 +85,15 @@ const AccountComparisonTable = ({rows, activeId}: {rows: ComparisonRow[]; active
                     <div className="text-right text-sm text-fg" style={{fontFamily: 'var(--type-mono)'}}>
                         {formatPrice(row.totalValue)}
                     </div>
-                    <div className={cn('text-right text-sm', getChangeColorClass(row.totalReturnPct || undefined))}
-                         style={{fontFamily: 'var(--type-mono)'}}>
-                        {row.totalReturnPct >= 0 ? '+' : ''}{row.totalReturnPct.toFixed(2)}%
+                    <div className="text-right" style={{fontFamily: 'var(--type-mono)'}}>
+                        <div className={cn('text-sm', getChangeColorClass(row.totalReturnPct || undefined))}>
+                            {row.totalReturnPct >= 0 ? '+' : ''}{row.totalReturnPct.toFixed(2)}%
+                        </div>
+                        {/* Ranked on the at-cost fallback like everything else; say so per row,
+                            because the page-level note only covers the active strategy. */}
+                        {unpricedLabel(row.unpriced ?? 0, row.holdings ?? 0) && (
+                            <div className="text-[10px] text-warning">{unpricedLabel(row.unpriced ?? 0, row.holdings ?? 0)}</div>
+                        )}
                     </div>
                     <div className="text-right text-sm text-fg-soft hidden md:block" style={{fontFamily: 'var(--type-mono)'}}>
                         {row.winRatePct === null ? '—' : `${row.winRatePct.toFixed(0)}%`}

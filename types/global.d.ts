@@ -211,9 +211,10 @@ declare global {
         currentPrice?: number;
         changePercent?: number;
         costBasis: number;        // avgCost * quantity
-        marketValue: number;      // currentPrice * quantity (0 if price unknown)
+        marketValue: number;      // currentPrice * quantity; the cost basis when priceStale
         unrealizedPnl: number;    // marketValue - costBasis
         unrealizedPnlPct: number; // unrealizedPnl / costBasis * 100
+        priceStale: boolean;      // no live quote: marketValue is the cost basis and the P&L above is a placeholder
     };
 
     type PortfolioSummary = {
@@ -275,6 +276,8 @@ declare global {
         totalValue: number;
         totalReturnPct: number;
         accountName: string;      // name of the user's best strategy account
+        unpriced: number;         // holdings in that account with no live quote (their value is at cost)
+        holdings: number;
     };
 
     type FriendProfile = {
@@ -283,7 +286,7 @@ declare global {
         email: string;
         portfolio: PortfolioSummary;  // the friend's best strategy account
         accountName: string;
-        accounts: {name: string; totalValue: number; totalReturnPct: number}[];
+        accounts: {name: string; totalValue: number; totalReturnPct: number; unpriced: number; holdings: number}[];
     };
 
     // --- Multi-account strategies & analytics ---

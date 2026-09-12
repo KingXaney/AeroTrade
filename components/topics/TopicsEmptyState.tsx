@@ -6,7 +6,7 @@ import {toast} from "sonner";
 import {Loader2} from "lucide-react";
 import TopicComposer from "@/components/topics/TopicComposer";
 import {cn} from "@/lib/utils";
-import {createTopic} from "@/lib/actions/topics.actions";
+import {followStarterTopics} from "@/lib/actions/topics.actions";
 import {STARTER_TOPICS} from "@/lib/topics/starters";
 
 export type SuggestedTopic = {name: string; keywords: string[]; exclude?: string[]};
@@ -45,16 +45,16 @@ const TopicsEmptyState = ({brainSuggestions}: {brainSuggestions: SuggestedTopic[
     });
 
     const followSelected = () => startTransition(async () => {
-        const picks = all.filter((s) => selected.has(s.name));
-        let created = 0;
-        let lastError: string | undefined;
-        for (const pick of picks) {
-            const result = await createTopic({name: pick.name, keywords: pick.keywords, exclude: pick.exclude ?? []});
-            if (result.success) created += 1; else lastError = result.message;
-        }
-        if (created > 0) toast.success(created === 1 ? 'Following 1 topic' : `Following ${created} topics`);
-        if (lastError && created < picks.length) toast.error(lastError);
-        router.refresh();
+        const picks = all.filter((s) => selected.has(s.name)).map((s) => ({name: s.name, keywords: s.keywords, exclude: s.exclude ?? []}));
+        const result = await followStarterTopics(picks);
+        if (result.created > 0) toast.success(result.created === 1 ? 'Following 1 topic' : `Following ${result.created} topics`);
+        if (result.message) toast.error(result.message);
+        // Land on the first new topic: its page does a bounded live fetch, so the first
+        // thing a new user sees is articles rather than a merged feed waiting on a job.
+        // push() alone — a refresh() on top would render that page (and its live
+        // fetch) a second time before the first has stamped lastFetchedAt.
+        if (result.firstSlug) router.push(`/topics/${result.firstSlug}`);
+        else router.refresh();
     });
 
     return (

@@ -4,6 +4,8 @@ import Link from "next/link";
 import {ACTIVE_ACCOUNT_COOKIE} from "@/lib/constants";
 import {getCurrentUserId} from "@/lib/actions/watchlist.actions";
 import {getAccountAnalytics, getComparisonStats, getPortfoliosForUser, getTradeHistory} from "@/lib/trading/account";
+import {countUnpriced} from "@/lib/trading/analytics";
+import {toComparisonRows, toSwitcherAccounts} from "@/lib/dashboard/select";
 import AccountSummary from "@/components/trade/AccountSummary";
 import PositionsTable from "@/components/trade/PositionsTable";
 import TradeHistory from "@/components/trade/TradeHistory";
@@ -39,19 +41,9 @@ const PortfolioPage = async ({searchParams}: PortfolioPageProps) => {
     ]);
 
     const count = portfolio.positions.length;
-    const switcherAccounts = all.map((x) => ({
-        id: x.account.id,
-        name: x.account.name,
-        totalReturnPct: x.summary.totalReturnPct,
-    }));
-    const comparisonRows = all.map((x) => ({
-        id: x.account.id,
-        name: x.account.name,
-        totalValue: x.summary.totalValue,
-        totalReturnPct: x.summary.totalReturnPct,
-        winRatePct: comparisonStats[x.account.id]?.winRatePct ?? null,
-        maxDrawdownPct: comparisonStats[x.account.id]?.maxDrawdownPct ?? null,
-    }));
+    const unpriced = countUnpriced(portfolio.positions);
+    const switcherAccounts = toSwitcherAccounts(all);
+    const comparisonRows = toComparisonRows(all, comparisonStats);
 
     return (
         <div className="space-y-4">
@@ -62,7 +54,9 @@ const PortfolioPage = async ({searchParams}: PortfolioPageProps) => {
                         {account.name}
                     </h1>
                     <p className="text-sm text-fg-muted">
-                        {count === 0 ? 'No open positions yet' : `${count} ${count === 1 ? 'holding' : 'holdings'} · live valuation`}
+                        {count === 0
+                            ? 'No open positions yet'
+                            : `${count} ${count === 1 ? 'holding' : 'holdings'} · ${unpriced === 0 ? 'live valuation' : unpriced === count ? 'valued at cost' : `${unpriced} valued at cost`}`}
                     </p>
                 </div>
                 <div className="flex flex-wrap items-center gap-3">

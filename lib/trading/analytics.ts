@@ -6,6 +6,59 @@
 export const toReturnPct = (value: number, base: number): number =>
     base > 0 ? (value / base - 1) * 100 : 0;
 
+export type PriceInfo = {price?: number; changePercent?: number};
+
+// One held position priced against the quote map.
+//
+// When the quote is missing, marketValue falls back to the cost basis — on purpose.
+// holdingsValue → totalValue → AccountSnapshot rows → the performance chart all sit
+// downstream of this number, so changing the fallback would silently rewrite history.
+// What changes instead is that the position is *flagged*: every surface that renders
+// unrealizedPnl checks priceStale first, so a missing quote can no longer show up as a
+// perfectly flat "+$0.00 (0.00%)" that looks like a real, priced position.
+export const enrichPosition = (p: PaperPosition, info: PriceInfo | undefined): EnrichedPosition => {
+    const currentPrice = info?.price;
+    const priceStale = typeof currentPrice !== 'number';
+    const costBasis = p.avgCost * p.quantity;
+    const marketValue = typeof currentPrice === 'number' ? currentPrice * p.quantity : costBasis;
+    const unrealizedPnl = marketValue - costBasis;
+    const unrealizedPnlPct = costBasis > 0 ? (unrealizedPnl / costBasis) * 100 : 0;
+    return {
+        symbol: p.symbol,
+        quantity: p.quantity,
+        avgCost: p.avgCost,
+        company: p.company || p.symbol,
+        currentPrice,
+        changePercent: info?.changePercent,
+        costBasis,
+        marketValue,
+        unrealizedPnl,
+        unrealizedPnlPct,
+        priceStale,
+    };
+};
+
+export const countUnpriced = (positions: readonly {priceStale: boolean}[]): number =>
+    positions.reduce((n, p) => n + (p.priceStale ? 1 : 0), 0);
+
+// Compact marker for rows that quote a return (leaderboard, strategy comparison,
+// account switcher): "unpriced" when nothing behind the number is live, "partly
+// unpriced" when some of it is, nothing when it all is.
+export const unpricedLabel = (unpriced: number, holdings: number): string | null => {
+    if (unpriced <= 0 || holdings <= 0) return null;
+    return unpriced >= holdings ? 'unpriced' : 'partly unpriced';
+};
+
+// One note per panel rather than one per row: the QA harness runs without a Finnhub
+// key, so every position is unpriced there and a per-row warning becomes a wall.
+export const describeUnpriced = (stale: number, total: number): string | null => {
+    if (stale <= 0 || total <= 0) return null;
+    const scope = stale >= total
+        ? (total === 1 ? 'This holding is unpriced' : `All ${total} holdings are unpriced`)
+        : `${stale} of ${total} holdings ${stale === 1 ? 'is' : 'are'} unpriced`;
+    return `${scope} — valued at cost, P&L withheld`;
+};
+
 // Largest peak-to-trough decline over the series, as a positive percentage.
 // Null until there are at least two points (a single day can't draw down).
 export const computeMaxDrawdown = (series: SnapshotPoint[]): number | null => {

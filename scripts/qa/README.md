@@ -40,5 +40,10 @@ palette, topic editing and deletion, and the chat suggestions. It exits non-zero
 if any check fails and prints one `PASS`/`FAIL` line per check.
 
 Without a Finnhub key the trade and markets pages show empty quotes, which is
-fine for these checks. The Inngest jobs are not part of this recipe; fire them
-with `npx inngest-cli dev` and `npm run trigger -- <job>`.
+fine for these checks — `qa-truthful-data.mjs` relies on it to assert that unpriced
+holdings are labelled rather than shown as a flat P&L. The Inngest jobs are not part
+of this recipe; fire them with `npx inngest-cli dev` and `npm run trigger -- <job>`.
+`qa-truthful-data.mjs` detects a dev server on :8288 and, when one is running,
+exercises the queued path (the first-run fill lands every starter, "Refresh now"
+runs the on-demand job) instead of the dead-queue path (honest failure, cooldown
+rolled back). Run it both ways before shipping a topics change.

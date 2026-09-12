@@ -25,6 +25,7 @@ export const toTopicView = (doc: LeanTopic): TopicView => ({
     createdAt: doc.createdAt ? new Date(doc.createdAt).getTime() : 0,
     lastFetchedAt: doc.lastFetchedAt ? new Date(doc.lastFetchedAt).getTime() : null,
     lastSeenAt: doc.lastSeenAt ? new Date(doc.lastSeenAt).getTime() : null,
+    refreshRequestedAt: doc.refreshRequestedAt ? new Date(doc.refreshRequestedAt).getTime() : null,
     brief: doc.brief
         ? {
             summary: doc.brief.summary,

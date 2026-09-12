@@ -1,7 +1,7 @@
 'use client';
 
 import {useState, useTransition, type FormEvent} from "react";
-import {useRouter} from "next/navigation";
+import {usePathname, useRouter} from "next/navigation";
 import {toast} from "sonner";
 import {Loader2} from "lucide-react";
 import {Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle} from "@/components/ui/dialog";
@@ -30,6 +30,7 @@ const mono = {fontFamily: 'var(--type-mono)'} as const;
 // open (Radix unmounts dialog content when closed) — no reset effect required.
 const ComposerForm = ({mode, initial, onClose, onSaved}: {mode: ComposerMode; initial: TopicView | null; onClose: () => void; onSaved?: (topic: TopicView) => void}) => {
     const router = useRouter();
+    const pathname = usePathname();
     const [name, setName] = useState(initial?.name ?? '');
     const [keywords, setKeywords] = useState<string[]>(initial?.keywords ?? []);
     const [exclude, setExclude] = useState<string[]>(initial?.exclude ?? []);
@@ -58,8 +59,11 @@ const ComposerForm = ({mode, initial, onClose, onSaved}: {mode: ComposerMode; in
             toast.success(mode === 'edit' ? 'Topic updated' : `Following "${result.topic.name}"`);
             onClose();
             onSaved?.(result.topic);
-            router.push(`/topics/${result.topic.slug}`);
-            router.refresh();
+            // One render of the destination, not two: a new topic's page runs a live
+            // fetch on first visit, and push()+refresh() would run it twice concurrently.
+            const target = `/topics/${result.topic.slug}`;
+            if (pathname === target) router.refresh();
+            else router.push(target);
         });
     };
 

@@ -6,6 +6,7 @@ import {redirect} from "next/navigation";
 import {searchStocks} from "@/lib/actions/finnhub.actions";
 import {getCachedTopicsOverview, getCachedWatchlistSymbols} from "@/lib/dashboard/cached";
 import {aggregatePortfolios, getPortfoliosForUser} from "@/lib/trading/account";
+import {countUnpriced} from "@/lib/trading/analytics";
 import ChatWidget from "@/components/chat/ChatWidget";
 import ThemeSync from "@/components/theme/ThemeSync";
 import {getAppearanceForUser} from "@/lib/actions/appearance.actions";
@@ -52,10 +53,12 @@ const Layout = async ({children}: {children: React.ReactNode}) => {
         totalReturnPct: portfolio.totalReturnPct,
         cash: portfolio.cash,
         strategiesCount: accountPortfolios.length,
+        unpriced: countUnpriced(portfolio.positions),
         top: portfolio.positions.slice(0, 3).map((p) => ({
             symbol: p.symbol,
             quantity: p.quantity,
             unrealizedPnlPct: p.unrealizedPnlPct,
+            priceStale: p.priceStale,
         })),
     };
 

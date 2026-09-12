@@ -18,6 +18,7 @@ declare global {
         createdAt: number;        // epoch ms
         lastFetchedAt: number | null;
         lastSeenAt: number | null;
+        refreshRequestedAt: number | null;   // last "Refresh now" claim; drives the button's cooldown
         brief: TopicBriefView | null;
     };
 
