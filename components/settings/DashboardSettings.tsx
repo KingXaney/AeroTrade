@@ -11,6 +11,7 @@ import {
 } from "@/lib/dashboard/layout";
 import {resetDashboardLayout, saveDashboardLayout} from "@/lib/actions/dashboard.actions";
 import {cn} from "@/lib/utils";
+import ConfirmDialog from "@/components/ui/ConfirmDialog";
 
 const SAVE_DEBOUNCE_MS = 300;
 
@@ -22,6 +23,7 @@ type Props = {initialLayout: DashboardLayout; availableIds: WidgetId[]};
 // List-based editor: every change persists (debounced) and reverts on failure.
 const DashboardSettings = ({initialLayout, availableIds}: Props) => {
     const [layout, setLayout] = useState(initialLayout);
+    const [confirmingReset, setConfirmingReset] = useState(false);
     const [, startTransition] = useTransition();
     const lastSaved = useRef(initialLayout);
     const timer = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -58,7 +60,11 @@ const DashboardSettings = ({initialLayout, availableIds}: Props) => {
         requestAnimationFrame(() => document.getElementById(focusId)?.focus());
     };
 
-    const reset = () => startTransition(async () => {
+    const reset = () => new Promise<void>((resolve) => startTransition(async () => {
+        // Cancel any pending autosave first. Its effect cleanup calls persist(snapshot),
+        // so a timer armed before the reset would write the old layout straight back over
+        // the $unset we are about to do.
+        if (timer.current) { clearTimeout(timer.current); timer.current = null; }
         const result = await resetDashboardLayout();
         if (result.success) {
             lastSaved.current = resetLayout();
@@ -67,7 +73,8 @@ const DashboardSettings = ({initialLayout, availableIds}: Props) => {
         } else {
             toast.error(result.message ?? 'Could not reset your dashboard');
         }
-    });
+        resolve();
+    }));
 
     const available = new Set(availableIds);
     const missing = missingWidgetIds(layout).filter((id) => available.has(id));
@@ -150,11 +157,24 @@ const DashboardSettings = ({initialLayout, availableIds}: Props) => {
 
             <div className="flex items-center justify-between pt-2 border-t border-line-strong/20">
                 <p className="text-[11px] text-fg-muted">Changes save automatically.</p>
-                <button type="button" onClick={reset}
+                <button type="button" onClick={() => setConfirmingReset(true)}
                         className="text-xs uppercase tracking-[0.1em] text-fg-muted hover:text-negative transition-colors" style={{fontFamily: 'var(--type-mono)'}}>
                     Reset to default
                 </button>
             </div>
+
+            {/* This used to fire on the first click and $unset the saved layout
+                immediately — sitting directly under "Changes save automatically." The
+                grid's own reset is revertible until you press Save; this one never was. */}
+            <ConfirmDialog
+                open={confirmingReset}
+                onOpenChange={setConfirmingReset}
+                title="Reset your dashboard?"
+                description="Your saved arrangement — which widgets you added, their order and their widths — is discarded and the default layout takes its place. This cannot be undone."
+                confirmLabel="Reset dashboard"
+                destructive
+                onConfirm={reset}
+            />
         </div>
     );
 };

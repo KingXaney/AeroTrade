@@ -4,8 +4,10 @@ import {useCallback, useEffect, useRef, useState, type FormEvent, type PointerEv
 import {useChat} from "@ai-sdk/react";
 import {DefaultChatTransport, type UIMessage} from "ai";
 import {useRouter} from "next/navigation";
+import Link from "next/link";
 import {X, Trash2} from "lucide-react";
 import ChatMessage from "@/components/chat/ChatMessage";
+import {describeChatError} from "@/lib/ai/chat-errors";
 import {CHAT_WELCOME_MESSAGE, CHAT_SUGGESTIONS} from "@/lib/constants";
 import {cn} from "@/lib/utils";
 
@@ -45,6 +47,7 @@ const ChatPanel = ({userId, onClose, initialMessages, onMessagesChange}: ChatPan
     const router = useRouter();
     const [input, setInput] = useState('');
     const listRef = useRef<HTMLDivElement>(null);
+    const inputRef = useRef<HTMLInputElement>(null);
 
     // Resizable size — restore from localStorage on first render (panel only mounts client-side),
     // persist on change.
@@ -85,7 +88,7 @@ const ChatPanel = ({userId, onClose, initialMessages, onMessagesChange}: ChatPan
         dragRef.current = null;
     }, []);
 
-    const {messages, sendMessage, status, error, setMessages} = useChat({
+    const {messages, sendMessage, status, error, setMessages, clearError, regenerate} = useChat({
         id: `chat-${userId}`,
         messages: initialMessages,
         transport: new DefaultChatTransport({api: '/api/chat'}),
@@ -104,6 +107,12 @@ const ChatPanel = ({userId, onClose, initialMessages, onMessagesChange}: ChatPan
         onMessagesChange(messages);
     }, [messages, onMessagesChange]);
 
+    // Opening the panel should put the cursor in the composer — otherwise the first
+    // thing a keyboard user does is hunt for it.
+    useEffect(() => {
+        inputRef.current?.focus();
+    }, []);
+
     // Auto-scroll to bottom on new messages or token streams.
     useEffect(() => {
         if (listRef.current) {
@@ -111,28 +120,46 @@ const ChatPanel = ({userId, onClose, initialMessages, onMessagesChange}: ChatPan
         }
     }, [messages]);
 
+    const isBusy = status === 'submitted' || status === 'streaming';
+
+    // These guards used to be `status !== 'ready'`, which excluded 'error' — and nothing
+    // ever moved status back to 'ready'. The input and Send button stayed enabled (isBusy
+    // is false in the error state), so after one failure the panel looked alive and
+    // silently swallowed every message until the page was reloaded.
+    const send = (text: string) => {
+        if (!text || isBusy) return;
+        clearError(); // no-op unless we're recovering from a failure
+        sendMessage({text});
+    };
+
     const onSubmit = (e: FormEvent) => {
         e.preventDefault();
         const text = input.trim();
-        if (!text || status !== 'ready') return;
-        sendMessage({text});
+        if (!text || isBusy) return;
+        send(text);
         setInput('');
     };
 
-    const onSuggestion = (text: string) => {
-        if (status !== 'ready') return;
-        sendMessage({text});
+    const onSuggestion = (text: string) => send(text);
+
+    const onRetry = () => {
+        if (isBusy || messages.length === 0) return;
+        clearError();
+        void regenerate();
     };
 
     const onClear = () => {
         setMessages([]);
+        clearError(); // otherwise "clear chat" left the panel stuck too
+        setInput('');
     };
-
-    const isBusy = status === 'submitted' || status === 'streaming';
 
     return (
         <div
-            className="fixed bottom-5 right-5 z-[80] flex max-w-[calc(100vw-2rem)] max-h-[calc(100vh-2rem)] flex-col rounded-2xl shadow-2xl sm:bottom-6 sm:right-6 overflow-hidden"
+            className="fixed bottom-5 right-5 z-[80] flex max-w-[calc(100vw-2rem)] max-h-[calc(100dvh-2rem)] flex-col rounded-2xl shadow-2xl sm:bottom-6 sm:right-6 overflow-hidden"
+            role="dialog"
+            aria-label="AeroTrade assistant"
+            onKeyDown={(e) => { if (e.key === 'Escape') { e.stopPropagation(); onClose(); } }}
             style={{
                 width: `${size.width}px`,
                 height: `${size.height}px`,
@@ -239,26 +266,64 @@ const ChatPanel = ({userId, onClose, initialMessages, onMessagesChange}: ChatPan
                     </div>
                 )}
 
-                {error && (
-                    <div className="rounded-md px-3 py-2 text-xs"
-                         style={{
-                             backgroundColor: 'color-mix(in srgb, var(--negative) 15%, transparent)',
-                             border: '1px solid color-mix(in srgb, var(--negative) 30%, transparent)',
-                             color: 'var(--negative)',
-                         }}>
-                        Something went wrong. {error.message}
-                    </div>
-                )}
+                {error && (() => {
+                    // Never render error.message — it can be a provider error, an HTML
+                    // error page from the host, or an SDK-masked string, and some of that
+                    // leaks infrastructure detail.
+                    const described = describeChatError(error);
+                    return (
+                        <div className="rounded-md px-3 py-2 text-xs space-y-2"
+                             style={{
+                                 backgroundColor: 'color-mix(in srgb, var(--negative) 15%, transparent)',
+                                 border: '1px solid color-mix(in srgb, var(--negative) 30%, transparent)',
+                                 color: 'var(--negative)',
+                             }}>
+                            <p>{described.message}</p>
+                            <div className="flex items-center gap-2">
+                                {described.action === 'retry' && (
+                                    <button type="button" onClick={onRetry} disabled={isBusy}
+                                            className="px-2 py-1 rounded font-bold uppercase tracking-wider text-[10px] text-negative disabled:opacity-50"
+                                            style={{border: '1px solid color-mix(in srgb, var(--negative) 40%, transparent)', fontFamily: 'var(--type-mono)'}}>
+                                        Try again
+                                    </button>
+                                )}
+                                {described.action === 'clear' && (
+                                    <button type="button" onClick={onClear}
+                                            className="px-2 py-1 rounded font-bold uppercase tracking-wider text-[10px] text-negative"
+                                            style={{border: '1px solid color-mix(in srgb, var(--negative) 40%, transparent)', fontFamily: 'var(--type-mono)'}}>
+                                        Clear chat
+                                    </button>
+                                )}
+                                {described.action === 'sign_in' && (
+                                    <Link href="/sign-in"
+                                          className="px-2 py-1 rounded font-bold uppercase tracking-wider text-[10px] text-negative"
+                                          style={{border: '1px solid color-mix(in srgb, var(--negative) 40%, transparent)', fontFamily: 'var(--type-mono)'}}>
+                                        Sign in
+                                    </Link>
+                                )}
+                                <button type="button" onClick={() => clearError()}
+                                        className="px-2 py-1 rounded font-bold uppercase tracking-wider text-[10px] text-fg-muted hover:text-fg-soft"
+                                        style={{fontFamily: 'var(--type-mono)'}}>
+                                    Dismiss
+                                </button>
+                            </div>
+                        </div>
+                    );
+                })()}
             </div>
 
             {/* Input */}
             <form onSubmit={onSubmit} className="flex items-center gap-2 px-3 py-3"
                   style={{ borderTop: '1px solid color-mix(in srgb, var(--line-strong) 30%, transparent)' }}>
                 <input
+                    ref={inputRef}
                     value={input}
                     onChange={(e) => setInput(e.target.value)}
                     placeholder="Query market data..."
-                    disabled={isBusy}
+                    // Deliberately not disabled while busy: disabling blurs the input, so
+                    // focus fell to <body> after every message — you had to click back in,
+                    // and Escape stopped reaching the panel. send() already refuses to
+                    // submit while a reply is streaming, and composing ahead is useful.
                     className="flex-1 rounded-lg px-3 py-2 text-sm text-fg outline-none field-focus border-none"
                     style={{
                         backgroundColor: 'var(--surface-2)',

@@ -6,7 +6,7 @@ import {toast} from "sonner";
 import {Loader2, Sparkles} from "lucide-react";
 import {cn} from "@/lib/utils";
 import {createTopic, deleteTopic} from "@/lib/actions/topics.actions";
-import ConfirmDialog from "@/components/topics/ConfirmDialog";
+import ConfirmDialog from "@/components/ui/ConfirmDialog";
 
 type Props = {
     name: string;

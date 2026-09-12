@@ -2,7 +2,7 @@
 
 import {useState} from "react";
 import {useRouter} from "next/navigation";
-import ReactMarkdown from "react-markdown";
+import SafeMarkdown from "@/components/markdown/SafeMarkdown";
 import {toast} from "sonner";
 import {cn, formatPrice, getChangeColorClass} from "@/lib/utils";
 import {applySuggestion} from "@/lib/actions/navigator.actions";
@@ -120,9 +120,9 @@ const SuggestionPanel = ({userSet, globalSet, accounts}: {userSet: SetView | nul
                 ))}
             </div>
             {set.rationaleMd && (
-                <div className="px-4 py-3 rounded-lg border bg-surface-2/40 border-brand/15 text-sm text-fg-soft leading-relaxed">
-                    <ReactMarkdown>{set.rationaleMd}</ReactMarkdown>
-                </div>
+                <SafeMarkdown className="px-4 py-3 rounded-lg border bg-surface-2/40 border-brand/15 text-sm text-fg-soft leading-relaxed">
+                    {set.rationaleMd}
+                </SafeMarkdown>
             )}
             <p className="text-[10px] uppercase tracking-[0.08em] text-fg-muted" style={{fontFamily: 'var(--type-mono)'}}>
                 Automated paper-trading experiment — not financial advice.

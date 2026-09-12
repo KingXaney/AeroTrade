@@ -6,7 +6,7 @@ import {toast} from "sonner";
 import {Loader2, MoreHorizontal, RefreshCw} from "lucide-react";
 import {DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger} from "@/components/ui/dropdown-menu";
 import KeywordChips from "@/components/topics/KeywordChips";
-import ConfirmDialog from "@/components/topics/ConfirmDialog";
+import ConfirmDialog from "@/components/ui/ConfirmDialog";
 import {useTopicsUi} from "@/components/topics/TopicsShell";
 import {deleteTopic, requestTopicRefreshAction} from "@/lib/actions/topics.actions";
 import {formatTimeAgo} from "@/lib/utils";

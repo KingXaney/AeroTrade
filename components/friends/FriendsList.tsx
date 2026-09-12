@@ -5,10 +5,16 @@ import Link from "next/link";
 import {useRouter} from "next/navigation";
 import {toast} from "sonner";
 import {removeFriend} from "@/lib/actions/friends.actions";
+import ConfirmDialog from "@/components/ui/ConfirmDialog";
 
 const FriendsList = ({friends}: {friends: FriendSummary[]}) => {
     const router = useRouter();
     const [busyId, setBusyId] = useState<string | null>(null);
+    // Removing is mutual, irreversible and one pixel from the row's own profile link:
+    // the friendship row is hard-deleted, both sides lose portfolio visibility and the
+    // leaderboard entry, and getting it back needs a fresh request the other person has
+    // to notice. Unfollowing a topic — a far smaller loss — already goes through a dialog.
+    const [pending, setPending] = useState<FriendSummary | null>(null);
 
     const onRemove = async (friendshipId: string) => {
         if (busyId) return;
@@ -50,16 +56,32 @@ const FriendsList = ({friends}: {friends: FriendSummary[]}) => {
                             </Link>
                             <button
                                 type="button"
-                                onClick={() => onRemove(f.friendshipId)}
+                                onClick={() => setPending(f)}
                                 disabled={busyId === f.friendshipId}
-                                title="Remove friend"
+                                aria-label={`Remove ${f.name}`}
+                                title={`Remove ${f.name}`}
                                 className="p-1.5 rounded text-fg-muted hover:text-negative transition-colors disabled:opacity-50"
                             >
-                                <span className="material-symbols-outlined text-base">person_remove</span>
+                                <span className="material-symbols-outlined text-base" aria-hidden="true">person_remove</span>
                             </button>
                         </div>
                     ))}
                 </div>
+            )}
+            {pending && (
+                <ConfirmDialog
+                    open
+                    onOpenChange={(next) => { if (!next) setPending(null); }}
+                    title={`Remove ${pending.name}?`}
+                    description="You'll both lose access to each other's portfolios and they'll drop off your leaderboard. You can send a new request later."
+                    confirmLabel="Remove friend"
+                    destructive
+                    onConfirm={async () => {
+                        const target = pending;
+                        setPending(null);
+                        await onRemove(target.friendshipId);
+                    }}
+                />
             )}
         </div>
     );

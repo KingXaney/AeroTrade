@@ -180,6 +180,7 @@ declare global {
         | 'getMarketNews'
         | 'getBrainDigest'
         | 'getAiSuggestions'
+        | 'getPaperPortfolio'
         | 'getFollowedTopics'
         | 'getTopicFeed'
         | 'followTopic'

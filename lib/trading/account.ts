@@ -87,6 +87,17 @@ export const getAccountsForUser = async (userId: string): Promise<PaperAccountDo
     return [created];
 };
 
+// Read-only sibling of getAccountsForUser: no lazy create, no legacy backfill.
+//
+// Use this wherever a *question* is being answered rather than an action taken. The chat
+// assistant is the motivating case — "how am I doing?" must not conjure a paper account
+// with a $100k starting balance for someone who has never traded, and must not race the
+// real creation path. getHeldSymbolsByUserId already reads this way.
+export const readAccountsForUser = async (userId: string): Promise<PaperAccountDoc[]> => {
+    await connectToDatabase();
+    return PaperAccount.find({userId}).sort({createdAt: 1});
+};
+
 // Ownership gate: every account-scoped read or write resolves the account through this.
 export const getOwnedAccount = async (userId: string, accountId: string): Promise<PaperAccountDoc | null> => {
     if (!Types.ObjectId.isValid(accountId)) return null;

@@ -293,7 +293,7 @@ export const CHAT_WELCOME_MESSAGE =
 export const CHAT_SUGGESTIONS = [
     "What's new in my topics?",
     "Follow news about AI chips",
+    "How is my paper portfolio doing?",
     "What's in my watchlist?",
     "Should I add NVDA?",
-    "Summarize today's market news",
 ];

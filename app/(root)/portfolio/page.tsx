@@ -77,7 +77,11 @@ const PortfolioPage = async ({searchParams}: PortfolioPageProps) => {
                         <span className="material-symbols-outlined text-base">candlestick_chart</span>
                         Trade Desk
                     </Link>
-                    <ResetAccountButton accountId={account.id} />
+                    <ResetAccountButton
+                        accountId={account.id}
+                        accountName={account.name}
+                        startingBalance={portfolio.startingBalance}
+                    />
                 </div>
             </div>
 
