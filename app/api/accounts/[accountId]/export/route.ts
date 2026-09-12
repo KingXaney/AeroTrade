@@ -30,7 +30,7 @@ export async function GET(request: Request, {params}: {params: Promise<{accountI
 
     const trades = await PaperTrade.find({accountId: String(account._id)}).sort({createdAt: 1}).lean();
 
-    const header = ['date', 'symbol', 'company', 'side', 'quantity', 'price', 'total', 'realized_pnl'];
+    const header = ['date', 'symbol', 'company', 'side', 'quantity', 'price', 'total', 'realized_pnl', 'source'];
     const rows = trades.map((t) => [
         new Date(t.createdAt).toISOString(),
         t.symbol,
@@ -40,6 +40,7 @@ export async function GET(request: Request, {params}: {params: Promise<{accountI
         t.price,
         t.total,
         typeof t.realizedPnl === 'number' ? t.realizedPnl : '',
+        t.source ?? '',   // blank = placed before the field existed; not reconstructable, so not guessed
     ].map(csvField).join(','));
     const csv = [header.join(','), ...rows].join('\n') + '\n';
 

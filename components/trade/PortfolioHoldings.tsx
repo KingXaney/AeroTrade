@@ -37,12 +37,16 @@ const PortfolioHoldings = ({positions, emptyText = 'No open positions.'}: {posit
                             <div className="text-[11px] text-fg-soft truncate max-w-[160px]">{p.company}</div>
                         </div>
                     </div>
-                    <div className="text-right text-fg" style={{fontFamily: 'var(--type-mono)'}}>{p.quantity}</div>
-                    <div className="text-right text-fg-soft" style={{fontFamily: 'var(--type-mono)'}}>{formatPrice(p.avgCost)}</div>
-                    <div className="text-right text-fg" style={{fontFamily: 'var(--type-mono)'}}>
+                    {/* Below md the header row is hidden, so each cell names itself. */}
+                    <div className="flex justify-between md:block md:text-right text-fg" style={{fontFamily: 'var(--type-mono)'}}><span className="md:hidden text-[10px] uppercase tracking-[0.1em] text-fg-muted mr-2">Qty</span>{p.quantity}</div>
+                    <div className="flex justify-between md:block md:text-right text-fg-soft" style={{fontFamily: 'var(--type-mono)'}}><span className="md:hidden text-[10px] uppercase tracking-[0.1em] text-fg-muted mr-2">Avg Cost</span>{formatPrice(p.avgCost)}</div>
+                    <div className="flex justify-between md:block md:text-right text-fg" style={{fontFamily: 'var(--type-mono)'}}>
+                        <span className="md:hidden text-[10px] uppercase tracking-[0.1em] text-fg-muted mr-2">Price</span>
                         {typeof p.currentPrice === 'number' ? formatPrice(p.currentPrice) : '—'}
                     </div>
-                    <div className="text-right" style={{fontFamily: 'var(--type-mono)'}}>
+                    <div className="flex justify-between md:block md:text-right" style={{fontFamily: 'var(--type-mono)'}}>
+                        <span className="md:hidden text-[10px] uppercase tracking-[0.1em] text-fg-muted mr-2">Value / P&L</span>
+                        <div className="text-right">
                         <div className="text-fg">{formatPrice(p.marketValue)}</div>
                         {p.priceStale ? (
                             <div className="text-xs text-fg-muted" title="No live quote — value shown at cost">—</div>
@@ -51,6 +55,7 @@ const PortfolioHoldings = ({positions, emptyText = 'No open positions.'}: {posit
                                 {p.unrealizedPnl >= 0 ? '+' : ''}{formatPrice(p.unrealizedPnl)} ({formatChangePercent(p.unrealizedPnlPct) || '0.00%'})
                             </div>
                         )}
+                        </div>
                     </div>
                 </div>
             ))}

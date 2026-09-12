@@ -118,7 +118,7 @@ const PortfolioPage = async ({searchParams}: PortfolioPageProps) => {
                 <h2 className="text-sm font-bold uppercase tracking-[0.1em] text-brand mb-4" style={{fontFamily: 'var(--type-mono)'}}>
                     Trade History
                 </h2>
-                <TradeHistory trades={trades} />
+                <TradeHistory trades={trades} totalCount={analytics?.tradeCount} exportHref={`/api/accounts/${account.id}/export`} />
             </section>
         </div>
     );

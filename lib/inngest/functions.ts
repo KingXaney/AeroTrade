@@ -508,6 +508,7 @@ export const runWeeklyNavigator = inngest.createFunction(
                                 symbol: order.symbol,
                                 side: order.side,
                                 quantity: order.quantity,
+                                source: 'ai-navigator',
                                 // Re-enforce the cash floor at execution time — live prices
                                 // may have drifted since planning.
                                 ...(order.side === 'buy' ? {minCashAfter: MIN_CASH_WEIGHT * orders.totalValue} : {}),
@@ -761,6 +762,7 @@ export const bootstrapAiNavigator = inngest.createFunction(
                             symbol: order.symbol,
                             side: order.side,
                             quantity: order.quantity,
+                            source: 'ai-navigator',
                             ...(order.side === 'buy' ? {minCashAfter: MIN_CASH_WEIGHT * orders.totalValue} : {}),
                         }));
                 }

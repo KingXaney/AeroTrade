@@ -1,15 +1,12 @@
 import {redirect} from "next/navigation";
 import {cookies} from "next/headers";
 import Link from "next/link";
-import TradingViewWidget from "@/components/TradingViewWidget";
-import {ACTIVE_ACCOUNT_COOKIE, TRADE_CHART_WIDGET_CONFIG} from "@/lib/constants";
+import {ACTIVE_ACCOUNT_COOKIE} from "@/lib/constants";
 import {getCurrentUserId} from "@/lib/actions/watchlist.actions";
 import {getAccountsForUser, getPortfolio, toAccountSummary} from "@/lib/trading/account";
-import OrderPanel from "@/components/trade/OrderPanel";
+import TradeDesk from "@/components/trade/TradeDesk";
 import OpenPositionsStrip from "@/components/trade/OpenPositionsStrip";
 import AccountSwitcher from "@/components/trade/AccountSwitcher";
-
-const scriptUrl = 'https://s3.tradingview.com/external-embedding/embed-widget-';
 
 type TradePageProps = {
     searchParams: Promise<{symbol?: string; account?: string}>;
@@ -55,20 +52,14 @@ const TradePage = async ({searchParams}: TradePageProps) => {
                 </div>
             </div>
 
-            {/* Chart + order entry — the focus of this page */}
-            <div className="grid gap-4 xl:grid-cols-3">
-                <section className="xl:col-span-2 glass-panel rounded-xl p-4">
-                    <TradingViewWidget
-                        title="Advanced Chart"
-                        scriptUrl={`${scriptUrl}advanced-chart.js`}
-                        config={TRADE_CHART_WIDGET_CONFIG(chartSymbol)}
-                        height={560}
-                    />
-                </section>
-                <div className="xl:col-span-1">
-                    <OrderPanel defaultSymbol={orderSymbol} cash={portfolio.cash} accountId={activeId} />
-                </div>
-            </div>
+            {/* Chart + order entry — the focus of this page; one symbol drives both */}
+            <TradeDesk
+                chartSymbol={chartSymbol}
+                orderSymbol={orderSymbol}
+                cash={portfolio.cash}
+                accountId={activeId}
+                positions={portfolio.positions.map((p) => ({symbol: p.symbol, quantity: p.quantity}))}
+            />
 
             {/* Open positions — compact quick-sell; full holdings & history live on /portfolio */}
             <section className="glass-panel rounded-xl p-5">

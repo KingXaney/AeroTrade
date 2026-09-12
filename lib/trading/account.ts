@@ -217,6 +217,7 @@ export const getTradeHistory = async (userId: string, accountId: string, limit =
             price: t.price,
             total: t.total,
             realizedPnl: t.realizedPnl,
+            ...(t.source ? {source: t.source as TradeSource} : {}),
             createdAt: new Date(t.createdAt).getTime(),
         }));
     } catch (error) {

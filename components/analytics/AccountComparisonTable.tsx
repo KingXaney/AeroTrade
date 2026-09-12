@@ -69,7 +69,7 @@ const AccountComparisonTable = ({rows, activeId}: {rows: ComparisonRow[]; active
                     onClick={() => void onPick(row.id)}
                     disabled={switching}
                     className={cn(
-                        'w-full grid grid-cols-2 md:grid-cols-[2fr_1fr_1fr_1fr_1fr] gap-2 md:gap-4 items-center px-4 py-3 rounded-xl border text-left transition-colors disabled:opacity-60',
+                        'w-full grid grid-cols-1 md:grid-cols-[2fr_1fr_1fr_1fr_1fr] gap-1.5 md:gap-4 items-center px-4 py-3 rounded-xl border text-left transition-colors disabled:opacity-60',
                         row.id === activeId
                             ? 'bg-brand-strong/6 border-brand/25'
                             : 'bg-surface-2/40 border-line-strong/20 hover:border-brand/30',
@@ -82,10 +82,14 @@ const AccountComparisonTable = ({rows, activeId}: {rows: ComparisonRow[]; active
                             {row.name}
                         </span>
                     </div>
-                    <div className="text-right text-sm text-fg" style={{fontFamily: 'var(--type-mono)'}}>
+                    {/* Below md the header row is hidden, so each cell names itself. */}
+                    <div className="flex justify-between md:block md:text-right text-sm text-fg" style={{fontFamily: 'var(--type-mono)'}}>
+                        <span className="md:hidden text-[10px] uppercase tracking-[0.1em] text-fg-muted mr-2">Value</span>
                         {formatPrice(row.totalValue)}
                     </div>
-                    <div className="text-right" style={{fontFamily: 'var(--type-mono)'}}>
+                    <div className="flex justify-between md:block md:text-right" style={{fontFamily: 'var(--type-mono)'}}>
+                        <span className="md:hidden text-[10px] uppercase tracking-[0.1em] text-fg-muted mr-2">Total Return</span>
+                        <div className="text-right">
                         <div className={cn('text-sm', getChangeColorClass(row.totalReturnPct || undefined))}>
                             {row.totalReturnPct >= 0 ? '+' : ''}{row.totalReturnPct.toFixed(2)}%
                         </div>
@@ -94,11 +98,16 @@ const AccountComparisonTable = ({rows, activeId}: {rows: ComparisonRow[]; active
                         {unpricedLabel(row.unpriced ?? 0, row.holdings ?? 0) && (
                             <div className="text-[10px] text-warning">{unpricedLabel(row.unpriced ?? 0, row.holdings ?? 0)}</div>
                         )}
+                        </div>
                     </div>
-                    <div className="text-right text-sm text-fg-soft hidden md:block" style={{fontFamily: 'var(--type-mono)'}}>
+                    {/* These two used to be hidden below md — the very numbers that make a
+                        strategy comparison a comparison. */}
+                    <div className="flex justify-between md:block md:text-right text-sm text-fg-soft" style={{fontFamily: 'var(--type-mono)'}}>
+                        <span className="md:hidden text-[10px] uppercase tracking-[0.1em] text-fg-muted mr-2">Win Rate</span>
                         {row.winRatePct === null ? '—' : `${row.winRatePct.toFixed(0)}%`}
                     </div>
-                    <div className="text-right text-sm hidden md:block" style={{fontFamily: 'var(--type-mono)'}}>
+                    <div className="flex justify-between md:block md:text-right text-sm" style={{fontFamily: 'var(--type-mono)'}}>
+                        <span className="md:hidden text-[10px] uppercase tracking-[0.1em] text-fg-muted mr-2">Max Drawdown</span>
                         {row.maxDrawdownPct === null
                             ? <span className="text-fg-soft">—</span>
                             : <span className={row.maxDrawdownPct > 0 ? 'text-negative' : 'text-fg-soft'}>−{row.maxDrawdownPct.toFixed(2)}%</span>}

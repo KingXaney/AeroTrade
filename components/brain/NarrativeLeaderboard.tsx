@@ -18,12 +18,16 @@ const TypeColumn = ({title, entities, followedByName}: {title: string; entities:
         ) : (
             <div className="space-y-1">
                 {entities.map((e) => (
-                    <Link key={e.key} href={`/brain?entity=${encodeURIComponent(e.key)}`}
-                          className="flex items-center justify-between px-3 py-2 rounded-lg border bg-surface-2/40 border-line-strong/20 hover:border-brand/30 transition-colors">
-                        <span className="text-xs font-semibold text-fg truncate max-w-[55%]" style={{fontFamily: 'var(--type-mono)'}}>
+                    // The row used to be one <Link> with the follow <button> nested inside it —
+                    // invalid markup, and the two fought over the click. Now the name is the
+                    // link and the button is its sibling.
+                    <div key={e.key}
+                         className="flex items-center justify-between gap-2 px-3 py-2 rounded-lg border bg-surface-2/40 border-line-strong/20 hover:border-brand/30 transition-colors">
+                        <Link href={`/brain?entity=${encodeURIComponent(e.key)}#evidence`}
+                              className="text-xs font-semibold text-fg hover:text-brand truncate max-w-[55%]" style={{fontFamily: 'var(--type-mono)'}}>
                             {e.displayName}
                             {e.thesisSince !== null && <span className="ml-1 text-brand">●</span>}
-                        </span>
+                        </Link>
                         <span className="flex items-center gap-1 text-[11px]" style={{fontFamily: 'var(--type-mono)'}}>
                             <span className="text-fg-soft">{e.weightSlow.toFixed(1)}</span>{' '}
                             <span className={cn(getChangeColorClass(e.sentimentSlow || undefined))}>
@@ -34,7 +38,7 @@ const TypeColumn = ({title, entities, followedByName}: {title: string; entities:
                                                    followed={followedByName[e.displayName.toLowerCase()] ?? null} className="size-6" />
                             )}
                         </span>
-                    </Link>
+                    </div>
                 ))}
             </div>
         )}

@@ -227,6 +227,11 @@ declare global {
         totalReturnPct: number;   // totalReturnAbs / startingBalance * 100
     };
 
+    // Who placed a paper trade. Absent on rows written before this field existed —
+    // nothing recorded which historical fills came from the AI, so absence honestly
+    // means "unknown", never "user".
+    type TradeSource = 'user' | 'ai-navigator' | 'ai-suggestion';
+
     type PaperTradeRecord = {
         id: string;
         symbol: string;
@@ -236,6 +241,7 @@ declare global {
         price: number;
         total: number;
         realizedPnl?: number;
+        source?: TradeSource;
         createdAt: number;        // epoch milliseconds
     };
 

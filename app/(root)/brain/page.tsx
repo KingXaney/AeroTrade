@@ -93,7 +93,7 @@ const BrainPage = async ({searchParams}: BrainPageProps) => {
 
             {/* Evidence drill-down for ?entity= */}
             {entity && evidence && (
-                <section className="glass-panel rounded-xl p-5">
+                <section id="evidence" className="glass-panel rounded-xl p-5 scroll-mt-24">
                     <h2 className="text-sm font-bold uppercase tracking-[0.1em] text-brand mb-4" style={{fontFamily: 'var(--type-mono)'}}>
                         Evidence
                     </h2>

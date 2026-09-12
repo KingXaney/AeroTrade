@@ -196,7 +196,7 @@ export const applySuggestion = async (
             if (typeof price !== 'number' || !(price > 0)) return {success: false, message: `No live price for ${symbol}`};
             const quantity = targetWeight <= 0 ? held.quantity : Math.min(held.quantity, Math.floor(sellValue / price));
             if (quantity < 1) return {success: false, message: 'Position is already at or below the suggested weight'};
-            const result = await executeOrder(userId, {accountId, symbol, side: 'sell', quantity});
+            const result = await executeOrder(userId, {accountId, symbol, side: 'sell', quantity, source: 'ai-suggestion'});
             if (result.success) revalidateNavigatorPaths();
             return {success: result.success, message: result.message};
         }
@@ -209,7 +209,7 @@ export const applySuggestion = async (
         const quantity = Math.floor(buyValue / price);
         if (quantity < 1) return {success: false, message: 'Position is already at or above the suggested weight'};
 
-        const result = await executeOrder(userId, {accountId, symbol, side: 'buy', quantity});
+        const result = await executeOrder(userId, {accountId, symbol, side: 'buy', quantity, source: 'ai-suggestion'});
         if (result.success) revalidateNavigatorPaths();
         return {success: result.success, message: result.message};
     } catch (error) {

@@ -4,6 +4,7 @@ import {useState} from "react";
 import {cn, getChangeColorClass} from "@/lib/utils";
 import SellPositionDialog from "@/components/trade/SellPositionDialog";
 import UnpricedNote from "@/components/trade/UnpricedNote";
+import TradeLink from "@/components/trade/TradeLink";
 
 // Compact, horizontally-scrolling open-positions strip for the Trade page.
 // Each chip shows symbol · qty · P&L%; Sell opens the shared partial-sell
@@ -34,6 +35,7 @@ const OpenPositionsStrip = ({positions, accountId}: {positions: EnrichedPosition
                                 </span>
                             )}
                         </div>
+                        <TradeLink symbol={p.symbol} variant="icon" className="size-7" />
                         <button
                             type="button"
                             onClick={() => setSellTarget(p)}

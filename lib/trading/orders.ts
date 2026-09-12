@@ -16,12 +16,14 @@ export type OrderRequest = {
     // Optional cash floor re-enforced at execution time (the AI navigator plans with
     // slightly stale prices; live drift must not let a buy breach the floor).
     minCashAfter?: number;
+    // Recorded on the trade so history and the CSV export can say who placed it.
+    source?: TradeSource;
 };
 
 // Market order at the current live price. Whole shares, long-only.
 export const executeOrder = async (
     userId: string,
-    {accountId, symbol, side, quantity, minCashAfter}: OrderRequest,
+    {accountId, symbol, side, quantity, minCashAfter, source}: OrderRequest,
 ): Promise<OrderResult & {price?: number}> => {
     try {
         const sym = (symbol || '').trim().toUpperCase();
@@ -100,6 +102,7 @@ export const executeOrder = async (
             price,
             total,
             ...(realizedPnl !== undefined ? {realizedPnl} : {}),
+            ...(source ? {source} : {}),
         });
 
         const verb = side === 'buy' ? 'Bought' : 'Sold';

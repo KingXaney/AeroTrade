@@ -1,6 +1,7 @@
 import {cn, formatPrice, formatChangePercent} from "@/lib/utils";
 import WatchlistButton from "@/components/watchlist/WatchlistButton";
 import FollowTopicButton from "@/components/topics/FollowTopicButton";
+import TradeLink from "@/components/trade/TradeLink";
 
 type StockHeaderProps = {
     symbol: string;
@@ -68,7 +69,8 @@ const StockHeader = ({
                         )}
                     </div>
                 </div>
-                <div className="flex items-center gap-2">
+                <div className="flex flex-wrap items-center gap-2">
+                    <TradeLink symbol={symbol} variant="button" />
                     <WatchlistButton
                         symbol={symbol}
                         company={company}

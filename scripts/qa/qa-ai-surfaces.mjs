@@ -27,7 +27,8 @@ try {
 
     await page.goto(`${BASE}/sign-up`, {waitUntil: 'load'});
     await page.fill('#fullName', 'QA AI');
-    await page.fill('#email', `qaai${Date.now()}@example.com`);
+    const email = `qaai${Date.now()}@example.com`;
+    await page.fill('#email', email);
     await page.fill('#password', 'Passw0rd!Passw0rd!');
     await page.click('button[type="submit"]');
     await page.waitForURL(/\/topics/, {timeout: 90000});
@@ -113,7 +114,9 @@ try {
     await shot('04-reset-confirm');
     await page.getByRole('button', {name: 'Cancel'}).click();
     await page.waitForTimeout(300);
-    const trades = await db.collection('papertrades').countDocuments();
+    // Scoped to this user: other harness scripts seed trades for their own users.
+    const me = await db.collection('user').findOne({email});
+    const trades = await db.collection('papertrades').countDocuments({userId: String(me._id)});
     check('cancelling the reset changed nothing', trades === 0);
 
     await page.goto(`${BASE}/settings`, {waitUntil: 'networkidle'});

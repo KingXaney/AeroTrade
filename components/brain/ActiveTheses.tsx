@@ -1,4 +1,6 @@
+import Link from "next/link";
 import {cn, getChangeColorClass} from "@/lib/utils";
+import TradeLink from "@/components/trade/TradeLink";
 import FollowTopicButton from "@/components/topics/FollowTopicButton";
 import type {FollowedByName} from "@/components/brain/NarrativeLeaderboard";
 
@@ -30,11 +32,17 @@ const ActiveTheses = ({theses, followedByName}: {theses: BrainEntitySummary[]; f
                         <div className="flex items-center gap-3">
                             <span className="material-symbols-outlined text-base text-brand">trending_up</span>
                             <div>
-                                <span className="text-sm font-semibold text-fg" style={{fontFamily: 'var(--type-display)'}}>
+                                {/* A row used to be a dead end. The name opens the evidence behind
+                                    the thesis; the follow button stays a sibling, never nested. */}
+                                <Link href={`/brain?entity=${encodeURIComponent(t.key)}#evidence`}
+                                      className="text-sm font-semibold text-fg hover:text-brand transition-colors" style={{fontFamily: 'var(--type-display)'}}>
                                     {t.displayName}
-                                </span>
+                                </Link>
                                 <div className="text-[10px] uppercase tracking-[0.08em] text-fg-muted" style={{fontFamily: 'var(--type-mono)'}}>
                                     {t.type} · active {weeks} {weeks === 1 ? 'week' : 'weeks'}
+                                    {t.type === 'ticker' && (
+                                        <> · <Link href={`/stocks/${encodeURIComponent(t.key)}`} className="text-brand hover:underline normal-case tracking-normal">stock page</Link></>
+                                    )}
                                 </div>
                             </div>
                         </div>
@@ -45,6 +53,7 @@ const ActiveTheses = ({theses, followedByName}: {theses: BrainEntitySummary[]; f
                                     sentiment {t.sentimentSlow >= 0 ? '+' : ''}{t.sentimentSlow.toFixed(2)}
                                 </div>
                             </div>
+                            {t.type === 'ticker' && <TradeLink symbol={t.key} variant="icon" className="size-7" />}
                             {followedByName && (
                                 <FollowTopicButton name={t.displayName} keywords={t.type === 'ticker' ? [t.displayName, t.key] : [t.displayName]}
                                                    followed={followedByName[t.displayName.toLowerCase()] ?? null} />
