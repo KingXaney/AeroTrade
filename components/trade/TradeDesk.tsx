@@ -27,6 +27,15 @@ const TradeDesk = ({chartSymbol, orderSymbol, cash, accountId, positions}: Props
     const pathname = usePathname();
     const searchParams = useSearchParams();
     const [symbol, setSymbol] = useState(chartSymbol);
+    // A Trade link or ⌘K hit while already on /trade is a soft navigation: Next keys the
+    // page segment without its search params, so this instance survives and only the
+    // prop changes. Adopt it (React's adjust-state-on-prop-change pattern); the echo of
+    // our own URL sync arrives with the value we already hold and is a no-op.
+    const [seeded, setSeeded] = useState(chartSymbol);
+    if (chartSymbol !== seeded) {
+        setSeeded(chartSymbol);
+        setSymbol(chartSymbol);
+    }
 
     const syncUrl = useDebounce((sym: string) => {
         const params = new URLSearchParams(searchParams);

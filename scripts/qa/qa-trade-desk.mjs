@@ -146,6 +146,15 @@ try {
     check('committing a symbol placed no order', (await db.collection('papertrades').countDocuments({accountId: mainId})) === tradesBefore);
     await shot('04-ticket-msft');
 
+    // A Trade link clicked while already on the desk is a soft navigation: the page
+    // instance survives, so the ticket has to adopt the new symbol from its props.
+    await page.goto(`${BASE}/trade?symbol=AAPL`, {waitUntil: 'domcontentloaded'});
+    await symbolInput.waitFor({timeout: 30000});
+    await page.locator('a[aria-label="Trade MSFT"]').first().click();
+    await page.waitForURL(/\/trade\?symbol=MSFT/, {timeout: 15000});
+    await page.waitForTimeout(500);
+    check('a same-route Trade link re-targets the ticket', (await symbolInput.inputValue()) === 'MSFT', await symbolInput.inputValue());
+
     // --- the dashboard quick-trade widget must not navigate -----------------------------
     await page.goto(`${BASE}/settings`, {waitUntil: 'load'});
     await page.getByLabel('Add Quick Trade').click();

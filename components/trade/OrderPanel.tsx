@@ -32,6 +32,19 @@ const OrderPanel = ({defaultSymbol = '', cash, accountId, positions = [], onSymb
     const [results, setResults] = useState<StockWithWatchlistStatus[]>([]);
     const [submitting, setSubmitting] = useState(false);
     const [committed, setCommitted] = useState(defaultSymbol.toUpperCase());
+    // Same-route deep links reuse this instance with a new defaultSymbol (see TradeDesk).
+    // Adopt an external symbol; ignore the echo of our own commit so a symbol the user is
+    // mid-way through typing is not wiped by the URL sync catching up.
+    const [seeded, setSeeded] = useState(defaultSymbol.toUpperCase());
+    if (defaultSymbol.toUpperCase() !== seeded) {
+        const next = defaultSymbol.toUpperCase();
+        setSeeded(next);
+        if (next !== committed) {
+            setSymbol(next);
+            setCommitted(next);
+            setResults([]);
+        }
+    }
 
     const loadPrice = useCallback(async (sym: string) => {
         if (!sym) { setPrice(null); return; }
