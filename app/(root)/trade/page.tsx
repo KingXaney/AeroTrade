@@ -5,6 +5,8 @@ import {ACTIVE_ACCOUNT_COOKIE} from "@/lib/constants";
 import {getCurrentUserId} from "@/lib/actions/watchlist.actions";
 import {getAccountsForUser, getPortfolio, toAccountSummary} from "@/lib/trading/account";
 import TradeDesk from "@/components/trade/TradeDesk";
+import MarketStatus from "@/components/system/MarketStatus";
+import {marketStatus} from "@/lib/prices/market-hours";
 import OpenPositionsStrip from "@/components/trade/OpenPositionsStrip";
 import AccountSwitcher from "@/components/trade/AccountSwitcher";
 
@@ -29,6 +31,7 @@ const TradePage = async ({searchParams}: TradePageProps) => {
     const activeId = String(active._id);
 
     const portfolio = await getPortfolio(userId, activeId);
+    const status = marketStatus();
     const switcherAccounts = accounts.map((a) => {
         const s = toAccountSummary(a);
         return {id: s.id, name: s.name};
@@ -42,7 +45,11 @@ const TradePage = async ({searchParams}: TradePageProps) => {
                     <h1 className="text-2xl font-semibold text-fg mb-1" style={{fontFamily: 'var(--type-display)'}}>
                         Trade Desk
                     </h1>
-                    <p className="text-sm text-fg-muted">Paper trading · live prices</p>
+                    {/* Used to read "live prices" at 3 a.m. on a Sunday. */}
+                    <p className="text-sm text-fg-muted flex flex-wrap items-center gap-x-3 gap-y-1">
+                        <span>Paper trading</span>
+                        <MarketStatus status={status} />
+                    </p>
                 </div>
                 <div className="flex items-center gap-3">
                     <AccountSwitcher accounts={switcherAccounts} activeId={activeId} />

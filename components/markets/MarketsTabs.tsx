@@ -1,6 +1,4 @@
-'use client';
-
-import {useState} from "react";
+import Link from "next/link";
 import TradingViewWidget from "@/components/TradingViewWidget";
 import {cn} from "@/lib/utils";
 import {
@@ -21,28 +19,36 @@ const TABS = [
     {id: 'forex', label: 'Forex', script: `${scriptBase}forex-cross-rates.js`, config: FOREX_CROSS_RATES_WIDGET_CONFIG, height: 540},
 ] as const;
 
-type TabId = typeof TABS[number]['id'];
+export type MarketsTabId = typeof TABS[number]['id'];
 
-const MarketsTabs = () => {
-    const [active, setActive] = useState<TabId>('stocks');
-    const tab = TABS.find((t) => t.id === active)!;
+export const isMarketsTabId = (value: unknown): value is MarketsTabId =>
+    typeof value === 'string' && TABS.some((t) => t.id === value);
+
+// The active tab lives in the URL (?view=heatmap): it survives a reload, can be
+// linked to, and renders correctly on the server — none of which useState did.
+const MarketsTabs = ({active}: {active: MarketsTabId}) => {
+    const tab = TABS.find((t) => t.id === active) ?? TABS[0];
 
     return (
         <section className="glass-panel rounded-xl p-4 md:p-6">
-            <div className="flex gap-1 mb-5 p-1 rounded-lg w-fit" style={{backgroundColor: 'var(--surface-0)'}}>
+            <div className="flex gap-1 mb-5 p-1 rounded-lg w-fit" style={{backgroundColor: 'var(--surface-0)'}} role="tablist" aria-label="Market views">
                 {TABS.map((t) => (
-                    <button
+                    <Link
                         key={t.id}
-                        type="button"
-                        onClick={() => setActive(t.id)}
+                        href={t.id === TABS[0].id ? '/markets' : `/markets?view=${t.id}`}
+                        replace
+                        scroll={false}
+                        role="tab"
+                        aria-selected={tab.id === t.id}
+                        aria-current={tab.id === t.id ? 'page' : undefined}
                         className={cn(
                             'px-4 py-1.5 rounded-md text-xs font-semibold transition-colors',
-                            active === t.id ? 'bg-brand text-on-brand' : 'text-fg-muted hover:text-fg',
+                            tab.id === t.id ? 'bg-brand text-on-brand' : 'text-fg-muted hover:text-fg',
                         )}
                         style={{fontFamily: 'var(--type-mono)'}}
                     >
                         {t.label}
-                    </button>
+                    </Link>
                 ))}
             </div>
             {/* key forces a clean remount so the previous widget's DOM is torn down on tab switch */}

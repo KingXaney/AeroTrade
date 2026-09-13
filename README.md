@@ -19,7 +19,7 @@ Follow the topics you care about, test trading strategies with virtual money, an
 
 **Follow the news, not just the tape.** Create a topic for anything — "Fed rate decisions", "AI chips", "NBA trade deadline" — and AeroTrade builds a feed for it from Google News search plus every source the news brain already reads. Each topic gets a daily AI *"what changed today"* brief, a slot in the daily email, and a place in the chat assistant.
 
-**Paper-trade strategies side by side.** Open several strategy accounts with their own starting balance, place market orders at live quotes, and compare them on return, drawdown, win rate and a daily benchmark curve against SPY. Export any account's fills as CSV.
+**Paper-trade strategies side by side.** Open several strategy accounts with their own starting balance, place market orders at the last price, and compare them on return, drawdown, win rate and a daily benchmark curve against SPY. Export any account's fills as CSV.
 
 **A news brain that builds market narratives.** Every morning a job ingests finance news, RSS, Reddit and SEC filings, has Gemini extract tickers, sectors and themes with sentiment, and folds them into an entity graph with *fast* (5-day) and *slow* (60-day) attention weights. Narratives whose slow weight stays high become **theses**.
 
@@ -30,7 +30,7 @@ Follow the topics you care about, test trading strategies with virtual money, an
 **Make it yours.** 12 colour palettes × 5 visual styles (minimal, futuristic, liquid glass, brutalist, soft), saved per account and rendered without a flash. A 31-widget dashboard you can drag, resize and extend.
 
 <div align="center">
-<img src="docs/screenshots/topic-ai-chips.png" alt="A followed topic: keyword chips, refresh, matched articles" width="440"> <img src="docs/screenshots/trade.png" alt="Trade desk: live chart and paper order entry" width="440">
+<img src="docs/screenshots/topic-ai-chips.png" alt="A followed topic: keyword chips, refresh, matched articles" width="440"> <img src="docs/screenshots/trade.png" alt="Trade desk: price chart and paper order entry and paper order entry" width="440">
 <br>
 <img src="docs/screenshots/settings-themes.png" alt="Theme picker in settings" width="440"> <img src="docs/screenshots/topics-paper.png" alt="The topics page in the Paper light theme" width="440">
 </div>

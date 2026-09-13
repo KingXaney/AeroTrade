@@ -242,6 +242,7 @@ declare global {
         total: number;
         realizedPnl?: number;
         source?: TradeSource;
+        accountName?: string;     // set when trades from several accounts are listed together
         createdAt: number;        // epoch milliseconds
     };
 

@@ -204,25 +204,51 @@ export const aggregatePortfolios = (list: AccountWithPortfolio[]): PortfolioSumm
     return {startingBalance, cash, positions, holdingsValue, totalValue, totalReturnAbs, totalReturnPct};
 };
 
+type LeanTrade = {
+    _id: unknown; symbol: string; company?: string; side: 'buy' | 'sell'; quantity: number; price: number; total: number;
+    realizedPnl?: number; source?: string; accountId?: string; createdAt: Date;
+};
+
+const toTradeRecord = (t: LeanTrade, accountName?: string): PaperTradeRecord => ({
+    id: String(t._id),
+    symbol: t.symbol,
+    company: t.company || t.symbol,
+    side: t.side,
+    quantity: t.quantity,
+    price: t.price,
+    total: t.total,
+    realizedPnl: t.realizedPnl,
+    ...(t.source ? {source: t.source as TradeSource} : {}),
+    ...(accountName ? {accountName} : {}),
+    createdAt: new Date(t.createdAt).getTime(),
+});
+
 export const getTradeHistory = async (userId: string, accountId: string, limit = 50): Promise<PaperTradeRecord[]> => {
     try {
         await connectToDatabase();
-        const trades = await PaperTrade.find({userId, accountId}).sort({createdAt: -1}).limit(limit).lean();
-        return trades.map((t) => ({
-            id: String(t._id),
-            symbol: t.symbol,
-            company: t.company || t.symbol,
-            side: t.side,
-            quantity: t.quantity,
-            price: t.price,
-            total: t.total,
-            realizedPnl: t.realizedPnl,
-            ...(t.source ? {source: t.source as TradeSource} : {}),
-            createdAt: new Date(t.createdAt).getTime(),
-        }));
+        const trades = await PaperTrade.find({userId, accountId}).sort({createdAt: -1}).limit(limit).lean<LeanTrade[]>();
+        return trades.map((t) => toTradeRecord(t));
     } catch (error) {
         console.error('Error fetching trade history:', error);
         return [];
+    }
+};
+
+// Newest fills across every strategy account, each tagged with its account's name —
+// the /history page's trade feed. Read-only (no lazy account creation).
+export const getRecentTradesForUser = async (userId: string, limit = 50): Promise<{trades: PaperTradeRecord[]; total: number}> => {
+    try {
+        await connectToDatabase();
+        const [trades, total, accounts] = await Promise.all([
+            PaperTrade.find({userId}).sort({createdAt: -1}).limit(limit).lean<LeanTrade[]>(),
+            PaperTrade.countDocuments({userId}),
+            PaperAccount.find({userId}).select('name').lean<{_id: unknown; name?: string}[]>(),
+        ]);
+        const names = new Map(accounts.map((a) => [String(a._id), a.name || DEFAULT_ACCOUNT_NAME]));
+        return {trades: trades.map((t) => toTradeRecord(t, t.accountId ? names.get(t.accountId) : undefined)), total};
+    } catch (error) {
+        console.error('Error fetching recent trades:', error);
+        return {trades: [], total: 0};
     }
 };
 

@@ -33,6 +33,12 @@ node qa-topics.mjs                         # 3. the checks (screenshots land in 
 node screenshots.mjs                       # or: capture the README screenshots
 ```
 
+The other scripts follow the same shape, one per change set: `qa-foundations.mjs`,
+`qa-navigation.mjs`, `qa-ai-surfaces.mjs`, `qa-truthful-data.mjs`, `qa-trade-desk.mjs`
+and `qa-auth.mjs` (password reset end to end — it reads the token out of the
+throwaway Mongo, since the harness has no SMTP). They share one database, so each
+scopes its assertions to the user it signs up.
+
 `qa-topics.mjs` signs up a fresh user, follows a starter topic, waits for the
 first live Google News fetch, then walks the dashboard, widget library,
 settings, theme picker (including the hover-sweep regression check), the ⌘K

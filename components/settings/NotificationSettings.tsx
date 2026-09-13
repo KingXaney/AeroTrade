@@ -20,7 +20,7 @@ const NotificationSettings = ({initial}: {initial: NotificationPreferences}) => 
         startTransition(async () => {
             const result = await toggleEmailNotifications(checked);
             if (result.success) {
-                toast.success(checked ? 'Subscribed to email alerts' : 'Unsubscribed from email alerts');
+                toast.success(checked ? 'Subscribed to the daily digest' : 'Unsubscribed from the daily digest');
             } else {
                 setEmailEnabled(!checked);
                 toast.error('Failed to update email preference');
@@ -60,7 +60,7 @@ const NotificationSettings = ({initial}: {initial: NotificationPreferences}) => 
                 <div className="flex items-center gap-3">
                     <Mail className="size-4 text-fg-soft"/>
                     <div>
-                        <div className="text-sm font-medium text-fg">Email alerts</div>
+                        <div className="text-sm font-medium text-fg">Daily digest email</div>
                         <div className="text-[11px] text-fg-muted">Daily news & updates</div>
                     </div>
                 </div>

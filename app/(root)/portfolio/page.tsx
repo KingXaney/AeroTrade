@@ -6,6 +6,7 @@ import {getCurrentUserId} from "@/lib/actions/watchlist.actions";
 import {getAccountAnalytics, getComparisonStats, getPortfoliosForUser, getTradeHistory} from "@/lib/trading/account";
 import {countUnpriced} from "@/lib/trading/analytics";
 import {toComparisonRows, toSwitcherAccounts} from "@/lib/dashboard/select";
+import {marketStatus} from "@/lib/prices/market-hours";
 import AccountSummary from "@/components/trade/AccountSummary";
 import PositionsTable from "@/components/trade/PositionsTable";
 import TradeHistory from "@/components/trade/TradeHistory";
@@ -42,6 +43,7 @@ const PortfolioPage = async ({searchParams}: PortfolioPageProps) => {
 
     const count = portfolio.positions.length;
     const unpriced = countUnpriced(portfolio.positions);
+    const marketOpen = marketStatus().state === 'open';
     const switcherAccounts = toSwitcherAccounts(all);
     const comparisonRows = toComparisonRows(all, comparisonStats);
 
@@ -56,7 +58,7 @@ const PortfolioPage = async ({searchParams}: PortfolioPageProps) => {
                     <p className="text-sm text-fg-muted">
                         {count === 0
                             ? 'No open positions yet'
-                            : `${count} ${count === 1 ? 'holding' : 'holdings'} · ${unpriced === 0 ? 'live valuation' : unpriced === count ? 'valued at cost' : `${unpriced} valued at cost`}`}
+                            : `${count} ${count === 1 ? 'holding' : 'holdings'} · ${unpriced === 0 ? (marketOpen ? 'live valuation' : 'valued at last close') : unpriced === count ? 'valued at cost' : `${unpriced} valued at cost`}`}
                     </p>
                 </div>
                 <div className="flex flex-wrap items-center gap-3">

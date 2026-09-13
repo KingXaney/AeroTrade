@@ -46,6 +46,9 @@ const TradeHistory = ({trades, totalCount, exportHref}: Props) => {
                                     {t.symbol}
                                 </Link>
                                 <span className="text-xs text-fg-muted ml-2">{t.quantity} @ {formatPrice(t.price)}</span>
+                                {t.accountName && (
+                                    <span className="ml-2 text-[10px] uppercase tracking-[0.08em] text-fg-muted" style={{fontFamily: 'var(--type-mono)'}}>{t.accountName}</span>
+                                )}
                                 {source && (
                                     <span className="ml-2 px-1.5 py-0.5 rounded text-[10px] uppercase tracking-wider whitespace-nowrap border border-line-strong/40 text-fg-soft"
                                           style={{fontFamily: 'var(--type-mono)'}} title="Placed by the AI, not by you">

@@ -1,10 +1,14 @@
 import TradingViewWidget from "@/components/TradingViewWidget";
 import {TICKER_TAPE_WIDGET_CONFIG} from "@/lib/constants";
-import MarketsTabs from "@/components/markets/MarketsTabs";
+import MarketsTabs, {isMarketsTabId} from "@/components/markets/MarketsTabs";
 
 const scriptUrl = 'https://s3.tradingview.com/external-embedding/embed-widget-';
 
-const MarketsPage = () => {
+type MarketsPageProps = {searchParams: Promise<{view?: string}>};
+
+const MarketsPage = async ({searchParams}: MarketsPageProps) => {
+    const {view} = await searchParams;
+    const active = isMarketsTabId(view) ? view : 'stocks';
     return (
         <div className="space-y-4">
             {/* Page Header */}
@@ -28,7 +32,7 @@ const MarketsPage = () => {
             </section>
 
             {/* Tabbed: Stocks / Heatmap / Crypto / Forex — one widget at a time */}
-            <MarketsTabs />
+            <MarketsTabs active={active} />
         </div>
     );
 };

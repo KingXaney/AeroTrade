@@ -1,5 +1,6 @@
 'use client';
 
+import Link from 'next/link';
 import { useForm } from 'react-hook-form';
 import { Button } from '@/components/ui/button';
 import InputField from '@/components/forms/InputField';
@@ -63,6 +64,9 @@ const SignIn = () => {
                     error={errors.password}
                     validation={{ required: 'Password is required', minLength: { value: 8, message: 'Password must be at least 8 characters' } }}
                 />
+                <div className="-mt-2 text-right">
+                    <Link href="/forgot-password" className="footer-link text-sm">Forgot your password?</Link>
+                </div>
 
                 <Button type="submit" disabled={isSubmitting} className="yellow-btn w-full mt-5">
                     {isSubmitting ? 'Signing In' : 'Sign In'}

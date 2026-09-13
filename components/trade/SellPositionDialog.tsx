@@ -96,7 +96,7 @@ const SellPositionDialog = ({position, accountId, onClose}: {position: EnrichedP
                     </div>
 
                     <div className="flex items-center justify-between text-sm">
-                        <span className="text-fg-muted">Live Price</span>
+                        <span className="text-fg-muted">Last Price</span>
                         <span className="text-fg" style={{fontFamily: 'var(--type-mono)'}}>
                             {typeof price === 'number' ? formatPrice(price) : '—'}
                         </span>
