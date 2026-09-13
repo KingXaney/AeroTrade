@@ -12,6 +12,8 @@ export function proxy(request: NextRequest) {
 
 export const config = {
     matcher: [
-        '/((?!api|_next/static|_next/image|favicon.ico|sign-in|sign-up|assets).*)',
+        // forgot-password and reset-password are public by design: the emailed reset link
+        // is opened logged out, and bouncing it to /sign-in would drop the token.
+        '/((?!api|_next/static|_next/image|favicon.ico|sign-in|sign-up|forgot-password|reset-password|assets).*)',
     ],
 };
