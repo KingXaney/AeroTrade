@@ -80,6 +80,23 @@ try {
     check('in-app 404 keeps the header chrome', await page.locator('header').count() > 0);
     await shot('03-not-found-in-app');
 
+    // --- TradingView embeds keep their transparency under a dark palette -----------
+    // Chrome paints a cross-origin iframe on an opaque white canvas when the iframe
+    // element's color-scheme differs from the embedded document's (TradingView never
+    // declares one). Under a dark palette <html> is color-scheme: dark, so every
+    // isTransparent widget went white and read as a broken light theme.
+    await page.context().addCookies([{name: 'aero-theme', value: 'v1:nord:minimal:0', domain: 'localhost', path: '/'}]);
+    await page.goto(`${BASE}/markets`, {waitUntil: 'domcontentloaded'});
+    await page.waitForSelector('.tradingview-widget-container iframe', {timeout: 30000});
+    const schemes = await page.evaluate(() => ({
+        html: document.documentElement.style.colorScheme,
+        iframes: Array.from(document.querySelectorAll('.tradingview-widget-container iframe')).map((f) => getComputedStyle(f).colorScheme),
+    }));
+    check('dark palette sets color-scheme: dark on <html>', schemes.html === 'dark', schemes.html);
+    check('TradingView iframes stay on the light scheme their documents use',
+        schemes.iframes.length > 0 && schemes.iframes.every((c) => c === 'light'), schemes.iframes.join(','));
+    await shot('03-tradingview-dark-palette');
+
     // --- mobile nav gap: baseline for PR 2 --------------------------------------
     // From the dashboard the QuickLinks widget happens to carry a /watchlist link, so
     // measure from a page that has no widgets — that is the real gap.
