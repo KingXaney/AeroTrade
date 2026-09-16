@@ -41,11 +41,11 @@ CRITICAL FORMATTING REQUIREMENTS:
 - Second sentence should add helpful context or reinforce the personalization
 
 Example personalized outputs (showing obvious customization with TWO sentences):
-<p class="mobile-text" style="margin: 0 0 30px 0; font-size: 16px; line-height: 1.6; color: #CCDADC;">Thanks for joining Signalist! As someone focused on <strong>technology growth stocks</strong>, you'll love our real-time alerts for companies like the ones you're tracking. We'll help you spot opportunities before they become mainstream news.</p>
+<p class="mobile-text" style="margin: 0 0 30px 0; font-size: 16px; line-height: 1.6; color: #CCDADC;">Thanks for joining AeroTrade! As someone focused on <strong>technology growth stocks</strong>, follow a topic like AI chips and the daily brief will tell you what changed before the market opens. Paper-trade your ideas with practice money and see how they hold up.</p>
 
-<p class="mobile-text" style="margin: 0 0 30px 0; font-size: 16px; line-height: 1.6; color: #CCDADC;">Great to have you aboard! Perfect for your <strong>conservative retirement strategy</strong> — we'll help you monitor dividend stocks without overwhelming you with noise. You can finally track your portfolio progress with confidence and clarity.</p>
+<p class="mobile-text" style="margin: 0 0 30px 0; font-size: 16px; line-height: 1.6; color: #CCDADC;">Great to have you aboard! Perfect for your <strong>conservative retirement strategy</strong> — the news brain reads hundreds of articles a day so you can watch dividend names without the noise. Track a practice portfolio against the S&amp;P 500 and let the numbers build your confidence.</p>
 
-<p class="mobile-text" style="margin: 0 0 30px 0; font-size: 16px; line-height: 1.6; color: #CCDADC;">You're all set! Since you're new to investing, we've designed simple tools to help you build confidence while learning the <strong>healthcare sector</strong> you're interested in. Our beginner-friendly alerts will guide you without the confusing jargon.</p>`
+<p class="mobile-text" style="margin: 0 0 30px 0; font-size: 16px; line-height: 1.6; color: #CCDADC;">You're all set! Since you're new to investing, start with a paper portfolio and a couple of topics in the <strong>healthcare sector</strong> you're interested in. The daily brief explains what moved in plain language, with none of the jargon.</p>`
 
 export const NEWS_SUMMARY_EMAIL_PROMPT = `Generate HTML content for a market news summary email that will be inserted into the NEWS_SUMMARY_EMAIL_TEMPLATE at the {{newsContent}} placeholder.
 
@@ -142,10 +142,10 @@ Content guidelines:
 - Organize news into logical sections with icons (📊 Market Overview, 📈 Top Gainers, 📉 Top Losers, 🔥 Breaking News, 💼 Earnings Reports, 🏛️ Economic Data, etc.)
 - NEVER repeat section headings - use each section type only once per email
 - For each news article, include its actual headline/title from the news data
-- Articles may carry "source" and "sourceType" fields ('finance', 'rss', 'reddit', 'sec'). Use them:
+- Articles may carry "source" and "sourceType" fields ('finance', 'rss', 'web', 'reddit', 'sec'). Use them:
   - Articles with sourceType 'sec' go in their own "🗂 Filings & Disclosures" section. Keep these strictly factual — say which form was filed (8-K, 10-Q, 10-K) and what that filing type generally means; do not speculate about the contents.
   - Articles with sourceType 'reddit' go in their own "💬 Social Buzz" section, placed LAST. Frame every item explicitly as community sentiment/speculation from retail traders, NOT verified news or facts. Never present a Reddit claim as confirmed.
-  - Articles with sourceType 'finance' or 'rss' flow into the normal news sections above.
+  - Articles with sourceType 'finance', 'rss' or 'web' flow into the normal news sections above.
 - Show the article's source name in the read-more line, e.g. "Read Full Story → (CNBC)" — append the source in parentheses after the arrow, inside the same link
 - Provide MINIMUM 3 CONCISE bullet points (NO "Key Takeaways" label - start directly with bullets)
 - Each bullet should be SHORT and EASY TO UNDERSTAND - one clear sentence preferred

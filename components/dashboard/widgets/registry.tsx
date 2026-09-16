@@ -15,6 +15,10 @@ import TopHoldings from "@/components/dashboard/widgets/TopHoldings";
 import SecondOpinionExcerpt from "@/components/dashboard/widgets/SecondOpinionExcerpt";
 import MarketNewsList from "@/components/dashboard/widgets/MarketNewsList";
 import QuickLinks from "@/components/dashboard/widgets/QuickLinks";
+import TopicsOverview from "@/components/dashboard/widgets/TopicsOverview";
+import TopicsLatest from "@/components/dashboard/widgets/TopicsLatest";
+import TopicBriefsList from "@/components/dashboard/widgets/TopicBriefsList";
+import TopicsWidgetEmpty from "@/components/dashboard/widgets/TopicsWidgetEmpty";
 import AccountSummary from "@/components/trade/AccountSummary";
 import OpenPositionsStrip from "@/components/trade/OpenPositionsStrip";
 import TradeHistory from "@/components/trade/TradeHistory";
@@ -71,6 +75,15 @@ const AnalyticsStatsAsync = async ({ctx}: {ctx: LoaderCtx}) => {
     }
     return <AnalyticsStats analytics={analytics} />;
 };
+// Empty feed + zero topics is the onboarding nudge; empty feed + topics is just "nothing matched yet".
+const TopicsLatestAsync = async ({ctx, span}: {ctx: LoaderCtx; span: WidgetSpan}) => {
+    const articles = (await LOADERS.topicsLatest(ctx)) ?? [];
+    if (articles.length > 0) return <TopicsLatest articles={articles} span={span} />;
+    const overview = await LOADERS.topicsOverview(ctx);
+    return overview && overview.topics.length > 0
+        ? <WidgetUnavailable text="No articles yet — we check for matches every few hours." />
+        : <TopicsWidgetEmpty />;
+};
 const BrainStatusAsync = async ({ctx}: {ctx: LoaderCtx}) => {
     const status = await LOADERS.brainStatus(ctx);
     if (!status) return <div className="glass-panel rounded-xl p-5"><WidgetUnavailable failed /></div>;
@@ -78,6 +91,11 @@ const BrainStatusAsync = async ({ctx}: {ctx: LoaderCtx}) => {
 };
 
 export const WIDGET_RENDERERS: Record<WidgetId, Renderer> = {
+    'topics-overview': (r) => need(r, 'topicsOverview', (o) => (
+        o.topics.length > 0 ? <TopicsOverview overview={o} span={r.span} /> : <TopicsWidgetEmpty />
+    )),
+    'topics-latest': (r) => <Suspense fallback={skeleton('topics-latest', 4)}><TopicsLatestAsync ctx={r.ctx} span={r.span} /></Suspense>,
+    'topic-briefs': (r) => need(r, 'topicsOverview', (o) => <TopicBriefsList overview={o} />),
     'portfolio-snapshot': (r) => need(r, 'portfolios', (p) => <PortfolioSnapshot portfolio={aggregatePortfolios(p)} best={bestStrategy(p)} />),
     'watchlist-movers': (r) => <Suspense fallback={skeleton('watchlist-movers', 4)}><WatchlistMoversAsync ctx={r.ctx} /></Suspense>,
     'friends-rank': (r) => need(r, 'leaderboard', (l) => <FriendsRank leaderboard={l} />),
@@ -105,7 +123,8 @@ export const WIDGET_RENDERERS: Record<WidgetId, Renderer> = {
             ? <AccountComparisonTable rows={toComparisonRows(r.data.portfolios, stats)} activeId={r.data.activeAccount.account.id} />
             : <WidgetUnavailable failed={r.failed.has('portfolios')} />
     )),
-    'quick-trade': (r) => need(r, 'activeAccount', (a) => <OrderPanel cash={a.summary.cash} accountId={a.account.id} />),
+    // No onSymbolCommit: the widget must never navigate the dashboard to /trade.
+    'quick-trade': (r) => need(r, 'activeAccount', (a) => <OrderPanel cash={a.summary.cash} accountId={a.account.id} positions={a.summary.positions} />),
     'leaderboard': (r) => need(r, 'leaderboard', (l) => <Leaderboard entries={l} />),
     'ai-navigator': (r) => need(r, 'navigatorStatus', (s) => <NavigatorCard status={s} />),
     'weekly-decisions': (r) => need(r, 'suggestions', (s) => (

@@ -4,6 +4,7 @@ import {getNavigatorStatus} from "@/lib/actions/navigator.actions";
 import {getActiveTheses, getBrainGraph, getBrainSystemStatus, getEntityEvidence, getTopEntities} from "@/lib/brain/queries";
 import {getLatestSecondOpinion, isSecondOpinionConfigured} from "@/lib/brain/opinion";
 import {getLatestSuggestions} from "@/lib/navigator/service";
+import {getTopicsForUser} from "@/lib/topics/store";
 import {getAccountsForUser, toAccountSummary} from "@/lib/trading/account";
 import ActiveTheses from "@/components/brain/ActiveTheses";
 import BrainGraph from "@/components/brain/BrainGraph";
@@ -24,7 +25,7 @@ const BrainPage = async ({searchParams}: BrainPageProps) => {
 
     const {entity} = await searchParams;
 
-    const [navigatorStatus, theses, topEntities, graph, suggestions, accounts, systemStatus, secondOpinion] = await Promise.all([
+    const [navigatorStatus, theses, topEntities, graph, suggestions, accounts, systemStatus, secondOpinion, topics] = await Promise.all([
         getNavigatorStatus(userId),
         getActiveTheses(),
         getTopEntities(),
@@ -33,7 +34,10 @@ const BrainPage = async ({searchParams}: BrainPageProps) => {
         getAccountsForUser(userId),
         getBrainSystemStatus(),
         getLatestSecondOpinion(userId),
+        getTopicsForUser(userId),
     ]);
+    // Lets a narrative row show "following" when a topic of the same name exists.
+    const followedByName = Object.fromEntries(topics.map((t) => [t.name.toLowerCase(), {id: t.id, slug: t.slug}]));
     const evidence = entity ? await getEntityEvidence(entity) : null;
     const applyAccounts = accounts.map((a) => {
         const s = toAccountSummary(a);
@@ -41,7 +45,7 @@ const BrainPage = async ({searchParams}: BrainPageProps) => {
     });
 
     return (
-        <div className="min-h-screen space-y-4">
+        <div className="space-y-4">
             {/* Header */}
             <div className="mb-2">
                 <h1 className="text-2xl font-semibold text-fg mb-1" style={{fontFamily: 'var(--type-display)'}}>
@@ -61,7 +65,7 @@ const BrainPage = async ({searchParams}: BrainPageProps) => {
                     <h2 className="text-sm font-bold uppercase tracking-[0.1em] text-brand mb-4" style={{fontFamily: 'var(--type-mono)'}}>
                         Active Theses
                     </h2>
-                    <ActiveTheses theses={theses} />
+                    <ActiveTheses theses={theses} followedByName={followedByName} />
                 </section>
 
                 {/* Navigator enrollment + weekly decisions */}
@@ -89,7 +93,7 @@ const BrainPage = async ({searchParams}: BrainPageProps) => {
 
             {/* Evidence drill-down for ?entity= */}
             {entity && evidence && (
-                <section className="glass-panel rounded-xl p-5">
+                <section id="evidence" className="glass-panel rounded-xl p-5 scroll-mt-24">
                     <h2 className="text-sm font-bold uppercase tracking-[0.1em] text-brand mb-4" style={{fontFamily: 'var(--type-mono)'}}>
                         Evidence
                     </h2>
@@ -102,7 +106,7 @@ const BrainPage = async ({searchParams}: BrainPageProps) => {
                 <h2 className="text-sm font-bold uppercase tracking-[0.1em] text-brand mb-4" style={{fontFamily: 'var(--type-mono)'}}>
                     Narrative Leaderboard
                 </h2>
-                <NarrativeLeaderboard entities={topEntities} />
+                <NarrativeLeaderboard entities={topEntities} followedByName={followedByName} />
             </section>
         </div>
     );

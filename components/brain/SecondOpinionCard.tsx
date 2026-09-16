@@ -2,7 +2,7 @@
 
 import {useEffect, useRef, useState} from "react";
 import {useRouter} from "next/navigation";
-import ReactMarkdown from "react-markdown";
+import SafeMarkdown from "@/components/markdown/SafeMarkdown";
 import {toast} from "sonner";
 import {formatTimeAgo} from "@/lib/utils";
 import {getSecondOpinionPrompt, requestSecondOpinion, saveManualSecondOpinion} from "@/lib/actions/opinion.actions";
@@ -19,16 +19,6 @@ const SOURCE_LABELS: Record<SecondOpinionView['source'], string> = {
 };
 
 const BUTTON_STYLE = {fontFamily: 'var(--type-mono)', border: '1px solid color-mix(in srgb, var(--brand) 35%, transparent)', backgroundColor: 'color-mix(in srgb, var(--brand-strong) 6%, transparent)'};
-
-// The text stripping in opinion-text.ts handles the common inline form, but
-// markdown has more ways to make a link than a regex should be trusted with
-// (reference definitions, protocol-relative targets, autolinks, images). This
-// renderer is the guarantee: an opinion written from untrusted headlines cannot
-// produce a clickable link or load a remote image, whatever syntax it uses.
-const MARKDOWN_COMPONENTS = {
-    a: ({children}: {children?: React.ReactNode}) => <span>{children}</span>,
-    img: () => null,
-};
 
 const SecondOpinionCard = ({configured, opinion}: {configured: boolean; opinion: SecondOpinionView | null}) => {
     const router = useRouter();
@@ -206,9 +196,9 @@ const SecondOpinionCard = ({configured, opinion}: {configured: boolean; opinion:
             )}
 
             {opinion ? (
-                <div className="px-4 py-3 rounded-lg border bg-surface-2/40 border-brand/15 text-sm text-fg-soft leading-relaxed [&_p]:mb-2 [&_ul]:mb-2 [&_ul]:pl-4 [&_li]:list-disc">
-                    <ReactMarkdown components={MARKDOWN_COMPONENTS}>{opinion.opinionMd}</ReactMarkdown>
-                </div>
+                <SafeMarkdown className="px-4 py-3 rounded-lg border bg-surface-2/40 border-brand/15 text-sm text-fg-soft leading-relaxed">
+                    {opinion.opinionMd}
+                </SafeMarkdown>
             ) : (
                 <p className="text-sm text-fg-muted">No opinion yet — copy the prompt above, or ask Claude Code to fetch one.</p>
             )}

@@ -14,7 +14,7 @@ const WatchlistEmpty = () => {
             </h3>
             <p className="text-fg-muted mb-6 max-w-md"
                style={{ fontFamily: 'var(--type-body)' }}>
-                Search for stocks to add them to your watchlist. Track real-time prices, set alerts, and monitor market movements.
+                Search for stocks to add them to your watchlist. See their quotes, market cap and P/E in one place, jump to the trade desk, or follow their news as a topic.
             </p>
             <div className="flex items-center gap-2 text-[10px] text-fg-muted"
                  style={{ fontFamily: 'var(--type-mono)', letterSpacing: '0.1em', textTransform: 'uppercase' }}>

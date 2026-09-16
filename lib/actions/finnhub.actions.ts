@@ -12,7 +12,8 @@ import {POPULAR_STOCK_SYMBOLS} from "@/lib/constants";
 import {getWatchlistSymbolsByUserId} from "@/lib/actions/watchlist.actions";
 
 const FINNHUB_BASE_URL = 'https://finnhub.io/api/v1';
-const FINNHUB_API_KEY = process.env.NEXT_PUBLIC_FINNHUB_API_KEY ?? '';
+// Server-only. NEXT_PUBLIC_FINNHUB_API_KEY is still honoured for existing deployments.
+const FINNHUB_API_KEY = process.env.FINNHUB_API_KEY ?? process.env.NEXT_PUBLIC_FINNHUB_API_KEY ?? '';
 
 // Generic fetch wrapper — caches the response if revalidateSeconds is provided, otherwise always fetches fresh
 const fetchJSON = async <T>(url: string, revalidateSeconds?: number): Promise<T> => {

@@ -2,27 +2,20 @@
 
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
-import { cn } from "@/lib/utils";
 import { signOut } from "@/lib/actions/auth.actions";
 import PortfolioSidebarCard, { type SidebarPortfolio } from "@/components/PortfolioSidebarCard";
-
-const sidebarNavItems = [
-    { href: '/', label: 'Dashboard', icon: 'space_dashboard' },
-    { href: '/markets', label: 'Markets', icon: 'query_stats' },
-    { href: '/trade', label: 'Trade', icon: 'candlestick_chart' },
-    { href: '/portfolio', label: 'Portfolio', icon: 'account_balance_wallet' },
-    { href: '/watchlist', label: 'Watchlist', icon: 'bookmark' },
-    { href: '/friends', label: 'Friends', icon: 'group' },
-    { href: '/history', label: 'History', icon: 'history' },
-    { href: '/settings', label: 'Settings', icon: 'settings' },
-];
+import TopicsSidebarCard, { type SidebarTopics } from "@/components/topics/TopicsSidebarCard";
+import NavList from "@/components/nav/NavList";
+import type { NavBadges } from "@/lib/navigation";
 
 type SidebarProps = {
-    watchlistCount: number;
     portfolio: SidebarPortfolio | null;
+    topics: SidebarTopics;
+    /** Same counts the mobile drawer gets, so the two surfaces can't disagree. */
+    badges: NavBadges;
 };
 
-function Sidebar({ watchlistCount, portfolio }: SidebarProps) {
+function Sidebar({ portfolio, topics, badges }: SidebarProps) {
     const pathname = usePathname();
     const router = useRouter();
 
@@ -39,67 +32,14 @@ function Sidebar({ watchlistCount, portfolio }: SidebarProps) {
                    WebkitBackdropFilter: 'blur(16px)',
                }}
         >
-            {/* Watchlist Summary Card */}
             <div className="p-6 flex-1 overflow-y-auto">
-                <Link
-                    href="/watchlist"
-                    className="relative block rounded-xl p-4 mb-6 shimmer overflow-hidden transition-all hover:brightness-110"
-                    style={{
-                        backgroundColor: 'color-mix(in srgb, var(--brand-strong) 6%, transparent)',
-                        border: '1px solid color-mix(in srgb, var(--brand) 15%, transparent)',
-                    }}
-                >
-                    <div className="relative z-10">
-                        <div className="flex items-center gap-3 mb-2">
-                            <span className="material-symbols-outlined text-brand"
-                                  style={{ fontVariationSettings: "'FILL' 1" }}
-                            >bookmark</span>
-                            <span className="text-brand text-xs font-bold tracking-[0.1em] uppercase"
-                                  style={{ fontFamily: 'var(--type-mono)' }}
-                            >Tracked Assets</span>
-                        </div>
-                        <p className="text-2xl font-semibold text-fg"
-                           style={{ fontFamily: 'var(--type-display)' }}
-                        >{watchlistCount}</p>
-                        <p className="text-sm text-brand-dim"
-                           style={{ fontFamily: 'var(--type-mono)' }}
-                        >{watchlistCount === 1 ? 'symbol' : 'symbols'} <span className="text-fg-muted text-xs">on watchlist</span></p>
-                    </div>
-                </Link>
+                <TopicsSidebarCard topics={topics} />
 
-                {/* Portfolio Summary Card */}
                 {portfolio && <PortfolioSidebarCard portfolio={portfolio} />}
 
-                {/* Navigation Items */}
-                <nav className="space-y-1">
-                    {sidebarNavItems.map((item) => {
-                        const isActive = item.href === '/'
-                            ? pathname === '/'
-                            : pathname.startsWith(item.href);
-                        return (
-                            <Link
-                                key={item.label}
-                                href={item.href}
-                                className={cn(
-                                    "flex items-center gap-4 px-4 py-3 transition-all text-xs font-bold tracking-[0.1em] uppercase",
-                                    isActive
-                                        ? "text-brand border-l-4 border-brand"
-                                        : "text-fg-soft hover:text-fg hover:bg-surface-3"
-                                )}
-                                style={{ fontFamily: 'var(--type-mono)' }}
-                            >
-                                <span
-                                    className="material-symbols-outlined"
-                                    style={isActive ? { fontVariationSettings: "'FILL' 1" } : undefined}
-                                >{item.icon}</span>
-                                <span>{item.label}</span>
-                            </Link>
-                        );
-                    })}
-                </nav>
+                <NavList pathname={pathname} badges={badges} />
             </div>
 
-            {/* Bottom Section */}
             <div className="mt-auto p-4 border-t border-line-strong/15">
                 <Link
                     href="/trade"

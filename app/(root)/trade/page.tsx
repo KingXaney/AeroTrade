@@ -1,15 +1,14 @@
 import {redirect} from "next/navigation";
 import {cookies} from "next/headers";
 import Link from "next/link";
-import TradingViewWidget from "@/components/TradingViewWidget";
-import {ACTIVE_ACCOUNT_COOKIE, TRADE_CHART_WIDGET_CONFIG} from "@/lib/constants";
+import {ACTIVE_ACCOUNT_COOKIE} from "@/lib/constants";
 import {getCurrentUserId} from "@/lib/actions/watchlist.actions";
 import {getAccountsForUser, getPortfolio, toAccountSummary} from "@/lib/trading/account";
-import OrderPanel from "@/components/trade/OrderPanel";
+import TradeDesk from "@/components/trade/TradeDesk";
+import MarketStatus from "@/components/system/MarketStatus";
+import {marketStatus} from "@/lib/prices/market-hours";
 import OpenPositionsStrip from "@/components/trade/OpenPositionsStrip";
 import AccountSwitcher from "@/components/trade/AccountSwitcher";
-
-const scriptUrl = 'https://s3.tradingview.com/external-embedding/embed-widget-';
 
 type TradePageProps = {
     searchParams: Promise<{symbol?: string; account?: string}>;
@@ -32,20 +31,25 @@ const TradePage = async ({searchParams}: TradePageProps) => {
     const activeId = String(active._id);
 
     const portfolio = await getPortfolio(userId, activeId);
+    const status = marketStatus();
     const switcherAccounts = accounts.map((a) => {
         const s = toAccountSummary(a);
         return {id: s.id, name: s.name};
     });
 
     return (
-        <div className="min-h-screen space-y-4">
+        <div className="space-y-4">
             {/* Header */}
             <div className="flex flex-col md:flex-row md:items-end md:justify-between gap-4 mb-2">
                 <div>
                     <h1 className="text-2xl font-semibold text-fg mb-1" style={{fontFamily: 'var(--type-display)'}}>
                         Trade Desk
                     </h1>
-                    <p className="text-sm text-fg-muted">Paper trading · live prices</p>
+                    {/* Used to read "live prices" at 3 a.m. on a Sunday. */}
+                    <p className="text-sm text-fg-muted flex flex-wrap items-center gap-x-3 gap-y-1">
+                        <span>Paper trading</span>
+                        <MarketStatus status={status} />
+                    </p>
                 </div>
                 <div className="flex items-center gap-3">
                     <AccountSwitcher accounts={switcherAccounts} activeId={activeId} />
@@ -55,20 +59,14 @@ const TradePage = async ({searchParams}: TradePageProps) => {
                 </div>
             </div>
 
-            {/* Chart + order entry — the focus of this page */}
-            <div className="grid gap-4 xl:grid-cols-3">
-                <section className="xl:col-span-2 glass-panel rounded-xl p-4">
-                    <TradingViewWidget
-                        title="Advanced Chart"
-                        scriptUrl={`${scriptUrl}advanced-chart.js`}
-                        config={TRADE_CHART_WIDGET_CONFIG(chartSymbol)}
-                        height={560}
-                    />
-                </section>
-                <div className="xl:col-span-1">
-                    <OrderPanel defaultSymbol={orderSymbol} cash={portfolio.cash} accountId={activeId} />
-                </div>
-            </div>
+            {/* Chart + order entry — the focus of this page; one symbol drives both */}
+            <TradeDesk
+                chartSymbol={chartSymbol}
+                orderSymbol={orderSymbol}
+                cash={portfolio.cash}
+                accountId={activeId}
+                positions={portfolio.positions.map((p) => ({symbol: p.symbol, quantity: p.quantity}))}
+            />
 
             {/* Open positions — compact quick-sell; full holdings & history live on /portfolio */}
             <section className="glass-panel rounded-xl p-5">

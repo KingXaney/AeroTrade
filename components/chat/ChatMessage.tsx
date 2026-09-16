@@ -1,9 +1,9 @@
 'use client';
 
-import ReactMarkdown from "react-markdown";
 import type {UIMessage} from "ai";
 import {cn} from "@/lib/utils";
 import ChatToolChip from "@/components/chat/ChatToolChip";
+import SafeMarkdown from "@/components/markdown/SafeMarkdown";
 
 type ChatMessageProps = {
     message: UIMessage;
@@ -18,6 +18,8 @@ const summarizeTool = (toolName: string, part: {input?: unknown; output?: unknow
         if (typeof input.symbol === 'string') return input.symbol;
         if (typeof input.query === 'string') return `"${input.query}"`;
         if (Array.isArray(input.symbols)) return input.symbols.join(', ');
+        if (typeof input.topic === 'string') return `"${input.topic}"`;
+        if (typeof input.name === 'string') return `"${input.name}"`;
     }
 
     if (toolName === 'getWatchlist' && Array.isArray(output)) {
@@ -25,6 +27,20 @@ const summarizeTool = (toolName: string, part: {input?: unknown; output?: unknow
     }
     if (toolName === 'getMarketNews' && Array.isArray(output)) {
         return `${output.length} articles`;
+    }
+    if (toolName === 'getFollowedTopics' && output && typeof output === 'object') {
+        const topics = (output as {topics?: unknown}).topics;
+        if (Array.isArray(topics)) return `${topics.length} ${topics.length === 1 ? 'topic' : 'topics'}`;
+    }
+    if (toolName === 'getPaperPortfolio' && output && typeof output === 'object') {
+        const {accounts, total} = output as {accounts?: unknown; total?: {totalValue?: number}};
+        if (Array.isArray(accounts) && typeof total?.totalValue === 'number') {
+            const positions = accounts.reduce(
+                (n: number, a) => n + ((a as {positions?: unknown[]}).positions?.length ?? 0),
+                0,
+            );
+            return `${positions} ${positions === 1 ? 'position' : 'positions'} · ${total.totalValue.toLocaleString('en-US', {style: 'currency', currency: 'USD', maximumFractionDigits: 0})}`;
+        }
     }
 
     return undefined;
@@ -53,9 +69,7 @@ const ChatMessage = ({message}: ChatMessageProps) => {
                         return isUser ? (
                             <span key={idx}>{part.text}</span>
                         ) : (
-                            <div key={idx} className="prose prose-invert prose-sm max-w-none prose-p:my-1 prose-ul:my-1 prose-li:my-0">
-                                <ReactMarkdown>{part.text}</ReactMarkdown>
-                            </div>
+                            <SafeMarkdown key={idx}>{part.text}</SafeMarkdown>
                         );
                     }
 

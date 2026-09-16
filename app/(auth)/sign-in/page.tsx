@@ -1,5 +1,6 @@
 'use client';
 
+import Link from 'next/link';
 import { useForm } from 'react-hook-form';
 import { Button } from '@/components/ui/button';
 import InputField from '@/components/forms/InputField';
@@ -26,7 +27,7 @@ const SignIn = () => {
         try {
             const result = await signInWithEmail(data);
             if (result.success) {
-                router.push('/')
+                router.push('/topics')
             } else {
                 toast.error('Sign in failed', {
                     description: result.error || 'Invalid email or password.'
@@ -48,10 +49,10 @@ const SignIn = () => {
                 <InputField
                     name="email"
                     label="Email"
-                    placeholder="[EMAIL_ADDRESS]"
+                    placeholder="you@example.com"
                     register={register}
                     error={errors.email}
-                    validation={{ required: 'Email is required', pattern: /^\w+@\w+\.\w+$/ }}
+                    validation={{ required: 'Email is required', pattern: { value: /^[^\s@]+@[^\s@]+\.[^\s@]+$/, message: 'Enter a valid email address' } }}
                 />
 
                 <InputField
@@ -61,8 +62,11 @@ const SignIn = () => {
                     type="password"
                     register={register}
                     error={errors.password}
-                    validation={{ required: 'Password is required', minLength: 8 }}
+                    validation={{ required: 'Password is required', minLength: { value: 8, message: 'Password must be at least 8 characters' } }}
                 />
+                <div className="-mt-2 text-right">
+                    <Link href="/forgot-password" className="footer-link text-sm">Forgot your password?</Link>
+                </div>
 
                 <Button type="submit" disabled={isSubmitting} className="yellow-btn w-full mt-5">
                     {isSubmitting ? 'Signing In' : 'Sign In'}

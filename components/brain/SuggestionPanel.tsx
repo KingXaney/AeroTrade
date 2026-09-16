@@ -2,7 +2,7 @@
 
 import {useState} from "react";
 import {useRouter} from "next/navigation";
-import ReactMarkdown from "react-markdown";
+import SafeMarkdown from "@/components/markdown/SafeMarkdown";
 import {toast} from "sonner";
 import {cn, formatPrice, getChangeColorClass} from "@/lib/utils";
 import {applySuggestion} from "@/lib/actions/navigator.actions";
@@ -62,7 +62,7 @@ const ItemRow = ({item, showApply, accounts}: {item: SuggestionItem; showApply: 
                     {showApply && item.action !== 'hold' && accounts.length > 0 && (
                         <>
                             <select value={accountId} onChange={(e) => setAccountId(e.target.value)}
-                                    className="text-[11px] rounded px-2 py-1 outline-none text-fg-soft"
+                                    className="text-[11px] rounded px-2 py-1 outline-none field-focus text-fg-soft"
                                     style={{backgroundColor: 'var(--surface-0)', border: '1px solid color-mix(in srgb, var(--line-strong) 40%, transparent)', fontFamily: 'var(--type-mono)'}}>
                                 {accounts.map((a) => <option key={a.id} value={a.id}>{a.name}</option>)}
                             </select>
@@ -109,7 +109,7 @@ const SuggestionPanel = ({userSet, globalSet, accounts}: {userSet: SetView | nul
             <p className="text-[11px] text-fg-muted" style={{fontFamily: 'var(--type-mono)'}}>
                 {userSet ? 'Your AI account' : 'Global model portfolio'} · {set.date}
                 {set.kind === 'preview' && (
-                    <span className="ml-2 px-1.5 py-0.5 rounded text-[10px] font-bold uppercase tracking-[0.08em] text-[#ffd700] bg-[rgba(255,215,0,0.08)]">
+                    <span className="ml-2 px-1.5 py-0.5 rounded text-[10px] font-bold uppercase tracking-[0.08em] text-warning bg-warning/10">
                         Preview — nothing traded
                     </span>
                 )}
@@ -120,9 +120,9 @@ const SuggestionPanel = ({userSet, globalSet, accounts}: {userSet: SetView | nul
                 ))}
             </div>
             {set.rationaleMd && (
-                <div className="px-4 py-3 rounded-lg border bg-surface-2/40 border-brand/15 text-sm text-fg-soft leading-relaxed">
-                    <ReactMarkdown>{set.rationaleMd}</ReactMarkdown>
-                </div>
+                <SafeMarkdown className="px-4 py-3 rounded-lg border bg-surface-2/40 border-brand/15 text-sm text-fg-soft leading-relaxed">
+                    {set.rationaleMd}
+                </SafeMarkdown>
             )}
             <p className="text-[10px] uppercase tracking-[0.08em] text-fg-muted" style={{fontFamily: 'var(--type-mono)'}}>
                 Automated paper-trading experiment — not financial advice.

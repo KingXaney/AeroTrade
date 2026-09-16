@@ -109,6 +109,10 @@ export const parseRssXml = (xml: string, sourceName: string): RawNewsArticle[] =
             continue;
         }
 
+        // Aggregators (Google News) name the originating outlet in <source>; carry it
+        // separately so callers can prefer it over the feed name without re-parsing.
+        const sourceTitle = stripHtml(textOf(raw["source"]));
+
         articles.push({
             id: hashId(url),
             headline,
@@ -118,6 +122,7 @@ export const parseRssXml = (xml: string, sourceName: string): RawNewsArticle[] =
             url,
             datetime: Math.round(parsedMs / MS_PER_SECOND),
             category: "general",
+            ...(sourceTitle ? {sourceTitle} : {}),
         });
     }
     return articles;

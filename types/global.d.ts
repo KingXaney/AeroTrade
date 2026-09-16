@@ -119,12 +119,6 @@ declare global {
         metric?: { [key: string]: number };
     };
 
-    type SelectedStock = {
-        symbol: string;
-        company: string;
-        currentPrice?: number;
-    };
-
     type WatchlistTableProps = {
         watchlist: StockWithData[];
     };
@@ -142,11 +136,7 @@ declare global {
         peRatio?: string;
     };
 
-    type AlertsListProps = {
-        alertData: Alert[] | undefined;
-    };
-
-    type NewsSourceType = 'finance' | 'rss' | 'reddit' | 'sec';
+    type NewsSourceType = 'finance' | 'rss' | 'web' | 'reddit' | 'sec';
 
     type MarketNewsArticle = {
         id: number;
@@ -162,15 +152,14 @@ declare global {
         fullSummary?: string;     // untruncated text for the news brain
     };
 
-    type WatchlistNewsProps = {
-        news?: MarketNewsArticle[];
-    };
-
     // --- Search & Watchlist ---
+    type TopicLink = {name: string; slug: string};
+
     type SearchCommandProps = {
         renderAs?: 'button' | 'text';
         label?: string;
         initialStocks: StockWithWatchlistStatus[];
+        initialTopics?: TopicLink[];   // followed topics, so ⌘K opens instead of duplicating
     };
 
     type WatchlistEntry = {
@@ -190,23 +179,12 @@ declare global {
         | 'removeStockFromWatchlist'
         | 'getMarketNews'
         | 'getBrainDigest'
-        | 'getAiSuggestions';
-
-    type AlertData = {
-        symbol: string;
-        company: string;
-        alertName: string;
-        alertType: 'upper' | 'lower';
-        threshold: string;
-    };
-
-    type AlertModalProps = {
-        alertId?: string;
-        alertData?: AlertData;
-        action?: string;
-        open: boolean;
-        setOpen: (open: boolean) => void;
-    };
+        | 'getAiSuggestions'
+        | 'getPaperPortfolio'
+        | 'getFollowedTopics'
+        | 'getTopicFeed'
+        | 'followTopic'
+        | 'unfollowTopic';
 
     type RawNewsArticle = {
         id: number;
@@ -218,17 +196,7 @@ declare global {
         image?: string;
         category?: string;
         related?: string;
-    };
-
-    type Alert = {
-        id: string;
-        symbol: string;
-        company: string;
-        alertName: string;
-        currentPrice: number;
-        alertType: 'upper' | 'lower';
-        threshold: number;
-        changePercent?: number;
+        sourceTitle?: string;     // outlet named by an RSS <source> element, when the feed carries one
     };
 
     // --- Paper trading ---
@@ -243,9 +211,10 @@ declare global {
         currentPrice?: number;
         changePercent?: number;
         costBasis: number;        // avgCost * quantity
-        marketValue: number;      // currentPrice * quantity (0 if price unknown)
+        marketValue: number;      // currentPrice * quantity; the cost basis when priceStale
         unrealizedPnl: number;    // marketValue - costBasis
         unrealizedPnlPct: number; // unrealizedPnl / costBasis * 100
+        priceStale: boolean;      // no live quote: marketValue is the cost basis and the P&L above is a placeholder
     };
 
     type PortfolioSummary = {
@@ -258,6 +227,11 @@ declare global {
         totalReturnPct: number;   // totalReturnAbs / startingBalance * 100
     };
 
+    // Who placed a paper trade. Absent on rows written before this field existed —
+    // nothing recorded which historical fills came from the AI, so absence honestly
+    // means "unknown", never "user".
+    type TradeSource = 'user' | 'ai-navigator' | 'ai-suggestion';
+
     type PaperTradeRecord = {
         id: string;
         symbol: string;
@@ -267,6 +241,8 @@ declare global {
         price: number;
         total: number;
         realizedPnl?: number;
+        source?: TradeSource;
+        accountName?: string;     // set when trades from several accounts are listed together
         createdAt: number;        // epoch milliseconds
     };
 
@@ -291,6 +267,15 @@ declare global {
         createdAt: number;
     };
 
+    /** A request this user sent that hasn't been answered yet. */
+    type SentFriendRequest = {
+        friendshipId: string;
+        addresseeId: string;
+        name: string;
+        email: string;
+        createdAt: number;
+    };
+
     type LeaderboardEntry = {
         id: string;
         name: string;
@@ -298,6 +283,8 @@ declare global {
         totalValue: number;
         totalReturnPct: number;
         accountName: string;      // name of the user's best strategy account
+        unpriced: number;         // holdings in that account with no live quote (their value is at cost)
+        holdings: number;
     };
 
     type FriendProfile = {
@@ -306,7 +293,7 @@ declare global {
         email: string;
         portfolio: PortfolioSummary;  // the friend's best strategy account
         accountName: string;
-        accounts: {name: string; totalValue: number; totalReturnPct: number}[];
+        accounts: {name: string; totalValue: number; totalReturnPct: number; unpriced: number; holdings: number}[];
     };
 
     // --- Multi-account strategies & analytics ---

@@ -15,6 +15,7 @@ export interface UserPreferences extends Document {
     userId: string;
     emailNotifications: boolean;
     digestMode: 'personalized' | 'general';
+    topicsInDigest?: boolean;
     appearance?: AppearancePrefs;
     dashboardLayout?: DashboardLayoutPrefs;
     updatedAt: Date;
@@ -46,6 +47,7 @@ const UserPreferencesSchema = new Schema<UserPreferences>({
     userId: {type: String, required: true, unique: true, index: true},
     emailNotifications: {type: Boolean, default: true},
     digestMode: {type: String, enum: ['personalized', 'general'], default: 'personalized'},
+    topicsInDigest: {type: Boolean, default: true},
     appearance: {type: AppearanceSchema, required: false},
     dashboardLayout: {type: DashboardLayoutSchema, required: false},
     updatedAt: {type: Date, default: Date.now},

@@ -36,6 +36,7 @@ const EXPECTED_TOKENS: PaletteToken[] = [
     'positive',
     'negative',
     'onNegative',
+    'warning',
     'secondaryTint',
 ];
 
@@ -187,6 +188,13 @@ describe('contrast floors', () => {
             expect(contrastRatio(tokens.onBrand, tokens.brand), id).toBeGreaterThanOrEqual(4.5);
         }
     });
+
+    it('keeps warning readable on panels — it marks caution, so it has to be read', () => {
+        for (const id of PALETTE_IDS) {
+            const {tokens} = PALETTES[id];
+            expect(contrastRatio(tokens.warning, tokens.surface1), id).toBeGreaterThanOrEqual(4.5);
+        }
+    });
 });
 
 describe('quiet-cyber parity', () => {
@@ -212,6 +220,7 @@ describe('quiet-cyber parity', () => {
             positive: '#7df4ff',
             negative: '#ffb4ab',
             onNegative: '#690005',
+            warning: '#ffd166',
             secondaryTint: '#7000ff',
         });
     });

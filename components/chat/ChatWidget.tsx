@@ -10,7 +10,7 @@ type ChatWidgetProps = {
     userId: string;
 };
 
-const storageKey = (userId: string) => `algotest:chat:${userId}`;
+const storageKey = (userId: string) => `aero-chat:${userId}`;
 
 // Restore messages from localStorage at mount. Returns [] if nothing or parse fails — keep failure silent.
 const loadMessages = (userId: string): UIMessage[] => {

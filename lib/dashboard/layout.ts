@@ -34,12 +34,29 @@ export const DashboardLayoutSchema = z.object({
 export type LayoutItem = z.infer<typeof LayoutItemSchema>;
 export type DashboardLayout = z.infer<typeof DashboardLayoutSchema>;
 
-// Today's dashboard, exactly — a user with no saved layout sees no change.
-export const DEFAULT_LAYOUT: DashboardLayout = {
+// The dashboard as it shipped before followed topics. Kept verbatim: a saved
+// layout that still equals it belongs to someone who never customised, and
+// migrateLegacyDefault moves them to the topics-first default below.
+export const LEGACY_DEFAULT_LAYOUT_V1: DashboardLayout = {
     version: LAYOUT_VERSION,
     widgets: [
         {id: 'portfolio-snapshot', span: 4},
         {id: 'watchlist-movers', span: 4},
+        {id: 'friends-rank', span: 4},
+        {id: 'news-brain-tile', span: 12},
+        {id: 'tv-heatmap', span: 8},
+        {id: 'tv-top-stories', span: 4},
+    ],
+};
+
+// Topics first, then the personal strip, then markets.
+export const DEFAULT_LAYOUT: DashboardLayout = {
+    version: LAYOUT_VERSION,
+    widgets: [
+        {id: 'topics-overview', span: 4},
+        {id: 'portfolio-snapshot', span: 4},
+        {id: 'watchlist-movers', span: 4},
+        {id: 'topics-latest', span: 8},
         {id: 'friends-rank', span: 4},
         {id: 'news-brain-tile', span: 12},
         {id: 'tv-heatmap', span: 8},
@@ -83,6 +100,12 @@ export const normalizeLayout = (input: unknown): DashboardLayout => {
     }
     return {version: LAYOUT_VERSION, widgets};
 };
+
+// Not a version bump (that would wipe every customised dashboard): only a layout
+// still identical to the old default is upgraded. Anything else is the user's.
+// Applied when a saved layout is read (layout-store.ts), never on save.
+export const migrateLegacyDefault = (layout: DashboardLayout): DashboardLayout =>
+    layoutsEqual(layout, LEGACY_DEFAULT_LAYOUT_V1) ? resetLayout() : layout;
 
 export const filterAvailable = (layout: DashboardLayout, ctx: AvailabilityContext): DashboardLayout => {
     const widgets = layout.widgets.filter((w) => isWidgetAvailable(WIDGETS[w.id], ctx));

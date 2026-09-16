@@ -31,14 +31,16 @@ export const SEC_LOOKBACK_DAYS = 7;
 
 export const SEC_MAX_SYMBOLS = 10;
 
-export const SOURCE_CAPS: Record<NewsSourceType, number> = {finance: 6, rss: 6, reddit: 4, sec: 4};
+// 'web' (Google News search) feeds followed topics only — capped at 0 here and for the
+// brain so topic articles never leak into the general digest or its extraction budget.
+export const SOURCE_CAPS: Record<NewsSourceType, number> = {finance: 6, rss: 6, web: 0, reddit: 4, sec: 4};
 
 export const TOTAL_ARTICLE_CAP = 16;
 
 // The news brain ingests with wider caps than the email digest. Sized to match the
 // extraction throughput in lib/brain/config.ts (batch size × daily call budget) —
 // ingesting more than can be tagged just grows a backlog of unread articles.
-export const BRAIN_SOURCE_CAPS: Record<NewsSourceType, number> = {finance: 30, rss: 30, reddit: 12, sec: 8};
+export const BRAIN_SOURCE_CAPS: Record<NewsSourceType, number> = {finance: 30, rss: 30, web: 0, reddit: 12, sec: 8};
 export const BRAIN_TOTAL_CAP = 80;
 
 export const FEED_REVALIDATE_SECONDS = 900;
@@ -48,6 +50,10 @@ export const contactEmail = (): string => process.env.SEC_CONTACT_EMAIL || "cont
 export const redditUserAgent = (): string => "AeroTrade/1.0 (paper-trading news digest; contact " + contactEmail() + ")";
 
 export const secUserAgent = (): string => "AeroTrade " + contactEmail();
+
+export const GOOGLE_NEWS_SEARCH_BASE = "https://news.google.com/rss/search";
+
+export const searchUserAgent = (): string => "AeroTrade/1.0 (followed-topics; contact " + contactEmail() + ")";
 
 // djb2 constants — named so the hash stays auditable without magic numbers inline.
 // Lives here, not in aggregate.ts, so the sanitizers can reuse it without dragging

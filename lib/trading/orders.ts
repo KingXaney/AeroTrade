@@ -16,12 +16,14 @@ export type OrderRequest = {
     // Optional cash floor re-enforced at execution time (the AI navigator plans with
     // slightly stale prices; live drift must not let a buy breach the floor).
     minCashAfter?: number;
+    // Recorded on the trade so history and the CSV export can say who placed it.
+    source?: TradeSource;
 };
 
 // Market order at the current live price. Whole shares, long-only.
 export const executeOrder = async (
     userId: string,
-    {accountId, symbol, side, quantity, minCashAfter}: OrderRequest,
+    {accountId, symbol, side, quantity, minCashAfter, source}: OrderRequest,
 ): Promise<OrderResult & {price?: number}> => {
     try {
         const sym = (symbol || '').trim().toUpperCase();
@@ -80,11 +82,15 @@ export const executeOrder = async (
         }
 
         const finalPositions = positions.filter((p) => p.quantity > 0);
-        const updated = await PaperAccount.updateOne({_id: account._id, userId}, {$set: {cash: newCash, positions: finalPositions}});
+        // `cash` doubles as a version stamp: every fill changes it, so a concurrent order
+        // that landed first makes this write match nothing instead of overwriting it.
+        const updated = await PaperAccount.updateOne(
+            {_id: account._id, userId, cash: account.cash},
+            {$set: {cash: newCash, positions: finalPositions}},
+        );
         if (updated.matchedCount === 0) {
-            // Account deleted between the ownership check and the write — never record
-            // a trade against an account that no longer exists.
-            return {success: false, message: 'Strategy account not found'};
+            const stillThere = await PaperAccount.exists({_id: account._id, userId});
+            return {success: false, message: stillThere ? 'Account changed while placing the order — please try again.' : 'Strategy account not found'};
         }
         await PaperTrade.create({
             userId,
@@ -96,6 +102,7 @@ export const executeOrder = async (
             price,
             total,
             ...(realizedPnl !== undefined ? {realizedPnl} : {}),
+            ...(source ? {source} : {}),
         });
 
         const verb = side === 'buy' ? 'Bought' : 'Sold';

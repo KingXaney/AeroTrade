@@ -4,7 +4,8 @@
 
 import {cache} from "react";
 import {getAccountAnalytics, getComparisonStats, getPortfoliosForUser, getTradeHistory} from "@/lib/trading/account";
-import {getCachedWatchlistSymbols} from "@/lib/dashboard/cached";
+import {getCachedTopicsOverview, getCachedWatchlistSymbols} from "@/lib/dashboard/cached";
+import {getMergedTopicFeed} from "@/lib/topics/store";
 import {getNews, getStocksWithData} from "@/lib/actions/finnhub.actions";
 import {getLeaderboard} from "@/lib/actions/friends.actions";
 import {getActiveTheses, getBrainGraph, getBrainSystemStatus, getTopEntities, type BrainSystemStatus} from "@/lib/brain/queries";
@@ -24,6 +25,7 @@ export const NEWS_SYMBOL_CAP = 5;     // getNews loops symbols serially
 export const RECENT_TRADES_LIMIT = 8;
 export const TOP_ENTITIES_PER_TYPE = 5;
 export const GRAPH_NODE_LIMIT = 16;
+export const TOPICS_LATEST_LIMIT = 6;
 
 export type DashboardData = Partial<{
     portfolios: AccountWithPortfolio[];
@@ -42,6 +44,8 @@ export type DashboardData = Partial<{
     brainStatus: BrainSystemStatus;
     secondOpinion: SecondOpinionView | null;
     news: MarketNewsArticle[];
+    topicsOverview: TopicsOverview;
+    topicsLatest: MergedTopicArticle[];
 }>;
 
 type Loader<K extends DataKey> = (ctx: LoaderCtx) => Promise<DashboardData[K]>;
@@ -86,6 +90,8 @@ export const LOADERS: {[K in DataKey]: Loader<K>} = {
     brainGraph: () => getBrainGraph(GRAPH_NODE_LIMIT),
     brainStatus: () => getBrainSystemStatus(),
     secondOpinion: ({userId}) => getLatestSecondOpinion(userId),
+    topicsOverview: ({userId}) => getCachedTopicsOverview(userId),
+    topicsLatest: ({userId}) => getMergedTopicFeed(userId, {limit: TOPICS_LATEST_LIMIT}),
 };
 
 export type LoadedDashboard = {data: DashboardData; failed: Set<DataKey>};

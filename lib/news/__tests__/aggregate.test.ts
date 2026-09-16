@@ -11,7 +11,8 @@ import {fetchFinnhubNews} from "@/lib/news/adapters/finnhub";
 import {fetchRedditNews} from "@/lib/news/adapters/reddit";
 import {fetchRssNews} from "@/lib/news/adapters/rss";
 import {fetchSecFilings} from "@/lib/news/adapters/sec";
-import {getAggregatedNews} from "@/lib/news/aggregate";
+import {capAndOrder, getAggregatedNews} from "@/lib/news/aggregate";
+import {BRAIN_SOURCE_CAPS, SOURCE_CAPS} from "@/lib/news/config";
 
 const finnhubMock = vi.mocked(fetchFinnhubNews);
 const rssMock = vi.mocked(fetchRssNews);
@@ -127,5 +128,35 @@ describe("getAggregatedNews", () => {
         expect(finnhubMock).toHaveBeenCalledWith(["AAPL", "TSLA"]);
         expect(rssMock).toHaveBeenCalledWith(["AAPL", "TSLA"]);
         expect(redditMock).toHaveBeenCalledWith(["AAPL", "TSLA"]);
+    });
+});
+
+// 'web' articles come from Google News search and belong to followed topics only.
+describe("capAndOrder with the web source", () => {
+    it("drops web articles under both the digest and brain caps", () => {
+        const articles = [...makeBatch(3, "web", 5000), ...makeBatch(2, "finance", 1000)];
+
+        expect(capAndOrder(articles, SOURCE_CAPS).map((article) => article.sourceType))
+            .toEqual(["finance", "finance"]);
+        expect(capAndOrder(articles, BRAIN_SOURCE_CAPS).map((article) => article.sourceType))
+            .toEqual(["finance", "finance"]);
+    });
+
+    it("slots web between rss and sec, newest first, when a caller-supplied cap opts it in", () => {
+        const caps: Record<NewsSourceType, number> = {finance: 6, rss: 6, web: 2, reddit: 4, sec: 4};
+        const articles = [
+            ...makeBatch(1, "sec", 4000),
+            ...makeBatch(3, "web", 5000),
+            ...makeBatch(1, "rss", 2000),
+            ...makeBatch(1, "finance", 1000),
+            ...makeBatch(1, "reddit", 3000),
+        ];
+
+        const result = capAndOrder(articles, caps, 16);
+
+        expect(result.map((article) => article.sourceType))
+            .toEqual(["finance", "rss", "web", "web", "sec", "reddit"]);
+        expect(result.filter((article) => article.sourceType === "web").map((article) => article.datetime))
+            .toEqual([5002, 5001]);
     });
 });

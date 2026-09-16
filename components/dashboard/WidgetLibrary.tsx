@@ -1,17 +1,8 @@
 'use client';
 
 import {Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle} from "@/components/ui/dialog";
-import {CATEGORY_ORDER, WIDGETS, type WidgetCategory, type WidgetId} from "@/lib/dashboard/widgets";
+import {CATEGORY_LABELS, CATEGORY_ORDER, WIDGETS, type WidgetId} from "@/lib/dashboard/widgets";
 import {MAX_WIDGETS} from "@/lib/dashboard/layout";
-
-const CATEGORY_LABELS: Record<WidgetCategory, string> = {
-    personal: 'Personal',
-    markets: 'Markets',
-    strategy: 'Strategy',
-    social: 'Social',
-    brain: 'News Brain & AI',
-    tools: 'Tools',
-};
 
 type Props = {
     open: boolean;
@@ -58,6 +49,7 @@ const WidgetLibrary = ({open, onOpenChange, ids, count, onAdd}: Props) => {
                                                         <div className="min-w-0">
                                                             <div className="flex items-center gap-2 flex-wrap">
                                                                 <span className="text-sm font-semibold text-fg" style={{fontFamily: 'var(--type-display)'}}>{def.title}</span>
+                                                                {def.isNew && <Badge>New</Badge>}
                                                                 {def.isClient && <Badge>Live embed</Badge>}
                                                                 {def.heavy && <Badge>Extra API calls</Badge>}
                                                                 {def.availability === 'advanced' && <Badge>Advanced</Badge>}

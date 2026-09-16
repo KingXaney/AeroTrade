@@ -3,12 +3,15 @@ import {getCurrentUserId, getWatchlistForUser} from "@/lib/actions/watchlist.act
 import {getStocksWithData} from "@/lib/actions/finnhub.actions";
 import WatchlistTable from "@/components/watchlist/WatchlistTable";
 import WatchlistEmpty from "@/components/watchlist/WatchlistEmpty";
+import MarketStatus from "@/components/system/MarketStatus";
+import {marketStatus} from "@/lib/prices/market-hours";
 
 const WatchlistPage = async () => {
     const userId = await getCurrentUserId();
     if (!userId) redirect('/sign-in');
 
     const items = await getWatchlistForUser(userId);
+    const status = marketStatus();
 
     if (items.length === 0) {
         return (
@@ -21,9 +24,10 @@ const WatchlistPage = async () => {
                         </h1>
                         <p className="text-sm text-fg-soft"
                            style={{ fontFamily: 'var(--type-body)' }}>
-                            Real-time telemetry for your tracked assets
+                            Quotes, market cap and P/E for the stocks you track
                         </p>
                     </div>
+                    <MarketStatus status={status} />
                 </div>
                 <WatchlistEmpty />
             </div>
@@ -53,14 +57,14 @@ const WatchlistPage = async () => {
                     </h1>
                     <p className="text-sm text-fg-soft"
                        style={{ fontFamily: 'var(--type-body)' }}>
-                        Real-time telemetry for your tracked assets
+                        Quotes, market cap and P/E for the stocks you track
                     </p>
                 </div>
                 <div className="flex items-center gap-3">
-                    <div className="flex items-center gap-2 text-[10px] text-fg-muted"
+                    <MarketStatus status={status} />
+                    <div className="text-[10px] text-fg-muted"
                          style={{ fontFamily: 'var(--type-mono)', letterSpacing: '0.02em' }}>
-                        <div className="w-2 h-2 rounded-full bg-brand animate-pulse"></div>
-                        {items.length} ASSETS TRACKED
+                        {items.length} TRACKED
                     </div>
                 </div>
             </div>

@@ -4,8 +4,12 @@ import {
     computeMaxDrawdown,
     computeRealizedPnl,
     computeWinStats,
+    countUnpriced,
+    describeUnpriced,
+    enrichPosition,
     mergeLivePoint,
     toReturnPct,
+    unpricedLabel,
 } from '@/lib/trading/analytics';
 
 const pt = (date: string, value: number) => ({date, value});
@@ -155,5 +159,71 @@ describe('buildPerfSeries', () => {
         );
         expect(series).toHaveLength(2);
         expect(series[1].accountPct).toBeCloseTo(8);
+    });
+});
+
+describe('enrichPosition', () => {
+    const held: PaperPosition = {symbol: 'NVDA', company: 'NVIDIA Corp', quantity: 10, avgCost: 100};
+
+    it('prices a position from the quote and flags it live', () => {
+        const p = enrichPosition(held, {price: 120, changePercent: 1.5});
+        expect(p).toMatchObject({
+            costBasis: 1000, marketValue: 1200, unrealizedPnl: 200, unrealizedPnlPct: 20,
+            currentPrice: 120, changePercent: 1.5, priceStale: false,
+        });
+    });
+
+    it('falls back to cost basis when the quote is missing — and says so', () => {
+        // The value must stay at cost (it feeds the snapshot series), but the
+        // resulting +$0.00 must never be presentable as a real, flat P&L.
+        const p = enrichPosition(held, undefined);
+        expect(p.marketValue).toBe(1000);
+        expect(p.unrealizedPnl).toBe(0);
+        expect(p.currentPrice).toBeUndefined();
+        expect(p.priceStale).toBe(true);
+    });
+
+    it('treats a quote row without a price the same as no quote', () => {
+        expect(enrichPosition(held, {changePercent: 2}).priceStale).toBe(true);
+    });
+
+    it('does not divide by a zero cost basis', () => {
+        const p = enrichPosition({...held, avgCost: 0}, {price: 5});
+        expect(p.unrealizedPnlPct).toBe(0);
+        expect(Number.isFinite(p.unrealizedPnlPct)).toBe(true);
+    });
+
+    it('falls back to the symbol when the stored company is blank', () => {
+        expect(enrichPosition({...held, company: ''}, {price: 1}).company).toBe('NVDA');
+    });
+});
+
+describe('unpriced summaries', () => {
+    const stale = {priceStale: true};
+    const live = {priceStale: false};
+
+    it('counts only the flagged positions', () => {
+        expect(countUnpriced([])).toBe(0);
+        expect(countUnpriced([live, stale, stale])).toBe(2);
+    });
+
+    it('says nothing when every position is priced', () => {
+        expect(describeUnpriced(0, 3)).toBeNull();
+        expect(describeUnpriced(0, 0)).toBeNull();
+    });
+
+    it('labels a ranked return as unpriced only when nothing behind it is live', () => {
+        expect(unpricedLabel(0, 3)).toBeNull();
+        expect(unpricedLabel(0, 0)).toBeNull();
+        expect(unpricedLabel(1, 3)).toBe('partly unpriced');
+        expect(unpricedLabel(3, 3)).toBe('unpriced');
+        expect(unpricedLabel(1, 1)).toBe('unpriced');
+    });
+
+    it('names the partial, total and single-holding cases', () => {
+        expect(describeUnpriced(1, 3)).toBe('1 of 3 holdings is unpriced — valued at cost, P&L withheld');
+        expect(describeUnpriced(2, 3)).toBe('2 of 3 holdings are unpriced — valued at cost, P&L withheld');
+        expect(describeUnpriced(3, 3)).toBe('All 3 holdings are unpriced — valued at cost, P&L withheld');
+        expect(describeUnpriced(1, 1)).toBe('This holding is unpriced — valued at cost, P&L withheld');
     });
 });

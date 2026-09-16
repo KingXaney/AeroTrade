@@ -4,6 +4,9 @@ import Link from "next/link";
 import {ACTIVE_ACCOUNT_COOKIE} from "@/lib/constants";
 import {getCurrentUserId} from "@/lib/actions/watchlist.actions";
 import {getAccountAnalytics, getComparisonStats, getPortfoliosForUser, getTradeHistory} from "@/lib/trading/account";
+import {countUnpriced} from "@/lib/trading/analytics";
+import {toComparisonRows, toSwitcherAccounts} from "@/lib/dashboard/select";
+import {marketStatus} from "@/lib/prices/market-hours";
 import AccountSummary from "@/components/trade/AccountSummary";
 import PositionsTable from "@/components/trade/PositionsTable";
 import TradeHistory from "@/components/trade/TradeHistory";
@@ -39,22 +42,13 @@ const PortfolioPage = async ({searchParams}: PortfolioPageProps) => {
     ]);
 
     const count = portfolio.positions.length;
-    const switcherAccounts = all.map((x) => ({
-        id: x.account.id,
-        name: x.account.name,
-        totalReturnPct: x.summary.totalReturnPct,
-    }));
-    const comparisonRows = all.map((x) => ({
-        id: x.account.id,
-        name: x.account.name,
-        totalValue: x.summary.totalValue,
-        totalReturnPct: x.summary.totalReturnPct,
-        winRatePct: comparisonStats[x.account.id]?.winRatePct ?? null,
-        maxDrawdownPct: comparisonStats[x.account.id]?.maxDrawdownPct ?? null,
-    }));
+    const unpriced = countUnpriced(portfolio.positions);
+    const marketOpen = marketStatus().state === 'open';
+    const switcherAccounts = toSwitcherAccounts(all);
+    const comparisonRows = toComparisonRows(all, comparisonStats);
 
     return (
-        <div className="min-h-screen space-y-4">
+        <div className="space-y-4">
             {/* Header */}
             <div className="flex flex-col md:flex-row md:items-end md:justify-between gap-4 mb-2">
                 <div>
@@ -62,7 +56,9 @@ const PortfolioPage = async ({searchParams}: PortfolioPageProps) => {
                         {account.name}
                     </h1>
                     <p className="text-sm text-fg-muted">
-                        {count === 0 ? 'No open positions yet' : `${count} ${count === 1 ? 'holding' : 'holdings'} · live valuation`}
+                        {count === 0
+                            ? 'No open positions yet'
+                            : `${count} ${count === 1 ? 'holding' : 'holdings'} · ${unpriced === 0 ? (marketOpen ? 'live valuation' : 'valued at last close') : unpriced === count ? 'valued at cost' : `${unpriced} valued at cost`}`}
                     </p>
                 </div>
                 <div className="flex flex-wrap items-center gap-3">
@@ -77,7 +73,11 @@ const PortfolioPage = async ({searchParams}: PortfolioPageProps) => {
                         <span className="material-symbols-outlined text-base">candlestick_chart</span>
                         Trade Desk
                     </Link>
-                    <ResetAccountButton accountId={account.id} />
+                    <ResetAccountButton
+                        accountId={account.id}
+                        accountName={account.name}
+                        startingBalance={portfolio.startingBalance}
+                    />
                 </div>
             </div>
 
@@ -120,7 +120,7 @@ const PortfolioPage = async ({searchParams}: PortfolioPageProps) => {
                 <h2 className="text-sm font-bold uppercase tracking-[0.1em] text-brand mb-4" style={{fontFamily: 'var(--type-mono)'}}>
                     Trade History
                 </h2>
-                <TradeHistory trades={trades} />
+                <TradeHistory trades={trades} totalCount={analytics?.tradeCount} exportHref={`/api/accounts/${account.id}/export`} />
             </section>
         </div>
     );

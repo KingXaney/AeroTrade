@@ -1,7 +1,7 @@
 # See https://help.github.com/articles/ignoring-files/ for more about ignoring files.
 
-# dependencies
-/node_modules
+# dependencies (any depth — scripts/qa has its own install)
+node_modules
 /.pnp
 .pnp.*
 .yarn/*
@@ -41,5 +41,19 @@ yarn-error.log*
 *.tsbuildinfo
 next-env.d.ts
 
-# superpowers brainstorming visual companion
+
+# editors
+.idea/
+.vscode/
+
+# local agent config (per-machine permissions)
+.claude/settings.local.json
 .superpowers/
+
+# design exports
+.stitch/
+*.zip
+
+# browser QA output
+scripts/qa/output/
+scripts/qa/package-lock.json

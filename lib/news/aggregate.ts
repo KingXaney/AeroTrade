@@ -10,10 +10,12 @@ import {normalizeUrl, SOURCE_CAPS, TOTAL_ARTICLE_CAP} from "@/lib/news/config";
 export {normalizeUrl};
 
 // Email sections render in this order — finance wires lead, social chatter closes.
-const SECTION_ORDER: NewsSourceType[] = ["finance", "rss", "sec", "reddit"];
+// 'web' is capped at 0 by default (topics never reach the digest); it sits in these
+// tables so they stay exhaustive and a caller-supplied cap can opt it in.
+const SECTION_ORDER: NewsSourceType[] = ["finance", "rss", "web", "sec", "reddit"];
 
 // When over the total cap, sacrifice the noisiest sources first; finance is the floor.
-const TRIM_ORDER: NewsSourceType[] = ["reddit", "rss", "sec", "finance"];
+const TRIM_ORDER: NewsSourceType[] = ["reddit", "rss", "web", "sec", "finance"];
 
 // Articles that predate sourceType stamping are treated as finance so they still render.
 const DEFAULT_SOURCE_TYPE: NewsSourceType = "finance";
@@ -44,7 +46,7 @@ export const capAndOrder = (
     caps: Record<NewsSourceType, number> = SOURCE_CAPS,
     totalCap: number = TOTAL_ARTICLE_CAP,
 ): MarketNewsArticle[] => {
-    const groups: Record<NewsSourceType, MarketNewsArticle[]> = {finance: [], rss: [], reddit: [], sec: []};
+    const groups: Record<NewsSourceType, MarketNewsArticle[]> = {finance: [], rss: [], web: [], reddit: [], sec: []};
 
     for (const article of articles) {
         groups[article.sourceType ?? DEFAULT_SOURCE_TYPE].push(article);

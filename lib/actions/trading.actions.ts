@@ -26,7 +26,7 @@ export const placeOrder = async (
     const userId = await getCurrentUserId();
     if (!userId) return {success: false, message: 'Not authenticated'};
 
-    const result = await executeOrder(userId, {accountId, symbol, side, quantity});
+    const result = await executeOrder(userId, {accountId, symbol, side, quantity, source: 'user'});
     if (result.success) revalidateTradingPaths();
     return {success: result.success, message: result.message};
 };

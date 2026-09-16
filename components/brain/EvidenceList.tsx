@@ -1,4 +1,9 @@
+import Link from "next/link";
 import {cn, formatTimeAgo, getChangeColorClass} from "@/lib/utils";
+import TradeLink from "@/components/trade/TradeLink";
+
+// Ticker keys are bare symbols; sectors and themes carry a "sector:" / "theme:" prefix.
+const isTickerKey = (key: string): boolean => /^[A-Z][A-Z0-9.\-]{0,9}$/.test(key);
 
 export type EvidenceItem = {
     headline: string;
@@ -14,9 +19,19 @@ export type EvidenceItem = {
 // Per-entity evidence drill-down: the actual articles behind a narrative's weight.
 const EvidenceList = ({entityKey, items}: {entityKey: string; items: EvidenceItem[]}) => (
     <div>
-        <p className="text-xs text-fg-muted mb-3" style={{fontFamily: 'var(--type-mono)'}}>
-            Evidence for <span className="text-brand">{entityKey}</span> · last 21 days
-        </p>
+        <div className="flex flex-wrap items-center justify-between gap-2 mb-3">
+            <p className="text-xs text-fg-muted" style={{fontFamily: 'var(--type-mono)'}}>
+                Evidence for <span className="text-brand">{entityKey}</span> · last 21 days
+            </p>
+            {isTickerKey(entityKey) && (
+                <span className="flex items-center gap-2">
+                    <Link href={`/stocks/${encodeURIComponent(entityKey)}`} className="text-xs text-brand hover:underline" style={{fontFamily: 'var(--type-mono)'}}>
+                        Stock page →
+                    </Link>
+                    <TradeLink symbol={entityKey} />
+                </span>
+            )}
+        </div>
         {items.length === 0 ? (
             <p className="text-sm text-fg-muted">No recent articles mention this entity.</p>
         ) : (

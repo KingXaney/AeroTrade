@@ -1,5 +1,7 @@
 import {cn, formatPrice, formatChangePercent} from "@/lib/utils";
 import WatchlistButton from "@/components/watchlist/WatchlistButton";
+import FollowTopicButton from "@/components/topics/FollowTopicButton";
+import TradeLink from "@/components/trade/TradeLink";
 
 type StockHeaderProps = {
     symbol: string;
@@ -8,6 +10,7 @@ type StockHeaderProps = {
     changePercent?: number;
     exchange?: string;
     isInWatchlist: boolean;
+    followedTopic?: {id: string; slug: string} | null;
 };
 
 const StockHeader = ({
@@ -17,6 +20,7 @@ const StockHeader = ({
     changePercent,
     exchange,
     isInWatchlist,
+    followedTopic = null,
 }: StockHeaderProps) => {
     return (
         <div className="glass-panel rounded-xl p-6 flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
@@ -39,7 +43,7 @@ const StockHeader = ({
                 </p>
             </div>
 
-            <div className="flex items-center gap-6">
+            <div className="flex flex-wrap items-center gap-4 sm:gap-6">
                 <div className="text-right">
                     <div className="text-2xl font-semibold text-fg"
                          style={{ fontFamily: 'var(--type-mono)' }}>
@@ -65,12 +69,16 @@ const StockHeader = ({
                         )}
                     </div>
                 </div>
-                <WatchlistButton
-                    symbol={symbol}
-                    company={company}
-                    isInWatchlist={isInWatchlist}
-                    type="button"
-                />
+                <div className="flex flex-wrap items-center gap-2">
+                    <TradeLink symbol={symbol} variant="button" />
+                    <WatchlistButton
+                        symbol={symbol}
+                        company={company}
+                        isInWatchlist={isInWatchlist}
+                        type="button"
+                    />
+                    <FollowTopicButton name={company} keywords={[company, symbol]} followed={followedTopic} type="button" />
+                </div>
             </div>
         </div>
     );

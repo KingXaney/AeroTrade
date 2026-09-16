@@ -1,11 +1,16 @@
 'use client';
 
-import {createContext, useCallback, useContext, useMemo, useRef, useState, useTransition, type ReactNode} from "react";
+import {createContext, useCallback, useContext, useEffect, useMemo, useRef, useState, useTransition, type ReactNode} from "react";
 import {useRouter} from "next/navigation";
 import {toast} from "sonner";
 import {PALETTES, type PaletteMode} from "@/lib/theme/palettes";
 import {modeOfTheme, themeEquals, type Theme} from "@/lib/theme/resolve";
 import {setAppearance} from "@/lib/actions/appearance.actions";
+
+// Hover intent: a card the pointer merely sweeps over never repaints the document.
+const PREVIEW_DELAY_MS = 60;
+// Crossing the gutter between two cards must never flash the committed theme in between.
+const CANCEL_DELAY_MS = 150;
 
 export type ThemeTokens = {
     mode: PaletteMode;
@@ -24,7 +29,7 @@ type ThemeContextValue = {
     pending: boolean;
     preview: (theme: Theme) => void;
     commit: (theme: Theme) => void;
-    cancel: () => void;
+    cancel: (delayMs?: number) => void;   // 0 = restore right now
 };
 
 const ThemeContext = createContext<ThemeContextValue | null>(null);
@@ -65,34 +70,80 @@ const ThemeProvider = ({initial, children}: {initial: Theme; children: ReactNode
         setCommitted(initial);
     }
 
-    // The theme a commit is saving; hover-out (cancel) must fall back to it, not to
-    // the previous committed theme, or the page flashes back until the save resolves.
+    // Refs, not closures: a deferred restore created during a save must read the
+    // theme that is committed when it *fires*, not when it was scheduled.
+    const committedRef = useRef(committed);
+    useEffect(() => { committedRef.current = committed; }, [committed]);
+    // The theme a commit is saving; hover-out must fall back to it, not to the
+    // previous committed theme, or the page flashes back until the save resolves.
     const pendingTheme = useRef<Theme | null>(null);
+    // Last theme painted, so re-applying what is already on screen is a no-op.
+    const applied = useRef<Theme>(initial);
+    const timer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
-    const preview = useCallback((theme: Theme) => {
-        if (pendingTheme.current) return;   // a commit is in flight; don't paint a third theme
+    const clearTimer = useCallback(() => {
+        if (timer.current !== null) {
+            clearTimeout(timer.current);
+            timer.current = null;
+        }
+    }, []);
+
+    const paint = useCallback((theme: Theme) => {
+        if (themeEquals(applied.current, theme)) return;
+        applied.current = theme;
         applyToDocument(theme);
     }, []);
-    const cancel = useCallback(() => applyToDocument(pendingTheme.current ?? committed), [committed]);
+
+    const restore = useCallback(() => paint(pendingTheme.current ?? committedRef.current), [paint]);
+
+    // One timer for both preview and restore: the latest intent always wins.
+    const schedule = useCallback((fn: () => void, delayMs: number) => {
+        clearTimer();
+        if (delayMs <= 0) {
+            fn();
+            return;
+        }
+        timer.current = setTimeout(() => {
+            timer.current = null;
+            fn();
+        }, delayMs);
+    }, [clearTimer]);
+
+    const preview = useCallback((theme: Theme) => {
+        if (pendingTheme.current) {   // a commit is in flight; never paint a third theme
+            clearTimer();
+            return;
+        }
+        schedule(() => paint(theme), PREVIEW_DELAY_MS);
+    }, [clearTimer, schedule, paint]);
+
+    const cancel = useCallback((delayMs: number = CANCEL_DELAY_MS) => schedule(restore, delayMs), [schedule, restore]);
 
     const commit = useCallback((theme: Theme) => {
+        clearTimer();
+        // Set before React re-renders the buttons as disabled: the blur that follows
+        // must restore to this theme, not the previous one.
         pendingTheme.current = theme;
-        applyToDocument(theme);
+        paint(theme);
         startTransition(async () => {
             const result = await setAppearance(theme);
             if (pendingTheme.current === theme) pendingTheme.current = null;
+            clearTimer();   // a leave-during-save must not revert what was just saved
             if (result.success) {
                 const saved = result.theme ?? theme;
+                committedRef.current = saved;
                 setCommitted(saved);
-                applyToDocument(saved);
+                paint(saved);
                 // The cookie write already re-renders the layouts; refresh is cheap insurance.
                 router.refresh();
             } else {
-                applyToDocument(pendingTheme.current ?? committed);
+                restore();
                 toast.error(result.message ?? 'Could not save your theme');
             }
         });
-    }, [committed, router]);
+    }, [clearTimer, paint, restore, router]);
+
+    useEffect(() => clearTimer, [clearTimer]);
 
     const value = useMemo<ThemeContextValue>(() => ({
         theme: committed,

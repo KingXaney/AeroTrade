@@ -4,6 +4,8 @@ import {useState} from "react";
 import Link from "next/link";
 import {cn, formatPrice, formatChangePercent, getChangeColorClass} from "@/lib/utils";
 import SellPositionDialog from "@/components/trade/SellPositionDialog";
+import UnpricedNote from "@/components/trade/UnpricedNote";
+import TradeLink from "@/components/trade/TradeLink";
 
 // Interactive holdings table for the trade page — each row opens a sell
 // dialog where the user picks how many shares to sell.
@@ -43,18 +45,28 @@ const PositionsTable = ({positions, accountId}: {positions: EnrichedPosition[]; 
                             <div className="text-[11px] text-fg-soft truncate max-w-[160px]">{p.company}</div>
                         </div>
                     </div>
-                    <div className="text-right text-fg" style={{fontFamily: 'var(--type-mono)'}}>{p.quantity}</div>
-                    <div className="text-right text-fg-soft" style={{fontFamily: 'var(--type-mono)'}}>{formatPrice(p.avgCost)}</div>
-                    <div className="text-right text-fg" style={{fontFamily: 'var(--type-mono)'}}>
+                    {/* Below md the header row is hidden, so each cell names itself. */}
+                    <div className="flex justify-between md:block md:text-right text-fg" style={{fontFamily: 'var(--type-mono)'}}><span className="md:hidden text-[10px] uppercase tracking-[0.1em] text-fg-muted mr-2">Qty</span>{p.quantity}</div>
+                    <div className="flex justify-between md:block md:text-right text-fg-soft" style={{fontFamily: 'var(--type-mono)'}}><span className="md:hidden text-[10px] uppercase tracking-[0.1em] text-fg-muted mr-2">Avg Cost</span>{formatPrice(p.avgCost)}</div>
+                    <div className="flex justify-between md:block md:text-right text-fg" style={{fontFamily: 'var(--type-mono)'}}>
+                        <span className="md:hidden text-[10px] uppercase tracking-[0.1em] text-fg-muted mr-2">Price</span>
                         {typeof p.currentPrice === 'number' ? formatPrice(p.currentPrice) : '—'}
                     </div>
-                    <div className="text-right" style={{fontFamily: 'var(--type-mono)'}}>
+                    <div className="flex justify-between md:block md:text-right" style={{fontFamily: 'var(--type-mono)'}}>
+                        <span className="md:hidden text-[10px] uppercase tracking-[0.1em] text-fg-muted mr-2">Value / P&L</span>
+                        <div className="text-right">
                         <div className="text-fg">{formatPrice(p.marketValue)}</div>
-                        <div className={cn('text-xs', getChangeColorClass(p.unrealizedPnl || undefined))}>
-                            {p.unrealizedPnl >= 0 ? '+' : ''}{formatPrice(p.unrealizedPnl)} ({formatChangePercent(p.unrealizedPnlPct) || '0.00%'})
+                        {p.priceStale ? (
+                            <div className="text-xs text-fg-muted" title="No live quote — value shown at cost">—</div>
+                        ) : (
+                            <div className={cn('text-xs', getChangeColorClass(p.unrealizedPnl || undefined))}>
+                                {p.unrealizedPnl >= 0 ? '+' : ''}{formatPrice(p.unrealizedPnl)} ({formatChangePercent(p.unrealizedPnlPct) || '0.00%'})
+                            </div>
+                        )}
                         </div>
                     </div>
-                    <div className="flex md:justify-end">
+                    <div className="flex md:justify-end gap-2">
+                        <TradeLink symbol={p.symbol} />
                         <button
                             type="button"
                             onClick={() => setSellTarget(p)}
@@ -66,6 +78,8 @@ const PositionsTable = ({positions, accountId}: {positions: EnrichedPosition[]; 
                     </div>
                 </div>
             ))}
+
+            <UnpricedNote positions={positions} className="px-4 pt-1" />
 
             {sellTarget && <SellPositionDialog position={sellTarget} accountId={accountId} onClose={() => setSellTarget(null)} />}
         </div>

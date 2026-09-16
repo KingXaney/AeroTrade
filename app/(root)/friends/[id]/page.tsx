@@ -3,6 +3,7 @@ import {notFound, redirect} from "next/navigation";
 import {cn, formatPrice, getChangeColorClass} from "@/lib/utils";
 import {getCurrentUserId} from "@/lib/actions/watchlist.actions";
 import {getFriendProfile} from "@/lib/actions/friends.actions";
+import {unpricedLabel} from "@/lib/trading/analytics";
 import AccountSummary from "@/components/trade/AccountSummary";
 import PortfolioHoldings from "@/components/trade/PortfolioHoldings";
 
@@ -20,7 +21,7 @@ const FriendProfilePage = async ({params}: FriendProfilePageProps) => {
     if (!profile) notFound();
 
     return (
-        <div className="min-h-screen space-y-6">
+        <div className="space-y-6">
             <div className="flex items-center gap-3">
                 <Link href="/friends" className="text-fg-muted hover:text-brand transition-colors">
                     <span className="material-symbols-outlined">arrow_back</span>
@@ -64,6 +65,9 @@ const FriendProfilePage = async ({params}: FriendProfilePageProps) => {
                                     <span className={cn('text-xs', getChangeColorClass(a.totalReturnPct || undefined))}>
                                         {a.totalReturnPct >= 0 ? '+' : ''}{a.totalReturnPct.toFixed(2)}%
                                     </span>
+                                    {unpricedLabel(a.unpriced, a.holdings) && (
+                                        <span className="block text-[10px] text-warning">{unpricedLabel(a.unpriced, a.holdings)}</span>
+                                    )}
                                 </div>
                             </div>
                         ))}

@@ -38,13 +38,11 @@ const TradingViewWidget = ({title, scriptUrl, config, height = 600, className}: 
                         style={{ fontFamily: 'var(--type-display)' }}>
                         {title}
                     </h3>
-                    <div className="flex items-center gap-2">
-                        <div className="w-2 h-2 rounded-full bg-brand animate-pulse"></div>
-                        <span className="text-[10px] text-fg-muted"
-                              style={{ fontFamily: 'var(--type-mono)', letterSpacing: '0.02em' }}>
-                            LIVE
-                        </span>
-                    </div>
+                    {/* No pulsing "LIVE": outside market hours the embed shows the last session. */}
+                    <span className="text-[10px] text-fg-muted"
+                          style={{ fontFamily: 'var(--type-mono)', letterSpacing: '0.02em' }}>
+                        TRADINGVIEW
+                    </span>
                 </div>
             )}
             <div className={cn('tradingview-widget-container', className)} ref={containerRef}>

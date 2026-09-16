@@ -50,7 +50,7 @@ const plexMono = IBM_Plex_Mono({
 
 export const metadata: Metadata = {
   title: "AeroTrade Terminal",
-  description: "Precision-futurism trading terminal. Track real-time stock prices, get personalized alerts and explore detailed company insights with a next-gen interface.",
+  description: "Paper-trading terminal with an AI news brain: follow the topics you care about, test strategies with virtual money, and let scheduled AI jobs read the news for you.",
 };
 
 export default async function RootLayout({

@@ -8,7 +8,8 @@ export type SidebarPortfolio = {
     totalReturnPct: number;
     cash: number;
     strategiesCount: number;
-    top: {symbol: string; quantity: number; unrealizedPnlPct: number}[];
+    unpriced: number;      // holdings with no live quote, across every account
+    top: {symbol: string; quantity: number; unrealizedPnlPct: number; priceStale: boolean}[];
 };
 
 const PortfolioSidebarCard = ({portfolio}: {portfolio: SidebarPortfolio}) => {
@@ -41,6 +42,11 @@ const PortfolioSidebarCard = ({portfolio}: {portfolio: SidebarPortfolio}) => {
                         {sign}{portfolio.totalReturnPct.toFixed(2)}%
                     </span>
                     <span className="text-fg-muted text-xs"> total return</span>
+                    {/* The headline return includes holdings valued at cost; say so in the
+                        one place on every page that quotes it without the summary panel. */}
+                    {portfolio.unpriced > 0 && (
+                        <span className="text-warning text-xs"> · {portfolio.unpriced} unpriced</span>
+                    )}
                 </p>
                 {portfolio.strategiesCount > 1 && (
                     <p className="text-[10px] uppercase tracking-[0.08em] text-fg-muted mt-1" style={{fontFamily: 'var(--type-mono)'}}>
@@ -63,10 +69,14 @@ const PortfolioSidebarCard = ({portfolio}: {portfolio: SidebarPortfolio}) => {
                                       style={{fontFamily: 'var(--type-mono)'}}>
                                     {h.symbol} <span className="text-fg-muted font-normal">×{h.quantity}</span>
                                 </span>
-                                <span className={cn('text-xs', getChangeColorClass(h.unrealizedPnlPct || undefined))}
-                                      style={{fontFamily: 'var(--type-mono)'}}>
-                                    {h.unrealizedPnlPct >= 0 ? '+' : ''}{h.unrealizedPnlPct.toFixed(2)}%
-                                </span>
+                                {h.priceStale ? (
+                                    <span className="text-xs text-fg-muted" style={{fontFamily: 'var(--type-mono)'}} title="No live quote">—</span>
+                                ) : (
+                                    <span className={cn('text-xs', getChangeColorClass(h.unrealizedPnlPct || undefined))}
+                                          style={{fontFamily: 'var(--type-mono)'}}>
+                                        {h.unrealizedPnlPct >= 0 ? '+' : ''}{h.unrealizedPnlPct.toFixed(2)}%
+                                    </span>
+                                )}
                             </div>
                         ))}
                     </div>

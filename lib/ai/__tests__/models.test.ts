@@ -62,6 +62,13 @@ describe("the matrix", () => {
             expect(MODEL_MATRIX[tier].extraction.jsonMode, tier).toBe(true);
         }
     });
+
+    // The brief parser expects a JSON object; prose would fall back to a raw-text brief.
+    it("keeps JSON mode on topic briefs in every tier", () => {
+        for (const tier of AI_TIERS) {
+            expect(MODEL_MATRIX[tier].topicBrief.jsonMode, tier).toBe(true);
+        }
+    });
 });
 
 describe("resolveTier", () => {

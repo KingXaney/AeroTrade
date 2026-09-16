@@ -1,5 +1,6 @@
 'use client';
 
+import {useEffect, type FocusEvent} from "react";
 import {useTheme} from "@/components/theme/ThemeProvider";
 import {Switch} from "@/components/ui/switch";
 import {cn} from "@/lib/utils";
@@ -50,12 +51,22 @@ const AppearanceSettings = () => {
         if (!themeEquals(next, theme)) commit(next);
     };
 
-    const hoverProps = (next: Theme) => ({
+    // Buttons only ever *start* a preview. The restore lives on the group, so the
+    // gutter between two cards is inside the hover region and moving A → B never
+    // passes through the committed theme.
+    const previewProps = (next: Theme) => ({
         onMouseEnter: () => preview(next),
-        onMouseLeave: () => cancel(),
         onFocus: () => preview(next),
-        onBlur: () => cancel(),
     });
+    const groupProps = {
+        onMouseLeave: () => cancel(),
+        // React's onBlur is focusout (bubbles): only restore when focus leaves the group.
+        onBlur: (e: FocusEvent<HTMLElement>) => {
+            if (!e.currentTarget.contains(e.relatedTarget as Node | null)) cancel();
+        },
+    };
+    // Keyboard / ⌘K navigation away mid-hover fires no mouseleave.
+    useEffect(() => () => cancel(0), [cancel]);
 
     const presetTheme = (p: Preset): Theme => ({palette: p.palette, style: p.style, reduceMotion: theme.reduceMotion});
 
@@ -73,14 +84,14 @@ const AppearanceSettings = () => {
                         Reset to default
                     </button>
                 </div>
-                <div role="radiogroup" aria-label="Theme presets" className="grid grid-cols-2 md:grid-cols-3 xl:grid-cols-4 gap-3">
+                <div role="radiogroup" aria-label="Theme presets" className="grid grid-cols-2 md:grid-cols-3 xl:grid-cols-4 gap-3" {...groupProps}>
                     {PRESETS.map((p) => {
                         const selected = activePreset?.id === p.id;
                         return (
                             <button key={p.id} type="button" role="radio" aria-checked={selected}
                                     disabled={pending}
                                     onClick={() => apply(presetTheme(p))}
-                                    {...hoverProps(presetTheme(p))}
+                                    {...previewProps(presetTheme(p))}
                                     className={cn(
                                         'text-left rounded-xl border p-2.5 transition-all bg-surface-2/40 border-line-strong/20 hover:border-brand/40 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand',
                                         selected && 'border-brand ring-1 ring-brand',
@@ -102,14 +113,14 @@ const AppearanceSettings = () => {
             {/* Palette */}
             <div>
                 <div className="text-[10px] uppercase tracking-[0.14em] text-fg-muted mb-2" style={{fontFamily: 'var(--type-mono)'}}>Palette</div>
-                <div role="radiogroup" aria-label="Colour palette" className="flex flex-wrap gap-2">
+                <div role="radiogroup" aria-label="Colour palette" className="flex flex-wrap gap-2" {...groupProps}>
                     {PALETTE_IDS.map((id) => {
                         const p = PALETTES[id];
                         const selected = theme.palette === id;
                         const next: Theme = {...theme, palette: id};
                         return (
                             <button key={id} type="button" role="radio" aria-checked={selected} disabled={pending}
-                                    onClick={() => apply(next)} {...hoverProps(next)}
+                                    onClick={() => apply(next)} {...previewProps(next)}
                                     className={cn(
                                         'inline-flex items-center gap-2 rounded-full border px-3 py-1.5 text-xs transition-colors bg-surface-2/40 border-line-strong/20 text-fg-soft hover:border-brand/40 hover:text-fg focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand',
                                         selected && 'border-brand text-fg',
@@ -131,14 +142,14 @@ const AppearanceSettings = () => {
             {/* Style */}
             <div>
                 <div className="text-[10px] uppercase tracking-[0.14em] text-fg-muted mb-2" style={{fontFamily: 'var(--type-mono)'}}>Style</div>
-                <div role="radiogroup" aria-label="Visual style" className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-2">
+                <div role="radiogroup" aria-label="Visual style" className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-2" {...groupProps}>
                     {STYLE_IDS.map((id) => {
                         const s = STYLES[id];
                         const selected = theme.style === id;
                         const next: Theme = {...theme, style: id};
                         return (
                             <button key={id} type="button" role="radio" aria-checked={selected} disabled={pending}
-                                    onClick={() => apply(next)} {...hoverProps(next)}
+                                    onClick={() => apply(next)} {...previewProps(next)}
                                     className={cn(
                                         'text-left rounded-lg border px-3 py-2.5 transition-colors bg-surface-2/40 border-line-strong/20 hover:border-brand/40 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand',
                                         selected && 'border-brand ring-1 ring-brand',

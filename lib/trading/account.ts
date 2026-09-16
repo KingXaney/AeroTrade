@@ -19,10 +19,12 @@ import {
     computeMaxDrawdown,
     computeRealizedPnl,
     computeWinStats,
+    enrichPosition,
     mergeLivePoint,
+    type PriceInfo,
 } from "@/lib/trading/analytics";
 
-export type PriceInfo = {price?: number; changePercent?: number};
+export type {PriceInfo};
 
 // Minimal plain shape used to compute a portfolio (works for Mongoose docs after
 // mapping, lean docs, or a synthesized default account).
@@ -87,6 +89,17 @@ export const getAccountsForUser = async (userId: string): Promise<PaperAccountDo
     return [created];
 };
 
+// Read-only sibling of getAccountsForUser: no lazy create, no legacy backfill.
+//
+// Use this wherever a *question* is being answered rather than an action taken. The chat
+// assistant is the motivating case — "how am I doing?" must not conjure a paper account
+// with a $100k starting balance for someone who has never traded, and must not race the
+// real creation path. getHeldSymbolsByUserId already reads this way.
+export const readAccountsForUser = async (userId: string): Promise<PaperAccountDoc[]> => {
+    await connectToDatabase();
+    return PaperAccount.find({userId}).sort({createdAt: 1});
+};
+
 // Ownership gate: every account-scoped read or write resolves the account through this.
 export const getOwnedAccount = async (userId: string, accountId: string): Promise<PaperAccountDoc | null> => {
     if (!Types.ObjectId.isValid(accountId)) return null;
@@ -130,26 +143,9 @@ export const computePortfolio = (
     account: AccountLike,
     priceMap: Map<string, PriceInfo>,
 ): PortfolioSummary => {
-    const positions: EnrichedPosition[] = account.positions.map((p) => {
-        const info = priceMap.get(p.symbol.toUpperCase());
-        const currentPrice = info?.price;
-        const costBasis = p.avgCost * p.quantity;
-        const marketValue = typeof currentPrice === 'number' ? currentPrice * p.quantity : costBasis;
-        const unrealizedPnl = marketValue - costBasis;
-        const unrealizedPnlPct = costBasis > 0 ? (unrealizedPnl / costBasis) * 100 : 0;
-        return {
-            symbol: p.symbol,
-            quantity: p.quantity,
-            avgCost: p.avgCost,
-            company: p.company || p.symbol,
-            currentPrice,
-            changePercent: info?.changePercent,
-            costBasis,
-            marketValue,
-            unrealizedPnl,
-            unrealizedPnlPct,
-        };
-    });
+    const positions: EnrichedPosition[] = account.positions.map((p) =>
+        enrichPosition(p, priceMap.get(p.symbol.toUpperCase())),
+    );
 
     const holdingsValue = positions.reduce((sum, p) => sum + p.marketValue, 0);
     const totalValue = account.cash + holdingsValue;
@@ -208,24 +204,51 @@ export const aggregatePortfolios = (list: AccountWithPortfolio[]): PortfolioSumm
     return {startingBalance, cash, positions, holdingsValue, totalValue, totalReturnAbs, totalReturnPct};
 };
 
+type LeanTrade = {
+    _id: unknown; symbol: string; company?: string; side: 'buy' | 'sell'; quantity: number; price: number; total: number;
+    realizedPnl?: number; source?: string; accountId?: string; createdAt: Date;
+};
+
+const toTradeRecord = (t: LeanTrade, accountName?: string): PaperTradeRecord => ({
+    id: String(t._id),
+    symbol: t.symbol,
+    company: t.company || t.symbol,
+    side: t.side,
+    quantity: t.quantity,
+    price: t.price,
+    total: t.total,
+    realizedPnl: t.realizedPnl,
+    ...(t.source ? {source: t.source as TradeSource} : {}),
+    ...(accountName ? {accountName} : {}),
+    createdAt: new Date(t.createdAt).getTime(),
+});
+
 export const getTradeHistory = async (userId: string, accountId: string, limit = 50): Promise<PaperTradeRecord[]> => {
     try {
         await connectToDatabase();
-        const trades = await PaperTrade.find({userId, accountId}).sort({createdAt: -1}).limit(limit).lean();
-        return trades.map((t) => ({
-            id: String(t._id),
-            symbol: t.symbol,
-            company: t.company || t.symbol,
-            side: t.side,
-            quantity: t.quantity,
-            price: t.price,
-            total: t.total,
-            realizedPnl: t.realizedPnl,
-            createdAt: new Date(t.createdAt).getTime(),
-        }));
+        const trades = await PaperTrade.find({userId, accountId}).sort({createdAt: -1}).limit(limit).lean<LeanTrade[]>();
+        return trades.map((t) => toTradeRecord(t));
     } catch (error) {
         console.error('Error fetching trade history:', error);
         return [];
+    }
+};
+
+// Newest fills across every strategy account, each tagged with its account's name —
+// the /history page's trade feed. Read-only (no lazy account creation).
+export const getRecentTradesForUser = async (userId: string, limit = 50): Promise<{trades: PaperTradeRecord[]; total: number}> => {
+    try {
+        await connectToDatabase();
+        const [trades, total, accounts] = await Promise.all([
+            PaperTrade.find({userId}).sort({createdAt: -1}).limit(limit).lean<LeanTrade[]>(),
+            PaperTrade.countDocuments({userId}),
+            PaperAccount.find({userId}).select('name').lean<{_id: unknown; name?: string}[]>(),
+        ]);
+        const names = new Map(accounts.map((a) => [String(a._id), a.name || DEFAULT_ACCOUNT_NAME]));
+        return {trades: trades.map((t) => toTradeRecord(t, t.accountId ? names.get(t.accountId) : undefined)), total};
+    } catch (error) {
+        console.error('Error fetching recent trades:', error);
+        return {trades: [], total: 0};
     }
 };
 

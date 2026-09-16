@@ -29,7 +29,15 @@
   --positive: #7df4ff;
   --negative: #ffb4ab;
   --on-negative: #690005;
+  --warning: #ffd166;
   --secondary-tint: #7000ff;
+
+  /* Medals are material colours, not semantic roles — gold should read as gold in
+     Dracula and in Paper alike, so they sit outside the palette registry. The light
+     palettes darken them because #ffd700 on a near-white panel is unreadable. */
+  --rank-1: #ffd700;
+  --rank-2: #c0c8d0;
+  --rank-3: #cd7f32;
 
   color-scheme: dark;
   --shade-1: rgb(0 0 0 / 0.25);
@@ -48,6 +56,12 @@
   --type-body: var(--font-hanken);
   --type-mono: var(--font-jetbrains);
 }
+
+html[data-mode="light"] {
+  --rank-1: #a67c00;
+  --rank-2: #6b7280;
+  --rank-3: #8a5524;
+}
 html[data-mode="light"] {
   color-scheme: light;
   --shade-1: rgb(15 23 42 / 0.06);
@@ -56,7 +70,7 @@ html[data-mode="light"] {
 }
 
 /* ═══════════════════════════════════════════════════════════════════
-   AERO-TRADE TERMINAL — CYBER-FIN TECH CORE DESIGN SYSTEM
+   AEROTRADE DESIGN SYSTEM
    Stitch Design Tokens: Precision-Futurism
    ═══════════════════════════════════════════════════════════════════ */
 
@@ -80,6 +94,7 @@ html[data-mode="light"] {
   --color-positive: var(--positive);
   --color-negative: var(--negative);
   --color-on-negative: var(--on-negative);
+  --color-warning: var(--warning);
   --color-secondary-tint: var(--secondary-tint);
   --color-background: var(--background);
   --color-foreground: var(--foreground);
@@ -437,6 +452,17 @@ html[data-mode="light"] {
   .form-input:focus {
     border-color: var(--brand-strong) !important;
     box-shadow: 0 0 0 1px color-mix(in srgb, var(--brand-strong) 20%, transparent);
+  }
+
+  /* Eleven hand-rolled inputs (the order ticket, the account dialogs, chat, friends,
+     keyword chips) set `outline-none` and their border inline, then added nothing back —
+     so a keyboard user had no idea which field was focused, including on the screen that
+     places trades. One class, matching .form-input:focus above; !important is needed to
+     beat the inline border those inputs carry. */
+  .field-focus:focus-visible {
+    outline: none;
+    border-color: var(--brand-strong) !important;
+    box-shadow: 0 0 0 3px color-mix(in srgb, var(--brand-strong) 25%, transparent);
   }
 
   /* ─── SELECT FIELDS ─── */

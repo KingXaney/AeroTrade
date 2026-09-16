@@ -1,8 +1,9 @@
 import {redirect} from "next/navigation";
 import {getCurrentUserId} from "@/lib/actions/watchlist.actions";
-import {getFriends, getIncomingRequests, getLeaderboard} from "@/lib/actions/friends.actions";
+import {getFriends, getIncomingRequests, getLeaderboard, getOutgoingRequests} from "@/lib/actions/friends.actions";
 import AddFriend from "@/components/friends/AddFriend";
 import FriendRequests from "@/components/friends/FriendRequests";
+import SentRequests from "@/components/friends/SentRequests";
 import FriendsList from "@/components/friends/FriendsList";
 import Leaderboard from "@/components/friends/Leaderboard";
 
@@ -10,14 +11,15 @@ const FriendsPage = async () => {
     const userId = await getCurrentUserId();
     if (!userId) redirect('/sign-in');
 
-    const [friends, requests, leaderboard] = await Promise.all([
+    const [friends, requests, sent, leaderboard] = await Promise.all([
         getFriends(userId),
         getIncomingRequests(userId),
+        getOutgoingRequests(userId),
         getLeaderboard(userId),
     ]);
 
     return (
-        <div className="min-h-screen space-y-6">
+        <div className="space-y-6">
             <div className="mb-2">
                 <h1 className="text-2xl font-semibold text-fg mb-1 tracking-tight" style={{fontFamily: 'var(--type-display)'}}>
                     Friends &amp; Competition
@@ -37,6 +39,7 @@ const FriendsPage = async () => {
                 <div className="lg:col-span-1 space-y-6">
                     <AddFriend />
                     <FriendRequests requests={requests} />
+                    <SentRequests requests={sent} />
                     <FriendsList friends={friends} />
                 </div>
             </div>

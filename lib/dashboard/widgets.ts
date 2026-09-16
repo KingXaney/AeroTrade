@@ -16,10 +16,20 @@ export type WidgetSpan = (typeof WIDGET_SPANS)[number];
 
 export const SPAN_LABELS: Record<WidgetSpan, string> = {3: 'XS', 4: 'S', 6: 'M', 8: 'L', 12: 'XL'};
 
-export type WidgetCategory = 'personal' | 'markets' | 'strategy' | 'social' | 'brain' | 'tools';
+export type WidgetCategory = 'topics' | 'personal' | 'markets' | 'strategy' | 'social' | 'brain' | 'tools';
 
 // Library grouping order; WIDGET_IDS below is kept in this order too.
-export const CATEGORY_ORDER: readonly WidgetCategory[] = ['personal', 'markets', 'strategy', 'social', 'brain', 'tools'];
+export const CATEGORY_ORDER: readonly WidgetCategory[] = ['topics', 'personal', 'markets', 'strategy', 'social', 'brain', 'tools'];
+
+export const CATEGORY_LABELS: Record<WidgetCategory, string> = {
+    topics: 'Topics',
+    personal: 'Personal',
+    markets: 'Markets',
+    strategy: 'Strategy',
+    social: 'Social',
+    brain: 'News Brain & AI',
+    tools: 'Tools',
+};
 
 export const DATA_KEYS = [
     'portfolios',
@@ -38,6 +48,8 @@ export const DATA_KEYS = [
     'brainStatus',
     'secondOpinion',
     'news',
+    'topicsOverview',
+    'topicsLatest',
 ] as const;
 export type DataKey = (typeof DATA_KEYS)[number];
 
@@ -60,11 +72,13 @@ export const DATA_KEY_DEPS: Record<DataKey, readonly DataKey[]> = {
     brainStatus: [],
     secondOpinion: [],
     news: ['watchlistSymbols'],
+    topicsOverview: [],
+    topicsLatest: [],
 };
 
 // Streamed under <Suspense> because they are slow or fan out to third parties;
 // their loaders resolve their own dependencies, so those never join the eager pass.
-export const LAZY_DATA_KEYS: readonly DataKey[] = ['movers', 'news', 'analytics', 'brainStatus'];
+export const LAZY_DATA_KEYS: readonly DataKey[] = ['movers', 'news', 'analytics', 'brainStatus', 'topicsLatest'];
 
 // 'link' = the clickable PersonalRow card · 'panel' = glass-panel + heading ·
 // 'panel-lg' / 'panel-sm' = panel with the TradingView paddings · 'bare' = the
@@ -95,9 +109,14 @@ export type WidgetDefinition = {
     wideOnTablet: boolean;            // iframes/charts that need the full row below xl
     isClient: boolean;
     heavy?: boolean;                  // extra third-party calls; surfaced as a badge in the library
+    isNew?: boolean;                  // shipped after the layout system; badged so customised dashboards find it
 };
 
 export const WIDGET_IDS = [
+    // topics
+    'topics-overview',
+    'topics-latest',
+    'topic-briefs',
     // personal
     'portfolio-snapshot',
     'watchlist-movers',
@@ -152,6 +171,44 @@ const tradingView = <Id extends WidgetId>(input: WidgetInput<Id>): WidgetDefinit
     define({chrome: 'panel-lg', isClient: true, wideOnTablet: true, ...input});
 
 export const WIDGETS: {readonly [K in WidgetId]: WidgetDefinition & {id: K}} = {
+    // --- Topics (what the user follows; the topics-first default starts here) ---
+    'topics-overview': define({
+        id: 'topics-overview',
+        title: 'Your topics',
+        description: 'Everything you follow, with what\'s new since your last visit.',
+        category: 'topics',
+        icon: 'interests',
+        spans: [4, 6, 8, 12],
+        defaultSpan: 4,
+        minHeight: 200,
+        dataKeys: ['topicsOverview'],
+        isNew: true,
+    }),
+    'topics-latest': define({
+        id: 'topics-latest',
+        title: 'Latest across your topics',
+        description: 'The newest articles matched to any topic you follow.',
+        category: 'topics',
+        icon: 'feed',
+        spans: [6, 8, 12],
+        defaultSpan: 8,
+        minHeight: 320,
+        dataKeys: ['topicsLatest'],
+        isNew: true,
+    }),
+    'topic-briefs': define({
+        id: 'topic-briefs',
+        title: 'Today\'s briefs',
+        description: 'The AI "what changed today" summary for each topic with fresh news.',
+        category: 'topics',
+        icon: 'auto_awesome',
+        spans: [6, 8, 12],
+        defaultSpan: 6,
+        minHeight: 240,
+        dataKeys: ['topicsOverview'],
+        isNew: true,
+    }),
+
     // --- Personal ---
     'portfolio-snapshot': define({
         id: 'portfolio-snapshot',

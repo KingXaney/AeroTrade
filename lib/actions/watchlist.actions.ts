@@ -94,10 +94,14 @@ export const addToWatchlist = async (
         const userId = await getCurrentUserId();
         if (!userId) return {success: false, message: 'Not authenticated'};
 
+        const ticker = symbol.trim().toUpperCase();
+        if (!/^[A-Z0-9.\-]{1,12}$/.test(ticker)) return {success: false, message: 'Invalid symbol'};
+        const displayName = company.trim().slice(0, 120) || ticker;
+
         await connectToDatabase();
         await Watchlist.updateOne(
-            {userId, symbol: symbol.toUpperCase()},
-            {$setOnInsert: {company, addedAt: new Date()}},
+            {userId, symbol: ticker},
+            {$setOnInsert: {company: displayName, addedAt: new Date()}},
             {upsert: true},
         );
 

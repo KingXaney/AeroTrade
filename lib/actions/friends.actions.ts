@@ -8,6 +8,7 @@ import Friendship from "@/database/models/friendship.model";
 import PaperAccount from "@/database/models/paper-account.model";
 import {PAPER_STARTING_BALANCE} from "@/lib/constants";
 import {getCurrentUserId} from "@/lib/actions/watchlist.actions";
+import {countUnpriced} from "@/lib/trading/analytics";
 import {
     buildPriceMap,
     computePortfolio,
@@ -184,6 +185,45 @@ export const getIncomingRequests = async (userId: string): Promise<FriendRequest
     }
 };
 
+// The mirror of getIncomingRequests. Without it, sending a request was a one-way door:
+// you got a toast and then no record at all — no way to tell a pending request from a
+// declined one, and a request sent to a typo'd address silently blocked the real one
+// forever (sendFriendRequest refuses when any Friendship row already exists).
+export const getOutgoingRequests = async (userId: string): Promise<SentFriendRequest[]> => {
+    try {
+        const db = await getDb();
+        const links = await Friendship.find({requesterId: userId, status: 'pending'}).sort({createdAt: -1}).lean();
+        if (links.length === 0) return [];
+        const profiles = await getProfilesByIds(db, links.map((l) => l.addresseeId));
+        return links.map((l) => {
+            const p = profiles.get(l.addresseeId);
+            return {
+                friendshipId: String(l._id),
+                addresseeId: l.addresseeId,
+                name: p?.name || 'Unknown',
+                email: p?.email || '',
+                createdAt: new Date(l.createdAt).getTime(),
+            };
+        });
+    } catch (error) {
+        console.error('Error fetching outgoing requests:', error);
+        return [];
+    }
+};
+
+// Just the count, for the nav badge. getIncomingRequests does a second round trip to
+// build profile names the badge would throw away, and this runs in the (root) layout on
+// every page load — so it stays a countDocuments on the indexed addresseeId.
+export const countIncomingRequests = async (userId: string): Promise<number> => {
+    try {
+        await getDb();
+        return await Friendship.countDocuments({addresseeId: userId, status: 'pending'});
+    } catch (error) {
+        console.error('Error counting incoming requests:', error);
+        return 0;
+    }
+};
+
 export const getFriends = async (userId: string): Promise<FriendSummary[]> => {
     try {
         const db = await getDb();
@@ -263,6 +303,10 @@ export const getLeaderboard = async (userId: string): Promise<LeaderboardEntry[]
                 totalValue: best.portfolio.totalValue,
                 totalReturnPct: best.portfolio.totalReturnPct,
                 accountName: best.name,
+                // Ranked on the same at-cost fallback as everything else; the row says so
+                // rather than pretending a quote-less strategy is exactly flat.
+                unpriced: countUnpriced(best.portfolio.positions),
+                holdings: best.portfolio.positions.length,
             };
         });
 
@@ -297,6 +341,8 @@ export const getFriendProfile = async (friendId: string, viewerId: string): Prom
                 name: x.account.name,
                 totalValue: x.summary.totalValue,
                 totalReturnPct: x.summary.totalReturnPct,
+                unpriced: countUnpriced(x.summary.positions),
+                holdings: x.summary.positions.length,
             })),
         };
     } catch (error) {

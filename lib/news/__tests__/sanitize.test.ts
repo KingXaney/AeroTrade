@@ -96,9 +96,9 @@ describe("sanitizeWelcomeIntroHtml", () => {
     });
 
     it("wraps plain text so the fallback copy renders identically", () => {
-        const out = sanitizeWelcomeIntroHtml("Thanks for joining AlgoTest.");
+        const out = sanitizeWelcomeIntroHtml("Thanks for joining AeroTrade.");
         expect(out).toBe(
-            '<p class="mobile-text" style="margin: 0 0 30px 0; font-size: 16px; line-height: 1.6; color: #CCDADC;">Thanks for joining AlgoTest.</p>',
+            '<p class="mobile-text" style="margin: 0 0 30px 0; font-size: 16px; line-height: 1.6; color: #CCDADC;">Thanks for joining AeroTrade.</p>',
         );
     });
 

@@ -10,6 +10,7 @@ import {
 } from "@/lib/constants";
 import {getCompanyProfile, getQuote} from "@/lib/actions/finnhub.actions";
 import {getCurrentUserId, isInWatchlist} from "@/lib/actions/watchlist.actions";
+import {getTopicsForUser} from "@/lib/topics/store";
 
 const TRADINGVIEW_SCRIPT = 'https://s3.tradingview.com/external-embedding/embed-widget-';
 
@@ -20,16 +21,18 @@ const StockDetailsPage = async ({params}: StockDetailsPageProps) => {
     const {symbol: raw} = await params;
     const symbol = raw.toUpperCase();
 
-    const [profile, quote, inWatchlist] = await Promise.all([
+    const [profile, quote, inWatchlist, topics] = await Promise.all([
         getCompanyProfile(symbol),
         getQuote(symbol),
         isInWatchlist(userId, symbol),
+        getTopicsForUser(userId),
     ]);
 
     // Finnhub returns an empty object for unknown symbols; treat that as 404.
     if (!profile.name && typeof quote.c !== 'number') notFound();
 
     const company = profile.name || symbol;
+    const followedTopic = topics.find((t) => t.name.toLowerCase() === company.toLowerCase() || t.keywords.includes(symbol.toLowerCase()));
 
     return (
         <div className="space-y-6">
@@ -39,6 +42,7 @@ const StockDetailsPage = async ({params}: StockDetailsPageProps) => {
                 currentPrice={quote.c}
                 changePercent={quote.dp}
                 isInWatchlist={inWatchlist}
+                followedTopic={followedTopic ? {id: followedTopic.id, slug: followedTopic.slug} : null}
             />
 
             {/* Symbol Info */}

@@ -10,11 +10,13 @@ import {getCurrentUserId} from "@/lib/actions/watchlist.actions";
 export type NotificationPreferences = {
     emailNotifications: boolean;
     digestMode: 'personalized' | 'general';
+    topicsInDigest: boolean;
 };
 
 const DEFAULT_NOTIFICATION_PREFERENCES: NotificationPreferences = {
     emailNotifications: true,
     digestMode: 'personalized',
+    topicsInDigest: true,
 };
 
 export const getNotificationPreferences = async (): Promise<NotificationPreferences> => {
@@ -29,6 +31,7 @@ export const getNotificationPreferences = async (): Promise<NotificationPreferen
         return {
             emailNotifications: prefs.emailNotifications !== false,
             digestMode: prefs.digestMode === 'general' ? 'general' : 'personalized',
+            topicsInDigest: prefs.topicsInDigest !== false,
         };
     } catch (e) {
         console.error('Error fetching notification preferences:', e);
@@ -79,5 +82,24 @@ export const setDigestMode = async (
     } catch (e) {
         console.error('Error setting digest mode:', e);
         return {success: false, mode: mode === 'personalized' ? 'general' : 'personalized'};
+    }
+};
+
+export const setTopicsInDigest = async (enabled: boolean): Promise<{ success: boolean; enabled: boolean }> => {
+    try {
+        const userId = await getCurrentUserId();
+        if (!userId) return {success: false, enabled: !enabled};
+
+        await connectToDatabase();
+        await UserPreferencesModel.findOneAndUpdate(
+            {userId},
+            {topicsInDigest: enabled, updatedAt: new Date()},
+            {upsert: true, new: true}
+        );
+
+        return {success: true, enabled};
+    } catch (e) {
+        console.error('Error setting topics-in-digest preference:', e);
+        return {success: false, enabled: !enabled};
     }
 };

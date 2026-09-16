@@ -3,11 +3,13 @@ import {
     DEFAULT_LAYOUT,
     DashboardLayoutSchema,
     LAYOUT_VERSION,
+    LEGACY_DEFAULT_LAYOUT_V1,
     MAX_WIDGETS,
     addWidget,
     filterAvailable,
     layoutFingerprint,
     layoutsEqual,
+    migrateLegacyDefault,
     missingWidgetIds,
     moveWidget,
     normalizeLayout,
@@ -35,8 +37,24 @@ describe('constants', () => {
         expect(MAX_WIDGETS).toBe(24);
     });
 
-    it('DEFAULT_LAYOUT is today\'s dashboard exactly', () => {
+    it('DEFAULT_LAYOUT is the topics-first dashboard', () => {
         expect(DEFAULT_LAYOUT).toEqual({
+            version: 1,
+            widgets: [
+                {id: 'topics-overview', span: 4},
+                {id: 'portfolio-snapshot', span: 4},
+                {id: 'watchlist-movers', span: 4},
+                {id: 'topics-latest', span: 8},
+                {id: 'friends-rank', span: 4},
+                {id: 'news-brain-tile', span: 12},
+                {id: 'tv-heatmap', span: 8},
+                {id: 'tv-top-stories', span: 4},
+            ],
+        });
+    });
+
+    it('LEGACY_DEFAULT_LAYOUT_V1 is the pre-topics dashboard, verbatim', () => {
+        expect(LEGACY_DEFAULT_LAYOUT_V1).toEqual({
             version: 1,
             widgets: [
                 {id: 'portfolio-snapshot', span: 4},
@@ -47,6 +65,38 @@ describe('constants', () => {
                 {id: 'tv-top-stories', span: 4},
             ],
         });
+        expect(layoutsEqual(LEGACY_DEFAULT_LAYOUT_V1, DEFAULT_LAYOUT)).toBe(false);
+    });
+});
+
+describe('migrateLegacyDefault', () => {
+    const legacyCopy = () => layout(LEGACY_DEFAULT_LAYOUT_V1.widgets.map((w) => ({...w})));
+
+    it('upgrades a layout still equal to the old default', () => {
+        const upgraded = migrateLegacyDefault(legacyCopy());
+        expect(upgraded).toEqual(DEFAULT_LAYOUT);
+        expect(upgraded).not.toBe(DEFAULT_LAYOUT);
+        expect(upgraded.widgets).not.toBe(DEFAULT_LAYOUT.widgets);
+    });
+
+    it('leaves anything the user touched alone, by reference', () => {
+        const reordered = layout([LEGACY_DEFAULT_LAYOUT_V1.widgets[1], LEGACY_DEFAULT_LAYOUT_V1.widgets[0], ...LEGACY_DEFAULT_LAYOUT_V1.widgets.slice(2)]);
+        const resized = layout(LEGACY_DEFAULT_LAYOUT_V1.widgets.map((w, i) => (i === 0 ? {...w, span: 6} : w)));
+        const extended = layout([...LEGACY_DEFAULT_LAYOUT_V1.widgets, {id: 'quick-links', span: 4}]);
+        const trimmed = layout(LEGACY_DEFAULT_LAYOUT_V1.widgets.slice(1));
+        const empty = layout([]);
+        for (const l of [reordered, resized, extended, trimmed, empty, DEFAULT_LAYOUT]) {
+            expect(migrateLegacyDefault(l)).toBe(l);
+        }
+    });
+
+    it('is not part of normalizeLayout, so a save is never rewritten', () => {
+        expect(normalizeLayout(LEGACY_DEFAULT_LAYOUT_V1)).toEqual(LEGACY_DEFAULT_LAYOUT_V1);
+        // Composed at the read site: a span that clamps back onto the legacy value still migrates.
+        const stillLegacy = {version: 1, widgets: LEGACY_DEFAULT_LAYOUT_V1.widgets.map((w) => (w.id === 'tv-heatmap' ? {...w, span: 9} : w))};
+        expect(migrateLegacyDefault(normalizeLayout(stillLegacy))).toEqual(DEFAULT_LAYOUT);
+        const customised = {version: 1, widgets: LEGACY_DEFAULT_LAYOUT_V1.widgets.map((w) => (w.id === 'tv-heatmap' ? {...w, span: 7} : w))};
+        expect(migrateLegacyDefault(normalizeLayout(customised)).widgets.map((w) => w.id)).toEqual(LEGACY_DEFAULT_LAYOUT_V1.widgets.map((w) => w.id));
     });
 });
 
@@ -318,6 +368,8 @@ describe('layoutsEqual + layoutFingerprint', () => {
 
     it('has a readable, versioned format', () => {
         expect(layoutFingerprint(DEFAULT_LAYOUT))
+            .toBe('v1:topics-overview@4,portfolio-snapshot@4,watchlist-movers@4,topics-latest@8,friends-rank@4,news-brain-tile@12,tv-heatmap@8,tv-top-stories@4');
+        expect(layoutFingerprint(LEGACY_DEFAULT_LAYOUT_V1))
             .toBe('v1:portfolio-snapshot@4,watchlist-movers@4,friends-rank@4,news-brain-tile@12,tv-heatmap@8,tv-top-stories@4');
         expect(layoutFingerprint({version: 1, widgets: []})).toBe('v1:');
     });

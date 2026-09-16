@@ -3,6 +3,8 @@ import {redirect} from "next/navigation";
 import {getCurrentUserId, getWatchlistForUser} from "@/lib/actions/watchlist.actions";
 import {getNews} from "@/lib/actions/finnhub.actions";
 import {formatTimeAgo} from "@/lib/utils";
+import {getRecentTradesForUser} from "@/lib/trading/account";
+import TradeHistory from "@/components/trade/TradeHistory";
 
 const formatAddedAt = (date: Date) =>
     new Date(date).toLocaleString('en-US', {
@@ -17,7 +19,7 @@ const HistoryPage = async () => {
     const userId = await getCurrentUserId();
     if (!userId) redirect('/sign-in');
 
-    const items = await getWatchlistForUser(userId);
+    const [items, recent] = await Promise.all([getWatchlistForUser(userId), getRecentTradesForUser(userId)]);
     const symbols = items.map((i) => i.symbol);
 
     // News personalized to the watchlist when present, otherwise general market news.
@@ -29,30 +31,41 @@ const HistoryPage = async () => {
     }
 
     return (
-        <div className="min-h-screen space-y-6">
+        <div className="space-y-6">
             {/* Page Header */}
             <div className="mb-2">
                 <h1 className="text-2xl font-semibold text-fg mb-1 tracking-tight"
                     style={{ fontFamily: 'var(--type-display)' }}>
-                    Activity History
+                    History
                 </h1>
                 <p className="text-sm text-fg-muted"
                    style={{ fontFamily: 'var(--type-mono)', letterSpacing: '0.02em' }}>
-                    Your watchlist timeline and market activity
+                    Your trades across every strategy, and what you have added to your watchlist
                 </p>
             </div>
 
+            {/* A page called History used to contain no trades. Removals are not recorded
+                (the watchlist model hard-deletes), so the list below is honest about being
+                "by date added", not a timeline. */}
+            <section className="glass-panel rounded-xl p-6">
+                <h2 className="text-xs font-bold uppercase tracking-[0.1em] text-brand mb-4"
+                    style={{ fontFamily: 'var(--type-mono)' }}>
+                    Trades
+                </h2>
+                <TradeHistory trades={recent.trades} totalCount={recent.total} />
+            </section>
+
             <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-                {/* Watchlist activity timeline */}
+                {/* Watchlist, by date added */}
                 <section className="lg:col-span-1 glass-panel rounded-xl p-6">
                     <h2 className="text-xs font-bold uppercase tracking-[0.1em] text-brand mb-4"
                         style={{ fontFamily: 'var(--type-mono)' }}>
-                        Watchlist Activity
+                        On your watchlist, by date added
                     </h2>
 
                     {items.length === 0 ? (
                         <p className="text-sm text-fg-muted">
-                            No activity yet. Add a stock to your watchlist to start your timeline.
+                            Nothing yet. Add a stock to your watchlist and it appears here with the date you added it.
                         </p>
                     ) : (
                         <ol className="relative space-y-5 border-l border-brand/15 pl-5">

@@ -52,7 +52,7 @@ const RenameDialog = ({accountId, currentName, onClose}: {accountId: string; cur
                         maxLength={40}
                         autoComplete="off"
                         autoFocus
-                        className="w-full rounded-lg px-3 py-2 text-sm text-fg outline-none"
+                        className="w-full rounded-lg px-3 py-2 text-sm text-fg outline-none field-focus"
                         style={{backgroundColor: 'var(--surface-0)', border: '1px solid color-mix(in srgb, var(--line-strong) 40%, transparent)', fontFamily: 'var(--type-mono)'}}
                     />
                     <button

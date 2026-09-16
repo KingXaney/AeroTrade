@@ -1,13 +1,8 @@
 import Link from "next/link";
+import {NAV_ITEMS} from "@/lib/navigation";
 
-const LINKS = [
-    {href: '/trade', label: 'Trade', icon: 'candlestick_chart'},
-    {href: '/portfolio', label: 'Portfolio', icon: 'account_balance_wallet'},
-    {href: '/watchlist', label: 'Watchlist', icon: 'bookmark'},
-    {href: '/markets', label: 'Markets', icon: 'query_stats'},
-    {href: '/brain', label: 'Brain', icon: 'neurology'},
-    {href: '/settings', label: 'Settings', icon: 'settings'},
-];
+// Every route except the dashboard itself — you are already on it.
+const LINKS = NAV_ITEMS.filter((i) => i.href !== '/');
 
 const QuickLinks = () => (
     <div className="grid grid-cols-3 gap-2">

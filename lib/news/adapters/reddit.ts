@@ -2,6 +2,7 @@
 
 import {formatArticle, validateArticle} from "@/lib/utils";
 import {FEED_REVALIDATE_SECONDS, hashId, REDDIT_POST_LIMIT, redditUserAgent, SUBREDDITS} from "@/lib/news/config";
+import {escapeRegExp} from "@/lib/topics/match";
 
 export type RedditPost = {
     title: string;
@@ -39,9 +40,6 @@ export const mapRedditPost = (post: RedditPost, subreddit: string): RawNewsArtic
         category: "social",
     };
 };
-
-// Regex metacharacters must be escaped so symbols like BRK.B match literally.
-const escapeRegExp = (value: string): string => value.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
 
 export const matchTickers = (title: string, symbols: string[]): string[] =>
     symbols.filter((symbol) => {

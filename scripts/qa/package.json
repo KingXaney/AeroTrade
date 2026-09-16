@@ -1,0 +1,9 @@
+{
+  "name": "aerotrade-qa",
+  "private": true,
+  "description": "Browser QA tooling for AeroTrade: in-memory MongoDB + Playwright. Separate from the app's package.json so a plain `npm install` stays light.",
+  "devDependencies": {
+    "mongodb-memory-server": "^10.4.3",
+    "playwright": "^1.62.1"
+  }
+}

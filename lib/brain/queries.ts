@@ -135,6 +135,9 @@ const JOB_DEFINITIONS: Array<Omit<JobHealth, 'lastRunAt' | 'lastMessage'>> = [
     {jobId: 'ai-navigator-weekly', label: 'AI navigator (weekly)', schedule: 'Mondays 10:00 ET', staleAfterHours: 8 * 24},
     {jobId: 'ai-navigator-bootstrap', label: 'AI run (manual/enroll)', schedule: 'on demand', staleAfterHours: Number.POSITIVE_INFINITY},
     {jobId: 'claude-second-opinion', label: 'Claude second opinion', schedule: 'on demand', staleAfterHours: Number.POSITIVE_INFINITY},
+    {jobId: 'refresh-topic-feeds', label: 'Topic feeds', schedule: 'every 3h', staleAfterHours: 7},
+    {jobId: 'generate-topic-briefs', label: 'Topic briefs', schedule: 'daily 08:00 ET', staleAfterHours: 30},
+    {jobId: 'refresh-topic-on-demand', label: 'Topic refresh (manual)', schedule: 'on demand', staleAfterHours: Number.POSITIVE_INFINITY},
 ];
 
 export const getBrainSystemStatus = async (): Promise<BrainSystemStatus> => {

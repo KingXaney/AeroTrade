@@ -1,5 +1,6 @@
 import {describe, expect, it} from 'vitest';
 import {
+    CATEGORY_LABELS,
     CATEGORY_ORDER,
     DATA_KEYS,
     DATA_KEY_DEPS,
@@ -22,9 +23,9 @@ const spanSet = new Set<number>(WIDGET_SPANS);
 const dataKeySet = new Set<string>(DATA_KEYS);
 
 describe('registry invariants', () => {
-    it('has 28 unique ids whose table keys match their id field', () => {
-        expect(WIDGET_IDS).toHaveLength(28);
-        expect(new Set(WIDGET_IDS).size).toBe(28);
+    it('has 31 unique ids whose table keys match their id field', () => {
+        expect(WIDGET_IDS).toHaveLength(31);
+        expect(new Set(WIDGET_IDS).size).toBe(31);
         expect(Object.keys(WIDGETS).sort()).toEqual([...WIDGET_IDS].sort());
         for (const id of WIDGET_IDS) {
             expect(WIDGETS[id].id).toBe(id);
@@ -82,6 +83,26 @@ describe('registry invariants', () => {
         expect(new Set(CATEGORY_ORDER).size).toBe(CATEGORY_ORDER.length);
     });
 
+    it('topics lead the library and every category has a label', () => {
+        expect(CATEGORY_ORDER[0]).toBe('topics');
+        expect(Object.keys(CATEGORY_LABELS).sort()).toEqual([...CATEGORY_ORDER].sort());
+        for (const label of Object.values(CATEGORY_LABELS)) {
+            expect(label.trim()).not.toBe('');
+        }
+    });
+
+    it('the topics widgets are plain panels flagged as new', () => {
+        const topics = defs.filter((d) => d.category === 'topics').map((d) => d.id).sort();
+        expect(topics).toEqual(['topic-briefs', 'topics-latest', 'topics-overview']);
+        for (const id of topics) {
+            expect(WIDGETS[id].chrome, id).toBe('panel');
+            expect(WIDGETS[id].isNew, id).toBe(true);
+        }
+        expect(defs.filter((d) => d.isNew).map((d) => d.id).sort()).toEqual(topics);
+        expect(WIDGETS['topics-latest'].dataKeys).toEqual(['topicsLatest']);
+        expect(WIDGETS['topic-briefs'].dataKeys).toEqual(['topicsOverview']);
+    });
+
     it('TradingView widgets embed without data of our own', () => {
         const tv = defs.filter((d) => d.id.startsWith('tv-'));
         expect(tv).toHaveLength(6);
@@ -111,6 +132,7 @@ describe('registry invariants', () => {
 
     it('default spans follow the plan table', () => {
         const expected: Record<WidgetId, number> = {
+            'topics-overview': 4, 'topics-latest': 8, 'topic-briefs': 6,
             'portfolio-snapshot': 4, 'watchlist-movers': 4, 'friends-rank': 4, 'news-brain-tile': 12,
             'tv-heatmap': 8, 'tv-top-stories': 4, 'tv-ticker-tape': 12, 'tv-market-screener': 12,
             'tv-crypto-screener': 8, 'tv-forex': 6,
@@ -153,7 +175,7 @@ describe('data key graph', () => {
     });
 
     it('lazy keys are known and match the plan', () => {
-        expect([...LAZY_DATA_KEYS].sort()).toEqual(['analytics', 'brainStatus', 'movers', 'news']);
+        expect([...LAZY_DATA_KEYS].sort()).toEqual(['analytics', 'brainStatus', 'movers', 'news', 'topicsLatest']);
         for (const key of LAZY_DATA_KEYS) {
             expect(dataKeySet.has(key)).toBe(true);
         }
@@ -258,8 +280,8 @@ describe('resolveDataKeys', () => {
 
     it('resolves the default layout to the plan\'s key sets', () => {
         const result = resolveDataKeys(DEFAULT_LAYOUT.widgets.map((w) => w.id));
-        expect(new Set(result.eager)).toEqual(new Set(['portfolios', 'leaderboard', 'theses', 'suggestions']));
-        expect(result.lazy).toEqual(['movers']);
+        expect(new Set(result.eager)).toEqual(new Set(['portfolios', 'leaderboard', 'theses', 'suggestions', 'topicsOverview']));
+        expect(result.lazy).toEqual(['movers', 'topicsLatest']);
         expect(result.needsActiveAccount).toBe(false);
     });
 

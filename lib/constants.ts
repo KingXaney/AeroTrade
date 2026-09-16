@@ -1,12 +1,12 @@
+// Header order: topics first, then the dashboard and the market pages. Watchlist,
+// Friends and History stay reachable from the sidebar, the dropdown and ⌘K.
 export const NAV_ITEMS = [
+    { href: '/topics', label: 'Topics' },
     { href: '/', label: 'Dashboard' },
-    { href: '/markets', label: 'Markets' },
-    { href: '/trade', label: 'Trade' },
-    { href: '/portfolio', label: 'Portfolio' },
     { href: '/brain', label: 'Brain' },
-    { href: '/watchlist', label: 'Watchlist' },
-    { href: '/friends', label: 'Friends' },
-    { href: '/history', label: 'History' },
+    { href: '/portfolio', label: 'Portfolio' },
+    { href: '/trade', label: 'Trade' },
+    { href: '/markets', label: 'Markets' },
     { href: '/search', label: 'Search' },
 ];
 
@@ -47,77 +47,8 @@ export const PREFERRED_INDUSTRIES = [
     { value: 'Consumer Goods', label: 'Consumer Goods' },
 ];
 
-export const ALERT_TYPE_OPTIONS = [
-    { value: 'upper', label: 'Upper' },
-    { value: 'lower', label: 'Lower' },
-];
-
-export const CONDITION_OPTIONS = [
-    { value: 'greater', label: 'Greater than (>)' },
-    { value: 'less', label: 'Less than (<)' },
-];
-
 // TradingView embed script base; each widget appends its script name (e.g. `stock-heatmap.js`).
 export const TV_SCRIPT_BASE = 'https://s3.tradingview.com/external-embedding/embed-widget-';
-
-// TradingView Charts
-export const MARKET_OVERVIEW_WIDGET_CONFIG = {
-    colorTheme: 'dark', // dark mode
-    dateRange: '12M', // last 12 months
-    locale: 'en', // language
-    largeChartUrl: '', // link to a large chart if needed
-    isTransparent: true, // makes background transparent
-    showFloatingTooltip: true, // show tooltip on hover
-    plotLineColorGrowing: '#7df4ff', // line color when price goes up
-    plotLineColorFalling: '#ffb4ab', // line color when price falls
-    gridLineColor: 'rgba(240, 243, 250, 0)', // grid line color
-    scaleFontColor: '#DBDBDB', // font color for scale
-    belowLineFillColorGrowing: 'rgba(41, 98, 255, 0.12)', // fill under line when growing
-    belowLineFillColorFalling: 'rgba(41, 98, 255, 0.12)', // fill under line when falling
-    belowLineFillColorGrowingBottom: 'rgba(41, 98, 255, 0)',
-    belowLineFillColorFallingBottom: 'rgba(41, 98, 255, 0)',
-    symbolActiveColor: 'rgba(0, 240, 255, 0.08)', // highlight color for active symbol
-    tabs: [
-        {
-            title: 'Financial',
-            symbols: [
-                { s: 'NYSE:JPM', d: 'JPMorgan Chase' },
-                { s: 'NYSE:WFC', d: 'Wells Fargo Co New' },
-                { s: 'NYSE:BAC', d: 'Bank Amer Corp' },
-                { s: 'NYSE:HSBC', d: 'Hsbc Hldgs Plc' },
-                { s: 'NYSE:C', d: 'Citigroup Inc' },
-                { s: 'NYSE:MA', d: 'Mastercard Incorporated' },
-            ],
-        },
-        {
-            title: 'Technology',
-            symbols: [
-                { s: 'NASDAQ:AAPL', d: 'Apple' },
-                { s: 'NASDAQ:GOOGL', d: 'Alphabet' },
-                { s: 'NASDAQ:MSFT', d: 'Microsoft' },
-                { s: 'NASDAQ:FB', d: 'Meta Platforms' },
-                { s: 'NYSE:ORCL', d: 'Oracle Corp' },
-                { s: 'NASDAQ:INTC', d: 'Intel Corp' },
-            ],
-        },
-        {
-            title: 'Services',
-            symbols: [
-                { s: 'NASDAQ:AMZN', d: 'Amazon' },
-                { s: 'NYSE:BABA', d: 'Alibaba Group Hldg Ltd' },
-                { s: 'NYSE:T', d: 'At&t Inc' },
-                { s: 'NYSE:WMT', d: 'Walmart' },
-                { s: 'NYSE:V', d: 'Visa' },
-            ],
-        },
-    ],
-    support_host: 'https://www.tradingview.com', // TradingView host
-    backgroundColor: '#111318', // background color
-    width: '100%', // full width
-    height: 600, // height in px
-    showSymbolLogo: true, // show logo next to symbols
-    showChart: true, // display mini chart
-};
 
 export const HEATMAP_WIDGET_CONFIG = {
     dataSource: 'SPX500',
@@ -149,51 +80,6 @@ export const TOP_STORIES_WIDGET_CONFIG = {
     height: '600',
 };
 
-export const MARKET_DATA_WIDGET_CONFIG = {
-    title: 'Stocks',
-    width: '100%',
-    height: 600,
-    locale: 'en',
-    showSymbolLogo: true,
-    colorTheme: 'dark',
-    isTransparent: false,
-    backgroundColor: '#111318',
-    symbolsGroups: [
-        {
-            name: 'Financial',
-            symbols: [
-                { name: 'NYSE:JPM', displayName: 'JPMorgan Chase' },
-                { name: 'NYSE:WFC', displayName: 'Wells Fargo Co New' },
-                { name: 'NYSE:BAC', displayName: 'Bank Amer Corp' },
-                { name: 'NYSE:HSBC', displayName: 'Hsbc Hldgs Plc' },
-                { name: 'NYSE:C', displayName: 'Citigroup Inc' },
-                { name: 'NYSE:MA', displayName: 'Mastercard Incorporated' },
-            ],
-        },
-        {
-            name: 'Technology',
-            symbols: [
-                { name: 'NASDAQ:AAPL', displayName: 'Apple' },
-                { name: 'NASDAQ:GOOGL', displayName: 'Alphabet' },
-                { name: 'NASDAQ:MSFT', displayName: 'Microsoft' },
-                { name: 'NASDAQ:FB', displayName: 'Meta Platforms' },
-                { name: 'NYSE:ORCL', displayName: 'Oracle Corp' },
-                { name: 'NASDAQ:INTC', displayName: 'Intel Corp' },
-            ],
-        },
-        {
-            name: 'Services',
-            symbols: [
-                { name: 'NASDAQ:AMZN', displayName: 'Amazon' },
-                { name: 'NYSE:BABA', displayName: 'Alibaba Group Hldg Ltd' },
-                { name: 'NYSE:T', displayName: 'At&t Inc' },
-                { name: 'NYSE:WMT', displayName: 'Walmart' },
-                { name: 'NYSE:V', displayName: 'Visa' },
-            ],
-        },
-    ],
-};
-
 export const SYMBOL_INFO_WIDGET_CONFIG = (symbol: string) => ({
     symbol: symbol.toUpperCase(),
     colorTheme: 'dark',
@@ -216,32 +102,6 @@ export const CANDLE_CHART_WIDGET_CONFIG = (symbol: string) => ({
     locale: 'en',
     save_image: false,
     style: 1,
-    symbol: symbol.toUpperCase(),
-    theme: 'dark',
-    timezone: 'Etc/UTC',
-    backgroundColor: '#111318',
-    gridColor: '#111318',
-    watchlist: [],
-    withdateranges: false,
-    compareSymbols: [],
-    studies: [],
-    width: '100%',
-    height: 600,
-});
-
-export const BASELINE_WIDGET_CONFIG = (symbol: string) => ({
-    allow_symbol_change: false,
-    calendar: false,
-    details: false,
-    hide_side_toolbar: true,
-    hide_top_toolbar: false,
-    hide_legend: false,
-    hide_volume: false,
-    hotlist: false,
-    interval: 'D',
-    locale: 'en',
-    save_image: false,
-    style: 10,
     symbol: symbol.toUpperCase(),
     theme: 'dark',
     timezone: 'Etc/UTC',
@@ -426,27 +286,14 @@ export const POPULAR_STOCK_SYMBOLS = [
     'SE',
 ];
 
-export const NO_MARKET_NEWS =
-    '<p class="mobile-text" style="margin:0 0 20px 0;font-size:16px;line-height:1.6;color:#4b5563;">No market news available today. Please check back tomorrow.</p>';
-
-export const WATCHLIST_TABLE_HEADER = [
-    'Company',
-    'Symbol',
-    'Price',
-    'Change',
-    'Market Cap',
-    'P/E Ratio',
-    'Alert',
-    'Action',
-];
-
 // --- Chat assistant ---
 export const CHAT_WELCOME_MESSAGE =
-    "Hi — I'm your AlgoTest Advisor. Ask me to look up a stock, summarize the news, or manage your watchlist.";
+    "Hi — I'm your AeroTrade Advisor. Ask what's new in your topics, follow something new, look up a stock, or manage your watchlist.";
 
 export const CHAT_SUGGESTIONS = [
+    "What's new in my topics?",
+    "Follow news about AI chips",
+    "How is my paper portfolio doing?",
     "What's in my watchlist?",
     "Should I add NVDA?",
-    "Summarize today's market news",
-    "Compare AAPL vs MSFT valuations",
 ];
