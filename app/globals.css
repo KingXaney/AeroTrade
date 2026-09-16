@@ -891,6 +891,13 @@ html[data-mode="light"] {
   background-color: var(--surface-0) !important;
   border-radius: var(--panel-radius);
   overflow: hidden !important;
+  /* Chrome paints a cross-origin iframe on an opaque white canvas whenever the iframe
+     element's color-scheme differs from the embedded document's. TradingView's embed
+     pages never declare one (so they count as light), and the dark palettes put
+     color-scheme: dark on <html> — every isTransparent widget then lost its transparency
+     and read as a broken light theme. The widget's own colours still come from
+     colorTheme; this only keeps the iframe element on the scheme its document uses. */
+  color-scheme: light;
 }
 
 .tv-embed-widget-wrapper__body {
