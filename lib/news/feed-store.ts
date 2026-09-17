@@ -1,0 +1,119 @@
+// Server-only: the news feed for one user, or for one preference (the digest job has no
+// session). Reads live here, in a plain module, so they are never exposed as POST
+// endpoints; the writes are in lib/actions/news-feed.actions.ts. The maths — which
+// requests to make, how to filter and merge — is pure and tested in lib/news/feed.ts.
+
+import {connectToDatabase} from "@/database/mongoose";
+import UserPreferencesModel from "@/database/models/user-preferences.model";
+import {getNews} from "@/lib/actions/finnhub.actions";
+import {getCachedWatchlistSymbols} from "@/lib/dashboard/cached";
+import {fetchGoogleNewsFeed} from "@/lib/news/adapters/search";
+import {fetchRssNews} from "@/lib/news/adapters/rss";
+import {FEED_FETCH_LIMIT, FEED_WATCHLIST_SYMBOL_CAP} from "@/lib/news/config";
+import {
+    defaultNewsFeed,
+    feedRequestsFor,
+    filterBySources,
+    mergeFeed,
+    normalizeNewsFeed,
+    type FeedBatch,
+    type FeedRequest,
+    type NewsFeedPrefs,
+} from "@/lib/news/feed";
+import {newsSearchEnabled} from "@/lib/topics/config";
+
+export type NewsFeedResult = {
+    articles: MarketNewsArticle[];
+    /** True when the feed is not what the user asked for: Google News is off or answered with nothing. */
+    fallback: boolean;
+    requested: number;
+};
+
+// Any failure reads as the default feed: a page never breaks on a preference.
+export const getNewsFeedPrefs = async (userId: string): Promise<NewsFeedPrefs> => {
+    try {
+        await connectToDatabase();
+        const prefs = await UserPreferencesModel.findOne({userId}).select('newsFeed').lean();
+        return normalizeNewsFeed(prefs?.newsFeed);
+    } catch (error) {
+        console.error('Error reading news feed preference:', error);
+        return defaultNewsFeed();
+    }
+};
+
+// What stands in for Google News when it is switched off or empty: the same wires the
+// digest runs on, plus Finnhub (watchlist company news when there is one, its market wire
+// otherwise). Better than an empty page, and flagged so the page can say so.
+const WIRES_FALLBACK: FeedRequest[] = [
+    {kind: 'markets', url: null, label: 'Markets', keepFeedOrder: false},
+    {kind: 'finnhub', url: null, label: 'Finnhub', keepFeedOrder: false},
+];
+
+const fetchRequest = (request: FeedRequest, symbols: string[]): Promise<MarketNewsArticle[]> => {
+    switch (request.kind) {
+        case 'top':
+        case 'section':
+        case 'search':
+            return request.url
+                ? fetchGoogleNewsFeed(request.url, {limit: FEED_FETCH_LIMIT, keepFeedOrder: request.keepFeedOrder})
+                : Promise.resolve([]);
+        case 'markets':
+            return fetchRssNews();
+        case 'watchlist':
+            return symbols.length > 0 ? getNews(symbols.slice(0, FEED_WATCHLIST_SYMBOL_CAP)) : Promise.resolve([]);
+        case 'finnhub':
+            return getNews(symbols.length > 0 ? symbols.slice(0, FEED_WATCHLIST_SYMBOL_CAP) : undefined);
+    }
+};
+
+// One dead source never empties the feed: each request settles on its own, and outlet
+// filtering runs per batch so a hidden outlet cannot waste a rotation slot in the merge.
+const runRequests = async (requests: FeedRequest[], prefs: NewsFeedPrefs, symbols: string[], limit: number): Promise<MarketNewsArticle[]> => {
+    const settled = await Promise.allSettled(requests.map((request) => fetchRequest(request, symbols)));
+    const batches: FeedBatch[] = [];
+    settled.forEach((result, i) => {
+        if (result.status === 'fulfilled') {
+            batches.push({kind: requests[i].kind, articles: filterBySources(result.value, prefs)});
+        } else {
+            console.error(`News feed request failed (${requests[i].label}):`, result.reason);
+        }
+    });
+    return mergeFeed(batches, {limit});
+};
+
+export const getNewsFeedForPrefs = async (
+    prefs: NewsFeedPrefs,
+    {limit, watchlistSymbols = []}: {limit: number; watchlistSymbols?: string[]},
+): Promise<NewsFeedResult> => {
+    const planned = feedRequestsFor(prefs);
+    const googlePlanned = planned.some((request) => request.url !== null);
+
+    // NEWS_SEARCH_ENABLED is the one kill switch for every Google News request. With it
+    // off, keep the non-Google slots the user chose and add the wires.
+    let requests = planned;
+    let fallback = false;
+    if (googlePlanned && !newsSearchEnabled()) {
+        const kept = planned.filter((request) => request.url === null);
+        requests = [...kept, ...WIRES_FALLBACK.filter((w) => !kept.some((k) => k.kind === w.kind))];
+        fallback = true;
+    }
+
+    let articles = await runRequests(requests, prefs, watchlistSymbols, limit);
+    if (articles.length === 0 && googlePlanned && !fallback) {
+        // Google answered with nothing (outage, a redirect to a consent page): the wires
+        // beat an empty page, as long as the page says they are standing in.
+        articles = await runRequests(WIRES_FALLBACK, prefs, watchlistSymbols, limit);
+        fallback = true;
+    }
+    return {articles, fallback, requested: requests.length};
+};
+
+// The feed for a signed-in page or widget. Watchlist symbols are only read when the feed
+// asks for them, through the per-request cache the layout and loaders already share.
+export const getNewsFeed = async (userId: string, {limit}: {limit: number}): Promise<NewsFeedResult> => {
+    const prefs = await getNewsFeedPrefs(userId);
+    const watchlistSymbols = prefs.includeWatchlist
+        ? await getCachedWatchlistSymbols(userId).catch((error: unknown) => { console.error('Watchlist unavailable for the news feed:', error); return [] as string[]; })
+        : [];
+    return getNewsFeedForPrefs(prefs, {limit, watchlistSymbols});
+};

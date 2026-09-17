@@ -4,6 +4,7 @@ import {cookies} from "next/headers";
 import {connectToDatabase} from "@/database/mongoose";
 import UserPreferencesModel from "@/database/models/user-preferences.model";
 import {getCurrentUserId} from "@/lib/actions/watchlist.actions";
+import {upsertPreferences} from "@/lib/preferences/upsert";
 import {
     DEFAULT_THEME,
     encodeThemeCookie,
@@ -56,17 +57,6 @@ const isThemeInput = (input: unknown): input is Theme =>
     && isPaletteId((input as Theme).palette)
     && isStyleId((input as Theme).style)
     && typeof (input as Theme).reduceMotion === 'boolean';
-
-// Two first-time upserts (theme + dashboard saved together) can race on the
-// unique userId index; the second attempt finds the document and updates it.
-const upsertPreferences = async (userId: string, update: Record<string, unknown>) => {
-    try {
-        await UserPreferencesModel.findOneAndUpdate({userId}, update, {upsert: true});
-    } catch (e) {
-        if ((e as {code?: number}).code !== 11000) throw e;
-        await UserPreferencesModel.findOneAndUpdate({userId}, update, {upsert: true});
-    }
-};
 
 export const setAppearance = async (input: unknown): Promise<AppearanceResult> => {
     const userId = await getCurrentUserId();

@@ -1,4 +1,5 @@
 import {Document, model, models, Schema} from "mongoose";
+import type {NewsFeedPrefs} from "@/lib/news/feed-prefs";
 
 export interface AppearancePrefs {
     palette: string;
@@ -18,11 +19,14 @@ export interface UserPreferences extends Document {
     topicsInDigest?: boolean;
     appearance?: AppearancePrefs;
     dashboardLayout?: DashboardLayoutPrefs;
+    newsFeed?: NewsFeedPrefs;          // absent = the default feed (lib/news/feed-prefs.ts)
     updatedAt: Date;
 }
 
 // Single-nested sub-schemas without defaults: a plain nested path would default
-// `widgets` to [] and persist an empty layout on every unrelated upsert.
+// `widgets` to [] and persist an empty layout on every unrelated upsert. The same goes
+// for every array inside a sub-schema (default: undefined), or a theme save would write
+// an empty news feed.
 const AppearanceSchema = new Schema<AppearancePrefs>(
     {
         palette: {type: String, required: true},
@@ -43,6 +47,18 @@ const DashboardLayoutSchema = new Schema<DashboardLayoutPrefs>(
     {_id: false},
 );
 
+const NewsFeedSchema = new Schema<NewsFeedPrefs>(
+    {
+        categories: {type: [String], default: undefined},
+        regions: {type: [String], default: undefined},
+        includeSources: {type: [String], default: undefined},
+        excludeSources: {type: [String], default: undefined},
+        keywords: {type: [String], default: undefined},
+        includeWatchlist: {type: Boolean},
+    },
+    {_id: false},
+);
+
 const UserPreferencesSchema = new Schema<UserPreferences>({
     userId: {type: String, required: true, unique: true, index: true},
     emailNotifications: {type: Boolean, default: true},
@@ -50,6 +66,7 @@ const UserPreferencesSchema = new Schema<UserPreferences>({
     topicsInDigest: {type: Boolean, default: true},
     appearance: {type: AppearanceSchema, required: false},
     dashboardLayout: {type: DashboardLayoutSchema, required: false},
+    newsFeed: {type: NewsFeedSchema, required: false},
     updatedAt: {type: Date, default: Date.now},
 });
 
