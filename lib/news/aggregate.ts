@@ -6,8 +6,9 @@ import {fetchRedditNews} from "@/lib/news/adapters/reddit";
 import {fetchRssNews} from "@/lib/news/adapters/rss";
 import {fetchSecFilings} from "@/lib/news/adapters/sec";
 import {normalizeUrl, SOURCE_CAPS, TOTAL_ARTICLE_CAP} from "@/lib/news/config";
+import {dedupeArticles} from "@/lib/news/dedupe";
 
-export {normalizeUrl};
+export {normalizeUrl, dedupeArticles};
 
 // Email sections render in this order — finance wires lead, social chatter closes.
 // 'web' is capped at 0 by default (topics never reach the digest); it sits in these
@@ -19,27 +20,6 @@ const TRIM_ORDER: NewsSourceType[] = ["reddit", "rss", "web", "sec", "finance"];
 
 // Articles that predate sourceType stamping are treated as finance so they still render.
 const DEFAULT_SOURCE_TYPE: NewsSourceType = "finance";
-
-export const dedupeArticles = (articles: MarketNewsArticle[]): MarketNewsArticle[] => {
-    const seenUrls = new Set<string>();
-    const seenHeadlines = new Set<string>();
-    const unique: MarketNewsArticle[] = [];
-
-    for (const article of articles) {
-        const urlKey = normalizeUrl(article.url);
-        const headlineKey = article.headline.trim().toLowerCase();
-
-        if (seenUrls.has(urlKey) || seenHeadlines.has(headlineKey)) {
-            continue;
-        }
-
-        seenUrls.add(urlKey);
-        seenHeadlines.add(headlineKey);
-        unique.push(article);
-    }
-
-    return unique;
-};
 
 export const capAndOrder = (
     articles: MarketNewsArticle[],

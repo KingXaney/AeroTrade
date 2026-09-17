@@ -6,7 +6,9 @@ import {cache} from "react";
 import {getAccountAnalytics, getComparisonStats, getPortfoliosForUser, getTradeHistory} from "@/lib/trading/account";
 import {getCachedTopicsOverview, getCachedWatchlistSymbols} from "@/lib/dashboard/cached";
 import {getMergedTopicFeed} from "@/lib/topics/store";
-import {getNews, getStocksWithData} from "@/lib/actions/finnhub.actions";
+import {getStocksWithData} from "@/lib/actions/finnhub.actions";
+import {getNewsFeed} from "@/lib/news/feed-store";
+import {NEWS_WIDGET_LIMIT} from "@/lib/news/config";
 import {getLeaderboard} from "@/lib/actions/friends.actions";
 import {getActiveTheses, getBrainGraph, getBrainSystemStatus, getTopEntities, type BrainSystemStatus} from "@/lib/brain/queries";
 import {getLatestSuggestions} from "@/lib/navigator/service";
@@ -21,7 +23,6 @@ export type LoaderCtx = {
 };
 
 export const MOVERS_SYMBOL_CAP = 8;   // 3 Finnhub calls per symbol — keep the fan-out bounded
-export const NEWS_SYMBOL_CAP = 5;     // getNews loops symbols serially
 export const RECENT_TRADES_LIMIT = 8;
 export const TOP_ENTITIES_PER_TYPE = 5;
 export const GRAPH_NODE_LIMIT = 16;
@@ -68,10 +69,9 @@ export const LOADERS: {[K in DataKey]: Loader<K>} = {
     portfolios: ({userId}) => getPortfoliosForUser(userId),
     watchlistSymbols: ({userId}) => getCachedWatchlistSymbols(userId),
     movers: async ({userId}) => getStocksWithData((await getCachedWatchlistSymbols(userId)).slice(0, MOVERS_SYMBOL_CAP)),
-    news: async ({userId}) => {
-        const symbols = (await getCachedWatchlistSymbols(userId)).slice(0, NEWS_SYMBOL_CAP);
-        return getNews(symbols.length ? symbols : undefined);
-    },
+    // The user's feed (Google News top stories by default); the watchlist only joins in
+    // when the preference asks for it, through the same per-request cache.
+    news: async ({userId}) => (await getNewsFeed(userId, {limit: NEWS_WIDGET_LIMIT})).articles,
     leaderboard: ({userId}) => cLeaderboard(userId),
     theses: () => cTheses(),
     suggestions: ({userId}) => cSuggestions(userId),

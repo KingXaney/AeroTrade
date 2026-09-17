@@ -1,8 +1,8 @@
 'use server';
 
 import {connectToDatabase} from "@/database/mongoose";
-import UserPreferencesModel from "@/database/models/user-preferences.model";
 import {getCurrentUserId} from "@/lib/actions/watchlist.actions";
+import {unsetPreference, upsertPreferences} from "@/lib/preferences/upsert";
 import {DashboardLayoutSchema, normalizeLayout, resetLayout, type DashboardLayout} from "@/lib/dashboard/layout";
 
 // Writes only. Reads live in lib/dashboard/layout-store.ts (a plain server module),
@@ -11,16 +11,6 @@ import {DashboardLayoutSchema, normalizeLayout, resetLayout, type DashboardLayou
 // client finishes its own save flow, so callers refresh explicitly.
 
 export type LayoutResult = OrderResult & {layout?: DashboardLayout};
-
-// Two first-time upserts (theme + layout) can race on the unique userId index.
-const upsertPreferences = async (userId: string, update: Record<string, unknown>) => {
-    try {
-        await UserPreferencesModel.findOneAndUpdate({userId}, update, {upsert: true});
-    } catch (e) {
-        if ((e as {code?: number}).code !== 11000) throw e;
-        await UserPreferencesModel.findOneAndUpdate({userId}, update, {upsert: true});
-    }
-};
 
 export const saveDashboardLayout = async (input: unknown): Promise<LayoutResult> => {
     const userId = await getCurrentUserId();
@@ -45,7 +35,7 @@ export const resetDashboardLayout = async (): Promise<LayoutResult> => {
     if (!userId) return {success: false, message: 'Not authenticated'};
     try {
         await connectToDatabase();
-        await UserPreferencesModel.updateOne({userId}, {$unset: {dashboardLayout: 1}, $set: {updatedAt: new Date()}});
+        await unsetPreference(userId, 'dashboardLayout');
         return {success: true, layout: resetLayout()};
     } catch (error) {
         console.error('Error resetting dashboard layout:', error);

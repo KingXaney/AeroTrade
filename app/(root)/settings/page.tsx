@@ -8,6 +8,8 @@ import AccountSection from "@/components/settings/AccountSection";
 import SectionHeading from "@/components/settings/SectionHeading";
 import DashboardSettings from "@/components/settings/DashboardSettings";
 import TopicsSettings from "@/components/settings/TopicsSettings";
+import NewsFeedSettings from "@/components/settings/NewsFeedSettings";
+import {getNewsFeedPrefs} from "@/lib/news/feed-store";
 import {getCachedTopicsOverview} from "@/lib/dashboard/cached";
 import {getDashboardLayoutForUser} from "@/lib/dashboard/layout-store";
 import {filterAvailable} from "@/lib/dashboard/layout";
@@ -16,6 +18,7 @@ import {WIDGET_IDS, WIDGETS, isWidgetAvailable} from "@/lib/dashboard/widgets";
 
 const SECTIONS = [
     {id: 'topics', label: 'Topics', icon: 'interests'},
+    {id: 'news', label: 'News feed', icon: 'feed'},
     {id: 'appearance', label: 'Appearance', icon: 'palette'},
     {id: 'dashboard', label: 'Dashboard', icon: 'space_dashboard'},
     {id: 'notifications', label: 'Notifications', icon: 'notifications'},
@@ -27,11 +30,12 @@ const SettingsPage = async () => {
     if (!session?.user) redirect('/sign-in');
     const user: User = {id: session.user.id, name: session.user.name, email: session.user.email};
 
-    const [notifications, layout, portfolios, topics] = await Promise.all([
+    const [notifications, layout, portfolios, topics, newsFeed] = await Promise.all([
         getNotificationPreferences(),
         getDashboardLayoutForUser(user.id),
         getPortfoliosForUser(user.id),
         getCachedTopicsOverview(user.id),
+        getNewsFeedPrefs(user.id),
     ]);
     const availability = {accountCount: portfolios.length, advanced: true};
     const availableIds = WIDGET_IDS.filter((id) => isWidgetAvailable(WIDGETS[id], availability));
@@ -43,7 +47,7 @@ const SettingsPage = async () => {
                 <h1 className="text-2xl font-semibold text-fg mb-1" style={{fontFamily: 'var(--type-display)'}}>
                     Settings
                 </h1>
-                <p className="text-sm text-fg-muted">Topics, appearance, dashboard layout, notifications and your account</p>
+                <p className="text-sm text-fg-muted">Topics, your news feed, appearance, dashboard layout, notifications and your account</p>
             </div>
 
             <div className="grid grid-cols-1 lg:grid-cols-12 gap-4 items-start">
@@ -62,6 +66,11 @@ const SettingsPage = async () => {
                     <section id="topics" className="glass-panel rounded-xl p-5 scroll-mt-24">
                         <SectionHeading>Topics</SectionHeading>
                         <TopicsSettings overview={topics} />
+                    </section>
+
+                    <section id="news" className="glass-panel rounded-xl p-5 scroll-mt-24">
+                        <SectionHeading>News feed</SectionHeading>
+                        <NewsFeedSettings initial={newsFeed} />
                     </section>
 
                     <section id="appearance" className="glass-panel rounded-xl p-5 scroll-mt-24">

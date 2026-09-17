@@ -11,6 +11,8 @@ export const formatTimeAgo = (timestamp: number) => {
   const diffInHours = Math.floor(diffInMs / (1000 * 60 * 60));
   const diffInMinutes = Math.floor(diffInMs / (1000 * 60));
 
+  // Feeds stamp items seconds ahead of this server's clock; never print "-1 minute ago".
+  if (diffInMinutes < 1) return 'just now';
   if (diffInHours > 24) {
     const days = Math.floor(diffInHours / 24);
     return `${days} day${days > 1 ? 's' : ''} ago`;

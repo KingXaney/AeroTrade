@@ -126,7 +126,7 @@ Unit tests cover the pure modules — the layout engine, theme tokens, news aggr
 ## Project structure
 
 ```
-app/            routes: (auth) sign-in/up · (root) dashboard, topics, brain, trade, portfolio, markets, watchlist, friends, history, settings · api/{chat,inngest,accounts}
+app/            routes: (auth) sign-in/up · (root) dashboard, topics, brain, trade, portfolio, markets, news, watchlist, friends, history, settings · api/{chat,inngest,accounts}
 components/     UI by feature: dashboard (widget grid + 31 widgets), topics, brain, trade, analytics, settings, chat, theme, ui (shadcn)
 lib/
   news/         source adapters (Finnhub, RSS, Reddit, SEC, Google News search), dedupe, HTML sanitiser

@@ -1,8 +1,8 @@
-// Google News RSS search — the one source that can answer an arbitrary keyword
-// query, which is what makes open-ended followed topics possible. No key needed;
-// results are opaque redirect links, so headlines (not URLs) carry the identity.
+// Google News RSS — the search feed that makes open-ended followed topics possible, and
+// (since the personal news feed) the query-less front page and topic sections too. No key
+// needed; results are opaque redirect links, so headlines (not URLs) carry the identity.
 
-import {FEED_REVALIDATE_SECONDS, GOOGLE_NEWS_SEARCH_BASE, searchUserAgent} from "@/lib/news/config";
+import {FEED_REVALIDATE_SECONDS, GOOGLE_NEWS_BASE, GOOGLE_NEWS_SEARCH_BASE, searchUserAgent, US_EDITION, type GoogleEdition} from "@/lib/news/config";
 import {parseRssXml} from "@/lib/news/adapters/rss";
 import {formatArticle, validateArticle} from "@/lib/utils";
 import {QUERY_MAX_CHARS, newsSearchEnabled} from "@/lib/topics/config";
@@ -44,8 +44,8 @@ export const buildSearchQuery = (keywords: string[], exclude: string[]): string 
     return query;
 };
 
-export const searchUrlFor = (query: string): string =>
-    `${GOOGLE_NEWS_SEARCH_BASE}?q=${encodeURIComponent(query)}&hl=en-US&gl=US&ceid=US:en`;
+export const searchUrlFor = (query: string, edition: GoogleEdition = US_EDITION): string =>
+    `${GOOGLE_NEWS_SEARCH_BASE}?q=${encodeURIComponent(query)}&hl=${edition.hl}&gl=${edition.gl}&ceid=${edition.ceid}`;
 
 const NAMED_ENTITIES: Record<string, string> = {
     nbsp: ' ', amp: '&', quot: '"', apos: "'", lt: '<', gt: '>',
@@ -96,7 +96,10 @@ export const parseSearchFeed = (xml: string): RawNewsArticle[] =>
         .filter((article) => (article.headline ?? '').length > 0);
 
 // Google returns the same story under several redirect ids: keep one per outlet+headline.
-export const toSearchArticles = (raw: RawNewsArticle[]): MarketNewsArticle[] => {
+// keepFeedOrder preserves the feed's own order (the front page and topic sections are ranked
+// by prominence, not time); the Map keeps first-insertion position even when a later
+// duplicate replaces the value.
+export const toSearchArticles = (raw: RawNewsArticle[], {keepFeedOrder = false}: {keepFeedOrder?: boolean} = {}): MarketNewsArticle[] => {
     const byKey = new Map<string, MarketNewsArticle>();
     raw.filter(validateArticle).forEach((article, index) => {
         const shaped: MarketNewsArticle = {
@@ -109,24 +112,40 @@ export const toSearchArticles = (raw: RawNewsArticle[]): MarketNewsArticle[] => 
         const existing = byKey.get(key);
         if (!existing || existing.datetime < shaped.datetime) byKey.set(key, shaped);
     });
-    return Array.from(byKey.values()).sort((a, b) => b.datetime - a.datetime);
+    const articles = Array.from(byKey.values());
+    return keepFeedOrder ? articles : articles.sort((a, b) => b.datetime - a.datetime);
 };
 
-export const fetchNewsForQuery = async (query: string, {limit = 40}: {limit?: number} = {}): Promise<MarketNewsArticle[]> => {
-    if (!newsSearchEnabled() || !query.trim()) return [];
+export type GoogleFeedOptions = {limit?: number; keepFeedOrder?: boolean};
+
+// Any Google News RSS URL — search, front page or topic section. NEWS_SEARCH_ENABLED is the
+// one kill switch for all of them. The URL must sit under the Google News base: this is the
+// only fetch in the app that takes a URL built from user-influenced input, so it can never
+// be pointed anywhere else.
+export const fetchGoogleNewsFeed = async (url: string, {limit = 40, keepFeedOrder = false}: GoogleFeedOptions = {}): Promise<MarketNewsArticle[]> => {
+    if (!newsSearchEnabled() || !url.startsWith(GOOGLE_NEWS_BASE)) return [];
     try {
         const init: NextFetchInit = {
             headers: {'User-Agent': searchUserAgent()},
+            // Topic sections answer with a 302 to an opaque topic id; the cache stores the
+            // final response.
+            redirect: 'follow',
             next: {revalidate: FEED_REVALIDATE_SECONDS},
         };
-        const response = await fetch(searchUrlFor(query), init);
+        const response = await fetch(url, init);
         if (!response.ok) {
-            console.error(`Google News search failed: ${response.status} ${response.statusText}`);
+            console.error(`Google News feed failed: ${response.status} ${response.statusText}`);
             return [];
         }
-        return toSearchArticles(parseSearchFeed(await response.text())).slice(0, Math.max(0, limit));
+        const articles = toSearchArticles(parseSearchFeed(await response.text()), {keepFeedOrder});
+        // A 200 that parses to nothing is the shape of a redirect to a consent page; say so.
+        if (articles.length === 0) console.warn(`Google News feed returned no items: ${url.split('?')[0]}`);
+        return articles.slice(0, Math.max(0, limit));
     } catch (error) {
-        console.error('Google News search error:', error);
+        console.error('Google News feed error:', error);
         return [];
     }
 };
+
+export const fetchNewsForQuery = async (query: string, options: GoogleFeedOptions = {}): Promise<MarketNewsArticle[]> =>
+    query.trim() ? fetchGoogleNewsFeed(searchUrlFor(query), options) : [];

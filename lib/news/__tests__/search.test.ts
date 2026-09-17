@@ -59,6 +59,11 @@ describe('searchUrlFor', () => {
         expect(searchUrlFor('("fed rate" OR fomc) -crypto & more'))
             .toBe('https://news.google.com/rss/search?q=(%22fed%20rate%22%20OR%20fomc)%20-crypto%20%26%20more&hl=en-US&gl=US&ceid=US:en');
     });
+
+    it('takes another edition without changing the query encoding', () => {
+        expect(searchUrlFor('nvidia', {hl: 'en-GB', gl: 'GB', ceid: 'GB:en'}))
+            .toBe('https://news.google.com/rss/search?q=nvidia&hl=en-GB&gl=GB&ceid=GB:en');
+    });
 });
 
 describe('decodeEntities', () => {
@@ -85,6 +90,15 @@ describe('parseSearchFeed + toSearchArticles', () => {
         expect(articles[0].datetime).toBe(Date.parse('Mon, 25 Aug 2026 14:00:00 GMT') / 1000);
         expect(articles.every((a) => a.sourceType === 'web')).toBe(true);
         expect(articles.every((a) => a.url.startsWith('https://news.google.com/'))).toBe(true);
+    });
+
+    it("keeps the feed's own order when asked, instead of sorting by time", () => {
+        const raw = parseSearchFeed(FIXTURE);
+        // Fixture order is Reuters (14:00, then its 13:00 duplicate), Bloomberg (12:00); put an
+        // older item first to prove the sort is what is being skipped.
+        const older = [raw[2], raw[0], raw[1]];
+        expect(toSearchArticles(older).map((a) => a.source)).toEqual(['Reuters', 'Bloomberg']);
+        expect(toSearchArticles(older, {keepFeedOrder: true}).map((a) => a.source)).toEqual(['Bloomberg', 'Reuters']);
     });
 
     it('returns nothing for garbage', () => {

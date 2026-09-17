@@ -149,7 +149,7 @@ export const fetchRssNews = async (symbols?: string[]): Promise<MarketNewsArticl
                 }
                 const xml = await res.text();
                 const isSymbolFeed = symbol !== undefined;
-                return parseRssXml(xml, feed.name)
+                return parseRssXml(xml, feed.outlet)
                     .filter((article) => validateArticle(article))
                     .map((article, index) => ({
                         ...formatArticle(article, isSymbolFeed, symbol, index),

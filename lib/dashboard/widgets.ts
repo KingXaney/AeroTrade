@@ -539,8 +539,8 @@ export const WIDGETS: {readonly [K in WidgetId]: WidgetDefinition & {id: K}} = {
     }),
     'market-news': define({
         id: 'market-news',
-        title: 'Market News',
-        description: 'Latest headlines for your watchlist symbols.',
+        title: 'News feed',
+        description: 'Top stories from Google News by default — tune categories, regions, outlets and keywords on the News page.',
         category: 'tools',
         icon: 'feed',
         spans: [4, 6, 8, 12],
@@ -548,6 +548,7 @@ export const WIDGETS: {readonly [K in WidgetId]: WidgetDefinition & {id: K}} = {
         minHeight: 320,
         dataKeys: ['news'],
         heavy: true,
+        href: '/news',
     }),
     'quick-links': define({
         id: 'quick-links',

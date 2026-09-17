@@ -46,7 +46,9 @@ function UserDropdown({user}: {user: User}) {
                             {initial}
                         </AvatarFallback>
                     </Avatar>
-                    <div className="hidden md:flex flex-col items-start leading-tight">
+                    {/* Seven nav items plus Search leave no room for a name below xl; the avatar
+                        and chevron still mark the menu. */}
+                    <div className="hidden xl:flex flex-col items-start leading-tight whitespace-nowrap">
                         <span className="text-sm font-medium text-fg"
                               style={{ fontFamily: 'var(--type-display)' }}>
                             {user.name}
@@ -56,7 +58,7 @@ function UserDropdown({user}: {user: User}) {
                             Paper trading
                         </span>
                     </div>
-                    <ChevronDown className="hidden md:block size-4 text-fg-muted group-hover:text-fg-soft transition-transform group-data-[state=open]:rotate-180"/>
+                    <ChevronDown className="hidden sm:block size-4 text-fg-muted group-hover:text-fg-soft transition-transform group-data-[state=open]:rotate-180"/>
                 </button>
             </DropdownMenuTrigger>
 

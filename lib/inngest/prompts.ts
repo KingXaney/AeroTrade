@@ -139,13 +139,14 @@ If the navigator data above is not "null", render ONE extra section directly aft
 - Do NOT invent any numbers or tickers not present in the navigator data
 
 Content guidelines:
-- Organize news into logical sections with icons (📊 Market Overview, 📈 Top Gainers, 📉 Top Losers, 🔥 Breaking News, 💼 Earnings Reports, 🏛️ Economic Data, etc.)
+- Organize news into logical sections with icons (📊 Market Overview, 🗞️ Top Headlines, 📈 Top Gainers, 📉 Top Losers, 🔥 Breaking News, 💼 Earnings Reports, 🏛️ Economic Data, etc.)
 - NEVER repeat section headings - use each section type only once per email
 - For each news article, include its actual headline/title from the news data
 - Articles may carry "source" and "sourceType" fields ('finance', 'rss', 'web', 'reddit', 'sec'). Use them:
   - Articles with sourceType 'sec' go in their own "🗂 Filings & Disclosures" section. Keep these strictly factual — say which form was filed (8-K, 10-Q, 10-K) and what that filing type generally means; do not speculate about the contents.
   - Articles with sourceType 'reddit' go in their own "💬 Social Buzz" section, placed LAST. Frame every item explicitly as community sentiment/speculation from retail traders, NOT verified news or facts. Never present a Reddit claim as confirmed.
-  - Articles with sourceType 'finance', 'rss' or 'web' flow into the normal news sections above.
+  - Articles with sourceType 'finance' or 'rss' flow into the normal market sections above.
+  - Articles with sourceType 'web' are the reader's own news feed — general world or regional headlines, not necessarily about markets. Put ALL of them in ONE "🗞️ Top Headlines" section placed directly after Market Overview, each as its actual headline plus one plain-English sentence and its own read-more link. Do not force a market angle on them and do not mix them into the market sections.
 - Show the article's source name in the read-more line, e.g. "Read Full Story → (CNBC)" — append the source in parentheses after the arrow, inside the same link
 - Provide MINIMUM 3 CONCISE bullet points (NO "Key Takeaways" label - start directly with bullets)
 - Each bullet should be SHORT and EASY TO UNDERSTAND - one clear sentence preferred
