@@ -51,7 +51,28 @@ export const redditUserAgent = (): string => "AeroTrade/1.0 (paper-trading news 
 
 export const secUserAgent = (): string => "AeroTrade " + contactEmail();
 
-export const GOOGLE_NEWS_SEARCH_BASE = "https://news.google.com/rss/search";
+export const GOOGLE_NEWS_BASE = "https://news.google.com/rss";
+export const GOOGLE_NEWS_SEARCH_BASE = `${GOOGLE_NEWS_BASE}/search`;
+
+// A Google News edition: interface language, country, and the combined edition id.
+export type GoogleEdition = {hl: string; gl: string; ceid: string};
+export const US_EDITION: GoogleEdition = {hl: "en-US", gl: "US", ceid: "US:en"};
+
+// --- The per-user news feed (lib/news/feed.ts) ---
+// Items to take from each Google feed before merging; the top-stories feed carries ~38,
+// topic sections ~70, so this is "everything" for the former and a fair share for the latter.
+export const FEED_FETCH_LIMIT = 70;
+// Anything older than this is dropped from a feed even if Google still lists it.
+export const FEED_MAX_AGE_SECONDS = 3 * 24 * 60 * 60;
+// Network calls one page view may fan out to; planFeedSlots is the only place that truncates.
+export const MAX_FEED_REQUESTS = 8;
+// getNews loops watchlist symbols serially against Finnhub.
+export const FEED_WATCHLIST_SYMBOL_CAP = 5;
+// How many of the user's feed articles join the daily digest, ahead of TOTAL_ARTICLE_CAP.
+export const FEED_DIGEST_CAP = 5;
+export const NEWS_WIDGET_LIMIT = 8;
+export const NEWS_HISTORY_LIMIT = 6;
+export const NEWS_PAGE_SIZE = 24;
 
 export const searchUserAgent = (): string => "AeroTrade/1.0 (followed-topics; contact " + contactEmail() + ")";
 

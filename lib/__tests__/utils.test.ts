@@ -16,6 +16,15 @@ describe('formatTimeAgo', () => {
         expect(formatTimeAgo(now - 25 * 3600)).toBe('1 day ago');
     });
 
+    it('says "just now" under a minute, including timestamps ahead of the clock', () => {
+        vi.useFakeTimers();
+        vi.setSystemTime(new Date('2026-09-05T12:00:00Z'));
+        const now = Math.floor(Date.now() / 1000);
+        expect(formatTimeAgo(now)).toBe('just now');
+        expect(formatTimeAgo(now - 30)).toBe('just now');
+        expect(formatTimeAgo(now + 90)).toBe('just now');
+    });
+
     it('treats exactly 24 hours as hours, not days', () => {
         vi.useFakeTimers();
         vi.setSystemTime(new Date('2026-09-05T12:00:00Z'));
