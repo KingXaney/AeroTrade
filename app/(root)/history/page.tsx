@@ -1,10 +1,11 @@
 import Link from "next/link";
 import {redirect} from "next/navigation";
 import {getCurrentUserId, getWatchlistForUser} from "@/lib/actions/watchlist.actions";
-import {getNews} from "@/lib/actions/finnhub.actions";
-import {formatTimeAgo} from "@/lib/utils";
+import {getNewsFeed} from "@/lib/news/feed-store";
+import {NEWS_HISTORY_LIMIT} from "@/lib/news/config";
 import {getRecentTradesForUser} from "@/lib/trading/account";
 import TradeHistory from "@/components/trade/TradeHistory";
+import NewsArticleCard from "@/components/news/NewsArticleCard";
 
 const formatAddedAt = (date: Date) =>
     new Date(date).toLocaleString('en-US', {
@@ -20,12 +21,12 @@ const HistoryPage = async () => {
     if (!userId) redirect('/sign-in');
 
     const [items, recent] = await Promise.all([getWatchlistForUser(userId), getRecentTradesForUser(userId)]);
-    const symbols = items.map((i) => i.symbol);
 
-    // News personalized to the watchlist when present, otherwise general market news.
+    // The user's own feed (Google News top stories unless they changed it); a feed
+    // failure never takes the page down.
     let news: MarketNewsArticle[] = [];
     try {
-        news = await getNews(symbols.length > 0 ? symbols : undefined);
+        news = (await getNewsFeed(userId, {limit: NEWS_HISTORY_LIMIT})).articles;
     } catch {
         news = [];
     }
@@ -88,34 +89,25 @@ const HistoryPage = async () => {
                     )}
                 </section>
 
-                {/* Related market news */}
+                {/* The user's news feed */}
                 <section className="lg:col-span-2 space-y-4">
-                    <h2 className="text-xs font-bold uppercase tracking-[0.1em] text-brand"
-                        style={{ fontFamily: 'var(--type-mono)' }}>
-                        {symbols.length > 0 ? 'News For Your Watchlist' : 'Market News'}
-                    </h2>
+                    <div className="flex items-center justify-between gap-3">
+                        <h2 className="text-xs font-bold uppercase tracking-[0.1em] text-brand"
+                            style={{ fontFamily: 'var(--type-mono)' }}>
+                            Your news feed
+                        </h2>
+                        <Link href="/news?edit=1" className="text-xs text-brand hover:underline" style={{ fontFamily: 'var(--type-mono)' }}>
+                            Edit feed →
+                        </Link>
+                    </div>
 
                     {news.length === 0 ? (
                         <div className="glass-panel rounded-xl p-6">
-                            <p className="text-sm text-fg-muted">No recent news available right now.</p>
+                            <p className="text-sm text-fg-muted">No headlines right now — try again in a few minutes.</p>
                         </div>
                     ) : (
                         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                            {news.map((article) => (
-                                <a
-                                    key={article.id}
-                                    href={article.url}
-                                    target="_blank"
-                                    rel="noopener noreferrer"
-                                    className="news-item flex flex-col"
-                                >
-                                    <span className="news-tag">{article.related || article.source}</span>
-                                    <h3 className="news-title">{article.headline}</h3>
-                                    <p className="news-meta">{formatTimeAgo(article.datetime)} · {article.source}</p>
-                                    <p className="news-summary">{article.summary}</p>
-                                    <span className="news-cta mt-auto">Read more →</span>
-                                </a>
-                            ))}
+                            {news.map((article) => <NewsArticleCard key={article.id} article={article} />)}
                         </div>
                     )}
                 </section>

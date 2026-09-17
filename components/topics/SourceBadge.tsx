@@ -3,7 +3,7 @@ const LABELS: Record<NewsSourceType, string> = {
     rss: 'News',
     reddit: 'Reddit',
     sec: 'SEC filing',
-    web: 'Web',
+    web: 'News',
 };
 
 const SourceBadge = ({sourceType, source}: {sourceType: NewsSourceType; source?: string}) => (

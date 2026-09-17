@@ -15,7 +15,7 @@ export type NavItem = {
     icon: string;
     /** Which count, if any, rides on this row. */
     badge?: NavBadgeKey;
-    /** The header has room for six; the rest live in the sidebar and the mobile drawer. */
+    /** The header has room for seven; the rest live in the sidebar and the mobile drawer. */
     inHeader: boolean;
 };
 
@@ -27,6 +27,7 @@ export const NAV_ITEMS: readonly NavItem[] = [
     {href: '/portfolio', label: 'Portfolio', icon: 'account_balance_wallet', inHeader: true},
     {href: '/trade', label: 'Trade', icon: 'candlestick_chart', inHeader: true},
     {href: '/markets', label: 'Markets', icon: 'query_stats', inHeader: true},
+    {href: '/news', label: 'News', icon: 'feed', inHeader: true},
     {href: '/watchlist', label: 'Watchlist', icon: 'bookmark', badge: 'watchlist', inHeader: false},
     {href: '/friends', label: 'Friends', icon: 'group', badge: 'friendRequests', inHeader: false},
     {href: '/history', label: 'History', icon: 'history', inHeader: false},

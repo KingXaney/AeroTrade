@@ -74,10 +74,10 @@ const settleToasts = async (page) => {
     check('sidebar topics card shows 1 topic followed', /1\s*topic\s*followed/i.test(sideCard), sideCard);
     const sideNav = await page.$$eval('aside nav a', (as) => as.map((a) => a.textContent.trim()));
     check('sidebar nav starts Topics · Dashboard · Brain', sideNav.join(',').startsWith('interestsTopics,space_dashboardDashboard,neurologyBrain'), sideNav.join(','));
-    // The sidebar is the surface that owns the account pages; all ten come from lib/navigation.ts.
-    check('sidebar nav lists all ten routes', sideNav.length === 10, String(sideNav.length));
+    // The sidebar is the surface that owns the account pages; all eleven come from lib/navigation.ts.
+    check('sidebar nav lists all eleven routes', sideNav.length === 11, String(sideNav.length));
     const headerHrefs = await page.$$eval('header nav ul li a', (as) => as.map((a) => a.getAttribute('href')));
-    check('header nav order', headerHrefs.join(',') === '/topics,/,/brain,/portfolio,/trade,/markets', headerHrefs.join(','));
+    check('header nav order', headerHrefs.join(',') === '/topics,/,/brain,/portfolio,/trade,/markets,/news', headerHrefs.join(','));
     // Search is a palette trigger, not a route — it used to be a fake '/search' NAV_ITEMS entry.
     check('header search is a real button with a ⌘K hint',
         await page.locator('header button.search-text kbd').count() === 1);

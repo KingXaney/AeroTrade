@@ -58,7 +58,7 @@ const skeleton = (id: WidgetId, rows = 3) => <WidgetSkeleton height={WIDGETS[id]
 const WatchlistMoversAsync = async ({ctx}: {ctx: LoaderCtx}) => (
     <WatchlistMovers movers={topMovers((await LOADERS.movers(ctx)) ?? [], 4)} />
 );
-const MarketNewsAsync = async ({ctx}: {ctx: LoaderCtx}) => <MarketNewsList news={(await LOADERS.news(ctx)) ?? []} />;
+const MarketNewsAsync = async ({ctx, span}: {ctx: LoaderCtx; span: number}) => <MarketNewsList news={(await LOADERS.news(ctx)) ?? []} span={span} />;
 const PerformanceChartAsync = async ({ctx}: {ctx: LoaderCtx}) => {
     const analytics = await LOADERS.analytics(ctx);
     if (!analytics) return <WidgetUnavailable text="No performance history yet — snapshots start tomorrow." />;
@@ -141,7 +141,7 @@ export const WIDGET_RENDERERS: Record<WidgetId, Renderer> = {
             <BrainStatusAsync ctx={r.ctx} />
         </Suspense>
     ),
-    'market-news': (r) => <Suspense fallback={skeleton('market-news', 4)}><MarketNewsAsync ctx={r.ctx} /></Suspense>,
+    'market-news': (r) => <Suspense fallback={skeleton('market-news', 4)}><MarketNewsAsync ctx={r.ctx} span={r.span} /></Suspense>,
     'quick-links': () => <QuickLinks />,
 };
 
