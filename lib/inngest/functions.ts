@@ -6,7 +6,9 @@ import {getWatchlistSymbolsByEmail} from "@/lib/actions/watchlist.actions";
 import {getQuote} from "@/lib/actions/finnhub.actions";
 import {getAggregatedNews, normalizeUrl} from "@/lib/news/aggregate";
 import {sanitizeDigestHtml, sanitizeWelcomeIntroHtml} from "@/lib/news/sanitize";
-import {BRAIN_SOURCE_CAPS, BRAIN_TOTAL_CAP, hashId} from "@/lib/news/config";
+import {BRAIN_SOURCE_CAPS, BRAIN_TOTAL_CAP, FEED_DIGEST_CAP, hashId} from "@/lib/news/config";
+import {pickDigestArticles} from "@/lib/news/feed";
+import {getNewsFeedForPrefs, getNewsFeedPrefs} from "@/lib/news/feed-store";
 import SuggestionSet, {GLOBAL_SUGGESTIONS_USER} from "@/database/models/suggestion-set.model";
 import NewsItem from "@/database/models/news-item.model";
 import AiNavigator from "@/database/models/ai-navigator.model";
@@ -570,11 +572,9 @@ export const sendDailyNewsSummary = inngest.createFunction(
 
             try {
                 const news = await step.run(`fetch-news-${safeId}`, async () => {
-                    if (user.digestMode === 'general') {
-                        return await getAggregatedNews({mode: 'general'});
-                    }
-                    // Holdings-aware: union of the watchlist and every symbol held
-                    // across the user's strategy accounts.
+                    // Holdings-aware: union of the watchlist and every symbol held across the
+                    // user's strategy accounts. Read in both digest modes now — the user's own
+                    // feed may ask for watchlist company news whatever the mode.
                     const [watchlist, held] = await Promise.all([
                         getWatchlistSymbolsByEmail(user.email),
                         getHeldSymbolsByUserId(user.id),
@@ -582,10 +582,21 @@ export const sendDailyNewsSummary = inngest.createFunction(
                     const symbols = Array.from(new Set(
                         [...watchlist, ...held].map((s) => s.toUpperCase()),
                     )).slice(0, PERSONALIZED_SYMBOL_CAP);
-                    if (symbols.length === 0) {
-                        return await getAggregatedNews({mode: 'general'});
-                    }
-                    return await getAggregatedNews({symbols, mode: 'personalized'});
+                    const marketPool = user.digestMode === 'general' || symbols.length === 0
+                        ? getAggregatedNews({mode: 'general'})
+                        : getAggregatedNews({symbols, mode: 'personalized'});
+                    // The user's news feed (Google News top stories unless they changed it) joins
+                    // the market pool as a bounded tail; the prompt gives it its own section. A
+                    // feed failure must never block the digest.
+                    const feed = getNewsFeedPrefs(user.id)
+                        .then((prefs) => getNewsFeedForPrefs(prefs, {limit: FEED_DIGEST_CAP, watchlistSymbols: symbols}))
+                        .then((result) => result.articles)
+                        .catch((error: unknown) => {
+                            console.error(`News feed unavailable for ${user.email}:`, error);
+                            return [] as MarketNewsArticle[];
+                        });
+                    const [aggregated, feedArticles] = await Promise.all([marketPool, feed]);
+                    return pickDigestArticles(aggregated, feedArticles);
                 });
 
                 if (!news || news.length === 0) {

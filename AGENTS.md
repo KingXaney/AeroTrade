@@ -18,7 +18,7 @@ product tour and docs/specs/ for the design documents behind the larger features
 ## Where things live
 
 - `app/` routes · `components/` UI by feature · `lib/actions/` server actions (session-derived, userId-scoped)
-- `lib/news` ingest + sanitise · `lib/brain` entity graph · `lib/navigator` allocation rails · `lib/topics` followed topics
+- `lib/news` ingest + sanitise + the per-user feed (`feed-prefs` client-safe, `feed` pure, `feed-store` server) · `lib/brain` entity graph · `lib/navigator` allocation rails · `lib/topics` followed topics
 - `lib/trading` paper accounts · `lib/dashboard` widget registry/layout · `lib/theme` palettes/styles · `lib/ai` models + chat tools
 - `lib/inngest/functions.ts` every scheduled job · `database/models/` Mongoose models · `types/global.d.ts` ambient domain types
 
