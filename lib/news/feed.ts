@@ -136,12 +136,20 @@ export const mergeFeed = (
     return out;
 };
 
-// The digest's article list with the user's feed folded in: the aggregated market pool
-// keeps priority, the feed contributes a bounded tail, and the whole thing stays under the
-// email's total cap. dedupeArticles is the digest's own rule, so the two agree.
+// The digest's article list with the user's feed folded in, under the email's total cap.
+// The feed gets RESERVED room: the market pool arrives already trimmed to that same cap
+// (SOURCE_CAPS sum to TOTAL_ARTICLE_CAP), so appending and re-slicing would squeeze the
+// feed out entirely whenever every wire is healthy — the normal case. Only feed stories
+// the pool does not already carry earn a slot, and the pool yields from its tail, which
+// capAndOrder ordered finance → rss → sec → reddit, so social chatter goes first. An
+// empty feed leaves the pool untouched. dedupeArticles is the digest's own rule.
 export const pickDigestArticles = (
     aggregated: MarketNewsArticle[],
     feed: MarketNewsArticle[],
     {feedCap = FEED_DIGEST_CAP, totalCap = TOTAL_ARTICLE_CAP}: {feedCap?: number; totalCap?: number} = {},
-): MarketNewsArticle[] =>
-    dedupeArticles([...aggregated, ...feed.slice(0, Math.max(0, feedCap))]).slice(0, Math.max(0, totalCap));
+): MarketNewsArticle[] => {
+    const pool = dedupeArticles(aggregated);
+    const tail = dedupeArticles([...pool, ...feed]).slice(pool.length, pool.length + Math.max(0, feedCap));
+    const total = Math.max(0, totalCap);
+    return [...pool.slice(0, Math.max(0, total - tail.length)), ...tail].slice(0, total);
+};

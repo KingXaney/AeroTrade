@@ -66,19 +66,26 @@ const fetchRequest = (request: FeedRequest, symbols: string[]): Promise<MarketNe
     }
 };
 
+type RunResult = {articles: MarketNewsArticle[]; googleAnswered: boolean};
+
 // One dead source never empties the feed: each request settles on its own, and outlet
 // filtering runs per batch so a hidden outlet cannot waste a rotation slot in the merge.
-const runRequests = async (requests: FeedRequest[], prefs: NewsFeedPrefs, symbols: string[], limit: number): Promise<MarketNewsArticle[]> => {
+// Google's health is judged on its RAW answer, before the outlet filter and the age cut:
+// a user who only wants a paywalled outlet, or whose keywords matched nothing today, has
+// an empty feed, not an outage.
+const runRequests = async (requests: FeedRequest[], prefs: NewsFeedPrefs, symbols: string[], limit: number): Promise<RunResult> => {
     const settled = await Promise.allSettled(requests.map((request) => fetchRequest(request, symbols)));
     const batches: FeedBatch[] = [];
+    let googleAnswered = false;
     settled.forEach((result, i) => {
         if (result.status === 'fulfilled') {
+            if (requests[i].url !== null && result.value.length > 0) googleAnswered = true;
             batches.push({kind: requests[i].kind, articles: filterBySources(result.value, prefs)});
         } else {
             console.error(`News feed request failed (${requests[i].label}):`, result.reason);
         }
     });
-    return mergeFeed(batches, {limit});
+    return {articles: mergeFeed(batches, {limit}), googleAnswered};
 };
 
 export const getNewsFeedForPrefs = async (
@@ -87,6 +94,9 @@ export const getNewsFeedForPrefs = async (
 ): Promise<NewsFeedResult> => {
     const planned = feedRequestsFor(prefs);
     const googlePlanned = planned.some((request) => request.url !== null);
+    // The watchlist enters the feed — the Finnhub fallback included — only when the feed
+    // asks for it, whatever a caller happens to have at hand.
+    const symbols = prefs.includeWatchlist ? watchlistSymbols : [];
 
     // NEWS_SEARCH_ENABLED is the one kill switch for every Google News request. With it
     // off, keep the non-Google slots the user chose and add the wires.
@@ -98,11 +108,12 @@ export const getNewsFeedForPrefs = async (
         fallback = true;
     }
 
-    let articles = await runRequests(requests, prefs, watchlistSymbols, limit);
-    if (articles.length === 0 && googlePlanned && !fallback) {
+    const first = await runRequests(requests, prefs, symbols, limit);
+    let articles = first.articles;
+    if (googlePlanned && !fallback && !first.googleAnswered && articles.length === 0) {
         // Google answered with nothing (outage, a redirect to a consent page): the wires
         // beat an empty page, as long as the page says they are standing in.
-        articles = await runRequests(WIRES_FALLBACK, prefs, watchlistSymbols, limit);
+        ({articles} = await runRequests(WIRES_FALLBACK, prefs, symbols, limit));
         fallback = true;
     }
     return {articles, fallback, requested: requests.length};

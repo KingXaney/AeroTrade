@@ -26,7 +26,7 @@ import {
     planFeedSlots,
     type NewsFeedPrefs,
 } from '@/lib/news/feed';
-import {FEED_DIGEST_CAP, GOOGLE_NEWS_BASE, MAX_FEED_REQUESTS, TOTAL_ARTICLE_CAP} from '@/lib/news/config';
+import {FEED_DIGEST_CAP, GOOGLE_NEWS_BASE, MAX_FEED_REQUESTS, RSS_FEEDS, TOTAL_ARTICLE_CAP, yahooSymbolFeed} from '@/lib/news/config';
 
 const NOW = 1_800_000_000;
 
@@ -238,6 +238,14 @@ describe('filterBySources', () => {
         expect(filterBySources(list, {includeSources: [], excludeSources: ['bbc.co.uk']}).map((a) => a.source)).toEqual(['Reuters', 'BBC News']);
     });
 
+    it('hides the markets wires by the same outlet name the chips use', () => {
+        // The RSS adapter stamps articles with feed.outlet, not the feed title
+        // ("CNBC Top News"), so "hide CNBC" reaches the CNBC wire too.
+        const wires = RSS_FEEDS.map((f) => article({source: f.outlet, url: `https://x/${f.outlet}`}));
+        expect(filterBySources(wires, {includeSources: [], excludeSources: ['CNBC', 'MarketWatch']}).map((a) => a.source)).toEqual(['Yahoo Finance']);
+        expect(yahooSymbolFeed('aapl').outlet).toBe('Yahoo Finance');
+    });
+
     it('applies both: include narrows, then hide removes', () => {
         expect(filterBySources(list, {includeSources: ['Reuters', 'BBC News'], excludeSources: ['BBC News']}).map((a) => a.source)).toEqual(['Reuters']);
     });
@@ -292,18 +300,37 @@ describe('mergeFeed', () => {
 });
 
 describe('pickDigestArticles', () => {
-    const aggregated = Array.from({length: 14}, (_, i) => article({headline: `Market ${i}`, url: `https://cnbc.com/${i}`}));
+    const market = (n: number) => Array.from({length: n}, (_, i) => article({headline: `Market ${i}`, url: `https://cnbc.com/${i}`, sourceType: 'finance'}));
     const feed = Array.from({length: 10}, (_, i) => article({headline: `World ${i}`, url: `https://news.google.com/rss/articles/F${i}?oc=5`}));
+    const isFeed = (a: MarketNewsArticle) => a.sourceType === 'web';
 
-    it('appends a bounded slice of the feed after the market pool and stays under the total cap', () => {
-        const out = pickDigestArticles(aggregated, feed);
-        expect(out).toHaveLength(Math.min(TOTAL_ARTICLE_CAP, 14 + FEED_DIGEST_CAP));
-        expect(out.slice(0, 14).map((a) => a.headline)).toEqual(aggregated.map((a) => a.headline));
-        expect(out.slice(14).every((a) => a.headline.startsWith('World'))).toBe(true);
+    it('appends at most FEED_DIGEST_CAP feed stories after a small market pool', () => {
+        const out = pickDigestArticles(market(4), feed);
+        expect(out).toHaveLength(4 + FEED_DIGEST_CAP);
+        expect(out.slice(0, 4).map((a) => a.headline)).toEqual(market(4).map((a) => a.headline));
+        expect(out.slice(4).map((a) => a.headline)).toEqual(feed.slice(0, FEED_DIGEST_CAP).map((a) => a.headline));
     });
 
-    it('does not repeat a story the market pool already has', () => {
-        const dup = [article({headline: 'Market 0', url: 'https://elsewhere/0'})];
-        expect(pickDigestArticles(aggregated.slice(0, 2), dup)).toHaveLength(2);
+    it("reserves the feed's slots when the market pool already fills the total cap", () => {
+        // getAggregatedNews returns exactly TOTAL_ARTICLE_CAP when every wire is healthy —
+        // the normal case. Appending and re-slicing would drop every feed story.
+        const out = pickDigestArticles(market(TOTAL_ARTICLE_CAP), feed);
+        expect(out).toHaveLength(TOTAL_ARTICLE_CAP);
+        expect(out.filter(isFeed)).toHaveLength(FEED_DIGEST_CAP);
+        expect(out.slice(0, TOTAL_ARTICLE_CAP - FEED_DIGEST_CAP).map((a) => a.headline))
+            .toEqual(market(TOTAL_ARTICLE_CAP - FEED_DIGEST_CAP).map((a) => a.headline));
+        expect(out.slice(-FEED_DIGEST_CAP).every(isFeed)).toBe(true);
+    });
+
+    it('leaves a full pool untouched when the feed is empty or failed', () => {
+        expect(pickDigestArticles(market(TOTAL_ARTICLE_CAP), []).map((a) => a.headline)).toEqual(market(TOTAL_ARTICLE_CAP).map((a) => a.headline));
+    });
+
+    it('does not let a story the pool already has cost a market slot', () => {
+        const dup = [article({headline: 'Market 0', url: 'https://elsewhere/0'}), ...feed.slice(0, 1)];
+        const out = pickDigestArticles(market(TOTAL_ARTICLE_CAP), dup);
+        expect(out).toHaveLength(TOTAL_ARTICLE_CAP);
+        expect(out.filter(isFeed)).toHaveLength(1);
+        expect(out.filter((a) => a.headline === 'Market 0')).toHaveLength(1);
     });
 });

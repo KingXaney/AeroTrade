@@ -1,17 +1,20 @@
 // Single knob file for the multi-source news digest — feeds, caps, and identity strings are swappable here without code changes.
 
-export type NewsFeed = {name: string; url: string};
+// `name` identifies the feed in logs; `outlet` is the publisher as the news feed's outlet
+// filter and Google's <source> spell it, so "hide CNBC" hides the CNBC wire too.
+export type NewsFeed = {name: string; outlet: string; url: string};
 
 export const RSS_FEEDS: NewsFeed[] = [
-    {name: "CNBC Top News", url: "https://www.cnbc.com/id/100003114/device/rss/rss.html"},
-    {name: "MarketWatch Top Stories", url: "https://feeds.content.dowjones.io/public/rss/mw_topstories"},
-    {name: "Yahoo Finance", url: "https://finance.yahoo.com/news/rssindex"},
+    {name: "CNBC Top News", outlet: "CNBC", url: "https://www.cnbc.com/id/100003114/device/rss/rss.html"},
+    {name: "MarketWatch Top Stories", outlet: "MarketWatch", url: "https://feeds.content.dowjones.io/public/rss/mw_topstories"},
+    {name: "Yahoo Finance", outlet: "Yahoo Finance", url: "https://finance.yahoo.com/news/rssindex"},
 ];
 
 export const yahooSymbolFeed = (symbol: string): NewsFeed => {
     const upper = symbol.toUpperCase();
     return {
         name: `Yahoo Finance ${upper}`,
+        outlet: "Yahoo Finance",
         url: `https://feeds.finance.yahoo.com/rss/2.0/headline?s=${upper}&region=US&lang=en-US`,
     };
 };
@@ -68,7 +71,8 @@ export const FEED_MAX_AGE_SECONDS = 3 * 24 * 60 * 60;
 export const MAX_FEED_REQUESTS = 8;
 // getNews loops watchlist symbols serially against Finnhub.
 export const FEED_WATCHLIST_SYMBOL_CAP = 5;
-// How many of the user's feed articles join the daily digest, ahead of TOTAL_ARTICLE_CAP.
+// Slots under TOTAL_ARTICLE_CAP reserved for the user's feed in the daily digest (the market
+// pool alone already fills the cap when every wire is healthy).
 export const FEED_DIGEST_CAP = 5;
 export const NEWS_WIDGET_LIMIT = 8;
 export const NEWS_HISTORY_LIMIT = 6;

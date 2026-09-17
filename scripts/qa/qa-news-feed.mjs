@@ -22,8 +22,12 @@ const note = (name, detail = '') => console.log(`NOTE  ${name}${detail ? `  — 
 const browser = await chromium.launch({channel: 'chrome'});
 const page = await browser.newPage({viewport: {width: 1440, height: 900}});
 const shot = (n) => page.screenshot({path: `${OUT}${n}.png`, fullPage: true});
-// sonner pauses dismissal while the pointer hovers a toast; park the mouse elsewhere.
-const settleToasts = async () => { await page.mouse.move(5, 700); await page.waitForTimeout(600); };
+// sonner pauses dismissal while the pointer hovers a toast: park the mouse, then wait it
+// out, so the next wait for a toast cannot resolve against the previous one.
+const settleToasts = async () => {
+    await page.mouse.move(5, 700);
+    await page.locator('[data-sonner-toast]').first().waitFor({state: 'detached', timeout: 10000}).catch(() => {});
+};
 const mongo = new MongoClient(MONGO);
 
 try {
