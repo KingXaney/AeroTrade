@@ -230,7 +230,7 @@ declare global {
     // Who placed a paper trade. Absent on rows written before this field existed —
     // nothing recorded which historical fills came from the AI, so absence honestly
     // means "unknown", never "user".
-    type TradeSource = 'user' | 'ai-navigator' | 'ai-suggestion';
+    type TradeSource = 'user' | 'ai-navigator' | 'ai-suggestion' | 'strategy';
 
     type PaperTradeRecord = {
         id: string;
@@ -242,6 +242,7 @@ declare global {
         total: number;
         realizedPnl?: number;
         source?: TradeSource;
+        reason?: string;          // why an automated fill happened, in the rule's own words
         accountName?: string;     // set when trades from several accounts are listed together
         createdAt: number;        // epoch milliseconds
     };

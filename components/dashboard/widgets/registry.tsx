@@ -13,6 +13,7 @@ import NewsBrainTile from "@/components/dashboard/widgets/NewsBrainTile";
 import TradingViewBody from "@/components/dashboard/widgets/TradingViewBody";
 import TopHoldings from "@/components/dashboard/widgets/TopHoldings";
 import SecondOpinionExcerpt from "@/components/dashboard/widgets/SecondOpinionExcerpt";
+import QuantStrategiesList from "@/components/dashboard/widgets/QuantStrategiesList";
 import MarketNewsList from "@/components/dashboard/widgets/MarketNewsList";
 import QuickLinks from "@/components/dashboard/widgets/QuickLinks";
 import TopicsOverview from "@/components/dashboard/widgets/TopicsOverview";
@@ -84,6 +85,11 @@ const TopicsLatestAsync = async ({ctx, span}: {ctx: LoaderCtx; span: WidgetSpan}
         ? <WidgetUnavailable text="No articles yet — we check for matches every few hours." />
         : <TopicsWidgetEmpty />;
 };
+const QuantStrategiesAsync = async ({ctx, span}: {ctx: LoaderCtx; span: number}) => {
+    const rows = await LOADERS.strategies(ctx);
+    if (!rows) return <WidgetUnavailable failed />;
+    return <QuantStrategiesList rows={rows} span={span} />;
+};
 const BrainStatusAsync = async ({ctx}: {ctx: LoaderCtx}) => {
     const status = await LOADERS.brainStatus(ctx);
     if (!status) return <div className="glass-panel rounded-xl p-5"><WidgetUnavailable failed /></div>;
@@ -141,6 +147,7 @@ export const WIDGET_RENDERERS: Record<WidgetId, Renderer> = {
             <BrainStatusAsync ctx={r.ctx} />
         </Suspense>
     ),
+    'quant-strategies': (r) => <Suspense fallback={skeleton('quant-strategies', 5)}><QuantStrategiesAsync ctx={r.ctx} span={r.span} /></Suspense>,
     'market-news': (r) => <Suspense fallback={skeleton('market-news', 4)}><MarketNewsAsync ctx={r.ctx} span={r.span} /></Suspense>,
     'quick-links': () => <QuickLinks />,
 };

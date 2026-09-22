@@ -46,7 +46,7 @@ try {
     check('text-warning utility is generated', warningUtility === 'rgb(255, 209, 102)', warningUtility);
 
     // --- no phantom scroll on the pages that carried a doubled min-h-screen -----
-    for (const path of ['/', '/portfolio', '/settings', '/brain', '/markets']) {
+    for (const path of ['/', '/portfolio', '/settings', '/brain', '/strategies', '/markets']) {
         await page.goto(`${BASE}${path}`, {waitUntil: 'networkidle'}).catch(() => {});
         const overflow = await page.evaluate(() =>
             document.documentElement.scrollHeight - window.innerHeight);

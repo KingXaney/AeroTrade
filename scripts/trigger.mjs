@@ -7,6 +7,9 @@
 //   npm run trigger -- snapshots                   daily account + benchmark snapshots
 //   npm run trigger -- topics                      refresh every followed keyword set
 //   npm run trigger -- briefs                      generate today's topic briefs
+//   npm run trigger -- strategies                  run the quant strategies (fills only during the session)
+//   npm run trigger -- strategies-preview          decide and record without filling anything
+//   npm run trigger -- strategies-resimulate       rebuild every strategy's backtest from a fresh backfill
 //   npm run trigger -- topic <userId> <keywordSetHash>   one on-demand topic refresh
 import { Inngest } from "inngest";
 
@@ -18,6 +21,14 @@ const EVENTS = {
     topics: 'app/refresh.topic.feeds',
     briefs: 'app/generate.topic.briefs',
     topic: 'topic/refresh.requested',
+    strategies: 'app/run.strategies',
+    'strategies-preview': 'app/run.strategies',
+    'strategies-resimulate': 'app/run.strategies',
+};
+
+const STRATEGY_DATA = {
+    'strategies-preview': { dryRun: true },
+    'strategies-resimulate': { resimulate: true },
 };
 
 const [job, userId, hash] = process.argv.slice(2);
@@ -26,7 +37,7 @@ if (!name || (job === 'topic' && (!userId || !Number.isFinite(Number(hash))))) {
     console.error(`Usage: npm run trigger -- <${Object.keys(EVENTS).join('|')}> [userId keywordSetHash]`);
     process.exit(1);
 }
-const data = job === 'topic' ? { userId, keywordSetHash: Number(hash) } : {};
+const data = job === 'topic' ? { userId, keywordSetHash: Number(hash) } : (STRATEGY_DATA[job] ?? {});
 
 // The id must match lib/inngest/client.ts so the event lands in the same app.
 const inngest = new Inngest({ id: 'aerotrade' });

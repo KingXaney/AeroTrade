@@ -16,6 +16,11 @@ import {getNavigatorStatus} from "@/lib/actions/navigator.actions";
 import {getLatestSecondOpinion, type SecondOpinionView} from "@/lib/brain/opinion";
 import {pickActiveAccount, type ComparisonStat, type LatestSuggestions} from "@/lib/dashboard/select";
 import type {DataKey} from "@/lib/dashboard/widgets";
+import {getStrategyWidgetRows} from "@/lib/strategies/queries";
+import type {StrategyLeaderboardRow} from "@/lib/strategies/views";
+
+// Followed strategies first, then the top of the ranking.
+const STRATEGY_WIDGET_LIMIT = 5;
 
 export type LoaderCtx = {
     userId: string;
@@ -45,6 +50,7 @@ export type DashboardData = Partial<{
     brainStatus: BrainSystemStatus;
     secondOpinion: SecondOpinionView | null;
     news: MarketNewsArticle[];
+    strategies: StrategyLeaderboardRow[];
     topicsOverview: TopicsOverview;
     topicsLatest: MergedTopicArticle[];
 }>;
@@ -89,6 +95,7 @@ export const LOADERS: {[K in DataKey]: Loader<K>} = {
     topEntities: () => getTopEntities(TOP_ENTITIES_PER_TYPE),
     brainGraph: () => getBrainGraph(GRAPH_NODE_LIMIT),
     brainStatus: () => getBrainSystemStatus(),
+    strategies: ({userId}) => getStrategyWidgetRows(userId, STRATEGY_WIDGET_LIMIT),
     secondOpinion: ({userId}) => getLatestSecondOpinion(userId),
     topicsOverview: ({userId}) => getCachedTopicsOverview(userId),
     topicsLatest: ({userId}) => getMergedTopicFeed(userId, {limit: TOPICS_LATEST_LIMIT}),

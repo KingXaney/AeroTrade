@@ -15,15 +15,17 @@ export type NavItem = {
     icon: string;
     /** Which count, if any, rides on this row. */
     badge?: NavBadgeKey;
-    /** The header has room for seven; the rest live in the sidebar and the mobile drawer. */
+    /** The header has room for eight; the rest live in the sidebar and the mobile drawer. */
     inHeader: boolean;
 };
 
-// Sidebar order: topics lead, the market pages follow, the account pages close it out.
+// Sidebar order: topics lead, the two global systems (brain, quant strategies) follow,
+// then the market pages, and the account pages close it out.
 export const NAV_ITEMS: readonly NavItem[] = [
     {href: '/topics', label: 'Topics', icon: 'interests', inHeader: true},
     {href: '/', label: 'Dashboard', icon: 'space_dashboard', inHeader: true},
     {href: '/brain', label: 'Brain', icon: 'neurology', inHeader: true},
+    {href: '/strategies', label: 'Strategies', icon: 'auto_graph', inHeader: true},
     {href: '/portfolio', label: 'Portfolio', icon: 'account_balance_wallet', inHeader: true},
     {href: '/trade', label: 'Trade', icon: 'candlestick_chart', inHeader: true},
     {href: '/markets', label: 'Markets', icon: 'query_stats', inHeader: true},

@@ -1,11 +1,13 @@
-// Pure-function coverage for the Stooq CSV client and the price signals.
+// Pure-function coverage for the Stooq CSV client, fetch-window planning and the price signals.
 // fetchStooqDaily is exercised against a stubbed global fetch — no network.
 
 import {afterEach, beforeEach, describe, expect, it, vi} from "vitest";
 import {decideFetchWindow, fetchStooqDaily, parseStooqCsv} from "@/lib/prices/stooq";
 import {computeSignals, type Bar} from "@/lib/prices/signals";
 import {
+    BACKFILL_CALENDAR_DAYS,
     BACKFILL_TRIGGER_GAP_DAYS,
+    STRATEGY_BACKFILL_CALENDAR_DAYS,
     TOPUP_CALENDAR_DAYS,
 } from "@/lib/prices/config";
 
@@ -24,13 +26,13 @@ const growthSeries = (count: number, growth: number): Bar[] =>
     seriesOf(Array.from({length: count}, (_, i) => 100 * Math.pow(growth, i)));
 
 describe("parseStooqCsv", () => {
-    it("parses a well-formed CSV into date/close/volume bars", () => {
+    it("parses a well-formed CSV into OHLC/close/volume bars", () => {
         const bars = parseStooqCsv(HAPPY_CSV);
 
         expect(bars).toEqual([
-            {date: "2026-07-27", close: 102.75, volume: 1500000},
-            {date: "2026-07-28", close: 103.1, volume: 1620500},
-            {date: "2026-07-29", close: 104.5, volume: 900000},
+            {date: "2026-07-27", close: 102.75, open: 101, high: 103.5, low: 100.2, volume: 1500000},
+            {date: "2026-07-28", close: 103.1, open: 102.8, high: 104, low: 101.9, volume: 1620500},
+            {date: "2026-07-29", close: 104.5, open: 103.2, high: 105.1, low: 102.7, volume: 900000},
         ]);
     });
 
@@ -38,8 +40,21 @@ describe("parseStooqCsv", () => {
         const csv = "Date,Open,High,Low,Close,Volume\n2026-07-29,103.2,105.1,102.7,104.50";
         const bars = parseStooqCsv(csv);
 
-        expect(bars).toEqual([{date: "2026-07-29", close: 104.5}]);
+        expect(bars).toEqual([{date: "2026-07-29", close: 104.5, open: 103.2, high: 105.1, low: 102.7}]);
         expect(bars[0].volume).toBeUndefined();
+    });
+
+    it("omits open/high/low that are blank, zero, negative or non-numeric", () => {
+        const csv = [
+            "Date,Open,High,Low,Close,Volume",
+            "2026-07-27,,0,-1,102.75,1500000",
+            "2026-07-28,abc,104.0,101.9,103.10,1620500",
+        ].join("\n");
+
+        expect(parseStooqCsv(csv)).toEqual([
+            {date: "2026-07-27", close: 102.75, volume: 1500000},
+            {date: "2026-07-28", close: 103.1, high: 104, low: 101.9, volume: 1620500},
+        ]);
     });
 
     it("skips blank lines and malformed rows but keeps the good ones", () => {
@@ -57,8 +72,8 @@ describe("parseStooqCsv", () => {
         ].join("\n");
 
         expect(parseStooqCsv(csv)).toEqual([
-            {date: "2026-07-27", close: 102.75, volume: 1500000},
-            {date: "2026-08-03", close: 105.25, volume: 800000},
+            {date: "2026-07-27", close: 102.75, open: 101, high: 103.5, low: 100.2, volume: 1500000},
+            {date: "2026-08-03", close: 105.25, open: 104, high: 106, low: 103.5, volume: 800000},
         ]);
     });
 
@@ -123,6 +138,72 @@ describe("decideFetchWindow", () => {
         expect(window.mode).toBe("topup");
         expect(window.fromDate).toBe("20251226");
         expect(window.toDate).toBe("20260105");
+    });
+
+    describe("earliest-bar rule", () => {
+        // 2026-07-30 − 1560 days = 2022-04-22; the 30-day tolerance moves the
+        // required earliest bar to 2022-05-22.
+        const STRATEGY_OPTS = {backfillCalendarDays: STRATEGY_BACKFILL_CALENDAR_DAYS};
+
+        it("keeps the two-argument behaviour when no earliest date is given", () => {
+            expect(decideFetchWindow("2026-07-29", TODAY)).toEqual(
+                decideFetchWindow("2026-07-29", TODAY, {}),
+            );
+            expect(decideFetchWindow("2026-07-29", TODAY, {earliestBarDate: null}).mode).toBe("topup");
+        });
+
+        it("tops up when the earliest stored bar is deep enough for the default window", () => {
+            // 730 − 30 = 700 days before today is 2024-08-29; a 2024-08-01 start is deeper.
+            const window = decideFetchWindow("2026-07-29", TODAY, {earliestBarDate: "2024-08-01"});
+
+            expect(window.mode).toBe("topup");
+            expect(window.fromDate).toBe("20260720");
+        });
+
+        it("tops up when the earliest bar lands inside the 30-day tolerance", () => {
+            const window = decideFetchWindow("2026-07-29", TODAY, {earliestBarDate: "2024-08-29"});
+
+            expect(window.mode).toBe("topup");
+        });
+
+        it("backfills when the earliest stored bar is too recent for the default window", () => {
+            const window = decideFetchWindow("2026-07-29", TODAY, {earliestBarDate: "2024-08-30"});
+
+            expect(window.mode).toBe("backfill");
+            expect(window.fromDate).toBe("20240730");
+            expect(window.toDate).toBe("20260730");
+        });
+
+        it("backfills a fresh two-year history when a strategy-depth window is requested", () => {
+            expect(STRATEGY_BACKFILL_CALENDAR_DAYS).toBe(1560);
+            expect(BACKFILL_CALENDAR_DAYS).toBe(730);
+            const window = decideFetchWindow("2026-07-29", TODAY, {...STRATEGY_OPTS, earliestBarDate: "2024-07-31"});
+
+            expect(window.mode).toBe("backfill");
+            expect(window.fromDate).toBe("20220422");
+            expect(window.toDate).toBe("20260730");
+        });
+
+        it("tops up when the stored history already reaches the strategy depth", () => {
+            const window = decideFetchWindow("2026-07-29", TODAY, {...STRATEGY_OPTS, earliestBarDate: "2022-05-22"});
+
+            expect(window.mode).toBe("topup");
+            expect(window.fromDate).toBe("20260720");
+        });
+
+        it("sizes a stale-gap backfill by the requested calendar days", () => {
+            const window = decideFetchWindow("2026-07-01", TODAY, STRATEGY_OPTS);
+
+            expect(window.mode).toBe("backfill");
+            expect(window.fromDate).toBe("20220422");
+        });
+
+        it("still backfills with no history at all under a custom depth", () => {
+            const window = decideFetchWindow(null, TODAY, STRATEGY_OPTS);
+
+            expect(window.mode).toBe("backfill");
+            expect(window.fromDate).toBe("20220422");
+        });
     });
 });
 
@@ -232,7 +313,7 @@ describe("fetchStooqDaily", () => {
             {cache: "no-store", headers: {"User-Agent": "AeroTrade/1.0"}},
         );
         expect(bars).toHaveLength(3);
-        expect(bars[0]).toEqual({date: "2026-07-27", close: 102.75, volume: 1500000});
+        expect(bars[0]).toEqual({date: "2026-07-27", close: 102.75, open: 101, high: 103.5, low: 100.2, volume: 1500000});
     });
 
     it("returns [] on a non-ok response", async () => {

@@ -1,7 +1,18 @@
 // Momentum / volatility / trend signals from daily closes. Pure math — the
 // caller owns data loading and ordering (barsAsc must be oldest-first).
 
-export type Bar = {date: string; close: number};
+// `close` is split-adjusted price return; `adjClose` (dividend-adjusted, when the
+// provider supplies it) exists only for total-return signals such as the T-bill hurdle.
+// Open/high/low arrive with the Yahoo provider; Stooq-era rows may lack them.
+export type Bar = {
+    date: string;
+    close: number;
+    open?: number;
+    high?: number;
+    low?: number;
+    volume?: number;
+    adjClose?: number;
+};
 
 export type Signals = {
     r63: number | null;

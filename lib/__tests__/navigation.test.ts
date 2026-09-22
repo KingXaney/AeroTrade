@@ -39,8 +39,9 @@ describe('NAV_ITEMS', () => {
     });
 
     it('derives the header list from the same array', () => {
-        expect(HEADER_NAV_ITEMS).toHaveLength(7);
+        expect(HEADER_NAV_ITEMS).toHaveLength(8);
         expect(HEADER_NAV_ITEMS.map((i) => i.href)).toContain('/news');
+        expect(HEADER_NAV_ITEMS.map((i) => i.href)).toContain('/strategies');
         for (const item of HEADER_NAV_ITEMS) {
             expect(NAV_ITEMS).toContain(item);
         }

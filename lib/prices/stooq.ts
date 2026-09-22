@@ -6,14 +6,32 @@ import {
     BACKFILL_TRIGGER_GAP_DAYS,
     TOPUP_CALENDAR_DAYS,
 } from "@/lib/prices/config";
+import {type Bar} from "@/lib/prices/signals";
 
-export type StooqBar = {date: string; close: number; volume?: number};
+// Both providers now produce the same shape; the alias survives for older imports.
+export type StooqBar = Bar;
 
-// CSV layout is 'Date,Open,High,Low,Close,Volume' — we only keep date/close/volume.
+// CSV layout is 'Date,Open,High,Low,Close,Volume'.
+const OPEN_FIELD_INDEX = 1;
+const HIGH_FIELD_INDEX = 2;
+const LOW_FIELD_INDEX = 3;
 const CLOSE_FIELD_INDEX = 4;
 const VOLUME_FIELD_INDEX = 5;
 const ISO_DATE_PATTERN = /^\d{4}-\d{2}-\d{2}$/;
 const MS_PER_DAY = 24 * 60 * 60 * 1000;
+// A stored history whose earliest bar lands within this many days of the
+// requested start is deep enough — providers trim the first sessions of a range.
+const BACKFILL_DEPTH_TOLERANCE_DAYS = 30;
+
+// Stooq occasionally emits 0 or blank for an OHLC field; a missing field is
+// safer than a fake one, so only finite positive prices are kept.
+const positivePriceField = (field: string | undefined): number | undefined => {
+    if (field === undefined || field === "") {
+        return undefined;
+    }
+    const value = Number(field);
+    return Number.isFinite(value) && value > 0 ? value : undefined;
+};
 
 export const parseStooqCsv = (csv: string): StooqBar[] => {
     const body = csv.trim();
@@ -40,6 +58,12 @@ export const parseStooqCsv = (csv: string): StooqBar[] => {
             continue;
         }
         const bar: StooqBar = {date: fields[0], close};
+        const open = positivePriceField(fields[OPEN_FIELD_INDEX]);
+        const high = positivePriceField(fields[HIGH_FIELD_INDEX]);
+        const low = positivePriceField(fields[LOW_FIELD_INDEX]);
+        if (open !== undefined) bar.open = open;
+        if (high !== undefined) bar.high = high;
+        if (low !== undefined) bar.low = low;
         const volumeField = fields[VOLUME_FIELD_INDEX];
         if (volumeField !== undefined && volumeField !== "") {
             const volume = Number(volumeField);
@@ -62,18 +86,32 @@ const minusCalendarDays = (date: Date, days: number): Date =>
 // Stooq's d1/d2 query params want compact YYYYMMDD.
 const toStooqDate = (date: Date): string => date.toISOString().slice(0, 10).replace(/-/g, "");
 
+export type FetchWindowOptions = {
+    // When known, a stored history that does not reach far enough back also
+    // triggers a backfill (a caller asking for 3 years must not settle for 2).
+    earliestBarDate?: string | null;
+    backfillCalendarDays?: number;
+};
+
+export type FetchWindow = {mode: "backfill" | "topup"; fromDate: string; toDate: string};
+
 export const decideFetchWindow = (
     latestBarDate: string | null,
     today: string,
-): {mode: "backfill" | "topup"; fromDate: string; toDate: string} => {
+    {earliestBarDate = null, backfillCalendarDays = BACKFILL_CALENDAR_DAYS}: FetchWindowOptions = {},
+): FetchWindow => {
     const todayUtc = parseUtcDate(today);
     // No history at all is treated as an infinite gap → backfill.
     const gapDays = latestBarDate === null
         ? Number.POSITIVE_INFINITY
         : Math.round((todayUtc.getTime() - parseUtcDate(latestBarDate).getTime()) / MS_PER_DAY);
+    const requiredEarliest = minusCalendarDays(todayUtc, backfillCalendarDays - BACKFILL_DEPTH_TOLERANCE_DAYS)
+        .toISOString()
+        .slice(0, 10);
+    const tooShallow = earliestBarDate !== null && earliestBarDate > requiredEarliest;
     // A gap of exactly BACKFILL_TRIGGER_GAP_DAYS is still fresh enough to top up.
-    const mode: "backfill" | "topup" = gapDays > BACKFILL_TRIGGER_GAP_DAYS ? "backfill" : "topup";
-    const windowDays = mode === "backfill" ? BACKFILL_CALENDAR_DAYS : TOPUP_CALENDAR_DAYS;
+    const mode: "backfill" | "topup" = gapDays > BACKFILL_TRIGGER_GAP_DAYS || tooShallow ? "backfill" : "topup";
+    const windowDays = mode === "backfill" ? backfillCalendarDays : TOPUP_CALENDAR_DAYS;
     return {
         mode,
         fromDate: toStooqDate(minusCalendarDays(todayUtc, windowDays)),

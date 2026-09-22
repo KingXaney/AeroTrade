@@ -35,7 +35,7 @@ try {
     // --- desktop nav unchanged -------------------------------------------------
     const sideHrefs = await page.$$eval('aside nav a', (as) => as.map((a) => a.getAttribute('href')));
     check('sidebar still lists all eleven routes',
-        sideHrefs.join(',') === '/topics,/,/brain,/portfolio,/trade,/markets,/news,/watchlist,/friends,/history,/settings',
+        sideHrefs.join(',') === '/topics,/,/brain,/strategies,/portfolio,/trade,/markets,/news,/watchlist,/friends,/history,/settings',
         sideHrefs.join(','));
     check('hamburger is hidden at desktop width',
         !(await page.locator('button[aria-label="Open navigation"]').isVisible()));

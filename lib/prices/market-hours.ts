@@ -122,6 +122,17 @@ export const isTradingDay = (date: string): boolean => {
     return wd !== 0 && wd !== 6 && !(date in NYSE_HOLIDAYS);
 };
 
+// The last session strictly before `date` (bounded: the longest closure in the table is
+// a few days). Only valid inside the years the holiday table covers.
+export const previousTradingDay = (date: string): string => {
+    let cursor = shiftDate(date, -1);
+    for (let i = 0; i < 14; i += 1) {
+        if (isTradingDay(cursor)) return cursor;
+        cursor = shiftDate(cursor, -1);
+    }
+    return cursor;
+};
+
 export const closeMinutesFor = (date: string): number => (NYSE_HALF_DAYS.has(date) ? HALF_DAY_CLOSE_MINUTES : CLOSE_MINUTES);
 
 // Next regular open strictly after `fromDate` at `fromMinutes` (or today's, if it is

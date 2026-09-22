@@ -60,6 +60,25 @@ import {MAX_BRIEF_CALLS_PER_RUN, newsSearchEnabled} from "@/lib/topics/config";
 import {TOPIC_BRIEFS_EVENT, TOPIC_FEEDS_EVENT, TOPIC_FIRST_RUN_EVENT, TOPIC_REFRESH_EVENT} from "@/lib/topics/events";
 import {ensureTopicHasArticles, getTopicsDigestData, getTopicsForUser} from "@/lib/topics/store";
 import {buildTopicsSectionHtml} from "@/lib/topics/digest-section";
+import {STRATEGIES, effectiveVersion} from "@/lib/strategies/catalog";
+import {STRATEGY_OWNER_ID} from "@/lib/strategies/config";
+import {previousTradingDay} from "@/lib/strategies/calendar";
+import {assessFreshness, chunkUniverse, runSummary, stepId, throttleDue} from "@/lib/strategies/job-helpers";
+import {decideForStrategy, isUniverseTooStale, simulateForStrategy} from "@/lib/strategies/runner";
+import {
+    backtestVersions,
+    claimRun,
+    completeRun,
+    ensureStrategyAccounts,
+    getLatestBarDates,
+    markStrategyError,
+    recordSkippedRuns,
+    releaseRun,
+    type OrderOutcome,
+} from "@/lib/strategies/store";
+import {ALL_STRATEGY_SYMBOLS, BENCHMARK_SYMBOL as STRATEGY_BENCHMARK, CORE_ETFS, LARGE_CAPS, SECTOR_ETFS} from "@/lib/strategies/universe";
+import {PRICE_CHUNK_SIZE, STRATEGY_BACKFILL_CALENDAR_DAYS} from "@/lib/prices/config";
+import {NYSE_HOLIDAYS, isTradingDay, marketStatus} from "@/lib/prices/market-hours";
 
 // Absolute links in email need the deployment's public URL (the same one better-auth uses).
 const APP_URL = (process.env.BETTER_AUTH_URL ?? '').replace(/\/$/, '') || 'http://localhost:3000';
@@ -435,7 +454,13 @@ export const runWeeklyNavigator = inngest.createFunction(
     async ({ step }) => {
         const universe = await step.run('build-universe', async () => buildNavigatorUniverse());
 
-        await step.run('ensure-price-bars', async () => ensureBars(universe.symbols));
+        // One step per chunk: a single 40-symbol step with Yahoo's spacing would exceed the
+        // route's 60 s budget and be retried from scratch.
+        const navigatorChunks = chunkUniverse(universe.symbols, PRICE_CHUNK_SIZE);
+        for (let i = 0; i < navigatorChunks.length; i += 1) {
+            const symbols = navigatorChunks[i];
+            await step.run(`ensure-price-bars-${i}`, async () => ensureBars(symbols, {limit: symbols.length}));
+        }
 
         // Deterministic scoring inputs: brain slow layer + eligibility counts + signals.
         const scored = await step.run('compute-global-scores', async () => computeNavigatorScores(universe.symbols));
@@ -733,7 +758,11 @@ export const bootstrapAiNavigator = inngest.createFunction(
         }
 
         const universe = await step.run('bootstrap-universe', async () => buildNavigatorUniverse());
-        await step.run('bootstrap-price-bars', async () => ensureBars(universe.symbols));
+        const bootstrapChunks = chunkUniverse(universe.symbols, PRICE_CHUNK_SIZE);
+        for (let i = 0; i < bootstrapChunks.length; i += 1) {
+            const symbols = bootstrapChunks[i];
+            await step.run(`bootstrap-price-bars-${i}`, async () => ensureBars(symbols, {limit: symbols.length}));
+        }
         const scored = await step.run('bootstrap-scores', async () => computeNavigatorScores(universe.symbols));
 
         const targets = buildTargets(scored);
@@ -1035,6 +1064,214 @@ export const generateTopicBriefs = inngest.createFunction(
 
         const summary = `Wrote ${written} topic briefs from ${candidates.length} keyword sets`;
         await step.run('record-job-run', async () => recordJobRun('generate-topic-briefs', summary));
+        return {success: true, message: summary};
+    },
+);
+
+
+// Quant strategies: every trading morning, decide each catalog strategy's orders from
+// the previous close and fill them through the same path users trade on. The engine
+// (lib/strategies) is the only place a decision is made; this function sequences
+// accounts → bars → freshness → per-strategy decide/fill → backtests → stamp.
+export const STRATEGIES_EVENT = 'app/run.strategies';
+const STRATEGIES_JOB = 'strategies-daily';
+const ORDER_THROTTLE_DELAY = '60s';
+const QUOTE_RETRY_DELAY = '15s';
+// The first chunk is the core ETFs: total-return legs whose adjusted closes are re-based
+// on every distribution, so their top-up window is deep.
+const TOTAL_RETURN_TOPUP_RANGE = '2y';
+
+type StrategiesEventData = {dryRun?: boolean; resimulate?: boolean; force?: boolean};
+
+export const runStrategiesDaily = inngest.createFunction(
+    {
+        id: STRATEGIES_JOB,
+        triggers: [
+            {event: STRATEGIES_EVENT},
+            {cron: 'TZ=America/New_York 35 9 * * 1-5'},
+            // Retry for provider lag: a successful 09:35 run leaves every claim taken.
+            {cron: 'TZ=America/New_York 30 10 * * 1-5'},
+        ],
+        concurrency: [{limit: 1}],
+    },
+    async ({step, event}) => {
+        const data = (event.data ?? {}) as StrategiesEventData;
+        const force = data.force === true;
+        const resimulate = data.resimulate === true;
+        // Inngest re-runs this body once per step, so the session decision is anchored to
+        // the trigger instant: a run that crosses 16:00 ET mid-way keeps its mode and date.
+        const at = new Date(typeof event.ts === 'number' ? event.ts : Date.now());
+        const today = getEasternDateString(at);
+
+        if (!force && !isTradingDay(today)) {
+            const why = NYSE_HOLIDAYS[today] ?? 'weekend';
+            const message = `Skipped — market closed (${why})`;
+            await step.run('record-job-run', async () => recordJobRun(STRATEGIES_JOB, message));
+            return {success: true, message};
+        }
+        const asOf = previousTradingDay(today);
+        // Outside the session a run only previews: filling at an after-hours quote on
+        // signals that are already a day old would not be the strategy's rule.
+        const dryRun = data.dryRun === true || (!force && marketStatus(at).state !== 'open');
+        const mode: 'live' | 'preview' = dryRun ? 'preview' : 'live';
+
+        const states = await step.run('ensure-accounts', async () => ensureStrategyAccounts(today));
+
+        // A holding that dropped out of the universe (a swapped ticker) still needs fresh bars,
+        // or the engine's left-universe exit could never price and never fill.
+        const heldOutside = await step.run('held-outside-universe', async () => {
+            const universe = new Set(ALL_STRATEGY_SYMBOLS);
+            return (await getHeldSymbolsByUserId(STRATEGY_OWNER_ID)).filter((s) => !universe.has(s));
+        });
+        // Known before the bars phase: a rule whose version changed rebuilds its backtest from
+        // the whole stored history, so the total-return legs are re-fetched on one basis first.
+        const versions = await step.run('check-backtests', async () => backtestVersions());
+        const rebuildNeeded = resimulate || STRATEGIES.some((def) =>
+            states.some((s) => s.strategyId === def.id) && versions[def.id] !== effectiveVersion(def));
+
+        const chunks = [
+            {symbols: [...CORE_ETFS], topupRange: TOTAL_RETURN_TOPUP_RANGE as '2y', forceBackfill: rebuildNeeded},
+            ...chunkUniverse([...SECTOR_ETFS, ...LARGE_CAPS, ...heldOutside], PRICE_CHUNK_SIZE).map((symbols) => ({symbols, topupRange: '1mo' as const, forceBackfill: resimulate})),
+        ];
+        const providers = {yahoo: 0, stooq: 0};
+        const failedSymbols: string[] = [];
+        for (let i = 0; i < chunks.length; i += 1) {
+            const chunk = chunks[i];
+            const result = await step.run(`ensure-bars-${i}`, async () => ensureBars(chunk.symbols, {
+                limit: chunk.symbols.length,
+                backfillCalendarDays: STRATEGY_BACKFILL_CALENDAR_DAYS,
+                requireOhlc: true,
+                topupRange: chunk.topupRange,
+                forceBackfill: chunk.forceBackfill,
+            }));
+            providers.yahoo += result.providers.yahoo;
+            providers.stooq += result.providers.stooq;
+            failedSymbols.push(...result.failed);
+        }
+
+        const trackedSymbols = [...ALL_STRATEGY_SYMBOLS, ...heldOutside];
+        const freshness = await step.run('check-freshness', async () => {
+            const latest = await getLatestBarDates(trackedSymbols);
+            return assessFreshness(latest, trackedSymbols, STRATEGY_BENCHMARK, asOf);
+        });
+
+        let ran = 0;
+        let planned = 0;
+        let filled = 0;
+        let ordersSoFar = 0;
+
+        if (!freshness.benchmarkFresh) {
+            const detail = `benchmark stale (latest ${STRATEGY_BENCHMARK} bar ${freshness.benchmarkLatest ?? 'none'}, needed ${asOf})`;
+            await step.run('record-skipped', async () => recordSkippedRuns(states, today, asOf, detail));
+        } else {
+            for (const def of STRATEGIES) {
+                const state = states.find((s) => s.strategyId === def.id);
+                if (!state || state.status !== 'active') continue;
+                const sid = stepId(def.id);
+                try {
+                    if (!dryRun) {
+                        const claimed = await step.run(`claim-${sid}`, async () => claimRun(def.id, today));
+                        if (!claimed) continue;
+                    }
+                    const plan = await step.run(`decide-${sid}`, async () => decideForStrategy(def, state, {asOf, today, mode}));
+                    if (plan.accountMissing) {
+                        await step.run(`error-${sid}`, async () => markStrategyError(def.id, 'strategy account missing'));
+                        continue;
+                    }
+                    if (plan.skipped || isUniverseTooStale(plan)) {
+                        // Give the day back so the 10:30 rerun can decide once the bars arrive.
+                        await step.run(`error-${sid}`, async () => {
+                            await markStrategyError(def.id, plan.skipped ?? 'too many stale symbols');
+                            if (!dryRun) await releaseRun(def.id, today);
+                        });
+                        continue;
+                    }
+                    ran += 1;
+                    planned += plan.orders.length;
+                    if (dryRun) continue;
+
+                    const outcomes: OrderOutcome[] = [];
+                    let sellFailed = false;
+                    for (const order of plan.orders) {
+                        if (sellFailed && order.side === 'buy') {
+                            // Buys were funded by sells that did not happen.
+                            outcomes.push({symbol: order.symbol, side: order.side, executed: false, message: 'Skipped: a funding sell failed this run'});
+                            continue;
+                        }
+                        if (throttleDue(ordersSoFar)) {
+                            await step.sleep(`order-throttle-${ordersSoFar}`, ORDER_THROTTLE_DELAY);
+                        }
+                        const request = {
+                            accountId: state.accountId,
+                            symbol: order.symbol,
+                            side: order.side,
+                            quantity: order.quantity,
+                            source: 'strategy' as const,
+                            reason: order.reason,
+                            // One fill per strategy, day, side and symbol: a replayed step finds it.
+                            idempotencyKey: `${def.id}:${today}:${order.side}:${order.symbol}`,
+                            ...(order.side === 'buy' ? {minCashAfter: plan.minCashAfter} : {}),
+                        };
+                        const orderStep = stepId(`execute-${sid}-${order.side}-${order.symbol}`);
+                        let result = await step.run(orderStep, async () => executeOrder(STRATEGY_OWNER_ID, request));
+                        if (!result.success && /live price/i.test(result.message ?? "")) {
+                            // A quote miss is usually the rate limit; one spaced retry.
+                            await step.sleep(`${orderStep}-wait`, QUOTE_RETRY_DELAY);
+                            result = await step.run(`${orderStep}-retry`, async () => executeOrder(STRATEGY_OWNER_ID, request));
+                        }
+                        ordersSoFar += 1;
+                        if (result.success) filled += 1;
+                        if (order.side === 'sell' && !result.success) sellFailed = true;
+                        outcomes.push({
+                            symbol: order.symbol,
+                            side: order.side,
+                            executed: result.success,
+                            ...(typeof result.price === 'number' ? {price: result.price} : {}),
+                            ...(result.success ? {} : {message: result.message}),
+                        });
+                    }
+                    await step.run(`save-run-${sid}`, async () => completeRun({
+                        strategyId: def.id,
+                        date: today,
+                        outcomes,
+                        rebalanceTriggered: plan.rebalanceTriggered,
+                    }));
+                } catch (error) {
+                    console.error('Strategy failed:', def.id, error);
+                    await step.run(`error-${sid}-crash`, async () => markStrategyError(def.id, `run failed: ${(error as Error).message ?? 'unknown'}`));
+                }
+            }
+        }
+
+        // Simulated records come after the live phase so a simulation failure can never
+        // block trading; they only rebuild when the rule version changed.
+        let backtestsRebuilt = 0;
+        for (const def of STRATEGIES) {
+            const state = states.find((s) => s.strategyId === def.id);
+            if (!state) continue;
+            if (!resimulate && versions[def.id] === effectiveVersion(def)) continue;
+            try {
+                await step.run(`simulate-${stepId(def.id)}`, async () => simulateForStrategy(def, state.launchDate));
+                backtestsRebuilt += 1;
+            } catch (error) {
+                console.error('Backtest failed:', def.id, error);
+                await step.run(`simulate-${stepId(def.id)}-error`, async () => markStrategyError(def.id, `backtest failed: ${(error as Error).message ?? 'unknown'}`));
+            }
+        }
+
+        const summary = runSummary({
+            ran,
+            total: STRATEGIES.length,
+            preview: dryRun,
+            filled,
+            planned,
+            staleSymbols: freshness.staleSymbols.length,
+            backtestsRebuilt,
+            providers,
+            failedSymbols,
+            asOf,
+        });
+        await step.run('record-job-run', async () => recordJobRun(STRATEGIES_JOB, summary));
         return {success: true, message: summary};
     },
 );
