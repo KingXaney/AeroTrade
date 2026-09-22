@@ -206,7 +206,7 @@ export const aggregatePortfolios = (list: AccountWithPortfolio[]): PortfolioSumm
 
 type LeanTrade = {
     _id: unknown; symbol: string; company?: string; side: 'buy' | 'sell'; quantity: number; price: number; total: number;
-    realizedPnl?: number; source?: string; accountId?: string; createdAt: Date;
+    realizedPnl?: number; source?: string; reason?: string; accountId?: string; createdAt: Date;
 };
 
 const toTradeRecord = (t: LeanTrade, accountName?: string): PaperTradeRecord => ({
@@ -219,6 +219,7 @@ const toTradeRecord = (t: LeanTrade, accountName?: string): PaperTradeRecord => 
     total: t.total,
     realizedPnl: t.realizedPnl,
     ...(t.source ? {source: t.source as TradeSource} : {}),
+    ...(t.reason ? {reason: t.reason} : {}),
     ...(accountName ? {accountName} : {}),
     createdAt: new Date(t.createdAt).getTime(),
 });

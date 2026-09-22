@@ -11,6 +11,7 @@ export interface PaperTradeDoc extends Document {
     total: number;
     realizedPnl?: number;
     source?: TradeSource;  // no schema default on purpose — Mongoose applies defaults on hydration, which would repaint every pre-existing row as 'user'
+    reason?: string;       // an automated fill's own explanation (quant strategies); absent on user trades
     createdAt: Date;
 }
 
@@ -24,7 +25,8 @@ const PaperTradeSchema = new Schema<PaperTradeDoc>({
     price: {type: Number, required: true, min: 0},
     total: {type: Number, required: true},
     realizedPnl: {type: Number},
-    source: {type: String, enum: ['user', 'ai-navigator', 'ai-suggestion']},
+    source: {type: String, enum: ['user', 'ai-navigator', 'ai-suggestion', 'strategy']},
+    reason: {type: String, maxlength: 200},
     createdAt: {type: Date, default: Date.now, index: true},
 });
 

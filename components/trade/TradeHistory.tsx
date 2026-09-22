@@ -4,12 +4,18 @@ import {cn, formatPrice, getChangeColorClass} from "@/lib/utils";
 const formatWhen = (ms: number) =>
     new Date(ms).toLocaleString('en-US', {month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit'});
 
-// Only AI-placed fills get a chip: 'user' is the default reading of a trade log, and
+// Only automated fills get a chip: 'user' is the default reading of a trade log, and
 // rows from before the field existed carry no source at all — that absence is honest
 // ("unknown"), not something to dress up as either.
 const SOURCE_LABEL: Partial<Record<TradeSource, string>> = {
     'ai-navigator': 'AI Navigator',
     'ai-suggestion': 'AI suggestion',
+    'strategy': 'Strategy',
+};
+const SOURCE_TITLE: Partial<Record<TradeSource, string>> = {
+    'ai-navigator': 'Placed by the AI, not by you',
+    'ai-suggestion': 'Placed by the AI, not by you',
+    'strategy': 'Placed by a quant strategy\'s rule, not by a person',
 };
 
 type Props = {
@@ -29,6 +35,7 @@ const TradeHistory = ({trades, totalCount, exportHref}: Props) => {
             {trades.map((t) => {
                 const isBuy = t.side === 'buy';
                 const source = t.source ? SOURCE_LABEL[t.source] : undefined;
+                const sourceTitle = t.source ? SOURCE_TITLE[t.source] : undefined;
                 return (
                     <div key={t.id}
                          className="flex items-center justify-between px-4 py-2.5 rounded-lg border bg-surface-2/40 border-line-strong/20">
@@ -51,9 +58,12 @@ const TradeHistory = ({trades, totalCount, exportHref}: Props) => {
                                 )}
                                 {source && (
                                     <span className="ml-2 px-1.5 py-0.5 rounded text-[10px] uppercase tracking-wider whitespace-nowrap border border-line-strong/40 text-fg-soft"
-                                          style={{fontFamily: 'var(--type-mono)'}} title="Placed by the AI, not by you">
+                                          style={{fontFamily: 'var(--type-mono)'}} title={sourceTitle}>
                                         {source}
                                     </span>
+                                )}
+                                {t.reason && (
+                                    <p className="mt-0.5 text-[11px] text-fg-muted leading-snug">{t.reason}</p>
                                 )}
                             </div>
                         </div>

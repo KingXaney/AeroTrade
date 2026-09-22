@@ -7,6 +7,7 @@ import PaperAccount from "@/database/models/paper-account.model";
 import PaperTrade from "@/database/models/paper-trade.model";
 import {getQuote, getCompanyProfile} from "@/lib/actions/finnhub.actions";
 import {getOwnedAccount} from "@/lib/trading/account";
+import {TRADE_REASON_MAX} from "@/lib/strategies/config";
 
 export type OrderRequest = {
     accountId: string;
@@ -18,12 +19,14 @@ export type OrderRequest = {
     minCashAfter?: number;
     // Recorded on the trade so history and the CSV export can say who placed it.
     source?: TradeSource;
+    // An automated caller's explanation for the fill, shown in the trade log.
+    reason?: string;
 };
 
 // Market order at the current live price. Whole shares, long-only.
 export const executeOrder = async (
     userId: string,
-    {accountId, symbol, side, quantity, minCashAfter, source}: OrderRequest,
+    {accountId, symbol, side, quantity, minCashAfter, source, reason}: OrderRequest,
 ): Promise<OrderResult & {price?: number}> => {
     try {
         const sym = (symbol || '').trim().toUpperCase();
@@ -103,6 +106,7 @@ export const executeOrder = async (
             total,
             ...(realizedPnl !== undefined ? {realizedPnl} : {}),
             ...(source ? {source} : {}),
+            ...(reason ? {reason: reason.slice(0, TRADE_REASON_MAX)} : {}),
         });
 
         const verb = side === 'buy' ? 'Bought' : 'Sold';

@@ -20,6 +20,7 @@ export interface UserPreferences extends Document {
     appearance?: AppearancePrefs;
     dashboardLayout?: DashboardLayoutPrefs;
     newsFeed?: NewsFeedPrefs;          // absent = the default feed (lib/news/feed-prefs.ts)
+    followedStrategies?: string[];     // quant-strategy slugs pinned on the dashboard; absent = none
     updatedAt: Date;
 }
 
@@ -67,6 +68,8 @@ const UserPreferencesSchema = new Schema<UserPreferences>({
     appearance: {type: AppearanceSchema, required: false},
     dashboardLayout: {type: DashboardLayoutSchema, required: false},
     newsFeed: {type: NewsFeedSchema, required: false},
+    // No default: an empty array would be persisted by every unrelated upsert.
+    followedStrategies: {type: [String], default: undefined},
     updatedAt: {type: Date, default: Date.now},
 });
 

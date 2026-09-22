@@ -4,7 +4,7 @@
 
 import UserPreferencesModel from "@/database/models/user-preferences.model";
 
-export type UnsettablePreference = 'appearance' | 'dashboardLayout' | 'newsFeed';
+export type UnsettablePreference = 'appearance' | 'dashboardLayout' | 'newsFeed' | 'followedStrategies';
 
 // Two first-time upserts (theme + layout saved together) can race on the unique userId
 // index; the second attempt finds the document and updates it.
