@@ -14,7 +14,7 @@ function NavItems({initialStocks, initialTopics}: NavItemsProps) {
     const pathName = usePathname();
 
     return (
-        <ul className="flex flex-col sm:flex-row p-2 gap-3 sm:gap-6 items-center">
+        <ul className="flex flex-col sm:flex-row p-2 gap-3 sm:gap-4 xl:gap-6 items-center">
             {HEADER_NAV_ITEMS.map(({href, label}) => (
                 <li key={href}>
                     <Link

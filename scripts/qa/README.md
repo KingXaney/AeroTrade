@@ -34,7 +34,9 @@ node screenshots.mjs                       # or: capture the README screenshots
 ```
 
 The other scripts follow the same shape, one per change set: `qa-foundations.mjs`,
-`qa-navigation.mjs`, `qa-ai-surfaces.mjs`, `qa-truthful-data.mjs`, `qa-trade-desk.mjs`
+`qa-navigation.mjs`, `qa-ai-surfaces.mjs`, `qa-truthful-data.mjs`, `qa-trade-desk.mjs`,
+`qa-news-feed.mjs`, `qa-strategies.mjs` (seeds the system-owned strategy accounts directly — the
+daily job never runs in this harness)
 and `qa-auth.mjs` (password reset end to end — it reads the token out of the
 throwaway Mongo, since the harness has no SMTP). They share one database, so each
 scopes its assertions to the user it signs up.

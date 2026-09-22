@@ -47,7 +47,7 @@ try {
 
     // --- navigation carries the new page ------------------------------------------------
     const headerHrefs = await page.$$eval('header nav ul li a', (as) => as.map((a) => a.getAttribute('href')));
-    check('header nav ends with /news', headerHrefs.join(',') === '/topics,/,/brain,/portfolio,/trade,/markets,/news', headerHrefs.join(','));
+    check('header nav ends with /news', headerHrefs.join(',') === '/topics,/,/brain,/strategies,/portfolio,/trade,/markets,/news', headerHrefs.join(','));
 
     // --- default: top stories, nothing stored -------------------------------------------
     await page.goto(`${BASE}/news`, {waitUntil: 'load'});

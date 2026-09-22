@@ -21,7 +21,10 @@ const Stat = ({label, value, valueClass, hint}: {label: string; value: string; v
 // Strategy analytics tiles — mirrors the AccountSummary visual pattern.
 // Win rate and drawdown show em-dashes until there is enough history to
 // compute them honestly (no closed trades / fewer than two snapshot days).
-const AnalyticsStats = ({analytics}: {analytics: AccountAnalytics}) => {
+// Takes only the six stat fields so a simulated record can use the same tiles.
+export type AnalyticsStatFields = Pick<AccountAnalytics, 'maxDrawdownPct' | 'winRatePct' | 'wins' | 'losses' | 'realizedPnl' | 'tradeCount'>;
+
+const AnalyticsStats = ({analytics, tradesHint = 'Buys + sells, all time'}: {analytics: AnalyticsStatFields; tradesHint?: string}) => {
     const {maxDrawdownPct, winRatePct, wins, losses, realizedPnl, tradeCount} = analytics;
     const realizedClass = getChangeColorClass(realizedPnl || undefined);
 
@@ -48,7 +51,7 @@ const AnalyticsStats = ({analytics}: {analytics: AccountAnalytics}) => {
             <Stat
                 label="Trades"
                 value={String(tradeCount)}
-                hint="Buys + sells, all time"
+                hint={tradesHint}
             />
         </div>
     );

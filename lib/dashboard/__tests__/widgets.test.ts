@@ -23,9 +23,9 @@ const spanSet = new Set<number>(WIDGET_SPANS);
 const dataKeySet = new Set<string>(DATA_KEYS);
 
 describe('registry invariants', () => {
-    it('has 31 unique ids whose table keys match their id field', () => {
-        expect(WIDGET_IDS).toHaveLength(31);
-        expect(new Set(WIDGET_IDS).size).toBe(31);
+    it('has 32 unique ids whose table keys match their id field', () => {
+        expect(WIDGET_IDS).toHaveLength(32);
+        expect(new Set(WIDGET_IDS).size).toBe(32);
         expect(Object.keys(WIDGETS).sort()).toEqual([...WIDGET_IDS].sort());
         for (const id of WIDGET_IDS) {
             expect(WIDGETS[id].id).toBe(id);
@@ -98,7 +98,8 @@ describe('registry invariants', () => {
             expect(WIDGETS[id].chrome, id).toBe('panel');
             expect(WIDGETS[id].isNew, id).toBe(true);
         }
-        expect(defs.filter((d) => d.isNew).map((d) => d.id).sort()).toEqual(topics);
+        // The quant-strategies panel shipped after the layout system too.
+        expect(defs.filter((d) => d.isNew).map((d) => d.id).sort()).toEqual([...topics, 'quant-strategies'].sort());
         expect(WIDGETS['topics-latest'].dataKeys).toEqual(['topicsLatest']);
         expect(WIDGETS['topic-briefs'].dataKeys).toEqual(['topicsOverview']);
     });
@@ -125,7 +126,7 @@ describe('registry invariants', () => {
             expect(WIDGETS[id].chrome, id).toBe('bare');
         }
         const heavy = defs.filter((d) => d.heavy).map((d) => d.id).sort();
-        expect(heavy).toEqual(['market-news', 'tv-crypto-screener', 'tv-market-screener', 'watchlist-movers']);
+        expect(heavy).toEqual(['market-news', 'quant-strategies', 'tv-crypto-screener', 'tv-market-screener', 'watchlist-movers']);
         expect(defs.filter((d) => d.availability !== 'always').map((d) => d.id).sort())
             .toEqual(['brain-status', 'strategy-comparison']);
     });
@@ -140,7 +141,7 @@ describe('registry invariants', () => {
             'performance-chart': 8, 'analytics-stats': 12, 'strategy-comparison': 12,
             leaderboard: 6,
             'ai-navigator': 4, 'weekly-decisions': 6, 'active-theses': 6, 'narrative-leaderboard': 12,
-            'knowledge-graph': 12, 'second-opinion': 6, 'brain-status': 12,
+            'knowledge-graph': 12, 'second-opinion': 6, 'brain-status': 12, 'quant-strategies': 6,
             'quick-trade': 4, 'market-news': 6, 'quick-links': 4,
         };
         for (const id of WIDGET_IDS) {
@@ -175,7 +176,7 @@ describe('data key graph', () => {
     });
 
     it('lazy keys are known and match the plan', () => {
-        expect([...LAZY_DATA_KEYS].sort()).toEqual(['analytics', 'brainStatus', 'movers', 'news', 'topicsLatest']);
+        expect([...LAZY_DATA_KEYS].sort()).toEqual(['analytics', 'brainStatus', 'movers', 'news', 'strategies', 'topicsLatest']);
         for (const key of LAZY_DATA_KEYS) {
             expect(dataKeySet.has(key)).toBe(true);
         }

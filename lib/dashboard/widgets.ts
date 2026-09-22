@@ -50,6 +50,7 @@ export const DATA_KEYS = [
     'news',
     'topicsOverview',
     'topicsLatest',
+    'strategies',
 ] as const;
 export type DataKey = (typeof DATA_KEYS)[number];
 
@@ -74,11 +75,12 @@ export const DATA_KEY_DEPS: Record<DataKey, readonly DataKey[]> = {
     news: ['watchlistSymbols'],
     topicsOverview: [],
     topicsLatest: [],
+    strategies: [],
 };
 
 // Streamed under <Suspense> because they are slow or fan out to third parties;
 // their loaders resolve their own dependencies, so those never join the eager pass.
-export const LAZY_DATA_KEYS: readonly DataKey[] = ['movers', 'news', 'analytics', 'brainStatus', 'topicsLatest'];
+export const LAZY_DATA_KEYS: readonly DataKey[] = ['movers', 'news', 'analytics', 'brainStatus', 'topicsLatest', 'strategies'];
 
 // 'link' = the clickable PersonalRow card · 'panel' = glass-panel + heading ·
 // 'panel-lg' / 'panel-sm' = panel with the TradingView paddings · 'bare' = the
@@ -147,6 +149,7 @@ export const WIDGET_IDS = [
     'knowledge-graph',
     'second-opinion',
     'brain-status',
+    'quant-strategies',
     // tools
     'quick-trade',
     'market-news',
@@ -520,6 +523,20 @@ export const WIDGETS: {readonly [K in WidgetId]: WidgetDefinition & {id: K}} = {
         availability: 'advanced',
         chrome: 'bare',
         showTitle: false,
+    }),
+    'quant-strategies': define({
+        id: 'quant-strategies',
+        title: 'Quant Strategies',
+        description: 'Live leaderboard of the eight classic strategies — deterministic rules, no AI. Followed ones first.',
+        category: 'brain',
+        icon: 'auto_graph',
+        spans: [4, 6, 8, 12],
+        defaultSpan: 6,
+        minHeight: 260,
+        dataKeys: ['strategies'],
+        heavy: true,
+        isNew: true,
+        href: '/strategies',
     }),
 
     // --- Tools ---

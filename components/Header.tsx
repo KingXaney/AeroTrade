@@ -16,7 +16,7 @@ function Header({user, initialStocks, initialTopics, navBadges}: HeaderProps) {
         <header className='header'>
             <div className='header-wrapper'>
                 {/* Brand */}
-                <div className="flex items-center gap-4 sm:gap-8">
+                <div className="flex items-center gap-4 sm:gap-6 xl:gap-8">
                     {/* The sidebar is hidden below lg and carries the only links to
                         /watchlist, /friends, /history and /settings. */}
                     <MobileNav badges={navBadges}/>
@@ -30,7 +30,9 @@ function Header({user, initialStocks, initialTopics, navBadges}: HeaderProps) {
                             AeroTrade
                         </span>
                     </Link>
-                    <nav className="hidden sm:block">
+                    {/* Below lg the drawer carries every route; showing the header list too
+                        overflowed the bar between 640 and 1023px. */}
+                    <nav className="hidden lg:block">
                         <NavItems initialStocks={initialStocks} initialTopics={initialTopics}/>
                     </nav>
                 </div>
