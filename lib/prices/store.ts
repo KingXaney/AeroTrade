@@ -14,6 +14,7 @@ import {
     YAHOO_DELAY_MS,
 } from "@/lib/prices/config";
 import {delay, getEasternDateString} from "@/lib/utils";
+import {previousTradingDay} from "@/lib/prices/market-hours";
 
 export type EnsureBarsOptions = {
     limit?: number;
@@ -30,6 +31,8 @@ export type EnsureBarsResult = {
     updated: number;
     failed: string[];
     providers: Record<PriceBarSource, number>;
+    // Symbols whose stored history already ended at the previous session — no call made.
+    fresh: number;
 };
 
 type StoredBarEdge = {date: string; close: number} | null;
@@ -103,8 +106,10 @@ export const ensureBars = async (
     const today = getEasternDateString();
     const requiredFrom = minusCalendarDays(today, backfillCalendarDays);
     let updated = 0;
+    let fresh = 0;
     const failed: string[] = [];
     const providers: Record<PriceBarSource, number> = {yahoo: 0, stooq: 0};
+    const previousSession = previousTradingDay(today);
 
     for (const symbol of unique) {
         try {
@@ -117,6 +122,12 @@ export const ensureBars = async (
             const missingOhlc = requireOhlc && planned.mode === "topup"
                 ? await PriceBar.exists({symbol, date: {$gte: requiredFrom}, high: {$exists: false}}) !== null
                 : false;
+            // Already current through the previous session and nothing to repair: a step
+            // retry or the late-morning rerun must not re-spend a provider call per symbol.
+            if (planned.mode === "topup" && !forceBackfill && !missingOhlc && latest !== null && latest.date >= previousSession) {
+                fresh += 1;
+                continue;
+            }
             // A forced backfill keeps the planned window's dates only when it
             // already was one; otherwise the deep window is planned afresh.
             const windowFor = (mode: FetchMode): FetchWindow =>
@@ -155,7 +166,7 @@ export const ensureBars = async (
             failed.push(symbol);
         }
     }
-    return {updated, failed, providers};
+    return {updated, failed, providers, fresh};
 };
 
 type LeanPriceBar = {

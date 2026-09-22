@@ -28,8 +28,9 @@ export const decide: Decide = (def, ctx) => {
             targets.push({symbol: BENCHMARK_SYMBOL, weight: FULL_WEIGHT, reason: 'initial deployment: buy and hold SPY'});
             state = 'enter';
         }
-        // The once-only purchase counts as done as soon as it was planned on fresh data.
-        rebalanceTriggered = due;
+        // Done only once SPY is actually held: a bounced fill (a gap-up through the cash
+        // floor) is re-planned on the next fresh day instead of leaving the baseline in cash.
+        rebalanceTriggered = due && holding !== undefined;
         rows.set(BENCHMARK_SYMBOL, {symbol: BENCHMARK_SYMBOL, state, values: {close, sinceEntry}});
     } else if (due) {
         // Deferred, not skipped: the purchase is retried on the next fresh day.

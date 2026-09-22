@@ -84,16 +84,19 @@ const getBacktestStats = async (): Promise<Map<string, SimulatedRecord>> => {
     return new Map(docs.map((d) => [d.strategyId, {from: d.from, to: d.to, stats: d.stats, closeFills: d.closeFills}]));
 };
 
-// SPY's return since each account's inception, from the same daily snapshots the
-// performance chart uses: the first benchmark row on or after inception is the base.
-const benchmarkReturnsSince = async (inceptionDates: readonly string[]): Promise<Map<string, number | null>> => {
+// SPY's return since each account's inception. The base is the first daily benchmark
+// snapshot on or after inception; the latest leg is SPY's live quote when one is in hand,
+// so it sits on the same basis as the account's live valuation (else the last snapshot).
+const benchmarkReturnsSince = async (inceptionDates: readonly string[], liveClose?: number): Promise<Map<string, number | null>> => {
     if (inceptionDates.length === 0) return new Map();
     const earliest = [...inceptionDates].sort()[0];
     const rows = await BenchmarkSnapshot.find({symbol: BENCHMARK_SYMBOL, date: {$gte: earliest}}).sort({date: 1}).lean<{date: string; close: number}[]>();
-    const latest = rows.length > 0 ? rows[rows.length - 1] : null;
+    const latest = typeof liveClose === 'number' && liveClose > 0
+        ? {date: getEasternDateString(), close: liveClose}
+        : (rows.length > 0 ? rows[rows.length - 1] : null);
     return new Map(inceptionDates.map((inception) => {
         const base = rows.find((r) => r.date >= inception);
-        const value = base && latest && base.close > 0 && latest.date > base.date ? (latest.close / base.close - 1) * 100 : null;
+        const value = base && latest && base.close > 0 && latest.date >= base.date ? (latest.close / base.close - 1) * 100 : null;
         return [inception, value];
     }));
 };
@@ -122,9 +125,11 @@ const buildLeaderboard = async (userId: string | null): Promise<StrategyLeaderbo
     const stateById = new Map(states.map((s) => [s.strategyId, s]));
     const accountById = new Map(accounts.map((a) => [String(a._id), a]));
 
-    // One shared quote map over held symbols only, never the 59-symbol universe.
-    const heldSymbols = Array.from(new Set(accounts.flatMap((a) => a.positions.map((p) => p.symbol.toUpperCase()))));
+    // One shared quote map over held symbols (plus SPY for the benchmark leg), never the
+    // 59-symbol universe.
+    const heldSymbols = Array.from(new Set([...accounts.flatMap((a) => a.positions.map((p) => p.symbol.toUpperCase())), BENCHMARK_SYMBOL]));
     const priceMap = await buildPriceMap(heldSymbols);
+    const spyLive = priceMap.get(BENCHMARK_SYMBOL)?.price;
     const portfolios = new Map(accounts.map((a) => [
         String(a._id),
         computePortfolio({cash: a.cash, startingBalance: a.startingBalance, positions: a.positions.map((p) => ({
@@ -138,7 +143,7 @@ const buildLeaderboard = async (userId: string | null): Promise<StrategyLeaderbo
         getComparisonStats(STRATEGY_OWNER_ID, liveValues),
         getLatestRuns(STRATEGIES.map((d) => d.id)),
         getBacktestStats(),
-        benchmarkReturnsSince(Array.from(new Set(inceptionByAccount.values()))),
+        benchmarkReturnsSince(Array.from(new Set(inceptionByAccount.values())), spyLive),
         snapshotDaysByAccount(Array.from(accountById.keys())),
     ]);
     const followedSet = new Set(followed);
@@ -179,17 +184,9 @@ const buildLeaderboard = async (userId: string | null): Promise<StrategyLeaderbo
     return {rows: rankLeaderboard(rows), started: rows.some((r) => r.live !== null)};
 };
 
-export const getStrategyLeaderboard = cache(async (userId: string | null): Promise<StrategyLeaderboard> => {
-    try {
-        return await buildLeaderboard(userId);
-    } catch (error) {
-        console.error('Error building the strategy leaderboard:', error);
-        return {rows: rankLeaderboard(STRATEGIES.map((def) => ({
-            id: def.id, name: def.name, family: def.family, cadence: def.cadence, launchDate: null, lastError: null,
-            live: null, simulated: null, lastAction: 'No run yet', followed: false,
-        }))), started: false};
-    }
-});
+// Errors propagate on purpose: the route's error boundary (and the widget's failed state)
+// must render, not a "has not run yet" that would be a lie.
+export const getStrategyLeaderboard = cache(async (userId: string | null): Promise<StrategyLeaderboard> => buildLeaderboard(userId));
 
 export const getStrategyWidgetRows = async (userId: string, limit: number): Promise<StrategyLeaderboardRow[]> =>
     selectWidgetRows((await getStrategyLeaderboard(userId)).rows, limit);
@@ -217,26 +214,34 @@ export type StrategyDetail = {
     backtest: StrategyBacktestView | null;
     followed: boolean;
     benchmarkReturnPct: number | null;
+    // Real 16:10 snapshots on record (the chart's series also carries today's live point).
+    snapshotDays: number;
 };
 
 export const getStrategyDetail = cache(async (slug: string, userId: string | null): Promise<StrategyDetail | null> => {
     const def = strategyBySlug(slug);
     if (!def) return null;
-    try {
-        await connectToDatabase();
-        const [states, followed] = await Promise.all([
-            getStrategyStates(),
-            userId ? getFollowedStrategies(userId) : Promise.resolve([] as string[]),
-        ]);
-        const state = states.find((s) => s.strategyId === def.id) ?? null;
-        const [analytics, trades, runs, backtestDoc] = await Promise.all([
-            state ? getAccountAnalytics(STRATEGY_OWNER_ID, state.accountId) : Promise.resolve(null),
-            state ? getTradeHistory(STRATEGY_OWNER_ID, state.accountId, DETAIL_TRADE_LIMIT) : Promise.resolve([] as PaperTradeRecord[]),
-            getLatestRuns([def.id]),
-            StrategyBacktest.findOne({strategyId: def.id}).lean<(StrategyBacktestView & {computedAt: Date}) | null>(),
-        ]);
-        const inception = analytics ? getEasternDateString(new Date(analytics.account.inceptionAt)) : null;
-        const benchmarkReturns = inception ? await benchmarkReturnsSince([inception]) : new Map<string, number | null>();
+    await connectToDatabase();
+    const [states, followed] = await Promise.all([
+        getStrategyStates(),
+        userId ? getFollowedStrategies(userId) : Promise.resolve([] as string[]),
+    ]);
+    const state = states.find((s) => s.strategyId === def.id) ?? null;
+    const [analytics, trades, runs, backtestDoc, snapshotDays] = await Promise.all([
+        state ? getAccountAnalytics(STRATEGY_OWNER_ID, state.accountId) : Promise.resolve(null),
+        state ? getTradeHistory(STRATEGY_OWNER_ID, state.accountId, DETAIL_TRADE_LIMIT) : Promise.resolve([] as PaperTradeRecord[]),
+        getLatestRuns([def.id]),
+        StrategyBacktest.findOne({strategyId: def.id}).lean<(StrategyBacktestView & {computedAt: Date}) | null>(),
+        state ? snapshotDaysByAccount([state.accountId]) : Promise.resolve(new Map<string, number>()),
+    ]);
+    const inception = analytics ? getEasternDateString(new Date(analytics.account.inceptionAt)) : null;
+    // The same basis as the account's live valuation: SPY's quote if held, else one quote.
+    const spyLive = analytics
+        ? (analytics.summary.positions.find((p) => p.symbol === BENCHMARK_SYMBOL)?.currentPrice
+            ?? (await buildPriceMap([BENCHMARK_SYMBOL])).get(BENCHMARK_SYMBOL)?.price)
+        : undefined;
+    const benchmarkReturns = inception ? await benchmarkReturnsSince([inception], spyLive) : new Map<string, number | null>();
+    {
         return {
             def,
             state,
@@ -258,10 +263,8 @@ export const getStrategyDetail = cache(async (slug: string, userId: string | nul
             } : null,
             followed: followed.includes(def.id),
             benchmarkReturnPct: inception ? (benchmarkReturns.get(inception) ?? null) : null,
+            snapshotDays: state ? (snapshotDays.get(state.accountId) ?? 0) : 0,
         };
-    } catch (error) {
-        console.error('Error loading strategy detail:', error);
-        return {def, state: null, analytics: null, trades: [], latestRun: null, backtest: null, followed: false, benchmarkReturnPct: null};
     }
 });
 
@@ -275,7 +278,7 @@ export type StrategiesSystemStatus = {
 };
 
 export const getStrategiesSystemStatus = cache(async (): Promise<StrategiesSystemStatus> => {
-    try {
+    {
         await connectToDatabase();
         const [jobs, latestBar, states] = await Promise.all([
             getJobHealth([STRATEGIES_JOB_ID]),
@@ -292,8 +295,5 @@ export const getStrategiesSystemStatus = cache(async (): Promise<StrategiesSyste
             lastRunDate: lastRunDates.length > 0 ? lastRunDates[lastRunDates.length - 1] : null,
             errors: states.filter((s) => s.lastError).map((s) => ({strategyId: s.strategyId, message: s.lastError as string})),
         };
-    } catch (error) {
-        console.error('Error loading strategies status:', error);
-        return {job: null, latestBarDate: null, started: false, launchDate: null, lastRunDate: null, errors: []};
     }
 });

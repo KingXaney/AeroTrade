@@ -5,6 +5,7 @@ import PerformanceChart from "@/components/analytics/PerformanceChart";
 import AnalyticsStats, {type AnalyticsStatFields} from "@/components/analytics/AnalyticsStats";
 import {cn} from "@/lib/utils";
 import type {SeriesStats} from "@/lib/strategies/types";
+import {formatDrawdown, formatPct, roundPct} from "@/lib/strategies/views";
 
 // Live and simulated curves side by side but never on one axis: a toggle, and each
 // panel says which basis it shows and how far it reaches.
@@ -36,21 +37,25 @@ const SimStat = ({label, value, className, hint}: {label: string; value: string;
     </div>
 );
 
+const signClass = (value: number | null): string | undefined => {
+    if (value === null) return undefined;
+    const rounded = roundPct(value);
+    return rounded > 0 ? 'text-positive' : rounded < 0 ? 'text-negative' : undefined;
+};
+
 // The backtest's own tiles: annualised figures make sense over three years where the
 // live tiles (a few weeks old) would not.
 const SimulatedStats = ({stats}: {stats: SeriesStats}) => (
     <div className="glass-panel rounded-xl p-5 grid grid-cols-2 md:grid-cols-6 gap-4" id="simulated-stats">
-        <SimStat label="Total return" value={pct(stats.totalReturnPct)} className={stats.totalReturnPct !== null ? (stats.totalReturnPct >= 0 ? 'text-positive' : 'text-negative') : undefined} hint="simulated window" />
-        <SimStat label="vs SPY" value={pct(stats.excessReturnPct)} className={stats.excessReturnPct !== null ? (stats.excessReturnPct >= 0 ? 'text-positive' : 'text-negative') : undefined} hint={`SPY ${pct(stats.benchmarkReturnPct)}`} />
-        <SimStat label="CAGR" value={pct(stats.cagrPct)} hint="annualised" />
-        <SimStat label="Max drawdown" value={stats.maxDrawdownPct === null ? '—' : stats.maxDrawdownPct > 0 ? `−${stats.maxDrawdownPct.toFixed(2)}%` : '0.00%'} className={stats.maxDrawdownPct !== null && stats.maxDrawdownPct > 0 ? 'text-negative' : undefined} hint="peak to trough" />
+        <SimStat label="Total return" value={formatPct(stats.totalReturnPct)} className={signClass(stats.totalReturnPct)} hint="simulated window" />
+        <SimStat label="vs SPY" value={formatPct(stats.excessReturnPct)} className={signClass(stats.excessReturnPct)} hint={`SPY ${formatPct(stats.benchmarkReturnPct)}`} />
+        <SimStat label="CAGR" value={formatPct(stats.cagrPct)} hint="annualised" />
+        <SimStat label="Max drawdown" value={formatDrawdown(stats.maxDrawdownPct)} className={stats.maxDrawdownPct !== null && roundPct(stats.maxDrawdownPct) > 0 ? 'text-negative' : undefined} hint="peak to trough" />
         <SimStat label="Volatility" value={stats.annualizedVolPct === null ? '—' : `${stats.annualizedVolPct.toFixed(1)}%`} hint="annualised" />
         <SimStat label="Win rate" value={stats.winRatePct === null ? '—' : `${stats.winRatePct.toFixed(0)}%`} hint={stats.winRatePct === null ? 'no closed trades' : `${stats.wins}W / ${stats.losses}L · ${stats.tradeCount} fills`} />
     </div>
 );
 
-const pct = (value: number | null, digits = 2): string =>
-    value === null ? '—' : `${value >= 0 ? '+' : ''}${value.toFixed(digits)}%`;
 
 const Tab = ({active, onClick, children, id}: {active: boolean; onClick: () => void; children: React.ReactNode; id: string}) => (
     <button
@@ -90,7 +95,7 @@ const StrategyPerformance = ({name, live, simulated, initialMode}: {name: string
                         <>
                             <p className="text-[11px] text-fg-muted mb-2" style={{fontFamily: 'var(--type-mono)'}}>
                                 Live since {live.since} · {live.snapshotDays} daily snapshot{live.snapshotDays === 1 ? '' : 's'} at 16:10 ET ·
-                                return {pct(live.totalReturnPct)} vs SPY {pct(live.benchmarkReturnPct)}
+                                return {formatPct(live.totalReturnPct)} vs SPY {formatPct(live.benchmarkReturnPct)}
                             </p>
                             {live.series.length >= 2 ? (
                                 <PerformanceChart series={live.series} accountName={name} />

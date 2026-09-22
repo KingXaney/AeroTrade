@@ -73,6 +73,7 @@ import {
     getLatestBarDates,
     markStrategyError,
     recordSkippedRuns,
+    releaseRun,
     type OrderOutcome,
 } from "@/lib/strategies/store";
 import {ALL_STRATEGY_SYMBOLS, BENCHMARK_SYMBOL as STRATEGY_BENCHMARK, CORE_ETFS, LARGE_CAPS, SECTOR_ETFS} from "@/lib/strategies/universe";
@@ -453,7 +454,13 @@ export const runWeeklyNavigator = inngest.createFunction(
     async ({ step }) => {
         const universe = await step.run('build-universe', async () => buildNavigatorUniverse());
 
-        await step.run('ensure-price-bars', async () => ensureBars(universe.symbols));
+        // One step per chunk: a single 40-symbol step with Yahoo's spacing would exceed the
+        // route's 60 s budget and be retried from scratch.
+        const navigatorChunks = chunkUniverse(universe.symbols, PRICE_CHUNK_SIZE);
+        for (let i = 0; i < navigatorChunks.length; i += 1) {
+            const symbols = navigatorChunks[i];
+            await step.run(`ensure-price-bars-${i}`, async () => ensureBars(symbols, {limit: symbols.length}));
+        }
 
         // Deterministic scoring inputs: brain slow layer + eligibility counts + signals.
         const scored = await step.run('compute-global-scores', async () => computeNavigatorScores(universe.symbols));
@@ -751,7 +758,11 @@ export const bootstrapAiNavigator = inngest.createFunction(
         }
 
         const universe = await step.run('bootstrap-universe', async () => buildNavigatorUniverse());
-        await step.run('bootstrap-price-bars', async () => ensureBars(universe.symbols));
+        const bootstrapChunks = chunkUniverse(universe.symbols, PRICE_CHUNK_SIZE);
+        for (let i = 0; i < bootstrapChunks.length; i += 1) {
+            const symbols = bootstrapChunks[i];
+            await step.run(`bootstrap-price-bars-${i}`, async () => ensureBars(symbols, {limit: symbols.length}));
+        }
         const scored = await step.run('bootstrap-scores', async () => computeNavigatorScores(universe.symbols));
 
         const targets = buildTargets(scored);
@@ -1087,7 +1098,10 @@ export const runStrategiesDaily = inngest.createFunction(
         const data = (event.data ?? {}) as StrategiesEventData;
         const force = data.force === true;
         const resimulate = data.resimulate === true;
-        const today = getEasternDateString();
+        // Inngest re-runs this body once per step, so the session decision is anchored to
+        // the trigger instant: a run that crosses 16:00 ET mid-way keeps its mode and date.
+        const at = new Date(typeof event.ts === 'number' ? event.ts : Date.now());
+        const today = getEasternDateString(at);
 
         if (!force && !isTradingDay(today)) {
             const why = NYSE_HOLIDAYS[today] ?? 'weekend';
@@ -1098,14 +1112,26 @@ export const runStrategiesDaily = inngest.createFunction(
         const asOf = previousTradingDay(today);
         // Outside the session a run only previews: filling at an after-hours quote on
         // signals that are already a day old would not be the strategy's rule.
-        const dryRun = data.dryRun === true || (!force && marketStatus().state !== 'open');
+        const dryRun = data.dryRun === true || (!force && marketStatus(at).state !== 'open');
         const mode: 'live' | 'preview' = dryRun ? 'preview' : 'live';
 
         const states = await step.run('ensure-accounts', async () => ensureStrategyAccounts(today));
 
+        // A holding that dropped out of the universe (a swapped ticker) still needs fresh bars,
+        // or the engine's left-universe exit could never price and never fill.
+        const heldOutside = await step.run('held-outside-universe', async () => {
+            const universe = new Set(ALL_STRATEGY_SYMBOLS);
+            return (await getHeldSymbolsByUserId(STRATEGY_OWNER_ID)).filter((s) => !universe.has(s));
+        });
+        // Known before the bars phase: a rule whose version changed rebuilds its backtest from
+        // the whole stored history, so the total-return legs are re-fetched on one basis first.
+        const versions = await step.run('check-backtests', async () => backtestVersions());
+        const rebuildNeeded = resimulate || STRATEGIES.some((def) =>
+            states.some((s) => s.strategyId === def.id) && versions[def.id] !== effectiveVersion(def));
+
         const chunks = [
-            {symbols: [...CORE_ETFS], topupRange: TOTAL_RETURN_TOPUP_RANGE as '2y'},
-            ...chunkUniverse([...SECTOR_ETFS, ...LARGE_CAPS], PRICE_CHUNK_SIZE).map((symbols) => ({symbols, topupRange: '1mo' as const})),
+            {symbols: [...CORE_ETFS], topupRange: TOTAL_RETURN_TOPUP_RANGE as '2y', forceBackfill: rebuildNeeded},
+            ...chunkUniverse([...SECTOR_ETFS, ...LARGE_CAPS, ...heldOutside], PRICE_CHUNK_SIZE).map((symbols) => ({symbols, topupRange: '1mo' as const, forceBackfill: resimulate})),
         ];
         const providers = {yahoo: 0, stooq: 0};
         const failedSymbols: string[] = [];
@@ -1116,16 +1142,17 @@ export const runStrategiesDaily = inngest.createFunction(
                 backfillCalendarDays: STRATEGY_BACKFILL_CALENDAR_DAYS,
                 requireOhlc: true,
                 topupRange: chunk.topupRange,
-                forceBackfill: resimulate,
+                forceBackfill: chunk.forceBackfill,
             }));
             providers.yahoo += result.providers.yahoo;
             providers.stooq += result.providers.stooq;
             failedSymbols.push(...result.failed);
         }
 
+        const trackedSymbols = [...ALL_STRATEGY_SYMBOLS, ...heldOutside];
         const freshness = await step.run('check-freshness', async () => {
-            const latest = await getLatestBarDates(ALL_STRATEGY_SYMBOLS);
-            return assessFreshness(latest, ALL_STRATEGY_SYMBOLS, STRATEGY_BENCHMARK, asOf);
+            const latest = await getLatestBarDates(trackedSymbols);
+            return assessFreshness(latest, trackedSymbols, STRATEGY_BENCHMARK, asOf);
         });
 
         let ran = 0;
@@ -1152,7 +1179,11 @@ export const runStrategiesDaily = inngest.createFunction(
                         continue;
                     }
                     if (plan.skipped || isUniverseTooStale(plan)) {
-                        await step.run(`error-${sid}`, async () => markStrategyError(def.id, plan.skipped ?? 'too many stale symbols'));
+                        // Give the day back so the 10:30 rerun can decide once the bars arrive.
+                        await step.run(`error-${sid}`, async () => {
+                            await markStrategyError(def.id, plan.skipped ?? 'too many stale symbols');
+                            if (!dryRun) await releaseRun(def.id, today);
+                        });
                         continue;
                     }
                     ran += 1;
@@ -1177,6 +1208,8 @@ export const runStrategiesDaily = inngest.createFunction(
                             quantity: order.quantity,
                             source: 'strategy' as const,
                             reason: order.reason,
+                            // One fill per strategy, day, side and symbol: a replayed step finds it.
+                            idempotencyKey: `${def.id}:${today}:${order.side}:${order.symbol}`,
                             ...(order.side === 'buy' ? {minCashAfter: plan.minCashAfter} : {}),
                         };
                         const orderStep = stepId(`execute-${sid}-${order.side}-${order.symbol}`);
@@ -1212,7 +1245,6 @@ export const runStrategiesDaily = inngest.createFunction(
 
         // Simulated records come after the live phase so a simulation failure can never
         // block trading; they only rebuild when the rule version changed.
-        const versions = await step.run('check-backtests', async () => backtestVersions());
         let backtestsRebuilt = 0;
         for (const def of STRATEGIES) {
             const state = states.find((s) => s.strategyId === def.id);

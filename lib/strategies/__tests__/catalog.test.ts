@@ -2,7 +2,8 @@ import {describe, expect, it} from 'vitest';
 import {effectiveVersion, STRATEGIES, STRATEGY_SLUGS, strategyBySlug} from '@/lib/strategies/catalog';
 import {DEFAULT_DRIFT_BAND, ENGINE_VERSION} from '@/lib/strategies/config';
 import {STRATEGY_RULES} from '@/lib/strategies/rules';
-import {UNIVERSES} from '@/lib/strategies/universe';
+import {SECTOR_ETFS, UNIVERSES} from '@/lib/strategies/universe';
+import {SECTOR_TO_ETF} from '@/lib/navigator/config';
 
 const EXPECTED_ORDER = [
     'buy-and-hold-spy',
@@ -51,6 +52,12 @@ describe('STRATEGIES', () => {
             expect(def.driftBand).toBe(DEFAULT_DRIFT_BAND);
             expect(def.version).toBe('1');
         }
+    });
+
+    it('pins the sector slots to the navigator sector map so a twelfth sector cannot over-allocate', () => {
+        expect([...SECTOR_ETFS]).toEqual(Object.values(SECTOR_TO_ETF));
+        expect(strategyBySlug('golden-cross')?.slots).toBe(UNIVERSES.sectors.length);
+        expect(strategyBySlug('sixty-forty')?.slots).toBe(UNIVERSES['sixty-forty'].length);
     });
 
     it('states the survivorship caveat on every large-cap strategy', () => {

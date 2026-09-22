@@ -11,7 +11,8 @@ export const CASH_FLOOR = 0.01;
 export const slotWeight = (slots: number): number => (1 - CASH_FLOOR) / slots;
 
 // Buys are sized from the previous close × (1 + buffer). A larger gap-up bounces the
-// order at the fill (insufficient cash) and the rule re-plans it the next day.
+// order at the fill (cash floor); the period is then not consumed, so the rule re-plans
+// on the next fresh day whatever its cadence.
 export const PRICE_BUFFER = 0.01;
 
 // A held, targeted position is only trimmed or topped up when its drift exceeds this
@@ -36,4 +37,4 @@ export const TRADE_REASON_MAX = 200;
 
 // Bump when rebalance/simulation/indicator semantics change; a strategy's own
 // `version` bumps for a rule or parameter change. Either re-runs its backtest.
-export const ENGINE_VERSION = '1';
+export const ENGINE_VERSION = '2';

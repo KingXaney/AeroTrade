@@ -151,16 +151,25 @@ describe("simulateStrategy — no look-ahead and cadence", () => {
         expect(r.stats.tradeCount).toBe(r.trades.length);
     });
 
-    it("respects the cash floor on the initial deployment", () => {
+    it("respects the cash floor on the initial deployment and retries every day", () => {
         const spy = seriesFrom(dates, (i) => 400 + i, (i) => (400 + i) * 1.03); // opens gap up 3%
         const r = simulateStrategy(buyAndHold, new Map([['SPY', spy]]), {startingBalance: 100_000, launchDate: LAUNCH, resultBars: 5});
-        // Sized at close × 1.01 but filled 3% higher: the buy breaches the floor and is rejected,
-        // then the rule simply retries on the next day (still rejected — the gap repeats).
+        // Sized at close × 1.01 but filled 3% higher: the buy breaches the floor and is rejected;
+        // the period is not consumed, so the rule re-plans on every following day.
         expect(r.trades).toHaveLength(0);
-        expect(r.rejections.length).toBeGreaterThan(0);
+        expect(r.rejections).toHaveLength(r.points.length - 1);
         expect(r.rejections[0].reason).toMatch(/cash floor|insufficient cash/);
         expect(r.points.every((p) => p.value === 100_000)).toBe(true);
         expect(CASH_FLOOR).toBe(0.01);
+    });
+
+    it("a bounced launch-day fill lands on the next day and the rule is then done", () => {
+        const firstFill = dates.length - 5; // resultBars 5 → decisions from n−6, first fill at n−5
+        const spy = seriesFrom(dates, (i) => 400 + i, (i) => (i === firstFill ? (400 + i) * 1.03 : 400 + i));
+        const r = simulateStrategy(buyAndHold, new Map([['SPY', spy]]), {startingBalance: 100_000, launchDate: LAUNCH, resultBars: 5});
+        expect(r.rejections).toHaveLength(1);
+        expect(r.trades).toHaveLength(1);
+        expect(r.trades[0].date).toBe(dates[firstFill + 1]);
     });
 
     it("finishes the eight real strategies over a full synthetic universe quickly", () => {

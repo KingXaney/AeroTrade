@@ -1,21 +1,20 @@
 'use client';
 
-import {useState, useTransition, type MouseEvent} from "react";
+import {useState, useTransition} from "react";
 import {useRouter} from "next/navigation";
 import {toast} from "sonner";
 import {followStrategy, unfollowStrategy} from "@/lib/actions/strategies.actions";
 import {cn} from "@/lib/utils";
 
-// Follow toggle for a leaderboard row. Lives inside a <Link>, so the click must stop
-// there. Optimistic: the star flips at once and reverts if the action fails.
-const FollowStar = ({slug, followed}: {slug: string; followed: boolean}) => {
+// Follow toggle for a leaderboard row. Sits beside the row's stretched link (never inside
+// it) so it is valid interactive content with its own accessible name. Optimistic: the
+// star flips at once and reverts if the action fails.
+const FollowStar = ({slug, name, followed, className}: {slug: string; name: string; followed: boolean; className?: string}) => {
     const router = useRouter();
     const [on, setOn] = useState(followed);
     const [pending, startTransition] = useTransition();
 
-    const toggle = (event: MouseEvent<HTMLButtonElement>) => {
-        event.preventDefault();
-        event.stopPropagation();
+    const toggle = () => {
         const next = !on;
         setOn(next);
         startTransition(async () => {
@@ -35,13 +34,13 @@ const FollowStar = ({slug, followed}: {slug: string; followed: boolean}) => {
             onClick={toggle}
             disabled={pending}
             aria-pressed={on}
-            aria-label={on ? `Unfollow ${slug}` : `Follow ${slug}`}
+            aria-label={on ? `Unfollow ${name}` : `Follow ${name}`}
             data-testid={`follow-star-${slug}`}
             className={cn('material-symbols-outlined text-[18px] leading-none transition-colors disabled:opacity-60',
-                on ? 'text-brand' : 'text-fg-muted hover:text-fg')}
+                on ? 'text-brand' : 'text-fg-muted hover:text-fg', className)}
             style={on ? {fontVariationSettings: "'FILL' 1"} : undefined}
         >
-            star
+            <span aria-hidden="true">star</span>
         </button>
     );
 };

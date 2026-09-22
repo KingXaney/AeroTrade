@@ -41,7 +41,7 @@ const FollowButton = ({slug, followed}: {slug: string; followed: boolean}) => {
             )}
             style={{fontFamily: 'var(--type-mono)'}}
         >
-            <span className="material-symbols-outlined text-[16px] leading-none" style={on ? {fontVariationSettings: "'FILL' 1"} : undefined}>star</span>
+            <span className="material-symbols-outlined text-[16px] leading-none" aria-hidden="true" style={on ? {fontVariationSettings: "'FILL' 1"} : undefined}>star</span>
             {on ? 'Following' : 'Follow'}
         </button>
     );

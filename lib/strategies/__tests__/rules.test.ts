@@ -122,13 +122,26 @@ describe('buy-and-hold-spy', () => {
     const def = definition('buy-and-hold-spy');
     const decide = STRATEGY_RULES[def.id];
 
-    it('targets SPY once on the first run', () => {
+    it('targets SPY on the first run and is not done until the position exists', () => {
         const decision = decide(def, makeContext({def, series: {SPY: trend(100, 110)}}));
-        expect(decision.rebalanceTriggered).toBe(true);
+        // Not yet done: a bounced fill must re-plan tomorrow rather than stay in cash forever.
+        expect(decision.rebalanceTriggered).toBe(false);
         expect(decision.targets).toEqual([
             {symbol: 'SPY', weight: FULL_WEIGHT, reason: 'initial deployment: buy and hold SPY'},
         ]);
         expect(rowFor(decision, 'SPY')).toEqual({symbol: 'SPY', state: 'enter', values: {close: 110, sinceEntry: null}});
+    });
+
+    it('marks itself done on the first fresh day the position exists', () => {
+        const decision = decide(def, makeContext({
+            def,
+            series: {SPY: trend(100, 110)},
+            holdings: [{symbol: 'SPY', quantity: 900, avgCost: 100}],
+            lastRebalanceDate: null,
+        }));
+        expect(decision.rebalanceTriggered).toBe(true);
+        expect(decision.targets).toEqual([]);
+        expect(rowFor(decision, 'SPY')?.state).toBe('held');
     });
 
     it('never trades again once it has bought', () => {

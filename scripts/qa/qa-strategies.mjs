@@ -95,7 +95,7 @@ try {
     await page.locator('[data-testid="strategy-leaderboard"]').waitFor({timeout: 30000});
     check('/strategies renders its heading', await page.getByRole('heading', {name: 'Quant Strategies', level: 1}).count() === 1);
     check('status strip says it has not run yet', /has not run yet/i.test(await page.locator('#strategies-status').innerText()));
-    const emptyRows = await page.locator('[data-testid="strategy-leaderboard"] a[data-strategy]').count();
+    const emptyRows = await page.locator('[data-testid="strategy-leaderboard"] [data-strategy]').count();
     check('catalog rows render before any run', emptyRows === 8, String(emptyRows));
     check('no strategy is ranked yet', (await page.locator('[data-testid="strategy-leaderboard"]').innerText()).includes('not started'));
     await shot('01-empty');
@@ -165,8 +165,10 @@ try {
     // --- leaderboard with a live record -----------------------------------------------
     await page.goto(`${BASE}/strategies`, {waitUntil: 'load'});
     await page.locator('[data-testid="strategy-leaderboard"]').waitFor({timeout: 30000});
-    const order = await page.$$eval('[data-testid="strategy-leaderboard"] a[data-strategy]', (as) => as.map((a) => a.getAttribute('data-strategy')));
+    const order = await page.$$eval('[data-testid="strategy-leaderboard"] [data-strategy]', (as) => as.map((a) => a.getAttribute('data-strategy')));
     check('eight strategies ranked by seeded live return', order.join(',') === [...CATALOG].reverse().map(([s]) => s).join(','), order.join(','));
+    check('follow stars are not nested inside the row links', await page.locator('[data-testid="strategy-leaderboard"] a button').count() === 0);
+    check('each row links to its detail page', await page.locator('[data-testid="strategy-leaderboard"] [data-strategy] a[href^="/strategies/"]').count() === 8);
     const board = await page.locator('[data-testid="strategy-leaderboard"]').innerText();
     // No Finnhub key in the harness: the SPY holding is valued at cost and the row says so.
     check('unpriced holdings are labelled on the ranking', /unpriced/.test(board));

@@ -109,6 +109,26 @@ export const describeLastRun = (run: StrategyRunView | null): string => {
 
 const withSign = (value: number, digits: number): string => `${value >= 0 ? '+' : ''}${value.toFixed(digits)}`;
 
+// Round first, then decide the sign and the colour, so a $3 loss on $100,000 reads "0.00%"
+// in neutral rather than "-0.00%" in red. (-0).toFixed(2) is already "0.00".
+export const roundPct = (value: number, digits = 2): number => Math.round(value * 10 ** digits) / 10 ** digits;
+
+export const formatPct = (value: number | null, digits = 2): string => {
+    if (value === null) return '—';
+    const rounded = roundPct(value, digits);
+    return `${rounded > 0 ? '+' : ''}${rounded.toFixed(digits)}%`;
+};
+
+export const formatDrawdown = (value: number | null): string => {
+    if (value === null) return '—';
+    const rounded = roundPct(value);
+    return rounded > 0 ? `−${rounded.toFixed(2)}%` : '0.00%';
+};
+
+// The colour input for getChangeColorClass: zero after rounding reads neutral.
+export const signedForColor = (value: number | null): number | undefined =>
+    value === null ? undefined : roundPct(value) || undefined;
+
 export const formatSignalValue = (value: number | string | boolean | null | undefined, format: SignalFormat): string => {
     if (value === null || value === undefined) return '—';
     switch (format) {

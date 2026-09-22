@@ -108,6 +108,13 @@ export const claimRun = async (strategyId: string, today: string): Promise<boole
     return doc !== null;
 };
 
+// Undo a day's claim when the strategy could not decide (its universe was too stale), so
+// the late-morning rerun is allowed to try again with fresher bars.
+export const releaseRun = async (strategyId: string, today: string): Promise<void> => {
+    await connectToDatabase();
+    await StrategyState.updateOne({strategyId, lastRunDate: today}, {$unset: {lastRunDate: ''}});
+};
+
 export const getLatestBarDates = async (symbols: readonly string[]): Promise<Map<string, string>> => {
     await connectToDatabase();
     const rows = await PriceBar.aggregate<{_id: string; latest: string}>([
@@ -209,7 +216,10 @@ export const completeRun = async (input: {
     const failed = input.outcomes.filter((o) => !o.executed);
     const update: Record<string, unknown> = {};
     if (input.outcomes.some((o) => o.executed)) update.lastTradeDate = input.date;
-    if (input.rebalanceTriggered) update.lastRebalanceDate = input.date;
+    // A rebalance counts as done only when everything it planned filled (vacuously when it
+    // planned nothing). A bounced entry is re-planned on the next fresh day; legs already at
+    // target sit inside the drift band, so the re-plan does not churn.
+    if (input.rebalanceTriggered && failed.length === 0) update.lastRebalanceDate = input.date;
     await StrategyState.updateOne(
         {strategyId: input.strategyId},
         failed.length > 0

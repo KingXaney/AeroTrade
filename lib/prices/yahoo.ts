@@ -23,6 +23,13 @@ const finiteAt = (list: unknown[] | undefined, index: number): number | undefine
     return typeof value === "number" && Number.isFinite(value) ? value : undefined;
 };
 
+// Providers emit 0 for a bad price; a zero low would pin a Donchian channel and a zero
+// close would poison every average, so prices must be positive. Volume may be zero.
+const positiveAt = (list: unknown[] | undefined, index: number): number | undefined => {
+    const value = finiteAt(list, index);
+    return value !== undefined && value > 0 ? value : undefined;
+};
+
 // Yahoo's timestamps are the session open in epoch seconds (09:30 ET), so the
 // ET calendar date is the bar's trading date whether the clock is on EDT or EST.
 const barDateOf = (timestampSeconds: number): string =>
@@ -59,8 +66,8 @@ export const parseYahooChart = (json: unknown, {excludeFrom}: {excludeFrom: stri
         if (typeof timestamp !== "number" || !Number.isFinite(timestamp)) {
             return;
         }
-        // A null close is a row Yahoo has not settled — skip it rather than store a hole.
-        const close = finiteAt(series.close, index);
+        // A null (or zero) close is a row Yahoo has not settled — skip it rather than store a hole.
+        const close = positiveAt(series.close, index);
         if (close === undefined) {
             return;
         }
@@ -71,11 +78,11 @@ export const parseYahooChart = (json: unknown, {excludeFrom}: {excludeFrom: stri
             return;
         }
         const bar: Bar = {date, close};
-        const open = finiteAt(series.open, index);
-        const high = finiteAt(series.high, index);
-        const low = finiteAt(series.low, index);
+        const open = positiveAt(series.open, index);
+        const high = positiveAt(series.high, index);
+        const low = positiveAt(series.low, index);
         const volume = finiteAt(series.volume, index);
-        const adjClose = finiteAt(adjcloses, index);
+        const adjClose = positiveAt(adjcloses, index);
         if (open !== undefined) bar.open = open;
         if (high !== undefined) bar.high = high;
         if (low !== undefined) bar.low = low;

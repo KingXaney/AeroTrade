@@ -1,8 +1,10 @@
 import Link from "next/link";
 import {cn, formatPrice, getChangeColorClass} from "@/lib/utils";
 
+// Eastern time, named: the server may sit in UTC and every fill time on this app is
+// described in ET.
 const formatWhen = (ms: number) =>
-    new Date(ms).toLocaleString('en-US', {month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit'});
+    `${new Date(ms).toLocaleString('en-US', {timeZone: 'America/New_York', month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit'})} ET`;
 
 // Only automated fills get a chip: 'user' is the default reading of a trade log, and
 // rows from before the field existed carry no source at all — that absence is honest

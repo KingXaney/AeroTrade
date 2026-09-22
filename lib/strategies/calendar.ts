@@ -6,10 +6,11 @@
 // skipped day (stale data, an outage) it catches up on the next fresh day instead of
 // silently losing the whole month.
 
-import {isTradingDay} from "@/lib/prices/market-hours";
+import {previousTradingDay} from "@/lib/prices/market-hours";
 import type {Cadence} from "@/lib/strategies/types";
 
-const MS_PER_DAY = 24 * 60 * 60 * 1000;
+export {previousTradingDay};
+
 const MONTH_NAMES = ['January', 'February', 'March', 'April', 'May', 'June', 'July',
     'August', 'September', 'October', 'November', 'December'];
 
@@ -60,18 +61,4 @@ export const describeNextRebalance = (cadence: Cadence, lastRebalanceDate: strin
             return `first trading day of ${MONTH_NAMES[next.month]} ${next.year}`;
         }
     }
-};
-
-const addCalendarDays = (date: string, days: number): string =>
-    new Date(new Date(`${date}T00:00:00Z`).getTime() + days * MS_PER_DAY).toISOString().slice(0, 10);
-
-// Live only (the NYSE table starts in 2025): the last session strictly before `date`.
-export const previousTradingDay = (date: string): string => {
-    let cursor = addCalendarDays(date, -1);
-    // Bounded: the longest NYSE closure in the table is a few days.
-    for (let i = 0; i < 14; i += 1) {
-        if (isTradingDay(cursor)) return cursor;
-        cursor = addCalendarDays(cursor, -1);
-    }
-    return cursor;
 };

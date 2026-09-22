@@ -2,20 +2,17 @@ import Link from "next/link";
 import type {CSSProperties} from "react";
 import {cn, getChangeColorClass} from "@/lib/utils";
 import {unpricedLabel} from "@/lib/trading/analytics";
-import {excessReturnPct, type StrategyLeaderboardRow} from "@/lib/strategies/views";
+import {excessReturnPct, formatDrawdown, formatPct, roundPct, signedForColor, type StrategyLeaderboardRow} from "@/lib/strategies/views";
 import FollowStar from "@/components/strategies/FollowStar";
 
 // The ranking: every quant strategy side by side, ordered by its LIVE return. The
 // simulated columns sit apart, dimmed and chip-labelled, so the two bases never read
-// as one number. Rows are links; nothing here is interactive except the follow star.
+// as one number. The whole row is clickable through a stretched link on the name, so the
+// follow star can be a sibling of the link rather than a button nested inside it.
 
 const rankStyle = (rank: number): CSSProperties | undefined =>
     rank >= 1 && rank <= 3 ? {color: `var(--rank-${rank})`} : undefined;
 
-const pct = (value: number | null, digits = 2): string =>
-    value === null ? '—' : `${value >= 0 ? '+' : ''}${value.toFixed(digits)}%`;
-
-const drawdown = (value: number | null): string => (value === null ? '—' : value > 0 ? `−${value.toFixed(2)}%` : '0.00%');
 
 const CADENCE_LABEL: Record<StrategyLeaderboardRow['cadence'], string> = {
     once: 'buy once',
@@ -55,12 +52,12 @@ const StrategyLeaderboard = ({rows, canFollow}: {rows: StrategyLeaderboardRow[];
                 const live = row.live;
                 const unpriced = live ? unpricedLabel(live.unpriced, live.holdings) : null;
                 return (
-                    <Link
+                    <div
                         key={row.id}
-                        href={`/strategies/${row.id}`}
                         data-strategy={row.id}
+                        data-rank={started ? rank : undefined}
                         className={cn(
-                            'grid grid-cols-1 gap-1.5 md:gap-4 items-center px-4 py-3 rounded-xl border transition-colors',
+                            'relative grid grid-cols-1 gap-1.5 md:gap-4 items-center px-4 py-3 rounded-xl border transition-colors',
                             GRID,
                             'bg-surface-2/40 border-line-strong/20 hover:border-brand/30',
                             !started && 'opacity-80',
@@ -73,8 +70,12 @@ const StrategyLeaderboard = ({rows, canFollow}: {rows: StrategyLeaderboardRow[];
                             </span>
                             <div className="min-w-0">
                                 <div className="flex items-center gap-2">
-                                    <span className="text-sm font-semibold text-fg truncate" style={{fontFamily: 'var(--type-display)'}}>{row.name}</span>
-                                    {canFollow && <FollowStar slug={row.id} followed={row.followed} />}
+                                    <Link href={`/strategies/${row.id}`}
+                                          className="text-sm font-semibold text-fg truncate after:absolute after:inset-0 after:rounded-xl"
+                                          style={{fontFamily: 'var(--type-display)'}}>
+                                        {row.name}
+                                    </Link>
+                                    {canFollow && <FollowStar slug={row.id} name={row.name} followed={row.followed} className="relative z-10" />}
                                 </div>
                                 <div className="text-[10px] text-fg-muted uppercase tracking-[0.08em]" style={{fontFamily: 'var(--type-mono)'}}>
                                     {row.family} · {CADENCE_LABEL[row.cadence]}
@@ -84,15 +85,15 @@ const StrategyLeaderboard = ({rows, canFollow}: {rows: StrategyLeaderboardRow[];
                             </div>
                         </div>
 
-                        <Cell label="Live return" className={live ? getChangeColorClass(live.totalReturnPct || undefined) : 'text-fg-muted'}>
-                            {live ? pct(live.totalReturnPct) : '—'}
+                        <Cell label="Live return" className={live ? getChangeColorClass(signedForColor(live.totalReturnPct)) : 'text-fg-muted'}>
+                            {live ? formatPct(live.totalReturnPct) : '—'}
                             {unpriced && <span className="block text-[10px] text-warning">{unpriced}</span>}
                         </Cell>
-                        <Cell label="vs SPY" className={live && excessReturnPct(live) !== null ? getChangeColorClass(excessReturnPct(live) || undefined) : 'text-fg-muted'}>
-                            {live ? pct(excessReturnPct(live)) : '—'}
+                        <Cell label="vs SPY" className={live && excessReturnPct(live) !== null ? getChangeColorClass(signedForColor(excessReturnPct(live))) : 'text-fg-muted'}>
+                            {live ? formatPct(excessReturnPct(live)) : '—'}
                         </Cell>
-                        <Cell label="Max drawdown" className={live && live.maxDrawdownPct !== null && live.maxDrawdownPct > 0 ? 'text-negative' : 'text-fg-soft'}>
-                            {live ? drawdown(live.maxDrawdownPct) : '—'}
+                        <Cell label="Max drawdown" className={live && live.maxDrawdownPct !== null && roundPct(live.maxDrawdownPct) > 0 ? 'text-negative' : 'text-fg-soft'}>
+                            {live ? formatDrawdown(live.maxDrawdownPct) : '—'}
                         </Cell>
                         <Cell label="Win rate" className="text-fg-soft">
                             {live && live.winRatePct !== null ? `${live.winRatePct.toFixed(0)}%` : '—'}
@@ -103,12 +104,12 @@ const StrategyLeaderboard = ({rows, canFollow}: {rows: StrategyLeaderboardRow[];
                         <Cell label="Simulated 3y" className="text-fg-muted">
                             {row.simulated ? (
                                 <span title={`Backtest ${row.simulated.from} → ${row.simulated.to}, next-open fills, no fees`}>
-                                    {pct(row.simulated.stats.totalReturnPct, 1)}
-                                    <span className="text-fg-muted/70"> · dd {drawdown(row.simulated.stats.maxDrawdownPct)}</span>
+                                    {formatPct(row.simulated.stats.totalReturnPct, 1)}
+                                    <span className="text-fg-muted/70"> · dd {formatDrawdown(row.simulated.stats.maxDrawdownPct)}</span>
                                 </span>
                             ) : 'not computed'}
                         </Cell>
-                    </Link>
+                    </div>
                 );
             })}
         </div>

@@ -113,10 +113,13 @@ export const simulateStrategy = (
         if (day.skipped) {
             skippedDays += 1;
         } else {
+            // Mirrors completeRun: the period is consumed only when every planned fill landed.
+            let dayRejected = false;
             for (const order of day.orders) {
                 const fillBar = indexes.get(order.symbol)?.byDate.get(tradeDate);
                 if (!fillBar) {
                     rejections.push({date: tradeDate, symbol: order.symbol, side: order.side, reason: 'no bar on fill date'});
+                    dayRejected = true;
                     continue;
                 }
                 let fill: SimTrade['fill'] = 'open';
@@ -131,6 +134,7 @@ export const simulateStrategy = (
                 const result = applyFill(account, order, price, order.side === 'buy' ? CASH_FLOOR * ctx.equity : undefined);
                 if (!result.ok) {
                     rejections.push({date: tradeDate, symbol: order.symbol, side: order.side, reason: result.reason});
+                    dayRejected = true;
                     continue;
                 }
                 account = result.account;
@@ -147,7 +151,7 @@ export const simulateStrategy = (
                     fill,
                 });
             }
-            if (day.decision.rebalanceTriggered) lastRebalanceDate = tradeDate;
+            if (day.decision.rebalanceTriggered && !dayRejected) lastRebalanceDate = tradeDate;
         }
 
         // Mark to market at the trade date's close.

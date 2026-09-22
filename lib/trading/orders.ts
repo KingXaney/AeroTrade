@@ -21,12 +21,15 @@ export type OrderRequest = {
     source?: TradeSource;
     // An automated caller's explanation for the fill, shown in the trade log.
     reason?: string;
+    // Replays of the same automated order (a job step retried after its response was lost)
+    // return the earlier fill instead of filling again.
+    idempotencyKey?: string;
 };
 
 // Market order at the current live price. Whole shares, long-only.
 export const executeOrder = async (
     userId: string,
-    {accountId, symbol, side, quantity, minCashAfter, source, reason}: OrderRequest,
+    {accountId, symbol, side, quantity, minCashAfter, source, reason, idempotencyKey}: OrderRequest,
 ): Promise<OrderResult & {price?: number}> => {
     try {
         const sym = (symbol || '').trim().toUpperCase();
@@ -39,6 +42,13 @@ export const executeOrder = async (
 
         const account = await getOwnedAccount(userId, accountId);
         if (!account) return {success: false, message: 'Strategy account not found'};
+
+        if (idempotencyKey) {
+            const prior = await PaperTrade.findOne({accountId: String(account._id), idempotencyKey}).lean<{price: number; quantity: number; symbol: string} | null>();
+            if (prior) {
+                return {success: true, message: `Already filled: ${prior.quantity} ${prior.symbol} @ $${prior.price.toFixed(2)}`, price: prior.price};
+            }
+        }
 
         const [quote, profile] = await Promise.all([getQuote(sym), getCompanyProfile(sym)]);
         const price = quote.c;
@@ -107,6 +117,7 @@ export const executeOrder = async (
             ...(realizedPnl !== undefined ? {realizedPnl} : {}),
             ...(source ? {source} : {}),
             ...(reason ? {reason: reason.slice(0, TRADE_REASON_MAX)} : {}),
+            ...(idempotencyKey ? {idempotencyKey} : {}),
         });
 
         const verb = side === 'buy' ? 'Bought' : 'Sold';

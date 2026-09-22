@@ -12,6 +12,7 @@ export interface PaperTradeDoc extends Document {
     realizedPnl?: number;
     source?: TradeSource;  // no schema default on purpose — Mongoose applies defaults on hydration, which would repaint every pre-existing row as 'user'
     reason?: string;       // an automated fill's own explanation (quant strategies); absent on user trades
+    idempotencyKey?: string; // one fill per key per account — a job step replay finds the earlier fill
     createdAt: Date;
 }
 
@@ -27,10 +28,14 @@ const PaperTradeSchema = new Schema<PaperTradeDoc>({
     realizedPnl: {type: Number},
     source: {type: String, enum: ['user', 'ai-navigator', 'ai-suggestion', 'strategy']},
     reason: {type: String, maxlength: 200},
+    idempotencyKey: {type: String},
     createdAt: {type: Date, default: Date.now, index: true},
 });
 
 PaperTradeSchema.index({accountId: 1, createdAt: -1});
+// Partial, not sparse: a sparse compound index would still index every row (accountId is
+// always present) and collide on the missing key.
+PaperTradeSchema.index({accountId: 1, idempotencyKey: 1}, {unique: true, partialFilterExpression: {idempotencyKey: {$exists: true}}});
 
 const PaperTrade = models?.PaperTrade || model<PaperTradeDoc>('PaperTrade', PaperTradeSchema);
 

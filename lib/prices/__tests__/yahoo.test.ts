@@ -108,6 +108,23 @@ describe("parseYahooChart", () => {
         expect(bars[0]).not.toHaveProperty("adjClose");
     });
 
+    it("drops zero prices but keeps a zero volume, and skips a row whose close is zero", () => {
+        const bars = parseYahooChart(
+            chartOf({
+                timestamp: [EDT_2026_07_27, EDT_2026_07_28],
+                open: [0, 102.8],
+                high: [103.5, 104],
+                low: [0, 101.9],
+                close: [102.75, 0],
+                volume: [0, 1620500],
+                adjclose: [0, 101.85],
+            }),
+            {excludeFrom: FAR_FUTURE},
+        );
+
+        expect(bars).toEqual([{date: "2026-07-27", close: 102.75, high: 103.5, volume: 0}]);
+    });
+
     it("tolerates a payload without the adjclose block", () => {
         const bars = parseYahooChart(
             chartOf({timestamp: [EDT_2026_07_27], close: [102.75]}),

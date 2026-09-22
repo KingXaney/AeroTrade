@@ -75,7 +75,7 @@ const StrategyPage = async ({params}: StrategyPageProps) => {
                     series: liveSeries,
                     stats: analytics,
                     since: liveSince,
-                    snapshotDays: liveSeries.length,
+                    snapshotDays: detail.snapshotDays,
                     benchmarkReturnPct: detail.benchmarkReturnPct,
                     totalReturnPct: analytics.summary.totalReturnPct,
                 } : null}
