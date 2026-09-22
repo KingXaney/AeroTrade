@@ -25,9 +25,11 @@ Follow the topics you care about, test trading strategies with virtual money, an
 
 **An AI Navigator that trades on those theses — inside hard rails.** Once a week it scores an eligible universe (news mass, sentiment, momentum, thesis, sector) and rebalances a dedicated paper account. Position count, weights, cash floor, trade frequency, holding period and stop-loss are deterministic constants; the LLM only writes the rationale.
 
-**A second opinion, a chat advisor, and a digest.** Claude can critique the brain's current picture; a tool-using chat assistant (14 tools) answers "what's new in my topics?" or "should I add NVDA?"; a daily email summarises the market for each user, personalised to their holdings, with links allow-listed to the actual articles.
+**Eight classic quant strategies, paper-traded live and explained.** Buy & hold, 60/40, golden cross, dual momentum, 12-1 momentum, RSI-2 mean reversion, Donchian breakouts and low volatility each run in their own system account every trading morning, decided from the previous close and filled at the open through the same order path you use. A leaderboard ranks them by live return against SPY; each page explains the rule, shows what it is watching, its holdings and every fill with its reason, alongside a clearly labelled three-year simulated record. Deterministic rules, no AI.
 
-**Make it yours.** 12 colour palettes × 5 visual styles (minimal, futuristic, liquid glass, brutalist, soft), saved per account and rendered without a flash. A 31-widget dashboard you can drag, resize and extend.
+**A second opinion, a chat advisor, and a digest.** Claude can critique the brain's current picture; a tool-using chat assistant (15 tools) answers "what's new in my topics?" or "should I add NVDA?"; a daily email summarises the market for each user, personalised to their holdings, with links allow-listed to the actual articles.
+
+**Make it yours.** 12 colour palettes × 5 visual styles (minimal, futuristic, liquid glass, brutalist, soft), saved per account and rendered without a flash. A 32-widget dashboard you can drag, resize and extend.
 
 <div align="center">
 <img src="docs/screenshots/topic-ai-chips.png" alt="A followed topic: keyword chips, refresh, matched articles" width="440"> <img src="docs/screenshots/trade.png" alt="Trade desk: price chart and paper order entry and paper order entry" width="440">
@@ -74,8 +76,8 @@ flowchart LR
 |---|---|
 | App | Next.js 16 (App Router, Server Actions, Turbopack), React 19, TypeScript strict |
 | UI | Tailwind v4 with semantic theme tokens, shadcn/radix primitives, dnd-kit, TradingView embeds |
-| Data | MongoDB + Mongoose 9 (16 models), better-auth for email/password sessions |
-| Jobs | Inngest (6 crons + on-demand events), idempotent steps, per-user rate limits |
+| Data | MongoDB + Mongoose 9 (20 models), better-auth for email/password sessions |
+| Jobs | Inngest (7 crons + on-demand events), idempotent steps, per-user rate limits |
 | AI | Vercel AI SDK; Gemini 2.5 Flash-Lite on the free tier for every scheduled job, optional Claude tiers, Claude for the second opinion |
 | Market data | Finnhub (quotes, profiles, search, news), Google News RSS, SEC EDGAR, Reddit |
 | Quality | Vitest (25 files / 446 tests), ESLint, `tsc --noEmit`, GitHub Actions, Playwright browser QA against an in-memory Mongo |
@@ -99,6 +101,7 @@ npx inngest-cli@latest dev -u http://localhost:3000/api/inngest
 npm run trigger -- brain        # build the news brain now
 npm run trigger -- topics       # refresh every followed topic (briefs: the AI briefs)
 npm run trigger -- navigator    # run the weekly AI Navigator
+npm run trigger -- strategies   # run the quant strategies (-preview decides without filling)
 npm run trigger -- news         # send today's digest emails
 ```
 
@@ -109,6 +112,7 @@ npm run trigger -- news         # send today's digest emails
 | `generate-topic-briefs` | 08:00 daily | one "what changed today" brief per topic with fresh news |
 | `ai-navigator-weekly` | Mondays 10:00 | score the universe and rebalance the Navigator account |
 | `daily-news-summary` | 12:00 daily | per-user digest email with a topics section |
+| `strategies-daily` | weekdays 09:35 (10:30 retry) | decide and fill every quant strategy's orders from the previous close; opens the system accounts and rebuilds backtests when a rule changes |
 | `daily-account-snapshots` | weekdays 16:10 | value every account and the SPY benchmark |
 
 ## Development
@@ -126,12 +130,14 @@ Unit tests cover the pure modules — the layout engine, theme tokens, news aggr
 ## Project structure
 
 ```
-app/            routes: (auth) sign-in/up · (root) dashboard, topics, brain, trade, portfolio, markets, news, watchlist, friends, history, settings · api/{chat,inngest,accounts}
-components/     UI by feature: dashboard (widget grid + 31 widgets), topics, brain, trade, analytics, settings, chat, theme, ui (shadcn)
+app/            routes: (auth) sign-in/up · (root) dashboard, topics, brain, strategies, strategies/[slug], trade, portfolio, markets, news, watchlist, friends, history, settings · api/{chat,inngest,accounts}
+components/     UI by feature: dashboard (widget grid + 32 widgets), topics, brain, strategies, trade, analytics, settings, chat, theme, ui (shadcn)
 lib/
   news/         source adapters (Finnhub, RSS, Reddit, SEC, Google News search), dedupe, HTML sanitiser
   brain/        extraction prompts + parsing, entity graph update with dual-timescale decay, queries, second opinion
   navigator/    universe eligibility, composite scoring, allocation rails, order planning
+  strategies/   the quant strategies: catalog + rules, indicators, calendar, rebalancer, engine, simulator, job + page reads
+  prices/       daily bars (Yahoo first, Stooq fallback), momentum/vol signals, the NYSE calendar
   topics/       keyword normalisation, matcher, search query builder, refresh, briefs, digest section
   trading/      paper accounts, orders, portfolio maths, analytics, snapshots
   dashboard/    widget registry, layout normalisation + legacy migration, loaders

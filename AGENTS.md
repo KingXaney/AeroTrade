@@ -12,7 +12,7 @@ product tour and docs/specs/ for the design documents behind the larger features
 - `npm test` / `npm run test:watch` — vitest, node environment, `lib/**/__tests__` only
 - `npm run build:check` — compile-only Next build; needs no database or keys
 - `npm run dev` + `npx inngest-cli@latest dev -u http://localhost:3000/api/inngest` — app + jobs
-- `npm run trigger -- <brain|navigator|news|snapshots|topics|briefs>` — fire a job locally
+- `npm run trigger -- <brain|navigator|news|snapshots|topics|briefs|strategies|strategies-preview|strategies-resimulate>` — fire a job locally
 - `scripts/qa/` — browser QA against an in-memory MongoDB (see its README)
 
 ## Where things live
@@ -20,6 +20,7 @@ product tour and docs/specs/ for the design documents behind the larger features
 - `app/` routes · `components/` UI by feature · `lib/actions/` server actions (session-derived, userId-scoped)
 - `lib/news` ingest + sanitise + the per-user feed (`feed-prefs` client-safe, `feed` pure, `feed-store` server) · `lib/brain` entity graph · `lib/navigator` allocation rails · `lib/topics` followed topics
 - `lib/trading` paper accounts · `lib/dashboard` widget registry/layout · `lib/theme` palettes/styles · `lib/ai` models + chat tools
+- `lib/strategies` the quant strategies: pure catalog/rules/engine/simulator (one `runStrategyDay` for live and backtest), `store`/`queries` server side · `lib/prices` daily bars (Yahoo first, Stooq fallback), signals, NYSE calendar
 - `lib/inngest/functions.ts` every scheduled job · `database/models/` Mongoose models · `types/global.d.ts` ambient domain types
 
 ## Invariants — keep these true
