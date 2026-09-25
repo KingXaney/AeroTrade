@@ -2,7 +2,7 @@
 // Client-safe: types plus arithmetic on plain data, nothing from the DB or the engine.
 
 import {formatPrice} from "@/lib/utils";
-import type {Cadence, SeriesPoint, SeriesStats, SignalFormat, SignalRow, StrategyFamily, StrategyId} from "@/lib/strategies/types";
+import type {Cadence, SeriesPoint, SeriesStats, SignalColumn, SignalFormat, SignalRow, StrategyFamily, StrategyId} from "@/lib/strategies/types";
 
 export type LiveRecord = {
     totalValue: number;
@@ -16,6 +16,9 @@ export type LiveRecord = {
     unpriced: number;
     snapshotDays: number;
     inceptionAt: number;
+    // Downsampled % return since inception, for the leaderboard sparkline. Its last
+    // point equals totalReturnPct by construction (see downsample/toSparkPct below).
+    spark: number[];
 };
 
 export type SimulatedRecord = {
@@ -23,6 +26,8 @@ export type SimulatedRecord = {
     to: string;
     stats: SeriesStats;
     closeFills: number;
+    // As LiveRecord.spark, over the backtest window; ends at stats.totalReturnPct.
+    spark: number[];
 };
 
 export type RunOrderView = {
@@ -61,8 +66,6 @@ export type StrategyLeaderboardRow = {
     lastError: string | null;
     live: LiveRecord | null;
     simulated: SimulatedRecord | null;
-    // One line from describeLastRun over the latest run.
-    lastAction: string;
     followed: boolean;
 };
 
@@ -95,7 +98,70 @@ export const everyLiveRecordYoung = (rows: readonly {live: LiveRecord | null}[],
     return started.length > 0 && started.every((r) => liveAgeDays((r.live as LiveRecord).inceptionAt, now) < LIVE_YOUNG_DAYS);
 };
 
-// One line for the leaderboard's "last action" cell.
+// ── Sparklines ──────────────────────────────────────────────────────────────────
+// A leaderboard is a comparison device, so every curve in a column shares ONE y-domain.
+// Eight independently auto-scaled sparks would give a +2% strategy the same triumphant
+// climb as a +137% one — the same disease as a column of em-dashes, drawn prettier.
+
+export const SPARK_POINTS = 40;
+// Below this many points a column draws nothing at all. Four segments is an EKG
+// artifact, not a curve, and a half-drawn column is exactly what we are deleting.
+export const MIN_SPARK_POINTS = 10;
+
+// Index decimation to at most n points. The endpoints are ALWAYS preserved, which is
+// what lets the last spark point equal the printed total return exactly.
+export const downsample = <T>(points: readonly T[], n: number): T[] => {
+    if (n <= 0 || points.length === 0) return [];
+    if (points.length <= n) return [...points];
+    if (n === 1) return [points[points.length - 1]];
+    const step = (points.length - 1) / (n - 1);
+    return Array.from({length: n}, (_, i) => points[Math.round(i * step)]);
+};
+
+// Values → % return from the first value, so curves on different capital bases compare.
+export const toSparkPct = (values: readonly number[]): number[] => {
+    if (values.length === 0) return [];
+    const base = values[0];
+    if (!(base > 0)) return values.map(() => 0);
+    return values.map((v) => (v / base - 1) * 100);
+};
+
+// Zero is always in frame, matching computeMaxDrawdown's and PerformanceChart's basis.
+export const sparkDomain = (series: readonly (readonly number[])[]): {min: number; max: number} | null => {
+    const values = series.flat();
+    if (values.length === 0) return null;
+    return {min: Math.min(...values, 0), max: Math.max(...values, 0)};
+};
+
+// All-or-nothing per column: true only when every *started* row can draw a curve.
+export const columnHasSpark = <T>(rows: readonly T[], pick: (row: T) => readonly number[] | null): boolean => {
+    const drawable = rows.map(pick).filter((s): s is readonly number[] => s !== null);
+    return drawable.length > 0 && drawable.every((s) => s.length >= MIN_SPARK_POINTS);
+};
+
+// How the ranking says "this number is partly at cost". One note per panel when it holds
+// for everything (the QA harness has no quote key, so that is the usual case), a marker
+// plus one legend when it holds for some. Never one warning per row: amber on all eight
+// rows stops reading as a warning and starts reading as wallpaper.
+export type UnpricedNote = {mode: 'panel'; text: string} | {mode: 'marker'; legend: string};
+
+export const unpricedNote = (rows: readonly {live: LiveRecord | null}[]): UnpricedNote | null => {
+    const started = rows.map((r) => r.live).filter((l): l is LiveRecord => l !== null);
+    const affected = started.filter((l) => l.unpriced > 0);
+    if (affected.length === 0) return null;
+    const everythingIsStale = affected.length === started.length && affected.every((l) => l.unpriced >= l.holdings);
+    return everythingIsStale
+        ? {mode: 'panel', text: 'Returns are unpriced — no live quotes, so every holding is valued at cost.'}
+        : {mode: 'marker', legend: '* partly unpriced — valued at cost until the next quote'};
+};
+
+// A column whose every value is absent is not information. `false` and `0` are values.
+export const visibleSignalColumns = (columns: readonly SignalColumn[], board: readonly SignalRow[]): SignalColumn[] => {
+    if (board.length === 0) return [...columns];
+    return columns.filter((c) => board.some((row) => row.values[c.key] !== null && row.values[c.key] !== undefined));
+};
+
+// One line for the detail page's "latest decision" summary.
 export const describeLastRun = (run: StrategyRunView | null): string => {
     if (!run) return 'No run yet';
     if (run.status === 'skipped') return `Skipped ${run.date}`;

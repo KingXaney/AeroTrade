@@ -18,7 +18,7 @@ import {
     readAccountsForUser,
     toAccountSummary,
 } from "@/lib/trading/account";
-import {countUnpriced} from "@/lib/trading/analytics";
+import {countUnpriced, mergeLivePoint} from "@/lib/trading/analytics";
 import {getEasternDateString} from "@/lib/utils";
 import {STRATEGIES, strategyBySlug} from "@/lib/strategies/catalog";
 import {STRATEGY_OWNER_ID} from "@/lib/strategies/config";
@@ -28,8 +28,11 @@ import type {SeriesStats, SignalRow, StrategyDefinition} from "@/lib/strategies/
 import {BENCHMARK_SYMBOL} from "@/lib/strategies/universe";
 import {
     describeLastRun,
+    downsample,
     rankLeaderboard,
     selectWidgetRows,
+    SPARK_POINTS,
+    toSparkPct,
     type LiveRecord,
     type SimulatedRecord,
     type StrategyLeaderboardRow,
@@ -77,11 +80,21 @@ const getLatestRuns = async (strategyIds: readonly string[]): Promise<Map<string
     return new Map(rows.map((r) => [r.strategyId, toRunView(r)]));
 };
 
-type LeanBacktestStats = {strategyId: string; from: string; to: string; stats: SeriesStats; closeFills: number};
+type LeanBacktestStats = {strategyId: string; from: string; to: string; stats: SeriesStats; closeFills: number; points?: {value: number}[]};
 
+// Only points.value is projected. A backtest holds ~756 points, so that is ~48 KB read
+// from Mongo inside a cache()d server call; only the 40-point downsample reaches the client.
 const getBacktestStats = async (): Promise<Map<string, SimulatedRecord>> => {
-    const docs = await StrategyBacktest.find({}, {strategyId: 1, from: 1, to: 1, stats: 1, closeFills: 1}).lean<LeanBacktestStats[]>();
-    return new Map(docs.map((d) => [d.strategyId, {from: d.from, to: d.to, stats: d.stats, closeFills: d.closeFills}]));
+    const docs = await StrategyBacktest
+        .find({}, {strategyId: 1, from: 1, to: 1, stats: 1, closeFills: 1, 'points.value': 1})
+        .lean<LeanBacktestStats[]>();
+    return new Map(docs.map((d) => [d.strategyId, {
+        from: d.from,
+        to: d.to,
+        stats: d.stats,
+        closeFills: d.closeFills,
+        spark: toSparkPct(downsample((d.points ?? []).map((p) => p.value), SPARK_POINTS)),
+    }]));
 };
 
 // SPY's return since each account's inception. The base is the first daily benchmark
@@ -101,12 +114,17 @@ const benchmarkReturnsSince = async (inceptionDates: readonly string[], liveClos
     }));
 };
 
-const snapshotDaysByAccount = async (accountIds: readonly string[]): Promise<Map<string, number>> => {
-    const rows = await AccountSnapshot.aggregate<{_id: string; days: number}>([
+type SnapshotSeries = {days: number; points: SnapshotPoint[]};
+
+// The count and the curve in one pass, so the sparkline and "N daily snapshots" can
+// never disagree about how much history there is.
+const snapshotSeriesByAccount = async (accountIds: readonly string[]): Promise<Map<string, SnapshotSeries>> => {
+    const rows = await AccountSnapshot.aggregate<{_id: string; days: number; points: SnapshotPoint[]}>([
         {$match: {accountId: {$in: [...accountIds]}}},
-        {$group: {_id: '$accountId', days: {$sum: 1}}},
+        {$sort: {date: 1}},
+        {$group: {_id: '$accountId', days: {$sum: 1}, points: {$push: {date: '$date', value: '$totalValue'}}}},
     ]);
-    return new Map(rows.map((r) => [r._id, r.days]));
+    return new Map(rows.map((r) => [r._id, {days: r.days, points: r.points}]));
 };
 
 export type StrategyLeaderboard = {
@@ -139,13 +157,16 @@ const buildLeaderboard = async (userId: string | null): Promise<StrategyLeaderbo
     const liveValues = Object.fromEntries(Array.from(portfolios.entries()).map(([id, p]) => [id, p.totalValue]));
     const inceptionByAccount = new Map(accounts.map((a) => [String(a._id), getEasternDateString(new Date(toAccountSummary(a).inceptionAt))]));
 
-    const [stats, runs, backtests, benchmarkReturns, snapshotDays] = await Promise.all([
+    // No getLatestRuns here on purpose: the ranking stopped printing a "last action"
+    // column (eight identical strings), and that was its only reader — so a StrategyRun
+    // aggregate over documents carrying board arrays comes off this page's hot path.
+    const [stats, backtests, benchmarkReturns, snapshots] = await Promise.all([
         getComparisonStats(STRATEGY_OWNER_ID, liveValues),
-        getLatestRuns(STRATEGIES.map((d) => d.id)),
         getBacktestStats(),
         benchmarkReturnsSince(Array.from(new Set(inceptionByAccount.values())), spyLive),
-        snapshotDaysByAccount(Array.from(accountById.keys())),
+        snapshotSeriesByAccount(Array.from(accountById.keys())),
     ]);
+    const today = getEasternDateString();
     const followedSet = new Set(followed);
 
     const rows: StrategyLeaderboardRow[] = STRATEGIES.map((def) => {
@@ -155,6 +176,7 @@ const buildLeaderboard = async (userId: string | null): Promise<StrategyLeaderbo
         let live: LiveRecord | null = null;
         if (state && account && portfolio) {
             const inception = inceptionByAccount.get(state.accountId) ?? state.launchDate;
+            const snapshot = snapshots.get(state.accountId);
             live = {
                 totalValue: portfolio.totalValue,
                 totalReturnPct: portfolio.totalReturnPct,
@@ -163,11 +185,16 @@ const buildLeaderboard = async (userId: string | null): Promise<StrategyLeaderbo
                 winRatePct: stats[state.accountId]?.winRatePct ?? null,
                 holdings: portfolio.positions.length,
                 unpriced: countUnpriced(portfolio.positions),
-                snapshotDays: snapshotDays.get(state.accountId) ?? 0,
+                snapshotDays: snapshot?.days ?? 0,
                 inceptionAt: toAccountSummary(account).inceptionAt,
+                // Today's live valuation is folded in the same way getComparisonStats does
+                // for drawdown, so the curve ends where totalReturnPct says it does.
+                spark: toSparkPct(downsample(
+                    mergeLivePoint(snapshot?.points ?? [], {date: today, value: portfolio.totalValue}).map((p) => p.value),
+                    SPARK_POINTS,
+                )),
             };
         }
-        const run = runs.get(def.id) ?? null;
         return {
             id: def.id,
             name: def.name,
@@ -177,7 +204,6 @@ const buildLeaderboard = async (userId: string | null): Promise<StrategyLeaderbo
             lastError: state?.lastError ?? null,
             live,
             simulated: backtests.get(def.id) ?? null,
-            lastAction: describeLastRun(run),
             followed: followedSet.has(def.id),
         };
     });
@@ -216,6 +242,8 @@ export type StrategyDetail = {
     benchmarkReturnPct: number | null;
     // Real 16:10 snapshots on record (the chart's series also carries today's live point).
     snapshotDays: number;
+    // One-line summary of the latest run, from describeLastRun.
+    lastActionLine: string;
 };
 
 export const getStrategyDetail = cache(async (slug: string, userId: string | null): Promise<StrategyDetail | null> => {
@@ -232,7 +260,7 @@ export const getStrategyDetail = cache(async (slug: string, userId: string | nul
         state ? getTradeHistory(STRATEGY_OWNER_ID, state.accountId, DETAIL_TRADE_LIMIT) : Promise.resolve([] as PaperTradeRecord[]),
         getLatestRuns([def.id]),
         StrategyBacktest.findOne({strategyId: def.id}).lean<(StrategyBacktestView & {computedAt: Date}) | null>(),
-        state ? snapshotDaysByAccount([state.accountId]) : Promise.resolve(new Map<string, number>()),
+        state ? snapshotSeriesByAccount([state.accountId]) : Promise.resolve(new Map<string, SnapshotSeries>()),
     ]);
     const inception = analytics ? getEasternDateString(new Date(analytics.account.inceptionAt)) : null;
     // The same basis as the account's live valuation: SPY's quote if held, else one quote.
@@ -248,6 +276,7 @@ export const getStrategyDetail = cache(async (slug: string, userId: string | nul
             analytics,
             trades,
             latestRun: runs.get(def.id) ?? null,
+            lastActionLine: describeLastRun(runs.get(def.id) ?? null),
             backtest: backtestDoc ? {
                 version: backtestDoc.version,
                 from: backtestDoc.from,
@@ -263,7 +292,7 @@ export const getStrategyDetail = cache(async (slug: string, userId: string | nul
             } : null,
             followed: followed.includes(def.id),
             benchmarkReturnPct: inception ? (benchmarkReturns.get(inception) ?? null) : null,
-            snapshotDays: state ? (snapshotDays.get(state.accountId) ?? 0) : 0,
+            snapshotDays: state ? (snapshotDays.get(state.accountId)?.days ?? 0) : 0,
         };
     }
 });

@@ -1,21 +1,29 @@
 import {describe, expect, it} from "vitest";
 import {
+    columnHasSpark,
     describeLastRun,
+    downsample,
     everyLiveRecordYoung,
     excessReturnPct,
     formatSignalValue,
     liveAgeDays,
+    MIN_SPARK_POINTS,
     pickPerfMode,
     rankLeaderboard,
     selectWidgetRows,
+    sparkDomain,
+    SPARK_POINTS,
     toPerfSeries,
+    toSparkPct,
+    unpricedNote,
+    visibleSignalColumns,
     type LiveRecord,
     type StrategyRunView,
 } from "@/lib/strategies/views";
 
 const live = (totalReturnPct: number, extra: Partial<LiveRecord> = {}): LiveRecord => ({
     totalValue: 100_000, totalReturnPct, benchmarkReturnPct: null, maxDrawdownPct: null, winRatePct: null,
-    holdings: 0, unpriced: 0, snapshotDays: 1, inceptionAt: 0, ...extra,
+    holdings: 0, unpriced: 0, snapshotDays: 1, inceptionAt: 0, spark: [], ...extra,
 });
 
 const run = (over: Partial<StrategyRunView> = {}): StrategyRunView => ({
@@ -133,5 +141,156 @@ describe("rounded percent formatting", () => {
         expect(signedForColor(-0.003)).toBeUndefined();
         expect(signedForColor(0.5)).toBe(0.5);
         expect(signedForColor(null)).toBeUndefined();
+    });
+});
+
+describe("downsample", () => {
+    it("returns nothing for an empty input or a non-positive target", () => {
+        expect(downsample([], 10)).toEqual([]);
+        expect(downsample([1, 2, 3], 0)).toEqual([]);
+        expect(downsample([1, 2, 3], -5)).toEqual([]);
+    });
+
+    it("copies the input when it is already short enough", () => {
+        // The QA seed has ~12 snapshots against SPARK_POINTS 40, so this path is live.
+        const input = [1, 2, 3];
+        const out = downsample(input, 40);
+        expect(out).toEqual([1, 2, 3]);
+        expect(out).not.toBe(input);
+    });
+
+    it("keeps only the last point when asked for one", () => {
+        expect(downsample([1, 2, 3, 9], 1)).toEqual([9]);
+    });
+
+    it("always preserves both endpoints", () => {
+        const input = Array.from({length: 756}, (_, i) => i);
+        const out = downsample(input, SPARK_POINTS);
+        expect(out).toHaveLength(SPARK_POINTS);
+        expect(out[0]).toBe(0);
+        expect(out[out.length - 1]).toBe(755);
+    });
+
+    it("walks forward without repeating or reordering", () => {
+        const out = downsample(Array.from({length: 500}, (_, i) => i), SPARK_POINTS);
+        for (let i = 1; i < out.length; i += 1) expect(out[i]).toBeGreaterThan(out[i - 1]);
+    });
+});
+
+describe("toSparkPct", () => {
+    it("starts at zero and reports growth from the first value", () => {
+        expect(toSparkPct([100, 150, 200])).toEqual([0, 50, 100]);
+    });
+
+    it("returns zeros rather than Infinity on a zero or negative base", () => {
+        expect(toSparkPct([0, 50])).toEqual([0, 0]);
+        expect(toSparkPct([-10, 50])).toEqual([0, 0]);
+    });
+
+    it("is empty for an empty series", () => {
+        expect(toSparkPct([])).toEqual([]);
+    });
+
+    it("ends exactly on the printed total return", () => {
+        // The contract that stops the picture and the number from disagreeing: because
+        // downsample keeps the endpoints, the last spark point IS totalReturnPct.
+        const points = Array.from({length: 756}, (_, i) => 100_000 * (1 + i / 1000));
+        const spark = toSparkPct(downsample(points, SPARK_POINTS));
+        const totalReturnPct = (points[points.length - 1] / points[0] - 1) * 100;
+        expect(spark[spark.length - 1]).toBeCloseTo(totalReturnPct, 10);
+    });
+});
+
+describe("sparkDomain", () => {
+    it("is null when there is nothing to draw", () => {
+        expect(sparkDomain([])).toBeNull();
+        expect(sparkDomain([[], []])).toBeNull();
+    });
+
+    it("spans every series it is given", () => {
+        expect(sparkDomain([[0, 5], [0, -3], [0, 12]])).toEqual({min: -3, max: 12});
+    });
+
+    it("always keeps zero in frame", () => {
+        expect(sparkDomain([[5, 9]])).toEqual({min: 0, max: 9});
+        expect(sparkDomain([[-9, -5]])).toEqual({min: -9, max: 0});
+    });
+});
+
+describe("columnHasSpark", () => {
+    const enough = Array.from({length: MIN_SPARK_POINTS}, () => 0);
+    const tooFew = Array.from({length: MIN_SPARK_POINTS - 1}, () => 0);
+
+    it("is false when any drawable row is too short", () => {
+        expect(columnHasSpark([{s: enough}, {s: tooFew}], (r) => r.s)).toBe(false);
+    });
+
+    it("is true when every drawable row is long enough", () => {
+        expect(columnHasSpark([{s: enough}, {s: enough}], (r) => r.s)).toBe(true);
+    });
+
+    it("ignores rows that have not started", () => {
+        expect(columnHasSpark([{s: enough}, {s: null}], (r) => r.s)).toBe(true);
+    });
+
+    it("is false when nothing has started", () => {
+        expect(columnHasSpark([{s: null}, {s: null}], (r) => r.s)).toBe(false);
+    });
+});
+
+describe("unpricedNote", () => {
+    it("says nothing when every holding is priced", () => {
+        expect(unpricedNote([{live: live(1, {holdings: 2, unpriced: 0})}])).toBeNull();
+    });
+
+    it("uses one panel note when nothing at all is priced", () => {
+        // The QA harness runs without a quote key, so this is its normal state.
+        const note = unpricedNote([
+            {live: live(1, {holdings: 2, unpriced: 2})},
+            {live: live(2, {holdings: 1, unpriced: 1})},
+        ]);
+        expect(note).toEqual({mode: 'panel', text: expect.stringContaining('unpriced')});
+    });
+
+    it("uses a row marker when only some rows are affected", () => {
+        const note = unpricedNote([
+            {live: live(1, {holdings: 2, unpriced: 2})},
+            {live: live(2, {holdings: 2, unpriced: 0})},
+        ]);
+        expect(note).toEqual({mode: 'marker', legend: expect.stringContaining('unpriced')});
+    });
+
+    it("ignores rows that have not started", () => {
+        expect(unpricedNote([{live: null}, {live: live(1, {holdings: 1, unpriced: 1})}]))
+            .toEqual({mode: 'panel', text: expect.stringContaining('unpriced')});
+    });
+});
+
+describe("visibleSignalColumns", () => {
+    const columns = [
+        {key: 'close', label: 'Last close', format: 'price' as const},
+        {key: 'ret', label: '12m return', format: 'pct' as const},
+        {key: 'beats', label: 'Beats T-bills', format: 'bool' as const},
+    ];
+    const row = (values: Record<string, number | string | boolean | null>) =>
+        ({symbol: 'XLK', state: 'held' as const, values});
+
+    it("drops a column no row has a value for", () => {
+        const out = visibleSignalColumns(columns, [row({close: 210.5, ret: null, beats: null})]);
+        expect(out.map((c) => c.key)).toEqual(['close']);
+    });
+
+    it("keeps a column as soon as one row has a value", () => {
+        const out = visibleSignalColumns(columns, [row({close: null, ret: null, beats: null}), row({ret: 0.12})]);
+        expect(out.map((c) => c.key)).toEqual(['ret']);
+    });
+
+    it("treats false and zero as values, not absence", () => {
+        const out = visibleSignalColumns(columns, [row({close: 0, ret: null, beats: false})]);
+        expect(out.map((c) => c.key)).toEqual(['close', 'beats']);
+    });
+
+    it("keeps every column when the board is empty", () => {
+        expect(visibleSignalColumns(columns, [])).toHaveLength(3);
     });
 });
