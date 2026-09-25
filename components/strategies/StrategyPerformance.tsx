@@ -121,7 +121,7 @@ const StrategyPerformance = ({name, live, simulated, initialMode}: {name: string
                                     Simulated — backtest, not live
                                 </span>
                                 <span className="text-[11px] text-fg-muted" style={{fontFamily: 'var(--type-mono)'}}>
-                                    {simulated.from} → {simulated.to} · next-open fills · no fees, slippage or dividends
+                                    {simulated.from} → {simulated.to} · next-open fills · no fees or slippage · interest and dividends included
                                     {simulated.closeFills > 0 ? ` · ${simulated.closeFills} fill${simulated.closeFills === 1 ? '' : 's'} used the close` : ''}
                                 </span>
                             </div>

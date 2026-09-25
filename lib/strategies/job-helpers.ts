@@ -56,6 +56,8 @@ export type RunSummaryInput = {
     planned: number;
     staleSymbols: number;
     backtestsRebuilt: number;
+    // Rebuilds held back until dividends and the T-bill rate cover the window.
+    backtestsWaiting?: number;
     providers: {yahoo: number; stooq: number};
     failedSymbols: readonly string[];
     asOf: string;
@@ -68,6 +70,7 @@ export const runSummary = (s: RunSummaryInput): string => {
         `bars as of ${s.asOf}`,
         `${s.staleSymbols} stale symbol(s)`,
         `${s.backtestsRebuilt} backtest(s) rebuilt`,
+        ...(s.backtestsWaiting ? [`${s.backtestsWaiting} backtest(s) waiting for data`] : []),
         `yahoo ${s.providers.yahoo} / stooq ${s.providers.stooq}`,
     ];
     if (s.failedSymbols.length > 0) parts.push(`failed: ${s.failedSymbols.join(', ')}`);

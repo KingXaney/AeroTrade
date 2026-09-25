@@ -2,8 +2,16 @@
 // stored daily bars with next-open fills. Pure. The calendar is the benchmark's bar
 // dates (the NYSE table only starts in 2025), the window ends before the launch date so
 // live and simulated never overlap, and nothing on day t can see bar t+1.
+//
+// Cash earns interest and holdings receive dividends through the SAME income clock the
+// nightly job replays live accounts with, stepped in the same order — open(d), d's fills,
+// close(d) — every calendar day, skipped days and weekends included. That order is what
+// makes a strategy's backtest and its live record earn identically (see the parity test).
 
 import type {Bar} from "@/lib/prices/signals";
+import {addCalendarDays, eachCalendarDay} from "@/lib/prices/calendar-days";
+import {totalReturnIndex} from "@/lib/prices/total-return";
+import {createIncomeClock, dividendsByExDate, makeRateLookup, type IncomeClock, type IncomeRow, type RatePoint} from "@/lib/trading/income";
 import {CASH_FLOOR, SIM_RESULT_BARS, WARMUP_BARS} from "@/lib/strategies/config";
 import {applyFill, buildContext, runStrategyDay, type SimAccount} from "@/lib/strategies/engine";
 import {summarizeSeries} from "@/lib/strategies/metrics";
@@ -16,6 +24,33 @@ export type SimulationOptions = {
     launchDate: string;
     resultBars?: number;
     warmupBars?: number;
+    // The 13-week T-bill series. When given, cash earns interest and holdings are paid their
+    // dividends (from the bars' stored `dividend` field); without it, price return only.
+    rates?: readonly RatePoint[];
+};
+
+// Steps the income clock one calendar day at a time, alongside the trading loop.
+const incomeWalker = (clock: IncomeClock | null) => {
+    let due = 0;
+    const rows: IncomeRow[] = [];
+    return {
+        rows,
+        // Start of day: yesterday's income becomes cash; ex-dates fix on the holdings now.
+        open: (date: string, account: SimAccount): SimAccount => {
+            if (clock === null) return account;
+            const credited = due === 0 ? account : {...account, cash: account.cash + due};
+            due = 0;
+            clock.open(date, new Map(credited.positions.map((p) => [p.symbol, p.quantity])));
+            return credited;
+        },
+        // End of day: interest on the day's closing cash, and any dividend paid today.
+        close: (date: string, account: SimAccount): void => {
+            if (clock === null) return;
+            const closed = clock.close(date, account.cash);
+            rows.push(...closed);
+            due = closed.reduce((sum, row) => sum + row.amount, 0);
+        },
+    };
 };
 
 const finitePositive = (value: number | undefined): value is number => typeof value === 'number' && Number.isFinite(value) && value > 0;
@@ -60,17 +95,20 @@ const emptyResult = (date: string, startingBalance: number, benchmarkClose: numb
         trades: [],
         rejections: [],
         stats: summarizeSeries(points, [], benchmark),
+        income: [],
     };
 };
 
 export const simulateStrategy = (
     def: StrategyDefinition,
     barsBySymbol: ReadonlyMap<string, readonly Bar[]>,
-    {startingBalance, launchDate, resultBars = SIM_RESULT_BARS, warmupBars = WARMUP_BARS}: SimulationOptions,
+    {startingBalance, launchDate, resultBars = SIM_RESULT_BARS, warmupBars = WARMUP_BARS, rates}: SimulationOptions,
 ): SimulationResult => {
     const benchmarkBars = (barsBySymbol.get(BENCHMARK_SYMBOL) ?? []).filter((bar) => bar.date < launchDate);
     const calendar = benchmarkBars.map((bar) => bar.date);
-    const benchmarkIndex = indexBars(benchmarkBars);
+    // SPY's total return — the same index every live "vs SPY" reads (identical to the closes
+    // when the bars carry no dividends).
+    const benchmarkIndex = indexBars(totalReturnIndex(benchmarkBars).map((p) => ({date: p.date, close: p.value})));
     const decide = STRATEGY_RULES[def.id];
 
     // Not enough history to warm the indicators up and still have a day to trade.
@@ -84,7 +122,13 @@ export const simulateStrategy = (
     const indexes = new Map<string, {byDate: Map<string, Bar>; dates: string[]}>();
     for (const [symbol, bars] of barsBySymbol) indexes.set(symbol, indexBars(bars));
 
+    const dividendPoints = rates === undefined ? [] : [...barsBySymbol].flatMap(([symbol, bars]) =>
+        bars.filter((bar) => typeof bar.dividend === 'number' && bar.dividend > 0).map((bar) => ({symbol, exDate: bar.date, perShare: bar.dividend as number})));
+    const income = incomeWalker(rates === undefined ? null : createIncomeClock({rateOn: makeRateLookup(rates), dividends: dividendsByExDate(dividendPoints)}));
+
     let account: SimAccount = {cash: startingBalance, positions: []};
+    // The account exists from the first result day, like a live account from its inception.
+    account = income.open(calendar[startIndex], account);
     let lastRebalanceDate: string | null = null;
     let isFirstRun = true;
     let closeFills = 0;
@@ -99,6 +143,14 @@ export const simulateStrategy = (
     for (let i = startIndex; i < n - 1; i += 1) {
         const asOf = calendar[i];
         const tradeDate = calendar[i + 1];
+        // Close asOf, walk any weekend or holiday, and open the trade date — so the decision
+        // below sees every credit dated before it, exactly as a live 09:35 run does.
+        income.close(asOf, account);
+        for (const day of eachCalendarDay(addCalendarDays(asOf, 1), addCalendarDays(tradeDate, -1))) {
+            account = income.open(day, account);
+            income.close(day, account);
+        }
+        account = income.open(tradeDate, account);
         const ctx = buildContext(def, {
             barsBySymbol,
             asOf,
@@ -177,5 +229,6 @@ export const simulateStrategy = (
         trades,
         rejections,
         stats: summarizeSeries(points, trades, benchmark),
+        income: income.rows,
     };
 };

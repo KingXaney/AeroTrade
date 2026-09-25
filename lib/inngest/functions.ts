@@ -35,7 +35,7 @@ import {recordJobRun} from "@/lib/inngest/job-runs";
 import {creditAccounts, planIncomeRun, type CreditOutcome} from "@/lib/trading/income-store";
 import {describeIncomeRun} from "@/lib/trading/income";
 import {addCalendarDays} from "@/lib/prices/calendar-days";
-import {ensureBars} from "@/lib/prices/store";
+import {ensureBars, symbolsLackingDividendCoverage} from "@/lib/prices/store";
 import {buildTargets} from "@/lib/navigator/allocator";
 import {ALWAYS_ELIGIBLE_SYMBOLS, MAX_POSITIONS, MIN_CASH_WEIGHT} from "@/lib/navigator/config";
 import {
@@ -67,7 +67,7 @@ import {STRATEGIES, effectiveVersion} from "@/lib/strategies/catalog";
 import {STRATEGY_OWNER_ID} from "@/lib/strategies/config";
 import {previousTradingDay} from "@/lib/strategies/calendar";
 import {assessFreshness, chunkUniverse, runSummary, stepId, throttleDue} from "@/lib/strategies/job-helpers";
-import {decideForStrategy, isUniverseTooStale, simulateForStrategy} from "@/lib/strategies/runner";
+import {SIM_INCOME_CALENDAR_DAYS, backtestDataReady, decideForStrategy, isUniverseTooStale, simulateForStrategy} from "@/lib/strategies/runner";
 import {
     backtestVersions,
     claimRun,
@@ -80,7 +80,7 @@ import {
     type OrderOutcome,
 } from "@/lib/strategies/store";
 import {ALL_STRATEGY_SYMBOLS, BENCHMARK_SYMBOL as STRATEGY_BENCHMARK, CORE_ETFS, LARGE_CAPS, SECTOR_ETFS} from "@/lib/strategies/universe";
-import {PRICE_CHUNK_SIZE, STRATEGY_BACKFILL_CALENDAR_DAYS} from "@/lib/prices/config";
+import {PRICE_CHUNK_SIZE, RATE_SYMBOL, STRATEGY_BACKFILL_CALENDAR_DAYS} from "@/lib/prices/config";
 import {NYSE_HOLIDAYS, isTradingDay, marketStatus} from "@/lib/prices/market-hours";
 
 // Absolute links in email need the deployment's public URL (the same one better-auth uses).
@@ -1207,21 +1207,45 @@ export const runStrategiesDaily = inngest.createFunction(
             {symbols: [...CORE_ETFS], topupRange: TOTAL_RETURN_TOPUP_RANGE as '2y', forceBackfill: rebuildNeeded},
             ...chunkUniverse([...SECTOR_ETFS, ...LARGE_CAPS, ...heldOutside], PRICE_CHUNK_SIZE).map((symbols) => ({symbols, topupRange: '1mo' as const, forceBackfill: resimulate})),
         ];
+        // A rebuild pays dividends across the whole backtest window, so any symbol whose
+        // dividends are not yet covered that far back is refetched deep — only those, not all
+        // 51 every morning, and only while a rebuild is pending.
+        const launches = states.map((s) => s.launchDate).sort();
+        const coverageFrom = launches.length > 0 ? addCalendarDays(launches[0], -SIM_INCOME_CALENDAR_DAYS) : today;
+        const coverageThrough = launches.length > 0 ? addCalendarDays(launches[launches.length - 1], -1) : today;
         const providers = {yahoo: 0, stooq: 0};
         const failedSymbols: string[] = [];
         for (let i = 0; i < chunks.length; i += 1) {
             const chunk = chunks[i];
-            const result = await step.run(`ensure-bars-${i}`, async () => ensureBars(chunk.symbols, {
-                limit: chunk.symbols.length,
-                backfillCalendarDays: STRATEGY_BACKFILL_CALENDAR_DAYS,
-                requireOhlc: true,
-                topupRange: chunk.topupRange,
-                forceBackfill: chunk.forceBackfill,
-            }));
+            const result = await step.run(`ensure-bars-${i}`, async () => {
+                const deep = chunk.forceBackfill
+                    ? chunk.symbols
+                    : (rebuildNeeded ? await symbolsLackingDividendCoverage(chunk.symbols, coverageFrom, coverageThrough) : []);
+                const shallow = chunk.symbols.filter((symbol) => !deep.includes(symbol));
+                const options = {backfillCalendarDays: STRATEGY_BACKFILL_CALENDAR_DAYS, requireOhlc: true, topupRange: chunk.topupRange};
+                // One after the other, never in parallel: ensureBars spaces its Yahoo calls, and two
+                // concurrent passes would double the request rate that the spacing exists to cap.
+                const runs = [
+                    deep.length > 0 ? await ensureBars(deep, {...options, limit: deep.length, forceBackfill: true}) : null,
+                    shallow.length > 0 ? await ensureBars(shallow, {...options, limit: shallow.length, forceBackfill: false}) : null,
+                ];
+                return {
+                    providers: {
+                        yahoo: runs.reduce((n, r) => n + (r?.providers.yahoo ?? 0), 0),
+                        stooq: runs.reduce((n, r) => n + (r?.providers.stooq ?? 0), 0),
+                    },
+                    failed: runs.flatMap((r) => r?.failed ?? []),
+                };
+            });
             providers.yahoo += result.providers.yahoo;
             providers.stooq += result.providers.stooq;
             failedSymbols.push(...result.failed);
         }
+        // The T-bill rate the backtests credit interest at (the income job keeps it fresh too).
+        await step.run('ensure-rate', async () => {
+            const r = await ensureBars([RATE_SYMBOL], {limit: 1, backfillCalendarDays: STRATEGY_BACKFILL_CALENDAR_DAYS});
+            return {updated: r.updated, failed: r.failed};
+        });
 
         const trackedSymbols = [...ALL_STRATEGY_SYMBOLS, ...heldOutside];
         const freshness = await step.run('check-freshness', async () => {
@@ -1320,11 +1344,20 @@ export const runStrategiesDaily = inngest.createFunction(
         // Simulated records come after the live phase so a simulation failure can never
         // block trading; they only rebuild when the rule version changed.
         let backtestsRebuilt = 0;
+        let backtestsWaiting = 0;
         for (const def of STRATEGIES) {
             const state = states.find((s) => s.strategyId === def.id);
             if (!state) continue;
             if (!resimulate && versions[def.id] === effectiveVersion(def)) continue;
             try {
+                // Saving stamps the version and ends the rebuild for good, so a backtest built on
+                // partial dividend or rate data would be frozen wrong. Wait for the data instead.
+                const readiness = await step.run(`simulate-ready-${stepId(def.id)}`, async () => backtestDataReady(def, state.launchDate));
+                if (!readiness.ready) {
+                    console.warn(`Backtest for ${def.id} waiting: ${readiness.reason}`);
+                    backtestsWaiting += 1;
+                    continue;
+                }
                 await step.run(`simulate-${stepId(def.id)}`, async () => simulateForStrategy(def, state.launchDate));
                 backtestsRebuilt += 1;
             } catch (error) {
@@ -1341,6 +1374,7 @@ export const runStrategiesDaily = inngest.createFunction(
             planned,
             staleSymbols: freshness.staleSymbols.length,
             backtestsRebuilt,
+            backtestsWaiting,
             providers,
             failedSymbols,
             asOf,

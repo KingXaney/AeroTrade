@@ -27,12 +27,15 @@ export const totalReturnIndex = (bars: readonly Bar[]): IndexPoint[] => {
         while (j < bars.length && bars[j].date <= paid) j += 1;
         if (j < bars.length) reinvested[j] += bar.dividend;
     });
-    const points: IndexPoint[] = [{date: bars[0].date, value: bars[0].close}];
-    for (let i = 1; i < bars.length; i += 1) {
-        const previous = points[i - 1].value;
-        points.push({date: bars[i].date, value: previous * (bars[i].close + reinvested[i]) / bars[i - 1].close});
-    }
-    return points;
+    // value_t = close_t × F_t, where F only moves when a dividend is reinvested:
+    // F_t = F_{t−1} × (1 + paid_t / close_t). The same chain as
+    // value_{t−1} × (close_t + paid_t) / close_{t−1}, but exactly the closes when nothing is
+    // paid, instead of drifting away from them through a long product of ratios.
+    let factor = 1;
+    return bars.map((bar, i) => {
+        if (reinvested[i] > 0) factor *= 1 + reinvested[i] / bar.close;
+        return {date: bar.date, value: bar.close * factor};
+    });
 };
 
 // The intraday leg: stored bars end at the previous session, so today's value is the last

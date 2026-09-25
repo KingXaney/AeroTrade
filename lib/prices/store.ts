@@ -221,3 +221,26 @@ export const getBarsForSymbols = async (
     }
     return map;
 };
+
+// ---------------------------------------------------------------------------
+// Readiness for income: which symbols' dividends can be trusted over a window
+// ---------------------------------------------------------------------------
+
+// Symbols whose stored dividends cannot be vouched for over [from, through] — they need a
+// deep refetch before anything that pays dividends (a backtest rebuild) may rely on them.
+export const symbolsLackingDividendCoverage = async (symbols: string[], from: string, through: string): Promise<string[]> => {
+    await connectToDatabase();
+    const unique = Array.from(new Set(symbols.map((s) => s.toUpperCase()))).filter(Boolean);
+    const metas = await PriceSeriesMeta.find({symbol: {$in: unique}}).lean<{symbol: string; dividendsFrom?: string; dividendsThrough?: string}[]>();
+    const covered = new Set(metas
+        .filter((m) => m.dividendsFrom !== undefined && m.dividendsThrough !== undefined && m.dividendsFrom <= from && m.dividendsThrough >= through)
+        .map((m) => m.symbol));
+    return unique.filter((symbol) => !covered.has(symbol));
+};
+
+// The stored T-bill series as rate points (a discount yield, annualised %).
+export const getRatePoints = async (): Promise<{date: string; discountPct: number}[]> => {
+    await connectToDatabase();
+    const bars = await PriceBar.find({symbol: RATE_SYMBOL}, {_id: 0, date: 1, close: 1}).sort({date: 1}).lean<{date: string; close: number}[]>();
+    return bars.map((bar) => ({date: bar.date, discountPct: bar.close}));
+};
