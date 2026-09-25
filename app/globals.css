@@ -293,9 +293,12 @@ html[data-mode="light"] {
   overflow: hidden;
   isolation: isolate;
 }
-/* The radius token beats layered utilities; partial-corner panels (edit-mode headers) opt out below. */
-.glass-panel.rounded-t-xl { border-bottom-left-radius: 0; border-bottom-right-radius: 0; }
-.glass-panel.rounded-b-xl { border-top-left-radius: 0; border-top-right-radius: 0; }
+/* Panel `interactive`. The radius token beats layered utilities because this rule sits
+   outside any cascade layer; `border` is set here the same way, so a `hover:border-brand/25`
+   utility loses to it and the hover reads as dead. Hence the attribute hook. */
+.glass-panel[data-interactive]:hover {
+  border-color: color-mix(in srgb, var(--brand) 25%, transparent);
+}
 
 /* Quiet Cyber redesign: shimmer, breathing pulse, and glow pulse are disabled.
    Kept as no-ops so existing .shimmer / .node-pulse / .animate-glow usages render
