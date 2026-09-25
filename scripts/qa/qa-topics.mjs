@@ -38,26 +38,37 @@ const settleToasts = async (page) => {
     const shot = async (name) => { await page.waitForTimeout(600); await page.screenshot({path: `${OUT}/${name}.png`, fullPage: true}); };
     const widgetOrder = () => page.$$eval('[data-widget-id]', (els) => els.map((e) => e.getAttribute('data-widget-id')));
 
-    // --- sign up: lands on /topics ---
+    // --- sign up: lands on the dashboard with topics already installed ---
+    const dashboardUrl = new RegExp(`^${BASE}/(\\?.*)?$`);
     await page.goto(`${BASE}/sign-up`, {waitUntil: 'load'});
     await page.fill('#fullName', 'QA Tester');
     await page.fill('#email', `qa${Date.now()}@example.com`);
     await page.fill('#password', 'Passw0rd!Passw0rd!');
     await page.click('button[type=submit]');
-    await page.waitForURL(/\/topics/, {timeout: 90000}).catch(async (e) => { await shot('00-sign-up-failed'); throw e; });
+    await page.waitForURL(dashboardUrl, {timeout: 90000}).catch(async (e) => { await shot('00-sign-up-failed'); throw e; });
     await page.waitForTimeout(1200);
-    check('sign-up lands on /topics', page.url().endsWith('/topics'), page.url());
+    check('sign-up lands on the dashboard, not a setup screen', dashboardUrl.test(page.url()), page.url());
 
-    // --- empty state -> follow a starter (a pressed chip is renamed "✓ AI chips", hence the regex) ---
-    const starter = page.getByRole('button', {name: /AI chips$/});
-    check('empty state shows starter chips', await starter.count() === 1 && await page.getByRole('button', {name: 'Write my own'}).count() === 1);
-    await shot('01-topics-empty');
-    await starter.click();
-    check('starter chip toggles aria-pressed', (await starter.getAttribute('aria-pressed')) === 'true');
-    await page.getByRole('button', {name: /^Follow 1 selected/}).click();
+    // --- the defaults are there, and the picker never appeared ---
+    await page.goto(`${BASE}/topics`, {waitUntil: 'load'});
     await page.waitForSelector('nav[aria-label="Your topics"]', {timeout: 60000});
     await page.waitForTimeout(800);
-    check('after follow: rail appears', true, page.url());
+    check('no setup wall: /topics opens on the feed', await page.getByRole('button', {name: 'Write my own'}).count() === 0);
+    // The rail leads with an "All topics" link, so key on the per-topic hrefs, not on `a`.
+    const railSel = 'nav[aria-label="Your topics"] a[href^="/topics/"]';
+    const railNames = await page.$$eval(railSel, (as) => as.map((a) => a.textContent.trim()));
+    const railText = railNames.join('|');
+    check('six topics preinstalled', railNames.length === 6, `${railNames.length}: ${railText}`);
+    check('the set is finance-led', /Fed rate decisions/.test(railText) && /AI chips/.test(railText), railText);
+    check('…with major world news in it', /Geopolitics/.test(railText) && /World economy/.test(railText), railText);
+    check('the preinstalled notice is shown', /came preinstalled/i.test(await page.locator('main').innerText()));
+    await shot('01-topics-preinstalled');
+
+    // Seeding runs once per account, not once per page view.
+    await page.goto(`${BASE}/topics`, {waitUntil: 'load'});
+    await page.waitForSelector('nav[aria-label="Your topics"]', {timeout: 60000});
+    check('seeding is idempotent across reloads',
+        (await page.$$eval(railSel, (as) => as.length)) === 6);
 
     // --- single topic page (first visit triggers the bounded live fetch) ---
     await page.goto(`${BASE}/topics/ai-chips`, {waitUntil: 'load'});
@@ -71,7 +82,7 @@ const settleToasts = async (page) => {
 
     // --- sidebar card + nav order ---
     const sideCard = (await page.locator('aside a[href="/topics"]').first().innerText()).replace(/\n/g, ' ');
-    check('sidebar topics card shows 1 topic followed', /1\s*topic\s*followed/i.test(sideCard), sideCard);
+    check('sidebar topics card shows the six followed topics', /6\s*topics\s*followed/i.test(sideCard), sideCard);
     const sideNav = await page.$$eval('aside nav a', (as) => as.map((a) => a.textContent.trim()));
     check('sidebar nav starts Topics · Dashboard · Brain', sideNav.join(',').startsWith('interestsTopics,space_dashboardDashboard,neurologyBrain'), sideNav.join(','));
     // The sidebar is the surface that owns the account pages; all eleven come from lib/navigation.ts.
@@ -192,8 +203,13 @@ const settleToasts = async (page) => {
     // --- index rail, then delete via the header menu ---
     await page.goto(`${BASE}/topics`, {waitUntil: 'load'});
     await page.waitForTimeout(1000);
-    const rail = await page.$$eval('nav[aria-label="Your topics"] a', (as) => as.map((a) => a.textContent.trim()));
-    check('rail lists All topics + 2 topics', rail.length === 3, rail.join(' | '));
+    // Counted relative to the seeded defaults: the absolute number is a property of the
+    // default set, which is asserted once above and free to change.
+    const rail = await page.$$eval(railSel, (as) => as.map((a) => a.textContent.trim()));
+    check('rail lists the defaults plus the topic just followed', rail.length === 7, rail.join(' | '));
+    check('…including the one made from the palette', rail.some((t) => /climate policy/i.test(t)), rail.join(' | '));
+    check('the preinstalled notice is gone once the set is no longer ours',
+        !/came preinstalled/i.test(await page.locator('main').innerText()));
     await page.goto(`${BASE}/topics/climate-policy`, {waitUntil: 'load'});
     await page.waitForTimeout(800);
     await page.getByRole('button', {name: 'Topic actions'}).click();
@@ -201,8 +217,12 @@ const settleToasts = async (page) => {
     await page.getByRole('button', {name: 'Stop following'}).last().click();
     await page.waitForURL(/\/topics$/, {timeout: 30000}).catch(() => {});
     await page.waitForTimeout(1200);
-    const rail2 = await page.$$eval('nav[aria-label="Your topics"] a', (as) => as.map((a) => a.textContent.trim()));
-    check('after delete: rail has All topics + 1', rail2.length === 2, rail2.join(' | '));
+    const rail2 = await page.$$eval(railSel, (as) => as.map((a) => a.textContent.trim()));
+    check('after delete: the rail is one shorter', rail2.length === rail.length - 1, rail2.join(' | '));
+    // The notice describes the current set, not history: back at exactly the defaults, it
+    // is true again and says so. That is the point of deriving it instead of storing a flag.
+    check('back at exactly the defaults, the notice is honest again',
+        /came preinstalled/i.test(await page.locator('main').innerText()));
     await page.goto(`${BASE}/topics/climate-policy`, {waitUntil: 'load'});
     await page.waitForTimeout(1000);
     // notFound() streams behind loading.tsx, so the status is 200; the not-found UI is what matters.

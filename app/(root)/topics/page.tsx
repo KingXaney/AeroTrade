@@ -2,6 +2,8 @@ import {redirect} from "next/navigation";
 import {getCurrentUserId} from "@/lib/actions/watchlist.actions";
 import {ensureTopicHasArticles, getMergedTopicFeed, getTopicsOverview} from "@/lib/topics/store";
 import {pickFirstRunTopic} from "@/lib/topics/first-run";
+import {seedDefaultTopics, shouldSeedDefaults} from "@/lib/topics/seed";
+import {isUntouchedDefaultSet} from "@/lib/topics/starters";
 import {getTopEntities} from "@/lib/brain/queries";
 import {suggestKeywords} from "@/lib/topics/suggest-keywords";
 import TopicsShell from "@/components/topics/TopicsShell";
@@ -32,8 +34,22 @@ const TopicsPage = async () => {
     if (!userId) redirect('/sign-in');
 
     let overview = await getTopicsOverview(userId);
+
+    // The safety net behind the sign-up seed: it catches every account that predates
+    // default topics, and any sign-up where seeding failed. Guarded by topicsSeededAt, so
+    // a user who deliberately unfollowed everything is left alone.
+    if (overview.topics.length === 0 && await shouldSeedDefaults(userId).catch(() => false)) {
+        const seeded = await seedDefaultTopics(userId).catch((error: unknown) => {
+            console.error('Could not seed default topics:', error);
+            return {created: 0, firstSlug: null};
+        });
+        if (seeded.created > 0) overview = await getTopicsOverview(userId);
+    }
+
+    // Reaching here with nothing means the user removed it all on purpose, so this is a
+    // deliberate empty state rather than the setup wall it used to be.
     if (overview.topics.length === 0) {
-        return <TopicsEmptyState brainSuggestions={await brainSuggestions()} />;
+        return <TopicsEmptyState brainSuggestions={await brainSuggestions()} canRestoreDefaults />;
     }
 
     let articles = await getMergedTopicFeed(userId, {limit: MERGED_FEED_SIZE});
@@ -55,7 +71,8 @@ const TopicsPage = async () => {
     const now = Date.now();
     return (
         <TopicsShell overview={overview}>
-            <AllTopicsHeader count={overview.topics.length} unseenTotal={overview.unseenTotal} />
+            <AllTopicsHeader count={overview.topics.length} unseenTotal={overview.unseenTotal}
+                             preinstalled={isUntouchedDefaultSet(overview.topics.map((t) => t.slug))} />
             {articles.length > 0
                 ? <TopicFeed initial={articles} showTopicTag pageSize={MERGED_FEED_SIZE} />
                 : <TopicFeedEmpty scope="all" topics={overview.topics} now={now} />}

@@ -1,7 +1,7 @@
 import {redirect} from "next/navigation";
 import {getCurrentUserId} from "@/lib/actions/watchlist.actions";
 import {getCachedWatchlistSymbols} from "@/lib/dashboard/cached";
-import {getNewsFeedForPrefs, getNewsFeedPrefs} from "@/lib/news/feed-store";
+import {getNewsFeedForPrefs, getNewsFeedPrefs, getTopicFeedBatch} from "@/lib/news/feed-store";
 import {NEWS_PAGE_SIZE} from "@/lib/news/config";
 import {describeNewsFeed} from "@/lib/news/feed-prefs";
 import NewsArticleCard from "@/components/news/NewsArticleCard";
@@ -17,10 +17,15 @@ const NewsPage = async ({searchParams}: NewsPageProps) => {
 
     const {edit} = await searchParams;
     const prefs = await getNewsFeedPrefs(userId);
-    const watchlistSymbols = prefs.includeWatchlist
-        ? await getCachedWatchlistSymbols(userId).catch(() => [] as string[])
-        : [];
-    const feed = await getNewsFeedForPrefs(prefs, {limit: NEWS_PAGE_SIZE, watchlistSymbols});
+    // This page reads the preference itself (the editor needs it), so unlike the widget and
+    // /history it has to ask for the topic batch explicitly.
+    const [watchlistSymbols, topicArticles] = await Promise.all([
+        prefs.includeWatchlist
+            ? getCachedWatchlistSymbols(userId).catch(() => [] as string[])
+            : Promise.resolve([] as string[]),
+        getTopicFeedBatch(userId),
+    ]);
+    const feed = await getNewsFeedForPrefs(prefs, {limit: NEWS_PAGE_SIZE, watchlistSymbols, topicArticles});
 
     return (
         <div className="space-y-4">

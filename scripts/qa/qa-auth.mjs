@@ -49,7 +49,7 @@ try {
     await page.fill('#email', email);
     await page.fill('#password', P1);
     await page.click('button[type="submit"]');
-    await page.waitForURL(/\/topics/, {timeout: 90000});
+    await page.waitForURL(new RegExp(`^${BASE}/(\\?.*)?$`), {timeout: 90000});
     const user = await db.collection('user').findOne({email});
     const userId = String(user._id);
 
@@ -123,7 +123,7 @@ try {
     check('the old password no longer works', true);
     await page.mouse.move(5, 700); await page.waitForTimeout(800);
     await page.fill('#password', P2); await page.click('button[type="submit"]');
-    await page.waitForURL(/\/topics/, {timeout: 60000});
+    await page.waitForURL(new RegExp(`^${BASE}/(\\?.*)?$`), {timeout: 60000});
     check('the new password signs in', true);
 
     await page.goto(`${BASE}/reset-password?token=${encodeURIComponent(token)}`, {waitUntil: 'load'});

@@ -5,7 +5,7 @@
 import {FEED_REVALIDATE_SECONDS, GOOGLE_NEWS_BASE, GOOGLE_NEWS_SEARCH_BASE, searchUserAgent, US_EDITION, type GoogleEdition} from "@/lib/news/config";
 import {parseRssXml} from "@/lib/news/adapters/rss";
 import {formatArticle, validateArticle} from "@/lib/utils";
-import {QUERY_MAX_CHARS, newsSearchEnabled} from "@/lib/topics/config";
+import {QUERY_MAX_CHARS, TOPIC_SEARCH_WINDOW, newsSearchEnabled} from "@/lib/topics/config";
 
 type NextFetchInit = RequestInit & {next?: {revalidate: number}};
 
@@ -22,15 +22,28 @@ const cleanTerm = (term: string): string =>
 
 const quoteTerm = (term: string): string => (/\s/.test(term) ? `"${term}"` : term);
 
-// ("fed rate" OR fomc) -crypto — built incrementally so truncation never splits a phrase.
-export const buildSearchQuery = (keywords: string[], exclude: string[]): string => {
+// ("fed rate" OR fomc) -crypto when:1d — built incrementally so truncation never splits a
+// phrase, and with the recency window reserved from the budget so it is never the thing
+// that gets truncated away.
+//
+// The window is the ONLY operator that survives into a query. cleanTerm strips ':' from
+// every user term before this point, so `when:` can only ever come from the constant here
+// — a keyword of "when:1d" is already flattened to "when 1d" and matched as text.
+export const buildSearchQuery = (
+    keywords: string[],
+    exclude: string[],
+    {window = TOPIC_SEARCH_WINDOW}: {window?: string | null} = {},
+): string => {
     const include = (keywords ?? []).map(cleanTerm).filter(Boolean);
     if (include.length === 0) return '';
+
+    const suffix = window ? ` when:${window}` : '';
+    const budget = QUERY_MAX_CHARS - suffix.length;
 
     const kept: string[] = [];
     for (const term of include) {
         const candidate = kept.length === 0 ? quoteTerm(term) : `(${[...kept, quoteTerm(term)].join(' OR ')})`;
-        if (candidate.length > QUERY_MAX_CHARS) break;
+        if (candidate.length > budget) break;
         kept.push(quoteTerm(term));
     }
     if (kept.length === 0) return '';
@@ -38,10 +51,10 @@ export const buildSearchQuery = (keywords: string[], exclude: string[]): string 
 
     for (const term of (exclude ?? []).map(cleanTerm).filter(Boolean)) {
         const next = `${query} -${quoteTerm(term)}`;
-        if (next.length > QUERY_MAX_CHARS) break;
+        if (next.length > budget) break;
         query = next;
     }
-    return query;
+    return `${query}${suffix}`;
 };
 
 export const searchUrlFor = (query: string, edition: GoogleEdition = US_EDITION): string =>

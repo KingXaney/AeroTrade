@@ -25,8 +25,8 @@ try {
     await page.fill('#email', `qa${Date.now()}@example.com`);
     await page.fill('#password', 'Passw0rd!Passw0rd!');
     await page.click('button[type="submit"]');
-    await page.waitForURL(/\/topics/, {timeout: 90000});
-    check('sign-up lands on /topics', page.url().endsWith('/topics'));
+    await page.waitForURL(new RegExp(`^${BASE}/(\\?.*)?$`), {timeout: 90000});
+    check('sign-up lands on the dashboard', new RegExp(`^${BASE}/(\\?.*)?$`).test(page.url()), page.url());
 
     // --- the warning token actually resolves (both globals.css edits landed) ----
     const warning = await page.evaluate(() =>

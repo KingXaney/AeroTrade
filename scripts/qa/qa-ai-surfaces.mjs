@@ -31,7 +31,7 @@ try {
     await page.fill('#email', email);
     await page.fill('#password', 'Passw0rd!Passw0rd!');
     await page.click('button[type="submit"]');
-    await page.waitForURL(/\/topics/, {timeout: 90000});
+    await page.waitForURL(new RegExp(`^${BASE}/(\\?.*)?$`), {timeout: 90000});
 
     const openChat = async () => {
         await page.locator('button[aria-label*="ssistant" i], button[aria-label*="chat" i]').first().click();

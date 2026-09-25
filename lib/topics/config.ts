@@ -1,7 +1,9 @@
 // Limits for followed topics. Actions, jobs and UI copy all read the same numbers
 // from here so a cap can never drift between the validator and the message shown.
 
-export const MAX_TOPICS_PER_USER = 12;
+// Six of these are seeded for every new account (lib/topics/starters.ts), so the cap is
+// the user's own budget plus the defaults — 12 would have left them only six slots.
+export const MAX_TOPICS_PER_USER = 16;
 export const MAX_KEYWORDS = 8;
 export const MAX_EXCLUDES = 8;
 export const NAME_MIN = 2;
@@ -15,6 +17,17 @@ export const MAX_MATCH_TEXT_CHARS = 2000;
 export const MATCH_CAP_PER_FETCH = 40;
 export const MAX_ARTICLES_PER_TOPIC_PER_DAY = 60;
 export const QUERY_MAX_CHARS = 200;
+
+// How far back a topic search asks Google News to look. Without a window, Google News
+// search ranks by RELEVANCE, not date: the unbounded "big tech earnings" query measured a
+// median result age of 25 days and a worst case of 149. Since the matcher caps at 40 and
+// never scores recency, that staleness landed straight in the store and the topic read as
+// the same news every day. Measured across five topic sets, `when:1d` returns 100% of
+// results inside 24 hours and still finds 27 for the quietest of them.
+export const TOPIC_SEARCH_WINDOW = '1d';
+// Widen once when a day's window comes back empty, so a genuinely quiet topic still fills
+// on its first fetch instead of starting blank.
+export const TOPIC_SEARCH_FALLBACK_WINDOW = '7d';
 
 // Briefs run on the free Gemini tier with a 15 s sleep between calls; 20 keeps the
 // daily job well inside the quota.

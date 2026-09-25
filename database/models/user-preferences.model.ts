@@ -21,6 +21,7 @@ export interface UserPreferences extends Document {
     dashboardLayout?: DashboardLayoutPrefs;
     newsFeed?: NewsFeedPrefs;          // absent = the default feed (lib/news/feed-prefs.ts)
     followedStrategies?: string[];     // quant-strategy slugs pinned on the dashboard; absent = none
+    topicsSeededAt?: Date;             // default topics installed once; absent = never seeded
     updatedAt: Date;
 }
 
@@ -70,6 +71,10 @@ const UserPreferencesSchema = new Schema<UserPreferences>({
     newsFeed: {type: NewsFeedSchema, required: false},
     // No default: an empty array would be persisted by every unrelated upsert.
     followedStrategies: {type: [String], default: undefined},
+    // Set once, when the default topics are installed. This — not the topic count — is
+    // what makes "I deleted them all on purpose" stick: without it, every page view would
+    // resurrect the defaults the user just removed.
+    topicsSeededAt: {type: Date, required: false},
     updatedAt: {type: Date, default: Date.now},
 });
 

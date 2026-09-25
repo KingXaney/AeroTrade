@@ -8,7 +8,7 @@ import TopicArticle from "@/database/models/topic-article.model";
 import {buildSearchQuery, fetchNewsForQuery} from "@/lib/news/adapters/search";
 import {hashId, normalizeUrl} from "@/lib/news/config";
 import {matchArticles, type MatchInput} from "@/lib/topics/match";
-import {BRIEF_MIN_AGE_HOURS, BRIEF_MIN_NEW_ARTICLES, MATCH_CAP_PER_FETCH, MAX_ARTICLES_PER_TOPIC_PER_DAY} from "@/lib/topics/config";
+import {BRIEF_MIN_AGE_HOURS, BRIEF_MIN_NEW_ARTICLES, MATCH_CAP_PER_FETCH, MAX_ARTICLES_PER_TOPIC_PER_DAY, TOPIC_SEARCH_FALLBACK_WINDOW} from "@/lib/topics/config";
 import type {TopicBriefArticle} from "@/lib/topics/prompts";
 import type {TopicBriefContent} from "@/lib/topics/brief";
 import {getEasternDateString} from "@/lib/utils";
@@ -36,8 +36,14 @@ type Candidate = MatchInput & {sourceType: NewsSourceType; summary: string};
 export const refreshKeywordGroup = async (group: KeywordGroup): Promise<RefreshResult> => {
     await connectToDatabase();
 
+    // Ask for the last day first. A quiet topic that finds nothing widens once rather than
+    // starting blank — the second request only happens when the first came back empty.
     const query = buildSearchQuery(group.keywords, group.exclude);
-    const web = query ? await fetchNewsForQuery(query, {limit: WEB_FETCH_LIMIT}) : [];
+    let web = query ? await fetchNewsForQuery(query, {limit: WEB_FETCH_LIMIT}) : [];
+    if (query && web.length === 0) {
+        const wider = buildSearchQuery(group.keywords, group.exclude, {window: TOPIC_SEARCH_FALLBACK_WINDOW});
+        web = wider ? await fetchNewsForQuery(wider, {limit: WEB_FETCH_LIMIT}) : [];
+    }
     // The brain's own sweep is read-only input here: finance/RSS/Reddit/SEC rows from
     // yesterday and today, so market topics also see the curated sources.
     const local = await NewsItem.find({publishedDate: {$gte: yesterdayEastern()}})
