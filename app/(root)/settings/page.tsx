@@ -5,7 +5,7 @@ import {getNotificationPreferences} from "@/lib/actions/preferences.actions";
 import AppearanceSettings from "@/components/settings/AppearanceSettings";
 import NotificationSettings from "@/components/settings/NotificationSettings";
 import AccountSection from "@/components/settings/AccountSection";
-import SectionHeading from "@/components/settings/SectionHeading";
+import SectionHeading from "@/components/primitives/SectionHeading";
 import DashboardSettings from "@/components/settings/DashboardSettings";
 import TopicsSettings from "@/components/settings/TopicsSettings";
 import NewsFeedSettings from "@/components/settings/NewsFeedSettings";

@@ -1,50 +1,50 @@
 import JobStamp from "@/components/system/JobStamp";
+import Badge from "@/components/primitives/Badge";
+import Panel from "@/components/primitives/Panel";
 import type {StrategiesSystemStatus} from "@/lib/strategies/queries";
 
-// Is the machinery running, and on which day's prices? One row, always visible, so a
+// Is the machinery running, and on which day's prices? One line, always visible, so a
 // stale feed or a skipped run is the first thing a reader sees — never a silent number.
+//
+// It used to be four tiles with a hint under each: twelve lines of chrome above the
+// actual ranking, every one of them saying the same thing on every visit. Now it is
+// quiet when healthy and only grows — the not-run-yet badge, the error list — when
+// something is actually wrong.
 
-const Stat = ({label, value, hint}: {label: string; value: string; hint?: string}) => (
-    <div className="flex flex-col gap-0.5 min-w-0">
-        <span className="text-[10px] uppercase tracking-[0.1em] text-fg-muted" style={{fontFamily: 'var(--type-mono)'}}>{label}</span>
-        <span className="text-sm font-semibold text-fg truncate" style={{fontFamily: 'var(--type-display)'}}>{value}</span>
-        {hint && <span className="text-[10px] text-fg-muted" style={{fontFamily: 'var(--type-mono)'}}>{hint}</span>}
-    </div>
+const Field = ({label, value, last}: {label: string; value: string; last?: boolean}) => (
+    <span className="whitespace-nowrap">
+        <span className="uppercase tracking-[0.1em] text-fg-muted">{label} </span>
+        <span className="text-fg-soft">{value}</span>
+        {!last && <span className="text-fg-muted" aria-hidden="true"> ·</span>}
+    </span>
 );
 
 const StrategyStatusStrip = ({status}: {status: StrategiesSystemStatus}) => (
-    <section className="glass-panel rounded-xl p-5" id="strategies-status">
-        <div className="flex items-center justify-between mb-4 gap-3">
-            <h2 className="text-sm font-bold uppercase tracking-[0.1em] text-brand" style={{fontFamily: 'var(--type-mono)'}}>
-                System Status
-            </h2>
+    <Panel id="strategies-status" pad={4}>
+        <div className="flex flex-wrap items-center justify-between gap-x-4 gap-y-2">
+            <p className="font-mono flex flex-wrap items-center gap-x-3 gap-y-1 text-[11px]">
+                <Field label="Live since" value={status.launchDate ?? '—'} />
+                <Field label="Last decision" value={status.lastRunDate ?? '—'} />
+                <Field label="Bars" value={status.latestBarDate ?? '—'} />
+                <Field label="Valued" value="16:10 ET" last />
+            </p>
             {!status.started && (
-                <span className="px-2 py-0.5 rounded text-[10px] uppercase tracking-[0.08em] text-warning bg-warning/10" style={{fontFamily: 'var(--type-mono)'}}>
-                    Preview of the catalog — has not run yet
-                </span>
+                <Badge tone="warning">Preview of the catalog — has not run yet</Badge>
             )}
         </div>
-        <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-4">
-            <Stat label="Live since" value={status.launchDate ?? '—'} hint={status.started ? 'system paper accounts opened' : 'first run 09:35 ET on the next trading day'} />
-            <Stat label="Last decision" value={status.lastRunDate ?? '—'} hint="orders fill ~5 min after the open" />
-            <Stat label="Bars as of" value={status.latestBarDate ?? '—'} hint="daily closes (Yahoo, Stooq fallback)" />
-            <Stat label="Valuation" value="16:10 ET" hint="daily snapshot after the close" />
-        </div>
-        {status.job && (
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-2">
-                <JobStamp job={status.job} />
-            </div>
-        )}
+
+        {status.job && <div className="mt-3"><JobStamp job={status.job} /></div>}
+
         {status.errors.length > 0 && (
             <ul className="mt-3 space-y-1" role="status">
                 {status.errors.map((e) => (
-                    <li key={e.strategyId} className="text-[11px] text-warning" style={{fontFamily: 'var(--type-mono)'}}>
+                    <li key={e.strategyId} className="font-mono text-[11px] text-warning">
                         {e.strategyId}: {e.message}
                     </li>
                 ))}
             </ul>
         )}
-    </section>
+    </Panel>
 );
 
 export default StrategyStatusStrip;

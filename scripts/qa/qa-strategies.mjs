@@ -112,8 +112,14 @@ try {
 
     // --- seed a system state the way the job would leave it ---------------------------
     const today = isoDaysAgo(0);
-    const launch = isoDaysAgo(6);
-    const inception = new Date(Date.now() - 6 * 24 * 60 * 60 * 1000);
+    // 13 days: long enough that 12 snapshots clear MIN_SPARK_POINTS (10) so the live
+    // sparkline column is reachable, still inside the 30-day "young record" note.
+    const launch = isoDaysAgo(13);
+    const inception = new Date(Date.now() - 13 * 24 * 60 * 60 * 1000);
+    const snapshotFor = (accountId, d, cash, holdingsValue) => ({
+        accountId, userId: OWNER, date: isoDaysAgo(d), totalValue: 100_000 + (13 - d) * 100,
+        cash, holdingsValue, startingBalance: 100_000,
+    });
     const seeded = [];
     for (let i = 0; i < CATALOG.length; i += 1) {
         const [slug, name] = CATALOG[i];
@@ -134,16 +140,23 @@ try {
             userId: OWNER, accountId: String(accountId), symbol: 'SPY', company: 'SPDR S&P 500', side: 'buy', quantity: 40,
             price: 500, total: 20_000, source: 'strategy', reason: `enter: seeded fill for ${slug}`, createdAt: new Date(),
         });
+        // Only five to begin with: the sparkline gate is asserted below, then the rest
+        // are inserted so the column appears. A half-drawn column is the bug being tested.
         for (let d = 5; d >= 1; d -= 1) {
-            await db.collection('accountsnapshots').insertOne({
-                accountId: String(accountId), userId: OWNER, date: isoDaysAgo(d), totalValue: 100_000 + (5 - d) * 100,
-                cash, holdingsValue, startingBalance: 100_000,
-            });
+            await db.collection('accountsnapshots').insertOne(snapshotFor(String(accountId), d, cash, holdingsValue));
         }
+        // RSI-2 ranks forty names: the page that ran to 4,764px. Seeding its real board
+        // size is what makes the row cap and the page-height guard below mean anything.
+        const board = slug === 'rsi2-mean-reversion'
+            ? Array.from({length: 40}, (_, k) => ({
+                symbol: `SYM${String(k).padStart(2, '0')}`, state: k < 3 ? 'held' : 'watch',
+                values: {close: 100 + k, sma50: 205.1, sma200: 198.2, spread: 0.0348, trendOn: true},
+            }))
+            : [{symbol: 'XLK', state: 'held', values: {close: 210.5, sma50: 205.1, sma200: 198.2, spread: 0.0348, trendOn: true}}];
         await db.collection('strategyruns').insertOne({
             strategyId: slug, date: today, asOf: isoDaysAgo(1), mode: 'live', status: 'done', staleCount: 0, universeSize: 11,
             rebalanceTriggered: true,
-            board: [{symbol: 'XLK', state: 'held', values: {close: 210.5, sma50: 205.1, sma200: 198.2, spread: 0.0348, trendOn: true}}],
+            board,
             orders: [{symbol: 'SPY', side: 'buy', quantity: 40, kind: 'enter', reason: `enter: seeded fill for ${slug}`, executed: true, price: 500}],
             skippedOrders: [], dataIssues: [], equity: 100_000, summary: '1/1 order(s) filled', createdAt: new Date(),
         });
@@ -157,14 +170,30 @@ try {
         });
         seeded.push({slug, name, accountId: String(accountId)});
     }
-    for (let d = 5; d >= 1; d -= 1) {
-        await db.collection('benchmarksnapshots').updateOne({symbol: 'SPY', date: isoDaysAgo(d)}, {$set: {close: 500 + (5 - d)}}, {upsert: true});
+    for (let d = 13; d >= 1; d -= 1) {
+        await db.collection('benchmarksnapshots').updateOne({symbol: 'SPY', date: isoDaysAgo(d)}, {$set: {close: 500 + (13 - d)}}, {upsert: true});
     }
     await db.collection('jobruns').updateOne({jobId: 'strategies-daily'}, {$set: {lastRunAt: new Date(), lastMessage: '8/8 strategies ran (seeded)'}}, {upsert: true});
+
+    // --- the sparkline column is all-or-nothing ----------------------------------------
+    // Five snapshots is four segments — an artifact, not a curve. The column must draw
+    // nothing at all rather than a ragged half, which is the defect being designed out.
+    await page.goto(`${BASE}/strategies`, {waitUntil: 'load'});
+    await page.locator('[data-testid="strategy-leaderboard"]').waitFor({timeout: 30000});
+    check('live sparklines are withheld while the record is too short',
+        await page.locator('svg[data-spark="live"]').count() === 0);
+    for (const {accountId} of seeded) {
+        const acct = await db.collection('paperaccounts').findOne({_id: new ObjectId(accountId)});
+        for (let d = 12; d >= 6; d -= 1) {
+            await db.collection('accountsnapshots').insertOne(snapshotFor(accountId, d, acct.cash, 20_000));
+        }
+    }
 
     // --- leaderboard with a live record -----------------------------------------------
     await page.goto(`${BASE}/strategies`, {waitUntil: 'load'});
     await page.locator('[data-testid="strategy-leaderboard"]').waitFor({timeout: 30000});
+    check('live sparklines draw for all eight once the record is long enough',
+        await page.locator('svg[data-spark="live"]').count() === 8);
     const order = await page.$$eval('[data-testid="strategy-leaderboard"] [data-strategy]', (as) => as.map((a) => a.getAttribute('data-strategy')));
     check('eight strategies ranked by seeded live return', order.join(',') === [...CATALOG].reverse().map(([s]) => s).join(','), order.join(','));
     check('follow stars are not nested inside the row links', await page.locator('[data-testid="strategy-leaderboard"] a button').count() === 0);
@@ -175,6 +204,25 @@ try {
     check('simulated column shows the seeded backtest', /\+11\.6%/.test(board));
     check('status strip shows the live-since date', (await page.locator('#strategies-status').innerText()).includes(launch));
     check('young-record note is shown', /under 30 days old/.test(await page.locator('main, body').first().innerText()));
+
+    // Columns that carried nothing on every row are gone. Scoped to the ranking: the
+    // detail page's analytics tiles legitimately still say "Max Drawdown".
+    check('columns with no information are gone from the ranking',
+        !/win rate|last action|max drawdown/i.test(board));
+    check('simulated sparklines draw for all eight',
+        await page.locator('[data-strategy] svg[data-spark="simulated"]').count() === 8);
+    check('a sparkline names the basis it is drawn on',
+        /simulated/i.test(await page.locator('svg[data-spark="simulated"]').first().getAttribute('aria-label') ?? ''));
+    // Direct regression guard: the simulated cell used to render two stacked values and
+    // clip the second ("-26.8" cut off mid-glyph).
+    const clipped = await page.$$eval('[data-cell="simulated"]', (els) => els.filter((e) => e.scrollWidth > e.clientWidth + 1).length);
+    check('the simulated cell does not clip its value', clipped === 0, `${clipped} clipped`);
+    // Rows are hairline-separated list items, not cards inside a card. Computed style,
+    // not a class name, so the check survives a refactor.
+    const rounded = await page.$$eval('[data-strategy]', (els) => els.filter((e) => getComputedStyle(e).borderRadius !== '0px').length);
+    check('ranking rows are not nested cards', rounded === 0, `${rounded} rounded rows`);
+    const indexText = await page.locator('body').innerText();
+    check('the disclaimer appears once on the ranking', (indexText.match(/not financial advice/gi) ?? []).length === 1);
     await shot('02-leaderboard');
 
     // --- detail page ---------------------------------------------------------------------
@@ -184,7 +232,13 @@ try {
     const signals = await page.locator('#signal-board').innerText();
     check('signal board renders the seeded row with its columns', /XLK/.test(signals) && /held/i.test(signals) && /205\.10|\$205\.10/.test(signals));
     const holdings = await page.locator('#strategy-holdings').innerText();
-    check('holdings show the seeded SPY position valued at cost', /SPY/.test(holdings) && /valued at cost/i.test(holdings));
+    check('holdings show the seeded SPY position', /SPY/.test(holdings));
+    // The caveat is stated once, on the headline tiles it actually qualifies — not again
+    // under the holdings table, which already prints "—" in the price cell.
+    const pageText = await page.locator('body').innerText();
+    check('the at-cost caveat is stated once, not on every panel',
+        (pageText.match(/valued at cost/gi) ?? []).length === 1,
+        String((pageText.match(/valued at cost/gi) ?? []).length));
     const decision = await page.locator('#strategy-decision').innerText();
     check('latest decision shows the filled order and its reason', /filled/.test(decision) && /seeded fill for golden-cross/.test(decision));
     const log = await page.locator('#strategy-trades').innerText();
@@ -193,7 +247,23 @@ try {
     const sim = await page.locator('#strategy-performance').innerText();
     check('simulated tab is labelled and shows the seeded stats', /backtest, not live/i.test(sim) && /\+11\.60%/.test(sim) && /\+9\.10%/.test(sim));
     check('simulated trade log is present and labelled', /hypothetical/i.test(await page.locator('#strategy-simulated-trades').innerText()));
+
+    // The editorial requirement, asserted: once a strategy has numbers, the chart is near
+    // the top of the page instead of below ~800px of static explanation.
+    const perfBox = await page.locator('#strategy-performance').boundingBox();
+    check('numbers come before prose', perfBox !== null && perfBox.y < 900, `chart at y=${Math.round(perfBox?.y ?? -1)}`);
+    const explainerEl = page.locator('#strategy-explainer');
+    check('the explainer is a native disclosure',
+        (await explainerEl.evaluate((el) => el.querySelector('details')?.tagName)) === 'DETAILS');
+    check('the explainer is closed once there are numbers to read',
+        !/cash floor/i.test(await explainerEl.innerText()));
+    await explainerEl.locator('summary').click();
+    check('the explainer opens on click with its copy intact',
+        /cash floor/i.test(await explainerEl.innerText()) && /why it might work/i.test(await explainerEl.innerText()));
+    const detailText = await page.locator('body').innerText();
+    check('the disclaimer appears once on a detail page', (detailText.match(/not financial advice/gi) ?? []).length === 1);
     await shot('03-detail');
+
 
     // --- follow persists and drives the widget ------------------------------------------
     await page.locator('#strategy-follow').click();
@@ -215,6 +285,18 @@ try {
     await page.getByText('Unfollowed').waitFor({timeout: 30000});
     await settleToasts();
     check('unfollowing the last strategy unsets the field', (await prefsDoc())?.followedStrategies === undefined);
+
+    // --- the page that ran to five screens -----------------------------------------------
+    await page.goto(`${BASE}/strategies/rsi2-mean-reversion`, {waitUntil: 'load'});
+    await page.locator('#signal-board').waitFor({timeout: 30000});
+    const visibleRows = await page.locator('#signal-board [data-signal-row]:visible').count();
+    check('the signal board caps its visible rows', visibleRows <= 12, String(visibleRows));
+    check('the rest of the board is behind a disclosure',
+        await page.locator('#signal-board details').count() === 1);
+    const height = await page.evaluate(() => document.body.scrollHeight);
+    check('the detail page is not a scroll marathon', height < 2800, `${height}px`);
+    await shot('05-rsi2');
+
 } catch (err) {
     failures++;
     console.log(`FAIL  threw: ${err.message}`);

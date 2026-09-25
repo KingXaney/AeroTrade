@@ -5,6 +5,10 @@
 import {DEFAULT_DRIFT_BAND, ENGINE_VERSION} from '@/lib/strategies/config';
 import type {StrategyDefinition, StrategyId} from '@/lib/strategies/types';
 
+// Rendered once per strategy page, never twice. It used to appear at the foot of the
+// detail page AND inside the reading guide, which is how a disclaimer stops being read.
+export const STRATEGIES_DISCLAIMER = 'Deterministic rules · no AI · paper money · not financial advice';
+
 const COMMON_CAVEATS: readonly string[] = [
     'Orders fill at the next session, not at the close that produced the signal.',
     'Buys are sized from the previous close in whole shares; a gap-up can bounce an order until the next day.',

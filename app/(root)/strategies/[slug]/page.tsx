@@ -2,9 +2,13 @@ import Link from "next/link";
 import {notFound, redirect} from "next/navigation";
 import {getCurrentUserId} from "@/lib/actions/watchlist.actions";
 import {getEasternDateString} from "@/lib/utils";
+import {STRATEGIES_DISCLAIMER} from "@/lib/strategies/catalog";
 import {getStrategyDetail} from "@/lib/strategies/queries";
 import {pickPerfMode, toPerfSeries} from "@/lib/strategies/views";
 import {UNIVERSES} from "@/lib/strategies/universe";
+import MicroLabel from "@/components/primitives/MicroLabel";
+import Panel from "@/components/primitives/Panel";
+import SectionHeading from "@/components/primitives/SectionHeading";
 import AccountSummary from "@/components/trade/AccountSummary";
 import PortfolioHoldings from "@/components/trade/PortfolioHoldings";
 import TradeHistory from "@/components/trade/TradeHistory";
@@ -18,16 +22,6 @@ import StrategyPerformance from "@/components/strategies/StrategyPerformance";
 type StrategyPageProps = {
     params: Promise<{slug: string}>;
 };
-
-const Panel = ({title, id, aside, children}: {title: string; id?: string; aside?: React.ReactNode; children: React.ReactNode}) => (
-    <section className="glass-panel rounded-xl p-5" id={id}>
-        <div className="flex items-center justify-between gap-3 mb-4">
-            <h2 className="text-sm font-bold uppercase tracking-[0.1em] text-brand" style={{fontFamily: 'var(--type-mono)'}}>{title}</h2>
-            {aside}
-        </div>
-        {children}
-    </section>
-);
 
 const CADENCE_LABEL = {once: 'buys once', daily: 'checked daily', monthly: 'rebalances monthly', quarterly: 'rebalances quarterly'} as const;
 
@@ -48,23 +42,26 @@ const StrategyPage = async ({params}: StrategyPageProps) => {
 
     return (
         <div className="space-y-4">
+            {/* The rule in one sentence stays visible; everything else about it is one
+                click away, so the numbers start about a screen higher than they did. */}
             <div className="flex flex-col md:flex-row md:items-end md:justify-between gap-4 mb-2">
-                <div className="flex items-start gap-3">
+                <div className="flex items-start gap-3 min-w-0">
                     <Link href="/strategies" className="text-fg-muted hover:text-brand transition-colors mt-1" aria-label="Back to strategies">
                         <span className="material-symbols-outlined">arrow_back</span>
                     </Link>
-                    <div>
-                        <h1 className="text-2xl font-semibold text-fg tracking-tight" style={{fontFamily: 'var(--type-display)'}}>{def.name}</h1>
-                        <p className="text-xs text-fg-muted mt-1" style={{fontFamily: 'var(--type-mono)'}} id="strategy-meta">
+                    <div className="min-w-0">
+                        <h1 className="font-heading text-2xl font-semibold text-fg tracking-tight">{def.name}</h1>
+                        <p className="font-mono text-xs text-fg-muted mt-1" id="strategy-meta">
                             {def.family} · {CADENCE_LABEL[def.cadence]} · {universeSize} symbol{universeSize === 1 ? '' : 's'} ·{' '}
                             {started ? `live since ${liveSince}` : <span className="text-warning">not started</span>}
                         </p>
+                        <p className="text-sm text-fg-soft mt-2 max-w-2xl">{def.explainer.summary}</p>
                     </div>
                 </div>
                 <FollowButton slug={def.id} followed={detail.followed} />
             </div>
 
-            <StrategyExplainer def={def} lastRebalanceDate={state?.lastRebalanceDate ?? null} />
+            <StrategyExplainer def={def} lastRebalanceDate={state?.lastRebalanceDate ?? null} defaultOpen={!started} />
 
             {analytics && <AccountSummary portfolio={analytics.summary} />}
 
@@ -89,40 +86,55 @@ const StrategyPage = async ({params}: StrategyPageProps) => {
             />
 
             <div className="grid grid-cols-1 xl:grid-cols-2 gap-4">
-                <Panel title="Current holdings" id="strategy-holdings">
+                <Panel id="strategy-holdings">
+                    <SectionHeading>Current holdings</SectionHeading>
                     <PortfolioHoldings
                         positions={analytics?.summary.positions ?? []}
                         emptyText={started ? def.explainer.cashReason : 'Not started — the account opens on the first run.'}
+                        showUnpricedNote={false}
                     />
                 </Panel>
-                <Panel title="Latest decision" id="strategy-decision">
-                    <LatestDecision run={latestRun} />
+
+                {/* What it saw and what it did are one story, so they share a panel. */}
+                <Panel id="strategy-decision">
+                    <SectionHeading>Latest decision</SectionHeading>
+                    <LatestDecision
+                        run={latestRun}
+                        headline={latestRun ? detail.lastActionLine : undefined}
+                        signals={<div id="strategy-signals"><SignalBoard columns={def.signalColumns} run={latestRun} /></div>}
+                    />
                 </Panel>
             </div>
 
-            <Panel title="What it is watching" id="strategy-signals">
-                <SignalBoard columns={def.signalColumns} run={latestRun} />
+            <Panel id="strategy-trades">
+                <div className="flex items-center justify-between gap-3 mb-4">
+                    <SectionHeading spacing="none">Live trade log</SectionHeading>
+                    <MicroLabel>
+                        {analytics ? `${analytics.tradeCount} fill${analytics.tradeCount === 1 ? '' : 's'}` : ''}
+                    </MicroLabel>
+                </div>
+                {trades.length === 0
+                    ? <p className="text-sm text-fg-muted p-4">No fills yet — the first orders are placed on the next run that finds a signal.</p>
+                    : <TradeHistory trades={trades} totalCount={analytics?.tradeCount} />}
+
+                {/* Hypothetical fills fold away under the real ones, never beside them. */}
+                <div className="mt-4 pt-4 border-t border-line-strong/20" id="strategy-simulated-trades">
+                    <details className="group">
+                        <summary className="font-mono cursor-pointer text-[11px] text-brand hover:underline">
+                            Simulated trade log — {backtest ? `${backtest.trades.length} hypothetical fills at the next day's open` : 'not computed yet'}
+                        </summary>
+                        <div className="pt-3">
+                            {backtest
+                                ? <SimulatedTradeList trades={backtest.trades} />
+                                : <p className="text-sm text-fg-muted">Backtest not computed yet — it is built on the first run.</p>}
+                        </div>
+                    </details>
+                </div>
             </Panel>
 
-            <div className="grid grid-cols-1 xl:grid-cols-2 gap-4">
-                <Panel title="Live trade log" id="strategy-trades" aside={
-                    <span className="text-[10px] uppercase tracking-[0.08em] text-fg-muted" style={{fontFamily: 'var(--type-mono)'}}>
-                        {analytics ? `${analytics.tradeCount} fill${analytics.tradeCount === 1 ? '' : 's'}` : ''}
-                    </span>
-                }>
-                    {trades.length === 0
-                        ? <p className="text-sm text-fg-muted p-4">No fills yet — the first orders are placed on the next run that finds a signal.</p>
-                        : <TradeHistory trades={trades} totalCount={analytics?.tradeCount} />}
-                </Panel>
-                <Panel title="Simulated trade log" id="strategy-simulated-trades">
-                    {backtest
-                        ? <SimulatedTradeList trades={backtest.trades} />
-                        : <p className="text-sm text-fg-muted p-4">Backtest not computed yet.</p>}
-                </Panel>
-            </div>
-
-            <p className="text-[10px] uppercase tracking-[0.08em] text-fg-muted text-center" style={{fontFamily: 'var(--type-mono)'}}>
-                Deterministic rules · no AI · paper money · not financial advice
+            {/* Once per page, and always visible — it used to be rendered twice. */}
+            <p className="font-mono text-[10px] uppercase tracking-[0.1em] text-fg-muted text-center">
+                {STRATEGIES_DISCLAIMER}
             </p>
         </div>
     );

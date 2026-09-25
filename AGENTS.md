@@ -18,6 +18,9 @@ product tour and docs/specs/ for the design documents behind the larger features
 ## Where things live
 
 - `app/` routes · `components/` UI by feature · `lib/actions/` server actions (session-derived, userId-scoped)
+- `components/primitives/` the shared surface vocabulary — `Panel`, `PageTitle`, `SectionHeading`,
+  `MicroLabel`, `Badge`, `EmptyState`, `iconButton`. Hand-owned, and separate from
+  `components/ui/` on purpose: that folder is the shadcn registry target and is regenerable.
 - `lib/news` ingest + sanitise + the per-user feed (`feed-prefs` client-safe, `feed` pure, `feed-store` server) · `lib/brain` entity graph · `lib/navigator` allocation rails · `lib/topics` followed topics
 - `lib/trading` paper accounts · `lib/dashboard` widget registry/layout · `lib/theme` palettes/styles · `lib/ai` models + chat tools
 - `lib/strategies` the quant strategies: pure catalog/rules/engine/simulator (one `runStrategyDay` for live and backtest), `store`/`queries` server side · `lib/prices` daily bars (Yahoo first, Stooq fallback), signals, NYSE calendar
@@ -31,9 +34,17 @@ product tour and docs/specs/ for the design documents behind the larger features
 3. User topics never write into `BrainEntity`; the navigator scores only the brain's global entities.
 4. LLM output is untrusted: JSON-parse with zod and clamp; email HTML goes through `sanitizeDigestHtml`
    with an allow-list of article URLs; briefs render as plain text.
-5. Colours and fonts come from the semantic theme tokens (`text-fg`, `bg-brand/10`, `var(--type-mono)`),
-   never hex literals in `.tsx`.
+5. Colours and fonts come from the semantic theme tokens (`text-fg`, `bg-brand/10`, `font-mono`),
+   never hex literals in `.tsx`. New code uses the `font-mono` / `font-heading` utilities rather
+   than `style={{fontFamily}}` — the older inline spelling is still widespread and is being retired.
 6. `normalizeLayout` stays pure; the legacy-default migration runs only where saved layouts are read.
+7. Framed surfaces are `<Panel>`, never a hand-rolled `bg-surface-2/40 + border` — only `.glass-panel`
+   reads `--panel-bg/-border/-blur/-shadow/-radius`, so anything else silently ignores four of the
+   five visual styles. `.glass-panel` is declared **outside any cascade layer**, so `rounded-*`,
+   `ring-*` and `shadow-*` written next to it lose and do nothing; use `outline-*` for a ring.
+8. A column, tile or caveat that is empty or identical on every row is not information — hide it
+   (`visibleSignalColumns`) or state it once per panel (`describeUnpriced`, `unpricedNote`), never
+   per row. Reference prose belongs in a `<details>`, above-the-fold space belongs to numbers.
 
 ## Next.js 16
 
