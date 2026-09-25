@@ -1,5 +1,9 @@
 # Followed Topics — news beyond the watchlist
 
+> **Superseded in part (2026-09-25):** the empty state is no longer the entry point — a new
+> account is seeded with six default topics and lands on the dashboard. See
+> [2026-09-25-default-topics.md](2026-09-25-default-topics.md).
+
 **Status:** implemented 2026-08-29 on `feature/themes-dashboard-widgets` (ships with the themes + widgets work).
 **Scope:** theme-picker hover fix (P0) and the followed-topics feature (P1–P5: pipeline, jobs, dashboard, email/chat, entry points).
 

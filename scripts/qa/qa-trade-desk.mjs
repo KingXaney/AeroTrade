@@ -35,7 +35,7 @@ try {
     await page.fill('#email', email);
     await page.fill('#password', 'Passw0rd!Passw0rd!');
     await page.click('button[type="submit"]');
-    await page.waitForURL(/\/topics/, {timeout: 90000});
+    await page.waitForURL(new RegExp(`^${BASE}/(\\?.*)?$`), {timeout: 90000});
     const user = await db.collection('user').findOne({email});
     const userId = String(user._id);
     const accounts = db.collection('paperaccounts');

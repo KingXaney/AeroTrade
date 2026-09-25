@@ -129,7 +129,12 @@ export const getNewsFeedForPrefs = async (
     // Topics lead the rotation: they are the most explicit statement of interest the user
     // has made. mergeFeed is round-robin, so this is a tie-break and a bounded share, not
     // a weighting — the topic batch can never swamp the rest of the feed.
-    const topics: FeedBatch[] = topicArticles.length > 0 ? [{kind: 'topics', articles: topicArticles}] : [];
+    //
+    // filterBySources applies here too. Outlet filtering runs per batch, so skipping it
+    // would let a followed topic smuggle in an outlet the user has explicitly hidden —
+    // "hidden" has to mean hidden everywhere, whichever door the article came through.
+    const kept = filterBySources(topicArticles, prefs);
+    const topics: FeedBatch[] = kept.length > 0 ? [{kind: 'topics', articles: kept}] : [];
     return {articles: mergeFeed([...topics, ...batches], {limit}), fallback, requested: requests.length};
 };
 

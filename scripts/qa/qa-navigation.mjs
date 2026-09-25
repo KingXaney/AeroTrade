@@ -21,7 +21,7 @@ const signUp = async (page, tag) => {
     await page.fill('#email', email);
     await page.fill('#password', 'Passw0rd!Passw0rd!');
     await page.click('button[type="submit"]');
-    await page.waitForURL(/\/topics/, {timeout: 90000});
+    await page.waitForURL(new RegExp(`^${BASE}/(\\?.*)?$`), {timeout: 90000});
     return email;
 };
 

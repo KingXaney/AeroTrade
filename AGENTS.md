@@ -21,7 +21,7 @@ product tour and docs/specs/ for the design documents behind the larger features
 - `components/primitives/` the shared surface vocabulary — `Panel`, `PageTitle`, `SectionHeading`,
   `MicroLabel`, `Badge`, `EmptyState`, `iconButton`. Hand-owned, and separate from
   `components/ui/` on purpose: that folder is the shadcn registry target and is regenerable.
-- `lib/news` ingest + sanitise + the per-user feed (`feed-prefs` client-safe, `feed` pure, `feed-store` server) · `lib/brain` entity graph · `lib/navigator` allocation rails · `lib/topics` followed topics
+- `lib/news` ingest + sanitise + the per-user feed (`feed-prefs` client-safe, `feed` pure, `feed-store` server) · `lib/brain` entity graph · `lib/navigator` allocation rails · `lib/topics` followed topics (`starters` the curated set, `seed` what a new account gets, `insert` the one write path)
 - `lib/trading` paper accounts · `lib/dashboard` widget registry/layout · `lib/theme` palettes/styles · `lib/ai` models + chat tools
 - `lib/strategies` the quant strategies: pure catalog/rules/engine/simulator (one `runStrategyDay` for live and backtest), `store`/`queries` server side · `lib/prices` daily bars (Yahoo first, Stooq fallback), signals, NYSE calendar
 - `lib/inngest/functions.ts` every scheduled job · `database/models/` Mongoose models · `types/global.d.ts` ambient domain types
@@ -45,6 +45,18 @@ product tour and docs/specs/ for the design documents behind the larger features
 8. A column, tile or caveat that is empty or identical on every row is not information — hide it
    (`visibleSignalColumns`) or state it once per panel (`describeUnpriced`, `unpricedNote`), never
    per row. Reference prose belongs in a `<details>`, above-the-fold space belongs to numbers.
+9. Default topics are seeded once per account (`seedDefaultTopics`), and `topicsSeededAt` — not the
+   topic count — is what makes that "once" hold: guarding on emptiness alone would resurrect the
+   defaults for anyone who unfollowed everything on purpose. The same reasoning applies to any
+   future onboarding default. Anything derived from the set instead (the "preinstalled" notice, via
+   `isUntouchedDefaultSet`) needs no flag at all and is preferred.
+10. `lib/news` reads followed-topic articles; `lib/topics` never reads the feed. Topics enter the
+   feed as a pre-fetched batch in `mergeFeed`, never as a `FeedRequest`, so the Google kill switch,
+   `MAX_FEED_REQUESTS` and the outage fallback are untouched — and the outage test deliberately
+   ignores them, since articles read from Mongo cannot prove Google answered. Every batch, the topic
+   one included, goes through `filterBySources`: a hidden outlet is hidden whichever door it uses.
+   Invariant 3 still holds — nothing here writes to `BrainEntity`, and `SOURCE_CAPS.web = 0` keeps
+   topic search hits out of the brain.
 
 ## Next.js 16
 

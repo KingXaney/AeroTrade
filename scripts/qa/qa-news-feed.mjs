@@ -33,13 +33,18 @@ const mongo = new MongoClient(MONGO);
 try {
     await mongo.connect();
     const db = mongo.db('aerotrade');
+    // Topic articles are shared by keywordSetHash, so a previous run's seeded story is
+    // still in the feed — and because topics lead the rotation it would be the first
+    // outlet the hidden-outlet section below picks, hiding the very source we seed.
+    const QA_TOPIC_SOURCE = 'QA Topic Wire';
+    await db.collection('topicarticles').deleteMany({source: {$in: [QA_TOPIC_SOURCE, 'QA Wire']}});
     const email = `qanews${Date.now()}@example.com`;
     await page.goto(`${BASE}/sign-up`, {waitUntil: 'load'});
     await page.fill('#fullName', 'QA News');
     await page.fill('#email', email);
     await page.fill('#password', 'Passw0rd!Passw0rd!');
     await page.click('button[type="submit"]');
-    await page.waitForURL(/\/topics/, {timeout: 90000});
+    await page.waitForURL(new RegExp(`^${BASE}/(\\?.*)?$`), {timeout: 90000});
     const userDoc = await db.collection('user').findOne({email});
     const userId = String(userDoc?._id ?? userDoc?.id ?? '');
     check('signed up', userId.length > 0);
@@ -51,6 +56,8 @@ try {
 
     // --- default: top stories, nothing stored -------------------------------------------
     await page.goto(`${BASE}/news`, {waitUntil: 'load'});
+    // The page streams past its loading boundary after `load` — same as /history below.
+    await page.getByRole('heading', {name: 'News', level: 1}).waitFor({timeout: 30000});
     check('/news renders its heading', await page.getByRole('heading', {name: 'News', level: 1}).count() === 1);
     check('default summary is top stories for the US', (await page.locator('#news-feed-summary').innerText()).trim() === 'Top stories · US');
     const cards = await page.locator('.news-item').count();
@@ -110,6 +117,49 @@ try {
     check('settings has a News feed section with the summary',
         /World/.test(await page.locator('#news').innerText()) && await page.locator('#settings-news-summary').count() === 1);
     await shot('03-settings');
+
+    // --- followed topics reach the feed --------------------------------------------------
+    // Inserted straight into Mongo so the check does not depend on Google News being
+    // reachable: the point under test is the merge, not the fetch.
+    const seededTopic = await db.collection('topics').findOne({userId, slug: 'ai-chips'});
+    check('the account was seeded with default topics', !!seededTopic, String(seededTopic?.name));
+    if (seededTopic) {
+        const url = `https://example.com/qa-topic-${Date.now()}`;
+        await db.collection('topicarticles').insertOne({
+            keywordSetHash: seededTopic.keywordSetHash,
+            contentHash: Math.floor(Math.random() * 1e9),
+            headline: 'QA topic story about AI chips',
+            summary: 'Seeded by the QA harness.',
+            url,
+            source: QA_TOPIC_SOURCE,
+            sourceType: 'web',
+            datetime: Math.floor(Date.now() / 1000) - 600,
+            publishedDate: new Date().toISOString().slice(0, 10),
+            score: 12,
+            matchedTerms: ['ai chips'],
+            createdAt: new Date(),
+        });
+
+        await page.goto(`${BASE}/news`, {waitUntil: 'load'});
+        const topicCards = page.locator('.news-item [data-topic]');
+        check('a followed topic reaches /news', await topicCards.count() > 0, `${await topicCards.count()} tagged cards`);
+        check('the card names the topic that brought it in',
+            /AI chips/.test(await page.locator('.news-item [data-topic="ai-chips"]').first().innerText().catch(() => '')));
+        const hrefs = await page.$$eval('.news-item', (as) => as.map((a) => a.getAttribute('href')));
+        check('no article is printed twice', new Set(hrefs).size === hrefs.length, `${hrefs.length} cards, ${new Set(hrefs).size} unique`);
+        check('topics do not swamp the feed', hrefs.length === 0 || (await topicCards.count()) < hrefs.length,
+            `${await topicCards.count()}/${hrefs.length}`);
+        await shot('05-topic-in-feed');
+
+        // /history takes the same getNewsFeed path, so the topic reaches it too.
+        await page.goto(`${BASE}/history`, {waitUntil: 'load'});
+        await page.getByRole('heading', {name: /^your news feed$/i}).waitFor({timeout: 30000});
+        check('/history carries followed topics as well', await page.locator('.news-item [data-topic]').count() > 0);
+
+        // Back to settings: the reset section below picks up where this one left off.
+        await page.goto(`${BASE}/settings`, {waitUntil: 'load'});
+        await page.locator('#settings-news-summary').waitFor({timeout: 30000});
+    }
 
     // --- reset from settings: back to absence -------------------------------------------
     await page.locator('#settings-news-reset').click();

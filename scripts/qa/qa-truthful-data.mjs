@@ -15,7 +15,8 @@ const MONGO = 'mongodb://127.0.0.1:27117/aerotrade';
 const OUT = new URL('./output/truthful-data/', import.meta.url).pathname;
 mkdirSync(OUT, {recursive: true});
 
-const STARTERS = ['Fed rate decisions', 'AI chips', 'Electric vehicles', 'Crypto regulation', 'Housing market', 'US elections', 'Oil & energy', 'Big Tech earnings'];
+// The six topics seeded for every new account (lib/topics/starters.ts DEFAULT_TOPIC_NAMES).
+const DEFAULTS = ['Fed rate decisions', 'AI chips', 'Big Tech earnings', 'Oil & energy', 'Geopolitics', 'World economy'];
 // The per-row placeholder the old code rendered for a quote-less position.
 const FAKE_FLAT = /\+\$0\.00 \(0\.00%\)/;
 
@@ -48,26 +49,42 @@ try {
     await page.fill('#email', email);
     await page.fill('#password', 'Passw0rd!Passw0rd!');
     await page.click('button[type="submit"]');
-    await page.waitForURL(/\/topics/, {timeout: 90000});
+    // Sign-up lands on the dashboard now: topics are seeded, so there is nothing to set up.
+    await page.waitForURL(new RegExp(`^${BASE}/(\\?.*)?$`), {timeout: 90000});
 
-    // --- first run: follow every starter in ONE action, land on the first topic -------
-    for (const name of STARTERS) await page.getByRole('button', {name: new RegExp(`${name.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}$`)}).click();
-    await page.getByRole('button', {name: /^Follow 8 selected/}).click();
-    await page.waitForURL(/\/topics\/fed-rate-decisions/, {timeout: 90000});
-    await page.waitForSelector('nav[aria-label="Your topics"]', {timeout: 60000});
-    check('following 8 starters lands on the first topic page', /\/topics\/fed-rate-decisions$/.test(page.url()), page.url());
-    // Earlier harness runs leave other users' starters behind; ours is the newest.
+    // --- the defaults are installed, and no setup screen was shown -------------------
+    // Earlier harness runs leave other users' topics behind; ours is the newest.
     const userId = (await topics.find({slug: 'fed-rate-decisions'}).sort({createdAt: -1}).limit(1).next())?.userId;
-    check('all 8 starters were created', await topics.countDocuments({userId}) === 8);
+    check('sign-up lands on the dashboard, not a setup screen', new RegExp(`^${BASE}/(\\?.*)?$`).test(page.url()), page.url());
+    check(`all ${DEFAULTS.length} default topics were seeded`, await topics.countDocuments({userId}) === DEFAULTS.length,
+        String(await topics.countDocuments({userId})));
+    const seededNames = (await topics.find({userId}).toArray()).map((t) => t.name).sort();
+    check('the seeded set is finance-led with world news in it', seededNames.join('|') === [...DEFAULTS].sort().join('|'), seededNames.join('|'));
+
+    await page.goto(`${BASE}/topics`, {waitUntil: 'load'});
+    await page.waitForSelector('nav[aria-label="Your topics"]', {timeout: 60000});
+    check('/topics shows the feed, never the picker', await page.getByRole('button', {name: 'Write my own'}).count() === 0);
+    check('the preinstalled notice is shown while the set is untouched',
+        /came preinstalled/i.test(await page.locator('main').innerText()));
+
     const stamped = async () => topics.countDocuments({userId, lastFetchedAt: {$ne: null}});
-    check('the landing topic was fetched inline', (await topics.findOne({userId, slug: 'fed-rate-decisions'}))?.lastFetchedAt != null);
     if (inngestUp) {
-        // ONE first-run event fills every starter a second apart. Under the old per-topic
-        // events the on-demand job's rateLimit dropped two of the eight.
-        const all = await until(async () => (await stamped()) === 8, 60000);
-        check('the first-run job fetched all 8 starters, none dropped', all, `${await stamped()}/8 stamped`);
+        // ONE first-run event fills every default a second apart. Under per-topic events
+        // the on-demand job's rateLimit would drop the tail of the batch.
+        const all = await until(async () => (await stamped()) === DEFAULTS.length, 60000);
+        check('the first-run job fetched every default, none dropped', all, `${await stamped()}/${DEFAULTS.length} stamped`);
     }
     await shot('01-first-topic');
+
+    // --- the marker: deleting them all must stick ------------------------------------
+    const seeded = await topics.find({userId}).toArray();
+    await topics.deleteMany({userId});
+    await page.goto(`${BASE}/topics`, {waitUntil: 'load'});
+    await page.getByRole('button', {name: 'Write my own'}).waitFor({timeout: 30000});
+    check('unfollowing everything is not undone on the next view', await topics.countDocuments({userId}) === 0);
+    check('the empty state offers the defaults back',
+        await page.getByRole('button', {name: 'Restore the default topics'}).count() === 1);
+    await topics.insertMany(seeded);
 
     // --- /topics safety net: at most one fetch per view, and it stops -----------------
     const hashes = (await topics.find({userId}).toArray()).map((t) => t.keywordSetHash);

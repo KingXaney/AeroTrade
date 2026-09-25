@@ -26,15 +26,12 @@ fs.mkdirSync(OUT, {recursive: true});
     await page.fill('#email', `ada${Date.now()}@example.com`);
     await page.fill('#password', 'Passw0rd!Passw0rd!');
     await page.click('button[type=submit]');
-    await page.waitForURL(/\/topics/, {timeout: 90000});
+    // Sign-up lands on the dashboard now, with the default topics already seeded — no
+    // starter picking to do. Visiting each page triggers its bounded live fetch, so the
+    // topics surfaces have real content in the shots.
+    await page.waitForURL(new RegExp(`^${BASE}/(\\?.*)?$`), {timeout: 90000});
     await page.waitForTimeout(1000);
 
-    // Two starters so every topics surface has real content (the first visit does a live Google News fetch).
-    for (const name of ['AI chips', 'Fed rate decisions']) {
-        await page.getByRole('button', {name: new RegExp(`${name}$`)}).click();
-    }
-    await page.getByRole('button', {name: /^Follow 2 selected/}).click();
-    await page.waitForSelector('nav[aria-label="Your topics"]', {timeout: 90000});
     for (const slug of ['ai-chips', 'fed-rate-decisions']) {
         await page.goto(`${BASE}/topics/${slug}`, {waitUntil: 'load'});
         await page.waitForTimeout(2500);
