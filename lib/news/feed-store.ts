@@ -20,6 +20,8 @@ import {
     type FeedRequest,
     type NewsFeedPrefs,
 } from "@/lib/news/feed";
+import {toFeedArticles} from "@/lib/news/topic-batch";
+import {getMergedTopicFeed} from "@/lib/topics/store";
 import {newsSearchEnabled} from "@/lib/topics/config";
 
 export type NewsFeedResult = {
@@ -63,17 +65,21 @@ const fetchRequest = (request: FeedRequest, symbols: string[]): Promise<MarketNe
             return symbols.length > 0 ? getNews(symbols.slice(0, FEED_WATCHLIST_SYMBOL_CAP)) : Promise.resolve([]);
         case 'finnhub':
             return getNews(symbols.length > 0 ? symbols.slice(0, FEED_WATCHLIST_SYMBOL_CAP) : undefined);
+        case 'topics':
+            // Unreachable: topic articles are read from Mongo and injected into the merge,
+            // never planned as a request. Present so the switch stays exhaustive.
+            return Promise.resolve([]);
     }
 };
 
-type RunResult = {articles: MarketNewsArticle[]; googleAnswered: boolean};
+type RunResult = {batches: FeedBatch[]; googleAnswered: boolean};
 
 // One dead source never empties the feed: each request settles on its own, and outlet
 // filtering runs per batch so a hidden outlet cannot waste a rotation slot in the merge.
 // Google's health is judged on its RAW answer, before the outlet filter and the age cut:
 // a user who only wants a paywalled outlet, or whose keywords matched nothing today, has
 // an empty feed, not an outage.
-const runRequests = async (requests: FeedRequest[], prefs: NewsFeedPrefs, symbols: string[], limit: number): Promise<RunResult> => {
+const runRequests = async (requests: FeedRequest[], prefs: NewsFeedPrefs, symbols: string[]): Promise<RunResult> => {
     const settled = await Promise.allSettled(requests.map((request) => fetchRequest(request, symbols)));
     const batches: FeedBatch[] = [];
     let googleAnswered = false;
@@ -85,12 +91,12 @@ const runRequests = async (requests: FeedRequest[], prefs: NewsFeedPrefs, symbol
             console.error(`News feed request failed (${requests[i].label}):`, result.reason);
         }
     });
-    return {articles: mergeFeed(batches, {limit}), googleAnswered};
+    return {batches, googleAnswered};
 };
 
 export const getNewsFeedForPrefs = async (
     prefs: NewsFeedPrefs,
-    {limit, watchlistSymbols = []}: {limit: number; watchlistSymbols?: string[]},
+    {limit, watchlistSymbols = [], topicArticles = []}: {limit: number; watchlistSymbols?: string[]; topicArticles?: MarketNewsArticle[]},
 ): Promise<NewsFeedResult> => {
     const planned = feedRequestsFor(prefs);
     const googlePlanned = planned.some((request) => request.url !== null);
@@ -108,23 +114,54 @@ export const getNewsFeedForPrefs = async (
         fallback = true;
     }
 
-    const first = await runRequests(requests, prefs, symbols, limit);
-    let articles = first.articles;
-    if (googlePlanned && !fallback && !first.googleAnswered && articles.length === 0) {
+    const first = await runRequests(requests, prefs, symbols);
+    let batches = first.batches;
+    // The outage test is deliberately made on the REQUESTED feed alone. Topic articles are
+    // read from Mongo, so they can neither prove nor disprove that Google answered, and
+    // letting them mask an outage would drop the "standing in" flag the page shows.
+    if (googlePlanned && !fallback && !first.googleAnswered && mergeFeed(batches, {limit}).length === 0) {
         // Google answered with nothing (outage, a redirect to a consent page): the wires
         // beat an empty page, as long as the page says they are standing in.
-        ({articles} = await runRequests(WIRES_FALLBACK, prefs, symbols, limit));
+        batches = (await runRequests(WIRES_FALLBACK, prefs, symbols)).batches;
         fallback = true;
     }
-    return {articles, fallback, requested: requests.length};
+
+    // Topics lead the rotation: they are the most explicit statement of interest the user
+    // has made. mergeFeed is round-robin, so this is a tie-break and a bounded share, not
+    // a weighting — the topic batch can never swamp the rest of the feed.
+    const topics: FeedBatch[] = topicArticles.length > 0 ? [{kind: 'topics', articles: topicArticles}] : [];
+    return {articles: mergeFeed([...topics, ...batches], {limit}), fallback, requested: requests.length};
+};
+
+// How many stored topic articles are offered to the merge. The round-robin bounds their
+// actual share; this only decides how deep the topic queue is when wires run dry.
+export const TOPIC_FEED_BATCH = 12;
+
+// The user's followed topics as feed articles. Best effort: a news page must never break
+// because the topics collection is unreachable.
+export const getTopicFeedBatch = async (userId: string, limit = TOPIC_FEED_BATCH): Promise<MarketNewsArticle[]> => {
+    try {
+        return toFeedArticles(await getMergedTopicFeed(userId, {limit}));
+    } catch (error) {
+        console.error('Topic articles unavailable for the news feed:', error);
+        return [];
+    }
 };
 
 // The feed for a signed-in page or widget. Watchlist symbols are only read when the feed
 // asks for them, through the per-request cache the layout and loaders already share.
+//
+// This is also where followed topics enter the news. Callers that take this path get them
+// for free; the digest calls getNewsFeedForPrefs directly and so does NOT, on purpose —
+// it already prints a dedicated "Your topics" section and would otherwise run the same
+// stories twice in one email.
 export const getNewsFeed = async (userId: string, {limit}: {limit: number}): Promise<NewsFeedResult> => {
     const prefs = await getNewsFeedPrefs(userId);
-    const watchlistSymbols = prefs.includeWatchlist
-        ? await getCachedWatchlistSymbols(userId).catch((error: unknown) => { console.error('Watchlist unavailable for the news feed:', error); return [] as string[]; })
-        : [];
-    return getNewsFeedForPrefs(prefs, {limit, watchlistSymbols});
+    const [watchlistSymbols, topicArticles] = await Promise.all([
+        prefs.includeWatchlist
+            ? getCachedWatchlistSymbols(userId).catch((error: unknown) => { console.error('Watchlist unavailable for the news feed:', error); return [] as string[]; })
+            : Promise.resolve([] as string[]),
+        getTopicFeedBatch(userId),
+    ]);
+    return getNewsFeedForPrefs(prefs, {limit, watchlistSymbols, topicArticles});
 };

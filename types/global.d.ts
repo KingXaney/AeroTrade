@@ -150,6 +150,9 @@ declare global {
         image?: string;
         sourceType?: NewsSourceType;
         fullSummary?: string;     // untruncated text for the news brain
+        // Set when the article reached the feed through a followed topic, so the card can
+        // say which one. Absent on everything fetched from a wire or a Google section.
+        topic?: {name: string; slug: string; color: string | null};
     };
 
     // --- Search & Watchlist ---
