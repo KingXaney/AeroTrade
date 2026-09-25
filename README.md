@@ -114,6 +114,7 @@ npm run trigger -- news         # send today's digest emails
 | `daily-news-summary` | 12:00 daily | per-user digest email with a topics section |
 | `strategies-daily` | weekdays 09:35 (10:30 retry) | decide and fill every quant strategy's orders from the previous close; opens the system accounts and rebuilds backtests when a rule changes |
 | `daily-account-snapshots` | weekdays 16:10 | value every account and the SPY benchmark |
+| `daily-account-income` | 00:05 daily | credit every account's interest on idle cash (13-week T-bill rate) and dividends on holdings through yesterday; replays a never-credited account from inception |
 
 ## Development
 

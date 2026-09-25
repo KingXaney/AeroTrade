@@ -8,6 +8,11 @@ export interface AccountSnapshotDoc extends Document {
     cash: number;
     holdingsValue: number;
     startingBalance: number;
+    // Which income this snapshot's cash already contains: every row of this account epoch
+    // dated on or before `incomeThrough`. Absent = none (written before income existed, or
+    // before the account's first credit). The income job tops snapshots up from here.
+    epoch?: number;
+    incomeThrough?: string;
 }
 
 const AccountSnapshotSchema = new Schema<AccountSnapshotDoc>({
@@ -18,6 +23,10 @@ const AccountSnapshotSchema = new Schema<AccountSnapshotDoc>({
     cash: {type: Number, required: true},
     holdingsValue: {type: Number, required: true},
     startingBalance: {type: Number, required: true},
+    // Declared, not just written: strict mode would strip an undeclared field while the
+    // accompanying $inc still applied, and a guard on it would match on every retry.
+    epoch: {type: Number},
+    incomeThrough: {type: String},
 });
 
 // Idempotency key: the daily cron upserts on {accountId, date}, so re-runs overwrite.

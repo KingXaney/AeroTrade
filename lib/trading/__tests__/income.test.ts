@@ -14,6 +14,7 @@ import {
     payDateFor,
     readyThrough,
     reconcile,
+    describeIncomeRun,
     replayIncome,
     type DividendPoint,
     type IncomeTrade,
@@ -186,5 +187,17 @@ describe('readyThrough', () => {
     it('ignores symbols released after a month of failures, and positions closed before the window', () => {
         expect(readyThrough({...base, rateOn: fresh, spans: xle, released: new Set(['XLE'])})).toBe('2026-09-24');
         expect(readyThrough({...base, rateOn: fresh, spans: [{symbol: 'XLE', firstHeld: '2026-06-01', lastHeld: '2026-07-01'}]})).toBe('2026-09-24');
+    });
+});
+
+describe('describeIncomeRun', () => {
+    it('leads with what was credited and names every account that was not', () => {
+        const line = describeIncomeRun([
+            {accountId: 'aaaaaa111111', status: 'credited', amount: 10.5},
+            {accountId: 'bbbbbb222222', status: 'credited', amount: 2.25},
+            {accountId: 'cccccc333333', status: 'current'},
+            {accountId: 'dddddd444444', status: 'skipped', reason: 'cash 1.00 ≠ 2.00 rebuilt from trades'},
+        ], '2026-09-24');
+        expect(line).toBe('Income through 2026-09-24: 2 account(s) credited $12.75 · 1 already current · 1 skipped: 444444 (cash 1.00 ≠ 2.00 rebuilt from trades)');
     });
 });

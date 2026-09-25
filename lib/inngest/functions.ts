@@ -32,6 +32,9 @@ import {
     UNEXTRACTED_PICKUP_LIMIT,
 } from "@/lib/brain/config";
 import {recordJobRun} from "@/lib/inngest/job-runs";
+import {creditAccounts, planIncomeRun, type CreditOutcome} from "@/lib/trading/income-store";
+import {describeIncomeRun} from "@/lib/trading/income";
+import {addCalendarDays} from "@/lib/prices/calendar-days";
 import {ensureBars} from "@/lib/prices/store";
 import {buildTargets} from "@/lib/navigator/allocator";
 import {ALWAYS_ELIGIBLE_SYMBOLS, MAX_POSITIONS, MIN_CASH_WEIGHT} from "@/lib/navigator/config";
@@ -162,6 +165,9 @@ export const recordDailySnapshots = inngest.createFunction(
                 // Memoized so write-snapshots can detect a reset that landed mid-run
                 // (reset always re-anchors inceptionAt).
                 inceptionAt: new Date(a.inceptionAt || a.createdAt).getTime(),
+                // Read with `cash` from the same document, so the snapshot records exactly
+                // which income its cash contains (lib/trading/income-store.ts tops it up).
+                incomeThrough: a.incomeThrough ?? null,
                 positions: (a.positions || []).map((p: PaperPosition) => ({
                     symbol: p.symbol,
                     company: p.company,
@@ -242,7 +248,10 @@ export const recordDailySnapshots = inngest.createFunction(
                             cash: summary.cash,
                             holdingsValue: summary.holdingsValue,
                             startingBalance: summary.startingBalance,
+                            epoch: a.inceptionAt,
+                            ...(a.incomeThrough ? {incomeThrough: a.incomeThrough} : {}),
                         },
+                        ...(a.incomeThrough ? {} : {$unset: {incomeThrough: 1}}),
                     },
                     {upsert: true},
                 );
@@ -253,6 +262,71 @@ export const recordDailySnapshots = inngest.createFunction(
 
         const summary = `Snapshotted ${written} account(s) + ${BENCHMARK_SYMBOL}`;
         await step.run('record-job-run', async () => recordJobRun('daily-account-snapshots', summary));
+        return {success: true, message: summary};
+    },
+)
+
+// Interest on idle cash and dividends on holdings, for every paper account — users', the AI
+// Navigator's and the quant strategies'. Runs at 00:05 ET every day (interest accrues on
+// weekends too) and credits everything dated through yesterday, so every weekday's strategy
+// decision, Navigator run and 16:10 snapshot already contains it. An account with no
+// watermark is replayed from inception: the first run IS the retroactive back-credit.
+// The rules live in lib/trading/income.ts; the database side in lib/trading/income-store.ts.
+const INCOME_SYMBOL_CHUNK = 8;           // 5y Yahoo fetches with polite spacing per 60 s step
+const INCOME_BACK_CREDIT_BATCH = 2;      // a replay from inception writes many rows and snapshots
+const INCOME_ROUTINE_BATCH = 25;
+
+export const creditDailyIncome = inngest.createFunction(
+    {
+        id: 'daily-account-income',
+        concurrency: [{limit: 1}],
+        triggers: [{event: 'app/credit.account.income'}, {cron: 'TZ=America/New_York 5 0 * * *'}],
+    },
+    async ({event, step}) => {
+        // Anchored to the event, not the wall clock, so a retry an hour later credits the same day.
+        const today = getEasternDateString(new Date(event.ts ?? Date.now()));
+        const end = addCalendarDays(today, -1);
+        const data = (event.data ?? {}) as {accountIds?: unknown};
+        // A scoped run (QA) touches only the named accounts, never another suite's fixtures.
+        const scope = Array.isArray(data.accountIds) ? data.accountIds.map(String) : null;
+
+        const plan = await step.run('plan-income', async () => planIncomeRun({accountIds: scope}));
+
+        const backfills = chunkUniverse(plan.backfill, INCOME_SYMBOL_CHUNK);
+        for (let i = 0; i < backfills.length; i += 1) {
+            await step.run(`income-backfill-${i}`, async () => {
+                const r = await ensureBars(backfills[i], {limit: backfills[i].length, forceBackfill: true});
+                return {updated: r.updated, failed: r.failed};
+            });
+        }
+        const topups = chunkUniverse(plan.topup, PRICE_CHUNK_SIZE);
+        for (let i = 0; i < topups.length; i += 1) {
+            await step.run(`income-topup-${i}`, async () => {
+                const r = await ensureBars(topups[i], {limit: topups[i].length});
+                return {updated: r.updated, fresh: r.fresh, failed: r.failed};
+            });
+        }
+
+        // Accounts never credited replay from inception — heavy, so two per step.
+        const credit = await step.run('split-accounts', async () => {
+            await connectToDatabase();
+            const docs = await PaperAccount.find({_id: {$in: plan.accountIds}}).select('_id incomeThrough').lean<{_id: unknown; incomeThrough?: string}[]>();
+            return {
+                backCredit: docs.filter((d) => !d.incomeThrough).map((d) => String(d._id)),
+                routine: docs.filter((d) => d.incomeThrough).map((d) => String(d._id)),
+            };
+        });
+        const batches = [
+            ...chunkUniverse(credit.backCredit, INCOME_BACK_CREDIT_BATCH),
+            ...chunkUniverse(credit.routine, INCOME_ROUTINE_BATCH),
+        ];
+        const outcomes: CreditOutcome[] = [];
+        for (let i = 0; i < batches.length; i += 1) {
+            outcomes.push(...await step.run(`credit-accounts-${i}`, async () => creditAccounts(batches[i], {end})));
+        }
+
+        const summary = describeIncomeRun(outcomes, end);
+        await step.run('record-job-run', async () => recordJobRun('daily-account-income', summary));
         return {success: true, message: summary};
     },
 )

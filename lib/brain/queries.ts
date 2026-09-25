@@ -140,6 +140,8 @@ export const JOB_DEFINITIONS: Array<Omit<JobHealth, 'lastRunAt' | 'lastMessage'>
     {jobId: 'refresh-topic-on-demand', label: 'Topic refresh (manual)', schedule: 'on demand', staleAfterHours: Number.POSITIVE_INFINITY},
     // Weekdays only, so a Monday-morning view is ~72h after Friday's run.
     {jobId: 'strategies-daily', label: 'Quant strategies', schedule: 'weekdays 09:35 ET', staleAfterHours: 80},
+    // Every day including weekends; its message names any account it could not credit.
+    {jobId: 'daily-account-income', label: 'Interest & dividends', schedule: 'daily 00:05 ET', staleAfterHours: 30},
 ];
 
 const withStamps = (defs: typeof JOB_DEFINITIONS, runs: {jobId: string; lastRunAt: Date; lastMessage?: string}[]): JobHealth[] => {

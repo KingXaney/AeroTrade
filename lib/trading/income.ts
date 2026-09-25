@@ -259,3 +259,26 @@ export const readyThrough = ({start, end, rateOn, spans, coverage, released}: {
 
 const minDate = (a: string, b: string): string => (a < b ? a : b);
 const maxDate = (a: string, b: string): string => (a > b ? a : b);
+
+// ---------------------------------------------------------------------------
+// The job's one-line summary — what the Brain status strip shows
+// ---------------------------------------------------------------------------
+
+type OutcomeLike = {accountId: string; status: string; amount?: number; reason?: string};
+
+// Credited accounts and dollars first; then anything that did not credit, named, so a
+// skipped account (history that does not reconcile) is visible instead of silently unpaid.
+export const describeIncomeRun = (outcomes: readonly OutcomeLike[], through: string): string => {
+    const credited = outcomes.filter((o) => o.status === 'credited');
+    const amount = credited.reduce((sum, o) => sum + (o.amount ?? 0), 0);
+    const parts = [`Income through ${through}: ${credited.length} account(s) credited $${amount.toFixed(2)}`];
+    const current = outcomes.filter((o) => o.status === 'current').length;
+    if (current > 0) parts.push(`${current} already current`);
+    for (const status of ['waiting', 'skipped', 'raced', 'error']) {
+        const hit = outcomes.filter((o) => o.status === status);
+        if (hit.length === 0) continue;
+        const named = hit.slice(0, 3).map((o) => `${o.accountId.slice(-6)}${o.reason ? ` (${o.reason})` : ''}`).join('; ');
+        parts.push(`${hit.length} ${status}: ${named}${hit.length > 3 ? ` +${hit.length - 3} more` : ''}`);
+    }
+    return parts.join(' · ');
+};

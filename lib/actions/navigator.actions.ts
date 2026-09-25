@@ -8,6 +8,7 @@ import {createPaperAccount} from "@/lib/actions/accounts.actions";
 import PaperAccount from "@/database/models/paper-account.model";
 import PaperTrade from "@/database/models/paper-trade.model";
 import AccountSnapshot from "@/database/models/account-snapshot.model";
+import AccountIncome from "@/database/models/account-income.model";
 import {getAccountsForUser, getOwnedAccount, getPortfolio, resolveStartingBalance, seedDayZeroSnapshot} from "@/lib/trading/account";
 import {executeOrder} from "@/lib/trading/orders";
 import {getQuote} from "@/lib/actions/finnhub.actions";
@@ -72,10 +73,14 @@ export const enrollAiNavigator = async (
             if (balance === null) return {success: false, message: 'Invalid starting balance'};
             await PaperAccount.updateOne(
                 {_id: reusable._id, userId},
-                {$set: {cash: balance, startingBalance: balance, positions: [], inceptionAt: new Date()}},
+                {
+                    $set: {cash: balance, startingBalance: balance, positions: [], inceptionAt: new Date()},
+                    $unset: {incomeThrough: 1, incomeTotals: 1},
+                },
             );
             await PaperTrade.deleteMany({accountId});
             await AccountSnapshot.deleteMany({accountId});
+            await AccountIncome.deleteMany({accountId});
             const fresh = await getOwnedAccount(userId, accountId);
             if (fresh) await seedDayZeroSnapshot(fresh);
         }
