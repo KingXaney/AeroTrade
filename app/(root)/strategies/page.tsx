@@ -3,6 +3,10 @@ import {getCurrentUserId} from "@/lib/actions/watchlist.actions";
 import {marketStatus} from "@/lib/prices/market-hours";
 import {getStrategiesSystemStatus, getStrategyLeaderboard} from "@/lib/strategies/queries";
 import {everyLiveRecordYoung, LIVE_YOUNG_DAYS} from "@/lib/strategies/views";
+import MicroLabel from "@/components/primitives/MicroLabel";
+import PageTitle from "@/components/primitives/PageTitle";
+import Panel from "@/components/primitives/Panel";
+import SectionHeading from "@/components/primitives/SectionHeading";
 import HowToRead from "@/components/strategies/HowToRead";
 import StrategyLeaderboard from "@/components/strategies/StrategyLeaderboard";
 import StrategyStatusStrip from "@/components/strategies/StrategyStatusStrip";
@@ -19,46 +23,44 @@ const StrategiesPage = async () => {
     // eslint-disable-next-line react-hooks/purity -- the age note is informational and re-renders every request
     const young = everyLiveRecordYoung(leaderboard.rows, Date.now());
 
+    const valuation = leaderboard.started
+        ? (marketOpen ? 'live valuation at the last price' : 'valued at the last close')
+        : 'no live records yet';
+
     return (
         <div className="space-y-4">
-            <div className="mb-2">
-                <h1 className="text-2xl font-semibold text-fg mb-1" style={{fontFamily: 'var(--type-display)'}}>
-                    Quant Strategies
-                </h1>
-                <p className="text-sm text-fg-muted">
-                    Eight classic quant strategies, paper-traded on the live market by deterministic rules — no AI — and
-                    measured against the S&amp;P 500 on the same terms as your own accounts. An experiment, not financial advice.
-                </p>
-                <p className="text-[11px] text-fg-muted mt-1" style={{fontFamily: 'var(--type-mono)'}} id="strategies-valuation">
-                    {leaderboard.started
-                        ? (marketOpen ? 'Live valuation at the last price' : 'Valued at the last close')
-                        : 'No live records yet'}
-                </p>
-            </div>
+            {/* Two lines above the ranking, not seven. The fuller explanation of what
+                live and simulated mean is one click away in the reading guide below. */}
+            <PageTitle
+                title="Quant Strategies"
+                subtitle="Eight classic rules, paper-traded live against the S&P 500."
+            />
 
             <StrategyStatusStrip status={status} />
 
-            <section className="glass-panel rounded-xl p-5">
+            <Panel>
                 <div className="flex items-center justify-between mb-4 gap-3">
-                    <h2 className="text-sm font-bold uppercase tracking-[0.1em] text-brand" style={{fontFamily: 'var(--type-mono)'}}>
-                        Leaderboard
-                    </h2>
-                    <span className="text-[10px] uppercase tracking-[0.08em] text-fg-muted" style={{fontFamily: 'var(--type-mono)'}}>
-                        ranked by live return since launch
-                    </span>
+                    <SectionHeading spacing="none">Leaderboard</SectionHeading>
+                    <MicroLabel id="strategies-valuation" className="text-right">
+                        ranked by live return · {valuation}
+                    </MicroLabel>
                 </div>
+
+                {/* Muted, not amber: "your record is young" is context, not a fault.
+                    Amber is reserved for something actually being wrong. */}
                 {young && (
-                    <p role="status" className="mb-3 text-[11px] text-warning" style={{fontFamily: 'var(--type-mono)'}}>
+                    <p role="status" className="font-mono mb-3 text-[11px] text-fg-muted">
                         Live records are under {LIVE_YOUNG_DAYS} days old — the simulated column shows each rule&apos;s three-year backtest for context.
                     </p>
                 )}
                 {!leaderboard.started && (
-                    <p role="status" className="mb-3 text-[11px] text-warning" style={{fontFamily: 'var(--type-mono)'}}>
+                    <p role="status" className="font-mono mb-3 text-[11px] text-warning">
                         The strategies have not run yet. Their accounts open on the first trading morning after deployment.
                     </p>
                 )}
+
                 <StrategyLeaderboard rows={leaderboard.rows} canFollow />
-            </section>
+            </Panel>
 
             <HowToRead />
         </div>
