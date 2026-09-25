@@ -24,7 +24,7 @@ different fields in different collections.
 
 | | |
 |---|---|
-| Seeded at sign-up | Six topics — **Fed rate decisions · AI chips · Big Tech earnings · Oil & energy** (finance) and **Geopolitics · World economy** (world news) |
+| Seeded at sign-up | Six topics — **Fed rate decisions · AI chips · Stock market · Oil & energy** (finance) and **Geopolitics · World economy** (world news) |
 | Landing page | The dashboard `/`, whose default layout already leads with topics |
 | Ownership | Ordinary `Topic` documents: rename, edit keywords, delete, all unchanged |
 | Once-only | `UserPreferences.topicsSeededAt` |
@@ -93,6 +93,43 @@ Which surfaces get topics falls out of which function they call:
 `NewsArticleCard` gives its tag slot to the topic when there is one. The slot answers "what
 is this about", and for a topic article the topic is the answer; without it the user cannot
 tell why their feed changed after following something. The outlet is still on the meta line.
+
+## Keeping the news current
+
+The first cut of this shipped a real defect, caught by asking "is it the same news every
+day?" and measuring rather than reasoning. **Google News search ranks by relevance, not
+date.** Unbounded, the `("big tech earnings" OR …)` query returned a median result age of
+**25 days** and a worst case of **149**. `matchArticles` scores keyword hits and never
+recency, and the store is capped at 40 per fetch — so months-old articles landed straight
+in the topic and it read as the same news every morning.
+
+Measured across five topic sets on the same day:
+
+| query | n | median age | within 24h |
+|---|---|---|---|
+| `big tech earnings` plain | 100 | 610h (25d) | 6 |
+| `big tech earnings when:7d` | 51 | 61h | 13 |
+| `big tech earnings when:1d` | 27 | 7.4h | **27 (all)** |
+| `stock market` plain | 100 | 5.2h | 94 |
+| `stock market when:7d` | 100 | 67.7h | 15 |
+| `stock market when:1d` | 100 | 4.6h | **100 (all)** |
+
+`when:7d` is *worse* than no window for a high-volume topic — Google returns a broader,
+relevance-spread set. `when:1d` won on every set tested and never returned zero, so
+`TOPIC_SEARCH_WINDOW = '1d'`. A fetch that comes back empty widens once to `7d`, so a
+genuinely quiet topic fills on its first try instead of starting blank.
+
+`when:` is the only operator that survives into a query, and it can only come from that
+constant: `cleanTerm` strips `:` from every user term before it is quoted, so a keyword of
+`when:30d` is flattened to the text `"when 30d"`. The window is reserved from
+`QUERY_MAX_CHARS` so truncation can never eat it.
+
+The feed's own keyword slot derives its window from `FEED_MAX_AGE_SECONDS` rather than
+hardcoding one — there is no point asking Google for articles `mergeFeed` would discard.
+
+**Why the seeded subject list changed.** `Big Tech earnings` only carries news about four
+weeks a quarter; on the day it was measured it returned 27 same-day articles against 100
+for `Stock market`. It stays in `STARTER_TOPICS` as an offerable chip, just not a default.
 
 ## Caps
 

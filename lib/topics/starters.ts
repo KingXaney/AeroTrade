@@ -24,9 +24,11 @@ export const STARTER_TOPICS: StarterTopic[] = [
         keywords: ['nvidia', 'ai chips', 'ai chip', 'ai accelerators', 'tsmc', 'data center gpu', 'blackwell', 'amd instinct'],
     },
     {
-        name: 'Big Tech earnings',
+        // A default has to carry news every day, not four weeks a quarter. Measured on the
+        // same day: this set returned 100 same-day articles, 'Big Tech earnings' 27.
+        name: 'Stock market',
         group: 'finance',
-        keywords: ['big tech earnings', 'apple earnings', 'microsoft earnings', 'alphabet earnings', 'amazon earnings', 'meta earnings', 'nvidia earnings', 'magnificent seven'],
+        keywords: ['stock market', 's&p 500', 'nasdaq', 'dow jones', 'wall street', 'stock futures', 'earnings season', 'market rally'],
     },
     {
         name: 'Oil & energy',
@@ -43,6 +45,11 @@ export const STARTER_TOPICS: StarterTopic[] = [
         name: 'World economy',
         group: 'world',
         keywords: ['global economy', 'imf', 'world bank', 'tariffs', 'trade war', 'supply chain', 'european central bank', 'bank of japan'],
+    },
+    {
+        name: 'Big Tech earnings',
+        group: 'finance',
+        keywords: ['big tech earnings', 'apple earnings', 'microsoft earnings', 'alphabet earnings', 'amazon earnings', 'meta earnings', 'nvidia earnings', 'magnificent seven'],
     },
     {
         name: 'Electric vehicles',
@@ -71,7 +78,7 @@ export const STARTER_TOPICS: StarterTopic[] = [
 export const DEFAULT_TOPIC_NAMES: readonly string[] = [
     'Fed rate decisions',
     'AI chips',
-    'Big Tech earnings',
+    'Stock market',
     'Oil & energy',
     'Geopolitics',
     'World economy',

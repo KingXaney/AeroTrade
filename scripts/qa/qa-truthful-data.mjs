@@ -16,7 +16,7 @@ const OUT = new URL('./output/truthful-data/', import.meta.url).pathname;
 mkdirSync(OUT, {recursive: true});
 
 // The six topics seeded for every new account (lib/topics/starters.ts DEFAULT_TOPIC_NAMES).
-const DEFAULTS = ['Fed rate decisions', 'AI chips', 'Big Tech earnings', 'Oil & energy', 'Geopolitics', 'World economy'];
+const DEFAULTS = ['Fed rate decisions', 'AI chips', 'Stock market', 'Oil & energy', 'Geopolitics', 'World economy'];
 // The per-row placeholder the old code rendered for a quote-less position.
 const FAKE_FLAT = /\+\$0\.00 \(0\.00%\)/;
 

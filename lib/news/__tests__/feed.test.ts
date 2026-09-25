@@ -182,7 +182,8 @@ describe('feedRequestsFor', () => {
         expect(top).toMatchObject({kind: 'top', region: 'US', url: 'https://news.google.com/rss?hl=en-US&gl=US&ceid=US:en', keepFeedOrder: true});
         const requests = feedRequestsFor(prefs({categories: ['world'], regions: ['GB'], keywords: ['fed rate', 'fomc']}));
         expect(requests.map((r) => r.kind)).toEqual(['search', 'section']);
-        expect(requests[0].url).toBe('https://news.google.com/rss/search?q=(%22fed%20rate%22%20OR%20fomc)&hl=en-GB&gl=GB&ceid=GB:en');
+        // The keyword slot carries a recency window derived from the feed's own age cut.
+        expect(requests[0].url).toBe('https://news.google.com/rss/search?q=(%22fed%20rate%22%20OR%20fomc)%20when%3A3d&hl=en-GB&gl=GB&ceid=GB:en');
         expect(requests[0].keepFeedOrder).toBe(false);
         expect(requests[1].url).toBe('https://news.google.com/rss/headlines/section/topic/WORLD?hl=en-GB&gl=GB&ceid=GB:en');
         expect(requests[1].label).toBe('World · GB');

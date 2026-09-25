@@ -18,6 +18,17 @@ export const MATCH_CAP_PER_FETCH = 40;
 export const MAX_ARTICLES_PER_TOPIC_PER_DAY = 60;
 export const QUERY_MAX_CHARS = 200;
 
+// How far back a topic search asks Google News to look. Without a window, Google News
+// search ranks by RELEVANCE, not date: the unbounded "big tech earnings" query measured a
+// median result age of 25 days and a worst case of 149. Since the matcher caps at 40 and
+// never scores recency, that staleness landed straight in the store and the topic read as
+// the same news every day. Measured across five topic sets, `when:1d` returns 100% of
+// results inside 24 hours and still finds 27 for the quietest of them.
+export const TOPIC_SEARCH_WINDOW = '1d';
+// Widen once when a day's window comes back empty, so a genuinely quiet topic still fills
+// on its first fetch instead of starting blank.
+export const TOPIC_SEARCH_FALLBACK_WINDOW = '7d';
+
 // Briefs run on the free Gemini tier with a 15 s sleep between calls; 20 keeps the
 // daily job well inside the quota.
 export const MAX_BRIEF_CALLS_PER_RUN = 20;

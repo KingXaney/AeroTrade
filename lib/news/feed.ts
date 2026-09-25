@@ -37,6 +37,11 @@ export type FeedRequest = {
     category?: NewsCategoryId;
 };
 
+// Don't ask Google for what mergeFeed would throw away: the keyword slot's recency window
+// is derived from the feed's own age cut, so the two cannot drift apart. Without any window
+// Google News search ranks by relevance and happily returns results months old.
+const FEED_SEARCH_WINDOW = `${Math.max(1, Math.round(FEED_MAX_AGE_SECONDS / 86400))}d`;
+
 const editionOf = (region: NewsRegionId): GoogleEdition =>
     (NEWS_REGIONS.find((r) => r.id === region) ?? NEWS_REGIONS[0]).edition;
 const editionQuery = (e: GoogleEdition): string => `hl=${e.hl}&gl=${e.gl}&ceid=${e.ceid}`;
@@ -48,7 +53,7 @@ const categoryOf = (id: NewsCategoryId) => NEWS_CATEGORIES.find((c) => c.id === 
 const toRequest = (prefs: NewsFeedPrefs, slot: FeedSlot): FeedRequest | null => {
     switch (slot.kind) {
         case 'search': {
-            const query = buildSearchQuery(prefs.keywords, []);
+            const query = buildSearchQuery(prefs.keywords, [], {window: FEED_SEARCH_WINDOW});
             if (!query) return null;
             return {kind: 'search', url: searchUrlFor(query, editionOf(prefs.regions[0] ?? 'US')), label: 'Your keywords', keepFeedOrder: false};
         }

@@ -1,5 +1,6 @@
 import {describe, expect, it} from 'vitest';
 import {buildSearchQuery, decodeEntities, parseSearchFeed, searchUrlFor, toSearchArticles} from '@/lib/news/adapters/search';
+import {TOPIC_SEARCH_WINDOW} from '@/lib/topics/config';
 
 const FIXTURE = `<?xml version="1.0" encoding="UTF-8"?>
 <rss version="2.0"><channel><title>"nvidia" - Google News</title>
@@ -38,19 +39,40 @@ const FIXTURE = `<?xml version="1.0" encoding="UTF-8"?>
 
 describe('buildSearchQuery', () => {
     it('quotes phrases, ORs terms and appends exclusions', () => {
-        expect(buildSearchQuery(['fed rate', 'fomc'], ['crypto'])).toBe('("fed rate" OR fomc) -crypto');
-        expect(buildSearchQuery(['nvidia'], [])).toBe('nvidia');
+        expect(buildSearchQuery(['fed rate', 'fomc'], ['crypto'], {window: null})).toBe('("fed rate" OR fomc) -crypto');
+        expect(buildSearchQuery(['nvidia'], [], {window: null})).toBe('nvidia');
     });
 
     it('strips operators and returns empty for no include terms', () => {
-        expect(buildSearchQuery(['site:x.com "quoted" (paren)'], [])).toBe('"site x.com quoted paren"');
-        expect(buildSearchQuery([], ['x'])).toBe('');
+        expect(buildSearchQuery(['site:x.com "quoted" (paren)'], [], {window: null})).toBe('"site x.com quoted paren"');
+        expect(buildSearchQuery([], ['x'], {window: null})).toBe('');
+        // No include terms means no query at all, so the window must not resurrect one.
+        expect(buildSearchQuery([], [])).toBe('');
+    });
+
+    // Google News search ranks by relevance, not date. Unbounded, the measured median
+    // result age for an earnings query was 25 days — which is what made a followed topic
+    // read as the same news every morning.
+    it('bounds the search to recent news by default', () => {
+        expect(buildSearchQuery(['fed rate', 'fomc'], ['crypto'])).toBe(`("fed rate" OR fomc) -crypto when:${TOPIC_SEARCH_WINDOW}`);
+        expect(buildSearchQuery(['nvidia'], [])).toBe(`nvidia when:${TOPIC_SEARCH_WINDOW}`);
+        expect(buildSearchQuery(['nvidia'], [], {window: '7d'})).toBe('nvidia when:7d');
+    });
+
+    // `when:` is the one operator in a query, and it can only come from the constant:
+    // cleanTerm flattens ':' out of every user term before it is quoted.
+    it('cannot be given a second window by user text', () => {
+        const query = buildSearchQuery(['when:30d'], []);
+        expect(query).toBe(`"when 30d" when:${TOPIC_SEARCH_WINDOW}`);
+        expect((query.match(/when:/g) ?? []).length).toBe(1);
     });
 
     it('never exceeds the length cap and never splits a phrase', () => {
         const query = buildSearchQuery(Array.from({length: 8}, (_, i) => `a very long keyword phrase number ${i}`), ['zzz']);
         expect(query.length).toBeLessThanOrEqual(200);
         expect((query.match(/"/g) ?? []).length % 2).toBe(0);
+        // The window is reserved from the budget, so truncation can never eat it.
+        expect(query.endsWith(` when:${TOPIC_SEARCH_WINDOW}`)).toBe(true);
     });
 });
 
