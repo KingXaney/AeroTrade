@@ -4,7 +4,17 @@ import UnpricedNote from "@/components/trade/UnpricedNote";
 
 // Read-only holdings table — used on the friend profile page (and as the visual base
 // the interactive PositionsTable mirrors on the trade page).
-const PortfolioHoldings = ({positions, emptyText = 'No open positions.'}: {positions: EnrichedPosition[]; emptyText?: string}) => {
+//
+// showUnpricedNote exists because the strategy detail page already carries the same
+// sentence on its headline tiles, and the identical amber line twice on one screen is
+// how a warning turns into wallpaper. The Price column still shows "—" per row there.
+type Props = {
+    positions: EnrichedPosition[];
+    emptyText?: string;
+    showUnpricedNote?: boolean;
+};
+
+const PortfolioHoldings = ({positions, emptyText = 'No open positions.', showUnpricedNote = true}: Props) => {
     if (positions.length === 0) {
         return <p className="text-sm text-fg-muted p-4">{emptyText}</p>;
     }
@@ -59,7 +69,7 @@ const PortfolioHoldings = ({positions, emptyText = 'No open positions.'}: {posit
                     </div>
                 </div>
             ))}
-            <UnpricedNote positions={positions} className="px-4 pt-1" />
+            {showUnpricedNote && <UnpricedNote positions={positions} className="px-4 pt-1" />}
         </div>
     );
 };
