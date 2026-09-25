@@ -176,6 +176,10 @@ export const searchStocks = async (
 // ============================================================================
 
 export const getQuote = async (symbol: string): Promise<QuoteData> => {
+    // Without a key every request is a guaranteed 401: the answer is the same empty quote
+    // (the symbol reads as unpriced), so skip the round-trip and the per-call error log —
+    // in development that log opens Next's error overlay on every page that values a position.
+    if (!FINNHUB_API_KEY) return {};
     try {
         const url = `${FINNHUB_BASE_URL}/quote?symbol=${encodeURIComponent(symbol.toUpperCase())}&token=${FINNHUB_API_KEY}`;
         return await fetchJSON<QuoteData>(url, 30);

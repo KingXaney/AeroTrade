@@ -282,3 +282,45 @@ export const describeIncomeRun = (outcomes: readonly OutcomeLike[], through: str
     }
     return parts.join(' · ');
 };
+
+// ---------------------------------------------------------------------------
+// What the Income panel shows
+// ---------------------------------------------------------------------------
+
+export type IncomeActivity = {
+    // Interest is credited every calendar day; thirty near-identical rows a month is noise, so
+    // it is shown one line per month.
+    interestByMonth: {month: string; amount: number; days: number; averageApy: number | null}[];
+    // Dividends are events worth seeing one by one.
+    dividends: {date: string; exDate: string | null; symbol: string; quantity: number | null; perShare: number | null; amount: number}[];
+};
+
+export const groupIncomeActivity = (
+    rows: readonly {kind: 'interest' | 'dividend'; date: string; symbol: string; amount: number; apy?: number; exDate?: string; perShare?: number; quantity?: number}[],
+    {months = 12, dividends = 20}: {months?: number; dividends?: number} = {},
+): IncomeActivity => {
+    const byMonth = new Map<string, {amount: number; days: number; apySum: number; apyDays: number}>();
+    for (const row of rows) {
+        if (row.kind !== 'interest') continue;
+        const month = row.date.slice(0, 7);
+        const entry = byMonth.get(month) ?? {amount: 0, days: 0, apySum: 0, apyDays: 0};
+        entry.amount += row.amount;
+        entry.days += 1;
+        if (typeof row.apy === 'number') {
+            entry.apySum += row.apy;
+            entry.apyDays += 1;
+        }
+        byMonth.set(month, entry);
+    }
+    return {
+        interestByMonth: [...byMonth.entries()]
+            .sort(([a], [b]) => b.localeCompare(a))
+            .slice(0, months)
+            .map(([month, e]) => ({month, amount: e.amount, days: e.days, averageApy: e.apyDays > 0 ? e.apySum / e.apyDays : null})),
+        dividends: rows
+            .filter((row) => row.kind === 'dividend')
+            .sort((a, b) => b.date.localeCompare(a.date) || a.symbol.localeCompare(b.symbol))
+            .slice(0, dividends)
+            .map((row) => ({date: row.date, exDate: row.exDate ?? null, symbol: row.symbol, quantity: row.quantity ?? null, perShare: row.perShare ?? null, amount: row.amount})),
+    };
+};

@@ -244,3 +244,10 @@ export const getRatePoints = async (): Promise<{date: string; discountPct: numbe
     const bars = await PriceBar.find({symbol: RATE_SYMBOL}, {_id: 0, date: 1, close: 1}).sort({date: 1}).lean<{date: string; close: number}[]>();
     return bars.map((bar) => ({date: bar.date, discountPct: bar.close}));
 };
+
+// The latest stored T-bill rate point, for the "earning X% APY" line.
+export const getLatestRatePoint = async (): Promise<{date: string; discountPct: number} | null> => {
+    await connectToDatabase();
+    const bar = await PriceBar.findOne({symbol: RATE_SYMBOL}, {_id: 0, date: 1, close: 1}).sort({date: -1}).lean<{date: string; close: number} | null>();
+    return bar ? {date: bar.date, discountPct: bar.close} : null;
+};

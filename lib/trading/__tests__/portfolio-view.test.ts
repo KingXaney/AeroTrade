@@ -113,6 +113,15 @@ describe('shape', () => {
         expect('realizedPnl' in buy).toBe(false);
     });
 
+    // Income is part of the return but in no trade's realized P&L; without it the model
+    // cannot explain a gain the trade history does not show.
+    it('states income earned, rounded, and zero — not missing — before the first credit', () => {
+        const s = summary();
+        const credited: AccountWithPortfolio = {...entry('Main', s), account: {...entry('Main', s).account, income: {interest: 12.345678, dividends: 18.89}}};
+        expect(toChatPortfolio([credited], s).accounts[0].income).toEqual({interestOnCash: 12.35, dividends: 18.89});
+        expect(toChatPortfolio([entry('Main', s)], s).accounts[0].income).toEqual({interestOnCash: 0, dividends: 0});
+    });
+
     it('is JSON-serializable end to end', () => {
         const s = summary();
         const view = toChatPortfolio([entry('Main', s)], s, []);

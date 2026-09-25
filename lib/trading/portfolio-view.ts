@@ -27,6 +27,8 @@ export type ChatAccount = {
     cash: number;
     totalValue: number;
     totalReturnPct: number;
+    // Earned without trading — part of totalReturnPct, and not in any trade's realized P&L.
+    income: {interestOnCash: number; dividends: number};
     positions: ChatPosition[];
 };
 
@@ -76,6 +78,7 @@ export const toChatAccount = (entry: AccountWithPortfolio): ChatAccount => ({
     cash: money(entry.summary.cash),
     totalValue: money(entry.summary.totalValue),
     totalReturnPct: Math.round(entry.summary.totalReturnPct * 100) / 100,
+    income: {interestOnCash: money(entry.account.income?.interest ?? 0), dividends: money(entry.account.income?.dividends ?? 0)},
     positions: entry.summary.positions.map(toChatPosition),
 });
 

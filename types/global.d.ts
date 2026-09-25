@@ -306,6 +306,8 @@ declare global {
         name: string;
         inceptionAt: number;      // epoch ms; anchors the performance chart
         createdAt: number;        // epoch ms
+        // Interest and dividends credited so far (lib/trading/income.ts); absent before the first credit.
+        income?: {interest: number; dividends: number};
     };
 
     type AccountWithPortfolio = {
@@ -334,6 +336,17 @@ declare global {
         losses: number;
         realizedPnl: number;
         tradeCount: number;
+        income: AccountIncomeSummary;
+    };
+
+    // What an account has earned from sitting still: interest on idle cash and dividends on
+    // holdings (lib/trading/income.ts). `apy` is today's rate on cash; null before any rate
+    // has been fetched.
+    type AccountIncomeSummary = {
+        interest: number;
+        dividends: number;
+        apy: number | null;
+        through: string | null;
     };
 
     // --- News brain & AI navigator ---

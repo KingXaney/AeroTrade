@@ -15,6 +15,7 @@ import {
     readyThrough,
     reconcile,
     describeIncomeRun,
+    groupIncomeActivity,
     replayIncome,
     type DividendPoint,
     type IncomeTrade,
@@ -199,5 +200,30 @@ describe('describeIncomeRun', () => {
             {accountId: 'dddddd444444', status: 'skipped', reason: 'cash 1.00 ≠ 2.00 rebuilt from trades'},
         ], '2026-09-24');
         expect(line).toBe('Income through 2026-09-24: 2 account(s) credited $12.75 · 1 already current · 1 skipped: 444444 (cash 1.00 ≠ 2.00 rebuilt from trades)');
+    });
+});
+
+describe('groupIncomeActivity', () => {
+    const rows = [
+        {kind: 'interest' as const, date: '2026-08-31', symbol: '', amount: 10, apy: 0.04},
+        {kind: 'interest' as const, date: '2026-09-01', symbol: '', amount: 11, apy: 0.04},
+        {kind: 'interest' as const, date: '2026-09-02', symbol: '', amount: 12, apy: 0.042},
+        {kind: 'dividend' as const, date: '2026-09-23', symbol: 'SPY', amount: 18.89, exDate: '2026-09-18', perShare: 1.889, quantity: 10},
+        {kind: 'dividend' as const, date: '2026-09-26', symbol: 'XLE', amount: 38, exDate: '2026-09-21', perShare: 0.38, quantity: 100},
+    ];
+
+    it('collapses daily interest into one line a month, newest first, with the average rate', () => {
+        const {interestByMonth} = groupIncomeActivity(rows);
+        expect(interestByMonth.map((m) => [m.month, m.amount, m.days])).toEqual([['2026-09', 23, 2], ['2026-08', 10, 1]]);
+        expect(interestByMonth[0].averageApy).toBeCloseTo(0.041, 12);
+    });
+
+    it('lists dividends one by one, newest first, capped', () => {
+        const {dividends} = groupIncomeActivity(rows, {dividends: 1});
+        expect(dividends).toEqual([{date: '2026-09-26', exDate: '2026-09-21', symbol: 'XLE', quantity: 100, perShare: 0.38, amount: 38}]);
+    });
+
+    it('is empty for an account with no income yet', () => {
+        expect(groupIncomeActivity([])).toEqual({interestByMonth: [], dividends: []});
     });
 });
