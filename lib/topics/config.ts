@@ -1,7 +1,9 @@
 // Limits for followed topics. Actions, jobs and UI copy all read the same numbers
 // from here so a cap can never drift between the validator and the message shown.
 
-export const MAX_TOPICS_PER_USER = 12;
+// Six of these are seeded for every new account (lib/topics/starters.ts), so the cap is
+// the user's own budget plus the defaults — 12 would have left them only six slots.
+export const MAX_TOPICS_PER_USER = 16;
 export const MAX_KEYWORDS = 8;
 export const MAX_EXCLUDES = 8;
 export const NAME_MIN = 2;

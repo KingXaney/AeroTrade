@@ -7,8 +7,10 @@ import Topic, {type TopicDoc} from "@/database/models/topic.model";
 import TopicArticle from "@/database/models/topic-article.model";
 import {getCurrentUserId} from "@/lib/actions/watchlist.actions";
 import {MAX_TOPICS_PER_USER, REFRESH_COOLDOWN_MS, refreshCooldownMessage, refreshCooldownRemainingMs} from "@/lib/topics/config";
-import {deriveKeywords, formatIssue, keywordSetHash, slugify, topicInputSchema} from "@/lib/topics/normalize";
+import {insertTopic, parseTopicInput} from "@/lib/topics/insert";
+import {keywordSetHash, slugify} from "@/lib/topics/normalize";
 import {requestTopicFirstRun, requestTopicRefresh} from "@/lib/topics/events";
+import {seedDefaultTopics} from "@/lib/topics/seed";
 import {getTopicArticles, toTopicView} from "@/lib/topics/store";
 
 export type TopicResult = OrderResult & {topic?: TopicView};
@@ -23,39 +25,6 @@ const revalidateTopics = () => {
     revalidatePath('/');
 };
 
-const parseInput = (input: unknown) => {
-    const parsed = topicInputSchema.safeParse(input);
-    if (!parsed.success) return {error: formatIssue(parsed.error)} as const;
-    const derived = deriveKeywords(parsed.data);
-    if (!derived) return {error: 'Add at least one keyword to match articles against.'} as const;
-    return {value: parsed.data, derived} as const;
-};
-
-// Validate, cap, dedupe, insert. Shared by createTopic and followStarterTopics and
-// deliberately NOT queueing anything: the two callers differ in exactly that.
-const insertTopic = async (userId: string, input: unknown): Promise<{doc: TopicDoc} | {error: string}> => {
-    const parsed = parseInput(input);
-    if ('error' in parsed) return {error: parsed.error ?? 'Invalid topic'};
-    const {value, derived} = parsed;
-
-    if ((await Topic.countDocuments({userId})) >= MAX_TOPICS_PER_USER) {
-        return {error: `You can follow up to ${MAX_TOPICS_PER_USER} topics. Remove one to add another.`};
-    }
-    const slug = slugify(value.name);
-    if (await Topic.exists({userId, slug})) {
-        return {error: `You already follow a topic called "${value.name}".`};
-    }
-    const doc = await Topic.create({
-        userId,
-        name: value.name,
-        slug,
-        keywords: derived.keywords,
-        exclude: derived.exclude,
-        color: value.color ?? undefined,
-        keywordSetHash: keywordSetHash(derived.keywords, derived.exclude),
-    });
-    return {doc};
-};
 
 export const createTopic = async (input: unknown): Promise<TopicResult> => {
     const userId = await getCurrentUserId();
@@ -114,12 +83,31 @@ export const followStarterTopics = async (inputs: unknown): Promise<FollowTopics
     }
 };
 
+// Putting the defaults back after unfollowing everything. `force` skips the once-only
+// marker because the user asked for this explicitly; seedDefaultTopics still refuses when
+// any topic already exists, so a double click is a no-op rather than six duplicate errors.
+export const restoreDefaultTopics = async (): Promise<FollowTopicsResult> => {
+    const userId = await getCurrentUserId();
+    if (!userId) return {success: false, message: 'Not authenticated', created: 0, firstSlug: null};
+
+    try {
+        await connectToDatabase();
+        const {created, firstSlug} = await seedDefaultTopics(userId, {force: true});
+        revalidateTopics();
+        if (created === 0) return {success: false, message: 'Could not restore the default topics', created, firstSlug};
+        return {success: true, created, firstSlug};
+    } catch (error) {
+        console.error('Error restoring default topics:', error);
+        return {success: false, message: 'Could not restore the default topics', created: 0, firstSlug: null};
+    }
+};
+
 export const updateTopic = async (topicId: string, input: unknown): Promise<TopicResult> => {
     const userId = await getCurrentUserId();
     if (!userId) return {success: false, message: 'Not authenticated'};
     if (!isValidObjectId(topicId)) return {success: false, message: 'Unknown topic'};
 
-    const parsed = parseInput(input);
+    const parsed = parseTopicInput(input);
     if ('error' in parsed) return {success: false, message: parsed.error};
     const {value, derived} = parsed;
 

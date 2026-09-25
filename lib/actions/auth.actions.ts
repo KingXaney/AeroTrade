@@ -6,6 +6,7 @@ import {cookies, headers} from "next/headers";
 import {THEME_COOKIE} from "@/lib/theme/resolve";
 import {syncThemeCookieForUser} from "@/lib/actions/appearance.actions";
 import {PASSWORD_RESET_LIMIT, PASSWORD_RESET_WINDOW_MS, passwordResetKey, takeRateLimit} from "@/lib/auth/rate-limit";
+import {seedDefaultTopics} from "@/lib/topics/seed";
 
 // Better-auth throws APIError-shaped objects with body.message; fall back to .message or a generic string.
 const extractAuthError = (e: unknown, fallback: string): string => {
@@ -21,6 +22,15 @@ export const signUpWithEmail = async ({ email, password, fullName, country, inve
         const response = await auth.api.signUpEmail({ body: { email, password, name: fullName } })
 
         if(response) {
+            // Awaited, not queued: the user is redirected to the dashboard the moment this
+            // returns, and the topics-first layout is the first thing they see. The welcome
+            // event carries no user id, so this cannot move into that handler as it stands.
+            // Never allowed to fail the sign-up — an account with no topics is recoverable
+            // (the /topics safety net seeds it), an account that failed to exist is not.
+            if (response.user?.id) {
+                await seedDefaultTopics(response.user.id).catch((e) => console.error('Failed to seed default topics', e))
+            }
+
             await inngest.send({
                 name: 'app/user.created',
                 data: { email, name: fullName, country, investmentGoals, riskTolerance, preferredIndustry }
