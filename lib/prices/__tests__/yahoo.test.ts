@@ -2,7 +2,7 @@
 // exercised against a stubbed global fetch — no network.
 
 import {afterEach, beforeEach, describe, expect, it, vi} from "vitest";
-import {fetchYahooDaily, parseYahooChart, yahooChartUrl} from "@/lib/prices/yahoo";
+import {DIVIDEND_NOISE_FLOOR, dividendCoverage, fetchYahooDaily, inferDividends, parseYahooChart, yahooChartUrl} from "@/lib/prices/yahoo";
 
 // Session opens (09:30 ET) as epoch seconds: EDT is UTC-4, EST is UTC-5.
 const EDT_2026_07_27 = Date.UTC(2026, 6, 27, 13, 30) / 1000;
@@ -43,7 +43,9 @@ const HAPPY_CHART = chartOf({
     low: [100.2, 101.9, 102.7],
     close: [102.75, 103.1, 104.5],
     volume: [1500000, 1620500, 900000],
-    adjclose: [101.5, 101.85, 103.23],
+    // One exact adjustment factor (0.98) throughout: no dividend inside this window. Rounded
+    // adjcloses would imply a spurious one — see the noise-floor test below.
+    adjclose: [102.75 * 0.98, 103.1 * 0.98, 104.5 * 0.98],
 });
 
 describe("yahooChartUrl", () => {
@@ -57,10 +59,11 @@ describe("yahooChartUrl", () => {
 
 describe("parseYahooChart", () => {
     it("parses OHLCV plus adjclose into ascending bars", () => {
+        // The first bar cannot know its dividend (no predecessor in the payload); the rest are 0.
         expect(parseYahooChart(HAPPY_CHART, {excludeFrom: FAR_FUTURE})).toEqual([
-            {date: "2026-07-27", close: 102.75, open: 101, high: 103.5, low: 100.2, volume: 1500000, adjClose: 101.5},
-            {date: "2026-07-28", close: 103.1, open: 102.8, high: 104, low: 101.9, volume: 1620500, adjClose: 101.85},
-            {date: "2026-07-29", close: 104.5, open: 103.2, high: 105.1, low: 102.7, volume: 900000, adjClose: 103.23},
+            {date: "2026-07-27", close: 102.75, open: 101, high: 103.5, low: 100.2, volume: 1500000, adjClose: 102.75 * 0.98},
+            {date: "2026-07-28", close: 103.1, open: 102.8, high: 104, low: 101.9, volume: 1620500, adjClose: 103.1 * 0.98, dividend: 0},
+            {date: "2026-07-29", close: 104.5, open: 103.2, high: 105.1, low: 102.7, volume: 900000, adjClose: 104.5 * 0.98, dividend: 0},
         ]);
     });
 
@@ -192,6 +195,82 @@ describe("parseYahooChart", () => {
     });
 });
 
+// Yahoo's adjclose multiplies every earlier price by (1 − D / close[t−1]) at each ex-date t,
+// so a payload built that way must give the dividend back exactly.
+const withDividend = (closes: number[], exIndex: number, dividend: number) => {
+    const factor = 1 - dividend / closes[exIndex - 1];
+    return closes.map((close, i) => (i < exIndex ? close * factor : close));
+};
+
+describe("inferDividends", () => {
+    const dates = ["2026-09-14", "2026-09-15", "2026-09-16", "2026-09-17"];
+    const closes = [650, 652, 649.5, 651];
+
+    it("recovers a dividend from the adjclose step on its ex-date", () => {
+        const adj = withDividend(closes, 2, 1.889);
+        const bars = inferDividends(dates.map((date, i) => ({date, close: closes[i], adjClose: adj[i]})));
+
+        expect(bars[0].dividend).toBeUndefined();
+        expect(bars[1].dividend).toBe(0);
+        expect(bars[2].dividend).toBeCloseTo(1.889, 9);
+        expect(bars[3].dividend).toBe(0);
+    });
+
+    it("leaves a bar unknown — not zero — when either side has no adjclose", () => {
+        const bars = inferDividends([
+            {date: dates[0], close: 650, adjClose: 640},
+            {date: dates[1], close: 652},
+            {date: dates[2], close: 649.5, adjClose: 640},
+        ]);
+
+        expect(bars.map((bar) => bar.dividend)).toEqual([undefined, undefined, undefined]);
+    });
+
+    it("does not mistake a split for a dividend: close and adjclose move together", () => {
+        // A 4-for-1 split rescales the whole split-adjusted series, so the factor is unchanged.
+        const split = [162.5, 163, 162.375, 162.75];
+        const bars = inferDividends(dates.map((date, i) => ({date, close: split[i], adjClose: split[i] * 0.97})));
+
+        expect(bars.slice(1).every((bar) => bar.dividend === 0)).toBe(true);
+    });
+
+    it("treats a step below the noise floor as zero and one above it as a dividend", () => {
+        // Rounding adjclose to cents implies ~4e-5 × price: above the floor, so a real payload's
+        // adjcloses (full precision, noise ≤ 9e-7) are what the floor was measured against.
+        const below = inferDividends([
+            {date: dates[0], close: 100, adjClose: 100},
+            {date: dates[1], close: 100, adjClose: 100 * (1 + DIVIDEND_NOISE_FLOOR / 2)},
+        ]);
+        const above = inferDividends([
+            {date: dates[0], close: 100, adjClose: 100 * (1 - DIVIDEND_NOISE_FLOOR * 3)},
+            {date: dates[1], close: 100, adjClose: 100},
+        ]);
+
+        expect(below[1].dividend).toBe(0);
+        expect(above[1].dividend).toBeCloseTo(100 * DIVIDEND_NOISE_FLOOR * 3, 9);
+    });
+});
+
+describe("dividendCoverage", () => {
+    it("vouches for the unbroken run of known dividends that ends the payload", () => {
+        expect(dividendCoverage([
+            {date: "2026-09-14", close: 1},
+            {date: "2026-09-15", close: 1, dividend: 0},
+            {date: "2026-09-16", close: 1, dividend: 0.5},
+        ])).toEqual({from: "2026-09-15", through: "2026-09-16"});
+    });
+
+    it("stops at a hole and vouches for nothing when the last bar is unknown", () => {
+        expect(dividendCoverage([
+            {date: "2026-09-14", close: 1, dividend: 0},
+            {date: "2026-09-15", close: 1},
+            {date: "2026-09-16", close: 1, dividend: 0},
+        ])).toEqual({from: "2026-09-16", through: "2026-09-16"});
+        expect(dividendCoverage([{date: "2026-09-14", close: 1, dividend: 0}, {date: "2026-09-15", close: 1}])).toBeNull();
+        expect(dividendCoverage([])).toBeNull();
+    });
+});
+
 describe("fetchYahooDaily", () => {
     beforeEach(() => {
         // Failures log by design; keep test output clean.
@@ -218,7 +297,7 @@ describe("fetchYahooDaily", () => {
         // The fixture is dated 2026; the live excludeFrom is today's ET date, so
         // every 2026-07 bar survives whatever day the suite runs on.
         expect(bars).toHaveLength(3);
-        expect(bars[0]).toMatchObject({date: "2026-07-27", close: 102.75, adjClose: 101.5});
+        expect(bars[0]).toMatchObject({date: "2026-07-27", close: 102.75, adjClose: 102.75 * 0.98});
     });
 
     it("returns [] on a non-ok response", async () => {

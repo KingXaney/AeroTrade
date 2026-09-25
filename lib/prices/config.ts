@@ -11,3 +11,13 @@ export const MAX_TRACKED_SYMBOLS = 50;
 export const STRATEGY_BACKFILL_CALENDAR_DAYS = 1560;
 // One Inngest step's worth of symbols: 12 × (Yahoo call + spacing) fits a 60 s route budget.
 export const PRICE_CHUNK_SIZE = 12;
+
+// The 13-week T-bill yield (a discount rate, annualised %) that paper cash earns interest
+// at. Fetched like any symbol; it has no dividends and cannot split.
+export const RATE_SYMBOL = '^IRX';
+
+// Dividends become cash this many calendar days after their ex-date — about when a real pay
+// date falls, and long enough for the ex-date's bar to settle before anyone relies on it
+// (the bar fetched the next morning may not carry Yahoo's rebase yet). Accounts, the SPY
+// total-return benchmark and the strategy simulator all use this one number.
+export const DIVIDEND_PAY_LAG_DAYS = 5;

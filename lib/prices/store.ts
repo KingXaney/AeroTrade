@@ -4,12 +4,16 @@
 
 import {connectToDatabase} from "@/database/mongoose";
 import PriceBar, {type PriceBarSource} from "@/database/models/price-bar.model";
+import PriceSeriesMeta from "@/database/models/price-series-meta.model";
 import {decideFetchWindow, fetchStooqDaily, type FetchWindow} from "@/lib/prices/stooq";
-import {fetchYahooDaily, type YahooRange} from "@/lib/prices/yahoo";
+import {dividendCoverage, fetchYahooDaily, type YahooRange} from "@/lib/prices/yahoo";
+import {mergeCoverage, type CoverageRange} from "@/lib/prices/coverage";
 import {type Bar} from "@/lib/prices/signals";
+import {BAR_PROJECTION, toBar, toSetFields, type LeanPriceBar} from "@/lib/prices/bar-fields";
 import {
     BACKFILL_CALENDAR_DAYS,
     MAX_TRACKED_SYMBOLS,
+    RATE_SYMBOL,
     STOOQ_DELAY_MS,
     YAHOO_DELAY_MS,
 } from "@/lib/prices/config";
@@ -50,16 +54,33 @@ const YAHOO_BACKFILL_RANGE: YahooRange = "5y";
 const minusCalendarDays = (isoDate: string, days: number): string =>
     new Date(new Date(`${isoDate}T00:00:00Z`).getTime() - days * MS_PER_DAY).toISOString().slice(0, 10);
 
-// Only the fields the provider actually supplied are written, so a Stooq
-// fallback never blanks the OHLC a previous Yahoo pass stored.
-const toSetFields = (bar: Bar, source: PriceBarSource): Record<string, number | string> => {
-    const fields: Record<string, number | string> = {close: bar.close, source};
-    if (bar.open !== undefined) fields.open = bar.open;
-    if (bar.high !== undefined) fields.high = bar.high;
-    if (bar.low !== undefined) fields.low = bar.low;
-    if (bar.volume !== undefined) fields.volume = bar.volume;
-    if (bar.adjClose !== undefined) fields.adjClose = bar.adjClose;
-    return fields;
+type StoredCoverage = {dividendsFrom?: string; dividendsThrough?: string} | null;
+
+const toRange = (doc: StoredCoverage): CoverageRange | null =>
+    doc?.dividendsFrom && doc.dividendsThrough ? {from: doc.dividendsFrom, through: doc.dividendsThrough} : null;
+
+// After a Yahoo write: extend the trusted range with what this payload vouched for, and end
+// any failing streak. Stooq never reaches here — it carries no adjclose, so no dividends.
+const recordCoverage = async (symbol: string, bars: Bar[]): Promise<void> => {
+    const stored = await PriceSeriesMeta.findOne({symbol}).lean<StoredCoverage>();
+    const merged = mergeCoverage(toRange(stored), dividendCoverage(bars));
+    await PriceSeriesMeta.updateOne(
+        {symbol},
+        {
+            $set: {updatedAt: new Date(), ...(merged ? {dividendsFrom: merged.from, dividendsThrough: merged.through} : {})},
+            $unset: {failingSince: 1},
+        },
+        {upsert: true},
+    );
+};
+
+// A fetch that produced no Yahoo payload starts (or continues) a failing streak, dated by its
+// first day, so a symbol Yahoo stops serving can eventually be released rather than block.
+// Two plain updates rather than one pipeline update: Mongoose 9 rejects pipelines unless
+// opted in, and "set only if absent" needs no pipeline when split this way.
+const recordFailure = async (symbol: string, today: string): Promise<void> => {
+    await PriceSeriesMeta.updateOne({symbol}, {$set: {updatedAt: new Date()}, $setOnInsert: {failingSince: today}}, {upsert: true});
+    await PriceSeriesMeta.updateOne({symbol, failingSince: {$exists: false}}, {$set: {failingSince: today}});
 };
 
 const closesDiffer = (fetched: number, stored: number): boolean =>
@@ -135,7 +156,8 @@ export const ensureBars = async (
             let window = windowFor(forceBackfill || missingOhlc ? "backfill" : planned.mode);
 
             let outcome = await fetchFromProviders(symbol, window, today, topupRange);
-            if (outcome !== null && window.mode === "topup" && latest !== null) {
+            // A yield is not a price: it cannot split, and a 0.5% move on 4% is 2 basis points.
+            if (outcome !== null && window.mode === "topup" && latest !== null && symbol !== RATE_SYMBOL) {
                 // The fetched bar for the stored latest date must agree with what
                 // we hold; a split re-adjusts every older close, so one mismatch
                 // means the whole stored history is on a different basis.
@@ -148,6 +170,7 @@ export const ensureBars = async (
             }
             if (outcome === null) {
                 failed.push(symbol);
+                await recordFailure(symbol, today);
                 continue;
             }
 
@@ -159,6 +182,8 @@ export const ensureBars = async (
                     upsert: true,
                 },
             })), {ordered: false});
+            if (source === "yahoo") await recordCoverage(symbol, bars);
+            else await recordFailure(symbol, today);
             providers[source] += 1;
             updated++;
         } catch (error) {
@@ -167,29 +192,6 @@ export const ensureBars = async (
         }
     }
     return {updated, failed, providers, fresh};
-};
-
-type LeanPriceBar = {
-    symbol: string;
-    date: string;
-    close: number;
-    open?: number | null;
-    high?: number | null;
-    low?: number | null;
-    volume?: number | null;
-    adjClose?: number | null;
-};
-
-const BAR_PROJECTION = {_id: 0, symbol: 1, date: 1, close: 1, open: 1, high: 1, low: 1, volume: 1, adjClose: 1} as const;
-
-const toBar = (doc: LeanPriceBar): Bar => {
-    const bar: Bar = {date: doc.date, close: doc.close};
-    if (typeof doc.open === "number") bar.open = doc.open;
-    if (typeof doc.high === "number") bar.high = doc.high;
-    if (typeof doc.low === "number") bar.low = doc.low;
-    if (typeof doc.volume === "number") bar.volume = doc.volume;
-    if (typeof doc.adjClose === "number") bar.adjClose = doc.adjClose;
-    return bar;
 };
 
 // Ascending bars per symbol, ready for computeSignals. Inclusive date bounds:
