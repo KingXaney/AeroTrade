@@ -11,12 +11,12 @@ import {
 } from "@/lib/dashboard/layout";
 import {resetDashboardLayout, saveDashboardLayout} from "@/lib/actions/dashboard.actions";
 import {cn} from "@/lib/utils";
+import {iconButton} from "@/components/primitives/iconButton";
 import ConfirmDialog from "@/components/ui/ConfirmDialog";
 
 const SAVE_DEBOUNCE_MS = 300;
 
 const switchClass = "data-[state=checked]:!bg-brand-strong data-[state=unchecked]:!bg-surface-4 data-[state=unchecked]:!border data-[state=unchecked]:!border-line-strong transition-colors duration-200";
-const iconButton = 'inline-flex items-center justify-center size-7 rounded-md text-fg-muted hover:text-fg hover:bg-surface-3 transition-colors disabled:opacity-30 disabled:hover:bg-transparent';
 
 type Props = {initialLayout: DashboardLayout; availableIds: WidgetId[]};
 

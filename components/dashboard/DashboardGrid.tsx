@@ -23,6 +23,7 @@ import {
     addWidget, layoutsEqual, missingWidgetIds, moveWidget, removeWidget, resetLayout, setSpan, type DashboardLayout,
 } from "@/lib/dashboard/layout";
 import {saveDashboardLayout} from "@/lib/actions/dashboard.actions";
+import PageTitle from "@/components/primitives/PageTitle";
 import {spanClass} from "@/components/dashboard/spanClass";
 import WidgetShell from "@/components/dashboard/WidgetShell";
 import WidgetPlaceholder from "@/components/dashboard/WidgetPlaceholder";
@@ -118,25 +119,21 @@ const DashboardGrid = ({initialLayout, bodies, availableIds, headerActions, star
 
     return (
         <div className="space-y-4">
-            <div className="flex flex-col md:flex-row md:items-end md:justify-between gap-4 mb-2">
-                <div>
-                    <h1 className="text-2xl font-semibold text-fg mb-1" style={{fontFamily: 'var(--type-display)'}}>
-                        Dashboard
-                    </h1>
-                    <p className="text-sm text-fg-muted">
-                        {editing ? 'Drag widgets by their handle, resize, remove, or add new ones — then save.' : 'Your topics, portfolio, watchlist and friends at a glance'}
-                    </p>
-                </div>
-                <DashboardToolbar
-                    editing={editing} dirty={dirty} pending={pending}
-                    onCustomize={() => setEditing(true)}
-                    onAdd={() => setLibraryOpen(true)}
-                    onReset={() => setLayout(resetLayout())}
-                    onSave={save}
-                    onCancel={cancel}
-                    extra={headerActions}
-                />
-            </div>
+            <PageTitle
+                title="Dashboard"
+                subtitle={editing ? 'Drag widgets by their handle, resize, remove, or add new ones — then save.' : 'Your topics, portfolio, watchlist and friends at a glance'}
+                actions={
+                    <DashboardToolbar
+                        editing={editing} dirty={dirty} pending={pending}
+                        onCustomize={() => setEditing(true)}
+                        onAdd={() => setLibraryOpen(true)}
+                        onReset={() => setLayout(resetLayout())}
+                        onSave={save}
+                        onCancel={cancel}
+                        extra={headerActions}
+                    />
+                }
+            />
 
             <DndContext id="dashboard-grid" sensors={sensors} collisionDetection={collisionDetection}
                         onDragStart={onDragStart} onDragEnd={onDragEnd} onDragCancel={() => setActiveId(null)}

@@ -1,5 +1,6 @@
 import {Suspense, type ReactNode} from "react";
 import {WIDGETS, type DataKey, type WidgetId, type WidgetSpan} from "@/lib/dashboard/widgets";
+import Panel from "@/components/primitives/Panel";
 import {LOADERS, type DashboardData, type LoaderCtx} from "@/lib/dashboard/loaders";
 import {bestStrategy, newsBrainSummary, toApplyAccounts, toComparisonRows, topMovers} from "@/lib/dashboard/select";
 import {aggregatePortfolios} from "@/lib/trading/account";
@@ -52,7 +53,13 @@ const need = <K extends DataKey>(r: WidgetRenderCtx, key: K, render: (value: Non
     return render(value as NonNullable<DashboardData[K]>);
 };
 
-const skeleton = (id: WidgetId, rows = 3) => <WidgetSkeleton height={WIDGETS[id].minHeight} rows={rows} />;
+// A fallback is not the widget's body, so for chrome:'bare' — where the body draws its
+// own panel and the shell draws nothing — the fallback has to bring the frame itself.
+// One rule read off the registry, rather than the same literal written at four sites.
+const framed = (id: WidgetId, node: ReactNode): ReactNode =>
+    WIDGETS[id].chrome === 'bare' ? <Panel>{node}</Panel> : node;
+
+const skeleton = (id: WidgetId, rows = 3) => framed(id, <WidgetSkeleton height={WIDGETS[id].minHeight} rows={rows} />);
 
 // Lazy bodies await their own (cache()-deduped) loader under Suspense so the
 // expensive calls stream in after the rest of the dashboard has painted.
@@ -67,13 +74,7 @@ const PerformanceChartAsync = async ({ctx}: {ctx: LoaderCtx}) => {
 };
 const AnalyticsStatsAsync = async ({ctx}: {ctx: LoaderCtx}) => {
     const analytics = await LOADERS.analytics(ctx);
-    if (!analytics) {
-        return (
-            <div className="glass-panel rounded-xl p-5">
-                <WidgetUnavailable text="No analytics yet — they appear once a daily snapshot exists." />
-            </div>
-        );
-    }
+    if (!analytics) return framed('analytics-stats', <WidgetUnavailable text="No analytics yet — they appear once a daily snapshot exists." />);
     return <AnalyticsStats analytics={analytics} />;
 };
 // Empty feed + zero topics is the onboarding nudge; empty feed + topics is just "nothing matched yet".
@@ -92,7 +93,7 @@ const QuantStrategiesAsync = async ({ctx, span}: {ctx: LoaderCtx; span: number})
 };
 const BrainStatusAsync = async ({ctx}: {ctx: LoaderCtx}) => {
     const status = await LOADERS.brainStatus(ctx);
-    if (!status) return <div className="glass-panel rounded-xl p-5"><WidgetUnavailable failed /></div>;
+    if (!status) return framed('brain-status', <WidgetUnavailable failed />);
     return <SystemStatus status={status} />;
 };
 
@@ -120,7 +121,7 @@ export const WIDGET_RENDERERS: Record<WidgetId, Renderer> = {
     'recent-trades': (r) => need(r, 'trades', (t) => <TradeHistory trades={t} />),
     'performance-chart': (r) => <Suspense fallback={skeleton('performance-chart', 5)}><PerformanceChartAsync ctx={r.ctx} /></Suspense>,
     'analytics-stats': (r) => (
-        <Suspense fallback={<div className="glass-panel rounded-xl p-5">{skeleton('analytics-stats', 2)}</div>}>
+        <Suspense fallback={skeleton('analytics-stats', 2)}>
             <AnalyticsStatsAsync ctx={r.ctx} />
         </Suspense>
     ),
@@ -143,7 +144,7 @@ export const WIDGET_RENDERERS: Record<WidgetId, Renderer> = {
         ? <WidgetUnavailable failed />
         : <SecondOpinionExcerpt opinion={r.data.secondOpinion ?? null} />,
     'brain-status': (r) => (
-        <Suspense fallback={<div className="glass-panel rounded-xl p-5">{skeleton('brain-status', 2)}</div>}>
+        <Suspense fallback={skeleton('brain-status', 2)}>
             <BrainStatusAsync ctx={r.ctx} />
         </Suspense>
     ),
