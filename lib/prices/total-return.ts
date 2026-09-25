@@ -52,3 +52,12 @@ export const indexReturnPct = (index: readonly IndexPoint[], from: string, to: s
     if (base === undefined || end === undefined || !(base.value > 0) || end.date < base.date) return null;
     return (end.value / base.value - 1) * 100;
 };
+
+// The index with today's point appended from the live quote — stored bars end at the previous
+// session, and without this a chart compares today's account with yesterday's SPY.
+export const appendLive = (index: readonly IndexPoint[], lastClose: number | null, quote: number | undefined, today: string): IndexPoint[] => {
+    const last = index[index.length - 1];
+    if (last === undefined || last.date >= today || lastClose === null) return [...index];
+    const value = extendWithQuote(index, lastClose, quote);
+    return value === null || value === last.value ? [...index] : [...index, {date: today, value}];
+};

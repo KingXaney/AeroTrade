@@ -4,7 +4,6 @@
 import {cache} from "react";
 import {connectToDatabase} from "@/database/mongoose";
 import AccountSnapshot from "@/database/models/account-snapshot.model";
-import BenchmarkSnapshot from "@/database/models/benchmark-snapshot.model";
 import StrategyBacktest from "@/database/models/strategy-backtest.model";
 import StrategyRun from "@/database/models/strategy-run.model";
 import PriceBar from "@/database/models/price-bar.model";
@@ -20,6 +19,8 @@ import {
 } from "@/lib/trading/account";
 import {countUnpriced, mergeLivePoint} from "@/lib/trading/analytics";
 import {getEasternDateString} from "@/lib/utils";
+import {getBenchmarkIndex} from "@/lib/prices/benchmark-store";
+import {appendLive, indexReturnPct} from "@/lib/prices/total-return";
 import {STRATEGIES, strategyBySlug} from "@/lib/strategies/catalog";
 import {STRATEGY_OWNER_ID} from "@/lib/strategies/config";
 import {getFollowedStrategies} from "@/lib/strategies/follows";
@@ -97,21 +98,17 @@ const getBacktestStats = async (): Promise<Map<string, SimulatedRecord>> => {
     }]));
 };
 
-// SPY's return since each account's inception. The base is the first daily benchmark
-// snapshot on or after inception; the latest leg is SPY's live quote when one is in hand,
-// so it sits on the same basis as the account's live valuation (else the last snapshot).
+// SPY's TOTAL return since each account's inception — the accounts earn interest and
+// dividends, so the benchmark reinvests its own. The base is the first index point on or
+// after inception; the latest leg is moved by SPY's live quote when one is in hand, so it
+// sits on the same basis as the account's live valuation.
 const benchmarkReturnsSince = async (inceptionDates: readonly string[], liveClose?: number): Promise<Map<string, number | null>> => {
     if (inceptionDates.length === 0) return new Map();
     const earliest = [...inceptionDates].sort()[0];
-    const rows = await BenchmarkSnapshot.find({symbol: BENCHMARK_SYMBOL, date: {$gte: earliest}}).sort({date: 1}).lean<{date: string; close: number}[]>();
-    const latest = typeof liveClose === 'number' && liveClose > 0
-        ? {date: getEasternDateString(), close: liveClose}
-        : (rows.length > 0 ? rows[rows.length - 1] : null);
-    return new Map(inceptionDates.map((inception) => {
-        const base = rows.find((r) => r.date >= inception);
-        const value = base && latest && base.close > 0 && latest.date >= base.date ? (latest.close / base.close - 1) * 100 : null;
-        return [inception, value];
-    }));
+    const today = getEasternDateString();
+    const {points, lastClose} = await getBenchmarkIndex(earliest);
+    const index = appendLive(points, lastClose, liveClose, today);
+    return new Map(inceptionDates.map((inception) => [inception, indexReturnPct(index, inception, today)]));
 };
 
 type SnapshotSeries = {days: number; points: SnapshotPoint[]};

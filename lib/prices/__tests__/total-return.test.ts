@@ -1,5 +1,5 @@
 import {describe, expect, it} from 'vitest';
-import {extendWithQuote, indexReturnPct, totalReturnIndex} from '@/lib/prices/total-return';
+import {appendLive, extendWithQuote, indexReturnPct, totalReturnIndex} from '@/lib/prices/total-return';
 import {DIVIDEND_PAY_LAG_DAYS} from '@/lib/prices/config';
 import type {Bar} from '@/lib/prices/signals';
 
@@ -54,5 +54,19 @@ describe('extendWithQuote and indexReturnPct', () => {
     it('reads the base on or after `from` and the end on or before `to`', () => {
         expect(indexReturnPct(index, '2026-09-22', '2026-09-25')).toBeCloseTo(5, 10);
         expect(indexReturnPct(index, '2026-09-25', '2026-09-26')).toBeNull();
+    });
+});
+
+describe('appendLive', () => {
+    const index = [{date: '2026-09-23', value: 200}, {date: '2026-09-24', value: 210}];
+
+    it('adds today from the live quote so the chart compares like with like', () => {
+        expect(appendLive(index, 105, 107.1, '2026-09-25')).toEqual([...index, {date: '2026-09-25', value: 210 * 107.1 / 105}]);
+    });
+
+    it('adds nothing without a quote, or when the bars already reach today', () => {
+        expect(appendLive(index, 105, undefined, '2026-09-25')).toEqual(index);
+        expect(appendLive(index, 105, 107, '2026-09-24')).toEqual(index);
+        expect(appendLive([], null, 107, '2026-09-25')).toEqual([]);
     });
 });

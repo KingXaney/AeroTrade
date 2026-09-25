@@ -3,7 +3,7 @@
 import {useMemo, useRef, useState} from "react";
 
 // Hand-rolled SVG performance chart: the strategy's %-return since inception
-// (cyan) vs the SPY benchmark (muted), from daily close snapshots. Deliberately
+// (cyan) vs SPY's total return (muted, lib/prices/total-return.ts). Deliberately
 // dependency-free — two polylines and a hover crosshair cover the need.
 
 const WIDTH = 720;
@@ -76,7 +76,7 @@ const PerformanceChart = ({series, accountName}: {series: PerfPoint[]; accountNa
                 </span>
                 <span className="flex items-center gap-1.5">
                     <span className="inline-block w-3 h-0.5 rounded" style={{backgroundColor: 'var(--fg-muted)'}} />
-                    <span className="text-fg-muted">S&amp;P 500 (SPY)</span>
+                    <span className="text-fg-muted">S&amp;P 500 (SPY, total return)</span>
                     <span className="text-fg-soft">
                         {(hover ?? last).benchmarkPct === null ? '—' : formatPct((hover ?? last).benchmarkPct as number)}
                     </span>
@@ -89,7 +89,7 @@ const PerformanceChart = ({series, accountName}: {series: PerfPoint[]; accountNa
                 viewBox={`0 0 ${WIDTH} ${HEIGHT}`}
                 className="w-full h-auto"
                 role="img"
-                aria-label={`Performance of ${accountName} vs the S&P 500 since inception`}
+                aria-label={`Performance of ${accountName} vs the S&P 500 total return since inception`}
                 onMouseMove={onMove}
                 onMouseLeave={() => setHoverIdx(null)}
             >

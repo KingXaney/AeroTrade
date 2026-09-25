@@ -10,9 +10,10 @@ import {connectToDatabase} from "@/database/mongoose";
 import PaperAccount, {type PaperAccountDoc} from "@/database/models/paper-account.model";
 import PaperTrade from "@/database/models/paper-trade.model";
 import AccountSnapshot from "@/database/models/account-snapshot.model";
-import BenchmarkSnapshot from "@/database/models/benchmark-snapshot.model";
 import {BENCHMARK_SYMBOL, MAX_STARTING_BALANCE, MIN_STARTING_BALANCE, PAPER_STARTING_BALANCE} from "@/lib/constants";
 import {getEasternDateString} from "@/lib/utils";
+import {getBenchmarkIndex} from "@/lib/prices/benchmark-store";
+import {appendLive} from "@/lib/prices/total-return";
 import {getQuote} from "@/lib/actions/finnhub.actions";
 import {
     buildPerfSeries,
@@ -283,22 +284,26 @@ export const getAccountAnalytics = async (userId: string, accountId: string): Pr
         const inceptionDate = getEasternDateString(new Date(summaryInfo.inceptionAt));
         const key = String(account._id);
 
-        const [snapshots, benchmarks, trades] = await Promise.all([
+        const [snapshots, benchmark, trades] = await Promise.all([
             AccountSnapshot.find({accountId: key}).sort({date: 1}).lean(),
-            BenchmarkSnapshot.find({symbol: BENCHMARK_SYMBOL, date: {$gte: inceptionDate}}).sort({date: 1}).lean(),
+            getBenchmarkIndex(inceptionDate),
             PaperTrade.find({accountId: key}).lean(),
         ]);
 
         const positions = toPlainPositions(account);
-        const priceMap = await buildPriceMap(positions.map((p) => p.symbol));
+        // SPY rides along in the same quote map: the benchmark needs today's point too.
+        const priceMap = await buildPriceMap([...positions.map((p) => p.symbol), BENCHMARK_SYMBOL]);
         const summary = computePortfolio(
             {cash: account.cash, startingBalance: account.startingBalance, positions},
             priceMap,
         );
 
         const snapshotPoints: SnapshotPoint[] = snapshots.map((s) => ({date: s.date, value: s.totalValue}));
-        const benchmarkPoints: SnapshotPoint[] = benchmarks.map((b) => ({date: b.date, value: b.close}));
-        const livePoint: SnapshotPoint = {date: getEasternDateString(), value: summary.totalValue};
+        const today = getEasternDateString();
+        // SPY total return, with today's point from the live quote so the chart's last point
+        // compares like with like instead of today's account against yesterday's SPY.
+        const benchmarkPoints: SnapshotPoint[] = appendLive(benchmark.points, benchmark.lastClose, priceMap.get(BENCHMARK_SYMBOL)?.price, today);
+        const livePoint: SnapshotPoint = {date: today, value: summary.totalValue};
 
         const tradeStats = trades.map((t) => ({side: t.side as string, realizedPnl: t.realizedPnl as number | undefined}));
         const winStats = computeWinStats(tradeStats);
