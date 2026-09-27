@@ -5,6 +5,7 @@ import Link from "next/link";
 import {cn, formatPrice, formatChangePercent, getChangeColorClass} from "@/lib/utils";
 import SellPositionDialog from "@/components/trade/SellPositionDialog";
 import UnpricedNote from "@/components/trade/UnpricedNote";
+import Term from "@/components/primitives/Term";
 import TradeLink from "@/components/trade/TradeLink";
 
 // Interactive holdings table for the trade page — each row opens a sell
@@ -22,7 +23,7 @@ const PositionsTable = ({positions, accountId}: {positions: EnrichedPosition[]; 
                  style={{fontFamily: 'var(--type-mono)', fontSize: '10px', letterSpacing: '0.1em', textTransform: 'uppercase', color: 'var(--fg-muted)'}}>
                 <div>Asset</div>
                 <div className="text-right">Qty</div>
-                <div className="text-right">Avg Cost</div>
+                <div className="text-right"><Term k="avg-cost">Avg Cost</Term></div>
                 <div className="text-right">Price</div>
                 <div className="text-right">Value / P&L</div>
                 <div className="text-right">Action</div>

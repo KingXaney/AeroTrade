@@ -4,6 +4,8 @@ import {DEFAULT_DRIFT_BAND, ENGINE_VERSION} from '@/lib/strategies/config';
 import {STRATEGY_RULES} from '@/lib/strategies/rules';
 import {SECTOR_ETFS, UNIVERSES} from '@/lib/strategies/universe';
 import {SECTOR_TO_ETF} from '@/lib/navigator/config';
+import {findBanned} from '@/lib/learn/banned';
+import {isGlossaryKey, shortHelp} from '@/lib/learn/glossary';
 
 const EXPECTED_ORDER = [
     'buy-and-hold-spy',
@@ -118,6 +120,26 @@ describe('STRATEGIES', () => {
             expect(new Set(keys).size).toBe(keys.length);
             expect(keys[0]).toBe('close');
             expect(Object.keys(def.params).length).toBeGreaterThan(0);
+        }
+    });
+
+    it('defines every signal column in the glossary and shows that definition as its help', () => {
+        for (const def of STRATEGIES) {
+            for (const column of def.signalColumns) {
+                expect(column.glossary && isGlossaryKey(column.glossary), `${def.id}.${column.key}`).toBe(true);
+                expect(column.help, `${def.id}.${column.key}`).toBe(shortHelp(column.glossary!));
+                expect(findBanned(column.help!, 'copy'), `${def.id}.${column.key}`).toEqual([]);
+            }
+        }
+        // The two 'rank' columns mean different things and say so.
+        expect(strategyBySlug('momentum-12-1')?.signalColumns.at(-1)?.glossary).toBe('momentum-rank');
+        expect(strategyBySlug('low-volatility')?.signalColumns.at(-1)?.glossary).toBe('vol-rank');
+    });
+
+    it('keeps the beginner line descriptive — it is shown above every number on the page', () => {
+        for (const def of STRATEGIES) {
+            expect(findBanned(def.explainer.beginnerLine, 'copy'), def.id).toEqual([]);
+            expect(def.explainer.beginnerLine.length).toBeLessThanOrEqual(120);
         }
     });
 

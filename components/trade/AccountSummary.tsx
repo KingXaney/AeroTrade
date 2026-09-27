@@ -1,7 +1,10 @@
+import type {ReactNode} from "react";
 import {cn, formatPrice, getChangeColorClass} from "@/lib/utils";
 import UnpricedNote from "@/components/trade/UnpricedNote";
+import Term from "@/components/primitives/Term";
+import WhatTheseMean from "@/components/learn/WhatTheseMean";
 
-const Stat = ({label, value, valueClass, hint}: {label: string; value: string; valueClass?: string; hint?: string}) => (
+const Stat = ({label, value, valueClass, hint}: {label: ReactNode; value: string; valueClass?: string; hint?: string}) => (
     <div className="flex flex-col gap-1">
         <span className="text-[10px] uppercase tracking-[0.1em] text-fg-muted"
               style={{fontFamily: 'var(--type-mono)'}}>
@@ -30,19 +33,23 @@ const AccountSummary = ({portfolio, income}: {portfolio: PortfolioSummary; incom
     return (
         <div className="glass-panel rounded-xl p-5 shimmer">
             <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-                <Stat label="Net Worth" value={formatPrice(portfolio.totalValue)} valueClass="text-brand" />
+                <Stat label={<Term k="net-worth">Net Worth</Term>} value={formatPrice(portfolio.totalValue)} valueClass="text-brand" />
                 <Stat
-                    label="Total Return"
+                    label={<Term k="total-return">Total Return</Term>}
                     value={`${sign}${formatPrice(portfolio.totalReturnAbs)} (${sign}${portfolio.totalReturnPct.toFixed(2)}%)`}
                     valueClass={returnClass}
                     hint={returnHint}
                 />
-                <Stat label="Buying Power" value={formatPrice(portfolio.cash)} hint={cashHint} />
-                <Stat label="Holdings Value" value={formatPrice(portfolio.holdingsValue)} />
+                <Stat label={<Term k="buying-power">Buying Power</Term>} value={formatPrice(portfolio.cash)} hint={cashHint} />
+                <Stat label={<Term k="holdings-value">Holdings Value</Term>} value={formatPrice(portfolio.holdingsValue)} />
             </div>
             {/* Net worth and total return both include the at-cost fallback, so the
                 headline numbers are only as live as the note says. */}
             <UnpricedNote positions={portfolio.positions} className="mt-3" />
+            <WhatTheseMean keys={[
+                'net-worth', 'total-return', ...(returnHint ? ['income'] : []),
+                'buying-power', ...(cashHint ? ['apy'] : []), 'holdings-value',
+            ]} />
         </div>
     );
 };

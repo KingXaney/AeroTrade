@@ -67,6 +67,8 @@ export type StrategyLeaderboardRow = {
     live: LiveRecord | null;
     simulated: SimulatedRecord | null;
     followed: boolean;
+    // The catalog's one-line description, shown by the wide dashboard widget.
+    beginnerLine: string;
 };
 
 export const excessReturnPct = (live: Pick<LiveRecord, 'totalReturnPct' | 'benchmarkReturnPct'>): number | null =>

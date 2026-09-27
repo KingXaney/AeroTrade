@@ -202,6 +202,7 @@ const buildLeaderboard = async (userId: string | null): Promise<StrategyLeaderbo
             live,
             simulated: backtests.get(def.id) ?? null,
             followed: followedSet.has(def.id),
+            beginnerLine: def.explainer.beginnerLine,
         };
     });
     return {rows: rankLeaderboard(rows), started: rows.some((r) => r.live !== null)};

@@ -72,7 +72,7 @@ const Pairs = ({columns, rows}: {columns: SignalColumn[]; rows: SignalRow[]}) =>
                 <Link href={`/stocks/${row.symbol}`} className="font-mono text-sm font-bold text-fg hover:text-brand">{row.symbol}</Link>
                 {columns.map((c) => (
                     <span key={c.key} className="text-xs">
-                        <MicroLabel>{c.label} </MicroLabel>
+                        <MicroLabel title={c.help}>{c.label} </MicroLabel>
                         <span className="font-mono text-fg-soft">{formatSignalValue(row.values[c.key], c.format)}</span>
                     </span>
                 ))}

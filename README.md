@@ -27,7 +27,7 @@ Follow the topics you care about, test trading strategies with virtual money, an
 
 **Eight classic quant strategies, paper-traded live and explained.** Buy & hold, 60/40, golden cross, dual momentum, 12-1 momentum, RSI-2 mean reversion, Donchian breakouts and low volatility each run in their own system account every trading morning, decided from the previous close and filled at the open through the same order path you use. A leaderboard ranks them by live return against SPY; each page explains the rule, shows what it is watching, its holdings and every fill with its reason, alongside a clearly labelled three-year simulated record. Deterministic rules, no AI.
 
-**A second opinion, a chat advisor, and a digest.** Claude can critique the brain's current picture; a tool-using chat assistant (15 tools) answers "what's new in my topics?" or "should I add NVDA?"; a daily email summarises the market for each user, personalised to their holdings, with links allow-listed to the actual articles.
+**A second opinion, a chat advisor, and a digest.** Claude can critique the brain's current picture; a tool-using chat assistant (15 tools) answers "what's new in my topics?" or "what does max drawdown mean?"; a daily email summarises the market for each user, personalised to their holdings, with links allow-listed to the actual articles.
 
 **Make it yours.** 12 colour palettes × 5 visual styles (minimal, futuristic, liquid glass, brutalist, soft), saved per account and rendered without a flash. A 32-widget dashboard you can drag, resize and extend.
 

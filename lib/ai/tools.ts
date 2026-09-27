@@ -1,4 +1,5 @@
 import {tool} from "ai";
+import {TOOL_DESCRIPTIONS} from "@/lib/ai/tool-copy";
 import {z} from "zod";
 import {
     searchStocks,
@@ -54,7 +55,7 @@ const findTopic = async (userId: string, ref: string): Promise<TopicView | null>
 // The userId closure keeps auth off the LLM — it never sees or supplies a user id.
 export const buildTools = (userId: string) => ({
     searchStock: tool({
-        description: 'Search for stocks by company name or ticker symbol. Use this when the user mentions a company or symbol you want to confirm exists. Returns up to 25 matches with isInWatchlist flags.',
+        description: TOOL_DESCRIPTIONS.searchStock,
         inputSchema: z.object({
             query: z.string().describe('Company name or ticker, e.g. "Apple" or "AAPL"'),
         }),
@@ -65,7 +66,7 @@ export const buildTools = (userId: string) => ({
     }),
 
     getStockQuote: tool({
-        description: 'Get the current price and percent change for a single stock symbol. Always use this before quoting any price number.',
+        description: TOOL_DESCRIPTIONS.getStockQuote,
         inputSchema: z.object({
             symbol: z.string().describe('Ticker symbol, e.g. "AAPL"'),
         }),
@@ -76,7 +77,7 @@ export const buildTools = (userId: string) => ({
     }),
 
     getStockProfile: tool({
-        description: 'Get a company profile (name, market capitalization). Use to identify a company by symbol and fetch its market cap.',
+        description: TOOL_DESCRIPTIONS.getStockProfile,
         inputSchema: z.object({
             symbol: z.string().describe('Ticker symbol'),
         }),
@@ -91,7 +92,7 @@ export const buildTools = (userId: string) => ({
     }),
 
     getStockFinancials: tool({
-        description: 'Get valuation metrics for a stock (P/E ratio, etc.). Use when discussing whether a stock is over/undervalued.',
+        description: TOOL_DESCRIPTIONS.getStockFinancials,
         inputSchema: z.object({
             symbol: z.string().describe('Ticker symbol'),
         }),
@@ -108,7 +109,7 @@ export const buildTools = (userId: string) => ({
     }),
 
     getWatchlist: tool({
-        description: "List the stocks currently in the user's watchlist. Returns symbol, company name, and when it was added.",
+        description: TOOL_DESCRIPTIONS.getWatchlist,
         inputSchema: z.object({}),
         execute: async () => {
             const items = await getWatchlistForUser(userId);
@@ -121,7 +122,7 @@ export const buildTools = (userId: string) => ({
     }),
 
     addStockToWatchlist: tool({
-        description: 'Add a stock to the watchlist. Idempotent — safe to call even if the stock is already there.',
+        description: TOOL_DESCRIPTIONS.addStockToWatchlist,
         inputSchema: z.object({
             symbol: z.string().describe('Ticker symbol, e.g. "NVDA"'),
             company: z.string().describe('Company display name, e.g. "NVIDIA Corp"'),
@@ -132,7 +133,7 @@ export const buildTools = (userId: string) => ({
     }),
 
     removeStockFromWatchlist: tool({
-        description: 'Remove a stock from the watchlist.',
+        description: TOOL_DESCRIPTIONS.removeStockFromWatchlist,
         inputSchema: z.object({
             symbol: z.string().describe('Ticker symbol to remove'),
         }),
@@ -142,7 +143,7 @@ export const buildTools = (userId: string) => ({
     }),
 
     getMarketNews: tool({
-        description: 'Fetch recent market news. Pass specific symbols to get company-specific news, or leave empty for general market news.',
+        description: TOOL_DESCRIPTIONS.getMarketNews,
         inputSchema: z.object({
             symbols: z.array(z.string()).optional().describe('Optional list of ticker symbols'),
         }),
@@ -159,7 +160,7 @@ export const buildTools = (userId: string) => ({
     }),
 
     getBrainDigest: tool({
-        description: 'Read the news brain: the strongest current market narratives (tickers, sectors, themes) with persistent-attention weight, sentiment and whether each is an active long-term thesis. Use when the user asks what the market cares about, which themes are building, or what the AI is watching.',
+        description: TOOL_DESCRIPTIONS.getBrainDigest,
         inputSchema: z.object({}),
         execute: async () => {
             const [digest, theses] = await Promise.all([getBrainDigestData(), getActiveTheses()]);
@@ -177,7 +178,7 @@ export const buildTools = (userId: string) => ({
     }),
 
     getAiSuggestions: tool({
-        description: "Fetch the AI Navigator's latest weekly portfolio decisions: the global model portfolio plus this user's own executed decisions if they are enrolled. Use when the user asks what the AI suggests, holds, or traded. Always present these as an automated paper-trading experiment, never as financial advice.",
+        description: TOOL_DESCRIPTIONS.getAiSuggestions,
         inputSchema: z.object({}),
         execute: async () => {
             await connectToDatabase();
@@ -205,8 +206,7 @@ export const buildTools = (userId: string) => ({
     }),
 
     getPaperPortfolio: tool({
-        description:
-            "Read the user's paper-trading accounts: cash, open positions with unrealised P&L, total value and return since inception, and optionally their recent trades. Call this before answering anything about what they hold, how they're doing, or whether to sell something — positions change, so never answer from memory or from earlier in the conversation. Read-only: you cannot place orders.",
+        description: TOOL_DESCRIPTIONS.getPaperPortfolio,
         inputSchema: z.object({
             account: z.string().optional().describe('Strategy account name, e.g. "AI Navigator". Omit for every account combined.'),
             includeRecentTrades: z.boolean().optional().describe('Set true for "what did I trade", "why is my P&L X", "did I sell Y"'),
@@ -261,7 +261,7 @@ export const buildTools = (userId: string) => ({
     }),
 
     getFollowedTopics: tool({
-        description: "List the news topics the user follows (markets or anything else) with how many articles are new since they last looked, the latest headline and today's AI brief when one exists. Call this first for \"what's new\", \"my topics\", or before reading a topic's feed.",
+        description: TOOL_DESCRIPTIONS.getFollowedTopics,
         inputSchema: z.object({}),
         execute: async () => {
             const overview = await getTopicsOverview(userId);
@@ -281,7 +281,7 @@ export const buildTools = (userId: string) => ({
     }),
 
     getTopicFeed: tool({
-        description: 'Read the newest articles matched to one followed topic. Pass the topic name or slug the way the user said it.',
+        description: TOOL_DESCRIPTIONS.getTopicFeed,
         inputSchema: z.object({
             topic: z.string().describe('Topic name or slug, e.g. "AI chips"'),
             limit: z.number().int().min(1).max(TOPIC_FEED_MAX).optional().describe(`Articles to return (default ${TOPIC_FEED_DEFAULT})`),
@@ -304,7 +304,7 @@ export const buildTools = (userId: string) => ({
     }),
 
     followTopic: tool({
-        description: 'Follow a new news topic for the user — any subject works ("Fed rate decisions", "NBA trade deadline", "AI chips"). Keywords are optional: leave them out unless the user named specific terms to match.',
+        description: TOOL_DESCRIPTIONS.followTopic,
         inputSchema: z.object({
             name: z.string().describe('Topic name, 2–60 characters'),
             keywords: z.array(z.string()).max(MAX_KEYWORDS).optional().describe('Optional match terms, each 2–40 characters'),
@@ -319,7 +319,7 @@ export const buildTools = (userId: string) => ({
     }),
 
     unfollowTopic: tool({
-        description: "Stop following one of the user's topics. Its matched articles disappear from their feed.",
+        description: TOOL_DESCRIPTIONS.unfollowTopic,
         inputSchema: z.object({
             topic: z.string().describe('Topic name or slug'),
         }),

@@ -4,6 +4,7 @@ import type {IncomeRow} from "@/lib/trading/income";
 
 import type {Bar} from "@/lib/prices/signals";
 import type {UniverseKey} from "@/lib/strategies/universe";
+import type {GlossaryKey} from "@/lib/learn/glossary";
 
 export type StrategyId =
     | 'buy-and-hold-spy'
@@ -28,7 +29,9 @@ export type StrategyFamily =
 
 export type SignalFormat = 'price' | 'pct' | 'number' | 'bool' | 'rank' | 'text';
 
-export type SignalColumn = {key: string; label: string; format: SignalFormat; help?: string};
+// `glossary` names the entry that defines the column; `help` is that entry's short text,
+// set in the catalog so the board needs no lookup at render time.
+export type SignalColumn = {key: string; label: string; format: SignalFormat; glossary?: GlossaryKey; help?: string};
 
 export type RowState = 'held' | 'enter' | 'exit' | 'watch' | 'excluded';
 

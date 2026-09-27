@@ -4,7 +4,7 @@ import {getCurrentUserId} from "@/lib/actions/watchlist.actions";
 import {getEasternDateString} from "@/lib/utils";
 import {STRATEGIES_DISCLAIMER} from "@/lib/strategies/catalog";
 import {getStrategyDetail} from "@/lib/strategies/queries";
-import {pickPerfMode, toPerfSeries} from "@/lib/strategies/views";
+import {pickPerfMode, toPerfSeries, visibleSignalColumns} from "@/lib/strategies/views";
 import {UNIVERSES} from "@/lib/strategies/universe";
 import MicroLabel from "@/components/primitives/MicroLabel";
 import Panel from "@/components/primitives/Panel";
@@ -18,6 +18,7 @@ import SignalBoard from "@/components/strategies/SignalBoard";
 import SimulatedTradeList from "@/components/strategies/SimulatedTradeList";
 import StrategyExplainer from "@/components/strategies/StrategyExplainer";
 import StrategyPerformance from "@/components/strategies/StrategyPerformance";
+import WhatTheseMean from "@/components/learn/WhatTheseMean";
 
 type StrategyPageProps = {
     params: Promise<{slug: string}>;
@@ -39,6 +40,8 @@ const StrategyPage = async ({params}: StrategyPageProps) => {
     const liveSeries = analytics?.series ?? [];
     const simulatedSeries = backtest ? toPerfSeries(backtest.points, backtest.benchmark) : [];
     const universeSize = UNIVERSES[def.universe].length;
+    // Only the columns the board actually shows get a definition (a hidden column is not there to explain).
+    const boardTerms = visibleSignalColumns(def.signalColumns, latestRun?.board ?? []).map((column) => column.glossary ?? column.key);
 
     return (
         <div className="space-y-4">
@@ -56,6 +59,7 @@ const StrategyPage = async ({params}: StrategyPageProps) => {
                             {started ? `live since ${liveSince}` : <span className="text-warning">not started</span>}
                         </p>
                         <p className="text-sm text-fg-soft mt-2 max-w-2xl">{def.explainer.summary}</p>
+                        <p className="font-mono text-[11px] text-fg-muted mt-1" id="strategy-beginner-line">In one line: {def.explainer.beginnerLine}</p>
                     </div>
                 </div>
                 <FollowButton slug={def.id} followed={detail.followed} />
@@ -101,7 +105,13 @@ const StrategyPage = async ({params}: StrategyPageProps) => {
                     <LatestDecision
                         run={latestRun}
                         headline={latestRun ? detail.lastActionLine : undefined}
-                        signals={<div id="strategy-signals"><SignalBoard columns={def.signalColumns} run={latestRun} /></div>}
+                        signals={(
+                            <div id="strategy-signals">
+                                <SignalBoard columns={def.signalColumns} run={latestRun} />
+                                {/* A sibling, not a child: #signal-board keeps exactly one disclosure of its own. */}
+                                {latestRun && latestRun.board.length > 0 && <WhatTheseMean id="board-terms" keys={boardTerms} />}
+                            </div>
+                        )}
                     />
                 </Panel>
             </div>

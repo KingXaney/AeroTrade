@@ -1,6 +1,7 @@
 import Link from "next/link";
 import {cn, formatPrice, formatChangePercent, getChangeColorClass} from "@/lib/utils";
 import UnpricedNote from "@/components/trade/UnpricedNote";
+import Term from "@/components/primitives/Term";
 
 // Read-only holdings table — used on the friend profile page (and as the visual base
 // the interactive PositionsTable mirrors on the trade page).
@@ -25,7 +26,7 @@ const PortfolioHoldings = ({positions, emptyText = 'No open positions.', showUnp
                  style={{fontFamily: 'var(--type-mono)', fontSize: '10px', letterSpacing: '0.1em', textTransform: 'uppercase', color: 'var(--fg-muted)'}}>
                 <div>Asset</div>
                 <div className="text-right">Qty</div>
-                <div className="text-right">Avg Cost</div>
+                <div className="text-right"><Term k="avg-cost">Avg Cost</Term></div>
                 <div className="text-right">Price</div>
                 <div className="text-right">Value / P&L</div>
             </div>

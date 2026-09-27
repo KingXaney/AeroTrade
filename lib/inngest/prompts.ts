@@ -21,7 +21,7 @@ IMPORTANT: Do NOT start the personalized content with "Welcome" since the email 
    - Experienced traders → Reference advanced tools/strategy enhancement  
    - Retirement planning → Reference building wealth over time
    - Specific sectors → Reference those exact industries by name
-   - Conservative approach → Reference safety and informed decisions
+   - Conservative approach → Reference patience and understanding a thing before committing to it
    - Aggressive approach → Reference opportunities and growth potential
 
 3. **Personal Touch**: Make it feel like it was written specifically for them:
@@ -43,7 +43,7 @@ CRITICAL FORMATTING REQUIREMENTS:
 Example personalized outputs (showing obvious customization with TWO sentences):
 <p class="mobile-text" style="margin: 0 0 30px 0; font-size: 16px; line-height: 1.6; color: #CCDADC;">Thanks for joining AeroTrade! As someone focused on <strong>technology growth stocks</strong>, follow a topic like AI chips and the daily brief will tell you what changed before the market opens. Paper-trade your ideas with practice money and see how they hold up.</p>
 
-<p class="mobile-text" style="margin: 0 0 30px 0; font-size: 16px; line-height: 1.6; color: #CCDADC;">Great to have you aboard! Perfect for your <strong>conservative retirement strategy</strong> — the news brain reads hundreds of articles a day so you can watch dividend names without the noise. Track a practice portfolio against the S&amp;P 500 and let the numbers build your confidence.</p>
+<p class="mobile-text" style="margin: 0 0 30px 0; font-size: 16px; line-height: 1.6; color: #CCDADC;">Great to have you aboard! Perfect for your <strong>conservative retirement strategy</strong> — the news brain reads hundreds of articles a day so you can follow the companies you already care about without the noise. Track a practice portfolio against the S&amp;P 500 and let the numbers build your confidence.</p>
 
 <p class="mobile-text" style="margin: 0 0 30px 0; font-size: 16px; line-height: 1.6; color: #CCDADC;">You're all set! Since you're new to investing, start with a paper portfolio and a couple of topics in the <strong>healthcare sector</strong> you're interested in. The daily brief explains what moved in plain language, with none of the jargon.</p>`
 
@@ -183,7 +183,7 @@ Stock Market Had Mixed Results Today
 </ul>
 
 <div style="background-color: #141414; border: 1px solid #374151; padding: 15px; border-radius: 6px; margin: 16px 0;">
-<p class="dark-text-secondary" style="margin: 0; font-size: 14px; color: #CCDADC; line-height: 1.4;">💡 <strong style="color: #FDD458;">Bottom Line:</strong> If you own tech stocks, today was good for you. If you're thinking about investing, tech companies might be a smart choice right now.</p>
+<p class="dark-text-secondary" style="margin: 0; font-size: 14px; color: #CCDADC; line-height: 1.4;">💡 <strong style="color: #FDD458;">Bottom Line:</strong> If you own tech stocks, today was good for you. This is what a sector-wide move looks like: the whole group rose together, not one company on its own news.</p>
 </div>
 
 <div style="margin: 20px 0 0 0;">
@@ -213,7 +213,7 @@ Apple Stock Jumped After Great Earnings Report
 </ul>
 
 <div style="background-color: #141414; border: 1px solid #374151; padding: 15px; border-radius: 6px; margin: 16px 0;">
-<p class="dark-text-secondary" style="margin: 0; font-size: 14px; color: #CCDADC; line-height: 1.4;">💡 <strong style="color: #FDD458;">Bottom Line:</strong> Apple is making money in different ways (phones AND services), so it's a pretty safe stock to own even when the economy gets shaky.</p>
+<p class="dark-text-secondary" style="margin: 0; font-size: 14px; color: #CCDADC; line-height: 1.4;">💡 <strong style="color: #FDD458;">Bottom Line:</strong> Apple is making money in different ways (phones AND services), which is what people mean when they call a business diversified: no single product decides its year.</p>
 </div>
 
 <div style="margin: 20px 0 0 0;">

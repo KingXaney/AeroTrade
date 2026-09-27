@@ -6,6 +6,8 @@ import AnalyticsStats, {type AnalyticsStatFields} from "@/components/analytics/A
 import {cn} from "@/lib/utils";
 import type {SeriesStats} from "@/lib/strategies/types";
 import {formatDrawdown, formatPct, roundPct} from "@/lib/strategies/views";
+import Term from "@/components/primitives/Term";
+import WhatTheseMean from "@/components/learn/WhatTheseMean";
 
 // Live and simulated curves side by side but never on one axis: a toggle, and each
 // panel says which basis it shows and how far it reaches.
@@ -29,7 +31,7 @@ export type SimulatedPanel = {
 
 type Mode = 'live' | 'simulated';
 
-const SimStat = ({label, value, className, hint}: {label: string; value: string; className?: string; hint?: string}) => (
+const SimStat = ({label, value, className, hint}: {label: React.ReactNode; value: string; className?: string; hint?: string}) => (
     <div className="flex flex-col gap-1">
         <span className="text-[10px] uppercase tracking-[0.1em] text-fg-muted" style={{fontFamily: 'var(--type-mono)'}}>{label}</span>
         <span className={cn('text-lg font-semibold text-fg', className)} style={{fontFamily: 'var(--type-display)'}}>{value}</span>
@@ -46,13 +48,16 @@ const signClass = (value: number | null): string | undefined => {
 // The backtest's own tiles: annualised figures make sense over three years where the
 // live tiles (a few weeks old) would not.
 const SimulatedStats = ({stats}: {stats: SeriesStats}) => (
-    <div className="glass-panel rounded-xl p-5 grid grid-cols-2 md:grid-cols-6 gap-4" id="simulated-stats">
-        <SimStat label="Total return" value={formatPct(stats.totalReturnPct)} className={signClass(stats.totalReturnPct)} hint="simulated window" />
-        <SimStat label="vs SPY" value={formatPct(stats.excessReturnPct)} className={signClass(stats.excessReturnPct)} hint={`SPY ${formatPct(stats.benchmarkReturnPct)}`} />
-        <SimStat label="CAGR" value={formatPct(stats.cagrPct)} hint="annualised" />
-        <SimStat label="Max drawdown" value={formatDrawdown(stats.maxDrawdownPct)} className={stats.maxDrawdownPct !== null && roundPct(stats.maxDrawdownPct) > 0 ? 'text-negative' : undefined} hint="peak to trough" />
-        <SimStat label="Volatility" value={stats.annualizedVolPct === null ? '—' : `${stats.annualizedVolPct.toFixed(1)}%`} hint="annualised" />
-        <SimStat label="Win rate" value={stats.winRatePct === null ? '—' : `${stats.winRatePct.toFixed(0)}%`} hint={stats.winRatePct === null ? 'no closed trades' : `${stats.wins}W / ${stats.losses}L · ${stats.tradeCount} fills`} />
+    <div className="glass-panel rounded-xl p-5" id="simulated-stats">
+        <div className="grid grid-cols-2 md:grid-cols-6 gap-4">
+        <SimStat label={<Term k="total-return">Total return</Term>} value={formatPct(stats.totalReturnPct)} className={signClass(stats.totalReturnPct)} hint="simulated window" />
+        <SimStat label={<Term k="vs-spy">vs SPY</Term>} value={formatPct(stats.excessReturnPct)} className={signClass(stats.excessReturnPct)} hint={`SPY ${formatPct(stats.benchmarkReturnPct)}`} />
+        <SimStat label={<Term k="cagr">CAGR</Term>} value={formatPct(stats.cagrPct)} hint="annualised" />
+        <SimStat label={<Term k="max-drawdown">Max drawdown</Term>} value={formatDrawdown(stats.maxDrawdownPct)} className={stats.maxDrawdownPct !== null && roundPct(stats.maxDrawdownPct) > 0 ? 'text-negative' : undefined} hint="peak to trough" />
+        <SimStat label={<Term k="volatility">Volatility</Term>} value={stats.annualizedVolPct === null ? '—' : `${stats.annualizedVolPct.toFixed(1)}%`} hint="annualised" />
+        <SimStat label={<Term k="win-rate">Win rate</Term>} value={stats.winRatePct === null ? '—' : `${stats.winRatePct.toFixed(0)}%`} hint={stats.winRatePct === null ? 'no closed trades' : `${stats.wins}W / ${stats.losses}L · ${stats.tradeCount} fills`} />
+        </div>
+        <WhatTheseMean keys={['total-return', 'vs-spy', 'simulated-record', 'cagr', 'max-drawdown', 'volatility', 'win-rate']} />
     </div>
 );
 

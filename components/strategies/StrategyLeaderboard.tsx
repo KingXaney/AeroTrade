@@ -11,6 +11,7 @@ import {
     type StrategyLeaderboardRow,
 } from "@/lib/strategies/views";
 import MicroLabel from "@/components/primitives/MicroLabel";
+import {shortHelp, type GlossaryKey} from "@/lib/learn/glossary";
 import FollowStar from "@/components/strategies/FollowStar";
 import Sparkline from "@/components/strategies/Sparkline";
 
@@ -37,12 +38,12 @@ const CADENCE_LABEL: Record<StrategyLeaderboardRow['cadence'], string> = {
 
 // One source for the header and the cells, so the two cannot drift apart. (They had:
 // the header set its type in an inline style object while the rows used Tailwind.)
-const COLUMNS = [
+const COLUMNS: readonly {key: string; label: string; align: string; glossary?: GlossaryKey}[] = [
     {key: 'name', label: 'Strategy', align: 'text-left'},
-    {key: 'live', label: 'Live return', align: 'text-right'},
-    {key: 'excess', label: 'vs SPY', align: 'text-right'},
-    {key: 'simulated', label: 'Simulated 3y', align: 'text-right'},
-] as const;
+    {key: 'live', label: 'Live return', align: 'text-right', glossary: 'total-return'},
+    {key: 'excess', label: 'vs SPY', align: 'text-right', glossary: 'vs-spy'},
+    {key: 'simulated', label: 'Simulated 3y', align: 'text-right', glossary: 'simulated-record'},
+];
 
 const GRID = 'md:grid-cols-[2.4fr_minmax(9.5rem,1.3fr)_minmax(5rem,0.8fr)_minmax(9.5rem,1.3fr)]';
 
@@ -64,7 +65,7 @@ const StrategyLeaderboard = ({rows, canFollow}: {rows: StrategyLeaderboardRow[];
     return (
         <div data-testid="strategy-leaderboard">
             <div className={cn('hidden md:grid gap-4 px-4 py-2 border-b border-line-strong/30', GRID)}>
-                {COLUMNS.map((c) => <MicroLabel key={c.key} className={c.align}>{c.label}</MicroLabel>)}
+                {COLUMNS.map((c) => <MicroLabel key={c.key} className={c.align} title={c.glossary ? shortHelp(c.glossary) : undefined}>{c.label}</MicroLabel>)}
             </div>
 
             <ul>
