@@ -142,7 +142,7 @@ const StrategyPerformance = ({name, live, simulated, initialMode}: {name: string
                 )}
             </div>
 
-            {showingLive && live && <AnalyticsStats analytics={live.stats} />}
+            {showingLive && live && <AnalyticsStats analytics={live.stats} definitions />}
             {!showingLive && simulated && <SimulatedStats stats={simulated.stats} />}
         </section>
     );

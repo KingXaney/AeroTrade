@@ -28,7 +28,10 @@ const Stat = ({label, value, valueClass, hint}: {label: ReactNode; value: string
 export type AnalyticsStatFields = Pick<AccountAnalytics, 'maxDrawdownPct' | 'winRatePct' | 'wins' | 'losses' | 'realizedPnl' | 'tradeCount'>
     & Partial<Pick<AccountAnalytics, 'income'>>;
 
-const AnalyticsStats = ({analytics, tradesHint = 'Buys + sells, all time'}: {analytics: AnalyticsStatFields; tradesHint?: string}) => {
+// `definitions` opts a page into the panel's "What these mean" disclosure. The dashboard
+// widget that mounts these tiles never passes it: the disclosure carries "Ask in chat"
+// links, which invariant 12 keeps off widgets. The Term titles stay either way.
+const AnalyticsStats = ({analytics, tradesHint = 'Buys + sells, all time', definitions = false}: {analytics: AnalyticsStatFields; tradesHint?: string; definitions?: boolean}) => {
     const {maxDrawdownPct, winRatePct, wins, losses, realizedPnl, tradeCount, income} = analytics;
     const realizedClass = getChangeColorClass(realizedPnl || undefined);
     const earned = income ? income.interest + income.dividends : 0;
@@ -70,7 +73,7 @@ const AnalyticsStats = ({analytics, tradesHint = 'Buys + sells, all time'}: {ana
                 hint={tradesHint}
             />
             </div>
-            <WhatTheseMean keys={['max-drawdown', 'win-rate', 'realized-pnl', ...(income ? ['income'] : []), 'trades']} />
+            {definitions && <WhatTheseMean keys={['max-drawdown', 'win-rate', 'realized-pnl', ...(income ? ['income'] : []), 'trades']} />}
         </div>
     );
 };

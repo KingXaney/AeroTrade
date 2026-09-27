@@ -339,7 +339,7 @@ export const STRATEGIES: readonly StrategyDefinition[] = [
             ],
             why: [
                 'The low-volatility anomaly: boring stocks have delivered similar or better returns than exciting ones with much less drawdown, contrary to the textbook risk-return trade-off.',
-                'Leverage constraints and lottery-seeking push investors toward volatile names, leaving calm ones underpriced.',
+                'Leverage constraints and lottery-seeking push investors toward volatile names, leaving calm ones with less demand than their record would suggest.',
             ],
             fails: [
                 'It trails badly in strong bull markets and sharp rebounds, when the most volatile names lead.',

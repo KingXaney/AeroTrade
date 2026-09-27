@@ -79,7 +79,7 @@ const toRunView = (run: LeanRun): StrategyRunView => ({
 // The latest run per strategy in one query. Reads and groups every run document for
 // the strategies named (boards included), so it belongs on a detail page, never on a
 // request path that fans out over all eight.
-export const getLatestRuns = async (strategyIds: readonly string[]): Promise<Map<string, StrategyRunView>> => {
+const getLatestRuns = async (strategyIds: readonly string[]): Promise<Map<string, StrategyRunView>> => {
     const rows = await StrategyRun.aggregate<LeanRun>([
         {$match: {strategyId: {$in: [...strategyIds]}}},
         {$sort: {date: -1}},
@@ -87,13 +87,6 @@ export const getLatestRuns = async (strategyIds: readonly string[]): Promise<Map
         {$replaceRoot: {newRoot: '$doc'}},
     ]);
     return new Map(rows.map((r) => [r.strategyId, toRunView(r)]));
-};
-
-// One run by date — an index seek on {strategyId, date}.
-export const getRunForDate = async (strategyId: string, date: string): Promise<StrategyRunView | null> => {
-    await connectToDatabase();
-    const run = await StrategyRun.findOne({strategyId, date}).lean<LeanRun | null>();
-    return run ? toRunView(run) : null;
 };
 
 type LeanReplay = {date: string; asOf: string; board?: SignalRow[]; orders?: LeanRun['orders']};

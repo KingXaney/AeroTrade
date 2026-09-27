@@ -133,16 +133,17 @@ Unit tests cover the pure modules — the layout engine, theme tokens, news aggr
 ## Project structure
 
 ```
-app/            routes: (auth) sign-in/up · (root) dashboard, topics, brain, strategies, strategies/[slug], trade, portfolio, markets, news, watchlist, friends, history, settings · api/{chat,inngest,accounts}
+app/            routes: (auth) sign-in/up · (root) dashboard, topics, brain, strategies, strategies/[slug], trade, portfolio, markets, news, watchlist, friends, history, learn, settings · api/{chat,inngest,accounts}
 components/     UI by feature: dashboard (widget grid + 33 widgets), topics, brain, strategies, trade, analytics, settings, chat, theme, ui (shadcn)
 lib/
   news/         source adapters (Finnhub, RSS, Reddit, SEC, Google News search), dedupe, HTML sanitiser
   brain/        extraction prompts + parsing, entity graph update with dual-timescale decay, queries, second opinion
   navigator/    universe eligibility, composite scoring, allocation rails, order planning
   strategies/   the quant strategies: catalog + rules, indicators, calendar, rebalancer, engine, simulator, job + page reads
-  prices/       daily bars (Yahoo first, Stooq fallback), momentum/vol signals, the NYSE calendar
+  prices/       daily bars (Yahoo first, Stooq fallback), dividends + the T-bill rate, momentum/vol signals, the NYSE calendar
   topics/       keyword normalisation, matcher, search query builder, refresh, briefs, digest section
-  trading/      paper accounts, orders, portfolio maths, analytics, snapshots
+  trading/      paper accounts, orders, portfolio maths, analytics, snapshots, interest + dividends (income)
+  learn/        the glossary (every metric, concept and rail), the no-advice word list, learner copy, missions / verdict / replay
   dashboard/    widget registry, layout normalisation + legacy migration, loaders
   theme/        palettes, styles, token generation
   ai/           model matrix by task and tier, chat tools, system prompt

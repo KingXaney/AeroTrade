@@ -100,7 +100,7 @@ const StrategyPage = async ({params}: StrategyPageProps) => {
 
             <StrategyExplainer def={def} lastRebalanceDate={state?.lastRebalanceDate ?? null} defaultOpen={!started} />
 
-            {analytics && <AccountSummary portfolio={analytics.summary} />}
+            {analytics && <AccountSummary portfolio={analytics.summary} definitions />}
 
             <StrategyPerformance
                 name={def.name}

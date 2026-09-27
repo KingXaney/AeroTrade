@@ -20,7 +20,9 @@ const Stat = ({label, value, valueClass, hint}: {label: ReactNode; value: string
 
 // Income is optional: the aggregated dashboard and a friend's page show the headline numbers
 // only; the account's own page says where part of the return came from.
-const AccountSummary = ({portfolio, income}: {portfolio: PortfolioSummary; income?: AccountIncomeSummary}) => {
+// `definitions` opts a page into the "What these mean" disclosure; the account-summary
+// widget never passes it (its "Ask in chat" links stay off the dashboard, invariant 12).
+const AccountSummary = ({portfolio, income, definitions = false}: {portfolio: PortfolioSummary; income?: AccountIncomeSummary; definitions?: boolean}) => {
     const earned = income ? income.interest + income.dividends : 0;
     const returnHint = income && earned > 0
         ? `incl. ${formatPrice(income.interest)} interest · ${formatPrice(income.dividends)} dividends`
@@ -46,10 +48,12 @@ const AccountSummary = ({portfolio, income}: {portfolio: PortfolioSummary; incom
             {/* Net worth and total return both include the at-cost fallback, so the
                 headline numbers are only as live as the note says. */}
             <UnpricedNote positions={portfolio.positions} className="mt-3" />
-            <WhatTheseMean keys={[
-                'net-worth', 'total-return', ...(returnHint ? ['income'] : []),
-                'buying-power', ...(cashHint ? ['apy'] : []), 'holdings-value',
-            ]} />
+            {definitions && (
+                <WhatTheseMean keys={[
+                    'net-worth', 'total-return', ...(returnHint ? ['income'] : []),
+                    'buying-power', ...(cashHint ? ['apy'] : []), 'holdings-value',
+                ]} />
+            )}
         </div>
     );
 };

@@ -78,6 +78,14 @@ try {
     await page.goto(`${BASE}/settings`, {waitUntil: 'load'});
     await page.locator('#dashboard').waitFor({timeout: 30000});
     check('…and the settings editor agrees', !/First week/.test(await page.locator('#dashboard').innerText()));
+    // The two widgets that reuse page panels carrying a "What these mean" disclosure: on the
+    // dashboard they keep their Term titles but get neither the disclosure nor its "Ask in
+    // chat" links (invariant 12). Neither is in the default layout, so put them there.
+    await db.collection('userpreferences').updateOne({userId: userA}, {$set: {dashboardLayout: {version: 1, widgets: [{id: 'account-summary', span: 12}, {id: 'analytics-stats', span: 12}]}, updatedAt: new Date()}}, {upsert: true});
+    await page.goto(`${BASE}/`, {waitUntil: 'load'});
+    await page.locator('[data-widget-id="account-summary"] [data-term]').first().waitFor({timeout: 30000});
+    check('the account-summary widget keeps its Term titles', await page.locator('[data-widget-id="account-summary"] [data-term]').count() >= 4);
+    check('no "What these mean" disclosure on any dashboard widget', await page.locator('[data-widget-id] [data-what-these-mean]').count() === 0);
     check('no "Ask in chat" link on any dashboard widget', await page.locator('[data-widget-id] [data-ask]').count() === 0);
 
     // --- user B: age cap and the one-time hide ----------------------------------------

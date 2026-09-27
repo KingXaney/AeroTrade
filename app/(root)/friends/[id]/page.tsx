@@ -47,7 +47,7 @@ const FriendProfilePage = async ({params}: FriendProfilePageProps) => {
                     Best strategy · <span className="text-fg">{profile.accountName}</span>
                 </span>
             </div>
-            <AccountSummary portfolio={profile.portfolio} />
+            <AccountSummary portfolio={profile.portfolio} definitions />
 
             {/* All strategies at a glance */}
             {profile.accounts.length > 1 && (

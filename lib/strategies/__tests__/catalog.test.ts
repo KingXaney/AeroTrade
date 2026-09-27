@@ -75,7 +75,7 @@ describe('STRATEGIES', () => {
         }
     });
 
-    it('discloses total-return signals on dual momentum and the dividend gap on buy and hold', () => {
+    it('discloses total-return signals on dual momentum and the reinvestment gap on buy and hold', () => {
         const gem = strategyBySlug('dual-momentum');
         expect(gem?.explainer.caveats.some((line) => /total return/i.test(line))).toBe(true);
         const spy = strategyBySlug('buy-and-hold-spy');
@@ -89,6 +89,19 @@ describe('STRATEGIES', () => {
             expect(caveats).toMatch(/whole shares/);
             expect(caveats).toMatch(/dividends/);
             expect(caveats).toMatch(/slippage/);
+            for (const line of def.explainer.caveats) {
+                expect(findBanned(line, 'copy'), `${def.id} caveat`).toEqual([]);
+            }
+        }
+    });
+
+    // The explainer narrates what a rule does and why it has worked; it may name a
+    // mechanism but never pass a verdict on a stock (the 'advice' tier).
+    it('explains every rule without a verdict on any stock', () => {
+        for (const def of STRATEGIES) {
+            const {explainer} = def;
+            const prose = [explainer.summary, explainer.watching, explainer.cashReason, ...explainer.how, ...explainer.why, ...explainer.fails].join(' ');
+            expect(findBanned(prose, 'advice'), def.id).toEqual([]);
         }
     });
 

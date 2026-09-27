@@ -1,10 +1,10 @@
-import type {IncomeRow} from "@/lib/trading/income";
 // Every shape the strategy engine, the rules, the simulator and the pages share.
 // Dependency-free on purpose: nothing here imports a rule, the engine or the DB.
 
 import type {Bar} from "@/lib/prices/signals";
 import type {UniverseKey} from "@/lib/strategies/universe";
 import type {GlossaryKey} from "@/lib/learn/glossary";
+import type {IncomeRow} from "@/lib/trading/income";
 
 export type StrategyId =
     | 'buy-and-hold-spy'
