@@ -67,6 +67,13 @@ try {
     check('trade history symbols link to the stock page', await page.locator('a[href="/stocks/AAPL"]').count() >= 2);
     check('an AI-placed trade carries a chip; user and legacy rows do not', await page.getByText('AI suggestion', {exact: true}).count() === 1);
     check('strategy comparison renders both accounts', await page.getByRole('button', {name: /Value/}).count() >= 1);
+    // The sell dialog's realized-result line reads '—' without a quote.
+    await page.getByRole('button', {name: /^Sell$/}).first().click();
+    const sellEst = page.locator('[data-testid="sell-est-pnl"]');
+    await sellEst.waitFor({timeout: 15000}).catch(() => {});
+    check('the sell dialog shows an unknown realized result without a quote', await sellEst.count() === 1 && /—/.test(await sellEst.innerText()));
+    await page.keyboard.press('Escape');
+    await page.waitForTimeout(300);
     await shot('01-portfolio');
 
     await page.setViewportSize({width: 390, height: 844});
@@ -115,6 +122,7 @@ try {
     const ticket = page.locator('form').first();
     check('Buy side shows buying power', /Buying Power \$97,000\.00/.test(await ticket.innerText()));
     check('an unknown price never disables Submit', !(await page.getByRole('button', {name: 'Buy AAPL'}).isDisabled()));
+    check('with no quote the buy side states no consequence', await page.locator('[data-testid="order-effect"]').count() === 0);
 
     await page.getByRole('button', {name: 'sell', exact: true}).click();
     check('Sell side says how many shares are owned', /You own 10 shares of AAPL/.test(await ticket.innerText()));
@@ -126,6 +134,14 @@ try {
         await page.getByRole('alert').filter({hasText: 'You only own 10 shares'}).count() === 1 && await page.getByRole('button', {name: 'Sell AAPL'}).isDisabled());
     await page.locator('#order-shares').fill('5');
     check('a sell within the position is allowed', !(await page.getByRole('button', {name: 'Sell AAPL'}).isDisabled()));
+    check('the sell side states the shares left', /5 of 10 shares · 5 left/.test(await page.locator('[data-testid="order-effect"]').innerText()));
+    // The queue line appears only while the NYSE session is closed (Mon–Fri 9:30–16:00 ET; holidays are rare enough to ignore here).
+    const et = new Date(new Date().toLocaleString('en-US', {timeZone: 'America/New_York'}));
+    const etMinutes = et.getHours() * 60 + et.getMinutes();
+    const closed = et.getDay() === 0 || et.getDay() === 6 || etMinutes < 570 || etMinutes >= 960;
+    const queue = page.locator('[data-testid="order-queue"]');
+    check('the ticket says when a real broker would fill, only while closed',
+        closed ? (await queue.count() === 1 && /queue this to/.test(await queue.innerText())) : await queue.count() === 0, `closed=${closed}`);
     await shot('03-ticket-sell');
 
     // Enter in the shares field submits; with no quote provider the server refuses, which
@@ -166,6 +182,7 @@ try {
     await widget.locator('#order-symbol').press('Enter');
     await page.waitForTimeout(1500);
     check('the dashboard widget never navigates to /trade', new URL(page.url()).pathname === '/', page.url());
+    check('the dashboard ticket keeps the queue line and definitions off', await widget.locator('[data-testid="order-queue"]').count() === 0 && await widget.locator('[data-what-these-mean]').count() === 0);
 
     // --- brain drill-downs --------------------------------------------------------------
     await page.goto(`${BASE}/brain`, {waitUntil: 'domcontentloaded'});

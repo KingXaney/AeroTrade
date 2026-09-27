@@ -12,5 +12,6 @@ status line pointing at the commit that shipped them.
 | [Quant strategies](specs/2026-09-21-quant-strategies.md) | Eight classic quant strategies paper-traded live by deterministic rules with a simulated warm-up: engine, catalog, daily job, Yahoo-first price bars, /strategies pages and widget | Implemented — `4ea3fa0` |
 | [Default topics](specs/2026-09-25-default-topics.md) | Six topics seeded at sign-up instead of a setup wall, the once-only `topicsSeededAt` marker, and followed topics folded into /news, the news widget and /history | Implemented |
 | [Brokerage income](specs/2026-09-25-brokerage-income.md) | Interest on idle cash at the 13-week T-bill rate, real dividends inferred from adjclose, SPY total-return benchmark — every account including the strategies' backtests, back-credited from inception | Implemented |
+| [Learn](specs/2026-09-27-learn.md) | The app teaches from its own data: a glossary behind every number, a no-advice word list every prompt and sentence is held to, a First-week checklist, /learn, Guess the Verdict, "What the rule saw", a rate-limited chat tutor with "Ask in chat", and an order ticket that states its consequences | Wave 1 implemented |
 
 `screenshots/` holds the images used by the README, captured with `scripts/qa/screenshots.mjs`.

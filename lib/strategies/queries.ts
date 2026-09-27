@@ -83,7 +83,7 @@ export const getLatestRuns = async (strategyIds: readonly string[]): Promise<Map
     const rows = await StrategyRun.aggregate<LeanRun>([
         {$match: {strategyId: {$in: [...strategyIds]}}},
         {$sort: {date: -1}},
-        {$group: {_id: '$strategyId', doc: {$first: '$ROOT'}}},
+        {$group: {_id: '$strategyId', doc: {$first: '$$ROOT'}}},
         {$replaceRoot: {newRoot: '$doc'}},
     ]);
     return new Map(rows.map((r) => [r.strategyId, toRunView(r)]));
@@ -114,8 +114,8 @@ export const getBoardRowsForFills = async (
             _id: 0,
             date: 1,
             asOf: 1,
-            board: {$filter: {input: '$board', as: 'row', cond: {$in: ['$row.symbol', symbols]}}},
-            orders: {$filter: {input: '$orders', as: 'o', cond: {$in: ['$o.symbol', symbols]}}},
+            board: {$filter: {input: '$board', as: 'row', cond: {$in: ['$$row.symbol', symbols]}}},
+            orders: {$filter: {input: '$orders', as: 'o', cond: {$in: ['$$o.symbol', symbols]}}},
         }},
     ]);
     return Object.fromEntries(rows.map((r) => [r.date, {

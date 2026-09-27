@@ -48,11 +48,20 @@ try {
     // --- no phantom scroll on the pages that carried a doubled min-h-screen -----
     for (const path of ['/', '/portfolio', '/settings', '/brain', '/strategies', '/markets']) {
         await page.goto(`${BASE}${path}`, {waitUntil: 'networkidle'}).catch(() => {});
-        const overflow = await page.evaluate(() =>
-            document.documentElement.scrollHeight - window.innerHeight);
-        // Real content can legitimately scroll; the bug was a fixed ~112px on short pages.
-        check(`${path} has no 112px phantom scroll`, overflow < 100 || overflow > 160,
-            `overflow ${overflow}px`);
+        // The bug was a doubled min-h-screen: scrollable space with nothing in it. So
+        // measure the gap between the document's scroll height and the bottom of the
+        // lowest rendered element, not the scroll height itself — real content can land
+        // at any height.
+        const phantom = await page.evaluate(() => {
+            let bottom = 0;
+            for (const el of document.body.querySelectorAll('*')) {
+                if (getComputedStyle(el).position === 'fixed') continue;
+                const r = el.getBoundingClientRect();
+                if (r.height > 0) bottom = Math.max(bottom, r.bottom + window.scrollY);
+            }
+            return document.documentElement.scrollHeight - bottom;
+        });
+        check(`${path} has no phantom scroll below its content`, phantom < 100, `${Math.round(phantom)}px of empty scroll`);
     }
 
     // --- focus ring on a hand-rolled input (the order ticket) ------------------

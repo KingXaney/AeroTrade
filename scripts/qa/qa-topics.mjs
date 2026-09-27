@@ -85,8 +85,8 @@ const settleToasts = async (page) => {
     check('sidebar topics card shows the six followed topics', /6\s*topics\s*followed/i.test(sideCard), sideCard);
     const sideNav = await page.$$eval('aside nav a', (as) => as.map((a) => a.textContent.trim()));
     check('sidebar nav starts Topics · Dashboard · Brain', sideNav.join(',').startsWith('interestsTopics,space_dashboardDashboard,neurologyBrain'), sideNav.join(','));
-    // The sidebar is the surface that owns the account pages; all eleven come from lib/navigation.ts.
-    check('sidebar nav lists all twelve routes', sideNav.length === 12, String(sideNav.length));
+    // The sidebar is the surface that owns the account pages; all thirteen come from lib/navigation.ts.
+    check('sidebar nav lists all thirteen routes', sideNav.length === 13, String(sideNav.length));
     const headerHrefs = await page.$$eval('header nav ul li a', (as) => as.map((a) => a.getAttribute('href')));
     check('header nav order', headerHrefs.join(',') === '/topics,/,/brain,/strategies,/portfolio,/trade,/markets,/news', headerHrefs.join(','));
     // Search is a palette trigger, not a route — it used to be a fake '/search' NAV_ITEMS entry.
@@ -236,6 +236,7 @@ const settleToasts = async (page) => {
         await chatBtn.click();
         await page.waitForTimeout(700);
         check('chat suggestions mention topics', /What's new in my topics\?/.test(await page.locator('body').innerText()));
+        check('chat offers no stock tip', !/NVDA|should I/i.test(await page.locator('[role="dialog"][aria-label="AeroTrade assistant"]').innerText()));
     } else {
         note('chat', 'no chat launcher button found by aria-label');
     }

@@ -24,6 +24,7 @@ product tour and docs/specs/ for the design documents behind the larger features
 - `lib/news` ingest + sanitise + the per-user feed (`feed-prefs` client-safe, `feed` pure, `feed-store` server) · `lib/brain` entity graph · `lib/navigator` allocation rails · `lib/topics` followed topics (`starters` the curated set, `seed` what a new account gets, `insert` the one write path)
 - `lib/trading` paper accounts (`income` the accrual convention, `income-store` the nightly credit) · `lib/prices` bars, dividends, the T-bill rate, the SPY total-return index · `lib/dashboard` widget registry/layout · `lib/theme` palettes/styles · `lib/ai` models + chat tools
 - `lib/strategies` the quant strategies: pure catalog/rules/engine/simulator (one `runStrategyDay` for live and backtest), `store`/`queries` server side · `lib/prices` daily bars (Yahoo first, Stooq fallback), signals, NYSE calendar
+- `lib/learn` what the app teaches: `glossary` (every metric, news concept and rail, pure and client-safe), `banned` (the one no-advice word list), `copy/<feature>` (every learner-facing sentence, as pure exports), `missions` / `verdict` / `replay` pure, `facts-store` the server reads · `components/learn/` the `WhatTheseMean` disclosure · `components/primitives/Term`
 - `lib/inngest/functions.ts` every scheduled job · `database/models/` Mongoose models · `types/global.d.ts` ambient domain types
 
 ## Invariants — keep these true
@@ -64,6 +65,19 @@ product tour and docs/specs/ for the design documents behind the larger features
    `PaperTrade`. Missing rate or dividend data holds the `incomeThrough` watermark back; it must never
    become a zero. Dividends are inferred from adjclose inside ONE Yahoo payload and stored — stored
    adjcloses are never compared across fetches (Yahoo rebases them on every distribution).
+12. The app teaches by describing, never by advising, and it does so from one registry. Every
+   learner-facing sentence is a pure export under `lib/learn/copy/` (components render it, never
+   inline prose) and its test calls `findBanned` from `lib/learn/banned.ts` — the same list the chat
+   chips, tool descriptions and model prompts are held to (a clause beginning "Never"/"No"/"Don't"
+   is a prohibition, not advice). Definitions come from `lib/learn/glossary.ts` only: a label carries
+   `title=` via `<Term>`, a panel has at most one collapsed `<WhatTheseMean>` listing only the terms it
+   shows, an automated fill has exactly one "What the rule saw" disclosure, and the chat's "Ask in
+   chat" link lives only inside those two — never as a per-row icon, never on a dashboard widget.
+   `beginnerLine` renders in the strategy detail header and the wide quant-strategies widget, nowhere
+   else. Learn surfaces self-limit from rows plus stamp-once fields in the no-default `learn`
+   preference sub-schema (no learner flag), and read with bounded queries — no board-carrying
+   aggregate on a request path. `#signal-board` keeps exactly one `<details>` of its own; new
+   disclosures are siblings inside `#strategy-signals`.
 
 ## Next.js 16
 
