@@ -21,6 +21,8 @@ import TopicsOverview from "@/components/dashboard/widgets/TopicsOverview";
 import TopicsLatest from "@/components/dashboard/widgets/TopicsLatest";
 import TopicBriefsList from "@/components/dashboard/widgets/TopicBriefsList";
 import TopicsWidgetEmpty from "@/components/dashboard/widgets/TopicsWidgetEmpty";
+import GettingStarted from "@/components/dashboard/widgets/GettingStarted";
+import {deriveMissions} from "@/lib/learn/missions";
 import AccountSummary from "@/components/trade/AccountSummary";
 import OpenPositionsStrip from "@/components/trade/OpenPositionsStrip";
 import TradeHistory from "@/components/trade/TradeHistory";
@@ -103,6 +105,7 @@ export const WIDGET_RENDERERS: Record<WidgetId, Renderer> = {
     )),
     'topics-latest': (r) => <Suspense fallback={skeleton('topics-latest', 4)}><TopicsLatestAsync ctx={r.ctx} span={r.span} /></Suspense>,
     'topic-briefs': (r) => need(r, 'topicsOverview', (o) => <TopicBriefsList overview={o} />),
+    'getting-started': (r) => need(r, 'learnFacts', (f) => <GettingStarted missions={deriveMissions(f)} />),
     'portfolio-snapshot': (r) => need(r, 'portfolios', (p) => <PortfolioSnapshot portfolio={aggregatePortfolios(p)} best={bestStrategy(p)} />),
     'watchlist-movers': (r) => <Suspense fallback={skeleton('watchlist-movers', 4)}><WatchlistMoversAsync ctx={r.ctx} /></Suspense>,
     'friends-rank': (r) => need(r, 'leaderboard', (l) => <FriendsRank leaderboard={l} />),

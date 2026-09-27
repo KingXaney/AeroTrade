@@ -98,7 +98,7 @@ const settleToasts = async (page) => {
     await page.goto(`${BASE}/`, {waitUntil: 'load'});
     await page.waitForTimeout(2500);
     const order = await widgetOrder();
-    check('default layout is topics-first', order.join(',') === 'topics-overview,portfolio-snapshot,watchlist-movers,topics-latest,friends-rank,news-brain-tile,tv-heatmap,tv-top-stories', order.join(','));
+    check('default layout is checklist-then-topics', order.join(',') === 'getting-started,topics-overview,portfolio-snapshot,watchlist-movers,topics-latest,friends-rank,news-brain-tile,tv-heatmap,tv-top-stories', order.join(','));
     check('topics-overview lists the topic', /AI chips/i.test(await page.locator('[data-widget-id="topics-overview"]').innerText()));
     await shot('03-dashboard');
 

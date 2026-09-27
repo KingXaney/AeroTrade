@@ -16,13 +16,14 @@ export type WidgetSpan = (typeof WIDGET_SPANS)[number];
 
 export const SPAN_LABELS: Record<WidgetSpan, string> = {3: 'XS', 4: 'S', 6: 'M', 8: 'L', 12: 'XL'};
 
-export type WidgetCategory = 'topics' | 'personal' | 'markets' | 'strategy' | 'social' | 'brain' | 'tools';
+export type WidgetCategory = 'topics' | 'learn' | 'personal' | 'markets' | 'strategy' | 'social' | 'brain' | 'tools';
 
 // Library grouping order; WIDGET_IDS below is kept in this order too.
-export const CATEGORY_ORDER: readonly WidgetCategory[] = ['topics', 'personal', 'markets', 'strategy', 'social', 'brain', 'tools'];
+export const CATEGORY_ORDER: readonly WidgetCategory[] = ['topics', 'learn', 'personal', 'markets', 'strategy', 'social', 'brain', 'tools'];
 
 export const CATEGORY_LABELS: Record<WidgetCategory, string> = {
     topics: 'Topics',
+    learn: 'Learn',
     personal: 'Personal',
     markets: 'Markets',
     strategy: 'Strategy',
@@ -51,6 +52,7 @@ export const DATA_KEYS = [
     'topicsOverview',
     'topicsLatest',
     'strategies',
+    'learnFacts',
 ] as const;
 export type DataKey = (typeof DATA_KEYS)[number];
 
@@ -76,6 +78,7 @@ export const DATA_KEY_DEPS: Record<DataKey, readonly DataKey[]> = {
     topicsOverview: [],
     topicsLatest: [],
     strategies: [],
+    learnFacts: [],
 };
 
 // Streamed under <Suspense> because they are slow or fan out to third parties;
@@ -87,11 +90,15 @@ export const LAZY_DATA_KEYS: readonly DataKey[] = ['movers', 'news', 'analytics'
 // component already draws its own glass-panel.
 export type WidgetChrome = 'link' | 'panel' | 'panel-lg' | 'panel-sm' | 'bare';
 
-export type WidgetAvailability = 'always' | 'multiAccount' | 'advanced';
+// 'onboarding' = the First-week checklist: shown while lib/learn/missions.ts says the
+// account is still in its first month with missions left, gone afterwards.
+export type WidgetAvailability = 'always' | 'multiAccount' | 'advanced' | 'onboarding';
 
 export type AvailabilityContext = {
     accountCount: number;
     advanced: boolean;
+    // Absent reads as false: a caller that has not computed it never shows the checklist.
+    onboarding?: boolean;
 };
 
 export type WidgetDefinition = {
@@ -119,6 +126,8 @@ export const WIDGET_IDS = [
     'topics-overview',
     'topics-latest',
     'topic-briefs',
+    // learn
+    'getting-started',
     // personal
     'portfolio-snapshot',
     'watchlist-movers',
@@ -209,6 +218,21 @@ export const WIDGETS: {readonly [K in WidgetId]: WidgetDefinition & {id: K}} = {
         defaultSpan: 6,
         minHeight: 240,
         dataKeys: ['topicsOverview'],
+        isNew: true,
+    }),
+
+    // --- Learn ---
+    'getting-started': define({
+        id: 'getting-started',
+        title: 'First week',
+        description: 'Five things to do in your first week, each with a 60-second lesson. It leaves on its own once they are done.',
+        category: 'learn',
+        icon: 'flag',
+        spans: [8, 12],
+        defaultSpan: 12,
+        minHeight: 150,
+        dataKeys: ['learnFacts'],
+        availability: 'onboarding',
         isNew: true,
     }),
 
@@ -602,6 +626,8 @@ export const isWidgetAvailable = (def: WidgetDefinition, ctx: AvailabilityContex
             return ctx.accountCount > 1;
         case 'advanced':
             return ctx.advanced;
+        case 'onboarding':
+            return ctx.onboarding ?? false;
     }
 };
 

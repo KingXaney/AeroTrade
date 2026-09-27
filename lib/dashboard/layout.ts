@@ -49,10 +49,12 @@ export const LEGACY_DEFAULT_LAYOUT_V1: DashboardLayout = {
     ],
 };
 
-// Topics first, then the personal strip, then markets.
+// The First-week checklist leads (it filters itself out once done), then topics, the
+// personal strip and markets.
 export const DEFAULT_LAYOUT: DashboardLayout = {
     version: LAYOUT_VERSION,
     widgets: [
+        {id: 'getting-started', span: 12},
         {id: 'topics-overview', span: 4},
         {id: 'portfolio-snapshot', span: 4},
         {id: 'watchlist-movers', span: 4},

@@ -15,6 +15,8 @@ import {getDashboardLayoutForUser} from "@/lib/dashboard/layout-store";
 import {filterAvailable} from "@/lib/dashboard/layout";
 import {getPortfoliosForUser} from "@/lib/trading/account";
 import {WIDGET_IDS, WIDGETS, isWidgetAvailable} from "@/lib/dashboard/widgets";
+import {getOnboardingFacts} from "@/lib/learn/facts-store";
+import {onboardingActive} from "@/lib/learn/missions";
 
 const SECTIONS = [
     {id: 'topics', label: 'Topics', icon: 'interests'},
@@ -30,14 +32,15 @@ const SettingsPage = async () => {
     if (!session?.user) redirect('/sign-in');
     const user: User = {id: session.user.id, name: session.user.name, email: session.user.email};
 
-    const [notifications, layout, portfolios, topics, newsFeed] = await Promise.all([
+    const [notifications, layout, portfolios, topics, newsFeed, facts] = await Promise.all([
         getNotificationPreferences(),
         getDashboardLayoutForUser(user.id),
         getPortfoliosForUser(user.id),
         getCachedTopicsOverview(user.id),
         getNewsFeedPrefs(user.id),
+        getOnboardingFacts(user.id),
     ]);
-    const availability = {accountCount: portfolios.length, advanced: true};
+    const availability = {accountCount: portfolios.length, advanced: true, onboarding: onboardingActive(facts)};
     const availableIds = WIDGET_IDS.filter((id) => isWidgetAvailable(WIDGETS[id], availability));
     const visibleLayout = filterAvailable(layout, availability);   // same view as the dashboard
 

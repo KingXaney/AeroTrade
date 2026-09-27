@@ -29,7 +29,7 @@ Follow the topics you care about, test trading strategies with virtual money, an
 
 **A second opinion, a chat advisor, and a digest.** Claude can critique the brain's current picture; a tool-using chat assistant (15 tools) answers "what's new in my topics?" or "what does max drawdown mean?"; a daily email summarises the market for each user, personalised to their holdings, with links allow-listed to the actual articles.
 
-**Make it yours.** 12 colour palettes × 5 visual styles (minimal, futuristic, liquid glass, brutalist, soft), saved per account and rendered without a flash. A 32-widget dashboard you can drag, resize and extend.
+**Make it yours.** 12 colour palettes × 5 visual styles (minimal, futuristic, liquid glass, brutalist, soft), saved per account and rendered without a flash. A 33-widget dashboard you can drag, resize and extend.
 
 <div align="center">
 <img src="docs/screenshots/topic-ai-chips.png" alt="A followed topic: keyword chips, refresh, matched articles" width="440"> <img src="docs/screenshots/trade.png" alt="Trade desk: price chart and paper order entry and paper order entry" width="440">
@@ -132,7 +132,7 @@ Unit tests cover the pure modules — the layout engine, theme tokens, news aggr
 
 ```
 app/            routes: (auth) sign-in/up · (root) dashboard, topics, brain, strategies, strategies/[slug], trade, portfolio, markets, news, watchlist, friends, history, settings · api/{chat,inngest,accounts}
-components/     UI by feature: dashboard (widget grid + 32 widgets), topics, brain, strategies, trade, analytics, settings, chat, theme, ui (shadcn)
+components/     UI by feature: dashboard (widget grid + 33 widgets), topics, brain, strategies, trade, analytics, settings, chat, theme, ui (shadcn)
 lib/
   news/         source adapters (Finnhub, RSS, Reddit, SEC, Google News search), dedupe, HTML sanitiser
   brain/        extraction prompts + parsing, entity graph update with dual-timescale decay, queries, second opinion

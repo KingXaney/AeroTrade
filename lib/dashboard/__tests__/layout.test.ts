@@ -37,10 +37,11 @@ describe('constants', () => {
         expect(MAX_WIDGETS).toBe(24);
     });
 
-    it('DEFAULT_LAYOUT is the topics-first dashboard', () => {
+    it('DEFAULT_LAYOUT is the checklist-then-topics dashboard', () => {
         expect(DEFAULT_LAYOUT).toEqual({
             version: 1,
             widgets: [
+                {id: 'getting-started', span: 12},
                 {id: 'topics-overview', span: 4},
                 {id: 'portfolio-snapshot', span: 4},
                 {id: 'watchlist-movers', span: 4},
@@ -246,7 +247,9 @@ describe('filterAvailable', () => {
 
     it('returns the same reference when nothing is removed', () => {
         expect(filterAvailable(mixed, {accountCount: 2, advanced: true})).toBe(mixed);
-        expect(filterAvailable(DEFAULT_LAYOUT, {accountCount: 0, advanced: false})).toBe(DEFAULT_LAYOUT);
+        // The default holds the checklist, so the identity holds only while onboarding is on.
+        expect(filterAvailable(DEFAULT_LAYOUT, {accountCount: 0, advanced: false, onboarding: true})).toBe(DEFAULT_LAYOUT);
+        expect(ids(filterAvailable(DEFAULT_LAYOUT, {accountCount: 0, advanced: false}))).not.toContain('getting-started');
     });
 });
 
@@ -368,7 +371,7 @@ describe('layoutsEqual + layoutFingerprint', () => {
 
     it('has a readable, versioned format', () => {
         expect(layoutFingerprint(DEFAULT_LAYOUT))
-            .toBe('v1:topics-overview@4,portfolio-snapshot@4,watchlist-movers@4,topics-latest@8,friends-rank@4,news-brain-tile@12,tv-heatmap@8,tv-top-stories@4');
+            .toBe('v1:getting-started@12,topics-overview@4,portfolio-snapshot@4,watchlist-movers@4,topics-latest@8,friends-rank@4,news-brain-tile@12,tv-heatmap@8,tv-top-stories@4');
         expect(layoutFingerprint(LEGACY_DEFAULT_LAYOUT_V1))
             .toBe('v1:portfolio-snapshot@4,watchlist-movers@4,friends-rank@4,news-brain-tile@12,tv-heatmap@8,tv-top-stories@4');
         expect(layoutFingerprint({version: 1, widgets: []})).toBe('v1:');
@@ -402,6 +405,10 @@ describe('missingWidgetIds', () => {
         expect(missing).not.toContain('brain-status');
         expect(missing).toHaveLength(WIDGET_IDS.length - DEFAULT_LAYOUT.widgets.length - 2);
         expect(missingWidgetIds(DEFAULT_LAYOUT, {accountCount: 2, advanced: true})).toContain('strategy-comparison');
+        // Present in the layout, so never in the missing list — whichever way the flag points.
+        expect(missingWidgetIds(DEFAULT_LAYOUT, {accountCount: 1, advanced: false, onboarding: true})).not.toContain('getting-started');
+        expect(missingWidgetIds({version: 1, widgets: []}, {accountCount: 1, advanced: false})).not.toContain('getting-started');
+        expect(missingWidgetIds({version: 1, widgets: []}, {accountCount: 1, advanced: false, onboarding: true})).toContain('getting-started');
     });
 
     it('is grouped by CATEGORY_ORDER', () => {
