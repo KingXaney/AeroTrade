@@ -8,6 +8,7 @@ import {
     isGlossaryKey,
     lookupTerm,
     resolveTerm,
+    searchGlossary,
     shortHelp,
 } from '@/lib/learn/glossary';
 import {STARTER_TOPICS} from '@/lib/topics/starters';
@@ -98,6 +99,14 @@ describe('lookups', () => {
     it('prefers the longest matching phrase', () => {
         expect(resolveTerm('dividend yield')?.key).toBe('dividend-yield');
         expect(resolveTerm('fed funds rate')?.key).toBe('fed funds rate');
+    });
+
+    it('ranks palette hits by prefix, then substring, and caps them', () => {
+        expect(searchGlossary('draw').map((e) => e.key)).toEqual(['max-drawdown']);
+        expect(searchGlossary('sma')[0].key).toMatch(/^sma/);
+        expect(searchGlossary('rate').length).toBeLessThanOrEqual(5);
+        expect(searchGlossary('r')).toEqual([]);
+        expect(searchGlossary('zzzz')).toEqual([]);
     });
 
     it('maps a matched article term to a concept and a name to nothing', () => {

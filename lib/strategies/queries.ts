@@ -25,6 +25,7 @@ import {STRATEGIES, strategyBySlug} from "@/lib/strategies/catalog";
 import {STRATEGY_OWNER_ID} from "@/lib/strategies/config";
 import {getFollowedStrategies} from "@/lib/strategies/follows";
 import {getStrategyStates, type StrategyStateView} from "@/lib/strategies/store";
+import type {ReplayRun} from "@/lib/learn/replay";
 import type {SeriesStats, SignalRow, StrategyDefinition} from "@/lib/strategies/types";
 import {BENCHMARK_SYMBOL} from "@/lib/strategies/universe";
 import {
@@ -50,6 +51,15 @@ type LeanRun = {
     skippedOrders: {symbol: string; reason: string}[]; dataIssues: string[]; equity: number; summary: string;
 };
 
+const toBoardRow = (row: SignalRow): SignalRow =>
+    ({symbol: row.symbol, state: row.state, values: row.values ?? {}, ...(row.note ? {note: row.note} : {})});
+
+const toOrderView = (o: LeanRun['orders'][number]): StrategyRunView['orders'][number] => ({
+    symbol: o.symbol, side: o.side, quantity: o.quantity, kind: o.kind, reason: o.reason, executed: o.executed,
+    price: typeof o.price === 'number' ? o.price : null,
+    message: o.message ?? null,
+});
+
 const toRunView = (run: LeanRun): StrategyRunView => ({
     date: run.date,
     asOf: run.asOf,
@@ -58,27 +68,61 @@ const toRunView = (run: LeanRun): StrategyRunView => ({
     staleCount: run.staleCount,
     universeSize: run.universeSize,
     rebalanceTriggered: run.rebalanceTriggered,
-    board: run.board.map((row) => ({symbol: row.symbol, state: row.state, values: row.values ?? {}, ...(row.note ? {note: row.note} : {})})),
-    orders: run.orders.map((o) => ({
-        symbol: o.symbol, side: o.side, quantity: o.quantity, kind: o.kind, reason: o.reason, executed: o.executed,
-        price: typeof o.price === 'number' ? o.price : null,
-        message: o.message ?? null,
-    })),
+    board: run.board.map(toBoardRow),
+    orders: run.orders.map(toOrderView),
     skippedOrders: run.skippedOrders ?? [],
     dataIssues: run.dataIssues ?? [],
     equity: run.equity,
     summary: run.summary,
 });
 
-// The latest run per strategy in one query.
-const getLatestRuns = async (strategyIds: readonly string[]): Promise<Map<string, StrategyRunView>> => {
+// The latest run per strategy in one query. Reads and groups every run document for
+// the strategies named (boards included), so it belongs on a detail page, never on a
+// request path that fans out over all eight.
+export const getLatestRuns = async (strategyIds: readonly string[]): Promise<Map<string, StrategyRunView>> => {
     const rows = await StrategyRun.aggregate<LeanRun>([
         {$match: {strategyId: {$in: [...strategyIds]}}},
         {$sort: {date: -1}},
-        {$group: {_id: '$strategyId', doc: {$first: '$$ROOT'}}},
+        {$group: {_id: '$strategyId', doc: {$first: '$ROOT'}}},
         {$replaceRoot: {newRoot: '$doc'}},
     ]);
     return new Map(rows.map((r) => [r.strategyId, toRunView(r)]));
+};
+
+// One run by date — an index seek on {strategyId, date}.
+export const getRunForDate = async (strategyId: string, date: string): Promise<StrategyRunView | null> => {
+    await connectToDatabase();
+    const run = await StrategyRun.findOne({strategyId, date}).lean<LeanRun | null>();
+    return run ? toRunView(run) : null;
+};
+
+type LeanReplay = {date: string; asOf: string; board?: SignalRow[]; orders?: LeanRun['orders']};
+
+// The board rows and planned orders behind a page's fills, keyed by run date. Only the
+// traded symbols' rows are projected: a hundred fills against RSI-2's forty-row boards
+// would otherwise ship 4,000 rows for the dozen that get opened.
+export const getBoardRowsForFills = async (
+    strategyId: string,
+    fills: readonly {date: string; symbol: string}[],
+): Promise<Record<string, ReplayRun>> => {
+    if (fills.length === 0) return {};
+    const dates = Array.from(new Set(fills.map((f) => f.date)));
+    const symbols = Array.from(new Set(fills.map((f) => f.symbol.toUpperCase())));
+    const rows = await StrategyRun.aggregate<LeanReplay>([
+        {$match: {strategyId, date: {$in: dates}}},
+        {$project: {
+            _id: 0,
+            date: 1,
+            asOf: 1,
+            board: {$filter: {input: '$board', as: 'row', cond: {$in: ['$row.symbol', symbols]}}},
+            orders: {$filter: {input: '$orders', as: 'o', cond: {$in: ['$o.symbol', symbols]}}},
+        }},
+    ]);
+    return Object.fromEntries(rows.map((r) => [r.date, {
+        asOf: r.asOf,
+        board: (r.board ?? []).map(toBoardRow),
+        orders: (r.orders ?? []).map(toOrderView),
+    }]));
 };
 
 type LeanBacktestStats = {strategyId: string; from: string; to: string; stats: SeriesStats; closeFills: number; points?: {value: number}[]};
@@ -242,6 +286,8 @@ export type StrategyDetail = {
     snapshotDays: number;
     // One-line summary of the latest run, from describeLastRun.
     lastActionLine: string;
+    // The stored board row and planned order behind each strategy fill on this page, by run date.
+    replays: Record<string, ReplayRun>;
 };
 
 export const getStrategyDetail = cache(async (slug: string, userId: string | null): Promise<StrategyDetail | null> => {
@@ -267,6 +313,10 @@ export const getStrategyDetail = cache(async (slug: string, userId: string | nul
             ?? (await buildPriceMap([BENCHMARK_SYMBOL])).get(BENCHMARK_SYMBOL)?.price)
         : undefined;
     const benchmarkReturns = inception ? await benchmarkReturnsSince([inception], spyLive) : new Map<string, number | null>();
+    // A second, bounded read: it needs the fills, which the pass above produced.
+    const replays = await getBoardRowsForFills(def.id, trades
+        .filter((t) => t.source === 'strategy')
+        .map((t) => ({date: getEasternDateString(new Date(t.createdAt)), symbol: t.symbol})));
     {
         return {
             def,
@@ -291,6 +341,7 @@ export const getStrategyDetail = cache(async (slug: string, userId: string | nul
             followed: followed.includes(def.id),
             benchmarkReturnPct: inception ? (benchmarkReturns.get(inception) ?? null) : null,
             snapshotDays: state ? (snapshotDays.get(state.accountId)?.days ?? 0) : 0,
+            replays,
         };
     }
 });

@@ -424,6 +424,25 @@ export const resolveTerm = (query: string): GlossaryEntry | null => {
     return null;
 };
 
+// Palette rows: entries whose term, key or alias starts with (then contains) the query,
+// best matches first. Plain string comparison; never a RegExp from the query.
+export const searchGlossary = (query: string, limit = 5): GlossaryEntry[] => {
+    const q = query.toLowerCase().trim();
+    if (q.length < 2) return [];
+    const rank = (entry: GlossaryEntry): number => {
+        const names = [entry.key, entry.term.toLowerCase(), ...entry.aliases.map((alias) => alias.toLowerCase())];
+        if (names.some((name) => name.startsWith(q))) return 0;
+        if (names.some((name) => name.includes(q))) return 1;
+        return 2;
+    };
+    return ENTRIES
+        .map((entry) => [rank(entry), entry] as const)
+        .filter(([score]) => score < 2)
+        .sort((a, b) => a[0] - b[0])
+        .slice(0, limit)
+        .map(([, entry]) => entry);
+};
+
 // A matched article term (a starter keyword, lowercase) → the concept that teaches it,
 // or null when the term is a name rather than a concept.
 export const conceptForTerm = (term: string): GlossaryEntry | null => {

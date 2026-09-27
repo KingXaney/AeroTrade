@@ -2,7 +2,7 @@
 // Client-safe: types plus arithmetic on plain data, nothing from the DB or the engine.
 
 import {formatPrice} from "@/lib/utils";
-import type {Cadence, SeriesPoint, SeriesStats, SignalColumn, SignalFormat, SignalRow, StrategyFamily, StrategyId} from "@/lib/strategies/types";
+import type {Cadence, RowState, SeriesPoint, SeriesStats, SignalColumn, SignalFormat, SignalRow, StrategyFamily, StrategyId} from "@/lib/strategies/types";
 
 export type LiveRecord = {
     totalValue: number;
@@ -156,6 +156,19 @@ export const unpricedNote = (rows: readonly {live: LiveRecord | null}[]): Unpric
         ? {mode: 'panel', text: 'Returns are unpriced — no live quotes, so every holding is valued at cost.'}
         : {mode: 'marker', legend: '* partly unpriced — valued at cost until the next quote'};
 };
+
+// The verdict vocabulary, in one place: the board, the quiz and the replay all read it,
+// so a chip can never say something the table it explains does not.
+export const STATE_LABEL: Record<RowState, string> = {
+    held: 'held', enter: 'enter', exit: 'exit', watch: 'watch', excluded: 'excluded',
+};
+export const STATE_TONE: Record<RowState, 'brand' | 'positive' | 'negative' | 'neutral'> = {
+    held: 'brand', enter: 'positive', exit: 'negative', watch: 'neutral', excluded: 'neutral',
+};
+// Acted-on rows first, then what the rule holds, then what it merely watches.
+export const STATE_ORDER: Record<RowState, number> = {enter: 0, exit: 1, held: 2, watch: 3, excluded: 4};
+export const sortBoard = (board: readonly SignalRow[]): SignalRow[] =>
+    [...board].sort((a, b) => STATE_ORDER[a.state] - STATE_ORDER[b.state] || a.symbol.localeCompare(b.symbol));
 
 // A column whose every value is absent is not information. `false` and `0` are values.
 export const visibleSignalColumns = (columns: readonly SignalColumn[], board: readonly SignalRow[]): SignalColumn[] => {

@@ -33,6 +33,7 @@ export const NAV_ITEMS: readonly NavItem[] = [
     {href: '/watchlist', label: 'Watchlist', icon: 'bookmark', badge: 'watchlist', inHeader: false},
     {href: '/friends', label: 'Friends', icon: 'group', badge: 'friendRequests', inHeader: false},
     {href: '/history', label: 'History', icon: 'history', inHeader: false},
+    {href: '/learn', label: 'Learn', icon: 'school', inHeader: false},
     {href: '/settings', label: 'Settings', icon: 'settings', inHeader: false},
 ] as const;
 

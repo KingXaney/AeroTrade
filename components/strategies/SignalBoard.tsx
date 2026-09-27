@@ -1,7 +1,7 @@
 import Link from "next/link";
 import {cn} from "@/lib/utils";
 import type {SignalColumn, SignalRow} from "@/lib/strategies/types";
-import {formatSignalValue, visibleSignalColumns, type StrategyRunView} from "@/lib/strategies/views";
+import {formatSignalValue, sortBoard, STATE_LABEL, STATE_TONE, visibleSignalColumns, type StrategyRunView} from "@/lib/strategies/views";
 import Badge from "@/components/primitives/Badge";
 import EmptyState from "@/components/primitives/EmptyState";
 import MicroLabel from "@/components/primitives/MicroLabel";
@@ -13,26 +13,20 @@ import MicroLabel from "@/components/primitives/MicroLabel";
 // hidden — Dual Momentum watches four symbols and was printing three columns of
 // em-dashes. And only the top rows are shown: RSI-2 ranks forty names, which was ~1,500px
 // of scroll and the single biggest reason its page ran to five screens.
+//
+// The verdict vocabulary (labels, tones, order) lives in lib/strategies/views so the
+// quiz and the replay cannot drift from this table; `data-verdict` marks the cells the
+// quiz hides while a reader is guessing.
 
 const SHOWN = 12;
 
-const STATE_LABEL: Record<SignalRow['state'], string> = {
-    held: 'held', enter: 'enter', exit: 'exit', watch: 'watch', excluded: 'excluded',
-};
-
-const STATE_TONE: Record<SignalRow['state'], 'brand' | 'positive' | 'negative' | 'neutral'> = {
-    held: 'brand', enter: 'positive', exit: 'negative', watch: 'neutral', excluded: 'neutral',
-};
-
-const ORDER: Record<SignalRow['state'], number> = {enter: 0, exit: 1, held: 2, watch: 3, excluded: 4};
-
 const Verdict = ({state}: {state: SignalRow['state']}) => (
-    <Badge tone={STATE_TONE[state]} variant="outline" className={cn(state === 'excluded' && 'opacity-70')}>
+    <Badge tone={STATE_TONE[state]} variant="outline" className={cn(state === 'excluded' && 'opacity-70')} data-verdict>
         {STATE_LABEL[state]}
     </Badge>
 );
 
-const Table = ({columns, rows}: {columns: SignalColumn[]; rows: SignalRow[]}) => {
+const Table = ({columns, rows}: {columns: readonly SignalColumn[]; rows: SignalRow[]}) => {
     const template = `minmax(7rem,1.4fr) repeat(${columns.length}, minmax(5rem,1fr)) minmax(5rem,0.8fr)`;
     return (
         <div className="overflow-x-auto">
@@ -63,23 +57,27 @@ const Table = ({columns, rows}: {columns: SignalColumn[]; rows: SignalRow[]}) =>
     );
 };
 
+// One board row as a line of label/value pairs — the view for a one- or two-symbol
+// board, and the shape the decision replay reuses so a past row reads like today's.
+export const SignalRowLine = ({columns, row}: {columns: readonly SignalColumn[]; row: SignalRow}) => (
+    <div data-signal-row={row.symbol} className="flex flex-wrap items-center gap-x-5 gap-y-1">
+        <Link href={`/stocks/${row.symbol}`} className="font-mono text-sm font-bold text-fg hover:text-brand">{row.symbol}</Link>
+        {columns.map((c) => (
+            <span key={c.key} className="text-xs">
+                <MicroLabel title={c.help}>{c.label} </MicroLabel>
+                <span className="font-mono text-fg-soft">{formatSignalValue(row.values[c.key], c.format)}</span>
+            </span>
+        ))}
+        <Verdict state={row.state} />
+        {row.note && <span className="text-[10px] text-fg-muted">{row.note}</span>}
+    </div>
+);
+
 // One or two symbols is not a table. A header row over a single line of values is
 // theatre — the labels outnumber the data.
-const Pairs = ({columns, rows}: {columns: SignalColumn[]; rows: SignalRow[]}) => (
+const Pairs = ({columns, rows}: {columns: readonly SignalColumn[]; rows: SignalRow[]}) => (
     <div className="space-y-3">
-        {rows.map((row) => (
-            <div key={row.symbol} data-signal-row={row.symbol} className="flex flex-wrap items-center gap-x-5 gap-y-1">
-                <Link href={`/stocks/${row.symbol}`} className="font-mono text-sm font-bold text-fg hover:text-brand">{row.symbol}</Link>
-                {columns.map((c) => (
-                    <span key={c.key} className="text-xs">
-                        <MicroLabel title={c.help}>{c.label} </MicroLabel>
-                        <span className="font-mono text-fg-soft">{formatSignalValue(row.values[c.key], c.format)}</span>
-                    </span>
-                ))}
-                <Verdict state={row.state} />
-                {row.note && <span className="text-[10px] text-fg-muted">{row.note}</span>}
-            </div>
-        ))}
+        {rows.map((row) => <SignalRowLine key={row.symbol} columns={columns} row={row} />)}
     </div>
 );
 
@@ -94,7 +92,7 @@ const SignalBoard = ({columns, run}: {columns: readonly SignalColumn[]; run: Str
         );
     }
 
-    const rows = [...run.board].sort((a, b) => ORDER[a.state] - ORDER[b.state] || a.symbol.localeCompare(b.symbol));
+    const rows = sortBoard(run.board);
     const shownColumns = visibleSignalColumns(columns, run.board);
     const head = rows.slice(0, SHOWN);
     const rest = rows.slice(SHOWN);
