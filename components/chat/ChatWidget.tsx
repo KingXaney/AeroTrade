@@ -4,6 +4,7 @@ import {useCallback, useEffect, useState} from "react";
 import {createPortal} from "react-dom";
 import type {UIMessage} from "ai";
 import ChatPanel from "@/components/chat/ChatPanel";
+import {subscribeAsk} from "@/lib/chat/ask";
 import {cn} from "@/lib/utils";
 
 type ChatWidgetProps = {
@@ -27,6 +28,9 @@ const loadMessages = (userId: string): UIMessage[] => {
 
 const ChatWidget = ({userId}: ChatWidgetProps) => {
     const [open, setOpen] = useState(false);
+    // The question an "Ask in chat" link typed before the panel was open; the panel seeds
+    // its composer from it on mount and it is cleared on close so it cannot come back.
+    const [pendingInput, setPendingInput] = useState<string | null>(null);
     // Lazily restore persisted messages on first render. The launcher button renders identically
     // on server and client, so reading localStorage here causes no hydration mismatch.
     const [initialMessages] = useState<UIMessage[]>(() => loadMessages(userId));
@@ -36,6 +40,13 @@ const ChatWidget = ({userId}: ChatWidgetProps) => {
     const [mounted, setMounted] = useState(false);
     // eslint-disable-next-line react-hooks/set-state-in-effect -- one-time flag to enable the body portal client-side
     useEffect(() => setMounted(true), []);
+
+    // An Ask link anywhere on the page opens the panel with its question in the composer.
+    // A click while the panel is already open is handled by the panel itself.
+    useEffect(() => subscribeAsk((text) => {
+        setPendingInput(text);
+        setOpen(true);
+    }), []);
 
     const persist = useCallback((messages: UIMessage[]) => {
         if (typeof window === 'undefined') return;
@@ -73,7 +84,8 @@ const ChatWidget = ({userId}: ChatWidgetProps) => {
                     userId={userId}
                     initialMessages={initialMessages}
                     onMessagesChange={persist}
-                    onClose={() => setOpen(false)}
+                    initialInput={pendingInput}
+                    onClose={() => { setOpen(false); setPendingInput(null); }}
                 />
             )}
         </>,

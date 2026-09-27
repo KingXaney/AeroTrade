@@ -134,7 +134,7 @@ export const WIDGET_RENDERERS: Record<WidgetId, Renderer> = {
             : <WidgetUnavailable failed={r.failed.has('portfolios')} />
     )),
     // No onSymbolCommit: the widget must never navigate the dashboard to /trade.
-    'quick-trade': (r) => need(r, 'activeAccount', (a) => <OrderPanel cash={a.summary.cash} accountId={a.account.id} positions={a.summary.positions} />),
+    'quick-trade': (r) => need(r, 'activeAccount', (a) => <OrderPanel cash={a.summary.cash} accountId={a.account.id} positions={a.summary.positions} compact />),
     'leaderboard': (r) => need(r, 'leaderboard', (l) => <Leaderboard entries={l} />),
     'ai-navigator': (r) => need(r, 'navigatorStatus', (s) => <NavigatorCard status={s} />),
     'weekly-decisions': (r) => need(r, 'suggestions', (s) => (

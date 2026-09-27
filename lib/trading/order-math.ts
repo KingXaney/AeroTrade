@@ -42,6 +42,68 @@ export const presetQuantities = (side: OrderSide, {cash, price, owned}: Pick<Ord
     ];
 };
 
+export type PositionLike = {symbol: string; quantity: number; marketValue?: number; avgCost?: number};
+
+export type OrderEffectInputs = {
+    side: OrderSide;
+    symbol: string;
+    quantity: number;
+    price: number | null;
+    cash: number;
+    positions: readonly PositionLike[];
+};
+
+export type OrderEffect =
+    | {side: 'buy'; estTotal: number; shareOfAccount: number; largestAfter: {symbol: string; weight: number} | null; cashAfter: number; cashAfterWeight: number}
+    | {side: 'sell'; quantity: number; owned: number; sharesAfter: number; avgCost: number | null; estRealizedPnl: number | null};
+
+// (sell price − average cost) × shares, the same arithmetic executeOrder records.
+export const estRealizedPnl = (price: number | null, avgCost: number | null | undefined, quantity: number): number | null =>
+    typeof price === 'number' && price > 0 && typeof avgCost === 'number' && quantity > 0 ? (price - avgCost) * quantity : null;
+
+// A position's value at the last quote, or at cost when no quote is in hand — the same
+// fallback the portfolio uses, so the ticket and the tiles agree.
+const valueOf = (p: PositionLike): number =>
+    typeof p.marketValue === 'number' ? p.marketValue : typeof p.avgCost === 'number' ? p.avgCost * p.quantity : 0;
+
+// What the order does to the account, at the last price. Advisory like checkOrder: the
+// server is the authority on the fill. A buy with no price has no effect to describe.
+export const describeOrderEffect = ({side, symbol, quantity, price, cash, positions}: OrderEffectInputs): OrderEffect | null => {
+    const qty = Math.floor(quantity);
+    if (!Number.isFinite(qty) || qty < 1) return null;
+    const upper = symbol.toUpperCase();
+    const held = positions.find((p) => p.symbol.toUpperCase() === upper);
+    if (side === 'sell') {
+        const owned = Math.floor(held?.quantity ?? 0);
+        if (owned < 1) return null;
+        const sold = Math.min(qty, owned);
+        return {
+            side: 'sell',
+            quantity: sold,
+            owned,
+            sharesAfter: owned - sold,
+            avgCost: typeof held?.avgCost === 'number' ? held.avgCost : null,
+            estRealizedPnl: estRealizedPnl(price, held?.avgCost, sold),
+        };
+    }
+    if (typeof price !== 'number' || !(price > 0)) return null;
+    const estTotal = price * qty;
+    const totalValue = cash + positions.reduce((sum, p) => sum + valueOf(p), 0);
+    if (!(totalValue > 0)) return null;
+    const after = positions.map((p) => ({symbol: p.symbol.toUpperCase(), value: valueOf(p) + (p.symbol.toUpperCase() === upper ? estTotal : 0)}));
+    if (!held) after.push({symbol: upper, value: estTotal});
+    const largest = after.reduce<{symbol: string; value: number} | null>((best, p) => (best === null || p.value > best.value ? p : best), null);
+    const cashAfter = cash - estTotal;
+    return {
+        side: 'buy',
+        estTotal,
+        shareOfAccount: estTotal / totalValue,
+        largestAfter: largest && largest.value > 0 ? {symbol: largest.symbol, weight: largest.value / totalValue} : null,
+        cashAfter,
+        cashAfterWeight: cashAfter / totalValue,
+    };
+};
+
 export const checkOrder = ({side, quantity, price, cash, owned}: OrderInputs): OrderCheck => {
     const qty = Math.floor(quantity);
     const hasPrice = typeof price === 'number' && price > 0;

@@ -1,5 +1,6 @@
 import {cn} from "@/lib/utils";
 import {GLOSSARY, isGlossaryKey, type GlossaryKey} from "@/lib/learn/glossary";
+import AskLink from "@/components/chat/AskLink";
 
 // The touch-reachable twin of every Term title= on a panel: one collapsed disclosure at
 // the panel's foot listing the definitions of the terms that panel shows, and only those
@@ -28,7 +29,10 @@ const WhatTheseMean = ({keys, id, label = 'What these mean', className}: Props) 
             <dl className="mt-2 grid grid-cols-1 md:grid-cols-2 gap-x-6 gap-y-2">
                 {entries.map((entry) => (
                     <div key={entry.key} id={id ? `${id}-${entry.key}` : undefined}>
-                        <dt className="font-heading text-xs font-semibold text-fg">{entry.term}</dt>
+                        <dt className="font-heading text-xs font-semibold text-fg flex items-baseline gap-2">
+                            {entry.term}
+                            <AskLink input={{kind: 'term', term: entry.term}} />
+                        </dt>
                         <dd className="text-xs text-fg-muted leading-relaxed">
                             {entry.long}
                             {entry.formula && (

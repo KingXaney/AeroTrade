@@ -12,6 +12,8 @@ export type ChatErrorCode =
     | 'unauthorized'
     | 'bad_request'
     | 'conversation_too_long'
+    | 'rate_limited'
+    | 'capacity_reached'
     | 'unavailable';
 
 type Spec = {status: number; message: string};
@@ -22,6 +24,14 @@ const SPECS: Record<ChatErrorCode, Spec> = {
     conversation_too_long: {
         status: 413,
         message: 'This conversation got too long for one request. Clear the chat to start fresh — your topics and watchlist are unaffected.',
+    },
+    rate_limited: {
+        status: 429,
+        message: "You've sent a lot of messages recently. The assistant takes new ones again in a little while — your topics, watchlist and paper accounts are unaffected.",
+    },
+    capacity_reached: {
+        status: 429,
+        message: "The assistant has used today's shared budget. It resets tomorrow; everything else in the app keeps working.",
     },
     unavailable: {status: 503, message: 'The assistant is unavailable right now. Try again in a moment.'},
 };
@@ -34,6 +44,9 @@ const ACTIONS: Record<ChatErrorCode, ChatErrorAction> = {
     // Re-sending the identical payload fails identically, so retry is the wrong verb.
     conversation_too_long: 'clear',
     bad_request: 'none',
+    // The identical request fails identically inside the window; the copy says when.
+    rate_limited: 'none',
+    capacity_reached: 'none',
     unavailable: 'retry',
 };
 

@@ -71,6 +71,7 @@ const StrategyPage = async ({params}: StrategyPageProps) => {
                 row={match?.row ?? null}
                 order={match?.order ?? null}
                 caption={describeReplay(match, run?.asOf ?? null, isReplayExpired(date, today))}
+                strategyName={def.name}
             />
         );
     };

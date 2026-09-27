@@ -167,6 +167,15 @@ const TIME = new Intl.DateTimeFormat('en-US', {timeZone: ZONE, hour: 'numeric', 
 const DAY = new Intl.DateTimeFormat('en-US', {timeZone: ZONE, weekday: 'short'});
 
 // "Open · closes 4:00 PM ET" / "Closed · opens Mon 9:30 AM ET" / "Closed · Thanksgiving · opens Fri 9:30 AM ET".
+// "Mon 9:30 AM ET" / "today 9:30 AM ET": when a real broker would fill an order placed
+// now, or null while the session is open. The holiday is named when that is the reason.
+export const describeQueuedFill = (status: MarketStatus): string | null => {
+    if (status.state === 'open' || !status.nextOpen) return null;
+    const sameDay = easternParts(new Date(status.nextOpen)).date === status.easternDate;
+    const when = `${sameDay ? 'today' : DAY.format(status.nextOpen)} ${TIME.format(status.nextOpen)} ET`;
+    return status.holiday ? `${when} (${status.holiday})` : when;
+};
+
 export const describeMarketStatus = (status: MarketStatus): string => {
     if (status.state === 'open') {
         return status.nextClose ? `Open · closes ${TIME.format(status.nextClose)} ET` : 'Open';
