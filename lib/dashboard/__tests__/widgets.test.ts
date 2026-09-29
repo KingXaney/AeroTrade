@@ -23,9 +23,9 @@ const spanSet = new Set<number>(WIDGET_SPANS);
 const dataKeySet = new Set<string>(DATA_KEYS);
 
 describe('registry invariants', () => {
-    it('has 32 unique ids whose table keys match their id field', () => {
-        expect(WIDGET_IDS).toHaveLength(32);
-        expect(new Set(WIDGET_IDS).size).toBe(32);
+    it('has 33 unique ids whose table keys match their id field', () => {
+        expect(WIDGET_IDS).toHaveLength(33);
+        expect(new Set(WIDGET_IDS).size).toBe(33);
         expect(Object.keys(WIDGETS).sort()).toEqual([...WIDGET_IDS].sort());
         for (const id of WIDGET_IDS) {
             expect(WIDGETS[id].id).toBe(id);
@@ -85,6 +85,7 @@ describe('registry invariants', () => {
 
     it('topics lead the library and every category has a label', () => {
         expect(CATEGORY_ORDER[0]).toBe('topics');
+        expect(CATEGORY_ORDER[1]).toBe('learn');
         expect(Object.keys(CATEGORY_LABELS).sort()).toEqual([...CATEGORY_ORDER].sort());
         for (const label of Object.values(CATEGORY_LABELS)) {
             expect(label.trim()).not.toBe('');
@@ -99,7 +100,7 @@ describe('registry invariants', () => {
             expect(WIDGETS[id].isNew, id).toBe(true);
         }
         // The quant-strategies panel shipped after the layout system too.
-        expect(defs.filter((d) => d.isNew).map((d) => d.id).sort()).toEqual([...topics, 'quant-strategies'].sort());
+        expect(defs.filter((d) => d.isNew).map((d) => d.id).sort()).toEqual([...topics, 'quant-strategies', 'getting-started'].sort());
         expect(WIDGETS['topics-latest'].dataKeys).toEqual(['topicsLatest']);
         expect(WIDGETS['topic-briefs'].dataKeys).toEqual(['topicsOverview']);
     });
@@ -128,12 +129,15 @@ describe('registry invariants', () => {
         const heavy = defs.filter((d) => d.heavy).map((d) => d.id).sort();
         expect(heavy).toEqual(['market-news', 'quant-strategies', 'tv-crypto-screener', 'tv-market-screener', 'watchlist-movers']);
         expect(defs.filter((d) => d.availability !== 'always').map((d) => d.id).sort())
-            .toEqual(['brain-status', 'strategy-comparison']);
+            .toEqual(['brain-status', 'getting-started', 'strategy-comparison']);
+        expect(WIDGETS['getting-started'].availability).toBe('onboarding');
+        expect(WIDGETS['getting-started'].dataKeys).toEqual(['learnFacts']);
     });
 
     it('default spans follow the plan table', () => {
         const expected: Record<WidgetId, number> = {
             'topics-overview': 4, 'topics-latest': 8, 'topic-briefs': 6,
+            'getting-started': 12,
             'portfolio-snapshot': 4, 'watchlist-movers': 4, 'friends-rank': 4, 'news-brain-tile': 12,
             'tv-heatmap': 8, 'tv-top-stories': 4, 'tv-ticker-tape': 12, 'tv-market-screener': 12,
             'tv-crypto-screener': 8, 'tv-forex': 6,
@@ -254,6 +258,12 @@ describe('isWidgetAvailable', () => {
         expect(isWidgetAvailable(WIDGETS['brain-status'], multi)).toBe(false);
         expect(isWidgetAvailable(WIDGETS['brain-status'], advanced)).toBe(true);
     });
+
+    it('onboarding follows its own flag and reads an absent flag as false', () => {
+        expect(isWidgetAvailable(WIDGETS['getting-started'], single)).toBe(false);
+        expect(isWidgetAvailable(WIDGETS['getting-started'], {...advanced, onboarding: false})).toBe(false);
+        expect(isWidgetAvailable(WIDGETS['getting-started'], {...single, onboarding: true})).toBe(true);
+    });
 });
 
 describe('resolveDataKeys', () => {
@@ -281,7 +291,7 @@ describe('resolveDataKeys', () => {
 
     it('resolves the default layout to the plan\'s key sets', () => {
         const result = resolveDataKeys(DEFAULT_LAYOUT.widgets.map((w) => w.id));
-        expect(new Set(result.eager)).toEqual(new Set(['portfolios', 'leaderboard', 'theses', 'suggestions', 'topicsOverview']));
+        expect(new Set(result.eager)).toEqual(new Set(['portfolios', 'leaderboard', 'theses', 'suggestions', 'topicsOverview', 'learnFacts']));
         expect(result.lazy).toEqual(['movers', 'topicsLatest']);
         expect(result.needsActiveAccount).toBe(false);
     });

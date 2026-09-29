@@ -12,6 +12,12 @@ export interface DashboardLayoutPrefs {
     widgets: {id: string; span: number}[];
 }
 
+// Learn-surface stamps: each is written once by the user's own click and read back as
+// derived state. No defaults anywhere in the sub-schema.
+export interface LearnPrefs {
+    missionsDismissedAt?: Date;
+}
+
 export interface UserPreferences extends Document {
     userId: string;
     emailNotifications: boolean;
@@ -22,6 +28,7 @@ export interface UserPreferences extends Document {
     newsFeed?: NewsFeedPrefs;          // absent = the default feed (lib/news/feed-prefs.ts)
     followedStrategies?: string[];     // quant-strategy slugs pinned on the dashboard; absent = none
     topicsSeededAt?: Date;             // default topics installed once; absent = never seeded
+    learn?: LearnPrefs;                // First-week checklist hidden by the user; absent = never
     updatedAt: Date;
 }
 
@@ -61,6 +68,13 @@ const NewsFeedSchema = new Schema<NewsFeedPrefs>(
     {_id: false},
 );
 
+const LearnSchema = new Schema<LearnPrefs>(
+    {
+        missionsDismissedAt: {type: Date, required: false},
+    },
+    {_id: false},
+);
+
 const UserPreferencesSchema = new Schema<UserPreferences>({
     userId: {type: String, required: true, unique: true, index: true},
     emailNotifications: {type: Boolean, default: true},
@@ -75,6 +89,7 @@ const UserPreferencesSchema = new Schema<UserPreferences>({
     // what makes "I deleted them all on purpose" stick: without it, every page view would
     // resurrect the defaults the user just removed.
     topicsSeededAt: {type: Date, required: false},
+    learn: {type: LearnSchema, required: false},
     updatedAt: {type: Date, default: Date.now},
 });
 

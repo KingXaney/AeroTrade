@@ -5,6 +5,8 @@ import {ADVISOR_SYSTEM_PROMPT} from "@/lib/ai/system-prompt";
 import {buildTools} from "@/lib/ai/tools";
 import {chatErrorBody, chatErrorStatus, type ChatErrorCode} from "@/lib/ai/chat-errors";
 import {getCurrentUserId} from "@/lib/actions/watchlist.actions";
+import {takeRateLimit} from "@/lib/auth/rate-limit";
+import {CHAT_GLOBAL_KEY, chatUserDayKey, chatUserHourKey, resolveChatLimits} from "@/lib/ai/chat-limits";
 
 // The transport only forwards the body text to the client, never the status — so the
 // reason has to travel inside the body or the panel can't tell 413 from 500.
@@ -25,6 +27,10 @@ export const maxDuration = 30;
 const MAX_MESSAGES = 40;
 const MAX_TOTAL_CHARS = 24_000;
 const MAX_OUTPUT_TOKENS = 2_048;
+
+// Resolved once per instance; a bad override is logged, never fatal.
+const limits = resolveChatLimits();
+if (limits.warning) console.warn(`Chat limits: ${limits.warning}`);
 
 const bodySchema = z.object({
     messages: z.array(z.object({
@@ -52,6 +58,12 @@ export async function POST(req: Request) {
     if (messages.reduce((n, m) => n + textLength(m), 0) > MAX_TOTAL_CHARS) {
         return fail('conversation_too_long');
     }
+
+    // Counted after validation so a rejected body spends nothing. User windows first:
+    // a stuck client hits its own hour and day before it can touch the shared budget.
+    if (!(await takeRateLimit(chatUserHourKey(userId), limits.userHour.limit, limits.userHour.windowMs))) return fail('rate_limited');
+    if (!(await takeRateLimit(chatUserDayKey(userId), limits.userDay.limit, limits.userDay.windowMs))) return fail('rate_limited');
+    if (!(await takeRateLimit(CHAT_GLOBAL_KEY, limits.global.limit, limits.global.windowMs))) return fail('capacity_reached');
 
     const result = streamText({
         model: google('gemini-2.5-flash'),

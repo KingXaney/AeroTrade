@@ -38,6 +38,12 @@ describe('NAV_ITEMS', () => {
         }
     });
 
+    it('keeps the glossary index in the sidebar, not the header', () => {
+        const learn = NAV_ITEMS.find((i) => i.href === '/learn');
+        expect(learn?.inHeader).toBe(false);
+        expect(learn?.label).toBe('Learn');
+    });
+
     it('derives the header list from the same array', () => {
         expect(HEADER_NAV_ITEMS).toHaveLength(8);
         expect(HEADER_NAV_ITEMS.map((i) => i.href)).toContain('/news');

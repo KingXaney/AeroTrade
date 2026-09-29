@@ -5,11 +5,12 @@ import {useRouter} from "next/navigation";
 import {toast} from "sonner";
 import {CommandDialog, CommandEmpty, CommandInput, CommandItem, CommandList} from "@/components/ui/command";
 import {Button} from "@/components/ui/button";
-import {Loader2, Search, Sparkles, TrendingUp} from "lucide-react";
+import {BookOpen, Loader2, Search, Sparkles, TrendingUp} from "lucide-react";
 import {searchStocks} from "@/lib/actions/finnhub.actions";
 import {createTopic} from "@/lib/actions/topics.actions";
 import {NAME_MAX} from "@/lib/topics/config";
 import {useDebounce} from "@/hooks/useDebounce";
+import {searchGlossary} from "@/lib/learn/glossary";
 
 // Anything shorter reads as a ticker prefix, not a topic.
 const TOPIC_MIN_CHARS = 3;
@@ -35,6 +36,8 @@ export default function SearchCommand({
     const topicQuery = searchTerm.trim();
     const canFollow = topicQuery.length >= TOPIC_MIN_CHARS && topicQuery.length <= NAME_MAX;
     const existingTopic = canFollow ? initialTopics.find((t) => t.name.toLowerCase() === topicQuery.toLowerCase()) : undefined;
+    // Glossary rows are matched client-side against a pure registry: no request, no key.
+    const learnHits = searchGlossary(topicQuery, 4);
 
     useEffect(() => {
         const onKeyDown = (e: KeyboardEvent) => {
@@ -116,12 +119,34 @@ export default function SearchCommand({
                     <CommandInput
                         value={searchTerm}
                         onValueChange={setSearchTerm}
-                        placeholder="Search stocks, or type a topic to follow..."
+                        placeholder="Search stocks, a term to learn, or a topic to follow..."
                         className="search-input"
                     />
                     {loading && <Loader2 className="search-loader" />}
                 </div>
                 <CommandList className="search-list">
+                    {learnHits.length > 0 && (
+                        <>
+                            <div className="search-count">Learn</div>
+                            {learnHits.map((entry) => (
+                                <CommandItem
+                                    key={entry.key}
+                                    value={`learn-${entry.key}`}
+                                    onSelect={() => goTo(`/learn#${entry.key}`)}
+                                    className="search-item-link"
+                                    data-learn-hit={entry.key}
+                                >
+                                    <BookOpen className="h-4 w-4 text-brand" />
+                                    <div className="flex-1">
+                                        <div className="search-item-name">{entry.term}</div>
+                                        <div className="text-sm text-fg-muted" style={{fontFamily: 'var(--type-mono)', fontSize: '11px', letterSpacing: '0.02em'}}>
+                                            {entry.short}
+                                        </div>
+                                    </div>
+                                </CommandItem>
+                            ))}
+                        </>
+                    )}
                     {canFollow && (
                         <>
                             <div className="search-count">Topics</div>

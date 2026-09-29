@@ -9,6 +9,8 @@ import {WIDGET_IDS, WIDGETS, isWidgetAvailable, resolveDataKeys, type WidgetId} 
 import {filterAvailable, layoutFingerprint} from "@/lib/dashboard/layout";
 import {loadDashboardData, type LoaderCtx} from "@/lib/dashboard/loaders";
 import {pickActiveAccount, toSwitcherAccounts} from "@/lib/dashboard/select";
+import {getOnboardingFacts} from "@/lib/learn/facts-store";
+import {onboardingActive} from "@/lib/learn/missions";
 import {renderWidgetBody} from "@/components/dashboard/widgets/registry";
 import DashboardGrid from "@/components/dashboard/DashboardGrid";
 import AccountSwitcher from "@/components/trade/AccountSwitcher";
@@ -29,8 +31,8 @@ const Home = async ({searchParams}: HomeProps) => {
     const ctx: LoaderCtx = {userId, preferredAccountId: account ?? cookieStore.get(ACTIVE_ACCOUNT_COOKIE)?.value};
 
     // Portfolios are cache()-deduped with the (root) layout, so this costs nothing extra.
-    const [stored, portfolios] = await Promise.all([getDashboardLayoutForUser(userId), getPortfoliosForUser(userId)]);
-    const availability = {accountCount: portfolios.length, advanced: true};
+    const [stored, portfolios, facts] = await Promise.all([getDashboardLayoutForUser(userId), getPortfoliosForUser(userId), getOnboardingFacts(userId)]);
+    const availability = {accountCount: portfolios.length, advanced: true, onboarding: onboardingActive(facts)};
     const layout = filterAvailable(stored, availability);
     const availableIds = WIDGET_IDS.filter((id) => isWidgetAvailable(WIDGETS[id], availability));
 

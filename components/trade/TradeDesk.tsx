@@ -4,6 +4,7 @@ import {useState} from "react";
 import {usePathname, useRouter, useSearchParams} from "next/navigation";
 import TradingViewWidget from "@/components/TradingViewWidget";
 import OrderPanel from "@/components/trade/OrderPanel";
+import type {PositionLike} from "@/lib/trading/order-math";
 import {TRADE_CHART_WIDGET_CONFIG} from "@/lib/constants";
 import {useDebounce} from "@/hooks/useDebounce";
 
@@ -15,14 +16,15 @@ type Props = {
     orderSymbol: string;       // bare ticker seeding the order panel
     cash: number;
     accountId: string;
-    positions: readonly {symbol: string; quantity: number}[];
+    positions: readonly PositionLike[];
+    queueNote: string | null;
 };
 
 // Chart and ticket share one symbol. Typing in the ticket used to leave the chart on
 // whatever the URL said; now a *committed* symbol (search pick, Enter, or leaving the
 // field) re-keys the chart and mirrors into ?symbol= — on commit, never per keystroke,
 // so reloads and shared links land on the same view.
-const TradeDesk = ({chartSymbol, orderSymbol, cash, accountId, positions}: Props) => {
+const TradeDesk = ({chartSymbol, orderSymbol, cash, accountId, positions, queueNote}: Props) => {
     const router = useRouter();
     const pathname = usePathname();
     const searchParams = useSearchParams();
@@ -61,7 +63,7 @@ const TradeDesk = ({chartSymbol, orderSymbol, cash, accountId, positions}: Props
                 />
             </section>
             <div className="xl:col-span-1">
-                <OrderPanel defaultSymbol={orderSymbol} cash={cash} accountId={accountId} positions={positions} onSymbolCommit={onSymbolCommit} />
+                <OrderPanel defaultSymbol={orderSymbol} cash={cash} accountId={accountId} positions={positions} onSymbolCommit={onSymbolCommit} queueNote={queueNote} />
             </div>
         </div>
     );

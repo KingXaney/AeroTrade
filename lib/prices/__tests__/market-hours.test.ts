@@ -2,6 +2,7 @@ import {describe, expect, it} from 'vitest';
 import {
     closeMinutesFor,
     describeMarketStatus,
+    describeQueuedFill,
     easternParts,
     easternToInstant,
     isMarketOpen,
@@ -76,6 +77,18 @@ describe('marketStatus', () => {
         expect(marketStatus(at('2026-03-09T13:29:00Z')).state).toBe('closed');
         expect(marketStatus(at('2026-11-02T14:30:00Z')).state).toBe('open');    // first EST Monday, 9:30
         expect(marketStatus(at('2026-11-02T14:29:00Z')).state).toBe('closed');
+    });
+});
+
+describe('describeQueuedFill', () => {
+    it('is nothing while the session is open', () => {
+        expect(describeQueuedFill(marketStatus(at('2026-09-14T15:00:00Z')))).toBeNull();
+    });
+
+    it('names the next open, today or a later day, and a holiday when that is why', () => {
+        expect(describeQueuedFill(marketStatus(at('2026-09-14T11:00:00Z')))).toBe('today 9:30 AM ET');
+        expect(describeQueuedFill(marketStatus(at('2026-09-12T15:00:00Z')))).toBe('Mon 9:30 AM ET');
+        expect(describeQueuedFill(marketStatus(at('2026-11-26T15:00:00Z')))).toBe('Fri 9:30 AM ET (Thanksgiving)');
     });
 });
 

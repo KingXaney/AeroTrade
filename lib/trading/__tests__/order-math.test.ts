@@ -1,5 +1,45 @@
 import {describe, expect, it} from 'vitest';
-import {affordableShares, checkOrder, presetQuantities} from '@/lib/trading/order-math';
+import {affordableShares, checkOrder, describeOrderEffect, estRealizedPnl, presetQuantities} from '@/lib/trading/order-math';
+
+const positions = [
+    {symbol: 'AAPL', quantity: 10, marketValue: 1_800, avgCost: 150},
+    {symbol: 'MSFT', quantity: 5, marketValue: 2_000, avgCost: 300},
+];
+
+describe('describeOrderEffect', () => {
+    it('sizes a buy against the whole account and names the largest position after it', () => {
+        const effect = describeOrderEffect({side: 'buy', symbol: 'aapl', quantity: 10, price: 150, cash: 96_200, positions});
+        expect(effect).toEqual({side: 'buy', estTotal: 1_500, shareOfAccount: 0.015, largestAfter: {symbol: 'AAPL', weight: 0.033}, cashAfter: 94_700, cashAfterWeight: 0.947});
+    });
+
+    it('reports a new symbol that becomes the largest position', () => {
+        const effect = describeOrderEffect({side: 'buy', symbol: 'NVDA', quantity: 40, price: 100, cash: 96_200, positions});
+        expect(effect?.side === 'buy' && effect.largestAfter).toEqual({symbol: 'NVDA', weight: 0.04});
+    });
+
+    it('has nothing to say about a buy with no price', () => {
+        expect(describeOrderEffect({side: 'buy', symbol: 'AAPL', quantity: 10, price: null, cash: 96_200, positions})).toBeNull();
+        expect(describeOrderEffect({side: 'buy', symbol: 'AAPL', quantity: 0, price: 150, cash: 96_200, positions})).toBeNull();
+    });
+
+    it('describes a sell by shares left and the estimated realized result, price or no price', () => {
+        expect(describeOrderEffect({side: 'sell', symbol: 'AAPL', quantity: 5, price: 200, cash: 0, positions}))
+            .toEqual({side: 'sell', quantity: 5, owned: 10, sharesAfter: 5, avgCost: 150, estRealizedPnl: 250});
+        expect(describeOrderEffect({side: 'sell', symbol: 'AAPL', quantity: 5, price: null, cash: 0, positions}))
+            .toEqual({side: 'sell', quantity: 5, owned: 10, sharesAfter: 5, avgCost: 150, estRealizedPnl: null});
+        expect(describeOrderEffect({side: 'sell', symbol: 'AAPL', quantity: 50, price: 200, cash: 0, positions})?.side === 'sell').toBe(true);
+        expect(describeOrderEffect({side: 'sell', symbol: 'ZZZ', quantity: 5, price: 200, cash: 0, positions})).toBeNull();
+    });
+});
+
+describe('estRealizedPnl', () => {
+    it('is (price − average cost) × shares, or unknown without a price', () => {
+        expect(estRealizedPnl(200, 180, 5)).toBe(100);
+        expect(estRealizedPnl(150, 180, 2)).toBe(-60);
+        expect(estRealizedPnl(null, 180, 5)).toBeNull();
+        expect(estRealizedPnl(200, undefined, 5)).toBeNull();
+    });
+});
 
 describe('affordableShares', () => {
     it('is whole shares at the price, or null when the price is unknown', () => {

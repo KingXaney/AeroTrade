@@ -6,7 +6,7 @@ import {getCurrentUserId} from "@/lib/actions/watchlist.actions";
 import {getAccountsForUser, getPortfolio, toAccountSummary} from "@/lib/trading/account";
 import TradeDesk from "@/components/trade/TradeDesk";
 import MarketStatus from "@/components/system/MarketStatus";
-import {marketStatus} from "@/lib/prices/market-hours";
+import {describeQueuedFill, marketStatus} from "@/lib/prices/market-hours";
 import OpenPositionsStrip from "@/components/trade/OpenPositionsStrip";
 import AccountSwitcher from "@/components/trade/AccountSwitcher";
 
@@ -65,7 +65,8 @@ const TradePage = async ({searchParams}: TradePageProps) => {
                 orderSymbol={orderSymbol}
                 cash={portfolio.cash}
                 accountId={activeId}
-                positions={portfolio.positions.map((p) => ({symbol: p.symbol, quantity: p.quantity}))}
+                positions={portfolio.positions.map((p) => ({symbol: p.symbol, quantity: p.quantity, marketValue: p.marketValue, avgCost: p.avgCost}))}
+                queueNote={describeQueuedFill(status)}
             />
 
             {/* Open positions — compact quick-sell; full holdings & history live on /portfolio */}

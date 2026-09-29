@@ -8,6 +8,7 @@ import Link from "next/link";
 import {X, Trash2} from "lucide-react";
 import ChatMessage from "@/components/chat/ChatMessage";
 import {describeChatError} from "@/lib/ai/chat-errors";
+import {subscribeAsk} from "@/lib/chat/ask";
 import {CHAT_WELCOME_MESSAGE, CHAT_SUGGESTIONS} from "@/lib/constants";
 import {cn} from "@/lib/utils";
 
@@ -19,6 +20,8 @@ type ChatPanelProps = {
     onClose: () => void;
     initialMessages: UIMessage[];
     onMessagesChange: (messages: UIMessage[]) => void;
+    // A question typed by an "Ask in chat" link before the panel opened. Prefill only.
+    initialInput?: string | null;
 };
 
 const SIZE_KEY = (userId: string) => `aero-chat-size:${userId}`;
@@ -43,9 +46,9 @@ const loadSize = (userId: string): {width: number; height: number} => {
 
 type ResizeEdge = 'top' | 'left' | 'corner';
 
-const ChatPanel = ({userId, onClose, initialMessages, onMessagesChange}: ChatPanelProps) => {
+const ChatPanel = ({userId, onClose, initialMessages, onMessagesChange, initialInput}: ChatPanelProps) => {
     const router = useRouter();
-    const [input, setInput] = useState('');
+    const [input, setInput] = useState(initialInput ?? '');
     const listRef = useRef<HTMLDivElement>(null);
     const inputRef = useRef<HTMLInputElement>(null);
 
@@ -112,6 +115,13 @@ const ChatPanel = ({userId, onClose, initialMessages, onMessagesChange}: ChatPan
     useEffect(() => {
         inputRef.current?.focus();
     }, []);
+
+    // An Ask link clicked while the panel is open replaces the draft and refocuses the
+    // composer. Nothing is sent: the reader still presses Send.
+    useEffect(() => subscribeAsk((text) => {
+        setInput(text);
+        inputRef.current?.focus();
+    }), []);
 
     // Auto-scroll to bottom on new messages or token streams.
     useEffect(() => {

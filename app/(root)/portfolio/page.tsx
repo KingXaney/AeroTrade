@@ -18,6 +18,7 @@ import AnalyticsStats from "@/components/analytics/AnalyticsStats";
 import PerformanceChart from "@/components/analytics/PerformanceChart";
 import ExportCsvButton from "@/components/analytics/ExportCsvButton";
 import IncomeActivity from "@/components/trade/IncomeActivity";
+import WhatTheseMean from "@/components/learn/WhatTheseMean";
 import Panel from "@/components/primitives/Panel";
 import SectionHeading from "@/components/primitives/SectionHeading";
 
@@ -107,12 +108,12 @@ const PortfolioPage = async ({searchParams}: PortfolioPageProps) => {
                         </p>
                         <PerformanceChart series={analytics.series} accountName={account.name} />
                     </section>
-                    <AnalyticsStats analytics={analytics} />
+                    <AnalyticsStats analytics={analytics} definitions />
                 </>
             )}
 
             {/* Account summary */}
-            <AccountSummary portfolio={portfolio} income={analytics?.income} />
+            <AccountSummary portfolio={portfolio} income={analytics?.income} definitions />
 
             {/* Holdings */}
             <section className="glass-panel rounded-xl p-5">
@@ -127,6 +128,7 @@ const PortfolioPage = async ({searchParams}: PortfolioPageProps) => {
                 <Panel id="income" aria-labelledby="income-heading">
                     <SectionHeading id="income-heading">Income</SectionHeading>
                     <IncomeActivity activity={income} />
+                    <WhatTheseMean keys={['apy', 't-bill-rate', 'ex-date', 'pay-date']} />
                 </Panel>
             )}
 

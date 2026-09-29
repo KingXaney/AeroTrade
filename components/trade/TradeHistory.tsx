@@ -1,5 +1,7 @@
 import Link from "next/link";
+import type {ReactNode} from "react";
 import {cn, formatPrice, getChangeColorClass} from "@/lib/utils";
+import {REPLAY_COPY} from "@/lib/learn/copy/replay";
 
 // Eastern time, named: the server may sit in UTC and every fill time on this app is
 // described in ET.
@@ -24,9 +26,12 @@ type Props = {
     trades: PaperTradeRecord[];
     totalCount?: number;      // the account's full trade count, when the list is capped
     exportHref?: string;      // where the complete history lives
+    // The one "What the rule saw" disclosure an automated fill may carry (strategy
+    // detail page only). A server render prop: the dashboard widget passes nothing.
+    detail?: (trade: PaperTradeRecord) => ReactNode;
 };
 
-const TradeHistory = ({trades, totalCount, exportHref}: Props) => {
+const TradeHistory = ({trades, totalCount, exportHref, detail}: Props) => {
     if (trades.length === 0) {
         return <p className="text-sm text-fg-muted p-4">No trades yet. Place your first order to get started.</p>;
     }
@@ -38,6 +43,7 @@ const TradeHistory = ({trades, totalCount, exportHref}: Props) => {
                 const isBuy = t.side === 'buy';
                 const source = t.source ? SOURCE_LABEL[t.source] : undefined;
                 const sourceTitle = t.source ? SOURCE_TITLE[t.source] : undefined;
+                const detailNode = detail ? detail(t) : null;
                 return (
                     <div key={t.id}
                          className="flex items-center justify-between px-4 py-2.5 rounded-lg border bg-surface-2/40 border-line-strong/20">
@@ -66,6 +72,14 @@ const TradeHistory = ({trades, totalCount, exportHref}: Props) => {
                                 )}
                                 {t.reason && (
                                     <p className="mt-0.5 text-[11px] text-fg-muted leading-snug">{t.reason}</p>
+                                )}
+                                {detailNode && (
+                                    <details data-replay className="mt-1">
+                                        <summary className="font-mono cursor-pointer list-none marker:content-none [&::-webkit-details-marker]:hidden text-[11px] text-brand hover:underline">
+                                            {REPLAY_COPY.summary}
+                                        </summary>
+                                        {detailNode}
+                                    </details>
                                 )}
                             </div>
                         </div>

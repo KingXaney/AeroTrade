@@ -38,7 +38,11 @@ The other scripts follow the same shape, one per change set: `qa-foundations.mjs
 `qa-news-feed.mjs`, `qa-strategies.mjs` (seeds the system-owned strategy accounts directly — the
 daily job never runs in this harness), `qa-income.mjs` (interest and dividends: runs the REAL nightly
 income job through the Inngest dev server, scoped to its own account; without the dev server on :8288
-it runs only the page checks)
+it runs only the page checks),
+`qa-learn.mjs` (the First-week checklist, /learn, the ⌘K glossary rows, Guess the Verdict and
+"What the rule saw" on a seeded strategy page, an "Ask in chat" prefill), `qa-tutor.mjs` (the
+chat's three rate-limit windows via seeded `ratelimits` rows, then the prefill — the tutor's
+answers themselves need a Gemini key and are checked by hand)
 and `qa-auth.mjs` (password reset end to end — it reads the token out of the
 throwaway Mongo, since the harness has no SMTP). They share one database, so each
 scopes its assertions to the user it signs up.

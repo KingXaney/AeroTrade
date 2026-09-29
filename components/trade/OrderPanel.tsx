@@ -7,7 +7,9 @@ import {cn, formatPrice} from "@/lib/utils";
 import {useDebounce} from "@/hooks/useDebounce";
 import {getQuote, searchStocks} from "@/lib/actions/finnhub.actions";
 import {placeOrder} from "@/lib/actions/trading.actions";
-import {checkOrder, presetQuantities} from "@/lib/trading/order-math";
+import {checkOrder, describeOrderEffect, presetQuantities, type PositionLike} from "@/lib/trading/order-math";
+import {orderEffectLine, queueLine} from "@/lib/learn/copy/trade";
+import WhatTheseMean from "@/components/learn/WhatTheseMean";
 
 type OrderPanelProps = {
     defaultSymbol?: string;
@@ -15,14 +17,20 @@ type OrderPanelProps = {
     accountId: string;
     // What the active account holds, so the ticket can say how many shares a sell
     // can touch and offer sell presets. Optional: the dashboard widget may omit it.
-    positions?: readonly {symbol: string; quantity: number}[];
+    positions?: readonly PositionLike[];
+    // What a real broker would do with the order right now (null while the session is
+    // open); computed on the server so the ticket never disagrees with MarketStatus.
+    queueNote?: string | null;
+    // The 360px dashboard ticket: the first two facts of the consequence line, no queue
+    // line, no definitions.
+    compact?: boolean;
     // Called when the user *commits* a symbol (picks a search hit, or leaves the field
     // with a new one). The trade desk uses it to move the chart; the dashboard's
     // quick-trade widget leaves it unset, so it never navigates anyone anywhere.
     onSymbolCommit?: (symbol: string) => void;
 };
 
-const OrderPanel = ({defaultSymbol = '', cash, accountId, positions = [], onSymbolCommit}: OrderPanelProps) => {
+const OrderPanel = ({defaultSymbol = '', cash, accountId, positions = [], onSymbolCommit, queueNote = null, compact = false}: OrderPanelProps) => {
     const router = useRouter();
     const [symbol, setSymbol] = useState(defaultSymbol.toUpperCase());
     const [side, setSide] = useState<'buy' | 'sell'>('buy');
@@ -112,6 +120,8 @@ const OrderPanel = ({defaultSymbol = '', cash, accountId, positions = [], onSymb
     const owned = positions.find((p) => p.symbol.toUpperCase() === symbol)?.quantity ?? 0;
     const check = checkOrder({side, quantity: qtyNum, price, cash, owned});
     const presets = presetQuantities(side, {cash, price, owned});
+    // Numbers, not a lesson: what this order does to the account at the last price.
+    const effect = symbol ? describeOrderEffect({side, symbol, quantity: qtyNum, price, cash, positions}) : null;
     // Advisory only: a definite problem (over-sell, over-budget at the last price)
     // blocks the button; an unknown price never does — executeOrder is the authority.
     const blocked = symbol !== '' && !check.ok;
@@ -241,6 +251,16 @@ const OrderPanel = ({defaultSymbol = '', cash, accountId, positions = [], onSymb
                 {symbol && check.message && (
                     <p role="alert" className="mt-1 text-xs text-negative">{check.message}</p>
                 )}
+                {effect && (
+                    <p className="mt-1.5 text-[11px] text-fg-muted" style={{fontFamily: 'var(--type-mono)'}} data-testid="order-effect">
+                        {orderEffectLine(effect, compact)}
+                    </p>
+                )}
+                {!compact && queueNote && (
+                    <p className="mt-1 text-[11px] text-fg-muted" style={{fontFamily: 'var(--type-mono)'}} data-testid="order-queue">
+                        {queueLine(queueNote)}
+                    </p>
+                )}
             </div>
 
             {/* Last price + estimate */}
@@ -272,6 +292,7 @@ const OrderPanel = ({defaultSymbol = '', cash, accountId, positions = [], onSymb
             >
                 {submitting ? 'Placing…' : `${side === 'buy' ? 'Buy' : 'Sell'} ${symbol || ''}`.trim()}
             </button>
+            {!compact && <WhatTheseMean keys={['buying-power', 'market-order', 'avg-cost']} className="mt-0" />}
         </form>
     );
 };

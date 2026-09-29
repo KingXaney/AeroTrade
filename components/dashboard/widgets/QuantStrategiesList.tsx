@@ -56,9 +56,10 @@ const QuantStrategiesList = ({rows, span}: {rows: StrategyLeaderboardRow[]; span
                                                 </>
                                             )}
                                         </div>
-                                        <MicroLabel as="div" className="truncate">
-                                            {row.family}{wide ? ` · ${live ? 'since launch' : 'not started'}` : ''}
-                                        </MicroLabel>
+                                        {/* Wide rows have room for the rule in one sentence; narrow ones keep the family. */}
+                                        {wide
+                                            ? <p className="text-[11px] text-fg-muted truncate" data-beginner-line>{row.beginnerLine}</p>
+                                            : <MicroLabel as="div" className="truncate">{row.family}</MicroLabel>}
                                     </div>
                                     <div className="font-mono flex items-center gap-2 shrink-0">
                                         {domain && live && (

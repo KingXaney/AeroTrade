@@ -12,7 +12,7 @@ import {
     type ChatErrorCode,
 } from '@/lib/ai/chat-errors';
 
-const CODES: ChatErrorCode[] = ['unauthorized', 'bad_request', 'conversation_too_long', 'unavailable'];
+const CODES: ChatErrorCode[] = ['unauthorized', 'bad_request', 'conversation_too_long', 'rate_limited', 'capacity_reached', 'unavailable'];
 
 describe('round trip', () => {
     it('recovers every code the route can send', () => {
@@ -40,6 +40,14 @@ describe('actions', () => {
     it('sends an expired session to sign-in', () => {
         const wire = JSON.stringify(chatErrorBody('unauthorized'));
         expect(describeChatError(new Error(wire)).action).toBe('sign_in');
+    });
+
+    it('offers no retry for a limited request, and never calls the assistant broken', () => {
+        for (const code of ['rate_limited', 'capacity_reached'] as const) {
+            const described = describeChatError(new Error(JSON.stringify(chatErrorBody(code))));
+            expect(described.action, code).toBe('none');
+            expect(described.message, code).not.toMatch(/unavailable|broken|error/i);
+        }
     });
 
     it('offers retry for a transient failure', () => {

@@ -33,6 +33,9 @@ const PaperTradeSchema = new Schema<PaperTradeDoc>({
 });
 
 PaperTradeSchema.index({accountId: 1, createdAt: -1});
+// The learn surfaces ask "has this user ever placed an order themselves" and, later,
+// for the first such fill — both keyed on the source, in order.
+PaperTradeSchema.index({userId: 1, source: 1, createdAt: 1});
 // Partial, not sparse: a sparse compound index would still index every row (accountId is
 // always present) and collide on the missing key.
 PaperTradeSchema.index({accountId: 1, idempotencyKey: 1}, {unique: true, partialFilterExpression: {idempotencyKey: {$exists: true}}});

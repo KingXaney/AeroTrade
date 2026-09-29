@@ -5,6 +5,7 @@ import {useRouter} from "next/navigation";
 import {toast} from "sonner";
 import {cn, formatPrice} from "@/lib/utils";
 import {placeOrder} from "@/lib/actions/trading.actions";
+import {estRealizedPnl} from "@/lib/trading/order-math";
 import {Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle} from "@/components/ui/dialog";
 
 // Sell dialog for one open position — pick how many shares to sell via free
@@ -107,6 +108,16 @@ const SellPositionDialog = ({position, accountId, onClose}: {position: EnrichedP
                             {estProceeds !== null ? formatPrice(estProceeds) : '—'}
                         </span>
                     </div>
+                    {/* The arithmetic a sell locks in, at the last price. */}
+                    {(() => {
+                        const pnl = estRealizedPnl(typeof price === 'number' ? price : null, position.avgCost, qtyNum);
+                        return (
+                            <div className="flex items-center justify-between text-[11px] text-fg-muted" style={{fontFamily: 'var(--type-mono)'}} data-testid="sell-est-pnl">
+                                <span>Est. realized P&L</span>
+                                <span>{pnl === null ? '—' : `${pnl >= 0 ? '+' : ''}${formatPrice(pnl)} · avg cost ${formatPrice(position.avgCost)}`}</span>
+                            </div>
+                        );
+                    })()}
 
                     <button
                         type="submit"

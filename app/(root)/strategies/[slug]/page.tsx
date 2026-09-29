@@ -4,20 +4,25 @@ import {getCurrentUserId} from "@/lib/actions/watchlist.actions";
 import {getEasternDateString} from "@/lib/utils";
 import {STRATEGIES_DISCLAIMER} from "@/lib/strategies/catalog";
 import {getStrategyDetail} from "@/lib/strategies/queries";
-import {pickPerfMode, toPerfSeries} from "@/lib/strategies/views";
+import {formatSignalValue, pickPerfMode, toPerfSeries, visibleSignalColumns} from "@/lib/strategies/views";
 import {UNIVERSES} from "@/lib/strategies/universe";
+import {describeReplay, fillDate, isReplayExpired, matchFillToRun} from "@/lib/learn/replay";
+import {explainVerdict, pickQuizRows} from "@/lib/learn/verdict";
 import MicroLabel from "@/components/primitives/MicroLabel";
 import Panel from "@/components/primitives/Panel";
 import SectionHeading from "@/components/primitives/SectionHeading";
 import AccountSummary from "@/components/trade/AccountSummary";
 import PortfolioHoldings from "@/components/trade/PortfolioHoldings";
 import TradeHistory from "@/components/trade/TradeHistory";
+import DecisionReplay from "@/components/strategies/DecisionReplay";
 import FollowButton from "@/components/strategies/FollowButton";
 import LatestDecision from "@/components/strategies/LatestDecision";
 import SignalBoard from "@/components/strategies/SignalBoard";
 import SimulatedTradeList from "@/components/strategies/SimulatedTradeList";
 import StrategyExplainer from "@/components/strategies/StrategyExplainer";
 import StrategyPerformance from "@/components/strategies/StrategyPerformance";
+import VerdictQuiz, {type QuizRow} from "@/components/strategies/VerdictQuiz";
+import WhatTheseMean from "@/components/learn/WhatTheseMean";
 
 type StrategyPageProps = {
     params: Promise<{slug: string}>;
@@ -39,6 +44,37 @@ const StrategyPage = async ({params}: StrategyPageProps) => {
     const liveSeries = analytics?.series ?? [];
     const simulatedSeries = backtest ? toPerfSeries(backtest.points, backtest.benchmark) : [];
     const universeSize = UNIVERSES[def.universe].length;
+    const today = getEasternDateString();
+
+    // Only the columns the board actually shows get a definition or a quiz cell — a hidden
+    // column is not there to explain.
+    const shownColumns = visibleSignalColumns(def.signalColumns, latestRun?.board ?? []);
+    const boardTerms = shownColumns.map((column) => column.glossary ?? column.key);
+    const quizRows: QuizRow[] = latestRun && latestRun.board.length > 0
+        ? pickQuizRows(latestRun.board).map((row) => ({
+            symbol: row.symbol,
+            cells: shownColumns.map((column) => ({label: column.label, value: formatSignalValue(row.values[column.key], column.format)})),
+            ...explainVerdict(row, latestRun),
+        }))
+        : [];
+
+    // The one disclosure an automated fill carries: the stored row and planned order the
+    // rule looked at that morning.
+    const replayFor = (trade: PaperTradeRecord) => {
+        if (trade.source !== 'strategy') return null;
+        const date = fillDate(trade.createdAt);
+        const run = detail.replays[date] ?? null;
+        const match = run ? matchFillToRun(run, trade.symbol, trade.side) : null;
+        return (
+            <DecisionReplay
+                columns={def.signalColumns}
+                row={match?.row ?? null}
+                order={match?.order ?? null}
+                caption={describeReplay(match, run?.asOf ?? null, isReplayExpired(date, today))}
+                strategyName={def.name}
+            />
+        );
+    };
 
     return (
         <div className="space-y-4">
@@ -56,6 +92,7 @@ const StrategyPage = async ({params}: StrategyPageProps) => {
                             {started ? `live since ${liveSince}` : <span className="text-warning">not started</span>}
                         </p>
                         <p className="text-sm text-fg-soft mt-2 max-w-2xl">{def.explainer.summary}</p>
+                        <p className="font-mono text-[11px] text-fg-muted mt-1" id="strategy-beginner-line">In one line: {def.explainer.beginnerLine}</p>
                     </div>
                 </div>
                 <FollowButton slug={def.id} followed={detail.followed} />
@@ -63,7 +100,7 @@ const StrategyPage = async ({params}: StrategyPageProps) => {
 
             <StrategyExplainer def={def} lastRebalanceDate={state?.lastRebalanceDate ?? null} defaultOpen={!started} />
 
-            {analytics && <AccountSummary portfolio={analytics.summary} />}
+            {analytics && <AccountSummary portfolio={analytics.summary} definitions />}
 
             <StrategyPerformance
                 name={def.name}
@@ -101,7 +138,16 @@ const StrategyPage = async ({params}: StrategyPageProps) => {
                     <LatestDecision
                         run={latestRun}
                         headline={latestRun ? detail.lastActionLine : undefined}
-                        signals={<div id="strategy-signals"><SignalBoard columns={def.signalColumns} run={latestRun} /></div>}
+                        signals={(
+                            /* While the quiz is open, the board's verdict cells are hidden with CSS so the
+                               server-rendered board needs no state. The definitions and the quiz are
+                               siblings of #signal-board: it keeps exactly one disclosure of its own. */
+                            <div id="strategy-signals" className="[&:has([data-verdict-quiz][open])_[data-verdict]]:invisible">
+                                <SignalBoard columns={def.signalColumns} run={latestRun} />
+                                {latestRun && latestRun.board.length > 0 && <WhatTheseMean id="board-terms" keys={boardTerms} />}
+                                {quizRows.length > 0 && <VerdictQuiz rows={quizRows} />}
+                            </div>
+                        )}
                     />
                 </Panel>
             </div>
@@ -115,7 +161,7 @@ const StrategyPage = async ({params}: StrategyPageProps) => {
                 </div>
                 {trades.length === 0
                     ? <p className="text-sm text-fg-muted p-4">No fills yet — the first orders are placed on the next run that finds a signal.</p>
-                    : <TradeHistory trades={trades} totalCount={analytics?.tradeCount} />}
+                    : <TradeHistory trades={trades} totalCount={analytics?.tradeCount} detail={replayFor} />}
 
                 {/* Hypothetical fills fold away under the real ones, never beside them. */}
                 <div className="mt-4 pt-4 border-t border-line-strong/20" id="strategy-simulated-trades">

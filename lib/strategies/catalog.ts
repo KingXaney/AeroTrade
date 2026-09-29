@@ -4,6 +4,7 @@
 
 import {DEFAULT_DRIFT_BAND, ENGINE_VERSION} from '@/lib/strategies/config';
 import type {StrategyDefinition, StrategyId} from '@/lib/strategies/types';
+import {shortHelp} from '@/lib/learn/glossary';
 
 // Rendered once per strategy page, never twice. It used to appear at the foot of the
 // detail page AND inside the reading guide, which is how a disclaimer stops being read.
@@ -21,7 +22,7 @@ const SURVIVORSHIP_CAVEAT =
 const TOTAL_RETURN_CAVEAT =
     'Signals use total return (dividends included) because the T-bill hurdle is entirely yield; the account itself is also paid those dividends, as cash.';
 
-const CLOSE_COLUMN = {key: 'close', label: 'Last close', format: 'price'} as const;
+const CLOSE_COLUMN = {key: 'close', label: 'Last close', format: 'price', glossary: 'close', help: shortHelp('close')} as const;
 
 export const STRATEGIES: readonly StrategyDefinition[] = [
     {
@@ -36,7 +37,7 @@ export const STRATEGIES: readonly StrategyDefinition[] = [
         driftBand: DEFAULT_DRIFT_BAND,
         signalColumns: [
             CLOSE_COLUMN,
-            {key: 'sinceEntry', label: 'Since entry', format: 'pct'},
+            {key: 'sinceEntry', label: 'Since entry', format: 'pct', glossary: 'since-entry', help: shortHelp('since-entry')},
         ],
         explainer: {
             summary: 'Buys the S&P 500 ETF on its first run and never trades again — the bar every other strategy has to clear.',
@@ -54,7 +55,7 @@ export const STRATEGIES: readonly StrategyDefinition[] = [
                 'Its result is a property of the start date: buying at a market top can take years to recover.',
             ],
             watching: 'Nothing after the first buy — the board simply shows SPY\'s last close and the gain since entry.',
-            beginnerLine: 'The strategy most professionals fail to beat is to buy the index and stop looking.',
+            beginnerLine: 'Owns the index and does nothing else — the bar most professional managers trail.',
             cashReason: 'In cash — the first purchase has not happened yet; it fills on the next session with a fresh SPY bar.',
             caveats: [
                 ...COMMON_CAVEATS,
@@ -74,9 +75,9 @@ export const STRATEGIES: readonly StrategyDefinition[] = [
         driftBand: DEFAULT_DRIFT_BAND,
         signalColumns: [
             CLOSE_COLUMN,
-            {key: 'weight', label: 'Current weight', format: 'pct'},
-            {key: 'target', label: 'Target', format: 'pct'},
-            {key: 'drift', label: 'Drift', format: 'pct'},
+            {key: 'weight', label: 'Current weight', format: 'pct', glossary: 'weight', help: shortHelp('weight')},
+            {key: 'target', label: 'Target', format: 'pct', glossary: 'target', help: shortHelp('target')},
+            {key: 'drift', label: 'Drift', format: 'pct', glossary: 'drift', help: shortHelp('drift')},
         ],
         explainer: {
             summary: 'The classic balanced portfolio: 60% stocks (SPY), 40% bonds (AGG), put back to target every quarter.',
@@ -96,7 +97,7 @@ export const STRATEGIES: readonly StrategyDefinition[] = [
                 'Quarterly rebalancing is slow; a crash and recovery inside one quarter is simply ridden out.',
             ],
             watching: 'Each leg\'s current weight, its target and the drift between them.',
-            beginnerLine: 'Own two things that do not move together, and keep putting them back in proportion.',
+            beginnerLine: 'Owns two things that do not move together and keeps putting them back in proportion.',
             cashReason: 'In cash — the first quarterly allocation has not been made yet; it fills on the next session when both SPY and AGG have fresh bars.',
             caveats: [
                 ...COMMON_CAVEATS,
@@ -116,10 +117,10 @@ export const STRATEGIES: readonly StrategyDefinition[] = [
         driftBand: DEFAULT_DRIFT_BAND,
         signalColumns: [
             CLOSE_COLUMN,
-            {key: 'sma50', label: 'SMA50', format: 'price'},
-            {key: 'sma200', label: 'SMA200', format: 'price'},
-            {key: 'spread', label: 'SMA50 vs SMA200', format: 'pct'},
-            {key: 'trendOn', label: 'Trend on', format: 'bool'},
+            {key: 'sma50', label: 'SMA50', format: 'price', glossary: 'sma50', help: shortHelp('sma50')},
+            {key: 'sma200', label: 'SMA200', format: 'price', glossary: 'sma200', help: shortHelp('sma200')},
+            {key: 'spread', label: 'SMA50 vs SMA200', format: 'pct', glossary: 'spread', help: shortHelp('spread')},
+            {key: 'trendOn', label: 'Trend on', format: 'bool', glossary: 'trend-on', help: shortHelp('trend-on')},
         ],
         explainer: {
             summary: 'Holds each of the eleven S&P sector ETFs while its 50-day average is above its 200-day average, and steps out when it is not.',
@@ -140,7 +141,7 @@ export const STRATEGIES: readonly StrategyDefinition[] = [
                 'A V-shaped crash and recovery (March 2020) sells near the bottom and buys back well above it.',
             ],
             watching: 'Each sector\'s close, SMA50, SMA200, the spread between the averages and whether the trend is on.',
-            beginnerLine: 'Own what is trending up, step aside from what is trending down, and accept being late both ways.',
+            beginnerLine: 'Owns what is trending up, steps aside from what is trending down, and accepts being late both ways.',
             cashReason: 'In cash — no sector ETF has its 50-day average above its 200-day average right now.',
             caveats: [...COMMON_CAVEATS],
         },
@@ -157,9 +158,9 @@ export const STRATEGIES: readonly StrategyDefinition[] = [
         driftBand: DEFAULT_DRIFT_BAND,
         signalColumns: [
             CLOSE_COLUMN,
-            {key: 'r12', label: '12m total return', format: 'pct'},
-            {key: 'aboveHurdle', label: 'Beats T-bills', format: 'bool'},
-            {key: 'pick', label: 'Would be chosen', format: 'bool'},
+            {key: 'r12', label: '12m total return', format: 'pct', glossary: 'r12', help: shortHelp('r12')},
+            {key: 'aboveHurdle', label: 'Beats T-bills', format: 'bool', glossary: 'above-hurdle', help: shortHelp('above-hurdle')},
+            {key: 'pick', label: 'Would be chosen', format: 'bool', glossary: 'pick', help: shortHelp('pick')},
         ],
         explainer: {
             summary: 'Gary Antonacci\'s Global Equities Momentum: each month hold US or international stocks if stocks beat T-bills over the past year, otherwise bonds.',
@@ -181,7 +182,7 @@ export const STRATEGIES: readonly StrategyDefinition[] = [
                 'In 2022 bonds fell too, so the "safe" leg lost money as well.',
             ],
             watching: 'The 12-month total return of each of the four ETFs, whether SPY clears the T-bill hurdle, and which ETF the rule would choose today.',
-            beginnerLine: 'Own the winner of the past year — unless the winner is cash, in which case own bonds.',
+            beginnerLine: 'Owns the past year\'s winner — unless the winner is cash, in which case it owns bonds.',
             cashReason: 'In cash — the first monthly allocation has not been made yet; it fills on the next session when the chosen ETF has a fresh bar.',
             caveats: [...COMMON_CAVEATS, TOTAL_RETURN_CAVEAT],
         },
@@ -198,8 +199,8 @@ export const STRATEGIES: readonly StrategyDefinition[] = [
         driftBand: DEFAULT_DRIFT_BAND,
         signalColumns: [
             CLOSE_COLUMN,
-            {key: 'momentum', label: '12-1 return', format: 'pct'},
-            {key: 'rank', label: 'Rank', format: 'rank'},
+            {key: 'momentum', label: '12-1 return', format: 'pct', glossary: 'momentum-12-1', help: shortHelp('momentum-12-1')},
+            {key: 'rank', label: 'Rank', format: 'rank', glossary: 'momentum-rank', help: shortHelp('momentum-rank')},
         ],
         explainer: {
             summary: 'Each month buys the eight large caps with the strongest return over the past twelve months, skipping the most recent month.',
@@ -221,7 +222,7 @@ export const STRATEGIES: readonly StrategyDefinition[] = [
                 'High turnover — a monthly reshuffle of eight names racks up trading costs the paper account does not charge.',
             ],
             watching: 'Each stock\'s 12-1 return and its rank in the universe.',
-            beginnerLine: 'Buy what has been going up for a year, ignore the last month, and reshuffle monthly.',
+            beginnerLine: 'Owns what has been going up for a year, ignores the last month, and reshuffles monthly.',
             cashReason: 'In cash — the first monthly ranking has not been traded yet; it fills on the next session once enough history is available.',
             caveats: [...COMMON_CAVEATS, SURVIVORSHIP_CAVEAT],
         },
@@ -238,10 +239,10 @@ export const STRATEGIES: readonly StrategyDefinition[] = [
         driftBand: DEFAULT_DRIFT_BAND,
         signalColumns: [
             CLOSE_COLUMN,
-            {key: 'rsi2', label: 'RSI(2)', format: 'number'},
-            {key: 'sma5', label: 'SMA5', format: 'price'},
-            {key: 'sma200', label: 'SMA200', format: 'price'},
-            {key: 'aboveSma200', label: 'Above SMA200', format: 'bool'},
+            {key: 'rsi2', label: 'RSI(2)', format: 'number', glossary: 'rsi2', help: shortHelp('rsi2')},
+            {key: 'sma5', label: 'SMA5', format: 'price', glossary: 'sma5', help: shortHelp('sma5')},
+            {key: 'sma200', label: 'SMA200', format: 'price', glossary: 'sma200', help: shortHelp('sma200')},
+            {key: 'aboveSma200', label: 'Above SMA200', format: 'bool', glossary: 'above-sma200', help: shortHelp('above-sma200')},
         ],
         explainer: {
             summary: 'Larry Connors\' RSI-2: buy large caps in an uptrend after a sharp two-day dip and sell them on the first bounce above the 5-day average.',
@@ -263,7 +264,7 @@ export const STRATEGIES: readonly StrategyDefinition[] = [
                 'Many small trades: the paper account ignores the slippage and commissions that would erode a real version.',
             ],
             watching: 'Each stock\'s RSI(2), close, SMA5 and SMA200, and whether it is above its long-term average.',
-            beginnerLine: 'Buy the dip in a strong stock, sell the bounce, repeat.',
+            beginnerLine: 'Buys a strong stock on a two-day dip and sells the bounce.',
             cashReason: 'In cash — no large cap in an uptrend is oversold (RSI(2) below 10) right now.',
             caveats: [...COMMON_CAVEATS, SURVIVORSHIP_CAVEAT],
         },
@@ -280,9 +281,9 @@ export const STRATEGIES: readonly StrategyDefinition[] = [
         driftBand: DEFAULT_DRIFT_BAND,
         signalColumns: [
             CLOSE_COLUMN,
-            {key: 'high55', label: '55-day high', format: 'price'},
-            {key: 'low20', label: '20-day low', format: 'price'},
-            {key: 'vsHigh', label: 'vs 55-day high', format: 'pct'},
+            {key: 'high55', label: '55-day high', format: 'price', glossary: 'high55', help: shortHelp('high55')},
+            {key: 'low20', label: '20-day low', format: 'price', glossary: 'low20', help: shortHelp('low20')},
+            {key: 'vsHigh', label: 'vs 55-day high', format: 'pct', glossary: 'vs-high', help: shortHelp('vs-high')},
         ],
         explainer: {
             summary: 'The Turtle traders\' channel rule: buy a large cap when it closes above its 55-day high, sell when it closes below its 20-day low.',
@@ -304,7 +305,7 @@ export const STRATEGIES: readonly StrategyDefinition[] = [
                 'A gap down through the 20-day low fills far below the trigger.',
             ],
             watching: 'Each stock\'s close, 55-day high, 20-day low and distance from the entry channel.',
-            beginnerLine: 'Buy new highs, sell new lows, and let the winners run.',
+            beginnerLine: 'Buys new highs, sells new lows, and lets the winners run.',
             cashReason: 'In cash — no large cap has closed above its 55-day high right now.',
             caveats: [
                 ...COMMON_CAVEATS,
@@ -325,8 +326,8 @@ export const STRATEGIES: readonly StrategyDefinition[] = [
         driftBand: DEFAULT_DRIFT_BAND,
         signalColumns: [
             CLOSE_COLUMN,
-            {key: 'vol63', label: '63-day vol', format: 'pct'},
-            {key: 'rank', label: 'Rank', format: 'rank'},
+            {key: 'vol63', label: '63-day vol', format: 'pct', glossary: 'vol63', help: shortHelp('vol63')},
+            {key: 'rank', label: 'Rank', format: 'rank', glossary: 'vol-rank', help: shortHelp('vol-rank')},
         ],
         explainer: {
             summary: 'Each month holds the ten large caps with the lowest realised volatility over the past quarter.',
@@ -338,7 +339,7 @@ export const STRATEGIES: readonly StrategyDefinition[] = [
             ],
             why: [
                 'The low-volatility anomaly: boring stocks have delivered similar or better returns than exciting ones with much less drawdown, contrary to the textbook risk-return trade-off.',
-                'Leverage constraints and lottery-seeking push investors toward volatile names, leaving calm ones underpriced.',
+                'Leverage constraints and lottery-seeking push investors toward volatile names, leaving calm ones with less demand than their record would suggest.',
             ],
             fails: [
                 'It trails badly in strong bull markets and sharp rebounds, when the most volatile names lead.',
@@ -346,7 +347,7 @@ export const STRATEGIES: readonly StrategyDefinition[] = [
                 'Volatility is backward-looking — a calm stock can become a volatile one the day after it is bought.',
             ],
             watching: 'Each stock\'s 63-day realised volatility and its rank from calmest to wildest.',
-            beginnerLine: 'Own the stocks that do not make headlines.',
+            beginnerLine: 'Owns the stocks that do not make headlines.',
             cashReason: 'In cash — the first monthly ranking has not been traded yet; it fills on the next session once enough history is available.',
             caveats: [...COMMON_CAVEATS, SURVIVORSHIP_CAVEAT],
         },

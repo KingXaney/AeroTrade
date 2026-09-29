@@ -2,6 +2,8 @@ import Link from "next/link";
 import {cn} from "@/lib/utils";
 import WatchlistButton from "@/components/watchlist/WatchlistButton";
 import TradeLink from "@/components/trade/TradeLink";
+import Term from "@/components/primitives/Term";
+import WhatTheseMean from "@/components/learn/WhatTheseMean";
 
 const WatchlistTable = ({watchlist}: WatchlistTableProps) => {
     return (
@@ -12,8 +14,8 @@ const WatchlistTable = ({watchlist}: WatchlistTableProps) => {
                 <div>Asset / Protocol</div>
                 <div className="text-right">Price (USD)</div>
                 <div className="text-right">24h Chg</div>
-                <div className="text-right">Market Cap</div>
-                <div className="text-right">P/E Ratio</div>
+                <div className="text-right"><Term k="market-cap">Market Cap</Term></div>
+                <div className="text-right"><Term k="pe-ratio">P/E Ratio</Term></div>
                 <div className="text-right">Actions</div>
             </div>
 
@@ -111,6 +113,7 @@ const WatchlistTable = ({watchlist}: WatchlistTableProps) => {
                     </div>
                 </div>
             ))}
+            <WhatTheseMean keys={['market-cap', 'pe-ratio']} />
         </div>
     );
 };
