@@ -95,6 +95,10 @@ export const executeOrder = async (
         }
 
         const finalPositions = positions.filter((p) => p.quantity > 0);
+        // The trade row is stamped with the moment its cash moved, not when the row was
+        // inserted after it: the income job rebuilds each day's cash and holdings from trade
+        // times, and an order spanning midnight must land on the day it actually filled.
+        const filledAt = new Date();
         // `cash` doubles as a version stamp: every fill changes it, so a concurrent order
         // that landed first makes this write match nothing instead of overwriting it.
         const updated = await PaperAccount.updateOne(
@@ -118,6 +122,7 @@ export const executeOrder = async (
             ...(source ? {source} : {}),
             ...(reason ? {reason: reason.slice(0, TRADE_REASON_MAX)} : {}),
             ...(idempotencyKey ? {idempotencyKey} : {}),
+            createdAt: filledAt,
         });
 
         const verb = side === 'buy' ? 'Bought' : 'Sold';

@@ -7,6 +7,11 @@ export interface PaperPositionDoc {
     avgCost: number;
 }
 
+export interface IncomeTotalsDoc {
+    interest?: number;
+    dividends?: number;
+}
+
 export interface PaperAccountDoc extends Document {
     userId: string;
     name: string;
@@ -14,6 +19,10 @@ export interface PaperAccountDoc extends Document {
     startingBalance: number;
     inceptionAt: Date;
     positions: PaperPositionDoc[];
+    // Every AccountIncome row dated on or before this ET date is already in `cash`. Absent
+    // means nothing has been credited yet, and the income job replays from inception.
+    incomeThrough?: string;
+    incomeTotals?: IncomeTotalsDoc;
     createdAt: Date;
     updatedAt: Date;
 }
@@ -39,6 +48,13 @@ const PaperAccountSchema = new Schema<PaperAccountDoc>(
         // in toAccountSummary. Every creation site sets this explicitly.
         inceptionAt: {type: Date},
         positions: {type: [PaperPositionSchema], default: []},
+        // No defaults on either: a default would be hydrated onto every existing account and
+        // read as "credited through <nothing>" — the income job keys the back-credit on absence.
+        incomeThrough: {type: String},
+        incomeTotals: {
+            type: new Schema<IncomeTotalsDoc>({interest: {type: Number}, dividends: {type: Number}}, {_id: false}),
+            required: false,
+        },
     },
     {timestamps: true},
 );

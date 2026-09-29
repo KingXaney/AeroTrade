@@ -37,4 +37,5 @@ export const TRADE_REASON_MAX = 200;
 
 // Bump when rebalance/simulation/indicator semantics change; a strategy's own
 // `version` bumps for a rule or parameter change. Either re-runs its backtest.
-export const ENGINE_VERSION = '2';
+// '3': cash earns T-bill interest, holdings receive dividends, SPY benchmark is total return.
+export const ENGINE_VERSION = '3';

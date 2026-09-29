@@ -22,7 +22,7 @@ product tour and docs/specs/ for the design documents behind the larger features
   `MicroLabel`, `Badge`, `EmptyState`, `iconButton`. Hand-owned, and separate from
   `components/ui/` on purpose: that folder is the shadcn registry target and is regenerable.
 - `lib/news` ingest + sanitise + the per-user feed (`feed-prefs` client-safe, `feed` pure, `feed-store` server) · `lib/brain` entity graph · `lib/navigator` allocation rails · `lib/topics` followed topics (`starters` the curated set, `seed` what a new account gets, `insert` the one write path)
-- `lib/trading` paper accounts · `lib/dashboard` widget registry/layout · `lib/theme` palettes/styles · `lib/ai` models + chat tools
+- `lib/trading` paper accounts (`income` the accrual convention, `income-store` the nightly credit) · `lib/prices` bars, dividends, the T-bill rate, the SPY total-return index · `lib/dashboard` widget registry/layout · `lib/theme` palettes/styles · `lib/ai` models + chat tools
 - `lib/strategies` the quant strategies: pure catalog/rules/engine/simulator (one `runStrategyDay` for live and backtest), `store`/`queries` server side · `lib/prices` daily bars (Yahoo first, Stooq fallback), signals, NYSE calendar
 - `lib/inngest/functions.ts` every scheduled job · `database/models/` Mongoose models · `types/global.d.ts` ambient domain types
 
@@ -57,6 +57,13 @@ product tour and docs/specs/ for the design documents behind the larger features
    one included, goes through `filterBySources`: a hidden outlet is hidden whichever door it uses.
    Invariant 3 still holds — nothing here writes to `BrainEntity`, and `SOURCE_CAPS.web = 0` keeps
    topic search hits out of the brain.
+11. Paper accounts earn like a brokerage account: interest on cash, dividends on holdings, benchmark
+   = SPY total return. `lib/trading/income.ts` is the ONLY implementation of the accrual convention —
+   the nightly job, the back-credit and the strategy simulator all step its clock, and a parity test
+   holds simulator and live replay to identical rows. Income is an `AccountIncome` row, never a
+   `PaperTrade`. Missing rate or dividend data holds the `incomeThrough` watermark back; it must never
+   become a zero. Dividends are inferred from adjclose inside ONE Yahoo payload and stored — stored
+   adjcloses are never compared across fetches (Yahoo rebases them on every distribution).
 
 ## Next.js 16
 

@@ -5,6 +5,7 @@
 //   npm run trigger -- navigator                   weekly AI Navigator run
 //   npm run trigger -- news                        today's digest emails
 //   npm run trigger -- snapshots                   daily account + benchmark snapshots
+//   npm run trigger -- income                      credit interest + dividends through yesterday (back-credits new accounts)
 //   npm run trigger -- topics                      refresh every followed keyword set
 //   npm run trigger -- briefs                      generate today's topic briefs
 //   npm run trigger -- strategies                  run the quant strategies (fills only during the session)
@@ -18,6 +19,7 @@ const EVENTS = {
     navigator: 'app/run.ai.navigator',
     news: 'app/send.daily.news',
     snapshots: 'app/record.daily.snapshots',
+    income: 'app/credit.account.income',
     topics: 'app/refresh.topic.feeds',
     briefs: 'app/generate.topic.briefs',
     topic: 'topic/refresh.requested',

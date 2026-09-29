@@ -14,7 +14,7 @@ const POINTS: readonly {title: string; body: string}[] = [
     {title: 'Simulated', body: 'The same rule run over three years of stored daily closes ending the day before launch. A backtest: hypothetical, shown apart from live results and never blended into them.'},
     {title: 'Fills', body: 'A decision is made on the previous close and filled at the next session — live about five minutes after the open at the last price, simulated at the next day\'s open. No look-ahead.'},
     {title: 'Sizing', body: 'Whole shares only, sized from the previous close with a 1% buffer, keeping at least 1% cash. Small cash residues are normal.'},
-    {title: 'Costs', body: 'No commissions, no slippage and no dividends in either record, so long-only results understate what an index fund earns by roughly its yield.'},
+    {title: 'Costs and income', body: 'No commissions and no slippage. Both records earn like a brokerage account: cash earns the 13-week T-bill rate and holdings are paid their dividends. The benchmark is SPY\'s total return, dividends reinvested.'},
     {title: 'Universe', body: 'A fixed list chosen in 2026: SPY and other core ETFs, the eleven sector ETFs and forty large caps. Applied to earlier years it carries survivorship bias, which the simulated numbers inherit.'},
 ];
 

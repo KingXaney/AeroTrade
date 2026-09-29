@@ -11,6 +11,7 @@ export interface PriceBarDoc extends Document {
     low?: number;
     volume?: number;
     adjClose?: number;            // dividend-adjusted total-return close (Yahoo only)
+    dividend?: number;            // cash dividend per share, ex-date = this bar (Yahoo only; absent = unknown)
     source?: PriceBarSource;
 }
 
@@ -25,6 +26,7 @@ const PriceBarSchema = new Schema<PriceBarDoc>({
     low: {type: Number},
     volume: {type: Number},
     adjClose: {type: Number},
+    dividend: {type: Number},
     source: {type: String, enum: ['yahoo', 'stooq']},
 });
 

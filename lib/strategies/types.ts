@@ -1,3 +1,4 @@
+import type {IncomeRow} from "@/lib/trading/income";
 // Every shape the strategy engine, the rules, the simulator and the pages share.
 // Dependency-free on purpose: nothing here imports a rule, the engine or the DB.
 
@@ -167,4 +168,7 @@ export type SimulationResult = {
     trades: readonly SimTrade[];
     rejections: readonly {date: string; symbol: string; side: 'buy' | 'sell'; reason: string}[];
     stats: SeriesStats;
+    // Interest and dividends credited along the way (lib/trading/income.ts). Not persisted
+    // with the backtest; it is here so the parity test can hold it against the live replay.
+    income: readonly IncomeRow[];
 };

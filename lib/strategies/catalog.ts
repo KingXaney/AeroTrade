@@ -12,14 +12,14 @@ export const STRATEGIES_DISCLAIMER = 'Deterministic rules · no AI · paper mone
 const COMMON_CAVEATS: readonly string[] = [
     'Orders fill at the next session, not at the close that produced the signal.',
     'Buys are sized from the previous close in whole shares; a gap-up can bounce an order until the next day.',
-    'No fees and no slippage are charged, and the paper account receives no dividends.',
+    'No fees and no slippage are charged. Like a brokerage account, idle cash earns the 13-week T-bill rate and holdings receive their dividends, as cash.',
 ];
 
 const SURVIVORSHIP_CAVEAT =
     'The 40-name list was chosen in 2026 and applied to earlier years, so simulated results carry survivorship bias.';
 
 const TOTAL_RETURN_CAVEAT =
-    'Signals use total return (dividends included) because the T-bill hurdle is entirely yield; the paper account itself earns price return only.';
+    'Signals use total return (dividends included) because the T-bill hurdle is entirely yield; the account itself is also paid those dividends, as cash.';
 
 const CLOSE_COLUMN = {key: 'close', label: 'Last close', format: 'price'} as const;
 
@@ -58,7 +58,7 @@ export const STRATEGIES: readonly StrategyDefinition[] = [
             cashReason: 'In cash — the first purchase has not happened yet; it fills on the next session with a fresh SPY bar.',
             caveats: [
                 ...COMMON_CAVEATS,
-                'It understates a real S&P 500 index fund by the dividend yield (roughly 1–2% a year) because the paper account receives no dividends.',
+                'Dividends arrive as cash, which earns T-bill interest, while the benchmark reinvests them in SPY — so even this can trail "SPY, total return" slightly in a rising market.',
             ],
         },
     },

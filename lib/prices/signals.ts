@@ -12,6 +12,9 @@ export type Bar = {
     low?: number;
     volume?: number;
     adjClose?: number;
+    // Cash dividend per share with its ex-date on this bar, inferred from the adjclose step
+    // inside one Yahoo payload (lib/prices/yahoo.ts). Absent = unknown, not zero.
+    dividend?: number;
 };
 
 export type Signals = {

@@ -10,9 +10,13 @@ import {connectToDatabase} from "@/database/mongoose";
 import PaperAccount, {type PaperAccountDoc} from "@/database/models/paper-account.model";
 import PaperTrade from "@/database/models/paper-trade.model";
 import AccountSnapshot from "@/database/models/account-snapshot.model";
-import BenchmarkSnapshot from "@/database/models/benchmark-snapshot.model";
 import {BENCHMARK_SYMBOL, MAX_STARTING_BALANCE, MIN_STARTING_BALANCE, PAPER_STARTING_BALANCE} from "@/lib/constants";
 import {getEasternDateString} from "@/lib/utils";
+import {getBenchmarkIndex} from "@/lib/prices/benchmark-store";
+import {getLatestRatePoint} from "@/lib/prices/store";
+import AccountIncome from "@/database/models/account-income.model";
+import {apyFromDiscount, groupIncomeActivity, type IncomeActivity} from "@/lib/trading/income";
+import {appendLive} from "@/lib/prices/total-return";
 import {getQuote} from "@/lib/actions/finnhub.actions";
 import {
     buildPerfSeries,
@@ -49,6 +53,7 @@ export const toAccountSummary = (account: PaperAccountDoc): PaperAccountSummary 
     name: account.name || DEFAULT_ACCOUNT_NAME,
     inceptionAt: new Date(account.inceptionAt || account.createdAt).getTime(),
     createdAt: new Date(account.createdAt).getTime(),
+    ...(account.incomeTotals ? {income: {interest: account.incomeTotals.interest ?? 0, dividends: account.incomeTotals.dividends ?? 0}} : {}),
 });
 
 const toPlainPositions = (account: {positions: PaperPosition[]}): PaperPosition[] =>
@@ -271,6 +276,37 @@ export const seedDayZeroSnapshot = async (account: PaperAccountDoc): Promise<voi
     );
 };
 
+// Running totals live on the account (kept in step with cash by the income job), so this is
+// one small read for the rate, not a scan of the ledger.
+const getIncomeSummary = async (account: {incomeTotals?: {interest?: number; dividends?: number}; incomeThrough?: string}): Promise<AccountIncomeSummary> => {
+    const rate = await getLatestRatePoint().catch(() => null);
+    return {
+        interest: account.incomeTotals?.interest ?? 0,
+        dividends: account.incomeTotals?.dividends ?? 0,
+        apy: rate ? apyFromDiscount(rate.discountPct) : null,
+        through: account.incomeThrough ?? null,
+    };
+};
+
+// The Income panel's rows: this account's current epoch only (a reset starts a new one), and
+// only dates already credited — a row a crashed run left behind is not income yet.
+export const getIncomeActivity = async (userId: string, accountId: string): Promise<IncomeActivity | null> => {
+    try {
+        const account = await getOwnedAccount(userId, accountId);
+        if (!account) return null;
+        if (!account.incomeThrough) return {interestByMonth: [], dividends: []};
+        const epoch = new Date(account.inceptionAt || account.createdAt).getTime();
+        const rows = await AccountIncome.find(
+            {accountId: String(account._id), epoch, date: {$lte: account.incomeThrough}},
+            {_id: 0, kind: 1, date: 1, symbol: 1, amount: 1, apy: 1, exDate: 1, perShare: 1, quantity: 1},
+        ).lean<Parameters<typeof groupIncomeActivity>[0][number][]>();
+        return groupIncomeActivity(rows);
+    } catch (error) {
+        console.error('Error reading income activity:', error);
+        return null;
+    }
+};
+
 // Everything the /portfolio analytics section needs for one account: current
 // summary, %-return series vs the SPY benchmark, drawdown and trade stats.
 // The math lives in analytics.ts (pure); this assembles its inputs.
@@ -283,22 +319,26 @@ export const getAccountAnalytics = async (userId: string, accountId: string): Pr
         const inceptionDate = getEasternDateString(new Date(summaryInfo.inceptionAt));
         const key = String(account._id);
 
-        const [snapshots, benchmarks, trades] = await Promise.all([
+        const [snapshots, benchmark, trades] = await Promise.all([
             AccountSnapshot.find({accountId: key}).sort({date: 1}).lean(),
-            BenchmarkSnapshot.find({symbol: BENCHMARK_SYMBOL, date: {$gte: inceptionDate}}).sort({date: 1}).lean(),
+            getBenchmarkIndex(inceptionDate),
             PaperTrade.find({accountId: key}).lean(),
         ]);
 
         const positions = toPlainPositions(account);
-        const priceMap = await buildPriceMap(positions.map((p) => p.symbol));
+        // SPY rides along in the same quote map: the benchmark needs today's point too.
+        const priceMap = await buildPriceMap([...positions.map((p) => p.symbol), BENCHMARK_SYMBOL]);
         const summary = computePortfolio(
             {cash: account.cash, startingBalance: account.startingBalance, positions},
             priceMap,
         );
 
         const snapshotPoints: SnapshotPoint[] = snapshots.map((s) => ({date: s.date, value: s.totalValue}));
-        const benchmarkPoints: SnapshotPoint[] = benchmarks.map((b) => ({date: b.date, value: b.close}));
-        const livePoint: SnapshotPoint = {date: getEasternDateString(), value: summary.totalValue};
+        const today = getEasternDateString();
+        // SPY total return, with today's point from the live quote so the chart's last point
+        // compares like with like instead of today's account against yesterday's SPY.
+        const benchmarkPoints: SnapshotPoint[] = appendLive(benchmark.points, benchmark.lastClose, priceMap.get(BENCHMARK_SYMBOL)?.price, today);
+        const livePoint: SnapshotPoint = {date: today, value: summary.totalValue};
 
         const tradeStats = trades.map((t) => ({side: t.side as string, realizedPnl: t.realizedPnl as number | undefined}));
         const winStats = computeWinStats(tradeStats);
@@ -306,6 +346,7 @@ export const getAccountAnalytics = async (userId: string, accountId: string): Pr
         return {
             account: summaryInfo,
             summary,
+            income: await getIncomeSummary(account),
             series: buildPerfSeries(snapshotPoints, benchmarkPoints, livePoint),
             maxDrawdownPct: computeMaxDrawdown(mergeLivePoint(snapshotPoints, livePoint)),
             winRatePct: winStats.winRatePct,

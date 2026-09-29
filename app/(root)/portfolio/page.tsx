@@ -3,7 +3,7 @@ import {cookies} from "next/headers";
 import Link from "next/link";
 import {ACTIVE_ACCOUNT_COOKIE} from "@/lib/constants";
 import {getCurrentUserId} from "@/lib/actions/watchlist.actions";
-import {getAccountAnalytics, getComparisonStats, getPortfoliosForUser, getTradeHistory} from "@/lib/trading/account";
+import {getAccountAnalytics, getComparisonStats, getIncomeActivity, getPortfoliosForUser, getTradeHistory} from "@/lib/trading/account";
 import {countUnpriced} from "@/lib/trading/analytics";
 import {toComparisonRows, toSwitcherAccounts} from "@/lib/dashboard/select";
 import {marketStatus} from "@/lib/prices/market-hours";
@@ -17,6 +17,9 @@ import AccountComparisonTable from "@/components/analytics/AccountComparisonTabl
 import AnalyticsStats from "@/components/analytics/AnalyticsStats";
 import PerformanceChart from "@/components/analytics/PerformanceChart";
 import ExportCsvButton from "@/components/analytics/ExportCsvButton";
+import IncomeActivity from "@/components/trade/IncomeActivity";
+import Panel from "@/components/primitives/Panel";
+import SectionHeading from "@/components/primitives/SectionHeading";
 
 type PortfolioPageProps = {
     searchParams: Promise<{account?: string}>;
@@ -35,10 +38,11 @@ const PortfolioPage = async ({searchParams}: PortfolioPageProps) => {
     const activeEntry = (preferredId && all.find((x) => x.account.id === preferredId)) || all[0];
     const {account, summary: portfolio} = activeEntry;
 
-    const [trades, analytics, comparisonStats] = await Promise.all([
+    const [trades, analytics, comparisonStats, income] = await Promise.all([
         getTradeHistory(userId, account.id),
         getAccountAnalytics(userId, account.id),
         getComparisonStats(userId, Object.fromEntries(all.map((x) => [x.account.id, x.summary.totalValue]))),
+        getIncomeActivity(userId, account.id),
     ]);
 
     const count = portfolio.positions.length;
@@ -95,9 +99,12 @@ const PortfolioPage = async ({searchParams}: PortfolioPageProps) => {
             {analytics && (
                 <>
                     <section className="glass-panel rounded-xl p-5">
-                        <h2 className="text-sm font-bold uppercase tracking-[0.1em] text-brand mb-4" style={{fontFamily: 'var(--type-mono)'}}>
+                        <h2 className="text-sm font-bold uppercase tracking-[0.1em] text-brand mb-1" style={{fontFamily: 'var(--type-mono)'}}>
                             Performance vs S&amp;P 500
                         </h2>
+                        <p className="font-mono text-[11px] text-fg-muted mb-4">
+                            Returns include interest on cash and dividends · benchmark is SPY&apos;s total return, dividends reinvested
+                        </p>
                         <PerformanceChart series={analytics.series} accountName={account.name} />
                     </section>
                     <AnalyticsStats analytics={analytics} />
@@ -105,7 +112,7 @@ const PortfolioPage = async ({searchParams}: PortfolioPageProps) => {
             )}
 
             {/* Account summary */}
-            <AccountSummary portfolio={portfolio} />
+            <AccountSummary portfolio={portfolio} income={analytics?.income} />
 
             {/* Holdings */}
             <section className="glass-panel rounded-xl p-5">
@@ -114,6 +121,14 @@ const PortfolioPage = async ({searchParams}: PortfolioPageProps) => {
                 </h2>
                 <PositionsTable positions={portfolio.positions} accountId={account.id} />
             </section>
+
+            {/* What the account earned without trading */}
+            {income && (
+                <Panel id="income" aria-labelledby="income-heading">
+                    <SectionHeading id="income-heading">Income</SectionHeading>
+                    <IncomeActivity activity={income} />
+                </Panel>
+            )}
 
             {/* Trade history */}
             <section className="glass-panel rounded-xl p-5">

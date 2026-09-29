@@ -5,6 +5,7 @@ import {cookies} from "next/headers";
 import PaperAccount from "@/database/models/paper-account.model";
 import PaperTrade from "@/database/models/paper-trade.model";
 import AccountSnapshot from "@/database/models/account-snapshot.model";
+import AccountIncome from "@/database/models/account-income.model";
 import {connectToDatabase} from "@/database/mongoose";
 import {
     ACTIVE_ACCOUNT_COOKIE,
@@ -180,6 +181,7 @@ export const deletePaperAccount = async (accountId: string): Promise<OrderResult
         const id = String(account._id);
         await PaperTrade.deleteMany({accountId: id});
         await AccountSnapshot.deleteMany({accountId: id});
+        await AccountIncome.deleteMany({accountId: id});
         await PaperAccount.deleteOne({_id: account._id, userId});
 
         const store = await cookies();

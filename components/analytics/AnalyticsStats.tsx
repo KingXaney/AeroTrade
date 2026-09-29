@@ -22,14 +22,16 @@ const Stat = ({label, value, valueClass, hint}: {label: string; value: string; v
 // Win rate and drawdown show em-dashes until there is enough history to
 // compute them honestly (no closed trades / fewer than two snapshot days).
 // Takes only the six stat fields so a simulated record can use the same tiles.
-export type AnalyticsStatFields = Pick<AccountAnalytics, 'maxDrawdownPct' | 'winRatePct' | 'wins' | 'losses' | 'realizedPnl' | 'tradeCount'>;
+export type AnalyticsStatFields = Pick<AccountAnalytics, 'maxDrawdownPct' | 'winRatePct' | 'wins' | 'losses' | 'realizedPnl' | 'tradeCount'>
+    & Partial<Pick<AccountAnalytics, 'income'>>;
 
 const AnalyticsStats = ({analytics, tradesHint = 'Buys + sells, all time'}: {analytics: AnalyticsStatFields; tradesHint?: string}) => {
-    const {maxDrawdownPct, winRatePct, wins, losses, realizedPnl, tradeCount} = analytics;
+    const {maxDrawdownPct, winRatePct, wins, losses, realizedPnl, tradeCount, income} = analytics;
     const realizedClass = getChangeColorClass(realizedPnl || undefined);
+    const earned = income ? income.interest + income.dividends : 0;
 
     return (
-        <div className="glass-panel rounded-xl p-5 grid grid-cols-2 md:grid-cols-4 gap-4">
+        <div className={cn('glass-panel rounded-xl p-5 grid grid-cols-2 gap-4', income ? 'md:grid-cols-5' : 'md:grid-cols-4')}>
             <Stat
                 label="Max Drawdown"
                 value={maxDrawdownPct === null ? '—' : `−${maxDrawdownPct.toFixed(2)}%`}
@@ -48,6 +50,16 @@ const AnalyticsStats = ({analytics, tradesHint = 'Buys + sells, all time'}: {ana
                 valueClass={realizedClass}
                 hint="From closed positions"
             />
+            {/* Without it, realized + unrealized P&L no longer add up to total return and the
+                gap has no explanation on the page. */}
+            {income && (
+                <Stat
+                    label="Income"
+                    value={`+${formatPrice(earned)}`}
+                    valueClass={earned > 0 ? 'text-positive' : undefined}
+                    hint={income.through === null ? 'First credit tonight' : 'Interest + dividends'}
+                />
+            )}
             <Stat
                 label="Trades"
                 value={String(tradeCount)}

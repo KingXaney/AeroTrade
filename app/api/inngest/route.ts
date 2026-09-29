@@ -2,6 +2,7 @@ import {serve} from "inngest/next";
 import {inngest} from "@/lib/inngest/client";
 import {
     bootstrapAiNavigator,
+    creditDailyIncome,
     fillFirstRunTopics,
     generateSecondOpinion,
     generateTopicBriefs,
@@ -34,5 +35,6 @@ export const { GET, POST, PUT } = serve({
         fillFirstRunTopics,
         generateTopicBriefs,
         runStrategiesDaily,
+        creditDailyIncome,
     ],
 })

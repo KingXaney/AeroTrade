@@ -77,8 +77,10 @@ day instead of losing the month.
   window because adjusted closes are re-based on every distribution.
 - Signals use split-adjusted closes; only dual momentum reads adjusted closes, because BIL's
   price return is ~0 % (its yield is paid out) and the T-bill hurdle would otherwise collapse
-  into "SPY is positive". Fills, equity and every displayed return are price return, like the
-  paper accounts themselves.
+  into "SPY is positive". Fills use prices; since engine version 3 (2026-09-25) equity also
+  includes T-bill interest on cash and dividends on holdings, credited on the same timetable as
+  every paper account, and the benchmark is SPY's total return — see
+  [2026-09-25-brokerage-income.md](2026-09-25-brokerage-income.md).
 - Outside regular hours a manual run is a preview: it decides and records but does not fill.
 - A strategy skips its day when more than 10 % of its universe has no fresh bar; the whole run
   skips, without taking claims, when SPY itself is stale (the 10:30 retry then runs).
@@ -105,4 +107,5 @@ day instead of losing the month.
 ## Out of scope
 
 A chat tool for strategies · user-built variants · per-user copies · CSV export for strategy
-accounts · LLM narration · dividends, fees, ATR sizing · intraday data · a public leaderboard.
+accounts · LLM narration · fees, ATR sizing · intraday data · a public leaderboard.
+(Dividends were out of scope here; they shipped with brokerage income on 2026-09-25.)
