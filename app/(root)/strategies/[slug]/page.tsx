@@ -8,6 +8,7 @@ import {formatSignalValue, pickPerfMode, toPerfSeries, visibleSignalColumns} fro
 import {UNIVERSES} from "@/lib/strategies/universe";
 import {describeReplay, fillDate, isReplayExpired, matchFillToRun} from "@/lib/learn/replay";
 import {explainVerdict, pickQuizRows} from "@/lib/learn/verdict";
+import {decodeReason} from "@/lib/learn/reasons";
 import MicroLabel from "@/components/primitives/MicroLabel";
 import Panel from "@/components/primitives/Panel";
 import SectionHeading from "@/components/primitives/SectionHeading";
@@ -51,15 +52,19 @@ const StrategyPage = async ({params}: StrategyPageProps) => {
     const shownColumns = visibleSignalColumns(def.signalColumns, latestRun?.board ?? []);
     const boardTerms = shownColumns.map((column) => column.glossary ?? column.key);
     const quizRows: QuizRow[] = latestRun && latestRun.board.length > 0
-        ? pickQuizRows(latestRun.board).map((row) => ({
-            symbol: row.symbol,
-            cells: shownColumns.map((column) => ({label: column.label, value: formatSignalValue(row.values[column.key], column.format)})),
-            ...explainVerdict(row, latestRun),
-        }))
+        ? pickQuizRows(latestRun.board).map((row) => {
+            const verdict = explainVerdict(row, latestRun);
+            return {
+                symbol: row.symbol,
+                cells: shownColumns.map((column) => ({label: column.label, value: formatSignalValue(row.values[column.key], column.format)})),
+                ...verdict,
+                gloss: decodeReason(verdict.explanation, {def}).clauses,
+            };
+        })
         : [];
 
     // The one disclosure an automated fill carries: the stored row and planned order the
-    // rule looked at that morning.
+    // rule looked at that morning, and that order's reason decoded.
     const replayFor = (trade: PaperTradeRecord) => {
         if (trade.source !== 'strategy') return null;
         const date = fillDate(trade.createdAt);
@@ -67,11 +72,10 @@ const StrategyPage = async ({params}: StrategyPageProps) => {
         const match = run ? matchFillToRun(run, trade.symbol, trade.side) : null;
         return (
             <DecisionReplay
-                columns={def.signalColumns}
+                def={def}
                 row={match?.row ?? null}
                 order={match?.order ?? null}
                 caption={describeReplay(match, run?.asOf ?? null, isReplayExpired(date, today))}
-                strategyName={def.name}
             />
         );
     };
@@ -137,6 +141,7 @@ const StrategyPage = async ({params}: StrategyPageProps) => {
                     <SectionHeading>Latest decision</SectionHeading>
                     <LatestDecision
                         run={latestRun}
+                        def={def}
                         headline={latestRun ? detail.lastActionLine : undefined}
                         signals={(
                             /* While the quiz is open, the board's verdict cells are hidden with CSS so the
@@ -171,7 +176,7 @@ const StrategyPage = async ({params}: StrategyPageProps) => {
                         </summary>
                         <div className="pt-3">
                             {backtest
-                                ? <SimulatedTradeList trades={backtest.trades} />
+                                ? <SimulatedTradeList trades={backtest.trades} def={def} />
                                 : <p className="text-sm text-fg-muted">Backtest not computed yet — it is built on the first run.</p>}
                         </div>
                     </details>

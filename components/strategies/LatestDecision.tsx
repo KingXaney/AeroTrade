@@ -1,11 +1,14 @@
 import {cn, formatPrice} from "@/lib/utils";
+import type {StrategyDefinition} from "@/lib/strategies/types";
 import type {StrategyRunView} from "@/lib/strategies/views";
 import Badge from "@/components/primitives/Badge";
 import EmptyState from "@/components/primitives/EmptyState";
 import MicroLabel from "@/components/primitives/MicroLabel";
+import ReasonDisclosure from "@/components/strategies/ReasonDisclosure";
 
 // The most recent run's plan and what came of it: every order with the rule's own
-// reason, whether it filled and at what price, and anything it could not do.
+// reason, whether it filled and at what price, and anything it could not do. Each order
+// carries one "What the rule saw" disclosure decoding its reason (the page passes `def`).
 //
 // The signal board renders inside this, under `signals`, rather than in a panel of its
 // own: what the rule saw and what it then did are one story, and giving them two
@@ -22,9 +25,11 @@ type Props = {
     // One-line summary of the run (describeLastRun), lifted off the old ranking column.
     headline?: string;
     signals?: React.ReactNode;
+    // The strategy whose parameters the decoded reasons quote.
+    def: StrategyDefinition;
 };
 
-const LatestDecision = ({run, headline, signals}: Props) => {
+const LatestDecision = ({run, headline, signals, def}: Props) => {
     if (!run) {
         return (
             <EmptyState
@@ -64,6 +69,7 @@ const LatestDecision = ({run, headline, signals}: Props) => {
                                 </span>
                             </div>
                             <p className="mt-1 text-[11px] text-fg-muted leading-snug">{o.reason}</p>
+                            <ReasonDisclosure reason={o.reason} symbol={o.symbol} def={def} />
                         </li>
                     ))}
                 </ul>

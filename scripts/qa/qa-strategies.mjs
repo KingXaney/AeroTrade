@@ -247,6 +247,16 @@ try {
     const sim = await page.locator('#strategy-performance').innerText();
     check('simulated tab is labelled and shows the seeded stats', /backtest, not live/i.test(sim) && /\+11\.60%/.test(sim) && /\+9\.10%/.test(sim));
     check('simulated trade log is present and labelled', /hypothetical/i.test(await page.locator('#strategy-simulated-trades').innerText()));
+    // The seeded live reasons are not rule strings, so they get no empty disclosure; the
+    // seeded simulated fill is one, and decodes by the rule that wrote it.
+    check('an order whose reason the decoder does not know gets no disclosure',
+        await page.locator('#latest-decision details[data-decoded]').count() === 0);
+    await page.locator('#strategy-simulated-trades > details > summary').click();
+    const simDecoded = page.locator('#simulated-trades details[data-decoded]');
+    check('the simulated fill carries one "What the rule saw"', await simDecoded.count() === 1);
+    await simDecoded.locator('summary').click();
+    check('…reading its reason in plain words', /99% of the account into SPY, with a 1% cash floor/.test(await simDecoded.innerText()));
+    await page.locator('#strategy-simulated-trades > details > summary').click();
 
     // The editorial requirement, asserted: once a strategy has numbers, the chart is near
     // the top of the page instead of below ~800px of static explanation.

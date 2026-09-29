@@ -1,120 +1,33 @@
 import {describe, expect, it} from 'vitest';
-import type {Bar} from '@/lib/prices/signals';
-import {STRATEGIES, strategyBySlug} from '@/lib/strategies/catalog';
-import {CASH_FLOOR, LOOKBACK_BARS, slotWeight} from '@/lib/strategies/config';
+import {STRATEGIES} from '@/lib/strategies/catalog';
+import {slotWeight} from '@/lib/strategies/config';
 import {STRATEGY_RULES} from '@/lib/strategies/rules';
-import type {Decision, Holding, StrategyContext, StrategyDefinition, StrategyId} from '@/lib/strategies/types';
 import {LARGE_CAPS, SECTOR_ETFS, UNIVERSES} from '@/lib/strategies/universe';
+import {
+    ASOF,
+    containsNaN,
+    definition,
+    donchianChannel,
+    dualLegs,
+    flat,
+    FULL_WEIGHT,
+    genericContext,
+    GOLDEN_CROSS_XLK,
+    lowVolWobble,
+    makeContext,
+    N,
+    rowFor,
+    RSI_RISING,
+    rsiDipped,
+    seriesFor,
+    SIXTY_FORTY_DRIFTED,
+    symbolsInState,
+    targetFor,
+    trend,
+} from '@/lib/strategies/__tests__/fixtures';
 
-// ---------------------------------------------------------------------------
-// Context builder: bars are dated on consecutive calendar days ending at asOf
-// (the rules never look at the calendar, only the cadence helper does).
-
-const ASOF = '2026-09-21';
-const TRADE = '2026-09-22';
-const DAY_MS = 24 * 60 * 60 * 1000;
-const N = LOOKBACK_BARS;
-const FULL_WEIGHT = 1 - CASH_FLOOR;
-
-const definition = (id: StrategyId): StrategyDefinition => {
-    const def = strategyBySlug(id);
-    if (!def) throw new Error(`no definition for ${id}`);
-    return def;
-};
-
-const dateAt = (asOf: string, offset: number): string =>
-    new Date(Date.parse(`${asOf}T00:00:00Z`) + offset * DAY_MS).toISOString().slice(0, 10);
-
-type Series = number[] | {closes: number[]; highs?: number[]; lows?: number[]; adjCloses?: number[]};
-
-const toBars = (series: Series, asOf: string): Bar[] => {
-    const spec = Array.isArray(series) ? {closes: series} : series;
-    const last = spec.closes.length - 1;
-    return spec.closes.map((close, i) => ({
-        date: dateAt(asOf, i - last),
-        close,
-        ...(spec.highs ? {high: spec.highs[i]} : {}),
-        ...(spec.lows ? {low: spec.lows[i]} : {}),
-        ...(spec.adjCloses ? {adjClose: spec.adjCloses[i]} : {}),
-    }));
-};
-
-type ContextOptions = {
-    def: StrategyDefinition;
-    series: Record<string, Series>;
-    asOf?: string;
-    tradeDate?: string;
-    // Symbols whose history stops one bar short of asOf.
-    stale?: readonly string[];
-    holdings?: readonly {symbol: string; quantity: number; avgCost?: number}[];
-    cash?: number;
-    lastRebalanceDate?: string | null;
-};
-
-const makeContext = (opts: ContextOptions): StrategyContext => {
-    const asOf = opts.asOf ?? ASOF;
-    const tradeDate = opts.tradeDate ?? TRADE;
-    const staleInput = new Set(opts.stale ?? []);
-    const bars = new Map<string, Bar[]>();
-    for (const [symbol, series] of Object.entries(opts.series)) {
-        const full = toBars(series, asOf);
-        bars.set(symbol, staleInput.has(symbol) ? full.slice(0, -1) : full);
-    }
-    const universe = UNIVERSES[opts.def.universe];
-    const fresh = (symbol: string): boolean => {
-        const series = bars.get(symbol);
-        return series?.[series.length - 1]?.date === asOf;
-    };
-    const eligible = new Set(universe.filter(fresh));
-    const stale = new Set(universe.filter((symbol) => !eligible.has(symbol)));
-    const holdings: Holding[] = (opts.holdings ?? []).map((holding) => {
-        const series = bars.get(holding.symbol);
-        const last = series?.[series.length - 1];
-        return {
-            symbol: holding.symbol,
-            quantity: holding.quantity,
-            avgCost: holding.avgCost ?? 100,
-            lastClose: last && last.date === asOf ? last.close : null,
-        };
-    });
-    const cash = opts.cash ?? 100_000;
-    const equity = holdings.reduce((sum, holding) => sum + holding.quantity * (holding.lastClose ?? holding.avgCost), cash);
-    return {
-        asOf,
-        tradeDate,
-        bars,
-        eligible,
-        stale,
-        holdings,
-        cash,
-        equity,
-        lastRebalanceDate: opts.lastRebalanceDate ?? null,
-        isFirstRun: holdings.length === 0,
-    };
-};
-
-const flat = (n: number, value: number): number[] => Array.from({length: n}, () => value);
-const ramp = (n: number, from: number, to: number): number[] =>
-    Array.from({length: n}, (_, i) => from + ((to - from) * i) / (n - 1));
-// Flat prefix, then a straight line over the last 253 bars: the 252-bar trailing
-// return is exactly to / from - 1.
-const trend = (from: number, to: number, n = N): number[] => [...flat(n - 253, from), ...ramp(253, from, to)];
-
-const seriesFor = (symbols: readonly string[], make: (symbol: string, index: number) => Series): Record<string, Series> =>
-    Object.fromEntries(symbols.map((symbol, index) => [symbol, make(symbol, index)]));
-
-const targetFor = (decision: Decision, symbol: string) => decision.targets.find((target) => target.symbol === symbol);
-const rowFor = (decision: Decision, symbol: string) => decision.board.find((row) => row.symbol === symbol);
-const symbolsInState = (decision: Decision, state: string): string[] =>
-    decision.board.filter((row) => row.state === state).map((row) => row.symbol);
-
-const containsNaN = (value: unknown): boolean => {
-    if (typeof value === 'number') return Number.isNaN(value);
-    if (typeof value === 'string') return value.includes('NaN');
-    if (Array.isArray(value)) return value.some(containsNaN);
-    if (value && typeof value === 'object') return Object.values(value).some(containsNaN);
-    return false;
-};
+// Context builders and series shapes live in fixtures.ts, shared with the reason
+// decoder round trip in lib/learn so both run on the strings the rules really emit.
 
 // ---------------------------------------------------------------------------
 
@@ -169,12 +82,7 @@ describe('buy-and-hold-spy', () => {
 describe('sixty-forty', () => {
     const def = definition('sixty-forty');
     const decide = STRATEGY_RULES[def.id];
-    // SPY 632 × 100 = 63,200 and AGG 700 × 50 = 35,000 on 100,000 of equity.
-    const drifted = {
-        series: {SPY: flat(N, 100), AGG: flat(N, 50)},
-        holdings: [{symbol: 'SPY', quantity: 632}, {symbol: 'AGG', quantity: 700}],
-        cash: 1_800,
-    };
+    const drifted = SIXTY_FORTY_DRIFTED;
 
     it('emits both legs with the drift text when a new quarter is due', () => {
         const decision = decide(def, makeContext({
@@ -220,9 +128,7 @@ describe('golden-cross', () => {
     const def = definition('golden-cross');
     const decide = STRATEGY_RULES[def.id];
     const rest = SECTOR_ETFS.filter((symbol) => symbol !== 'XLK');
-    // Flat 100 → drift down to 85 → climb to 130 → slide to 70: the first evaluable
-    // day (bar 259) is still inside the decline, then one cross each way.
-    const xlk = [...flat(200, 100), ...ramp(100, 100, 85), ...ramp(200, 85, 130), ...ramp(150, 130, 70)];
+    const xlk = GOLDEN_CROSS_XLK;
 
     it('enters on the bar SMA50 first exceeds SMA200, holds, and exits when it drops back', () => {
         let held: string[] = [];
@@ -279,11 +185,7 @@ describe('golden-cross', () => {
 describe('dual-momentum', () => {
     const def = definition('dual-momentum');
     const decide = STRATEGY_RULES[def.id];
-    const legs = (returns: Record<string, {price: number; total: number}>): Record<string, Series> =>
-        Object.fromEntries(Object.entries(returns).map(([symbol, r]) => [symbol, {
-            closes: trend(100, 100 * (1 + r.price)),
-            adjCloses: trend(100, 100 * (1 + r.total)),
-        }]));
+    const legs = dualLegs;
 
     it('picks AGG when SPY trails T-bills on total return although price return says otherwise', () => {
         const decision = decide(def, makeContext({
@@ -440,14 +342,8 @@ describe('momentum-12-1', () => {
 describe('rsi2-mean-reversion', () => {
     const def = definition('rsi2-mean-reversion');
     const decide = STRATEGY_RULES[def.id];
-    const rising = ramp(N, 100, 125.9);
-    // Two consecutive drops of `depth` on top of the uptrend: RSI(2) falls with depth.
-    const dipped = (depth: number): number[] => {
-        const closes = [...rising];
-        closes[N - 2] = rising[N - 3] - depth;
-        closes[N - 1] = rising[N - 3] - 2 * depth;
-        return closes;
-    };
+    const rising = RSI_RISING;
+    const dipped = rsiDipped;
     const DIP_COUNT = 7;
     const series = seriesFor(LARGE_CAPS, (_, index) => (index < DIP_COUNT ? dipped(0.5 + 0.25 * index) : rising));
     const strongestFirst = LARGE_CAPS.slice(0, DIP_COUNT).reverse();
@@ -510,11 +406,7 @@ describe('rsi2-mean-reversion', () => {
 describe('donchian-breakout', () => {
     const def = definition('donchian-breakout');
     const decide = STRATEGY_RULES[def.id];
-    // Flat 100 with a 101 / 99 channel; only the last close varies.
-    const channel = (lastClose: number): Series => {
-        const closes = [...flat(N - 1, 100), lastClose];
-        return {closes, highs: closes.map((c) => c + 1), lows: closes.map((c) => c - 1)};
-    };
+    const channel = donchianChannel;
     const BREAKOUT_COUNT = 10;
     const series = seriesFor(LARGE_CAPS, (_, index) => channel(index < BREAKOUT_COUNT ? 101 + 0.5 * index : 100));
 
@@ -563,8 +455,7 @@ describe('donchian-breakout', () => {
 describe('low-volatility', () => {
     const def = definition('low-volatility');
     const decide = STRATEGY_RULES[def.id];
-    // Alternating ± amplitude around 100; amplitude (and so volatility) grows with the index.
-    const wobble = (amplitude: number): number[] => Array.from({length: N}, (_, i) => 100 + (i % 2 === 0 ? amplitude : -amplitude));
+    const wobble = lowVolWobble;
     const series = seriesFor(LARGE_CAPS, (_, index) => wobble(0.5 * (Math.max(index, 1))));
 
     it('holds the ten calmest when due, alphabetical on ties', () => {
@@ -600,20 +491,6 @@ describe('low-volatility', () => {
 
 // ---------------------------------------------------------------------------
 // Properties every rule must satisfy.
-
-const genericContext = (def: StrategyDefinition): StrategyContext => {
-    const universe = UNIVERSES[def.universe];
-    const withOhlc = (index: number): Series => {
-        const closes = trend(100, 100 + 5 * (index + 1));
-        return {closes, highs: closes.map((c) => c * 1.01), lows: closes.map((c) => c * 0.99), adjCloses: closes};
-    };
-    return makeContext({
-        def,
-        series: {...seriesFor(universe, (_, index) => withOhlc(index)), ZZZ: withOhlc(3)},
-        stale: [universe[0]],
-        holdings: [{symbol: universe[universe.length - 1], quantity: 10}, {symbol: 'ZZZ', quantity: 5}],
-    });
-};
 
 describe.each(STRATEGIES.map((def) => [def.id, def] as const))('%s', (_, def) => {
     const decide = STRATEGY_RULES[def.id];

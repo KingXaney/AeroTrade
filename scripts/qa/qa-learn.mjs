@@ -1,8 +1,9 @@
 // The learn surfaces, keyless: the First-week checklist reads its own progress and
 // leaves; /learn and the ⌘K palette reach the glossary; a strategy page carries the
 // beginner line, column definitions, Guess the Verdict and "What the rule saw"; an
-// "Ask in chat" link prefills the assistant without sending. Run against the harness
-// in README.md (in-memory Mongo on :27117 + `npm run dev`).
+// "Ask in chat" link prefills the assistant without sending; a rule's reason is decoded
+// clause by clause wherever a fill or an order shows it, and nowhere else. Run against
+// the harness in README.md (in-memory Mongo on :27117 + `npm run dev`).
 import {chromium} from 'playwright';
 import {MongoClient, ObjectId} from 'mongodb';
 import {mkdirSync} from 'node:fs';
@@ -188,6 +189,10 @@ try {
     const quizText = await page.locator('#verdict-quiz').innerText();
     check('the reveal quotes the rule\'s own reason', quizText.includes('SMA50 42.10 > SMA200 40.00'));
     check('the tally counts the guess', /1 of 1 matched the rule/.test(quizText));
+    const quizGloss = page.locator('[data-quiz-row="XLF"] [data-reason-gloss]');
+    check('the reveal decodes the reason in plain words', await quizGloss.count() === 1
+        && /50-day average \(42\.10\) was above the 200-day average \(40\.00\)/.test(await quizGloss.innerText()));
+    check('a verdict explained by its fixed meaning gets no gloss', await page.locator('[data-quiz-row="XLK"] [data-reason-gloss]').count() === 0);
     check('the disclaimer still appears once', ((await page.locator('body').innerText()).match(/not financial advice/gi) ?? []).length === 1);
     await shot('03-quiz');
 
@@ -196,9 +201,22 @@ try {
     await replays.first().locator('summary').click();
     const replayText = await replays.first().innerText();
     check('the replay shows the stored row and the planned order', /42\.10/.test(replayText) && /planned order/i.test(replayText) && replayText.includes('SMA50 42.10 > SMA200 40.00'), replayText.replace(/\s+/g, ' ').slice(0, 160));
+    const replayGloss = replays.first().locator('[data-reason-gloss]');
+    check('the replay decodes the planned order clause by clause', await replayGloss.count() === 1
+        && /50-day average \(42\.10\) was above the 200-day average \(40\.00\)/.test(await replayGloss.innerText()));
+    check('a decoded clause carries its glossary definition', await replayGloss.locator('[data-term="trend-on"][title]').count() === 1);
     await replays.nth(1).locator('summary').click();
     check('an expired fill says the record is gone', /kept 400 days/.test(await replays.nth(1).innerText()));
+    check('…and decodes nothing it no longer has', await replays.nth(1).locator('[data-reason-gloss]').count() === 0);
     await shot('04-replay');
+
+    const decided = page.locator('#latest-decision details[data-decoded]');
+    check('each planned order in the latest decision has one "What the rule saw"', await decided.count() === 2);
+    check('…outside the board, which keeps no disclosure of its own', await page.locator('#signal-board details').count() === 0);
+    await decided.first().locator('summary').click();
+    const decidedText = await decided.first().innerText();
+    check('…which reads the reason in the rule\'s own parameters', /one of its 11 equal slots/.test(decidedText) && /50-day average/.test(decidedText), decidedText.replace(/\s+/g, ' ').slice(0, 160));
+    check('…and ends with one "Ask in chat"', await decided.first().locator('[data-ask="reason"]').count() === 1);
 
     // --- Ask in chat: prefilled, never sent ------------------------------------------------
     await terms.locator('summary').click();
@@ -210,6 +228,79 @@ try {
     check('nothing was sent', !/mean here/.test(await dialog.innerText()));
     check('the composer is focused', await page.evaluate(() => document.activeElement?.getAttribute('placeholder')) === 'Query market data...');
     await shot('05-ask');
+    // The panel may cover the link, and what is under test is the link's own handler.
+    await decided.first().locator('[data-ask="reason"]').evaluate((el) => el.click());
+    await page.waitForTimeout(300);
+    check('a decoded reason\'s Ask names the strategy, the symbol and the reason',
+        (await composer.inputValue()) === `Explain this reason from the Golden Cross Sectors strategy for XLF: ${enterReason}`, await composer.inputValue());
+
+    // --- RSI-2: a real entry decoded in the replay; a simulated exit in the backtest log --
+    const rsiId = new ObjectId();
+    const rsiReason = 'enter: RSI(2) 3.4 < 10 with close 123.45 above SMA200 110.00';
+    await db.collection('paperaccounts').insertOne({
+        _id: rsiId, userId: OWNER, name: 'RSI-2 Mean Reversion', cash: 80_224, startingBalance: 100_000, inceptionAt: inception,
+        positions: [{symbol: 'AAPL', company: 'Apple Inc', quantity: 160, avgCost: 123.6}], createdAt: inception, updatedAt: new Date(),
+    });
+    await db.collection('strategystates').insertOne({
+        strategyId: 'rsi2-mean-reversion', accountId: String(rsiId), status: 'active', version: '1', launchDate: isoDaysAgo(13),
+        lastRunDate: today, lastTradeDate: today, lastRebalanceDate: today, createdAt: inception, updatedAt: new Date(),
+    });
+    await db.collection('papertrades').insertOne({
+        userId: OWNER, accountId: String(rsiId), symbol: 'AAPL', company: 'Apple Inc', side: 'buy', quantity: 160, price: 123.6, total: 19_776,
+        source: 'strategy', reason: rsiReason, createdAt: new Date(),
+    });
+    await db.collection('strategyruns').insertOne({
+        strategyId: 'rsi2-mean-reversion', date: today, asOf: isoDaysAgo(1), mode: 'live', status: 'done', staleCount: 0, universeSize: 40, rebalanceTriggered: true,
+        board: [
+            {symbol: 'AAPL', state: 'enter', values: {close: 123.45, rsi2: 3.4, sma5: 126.1, sma200: 110, aboveSma200: true}},
+            {symbol: 'MSFT', state: 'watch', values: {close: 410, rsi2: 6.2, sma5: 415, sma200: 380, aboveSma200: true}, note: 'signal, but no open slot'},
+        ],
+        orders: [{symbol: 'AAPL', side: 'buy', quantity: 160, kind: 'enter', reason: rsiReason, executed: true, price: 123.6}],
+        skippedOrders: [], dataIssues: [], equity: 100_000, summary: '1/1 order(s) filled', createdAt: new Date(),
+    });
+    const simPoints = Array.from({length: 30}, (_, k) => ({date: isoDaysAgo(60 - k), value: 100_000 * (1 + k * 0.002)}));
+    await db.collection('strategybacktests').insertOne({
+        strategyId: 'rsi2-mean-reversion', version: '1', from: simPoints[0].date, to: simPoints[simPoints.length - 1].date, fillRule: 'next-open',
+        closeFills: 0, skippedDays: 0, points: simPoints, benchmark: simPoints.map((p) => ({date: p.date, value: 500 + (p.value - 100_000) / 400})),
+        trades: [{date: simPoints[3].date, symbol: 'MSFT', side: 'sell', quantity: 10, price: 130, total: 1_300, realizedPnl: 20, reason: 'exit: close 130.00 > SMA5 128.00', fill: 'open'}],
+        stats: {totalReturnPct: 5.8, cagrPct: 4.1, annualizedVolPct: 9.3, maxDrawdownPct: 1.2, winRatePct: 100, wins: 1, losses: 0, tradeCount: 1, benchmarkReturnPct: 5.0, excessReturnPct: 0.8},
+        computedAt: new Date(),
+    });
+
+    await page.goto(`${BASE}/strategies/rsi2-mean-reversion`, {waitUntil: 'load'});
+    await page.locator('#strategy-trades').waitFor({timeout: 30000});
+    const rsiReplay = page.locator('#strategy-trades details[data-replay]');
+    check('the RSI-2 fill has one "What the rule saw"', await rsiReplay.count() === 1);
+    await rsiReplay.locator('summary').click();
+    const rsiGloss = await rsiReplay.locator('[data-reason-gloss]').innerText();
+    check('the seeded RSI-2 reason opens to its decoded clauses', /\b10\b/.test(rsiGloss) && /SMA200/.test(rsiGloss), rsiGloss.replace(/\s+/g, ' ').slice(0, 200));
+    check('…reading the entry level and the trend filter in plain words',
+        /under the entry level of 10/.test(rsiGloss) && /200-day average \(110\.00\)/.test(rsiGloss) && /5-day average/.test(rsiGloss));
+    check('…with the RSI clause carrying its definition', await rsiReplay.locator('[data-reason-gloss] [data-term="rsi2"]').count() === 1);
+    await page.locator('#verdict-quiz summary').click();
+    await page.locator('[data-quiz-row="MSFT"] button[aria-pressed]', {hasText: 'watch'}).click();
+    await page.locator('#verdict-reveal').click();
+    check('a board note is decoded in the reveal too', /all 5 slots were taken/.test(await page.locator('[data-quiz-row="MSFT"] [data-reason-gloss]').innerText()));
+    await page.locator('#strategy-simulated-trades > details > summary').click();
+    const simDecoded = page.locator('#simulated-trades details[data-decoded]');
+    check('a simulated fill has its own "What the rule saw", and no replay', await simDecoded.count() === 1 && await page.locator('#simulated-trades details[data-replay]').count() === 0);
+    await simDecoded.locator('summary').click();
+    check('…decoding the simulated exit', /rose above the 5-day average \(128\.00\)/.test(await simDecoded.innerText()));
+    check('the disclaimer still appears once on the RSI-2 page', ((await page.locator('body').innerText()).match(/not financial advice/gi) ?? []).length === 1);
+    await shot('06-rsi2-decoded');
+
+    // --- /history is the user's own trades: the reason line, never the decoder ------------
+    // Strategy fills live in the system owner's accounts, so this is seeded under user A's
+    // own account: the placement rule says the decoder belongs to the strategy page's fills.
+    await db.collection('papertrades').insertOne({
+        userId: userA, accountId: mainId, symbol: 'AAPL', company: 'Apple Inc', side: 'buy', quantity: 1, price: 123.6, total: 123.6,
+        source: 'strategy', reason: rsiReason, createdAt: new Date(),
+    });
+    await page.goto(`${BASE}/history`, {waitUntil: 'load'});
+    await page.getByRole('heading', {name: 'Trades', exact: true}).waitFor({timeout: 30000});
+    const historyTrades = page.locator('section', {has: page.getByRole('heading', {name: 'Trades', exact: true})});
+    check('/history shows the reason line as written', (await historyTrades.innerText()).includes(rsiReason));
+    check('/history carries no decoder, disclosure or Ask link', await historyTrades.locator('[data-reason-gloss], details, [data-ask]').count() === 0);
 } catch (err) {
     failures++;
     console.log(`FAIL  threw: ${err.message}`);
