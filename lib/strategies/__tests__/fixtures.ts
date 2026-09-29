@@ -1,15 +1,17 @@
 // Shared test fixtures for the strategy rules: a context builder whose bars are dated on
 // consecutive calendar days ending at asOf (the rules never look at the calendar, only
 // the cadence helper does), the series shapes the rule tests force their branches with,
-// and the generic context every rule's property tests run against. Imported by
-// rules.test.ts and by lib/learn's reason-decoder round trip, so both exercise the
-// strings the rules really emit. Not a test file itself (vitest picks up *.test.ts).
+// the generic context every rule's property tests run against, and the per-rule contexts
+// that drive each rule down every branch. Imported by rules.test.ts and by lib/learn's
+// reason-decoder and board-narration round trips, so all three exercise what the rules
+// really emit. Not a test file itself (vitest picks up *.test.ts).
 
 import type {Bar} from '@/lib/prices/signals';
 import {strategyBySlug} from '@/lib/strategies/catalog';
 import {CASH_FLOOR, LOOKBACK_BARS} from '@/lib/strategies/config';
+import {STRATEGY_RULES} from '@/lib/strategies/rules';
 import type {Decision, Holding, StrategyContext, StrategyDefinition, StrategyId} from '@/lib/strategies/types';
-import {UNIVERSES} from '@/lib/strategies/universe';
+import {LARGE_CAPS, SECTOR_ETFS, UNIVERSES} from '@/lib/strategies/universe';
 
 export const ASOF = '2026-09-21';
 export const TRADE = '2026-09-22';
@@ -172,4 +174,105 @@ export const genericContext = (def: StrategyDefinition): StrategyContext => {
         stale: [universe[0]],
         holdings: [{symbol: universe[universe.length - 1], quantity: 10}, {symbol: 'ZZZ', quantity: 5}],
     });
+};
+
+// ---------------------------------------------------------------------------
+// The contexts that force each rule down its branches.
+
+export const branchContexts = (def: StrategyDefinition): StrategyContext[] => {
+    const id = def.id;
+    const make = (opts: Omit<Parameters<typeof makeContext>[0], 'def'>) => makeContext({def, ...opts});
+    switch (id) {
+        case 'buy-and-hold-spy':
+            return [
+                make({series: {SPY: trend(100, 110)}}),
+                make({series: {SPY: trend(100, 110)}, stale: ['SPY']}),
+            ];
+        case 'sixty-forty':
+            return [
+                make({...SIXTY_FORTY_DRIFTED, asOf: '2026-09-30', tradeDate: '2026-10-01', lastRebalanceDate: '2026-07-01'}),
+                make({series: SIXTY_FORTY_DRIFTED.series}),
+                make({...SIXTY_FORTY_DRIFTED, stale: ['AGG']}),
+                make({...SIXTY_FORTY_DRIFTED, stale: ['SPY', 'AGG']}),
+                // Equity below zero leaves a held leg's weight unmeasurable: the "unpriced" wording.
+                make({...SIXTY_FORTY_DRIFTED, cash: -1_000_000}),
+            ];
+        case 'golden-cross': {
+            const rest = SECTOR_ETFS.filter((symbol) => symbol !== 'XLK');
+            const days: StrategyContext[] = [];
+            let held = false;
+            for (let day = N - 1; day < GOLDEN_CROSS_XLK.length; day += 10) {
+                const ctx = make({
+                    series: {XLK: GOLDEN_CROSS_XLK.slice(day - N + 1, day + 1), ...seriesFor(rest, () => flat(N, 100))},
+                    holdings: held ? [{symbol: 'XLK', quantity: 10}] : [],
+                });
+                days.push(ctx);
+                const row = STRATEGY_RULES[id](def, ctx).board.find((r) => r.symbol === 'XLK');
+                if (row?.state === 'enter') held = true;
+                if (row?.state === 'exit') held = false;
+            }
+            days.push(make({
+                series: {XLK: flat(150, 100), ...seriesFor(rest, () => flat(N, 100))},
+                holdings: [{symbol: 'XLK', quantity: 10}, {symbol: 'XLE', quantity: 10}],
+            }));
+            return days;
+        }
+        case 'dual-momentum':
+            return [
+                make({series: dualLegs({SPY: {price: 0.05, total: 0.01}, EFA: {price: 0, total: 0}, AGG: {price: 0, total: 0.02}, BIL: {price: 0, total: 0.04}})}),
+                make({
+                    series: dualLegs({SPY: {price: 0.15, total: 0.182}, EFA: {price: 0.1, total: 0.121}, AGG: {price: 0, total: 0.02}, BIL: {price: 0, total: 0.049}}),
+                    holdings: [{symbol: 'AGG', quantity: 900}],
+                }),
+                make({
+                    series: dualLegs({SPY: {price: 0.1, total: 0.1}, EFA: {price: 0.2, total: 0.2}, AGG: {price: 0, total: 0}, BIL: {price: 0, total: 0.03}}),
+                    holdings: [{symbol: 'SPY', quantity: 900}],
+                }),
+                make({
+                    series: dualLegs({SPY: {price: 0.05, total: 0.01}, EFA: {price: 0, total: 0}, AGG: {price: 0, total: 0.02}, BIL: {price: 0, total: 0.04}}),
+                    stale: ['AGG'],
+                    holdings: [{symbol: 'SPY', quantity: 900}],
+                }),
+                make({series: dualLegs({SPY: {price: 0.05, total: 0.03}, EFA: {price: 0, total: 0}, AGG: {price: 0, total: 0}})}),
+                make({series: {...dualLegs({EFA: {price: 0, total: 0}, AGG: {price: 0, total: 0}, BIL: {price: 0, total: 0.01}}), SPY: flat(100, 100)}}),
+            ];
+        case 'momentum-12-1': {
+            const series = seriesFor(LARGE_CAPS, (_, index) => trend(100, 100 + Math.min(index, 38)));
+            return [
+                make({series}),
+                make({series, holdings: [{symbol: LARGE_CAPS[37], quantity: 10}, {symbol: LARGE_CAPS[0], quantity: 10}]}),
+                make({series: {...series, [LARGE_CAPS[5]]: flat(100, 100)}, holdings: [{symbol: LARGE_CAPS[5], quantity: 10}]}),
+            ];
+        }
+        case 'rsi2-mean-reversion': {
+            const series = seriesFor(LARGE_CAPS, (_, index) => (index < 7 ? rsiDipped(0.5 + 0.25 * index) : RSI_RISING));
+            return [
+                make({series}),
+                make({
+                    series: {...series, [LARGE_CAPS[20]]: rsiDipped(1)},
+                    stale: [LARGE_CAPS[30]],
+                    holdings: [10, 11, 20, 30].map((index) => ({symbol: LARGE_CAPS[index], quantity: 10})),
+                }),
+                make({series: {...series, [LARGE_CAPS[8]]: flat(150, 100)}, stale: [LARGE_CAPS[6]], holdings: [{symbol: LARGE_CAPS[8], quantity: 10}]}),
+            ];
+        }
+        case 'donchian-breakout': {
+            const series = seriesFor(LARGE_CAPS, (_, index) => donchianChannel(index < 10 ? 101 + 0.5 * index : 100));
+            return [
+                make({
+                    series: {...series, [LARGE_CAPS[20]]: donchianChannel(98.5), [LARGE_CAPS[21]]: donchianChannel(99)},
+                    holdings: [{symbol: LARGE_CAPS[20], quantity: 10}, {symbol: LARGE_CAPS[21], quantity: 10}],
+                }),
+                make({series: {...series, [LARGE_CAPS[5]]: flat(N, 100)}, holdings: [{symbol: LARGE_CAPS[5], quantity: 10}]}),
+            ];
+        }
+        case 'low-volatility': {
+            const series = seriesFor(LARGE_CAPS, (_, index) => lowVolWobble(0.5 * Math.max(index, 1)));
+            return [
+                make({series}),
+                make({series, holdings: [{symbol: LARGE_CAPS[39], quantity: 10}, {symbol: LARGE_CAPS[5], quantity: 10}]}),
+                make({series: {...series, [LARGE_CAPS[3]]: flat(50, 100)}, holdings: [{symbol: LARGE_CAPS[3], quantity: 10}]}),
+            ];
+        }
+    }
 };

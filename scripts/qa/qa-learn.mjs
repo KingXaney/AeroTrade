@@ -1,6 +1,7 @@
 // The learn surfaces, keyless: the First-week checklist reads its own progress and
 // leaves; /learn and the ⌘K palette reach the glossary; a strategy page carries the
-// beginner line, column definitions, Guess the Verdict and "What the rule saw"; an
+// beginner line, column definitions led by "Read this board" (its top row in plain words,
+// hidden while the quiz is open), Guess the Verdict and "What the rule saw"; an
 // "Ask in chat" link prefills the assistant without sending; a rule's reason is decoded
 // clause by clause wherever a fill or an order shows it, and nowhere else. Run against
 // the harness in README.md (in-memory Mongo on :27117 + `npm run dev`).
@@ -173,14 +174,35 @@ try {
     const terms = page.locator('#board-terms');
     // Collapsed <details> keep their body out of innerText; read the definition terms directly.
     const termNames = (await terms.locator('dt').allTextContents()).join(' ');
-    check('one "What these mean" sits beside the board and names its columns', await terms.count() === 1 && /SMA50/.test(termNames), termNames.slice(0, 80));
+    check('one disclosure sits beside the board and names its columns', await terms.count() === 1 && /SMA50/.test(termNames), termNames.slice(0, 80));
     check('a definition row offers "Ask in chat"', await terms.locator('[data-ask="term"]').count() >= 3);
+
+    // --- Read this board: the row the board lists first, read by the rule's own narrator ---
+    check('the panel still has one "What these mean" of its own', await page.locator('#strategy-decision [data-what-these-mean]').count() === 1);
+    check('the disclosure is titled by the board\'s top row', (await terms.locator('summary').innerText()).includes('Read this board — XLF'),
+        (await terms.locator('summary').innerText()).replace(/\s+/g, ' '));
+    await terms.locator('summary').click();
+    const rowReading = terms.locator('[data-board-row-reading]');
+    const rowReadingText = await rowReading.innerText();
+    check('the reading quotes the top row\'s numbers as the board prints them',
+        /50-day average \(\$42\.10\) is above its 200-day average \(\$40\.00\)/.test(rowReadingText) && /Trend on reads yes/.test(rowReadingText),
+        rowReadingText.replace(/\s+/g, ' ').slice(0, 200));
+    check('…and ends on the verdict in the rule\'s own slot count', /verdict is enter/.test(rowReadingText) && /one of its 11 equal slots/.test(rowReadingText));
+    check('one line says how every other row reads', /while the 50-day average is above the 200-day average/.test(await terms.locator('[data-board-key]').innerText()));
+    check('the definitions follow the reading, under their usual heading', /what these mean/i.test(await terms.innerText()) && await terms.locator('dl dt').count() >= 3);
+    check('the reading is prose, with no chat link of its own', await terms.locator('[data-board-reading] [data-ask]').count() === 0);
+    await shot('03a-read-this-board');
 
     const verdictVisible = () => page.$$eval('#signal-board [data-verdict]', (els) => els.map((el) => getComputedStyle(el).visibility));
     check('verdicts are visible before the quiz opens', (await verdictVisible()).every((v) => v === 'visible'));
     await page.locator('#verdict-quiz summary').click();
     await page.waitForTimeout(300);
     check('the verdict column hides while guessing', (await verdictVisible()).every((v) => v === 'hidden'));
+    // The reading states the top row's verdict, which the quiz asks for.
+    check('the top row\'s reading hides while guessing, and says why', !(await rowReading.isVisible())
+        && await terms.locator('[data-board-reading-paused]').isVisible()
+        && await terms.locator('[data-board-key]').isVisible());
+    await terms.locator('summary').click();
     const quizSymbols = await page.$$eval('#verdict-quiz [data-quiz-row]', (els) => els.map((el) => el.getAttribute('data-quiz-row')));
     check('the quiz asks about acted-on rows first and never an excluded one', quizSymbols[0] === 'XLE' && quizSymbols[1] === 'XLF' && !quizSymbols.includes('XLP'), quizSymbols.join(','));
     check('Reveal waits for a guess', await page.locator('#verdict-reveal').isDisabled());
@@ -269,6 +291,15 @@ try {
 
     await page.goto(`${BASE}/strategies/rsi2-mean-reversion`, {waitUntil: 'load'});
     await page.locator('#strategy-trades').waitFor({timeout: 30000});
+    const rsiTerms = page.locator('#board-terms');
+    check('the RSI-2 board is read from its top row', (await rsiTerms.locator('summary').innerText()).includes('Read this board — AAPL'));
+    await rsiTerms.locator('summary').click();
+    const rsiReading = await rsiTerms.locator('[data-board-reading]').innerText();
+    check('…in its own entry level, trend filter, slots and exit average',
+        /2-day RSI reads 3\.4, under the entry level of 10/.test(rsiReading) && /close \(\$123\.45\) is above the 200-day average \(\$110\.00\)/.test(rsiReading)
+        && /one of 5 equal slots/.test(rsiReading) && /under 10 and its close is above the 200-day average/.test(rsiReading),
+        rsiReading.replace(/\s+/g, ' ').slice(0, 240));
+    await rsiTerms.locator('summary').click();
     const rsiReplay = page.locator('#strategy-trades details[data-replay]');
     check('the RSI-2 fill has one "What the rule saw"', await rsiReplay.count() === 1);
     await rsiReplay.locator('summary').click();

@@ -24,7 +24,7 @@ product tour and docs/specs/ for the design documents behind the larger features
 - `lib/news` ingest + sanitise + the per-user feed (`feed-prefs` client-safe, `feed` pure, `feed-store` server) · `lib/brain` entity graph · `lib/navigator` allocation rails · `lib/topics` followed topics (`starters` the curated set, `seed` what a new account gets, `insert` the one write path)
 - `lib/trading` paper accounts (`income` the accrual convention, `income-store` the nightly credit) · `lib/dashboard` widget registry/layout · `lib/theme` palettes/styles · `lib/ai` models + chat tools
 - `lib/strategies` the quant strategies: pure catalog/rules/engine/simulator (one `runStrategyDay` for live and backtest; `params` the one reader of `def.params`), `store`/`queries` server side · `lib/prices` daily bars (Yahoo first, Stooq fallback), dividends, the T-bill rate, the SPY total-return index, signals, NYSE calendar
-- `lib/learn` what the app teaches: `glossary` (every metric, news concept and rail, pure and client-safe), `banned` (the one no-advice word list), `copy/<feature>` (every learner-facing sentence, as pure exports), `missions` / `verdict` / `replay` pure, `reasons` the reason decoder (one ordered grammar over every string the rules, `planOrders` and the engine write; a round-trip test runs every rule's branches through it, so a reworded reason fails there, not on the page), `facts-store` the server reads · `components/learn/` the `WhatTheseMean` disclosure and `ReasonGloss` · `components/primitives/Term`
+- `lib/learn` what the app teaches: `glossary` (every metric, news concept and rail, pure and client-safe), `banned` (the one no-advice word list), `copy/<feature>` (every learner-facing sentence, as pure exports), `missions` / `verdict` / `replay` pure, `reasons` the reason decoder (one ordered grammar over every string the rules, `planOrders` and the engine write; a round-trip test runs every rule's branches through it, so a reworded reason fails there, not on the page), `board-narration` "Read this board" (the signal board's top row read by a narrator per strategy from `row.values` and the catalog's parameters), `facts-store` the server reads · `components/learn/` the `WhatTheseMean` disclosure, `ReasonGloss` and `BoardReading` · `components/primitives/Term`
 - `lib/inngest/functions.ts` every scheduled job · `database/models/` Mongoose models · `types/global.d.ts` ambient domain types
 
 ## Invariants — keep these true
@@ -78,7 +78,9 @@ product tour and docs/specs/ for the design documents behind the larger features
    widget. Learn surfaces self-limit from rows plus stamp-once fields in the no-default `learn`
    preference sub-schema (no learner flag), and read with bounded queries — no board-carrying
    aggregate on a request path. `#signal-board` keeps exactly one `<details>` of its own; new
-   disclosures are siblings inside `#strategy-signals`.
+   disclosures are siblings inside `#strategy-signals`. The board's one `<WhatTheseMean>` is led by
+   "Read this board — SYMBOL", and anything that states a board verdict hides while Guess the Verdict
+   is open (the `:has` switch on `#strategy-signals`).
 
 ## Next.js 16
 
