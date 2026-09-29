@@ -127,6 +127,15 @@ export const describeOrderEffect = ({side, symbol, quantity, price, cash, positi
     };
 };
 
+// The ticket's one "What these mean" disclosure lists what its lines show: the three terms it
+// always uses, and APY only while the buy line carries the interest clause (a sell, a buy with
+// no price yet, no stored rate or no cash left says nothing about interest).
+export const TICKET_TERMS = ['buying-power', 'market-order', 'avg-cost'] as const;
+export type TicketTerm = (typeof TICKET_TERMS)[number] | 'apy';
+
+export const ticketTerms = (effect: OrderEffect | null): TicketTerm[] =>
+    effect?.side === 'buy' && effect.cashYield ? [...TICKET_TERMS, 'apy'] : [...TICKET_TERMS];
+
 export const checkOrder = ({side, quantity, price, cash, owned}: OrderInputs): OrderCheck => {
     const qty = Math.floor(quantity);
     const hasPrice = typeof price === 'number' && price > 0;

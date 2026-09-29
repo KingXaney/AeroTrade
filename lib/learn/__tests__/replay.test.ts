@@ -1,7 +1,7 @@
 import {describe, expect, it} from 'vitest';
 import {findBanned} from '@/lib/learn/banned';
 import {REPLAY_COPY} from '@/lib/learn/copy/replay';
-import {describeReplay, fillDate, isReplayExpired, matchFillToRun, type ReplayRun} from '@/lib/learn/replay';
+import {describeReplay, fillDate, isReplayExpired, matchFillToRun, replayReason, type ReplayRun} from '@/lib/learn/replay';
 
 const run: ReplayRun = {
     asOf: '2026-09-25',
@@ -25,6 +25,25 @@ describe('matchFillToRun', () => {
         expect(match.order?.reason).toMatch(/^enter: SMA50/);
         expect(matchFillToRun(run, 'XLF', 'sell').order).toBeNull();
         expect(matchFillToRun(run, 'XLE', 'buy')).toEqual({row: null, order: null});
+    });
+});
+
+// The reason a fill's "What the rule saw" decodes: the planned order's while the run record
+// lasts, else the reason stored on the fill itself — an expired board takes the row with it,
+// not the rule's words, which the trade row still carries.
+describe('replayReason', () => {
+    const stored = 'exit: SMA50 80.00 ≤ SMA200 81.00';
+    it('reads the planned order while the record lasts', () => {
+        expect(replayReason(matchFillToRun(run, 'XLF', 'buy'), stored)).toBe(run.orders[0].reason);
+    });
+    it('falls back to the fill\'s own reason when the record is gone or never matched', () => {
+        expect(replayReason(null, stored)).toBe(stored);
+        expect(replayReason({row: null, order: null}, stored)).toBe(stored);
+        expect(replayReason({row: run.board[0], order: null}, stored)).toBe(stored);
+    });
+    it('has nothing to decode when neither carries a reason', () => {
+        expect(replayReason(null, undefined)).toBeNull();
+        expect(replayReason(null, '   ')).toBeNull();
     });
 });
 

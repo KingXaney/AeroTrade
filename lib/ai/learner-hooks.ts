@@ -13,7 +13,7 @@ import PaperTrade from "@/database/models/paper-trade.model";
 import type {PaperAccountDoc} from "@/database/models/paper-account.model";
 import type {LearnerAccountValue, LearnerFigure, LearnerValue} from "@/lib/ai/explain";
 import type {GlossaryKey} from "@/lib/learn/glossary";
-import {buildPriceMap, computePortfolio, readAccountsForUser, toAccountSummary} from "@/lib/trading/account";
+import {buildPriceMap, computePortfolio, epochTradesOf, readAccountsForUser, toAccountSummary} from "@/lib/trading/account";
 import {countUnpriced, drawdownWindow, mergeLivePoint, winStatsFromCounts} from "@/lib/trading/analytics";
 import {getEasternDateString} from "@/lib/utils";
 
@@ -43,10 +43,11 @@ const idOf = (doc: PaperAccountDoc): string => String(doc._id);
 const nameOf = (doc: PaperAccountDoc): string => toAccountSummary(doc).name;
 
 // One $group per account instead of the sell rows themselves: a long-lived account's
-// thousands of sells come back as four numbers.
+// thousands of sells come back as four numbers. Each account's current epoch only
+// (epochTradesOf), so the chat's win rate is the one /portfolio shows.
 const sellTotalsOf = async (userId: string, docs: PaperAccountDoc[]) => {
     const rows = await PaperTrade.aggregate<SellTotals & {_id: string}>([
-        {$match: {userId, accountId: {$in: docs.map(idOf)}, side: 'sell'}},
+        {$match: {...epochTradesOf(userId, docs), side: 'sell'}},
         {$group: {
             _id: '$accountId',
             sells: {$sum: 1},

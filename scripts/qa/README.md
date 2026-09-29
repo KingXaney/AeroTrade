@@ -35,7 +35,8 @@ node screenshots.mjs                       # or: capture the README screenshots
 
 The other scripts follow the same shape, one per change set: `qa-foundations.mjs`,
 `qa-navigation.mjs`, `qa-ai-surfaces.mjs`, `qa-truthful-data.mjs`, `qa-trade-desk.mjs` (the ticket,
-the CSV export and the note; for the "earning ≈$x/month" clause it answers the page's `getQuote`
+the CSV export and the comparison table — neither counts a row from before the account's
+inception — and the note, read back from `placeOrder`'s own request; for the "earning ≈$x/month" clause it answers the page's `getQuote`
 server action with a fixed price, since the harness has no quote provider, and removes the ^IRX
 row it seeds),
 `qa-news-feed.mjs`, `qa-strategies.mjs` (seeds the system-owned strategy accounts directly — the

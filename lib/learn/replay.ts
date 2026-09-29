@@ -28,3 +28,11 @@ export const describeReplay = (match: ReplayMatch | null, asOf: string | null, e
     if (match && asOf && (match.row || match.order)) return REPLAY_COPY.caption(asOf);
     return expired ? REPLAY_COPY.expired : REPLAY_COPY.missing;
 };
+
+// The reason a fill's "What the rule saw" decodes and hands to "Ask in chat": the planned
+// order's while the run record lasts, else the reason the fill itself stores — an expired
+// record loses the board row, not the rule's words. Null when neither has any.
+export const replayReason = (match: ReplayMatch | null, fillReason: string | undefined): string | null => {
+    const reason = match?.order?.reason ?? fillReason;
+    return reason && reason.trim() !== '' ? reason : null;
+};

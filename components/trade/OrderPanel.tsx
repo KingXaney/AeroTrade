@@ -7,7 +7,7 @@ import {cn, formatPrice} from "@/lib/utils";
 import {useDebounce} from "@/hooks/useDebounce";
 import {getQuote, searchStocks} from "@/lib/actions/finnhub.actions";
 import {placeOrder} from "@/lib/actions/trading.actions";
-import {checkOrder, describeOrderEffect, presetQuantities, type PositionLike} from "@/lib/trading/order-math";
+import {checkOrder, describeOrderEffect, presetQuantities, ticketTerms, type PositionLike} from "@/lib/trading/order-math";
 import {orderEffectLine, queueLine} from "@/lib/learn/copy/trade";
 import {NOTE_COPY} from "@/lib/learn/copy/receipts";
 import {TRADE_REASON_MAX} from "@/lib/strategies/config";
@@ -35,9 +35,6 @@ type OrderPanelProps = {
     // quick-trade widget leaves it unset, so it never navigates anyone anywhere.
     onSymbolCommit?: (symbol: string) => void;
 };
-
-// The ticket's one definitions disclosure; APY joins it only when a rate can put it on the line.
-const TICKET_TERMS = ['buying-power', 'market-order', 'avg-cost'] as const;
 
 const OrderPanel = ({defaultSymbol = '', cash, accountId, positions = [], onSymbolCommit, queueNote = null, compact = false, apy = null}: OrderPanelProps) => {
     const router = useRouter();
@@ -323,7 +320,8 @@ const OrderPanel = ({defaultSymbol = '', cash, accountId, positions = [], onSymb
             >
                 {submitting ? 'Placing…' : `${side === 'buy' ? 'Buy' : 'Sell'} ${symbol || ''}`.trim()}
             </button>
-            {!compact && <WhatTheseMean keys={apy === null ? TICKET_TERMS : [...TICKET_TERMS, 'apy']} className="mt-0" />}
+            {/* The one definitions disclosure: APY joins it only while the buy line states it. */}
+            {!compact && <WhatTheseMean keys={ticketTerms(effect)} className="mt-0" />}
         </form>
     );
 };

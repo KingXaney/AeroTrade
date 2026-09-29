@@ -40,8 +40,14 @@ const FIRST_SNAP = addDays(TODAY, -12);
 // Day 4 is the peak (102,000), day 8 the low (96,000): a 5.88% fall that needs +6.25% back.
 // Today's live point is the cash, 100,000, still short of the peak.
 const VALUES = [100_000, 100_500, 101_000, 102_000, 101_000, 99_000, 97_000, 96_000, 97_000, 98_000];
-const PEAK = addDays(FIRST_SNAP, 3);
-const TROUGH = addDays(FIRST_SNAP, 7);
+const PEAK_INDEX = 3;
+const TROUGH_INDEX = 7;
+const PEAK = addDays(FIRST_SNAP, PEAK_INDEX);
+const TROUGH = addDays(FIRST_SNAP, TROUGH_INDEX);
+// PerformanceChart's own geometry: x(i) = PAD_X + i / (n − 1) × (WIDTH − 2 × PAD_X).
+const CHART = {width: 720, padX: 44};
+// '+0.2%', '−3.1%', '0.0%' — lib/learn/copy/portfolio.ts pctOneDecimal.
+const pctOneDecimal = (pct) => { const r = Math.round(pct * 10) / 10; return r === 0 ? '0.0%' : `${r < 0 ? '−' : '+'}${Math.abs(r).toFixed(1)}%`; };
 
 const browser = await chromium.launch({channel: 'chrome'});
 const page = await browser.newPage({viewport: {width: 1440, height: 900}});
@@ -112,7 +118,11 @@ try {
     const hint = await drawdownHint();
     check('the tile shows the seeded fall', /−5\.88%/.test(await tileValue()), await tileValue());
     check('the hint dates the stretch peak → low', new RegExp(`${escape(short(PEAK))} → ${escape(short(TROUGH))}`).test(hint), hint);
-    check('the hint sets SPY beside it over the same days', /SPY [+−]\d+\.\d% same days/.test(hint), hint);
+    // SPY over exactly those days, from the seeded closes: each date reads the last bar on or
+    // before it (the chart's forward fill across weekends), and no dividend moves the index.
+    const spyClose = (date) => 600 + weekdays.indexOf(weekdayOnOrBefore(date)) * 0.5;
+    const spySameDays = `SPY ${pctOneDecimal((spyClose(TROUGH) / spyClose(PEAK) - 1) * 100)} same days`;
+    check('the hint sets SPY beside it over the same days', hint.includes(spySameDays), `${hint} | expected ${spySameDays}`);
     check('the hint says what the climb back takes', /\+6\.3% to recover/.test(hint), hint);
     check('the hint matches the dated pattern', /[A-Z][a-z]{2} \d+ → [A-Z][a-z]{2} \d+ · SPY [+−]\d+\.\d% same days · \+\d+\.\d% to recover/.test(hint), hint);
     const panels = page.locator('main [data-what-these-mean]');
@@ -121,8 +131,16 @@ try {
     check('a dated hint brings Recovery into the panel\'s definitions', /recovery/i.test(terms), terms.replace(/\s+/g, ' ').slice(0, 300));
     const band = page.locator('[data-testid=drawdown-band]');
     check('the chart shades one drawdown band', (await band.count()) === 1);
-    const bandWidth = Number(await band.first().getAttribute('width').catch(() => '0'));
-    check('the band has width', bandWidth > 0, String(bandWidth));
+    // Where the band sits, not only that it exists: from the seeded peak's x to the seeded low's,
+    // on an n-point series (n read off the account line the band is drawn under).
+    const accountLine = await page.locator('svg:has([data-testid=drawdown-band]) path.stroke-brand').first().getAttribute('d');
+    const points = (accountLine?.match(/[ML]/g) ?? []).length;
+    const xAt = (i) => CHART.padX + (i / (points - 1)) * (CHART.width - CHART.padX * 2);
+    const bandX = Number(await band.first().getAttribute('x'));
+    const bandWidth = Number(await band.first().getAttribute('width'));
+    check('the band spans the seeded peak to the seeded low', points === VALUES.length + 1
+        && Math.abs(bandX - xAt(PEAK_INDEX)) < 0.5 && Math.abs(bandWidth - (xAt(TROUGH_INDEX) - xAt(PEAK_INDEX))) < 0.5,
+        `points=${points} x=${bandX} width=${bandWidth}, expected x=${xAt(PEAK_INDEX).toFixed(1)} width=${(xAt(TROUGH_INDEX) - xAt(PEAK_INDEX)).toFixed(1)}`);
     check('the band legend dates the stretch', new RegExp(`${escape(short(PEAK))} → ${escape(short(TROUGH))}`).test(await text('[data-testid=drawdown-band-legend]')), await text('[data-testid=drawdown-band-legend]'));
     check('ten days of history give a typical daily swing', /±\$[\d,]+/.test(await text('[data-testid=risk-swing]')), await text('[data-testid=risk-swing]'));
     await shot('01-dated-drawdown');

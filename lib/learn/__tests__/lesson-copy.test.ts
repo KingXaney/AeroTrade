@@ -106,6 +106,40 @@ describe('momentCopy', () => {
     });
 });
 
+// Definitions come from the glossary only (invariant 12): a lesson that states what a term
+// means quotes the entry's own short line, never a sentence of its own that could drift.
+describe('momentCopy definitions', () => {
+    const defined = (key: keyof typeof GLOSSARY): string => `${GLOSSARY[key].term}: ${GLOSSARY[key].short}`;
+    const bodyOf = (index: number): string => momentCopy(moments[index]).body.join(' ');
+
+    it('quotes the glossary for the terms each lesson defines', () => {
+        expect(bodyOf(0)).toContain(defined('market-order'));
+        expect(bodyOf(2)).toContain(defined('market-order'));
+        expect(bodyOf(3)).toContain(defined('realized-pnl'));
+        expect(bodyOf(3)).toContain(defined('win-rate'));
+        expect(bodyOf(3)).toContain(defined('unrealized-pnl'));
+        expect(bodyOf(9)).toContain(defined('max-drawdown'));
+    });
+
+    it('has no definition of its own for a term the glossary defines', () => {
+        const own = [/A drawdown is how far/i, /Win rate counts/i, /A market order fills/i, /locks in part of a result/i,
+            /buying more moves it/i, /A fall takes a larger rise/i, /keep an unrealized result/i];
+        for (const moment of moments) {
+            const body = momentCopy(moment).body.join(' ');
+            for (const pattern of own) expect(body, `${moment.kind}: ${pattern}`).not.toMatch(pattern);
+        }
+    });
+
+    it('defines only terms the lesson also lists', () => {
+        for (const moment of moments) {
+            const copy = momentCopy(moment);
+            for (const key of Object.keys(GLOSSARY) as (keyof typeof GLOSSARY)[]) {
+                if (copy.body.some((line) => line.includes(defined(key)))) expect(copy.terms, `${moment.kind}: ${key}`).toContain(key);
+            }
+        }
+    });
+});
+
 describe('LESSON_COPY', () => {
     it('describes and never advises', () => {
         const strings = [...Object.values(LESSON_COPY), lessonCountLine(1), lessonCountLine(7)];

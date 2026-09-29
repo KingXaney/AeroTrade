@@ -118,9 +118,32 @@ describe('drawdownWindow', () => {
         expect(drawdownWindow(back)).toMatchObject({peakDate: '2026-07-06', troughDate: '2026-07-07'});
     });
 
-    it('agrees with computeMaxDrawdown on every series', () => {
-        const series = [pt('2026-07-01', 100_000), pt('2026-07-02', 120_000), pt('2026-07-03', 90_000), pt('2026-07-04', 110_000)];
-        expect(computeMaxDrawdown(series)).toBe(drawdownWindow(series)?.pct);
+    // computeMaxDrawdown is drawdownWindow(...).pct, so comparing the two proves nothing; the
+    // window is held instead to a brute force over every earlier/later pair of points.
+    it('finds the same fall a brute force over every pair of days finds', () => {
+        const bruteForce = (values: number[]): number => {
+            let worst = 0;
+            values.forEach((high, i) => values.slice(i).forEach((low) => { worst = Math.max(worst, ((high - low) / high) * 100); }));
+            return worst;
+        };
+        const cases = [
+            [100_000, 120_000, 90_000, 110_000],
+            [100, 80, 150, 105, 160, 90, 95],
+            [50, 60, 55, 70, 40, 45, 80, 20],
+            [100, 100, 100],
+            [10, 9, 8, 7, 6],
+        ];
+        for (const values of cases) {
+            const series = values.map((value, i) => pt(`2026-07-${String(i + 1).padStart(2, '0')}`, value));
+            const window = drawdownWindow(series);
+            expect(window?.pct, values.join(',')).toBeCloseTo(bruteForce(values), 10);
+            expect(computeMaxDrawdown(series), values.join(',')).toBeCloseTo(bruteForce(values), 10);
+            if (window && window.pct > 0) {
+                expect(((window.peakValue - window.troughValue) / window.peakValue) * 100, values.join(',')).toBeCloseTo(window.pct, 10);
+                expect(window.peakDate < window.troughDate, values.join(',')).toBe(true);
+            }
+        }
+        expect(drawdownWindow([pt('2026-07-01', 100_000), pt('2026-07-02', 120_000), pt('2026-07-03', 90_000)])?.pct).toBe(25);
     });
 });
 

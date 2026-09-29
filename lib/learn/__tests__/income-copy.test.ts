@@ -6,6 +6,7 @@
 import {describe, expect, it} from 'vitest';
 import {findBanned} from '@/lib/learn/banned';
 import {GLOSSARY} from '@/lib/learn/glossary';
+import {DIVIDEND_PAY_LAG_DAYS} from '@/lib/prices/config';
 import {
     INCOME_COPY,
     dividendReceipt,
@@ -25,6 +26,7 @@ import {
     dividendsByExDate,
     groupIncomeActivity,
     makeRateLookup,
+    missedExDates,
     replayIncome,
     withReceipts,
     type IncomeMonth,
@@ -178,7 +180,7 @@ describe('dividend receipts', () => {
         expect(view.dividends).toHaveLength(1);
         const [spy] = view.dividends;
         expect(dividendSummary(spy)).toBe('10 × $1.889 · paid Sep 23');
-        expect(dividendReceipt(spy.receipt!)).toBe('10 shares held at the close on Sep 17, the day before the Sep 18 ex-date (held since Sep 3) · 10 × $1.889 = $18.89 · paid Sep 23, 5 days after the ex-date');
+        expect(dividendReceipt(spy.receipt!)).toBe('10 shares held at the end of Sep 17, the day before the Sep 18 ex-date (held since Sep 3) · 10 × $1.889 = $18.89 · paid Sep 23, 5 days after the ex-date');
         expect(cents((spy.quantity as number) * (spy.perShare as number))).toBe(cents(rows[0].amount));
     });
 
@@ -187,6 +189,21 @@ describe('dividend receipts', () => {
             'Sold 5 AGG on Sep 18, the session before its Sep 21 ex-date: a day early for $0.30 a share ($1.50).',
             'Bought 20 XLE on Sep 21, its ex-dividend date: a day late for $0.26 a share ($5.20).',
         ]);
+    });
+
+    // The clock pays the holding at the END of the calendar day before the ex-date; before a
+    // Monday ex-date that day is a Sunday, which has no close, and a weekend sell is not in a session.
+    it('names a weekend day as the end of it, never as a close or a session', () => {
+        expect(dividendReceipt({
+            symbol: 'SPY', exDate: '2026-09-21', closeBefore: '2026-09-20', payDate: '2026-09-26',
+            quantity: 10, perShare: 1.889, amount: 18.89, heldSince: '2026-09-03',
+        })).toBe('10 shares held at the end of Sep 20, the day before the Sep 21 ex-date (held since Sep 3) · 10 × $1.889 = $18.89 · paid Sep 26, 5 days after the ex-date');
+        const saturday = missedExDates(
+            [{symbol: 'AGG', side: 'buy', quantity: 5, createdAt: at('2026-09-02')}, {symbol: 'AGG', side: 'sell', quantity: 5, createdAt: at('2026-09-19')}],
+            [{symbol: 'AGG', exDate: '2026-09-21', perShare: 0.3}],
+        );
+        expect(saturday.map(missedLine)).toEqual(['Sold 5 AGG on Sep 19, before its Sep 21 ex-date: a day early for $0.30 a share ($1.50).']);
+        for (const line of saturday.map(missedLine)) expect(findBanned(line, 'copy'), line).toEqual([]);
     });
 
     it('keeps the summary to the date when a row has no share count', () => {
@@ -213,5 +230,20 @@ describe('the rate conversion the panel defines', () => {
         expect(entry.long).toContain(`${(bondEquivalentYield(4.07) * 100).toFixed(2)}%`);
         expect(entry.long).toContain(`${(apyFromDiscount(4.07) * 100).toFixed(2)}%`);
         expect(entry.long).toContain(`${(CASH_YIELD_SPREAD * 100).toFixed(2)}%`);
+    });
+});
+
+// The pay lag is a constant of the income clock; every sentence that states it follows it.
+describe('the pay lag the panel states', () => {
+    const WORDS = ['zero', 'one', 'two', 'three', 'four', 'five', 'six', 'seven', 'eight', 'nine', 'ten'];
+
+    it('is the lag the clock pays on', () => {
+        expect(INCOME_COPY.emptyDescription).toContain(`paid ${DIVIDEND_PAY_LAG_DAYS} days after`);
+        expect(INCOME_COPY.emptyDescription).not.toMatch(new RegExp(`\\b(${WORDS.join('|')}) days\\b`));
+    });
+
+    it('agrees with the glossary\'s pay-date entry, which is import-free and so spells it out', () => {
+        expect(GLOSSARY['pay-date'].short).toContain(`${WORDS[DIVIDEND_PAY_LAG_DAYS]} days after the ex-date`);
+        expect(GLOSSARY['pay-date'].long).toContain(`${WORDS[DIVIDEND_PAY_LAG_DAYS]}-day lag`);
     });
 });

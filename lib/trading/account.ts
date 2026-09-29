@@ -244,8 +244,18 @@ const tradeEpoch = cache(async (userId: string, accountId: string): Promise<{sin
     return account ? {since: account.inceptionAt ?? null} : undefined;
 });
 
-const epochTrades = (userId: string, accountId: string, since: Date | null) =>
+// The one PaperTrade filter for an account's current epoch. Exported for readers that already
+// hold the account (the CSV export, the chat's learner figures) — they apply the same rule
+// without reading the account again.
+export const epochTrades = (userId: string, accountId: string, since: Date | null | undefined) =>
     ({userId, accountId, ...(since ? {createdAt: {$gte: since}} : {})});
+
+// The same rule over several accounts at once: each account's trades from its own inceptionAt.
+// No accounts match nothing (MongoDB rejects an empty $or).
+export const epochTradesOf = (userId: string, accounts: readonly {_id: unknown; inceptionAt?: Date | null}[]) =>
+    (accounts.length === 0
+        ? {userId, accountId: {$in: [] as string[]}}
+        : {$or: accounts.map((a) => epochTrades(userId, String(a._id), a.inceptionAt))});
 
 // One account's whole trade ledger for its current epoch, oldest first — the one PaperTrade
 // read a page makes for an account: analytics (trade count, realized P&L, win rate), the trade
@@ -436,18 +446,25 @@ export const getAccountAnalytics = async (userId: string, accountId: string): Pr
     }
 };
 
-// Win rate + max drawdown for every account of a user in two bulk queries
+// Win rate + max drawdown for every account of a user in bulk queries
 // (feeds the strategy comparison table without N per-account round trips).
 // liveValues (accountId -> current total value) folds today's live valuation
-// into each drawdown series the same way getAccountAnalytics does.
+// into each drawdown series the same way getAccountAnalytics does. Trades are each
+// account's current epoch (epochTradesOf), so the table's win rate is the tile's.
 export const getComparisonStats = async (
     userId: string,
     liveValues?: Record<string, number>,
 ): Promise<Record<string, {winRatePct: number | null; maxDrawdownPct: number | null}>> => {
     try {
         await connectToDatabase();
+        const epochTradesForUser = async () => {
+            const accounts = await PaperAccount.find({userId}).select('inceptionAt').lean<{_id: unknown; inceptionAt?: Date}[]>();
+            return PaperTrade.find(epochTradesOf(userId, accounts))
+                .select('accountId side realizedPnl')
+                .lean<{accountId?: string; side: string; realizedPnl?: number}[]>();
+        };
         const [trades, snapshots] = await Promise.all([
-            PaperTrade.find({userId}).lean(),
+            epochTradesForUser(),
             AccountSnapshot.find({userId}).sort({date: 1}).lean(),
         ]);
 

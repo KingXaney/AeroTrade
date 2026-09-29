@@ -168,9 +168,11 @@ try {
         board: [row('XLK', 'held', 210.5, 198.2), row('XLF', 'enter', 42.1, 40), row('XLE', 'exit', 80, 81), row('XLU', 'watch', 70, 72), row('XLP', 'excluded', 0, 0, 'needs 200 bars')],
         orders: [
             {symbol: 'XLF', side: 'buy', quantity: 10, kind: 'enter', reason: enterReason, executed: true, price: 42.2},
-            {symbol: 'XLE', side: 'sell', quantity: 5, kind: 'exit', reason: exitReason, executed: true, price: 80},
+            // Today's exit did not fill (the XLE fill in the log is the 401-day-old one), so the
+            // latest decision has one order with a "What the rule saw" of its own and one without.
+            {symbol: 'XLE', side: 'sell', quantity: 5, kind: 'exit', reason: exitReason, executed: false, price: null, message: 'not held'},
         ],
-        skippedOrders: [], dataIssues: [], equity: 100_000, summary: '2/2 order(s) filled', createdAt: new Date(),
+        skippedOrders: [], dataIssues: [], equity: 100_000, summary: '1/2 order(s) filled', createdAt: new Date(),
     });
 
     await page.goto(`${BASE}/strategies/golden-cross`, {waitUntil: 'load'});
@@ -201,10 +203,18 @@ try {
     await shot('03a-read-this-board');
 
     const verdictVisible = () => page.$$eval('#signal-board [data-verdict]', (els) => els.map((el) => getComputedStyle(el).visibility));
+    // Everything in the latest decision that states a row's verdict: the headline, each order
+    // (side, kind, raw reason, decoded reason) — the orders say "buy XLF · enter" as plainly as the board.
+    const RUN_VERDICTS = ['[data-run-verdict]', '[data-order-reason]', 'details[data-decoded]'].map((sel) => `#latest-decision ${sel}`).join(', ');
+    const runVerdictVisible = () => page.$$eval(RUN_VERDICTS, (els) => els.map((el) => getComputedStyle(el).visibility));
     check('verdicts are visible before the quiz opens', (await verdictVisible()).every((v) => v === 'visible'));
+    check('…and so are the run\'s headline, orders and their reasons', (await runVerdictVisible()).length === 6 && (await runVerdictVisible()).every((v) => v === 'visible'),
+        (await runVerdictVisible()).join(','));
     await page.locator('#verdict-quiz summary').click();
     await page.waitForTimeout(300);
     check('the verdict column hides while guessing', (await verdictVisible()).every((v) => v === 'hidden'));
+    check('…and so do the run\'s headline, orders, their reasons and "What the rule saw"', (await runVerdictVisible()).every((v) => v === 'hidden'),
+        (await runVerdictVisible()).join(','));
     // The reading states the top row's verdict, which the quiz asks for.
     check('the top row\'s reading hides while guessing, and says why', !(await rowReading.isVisible())
         && await terms.locator('[data-board-reading-paused]').isVisible()
@@ -224,6 +234,9 @@ try {
     check('a verdict explained by its fixed meaning gets no gloss', await page.locator('[data-quiz-row="XLK"] [data-reason-gloss]').count() === 0);
     check('the disclaimer still appears once', ((await page.locator('body').innerText()).match(/not financial advice/gi) ?? []).length === 1);
     await shot('03-quiz');
+    await page.locator('#verdict-quiz summary').click();
+    await page.waitForTimeout(300);
+    check('closing the quiz brings the orders back', (await runVerdictVisible()).every((v) => v === 'visible'));
 
     const replays = page.locator('#strategy-trades details[data-replay]');
     check('every strategy fill has one "What the rule saw" disclosure', await replays.count() === 2);
@@ -236,15 +249,25 @@ try {
     check('a decoded clause carries its glossary definition', await replayGloss.locator('[data-term="trend-on"][title]').count() === 1);
     await replays.nth(1).locator('summary').click();
     check('an expired fill says the record is gone', /kept 400 days/.test(await replays.nth(1).innerText()));
-    check('…and decodes nothing it no longer has', await replays.nth(1).locator('[data-reason-gloss]').count() === 0);
+    // The board row expired with the record; the rule's words did not — the fill stores them.
+    check('…shows no board row it no longer has', await replays.nth(1).locator('[data-replay-body] [data-verdict]').count() === 0);
+    const expiredGloss = replays.nth(1).locator('[data-reason-gloss]');
+    check('…and still decodes the reason the fill stores', await expiredGloss.count() === 1
+        && /50-day average \(80\.00\)/.test(await expiredGloss.innerText()) && /at or below/.test(await expiredGloss.innerText()),
+        (await replays.nth(1).innerText()).replace(/\s+/g, ' ').slice(0, 200));
+    check('…with its one "Ask in chat"', await replays.nth(1).locator('[data-ask="reason"]').count() === 1);
     await shot('04-replay');
 
+    // One "What the rule saw" per fill: a filled order's lives on its trade-log row, so only
+    // the order that did not fill carries one here.
     const decided = page.locator('#latest-decision details[data-decoded]');
-    check('each planned order in the latest decision has one "What the rule saw"', await decided.count() === 2);
+    const orderRow = (symbol) => page.locator('#latest-decision li[data-run-verdict]', {has: page.locator('span', {hasText: new RegExp(`^${symbol}$`)})});
+    check('the filled order in the latest decision has no disclosure of its own', await orderRow('XLF').locator('details').count() === 0);
+    check('the order that did not fill has one "What the rule saw"', await decided.count() === 1 && await orderRow('XLE').locator('details[data-decoded]').count() === 1);
     check('…outside the board, which keeps no disclosure of its own', await page.locator('#signal-board details').count() === 0);
     await decided.first().locator('summary').click();
     const decidedText = await decided.first().innerText();
-    check('…which reads the reason in the rule\'s own parameters', /one of its 11 equal slots/.test(decidedText) && /50-day average/.test(decidedText), decidedText.replace(/\s+/g, ' ').slice(0, 160));
+    check('…which reads the reason in the rule\'s own words', /50-day average \(80\.00\)/.test(decidedText) && /at or below/.test(decidedText), decidedText.replace(/\s+/g, ' ').slice(0, 160));
     check('…and ends with one "Ask in chat"', await decided.first().locator('[data-ask="reason"]').count() === 1);
 
     // --- Ask in chat: prefilled, never sent ------------------------------------------------
@@ -261,7 +284,7 @@ try {
     await decided.first().locator('[data-ask="reason"]').evaluate((el) => el.click());
     await page.waitForTimeout(300);
     check('a decoded reason\'s Ask names the strategy, the symbol and the reason',
-        (await composer.inputValue()) === `Explain this reason from the Golden Cross Sectors strategy for XLF: ${enterReason}`, await composer.inputValue());
+        (await composer.inputValue()) === `Explain this reason from the Golden Cross Sectors strategy for XLE: ${exitReason}`, await composer.inputValue());
 
     // --- RSI-2: a real entry decoded in the replay; a simulated exit in the backtest log --
     const rsiId = new ObjectId();

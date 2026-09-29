@@ -4,11 +4,13 @@
 // — and is held to the 'copy' tier of lib/learn/banned.ts by lesson-copy.test.ts on a grid of
 // rows. A rebalance is described by the catalog's cadence and the StrategyState outcome only;
 // the beginner line is never quoted here (it belongs to the strategy header, the wide
-// quant-strategies widget and /learn).
+// quant-strategies widget and /learn). A term the lesson defines is quoted from the glossary
+// ("Win rate: …", GLOSSARY[key].short), never restated in the lesson's own words, so the two
+// cannot drift apart; the lesson's own sentences carry only the row's facts.
 //
 // Import-free of server code: the widget renders it on the server, the Got it button on the client.
 
-import type {GlossaryKey} from "@/lib/learn/glossary";
+import {GLOSSARY, type GlossaryKey} from "@/lib/learn/glossary";
 import {DRAWDOWN_MOMENT_THRESHOLD, type Moment} from "@/lib/learn/moments";
 import {pctOneDecimal, shortDate, signedMoney} from "@/lib/learn/copy/portfolio";
 import {describeNextRebalance} from "@/lib/strategies/calendar";
@@ -23,6 +25,8 @@ const QUANTITY = new Intl.NumberFormat('en-US', {maximumFractionDigits: 4});
 const money = (amount: number): string => MONEY.format(amount);
 const qty = (n: number): string => QUANTITY.format(n);
 const shares = (n: number): string => `${qty(n)} ${n === 1 ? 'share' : 'shares'}`;
+// 'Win rate: Sells that locked in a profit, as a share of all sells.' — the glossary's own line.
+const defined = (key: GlossaryKey): string => `${GLOSSARY[key].term}: ${GLOSSARY[key].short}`;
 
 export type MomentCopy = {
     label: string;
@@ -75,9 +79,9 @@ const fillCopy = (moment: Extract<Moment, {kind: 'first-fill'}>): MomentCopy => 
         title: 'Your first paper trade',
         figure: `${verb} ${qty(fill.quantity)} ${fill.symbol} at ${money(fill.price)} · ${shortDate(fill.date)}`,
         body: [
-            'A market order fills at once here, at the last quote; a real broker fills at the next price available.',
+            defined('market-order'),
             fill.side === 'buy'
-                ? `The price paid is now the average cost of the ${fill.symbol} shares held; buying more moves it, selling does not.`
+                ? `The price paid is now the average cost of the ${fill.symbol} shares held.`
                 : 'A sale is measured against the average cost of the shares it closed.',
             'Every fill in the trade log on /portfolio opens to a receipt: the cash that moved and the shares before and after.',
         ],
@@ -95,9 +99,9 @@ const sellCopy = (moment: Extract<Moment, {kind: 'first-sell'}>): MomentCopy => 
         title: 'Your first sell',
         figure: `Sold ${qty(sell.quantity)} ${sell.symbol} at ${money(sell.price)}${realized} · ${shortDate(sell.date)}`,
         body: [
-            'A sell locks in part of a result that was only on paper: the sale price minus the average cost, times the shares sold.',
-            'Win rate counts the sells that locked in a profit, as a share of all sells, so this is the first sell it counts.',
-            'Shares still held keep an unrealized result that moves with the price.',
+            defined('realized-pnl'),
+            `${defined('win-rate')} This is the first sell it counts.`,
+            defined('unrealized-pnl'),
         ],
         terms: ['realized-pnl', 'win-rate', 'unrealized-pnl'],
         href: '/portfolio',
@@ -137,9 +141,9 @@ const drawdownCopy = (moment: Extract<Moment, {kind: 'first-drawdown'}>): Moment
         title: `Your account's first ${Math.round(DRAWDOWN_MOMENT_THRESHOLD * 100)}% drop`,
         figure: `${pctOneDecimal(-fallPct)} from the ${shortDate(w.peakDate, crossesYear)} high of ${money(w.peakValue)} · ${shortDate(w.date, crossesYear)}`,
         body: [
-            'A drawdown is how far the account\'s value sits below its highest point so far, as a share of that high.',
-            `A fall takes a larger rise to undo: from ${Math.abs(Math.round(fallPct * 10) / 10).toFixed(1)}% down, it takes ${pctOneDecimal(recoveryPct)} to get back to the old high.`,
-            'Max drawdown on /portfolio keeps the largest such fall, dated, with SPY over the same days.',
+            defined('max-drawdown'),
+            `From ${Math.abs(Math.round(fallPct * 10) / 10).toFixed(1)}% down, it takes ${pctOneDecimal(recoveryPct)} to get back to the old high.`,
+            'The Max drawdown tile on /portfolio dates the largest fall, with SPY over the same days.',
         ],
         terms: ['max-drawdown', 'recovery'],
         href: '/portfolio',

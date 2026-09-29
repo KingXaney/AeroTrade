@@ -1,5 +1,5 @@
 import {describe, expect, it} from 'vitest';
-import {CASH_YIELD_DAYS, affordableShares, checkOrder, describeOrderEffect, estRealizedPnl, isOrderSide, presetQuantities, sanitizeTradeNote} from '@/lib/trading/order-math';
+import {CASH_YIELD_DAYS, TICKET_TERMS, affordableShares, checkOrder, describeOrderEffect, estRealizedPnl, isOrderSide, presetQuantities, sanitizeTradeNote, ticketTerms} from '@/lib/trading/order-math';
 import {interestOverDays} from '@/lib/trading/income';
 import {TRADE_REASON_MAX} from '@/lib/strategies/config';
 
@@ -57,6 +57,26 @@ describe('describeOrderEffect', () => {
             .toEqual({side: 'sell', quantity: 5, owned: 10, sharesAfter: 5, avgCost: 150, estRealizedPnl: null});
         expect(describeOrderEffect({side: 'sell', symbol: 'AAPL', quantity: 50, price: 200, cash: 0, positions})?.side === 'sell').toBe(true);
         expect(describeOrderEffect({side: 'sell', symbol: 'ZZZ', quantity: 5, price: 200, cash: 0, positions})).toBeNull();
+    });
+});
+
+// The ticket's one "What these mean" lists only terms its lines show: APY only while the buy
+// line carries the interest clause — not on the sell side, not before a price, not with no rate.
+describe('ticketTerms', () => {
+    const buy = (apy: number | null, price: number | null = 150) => describeOrderEffect({side: 'buy', symbol: 'AAPL', quantity: 10, price, cash: 96_200, positions, apy});
+    it('adds APY when the buy line states what the cash left would earn', () => {
+        expect(ticketTerms(buy(0.0392))).toEqual([...TICKET_TERMS, 'apy']);
+    });
+    it('leaves APY out whenever no line shows it', () => {
+        const sell = describeOrderEffect({side: 'sell', symbol: 'AAPL', quantity: 5, price: 160, cash: 96_200, positions, apy: 0.0392});
+        expect(sell?.side).toBe('sell');
+        expect(ticketTerms(sell)).toEqual([...TICKET_TERMS]);
+        expect(ticketTerms(buy(0.0392, null))).toEqual([...TICKET_TERMS]);
+        expect(ticketTerms(buy(null))).toEqual([...TICKET_TERMS]);
+        // Spending past the cash leaves nothing to earn on, so no clause either.
+        const spendAll = describeOrderEffect({side: 'buy', symbol: 'AAPL', quantity: 700, price: 150, cash: 96_200, positions, apy: 0.0392});
+        expect(ticketTerms(spendAll)).toEqual([...TICKET_TERMS]);
+        expect(ticketTerms(null)).toEqual([...TICKET_TERMS]);
     });
 });
 

@@ -80,8 +80,9 @@ try {
         // A learner's note a spreadsheet would read as a formula: the export must neutralise it.
         trade({createdAt: new Date(Date.now() - 500), side: 'sell', quantity: 2, price: 160, total: 320, realizedPnl: 20, source: 'user', reason: '=1+1'}),
         // A row from before the account's inception: what a reset that re-anchored inceptionAt
-        // but crashed before deleting the old epoch's trades leaves behind. No trade read shows it.
-        trade({createdAt: new Date(mainInception.getTime() - 60_000), symbol: 'ZZOLD', company: 'Old Epoch Co', source: 'user'}),
+        // but crashed before deleting the old epoch's trades leaves behind. No trade read shows it
+        // — a losing sell, so a read that counted it would halve the win rate (100% → 50%).
+        trade({createdAt: new Date(mainInception.getTime() - 60_000), symbol: 'ZZOLD', company: 'Old Epoch Co', side: 'sell', quantity: 1, price: 100, total: 100, realizedPnl: -500, source: 'user'}),
     ]);
     await db.collection('watchlists').insertOne({userId, symbol: 'AAPL', company: 'Apple Inc', addedAt: new Date()});
     await db.collection('brainentities').updateOne({key: 'NVDA'}, {$set: {
@@ -98,6 +99,12 @@ try {
     check('an AI-placed trade carries a chip; user and legacy rows do not', await page.getByText('AI suggestion', {exact: true}).count() === 1);
     check('a trade from before the account\'s inception is not in its trade log', await page.locator('a[href="/stocks/ZZOLD"]').count() === 0);
     check('strategy comparison renders both accounts', await page.getByRole('button', {name: /Value/}).count() >= 1);
+    // The table's win rate is this epoch's, like the tile's: one winning sell, the old losing one unread.
+    // A comparison row is the one button carrying its cells' own labels (the header's account
+    // switcher is also named "Main Strategy").
+    const mainRow = page.locator('button', {hasText: 'Main Strategy'}).filter({hasText: 'Max Drawdown'}).first();
+    const mainWinRate = (await mainRow.locator(':scope > div').nth(3).innerText()).trim();
+    check('the comparison table counts only this epoch\'s sells', mainWinRate === '100%', mainWinRate);
     // The sell dialog's realized-result line reads '—' without a quote.
     await page.getByRole('button', {name: /^Sell$/}).first().click();
     const sellEst = page.locator('[data-testid="sell-est-pnl"]');
@@ -123,6 +130,7 @@ try {
     check('CSV rows carry the source, blank when unknown', rows.some((r) => r.endsWith(',"ai-suggestion",""')) && rows.some((r) => r.endsWith(',"","",""')), rows.map((r) => r.split(',').slice(-2).join(',')).join('|'));
     check('a note starting with = exports as quoted text, not a formula', rows.some((r) => r.endsWith(`,"user","'=1+1"`)), rows.map((r) => r.split(',').slice(-2).join(',')).join('|'));
     check('numbers stay bare and strings are quoted', rows.some((r) => /^"[^"]+","AAPL","Apple Inc","sell",2,160,320,20,"user",/.test(r)), rows.join(' | '));
+    check('the export is this epoch\'s: no row from before the account\'s inception', rows.length === 4 && !rows.some((r) => r.includes('ZZOLD')), rows.map((r) => r.split(',')[1]).join('|'));
 
     // --- watchlist + stock page affordances --------------------------------------------
     await page.goto(`${BASE}/watchlist`, {waitUntil: 'load'});
@@ -273,6 +281,7 @@ try {
     check('…and the ticket defines APY once', await apyDefinitions() === 1);
     await page.getByRole('button', {name: 'sell', exact: true}).click();
     check('a sell carries no interest clause', !/APY|earning/.test(await page.locator('[data-testid="order-effect"]').innerText()));
+    check('…and the sell ticket defines no APY', await apyDefinitions() === 0);
     await shot('04b-ticket-apy');
     // A rate the income job would not credit at (older than a week: usableRate) is not quoted.
     if (seededRate) {
@@ -284,6 +293,31 @@ try {
     } else {
         console.log('SKIP  the stale-rate buy line  — an earlier suite already stored ^IRX');
     }
+
+    // --- the learner's "why" leaves the ticket with the order -----------------------------
+    // Type a note, press Buy, and read placeOrder's own POST. The harness has no quote provider,
+    // so the server refuses the fill and nothing is stored: what is under test is that the ticket
+    // sends the note at all (the server's sanitising has its own unit test).
+    const note = 'QA note - bought on the pullback';
+    let placeOrderBody = null;
+    const capturePlaceOrder = async (route) => {
+        const body = route.request().postData() ?? '';
+        if (route.request().method() === 'POST' && route.request().headers()['next-action'] && body.includes('"accountId"')) placeOrderBody = body;
+        return route.fallback();
+    };
+    await page.route(onTicketPages, capturePlaceOrder);
+    await page.goto(`${BASE}/trade?symbol=AAPL`, {waitUntil: 'domcontentloaded'});
+    await symbolInput.waitFor({timeout: 30000});
+    await page.locator('#order-shares').fill('1');
+    await noteField.fill(note);
+    const tradesBeforeNote = await db.collection('papertrades').countDocuments({accountId: mainId});
+    await page.getByRole('button', {name: 'Buy AAPL'}).click();
+    await page.getByText(/Couldn.t fetch a live price/).waitFor({timeout: 30000}).catch(() => {});
+    check('Buy sends the typed note with the order', placeOrderBody !== null && placeOrderBody.includes(`"note":"${note}"`) && placeOrderBody.includes('"side":"buy"'),
+        placeOrderBody ?? 'no placeOrder POST');
+    check('…and the server stayed the authority (nothing traded)', (await db.collection('papertrades').countDocuments({accountId: mainId})) === tradesBeforeNote);
+    await page.unroute(onTicketPages, capturePlaceOrder);
+    await settleToasts();
 
     // --- the dashboard quick-trade widget must not navigate -----------------------------
     await page.goto(`${BASE}/settings`, {waitUntil: 'load'});
@@ -308,7 +342,9 @@ try {
     const compactLine = widget.locator('[data-testid="order-effect"]');
     await compactLine.waitFor({timeout: 15000}).catch(() => {});
     const compactText = await compactLine.count() === 1 ? await compactLine.innerText() : '';
-    check('the compact ticket states no cash left and no interest clause', compactText !== '' && !/cash left|APY|earning/.test(compactText), compactText || 'no line');
+    // The interest clause goes with the cash left, and the widget is given no APY at all, so only
+    // the first half can fail here; trade-copy.test.ts owns the compact line's interest rule.
+    check('the compact ticket states no cash left', compactText !== '' && !/cash left/.test(compactText), compactText || 'no line');
     await page.unroute(onTicketPages, quoteStub);
 
     // --- brain drill-downs --------------------------------------------------------------

@@ -1,10 +1,12 @@
 // The return bridge: an account's total return split into what moved it — price moves on
 // shares still held, results locked in by sells, interest on cash and dividends — adding
-// up to the Total Return tile to the cent. The ledger replay below follows executeOrder's
-// average-cost arithmetic (lib/trading/orders.ts), so an account whose every sell recorded
-// its result has nothing left over; only a legacy sell stored without one shows as residual.
+// up to the Total Return tile to the cent. The ledger below is folded through the engine's
+// applyFill (lib/strategies/engine.ts, the mirror of executeOrder), never a copy of the fill
+// arithmetic, so an account whose every sell recorded its result has nothing left over; only a
+// legacy sell stored without one shows as residual.
 
 import {describe, expect, it} from 'vitest';
+import {applyFill, type SimAccount} from '@/lib/strategies/engine';
 import {buildReturnBridge, toCents, type BridgeInput, type ReturnBridge} from '@/lib/trading/bridge';
 import {formatPrice} from '@/lib/utils';
 
@@ -64,42 +66,29 @@ describe('buildReturnBridge', () => {
     });
 
     it('leaves nothing over when every sell recorded its result (executeOrder arithmetic)', () => {
-        // Buys and sells priced like real quotes, average cost carried the way executeOrder does.
-        type Pos = {quantity: number; avgCost: number};
+        // Buys and sells priced like real quotes, each one through applyFill: cash, average cost
+        // and the realized result a sell records all come from the one fill implementation.
         const start = 100_000;
-        let cash = start;
-        let realized = 0;
-        const book = new Map<string, Pos>();
-        const fill = (symbol: string, side: 'buy' | 'sell', quantity: number, price: number) => {
-            const total = quantity * price;
-            const pos = book.get(symbol);
-            if (side === 'buy') {
-                if (pos) {
-                    pos.avgCost = (pos.avgCost * pos.quantity + price * quantity) / (pos.quantity + quantity);
-                    pos.quantity += quantity;
-                } else {
-                    book.set(symbol, {quantity, avgCost: price});
-                }
-                cash -= total;
-            } else if (pos) {
-                realized += (price - pos.avgCost) * quantity;
-                pos.quantity -= quantity;
-                cash += total;
-                if (pos.quantity === 0) book.delete(symbol);
-            }
-        };
-        fill('AAPL', 'buy', 7, 187.33);
-        fill('AAPL', 'buy', 13, 191.07);
-        fill('MSFT', 'buy', 3, 411.29);
-        fill('AAPL', 'sell', 9, 199.99);
-        fill('MSFT', 'sell', 3, 398.41);
-        fill('NVDA', 'buy', 11, 121.13);
+        const orders: [string, 'buy' | 'sell', number, number][] = [
+            ['AAPL', 'buy', 7, 187.33],
+            ['AAPL', 'buy', 13, 191.07],
+            ['MSFT', 'buy', 3, 411.29],
+            ['AAPL', 'sell', 9, 199.99],
+            ['MSFT', 'sell', 3, 398.41],
+            ['NVDA', 'buy', 11, 121.13],
+        ];
+        const {account, realized} = orders.reduce<{account: SimAccount; realized: number}>((acc, [symbol, side, quantity, price]) => {
+            const fill = applyFill(acc.account, {symbol, side, quantity}, price);
+            if (!fill.ok) throw new Error(`${side} ${quantity} ${symbol}: ${fill.reason}`);
+            return {account: fill.account, realized: acc.realized + (fill.realizedPnl ?? 0)};
+        }, {account: {cash: start, positions: []}, realized: 0});
         const interest = 212.4387;
         const dividends = 4.1633;
-        cash += interest + dividends;
+        const cash = account.cash + interest + dividends;
         const quotes: Record<string, number> = {AAPL: 203.51, NVDA: 118.77};
-        const positions = [...book.entries()].map(([symbol, p]) => held((quotes[symbol] - p.avgCost) * p.quantity));
-        const totalValue = cash + [...book.entries()].reduce((sum, [symbol, p]) => sum + quotes[symbol] * p.quantity, 0);
+        expect(account.positions.map((p) => p.symbol).sort()).toEqual(['AAPL', 'NVDA']);
+        const positions = account.positions.map((p) => held((quotes[p.symbol] - p.avgCost) * p.quantity));
+        const totalValue = cash + account.positions.reduce((sum, p) => sum + quotes[p.symbol] * p.quantity, 0);
 
         const bridge = buildReturnBridge({
             totalReturn: totalValue - start, positions, realizedPnl: realized, income: {interest, dividends}, tradeCount: 6,

@@ -181,9 +181,9 @@ try {
         }
         const dividendReceipt = async (symbol) => (await page.locator(`[data-income-dividend="${symbol}"] details p`).first().innerText().catch(() => '')).trim();
         check('the SPY receipt reads the entitled close, the arithmetic and the pay lag',
-            await dividendReceipt('SPY') === `10 shares held at the close on ${short(addDays(EX_SPY, -1))}, the day before the ${short(EX_SPY)} ex-date (held since ${short(BUY_SPY)}) · 10 × $1.889 = $18.89 · paid ${short(addDays(EX_SPY, 5))}, 5 days after the ex-date`,
+            await dividendReceipt('SPY') === `10 shares held at the end of ${short(addDays(EX_SPY, -1))}, the day before the ${short(EX_SPY)} ex-date (held since ${short(BUY_SPY)}) · 10 × $1.889 = $18.89 · paid ${short(addDays(EX_SPY, 5))}, 5 days after the ex-date`,
             await dividendReceipt('SPY'));
-        check('the AAPL receipt too', /^20 shares held at the close on .* · 20 × \$0\.26 = \$5\.20 · paid .*, 5 days after the ex-date$/.test(await dividendReceipt('AAPL')), await dividendReceipt('AAPL'));
+        check('the AAPL receipt too', /^20 shares held at the end of .* · 20 × \$0\.26 = \$5\.20 · paid .*, 5 days after the ex-date$/.test(await dividendReceipt('AAPL')), await dividendReceipt('AAPL'));
         check('no fill missed an ex-date, so there is no missed block', (await page.locator('#income [data-testid=income-missed]').count()) === 0);
         check('the chart is against SPY total return', /SPY, total return/.test(main) && /benchmark is SPY/.test(main));
         check('trade count is unchanged by income', /Trades\s*2\b/i.test(main.replace(/\n/g, ' ')), main.match(/Trades[\s\S]{0,20}/)?.[0]);

@@ -9,7 +9,7 @@ import {BOARD_COPY} from "@/lib/learn/copy/board";
 // The reading states the top row's verdict, which Guess the Verdict asks the reader to
 // call, so the strategy page hides `data-board-row-reading` and shows
 // `data-board-reading-paused` in its place while the quiz is open (CSS :has on
-// #strategy-signals, the same switch that hides the board's verdict column). The line on
+// #latest-decision, the same switch that hides the board's verdict column). The line on
 // how every row reads stays: it is the rule, not an answer.
 
 const BoardReading = ({reading}: {reading: Reading}) => (

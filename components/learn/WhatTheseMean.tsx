@@ -1,6 +1,7 @@
 import type {ReactNode} from "react";
 import {cn} from "@/lib/utils";
 import {GLOSSARY, isGlossaryKey, type GlossaryKey} from "@/lib/learn/glossary";
+import {DEFINITIONS_COPY} from "@/lib/learn/copy/definitions";
 import AskLink from "@/components/chat/AskLink";
 import MicroLabel from "@/components/primitives/MicroLabel";
 
@@ -17,8 +18,6 @@ import MicroLabel from "@/components/primitives/MicroLabel";
 // Native <details>, no JavaScript, client-safe: it renders inside 'use client' panels
 // (StrategyPerformance) and server panels alike.
 
-const DEFINITIONS_LABEL = 'What these mean';
-
 type Props = {
     keys: readonly (GlossaryKey | string)[];
     id?: string;
@@ -27,7 +26,7 @@ type Props = {
     children?: ReactNode;
 };
 
-const WhatTheseMean = ({keys, id, label = DEFINITIONS_LABEL, className, children}: Props) => {
+const WhatTheseMean = ({keys, id, label = DEFINITIONS_COPY.label, className, children}: Props) => {
     const entries = Array.from(new Set(keys.filter(isGlossaryKey))).map((key) => GLOSSARY[key]);
     if (entries.length === 0 && !children) return null;
     return (
@@ -37,7 +36,7 @@ const WhatTheseMean = ({keys, id, label = DEFINITIONS_LABEL, className, children
                 {label}
             </summary>
             {children && <div className="mt-2">{children}</div>}
-            {children && entries.length > 0 && <MicroLabel as="p" className="mt-3">{DEFINITIONS_LABEL}</MicroLabel>}
+            {children && entries.length > 0 && <MicroLabel as="p" className="mt-3">{DEFINITIONS_COPY.label}</MicroLabel>}
             {entries.length > 0 && (
                 <dl className="mt-2 grid grid-cols-1 md:grid-cols-2 gap-x-6 gap-y-2">
                     {entries.map((entry) => (

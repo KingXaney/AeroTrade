@@ -6,7 +6,7 @@ import {STRATEGIES_DISCLAIMER} from "@/lib/strategies/catalog";
 import {getStrategyDetail} from "@/lib/strategies/queries";
 import {formatSignalValue, pickPerfMode, toPerfSeries, visibleSignalColumns} from "@/lib/strategies/views";
 import {UNIVERSES} from "@/lib/strategies/universe";
-import {describeReplay, fillDate, isReplayExpired, matchFillToRun} from "@/lib/learn/replay";
+import {describeReplay, fillDate, isReplayExpired, matchFillToRun, replayReason} from "@/lib/learn/replay";
 import {explainVerdict, pickQuizRows} from "@/lib/learn/verdict";
 import {decodeReason} from "@/lib/learn/reasons";
 import {narrateBoard} from "@/lib/learn/board-narration";
@@ -81,6 +81,8 @@ const StrategyPage = async ({params}: StrategyPageProps) => {
                 row={match?.row ?? null}
                 order={match?.order ?? null}
                 caption={describeReplay(match, run?.asOf ?? null, isReplayExpired(date, today))}
+                reason={replayReason(match, trade.reason)}
+                symbol={trade.symbol}
             />
         );
     };
@@ -149,15 +151,13 @@ const StrategyPage = async ({params}: StrategyPageProps) => {
                         def={def}
                         headline={latestRun ? detail.lastActionLine : undefined}
                         signals={(
-                            /* While the quiz is open, the board's verdict cells and the top row's reading
-                               (which states a verdict) are hidden with CSS, so the server-rendered board
-                               needs no state. The reading, the definitions and the quiz are siblings of
-                               #signal-board: it keeps exactly one disclosure of its own, and the reading
-                               leads the panel's one "What these mean", titled "Read this board — SYMBOL". */
-                            <div
-                                id="strategy-signals"
-                                className="[&:has([data-verdict-quiz][open])_[data-verdict]]:invisible [&:has([data-verdict-quiz][open])_[data-board-row-reading]]:hidden [&:has([data-verdict-quiz][open])_[data-board-reading-paused]]:block"
-                            >
+                            /* While the quiz is open, LatestDecision hides everything in the panel that
+                               states a verdict — the board's verdict cells, the top row's reading, the
+                               run's headline and its orders — with one CSS switch on #latest-decision.
+                               The reading, the definitions and the quiz are siblings of #signal-board: it
+                               keeps exactly one disclosure of its own, and the reading leads the panel's
+                               one "What these mean", titled "Read this board — SYMBOL". */
+                            <div id="strategy-signals">
                                 <SignalBoard columns={def.signalColumns} run={latestRun} />
                                 {boardReading && (
                                     <WhatTheseMean id="board-terms" keys={boardTerms} label={BOARD_COPY.summary(boardReading.symbol)}>

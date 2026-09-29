@@ -10,6 +10,8 @@
 
 import {shortDate} from "@/lib/learn/copy/portfolio";
 import {addCalendarDays} from "@/lib/prices/calendar-days";
+import {isTradingDay} from "@/lib/prices/market-hours";
+import {DIVIDEND_PAY_LAG_DAYS} from "@/lib/prices/config";
 import {dailyFactor, type DividendReceipt, type IncomeActivity, type IncomeMonth, type MissedExDate} from "@/lib/trading/income";
 
 const MONEY = new Intl.NumberFormat('en-US', {style: 'currency', currency: 'USD', minimumFractionDigits: 2, maximumFractionDigits: 2});
@@ -26,7 +28,8 @@ const apyPct = (apy: number): string => `${(apy * 100).toFixed(2)}%`;
 
 export const INCOME_COPY = {
     emptyTitle: 'No income yet',
-    emptyDescription: 'Idle cash earns interest at the 13-week T-bill rate, credited each night. A dividend is paid five days after a holding goes ex-dividend.',
+    // The lag is the income clock's own constant (payDateFor), so the sentence cannot drift from it.
+    emptyDescription: `Idle cash earns interest at the 13-week T-bill rate, credited each night. A dividend is paid ${DIVIDEND_PAY_LAG_DAYS} days after a holding goes ex-dividend.`,
     interestHeading: 'Interest on cash',
     dividendsHeading: 'Dividends',
     noDividends: 'None yet — a holding pays after its ex-dividend date.',
@@ -98,14 +101,16 @@ const daysBetween = (from: string, to: string): number => {
     return days;
 };
 
-// '10 shares held at the close on Sep 17, the day before the Sep 18 ex-date (held since Sep 3)
+// '10 shares held at the end of Sep 17, the day before the Sep 18 ex-date (held since Sep 3)
 //  · 10 × $1.889 = $18.89 · paid Sep 23, 5 days after the ex-date'
+// "The end of", as the clock reads it: before a Monday ex-date that day is a Sunday, with no close.
 export const dividendReceipt = (r: DividendReceipt): string => [
-    `${plural(r.quantity, 'share', 'shares')} held at the close on ${shortDate(r.closeBefore)}, the day before the ${shortDate(r.exDate)} ex-date${r.heldSince ? ` (held since ${shortDate(r.heldSince)})` : ''}`,
+    `${plural(r.quantity, 'share', 'shares')} held at the end of ${shortDate(r.closeBefore)}, the day before the ${shortDate(r.exDate)} ex-date${r.heldSince ? ` (held since ${shortDate(r.heldSince)})` : ''}`,
     `${qty(r.quantity)} × ${perShare(r.perShare)} = ${money(r.amount)}`,
     `paid ${shortDate(r.payDate)}, ${plural(daysBetween(r.exDate, r.payDate), 'day', 'days')} after the ex-date`,
 ].join(' · ');
 
+// A paper sell can fill on a weekend; only a sell on a trading day was "the session before".
 export const missedLine = (m: MissedExDate): string => (m.kind === 'bought-on-ex-date'
     ? `Bought ${qty(m.quantity)} ${m.symbol} on ${shortDate(m.tradeDate)}, its ex-dividend date: a day late for ${perShare(m.perShare)} a share (${money(m.amount)}).`
-    : `Sold ${qty(m.quantity)} ${m.symbol} on ${shortDate(m.tradeDate)}, the session before its ${shortDate(m.exDate)} ex-date: a day early for ${perShare(m.perShare)} a share (${money(m.amount)}).`);
+    : `Sold ${qty(m.quantity)} ${m.symbol} on ${shortDate(m.tradeDate)}, ${isTradingDay(m.tradeDate) ? 'the session ' : ''}before its ${shortDate(m.exDate)} ex-date: a day early for ${perShare(m.perShare)} a share (${money(m.amount)}).`);

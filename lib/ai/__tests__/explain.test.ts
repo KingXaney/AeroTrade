@@ -55,6 +55,19 @@ describe('shapeExplain', () => {
         expect(out.notes).toEqual([EXPLAIN_NOTES.noEntry]);
     });
 
+    // The helper above nulls `yours` itself, as the tool skips the read; this calls the shaper
+    // directly so its own guard is what keeps figures away from a term it could not define.
+    it('drops the learner\'s figures itself when there is no entry to attach them to', () => {
+        const yours: LearnerValue = {accounts: [{account: 'Main Strategy', figures: {maxDrawdownPct: 5.88}}]};
+        const out = shapeExplain({term: 'zorblax ratio', entry: null, decoded: null, yours});
+        expect(out.entry).toBeNull();
+        expect(out.yours).toBeNull();
+        expect(out.notes).toEqual([EXPLAIN_NOTES.noEntry]);
+        const reasonOnly = shapeExplain({reason: GOLDEN_CROSS, entry: null, decoded: decodeReason(GOLDEN_CROSS), yours});
+        expect(reasonOnly.yours).toBeNull();
+        expect(JSON.stringify(reasonOnly)).not.toContain('5.88');
+    });
+
     it('treats a pattern-shaped query as plain text', () => {
         for (const term of ['(.*)+[', '\\d{4}$', '.*', 'max drawdown|win rate']) {
             expect(() => explain({term}), term).not.toThrow();
