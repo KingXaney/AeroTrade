@@ -9,7 +9,7 @@ Follow the topics you care about, test trading strategies with virtual money, an
 [![License: MIT](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
 ![Next.js 16](https://img.shields.io/badge/Next.js-16-black)
 ![TypeScript](https://img.shields.io/badge/TypeScript-strict-3178c6)
-![Tests](https://img.shields.io/badge/tests-446%20passing-brightgreen)
+![Tests](https://img.shields.io/badge/tests-1124%20passing-brightgreen)
 
 <img src="docs/screenshots/dashboard.png" alt="AeroTrade dashboard: followed topics, portfolio, latest articles, market heatmap" width="900">
 
@@ -27,7 +27,7 @@ Follow the topics you care about, test trading strategies with virtual money, an
 
 **Eight classic quant strategies, paper-traded live and explained.** Buy & hold, 60/40, golden cross, dual momentum, 12-1 momentum, RSI-2 mean reversion, Donchian breakouts and low volatility each run in their own system account every trading morning, decided from the previous close and filled at the open through the same order path you use. A leaderboard ranks them by live return against SPY; each page explains the rule, shows what it is watching, its holdings and every fill with its reason, alongside a clearly labelled three-year simulated record. Deterministic rules, no AI.
 
-**Learn from the numbers in front of you.** Every figure in the app carries its own definition — hover a column or open a panel's *"What these mean"* — from one glossary whose formulas are cited from the code that computes them, and `/learn` lists it all with a link to the real number on your account. A strategy page lets you call today's verdicts before the rule reveals them and opens any fill to the exact board row the rule looked at that morning; a First-week checklist ticks itself from what you actually did; the order ticket says what an order does to the account before you place it. Descriptions only — a unit test keeps every sentence, chip and prompt free of advice.
+**Learn from the numbers in front of you.** Every figure in the app carries its own definition — hover a column or open a panel's *"What these mean"* — from one glossary whose formulas are cited from the code that computes them, and `/learn` lists it all with a link to the real number on your account. A strategy page lets you call today's verdicts before the rule reveals them, reads its signal board in plain words, and opens any fill to the exact board row the rule looked at that morning, its reason decoded clause by clause. Your own account explains itself too: guess how much of your return came from interest and dividends, then see it split to the cent; every fill and every income line has a receipt, and the "why" you wrote for a buy comes back when you sell. A First-week checklist ticks itself from what you actually did, a Today's lesson widget picks up your first dividend or the term your topics used today, the order ticket says what an order does to the account before you place it (down to what the cash left would earn), and the chat tutor answers "what is my max drawdown?" from the same glossary, with your own figure. Descriptions only — a unit test keeps every sentence, chip and prompt free of advice.
 
 **A second opinion, a chat advisor, and a digest.** Claude can critique the brain's current picture; a tool-using chat assistant (16 tools) answers "what's new in my topics?" or "what does max drawdown mean?"; a daily email summarises the market for each user, personalised to their holdings, with links allow-listed to the actual articles.
 
@@ -82,7 +82,7 @@ flowchart LR
 | Jobs | Inngest (7 crons + on-demand events), idempotent steps, per-user rate limits |
 | AI | Vercel AI SDK; Gemini 2.5 Flash-Lite on the free tier for every scheduled job, optional Claude tiers, Claude for the second opinion |
 | Market data | Finnhub (quotes, profiles, search, news), Google News RSS, SEC EDGAR, Reddit |
-| Quality | Vitest (25 files / 446 tests), ESLint, `tsc --noEmit`, GitHub Actions, Playwright browser QA against an in-memory Mongo |
+| Quality | Vitest (77 files / 1124 tests), ESLint, `tsc --noEmit`, GitHub Actions, Playwright browser QA against an in-memory Mongo |
 
 ## Getting started
 
