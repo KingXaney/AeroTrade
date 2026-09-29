@@ -18,4 +18,5 @@ export const TOOL_DESCRIPTIONS: Record<ChatToolName, string> = {
     getTopicFeed: 'Read the newest articles matched to one followed topic. Pass the topic name or slug the way the user said it.',
     followTopic: 'Follow a new news topic for the user — any subject works ("Fed rate decisions", "NBA trade deadline", "AI chips"). Keywords are optional: leave them out unless the user named specific terms to match.',
     unfollowTopic: "Stop following one of the user's topics. Its matched articles disappear from their feed.",
+    explainTerm: 'Look up the app\'s own definition of a term, metric or news concept ("max drawdown", "win rate", "FOMC"), or decode a reason a quant strategy wrote on a fill or board row, clause by clause. For cash, income, win rate, realized P&L, total return and max drawdown it also returns the learner\'s own paper figure for each account. Call it before defining anything, passing the term, or the reason exactly as quoted. It returns entry: null when the app has no entry.',
 };

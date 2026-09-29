@@ -21,22 +21,24 @@ import {createTopic, deleteTopic} from "@/lib/actions/topics.actions";
 import {MAX_KEYWORDS} from "@/lib/topics/config";
 import {
     aggregatePortfolios,
-    buildPriceMap,
     computePortfolio,
     getTradeHistory,
     readAccountsForUser,
     toAccountSummary,
 } from "@/lib/trading/account";
 import {findAccountByName, toChatPortfolio} from "@/lib/trading/portfolio-view";
+import {resolveTerm} from "@/lib/learn/glossary";
+import {decodeReason} from "@/lib/learn/reasons";
+import {shapeExplain} from "@/lib/ai/explain";
+import {priceLargestHoldings, readLearnerValue} from "@/lib/ai/learner-hooks";
 
 const TOPIC_FEED_DEFAULT = 5;
 const TOPIC_FEED_MAX = 10;
 
-// buildPriceMap is one Finnhub quote per unique symbol with no ceiling. A chat answer
-// doesn't need every tail position priced to the cent, so price the largest holdings and
-// report how many were left at cost. (getQuote caches 30s, so repeat calls in one
-// conversation are close to free — this bounds the first one.)
-const CHAT_MAX_PRICED_SYMBOLS = 25;
+// Bounds on what the model may pass explainTerm; the shaper clips what it echoes back.
+const EXPLAIN_TERM_MAX = 200;
+const EXPLAIN_REASON_MAX = 1000;
+
 const CHAT_TRADES_DEFAULT = 8;
 const CHAT_TRADES_MAX = 20;
 
@@ -231,11 +233,7 @@ export const buildTools = (userId: string) => ({
 
                 // Price the biggest holdings first; the rest fall back to cost basis and
                 // are counted in `valuation`.
-                const ranked = chosen
-                    .flatMap((d) => d.positions ?? [])
-                    .sort((a, b) => b.avgCost * b.quantity - a.avgCost * a.quantity)
-                    .map((p) => p.symbol);
-                const prices = await buildPriceMap(Array.from(new Set(ranked)).slice(0, CHAT_MAX_PRICED_SYMBOLS));
+                const prices = await priceLargestHoldings(chosen);
 
                 const withPortfolios = chosen.map((d) => ({
                     account: toAccountSummary(d),
@@ -332,6 +330,22 @@ export const buildTools = (userId: string) => ({
                 : {success: false, message: result.message ?? 'Could not unfollow the topic'};
         },
     }),
-});
+
+    explainTerm: tool({
+        description: TOOL_DESCRIPTIONS.explainTerm,
+        inputSchema: z.object({
+            term: z.string().max(EXPLAIN_TERM_MAX).optional().describe('The term as the user wrote it, e.g. "max drawdown" or "my win rate"'),
+            reason: z.string().max(EXPLAIN_REASON_MAX).optional().describe('A reason a strategy wrote, quoted exactly, e.g. "enter: SMA50 42.10 > SMA200 40.00 (+5.3%)"'),
+        }),
+        execute: async ({term, reason}) => {
+            // The glossary's one resolver and the reason decoder; neither builds a RegExp
+            // from what the model passed (invariant 2).
+            const entry = term ? resolveTerm(term) : null;
+            const decoded = reason ? decodeReason(reason) : null;
+            const yours = entry ? await readLearnerValue(userId, entry.key) : null;
+            return shapeExplain({term, reason, entry, decoded, yours});
+        },
+    }),
+}) satisfies Record<ChatToolName, unknown>;
 
 export type ChatTools = ReturnType<typeof buildTools>;

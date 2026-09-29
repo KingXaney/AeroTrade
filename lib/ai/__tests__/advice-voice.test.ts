@@ -14,7 +14,7 @@ import {RATIONALE_PROMPT} from '@/lib/brain/prompts';
 import {findBanned} from '@/lib/learn/banned';
 
 // Bumped when a tool is added; the Record type already forces the copy to exist.
-const TOOL_COUNT = 15;
+const TOOL_COUNT = 16;
 
 // A denylist of real symbols, not a bare uppercase regex: "AI chips" is a topic, not a
 // ticker.
@@ -49,6 +49,18 @@ describe('advice voice', () => {
             expect(findBanned(chip, 'copy'), chip).toEqual([]);
         }
         expect(CHAT_SUGGESTIONS).toContain("What's new in my topics?");
+    });
+
+    it('names every tool in the advisor prompt', () => {
+        for (const name of Object.keys(TOOL_DESCRIPTIONS)) {
+            expect(ADVISOR_SYSTEM_PROMPT, name).toContain(`**${name}**`);
+        }
+    });
+
+    it('defines terms only through explainTerm, and admits a missing entry', () => {
+        const tutoring = ADVISOR_SYSTEM_PROMPT.slice(ADVISOR_SYSTEM_PROMPT.indexOf('# Tutoring'));
+        expect(tutoring).toContain('explainTerm');
+        expect(tutoring).toMatch(/the app has no entry/i);
     });
 
     it('gives every tool a description', () => {

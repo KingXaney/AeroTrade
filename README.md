@@ -29,7 +29,7 @@ Follow the topics you care about, test trading strategies with virtual money, an
 
 **Learn from the numbers in front of you.** Every figure in the app carries its own definition — hover a column or open a panel's *"What these mean"* — from one glossary whose formulas are cited from the code that computes them, and `/learn` lists it all with a link to the real number on your account. A strategy page lets you call today's verdicts before the rule reveals them and opens any fill to the exact board row the rule looked at that morning; a First-week checklist ticks itself from what you actually did; the order ticket says what an order does to the account before you place it. Descriptions only — a unit test keeps every sentence, chip and prompt free of advice.
 
-**A second opinion, a chat advisor, and a digest.** Claude can critique the brain's current picture; a tool-using chat assistant (15 tools) answers "what's new in my topics?" or "what does max drawdown mean?"; a daily email summarises the market for each user, personalised to their holdings, with links allow-listed to the actual articles.
+**A second opinion, a chat advisor, and a digest.** Claude can critique the brain's current picture; a tool-using chat assistant (16 tools) answers "what's new in my topics?" or "what does max drawdown mean?"; a daily email summarises the market for each user, personalised to their holdings, with links allow-listed to the actual articles.
 
 **Make it yours.** 12 colour palettes × 5 visual styles (minimal, futuristic, liquid glass, brutalist, soft), saved per account and rendered without a flash. A 33-widget dashboard you can drag, resize and extend.
 

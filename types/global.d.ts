@@ -187,7 +187,8 @@ declare global {
         | 'getFollowedTopics'
         | 'getTopicFeed'
         | 'followTopic'
-        | 'unfollowTopic';
+        | 'unfollowTopic'
+        | 'explainTerm';
 
     type RawNewsArticle = {
         id: number;
