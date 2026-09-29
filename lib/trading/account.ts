@@ -19,10 +19,12 @@ import {apyFromDiscount, groupIncomeActivity, type IncomeActivity} from "@/lib/t
 import {appendLive} from "@/lib/prices/total-return";
 import {getQuote} from "@/lib/actions/finnhub.actions";
 import {
+    benchmarkReturnBetween,
     buildPerfSeries,
     computeMaxDrawdown,
     computeRealizedPnl,
     computeWinStats,
+    drawdownWindow,
     enrichPosition,
     mergeLivePoint,
     type PriceInfo,
@@ -342,13 +344,21 @@ export const getAccountAnalytics = async (userId: string, accountId: string): Pr
 
         const tradeStats = trades.map((t) => ({side: t.side as string, realizedPnl: t.realizedPnl as number | undefined}));
         const winStats = computeWinStats(tradeStats);
+        // One window, dated, over the same points the chart draws: the tile's number, its hint
+        // and the chart's shaded band all describe the same stretch.
+        const series = buildPerfSeries(snapshotPoints, benchmarkPoints, livePoint);
+        const drawdown = drawdownWindow(mergeLivePoint(snapshotPoints, livePoint));
 
         return {
             account: summaryInfo,
             summary,
             income: await getIncomeSummary(account),
-            series: buildPerfSeries(snapshotPoints, benchmarkPoints, livePoint),
-            maxDrawdownPct: computeMaxDrawdown(mergeLivePoint(snapshotPoints, livePoint)),
+            series,
+            maxDrawdownPct: drawdown?.pct ?? null,
+            drawdown,
+            benchmarkOverDrawdownPct: drawdown && drawdown.pct > 0
+                ? benchmarkReturnBetween(series, drawdown.peakDate, drawdown.troughDate)
+                : null,
             winRatePct: winStats.winRatePct,
             wins: winStats.wins,
             losses: winStats.losses,

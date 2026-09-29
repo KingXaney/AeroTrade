@@ -2,8 +2,11 @@ import type {ReactNode} from "react";
 import {cn, formatPrice, getChangeColorClass} from "@/lib/utils";
 import Term from "@/components/primitives/Term";
 import WhatTheseMean from "@/components/learn/WhatTheseMean";
+import {DRAWDOWN_COPY, drawdownLine} from "@/lib/learn/copy/portfolio";
 
-const Stat = ({label, value, valueClass, hint}: {label: ReactNode; value: string; valueClass?: string; hint?: string}) => (
+// The one analytics tile: exported so the risk lens (components/learn/RiskLens.tsx) is built
+// from it rather than from a third copy.
+export const Stat = ({label, value, valueClass, hint}: {label: ReactNode; value: string; valueClass?: string; hint?: string}) => (
     <div className="flex flex-col gap-1">
         <span className="text-[10px] uppercase tracking-[0.1em] text-fg-muted"
               style={{fontFamily: 'var(--type-mono)'}}>
@@ -24,17 +27,21 @@ const Stat = ({label, value, valueClass, hint}: {label: ReactNode; value: string
 // Strategy analytics tiles — mirrors the AccountSummary visual pattern.
 // Win rate and drawdown show em-dashes until there is enough history to
 // compute them honestly (no closed trades / fewer than two snapshot days).
-// Takes only the six stat fields so a simulated record can use the same tiles.
+// Takes only the six stat fields so a simulated record can use the same tiles. The dated
+// drawdown is optional: without it (a caller built from older data) the hint stays undated.
 export type AnalyticsStatFields = Pick<AccountAnalytics, 'maxDrawdownPct' | 'winRatePct' | 'wins' | 'losses' | 'realizedPnl' | 'tradeCount'>
-    & Partial<Pick<AccountAnalytics, 'income'>>;
+    & Partial<Pick<AccountAnalytics, 'income' | 'drawdown' | 'benchmarkOverDrawdownPct'>>;
 
 // `definitions` opts a page into the panel's "What these mean" disclosure. The dashboard
 // widget that mounts these tiles never passes it: the disclosure carries "Ask in chat"
 // links, which invariant 12 keeps off widgets. The Term titles stay either way.
 const AnalyticsStats = ({analytics, tradesHint = 'Buys + sells, all time', definitions = false}: {analytics: AnalyticsStatFields; tradesHint?: string; definitions?: boolean}) => {
-    const {maxDrawdownPct, winRatePct, wins, losses, realizedPnl, tradeCount, income} = analytics;
+    const {maxDrawdownPct, winRatePct, wins, losses, realizedPnl, tradeCount, income, drawdown, benchmarkOverDrawdownPct} = analytics;
     const realizedClass = getChangeColorClass(realizedPnl || undefined);
     const earned = income ? income.interest + income.dividends : 0;
+    const drawdownHint = drawdownLine({maxDrawdownPct, drawdown, benchmarkOverDrawdownPct});
+    // A dated hint says what the climb back takes, so its definition joins the disclosure.
+    const dated = drawdownHint !== DRAWDOWN_COPY.undated && drawdownHint !== DRAWDOWN_COPY.needsHistory;
 
     return (
         <div className="glass-panel rounded-xl p-5">
@@ -43,7 +50,7 @@ const AnalyticsStats = ({analytics, tradesHint = 'Buys + sells, all time', defin
                 label={<Term k="max-drawdown">Max Drawdown</Term>}
                 value={maxDrawdownPct === null ? '—' : `−${maxDrawdownPct.toFixed(2)}%`}
                 valueClass={maxDrawdownPct !== null && maxDrawdownPct > 0 ? 'text-negative' : undefined}
-                hint={maxDrawdownPct === null ? 'Needs 2+ days of history' : 'Largest peak-to-trough dip'}
+                hint={drawdownHint}
             />
             <Stat
                 label={<Term k="win-rate">Win Rate</Term>}
@@ -73,7 +80,7 @@ const AnalyticsStats = ({analytics, tradesHint = 'Buys + sells, all time', defin
                 hint={tradesHint}
             />
             </div>
-            {definitions && <WhatTheseMean keys={['max-drawdown', 'win-rate', 'realized-pnl', ...(income ? ['income'] : []), 'trades']} />}
+            {definitions && <WhatTheseMean keys={['max-drawdown', ...(dated ? ['recovery'] : []), 'win-rate', 'realized-pnl', ...(income ? ['income'] : []), 'trades']} />}
         </div>
     );
 };

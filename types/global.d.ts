@@ -326,11 +326,25 @@ declare global {
         benchmarkPct: number | null;  // % return of SPY over the same window (null before first benchmark point)
     };
 
+    // The worst peak-to-trough stretch of a value series (lib/trading/analytics.ts
+    // drawdownWindow). A series that never fell has a zero window: pct 0, peak = trough.
+    type DrawdownWindow = {
+        pct: number;                        // the fall from the peak, as a positive %
+        peakDate: string;
+        peakValue: number;
+        troughDate: string;
+        troughValue: number;
+        recovered: boolean;                 // a later point reached the peak value again
+        recoveryPctNeeded: number | null;   // peak / trough − 1, as %; null when the trough is not above zero
+    };
+
     type AccountAnalytics = {
         account: PaperAccountSummary;
         summary: PortfolioSummary;
         series: PerfPoint[];
         maxDrawdownPct: number | null;  // null until enough snapshots exist
+        drawdown: DrawdownWindow | null;          // the dated window behind maxDrawdownPct
+        benchmarkOverDrawdownPct: number | null;  // SPY total return from its peak date to its trough date
         winRatePct: number | null;      // null until a closed (sell) trade exists
         wins: number;
         losses: number;
