@@ -2,7 +2,7 @@
 // explainTerm answers with the glossary entry plus, for the keys below, one value per paper
 // account. Each key reads the least it needs:
 //   buying-power, income       — the account documents themselves (readAccountsForUser);
-//   win-rate, realized-pnl     — the account's sells, projected to side and realizedPnl only;
+//   win-rate, realized-pnl     — the account's sells, counted and summed in the database;
 //   total-return, max-drawdown — the priced path, quoting at most CHAT_MAX_PRICED_SYMBOLS.
 // No reader touches PaperTrade.reason: a learner's "why" notes are theirs, never the tutor's.
 // Server-only and DB-bound, so browser QA covers it (invariant 1); lib/ai/explain.ts shapes
@@ -14,7 +14,7 @@ import type {PaperAccountDoc} from "@/database/models/paper-account.model";
 import type {LearnerAccountValue, LearnerFigure, LearnerValue} from "@/lib/ai/explain";
 import type {GlossaryKey} from "@/lib/learn/glossary";
 import {buildPriceMap, computePortfolio, readAccountsForUser, toAccountSummary} from "@/lib/trading/account";
-import {computeRealizedPnl, computeWinStats, countUnpriced, drawdownWindow, mergeLivePoint} from "@/lib/trading/analytics";
+import {countUnpriced, drawdownWindow, mergeLivePoint, winStatsFromCounts} from "@/lib/trading/analytics";
 import {getEasternDateString} from "@/lib/utils";
 
 // buildPriceMap is one Finnhub quote per unique symbol with no ceiling. A chat answer
@@ -34,17 +34,29 @@ export const priceLargestHoldings = (docs: readonly PaperAccountDoc[]) => {
 };
 
 type Reader = (userId: string, docs: PaperAccountDoc[]) => Promise<LearnerAccountValue[]>;
-type SellRow = {accountId?: string; side: string; realizedPnl?: number};
+// Per account: every sell, the closed ones (a recorded realizedPnl — computeWinStats's rule),
+// the winners among them and their realized total.
+type SellTotals = {sells: number; closed: number; wins: number; realizedPnl: number};
 type SnapshotRow = {accountId: string; date: string; totalValue: number};
 
 const idOf = (doc: PaperAccountDoc): string => String(doc._id);
 const nameOf = (doc: PaperAccountDoc): string => toAccountSummary(doc).name;
 
-const sellsOf = async (userId: string, docs: PaperAccountDoc[]) => {
-    const rows = await PaperTrade.find({userId, accountId: {$in: docs.map(idOf)}, side: 'sell'})
-        .select('accountId side realizedPnl')
-        .lean<SellRow[]>();
-    return (doc: PaperAccountDoc): SellRow[] => rows.filter((row) => row.accountId === idOf(doc));
+// One $group per account instead of the sell rows themselves: a long-lived account's
+// thousands of sells come back as four numbers.
+const sellTotalsOf = async (userId: string, docs: PaperAccountDoc[]) => {
+    const rows = await PaperTrade.aggregate<SellTotals & {_id: string}>([
+        {$match: {userId, accountId: {$in: docs.map(idOf)}, side: 'sell'}},
+        {$group: {
+            _id: '$accountId',
+            sells: {$sum: 1},
+            closed: {$sum: {$cond: [{$isNumber: '$realizedPnl'}, 1, 0]}},
+            wins: {$sum: {$cond: [{$and: [{$isNumber: '$realizedPnl'}, {$gt: ['$realizedPnl', 0]}]}, 1, 0]}},
+            realizedPnl: {$sum: '$realizedPnl'},
+        }},
+    ]);
+    const byAccount = new Map(rows.map((row) => [String(row._id), row]));
+    return (doc: PaperAccountDoc): SellTotals => byAccount.get(idOf(doc)) ?? {sells: 0, closed: 0, wins: 0, realizedPnl: 0};
 };
 
 const pricedOf = async (docs: PaperAccountDoc[]) => {
@@ -68,16 +80,16 @@ const READERS = {
         })),
 
     'win-rate': async (userId, docs) => {
-        const sells = await sellsOf(userId, docs);
+        const totals = await sellTotalsOf(userId, docs);
         return docs.map((d) => {
-            const stats = computeWinStats(sells(d));
+            const stats = winStatsFromCounts(totals(d));
             return {account: nameOf(d), figures: {winRatePct: stats.winRatePct, wins: stats.wins, losses: stats.losses}};
         });
     },
 
     'realized-pnl': async (userId, docs) => {
-        const sells = await sellsOf(userId, docs);
-        return docs.map((d) => ({account: nameOf(d), figures: {realizedPnl: computeRealizedPnl(sells(d)), sells: sells(d).length}}));
+        const totals = await sellTotalsOf(userId, docs);
+        return docs.map((d) => ({account: nameOf(d), figures: {realizedPnl: totals(d).realizedPnl, sells: totals(d).sells}}));
     },
 
     'total-return': async (_userId, docs) => {

@@ -52,6 +52,7 @@ export const DATA_KEYS = [
     'topicsOverview',
     'topicsLatest',
     'strategies',
+    'onboardingFacts',
     'learnFacts',
     'lesson',
 ] as const;
@@ -79,13 +80,16 @@ export const DATA_KEY_DEPS: Record<DataKey, readonly DataKey[]> = {
     topicsOverview: [],
     topicsLatest: [],
     strategies: [],
+    onboardingFacts: [],
     learnFacts: [],
     lesson: [],
 };
 
 // Streamed under <Suspense> because they are slow or fan out to third parties;
 // their loaders resolve their own dependencies, so those never join the eager pass.
-export const LAZY_DATA_KEYS: readonly DataKey[] = ['movers', 'news', 'analytics', 'brainStatus', 'topicsLatest', 'strategies'];
+// 'lesson' is lazy for a different reason: Today's lesson needs it only on a day when no
+// moment from the learn facts wins, so it is read only when that body renders.
+export const LAZY_DATA_KEYS: readonly DataKey[] = ['movers', 'news', 'analytics', 'brainStatus', 'topicsLatest', 'strategies', 'lesson'];
 
 // 'link' = the clickable PersonalRow card · 'panel' = glass-panel + heading ·
 // 'panel-lg' / 'panel-sm' = panel with the TradingView paddings · 'bare' = the
@@ -234,7 +238,8 @@ export const WIDGETS: {readonly [K in WidgetId]: WidgetDefinition & {id: K}} = {
         spans: [8, 12],
         defaultSpan: 12,
         minHeight: 150,
-        dataKeys: ['learnFacts'],
+        // The onboarding facts only — a cache() hit on the dashboard's own availability read.
+        dataKeys: ['onboardingFacts'],
         availability: 'onboarding',
         isNew: true,
     }),

@@ -131,7 +131,10 @@ describe('registry invariants', () => {
         expect(defs.filter((d) => d.availability !== 'always').map((d) => d.id).sort())
             .toEqual(['brain-status', 'getting-started', 'strategy-comparison']);
         expect(WIDGETS['getting-started'].availability).toBe('onboarding');
-        expect(WIDGETS['getting-started'].dataKeys).toEqual(['learnFacts']);
+        // The checklist reads the onboarding facts only (a cache() hit on the page's own
+        // availability read), never the lesson reads that Today's lesson needs.
+        expect(WIDGETS['getting-started'].dataKeys).toEqual(['onboardingFacts']);
+        expect(resolveDataKeys(['getting-started'])).toEqual({eager: ['onboardingFacts'], lazy: [], needsActiveAccount: false});
     });
 
     it('Today\'s lesson is a library-only learn panel on the learn facts and the day\'s lesson', () => {
@@ -140,6 +143,8 @@ describe('registry invariants', () => {
         expect(lesson.availability).toBe('always');
         expect(lesson.chrome).toBe('panel');
         expect(lesson.dataKeys).toEqual(['learnFacts', 'lesson']);
+        // The day's concept streams in only when no moment from the facts wins.
+        expect(resolveDataKeys(['todays-lesson'])).toEqual({eager: ['learnFacts'], lazy: ['lesson'], needsActiveAccount: false});
         expect(DEFAULT_LAYOUT.widgets.map((w) => w.id)).not.toContain('todays-lesson');
         expect(defs.filter((d) => d.category === 'learn').map((d) => d.id)).toEqual(['getting-started', 'todays-lesson']);
     });
@@ -190,7 +195,7 @@ describe('data key graph', () => {
     });
 
     it('lazy keys are known and match the plan', () => {
-        expect([...LAZY_DATA_KEYS].sort()).toEqual(['analytics', 'brainStatus', 'movers', 'news', 'strategies', 'topicsLatest']);
+        expect([...LAZY_DATA_KEYS].sort()).toEqual(['analytics', 'brainStatus', 'lesson', 'movers', 'news', 'strategies', 'topicsLatest']);
         for (const key of LAZY_DATA_KEYS) {
             expect(dataKeySet.has(key)).toBe(true);
         }
@@ -301,7 +306,7 @@ describe('resolveDataKeys', () => {
 
     it('resolves the default layout to the plan\'s key sets', () => {
         const result = resolveDataKeys(DEFAULT_LAYOUT.widgets.map((w) => w.id));
-        expect(new Set(result.eager)).toEqual(new Set(['portfolios', 'leaderboard', 'theses', 'suggestions', 'topicsOverview', 'learnFacts']));
+        expect(new Set(result.eager)).toEqual(new Set(['portfolios', 'leaderboard', 'theses', 'suggestions', 'topicsOverview', 'onboardingFacts']));
         expect(result.lazy).toEqual(['movers', 'topicsLatest']);
         expect(result.needsActiveAccount).toBe(false);
     });

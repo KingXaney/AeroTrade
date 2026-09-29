@@ -95,6 +95,15 @@ const QuantStrategiesAsync = async ({ctx, span}: {ctx: LoaderCtx; span: number})
     if (!rows) return <WidgetUnavailable failed />;
     return <QuantStrategiesList rows={rows} span={span} />;
 };
+// Read only on a day no moment wins. A failed read shows the same "unavailable" state the
+// eager pass gave it, not the error boundary's replacement panel.
+const TodaysLessonAsync = async ({ctx}: {ctx: LoaderCtx}) => {
+    const lesson = await LOADERS.lesson(ctx).catch((error) => {
+        console.error('Dashboard loader "lesson" failed:', error);
+        return undefined;
+    });
+    return lesson ? <TodaysLesson lesson={lesson} /> : <WidgetUnavailable failed />;
+};
 const BrainStatusAsync = async ({ctx}: {ctx: LoaderCtx}) => {
     const status = await LOADERS.brainStatus(ctx);
     if (!status) return framed('brain-status', <WidgetUnavailable failed />);
@@ -107,14 +116,14 @@ export const WIDGET_RENDERERS: Record<WidgetId, Renderer> = {
     )),
     'topics-latest': (r) => <Suspense fallback={skeleton('topics-latest', 4)}><TopicsLatestAsync ctx={r.ctx} span={r.span} /></Suspense>,
     'topic-briefs': (r) => need(r, 'topicsOverview', (o) => <TopicBriefsList overview={o} />),
-    'getting-started': (r) => need(r, 'learnFacts', (f) => <GettingStarted missions={deriveMissions(f)} />),
-    // A fresh moment wins and never waits on the lesson loader's guard: a failed lesson read
-    // degrades to moment-only, and only a day with no moment needs the concept at all.
+    'getting-started': (r) => need(r, 'onboardingFacts', (f) => <GettingStarted missions={deriveMissions(f)} />),
+    // A fresh moment wins and never reads the lesson at all: 'lesson' is a lazy key, so the
+    // concept is read (streamed under Suspense) only on a day with no moment.
     'todays-lesson': (r) => {
         const facts = r.data.learnFacts;
         const moment = facts ? deriveMoments(facts, facts.today)[0] : undefined;
         if (moment) return <TodaysLesson moment={moment} />;
-        return need(r, 'lesson', (lesson) => <TodaysLesson lesson={lesson} />);
+        return <Suspense fallback={skeleton('todays-lesson')}><TodaysLessonAsync ctx={r.ctx} /></Suspense>;
     },
     'portfolio-snapshot': (r) => need(r, 'portfolios', (p) => <PortfolioSnapshot portfolio={aggregatePortfolios(p)} best={bestStrategy(p)} />),
     'watchlist-movers': (r) => <Suspense fallback={skeleton('watchlist-movers', 4)}><WatchlistMoversAsync ctx={r.ctx} /></Suspense>,

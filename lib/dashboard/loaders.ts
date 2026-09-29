@@ -18,8 +18,8 @@ import {pickActiveAccount, type ComparisonStat, type LatestSuggestions} from "@/
 import type {DataKey} from "@/lib/dashboard/widgets";
 import {getStrategyWidgetRows} from "@/lib/strategies/queries";
 import type {StrategyLeaderboardRow} from "@/lib/strategies/views";
-import {getLearnFacts} from "@/lib/learn/facts-store";
-import type {LearnFacts} from "@/lib/learn/facts";
+import {getLearnFacts, getOnboardingFacts} from "@/lib/learn/facts-store";
+import type {LearnFacts, OnboardingFacts} from "@/lib/learn/facts";
 import {getTodaysLesson} from "@/lib/learn/lesson-store";
 import type {Lesson} from "@/lib/learn/lesson";
 
@@ -57,6 +57,7 @@ export type DashboardData = Partial<{
     strategies: StrategyLeaderboardRow[];
     topicsOverview: TopicsOverview;
     topicsLatest: MergedTopicArticle[];
+    onboardingFacts: OnboardingFacts;
     learnFacts: LearnFacts;
     lesson: Lesson;
 }>;
@@ -105,8 +106,11 @@ export const LOADERS: {[K in DataKey]: Loader<K>} = {
     secondOpinion: ({userId}) => getLatestSecondOpinion(userId),
     topicsOverview: ({userId}) => getCachedTopicsOverview(userId),
     topicsLatest: ({userId}) => getMergedTopicFeed(userId, {limit: TOPICS_LATEST_LIMIT}),
-    // The onboarding half is cache()-shared with the page, which reads it for widget availability.
+    // cache()-shared with the page, which reads it for widget availability: the checklist costs no read.
+    onboardingFacts: ({userId}) => getOnboardingFacts(userId),
+    // The onboarding half is the same cached read; the lesson reads are Today's lesson's alone.
     learnFacts: ({userId}) => getLearnFacts(userId),
+    // Lazy: awaited under Suspense only when no moment wins (components/dashboard/widgets/registry.tsx).
     lesson: ({userId}) => getTodaysLesson(userId),
 };
 
