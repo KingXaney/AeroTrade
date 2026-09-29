@@ -56,6 +56,12 @@ export const apyFromDiscount = (discountPct: number, spread = CASH_YIELD_SPREAD)
 // and a weekend cost nothing.
 export const dailyFactor = (apy: number): number => (1 + apy) ** (1 / DAYS_PER_YEAR) - 1;
 
+// What the clock credits on `cash` over `days` nights at one constant APY with nothing traded:
+// each night's interest joins the next day's cash, so it compounds. The order ticket's
+// "earning ≈$x/month" is this; a parity test holds it to replayIncome's rows.
+export const interestOverDays = (cash: number, apy: number, days: number): number =>
+    cash > 0 && apy > 0 && days > 0 ? cash * ((1 + dailyFactor(apy)) ** days - 1) : 0;
+
 export type RateLookup = (date: string) => RatePoint | null;
 
 // The latest point on or before a date — never after, so nothing is paid at a rate that

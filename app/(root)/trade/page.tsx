@@ -3,7 +3,7 @@ import {cookies} from "next/headers";
 import Link from "next/link";
 import {ACTIVE_ACCOUNT_COOKIE} from "@/lib/constants";
 import {getCurrentUserId} from "@/lib/actions/watchlist.actions";
-import {getAccountsForUser, getPortfolio, getTradeLedger, toAccountSummary} from "@/lib/trading/account";
+import {getAccountsForUser, getCashApy, getPortfolio, getTradeLedger, toAccountSummary} from "@/lib/trading/account";
 import {replayReceipts} from "@/lib/trading/receipts";
 import {openLotNotes} from "@/lib/trading/lots";
 import LastFill from "@/components/trade/LastFill";
@@ -33,7 +33,7 @@ const TradePage = async ({searchParams}: TradePageProps) => {
     const active = (preferredId && accounts.find((a) => String(a._id) === preferredId)) || accounts[0];
     const activeId = String(active._id);
 
-    const [portfolio, ledger] = await Promise.all([getPortfolio(userId, activeId), getTradeLedger(userId, activeId)]);
+    const [portfolio, ledger, apy] = await Promise.all([getPortfolio(userId, activeId), getTradeLedger(userId, activeId), getCashApy()]);
     const lastTrade = ledger.at(-1) ?? null;
     const lastReceipt = lastTrade ? replayReceipts(ledger)[lastTrade.id] : undefined;
     const status = marketStatus();
@@ -72,6 +72,7 @@ const TradePage = async ({searchParams}: TradePageProps) => {
                 accountId={activeId}
                 positions={portfolio.positions.map((p) => ({symbol: p.symbol, quantity: p.quantity, marketValue: p.marketValue, avgCost: p.avgCost}))}
                 queueNote={describeQueuedFill(status)}
+                apy={apy}
             />
 
             <LastFill trade={lastTrade} receipt={lastReceipt} />

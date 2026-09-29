@@ -288,17 +288,22 @@ export const seedDayZeroSnapshot = async (account: PaperAccountDoc): Promise<voi
     );
 };
 
+// The APY idle cash earns at the latest stored T-bill rate; null until a rate is stored (never
+// a zero for missing data). One read per render, shared by the Income panel's figure (every
+// account in view) and the /trade ticket's "earning ≈$x/month" clause, so the two agree.
+export const getCashApy = cache(async (): Promise<number | null> => {
+    const rate = await getLatestRatePoint().catch(() => null);
+    return rate ? apyFromDiscount(rate.discountPct) : null;
+});
+
 // Running totals live on the account (kept in step with cash by the income job), so this is
 // one small read for the rate, not a scan of the ledger.
-const getIncomeSummary = async (account: {incomeTotals?: {interest?: number; dividends?: number}; incomeThrough?: string}): Promise<AccountIncomeSummary> => {
-    const rate = await getLatestRatePoint().catch(() => null);
-    return {
-        interest: account.incomeTotals?.interest ?? 0,
-        dividends: account.incomeTotals?.dividends ?? 0,
-        apy: rate ? apyFromDiscount(rate.discountPct) : null,
-        through: account.incomeThrough ?? null,
-    };
-};
+const getIncomeSummary = async (account: {incomeTotals?: {interest?: number; dividends?: number}; incomeThrough?: string}): Promise<AccountIncomeSummary> => ({
+    interest: account.incomeTotals?.interest ?? 0,
+    dividends: account.incomeTotals?.dividends ?? 0,
+    apy: await getCashApy(),
+    through: account.incomeThrough ?? null,
+});
 
 // The Income panel's rows: this account's current epoch only (a reset starts a new one), and
 // only dates already credited — a row a crashed run left behind is not income yet. Each row

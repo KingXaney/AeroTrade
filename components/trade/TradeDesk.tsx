@@ -18,13 +18,14 @@ type Props = {
     accountId: string;
     positions: readonly PositionLike[];
     queueNote: string | null;
+    apy: number | null;        // cash APY at the latest T-bill rate (getCashApy); null before any rate is stored
 };
 
 // Chart and ticket share one symbol. Typing in the ticket used to leave the chart on
 // whatever the URL said; now a *committed* symbol (search pick, Enter, or leaving the
 // field) re-keys the chart and mirrors into ?symbol= — on commit, never per keystroke,
 // so reloads and shared links land on the same view.
-const TradeDesk = ({chartSymbol, orderSymbol, cash, accountId, positions, queueNote}: Props) => {
+const TradeDesk = ({chartSymbol, orderSymbol, cash, accountId, positions, queueNote, apy}: Props) => {
     const router = useRouter();
     const pathname = usePathname();
     const searchParams = useSearchParams();
@@ -63,7 +64,7 @@ const TradeDesk = ({chartSymbol, orderSymbol, cash, accountId, positions, queueN
                 />
             </section>
             <div className="xl:col-span-1">
-                <OrderPanel defaultSymbol={orderSymbol} cash={cash} accountId={accountId} positions={positions} onSymbolCommit={onSymbolCommit} queueNote={queueNote} />
+                <OrderPanel defaultSymbol={orderSymbol} cash={cash} accountId={accountId} positions={positions} onSymbolCommit={onSymbolCommit} queueNote={queueNote} apy={apy} />
             </div>
         </div>
     );

@@ -1,5 +1,6 @@
 import {describe, expect, it} from 'vitest';
-import {affordableShares, checkOrder, describeOrderEffect, estRealizedPnl, presetQuantities, sanitizeTradeNote} from '@/lib/trading/order-math';
+import {CASH_YIELD_DAYS, affordableShares, checkOrder, describeOrderEffect, estRealizedPnl, presetQuantities, sanitizeTradeNote} from '@/lib/trading/order-math';
+import {interestOverDays} from '@/lib/trading/income';
 import {TRADE_REASON_MAX} from '@/lib/strategies/config';
 
 const positions = [
@@ -10,7 +11,33 @@ const positions = [
 describe('describeOrderEffect', () => {
     it('sizes a buy against the whole account and names the largest position after it', () => {
         const effect = describeOrderEffect({side: 'buy', symbol: 'aapl', quantity: 10, price: 150, cash: 96_200, positions});
-        expect(effect).toEqual({side: 'buy', estTotal: 1_500, shareOfAccount: 0.015, largestAfter: {symbol: 'AAPL', weight: 0.033}, cashAfter: 94_700, cashAfterWeight: 0.947});
+        expect(effect).toEqual({side: 'buy', estTotal: 1_500, shareOfAccount: 0.015, largestAfter: {symbol: 'AAPL', weight: 0.033}, cashAfter: 94_700, cashAfterWeight: 0.947, cashYield: null});
+    });
+
+    it('prices the cash left after a buy at the cash APY: 30 days of daily compounding', () => {
+        const effect = describeOrderEffect({side: 'buy', symbol: 'AAPL', quantity: 10, price: 150, cash: 96_200, positions, apy: 0.0392});
+        expect(effect?.side === 'buy' && effect.cashYield).toEqual({apy: 0.0392, days: CASH_YIELD_DAYS, amount: interestOverDays(94_700, 0.0392, CASH_YIELD_DAYS)});
+        expect(CASH_YIELD_DAYS).toBe(30);
+        expect(effect?.side === 'buy' && effect.cashYield?.amount).toBeCloseTo(299.76, 2);
+    });
+
+    it('has no cash yield without a known rate or without cash left — never a made-up zero', () => {
+        const buy = (over: {apy?: number | null; quantity?: number}) =>
+            describeOrderEffect({side: 'buy', symbol: 'AAPL', quantity: over.quantity ?? 10, price: 150, cash: 96_200, positions, apy: over.apy});
+        for (const apy of [undefined, null, Number.NaN, -0.01]) {
+            const effect = buy({apy});
+            expect(effect?.side === 'buy' && effect.cashYield, String(apy)).toBeNull();
+        }
+        const allIn = buy({apy: 0.0392, quantity: 700});   // $105,000 against $96,200 of cash
+        expect(allIn?.side === 'buy' && allIn.cashYield).toBeNull();
+        // A real 0% rate (2021's T-bills, after the spread) is a fact, not missing data.
+        const zero = buy({apy: 0});
+        expect(zero?.side === 'buy' && zero.cashYield).toEqual({apy: 0, days: CASH_YIELD_DAYS, amount: 0});
+    });
+
+    it('never attaches a cash yield to a sell', () => {
+        expect(describeOrderEffect({side: 'sell', symbol: 'AAPL', quantity: 5, price: 200, cash: 0, positions, apy: 0.0392}))
+            .toEqual({side: 'sell', quantity: 5, owned: 10, sharesAfter: 5, avgCost: 150, estRealizedPnl: 250});
     });
 
     it('reports a new symbol that becomes the largest position', () => {

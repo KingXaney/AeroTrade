@@ -3,6 +3,7 @@
 // (executeOrder) re-checks everything with the live price and stays authoritative.
 
 import {TRADE_REASON_MAX} from "@/lib/strategies/config";
+import {interestOverDays} from "@/lib/trading/income";
 
 export type OrderSide = 'buy' | 'sell';
 
@@ -53,11 +54,27 @@ export type OrderEffectInputs = {
     price: number | null;
     cash: number;
     positions: readonly PositionLike[];
+    // The cash APY at the latest stored T-bill rate (getCashApy); null or absent when no rate
+    // is stored yet, and then nothing is said about interest.
+    apy?: number | null;
 };
 
+// The ticket's "month": 30 days of daily compounding on the cash left after the order.
+export const CASH_YIELD_DAYS = 30;
+
+// What the cash left would earn over CASH_YIELD_DAYS at today's APY if nothing else moved.
+export type CashYield = {apy: number; days: number; amount: number};
+
 export type OrderEffect =
-    | {side: 'buy'; estTotal: number; shareOfAccount: number; largestAfter: {symbol: string; weight: number} | null; cashAfter: number; cashAfterWeight: number}
+    | {side: 'buy'; estTotal: number; shareOfAccount: number; largestAfter: {symbol: string; weight: number} | null; cashAfter: number; cashAfterWeight: number; cashYield: CashYield | null}
     | {side: 'sell'; quantity: number; owned: number; sharesAfter: number; avgCost: number | null; estRealizedPnl: number | null};
+
+// A rate that is unknown stays unknown: no zero is invented for it, and cash that the order
+// spends past zero earns nothing to describe.
+const cashYieldOf = (cashAfter: number, apy: number | null | undefined): CashYield | null =>
+    typeof apy === 'number' && Number.isFinite(apy) && apy >= 0 && cashAfter > 0
+        ? {apy, days: CASH_YIELD_DAYS, amount: interestOverDays(cashAfter, apy, CASH_YIELD_DAYS)}
+        : null;
 
 // (sell price − average cost) × shares, the same arithmetic executeOrder records.
 export const estRealizedPnl = (price: number | null, avgCost: number | null | undefined, quantity: number): number | null =>
@@ -70,7 +87,7 @@ const valueOf = (p: PositionLike): number =>
 
 // What the order does to the account, at the last price. Advisory like checkOrder: the
 // server is the authority on the fill. A buy with no price has no effect to describe.
-export const describeOrderEffect = ({side, symbol, quantity, price, cash, positions}: OrderEffectInputs): OrderEffect | null => {
+export const describeOrderEffect = ({side, symbol, quantity, price, cash, positions, apy}: OrderEffectInputs): OrderEffect | null => {
     const qty = Math.floor(quantity);
     if (!Number.isFinite(qty) || qty < 1) return null;
     const upper = symbol.toUpperCase();
@@ -103,6 +120,7 @@ export const describeOrderEffect = ({side, symbol, quantity, price, cash, positi
         largestAfter: largest && largest.value > 0 ? {symbol: largest.symbol, weight: largest.value / totalValue} : null,
         cashAfter,
         cashAfterWeight: cashAfter / totalValue,
+        cashYield: cashYieldOf(cashAfter, apy),
     };
 };
 

@@ -26,13 +26,20 @@ type OrderPanelProps = {
     // The 360px dashboard ticket: the first two facts of the consequence line, no queue
     // line, no definitions.
     compact?: boolean;
+    // The cash APY at the latest T-bill rate (getCashApy), for the buy line's "earning
+    // ≈$x/month" clause on the cash left. Null or unset: no clause. The dashboard widget
+    // leaves it unset — its compact line drops the cash left the clause describes.
+    apy?: number | null;
     // Called when the user *commits* a symbol (picks a search hit, or leaves the field
     // with a new one). The trade desk uses it to move the chart; the dashboard's
     // quick-trade widget leaves it unset, so it never navigates anyone anywhere.
     onSymbolCommit?: (symbol: string) => void;
 };
 
-const OrderPanel = ({defaultSymbol = '', cash, accountId, positions = [], onSymbolCommit, queueNote = null, compact = false}: OrderPanelProps) => {
+// The ticket's one definitions disclosure; APY joins it only when a rate can put it on the line.
+const TICKET_TERMS = ['buying-power', 'market-order', 'avg-cost'] as const;
+
+const OrderPanel = ({defaultSymbol = '', cash, accountId, positions = [], onSymbolCommit, queueNote = null, compact = false, apy = null}: OrderPanelProps) => {
     const router = useRouter();
     const [symbol, setSymbol] = useState(defaultSymbol.toUpperCase());
     const [side, setSide] = useState<'buy' | 'sell'>('buy');
@@ -125,7 +132,7 @@ const OrderPanel = ({defaultSymbol = '', cash, accountId, positions = [], onSymb
     const check = checkOrder({side, quantity: qtyNum, price, cash, owned});
     const presets = presetQuantities(side, {cash, price, owned});
     // Numbers, not a lesson: what this order does to the account at the last price.
-    const effect = symbol ? describeOrderEffect({side, symbol, quantity: qtyNum, price, cash, positions}) : null;
+    const effect = symbol ? describeOrderEffect({side, symbol, quantity: qtyNum, price, cash, positions, apy}) : null;
     // Advisory only: a definite problem (over-sell, over-budget at the last price)
     // blocks the button; an unknown price never does — executeOrder is the authority.
     const blocked = symbol !== '' && !check.ok;
@@ -316,7 +323,7 @@ const OrderPanel = ({defaultSymbol = '', cash, accountId, positions = [], onSymb
             >
                 {submitting ? 'Placing…' : `${side === 'buy' ? 'Buy' : 'Sell'} ${symbol || ''}`.trim()}
             </button>
-            {!compact && <WhatTheseMean keys={['buying-power', 'market-order', 'avg-cost']} className="mt-0" />}
+            {!compact && <WhatTheseMean keys={apy === null ? TICKET_TERMS : [...TICKET_TERMS, 'apy']} className="mt-0" />}
         </form>
     );
 };

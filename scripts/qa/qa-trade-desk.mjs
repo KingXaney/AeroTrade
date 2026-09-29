@@ -26,6 +26,27 @@ const shot = (n) => page.screenshot({path: `${OUT}${n}.png`, fullPage: true});
 const settleToasts = async () => { await page.mouse.move(5, 700); await page.waitForTimeout(600); };
 const mongo = new MongoClient(MONGO);
 
+// No quote provider in this harness, so the ticket never has a price to size a buy with. For
+// the cash-interest checks, answer the page's getQuote server action with a fixed last price:
+// only an action whose real answer is the empty quote `{}` is rewritten, so search, placeOrder
+// and every other action pass through, and the server's own quote (placeOrder) is untouched.
+const STUB_PRICE = 150;
+let quotesStubbed = 0;
+const onTicketPages = (url) => url.pathname === '/trade' || url.pathname === '/';
+const quoteStub = async (route) => {
+    const request = route.request();
+    // getQuote(symbol) posts its one argument: ["AAPL"].
+    if (request.method() !== 'POST' || !request.headers()['next-action'] || !/^\["[A-Z.]+"\]$/.test(request.postData() ?? '')) return route.fallback();
+    const response = await route.fetch();
+    const body = await response.text();
+    const row = /"a":"\$@([0-9a-f]+)"/.exec(body)?.[1];
+    const stubbed = row ? body.replace(new RegExp(`^${row}:\\{\\}$`, 'm'), `${row}:{"c":${STUB_PRICE}}`) : body;
+    if (stubbed !== body) quotesStubbed++;
+    return route.fulfill({response, body: stubbed});
+};
+// The ^IRX row this suite seeds, removed again so later suites see the database they expect.
+let seededRate = null;
+
 try {
     await mongo.connect();
     const db = mongo.db('aerotrade');
@@ -182,6 +203,50 @@ try {
     await page.waitForTimeout(500);
     check('a same-route Trade link re-targets the ticket', (await symbolInput.inputValue()) === 'MSFT', await symbolInput.inputValue());
 
+    // --- what the cash left would earn: "earning ≈$x/month at y% APY" ---------------------
+    // Priced at $150 by the stub: 10 AAPL leave $95,500 of the $100,000 account in cash.
+    await page.route(onTicketPages, quoteStub);
+    const pricebars = db.collection('pricebars');
+    const buyLine = async () => {
+        await page.goto(`${BASE}/trade?symbol=AAPL`, {waitUntil: 'domcontentloaded'});
+        await symbolInput.waitFor({timeout: 30000});
+        await page.locator('#order-shares').fill('10');
+        const line = page.locator('[data-testid="order-effect"]');
+        await line.waitFor({timeout: 30000}).catch(() => {});
+        return await line.count() === 1 ? line.innerText() : '';
+    };
+    // How many times the ticket's one definitions disclosure defines APY.
+    const apyDefinitions = async () => {
+        const terms = page.locator('form').first().locator('[data-what-these-mean]');
+        await terms.locator('summary').click();
+        return terms.locator('dt', {hasText: /^APY/}).count();
+    };
+    if (await pricebars.countDocuments({symbol: '^IRX'}) === 0) {
+        const line = await buyLine();
+        check('the quote stub prices the ticket', quotesStubbed > 0 && /cash left \$95,500/.test(line), `stubbed=${quotesStubbed} line=${line}`);
+        check('with no T-bill rate stored the buy line says nothing about interest (never 0%)', line !== '' && !/APY|earning|0\.00%/.test(line), line);
+        check('…and the ticket defines no APY', await apyDefinitions() === 0);
+        const date = new Date().toLocaleDateString('en-CA', {timeZone: 'America/New_York'});
+        seededRate = {symbol: '^IRX', date};
+        await pricebars.updateOne(seededRate, {$set: {...seededRate, close: 4.07, open: 4.07, high: 4.07, low: 4.07, source: 'yahoo'}}, {upsert: true});
+    } else {
+        console.log('SKIP  the no-rate buy line  — an earlier suite already stored ^IRX');
+    }
+    // The expected clause, computed here from the latest ^IRX close the page will read:
+    // bond-equivalent yield − the 0.25% spread, then 30 days of daily compounding.
+    const rate = await pricebars.findOne({symbol: '^IRX'}, {sort: {date: -1}});
+    const discount = rate.close / 100;
+    const apy = Math.max(0, (365 * discount) / (360 - 91 * discount) - 0.0025);
+    const perMonth = 95_500 * ((1 + apy) ** (30 / 365) - 1);
+    const shown = perMonth < 10 ? `$${perMonth.toFixed(2)}` : `$${perMonth.toLocaleString('en-US', {maximumFractionDigits: 0})}`;
+    const clause = `earning ≈${shown}/month at ${(apy * 100).toFixed(2)}% APY`;
+    const priced = await buyLine();
+    check('a buy states what the cash left would earn in 30 days at the cash APY', /cash left \$95,500 \(\d+%\) · /.test(priced) && priced.endsWith(clause), `${priced} | expected …${clause}`);
+    check('…and the ticket defines APY once', await apyDefinitions() === 1);
+    await page.getByRole('button', {name: 'sell', exact: true}).click();
+    check('a sell carries no interest clause', !/APY|earning/.test(await page.locator('[data-testid="order-effect"]').innerText()));
+    await shot('04b-ticket-apy');
+
     // --- the dashboard quick-trade widget must not navigate -----------------------------
     await page.goto(`${BASE}/settings`, {waitUntil: 'load'});
     await page.getByLabel('Add Quick Trade').click();
@@ -195,6 +260,12 @@ try {
     check('the dashboard widget never navigates to /trade', new URL(page.url()).pathname === '/', page.url());
     check('the dashboard ticket keeps the queue line and definitions off', await widget.locator('[data-testid="order-queue"]').count() === 0 && await widget.locator('[data-what-these-mean]').count() === 0);
     check('the compact ticket has no note field', await widget.locator('#order-note').count() === 0);
+    // Still priced by the stub, with ^IRX stored: the 360px line keeps its first two facts only.
+    const compactLine = widget.locator('[data-testid="order-effect"]');
+    await compactLine.waitFor({timeout: 15000}).catch(() => {});
+    const compactText = await compactLine.count() === 1 ? await compactLine.innerText() : '';
+    check('the compact ticket states no cash left and no interest clause', compactText !== '' && !/cash left|APY|earning/.test(compactText), compactText || 'no line');
+    await page.unroute(onTicketPages, quoteStub);
 
     // --- brain drill-downs --------------------------------------------------------------
     await page.goto(`${BASE}/brain`, {waitUntil: 'domcontentloaded'});
@@ -213,6 +284,7 @@ try {
     console.log(`FAIL  threw: ${err.message}`);
     await shot('99-error').catch(() => {});
 } finally {
+    if (seededRate) await mongo.db('aerotrade').collection('pricebars').deleteOne(seededRate).catch(() => {});
     await mongo.close().catch(() => {});
     await browser.close();
 }
