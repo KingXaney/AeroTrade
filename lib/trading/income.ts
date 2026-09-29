@@ -64,6 +64,13 @@ export const interestOverDays = (cash: number, apy: number, days: number): numbe
 
 export type RateLookup = (date: string) => RatePoint | null;
 
+// The rate that counts on `date`: the latest point no older than RATE_MAX_STALENESS_DAYS, else
+// none. The one staleness rule — readyThrough holds the income watermark with it, and the APY
+// the Income panel and the order ticket quote (account.getCashApy) goes blank with it, so a
+// rate the job would not credit at is never quoted as today's rate either.
+export const usableRate = <P extends {date: string}>(point: P | null, date: string): P | null =>
+    point !== null && point.date >= addCalendarDays(date, -RATE_MAX_STALENESS_DAYS) ? point : null;
+
 // The latest point on or before a date — never after, so nothing is paid at a rate that
 // was not yet known.
 export const makeRateLookup = (points: readonly RatePoint[]): RateLookup => {
@@ -242,8 +249,7 @@ export const readyThrough = ({start, end, rateOn, spans, coverage, released}: {
 }): string | null => {
     let ready = end;
     for (const day of eachCalendarDay(start, end)) {
-        const rate = rateOn(day);
-        if (rate === null || rate.date < addCalendarDays(day, -RATE_MAX_STALENESS_DAYS)) {
+        if (usableRate(rateOn(day), day) === null) {
             ready = addCalendarDays(day, -1);
             break;
         }

@@ -85,7 +85,8 @@ export const firstDrawdownCrossing = (
         series.sort((a, b) => a.date.localeCompare(b.date));
         let peak = series[0];
         for (const point of series) {
-            if (point.totalValue > peak.totalValue) peak = point;
+            // The latest of equal highs, as drawdownWindow reads it: flat days at the top are not the fall.
+            if (point.totalValue >= peak.totalValue) peak = point;
             const pct = 1 - point.totalValue / peak.totalValue;
             // The epsilon keeps an exact 5.00% fall from reading as 4.9999…%.
             if (pct >= threshold - 1e-9) {

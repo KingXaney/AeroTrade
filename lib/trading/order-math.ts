@@ -7,6 +7,9 @@ import {interestOverDays} from "@/lib/trading/income";
 
 export type OrderSide = 'buy' | 'sell';
 
+// A side from outside the type system (a server action's argument): exactly 'buy' or 'sell'.
+export const isOrderSide = (value: unknown): value is OrderSide => value === 'buy' || value === 'sell';
+
 export type OrderInputs = {
     side: OrderSide;
     quantity: number;          // whatever the user typed, already coerced to a number

@@ -8,8 +8,8 @@ const FORMULA_START = /^[=+\-@\t\r]/;
 
 export const neutraliseFormula = (value: string): string => (FORMULA_START.test(value) ? `'${value}` : value);
 
-// RFC 4180 quoting: wrap in quotes when the value contains a comma, quote or newline.
-export const csvField = (value: string | number): string => {
-    const s = typeof value === 'number' ? String(value) : neutraliseFormula(value);
-    return /[",\n\r]/.test(s) ? `"${s.replace(/"/g, '""')}"` : s;
-};
+// Every string cell is quoted (RFC 4180, embedded quotes doubled), not only one holding a
+// comma: a spreadsheet whose locale separates fields with ';' would split an unquoted
+// 'dip;=cmd|…' there and evaluate the half that starts with '='. Numbers stay bare.
+export const csvField = (value: string | number): string =>
+    typeof value === 'number' ? String(value) : `"${neutraliseFormula(value).replace(/"/g, '""')}"`;

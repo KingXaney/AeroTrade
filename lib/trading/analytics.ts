@@ -64,13 +64,15 @@ export const describeUnpriced = (stale: number, total: number): string | null =>
 // low needed to get there (peak / trough − 1 — a 20% fall needs 25%). Null until there are at
 // least two points (a single day can't draw down); a series that never fell gets a zero
 // window rather than null, so "no drawdown yet" and "not enough history" stay distinct. Of
-// two equally deep stretches, the first is kept.
+// two equally deep stretches, the first is kept. The peak is the LATEST of equal highs: days
+// spent flat at the top are not part of the fall, and a window that started on the first of
+// them would date the band, the hint and "SPY same days" across a stretch that never fell.
 export const drawdownWindow = (series: readonly SnapshotPoint[]): DrawdownWindow | null => {
     if (series.length < 2) return null;
     let peak = series[0];
     let worst = {pct: 0, peak: series[0], trough: series[0], troughIndex: 0};
     series.forEach((point, index) => {
-        if (point.value > peak.value) peak = point;
+        if (point.value >= peak.value) peak = point;
         if (!(peak.value > 0)) return;
         const pct = ((peak.value - point.value) / peak.value) * 100;
         if (pct > worst.pct) worst = {pct, peak, trough: point, troughIndex: index};
@@ -139,13 +141,18 @@ export const concentration = (
 
 export type TradeForStats = {side: string; realizedPnl?: number};
 
+export type WinStats = {wins: number; losses: number; winRatePct: number | null};
+
+// Win rate from the two counts it needs — what a database $group returns, so a reader that
+// only wants the rate never pulls the trades back to count them.
+export const winStatsFromCounts = ({closed, wins}: {closed: number; wins: number}): WinStats =>
+    ({wins, losses: closed - wins, winRatePct: closed > 0 ? (wins / closed) * 100 : null});
+
 // Closed trades are sells with a recorded realizedPnl; a win is a positive one.
 // Win rate is null until at least one position has been (partially) closed.
-export const computeWinStats = (trades: TradeForStats[]): {wins: number; losses: number; winRatePct: number | null} => {
+export const computeWinStats = (trades: TradeForStats[]): WinStats => {
     const closed = trades.filter((t) => t.side === 'sell' && typeof t.realizedPnl === 'number');
-    const wins = closed.filter((t) => (t.realizedPnl as number) > 0).length;
-    const losses = closed.length - wins;
-    return {wins, losses, winRatePct: closed.length > 0 ? (wins / closed.length) * 100 : null};
+    return winStatsFromCounts({closed: closed.length, wins: closed.filter((t) => (t.realizedPnl as number) > 0).length});
 };
 
 export const computeRealizedPnl = (trades: TradeForStats[]): number =>

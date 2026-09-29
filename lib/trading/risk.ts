@@ -6,6 +6,8 @@
 // by √252 — stated in dollars at today's value instead of as a yearly percentage. About two
 // days in three move less than it.
 
+import {isTradingDay} from "@/lib/prices/market-hours";
+
 // Two daily changes are the fewest a spread can be measured from.
 export const MIN_SWING_POINTS = 3;
 
@@ -15,13 +17,21 @@ export type DailySwing = {
     days: number;      // daily changes it was measured over
 };
 
-export const dailySwingDollars = (series: readonly PerfPoint[], totalValue: number): DailySwing | null => {
-    if (series.length < MIN_SWING_POINTS || !(totalValue > 0)) return null;
+// Measured on closes only: `snapshotThrough` is the last stored daily snapshot (null before
+// the first). The series the page draws ends with today's live value, which is a close only
+// once today's snapshot exists — on a weekend, or a weekday before the 16:10 snapshot, it
+// repeats the last close (or half a day) and would add a near-zero "move". A snapshot the
+// weekday cron wrote on a market holiday repeats the day before the same way, so only NYSE
+// trading days count.
+export const dailySwingDollars = (series: readonly PerfPoint[], totalValue: number, snapshotThrough: string | null): DailySwing | null => {
+    if (snapshotThrough === null || !(totalValue > 0)) return null;
+    const closes = series.filter((point) => point.date <= snapshotThrough && isTradingDay(point.date));
+    if (closes.length < MIN_SWING_POINTS) return null;
     // accountPct is a return on one base, so consecutive growth factors divide to the day's ratio.
     const returns: number[] = [];
-    for (let i = 1; i < series.length; i += 1) {
-        const before = 1 + series[i - 1].accountPct / 100;
-        const after = 1 + series[i].accountPct / 100;
+    for (let i = 1; i < closes.length; i += 1) {
+        const before = 1 + closes[i - 1].accountPct / 100;
+        const after = 1 + closes[i].accountPct / 100;
         if (before > 0 && after > 0) returns.push(Math.log(after / before));
     }
     if (returns.length < MIN_SWING_POINTS - 1) return null;

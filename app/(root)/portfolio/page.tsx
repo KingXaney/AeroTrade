@@ -3,7 +3,7 @@ import {cookies} from "next/headers";
 import Link from "next/link";
 import {ACTIVE_ACCOUNT_COOKIE} from "@/lib/constants";
 import {getCurrentUserId} from "@/lib/actions/watchlist.actions";
-import {getAccountAnalytics, getComparisonStats, getIncomeActivity, getPortfoliosForUser, getTradeHistory, getTradeLedger} from "@/lib/trading/account";
+import {getAccountAnalytics, getComparisonStats, getIncomeActivity, getPortfoliosForUser, getTradeLedger, TRADE_HISTORY_LIMIT} from "@/lib/trading/account";
 import {replayReceipts} from "@/lib/trading/receipts";
 import {buyNotesBySellId, openLotNotes} from "@/lib/trading/lots";
 import {countUnpriced} from "@/lib/trading/analytics";
@@ -45,16 +45,23 @@ const PortfolioPage = async ({searchParams}: PortfolioPageProps) => {
     const activeEntry = (preferredId && all.find((x) => x.account.id === preferredId)) || all[0];
     const {account, summary: portfolio} = activeEntry;
 
-    // getTradeHistory, getAccountAnalytics and this share one cached ledger read.
-    const [ledger, trades, analytics, comparisonStats, income] = await Promise.all([
-        getTradeLedger(userId, account.id),
-        getTradeHistory(userId, account.id),
+    // The page's one ledger read, shared (cache()) with getAccountAnalytics and getIncomeActivity,
+    // which hide their own sections when it fails. A failed read hides everything drawn from it
+    // here too — the trade log with its receipts and buy notes, the lot notes — rather than
+    // showing an empty ledger as "0 trades".
+    const [ledger, analytics, comparisonStats, income] = await Promise.all([
+        getTradeLedger(userId, account.id).catch((error) => {
+            console.error('Portfolio: reading the trade ledger failed:', error);
+            return null;
+        }),
         getAccountAnalytics(userId, account.id),
         getComparisonStats(userId, Object.fromEntries(all.map((x) => [x.account.id, x.summary.totalValue]))),
         getIncomeActivity(userId, account.id),
     ]);
 
-    const receipts = replayReceipts(ledger);
+    // The trade log is the ledger's tail, newest first.
+    const trades = ledger ? ledger.slice(-TRADE_HISTORY_LIMIT).reverse() : null;
+    const receipts = ledger ? replayReceipts(ledger) : undefined;
     const count = portfolio.positions.length;
     const unpriced = countUnpriced(portfolio.positions);
     const marketOpen = marketStatus().state === 'open';
@@ -127,7 +134,7 @@ const PortfolioPage = async ({searchParams}: PortfolioPageProps) => {
                     </section>
                     <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
                         <ReturnBridge accountId={account.id} bridge={bridge} />
-                        <RiskLens series={analytics.series} portfolio={portfolio} />
+                        <RiskLens series={analytics.series} snapshotThrough={analytics.snapshotThrough} portfolio={portfolio} />
                     </div>
                     <AnalyticsStats analytics={analytics} definitions />
                 </>
@@ -141,7 +148,7 @@ const PortfolioPage = async ({searchParams}: PortfolioPageProps) => {
                 <h2 className="text-sm font-bold uppercase tracking-[0.1em] text-brand mb-4" style={{fontFamily: 'var(--type-mono)'}}>
                     Holdings
                 </h2>
-                <PositionsTable positions={portfolio.positions} accountId={account.id} lotNotes={openLotNotes(ledger)} />
+                <PositionsTable positions={portfolio.positions} accountId={account.id} lotNotes={ledger ? openLotNotes(ledger) : undefined} />
             </section>
 
             {/* What the account earned without trading */}
@@ -153,13 +160,15 @@ const PortfolioPage = async ({searchParams}: PortfolioPageProps) => {
                 </Panel>
             )}
 
-            {/* Trade history */}
-            <section className="glass-panel rounded-xl p-5">
-                <h2 className="text-sm font-bold uppercase tracking-[0.1em] text-brand mb-4" style={{fontFamily: 'var(--type-mono)'}}>
-                    Trade History
-                </h2>
-                <TradeHistory trades={trades} totalCount={analytics?.tradeCount} exportHref={`/api/accounts/${account.id}/export`} receipts={receipts} buyNotesBySellId={buyNotesBySellId(ledger)} />
-            </section>
+            {/* Trade history — only from a ledger that was read */}
+            {ledger && trades && (
+                <section className="glass-panel rounded-xl p-5">
+                    <h2 className="text-sm font-bold uppercase tracking-[0.1em] text-brand mb-4" style={{fontFamily: 'var(--type-mono)'}}>
+                        Trade History
+                    </h2>
+                    <TradeHistory trades={trades} totalCount={analytics?.tradeCount} exportHref={`/api/accounts/${account.id}/export`} receipts={receipts} buyNotesBySellId={buyNotesBySellId(ledger)} />
+                </section>
+            )}
         </div>
     );
 };

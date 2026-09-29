@@ -165,7 +165,8 @@ try {
 
         // --- receipts: each one reproduces the stored rows to the cent ------------------------
         await page.locator('#income details[data-income-receipt]').evaluateAll((els) => els.forEach((d) => { d.open = true; }));
-        const RECEIPT = /^average cash (\$[\d,]+\.\d{2}) × (0\.\d{6})%\/day \(\(1 \+ (\d+\.\d{2})%\)\^\(1\/365\) − 1\) × (\d+) days? = (\$[\d,]+\.\d{2})$/;
+        // The daily rate prints to 6–12 decimals: the fewest at which the printed numbers multiply back.
+        const RECEIPT = /^average cash (\$[\d,]+\.\d{2}) × (0\.\d{6,12})%\/day \(\(1 \+ (\d+\.\d{2})%\)\^\(1\/365\) − 1\) × (\d+) days? = (\$[\d,]+\.\d{2})$/;
         for (const month of months) {
             const text = (await page.locator(`[data-income-month="${month}"] details p`).first().innerText().catch(() => '')).trim();
             const stored = interest.filter((r) => r.date.startsWith(month));
@@ -176,7 +177,7 @@ try {
             if (m === null) continue;
             check(`${month}: its total is the stored rows to the cent`, cents(dollars(m[5])) === cents(sum), `${m[5]} vs ${sum.toFixed(4)}`);
             check(`${month}: its average cash is rebuilt from the stored rows`, cents(dollars(m[1])) === cents(averageCash) && Number(m[4]) === stored.length, `${m[1]} vs ${averageCash.toFixed(4)}, ${m[4]} days`);
-            check(`${month}: the printed numbers multiply back to within a cent or two`, Math.abs(dollars(m[1]) * Number(m[2]) / 100 * Number(m[4]) - sum) < 0.05, `${(dollars(m[1]) * Number(m[2]) / 100 * Number(m[4])).toFixed(4)} vs ${sum.toFixed(4)}`);
+            check(`${month}: the printed numbers multiply back to the stored cent`, cents(dollars(m[1]) * Number(m[2]) / 100 * Number(m[4])) === cents(sum), `${(dollars(m[1]) * Number(m[2]) / 100 * Number(m[4])).toFixed(4)} vs ${sum.toFixed(4)}`);
         }
         const dividendReceipt = async (symbol) => (await page.locator(`[data-income-dividend="${symbol}"] details p`).first().innerText().catch(() => '')).trim();
         check('the SPY receipt reads the entitled close, the arithmetic and the pay lag',

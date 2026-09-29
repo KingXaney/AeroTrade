@@ -67,7 +67,8 @@ const isStrategyId = (value: string): value is StrategyId => (STRATEGY_SLUGS as 
 
 // What Today's lesson reads on top of the onboarding facts. After the (shared) account and
 // preference reads, every query runs in one Promise.all:
-// - the first user fill and the first user sell, on the {userId, source, createdAt} index;
+// - the first user fill on the {userId, source, createdAt} index, the first user sell on
+//   {userId, source, side, createdAt} — each one index probe;
 // - the first dividend credited within each account's watermark (incomeThrough), for the
 //   account's current epoch — inceptionAt, falling back to createdAt for accounts from before
 //   inceptionAt existed, as getIncomeActivity reads it;

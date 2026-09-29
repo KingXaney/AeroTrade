@@ -343,6 +343,9 @@ declare global {
         account: PaperAccountSummary;
         summary: PortfolioSummary;
         series: PerfPoint[];
+        // The last stored daily snapshot's date (null before the first): points after it are
+        // today's live value, not a close — the risk lens measures closes only.
+        snapshotThrough: string | null;
         maxDrawdownPct: number | null;  // null until enough snapshots exist
         drawdown: DrawdownWindow | null;          // the dated window behind maxDrawdownPct
         benchmarkOverDrawdownPct: number | null;  // SPY total return from its peak date to its trough date

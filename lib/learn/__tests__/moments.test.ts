@@ -144,6 +144,11 @@ describe('firstDrawdownCrossing', () => {
         expect(hit!.pct).toBeCloseTo(0.05, 6);
     });
 
+    it('dates the fall from the latest of several equal highs', () => {
+        const hit = firstDrawdownCrossing(series('a', '2026-09-01', [100_000, 100_000, 100_000, 100_000, 97_000, 94_000]));
+        expect(hit).toMatchObject({date: '2026-09-06', peakDate: '2026-09-04', peakValue: 100_000, value: 94_000});
+    });
+
     it('is null when no fall reaches the threshold', () => {
         expect(firstDrawdownCrossing(series('a', '2026-09-10', [100_000, 101_000, 97_000, 104_000]))).toBeNull();
         expect(firstDrawdownCrossing([])).toBeNull();

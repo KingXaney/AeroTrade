@@ -18,6 +18,8 @@ import {
     groupIncomeActivity,
     interestOverDays,
     replayIncome,
+    usableRate,
+    RATE_MAX_STALENESS_DAYS,
     type DividendPoint,
     type IncomeTrade,
     type RatePoint,
@@ -167,6 +169,31 @@ describe('holdingSpans', () => {
             {symbol: 'SPY', firstHeld: '2026-09-01', lastHeld: '2026-09-10'},
             {symbol: 'XLE', firstHeld: '2026-09-05', lastHeld: null},
         ]);
+    });
+});
+
+// One staleness rule for every reader of the rate: the job's watermark (readyThrough) and the
+// APY the Income panel and the ticket quote (account.getCashApy) agree on when it stops counting.
+describe('usableRate', () => {
+    const point = {date: '2026-09-10', discountPct: 4.07};
+
+    it('is the point while it is at most a week old', () => {
+        expect(RATE_MAX_STALENESS_DAYS).toBe(7);
+        expect(usableRate(point, '2026-09-10')).toBe(point);
+        expect(usableRate(point, '2026-09-17')).toBe(point);
+    });
+
+    it('is null once it is older than that, and null without a point', () => {
+        expect(usableRate(point, '2026-09-18')).toBeNull();
+        expect(usableRate(null, '2026-09-10')).toBeNull();
+    });
+
+    it('is the rule readyThrough holds the watermark with', () => {
+        const rateOn = makeRateLookup([point]);
+        const ready = readyThrough({start: '2026-09-11', end: '2026-09-30', rateOn, spans: [], coverage: () => null, released: new Set<string>()});
+        expect(ready).toBe('2026-09-17');
+        expect(usableRate(rateOn(ready as string), ready as string)).toBe(point);
+        expect(usableRate(rateOn('2026-09-18'), '2026-09-18')).toBeNull();
     });
 });
 

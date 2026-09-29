@@ -1,5 +1,5 @@
 import {describe, expect, it} from 'vitest';
-import {CASH_YIELD_DAYS, affordableShares, checkOrder, describeOrderEffect, estRealizedPnl, presetQuantities, sanitizeTradeNote} from '@/lib/trading/order-math';
+import {CASH_YIELD_DAYS, affordableShares, checkOrder, describeOrderEffect, estRealizedPnl, isOrderSide, presetQuantities, sanitizeTradeNote} from '@/lib/trading/order-math';
 import {interestOverDays} from '@/lib/trading/income';
 import {TRADE_REASON_MAX} from '@/lib/strategies/config';
 
@@ -163,5 +163,20 @@ describe('sanitizeTradeNote', () => {
 
     it('leaves markup as text: rendering escapes it, the note is never parsed', () => {
         expect(sanitizeTradeNote('earnings <b>beat</b>')).toBe('earnings <b>beat</b>');
+    });
+});
+
+// A server action's arguments arrive unchecked. executeOrder used to treat anything that was
+// not 'buy' as a sell: it moved the account, then the trade row failed the schema's enum.
+describe('isOrderSide', () => {
+    it('accepts exactly buy and sell', () => {
+        expect(isOrderSide('buy')).toBe(true);
+        expect(isOrderSide('sell')).toBe(true);
+    });
+
+    it('rejects everything else, before any write can happen', () => {
+        for (const value of ['short', 'BUY', 'Sell', '', ' buy', null, undefined, 1, {}, ['buy']]) {
+            expect(isOrderSide(value), String(value)).toBe(false);
+        }
     });
 });

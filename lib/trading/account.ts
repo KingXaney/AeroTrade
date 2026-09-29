@@ -15,7 +15,7 @@ import {getEasternDateString} from "@/lib/utils";
 import {getBenchmarkIndex} from "@/lib/prices/benchmark-store";
 import {getDividendPoints, getLatestRatePoint} from "@/lib/prices/store";
 import AccountIncome from "@/database/models/account-income.model";
-import {apyFromDiscount, groupIncomeActivity, withReceipts, type IncomeView} from "@/lib/trading/income";
+import {apyFromDiscount, groupIncomeActivity, usableRate, withReceipts, type IncomeView} from "@/lib/trading/income";
 import {appendLive} from "@/lib/prices/total-return";
 import {getQuote} from "@/lib/actions/finnhub.actions";
 import {
@@ -231,26 +231,58 @@ const toTradeRecord = (t: LeanTrade, accountName?: string): PaperTradeRecord => 
     createdAt: new Date(t.createdAt).getTime(),
 });
 
-// One account's whole trade ledger, oldest first — the one PaperTrade read a page makes for an
-// account: analytics (trade count, realized P&L, win rate), the trade log's tail, fill
-// receipts and the buy notes all derive from it. cache() dedupes it within a render.
-// Unbounded on purpose: analytics already summed every trade, and the income job reads the
-// whole epoch the same way. Not filtered by inceptionAt: a reset deletes the old epoch's
-// trades, and accounts from before inceptionAt existed keep their migrated history visible.
-export const getTradeLedger = cache(async (userId: string, accountId: string): Promise<PaperTradeRecord[]> => {
-    try {
-        await connectToDatabase();
-        const trades = await PaperTrade.find({userId, accountId}).sort({createdAt: 1, _id: 1}).lean<LeanTrade[]>();
-        return trades.map((t) => toTradeRecord(t));
-    } catch (error) {
-        console.error('Error fetching trade ledger:', error);
-        return [];
-    }
+// Where an account's current epoch starts, for every per-account trade read. A reset
+// re-anchors inceptionAt and then deletes the old epoch's trades; one that crashed between the
+// two leaves rows behind that must not feed a receipt, a lot note or a count, so reads start at
+// inceptionAt, as creditAccountIncome's do. Accounts from before inceptionAt existed have none
+// and keep their migrated history. Undefined when the account is not this user's — nothing of
+// theirs to read. cache() shares it between a render's ledger and history reads.
+const tradeEpoch = cache(async (userId: string, accountId: string): Promise<{since: Date | null} | undefined> => {
+    if (!Types.ObjectId.isValid(accountId)) return undefined;
+    await connectToDatabase();
+    const account = await PaperAccount.findOne({_id: accountId, userId}).select('inceptionAt').lean<{inceptionAt?: Date} | null>();
+    return account ? {since: account.inceptionAt ?? null} : undefined;
 });
 
-// The newest `limit` fills, newest first: the ledger's tail.
-export const getTradeHistory = async (userId: string, accountId: string, limit = 50): Promise<PaperTradeRecord[]> =>
-    (await getTradeLedger(userId, accountId)).slice(-limit).reverse();
+const epochTrades = (userId: string, accountId: string, since: Date | null) =>
+    ({userId, accountId, ...(since ? {createdAt: {$gte: since}} : {})});
+
+// One account's whole trade ledger for its current epoch, oldest first — the one PaperTrade
+// read a page makes for an account: analytics (trade count, realized P&L, win rate), the trade
+// log's tail, fill receipts and the buy notes all derive from it. cache() dedupes it within a
+// render. Unbounded on purpose (analytics sums every trade, as the income job reads the whole
+// epoch), and walked on the {accountId, createdAt, _id} index, so it never sorts in memory.
+// A failed read THROWS: an empty ledger would read as "0 trades", $0 realized and "No trades
+// yet". getAccountAnalytics and getIncomeActivity catch it and hide their sections; a page that
+// calls it directly catches it and hides what it draws from it.
+export const getTradeLedger = cache(async (userId: string, accountId: string): Promise<PaperTradeRecord[]> => {
+    const epoch = await tradeEpoch(userId, accountId);
+    if (!epoch) return [];
+    const trades = await PaperTrade.find(epochTrades(userId, accountId, epoch.since)).sort({createdAt: 1, _id: 1}).lean<LeanTrade[]>();
+    return trades.map((t) => toTradeRecord(t));
+});
+
+// The trade log's page size, for getTradeHistory and for pages that slice their ledger.
+export const TRADE_HISTORY_LIMIT = 50;
+
+// The newest `limit` fills of the current epoch, newest first, in a bounded read of their own
+// (the same index, walked backwards, `limit` rows) — for callers that do not hold the ledger:
+// the chat tool, the recent-trades widget, a strategy page. /portfolio and /trade already read
+// the ledger and slice it instead.
+export const getTradeHistory = async (userId: string, accountId: string, limit = TRADE_HISTORY_LIMIT): Promise<PaperTradeRecord[]> => {
+    try {
+        const epoch = await tradeEpoch(userId, accountId);
+        if (!epoch) return [];
+        const trades = await PaperTrade.find(epochTrades(userId, accountId, epoch.since))
+            .sort({createdAt: -1, _id: -1})
+            .limit(limit)
+            .lean<LeanTrade[]>();
+        return trades.map((t) => toTradeRecord(t));
+    } catch (error) {
+        console.error('Error fetching trade history:', error);
+        return [];
+    }
+};
 
 // Newest fills across every strategy account, each tagged with its account's name —
 // the /history page's trade feed. Read-only (no lazy account creation).
@@ -288,11 +320,16 @@ export const seedDayZeroSnapshot = async (account: PaperAccountDoc): Promise<voi
     );
 };
 
-// The APY idle cash earns at the latest stored T-bill rate; null until a rate is stored (never
-// a zero for missing data). One read per render, shared by the Income panel's figure (every
-// account in view) and the /trade ticket's "earning ≈$x/month" clause, so the two agree.
+// The APY idle cash earns at the latest stored T-bill rate; null until a rate is stored, and
+// null again once that rate is stale by the income job's own rule (usableRate) — never a zero
+// for missing data, never a rate the job would not credit at. One read per render, shared by
+// the Income panel's figure (every account in view) and the /trade ticket's "earning ≈$x/month"
+// clause, so the two agree.
 export const getCashApy = cache(async (): Promise<number | null> => {
-    const rate = await getLatestRatePoint().catch(() => null);
+    const rate = usableRate(await getLatestRatePoint().catch((error) => {
+        console.error('Error reading the T-bill rate:', error);
+        return null;
+    }), getEasternDateString());
     return rate ? apyFromDiscount(rate.discountPct) : null;
 });
 
@@ -325,7 +362,8 @@ export const getIncomeActivity = async (userId: string, accountId: string): Prom
             ).lean<Parameters<typeof groupIncomeActivity>[0][number][]>(),
             getTradeLedger(userId, key),
         ]);
-        // The trades the income job replays: this epoch's, by timestamp (creditAccountIncome).
+        // The trades the income job replays: this epoch's, by timestamp (creditAccountIncome). The
+        // ledger already starts at inceptionAt; an account without one starts at createdAt here.
         const fills = ledger.filter((t) => t.createdAt >= epoch);
         const points = await getDividendPoints(fills.map((t) => t.symbol), getEasternDateString(inceptionAt), account.incomeThrough);
         return withReceipts(groupIncomeActivity(rows), fills, points);
@@ -380,6 +418,7 @@ export const getAccountAnalytics = async (userId: string, accountId: string): Pr
             summary,
             income: await getIncomeSummary(account),
             series,
+            snapshotThrough: snapshotPoints.at(-1)?.date ?? null,
             maxDrawdownPct: drawdown?.pct ?? null,
             drawdown,
             benchmarkOverDrawdownPct: drawdown && drawdown.pct > 0

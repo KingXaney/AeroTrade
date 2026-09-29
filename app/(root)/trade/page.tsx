@@ -33,9 +33,18 @@ const TradePage = async ({searchParams}: TradePageProps) => {
     const active = (preferredId && accounts.find((a) => String(a._id) === preferredId)) || accounts[0];
     const activeId = String(active._id);
 
-    const [portfolio, ledger, apy] = await Promise.all([getPortfolio(userId, activeId), getTradeLedger(userId, activeId), getCashApy()]);
-    const lastTrade = ledger.at(-1) ?? null;
-    const lastReceipt = lastTrade ? replayReceipts(ledger)[lastTrade.id] : undefined;
+    // A failed ledger read hides what is drawn from it (the last fill, the lot notes) instead of
+    // reading as an account with no fills.
+    const [portfolio, ledger, apy] = await Promise.all([
+        getPortfolio(userId, activeId),
+        getTradeLedger(userId, activeId).catch((error) => {
+            console.error('Trade desk: reading the trade ledger failed:', error);
+            return null;
+        }),
+        getCashApy(),
+    ]);
+    const lastTrade = ledger?.at(-1) ?? null;
+    const lastReceipt = ledger && lastTrade ? replayReceipts(ledger)[lastTrade.id] : undefined;
     const status = marketStatus();
     const switcherAccounts = accounts.map((a) => {
         const s = toAccountSummary(a);
@@ -75,7 +84,7 @@ const TradePage = async ({searchParams}: TradePageProps) => {
                 apy={apy}
             />
 
-            <LastFill trade={lastTrade} receipt={lastReceipt} />
+            {ledger && <LastFill trade={lastTrade} receipt={lastReceipt} />}
 
             {/* Open positions — compact quick-sell; full holdings & history live on /portfolio */}
             <section className="glass-panel rounded-xl p-5">
@@ -87,7 +96,7 @@ const TradePage = async ({searchParams}: TradePageProps) => {
                         Full holdings &amp; history →
                     </Link>
                 </div>
-                <OpenPositionsStrip positions={portfolio.positions} accountId={activeId} lotNotes={openLotNotes(ledger)} />
+                <OpenPositionsStrip positions={portfolio.positions} accountId={activeId} lotNotes={ledger ? openLotNotes(ledger) : undefined} />
             </section>
         </div>
     );

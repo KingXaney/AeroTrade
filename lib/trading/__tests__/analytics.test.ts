@@ -13,6 +13,7 @@ import {
     mergeLivePoint,
     toReturnPct,
     unpricedLabel,
+    winStatsFromCounts,
 } from '@/lib/trading/analytics';
 
 const pt = (date: string, value: number) => ({date, value});
@@ -104,6 +105,19 @@ describe('drawdownWindow', () => {
         expect(drawdownWindow(twice)).toMatchObject({peakDate: '2026-07-01', troughDate: '2026-07-02', recovered: true});
     });
 
+    // A flat stretch at the high is not part of the fall: the window starts at the LAST day the
+    // account stood at its peak, so the band, the hint and "SPY same days" span the fall alone.
+    it('starts at the latest of several equal highs', () => {
+        const series = [
+            pt('2026-09-01', 100_000), pt('2026-09-02', 100_000), pt('2026-09-03', 100_000), pt('2026-09-04', 100_000),
+            pt('2026-09-08', 97_000), pt('2026-09-09', 94_000),
+        ];
+        expect(drawdownWindow(series)).toMatchObject({peakDate: '2026-09-04', peakValue: 100_000, troughDate: '2026-09-09', troughValue: 94_000});
+        // A return to the same high after a fall moves the start too.
+        const back = [pt('2026-07-01', 100), pt('2026-07-02', 95), pt('2026-07-03', 100), pt('2026-07-06', 100), pt('2026-07-07', 80)];
+        expect(drawdownWindow(back)).toMatchObject({peakDate: '2026-07-06', troughDate: '2026-07-07'});
+    });
+
     it('agrees with computeMaxDrawdown on every series', () => {
         const series = [pt('2026-07-01', 100_000), pt('2026-07-02', 120_000), pt('2026-07-03', 90_000), pt('2026-07-04', 110_000)];
         expect(computeMaxDrawdown(series)).toBe(drawdownWindow(series)?.pct);
@@ -181,6 +195,20 @@ describe('computeWinStats', () => {
         expect(stats.wins).toBe(2);
         expect(stats.losses).toBe(2);
         expect(stats.winRatePct).toBeCloseTo(50);
+    });
+});
+
+// The chat's win rate counts sells in the database ($group) instead of reading them back; the
+// arithmetic on those counts is this one function, which computeWinStats also ends in.
+describe('winStatsFromCounts', () => {
+    it('is null (not 0%) with nothing closed, and wins over closed otherwise', () => {
+        expect(winStatsFromCounts({closed: 0, wins: 0})).toEqual({wins: 0, losses: 0, winRatePct: null});
+        expect(winStatsFromCounts({closed: 4, wins: 3})).toEqual({wins: 3, losses: 1, winRatePct: 75});
+    });
+
+    it('is what computeWinStats gives for the same trades', () => {
+        const trades = [{side: 'buy'}, {side: 'sell', realizedPnl: 250}, {side: 'sell'}, {side: 'sell', realizedPnl: 0}, {side: 'sell', realizedPnl: -5}];
+        expect(computeWinStats(trades)).toEqual(winStatsFromCounts({closed: 3, wins: 1}));
     });
 });
 

@@ -144,9 +144,13 @@ try {
     const today = isoDaysAgo(0);
     const inception = new Date(Date.now() - 13 * 86_400_000);
     const gcId = new ObjectId();
+    // Older than its 401-day-old fill below: every trade read starts at the account's inceptionAt
+    // (a fill from before it belongs to an epoch a reset ended), so the expired fill needs a
+    // current epoch that reaches back past the 400-day run retention.
+    const gcInception = new Date(Date.now() - 402 * 86_400_000);
     await db.collection('paperaccounts').insertOne({
-        _id: gcId, userId: OWNER, name: 'Golden Cross Sectors', cash: 99_578, startingBalance: 100_000, inceptionAt: inception,
-        positions: [{symbol: 'XLF', company: 'Financials', quantity: 10, avgCost: 42.2}], createdAt: inception, updatedAt: new Date(),
+        _id: gcId, userId: OWNER, name: 'Golden Cross Sectors', cash: 99_578, startingBalance: 100_000, inceptionAt: gcInception,
+        positions: [{symbol: 'XLF', company: 'Financials', quantity: 10, avgCost: 42.2}], createdAt: gcInception, updatedAt: new Date(),
     });
     await db.collection('strategystates').insertOne({
         strategyId: 'golden-cross', accountId: String(gcId), status: 'active', version: '1.1', launchDate: isoDaysAgo(13),

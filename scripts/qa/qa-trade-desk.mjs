@@ -63,7 +63,10 @@ try {
     const accounts = db.collection('paperaccounts');
     const main = await accounts.findOne({userId});   // lazily created by the first render
     check('a paper account exists for the user', !!main);
-    await accounts.updateOne({_id: main._id}, {$set: {cash: 97_000, positions: [
+    // The account began a minute ago, so the fills seeded below (a few seconds old) fall inside
+    // its current epoch: every trade read starts at inceptionAt.
+    const mainInception = new Date(Date.now() - 60_000);
+    await accounts.updateOne({_id: main._id}, {$set: {inceptionAt: mainInception, cash: 97_000, positions: [
         {symbol: 'AAPL', company: 'Apple Inc', quantity: 10, avgCost: 150},
         {symbol: 'MSFT', company: 'Microsoft', quantity: 5, avgCost: 300},
     ]}});
@@ -76,6 +79,9 @@ try {
         trade({createdAt: new Date(Date.now() - 1000), source: 'ai-suggestion'}),
         // A learner's note a spreadsheet would read as a formula: the export must neutralise it.
         trade({createdAt: new Date(Date.now() - 500), side: 'sell', quantity: 2, price: 160, total: 320, realizedPnl: 20, source: 'user', reason: '=1+1'}),
+        // A row from before the account's inception: what a reset that re-anchored inceptionAt
+        // but crashed before deleting the old epoch's trades leaves behind. No trade read shows it.
+        trade({createdAt: new Date(mainInception.getTime() - 60_000), symbol: 'ZZOLD', company: 'Old Epoch Co', source: 'user'}),
     ]);
     await db.collection('watchlists').insertOne({userId, symbol: 'AAPL', company: 'Apple Inc', addedAt: new Date()});
     await db.collection('brainentities').updateOne({key: 'NVDA'}, {$set: {
@@ -90,6 +96,7 @@ try {
     check('holdings rows offer a Trade link to the prefilled ticket', await page.locator('a[href="/trade?symbol=AAPL"]').count() >= 1);
     check('trade history symbols link to the stock page', await page.locator('a[href="/stocks/AAPL"]').count() >= 2);
     check('an AI-placed trade carries a chip; user and legacy rows do not', await page.getByText('AI suggestion', {exact: true}).count() === 1);
+    check('a trade from before the account\'s inception is not in its trade log', await page.locator('a[href="/stocks/ZZOLD"]').count() === 0);
     check('strategy comparison renders both accounts', await page.getByRole('button', {name: /Value/}).count() >= 1);
     // The sell dialog's realized-result line reads '—' without a quote.
     await page.getByRole('button', {name: /^Sell$/}).first().click();
@@ -111,9 +118,11 @@ try {
 
     const csv = await (await page.request.get(`${BASE}/api/accounts/${mainId}/export`)).text();
     const [header, ...rows] = csv.trim().split('\n');
-    check('CSV export has source then reason columns', header.endsWith(',source,reason'), header);
-    check('CSV rows carry the source, blank when unknown', rows.some((r) => r.endsWith(',ai-suggestion,')) && rows.some((r) => r.endsWith(',,,')), rows.map((r) => r.split(',').slice(-2).join(',')).join('|'));
-    check('a note starting with = exports as text, not a formula', rows.some((r) => r.endsWith(",user,'=1+1")), rows.map((r) => r.split(',').slice(-2).join(',')).join('|'));
+    // Every string cell is quoted (a ';'-separated locale must not split a note); numbers stay bare.
+    check('CSV export has source then reason columns, quoted', header.endsWith(',"source","reason"'), header);
+    check('CSV rows carry the source, blank when unknown', rows.some((r) => r.endsWith(',"ai-suggestion",""')) && rows.some((r) => r.endsWith(',"","",""')), rows.map((r) => r.split(',').slice(-2).join(',')).join('|'));
+    check('a note starting with = exports as quoted text, not a formula', rows.some((r) => r.endsWith(`,"user","'=1+1"`)), rows.map((r) => r.split(',').slice(-2).join(',')).join('|'));
+    check('numbers stay bare and strings are quoted', rows.some((r) => /^"[^"]+","AAPL","Apple Inc","sell",2,160,320,20,"user",/.test(r)), rows.join(' | '));
 
     // --- watchlist + stock page affordances --------------------------------------------
     await page.goto(`${BASE}/watchlist`, {waitUntil: 'load'});
@@ -185,6 +194,25 @@ try {
     check('…and the server stayed the authority (nothing traded)', (await db.collection('papertrades').countDocuments({accountId: mainId})) === tradesBefore);
     await settleToasts();
 
+    // A server action's arguments arrive unchecked: a side other than buy/sell is refused first,
+    // before the quote and before any write (it used to run the sell branch).
+    let tampered = 0;
+    const tamperSide = async (route) => {
+        const body = route.request().postData() ?? '';
+        if (route.request().method() !== 'POST' || !route.request().headers()['next-action'] || !body.includes('"side":"sell"')) return route.fallback();
+        tampered++;
+        return route.continue({postData: body.split('"side":"sell"').join('"side":"short"')});
+    };
+    await page.route(onTicketPages, tamperSide);
+    const cashBefore = (await db.collection('paperaccounts').findOne({_id: main._id})).cash;
+    await page.locator('#order-shares').press('Enter');
+    const refused = await page.getByText('Choose buy or sell').waitFor({timeout: 30000}).then(() => true, () => false);
+    check('an order whose side is neither buy nor sell is refused first', tampered > 0 && refused, `tampered=${tampered}`);
+    check('…and nothing moved', (await db.collection('papertrades').countDocuments({accountId: mainId})) === tradesBefore
+        && (await db.collection('paperaccounts').findOne({_id: main._id})).cash === cashBefore);
+    await page.unroute(onTicketPages, tamperSide);
+    await settleToasts();
+
     // Enter in the symbol field commits the symbol (chart + URL), never the order.
     await symbolInput.fill('MSFT');
     await symbolInput.press('Enter');
@@ -246,14 +274,30 @@ try {
     await page.getByRole('button', {name: 'sell', exact: true}).click();
     check('a sell carries no interest clause', !/APY|earning/.test(await page.locator('[data-testid="order-effect"]').innerText()));
     await shot('04b-ticket-apy');
+    // A rate the income job would not credit at (older than a week: usableRate) is not quoted.
+    if (seededRate) {
+        const stale = new Date(Date.now() - 8 * 86_400_000).toLocaleDateString('en-CA', {timeZone: 'America/New_York'});
+        await pricebars.updateOne(seededRate, {$set: {date: stale}});
+        const staleLine = await buyLine();
+        check('a T-bill rate older than a week is not quoted on the ticket', staleLine !== '' && !/APY|earning/.test(staleLine), staleLine);
+        await pricebars.updateOne({symbol: '^IRX', date: stale}, {$set: {date: seededRate.date}});
+    } else {
+        console.log('SKIP  the stale-rate buy line  — an earlier suite already stored ^IRX');
+    }
 
     // --- the dashboard quick-trade widget must not navigate -----------------------------
     await page.goto(`${BASE}/settings`, {waitUntil: 'load'});
     await page.getByLabel('Add Quick Trade').click();
+    await page.getByLabel('Add Recent Trades').click();
     await page.waitForTimeout(1200);   // debounced autosave
     await page.goto(`${BASE}/`, {waitUntil: 'domcontentloaded'});
     const widget = page.locator('[data-widget-id="quick-trade"]');
     await widget.waitFor({timeout: 30000});
+    // The widget's own bounded read (the newest eight of the current epoch), not the ledger.
+    const recent = page.locator('[data-widget-id="recent-trades"]');
+    await recent.waitFor({timeout: 30000});
+    check('the recent-trades widget lists this epoch\'s fills and not the old epoch\'s',
+        /AAPL/.test(await recent.innerText()) && !/ZZOLD/.test(await recent.innerText()), (await recent.innerText()).replace(/\s+/g, ' ').slice(0, 160));
     await widget.locator('#order-symbol').fill('TSLA');
     await widget.locator('#order-symbol').press('Enter');
     await page.waitForTimeout(1500);

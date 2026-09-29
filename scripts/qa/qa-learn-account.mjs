@@ -217,8 +217,14 @@ try {
     check('the missed block is muted, not a warning', /text-fg-muted/.test(await page.locator('[data-testid=income-missed]').getAttribute('class')) && !/text-warning/.test(await page.locator('[data-testid=income-missed]').getAttribute('class')));
     await page.locator('#income details[data-income-receipt]').evaluateAll((els) => els.forEach((d) => { d.open = true; }));
     const monthReceipts = (await page.locator('#income [data-income-month] details p').allInnerTexts()).map((r) => r.trim());
-    check('each interest month rebuilds from $100,000 at the daily factor of 3.92%',
-        monthReceipts.length > 0 && monthReceipts.every((r) => /^average cash \$100,000\.00 × 0\.010535%\/day \(\(1 \+ 3\.92%\)\^\(1\/365\) − 1\) × \d days? = \$[\d.]+$/.test(r)),
+    // The rate prints to as many decimals (6–12) as it takes for the printed numbers to multiply
+    // back to the printed total: 0.010535% × 3 days on $100,000 is $31.605, so this one needs 7.
+    const RECEIPT_100K = /^average cash \$100,000\.00 × (0\.010535\d{0,6})%\/day \(\(1 \+ 3\.92%\)\^\(1\/365\) − 1\) × (\d) days? = \$([\d.]+)$/;
+    check('each interest month rebuilds from $100,000 at the daily factor of 3.92%, to its printed cent',
+        monthReceipts.length > 0 && monthReceipts.every((r) => {
+            const m = RECEIPT_100K.exec(r);
+            return m !== null && Math.round(100_000 * (Number(m[1]) / 100) * Number(m[2]) * 100) === Math.round(Number(m[3]) * 100);
+        }),
         monthReceipts.join(' | '));
     const seededByMonth = {};
     for (const date of interestDays) seededByMonth[date.slice(0, 7)] = (seededByMonth[date.slice(0, 7)] ?? 0) + 100_000 * factor;

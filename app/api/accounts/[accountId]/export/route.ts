@@ -38,7 +38,7 @@ export async function GET(request: Request, {params}: {params: Promise<{accountI
         t.source ?? '',   // blank = placed before the field existed; not reconstructable, so not guessed
         t.reason ?? '',   // the learner's own note or an automated caller's reason; csvField neutralises formulas
     ].map(csvField).join(','));
-    const csv = [header.join(','), ...rows].join('\n') + '\n';
+    const csv = [header.map(csvField).join(','), ...rows].join('\n') + '\n';
 
     return new NextResponse(csv, {
         headers: {

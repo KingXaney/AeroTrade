@@ -2,7 +2,7 @@
 // each number. Interest is printed with the daily factor the accrual convention uses
 // (lib/trading/income.ts dailyFactor), never as "÷ 365", so the arithmetic on screen is the
 // arithmetic that credited the cash. Every sentence describes; none says what to do. Held to
-// the no-advice list, and each month recomputed to the cent, by
+// the no-advice list, and each printed receipt multiplied back to its cent, by
 // lib/learn/__tests__/income-copy.test.ts.
 //
 // Import-free of server code: IncomeActivity renders it on the server today, and nothing
@@ -46,12 +46,38 @@ export const interestSummary = (m: IncomeMonth): string => {
     return `${plural(m.days, 'day', 'days')}${apy !== null ? ` · ${apyPct(apy)} APY` : ''}`;
 };
 
+// The daily rate is printed to the fewest decimals of a percent, from six up to twelve, at
+// which the receipt's own printed numbers — the cash to the cent, the rate, the days —
+// multiply back to its printed total's cent: a reader checking it by hand lands on the stored
+// sum, not a cent or fifteen away. Six is enough for most months; a million dollars needs more.
+const RATE_DECIMALS = {min: 6, max: 12} as const;
+const printedDollars = (amount: number): number => Number(money(amount).replace(/[$,]/g, ''));
+const multipliesBack = (cash: number, pct: string, days: number, total: number): boolean =>
+    Math.round(cash * (Number(pct) / 100) * days * 100) === Math.round(total * 100);
+
+const printedDailyRate = (averageCash: number, apy: number, days: number, amount: number): string => {
+    const cash = printedDollars(averageCash);
+    const total = printedDollars(amount);
+    // The convention's daily factor first. In the rare month where rounding the cash to the
+    // cent alone moves the product across a cent, the rate that printed cash earned
+    // (total ÷ cash ÷ days) — the same factor to every digit that matters — is printed instead.
+    const candidates = [dailyFactor(apy), cash > 0 && days > 0 ? total / (cash * days) : null];
+    for (const rate of candidates) {
+        if (rate === null) continue;
+        for (let decimals: number = RATE_DECIMALS.min; decimals <= RATE_DECIMALS.max; decimals += 1) {
+            const pct = (rate * 100).toFixed(decimals);
+            if (multipliesBack(cash, pct, days, total)) return pct;
+        }
+    }
+    return (dailyFactor(apy) * 100).toFixed(RATE_DECIMALS.max);
+};
+
 // 'average cash $61,300.00 × 0.010535%/day ((1 + 3.92%)^(1/365) − 1) × 24 days = $154.99'
 export const interestReceipt = (m: IncomeMonth): string => {
     if (m.averageCash === null || m.cashWeightedApy === null) {
         return `${plural(m.days, 'daily credit', 'daily credits')}, each day's closing cash × ((1 + that day's APY)^(1/365) − 1) = ${money(m.amount)}`;
     }
-    const perDay = `${(dailyFactor(m.cashWeightedApy) * 100).toFixed(6)}%`;
+    const perDay = `${printedDailyRate(m.averageCash, m.cashWeightedApy, m.days, m.amount)}%`;
     return `average cash ${money(m.averageCash)} × ${perDay}/day ((1 + ${apyPct(m.cashWeightedApy)})^(1/365) − 1) × ${plural(m.days, 'day', 'days')} = ${money(m.amount)}`;
 };
 

@@ -32,8 +32,16 @@ import {
     type LedgerFill,
 } from '@/lib/trading/income';
 
-const MONEY = new Intl.NumberFormat('en-US', {style: 'currency', currency: 'USD', minimumFractionDigits: 2, maximumFractionDigits: 2});
 const cents = (amount: number): number => Math.round(amount * 100);
+const dollars = (printed: string): number => Number(printed.replace(/[$,]/g, ''));
+
+// The receipt as a reader sees it: its printed operands, multiplied back, and its printed total,
+// both in cents. Null when the line is not the average-cash receipt.
+const RECEIPT = /^average cash (\$[\d,]+\.\d{2}) × (\d+\.\d{6,12})%\/day \(\(1 \+ \d+\.\d{2}%\)\^\(1\/365\) − 1\) × (\d+) days? = (\$[\d,]+\.\d{2})$/;
+const readReceipt = (line: string): {product: number; total: number} | null => {
+    const m = RECEIPT.exec(line);
+    return m ? {product: cents(dollars(m[1]) * (Number(m[2]) / 100) * Number(m[3])), total: cents(dollars(m[4]))} : null;
+};
 const at = (date: string): number => Date.parse(`${date}T16:00:00Z`);
 
 const month = (over: Partial<IncomeMonth>): IncomeMonth => ({
@@ -69,14 +77,29 @@ describe('interestReceipt', () => {
     });
     const months = groupIncomeActivity(rows).interestByMonth;
 
-    it('recomputes every stored month to the cent from what it prints', () => {
+    it('recomputes every stored month to the cent from the numbers it prints', () => {
         expect(months.map((m) => m.month)).toEqual(['2026-10', '2026-09']);
         for (const m of months) {
             const stored = rows.filter((r) => r.kind === 'interest' && r.date.startsWith(m.month)).reduce((s, r) => s + r.amount, 0);
-            const rebuilt = (m.averageCash as number) * dailyFactor(m.cashWeightedApy as number) * m.days;
-            expect(cents(rebuilt), m.month).toBe(cents(stored));
-            expect(interestReceipt(m).endsWith(`= ${MONEY.format(stored)}`), m.month).toBe(true);
+            const printed = readReceipt(interestReceipt(m));
+            expect(printed, m.month).not.toBeNull();
+            expect(printed?.product, m.month).toBe(cents(stored));
+            expect(printed?.total, m.month).toBe(cents(stored));
         }
+    });
+
+    // credited → 0 keeps interest out of cash, so the end-of-day cash is known by hand:
+    // 100,000 for Sep 1–9, 40,000 from the 60,000 buy on Sep 10 — an average of 58,000.
+    it('prints the average cash the account really held', () => {
+        const {rows: flat} = replayIncome({
+            from: '2026-09-01', to: '2026-09-30', startCash: 100_000, startHoldings: new Map(),
+            trades: [{date: '2026-09-10', symbol: 'SPY', side: 'buy', quantity: 60, total: 60_000}],
+            clock: createIncomeClock({rateOn: makeRateLookup(rates), dividends: new Map()}), credited: () => 0,
+        });
+        const [september] = groupIncomeActivity(flat).interestByMonth;
+        expect((9 * 100_000 + 21 * 40_000) / 30).toBe(58_000);
+        expect(interestReceipt(september)).toMatch(/^average cash \$58,000\.00 × /);
+        expect(readReceipt(interestReceipt(september))?.product).toBe(cents(flat.reduce((s, r) => s + r.amount, 0)));
     });
 
     it('says when the rate moved, and names the weighting, only then', () => {
@@ -85,6 +108,45 @@ describe('interestReceipt', () => {
         expect(rateMovedNote(september)).toBe(`The rate moved between ${(apyFromDiscount(4.0) * 100).toFixed(2)}% and ${(apyFromDiscount(4.6) * 100).toFixed(2)}% APY this month; ${((september.cashWeightedApy as number) * 100).toFixed(2)}% is the rate weighted by the cash that earned it, the one rate that gives the same total.`);
         expect(interestSummary(september)).toBe(`30 days · ${((september.cashWeightedApy as number) * 100).toFixed(2)}% APY`);
         expect(monthLabel('2026-09')).toBe('September 2026');
+    });
+});
+
+// A reader who multiplies the receipt's printed numbers must land on its printed total. Over a
+// grid of balances ($1k–$1M), month lengths (28–31 days) and rates (≈0–6% APY, steady and
+// stepping mid-month), each month replayed by the clock itself: zero receipts off by a cent.
+describe('every interest receipt multiplies back from what it prints', () => {
+    const cashes = [1_000, 1_234.56, 5_000, 12_345.67, 61_300, 99_999.99, 250_000, 512_345.12, 777_777.77, 1_000_000];
+    const discounts = Array.from({length: 61}, (_, i) => 0.3 + i * 0.1);
+
+    it('to the cent, on every one', () => {
+        const misses: string[] = [];
+        let checked = 0;
+        for (const cash of cashes) {
+            for (let days = 28; days <= 31; days += 1) {
+                for (const discount of discounts) {
+                    for (const stepping of [false, true]) {
+                        const rates = [{date: '2026-09-25', discountPct: discount}, ...(stepping ? [{date: '2026-10-16', discountPct: discount * 1.2}] : [])];
+                        const {rows} = replayIncome({
+                            from: '2026-10-01', to: `2026-10-${days}`, startCash: cash, startHoldings: new Map(), trades: [],
+                            clock: createIncomeClock({rateOn: makeRateLookup(rates), dividends: new Map()}),
+                        });
+                        const [m] = groupIncomeActivity(rows).interestByMonth;
+                        const stored = cents(rows.reduce((sum, r) => sum + r.amount, 0));
+                        const line = interestReceipt(m);
+                        const printed = readReceipt(line);
+                        checked += 1;
+                        if (printed === null || printed.product !== stored || printed.total !== stored) misses.push(`${line} (stored ${stored}¢)`);
+                    }
+                }
+            }
+        }
+        expect(checked).toBe(cashes.length * 4 * discounts.length * 2);
+        expect(misses.slice(0, 5)).toEqual([]);
+        expect(misses).toHaveLength(0);
+    });
+
+    it('prints the daily rate to six decimals when six already multiply back', () => {
+        expect(interestReceipt(month({}))).toContain('× 0.010535%/day');
     });
 });
 

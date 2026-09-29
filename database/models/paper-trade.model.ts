@@ -32,10 +32,18 @@ const PaperTradeSchema = new Schema<PaperTradeDoc>({
     createdAt: {type: Date, default: Date.now, index: true},
 });
 
-PaperTradeSchema.index({accountId: 1, createdAt: -1});
+// One account's current epoch in fill order: the ledger walks it forwards and the bounded
+// history (the newest N) backwards, so neither sorts in memory; _id breaks a tie between fills
+// stamped in the same millisecond the same way both directions. Replaces {accountId, createdAt:
+// -1}, which served only the descending read and left the ledger a blocking SORT (a deployment
+// that already built it keeps it until it is dropped by hand; nothing reads it by name).
+PaperTradeSchema.index({accountId: 1, createdAt: 1, _id: 1});
 // The learn surfaces ask "has this user ever placed an order themselves" and, later,
 // for the first such fill — both keyed on the source, in order.
 PaperTradeSchema.index({userId: 1, source: 1, createdAt: 1});
+// …and for the first such SELL: with side in the key it is one index probe, not a walk
+// through every buy of a user who has never sold.
+PaperTradeSchema.index({userId: 1, source: 1, side: 1, createdAt: 1});
 // Partial, not sparse: a sparse compound index would still index every row (accountId is
 // always present) and collide on the missing key.
 PaperTradeSchema.index({accountId: 1, idempotencyKey: 1}, {unique: true, partialFilterExpression: {idempotencyKey: {$exists: true}}});
