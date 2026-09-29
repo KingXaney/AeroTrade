@@ -6,8 +6,11 @@
 // clause by clause wherever a fill or an order shows it, and nowhere else. Today's lesson,
 // added from the widget library, teaches the term of the day, then a concept today's topic
 // articles used, then a fresh first from the account (a drop, a credited dividend) until
-// "Got it", then a followed monthly strategy's rebalance. Run against the harness in
-// README.md (in-memory Mongo on :27117 + `npm run dev`).
+// "Got it", then a followed monthly strategy's rebalance. The Daily quiz, added the same way,
+// asks one question from the one board inside its ten-day window (a skipped day and older
+// boards are passed over), reveals the seeded reason and its gloss, counts an answered day
+// once however often it is answered, and says plainly when there is no board to ask about.
+// Run against the harness in README.md (in-memory Mongo on :27117 + `npm run dev`).
 import {chromium} from 'playwright';
 import {MongoClient, ObjectId} from 'mongodb';
 import {mkdirSync} from 'node:fs';
@@ -482,6 +485,169 @@ try {
     check('/ and /settings agree on the First-week checklist', onDashboard && /First week/.test(settingsText), `dashboard=${onDashboard}`);
     check('…and list Today\'s lesson in the saved layout', /Today's lesson/.test(settingsText));
     await contextC.close();
+
+    // --- Daily quiz: library-only; one question from a recent board, a day counted once ------
+    // The board is RSI-2's from yesterday, the only usable one in the ten-day window: today's
+    // RSI-2 run is a skipped day, and every other strategy's board is twelve days old. Every
+    // askable row carries a reason the decoder reads, so whichever question today's date
+    // seeds, its reveal quotes a seeded reason and its gloss.
+    await db.collection('strategyruns').deleteMany({});
+    const quizExit = 'exit: close 130.00 > SMA5 128.00';
+    const quizRows = {
+        AAPL: {state: 'enter', reason: rsiReason, gloss: /under the entry level of 10/},
+        MSFT: {state: 'watch', reason: 'signal, but no open slot', gloss: /all 5 slots were taken/},
+        NVDA: {state: 'exit', reason: quizExit, gloss: /rose above the 5-day average \(128\.00\)/},
+    };
+    const quizRun = (strategyId, date, extra) => ({
+        strategyId, date, asOf: date, mode: 'live', status: 'done', staleCount: 0, universeSize: 40, rebalanceTriggered: true,
+        board: [], orders: [], skippedOrders: [], dataIssues: [], equity: 100_000, summary: '', createdAt: new Date(), ...extra,
+    });
+    await db.collection('strategyruns').insertMany([
+        quizRun('rsi2-mean-reversion', isoDaysAgo(1), {
+            board: [
+                {symbol: 'AAPL', state: 'enter', values: {close: 123.45, rsi2: 3.4, sma5: 126.1, sma200: 110, aboveSma200: true}},
+                {symbol: 'MSFT', state: 'watch', values: {close: 410, rsi2: 6.2, sma5: 415, sma200: 380, aboveSma200: true}, note: quizRows.MSFT.reason},
+                {symbol: 'NVDA', state: 'exit', values: {close: 130, rsi2: 81.5, sma5: 128, sma200: 100, aboveSma200: true}},
+                {symbol: 'KO', state: 'excluded', values: {close: null, rsi2: null, sma5: null, sma200: null, aboveSma200: null}, note: 'needs 200 bars'},
+            ],
+            orders: [
+                {symbol: 'AAPL', side: 'buy', quantity: 160, kind: 'enter', reason: rsiReason, executed: true, price: 123.6},
+                {symbol: 'NVDA', side: 'sell', quantity: 10, kind: 'exit', reason: quizExit, executed: true, price: 130},
+            ],
+        }),
+        quizRun('rsi2-mean-reversion', today, {mode: 'skipped', status: 'skipped', summary: 'skipped: stale data'}),
+        ...['buy-and-hold-spy', 'sixty-forty', 'golden-cross', 'dual-momentum', 'momentum-12-1', 'donchian-breakout', 'low-volatility'].map((id) =>
+            quizRun(id, isoDaysAgo(12), {board: [{symbol: 'SPY', state: 'held', values: {close: 500}}, {symbol: 'QQQ', state: 'watch', values: {close: 400}}]})),
+    ]);
+
+    const contextD = await browser.newContext({viewport: {width: 1440, height: 900}});
+    const pageD = await contextD.newPage();
+    const emailD = await signUp(pageD, 'learnD');
+    const userD = await userIdFor(emailD);
+    await pageD.locator('[data-widget-id]').first().waitFor({timeout: 30000});
+    check('the Daily quiz is not on the default dashboard', await pageD.locator('[data-widget-id="daily-quiz"]').count() === 0);
+    await pageD.goto(`${BASE}/?customize=1`, {waitUntil: 'load'});
+    await pageD.getByRole('button', {name: /Add widget/i}).first().click();
+    const libraryD = pageD.locator('[role="dialog"]');
+    await libraryD.waitFor({timeout: 15000});
+    check('the library lists the Daily quiz under Learn, badged New', /LEARN[\s\S]*Daily quiz[\s\S]*NEW/i.test(await libraryD.innerText()));
+    await libraryD.locator('div')
+        .filter({has: pageD.getByText('Daily quiz', {exact: true})})
+        .filter({has: pageD.getByRole('button', {name: 'Add', exact: true})})
+        .last().getByRole('button', {name: 'Add', exact: true}).click();
+    await pageD.keyboard.press('Escape');
+    await pageD.getByRole('button', {name: 'Save', exact: true}).click();
+    const quizWidget = pageD.locator('[data-widget-id="daily-quiz"]');
+    const quiz = quizWidget.locator('#daily-quiz');
+    await quiz.waitFor({timeout: 60000});
+    const savedD = await db.collection('userpreferences').findOne({userId: userD});
+    check('adding it from the library saves it into the layout', (savedD?.dashboardLayout?.widgets ?? []).some((w) => w.id === 'daily-quiz'));
+
+    const [, runMonth, runDay] = isoDaysAgo(1).split('-');
+    const runLabel = `${['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'][Number(runMonth) - 1]} ${Number(runDay)}`;
+    check('the question comes from the one board inside the window, past today\'s skipped day',
+        await quiz.getAttribute('data-quiz-strategy') === 'rsi2-mean-reversion'
+        && (await quiz.innerText()).toUpperCase().includes(`RSI-2 MEAN REVERSION · ${runLabel}`.toUpperCase()),
+        `${await quiz.getAttribute('data-quiz-strategy')} · ${runLabel}`);
+    const template = await quiz.getAttribute('data-quiz-template');
+    check('today\'s date seeds one of the three kinds of question', ['which-verdict', 'why-this-verdict', 'which-symbol'].includes(template), template);
+    check('no count before the first answer', await quiz.locator('[data-quiz-days]').count() === 0);
+    const noHandOffD = async () => await quizWidget.locator('[data-what-these-mean], [data-ask], details').count() === 0;
+    check('the widget carries no "What these mean", no "Ask in chat" and no disclosure', await noHandOffD());
+    const prompt = await quiz.locator('[data-quiz-prompt]').innerText();
+    const optionIds = await quiz.locator('[data-quiz-option]').evaluateAll((els) => els.map((e) => e.getAttribute('data-quiz-option')));
+    check('no answer is marked before one is given', await quiz.locator('[data-quiz-correct]').count() === 0 && optionIds.length >= 3, JSON.stringify(optionIds));
+    const optionTexts = await quiz.locator('[data-quiz-option]').allInnerTexts();
+    if (template === 'which-verdict') {
+        const symbol = await quiz.locator('[data-quiz-row]').getAttribute('data-quiz-row');
+        check('which verdict: one seeded row with its numbers, the four decisions as options',
+            symbol in quizRows && prompt === `What did the rule decide for ${symbol}?` && /RSI\(2\)/.test(await quiz.locator('[data-quiz-row]').innerText())
+            && JSON.stringify(optionIds) === JSON.stringify(['enter', 'exit', 'held', 'watch']), `${symbol} · ${prompt}`);
+    } else if (template === 'why-this-verdict') {
+        check('why this verdict: four plain-English readings, never the raw strings',
+            optionTexts.length === 4 && optionTexts.every((t) => !Object.values(quizRows).some((r) => t.trim() === r.reason))
+            && /^The rule marked (AAPL|MSFT|NVDA) “(enter|watch|exit)”\. Which reading explains that verdict\?$/.test(prompt),
+            `${prompt} · ${optionTexts.join(' | ').slice(0, 300)}`);
+    } else {
+        check('which symbol: seeded rows with their numbers as options',
+            optionIds.every((id) => id in quizRows) && /^Which of these did the rule mark “(enter|watch|exit)”\?$/.test(prompt)
+            && optionTexts.every((t) => /RSI\(2\)/.test(t)), `${prompt} · ${optionIds.join(',')}`);
+    }
+
+    // The first answer: the reveal is the stored verdict and reason, decoded; the day counts once.
+    const waitText = async (locator, pattern, ms = 15000) => {
+        const until = Date.now() + ms;
+        let text = '';
+        while (Date.now() < until) {
+            text = (await locator.count()) > 0 ? await locator.first().innerText() : '';
+            if (pattern.test(text)) return text;
+            await new Promise((r) => setTimeout(r, 200));
+        }
+        return text;
+    };
+    const answerWith = async (id) => {
+        await Promise.all([
+            pageD.waitForResponse((r) => r.request().method() === 'POST' && !!r.request().headers()['next-action'], {timeout: 15000}),
+            quiz.locator(`[data-quiz-option="${id}"]`).click(),
+        ]);
+        await quiz.locator('[data-quiz-reveal]').waitFor({timeout: 15000});
+    };
+    await answerWith(optionIds[0]);
+    const reveal = quiz.locator('[data-quiz-reveal]');
+    const revealedSymbol = await reveal.getAttribute('data-quiz-reveal');
+    const seeded = quizRows[revealedSymbol];
+    const explanation = await reveal.locator('[data-quiz-explanation]').innerText();
+    const glossText = (await reveal.locator('[data-reason-gloss]').count()) === 1 ? await reveal.locator('[data-reason-gloss]').innerText() : '';
+    check('the reveal quotes the seeded reason', !!seeded && explanation === seeded.reason, `${revealedSymbol}: ${explanation}`);
+    check('…decodes it clause by clause', !!seeded && seeded.gloss.test(glossText), glossText.replace(/\s+/g, ' ').slice(0, 200));
+    check('…under the stored verdict', !!seeded && await reveal.getAttribute('data-quiz-verdict') === seeded.state);
+    const correctIds = await quiz.locator('[data-quiz-correct="true"]').evaluateAll((els) => els.map((e) => e.getAttribute('data-quiz-option')));
+    const expectedCorrect = template === 'which-symbol' ? revealedSymbol : seeded?.state;
+    check('exactly one option is the rule\'s answer, and it is the stored one', correctIds.length === 1 && correctIds[0] === expectedCorrect, `${correctIds} vs ${expectedCorrect}`);
+    check('…about the row or the verdict the question named',
+        template === 'which-symbol' ? prompt.includes(`“${seeded?.state}”`) : prompt.includes(revealedSymbol ?? '—'), prompt);
+    const outcome = await reveal.locator('[data-quiz-outcome]').innerText();
+    check('the outcome says whether the answer matched', (optionIds[0] === correctIds[0]) === /^Matched the rule$/.test(outcome.trim()), outcome);
+    check('…and the pick is pressed, the rest locked', await quiz.locator(`[data-quiz-option="${optionIds[0]}"][aria-pressed="true"]`).count() === 1
+        && await quiz.locator('[data-quiz-option]:not([disabled])').count() === 0);
+    check('…linking to the whole board', await reveal.locator('a[href="/strategies/rsi2-mean-reversion"]').count() === 1);
+    check('the first answer counts the day', await waitText(quiz.locator('[data-quiz-days]'), /^Days answered: 1$/) === 'Days answered: 1');
+    let prefsD = await db.collection('userpreferences').findOne({userId: userD});
+    check('…once, dated today in ET', prefsD?.learn?.quizDaysAnswered === 1 && prefsD?.learn?.quizLastAnsweredDate === today, JSON.stringify(prefsD?.learn));
+    check('…and still no hand-off after the reveal', await noHandOffD());
+    await pageD.screenshot({path: `${OUT}08-daily-quiz.png`, fullPage: true});
+
+    // Answering again the same day — after a reload, with another option — counts nothing.
+    await pageD.reload({waitUntil: 'load'});
+    await quiz.waitFor({timeout: 30000});
+    check('a reload asks the same question', await quiz.getAttribute('data-quiz-template') === template && (await quiz.locator('[data-quiz-prompt]').innerText()) === prompt);
+    check('…and shows the count before an answer', (await quiz.locator('[data-quiz-days]').innerText()) === 'Days answered: 1');
+    await answerWith(optionIds[optionIds.length - 1]);
+    check('answering twice the same day counts once', await waitText(quiz.locator('[data-quiz-days]'), /^Days answered: \d+$/) === 'Days answered: 1');
+    prefsD = await db.collection('userpreferences').findOne({userId: userD});
+    check('…in the stored count too', prefsD?.learn?.quizDaysAnswered === 1 && prefsD?.learn?.quizLastAnsweredDate === today, JSON.stringify(prefsD?.learn));
+
+    // A day last counted yesterday: today's first answer counts.
+    await db.collection('userpreferences').updateOne({userId: userD}, {$set: {'learn.quizLastAnsweredDate': isoDaysAgo(1)}});
+    await pageD.reload({waitUntil: 'load'});
+    await quiz.waitFor({timeout: 30000});
+    await answerWith(optionIds[0]);
+    check('the next day\'s answer counts a second day', await waitText(quiz.locator('[data-quiz-days]'), /^Days answered: 2$/) === 'Days answered: 2');
+    prefsD = await db.collection('userpreferences').findOne({userId: userD});
+    check('…stored as two, dated today', prefsD?.learn?.quizDaysAnswered === 2 && prefsD?.learn?.quizLastAnsweredDate === today, JSON.stringify(prefsD?.learn));
+
+    // With no usable board in the window: an honest empty state that still shows the count.
+    await db.collection('strategyruns').deleteMany({strategyId: 'rsi2-mean-reversion', date: isoDaysAgo(1)});
+    await pageD.reload({waitUntil: 'load'});
+    await quizWidget.getByText('No question today').waitFor({timeout: 30000});
+    const emptyText = await quizWidget.innerText();
+    check('twelve-day-old boards and a skipped day ask nothing: the empty state says why',
+        await quizWidget.locator('#daily-quiz').count() === 0 && /signal board of the last 10 days/.test(emptyText) && /Days answered: 2/.test(emptyText),
+        emptyText.replace(/\s+/g, ' ').slice(0, 200));
+    await pageD.goto(`${BASE}/settings`, {waitUntil: 'load'});
+    await pageD.locator('#dashboard').waitFor({timeout: 30000});
+    check('/settings lists the Daily quiz in the saved layout', /Daily quiz/.test(await pageD.locator('#dashboard').innerText()));
+    await contextD.close();
 } catch (err) {
     failures++;
     console.log(`FAIL  threw: ${err.message}`);

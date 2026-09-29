@@ -23,9 +23,9 @@ const spanSet = new Set<number>(WIDGET_SPANS);
 const dataKeySet = new Set<string>(DATA_KEYS);
 
 describe('registry invariants', () => {
-    it('has 34 unique ids whose table keys match their id field', () => {
-        expect(WIDGET_IDS).toHaveLength(34);
-        expect(new Set(WIDGET_IDS).size).toBe(34);
+    it('has 35 unique ids whose table keys match their id field', () => {
+        expect(WIDGET_IDS).toHaveLength(35);
+        expect(new Set(WIDGET_IDS).size).toBe(35);
         expect(Object.keys(WIDGETS).sort()).toEqual([...WIDGET_IDS].sort());
         for (const id of WIDGET_IDS) {
             expect(WIDGETS[id].id).toBe(id);
@@ -100,7 +100,7 @@ describe('registry invariants', () => {
             expect(WIDGETS[id].isNew, id).toBe(true);
         }
         // The quant-strategies panel shipped after the layout system too.
-        expect(defs.filter((d) => d.isNew).map((d) => d.id).sort()).toEqual([...topics, 'quant-strategies', 'getting-started', 'todays-lesson'].sort());
+        expect(defs.filter((d) => d.isNew).map((d) => d.id).sort()).toEqual([...topics, 'quant-strategies', 'getting-started', 'todays-lesson', 'daily-quiz'].sort());
         expect(WIDGETS['topics-latest'].dataKeys).toEqual(['topicsLatest']);
         expect(WIDGETS['topic-briefs'].dataKeys).toEqual(['topicsOverview']);
     });
@@ -146,13 +146,26 @@ describe('registry invariants', () => {
         // The day's concept streams in only when no moment from the facts wins.
         expect(resolveDataKeys(['todays-lesson'])).toEqual({eager: ['learnFacts'], lazy: ['lesson'], needsActiveAccount: false});
         expect(DEFAULT_LAYOUT.widgets.map((w) => w.id)).not.toContain('todays-lesson');
-        expect(defs.filter((d) => d.category === 'learn').map((d) => d.id)).toEqual(['getting-started', 'todays-lesson']);
+        expect(defs.filter((d) => d.category === 'learn').map((d) => d.id)).toEqual(['getting-started', 'todays-lesson', 'daily-quiz']);
+    });
+
+    it('the Daily quiz is a library-only learn panel on one lazy key', () => {
+        const quiz = WIDGETS['daily-quiz'];
+        expect(quiz.category).toBe('learn');
+        expect(quiz.availability).toBe('always');
+        expect(quiz.chrome).toBe('panel');
+        expect(quiz.isClient).toBe(false);
+        expect(quiz.dataKeys).toEqual(['dailyQuiz']);
+        // A question is never above-the-fold critical: it streams in under Suspense.
+        expect(resolveDataKeys(['daily-quiz'])).toEqual({eager: [], lazy: ['dailyQuiz'], needsActiveAccount: false});
+        expect(DATA_KEY_DEPS.dailyQuiz).toEqual([]);
+        expect(DEFAULT_LAYOUT.widgets.map((w) => w.id)).not.toContain('daily-quiz');
     });
 
     it('default spans follow the plan table', () => {
         const expected: Record<WidgetId, number> = {
             'topics-overview': 4, 'topics-latest': 8, 'topic-briefs': 6,
-            'getting-started': 12, 'todays-lesson': 6,
+            'getting-started': 12, 'todays-lesson': 6, 'daily-quiz': 6,
             'portfolio-snapshot': 4, 'watchlist-movers': 4, 'friends-rank': 4, 'news-brain-tile': 12,
             'tv-heatmap': 8, 'tv-top-stories': 4, 'tv-ticker-tape': 12, 'tv-market-screener': 12,
             'tv-crypto-screener': 8, 'tv-forex': 6,
@@ -195,7 +208,7 @@ describe('data key graph', () => {
     });
 
     it('lazy keys are known and match the plan', () => {
-        expect([...LAZY_DATA_KEYS].sort()).toEqual(['analytics', 'brainStatus', 'lesson', 'movers', 'news', 'strategies', 'topicsLatest']);
+        expect([...LAZY_DATA_KEYS].sort()).toEqual(['analytics', 'brainStatus', 'dailyQuiz', 'lesson', 'movers', 'news', 'strategies', 'topicsLatest']);
         for (const key of LAZY_DATA_KEYS) {
             expect(dataKeySet.has(key)).toBe(true);
         }

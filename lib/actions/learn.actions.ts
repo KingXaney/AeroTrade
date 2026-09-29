@@ -6,6 +6,11 @@ import {getCurrentUserId} from "@/lib/actions/watchlist.actions";
 import {upsertPreferences} from "@/lib/preferences/upsert";
 import {LESSONS_SEEN_CAP, lessonKey, parseLessonId} from "@/lib/learn/moments";
 import {LESSON_COPY} from "@/lib/learn/copy/lesson";
+import {parseQuizDate} from "@/lib/learn/quiz";
+import {DAILY_QUIZ_COPY} from "@/lib/learn/copy/quiz";
+import {readQuizDaysAnswered} from "@/lib/learn/quiz-read";
+import UserPreferencesModel from "@/database/models/user-preferences.model";
+import {getEasternDateString} from "@/lib/utils";
 
 // Writes only; the reads live in lib/learn/facts-store.ts (a plain server module).
 
@@ -45,5 +50,38 @@ export const markLessonSeen = async (input: unknown): Promise<OrderResult> => {
     } catch (error) {
         console.error('Error marking a lesson seen:', error);
         return {success: false, message: LESSON_COPY.notSaved};
+    }
+};
+
+export type QuizAnswerResult = {success: true; daysAnswered: number} | {success: false; message: string};
+
+// The Daily quiz's answer: counts the day once. The argument arrives from the client, so it is
+// `unknown` until parseQuizDate says it is today's ET date, exactly — a question left open past
+// midnight is an earlier day's and is not counted. One atomic update, filtered on the date not
+// being the last one counted: a second answer the same day (another tab, a reload, a double
+// click) matches nothing and changes nothing. With no preferences document yet, the upsert
+// creates it; when the document exists but today is already counted, that upsert collides on
+// the unique userId and the collision means "counted already". Correctness is not recorded:
+// the count is of days answered, with no streak and no reward.
+export const recordQuizAnswer = async (input: unknown): Promise<QuizAnswerResult> => {
+    const userId = await getCurrentUserId();
+    if (!userId) return {success: false, message: DAILY_QUIZ_COPY.notSignedIn};
+    const date = parseQuizDate(input, getEasternDateString());
+    if (!date) return {success: false, message: DAILY_QUIZ_COPY.stale};
+    try {
+        await connectToDatabase();
+        try {
+            await UserPreferencesModel.updateOne(
+                {userId, 'learn.quizLastAnsweredDate': {$ne: date}},
+                {$set: {'learn.quizLastAnsweredDate': date, updatedAt: new Date()}, $inc: {'learn.quizDaysAnswered': 1}},
+                {upsert: true},
+            );
+        } catch (e) {
+            if ((e as {code?: number}).code !== 11000) throw e;
+        }
+        return {success: true, daysAnswered: await readQuizDaysAnswered(userId)};
+    } catch (error) {
+        console.error('Error recording a quiz answer:', error);
+        return {success: false, message: DAILY_QUIZ_COPY.notSaved};
     }
 };

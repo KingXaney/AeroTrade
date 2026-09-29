@@ -26,7 +26,8 @@ import {STRATEGY_OWNER_ID} from "@/lib/strategies/config";
 import {getFollowedStrategies} from "@/lib/strategies/follows";
 import {getStrategyStates, type StrategyStateView} from "@/lib/strategies/store";
 import type {ReplayRun} from "@/lib/learn/replay";
-import type {SeriesStats, SignalRow, StrategyDefinition} from "@/lib/strategies/types";
+import type {QuizRun} from "@/lib/learn/quiz";
+import type {SeriesStats, SignalRow, StrategyDefinition, StrategyId} from "@/lib/strategies/types";
 import {BENCHMARK_SYMBOL} from "@/lib/strategies/universe";
 import {
     describeLastRun,
@@ -116,6 +117,30 @@ export const getBoardRowsForFills = async (
         board: (r.board ?? []).map(toBoardRow),
         orders: (r.orders ?? []).map(toOrderView),
     }]));
+};
+
+type LeanQuizRun = {strategyId: StrategyId; date: string; board?: SignalRow[]; orders?: {symbol: string; side: 'buy' | 'sell'; reason: string}[]};
+
+// The Daily quiz's read: the newest usable run per strategy dated on or after `since`, as one
+// point read per strategy on the {strategyId, date} index (eight at most, each scanning no
+// further back than `since`) — never the board-carrying aggregate over every run. A skipped
+// day or an empty board is passed over for the day before it; orders are projected to what
+// the reveal quotes.
+export const getRecentRuns = async (
+    strategyIds: readonly StrategyId[],
+    since: string,
+): Promise<Partial<Record<StrategyId, QuizRun>>> => {
+    await connectToDatabase();
+    const runs = await Promise.all(strategyIds.map((strategyId) => StrategyRun
+        .findOne({strategyId, date: {$gte: since}, status: {$ne: 'skipped'}, 'board.0': {$exists: true}})
+        .sort({date: -1})
+        .select({_id: 0, strategyId: 1, date: 1, board: 1, 'orders.symbol': 1, 'orders.side': 1, 'orders.reason': 1})
+        .lean<LeanQuizRun | null>()));
+    return Object.fromEntries(runs.flatMap((run) => (run ? [[run.strategyId, {
+        date: run.date,
+        board: (run.board ?? []).map(toBoardRow),
+        orders: (run.orders ?? []).map((o) => ({symbol: o.symbol, side: o.side, reason: o.reason})),
+    } satisfies QuizRun]] : [])));
 };
 
 type LeanBacktestStats = {strategyId: string; from: string; to: string; stats: SeriesStats; closeFills: number; points?: {value: number}[]};
