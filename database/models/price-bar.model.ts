@@ -32,6 +32,11 @@ const PriceBarSchema = new Schema<PriceBarDoc>({
 
 // Idempotency key for daily appends and backfills (same trick as AccountSnapshot).
 PriceBarSchema.index({symbol: 1, date: 1}, {unique: true});
+// Only the few bars that paid a dividend (~4 a year per payer, against ~250 bars): the nightly
+// income job and the Income panel's receipts read {symbol, date, dividend} for dividend > 0,
+// which this index answers without touching a document. `dividend` is in the key (not only in
+// the filter) so the read is covered, and so the key pattern differs from the unique index.
+PriceBarSchema.index({symbol: 1, date: 1, dividend: 1}, {partialFilterExpression: {dividend: {$gt: 0}}, name: 'dividends_by_symbol_date'});
 
 const PriceBar = models?.PriceBar || model<PriceBarDoc>('PriceBar', PriceBarSchema);
 

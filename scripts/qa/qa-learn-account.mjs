@@ -7,7 +7,8 @@
 // remembers the guess across a reload, and the risk lens names the largest position beside
 // the Navigator's rails. Notes on the seeded buys come back as text under the sell that closed
 // them and in the sell dialog, every fill carries a receipt, and /trade shows the last fill.
-// A fresh account first shows every empty state.
+// The Income panel reads a receipt for every month and a buy made on its own ex-date. A fresh
+// account first shows every empty state.
 
 import {chromium} from 'playwright';
 import {MongoClient} from 'mongodb';
@@ -84,6 +85,7 @@ try {
     check('an all-cash account says so', /cash 100% · no holdings yet/.test(await text('[data-testid=risk-largest]')), await text('[data-testid=risk-largest]'));
     check('an all-cash account has no concentration caption', (await page.locator('[data-testid=risk-caption]').count()) === 0);
     check('a fresh account shades no band', (await page.locator('[data-testid=drawdown-band]').count()) === 0);
+    check('a fresh account has no income and no missed block', /No income yet/.test(await text('#income')) && (await page.locator('[data-testid=income-missed]').count()) === 0, await text('#income'));
     await shot('00-fresh');
     await page.goto(`${BASE}/trade`, {waitUntil: 'load'});
     await page.locator('#last-fill').waitFor({timeout: 30000});
@@ -192,6 +194,47 @@ try {
     check('…with its receipt', (await text('#last-fill [data-testid=fill-receipt]')) === 'Cash −$6,000.00 · QALRN 0 → 10 shares · avg cost — → $600.00', await text('#last-fill [data-testid=fill-receipt]'));
     check('…and the why you wrote', (await text('#last-fill [data-testid=last-fill-note]')) === 'your why: “long runway”', await text('#last-fill [data-testid=last-fill-note]'));
     await shot('05-last-fill');
+
+    // --- income receipts: seeded rows, and a buy on its own ex-date --------------------------
+    // QALRN was bought 10 minutes ago; a dividend with that day as its ex-date is one the buy
+    // missed by a day. Three interest rows on $100,000 at 3.92% APY give a receipt to rebuild.
+    const QALRN_DAY = etDate((await db.collection('papertrades').findOne({accountId, symbol: 'QALRN'})).createdAt);
+    const factor = (1 + 0.0392) ** (1 / 365) - 1;
+    const interestDays = [3, 2, 1].map((n) => addDays(QALRN_DAY, -n));
+    const epoch = etNoon(addDays(FIRST_SNAP, -1)).getTime();
+    await db.collection('pricebars').updateOne({symbol: 'QALRN', date: QALRN_DAY}, {$set: {symbol: 'QALRN', date: QALRN_DAY, close: 600, source: 'yahoo', dividend: 0.5}}, {upsert: true});
+    await db.collection('accountincomes').insertMany(interestDays.map((date) => ({
+        accountId, userId, epoch, kind: 'interest', date, symbol: '', amount: 100_000 * factor, apy: 0.0392, createdAt: new Date(),
+    })));
+    await db.collection('paperaccounts').updateOne({_id: account._id}, {$set: {incomeThrough: QALRN_DAY}});
+    await page.goto(`${BASE}/portfolio`, {waitUntil: 'load'});
+    await page.locator('#income [data-testid=income-interest]').waitFor({timeout: 30000});
+    const missedLines = (await page.locator('[data-testid=income-missed] p').allInnerTexts()).map((l) => l.trim());
+    check('a buy on the ex-date is stated once, in the one missed block',
+        (await page.locator('[data-testid=income-missed]').count()) === 1 && /missed by a day/i.test(await text('[data-testid=income-missed]'))
+            && missedLines.length === 1 && missedLines[0] === `Bought 10 QALRN on ${short(QALRN_DAY)}, its ex-dividend date: a day late for $0.50 a share ($5.00).`,
+        missedLines.join(' | '));
+    check('the missed block is muted, not a warning', /text-fg-muted/.test(await page.locator('[data-testid=income-missed]').getAttribute('class')) && !/text-warning/.test(await page.locator('[data-testid=income-missed]').getAttribute('class')));
+    await page.locator('#income details[data-income-receipt]').evaluateAll((els) => els.forEach((d) => { d.open = true; }));
+    const monthReceipts = (await page.locator('#income [data-income-month] details p').allInnerTexts()).map((r) => r.trim());
+    check('each interest month rebuilds from $100,000 at the daily factor of 3.92%',
+        monthReceipts.length > 0 && monthReceipts.every((r) => /^average cash \$100,000\.00 × 0\.010535%\/day \(\(1 \+ 3\.92%\)\^\(1\/365\) − 1\) × \d days? = \$[\d.]+$/.test(r)),
+        monthReceipts.join(' | '));
+    const seededByMonth = {};
+    for (const date of interestDays) seededByMonth[date.slice(0, 7)] = (seededByMonth[date.slice(0, 7)] ?? 0) + 100_000 * factor;
+    const printedByMonth = Object.fromEntries(await page.locator('#income [data-income-month]').evaluateAll((els) =>
+        els.map((el) => [el.dataset.incomeMonth, Number((/= \$([\d,]+\.\d{2})$/.exec((el.querySelector('details p')?.textContent ?? '').trim())?.[1] ?? 'NaN').replace(/,/g, ''))])));
+    check('…and each receipt totals its month\'s seeded rows to the cent',
+        Object.keys(seededByMonth).length === Object.keys(printedByMonth).length
+            && Object.entries(seededByMonth).every(([month, sum]) => Math.round(printedByMonth[month] * 100) === Math.round(sum * 100)),
+        `${JSON.stringify(printedByMonth)} vs ${JSON.stringify(seededByMonth)}`);
+    const incomeTerms = page.locator('#income [data-what-these-mean]');
+    check('the income panel keeps exactly one What these mean', (await incomeTerms.count()) === 1);
+    await incomeTerms.evaluateAll((els) => els.forEach((d) => { d.open = true; }));
+    const incomeDefs = await text('#income [data-what-these-mean]');
+    check('…and it carries the discount → bond-equivalent − spread conversion', /Bond-equivalent yield/.test(incomeDefs) && /APY = 365 × d ÷ \(360 − 91 × d\) − 0\.25%/.test(incomeDefs), incomeDefs.slice(0, 300));
+    check('no Ask link inside a receipt', (await page.locator('#income [data-income-receipt] a').count()) === 0);
+    await shot('06-income-receipts');
 } catch (err) {
     failures++;
     console.log(`FAIL  threw: ${err.message}`);

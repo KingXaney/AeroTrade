@@ -15,6 +15,7 @@
 
 import {DIVIDEND_PAY_LAG_DAYS} from "@/lib/prices/config";
 import {addCalendarDays, eachCalendarDay} from "@/lib/prices/calendar-days";
+import {easternParts, previousTradingDay} from "@/lib/prices/market-hours";
 import type {CoverageRange} from "@/lib/prices/coverage";
 
 // Real sweep accounts pay somewhat below T-bills; one named number, not a hidden fudge.
@@ -287,36 +288,76 @@ export const describeIncomeRun = (outcomes: readonly OutcomeLike[], through: str
 // What the Income panel shows
 // ---------------------------------------------------------------------------
 
+// The APY whose daily factor is `rate` — dailyFactor's inverse.
+export const apyForDailyRate = (rate: number): number => (1 + rate) ** DAYS_PER_YEAR - 1;
+
+export type IncomeMonth = {
+    month: string;
+    amount: number;
+    days: number;
+    averageApy: number | null;
+    // The month's average end-of-day cash, rebuilt from its own rows: each day's interest is
+    // that day's cash × dailyFactor(that day's APY), so the cash is the amount ÷ the factor.
+    // Null when a row was stored without its rate.
+    averageCash: number | null;
+    // The one APY that, credited daily on every dollar-day of the month, gives exactly the
+    // month's interest: the day's own APY when the rate held all month, otherwise the days'
+    // rates weighted by the cash that earned them. averageCash × dailyFactor(this) × days is
+    // the stored sum; a plain average of the days' APYs is not, once cash and rate both move.
+    cashWeightedApy: number | null;
+    minApy: number | null;
+    maxApy: number | null;
+};
+
 export type IncomeActivity = {
     // Interest is credited every calendar day; thirty near-identical rows a month is noise, so
     // it is shown one line per month.
-    interestByMonth: {month: string; amount: number; days: number; averageApy: number | null}[];
+    interestByMonth: IncomeMonth[];
     // Dividends are events worth seeing one by one.
     dividends: {date: string; exDate: string | null; symbol: string; quantity: number | null; perShare: number | null; amount: number}[];
 };
+
+type MonthTotals = {amount: number; days: number; apySum: number; apyDays: number; cashDays: number; rebuilt: boolean; minApy: number; maxApy: number};
 
 export const groupIncomeActivity = (
     rows: readonly {kind: 'interest' | 'dividend'; date: string; symbol: string; amount: number; apy?: number; exDate?: string; perShare?: number; quantity?: number}[],
     {months = 12, dividends = 20}: {months?: number; dividends?: number} = {},
 ): IncomeActivity => {
-    const byMonth = new Map<string, {amount: number; days: number; apySum: number; apyDays: number}>();
+    const byMonth = new Map<string, MonthTotals>();
     for (const row of rows) {
         if (row.kind !== 'interest') continue;
         const month = row.date.slice(0, 7);
-        const entry = byMonth.get(month) ?? {amount: 0, days: 0, apySum: 0, apyDays: 0};
+        const entry = byMonth.get(month) ?? {amount: 0, days: 0, apySum: 0, apyDays: 0, cashDays: 0, rebuilt: true, minApy: Infinity, maxApy: -Infinity};
         entry.amount += row.amount;
         entry.days += 1;
         if (typeof row.apy === 'number') {
             entry.apySum += row.apy;
             entry.apyDays += 1;
+            entry.minApy = Math.min(entry.minApy, row.apy);
+            entry.maxApy = Math.max(entry.maxApy, row.apy);
         }
+        const factor = typeof row.apy === 'number' ? dailyFactor(row.apy) : 0;
+        if (factor > 0) entry.cashDays += row.amount / factor;
+        else entry.rebuilt = false;
         byMonth.set(month, entry);
     }
     return {
         interestByMonth: [...byMonth.entries()]
             .sort(([a], [b]) => b.localeCompare(a))
             .slice(0, months)
-            .map(([month, e]) => ({month, amount: e.amount, days: e.days, averageApy: e.apyDays > 0 ? e.apySum / e.apyDays : null})),
+            .map(([month, e]) => {
+                const rebuilt = e.rebuilt && e.cashDays > 0;
+                return {
+                    month,
+                    amount: e.amount,
+                    days: e.days,
+                    averageApy: e.apyDays > 0 ? e.apySum / e.apyDays : null,
+                    averageCash: rebuilt ? e.cashDays / e.days : null,
+                    cashWeightedApy: rebuilt ? apyForDailyRate(e.amount / e.cashDays) : null,
+                    minApy: e.apyDays > 0 ? e.minApy : null,
+                    maxApy: e.apyDays > 0 ? e.maxApy : null,
+                };
+            }),
         dividends: rows
             .filter((row) => row.kind === 'dividend')
             .sort((a, b) => b.date.localeCompare(a.date) || a.symbol.localeCompare(b.symbol))
@@ -324,3 +365,121 @@ export const groupIncomeActivity = (
             .map((row) => ({date: row.date, exDate: row.exDate ?? null, symbol: row.symbol, quantity: row.quantity ?? null, perShare: row.perShare ?? null, amount: row.amount})),
     };
 };
+
+// ---------------------------------------------------------------------------
+// Receipts — why each credit is the number it is, read back from the same convention
+// ---------------------------------------------------------------------------
+
+// A fill as the trade ledger (account.getTradeLedger) carries it. Dated in Eastern time, the
+// way the income job dates every trade, so "the close before the ex-date" means the same day
+// here as it did when the clock decided who was paid.
+export type LedgerFill = {symbol: string; side: 'buy' | 'sell'; quantity: number; createdAt: number};
+
+type DatedFill = {date: string; symbol: string; delta: number};
+
+const datedFills = (ledger: readonly LedgerFill[], symbol: string): DatedFill[] => ledger
+    .filter((t) => t.symbol.toUpperCase() === symbol)
+    .map((t) => ({date: easternParts(new Date(t.createdAt)).date, symbol, delta: t.side === 'buy' ? t.quantity : -t.quantity}))
+    .sort((a, b) => a.date.localeCompare(b.date));
+
+// Shares held at the END of `date` — the holding the clock's open(date + 1) reads.
+const sharesAtClose = (fills: readonly DatedFill[], date: string): number =>
+    fills.reduce((sum, f) => (f.date <= date ? sum + f.delta : sum), 0);
+
+export type DividendReceipt = {
+    symbol: string;
+    exDate: string;
+    closeBefore: string;      // the day whose closing holding was paid
+    payDate: string;
+    quantity: number;
+    perShare: number;
+    amount: number;
+    // The first day of the holding the ledger shows at that close (since it was last flat);
+    // null when the ledger does not show exactly the shares that were paid.
+    heldSince: string | null;
+};
+
+export const explainDividend = (row: IncomeActivity['dividends'][number], ledger: readonly LedgerFill[]): DividendReceipt | null => {
+    if (row.exDate === null || row.quantity === null || row.perShare === null) return null;
+    const closeBefore = addCalendarDays(row.exDate, -1);
+    const fills = datedFills(ledger, row.symbol);
+    let held = 0;
+    let since: string | null = null;
+    for (const f of fills) {
+        if (f.date > closeBefore) break;
+        const next = held + f.delta;
+        if (held <= QUANTITY_TOLERANCE && next > QUANTITY_TOLERANCE) since = f.date;
+        if (next <= QUANTITY_TOLERANCE) since = null;
+        held = next;
+    }
+    const matches = Math.abs(held - row.quantity) <= QUANTITY_TOLERANCE;
+    return {
+        symbol: row.symbol, exDate: row.exDate, closeBefore, payDate: row.date,
+        quantity: row.quantity, perShare: row.perShare, amount: row.amount,
+        heldSince: matches ? since : null,
+    };
+};
+
+export type MissedExDate = {
+    symbol: string;
+    exDate: string;
+    perShare: number;
+    // A buy on the ex-date is one day late; a sell in the session before it is one day early.
+    kind: 'bought-on-ex-date' | 'sold-before-ex-date';
+    tradeDate: string;
+    quantity: number;
+    amount: number;
+};
+
+// Ex-dates a fill missed by one day, by the clock's own rule (paid on the holding at the end
+// of the day before the ex-date). Net, not gross: a sell bought back before that close, or a
+// buy on the ex-date matched by a sell the same day, missed nothing.
+export const missedExDates = (
+    ledger: readonly LedgerFill[],
+    points: readonly DividendPoint[],
+    {limit = 5}: {limit?: number} = {},
+): MissedExDate[] => {
+    const bySymbol = new Map<string, DatedFill[]>();
+    const fillsOf = (symbol: string): DatedFill[] => {
+        const cached = bySymbol.get(symbol);
+        if (cached) return cached;
+        const fills = datedFills(ledger, symbol);
+        bySymbol.set(symbol, fills);
+        return fills;
+    };
+    const missed: MissedExDate[] = [];
+    for (const point of points) {
+        if (!(point.perShare > 0)) continue;
+        const fills = fillsOf(point.symbol.toUpperCase());
+        if (fills.length === 0) continue;
+        const closeBefore = addCalendarDays(point.exDate, -1);
+        const entitled = sharesAtClose(fills, closeBefore);
+
+        const boughtLate = sharesAtClose(fills, point.exDate) - entitled;
+        if (boughtLate > QUANTITY_TOLERANCE && fills.some((f) => f.date === point.exDate && f.delta > 0)) {
+            missed.push({symbol: point.symbol, exDate: point.exDate, perShare: point.perShare, kind: 'bought-on-ex-date', tradeDate: point.exDate, quantity: boughtLate, amount: boughtLate * point.perShare});
+        }
+
+        const session = previousTradingDay(point.exDate);
+        const sells = fills.filter((f) => f.date >= session && f.date <= closeBefore && f.delta < 0);
+        const soldEarly = sharesAtClose(fills, addCalendarDays(session, -1)) - entitled;
+        if (soldEarly > QUANTITY_TOLERANCE && sells.length > 0) {
+            missed.push({symbol: point.symbol, exDate: point.exDate, perShare: point.perShare, kind: 'sold-before-ex-date', tradeDate: sells[sells.length - 1].date, quantity: soldEarly, amount: soldEarly * point.perShare});
+        }
+    }
+    return missed
+        .sort((a, b) => b.exDate.localeCompare(a.exDate) || a.symbol.localeCompare(b.symbol))
+        .slice(0, limit);
+};
+
+export type IncomeView = {
+    interestByMonth: IncomeMonth[];
+    dividends: (IncomeActivity['dividends'][number] & {receipt: DividendReceipt | null})[];
+    missed: MissedExDate[];
+};
+
+export const withReceipts = (activity: IncomeActivity, ledger: readonly LedgerFill[], points: readonly DividendPoint[]): IncomeView => ({
+    interestByMonth: activity.interestByMonth,
+    dividends: activity.dividends.map((d) => ({...d, receipt: explainDividend(d, ledger)})),
+    missed: missedExDates(ledger, points),
+});

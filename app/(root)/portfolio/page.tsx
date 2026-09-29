@@ -149,7 +149,7 @@ const PortfolioPage = async ({searchParams}: PortfolioPageProps) => {
                 <Panel id="income" aria-labelledby="income-heading">
                     <SectionHeading id="income-heading">Income</SectionHeading>
                     <IncomeActivity activity={income} />
-                    <WhatTheseMean keys={['apy', 't-bill-rate', 'ex-date', 'pay-date']} />
+                    <WhatTheseMean keys={['apy', 't-bill-rate', 'bond-equivalent-yield', 'ex-date', 'pay-date']} />
                 </Panel>
             )}
 

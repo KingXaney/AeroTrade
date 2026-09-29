@@ -13,9 +13,9 @@ import AccountSnapshot from "@/database/models/account-snapshot.model";
 import {BENCHMARK_SYMBOL, MAX_STARTING_BALANCE, MIN_STARTING_BALANCE, PAPER_STARTING_BALANCE} from "@/lib/constants";
 import {getEasternDateString} from "@/lib/utils";
 import {getBenchmarkIndex} from "@/lib/prices/benchmark-store";
-import {getLatestRatePoint} from "@/lib/prices/store";
+import {getDividendPoints, getLatestRatePoint} from "@/lib/prices/store";
 import AccountIncome from "@/database/models/account-income.model";
-import {apyFromDiscount, groupIncomeActivity, type IncomeActivity} from "@/lib/trading/income";
+import {apyFromDiscount, groupIncomeActivity, withReceipts, type IncomeView} from "@/lib/trading/income";
 import {appendLive} from "@/lib/prices/total-return";
 import {getQuote} from "@/lib/actions/finnhub.actions";
 import {
@@ -301,18 +301,29 @@ const getIncomeSummary = async (account: {incomeTotals?: {interest?: number; div
 };
 
 // The Income panel's rows: this account's current epoch only (a reset starts a new one), and
-// only dates already credited — a row a crashed run left behind is not income yet.
-export const getIncomeActivity = async (userId: string, accountId: string): Promise<IncomeActivity | null> => {
+// only dates already credited — a row a crashed run left behind is not income yet. Each row
+// comes with its receipt, read from the render's one ledger read (getTradeLedger) and the
+// narrow dividend read for the symbols it traded, bounded to [inception, incomeThrough]. No
+// rate series and no price metas: every interest receipt rebuilds from its own rows.
+export const getIncomeActivity = async (userId: string, accountId: string): Promise<IncomeView | null> => {
     try {
         const account = await getOwnedAccount(userId, accountId);
         if (!account) return null;
-        if (!account.incomeThrough) return {interestByMonth: [], dividends: []};
-        const epoch = new Date(account.inceptionAt || account.createdAt).getTime();
-        const rows = await AccountIncome.find(
-            {accountId: String(account._id), epoch, date: {$lte: account.incomeThrough}},
-            {_id: 0, kind: 1, date: 1, symbol: 1, amount: 1, apy: 1, exDate: 1, perShare: 1, quantity: 1},
-        ).lean<Parameters<typeof groupIncomeActivity>[0][number][]>();
-        return groupIncomeActivity(rows);
+        if (!account.incomeThrough) return {interestByMonth: [], dividends: [], missed: []};
+        const inceptionAt = new Date(account.inceptionAt || account.createdAt);
+        const epoch = inceptionAt.getTime();
+        const key = String(account._id);
+        const [rows, ledger] = await Promise.all([
+            AccountIncome.find(
+                {accountId: key, epoch, date: {$lte: account.incomeThrough}},
+                {_id: 0, kind: 1, date: 1, symbol: 1, amount: 1, apy: 1, exDate: 1, perShare: 1, quantity: 1},
+            ).lean<Parameters<typeof groupIncomeActivity>[0][number][]>(),
+            getTradeLedger(userId, key),
+        ]);
+        // The trades the income job replays: this epoch's, by timestamp (creditAccountIncome).
+        const fills = ledger.filter((t) => t.createdAt >= epoch);
+        const points = await getDividendPoints(fills.map((t) => t.symbol), getEasternDateString(inceptionAt), account.incomeThrough);
+        return withReceipts(groupIncomeActivity(rows), fills, points);
     } catch (error) {
         console.error('Error reading income activity:', error);
         return null;
