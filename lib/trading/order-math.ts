@@ -2,6 +2,8 @@
 // order can obviously not fill. Pure on purpose so it is unit-tested; the server
 // (executeOrder) re-checks everything with the live price and stays authoritative.
 
+import {TRADE_REASON_MAX} from "@/lib/strategies/config";
+
 export type OrderSide = 'buy' | 'sell';
 
 export type OrderInputs = {
@@ -123,4 +125,20 @@ export const checkOrder = ({side, quantity, price, cash, owned}: OrderInputs): O
         return {ok: false, message: `Not enough buying power — need ${money(estTotal)}, have ${money(cash)}`, estTotal};
     }
     return {ok: true, message: null, estTotal};
+};
+
+// A learner's own "why" for an order: plain text, one line, bounded. Control characters
+// (which includes newlines and tabs) become spaces before whitespace collapses, so a pasted
+// paragraph reads as one line in the trade log. Markup is left as text — every surface
+// renders the note as a React text node, never as HTML. The clip counts UTF-16 units like
+// the textarea's maxLength does, and drops a surrogate half it would leave behind.
+// Undefined means "no note".
+const CONTROL_CHARS = /[\u0000-\u001f\u007f-\u009f]/g;
+const TRAILING_HIGH_SURROGATE = /[\ud800-\udbff]$/;
+
+export const sanitizeTradeNote = (input: unknown): string | undefined => {
+    if (typeof input !== 'string') return undefined;
+    const note = input.replace(CONTROL_CHARS, ' ').replace(/\s+/g, ' ').trim()
+        .slice(0, TRADE_REASON_MAX).replace(TRAILING_HIGH_SURROGATE, '').trim();
+    return note === '' ? undefined : note;
 };

@@ -3,13 +3,15 @@
 import {useState} from "react";
 import {cn, getChangeColorClass} from "@/lib/utils";
 import SellPositionDialog from "@/components/trade/SellPositionDialog";
+import type {Lot} from "@/lib/trading/lots";
 import UnpricedNote from "@/components/trade/UnpricedNote";
 import TradeLink from "@/components/trade/TradeLink";
 
 // Compact, horizontally-scrolling open-positions strip for the Trade page.
 // Each chip shows symbol · qty · P&L%; Sell opens the shared partial-sell
 // dialog. The full positions table + trade history live on /portfolio.
-const OpenPositionsStrip = ({positions, accountId}: {positions: EnrichedPosition[]; accountId: string}) => {
+// lotNotes: the learner's notes on the shares still held, by symbol (pages only).
+const OpenPositionsStrip = ({positions, accountId, lotNotes}: {positions: EnrichedPosition[]; accountId: string; lotNotes?: Readonly<Record<string, readonly Lot[]>>}) => {
     const [sellTarget, setSellTarget] = useState<EnrichedPosition | null>(null);
 
     if (positions.length === 0) {
@@ -47,7 +49,7 @@ const OpenPositionsStrip = ({positions, accountId}: {positions: EnrichedPosition
                     </div>
                 ))}
 
-                {sellTarget && <SellPositionDialog position={sellTarget} accountId={accountId} onClose={() => setSellTarget(null)} />}
+                {sellTarget && <SellPositionDialog position={sellTarget} accountId={accountId} notes={lotNotes?.[sellTarget.symbol]} onClose={() => setSellTarget(null)} />}
             </div>
             <UnpricedNote positions={positions} className="mt-1" />
         </div>

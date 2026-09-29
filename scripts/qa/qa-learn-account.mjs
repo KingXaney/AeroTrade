@@ -5,7 +5,9 @@
 // the chart shades it. Then a sell, a holding with no quote and income totals: the return
 // bridge asks for a guess, reveals lines that add up to the Total Return tile to the cent,
 // remembers the guess across a reload, and the risk lens names the largest position beside
-// the Navigator's rails. A fresh account first shows every empty state.
+// the Navigator's rails. Notes on the seeded buys come back as text under the sell that closed
+// them and in the sell dialog, every fill carries a receipt, and /trade shows the last fill.
+// A fresh account first shows every empty state.
 
 import {chromium} from 'playwright';
 import {MongoClient} from 'mongodb';
@@ -83,6 +85,10 @@ try {
     check('an all-cash account has no concentration caption', (await page.locator('[data-testid=risk-caption]').count()) === 0);
     check('a fresh account shades no band', (await page.locator('[data-testid=drawdown-band]').count()) === 0);
     await shot('00-fresh');
+    await page.goto(`${BASE}/trade`, {waitUntil: 'load'});
+    await page.locator('#last-fill').waitFor({timeout: 30000});
+    check('a fresh desk has no last fill yet', /No fills in this account yet/.test(await text('#last-fill')) && (await page.locator('#last-fill [data-testid=fill-receipt]').count()) === 0, await text('#last-fill'));
+    check('the ticket offers a why field capped at 200', (await page.locator('#order-note').getAttribute('maxlength')) === '200');
 
     // --- SPY bars, deeper than the store's "deep enough" check, and dividend coverage -------
     const weekdays = [];
@@ -129,9 +135,9 @@ try {
     }});
     const at = (n) => new Date(Date.now() - n * 60_000);
     await db.collection('papertrades').insertMany([
-        {userId, accountId, symbol: 'SPY', company: 'SPDR S&P 500', side: 'buy', quantity: 5, price: 500, total: 2500, source: 'user', createdAt: at(30)},
+        {userId, accountId, symbol: 'SPY', company: 'SPDR S&P 500', side: 'buy', quantity: 5, price: 500, total: 2500, source: 'user', reason: 'earnings <b>beat</b>', createdAt: at(30)},
         {userId, accountId, symbol: 'SPY', company: 'SPDR S&P 500', side: 'sell', quantity: 5, price: 550, total: 2750, realizedPnl: 250, source: 'user', createdAt: at(20)},
-        {userId, accountId, symbol: 'QALRN', company: 'QA Learn Co', side: 'buy', quantity: 10, price: 600, total: 6000, source: 'user', createdAt: at(10)},
+        {userId, accountId, symbol: 'QALRN', company: 'QA Learn Co', side: 'buy', quantity: 10, price: 600, total: 6000, source: 'user', reason: 'long runway', createdAt: at(10)},
     ]);
     await page.goto(`${BASE}/portfolio`, {waitUntil: 'load'});
     await page.locator('main').getByText(/max drawdown/i).first().waitFor({timeout: 30000});
@@ -163,6 +169,29 @@ try {
     check('the largest position is the holding', /6%/.test(await text('[data-testid=risk-largest]')) && /QALRN/.test(await text('[data-testid=risk-largest]')), await text('[data-testid=risk-largest]'));
     check('the caption sets it beside the Navigator rails', /6% of this account moves with one holding, QALRN · the AI Navigator caps itself at 20% per name and keeps at least 10% in cash/.test(await text('[data-testid=risk-caption]')), await text('[data-testid=risk-caption]'));
     await shot('03-risk-lens');
+
+    // --- the learner's why and each fill's receipt ------------------------------------------
+    const reasons = await page.locator('main [data-trade-reason]').allInnerTexts();
+    check('a note with markup renders as the text typed', reasons.includes('earnings <b>beat</b>') && (await page.locator('main [data-trade-reason] b').count()) === 0, reasons.join(' | '));
+    check('a sell quotes the note of the buy it closed', /^bought for: “earnings <b>beat<\/b>”$/.test(await text('[data-testid=bought-for]')) && (await page.locator('[data-testid=bought-for]').count()) === 1, await text('[data-testid=bought-for]'));
+    const receipts = (await page.locator('main [data-testid=fill-receipt]').allInnerTexts()).map((r) => r.replace(/\s+/g, ' ').trim());
+    check('every fill carries a receipt', receipts.length === 3, String(receipts.length));
+    check('the sell\'s receipt reads cash, shares, cost and result',
+        receipts.includes('Cash +$2,750.00 · SPY 5 → 0 shares · avg cost $500.00 → — · realized +$250.00'), receipts.join(' | '));
+    check('a buy\'s receipt reads cash, shares and the new cost', receipts.includes('Cash −$6,000.00 · QALRN 0 → 10 shares · avg cost — → $600.00'), receipts.join(' | '));
+    await page.getByRole('button', {name: /^Sell$/}).first().click();
+    const lotNotes = page.locator('[data-testid=sell-lot-notes]');
+    await lotNotes.waitFor({timeout: 15000}).catch(() => {});
+    check('the sell dialog shows what you wrote when you bought', /10 shares from [A-Z][a-z]{2} \d+ at \$600\.00 — “long runway”/.test(await text('[data-testid=sell-lot-notes]')), await text('[data-testid=sell-lot-notes]'));
+    await shot('04-sell-notes');
+    await page.keyboard.press('Escape');
+
+    await page.goto(`${BASE}/trade`, {waitUntil: 'load'});
+    await page.locator('#last-fill [data-testid=last-fill-title]').waitFor({timeout: 30000});
+    check('the desk shows the last fill', /^Bought 10 QALRN @ \$600\.00 · [A-Z][a-z]{2} \d+$/.test(await text('#last-fill [data-testid=last-fill-title]')), await text('#last-fill'));
+    check('…with its receipt', (await text('#last-fill [data-testid=fill-receipt]')) === 'Cash −$6,000.00 · QALRN 0 → 10 shares · avg cost — → $600.00', await text('#last-fill [data-testid=fill-receipt]'));
+    check('…and the why you wrote', (await text('#last-fill [data-testid=last-fill-note]')) === 'your why: “long runway”', await text('#last-fill [data-testid=last-fill-note]'));
+    await shot('05-last-fill');
 } catch (err) {
     failures++;
     console.log(`FAIL  threw: ${err.message}`);

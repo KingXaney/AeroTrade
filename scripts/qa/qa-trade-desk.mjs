@@ -1,6 +1,7 @@
 // PR 5 (Trade desk + brain): trade deep links, tables that label themselves below md,
 // the order ticket's presets and advisory checks, chart-follows-ticker (and the
-// dashboard widget that must NOT navigate), the trade `source` chip + CSV column, and
+// dashboard widget that must NOT navigate), the trade `source` chip + CSV columns (a note that
+// looks like a formula exports as text), the order note's 200-character limit, and
 // brain rows that drill into evidence with valid markup.
 // Run against the harness in README.md (in-memory Mongo on :27117 + `npm run dev`; no
 // Finnhub key, so prices are unknown and the ticket's price-based paths stay open).
@@ -52,6 +53,8 @@ try {
         trade({createdAt: new Date(Date.now() - 3000)}),                                 // pre-field row: no source, no chip
         trade({createdAt: new Date(Date.now() - 2000), source: 'user'}),
         trade({createdAt: new Date(Date.now() - 1000), source: 'ai-suggestion'}),
+        // A learner's note a spreadsheet would read as a formula: the export must neutralise it.
+        trade({createdAt: new Date(Date.now() - 500), side: 'sell', quantity: 2, price: 160, total: 320, realizedPnl: 20, source: 'user', reason: '=1+1'}),
     ]);
     await db.collection('watchlists').insertOne({userId, symbol: 'AAPL', company: 'Apple Inc', addedAt: new Date()});
     await db.collection('brainentities').updateOne({key: 'NVDA'}, {$set: {
@@ -87,8 +90,9 @@ try {
 
     const csv = await (await page.request.get(`${BASE}/api/accounts/${mainId}/export`)).text();
     const [header, ...rows] = csv.trim().split('\n');
-    check('CSV export has a source column', header.endsWith(',source'), header);
-    check('CSV rows carry the source, blank when unknown', rows.some((r) => r.endsWith(',ai-suggestion')) && rows.some((r) => r.endsWith(',')), rows.map((r) => r.split(',').pop()).join('|'));
+    check('CSV export has source then reason columns', header.endsWith(',source,reason'), header);
+    check('CSV rows carry the source, blank when unknown', rows.some((r) => r.endsWith(',ai-suggestion,')) && rows.some((r) => r.endsWith(',,,')), rows.map((r) => r.split(',').slice(-2).join(',')).join('|'));
+    check('a note starting with = exports as text, not a formula', rows.some((r) => r.endsWith(",user,'=1+1")), rows.map((r) => r.split(',').slice(-2).join(',')).join('|'));
 
     // --- watchlist + stock page affordances --------------------------------------------
     await page.goto(`${BASE}/watchlist`, {waitUntil: 'load'});
@@ -123,6 +127,13 @@ try {
     check('Buy side shows buying power', /Buying Power \$97,000\.00/.test(await ticket.innerText()));
     check('an unknown price never disables Submit', !(await page.getByRole('button', {name: 'Buy AAPL'}).isDisabled()));
     check('with no quote the buy side states no consequence', await page.locator('[data-testid="order-effect"]').count() === 0);
+    // The learner's "why": the field holds at most 200 characters however much is pasted.
+    const noteField = page.locator('#order-note');
+    check('the ticket asks why, optionally', await noteField.count() === 1 && /why/i.test(await page.locator('label[for="order-note"]').innerText()));
+    await noteField.fill('x'.repeat(250));
+    check('a 250-character note is clipped to 200', (await noteField.inputValue()).length === 200, String((await noteField.inputValue()).length));
+    check('the counter shows the limit reached', /200\/200/.test(await ticket.innerText()));
+    await noteField.fill('');
 
     await page.getByRole('button', {name: 'sell', exact: true}).click();
     check('Sell side says how many shares are owned', /You own 10 shares of AAPL/.test(await ticket.innerText()));
@@ -183,6 +194,7 @@ try {
     await page.waitForTimeout(1500);
     check('the dashboard widget never navigates to /trade', new URL(page.url()).pathname === '/', page.url());
     check('the dashboard ticket keeps the queue line and definitions off', await widget.locator('[data-testid="order-queue"]').count() === 0 && await widget.locator('[data-what-these-mean]').count() === 0);
+    check('the compact ticket has no note field', await widget.locator('#order-note').count() === 0);
 
     // --- brain drill-downs --------------------------------------------------------------
     await page.goto(`${BASE}/brain`, {waitUntil: 'domcontentloaded'});

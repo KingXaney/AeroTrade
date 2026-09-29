@@ -6,12 +6,16 @@ import {toast} from "sonner";
 import {cn, formatPrice} from "@/lib/utils";
 import {placeOrder} from "@/lib/actions/trading.actions";
 import {estRealizedPnl} from "@/lib/trading/order-math";
+import type {Lot} from "@/lib/trading/lots";
+import {SELL_NOTES_COPY} from "@/lib/learn/copy/receipts";
+import MicroLabel from "@/components/primitives/MicroLabel";
 import {Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle} from "@/components/ui/dialog";
 
 // Sell dialog for one open position — pick how many shares to sell via free
 // entry or 25/50/75/Max presets. Parents mount it conditionally per selected
 // position, so every open starts with fresh state (qty defaults to Max).
-const SellPositionDialog = ({position, accountId, onClose}: {position: EnrichedPosition; accountId: string; onClose: () => void}) => {
+// `notes`: the learner's own notes on the shares still held (oldest first), when the page has them.
+const SellPositionDialog = ({position, accountId, notes, onClose}: {position: EnrichedPosition; accountId: string; notes?: readonly Lot[]; onClose: () => void}) => {
     const router = useRouter();
     const [qty, setQty] = useState(String(position.quantity));
     const [submitting, setSubmitting] = useState(false);
@@ -118,6 +122,17 @@ const SellPositionDialog = ({position, accountId, onClose}: {position: EnrichedP
                             </div>
                         );
                     })()}
+
+                    {notes && notes.length > 0 && (
+                        <div data-testid="sell-lot-notes" className="border-t border-line-strong/30 pt-3">
+                            <MicroLabel as="p" title={SELL_NOTES_COPY.order}>{SELL_NOTES_COPY.heading}</MicroLabel>
+                            <ul className="mt-1 space-y-0.5">
+                                {notes.map((lot) => (
+                                    <li key={lot.buyId} className="text-[11px] text-fg-soft leading-snug break-words">{SELL_NOTES_COPY.lot(lot)}</li>
+                                ))}
+                            </ul>
+                        </div>
+                    )}
 
                     <button
                         type="submit"

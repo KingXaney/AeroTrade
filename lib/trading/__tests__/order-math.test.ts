@@ -1,5 +1,6 @@
 import {describe, expect, it} from 'vitest';
-import {affordableShares, checkOrder, describeOrderEffect, estRealizedPnl, presetQuantities} from '@/lib/trading/order-math';
+import {affordableShares, checkOrder, describeOrderEffect, estRealizedPnl, presetQuantities, sanitizeTradeNote} from '@/lib/trading/order-math';
+import {TRADE_REASON_MAX} from '@/lib/strategies/config';
 
 const positions = [
     {symbol: 'AAPL', quantity: 10, marketValue: 1_800, avgCost: 150},
@@ -107,5 +108,33 @@ describe('checkOrder', () => {
 
     it('a sell within the position is fine even with no price', () => {
         expect(checkOrder({side: 'sell', quantity: 5, ...base, price: null})).toEqual({ok: true, message: null, estTotal: null});
+    });
+});
+
+describe('sanitizeTradeNote', () => {
+    it('trims, collapses whitespace and strips control characters', () => {
+        expect(sanitizeTradeNote('  earnings\n\n  beat\t\u0000 guidance \u0007 ')).toBe('earnings beat guidance');
+    });
+
+    it('clips to TRADE_REASON_MAX characters', () => {
+        const note = sanitizeTradeNote('x'.repeat(250));
+        expect(note).toHaveLength(TRADE_REASON_MAX);
+    });
+
+    it('never cuts an emoji in half at the limit (a lone surrogate is not valid text to store)', () => {
+        const note = sanitizeTradeNote('a' + '\u{1F4C8}'.repeat(150));
+        expect(note).toBeDefined();
+        expect((note ?? '').length).toBeLessThanOrEqual(TRADE_REASON_MAX);
+        expect(note).toMatch(/^a(\u{1F4C8})+$/u);
+    });
+
+    it('returns undefined for anything that is not a non-blank string', () => {
+        for (const input of [undefined, null, 42, {}, ['a'], '', '   ', '\n\t']) {
+            expect(sanitizeTradeNote(input), String(input)).toBeUndefined();
+        }
+    });
+
+    it('leaves markup as text: rendering escapes it, the note is never parsed', () => {
+        expect(sanitizeTradeNote('earnings <b>beat</b>')).toBe('earnings <b>beat</b>');
     });
 });

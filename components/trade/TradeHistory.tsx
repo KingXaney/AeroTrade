@@ -2,6 +2,8 @@ import Link from "next/link";
 import type {ReactNode} from "react";
 import {cn, formatPrice, getChangeColorClass} from "@/lib/utils";
 import {REPLAY_COPY} from "@/lib/learn/copy/replay";
+import {boughtForLine, receiptLine} from "@/lib/learn/copy/receipts";
+import type {FillReceipt} from "@/lib/trading/receipts";
 
 // Eastern time, named: the server may sit in UTC and every fill time on this app is
 // described in ET.
@@ -29,9 +31,13 @@ type Props = {
     // The one "What the rule saw" disclosure an automated fill may carry (strategy
     // detail page only). A server render prop: the dashboard widget passes nothing.
     detail?: (trade: PaperTradeRecord) => ReactNode;
+    // What each fill did to the account (replayed from the ledger) and, under a sell, the
+    // notes of the buys it closed. Page-only: the dashboard widget passes neither.
+    receipts?: Readonly<Record<string, FillReceipt>>;
+    buyNotesBySellId?: Readonly<Record<string, readonly string[]>>;
 };
 
-const TradeHistory = ({trades, totalCount, exportHref, detail}: Props) => {
+const TradeHistory = ({trades, totalCount, exportHref, detail, receipts, buyNotesBySellId}: Props) => {
     if (trades.length === 0) {
         return <p className="text-sm text-fg-muted p-4">No trades yet. Place your first order to get started.</p>;
     }
@@ -44,6 +50,8 @@ const TradeHistory = ({trades, totalCount, exportHref, detail}: Props) => {
                 const source = t.source ? SOURCE_LABEL[t.source] : undefined;
                 const sourceTitle = t.source ? SOURCE_TITLE[t.source] : undefined;
                 const detailNode = detail ? detail(t) : null;
+                const receipt = receipts?.[t.id];
+                const boughtFor = buyNotesBySellId?.[t.id];
                 return (
                     <div key={t.id}
                          className="flex items-center justify-between px-4 py-2.5 rounded-lg border bg-surface-2/40 border-line-strong/20">
@@ -71,7 +79,13 @@ const TradeHistory = ({trades, totalCount, exportHref, detail}: Props) => {
                                     </span>
                                 )}
                                 {t.reason && (
-                                    <p className="mt-0.5 text-[11px] text-fg-muted leading-snug">{t.reason}</p>
+                                    <p data-trade-reason className="mt-0.5 text-[11px] text-fg-muted leading-snug break-words">{t.reason}</p>
+                                )}
+                                {boughtFor && boughtFor.length > 0 && (
+                                    <p data-testid="bought-for" className="mt-0.5 text-[11px] text-fg-muted leading-snug break-words">{boughtForLine(boughtFor)}</p>
+                                )}
+                                {receipt && (
+                                    <p data-testid="fill-receipt" className="mt-0.5 font-mono text-[11px] text-fg-muted leading-snug">{receiptLine(receipt)}</p>
                                 )}
                                 {detailNode && (
                                     <details data-replay className="mt-1">

@@ -9,6 +9,7 @@ import {PAPER_STARTING_BALANCE} from "@/lib/constants";
 import {getCurrentUserId} from "@/lib/actions/watchlist.actions";
 import {getOwnedAccount, resolveStartingBalance, seedDayZeroSnapshot} from "@/lib/trading/account";
 import {executeOrder} from "@/lib/trading/orders";
+import {sanitizeTradeNote} from "@/lib/trading/order-math";
 
 // Every surface that shows account data — trade desk, portfolio hub, dashboard, friends.
 const revalidateTradingPaths = () => {
@@ -21,13 +22,16 @@ const revalidateTradingPaths = () => {
 // Place a market order at the current live price. Whole shares, long-only.
 // Thin session wrapper — the execution logic lives in lib/trading/orders.ts so the
 // AI navigator job can share the exact same path without a request context.
+// `note` is the learner's own "why": typed unknown because a server action's arguments
+// arrive from the client unchecked; sanitizeTradeNote keeps only a bounded one-line string.
 export const placeOrder = async (
-    {symbol, side, quantity, accountId}: {symbol: string; side: 'buy' | 'sell'; quantity: number; accountId: string},
+    {symbol, side, quantity, accountId, note}: {symbol: string; side: 'buy' | 'sell'; quantity: number; accountId: string; note?: unknown},
 ): Promise<OrderResult> => {
     const userId = await getCurrentUserId();
     if (!userId) return {success: false, message: 'Not authenticated'};
 
-    const result = await executeOrder(userId, {accountId, symbol, side, quantity, source: 'user'});
+    const reason = sanitizeTradeNote(note);
+    const result = await executeOrder(userId, {accountId, symbol, side, quantity, source: 'user', ...(reason ? {reason} : {})});
     if (result.success) revalidateTradingPaths();
     return {success: result.success, message: result.message};
 };

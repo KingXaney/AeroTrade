@@ -231,16 +231,26 @@ const toTradeRecord = (t: LeanTrade, accountName?: string): PaperTradeRecord => 
     createdAt: new Date(t.createdAt).getTime(),
 });
 
-export const getTradeHistory = async (userId: string, accountId: string, limit = 50): Promise<PaperTradeRecord[]> => {
+// One account's whole trade ledger, oldest first — the one PaperTrade read a page makes for an
+// account: analytics (trade count, realized P&L, win rate), the trade log's tail, fill
+// receipts and the buy notes all derive from it. cache() dedupes it within a render.
+// Unbounded on purpose: analytics already summed every trade, and the income job reads the
+// whole epoch the same way. Not filtered by inceptionAt: a reset deletes the old epoch's
+// trades, and accounts from before inceptionAt existed keep their migrated history visible.
+export const getTradeLedger = cache(async (userId: string, accountId: string): Promise<PaperTradeRecord[]> => {
     try {
         await connectToDatabase();
-        const trades = await PaperTrade.find({userId, accountId}).sort({createdAt: -1}).limit(limit).lean<LeanTrade[]>();
+        const trades = await PaperTrade.find({userId, accountId}).sort({createdAt: 1, _id: 1}).lean<LeanTrade[]>();
         return trades.map((t) => toTradeRecord(t));
     } catch (error) {
-        console.error('Error fetching trade history:', error);
+        console.error('Error fetching trade ledger:', error);
         return [];
     }
-};
+});
+
+// The newest `limit` fills, newest first: the ledger's tail.
+export const getTradeHistory = async (userId: string, accountId: string, limit = 50): Promise<PaperTradeRecord[]> =>
+    (await getTradeLedger(userId, accountId)).slice(-limit).reverse();
 
 // Newest fills across every strategy account, each tagged with its account's name —
 // the /history page's trade feed. Read-only (no lazy account creation).
@@ -324,7 +334,7 @@ export const getAccountAnalytics = async (userId: string, accountId: string): Pr
         const [snapshots, benchmark, trades] = await Promise.all([
             AccountSnapshot.find({accountId: key}).sort({date: 1}).lean(),
             getBenchmarkIndex(inceptionDate),
-            PaperTrade.find({accountId: key}).lean(),
+            getTradeLedger(userId, key),
         ]);
 
         const positions = toPlainPositions(account);
@@ -342,7 +352,7 @@ export const getAccountAnalytics = async (userId: string, accountId: string): Pr
         const benchmarkPoints: SnapshotPoint[] = appendLive(benchmark.points, benchmark.lastClose, priceMap.get(BENCHMARK_SYMBOL)?.price, today);
         const livePoint: SnapshotPoint = {date: today, value: summary.totalValue};
 
-        const tradeStats = trades.map((t) => ({side: t.side as string, realizedPnl: t.realizedPnl as number | undefined}));
+        const tradeStats = trades.map((t) => ({side: t.side as string, realizedPnl: t.realizedPnl}));
         const winStats = computeWinStats(tradeStats);
         // One window, dated, over the same points the chart draws: the tile's number, its hint
         // and the chart's shaded band all describe the same stretch.

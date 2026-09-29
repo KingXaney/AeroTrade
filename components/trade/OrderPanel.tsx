@@ -9,6 +9,8 @@ import {getQuote, searchStocks} from "@/lib/actions/finnhub.actions";
 import {placeOrder} from "@/lib/actions/trading.actions";
 import {checkOrder, describeOrderEffect, presetQuantities, type PositionLike} from "@/lib/trading/order-math";
 import {orderEffectLine, queueLine} from "@/lib/learn/copy/trade";
+import {NOTE_COPY} from "@/lib/learn/copy/receipts";
+import {TRADE_REASON_MAX} from "@/lib/strategies/config";
 import WhatTheseMean from "@/components/learn/WhatTheseMean";
 
 type OrderPanelProps = {
@@ -39,6 +41,8 @@ const OrderPanel = ({defaultSymbol = '', cash, accountId, positions = [], onSymb
     const [priceLoading, setPriceLoading] = useState(false);
     const [results, setResults] = useState<StockWithWatchlistStatus[]>([]);
     const [submitting, setSubmitting] = useState(false);
+    // The learner's own "why"; the server sanitises it (sanitizeTradeNote) and stores it on the fill.
+    const [note, setNote] = useState('');
     const [committed, setCommitted] = useState(defaultSymbol.toUpperCase());
     // Same-route deep links reuse this instance with a new defaultSymbol (see TradeDesk).
     // Adopt an external symbol; ignore the echo of our own commit so a symbol the user is
@@ -134,9 +138,10 @@ const OrderPanel = ({defaultSymbol = '', cash, accountId, positions = [], onSymb
 
         setSubmitting(true);
         try {
-            const result = await placeOrder({symbol, side, quantity: Math.floor(qtyNum), accountId});
+            const result = await placeOrder({symbol, side, quantity: Math.floor(qtyNum), accountId, ...(!compact && note.trim() ? {note} : {})});
             if (result.success) {
                 toast.success(result.message || 'Order filled');
+                setNote('');
                 router.refresh();
             } else {
                 toast.error(result.message || 'Order failed');
@@ -262,6 +267,25 @@ const OrderPanel = ({defaultSymbol = '', cash, accountId, positions = [], onSymb
                     </p>
                 )}
             </div>
+
+            {/* The learner's "why": a line they will see again at the sell. Not on the compact ticket. */}
+            {!compact && (
+                <div>
+                    <div className="flex items-center justify-between">
+                        <label htmlFor="order-note" className="font-mono text-[10px] uppercase tracking-[0.1em] text-fg-muted">{NOTE_COPY.label}</label>
+                        <span className="font-mono text-[10px] text-fg-muted" aria-hidden>{NOTE_COPY.counter(note.length, TRADE_REASON_MAX)}</span>
+                    </div>
+                    <textarea
+                        id="order-note"
+                        value={note}
+                        onChange={(e) => setNote(e.target.value)}
+                        maxLength={TRADE_REASON_MAX}
+                        rows={2}
+                        placeholder={NOTE_COPY.placeholder}
+                        className="w-full mt-1 rounded-lg px-3 py-2 text-xs text-fg outline-none field-focus resize-none bg-surface-0 border border-line-strong/40"
+                    />
+                </div>
+            )}
 
             {/* Last price + estimate */}
             <div className="flex items-center justify-between text-sm">
