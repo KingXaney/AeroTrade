@@ -53,6 +53,7 @@ export const DATA_KEYS = [
     'topicsLatest',
     'strategies',
     'learnFacts',
+    'lesson',
 ] as const;
 export type DataKey = (typeof DATA_KEYS)[number];
 
@@ -79,6 +80,7 @@ export const DATA_KEY_DEPS: Record<DataKey, readonly DataKey[]> = {
     topicsLatest: [],
     strategies: [],
     learnFacts: [],
+    lesson: [],
 };
 
 // Streamed under <Suspense> because they are slow or fan out to third parties;
@@ -128,6 +130,7 @@ export const WIDGET_IDS = [
     'topic-briefs',
     // learn
     'getting-started',
+    'todays-lesson',
     // personal
     'portfolio-snapshot',
     'watchlist-movers',
@@ -233,6 +236,21 @@ export const WIDGETS: {readonly [K in WidgetId]: WidgetDefinition & {id: K}} = {
         minHeight: 150,
         dataKeys: ['learnFacts'],
         availability: 'onboarding',
+        isNew: true,
+    }),
+    // Library-only (never in DEFAULT_LAYOUT): a first from the account when one just happened,
+    // else the glossary concept today's topic articles used. No "What these mean" and no
+    // "Ask in chat" on a widget (invariant 12); its labels carry titles only.
+    'todays-lesson': define({
+        id: 'todays-lesson',
+        title: 'Today\'s lesson',
+        description: 'One idea a day: a first from your own account when one just happened, otherwise a term today\'s articles in your topics used.',
+        category: 'learn',
+        icon: 'school',
+        spans: [4, 6, 8, 12],
+        defaultSpan: 6,
+        minHeight: 220,
+        dataKeys: ['learnFacts', 'lesson'],
         isNew: true,
     }),
 

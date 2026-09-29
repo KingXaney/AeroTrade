@@ -22,7 +22,9 @@ import TopicsLatest from "@/components/dashboard/widgets/TopicsLatest";
 import TopicBriefsList from "@/components/dashboard/widgets/TopicBriefsList";
 import TopicsWidgetEmpty from "@/components/dashboard/widgets/TopicsWidgetEmpty";
 import GettingStarted from "@/components/dashboard/widgets/GettingStarted";
+import TodaysLesson from "@/components/dashboard/widgets/TodaysLesson";
 import {deriveMissions} from "@/lib/learn/missions";
+import {deriveMoments} from "@/lib/learn/moments";
 import AccountSummary from "@/components/trade/AccountSummary";
 import OpenPositionsStrip from "@/components/trade/OpenPositionsStrip";
 import TradeHistory from "@/components/trade/TradeHistory";
@@ -106,6 +108,14 @@ export const WIDGET_RENDERERS: Record<WidgetId, Renderer> = {
     'topics-latest': (r) => <Suspense fallback={skeleton('topics-latest', 4)}><TopicsLatestAsync ctx={r.ctx} span={r.span} /></Suspense>,
     'topic-briefs': (r) => need(r, 'topicsOverview', (o) => <TopicBriefsList overview={o} />),
     'getting-started': (r) => need(r, 'learnFacts', (f) => <GettingStarted missions={deriveMissions(f)} />),
+    // A fresh moment wins and never waits on the lesson loader's guard: a failed lesson read
+    // degrades to moment-only, and only a day with no moment needs the concept at all.
+    'todays-lesson': (r) => {
+        const facts = r.data.learnFacts;
+        const moment = facts ? deriveMoments(facts, facts.today)[0] : undefined;
+        if (moment) return <TodaysLesson moment={moment} />;
+        return need(r, 'lesson', (lesson) => <TodaysLesson lesson={lesson} />);
+    },
     'portfolio-snapshot': (r) => need(r, 'portfolios', (p) => <PortfolioSnapshot portfolio={aggregatePortfolios(p)} best={bestStrategy(p)} />),
     'watchlist-movers': (r) => <Suspense fallback={skeleton('watchlist-movers', 4)}><WatchlistMoversAsync ctx={r.ctx} /></Suspense>,
     'friends-rank': (r) => need(r, 'leaderboard', (l) => <FriendsRank leaderboard={l} />),

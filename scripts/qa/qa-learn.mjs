@@ -3,8 +3,11 @@
 // beginner line, column definitions led by "Read this board" (its top row in plain words,
 // hidden while the quiz is open), Guess the Verdict and "What the rule saw"; an
 // "Ask in chat" link prefills the assistant without sending; a rule's reason is decoded
-// clause by clause wherever a fill or an order shows it, and nowhere else. Run against
-// the harness in README.md (in-memory Mongo on :27117 + `npm run dev`).
+// clause by clause wherever a fill or an order shows it, and nowhere else. Today's lesson,
+// added from the widget library, teaches the term of the day, then a concept today's topic
+// articles used, then a fresh first from the account (a drop, a credited dividend) until
+// "Got it", then a followed monthly strategy's rebalance. Run against the harness in
+// README.md (in-memory Mongo on :27117 + `npm run dev`).
 import {chromium} from 'playwright';
 import {MongoClient, ObjectId} from 'mongodb';
 import {mkdirSync} from 'node:fs';
@@ -332,6 +335,126 @@ try {
     const historyTrades = page.locator('section', {has: page.getByRole('heading', {name: 'Trades', exact: true})});
     check('/history shows the reason line as written', (await historyTrades.innerText()).includes(rsiReason));
     check('/history carries no decoder, disclosure or Ask link', await historyTrades.locator('[data-reason-gloss], details, [data-ask]').count() === 0);
+
+    // --- Today's lesson: library-only; a fresh first from the account, else today's concept -
+    const contextC = await browser.newContext({viewport: {width: 1440, height: 900}});
+    const pageC = await contextC.newPage();
+    const emailC = await signUp(pageC, 'learnC');
+    const userC = await userIdFor(emailC);
+    await pageC.locator('[data-widget-id]').first().waitFor({timeout: 30000});
+    check('Today\'s lesson is not on the default dashboard', await pageC.locator('[data-widget-id="todays-lesson"]').count() === 0);
+    // A deterministic feed: no topics at all, so nothing in them can have used a term today.
+    await db.collection('topics').deleteMany({userId: userC});
+    await pageC.goto(`${BASE}/?customize=1`, {waitUntil: 'load'});
+    await pageC.getByRole('button', {name: /Add widget/i}).first().click();
+    const library = pageC.locator('[role="dialog"]');
+    await library.waitFor({timeout: 15000});
+    check('the library lists it under Learn, badged New', /LEARN[\s\S]*Today's lesson[\s\S]*NEW/i.test(await library.innerText()));
+    await library.locator('div')
+        .filter({has: pageC.getByText('Today\'s lesson', {exact: true})})
+        .filter({has: pageC.getByRole('button', {name: 'Add', exact: true})})
+        .last().getByRole('button', {name: 'Add', exact: true}).click();
+    await pageC.keyboard.press('Escape');
+    await pageC.getByRole('button', {name: 'Save', exact: true}).click();
+    const lessonWidget = pageC.locator('[data-widget-id="todays-lesson"]');
+    await lessonWidget.locator('#todays-lesson-concept').waitFor({timeout: 60000});
+    const savedC = await db.collection('userpreferences').findOne({userId: userC});
+    check('adding it from the library saves it into the layout', (savedC?.dashboardLayout?.widgets ?? []).some((w) => w.id === 'todays-lesson'));
+    check('with no topic articles today it teaches the term of the day',
+        await lessonWidget.locator('[data-lesson-mode="day"]').count() === 1
+        && /Nothing in your topics used a glossary term today/.test(await lessonWidget.innerText()));
+    check('…with a link to that term on /learn', await lessonWidget.locator('a[href^="/learn#"]').count() === 1);
+    const noHandOff = async () => await lessonWidget.locator('[data-what-these-mean], [data-ask], details').count() === 0;
+    check('the widget carries no "What these mean" and no "Ask in chat"', await noHandOff());
+
+    // A followed topic whose article used "fomc" today: the concept, with the headline as text.
+    const lessonHash = 900_000_000 + Math.floor(Math.random() * 1_000_000);
+    await db.collection('topics').insertOne({userId: userC, name: 'QA Fed', slug: 'qa-fed', keywords: ['fomc'], exclude: [], keywordSetHash: lessonHash, createdAt: new Date(), updatedAt: new Date()});
+    const trickyHeadline = 'Fed <b>holds</b> rates & "signals" patience after the FOMC';
+    await db.collection('topicarticles').insertOne({
+        keywordSetHash: lessonHash, contentHash: lessonHash + 1, headline: trickyHeadline, summary: '', url: 'https://example.com/fomc-holds',
+        source: 'Example Wire', sourceType: 'google', datetime: Math.floor(Date.now() / 1000), publishedDate: today, score: 3, matchedTerms: ['fomc'], createdAt: new Date(),
+    });
+    await pageC.reload({waitUntil: 'load'});
+    await lessonWidget.locator('[data-lesson-concept="fomc"]').waitFor({timeout: 30000});
+    const conceptText = await lessonWidget.innerText();
+    check('an article that used "fomc" today makes the FOMC the lesson', /The FOMC/.test(conceptText) && /1 of today's articles in your topics used this term/.test(conceptText), conceptText.replace(/\s+/g, ' ').slice(0, 160));
+    check('…quoting the headline as text, never as markup', conceptText.includes(trickyHeadline) && await lessonWidget.locator('[data-lesson-headline] b').count() === 0);
+    check('…linking to the article', await lessonWidget.locator('[data-lesson-headline] a[href="https://example.com/fomc-holds"][rel~="noopener"]').count() === 1);
+    await pageC.screenshot({path: `${OUT}07a-todays-lesson-concept.png`, fullPage: true});
+
+    // The first 5% drop: shown while it is fresh, hidden once it is outside the week.
+    const accountC = await db.collection('paperaccounts').findOne({userId: userC});
+    const accountCId = String(accountC._id);
+    const snap = (date, totalValue) => ({accountId: accountCId, userId: userC, date, totalValue, cash: totalValue, holdingsValue: 0, startingBalance: 100_000});
+    await db.collection('accountsnapshots').insertMany([snap(isoDaysAgo(3), 100_000), snap(isoDaysAgo(2), 94_000)]);
+    await pageC.reload({waitUntil: 'load'});
+    await lessonWidget.locator('[data-lesson-moment="first-drawdown"]').waitFor({timeout: 30000});
+    const dropText = await lessonWidget.innerText();
+    check('a fresh 6% fall from the high is the lesson', /first 5% drop/.test(dropText) && /−6\.0% from the/.test(dropText) && /\+6\.4% to get back/.test(dropText), dropText.replace(/\s+/g, ' ').slice(0, 200));
+    check('…with its terms titled from the glossary', await lessonWidget.locator('[data-term="max-drawdown"][title], [data-term="recovery"][title]').count() === 2);
+    check('…and still no hand-off on the widget', await noHandOff());
+    await db.collection('accountsnapshots').updateOne({accountId: accountCId, date: isoDaysAgo(3)}, {$set: {date: isoDaysAgo(12)}});
+    await db.collection('accountsnapshots').updateOne({accountId: accountCId, date: isoDaysAgo(2)}, {$set: {date: isoDaysAgo(11)}});
+    await pageC.reload({waitUntil: 'load'});
+    await lessonWidget.locator('[data-lesson-concept="fomc"]').waitFor({timeout: 30000});
+    check('the same fall moved outside the window no longer shows', await lessonWidget.locator('[data-lesson-moment]').count() === 0);
+
+    // The first dividend: only once it is credited (on or before the watermark).
+    const epochC = new Date(accountC.inceptionAt ?? accountC.createdAt).getTime();
+    await db.collection('accountincomes').insertOne({
+        accountId: accountCId, userId: userC, epoch: epochC, kind: 'dividend', date: isoDaysAgo(1), symbol: 'SPY',
+        amount: 18.89, perShare: 1.889, quantity: 10, exDate: isoDaysAgo(6), createdAt: new Date(),
+    });
+    await db.collection('paperaccounts').updateOne({_id: accountC._id}, {$set: {incomeThrough: isoDaysAgo(2)}});
+    await pageC.reload({waitUntil: 'load'});
+    await lessonWidget.locator('#todays-lesson-concept').waitFor({timeout: 30000});
+    check('a dividend past the watermark is not income yet', await lessonWidget.locator('[data-lesson-moment]').count() === 0);
+    await db.collection('paperaccounts').updateOne({_id: accountC._id}, {$set: {incomeThrough: isoDaysAgo(1)}});
+    await pageC.reload({waitUntil: 'load'});
+    await lessonWidget.locator('[data-lesson-moment="first-dividend"]').waitFor({timeout: 30000});
+    const dividendFigure = await lessonWidget.locator('[data-lesson-figure]').innerText();
+    check('the credited dividend is the lesson, with its own arithmetic', /^SPY: 10 shares × \$1\.889 = \$18\.89 · paid /.test(dividendFigure), dividendFigure);
+    check('…linking to the Income panel', await lessonWidget.locator('a[href="/portfolio#income"]').count() === 1);
+    await lessonWidget.locator('#lesson-got-it').click();
+    await lessonWidget.locator('[data-lesson-concept="fomc"]').waitFor({timeout: 30000});
+    const prefsC = await db.collection('userpreferences').findOne({userId: userC});
+    check('Got it stamps the key once', JSON.stringify(prefsC?.learn?.lessonsSeen) === JSON.stringify(['first-dividend']), JSON.stringify(prefsC?.learn?.lessonsSeen));
+    await pageC.reload({waitUntil: 'load'});
+    await lessonWidget.locator('#todays-lesson-concept').waitFor({timeout: 30000});
+    check('a seen moment stays gone', await lessonWidget.locator('[data-lesson-moment]').count() === 0);
+
+    // A followed strategy's rebalance: a monthly check is a moment, a daily one is routine.
+    // One state per strategy (unique index): borrow momentum-12-1's and put it back afterwards.
+    const priorMomentum = await db.collection('strategystates').findOne({strategyId: 'momentum-12-1'});
+    await db.collection('strategystates').updateOne({strategyId: 'momentum-12-1'}, {$set: {
+        accountId: priorMomentum?.accountId ?? 'qa-lesson-none', status: 'active', version: priorMomentum?.version ?? '1', launchDate: priorMomentum?.launchDate ?? isoDaysAgo(40),
+        lastRunDate: today, lastTradeDate: today, lastRebalanceDate: today, updatedAt: new Date(),
+    }, $setOnInsert: {createdAt: new Date()}}, {upsert: true});
+    await db.collection('userpreferences').updateOne({userId: userC}, {$set: {followedStrategies: ['golden-cross']}});
+    await pageC.reload({waitUntil: 'load'});
+    await lessonWidget.locator('#todays-lesson-concept').waitFor({timeout: 30000});
+    check('a followed daily strategy\'s check is not a moment', await lessonWidget.locator('[data-lesson-moment]').count() === 0);
+    await db.collection('userpreferences').updateOne({userId: userC}, {$set: {followedStrategies: ['golden-cross', 'momentum-12-1']}});
+    await pageC.reload({waitUntil: 'load'});
+    await lessonWidget.locator('[data-lesson-moment="rebalance"]').waitFor({timeout: 30000});
+    const rebalanceText = await lessonWidget.innerText();
+    check('a followed monthly strategy\'s rebalance is, by cadence and outcome', /12-1 Momentum|Momentum/.test(rebalanceText) && /first trading day of each month/.test(rebalanceText) && /placed orders/.test(rebalanceText), rebalanceText.replace(/\s+/g, ' ').slice(0, 200));
+    check('…linking to the strategy', await lessonWidget.locator('a[href="/strategies/momentum-12-1"]').count() === 1);
+    if (priorMomentum) await db.collection('strategystates').replaceOne({strategyId: 'momentum-12-1'}, priorMomentum);
+    else await db.collection('strategystates').deleteOne({strategyId: 'momentum-12-1'});
+    await pageC.screenshot({path: `${OUT}07-todays-lesson.png`, fullPage: true});
+
+    // The page and the settings editor read the same onboarding facts.
+    await pageC.goto(`${BASE}/`, {waitUntil: 'load'});
+    await pageC.locator('[data-widget-id]').first().waitFor({timeout: 30000});
+    const onDashboard = await pageC.locator('[data-widget-id="getting-started"]').count() === 1;
+    await pageC.goto(`${BASE}/settings`, {waitUntil: 'load'});
+    await pageC.locator('#dashboard').waitFor({timeout: 30000});
+    const settingsText = await pageC.locator('#dashboard').innerText();
+    check('/ and /settings agree on the First-week checklist', onDashboard && /First week/.test(settingsText), `dashboard=${onDashboard}`);
+    check('…and list Today\'s lesson in the saved layout', /Today's lesson/.test(settingsText));
+    await contextC.close();
 } catch (err) {
     failures++;
     console.log(`FAIL  threw: ${err.message}`);

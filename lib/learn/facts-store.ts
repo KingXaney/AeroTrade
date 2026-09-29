@@ -3,29 +3,44 @@
 // so the dashboard page (which needs the answer for widget availability) and the
 // widget's own loader share one set of reads per request.
 //
-// Every read is an existence check or a projection — no bar reads, no quotes, and
-// never the lazy account-creation path (readAccountsForUser answers a question, it
-// does not open an account).
+// Every read is an existence check, a projection or a single indexed row — no bar reads,
+// no quotes, and never the lazy account-creation path (readAccountsForUser answers a
+// question, it does not open an account).
 
 import {cache} from "react";
 import {connectToDatabase} from "@/database/mongoose";
+import AccountIncome from "@/database/models/account-income.model";
+import AccountSnapshot from "@/database/models/account-snapshot.model";
 import AiNavigator from "@/database/models/ai-navigator.model";
 import PaperTrade from "@/database/models/paper-trade.model";
+import StrategyState from "@/database/models/strategy-state.model";
 import Topic from "@/database/models/topic.model";
 import UserPreferencesModel from "@/database/models/user-preferences.model";
 import Watchlist from "@/database/models/watchlist.model";
 import {readAccountsForUser} from "@/lib/trading/account";
 import {getEasternDateString} from "@/lib/utils";
-import type {OnboardingFacts} from "@/lib/learn/facts";
+import {daysBetween, type LearnDividend, type LearnFacts, type LearnFill, type LearnRebalance, type LearnSell, type OnboardingFacts} from "@/lib/learn/facts";
+import {ONBOARDING_MAX_DAYS} from "@/lib/learn/missions";
+import {firstDrawdownCrossing, shiftDate} from "@/lib/learn/moments";
+import {STRATEGY_SLUGS} from "@/lib/strategies/catalog";
+import type {StrategyId} from "@/lib/strategies/types";
 
-type LearnPrefs = {followedStrategies?: string[]; learn?: {missionsDismissedAt?: Date}} | null;
+type LearnPrefs = {followedStrategies?: string[]; learn?: {missionsDismissedAt?: Date; lessonsSeen?: string[]}} | null;
+
+// Shared by both fact readers, so the page's availability check and the widget's loader
+// read the accounts and the preferences once per request.
+const readAccounts = cache((userId: string) => readAccountsForUser(userId));
+const readLearnPrefs = cache(async (userId: string): Promise<LearnPrefs> => {
+    await connectToDatabase();
+    return UserPreferencesModel.findOne({userId}).select('followedStrategies learn').lean<LearnPrefs>();
+});
 
 export const getOnboardingFacts = cache(async (userId: string): Promise<OnboardingFacts> => {
     await connectToDatabase();
     const [accounts, trade, prefs, topic, watch, navigator] = await Promise.all([
-        readAccountsForUser(userId),
+        readAccounts(userId),
         PaperTrade.exists({userId, source: 'user'}),
-        UserPreferencesModel.findOne({userId}).select('followedStrategies learn').lean<LearnPrefs>(),
+        readLearnPrefs(userId),
         Topic.exists({userId, lastSeenAt: {$exists: true}}),
         Watchlist.exists({userId}),
         AiNavigator.exists({userId}),
@@ -42,4 +57,85 @@ export const getOnboardingFacts = cache(async (userId: string): Promise<Onboardi
         navigatorEnrolled: navigator !== null,
         missionsDismissedAt: dismissed ? new Date(dismissed).toISOString() : null,
     };
+});
+
+type LeanFill = {symbol: string; side: 'buy' | 'sell'; quantity: number; price: number; realizedPnl?: number | null; createdAt: Date};
+type LeanDividend = {symbol: string; date: string; amount: number; perShare?: number; quantity?: number; exDate?: string};
+type LeanState = {strategyId: string; lastRebalanceDate?: string; lastTradeDate?: string};
+
+const isStrategyId = (value: string): value is StrategyId => (STRATEGY_SLUGS as readonly string[]).includes(value);
+
+// What Today's lesson reads on top of the onboarding facts. After the (shared) account and
+// preference reads, every query runs in one Promise.all:
+// - the first user fill and the first user sell, on the {userId, source, createdAt} index;
+// - the first dividend credited within each account's watermark (incomeThrough), for the
+//   account's current epoch — inceptionAt, falling back to createdAt for accounts from before
+//   inceptionAt existed, as getIncomeActivity reads it;
+// - the drawdown scan: only accounts younger than ONBOARDING_MAX_DAYS, projected to three
+//   fields and dated on or after the same cutoff, so it can never grow into a history read;
+// - the followed strategies' StrategyState rows (eight at most) for their last check.
+export const getLearnFacts = cache(async (userId: string): Promise<LearnFacts> => {
+    await connectToDatabase();
+    const [accounts, prefs] = await Promise.all([readAccounts(userId), readLearnPrefs(userId)]);
+    const followed = (prefs?.followedStrategies ?? []).filter(isStrategyId);
+    const today = getEasternDateString();
+    const cutoff = shiftDate(today, -ONBOARDING_MAX_DAYS);
+    const young = accounts.filter((a) => daysBetween(getEasternDateString(new Date(a.createdAt)), today) <= ONBOARDING_MAX_DAYS);
+    const credited = accounts.filter((a) => typeof a.incomeThrough === 'string' && a.incomeThrough.length > 0);
+
+    const [onboarding, fill, sell, dividend, snapshots, states] = await Promise.all([
+        getOnboardingFacts(userId),
+        PaperTrade.findOne({userId, source: 'user'}).sort({createdAt: 1}).select('symbol side quantity price createdAt').lean<LeanFill | null>(),
+        PaperTrade.findOne({userId, source: 'user', side: 'sell'}).sort({createdAt: 1}).select('symbol side quantity price realizedPnl createdAt').lean<LeanFill | null>(),
+        credited.length === 0 ? null : AccountIncome.findOne({
+            $or: credited.map((a) => ({
+                accountId: String(a._id),
+                epoch: new Date(a.inceptionAt || a.createdAt).getTime(),
+                kind: 'dividend',
+                date: {$lte: a.incomeThrough},
+            })),
+        }).sort({date: 1}).select('symbol date amount perShare quantity exDate').lean<LeanDividend | null>(),
+        young.length === 0 ? [] : AccountSnapshot.find({accountId: {$in: young.map((a) => String(a._id))}, date: {$gte: cutoff}})
+            .select('accountId date totalValue').lean<{accountId: string; date: string; totalValue: number}[]>(),
+        followed.length === 0 ? [] : StrategyState.find({strategyId: {$in: followed}}).select('strategyId lastRebalanceDate lastTradeDate').lean<LeanState[]>(),
+    ]);
+
+    const rebalances: LearnRebalance[] = states
+        .filter((s) => isStrategyId(s.strategyId) && typeof s.lastRebalanceDate === 'string')
+        .map((s) => ({strategyId: s.strategyId as StrategyId, date: s.lastRebalanceDate as string, traded: s.lastTradeDate === s.lastRebalanceDate}));
+
+    return {
+        ...onboarding,
+        firstFill: fill ? toFill(fill) : null,
+        firstSell: sell ? toSell(sell) : null,
+        firstDividend: dividend ? toDividend(dividend) : null,
+        firstDrawdown: firstDrawdownCrossing(snapshots.map((s) => ({accountId: String(s.accountId), date: s.date, totalValue: s.totalValue}))),
+        rebalances,
+        lessonsSeen: prefs?.learn?.lessonsSeen ?? [],
+    };
+});
+
+const toFill = (t: LeanFill): LearnFill => ({
+    date: getEasternDateString(new Date(t.createdAt)),
+    symbol: t.symbol,
+    side: t.side,
+    quantity: t.quantity,
+    price: t.price,
+});
+
+const toSell = (t: LeanFill): LearnSell => ({
+    date: getEasternDateString(new Date(t.createdAt)),
+    symbol: t.symbol,
+    quantity: t.quantity,
+    price: t.price,
+    realizedPnl: typeof t.realizedPnl === 'number' ? t.realizedPnl : null,
+});
+
+const toDividend = (row: LeanDividend): LearnDividend => ({
+    date: row.date,
+    symbol: row.symbol,
+    amount: row.amount,
+    perShare: typeof row.perShare === 'number' ? row.perShare : null,
+    quantity: typeof row.quantity === 'number' ? row.quantity : null,
+    exDate: row.exDate ?? null,
 });
