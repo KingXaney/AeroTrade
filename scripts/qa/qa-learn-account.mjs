@@ -1,8 +1,11 @@
 // Browser QA for learning from your own account (learn Wave 2, slice 2.3). Seeds an account
 // whose snapshots rise to a peak on day 4 and fall to a low on day 8, plus SPY bars deep
 // enough that the benchmark store never refetches, and checks that the Max Drawdown tile's
-// hint dates that stretch, sets SPY beside it and says what the climb back takes. A fresh
-// account first shows the undated "needs history" hint.
+// hint dates that stretch, sets SPY beside it and says what the climb back takes, and that
+// the chart shades it. Then a sell, a holding with no quote and income totals: the return
+// bridge asks for a guess, reveals lines that add up to the Total Return tile to the cent,
+// remembers the guess across a reload, and the risk lens names the largest position beside
+// the Navigator's rails. A fresh account first shows every empty state.
 
 import {chromium} from 'playwright';
 import {MongoClient} from 'mongodb';
@@ -73,6 +76,12 @@ try {
     await page.goto(`${BASE}/portfolio`, {waitUntil: 'load'});
     const fresh = await drawdownHint();
     check('a fresh account keeps the undated hint', /Needs 2\+ days of history/.test(fresh), fresh || (await page.locator('main').innerText()).replace(/\s+/g, ' ').slice(0, 400));
+    const text = async (sel) => (await page.locator(sel).first().innerText().catch(() => '')).replace(/\s+/g, ' ').trim();
+    check('a fresh account has nothing to split yet', /Nothing to split yet/.test(await text('#return-bridge')), await text('#return-bridge'));
+    check('a fresh account has no swing yet', /Needs 3\+ days of history/.test(await text('[data-testid=risk-swing]')), await text('[data-testid=risk-swing]'));
+    check('an all-cash account says so', /cash 100% · no holdings yet/.test(await text('[data-testid=risk-largest]')), await text('[data-testid=risk-largest]'));
+    check('an all-cash account has no concentration caption', (await page.locator('[data-testid=risk-caption]').count()) === 0);
+    check('a fresh account shades no band', (await page.locator('[data-testid=drawdown-band]').count()) === 0);
     await shot('00-fresh');
 
     // --- SPY bars, deeper than the store's "deep enough" check, and dividend coverage -------
@@ -102,7 +111,58 @@ try {
     await panels.evaluateAll((els) => els.forEach((d) => { d.open = true; }));
     const terms = (await panels.allInnerTexts()).join(' | ');
     check('a dated hint brings Recovery into the panel\'s definitions', /recovery/i.test(terms), terms.replace(/\s+/g, ' ').slice(0, 300));
+    const band = page.locator('[data-testid=drawdown-band]');
+    check('the chart shades one drawdown band', (await band.count()) === 1);
+    const bandWidth = Number(await band.first().getAttribute('width').catch(() => '0'));
+    check('the band has width', bandWidth > 0, String(bandWidth));
+    check('the band legend dates the stretch', new RegExp(`${escape(short(PEAK))} → ${escape(short(TROUGH))}`).test(await text('[data-testid=drawdown-band-legend]')), await text('[data-testid=drawdown-band-legend]'));
+    check('ten days of history give a typical daily swing', /±\$[\d,]+/.test(await text('[data-testid=risk-swing]')), await text('[data-testid=risk-swing]'));
     await shot('01-dated-drawdown');
+
+    // --- a sell, a holding and income: the bridge ------------------------------------------
+    // Total return = 250 realized + 12.34 interest + 5.66 dividends + 0 on a holding with no
+    // quote (valued at cost) = +$268.00, of which income is 18.00 (7%).
+    await db.collection('paperaccounts').updateOne({_id: account._id}, {$set: {
+        cash: 100_000 + 250 + 12.34 + 5.66 - 6_000,
+        positions: [{symbol: 'QALRN', company: 'QA Learn Co', quantity: 10, avgCost: 600}],
+        incomeTotals: {interest: 12.34, dividends: 5.66},
+    }});
+    const at = (n) => new Date(Date.now() - n * 60_000);
+    await db.collection('papertrades').insertMany([
+        {userId, accountId, symbol: 'SPY', company: 'SPDR S&P 500', side: 'buy', quantity: 5, price: 500, total: 2500, source: 'user', createdAt: at(30)},
+        {userId, accountId, symbol: 'SPY', company: 'SPDR S&P 500', side: 'sell', quantity: 5, price: 550, total: 2750, realizedPnl: 250, source: 'user', createdAt: at(20)},
+        {userId, accountId, symbol: 'QALRN', company: 'QA Learn Co', side: 'buy', quantity: 10, price: 600, total: 6000, source: 'user', createdAt: at(10)},
+    ]);
+    await page.goto(`${BASE}/portfolio`, {waitUntil: 'load'});
+    await page.locator('main').getByText(/max drawdown/i).first().waitFor({timeout: 30000});
+    const form = page.locator('[data-bridge-guess-form]');
+    check('a gain with income asks for a guess first', (await form.count()) === 1 && (await page.locator('[data-bridge-line]').count()) === 0, await text('#return-bridge'));
+    check('the guess prompt names the total', /\+\$268\.00/.test(await text('[data-bridge-guess-form]')), await text('[data-bridge-guess-form]'));
+    await page.locator('#bridge-guess').fill('10');
+    await page.click('#bridge-reveal');
+    await page.locator('[data-bridge-line]').first().waitFor({timeout: 10000});
+    const cents = await page.locator('[data-bridge-line]').evaluateAll((els) => els.map((el) => [el.dataset.bridgeLine, Number(el.dataset.cents)]));
+    const totalCents = Number(await page.locator('[data-bridge-total]').getAttribute('data-cents'));
+    const sum = cents.reduce((acc, [, c]) => acc + c, 0);
+    check('the bridge lines add up to its total to the cent', sum === totalCents, JSON.stringify(cents) + ` total ${totalCents}`);
+    const tile = (await page.locator('main').getByText(/^\+\$[\d,]+\.\d{2} \(\+\d+\.\d{2}%\)$/).first().textContent().catch(() => '')) ?? '';
+    const tileCents = Math.round(Number(tile.replace(/^\+\$/, '').split(' ')[0].replace(/,/g, '')) * 100);
+    check('the bridge total matches the Total Return tile', tileCents === totalCents && totalCents === 26_800, `tile "${tile}" bridge ${totalCents}`);
+    const byKey = Object.fromEntries(cents);
+    check('each line carries its part', byKey.realized === 25_000 && byKey.interest === 1_234 && byKey.dividends === 566 && byKey.price === 0 && !('residual' in byKey), JSON.stringify(byKey));
+    check('the unpriced holding is noted once, on the price line', /valued at cost/.test(await text('[data-bridge-line=price]')), await text('[data-bridge-line=price]'));
+    check('the reveal states the guess and the share', /You guessed 10% on [A-Z][a-z]{2} \d+ · interest and dividends were 7% of it/.test(await text('[data-bridge-guess]')), await text('[data-bridge-guess]'));
+    await shot('02-bridge');
+
+    await page.reload({waitUntil: 'load'});
+    await page.locator('[data-bridge-guess]').waitFor({timeout: 30000});
+    check('a stored guess skips the slider', (await form.count()) === 0 && (await page.locator('[data-bridge-line]').count()) > 0);
+    await page.click('#bridge-guess-again');
+    check('guess again brings the slider back', (await form.count()) === 1 && (await page.locator('[data-bridge-line]').count()) === 0);
+
+    check('the largest position is the holding', /6%/.test(await text('[data-testid=risk-largest]')) && /QALRN/.test(await text('[data-testid=risk-largest]')), await text('[data-testid=risk-largest]'));
+    check('the caption sets it beside the Navigator rails', /6% of this account moves with one holding, QALRN · the AI Navigator caps itself at 20% per name and keeps at least 10% in cash/.test(await text('[data-testid=risk-caption]')), await text('[data-testid=risk-caption]'));
+    await shot('03-risk-lens');
 } catch (err) {
     failures++;
     console.log(`FAIL  threw: ${err.message}`);

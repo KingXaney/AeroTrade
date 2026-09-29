@@ -5,6 +5,8 @@ import {ACTIVE_ACCOUNT_COOKIE} from "@/lib/constants";
 import {getCurrentUserId} from "@/lib/actions/watchlist.actions";
 import {getAccountAnalytics, getComparisonStats, getIncomeActivity, getPortfoliosForUser, getTradeHistory} from "@/lib/trading/account";
 import {countUnpriced} from "@/lib/trading/analytics";
+import {buildReturnBridge} from "@/lib/trading/bridge";
+import {drawdownBand} from "@/lib/learn/copy/portfolio";
 import {toComparisonRows, toSwitcherAccounts} from "@/lib/dashboard/select";
 import {marketStatus} from "@/lib/prices/market-hours";
 import AccountSummary from "@/components/trade/AccountSummary";
@@ -18,6 +20,8 @@ import AnalyticsStats from "@/components/analytics/AnalyticsStats";
 import PerformanceChart from "@/components/analytics/PerformanceChart";
 import ExportCsvButton from "@/components/analytics/ExportCsvButton";
 import IncomeActivity from "@/components/trade/IncomeActivity";
+import ReturnBridge from "@/components/learn/ReturnBridge";
+import RiskLens from "@/components/learn/RiskLens";
 import WhatTheseMean from "@/components/learn/WhatTheseMean";
 import Panel from "@/components/primitives/Panel";
 import SectionHeading from "@/components/primitives/SectionHeading";
@@ -51,6 +55,14 @@ const PortfolioPage = async ({searchParams}: PortfolioPageProps) => {
     const marketOpen = marketStatus().state === 'open';
     const switcherAccounts = toSwitcherAccounts(all);
     const comparisonRows = toComparisonRows(all, comparisonStats);
+    // Split from the same summary the Total Return tile prints, so the lines add up to it.
+    const bridge = analytics ? buildReturnBridge({
+        totalReturn: portfolio.totalReturnAbs,
+        positions: portfolio.positions,
+        realizedPnl: analytics.realizedPnl,
+        income: analytics.income,
+        tradeCount: analytics.tradeCount,
+    }) : null;
 
     return (
         <div className="space-y-4">
@@ -106,8 +118,12 @@ const PortfolioPage = async ({searchParams}: PortfolioPageProps) => {
                         <p className="font-mono text-[11px] text-fg-muted mb-4">
                             Returns include interest on cash and dividends · benchmark is SPY&apos;s total return, dividends reinvested
                         </p>
-                        <PerformanceChart series={analytics.series} accountName={account.name} />
+                        <PerformanceChart series={analytics.series} accountName={account.name} band={drawdownBand(analytics.drawdown)} />
                     </section>
+                    <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+                        <ReturnBridge accountId={account.id} bridge={bridge} />
+                        <RiskLens series={analytics.series} portfolio={portfolio} />
+                    </div>
                     <AnalyticsStats analytics={analytics} definitions />
                 </>
             )}
