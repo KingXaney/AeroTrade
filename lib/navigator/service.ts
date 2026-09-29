@@ -129,7 +129,8 @@ export const computeNavigatorScores = async (symbols: string[]): Promise<ScoredS
         const weight = entity?.weightSlow ?? 0;
         return {
             symbol,
-            newsWeightSlow: weight,
+            // No entity is no coverage, which scores as neutral news (see ScoringInput).
+            newsWeightSlow: entity ? weight : null,
             sentimentSlow: weight > 1e-9 ? (entity?.sentimentSumSlow ?? 0) / weight : 0,
             signals: computeSignals(bars),
             sectorTilt: sectorKey ? sectorStanding.tiltByKey.get(sectorKey) ?? 0 : 0,
