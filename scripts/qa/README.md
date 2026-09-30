@@ -57,18 +57,23 @@ it runs only the page checks),
 its ten-day window, the reveal and its gloss, a day counted once (two tabs answering at once
 included), each kind of question forced from a board only it can use, the empty state; it wipes
 `strategyruns` and seeds its own, so it runs late — Time in the market on a seeded V-shaped SPY
-(it snapshots and restores the SPY and ^IRX bars it replaces), and `/brain`: the legend's
+from the earlier of two accounts' current records, every way and each of the table's eight starts
+checked against values computed in the script (it snapshots and restores the SPY and ^IRX bars
+it replaces), and `/brain`: the legend's
 constants, one event badge, "since thesis" once bars are stored, each Navigator decision
 decoded, titles only on the widgets), `qa-learn-account.mjs` (the
 portfolio surfaces on a seeded account: a fresh account's empty states first, then seeded
 snapshots, a sell, an unpriced holding and income totals for the dated drawdown and its shaded
 band, the return bridge's guess and lines that add up to the Total Return tile to the cent, the
 risk lens, buy notes under the sell, fill receipts, `/trade`'s Last fill, a receipt per
-income month, Luck or skill — edge closes seeded for the 40 large caps and the seeded sample
-replayed in the script, so the printed rank, SPY and the median are checked against numbers
-computed outside the app; the marker withheld with an unpriced holding, placed from a snapshot on
-the last session, and ended on a stale snapshot's date — and Trading habits over three closed
-lots with a strategy round trip left out; it removes the large-cap bars it seeded), `qa-tutor.mjs` (the
+income month, Luck or skill — edge closes seeded for the 40 large caps, dividends on SPY and on
+them over a flat ^IRX of its own, and the seeded sample replayed in the script with the income
+convention and the app's NYSE calendar (loaded with `jiti`), so the printed window, rank, SPY, the
+median and each marker's place on the axis are checked against numbers computed outside the app;
+the marker withheld with an unpriced holding, placed from a snapshot on the last session, and
+ended on a stale snapshot's date — and Trading habits over four closed lots with a strategy round
+trip and a sale before its 30-day window left out; it removes the large-cap bars it seeded and
+puts back the ^IRX points and any other suite's large-cap dividends it set aside), `qa-tutor.mjs` (the
 chat's three rate-limit windows via seeded `ratelimits` rows, the prefill, then the `explainTerm`
 chip from a stubbed UI-message stream — the tutor's answers themselves need a Gemini key and are
 checked by hand)
