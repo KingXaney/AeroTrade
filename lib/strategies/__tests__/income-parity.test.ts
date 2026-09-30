@@ -7,6 +7,8 @@ import type {Bar} from "@/lib/prices/signals";
 import {addCalendarDays, eachCalendarDay} from "@/lib/prices/calendar-days";
 import {strategyBySlug} from "@/lib/strategies/catalog";
 import {simulateStrategy} from "@/lib/strategies/simulate";
+import {applyOverrides} from "@/lib/strategies/whatif";
+import {SYNTHETIC_LAUNCH, syntheticMarket} from "@/lib/strategies/__tests__/synthetic-universe";
 import {createIncomeClock, dividendsByExDate, makeRateLookup, replayIncome, type RatePoint} from "@/lib/trading/income";
 
 const weekdays = (count: number, from: string): string[] => {
@@ -35,7 +37,7 @@ const withDividends = (series: Bar[], paid: Record<string, number>): Bar[] =>
 const priced = (base: number, step: number): Bar[] =>
     dates.map((date, i) => ({date, close: base + i * step, open: base + i * step - 0.25, high: base + i * step + 1, low: base + i * step - 1}));
 
-const liveReplayOf = (result: ReturnType<typeof simulateStrategy>, bars: Map<string, Bar[]>) => {
+const liveReplayOf = (result: ReturnType<typeof simulateStrategy>, bars: Map<string, Bar[]>, rateSeries: readonly RatePoint[] = rates) => {
     const dividends = [...bars].flatMap(([symbol, series]) =>
         series.filter((b) => (b.dividend ?? 0) > 0).map((b) => ({symbol, exDate: b.date, perShare: b.dividend as number})));
     return replayIncome({
@@ -45,7 +47,7 @@ const liveReplayOf = (result: ReturnType<typeof simulateStrategy>, bars: Map<str
         startCash: 100_000,
         startHoldings: new Map(),
         trades: result.trades.map((t) => ({date: t.date, symbol: t.symbol, side: t.side, quantity: t.quantity, total: t.total})),
-        clock: createIncomeClock({rateOn: makeRateLookup(rates), dividends: dividendsByExDate(dividends)}),
+        clock: createIncomeClock({rateOn: makeRateLookup(rateSeries), dividends: dividendsByExDate(dividends)}),
     });
 };
 
@@ -102,5 +104,35 @@ describe("income parity — simulator vs the live replay", () => {
         expect(result.income.some((r) => r.symbol === 'SPY' && r.exDate === spySell!.date)).toBe(true);
         expect(result.income.some((r) => r.kind === 'dividend' && r.symbol === 'AGG')).toBe(true);
         expectSameRows(result.income, liveReplayOf(result, bars).rows);
+    });
+});
+
+// The what-if lab runs the same simulator on an overridden definition. The setting changes
+// which trades happen, never how income is credited: the parity must hold for those too.
+describe("income parity — what-if settings", () => {
+    it("sixty-forty at 80% SPY: the quarterly sell on an ex-date is still paid identically", () => {
+        const def = applyOverrides(strategyBySlug('sixty-forty')!, {spyWeight: 0.8});
+        const monthStarts = dates.filter((d, i) => i > startIndex && dates[i - 1].slice(0, 7) !== d.slice(0, 7));
+        const spy = withDividends(priced(500, 6), Object.fromEntries(monthStarts.map((d) => [d, 1.75])));
+        const agg = withDividends(priced(98, -0.05), Object.fromEntries(monthStarts.map((d) => [d, 0.3])));
+        const bars = new Map<string, Bar[]>([['SPY', spy], ['AGG', agg]]);
+        const result = simulateStrategy(def, bars, {startingBalance: 100_000, launchDate: LAUNCH, resultBars: 40, warmupBars: WARMUP, rates});
+
+        const firstSpyBuy = result.trades.find((t) => t.symbol === 'SPY' && t.side === 'buy');
+        expect(firstSpyBuy!.total / 100_000).toBeGreaterThan(0.75);
+        expect(result.trades.some((t) => t.symbol === 'SPY' && t.side === 'sell' && t.date === '2026-07-01')).toBe(true);
+        expectSameRows(result.income, liveReplayOf(result, bars).rows);
+    });
+
+    it("low volatility holding 3 names on a 21-day window: many symbols, many ex-dates, identical", () => {
+        const market = syntheticMarket(160);
+        const def = applyOverrides(strategyBySlug('low-volatility')!, {top: 3, volWindow: 21});
+        const result = simulateStrategy(def, market.bars, {startingBalance: 100_000, launchDate: SYNTHETIC_LAUNCH, resultBars: 120, warmupBars: 30, rates: market.rates});
+
+        // Three slots, rotated monthly: sells happen and more than three names are ever held.
+        expect(new Set(result.trades.map((t) => t.symbol)).size).toBeGreaterThan(3);
+        expect(result.trades.some((t) => t.side === 'sell')).toBe(true);
+        expect(result.income.filter((r) => r.kind === 'dividend').length).toBeGreaterThan(2);
+        expectSameRows(result.income, liveReplayOf(result, market.bars, market.rates).rows);
     });
 });
