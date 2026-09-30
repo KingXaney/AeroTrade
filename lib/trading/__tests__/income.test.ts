@@ -144,6 +144,41 @@ describe('replayIncome', () => {
         expect(replayIncome({from: '2026-09-20', to: '2026-09-19', startCash: 1, startHoldings: new Map(), trades: [], clock: clockWith()}).rows).toEqual([]);
         expect(replayIncome({from: '2026-09-18', to: '2026-09-19', startCash: 0, startHoldings: new Map(), trades: [], clock: clockWith()}).rows).toEqual([]);
     });
+
+    // Deposits are optional and new (the time-in-the-market lesson's monthly contributions);
+    // every caller that passes none must replay exactly as before.
+    it('replays identically with no deposits or an empty list', () => {
+        const input = {
+            from: '2026-09-18', to: '2026-09-30', startCash: 100_000, startHoldings: new Map([['XLE', 50]]),
+            trades: [trade('2026-09-19', 'XLE', 'buy', 100, 90), trade('2026-09-23', 'XLE', 'sell', 30, 92)],
+        };
+        const without = replayIncome({...input, clock: clockWith(XLE_DIVIDEND)});
+        const empty = replayIncome({...input, deposits: [], clock: clockWith(XLE_DIVIDEND)});
+        expect(empty.rows).toEqual(without.rows);
+        expect(empty.cash).toBe(without.cash);
+        expect([...empty.holdings]).toEqual([...without.holdings]);
+    });
+
+    it('lands a deposit at the start of its day, before that day\'s trades, and accrues on it from that close', () => {
+        const f = dailyFactor(apyFromDiscount(4.07));
+        const {rows, cash} = replayIncome({
+            from: '2026-09-18', to: '2026-09-20', startCash: 0, startHoldings: new Map(), trades: [], clock: clockWith(),
+            deposits: [{date: '2026-09-19', amount: 600}, {date: '2026-09-19', amount: 400}],
+        });
+        expect(rows.map((r) => r.date)).toEqual(['2026-09-19', '2026-09-20']);
+        expect(rows[0].amount).toBeCloseTo(1_000 * f, 12);
+        expect(rows[1].amount).toBeCloseTo(1_000 * (1 + f) * f, 12);
+        expect(cash).toBeCloseTo(1_000 * (1 + f), 10);
+
+        // Deposited and spent the same day: nothing is left idle at the close, so nothing accrues.
+        const spent = replayIncome({
+            from: '2026-09-18', to: '2026-09-20', startCash: 0, startHoldings: new Map(), clock: clockWith(),
+            deposits: [{date: '2026-09-18', amount: 6_000}], trades: [trade('2026-09-18', 'SPY', 'buy', 10, 600)],
+        });
+        expect(spent.rows).toEqual([]);
+        expect(spent.cash).toBe(0);
+        expect(spent.holdings.get('SPY')).toBe(10);
+    });
 });
 
 describe('reconcile', () => {

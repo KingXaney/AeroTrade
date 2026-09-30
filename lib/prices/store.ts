@@ -253,10 +253,15 @@ export const getDividendPoints = async (symbols: string[], from: string, to: str
     return bars.map((bar) => ({symbol: bar.symbol, exDate: bar.date, perShare: bar.dividend}));
 };
 
-// The stored T-bill series as rate points (a discount yield, annualised %).
-export const getRatePoints = async (): Promise<{date: string; discountPct: number}[]> => {
+// The stored T-bill series as rate points (a discount yield, annualised %). The jobs read it
+// whole; a request path passes inclusive `from`/`to` so the read stays bounded.
+export const getRatePoints = async ({from, to}: {from?: string; to?: string} = {}): Promise<{date: string; discountPct: number}[]> => {
     await connectToDatabase();
-    const bars = await PriceBar.find({symbol: RATE_SYMBOL}, {_id: 0, date: 1, close: 1}).sort({date: 1}).lean<{date: string; close: number}[]>();
+    const date: Record<string, string> = {};
+    if (from !== undefined) date.$gte = from;
+    if (to !== undefined) date.$lte = to;
+    const filter = {symbol: RATE_SYMBOL, ...(Object.keys(date).length > 0 ? {date} : {})};
+    const bars = await PriceBar.find(filter, {_id: 0, date: 1, close: 1}).sort({date: 1}).lean<{date: string; close: number}[]>();
     return bars.map((bar) => ({date: bar.date, discountPct: bar.close}));
 };
 

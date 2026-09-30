@@ -10,6 +10,8 @@ const BOARD: readonly GlossaryKey[] = [
     'close', 'since-entry', 'weight', 'target', 'drift', 'sma50', 'sma200', 'sma5', 'spread', 'trend-on',
     'r12', 'above-hurdle', 'pick', 'momentum-12-1', 'momentum-rank', 'rsi2', 'above-sma200',
     'high55', 'low20', 'vs-high', 'vol63', 'vol-rank', 'simulated-record',
+    // Time in the market lives on a strategy page (buy-and-hold SPY), so it homes with them.
+    'lump-sum', 'dollar-cost-averaging', 'cash-only', 'underwater',
 ];
 const MARKET: readonly GlossaryKey[] = ['market-cap', 'pe-ratio', 'dividend-yield', 'beta', 'fifty-two-week-range'];
 

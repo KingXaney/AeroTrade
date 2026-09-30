@@ -10,6 +10,9 @@
 // asks one question from the one board inside its ten-day window (a skipped day and older
 // boards are passed over), reveals the seeded reason and its gloss, counts an answered day
 // once however often it is answered, and says plainly when there is no board to ask about.
+// On the buy-and-hold page, Time in the market sets three ways of owning a seeded V-shaped SPY
+// side by side from the account's inception, moves with a start typed inside the dip, holds
+// its printed arithmetic to the cent, and prints a dash for cash once ^IRX is gone.
 // Run against the harness in README.md (in-memory Mongo on :27117 + `npm run dev`).
 import {chromium} from 'playwright';
 import {MongoClient, ObjectId} from 'mongodb';
@@ -648,6 +651,138 @@ try {
     await pageD.locator('#dashboard').waitFor({timeout: 30000});
     check('/settings lists the Daily quiz in the saved layout', /Daily quiz/.test(await pageD.locator('#dashboard').innerText()));
     await contextD.close();
+
+    // --- user E: time in the market on the buy-and-hold page -------------------------------
+    // Seeds a V in SPY (a rise to a peak about a year ago, a 30% fall over 60 sessions, a long
+    // climb) with no dividends, so the total-return index is the closes, and a flat ^IRX. The
+    // bars already stored are put back afterwards, so later suites see the database they expect.
+    const pricebars = db.collection('pricebars');
+    const savedBars = await pricebars.find({symbol: {$in: ['SPY', '^IRX']}}).toArray();
+    try {
+        const addDays = (date, n) => { const [y, m, d] = date.split('-').map(Number); return new Date(Date.UTC(y, m - 1, d + n)).toISOString().slice(0, 10); };
+        const weekday = (date) => ![0, 6].includes(new Date(`${date}T12:00:00Z`).getUTCDay());
+        const MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+        const long = (date) => `${MONTHS[Number(date.slice(5, 7)) - 1]} ${Number(date.slice(8, 10))}, ${date.slice(0, 4)}`;
+        const cents = (x) => Math.round(x * 100);
+        const money = (c) => `$${(c / 100).toLocaleString('en-US', {minimumFractionDigits: 2, maximumFractionDigits: 2})}`;
+        const parseMoney = (text) => { const m = /^([+−]?)\$([\d,]+\.\d{2})$/.exec(text.trim()); return m ? (m[1] === '−' ? -1 : 1) * Math.round(Number(m[2].replace(/,/g, '')) * 100) : NaN; };
+        const addMonths = (date, k) => {
+            const [y, m, d] = date.split('-').map(Number);
+            const first = new Date(Date.UTC(y, m - 1 + k, 1));
+            const last = new Date(Date.UTC(first.getUTCFullYear(), first.getUTCMonth() + 1, 0)).getUTCDate();
+            return new Date(Date.UTC(first.getUTCFullYear(), first.getUTCMonth(), Math.min(d, last))).toISOString().slice(0, 10);
+        };
+
+        const todayE = isoDaysAgo(0);
+        const sessions = [];
+        for (let d = addDays(todayE, -800); d < todayE; d = addDays(d, 1)) if (weekday(d)) sessions.push(d);
+        const N = sessions.length;
+        const P = N - 250;             // the peak, about a year back
+        const T = P + 60;              // the low, 60 sessions later
+        const close = (i) => (i <= P ? 500 - (P - i) * 0.25 : i <= T ? 500 - (i - P) * 2.5 : 350 + (i - T) * 1.5);
+        const PEAK_DATE = sessions[P];
+        const LOW_DATE = sessions[T];
+        const LAST = sessions[N - 1];
+        await pricebars.deleteMany({symbol: {$in: ['SPY', '^IRX']}});
+        const bar = (symbol, date, value) => ({symbol, date, close: value, open: value, high: value, low: value, source: 'yahoo', dividend: 0});
+        await pricebars.insertMany([...sessions.map((d, i) => bar('SPY', d, close(i))), ...sessions.map((d) => bar('^IRX', d, 4.07))]);
+
+        const contextE = await browser.newContext({viewport: {width: 1440, height: 900}});
+        const pageE = await contextE.newPage();
+        const emailE = await signUp(pageE, 'learnE');
+        const userE = await userIdFor(emailE);
+        await pageE.locator('[data-widget-id]').first().waitFor({timeout: 30000});
+        let accountE = null;
+        for (let i = 0; i < 30 && !accountE; i++) { accountE = await db.collection('paperaccounts').findOne({userId: userE}); if (!accountE) await pageE.waitForTimeout(1000); }
+        await db.collection('paperaccounts').updateOne({_id: accountE._id}, {$set: {inceptionAt: new Date(`${PEAK_DATE}T16:00:00Z`)}});
+
+        const panel = pageE.locator('#time-in-market');
+        const openPage = async (query = '') => {
+            await pageE.goto(`${BASE}/strategies/buy-and-hold-spy${query}`, {waitUntil: 'load'});
+            await panel.waitFor({timeout: 60000});
+        };
+        const tiles = async (way) => {
+            const read = async (i) => (await pageE.locator(`#time-in-market-${way} [data-tile="${i}"]`).innerText()).split('\n').map((s) => s.trim()).filter(Boolean);
+            const [end, change, under] = [await read(0), await read(1), await read(2)];
+            return {end: end[1], putIn: (end[2] ?? '').replace(/ put in$/, ''), change: change[1], pct: change[2] ?? '', under: under[1], underHint: under[2] ?? ''};
+        };
+        const addsUp = (t) => parseMoney(t.end) - parseMoney(t.putIn) === parseMoney(t.change);
+
+        await openPage();
+        check('buy-and-hold carries Time in the market, starting on the account\'s inception', await pageE.inputValue('#time-in-market-from') === PEAK_DATE
+            && (await panel.locator('[data-testid="time-in-market-source"]').innerText()) === 'Starts the day your first paper account opened.');
+        check('…over the seeded window', (await pageE.locator('#time-in-market-window').innerText()) === `$10,000 each way · ${long(PEAK_DATE)} → ${long(LAST)} · ${N - P} trading days`,
+            await pageE.locator('#time-in-market-window').innerText());
+        check('three ways render side by side', await pageE.locator('#time-in-market-ways > *').count() === 3
+            && await pageE.locator('#time-in-market-ways [data-term="lump-sum"][title], #time-in-market-ways [data-term="dollar-cost-averaging"][title], #time-in-market-ways [data-term="cash-only"][title]').count() === 3);
+
+        const lumpPeak = await tiles('lumpSum');
+        check('all at once from the peak: the closes\' own ratio, to the cent', parseMoney(lumpPeak.end) === cents(10_000 * close(N - 1) / close(P)) && lumpPeak.putIn === '$10,000.00',
+            `${lumpPeak.end} vs ${money(cents(10_000 * close(N - 1) / close(P)))}`);
+        const firstBack = sessions.findIndex((d, i) => i > T && close(i) >= 500);
+        check('…below the dollars put in from the day after the peak until the climb back', lumpPeak.under === `${firstBack - P - 1} of ${N - P} days`
+            && lumpPeak.underHint === `longest ${long(sessions[P + 1])} → ${long(sessions[firstBack - 1])}, ${firstBack - P - 1} trading days`, `${lumpPeak.under} · ${lumpPeak.underHint}`);
+        const f = (1 + (365 * 0.0407 / (360 - 91 * 0.0407) - 0.0025)) ** (1 / 365) - 1;
+        const days = Math.round((Date.parse(`${LAST}T00:00:00Z`) - Date.parse(`${PEAK_DATE}T00:00:00Z`)) / 86_400_000) + 1;
+        const cashPeak = await tiles('cashOnly');
+        check('cash only: daily compounding at the seeded rate for every calendar day, to the cent', parseMoney(cashPeak.end) === cents(10_000 * (1 + f) ** days)
+            && cashPeak.under === `0 of ${N - P} days` && cashPeak.underHint === 'not one trading day', `${cashPeak.end} vs ${money(cents(10_000 * (1 + f) ** days))}`);
+        const dca = await tiles('dollarCostAverage');
+        let deposits = 0;
+        while (addMonths(PEAK_DATE, deposits) <= LAST) deposits++;
+        check('monthly deposits: the whole amount, in one deposit a month', dca.putIn === '$10,000.00'
+            && (await pageE.locator('#time-in-market-dollarCostAverage').innerText()).includes(`$10,000 in ${deposits} monthly deposits into SPY`));
+        check('every way\'s printed end minus what went in is its printed change', [lumpPeak, cashPeak, dca].every(addsUp), JSON.stringify([lumpPeak, cashPeak, dca].map((t) => [t.end, t.putIn, t.change])));
+        check('…and the printed percentage is that change over what went in', [lumpPeak, cashPeak, dca].every((t) => {
+            const pct = Math.round(parseMoney(t.change) / parseMoney(t.putIn) * 10_000) / 100;
+            return t.pct === `${pct > 0 ? '+' : pct < 0 ? '−' : ''}${Math.abs(pct).toFixed(2)}% of the dollars put in`;
+        }), [lumpPeak, cashPeak, dca].map((t) => t.pct).join(' | '));
+        const chart = panel.locator('[data-testid="dollar-chart"]');
+        check('the chart draws the three ways as dollars per dollar put in', await chart.locator('path[data-line]').count() === 3
+            && (await chart.locator('[data-line="lumpSum"] [data-line-value]').innerText()) === `$${(close(N - 1) / close(P)).toFixed(2)}`);
+        const panelText = await panel.innerText();
+        check('"growth of each dollar contributed" is said once, the caveat once', (panelText.match(/Growth of each dollar contributed/g) ?? []).length === 1
+            && (panelText.match(/In hindsight/g) ?? []).length === 1);
+        check('one disclosure, "Why the start date matters", holding the definitions', await panel.locator('details').count() === 1
+            && /Why the start date matters/.test(await panel.locator('details summary').innerText()));
+        await panel.locator('details').evaluate((d) => { d.open = true; });
+        const rows = panel.locator('[data-testid="time-in-market-table"] tbody tr');
+        check('…with earlier starts a quarter apart, each a link to that start', await rows.count() >= 3
+            && (await rows.first().locator('a').getAttribute('href')).startsWith('/strategies/buy-and-hold-spy?from='), String(await rows.count()));
+        await pageE.screenshot({path: `${OUT}09-time-in-market.png`, fullPage: true});
+
+        // A start inside the dip: the native form, then the same three ways from the low.
+        await pageE.fill('#time-in-market-from', LOW_DATE);
+        await Promise.all([pageE.waitForURL(new RegExp(`from=${LOW_DATE}`), {timeout: 30000}), pageE.click('#time-in-market-form button[type="submit"]')]);
+        await panel.waitFor({timeout: 60000});
+        const lumpLow = await tiles('lumpSum');
+        check('a start inside the dip changes the numbers', parseMoney(lumpLow.end) === cents(10_000 * close(N - 1) / close(T)) && lumpLow.end !== lumpPeak.end
+            && lumpLow.under === `0 of ${N - T} days`, `${lumpLow.end} · ${lumpLow.under}`);
+        check('…and a typed start says nothing about the account', await panel.locator('[data-testid="time-in-market-source"]').count() === 0);
+
+        await openPage('?from=not-a-date');
+        check('a malformed ?from= falls back to the inception date', await pageE.inputValue('#time-in-market-from') === PEAK_DATE && await panel.locator('[data-testid="time-in-market-moved"]').count() === 0);
+        await openPage('?from=1990-01-01');
+        check('a start before the stored history is clamped, and says so', /^1990-01-01 is outside the stored range; showing /.test(await panel.locator('[data-testid="time-in-market-moved"]').innerText())
+            && (await pageE.locator('#time-in-market-window').innerText()).includes(`${long(sessions[0])} → ${long(LAST)}`));
+
+        // No stored ^IRX: the ways that hold cash cannot be priced — a dash, never a zero.
+        await pricebars.deleteMany({symbol: '^IRX'});
+        await openPage();
+        const cashNoRate = await tiles('cashOnly');
+        check('removing ^IRX shows — for cash only', cashNoRate.end === '—' && cashNoRate.change === '—' && cashNoRate.under === '—', JSON.stringify(cashNoRate));
+        check('…says why once, and keeps all at once, which never holds cash', /No usable T-bill rate is stored for /.test(await panel.locator('[data-testid="time-in-market-rate-gap"]').innerText())
+            && parseMoney((await tiles('lumpSum')).end) === cents(10_000 * close(N - 1) / close(P))
+            && await panel.locator('[data-testid="dollar-chart"] path[data-line="cashOnly"]').count() === 0);
+
+        await pageE.goto(`${BASE}/strategies/golden-cross`, {waitUntil: 'load'});
+        await pageE.locator('#strategy-explainer').waitFor({timeout: 30000});
+        check('no other strategy page carries it', await pageE.locator('#time-in-market').count() === 0);
+        await contextE.close();
+    } finally {
+        await pricebars.deleteMany({symbol: {$in: ['SPY', '^IRX']}});
+        if (savedBars.length > 0) await pricebars.insertMany(savedBars);
+    }
 } catch (err) {
     failures++;
     console.log(`FAIL  threw: ${err.message}`);

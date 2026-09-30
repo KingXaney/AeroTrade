@@ -18,7 +18,7 @@ const formatPct = (v: number) => `${v >= 0 ? '+' : ''}${v.toFixed(2)}%`;
 // lib/learn/copy). Dates not on the series draw nothing.
 export type ChartBand = {from: string; to: string; label: string};
 
-const PerformanceChart = ({series, accountName, band}: {series: PerfPoint[]; accountName: string; band?: ChartBand | null}) => {
+const ReturnChart = ({series, accountName, band}: {series: PerfPoint[]; accountName: string; band?: ChartBand | null}) => {
     const svgRef = useRef<SVGSVGElement>(null);
     const [hoverIdx, setHoverIdx] = useState<number | null>(null);
 
@@ -144,5 +144,100 @@ const PerformanceChart = ({series, accountName, band}: {series: PerfPoint[]; acc
         </div>
     );
 };
+
+// ---------------------------------------------------------------------------------------------
+// Dollar-value mode: lines of dollar values on one set of dates, around a dashed baseline. Built
+// for "Time in the market" (the growth of each dollar contributed, three ways of owning SPY),
+// where a series that takes deposits is not a return series and must never be rebased through
+// toPerfSeries. Every label comes from the caller (copy lives in lib/learn/copy); the lines are
+// told apart by colour and dash, and no colour says which line is ahead.
+// ---------------------------------------------------------------------------------------------
+
+export type DollarLineTone = 'brand' | 'secondary' | 'muted';
+export type DollarLine = {key: string; label: string; tone: DollarLineTone; values: readonly number[]};
+export type DollarSeries = {dates: readonly string[]; lines: readonly DollarLine[]; baseline: number; ariaLabel: string};
+
+const TONES: Record<DollarLineTone, {stroke: string; swatch: string; width: number; dash?: string}> = {
+    brand: {stroke: 'stroke-brand', swatch: 'bg-brand', width: 1.75},
+    secondary: {stroke: 'stroke-chart-2', swatch: 'bg-chart-2', width: 1.5},
+    muted: {stroke: 'stroke-fg-muted', swatch: 'bg-fg-muted', width: 1.25, dash: '5 3'},
+};
+
+const formatDollars = (v: number) => `$${v.toFixed(2)}`;
+
+const DollarChart = ({dates, lines, baseline, ariaLabel}: DollarSeries) => {
+    const svgRef = useRef<SVGSVGElement>(null);
+    const [hoverIdx, setHoverIdx] = useState<number | null>(null);
+    const count = dates.length;
+
+    const geometry = useMemo(() => {
+        const drawn = lines.filter((line) => line.values.length === count);
+        if (count < 2 || drawn.length === 0) return null;
+        let min = baseline;
+        let max = baseline;
+        for (const line of drawn) for (const v of line.values) { if (v < min) min = v; if (v > max) max = v; }
+        const span = max - min || 1;
+        const x = (i: number) => PAD_X + (i / (count - 1)) * (WIDTH - PAD_X * 2);
+        const y = (v: number) => PAD_Y + (1 - (v - min) / span) * (HEIGHT - PAD_Y * 2);
+        const paths = drawn.map((line) => ({line, d: line.values.map((v, i) => `${i === 0 ? 'M' : 'L'}${x(i).toFixed(1)},${y(v).toFixed(1)}`).join(' ')}));
+        return {x, y, paths, drawn, min, max, baseY: y(baseline)};
+    }, [lines, baseline, count]);
+
+    if (!geometry) return null;
+
+    const onMove = (e: React.MouseEvent<SVGSVGElement>) => {
+        const rect = svgRef.current?.getBoundingClientRect();
+        if (!rect) return;
+        const px = ((e.clientX - rect.left) / rect.width) * WIDTH;
+        const idx = Math.round(((px - PAD_X) / (WIDTH - PAD_X * 2)) * (count - 1));
+        setHoverIdx(Math.max(0, Math.min(count - 1, idx)));
+    };
+    const at = hoverIdx ?? count - 1;
+
+    return (
+        <div data-testid="dollar-chart">
+            <div className="flex flex-wrap items-center gap-4 mb-3 text-xs font-mono">
+                {geometry.drawn.map((line) => (
+                    <span key={line.key} className="flex items-center gap-1.5" data-line={line.key}>
+                        <span className={`inline-block w-3 h-0.5 rounded ${TONES[line.tone].swatch}`} />
+                        <span className="text-fg-muted">{line.label}</span>
+                        <span className="text-fg" data-line-value>{formatDollars(line.values[at])}</span>
+                    </span>
+                ))}
+                <span className="ml-auto text-fg-muted">{dates[at]}</span>
+            </div>
+            <svg ref={svgRef} viewBox={`0 0 ${WIDTH} ${HEIGHT}`} className="w-full h-auto" role="img" aria-label={ariaLabel}
+                 onMouseMove={onMove} onMouseLeave={() => setHoverIdx(null)}>
+                <line x1={PAD_X} x2={WIDTH - PAD_X} y1={geometry.baseY} y2={geometry.baseY}
+                      className="stroke-line-strong/50" strokeDasharray="4 4" strokeWidth="1" />
+                <text x={PAD_X - 6} y={geometry.baseY + 3} textAnchor="end" fontSize="9" className="fill-fg-muted font-mono">{formatDollars(baseline)}</text>
+                <text x={PAD_X - 6} y={PAD_Y + 3} textAnchor="end" fontSize="9" className="fill-fg-muted font-mono">{formatDollars(geometry.max)}</text>
+                <text x={PAD_X - 6} y={HEIGHT - PAD_Y + 3} textAnchor="end" fontSize="9" className="fill-fg-muted font-mono">{formatDollars(geometry.min)}</text>
+                {/* Drawn last-listed first, so the first line the caller lists sits on top. */}
+                {[...geometry.paths].reverse().map(({line, d}) => (
+                    <path key={line.key} d={d} fill="none" data-line={line.key} className={TONES[line.tone].stroke}
+                          strokeWidth={TONES[line.tone].width} strokeDasharray={TONES[line.tone].dash} />
+                ))}
+                {hoverIdx !== null && (
+                    <g>
+                        <line x1={geometry.x(hoverIdx)} x2={geometry.x(hoverIdx)} y1={PAD_Y} y2={HEIGHT - PAD_Y} className="stroke-brand/35" strokeWidth="1" />
+                        {geometry.drawn.map((line) => (
+                            <circle key={line.key} cx={geometry.x(hoverIdx)} cy={geometry.y(line.values[hoverIdx])} r="2.5" className={`${TONES[line.tone].stroke} fill-bg`} strokeWidth="1.5" />
+                        ))}
+                    </g>
+                )}
+            </svg>
+        </div>
+    );
+};
+
+// One chart, two modes: a return series against SPY (the default), or dollar values.
+type ReturnProps = {series: PerfPoint[]; accountName: string; band?: ChartBand | null; dollars?: undefined};
+type DollarProps = {dollars: DollarSeries; series?: undefined; accountName?: undefined; band?: undefined};
+
+const PerformanceChart = (props: ReturnProps | DollarProps) =>
+    props.dollars !== undefined
+        ? <DollarChart {...props.dollars} />
+        : <ReturnChart series={props.series} accountName={props.accountName} band={props.band} />;
 
 export default PerformanceChart;
