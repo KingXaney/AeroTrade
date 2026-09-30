@@ -1,10 +1,10 @@
 // The what-if parameter lab, pure layer: which knobs a learner may turn on each strategy and
 // how far, the schema a setting must pass, how a setting becomes a definition the UNCHANGED
-// engine runs, the fixed grid the nightly strategies job precomputes, the diff a page prints
-// and the compact view it draws. No DB and no engine import: the job hands
-// applyOverrides(def, variant.overrides) to simulateStrategy itself, with the same bars,
-// launch date and rates as the stored backtest, so a variant differs from the stored run by
-// its setting alone.
+// engine runs, the fixed grid the nightly strategies job precomputes, the diff a page prints,
+// the compact view it draws and the lab's props (whatIfLab). No DB and no engine import: the
+// job (runner.simulateVariantsForStrategy) hands applyOverrides(def, variant.overrides) to
+// simulateStrategy itself, with the same bars, launch date and rates as the stored backtest,
+// so a variant differs from the stored run by its setting alone.
 //
 // Server-side module (it pulls zod); a client component imports only its types.
 
@@ -181,3 +181,90 @@ export const toWhatIfView = (result: SimulationResult): WhatIfView => ({
     skippedDays: result.skippedDays,
     points: whatIfPoints(result.points),
 });
+
+// ── The lab on a strategy page ──────────────────────────────────────────────────
+
+// One precomputed variant as the nightly job stores it: StrategyBacktest.variants is an ARRAY
+// of these (the ids hold dots, so they are never Mongo keys).
+export type StoredWhatIfVariant = {id: string; knob: string; value: number} & WhatIfView;
+
+// A knob's control: every value the grid visits plus the catalog value, ascending. A
+// single-knob strategy gets five positions; a two-knob one three per knob; momentum 12-1's
+// lookback and skip only move one way, so they get two.
+export type LabKnob = {key: string; catalog: number; positions: number[]};
+
+export const labKnobs = (def: StrategyDefinition): LabKnob[] => {
+    const grid = gridFor(def);
+    return [...new Set(grid.map((variant) => variant.knob))].flatMap((key) => {
+        const catalog = findParam(def, key);
+        if (catalog === null) return [];
+        const values = new Set([catalog, ...grid.filter((variant) => variant.knob === key).map((variant) => variant.value)]);
+        return [{key, catalog, positions: [...values].sort((a, b) => a - b)}];
+    });
+};
+
+// What the detail page reads: the stored backtest and whatever variants were stored with it.
+export type WhatIfBacktest = {
+    version: string;
+    from: string;
+    to: string;
+    points: readonly SeriesPoint[];
+    stats: SeriesStats;
+    variants?: readonly StoredWhatIfVariant[];
+    variantsVersion?: string;
+};
+
+export type WhatIfLabVariant = {
+    id: string;
+    knob: string;
+    value: number;
+    changes: ParamChange[];
+    stats: SeriesStats;
+    closeFills: number;
+    skippedDays: number;
+    // On the stored line's dates, one value per date.
+    values: number[];
+};
+
+export type WhatIfLabView = {
+    knobs: LabKnob[];
+    // The stored backtest through whatIfPoints: its dates are the chart's one axis.
+    stored: {from: string; to: string; dates: string[]; values: number[]; stats: SeriesStats} | null;
+    // Empty until the nightly job has computed them for this backtest.
+    variants: WhatIfLabVariant[];
+};
+
+// The lab's props, built on the server so a client control can switch variants without a
+// round trip. A variant is shown only beside the backtest it was computed with: the same
+// version, the same window and the same decimated dates (anything else is not "the same rule
+// with one setting moved" and waits for the next night's grid). Null: the rule has no knob.
+export const whatIfLab = (def: StrategyDefinition, backtest: WhatIfBacktest | null): WhatIfLabView | null => {
+    const grid = gridFor(def);
+    if (grid.length === 0) return null;
+    const knobs = labKnobs(def);
+    if (backtest === null) return {knobs, stored: null, variants: []};
+    const points = whatIfPoints(backtest.points);
+    const dates = points.map((point) => point.date);
+    const current = backtest.variantsVersion === backtest.version ? (backtest.variants ?? []) : [];
+    const variants = grid.flatMap(({id}) => {
+        const found = current.find((variant) => variant.id === id);
+        const aligned = found !== undefined && found.from === backtest.from && found.to === backtest.to
+            && found.points.length === dates.length && found.points.every((point, i) => point.date === dates[i]);
+        if (!aligned) return [];
+        return [{
+            id: found.id,
+            knob: found.knob,
+            value: found.value,
+            changes: paramDiff(def, {[found.knob]: found.value}),
+            stats: found.stats,
+            closeFills: found.closeFills,
+            skippedDays: found.skippedDays,
+            values: found.points.map((point) => point.value),
+        }];
+    });
+    return {
+        knobs,
+        stored: {from: backtest.from, to: backtest.to, dates, values: points.map((point) => point.value), stats: backtest.stats},
+        variants,
+    };
+};

@@ -1,7 +1,9 @@
 // The quant-strategies tab: the nav carries it, the leaderboard and detail pages render
 // honestly with nothing seeded (the job never runs in this harness), then with a seeded
 // system state they rank by the seeded live return, label unpriced holdings, show the
-// explainer / signal board / trade reasons / simulated record, and follow persists.
+// explainer / signal board / trade reasons / simulated record, and follow persists. The
+// what-if lab reads a seeded grid (golden cross: two knobs; 60/40: a slider), switches it
+// without a request or a write, and says "computed overnight" where no grid is stored yet.
 // Run against the harness in README.md (in-memory Mongo on :27117 + `npm run dev`).
 import {chromium} from 'playwright';
 import {MongoClient, ObjectId} from 'mongodb';
@@ -112,6 +114,23 @@ try {
 
     // --- seed a system state the way the job would leave it ---------------------------
     const today = isoDaysAgo(0);
+    // The what-if lab's precomputed grid as the nightly job stores it: an ARRAY beside the
+    // backtest, stamped with the backtest's version, on the stored backtest's dates (30 points
+    // decimate to themselves). Golden cross has two knobs, 60/40 one (a slider); every other
+    // rule has none stored yet, so its lab shows the "computed overnight" state.
+    const WHATIF = {
+        'golden-cross': [['fast', 20, 7.7], ['fast', 100, 14.4], ['slow', 100, 3.3], ['slow', 250, 9.9]],
+        'sixty-forty': [['spyWeight', 0.4, 6.1], ['spyWeight', 0.5, 8.2], ['spyWeight', 0.7, 12.5], ['spyWeight', 0.8, 13.9]],
+    };
+    const variantsFor = (slug, points) => (WHATIF[slug] ? {
+        variantsVersion: '1.1',
+        variants: WHATIF[slug].map(([knob, value, ret]) => ({
+            id: `${knob}=${value}`, knob, value, from: points[0].date, to: points[points.length - 1].date,
+            stats: {totalReturnPct: ret, cagrPct: ret / 3, annualizedVolPct: 11, maxDrawdownPct: 3, winRatePct: null, wins: 0, losses: 0, tradeCount: 4, benchmarkReturnPct: 10.0, excessReturnPct: ret - 10},
+            closeFills: 0, skippedDays: 0,
+            points: points.map((p, k) => ({date: p.date, value: 100_000 * (1 + (k / (points.length - 1)) * (ret / 100))})),
+        })),
+    } : {});
     // 13 days: long enough that 12 snapshots clear MIN_SPARK_POINTS (10) so the live
     // sparkline column is reachable, still inside the 30-day "young record" note.
     const launch = isoDaysAgo(13);
@@ -167,6 +186,7 @@ try {
             trades: [{date: points[1].date, symbol: 'SPY', side: 'buy', quantity: 190, price: 500, total: 95_000, reason: 'initial deployment: buy and hold SPY', fill: 'open'}],
             stats: {totalReturnPct: 11.6, cagrPct: 9.1, annualizedVolPct: 12.3, maxDrawdownPct: 2.5, winRatePct: null, wins: 0, losses: 0, tradeCount: 1, benchmarkReturnPct: 10.0, excessReturnPct: 1.6},
             computedAt: new Date(),
+            ...variantsFor(slug, points),
         });
         seeded.push({slug, name, accountId: String(accountId)});
     }
@@ -282,6 +302,61 @@ try {
     check('the disclaimer appears once on a detail page', (detailText.match(/not financial advice/gi) ?? []).length === 1);
     await shot('03-detail');
 
+    // --- what-if lab: the nightly grid beside the stored backtest --------------------------
+    // Everything arrives with the page: switching settings sends no request and writes nothing.
+    const lab = page.locator('#whatif-lab');
+    const labStats = page.locator('#whatif-stats');
+    const whatIfDiff = page.locator('#whatif-diff');
+    const storedDoc = async () => JSON.stringify(await db.collection('strategybacktests').findOne({strategyId: 'golden-cross'}));
+    const docBefore = await storedDoc();
+    const tradesBefore = await db.collection('papertrades').countDocuments({});
+    const posts = [];
+    const onRequest = (req) => { if (req.method() === 'POST') posts.push(req.url()); };
+    page.on('request', onRequest);
+    const simulatedBefore = await page.locator('#simulated-stats').innerText();
+    await lab.scrollIntoViewIfNeeded();
+    check('the what-if lab renders on a rule with knobs', await lab.count() === 1 && /what-if lab/i.test(await page.locator('#whatif-lab-heading').innerText()));
+    check('…three positions per knob, the catalog value among them and pressed',
+        (await lab.locator('[data-knob="fast"]').evaluateAll((els) => els.map((e) => e.getAttribute('data-value')))).join(',') === '20,50,100'
+        && (await lab.locator('[data-knob="slow"]').evaluateAll((els) => els.map((e) => e.getAttribute('data-value')))).join(',') === '100,200,250'
+        && await lab.locator('[data-knob="fast"][data-value="50"][aria-pressed="true"]').count() === 1
+        && /50 \(catalog\)/.test(await lab.locator('[data-knob="fast"][data-value="50"]').innerText()));
+    check('…starting at the catalog setting: the stored backtest\'s own numbers',
+        (await whatIfDiff.innerText()) === 'Catalog setting' && /\+11\.60%/.test(await labStats.innerText())
+        && await lab.locator('path[data-line="stored"]').count() === 1 && await lab.locator('path[data-line="whatif"]').count() === 0);
+    await lab.locator('[data-knob="fast"][data-value="20"]').click();
+    await page.waitForFunction(() => document.querySelector('#whatif-diff')?.getAttribute('data-variant') === 'fast=20');
+    const fast20 = await labStats.innerText();
+    check('a position switches the diff line and the what-if tiles',
+        (await whatIfDiff.innerText()) === 'Fast average (days): 50 → 20' && /\+7\.70%/.test(fast20) && /-2\.30%/.test(fast20) && !/\+11\.60%/.test(fast20), fast20.replace(/\s+/g, ' ').slice(0, 120));
+    check('…and the chart draws the what-if beside the stored backtest',
+        await lab.locator('path[data-line="whatif"]').count() === 1 && await lab.locator('path[data-line="stored"]').count() === 1
+        && (await lab.locator('[data-line="whatif"] [data-line-value]').innerText()) === '$107,700.00'
+        && /What-if/.test(await lab.locator('[data-testid="dollar-chart"]').innerText())
+        && /Stored backtest \(catalog setting\)/.test(await lab.locator('[data-testid="dollar-chart"]').innerText()));
+    await lab.locator('[data-knob="slow"][data-value="250"]').click();
+    await page.waitForFunction(() => document.querySelector('#whatif-diff')?.getAttribute('data-variant') === 'slow=250');
+    check('one setting moves at a time: the other knob returns to its catalog value',
+        (await whatIfDiff.innerText()) === 'Slow average (days): 200 → 250' && /\+9\.90%/.test(await labStats.innerText())
+        && await lab.locator('[data-knob="fast"][data-value="50"][aria-pressed="true"]').count() === 1
+        && await lab.locator('[aria-pressed="true"]').count() === 2);
+    await lab.locator('[data-knob="slow"][data-value="200"]').click();
+    await page.waitForFunction(() => document.querySelector('#whatif-diff')?.getAttribute('data-variant') === 'catalog');
+    check('…and the catalog position is the stored backtest again', /\+11\.60%/.test(await labStats.innerText()) && await lab.locator('path[data-line="whatif"]').count() === 0);
+    check('#simulated-stats is unchanged by the lab', (await page.locator('#simulated-stats').innerText()) === simulatedBefore);
+    check('the what-if tiles are the simulated tiles, with no delta column or ranking',
+        await labStats.locator('.grid > div').count() === await page.locator('#simulated-stats .grid > div').count()
+        && !/delta|difference|rank|better|best/i.test(await lab.innerText()));
+    check('the caveat is stated once', ((await page.locator('body').innerText()).match(/same three years, in hindsight/gi) ?? []).length === 1);
+    check('the lab has one "What these mean", and "Ask in chat" only inside it',
+        await lab.locator('[data-what-these-mean]').count() === 1 && await page.locator('#whatif-lab-panel [data-what-these-mean]').count() === 0
+        && await lab.locator('[data-ask]').count() === await lab.locator('[data-what-these-mean] [data-ask]').count());
+    check('no variant trades are shown', await lab.locator('table, [data-trade], details[data-decoded]').count() === 0);
+    page.off('request', onRequest);
+    check('switching settings sends nothing to the server', posts.length === 0, posts.join(', '));
+    check('…and persists nothing', (await storedDoc()) === docBefore && (await db.collection('papertrades').countDocuments({})) === tradesBefore);
+    await shot('03b-whatif');
+
 
     // --- follow persists and drives the widget ------------------------------------------
     await page.locator('#strategy-follow').click();
@@ -322,6 +397,30 @@ try {
     const fallbackReading = await rsiBoardTerms.locator('[data-board-row-reading]').innerText();
     check('…honestly, by its verdict alone', /does not have every number this rule reads for SYM00/.test(fallbackReading)
         && /verdict for SYM00 is held/.test(fallbackReading) && !/undefined|NaN|null/.test(fallbackReading), fallbackReading.replace(/\s+/g, ' ').slice(0, 200));
+
+    // --- the what-if lab before its grid exists, on a one-knob rule, and on a rule with none --
+    // RSI-2's backtest was seeded without variants: the lab says when they come, and nothing else.
+    const pending = page.locator('#whatif-lab [data-testid="whatif-pending"]');
+    check('a rule whose grid is not computed yet says so honestly', await pending.count() === 1 && /computed overnight/i.test(await pending.innerText())
+        && await page.locator('#whatif-stats, #whatif-lab [data-testid="dollar-chart"], #whatif-lab button, #whatif-slider').count() === 0);
+    await page.goto(`${BASE}/strategies/sixty-forty`, {waitUntil: 'load'});
+    const slider = page.locator('#whatif-slider');
+    await slider.waitFor({timeout: 30000});
+    check('a one-knob rule gets a five-position slider, set on the catalog value',
+        await slider.getAttribute('max') === '4' && await slider.inputValue() === '2'
+        && (await page.locator('#whatif-controls [data-position]').allInnerTexts()).join(',') === '40%,50%,60% (catalog),70%,80%'
+        && await page.locator('#whatif-lab button[data-knob]').count() === 0);
+    await slider.fill('4');
+    await page.waitForFunction(() => document.querySelector('#whatif-diff')?.getAttribute('data-variant') === 'spyWeight=0.8');
+    check('…and moving it switches the diff line and the tiles',
+        (await page.locator('#whatif-diff').innerText()) === 'SPY weight: 60% → 80%' && /\+13\.90%/.test(await page.locator('#whatif-stats').innerText()));
+    await slider.fill('0');
+    await page.waitForFunction(() => document.querySelector('#whatif-diff')?.getAttribute('data-variant') === 'spyWeight=0.4');
+    check('…to either end', (await page.locator('#whatif-diff').innerText()) === 'SPY weight: 60% → 40%' && /\+6\.10%/.test(await page.locator('#whatif-stats').innerText()));
+    await shot('06-whatif-slider');
+    await page.goto(`${BASE}/strategies/buy-and-hold-spy`, {waitUntil: 'load'});
+    await page.locator('#strategy-performance').waitFor({timeout: 30000});
+    check('buy and hold has no knob, so no lab', await page.locator('#whatif-lab').count() === 0);
 
 } catch (err) {
     failures++;

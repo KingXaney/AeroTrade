@@ -14,13 +14,17 @@ import {visibleSignalColumns} from '@/lib/strategies/views';
 import {
     applyOverrides,
     gridFor,
+    labKnobs,
     overridesSchema,
     paramDiff,
     PARAM_RANGES,
     toWhatIfView,
     WHATIF_MAX_VARIANTS,
     WHATIF_VIEW_POINTS,
+    whatIfLab,
     whatIfPoints,
+    type StoredWhatIfVariant,
+    type WhatIfBacktest,
 } from '@/lib/strategies/whatif';
 import {genericContext} from '@/lib/strategies/__tests__/fixtures';
 
@@ -233,5 +237,96 @@ describe('toWhatIfView', () => {
     it('draws the stored backtest on the same dates, so the two lines share one axis', () => {
         const r = result(757);
         expect(whatIfPoints(r.points).map((p) => p.date)).toEqual(toWhatIfView(r).points.map((p) => p.date));
+    });
+});
+
+describe('labKnobs', () => {
+    const positions = (id: StrategyId) => Object.fromEntries(labKnobs(def(id)).map((k) => [k.key, k.positions]));
+
+    it('gives a single-knob strategy one five-position control, the catalog value among them', () => {
+        expect(positions('sixty-forty')).toEqual({spyWeight: [0.4, 0.5, 0.6, 0.7, 0.8]});
+        expect(positions('dual-momentum')).toEqual({lookback: [21, 63, 126, 189, 252]});
+    });
+
+    it('gives a two-knob strategy three positions per knob, the catalog in the middle', () => {
+        expect(positions('golden-cross')).toEqual({fast: [20, 50, 100], slow: [100, 200, 250]});
+        expect(positions('rsi2-mean-reversion')).toEqual({entryRsi: [5, 10, 20], exitSma: [3, 5, 10]});
+        expect(positions('donchian-breakout')).toEqual({entryChannel: [20, 55, 100], exitChannel: [10, 20, 55]});
+        expect(positions('low-volatility')).toEqual({volWindow: [21, 63, 126], top: [5, 10, 20]});
+    });
+
+    it('keeps momentum 12-1 uneven: two positions for lookback and skip, three for positions held', () => {
+        expect(positions('momentum-12-1')).toEqual({lookback: [126, 252], skip: [0, 21], top: [4, 8, 16]});
+    });
+
+    it('offers every grid value and the catalog value of every knob, in grid order, and nothing for buy and hold', () => {
+        expect(labKnobs(def('buy-and-hold-spy'))).toEqual([]);
+        for (const d of STRATEGIES) {
+            const knobs = labKnobs(d);
+            expect(knobs.map((k) => k.key)).toEqual([...new Set(gridFor(d).map((v) => v.knob))]);
+            for (const knob of knobs) {
+                expect(knob.catalog).toBe(findParam(d, knob.key));
+                expect(knob.positions).toContain(knob.catalog);
+                expect([...knob.positions].sort((a, b) => a - b)).toEqual(knob.positions);
+            }
+            for (const variant of gridFor(d)) {
+                expect(knobs.find((k) => k.key === variant.knob)?.positions, variant.id).toContain(variant.value);
+            }
+        }
+    });
+});
+
+describe('whatIfLab', () => {
+    const gc = def('golden-cross');
+    const series = (count: number, step: number) =>
+        Array.from({length: count}, (_, i) => ({date: `d${String(i).padStart(4, '0')}`, value: 100_000 + i * step}));
+    const stats = {totalReturnPct: 1, cagrPct: 1, annualizedVolPct: 1, maxDrawdownPct: 0, winRatePct: null, wins: 0, losses: 0, tradeCount: 0, benchmarkReturnPct: 1, excessReturnPct: 0};
+    const stored = (extra: Partial<WhatIfBacktest> = {}): WhatIfBacktest => {
+        const points = series(300, 5);
+        return {version: '3.1', from: points[0].date, to: points[299].date, points, stats, ...extra};
+    };
+    const variant = (id: string, knob: string, value: number, step = 9): StoredWhatIfVariant => {
+        const points = series(300, step);
+        return {id, knob, value, from: points[0].date, to: points[299].date, stats: {...stats, totalReturnPct: step}, closeFills: 1, skippedDays: 0, points: whatIfPoints(points)};
+    };
+    const grid = () => gridFor(gc).map((v, i) => variant(v.id, v.knob, v.value, 10 + i));
+
+    it('has no lab for a strategy without knobs', () => {
+        expect(whatIfLab(def('buy-and-hold-spy'), stored())).toBeNull();
+    });
+
+    it('shows the controls and nothing computed before the backtest or its variants exist', () => {
+        expect(whatIfLab(gc, null)).toEqual({knobs: labKnobs(gc), stored: null, variants: []});
+        const lab = whatIfLab(gc, stored());
+        expect(lab?.variants).toEqual([]);
+        expect(lab?.stored?.dates).toHaveLength(WHATIF_VIEW_POINTS);
+    });
+
+    it('draws the stored backtest decimated onto the variants\' dates, and each variant beside it', () => {
+        const backtest = stored({variants: grid(), variantsVersion: '3.1'});
+        const lab = whatIfLab(gc, backtest);
+        expect(lab?.stored).toMatchObject({from: backtest.from, to: backtest.to, stats});
+        expect(lab?.stored?.dates).toEqual(whatIfPoints(backtest.points).map((p) => p.date));
+        expect(lab?.stored?.values).toEqual(whatIfPoints(backtest.points).map((p) => p.value));
+        expect(lab?.variants.map((v) => v.id)).toEqual(gridFor(gc).map((v) => v.id));
+        const fast20 = lab?.variants[0];
+        expect(fast20).toMatchObject({knob: 'fast', value: 20, changes: [{key: 'fast', from: 50, to: 20}], closeFills: 1, skippedDays: 0});
+        expect(fast20?.stats.totalReturnPct).toBe(10);
+        expect(fast20?.values).toHaveLength(lab?.stored?.dates.length ?? -1);
+    });
+
+    it('hides variants computed for another version of the backtest', () => {
+        expect(whatIfLab(gc, stored({variants: grid(), variantsVersion: '2.1'}))?.variants).toEqual([]);
+        expect(whatIfLab(gc, stored({variants: grid()}))?.variants).toEqual([]);
+    });
+
+    it('drops a variant off the grid or off the stored calendar, keeping the rest in grid order', () => {
+        const [a, b, c, d] = grid();
+        const offGrid = variant('fast=30', 'fast', 30);
+        const offCalendar = {...c, points: c.points.map((p, i) => (i === 5 ? {...p, date: 'x'} : p))};
+        const lab = whatIfLab(gc, stored({variants: [d, offGrid, b, offCalendar, a], variantsVersion: '3.1'}));
+        expect(lab?.variants.map((v) => v.id)).toEqual([a.id, b.id, d.id]);
+        const otherWindow = {...a, from: 'd0001'};
+        expect(whatIfLab(gc, stored({variants: [otherWindow], variantsVersion: '3.1'}))?.variants).toEqual([]);
     });
 });

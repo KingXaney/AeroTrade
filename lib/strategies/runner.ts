@@ -1,6 +1,6 @@
 // What one Inngest step does for one strategy: load the decision input, run the ONE
-// shared decision path, persist the plan; or rebuild the simulated record. Server
-// module; the job in lib/inngest/functions.ts sequences these into steps.
+// shared decision path, persist the plan; or rebuild the simulated record, or its what-if
+// grid. Server module; the job in lib/inngest/functions.ts sequences these into steps.
 
 import {buildContext, runStrategyDay} from "@/lib/strategies/engine";
 import {STRATEGY_RULES} from "@/lib/strategies/rules";
@@ -8,9 +8,10 @@ import {simulateStrategy} from "@/lib/strategies/simulate";
 import {effectiveVersion} from "@/lib/strategies/catalog";
 import {CASH_FLOOR, STRATEGY_STARTING_BALANCE} from "@/lib/strategies/config";
 import {universeIsTooStale} from "@/lib/strategies/job-helpers";
-import {loadDecisionInput, loadSimulationBars, saveBacktest, savePlannedRun, type StrategyStateView} from "@/lib/strategies/store";
+import {loadDecisionInput, loadSimulationBars, saveBacktest, savePlannedRun, saveVariants, type StrategyStateView} from "@/lib/strategies/store";
 import type {PlannedOrder, StrategyDefinition} from "@/lib/strategies/types";
 import {BENCHMARK_SYMBOL, UNIVERSES} from "@/lib/strategies/universe";
+import {applyOverrides, gridFor, toWhatIfView, type StoredWhatIfVariant} from "@/lib/strategies/whatif";
 import {getRatePoints, symbolsLackingDividendCoverage} from "@/lib/prices/store";
 import {addCalendarDays} from "@/lib/prices/calendar-days";
 import {RATE_MAX_STALENESS_DAYS} from "@/lib/trading/income";
@@ -98,4 +99,28 @@ export const simulateForStrategy = async (def: StrategyDefinition, launchDate: s
     const result = simulateStrategy(def, bars, {startingBalance: STRATEGY_STARTING_BALANCE, launchDate, rates});
     await saveBacktest(def.id, effectiveVersion(def), result);
     return {points: result.points.length, trades: result.trades.length};
+};
+
+// The what-if grid for one strategy, in one step: the same readiness guard as the backtest
+// (never on partial dividend or rate data), the bars and rates loaded ONCE, then each variant
+// of gridFor(def) through the unchanged engine with the stored backtest's own inputs — same
+// bars, launch date, starting balance and rates — so a variant differs by its setting alone.
+// Writes only StrategyBacktest.variants (saveVariants), never saveBacktest, never an account.
+export const simulateVariantsForStrategy = async (
+    def: StrategyDefinition,
+    launchDate: string,
+): Promise<{computed: number; waiting?: string}> => {
+    const grid = gridFor(def);
+    if (grid.length === 0) return {computed: 0};
+    const readiness = await backtestDataReady(def, launchDate);
+    if (!readiness.ready) return {computed: 0, waiting: readiness.reason};
+    const [bars, rates] = await Promise.all([loadSimulationBars(def, BENCHMARK_SYMBOL), getRatePoints()]);
+    const variants: StoredWhatIfVariant[] = grid.map((variant) => ({
+        id: variant.id,
+        knob: variant.knob,
+        value: variant.value,
+        ...toWhatIfView(simulateStrategy(applyOverrides(def, variant.overrides), bars, {startingBalance: STRATEGY_STARTING_BALANCE, launchDate, rates})),
+    }));
+    const saved = await saveVariants(def.id, effectiveVersion(def), variants);
+    return {computed: saved ? variants.length : 0};
 };

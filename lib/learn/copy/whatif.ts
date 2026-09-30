@@ -48,3 +48,19 @@ export const WHATIF_COPY = {
 // The one diff line above the what-if's numbers; the catalog setting itself has no diff.
 export const whatIfDiffLine = (changes: readonly ParamChange[]): string =>
     changes.length === 0 ? WHATIF_COPY.catalogSetting : changes.map(paramChangeText).join(' · ');
+
+// A position on a knob's control: the value, and which one is the catalog's.
+export const positionText = (value: number, isCatalog: boolean): string =>
+    `${formatParamValue(value)}${isCatalog ? ' (catalog)' : ''}`;
+
+// The lab on a strategy page (components/strategies/WhatIfLab.tsx): the precomputed grid of
+// settings, one knob moved at a time, drawn beside the stored backtest.
+export const WHATIF_LAB = {
+    heading: 'What-if lab',
+    window: (from: string, to: string): string =>
+        `${from} → ${to} · the stored backtest's bars, next-open fills, interest and dividends · one setting moved`,
+    oneAtATime: 'One setting moves at a time; the others keep their catalog value.',
+    pending: 'Other settings are computed overnight, after the stored backtest; none are ready for this rule yet.',
+    knobAria: (label: string, position: string): string => `${label}: ${position}`,
+    chartAria: (diffLine: string): string => `Account value with ${diffLine}, beside the stored backtest at the catalog setting`,
+} as const;

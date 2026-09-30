@@ -163,7 +163,10 @@ const TONES: Record<DollarLineTone, {stroke: string; swatch: string; width: numb
     muted: {stroke: 'stroke-fg-muted', swatch: 'bg-fg-muted', width: 1.25, dash: '5 3'},
 };
 
-const formatDollars = (v: number) => `$${v.toFixed(2)}`;
+// Grouped, so an account worth $112,345.67 reads as one; the axis labels sit inside PAD_X, so from
+// $10,000 up they shorten to thousands ("$112k"). Below that both print as before ("$1.23").
+const formatDollars = (v: number) => `$${v.toLocaleString('en-US', {minimumFractionDigits: 2, maximumFractionDigits: 2})}`;
+const formatAxisDollars = (v: number) => (Math.abs(v) >= 10_000 ? `$${(v / 1000).toFixed(0)}k` : formatDollars(v));
 
 const DollarChart = ({dates, lines, baseline, ariaLabel}: DollarSeries) => {
     const svgRef = useRef<SVGSVGElement>(null);
@@ -210,9 +213,9 @@ const DollarChart = ({dates, lines, baseline, ariaLabel}: DollarSeries) => {
                  onMouseMove={onMove} onMouseLeave={() => setHoverIdx(null)}>
                 <line x1={PAD_X} x2={WIDTH - PAD_X} y1={geometry.baseY} y2={geometry.baseY}
                       className="stroke-line-strong/50" strokeDasharray="4 4" strokeWidth="1" />
-                <text x={PAD_X - 6} y={geometry.baseY + 3} textAnchor="end" fontSize="9" className="fill-fg-muted font-mono">{formatDollars(baseline)}</text>
-                <text x={PAD_X - 6} y={PAD_Y + 3} textAnchor="end" fontSize="9" className="fill-fg-muted font-mono">{formatDollars(geometry.max)}</text>
-                <text x={PAD_X - 6} y={HEIGHT - PAD_Y + 3} textAnchor="end" fontSize="9" className="fill-fg-muted font-mono">{formatDollars(geometry.min)}</text>
+                <text x={PAD_X - 6} y={geometry.baseY + 3} textAnchor="end" fontSize="9" className="fill-fg-muted font-mono">{formatAxisDollars(baseline)}</text>
+                <text x={PAD_X - 6} y={PAD_Y + 3} textAnchor="end" fontSize="9" className="fill-fg-muted font-mono">{formatAxisDollars(geometry.max)}</text>
+                <text x={PAD_X - 6} y={HEIGHT - PAD_Y + 3} textAnchor="end" fontSize="9" className="fill-fg-muted font-mono">{formatAxisDollars(geometry.min)}</text>
                 {/* Drawn last-listed first, so the first line the caller lists sits on top. */}
                 {[...geometry.paths].reverse().map(({line, d}) => (
                     <path key={line.key} d={d} fill="none" data-line={line.key} className={TONES[line.tone].stroke}

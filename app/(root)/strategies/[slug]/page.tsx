@@ -28,6 +28,7 @@ import VerdictQuiz, {type QuizRow} from "@/components/strategies/VerdictQuiz";
 import WhatTheseMean from "@/components/learn/WhatTheseMean";
 import BoardReading from "@/components/learn/BoardReading";
 import TimeInMarket from "@/components/strategies/TimeInMarket";
+import WhatIfLab from "@/components/strategies/WhatIfLab";
 import {TIME_IN_MARKET_STRATEGY} from "@/lib/learn/time-in-market";
 import {getTimeInMarket} from "@/lib/learn/time-in-market-read";
 
@@ -140,6 +141,9 @@ const StrategyPage = async ({params, searchParams}: StrategyPageProps) => {
                     closeFills: backtest.closeFills,
                 } : null}
             />
+
+            {/* Every rule with a knob (not buy-and-hold): the nightly grid beside the stored backtest. */}
+            {detail.whatIf && <WhatIfLab view={detail.whatIf} />}
 
             {/* Buy-and-hold only; a failed read hides it rather than showing zeros. */}
             {timeInMarket && <TimeInMarket view={timeInMarket} path={`/strategies/${def.id}`} />}

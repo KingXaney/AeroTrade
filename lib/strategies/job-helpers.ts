@@ -58,6 +58,8 @@ export type RunSummaryInput = {
     backtestsRebuilt: number;
     // Rebuilds held back until dividends and the T-bill rate cover the window.
     backtestsWaiting?: number;
+    // Strategies whose what-if grid was computed this run (lib/strategies/whatif.ts).
+    whatIfGrids?: number;
     providers: {yahoo: number; stooq: number};
     failedSymbols: readonly string[];
     asOf: string;
@@ -71,6 +73,7 @@ export const runSummary = (s: RunSummaryInput): string => {
         `${s.staleSymbols} stale symbol(s)`,
         `${s.backtestsRebuilt} backtest(s) rebuilt`,
         ...(s.backtestsWaiting ? [`${s.backtestsWaiting} backtest(s) waiting for data`] : []),
+        ...(s.whatIfGrids ? [`${s.whatIfGrids} what-if grid(s) computed`] : []),
         `yahoo ${s.providers.yahoo} / stooq ${s.providers.stooq}`,
     ];
     if (s.failedSymbols.length > 0) parts.push(`failed: ${s.failedSymbols.join(', ')}`);
@@ -79,3 +82,23 @@ export const runSummary = (s: RunSummaryInput): string => {
 
 // Inngest step ids must be [a-zA-Z0-9_-]; the sentinel owner and slugs carry ':' and '-'.
 export const stepId = (raw: string): string => raw.replace(/[^a-zA-Z0-9_-]/g, '_');
+
+// What the nightly job knows about a strategy's stored what-if variants: the stored backtest's
+// version, the version its variants were computed under (null: none yet) and their ids in order.
+export type VariantStamp = {
+    version: string;
+    variantsVersion: string | null;
+    variantIds: readonly string[] | null;
+};
+
+// Whether tonight's run (re)computes a strategy's what-if grid. Only against a backtest already
+// built for this version (the variants run on the same engine as the line they are drawn
+// beside), and then only when that backtest was rebuilt since the variants were computed or
+// the grid's ids moved — never every night. `force` is the job's resimulate, which rebuilds
+// every backtest on the same version and so must redo the grids beside them.
+export const variantsDue = (stamp: VariantStamp | undefined, expectedVersion: string, gridIds: readonly string[], force = false): boolean => {
+    if (gridIds.length === 0 || stamp === undefined || stamp.version !== expectedVersion) return false;
+    if (force || stamp.variantsVersion !== stamp.version) return true;
+    const stored = stamp.variantIds ?? [];
+    return stored.length !== gridIds.length || stored.some((id, i) => id !== gridIds[i]);
+};

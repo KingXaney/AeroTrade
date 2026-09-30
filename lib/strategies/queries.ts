@@ -29,6 +29,7 @@ import type {ReplayRun} from "@/lib/learn/replay";
 import type {QuizRun} from "@/lib/learn/quiz";
 import type {SeriesStats, SignalRow, StrategyDefinition, StrategyId} from "@/lib/strategies/types";
 import {BENCHMARK_SYMBOL} from "@/lib/strategies/universe";
+import {whatIfLab, type StoredWhatIfVariant, type WhatIfLabView} from "@/lib/strategies/whatif";
 import {
     describeLastRun,
     downsample,
@@ -306,6 +307,8 @@ export type StrategyDetail = {
     lastActionLine: string;
     // The stored board row and planned order behind each strategy fill on this page, by run date.
     replays: Record<string, ReplayRun>;
+    // The what-if lab: the precomputed grid beside this backtest (null: the rule has no knob).
+    whatIf: WhatIfLabView | null;
 };
 
 export const getStrategyDetail = cache(async (slug: string, userId: string | null): Promise<StrategyDetail | null> => {
@@ -321,7 +324,9 @@ export const getStrategyDetail = cache(async (slug: string, userId: string | nul
         state ? getAccountAnalytics(STRATEGY_OWNER_ID, state.accountId) : Promise.resolve(null),
         state ? getTradeHistory(STRATEGY_OWNER_ID, state.accountId, DETAIL_TRADE_LIMIT) : Promise.resolve([] as PaperTradeRecord[]),
         getLatestRuns([def.id]),
-        StrategyBacktest.findOne({strategyId: def.id}).lean<(StrategyBacktestView & {computedAt: Date}) | null>(),
+        // One document: the page's backtest and the ≤4 what-if variants stored with it.
+        StrategyBacktest.findOne({strategyId: def.id})
+            .lean<(StrategyBacktestView & {computedAt: Date; variants?: StoredWhatIfVariant[]; variantsVersion?: string}) | null>(),
         state ? snapshotSeriesByAccount([state.accountId]) : Promise.resolve(new Map<string, SnapshotSeries>()),
     ]);
     const inception = analytics ? getEasternDateString(new Date(analytics.account.inceptionAt)) : null;
@@ -360,6 +365,7 @@ export const getStrategyDetail = cache(async (slug: string, userId: string | nul
             benchmarkReturnPct: inception ? (benchmarkReturns.get(inception) ?? null) : null,
             snapshotDays: state ? (snapshotDays.get(state.accountId)?.days ?? 0) : 0,
             replays,
+            whatIf: whatIfLab(def, backtestDoc),
         };
     }
 });

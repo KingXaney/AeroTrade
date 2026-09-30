@@ -66,8 +66,9 @@ import {buildTopicsSectionHtml} from "@/lib/topics/digest-section";
 import {STRATEGIES, effectiveVersion} from "@/lib/strategies/catalog";
 import {STRATEGY_OWNER_ID} from "@/lib/strategies/config";
 import {previousTradingDay} from "@/lib/strategies/calendar";
-import {assessFreshness, chunkUniverse, runSummary, stepId, throttleDue} from "@/lib/strategies/job-helpers";
-import {SIM_INCOME_CALENDAR_DAYS, backtestDataReady, decideForStrategy, isUniverseTooStale, simulateForStrategy} from "@/lib/strategies/runner";
+import {assessFreshness, chunkUniverse, runSummary, stepId, throttleDue, variantsDue} from "@/lib/strategies/job-helpers";
+import {SIM_INCOME_CALENDAR_DAYS, backtestDataReady, decideForStrategy, isUniverseTooStale, simulateForStrategy, simulateVariantsForStrategy} from "@/lib/strategies/runner";
+import {gridFor} from "@/lib/strategies/whatif";
 import {
     backtestVersions,
     claimRun,
@@ -77,6 +78,7 @@ import {
     markStrategyError,
     recordSkippedRuns,
     releaseRun,
+    variantStamps,
     type OrderOutcome,
 } from "@/lib/strategies/store";
 import {ALL_STRATEGY_SYMBOLS, BENCHMARK_SYMBOL as STRATEGY_BENCHMARK, CORE_ETFS, LARGE_CAPS, SECTOR_ETFS} from "@/lib/strategies/universe";
@@ -1366,6 +1368,26 @@ export const runStrategiesDaily = inngest.createFunction(
             }
         }
 
+        // The what-if grid (lib/strategies/whatif.ts), beside the backtest each strategy has NOW —
+        // so read after the rebuilds above. One step per strategy, and only when its backtest was
+        // rebuilt since the grid was computed or the grid changed: not every night. The step
+        // keeps the backtest's readiness guard and writes StrategyBacktest.variants alone.
+        let whatIfGrids = 0;
+        const stamps = await step.run('check-variants', async () => variantStamps());
+        for (const def of STRATEGIES) {
+            const state = states.find((s) => s.strategyId === def.id);
+            if (!state || !variantsDue(stamps[def.id], effectiveVersion(def), gridFor(def).map((v) => v.id), resimulate)) continue;
+            try {
+                const grid = await step.run(`variants-${stepId(def.id)}`, async () => simulateVariantsForStrategy(def, state.launchDate));
+                if (grid.waiting) console.warn(`What-if grid for ${def.id} waiting: ${grid.waiting}`);
+                if (grid.computed > 0) whatIfGrids += 1;
+            } catch (error) {
+                // A missing grid only leaves the lab's "computed overnight" state up; it never
+                // marks the strategy, whose trading and backtest are untouched.
+                console.error('What-if grid failed:', def.id, error);
+            }
+        }
+
         const summary = runSummary({
             ran,
             total: STRATEGIES.length,
@@ -1375,6 +1397,7 @@ export const runStrategiesDaily = inngest.createFunction(
             staleSymbols: freshness.staleSymbols.length,
             backtestsRebuilt,
             backtestsWaiting,
+            whatIfGrids,
             providers,
             failedSymbols,
             asOf,

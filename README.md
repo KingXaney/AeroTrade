@@ -82,7 +82,7 @@ flowchart LR
 | Jobs | Inngest (7 crons + on-demand events), idempotent steps, per-user rate limits |
 | AI | Vercel AI SDK; Gemini 2.5 Flash-Lite on the free tier for every scheduled job, optional Claude tiers, Claude for the second opinion |
 | Market data | Finnhub (quotes, profiles, search, news), Google News RSS, SEC EDGAR, Reddit |
-| Quality | Vitest (85 files / 1238 tests), ESLint, `tsc --noEmit`, GitHub Actions, Playwright browser QA against an in-memory Mongo |
+| Quality | Vitest (85 files / 1256 tests), ESLint, `tsc --noEmit`, GitHub Actions, Playwright browser QA against an in-memory Mongo |
 
 ## Getting started
 

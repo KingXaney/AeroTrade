@@ -4,9 +4,9 @@
 
 import {describe, expect, it} from 'vitest';
 import {findBanned} from '@/lib/learn/banned';
-import {formatParamValue, paramChangeText, paramLabel, PARAM_LABELS, whatIfDiffLine, WHATIF_COPY} from '@/lib/learn/copy/whatif';
+import {formatParamValue, paramChangeText, paramLabel, PARAM_LABELS, positionText, whatIfDiffLine, WHATIF_COPY, WHATIF_LAB} from '@/lib/learn/copy/whatif';
 import {STRATEGIES, strategyBySlug} from '@/lib/strategies/catalog';
-import {gridFor, paramDiff, PARAM_RANGES} from '@/lib/strategies/whatif';
+import {gridFor, labKnobs, paramDiff, PARAM_RANGES} from '@/lib/strategies/whatif';
 
 const clean = (text: string) => {
     expect(text, text).not.toMatch(/undefined|NaN|null|\[object|Infinity/);
@@ -60,5 +60,28 @@ describe('what-if copy', () => {
     it('states the caveat and the two series plainly', () => {
         for (const text of Object.values(WHATIF_COPY)) clean(text);
         expect(WHATIF_COPY.caveat).toMatch(/same rule, different setting, same three years, in hindsight/i);
+    });
+
+    it('words the lab — heading, window, controls, empty state, chart — plainly, on every strategy', () => {
+        const strings = Object.values(WHATIF_LAB).flatMap((v) => (typeof v === 'string' ? [v] : []));
+        expect(strings.length).toBeGreaterThan(2);
+        for (const text of strings) clean(text);
+        expect(WHATIF_LAB.pending).toMatch(/computed overnight/i);
+        for (const [from, to] of [['2022-09-30', '2025-09-26'], ['2023-01-03', '2026-01-02']]) clean(WHATIF_LAB.window(from, to));
+        expect(WHATIF_LAB.window('2022-09-30', '2025-09-26')).toContain('2022-09-30 → 2025-09-26');
+        for (const def of STRATEGIES) {
+            for (const knob of labKnobs(def)) {
+                for (const value of knob.positions) {
+                    const text = positionText(value, value === knob.catalog);
+                    clean(text);
+                    expect(text).toContain(formatParamValue(value));
+                    clean(WHATIF_LAB.knobAria(paramLabel(knob.key), text));
+                }
+            }
+            for (const variant of gridFor(def)) clean(WHATIF_LAB.chartAria(whatIfDiffLine(paramDiff(def, variant.overrides))));
+        }
+        expect(positionText(50, true)).toBe('50 (catalog)');
+        expect(positionText(0.8, false)).toBe('80%');
+        clean(WHATIF_LAB.chartAria(whatIfDiffLine([])));
     });
 });

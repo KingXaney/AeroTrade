@@ -7,6 +7,7 @@ import {
     stepId,
     throttleDue,
     universeIsTooStale,
+    variantsDue,
 } from "@/lib/strategies/job-helpers";
 import {STRATEGIES} from "@/lib/strategies/catalog";
 
@@ -69,11 +70,59 @@ describe("runSummary", () => {
         expect(runSummary({...base, preview: true, failedSymbols: ['PFE']})).toContain('(preview — nothing filled)');
         expect(runSummary({...base, failedSymbols: ['PFE']})).toMatch(/failed: PFE$/);
     });
+
+    it("names the what-if grids computed, and only when there were some", () => {
+        const base = {ran: 8, total: 8, preview: false, filled: 0, planned: 0, staleSymbols: 0, backtestsRebuilt: 1,
+            providers: {yahoo: 0, stooq: 0}, failedSymbols: [], asOf: '2026-09-18'};
+        expect(runSummary({...base, whatIfGrids: 7})).toContain('1 backtest(s) rebuilt, 7 what-if grid(s) computed, yahoo');
+        expect(runSummary({...base, whatIfGrids: 0})).not.toContain('what-if');
+    });
 });
 
 describe("stepId", () => {
     it("sanitises the sentinel and is a no-op on every catalog id", () => {
         expect(stepId('system:strategies')).toBe('system_strategies');
         for (const def of STRATEGIES) expect(stepId(def.id)).toBe(def.id);
+    });
+});
+
+// The nightly what-if grid is recomputed only when it would differ: the stored backtest was
+// rebuilt under another version since the variants were computed, or the grid itself changed.
+describe("variantsDue", () => {
+    const grid = ['fast=20', 'fast=100', 'slow=100', 'slow=250'];
+    const current = {version: '3.1', variantsVersion: '3.1', variantIds: [...grid]};
+
+    it("is a no-op when the variants match the stored backtest and the grid", () => {
+        expect(variantsDue(current, '3.1', grid)).toBe(false);
+    });
+
+    it("recomputes when the stored backtest's version changed since the variants were computed", () => {
+        expect(variantsDue({...current, variantsVersion: '2.1'}, '3.1', grid)).toBe(true);
+    });
+
+    it("computes a backtest's first variants (none stored yet)", () => {
+        expect(variantsDue({version: '3.1', variantsVersion: null, variantIds: null}, '3.1', grid)).toBe(true);
+    });
+
+    it("recomputes when the stored ids differ from the grid's — a changed value, a missing one, a new order", () => {
+        expect(variantsDue({...current, variantIds: ['fast=20', 'fast=100', 'slow=100', 'slow=240']}, '3.1', grid)).toBe(true);
+        expect(variantsDue({...current, variantIds: grid.slice(0, 3)}, '3.1', grid)).toBe(true);
+        expect(variantsDue({...current, variantIds: [...grid].reverse()}, '3.1', grid)).toBe(true);
+    });
+
+    it("waits while the stored backtest is missing or not yet rebuilt for this version", () => {
+        expect(variantsDue(undefined, '3.1', grid)).toBe(false);
+        // A backtest waiting for its rebuild: the variants would run on another engine than it.
+        expect(variantsDue({version: '2.1', variantsVersion: '2.1', variantIds: ['fast=30']}, '3.1', grid)).toBe(false);
+    });
+
+    it("recomputes a current grid on a resimulate, which rebuilt the backtest on the same version", () => {
+        expect(variantsDue(current, '3.1', grid, true)).toBe(true);
+        expect(variantsDue({version: '2.1', variantsVersion: '2.1', variantIds: grid}, '3.1', grid, true)).toBe(false);
+        expect(variantsDue(current, '3.1', [], true)).toBe(false);
+    });
+
+    it("never computes for a strategy with no knobs", () => {
+        expect(variantsDue({version: '3.1', variantsVersion: null, variantIds: null}, '3.1', [])).toBe(false);
     });
 });
