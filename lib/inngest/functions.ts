@@ -63,6 +63,9 @@ import {MAX_BRIEF_CALLS_PER_RUN, newsSearchEnabled} from "@/lib/topics/config";
 import {TOPIC_BRIEFS_EVENT, TOPIC_FEEDS_EVENT, TOPIC_FIRST_RUN_EVENT, TOPIC_REFRESH_EVENT} from "@/lib/topics/events";
 import {ensureTopicHasArticles, getTopicsDigestData, getTopicsForUser} from "@/lib/topics/store";
 import {buildTopicsSectionHtml} from "@/lib/topics/digest-section";
+import {buildLessonSectionHtml, lessonSectionLinks, pickDigestMoment} from "@/lib/learn/digest-section";
+import {getLearnFacts} from "@/lib/learn/facts-store";
+import {getTodaysLesson} from "@/lib/learn/lesson-store";
 import {STRATEGIES, effectiveVersion} from "@/lib/strategies/catalog";
 import {STRATEGY_OWNER_ID} from "@/lib/strategies/config";
 import {previousTradingDay} from "@/lib/strategies/calendar";
@@ -750,6 +753,23 @@ export const sendDailyNewsSummary = inngest.createFunction(
                     }
                 });
 
+                // Today's lesson: a first from the learner's own account (or a followed strategy's
+                // rebalance) dated exactly yesterday — this noon run would otherwise mail a morning
+                // fill or a 09:35 rebalance twice — else the day's glossary concept. Deterministic (no
+                // model), escaped, links allow-listed to exactly the ones it builds; it rides under the
+                // same emailNotifications opt-out as the rest, and a failure only drops the section.
+                const lessonSection = await step.run(`fetch-lesson-${safeId}`, async () => {
+                    try {
+                        const facts = await getLearnFacts(user.id);
+                        const moment = pickDigestMoment(facts, facts.today);
+                        const input = {moment, term: moment ? null : await getTodaysLesson(user.id)};
+                        return sanitizeDigestHtml(buildLessonSectionHtml(input, APP_URL), lessonSectionLinks(input, APP_URL));
+                    } catch (error) {
+                        console.error('Lesson email section failed:', error);
+                        return '';
+                    }
+                });
+
                 // fullSummary is for the news brain — JSON.stringify drops undefined values,
                 // keeping the email prompt lean.
                 const promptNews = news.map((article) => ({...article, fullSummary: undefined}));
@@ -774,6 +794,7 @@ export const sendDailyNewsSummary = inngest.createFunction(
                         // to point at URLs from the actual article set.
                         newsContent: sanitizeDigestHtml(newsContent, news.map((n) => n.url)),
                         topicsSection,
+                        lessonSection,
                     });
                 });
 

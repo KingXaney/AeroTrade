@@ -17,14 +17,15 @@ const MAX_TOPICS = 6;
 const MAX_ARTICLES = 3;
 const MAX_BULLETS = 4;
 
-const HEADING_STYLE = 'margin: 30px 0 15px 0; font-size: 20px; font-weight: 600; color: #f8f9fa; line-height: 1.3;';
-const TOPIC_NAME_STYLE = 'margin: 0 0 4px 0; font-size: 18px; font-weight: 600; color: #f8f9fa; line-height: 1.3;';
-const META_STYLE = 'margin: 0 0 10px 0; font-size: 13px; line-height: 1.4; color: #8a9ba0;';
-const TEXT_STYLE = 'margin: 0 0 10px 0; font-size: 16px; line-height: 1.6; color: #CCDADC;';
-const LIST_STYLE = 'margin: 0 0 12px 0; padding: 0 0 0 20px; font-size: 15px; line-height: 1.5; color: #CCDADC;';
-const ARTICLE_STYLE = 'margin: 0 0 6px 0; font-size: 15px; line-height: 1.5; color: #CCDADC;';
-const LINK_STYLE = 'color: #FDD458; text-decoration: none;';
-const FOOTER_STYLE = 'margin: 20px 0 0 0; font-size: 14px; line-height: 1.5; color: #CCDADC;';
+// Shared with the lesson section (lib/learn/digest-section.ts), so the two blocks read as one email.
+export const HEADING_STYLE = 'margin: 30px 0 15px 0; font-size: 20px; font-weight: 600; color: #f8f9fa; line-height: 1.3;';
+export const TOPIC_NAME_STYLE = 'margin: 0 0 4px 0; font-size: 18px; font-weight: 600; color: #f8f9fa; line-height: 1.3;';
+export const META_STYLE = 'margin: 0 0 10px 0; font-size: 13px; line-height: 1.4; color: #8a9ba0;';
+export const TEXT_STYLE = 'margin: 0 0 10px 0; font-size: 16px; line-height: 1.6; color: #CCDADC;';
+export const LIST_STYLE = 'margin: 0 0 12px 0; padding: 0 0 0 20px; font-size: 15px; line-height: 1.5; color: #CCDADC;';
+export const ARTICLE_STYLE = 'margin: 0 0 6px 0; font-size: 15px; line-height: 1.5; color: #CCDADC;';
+export const LINK_STYLE = 'color: #FDD458; text-decoration: none;';
+export const FOOTER_STYLE = 'margin: 20px 0 0 0; font-size: 14px; line-height: 1.5; color: #CCDADC;';
 
 const isHttpUrl = (value: string): boolean => {
     try {
@@ -36,8 +37,8 @@ const isHttpUrl = (value: string): boolean => {
 };
 
 // A non-http URL (javascript:, data:, a bare path) is shown as text so the digest can
-// never carry a clickable non-web target.
-const linkOrText = (url: string, label: string): string =>
+// never carry a clickable non-web target. Shared with the lesson section (lib/learn/digest-section.ts).
+export const linkOrText = (url: string, label: string): string =>
     isHttpUrl(url)
         ? `<a href="${escapeHtml(url)}" style="${LINK_STYLE}">${escapeHtml(label)}</a>`
         : escapeHtml(label);
