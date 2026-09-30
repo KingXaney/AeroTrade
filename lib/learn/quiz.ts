@@ -96,6 +96,12 @@ const pick = <T>(items: readonly T[], date: string, salt: string): T | undefined
 // The oldest board date getRecentRuns reads for a given day.
 export const quizRunFloor = (today: string): string => addCalendarDays(today, -QUIZ_RUN_WINDOW_DAYS);
 
+// The boards a day's question is read from: the window's, dated before the day itself. Today's
+// run lands at 09:35 and may be re-planned by the 10:30 retry, so a question read from it could
+// change mid-day; the boards dated before today are final, which keeps the question the same all
+// day (and lets the read memoise it for the day).
+export const quizRunWindow = (today: string): {since: string; before: string} => ({since: quizRunFloor(today), before: today});
+
 // recordQuizAnswer's one input: the question's day, which must be today in ET. Shape first
 // (a string of exactly YYYY-MM-DD), then equality — today's date is a real calendar date, so
 // a string equal to it needs no further check.

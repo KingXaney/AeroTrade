@@ -1,14 +1,15 @@
-import {describe, expect, it} from 'vitest';
+import {describe, expect, it, vi} from 'vitest';
 import {findBanned} from '@/lib/learn/banned';
 import {GLOSSARY} from '@/lib/learn/glossary';
 import {CONCEPT_KEYS, type Lesson, type LessonHeadline} from '@/lib/learn/lesson';
 import type {LearnFacts} from '@/lib/learn/facts';
 import {deriveMoments, type Moment} from '@/lib/learn/moments';
-import {momentCopy} from '@/lib/learn/copy/lesson';
+import {lessonLearnHref, momentCopy} from '@/lib/learn/copy/lesson';
 import {
     DIGEST_MAX_HEADLINE_CHARS,
     DIGEST_MAX_HEADLINES,
     buildLessonSectionHtml,
+    lessonSectionFor,
     lessonSectionLinks,
     pickDigestMoment,
 } from '@/lib/learn/digest-section';
@@ -230,5 +231,40 @@ describe('pickDigestMoment', () => {
         if (!daily) throw new Error('fixture');
         const routine: LearnFacts = {...none, followedStrategies: [daily.id], rebalances: [{strategyId: daily.id, date: YESTERDAY, traded: true}]};
         expect(pickDigestMoment(routine, TODAY)).toBeNull();
+    });
+});
+
+describe('lessonSectionFor', () => {
+    const TODAY = '2026-09-30';
+    const facts: LearnFacts = {
+        today: TODAY, accountCreatedOn: '2026-09-20', hasUserTrade: false, followedStrategies: [], topicOpened: false,
+        hasWatchlist: false, navigatorEnrolled: false, missionsDismissedAt: null,
+        firstFill: null, firstSell: null, firstDividend: null, firstDrawdown: null, rebalances: [], lessonsSeen: [],
+    };
+    const withMoment: LearnFacts = {...facts, hasUserTrade: true, firstFill: {date: '2026-09-29', symbol: 'SPY', side: 'buy', quantity: 3, price: 500}};
+
+    it('mails yesterday\'s moment, sanitised to its own link, without reading the day\'s term', async () => {
+        const loadTerm = vi.fn(async () => dayLesson());
+        const html = await lessonSectionFor({facts: withMoment, loadTerm, appUrl: APP});
+        expect(loadTerm).not.toHaveBeenCalled();
+        expect(textOf(html)).toContain(momentCopy(fill).title);
+        expect(hrefsOf(html)).toEqual([`${APP}${momentCopy(fill).href}`]);
+    });
+
+    it('otherwise mails the day\'s term, its links the only ones kept', async () => {
+        const loadTerm = vi.fn(async () => feedLesson([headline(1), headline(2, {url: 'javascript:alert(1)'})]));
+        const html = await lessonSectionFor({facts, loadTerm, appUrl: APP});
+        expect(loadTerm).toHaveBeenCalledTimes(1);
+        expect(html).toBe(sanitizeDigestHtml(html, lessonSectionLinks({moment: null, term: await loadTerm()}, APP)));
+        expect(hrefsOf(html)).toEqual([headline(1).url, `${APP}${lessonLearnHref('tariffs')}`]);
+        expect(html).not.toContain('javascript:');
+    });
+
+    it('drops the section, never the email, when anything in it fails', async () => {
+        expect(await lessonSectionFor({facts, loadTerm: async () => { throw new Error('aggregate failed'); }, appUrl: APP})).toBe('');
+        // Facts in a shape the builder cannot read throw inside it: still ''.
+        const broken = {...facts, rebalances: null} as unknown as LearnFacts;
+        expect(await lessonSectionFor({facts: broken, loadTerm: async () => dayLesson(), appUrl: APP})).toBe('');
+        expect(await lessonSectionFor({facts, loadTerm: async () => null, appUrl: APP})).toBe('');
     });
 });

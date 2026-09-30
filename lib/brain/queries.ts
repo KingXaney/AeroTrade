@@ -7,8 +7,10 @@ import NewsItem from "@/database/models/news-item.model";
 import JobRun from "@/database/models/job-run.model";
 import PriceBar from "@/database/models/price-bar.model";
 import {earliestSince, sinceThesisBySymbol, sinceThesisTargets, type SinceThesisLegs} from "@/lib/brain/since-thesis";
-import {getBenchmarkIndex} from "@/lib/prices/benchmark-store";
-import {getBarsForSymbols} from "@/lib/prices/store";
+import {BENCHMARK_SYMBOL} from "@/lib/constants";
+import {createDayMemo, remember} from "@/lib/day-memo";
+import {addCalendarDays} from "@/lib/prices/calendar-days";
+import {getBarsFrom, getLatestBars} from "@/lib/prices/store";
 import {getEasternDateString} from "@/lib/utils";
 
 const safeAvg = (sum: number, weight: number): number => (Math.abs(weight) < 1e-9 ? 0 : sum / weight);
@@ -81,20 +83,35 @@ export const getEntityEvidence = async (entityKey: string, lookbackDays = 21, li
 };
 
 // "since thesis" for Active Theses: the heaviest ticker theses (lib/brain/since-thesis.ts),
-// read in one batch — every thesis ticker's bars from the earliest thesis date in one query,
-// SPY's total-return index from the same date in another — then measured in memory. A second
-// read on /brain, after the theses resolve, because it needs their keys and dates. A failed
-// read hides the lines rather than breaking the page.
+// read in one batch — each thesis ticker's bars from its own thesis date and SPY's from the
+// earliest of them, one $or query (getBarsFrom) — then measured in memory. A second read on
+// /brain, after the theses resolve, because it needs their keys and dates. The lines depend on
+// no viewer, so they are memoised for the ET day per (the theses, the latest stored close of
+// each symbol): one small aggregate stamps the data, a close stored later moves the stamp and is
+// read, and a read taken before the morning's prices land is not pinned. A failed read hides the
+// lines rather than breaking the page.
+const STAMP_LOOKBACK_DAYS = 31;
+const sinceMemo = createDayMemo<Record<string, SinceThesisLegs>>(16);
+
 export const getSinceThesis = async (theses: readonly BrainEntitySummary[]): Promise<Record<string, SinceThesisLegs>> => {
     const targets = sinceThesisTargets(theses);
     const earliest = earliestSince(targets);
     if (earliest === null) return {};
     try {
-        const [barsBySymbol, benchmark] = await Promise.all([
-            getBarsForSymbols(targets.map((t) => t.symbol), {from: earliest}),
-            getBenchmarkIndex(earliest),
-        ]);
-        return sinceThesisBySymbol(targets, barsBySymbol, benchmark.points);
+        const today = getEasternDateString();
+        const symbols = [...new Set([...targets.map((t) => t.symbol.toUpperCase()), BENCHMARK_SYMBOL])];
+        const latest = await getLatestBars(symbols, {since: addCalendarDays(today, -STAMP_LOOKBACK_DAYS), onOrBefore: today});
+        const key = [
+            targets.map((t) => `${t.symbol}@${t.since}`).join(','),
+            symbols.map((symbol) => {
+                const bar = latest.get(symbol);
+                return bar ? `${symbol}:${bar.date}:${bar.close}` : `${symbol}:-`;
+            }).join(','),
+        ].join('|');
+        return await remember(sinceMemo, key, today, async () => {
+            const bars = await getBarsFrom([...targets.map((t) => ({symbol: t.symbol, from: t.since})), {symbol: BENCHMARK_SYMBOL, from: earliest}]);
+            return sinceThesisBySymbol(targets, bars, bars.get(BENCHMARK_SYMBOL) ?? []);
+        });
     } catch (error) {
         console.error('Error reading since-thesis returns:', error);
         return {};

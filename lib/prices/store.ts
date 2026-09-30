@@ -224,6 +224,31 @@ export const getBarsForSymbols = async (
     return map;
 };
 
+// Each symbol's bars from its own date through `to`, ascending, in one query: an $or of
+// per-symbol ranges on the {symbol, date} index, for a read whose symbols start on different
+// days ("since thesis": each ticker from its own thesis date). Overlapping ranges for one
+// symbol come back once, from the earliest of them.
+export const getBarsFrom = async (requests: readonly {symbol: string; from: string}[], to?: string): Promise<Map<string, Bar[]>> => {
+    const earliest = new Map<string, string>();
+    for (const {symbol, from} of requests) {
+        const key = symbol.toUpperCase();
+        if (!key) continue;
+        const current = earliest.get(key);
+        if (current === undefined || from < current) earliest.set(key, from);
+    }
+    const map = new Map<string, Bar[]>();
+    if (earliest.size === 0) return map;
+    await connectToDatabase();
+    const ranges = [...earliest].map(([symbol, from]) => ({symbol, date: {$gte: from, ...(to !== undefined ? {$lte: to} : {})}}));
+    const docs = await PriceBar.find({$or: ranges}, BAR_PROJECTION).sort({date: 1}).lean<LeanPriceBar[]>();
+    for (const doc of docs) {
+        const list = map.get(doc.symbol) ?? [];
+        list.push(toBar(doc));
+        map.set(doc.symbol, list);
+    }
+    return map;
+};
+
 // ---------------------------------------------------------------------------
 // Readiness for income: which symbols' dividends can be trusted over a window
 // ---------------------------------------------------------------------------
@@ -283,6 +308,25 @@ export const getLatestBarDate = async (symbol: string, onOrBefore: string): Prom
         .sort({date: -1})
         .lean<{date: string} | null>();
     return bar?.date ?? null;
+};
+
+// Each symbol's latest stored bar (date and close) from `since` through `onOrBefore`, in one
+// aggregate on the unique {symbol, date} index — at most the bars inside that short range, never
+// a history. A symbol with no bar in the range is absent. What a request-path read keys its day
+// memo on (the data's own stamp), and how Luck or skill finds the last session its whole pool has.
+export const getLatestBars = async (
+    symbols: string[],
+    {since, onOrBefore}: {since: string; onOrBefore: string},
+): Promise<Map<string, {date: string; close: number}>> => {
+    const unique = Array.from(new Set(symbols.map((s) => s.toUpperCase()))).filter(Boolean);
+    if (unique.length === 0 || since > onOrBefore) return new Map();
+    await connectToDatabase();
+    const rows = await PriceBar.aggregate<{_id: string; date: string; close: number}>([
+        {$match: {symbol: {$in: unique}, date: {$gte: since, $lte: onOrBefore}}},
+        {$sort: {symbol: -1, date: -1}},
+        {$group: {_id: '$symbol', date: {$first: '$date'}, close: {$first: '$close'}}},
+    ]);
+    return new Map(rows.map((row) => [row._id, {date: row.date, close: row.close}]));
 };
 
 // The stored T-bill series as rate points (a discount yield, annualised %). The jobs read it

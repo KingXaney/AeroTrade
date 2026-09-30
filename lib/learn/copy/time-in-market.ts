@@ -91,5 +91,5 @@ export const TIM_COPY = {
     tableStart: 'Start',
     tableDate: (date: string) => day(date),
     tablePct: (pct: number | null) => (pct === null ? '—' : pctOneDecimal(pct)),
-    caveat: `In hindsight, on stored daily closes: SPY with its dividends reinvested on their pay dates, each deposit invested at the close of the first trading day on or after it arrives, idle cash at the T-bill rate less ${(CASH_YIELD_SPREAD * 100).toFixed(2)}%, and no fees, taxes or spreads.`,
+    caveat: `In hindsight, on stored daily closes: SPY held as shares, each dividend paid as cash on its pay date to the shares held the evening before its ex-date, each deposit invested at the close of the first trading day on or after it arrives, idle cash at the T-bill rate less ${(CASH_YIELD_SPREAD * 100).toFixed(2)}%, and no fees, taxes or spreads.`,
 };

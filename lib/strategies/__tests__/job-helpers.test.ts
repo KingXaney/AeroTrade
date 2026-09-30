@@ -87,10 +87,19 @@ describe("stepId", () => {
 });
 
 // The nightly what-if grid is recomputed only when it would differ: the stored backtest was
-// rebuilt under another version since the variants were computed, or the grid itself changed.
+// rebuilt since the variants were computed beside it, or the grid itself changed.
 describe("variantsDue", () => {
     const grid = ['fast=20', 'fast=100', 'slow=100', 'slow=250'];
-    const current = {version: '3.1', variantsVersion: '3.1', variantIds: [...grid]};
+    const BUILT = Date.parse('2026-09-28T13:40:00Z');
+    const current = {version: '3.1', variantsVersion: '3.1', variantIds: [...grid], computedAt: BUILT, variantsFor: BUILT};
+
+    it("recomputes when the backtest was rebuilt on the same version since the variants were computed", () => {
+        // A resimulate rebuilt the backtest on new data and its variants step failed: the next
+        // night must try again, not keep yesterday's variants beside today's line.
+        expect(variantsDue({...current, computedAt: BUILT + 86_400_000}, '3.1', grid)).toBe(true);
+        // Variants stored before builds were stamped are treated as another build's.
+        expect(variantsDue({...current, variantsFor: null}, '3.1', grid)).toBe(true);
+    });
 
     it("is a no-op when the variants match the stored backtest and the grid", () => {
         expect(variantsDue(current, '3.1', grid)).toBe(false);
@@ -101,7 +110,7 @@ describe("variantsDue", () => {
     });
 
     it("computes a backtest's first variants (none stored yet)", () => {
-        expect(variantsDue({version: '3.1', variantsVersion: null, variantIds: null}, '3.1', grid)).toBe(true);
+        expect(variantsDue({version: '3.1', variantsVersion: null, variantIds: null, computedAt: BUILT, variantsFor: null}, '3.1', grid)).toBe(true);
     });
 
     it("recomputes when the stored ids differ from the grid's — a changed value, a missing one, a new order", () => {
@@ -113,16 +122,16 @@ describe("variantsDue", () => {
     it("waits while the stored backtest is missing or not yet rebuilt for this version", () => {
         expect(variantsDue(undefined, '3.1', grid)).toBe(false);
         // A backtest waiting for its rebuild: the variants would run on another engine than it.
-        expect(variantsDue({version: '2.1', variantsVersion: '2.1', variantIds: ['fast=30']}, '3.1', grid)).toBe(false);
+        expect(variantsDue({version: '2.1', variantsVersion: '2.1', variantIds: ['fast=30'], computedAt: BUILT, variantsFor: BUILT}, '3.1', grid)).toBe(false);
     });
 
     it("recomputes a current grid on a resimulate, which rebuilt the backtest on the same version", () => {
         expect(variantsDue(current, '3.1', grid, true)).toBe(true);
-        expect(variantsDue({version: '2.1', variantsVersion: '2.1', variantIds: grid}, '3.1', grid, true)).toBe(false);
+        expect(variantsDue({version: '2.1', variantsVersion: '2.1', variantIds: grid, computedAt: BUILT, variantsFor: BUILT}, '3.1', grid, true)).toBe(false);
         expect(variantsDue(current, '3.1', [], true)).toBe(false);
     });
 
     it("never computes for a strategy with no knobs", () => {
-        expect(variantsDue({version: '3.1', variantsVersion: null, variantIds: null}, '3.1', [])).toBe(false);
+        expect(variantsDue({version: '3.1', variantsVersion: null, variantIds: null, computedAt: BUILT, variantsFor: null}, '3.1', [])).toBe(false);
     });
 });

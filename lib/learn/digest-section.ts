@@ -5,10 +5,11 @@
 // only http(s) URLs become anchors (linkOrText), and the daily-news step passes the result through
 // sanitizeDigestHtml with lessonSectionLinks — exactly the links built here (invariant 4).
 //
-// Pure: the facts come from lib/learn/facts-store.ts getLearnFacts, the concept from
-// lib/learn/lesson-store.ts getTodaysLesson. Nothing is stamped: "Got it" stays on the widget.
+// Pure: the facts come from lib/learn/facts-store.ts (readLearnFacts in the job), the concept
+// from lib/learn/lesson-store.ts, handed in as a loader so it is read only when no moment is
+// mailed. Nothing is stamped: "Got it" stays on the widget.
 
-import {escapeHtml} from "@/lib/news/sanitize";
+import {escapeHtml, sanitizeDigestHtml} from "@/lib/news/sanitize";
 import {ARTICLE_STYLE, FOOTER_STYLE, HEADING_STYLE, META_STYLE, TEXT_STYLE, TOPIC_NAME_STYLE, linkOrText} from "@/lib/topics/digest-section";
 import {GLOSSARY} from "@/lib/learn/glossary";
 import type {LearnFacts} from "@/lib/learn/facts";
@@ -104,4 +105,23 @@ export const buildLessonSectionHtml = ({moment, term}: LessonSectionInput, appUr
     if (!body) return '';
     const heading = `<h2 class="mobile-news-title dark-text" style="${HEADING_STYLE}">&#128218; ${escapeHtml(LESSON_COPY.emailHeading)}</h2>`;
     return `${heading}<div style="margin: 0 0 24px 0;">${body}</div>`;
+};
+
+// The whole section for one learner, as the daily-news job mails it: yesterday's moment when
+// there is one (the day's term is then never read), otherwise the day's term; built, then
+// sanitised to exactly the links it builds. Anything that fails drops the section — '' — and
+// never the email. `loadTerm` is the job's read of the day's term (lesson-store).
+export const lessonSectionFor = async ({facts, loadTerm, appUrl}: {
+    facts: LearnFacts;
+    loadTerm: () => Promise<Lesson | null>;
+    appUrl: string;
+}): Promise<string> => {
+    try {
+        const moment = pickDigestMoment(facts, facts.today);
+        const input: LessonSectionInput = {moment, term: moment ? null : await loadTerm()};
+        return sanitizeDigestHtml(buildLessonSectionHtml(input, appUrl), lessonSectionLinks(input, appUrl));
+    } catch (error) {
+        console.error('Lesson email section failed:', error);
+        return '';
+    }
 };

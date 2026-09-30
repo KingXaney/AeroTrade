@@ -49,10 +49,12 @@ export interface StrategyBacktestDoc extends Document {
     trades: BacktestTradeDoc[];
     stats: SeriesStats;
     computedAt: Date;
-    // Absent until the nightly job computes them; variantsVersion is the backtest version they
-    // were computed beside, so a rebuilt backtest shows none until its own grid is computed.
+    // Absent until the nightly job computes them; variantsVersion and variantsFor are the
+    // backtest version and build (computedAt) they were computed beside, so a rebuilt backtest —
+    // a new version or a resimulate on the same one — shows none until its own grid is computed.
     variants?: BacktestVariantDoc[];
     variantsVersion?: string;
+    variantsFor?: Date;
 }
 
 const PointSchema = new Schema<BacktestPointDoc>(
@@ -108,6 +110,7 @@ const StrategyBacktestSchema = new Schema<StrategyBacktestDoc>({
     // No default: an empty array would read as "computed, and nothing to show".
     variants: {type: [VariantSchema], default: undefined},
     variantsVersion: {type: String},
+    variantsFor: {type: Date},
 }, {minimize: false});
 
 const StrategyBacktest = models?.StrategyBacktest || model<StrategyBacktestDoc>('StrategyBacktest', StrategyBacktestSchema);

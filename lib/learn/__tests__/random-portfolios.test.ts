@@ -7,14 +7,15 @@
 import {describe, expect, it} from 'vitest';
 import {
     buildLuckView,
-    createDayMemo,
+    completeSession,
     histogram,
-    holdInputs,
     holdReturn,
+    holdWindow,
     LUCK_MIN_POOL,
     LUCK_MIN_SESSIONS,
     LUCK_PORTFOLIO_SIZE,
     LUCK_SAMPLE_COUNT,
+    LUCK_STALE_DAYS,
     luckWindow,
     medianOf,
     mulberry32,
@@ -25,9 +26,11 @@ import {
     sessionsBetween,
     type HoldInput,
 } from '@/lib/learn/random-portfolios';
+import {eachCalendarDay} from '@/lib/prices/calendar-days';
+import {createIncomeClock, dividendsByExDate, makeRateLookup, payDateFor, replayIncome} from '@/lib/trading/income';
 
-const input = (symbol: string, startClose: number, endClose: number, dividendsPerShare = 0): HoldInput =>
-    ({symbol, startClose, endClose, dividendsPerShare});
+const input = (symbol: string, startClose: number, endClose: number, incomePerShare = 0): HoldInput =>
+    ({symbol, startClose, endClose, incomePerShare});
 
 describe('mulberry32 and seedFrom', () => {
     it('repeats the same stream for the same seed and differs for another', () => {
@@ -74,49 +77,97 @@ describe('samplePortfolios', () => {
     });
 });
 
-describe('holdInputs', () => {
-    it('pairs each symbol\'s two edge closes and sums the dividends with ex-dates inside the window', () => {
-        const map = holdInputs(
-            [
-                {symbol: 'AAA', date: '2026-08-03', close: 100},
-                {symbol: 'AAA', date: '2026-09-25', close: 110},
-                {symbol: 'BBB', date: '2026-08-03', close: 50},   // no end bar: left out
-                {symbol: 'CCC', date: '2026-09-25', close: 20},   // no start bar: left out
-                {symbol: 'DDD', date: '2026-08-03', close: 0},    // a zero close is not a price
-                {symbol: 'DDD', date: '2026-09-25', close: 5},
+describe('holdWindow', () => {
+    const FROM = '2026-08-03';
+    const TO = '2026-09-25';
+    const edges = [
+        {symbol: 'AAA', date: FROM, close: 100},
+        {symbol: 'AAA', date: TO, close: 110},
+        {symbol: 'BBB', date: FROM, close: 50},   // no end bar: left out
+        {symbol: 'CCC', date: TO, close: 20},     // no start bar: left out
+        {symbol: 'DDD', date: FROM, close: 0},    // a zero close is not a price
+        {symbol: 'DDD', date: TO, close: 5},
+    ];
+
+    it('pairs each symbol\'s two edge closes and pays each dividend the way a paper account is paid', () => {
+        // A snapshot on TO holds the income rows dated before TO: a dividend counts once its pay
+        // date (ex-date + DIVIDEND_PAY_LAG_DAYS) is before the last day, to the shares held the
+        // evening before its ex-date.
+        const dividends = [
+            {symbol: 'AAA', exDate: FROM, perShare: 9},           // on the buy day: the seller keeps it
+            {symbol: 'AAA', exDate: '2026-08-20', perShare: 0.5},  // paid Aug 25
+            {symbol: 'AAA', exDate: '2026-09-19', perShare: 0.25}, // paid Sep 24, the day before TO
+            {symbol: 'AAA', exDate: '2026-09-20', perShare: 0.4},  // paid Sep 25: cash only the day after
+            {symbol: 'AAA', exDate: TO, perShare: 0.3},            // on the last day: paid after the window
+            {symbol: 'AAA', exDate: '2026-09-26', perShare: 7},    // after the window
+        ];
+        expect(payDateFor('2026-09-19') < TO).toBe(true);
+        expect(payDateFor('2026-09-20')).toBe(TO);
+        const hold = holdWindow({bars: edges, dividends, rates: [], from: FROM, to: TO});
+        expect([...hold.inputs.keys()]).toEqual(['AAA']);
+        expect(hold.inputs.get('AAA')).toEqual({symbol: 'AAA', startClose: 100, endClose: 110, incomePerShare: expect.closeTo(0.75, 12)});
+        // No rate stored: cash earns nothing, never an invented rate.
+        expect(hold.cashGrowth).toBe(1);
+    });
+
+    it('counts no dividend whose ex-date falls in the last days of the window, SPY\'s marker included', () => {
+        // SPY goes ex $1.80 on the window's last day and its close drops by it: the paper account
+        // is paid five days later, so the marker shows the drop.
+        const hold = holdWindow({
+            bars: [{symbol: 'SPY', date: FROM, close: 600}, {symbol: 'SPY', date: TO, close: 598.2}],
+            dividends: [{symbol: 'SPY', exDate: TO, perShare: 1.8}],
+            rates: [], from: FROM, to: TO,
+        });
+        const shares = Math.floor(100_000 / 600 + 1e-9);
+        expect(holdReturn(['SPY'], hold, 100_000)?.returnPct).toBeCloseTo((shares * (598.2 - 600)) / 100_000 * 100, 9);
+    });
+
+    it('lets leftover cash and paid dividends earn the T-bill rate on the one income clock', () => {
+        const rates = eachCalendarDay('2026-07-27', TO).map((date) => ({date, discountPct: 4.07}));
+        const dividends = [{symbol: 'AAA', exDate: '2026-08-20', perShare: 0.5}, {symbol: 'EEE', exDate: '2026-09-01', perShare: 1.25}];
+        const bars = [...edges, {symbol: 'EEE', date: FROM, close: 33}, {symbol: 'EEE', date: TO, close: 31}];
+        const hold = holdWindow({bars, dividends, rates, from: FROM, to: TO});
+        expect(hold.cashGrowth).toBeGreaterThan(1);
+        const result = holdReturn(['AAA', 'EEE'], hold, 10_000);
+        // The same portfolio replayed directly: bought at FROM's close, held through TO.
+        const aaa = Math.floor(5_000 / 100 + 1e-9);
+        const eee = Math.floor(5_000 / 33 + 1e-9);
+        const clock = createIncomeClock({rateOn: makeRateLookup(rates), dividends: dividendsByExDate(dividends)});
+        const replay = replayIncome({
+            from: FROM, to: TO, startCash: 10_000, startHoldings: new Map(), clock,
+            trades: [
+                {date: FROM, symbol: 'AAA', side: 'buy', quantity: aaa, total: aaa * 100},
+                {date: FROM, symbol: 'EEE', side: 'buy', quantity: eee, total: eee * 33},
             ],
-            [
-                {symbol: 'AAA', exDate: '2026-08-03', perShare: 9},    // on the buy day: the seller keeps it
-                {symbol: 'AAA', exDate: '2026-08-20', perShare: 0.5},
-                {symbol: 'AAA', exDate: '2026-09-25', perShare: 0.25}, // on the last day: held at the close before
-                {symbol: 'AAA', exDate: '2026-09-26', perShare: 7},    // after the window
-            ],
-            '2026-08-03',
-            '2026-09-25',
-        );
-        expect([...map.keys()]).toEqual(['AAA']);
-        expect(map.get('AAA')).toEqual({symbol: 'AAA', startClose: 100, endClose: 110, dividendsPerShare: 0.75});
+        });
+        expect(replay.rows.some((row) => row.kind === 'dividend' && row.symbol === 'EEE')).toBe(true);
+        expect(result?.endValue).toBeCloseTo(replay.cash + aaa * 110 + eee * 31, 8);
+        expect(result?.cash).toBeCloseTo(10_000 - aaa * 100 - eee * 33, 9);
     });
 });
 
 describe('holdReturn', () => {
-    it('buys equal dollar amounts in whole shares, keeps the rest as cash, and counts dividends as cash', () => {
-        const inputs = new Map([
-            ['AAA', input('AAA', 30, 33, 1)],   // $500 → 16 shares ($480), $20 left
-            ['BBB', input('BBB', 70, 63)],      // $500 → 7 shares ($490), $10 left
+    const window = (entries: HoldInput[], cashGrowth = 1) => ({inputs: new Map(entries.map((e) => [e.symbol, e])), cashGrowth});
+
+    it('buys equal dollar amounts in whole shares, keeps the rest as cash, and adds each share\'s income', () => {
+        const hold = window([
+            input('AAA', 30, 33, 1),   // $500 → 16 shares ($480), $20 left
+            input('BBB', 70, 63),      // $500 → 7 shares ($490), $10 left
         ]);
-        const result = holdReturn(['AAA', 'BBB'], inputs, 1000);
+        const result = holdReturn(['AAA', 'BBB'], hold, 1000);
         // cash 30 + 16 × (33 + 1) + 7 × 63 = 30 + 544 + 441 = 1015
         expect(result?.cash).toBeCloseTo(30, 9);
         expect(result?.endValue).toBeCloseTo(1015, 9);
         expect(result?.returnPct).toBeCloseTo(1.5, 9);
+        // The leftover grows by the window's cash factor.
+        expect(holdReturn(['AAA', 'BBB'], {...hold, cashGrowth: 1.01}, 1000)?.endValue).toBeCloseTo(1015 + 30 * 0.01, 9);
     });
 
     it('holds cash when a share costs more than its slice, and is null for a symbol with no prices', () => {
-        const inputs = new Map([['BIG', input('BIG', 900, 1800)]]);
-        expect(holdReturn(['BIG'], inputs, 500)?.returnPct).toBe(0);
-        expect(holdReturn(['BIG', 'NOPE'], inputs, 5000)).toBeNull();
-        expect(holdReturn([], inputs, 5000)).toBeNull();
+        const hold = window([input('BIG', 900, 1800)]);
+        expect(holdReturn(['BIG'], hold, 500)?.returnPct).toBe(0);
+        expect(holdReturn(['BIG', 'NOPE'], hold, 5000)).toBeNull();
+        expect(holdReturn([], hold, 5000)).toBeNull();
     });
 });
 
@@ -167,8 +218,36 @@ describe('trading sessions', () => {
     });
 });
 
+describe('completeSession', () => {
+    const universe = Array.from({length: 40}, (_, i) => `L${String(i).padStart(2, '0')}`);
+    const latest = (spy: string | null, caps: (i: number) => string | null) => new Map([
+        ...(spy ? [['SPY', spy] as [string, string]] : []),
+        ...universe.flatMap((s, i) => { const d = caps(i); return d ? [[s, d] as [string, string]] : []; }),
+    ]);
+
+    it('ends before SPY\'s latest close while most of the pool has not got that session yet (08:00 ET)', () => {
+        expect(completeSession({latest: latest('2026-09-29', (i) => (i < 12 ? '2026-09-29' : '2026-09-28')), universe, benchmark: 'SPY'})).toBe('2026-09-28');
+        // …and one chunk short is still short: the whole pool, not most of it.
+        expect(completeSession({latest: latest('2026-09-29', (i) => (i < 39 ? '2026-09-29' : '2026-09-28')), universe, benchmark: 'SPY'})).toBe('2026-09-28');
+    });
+
+    it('ends on SPY\'s latest close once every large cap has it (16:00 ET), never after it', () => {
+        expect(completeSession({latest: latest('2026-09-29', () => '2026-09-29'), universe, benchmark: 'SPY'})).toBe('2026-09-29');
+        expect(completeSession({latest: latest('2026-09-28', () => '2026-09-29'), universe, benchmark: 'SPY'})).toBe('2026-09-28');
+    });
+
+    it('leaves out a name not served for more than LUCK_STALE_DAYS, and has no end without SPY or a pool', () => {
+        expect(completeSession({latest: latest('2026-10-01', (i) => (i === 0 ? '2026-09-10' : '2026-10-01')), universe, benchmark: 'SPY'})).toBe('2026-10-01');
+        expect(completeSession({latest: latest('2026-10-01', (i) => (i === 0 ? '2026-09-24' : '2026-10-01')), universe, benchmark: 'SPY'})).toBe('2026-09-24');
+        expect(LUCK_STALE_DAYS).toBe(7);
+        expect(completeSession({latest: latest(null, () => '2026-10-01'), universe, benchmark: 'SPY'})).toBeNull();
+        expect(completeSession({latest: latest('2026-10-01', (i) => (i < LUCK_MIN_POOL - 1 ? '2026-10-01' : null)), universe, benchmark: 'SPY'})).toBeNull();
+        expect(completeSession({latest: latest('2026-10-01', (i) => (i < LUCK_MIN_POOL ? '2026-10-01' : null)), universe, benchmark: 'SPY'})).toBe('2026-10-01');
+    });
+});
+
 describe('luckWindow', () => {
-    const base = {inceptionDate: '2026-08-03', lastSession: '2026-09-25', unpriced: 0};
+    const base = {inceptionDate: '2026-08-03', lastSession: '2026-09-25', unpriced: 0, ownFills: true};
     const snap = (date: string, totalValue = 103_000) => ({date, totalValue, startingBalance: 100_000});
 
     it('ends on the latest session when the account has a snapshot that day, with the snapshot\'s return', () => {
@@ -195,6 +274,13 @@ describe('luckWindow', () => {
         expect(w).toMatchObject({start: '2026-07-31', end: '2026-09-25', yoursPct: null, withheld: 'no-snapshot'});
     });
 
+    it('places no one on an account whose fills the learner did not place (the AI Navigator\'s, or one never traded)', () => {
+        const w = luckWindow({...base, ownFills: false, lastSnapshot: snap('2026-09-25')});
+        expect(w).toMatchObject({start: '2026-08-03', end: '2026-09-25', yoursPct: null, withheld: 'not-yours'});
+        // …even with its holdings unpriced: whose return it is comes first.
+        expect(luckWindow({...base, ownFills: false, unpriced: 1, lastSnapshot: null})).toMatchObject({end: '2026-09-25', withheld: 'not-yours'});
+    });
+
     it('has no window without a stored session, or before the account existed', () => {
         expect(luckWindow({...base, lastSession: null, lastSnapshot: null})).toBeNull();
         expect(luckWindow({...base, lastSession: '2026-07-01', lastSnapshot: null})).toBeNull();
@@ -208,21 +294,22 @@ describe('buildLuckView', () => {
         ...universe.map((symbol, i) => [symbol, input(symbol, 100, 100 + i)] as const),
         ['SPY', input('SPY', 500, 560)],
     ]);
+    const hold = {inputs, cashGrowth: 1};
     const window = {start: '2026-08-03', end: '2026-09-25', sessions: 38, yoursPct: 25, withheld: null};
 
     it('needs ten sessions before it compares anything', () => {
-        expect(buildLuckView({window: {...window, sessions: LUCK_MIN_SESSIONS - 1}, inputs, universe, seed: 1, amount: 100_000}))
+        expect(buildLuckView({window: {...window, sessions: LUCK_MIN_SESSIONS - 1}, hold, universe, seed: 1, amount: 100_000}))
             .toEqual({status: 'needs-days', sessions: LUCK_MIN_SESSIONS - 1});
     });
 
     it('says prices are missing when too little of the universe has both edge closes', () => {
         const few = new Map([...inputs].slice(0, LUCK_MIN_POOL - 1));
-        expect(buildLuckView({window, inputs: few, universe, seed: 1, amount: 100_000}))
+        expect(buildLuckView({window, hold: {inputs: few, cashGrowth: 1}, universe, seed: 1, amount: 100_000}))
             .toEqual({status: 'no-prices', sessions: 38});
     });
 
     it('places the snapshot return among a thousand seeded portfolios, with SPY and the median beside it', () => {
-        const view = buildLuckView({window, inputs, universe, seed: seedFrom('acc', '2026-09-25'), amount: 100_000});
+        const view = buildLuckView({window, hold, universe, seed: seedFrom('acc', '2026-09-25'), amount: 100_000});
         if (view.status !== 'ready') throw new Error(view.status);
         expect(view.count).toBe(LUCK_SAMPLE_COUNT);
         expect(view.size).toBe(LUCK_PORTFOLIO_SIZE);
@@ -234,7 +321,7 @@ describe('buildLuckView', () => {
         expect(view.histogram.counts.reduce((a, b) => a + b, 0)).toBe(LUCK_SAMPLE_COUNT);
         expect(view.yours).not.toBeNull();
         // the rank is recomputable from the returns the view was built on
-        const again = buildLuckView({window, inputs, universe, seed: seedFrom('acc', '2026-09-25'), amount: 100_000});
+        const again = buildLuckView({window, hold, universe, seed: seedFrom('acc', '2026-09-25'), amount: 100_000});
         expect(again).toEqual(view);
         expect(view.yours?.pct).toBe(25);
         expect(view.yours?.rankPct).toBe(Math.floor((view.yours?.below ?? 0) / LUCK_SAMPLE_COUNT * 100));
@@ -243,9 +330,9 @@ describe('buildLuckView', () => {
     });
 
     it('lands above all of them past the best five, and keeps SPY and the median when the marker is withheld', () => {
-        const top = buildLuckView({window: {...window, yoursPct: 50}, inputs, universe, seed: 3, amount: 100_000});
+        const top = buildLuckView({window: {...window, yoursPct: 50}, hold, universe, seed: 3, amount: 100_000});
         expect(top.status === 'ready' && top.yours).toMatchObject({below: LUCK_SAMPLE_COUNT, rankPct: 100});
-        const withheld = buildLuckView({window: {...window, yoursPct: null, withheld: 'unpriced'}, inputs, universe, seed: 3, amount: 100_000});
+        const withheld = buildLuckView({window: {...window, yoursPct: null, withheld: 'unpriced'}, hold, universe, seed: 3, amount: 100_000});
         if (withheld.status !== 'ready') throw new Error(withheld.status);
         expect(withheld.yours).toBeNull();
         expect(withheld.withheld).toBe('unpriced');
@@ -255,27 +342,7 @@ describe('buildLuckView', () => {
 
     it('uses only the universe for the sample: SPY is a marker, never a pick', () => {
         const onlySpyExtra = new Map([...inputs].filter(([s]) => s === 'SPY' || universe.slice(0, 25).includes(s)));
-        const view = buildLuckView({window, inputs: onlySpyExtra, universe, seed: 9, amount: 100_000});
+        const view = buildLuckView({window, hold: {inputs: onlySpyExtra, cashGrowth: 1}, universe, seed: 9, amount: 100_000});
         expect(view.status === 'ready' && view.pool).toBe(25);
-    });
-});
-
-describe('createDayMemo', () => {
-    it('keeps values for the day they were stored and forgets them when the date turns', () => {
-        const memo = createDayMemo<number>(2);
-        memo.set('a', '2026-09-25', 1);
-        expect(memo.get('a', '2026-09-25')).toBe(1);
-        expect(memo.get('a', '2026-09-26')).toBeUndefined();
-        expect(memo.get('a', '2026-09-25')).toBeUndefined();
-    });
-
-    it('holds at most `limit` keys, dropping the oldest', () => {
-        const memo = createDayMemo<number>(2);
-        memo.set('a', 'd', 1);
-        memo.set('b', 'd', 2);
-        memo.set('c', 'd', 3);
-        expect(memo.get('a', 'd')).toBeUndefined();
-        expect(memo.get('b', 'd')).toBe(2);
-        expect(memo.get('c', 'd')).toBe(3);
     });
 });

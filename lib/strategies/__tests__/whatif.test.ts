@@ -281,10 +281,13 @@ describe('whatIfLab', () => {
     const series = (count: number, step: number) =>
         Array.from({length: count}, (_, i) => ({date: `d${String(i).padStart(4, '0')}`, value: 100_000 + i * step}));
     const stats = {totalReturnPct: 1, cagrPct: 1, annualizedVolPct: 1, maxDrawdownPct: 0, winRatePct: null, wins: 0, losses: 0, tradeCount: 0, benchmarkReturnPct: 1, excessReturnPct: 0};
+    const BUILT = new Date('2026-09-28T13:40:00Z');
     const stored = (extra: Partial<WhatIfBacktest> = {}): WhatIfBacktest => {
         const points = series(300, 5);
-        return {version: '3.1', from: points[0].date, to: points[299].date, points, stats, ...extra};
+        return {version: '3.1', from: points[0].date, to: points[299].date, points, stats, computedAt: BUILT, ...extra};
     };
+    // Variants as the nightly job stores them beside the backtest build they were computed for.
+    const beside = {variantsVersion: '3.1', variantsFor: BUILT};
     const variant = (id: string, knob: string, value: number, step = 9): StoredWhatIfVariant => {
         const points = series(300, step);
         return {id, knob, value, from: points[0].date, to: points[299].date, stats: {...stats, totalReturnPct: step}, closeFills: 1, skippedDays: 0, points: whatIfPoints(points)};
@@ -303,7 +306,7 @@ describe('whatIfLab', () => {
     });
 
     it('draws the stored backtest decimated onto the variants\' dates, and each variant beside it', () => {
-        const backtest = stored({variants: grid(), variantsVersion: '3.1'});
+        const backtest = stored({variants: grid(), ...beside});
         const lab = whatIfLab(gc, backtest);
         expect(lab?.stored).toMatchObject({from: backtest.from, to: backtest.to, stats});
         expect(lab?.stored?.dates).toEqual(whatIfPoints(backtest.points).map((p) => p.date));
@@ -316,17 +319,27 @@ describe('whatIfLab', () => {
     });
 
     it('hides variants computed for another version of the backtest', () => {
-        expect(whatIfLab(gc, stored({variants: grid(), variantsVersion: '2.1'}))?.variants).toEqual([]);
+        expect(whatIfLab(gc, stored({variants: grid(), variantsVersion: '2.1', variantsFor: BUILT}))?.variants).toEqual([]);
         expect(whatIfLab(gc, stored({variants: grid()}))?.variants).toEqual([]);
+    });
+
+    it('hides variants computed beside an earlier build of the same version', () => {
+        // A resimulate rebuilt the backtest (same version, same window, new data) and the grid
+        // was not recomputed: the old variants are not "this line with one setting moved".
+        const rebuilt = new Date(BUILT.getTime() + 86_400_000);
+        expect(whatIfLab(gc, stored({variants: grid(), ...beside, computedAt: rebuilt}))?.variants).toEqual([]);
+        expect(whatIfLab(gc, stored({variants: grid(), variantsVersion: '3.1'}))?.variants).toEqual([]);
+        // The same instant however it arrives (a Date from Mongo, ms from a step's JSON).
+        expect(whatIfLab(gc, stored({variants: grid(), variantsVersion: '3.1', variantsFor: BUILT.getTime()}))?.variants).toHaveLength(grid().length);
     });
 
     it('drops a variant off the grid or off the stored calendar, keeping the rest in grid order', () => {
         const [a, b, c, d] = grid();
         const offGrid = variant('fast=30', 'fast', 30);
         const offCalendar = {...c, points: c.points.map((p, i) => (i === 5 ? {...p, date: 'x'} : p))};
-        const lab = whatIfLab(gc, stored({variants: [d, offGrid, b, offCalendar, a], variantsVersion: '3.1'}));
+        const lab = whatIfLab(gc, stored({variants: [d, offGrid, b, offCalendar, a], ...beside}));
         expect(lab?.variants.map((v) => v.id)).toEqual([a.id, b.id, d.id]);
         const otherWindow = {...a, from: 'd0001'};
-        expect(whatIfLab(gc, stored({variants: [otherWindow], variantsVersion: '3.1'}))?.variants).toEqual([]);
+        expect(whatIfLab(gc, stored({variants: [otherWindow], ...beside}))?.variants).toEqual([]);
     });
 });

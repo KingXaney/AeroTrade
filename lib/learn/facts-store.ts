@@ -1,7 +1,9 @@
 // Server reads behind the learn surfaces. A plain module (not 'use server') so nothing
 // here is a POST endpoint; callers derive the userId from the session. cache()-wrapped
 // so the dashboard page (which needs the answer for widget availability) and the
-// widget's own loader share one set of reads per request.
+// widget's own loader share one set of reads per request. cache() shares nothing outside a
+// render, so the daily digest job reads through readLearnFacts, which reads the accounts and
+// the preferences once and hands them to both builders.
 //
 // Every read is an existence check, a projection or a single indexed row — no bar reads,
 // no quotes, and never the lazy account-creation path (readAccountsForUser answers a
@@ -26,21 +28,24 @@ import {STRATEGY_SLUGS} from "@/lib/strategies/catalog";
 import type {StrategyId} from "@/lib/strategies/types";
 
 type LearnPrefs = {followedStrategies?: string[]; learn?: {missionsDismissedAt?: Date; lessonsSeen?: string[]}} | null;
+type LearnRows = {accounts: Awaited<ReturnType<typeof readAccountsForUser>>; prefs: LearnPrefs};
 
+const readRowsNow = async (userId: string): Promise<LearnRows> => {
+    await connectToDatabase();
+    const [accounts, prefs] = await Promise.all([
+        readAccountsForUser(userId),
+        UserPreferencesModel.findOne({userId}).select('followedStrategies learn').lean<LearnPrefs>(),
+    ]);
+    return {accounts, prefs};
+};
 // Shared by both fact readers, so the page's availability check and the widget's loader
 // read the accounts and the preferences once per request.
-const readAccounts = cache((userId: string) => readAccountsForUser(userId));
-const readLearnPrefs = cache(async (userId: string): Promise<LearnPrefs> => {
-    await connectToDatabase();
-    return UserPreferencesModel.findOne({userId}).select('followedStrategies learn').lean<LearnPrefs>();
-});
+const readRows = cache(readRowsNow);
 
-export const getOnboardingFacts = cache(async (userId: string): Promise<OnboardingFacts> => {
+const onboardingFrom = async (userId: string, {accounts, prefs}: LearnRows): Promise<OnboardingFacts> => {
     await connectToDatabase();
-    const [accounts, trade, prefs, topic, watch, navigator] = await Promise.all([
-        readAccounts(userId),
+    const [trade, topic, watch, navigator] = await Promise.all([
         PaperTrade.exists({userId, source: 'user'}),
-        readLearnPrefs(userId),
         Topic.exists({userId, lastSeenAt: {$exists: true}}),
         Watchlist.exists({userId}),
         AiNavigator.exists({userId}),
@@ -57,7 +62,9 @@ export const getOnboardingFacts = cache(async (userId: string): Promise<Onboardi
         navigatorEnrolled: navigator !== null,
         missionsDismissedAt: dismissed ? new Date(dismissed).toISOString() : null,
     };
-});
+};
+
+export const getOnboardingFacts = cache(async (userId: string): Promise<OnboardingFacts> => onboardingFrom(userId, await readRows(userId)));
 
 type LeanFill = {symbol: string; side: 'buy' | 'sell'; quantity: number; price: number; realizedPnl?: number | null; createdAt: Date};
 type LeanDividend = {symbol: string; date: string; amount: number; perShare?: number; quantity?: number; exDate?: string};
@@ -73,11 +80,11 @@ const isStrategyId = (value: string): value is StrategyId => (STRATEGY_SLUGS as 
 //   account's current epoch — inceptionAt, falling back to createdAt for accounts from before
 //   inceptionAt existed, as getIncomeActivity reads it;
 // - the drawdown scan: only accounts younger than ONBOARDING_MAX_DAYS, projected to three
-//   fields and dated on or after the same cutoff, so it can never grow into a history read;
+//   fields and dated on or after the same cutoff, so it can never grow into a history read
+//   (the digest needs it too: a first drawdown crossed yesterday is a moment it mails);
 // - the followed strategies' StrategyState rows (eight at most) for their last check.
-export const getLearnFacts = cache(async (userId: string): Promise<LearnFacts> => {
-    await connectToDatabase();
-    const [accounts, prefs] = await Promise.all([readAccounts(userId), readLearnPrefs(userId)]);
+// The rows' read has connected; the onboarding promise is joined before anything else awaits.
+const learnFactsFrom = async (userId: string, {accounts, prefs}: LearnRows, onboardingFacts: Promise<OnboardingFacts>): Promise<LearnFacts> => {
     const followed = (prefs?.followedStrategies ?? []).filter(isStrategyId);
     const today = getEasternDateString();
     const cutoff = shiftDate(today, -ONBOARDING_MAX_DAYS);
@@ -85,7 +92,7 @@ export const getLearnFacts = cache(async (userId: string): Promise<LearnFacts> =
     const credited = accounts.filter((a) => typeof a.incomeThrough === 'string' && a.incomeThrough.length > 0);
 
     const [onboarding, fill, sell, dividend, snapshots, states] = await Promise.all([
-        getOnboardingFacts(userId),
+        onboardingFacts,
         PaperTrade.findOne({userId, source: 'user'}).sort({createdAt: 1}).select('symbol side quantity price createdAt').lean<LeanFill | null>(),
         PaperTrade.findOne({userId, source: 'user', side: 'sell'}).sort({createdAt: 1}).select('symbol side quantity price realizedPnl createdAt').lean<LeanFill | null>(),
         credited.length === 0 ? null : AccountIncome.findOne({
@@ -114,7 +121,17 @@ export const getLearnFacts = cache(async (userId: string): Promise<LearnFacts> =
         rebalances,
         lessonsSeen: prefs?.learn?.lessonsSeen ?? [],
     };
-});
+};
+
+export const getLearnFacts = cache(async (userId: string): Promise<LearnFacts> =>
+    learnFactsFrom(userId, await readRows(userId), getOnboardingFacts(userId)));
+
+// The digest job's reader (no render, so no cache() sharing): the accounts and the preferences
+// are read once and handed to the onboarding and the lesson builders alike.
+export const readLearnFacts = async (userId: string): Promise<LearnFacts> => {
+    const rows = await readRowsNow(userId);
+    return learnFactsFrom(userId, rows, onboardingFrom(userId, rows));
+};
 
 const toFill = (t: LeanFill): LearnFill => ({
     date: getEasternDateString(new Date(t.createdAt)),

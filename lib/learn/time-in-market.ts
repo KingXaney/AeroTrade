@@ -2,25 +2,29 @@
 // picks — all of it into SPY on the first day, the same amount in equal monthly deposits, or
 // none of it (kept as cash). Pure and client-safe; the server read is time-in-market-read.ts.
 //
-// SPY here is the total-return index getBenchmarkIndex builds (dividends reinvested on their
-// pay dates), so a way that holds SPY holds units of that index. Cash — the deposit waiting
-// for the next session, the interest it earned — goes through replayIncome, the one clock
-// every paper account, the income job and the strategy simulator use (invariant 11). A day
-// that holds cash and has no usable T-bill rate makes the way null, never zero; a day that
-// holds no cash needs no rate.
+// Each way is what a paper account doing the same would hold (invariant 11): SPY as shares
+// bought at its stored closes, paid its stored dividends on the one clock every paper account,
+// the income job and the strategy simulator use (replayIncome) — owed to the shares held the
+// evening before the ex-date, paid as cash on the pay date, so a purchase made after an ex-date
+// collects nothing until the next one — and cash (a deposit waiting for the next session, a
+// paid dividend, the interest they earn) at the T-bill rate. A day that holds cash and has no
+// usable T-bill rate makes the way null, never zero; a day that holds no cash needs no rate.
 
 import {z} from "zod";
 import {addCalendarDays, eachCalendarDay} from "@/lib/prices/calendar-days";
 import {STRATEGY_BACKFILL_CALENDAR_DAYS} from "@/lib/prices/config";
 import type {IndexPoint} from "@/lib/prices/total-return";
 import type {StrategyId} from "@/lib/strategies/types";
+import {downsample} from "@/lib/strategies/views";
 import {toCents} from "@/lib/trading/bridge";
 import {
     createIncomeClock,
+    dividendsByExDate,
     makeRateLookup,
     replayIncome,
     usableRate,
     type Deposit,
+    type DividendPoint,
     type IncomeClock,
     type IncomeTrade,
     type RateLookup,
@@ -49,8 +53,10 @@ export type WayKey = 'lumpSum' | 'dollarCostAverage' | 'cashOnly';
 export const WAY_KEYS: readonly WayKey[] = ['lumpSum', 'dollarCostAverage', 'cashOnly'];
 
 export type DateWindow = {start: string; end: string};
-// End-of-day value on one session (cash, interest accrued that day, and units × the index)
-// beside the dollars deposited so far.
+// SPY's stored daily closes (value = the close) and its stored dividends per share by ex-date.
+export type SpyHistory = {closes: readonly IndexPoint[]; dividends: readonly DividendPoint[]};
+// End-of-day value on one session (cash, the income rows dated that day, and shares × the
+// close) beside the dollars deposited so far.
 export type WayPoint = {date: string; value: number; contributed: number};
 export type WaySeries = {points: WayPoint[]; deposits: Deposit[]};
 
@@ -120,16 +126,16 @@ export const monthlyDeposits = (start: string, end: string, amount: number): Dep
 
 // ---- the three ways -------------------------------------------------------------------------
 
-const sessionsIn = (index: readonly IndexPoint[], {start, end}: DateWindow): IndexPoint[] =>
-    index.filter((point) => point.date >= start && point.date <= end);
+const sessionsIn = (closes: readonly IndexPoint[], {start, end}: DateWindow): IndexPoint[] =>
+    closes.filter((point) => point.date >= start && point.date <= end);
 
-// The one walk behind all three. Deposits land in cash; with `invest`, each buys units of the
-// index at the first session on or after it, so a deposit made on a weekend waits — and earns —
-// until Monday. The clock is watched, not changed: a close that holds cash on a day with no
-// usable rate (the income job's own staleness rule) voids the way. Each session's value is then
-// rebuilt from the same deposits, buys and credited rows the clock walked.
-const own = (index: readonly IndexPoint[], window: DateWindow, deposits: readonly Deposit[], rateOn: RateLookup, invest: boolean): WaySeries | null => {
-    const sessions = sessionsIn(index, window);
+// The one walk behind all three. Deposits land in cash; with `invest`, each buys SPY shares at
+// the close of the first session on or after it, so a deposit made on a weekend waits — and
+// earns — until Monday. The clock is watched, not changed: a close that holds cash on a day
+// with no usable rate (the income job's own staleness rule) voids the way. Each session's value
+// is then rebuilt from the same deposits, buys and credited rows the clock walked.
+const own = (spy: SpyHistory, window: DateWindow, deposits: readonly Deposit[], rateOn: RateLookup, invest: boolean): WaySeries | null => {
+    const sessions = sessionsIn(spy.closes, window);
     if (sessions.length === 0) return null;
     const trades: IncomeTrade[] = [];
     if (invest) {
@@ -139,7 +145,7 @@ const own = (index: readonly IndexPoint[], window: DateWindow, deposits: readonl
             trades.push({date: session.date, symbol: HOLDING, side: 'buy', quantity: deposit.amount / session.value, total: deposit.amount});
         }
     }
-    const clock = createIncomeClock({rateOn, dividends: new Map()});
+    const clock = createIncomeClock({rateOn, dividends: dividendsByExDate(spy.dividends.filter((point) => point.symbol === HOLDING))});
     let unpriced = false;
     const watched: IncomeClock = {
         open: clock.open,
@@ -152,7 +158,7 @@ const own = (index: readonly IndexPoint[], window: DateWindow, deposits: readonl
     if (unpriced) return null;
 
     const cashIn = new Map<string, number>();
-    const unitsIn = new Map<string, number>();
+    const sharesIn = new Map<string, number>();
     const paidIn = new Map<string, number>();
     const bump = (map: Map<string, number>, date: string, amount: number) => map.set(date, (map.get(date) ?? 0) + amount);
     for (const deposit of deposits) {
@@ -161,36 +167,36 @@ const own = (index: readonly IndexPoint[], window: DateWindow, deposits: readonl
     }
     for (const trade of trades) {
         bump(cashIn, trade.date, -trade.total);
-        bump(unitsIn, trade.date, trade.quantity);
+        bump(sharesIn, trade.date, trade.quantity);
     }
     // A row dated d is owed at d's close and cash at d+1's open; as value it counts on d.
     for (const row of rows) bump(cashIn, row.date, row.amount);
-    const indexOn = new Map(sessions.map((point) => [point.date, point.value]));
+    const closeOn = new Map(sessions.map((point) => [point.date, point.value]));
     let cash = 0;
-    let units = 0;
+    let shares = 0;
     let contributed = 0;
     const points: WayPoint[] = [];
     for (const day of eachCalendarDay(window.start, window.end)) {
         cash += cashIn.get(day) ?? 0;
-        units += unitsIn.get(day) ?? 0;
+        shares += sharesIn.get(day) ?? 0;
         contributed += paidIn.get(day) ?? 0;
-        const value = indexOn.get(day);
-        if (value !== undefined) points.push({date: day, value: cash + units * value, contributed});
+        const close = closeOn.get(day);
+        if (close !== undefined) points.push({date: day, value: cash + shares * close, contributed});
     }
     return {points, deposits: [...deposits]};
 };
 
 // The whole amount into SPY at the first session of the window.
-export const lumpSum = (index: readonly IndexPoint[], window: DateWindow, amount: number, rateOn: RateLookup): WaySeries | null =>
-    own(index, window, [{date: window.start, amount}], rateOn, true);
+export const lumpSum = (spy: SpyHistory, window: DateWindow, amount: number, rateOn: RateLookup): WaySeries | null =>
+    own(spy, window, [{date: window.start, amount}], rateOn, true);
 
 // The same amount in equal monthly deposits across the window, each into SPY when it arrives.
-export const dollarCostAverage = (index: readonly IndexPoint[], window: DateWindow, amount: number, rateOn: RateLookup): WaySeries | null =>
-    own(index, window, monthlyDeposits(window.start, window.end, amount), rateOn, true);
+export const dollarCostAverage = (spy: SpyHistory, window: DateWindow, amount: number, rateOn: RateLookup): WaySeries | null =>
+    own(spy, window, monthlyDeposits(window.start, window.end, amount), rateOn, true);
 
 // The whole amount kept as cash: replayIncome with no trades, valued on SPY's sessions.
-export const cashOnly = (index: readonly IndexPoint[], window: DateWindow, amount: number, rateOn: RateLookup): WaySeries | null =>
-    own(index, window, [{date: window.start, amount}], rateOn, false);
+export const cashOnly = (spy: SpyHistory, window: DateWindow, amount: number, rateOn: RateLookup): WaySeries | null =>
+    own(spy, window, [{date: window.start, amount}], rateOn, false);
 
 // ---- reading a way --------------------------------------------------------------------------
 
@@ -253,25 +259,25 @@ export type StartRow = {start: string; ways: Record<WayKey, number | null>};
 export const tableStarts = (today: string, rows = TABLE_ROWS, stepMonths = TABLE_STEP_MONTHS): string[] =>
     Array.from({length: rows}, (_, k) => addMonths(today, -stepMonths * (k + 1)));
 
-const threeWays = (index: readonly IndexPoint[], window: DateWindow, amount: number, rateOn: RateLookup): Record<WayKey, WaySeries | null> => ({
-    lumpSum: lumpSum(index, window, amount, rateOn),
-    dollarCostAverage: dollarCostAverage(index, window, amount, rateOn),
-    cashOnly: cashOnly(index, window, amount, rateOn),
+const threeWays = (spy: SpyHistory, window: DateWindow, amount: number, rateOn: RateLookup): Record<WayKey, WaySeries | null> => ({
+    lumpSum: lumpSum(spy, window, amount, rateOn),
+    dollarCostAverage: dollarCostAverage(spy, window, amount, rateOn),
+    cashOnly: cashOnly(spy, window, amount, rateOn),
 });
 
 // The same amount and the same end date, from each start the stored history reaches (a start
 // before the first stored session is left out, never shortened). Each row starts at the first
 // session on or after its date, which is also where the row's link lands.
-export const startDateTable = (index: readonly IndexPoint[], rateOn: RateLookup, starts: readonly string[], amount: number): StartRow[] => {
-    const first = index[0]?.date;
-    const end = index[index.length - 1]?.date;
+export const startDateTable = (spy: SpyHistory, rateOn: RateLookup, starts: readonly string[], amount: number): StartRow[] => {
+    const first = spy.closes[0]?.date;
+    const end = spy.closes[spy.closes.length - 1]?.date;
     if (first === undefined || end === undefined) return [];
     const rows: StartRow[] = [];
     for (const start of starts) {
         if (start < first) continue;
-        const session = index.find((point) => point.date >= start);
+        const session = spy.closes.find((point) => point.date >= start);
         if (session === undefined || session.date >= end || rows.some((row) => row.start === session.date)) continue;
-        const ways = threeWays(index, {start: session.date, end}, amount, rateOn);
+        const ways = threeWays(spy, {start: session.date, end}, amount, rateOn);
         rows.push({
             start: session.date,
             ways: {
@@ -302,7 +308,8 @@ export type TimeInMarketView = {
     // The first day of the window with no usable T-bill rate, when that voided the cash way.
     rateGap: string | null;
     // Growth of each dollar contributed (value ÷ dollars deposited so far), one value per
-    // session; a way that could not be priced has no line.
+    // charted session (at most TIM_CHART_POINTS, both ends kept); a way that could not be
+    // priced has no line.
     chart: {dates: string[]; lines: ChartLine[]};
     table: StartRow[];
 };
@@ -311,17 +318,29 @@ const firstRateGap = (rateOn: RateLookup, {start, end}: DateWindow): string | nu
     eachCalendarDay(start, end).find((day) => usableRate(rateOn(day), day) === null) ?? null;
 
 const PER_DOLLAR_DECIMALS = 1e6;
+// The chart ships at most this many sessions to the client — about one a week over the three
+// years the table can reach. Index decimation keeps both ends exactly (lib/strategies/views.ts
+// downsample), so the line still ends on the value the tiles print, and every line keeps the
+// same sessions as the dates beneath it.
+export const TIM_CHART_POINTS = 160;
 
-export const buildTimeInMarket = ({index, rates, resolved, amount, starts}: {
-    index: readonly IndexPoint[];
+// The same sessions of the dates and of every line.
+const decimateChart = (dates: readonly string[], lines: readonly ChartLine[]): {dates: string[]; lines: ChartLine[]} => {
+    const keep = downsample(dates.map((_, i) => i), TIM_CHART_POINTS);
+    return {dates: keep.map((i) => dates[i]), lines: lines.map((line) => ({key: line.key, values: keep.map((i) => line.values[i])}))};
+};
+
+// `table` is startDateTable's rows for the same history (the read memoises them for the day;
+// they depend on no learner).
+export const buildTimeInMarket = ({spy, rates, resolved, amount, table}: {
+    spy: SpyHistory;
     rates: readonly RatePoint[];
     resolved: ResolvedStart;
     amount: number;
-    starts: readonly string[];
+    table: StartRow[];
 }): TimeInMarketView => {
     const rateOn = makeRateLookup(rates);
-    const sessions = index.filter((point) => point.date >= resolved.from);
-    const table = startDateTable(index, rateOn, starts, amount);
+    const sessions = spy.closes.filter((point) => point.date >= resolved.from);
     const first = sessions[0];
     const last = sessions[sessions.length - 1];
     if (sessions.length < 2 || first === undefined || last === undefined) {
@@ -331,7 +350,7 @@ export const buildTimeInMarket = ({index, rates, resolved, amount, starts}: {
         };
     }
     const window = {start: first.date, end: last.date};
-    const series = threeWays(index, window, amount, rateOn);
+    const series = threeWays(spy, window, amount, rateOn);
     const lines = WAY_KEYS.flatMap((key): ChartLine[] => {
         const way = series[key];
         return way ? [{key, values: way.points.map((p) => Math.round(p.value / p.contributed * PER_DOLLAR_DECIMALS) / PER_DOLLAR_DECIMALS)}] : [];
@@ -341,7 +360,7 @@ export const buildTimeInMarket = ({index, rates, resolved, amount, starts}: {
         deposits: monthlyDeposits(window.start, window.end, amount).length,
         ways: {lumpSum: summarizeWay(series.lumpSum), dollarCostAverage: summarizeWay(series.dollarCostAverage), cashOnly: summarizeWay(series.cashOnly)},
         rateGap: series.cashOnly === null ? firstRateGap(rateOn, window) : null,
-        chart: {dates: sessions.map((point) => point.date), lines},
+        chart: decimateChart(sessions.map((point) => point.date), lines),
         table,
     };
 };

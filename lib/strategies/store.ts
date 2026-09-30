@@ -289,28 +289,33 @@ export const saveBacktest = async (strategyId: string, version: string, result: 
 };
 
 // What the nightly job needs to decide whether a strategy's what-if grid is due: the stored
-// backtest's version, the version its variants were computed beside and their ids. One small
-// projected read across the eight backtests — never the points.
+// backtest's version and build, the version and build its variants were computed beside and
+// their ids. One small projected read across the eight backtests — never the points.
 export const variantStamps = async (): Promise<Record<string, VariantStamp>> => {
     await connectToDatabase();
     const docs = await StrategyBacktest
-        .find({}, {strategyId: 1, version: 1, variantsVersion: 1, 'variants.id': 1})
-        .lean<{strategyId: string; version: string; variantsVersion?: string; variants?: {id: string}[]}[]>();
+        .find({}, {strategyId: 1, version: 1, computedAt: 1, variantsVersion: 1, variantsFor: 1, 'variants.id': 1})
+        .lean<{strategyId: string; version: string; computedAt?: Date; variantsVersion?: string; variantsFor?: Date; variants?: {id: string}[]}[]>();
+    const ms = (date: Date | undefined): number | null => (date ? new Date(date).getTime() : null);
     return Object.fromEntries(docs.map((d) => [d.strategyId, {
         version: d.version,
         variantsVersion: d.variantsVersion ?? null,
         variantIds: d.variants ? d.variants.map((v) => v.id) : null,
+        computedAt: ms(d.computedAt),
+        variantsFor: ms(d.variantsFor),
     }]));
 };
 
-// Attaches a what-if grid to the backtest it was computed beside, and only to that one: the
-// filter on version means a backtest rebuilt meanwhile keeps no variants from another engine.
-// Never touches the backtest itself (that is saveBacktest's) or any account.
-export const saveVariants = async (strategyId: string, version: string, variants: readonly StoredWhatIfVariant[]): Promise<boolean> => {
+// Attaches a what-if grid to the backtest build it was computed beside, and only to that one:
+// the filter on version and computedAt means a backtest rebuilt meanwhile — by a new engine
+// version or a resimulate on the same one — keeps no variants from another build. Never
+// touches the backtest itself (that is saveBacktest's) or any account.
+export const saveVariants = async (strategyId: string, version: string, computedAt: number, variants: readonly StoredWhatIfVariant[]): Promise<boolean> => {
     await connectToDatabase();
+    const build = new Date(computedAt);
     const result = await StrategyBacktest.updateOne(
-        {strategyId, version},
-        {$set: {variants, variantsVersion: version}},
+        {strategyId, version, computedAt: build},
+        {$set: {variants, variantsVersion: version, variantsFor: build}},
     );
     return result.matchedCount === 1;
 };

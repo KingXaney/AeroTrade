@@ -1,12 +1,13 @@
 // Three ways of owning SPY over one window — all at once, in monthly deposits, or not at all —
-// walked through the one income clock (lib/trading/income.ts replayIncome). The index stands
-// in for SPY with dividends reinvested, as getBenchmarkIndex serves it; idle cash earns the
+// walked through the one income clock (lib/trading/income.ts replayIncome). SPY is held as
+// shares at its stored closes and paid its stored dividends the way a paper account is (to the
+// shares held the evening before the ex-date, as cash on the pay date); idle cash earns the
 // T-bill rate exactly as a paper account's does, and a day that needs a rate and has none
 // makes the way null, never zero.
 
 import {describe, expect, it} from 'vitest';
 import {addCalendarDays, eachCalendarDay} from '@/lib/prices/calendar-days';
-import {createIncomeClock, makeRateLookup, replayIncome, type RatePoint} from '@/lib/trading/income';
+import {createIncomeClock, makeRateLookup, payDateFor, replayIncome, type RatePoint} from '@/lib/trading/income';
 import {
     buildTimeInMarket,
     cashOnly,
@@ -18,6 +19,7 @@ import {
     resolveStart,
     startDateTable,
     summarizeWay,
+    TIM_CHART_POINTS,
     tableStarts,
     underwaterSpans,
     type WayPoint,
@@ -33,6 +35,8 @@ const INDEX = DATES.map((date, i) => ({date, value: vShape(i)}));
 const PEAK = DATES[60];
 const TROUGH = DATES[120];
 const END = DATES[DATES.length - 1];
+// No dividends in the V: the ways' values are the closes' own arithmetic.
+const SPY = {closes: INDEX, dividends: []};
 
 // A point every weekday, forward-filled over weekends by the lookup, as ^IRX is stored.
 const RATES: RatePoint[] = weekdays('2024-12-01', '2025-12-31').map((date) => ({date, discountPct: 4.07}));
@@ -90,7 +94,7 @@ describe('monthlyDeposits', () => {
 
 describe('lumpSum', () => {
     it('is the index scaled to the amount on every session, and never needs a rate', () => {
-        const series = lumpSum(INDEX, {start: PEAK, end: END}, AMOUNT, noRate);
+        const series = lumpSum(SPY, {start: PEAK, end: END}, AMOUNT, noRate);
         expect(series).not.toBeNull();
         const points = series?.points ?? [];
         expect(points[0].date).toBe(PEAK);
@@ -103,9 +107,51 @@ describe('lumpSum', () => {
     });
 });
 
+describe('dividends on the paper account\'s timetable', () => {
+    // Flat SPY at $600; a $1.80 dividend goes ex on Tue 2026-06-16 (the close already reflects it).
+    const flat = weekdays('2026-05-20', '2026-09-29').map((date) => ({date, value: 600}));
+    const spy = {closes: flat, dividends: [{symbol: 'SPY', exDate: '2026-06-16', perShare: 1.8}]};
+    const rates = weekdays('2026-05-01', '2026-09-30').map((date) => ({date, discountPct: 4}));
+
+    it('pays nothing to a purchase made after the ex-date, all at once or in deposits', () => {
+        const window = {start: '2026-06-17', end: '2026-09-29'};
+        const lump = lumpSum(spy, window, AMOUNT, makeRateLookup(rates));
+        expect(lump?.points.every((p) => Math.abs(p.value - AMOUNT) < 1e-9)).toBe(true);
+        const monthly = dollarCostAverage(spy, window, AMOUNT, makeRateLookup(rates));
+        expect(cents(monthly?.points.at(-1)?.value ?? NaN)).toBe(cents(AMOUNT));
+    });
+
+    it('pays shares held the evening before the ex-date, as cash on the pay date, which then earns', () => {
+        const window = {start: '2026-06-15', end: '2026-09-29'};
+        const lump = lumpSum(spy, window, AMOUNT, makeRateLookup(rates));
+        const valueOn = (date: string) => lump?.points.find((p) => p.date === date)?.value ?? NaN;
+        const paid = (AMOUNT / 600) * 1.8;
+        expect(payDateFor('2026-06-16')).toBe('2026-06-21');
+        expect(valueOn('2026-06-19')).toBeCloseTo(AMOUNT, 9);                // owed, not paid yet
+        // Paid Sunday; Monday's value holds it and Monday's first cent of interest on it.
+        expect(valueOn('2026-06-22') - (AMOUNT + paid)).toBeGreaterThan(0);
+        expect(valueOn('2026-06-22') - (AMOUNT + paid)).toBeLessThan(0.01);
+        expect(valueOn('2026-09-29')).toBeGreaterThan(AMOUNT + paid);
+        // The same end as a paper account holding those shares.
+        const clock = createIncomeClock({rateOn: makeRateLookup(rates), dividends: new Map([['2026-06-16', spy.dividends]])});
+        const replay = replayIncome({
+            from: window.start, to: window.end, startCash: AMOUNT, startHoldings: new Map(), clock,
+            trades: [{date: window.start, symbol: 'SPY', side: 'buy', quantity: AMOUNT / 600, total: AMOUNT}],
+        });
+        const lastRows = replay.rows.filter((r) => r.date === window.end).reduce((sum, r) => sum + r.amount, 0);
+        expect(valueOn('2026-09-29')).toBeCloseTo(replay.cash + lastRows + AMOUNT, 9);
+    });
+
+    it('holds its dividend cash to the same rule as any cash: no rate, no value', () => {
+        const window = {start: '2026-06-15', end: '2026-09-29'};
+        expect(lumpSum(spy, window, AMOUNT, makeRateLookup([]))).toBeNull();
+        expect(lumpSum(spy, {start: '2026-06-17', end: '2026-09-29'}, AMOUNT, makeRateLookup([]))).not.toBeNull();
+    });
+});
+
 describe('cashOnly', () => {
     it('is replayIncome with no trades: its last point is the replay\'s cash plus the final day\'s rows', () => {
-        const series = cashOnly(INDEX, {start: PEAK, end: END}, AMOUNT, rateOn);
+        const series = cashOnly(SPY, {start: PEAK, end: END}, AMOUNT, rateOn);
         const clock = createIncomeClock({rateOn, dividends: new Map()});
         const replay = replayIncome({from: PEAK, to: END, startCash: AMOUNT, startHoldings: new Map(), trades: [], clock});
         const finalRows = replay.rows.filter((r) => r.date === END).reduce((sum, r) => sum + r.amount, 0);
@@ -116,8 +162,8 @@ describe('cashOnly', () => {
 
     it('is null, never zero, when a day in the window has no usable rate', () => {
         const gap = RATES.filter((r) => r.date < '2025-06-02' || r.date > '2025-06-20');
-        expect(cashOnly(INDEX, {start: PEAK, end: END}, AMOUNT, makeRateLookup(gap))).toBeNull();
-        expect(cashOnly(INDEX, {start: PEAK, end: END}, AMOUNT, noRate)).toBeNull();
+        expect(cashOnly(SPY, {start: PEAK, end: END}, AMOUNT, makeRateLookup(gap))).toBeNull();
+        expect(cashOnly(SPY, {start: PEAK, end: END}, AMOUNT, noRate)).toBeNull();
     });
 });
 
@@ -125,7 +171,7 @@ describe('dollarCostAverage', () => {
     it('invests each deposit at the first session on or after it, and its last point is the replay\'s', () => {
         // 2025-05-03 is a Saturday: that deposit waits for Monday the 5th, earning the weekend's interest.
         const window = {start: '2025-02-03', end: END};
-        const series = dollarCostAverage(INDEX, window, AMOUNT, rateOn);
+        const series = dollarCostAverage(SPY, window, AMOUNT, rateOn);
         const deposits = monthlyDeposits('2025-02-03', END, AMOUNT);
         expect(series?.deposits).toEqual(deposits);
         expect(deposits.map((d) => d.date)).toContain('2025-05-03');
@@ -146,7 +192,7 @@ describe('dollarCostAverage', () => {
     });
 
     it('counts only what has been deposited so far as contributed', () => {
-        const points = dollarCostAverage(INDEX, {start: '2025-02-03', end: END}, AMOUNT, rateOn)?.points ?? [];
+        const points = dollarCostAverage(SPY, {start: '2025-02-03', end: END}, AMOUNT, rateOn)?.points ?? [];
         const onMarch3 = points.find((p) => p.date === '2025-03-03');
         expect(cents(onMarch3?.contributed ?? NaN)).toBe(cents(2 * AMOUNT / 11) + 1);   // 11 deposits, the first cents go to the earliest
         expect(points.every((p, i) => i === 0 || p.contributed >= points[i - 1].contributed)).toBe(true);
@@ -154,13 +200,13 @@ describe('dollarCostAverage', () => {
 
     it('is the lump sum when the window holds a single deposit', () => {
         const window = {start: PEAK, end: DATES[70]};
-        expect(dollarCostAverage(INDEX, window, AMOUNT, rateOn)?.points).toEqual(lumpSum(INDEX, window, AMOUNT, rateOn)?.points);
+        expect(dollarCostAverage(SPY, window, AMOUNT, rateOn)?.points).toEqual(lumpSum(SPY, window, AMOUNT, rateOn)?.points);
     });
 
     it('needs a rate only on a day it holds cash: weekday deposits never sit idle, a weekend one does', () => {
         // Jan 6, Feb 6 and Mar 6 are all weekdays — nothing waits overnight.
-        expect(dollarCostAverage(INDEX, {start: '2025-01-06', end: '2025-03-31'}, AMOUNT, noRate)).not.toBeNull();
-        expect(dollarCostAverage(INDEX, {start: '2025-02-03', end: END}, AMOUNT, noRate)).toBeNull();
+        expect(dollarCostAverage(SPY, {start: '2025-01-06', end: '2025-03-31'}, AMOUNT, noRate)).not.toBeNull();
+        expect(dollarCostAverage(SPY, {start: '2025-02-03', end: END}, AMOUNT, noRate)).toBeNull();
     });
 });
 
@@ -191,8 +237,8 @@ describe('summarizeWay', () => {
     });
 
     it('reads the V differently from its peak and from its low', () => {
-        const fromPeak = summarizeWay(lumpSum(INDEX, {start: PEAK, end: END}, AMOUNT, rateOn));
-        const fromLow = summarizeWay(lumpSum(INDEX, {start: TROUGH, end: END}, AMOUNT, rateOn));
+        const fromPeak = summarizeWay(lumpSum(SPY, {start: PEAK, end: END}, AMOUNT, rateOn));
+        const fromLow = summarizeWay(lumpSum(SPY, {start: TROUGH, end: END}, AMOUNT, rateOn));
         expect(fromPeak?.underwaterSessions).toBeGreaterThan(60);
         expect(fromPeak?.longest?.from).toBe(DATES[61]);
         expect(fromLow?.underwaterSessions).toBe(0);
@@ -207,14 +253,14 @@ describe('startDateTable', () => {
     });
 
     it('runs the three ways from each start the stored history reaches, to the same end', () => {
-        const rows = startDateTable(INDEX, rateOn, tableStarts('2025-12-31'), AMOUNT);
+        const rows = startDateTable(SPY, rateOn, tableStarts('2025-12-31'), AMOUNT);
         expect(rows.map((r) => r.start)).toEqual(['2025-09-30', '2025-06-30', '2025-03-31']);
         for (const row of rows) {
-            const lump = summarizeWay(lumpSum(INDEX, {start: row.start, end: END}, AMOUNT, rateOn));
+            const lump = summarizeWay(lumpSum(SPY, {start: row.start, end: END}, AMOUNT, rateOn));
             expect(row.ways.lumpSum).toBe((lump?.changeCents ?? NaN) / (lump?.contributedCents ?? NaN) * 100);
             expect(row.ways.cashOnly).not.toBeNull();
         }
-        expect(startDateTable(INDEX, noRate, ['2025-06-30'], AMOUNT)[0].ways.cashOnly).toBeNull();
+        expect(startDateTable(SPY, noRate, ['2025-06-30'], AMOUNT)[0].ways.cashOnly).toBeNull();
     });
 });
 
@@ -222,25 +268,37 @@ describe('buildTimeInMarket', () => {
     const resolved = resolveStart({requested: PEAK, inception: null, today: '2026-01-02'});
 
     it('lines the three ways up on one set of sessions, each starting at one dollar per dollar', () => {
-        const view = buildTimeInMarket({index: INDEX, rates: RATES, resolved, amount: AMOUNT, starts: []});
+        const view = buildTimeInMarket({spy: SPY, rates: RATES, resolved, amount: AMOUNT, table: []});
         expect(view.status).toBe('ok');
         expect(view.start).toBe(PEAK);
         expect(view.end).toBe(END);
         expect(view.sessions).toBe(DATES.length - 60);
         expect(view.deposits).toBe(monthlyDeposits(PEAK, END, AMOUNT).length);
         expect(view.ways.dollarCostAverage?.deposits).toBe(view.deposits);
-        expect(view.chart.dates).toEqual(DATES.slice(60));
+        // Two hundred sessions go to the client as TIM_CHART_POINTS of them, both ends kept.
+        expect(DATES.length - 60).toBeGreaterThan(TIM_CHART_POINTS);
+        expect(view.chart.dates).toHaveLength(TIM_CHART_POINTS);
+        expect(view.chart.dates[0]).toBe(PEAK);
+        expect(view.chart.dates.at(-1)).toBe(END);
+        expect(view.chart.dates.every((date, i) => DATES.includes(date) && (i === 0 || date > view.chart.dates[i - 1]))).toBe(true);
         expect(view.chart.lines.map((l) => l.key)).toEqual(['lumpSum', 'dollarCostAverage', 'cashOnly']);
         for (const line of view.chart.lines) {
             expect(line.values).toHaveLength(view.chart.dates.length);
             expect(line.values[0]).toBeCloseTo(1, 3);
         }
+        // The last charted value is the way's own last session, as the tiles print it.
+        const [lump, , cash] = view.chart.lines;
+        expect(lump.values.at(-1)).toBeCloseTo(vShape(DATES.length - 1) / vShape(60), 6);
+        expect(cash.values.at(-1)).toBeCloseTo((view.ways.cashOnly?.endCents ?? NaN) / 100 / AMOUNT, 6);
+        // …and a charted session carries that session's value, not a neighbour's.
+        const k = 97;
+        expect(lump.values[k]).toBeCloseTo(vShape(DATES.indexOf(view.chart.dates[k])) / vShape(60), 6);
         expect(view.rateGap).toBeNull();
     });
 
     it('drops a way the rates cannot price and names the first day without one', () => {
         const rates = RATES.filter((r) => r.date < '2025-06-02' || r.date > '2025-06-20');
-        const view = buildTimeInMarket({index: INDEX, rates, resolved, amount: AMOUNT, starts: []});
+        const view = buildTimeInMarket({spy: SPY, rates, resolved, amount: AMOUNT, table: []});
         expect(view.ways.cashOnly).toBeNull();
         expect(view.ways.lumpSum).not.toBeNull();
         expect(view.chart.lines.map((l) => l.key)).not.toContain('cashOnly');
@@ -249,7 +307,7 @@ describe('buildTimeInMarket', () => {
     });
 
     it('says so when the stored history does not reach the window', () => {
-        const view = buildTimeInMarket({index: INDEX.slice(0, 1), rates: RATES, resolved: resolveStart({requested: DATES[0], inception: null, today: '2026-01-02'}), amount: AMOUNT, starts: []});
+        const view = buildTimeInMarket({spy: {closes: INDEX.slice(0, 1), dividends: []}, rates: RATES, resolved: resolveStart({requested: DATES[0], inception: null, today: '2026-01-02'}), amount: AMOUNT, table: []});
         expect(view.status).toBe('no-history');
         expect(view.chart.lines).toEqual([]);
     });

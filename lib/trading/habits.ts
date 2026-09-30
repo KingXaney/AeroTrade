@@ -2,10 +2,12 @@
 // Pure — the page hands in the account's epoch ledger (the one cached getTradeLedger read), the
 // last price of each symbol it knows one for, and the clock.
 //
-// Only fills the learner placed count (source 'user'): a strategy's or the Navigator's fill is a
-// rule's decision, not a habit. Lots come from matchLots (FIFO), which pairs each sell with the
-// buys it closed; FIFO here is a way of pairing, and the account's realized P&L (average cost)
-// is untouched. Every figure is a measurement — how long, how many, how often — and the pace
+// Only decisions the learner made count (source 'user'): a strategy's, a suggestion's or the
+// Navigator's fill is a rule's decision, not a habit. Lots come from matchLots (FIFO) over EVERY
+// fill in the account — pairing the learner's fills alone would let a learner's sell close a lot
+// an automated sell had already closed — and then a closed lot counts when its sell is the
+// learner's, an open lot when its buy is. FIFO here is a way of pairing, and the account's
+// realized P&L (average cost) is untouched. Every figure is a measurement — how long, how many, how often — and the pace
 // is set beside the catalog's own cadences, never beside an invented holding period.
 
 import {byTime, matchLots, type LedgerTrade} from "@/lib/trading/lots";
@@ -36,9 +38,9 @@ export const userFills = (ledger: readonly LedgerTrade[]): LedgerTrade[] => ledg
 
 // Every lot (or part of one) a learner's sell closed, in the order the sells happened.
 export const closedLots = (ledger: readonly LedgerTrade[]): ClosedLot[] => {
-    const fills = byTime(userFills(ledger));
+    const fills = byTime(ledger);
     const {matches} = matchLots(fills);
-    return fills.flatMap((sell) => (sell.side !== 'sell' ? [] : (matches[sell.id] ?? []).map((lot) => ({
+    return fills.flatMap((sell) => (sell.side !== 'sell' || sell.source !== 'user' ? [] : (matches[sell.id] ?? []).map((lot) => ({
         sellId: sell.id,
         symbol: sell.symbol,
         quantity: lot.quantity,
@@ -113,7 +115,8 @@ export const computeHabits = ({ledger, prices, now, inceptionAt, startingBalance
     let openWinners = 0;
     let openLosers = 0;
     let unpricedOpen = 0;
-    for (const lot of matchLots(fills).open) {
+    const ownBuys = new Set(fills.filter((t) => t.side === 'buy').map((t) => t.id));
+    for (const lot of matchLots(ledger).open.filter((open) => ownBuys.has(open.buyId))) {
         const price = prices.get(lot.symbol);
         if (price === undefined || !(price > 0)) unpricedOpen += 1;
         else if (price > lot.price) openWinners += 1;

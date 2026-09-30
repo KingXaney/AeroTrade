@@ -63,9 +63,9 @@ import {MAX_BRIEF_CALLS_PER_RUN, newsSearchEnabled} from "@/lib/topics/config";
 import {TOPIC_BRIEFS_EVENT, TOPIC_FEEDS_EVENT, TOPIC_FIRST_RUN_EVENT, TOPIC_REFRESH_EVENT} from "@/lib/topics/events";
 import {ensureTopicHasArticles, getTopicsDigestData, getTopicsForUser} from "@/lib/topics/store";
 import {buildTopicsSectionHtml} from "@/lib/topics/digest-section";
-import {buildLessonSectionHtml, lessonSectionLinks, pickDigestMoment} from "@/lib/learn/digest-section";
-import {getLearnFacts} from "@/lib/learn/facts-store";
-import {getTodaysLesson} from "@/lib/learn/lesson-store";
+import {lessonSectionFor} from "@/lib/learn/digest-section";
+import {readLearnFacts} from "@/lib/learn/facts-store";
+import {readLessonForDigest} from "@/lib/learn/lesson-store";
 import {STRATEGIES, effectiveVersion} from "@/lib/strategies/catalog";
 import {STRATEGY_OWNER_ID} from "@/lib/strategies/config";
 import {previousTradingDay} from "@/lib/strategies/calendar";
@@ -662,7 +662,7 @@ export const runWeeklyNavigator = inngest.createFunction(
 
 export const sendDailyNewsSummary = inngest.createFunction(
     { id: 'daily-news-summary', triggers: [{ event: 'app/send.daily.news' }, { cron: 'TZ=America/New_York 0 12 * * *' }] },
-    async ({ step }) => {
+    async ({ step, runId }) => {
         // Step #1: Get all users for news delivery
         const users = await step.run('get-all-users', getAllUsersForNewsEmail)
 
@@ -735,39 +735,39 @@ export const sendDailyNewsSummary = inngest.createFunction(
                     }
                 });
 
-                // Followed topics: a deterministic section (no LLM), every string escaped
-                // and links allow-listed to the articles it lists. Off per user, and a
-                // failure here only drops the section.
-                const topicsSection = await step.run(`fetch-topics-${safeId}`, async () => {
-                    if (!user.topicsInDigest) return '';
-                    try {
-                        const data = await getTopicsDigestData(user.id);
-                        if (data.length === 0) return '';
-                        const manageUrl = `${APP_URL}/topics`;
-                        const section = buildTopicsSectionHtml(data, manageUrl);
-                        const allowed = [manageUrl, ...data.flatMap((t) => t.articles.map((a) => a.url))];
-                        return sanitizeDigestHtml(section, allowed);
-                    } catch (error) {
-                        console.error('Topics email section failed:', error);
-                        return '';
-                    }
-                });
-
-                // Today's lesson: a first from the learner's own account (or a followed strategy's
-                // rebalance) dated exactly yesterday — this noon run would otherwise mail a morning
-                // fill or a 09:35 rebalance twice — else the day's glossary concept. Deterministic (no
-                // model), escaped, links allow-listed to exactly the ones it builds; it rides under the
-                // same emailNotifications opt-out as the rest, and a failure only drops the section.
-                const lessonSection = await step.run(`fetch-lesson-${safeId}`, async () => {
-                    try {
-                        const facts = await getLearnFacts(user.id);
-                        const moment = pickDigestMoment(facts, facts.today);
-                        const input = {moment, term: moment ? null : await getTodaysLesson(user.id)};
-                        return sanitizeDigestHtml(buildLessonSectionHtml(input, APP_URL), lessonSectionLinks(input, APP_URL));
-                    } catch (error) {
-                        console.error('Lesson email section failed:', error);
-                        return '';
-                    }
+                // Two deterministic sections (no LLM), in one step: followed topics (off per user),
+                // every string escaped and links allow-listed to the articles it lists; and Today's
+                // lesson — a first from the learner's own account (or a followed strategy's
+                // rebalance) dated exactly yesterday (this noon run would otherwise mail a morning
+                // fill or a 09:35 rebalance twice), else the day's glossary concept, read once per
+                // distinct keyword set in this run (lessonSectionFor, lib/learn/digest-section.ts).
+                // Both ride under the same emailNotifications opt-out as the rest, and a failure
+                // in either only drops that section.
+                const {topicsSection, lessonSection} = await step.run(`fetch-sections-${safeId}`, async () => {
+                    const topics = async (): Promise<string> => {
+                        if (!user.topicsInDigest) return '';
+                        try {
+                            const data = await getTopicsDigestData(user.id);
+                            if (data.length === 0) return '';
+                            const manageUrl = `${APP_URL}/topics`;
+                            const section = buildTopicsSectionHtml(data, manageUrl);
+                            const allowed = [manageUrl, ...data.flatMap((t) => t.articles.map((a) => a.url))];
+                            return sanitizeDigestHtml(section, allowed);
+                        } catch (error) {
+                            console.error('Topics email section failed:', error);
+                            return '';
+                        }
+                    };
+                    const lesson = async (): Promise<string> => {
+                        try {
+                            return await lessonSectionFor({facts: await readLearnFacts(user.id), loadTerm: () => readLessonForDigest(user.id, runId), appUrl: APP_URL});
+                        } catch (error) {
+                            console.error('Lesson email section failed:', error);
+                            return '';
+                        }
+                    };
+                    const [topicsHtml, lessonHtml] = await Promise.all([topics(), lesson()]);
+                    return {topicsSection: topicsHtml, lessonSection: lessonHtml};
                 });
 
                 // fullSummary is for the news brain — JSON.stringify drops undefined values,
@@ -1399,7 +1399,7 @@ export const runStrategiesDaily = inngest.createFunction(
             const state = states.find((s) => s.strategyId === def.id);
             if (!state || !variantsDue(stamps[def.id], effectiveVersion(def), gridFor(def).map((v) => v.id), resimulate)) continue;
             try {
-                const grid = await step.run(`variants-${stepId(def.id)}`, async () => simulateVariantsForStrategy(def, state.launchDate));
+                const grid = await step.run(`variants-${stepId(def.id)}`, async () => simulateVariantsForStrategy(def, state.launchDate, stamps[def.id]?.computedAt ?? null));
                 if (grid.waiting) console.warn(`What-if grid for ${def.id} waiting: ${grid.waiting}`);
                 if (grid.computed > 0) whatIfGrids += 1;
             } catch (error) {

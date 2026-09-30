@@ -112,6 +112,9 @@ const LuckOrSkill = ({luck}: {luck: LuckRead}) => {
                 {view.withheld === 'no-snapshot' && (
                     <p className="mt-1 font-mono text-[11px] text-fg-muted" data-testid="luck-withheld">{LUCK_COPY.noSnapshot}</p>
                 )}
+                {view.withheld === 'not-yours' && (
+                    <p className="mt-1 font-mono text-[11px] text-fg-muted" data-testid="luck-withheld">{LUCK_COPY.notYours}</p>
+                )}
                 <p className="mt-1 font-mono text-[11px] text-fg-muted" data-testid="luck-window">{LUCK_COPY.window(view)}</p>
                 <div className="mt-3">
                     <Histogram view={view} markers={markers} />

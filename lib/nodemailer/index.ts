@@ -1,6 +1,6 @@
 import nodemailer from 'nodemailer';
 import {escapeHtml} from "@/lib/news/sanitize";
-import {WELCOME_EMAIL_TEMPLATE, NEWS_SUMMARY_EMAIL_TEMPLATE, PASSWORD_RESET_EMAIL_TEMPLATE} from "@/lib/nodemailer/templates";
+import {WELCOME_EMAIL_TEMPLATE, PASSWORD_RESET_EMAIL_TEMPLATE, renderNewsSummaryEmail} from "@/lib/nodemailer/templates";
 
 export const transporter = nodemailer.createTransport({
     service: 'gmail',
@@ -70,13 +70,7 @@ export const sendWelcomeEmail = async ({ email, name, intro }: WelcomeEmailData)
 export const sendNewsSummaryEmail = async (
     { email, date, newsContent, topicsSection = '', lessonSection = '' }: { email: string; date: string; newsContent: string; topicsSection?: string; lessonSection?: string }
 ): Promise<void> => {
-    const htmlTemplate = NEWS_SUMMARY_EMAIL_TEMPLATE
-        .replaceAll('{{appUrl}}', () => appUrl())
-        .replace('{{date}}', () => escapeHtml(date))
-        // newsContent, topicsSection and lessonSection are deliberately HTML — sanitizeDigestHtml has already run on them.
-        .replace('{{newsContent}}', () => newsContent)
-        .replace('{{topicsSection}}', () => topicsSection)
-        .replace('{{lessonSection}}', () => lessonSection);
+    const htmlTemplate = renderNewsSummaryEmail({appUrl: appUrl(), date, newsContent, topicsSection, lessonSection});
 
     const mailOptions = {
         from: `"AeroTrade News" <${process.env.NODEMAILER_EMAIL}>`,

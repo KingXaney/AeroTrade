@@ -373,6 +373,26 @@ try {
         `${lineC} | expected ${landed(returnsC, (108_100 / 100_000 - 1) * 100)}`);
     await shot('09-luck-stale-snapshot');
 
+    // Case D: the same account with none of its fills placed by the learner (as the AI
+    // Navigator's account is) → the sample and its markers stay, "you" is not placed, and the
+    // note says why. The fills are put back before the habits below count them.
+    const ownFillIds = (await db.collection('papertrades').find({accountId, source: 'user'}, {projection: {_id: 1}}).toArray()).map((t) => t._id);
+    await db.collection('papertrades').updateMany({_id: {$in: ownFillIds}}, {$set: {source: 'ai-navigator'}});
+    try {
+        await page.goto(`${BASE}/portfolio`, {waitUntil: 'load'});
+        await page.locator('#luck-or-skill [data-luck-marker]').first().waitFor({timeout: 30000});
+        check('an account without a fill of the learner\'s is not placed: the sample, SPY and the median only',
+            ownFillIds.length > 0 && /^1,000 random five-stock portfolios over the same \d+ trading days$/.test(await luckText())
+                && (await page.locator('#luck-or-skill [data-luck-marker=you]').count()) === 0
+                && (await page.locator('#luck-or-skill [data-luck-marker=spy]').count()) === 1
+                && (await page.locator('#luck-or-skill [data-luck-marker=median]').count()) === 1,
+            `${ownFillIds.length} fills · ${await luckText()}`);
+        check('…and says why, once', (await text('#luck-or-skill [data-testid=luck-withheld]')) === 'No fill in this account was placed by you, so its return is not placed among them.'
+            && (await page.locator('#luck-or-skill [data-testid=luck-withheld]').count()) === 1, await text('#luck-or-skill [data-testid=luck-withheld]'));
+    } finally {
+        await db.collection('papertrades').updateMany({_id: {$in: ownFillIds}}, {$set: {source: 'user'}});
+    }
+
     // --- trading habits: three closed lots of the learner's own, and a strategy fill ignored -----
     // Closed: SPY (the round trip above, minutes long, a winner), AAPL (5 days, a winner), MSFT
     // (10 days, a loser). Open: QALRN, no quote. A strategy's NVDA round trip must not count.

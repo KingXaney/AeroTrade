@@ -212,6 +212,17 @@ export type WhatIfBacktest = {
     stats: SeriesStats;
     variants?: readonly StoredWhatIfVariant[];
     variantsVersion?: string;
+    // The backtest's build, and the build its variants were computed beside (a Date from the
+    // document, or ms): a rebuild on the same version must not keep the last build's variants.
+    computedAt?: Date | number | string;
+    variantsFor?: Date | number | string;
+};
+
+// Two stamps name the same build: both present and the same instant.
+export const sameBuild = (a: Date | number | string | undefined | null, b: Date | number | string | undefined | null): boolean => {
+    if (a === undefined || a === null || b === undefined || b === null) return false;
+    const [x, y] = [new Date(a).getTime(), new Date(b).getTime()];
+    return Number.isFinite(x) && x === y;
 };
 
 export type WhatIfLabVariant = {
@@ -236,8 +247,8 @@ export type WhatIfLabView = {
 
 // The lab's props, built on the server so a client control can switch variants without a
 // round trip. A variant is shown only beside the backtest it was computed with: the same
-// version, the same window and the same decimated dates (anything else is not "the same rule
-// with one setting moved" and waits for the next night's grid). Null: the rule has no knob.
+// version and build, the same window and the same decimated dates (anything else is not "the
+// same rule with one setting moved" and waits for the next night's grid). Null: no knob.
 export const whatIfLab = (def: StrategyDefinition, backtest: WhatIfBacktest | null): WhatIfLabView | null => {
     const grid = gridFor(def);
     if (grid.length === 0) return null;
@@ -245,7 +256,7 @@ export const whatIfLab = (def: StrategyDefinition, backtest: WhatIfBacktest | nu
     if (backtest === null) return {knobs, stored: null, variants: []};
     const points = whatIfPoints(backtest.points);
     const dates = points.map((point) => point.date);
-    const current = backtest.variantsVersion === backtest.version ? (backtest.variants ?? []) : [];
+    const current = backtest.variantsVersion === backtest.version && sameBuild(backtest.variantsFor, backtest.computedAt) ? (backtest.variants ?? []) : [];
     const variants = grid.flatMap(({id}) => {
         const found = current.find((variant) => variant.id === id);
         const aligned = found !== undefined && found.from === backtest.from && found.to === backtest.to

@@ -51,6 +51,37 @@ describe('closedLots', () => {
     });
 });
 
+describe('pairing across every fill in the account', () => {
+    // FIFO runs over the account's whole ledger, so a learner's sell closes the shares the
+    // account actually still held — not a lot an applied AI suggestion already sold.
+    const MIXED: LedgerTrade[] = [
+        fill('buy', 'AAPL', 10, 100, 25),                   // the learner buys 10 @100
+        fill('sell', 'AAPL', 10, 90, 20, 'ai-suggestion'),  // an applied suggestion sells those 10 @90
+        fill('buy', 'AAPL', 10, 120, 15),                   // the learner buys 10 @120
+        fill('sell', 'AAPL', 10, 130, 5),                   // …and sells them @130: a winner held 10 days
+        fill('buy', 'MSFT', 1, 100, 25), fill('sell', 'MSFT', 1, 110, 22),
+        fill('buy', 'KO', 1, 100, 25), fill('sell', 'KO', 1, 90, 22),
+        fill('buy', 'NVDA', 4, 100, 12, 'ai-navigator'),    // a rule's open lot: not the learner's
+        fill('buy', 'XLK', 2, 100, 10, 'strategy'),
+        fill('sell', 'XLK', 1, 90, 9),                      // the learner sells part of a rule's lot
+    ];
+
+    it('pairs a learner\'s sell with the lot the account still held', () => {
+        const aapl = closedLots(MIXED).filter((lot) => lot.symbol === 'AAPL');
+        expect(aapl.map((lot) => [lot.quantity, lot.buyPrice, lot.sellPrice, (lot.soldAt - lot.boughtAt) / DAY])).toEqual([[10, 120, 130, 10]]);
+        // A learner's sell of a rule's lot is still the learner's decision to sell.
+        expect(closedLots(MIXED).filter((lot) => lot.symbol === 'XLK').map((lot) => [lot.quantity, lot.buyPrice])).toEqual([[1, 100]]);
+    });
+
+    it('counts only the learner\'s own open lots among winners and losers', () => {
+        const habits = computeHabits({ledger: MIXED, prices: new Map([['AAPL', 125], ['NVDA', 150], ['XLK', 120]]), now: NOW, inceptionAt: NOW - 60 * DAY, startingBalance: 100_000});
+        // Closed: AAPL and MSFT up, KO and XLK down; open: nothing the learner bought (NVDA and
+        // the rest of XLK were bought by rules).
+        expect(habits?.sold).toEqual({winners: {sold: 2, total: 2}, losers: {sold: 2, total: 2}, unpricedOpen: 0});
+        expect(habits?.hold).toMatchObject({winners: 2, losers: 2, winnerDays: 6.5, loserDays: 2});
+    });
+});
+
 describe('computeHabits', () => {
     it('is null under three closed lots, however many fills there are', () => {
         expect(HABITS_MIN_CLOSED_LOTS).toBe(3);

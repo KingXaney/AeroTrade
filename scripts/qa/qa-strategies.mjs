@@ -132,15 +132,17 @@ try {
     // --- seed a system state the way the job would leave it ---------------------------
     const today = isoDaysAgo(0);
     // The what-if lab's precomputed grid as the nightly job stores it: an ARRAY beside the
-    // backtest, stamped with the backtest's version, on the stored backtest's dates (30 points
-    // decimate to themselves). Golden cross has two knobs, 60/40 one (a slider); every other
+    // backtest, stamped with the backtest's version and build (variantsFor = its computedAt), on
+    // the stored backtest's dates (30 points decimate to themselves). Golden cross has two knobs, 60/40 one (a slider); every other
     // rule has none stored yet, so its lab shows the "computed overnight" state.
     const WHATIF = {
         'golden-cross': [['fast', 20, 7.7], ['fast', 100, 14.4], ['slow', 100, 3.3], ['slow', 250, 9.9]],
         'sixty-forty': [['spyWeight', 0.4, 6.1], ['spyWeight', 0.5, 8.2], ['spyWeight', 0.7, 12.5], ['spyWeight', 0.8, 13.9]],
     };
+    const builtAt = new Date();
     const variantsFor = (slug, points) => (WHATIF[slug] ? {
         variantsVersion: '1.1',
+        variantsFor: builtAt,
         variants: WHATIF[slug].map(([knob, value, ret]) => ({
             id: `${knob}=${value}`, knob, value, from: points[0].date, to: points[points.length - 1].date,
             stats: {totalReturnPct: ret, cagrPct: ret / 3, annualizedVolPct: 11, maxDrawdownPct: 3, winRatePct: null, wins: 0, losses: 0, tradeCount: 4, benchmarkReturnPct: 10.0, excessReturnPct: ret - 10},
@@ -202,7 +204,7 @@ try {
             closeFills: 0, skippedDays: 0, points, benchmark: points.map((p) => ({date: p.date, value: 500 + (p.value - 100_000) / 400})),
             trades: [{date: points[1].date, symbol: 'SPY', side: 'buy', quantity: 190, price: 500, total: 95_000, reason: 'initial deployment: buy and hold SPY', fill: 'open'}],
             stats: {totalReturnPct: 11.6, cagrPct: 9.1, annualizedVolPct: 12.3, maxDrawdownPct: 2.5, winRatePct: null, wins: 0, losses: 0, tradeCount: 1, benchmarkReturnPct: 10.0, excessReturnPct: 1.6},
-            computedAt: new Date(),
+            computedAt: builtAt,
             ...variantsFor(slug, points),
         });
         seeded.push({slug, name, accountId: String(accountId)});

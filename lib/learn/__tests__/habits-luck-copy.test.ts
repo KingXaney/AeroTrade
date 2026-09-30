@@ -171,7 +171,7 @@ describe('Luck or skill copy', () => {
             LUCK_COPY.sampleOnly(view), LUCK_COPY.noSnapshot, LUCK_COPY.window(view), LUCK_COPY.chartLabel(view),
             LUCK_COPY.method(view), LUCK_COPY.markerValue(LUCK_COPY.marker.spy, -1.25), LUCK_COPY.markerValue(LUCK_COPY.marker.median, 0),
             LUCK_COPY.heading, LUCK_COPY.needsDaysTitle, LUCK_COPY.needsDaysDescription(0), LUCK_COPY.needsDaysDescription(7),
-            LUCK_COPY.noPricesTitle, LUCK_COPY.noPricesDescription,
+            LUCK_COPY.noPricesTitle, LUCK_COPY.noPricesDescription, LUCK_COPY.notYours,
         ]) clean(text);
         expect(LUCK_COPY.binTitle(-4, -3.375, 1)).toBe('−4.0% to −3.4%: 1 portfolio');
         clean(LUCK_COPY.binTitle(0.5, 1.25, 37));
@@ -181,5 +181,10 @@ describe('Luck or skill copy', () => {
         expect(LUCK_COPY.window({start: '2025-12-19', end: '2026-01-09'})).toBe('bought at the Dec 19, 2025 close · valued at the Jan 9, 2026 close');
         expect(LUCK_COPY.needsDaysTitle).toBe('Needs 10 trading days');
         expect(LUCK_COPY.method(view)).toMatch(/survivorship bias/);
+        // Dividends reach the portfolios the way a paper account is paid them, and cash earns.
+        expect(LUCK_COPY.method(view)).toMatch(/pay date/);
+        expect(LUCK_COPY.method(view)).toMatch(/evening before its ex-date/);
+        expect(LUCK_COPY.method(view)).toMatch(/T-bill rate/);
+        expect(LUCK_COPY.method(view)).not.toMatch(/dividends kept as cash/);
     });
 });

@@ -75,12 +75,16 @@ describe('wayTiles', () => {
 
     it('adds up on what the three ways actually compute, deposits split into cents included', () => {
         const dates = eachCalendarDay('2025-01-06', '2025-12-31').filter((d) => ![0, 6].includes(new Date(`${d}T12:00:00Z`).getUTCDay()));
-        const index = dates.map((date, i) => ({date, value: 100 + Math.sin(i / 9) * 20 + i * 0.07}));
+        // Quarterly dividends too, so the identity holds with dividend cash earning interest.
+        const spy = {
+            closes: dates.map((date, i) => ({date, value: 100 + Math.sin(i / 9) * 20 + i * 0.07})),
+            dividends: ['2025-03-21', '2025-06-20', '2025-09-19', '2025-12-19'].map((exDate) => ({symbol: 'SPY', exDate, perShare: 0.43})),
+        };
         const rateOn = makeRateLookup(dates.map((date) => ({date, discountPct: 4.07})));
         for (const start of ['2025-01-06', '2025-02-03', '2025-05-02', '2025-08-29']) {
             for (const amount of [10_000, 12_345.67, 999.99]) {
                 const window = {start, end: dates[dates.length - 1]};
-                for (const series of [lumpSum(index, window, amount, rateOn), dollarCostAverage(index, window, amount, rateOn), cashOnly(index, window, amount, rateOn)]) {
+                for (const series of [lumpSum(spy, window, amount, rateOn), dollarCostAverage(spy, window, amount, rateOn), cashOnly(spy, window, amount, rateOn)]) {
                     const way = summarizeWay(series);
                     expect(way).not.toBeNull();
                     expect(dollars((wayTiles(way).end.hint ?? '').replace(/ put in$/, ''))).toBe(Math.round(amount * 100));

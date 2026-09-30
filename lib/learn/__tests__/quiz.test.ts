@@ -19,6 +19,7 @@ import {
     QUIZ_TEMPLATES,
     quizDaysFrom,
     quizRunFloor,
+    quizRunWindow,
     type DailyQuiz,
     type QuizRun,
     type QuizTemplate,
@@ -144,6 +145,14 @@ describe('quizRunFloor', () => {
         expect(QUIZ_RUN_WINDOW_DAYS).toBe(10);
         expect(quizRunFloor('2026-09-29')).toBe('2026-09-19');
         expect(quizRunFloor('2026-03-05')).toBe('2026-02-23');
+    });
+});
+
+describe('quizRunWindow', () => {
+    it('reads the boards stored before the day opens, never the day\'s own run', () => {
+        // Today's run lands at 09:35 and may be re-planned at 10:30: a question read from it
+        // would change during the day. The boards dated before today are final.
+        expect(quizRunWindow('2026-09-29')).toEqual({since: '2026-09-19', before: '2026-09-29'});
     });
 });
 

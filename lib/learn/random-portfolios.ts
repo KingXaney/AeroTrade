@@ -1,13 +1,18 @@
 // Luck or skill: where the learner's return lands among random portfolios held over the same
 // days. Pure — the server read (lib/learn/luck-read.ts) hands in the two edge closes per symbol,
-// the dividend rows between them and the account's last snapshot.
+// the dividend rows between them, the T-bill points and the account's last snapshot.
 //
 // The comparison is built to be fair and reproducible:
 //   - the sample is seeded (account + window end), so a reload shows the same thousand;
 //   - each portfolio is five names drawn from the strategies' large-cap universe, bought in
 //     equal dollar amounts at the close of the window's first session, in whole shares (the
-//     remainder stays as cash), and held to the close of its last; a dividend whose ex-date
-//     falls inside is kept as cash, which is how a paper account receives one;
+//     remainder stays as cash), and held to the close of its last;
+//   - it earns what a paper account holding it would (invariant 11), on the one clock in
+//     lib/trading/income.ts: a dividend is owed to the shares held the evening before its
+//     ex-date and paid DIVIDEND_PAY_LAG_DAYS later, and cash — the remainder, then each paid
+//     dividend — earns the T-bill rate. Like the learner's snapshot, the value on the last day
+//     holds the income rows dated before it (replayIncome's cash), so a dividend whose pay date
+//     is not yet behind the last day is not counted, for the portfolios and SPY alike;
 //   - the learner's return is a stored snapshot's, never a live value built on a missing
 //     quote, and the portfolios end on that snapshot's date (luckWindow).
 // The universe was chosen in 2026, so the sample carries survivorship bias; the copy says so.
@@ -15,7 +20,15 @@
 import {isTradingDay, previousTradingDay} from "@/lib/prices/market-hours";
 import {addCalendarDays} from "@/lib/prices/calendar-days";
 import {fnv1a} from "@/lib/learn/quiz";
-import type {DividendPoint} from "@/lib/trading/income";
+import {
+    createIncomeClock,
+    dividendsByExDate,
+    makeRateLookup,
+    replayIncome,
+    usableRate,
+    type DividendPoint,
+    type RatePoint,
+} from "@/lib/trading/income";
 
 export const LUCK_SAMPLE_COUNT = 1000;
 export const LUCK_PORTFOLIO_SIZE = 5;
@@ -25,6 +38,10 @@ export const LUCK_MIN_SESSIONS = 10;
 // portfolios would be drawn from a handful of names.
 export const LUCK_MIN_POOL = 20;
 export const LUCK_HISTOGRAM_BINS = 24;
+// A large cap whose latest stored close is more than this many days behind SPY's is not being
+// served (the price provider has failed it all week): it leaves the pool rather than holding
+// every window back.
+export const LUCK_STALE_DAYS = 7;
 
 // ---- seeded randomness ----------------------------------------------------------------------
 
@@ -65,17 +82,41 @@ export const samplePortfolios = (
 // ---- holding over the window ----------------------------------------------------------------
 
 export type EdgeBar = {symbol: string; date: string; close: number};
-export type HoldInput = {symbol: string; startClose: number; endClose: number; dividendsPerShare: number};
+// incomePerShare: the cash one share bought at the window's first close has brought in by its
+// last day — its dividends, paid on their pay dates, and the interest they have earned since.
+export type HoldInput = {symbol: string; startClose: number; endClose: number; incomePerShare: number};
+// cashGrowth: what one dollar of cash left at the first close is worth on the last day.
+export type HoldWindow = {inputs: Map<string, HoldInput>; cashGrowth: number};
 
-// Symbol → its close on `from` and on `to` (both required, both positive) and the dividends per
-// share with an ex-date after `from` and on or before `to`: a holder at the `from` close owns the
-// shares the evening before each of those ex-dates. A symbol missing either close is left out.
-export const holdInputs = (
-    bars: readonly EdgeBar[],
-    dividends: readonly DividendPoint[],
-    from: string,
-    to: string,
-): Map<string, HoldInput> => {
+// Everything the clock does is linear in cash and shares — interest is cash × a daily factor,
+// a dividend is shares × its amount — so one walk per symbol (one share, no cash) and one for
+// a dollar of cash give every portfolio's income exactly: remainder × cashGrowth plus shares ×
+// incomePerShare, the same number a replay of that portfolio gives (the test holds them equal).
+// A day with no usable rate (the income job's own staleness rule) earns nothing, as the
+// learner's account is not credited for it either until a rate arrives.
+const incomeWalk = (from: string, to: string, rates: readonly RatePoint[], dividends: readonly DividendPoint[]) => {
+    const lookup = makeRateLookup(rates);
+    const clock = () => createIncomeClock({rateOn: (date) => usableRate(lookup(date), date), dividends: dividendsByExDate(dividends)});
+    return {
+        cashGrowth: replayIncome({from, to, startCash: 1, startHoldings: new Map(), trades: [], clock: clock()}).cash,
+        // Bought at `from`'s close (a zero-cost buy, so no cash moves): not holding the evening
+        // before an ex-date of `from` itself, holding for every later one.
+        perShare: (symbol: string): number => replayIncome({
+            from, to, startCash: 0, startHoldings: new Map(), clock: clock(),
+            trades: [{date: from, symbol, side: 'buy', quantity: 1, total: 0}],
+        }).cash,
+    };
+};
+
+// Symbol → its close on `from` and on `to` (both required, both positive) and what one share
+// held between them earned. A symbol missing either close is left out.
+export const holdWindow = ({bars, dividends, rates, from, to}: {
+    bars: readonly EdgeBar[];
+    dividends: readonly DividendPoint[];
+    rates: readonly RatePoint[];
+    from: string;
+    to: string;
+}): HoldWindow => {
     const starts = new Map<string, number>();
     const ends = new Map<string, number>();
     for (const bar of bars) {
@@ -83,39 +124,38 @@ export const holdInputs = (
         if (bar.date === from) starts.set(bar.symbol, bar.close);
         if (bar.date === to) ends.set(bar.symbol, bar.close);
     }
-    const perShare = new Map<string, number>();
-    for (const d of dividends) {
-        if (d.exDate > from && d.exDate <= to && d.perShare > 0) perShare.set(d.symbol, (perShare.get(d.symbol) ?? 0) + d.perShare);
-    }
-    const out = new Map<string, HoldInput>();
+    const walk = incomeWalk(from, to, rates, dividends);
+    const inputs = new Map<string, HoldInput>();
     for (const symbol of [...starts.keys()].sort()) {
         const startClose = starts.get(symbol);
         const endClose = ends.get(symbol);
         if (startClose === undefined || endClose === undefined) continue;
-        out.set(symbol, {symbol, startClose, endClose, dividendsPerShare: perShare.get(symbol) ?? 0});
+        inputs.set(symbol, {symbol, startClose, endClose, incomePerShare: walk.perShare(symbol)});
     }
-    return out;
+    return {inputs, cashGrowth: walk.cashGrowth};
 };
 
+// cash: the remainder the whole-share rule left at the first close.
 export type HoldResult = {endValue: number; cash: number; returnPct: number};
 
-// Equal dollar slices, whole shares, the remainder as cash; dividends are cash too. Null when a
-// name has no prices (the caller draws only from names that do).
-export const holdReturn = (symbols: readonly string[], inputs: ReadonlyMap<string, HoldInput>, amount: number): HoldResult | null => {
+// Equal dollar slices, whole shares, the remainder as cash; each share brings its income, the
+// remainder grows by the window's cash factor. Null when a name has no prices (the caller
+// draws only from names that do).
+export const holdReturn = (symbols: readonly string[], hold: HoldWindow, amount: number): HoldResult | null => {
     if (symbols.length === 0 || !(amount > 0)) return null;
     const slice = amount / symbols.length;
     let spent = 0;
     let endHoldings = 0;
     for (const symbol of symbols) {
-        const hold = inputs.get(symbol);
-        if (!hold) return null;
+        const input = hold.inputs.get(symbol);
+        if (!input) return null;
         // The epsilon keeps an exact fit (20,000 / 100) from flooring to 199 on a float wobble.
-        const shares = Math.floor(slice / hold.startClose + 1e-9);
-        spent += shares * hold.startClose;
-        endHoldings += shares * (hold.endClose + hold.dividendsPerShare);
+        const shares = Math.floor(slice / input.startClose + 1e-9);
+        spent += shares * input.startClose;
+        endHoldings += shares * (input.endClose + input.incomePerShare);
     }
     const cash = amount - spent;
-    const endValue = cash + endHoldings;
+    const endValue = cash * hold.cashGrowth + endHoldings;
     return {endValue, cash, returnPct: (endValue / amount - 1) * 100};
 };
 
@@ -176,9 +216,34 @@ export const sessionsBetween = (from: string, to: string): number => {
     return count;
 };
 
+// The last session SPY and every large cap still being served have a stored close for: the
+// window's end. SPY (and every held name) is topped up at 00:05 ET each night by the income job,
+// the rest of the large caps only by the 09:35 weekday strategies job, in chunks — so SPY's own
+// latest bar would end the window on a day most of the pool has no close for yet, and the sample
+// would be drawn from whichever names happened to be stored. Null without SPY, or with fewer
+// than LUCK_MIN_POOL names being served.
+export const completeSession = ({latest, universe, benchmark}: {
+    latest: ReadonlyMap<string, string>;
+    universe: readonly string[];
+    benchmark: string;
+}): string | null => {
+    const spy = latest.get(benchmark);
+    if (spy === undefined) return null;
+    const floor = addCalendarDays(spy, -LUCK_STALE_DAYS);
+    const served = universe.flatMap((symbol) => {
+        const date = latest.get(symbol);
+        return date !== undefined && date >= floor ? [date] : [];
+    });
+    if (served.length < LUCK_MIN_POOL) return null;
+    return served.reduce((end, date) => (date < end ? date : end), spy);
+};
+
 export type SnapshotReading = {date: string; totalValue: number; startingBalance: number};
 
-export type LuckWithheld = 'unpriced' | 'no-snapshot';
+// Why the learner's marker is not drawn: a holding with no quote and no snapshot on the last
+// session, no snapshot at all, or an account none of whose fills the learner placed (the AI
+// Navigator's account, or one never traded) — its return is a rule's, not "your return".
+export type LuckWithheld = 'unpriced' | 'no-snapshot' | 'not-yours';
 
 export type LuckWindow = {
     start: string;          // the session whose close the portfolios buy at
@@ -196,13 +261,16 @@ export type LuckWindow = {
 //     known (a live value would be at cost, and the snapshot job skips such an account), so the
 //     portfolios run to the latest session and the learner's marker is withheld;
 //   - no snapshot that day, everything priced → end on the last snapshot's date;
-//   - no snapshot at all → the latest session, marker withheld.
+//   - no snapshot at all → the latest session, marker withheld;
+//   - no fill in the account placed by the learner → the latest session, marker withheld: the
+//     same scope as Trading habits, which counts the learner's own fills only.
 // `lastSnapshot` is the account's latest snapshot dated from inception through `lastSession`.
-export const luckWindow = ({inceptionDate, lastSession, lastSnapshot, unpriced}: {
+export const luckWindow = ({inceptionDate, lastSession, lastSnapshot, unpriced, ownFills}: {
     inceptionDate: string;
     lastSession: string | null;
     lastSnapshot: SnapshotReading | null;
     unpriced: number;
+    ownFills: boolean;
 }): LuckWindow | null => {
     if (lastSession === null || lastSession < inceptionDate) return null;
     const start = sessionOnOrBefore(inceptionDate);
@@ -211,6 +279,7 @@ export const luckWindow = ({inceptionDate, lastSession, lastSnapshot, unpriced}:
     const at = (end: string, yoursPct: number | null, withheld: LuckWithheld | null): LuckWindow =>
         ({start, end, sessions: sessionsBetween(start, end), yoursPct, withheld: yoursPct === null ? (withheld ?? 'no-snapshot') : null});
 
+    if (!ownFills) return at(lastSession, null, 'not-yours');
     if (lastSnapshot && lastSnapshot.date === lastSession) return at(lastSession, reading(lastSnapshot), null);
     if (unpriced > 0) return at(lastSession, null, 'unpriced');
     if (lastSnapshot) return at(sessionOnOrBefore(lastSnapshot.date), reading(lastSnapshot), null);
@@ -239,9 +308,9 @@ export type LuckView =
     | {status: 'no-prices'; sessions: number}
     | LuckReady;
 
-export const buildLuckView = ({window, inputs, universe, seed, amount, benchmark = 'SPY', count = LUCK_SAMPLE_COUNT, size = LUCK_PORTFOLIO_SIZE}: {
+export const buildLuckView = ({window, hold, universe, seed, amount, benchmark = 'SPY', count = LUCK_SAMPLE_COUNT, size = LUCK_PORTFOLIO_SIZE}: {
     window: LuckWindow;
-    inputs: ReadonlyMap<string, HoldInput>;
+    hold: HoldWindow;
     universe: readonly string[];
     seed: number;
     amount: number;
@@ -250,16 +319,16 @@ export const buildLuckView = ({window, inputs, universe, seed, amount, benchmark
     size?: number;
 }): LuckView => {
     if (window.sessions < LUCK_MIN_SESSIONS) return {status: 'needs-days', sessions: window.sessions};
-    const pool = universe.filter((symbol) => inputs.has(symbol));
+    const pool = universe.filter((symbol) => hold.inputs.has(symbol));
     if (pool.length < Math.max(LUCK_MIN_POOL, size)) return {status: 'no-prices', sessions: window.sessions};
 
     const returns = samplePortfolios(pool, {count, size, random: mulberry32(seed)})
-        .map((portfolio) => holdReturn(portfolio, inputs, amount)?.returnPct)
+        .map((portfolio) => holdReturn(portfolio, hold, amount)?.returnPct)
         .filter((pct): pct is number => pct !== undefined)
         .sort((a, b) => a - b);
     const medianPct = medianOf(returns);
     if (medianPct === null) return {status: 'no-prices', sessions: window.sessions};
-    const spyPct = holdReturn([benchmark], inputs, amount)?.returnPct ?? null;
+    const spyPct = holdReturn([benchmark], hold, amount)?.returnPct ?? null;
     const yours = window.yoursPct === null ? null : {pct: window.yoursPct, ...(({below, pct}) => ({below, rankPct: pct}))(percentileRank(returns, window.yoursPct))};
     const markers = [medianPct, spyPct, yours?.pct].filter((x): x is number => typeof x === 'number');
     return {
@@ -275,36 +344,5 @@ export const buildLuckView = ({window, inputs, universe, seed, amount, benchmark
         yours,
         withheld: window.withheld,
         histogram: histogram(returns, LUCK_HISTOGRAM_BINS, markers),
-    };
-};
-
-// ---- a memo that lives for one ET day -------------------------------------------------------
-
-// The edge closes of a past window do not change during a day, so the read keeps them per
-// (start, end) until the ET date turns — at most `limit` windows, oldest dropped first.
-export const createDayMemo = <T>(limit: number) => {
-    let day = '';
-    const entries = new Map<string, T>();
-    const turn = (today: string) => {
-        if (today !== day) {
-            entries.clear();
-            day = today;
-        }
-    };
-    return {
-        get: (key: string, today: string): T | undefined => {
-            turn(today);
-            return entries.get(key);
-        },
-        set: (key: string, today: string, value: T): void => {
-            turn(today);
-            entries.delete(key);
-            entries.set(key, value);
-            while (entries.size > limit) {
-                const oldest = entries.keys().next().value;
-                if (oldest === undefined) break;
-                entries.delete(oldest);
-            }
-        },
     };
 };

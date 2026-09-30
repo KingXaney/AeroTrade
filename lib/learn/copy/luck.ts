@@ -42,6 +42,8 @@ export const LUCK_COPY = {
     // With the learner's marker withheld, the same sample without a placement.
     sampleOnly: (view: Sample): string => `${COUNT.format(view.count)} ${portfolios(view)}`,
     noSnapshot: 'Your return shows once a daily snapshot of this account is stored for the last of these days.',
+    // An account with no fill the learner placed (the AI Navigator's, or one not traded yet).
+    notYours: 'No fill in this account was placed by you, so its return is not placed among them.',
 
     marker: {you: 'You', spy: 'SPY', median: 'Median'},
     markerValue: (label: string, pct: number): string => `${label} ${pctOneDecimal(pct)}`,
@@ -57,5 +59,5 @@ export const LUCK_COPY = {
 
     // Leads the panel's one "What these mean": how the sample was built, with its caveat, once.
     method: ({size, pool}: Pick<LuckReady, 'size' | 'pool'>): string =>
-        `Each portfolio holds ${numberWord(size)} of the ${pool} large caps with a close stored on both days, picked at random with a fixed seed, bought in equal dollar amounts in whole shares (the remainder stays as cash) and held to the last close, with dividends kept as cash. SPY is held the same way. Your return is this account's stored daily snapshot on the last day, never a live value. The large caps were chosen in 2026, so the sample carries survivorship bias.`,
+        `Each portfolio holds ${numberWord(size)} of the ${pool} large caps with a close stored on both days, picked at random with a fixed seed, bought in equal dollar amounts in whole shares (the remainder stays as cash) and held to the last close, each dividend paid as cash on its pay date to the shares held the evening before its ex-date, and cash earning the T-bill rate, as in a paper account. SPY is held the same way. Your return is this account's stored daily snapshot on the last day, never a live value. The large caps were chosen in 2026, so the sample carries survivorship bias.`,
 };
