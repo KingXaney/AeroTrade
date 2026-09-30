@@ -1,8 +1,9 @@
 // The /brain legend: how the brain turns articles into weights and theses, and how the AI
 // Navigator turns those into a score and trades under its rails — every figure read from
 // lib/brain/config.ts, lib/navigator/config.ts and scoring.ts, and the fading example worked
-// out by lib/brain/decay.ts itself, so a changed constant changes the legend (the test mocks
-// one and watches it follow). Mechanism only; the sentences live in lib/learn/copy/brain.ts.
+// out by lib/brain/decay.ts itself, so a changed constant changes the legend (the test moves
+// every one to a sentinel and watches the text follow). Mechanism only; the sentences live in
+// lib/learn/copy/brain.ts.
 //
 // Pure and client-importable.
 

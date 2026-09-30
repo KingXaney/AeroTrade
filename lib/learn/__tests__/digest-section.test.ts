@@ -1,4 +1,4 @@
-import {describe, expect, it, vi} from 'vitest';
+import {afterEach, describe, expect, it, vi} from 'vitest';
 import {findBanned} from '@/lib/learn/banned';
 import {GLOSSARY} from '@/lib/learn/glossary';
 import {CONCEPT_KEYS, type Lesson, type LessonHeadline} from '@/lib/learn/lesson';
@@ -8,6 +8,7 @@ import {lessonLearnHref, momentCopy} from '@/lib/learn/copy/lesson';
 import {
     DIGEST_MAX_HEADLINE_CHARS,
     DIGEST_MAX_HEADLINES,
+    DIGEST_MAX_SENTENCES,
     buildLessonSectionHtml,
     lessonSectionFor,
     lessonSectionLinks,
@@ -115,14 +116,71 @@ describe('buildLessonSectionHtml', () => {
         expect(hrefsOf(html)).toEqual(['https://news.example.com/story-1', 'https://news.example.com/story-2', `${APP}/learn#tariffs`]);
     });
 
-    it('caps headlines and clips a long one', () => {
-        const long = 'x'.repeat(DIGEST_MAX_HEADLINE_CHARS + 50);
+    it('caps headlines at three and clips a long one to 200 characters', () => {
+        expect([DIGEST_MAX_HEADLINES, DIGEST_MAX_HEADLINE_CHARS, DIGEST_MAX_SENTENCES]).toEqual([3, 200, 3]);
+        const long = 'x'.repeat(250);
         const many = [headline(1, {headline: long}), ...Array.from({length: 6}, (_, i) => headline(i + 2))];
         const html = buildLessonSectionHtml({moment: null, term: feedLesson(many)}, APP);
-        expect((html.match(/news\.example\.com\/story-\d/g) ?? []).length).toBe(DIGEST_MAX_HEADLINES);
-        expect(html).not.toContain(long);
-        expect(html).toContain(`${'x'.repeat(DIGEST_MAX_HEADLINE_CHARS - 1)}…`);
-        expect(lessonSectionLinks({moment: null, term: feedLesson(many)}, APP)).toHaveLength(1 + DIGEST_MAX_HEADLINES);
+        expect(hrefsOf(html).filter((href) => href.startsWith('https://news.example.com/'))).toEqual([1, 2, 3].map((i) => headline(i).url));
+        // Exactly 199 characters and the ellipsis, as the anchor's whole text.
+        expect(html).toMatch(/>x{199}…<\/a>/);
+        expect(html).not.toMatch(/x{200}/);
+        expect(lessonSectionLinks({moment: null, term: feedLesson(many)}, APP)).toHaveLength(4);
+    });
+
+    it('escapes the moment copy, which quotes the typed symbol, and the glossary\'s own title', () => {
+        const typed: Moment = {...fill, fill: {...fill.fill, symbol: '<IMG SRC=X ONERROR=1>&CO'}};
+        const html = buildLessonSectionHtml({moment: typed, term: null}, APP);
+        expect(html).toContain('&lt;IMG SRC=X ONERROR=1&gt;&amp;CO');
+        expect(html).not.toMatch(/<IMG/i);
+        expect(html).not.toMatch(/&CO/);
+        // The term's title is an <h3> of its own: "S&P 500" arrives escaped there too.
+        const term = buildLessonSectionHtml({moment: null, term: dayLesson('s&p 500')}, APP);
+        expect(term).toMatch(/<h3 [^>]*>S&amp;P 500<\/h3>/);
+        expect(term).not.toContain('S&P');
+    });
+});
+
+describe('the lesson section with one helper swapped out', () => {
+    afterEach(() => {
+        vi.doUnmock('@/lib/learn/copy/lesson');
+        vi.doUnmock('@/lib/topics/digest-section');
+        vi.resetModules();
+    });
+
+    it('is sanitised in the job to exactly its own links, whatever the builder emits', async () => {
+        // A builder that one day emitted a link off its list: the section as mailed keeps its
+        // text and drops the anchor, because lessonSectionFor sanitises against lessonSectionLinks.
+        vi.resetModules();
+        vi.doMock('@/lib/topics/digest-section', async (importOriginal) => {
+            const original = await importOriginal<typeof import('@/lib/topics/digest-section')>();
+            return {...original, linkOrText: (url: string, label: string) => `${original.linkOrText(url, label)}<a href="https://stray.example.com/">stray</a>`};
+        });
+        const mocked = await import('@/lib/learn/digest-section');
+        expect(mocked.buildLessonSectionHtml({moment: fill, term: null}, APP)).toContain('stray.example.com');
+        const facts: LearnFacts = {
+            today: '2026-09-30', accountCreatedOn: '2026-09-20', hasUserTrade: true, followedStrategies: [], topicOpened: false,
+            hasWatchlist: false, navigatorEnrolled: false, missionsDismissedAt: null,
+            firstFill: fill.fill, firstSell: null, firstDividend: null, firstDrawdown: null, rebalances: [], lessonsSeen: [],
+        };
+        const mailed = await mocked.lessonSectionFor({facts, loadTerm: async () => null, appUrl: APP});
+        expect(mailed).not.toContain('stray.example.com');
+        expect(hrefsOf(mailed)).toEqual([`${APP}${momentCopy(fill).href}`]);
+        expect(textOf(mailed)).toContain(momentCopy(fill).title);
+    });
+
+    it('mails at most three sentences of a moment\'s copy', async () => {
+        // Every moment's copy is two or three sentences today; one that grows is cut at three.
+        vi.resetModules();
+        vi.doMock('@/lib/learn/copy/lesson', async (importOriginal) => {
+            const original = await importOriginal<typeof import('@/lib/learn/copy/lesson')>();
+            return {...original, momentCopy: (moment: Moment) => ({...original.momentCopy(moment), body: ['First.', 'Second.', 'Third.', 'Fourth.', 'Fifth.']})};
+        });
+        const mocked = await import('@/lib/learn/digest-section');
+        const text = textOf(mocked.buildLessonSectionHtml({moment: fill, term: null}, APP));
+        expect(text).toContain('First. Second. Third.');
+        expect(text).not.toContain('Fourth.');
+        expect(text).not.toContain('Fifth.');
     });
 });
 

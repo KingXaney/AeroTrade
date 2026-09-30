@@ -9,7 +9,8 @@
 // "Got it", then a followed monthly strategy's rebalance. The Daily quiz, added the same way,
 // asks one question from the one board inside its ten-day window (a skipped day and older
 // boards are passed over), reveals the seeded reason and its gloss, counts an answered day
-// once however often it is answered, and says plainly when there is no board to ask about.
+// once however often it is answered (two tabs at once included), asks each kind of question
+// from a board only that kind can use, and says plainly when there is no board to ask about.
 // On the buy-and-hold page, Time in the market sets three ways of owning a seeded V-shaped SPY
 // side by side from the account's inception, moves with a start typed inside the dip, holds
 // its printed arithmetic to the cent, and prints a dash for cash once ^IRX is gone.
@@ -537,7 +538,18 @@ try {
     await pageD.getByRole('button', {name: /Add widget/i}).first().click();
     const libraryD = pageD.locator('[role="dialog"]');
     await libraryD.waitFor({timeout: 15000});
-    check('the library lists the Daily quiz under Learn, badged New', /LEARN[\s\S]*Daily quiz[\s\S]*NEW/i.test(await libraryD.innerText()));
+    // Read from the Daily quiz's own row: its badges, and the heading of the group that holds it.
+    const libraryRow = await libraryD.evaluate((dialog) => {
+        const title = [...dialog.querySelectorAll('span')].find((el) => el.textContent?.trim() === 'Daily quiz');
+        let row = title?.parentElement ?? null;
+        while (row && !row.querySelector('button')) row = row.parentElement;
+        const group = row?.parentElement?.parentElement;
+        return {
+            badges: row ? [...row.querySelectorAll('span')].map((el) => el.textContent?.trim()).filter((text) => text === 'New').length : 0,
+            group: group?.firstElementChild?.textContent?.trim() ?? '',
+        };
+    });
+    check('the library lists the Daily quiz under Learn, its own row badged New', libraryRow.badges === 1 && /^learn$/i.test(libraryRow.group), JSON.stringify(libraryRow));
     await libraryD.locator('div')
         .filter({has: pageD.getByText('Daily quiz', {exact: true})})
         .filter({has: pageD.getByRole('button', {name: 'Add', exact: true})})
@@ -631,6 +643,7 @@ try {
     check('…and shows the count before an answer', (await quiz.locator('[data-quiz-days]').innerText()) === 'Days answered: 1');
     await answerWith(optionIds[optionIds.length - 1]);
     check('answering twice the same day counts once', await waitText(quiz.locator('[data-quiz-days]'), /^Days answered: \d+$/) === 'Days answered: 1');
+    check('…and says nothing failed: the second answer was accepted, not refused', await quiz.locator('[data-quiz-note]').count() === 0);
     prefsD = await db.collection('userpreferences').findOne({userId: userD});
     check('…in the stored count too', prefsD?.learn?.quizDaysAnswered === 1 && prefsD?.learn?.quizLastAnsweredDate === today, JSON.stringify(prefsD?.learn));
 
@@ -643,13 +656,119 @@ try {
     prefsD = await db.collection('userpreferences').findOne({userId: userD});
     check('…stored as two, dated today', prefsD?.learn?.quizDaysAnswered === 2 && prefsD?.learn?.quizLastAnsweredDate === today, JSON.stringify(prefsD?.learn));
 
+    // Two tabs answering the same day at the same moment: one atomic write counts it once, and
+    // the tab that lost the race is told nothing failed.
+    await db.collection('userpreferences').updateOne({userId: userD}, {$set: {'learn.quizLastAnsweredDate': isoDaysAgo(1)}});
+    const pageD2 = await contextD.newPage();
+    await Promise.all([pageD.reload({waitUntil: 'load'}), pageD2.goto(`${BASE}/`, {waitUntil: 'load'})]);
+    const quiz2 = pageD2.locator('[data-widget-id="daily-quiz"] #daily-quiz');
+    await Promise.all([quiz.waitFor({timeout: 30000}), quiz2.waitFor({timeout: 30000})]);
+    const isQuizAction = (r) => r.request().method() === 'POST' && !!r.request().headers()['next-action'];
+    await Promise.all([
+        pageD.waitForResponse(isQuizAction, {timeout: 15000}),
+        pageD2.waitForResponse(isQuizAction, {timeout: 15000}),
+        quiz.locator(`[data-quiz-option="${optionIds[0]}"]`).click(),
+        quiz2.locator(`[data-quiz-option="${optionIds[1]}"]`).click(),
+    ]);
+    const bothDays = await Promise.all([quiz, quiz2].map((q) => waitText(q.locator('[data-quiz-days]'), /^Days answered: \d+$/)));
+    prefsD = await db.collection('userpreferences').findOne({userId: userD});
+    check('two tabs answering at once count the day once', prefsD?.learn?.quizDaysAnswered === 3 && prefsD?.learn?.quizLastAnsweredDate === today
+        && bothDays.every((text) => text === 'Days answered: 3'), `${JSON.stringify(prefsD?.learn)} · ${bothDays.join(' | ')}`);
+    check('…and neither tab says its answer could not be counted', await quiz.locator('[data-quiz-note]').count() === 0 && await quiz2.locator('[data-quiz-note]').count() === 0);
+    await pageD2.close();
+
+    // Each kind of question, whatever today's date seeds: RSI-2's only usable board is replaced by
+    // one on which a single kind can be built (a new run date, so the day's memo reads it afresh).
+    // "Which symbol" needs rows with numbers, so "which verdict" can always be built from its board
+    // too; it is asked only when today's rotation tries it before "which verdict" (two days in three).
+    const fnv1a = (text) => {
+        let hash = 0x811c9dc5;
+        for (let i = 0; i < text.length; i++) {
+            hash ^= text.charCodeAt(i);
+            hash = Math.imul(hash, 0x01000193);
+        }
+        return hash >>> 0;
+    };
+    const symbolAskable = fnv1a(`${today}|template`) % 3 !== 0;
+    const blankValues = {close: null, rsi2: null, sma5: null, sma200: null, aboveSma200: null};
+    const forcedBoards = [
+        {template: 'which-verdict', date: isoDaysAgo(2), orders: [],
+            board: [{symbol: 'KO', state: 'held', values: {close: 62, rsi2: 40, sma5: 61.5, sma200: 60, aboveSma200: true}}]},
+        // Rows the board prints without a number: only a reading can be asked about.
+        {template: 'why-this-verdict', date: isoDaysAgo(3),
+            board: [
+                {symbol: 'AAPL', state: 'enter', values: blankValues},
+                {symbol: 'MSFT', state: 'watch', values: blankValues, note: quizRows.MSFT.reason},
+                {symbol: 'NVDA', state: 'exit', values: blankValues},
+            ],
+            orders: [
+                {symbol: 'AAPL', side: 'buy', quantity: 160, kind: 'enter', reason: rsiReason, executed: true, price: 123.6},
+                {symbol: 'NVDA', side: 'sell', quantity: 10, kind: 'exit', reason: quizExit, executed: true, price: 130},
+            ]},
+        // Numbers on every row and no reason the decoder reads: no reading to ask about.
+        {template: symbolAskable ? 'which-symbol' : 'which-verdict', date: isoDaysAgo(4), orders: [],
+            board: [
+                {symbol: 'AAPL', state: 'enter', values: {close: 123.45, rsi2: 3.4, sma5: 126.1, sma200: 110, aboveSma200: true}},
+                {symbol: 'KO', state: 'held', values: {close: 62, rsi2: 40, sma5: 61.5, sma200: 60, aboveSma200: true}},
+                {symbol: 'PEP', state: 'watch', values: {close: 170, rsi2: 55, sma5: 168, sma200: 160, aboveSma200: true}},
+                {symbol: 'NVDA', state: 'exit', values: {close: 130, rsi2: 81.5, sma5: 128, sma200: 100, aboveSma200: true}},
+            ]},
+    ];
+    const askedTemplates = new Set([template]);
+    for (const forced of forcedBoards) {
+        await db.collection('strategyruns').deleteMany({strategyId: 'rsi2-mean-reversion', date: {$ne: today}});
+        await db.collection('strategyruns').insertOne(quizRun('rsi2-mean-reversion', forced.date, {board: forced.board, orders: forced.orders}));
+        await pageD.reload({waitUntil: 'load'});
+        await quiz.waitFor({timeout: 30000});
+        const asked = await quiz.getAttribute('data-quiz-template');
+        askedTemplates.add(asked);
+        const forcedPrompt = await quiz.locator('[data-quiz-prompt]').innerText();
+        const forcedIds = await quiz.locator('[data-quiz-option]').evaluateAll((els) => els.map((e) => e.getAttribute('data-quiz-option')));
+        const forcedTexts = (await quiz.locator('[data-quiz-option]').allInnerTexts()).map((t) => t.replace(/\s+/g, ' ').trim());
+        const boardSymbols = forced.board.map((row) => row.symbol);
+        let rendered = false;
+        if (asked === 'which-verdict') {
+            const row = await quiz.locator('[data-quiz-row]').getAttribute('data-quiz-row');
+            rendered = boardSymbols.includes(row) && /RSI\(2\)/.test(await quiz.locator('[data-quiz-row]').innerText())
+                && JSON.stringify(forcedIds) === JSON.stringify(['enter', 'exit', 'held', 'watch'])
+                // The verdict badges are uppercased by CSS, which innerText follows.
+                && JSON.stringify(forcedTexts.map((t) => t.toLowerCase())) === JSON.stringify(['enter', 'exit', 'held', 'watch']);
+        } else if (asked === 'why-this-verdict') {
+            rendered = await quiz.locator('[data-quiz-row]').count() === 0 && forcedTexts.length === 4
+                && forcedTexts.every((t) => t.length > 20 && ![rsiReason, quizExit, quizRows.MSFT.reason].includes(t));
+        } else {
+            rendered = await quiz.locator('[data-quiz-row]').count() === 0 && forcedIds.length === 4 && forcedIds.every((id) => boardSymbols.includes(id))
+                && forcedTexts.every((t, i) => t.startsWith(forcedIds[i]) && /RSI\(2\)/.test(t));
+        }
+        check(`a board only "${forced.template}" can be asked from asks it, its options drawn that way`, asked === forced.template && rendered,
+            `${asked} · ${forcedPrompt} · ${forcedTexts.join(' | ').slice(0, 240)}`);
+        await answerWith(forcedIds[0]);
+        const forcedReveal = quiz.locator('[data-quiz-reveal]');
+        const correct = await quiz.locator('[data-quiz-correct="true"]').evaluateAll((els) => els.map((e) => e.getAttribute('data-quiz-option')));
+        const revealSymbol = await forcedReveal.getAttribute('data-quiz-reveal');
+        const revealVerdict = await forcedReveal.getAttribute('data-quiz-verdict');
+        const verdictOf = (symbol) => forced.board.find((row) => row.symbol === symbol)?.state;
+        const afterTexts = (await quiz.locator('[data-quiz-option]').allInnerTexts()).map((t) => t.replace(/\s+/g, ' ').trim());
+        check(`…and its reveal names one right answer, the board's own verdict${asked === 'which-verdict' ? '' : ', each option now showing the verdict it stands for'}`,
+            correct.length === 1 && verdictOf(revealSymbol) === revealVerdict
+            && correct[0] === (asked === 'which-symbol' ? revealSymbol : revealVerdict)
+            && (asked === 'which-verdict' || afterTexts.every((t) => / (enter|exit|held|watch)$/i.test(t)))
+            && await quiz.locator('[data-quiz-note]').count() === 0,
+            `${revealSymbol} ${revealVerdict} · ${correct} · ${afterTexts.join(' | ').slice(0, 200)}`);
+    }
+    if (!symbolAskable) console.log(`NOTE  today's rotation tries "which verdict" before "which symbol", so "which symbol" is not askable today (${today}); the unit tests cover it`);
+    check('every kind of question was asked in this run, or is not askable today', ['which-verdict', 'why-this-verdict', ...(symbolAskable ? ['which-symbol'] : [])].every((t) => askedTemplates.has(t)),
+        [...askedTemplates].join(','));
+    prefsD = await db.collection('userpreferences').findOne({userId: userD});
+    check('…answering them on a day already counted leaves the count at three', prefsD?.learn?.quizDaysAnswered === 3, JSON.stringify(prefsD?.learn));
+
     // With no usable board in the window: an honest empty state that still shows the count.
-    await db.collection('strategyruns').deleteMany({strategyId: 'rsi2-mean-reversion', date: isoDaysAgo(1)});
+    await db.collection('strategyruns').deleteMany({strategyId: 'rsi2-mean-reversion', date: {$ne: today}});
     await pageD.reload({waitUntil: 'load'});
     await quizWidget.getByText('No question today').waitFor({timeout: 30000});
     const emptyText = await quizWidget.innerText();
     check('twelve-day-old boards and a skipped day ask nothing: the empty state says why',
-        await quizWidget.locator('#daily-quiz').count() === 0 && /signal board of the last 10 days/.test(emptyText) && /Days answered: 2/.test(emptyText),
+        await quizWidget.locator('#daily-quiz').count() === 0 && /signal board of the last 10 days/.test(emptyText) && /Days answered: 3/.test(emptyText),
         emptyText.replace(/\s+/g, ' ').slice(0, 200));
     await pageD.goto(`${BASE}/settings`, {waitUntil: 'load'});
     await pageD.locator('#dashboard').waitFor({timeout: 30000});
@@ -820,14 +939,15 @@ try {
             decayedTo: todayF, lastSeenAt: new Date(), verified: true,
             thesisSince: new Date(`${thesisDate}T11:30:00Z`), peakSlowWeight: 900, links: [],
         }}, {upsert: true});
-        const article = (n, eventType) => ({
+        const article = (n, eventType, sentiment) => ({
             contentHash: 700_000_000 + Math.floor(Math.random() * 1_000_000) * 10 + n,
             headline: `QA brain article ${n}`, summary: 'QA', source: 'QA Wire', sourceType: 'finance',
             url: `https://example.com/qa-brain-${Date.now()}-${n}`, datetime: Math.floor(Date.now() / 1000) - n * 3600, publishedDate: todayF,
             category: '', related: '', createdAt: new Date(),
-            extraction: {eventType, importance: 0.73, entities: [{key: THESIS_KEY, type: 'ticker', sentiment: 0.4, relevance: 0.9}], model: 'qa', extractedAt: new Date()},
+            extraction: {eventType, importance: 0.73, entities: [{key: THESIS_KEY, type: 'ticker', sentiment, relevance: 0.9}], model: 'qa', extractedAt: new Date()},
         });
-        const insertedNews = await db.collection('newsitems').insertMany([article(1, 'earnings'), article(2, 'other')]);
+        const articlesF = [article(1, 'earnings', 0.4), article(2, 'other', -0.25)];
+        const insertedNews = await db.collection('newsitems').insertMany(articlesF);
         newsIdsF = Object.values(insertedNews.insertedIds);
         const item = (symbol, action, reasons, extra = {}) => ({symbol, action, targetWeight: 0.1, currentWeight: 0, score: 0.3, reasons, executed: false, ...extra});
         await db.collection('suggestionsets').insertOne({userId: userF, date: todayF, kind: 'executed', createdAt: new Date(), items: [
@@ -889,6 +1009,13 @@ try {
         const labelText = await labels.innerText();
         check('…which names the filings', /Earnings news/.test(labelText) && /10-Q/.test(labelText) && /10-K/.test(labelText) && !/Legal news/.test(labelText));
         check('an article\'s importance is never printed', !/0\.73|importance/i.test(await evidence.innerText()));
+        // Each row is its own article's link, printing that article's sentiment for this name.
+        const rowFor = (a) => evidence.locator(`a[href="${a.url}"]`);
+        const rowTexts = await Promise.all(articlesF.map(async (a) => ((await rowFor(a).count()) === 1 ? (await rowFor(a).innerText()).replace(/\s+/g, ' ') : '')));
+        check('each evidence row links to its article and prints its sentiment for the name',
+            // The badge is uppercased by CSS, which innerText follows.
+            /QA brain article 1/.test(rowTexts[0]) && /\+0\.40/.test(rowTexts[0]) && /Earnings/i.test(rowTexts[0])
+            && /QA brain article 2/.test(rowTexts[1]) && /-0\.25/.test(rowTexts[1]) && !/Earnings/i.test(rowTexts[1]), rowTexts.join(' | '));
 
         // Bars for QATH and SPY from before the thesis: the line appears, both legs over the same sessions.
         const sessionsF = [];
@@ -905,8 +1032,12 @@ try {
         await sinceLine().waitFor({timeout: 30000}).catch(() => {});
         check('with bars stored, "since thesis" appears with both legs', await sinceLine().count() === 1 && (await sinceLine().innerText()).trim() === expected,
             `${await sinceLine().count() === 1 ? (await sinceLine().innerText()).trim() : 'no line'} vs ${expected}`);
-        check('…dated from the first close on or after the thesis day', (await sinceLine().getAttribute('title') ?? '').startsWith('From the close of ')
-            && await sinceLine().locator('[data-term="since-thesis"][title]').count() === 1);
+        const MONTHS_F = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+        const longF = (date) => `${MONTHS_F[Number(date.slice(5, 7)) - 1]} ${Number(date.slice(8, 10))}, ${date.slice(0, 4)}`;
+        const windowTitle = `From the close of ${longF(sessionsF[b])} to the close of ${longF(sessionsF[e])}.`;
+        check('…dated from the first close on or after the thesis day to the last close both have',
+            (await sinceLine().getAttribute('title')) === windowTitle && await sinceLine().locator('[data-term="since-thesis"][title]').count() === 1,
+            `${await sinceLine().getAttribute('title')} vs ${windowTitle}`);
 
         // The same panels as dashboard widgets: titles only — no definitions, no Ask link, no gloss, no line.
         await pageF.goto(`${BASE}/settings`, {waitUntil: 'load'});

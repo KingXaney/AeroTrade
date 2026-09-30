@@ -24,6 +24,8 @@ describe('EVENT_TYPES', () => {
                 continue;
             }
             expect(badge, type).not.toBeNull();
+            // Its own label's entry, not merely some entry: "Guidance" is defined by event-guidance.
+            expect(badge?.term, type).toBe(`event-${type}`);
             expect(isGlossaryKey(badge?.term ?? ''), type).toBe(true);
             expect(badge?.label.length ?? 0).toBeGreaterThan(0);
             expect(findBanned(badge?.label ?? '', 'copy')).toEqual([]);

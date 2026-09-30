@@ -65,6 +65,18 @@ describe('sinceThesisLegs', () => {
         expect(sinceThesisLegs('2026-09-08', bars([['2026-09-08', 0], ['2026-09-09', 51]]), spy)).toBeNull();   // an unusable close
     });
 
+    it('hides the line rather than end the two legs on different closes', () => {
+        // The name has Sep 8, 9 and 11; SPY ends on Sep 10. The last close both have would be the
+        // name's Sep 9 against SPY's Sep 10: two different ends, so no line rather than a mismatched one.
+        const gappy = bars([['2026-09-08', 50], ['2026-09-09', 51], ['2026-09-11', 60]]);
+        expect(sinceThesisLegs('2026-09-08', gappy, spy)).toBeNull();
+        // With SPY's Sep 11 stored as well, both legs end there.
+        const spyThrough11 = bars([['2026-09-04', 100], ['2026-09-08', 101], ['2026-09-09', 102], ['2026-09-10', 107.06], ['2026-09-11', 103.02]]);
+        expect(sinceThesisLegs('2026-09-08', gappy, spyThrough11)).toEqual({
+            from: '2026-09-08', to: '2026-09-11', symbolPct: expect.closeTo(20, 6), spyPct: expect.closeTo(2, 6),
+        });
+    });
+
     it('pays each leg only the dividends a holder from the base close is owed', () => {
         // Flat closes every session from Sep 1; the thesis close is Wed Sep 16.
         const flat = (exDates: Record<string, number>): Bar[] => {
@@ -87,7 +99,7 @@ describe('sinceThesisLegs', () => {
 });
 
 describe('sinceThesisBySymbol', () => {
-    it('keys a line per thesis that has both legs, reinvesting stored dividends on the name too', () => {
+    it('keys a line per thesis that has both legs, and none for one missing a leg', () => {
         const spyBars = bars([['2026-09-08', 100], ['2026-09-09', 100], ['2026-09-10', 106]]);
         const bySymbol = new Map<string, Bar[]>([
             ['NVDA', bars([['2026-09-08', 100], ['2026-09-09', 102], ['2026-09-10', 104.1]])],

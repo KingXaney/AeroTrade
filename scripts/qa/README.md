@@ -43,15 +43,19 @@ server action with a fixed price, since the harness has no quote provider, and r
 row it seeds; `/stocks/AAPL` renders keyless because a strategy watches it),
 `qa-news-feed.mjs`, `qa-strategies.mjs` (seeds the system-owned strategy accounts directly — the
 daily job never runs in this harness; the what-if lab from a seeded grid — two knobs on golden
-cross, a slider on 60/40, "computed overnight" before a grid exists, none on buy-and-hold — and
-the stock page: keyless empty key numbers, seeded rows under "What the rules see" on
-`/stocks/NVDA`, three watchers on `/stocks/SPY`, none on `/stocks/ZZZ`), `qa-income.mjs` (interest and dividends: runs the REAL nightly
+cross, a slider on 60/40, "computed overnight" before a grid exists, none on buy-and-hold — then
+the job's own what-if store, `saveVariants` / `variantStamps` / `saveBacktest`, called through
+Mongoose on the harness database: the app's TypeScript is loaded with `jiti`, resolved from the
+repo's `node_modules`, with `MONGODB_URI` pointed at the harness; and the stock page: keyless
+empty key numbers, each rule's newest seeded row under "What the rules see" on `/stocks/NVDA`,
+three watchers on `/stocks/SPY`, none on `/stocks/ZZZ`), `qa-income.mjs` (interest and dividends: runs the REAL nightly
 income job through the Inngest dev server, scoped to its own account; without the dev server on :8288
 it runs only the page checks),
 `qa-learn.mjs` (the First-week checklist, /learn, the ⌘K glossary rows, Guess the Verdict,
 "What the rule saw" with the decoded reason and "Read this board" on a seeded strategy page, an
 "Ask in chat" prefill, Today's lesson added from the library, the Daily quiz — one board inside
-its ten-day window, the reveal and its gloss, a day counted once, the empty state; it wipes
+its ten-day window, the reveal and its gloss, a day counted once (two tabs answering at once
+included), each kind of question forced from a board only it can use, the empty state; it wipes
 `strategyruns` and seeds its own, so it runs late — Time in the market on a seeded V-shaped SPY
 (it snapshots and restores the SPY and ^IRX bars it replaces), and `/brain`: the legend's
 constants, one event badge, "since thesis" once bars are stored, each Navigator decision

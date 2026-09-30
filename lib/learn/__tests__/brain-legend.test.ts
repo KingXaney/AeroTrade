@@ -70,31 +70,68 @@ describe('brainLegend follows the constants', () => {
     afterEach(() => {
         vi.doUnmock('@/lib/brain/config');
         vi.doUnmock('@/lib/navigator/config');
+        vi.doUnmock('@/lib/navigator/scoring');
         vi.resetModules();
     });
 
-    it('changes when a half-life or a score weight changes', async () => {
+    it('prints every figure from its constant: each one moved to a sentinel moves the text', async () => {
         vi.resetModules();
         vi.doMock('@/lib/brain/config', async (importOriginal) => ({
             ...(await importOriginal<typeof import('@/lib/brain/config')>()),
+            EXTRACTION_BATCH_SIZE: 17,
+            MAX_EXTRACTION_CALLS_PER_DAY: 7,
+            HALF_LIFE_FAST_DAYS: 4,
             HALF_LIFE_SLOW_DAYS: 90,
-            DAILY_DECAY_SLOW: 0.5 ** (1 / 90),
+            // Out of step with the half-life on purpose (a 45-day half-life): the fading example
+            // must come from decay.ts's own daily factor, not a closed form of HALF_LIFE_SLOW_DAYS.
+            DAILY_DECAY_SLOW: 0.5 ** (1 / 45),
             THESIS_WEIGHT_THRESHOLD: 7,
+            THESIS_EXIT_FRACTION: 0.35,
         }));
-        vi.doMock('@/lib/navigator/config', async (importOriginal) => {
-            const original = await importOriginal<typeof import('@/lib/navigator/config')>();
-            return {...original, MAX_POSITIONS: 10, SCORE_WEIGHTS: {...original.SCORE_WEIGHTS, momentumLong: 0.4, newsSlow: 0.15}};
-        });
+        vi.doMock('@/lib/navigator/config', async (importOriginal) => ({
+            ...(await importOriginal<typeof import('@/lib/navigator/config')>()),
+            MAX_POSITIONS: 9,
+            MAX_POSITION_WEIGHT: 0.17,
+            MIN_CASH_WEIGHT: 0.13,
+            MAX_TRADES_PER_WEEK: 4,
+            MIN_HOLDING_TRADING_DAYS: 17,
+            REBALANCE_BAND: 0.07,
+            ENTRY_SCORE_THRESHOLD: 0.19,
+            EXIT_SCORE_THRESHOLD: -0.05,
+            HARD_STOP_DRAWDOWN: 0.23,
+            MIN_ARTICLES_FOR_ELIGIBILITY: 4,
+            MIN_DISTINCT_SOURCES: 5,
+            ELIGIBILITY_LOOKBACK_DAYS: 16,
+            MIN_PRICE_BARS: 111,
+            SCORE_WEIGHTS: {newsSlow: 0.21, sentimentSlow: 0.14, momentumLong: 0.31, thesis: 0.22, sectorSlow: 0.12},
+            MOMENTUM_MIX: {r126: 0.41, r252: 0.33, r63: 0.26},
+            VOLATILITY_HAIRCUT: 0.7,
+            ALWAYS_ELIGIBLE_SYMBOLS: ['SPY', 'QQQ'],
+        }));
+        vi.doMock('@/lib/navigator/scoring', async (importOriginal) => ({
+            ...(await importOriginal<typeof import('@/lib/navigator/scoring')>()),
+            TOP_QUINTILE_FRACTION: 0.15,
+        }));
         const mocked = await import('@/lib/learn/brain-legend');
         const text = legendText(mocked.brainLegend());
-        expect(text).toContain('halves every 90 days');
-        expect(text).toContain('a slow weight of 10 is 7.1 after 45 days and 5.0 after 90.');
-        expect(text).toContain('reaches 7');
-        expect(text).toContain('momentum 0.40');
-        expect(text).toContain('news rank 0.15');
-        expect(text).toContain('the 10 highest scores');
-        expect(text).not.toContain('halves every 60 days');
-        expect(text).not.toContain('momentum 0.35');
+        for (const figure of [
+            'reads up to 119 new articles',
+            'the fast layer halves every 4 days', 'the slow layer halves every 90 days',
+            'a slow weight of 10 is 5.0 after 45 days and 2.5 after 90.',
+            'reaches 7,', 'below 35% of the highest',
+            'news rank 0.21, news sentiment 0.14, momentum 0.31, thesis 0.22, sector standing 0.12',
+            '6-month (0.41), 12-month (0.33) and 3-month (0.26)',
+            'the most volatile 15% of symbols have a positive score multiplied by 0.7',
+            'the 9 highest scores above 0.19', 'at most 17% of the account in one name, with at least 13% kept in cash',
+            'drops below -0.05 or its price is 23% under the average cost', 'held 17 trading days',
+            'more than 7% of the account from its target', 'at most 4 trades a week',
+            'Apart from 2 always-eligible funds, a symbol needs 4 articles from 5 sources in 16 days and 111 daily bars',
+        ]) {
+            expect(text, figure).toContain(figure);
+        }
+        for (const stale of ['halves every 5 days', 'halves every 60 days', 'most volatile 20%', 'multiplied by 0.8', '25% under', 'held 21 trading days', '13 always-eligible']) {
+            expect(text, stale).not.toContain(stale);
+        }
     });
 });
 

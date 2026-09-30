@@ -3,11 +3,17 @@
 // system state they rank by the seeded live return, label unpriced holdings, show the
 // explainer / signal board / trade reasons / simulated record, and follow persists. The
 // what-if lab reads a seeded grid (golden cross: two knobs; 60/40: a slider), switches it
-// without a request or a write, and says "computed overnight" where no grid is stored yet.
+// without a request or a write, and says "computed overnight" where no grid is stored yet; the
+// nightly job's own store (saveVariants, variantStamps, saveBacktest), loaded from the app's
+// TypeScript through jiti, writes a grid only beside the build it was computed for, finds nothing
+// due the next night, and re-queues it after a rebuild. The stock page shows each rule's newest run.
 // Run against the harness in README.md (in-memory Mongo on :27117 + `npm run dev`).
 import {chromium} from 'playwright';
 import {MongoClient, ObjectId} from 'mongodb';
 import {mkdirSync} from 'node:fs';
+// The repo's own TypeScript loader (a dev dependency of the app's toolchain), so the checks below
+// can call the job's store functions as the job does, through Mongoose, on this harness database.
+import {createJiti} from 'jiti';
 
 const BASE = 'http://localhost:3000';
 const MONGO = 'mongodb://127.0.0.1:27117/aerotrade';
@@ -329,8 +335,14 @@ try {
     const storedDoc = async () => JSON.stringify(await db.collection('strategybacktests').findOne({strategyId: 'golden-cross'}));
     const docBefore = await storedDoc();
     const tradesBefore = await db.collection('papertrades').countDocuments({});
+    // Every document, fetch or XHR request — a server action, a router push's RSC fetch, a GET of
+    // variant points — not only POSTs; the dev server's own endpoints and static chunks are not the page's.
     const posts = [];
-    const onRequest = (req) => { if (req.method() === 'POST') posts.push(req.url()); };
+    const onRequest = (req) => {
+        if (!['document', 'fetch', 'xhr', 'eventsource'].includes(req.resourceType())) return;
+        if (/\/(_next|__nextjs)[^/]*\//.test(new URL(req.url()).pathname)) return;
+        posts.push(`${req.method()} ${req.url()}`);
+    };
     page.on('request', onRequest);
     const simulatedBefore = await page.locator('#simulated-stats').innerText();
     await lab.scrollIntoViewIfNeeded();
@@ -383,7 +395,7 @@ try {
         && await lab.locator('[data-ask]').count() === await lab.locator('[data-what-these-mean] [data-ask]').count());
     check('no variant trades are shown', await lab.locator('table, [data-trade], details[data-decoded]').count() === 0);
     page.off('request', onRequest);
-    check('switching settings sends nothing to the server', posts.length === 0, posts.join(', '));
+    check('switching settings sends no request at all to the server', posts.length === 0, posts.join(', '));
     check('…and persists nothing', (await storedDoc()) === docBefore && (await db.collection('papertrades').countDocuments({})) === tradesBefore);
     await shot('03b-whatif');
 
@@ -452,6 +464,69 @@ try {
     await page.locator('#strategy-performance').waitFor({timeout: 30000});
     check('buy and hold has no knob, so no lab', await page.locator('#whatif-lab').count() === 0);
 
+    // --- the what-if write path: the job's own store, through Mongoose on this database ----------
+    // Donchian's backtest was seeded at build `builtAt` with no grid. The job computes a grid beside
+    // the build variantStamps reported and saves it with saveVariants, whose filter must refuse an
+    // earlier build or another version; the next night variantsDue finds nothing to do, and a
+    // rebuilt backtest (saveBacktest) makes the grid due again and hides the old one on the page.
+    const ROOT = new URL('../../', import.meta.url).pathname;
+    process.env.MONGODB_URI ??= MONGO;
+    process.env.BETTER_AUTH_SECRET ??= 'local-qa-secret-at-least-32-characters-long';
+    process.env.BETTER_AUTH_URL ??= BASE;
+    const jiti = createJiti(import.meta.url, {alias: {'@': ROOT.replace(/\/$/, '')}, fsCache: false});
+    const store = await jiti.import(`${ROOT}lib/strategies/store.ts`);
+    const {variantsDue} = await jiti.import(`${ROOT}lib/strategies/job-helpers.ts`);
+    const {gridFor} = await jiti.import(`${ROOT}lib/strategies/whatif.ts`);
+    const {strategyBySlug} = await jiti.import(`${ROOT}lib/strategies/catalog.ts`);
+    const GRID_SLUG = 'donchian-breakout';
+    const gridIds = gridFor(strategyBySlug(GRID_SLUG)).map((v) => v.id);
+    const backtestDoc = () => db.collection('strategybacktests').findOne({strategyId: GRID_SLUG});
+    const seededBacktest = await backtestDoc();
+    const build = seededBacktest.computedAt.getTime();
+    const grid = gridFor(strategyBySlug(GRID_SLUG)).map((v, k) => ({
+        id: v.id, knob: v.knob, value: v.value, from: seededBacktest.from, to: seededBacktest.to,
+        stats: {...seededBacktest.stats, totalReturnPct: 5 + k}, closeFills: 0, skippedDays: 0,
+        points: seededBacktest.points.map((p, i) => ({date: p.date, value: p.value * (1 + (k + 1) * i / 10_000)})),
+    }));
+    let stamp = (await store.variantStamps())[GRID_SLUG];
+    check('variantStamps reads the stored build, and no grid for it yet: due tonight',
+        stamp?.version === '1.1' && stamp.computedAt === build && stamp.variantsFor === null && stamp.variantIds === null
+        && variantsDue(stamp, '1.1', gridIds) === true, JSON.stringify(stamp));
+    check('saveVariants refuses a grid computed beside an earlier build of the same version',
+        await store.saveVariants(GRID_SLUG, '1.1', build - 86_400_000, grid) === false && (await backtestDoc()).variants === undefined);
+    check('…and one computed for another version', await store.saveVariants(GRID_SLUG, '1.0', build, grid) === false && (await backtestDoc()).variants === undefined);
+    check('…and attaches one to the build it was computed beside', await store.saveVariants(GRID_SLUG, '1.1', build, grid) === true);
+    const withGrid = await backtestDoc();
+    check('…as an array stamped with that version and build, the backtest itself untouched',
+        (withGrid.variants ?? []).map((v) => v.id).join(',') === gridIds.join(',') && withGrid.variantsVersion === '1.1'
+        && withGrid.variantsFor?.getTime() === build && withGrid.computedAt.getTime() === build
+        && JSON.stringify(withGrid.points) === JSON.stringify(seededBacktest.points) && JSON.stringify(withGrid.stats) === JSON.stringify(seededBacktest.stats),
+        JSON.stringify({ids: (withGrid.variants ?? []).map((v) => v.id), version: withGrid.variantsVersion, for: withGrid.variantsFor}));
+    stamp = (await store.variantStamps())[GRID_SLUG];
+    check('the next night nothing is due: the stored grid is this build\'s, with the grid\'s ids',
+        variantsDue(stamp, '1.1', gridIds) === false && stamp.variantsFor === build && stamp.variantIds.join(',') === gridIds.join(',')
+        && variantsDue(stamp, '1.1', gridIds, true) === true, JSON.stringify(stamp));
+    await page.goto(`${BASE}/strategies/${GRID_SLUG}`, {waitUntil: 'load'});
+    const gridLab = page.locator('#whatif-lab');
+    await gridLab.waitFor({timeout: 30000});
+    check('the strategy page draws the grid the store wrote', await gridLab.locator('[data-testid="whatif-pending"]').count() === 0
+        && (await gridLab.locator('[data-knob="entryChannel"]').evaluateAll((els) => els.map((e) => e.getAttribute('data-value')))).join(',') === '20,55,100');
+    await gridLab.locator('[data-knob="entryChannel"][data-value="100"]').click();
+    await page.waitForFunction(() => document.querySelector('#whatif-diff')?.getAttribute('data-variant') === 'entryChannel=100');
+    check('…each setting with the numbers stored for it', /\+6\.00%/.test(await page.locator('#whatif-stats').innerText()));
+    // A resimulate rebuilds the backtest on the same version: a new build, so the old grid is not its.
+    {
+        const {from, to, fillRule, closeFills, skippedDays, points, benchmark, trades, stats} = seededBacktest;
+        await store.saveBacktest(GRID_SLUG, '1.1', {from, to, fillRule, closeFills, skippedDays, points, benchmark, trades, stats});
+    }
+    stamp = (await store.variantStamps())[GRID_SLUG];
+    check('a backtest rebuilt on the same version makes its grid due again',
+        stamp.computedAt > build && stamp.variantsFor === build && variantsDue(stamp, '1.1', gridIds) === true, JSON.stringify(stamp));
+    await page.goto(`${BASE}/strategies/${GRID_SLUG}`, {waitUntil: 'load'});
+    await gridLab.waitFor({timeout: 30000});
+    check('…and the page hides the old grid until then', await gridLab.locator('[data-testid="whatif-pending"]').count() === 1
+        && await page.locator('#whatif-stats').count() === 0);
+
     // --- the stock page: what the rules see, from seeded boards ---------------------------------
     // RSI-2's board gains an NVDA row in its own columns and 12-1 momentum's a held one on the
     // same close: each row keeps its numbers and verdict, the shared close and run dates are
@@ -460,6 +535,12 @@ try {
         {$push: {board: {symbol: 'NVDA', state: 'enter', values: {close: 181.25, rsi2: 4.2, sma5: 186.4, sma200: 150.3, aboveSma200: true}}}});
     await db.collection('strategyruns').updateOne({strategyId: 'momentum-12-1', date: today},
         {$push: {board: {symbol: 'NVDA', state: 'held', values: {close: 181.25, momentum: 0.842, rank: 2}}}});
+    // An older RSI-2 run with another NVDA row: the page must read each rule's newest run, not its first.
+    const olderRun = await db.collection('strategyruns').insertOne({
+        strategyId: 'rsi2-mean-reversion', date: isoDaysAgo(3), asOf: isoDaysAgo(4), mode: 'live', status: 'done', staleCount: 0, universeSize: 40,
+        rebalanceTriggered: false, orders: [], skippedOrders: [], dataIssues: [], equity: 100_000, summary: 'older run', createdAt: new Date(),
+        board: [{symbol: 'NVDA', state: 'exit', values: {close: 150.5, rsi2: 91.1, sma5: 149.2, sma200: 140.7, aboveSma200: true}}],
+    });
     await page.goto(`${BASE}/stocks/NVDA`, {waitUntil: 'domcontentloaded'});
     const rulesSee = page.locator('#rules-see');
     await rulesSee.locator('[data-rules-see-row]').first().waitFor({timeout: 30000});
@@ -469,6 +550,8 @@ try {
         /RSI-2 Mean Reversion/.test(rsiText) && /^enter$/i.test((await rsiRow.locator('[data-rules-see-verdict]').innerText()).trim())
         && /RSI\(2\)\s*4\.2/i.test(rsiText) && /\$186\.40/.test(rsiText) && /\$150\.30/.test(rsiText) && /yes/.test(rsiText),
         rsiText.replace(/\s+/g, ' '));
+    check('…from its newest run, not the older one stored beside it',
+        !/91\.1|\$149\.20|\$140\.70|150\.5/.test(rsiText) && !/^exit$/i.test((await rsiRow.locator('[data-rules-see-verdict]').innerText()).trim()));
     check('…linking to the strategy', await rsiRow.locator('a[href="/strategies/rsi2-mean-reversion"]').count() === 1);
     const momentumRow = rulesSee.locator('[data-rules-see-row="momentum-12-1"]');
     const momentumText = await momentumRow.innerText();
@@ -495,6 +578,7 @@ try {
     check('"Ask in chat" appears only inside that disclosure',
         await rulesSee.locator('[data-ask]').count() > 0 && await rulesSee.locator('[data-ask]').count() === await rowsReading.locator('[data-ask]').count());
     check('the page still states no key numbers keyless', await page.locator('#key-numbers [data-key-number]').count() === 0);
+    await db.collection('strategyruns').deleteOne({_id: olderRun.insertedId});
     await shot('07-stock-rules-see');
     await page.goto(`${BASE}/stocks/SPY`, {waitUntil: 'domcontentloaded'});
     await page.locator('#rules-see').waitFor({timeout: 30000});

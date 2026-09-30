@@ -122,6 +122,20 @@ describe('overridesSchema', () => {
         expect(golden.safeParse({slow: 60}).success).toBe(true);
         expect(golden.safeParse({fast: 150}).success).toBe(true);
     });
+
+    it('compares a lone knob with the catalog value of its partner, whatever that value is', () => {
+        // A catalog whose slow average (120) and lookback (42) sit inside the other knob's range:
+        // a lone fast of 150 or a lone skip of 42 is out of order against them, a smaller one is not.
+        const golden = def('golden-cross');
+        const slow120 = overridesSchema({...golden, params: {...golden.params, slow: 120}});
+        expect(slow120.safeParse({fast: 150}).success).toBe(false);
+        expect(slow120.safeParse({fast: 120}).success).toBe(false);
+        expect(slow120.safeParse({fast: 100}).success).toBe(true);
+        const momentum = def('momentum-12-1');
+        const lookback42 = overridesSchema({...momentum, params: {...momentum.params, lookback: 42}});
+        expect(lookback42.safeParse({skip: 42}).success).toBe(false);
+        expect(lookback42.safeParse({skip: 21}).success).toBe(true);
+    });
 });
 
 describe('applyOverrides', () => {
@@ -215,7 +229,8 @@ describe('paramDiff', () => {
 
 describe('toWhatIfView', () => {
     const result = (count: number): SimulationResult => {
-        const points = Array.from({length: count}, (_, i) => ({date: `d${String(i).padStart(4, '0')}`, value: 100_000 + i * 7}));
+        // Values with cents: a decimation that rounded would not keep the ends exact.
+        const points = Array.from({length: count}, (_, i) => ({date: `d${String(i).padStart(4, '0')}`, value: 100_000 + i * 7.13}));
         return {
             from: points[0].date, to: points[count - 1].date, fillRule: 'next-open', closeFills: 2, skippedDays: 1,
             points, benchmark: points, trades: [], rejections: [], income: [],
@@ -341,5 +356,9 @@ describe('whatIfLab', () => {
         expect(lab?.variants.map((v) => v.id)).toEqual([a.id, b.id, d.id]);
         const otherWindow = {...a, from: 'd0001'};
         expect(whatIfLab(gc, stored({variants: [otherWindow], ...beside}))?.variants).toEqual([]);
+        // The same start and the same dates as far as they go, but another end, or one point short.
+        expect(whatIfLab(gc, stored({variants: [{...a, to: 'd0298'}], ...beside}))?.variants).toEqual([]);
+        expect(whatIfLab(gc, stored({variants: [{...a, points: a.points.slice(0, -1)}], ...beside}))?.variants).toEqual([]);
+        expect(whatIfLab(gc, stored({variants: [a], ...beside}))?.variants.map((v) => v.id)).toEqual([a.id]);
     });
 });

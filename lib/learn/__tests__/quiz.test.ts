@@ -78,11 +78,13 @@ const expectWellFormed = (quiz: DailyQuiz, runs: Partial<Record<StrategyId, Quiz
     if (!row) return;
     expect(quiz.reveal.explanation).toBe(explainVerdict(row, run).explanation);
     expect(quiz.reveal.gloss).toEqual(decodeReason(quiz.reveal.explanation, {def}).clauses);
+    // A row the board prints as dashes gives nothing to reason from: never asked, never offered.
+    const hasNumbers = (cells: DailyQuiz['cells']) => cells.some((cell) => cell.value !== '—');
     switch (quiz.template) {
         case 'which-verdict':
             expect(quiz.symbol).toBe(row.symbol);
             expect(quiz.answerId).toBe(row.state);
-            expect(quiz.cells.length).toBeGreaterThan(0);
+            expect(hasNumbers(quiz.cells), JSON.stringify(quiz.cells)).toBe(true);
             break;
         case 'why-this-verdict':
             expect(quiz.symbol).toBe(row.symbol);
@@ -98,7 +100,7 @@ const expectWellFormed = (quiz: DailyQuiz, runs: Partial<Record<StrategyId, Quiz
             expect(quiz.options.filter((o) => o.state === quiz.verdict)).toHaveLength(1);
             for (const option of quiz.options) {
                 expect(run.board.find((r) => r.symbol === option.id)?.state, option.id).toBe(option.state);
-                expect(option.cells.length).toBeGreaterThan(0);
+                expect(hasNumbers(option.cells), `${option.id} ${JSON.stringify(option.cells)}`).toBe(true);
             }
             break;
     }
@@ -116,6 +118,9 @@ describe('parseQuizDate', () => {
     it('accepts only today\'s ET date, as YYYY-MM-DD', () => {
         expect(parseQuizDate('2026-09-29', '2026-09-29')).toBe('2026-09-29');
         expect(parseQuizDate('2026-09-28', '2026-09-29')).toBeNull();
+        // A later day neither: a client may not count tomorrow's answer today.
+        expect(parseQuizDate('2026-09-30', '2026-09-29')).toBeNull();
+        expect(parseQuizDate('2027-01-01', '2026-09-29')).toBeNull();
         expect(parseQuizDate('2026-9-29', '2026-09-29')).toBeNull();
         expect(parseQuizDate('2026-09-29T00:00:00Z', '2026-09-29')).toBeNull();
         expect(parseQuizDate(' 2026-09-29', '2026-09-29')).toBeNull();
@@ -255,6 +260,80 @@ describe('buildDailyQuiz', () => {
         expect(quiz.options.find((o) => o.id === 'AAPL')?.cells.find((c) => c.label === 'RSI(2)')?.value).toBe('3.4');
         expect(quiz.symbol).toBeNull();
     });
+
+    // Two enters with their own reasons, three watches, an exit and a holding: a board where the
+    // distractor rules and the seeded picks have real choices to make.
+    const amznEnter = 'enter: RSI(2) 7.9 < 10 with close 180.00 above SMA200 170.00';
+    const repeated: QuizRun = {
+        date: '2026-09-28',
+        board: [
+            {symbol: 'AAPL', state: 'enter', values: {close: 123.45, rsi2: 3.4, sma5: 126.1, sma200: 110, aboveSma200: true}},
+            {symbol: 'AMZN', state: 'enter', values: {close: 180, rsi2: 7.9, sma5: 184, sma200: 170, aboveSma200: true}},
+            {symbol: 'MSFT', state: 'watch', values: {close: 410, rsi2: 6.2, sma5: 415, sma200: 380, aboveSma200: true}, note: 'signal, but no open slot'},
+            {symbol: 'GOOG', state: 'watch', values: {close: 160, rsi2: 8.8, sma5: 163, sma200: 150, aboveSma200: true}, note: 'signal, but no open slot'},
+            {symbol: 'META', state: 'watch', values: {close: 500, rsi2: 55, sma5: 495, sma200: 450, aboveSma200: true}},
+            {symbol: 'NVDA', state: 'exit', values: {close: 130, rsi2: 81.5, sma5: 128, sma200: 100, aboveSma200: true}},
+            {symbol: 'KO', state: 'held', values: {close: 62, rsi2: 40, sma5: 61.5, sma200: 60, aboveSma200: true}},
+        ],
+        orders: [
+            {symbol: 'AAPL', side: 'buy', reason: rsiEnter},
+            {symbol: 'AMZN', side: 'buy', reason: amznEnter},
+            {symbol: 'NVDA', side: 'sell', reason: rsiExit},
+        ],
+    };
+    const reversedRepeated: QuizRun = {...repeated, board: [...repeated.board].reverse(), orders: [...repeated.orders].reverse()};
+
+    it('which symbol: one row of each other verdict before any repeat, so four options cover the four verdicts', () => {
+        const quizzes = DATES.map((date) => buildDailyQuiz(date, [RSI], {'rsi2-mean-reversion': repeated}) as DailyQuiz)
+            .filter((quiz) => quiz.template === 'which-symbol');
+        expect(quizzes.length).toBeGreaterThan(5);
+        for (const quiz of quizzes) {
+            expectWellFormed(quiz, {'rsi2-mean-reversion': repeated});
+            expect(quiz.options.map((o) => o.id)).toHaveLength(4);
+            expect(new Set(quiz.options.map((o) => o.state)), quiz.options.map((o) => o.id).join(',')).toEqual(new Set(['enter', 'exit', 'held', 'watch']));
+        }
+    });
+
+    it('asks the same question whatever order a board with repeated verdicts arrives in', () => {
+        const seen = new Set<QuizTemplate>();
+        for (const date of DATES) {
+            const quiz = buildDailyQuiz(date, [RSI], {'rsi2-mean-reversion': repeated}) as DailyQuiz;
+            expectWellFormed(quiz, {'rsi2-mean-reversion': repeated});
+            expect(buildDailyQuiz(date, [RSI], {'rsi2-mean-reversion': reversedRepeated}), date).toEqual(quiz);
+            seen.add(quiz.template);
+        }
+        expect(seen).toEqual(new Set(QUIZ_TEMPLATES));
+    });
+
+    it('never asks about, nor offers, a row the board prints without a number', () => {
+        // A holding with no stored values: every visible cell of its row reads "—".
+        const blank: QuizRun = {
+            ...repeated,
+            board: [...repeated.board, {symbol: 'ZZZ', state: 'held', values: {close: null, rsi2: null, sma5: null, sma200: null, aboveSma200: null}}],
+        };
+        const runs = {'rsi2-mean-reversion': blank};
+        for (const date of DATES) {
+            const quiz = buildDailyQuiz(date, [RSI], runs) as DailyQuiz;
+            expectWellFormed(quiz, runs);
+            expect(quiz.reveal.symbol, date).not.toBe('ZZZ');
+            expect(quiz.options.map((o) => o.id), date).not.toContain('ZZZ');
+        }
+    });
+
+    it('does not always put the right answer in the same place', () => {
+        // The options are in a seeded order: a quiz whose answer always came first (or always
+        // came in one slot) could be passed without reading it.
+        const slots = new Map<QuizTemplate, Set<number>>();
+        for (const date of DATES) {
+            const quiz = buildDailyQuiz(date, [RSI], {'rsi2-mean-reversion': repeated}) as DailyQuiz;
+            const slot = quiz.options.findIndex((o) => o.id === quiz.answerId);
+            expect(slot, date).toBeGreaterThanOrEqual(0);
+            slots.set(quiz.template, (slots.get(quiz.template) ?? new Set()).add(slot));
+        }
+        for (const template of QUIZ_TEMPLATES) {
+            expect(slots.get(template)?.size ?? 0, `${template}: ${[...(slots.get(template) ?? [])]}`).toBeGreaterThan(1);
+        }
+    });
 });
 
 // Every day each rule's generic and branch contexts produce, as the run the quiz reads.
@@ -284,6 +363,15 @@ describe('buildDailyQuiz over what the rules emit', () => {
 
     it('gives every question one right answer and a reveal that is the stored record', () => {
         for (const {quiz, runs} of quizzes) expectWellFormed(quiz, runs);
+    });
+
+    it('puts the right answer in more than one place for each kind of question', () => {
+        for (const template of QUIZ_TEMPLATES) {
+            const slots = new Set(quizzes.filter(({quiz}) => quiz.template === template)
+                .map(({quiz}) => quiz.options.findIndex((o) => o.id === quiz.answerId)));
+            expect(slots.has(-1), template).toBe(false);
+            expect(slots.size, `${template}: ${[...slots]}`).toBeGreaterThan(1);
+        }
     });
 
     it('never offers a raw rule string, nor a reading that names the row asked about', () => {

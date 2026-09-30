@@ -176,6 +176,26 @@ describe('decodeNavigatorReason clauses', () => {
         expect(glossOf('enter: score 0.42')).toContain('above the entry line of 0.15; the 8 highest');
     });
 
+    it('says the Navigator bought on every buy it placed and sold on every sell', () => {
+        // The fixture's orders carry their side: a resize reads as the trade it was, each way.
+        expect(ORDERS.filter((order) => order.reason.startsWith('rebalance')).map((order) => order.side).sort()).toEqual(['buy', 'sell']);
+        for (const order of ORDERS) {
+            const {clauses} = decodeNavigatorReason(order.reason);
+            // The clause that names the trade: the drift for a resize, the lead clause otherwise.
+            const action = order.reason.startsWith('rebalance') ? clauses[1] : clauses[0];
+            const [did, didNot] = order.side === 'buy' ? [/\bbought\b/, /\bsold\b/] : [/\bsold\b/, /\bbought\b/];
+            expect(action?.gloss, order.reason).toMatch(did);
+            expect(action?.gloss, order.reason).not.toMatch(didNot);
+        }
+    });
+
+    it('reads the ineligible counts in the order the reason gives them, and the sector part at its own weight', () => {
+        expect(glossOf('ineligible (3 articles, 2 sources, 40 bars)')).toContain('this one had 3, 2 and 40.');
+        expect(glossOf('ineligible (1 articles, 1 sources, 40 bars)')).toContain('needs 3 articles from 2 sources in 21 days and 126 daily bars');
+        // Sector standing is weighted 0.10 in SCORE_WEIGHTS; news sentiment's 0.15 is another part.
+        expect(glossOf('Technology sector standing 0.8')).toContain('the standing has a weight of 0.10 in the score');
+    });
+
     it('is not the strategies\' grammar: the same resize reads with each owner\'s band', () => {
         const reason = 'rebalance +3.8% drift toward 12.0% target';
         expect(decodeReason(reason).clauses[0].gloss).toContain('2% of the account');
@@ -196,17 +216,34 @@ describe('glossNavigatorReasons', () => {
 describe('the grammar follows the config', () => {
     afterEach(() => {
         vi.doUnmock('@/lib/navigator/config');
+        vi.doUnmock('@/lib/navigator/scoring');
         vi.doUnmock('@/lib/brain/config');
         vi.resetModules();
     });
 
-    it('moves with a changed Navigator rail and a changed half-life', async () => {
+    it('prints every figure from its constant: each one moved to a sentinel moves the gloss', async () => {
         vi.resetModules();
         vi.doMock('@/lib/navigator/config', async (importOriginal) => ({
             ...(await importOriginal<typeof import('@/lib/navigator/config')>()),
-            REBALANCE_BAND: 0.08,
-            ENTRY_SCORE_THRESHOLD: 0.25,
-            SCORE_WEIGHTS: {newsSlow: 0.3, sentimentSlow: 0.1, momentumLong: 0.3, thesis: 0.2, sectorSlow: 0.1},
+            MAX_POSITIONS: 9,
+            MAX_POSITION_WEIGHT: 0.17,
+            MIN_CASH_WEIGHT: 0.13,
+            MIN_HOLDING_TRADING_DAYS: 17,
+            REBALANCE_BAND: 0.07,
+            ENTRY_SCORE_THRESHOLD: 0.19,
+            EXIT_SCORE_THRESHOLD: -0.05,
+            HARD_STOP_DRAWDOWN: 0.23,
+            MIN_ARTICLES_FOR_ELIGIBILITY: 4,
+            MIN_DISTINCT_SOURCES: 5,
+            ELIGIBILITY_LOOKBACK_DAYS: 16,
+            MIN_PRICE_BARS: 111,
+            SCORE_WEIGHTS: {newsSlow: 0.21, sentimentSlow: 0.14, momentumLong: 0.31, thesis: 0.22, sectorSlow: 0.12},
+            MOMENTUM_MIX: {r126: 0.41, r252: 0.33, r63: 0.26},
+            VOLATILITY_HAIRCUT: 0.7,
+        }));
+        vi.doMock('@/lib/navigator/scoring', async (importOriginal) => ({
+            ...(await importOriginal<typeof import('@/lib/navigator/scoring')>()),
+            TOP_QUINTILE_FRACTION: 0.15,
         }));
         vi.doMock('@/lib/brain/config', async (importOriginal) => ({
             ...(await importOriginal<typeof import('@/lib/brain/config')>()),
@@ -214,10 +251,23 @@ describe('the grammar follows the config', () => {
         }));
         const mocked = await import('@/lib/learn/reasons');
         const glossOf = (reason: string): string => mocked.decodeNavigatorReason(reason).clauses.map((clause) => clause.gloss).join(' ');
-        expect(glossOf('rebalance +10.0% drift toward 15.0% target')).toContain('more than 8% of the account');
-        expect(glossOf('enter: score 0.42')).toContain('entry line of 0.25');
-        expect(glossOf('6-month momentum +12.0%')).toContain('weight of 0.30');
-        expect(glossOf('slow news weight 12.3 (rank 2/25)')).toContain('halves every 90 days');
+        const expected: [string, string[]][] = [
+            ['slow news weight 12.3 (rank 2/25)', ['halves every 90 days', 'has a weight of 0.21 in the score']],
+            [NEUTRAL_NEWS_REASON, ['(weight 0.21)']],
+            ['6-month momentum +12.0%', ['Momentum has a weight of 0.31', '6-month change 0.41, 12-month 0.33, 3-month 0.26']],
+            ['thesis active', ['added 0.22 to the score']],
+            ['Technology sector standing 0.8', ['the standing has a weight of 0.12 in the score']],
+            ['high volatility haircut', ['among the highest 15% of the symbols', 'multiplied by 0.7']],
+            ['ineligible (1 articles, 1 sources, 40 bars)', ['needs 4 articles from 5 sources in 16 days and 111 daily bars']],
+            ['exit: score -0.20 below exit threshold 0', ['the 17-trading-day minimum hold', 'under the exit line of -0.05']],
+            ['exit: hard stop -30% vs cost', ['past the hard stop at 23% below cost']],
+            ['rebalance +10.0% drift toward 15.0% target', ['more than 7% of the account', 'only after 17 trading days', 'at most 17% in one name, with at least 13% kept in cash']],
+            ['enter: score 0.42', ['above the entry line of 0.19; the 9 highest', 'only below -0.05']],
+        ];
+        for (const [reason, figures] of expected) {
+            const text = glossOf(reason);
+            for (const figure of figures) expect(text, reason).toContain(figure);
+        }
     });
 });
 

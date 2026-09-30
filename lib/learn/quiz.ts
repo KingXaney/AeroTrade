@@ -204,14 +204,15 @@ const whyThisVerdict = (date: string, board: Board, boards: readonly Board[]): D
 };
 
 // The asked row plus rows with other verdicts: one of each other verdict first, then the rest,
-// in a seeded order, up to four options.
+// in a seeded order, up to four options. Every option is a row the board prints with a number:
+// a row of dashes is never offered, as it is never asked about.
 const whichSymbol = (date: string, board: Board): DailyQuiz | null => {
-    const askable = board.run.board.filter((r) => r.state !== 'excluded');
+    const offerable = board.run.board.filter((r) => r.state !== 'excluded' && hasNumbers(cellsFor(board, r)));
     const candidates = pickQuizRows(board.run.board).filter((target) =>
-        hasNumbers(cellsFor(board, target)) && askable.filter((r) => r.state !== target.state).length >= MIN_OPTIONS - 1);
+        offerable.includes(target) && offerable.filter((r) => r.state !== target.state).length >= MIN_OPTIONS - 1);
     const row = pick(candidates, date, `which-symbol:${board.def.id}`);
     if (!row) return null;
-    const rest = seededOrder(askable.filter((r) => r.state !== row.state), date, 'which-symbol-rest', (r) => r.symbol);
+    const rest = seededOrder(offerable.filter((r) => r.state !== row.state), date, 'which-symbol-rest', (r) => r.symbol);
     const firstOfEach = rest.filter((r, i) => rest.findIndex((other) => other.state === r.state) === i);
     const distractors = [...firstOfEach, ...rest.filter((r) => !firstOfEach.includes(r))].slice(0, MAX_SYMBOL_OPTIONS - 1);
     const options = seededOrder([row, ...distractors], date, 'which-symbol-options', (r) => r.symbol)
