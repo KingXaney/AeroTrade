@@ -5,7 +5,19 @@ import {inngest} from "@/lib/inngest/client";
 import {cookies, headers} from "next/headers";
 import {THEME_COOKIE} from "@/lib/theme/resolve";
 import {syncThemeCookieForUser} from "@/lib/actions/appearance.actions";
-import {PASSWORD_RESET_LIMIT, PASSWORD_RESET_WINDOW_MS, passwordResetKey, takeRateLimit} from "@/lib/auth/rate-limit";
+import {takeRateLimit} from "@/lib/auth/rate-limit";
+import {
+    PASSWORD_RESET_LIMIT,
+    PASSWORD_RESET_WINDOW_MS,
+    SIGN_IN_CLIENT_LIMIT,
+    SIGN_IN_EMAIL_LIMIT,
+    SIGN_IN_LIMITED_MESSAGE,
+    SIGN_IN_WINDOW_MS,
+    clientIpFrom,
+    passwordResetKey,
+    signInClientKey,
+    signInEmailKey,
+} from "@/lib/auth/limits";
 import {seedDefaultTopics} from "@/lib/topics/seed";
 
 // Better-auth throws APIError-shaped objects with body.message; fall back to .message or a generic string.
@@ -44,8 +56,25 @@ export const signUpWithEmail = async ({ email, password, fullName, country, inve
     }
 }
 
+// Client first, then address: a client already over its limit spends nothing of the address's
+// budget, so one machine walking a list of addresses can lock out no more of them than its own
+// client limit allows.
+// A request with no client address (see clientIpFrom) is counted per address only.
+const withinSignInLimits = async (email: string): Promise<boolean> => {
+    const ip = clientIpFrom(await headers());
+    if (ip && !(await takeRateLimit(signInClientKey(ip), SIGN_IN_CLIENT_LIMIT, SIGN_IN_WINDOW_MS))) return false;
+    return takeRateLimit(signInEmailKey(email ?? ''), SIGN_IN_EMAIL_LIMIT, SIGN_IN_WINDOW_MS);
+}
+
 export const signInWithEmail = async ({ email, password }: SignInFormData) => {
     try {
+        // Refused before better-auth is asked, so the answer cannot differ between an address
+        // with an account and one without — and a correct password does not get through either.
+        if (!(await withinSignInLimits(email))) {
+            console.warn('Sign-in rate limit reached');
+            return { success: false, error: SIGN_IN_LIMITED_MESSAGE }
+        }
+
         const response = await auth.api.signInEmail({ body: { email, password } })
         if (response?.user?.id) {
             await syncThemeCookieForUser(response.user.id).catch((e) => console.error('Theme cookie sync failed', e));

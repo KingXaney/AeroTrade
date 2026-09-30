@@ -39,8 +39,9 @@ function createAuthInstance(db: Parameters<typeof mongodbAdapter>[0]) {
         },
         // NOTE: this only runs inside better-auth's HTTP router, which this app bypasses
         // (every call goes through auth.api.* from a server action) — so it limits
-        // nothing here. The password-reset action uses lib/auth/rate-limit.ts instead;
-        // applying that to sign-in is a follow-up.
+        // nothing here. The server actions limit themselves through lib/auth/rate-limit.ts
+        // with the limits in lib/auth/limits.ts: password reset per address, sign-in per
+        // address and per client address. Sign-up is not limited yet.
         rateLimit: {
             enabled: true,
             storage: 'database',

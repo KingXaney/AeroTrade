@@ -78,7 +78,8 @@ chat's three rate-limit windows via seeded `ratelimits` rows, the prefill, then 
 and `getQuantStrategies` chips from stubbed UI-message streams — the tutor's answers themselves need
 a Gemini key and are checked by hand)
 and `qa-auth.mjs` (password reset end to end — it reads the token out of the
-throwaway Mongo, since the harness has no SMTP). They share one database, so each
+throwaway Mongo, since the harness has no SMTP — and the sign-in limits: eleven attempts on one
+address, the per-client counter seeded to its limit, every `signin:*` row removed at the end). They share one database, so each
 scopes its assertions to the user it signs up.
 
 `qa-topics.mjs` signs up a fresh user, follows a starter topic, waits for the
