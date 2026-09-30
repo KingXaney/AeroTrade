@@ -190,6 +190,9 @@ export const getQuote = async (symbol: string): Promise<QuoteData> => {
 };
 
 export const getCompanyProfile = async (symbol: string): Promise<ProfileData> => {
+    // Keyless, the answer is the same empty profile getQuote gives: skip the certain 401 and
+    // its error log (the stock page renders keyless for every symbol a strategy watches).
+    if (!FINNHUB_API_KEY) return {};
     try {
         const url = `${FINNHUB_BASE_URL}/stock/profile2?symbol=${encodeURIComponent(symbol.toUpperCase())}&token=${FINNHUB_API_KEY}`;
         return await fetchJSON<ProfileData>(url, 60 * 60 * 24); // profile is stable; cache a day
@@ -200,6 +203,7 @@ export const getCompanyProfile = async (symbol: string): Promise<ProfileData> =>
 };
 
 export const getFinancials = async (symbol: string): Promise<FinancialsData> => {
+    if (!FINNHUB_API_KEY) return {};
     try {
         const url = `${FINNHUB_BASE_URL}/stock/metric?symbol=${encodeURIComponent(symbol.toUpperCase())}&metric=all&token=${FINNHUB_API_KEY}`;
         return await fetchJSON<FinancialsData>(url, 60 * 60); // metrics change slowly; cache an hour

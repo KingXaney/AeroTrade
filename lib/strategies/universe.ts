@@ -4,6 +4,8 @@
 
 import {BENCHMARK_SYMBOL} from "@/lib/constants";
 import {SECTOR_TO_ETF} from "@/lib/navigator/config";
+import {STRATEGIES} from "@/lib/strategies/catalog";
+import type {StrategyDefinition} from "@/lib/strategies/types";
 
 export type UniverseKey = 'spy' | 'sixty-forty' | 'sectors' | 'gem' | 'largecaps';
 
@@ -37,3 +39,11 @@ export {BENCHMARK_SYMBOL};
 export const ALL_STRATEGY_SYMBOLS: readonly string[] = Array.from(new Set([
     ...CORE_ETFS, ...SECTOR_ETFS, ...LARGE_CAPS,
 ]));
+
+// The strategies that put `symbol` on their signal board, in catalog order: SPY is watched by
+// buy-and-hold, 60/40 and dual momentum, a large cap by the four large-cap rules. Pure. The
+// stock page renders for any symbol this names, and reads one board row per strategy named.
+export const strategiesWatching = (symbol: string): StrategyDefinition[] => {
+    const wanted = symbol.trim().toUpperCase();
+    return wanted ? STRATEGIES.filter((def) => UNIVERSES[def.universe].includes(wanted)) : [];
+};

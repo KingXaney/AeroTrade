@@ -112,6 +112,23 @@ try {
     await page.getByText('Not found').first().waitFor({timeout: 30000}).catch(() => {});
     check('unknown slug renders the in-app 404', await page.getByText('Not found').count() > 0 && await page.locator('header').count() > 0);
 
+    // --- the stock page in plain words, before any run ------------------------------------
+    // No Finnhub key here. A symbol a strategy watches renders anyway: its key numbers say
+    // honestly that the feed sent none, and "What the rules see" counts the four large-cap
+    // rules without inventing a row. A symbol no strategy watches still 404s keyless.
+    await page.goto(`${BASE}/stocks/NVDA`, {waitUntil: 'domcontentloaded'});
+    await page.locator('#key-numbers').waitFor({timeout: 30000});
+    check('keyless /stocks/NVDA renders the key numbers\' honest empty state',
+        /No key numbers came back for NVDA/.test(await page.locator('#key-numbers').innerText())
+        && await page.locator('#key-numbers [data-key-number], #key-numbers [data-what-these-mean]').count() === 0);
+    const emptyRules = await page.locator('#rules-see').innerText();
+    check('…and "What the rules see" names four watching rules and no row',
+        /on the signal board of 4 rule-based strategies/.test(emptyRules) && /No stored board has a row for NVDA yet/.test(emptyRules)
+        && await page.locator('#rules-see [data-rules-see-row], #rules-see [data-what-these-mean]').count() === 0, emptyRules.replace(/\s+/g, ' ').slice(0, 200));
+    await page.goto(`${BASE}/stocks/ZZZ`, {waitUntil: 'domcontentloaded'});
+    await page.getByText('Not found').first().waitFor({timeout: 30000}).catch(() => {});
+    check('/stocks/ZZZ, in no strategy\'s universe, has no "What the rules see"', await page.locator('#rules-see').count() === 0);
+
     // --- seed a system state the way the job would leave it ---------------------------
     const today = isoDaysAgo(0);
     // The what-if lab's precomputed grid as the nightly job stores it: an ARRAY beside the
@@ -421,6 +438,57 @@ try {
     await page.goto(`${BASE}/strategies/buy-and-hold-spy`, {waitUntil: 'load'});
     await page.locator('#strategy-performance').waitFor({timeout: 30000});
     check('buy and hold has no knob, so no lab', await page.locator('#whatif-lab').count() === 0);
+
+    // --- the stock page: what the rules see, from seeded boards ---------------------------------
+    // RSI-2's board gains an NVDA row in its own columns and 12-1 momentum's a held one on the
+    // same close: each row keeps its numbers and verdict, the shared close and run dates are
+    // stated once, and the two large-cap rules with no NVDA row are named once.
+    await db.collection('strategyruns').updateOne({strategyId: 'rsi2-mean-reversion', date: today},
+        {$push: {board: {symbol: 'NVDA', state: 'enter', values: {close: 181.25, rsi2: 4.2, sma5: 186.4, sma200: 150.3, aboveSma200: true}}}});
+    await db.collection('strategyruns').updateOne({strategyId: 'momentum-12-1', date: today},
+        {$push: {board: {symbol: 'NVDA', state: 'held', values: {close: 181.25, momentum: 0.842, rank: 2}}}});
+    await page.goto(`${BASE}/stocks/NVDA`, {waitUntil: 'domcontentloaded'});
+    const rulesSee = page.locator('#rules-see');
+    await rulesSee.locator('[data-rules-see-row]').first().waitFor({timeout: 30000});
+    const rsiRow = rulesSee.locator('[data-rules-see-row="rsi2-mean-reversion"]');
+    const rsiText = await rsiRow.innerText();
+    check('a seeded RSI-2 run lists NVDA under "What the rules see" with its verdict and values',
+        /RSI-2 Mean Reversion/.test(rsiText) && /^enter$/i.test((await rsiRow.locator('[data-rules-see-verdict]').innerText()).trim())
+        && /RSI\(2\)\s*4\.2/i.test(rsiText) && /\$186\.40/.test(rsiText) && /\$150\.30/.test(rsiText) && /yes/.test(rsiText),
+        rsiText.replace(/\s+/g, ' '));
+    check('…linking to the strategy', await rsiRow.locator('a[href="/strategies/rsi2-mean-reversion"]').count() === 1);
+    const momentumRow = rulesSee.locator('[data-rules-see-row="momentum-12-1"]');
+    const momentumText = await momentumRow.innerText();
+    check('…beside 12-1 momentum\'s held row',
+        /^held$/i.test((await momentumRow.locator('[data-rules-see-verdict]').innerText()).trim()) && /\+84\.2%/.test(momentumText) && /#2/.test(momentumText),
+        momentumText.replace(/\s+/g, ' '));
+    const rulesText = await rulesSee.innerText();
+    check('the shared close and run dates are stated once for the panel, not per row',
+        (rulesText.match(/\$181\.25/g) ?? []).length === 1 && !/181\.25/.test(rsiText + momentumText)
+        && (rulesText.match(/decided for/g) ?? []).length === 1 && rulesText.includes(`As of the ${isoDaysAgo(1)} close · decided for ${today}`),
+        rulesText.replace(/\s+/g, ' ').slice(0, 300));
+    check('the large-cap rules with no NVDA row are named once',
+        rulesText.includes('No stored board row for NVDA from Donchian 55/20 Breakout or Low Volatility Top 10.')
+        && await rulesSee.locator('[data-rules-see-row]').count() === 2);
+    const rowsReading = rulesSee.locator('[data-what-these-mean]');
+    check('the panel has one disclosure, led by reading its rows',
+        await rowsReading.count() === 1 && (await rowsReading.locator('summary').innerText()).includes('Read these rows — NVDA'));
+    await rowsReading.locator('summary').click();
+    const readingText = await rowsReading.innerText();
+    check('…which reads each row by its own rule, then defines the columns shown',
+        /2-day RSI reads 4\.2, under the entry level of 10/.test(readingText) && /so the verdict is enter/.test(readingText)
+        && /That ranks #2, where #1 is the strongest\./.test(readingText) && /RSI\(2\)/.test(readingText) && /Last close/i.test(readingText),
+        readingText.replace(/\s+/g, ' ').slice(0, 300));
+    check('"Ask in chat" appears only inside that disclosure',
+        await rulesSee.locator('[data-ask]').count() > 0 && await rulesSee.locator('[data-ask]').count() === await rowsReading.locator('[data-ask]').count());
+    check('the page still states no key numbers keyless', await page.locator('#key-numbers [data-key-number]').count() === 0);
+    await shot('07-stock-rules-see');
+    await page.goto(`${BASE}/stocks/SPY`, {waitUntil: 'domcontentloaded'});
+    await page.locator('#rules-see').waitFor({timeout: 30000});
+    const spyRules = await page.locator('#rules-see').innerText();
+    check('/stocks/SPY counts the three rules that hold or weigh SPY',
+        /on the signal board of 3 rule-based strategies/.test(spyRules) && /No stored board has a row for SPY yet/.test(spyRules),
+        spyRules.replace(/\s+/g, ' ').slice(0, 200));
 
 } catch (err) {
     failures++;

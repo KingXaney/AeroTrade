@@ -27,8 +27,9 @@ import {getFollowedStrategies} from "@/lib/strategies/follows";
 import {getStrategyStates, type StrategyStateView} from "@/lib/strategies/store";
 import type {ReplayRun} from "@/lib/learn/replay";
 import type {QuizRun} from "@/lib/learn/quiz";
+import type {SymbolBoardRead} from "@/lib/learn/rules-see";
 import type {SeriesStats, SignalRow, StrategyDefinition, StrategyId} from "@/lib/strategies/types";
-import {BENCHMARK_SYMBOL} from "@/lib/strategies/universe";
+import {BENCHMARK_SYMBOL, strategiesWatching} from "@/lib/strategies/universe";
 import {whatIfLab, type StoredWhatIfVariant, type WhatIfLabView} from "@/lib/strategies/whatif";
 import {
     describeLastRun,
@@ -143,6 +144,31 @@ export const getRecentRuns = async (
         orders: (run.orders ?? []).map((o) => ({symbol: o.symbol, side: o.side, reason: o.reason})),
     } satisfies QuizRun]] : [])));
 };
+
+type LeanSymbolRun = {date: string; asOf: string; board?: SignalRow[]};
+
+// The stock page's "What the rules see": for each strategy watching `symbol`, its newest run —
+// the run that strategy's own signal board shows — with the board projected by $elemMatch to
+// this symbol's one row. One findOne per watching strategy (four at most, each the first entry
+// of a backward walk down the {strategyId, date} index) in one Promise.all; never the
+// board-carrying aggregate. A strategy with no run yet is left out; a run whose board has no
+// row for the symbol comes back with `row: null`.
+export const getBoardRowsForSymbol = cache(async (symbol: string): Promise<SymbolBoardRead[]> => {
+    const wanted = symbol.trim().toUpperCase();
+    const watching = strategiesWatching(wanted);
+    if (watching.length === 0) return [];
+    await connectToDatabase();
+    const runs = await Promise.all(watching.map((def) => StrategyRun
+        .findOne({strategyId: def.id}, {_id: 0, date: 1, asOf: 1, board: {$elemMatch: {symbol: wanted}}})
+        .sort({date: -1})
+        .lean<LeanSymbolRun | null>()));
+    return watching.flatMap((def, i) => {
+        const run = runs[i];
+        if (!run) return [];
+        const row = run.board?.[0];
+        return [{strategyId: def.id, date: run.date, asOf: run.asOf, row: row ? toBoardRow(row) : null}];
+    });
+});
 
 type LeanBacktestStats = {strategyId: string; from: string; to: string; stats: SeriesStats; closeFills: number; points?: {value: number}[]};
 
