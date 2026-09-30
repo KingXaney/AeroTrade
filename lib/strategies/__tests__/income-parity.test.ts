@@ -134,5 +134,22 @@ describe("income parity — what-if settings", () => {
         expect(result.trades.some((t) => t.side === 'sell')).toBe(true);
         expect(result.income.filter((r) => r.kind === 'dividend').length).toBeGreaterThan(2);
         expectSameRows(result.income, liveReplayOf(result, market.bars, market.rates).rows);
+
+        // The settings took effect: never more than three names held at a close, where the
+        // catalog's ten slots hold more; and the 21-day window picks other names than the 63-day one.
+        const mostHeld = (trades: readonly {date: string; symbol: string; side: string; quantity: number}[]) => {
+            const held = new Map<string, number>();
+            let most = 0;
+            for (const date of [...new Set(trades.map((t) => t.date))].sort()) {
+                for (const t of trades.filter((x) => x.date === date)) held.set(t.symbol, (held.get(t.symbol) ?? 0) + (t.side === 'buy' ? t.quantity : -t.quantity));
+                most = Math.max(most, [...held.values()].filter((q) => q > 1e-9).length);
+            }
+            return most;
+        };
+        const run = (overrides: Parameters<typeof applyOverrides>[1]) => simulateStrategy(applyOverrides(strategyBySlug('low-volatility')!, overrides), market.bars,
+            {startingBalance: 100_000, launchDate: SYNTHETIC_LAUNCH, resultBars: 120, warmupBars: 30, rates: market.rates});
+        expect(mostHeld(result.trades)).toBe(3);
+        expect(mostHeld(run({}).trades)).toBeGreaterThan(3);
+        expect(run({top: 3}).trades.map((t) => `${t.date} ${t.side} ${t.symbol}`)).not.toEqual(result.trades.map((t) => `${t.date} ${t.side} ${t.symbol}`));
     });
 });

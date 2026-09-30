@@ -11,6 +11,7 @@ import {
     histogram,
     holdReturn,
     holdWindow,
+    LUCK_HISTOGRAM_BINS,
     LUCK_MIN_POOL,
     LUCK_MIN_SESSIONS,
     LUCK_PORTFOLIO_SIZE,
@@ -193,10 +194,12 @@ describe('percentileRank, medianOf, histogram', () => {
         const h = histogram(values, 4, [-4]);
         expect(h.min).toBe(-4);
         expect(h.max).toBe(11);
-        expect(h.counts).toHaveLength(4);
-        expect(h.counts.reduce((a, b) => a + b, 0)).toBe(values.length);
-        // the maximum lands in the last bin, not past it
-        expect(h.counts[3]).toBeGreaterThan(0);
+        // Four bins 3.75 wide from −4: [−4, −0.25) holds only the marker's room, then 0–3, 4–7,
+        // and 8–11, the maximum in the last bin, not past it.
+        expect(h.binWidth).toBe(3.75);
+        expect(h.counts).toEqual([0, 4, 4, 4]);
+        // A value on a bin's lower edge belongs to that bin.
+        expect(histogram([0, 3.75, 7.5, 11.25, 15], 4).counts).toEqual([1, 1, 1, 2]);
         const flat = histogram([2, 2, 2], 24);
         expect(flat.max).toBeGreaterThan(flat.min);
         expect(flat.counts.reduce((a, b) => a + b, 0)).toBe(3);
@@ -297,9 +300,11 @@ describe('buildLuckView', () => {
     const hold = {inputs, cashGrowth: 1};
     const window = {start: '2026-08-03', end: '2026-09-25', sessions: 38, yoursPct: 25, withheld: null};
 
-    it('needs ten sessions before it compares anything', () => {
-        expect(buildLuckView({window: {...window, sessions: LUCK_MIN_SESSIONS - 1}, hold, universe, seed: 1, amount: 100_000}))
-            .toEqual({status: 'needs-days', sessions: LUCK_MIN_SESSIONS - 1});
+    it('needs ten sessions before it compares anything, and ten is enough', () => {
+        expect(LUCK_MIN_SESSIONS).toBe(10);
+        expect(buildLuckView({window: {...window, sessions: 9}, hold, universe, seed: 1, amount: 100_000}))
+            .toEqual({status: 'needs-days', sessions: 9});
+        expect(buildLuckView({window: {...window, sessions: 10}, hold, universe, seed: 1, amount: 100_000})).toMatchObject({status: 'ready', sessions: 10});
     });
 
     it('says prices are missing when too little of the universe has both edge closes', () => {
@@ -324,20 +329,62 @@ describe('buildLuckView', () => {
         const again = buildLuckView({window, hold, universe, seed: seedFrom('acc', '2026-09-25'), amount: 100_000});
         expect(again).toEqual(view);
         expect(view.yours?.pct).toBe(25);
-        expect(view.yours?.rankPct).toBe(Math.floor((view.yours?.below ?? 0) / LUCK_SAMPLE_COUNT * 100));
-        expect(view.yours?.below).toBeGreaterThan(500);
-        expect(view.yours?.below).toBeLessThan(LUCK_SAMPLE_COUNT);
+        // The same thousand drawn again here and counted by hand: large cap i returns i%, and
+        // five of them in equal dollars return the mean of their i's.
+        const byHand = samplePortfolios(universe, {count: LUCK_SAMPLE_COUNT, size: LUCK_PORTFOLIO_SIZE, random: mulberry32(seedFrom('acc', '2026-09-25'))})
+            .map((names) => names.reduce((sum, name) => sum + universe.indexOf(name), 0) / names.length)
+            .sort((a, b) => a - b);
+        const below = byHand.filter((r) => r < 25).length;
+        expect(view.yours).toEqual({pct: 25, below, rankPct: Math.floor(below / 10)});
+        expect(view.medianPct).toBeCloseTo((byHand[499] + byHand[500]) / 2, 9);
+        // …pinned, so a change to the draw itself shows too.
+        expect(view.yours).toEqual({pct: 25, below: 840, rankPct: 84});
+        expect(view.medianPct).toBeCloseTo(19.6, 9);
+        expect(view.histogram.counts).toHaveLength(LUCK_HISTOGRAM_BINS);
+        expect(LUCK_HISTOGRAM_BINS).toBe(24);
+    });
+
+    it('marks the median, not the mean, of a lopsided sample', () => {
+        // Four large caps return over 200%: the portfolios holding one pull the mean far above
+        // the middle of the sample, and the median stays with the middle.
+        const skewed = new Map<string, HoldInput>(universe.map((symbol, i) => [symbol, input(symbol, 100, 100 + (i < 36 ? i : 200 + i))]));
+        const view = buildLuckView({window, hold: {inputs: skewed, cashGrowth: 1}, universe, seed: 5, amount: 100_000});
+        if (view.status !== 'ready') throw new Error(view.status);
+        const byHand = samplePortfolios(universe, {count: LUCK_SAMPLE_COUNT, size: LUCK_PORTFOLIO_SIZE, random: mulberry32(5)})
+            .map((names) => names.reduce((sum, name) => sum + (skewed.get(name)?.endClose ?? NaN) - 100, 0) / names.length)
+            .sort((a, b) => a - b);
+        const mean = byHand.reduce((a, b) => a + b, 0) / byHand.length;
+        expect(view.medianPct).toBeCloseTo((byHand[499] + byHand[500]) / 2, 9);
+        expect(Math.abs(view.medianPct - mean)).toBeGreaterThan(5);
+        expect(view.yours?.below).toBe(byHand.filter((r) => r < 25).length);
     });
 
     it('lands above all of them past the best five, and keeps SPY and the median when the marker is withheld', () => {
         const top = buildLuckView({window: {...window, yoursPct: 50}, hold, universe, seed: 3, amount: 100_000});
         expect(top.status === 'ready' && top.yours).toMatchObject({below: LUCK_SAMPLE_COUNT, rankPct: 100});
+        // The axis stretches to the marker past the best portfolio (five of 0..39 average at most 37)…
+        expect(top.status === 'ready' && top.histogram.max).toBe(50);
+        // …and to a SPY below the worst one.
+        const spyDown = new Map([...inputs, ['SPY', input('SPY', 500, 485)]]);
+        const low = buildLuckView({window, hold: {inputs: spyDown, cashGrowth: 1}, universe, seed: 3, amount: 100_000});
+        if (low.status !== 'ready') throw new Error(low.status);
+        expect(low.spyPct).toBeCloseTo(-3, 9);
+        expect(low.histogram.min).toBeCloseTo(-3, 9);
         const withheld = buildLuckView({window: {...window, yoursPct: null, withheld: 'unpriced'}, hold, universe, seed: 3, amount: 100_000});
         if (withheld.status !== 'ready') throw new Error(withheld.status);
         expect(withheld.yours).toBeNull();
         expect(withheld.withheld).toBe('unpriced');
         expect(withheld.spyPct).toBeCloseTo(12, 9);
         expect(withheld.medianPct).not.toBeNull();
+    });
+
+    it('holds SPY in whole shares, its remainder as cash growing at the window\'s cash factor', () => {
+        // $100,000 at $333 is 300 shares ($99,900) and $100 of cash: 300 × $350 + $100 = $105,100.
+        const odd = new Map([...inputs, ['SPY', input('SPY', 333, 350)]]);
+        const view = buildLuckView({window, hold: {inputs: odd, cashGrowth: 1}, universe, seed: 1, amount: 100_000});
+        expect(view.status === 'ready' && view.spyPct).toBeCloseTo(5.1, 9);
+        const earning = buildLuckView({window, hold: {inputs: odd, cashGrowth: 1.01}, universe, seed: 1, amount: 100_000});
+        expect(earning.status === 'ready' && earning.spyPct).toBeCloseTo(5.101, 9);
     });
 
     it('uses only the universe for the sample: SPY is a marker, never a pick', () => {

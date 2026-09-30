@@ -146,8 +146,9 @@ describe('replayIncome', () => {
     });
 
     // Deposits are optional and new (the time-in-the-market lesson's monthly contributions);
-    // every caller that passes none must replay exactly as before.
-    it('replays identically with no deposits or an empty list', () => {
+    // every caller that passes none must replay exactly as before: the convention walked by
+    // hand below, with no deposit anywhere in it.
+    it('replays with no deposits, or an empty list, exactly as the convention walked by hand', () => {
         const input = {
             from: '2026-09-18', to: '2026-09-30', startCash: 100_000, startHoldings: new Map([['XLE', 50]]),
             trades: [trade('2026-09-19', 'XLE', 'buy', 100, 90), trade('2026-09-23', 'XLE', 'sell', 30, 92)],
@@ -157,6 +158,28 @@ describe('replayIncome', () => {
         expect(empty.rows).toEqual(without.rows);
         expect(empty.cash).toBe(without.cash);
         expect([...empty.holdings]).toEqual([...without.holdings]);
+
+        // By hand: each close earns a day's interest on that day's cash, credited at the next
+        // open; the buy and the sell move cash on their own days; the 150 XLE held the evening
+        // before the Sep 21 ex-date are paid $0.38 each on Sep 26, credited on the 27th.
+        const f = dailyFactor(apyFromDiscount(4.07));
+        const moves: Record<string, number> = {'2026-09-19': -9_000, '2026-09-23': 30 * 92};
+        let cash = 100_000;
+        let credit = 0;
+        const interest: [string, number][] = [];
+        for (let day = 18; day <= 30; day += 1) {
+            const date = `2026-09-${day}`;
+            cash += credit + (moves[date] ?? 0);
+            interest.push([date, cash * f]);
+            credit = cash * f + (date === '2026-09-26' ? 150 * 0.38 : 0);
+        }
+        const rowsOf = (kind: string) => without.rows.filter((r) => r.kind === kind);
+        expect(rowsOf('interest').map((r) => r.date)).toEqual(interest.map(([date]) => date));
+        rowsOf('interest').forEach((row, i) => expect(row.amount, row.date).toBeCloseTo(interest[i][1], 9));
+        expect(rowsOf('dividend').map((r) => [r.date, r.amount])).toEqual([['2026-09-26', expect.closeTo(57, 9)]]);
+        // The last day's credit lands at the next open, so it is not in the end-of-day cash.
+        expect(without.cash).toBeCloseTo(cash, 8);
+        expect([...without.holdings]).toEqual([['XLE', 120]]);
     });
 
     it('lands a deposit at the start of its day, before that day\'s trades, and accrues on it from that close', () => {

@@ -4,11 +4,12 @@
 // Bounded, and no network: the learner's accounts through the read-only account read (never
 // the lazy-create path), and — in the same round trip — the latest stored SPY close and T-bill
 // point (one small aggregate, getLatestBars), which stamp the data. SPY's closes and dividends
-// and the stored ^IRX points, from the earliest date the window or the start-date table reaches
-// (at most MAX_LOOKBACK_DAYS back), and the table built on them depend on no learner, so they
-// are memoised per (that date, the stamp) for the ET day: a close or a rate stored later moves
-// the stamp and is read, and nothing is pinned. The maths is lib/learn/time-in-market.ts. A
-// failed read returns null and the page hides the panel rather than showing zeros.
+// and the stored ^IRX points, from a week before the earliest date the window or the start-date
+// table reaches (MAX_LOOKBACK_DAYS back at most, plus that week), and the table built on them
+// depend on no learner, so they are memoised per (that date, the stamp) for the ET day: a close
+// or a rate stored later moves the stamp and is read, and nothing is pinned. The maths is
+// lib/learn/time-in-market.ts. A failed read returns null and the page hides the panel rather
+// than showing zeros.
 
 import {BENCHMARK_SYMBOL} from "@/lib/constants";
 import {createDayMemo, remember} from "@/lib/day-memo";
@@ -33,6 +34,10 @@ export type TimeInMarketRead = TimeInMarketView & {inception: string | null};
 
 // How far back the stamp's lookup reaches; SPY and ^IRX are both stored every night.
 const STAMP_LOOKBACK_DAYS = 31;
+// A start on a weekend or a holiday opens on the next session. Read from a week before the
+// earliest start, so a stored close on or before it is in hand and startDateTable can tell the
+// history reaching a start from the history beginning after it (it drops only the latter).
+const START_READ_PAD_DAYS = 7;
 
 type History = {spy: SpyHistory; rates: RatePoint[]; table: StartRow[]};
 
@@ -70,7 +75,7 @@ export const getTimeInMarket = async (userId: string, requested: unknown): Promi
             .reduce<string | null>((earliest, date) => (earliest === null || date < earliest ? date : earliest), null);
         const resolved = resolveStart({requested, inception, today});
         const starts = tableStarts(today);
-        const from = [resolved.from, ...starts].reduce((a, b) => (a < b ? a : b));
+        const from = addCalendarDays([resolved.from, ...starts].reduce((a, b) => (a < b ? a : b)), -START_READ_PAD_DAYS);
         const stamp = [BENCHMARK_SYMBOL, RATE_SYMBOL].map((symbol) => {
             const bar = latest.get(symbol);
             return bar ? `${bar.date}:${bar.close}` : '-';

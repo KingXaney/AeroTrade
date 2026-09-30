@@ -115,20 +115,46 @@ describe('computeHabits', () => {
         // user fills within 30 days: all nine (the strategy's two are not the learner's)
         expect(habits?.pace).toMatchObject({fills: 9, windowDays: PACE_WINDOW_DAYS, full: true});
         expect(habits?.pace.days).toBe(8);
-        expect(habits?.pace.sessions).toBeGreaterThanOrEqual(19);
-        expect(habits?.pace.sessions).toBeLessThanOrEqual(22);
+        // Sat Aug 29 through Mon Sep 28, today included: 21 weekdays less Labor Day (Sep 7).
+        expect(habits?.pace).toMatchObject({since: '2026-08-29', sessions: 20});
+        expect(PACE_WINDOW_DAYS).toBe(30);
     });
 
     it('clips the window at the account\'s inception', () => {
         const habits = computeHabits({...base, inceptionAt: NOW - 12 * DAY});
         expect(habits?.pace).toMatchObject({windowDays: 12, full: false});
         expect(habits?.pace.fills).toBe(6);
+        // …and turnover with it: AAPL's sale 15 days ago is before the record began.
+        expect(habits?.turnover.soldCents).toBe(384_000);
     });
 
     it('states turnover as the dollars sold in the window against the starting balance, in cents', () => {
         const habits = computeHabits(base);
         // 1,200 + 1,800 + 2,040 = 5,040 sold
         expect(habits?.turnover).toEqual({soldCents: 504_000, startingCents: 10_000_000});
+        // A sale 35 days ago is a closed lot, but not the last 30 days' turnover or pace.
+        const older = computeHabits({...base, ledger: [fill('buy', 'IBM', 5, 100, 40), fill('sell', 'IBM', 5, 150, 35), ...LEDGER]});
+        expect(older?.closedLots).toBe(4);
+        expect(older?.turnover.soldCents).toBe(504_000);
+        expect(older?.pace.fills).toBe(9);
+    });
+
+    it('counts a lot sold at cost, or open at its cost, as neither a winner nor a loser', () => {
+        const flat: LedgerTrade[] = [
+            ...LEDGER,
+            fill('buy', 'PEP', 2, 150, 7), fill('sell', 'PEP', 2, 150, 4),   // closed at cost
+            fill('buy', 'MCD', 1, 300, 3),                                     // open at cost
+        ];
+        const habits = computeHabits({...base, ledger: flat, prices: new Map([...PRICES, ['MCD', 300]])});
+        expect(habits?.closedLots).toBe(4);
+        expect(habits?.hold).toEqual({winnerDays: 3, loserDays: 10, winners: 2, losers: 1});
+        expect(habits?.sold).toEqual({winners: {sold: 2, total: 3}, losers: {sold: 1, total: 2}, unpricedOpen: 1});
+    });
+
+    it('leaves out an open lot quoted at zero, as it does one with no quote', () => {
+        const habits = computeHabits({...base, prices: new Map([...PRICES, ['NVDA', 0]])});
+        // NVDA (open, a winner at 130) has a 0 quote now: left out with QALRN.
+        expect(habits?.sold).toEqual({winners: {sold: 2, total: 2}, losers: {sold: 1, total: 2}, unpricedOpen: 2});
     });
 
     it('prices "had you held" from the last quotes of the most recently sold names only', () => {
@@ -145,9 +171,11 @@ describe('hadYouHeldSymbols', () => {
         const many: LedgerTrade[] = [];
         for (let i = 0; i < 8; i += 1) many.push(fill('buy', `S${i}`, 1, 10, 30 - i), fill('sell', `S${i}`, 1, 11, 20 - i));
         const {symbols, capped} = hadYouHeldSymbols(many);
-        expect(symbols).toHaveLength(HAD_YOU_HELD_MAX_SYMBOLS);
-        expect(symbols[0]).toBe('S7');
+        expect(HAD_YOU_HELD_MAX_SYMBOLS).toBe(5);
+        expect(symbols).toEqual(['S7', 'S6', 'S5', 'S4', 'S3']);
         expect(capped).toBe(true);
+        // Exactly five names sold is not capped.
+        expect(hadYouHeldSymbols(many.slice(0, 10))).toEqual({symbols: ['S4', 'S3', 'S2', 'S1', 'S0'], capped: false});
     });
 });
 

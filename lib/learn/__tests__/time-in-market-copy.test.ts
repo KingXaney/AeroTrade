@@ -183,6 +183,14 @@ describe('TIM_COPY', () => {
         expect(TIM_COPY.tableCaption('2026-03-31', 8)).toBe('The same amount and the same end date, Mar 31, 2026, from 8 earlier starts a quarter apart:');
         expect(TIM_COPY.tableCaption('2026-03-31', 5)).toContain('from 5 earlier starts');
         expect(TIM_COPY.tableCaption('2026-03-31', 1)).toBe('The same amount and the same end date, Mar 31, 2026, from 1 earlier start:');
+        expect(TIM_COPY.tableCaption('2025-12-31', 3)).toBe('The same amount and the same end date, Dec 31, 2025, from 3 earlier starts a quarter apart:');
+    });
+
+    it('prints each table cell as the change to one decimal, signed, or a dash for a way it could not price', () => {
+        expect(TIM_COPY.tablePct(23.456)).toBe('+23.5%');
+        expect(TIM_COPY.tablePct(-12.34)).toBe('−12.3%');
+        expect(TIM_COPY.tablePct(0.04)).toBe('0.0%');
+        expect(TIM_COPY.tablePct(null)).toBe('—');
     });
 
     it('states the caveat with the spread the clock charges', () => {

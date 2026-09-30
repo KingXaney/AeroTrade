@@ -8,14 +8,18 @@
 // the Navigator's rails. Notes on the seeded buys come back as text under the sell that closed
 // them and in the sell dialog, every fill carries a receipt, and /trade shows the last fill.
 // The Income panel reads a receipt for every month and a buy made on its own ex-date. Luck or
-// skill places the account among a replayed sample of random portfolios (withheld with an
-// unpriced holding and no snapshot on the last session, ended on the last snapshot's date when
-// everything is priced), and Trading habits measures the learner's own lots, a strategy round
-// trip left out. A fresh account first shows every empty state.
+// skill places the account among a replayed sample of random portfolios (dividends and interest
+// replayed on the one income convention, the window's sessions on the NYSE calendar, each marker
+// placed on the axis; withheld with an unpriced holding and no snapshot on the last session,
+// ended on the last snapshot's date and seeded from it when everything is priced), and Trading
+// habits measures the learner's own lots over its window, a strategy round trip and an older
+// sale left out. A fresh account first shows every empty state.
 
 import {chromium} from 'playwright';
 import {MongoClient} from 'mongodb';
 import {mkdirSync} from 'node:fs';
+// The repo's own TypeScript loader, for the app's NYSE holiday table (lib/prices/market-hours.ts).
+import {createJiti} from 'jiti';
 
 const BASE = 'http://localhost:3000';
 const MONGO = 'mongodb://127.0.0.1:27117/aerotrade';
@@ -56,6 +60,8 @@ const browser = await chromium.launch({channel: 'chrome'});
 const page = await browser.newPage({viewport: {width: 1440, height: 900}});
 const shot = (n) => page.screenshot({path: `${OUT}${n}.png`, fullPage: true});
 const mongo = new MongoClient(MONGO);
+// Puts back the bars the luck checks set aside or seeded; replaced once they are seeded.
+let restoreLuck = async () => {};
 const until = async (fn, ms) => { const end = Date.now() + ms; let v = await fn(); while (!v && Date.now() < end) { await page.waitForTimeout(1000); v = await fn(); } return v; };
 // The Max Drawdown tile's hint: the element whose own text is the hint, found by its shape.
 const HINT = /^(Needs 2\+ days of history|Largest peak-to-trough dip|[A-Z][a-z]{2} \d+.* → .*)$/;
@@ -267,26 +273,68 @@ try {
 
     // --- luck or skill, and trading habits (learn Wave 3, slice 3.4) --------------------------
     // Sixty days of epoch, edge closes for all 40 large caps (every one bought at 100, large cap i
-    // ends at 100 + i, so five of them in equal dollars return exactly the mean of their i's), and
-    // the SPY bars seeded above. The sample is replayed here from the same seed, so the printed
-    // rank, SPY and the median are checked against numbers computed outside the app.
+    // ends at 100 + i, so five of them in equal dollars return the mean of their i's), the SPY bars
+    // seeded above, a flat 4.07% ^IRX over the window, and dividends: SPY and ten large caps paid
+    // inside the window, one on the buy day (the seller's) and one whose pay date is after the last
+    // day (not cash yet). The sample, SPY and the window are replayed here from the same seed, the
+    // NYSE calendar and the one income convention (owed to the shares held the evening before the
+    // ex-date, paid five days later, cash earning the rate's daily factor from the next day), so
+    // the printed rank, SPY, the median and each marker's place are checked against numbers
+    // computed outside the app.
     const LARGE_CAPS = ['AAPL', 'MSFT', 'NVDA', 'AMZN', 'GOOGL', 'META', 'AVGO', 'TSLA', 'JPM', 'V',
         'MA', 'UNH', 'XOM', 'JNJ', 'PG', 'COST', 'HD', 'LLY', 'ABBV', 'KO',
         'PEP', 'MRK', 'CVX', 'WMT', 'BAC', 'ORCL', 'CSCO', 'CRM', 'ADBE', 'NFLX',
         'AMD', 'INTC', 'TMO', 'ACN', 'MCD', 'DIS', 'PFE', 'CAT', 'HON', 'LIN'];
     const fnv1a = (t) => { let h = 0x811c9dc5; for (let i = 0; i < t.length; i++) { h ^= t.charCodeAt(i); h = Math.imul(h, 0x01000193); } return h >>> 0; };
     const mulberry32 = (seed) => { let s = seed >>> 0; return () => { s = (s + 0x6d2b79f5) >>> 0; let t = s; t = Math.imul(t ^ (t >>> 15), t | 1); t ^= t + Math.imul(t ^ (t >>> 7), t | 61); return ((t ^ (t >>> 14)) >>> 0) / 4294967296; }; };
+    // The app's NYSE calendar, loaded through jiti for its holiday table (a table, not what these
+    // checks test); the window's rule is applied here with it.
+    const ROOT = new URL('../../', import.meta.url).pathname;
+    const jiti = createJiti(import.meta.url, {alias: {'@': ROOT.replace(/\/$/, '')}, fsCache: false});
+    const {isTradingDay} = await jiti.import(`${ROOT}lib/prices/market-hours.ts`);
+    const sessionOnOrBefore = (date) => { let d = date; while (!isTradingDay(d)) d = addDays(d, -1); return d; };
+    const sessionsBetween = (from, to) => { let n = 0; for (let d = addDays(from, 1); d <= to; d = addDays(d, 1)) if (isTradingDay(d)) n += 1; return n; };
+    const nextWeekday = (date) => { let d = addDays(date, 1); while (!isWeekday(d)) d = addDays(d, 1); return d; };
+    const daysBetween = (a, b) => Math.round((Date.parse(`${b}T12:00:00Z`) - Date.parse(`${a}T12:00:00Z`)) / 86_400_000);
+    // 4.07% discount → bond-equivalent − 0.25%, compounded once a calendar day.
+    const F = (1 + (365 * 0.0407 / (360 - 91 * 0.0407) - 0.0025)) ** (1 / 365) - 1;
+
+    // The last stored SPY session is what the app ends a window on; read it rather than assume it.
+    const END = (await db.collection('pricebars').find({symbol: 'SPY', date: {$lte: TODAY}}).sort({date: -1}).limit(1).toArray())[0]?.date;
+    const LUCK_INCEPTION = addDays(TODAY, -60);
+    // The portfolios buy at the inception date's close, or the session's before it.
+    const START = sessionOnOrBefore(LUCK_INCEPTION);
+    const MID = weekdayOnOrBefore(addDays(LUCK_INCEPTION, 20));
+    const LATE = weekdayOnOrBefore(addDays(END, -2));     // paid five days later: after the last day
+    const DIVIDENDS = [
+        {symbol: 'SPY', exDate: START, perShare: 50},     // the buy day's: the seller keeps it
+        {symbol: 'SPY', exDate: nextWeekday(START), perShare: 4},
+        {symbol: 'SPY', exDate: LATE, perShare: 30},
+        {symbol: 'AAPL', exDate: START, perShare: 50},
+        // The calendar day after the buy, weekend or not, on every large cap: the first ex-date the
+        // shares are owed (a read of the dividends that began a day late would move the median).
+        ...LARGE_CAPS.map((symbol) => ({symbol, exDate: addDays(START, 1), perShare: 1})),
+        ...LARGE_CAPS.slice(10, 20).map((symbol) => ({symbol, exDate: MID, perShare: 3})),
+        {symbol: 'LIN', exDate: LATE, perShare: 40},
+    ];
     const endClose = (symbol) => 100 + LARGE_CAPS.indexOf(symbol);
-    const sampleReturns = (seedText) => {
+    // What a share bought at START's close has brought in by `end`: each dividend with an ex-date
+    // after START whose pay date is before `end` (the snapshot holds the rows dated before its
+    // day), grown by interest from the day after it was paid.
+    const incomePerShare = (symbol, end, paid = true) => (!paid ? 0 : DIVIDENDS
+        .filter((d) => d.symbol === symbol && d.exDate > START && d.exDate <= end && addDays(d.exDate, 5) < end)
+        .reduce((sum, d) => sum + d.perShare * (1 + F) ** (daysBetween(addDays(d.exDate, 5), end) - 1), 0));
+    const sampleReturns = (seedText, end, paid = true) => {
         const random = mulberry32(fnv1a(seedText));
         const names = [...LARGE_CAPS].sort();
         const out = [];
         for (let n = 0; n < 1000; n += 1) {
             const deck = [...names];
             for (let i = 0; i < 5; i += 1) { const j = i + Math.floor(random() * (deck.length - i)); [deck[i], deck[j]] = [deck[j], deck[i]]; }
-            let end = 0;
-            for (const s of deck.slice(0, 5)) end += Math.floor(20_000 / 100 + 1e-9) * endClose(s);
-            out.push(((100_000 - 100_000 + end) / 100_000 - 1) * 100);
+            // $20,000 a name at $100 is 200 whole shares, nothing left over as cash.
+            let value = 0;
+            for (const s of deck.slice(0, 5)) value += Math.floor(20_000 / 100 + 1e-9) * (endClose(s) + incomePerShare(s, end, paid));
+            out.push((value / 100_000 - 1) * 100);
         }
         return out.sort((a, b) => a - b);
     };
@@ -296,21 +344,62 @@ try {
         return below >= 1000 ? 'above all 1,000' : below === 0 ? 'above none of the 1,000' : pct < 1 ? `above ${below} of the 1,000` : `above ${pct}% of 1,000`;
     };
     const median = (sorted) => (sorted[499] + sorted[500]) / 2;
-    const spyHold = (start, end) => {
-        const shares = Math.floor(100_000 / spyClose(start) + 1e-9);
-        return ((100_000 - shares * spyClose(start) + shares * spyClose(end)) / 100_000 - 1) * 100;
+    // SPY the same way: whole shares, the remainder as cash earning from START's close.
+    const spyHold = (end, paid = true) => {
+        const shares = Math.floor(100_000 / spyClose(START) + 1e-9);
+        const cash = 100_000 - shares * spyClose(START);
+        return ((cash * (1 + F) ** daysBetween(START, end) + shares * (spyClose(end) + incomePerShare('SPY', end, paid))) / 100_000 - 1) * 100;
     };
-    // The last stored SPY session is what the app ends a window on; read it rather than assume it.
-    const END = (await db.collection('pricebars').find({symbol: 'SPY', date: {$lte: TODAY}}).sort({date: -1}).limit(1).toArray())[0]?.date;
-    const LUCK_INCEPTION = addDays(TODAY, -60);
+    const windowLineFor = (end) => {
+        const withYear = START.slice(0, 4) !== end.slice(0, 4);
+        const label = (d) => (withYear ? `${short(d)}, ${d.slice(0, 4)}` : short(d));
+        return `bought at the ${label(START)} close · valued at the ${label(end)} close`;
+    };
+    // LuckOrSkill's geometry: x = 16 + (pct − min) / (max − min) × 688, the span covering the
+    // sample and every marker.
+    const markerPlaces = async (returns, markers) => {
+        const all = [...returns, ...Object.values(markers)];
+        const min = Math.min(...all);
+        const max = Math.max(...all);
+        const places = [];
+        for (const [key, pct] of Object.entries(markers)) {
+            const x1 = Number(await page.locator(`#luck-or-skill [data-luck-marker=${key}] line`).getAttribute('x1'));
+            const want = 16 + ((pct - min) / (max - min)) * 688;
+            places.push({key, x1: Math.round(x1 * 10) / 10, want: Math.round(want * 10) / 10, ok: Math.abs(x1 - want) < 1 && x1 >= 15.5 && x1 <= 704.5});
+        }
+        return places;
+    };
+
+    const pricebars = db.collection('pricebars');
     const startRegion = [];
     for (let d = addDays(LUCK_INCEPTION, -7); d <= addDays(LUCK_INCEPTION, 3); d = addDays(d, 1)) if (isWeekday(d)) startRegion.push(d);
     const endRegion = [];
     for (let d = addDays(END, -14); d <= END; d = addDays(d, 1)) if (isWeekday(d)) endRegion.push(d);
-    await db.collection('pricebars').bulkWrite(LARGE_CAPS.flatMap((symbol) => [
+    await pricebars.bulkWrite(LARGE_CAPS.flatMap((symbol) => [
         ...startRegion.map((date) => ({updateOne: {filter: {symbol, date}, update: {$set: {symbol, date, close: 100, source: 'yahoo', dividend: 0, qaLuck: true}}, upsert: true}})),
         ...endRegion.map((date) => ({updateOne: {filter: {symbol, date}, update: {$set: {symbol, date, close: endClose(symbol), source: 'yahoo', dividend: 0, qaLuck: true}}, upsert: true}})),
+        ...[MID, addDays(START, 1)].map((date) => ({updateOne: {filter: {symbol, date}, update: {$set: {symbol, date, close: 100, source: 'yahoo', dividend: 0, qaLuck: true}}, upsert: true}})),
     ]), {ordered: false});
+    // An earlier suite's large-cap dividend inside the window (qa-income's AAPL) would pay the
+    // sample too, and its ^IRX would be a rate these numbers do not know: both are set aside for
+    // the luck checks and put back after them.
+    const foreignDividends = await pricebars.find({symbol: {$in: LARGE_CAPS}, date: {$gt: START, $lte: END}, dividend: {$gt: 0}, qaLuck: {$ne: true}}, {projection: {_id: 1, dividend: 1}}).toArray();
+    await pricebars.updateMany({_id: {$in: foreignDividends.map((b) => b._id)}}, {$set: {dividend: 0}});
+    const RATE_FROM = addDays(START, -14);
+    const savedRates = await pricebars.find({symbol: '^IRX', date: {$gte: RATE_FROM, $lte: TODAY}}).toArray();
+    await pricebars.deleteMany({symbol: '^IRX', date: {$gte: RATE_FROM, $lte: TODAY}});
+    const rateDays = [];
+    for (let d = RATE_FROM; d <= END; d = addDays(d, 1)) if (isWeekday(d)) rateDays.push(d);
+    await pricebars.insertMany(rateDays.map((date) => ({symbol: '^IRX', date, close: 4.07, open: 4.07, high: 4.07, low: 4.07, source: 'yahoo', dividend: 0})));
+    for (const d of DIVIDENDS) await pricebars.updateOne({symbol: d.symbol, date: d.exDate}, {$set: {dividend: d.perShare}});
+    restoreLuck = async () => {
+        restoreLuck = async () => {};
+        await pricebars.deleteMany({symbol: '^IRX', date: {$gte: RATE_FROM, $lte: TODAY}});
+        if (savedRates.length > 0) await pricebars.insertMany(savedRates);
+        for (const b of foreignDividends) await pricebars.updateOne({_id: b._id}, {$set: {dividend: b.dividend}});
+        await pricebars.updateMany({symbol: 'SPY', date: {$in: DIVIDENDS.filter((d) => d.symbol === 'SPY').map((d) => d.exDate)}}, {$set: {dividend: 0}});
+        await pricebars.deleteMany({qaLuck: true});
+    };
     await db.collection('paperaccounts').updateOne({_id: account._id}, {$set: {inceptionAt: etNoon(LUCK_INCEPTION)}});
     // A snapshot on the last session would be a real close; take it away so the holding with no
     // quote (QALRN) leaves nothing to read the learner's return from.
@@ -322,20 +411,28 @@ try {
     const luckText = async () => text('#luck-or-skill [data-testid=luck-landed]');
     const sampleLine = await luckText();
     const sampleMatch = /^1,000 random five-stock portfolios over the same (\d+) trading days$/.exec(sampleLine);
-    check('with an unpriced holding and no snapshot that day, the panel places no one', sampleMatch !== null && Number(sampleMatch?.[1]) >= 10, sampleLine);
+    const SESSIONS = sessionsBetween(START, END);
+    check('with an unpriced holding and no snapshot that day, the panel places no one', sampleMatch !== null, sampleLine);
+    check('…over the NYSE sessions after the inception close through the last one, counted here', Number(sampleMatch?.[1]) === SESSIONS && SESSIONS >= 10, `${sampleLine} | expected ${SESSIONS}`);
     check('…and says why with the unpriced note', (await text('#luck-or-skill [data-testid=luck-withheld]')) === 'This holding is unpriced — valued at cost, P&L withheld', await text('#luck-or-skill [data-testid=luck-withheld]'));
     check('…with SPY and the median marked, and no "you" marker',
         (await page.locator('#luck-or-skill [data-luck-marker=spy]').count()) === 1 && (await page.locator('#luck-or-skill [data-luck-marker=median]').count()) === 1
             && (await page.locator('#luck-or-skill [data-luck-marker=you]').count()) === 0);
     const windowLine = await text('#luck-or-skill [data-testid=luck-window]');
-    const windowMatch = /^bought at the ([A-Z][a-z]{2} \d+) close · valued at the ([A-Z][a-z]{2} \d+) close$/.exec(windowLine);
-    const START = startRegion.find((d) => short(d) === windowMatch?.[1]);
-    check('the window starts at the inception close and ends on the last session', START !== undefined && windowMatch?.[2] === short(END), `${windowLine} | END ${END}`);
-    const returnsA = sampleReturns(`${accountId}|${END}`);
+    check('the window starts at the inception close and ends on the last session', windowLine === windowLineFor(END), `${windowLine} | expected ${windowLineFor(END)}`);
+    const returnsA = sampleReturns(`${accountId}|${END}`, END);
     const markerText = async (key) => text(`#luck-or-skill [data-luck-value=${key}]`);
-    check('SPY is held the same way, in whole shares, over the same days', START !== undefined && (await markerText('spy')) === `SPY ${pctOneDecimal(spyHold(START, END))}`, `${await markerText('spy')} vs ${START ? pctOneDecimal(spyHold(START, END)) : '?'}`);
-    check('the median is the replayed sample\'s', (await markerText('median')) === `Median ${pctOneDecimal(median(returnsA))}`, `${await markerText('median')} vs ${pctOneDecimal(median(returnsA))}`);
-    check('the histogram draws the thousand as bars', (await page.locator('#luck-or-skill [data-luck-bar]').count()) >= 5);
+    check('SPY is held the same way over the same days, paid what a paper account is paid (not the buy day\'s dividend, not one paid after the last day)',
+        (await markerText('spy')) === `SPY ${pctOneDecimal(spyHold(END))}` && pctOneDecimal(spyHold(END)) !== pctOneDecimal(spyHold(END, false)),
+        `${await markerText('spy')} vs SPY ${pctOneDecimal(spyHold(END))} (price only ${pctOneDecimal(spyHold(END, false))})`);
+    check('the median is the replayed sample\'s, its dividends paid in',
+        (await markerText('median')) === `Median ${pctOneDecimal(median(returnsA))}` && pctOneDecimal(median(returnsA)) !== pctOneDecimal(median(sampleReturns(`${accountId}|${END}`, END, false))),
+        `${await markerText('median')} vs Median ${pctOneDecimal(median(returnsA))} (without dividends ${pctOneDecimal(median(sampleReturns(`${accountId}|${END}`, END, false)))})`);
+    const barTitles = await page.locator('#luck-or-skill [data-luck-bar] title').allTextContents();
+    const barTotal = barTitles.reduce((sum, t) => sum + Number(/: (\d+) portfolios?$/.exec(t.trim())?.[1] ?? NaN), 0);
+    check('the histogram draws the thousand as bars, their counts adding up to 1,000', barTitles.length >= 5 && barTotal === 1000, `${barTitles.length} bars, ${barTotal}`);
+    const placesA = await markerPlaces(returnsA, {spy: spyHold(END), median: median(returnsA)});
+    check('each marker sits on the axis at its value, the axis stretched to SPY below the sample', placesA.every((p) => p.ok), JSON.stringify(placesA));
     check('the luck panel has exactly one What these mean, and no link outside it',
         (await page.locator('#luck-or-skill [data-what-these-mean]').count()) === 1
             && (await page.locator('#luck-or-skill a').count()) === (await page.locator('#luck-or-skill [data-what-these-mean] a').count()));
@@ -347,30 +444,39 @@ try {
     await page.goto(`${BASE}/portfolio`, {waitUntil: 'load'});
     await page.locator('#luck-or-skill [data-luck-marker]').first().waitFor({timeout: 30000});
     const yoursB = (120_300 / 100_000 - 1) * 100;
-    const expectedB = `Your return landed ${landed(returnsA, yoursB)} random five-stock portfolios over the same ${sampleMatch?.[1]} trading days`;
+    const expectedB = `Your return landed ${landed(returnsA, yoursB)} random five-stock portfolios over the same ${SESSIONS} trading days`;
     check('the snapshot return lands where the replayed sample puts it', (await luckText()) === expectedB, `${await luckText()} | expected ${expectedB}`);
     check('…marked "You +20.3%" beside SPY and the median, with nothing withheld',
         (await markerText('you')) === 'You +20.3%' && (await page.locator('#luck-or-skill [data-luck-marker=you]').count()) === 1
             && (await page.locator('#luck-or-skill [data-testid=luck-withheld]').count()) === 0, await markerText('you'));
+    const placesB = await markerPlaces(returnsA, {you: yoursB, spy: spyHold(END), median: median(returnsA)});
+    check('…each of the three markers at its value on the axis', placesB.every((p) => p.ok), JSON.stringify(placesB));
     check('the copy places, never ranks', !/\bbeat|outperform|better|worse\b/i.test(await text('#luck-or-skill')), await text('#luck-or-skill'));
     await shot('08-luck-placed');
 
     // Case C: everything priced (no holdings), last snapshot a week before the last session → the
-    // portfolios end on the snapshot's date, and the sample is seeded from that window.
+    // portfolios end on the snapshot's session, the sample is seeded from that window, and the
+    // snapshot's return (+19.9%) sits near the sample's middle, where the share it lands above
+    // depends on the seed.
     const C_DATE = endRegion[endRegion.length - 6];
+    const C_END = sessionOnOrBefore(C_DATE);
     await db.collection('paperaccounts').updateOne({_id: account._id}, {$set: {positions: []}});
     await db.collection('accountsnapshots').deleteMany({accountId, date: {$gt: C_DATE}});
-    await db.collection('accountsnapshots').updateOne({accountId, date: C_DATE}, {$set: {accountId, userId, date: C_DATE, totalValue: 108_100, cash: 108_100, holdingsValue: 0, startingBalance: 100_000}}, {upsert: true});
+    await db.collection('accountsnapshots').updateOne({accountId, date: C_DATE}, {$set: {accountId, userId, date: C_DATE, totalValue: 119_900, cash: 119_900, holdingsValue: 0, startingBalance: 100_000}}, {upsert: true});
     await page.goto(`${BASE}/portfolio`, {waitUntil: 'load'});
     await page.locator('#luck-or-skill [data-luck-marker]').first().waitFor({timeout: 30000});
     const lineC = await luckText();
     const matchC = /^Your return landed (.+) random five-stock portfolios over the same (\d+) trading days$/.exec(lineC);
-    const returnsC = sampleReturns(`${accountId}|${C_DATE}`);
+    const returnsC = sampleReturns(`${accountId}|${C_END}`, C_END);
+    const yoursC = (119_900 / 100_000 - 1) * 100;
     check('with every holding priced, the window ends on the last snapshot\'s date',
-        (await text('#luck-or-skill [data-testid=luck-window]')).endsWith(`valued at the ${short(C_DATE)} close`) && Number(matchC?.[2]) < Number(sampleMatch?.[1]),
-        `${await text('#luck-or-skill [data-testid=luck-window]')} | ${lineC}`);
-    check('…and places the snapshot return in that window\'s sample', matchC?.[1] === landed(returnsC, (108_100 / 100_000 - 1) * 100) && (await markerText('you')) === 'You +8.1%',
-        `${lineC} | expected ${landed(returnsC, (108_100 / 100_000 - 1) * 100)}`);
+        (await text('#luck-or-skill [data-testid=luck-window]')) === windowLineFor(C_END) && Number(matchC?.[2]) === sessionsBetween(START, C_END),
+        `${await text('#luck-or-skill [data-testid=luck-window]')} | ${lineC} | expected ${sessionsBetween(START, C_END)} days`);
+    check('…and places the snapshot return in the sample seeded from that window', matchC?.[1] === landed(returnsC, yoursC) && (await markerText('you')) === 'You +19.9%',
+        `${lineC} | expected ${landed(returnsC, yoursC)}; seeded from the last session it would be ${landed(sampleReturns(`${accountId}|${END}`, C_END), yoursC)}`);
+    check('…beside that sample\'s median and SPY over the same days',
+        (await markerText('median')) === `Median ${pctOneDecimal(median(returnsC))}` && (await markerText('spy')) === `SPY ${pctOneDecimal(spyHold(C_END))}`,
+        `${await markerText('median')} · ${await markerText('spy')} vs Median ${pctOneDecimal(median(returnsC))} · SPY ${pctOneDecimal(spyHold(C_END))}`);
     await shot('09-luck-stale-snapshot');
 
     // Case D: the same account with none of its fills placed by the learner (as the AI
@@ -393,11 +499,14 @@ try {
         await db.collection('papertrades').updateMany({_id: {$in: ownFillIds}}, {$set: {source: 'user'}});
     }
 
-    // --- trading habits: three closed lots of the learner's own, and a strategy fill ignored -----
+    // --- trading habits: four closed lots of the learner's own, and a strategy fill ignored ------
     // Closed: SPY (the round trip above, minutes long, a winner), AAPL (5 days, a winner), MSFT
-    // (10 days, a loser). Open: QALRN, no quote. A strategy's NVDA round trip must not count.
+    // (10 days, a loser), IBM (10 days, a loser, sold 35 days ago: before the 30-day window).
+    // Open: QALRN, no quote. A strategy's NVDA round trip must not count.
     const daysAgo = (n) => new Date(Date.now() - n * 86_400_000);
     await db.collection('papertrades').insertMany([
+        {userId, accountId, symbol: 'IBM', company: 'IBM', side: 'buy', quantity: 5, price: 100, total: 500, source: 'user', createdAt: daysAgo(45)},
+        {userId, accountId, symbol: 'IBM', company: 'IBM', side: 'sell', quantity: 5, price: 90, total: 450, realizedPnl: -50, source: 'user', createdAt: daysAgo(35)},
         {userId, accountId, symbol: 'AAPL', company: 'Apple Inc', side: 'buy', quantity: 10, price: 100, total: 1000, source: 'user', createdAt: daysAgo(20)},
         {userId, accountId, symbol: 'MSFT', company: 'Microsoft', side: 'buy', quantity: 10, price: 200, total: 2000, source: 'user', createdAt: daysAgo(18)},
         {userId, accountId, symbol: 'AAPL', company: 'Apple Inc', side: 'sell', quantity: 10, price: 120, total: 1200, realizedPnl: 200, source: 'user', createdAt: daysAgo(15)},
@@ -410,10 +519,10 @@ try {
     const habitTile = async (id) => text(`#trading-habits [data-testid=${id}]`);
     // Distinct ET dates of the learner's seven fills: today's three and four earlier days.
     const userDays = new Set([etDate(), ...[20, 18, 15, 8].map((n) => etDate(daysAgo(n)))]).size;
-    check('habits count only the learner\'s own fills (the strategy round trip is left out)',
+    check('habits count only the learner\'s own fills in the last 30 days (the strategy round trip and the sale 35 days ago left out)',
         new RegExp(`7 fills on ${userDays} days`).test(await habitTile('habits-pace')) && /in the last 30 days/.test(await habitTile('habits-pace')), await habitTile('habits-pace'));
     check('hold time: winners a median of 3 days, losers 10', /winners 3 days · losers 10 days/.test(await habitTile('habits-hold'))
-        && /median of 2 winning lots and 1 losing lot sold/.test(await habitTile('habits-hold')), await habitTile('habits-hold'));
+        && /median of 2 winning lots and 2 losing lots sold/.test(await habitTile('habits-hold')), await habitTile('habits-hold'));
     const soldTile = await habitTile('habits-sold');
     const soldShares = /sold (\d+)% of winners · (\d+)% of losers/.exec(soldTile);
     const soldCounts = /(\d+) of (\d+) lots? up · (\d+) of (\d+) lots? down/.exec(soldTile);
@@ -424,25 +533,29 @@ try {
     check('the open lot with no quote is left out, said once', (await text('#trading-habits [data-testid=habits-unpriced]')) === '1 open lot without a live quote left out of winners and losers');
     const turnoverTile = await habitTile('habits-turnover');
     const turnover = /\$([\d,]+\.\d{2})\s+(\d+)% of the \$([\d,]+\.\d{2}) starting balance, same days/.exec(turnoverTile);
-    check('shares sold: $5,750.00, and the printed share reproduces from the two amounts',
+    check('shares sold in the window: $5,750.00 (not the $450.00 sale 35 days ago), and the printed share reproduces from the two amounts',
         turnover !== null && turnover[1] === '5,750.00'
             && Number(turnover[2]) === Math.round(Number(turnover[1].replace(/,/g, '')) / Number(turnover[3].replace(/,/g, '')) * 100), turnoverTile);
     check('no quote, no "had you held" tile', (await page.locator('#trading-habits [data-testid=habits-held]').count()) === 0);
-    check('the pace sits beside the catalog\'s cadences only',
-        /^Beside the strategies' clocks: 3 daily rules on any of these \d+ sessions · 3 monthly rules on 1 day a month · 1 quarterly rule on 1 day a quarter · 1 buy-once rule on its first day only$/.test(await text('#trading-habits [data-testid=habits-cadence]')),
-        await text('#trading-habits [data-testid=habits-cadence]'));
+    // The window's NYSE sessions: from the ET date 30 days back through today, both included.
+    let paceSessions = 0;
+    for (let d = etDate(daysAgo(30)); d <= etDate(); d = addDays(d, 1)) if (isTradingDay(d)) paceSessions += 1;
+    check('the pace sits beside the catalog\'s cadences only, over the window\'s NYSE sessions counted here',
+        (await text('#trading-habits [data-testid=habits-cadence]')) === `Beside the strategies' clocks: 3 daily rules on any of these ${paceSessions} sessions · 3 monthly rules on 1 day a month · 1 quarterly rule on 1 day a quarter · 1 buy-once rule on its first day only`,
+        `${await text('#trading-habits [data-testid=habits-cadence]')} | expected ${paceSessions} sessions`);
     check('the habits panel has one What these mean, holding every link', (await page.locator('#trading-habits [data-what-these-mean]').count()) === 1
         && (await page.locator('#trading-habits a').count()) === (await page.locator('#trading-habits [data-what-these-mean] a').count()));
     await page.locator('#trading-habits [data-what-these-mean]').evaluate((d) => { d.open = true; });
     const habitsDefs = await text('#trading-habits [data-what-these-mean]');
     check('…whose definitions name the jargon the tiles avoid', /Disposition effect/.test(habitsDefs) && /Turnover/.test(habitsDefs) && /Time held/.test(habitsDefs), habitsDefs.slice(0, 300));
     await shot('10-trading-habits');
-    await db.collection('pricebars').deleteMany({qaLuck: true});
+    await restoreLuck();
 } catch (err) {
     failures++;
     console.log(`FAIL  threw: ${err.message}`);
     await shot('99-error').catch(() => {});
 } finally {
+    await restoreLuck().catch(() => {});
     await mongo.close().catch(() => {});
     await browser.close();
 }

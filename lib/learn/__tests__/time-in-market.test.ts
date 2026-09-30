@@ -45,6 +45,32 @@ const noRate = makeRateLookup([]);
 const AMOUNT = 10_000;
 const cents = (x: number) => Math.round(x * 100);
 
+// The same ways by hand, off the clock: 4.07% discount → bond-equivalent − 0.25%, compounded
+// once per calendar day, the day's interest counted in that day's value.
+const F = (1 + (365 * 0.0407 / (360 - 91 * 0.0407) - 0.0025)) ** (1 / 365) - 1;
+const daysBetween = (a: string, b: string) => Math.round((Date.parse(`${b}T12:00:00Z`) - Date.parse(`${a}T12:00:00Z`)) / 86_400_000);
+// Cash only: the amount compounding every calendar day of the window, the first and last included.
+const cashByHand = (start: string, end: string) => AMOUNT * (1 + F) ** (daysBetween(start, end) + 1);
+// Monthly deposits on the V: each buys SPY at the close of the first session on or after it;
+// one that lands on a weekend earns interest until Monday, and that interest stays as cash.
+const dcaByHand = (start: string, end: string): WayPoint[] => {
+    const sessions = INDEX.filter((p) => p.date >= start && p.date <= end);
+    const buys = monthlyDeposits(start, end, AMOUNT).map((deposit) => {
+        const session = sessions.find((p) => p.date >= deposit.date);
+        if (!session) throw new Error(`no session after ${deposit.date}`);
+        return {deposit, session: session.date, shares: deposit.amount / session.value, idle: deposit.amount * ((1 + F) ** daysBetween(deposit.date, session.date) - 1)};
+    });
+    return sessions.map((p) => {
+        const made = buys.filter((b) => b.deposit.date <= p.date);
+        return {
+            date: p.date,
+            value: made.reduce((sum, b) => sum + b.shares * p.value + b.idle * (1 + F) ** (daysBetween(b.session, p.date) + 1), 0),
+            contributed: made.reduce((sum, b) => sum + b.deposit.amount, 0),
+        };
+    });
+};
+const pctOfPutIn = (value: number) => (cents(value) - cents(AMOUNT)) / cents(AMOUNT) * 100;
+
 describe('resolveStart', () => {
     const today = '2026-09-29';
     const floor = addCalendarDays(today, -MAX_LOOKBACK_DAYS);
@@ -73,6 +99,11 @@ describe('resolveStart', () => {
 
     it('starts a year back when there is no account to date it from', () => {
         expect(resolveStart({requested: undefined, inception: null, today})).toMatchObject({from: '2025-09-29', source: 'fallback'});
+    });
+
+    it('moves an inception older than the stored history up to the floor, and says nothing is out of range', () => {
+        expect(resolveStart({requested: undefined, inception: '2020-01-02', today})).toEqual({from: floor, source: 'inception', outOfRange: null, floor, ceiling});
+        expect(resolveStart({requested: 'abc', inception: '2020-01-02', today})).toMatchObject({from: floor, source: 'inception'});
     });
 });
 
@@ -203,6 +234,18 @@ describe('dollarCostAverage', () => {
         expect(dollarCostAverage(SPY, window, AMOUNT, rateOn)?.points).toEqual(lumpSum(SPY, window, AMOUNT, rateOn)?.points);
     });
 
+    it('is the deposits\' shares at each close plus the weekend interest they earned, session by session', () => {
+        const series = dollarCostAverage(SPY, {start: PEAK, end: END}, AMOUNT, rateOn);
+        const byHand = dcaByHand(PEAK, END);
+        expect(series?.points.map((p) => p.date)).toEqual(byHand.map((p) => p.date));
+        series?.points.forEach((p, i) => {
+            expect(Math.abs(p.value - byHand[i].value), p.date).toBeLessThan(1e-6);
+            expect(cents(p.contributed), p.date).toBe(cents(byHand[i].contributed));
+        });
+        // A weekend deposit did wait: the residual interest is in the hand count.
+        expect(monthlyDeposits(PEAK, END, AMOUNT).some((d) => !isWeekday(d.date))).toBe(true);
+    });
+
     it('needs a rate only on a day it holds cash: weekday deposits never sit idle, a weekend one does', () => {
         // Jan 6, Feb 6 and Mar 6 are all weekdays — nothing waits overnight.
         expect(dollarCostAverage(SPY, {start: '2025-01-06', end: '2025-03-31'}, AMOUNT, noRate)).not.toBeNull();
@@ -224,6 +267,12 @@ describe('underwaterSpans', () => {
         expect(underwaterSpans([pt('d1', 100), pt('d2', 101)])).toEqual([]);
         expect(underwaterSpans([])).toEqual([]);
     });
+
+    it('is not the drawdown: off its own high but above what went in is not underwater', () => {
+        expect(underwaterSpans([pt('d1', 100), pt('d2', 110), pt('d3', 105), pt('d4', 100.01)])).toEqual([]);
+        // …and a deposit that lifts what went in can put the same value under it.
+        expect(underwaterSpans([pt('d1', 110), pt('d2', 105, 150), pt('d3', 160, 150)]).map((s) => [s.from, s.sessions])).toEqual([['d2', 1]]);
+    });
 });
 
 describe('summarizeWay', () => {
@@ -234,6 +283,23 @@ describe('summarizeWay', () => {
             longest: {from: 'd2', to: 'd2', sessions: 1, ongoing: false, deepestPct: (90.004 / 150 - 1) * 100},
         });
         expect(summarizeWay(null)).toBeNull();
+    });
+
+    it('adds every span into the day count and names the longest, wherever it falls', () => {
+        const deposits = [{date: 'd1', amount: 100}];
+        const longerFirst = summarizeWay({points: [pt('d1', 100), pt('d2', 99), pt('d3', 98), pt('d4', 97), pt('d5', 101), pt('d6', 99), pt('d7', 102)], deposits});
+        expect(longerFirst).toMatchObject({underwaterSessions: 4, sessions: 7, longest: {from: 'd2', to: 'd4', sessions: 3, ongoing: false}});
+        const longerLast = summarizeWay({points: [pt('d1', 100), pt('d2', 99), pt('d3', 101), pt('d4', 98), pt('d5', 97), pt('d6', 96), pt('d7', 95)], deposits});
+        expect(longerLast).toMatchObject({underwaterSessions: 5, longest: {from: 'd4', to: 'd7', sessions: 4, ongoing: true}});
+    });
+
+    it('counts the monthly way\'s days below the dollars deposited so far, by hand', () => {
+        const byHand = dcaByHand(PEAK, END);
+        const below = byHand.filter((p) => cents(p.value) < cents(p.contributed)).length;
+        const summary = summarizeWay(dollarCostAverage(SPY, {start: PEAK, end: END}, AMOUNT, rateOn));
+        expect(below).toBeGreaterThan(0);
+        expect(summary?.underwaterSessions).toBe(below);
+        expect(summary?.sessions).toBe(byHand.length);
     });
 
     it('reads the V differently from its peak and from its low', () => {
@@ -255,12 +321,30 @@ describe('startDateTable', () => {
     it('runs the three ways from each start the stored history reaches, to the same end', () => {
         const rows = startDateTable(SPY, rateOn, tableStarts('2025-12-31'), AMOUNT);
         expect(rows.map((r) => r.start)).toEqual(['2025-09-30', '2025-06-30', '2025-03-31']);
+        const ways = {lumpSum, dollarCostAverage, cashOnly};
         for (const row of rows) {
-            const lump = summarizeWay(lumpSum(SPY, {start: row.start, end: END}, AMOUNT, rateOn));
-            expect(row.ways.lumpSum).toBe((lump?.changeCents ?? NaN) / (lump?.contributedCents ?? NaN) * 100);
-            expect(row.ways.cashOnly).not.toBeNull();
+            for (const key of ['lumpSum', 'dollarCostAverage', 'cashOnly'] as const) {
+                const way = summarizeWay(ways[key](SPY, {start: row.start, end: END}, AMOUNT, rateOn));
+                expect(row.ways[key], `${row.start} ${key}`).toBe((way?.changeCents ?? NaN) / (way?.contributedCents ?? NaN) * 100);
+            }
+            // Each column by hand: the closes' ratio, the deposits' shares plus weekend interest,
+            // and cash compounding every calendar day.
+            expect(row.ways.lumpSum).toBeCloseTo(pctOfPutIn(AMOUNT * vShape(DATES.length - 1) / vShape(DATES.indexOf(row.start))), 9);
+            expect(row.ways.dollarCostAverage).toBeCloseTo(pctOfPutIn(dcaByHand(row.start, END).at(-1)?.value ?? NaN), 9);
+            expect(row.ways.cashOnly).toBeCloseTo(pctOfPutIn(cashByHand(row.start, END)), 9);
         }
+        // The three columns are three different numbers on the V.
+        expect(new Set(Object.values(rows[1].ways)).size).toBe(3);
         expect(startDateTable(SPY, noRate, ['2025-06-30'], AMOUNT)[0].ways.cashOnly).toBeNull();
+    });
+
+    it('starts each row at the first session on or after its date, once per session', () => {
+        // Sat Sep 27 and Sun Sep 28 both open on Mon Sep 29; a start before the first stored close
+        // and one on the last are left out.
+        const rows = startDateTable(SPY, rateOn, ['2025-09-27', '2025-09-28', '2025-09-29', '2024-12-31', END], AMOUNT);
+        expect(rows.map((r) => r.start)).toEqual(['2025-09-29']);
+        expect(rows[0].ways.lumpSum).toBeCloseTo(pctOfPutIn(AMOUNT * vShape(DATES.length - 1) / vShape(DATES.indexOf('2025-09-29'))), 9);
+        expect(startDateTable(SPY, rateOn, ['2025-06-28', '2025-03-29'], AMOUNT).map((r) => r.start)).toEqual(['2025-06-30', '2025-03-31']);
     });
 });
 
@@ -286,10 +370,13 @@ describe('buildTimeInMarket', () => {
             expect(line.values).toHaveLength(view.chart.dates.length);
             expect(line.values[0]).toBeCloseTo(1, 3);
         }
-        // The last charted value is the way's own last session, as the tiles print it.
-        const [lump, , cash] = view.chart.lines;
+        // The last charted value is the way's own last session, as the tiles print it: for the
+        // monthly way, its end over the dollars it took in — never rebased to its first deposit.
+        const [lump, dca, cash] = view.chart.lines;
         expect(lump.values.at(-1)).toBeCloseTo(vShape(DATES.length - 1) / vShape(60), 6);
         expect(cash.values.at(-1)).toBeCloseTo((view.ways.cashOnly?.endCents ?? NaN) / 100 / AMOUNT, 6);
+        expect(dca.values.at(-1)).toBeCloseTo((view.ways.dollarCostAverage?.endCents ?? NaN) / (view.ways.dollarCostAverage?.contributedCents ?? NaN), 5);
+        expect(dca.values.at(-1)).toBeCloseTo((dcaByHand(PEAK, END).at(-1)?.value ?? NaN) / AMOUNT, 5);
         // …and a charted session carries that session's value, not a neighbour's.
         const k = 97;
         expect(lump.values[k]).toBeCloseTo(vShape(DATES.indexOf(view.chart.dates[k])) / vShape(60), 6);
@@ -302,6 +389,11 @@ describe('buildTimeInMarket', () => {
         expect(view.ways.cashOnly).toBeNull();
         expect(view.ways.lumpSum).not.toBeNull();
         expect(view.chart.lines.map((l) => l.key)).not.toContain('cashOnly');
+        // The monthly way keeps a weekend deposit's interest as cash through the gap: however
+        // little it holds, a day with cash and no rate is unpriced, never a zero.
+        expect(monthlyDeposits(PEAK, END, AMOUNT).some((d) => d.date < '2025-06-02' && !isWeekday(d.date))).toBe(true);
+        expect(view.ways.dollarCostAverage).toBeNull();
+        expect(view.chart.lines.map((l) => l.key)).toEqual(['lumpSum']);
         // The last point before the gap is Fri May 30; usableRate carries it seven days, through Jun 6.
         expect(view.rateGap).toBe('2025-06-07');
     });
