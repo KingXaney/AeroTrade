@@ -1,7 +1,8 @@
 // What the chat's explainTerm tool hands the model. The tool resolves the term with the
-// glossary's one resolver (resolveTerm), decodes a strategy reason with decodeReason, and
-// reads the learner's own figure through lib/ai/learner-hooks.ts; this module only shapes
-// those results. Pure and import-light so the shape is unit-tested.
+// glossary's one resolver (resolveTerm), decodes a quoted reason with decodeQuotedReason —
+// a quant strategy's grammar or the AI Navigator's — and reads the learner's own figure
+// through lib/ai/learner-hooks.ts; this module only shapes those results. Pure and
+// import-light so the shape is unit-tested.
 //
 // The output is data for the model, never text for the page (invariant 4): definitions
 // come verbatim from lib/learn/glossary.ts, every call carries the same stance line, and
@@ -9,7 +10,7 @@
 // free text a reader happened to return (a trade note above all) can reach the model.
 
 import {lookupTerm, type GlossaryEntry, type GlossaryKind} from '@/lib/learn/glossary';
-import type {DecodedReason} from '@/lib/learn/reasons';
+import {decodeNavigatorReason, decodeReason, type DecodedReason} from '@/lib/learn/reasons';
 import {MAX_PAPER_ACCOUNTS} from '@/lib/constants';
 
 export const EXPLAIN_STANCE =
@@ -32,11 +33,16 @@ export type LearnerFigure = number | boolean | string | null;
 export type LearnerAccountValue = {account: string; figures: Readonly<Record<string, LearnerFigure>>};
 export type LearnerValue = {accounts: readonly LearnerAccountValue[]};
 
+// Which engine wrote a reason: a quant strategy or the AI Navigator.
+export type ReasonWriter = 'strategy' | 'navigator';
+
 export type ExplainParts = {
     term?: string;
     reason?: string;
     entry: GlossaryEntry | null;
     decoded: DecodedReason | null;
+    // The grammar that decoded it; null or absent when neither did.
+    writer?: ReasonWriter | null;
     yours: LearnerValue | null;
 };
 
@@ -57,7 +63,7 @@ export type ExplainReason = {clauses: ExplainClause[]; unrecognised: string[]};
 export type ExplainResult = {
     stance: string;
     entry: ExplainEntry | null;
-    reason: ExplainReason | null;
+    reason: (ExplainReason & {writer?: ReasonWriter}) | null;
     yours: {paper: true; accounts: LearnerAccountValue[]} | null;
     notes: string[];
 };
@@ -113,7 +119,25 @@ export const shapeReason = (decoded: DecodedReason): ExplainReason => ({
     unrecognised: decoded.unknown.map((text) => echoText(text, MAX_ECHO_CHARS)),
 });
 
-export const shapeExplain = ({term, reason, entry, decoded, yours}: ExplainParts): ExplainResult => {
+const DECODERS: Record<ReasonWriter, (reason: string) => DecodedReason> = {
+    strategy: (reason) => decodeReason(reason),
+    navigator: decodeNavigatorReason,
+};
+
+// A quoted reason, read by the grammar of whoever wrote it. The two engines share one shape
+// ("rebalance +3.8% drift toward 12.0% target") under different bands, so a `hint` from the
+// caller goes first; without one the strategies' grammar does. The other grammar reads only
+// what the first leaves whole, so a wrong hint still decodes. Both decoders keep their own
+// length guard (MAX_REASON_CHARS) and never build a RegExp from the text (invariant 2).
+export const decodeQuotedReason = (reason: string, hint?: ReasonWriter): {decoded: DecodedReason; writer: ReasonWriter | null} => {
+    const order: ReasonWriter[] = hint === 'navigator' ? ['navigator', 'strategy'] : ['strategy', 'navigator'];
+    const [first, second] = order.map((writer) => ({writer, decoded: DECODERS[writer](reason)}));
+    if (first.decoded.clauses.length > 0) return first;
+    if (second.decoded.clauses.length > 0) return second;
+    return {decoded: first.decoded, writer: null};
+};
+
+export const shapeExplain = ({term, reason, entry, decoded, writer, yours}: ExplainParts): ExplainResult => {
     const askedTerm = hasText(term);
     const askedReason = hasText(reason);
     const notes: string[] = [];
@@ -122,8 +146,9 @@ export const shapeExplain = ({term, reason, entry, decoded, yours}: ExplainParts
     const shapedEntry = askedTerm && entry ? shapeEntry(entry) : null;
     if (askedTerm && !shapedEntry) notes.push(EXPLAIN_NOTES.noEntry);
 
+    const decodedReason = decoded ?? {clauses: [], unknown: [reason ?? '']};
     const shapedReason = askedReason
-        ? shapeReason(decoded ?? {clauses: [], unknown: [reason]})
+        ? {...(writer && decodedReason.clauses.length > 0 ? {writer} : {}), ...shapeReason(decodedReason)}
         : null;
     if (shapedReason && shapedReason.clauses.length === 0) notes.push(EXPLAIN_NOTES.undecoded);
 

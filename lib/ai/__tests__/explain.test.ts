@@ -1,20 +1,28 @@
 // The explainTerm tool's output is data for the model, shaped here and nowhere else: the
 // glossary entry resolveTerm found, the decoded reason, the learner's own figures and one
 // constant stance line. These tests drive the shaper through the same resolver and decoder
-// the tool calls, so a definition can only come from lib/learn/glossary.ts.
+// choice the tool makes, so a definition can only come from lib/learn/glossary.ts.
 
 import {describe, expect, it} from 'vitest';
-import {EXPLAIN_NOTES, EXPLAIN_STANCE, MAX_ECHO_CHARS, shapeExplain, type LearnerValue} from '@/lib/ai/explain';
+import {
+    decodeQuotedReason,
+    EXPLAIN_NOTES,
+    EXPLAIN_STANCE,
+    MAX_ECHO_CHARS,
+    shapeExplain,
+    type LearnerValue,
+    type ReasonWriter,
+} from '@/lib/ai/explain';
 import {GLOSSARY, resolveTerm} from '@/lib/learn/glossary';
-import {decodeReason} from '@/lib/learn/reasons';
+import {decodeNavigatorReason, decodeReason, MAX_REASON_CHARS} from '@/lib/learn/reasons';
 import {findBanned} from '@/lib/learn/banned';
 import {MAX_PAPER_ACCOUNTS} from '@/lib/constants';
 
-// What the tool does with its two inputs, minus the database read.
-const explain = (input: {term?: string; reason?: string}, yours: LearnerValue | null = null) => {
+// What the tool does with its inputs, minus the database read.
+const explain = (input: {term?: string; reason?: string; writer?: ReasonWriter}, yours: LearnerValue | null = null) => {
     const entry = input.term ? resolveTerm(input.term) : null;
-    const decoded = input.reason ? decodeReason(input.reason) : null;
-    return shapeExplain({...input, entry, decoded, yours: entry ? yours : null});
+    const quoted = input.reason ? decodeQuotedReason(input.reason, input.writer) : null;
+    return shapeExplain({term: input.term, reason: input.reason, entry, decoded: quoted?.decoded ?? null, writer: quoted?.writer ?? null, yours: entry ? yours : null});
 };
 
 const GOLDEN_CROSS = 'enter: SMA50 42.10 > SMA200 40.00 (+5.3%)';
@@ -83,6 +91,7 @@ describe('shapeExplain', () => {
         expect(out.reason?.clauses[0]).not.toHaveProperty('term');
         expect(out.reason?.clauses[1]).toMatchObject({term: GLOSSARY['trend-on'].term, definition: GLOSSARY['trend-on'].short});
         expect(out.reason?.clauses[2]).toMatchObject({term: GLOSSARY.spread.term, definition: GLOSSARY.spread.short});
+        expect(out.reason?.writer).toBe('strategy');
         expect(out.notes).toEqual([]);
     });
 
@@ -110,6 +119,79 @@ describe('shapeExplain', () => {
             expect(out.reason).toBeNull();
             expect(out.notes).toEqual([EXPLAIN_NOTES.nothingAsked]);
         }
+    });
+});
+
+// The AI Navigator writes its own reasons (getAiSuggestions hands them to the model), in a
+// grammar of its own; the strategies' grammar reads a quoted reason first and the Navigator's
+// reads what it leaves whole, unless the caller says who wrote it.
+describe('decodeQuotedReason — strategy or Navigator', () => {
+    const NAV_NEWS = 'slow news weight 3.2 (rank 4/59)';
+    const NAV_NEUTRAL = 'no brain coverage — news neutral';
+    const NAV_ENTER = 'enter: score 0.42';
+    const SHARED = 'rebalance +3.8% drift toward 12.0% target';
+
+    it('reads a strategy reason with the strategies\' grammar', () => {
+        const out = decodeQuotedReason(GOLDEN_CROSS);
+        expect(out.writer).toBe('strategy');
+        expect(out.decoded).toEqual(decodeReason(GOLDEN_CROSS));
+    });
+
+    it('reads a Navigator reason the strategies\' grammar leaves whole', () => {
+        for (const reason of [NAV_NEWS, NAV_NEUTRAL, NAV_ENTER, 'exit: thesis broken', 'holding — no exit trigger']) {
+            expect(decodeReason(reason).clauses, reason).toEqual([]);
+            const out = decodeQuotedReason(reason);
+            expect(out.writer, reason).toBe('navigator');
+            expect(out.decoded, reason).toEqual(decodeNavigatorReason(reason));
+            expect(out.decoded.clauses.length, reason).toBeGreaterThan(0);
+        }
+    });
+
+    it('leaves garbage unrecognised, whole', () => {
+        for (const reason of ['bought on a hunch', '(.*)+[', 'rebalance lots']) {
+            const out = decodeQuotedReason(reason);
+            expect(out.writer, reason).toBeNull();
+            expect(out.decoded, reason).toEqual({clauses: [], unknown: [reason]});
+        }
+    });
+
+    it('reads a shape both engines write by the hint, the strategies\' band without one', () => {
+        expect(decodeQuotedReason(SHARED).writer).toBe('strategy');
+        expect(decodeQuotedReason(SHARED).decoded).toEqual(decodeReason(SHARED));
+        expect(decodeQuotedReason(SHARED, 'strategy').decoded).toEqual(decodeReason(SHARED));
+        const nav = decodeQuotedReason(SHARED, 'navigator');
+        expect(nav.writer).toBe('navigator');
+        expect(nav.decoded).toEqual(decodeNavigatorReason(SHARED));
+        expect(nav.decoded).not.toEqual(decodeReason(SHARED));
+    });
+
+    it('falls back to the other grammar when the hint names the wrong writer', () => {
+        expect(decodeQuotedReason(GOLDEN_CROSS, 'navigator')).toEqual({writer: 'strategy', decoded: decodeReason(GOLDEN_CROSS)});
+        expect(decodeQuotedReason(NAV_ENTER, 'strategy')).toEqual({writer: 'navigator', decoded: decodeNavigatorReason(NAV_ENTER)});
+    });
+
+    it('keeps the decoders\' length guard: an overlong reason is not read at all', () => {
+        const stale = `12/40 symbols stale: ${'ABC, '.repeat(120)}`;
+        expect(stale.length).toBeGreaterThan(MAX_REASON_CHARS);
+        const out = decodeQuotedReason(stale);
+        expect(out.writer).toBeNull();
+        expect(out.decoded.clauses).toEqual([]);
+    });
+
+    it('hands the model the Navigator\'s clauses with the glossary\'s definitions', () => {
+        const out = explain({reason: NAV_NEWS});
+        expect(out.reason?.writer).toBe('navigator');
+        expect(out.reason?.unrecognised).toEqual([]);
+        expect(out.reason?.clauses[0]).toMatchObject({text: 'slow news weight 3.2', term: GLOSSARY['news-weight'].term, definition: GLOSSARY['news-weight'].short});
+        expect(out.notes).toEqual([]);
+
+        const neutral = explain({reason: NAV_NEUTRAL});
+        expect(neutral.reason?.clauses).toHaveLength(1);
+        expect(neutral.reason?.clauses[0].text).toBe(NAV_NEUTRAL);
+
+        const hunch = explain({reason: 'bought on a hunch', writer: 'navigator'});
+        expect(hunch.reason).toEqual({clauses: [], unrecognised: ['bought on a hunch']});
+        expect(hunch.notes).toEqual([EXPLAIN_NOTES.undecoded]);
     });
 });
 
