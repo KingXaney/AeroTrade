@@ -49,8 +49,12 @@ it runs only the page checks),
 portfolio surfaces on a seeded account: a fresh account's empty states first, then seeded
 snapshots, a sell, an unpriced holding and income totals for the dated drawdown and its shaded
 band, the return bridge's guess and lines that add up to the Total Return tile to the cent, the
-risk lens, buy notes under the sell, fill receipts, `/trade`'s Last fill and a receipt per
-income month), `qa-tutor.mjs` (the
+risk lens, buy notes under the sell, fill receipts, `/trade`'s Last fill, a receipt per
+income month, Luck or skill — edge closes seeded for the 40 large caps and the seeded sample
+replayed in the script, so the printed rank, SPY and the median are checked against numbers
+computed outside the app; the marker withheld with an unpriced holding, placed from a snapshot on
+the last session, and ended on a stale snapshot's date — and Trading habits over three closed
+lots with a strategy round trip left out; it removes the large-cap bars it seeded), `qa-tutor.mjs` (the
 chat's three rate-limit windows via seeded `ratelimits` rows, the prefill, then the `explainTerm`
 chip from a stubbed UI-message stream — the tutor's answers themselves need a Gemini key and are
 checked by hand)

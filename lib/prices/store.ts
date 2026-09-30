@@ -20,6 +20,7 @@ import {
 } from "@/lib/prices/config";
 import {delay, getEasternDateString} from "@/lib/utils";
 import {previousTradingDay} from "@/lib/prices/market-hours";
+import {addCalendarDays} from "@/lib/prices/calendar-days";
 
 export type EnsureBarsOptions = {
     limit?: number;
@@ -251,6 +252,37 @@ export const getDividendPoints = async (symbols: string[], from: string, to: str
         {_id: 0, symbol: 1, date: 1, dividend: 1},
     ).sort({date: 1}).lean<{symbol: string; date: string; dividend: number}[]>();
     return bars.map((bar) => ({symbol: bar.symbol, exDate: bar.date, perShare: bar.dividend}));
+};
+
+// A buy-at-`from`, sell-at-`to` hold needs only two closes per symbol and the dividends paid in
+// between: the bars dated exactly `from` and `to` (the unique {symbol, date} index, at most two
+// documents a symbol) and the dividend rows with ex-dates after `from` through `to` (the partial
+// dividend index, via getDividendPoints). Never the bars in between. `from` and `to` are
+// sessions; a symbol with no bar on either one is simply missing from `bars`.
+export const getHoldWindowBars = async (
+    symbols: string[],
+    from: string,
+    to: string,
+): Promise<{bars: {symbol: string; date: string; close: number}[]; dividends: DividendPoint[]}> => {
+    const unique = Array.from(new Set(symbols.map((s) => s.toUpperCase()))).filter(Boolean);
+    if (unique.length === 0 || from > to) return {bars: [], dividends: []};
+    await connectToDatabase();
+    const [bars, dividends] = await Promise.all([
+        PriceBar.find({symbol: {$in: unique}, date: {$in: [from, to]}}, {_id: 0, symbol: 1, date: 1, close: 1})
+            .lean<{symbol: string; date: string; close: number}[]>(),
+        getDividendPoints(unique, addCalendarDays(from, 1), to),
+    ]);
+    return {bars, dividends};
+};
+
+// The latest stored bar date for a symbol on or before `onOrBefore` — the last session the
+// price job has stored. One point read on the unique index.
+export const getLatestBarDate = async (symbol: string, onOrBefore: string): Promise<string | null> => {
+    await connectToDatabase();
+    const bar = await PriceBar.findOne({symbol: symbol.toUpperCase(), date: {$lte: onOrBefore}}, {_id: 0, date: 1})
+        .sort({date: -1})
+        .lean<{date: string} | null>();
+    return bar?.date ?? null;
 };
 
 // The stored T-bill series as rate points (a discount yield, annualised %). The jobs read it
