@@ -1,7 +1,8 @@
 // Copy for "Time in the market". Every sentence is rendered on a grid of inputs and held to the
 // 'copy' tier of lib/learn/banned.ts. The tiles are parsed back from what they print: worth at
-// the end minus put in is the printed change to the cent, and the printed percentage is that
-// change over that put-in — on hand-picked cents and on the ways the pure module computes.
+// the end minus the amount the window line states is the printed change to the cent, and the
+// printed percentage is that change over that amount — on hand-picked cents and on the ways the
+// pure module computes. The amount is stated once, in the window line.
 
 import {describe, expect, it} from 'vitest';
 import {findBanned} from '@/lib/learn/banned';
@@ -11,6 +12,8 @@ import {
     cashOnly,
     dollarCostAverage,
     lumpSum,
+    MAX_LOOKBACK_DAYS,
+    MIN_WINDOW_DAYS,
     summarizeWay,
     WAY_KEYS,
     type StartSource,
@@ -35,12 +38,19 @@ const summary = (contributedCents: number, endCents: number, patch: Partial<WayS
     contributedCents, endCents, changeCents: endCents - contributedCents, deposits: 12, sessions: 250, underwaterSessions: 0, longest: null, ...patch,
 });
 
-// What a reader can check with a pencil: the printed numbers, parsed back.
-const expectTilesAddUp = (tiles: ReturnType<typeof wayTiles>) => {
+// The amount the window line states, in cents: "$10,000 each way · …" or "$12,345.67 each way · …".
+const windowAmount = (line: string): number => {
+    const match = /^\$([\d,]+(?:\.\d{2})?) each way · /.exec(line);
+    if (!match) throw new Error(`no amount: ${line}`);
+    return Math.round(Number(match[1].replace(/,/g, '')) * 100);
+};
+
+// What a reader can check with a pencil: the printed numbers, parsed back, against the amount
+// the window line printed.
+const expectTilesAddUp = (tiles: ReturnType<typeof wayTiles>, putIn: number) => {
     const end = dollars(tiles.end.value);
-    const putIn = dollars((tiles.end.hint ?? '').replace(/ put in$/, ''));
     const change = dollars(tiles.change.value);
-    expect(end - putIn, `${tiles.end.value} − ${tiles.end.hint} vs ${tiles.change.value}`).toBe(change);
+    expect(end - putIn, `${tiles.end.value} − ${putIn}¢ vs ${tiles.change.value}`).toBe(change);
     const pct = /^([+−]?)(\d+\.\d{2})% of the dollars put in$/.exec(tiles.change.hint ?? '');
     expect(pct, tiles.change.hint).not.toBeNull();
     const printed = (pct?.[1] === '−' ? -1 : 1) * Number(pct?.[2]);
@@ -64,7 +74,8 @@ describe('wayTiles', () => {
         for (const contributed of [1_000_000, 999_999, 1]) {
             for (const end of [0, 1, 999_999, 1_000_000, 1_234_567, 3_000_001]) {
                 const tiles = wayTiles(summary(contributed, end));
-                expectTilesAddUp(tiles);
+                expectTilesAddUp(tiles, windowAmount(TIM_COPY.window(contributed / 100, '2025-03-31', '2026-03-31', 251)));
+                expect(tiles.end.hint, 'the amount is not repeated under each way').toBeUndefined();
                 for (const tile of Object.values(tiles)) {
                     clean(tile.value);
                     clean(tile.hint ?? null);
@@ -87,8 +98,11 @@ describe('wayTiles', () => {
                 for (const series of [lumpSum(spy, window, amount, rateOn), dollarCostAverage(spy, window, amount, rateOn), cashOnly(spy, window, amount, rateOn)]) {
                     const way = summarizeWay(series);
                     expect(way).not.toBeNull();
-                    expect(dollars((wayTiles(way).end.hint ?? '').replace(/ put in$/, ''))).toBe(Math.round(amount * 100));
-                    expectTilesAddUp(wayTiles(way));
+                    const stated = windowAmount(TIM_COPY.window(amount, window.start, window.end, way?.sessions ?? 0));
+                    expect(stated).toBe(Math.round(amount * 100));
+                    // Every way ends having taken in exactly the amount the window line states.
+                    expect(way?.contributedCents).toBe(stated);
+                    expectTilesAddUp(wayTiles(way), stated);
                 }
             }
         }
@@ -122,7 +136,7 @@ describe('TIM_COPY', () => {
                 clean(TIM_COPY.window(10_000, a, b, 251));
                 clean(TIM_COPY.outOfRange('1990-01-01', a));
                 clean(TIM_COPY.chartAria(a, b));
-                clean(TIM_COPY.tableCaption(10_000, b));
+                for (const rows of [1, 3, 8]) clean(TIM_COPY.tableCaption(b, rows));
                 for (const source of ['requested', 'inception', 'fallback'] as StartSource[]) {
                     clean(TIM_COPY.source(source, a, b));
                     clean(TIM_COPY.source(source, a, null));
@@ -130,15 +144,45 @@ describe('TIM_COPY', () => {
             }
             clean(TIM_COPY.rateGap(a));
             clean(TIM_COPY.tableDate(a));
-            for (const way of WAY_KEYS) for (const deposits of [1, 3, 14]) clean(TIM_COPY.wayDetail(way, 10_000, a, deposits));
+            for (const way of WAY_KEYS) for (const deposits of [1, 3, 14]) clean(TIM_COPY.wayDetail(way, a, deposits));
         }
         for (const pct of [null, -12.34, 0, 0.04, 23.456]) clean(TIM_COPY.tablePct(pct));
     });
 
-    it('says why a window starts where it does', () => {
-        expect(TIM_COPY.source('inception', '2025-03-31', '2025-03-31')).toBe('Starts the day your first paper account opened.');
-        expect(TIM_COPY.source('inception', '2026-06-30', '2026-09-20')).toBe('Your first paper account opened on Sep 20, 2026; a window here spans at least 91 days, so it starts on Jun 30, 2026.');
+    it('says why a window starts where it does, naming the bound that moved it', () => {
+        // inceptionAt is re-anchored by a reset, so it dates the account's current record, not its opening.
+        expect(TIM_COPY.source('inception', '2025-03-31', '2025-03-31')).toBe("Starts the day your paper account's current record began.");
+        // A young account: the ceiling (MIN_WINDOW_DAYS before today) moved the start earlier.
+        expect(TIM_COPY.source('inception', '2026-06-30', '2026-09-20'))
+            .toBe(`Your paper account's current record began on Sep 20, 2026; a window here spans at least ${MIN_WINDOW_DAYS} days, so it starts on Jun 30, 2026.`);
+        // An old account: the floor (MAX_LOOKBACK_DAYS before today) moved the start later.
+        expect(TIM_COPY.source('inception', '2022-06-24', '2021-01-04'))
+            .toBe(`Your paper account's current record began on Jan 4, 2021; a window here starts at most ${MAX_LOOKBACK_DAYS.toLocaleString('en-US')} days back, so it starts on Jun 24, 2022.`);
+        expect(TIM_COPY.source('inception', '2022-06-24', '2021-01-04')).not.toMatch(/at least/);
         expect(TIM_COPY.source('requested', '2025-03-31', '2025-01-02')).toBeNull();
+        expect(TIM_COPY.source('fallback', '2025-03-31', null)).toBe('No paper account yet, so the window starts a year back.');
+    });
+
+    it('states the amount once, in the window line, and each way by how it enters SPY', () => {
+        const printed = [
+            TIM_COPY.window(10_000, '2025-03-31', '2026-03-31', 251),
+            ...WAY_KEYS.map((way) => TIM_COPY.wayDetail(way, '2025-03-31', 13)),
+            ...WAY_KEYS.flatMap(() => Object.values(wayTiles(summary(1_000_000, 1_234_567))).flatMap((tile) => [tile.value, tile.hint ?? ''])),
+            TIM_COPY.tableCaption('2026-03-31', 8),
+        ].join('\n');
+        expect(printed.match(/\$10,000(?:\.00)?(?![\d,.])/g), printed).toHaveLength(1);
+        expect(TIM_COPY.wayDetail('lumpSum', '2025-03-31', 13)).toBe('Into SPY on Mar 31, 2025');
+        expect(TIM_COPY.wayDetail('dollarCostAverage', '2025-03-31', 13)).toBe('13 monthly deposits into SPY');
+        expect(TIM_COPY.wayDetail('dollarCostAverage', '2025-03-31', 1)).toBe('1 monthly deposit into SPY');
+        expect(TIM_COPY.wayDetail('cashOnly', '2025-03-31', 13)).toBe('Kept as cash, earning interest');
+        // A non-whole amount is stated to the cent, so the tiles still add up against it.
+        expect(TIM_COPY.window(12_345.67, '2025-03-31', '2026-03-31', 251)).toBe('$12,345.67 each way · Mar 31, 2025 → Mar 31, 2026 · 251 trading days');
+    });
+
+    it('captions the table with the rows it has, not the rows it asked for', () => {
+        expect(TIM_COPY.tableCaption('2026-03-31', 8)).toBe('The same amount and the same end date, Mar 31, 2026, from 8 earlier starts a quarter apart:');
+        expect(TIM_COPY.tableCaption('2026-03-31', 5)).toContain('from 5 earlier starts');
+        expect(TIM_COPY.tableCaption('2026-03-31', 1)).toBe('The same amount and the same end date, Mar 31, 2026, from 1 earlier start:');
     });
 
     it('states the caveat with the spread the clock charges', () => {

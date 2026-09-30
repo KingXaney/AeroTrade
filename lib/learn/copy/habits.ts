@@ -4,8 +4,13 @@
 // each sentence to the 'copy' tier of lib/learn/banned.ts on a grid of inputs, and parses the
 // printed figures back to check that they agree with each other.
 
-import type {CadenceControl, Habits, LotCount} from "@/lib/trading/habits";
+import {PACE_WINDOW_DAYS, type CadenceControl, type Habits, type LotCount} from "@/lib/trading/habits";
+import type {GlossaryKey} from "@/lib/learn/glossary";
 import {shortDate, signedMoney} from "@/lib/learn/copy/portfolio";
+
+// The terms the panel's one "What these mean" lists, in order; 'had-you-held' only while that
+// tile shows. The method paragraph leading it says only what these do not.
+export const HABITS_TERMS: readonly GlossaryKey[] = ['hold-time', 'disposition-effect', 'trades', 'turnover', 'had-you-held'];
 
 const MONEY = new Intl.NumberFormat('en-US', {style: 'currency', currency: 'USD', minimumFractionDigits: 2, maximumFractionDigits: 2});
 const money = (cents: number): string => MONEY.format(cents / 100);
@@ -40,7 +45,8 @@ const cadenceName = (cadence: CadenceControl['cadence'], count: number): string 
 
 export const HABITS_COPY = {
     heading: 'Trading habits',
-    emptyTitle: 'Habits show after 3 closed lots',
+    // Called with HABITS_MIN_CLOSED_LOTS, the threshold the read holds the panel to.
+    emptyTitle: (lots: number): string => `Habits show after ${plural(lots, 'closed lot', 'closed lots')}`,
     emptyDescription: (closed: number): string =>
         `A lot is the shares one buy added, and a sell closes the oldest ones first. This account has closed ${plural(closed, 'lot', 'lots')} of your own orders so far.`,
 
@@ -59,7 +65,7 @@ export const HABITS_COPY = {
 
     paceLabel: 'How often you traded',
     paceValue: ({fills, days}: Habits['pace']): string => `${plural(fills, 'fill', 'fills')} on ${plural(days, 'day', 'days')}`,
-    paceHint: ({full, since}: Habits['pace']): string => (full ? 'in the last 30 days' : `since ${shortDate(since)}`),
+    paceHint: ({full, since}: Habits['pace']): string => (full ? `in the last ${PACE_WINDOW_DAYS} days` : `since ${shortDate(since)}`),
 
     turnoverLabel: 'Shares sold',
     turnoverValue: ({soldCents}: Habits['turnover']): string => money(soldCents),
@@ -77,6 +83,9 @@ export const HABITS_COPY = {
     cadenceLine: (controls: readonly CadenceControl[], sessions: number): string =>
         `Beside the strategies' clocks: ${controls.map((c) => `${cadenceName(c.cadence, c.names.length)} ${CADENCE_PHRASE[c.cadence](sessions, c.names.length)}`).join(' · ')}`,
 
-    // Leads the panel's one "What these mean": how the lots were counted.
-    method: 'Counted over the orders you placed in this account; strategy and Navigator fills are left out. Each sell is paired with the oldest shares still held. A winner is a lot sold above its buy price, or still open above it at the last quote; a loser is the reverse.',
+    // Leads the panel's one "What these mean" with what the definitions beneath it do not say:
+    // whose fills count, and that the pairing still runs over all of them (lib/trading/habits.ts).
+    // How a sell is paired, and what a winner is, are the hold-time and disposition-effect
+    // entries' to state.
+    method: "Only orders you placed count; a strategy's, a suggestion's or the Navigator's fill is left out. Lots are still paired across every fill in this account, so a lot counts here when you placed the sell that closed it or, while it is open, the buy that opened it.",
 };

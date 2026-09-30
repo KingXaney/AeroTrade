@@ -256,7 +256,7 @@ const ENTRIES = [
     // ---- your own trading (the /portfolio habits and luck panels) -----------------------------
     {key: 'random-portfolios', kind: 'metric', term: 'Random portfolios', aliases: ['random portfolios', 'random five-stock portfolios', 'luck or skill', 'dartboard portfolios'],
         short: 'Five of the 40 large caps picked at random, equal dollars in whole shares, held over the same days as the account.',
-        long: 'A thousand of them, drawn with a fixed seed so a reload shows the same ones, each bought at the close of the account\'s first day and valued at the close of the last day its snapshot covers, dividends kept as cash. Their spread shows how far chance alone moved a five-stock portfolio over those days; where the account lands in it is a measurement, not a verdict.',
+        long: 'A thousand of them, drawn with a fixed seed so a reload shows the same ones, each bought at the close of the account\'s first day and valued at the close of the last day its snapshot covers. Their spread shows how far chance alone moved a five-stock portfolio over those days; where the account lands in it is a measurement, not a verdict.',
         computedIn: 'lib/learn/random-portfolios.ts buildLuckView', seeAlso: ['percentile', 'median', 'survivorship-bias']},
     {key: 'median', kind: 'metric', term: 'Median', aliases: ['median', 'middle value'],
         short: 'The middle value: half of the group is at or below it and half at or above it.',

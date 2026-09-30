@@ -1,5 +1,5 @@
 // Luck or skill: the pure layer. A seeded sample of random five-stock portfolios held over the
-// learner's own window, equal-weight in whole shares with dividends kept as cash; where the
+// learner's own window, equal-weight in whole shares, earning on the one income clock; where the
 // learner's snapshot return lands among them; and the rule that decides the window (it ends on
 // the last snapshot's date, and the learner's marker is withheld — never replaced by a live
 // at-cost value — when holdings are unpriced and there is no snapshot on the latest session).

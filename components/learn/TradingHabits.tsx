@@ -1,7 +1,7 @@
 import type {HabitsRead} from "@/lib/learn/habits-read";
-import {cadenceControls} from "@/lib/trading/habits";
+import {cadenceControls, HABITS_MIN_CLOSED_LOTS} from "@/lib/trading/habits";
 import {STRATEGIES} from "@/lib/strategies/catalog";
-import {HABITS_COPY} from "@/lib/learn/copy/habits";
+import {HABITS_COPY, HABITS_TERMS} from "@/lib/learn/copy/habits";
 import {Stat} from "@/components/analytics/AnalyticsStats";
 import Panel from "@/components/primitives/Panel";
 import SectionHeading from "@/components/primitives/SectionHeading";
@@ -21,7 +21,7 @@ const TradingHabits = ({read}: {read: HabitsRead}) => {
         return (
             <Panel id="trading-habits" aria-labelledby="habits-heading">
                 <SectionHeading id="habits-heading" spacing="sm">{HABITS_COPY.heading}</SectionHeading>
-                <EmptyState title={HABITS_COPY.emptyTitle} description={HABITS_COPY.emptyDescription(read.closedLots)} className="px-0" />
+                <EmptyState title={HABITS_COPY.emptyTitle(HABITS_MIN_CLOSED_LOTS)} description={HABITS_COPY.emptyDescription(read.closedLots)} className="px-0" />
             </Panel>
         );
     }
@@ -55,7 +55,7 @@ const TradingHabits = ({read}: {read: HabitsRead}) => {
             <p className="mt-2 font-mono text-[11px] text-fg-muted" data-testid="habits-cadence">
                 {HABITS_COPY.cadenceLine(cadenceControls(STRATEGIES), habits.pace.sessions)}
             </p>
-            <WhatTheseMean keys={['hold-time', 'disposition-effect', 'trades', 'turnover', ...(held ? ['had-you-held'] : [])]}>
+            <WhatTheseMean keys={HABITS_TERMS.filter((key) => key !== 'had-you-held' || held)}>
                 <p className="text-xs text-fg-muted leading-relaxed" data-testid="habits-method">{HABITS_COPY.method}</p>
             </WhatTheseMean>
         </Panel>

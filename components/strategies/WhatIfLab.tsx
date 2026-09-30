@@ -16,9 +16,10 @@ import type {LabKnob, WhatIfLabVariant, WhatIfLabView} from "@/lib/strategies/wh
 // persisted by looking. A single-knob rule gets a slider over its positions; a rule with more
 // knobs gets one row of positions per knob, and moving one returns the others to the catalog.
 // The chart sets "What-if" beside "Stored backtest (catalog setting)" on the same dates, and the
-// tiles below are the stored backtest's own tiles for the setting (#whatif-stats) — no delta,
-// no colour saying which is ahead, no ranking, and no variant trades (their reasons would print
-// the catalog's parameters). Imports only types from the lab; every sentence is from the copy.
+// tiles below are the stored backtest's own tiles for the setting (#whatif-stats, `neutral`, so
+// no sign colour says which is ahead) — no delta, no ranking, and no variant trades (their
+// reasons would print the catalog's parameters). Imports only types from the lab; every
+// sentence is from the copy.
 
 type Props = {view: WhatIfLabView};
 
@@ -77,7 +78,7 @@ const WhatIfLab = ({view}: Props) => {
                 <p className="font-mono text-[11px] text-fg-muted mt-3" data-testid="whatif-caveat">{WHATIF_COPY.caveat}</p>
             </Panel>
 
-            <SimulatedStats id="whatif-stats" stats={selected?.stats ?? stored.stats} />
+            <SimulatedStats id="whatif-stats" stats={selected?.stats ?? stored.stats} neutral />
         </section>
     );
 };

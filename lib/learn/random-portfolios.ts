@@ -15,7 +15,8 @@
 //     is not yet behind the last day is not counted, for the portfolios and SPY alike;
 //   - the learner's return is a stored snapshot's, never a live value built on a missing
 //     quote, and the portfolios end on that snapshot's date (luckWindow).
-// The universe was chosen in 2026, so the sample carries survivorship bias; the copy says so.
+// The universe was chosen in 2026, so the sample carries survivorship bias; the panel's
+// definitions (the survivorship-bias entry) say so.
 
 import {isTradingDay, previousTradingDay} from "@/lib/prices/market-hours";
 import {addCalendarDays} from "@/lib/prices/calendar-days";

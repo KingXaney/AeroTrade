@@ -5,13 +5,24 @@
 // and the panel's one "What these mean" carries them. Held to the 'copy' tier of
 // lib/learn/banned.ts and a list of evaluative words by key-numbers.test.ts.
 
+import {FINANCIALS_REVALIDATE_SECONDS, PROFILE_REVALIDATE_SECONDS} from '@/lib/constants';
+
+// 'once an hour', 'once a day', 'every 6 hours', 'every 30 minutes': a cache's revalidation.
+const everyText = (seconds: number): string => {
+    if (seconds === 60 * 60) return 'once an hour';
+    if (seconds === 24 * 60 * 60) return 'once a day';
+    if (seconds % (60 * 60) === 0) return `every ${seconds / (60 * 60)} hours`;
+    return `every ${Math.round(seconds / 60)} minutes`;
+};
+
 export const KEY_NUMBERS_COPY = {
     heading: 'Key numbers',
     emptyTitle: (symbol: string): string => `No key numbers came back for ${symbol}.`,
     emptyDescription:
         'They come from the market-data feed, which has none for some symbols (funds among them) and none at all when no market-data key is configured.',
-    // Stated once per panel, under the rows.
-    source: 'From the market-data feed, refreshed at most once an hour, so a ratio can trail the live quote.',
+    // Stated once per panel, under the rows: the ratios come from the financials fetch, market
+    // cap from the company profile, each cached as the constants say.
+    source: `From the market-data feed, refreshed at most ${everyText(FINANCIALS_REVALIDATE_SECONDS)} (market cap ${everyText(PROFILE_REVALIDATE_SECONDS)}), so a figure can trail the live quote.`,
 
     marketCap: (amount: string): string =>
         `The share price times every share outstanding: about ${amount} for the whole company.`,

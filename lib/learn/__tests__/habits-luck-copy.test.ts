@@ -3,12 +3,13 @@
 // ("landed above 62%", never "beat"). The printed figures are parsed back and checked against
 // each other: a share against its counts, a difference against the two amounts it sits between.
 
-import {describe, expect, it} from 'vitest';
+import {afterEach, describe, expect, it, vi} from 'vitest';
 import {findBanned} from '@/lib/learn/banned';
 import {daysHeld, HABITS_COPY, lotShare, turnoverShare} from '@/lib/learn/copy/habits';
-import {landedShare, LUCK_COPY} from '@/lib/learn/copy/luck';
-import {cadenceControls, type Habits} from '@/lib/trading/habits';
-import {histogram, type LuckReady} from '@/lib/learn/random-portfolios';
+import {landedShare, LUCK_COPY, LUCK_TERMS} from '@/lib/learn/copy/luck';
+import {cadenceControls, HABITS_MIN_CLOSED_LOTS, PACE_WINDOW_DAYS, type Habits} from '@/lib/trading/habits';
+import {histogram, LUCK_MIN_SESSIONS, type LuckReady} from '@/lib/learn/random-portfolios';
+import {GLOSSARY} from '@/lib/learn/glossary';
 import {STRATEGIES} from '@/lib/strategies/catalog';
 
 const clean = (text: string | null) => {
@@ -122,7 +123,7 @@ describe('Trading habits copy', () => {
         }
         expect(HABITS_COPY.paceHint(grid[2].pace)).toBe('since Sep 16');
         expect(HABITS_COPY.paceValue(grid[2].pace)).toBe('1 fill on 1 day');
-        for (const text of [HABITS_COPY.heading, HABITS_COPY.emptyTitle, HABITS_COPY.emptyDescription(0), HABITS_COPY.emptyDescription(2),
+        for (const text of [HABITS_COPY.heading, HABITS_COPY.emptyTitle(HABITS_MIN_CLOSED_LOTS), HABITS_COPY.emptyDescription(0), HABITS_COPY.emptyDescription(2),
             HABITS_COPY.holdLabel, HABITS_COPY.soldLabel, HABITS_COPY.paceLabel, HABITS_COPY.turnoverLabel, HABITS_COPY.heldLabel, HABITS_COPY.method]) clean(text);
     });
 });
@@ -170,7 +171,7 @@ describe('Luck or skill copy', () => {
         for (const text of [
             LUCK_COPY.sampleOnly(view), LUCK_COPY.noSnapshot, LUCK_COPY.window(view), LUCK_COPY.chartLabel(view),
             LUCK_COPY.method(view), LUCK_COPY.markerValue(LUCK_COPY.marker.spy, -1.25), LUCK_COPY.markerValue(LUCK_COPY.marker.median, 0),
-            LUCK_COPY.heading, LUCK_COPY.needsDaysTitle, LUCK_COPY.needsDaysDescription(0), LUCK_COPY.needsDaysDescription(7),
+            LUCK_COPY.heading, LUCK_COPY.needsDaysTitle(LUCK_MIN_SESSIONS), LUCK_COPY.needsDaysDescription(0), LUCK_COPY.needsDaysDescription(7),
             LUCK_COPY.noPricesTitle, LUCK_COPY.noPricesDescription, LUCK_COPY.notYours,
         ]) clean(text);
         expect(LUCK_COPY.binTitle(-4, -3.375, 1)).toBe('−4.0% to −3.4%: 1 portfolio');
@@ -179,12 +180,37 @@ describe('Luck or skill copy', () => {
         expect(LUCK_COPY.markerValue('You', 3.14)).toBe('You +3.1%');
         expect(LUCK_COPY.window(view)).toBe('bought at the Aug 14 close · valued at the Oct 2 close');
         expect(LUCK_COPY.window({start: '2025-12-19', end: '2026-01-09'})).toBe('bought at the Dec 19, 2025 close · valued at the Jan 9, 2026 close');
-        expect(LUCK_COPY.needsDaysTitle).toBe('Needs 10 trading days');
-        expect(LUCK_COPY.method(view)).toMatch(/survivorship bias/);
+        // The survivorship caveat is the survivorship-bias entry's, listed beneath the method.
+        expect(LUCK_COPY.method(view)).not.toMatch(/survivorship/);
+        expect(LUCK_TERMS).toContain('survivorship-bias');
         // Dividends reach the portfolios the way a paper account is paid them, and cash earns.
         expect(LUCK_COPY.method(view)).toMatch(/pay date/);
         expect(LUCK_COPY.method(view)).toMatch(/evening before its ex-date/);
         expect(LUCK_COPY.method(view)).toMatch(/T-bill rate/);
         expect(LUCK_COPY.method(view)).not.toMatch(/dividends kept as cash/);
+    });
+});
+
+describe('copy that follows its constants', () => {
+    afterEach(() => {
+        vi.doUnmock('@/lib/trading/habits');
+        vi.resetModules();
+    });
+
+    it('states the thresholds the modules use, as the modules set them', () => {
+        expect(LUCK_COPY.needsDaysTitle(LUCK_MIN_SESSIONS)).toBe('Needs 10 trading days');
+        expect(LUCK_COPY.needsDaysTitle(1)).toBe('Needs 1 trading day');
+        expect(HABITS_COPY.emptyTitle(HABITS_MIN_CLOSED_LOTS)).toBe('Habits show after 3 closed lots');
+        expect(HABITS_COPY.paceHint({fills: 7, days: 5, windowDays: PACE_WINDOW_DAYS, sessions: 21, since: '2026-08-29', full: true}))
+            .toBe(`in the last ${PACE_WINDOW_DAYS} days`);
+        // The turnover definition names the same window the pace and turnover tiles measure.
+        expect(GLOSSARY.turnover.long).toContain(`over the last ${PACE_WINDOW_DAYS} days`);
+    });
+
+    it('moves the pace window with PACE_WINDOW_DAYS', async () => {
+        vi.resetModules();
+        vi.doMock('@/lib/trading/habits', async (importOriginal) => ({...(await importOriginal<typeof import('@/lib/trading/habits')>()), PACE_WINDOW_DAYS: 28}));
+        const mocked = await import('@/lib/learn/copy/habits');
+        expect(mocked.HABITS_COPY.paceHint({fills: 7, days: 5, windowDays: 28, sessions: 20, since: '2026-09-01', full: true})).toBe('in the last 28 days');
     });
 });

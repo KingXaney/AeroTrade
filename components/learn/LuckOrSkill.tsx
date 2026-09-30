@@ -1,6 +1,6 @@
 import type {LuckRead} from "@/lib/learn/luck-read";
-import type {LuckReady} from "@/lib/learn/random-portfolios";
-import {LUCK_COPY} from "@/lib/learn/copy/luck";
+import {LUCK_MIN_SESSIONS, type LuckReady} from "@/lib/learn/random-portfolios";
+import {LUCK_COPY, LUCK_TERMS} from "@/lib/learn/copy/luck";
 import {pctOneDecimal} from "@/lib/learn/copy/portfolio";
 import {describeUnpriced} from "@/lib/trading/analytics";
 import Panel from "@/components/primitives/Panel";
@@ -89,7 +89,7 @@ const Histogram = ({view, markers}: {view: LuckReady; markers: Marker[]}) => {
 const LuckOrSkill = ({luck}: {luck: LuckRead}) => {
     const body = (() => {
         if (luck.status === 'needs-days') {
-            return <EmptyState title={LUCK_COPY.needsDaysTitle} description={LUCK_COPY.needsDaysDescription(luck.sessions)} className="px-0" />;
+            return <EmptyState title={LUCK_COPY.needsDaysTitle(LUCK_MIN_SESSIONS)} description={LUCK_COPY.needsDaysDescription(luck.sessions)} className="px-0" />;
         }
         if (luck.status === 'no-prices') {
             return <EmptyState title={LUCK_COPY.noPricesTitle} description={LUCK_COPY.noPricesDescription} className="px-0" />;
@@ -124,7 +124,7 @@ const LuckOrSkill = ({luck}: {luck: LuckRead}) => {
                         <li key={marker.key} data-luck-value={marker.key}>{LUCK_COPY.markerValue(marker.label, marker.pct)}</li>
                     ))}
                 </ul>
-                <WhatTheseMean keys={['random-portfolios', ...(view.yours ? ['percentile'] : []), 'median', 'benchmark', 'survivorship-bias']}>
+                <WhatTheseMean keys={LUCK_TERMS.filter((key) => key !== 'percentile' || view.yours)}>
                     <p className="text-xs text-fg-muted leading-relaxed" data-testid="luck-method">{LUCK_COPY.method(view)}</p>
                 </WhatTheseMean>
             </>

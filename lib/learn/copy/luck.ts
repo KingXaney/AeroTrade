@@ -5,7 +5,12 @@
 // lib/learn/banned.ts and parses the printed rank back against the counts it came from.
 
 import type {LuckReady} from "@/lib/learn/random-portfolios";
+import type {GlossaryKey} from "@/lib/learn/glossary";
 import {pctOneDecimal, shortDate} from "@/lib/learn/copy/portfolio";
+
+// The terms the panel's one "What these mean" lists, in order; 'percentile' only while the
+// learner's return is placed. The method paragraph leading it says only what these do not.
+export const LUCK_TERMS: readonly GlossaryKey[] = ['random-portfolios', 'percentile', 'median', 'benchmark', 'survivorship-bias'];
 
 const COUNT = new Intl.NumberFormat('en-US');
 const WORDS = ['zero', 'one', 'two', 'three', 'four', 'five', 'six', 'seven', 'eight', 'nine', 'ten'];
@@ -29,7 +34,8 @@ const portfolios = ({size, sessions}: Sample): string =>
 export const LUCK_COPY = {
     heading: 'Luck or skill',
 
-    needsDaysTitle: 'Needs 10 trading days',
+    // Called with LUCK_MIN_SESSIONS, the threshold buildLuckView holds the window to.
+    needsDaysTitle: (sessions: number): string => `Needs ${plural(sessions, 'trading day', 'trading days')}`,
     needsDaysDescription: (sessions: number): string =>
         `Random portfolios are held over the same days as this account, and it has ${plural(sessions, 'trading day', 'trading days')} so far.`,
     noPricesTitle: 'Prices for these days are not stored yet',
@@ -57,7 +63,10 @@ export const LUCK_COPY = {
     chartLabel: (view: Pick<LuckReady, 'count' | 'histogram'>): string =>
         `Histogram of ${COUNT.format(view.count)} random portfolio returns, from ${pctOneDecimal(view.histogram.min)} to ${pctOneDecimal(view.histogram.max)}`,
 
-    // Leads the panel's one "What these mean": how the sample was built, with its caveat, once.
+    // Leads the panel's one "What these mean" with what the definitions beneath it do not say:
+    // this window's pool, the equal dollars and the leftover cash, how income is credited (stated
+    // here and nowhere else) and what "your return" is. The sample's draw and its survivorship
+    // caveat are the random-portfolios and survivorship-bias entries' to state.
     method: ({size, pool}: Pick<LuckReady, 'size' | 'pool'>): string =>
-        `Each portfolio holds ${numberWord(size)} of the ${pool} large caps with a close stored on both days, picked at random with a fixed seed, bought in equal dollar amounts in whole shares (the remainder stays as cash) and held to the last close, each dividend paid as cash on its pay date to the shares held the evening before its ex-date, and cash earning the T-bill rate, as in a paper account. SPY is held the same way. Your return is this account's stored daily snapshot on the last day, never a live value. The large caps were chosen in 2026, so the sample carries survivorship bias.`,
+        `Each portfolio's ${numberWord(size)} names, bought in equal dollar amounts, come from the ${pool} large caps with a close stored on both days; whole shares leave a remainder, which stays as cash. Each dividend is paid as cash on its pay date to the shares held the evening before its ex-date, and cash earns the T-bill rate, as in a paper account. SPY is held the same way. Your return is this account's stored daily snapshot on the last day, never a live value.`,
 };

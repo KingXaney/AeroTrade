@@ -172,7 +172,7 @@ describe('decodeNavigatorReason clauses', () => {
         expect(resize[0]).toMatchObject({rail: 'REBALANCE_BAND'});
         expect(resize[0].gloss).toContain('more than 5% of the account');
         expect(resize[1].gloss).toMatch(/over its target, so the Navigator sold/);
-        expect(resize[2].gloss).toContain('at most 20% in one name, with 10% kept in cash');
+        expect(resize[2].gloss).toContain('at most 20% in one name, with at least 10% kept in cash');
         expect(glossOf('enter: score 0.42')).toContain('above the entry line of 0.15; the 8 highest');
     });
 

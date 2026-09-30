@@ -708,20 +708,22 @@ try {
         const tiles = async (way) => {
             const read = async (i) => (await pageE.locator(`#time-in-market-${way} [data-tile="${i}"]`).innerText()).split('\n').map((s) => s.trim()).filter(Boolean);
             const [end, change, under] = [await read(0), await read(1), await read(2)];
-            return {end: end[1], putIn: (end[2] ?? '').replace(/ put in$/, ''), change: change[1], pct: change[2] ?? '', under: under[1], underHint: under[2] ?? ''};
+            return {end: end[1], endHint: end[2] ?? null, change: change[1], pct: change[2] ?? '', under: under[1], underHint: under[2] ?? ''};
         };
-        const addsUp = (t) => parseMoney(t.end) - parseMoney(t.putIn) === parseMoney(t.change);
+        // The amount is stated once, in the window line; every way's tiles add up against it.
+        const PUT_IN = cents(10_000);
+        const addsUp = (t) => parseMoney(t.end) - PUT_IN === parseMoney(t.change);
 
         await openPage();
         check('buy-and-hold carries Time in the market, starting on the account\'s inception', await pageE.inputValue('#time-in-market-from') === PEAK_DATE
-            && (await panel.locator('[data-testid="time-in-market-source"]').innerText()) === 'Starts the day your first paper account opened.');
+            && (await panel.locator('[data-testid="time-in-market-source"]').innerText()) === "Starts the day your paper account's current record began.");
         check('…over the seeded window', (await pageE.locator('#time-in-market-window').innerText()) === `$10,000 each way · ${long(PEAK_DATE)} → ${long(LAST)} · ${N - P} trading days`,
             await pageE.locator('#time-in-market-window').innerText());
         check('three ways render side by side', await pageE.locator('#time-in-market-ways > *').count() === 3
             && await pageE.locator('#time-in-market-ways [data-term="lump-sum"][title], #time-in-market-ways [data-term="dollar-cost-averaging"][title], #time-in-market-ways [data-term="cash-only"][title]').count() === 3);
 
         const lumpPeak = await tiles('lumpSum');
-        check('all at once from the peak: the closes\' own ratio, to the cent', parseMoney(lumpPeak.end) === cents(10_000 * close(N - 1) / close(P)) && lumpPeak.putIn === '$10,000.00',
+        check('all at once from the peak: the closes\' own ratio, to the cent', parseMoney(lumpPeak.end) === cents(10_000 * close(N - 1) / close(P)) && lumpPeak.endHint === null,
             `${lumpPeak.end} vs ${money(cents(10_000 * close(N - 1) / close(P)))}`);
         const firstBack = sessions.findIndex((d, i) => i > T && close(i) >= 500);
         check('…below the dollars put in from the day after the peak until the climb back', lumpPeak.under === `${firstBack - P - 1} of ${N - P} days`
@@ -734,11 +736,14 @@ try {
         const dca = await tiles('dollarCostAverage');
         let deposits = 0;
         while (addMonths(PEAK_DATE, deposits) <= LAST) deposits++;
-        check('monthly deposits: the whole amount, in one deposit a month', dca.putIn === '$10,000.00'
-            && (await pageE.locator('#time-in-market-dollarCostAverage').innerText()).includes(`$10,000 in ${deposits} monthly deposits into SPY`));
-        check('every way\'s printed end minus what went in is its printed change', [lumpPeak, cashPeak, dca].every(addsUp), JSON.stringify([lumpPeak, cashPeak, dca].map((t) => [t.end, t.putIn, t.change])));
-        check('…and the printed percentage is that change over what went in', [lumpPeak, cashPeak, dca].every((t) => {
-            const pct = Math.round(parseMoney(t.change) / parseMoney(t.putIn) * 10_000) / 100;
+        check('monthly deposits: the whole amount, in one deposit a month', dca.endHint === null
+            && (await pageE.locator('#time-in-market-dollarCostAverage').innerText()).includes(`${deposits} monthly deposits into SPY`));
+        const shownText = await panel.innerText();
+        check('the amount is stated once, in the window line, never under a way',
+            (shownText.match(/\$10,000(?:\.00)?(?![\d,.])/g) ?? []).length === 1, (shownText.match(/\$10,000[^\n]*/g) ?? []).join(' | '));
+        check('every way\'s printed end minus the stated amount is its printed change', [lumpPeak, cashPeak, dca].every(addsUp), JSON.stringify([lumpPeak, cashPeak, dca].map((t) => [t.end, t.change])));
+        check('…and the printed percentage is that change over the stated amount', [lumpPeak, cashPeak, dca].every((t) => {
+            const pct = Math.round(parseMoney(t.change) / PUT_IN * 10_000) / 100;
             return t.pct === `${pct > 0 ? '+' : pct < 0 ? '−' : ''}${Math.abs(pct).toFixed(2)}% of the dollars put in`;
         }), [lumpPeak, cashPeak, dca].map((t) => t.pct).join(' | '));
         const chart = panel.locator('[data-testid="dollar-chart"]');
@@ -753,6 +758,8 @@ try {
         const rows = panel.locator('[data-testid="time-in-market-table"] tbody tr');
         check('…with earlier starts a quarter apart, each a link to that start', await rows.count() >= 3
             && (await rows.first().locator('a').getAttribute('href')).startsWith('/strategies/buy-and-hold-spy?from='), String(await rows.count()));
+        const tableCaption = await panel.locator('[data-testid="time-in-market-table"] caption').innerText();
+        check('…captioned with the rows it has', tableCaption.includes(`from ${await rows.count()} earlier start`) && !/\$/.test(tableCaption), tableCaption);
         await pageE.screenshot({path: `${OUT}09-time-in-market.png`, fullPage: true});
 
         // A start inside the dip: the native form, then the same three ways from the low.

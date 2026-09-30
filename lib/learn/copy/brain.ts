@@ -37,7 +37,7 @@ export const BRAIN_LEGEND_COPY = {
 
     railsHeading: "The Navigator's rails",
     entry: (positions: number, entry: string, cap: string, cash: string): string =>
-        `It holds the ${positions} highest scores above ${entry}, sized by score, at most ${cap} of the account in one name, with ${cash} kept in cash.`,
+        `It holds the ${positions} highest scores above ${entry}, sized by score, at most ${cap} of the account in one name, with at least ${cash} kept in cash.`,
     exit: (exit: string, stop: string, minHold: number): string =>
         `A holding is sold when its score drops below ${exit} or its price is ${stop} under the average cost; otherwise a trim waits until it has been held ${minHold} trading days.`,
     pace: (band: string, trades: number): string =>

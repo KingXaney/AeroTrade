@@ -5,7 +5,8 @@
 // lib/learn/banned.ts plus a list of the evaluative words a stock page is most tempted by, and
 // every figure a sentence repeats is parsed back and checked against the value beside it.
 
-import {describe, expect, it} from 'vitest';
+import {afterEach, describe, expect, it, vi} from 'vitest';
+import {FINANCIALS_REVALIDATE_SECONDS, PROFILE_REVALIDATE_SECONDS} from '@/lib/constants';
 import {findBanned} from '@/lib/learn/banned';
 import {isGlossaryKey} from '@/lib/learn/glossary';
 import {KEY_NUMBER_KEYS, readKeyNumbers, type KeyNumber} from '@/lib/learn/key-numbers';
@@ -175,5 +176,29 @@ describe('readKeyNumbers', () => {
         for (const text of [KEY_NUMBERS_COPY.heading, KEY_NUMBERS_COPY.emptyTitle('NVDA'), KEY_NUMBERS_COPY.emptyDescription, KEY_NUMBERS_COPY.source, KEY_NUMBERS_COPY.peNone, KEY_NUMBERS_COPY.dividendNone, KEY_NUMBERS_COPY.betaZero]) {
             clean(text);
         }
+    });
+});
+
+describe('the source line follows the cache it describes', () => {
+    afterEach(() => {
+        vi.doUnmock('@/lib/constants');
+        vi.resetModules();
+    });
+
+    it('states how often the figures and the market cap are refreshed, from the fetch revalidation constants', () => {
+        expect(FINANCIALS_REVALIDATE_SECONDS).toBe(60 * 60);
+        expect(PROFILE_REVALIDATE_SECONDS).toBe(24 * 60 * 60);
+        expect(KEY_NUMBERS_COPY.source).toBe('From the market-data feed, refreshed at most once an hour (market cap once a day), so a figure can trail the live quote.');
+    });
+
+    it('moves with the constants', async () => {
+        vi.resetModules();
+        vi.doMock('@/lib/constants', async (importOriginal) => ({
+            ...(await importOriginal<typeof import('@/lib/constants')>()),
+            FINANCIALS_REVALIDATE_SECONDS: 30 * 60,
+            PROFILE_REVALIDATE_SECONDS: 6 * 60 * 60,
+        }));
+        const mocked = await import('@/lib/learn/copy/key-numbers');
+        expect(mocked.KEY_NUMBERS_COPY.source).toBe('From the market-data feed, refreshed at most every 30 minutes (market cap every 6 hours), so a figure can trail the live quote.');
     });
 });

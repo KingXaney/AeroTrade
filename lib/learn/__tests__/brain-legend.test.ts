@@ -7,6 +7,8 @@ import {findBanned} from '@/lib/learn/banned';
 import {brainLegend} from '@/lib/learn/brain-legend';
 import {BRAIN_COPY, BRAIN_LEGEND_COPY} from '@/lib/learn/copy/brain';
 import {NAVIGATOR_COPY} from '@/lib/learn/copy/navigator';
+import {buildTargets} from '@/lib/navigator/allocator';
+import {MAX_POSITION_WEIGHT, MIN_CASH_WEIGHT} from '@/lib/navigator/config';
 
 const MECHANISM_ONLY = /\b(works?|worked|working|fails?|failed|beat(s|en|ing)?|outperform\w*|underperform\w*|lags?|lagged|wins?|loses)\b/i;
 
@@ -25,11 +27,24 @@ describe('brainLegend', () => {
         for (const figure of ['up to 160 new articles', 'halves every 5 days', 'halves every 60 days', 'reaches 5', 'below 40%',
             'news rank 0.20', 'news sentiment 0.15', 'momentum 0.35', 'thesis 0.20', 'sector standing 0.10',
             '6-month (0.50), 12-month (0.30) and 3-month (0.20)', 'most volatile 20%', 'multiplied by 0.8',
-            'the 8 highest scores above 0.15', 'at most 20%', 'with 10% kept in cash', 'drops below 0 ', '25% under the average cost',
+            'the 8 highest scores above 0.15', 'at most 20%', 'with at least 10% kept in cash', 'drops below 0 ', '25% under the average cost',
             'held 21 trading days', 'more than 5% of the account', 'at most 3 trades a week', '13 always-eligible funds',
             '3 articles from 2 sources in 21 days and 126 daily bars']) {
             expect(text, figure).toContain(figure);
         }
+    });
+
+    it('states the cash share as the floor it is: three capped picks keep far more than the minimum', () => {
+        // Three picks, each capped at MAX_POSITION_WEIGHT, invest 60% and keep 40% in cash: the
+        // allocator only ever scales weights down to protect MIN_CASH_WEIGHT, never up to meet it.
+        const picks = ['AAA', 'BBB', 'CCC'].map((symbol) => ({symbol, score: 0.9, eligible: true, reasons: []}));
+        const targets = buildTargets(picks);
+        expect(targets.map((t) => t.weight)).toEqual([MAX_POSITION_WEIGHT, MAX_POSITION_WEIGHT, MAX_POSITION_WEIGHT]);
+        const cash = 1 - targets.reduce((sum, t) => sum + t.weight, 0);
+        expect(cash).toBeGreaterThan(MIN_CASH_WEIGHT);
+        const text = legendText(brainLegend());
+        expect(text).toContain(`with at least ${Math.round(MIN_CASH_WEIGHT * 100)}% kept in cash`);
+        expect(text).not.toMatch(/with \d+% kept in cash/);
     });
 
     it('works out the fading example with decay.ts', () => {

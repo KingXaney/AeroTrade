@@ -5,7 +5,7 @@ import SectionHeading from "@/components/primitives/SectionHeading";
 import Term from "@/components/primitives/Term";
 import WhatTheseMean from "@/components/learn/WhatTheseMean";
 import SeriesTiles from "@/components/strategies/SeriesTiles";
-import {TIM_COPY, wayTiles} from "@/lib/learn/copy/time-in-market";
+import {TIM_COPY, TIM_TERMS, wayTiles} from "@/lib/learn/copy/time-in-market";
 import type {GlossaryKey} from "@/lib/learn/glossary";
 import {WAY_KEYS, type WayKey} from "@/lib/learn/time-in-market";
 import type {TimeInMarketRead} from "@/lib/learn/time-in-market-read";
@@ -20,7 +20,6 @@ import type {TimeInMarketRead} from "@/lib/learn/time-in-market-read";
 
 const WAY_TERM: Record<WayKey, GlossaryKey> = {lumpSum: 'lump-sum', dollarCostAverage: 'dollar-cost-averaging', cashOnly: 'cash-only'};
 const WAY_TONE: Record<WayKey, DollarLineTone> = {lumpSum: 'brand', dollarCostAverage: 'secondary', cashOnly: 'muted'};
-const TERMS: readonly GlossaryKey[] = ['lump-sum', 'dollar-cost-averaging', 'cash-only', 'underwater', 't-bill-rate'];
 
 const TimeInMarket = ({view, path}: {view: TimeInMarketRead; path: string}) => {
     const {resolved} = view;
@@ -67,13 +66,13 @@ const TimeInMarket = ({view, path}: {view: TimeInMarketRead; path: string}) => {
                     </figure>
                 )}
 
-                <WhatTheseMean id="time-in-market-why" label={TIM_COPY.whyLabel} keys={TERMS}>
+                <WhatTheseMean id="time-in-market-why" label={TIM_COPY.whyLabel} keys={TIM_TERMS}>
                     {TIM_COPY.why.map((paragraph) => (
                         <p key={paragraph} className="text-xs text-fg-soft leading-relaxed mb-2 max-w-3xl">{paragraph}</p>
                     ))}
                     {view.table.length > 0 && (
                         <table className="mt-2 w-full max-w-2xl font-mono text-xs" data-testid="time-in-market-table">
-                            <caption className="caption-top text-left text-[11px] text-fg-muted pb-1">{TIM_COPY.tableCaption(view.amount, view.end)}</caption>
+                            <caption className="caption-top text-left text-[11px] text-fg-muted pb-1">{TIM_COPY.tableCaption(view.end, view.table.length)}</caption>
                             <thead>
                                 <tr className="text-fg-muted">
                                     <th scope="col" className="text-left font-normal py-1">{TIM_COPY.tableStart}</th>
@@ -105,7 +104,7 @@ const TimeInMarket = ({view, path}: {view: TimeInMarketRead; path: string}) => {
                                 key={way}
                                 id={`time-in-market-${way}`}
                                 title={<Term k={WAY_TERM[way]}>{TIM_COPY.wayLabel[way]}</Term>}
-                                detail={TIM_COPY.wayDetail(way, view.amount, view.start, view.deposits)}
+                                detail={TIM_COPY.wayDetail(way, view.start, view.deposits)}
                                 tiles={[
                                     {label: TIM_COPY.endLabel, ...tiles.end},
                                     {label: TIM_COPY.changeLabel, ...tiles.change},

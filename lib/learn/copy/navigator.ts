@@ -49,7 +49,7 @@ export const NAVIGATOR_GLOSS = {
     rebalanceUnder: (drift: string): string => `It sat ${drift} of the account under its target, so the Navigator bought shares to close the gap.`,
     rebalanceOver: (drift: string): string => `It sat ${drift} of the account over its target, so the Navigator sold shares to close the gap.`,
     target: (target: string, cap: string, cash: string): string =>
-        `The target was ${target} of the account: its score's share of the week's picks, at most ${cap} in one name, with ${cash} kept in cash.`,
+        `The target was ${target} of the account: its score's share of the week's picks, at most ${cap} in one name, with at least ${cash} kept in cash.`,
     enter: (): string => 'A symbol the account did not hold was among the week\'s targets, so the Navigator bought toward its target weight.',
     enterScore: (score: string, entry: string, positions: number, exit: string): string =>
         `Its score of ${score} was above the entry line of ${entry}; the ${positions} highest such scores become the week's targets, and a held position is sold on score only below ${exit}.`,

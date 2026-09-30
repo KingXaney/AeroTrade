@@ -8,7 +8,7 @@ import {
     formatChangePercent,
     formatMarketCapValue,
 } from "@/lib/utils";
-import {POPULAR_STOCK_SYMBOLS} from "@/lib/constants";
+import {FINANCIALS_REVALIDATE_SECONDS, POPULAR_STOCK_SYMBOLS, PROFILE_REVALIDATE_SECONDS} from "@/lib/constants";
 import {getWatchlistSymbolsByUserId} from "@/lib/actions/watchlist.actions";
 
 const FINNHUB_BASE_URL = 'https://finnhub.io/api/v1';
@@ -195,7 +195,7 @@ export const getCompanyProfile = async (symbol: string): Promise<ProfileData> =>
     if (!FINNHUB_API_KEY) return {};
     try {
         const url = `${FINNHUB_BASE_URL}/stock/profile2?symbol=${encodeURIComponent(symbol.toUpperCase())}&token=${FINNHUB_API_KEY}`;
-        return await fetchJSON<ProfileData>(url, 60 * 60 * 24); // profile is stable; cache a day
+        return await fetchJSON<ProfileData>(url, PROFILE_REVALIDATE_SECONDS); // profile is stable; cache a day
     } catch (error) {
         console.error(`Error fetching profile for ${symbol}:`, error);
         return {};
@@ -206,7 +206,7 @@ export const getFinancials = async (symbol: string): Promise<FinancialsData> => 
     if (!FINNHUB_API_KEY) return {};
     try {
         const url = `${FINNHUB_BASE_URL}/stock/metric?symbol=${encodeURIComponent(symbol.toUpperCase())}&metric=all&token=${FINNHUB_API_KEY}`;
-        return await fetchJSON<FinancialsData>(url, 60 * 60); // metrics change slowly; cache an hour
+        return await fetchJSON<FinancialsData>(url, FINANCIALS_REVALIDATE_SECONDS); // metrics change slowly; cache an hour
     } catch (error) {
         console.error(`Error fetching financials for ${symbol}:`, error);
         return {};

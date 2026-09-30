@@ -348,6 +348,15 @@ try {
     const fast20 = await labStats.innerText();
     check('a position switches the diff line and the what-if tiles',
         (await whatIfDiff.innerText()) === 'Fast average (days): 50 → 20' && /\+7\.70%/.test(fast20) && /-2\.30%/.test(fast20) && !/\+11\.60%/.test(fast20), fast20.replace(/\s+/g, ' ').slice(0, 120));
+    // Checked while the setting is selected — the one state where a delta, a colour for "ahead"
+    // or a leak into the stored backtest's own tiles could render.
+    const colourCount = (selector) => page.locator(`${selector} .text-positive, ${selector} .text-negative`).count();
+    check('…in tiles that carry no sign colour, while the stored backtest\'s own tiles keep theirs',
+        await colourCount('#whatif-stats') === 0 && await colourCount('#simulated-stats') > 0);
+    check('…and #simulated-stats is unchanged while a setting is selected, with no delta or ranking beside it',
+        (await page.locator('#simulated-stats').innerText()) === simulatedBefore
+        && await labStats.locator('.grid > div').count() === await page.locator('#simulated-stats .grid > div').count()
+        && !/delta|difference|rank|better|best/i.test(await lab.innerText()));
     check('…and the chart draws the what-if beside the stored backtest',
         await lab.locator('path[data-line="whatif"]').count() === 1 && await lab.locator('path[data-line="stored"]').count() === 1
         && (await lab.locator('[data-line="whatif"] [data-line-value]').innerText()) === '$107,700.00'
@@ -359,6 +368,8 @@ try {
         (await whatIfDiff.innerText()) === 'Slow average (days): 200 → 250' && /\+9\.90%/.test(await labStats.innerText())
         && await lab.locator('[data-knob="fast"][data-value="50"][aria-pressed="true"]').count() === 1
         && await lab.locator('[aria-pressed="true"]').count() === 2);
+    check('…still without a sign colour, and #simulated-stats still unchanged',
+        await colourCount('#whatif-stats') === 0 && (await page.locator('#simulated-stats').innerText()) === simulatedBefore);
     await lab.locator('[data-knob="slow"][data-value="200"]').click();
     await page.waitForFunction(() => document.querySelector('#whatif-diff')?.getAttribute('data-variant') === 'catalog');
     check('…and the catalog position is the stored backtest again', /\+11\.60%/.test(await labStats.innerText()) && await lab.locator('path[data-line="whatif"]').count() === 0);
