@@ -33,19 +33,29 @@ node qa-topics.mjs                         # 3. the checks (screenshots land in 
 node screenshots.mjs                       # or: capture the README screenshots
 ```
 
-The other scripts follow the same shape, one per change set: `qa-foundations.mjs`,
+The other scripts follow the same shape, one per change set: `qa-foundations.mjs` (its in-app
+404 waits for the rendered page, and a symbol no strategy watches still 404s keyless with no
+stock panels),
 `qa-navigation.mjs`, `qa-ai-surfaces.mjs`, `qa-truthful-data.mjs`, `qa-trade-desk.mjs` (the ticket,
 the CSV export and the comparison table — neither counts a row from before the account's
 inception — and the note, read back from `placeOrder`'s own request; for the "earning ≈$x/month" clause it answers the page's `getQuote`
 server action with a fixed price, since the harness has no quote provider, and removes the ^IRX
-row it seeds),
+row it seeds; `/stocks/AAPL` renders keyless because a strategy watches it),
 `qa-news-feed.mjs`, `qa-strategies.mjs` (seeds the system-owned strategy accounts directly — the
-daily job never runs in this harness), `qa-income.mjs` (interest and dividends: runs the REAL nightly
+daily job never runs in this harness; the what-if lab from a seeded grid — two knobs on golden
+cross, a slider on 60/40, "computed overnight" before a grid exists, none on buy-and-hold — and
+the stock page: keyless empty key numbers, seeded rows under "What the rules see" on
+`/stocks/NVDA`, three watchers on `/stocks/SPY`, none on `/stocks/ZZZ`), `qa-income.mjs` (interest and dividends: runs the REAL nightly
 income job through the Inngest dev server, scoped to its own account; without the dev server on :8288
 it runs only the page checks),
 `qa-learn.mjs` (the First-week checklist, /learn, the ⌘K glossary rows, Guess the Verdict,
 "What the rule saw" with the decoded reason and "Read this board" on a seeded strategy page, an
-"Ask in chat" prefill, and Today's lesson added from the library), `qa-learn-account.mjs` (the
+"Ask in chat" prefill, Today's lesson added from the library, the Daily quiz — one board inside
+its ten-day window, the reveal and its gloss, a day counted once, the empty state; it wipes
+`strategyruns` and seeds its own, so it runs late — Time in the market on a seeded V-shaped SPY
+(it snapshots and restores the SPY and ^IRX bars it replaces), and `/brain`: the legend's
+constants, one event badge, "since thesis" once bars are stored, each Navigator decision
+decoded, titles only on the widgets), `qa-learn-account.mjs` (the
 portfolio surfaces on a seeded account: a fresh account's empty states first, then seeded
 snapshots, a sell, an unpriced holding and income totals for the dated drawdown and its shaded
 band, the return bridge's guess and lines that add up to the Total Return tile to the cent, the
@@ -71,7 +81,9 @@ if any check fails and prints one `PASS`/`FAIL` line per check.
 Without a Finnhub key the trade and markets pages show empty quotes, which is
 fine for these checks — `qa-truthful-data.mjs` relies on it to assert that unpriced
 holdings are labelled rather than shown as a flat P&L. The Inngest jobs are not part
-of this recipe; fire them with `npx inngest-cli dev` and `npm run trigger -- <job>`.
+of this recipe; fire them with `npx inngest-cli dev` and `npm run trigger -- <job>`. The daily
+digest has no suite: it sends only after a news pull, a model's summary and SMTP, so its topics
+and lesson sections are pure builders covered by unit tests instead.
 `qa-truthful-data.mjs` detects a dev server on :8288 and, when one is running,
 exercises the queued path (the first-run fill lands every starter, "Refresh now"
 runs the on-demand job) instead of the dead-queue path (honest failure, cooldown
