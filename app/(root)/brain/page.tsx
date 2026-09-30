@@ -1,12 +1,15 @@
 import {redirect} from "next/navigation";
 import {getCurrentUserId} from "@/lib/actions/watchlist.actions";
 import {getNavigatorStatus} from "@/lib/actions/navigator.actions";
-import {getActiveTheses, getBrainGraph, getBrainSystemStatus, getEntityEvidence, getTopEntities} from "@/lib/brain/queries";
+import {getActiveTheses, getBrainGraph, getBrainSystemStatus, getEntityEvidence, getSinceThesis, getTopEntities} from "@/lib/brain/queries";
+import {glossNavigatorReasons} from "@/lib/learn/reasons";
+import type {SuggestionSetView} from "@/lib/navigator/service";
 import {getLatestSecondOpinion, isSecondOpinionConfigured} from "@/lib/brain/opinion";
 import {getLatestSuggestions} from "@/lib/navigator/service";
 import {getTopicsForUser} from "@/lib/topics/store";
 import {getAccountsForUser, toAccountSummary} from "@/lib/trading/account";
 import ActiveTheses from "@/components/brain/ActiveTheses";
+import BrainLegend from "@/components/brain/BrainLegend";
 import BrainGraph from "@/components/brain/BrainGraph";
 import EvidenceList from "@/components/brain/EvidenceList";
 import NarrativeLeaderboard from "@/components/brain/NarrativeLeaderboard";
@@ -14,6 +17,13 @@ import NavigatorCard from "@/components/brain/NavigatorCard";
 import SecondOpinionCard from "@/components/brain/SecondOpinionCard";
 import SuggestionPanel from "@/components/brain/SuggestionPanel";
 import SystemStatus from "@/components/brain/SystemStatus";
+
+// Each decision's reasons decoded here, on the server, so the client panel renders clauses
+// without bundling the grammar.
+const withGloss = (set: SuggestionSetView | null) => set && {
+    ...set,
+    items: set.items.map((item) => ({...item, gloss: glossNavigatorReasons(item.reasons)})),
+};
 
 type BrainPageProps = {
     searchParams: Promise<{entity?: string}>;
@@ -38,7 +48,11 @@ const BrainPage = async ({searchParams}: BrainPageProps) => {
     ]);
     // Lets a narrative row show "following" when a topic of the same name exists.
     const followedByName = Object.fromEntries(topics.map((t) => [t.name.toLowerCase(), {id: t.id, slug: t.slug}]));
-    const evidence = entity ? await getEntityEvidence(entity) : null;
+    // A second read that waits on the theses: "since thesis" needs their keys and dates.
+    const [evidence, sinceThesis] = await Promise.all([
+        entity ? getEntityEvidence(entity) : null,
+        getSinceThesis(theses),
+    ]);
     const applyAccounts = accounts.map((a) => {
         const s = toAccountSummary(a);
         return {id: s.id, name: s.name};
@@ -58,6 +72,7 @@ const BrainPage = async ({searchParams}: BrainPageProps) => {
 
             {/* Is the machinery actually running? */}
             <SystemStatus status={systemStatus} />
+            <BrainLegend />
 
             <div className="grid grid-cols-1 xl:grid-cols-2 gap-4">
                 {/* Active theses — the centerpiece */}
@@ -65,7 +80,7 @@ const BrainPage = async ({searchParams}: BrainPageProps) => {
                     <h2 className="text-sm font-bold uppercase tracking-[0.1em] text-brand mb-4" style={{fontFamily: 'var(--type-mono)'}}>
                         Active Theses
                     </h2>
-                    <ActiveTheses theses={theses} followedByName={followedByName} />
+                    <ActiveTheses theses={theses} followedByName={followedByName} sinceThesis={sinceThesis} definitions />
                 </section>
 
                 {/* Navigator enrollment + weekly decisions */}
@@ -75,7 +90,7 @@ const BrainPage = async ({searchParams}: BrainPageProps) => {
                         <h2 className="text-sm font-bold uppercase tracking-[0.1em] text-brand mb-4" style={{fontFamily: 'var(--type-mono)'}}>
                             Weekly Decisions
                         </h2>
-                        <SuggestionPanel userSet={suggestions.user} globalSet={suggestions.global} accounts={applyAccounts} />
+                        <SuggestionPanel userSet={withGloss(suggestions.user)} globalSet={withGloss(suggestions.global)} accounts={applyAccounts} />
                     </section>
                 </div>
             </div>

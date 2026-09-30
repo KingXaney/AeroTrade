@@ -22,4 +22,12 @@ describe('whereItLives', () => {
         expect(whereItLives(GLOSSARY.fomc).href).toBe('/topics');
         expect(groupOf(GLOSSARY['position-cap'])).toBe('rails');
     });
+
+    it('homes the brain\'s numbers and event labels on /brain, beside the rails', () => {
+        for (const key of ['news-weight', 'news-sentiment', 'thesis', 'since-thesis', 'event-earnings', 'event-legal'] as const) {
+            expect(groupOf(GLOSSARY[key]), key).toBe('brain');
+            expect(whereItLives(GLOSSARY[key]).href).toBe('/brain');
+        }
+        expect(GLOSSARY_GROUPS.map((group) => group.id)).toEqual(['board', 'portfolio', 'market', 'concepts', 'brain', 'rails']);
+    });
 });

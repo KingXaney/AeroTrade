@@ -1,6 +1,11 @@
 import Link from "next/link";
 import {cn, formatTimeAgo, getChangeColorClass} from "@/lib/utils";
 import TradeLink from "@/components/trade/TradeLink";
+import Badge from "@/components/primitives/Badge";
+import Term from "@/components/primitives/Term";
+import WhatTheseMean from "@/components/learn/WhatTheseMean";
+import {eventBadge, eventTermsShown} from "@/lib/learn/event-types";
+import {BRAIN_COPY} from "@/lib/learn/copy/brain";
 
 // Ticker keys are bare symbols; sectors and themes carry a "sector:" / "theme:" prefix.
 const isTickerKey = (key: string): boolean => /^[A-Z][A-Z0-9.\-]{0,9}$/.test(key);
@@ -14,6 +19,20 @@ export type EvidenceItem = {
     publishedDate: string;
     sentiment: number;
     relevance: number;
+    // The extractor's label for the kind of event the article covers; 'other' shows no badge.
+    eventType: string | null;
+};
+
+// The row's event badge, its definition as the title (the panel's disclosure below is the
+// touch-reachable twin).
+const EventBadge = ({eventType}: {eventType: string | null}) => {
+    const badge = eventBadge(eventType);
+    if (!badge) return null;
+    return (
+        <Term k={badge.term} className="no-underline">
+            <Badge>{badge.label}</Badge>
+        </Term>
+    );
 };
 
 // Per-entity evidence drill-down: the actual articles behind a narrative's weight.
@@ -46,14 +65,17 @@ const EvidenceList = ({entityKey, items}: {entityKey: string; items: EvidenceIte
                                 {item.sentiment >= 0 ? '+' : ''}{item.sentiment.toFixed(2)}
                             </span>
                         </div>
-                        <div className="text-[11px] text-fg-muted mt-1" style={{fontFamily: 'var(--type-mono)'}}>
-                            {item.source} · {formatTimeAgo(item.datetime)}
-                            {item.sourceType === 'reddit' && <span className="ml-2 text-negative">community sentiment</span>}
+                        <div className="flex flex-wrap items-center gap-2 text-[11px] text-fg-muted mt-1" style={{fontFamily: 'var(--type-mono)'}}>
+                            <EventBadge eventType={item.eventType} />
+                            <span>{item.source} · {formatTimeAgo(item.datetime)}</span>
+                            {item.sourceType === 'reddit' && <span className="text-negative">community sentiment</span>}
                         </div>
                     </a>
                 ))}
             </div>
         )}
+        {/* One disclosure per panel, listing only the labels on screen. */}
+        <WhatTheseMean keys={eventTermsShown(items.map((item) => item.eventType))} label={BRAIN_COPY.labelsSummary} />
     </div>
 );
 

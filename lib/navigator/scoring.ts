@@ -37,7 +37,7 @@ type MomentumHorizon = keyof typeof MOMENTUM_MIX;
 type MomentumResult = {component: number; reason: string};
 
 // Fraction of the universe (by 63d vol) that takes the volatility haircut.
-const TOP_QUINTILE_FRACTION = 0.2;
+export const TOP_QUINTILE_FRACTION = 0.2;
 
 // Reason strings show one decimal — enough to be readable, stable across runs.
 const REASON_DECIMALS = 1;

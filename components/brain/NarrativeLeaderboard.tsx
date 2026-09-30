@@ -1,6 +1,8 @@
 import Link from "next/link";
 import {cn, getChangeColorClass} from "@/lib/utils";
 import FollowTopicButton from "@/components/topics/FollowTopicButton";
+import {THESIS_WEIGHT_THRESHOLD} from "@/lib/brain/config";
+import {BRAIN_COPY} from "@/lib/learn/copy/brain";
 
 // Lower-cased topic name -> the user's topic; only the /brain page passes it.
 export type FollowedByName = Record<string, {id: string; slug: string}>;
@@ -45,13 +47,22 @@ const TypeColumn = ({title, entities, followedByName}: {title: string; entities:
     </div>
 );
 
-// Slow-layer leaderboard per entity type. The cyan dot marks an active thesis.
-const NarrativeLeaderboard = ({entities, followedByName}: {entities: Record<BrainEntityType, BrainEntitySummary[]>; followedByName?: FollowedByName}) => (
-    <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-        <TypeColumn title="Themes" entities={entities.theme} followedByName={followedByName} />
-        <TypeColumn title="Sectors" entities={entities.sector} followedByName={followedByName} />
-        <TypeColumn title="Tickers" entities={entities.ticker} followedByName={followedByName} />
-    </div>
-);
+// Slow-layer leaderboard per entity type. The cyan dot marks an active thesis, and the line
+// under the columns says so — only when some row carries the dot (invariant 8).
+const NarrativeLeaderboard = ({entities, followedByName}: {entities: Record<BrainEntityType, BrainEntitySummary[]>; followedByName?: FollowedByName}) => {
+    const anyThesis = [...entities.theme, ...entities.sector, ...entities.ticker].some((e) => e.thesisSince !== null);
+    return (
+        <div>
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                <TypeColumn title="Themes" entities={entities.theme} followedByName={followedByName} />
+                <TypeColumn title="Sectors" entities={entities.sector} followedByName={followedByName} />
+                <TypeColumn title="Tickers" entities={entities.ticker} followedByName={followedByName} />
+            </div>
+            {anyThesis && (
+                <p data-testid="thesis-legend" className="font-mono text-[11px] text-fg-muted mt-3">{BRAIN_COPY.thesisDot(THESIS_WEIGHT_THRESHOLD)}</p>
+            )}
+        </div>
+    );
+};
 
 export default NarrativeLeaderboard;

@@ -13,6 +13,10 @@
 // On the buy-and-hold page, Time in the market sets three ways of owning a seeded V-shaped SPY
 // side by side from the account's inception, moves with a start typed inside the dip, holds
 // its printed arithmetic to the cent, and prints a dash for cash once ^IRX is gone.
+// On /brain, the legend sits collapsed under System Status and states the constants (60, 0.35);
+// an earnings article carries the one badge and the evidence one "What these labels mean"; a
+// thesis gets "since thesis" only once its bars and SPY's are stored; each Navigator decision
+// opens to its reasons in plain words; the same panels as widgets carry titles only.
 // Run against the harness in README.md (in-memory Mongo on :27117 + `npm run dev`).
 import {chromium} from 'playwright';
 import {MongoClient, ObjectId} from 'mongodb';
@@ -782,6 +786,141 @@ try {
     } finally {
         await pricebars.deleteMany({symbol: {$in: ['SPY', '^IRX']}});
         if (savedBars.length > 0) await pricebars.insertMany(savedBars);
+    }
+    // --- user F: /brain — the legend, event badges, "since thesis", the Navigator's reasons ---
+    // A made-up ticker, QATH, with the heaviest active thesis (three weeks old), two articles
+    // about it (one labelled earnings, one other) and a decision set of the user's own carrying
+    // Navigator reasons. Bars for QATH and SPY are seeded only after the first look; everything
+    // seeded is removed again and the stored SPY bars are put back.
+    const THESIS_KEY = 'QATH';
+    const pricebarsF = db.collection('pricebars');
+    const savedSpyF = await pricebarsF.find({symbol: 'SPY'}).toArray();
+    let userF = null;
+    let newsIdsF = [];
+    try {
+        const addDaysF = (date, n) => { const [y, m, d] = date.split('-').map(Number); return new Date(Date.UTC(y, m - 1, d + n)).toISOString().slice(0, 10); };
+        const weekdayF = (date) => ![0, 6].includes(new Date(`${date}T12:00:00Z`).getUTCDay());
+        const pctText = (pct) => { const r = Math.round(pct * 10) / 10; return r === 0 ? '0.0%' : `${r < 0 ? '−' : '+'}${Math.abs(r).toFixed(1)}%`; };
+        const todayF = isoDaysAgo(0);
+        const thesisDate = isoDaysAgo(21);
+
+        const contextF = await browser.newContext({viewport: {width: 1440, height: 900}});
+        const pageF = await contextF.newPage();
+        const emailF = await signUp(pageF, 'learnF');
+        userF = await userIdFor(emailF);
+        await db.collection('brainentities').updateOne({key: THESIS_KEY}, {$set: {
+            key: THESIS_KEY, type: 'ticker', displayName: THESIS_KEY, weightFast: 4, sentimentSumFast: 1, weightSlow: 900, sentimentSumSlow: 270,
+            decayedTo: todayF, lastSeenAt: new Date(), verified: true,
+            thesisSince: new Date(`${thesisDate}T11:30:00Z`), peakSlowWeight: 900, links: [],
+        }}, {upsert: true});
+        const article = (n, eventType) => ({
+            contentHash: 700_000_000 + Math.floor(Math.random() * 1_000_000) * 10 + n,
+            headline: `QA brain article ${n}`, summary: 'QA', source: 'QA Wire', sourceType: 'finance',
+            url: `https://example.com/qa-brain-${Date.now()}-${n}`, datetime: Math.floor(Date.now() / 1000) - n * 3600, publishedDate: todayF,
+            category: '', related: '', createdAt: new Date(),
+            extraction: {eventType, importance: 0.73, entities: [{key: THESIS_KEY, type: 'ticker', sentiment: 0.4, relevance: 0.9}], model: 'qa', extractedAt: new Date()},
+        });
+        const insertedNews = await db.collection('newsitems').insertMany([article(1, 'earnings'), article(2, 'other')]);
+        newsIdsF = Object.values(insertedNews.insertedIds);
+        const item = (symbol, action, reasons, extra = {}) => ({symbol, action, targetWeight: 0.1, currentWeight: 0, score: 0.3, reasons, executed: false, ...extra});
+        await db.collection('suggestionsets').insertOne({userId: userF, date: todayF, kind: 'executed', createdAt: new Date(), items: [
+            item(THESIS_KEY, 'buy', ['enter: score 0.42', 'slow news weight 12.3 (rank 1/25)', '6-month momentum +12.0%', `thesis ${THESIS_KEY}`],
+                {quantity: 10, targetWeight: 0.12, score: 0.42, executed: true, executionPrice: 100}),
+            item('SPY', 'hold', ['no brain coverage — news neutral', 'a reason the grammar has never seen']),
+            item('ZZQA', 'hold', ['a reason the grammar has never seen']),
+        ]});
+
+        const openBrain = async (query = '') => {
+            await pageF.goto(`${BASE}/brain${query}`, {waitUntil: 'domcontentloaded'});
+            await pageF.getByText('Active Theses').first().waitFor({timeout: 60000});
+        };
+        const panelOf = (heading) => pageF.locator('section', {has: pageF.locator('h2', {hasText: heading})});
+        const sinceLine = () => pageF.locator('[data-testid="since-thesis"]', {hasText: THESIS_KEY});
+
+        await openBrain();
+        const legend = pageF.locator('#brain-legend');
+        check('the legend sits right under System Status, collapsed', await legend.count() === 1
+            && await legend.evaluate((el) => /System Status/i.test(el.previousElementSibling?.textContent ?? ''))
+            && !(await legend.locator('details').evaluate((d) => d.open)));
+        await legend.locator('details').evaluate((d) => { d.open = true; });
+        const legendText = await legend.innerText();
+        check('…and opens to the constants: the 60-day half-life and momentum\'s 0.35', /halves every 60 days/.test(legendText) && /momentum 0\.35/.test(legendText),
+            legendText.replace(/\s+/g, ' ').slice(0, 160));
+        check('…describing mechanism, never a result', !/\b(works?|fails?|beat|outperform)/i.test(legendText));
+
+        const theses = panelOf('Active Theses');
+        check('Active Theses labels weight and sentiment with their definitions', await theses.locator('[data-term="news-weight"][title]').count() >= 1
+            && await theses.locator('[data-term="news-sentiment"][title]').count() >= 1);
+        check('…with one "What these mean" for the panel', await theses.locator('[data-what-these-mean]').count() === 1);
+        check('no "since thesis" line before any bars are stored', await sinceLine().count() === 0);
+        check('the leaderboard says what the dot means, once', (await pageF.locator('[data-testid="thesis-legend"]').allInnerTexts()).join('|')
+            === '● thesis: the news about this name has stayed strong for weeks (its slow weight reached 5)');
+
+        const decisions = panelOf('Weekly Decisions');
+        const glosses = decisions.locator('[data-navigator-gloss]');
+        check('each decision with a readable reason has one closed "What the Navigator saw"', await glosses.count() === 2
+            && (await glosses.evaluateAll((all) => all.every((d) => !d.open))), String(await glosses.count()));
+        check('…the raw reasons still listed', /enter: score 0\.42/.test(await decisions.innerText()) && /a reason the grammar has never seen/.test(await decisions.innerText()));
+        await glosses.evaluateAll((all) => all.forEach((d) => { d.open = true; }));
+        const [enterGloss, spyGloss] = await glosses.allInnerTexts();
+        check('…reading the entry with the config\'s rails', /entry line of 0\.15/.test(enterGloss) && /halves every 60 days/.test(enterGloss) && /An active thesis on QATH/.test(enterGloss),
+            enterGloss.replace(/\s+/g, ' ').slice(0, 200));
+        check('…and the neutral-news reason for a symbol the brain does not cover', /set to 0, the middle/.test(spyGloss), spyGloss.replace(/\s+/g, ' ').slice(0, 160));
+        await pageF.screenshot({path: `${OUT}10-brain.png`, fullPage: true});
+
+        // Evidence: one badge for the earnings article, none for "other", one label disclosure.
+        await openBrain(`?entity=${THESIS_KEY}#evidence`);
+        const evidence = pageF.locator('#evidence');
+        await evidence.waitFor({timeout: 30000});
+        check('the evidence lists both articles', (await evidence.innerText()).includes('QA brain article 1') && (await evidence.innerText()).includes('QA brain article 2'));
+        check('one badge, for the earnings article', await evidence.locator('[data-term^="event-"]').count() === 1
+            && await evidence.locator('[data-term="event-earnings"][title*="8-K"]').count() === 1);
+        const labels = evidence.locator('details');
+        check('…and one "What these labels mean", listing only that label', await labels.count() === 1
+            && (await labels.locator('summary').innerText()).includes('What these labels mean'));
+        await labels.evaluate((d) => { d.open = true; });
+        const labelText = await labels.innerText();
+        check('…which names the filings', /Earnings news/.test(labelText) && /10-Q/.test(labelText) && /10-K/.test(labelText) && !/Legal news/.test(labelText));
+        check('an article\'s importance is never printed', !/0\.73|importance/i.test(await evidence.innerText()));
+
+        // Bars for QATH and SPY from before the thesis: the line appears, both legs over the same sessions.
+        const sessionsF = [];
+        for (let d = addDaysF(thesisDate, -10); d <= isoDaysAgo(1); d = addDaysF(d, 1)) if (weekdayF(d)) sessionsF.push(d);
+        const qathClose = (i) => 100 * (1 + 0.004 * i);
+        const spyClose = (i) => 500 * (1 + 0.001 * i);
+        const b = sessionsF.findIndex((d) => d >= thesisDate);
+        const e = sessionsF.length - 1;
+        const barF = (symbol, date, value) => ({symbol, date, close: value, open: value, high: value, low: value, source: 'yahoo', dividend: 0});
+        await pricebarsF.deleteMany({symbol: {$in: [THESIS_KEY, 'SPY']}});
+        await pricebarsF.insertMany([...sessionsF.map((d, i) => barF(THESIS_KEY, d, qathClose(i))), ...sessionsF.map((d, i) => barF('SPY', d, spyClose(i)))]);
+        const expected = `since thesis: ${THESIS_KEY} ${pctText((qathClose(e) / qathClose(b) - 1) * 100)} · SPY ${pctText((spyClose(e) / spyClose(b) - 1) * 100)}`;
+        await openBrain();
+        await sinceLine().waitFor({timeout: 30000}).catch(() => {});
+        check('with bars stored, "since thesis" appears with both legs', await sinceLine().count() === 1 && (await sinceLine().innerText()).trim() === expected,
+            `${await sinceLine().count() === 1 ? (await sinceLine().innerText()).trim() : 'no line'} vs ${expected}`);
+        check('…dated from the first close on or after the thesis day', (await sinceLine().getAttribute('title') ?? '').startsWith('From the close of ')
+            && await sinceLine().locator('[data-term="since-thesis"][title]').count() === 1);
+
+        // The same panels as dashboard widgets: titles only — no definitions, no Ask link, no gloss, no line.
+        await pageF.goto(`${BASE}/settings`, {waitUntil: 'load'});
+        await pageF.getByLabel('Add Active Theses').click();
+        await pageF.getByLabel('Add Weekly Decisions').click();
+        await pageF.waitForTimeout(1200);   // debounced autosave
+        await pageF.goto(`${BASE}/`, {waitUntil: 'domcontentloaded'});
+        const thesesWidget = pageF.locator('[data-widget-id="active-theses"]');
+        const decisionsWidget = pageF.locator('[data-widget-id="weekly-decisions"]');
+        await thesesWidget.getByText(THESIS_KEY).first().waitFor({timeout: 30000});
+        await decisionsWidget.getByText('enter: score 0.42').waitFor({timeout: 30000});
+        check('the Active Theses widget keeps its titles and nothing else', await thesesWidget.locator('[data-term="news-weight"][title]').count() >= 1
+            && await thesesWidget.locator('[data-what-these-mean], [data-ask], [data-testid="since-thesis"]').count() === 0);
+        check('the Weekly Decisions widget carries no gloss', await decisionsWidget.locator('[data-navigator-gloss], [data-ask]').count() === 0);
+        await contextF.close();
+    } finally {
+        await db.collection('brainentities').deleteOne({key: THESIS_KEY});
+        if (newsIdsF.length > 0) await db.collection('newsitems').deleteMany({_id: {$in: newsIdsF}});
+        if (userF) await db.collection('suggestionsets').deleteMany({userId: userF});
+        await pricebarsF.deleteMany({symbol: {$in: [THESIS_KEY, 'SPY']}});
+        if (savedSpyF.length > 0) await pricebarsF.insertMany(savedSpyF);
     }
 } catch (err) {
     failures++;
