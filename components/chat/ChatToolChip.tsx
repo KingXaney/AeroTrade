@@ -27,6 +27,7 @@ const LABELS: Record<ChatToolName, string> = {
     followTopic: 'Following a topic',
     unfollowTopic: 'Unfollowing a topic',
     explainTerm: 'Looking up the definition',
+    getQuantStrategies: 'Reading the quant strategies',
 };
 
 const ChatToolChip = ({toolName, state, summary}: ChatToolChipProps) => {

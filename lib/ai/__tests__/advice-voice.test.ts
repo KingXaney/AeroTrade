@@ -14,7 +14,7 @@ import {RATIONALE_PROMPT} from '@/lib/brain/prompts';
 import {findBanned} from '@/lib/learn/banned';
 
 // Bumped when a tool is added; the Record type already forces the copy to exist.
-const TOOL_COUNT = 16;
+const TOOL_COUNT = 17;
 
 // A denylist of real symbols, not a bare uppercase regex: "AI chips" is a topic, not a
 // ticker.

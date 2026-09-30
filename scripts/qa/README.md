@@ -75,8 +75,8 @@ ended on a stale snapshot's date — and Trading habits over four closed lots wi
 trip and a sale before its 30-day window left out; it removes the large-cap bars it seeded and
 puts back the ^IRX points and any other suite's large-cap dividends it set aside), `qa-tutor.mjs` (the
 chat's three rate-limit windows via seeded `ratelimits` rows, the prefill, then the `explainTerm`
-chip from a stubbed UI-message stream — the tutor's answers themselves need a Gemini key and are
-checked by hand)
+and `getQuantStrategies` chips from stubbed UI-message streams — the tutor's answers themselves need
+a Gemini key and are checked by hand)
 and `qa-auth.mjs` (password reset end to end — it reads the token out of the
 throwaway Mongo, since the harness has no SMTP). They share one database, so each
 scopes its assertions to the user it signs up.

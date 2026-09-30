@@ -1,7 +1,8 @@
 // The chat tutor's guard rails, keyless: the three rate-limit windows refuse in order
 // with honest copy and no retry, an "Ask in chat" link prefills the composer without
-// sending, and explainTerm's chip renders from a stubbed stream. The tutor's actual
-// answers need a Gemini key and are checked by hand. Run against the harness in README.md.
+// sending, and the explainTerm and getQuantStrategies chips render from stubbed streams.
+// The tutor's actual answers need a Gemini key and are checked by hand. Run against the
+// harness in README.md.
 import {chromium} from 'playwright';
 import {MongoClient} from 'mongodb';
 import {mkdirSync} from 'node:fs';
@@ -116,11 +117,11 @@ try {
     // chip: its label, the glossary name as summary, the quoted term when there is no entry,
     // and nothing repeated for a reason.
     const STANCE = "These are the app's own definitions, and the learner's own paper-account figures where the app computes them.";
-    const explainStream = (id, input, output, reply) => [
-        {type: 'start', messageId: `qa-explain-${id}`},
+    const toolStream = (toolName, id, input, output, reply) => [
+        {type: 'start', messageId: `qa-${toolName}-${id}`},
         {type: 'start-step'},
-        {type: 'tool-input-start', toolCallId: `call-${id}`, toolName: 'explainTerm'},
-        {type: 'tool-input-available', toolCallId: `call-${id}`, toolName: 'explainTerm', input},
+        {type: 'tool-input-start', toolCallId: `call-${id}`, toolName},
+        {type: 'tool-input-available', toolCallId: `call-${id}`, toolName, input},
         {type: 'tool-output-available', toolCallId: `call-${id}`, output},
         {type: 'finish-step'},
         {type: 'start-step'},
@@ -130,6 +131,7 @@ try {
         {type: 'finish-step'},
         {type: 'finish', finishReason: 'stop'},
     ].map((chunk) => `data: ${JSON.stringify(chunk)}\n\n`).join('') + 'data: [DONE]\n\n';
+    const explainStream = (id, input, output, reply) => toolStream('explainTerm', id, input, output, reply);
     const sentBodies = [];
     const stubOnce = async (body) => {
         await page.unroute('**/api/chat').catch(() => {});
@@ -183,9 +185,62 @@ try {
     await dialog.getByText('Stubbed answer three.').waitFor({timeout: 30000});
     check('a reason lookup shows the label alone',
         await explainChips().count() === 3 && await explainChips().last().locator('span.text-fg-muted').count() === 0);
+    await shot('05-explain-chips');
+
+    // --- getQuantStrategies' chip, from a stubbed stream -------------------------------------
+    // Outputs in lib/ai/quant-strategies.ts's shape. The chip names the strategy once the tool
+    // has read it, counts the list when no slug was passed, and quotes the slug as asked when
+    // no strategy matched. The tool's own reads are the /strategies page's leaderboard and the
+    // detail page's latest run, which qa-strategies and qa-learn walk.
+    const QUANT_STANCE = "These are the app's eight rule-based paper strategies, read from its own records.";
+    const quantChips = () => dialog.locator('div.rounded-full').filter({hasText: 'Reading the quant strategies'});
+    const quantSummary = async () => (await quantChips().last().locator('span.text-fg-muted').innerText()).trim();
+    const QUANT_NAMES = ['Buy & Hold SPY', '60/40 Quarterly', 'Golden Cross Sectors', 'Dual Momentum (GEM)',
+        '12-1 Momentum Top 8', 'RSI-2 Mean Reversion', 'Donchian 55/20 Breakout', 'Low Volatility Top 10'];
+
+    await stubOnce(toolStream('getQuantStrategies', '4', {slug: 'golden-cross'}, {
+        stance: QUANT_STANCE,
+        strategy: {
+            slug: 'golden-cross', name: 'Golden Cross Sectors', family: 'Trend following', cadence: 'daily', followed: false, slots: 11,
+            live: {returnPct: 1.23, spyReturnPct: 0.99, vsSpyPct: 0.24, maxDrawdownPct: 2.35, fills: 12, holdings: 3, unpricedHoldings: 0, since: '2026-09-21'},
+            simulated: null,
+        },
+        latestRun: {
+            date: '2026-09-22', asOf: '2026-09-21', mode: 'live', status: 'done', ordersTotal: 1,
+            orders: [{side: 'buy', symbol: 'XLF', quantity: 213, kind: 'enter', filled: true, price: 42.35,
+                reason: 'enter: SMA50 42.10 > SMA200 40.00 (+5.3%)', decoded: {clauses: [{text: 'enter', gloss: 'The trend condition held.'}], unrecognised: []}}],
+            skipped: [], dataIssues: [], watching: {rows: [], totalRows: 0, columns: [], reading: null},
+        },
+        notes: [],
+    }, 'Stubbed answer four.'));
+    await send('Why did the golden cross strategy buy XLF?');
+    await dialog.getByText('Stubbed answer four.').waitFor({timeout: 30000});
+    check('the getQuantStrategies chip reads "Reading the quant strategies"', await quantChips().count() === 1);
+    check("its summary is the strategy's name", await quantSummary() === '— Golden Cross Sectors', await quantSummary());
+    check('a finished read shows as done, not pending or failed', /text-positive/.test(await quantChips().last().getAttribute('class') ?? ''));
+
+    await stubOnce(toolStream('getQuantStrategies', '5', {}, {
+        stance: QUANT_STANCE,
+        strategies: QUANT_NAMES.map((name, i) => ({slug: `s${i}`, name, family: 'Baseline', cadence: 'daily', followed: false, live: null, simulated: null})),
+        notes: ['No strategy has a live record yet; the first run happens on the next trading morning.'],
+    }, 'Stubbed answer five.'));
+    await send('How are the quant strategies doing?');
+    await dialog.getByText('Stubbed answer five.').waitFor({timeout: 30000});
+    check('without a slug the chip counts the list', await quantSummary() === '— 8 strategies', await quantSummary());
+
+    await stubOnce(toolStream('getQuantStrategies', '6', {slug: 'covered calls'}, {
+        stance: QUANT_STANCE, strategy: null, asked: 'covered calls',
+        known: QUANT_NAMES.map((name, i) => ({slug: `s${i}`, name})),
+        notes: ['No single strategy matches that name. These are the eight, by slug and name.'],
+    }, 'Stubbed answer six.'));
+    await send('How is the covered calls strategy doing?');
+    await dialog.getByText('Stubbed answer six.').waitFor({timeout: 30000});
+    check('with no match the chip quotes the slug as asked', await quantSummary() === '— "covered calls"', await quantSummary());
+    check('three quant reads, three chips', await quantChips().count() === 3);
+
     check('a stubbed stream never reached the server (no window counted it)', await windowCounts() === countsBefore, countsBefore);
     await page.unroute('**/api/chat');
-    await shot('05-explain-chips');
+    await shot('06-quant-chips');
 } catch (err) {
     failures++;
     console.log(`FAIL  threw: ${err.message}`);

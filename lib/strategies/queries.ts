@@ -79,17 +79,13 @@ const toRunView = (run: LeanRun): StrategyRunView => ({
     summary: run.summary,
 });
 
-// The latest run per strategy in one query. Reads and groups every run document for
-// the strategies named (boards included), so it belongs on a detail page, never on a
-// request path that fans out over all eight.
-const getLatestRuns = async (strategyIds: readonly string[]): Promise<Map<string, StrategyRunView>> => {
-    const rows = await StrategyRun.aggregate<LeanRun>([
-        {$match: {strategyId: {$in: [...strategyIds]}}},
-        {$sort: {date: -1}},
-        {$group: {_id: '$strategyId', doc: {$first: '$$ROOT'}}},
-        {$replaceRoot: {newRoot: '$doc'}},
-    ]);
-    return new Map(rows.map((r) => [r.strategyId, toRunView(r)]));
+// One strategy's newest run: the first entry of a backward walk down the {strategyId, date}
+// index — one document, its board included (at most the rule's universe). The detail page's
+// latest decision and the chat's getQuantStrategies read it; never fanned out over all eight.
+export const getLatestRun = async (strategyId: StrategyId): Promise<StrategyRunView | null> => {
+    await connectToDatabase();
+    const run = await StrategyRun.findOne({strategyId}).sort({date: -1}).lean<LeanRun | null>();
+    return run ? toRunView(run) : null;
 };
 
 type LeanReplay = {date: string; asOf: string; board?: SignalRow[]; orders?: LeanRun['orders']};
@@ -261,9 +257,9 @@ const buildLeaderboard = async (userId: string | null): Promise<StrategyLeaderbo
     const liveValues = Object.fromEntries(Array.from(portfolios.entries()).map(([id, p]) => [id, p.totalValue]));
     const inceptionByAccount = new Map(accounts.map((a) => [String(a._id), getEasternDateString(new Date(toAccountSummary(a).inceptionAt))]));
 
-    // No getLatestRuns here on purpose: the ranking stopped printing a "last action"
-    // column (eight identical strings), and that was its only reader — so a StrategyRun
-    // aggregate over documents carrying board arrays comes off this page's hot path.
+    // No run read here on purpose: the ranking stopped printing a "last action" column
+    // (eight identical strings), and that was its only reader — so no StrategyRun document
+    // carrying a board array sits on this page's hot path.
     const [stats, backtests, benchmarkReturns, snapshots] = await Promise.all([
         getComparisonStats(STRATEGY_OWNER_ID, liveValues),
         getBacktestStats(),
@@ -287,6 +283,7 @@ const buildLeaderboard = async (userId: string | null): Promise<StrategyLeaderbo
                 benchmarkReturnPct: benchmarkReturns.get(inception) ?? null,
                 maxDrawdownPct: stats[state.accountId]?.maxDrawdownPct ?? null,
                 winRatePct: stats[state.accountId]?.winRatePct ?? null,
+                fills: stats[state.accountId]?.tradeCount ?? 0,
                 holdings: portfolio.positions.length,
                 unpriced: countUnpriced(portfolio.positions),
                 snapshotDays: snapshot?.days ?? 0,
@@ -364,10 +361,10 @@ export const getStrategyDetail = cache(async (slug: string, userId: string | nul
         userId ? getFollowedStrategies(userId) : Promise.resolve([] as string[]),
     ]);
     const state = states.find((s) => s.strategyId === def.id) ?? null;
-    const [analytics, trades, runs, backtestDoc, snapshotDays] = await Promise.all([
+    const [analytics, trades, latestRun, backtestDoc, snapshotDays] = await Promise.all([
         state ? getAccountAnalytics(STRATEGY_OWNER_ID, state.accountId) : Promise.resolve(null),
         state ? getTradeHistory(STRATEGY_OWNER_ID, state.accountId, DETAIL_TRADE_LIMIT) : Promise.resolve([] as PaperTradeRecord[]),
-        getLatestRuns([def.id]),
+        getLatestRun(def.id),
         // One document: the page's backtest and the ≤4 what-if variants stored with it.
         StrategyBacktest.findOne({strategyId: def.id})
             .lean<(StrategyBacktestView & {computedAt: Date; variants?: StoredWhatIfVariant[]; variantsVersion?: string; variantsFor?: Date}) | null>(),
@@ -390,8 +387,8 @@ export const getStrategyDetail = cache(async (slug: string, userId: string | nul
             state,
             analytics,
             trades,
-            latestRun: runs.get(def.id) ?? null,
-            lastActionLine: describeLastRun(runs.get(def.id) ?? null),
+            latestRun,
+            lastActionLine: describeLastRun(latestRun),
             backtest: backtestDoc ? {
                 version: backtestDoc.version,
                 from: backtestDoc.from,

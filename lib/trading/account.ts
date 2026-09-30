@@ -461,15 +461,17 @@ export const getAccountAnalytics = async (userId: string, accountId: string): Pr
     }
 };
 
-// Win rate + max drawdown for every account of a user in bulk queries
-// (feeds the strategy comparison table without N per-account round trips).
+export type ComparisonStats = {winRatePct: number | null; maxDrawdownPct: number | null; tradeCount: number};
+
+// Win rate + max drawdown (and the fill count behind the win rate) for every account of a
+// user in bulk queries (feeds the strategy comparison table without N per-account round trips).
 // liveValues (accountId -> current total value) folds today's live valuation
 // into each drawdown series the same way getAccountAnalytics does. Trades are each
 // account's current epoch (epochTradesOf), so the table's win rate is the tile's.
 export const getComparisonStats = async (
     userId: string,
     liveValues?: Record<string, number>,
-): Promise<Record<string, {winRatePct: number | null; maxDrawdownPct: number | null}>> => {
+): Promise<Record<string, ComparisonStats>> => {
     try {
         await connectToDatabase();
         const epochTradesForUser = async () => {
@@ -499,16 +501,18 @@ export const getComparisonStats = async (
 
         const today = getEasternDateString();
         const ids = new Set([...tradesByAccount.keys(), ...snapshotsByAccount.keys(), ...Object.keys(liveValues ?? {})]);
-        const result: Record<string, {winRatePct: number | null; maxDrawdownPct: number | null}> = {};
+        const result: Record<string, ComparisonStats> = {};
         for (const id of ids) {
             const live = liveValues?.[id];
             const points = mergeLivePoint(
                 snapshotsByAccount.get(id) ?? [],
                 typeof live === 'number' ? {date: today, value: live} : undefined,
             );
+            const accountTrades = tradesByAccount.get(id) ?? [];
             result[id] = {
-                winRatePct: computeWinStats(tradesByAccount.get(id) ?? []).winRatePct,
+                winRatePct: computeWinStats(accountTrades).winRatePct,
                 maxDrawdownPct: computeMaxDrawdown(points),
+                tradeCount: accountTrades.length,
             };
         }
         return result;

@@ -23,7 +23,7 @@ import {
 
 const live = (totalReturnPct: number, extra: Partial<LiveRecord> = {}): LiveRecord => ({
     totalValue: 100_000, totalReturnPct, benchmarkReturnPct: null, maxDrawdownPct: null, winRatePct: null,
-    holdings: 0, unpriced: 0, snapshotDays: 1, inceptionAt: 0, spark: [], ...extra,
+    fills: 0, holdings: 0, unpriced: 0, snapshotDays: 1, inceptionAt: 0, spark: [], ...extra,
 });
 
 const run = (over: Partial<StrategyRunView> = {}): StrategyRunView => ({

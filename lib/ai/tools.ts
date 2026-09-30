@@ -30,6 +30,9 @@ import {findAccountByName, toChatPortfolio} from "@/lib/trading/portfolio-view";
 import {resolveTerm} from "@/lib/learn/glossary";
 import {decodeReason} from "@/lib/learn/reasons";
 import {shapeExplain} from "@/lib/ai/explain";
+import {resolveStrategy, shapeQuantLeaderboard, shapeQuantStrategy, shapeUnknownStrategy} from "@/lib/ai/quant-strategies";
+import {STRATEGY_SLUGS} from "@/lib/strategies/catalog";
+import {getLatestRun, getStrategyLeaderboard} from "@/lib/strategies/queries";
 import {priceLargestHoldings, readLearnerValue} from "@/lib/ai/learner-hooks";
 
 const TOPIC_FEED_DEFAULT = 5;
@@ -38,6 +41,9 @@ const TOPIC_FEED_MAX = 10;
 // Bounds on what the model may pass explainTerm; the shaper clips what it echoes back.
 const EXPLAIN_TERM_MAX = 200;
 const EXPLAIN_REASON_MAX = 1000;
+
+// Longer than any slug or strategy name; the shaper clips what it echoes back.
+const QUANT_SLUG_MAX = 80;
 
 const CHAT_TRADES_DEFAULT = 8;
 const CHAT_TRADES_MAX = 20;
@@ -344,6 +350,27 @@ export const buildTools = (userId: string) => ({
             const decoded = reason ? decodeReason(reason) : null;
             const yours = entry ? await readLearnerValue(userId, entry.key) : null;
             return shapeExplain({term, reason, entry, decoded, yours});
+        },
+    }),
+
+    getQuantStrategies: tool({
+        description: TOOL_DESCRIPTIONS.getQuantStrategies,
+        inputSchema: z.object({
+            slug: z.string().max(QUANT_SLUG_MAX).optional()
+                .describe(`One strategy's slug: ${STRATEGY_SLUGS.join(', ')}. Omit it for all eight.`),
+        }),
+        execute: async ({slug}) => {
+            try {
+                // The /strategies page's own cached reader; with a slug, one run document more.
+                if (!slug?.trim()) return shapeQuantLeaderboard((await getStrategyLeaderboard(userId)).rows);
+                const def = resolveStrategy(slug);
+                if (!def) return shapeUnknownStrategy(slug);
+                const [leaderboard, run] = await Promise.all([getStrategyLeaderboard(userId), getLatestRun(def.id)]);
+                return shapeQuantStrategy({def, row: leaderboard.rows.find((row) => row.id === def.id) ?? null, run});
+            } catch (error) {
+                console.error('getQuantStrategies failed:', error);
+                return {error: 'Could not read the quant strategies right now.'};
+            }
         },
     }),
 }) satisfies Record<ChatToolName, unknown>;

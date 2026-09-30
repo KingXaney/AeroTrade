@@ -22,6 +22,14 @@ const summarizeTool = (toolName: string, part: {input?: unknown; output?: unknow
         return input && typeof input.term === 'string' && input.term.trim() ? `"${input.term.trim()}"` : undefined;
     }
 
+    // The strategy's name once the tool has read it, else the slug as asked, else the count.
+    if (toolName === 'getQuantStrategies') {
+        const out = output && typeof output === 'object' ? (output as {strategy?: {name?: unknown} | null; strategies?: unknown}) : undefined;
+        if (out?.strategy && typeof out.strategy.name === 'string') return out.strategy.name;
+        if (Array.isArray(out?.strategies)) return `${out.strategies.length} ${out.strategies.length === 1 ? 'strategy' : 'strategies'}`;
+        return input && typeof input.slug === 'string' && input.slug.trim() ? `"${input.slug.trim()}"` : undefined;
+    }
+
     if (input && typeof input === 'object') {
         if (typeof input.symbol === 'string') return input.symbol;
         if (typeof input.query === 'string') return `"${input.query}"`;

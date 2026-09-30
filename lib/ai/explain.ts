@@ -52,10 +52,12 @@ export type ExplainEntry = {
 
 export type ExplainClause = {text: string; gloss: string; term?: string; definition?: string};
 
+export type ExplainReason = {clauses: ExplainClause[]; unrecognised: string[]};
+
 export type ExplainResult = {
     stance: string;
     entry: ExplainEntry | null;
-    reason: {clauses: ExplainClause[]; unrecognised: string[]} | null;
+    reason: ExplainReason | null;
     yours: {paper: true; accounts: LearnerAccountValue[]} | null;
     notes: string[];
 };
@@ -67,6 +69,9 @@ const hasText = (value: string | undefined): value is string => typeof value ===
 const clean = (text: string): string => text.replace(/[\u0000-\u001f\u007f]+/g, ' ').replace(/\s+/g, ' ').trim();
 
 const clip = (text: string, max: number): string => (text.length <= max ? text : `${text.slice(0, max - 1)}…`);
+
+// Text echoed back to the model: control characters and runs of space folded, then clipped.
+export const echoText = (text: string, max: number): string => clip(clean(text), max);
 
 const round2 = (n: number): number => Math.round(n * 100) / 100;
 
@@ -94,7 +99,9 @@ const shapeEntry = (entry: GlossaryEntry): ExplainEntry => ({
     seeAlso: (entry.seeAlso ?? []).flatMap((key) => lookupTerm(key)?.term ?? []),
 });
 
-const shapeReason = (decoded: DecodedReason): NonNullable<ExplainResult['reason']> => ({
+// A decoded reason, each clause with the glossary's name and short definition for its term.
+// getQuantStrategies (lib/ai/quant-strategies.ts) shapes its orders' reasons through it too.
+export const shapeReason = (decoded: DecodedReason): ExplainReason => ({
     clauses: decoded.clauses.map((clause) => {
         const defined = clause.term ? lookupTerm(clause.term) : null;
         return {
@@ -103,7 +110,7 @@ const shapeReason = (decoded: DecodedReason): NonNullable<ExplainResult['reason'
             ...(defined ? {term: defined.term, definition: defined.short} : {}),
         };
     }),
-    unrecognised: decoded.unknown.map((text) => clip(clean(text), MAX_ECHO_CHARS)),
+    unrecognised: decoded.unknown.map((text) => echoText(text, MAX_ECHO_CHARS)),
 });
 
 export const shapeExplain = ({term, reason, entry, decoded, yours}: ExplainParts): ExplainResult => {
@@ -125,7 +132,7 @@ export const shapeExplain = ({term, reason, entry, decoded, yours}: ExplainParts
         ? {
             paper: true as const,
             accounts: yours.accounts.slice(0, MAX_PAPER_ACCOUNTS).map((a) => ({
-                account: clip(clean(String(a.account)), MAX_NAME_CHARS),
+                account: echoText(String(a.account), MAX_NAME_CHARS),
                 figures: shapeFigures(a.figures),
             })),
         }

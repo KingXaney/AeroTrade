@@ -11,6 +11,8 @@ export type LiveRecord = {
     benchmarkReturnPct: number | null;
     maxDrawdownPct: number | null;
     winRatePct: number | null;
+    // Fills since the account's inception (getComparisonStats' tradeCount).
+    fills: number;
     holdings: number;
     // Holdings with no live quote — the return is partly at cost.
     unpriced: number;
