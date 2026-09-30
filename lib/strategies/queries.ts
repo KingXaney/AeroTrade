@@ -14,6 +14,7 @@ import {
     getAccountAnalytics,
     getComparisonStats,
     getTradeHistory,
+    getTradeLedger,
     readAccountsForUser,
     toAccountSummary,
 } from "@/lib/trading/account";
@@ -410,6 +411,17 @@ export const getStrategyDetail = cache(async (slug: string, userId: string | nul
         };
     }
 });
+
+// A strategy's whole live ledger, for its CSV export: the system account's current epoch, oldest
+// first, uncapped (getTradeLedger — an export is complete by definition, unlike the page's
+// DETAIL_TRADE_LIMIT tail). Null for a slug the catalog does not know; no trades before the
+// first run opens the account. A failed read throws, so the route answers 500, never an empty file.
+export const getStrategyLedger = async (slug: string): Promise<{def: StrategyDefinition; trades: PaperTradeRecord[]} | null> => {
+    const def = strategyBySlug(slug);
+    if (!def) return null;
+    const state = (await getStrategyStates()).find((s) => s.strategyId === def.id);
+    return {def, trades: state ? await getTradeLedger(STRATEGY_OWNER_ID, state.accountId) : []};
+};
 
 export type StrategiesSystemStatus = {
     job: JobHealth | null;

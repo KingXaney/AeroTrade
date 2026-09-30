@@ -48,7 +48,8 @@ the job's own what-if store, `saveVariants` / `variantStamps` / `saveBacktest`, 
 Mongoose on the harness database: the app's TypeScript is loaded with `jiti`, resolved from the
 repo's `node_modules`, with `MONGODB_URI` pointed at the harness; and the stock page: keyless
 empty key numbers, each rule's newest seeded row under "What the rules see" on `/stocks/NVDA`,
-three watchers on `/stocks/SPY`, none on `/stocks/ZZZ`), `qa-income.mjs` (interest and dividends: runs the REAL nightly
+three watchers on `/stocks/SPY`, none on `/stocks/ZZZ`; the live trade log's CSV export — this
+epoch's fills only, 404 for an unknown slug, 401 signed out), `qa-income.mjs` (interest and dividends: runs the REAL nightly
 income job through the Inngest dev server, scoped to its own account; without the dev server on :8288
 it runs only the page checks),
 `qa-learn.mjs` (the First-week checklist, /learn, the ⌘K glossary rows, Guess the Verdict,
