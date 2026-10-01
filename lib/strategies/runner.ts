@@ -1,6 +1,6 @@
 // What one Inngest step does for one strategy: load the decision input, run the ONE
 // shared decision path, persist the plan; or rebuild the simulated record, or its what-if
-// grid. Server module; the job in lib/jobs/functions.ts sequences these into steps.
+// grid. Server module; the job in lib/jobs/functions/strategies.ts sequences these into steps.
 
 import {buildContext, runStrategyDay} from "@/lib/strategies/engine";
 import {STRATEGY_RULES} from "@/lib/strategies/rules";
