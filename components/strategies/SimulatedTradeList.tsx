@@ -1,4 +1,5 @@
 import {cn, formatPrice, getChangeColorClass} from "@/lib/utils";
+import {formatSignedPrice} from "@/lib/format";
 import type {StrategyBacktestView} from "@/lib/strategies/queries";
 import type {StrategyDefinition} from "@/lib/strategies/types";
 import ReasonDisclosure from "@/components/strategies/ReasonDisclosure";
@@ -36,8 +37,8 @@ const SimulatedTradeList = ({trades, def}: {trades: StrategyBacktestView['trades
                         <div className="text-[10px] text-fg-muted" style={{fontFamily: 'var(--type-mono)'}}>
                             {t.date}
                             {typeof t.realizedPnl === 'number' && (
-                                <span className={cn('ml-2', getChangeColorClass(t.realizedPnl || undefined))}>
-                                    {t.realizedPnl >= 0 ? '+' : ''}{formatPrice(t.realizedPnl)}
+                                <span className={cn('ml-2', getChangeColorClass(t.realizedPnl))}>
+                                    {formatSignedPrice(t.realizedPnl)}
                                 </span>
                             )}
                         </div>

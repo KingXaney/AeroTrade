@@ -3,6 +3,7 @@
 import {useState} from "react";
 import Link from "next/link";
 import {cn, formatPrice, formatChangePercent, getChangeColorClass} from "@/lib/utils";
+import {formatSignedPrice} from "@/lib/format";
 import SellPositionDialog from "@/components/trade/SellPositionDialog";
 import type {Lot} from "@/lib/trading/lots";
 import UnpricedNote from "@/components/trade/UnpricedNote";
@@ -62,8 +63,8 @@ const PositionsTable = ({positions, accountId, lotNotes}: {positions: EnrichedPo
                         {p.priceStale ? (
                             <div className="text-xs text-fg-muted" title="No live quote — value shown at cost">—</div>
                         ) : (
-                            <div className={cn('text-xs', getChangeColorClass(p.unrealizedPnl || undefined))}>
-                                {p.unrealizedPnl >= 0 ? '+' : ''}{formatPrice(p.unrealizedPnl)} ({formatChangePercent(p.unrealizedPnlPct)})
+                            <div className={cn('text-xs', getChangeColorClass(p.unrealizedPnl))}>
+                                {formatSignedPrice(p.unrealizedPnl)} ({formatChangePercent(p.unrealizedPnlPct)})
                             </div>
                         )}
                         </div>

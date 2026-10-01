@@ -25,6 +25,19 @@ export const formatDrawdown = (value: number | null): string => {
     return rounded > 0 ? `−${rounded.toFixed(2)}%` : '0.00%';
 };
 
+// A plain signed figure, such as a sentiment score, on the same rule.
+export const formatSigned = (value: number, digits = 2): string => {
+    const rounded = roundPct(value, digits);
+    return `${rounded > 0 ? '+' : ''}${rounded.toFixed(digits)}`;
+};
+
+// A dollar change (P&L), rounded to the cent first. `|| 0` drops the -0 that rounding a tiny
+// loss leaves, which Intl would print as "-$0.00".
+export const formatSignedPrice = (value: number): string => {
+    const cents = roundPct(value) || 0;
+    return `${cents > 0 ? '+' : ''}${formatPrice(cents)}`;
+};
+
 // The colour input for getChangeColorClass: zero after rounding reads neutral.
 export const signedForColor = (value: number | null): number | undefined =>
     value === null ? undefined : roundPct(value) || undefined;

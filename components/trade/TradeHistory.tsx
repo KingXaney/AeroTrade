@@ -1,6 +1,7 @@
 import Link from "next/link";
 import type {ReactNode} from "react";
 import {cn, formatPrice, getChangeColorClass} from "@/lib/utils";
+import {formatSignedPrice} from "@/lib/format";
 import {REPLAY_COPY} from "@/lib/learn/copy/replay";
 import {boughtForLine, receiptLine} from "@/lib/learn/copy/receipts";
 import type {FillReceipt} from "@/lib/trading/receipts";
@@ -102,8 +103,8 @@ const TradeHistory = ({trades, totalCount, exportHref, detail, receipts, buyNote
                             <div className="text-[10px] text-fg-muted">
                                 {formatWhen(t.createdAt)}
                                 {typeof t.realizedPnl === 'number' && (
-                                    <span className={cn('ml-2', getChangeColorClass(t.realizedPnl || undefined))}>
-                                        {t.realizedPnl >= 0 ? '+' : ''}{formatPrice(t.realizedPnl)}
+                                    <span className={cn('ml-2', getChangeColorClass(t.realizedPnl))}>
+                                        {formatSignedPrice(t.realizedPnl)}
                                     </span>
                                 )}
                             </div>

@@ -1,5 +1,7 @@
+import {readdirSync, readFileSync} from 'node:fs';
+import {fileURLToPath} from 'node:url';
 import {describe, expect, it} from 'vitest';
-import {formatChangePercent, getChangeColorClass} from '@/lib/format';
+import {formatChangePercent, formatDrawdown, formatSigned, formatSignedPrice, getChangeColorClass} from '@/lib/format';
 
 describe('formatChangePercent', () => {
     // A flat stock printed nothing at all (StockHeader's pill went blank), and a move inside
@@ -32,5 +34,52 @@ describe('getChangeColorClass', () => {
         expect(getChangeColorClass(0.005)).toBe('text-positive');
         expect(getChangeColorClass(null)).toBe('text-fg-muted');
         expect(getChangeColorClass(Number.NaN)).toBe('text-fg-muted');
+    });
+});
+
+describe('formatSignedPrice', () => {
+    it('rounds to the cent before it signs, so a flat P&L is never "-$0.00"', () => {
+        expect(formatSignedPrice(-0.004)).toBe('$0.00');
+        expect(formatSignedPrice(-0)).toBe('$0.00');
+        expect(formatSignedPrice(0.004)).toBe('$0.00');
+        expect(formatSignedPrice(1234.5)).toBe('+$1,234.50');
+        expect(formatSignedPrice(-3.2)).toBe('-$3.20');
+    });
+});
+
+describe('formatSigned', () => {
+    it('signs a plain figure (a sentiment score) by its rounded value', () => {
+        expect(formatSigned(-0.003)).toBe('0.00');
+        expect(formatSigned(0)).toBe('0.00');
+        expect(formatSigned(0.25)).toBe('+0.25');
+        expect(formatSigned(-0.25)).toBe('-0.25');
+        expect(formatSigned(0.125, 1)).toBe('+0.1');
+    });
+});
+
+describe('formatDrawdown', () => {
+    it('reads an account that never fell as 0.00%, not "−0.00%"', () => {
+        expect(formatDrawdown(0)).toBe('0.00%');
+        expect(formatDrawdown(0.001)).toBe('0.00%');
+        expect(formatDrawdown(4.2)).toBe('−4.20%');
+    });
+});
+
+// The screens hand-wrote `x >= 0 ? '+' : ''` and `−${dd.toFixed(2)}%`, so a tiny loss read as a
+// red "-0.00%" and a flat drawdown as "−0.00%". Every sign now comes from this module.
+describe('no hand-rolled signs in the UI', () => {
+    const root = fileURLToPath(new URL('../..', import.meta.url));
+    const sources = ['components', 'app'].flatMap((dir) =>
+        readdirSync(`${root}${dir}`, {recursive: true, encoding: 'utf8'})
+            .filter((f) => /\.tsx?$/.test(f))
+            .map((f) => `${dir}/${f}`));
+
+    it('routes every signed number through lib/format', () => {
+        const handRolled = sources.filter((file) => {
+            const text = readFileSync(`${root}${file}`, 'utf8');
+            return /\?\s*['"]\+['"]\s*:\s*['"]['"]/.test(text) || /−\$?\{[^}]*toFixed\(/.test(text);
+        });
+        expect(sources.length).toBeGreaterThan(50);
+        expect(handRolled).toEqual([]);
     });
 });

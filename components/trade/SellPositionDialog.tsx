@@ -4,6 +4,7 @@ import {useState} from "react";
 import {useRouter} from "next/navigation";
 import {toast} from "sonner";
 import {cn, formatPrice} from "@/lib/utils";
+import {formatSignedPrice} from "@/lib/format";
 import {placeOrder} from "@/lib/actions/trading.actions";
 import {estRealizedPnl} from "@/lib/trading/order-math";
 import type {Lot} from "@/lib/trading/lots";
@@ -118,7 +119,7 @@ const SellPositionDialog = ({position, accountId, notes, onClose}: {position: En
                         return (
                             <div className="flex items-center justify-between text-[11px] text-fg-muted" style={{fontFamily: 'var(--type-mono)'}} data-testid="sell-est-pnl">
                                 <span>Est. realized P&L</span>
-                                <span>{pnl === null ? '—' : `${pnl >= 0 ? '+' : ''}${formatPrice(pnl)} · avg cost ${formatPrice(position.avgCost)}`}</span>
+                                <span>{pnl === null ? '—' : `${formatSignedPrice(pnl)} · avg cost ${formatPrice(position.avgCost)}`}</span>
                             </div>
                         );
                     })()}
