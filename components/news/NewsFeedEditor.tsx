@@ -4,7 +4,7 @@ import {useState, useTransition} from "react";
 import {useRouter} from "next/navigation";
 import {toast} from "sonner";
 import {Loader2} from "lucide-react";
-import {Switch} from "@/components/ui/switch";
+import Switch from "@/components/primitives/Switch";
 import ConfirmDialog from "@/components/primitives/ConfirmDialog";
 import KeywordChips from "@/components/forms/KeywordChips";
 import {resetNewsFeed, saveNewsFeed} from "@/lib/actions/news-feed.actions";
@@ -34,7 +34,6 @@ import {cn} from "@/lib/utils";
 // through the search adapter and has no business in the client bundle.
 
 const mono = {fontFamily: 'var(--type-mono)'} as const;
-const switchClass = "data-[state=checked]:!bg-brand-strong data-[state=unchecked]:!bg-surface-4 data-[state=unchecked]:!border data-[state=unchecked]:!border-line-strong transition-colors duration-200";
 const chipClass = (on: boolean) => cn(
     'rounded-full border px-3 py-1.5 text-xs transition-colors',
     on ? 'border-brand bg-brand/10 text-brand' : 'border-line-strong/30 bg-surface-2/40 text-fg-soft hover:text-fg hover:border-brand/40',
@@ -175,7 +174,7 @@ const NewsFeedEditor = ({initial, startOpen = false}: Props) => {
                             <div className="text-[11px] text-fg-muted">Company headlines for the symbols you watch, mixed into the feed.</div>
                         </div>
                         <Switch id="news-watchlist-toggle" checked={draft.includeWatchlist}
-                                onCheckedChange={(checked) => setDraft({...draft, includeWatchlist: checked})} className={switchClass} />
+                                onCheckedChange={(checked) => setDraft({...draft, includeWatchlist: checked})} />
                     </label>
 
                     {dropped > 0 && (
