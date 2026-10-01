@@ -9,6 +9,7 @@ const stubs = vi.hoisted(() => ({
     searchStocks: vi.fn(),
     getWatchlistSymbolsByUserId: vi.fn(),
     getNews: vi.fn(),
+    getLatestSuggestions: vi.fn(),
 }));
 
 vi.mock('@/lib/actions/finnhub.actions', () => ({
@@ -25,7 +26,6 @@ vi.mock('@/lib/actions/watchlist.actions', () => ({
     getWatchlistSymbolsByUserId: stubs.getWatchlistSymbolsByUserId,
 }));
 vi.mock('@/database/mongoose', () => ({connectToDatabase: async () => undefined}));
-vi.mock('@/database/models/suggestion-set.model', () => ({default: {}, GLOBAL_SUGGESTIONS_USER: 'global'}));
 vi.mock('@/lib/brain/queries', () => ({getActiveTheses: vi.fn(), getBrainDigestData: vi.fn()}));
 vi.mock('@/lib/topics/store', () => ({getTopicFeed: vi.fn(), getTopicsForUser: vi.fn(), getTopicsOverview: vi.fn()}));
 vi.mock('@/lib/actions/topics.actions', () => ({createTopic: vi.fn(), deleteTopic: vi.fn()}));
@@ -37,6 +37,7 @@ vi.mock('@/lib/trading/account', () => ({
     toAccountSummary: vi.fn(),
 }));
 vi.mock('@/lib/strategies/queries', () => ({getLatestRun: vi.fn(), getStrategyLeaderboard: vi.fn()}));
+vi.mock('@/lib/navigator/service', () => ({getLatestSuggestions: stubs.getLatestSuggestions}));
 vi.mock('@/lib/ai/learner-hooks', () => ({priceLargestHoldings: vi.fn(), readLearnerValue: vi.fn()}));
 
 import {buildTools} from '@/lib/ai/tools';
@@ -101,5 +102,31 @@ describe('getMarketNews', () => {
         await run('getMarketNews', {symbols: []});
 
         expect(stubs.getNews).toHaveBeenCalledWith(undefined);
+    });
+});
+
+describe('getAiSuggestions', () => {
+    const item = (symbol: string, targetWeight: number): SuggestionItem => ({
+        symbol, action: 'buy', targetWeight, currentWeight: 0, score: 1, reasons: ['why'], executed: true,
+    });
+
+    it('reads the closure user\'s sets through the Navigator\'s one read and shapes them', async () => {
+        stubs.getLatestSuggestions.mockResolvedValue({
+            global: {date: '2026-09-28', kind: 'preview', items: [item('SPY', 0.255)], rationaleMd: 'notes'},
+            user: null,
+        });
+
+        const result = await run('getAiSuggestions', {});
+
+        expect(stubs.getLatestSuggestions).toHaveBeenCalledWith('user-1');
+        expect(result).toEqual({
+            global: {
+                date: '2026-09-28',
+                preview: true,
+                items: [{action: 'buy', symbol: 'SPY', targetWeightPct: 26, executed: true, reasons: ['why']}],
+                rationale: 'notes',
+            },
+            yours: null,
+        });
     });
 });

@@ -14,8 +14,7 @@ import {
     getWatchlistForUser,
     getWatchlistSymbolsByUserId,
 } from "@/lib/actions/watchlist.actions";
-import {connectToDatabase} from "@/database/mongoose";
-import SuggestionSet, {GLOBAL_SUGGESTIONS_USER} from "@/database/models/suggestion-set.model";
+import {getLatestSuggestions, type SuggestionSetView} from "@/lib/navigator/service";
 import {getActiveTheses, getBrainDigestData} from "@/lib/brain/queries";
 import {getTopicFeed, getTopicsForUser, getTopicsOverview} from "@/lib/topics/store";
 import {createTopic, deleteTopic} from "@/lib/actions/topics.actions";
@@ -195,13 +194,8 @@ export const buildTools = (userId: string) => ({
         description: TOOL_DESCRIPTIONS.getAiSuggestions,
         inputSchema: z.object({}),
         execute: async () => {
-            await connectToDatabase();
-            type LeanSet = {date: string; kind?: string; items: SuggestionItem[]; rationaleMd?: string} | null;
-            const [globalSet, userSet] = await Promise.all([
-                SuggestionSet.findOne({userId: GLOBAL_SUGGESTIONS_USER}).sort({date: -1}).lean<LeanSet>(),
-                SuggestionSet.findOne({userId}).sort({date: -1}).lean<LeanSet>(),
-            ]);
-            const shape = (set: LeanSet) =>
+            const {global, user} = await getLatestSuggestions(userId);
+            const shape = (set: SuggestionSetView | null) =>
                 set ? {
                     date: set.date,
                     // Previews are manual analysis runs — nothing was traded.
@@ -213,9 +207,9 @@ export const buildTools = (userId: string) => ({
                         executed: i.executed,
                         reasons: i.reasons,
                     })),
-                    rationale: set.rationaleMd ?? null,
+                    rationale: set.rationaleMd,
                 } : null;
-            return {global: shape(globalSet), yours: shape(userSet)};
+            return {global: shape(global), yours: shape(user)};
         },
     }),
 
