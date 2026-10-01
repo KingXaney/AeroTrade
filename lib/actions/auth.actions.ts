@@ -135,10 +135,11 @@ export const resetPassword = async ({ token, newPassword }: { token: string; new
     }
 }
 
-export const signOut = async () => {
+export const signOut = async (): Promise<{ success: true } | { success: false; error: string }> => {
     try {
         await auth.api.signOut({ headers: await headers() });
         (await cookies()).delete(THEME_COOKIE);
+        return { success: true }
     } catch (e) {
         console.error('Sign out failed', e)
         return { success: false, error: 'Sign out failed' }

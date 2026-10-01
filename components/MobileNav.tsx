@@ -6,7 +6,7 @@ import Link from "next/link";
 import {Menu} from "lucide-react";
 import {Sheet, SheetContent, SheetTrigger} from "@/components/ui/sheet";
 import NavList from "@/components/nav/NavList";
-import {signOut} from "@/lib/actions/auth.actions";
+import {useSignOut} from "@/hooks/useSignOut";
 import type {NavBadges} from "@/lib/navigation";
 
 // Below lg the sidebar is hidden, and it was the only surface linking /watchlist,
@@ -15,6 +15,7 @@ import type {NavBadges} from "@/lib/navigation";
 const MobileNav = ({badges}: {badges?: NavBadges}) => {
     const pathname = usePathname();
     const [open, setOpen] = useState(false);
+    const signOut = useSignOut();
 
     // Every link inside the drawer closes it on click, but Radix does not close on a
     // route change it didn't cause — a browser Back while the drawer is open would
@@ -65,8 +66,7 @@ const MobileNav = ({badges}: {badges?: NavBadges}) => {
                     <button
                         type="button"
                         onClick={async () => {
-                            setOpen(false);
-                            await signOut();
+                            if (await signOut()) setOpen(false);
                         }}
                         className="w-full flex items-center gap-4 px-4 py-2 text-fg-soft hover:text-negative transition-colors text-xs font-bold tracking-[0.1em] uppercase"
                         style={{fontFamily: 'var(--type-mono)'}}
