@@ -2,24 +2,27 @@
 // server code shared by the /brain page and BOTH Inngest jobs: the weekly run and
 // the one-time enrollment bootstrap, which must make identical decisions).
 
+import {Types} from "mongoose";
 import {connectToDatabase} from "@/database/mongoose";
 import SuggestionSet, {GLOBAL_SUGGESTIONS_USER, type SuggestionSetDoc} from "@/database/models/suggestion-set.model";
 import AiNavigator from "@/database/models/ai-navigator.model";
 import BrainEntity from "@/database/models/brain-entity.model";
 import NewsItem from "@/database/models/news-item.model";
+import PaperAccount from "@/database/models/paper-account.model";
 import PaperTrade from "@/database/models/paper-trade.model";
 import {getTopVerifiedTickers} from "@/lib/brain/queries";
 import {getBarsForSymbols} from "@/lib/prices/store";
 import {computeSignals} from "@/lib/prices/signals";
 import {dominantSectorKey, rankNormalize, scoreUniverse, type ScoredSymbol, type ScoringInput} from "@/lib/navigator/scoring";
 import {diffToOrders, HOLDING_REASON, type HeldPosition, type PlannedOrder, type TargetWeight} from "@/lib/navigator/allocator";
+import {selectNavigatorUniverse, type NavigatorUniverse} from "@/lib/navigator/universe";
 import {
     ALWAYS_ELIGIBLE_SYMBOLS,
     ELIGIBILITY_LOOKBACK_DAYS,
     ETF_TO_SECTOR_KEY,
     SECTOR_KEY_PREFIX,
 } from "@/lib/navigator/config";
-import {buildPriceMap, computePortfolio, getHeldSymbolsByUserId, getOwnedAccount} from "@/lib/trading/account";
+import {buildPriceMap, computePortfolio, getOwnedAccount} from "@/lib/trading/account";
 import {getEasternDateString} from "@/lib/utils";
 
 export type SuggestionSetView = {
@@ -55,18 +58,21 @@ const toView = (set: SuggestionSetDoc | null): SuggestionSetView | null => {
 // ---------------------------------------------------------------------------
 
 // Symbols worth scoring: always-eligible ETFs + the brain's top verified tickers
-// + everything any enrolled account currently holds.
-export const buildNavigatorUniverse = async (): Promise<{symbols: string[]; navigators: {userId: string; accountId: string}[]}> => {
+// + what each enrolled Navigator account holds (selectNavigatorUniverse).
+export const buildNavigatorUniverse = async (): Promise<NavigatorUniverse & {navigators: {userId: string; accountId: string}[]}> => {
     await connectToDatabase();
     const navigators = (await AiNavigator.find({status: 'active'}).lean())
         .map((n) => ({userId: n.userId, accountId: n.accountId}));
-    const held = new Set<string>();
-    for (const nav of navigators) {
-        for (const sym of await getHeldSymbolsByUserId(nav.userId)) held.add(sym);
-    }
+    const accountIds = navigators.map((n) => n.accountId).filter((id) => Types.ObjectId.isValid(id));
+    const accounts = await PaperAccount.find({_id: {$in: accountIds}}).select('userId positions.symbol')
+        .lean<{_id: unknown; userId: string; positions?: {symbol: string}[]}[]>();
     const topTickers = await getTopVerifiedTickers(25);
-    const symbols = Array.from(new Set([...ALWAYS_ELIGIBLE_SYMBOLS, ...topTickers, ...held]));
-    return {symbols, navigators};
+    const universe = selectNavigatorUniverse({
+        navigators,
+        accounts: accounts.map((a) => ({id: String(a._id), userId: a.userId, symbols: (a.positions ?? []).map((p) => p.symbol)})),
+        topTickers,
+    });
+    return {...universe, navigators};
 };
 
 // Deterministic scoring inputs: brain slow layer + eligibility counts + signals.

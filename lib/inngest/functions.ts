@@ -36,7 +36,7 @@ import {creditAccounts, planIncomeRun, type CreditOutcome} from "@/lib/trading/i
 import {describeIncomeRun} from "@/lib/trading/income";
 import {addCalendarDays} from "@/lib/prices/calendar-days";
 import {ensureBars, symbolsLackingDividendCoverage} from "@/lib/prices/store";
-import {buildTargets} from "@/lib/navigator/allocator";
+import {navigatorTargets} from "@/lib/navigator/universe";
 import {ALWAYS_ELIGIBLE_SYMBOLS, MAX_POSITIONS, MIN_CASH_WEIGHT} from "@/lib/navigator/config";
 import {
     buildHoldItems,
@@ -545,7 +545,7 @@ export const runWeeklyNavigator = inngest.createFunction(
         const scored = await step.run('compute-global-scores', async () => computeNavigatorScores(universe.symbols));
 
         const today = getEasternDateString();
-        const targets = buildTargets(scored);
+        const targets = navigatorTargets(scored, universe);
         const scoreBySymbol = new Map(scored.map((s) => [s.symbol, s]));
 
         await step.run('save-global-suggestions', async () => {
@@ -862,7 +862,7 @@ export const bootstrapAiNavigator = inngest.createFunction(
         }
         const scored = await step.run('bootstrap-scores', async () => computeNavigatorScores(universe.symbols));
 
-        const targets = buildTargets(scored);
+        const targets = navigatorTargets(scored, universe);
         const scoreBySymbol = new Map(scored.map((s) => [s.symbol, s]));
 
         // The lifted MAX_POSITIONS cap is only for an initial deployment of an
