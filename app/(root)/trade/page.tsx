@@ -60,7 +60,7 @@ const TradePage = async ({searchParams}: TradePageProps) => {
             {/* Header */}
             <div className="flex flex-col md:flex-row md:items-end md:justify-between gap-4 mb-2">
                 <div>
-                    <h1 className="text-2xl font-semibold text-fg mb-1" style={{fontFamily: 'var(--type-display)'}}>
+                    <h1 className="text-2xl font-semibold text-fg mb-1 font-heading">
                         Trade Desk
                     </h1>
                     {/* Used to read "live prices" at 3 a.m. on a Sunday. */}
@@ -71,7 +71,7 @@ const TradePage = async ({searchParams}: TradePageProps) => {
                 </div>
                 <div className="flex items-center gap-3">
                     <AccountSwitcher accounts={switcherAccounts} activeId={activeId} />
-                    <Link href="/portfolio" className="text-xs text-brand hover:underline" style={{fontFamily: 'var(--type-mono)'}}>
+                    <Link href="/portfolio" className="text-xs text-brand hover:underline font-mono">
                         View full portfolio →
                     </Link>
                 </div>
@@ -93,10 +93,10 @@ const TradePage = async ({searchParams}: TradePageProps) => {
             {/* Open positions — compact quick-sell; full holdings & history live on /portfolio */}
             <Panel>
                 <div className="flex items-center justify-between mb-4">
-                    <h2 className="text-sm font-bold uppercase tracking-[0.1em] text-brand" style={{fontFamily: 'var(--type-mono)'}}>
+                    <h2 className="text-sm font-bold uppercase tracking-[0.1em] text-brand font-mono">
                         Open Positions
                     </h2>
-                    <Link href="/portfolio" className="text-xs text-fg-muted hover:text-brand" style={{fontFamily: 'var(--type-mono)'}}>
+                    <Link href="/portfolio" className="text-xs text-fg-muted hover:text-brand font-mono">
                         Full holdings &amp; history →
                     </Link>
                 </div>

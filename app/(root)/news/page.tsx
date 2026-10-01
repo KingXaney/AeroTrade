@@ -29,10 +29,10 @@ const NewsPage = async ({searchParams}: NewsPageProps) => {
     return (
         <div className="space-y-4">
             <div className="mb-2">
-                <h1 className="text-2xl font-semibold text-fg mb-1" style={{fontFamily: 'var(--type-display)'}}>
+                <h1 className="text-2xl font-semibold text-fg mb-1 font-heading">
                     News
                 </h1>
-                <p id="news-feed-summary" className="text-sm text-fg-muted" style={{fontFamily: 'var(--type-mono)'}}>
+                <p id="news-feed-summary" className="text-sm text-fg-muted font-mono">
                     {describeNewsFeed(prefs)}
                 </p>
             </div>
@@ -40,7 +40,7 @@ const NewsPage = async ({searchParams}: NewsPageProps) => {
             <NewsFeedEditor initial={prefs} startOpen={edit === '1'} />
 
             {feed.fallback && (
-                <p role="status" className="text-[11px] text-warning px-1" style={{fontFamily: 'var(--type-mono)'}}>
+                <p role="status" className="text-[11px] text-warning px-1 font-mono">
                     Google News is unavailable right now — showing market wires instead of your feed.
                 </p>
             )}

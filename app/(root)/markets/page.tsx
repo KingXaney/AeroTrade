@@ -12,8 +12,7 @@ const MarketsPage = async ({searchParams}: MarketsPageProps) => {
         <div className="space-y-4">
             {/* Page Header */}
             <div className="mb-6">
-                <h1 className="text-2xl font-semibold text-fg mb-1"
-                    style={{ fontFamily: 'var(--type-display)' }}>
+                <h1 className="text-2xl font-semibold text-fg mb-1 font-heading">
                     Markets
                 </h1>
                 <p className="text-sm text-fg-muted">

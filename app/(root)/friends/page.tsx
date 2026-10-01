@@ -19,10 +19,10 @@ const FriendsPage = async () => {
     return (
         <div className="space-y-6">
             <div className="mb-2">
-                <h1 className="text-2xl font-semibold text-fg mb-1 tracking-tight" style={{fontFamily: 'var(--type-display)'}}>
+                <h1 className="text-2xl font-semibold text-fg mb-1 tracking-tight font-heading">
                     Friends &amp; Competition
                 </h1>
-                <p className="text-sm text-fg-muted" style={{fontFamily: 'var(--type-mono)', letterSpacing: '0.02em'}}>
+                <p className="text-sm text-fg-muted font-mono" style={{letterSpacing: '0.02em'}}>
                     Connect with friends and see who&apos;s the best trader
                 </p>
             </div>

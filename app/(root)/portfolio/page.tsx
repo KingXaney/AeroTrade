@@ -41,7 +41,7 @@ const PortfolioPage = async ({searchParams}: PortfolioPageProps) => {
             {/* Header */}
             <div className="flex flex-col md:flex-row md:items-end md:justify-between gap-4 mb-2">
                 <div>
-                    <h1 className="text-2xl font-semibold text-fg mb-1" style={{fontFamily: 'var(--type-display)'}}>
+                    <h1 className="text-2xl font-semibold text-fg mb-1 font-heading">
                         {account.name}
                     </h1>
                     <p className="text-sm text-fg-muted">{view.summaryLine}</p>
@@ -68,7 +68,7 @@ const PortfolioPage = async ({searchParams}: PortfolioPageProps) => {
             {/* Which account wins — all accounts side by side */}
             {view.multiAccount && (
                 <Panel>
-                    <h2 className="text-sm font-bold uppercase tracking-[0.1em] text-brand mb-4" style={{fontFamily: 'var(--type-mono)'}}>
+                    <h2 className="text-sm font-bold uppercase tracking-[0.1em] text-brand mb-4 font-mono">
                         Account Comparison
                     </h2>
                     <AccountComparisonTable rows={view.comparisonRows} activeId={account.id} />
@@ -79,7 +79,7 @@ const PortfolioPage = async ({searchParams}: PortfolioPageProps) => {
             {analytics && (
                 <>
                     <Panel>
-                        <h2 className="text-sm font-bold uppercase tracking-[0.1em] text-brand mb-1" style={{fontFamily: 'var(--type-mono)'}}>
+                        <h2 className="text-sm font-bold uppercase tracking-[0.1em] text-brand mb-1 font-mono">
                             Performance vs S&amp;P 500
                         </h2>
                         <p className="font-mono text-[11px] text-fg-muted mb-4">
@@ -109,7 +109,7 @@ const PortfolioPage = async ({searchParams}: PortfolioPageProps) => {
 
             {/* Holdings */}
             <Panel>
-                <h2 className="text-sm font-bold uppercase tracking-[0.1em] text-brand mb-4" style={{fontFamily: 'var(--type-mono)'}}>
+                <h2 className="text-sm font-bold uppercase tracking-[0.1em] text-brand mb-4 font-mono">
                     Holdings
                 </h2>
                 <PositionsTable positions={portfolio.positions} accountId={account.id} lotNotes={view.lotNotes} />
@@ -127,7 +127,7 @@ const PortfolioPage = async ({searchParams}: PortfolioPageProps) => {
             {/* Trade history — only from a ledger that was read */}
             {tradeLog && (
                 <Panel>
-                    <h2 className="text-sm font-bold uppercase tracking-[0.1em] text-brand mb-4" style={{fontFamily: 'var(--type-mono)'}}>
+                    <h2 className="text-sm font-bold uppercase tracking-[0.1em] text-brand mb-4 font-mono">
                         Trade History
                     </h2>
                     <TradeHistory trades={tradeLog.trades} totalCount={analytics?.tradeCount} exportHref={tradeLog.exportHref} receipts={tradeLog.receipts} buyNotesBySellId={tradeLog.buyNotesBySellId} />

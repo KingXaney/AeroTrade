@@ -5,7 +5,7 @@ const NewsLoading = () => (
     <RouteLoading
         header={
             <div className="mb-2">
-                <h1 className="text-2xl font-semibold text-fg mb-1" style={{fontFamily: 'var(--type-display)'}}>News</h1>
+                <h1 className="text-2xl font-semibold text-fg mb-1 font-heading">News</h1>
                 <p className="text-sm text-fg-muted">Loading your feed…</p>
             </div>
         }

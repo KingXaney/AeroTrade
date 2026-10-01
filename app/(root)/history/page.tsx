@@ -29,12 +29,11 @@ const HistoryPage = async () => {
         <div className="space-y-6">
             {/* Page Header */}
             <div className="mb-2">
-                <h1 className="text-2xl font-semibold text-fg mb-1 tracking-tight"
-                    style={{ fontFamily: 'var(--type-display)' }}>
+                <h1 className="text-2xl font-semibold text-fg mb-1 tracking-tight font-heading">
                     History
                 </h1>
-                <p className="text-sm text-fg-muted"
-                   style={{ fontFamily: 'var(--type-mono)', letterSpacing: '0.02em' }}>
+                <p className="text-sm text-fg-muted font-mono"
+                   style={{ letterSpacing: '0.02em' }}>
                     Your trades across every account, and what you have added to your watchlist
                 </p>
             </div>
@@ -43,8 +42,7 @@ const HistoryPage = async () => {
                 (the watchlist model hard-deletes), so the list below is honest about being
                 "by date added", not a timeline. */}
             <Panel pad={6}>
-                <h2 className="text-xs font-bold uppercase tracking-[0.1em] text-brand mb-4"
-                    style={{ fontFamily: 'var(--type-mono)' }}>
+                <h2 className="text-xs font-bold uppercase tracking-[0.1em] text-brand mb-4 font-mono">
                     Trades
                 </h2>
                 {recent ? (
@@ -57,8 +55,7 @@ const HistoryPage = async () => {
             <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
                 {/* Watchlist, by date added */}
                 <Panel pad={6} className="lg:col-span-1">
-                    <h2 className="text-xs font-bold uppercase tracking-[0.1em] text-brand mb-4"
-                        style={{ fontFamily: 'var(--type-mono)' }}>
+                    <h2 className="text-xs font-bold uppercase tracking-[0.1em] text-brand mb-4 font-mono">
                         On your watchlist, by date added
                     </h2>
 
@@ -78,8 +75,8 @@ const HistoryPage = async () => {
                                             Added <span className="font-semibold">{item.symbol}</span>
                                             <span className="text-fg-muted"> — {item.company}</span>
                                         </p>
-                                        <p className="text-[10px] text-fg-muted mt-0.5"
-                                           style={{ fontFamily: 'var(--type-mono)', letterSpacing: '0.02em' }}>
+                                        <p className="text-[10px] text-fg-muted mt-0.5 font-mono"
+                                           style={{ letterSpacing: '0.02em' }}>
                                             {formatEasternTimestamp(item.addedAt, {year: true})}
                                         </p>
                                     </Link>
@@ -92,11 +89,10 @@ const HistoryPage = async () => {
                 {/* The user's news feed */}
                 <section className="lg:col-span-2 space-y-4">
                     <div className="flex items-center justify-between gap-3">
-                        <h2 className="text-xs font-bold uppercase tracking-[0.1em] text-brand"
-                            style={{ fontFamily: 'var(--type-mono)' }}>
+                        <h2 className="text-xs font-bold uppercase tracking-[0.1em] text-brand font-mono">
                             Your news feed
                         </h2>
-                        <Link href="/news?edit=1" className="text-xs text-brand hover:underline" style={{ fontFamily: 'var(--type-mono)' }}>
+                        <Link href="/news?edit=1" className="text-xs text-brand hover:underline font-mono">
                             Edit feed →
                         </Link>
                     </div>

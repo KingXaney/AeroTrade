@@ -36,7 +36,7 @@ const SettingsPage = async () => {
     return (
         <div className="space-y-4">
             <div className="mb-2">
-                <h1 className="text-2xl font-semibold text-fg mb-1" style={{fontFamily: 'var(--type-display)'}}>
+                <h1 className="text-2xl font-semibold text-fg mb-1 font-heading">
                     Settings
                 </h1>
                 <p className="text-sm text-fg-muted">Topics, your news feed, appearance, dashboard layout, notifications and your account</p>
@@ -46,8 +46,7 @@ const SettingsPage = async () => {
                 <Panel as="nav" pad={2} className="lg:col-span-3 lg:sticky lg:top-24" aria-label="Settings sections">
                     {SECTIONS.map((s) => (
                         <a key={s.id} href={`#${s.id}`}
-                           className="flex items-center gap-3 px-3 py-2.5 rounded-lg text-xs font-bold tracking-[0.1em] uppercase text-fg-soft hover:text-fg hover:bg-surface-3 transition-colors"
-                           style={{fontFamily: 'var(--type-mono)'}}>
+                           className="flex items-center gap-3 px-3 py-2.5 rounded-lg text-xs font-bold tracking-[0.1em] uppercase text-fg-soft hover:text-fg hover:bg-surface-3 transition-colors font-mono">
                             <span className="material-symbols-outlined text-base">{s.icon}</span>
                             {s.label}
                         </a>

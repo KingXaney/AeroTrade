@@ -20,12 +20,10 @@ const WatchlistPage = async () => {
             <div className="space-y-6">
                 <div className="flex flex-col md:flex-row justify-between items-start md:items-end gap-4">
                     <div>
-                        <h1 className="text-2xl font-semibold text-fg mb-1 tracking-tight"
-                            style={{ fontFamily: 'var(--type-display)' }}>
+                        <h1 className="text-2xl font-semibold text-fg mb-1 tracking-tight font-heading">
                             Active Watchlist
                         </h1>
-                        <p className="text-sm text-fg-soft"
-                           style={{ fontFamily: 'var(--type-body)' }}>
+                        <p className="text-sm text-fg-soft font-sans">
                             Quotes, market cap and P/E for the stocks you track
                         </p>
                     </div>
@@ -44,19 +42,17 @@ const WatchlistPage = async () => {
         <div className="space-y-6">
             <div className="flex flex-col md:flex-row justify-between items-start md:items-end gap-4">
                 <div>
-                    <h1 className="text-2xl font-semibold text-fg mb-1 tracking-tight"
-                        style={{ fontFamily: 'var(--type-display)' }}>
+                    <h1 className="text-2xl font-semibold text-fg mb-1 tracking-tight font-heading">
                         Active Watchlist
                     </h1>
-                    <p className="text-sm text-fg-soft"
-                       style={{ fontFamily: 'var(--type-body)' }}>
+                    <p className="text-sm text-fg-soft font-sans">
                         Quotes, market cap and P/E for the stocks you track
                     </p>
                 </div>
                 <div className="flex items-center gap-3">
                     <MarketStatus status={status} />
-                    <div className="text-[10px] text-fg-muted"
-                         style={{ fontFamily: 'var(--type-mono)', letterSpacing: '0.02em' }}>
+                    <div className="text-[10px] text-fg-muted font-mono"
+                         style={{ letterSpacing: '0.02em' }}>
                         {view.tracked} TRACKED
                     </div>
                 </div>

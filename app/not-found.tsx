@@ -5,8 +5,7 @@ import {actionButton} from "@/components/primitives/ActionButton";
 const NotFound = () => (
     <main className="min-h-screen flex items-center justify-center px-6" style={{color: 'var(--fg-soft)'}}>
         <div className="text-center max-w-md">
-            <h1 className="text-2xl font-semibold text-fg mb-2 tracking-tight"
-                style={{fontFamily: 'var(--type-display)'}}>
+            <h1 className="text-2xl font-semibold text-fg mb-2 tracking-tight font-heading">
                 Not found
             </h1>
             <p className="text-sm text-fg-muted">We couldn&apos;t find that page.</p>

@@ -29,7 +29,7 @@ const TopicPage = async ({params}: TopicPageProps) => {
             {topic.brief
                 ? <TopicBrief brief={topic.brief} />
                 : articles.length > 0 && (
-                    <p className="text-xs text-fg-muted px-1" style={{fontFamily: 'var(--type-mono)'}}>
+                    <p className="text-xs text-fg-muted px-1 font-mono">
                         Your first &ldquo;what changed today&rdquo; brief arrives after tonight&apos;s refresh.
                     </p>
                 )}
