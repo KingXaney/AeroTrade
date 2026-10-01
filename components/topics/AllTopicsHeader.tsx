@@ -3,6 +3,7 @@
 import {Plus} from "lucide-react";
 import {useTopicsUi} from "@/components/topics/TopicsShell";
 import Panel from "@/components/primitives/Panel";
+import ActionButton from "@/components/primitives/ActionButton";
 
 const AllTopicsHeader = ({count, unseenTotal, preinstalled}: {count: number; unseenTotal: number; preinstalled: boolean}) => {
     const {openComposer} = useTopicsUi();
@@ -21,12 +22,10 @@ const AllTopicsHeader = ({count, unseenTotal, preinstalled}: {count: number; uns
                     </p>
                 )}
             </div>
-            <button type="button" onClick={() => openComposer('create')}
-                    className="inline-flex items-center gap-2 px-3 py-2 rounded-lg text-xs font-bold uppercase tracking-[0.1em] bg-brand text-on-brand"
-                    style={{fontFamily: 'var(--type-mono)'}}>
+            <ActionButton className="inline-flex items-center gap-2" onClick={() => openComposer('create')}>
                 <Plus className="size-4" />
                 New topic
-            </button>
+            </ActionButton>
         </Panel>
     );
 };

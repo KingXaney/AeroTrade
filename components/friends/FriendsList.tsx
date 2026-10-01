@@ -8,6 +8,7 @@ import {removeFriend} from "@/lib/actions/friends.actions";
 import ConfirmDialog from "@/components/primitives/ConfirmDialog";
 import type {FriendSummary} from '@/lib/friends/types';
 import Panel from '@/components/primitives/Panel';
+import RowCard from "@/components/primitives/RowCard";
 
 const FriendsList = ({friends}: {friends: FriendSummary[]}) => {
     const router = useRouter();
@@ -44,8 +45,7 @@ const FriendsList = ({friends}: {friends: FriendSummary[]}) => {
             ) : (
                 <div className="space-y-2">
                     {friends.map((f) => (
-                        <div key={f.friendshipId}
-                             className="flex items-center justify-between px-4 py-2.5 rounded-lg border bg-surface-2/40 border-line-strong/20">
+                        <RowCard key={f.friendshipId} className="flex items-center justify-between py-2.5">
                             <Link href={`/friends/${f.id}`} className="group flex items-center gap-3 min-w-0">
                                 <div className="w-8 h-8 rounded-full flex items-center justify-center text-xs font-bold shrink-0"
                                      style={{backgroundColor: 'var(--brand-strong)', color: 'var(--on-brand)', fontFamily: 'var(--type-display)'}}>
@@ -66,7 +66,7 @@ const FriendsList = ({friends}: {friends: FriendSummary[]}) => {
                             >
                                 <span className="material-symbols-outlined text-base" aria-hidden="true">person_remove</span>
                             </button>
-                        </div>
+                        </RowCard>
                     ))}
                 </div>
             )}

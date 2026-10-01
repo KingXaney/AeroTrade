@@ -7,6 +7,7 @@ import {boughtForLine, receiptLine} from "@/lib/learn/copy/receipts";
 import type {FillReceipt} from "@/lib/trading/receipts";
 import type {PaperTradeRecord, TradeSource} from '@/lib/trading/types';
 import Disclosure from "@/components/primitives/Disclosure";
+import RowCard from "@/components/primitives/RowCard";
 
 // Only automated fills get a chip: 'user' is the default reading of a trade log, and
 // rows from before the field existed carry no source at all — that absence is honest
@@ -51,8 +52,7 @@ const TradeHistory = ({trades, totalCount, exportHref, detail, receipts, buyNote
                 const receipt = receipts?.[t.id];
                 const boughtFor = buyNotesBySellId?.[t.id];
                 return (
-                    <div key={t.id}
-                         className="flex items-center justify-between px-4 py-2.5 rounded-lg border bg-surface-2/40 border-line-strong/20">
+                    <RowCard key={t.id} className="flex items-center justify-between py-2.5">
                         <div className="flex items-center gap-3 min-w-0">
                             <span className={cn(
                                 'px-2 py-0.5 rounded text-[10px] font-bold uppercase tracking-wider border shrink-0',
@@ -103,7 +103,7 @@ const TradeHistory = ({trades, totalCount, exportHref, detail, receipts, buyNote
                                 )}
                             </div>
                         </div>
-                    </div>
+                    </RowCard>
                 );
             })}
             {capped && (

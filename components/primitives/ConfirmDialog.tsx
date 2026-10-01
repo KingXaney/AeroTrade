@@ -5,6 +5,7 @@ import {toast} from "sonner";
 import {Loader2} from "lucide-react";
 import {Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle} from "@/components/ui/dialog";
 import {cn} from "@/lib/utils";
+import ActionButton from "@/components/primitives/ActionButton";
 
 type Props = {
     open: boolean;
@@ -43,16 +44,14 @@ const ConfirmDialog = ({open, onOpenChange, title, description, confirmLabel, de
                 </DialogHeader>
                 <div className="mt-2 flex justify-end gap-2" style={{fontFamily: 'var(--type-mono)'}}>
                     {/* Cancel first so keyboard users land on the safe action. */}
-                    <button type="button" autoFocus onClick={() => onOpenChange(false)} disabled={busy}
-                            className="px-3 py-2 rounded-lg text-xs font-bold uppercase tracking-[0.1em] text-fg-soft hover:text-fg border border-line-strong/40">
+                    <ActionButton variant="secondary" autoFocus onClick={() => onOpenChange(false)} disabled={busy}>
                         Cancel
-                    </button>
-                    <button type="button" onClick={confirm} disabled={busy}
-                            className={cn('inline-flex items-center gap-2 px-3 py-2 rounded-lg text-xs font-bold uppercase tracking-[0.1em] disabled:opacity-50',
-                                destructive ? 'bg-negative/15 text-negative border border-negative/30' : 'bg-brand text-on-brand')}>
+                    </ActionButton>
+                    <ActionButton onClick={confirm} disabled={busy}
+                                  className={cn('inline-flex items-center gap-2', destructive && 'bg-negative/15 text-negative border border-negative/30')}>
                         {busy && <Loader2 className="size-3.5 animate-spin" />}
                         {confirmLabel}
-                    </button>
+                    </ActionButton>
                 </div>
             </DialogContent>
         </Dialog>

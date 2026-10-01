@@ -10,6 +10,7 @@ import {BRAIN_COPY} from "@/lib/learn/copy/brain";
 import type {SinceThesisLegs} from "@/lib/brain/since-thesis";
 import {evidenceHref} from "@/lib/brain/links";
 import type {BrainEntitySummary} from '@/lib/brain/types';
+import RowCard from "@/components/primitives/RowCard";
 
 const MS_PER_WEEK = 7 * 24 * 60 * 60 * 1000;
 
@@ -46,8 +47,7 @@ const ActiveTheses = ({theses, followedByName, sinceThesis, definitions = false}
                 const weeks = weeksActive(t.thesisSince);
                 const since = sinceThesis?.[t.key];
                 return (
-                    <div key={t.key}
-                         className="flex items-center justify-between px-4 py-3 rounded-lg border bg-surface-2/40 border-brand/15">
+                    <RowCard key={t.key} tone="brand" className="flex items-center justify-between">
                         <div className="flex items-center gap-3">
                             <span className="material-symbols-outlined text-base text-brand">trending_up</span>
                             <div>
@@ -84,7 +84,7 @@ const ActiveTheses = ({theses, followedByName, sinceThesis, definitions = false}
                                                    followed={followedByName[t.displayName.toLowerCase()] ?? null} />
                             )}
                         </div>
-                    </div>
+                    </RowCard>
                 );
             })}
             {definitions && <WhatTheseMean keys={['thesis', 'news-weight', 'news-sentiment', ...(anySince ? ['since-thesis'] : [])]} />}

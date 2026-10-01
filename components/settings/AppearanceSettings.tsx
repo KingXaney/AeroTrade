@@ -8,6 +8,7 @@ import {PALETTE_IDS, PALETTES, type PaletteId} from "@/lib/theme/palettes";
 import {PRESETS, findPreset, type Preset} from "@/lib/theme/presets";
 import {STYLE_IDS, STYLES, type StyleId} from "@/lib/theme/styles";
 import {DEFAULT_THEME, themeEquals, type Theme} from "@/lib/theme/resolve";
+import RowCard from "@/components/primitives/RowCard";
 
 // Tiny rendition of a palette × style combination for the preset cards.
 const ThemeSwatch = ({palette, style}: {palette: PaletteId; style: StyleId}) => {
@@ -166,7 +167,7 @@ const AppearanceSettings = () => {
             </div>
 
             {/* Motion */}
-            <div className="flex items-center justify-between rounded-lg border border-line-strong/20 bg-surface-2/40 px-4 py-3">
+            <RowCard className="flex items-center justify-between">
                 <div>
                     <div className="text-sm font-medium text-fg">Reduce motion</div>
                     <div className="text-[11px] text-fg-muted">Stops shimmer, particles and drifting backdrops. Your OS setting is always respected too.</div>
@@ -177,7 +178,7 @@ const AppearanceSettings = () => {
                     disabled={pending}
                     onCheckedChange={(checked) => apply({...theme, reduceMotion: checked})}
                 />
-            </div>
+            </RowCard>
         </div>
     );
 };

@@ -9,6 +9,7 @@ import {ASKABLE_STATES, VERDICT_QUIZ_COPY} from "@/lib/learn/copy/verdict";
 import Badge from "@/components/primitives/Badge";
 import Disclosure from "@/components/primitives/Disclosure";
 import ReasonGloss from "@/components/learn/ReasonGloss";
+import RowCard from "@/components/primitives/RowCard";
 
 // Guess the Verdict: today's real board rows with the verdict hidden. The reader calls
 // each row, then the stored verdict and the rule's own reason are revealed, the reason
@@ -30,8 +31,8 @@ const VerdictQuiz = ({rows}: {rows: QuizRow[]}) => {
                     const guess = guesses[row.symbol];
                     const outcome = guess === undefined ? VERDICT_QUIZ_COPY.unanswered : guess === row.answer ? VERDICT_QUIZ_COPY.matched : VERDICT_QUIZ_COPY.missed;
                     return (
-                        <li key={row.symbol} data-quiz-row={row.symbol}
-                            className="flex flex-wrap items-center gap-x-4 gap-y-1.5 px-3 py-2 rounded-lg border bg-surface-2/40 border-line-strong/20">
+                        <RowCard as="li" key={row.symbol} data-quiz-row={row.symbol}
+                            className="flex flex-wrap items-center gap-x-4 gap-y-1.5 px-3 py-2">
                             <span className="font-mono text-sm font-bold text-fg">{row.symbol}</span>
                             {row.cells.map((cell) => (
                                 <span key={cell.label} className="text-xs">
@@ -61,7 +62,7 @@ const VerdictQuiz = ({rows}: {rows: QuizRow[]}) => {
                                 </span>
                             )}
                             {revealed && <ReasonGloss clauses={row.gloss} quoted={row.explanation} className="basis-full pl-1" />}
-                        </li>
+                        </RowCard>
                     );
                 })}
             </ul>

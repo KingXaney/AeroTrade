@@ -10,6 +10,8 @@ import {estRealizedPnl} from "@/lib/trading/order-math";
 import type {Lot} from "@/lib/trading/lots";
 import {SELL_NOTES_COPY} from "@/lib/learn/copy/receipts";
 import MicroLabel from "@/components/primitives/MicroLabel";
+import ActionButton from "@/components/primitives/ActionButton";
+import TextField from "@/components/primitives/TextField";
 import {Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle} from "@/components/ui/dialog";
 import type {EnrichedPosition} from '@/lib/trading/types';
 
@@ -69,14 +71,13 @@ const SellPositionDialog = ({position, accountId, notes, onClose}: {position: En
                         <label htmlFor="sell-qty" className="text-[10px] uppercase tracking-[0.1em] text-fg-muted" style={{fontFamily: 'var(--type-mono)'}}>
                             Shares to sell
                         </label>
-                        <input
+                        <TextField
                             id="sell-qty"
                             value={qty}
                             onChange={(e) => setQty(e.target.value.replace(/[^0-9]/g, ''))}
                             inputMode="numeric"
                             autoComplete="off"
-                            className="w-full mt-1 rounded-lg px-3 py-2 text-sm text-fg outline-none field-focus"
-                            style={{backgroundColor: 'var(--surface-0)', border: '1px solid color-mix(in srgb, var(--line-strong) 40%, transparent)', fontFamily: 'var(--type-mono)'}}
+                            className="w-full mt-1"
                         />
                         {qtyNum > owned && (
                             <p className="mt-1 text-xs text-negative">You only own {owned} share{owned === 1 ? '' : 's'}</p>
@@ -136,18 +137,9 @@ const SellPositionDialog = ({position, accountId, notes, onClose}: {position: En
                         </div>
                     )}
 
-                    <button
-                        type="submit"
-                        disabled={submitting || !valid}
-                        className="w-full py-3 rounded-lg text-sm font-bold uppercase tracking-wider transition-all active:scale-[0.98] disabled:opacity-50 text-on-negative"
-                        style={{
-                            fontFamily: 'var(--type-mono)',
-                            backgroundColor: 'var(--negative)',
-                            boxShadow: '0 0 15px color-mix(in srgb, var(--negative) 25%, transparent)',
-                        }}
-                    >
+                    <ActionButton type="submit" variant="destructive" size="block" glow disabled={submitting || !valid}>
                         {submitting ? 'Selling…' : `Sell ${qtyNum || 0} share${qtyNum === 1 ? '' : 's'}`}
-                    </button>
+                    </ActionButton>
                 </form>
             </DialogContent>
         </Dialog>

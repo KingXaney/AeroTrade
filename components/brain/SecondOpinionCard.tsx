@@ -9,6 +9,9 @@ import {getSecondOpinionPrompt, requestSecondOpinion, saveManualSecondOpinion} f
 import {runWithToast, UNREACHABLE_MESSAGE} from "@/lib/action-toast";
 import type {SecondOpinionView} from "@/lib/brain/opinion";
 import Panel from "@/components/primitives/Panel";
+import {rowCard} from "@/components/primitives/RowCard";
+import ActionButton from "@/components/primitives/ActionButton";
+import {TextArea} from "@/components/primitives/TextField";
 
 // The API path generates in the background, so refresh a couple of times after
 // queueing instead of making the user hunt for the reload button.
@@ -117,11 +120,9 @@ const SecondOpinionCard = ({configured, opinion}: {configured: boolean; opinion:
 
             <div className="flex flex-wrap items-center gap-2 mb-4">
                 {configured && (
-                    <button type="button" onClick={() => void onAsk()} disabled={busy}
-                            className="px-3 py-2 rounded-lg text-xs font-bold uppercase tracking-wider transition-all active:scale-[0.98] disabled:opacity-50 text-on-brand"
-                            style={{fontFamily: 'var(--type-mono)', backgroundColor: 'var(--brand-strong)'}}>
+                    <ActionButton variant="strong" onClick={() => void onAsk()} disabled={busy}>
                         {pending === 'ask' ? 'Queueing…' : 'Ask Claude (paid API)'}
-                    </button>
+                    </ActionButton>
                 )}
                 <button type="button" onClick={() => void onCopyPrompt()} disabled={busy}
                         className="px-3 py-2 rounded-lg text-xs font-bold uppercase tracking-wider text-brand transition-all active:scale-[0.98] disabled:opacity-50"
@@ -129,11 +130,9 @@ const SecondOpinionCard = ({configured, opinion}: {configured: boolean; opinion:
                     {pending === 'copy' ? 'Building…' : 'Copy prompt for claude.ai'}
                 </button>
                 {!pasteOpen && (
-                    <button type="button" onClick={() => setPasteOpen(true)} disabled={busy}
-                            className="px-3 py-2 rounded-lg text-xs font-bold uppercase tracking-wider text-fg-soft hover:text-brand transition-colors disabled:opacity-50"
-                            style={{fontFamily: 'var(--type-mono)', border: '1px solid color-mix(in srgb, var(--line-strong) 40%, transparent)'}}>
+                    <ActionButton variant="secondary" onClick={() => setPasteOpen(true)} disabled={busy} className="tracking-wider hover:text-brand">
                         Paste an answer
-                    </button>
+                    </ActionButton>
                 )}
             </div>
 
@@ -149,9 +148,8 @@ const SecondOpinionCard = ({configured, opinion}: {configured: boolean; opinion:
                     <label htmlFor="second-opinion-prompt" className="text-[10px] uppercase tracking-[0.1em] text-fg-muted" style={{fontFamily: 'var(--type-mono)'}}>
                         Prompt — select all and copy
                     </label>
-                    <textarea id="second-opinion-prompt" readOnly value={promptFallback} rows={6} onFocus={(e) => e.currentTarget.select()}
-                              className="w-full mt-1 rounded-lg px-3 py-2 text-xs text-fg-soft outline-none focus:ring-1 focus:ring-brand"
-                              style={{backgroundColor: 'var(--surface-0)', border: '1px solid color-mix(in srgb, var(--line-strong) 40%, transparent)', fontFamily: 'var(--type-mono)'}} />
+                    <TextArea id="second-opinion-prompt" readOnly value={promptFallback} rows={6} onFocus={(e) => e.currentTarget.select()}
+                              className="w-full mt-1 text-xs text-fg-soft" />
                 </div>
             )}
 
@@ -160,10 +158,9 @@ const SecondOpinionCard = ({configured, opinion}: {configured: boolean; opinion:
                     <label htmlFor="second-opinion-answer" className="text-[10px] uppercase tracking-[0.1em] text-fg-muted" style={{fontFamily: 'var(--type-mono)'}}>
                         Claude&apos;s answer
                     </label>
-                    <textarea id="second-opinion-answer" value={pasted} onChange={(e) => setPasted(e.target.value)} rows={5}
+                    <TextArea id="second-opinion-answer" value={pasted} onChange={(e) => setPasted(e.target.value)} rows={5}
                               placeholder="Paste Claude's answer here…"
-                              className="w-full mt-1 rounded-lg px-3 py-2 text-sm text-fg outline-none focus:ring-1 focus:ring-brand"
-                              style={{backgroundColor: 'var(--surface-0)', border: '1px solid color-mix(in srgb, var(--line-strong) 40%, transparent)', fontFamily: 'var(--type-mono)'}} />
+                              className="w-full mt-1" />
                     <div className="flex items-center gap-2 mt-2">
                         <button type="button" onClick={() => void onSavePasted()} disabled={busy || pasted.trim().length === 0}
                                 className="px-3 py-2 rounded-lg text-xs font-bold uppercase tracking-wider text-brand transition-all active:scale-[0.98] disabled:opacity-50"
@@ -180,7 +177,7 @@ const SecondOpinionCard = ({configured, opinion}: {configured: boolean; opinion:
             )}
 
             {opinion ? (
-                <SafeMarkdown className="px-4 py-3 rounded-lg border bg-surface-2/40 border-brand/15 text-sm text-fg-soft leading-relaxed">
+                <SafeMarkdown className={rowCard({tone: 'brand', className: 'text-sm text-fg-soft leading-relaxed'})}>
                     {opinion.opinionMd}
                 </SafeMarkdown>
             ) : (

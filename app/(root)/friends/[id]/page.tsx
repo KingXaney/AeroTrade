@@ -8,6 +8,7 @@ import {unpricedLabel} from "@/lib/trading/analytics";
 import AccountSummary from "@/components/trading/portfolio/AccountSummary";
 import HoldingsTable from "@/components/trading/portfolio/HoldingsTable";
 import Panel from "@/components/primitives/Panel";
+import RowCard from "@/components/primitives/RowCard";
 
 type FriendProfilePageProps = {
     params: Promise<{id: string}>;
@@ -58,8 +59,7 @@ const FriendProfilePage = async ({params}: FriendProfilePageProps) => {
                     </h2>
                     <div className="space-y-1.5">
                         {profile.accounts.map((a) => (
-                            <div key={a.name}
-                                 className="flex items-center justify-between px-4 py-3 rounded-lg border bg-surface-2/40 border-line-strong/20">
+                            <RowCard key={a.name} className="flex items-center justify-between">
                                 <span className="text-sm text-fg" style={{fontFamily: 'var(--type-mono)'}}>{a.name}</span>
                                 <div className="text-right" style={{fontFamily: 'var(--type-mono)'}}>
                                     <span className="text-sm text-fg mr-3">{formatPrice(a.totalValue)}</span>
@@ -70,7 +70,7 @@ const FriendProfilePage = async ({params}: FriendProfilePageProps) => {
                                         <span className="block text-[10px] text-warning">{unpricedLabel(a.unpriced, a.holdings)}</span>
                                     )}
                                 </div>
-                            </div>
+                            </RowCard>
                         ))}
                     </div>
                 </Panel>

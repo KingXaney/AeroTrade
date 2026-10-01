@@ -6,6 +6,8 @@ import {toast} from "sonner";
 import {respondToFriendRequest} from "@/lib/actions/friends.actions";
 import type {FriendRequest} from '@/lib/friends/types';
 import Panel from '@/components/primitives/Panel';
+import RowCard from "@/components/primitives/RowCard";
+import ActionButton from "@/components/primitives/ActionButton";
 
 const FriendRequests = ({requests}: {requests: FriendRequest[]}) => {
     const router = useRouter();
@@ -36,33 +38,22 @@ const FriendRequests = ({requests}: {requests: FriendRequest[]}) => {
             </h2>
             <div className="space-y-2">
                 {requests.map((r) => (
-                    <div key={r.friendshipId}
-                         className="flex items-center justify-between px-4 py-3 rounded-lg border bg-surface-2/40 border-line-strong/20">
+                    <RowCard key={r.friendshipId} className="flex items-center justify-between">
                         <div>
                             <div className="text-sm font-semibold text-fg">{r.name}</div>
                             <div className="text-[11px] text-fg-muted">{r.email}</div>
                         </div>
                         <div className="flex items-center gap-2">
-                            <button
-                                type="button"
-                                onClick={() => respond(r.friendshipId, true)}
-                                disabled={busyId === r.friendshipId}
-                                className="px-3 py-1.5 rounded text-xs font-bold uppercase tracking-wider text-on-brand disabled:opacity-50"
-                                style={{backgroundColor: 'var(--brand-strong)', fontFamily: 'var(--type-mono)'}}
-                            >
+                            <ActionButton variant="strong" size="xs" className="rounded"
+                                          onClick={() => respond(r.friendshipId, true)} disabled={busyId === r.friendshipId}>
                                 Accept
-                            </button>
-                            <button
-                                type="button"
-                                onClick={() => respond(r.friendshipId, false)}
-                                disabled={busyId === r.friendshipId}
-                                className="px-3 py-1.5 rounded text-xs font-bold uppercase tracking-wider text-fg-soft hover:text-negative disabled:opacity-50"
-                                style={{border: '1px solid color-mix(in srgb, var(--line-strong) 40%, transparent)', fontFamily: 'var(--type-mono)'}}
-                            >
+                            </ActionButton>
+                            <ActionButton variant="danger" size="xs" className="rounded tracking-wider"
+                                          onClick={() => respond(r.friendshipId, false)} disabled={busyId === r.friendshipId}>
                                 Decline
-                            </button>
+                            </ActionButton>
                         </div>
-                    </div>
+                    </RowCard>
                 ))}
             </div>
         </Panel>

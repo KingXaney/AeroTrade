@@ -6,6 +6,8 @@ import {toast} from "sonner";
 import {createPaperAccount} from "@/lib/actions/accounts.actions";
 import {PAPER_STARTING_BALANCE, STARTING_BALANCE_RANGE, resolveStartingBalance} from "@/lib/trading/starting-balance";
 import {Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle} from "@/components/ui/dialog";
+import ActionButton from "@/components/primitives/ActionButton";
+import TextField from "@/components/primitives/TextField";
 
 // Name a new paper account and pick its starting balance. Mounted conditionally
 // by AccountSwitcher so every open starts with fresh state (same pattern as
@@ -54,7 +56,7 @@ const CreateAccountDialog = ({onClose}: {onClose: () => void}) => {
                         <label htmlFor="account-name" className="text-[10px] uppercase tracking-[0.1em] text-fg-muted" style={{fontFamily: 'var(--type-mono)'}}>
                             Account name
                         </label>
-                        <input
+                        <TextField
                             id="account-name"
                             value={name}
                             onChange={(e) => setName(e.target.value)}
@@ -62,8 +64,7 @@ const CreateAccountDialog = ({onClose}: {onClose: () => void}) => {
                             maxLength={40}
                             autoComplete="off"
                             autoFocus
-                            className="w-full mt-1 rounded-lg px-3 py-2 text-sm text-fg outline-none field-focus"
-                            style={{backgroundColor: 'var(--surface-0)', border: '1px solid color-mix(in srgb, var(--line-strong) 40%, transparent)', fontFamily: 'var(--type-mono)'}}
+                            className="w-full mt-1"
                         />
                     </div>
 
@@ -71,14 +72,13 @@ const CreateAccountDialog = ({onClose}: {onClose: () => void}) => {
                         <label htmlFor="account-balance" className="text-[10px] uppercase tracking-[0.1em] text-fg-muted" style={{fontFamily: 'var(--type-mono)'}}>
                             Starting balance ($)
                         </label>
-                        <input
+                        <TextField
                             id="account-balance"
                             value={balance}
                             onChange={(e) => setBalance(e.target.value.replace(/[^0-9]/g, ''))}
                             inputMode="numeric"
                             autoComplete="off"
-                            className="w-full mt-1 rounded-lg px-3 py-2 text-sm text-fg outline-none field-focus"
-                            style={{backgroundColor: 'var(--surface-0)', border: '1px solid color-mix(in srgb, var(--line-strong) 40%, transparent)', fontFamily: 'var(--type-mono)'}}
+                            className="w-full mt-1"
                         />
                         {!balanceValid && balance !== '' && (
                             <p className="mt-1 text-xs text-negative">
@@ -87,18 +87,9 @@ const CreateAccountDialog = ({onClose}: {onClose: () => void}) => {
                         )}
                     </div>
 
-                    <button
-                        type="submit"
-                        disabled={submitting || !valid}
-                        className="w-full py-3 rounded-lg text-sm font-bold uppercase tracking-wider transition-all active:scale-[0.98] disabled:opacity-50 text-on-brand"
-                        style={{
-                            fontFamily: 'var(--type-mono)',
-                            backgroundColor: 'var(--brand-strong)',
-                            boxShadow: '0 0 15px color-mix(in srgb, var(--brand-strong) 30%, transparent)',
-                        }}
-                    >
+                    <ActionButton type="submit" variant="strong" size="block" glow disabled={submitting || !valid}>
                         {submitting ? 'Creating…' : `Create with $${(balanceNum || 0).toLocaleString('en-US')}`}
-                    </button>
+                    </ActionButton>
                 </form>
             </DialogContent>
         </Dialog>

@@ -6,6 +6,7 @@ import {refreshCooldownUntil} from "@/lib/topics/config";
 import {pickStalestTopic} from "@/lib/topics/first-run";
 import type {TopicOverviewItem} from '@/lib/topics/types';
 import Panel from '@/components/primitives/Panel';
+import {actionButton} from "@/components/primitives/ActionButton";
 
 const mono = {fontFamily: 'var(--type-mono)'} as const;
 
@@ -14,7 +15,7 @@ type Props = {now: number} & (   // now: the server render instant, for the refr
     | {scope: 'all'; topics: TopicOverviewItem[]}
 );
 
-const secondary = "px-3 py-2 rounded-lg text-xs font-bold uppercase tracking-[0.1em] text-fg-soft hover:text-fg border border-line-strong/40";
+const secondary = actionButton({variant: 'secondary'});
 
 // Empty feed for one topic or for the merged view. Both get real actions now: the
 // merged version used to be text only, telling the user to wait for a job they had no

@@ -3,6 +3,7 @@ import TopicBrief from "@/components/topics/TopicBrief";
 import TopicsWidgetEmpty from "@/components/dashboard/widgets/topics/TopicsWidgetEmpty";
 import WidgetUnavailable from "@/components/dashboard/WidgetUnavailable";
 import type {TopicsOverview} from '@/lib/topics/types';
+import RowCard from "@/components/primitives/RowCard";
 
 const MAX_BRIEFS = 3;
 
@@ -27,13 +28,13 @@ const TopicBriefsList = ({overview}: {overview: TopicsOverview}) => {
     return (
         <div className="space-y-3">
             {briefed.map((t) => t.brief && (
-                <div key={t.id} className="rounded-lg border border-line-strong/20 bg-surface-2/40 p-4">
+                <RowCard key={t.id} className="p-4">
                     <Link href={`/topics/${t.slug}`} className="mb-2 inline-flex items-center gap-2 text-sm font-semibold text-fg transition-colors hover:text-brand" style={{fontFamily: 'var(--type-display)'}}>
                         <span className="h-2 w-2 rounded-full" style={{background: t.color ?? 'var(--brand)'}} aria-hidden="true" />
                         {t.name}
                     </Link>
                     <TopicBrief brief={t.brief} compact />
-                </div>
+                </RowCard>
             ))}
         </div>
     );

@@ -5,6 +5,7 @@ import {Loader2} from "lucide-react";
 import TopicArticleCard from "@/components/topics/TopicArticleCard";
 import {fetchTopicFeedPage} from "@/lib/actions/topics.actions";
 import type {MergedTopicArticle, TopicArticleView} from '@/lib/topics/types';
+import ActionButton from "@/components/primitives/ActionButton";
 
 type MergedOrPlain = TopicArticleView | MergedTopicArticle;
 
@@ -59,12 +60,10 @@ const TopicFeed = ({topicId, initial, unseenCount = 0, pageSize = 20, showTopicT
             {error && <p className="mt-3 text-xs text-negative">{error}</p>}
             {topicId && !exhausted && (
                 <div className="mt-4 flex justify-center">
-                    <button type="button" onClick={loadMore} disabled={pending}
-                            className="inline-flex items-center gap-2 px-4 py-2 rounded-lg text-xs font-bold uppercase tracking-[0.1em] text-fg-soft hover:text-fg border border-line-strong/40 disabled:opacity-50"
-                            style={{fontFamily: 'var(--type-mono)'}}>
+                    <ActionButton variant="secondary" size="md" className="inline-flex items-center gap-2" onClick={loadMore} disabled={pending}>
                         {pending && <Loader2 className="size-3.5 animate-spin" />}
                         Load more
-                    </button>
+                    </ActionButton>
                 </div>
             )}
         </div>

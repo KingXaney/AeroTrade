@@ -11,6 +11,8 @@ import {
     DropdownMenuItem,
     DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
+import ActionButton from "@/components/primitives/ActionButton";
+import TextField from "@/components/primitives/TextField";
 
 // Rename dialog — mounted conditionally so state resets per open.
 const RenameDialog = ({accountId, currentName, onClose}: {accountId: string; currentName: string; onClose: () => void}) => {
@@ -46,23 +48,17 @@ const RenameDialog = ({accountId, currentName, onClose}: {accountId: string; cur
                     <DialogDescription className="text-fg-muted">Pick a new name for this account.</DialogDescription>
                 </DialogHeader>
                 <form className="flex flex-col gap-4" onSubmit={(e) => { e.preventDefault(); void onConfirm(); }}>
-                    <input
+                    <TextField
                         value={name}
                         onChange={(e) => setName(e.target.value)}
                         maxLength={40}
                         autoComplete="off"
                         autoFocus
-                        className="w-full rounded-lg px-3 py-2 text-sm text-fg outline-none field-focus"
-                        style={{backgroundColor: 'var(--surface-0)', border: '1px solid color-mix(in srgb, var(--line-strong) 40%, transparent)', fontFamily: 'var(--type-mono)'}}
+                        className="w-full"
                     />
-                    <button
-                        type="submit"
-                        disabled={submitting || !valid}
-                        className="w-full py-3 rounded-lg text-sm font-bold uppercase tracking-wider transition-all active:scale-[0.98] disabled:opacity-50 text-on-brand"
-                        style={{fontFamily: 'var(--type-mono)', backgroundColor: 'var(--brand-strong)'}}
-                    >
+                    <ActionButton type="submit" variant="strong" size="block" disabled={submitting || !valid}>
                         {submitting ? 'Renaming…' : 'Rename'}
-                    </button>
+                    </ActionButton>
                 </form>
             </DialogContent>
         </Dialog>
@@ -102,15 +98,9 @@ const DeleteDialog = ({accountId, accountName, onClose}: {accountId: string; acc
                         This permanently removes the account, its positions, its trade history and its performance record. This cannot be undone.
                     </DialogDescription>
                 </DialogHeader>
-                <button
-                    type="button"
-                    onClick={() => void onConfirm()}
-                    disabled={submitting}
-                    className="w-full py-3 rounded-lg text-sm font-bold uppercase tracking-wider transition-all active:scale-[0.98] disabled:opacity-50 text-on-negative"
-                    style={{fontFamily: 'var(--type-mono)', backgroundColor: 'var(--negative)'}}
-                >
+                <ActionButton variant="destructive" size="block" onClick={() => void onConfirm()} disabled={submitting}>
                     {submitting ? 'Deleting…' : 'Delete Account'}
-                </button>
+                </ActionButton>
             </DialogContent>
         </Dialog>
     );

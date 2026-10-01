@@ -5,6 +5,7 @@ import {formatSignedPrice, formatPrice, formatChangePercent, getChangeColorClass
 import UnpricedNote from "@/components/trading/UnpricedNote";
 import Term from "@/components/primitives/Term";
 import type {EnrichedPosition} from '@/lib/trading/types';
+import RowCard from "@/components/primitives/RowCard";
 
 // The one holdings table. Read-only as rendered by the friend profile page, the strategy
 // detail page and the dashboard's Top Holdings widget; /portfolio's PositionsTable passes
@@ -43,8 +44,7 @@ const HoldingsTable = ({positions, emptyText = 'No open positions.', showUnprice
             </div>
 
             {positions.map((p) => (
-                <div key={p.symbol}
-                     className={`grid grid-cols-1 ${rowColumns} gap-2 md:gap-4 items-center px-4 py-3 rounded-xl border bg-surface-2/40 border-line-strong/20${rowHover}`}>
+                <RowCard key={p.symbol} className={`grid grid-cols-1 ${rowColumns} gap-2 md:gap-4 items-center rounded-xl${rowHover}`}>
                     <div className="flex items-center gap-3">
                         <div className="w-8 h-8 rounded flex items-center justify-center text-xs font-bold"
                              style={{backgroundColor: 'var(--surface-4)', color: 'var(--brand)', fontFamily: 'var(--type-display)', border: '1px solid color-mix(in srgb, var(--brand) 20%, transparent)'}}>
@@ -80,7 +80,7 @@ const HoldingsTable = ({positions, emptyText = 'No open positions.', showUnprice
                         </div>
                     </div>
                     {actions && <div className="flex md:justify-end gap-2">{actions(p)}</div>}
-                </div>
+                </RowCard>
             ))}
             {showUnpricedNote && <UnpricedNote positions={positions} className="px-4 pt-1" />}
         </div>

@@ -5,6 +5,7 @@ import {formatDrawdown, formatPct, roundPct, formatPrice, getChangeColorClass} f
 import {unpricedLabel} from "@/lib/trading/analytics";
 import type {ComparisonRow} from "@/lib/trading/active-account";
 import useSwitchAccount from "@/components/trading/accounts/useSwitchAccount";
+import {rowCard} from "@/components/primitives/RowCard";
 
 // The "which account wins" view: every one of the user's paper accounts side by side.
 // Clicking a row makes that account the active one.
@@ -30,12 +31,11 @@ const AccountComparisonTable = ({rows, activeId}: {rows: ComparisonRow[]; active
                     type="button"
                     onClick={() => void switchTo(row.id)}
                     disabled={switching}
-                    className={cn(
-                        'w-full grid grid-cols-1 md:grid-cols-[2fr_1fr_1fr_1fr_1fr] gap-1.5 md:gap-4 items-center px-4 py-3 rounded-xl border text-left transition-colors disabled:opacity-60',
-                        row.id === activeId
-                            ? 'bg-brand-strong/6 border-brand/25'
-                            : 'bg-surface-2/40 border-line-strong/20 hover:border-brand/30',
-                    )}
+                    className={rowCard({
+                        tone: row.id === activeId ? 'selected' : 'plain',
+                        interactive: row.id !== activeId,
+                        className: 'w-full grid grid-cols-1 md:grid-cols-[2fr_1fr_1fr_1fr_1fr] gap-1.5 md:gap-4 items-center rounded-xl text-left transition-colors disabled:opacity-60',
+                    })}
                 >
                     <div className="flex items-center gap-2">
                         <span className="text-xs w-4 text-fg-muted" style={{fontFamily: 'var(--type-mono)'}}>{i + 1}</span>

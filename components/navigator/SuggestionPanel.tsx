@@ -14,6 +14,8 @@ import type {ApplyAccount} from "@/lib/trading/active-account";
 import {NAVIGATOR_COPY} from "@/lib/learn/copy/navigator";
 import ReasonGloss from "@/components/learn/ReasonGloss";
 import type {SuggestionAction, SuggestionItem} from '@/lib/navigator/types';
+import RowCard, {rowCard} from "@/components/primitives/RowCard";
+import {FIELD_STYLE, fieldClass} from "@/components/primitives/TextField";
 
 // `gloss`: the item's reasons decoded on the server (glossNavigatorReasons), so this client
 // file never bundles the grammar. /brain passes it; the weekly-decisions widget does not.
@@ -45,7 +47,7 @@ const ItemRow = ({item, showApply, accounts}: {item: GlossedItem; showApply: boo
     };
 
     return (
-        <div className="px-4 py-3 rounded-lg border bg-surface-2/40 border-line-strong/20">
+        <RowCard>
             <div className="flex items-center justify-between gap-3 flex-wrap">
                 <div className="flex items-center gap-3">
                     <span className={cn('text-[10px] font-bold uppercase tracking-[0.1em] px-2 py-1 rounded', ACTION_STYLES[item.action])}
@@ -69,8 +71,7 @@ const ItemRow = ({item, showApply, accounts}: {item: GlossedItem; showApply: boo
                     {showApply && item.action !== 'hold' && accounts.length > 0 && (
                         <>
                             <select value={accountId} onChange={(e) => setAccountId(e.target.value)}
-                                    className="text-[11px] rounded px-2 py-1 outline-none field-focus text-fg-soft"
-                                    style={{backgroundColor: 'var(--surface-0)', border: '1px solid color-mix(in srgb, var(--line-strong) 40%, transparent)', fontFamily: 'var(--type-mono)'}}>
+                                    className={fieldClass('text-[11px] rounded px-2 py-1 text-fg-soft')} style={FIELD_STYLE}>
                                 {accounts.map((a) => <option key={a.id} value={a.id}>{a.name}</option>)}
                             </select>
                             <button type="button" onClick={() => void onApply()} disabled={applying}
@@ -97,7 +98,7 @@ const ItemRow = ({item, showApply, accounts}: {item: GlossedItem; showApply: boo
                     <ReasonGloss clauses={item.gloss} className="mt-2" />
                 </Disclosure>
             )}
-        </div>
+        </RowCard>
     );
 };
 
@@ -133,7 +134,7 @@ const SuggestionPanel = ({userSet, globalSet, accounts}: {userSet: SetView | nul
                 ))}
             </div>
             {set.rationaleMd && (
-                <SafeMarkdown className="px-4 py-3 rounded-lg border bg-surface-2/40 border-brand/15 text-sm text-fg-soft leading-relaxed">
+                <SafeMarkdown className={rowCard({tone: 'brand', className: 'text-sm text-fg-soft leading-relaxed'})}>
                     {set.rationaleMd}
                 </SafeMarkdown>
             )}

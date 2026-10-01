@@ -3,6 +3,7 @@ import {formatSignedPrice, formatPrice, getChangeColorClass} from "@/lib/format"
 import type {StrategyBacktestView} from "@/lib/strategies/page-store";
 import type {StrategyDefinition} from "@/lib/strategies/types";
 import ReasonDisclosure from "@/components/strategies/ReasonDisclosure";
+import RowCard from "@/components/primitives/RowCard";
 
 // Backtest fills, newest first, dated by bar (no clock time: a simulated fill is "the
 // open of that day", not an instant). Capped; the count says how many there were. Each
@@ -20,7 +21,7 @@ const SimulatedTradeList = ({trades, def}: {trades: StrategyBacktestView['trades
                 Simulated — hypothetical fills at the next day&apos;s open, no fees or slippage.
             </p>
             {recent.map((t, i) => (
-                <div key={`${t.date}-${t.symbol}-${t.side}-${i}`} className="flex items-center justify-between px-4 py-2 rounded-lg border bg-surface-2/40 border-line-strong/20">
+                <RowCard key={`${t.date}-${t.symbol}-${t.side}-${i}`} className="flex items-center justify-between py-2">
                     <div className="min-w-0">
                         <span className={cn('px-2 py-0.5 rounded text-[10px] font-bold uppercase tracking-wider border mr-2',
                             t.side === 'buy' ? 'bg-brand/10 text-brand border-brand/20' : 'bg-negative/10 text-negative border-negative/20')}
@@ -43,7 +44,7 @@ const SimulatedTradeList = ({trades, def}: {trades: StrategyBacktestView['trades
                             )}
                         </div>
                     </div>
-                </div>
+                </RowCard>
             ))}
             {trades.length > SHOW && (
                 <p className="px-4 pt-2 text-[11px] text-fg-muted" style={{fontFamily: 'var(--type-mono)'}}>

@@ -7,6 +7,7 @@ import Term from "@/components/primitives/Term";
 import WhatTheseMean from "@/components/learn/WhatTheseMean";
 import {eventBadge, eventTermsShown} from "@/lib/brain/event-types";
 import {BRAIN_COPY} from "@/lib/learn/copy/brain";
+import {rowCard} from "@/components/primitives/RowCard";
 
 // Ticker keys are bare symbols; sectors and themes carry a "sector:" / "theme:" prefix.
 const isTickerKey = (key: string): boolean => /^[A-Z][A-Z0-9.\-]{0,9}$/.test(key);
@@ -58,7 +59,7 @@ const EvidenceList = ({entityKey, items}: {entityKey: string; items: EvidenceIte
             <div className="space-y-2">
                 {items.map((item) => (
                     <a key={item.url} href={item.url} target="_blank" rel="noopener noreferrer"
-                       className="block px-4 py-3 rounded-lg border bg-surface-2/40 border-line-strong/20 hover:border-brand/30 transition-colors">
+                       className={rowCard({interactive: true, className: 'block'})}>
                         <div className="flex items-start justify-between gap-3">
                             <span className="text-sm text-fg">{item.headline}</span>
                             <span className={cn('text-xs shrink-0', getChangeColorClass(item.sentiment || undefined))}

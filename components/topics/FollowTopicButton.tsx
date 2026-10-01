@@ -7,6 +7,7 @@ import {Loader2, Sparkles} from "lucide-react";
 import {cn} from "@/lib/utils";
 import {createTopic, deleteTopic} from "@/lib/actions/topics.actions";
 import UnfollowTopicDialog from "@/components/topics/UnfollowTopicDialog";
+import {actionButton} from "@/components/primitives/ActionButton";
 
 type Props = {
     name: string;
@@ -69,9 +70,8 @@ const FollowTopicButton = ({name, keywords, followed = null, type = 'icon', clas
         <>
             {type === 'button' ? (
                 <button type="button" onClick={onClick} disabled={pending} aria-pressed={following}
-                        className={cn('inline-flex items-center gap-2 px-3 py-2 rounded-lg text-xs font-bold uppercase tracking-[0.1em] transition-colors disabled:opacity-50',
-                            following ? 'border border-brand/40 text-brand' : 'bg-brand text-on-brand', className)}
-                        style={{fontFamily: 'var(--type-mono)'}}>
+                        className={actionButton({className: cn('inline-flex items-center gap-2 transition-colors',
+                            following && 'bg-transparent border border-brand/40 text-brand', className)})}>
                     {pending ? <Loader2 className="size-3.5 animate-spin" /> : <Sparkles className="size-3.5" />}
                     {label}
                 </button>

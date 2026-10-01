@@ -12,6 +12,7 @@ import {MAX_EXCLUDES, NAME_MAX} from "@/lib/topics/config";
 import {KEYWORD_MAX, MAX_KEYWORDS} from "@/lib/news/keywords";
 import {suggestKeywords} from "@/lib/topics/suggest-keywords";
 import type {TopicView} from '@/lib/topics/types';
+import ActionButton from "@/components/primitives/ActionButton";
 
 const TOPIC_COLORS = ['#7df4ff', '#a6e3a1', '#f9e2af', '#fab387', '#f38ba8', '#cba6f7', '#89b4fa', '#94e2d5'];
 
@@ -139,15 +140,13 @@ const ComposerForm = ({mode, initial, onClose, onSaved}: {mode: ComposerMode; in
             {error && <p className="text-sm text-negative">{error}</p>}
 
             <div className="flex justify-end gap-2" style={mono}>
-                <button type="button" onClick={onClose} disabled={pending}
-                        className="px-3 py-2 rounded-lg text-xs font-bold uppercase tracking-[0.1em] text-fg-soft hover:text-fg border border-line-strong/40">
+                <ActionButton variant="secondary" onClick={onClose} disabled={pending}>
                     Cancel
-                </button>
-                <button type="submit" disabled={pending || name.trim().length < 2}
-                        className="inline-flex items-center gap-2 px-3 py-2 rounded-lg text-xs font-bold uppercase tracking-[0.1em] bg-brand text-on-brand disabled:opacity-50">
+                </ActionButton>
+                <ActionButton type="submit" className="inline-flex items-center gap-2" disabled={pending || name.trim().length < 2}>
                     {pending && <Loader2 className="size-3.5 animate-spin" />}
                     {mode === 'edit' ? 'Save changes' : 'Follow topic'}
-                </button>
+                </ActionButton>
             </div>
         </form>
     );

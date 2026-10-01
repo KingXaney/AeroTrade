@@ -6,6 +6,7 @@ import {THESIS_WEIGHT_THRESHOLD} from "@/lib/brain/config";
 import {evidenceHref} from "@/lib/brain/links";
 import {BRAIN_COPY} from "@/lib/learn/copy/brain";
 import type {BrainEntitySummary, BrainEntityType} from '@/lib/brain/types';
+import RowCard from "@/components/primitives/RowCard";
 
 // Lower-cased topic name -> the user's topic; only the /brain page passes it.
 export type FollowedByName = Record<string, {id: string; slug: string}>;
@@ -26,8 +27,7 @@ const TypeColumn = ({title, entities, followedByName}: {title: string; entities:
                     // The row used to be one <Link> with the follow <button> nested inside it —
                     // invalid markup, and the two fought over the click. Now the name is the
                     // link and the button is its sibling.
-                    <div key={e.key}
-                         className="flex items-center justify-between gap-2 px-3 py-2 rounded-lg border bg-surface-2/40 border-line-strong/20 hover:border-brand/30 transition-colors">
+                    <RowCard key={e.key} interactive className="flex items-center justify-between gap-2 px-3 py-2">
                         <Link href={evidenceHref(e.key)}
                               className="text-xs font-semibold text-fg hover:text-brand truncate max-w-[55%]" style={{fontFamily: 'var(--type-mono)'}}>
                             {e.displayName}
@@ -43,7 +43,7 @@ const TypeColumn = ({title, entities, followedByName}: {title: string; entities:
                                                    followed={followedByName[e.displayName.toLowerCase()] ?? null} className="size-6" />
                             )}
                         </span>
-                    </div>
+                    </RowCard>
                 ))}
             </div>
         )}

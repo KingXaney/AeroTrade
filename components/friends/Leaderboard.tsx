@@ -4,6 +4,7 @@ import {formatPct, formatPrice, getChangeColorClass} from "@/lib/format";
 import {unpricedLabel} from "@/lib/trading/analytics";
 import type {LeaderboardEntry} from '@/lib/friends/types';
 import Panel from '@/components/primitives/Panel';
+import {rowCard} from "@/components/primitives/RowCard";
 
 // Medal colours come from --rank-* in globals.css, not the palette registry: gold is a
 // material, not a semantic role, so it stays gold in every theme (darkened under the
@@ -32,12 +33,11 @@ const Leaderboard = ({entries}: {entries: LeaderboardEntry[]}) => {
                     {entries.map((e, i) => {
                         const rank = i + 1;
                         const row = (
-                            <div className={cn(
-                                'flex items-center justify-between px-4 py-3 rounded-lg border transition-colors',
-                                e.isYou
-                                    ? 'bg-brand-strong/6 border-brand/25'
-                                    : 'bg-surface-2/40 border-line-strong/20 hover:border-brand/30',
-                            )}>
+                            <div className={rowCard({
+                                tone: e.isYou ? 'selected' : 'plain',
+                                interactive: !e.isYou,
+                                className: 'flex items-center justify-between transition-colors',
+                            })}>
                                 <div className="flex items-center gap-3">
                                     <span className={cn('w-5 text-center font-bold', rankClass(rank))} style={{fontFamily: 'var(--type-mono)', ...rankStyle(rank)}}>
                                         {rank}

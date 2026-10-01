@@ -11,6 +11,7 @@ import {
 import EmptyState from "@/components/primitives/EmptyState";
 import MicroLabel from "@/components/primitives/MicroLabel";
 import Sparkline from "@/components/strategies/Sparkline";
+import {rowCard} from "@/components/primitives/RowCard";
 
 // The leaderboard's top rows for the dashboard: followed strategies first, then the
 // best live returns — so no position number, which would read as a rank. Panel chrome,
@@ -44,7 +45,7 @@ const QuantStrategiesList = ({rows, span}: {rows: StrategyLeaderboardRow[]; span
                         return (
                             <li key={row.id}>
                                 <Link href={`/strategies/${row.id}`} data-strategy={row.id}
-                                      className="flex items-center justify-between gap-3 px-3 py-2 rounded-lg border bg-surface-2/40 border-line-strong/20 hover:border-brand/30 transition-colors">
+                                      className={rowCard({interactive: true, className: 'flex items-center justify-between gap-3 px-3 py-2'})}>
                                     <div className="min-w-0">
                                         <div className="flex items-center gap-1.5">
                                             <span className="font-heading text-sm font-semibold text-fg truncate">{row.name}</span>

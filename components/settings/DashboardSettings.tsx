@@ -13,6 +13,7 @@ import {resetDashboardLayout, saveDashboardLayout} from "@/lib/actions/dashboard
 import {cn} from "@/lib/utils";
 import {iconButton} from "@/components/primitives/iconButton";
 import ConfirmDialog from "@/components/primitives/ConfirmDialog";
+import RowCard from "@/components/primitives/RowCard";
 
 const SAVE_DEBOUNCE_MS = 300;
 
@@ -92,7 +93,7 @@ const DashboardSettings = ({initialLayout, availableIds}: Props) => {
                         {layout.widgets.map((w, index) => {
                             const def = WIDGETS[w.id];
                             return (
-                                <div key={w.id} className="flex items-center justify-between gap-3 rounded-lg border border-line-strong/20 bg-surface-2/40 px-3 py-2">
+                                <RowCard key={w.id} className="flex items-center justify-between gap-3 px-3 py-2">
                                     <div className="flex items-center gap-2 min-w-0">
                                         <span className="material-symbols-outlined text-base text-brand">{def.icon}</span>
                                         <span className="text-sm text-fg truncate" style={{fontFamily: 'var(--type-display)'}}>{def.title}</span>
@@ -111,7 +112,7 @@ const DashboardSettings = ({initialLayout, availableIds}: Props) => {
                                         <button type="button" className={cn(iconButton, 'hover:text-negative')} aria-label={`Remove ${def.title}`}
                                                 onClick={() => setLayout((l) => removeWidget(l, w.id))}><X className="size-4" /></button>
                                     </div>
-                                </div>
+                                </RowCard>
                             );
                         })}
                     </div>
@@ -134,7 +135,7 @@ const DashboardSettings = ({initialLayout, availableIds}: Props) => {
                                         {inCategory.map((id) => {
                                             const def = WIDGETS[id];
                                             return (
-                                                <label key={id} className="flex items-center justify-between gap-3 rounded-lg border border-line-strong/20 bg-surface-2/40 px-3 py-2 cursor-pointer">
+                                                <RowCard as="label" key={id} className="flex items-center justify-between gap-3 px-3 py-2 cursor-pointer">
                                                     <div className="flex items-center gap-2 min-w-0">
                                                         <span className="material-symbols-outlined text-base text-brand">{def.icon}</span>
                                                         <div className="min-w-0">
@@ -143,7 +144,7 @@ const DashboardSettings = ({initialLayout, availableIds}: Props) => {
                                                         </div>
                                                     </div>
                                                     <Switch checked={false} onCheckedChange={() => setLayout((l) => addWidget(l, id))} aria-label={`Add ${def.title}`} />
-                                                </label>
+                                                </RowCard>
                                             );
                                         })}
                                     </div>

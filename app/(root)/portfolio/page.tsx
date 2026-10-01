@@ -21,6 +21,7 @@ import LuckOrSkill from "@/components/trading/learn/LuckOrSkill";
 import WhatTheseMean from "@/components/learn/WhatTheseMean";
 import Panel from "@/components/primitives/Panel";
 import SectionHeading from "@/components/primitives/SectionHeading";
+import {actionButton} from "@/components/primitives/ActionButton";
 
 type PortfolioPageProps = {
     searchParams: Promise<{account?: string}>;
@@ -51,8 +52,7 @@ const PortfolioPage = async ({searchParams}: PortfolioPageProps) => {
                     <ExportCsvButton accountId={account.id} />
                     <Link
                         href="/trade"
-                        className="inline-flex items-center gap-2 px-4 py-2 rounded-lg text-xs font-bold uppercase tracking-[0.1em] transition-all active:scale-[0.98]"
-                        style={{fontFamily: 'var(--type-mono)', backgroundColor: 'var(--brand)', color: 'var(--on-brand)'}}
+                        className={actionButton({size: 'md', className: 'inline-flex items-center gap-2 transition-all active:scale-[0.98]'})}
                     >
                         <span className="material-symbols-outlined text-base">candlestick_chart</span>
                         Trade Desk

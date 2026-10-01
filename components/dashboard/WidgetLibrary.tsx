@@ -3,6 +3,8 @@
 import {Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle} from "@/components/ui/dialog";
 import {CATEGORY_LABELS, CATEGORY_ORDER, WIDGETS, type WidgetId} from "@/lib/dashboard/catalog";
 import {MAX_WIDGETS} from "@/lib/dashboard/layout";
+import RowCard from "@/components/primitives/RowCard";
+import ActionButton from "@/components/primitives/ActionButton";
 
 type Props = {
     open: boolean;
@@ -43,7 +45,7 @@ const WidgetLibrary = ({open, onOpenChange, ids, count, onAdd}: Props) => {
                                         {inCategory.map((id) => {
                                             const def = WIDGETS[id];
                                             return (
-                                                <div key={id} className="flex items-center justify-between gap-3 rounded-lg border border-line-strong/20 bg-surface-2/40 px-3 py-2.5">
+                                                <RowCard key={id} className="flex items-center justify-between gap-3 px-3 py-2.5">
                                                     <div className="flex items-start gap-3 min-w-0">
                                                         <span className="material-symbols-outlined text-brand mt-0.5">{def.icon}</span>
                                                         <div className="min-w-0">
@@ -57,12 +59,10 @@ const WidgetLibrary = ({open, onOpenChange, ids, count, onAdd}: Props) => {
                                                             <p className="text-xs text-fg-muted leading-snug mt-0.5">{def.description}</p>
                                                         </div>
                                                     </div>
-                                                    <button type="button" onClick={() => onAdd(id)} disabled={full}
-                                                            className="shrink-0 px-3 py-1.5 rounded-md text-[10px] font-bold uppercase tracking-[0.1em] bg-brand text-on-brand disabled:opacity-40"
-                                                            style={{fontFamily: 'var(--type-mono)'}}>
+                                                    <ActionButton size="xs" className="shrink-0 rounded-md text-[10px] disabled:opacity-40" onClick={() => onAdd(id)} disabled={full}>
                                                         Add
-                                                    </button>
-                                                </div>
+                                                    </ActionButton>
+                                                </RowCard>
                                             );
                                         })}
                                     </div>

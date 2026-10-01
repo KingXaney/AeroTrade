@@ -6,12 +6,11 @@ import {toast} from "sonner";
 import {Loader2, RefreshCw} from "lucide-react";
 import {requestTopicRefreshAction} from "@/lib/actions/topics.actions";
 import {cn} from "@/lib/utils";
+import {actionButton} from "@/components/primitives/ActionButton";
 
 // How long after a queued refresh to re-read the page for articles. The on-demand
 // job is one search plus a bulk upsert, so new rows exist within seconds.
 const RESULT_CHECK_DELAY_MS = 20_000;
-
-const mono = {fontFamily: 'var(--type-mono)'} as const;
 
 const secondsBetween = (until: number | null, now: number): number =>
     until ? Math.max(0, Math.ceil((until - now) / 1000)) : 0;
@@ -81,10 +80,7 @@ const RefreshTopicButton = ({topicId, cooldownUntil, serverNow, variant = 'ghost
     return (
         <button type="button" onClick={refresh} disabled={pending || cooling}
                 title={cooling ? 'Each topic can be refreshed once every ten minutes' : undefined}
-                className={cn('inline-flex items-center gap-2 px-3 py-2 rounded-lg text-xs font-bold uppercase tracking-[0.1em] disabled:opacity-50',
-                    variant === 'primary' ? 'bg-brand text-on-brand' : 'text-fg-soft hover:text-fg border border-line-strong/40',
-                    className)}
-                style={mono}>
+                className={actionButton({variant: variant === 'primary' ? 'primary' : 'secondary', className: cn('inline-flex items-center gap-2', className)})}>
             {pending ? <Loader2 className="size-3.5 animate-spin" /> : <RefreshCw className="size-3.5" />}
             {pending ? 'Refreshing…' : cooling ? countdownLabel(seconds) : 'Refresh now'}
         </button>
