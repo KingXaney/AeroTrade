@@ -1,35 +1,24 @@
 import {notFound} from "next/navigation";
 import {requireUserId} from "@/lib/auth/session";
-import {ensureTopicHasArticles, getCachedTopicsOverview, getTopicArticles, getTopicsOverview} from "@/lib/topics/store";
+import {getTopicPageView, TOPIC_PAGE_SIZE} from "@/lib/topics/page-store";
 import TopicsShell from "@/components/topics/TopicsShell";
 import TopicHeader from "@/components/topics/TopicHeader";
 import TopicBrief from "@/components/topics/TopicBrief";
 import TopicFeed from "@/components/topics/TopicFeed";
 import TopicFeedEmpty from "@/components/topics/TopicFeedEmpty";
 import TopicSeenMarker from "@/components/topics/TopicSeenMarker";
-import {topicFeedKey} from "@/lib/topics/feed-key";
-
-const PAGE_SIZE = 20;
 
 type TopicPageProps = {params: Promise<{slug: string}>};
 
+// The first-visit fetch and the re-read after it live in getTopicPageView
+// (lib/topics/page-store.ts); the page only composes its view.
 const TopicPage = async ({params}: TopicPageProps) => {
     const userId = await requireUserId();
 
     const {slug} = await params;
-    // The layout's sidebar card already read this for the request; only a read after a
-    // write below goes back to the store.
-    let overview = await getCachedTopicsOverview(userId);
-    let topic = overview.topics.find((t) => t.slug === slug);
-    if (!topic) notFound();
-
-    // A brand-new topic gets one bounded live fetch so its first visit isn't empty;
-    // counts and "refreshed …" come from a second read so the header isn't stale.
-    if (await ensureTopicHasArticles(topic)) {
-        overview = await getTopicsOverview(userId);
-        topic = overview.topics.find((t) => t.slug === slug) ?? topic;
-    }
-    const articles = await getTopicArticles(topic.keywordSetHash, {limit: PAGE_SIZE});
+    const view = await getTopicPageView(userId, slug);
+    if (!view) notFound();
+    const {overview, topic, articles} = view;
     // eslint-disable-next-line react-hooks/purity -- server component: the render instant is captured once so the refresh button's cooldown hydrates deterministically
     const now = Date.now();
 
@@ -45,8 +34,8 @@ const TopicPage = async ({params}: TopicPageProps) => {
                     </p>
                 )}
             {articles.length > 0
-                ? <TopicFeed key={topicFeedKey(articles, topic.keywordSetHash)} topicId={topic.id} initial={articles}
-                             unseenCount={topic.unseenCount} pageSize={PAGE_SIZE} />
+                ? <TopicFeed key={view.feedKey} topicId={topic.id} initial={articles}
+                             unseenCount={topic.unseenCount} pageSize={TOPIC_PAGE_SIZE} />
                 : <TopicFeedEmpty scope="topic" topic={topic} now={now} />}
         </TopicsShell>
     );
