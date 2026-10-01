@@ -4,6 +4,8 @@
   "description": "Browser QA tooling for AeroTrade: in-memory MongoDB + Playwright. Separate from the app's package.json so a plain `npm install` stays light.",
   "devDependencies": {
     "mongodb-memory-server": "^10.4.3",
-    "playwright": "^1.62.1"
+    "pixelmatch": "^7.2.0",
+    "playwright": "^1.62.1",
+    "pngjs": "^7.0.0"
   }
 }
