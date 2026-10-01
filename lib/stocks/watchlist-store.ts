@@ -6,12 +6,7 @@
 import {cache} from "react";
 import {connectToDatabase} from "@/database/mongoose";
 import Watchlist from "@/database/models/watchlist.model";
-
-type WatchlistEntry = {
-    symbol: string;
-    company: string;
-    addedAt: Date;
-};
+import type {WatchlistEntry} from "@/lib/stocks/types";
 
 // Used by the daily-news Inngest pipeline (which only knows the user's email).
 export const getWatchlistSymbolsByEmail = async (email: string): Promise<string[]> => {
