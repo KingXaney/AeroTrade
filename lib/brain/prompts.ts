@@ -1,6 +1,7 @@
 // Prompts for the news brain. The extractor turns articles into structured JSON
-// (schema-enforced downstream by lib/brain/extraction.ts); the rationale writer
-// paraphrases deterministic reasons — neither ever picks positions or sizes.
+// (schema-enforced downstream by lib/brain/extraction.ts); the second opinion argues with
+// the brain's picture — neither ever picks positions or sizes. The Navigator's weekly
+// rationale is lib/navigator/prompts.ts.
 
 export const EXTRACTION_PROMPT = `You are a financial news tagger. For EACH article in the JSON array below, extract structured data.
 
@@ -65,10 +66,11 @@ export type SecondOpinionContext = {
     headlines: SecondOpinionHeadline[];
 };
 
-// Substituted through a replacer function rather than a replacement string:
-// scraped headlines reach this JSON, and a "$&" or "$`" in one would otherwise
-// be expanded by String.replace and quietly rewrite the prompt around it.
-export const injectJson = (template: string, token: string, value: unknown, indent = 1): string =>
+// lib/ai/prompt-utils' injectJson, which every other prompt builder imports. This file keeps
+// its own unexported copy because it stays import-free: scripts/second-opinion-local.mjs loads
+// it with Node's type stripping, which cannot resolve "@/". A replacer function, never a
+// replacement string: a "$&" in a scraped headline would otherwise rewrite the prompt.
+const injectJson = (template: string, token: string, value: unknown, indent = 1): string =>
     template.replace(token, () => JSON.stringify(value, null, indent));
 
 export const buildSecondOpinionPrompt = (context: SecondOpinionContext): string => {
@@ -82,30 +84,3 @@ export const buildSecondOpinionPrompt = (context: SecondOpinionContext): string 
 // Code CLI and copy-to-clipboard paths).
 export const buildStandaloneSecondOpinionPrompt = (context: SecondOpinionContext): string =>
     `${SECOND_OPINION_SYSTEM}\n\n---\n\n${buildSecondOpinionPrompt(context)}`;
-
-// Shared by the weekly run and the enrollment bootstrap, which must narrate
-// identically. Goes through injectJson for the same reason the extraction prompt
-// does: a reason string is built from scraped text, and "$&" in a replacement
-// string would rewrite the prompt around itself.
-export const buildRationalePrompt = (items: SuggestionItem[], narratives: unknown): string => {
-    const summarized = items.map((item) => ({
-        action: item.action,
-        symbol: item.symbol,
-        targetWeightPct: Math.round(item.targetWeight * 100),
-        reasons: item.reasons,
-    }));
-    return injectJson(injectJson(RATIONALE_PROMPT, '{{items}}', summarized), '{{narratives}}', narratives);
-};
-
-export const RATIONALE_PROMPT = `You are the narrator for an automated PAPER-TRADING experiment (no real money). Write a weekly update in ~120 words of plain markdown (no headings, no code fences).
-
-This week's decisions (deterministic scoring output — your ONLY source of facts):
-{{items}}
-
-Top active market narratives from the news brain:
-{{narratives}}
-
-Rules:
-- ONLY restate the provided reasons and narratives. Never invent tickers, numbers, predictions, or facts not present above.
-- Explain the week's moves (or why the portfolio is holding still) in plain English, referencing the thesis names.
-- End with exactly this sentence: "This is an automated paper-trading experiment, not financial advice."`;

@@ -1,5 +1,5 @@
 import {inngest} from "@/lib/jobs/client";
-import {buildWelcomePrompt, NEWS_SUMMARY_EMAIL_PROMPT} from "@/lib/jobs/prompts"
+import {buildWelcomePrompt, NEWS_SUMMARY_EMAIL_PROMPT} from "@/lib/email/prompts";
 import {getFormattedTodayDate, mailerReady, sendNewsSummaryEmail, sendWelcomeEmail} from "@/lib/email/send";
 import {getAllUsersForNewsEmail} from "@/lib/email/recipients";
 import {getWatchlistSymbolsByEmail} from "@/lib/stocks/watchlist-store";
@@ -16,7 +16,9 @@ import AiNavigator from "@/database/models/ai-navigator.model";
 import {getActiveTheses, getBrainDigestData, getTopEntities, getTopVerifiedTickers} from "@/lib/brain/store";
 import {foldExtractionsIntoBrain, type ArticleFold} from "@/lib/brain/update";
 import {parseExtractionResponse, sanitizeExtraction} from "@/lib/brain/extraction";
-import {buildRationalePrompt, buildSecondOpinionPrompt, EXTRACTION_PROMPT, injectJson, SECOND_OPINION_SYSTEM} from "@/lib/brain/prompts";
+import {buildSecondOpinionPrompt, EXTRACTION_PROMPT, SECOND_OPINION_SYSTEM} from "@/lib/brain/prompts";
+import {buildRationalePrompt} from "@/lib/navigator/prompts";
+import {injectJson} from "@/lib/ai/prompt-utils";
 import {inferText} from "@/lib/ai/infer";
 import {
     gatherOpinionContext,

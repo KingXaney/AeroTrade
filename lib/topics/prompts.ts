@@ -1,7 +1,7 @@
 // Prompt for the per-topic daily brief. Only headline/source/date reach the model —
 // no URLs — so nothing it emits can carry a link back into the email or the UI.
 
-import {injectJson} from "@/lib/brain/prompts";
+import {injectJson} from "@/lib/ai/prompt-utils";
 
 export type TopicBriefArticle = {headline: string; source: string; publishedAt: string};
 
