@@ -15,7 +15,7 @@ import {
     DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 
-// Dropdown to switch between strategy accounts. Lives in the /trade and /portfolio headers
+// Dropdown to switch between the user's paper accounts. Lives in the /trade and /portfolio headers
 // and on the dashboard; the active account is stored in an HTTP-only cookie.
 const AccountSwitcher = ({accounts, activeId}: {accounts: SwitcherAccount[]; activeId: string}) => {
     const {switching, switchTo} = useSwitchAccount(activeId);
@@ -34,7 +34,7 @@ const AccountSwitcher = ({accounts, activeId}: {accounts: SwitcherAccount[]; act
                         style={{border: '1px solid color-mix(in srgb, var(--line-strong) 40%, transparent)', backgroundColor: 'color-mix(in srgb, var(--surface-2) 40%, transparent)', fontFamily: 'var(--type-mono)'}}
                     >
                         <span className="material-symbols-outlined text-base">account_tree</span>
-                        {active?.name ?? 'Strategy'}
+                        {active?.name ?? 'Account'}
                         <span className="material-symbols-outlined text-base">expand_more</span>
                     </button>
                 </DropdownMenuTrigger>
@@ -66,7 +66,7 @@ const AccountSwitcher = ({accounts, activeId}: {accounts: SwitcherAccount[]; act
                         onSelect={() => setCreating(true)}
                         className="cursor-pointer text-brand focus:bg-brand-strong/6"
                     >
-                        <span className="text-sm" style={{fontFamily: 'var(--type-mono)'}}>＋ New strategy account</span>
+                        <span className="text-sm" style={{fontFamily: 'var(--type-mono)'}}>＋ New account</span>
                     </DropdownMenuItem>
                 </DropdownMenuContent>
             </DropdownMenu>

@@ -129,7 +129,7 @@ export const WELCOME_EMAIL_TEMPLATE = `<!DOCTYPE html>
                             
                             <!-- Feature List -->
                             <ul class="mobile-text dark-text-secondary" style="margin: 0 0 30px 0; padding-left: 20px; font-size: 16px; line-height: 1.6; color: #CCDADC;">
-                                <li style="margin-bottom: 12px;">Paper-trade with $100,000 of practice money and track your strategies against the S&amp;P 500</li>
+                                <li style="margin-bottom: 12px;">Paper-trade with $100,000 of practice money and track your accounts against the S&amp;P 500</li>
                                 <li style="margin-bottom: 12px;">Follow the topics you care about &mdash; Fed decisions, AI chips, oil &mdash; and get a daily brief on what changed</li>
                                 <li style="margin-bottom: 12px;">Ask the news brain what the market is paying attention to, and let it critique your portfolio</li>
                             </ul>

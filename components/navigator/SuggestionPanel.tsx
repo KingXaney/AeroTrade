@@ -102,7 +102,7 @@ const ItemRow = ({item, showApply, accounts}: {item: GlossedItem; showApply: boo
 };
 
 // Weekly decisions: the user's own executed set when enrolled, else the global model
-// portfolio with one-click apply to any of the user's strategy accounts.
+// portfolio with one-click apply to any of the user's paper accounts.
 const SuggestionPanel = ({userSet, globalSet, accounts}: {userSet: SetView | null; globalSet: SetView | null; accounts: ApplyAccount[]}) => {
     const set = userSet ?? globalSet;
 

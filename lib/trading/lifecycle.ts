@@ -73,17 +73,17 @@ export const restartAccount = async (
     if (fresh) await seedDayZeroSnapshot(fresh);
 };
 
-// Delete a strategy account and everything scoped to it (trades, snapshots, income).
+// Delete a paper account and everything scoped to it (trades, snapshots, income).
 // `deletedId` lets the action clear the active-account cookie when it named this one.
 export const deleteOwnedAccount = async (
     userId: string,
     accountId: string,
 ): Promise<ActionResult & {deletedId?: string}> => {
     const account = await getOwnedAccount(userId, accountId);
-    if (!account) return {success: false, message: 'Strategy account not found'};
+    if (!account) return {success: false, message: 'Account not found'};
 
     const count = await PaperAccount.countDocuments({userId});
-    if (count <= 1) return {success: false, message: 'You need at least one strategy account'};
+    if (count <= 1) return {success: false, message: 'You need at least one account'};
 
     // Deleting it would leave the weekly run with no account to trade, and enrolling
     // again is refused while the enrollment stands; unenrolling keeps the account.
@@ -99,5 +99,5 @@ export const deleteOwnedAccount = async (
     await AccountSnapshot.deleteMany({accountId: id});
     await AccountIncome.deleteMany({accountId: id});
     await PaperAccount.deleteOne({_id: account._id, userId});
-    return {success: true, message: `Deleted "${account.name || 'strategy'}"`, deletedId: id};
+    return {success: true, message: `Deleted "${account.name || 'account'}"`, deletedId: id};
 };

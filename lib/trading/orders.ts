@@ -54,7 +54,7 @@ export const executeOrder = async (
         }
 
         const account = await getOwnedAccount(userId, accountId);
-        if (!account) return {success: false, message: 'Strategy account not found'};
+        if (!account) return {success: false, message: 'Account not found'};
 
         if (idempotencyKey) {
             const prior = await PaperTrade.findOne({accountId: String(account._id), idempotencyKey}).lean<{price: number; quantity: number; symbol: string} | null>();
@@ -111,7 +111,7 @@ export const executeOrder = async (
         );
         if (updated.matchedCount === 0) {
             const stillThere = await PaperAccount.exists({_id: account._id, userId});
-            return {success: false, message: stillThere ? 'Account changed while placing the order — please try again.' : 'Strategy account not found'};
+            return {success: false, message: stillThere ? 'Account changed while placing the order — please try again.' : 'Account not found'};
         }
         await PaperTrade.create({
             userId,

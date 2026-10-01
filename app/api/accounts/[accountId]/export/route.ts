@@ -3,7 +3,7 @@ import {getSessionUser} from "@/lib/auth/session";
 import {getAccountExport} from "@/lib/trading/ledger";
 import {csvDownloadHeaders, tradesCsv, tradesCsvFilename} from "@/lib/trading/csv";
 
-// Full trade history of one strategy account's current epoch as a CSV download, read by
+// Full trade history of one paper account's current epoch as a CSV download, read by
 // getAccountExport (the whole epoch, not the trade log's page). The rows are written by
 // tradesCsv, which the quant strategies' export (/api/strategies/[slug]/export) shares.
 export async function GET(request: Request, {params}: {params: Promise<{accountId: string}>}) {
@@ -19,6 +19,6 @@ export async function GET(request: Request, {params}: {params: Promise<{accountI
     }
 
     return new NextResponse(tradesCsv(exported.trades), {
-        headers: csvDownloadHeaders(tradesCsvFilename(exported.name || 'strategy')),
+        headers: csvDownloadHeaders(tradesCsvFilename(exported.name || 'account')),
     });
 }

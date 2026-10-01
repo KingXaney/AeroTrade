@@ -142,11 +142,11 @@ describe('shape', () => {
 });
 
 describe('findAccountByName', () => {
-    const accounts = [{name: 'Main Strategy'}, {name: 'AI Navigator'}, {name: 'Momentum'}];
+    const accounts = [{name: 'Main account'}, {name: 'AI Navigator'}, {name: 'Momentum'}];
 
     it('prefers an exact case-insensitive match over a substring one', () => {
-        // 'Main' substring-matches 'Main Strategy'; an exact name must always win.
-        const list = [{name: 'Main Strategy'}, {name: 'Main'}];
+        // 'Main' substring-matches 'Main account'; an exact name must always win.
+        const list = [{name: 'Main account'}, {name: 'Main'}];
         expect(findAccountByName(list, 'main')?.name).toBe('Main');
     });
 

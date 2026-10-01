@@ -94,7 +94,7 @@ export const getTradeHistory = async (userId: string, accountId: string, limit =
     }
 };
 
-// Newest fills across every strategy account, each tagged with its account's name —
+// Newest fills across every one of the user's accounts, each tagged with its account's name —
 // the /history page's trade feed. Read-only (no lazy account creation). The list and its count
 // are each account's current epoch (epochTradesOf), as every per-account read is: a reset that
 // crashed before deleting the old epoch's fills must not bring them back here either.

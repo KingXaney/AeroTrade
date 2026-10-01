@@ -6,7 +6,7 @@ import WhatTheseMean from "@/components/learn/WhatTheseMean";
 import {DRAWDOWN_COPY, drawdownLine} from "@/lib/learn/copy/portfolio";
 import type {AccountAnalytics} from '@/lib/trading/types';
 
-// Strategy analytics tiles — mirrors the AccountSummary visual pattern.
+// Account analytics tiles — mirrors the AccountSummary visual pattern.
 // Win rate and drawdown show em-dashes until there is enough history to
 // compute them honestly (no closed trades / fewer than two snapshot days).
 // Takes only the six stat fields so a simulated record can use the same tiles. The dated

@@ -65,7 +65,7 @@ describe('shapeExplain', () => {
     });
 
     it('says the app has no entry instead of defining from memory', () => {
-        const out = explain({term: 'zorblax ratio'}, {accounts: [{account: 'Main Strategy', figures: {cash: 1}}]});
+        const out = explain({term: 'zorblax ratio'}, {accounts: [{account: 'Main account', figures: {cash: 1}}]});
         expect(out.entry).toBeNull();
         expect(out.yours).toBeNull();
         expect(out.notes).toEqual([EXPLAIN_NOTES.noEntry]);
@@ -74,7 +74,7 @@ describe('shapeExplain', () => {
     // The helper above nulls `yours` itself, as the tool skips the read; this calls the shaper
     // directly so its own guard is what keeps figures away from a term it could not define.
     it('drops the learner\'s figures itself when there is no entry to attach them to', () => {
-        const yours: LearnerValue = {accounts: [{account: 'Main Strategy', figures: {maxDrawdownPct: 5.88}}]};
+        const yours: LearnerValue = {accounts: [{account: 'Main account', figures: {maxDrawdownPct: 5.88}}]};
         const out = shapeExplain({term: 'zorblax ratio', entry: null, readings: null, yours});
         expect(out.entry).toBeNull();
         expect(out.yours).toBeNull();
@@ -229,7 +229,7 @@ describe("shapeExplain — the learner's own figures", () => {
     it('rounds numbers and keeps only numbers, flags and dates', () => {
         const out = explain({term: 'max drawdown'}, {
             accounts: [{
-                account: 'Main Strategy',
+                account: 'Main account',
                 figures: {
                     maxDrawdownPct: 5.882352941,
                     peakDate: '2026-09-19',
@@ -245,7 +245,7 @@ describe("shapeExplain — the learner's own figures", () => {
         expect(out.yours).toEqual({
             paper: true,
             accounts: [{
-                account: 'Main Strategy',
+                account: 'Main account',
                 figures: {maxDrawdownPct: 5.88, peakDate: '2026-09-19', recovered: false, recoveryPctNeeded: null, broken: null},
             }],
         });

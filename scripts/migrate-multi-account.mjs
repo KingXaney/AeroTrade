@@ -43,7 +43,7 @@ async function main() {
         //    inceptionAt copies each account's own createdAt).
         const named = await accounts.updateMany(
             { name: { $exists: false } },
-            [{ $set: { name: 'Main Strategy', inceptionAt: '$createdAt' } }],
+            [{ $set: { name: 'Main account', inceptionAt: '$createdAt' } }],   // = DEFAULT_ACCOUNT_NAME
         );
         console.log(`OK: backfilled name/inceptionAt on ${named.modifiedCount} account(s)`);
 

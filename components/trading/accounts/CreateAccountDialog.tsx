@@ -7,7 +7,7 @@ import {createPaperAccount} from "@/lib/actions/accounts.actions";
 import {PAPER_STARTING_BALANCE, STARTING_BALANCE_RANGE, resolveStartingBalance} from "@/lib/trading/starting-balance";
 import {Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle} from "@/components/ui/dialog";
 
-// Name a new strategy account and pick its starting balance. Mounted conditionally
+// Name a new paper account and pick its starting balance. Mounted conditionally
 // by AccountSwitcher so every open starts with fresh state (same pattern as
 // SellPositionDialog).
 const CreateAccountDialog = ({onClose}: {onClose: () => void}) => {
@@ -26,11 +26,11 @@ const CreateAccountDialog = ({onClose}: {onClose: () => void}) => {
         try {
             const result = await createPaperAccount({name, startingBalance: balanceNum});
             if (result.success) {
-                toast.success(result.message || 'Strategy created');
+                toast.success(result.message || 'Account created');
                 onClose();
                 router.refresh();
             } else {
-                toast.error(result.message || 'Could not create the strategy');
+                toast.error(result.message || 'Could not create the account');
             }
         } finally {
             setSubmitting(false);
@@ -42,17 +42,17 @@ const CreateAccountDialog = ({onClose}: {onClose: () => void}) => {
             <DialogContent className="bg-surface-1 ring-line sm:max-w-sm">
                 <DialogHeader>
                     <DialogTitle className="text-sm font-bold uppercase tracking-[0.1em] text-brand" style={{fontFamily: 'var(--type-mono)'}}>
-                        New Strategy Account
+                        New Account
                     </DialogTitle>
                     <DialogDescription className="text-fg-muted">
-                        Each strategy gets its own paper account so you can compare how they perform. Returns are tracked in %, so any starting balance stays comparable.
+                        Each account holds its own cash, positions and record, so you can compare how they perform. Returns are tracked in %, so any starting balance stays comparable.
                     </DialogDescription>
                 </DialogHeader>
 
                 <form className="flex flex-col gap-4" onSubmit={(e) => { e.preventDefault(); void onConfirm(); }}>
                     <div>
                         <label htmlFor="account-name" className="text-[10px] uppercase tracking-[0.1em] text-fg-muted" style={{fontFamily: 'var(--type-mono)'}}>
-                            Strategy name
+                            Account name
                         </label>
                         <input
                             id="account-name"

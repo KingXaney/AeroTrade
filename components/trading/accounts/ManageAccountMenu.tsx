@@ -41,9 +41,9 @@ const RenameDialog = ({accountId, currentName, onClose}: {accountId: string; cur
             <DialogContent className="bg-surface-1 ring-line sm:max-w-sm">
                 <DialogHeader>
                     <DialogTitle className="text-sm font-bold uppercase tracking-[0.1em] text-brand" style={{fontFamily: 'var(--type-mono)'}}>
-                        Rename Strategy
+                        Rename Account
                     </DialogTitle>
-                    <DialogDescription className="text-fg-muted">Pick a new name for this strategy account.</DialogDescription>
+                    <DialogDescription className="text-fg-muted">Pick a new name for this account.</DialogDescription>
                 </DialogHeader>
                 <form className="flex flex-col gap-4" onSubmit={(e) => { e.preventDefault(); void onConfirm(); }}>
                     <input
@@ -80,7 +80,7 @@ const DeleteDialog = ({accountId, accountName, onClose}: {accountId: string; acc
         try {
             const result = await deletePaperAccount(accountId);
             if (result.success) {
-                toast.success(result.message || 'Strategy deleted');
+                toast.success(result.message || 'Account deleted');
                 onClose();
                 router.refresh();
             } else {
@@ -109,7 +109,7 @@ const DeleteDialog = ({accountId, accountName, onClose}: {accountId: string; acc
                     className="w-full py-3 rounded-lg text-sm font-bold uppercase tracking-wider transition-all active:scale-[0.98] disabled:opacity-50 text-on-negative"
                     style={{fontFamily: 'var(--type-mono)', backgroundColor: 'var(--negative)'}}
                 >
-                    {submitting ? 'Deleting…' : 'Delete Strategy'}
+                    {submitting ? 'Deleting…' : 'Delete Account'}
                 </button>
             </DialogContent>
         </Dialog>
@@ -117,7 +117,7 @@ const DeleteDialog = ({accountId, accountName, onClose}: {accountId: string; acc
 };
 
 // Kebab menu next to the account switcher on /portfolio: rename or delete the
-// active strategy account. Deleting is blocked server-side for the last account.
+// active paper account. Deleting is blocked server-side for the last account.
 const ManageAccountMenu = ({accountId, accountName, canDelete}: {accountId: string; accountName: string; canDelete: boolean}) => {
     const [dialog, setDialog] = useState<'rename' | 'delete' | null>(null);
 
@@ -127,7 +127,7 @@ const ManageAccountMenu = ({accountId, accountName, canDelete}: {accountId: stri
                 <DropdownMenuTrigger asChild>
                     <button
                         type="button"
-                        aria-label="Manage strategy account"
+                        aria-label="Manage account"
                         className="px-2 py-2 rounded-lg text-fg-muted hover:text-fg transition-colors"
                         style={{border: '1px solid color-mix(in srgb, var(--line-strong) 40%, transparent)'}}
                     >

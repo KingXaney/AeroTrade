@@ -56,7 +56,7 @@ const set = (date: string, count: number, kind: SuggestionSetView['kind'] = 'exe
     rationaleMd: null,
 });
 
-const main = entry('a1', 'Main Strategy', 4.2);
+const main = entry('a1', 'Main account', 4.2);
 const growth = entry('a2', 'Growth', 9.5, {totalValue: 109_500});
 const value = entry('a3', 'Value', -2.1, {totalValue: 97_900});
 
@@ -72,7 +72,7 @@ describe('bestAccount', () => {
 
     it('picks the highest return among several accounts', () => {
         expect(bestAccount([main, growth, value])).toEqual({name: 'Growth', totalReturnPct: 9.5});
-        expect(bestAccount([value, main])).toEqual({name: 'Main Strategy', totalReturnPct: 4.2});
+        expect(bestAccount([value, main])).toEqual({name: 'Main account', totalReturnPct: 4.2});
     });
 
     it('keeps the first account on a tie', () => {

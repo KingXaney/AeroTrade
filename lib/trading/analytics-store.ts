@@ -92,7 +92,7 @@ export const getAccountAnalytics = async (userId: string, accountId: string): Pr
 type ComparisonStats = {winRatePct: number | null; maxDrawdownPct: number | null; tradeCount: number};
 
 // Win rate + max drawdown (and the fill count behind the win rate) for every account of a
-// user in bulk queries (feeds the strategy comparison table without N per-account round trips).
+// user in bulk queries (feeds the account comparison table without N per-account round trips).
 // liveValues (accountId -> current total value) folds today's live valuation
 // into each drawdown series the same way getAccountAnalytics does. Trades are each
 // account's current epoch (epochTradesOf), so the table's win rate is the tile's.

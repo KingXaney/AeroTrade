@@ -1,4 +1,4 @@
-// Which strategy account the UI operates on, and the account lists its pickers show. Pure and
+// Which paper account the UI operates on, and the account lists its pickers show. Pure and
 // client-safe: the pages call these, the picker components import the types.
 //
 // The rule: ?account= first, then the cookie the last switch wrote, then the user's first

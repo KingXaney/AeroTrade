@@ -6,8 +6,8 @@ import {unpricedLabel} from "@/lib/trading/analytics";
 import type {ComparisonRow} from "@/lib/trading/active-account";
 import useSwitchAccount from "@/components/trading/accounts/useSwitchAccount";
 
-// The "which strategy wins" view: every strategy account side by side.
-// Clicking a row makes that strategy the active one.
+// The "which account wins" view: every one of the user's paper accounts side by side.
+// Clicking a row makes that account the active one.
 const AccountComparisonTable = ({rows, activeId}: {rows: ComparisonRow[]; activeId: string}) => {
     const {switching, switchTo} = useSwitchAccount(activeId);
 
@@ -17,7 +17,7 @@ const AccountComparisonTable = ({rows, activeId}: {rows: ComparisonRow[]; active
         <div className="space-y-2">
             <div className="hidden md:grid grid-cols-[2fr_1fr_1fr_1fr_1fr] gap-4 px-4 py-2 border-b border-line-strong/30"
                  style={{fontFamily: 'var(--type-mono)', fontSize: '10px', letterSpacing: '0.1em', textTransform: 'uppercase', color: 'var(--fg-muted)'}}>
-                <div>Strategy</div>
+                <div>Account</div>
                 <div className="text-right">Value</div>
                 <div className="text-right">Total Return</div>
                 <div className="text-right">Win Rate</div>
@@ -56,14 +56,14 @@ const AccountComparisonTable = ({rows, activeId}: {rows: ComparisonRow[]; active
                             {formatPct(row.totalReturnPct)}
                         </div>
                         {/* Ranked on the at-cost fallback like everything else; say so per row,
-                            because the page-level note only covers the active strategy. */}
+                            because the page-level note only covers the active account. */}
                         {unpricedLabel(row.unpriced, row.holdings) && (
                             <div className="text-[10px] text-warning">{unpricedLabel(row.unpriced, row.holdings)}</div>
                         )}
                         </div>
                     </div>
                     {/* These two used to be hidden below md — the very numbers that make a
-                        strategy comparison a comparison. */}
+                        account comparison a comparison. */}
                     <div className="flex justify-between md:block md:text-right text-sm text-fg-soft" style={{fontFamily: 'var(--type-mono)'}}>
                         <span className="md:hidden text-[10px] uppercase tracking-[0.1em] text-fg-muted mr-2">Win Rate</span>
                         {row.winRatePct === null ? '—' : `${row.winRatePct.toFixed(0)}%`}

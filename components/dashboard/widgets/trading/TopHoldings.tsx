@@ -4,7 +4,7 @@ import type {EnrichedPosition} from '@/lib/trading/types';
 
 const TOP_HOLDINGS_COUNT = 6;
 
-// The active strategy's positions, largest first.
+// The active account's positions, largest first.
 const TopHoldings = ({positions, accountName}: {positions: EnrichedPosition[]; accountName: string}) => {
     const sorted = [...positions].sort((a, b) => b.marketValue - a.marketValue);
     return (

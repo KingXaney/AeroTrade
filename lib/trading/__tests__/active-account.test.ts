@@ -29,7 +29,7 @@ const entry = (id: string, name: string, totalReturnPct: number, extra: Partial<
     summary: summary({totalReturnPct, ...extra}),
 });
 
-const main = entry('a1', 'Main Strategy', 4.2);
+const main = entry('a1', 'Main account', 4.2);
 const growth = entry('a2', 'Growth', 9.5, {totalValue: 109_500});
 const value = entry('a3', 'Value', -2.1, {totalValue: 97_900});
 
@@ -78,13 +78,13 @@ describe('pickActiveAccountId', () => {
 
 describe('account projections', () => {
     it('toApplyAccounts keeps only id and name', () => {
-        expect(toApplyAccounts([main, growth])).toEqual([{id: 'a1', name: 'Main Strategy'}, {id: 'a2', name: 'Growth'}]);
+        expect(toApplyAccounts([main, growth])).toEqual([{id: 'a1', name: 'Main account'}, {id: 'a2', name: 'Growth'}]);
         expect(toApplyAccounts([])).toEqual([]);
     });
 
     it('toSwitcherAccounts adds the return and the unpriced count', () => {
         expect(toSwitcherAccounts([main, growth])).toEqual([
-            {id: 'a1', name: 'Main Strategy', totalReturnPct: 4.2, unpriced: 0, holdings: 0},
+            {id: 'a1', name: 'Main account', totalReturnPct: 4.2, unpriced: 0, holdings: 0},
             {id: 'a2', name: 'Growth', totalReturnPct: 9.5, unpriced: 0, holdings: 0},
         ]);
         const stale = {symbol: 'X', company: 'X', quantity: 1, avgCost: 1, costBasis: 1, marketValue: 1, unrealizedPnl: 0, unrealizedPnlPct: 0, priceStale: true};
@@ -98,7 +98,7 @@ describe('account projections', () => {
             a3: {winRatePct: null, maxDrawdownPct: 3},
         });
         expect(rows).toEqual([
-            {id: 'a1', name: 'Main Strategy', totalValue: 100_000, totalReturnPct: 4.2, winRatePct: 60, maxDrawdownPct: 12.5, unpriced: 0, holdings: 0},
+            {id: 'a1', name: 'Main account', totalValue: 100_000, totalReturnPct: 4.2, winRatePct: 60, maxDrawdownPct: 12.5, unpriced: 0, holdings: 0},
             {id: 'a2', name: 'Growth', totalValue: 109_500, totalReturnPct: 9.5, winRatePct: null, maxDrawdownPct: null, unpriced: 0, holdings: 0},
             {id: 'a3', name: 'Value', totalValue: 97_900, totalReturnPct: -2.1, winRatePct: null, maxDrawdownPct: 3, unpriced: 0, holdings: 0},
         ]);

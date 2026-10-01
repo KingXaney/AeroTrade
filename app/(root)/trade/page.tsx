@@ -33,7 +33,7 @@ const TradePage = async ({searchParams}: TradePageProps) => {
     // always is one.
     const accounts = await getCachedAccountsForUser(userId);
     const activeId = pickActiveAccountId(accounts.map((a) => String(a._id)), preferredAccountId(accountParam, await cookies()));
-    if (!activeId) throw new Error('No strategy account');
+    if (!activeId) throw new Error('No paper account');
 
     // A failed ledger read hides what is drawn from it (the last fill, the lot notes) instead of
     // reading as an account with no fills.
@@ -46,7 +46,7 @@ const TradePage = async ({searchParams}: TradePageProps) => {
         getCashApy(),
     ]);
     const active = pickActiveAccount(all, activeId);
-    if (!active) throw new Error('No strategy account');
+    if (!active) throw new Error('No paper account');
     const portfolio = active.summary;
     const lastTrade = ledger?.at(-1) ?? null;
     const lastReceipt = ledger && lastTrade ? replayReceipts(ledger)[lastTrade.id] : undefined;

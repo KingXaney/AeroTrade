@@ -66,7 +66,7 @@ const dropLegacySingleAccountIndex = async (): Promise<boolean> => {
     }
 };
 
-// Create a new strategy account (default or custom starting balance) and make it active.
+// Create a new paper account (default or custom starting balance) and make it active.
 export const createPaperAccount = async (
     {name, startingBalance}: {name: string; startingBalance?: number},
 ): Promise<ActionResult & {accountId?: string}> => {
@@ -84,10 +84,10 @@ export const createPaperAccount = async (
 
         const accounts = await getAccountsForUser(userId);
         if (accounts.length >= MAX_PAPER_ACCOUNTS) {
-            return {success: false, message: `You can have at most ${MAX_PAPER_ACCOUNTS} strategy accounts`};
+            return {success: false, message: `You can have at most ${MAX_PAPER_ACCOUNTS} accounts`};
         }
         if (accounts.some((a) => (a.name || '').toLowerCase() === clean.toLowerCase())) {
-            return {success: false, message: `You already have a strategy named "${clean}"`};
+            return {success: false, message: `You already have an account named "${clean}"`};
         }
 
         const insertAndActivate = async (): Promise<ActionResult & {accountId?: string}> => {
@@ -119,7 +119,7 @@ export const createPaperAccount = async (
             return {success: false, message: 'A database migration is pending — run `npm run migrate:accounts`, then try again'};
         }
         if (isDuplicateKeyError(error)) {
-            return {success: false, message: 'You already have a strategy with that name'};
+            return {success: false, message: 'You already have an account with that name'};
         }
         console.error('Error creating account:', error);
         return {success: false, message: 'Could not create the account'};
@@ -135,7 +135,7 @@ export const renamePaperAccount = async ({accountId, name}: {accountId: string; 
         if (!clean) return {success: false, message: `Name must be 1–${ACCOUNT_NAME_MAX_LENGTH} characters`};
 
         const account = await getOwnedAccount(userId, accountId);
-        if (!account) return {success: false, message: 'Strategy account not found'};
+        if (!account) return {success: false, message: 'Account not found'};
 
         // Mirror create's case-insensitive duplicate guard (the unique index is
         // case-sensitive); exclude this account so case-only self-renames still work.
@@ -143,7 +143,7 @@ export const renamePaperAccount = async ({accountId, name}: {accountId: string; 
         const duplicate = accounts.some((a) =>
             String(a._id) !== String(account._id) && (a.name || '').toLowerCase() === clean.toLowerCase());
         if (duplicate) {
-            return {success: false, message: `You already have a strategy named "${clean}"`};
+            return {success: false, message: `You already have an account named "${clean}"`};
         }
 
         await PaperAccount.updateOne({_id: account._id, userId}, {$set: {name: clean}});
@@ -151,14 +151,14 @@ export const renamePaperAccount = async ({accountId, name}: {accountId: string; 
         return {success: true, message: `Renamed to "${clean}"`};
     } catch (error) {
         if (isDuplicateKeyError(error)) {
-            return {success: false, message: 'You already have a strategy with that name'};
+            return {success: false, message: 'You already have an account with that name'};
         }
         console.error('Error renaming account:', error);
         return {success: false, message: 'Could not rename the account'};
     }
 };
 
-// Reset one strategy account: back to starting cash, no positions, cleared trade log
+// Reset one paper account: back to starting cash, no positions, cleared trade log
 // and performance history, with inception re-anchored to now. Preserves the account's
 // own starting balance unless a new one is passed.
 export const resetPaperAccount = async (accountId: string, startingBalance?: number): Promise<ActionResult> => {
@@ -167,7 +167,7 @@ export const resetPaperAccount = async (accountId: string, startingBalance?: num
         if (!userId) return {success: false, message: 'Not authenticated'};
 
         const account = await getOwnedAccount(userId, accountId);
-        if (!account) return {success: false, message: 'Strategy account not found'};
+        if (!account) return {success: false, message: 'Account not found'};
 
         const balance = startingBalance === undefined
             ? (account.startingBalance || PAPER_STARTING_BALANCE)
@@ -177,14 +177,14 @@ export const resetPaperAccount = async (accountId: string, startingBalance?: num
         await restartAccount(userId, account, balance, {sweepLegacyTrades: true});
 
         revalidateAccountPaths();
-        return {success: true, message: `${account.name || 'Strategy'} reset to $${balance.toLocaleString('en-US')}`};
+        return {success: true, message: `${account.name || 'Account'} reset to $${balance.toLocaleString('en-US')}`};
     } catch (error) {
         console.error('Error resetting account:', error);
         return {success: false, message: 'Reset failed'};
     }
 };
 
-// Delete a strategy account and everything scoped to it (lib/trading/lifecycle).
+// Delete a paper account and everything scoped to it (lib/trading/lifecycle).
 export const deletePaperAccount = async (accountId: string): Promise<ActionResult> => {
     try {
         const userId = await getCurrentUserId();
@@ -206,20 +206,20 @@ export const deletePaperAccount = async (accountId: string): Promise<ActionResul
     }
 };
 
-// Switch which strategy account the trade/portfolio pages operate on.
+// Switch which paper account the trade/portfolio pages operate on.
 export const setActiveAccount = async (accountId: string): Promise<ActionResult> => {
     try {
         const userId = await getCurrentUserId();
         if (!userId) return {success: false, message: 'Not authenticated'};
 
         const account = await getOwnedAccount(userId, accountId);
-        if (!account) return {success: false, message: 'Strategy account not found'};
+        if (!account) return {success: false, message: 'Account not found'};
 
         await setActiveAccountCookie(String(account._id));
         revalidatePath('/');
         revalidatePath('/trade');
         revalidatePath('/portfolio');
-        return {success: true, message: `Switched to "${account.name || 'strategy'}"`};
+        return {success: true, message: `Switched to "${account.name || 'account'}"`};
     } catch (error) {
         console.error('Error switching account:', error);
         return {success: false, message: 'Could not switch accounts'};

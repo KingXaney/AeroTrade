@@ -34,7 +34,7 @@ const HistoryPage = async () => {
                 </h1>
                 <p className="text-sm text-fg-muted"
                    style={{ fontFamily: 'var(--type-mono)', letterSpacing: '0.02em' }}>
-                    Your trades across every strategy, and what you have added to your watchlist
+                    Your trades across every account, and what you have added to your watchlist
                 </p>
             </div>
 

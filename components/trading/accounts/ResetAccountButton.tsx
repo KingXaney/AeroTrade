@@ -7,7 +7,7 @@ import {resetPaperAccount} from "@/lib/actions/accounts.actions";
 import {formatPrice} from "@/lib/format";
 import ConfirmDialog from "@/components/primitives/ConfirmDialog";
 
-// Resets one strategy account to its starting balance. This was a click-twice toggle
+// Resets one paper account to its starting balance. This was a click-twice toggle
 // labelled "Click to confirm" that disarmed on blur — so it was really hover-and-click-
 // twice, and neither label ever said what it destroys. resetPaperAccount clears the
 // positions, deletes every PaperTrade and AccountSnapshot, and resets inceptionAt, which
@@ -28,7 +28,7 @@ const ResetAccountButton = ({accountId, accountName, startingBalance}: Props) =>
         try {
             const result = await resetPaperAccount(accountId);
             if (result.success) {
-                toast.success(result.message || 'Strategy reset');
+                toast.success(result.message || 'Account reset');
                 router.refresh();
             } else {
                 toast.error(result.message || 'Reset failed');
@@ -47,14 +47,14 @@ const ResetAccountButton = ({accountId, accountName, startingBalance}: Props) =>
                 className="px-3 py-2 rounded-lg text-xs font-bold uppercase tracking-wider text-fg-soft hover:text-negative transition-colors disabled:opacity-50"
                 style={{border: '1px solid color-mix(in srgb, var(--line-strong) 40%, transparent)', fontFamily: 'var(--type-mono)'}}
             >
-                {busy ? 'Resetting…' : 'Reset Strategy'}
+                {busy ? 'Resetting…' : 'Reset Account'}
             </button>
             <ConfirmDialog
                 open={open}
                 onOpenChange={setOpen}
                 title={`Reset “${accountName}”?`}
-                description={`This permanently deletes every position, the entire trade history and all performance snapshots for this strategy, and restarts its record from today with ${formatPrice(startingBalance)} in cash. Export the trade history first if you want to keep it. This cannot be undone.`}
-                confirmLabel="Reset strategy"
+                description={`This permanently deletes every position, the entire trade history and all performance snapshots for this account, and restarts its record from today with ${formatPrice(startingBalance)} in cash. Export the trade history first if you want to keep it. This cannot be undone.`}
+                confirmLabel="Reset account"
                 destructive
                 onConfirm={onConfirm}
             />

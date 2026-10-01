@@ -1,6 +1,6 @@
 import {Document, model, models, Schema} from "mongoose";
 
-// Per-user opt-in to the AI-managed strategy account. lastRunDate doubles as the
+// Per-user opt-in to the AI-managed paper account. lastRunDate doubles as the
 // atomic run claim: the weekly job (or an early "Run AI now") only trades for a user after
 // winning findOneAndUpdate({userId, lastRunDate: {$ne: weekKey}}) — the double-trade guard.
 // Despite its name the field holds the ET week key; the stored name stays.

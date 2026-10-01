@@ -19,7 +19,7 @@ type FriendProfile = {
     id: string;
     name: string;
     email: string;
-    portfolio: PortfolioSummary;  // the friend's best strategy account
+    portfolio: PortfolioSummary;  // the friend's best paper account
     accountName: string;
     accounts: {name: string; totalValue: number; totalReturnPct: number; unpriced: number; holdings: number}[];
 };
@@ -177,8 +177,8 @@ export const getFriends = async (userId: string): Promise<FriendSummary[]> => {
     }
 };
 
-// You + accepted friends, each ranked by their BEST strategy account's return %
-// (one account = one strategy — the competition is "whose best strategy wins",
+// You + accepted friends, each ranked by their BEST paper account's return %
+// (the competition is "whose best account wins",
 // so experimenting with a throwaway account never drags your ranking down).
 // Prices every account of every user from one shared quote map.
 export const getLeaderboard = async (userId: string): Promise<LeaderboardEntry[]> => {
@@ -255,7 +255,7 @@ export const getFriendProfile = async (friendId: string, viewerId: string): Prom
         const profile = profiles.get(friendId);
         if (!profile) return null;
 
-        // Show the friend's best strategy in full, plus a compact list of all their strategies.
+        // Show the friend's best account in full, plus a compact list of all their accounts.
         const all = await getPortfoliosForUser(friendId);
         const best = all.reduce((top, x) => (x.summary.totalReturnPct > top.summary.totalReturnPct ? x : top));
         return {

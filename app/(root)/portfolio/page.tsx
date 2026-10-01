@@ -45,7 +45,7 @@ const PortfolioPage = async ({searchParams}: PortfolioPageProps) => {
     const all = await getPortfoliosForUser(userId);
     const activeEntry = pickActiveAccount(all, preferredAccountId(accountParam, await cookies()));
     // getPortfoliosForUser creates the first account, so there always is one.
-    if (!activeEntry) throw new Error('No strategy account');
+    if (!activeEntry) throw new Error('No paper account');
     const {account, summary: portfolio} = activeEntry;
 
     // The page's one ledger read, shared (cache()) with getAccountAnalytics and getIncomeActivity,
@@ -136,11 +136,11 @@ const PortfolioPage = async ({searchParams}: PortfolioPageProps) => {
                 </div>
             </div>
 
-            {/* Which strategy wins — all accounts side by side */}
+            {/* Which account wins — all accounts side by side */}
             {all.length > 1 && (
                 <section className="glass-panel rounded-xl p-5">
                     <h2 className="text-sm font-bold uppercase tracking-[0.1em] text-brand mb-4" style={{fontFamily: 'var(--type-mono)'}}>
-                        Strategy Comparison
+                        Account Comparison
                     </h2>
                     <AccountComparisonTable rows={comparisonRows} activeId={account.id} />
                 </section>

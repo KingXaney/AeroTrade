@@ -53,7 +53,7 @@ export const tradesCsv = (trades: readonly CsvTrade[]): string =>
 export const accountExportHref = (accountId: string): string => `/api/accounts/${accountId}/export`;
 
 const slugify = (name: string): string =>
-    name.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '') || 'strategy';
+    name.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '') || 'account';   // only an account name can lack one: a strategy's id never does
 
 // "<name>-trades.csv", or "<name>-trades-<YYYY-MM-DD>.csv" when the export is dated.
 export const tradesCsvFilename = (name: string, date?: string): string =>

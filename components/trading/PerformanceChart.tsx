@@ -4,7 +4,7 @@ import {useMemo, useRef, useState} from "react";
 import {formatPct} from "@/lib/format";
 import type {PerfPoint} from '@/lib/trading/types';
 
-// Hand-rolled SVG performance chart: the strategy's %-return since inception
+// Hand-rolled SVG performance chart: an account's (or a quant strategy's) %-return since inception
 // (cyan) vs SPY's total return (muted, lib/prices/total-return.ts). Deliberately
 // dependency-free — two polylines and a hover crosshair cover the need.
 

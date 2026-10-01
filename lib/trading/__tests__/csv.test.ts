@@ -86,9 +86,9 @@ describe('tradesCsv', () => {
 
 describe('tradesCsvFilename', () => {
     it('names an account export after the account, as before', () => {
-        expect(tradesCsvFilename('Main Strategy')).toBe('main-strategy-trades.csv');
+        expect(tradesCsvFilename('Main account')).toBe('main-account-trades.csv');
         expect(tradesCsvFilename('  Value / Growth #2 ')).toBe('value-growth-2-trades.csv');
-        expect(tradesCsvFilename('!!!')).toBe('strategy-trades.csv');
+        expect(tradesCsvFilename('!!!')).toBe('account-trades.csv');
     });
 
     it('adds the day when given one', () => {
