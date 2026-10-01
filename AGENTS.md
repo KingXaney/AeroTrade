@@ -34,7 +34,7 @@ product tour and docs/specs/ for the design documents behind the larger features
 
 1. Pure modules (`lib/**` without DB/network) are unit-tested; DB-bound modules are covered by `scripts/qa`.
    Tests must never import `lib/actions/*`, `lib/auth/server.ts`, `lib/auth/session.ts` or `lib/dashboard/loaders.ts` (top-level DB await).
-2. User text never becomes a regex except through `escapeRegExp` (`lib/topics/match.ts`).
+2. User text never becomes a regex except through `escapeRegExp` (`lib/text.ts`).
 3. User topics never write into `BrainEntity`; the navigator scores only the brain's global entities.
 4. LLM output is untrusted: JSON-parse with zod and clamp; email HTML goes through `sanitizeDigestHtml`
    with an allow-list of article URLs; briefs render as plain text.

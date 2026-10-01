@@ -1,5 +1,5 @@
 import {describe, expect, it} from 'vitest';
-import {escapeRegExp, matchArticles, scoreArticle, termPattern} from '@/lib/topics/match';
+import {matchArticles, scoreArticle, termPattern} from '@/lib/topics/match';
 
 const article = (headline: string, summary = '', datetime = 1_700_000_000) =>
     ({headline, summary, url: `https://example.com/${datetime}`, source: 'Test', datetime});
@@ -19,7 +19,6 @@ describe('termPattern', () => {
         expect(termPattern('C++').test('Learning C++ today')).toBe(true);
         expect(termPattern('.NET').test('Microsoft .NET 9 ships')).toBe(true);
         expect(termPattern('S&P 500').test('S&P 500 hits a record')).toBe(true);
-        expect(escapeRegExp('a.b*c')).toBe('a\\.b\\*c');
     });
 
     it('supports cashtags and unicode boundaries', () => {

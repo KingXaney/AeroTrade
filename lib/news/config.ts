@@ -79,26 +79,3 @@ export const NEWS_HISTORY_LIMIT = 6;
 export const NEWS_PAGE_SIZE = 24;
 
 export const searchUserAgent = (): string => "AeroTrade/1.0 (followed-topics; contact " + contactEmail() + ")";
-
-// djb2 constants — named so the hash stays auditable without magic numbers inline.
-// Lives here, not in aggregate.ts, so the sanitizers can reuse it without dragging
-// the fetch adapters (and through them better-auth and mongoose) into their import
-// graph. Pairs with hashId below: together they form the article dedupe key.
-export const normalizeUrl = (url: string): string => {
-    // Query strings carry tracking params (utm_*) that make identical stories look distinct.
-    const withoutQuery = url.toLowerCase().split("?")[0];
-    return withoutQuery.replace(/\/+$/, "");
-};
-
-const DJB2_SEED = 5381;
-const DJB2_SHIFT = 5;
-
-export const hashId = (input: string): number => {
-    let hash = DJB2_SEED;
-    for (let i = 0; i < input.length; i++) {
-        // hash * 33 + charCode, forced into 32-bit space each step to stay deterministic.
-        hash = ((hash << DJB2_SHIFT) + hash + input.charCodeAt(i)) | 0;
-    }
-    // >>> 0 coerces to unsigned so ids are always positive 32-bit integers, stable across runs.
-    return hash >>> 0;
-};

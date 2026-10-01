@@ -4,9 +4,10 @@ import {getFormattedTodayDate, mailerReady, sendNewsSummaryEmail, sendWelcomeEma
 import {getAllUsersForNewsEmail} from "@/lib/email/recipients";
 import {getWatchlistSymbolsByEmail} from "@/lib/stocks/watchlist-store";
 import {getQuote, searchStocks} from "@/lib/prices/finnhub";
-import {getAggregatedNews, normalizeUrl} from "@/lib/news/aggregate";
+import {getAggregatedNews} from "@/lib/news/aggregate";
 import {sanitizeDigestHtml, sanitizeWelcomeIntroHtml} from "@/lib/news/sanitize";
-import {BRAIN_SOURCE_CAPS, BRAIN_TOTAL_CAP, FEED_DIGEST_CAP, hashId} from "@/lib/news/config";
+import {BRAIN_SOURCE_CAPS, BRAIN_TOTAL_CAP, FEED_DIGEST_CAP} from "@/lib/news/config";
+import {hashId, normalizeUrl} from "@/lib/text";
 import {pickDigestArticles} from "@/lib/news/feed";
 import {getNewsFeedForPrefs, getNewsFeedPrefs} from "@/lib/news/feed-store";
 import SuggestionSet, {GLOBAL_SUGGESTIONS_USER} from "@/database/models/suggestion-set.model";

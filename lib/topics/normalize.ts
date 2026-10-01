@@ -3,7 +3,7 @@
 // "Fed Rate" and " fed rate " share one fetch and one article set.
 
 import {z} from 'zod';
-import {hashId} from "@/lib/news/config";
+import {hashId} from "@/lib/text";
 import {KEYWORD_MAX, KEYWORD_MIN, MAX_EXCLUDES, MAX_KEYWORDS, NAME_MAX, NAME_MIN} from "@/lib/topics/config";
 
 const SURROUNDING_QUOTES = /^["'“”‘’]+|["'“”‘’]+$/g;

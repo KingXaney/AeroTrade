@@ -5,10 +5,10 @@ import {fetchFinnhubNews} from "@/lib/news/adapters/finnhub";
 import {fetchRedditNews} from "@/lib/news/adapters/reddit";
 import {fetchRssNews} from "@/lib/news/adapters/rss";
 import {fetchSecFilings} from "@/lib/news/adapters/sec";
-import {normalizeUrl, SOURCE_CAPS, TOTAL_ARTICLE_CAP} from "@/lib/news/config";
+import {SOURCE_CAPS, TOTAL_ARTICLE_CAP} from "@/lib/news/config";
 import {dedupeArticles} from "@/lib/news/dedupe";
 
-export {normalizeUrl, dedupeArticles};
+export {dedupeArticles};
 
 // Email sections render in this order — finance wires lead, social chatter closes.
 // 'web' is capped at 0 by default (topics never reach the digest); it sits in these

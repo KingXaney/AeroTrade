@@ -4,7 +4,7 @@
 // it was handed, the feed remounts when — and only when — that page changes, so a
 // refresh that found nothing new keeps whatever "Load more" added.
 
-import {hashId} from "@/lib/news/config";
+import {hashId} from "@/lib/text";
 
 type Keyed = {contentHash: number; topicSlug?: string};
 

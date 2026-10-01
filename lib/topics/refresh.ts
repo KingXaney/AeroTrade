@@ -6,7 +6,7 @@ import NewsItem from "@/database/models/news-item.model";
 import Topic from "@/database/models/topic.model";
 import TopicArticle from "@/database/models/topic-article.model";
 import {buildSearchQuery, fetchNewsForQuery} from "@/lib/news/adapters/search";
-import {hashId, normalizeUrl} from "@/lib/news/config";
+import {hashId, normalizeUrl} from "@/lib/text";
 import {matchArticles, type MatchInput} from "@/lib/topics/match";
 import {BRIEF_MIN_AGE_HOURS, BRIEF_MIN_NEW_ARTICLES, MATCH_CAP_PER_FETCH, MAX_ARTICLES_PER_TOPIC_PER_DAY, TOPIC_SEARCH_FALLBACK_WINDOW} from "@/lib/topics/config";
 import type {TopicBriefArticle} from "@/lib/topics/prompts";

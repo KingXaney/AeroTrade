@@ -7,9 +7,9 @@ import {
     SEC_FORM_TYPES,
     SEC_LOOKBACK_DAYS,
     SEC_MAX_SYMBOLS,
-    hashId,
     secUserAgent,
 } from "@/lib/news/config";
+import {hashId} from "@/lib/text";
 import {formatArticle, FULL_SUMMARY_MAX_CHARS, validateArticle} from "@/lib/news/article";
 
 // Shape of one <entry> from EDGAR's browse Atom feed when parsed with ignoreAttributes: false.

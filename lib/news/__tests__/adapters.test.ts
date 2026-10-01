@@ -12,7 +12,7 @@ import {
     pickFilingDocument,
     type EdgarEntry,
 } from "@/lib/news/adapters/sec";
-import {hashId} from "@/lib/news/config";
+import {hashId} from "@/lib/text";
 
 // Known-good reference instants so datetime assertions stay exact UNIX seconds.
 const JAN_6_2025_NOON_UTC = 1736164800;

@@ -3,9 +3,7 @@
 // (capped) text length.
 
 import {MATCH_CAP_PER_FETCH, MAX_MATCH_TEXT_CHARS} from "@/lib/topics/config";
-
-// Regex metacharacters must be escaped so symbols like BRK.B match literally.
-export const escapeRegExp = (value: string): string => value.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+import {escapeRegExp} from "@/lib/text";
 
 // Unicode-aware whole-word boundary. \b only knows ASCII word characters, so it would
 // let 'ai' match inside 'said' in accented text and never match a CJK term at all.
