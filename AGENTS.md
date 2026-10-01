@@ -6,6 +6,12 @@ A paper-trading terminal with an AI news brain (Next.js 16 App Router, React 19,
 Tailwind v4, MongoDB/Mongoose, better-auth, Inngest, Vercel AI SDK). See README.md for the
 product tour and docs/specs/ for the design documents behind the larger features.
 
+Words: a user's own paper account is an **account** — in what users see, in identifiers
+(`bestAccount`, `accountsCount`) and in widget categories (`accounts`). **Strategy** means only the
+eight rule-based quant strategies (`lib/strategies`, `/strategies`, category `strategies`), so
+`PaperTrade.source: 'strategy'` is a quant fill. Stored values keep their spelling: accounts made
+before the rename keep the name "Main Strategy" (new ones are "Main account", `DEFAULT_ACCOUNT_NAME`).
+
 ## Commands
 
 - `npm run check` — lint + typecheck + unit tests (what CI runs)
