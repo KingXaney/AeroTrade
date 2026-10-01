@@ -133,3 +133,24 @@ export const saveSecondOpinion = async (
         {upsert: true},
     );
 };
+
+// The second-opinion job's Claude answer (step.ai.infer's Anthropic message), saved for the
+// user who asked; returns the job's run message.
+export const saveOpinionResponse = async (
+    userId: string,
+    response: {stop_reason: string | null; content: ReadonlyArray<{type: string; text?: string}>},
+): Promise<string> => {
+    // Claude Opus 5 can decline via its safety classifiers ('refusal' —
+    // newer than the adapter's stop_reason union, hence the widening).
+    const stopReason: string | null = response.stop_reason;
+    if (stopReason === 'refusal') return 'Claude declined the request';
+    const text = response.content
+        .map((block) => (block.type === 'text' && 'text' in block ? block.text : ''))
+        .filter(Boolean)
+        .join('\n')
+        .trim();
+    if (!text) return 'Claude returned no text';
+
+    await saveSecondOpinion({userId, opinionMd: text, modelUsed: SECOND_OPINION_MODEL, source: 'api'});
+    return `Second opinion written (${text.length} chars)`;
+};
