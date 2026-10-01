@@ -7,8 +7,11 @@ export const PAPER_STARTING_BALANCE = 100_000;
 export const MIN_STARTING_BALANCE = 1_000;
 export const MAX_STARTING_BALANCE = 10_000_000;
 
-// "$1,000 and $10,000,000": the dialogs say "Between …", the create action "must be between …".
+// "$1,000 and $10,000,000": the dialogs say "Between …", the server STARTING_BALANCE_ERROR.
 export const STARTING_BALANCE_RANGE = `$${MIN_STARTING_BALANCE.toLocaleString('en-US')} and $${MAX_STARTING_BALANCE.toLocaleString('en-US')}`;
+
+// The one refusal for a bad balance: create, reset and the Navigator's re-enroll all return it.
+export const STARTING_BALANCE_ERROR = `Starting balance must be between ${STARTING_BALANCE_RANGE}`;
 
 // Whole dollars within bounds; undefined means the standard default; null = invalid.
 // The starting balance is fixed at creation — editing it mid-flight would corrupt

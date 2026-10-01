@@ -7,7 +7,7 @@ import {getCurrentUserId} from "@/lib/auth/session";
 import {createPaperAccount} from "@/lib/actions/accounts.actions";
 import {getAccountsForUser, getOwnedAccount} from "@/lib/trading/accounts";
 import {getPortfolio} from "@/lib/trading/valuation";
-import {resolveStartingBalance} from "@/lib/trading/starting-balance";
+import {STARTING_BALANCE_ERROR, resolveStartingBalance} from "@/lib/trading/starting-balance";
 import {restartAccount} from "@/lib/trading/lifecycle";
 import {executeOrder} from "@/lib/trading/orders";
 import {getQuote} from "@/lib/prices/finnhub";
@@ -52,7 +52,7 @@ export const enrollAiNavigator = async (
             // (guarded above), so restart it cleanly at the requested amount. No legacy-trade
             // sweep: this account was created after the migration, so those rows are not its.
             const balance = resolveStartingBalance(startingBalance);
-            if (balance === null) return {success: false, message: 'Invalid starting balance'};
+            if (balance === null) return {success: false, message: STARTING_BALANCE_ERROR};
             await restartAccount(userId, reusable, balance);
         }
         if (!accountId) {

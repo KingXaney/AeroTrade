@@ -7,7 +7,7 @@ import {connectToDatabase} from "@/database/mongoose";
 import {ACTIVE_ACCOUNT_COOKIE, MAX_PAPER_ACCOUNTS} from "@/lib/trading/config";
 import {getCurrentUserId} from "@/lib/auth/session";
 import {getAccountsForUser, getOwnedAccount} from "@/lib/trading/accounts";
-import {PAPER_STARTING_BALANCE, STARTING_BALANCE_RANGE, resolveStartingBalance} from "@/lib/trading/starting-balance";
+import {PAPER_STARTING_BALANCE, STARTING_BALANCE_ERROR, resolveStartingBalance} from "@/lib/trading/starting-balance";
 import {deleteOwnedAccount, restartAccount, seedDayZeroSnapshot} from "@/lib/trading/lifecycle";
 
 const ACCOUNT_NAME_MAX_LENGTH = 40;
@@ -78,7 +78,7 @@ export const createPaperAccount = async (
 
         const balance = resolveStartingBalance(startingBalance);
         if (balance === null) {
-            return {success: false, message: `Starting balance must be between ${STARTING_BALANCE_RANGE}`};
+            return {success: false, message: STARTING_BALANCE_ERROR};
         }
 
         const accounts = await getAccountsForUser(userId);
@@ -171,7 +171,7 @@ export const resetPaperAccount = async (accountId: string, startingBalance?: num
         const balance = startingBalance === undefined
             ? (account.startingBalance || PAPER_STARTING_BALANCE)
             : resolveStartingBalance(startingBalance);
-        if (balance === null) return {success: false, message: 'Invalid starting balance'};
+        if (balance === null) return {success: false, message: STARTING_BALANCE_ERROR};
 
         await restartAccount(userId, account, balance, {sweepLegacyTrades: true});
 
