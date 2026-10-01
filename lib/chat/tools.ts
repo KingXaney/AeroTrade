@@ -8,12 +8,8 @@ import {
     getFinancials,
     getNews,
 } from "@/lib/prices/finnhub";
-import {
-    addToWatchlist,
-    removeFromWatchlist,
-    getWatchlistForUser,
-    getWatchlistSymbolsByUserId,
-} from "@/lib/actions/watchlist.actions";
+import {addToWatchlist, removeFromWatchlist} from "@/lib/actions/watchlist.actions";
+import {getWatchlistForUser, getWatchlistSymbolsByUserId} from "@/lib/stocks/watchlist-store";
 import {getLatestSuggestions, type SuggestionSetView} from "@/lib/navigator/store";
 import {getActiveTheses, getBrainDigestData} from "@/lib/brain/store";
 import {getTopicFeed, getTopicsForUser, getTopicsOverview} from "@/lib/topics/store";

@@ -12,7 +12,7 @@ import KeyNumbers from "@/components/stock/KeyNumbers";
 import RulesSee from "@/components/stock/RulesSee";
 import {getCompanyProfile, getFinancials, getQuote} from "@/lib/prices/finnhub";
 import {requireUserId} from "@/lib/auth/session";
-import {isInWatchlist} from "@/lib/actions/watchlist.actions";
+import {isInWatchlist} from "@/lib/stocks/watchlist-store";
 import {getTopicsForUser} from "@/lib/topics/store";
 import {readKeyNumbers} from "@/lib/stocks/key-numbers";
 import {buildRulesSee, type SymbolBoardRead} from "@/lib/stocks/rules-see";

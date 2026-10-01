@@ -1,6 +1,6 @@
 import Link from "next/link";
 import {requireUserId} from "@/lib/auth/session";
-import {getWatchlistForUser} from "@/lib/actions/watchlist.actions";
+import {getWatchlistForUser} from "@/lib/stocks/watchlist-store";
 import {getNewsFeed} from "@/lib/news/feed-store";
 import {NEWS_HISTORY_LIMIT} from "@/lib/news/config";
 import {getRecentTradesForUser} from "@/lib/trading/account";

@@ -1,5 +1,5 @@
 import {cache} from "react";
-import {getWatchlistSymbolsByUserId} from "@/lib/actions/watchlist.actions";
+import {getWatchlistSymbolsByUserId} from "@/lib/stocks/watchlist-store";
 import {getTopicsOverview} from "@/lib/topics/store";
 
 // Per-request dedupe shared by the (root) layout and the dashboard loaders.

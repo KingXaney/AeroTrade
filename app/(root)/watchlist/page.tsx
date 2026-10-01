@@ -1,5 +1,5 @@
 import {requireUserId} from "@/lib/auth/session";
-import {getWatchlistForUser} from "@/lib/actions/watchlist.actions";
+import {getWatchlistForUser} from "@/lib/stocks/watchlist-store";
 import {getStocksWithData} from "@/lib/prices/finnhub";
 import WatchlistTable from "@/components/watchlist/WatchlistTable";
 import WatchlistEmpty from "@/components/watchlist/WatchlistEmpty";

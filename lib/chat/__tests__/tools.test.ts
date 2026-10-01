@@ -23,6 +23,8 @@ vi.mock('@/lib/prices/finnhub', () => ({
 vi.mock('@/lib/actions/watchlist.actions', () => ({
     addToWatchlist: vi.fn(),
     removeFromWatchlist: vi.fn(),
+}));
+vi.mock('@/lib/stocks/watchlist-store', () => ({
     getWatchlistForUser: stubs.getWatchlistForUser,
     getWatchlistSymbolsByUserId: stubs.getWatchlistSymbolsByUserId,
 }));
