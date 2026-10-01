@@ -36,7 +36,8 @@ const PaperTradeSchema = new Schema<PaperTradeDoc>({
 // history (the newest N) backwards, so neither sorts in memory; _id breaks a tie between fills
 // stamped in the same millisecond the same way both directions. Replaces {accountId, createdAt:
 // -1}, which served only the descending read and left the ledger a blocking SORT (a deployment
-// that already built it keeps it until it is dropped by hand; nothing reads it by name).
+// that already built it keeps it until `npm run migrate:accounts` drops it; nothing reads it by
+// name). Every index here is also listed in scripts/migration-indexes.mjs, held equal by a test.
 PaperTradeSchema.index({accountId: 1, createdAt: 1, _id: 1});
 // The learn surfaces ask "has this user ever placed an order themselves" and, later,
 // for the first such fill — both keyed on the source, in order.
