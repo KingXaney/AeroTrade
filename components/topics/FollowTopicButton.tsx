@@ -6,7 +6,7 @@ import {toast} from "sonner";
 import {Loader2, Sparkles} from "lucide-react";
 import {cn} from "@/lib/utils";
 import {createTopic, deleteTopic} from "@/lib/actions/topics.actions";
-import ConfirmDialog from "@/components/primitives/ConfirmDialog";
+import UnfollowTopicDialog from "@/components/topics/UnfollowTopicDialog";
 
 type Props = {
     name: string;
@@ -83,15 +83,7 @@ const FollowTopicButton = ({name, keywords, followed = null, type = 'icon', clas
                     {pending ? <Loader2 className="size-4 animate-spin" /> : <Sparkles className="size-4" />}
                 </button>
             )}
-            <ConfirmDialog
-                open={confirming}
-                onOpenChange={setConfirming}
-                title={`Stop following “${name}”?`}
-                description="Its matched articles are removed. This cannot be undone."
-                confirmLabel="Stop following"
-                destructive
-                onConfirm={unfollow}
-            />
+            <UnfollowTopicDialog name={name} open={confirming} onOpenChange={setConfirming} onConfirm={unfollow} />
         </>
     );
 };
