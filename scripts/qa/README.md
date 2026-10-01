@@ -22,7 +22,7 @@ needed.
 From the repo root, with ports 3000, 27117 and 8288 free:
 
 ```bash
-npm run qa                         # every suite, in run.sh's order (~25 min)
+npm run qa                         # every suite, in run.sh's order (about 5 minutes)
 npm run qa -- learn income         # just these; "qa-" and ".mjs" are optional
 npm run qa -- --up                 # start the harness and keep it up until Ctrl-C
 npm run qa -- --up topics          # run a suite, then keep the harness up to poke at what it left
@@ -33,7 +33,8 @@ npm run qa -- --up topics          # run a suite, then keep the harness up to po
 Inngest dev server on :8288 — runs the suites one after another, stops everything it started and
 prints one line per suite. Each suite prints one `PASS`/`FAIL` line per check and exits non-zero
 when any fails. Logs land in `output/logs/` (`<suite>.log`, the harness's `_dev.log`,
-`_mongo.log`, `_inngest.log`, and `SUMMARY`); screenshots in `output/<suite>/`.
+`_mongo.log`, `_inngest.log`, and `SUMMARY`); screenshots in one folder per suite
+(`output/topics/` for `qa-topics`).
 
 With the harness up (`--up`), a single suite also runs on its own: `node qa-topics.mjs` from
 `scripts/qa`. `QA_BASE_URL`, `QA_MONGO_URL` and `QA_INNGEST_URL` point the suites elsewhere.
