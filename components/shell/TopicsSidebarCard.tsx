@@ -1,10 +1,6 @@
 import Link from "next/link";
+import type {SidebarTopics} from "@/lib/shell/sidebar";
 
-export type SidebarTopics = {
-    followed: number;
-    unseen: number;
-    top: {slug: string; name: string; color: string | null; unseenCount: number}[];
-};
 
 const mono = {fontFamily: 'var(--type-mono)'} as const;
 const display = {fontFamily: 'var(--type-display)'} as const;

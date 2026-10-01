@@ -3,8 +3,9 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useSignOut } from "@/components/shell/useSignOut";
-import PortfolioSidebarCard, { type SidebarPortfolio } from "@/components/shell/PortfolioSidebarCard";
-import TopicsSidebarCard, { type SidebarTopics } from "@/components/shell/TopicsSidebarCard";
+import PortfolioSidebarCard from "@/components/shell/PortfolioSidebarCard";
+import TopicsSidebarCard from "@/components/shell/TopicsSidebarCard";
+import type { SidebarPortfolio, SidebarTopics } from "@/lib/shell/sidebar";
 import NavList from "@/components/shell/NavList";
 import type { NavBadges } from "@/lib/shell/navigation";
 

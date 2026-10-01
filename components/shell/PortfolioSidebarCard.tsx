@@ -1,18 +1,10 @@
 import Link from "next/link";
 import {cn} from "@/lib/utils";
 import {formatPct, formatPrice, getChangeColorClass} from "@/lib/format";
+import type {SidebarPortfolio} from "@/lib/shell/sidebar";
 
 // Compact, glanceable portfolio summary for the left sidebar, under the topics card
 // (Sidebar.tsx); links through to the full /portfolio page.
-export type SidebarPortfolio = {
-    totalValue: number;
-    totalReturnPct: number;
-    cash: number;
-    accountsCount: number;
-    unpriced: number;      // holdings with no live quote, across every account
-    top: {symbol: string; quantity: number; unrealizedPnlPct: number; priceStale: boolean}[];
-};
-
 const PortfolioSidebarCard = ({portfolio}: {portfolio: SidebarPortfolio}) => {
     return (
         <Link
