@@ -8,7 +8,7 @@
 // table reaches (MAX_LOOKBACK_DAYS back at most, plus that week), and the table built on them
 // depend on no learner, so they are memoised per (that date, the stamp) for the ET day: a close
 // or a rate stored later moves the stamp and is read, and nothing is pinned. The maths is
-// lib/learn/time-in-market.ts. A failed read returns null and the page hides the panel rather
+// lib/strategies/learn/time-in-market.ts. A failed read returns null and the page hides the panel rather
 // than showing zeros.
 
 import {BENCHMARK_SYMBOL} from "@/lib/constants";
@@ -17,7 +17,7 @@ import {addCalendarDays} from "@/lib/prices/calendar-days";
 import {RATE_SYMBOL} from "@/lib/prices/config";
 import {getBarsForSymbols, getLatestBars, getRatePoints} from "@/lib/prices/store";
 import {readAccountsForUser} from "@/lib/trading/account";
-import {makeRateLookup, RATE_MAX_STALENESS_DAYS, type RatePoint} from "@/lib/trading/income";
+import {makeRateLookup, RATE_MAX_STALENESS_DAYS, type RatePoint} from "@/lib/income/accrual";
 import {getEasternDateString} from "@/lib/utils";
 import {
     buildTimeInMarket,
@@ -28,7 +28,7 @@ import {
     type SpyHistory,
     type StartRow,
     type TimeInMarketView,
-} from "@/lib/learn/time-in-market";
+} from "@/lib/strategies/learn/time-in-market";
 
 export type TimeInMarketRead = TimeInMarketView & {inception: string | null};
 

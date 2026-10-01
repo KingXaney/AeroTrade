@@ -47,7 +47,7 @@ spurious. The chart's `events` param is still not used (it drew a 429).
 - `PriceSeriesMeta` records the one unbroken date range a symbol's dividends can be trusted for.
   A gap between fetches is never bridged.
 
-## The one convention (`lib/trading/income.ts`)
+## The one convention (`lib/income/accrual.ts`)
 
 For each calendar day *d*: **open(d)** fixes ex-date-*d* dividends on the holdings at the end of
 *d−1*; *d*'s trades apply; **close(d)** accrues interest on the end-of-day cash and pays any
@@ -55,7 +55,7 @@ dividend dated *d*. Rows dated *d* become cash at the start of *d+1*, so a snaps
 on day *s* contains every row dated before *s*. The nightly job, the back-credit and the strategy
 simulator all step this one clock; nothing else implements it.
 
-## Crediting without transactions (`lib/trading/income-store.ts`)
+## Crediting without transactions (`lib/income/store.ts`)
 
 1. **Reconcile first.** Starting balance + every trade + every credit must equal the account's
    cash and positions. One that does not is skipped and named in the job summary — interest is

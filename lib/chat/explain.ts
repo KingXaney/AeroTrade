@@ -2,7 +2,7 @@
 // glossary's one resolver (resolveTerm), decodes a quoted reason with decodeQuotedReason —
 // a quant strategy's grammar or the AI Navigator's, or both for a shape both engines write
 // when no writer is named — and reads the learner's own figure through
-// lib/ai/learner-hooks.ts; this module only shapes those results. Pure and import-light so
+// lib/chat/learner-hooks.ts; this module only shapes those results. Pure and import-light so
 // the shape is unit-tested.
 //
 // The output is data for the model, never text for the page (invariant 4): definitions
@@ -116,7 +116,7 @@ const shapeEntry = (entry: GlossaryEntry): ExplainEntry => ({
 });
 
 // A decoded reason, each clause with the glossary's name and short definition for its term.
-// getQuantStrategies (lib/ai/quant-strategies.ts) shapes its orders' reasons through it too.
+// getQuantStrategies (lib/chat/quant-strategies.ts) shapes its orders' reasons through it too.
 export const shapeReason = (decoded: DecodedReason): ExplainReason => ({
     clauses: decoded.clauses.map((clause) => {
         const defined = clause.term ? lookupTerm(clause.term) : null;

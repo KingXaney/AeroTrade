@@ -1,4 +1,4 @@
-// Copy for the stock page's "Key numbers" panel (lib/learn/key-numbers.ts builds the rows).
+// Copy for the stock page's "Key numbers" panel (lib/stocks/key-numbers.ts builds the rows).
 // Each sentence says what its figure divides — or, for market cap, multiplies — and repeats
 // the figure exactly as the value beside it prints it. Nothing here calls a number high, low,
 // cheap or anything else: the definitions (lib/learn/glossary.ts) say what a figure measures,

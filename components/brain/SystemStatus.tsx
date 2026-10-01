@@ -1,4 +1,4 @@
-import {type BrainSystemStatus} from "@/lib/brain/queries";
+import {type BrainSystemStatus} from "@/lib/brain/store";
 import JobStamp, {jobHealth} from "@/components/system/JobStamp";
 
 // Pipeline observability for the /brain page: is each Inngest job actually

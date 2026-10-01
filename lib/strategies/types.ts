@@ -4,7 +4,7 @@
 import type {Bar} from "@/lib/prices/signals";
 import type {UniverseKey} from "@/lib/strategies/universe";
 import type {GlossaryKey} from "@/lib/learn/glossary";
-import type {IncomeRow} from "@/lib/trading/income";
+import type {IncomeRow} from "@/lib/income/accrual";
 
 export type StrategyId =
     | 'buy-and-hold-spy'
@@ -171,7 +171,7 @@ export type SimulationResult = {
     trades: readonly SimTrade[];
     rejections: readonly {date: string; symbol: string; side: 'buy' | 'sell'; reason: string}[];
     stats: SeriesStats;
-    // Interest and dividends credited along the way (lib/trading/income.ts). Not persisted
+    // Interest and dividends credited along the way (lib/income/accrual.ts). Not persisted
     // with the backtest; it is here so the parity test can hold it against the live replay.
     income: readonly IncomeRow[];
 };

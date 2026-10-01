@@ -7,7 +7,7 @@ import {useRouter} from "next/navigation";
 import Link from "next/link";
 import {X, Trash2} from "lucide-react";
 import ChatMessage from "@/components/chat/ChatMessage";
-import {describeChatError} from "@/lib/ai/chat-errors";
+import {describeChatError} from "@/lib/chat/errors";
 import {subscribeAsk} from "@/lib/chat/ask";
 import {CHAT_WELCOME_MESSAGE, CHAT_SUGGESTIONS} from "@/lib/constants";
 import {cn} from "@/lib/utils";

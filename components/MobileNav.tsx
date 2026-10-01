@@ -7,7 +7,7 @@ import {Menu} from "lucide-react";
 import {Sheet, SheetContent, SheetTrigger} from "@/components/ui/sheet";
 import NavList from "@/components/nav/NavList";
 import {useSignOut} from "@/hooks/useSignOut";
-import type {NavBadges} from "@/lib/navigation";
+import type {NavBadges} from "@/lib/shell/navigation";
 
 // Below lg the sidebar is hidden, and it was the only surface linking /watchlist,
 // /friends, /history and /settings — so on a phone (or a narrow window) those four pages

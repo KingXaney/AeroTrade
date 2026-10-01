@@ -2,7 +2,7 @@ import Link from "next/link";
 import NavItems from "@/components/NavItems";
 import UserDropdown from "@/components/UserDropdown";
 import MobileNav from "@/components/MobileNav";
-import type {NavBadges} from "@/lib/navigation";
+import type {NavBadges} from "@/lib/shell/navigation";
 
 type HeaderProps = {
     user: User;

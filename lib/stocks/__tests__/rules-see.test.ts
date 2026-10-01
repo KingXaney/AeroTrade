@@ -6,7 +6,7 @@
 import {describe, expect, it} from 'vitest';
 import {findBanned} from '@/lib/learn/banned';
 import {isGlossaryKey} from '@/lib/learn/glossary';
-import {buildRulesSee, type SymbolBoardRead} from '@/lib/learn/rules-see';
+import {buildRulesSee, type SymbolBoardRead} from '@/lib/stocks/rules-see';
 import {RULES_SEE_COPY} from '@/lib/learn/copy/rules-see';
 import {strategyBySlug} from '@/lib/strategies/catalog';
 import {strategiesWatching} from '@/lib/strategies/universe';

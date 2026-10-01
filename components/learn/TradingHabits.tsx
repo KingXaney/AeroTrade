@@ -1,5 +1,5 @@
-import type {HabitsRead} from "@/lib/learn/habits-read";
-import {cadenceControls, HABITS_MIN_CLOSED_LOTS} from "@/lib/trading/habits";
+import type {HabitsRead} from "@/lib/trading/learn/habits-store";
+import {cadenceControls, HABITS_MIN_CLOSED_LOTS} from "@/lib/trading/learn/habits";
 import {STRATEGIES} from "@/lib/strategies/catalog";
 import {HABITS_COPY, HABITS_TERMS} from "@/lib/learn/copy/habits";
 import {Stat} from "@/components/analytics/AnalyticsStats";
@@ -9,7 +9,7 @@ import EmptyState from "@/components/primitives/EmptyState";
 import Term from "@/components/primitives/Term";
 import WhatTheseMean from "@/components/learn/WhatTheseMean";
 
-// "Trading habits": plain-word tiles over the learner's own lots (lib/trading/habits.ts) — how
+// "Trading habits": plain-word tiles over the learner's own lots (lib/trading/learn/habits.ts) — how
 // long winners and losers were held, the share of each that was sold, how often and how much
 // was traded beside the catalog's own cadences, and what the shares sold would be worth now.
 // The jargon (time held, disposition effect, turnover) lives in the one "What these mean".

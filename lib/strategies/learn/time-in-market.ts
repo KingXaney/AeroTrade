@@ -16,7 +16,7 @@ import {STRATEGY_BACKFILL_CALENDAR_DAYS} from "@/lib/prices/config";
 import type {IndexPoint} from "@/lib/prices/total-return";
 import type {StrategyId} from "@/lib/strategies/types";
 import {downsample} from "@/lib/strategies/views";
-import {toCents} from "@/lib/trading/bridge";
+import {toCents} from "@/lib/trading/learn/bridge";
 import {
     createIncomeClock,
     dividendsByExDate,
@@ -29,7 +29,7 @@ import {
     type IncomeTrade,
     type RateLookup,
     type RatePoint,
-} from "@/lib/trading/income";
+} from "@/lib/income/accrual";
 
 // The one page that carries the lesson: owning SPY and doing nothing is itself a strategy.
 export const TIME_IN_MARKET_STRATEGY: StrategyId = 'buy-and-hold-spy';

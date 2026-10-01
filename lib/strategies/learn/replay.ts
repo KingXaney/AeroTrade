@@ -1,6 +1,6 @@
 // Decision replay: pairs a strategy fill with the stored board row and planned order
 // the rule looked at that morning. Pure; the read (getBoardRowsForFills) lives in
-// lib/strategies/queries.ts.
+// lib/strategies/page-store.ts.
 
 import {getEasternDateString} from "@/lib/utils";
 import {STRATEGY_RUN_TTL_DAYS} from "@/lib/strategies/config";

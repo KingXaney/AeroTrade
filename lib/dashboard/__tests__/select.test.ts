@@ -8,7 +8,7 @@ import {
     toSwitcherAccounts,
     topMovers,
 } from '@/lib/dashboard/select';
-import type {SuggestionSetView} from '@/lib/navigator/service';
+import type {SuggestionSetView} from '@/lib/navigator/store';
 
 const summary = (overrides: Partial<PortfolioSummary> = {}): PortfolioSummary => ({
     startingBalance: 100_000,

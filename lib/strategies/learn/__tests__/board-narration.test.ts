@@ -9,7 +9,7 @@ import {describe, expect, it} from 'vitest';
 import {findBanned} from '@/lib/learn/banned';
 import {BOARD_COPY} from '@/lib/learn/copy/board';
 import {STATE_MEANING} from '@/lib/learn/copy/verdict';
-import {narrateBoard, readBoardRow, type BoardReading} from '@/lib/learn/board-narration';
+import {narrateBoard, readBoardRow, type BoardReading} from '@/lib/strategies/learn/board-narration';
 import {STRATEGIES} from '@/lib/strategies/catalog';
 import {STRATEGY_RULES} from '@/lib/strategies/rules';
 import {sortBoard} from '@/lib/strategies/views';

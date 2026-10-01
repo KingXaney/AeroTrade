@@ -1,6 +1,6 @@
-import {inngest} from "@/lib/inngest/client";
-import {buildWelcomePrompt, NEWS_SUMMARY_EMAIL_PROMPT} from "@/lib/inngest/prompts"
-import {mailerReady, sendNewsSummaryEmail, sendWelcomeEmail} from "@/lib/nodemailer";
+import {inngest} from "@/lib/jobs/client";
+import {buildWelcomePrompt, NEWS_SUMMARY_EMAIL_PROMPT} from "@/lib/jobs/prompts"
+import {mailerReady, sendNewsSummaryEmail, sendWelcomeEmail} from "@/lib/email/send";
 import {getAllUsersForNewsEmail} from "@/lib/actions/user.actions";
 import {getWatchlistSymbolsByEmail} from "@/lib/actions/watchlist.actions";
 import {getQuote} from "@/lib/actions/finnhub.actions";
@@ -12,7 +12,7 @@ import {getNewsFeedForPrefs, getNewsFeedPrefs} from "@/lib/news/feed-store";
 import SuggestionSet, {GLOBAL_SUGGESTIONS_USER} from "@/database/models/suggestion-set.model";
 import NewsItem from "@/database/models/news-item.model";
 import AiNavigator from "@/database/models/ai-navigator.model";
-import {getActiveTheses, getBrainDigestData, getTopEntities, getTopVerifiedTickers} from "@/lib/brain/queries";
+import {getActiveTheses, getBrainDigestData, getTopEntities, getTopVerifiedTickers} from "@/lib/brain/store";
 import {foldExtractionsIntoBrain, type ArticleFold} from "@/lib/brain/update";
 import {parseExtractionResponse, sanitizeExtraction} from "@/lib/brain/extraction";
 import {buildRationalePrompt, buildSecondOpinionPrompt, EXTRACTION_PROMPT, injectJson, SECOND_OPINION_SYSTEM} from "@/lib/brain/prompts";
@@ -31,9 +31,9 @@ import {
     THEME_REUSE_LIST_SIZE,
     UNEXTRACTED_PICKUP_LIMIT,
 } from "@/lib/brain/config";
-import {recordJobRun} from "@/lib/inngest/job-runs";
-import {creditAccounts, planIncomeRun, type CreditOutcome} from "@/lib/trading/income-store";
-import {describeIncomeRun} from "@/lib/trading/income";
+import {recordJobRun} from "@/lib/jobs/job-runs";
+import {creditAccounts, planIncomeRun, type CreditOutcome} from "@/lib/income/store";
+import {describeIncomeRun} from "@/lib/income/accrual";
 import {addCalendarDays} from "@/lib/prices/calendar-days";
 import {ensureBars, symbolsLackingDividendCoverage} from "@/lib/prices/store";
 import {navigatorTargets} from "@/lib/navigator/universe";
@@ -44,7 +44,7 @@ import {
     buildOrderItem,
     computeNavigatorScores,
     planAccountOrders,
-} from "@/lib/navigator/service";
+} from "@/lib/navigator/store";
 import {executeOrder} from "@/lib/trading/orders";
 import BrainEntity from "@/database/models/brain-entity.model";
 import {searchStocks} from "@/lib/actions/finnhub.actions";
@@ -62,8 +62,8 @@ import {parseBriefText} from "@/lib/topics/brief";
 import {MAX_BRIEF_CALLS_PER_RUN, newsSearchEnabled} from "@/lib/topics/config";
 import {TOPIC_BRIEFS_EVENT, TOPIC_FEEDS_EVENT, TOPIC_FIRST_RUN_EVENT, TOPIC_REFRESH_EVENT} from "@/lib/topics/events";
 import {ensureTopicHasArticles, getTopicsDigestData, getTopicsForUser} from "@/lib/topics/store";
-import {buildTopicsSectionHtml} from "@/lib/topics/digest-section";
-import {lessonSectionFor} from "@/lib/learn/digest-section";
+import {buildTopicsSectionHtml} from "@/lib/email/sections/topics";
+import {lessonSectionFor} from "@/lib/email/sections/lesson";
 import {readLearnFacts} from "@/lib/learn/facts-store";
 import {readLessonForDigest} from "@/lib/learn/lesson-store";
 import {STRATEGIES, effectiveVersion} from "@/lib/strategies/catalog";
@@ -169,7 +169,7 @@ export const recordDailySnapshots = inngest.createFunction(
                 // (reset always re-anchors inceptionAt).
                 inceptionAt: new Date(a.inceptionAt || a.createdAt).getTime(),
                 // Read with `cash` from the same document, so the snapshot records exactly
-                // which income its cash contains (lib/trading/income-store.ts tops it up).
+                // which income its cash contains (lib/income/store.ts tops it up).
                 incomeThrough: a.incomeThrough ?? null,
                 positions: (a.positions || []).map((p: PaperPosition) => ({
                     symbol: p.symbol,
@@ -274,7 +274,7 @@ export const recordDailySnapshots = inngest.createFunction(
 // weekends too) and credits everything dated through yesterday, so every weekday's strategy
 // decision, Navigator run and 16:10 snapshot already contains it. An account with no
 // watermark is replayed from inception: the first run IS the retroactive back-credit.
-// The rules live in lib/trading/income.ts; the database side in lib/trading/income-store.ts.
+// The rules live in lib/income/accrual.ts; the database side in lib/income/store.ts.
 const INCOME_SYMBOL_CHUNK = 8;           // 5y Yahoo fetches with polite spacing per 60 s step
 const INCOME_BACK_CREDIT_BATCH = 2;      // a replay from inception writes many rows and snapshots
 const INCOME_ROUTINE_BATCH = 25;
@@ -741,7 +741,7 @@ export const sendDailyNewsSummary = inngest.createFunction(
                 // lesson — a first from the learner's own account (or a followed strategy's
                 // rebalance) dated exactly yesterday (this noon run would otherwise mail a morning
                 // fill or a 09:35 rebalance twice), else the day's glossary concept, read once per
-                // distinct keyword set in this run (lessonSectionFor, lib/learn/digest-section.ts).
+                // distinct keyword set in this run (lessonSectionFor, lib/email/sections/lesson.ts).
                 // Both ride under the same emailNotifications opt-out as the rest, and a failure
                 // in either only drops that section.
                 const {topicsSection, lessonSection} = await step.run(`fetch-sections-${safeId}`, async () => {

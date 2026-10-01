@@ -3,7 +3,7 @@
 // Read from the %-since-inception series the /portfolio page already has.
 
 import {describe, expect, it} from 'vitest';
-import {dailySwingDollars, MIN_SWING_POINTS} from '@/lib/trading/risk';
+import {dailySwingDollars, MIN_SWING_POINTS} from '@/lib/trading/learn/risk';
 
 const perf = (date: string, accountPct: number) => ({date, accountPct, benchmarkPct: null});
 

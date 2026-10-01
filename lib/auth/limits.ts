@@ -1,6 +1,6 @@
 // How often the sign-in-adjacent server actions may be called, and the counter keys they
-// spend. better-auth's own rateLimit never runs here (see lib/better-auth/auth.ts), so these
-// are the app's only limits on them; lib/auth/rate-limit.ts takeRateLimit does the counting.
+// spend. better-auth's own rateLimit never runs here (see lib/auth/server.ts), so these
+// are the app's only limits on them; lib/rate-limit.ts takeRateLimit does the counting.
 //
 // Import-free so the keys, the client-address reading, the sign-in input check and the order
 // the two sign-in counters are spent in are unit-tested like chat-limits.

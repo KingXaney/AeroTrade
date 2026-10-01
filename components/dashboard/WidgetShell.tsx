@@ -5,7 +5,7 @@ import {type KeyboardEvent, type ReactNode} from "react";
 import {useSortable} from "@dnd-kit/sortable";
 import {ChevronLeft, ChevronRight, GripVertical, X} from "lucide-react";
 import {cn} from "@/lib/utils";
-import type {WidgetDefinition, WidgetSpan} from "@/lib/dashboard/widgets";
+import type {WidgetDefinition, WidgetSpan} from "@/lib/dashboard/catalog";
 import MicroLabel from "@/components/primitives/MicroLabel";
 import Panel, {type PanelPad} from "@/components/primitives/Panel";
 import SectionHeading from "@/components/primitives/SectionHeading";

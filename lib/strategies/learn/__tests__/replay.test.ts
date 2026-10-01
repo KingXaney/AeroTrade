@@ -1,7 +1,7 @@
 import {describe, expect, it} from 'vitest';
 import {findBanned} from '@/lib/learn/banned';
 import {REPLAY_COPY} from '@/lib/learn/copy/replay';
-import {describeReplay, fillDate, isReplayExpired, matchFillToRun, replayReason, type ReplayRun} from '@/lib/learn/replay';
+import {describeReplay, fillDate, isReplayExpired, matchFillToRun, replayReason, type ReplayRun} from '@/lib/strategies/learn/replay';
 
 const run: ReplayRun = {
     asOf: '2026-09-25',

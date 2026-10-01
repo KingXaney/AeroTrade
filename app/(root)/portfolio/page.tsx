@@ -7,10 +7,10 @@ import {getAccountAnalytics, getComparisonStats, getIncomeActivity, getPortfolio
 import {replayReceipts} from "@/lib/trading/receipts";
 import {buyNotesBySellId, openLotNotes} from "@/lib/trading/lots";
 import {countUnpriced} from "@/lib/trading/analytics";
-import {buildReturnBridge} from "@/lib/trading/bridge";
+import {buildReturnBridge} from "@/lib/trading/learn/bridge";
 import {drawdownBand} from "@/lib/learn/copy/portfolio";
-import {getLuckOrSkill} from "@/lib/learn/luck-read";
-import {getTradingHabits} from "@/lib/learn/habits-read";
+import {getLuckOrSkill} from "@/lib/trading/learn/luck-store";
+import {getTradingHabits} from "@/lib/trading/learn/habits-store";
 import {toComparisonRows, toSwitcherAccounts} from "@/lib/dashboard/select";
 import {marketStatus} from "@/lib/prices/market-hours";
 import AccountSummary from "@/components/trade/AccountSummary";

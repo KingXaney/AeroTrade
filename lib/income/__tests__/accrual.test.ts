@@ -23,7 +23,7 @@ import {
     type DividendPoint,
     type IncomeTrade,
     type RatePoint,
-} from '@/lib/trading/income';
+} from '@/lib/income/accrual';
 
 const RATES: RatePoint[] = [{date: '2026-09-01', discountPct: 4.07}];
 const clockWith = (dividends: DividendPoint[] = [], rates: RatePoint[] = RATES) =>

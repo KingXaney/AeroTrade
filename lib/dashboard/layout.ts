@@ -13,7 +13,7 @@ import {
     isWidgetId,
     type AvailabilityContext,
     type WidgetId,
-} from '@/lib/dashboard/widgets';
+} from '@/lib/dashboard/catalog';
 
 export const LAYOUT_VERSION = 1;
 export const MAX_WIDGETS = 24;

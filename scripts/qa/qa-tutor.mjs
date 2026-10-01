@@ -113,7 +113,7 @@ try {
 
     // --- explainTerm's chip, from a stubbed stream ------------------------------------------
     // The real answer needs a Gemini key; the stream is stubbed in the AI SDK's UI-message
-    // format with an output in lib/ai/explain.ts's shape, so what is checked here is the
+    // format with an output in lib/chat/explain.ts's shape, so what is checked here is the
     // chip: its label, the glossary name as summary, the quoted term when there is no entry,
     // and nothing repeated for a reason.
     const STANCE = "These are the app's own definitions, and the learner's own paper-account figures where the app computes them.";
@@ -188,7 +188,7 @@ try {
     await shot('05-explain-chips');
 
     // --- getQuantStrategies' chip, from a stubbed stream -------------------------------------
-    // Outputs in lib/ai/quant-strategies.ts's shape. The chip names the strategy once the tool
+    // Outputs in lib/chat/quant-strategies.ts's shape. The chip names the strategy once the tool
     // has read it, counts the list when no slug was passed, and quotes the slug as asked when
     // no strategy matched. The tool's own reads are the /strategies page's leaderboard and the
     // detail page's latest run, which qa-strategies and qa-learn walk.

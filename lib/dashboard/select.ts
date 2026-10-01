@@ -2,7 +2,7 @@
 // Only ambient types (types/global.d.ts) and a type-only import, so vitest can
 // load this without mongoose or React.
 
-import type {SuggestionSetView} from '@/lib/navigator/service';
+import type {SuggestionSetView} from '@/lib/navigator/store';
 import {countUnpriced} from '@/lib/trading/analytics';
 
 export type BestStrategy = {name: string; totalReturnPct: number};

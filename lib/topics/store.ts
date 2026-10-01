@@ -6,7 +6,7 @@ import {connectToDatabase} from "@/database/mongoose";
 import Topic, {type TopicDoc} from "@/database/models/topic.model";
 import TopicArticle, {type TopicArticleDoc} from "@/database/models/topic-article.model";
 import {refreshKeywordGroup} from "@/lib/topics/refresh";
-import type {TopicDigestInput} from "@/lib/topics/digest-section";
+import type {TopicDigestInput} from "@/lib/email/sections/topics";
 
 const DAY_SECONDS = 24 * 60 * 60;
 const DIGEST_TOPIC_CAP = 6;

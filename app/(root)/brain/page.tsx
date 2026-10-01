@@ -1,11 +1,11 @@
 import {redirect} from "next/navigation";
 import {getCurrentUserId} from "@/lib/actions/watchlist.actions";
 import {getNavigatorStatus} from "@/lib/actions/navigator.actions";
-import {getActiveTheses, getBrainGraph, getBrainSystemStatus, getEntityEvidence, getSinceThesis, getTopEntities} from "@/lib/brain/queries";
+import {getActiveTheses, getBrainGraph, getBrainSystemStatus, getEntityEvidence, getSinceThesis, getTopEntities} from "@/lib/brain/store";
 import {glossNavigatorReasons} from "@/lib/learn/reasons";
-import type {SuggestionSetView} from "@/lib/navigator/service";
+import type {SuggestionSetView} from "@/lib/navigator/store";
 import {getLatestSecondOpinion, isSecondOpinionConfigured} from "@/lib/brain/opinion";
-import {getLatestSuggestions} from "@/lib/navigator/service";
+import {getLatestSuggestions} from "@/lib/navigator/store";
 import {getTopicsForUser} from "@/lib/topics/store";
 import {getAccountsForUser, toAccountSummary} from "@/lib/trading/account";
 import ActiveTheses from "@/components/brain/ActiveTheses";

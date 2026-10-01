@@ -3,13 +3,13 @@ import {notFound, redirect} from "next/navigation";
 import {getCurrentUserId} from "@/lib/actions/watchlist.actions";
 import {getEasternDateString} from "@/lib/utils";
 import {STRATEGIES_DISCLAIMER} from "@/lib/strategies/catalog";
-import {getStrategyDetail} from "@/lib/strategies/queries";
+import {getStrategyDetail} from "@/lib/strategies/page-store";
 import {formatSignalValue, pickPerfMode, toPerfSeries, visibleSignalColumns} from "@/lib/strategies/views";
 import {UNIVERSES} from "@/lib/strategies/universe";
-import {describeReplay, fillDate, isReplayExpired, matchFillToRun, replayReason} from "@/lib/learn/replay";
-import {explainVerdict, pickQuizRows} from "@/lib/learn/verdict";
+import {describeReplay, fillDate, isReplayExpired, matchFillToRun, replayReason} from "@/lib/strategies/learn/replay";
+import {explainVerdict, pickQuizRows} from "@/lib/strategies/learn/verdict";
 import {decodeReason} from "@/lib/learn/reasons";
-import {narrateBoard} from "@/lib/learn/board-narration";
+import {narrateBoard} from "@/lib/strategies/learn/board-narration";
 import {BOARD_COPY} from "@/lib/learn/copy/board";
 import {EXPORT_COPY} from "@/lib/learn/copy/export";
 import MicroLabel from "@/components/primitives/MicroLabel";
@@ -30,8 +30,8 @@ import WhatTheseMean from "@/components/learn/WhatTheseMean";
 import BoardReading from "@/components/learn/BoardReading";
 import TimeInMarket from "@/components/strategies/TimeInMarket";
 import WhatIfLab from "@/components/strategies/WhatIfLab";
-import {TIME_IN_MARKET_STRATEGY} from "@/lib/learn/time-in-market";
-import {getTimeInMarket} from "@/lib/learn/time-in-market-read";
+import {TIME_IN_MARKET_STRATEGY} from "@/lib/strategies/learn/time-in-market";
+import {getTimeInMarket} from "@/lib/strategies/learn/time-in-market-store";
 
 type StrategyPageProps = {
     params: Promise<{slug: string}>;

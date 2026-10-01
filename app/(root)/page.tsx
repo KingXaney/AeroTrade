@@ -5,7 +5,7 @@ import {ACTIVE_ACCOUNT_COOKIE} from "@/lib/constants";
 import {getCurrentUserId} from "@/lib/actions/watchlist.actions";
 import {getDashboardLayoutForUser} from "@/lib/dashboard/layout-store";
 import {getPortfoliosForUser} from "@/lib/trading/account";
-import {WIDGET_IDS, WIDGETS, isWidgetAvailable, resolveDataKeys, type WidgetId} from "@/lib/dashboard/widgets";
+import {WIDGET_IDS, WIDGETS, isWidgetAvailable, resolveDataKeys, type WidgetId} from "@/lib/dashboard/catalog";
 import {filterAvailable, layoutFingerprint} from "@/lib/dashboard/layout";
 import {loadDashboardData, type LoaderCtx} from "@/lib/dashboard/loaders";
 import {pickActiveAccount, toSwitcherAccounts} from "@/lib/dashboard/select";

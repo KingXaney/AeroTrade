@@ -42,8 +42,8 @@ vi.mock('@/lib/trading/account', () => ({
     readAccountsForUser: async () => stored.accounts,
 }));
 
-import {getTimeInMarket} from '@/lib/learn/time-in-market-read';
-import {TIM_CHART_POINTS} from '@/lib/learn/time-in-market';
+import {getTimeInMarket} from '@/lib/strategies/learn/time-in-market-store';
+import {TIM_CHART_POINTS} from '@/lib/strategies/learn/time-in-market';
 
 describe('getTimeInMarket', () => {
     beforeEach(() => {

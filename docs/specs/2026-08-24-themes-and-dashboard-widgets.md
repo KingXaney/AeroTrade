@@ -47,7 +47,7 @@ which also absorbs the notification toggles that used to sit in the user dropdow
 
 ## Dashboard widgets
 
-- **Registry** (`lib/dashboard/widgets.ts`, pure): 28 widgets with allowed spans on a
+- **Registry** (`lib/dashboard/catalog.ts`, pure): 28 widgets with allowed spans on a
   12-column grid, data keys, chrome (`link` / `panel` / `panel-lg` / `panel-sm` / `bare`)
   and availability (`multiAccount`, `advanced`). `resolveDataKeys()` splits the transitive
   data needs into an eager `Promise.all` and lazy keys streamed under `<Suspense>`.

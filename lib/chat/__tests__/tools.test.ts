@@ -27,7 +27,7 @@ vi.mock('@/lib/actions/watchlist.actions', () => ({
     getWatchlistSymbolsByUserId: stubs.getWatchlistSymbolsByUserId,
 }));
 vi.mock('@/database/mongoose', () => ({connectToDatabase: async () => undefined}));
-vi.mock('@/lib/brain/queries', () => ({getActiveTheses: vi.fn(), getBrainDigestData: vi.fn()}));
+vi.mock('@/lib/brain/store', () => ({getActiveTheses: vi.fn(), getBrainDigestData: vi.fn()}));
 vi.mock('@/lib/topics/store', () => ({getTopicFeed: vi.fn(), getTopicsForUser: vi.fn(), getTopicsOverview: vi.fn()}));
 vi.mock('@/lib/actions/topics.actions', () => ({createTopic: vi.fn(), deleteTopic: vi.fn()}));
 vi.mock('@/lib/trading/account', () => ({
@@ -37,11 +37,11 @@ vi.mock('@/lib/trading/account', () => ({
     readAccountsForUser: vi.fn(),
     toAccountSummary: vi.fn(),
 }));
-vi.mock('@/lib/strategies/queries', () => ({getLatestRun: vi.fn(), getStrategyLeaderboard: vi.fn()}));
-vi.mock('@/lib/navigator/service', () => ({getLatestSuggestions: stubs.getLatestSuggestions}));
-vi.mock('@/lib/ai/learner-hooks', () => ({priceLargestHoldings: vi.fn(), readLearnerValue: vi.fn()}));
+vi.mock('@/lib/strategies/page-store', () => ({getLatestRun: vi.fn(), getStrategyLeaderboard: vi.fn()}));
+vi.mock('@/lib/navigator/store', () => ({getLatestSuggestions: stubs.getLatestSuggestions}));
+vi.mock('@/lib/chat/learner-hooks', () => ({priceLargestHoldings: vi.fn(), readLearnerValue: vi.fn()}));
 
-import {buildTools} from '@/lib/ai/tools';
+import {buildTools} from '@/lib/chat/tools';
 import {FEED_WATCHLIST_SYMBOL_CAP} from '@/lib/news/config';
 
 const tools = buildTools('user-1');

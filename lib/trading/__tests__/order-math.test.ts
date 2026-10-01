@@ -1,6 +1,6 @@
 import {describe, expect, it} from 'vitest';
 import {CASH_YIELD_DAYS, TICKET_TERMS, affordableShares, checkOrder, describeOrderEffect, estRealizedPnl, isOrderSide, presetQuantities, sanitizeTradeNote, ticketTerms} from '@/lib/trading/order-math';
-import {interestOverDays} from '@/lib/trading/income';
+import {interestOverDays} from '@/lib/income/accrual';
 import {TRADE_REASON_MAX} from '@/lib/strategies/config';
 
 const positions = [

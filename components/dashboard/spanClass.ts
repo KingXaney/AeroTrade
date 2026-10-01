@@ -1,4 +1,4 @@
-import type {WidgetSpan} from "@/lib/dashboard/widgets";
+import type {WidgetSpan} from "@/lib/dashboard/catalog";
 
 // Literal class strings so the Tailwind scanner sees them — never build col-span-${n} at runtime.
 // Reproduces today's breakpoints: one column <md, three 4-span cards from md, 12 columns at xl.

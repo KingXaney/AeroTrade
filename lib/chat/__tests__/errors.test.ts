@@ -10,7 +10,7 @@ import {
     chatErrorStatus,
     describeChatError,
     type ChatErrorCode,
-} from '@/lib/ai/chat-errors';
+} from '@/lib/chat/errors';
 
 const CODES: ChatErrorCode[] = ['unauthorized', 'bad_request', 'conversation_too_long', 'rate_limited', 'capacity_reached', 'unavailable'];
 

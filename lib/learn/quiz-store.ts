@@ -14,7 +14,7 @@ import UserPreferencesModel from "@/database/models/user-preferences.model";
 import {createDayMemo, remember} from "@/lib/day-memo";
 import {buildDailyQuiz, quizDaysFrom, quizRunWindow, type DailyQuiz} from "@/lib/learn/quiz";
 import {STRATEGIES, STRATEGY_SLUGS} from "@/lib/strategies/catalog";
-import {getRecentRunDates, getRecentRuns} from "@/lib/strategies/queries";
+import {getRecentRunDates, getRecentRuns} from "@/lib/strategies/page-store";
 import {getEasternDateString} from "@/lib/utils";
 
 export type DailyQuizView = {

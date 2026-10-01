@@ -1,5 +1,5 @@
 import {describe, expect, it} from 'vitest';
-import {buildWelcomePrompt, PERSONALIZED_WELCOME_EMAIL_PROMPT} from '@/lib/inngest/prompts';
+import {buildWelcomePrompt, PERSONALIZED_WELCOME_EMAIL_PROMPT} from '@/lib/jobs/prompts';
 
 const profile = {country: 'US', investmentGoals: 'Growth', riskTolerance: 'Medium', preferredIndustry: 'Technology'};
 const count = (haystack: string, needle: string) => haystack.split(needle).length - 1;

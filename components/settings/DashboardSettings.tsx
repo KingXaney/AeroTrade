@@ -5,7 +5,7 @@ import Link from "next/link";
 import {toast} from "sonner";
 import {ArrowDown, ArrowUp, X} from "lucide-react";
 import {Switch} from "@/components/ui/switch";
-import {CATEGORY_LABELS, CATEGORY_ORDER, SPAN_LABELS, WIDGETS, type WidgetId} from "@/lib/dashboard/widgets";
+import {CATEGORY_LABELS, CATEGORY_ORDER, SPAN_LABELS, WIDGETS, type WidgetId} from "@/lib/dashboard/catalog";
 import {
     addWidget, layoutsEqual, missingWidgetIds, moveWidget, removeWidget, resetLayout, setSpan, type DashboardLayout,
 } from "@/lib/dashboard/layout";

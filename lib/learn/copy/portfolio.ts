@@ -9,7 +9,7 @@
 // so the comparison cannot drift from what the allocator does.
 
 import {MAX_POSITION_WEIGHT, MIN_CASH_WEIGHT} from "@/lib/navigator/config";
-import type {BridgeLineKey} from "@/lib/trading/bridge";
+import type {BridgeLineKey} from "@/lib/trading/learn/bridge";
 
 const MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
 

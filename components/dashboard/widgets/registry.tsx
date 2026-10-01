@@ -1,5 +1,5 @@
 import {Suspense, type ReactNode} from "react";
-import {WIDGETS, type DataKey, type WidgetId, type WidgetSpan} from "@/lib/dashboard/widgets";
+import {WIDGETS, type DataKey, type WidgetId, type WidgetSpan} from "@/lib/dashboard/catalog";
 import Panel from "@/components/primitives/Panel";
 import {LOADERS, type DashboardData, type LoaderCtx} from "@/lib/dashboard/loaders";
 import {bestStrategy, newsBrainSummary, toApplyAccounts, toComparisonRows, topMovers} from "@/lib/dashboard/select";

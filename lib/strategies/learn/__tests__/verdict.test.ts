@@ -2,7 +2,7 @@ import {describe, expect, it} from 'vitest';
 import {findBanned} from '@/lib/learn/banned';
 import type {SignalRow} from '@/lib/strategies/types';
 import {ASKABLE_STATES, STATE_MEANING, VERDICT_QUIZ_COPY} from '@/lib/learn/copy/verdict';
-import {explainVerdict, pickQuizRows, QUIZ_ROWS} from '@/lib/learn/verdict';
+import {explainVerdict, pickQuizRows, QUIZ_ROWS} from '@/lib/strategies/learn/verdict';
 
 const row = (symbol: string, state: SignalRow['state'], note?: string): SignalRow =>
     ({symbol, state, values: {close: 100}, ...(note ? {note} : {})});

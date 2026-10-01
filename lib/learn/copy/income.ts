@@ -1,6 +1,6 @@
 // The Income panel on /portfolio: what the account earned without trading, and a receipt for
 // each number. Interest is printed with the daily factor the accrual convention uses
-// (lib/trading/income.ts dailyFactor), never as "÷ 365", so the arithmetic on screen is the
+// (lib/income/accrual.ts dailyFactor), never as "÷ 365", so the arithmetic on screen is the
 // arithmetic that credited the cash. Every sentence describes; none says what to do. Held to
 // the no-advice list, and each printed receipt multiplied back to its cent, by
 // lib/learn/__tests__/income-copy.test.ts.
@@ -12,7 +12,7 @@ import {shortDate} from "@/lib/learn/copy/portfolio";
 import {addCalendarDays} from "@/lib/prices/calendar-days";
 import {isTradingDay} from "@/lib/prices/market-hours";
 import {DIVIDEND_PAY_LAG_DAYS} from "@/lib/prices/config";
-import {dailyFactor, type DividendReceipt, type IncomeActivity, type IncomeMonth, type MissedExDate} from "@/lib/trading/income";
+import {dailyFactor, type DividendReceipt, type IncomeActivity, type IncomeMonth, type MissedExDate} from "@/lib/income/accrual";
 
 const MONEY = new Intl.NumberFormat('en-US', {style: 'currency', currency: 'USD', minimumFractionDigits: 2, maximumFractionDigits: 2});
 // Dividends are declared to the tenth of a cent and beyond; printing $1.89 for $1.889 would

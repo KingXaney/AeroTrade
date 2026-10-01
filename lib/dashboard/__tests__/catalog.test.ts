@@ -15,7 +15,7 @@ import {
     resolveDataKeys,
     type DataKey,
     type WidgetId,
-} from '@/lib/dashboard/widgets';
+} from '@/lib/dashboard/catalog';
 import {DEFAULT_LAYOUT} from '@/lib/dashboard/layout';
 
 const defs = Object.values(WIDGETS);

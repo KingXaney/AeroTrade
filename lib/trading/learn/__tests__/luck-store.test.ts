@@ -41,8 +41,8 @@ vi.mock('@/lib/trading/account', () => ({
     },
 }));
 
-import {getLuckOrSkill} from '@/lib/learn/luck-read';
-import {buildLuckView, holdWindow, luckWindow, seedFrom} from '@/lib/learn/random-portfolios';
+import {getLuckOrSkill} from '@/lib/trading/learn/luck-store';
+import {buildLuckView, holdWindow, luckWindow, seedFrom} from '@/lib/trading/learn/random-portfolios';
 import {LARGE_CAPS} from '@/lib/strategies/universe';
 
 const YESTERDAY = '2026-09-29';

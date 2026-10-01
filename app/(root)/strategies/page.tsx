@@ -1,7 +1,7 @@
 import {redirect} from "next/navigation";
 import {getCurrentUserId} from "@/lib/actions/watchlist.actions";
 import {marketStatus} from "@/lib/prices/market-hours";
-import {getStrategiesSystemStatus, getStrategyLeaderboard} from "@/lib/strategies/queries";
+import {getStrategiesSystemStatus, getStrategyLeaderboard} from "@/lib/strategies/page-store";
 import {everyLiveRecordYoung, LIVE_YOUNG_DAYS} from "@/lib/strategies/views";
 import MicroLabel from "@/components/primitives/MicroLabel";
 import PageTitle from "@/components/primitives/PageTitle";

@@ -1,4 +1,4 @@
-import type {KeyNumber} from "@/lib/learn/key-numbers";
+import type {KeyNumber} from "@/lib/stocks/key-numbers";
 import {KEY_NUMBERS_COPY} from "@/lib/learn/copy/key-numbers";
 import Panel from "@/components/primitives/Panel";
 import SectionHeading from "@/components/primitives/SectionHeading";
@@ -6,7 +6,7 @@ import EmptyState from "@/components/primitives/EmptyState";
 import Term from "@/components/primitives/Term";
 import WhatTheseMean from "@/components/learn/WhatTheseMean";
 
-// The stock page's "Key numbers": each figure the market-data feed reports (lib/learn/key-numbers.ts),
+// The stock page's "Key numbers": each figure the market-data feed reports (lib/stocks/key-numbers.ts),
 // its value and one sentence saying what it divides. The definitions live in the panel's one
 // "What these mean". Without a market-data key the feed sends nothing, and the panel says so
 // rather than printing zeros. Server component; no inline prose.

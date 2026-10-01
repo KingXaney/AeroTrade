@@ -7,7 +7,7 @@ import {afterEach, beforeEach, describe, expect, it, vi} from 'vitest';
 const {sendMail} = vi.hoisted(() => ({sendMail: vi.fn()}));
 vi.mock('nodemailer', () => ({default: {createTransport: () => ({sendMail})}}));
 
-import {mailerReady, sendNewsSummaryEmail, sendPasswordResetEmail, sendWelcomeEmail} from '@/lib/nodemailer';
+import {mailerReady, sendNewsSummaryEmail, sendPasswordResetEmail, sendWelcomeEmail} from '@/lib/email/send';
 
 const senders = {
     'password reset': () => sendPasswordResetEmail({email: 'a@b.co', name: 'Ada', token: 'secret-token'}),

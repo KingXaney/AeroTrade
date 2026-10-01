@@ -5,7 +5,7 @@
 // across two vintages would be wrong. Chaining plain closes and stored dividend amounts is
 // immune to that.
 //
-// Dividends enter on the same timetable accounts are paid on (lib/trading/income.ts): paid
+// Dividends enter on the same timetable accounts are paid on (lib/income/accrual.ts): paid
 // DIVIDEND_PAY_LAG_DAYS after the ex-date, as cash at the start of the following day. So a
 // paper account holding only SPY crosses every ex-date in step with this index, instead of
 // showing a gap of one quarterly dividend for a week.

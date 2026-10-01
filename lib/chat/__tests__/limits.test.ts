@@ -9,7 +9,7 @@ import {
     DAY_MS,
     HOUR_MS,
     resolveChatLimits,
-} from '@/lib/ai/chat-limits';
+} from '@/lib/chat/limits';
 
 describe('resolveChatLimits', () => {
     it('uses the defaults when nothing is set', () => {

@@ -10,7 +10,7 @@ import {dividendCoverage, fetchYahooDaily, type YahooRange} from "@/lib/prices/y
 import {mergeCoverage, type CoverageRange} from "@/lib/prices/coverage";
 import {type Bar} from "@/lib/prices/signals";
 import {BAR_PROJECTION, toBar, toSetFields, type LeanPriceBar} from "@/lib/prices/bar-fields";
-import type {DividendPoint} from "@/lib/trading/income";
+import type {DividendPoint} from "@/lib/income/accrual";
 import {
     BACKFILL_CALENDAR_DAYS,
     MAX_TRACKED_SYMBOLS,

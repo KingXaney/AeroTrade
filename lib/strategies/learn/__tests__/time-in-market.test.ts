@@ -1,5 +1,5 @@
 // Three ways of owning SPY over one window — all at once, in monthly deposits, or not at all —
-// walked through the one income clock (lib/trading/income.ts replayIncome). SPY is held as
+// walked through the one income clock (lib/income/accrual.ts replayIncome). SPY is held as
 // shares at its stored closes and paid its stored dividends the way a paper account is (to the
 // shares held the evening before the ex-date, as cash on the pay date); idle cash earns the
 // T-bill rate exactly as a paper account's does, and a day that needs a rate and has none
@@ -7,7 +7,7 @@
 
 import {describe, expect, it} from 'vitest';
 import {addCalendarDays, eachCalendarDay} from '@/lib/prices/calendar-days';
-import {createIncomeClock, makeRateLookup, payDateFor, replayIncome, type RatePoint} from '@/lib/trading/income';
+import {createIncomeClock, makeRateLookup, payDateFor, replayIncome, type RatePoint} from '@/lib/income/accrual';
 import {
     buildTimeInMarket,
     cashOnly,
@@ -23,7 +23,7 @@ import {
     tableStarts,
     underwaterSpans,
     type WayPoint,
-} from '@/lib/learn/time-in-market';
+} from '@/lib/strategies/learn/time-in-market';
 
 const isWeekday = (date: string) => ![0, 6].includes(new Date(`${date}T12:00:00Z`).getUTCDay());
 const weekdays = (from: string, to: string) => eachCalendarDay(from, to).filter(isWeekday);

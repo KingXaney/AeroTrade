@@ -2,7 +2,7 @@
 
 import {connectToDatabase} from "@/database/mongoose";
 import {getCurrentUserId} from "@/lib/actions/watchlist.actions";
-import {unsetPreference, upsertPreferences} from "@/lib/preferences/upsert";
+import {unsetPreference, upsertPreferences} from "@/lib/settings/preferences-store";
 import {DashboardLayoutSchema, normalizeLayout, resetLayout, type DashboardLayout} from "@/lib/dashboard/layout";
 
 // Writes only. Reads live in lib/dashboard/layout-store.ts (a plain server module),

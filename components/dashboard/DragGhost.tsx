@@ -1,4 +1,4 @@
-import type {WidgetDefinition, WidgetSpan} from "@/lib/dashboard/widgets";
+import type {WidgetDefinition, WidgetSpan} from "@/lib/dashboard/catalog";
 import MicroLabel from "@/components/primitives/MicroLabel";
 import Panel from "@/components/primitives/Panel";
 

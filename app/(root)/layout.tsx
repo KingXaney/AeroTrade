@@ -1,6 +1,6 @@
 import Header from "@/components/Header";
 import Sidebar from "@/components/Sidebar";
-import {auth} from "@/lib/better-auth/auth";
+import {auth} from "@/lib/auth/server";
 import {headers} from "next/headers";
 import {redirect} from "next/navigation";
 import {searchStocks} from "@/lib/actions/finnhub.actions";
@@ -11,7 +11,7 @@ import ChatWidget from "@/components/chat/ChatWidget";
 import ThemeSync from "@/components/theme/ThemeSync";
 import {getAppearanceForUser} from "@/lib/actions/appearance.actions";
 import {countIncomingRequests} from "@/lib/actions/friends.actions";
-import type {NavBadges} from "@/lib/navigation";
+import type {NavBadges} from "@/lib/shell/navigation";
 
 // Every page under (root) reads the session from request headers, so they can never be
 // statically prerendered. Declaring this avoids a build-time dynamic-usage error.

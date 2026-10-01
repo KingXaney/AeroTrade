@@ -1,4 +1,4 @@
-import {inngest} from "@/lib/inngest/client";
+import {inngest} from "@/lib/jobs/client";
 
 export const TOPIC_REFRESH_EVENT = 'topic/refresh.requested';
 export const TOPIC_FIRST_RUN_EVENT = 'topic/first-run.requested';

@@ -4,7 +4,7 @@ import {revalidatePath} from "next/cache";
 import SecondOpinion from "@/database/models/second-opinion.model";
 import {connectToDatabase} from "@/database/mongoose";
 import {getCurrentUserId} from "@/lib/actions/watchlist.actions";
-import {inngest} from "@/lib/inngest/client";
+import {inngest} from "@/lib/jobs/client";
 import {
     gatherOpinionContext,
     isSecondOpinionConfigured,

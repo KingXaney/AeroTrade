@@ -14,7 +14,7 @@ import {
     type ExplainResult,
     type LearnerValue,
     type ReasonWriter,
-} from '@/lib/ai/explain';
+} from '@/lib/chat/explain';
 import {GLOSSARY, resolveTerm} from '@/lib/learn/glossary';
 import {decodeNavigatorReason, decodeReason, MAX_REASON_CHARS} from '@/lib/learn/reasons';
 import {findBanned} from '@/lib/learn/banned';

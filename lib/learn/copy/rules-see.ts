@@ -1,4 +1,4 @@
-// Copy for the stock page's "What the rules see" panel (lib/learn/rules-see.ts builds the view):
+// Copy for the stock page's "What the rules see" panel (lib/stocks/rules-see.ts builds the view):
 // the row each rule-based strategy stored for this symbol on its latest board. The rows are
 // the rules' own records, quoted; nothing here says what the reader might do with them. Each
 // row's plain-words reading comes from lib/learn/copy/board.ts through readBoardRow. Held to

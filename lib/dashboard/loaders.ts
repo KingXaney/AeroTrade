@@ -1,5 +1,5 @@
 // Server-only data loaders for the dashboard widgets. Never imported by tests:
-// the action modules below reach lib/better-auth/auth.ts, whose top-level
+// the action modules below reach lib/auth/server.ts, whose top-level
 // await needs a database.
 
 import {cache} from "react";
@@ -10,19 +10,19 @@ import {getStocksWithData} from "@/lib/actions/finnhub.actions";
 import {getNewsFeed} from "@/lib/news/feed-store";
 import {NEWS_WIDGET_LIMIT} from "@/lib/news/config";
 import {getLeaderboard} from "@/lib/actions/friends.actions";
-import {getActiveTheses, getBrainGraph, getBrainSystemStatus, getTopEntities, type BrainSystemStatus} from "@/lib/brain/queries";
-import {getLatestSuggestions} from "@/lib/navigator/service";
+import {getActiveTheses, getBrainGraph, getBrainSystemStatus, getTopEntities, type BrainSystemStatus} from "@/lib/brain/store";
+import {getLatestSuggestions} from "@/lib/navigator/store";
 import {getNavigatorStatus} from "@/lib/actions/navigator.actions";
 import {getLatestSecondOpinion, type SecondOpinionView} from "@/lib/brain/opinion";
 import {pickActiveAccount, type ComparisonStat, type LatestSuggestions} from "@/lib/dashboard/select";
-import type {DataKey} from "@/lib/dashboard/widgets";
-import {getStrategyWidgetRows} from "@/lib/strategies/queries";
+import type {DataKey} from "@/lib/dashboard/catalog";
+import {getStrategyWidgetRows} from "@/lib/strategies/page-store";
 import type {StrategyLeaderboardRow} from "@/lib/strategies/views";
 import {getLearnFacts, getOnboardingFacts} from "@/lib/learn/facts-store";
 import type {LearnFacts, OnboardingFacts} from "@/lib/learn/facts";
 import {getTodaysLesson} from "@/lib/learn/lesson-store";
 import type {Lesson} from "@/lib/learn/lesson";
-import {getDailyQuiz, type DailyQuizView} from "@/lib/learn/quiz-read";
+import {getDailyQuiz, type DailyQuizView} from "@/lib/learn/quiz-store";
 
 // Followed strategies first, then the top of the ranking.
 const STRATEGY_WIDGET_LIMIT = 5;

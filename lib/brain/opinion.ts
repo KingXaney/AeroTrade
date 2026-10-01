@@ -6,7 +6,7 @@ import SecondOpinion, {type SecondOpinionSource} from "@/database/models/second-
 import NewsItem from "@/database/models/news-item.model";
 import SuggestionSet, {GLOBAL_SUGGESTIONS_USER} from "@/database/models/suggestion-set.model";
 import {connectToDatabase} from "@/database/mongoose";
-import {getActiveTheses, getBrainDigestData} from "@/lib/brain/queries";
+import {getActiveTheses, getBrainDigestData} from "@/lib/brain/store";
 import type {SecondOpinionContext} from "@/lib/brain/prompts";
 import {
     SECOND_OPINION_HEADLINE_COUNT,

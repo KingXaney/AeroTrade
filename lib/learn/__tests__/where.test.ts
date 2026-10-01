@@ -1,7 +1,7 @@
 import {describe, expect, it} from 'vitest';
 import {GLOSSARY, GLOSSARY_KEYS} from '@/lib/learn/glossary';
 import {GLOSSARY_GROUPS, groupOf, whereItLives} from '@/lib/learn/where';
-import {EVENT_BADGES} from '@/lib/learn/event-types';
+import {EVENT_BADGES} from '@/lib/brain/event-types';
 
 describe('whereItLives', () => {
     it('places every entry in exactly one group with an in-app home', () => {

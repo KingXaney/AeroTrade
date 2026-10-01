@@ -20,7 +20,7 @@ vi.mock('@/database/models/user-preferences.model', () => ({
         return {learn: {quizDaysAnswered: 4}};
     }})})},
 }));
-vi.mock('@/lib/strategies/queries', () => ({
+vi.mock('@/lib/strategies/page-store', () => ({
     getRecentRunDates: async (_ids: string[], window: {since: string; before: string}) => {
         db.windows.push(window);
         return Object.fromEntries([...db.runs].map(([id, run]) => [id, run.date]));
@@ -31,7 +31,7 @@ vi.mock('@/lib/strategies/queries', () => ({
     },
 }));
 
-import {getDailyQuiz} from '@/lib/learn/quiz-read';
+import {getDailyQuiz} from '@/lib/learn/quiz-store';
 
 const rsiRun: QuizRun = {
     date: '2026-09-28',

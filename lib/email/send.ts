@@ -1,6 +1,6 @@
 import nodemailer from 'nodemailer';
 import {escapeHtml} from "@/lib/news/sanitize";
-import {WELCOME_EMAIL_TEMPLATE, PASSWORD_RESET_EMAIL_TEMPLATE, renderNewsSummaryEmail} from "@/lib/nodemailer/templates";
+import {WELCOME_EMAIL_TEMPLATE, PASSWORD_RESET_EMAIL_TEMPLATE, renderNewsSummaryEmail} from "@/lib/email/templates";
 
 export const transporter = nodemailer.createTransport({
     service: 'gmail',

@@ -1,15 +1,15 @@
 // "What the rules see" on the stock page: for each strategy that watches a symbol, the row it
 // stored for that symbol on its latest board — verdict and values formatted exactly as the
 // strategy's own signal board prints them, and read in plain words by that rule's narrator
-// (lib/learn/board-narration.ts). Pure and client-safe; the read is
-// lib/strategies/queries.ts getBoardRowsForSymbol.
+// (lib/strategies/learn/board-narration.ts). Pure and client-safe; the read is
+// lib/strategies/page-store.ts getBoardRowsForSymbol.
 //
 // Invariant 8 in practice: the run's dates, and any value every row prints the same (the
 // close, when the rows share a run date), are stated once for the panel instead of on each
 // row; a column a row leaves blank is not shown for that row; the strategies with no stored
 // row are named once, in one line.
 
-import {readBoardRow} from '@/lib/learn/board-narration';
+import {readBoardRow} from '@/lib/strategies/learn/board-narration';
 import type {GlossaryKey} from '@/lib/learn/glossary';
 import type {RowState, SignalColumn, SignalRow, StrategyDefinition, StrategyId} from '@/lib/strategies/types';
 import {formatSignalValue, visibleSignalColumns} from '@/lib/strategies/views';

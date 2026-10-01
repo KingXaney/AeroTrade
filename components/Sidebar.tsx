@@ -6,7 +6,7 @@ import { useSignOut } from "@/hooks/useSignOut";
 import PortfolioSidebarCard, { type SidebarPortfolio } from "@/components/PortfolioSidebarCard";
 import TopicsSidebarCard, { type SidebarTopics } from "@/components/topics/TopicsSidebarCard";
 import NavList from "@/components/nav/NavList";
-import type { NavBadges } from "@/lib/navigation";
+import type { NavBadges } from "@/lib/shell/navigation";
 
 type SidebarProps = {
     portfolio: SidebarPortfolio | null;

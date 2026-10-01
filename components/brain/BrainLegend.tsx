@@ -1,8 +1,8 @@
 import Panel from "@/components/primitives/Panel";
-import {brainLegend} from "@/lib/learn/brain-legend";
+import {brainLegend} from "@/lib/brain/legend";
 
 // Under System Status on /brain: how the brain weighs the news and how the Navigator scores
-// and trades, every figure read from the constants the code runs on (lib/learn/brain-legend.ts).
+// and trades, every figure read from the constants the code runs on (lib/brain/legend.ts).
 // Reference prose, so it stays collapsed (invariant 8); mechanism only (invariant 12).
 const BrainLegend = () => {
     const legend = brainLegend();

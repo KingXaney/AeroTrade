@@ -1,7 +1,7 @@
 // Shaping the paper accounts into something the chat model can read.
 //
 // Pure on purpose: lib/trading/account.ts reaches lib/actions/* and therefore
-// lib/better-auth/auth.ts, whose top-level await opens a DB connection — so anything
+// lib/auth/server.ts, whose top-level await opens a DB connection — so anything
 // importing it is untestable under vitest (AGENTS.md invariant 1). The mapping and the
 // account-name resolution live here so they can be.
 

@@ -11,7 +11,7 @@
 // between) and the T-bill points of the window. Those inputs depend only on the window and the
 // stored data, so they are memoised per (start, end, the T-bill series' latest point) for the
 // ET day: the end moves as soon as the morning's closes land, so a read taken before them is
-// never pinned. The maths is lib/learn/random-portfolios.ts. A failed read returns null and the
+// never pinned. The maths is lib/trading/learn/random-portfolios.ts. A failed read returns null and the
 // page hides the panel rather than showing zeros.
 
 import {BENCHMARK_SYMBOL} from "@/lib/constants";
@@ -20,7 +20,7 @@ import {addCalendarDays} from "@/lib/prices/calendar-days";
 import {RATE_SYMBOL} from "@/lib/prices/config";
 import {getHoldWindowBars, getLatestBars, getRatePoints} from "@/lib/prices/store";
 import {getLastSnapshotBetween} from "@/lib/trading/account";
-import {RATE_MAX_STALENESS_DAYS} from "@/lib/trading/income";
+import {RATE_MAX_STALENESS_DAYS} from "@/lib/income/accrual";
 import {LARGE_CAPS} from "@/lib/strategies/universe";
 import {getEasternDateString} from "@/lib/utils";
 import {
@@ -34,7 +34,7 @@ import {
     sessionsBetween,
     type HoldWindow,
     type LuckView,
-} from "@/lib/learn/random-portfolios";
+} from "@/lib/trading/learn/random-portfolios";
 
 export type LuckRead = LuckView & {unpriced: number; holdings: number};
 

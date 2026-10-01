@@ -1,5 +1,5 @@
 // The Income panel's receipts: every number they print must come back out of the one accrual
-// convention (lib/trading/income.ts). Rows here are produced by replayIncome itself, so a
+// convention (lib/income/accrual.ts). Rows here are produced by replayIncome itself, so a
 // receipt that drifted from what the clock credits fails against the clock, not a copy of it.
 
 import {describe, expect, it} from 'vitest';
@@ -19,7 +19,7 @@ import {
     type IncomeTrade,
     type LedgerFill,
     type RatePoint,
-} from '@/lib/trading/income';
+} from '@/lib/income/accrual';
 
 // Noon in New York in September (EDT), so the Eastern date is the date written.
 const at = (date: string): number => Date.parse(`${date}T16:00:00Z`);

@@ -2,7 +2,7 @@
 
 import {useEffect, useState} from "react";
 import {cn, getEasternDateString} from "@/lib/utils";
-import type {BridgeLineKey, ReturnBridge as Bridge} from "@/lib/trading/bridge";
+import type {BridgeLineKey, ReturnBridge as Bridge} from "@/lib/trading/learn/bridge";
 import type {GlossaryKey} from "@/lib/learn/glossary";
 import {BRIDGE_COPY, signedMoney} from "@/lib/learn/copy/portfolio";
 import Panel from "@/components/primitives/Panel";
@@ -13,7 +13,7 @@ import WhatTheseMean from "@/components/learn/WhatTheseMean";
 
 // "Where the return came from": the account's total return split into price moves on shares
 // still held, results locked in by sells, interest and dividends — lines that add up to the
-// Total Return figure to the cent (lib/trading/bridge.ts, computed on the server).
+// Total Return figure to the cent (lib/trading/learn/bridge.ts, computed on the server).
 //
 // While the income share is a question worth asking (a gain, some income), the split waits
 // behind one guess: what share came from interest and dividends. The guess is kept in this

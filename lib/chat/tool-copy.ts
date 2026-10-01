@@ -1,4 +1,4 @@
-// The chat tools' descriptions, kept apart from lib/ai/tools.ts (which imports server
+// The chat tools' descriptions, kept apart from lib/chat/tools.ts (which imports server
 // actions) so a unit test can hold every one of them to the no-advice voice without
 // touching the database. The Record type makes a tool without copy a type error.
 

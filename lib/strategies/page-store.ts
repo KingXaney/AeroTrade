@@ -7,7 +7,7 @@ import AccountSnapshot from "@/database/models/account-snapshot.model";
 import StrategyBacktest from "@/database/models/strategy-backtest.model";
 import StrategyRun from "@/database/models/strategy-run.model";
 import PriceBar from "@/database/models/price-bar.model";
-import {getJobHealth, type JobHealth} from "@/lib/brain/queries";
+import {getJobHealth, type JobHealth} from "@/lib/brain/store";
 import {
     buildPriceMap,
     computePortfolio,
@@ -26,9 +26,9 @@ import {STRATEGIES, strategyBySlug} from "@/lib/strategies/catalog";
 import {STRATEGY_OWNER_ID} from "@/lib/strategies/config";
 import {getFollowedStrategies} from "@/lib/strategies/follows";
 import {getStrategyStates, type StrategyStateView} from "@/lib/strategies/store";
-import type {ReplayRun} from "@/lib/learn/replay";
+import type {ReplayRun} from "@/lib/strategies/learn/replay";
 import type {QuizRun} from "@/lib/learn/quiz";
-import type {SymbolBoardRead} from "@/lib/learn/rules-see";
+import type {SymbolBoardRead} from "@/lib/stocks/rules-see";
 import type {SeriesStats, SignalRow, StrategyDefinition, StrategyId} from "@/lib/strategies/types";
 import {BENCHMARK_SYMBOL, strategiesWatching} from "@/lib/strategies/universe";
 import {whatIfLab, type StoredWhatIfVariant, type WhatIfLabView} from "@/lib/strategies/whatif";

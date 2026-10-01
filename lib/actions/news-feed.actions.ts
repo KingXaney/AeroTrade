@@ -2,7 +2,7 @@
 
 import {connectToDatabase} from "@/database/mongoose";
 import {getCurrentUserId} from "@/lib/actions/watchlist.actions";
-import {unsetPreference, upsertPreferences} from "@/lib/preferences/upsert";
+import {unsetPreference, upsertPreferences} from "@/lib/settings/preferences-store";
 import {defaultNewsFeed, isDefaultNewsFeed, NewsFeedSchema, normalizeNewsFeed, type NewsFeedPrefs} from "@/lib/news/feed-prefs";
 import {formatIssue} from "@/lib/topics/normalize";
 

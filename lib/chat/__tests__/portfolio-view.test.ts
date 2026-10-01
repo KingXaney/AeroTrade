@@ -9,7 +9,7 @@ import {
     toChatPortfolio,
     toChatPosition,
     toChatTrade,
-} from '@/lib/trading/portfolio-view';
+} from '@/lib/chat/portfolio-view';
 
 const position = (over: Partial<EnrichedPosition> = {}): EnrichedPosition => ({
     symbol: 'NVDA',

@@ -3,14 +3,14 @@
 // which way to take, and no sentence ranks them (the test holds each to the 'copy' tier of
 // lib/learn/banned.ts on a grid of inputs).
 //
-// The tiles print money from whole cents (lib/learn/time-in-market.ts summarizeWay), so the
+// The tiles print money from whole cents (lib/strategies/learn/time-in-market.ts summarizeWay), so the
 // printed "worth at the end" minus the amount the window line states is the printed change, to
 // the cent, and the printed percentage is that change over that amount. Every way takes in
 // exactly that amount by its last day, so the amount is stated once, in the window line
 // (invariant 8), and never under a way.
 
-import {CASH_YIELD_SPREAD} from "@/lib/trading/income";
-import {MAX_LOOKBACK_DAYS, MIN_WINDOW_DAYS, type StartSource, type UnderwaterSpan, type WayKey, type WaySummary} from "@/lib/learn/time-in-market";
+import {CASH_YIELD_SPREAD} from "@/lib/income/accrual";
+import {MAX_LOOKBACK_DAYS, MIN_WINDOW_DAYS, type StartSource, type UnderwaterSpan, type WayKey, type WaySummary} from "@/lib/strategies/learn/time-in-market";
 import {pctOneDecimal, shortDate} from "@/lib/learn/copy/portfolio";
 import type {GlossaryKey} from "@/lib/learn/glossary";
 

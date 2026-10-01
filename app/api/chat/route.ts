@@ -1,12 +1,12 @@
 import {convertToModelMessages, streamText, stepCountIs, type UIMessage} from "ai";
 import {createGoogleGenerativeAI} from "@ai-sdk/google";
 import {z} from "zod";
-import {ADVISOR_SYSTEM_PROMPT} from "@/lib/ai/system-prompt";
-import {buildTools} from "@/lib/ai/tools";
-import {chatErrorBody, chatErrorStatus, type ChatErrorCode} from "@/lib/ai/chat-errors";
+import {ADVISOR_SYSTEM_PROMPT} from "@/lib/chat/system-prompt";
+import {buildTools} from "@/lib/chat/tools";
+import {chatErrorBody, chatErrorStatus, type ChatErrorCode} from "@/lib/chat/errors";
 import {getCurrentUserId} from "@/lib/actions/watchlist.actions";
-import {takeRateLimit} from "@/lib/auth/rate-limit";
-import {CHAT_GLOBAL_KEY, chatUserDayKey, chatUserHourKey, resolveChatLimits} from "@/lib/ai/chat-limits";
+import {takeRateLimit} from "@/lib/rate-limit";
+import {CHAT_GLOBAL_KEY, chatUserDayKey, chatUserHourKey, resolveChatLimits} from "@/lib/chat/limits";
 
 // The transport only forwards the body text to the client, never the status — so the
 // reason has to travel inside the body or the panel can't tell 413 from 500.

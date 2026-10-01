@@ -10,8 +10,8 @@
 // own narrator, and every call carries the same stance line. Neither the beginner line
 // (invariant 12 fixes where it renders) nor the catalog's summaries travel.
 
-import {echoText, MAX_ECHO_CHARS, shapeReason, type ExplainReason} from '@/lib/ai/explain';
-import {narrateBoard} from '@/lib/learn/board-narration';
+import {echoText, MAX_ECHO_CHARS, shapeReason, type ExplainReason} from '@/lib/chat/explain';
+import {narrateBoard} from '@/lib/strategies/learn/board-narration';
 import {decodeReason} from '@/lib/learn/reasons';
 import {STRATEGIES, strategyBySlug} from '@/lib/strategies/catalog';
 import type {Cadence, RowState, SignalColumn, SignalRow, StrategyDefinition, StrategyFamily, StrategyId} from '@/lib/strategies/types';

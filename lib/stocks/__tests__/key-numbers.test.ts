@@ -9,7 +9,7 @@ import {afterEach, describe, expect, it, vi} from 'vitest';
 import {FINANCIALS_REVALIDATE_SECONDS, PROFILE_REVALIDATE_SECONDS} from '@/lib/constants';
 import {findBanned} from '@/lib/learn/banned';
 import {isGlossaryKey} from '@/lib/learn/glossary';
-import {KEY_NUMBER_KEYS, readKeyNumbers, type KeyNumber} from '@/lib/learn/key-numbers';
+import {KEY_NUMBER_KEYS, readKeyNumbers, type KeyNumber} from '@/lib/stocks/key-numbers';
 import {KEY_NUMBERS_COPY} from '@/lib/learn/copy/key-numbers';
 
 const EVALUATIVE = /\b(cheap(er)?|expensive|high(er)?|low(er)?|attractive|bargain|pricey|rich|stretched|fair(ly)?|reasonable|undervalued|overvalued|risky|safe|good|bad|strong|weak|premium|discount|healthy|lofty|elevated|modest)\b/i;

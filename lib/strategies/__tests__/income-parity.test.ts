@@ -9,7 +9,7 @@ import {strategyBySlug} from "@/lib/strategies/catalog";
 import {simulateStrategy} from "@/lib/strategies/simulate";
 import {applyOverrides} from "@/lib/strategies/whatif";
 import {SYNTHETIC_LAUNCH, syntheticMarket} from "@/lib/strategies/__tests__/synthetic-universe";
-import {createIncomeClock, dividendsByExDate, makeRateLookup, replayIncome, type RatePoint} from "@/lib/trading/income";
+import {createIncomeClock, dividendsByExDate, makeRateLookup, replayIncome, type RatePoint} from "@/lib/income/accrual";
 
 const weekdays = (count: number, from: string): string[] => {
     const dates: string[] = [];

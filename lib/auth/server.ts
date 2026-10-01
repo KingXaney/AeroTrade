@@ -3,7 +3,7 @@ import { mongodbAdapter} from "better-auth/adapters/mongodb";
 import { connectToDatabase} from "@/database/mongoose";
 import { nextCookies} from "better-auth/next-js";
 import { after } from "next/server";
-import { sendPasswordResetEmail } from "@/lib/nodemailer";
+import { sendPasswordResetEmail } from "@/lib/email/send";
 import { MAX_PASSWORD_LENGTH, MIN_PASSWORD_LENGTH } from "@/lib/auth/validation";
 
 function createAuthInstance(db: Parameters<typeof mongodbAdapter>[0]) {
@@ -41,7 +41,7 @@ function createAuthInstance(db: Parameters<typeof mongodbAdapter>[0]) {
         },
         // NOTE: this only runs inside better-auth's HTTP router, which this app bypasses
         // (every call goes through auth.api.* from a server action) — so it limits
-        // nothing here. The server actions limit themselves through lib/auth/rate-limit.ts
+        // nothing here. The server actions limit themselves through lib/rate-limit.ts
         // with the limits in lib/auth/limits.ts: password reset per address, sign-in per
         // address and per client address. Sign-up is not limited yet.
         rateLimit: {

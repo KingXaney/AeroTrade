@@ -1,5 +1,5 @@
-import type {LuckRead} from "@/lib/learn/luck-read";
-import {LUCK_MIN_SESSIONS, type LuckReady} from "@/lib/learn/random-portfolios";
+import type {LuckRead} from "@/lib/trading/learn/luck-store";
+import {LUCK_MIN_SESSIONS, type LuckReady} from "@/lib/trading/learn/random-portfolios";
 import {LUCK_COPY, LUCK_TERMS} from "@/lib/learn/copy/luck";
 import {pctOneDecimal} from "@/lib/learn/copy/portfolio";
 import {describeUnpriced} from "@/lib/trading/analytics";
@@ -9,7 +9,7 @@ import EmptyState from "@/components/primitives/EmptyState";
 import WhatTheseMean from "@/components/learn/WhatTheseMean";
 
 // "Luck or skill": the account's return placed among a thousand seeded random five-stock
-// portfolios held over the same days (lib/learn/random-portfolios.ts), drawn as a histogram
+// portfolios held over the same days (lib/trading/learn/random-portfolios.ts), drawn as a histogram
 // with three labelled markers — you, SPY, the median — told apart by label and dash, never by
 // colour alone. A placement, not a verdict. Server component; each bar's native tooltip gives
 // its range and count, and the marker list beneath is the same data as text.

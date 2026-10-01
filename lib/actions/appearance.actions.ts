@@ -4,7 +4,7 @@ import {cookies} from "next/headers";
 import {connectToDatabase} from "@/database/mongoose";
 import UserPreferencesModel from "@/database/models/user-preferences.model";
 import {getCurrentUserId} from "@/lib/actions/watchlist.actions";
-import {upsertPreferences} from "@/lib/preferences/upsert";
+import {upsertPreferences} from "@/lib/settings/preferences-store";
 import {
     DEFAULT_THEME,
     encodeThemeCookie,

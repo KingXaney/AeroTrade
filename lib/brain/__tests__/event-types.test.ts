@@ -4,7 +4,7 @@
 import {describe, expect, it} from 'vitest';
 import {ExtractionBatchSchema} from '@/lib/brain/extraction';
 import {findBanned} from '@/lib/learn/banned';
-import {EVENT_BADGES, EVENT_TYPES, eventBadge, eventTermsShown} from '@/lib/learn/event-types';
+import {EVENT_BADGES, EVENT_TYPES, eventBadge, eventTermsShown} from '@/lib/brain/event-types';
 import {GLOSSARY, isGlossaryKey} from '@/lib/learn/glossary';
 
 const extractorLabels = (): readonly string[] =>

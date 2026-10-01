@@ -11,7 +11,7 @@ import {
     monthLabel,
     rateMovedNote,
 } from "@/lib/learn/copy/income";
-import type {IncomeView} from "@/lib/trading/income";
+import type {IncomeView} from "@/lib/income/accrual";
 
 // What the account earned without trading: interest on idle cash and dividends on holdings.
 // Interest is one line a month — it is credited every calendar day, and thirty near-identical

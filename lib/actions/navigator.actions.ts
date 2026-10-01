@@ -13,7 +13,7 @@ import {getAccountsForUser, getOwnedAccount, getPortfolio, resolveStartingBalanc
 import {executeOrder} from "@/lib/trading/orders";
 import {getQuote} from "@/lib/actions/finnhub.actions";
 import {AI_NAVIGATOR_ACCOUNT_NAME} from "@/lib/navigator/config";
-import {inngest} from "@/lib/inngest/client";
+import {inngest} from "@/lib/jobs/client";
 
 const revalidateNavigatorPaths = () => {
     revalidatePath('/brain');

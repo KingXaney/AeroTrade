@@ -15,7 +15,7 @@ import {getEasternDateString} from "@/lib/utils";
 import {getBenchmarkIndex} from "@/lib/prices/benchmark-store";
 import {getDividendPoints, getLatestRatePoint} from "@/lib/prices/store";
 import AccountIncome from "@/database/models/account-income.model";
-import {apyFromDiscount, groupIncomeActivity, usableRate, withReceipts, type IncomeView} from "@/lib/trading/income";
+import {apyFromDiscount, groupIncomeActivity, usableRate, withReceipts, type IncomeView} from "@/lib/income/accrual";
 import {appendLive} from "@/lib/prices/total-return";
 import {getQuote} from "@/lib/actions/finnhub.actions";
 import {

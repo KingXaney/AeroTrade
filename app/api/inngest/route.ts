@@ -1,5 +1,5 @@
 import {serve} from "inngest/next";
-import {inngest} from "@/lib/inngest/client";
+import {inngest} from "@/lib/jobs/client";
 import {
     bootstrapAiNavigator,
     creditDailyIncome,
@@ -14,7 +14,7 @@ import {
     sendDailyNewsSummary,
     sendSignUpEmail,
     updateNewsBrain,
-} from "@/lib/inngest/functions";
+} from "@/lib/jobs/functions";
 
 // A 12-symbol price chunk with provider spacing, first-run bulk writes and
 // fallbacks runs 30–45 s; the default route budget would cut it off.

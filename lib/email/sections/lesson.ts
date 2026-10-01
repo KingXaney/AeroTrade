@@ -10,7 +10,7 @@
 // mailed. Nothing is stamped: "Got it" stays on the widget.
 
 import {escapeHtml, sanitizeDigestHtml} from "@/lib/news/sanitize";
-import {ARTICLE_STYLE, FOOTER_STYLE, HEADING_STYLE, META_STYLE, TEXT_STYLE, TOPIC_NAME_STYLE, linkOrText} from "@/lib/topics/digest-section";
+import {ARTICLE_STYLE, FOOTER_STYLE, HEADING_STYLE, META_STYLE, TEXT_STYLE, TOPIC_NAME_STYLE, linkOrText} from "@/lib/email/sections/topics";
 import {GLOSSARY} from "@/lib/learn/glossary";
 import type {LearnFacts} from "@/lib/learn/facts";
 import {safeArticleUrl, type Lesson, type LessonHeadline} from "@/lib/learn/lesson";

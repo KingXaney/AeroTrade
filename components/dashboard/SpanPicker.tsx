@@ -1,6 +1,6 @@
 'use client';
 
-import {SPAN_LABELS, type WidgetSpan} from "@/lib/dashboard/widgets";
+import {SPAN_LABELS, type WidgetSpan} from "@/lib/dashboard/catalog";
 import {cn} from "@/lib/utils";
 
 const SpanPicker = ({spans, value, onChange}: {spans: readonly WidgetSpan[]; value: WidgetSpan; onChange: (span: WidgetSpan) => void}) => (

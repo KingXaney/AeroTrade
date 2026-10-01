@@ -2,10 +2,10 @@
 // epoch ledger (the one cached getTradeLedger read — no second trade read) and its priced
 // positions. The only extra reads are quotes for "had you held": the names most recently sold
 // (at most HAD_YOU_HELD_MAX_SYMBOLS) that the portfolio does not already price. A plain server
-// module; the maths is lib/trading/habits.ts.
+// module; the maths is lib/trading/learn/habits.ts.
 
 import {buildPriceMap} from "@/lib/trading/account";
-import {closedLots, computeHabits, HABITS_MIN_CLOSED_LOTS, hadYouHeldSymbols, type Habits} from "@/lib/trading/habits";
+import {closedLots, computeHabits, HABITS_MIN_CLOSED_LOTS, hadYouHeldSymbols, type Habits} from "@/lib/trading/learn/habits";
 import type {LedgerTrade} from "@/lib/trading/lots";
 
 export type HabitsRead = {habits: Habits | null; closedLots: number};

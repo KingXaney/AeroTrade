@@ -3,12 +3,12 @@
 import {revalidatePath} from "next/cache";
 import {connectToDatabase} from "@/database/mongoose";
 import {getCurrentUserId} from "@/lib/actions/watchlist.actions";
-import {upsertPreferences} from "@/lib/preferences/upsert";
+import {upsertPreferences} from "@/lib/settings/preferences-store";
 import {LESSONS_SEEN_CAP, lessonKey, parseLessonId} from "@/lib/learn/moments";
 import {LESSON_COPY} from "@/lib/learn/copy/lesson";
 import {parseQuizDate} from "@/lib/learn/quiz";
 import {DAILY_QUIZ_COPY} from "@/lib/learn/copy/quiz";
-import {readQuizDaysAnswered} from "@/lib/learn/quiz-read";
+import {readQuizDaysAnswered} from "@/lib/learn/quiz-store";
 import UserPreferencesModel from "@/database/models/user-preferences.model";
 import {getEasternDateString} from "@/lib/utils";
 

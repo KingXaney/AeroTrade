@@ -1,4 +1,4 @@
-// Copy for "Read this board" (lib/learn/board-narration.ts): the top row of a strategy's
+// Copy for "Read this board" (lib/strategies/learn/board-narration.ts): the top row of a strategy's
 // signal board read in plain words — what its numbers say, then the verdict they led to —
 // and one line per strategy on how every other row reads. Sentences describe what the
 // rule looks at and what it did; none says what a reader ought to do, and the test holds

@@ -4,7 +4,7 @@
 // each sentence to the 'copy' tier of lib/learn/banned.ts on a grid of inputs, and parses the
 // printed figures back to check that they agree with each other.
 
-import {PACE_WINDOW_DAYS, type CadenceControl, type Habits, type LotCount} from "@/lib/trading/habits";
+import {PACE_WINDOW_DAYS, type CadenceControl, type Habits, type LotCount} from "@/lib/trading/learn/habits";
 import type {GlossaryKey} from "@/lib/learn/glossary";
 import {shortDate, signedMoney} from "@/lib/learn/copy/portfolio";
 
@@ -84,7 +84,7 @@ export const HABITS_COPY = {
         `Beside the strategies' clocks: ${controls.map((c) => `${cadenceName(c.cadence, c.names.length)} ${CADENCE_PHRASE[c.cadence](sessions, c.names.length)}`).join(' · ')}`,
 
     // Leads the panel's one "What these mean" with what the definitions beneath it do not say:
-    // whose fills count, and that the pairing still runs over all of them (lib/trading/habits.ts).
+    // whose fills count, and that the pairing still runs over all of them (lib/trading/learn/habits.ts).
     // How a sell is paired, and what a winner is, are the hold-time and disposition-effect
     // entries' to state.
     method: "Only orders you placed count; a strategy's, a suggestion's or the Navigator's fill is left out. Lots are still paired across every fill in this account, so a lot counts here when you placed the sell that closed it or, while it is open, the buy that opened it.",

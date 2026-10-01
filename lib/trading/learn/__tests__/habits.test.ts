@@ -11,7 +11,7 @@ import {
     HAD_YOU_HELD_MAX_SYMBOLS,
     hadYouHeldSymbols,
     PACE_WINDOW_DAYS,
-} from '@/lib/trading/habits';
+} from '@/lib/trading/learn/habits';
 import type {LedgerTrade} from '@/lib/trading/lots';
 import {STRATEGIES} from '@/lib/strategies/catalog';
 

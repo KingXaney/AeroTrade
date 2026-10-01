@@ -1,5 +1,5 @@
 // Luck or skill: where the learner's return lands among random portfolios held over the same
-// days. Pure — the server read (lib/learn/luck-read.ts) hands in the two edge closes per symbol,
+// days. Pure — the server read (lib/trading/learn/luck-store.ts) hands in the two edge closes per symbol,
 // the dividend rows between them, the T-bill points and the account's last snapshot.
 //
 // The comparison is built to be fair and reproducible:
@@ -8,7 +8,7 @@
 //     equal dollar amounts at the close of the window's first session, in whole shares (the
 //     remainder stays as cash), and held to the close of its last;
 //   - it earns what a paper account holding it would (invariant 11), on the one clock in
-//     lib/trading/income.ts: a dividend is owed to the shares held the evening before its
+//     lib/income/accrual.ts: a dividend is owed to the shares held the evening before its
 //     ex-date and paid DIVIDEND_PAY_LAG_DAYS later, and cash — the remainder, then each paid
 //     dividend — earns the T-bill rate. Like the learner's snapshot, the value on the last day
 //     holds the income rows dated before it (replayIncome's cash), so a dividend whose pay date
@@ -29,7 +29,7 @@ import {
     usableRate,
     type DividendPoint,
     type RatePoint,
-} from "@/lib/trading/income";
+} from "@/lib/income/accrual";
 
 export const LUCK_SAMPLE_COUNT = 1000;
 export const LUCK_PORTFOLIO_SIZE = 5;

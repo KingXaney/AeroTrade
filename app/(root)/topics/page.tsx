@@ -5,7 +5,7 @@ import {getCachedTopicsOverview} from "@/lib/dashboard/cached";
 import {pickFirstRunTopic} from "@/lib/topics/first-run";
 import {seedDefaultTopics, shouldSeedDefaults} from "@/lib/topics/seed";
 import {isUntouchedDefaultSet} from "@/lib/topics/starters";
-import {getTopEntities} from "@/lib/brain/queries";
+import {getTopEntities} from "@/lib/brain/store";
 import {suggestKeywords} from "@/lib/topics/suggest-keywords";
 import TopicsShell from "@/components/topics/TopicsShell";
 import AllTopicsHeader from "@/components/topics/AllTopicsHeader";

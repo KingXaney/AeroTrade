@@ -34,7 +34,7 @@ import {
     type IncomeRow,
     type IncomeTrade,
     type RateLookup,
-} from "@/lib/trading/income";
+} from "@/lib/income/accrual";
 
 type LeanAccount = {
     _id: unknown;

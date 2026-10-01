@@ -5,7 +5,7 @@ import TradeLink from "@/components/trade/TradeLink";
 import Badge from "@/components/primitives/Badge";
 import Term from "@/components/primitives/Term";
 import WhatTheseMean from "@/components/learn/WhatTheseMean";
-import {eventBadge, eventTermsShown} from "@/lib/learn/event-types";
+import {eventBadge, eventTermsShown} from "@/lib/brain/event-types";
 import {BRAIN_COPY} from "@/lib/learn/copy/brain";
 
 // Ticker keys are bare symbols; sectors and themes carry a "sector:" / "theme:" prefix.

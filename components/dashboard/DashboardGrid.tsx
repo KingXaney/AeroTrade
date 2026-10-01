@@ -18,7 +18,7 @@ import {
     type DragStartEvent,
 } from "@dnd-kit/core";
 import {SortableContext, type SortingStrategy} from "@dnd-kit/sortable";
-import {WIDGETS, type WidgetId} from "@/lib/dashboard/widgets";
+import {WIDGETS, type WidgetId} from "@/lib/dashboard/catalog";
 import {
     addWidget, layoutsEqual, missingWidgetIds, moveWidget, removeWidget, resetLayout, setSpan, type DashboardLayout,
 } from "@/lib/dashboard/layout";

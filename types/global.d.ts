@@ -308,7 +308,7 @@ declare global {
         name: string;
         inceptionAt: number;      // epoch ms; anchors the performance chart
         createdAt: number;        // epoch ms
-        // Interest and dividends credited so far (lib/trading/income.ts); absent before the first credit.
+        // Interest and dividends credited so far (lib/income/accrual.ts); absent before the first credit.
         income?: {interest: number; dividends: number};
     };
 
@@ -359,7 +359,7 @@ declare global {
     };
 
     // What an account has earned from sitting still: interest on idle cash and dividends on
-    // holdings (lib/trading/income.ts). `apy` is today's rate on cash; null before any rate
+    // holdings (lib/income/accrual.ts). `apy` is today's rate on cash; null before any rate
     // has been fetched.
     type AccountIncomeSummary = {
         interest: number;

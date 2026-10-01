@@ -1,5 +1,5 @@
 import {describe, expect, it} from 'vitest';
-import {buildTopicsSectionHtml} from '@/lib/topics/digest-section';
+import {buildTopicsSectionHtml} from '@/lib/email/sections/topics';
 
 describe('buildTopicsSectionHtml', () => {
     it('returns an empty string when there are no topics', () => {

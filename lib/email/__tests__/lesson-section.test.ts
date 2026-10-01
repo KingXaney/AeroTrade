@@ -13,7 +13,7 @@ import {
     lessonSectionFor,
     lessonSectionLinks,
     pickDigestMoment,
-} from '@/lib/learn/digest-section';
+} from '@/lib/email/sections/lesson';
 import {sanitizeDigestHtml} from '@/lib/news/sanitize';
 import {STRATEGIES} from '@/lib/strategies/catalog';
 
@@ -144,7 +144,7 @@ describe('buildLessonSectionHtml', () => {
 describe('the lesson section with one helper swapped out', () => {
     afterEach(() => {
         vi.doUnmock('@/lib/learn/copy/lesson');
-        vi.doUnmock('@/lib/topics/digest-section');
+        vi.doUnmock('@/lib/email/sections/topics');
         vi.resetModules();
     });
 
@@ -152,11 +152,11 @@ describe('the lesson section with one helper swapped out', () => {
         // A builder that one day emitted a link off its list: the section as mailed keeps its
         // text and drops the anchor, because lessonSectionFor sanitises against lessonSectionLinks.
         vi.resetModules();
-        vi.doMock('@/lib/topics/digest-section', async (importOriginal) => {
-            const original = await importOriginal<typeof import('@/lib/topics/digest-section')>();
+        vi.doMock('@/lib/email/sections/topics', async (importOriginal) => {
+            const original = await importOriginal<typeof import('@/lib/email/sections/topics')>();
             return {...original, linkOrText: (url: string, label: string) => `${original.linkOrText(url, label)}<a href="https://stray.example.com/">stray</a>`};
         });
-        const mocked = await import('@/lib/learn/digest-section');
+        const mocked = await import('@/lib/email/sections/lesson');
         expect(mocked.buildLessonSectionHtml({moment: fill, term: null}, APP)).toContain('stray.example.com');
         const facts: LearnFacts = {
             today: '2026-09-30', accountCreatedOn: '2026-09-20', hasUserTrade: true, followedStrategies: [], topicOpened: false,
@@ -176,7 +176,7 @@ describe('the lesson section with one helper swapped out', () => {
             const original = await importOriginal<typeof import('@/lib/learn/copy/lesson')>();
             return {...original, momentCopy: (moment: Moment) => ({...original.momentCopy(moment), body: ['First.', 'Second.', 'Third.', 'Fourth.', 'Fifth.']})};
         });
-        const mocked = await import('@/lib/learn/digest-section');
+        const mocked = await import('@/lib/email/sections/lesson');
         const text = textOf(mocked.buildLessonSectionHtml({moment: fill, term: null}, APP));
         expect(text).toContain('First. Second. Third.');
         expect(text).not.toContain('Fourth.');

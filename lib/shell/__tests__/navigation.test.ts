@@ -4,7 +4,7 @@
 
 import {describe, expect, it} from 'vitest';
 
-import {HEADER_NAV_ITEMS, NAV_ITEMS, isActiveNav} from '@/lib/navigation';
+import {HEADER_NAV_ITEMS, NAV_ITEMS, isActiveNav} from '@/lib/shell/navigation';
 import * as constants from '@/lib/constants';
 
 describe('NAV_ITEMS', () => {

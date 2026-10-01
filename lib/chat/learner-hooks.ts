@@ -5,13 +5,13 @@
 //   win-rate, realized-pnl     — the account's sells, counted and summed in the database;
 //   total-return, max-drawdown — the priced path, quoting at most CHAT_MAX_PRICED_SYMBOLS.
 // No reader touches PaperTrade.reason: a learner's "why" notes are theirs, never the tutor's.
-// Server-only and DB-bound, so browser QA covers it (invariant 1); lib/ai/explain.ts shapes
+// Server-only and DB-bound, so browser QA covers it (invariant 1); lib/chat/explain.ts shapes
 // what comes back.
 
 import AccountSnapshot from "@/database/models/account-snapshot.model";
 import PaperTrade from "@/database/models/paper-trade.model";
 import type {PaperAccountDoc} from "@/database/models/paper-account.model";
-import type {LearnerAccountValue, LearnerFigure, LearnerValue} from "@/lib/ai/explain";
+import type {LearnerAccountValue, LearnerFigure, LearnerValue} from "@/lib/chat/explain";
 import type {GlossaryKey} from "@/lib/learn/glossary";
 import {buildPriceMap, computePortfolio, epochTradesOf, readAccountsForUser, toAccountSummary} from "@/lib/trading/account";
 import {countUnpriced, drawdownWindow, mergeLivePoint, winStatsFromCounts} from "@/lib/trading/analytics";

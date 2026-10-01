@@ -19,7 +19,7 @@ import {
     type DashboardLayout,
     type LayoutItem,
 } from '@/lib/dashboard/layout';
-import {CATEGORY_ORDER, WIDGETS, WIDGET_IDS} from '@/lib/dashboard/widgets';
+import {CATEGORY_ORDER, WIDGETS, WIDGET_IDS} from '@/lib/dashboard/catalog';
 
 // Frozen inputs turn any accidental mutation into a TypeError (modules are strict).
 const layout = (widgets: LayoutItem[]): DashboardLayout => {

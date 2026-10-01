@@ -3,7 +3,7 @@
 // (executeOrder) re-checks everything with the live price and stays authoritative.
 
 import {TRADE_REASON_MAX} from "@/lib/strategies/config";
-import {interestOverDays} from "@/lib/trading/income";
+import {interestOverDays} from "@/lib/income/accrual";
 
 export type OrderSide = 'buy' | 'sell';
 

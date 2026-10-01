@@ -4,7 +4,7 @@
 
 import {afterEach, describe, expect, it, vi} from 'vitest';
 import {findBanned} from '@/lib/learn/banned';
-import {brainLegend} from '@/lib/learn/brain-legend';
+import {brainLegend} from '@/lib/brain/legend';
 import {BRAIN_COPY, BRAIN_LEGEND_COPY} from '@/lib/learn/copy/brain';
 import {NAVIGATOR_COPY} from '@/lib/learn/copy/navigator';
 import {buildTargets} from '@/lib/navigator/allocator';
@@ -112,7 +112,7 @@ describe('brainLegend follows the constants', () => {
             ...(await importOriginal<typeof import('@/lib/navigator/scoring')>()),
             TOP_QUINTILE_FRACTION: 0.15,
         }));
-        const mocked = await import('@/lib/learn/brain-legend');
+        const mocked = await import('@/lib/brain/legend');
         const text = legendText(mocked.brainLegend());
         for (const figure of [
             'reads up to 119 new articles',

@@ -10,7 +10,7 @@ import BrainEntity from "@/database/models/brain-entity.model";
 import NewsItem from "@/database/models/news-item.model";
 import PaperAccount from "@/database/models/paper-account.model";
 import PaperTrade from "@/database/models/paper-trade.model";
-import {getTopVerifiedTickers} from "@/lib/brain/queries";
+import {getTopVerifiedTickers} from "@/lib/brain/store";
 import {getBarsForSymbols} from "@/lib/prices/store";
 import {computeSignals} from "@/lib/prices/signals";
 import {dominantSectorKey, rankNormalize, scoreUniverse, type ScoredSymbol, type ScoringInput} from "@/lib/navigator/scoring";

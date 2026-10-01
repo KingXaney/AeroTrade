@@ -1,5 +1,5 @@
 import Link from "next/link";
-import {NAV_ITEMS} from "@/lib/navigation";
+import {NAV_ITEMS} from "@/lib/shell/navigation";
 
 // Every route except the dashboard itself — you are already on it.
 const LINKS = NAV_ITEMS.filter((i) => i.href !== '/');

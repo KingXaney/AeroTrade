@@ -1,5 +1,5 @@
 import {tool} from "ai";
-import {TOOL_DESCRIPTIONS} from "@/lib/ai/tool-copy";
+import {TOOL_DESCRIPTIONS} from "@/lib/chat/tool-copy";
 import {z} from "zod";
 import {
     searchStocks,
@@ -14,8 +14,8 @@ import {
     getWatchlistForUser,
     getWatchlistSymbolsByUserId,
 } from "@/lib/actions/watchlist.actions";
-import {getLatestSuggestions, type SuggestionSetView} from "@/lib/navigator/service";
-import {getActiveTheses, getBrainDigestData} from "@/lib/brain/queries";
+import {getLatestSuggestions, type SuggestionSetView} from "@/lib/navigator/store";
+import {getActiveTheses, getBrainDigestData} from "@/lib/brain/store";
 import {getTopicFeed, getTopicsForUser, getTopicsOverview} from "@/lib/topics/store";
 import {createTopic, deleteTopic} from "@/lib/actions/topics.actions";
 import {MAX_KEYWORDS} from "@/lib/topics/config";
@@ -27,13 +27,13 @@ import {
     readAccountsForUser,
     toAccountSummary,
 } from "@/lib/trading/account";
-import {findAccountByName, toChatPortfolio} from "@/lib/trading/portfolio-view";
+import {findAccountByName, toChatPortfolio} from "@/lib/chat/portfolio-view";
 import {resolveTerm} from "@/lib/learn/glossary";
-import {decodeQuotedReason, shapeExplain} from "@/lib/ai/explain";
-import {resolveStrategy, shapeQuantLeaderboard, shapeQuantStrategy, shapeUnknownStrategy} from "@/lib/ai/quant-strategies";
+import {decodeQuotedReason, shapeExplain} from "@/lib/chat/explain";
+import {resolveStrategy, shapeQuantLeaderboard, shapeQuantStrategy, shapeUnknownStrategy} from "@/lib/chat/quant-strategies";
 import {STRATEGY_SLUGS} from "@/lib/strategies/catalog";
-import {getLatestRun, getStrategyLeaderboard} from "@/lib/strategies/queries";
-import {priceLargestHoldings, readLearnerValue} from "@/lib/ai/learner-hooks";
+import {getLatestRun, getStrategyLeaderboard} from "@/lib/strategies/page-store";
+import {priceLargestHoldings, readLearnerValue} from "@/lib/chat/learner-hooks";
 
 const TOPIC_FEED_DEFAULT = 5;
 const TOPIC_FEED_MAX = 10;

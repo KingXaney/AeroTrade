@@ -1,6 +1,6 @@
 import {headers} from "next/headers";
 import {NextResponse} from "next/server";
-import {auth} from "@/lib/better-auth/auth";
+import {auth} from "@/lib/auth/server";
 import PaperTrade from "@/database/models/paper-trade.model";
 import {epochTrades, getOwnedAccount} from "@/lib/trading/account";
 import {csvDownloadHeaders, tradesCsv, tradesCsvFilename, type CsvTrade} from "@/lib/trading/csv";

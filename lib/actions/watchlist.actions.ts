@@ -4,7 +4,7 @@ import {revalidatePath} from "next/cache";
 import {headers} from "next/headers";
 import {connectToDatabase} from "@/database/mongoose";
 import Watchlist from "@/database/models/watchlist.model";
-import {auth} from "@/lib/better-auth/auth";
+import {auth} from "@/lib/auth/server";
 
 // ============================================================================
 // --- Session ---

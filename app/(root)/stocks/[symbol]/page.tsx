@@ -13,9 +13,9 @@ import RulesSee from "@/components/stock/RulesSee";
 import {getCompanyProfile, getFinancials, getQuote} from "@/lib/actions/finnhub.actions";
 import {getCurrentUserId, isInWatchlist} from "@/lib/actions/watchlist.actions";
 import {getTopicsForUser} from "@/lib/topics/store";
-import {readKeyNumbers} from "@/lib/learn/key-numbers";
-import {buildRulesSee, type SymbolBoardRead} from "@/lib/learn/rules-see";
-import {getBoardRowsForSymbol} from "@/lib/strategies/queries";
+import {readKeyNumbers} from "@/lib/stocks/key-numbers";
+import {buildRulesSee, type SymbolBoardRead} from "@/lib/stocks/rules-see";
+import {getBoardRowsForSymbol} from "@/lib/strategies/page-store";
 import {strategiesWatching} from "@/lib/strategies/universe";
 import {cn} from "@/lib/utils";
 

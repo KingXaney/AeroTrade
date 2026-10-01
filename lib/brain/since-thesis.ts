@@ -1,6 +1,6 @@
 // "since thesis: NVDA +4.1% · SPY +6.0%" on /brain's Active Theses: what a ticker and SPY
 // each returned from the first close on or after the day its thesis began. The maths is here
-// and pure; the batched read that feeds it is lib/brain/queries.ts getSinceThesis (each thesis
+// and pure; the batched read that feeds it is lib/brain/store.ts getSinceThesis (each thesis
 // ticker's bars from its own thesis date, SPY's from the earliest one).
 //
 // Both legs are total returns on the same footing — closes with stored dividends reinvested on

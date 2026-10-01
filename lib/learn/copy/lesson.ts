@@ -1,5 +1,5 @@
 // Copy for Today's lesson (components/dashboard/widgets/TodaysLesson.tsx, and the digest email's
-// section in lib/learn/digest-section.ts): a first from the learner's own account, a followed
+// section in lib/email/sections/lesson.ts): a first from the learner's own account, a followed
 // strategy's rebalance, or a concept today's topic articles used. Every sentence describes what
 // happened or what a term measures — none says what to do — and is held to the 'copy' tier of
 // lib/learn/banned.ts by lesson-copy.test.ts on a grid of rows. A rebalance is described by the
@@ -42,7 +42,7 @@ export type MomentCopy = {
 };
 
 export const LESSON_COPY = {
-    // The daily digest email's section heading (lib/learn/digest-section.ts).
+    // The daily digest email's section heading (lib/email/sections/lesson.ts).
     emailHeading: 'Today\'s lesson',
     accountLabel: 'From your account',
     strategyLabel: 'A strategy you follow',

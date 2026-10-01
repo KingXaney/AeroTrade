@@ -26,9 +26,9 @@ import {
     sessionOnOrBefore,
     sessionsBetween,
     type HoldInput,
-} from '@/lib/learn/random-portfolios';
+} from '@/lib/trading/learn/random-portfolios';
 import {eachCalendarDay} from '@/lib/prices/calendar-days';
-import {createIncomeClock, dividendsByExDate, makeRateLookup, payDateFor, replayIncome} from '@/lib/trading/income';
+import {createIncomeClock, dividendsByExDate, makeRateLookup, payDateFor, replayIncome} from '@/lib/income/accrual';
 
 const input = (symbol: string, startClose: number, endClose: number, incomePerShare = 0): HoldInput =>
     ({symbol, startClose, endClose, incomePerShare});

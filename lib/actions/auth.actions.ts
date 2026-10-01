@@ -1,11 +1,11 @@
 'use server';
 
-import {auth} from "@/lib/better-auth/auth";
-import {inngest} from "@/lib/inngest/client";
+import {auth} from "@/lib/auth/server";
+import {inngest} from "@/lib/jobs/client";
 import {cookies, headers} from "next/headers";
 import {THEME_COOKIE} from "@/lib/theme/resolve";
 import {syncThemeCookieForUser} from "@/lib/actions/appearance.actions";
-import {takeRateLimit} from "@/lib/auth/rate-limit";
+import {takeRateLimit} from "@/lib/rate-limit";
 import {
     PASSWORD_RESET_LIMIT,
     PASSWORD_RESET_WINDOW_MS,

@@ -9,7 +9,7 @@
 
 import type {Bar} from '@/lib/prices/signals';
 import {addCalendarDays} from '@/lib/prices/calendar-days';
-import type {RatePoint} from '@/lib/trading/income';
+import type {RatePoint} from '@/lib/income/accrual';
 import {BENCHMARK_SYMBOL, UNIVERSES} from '@/lib/strategies/universe';
 
 export const SYNTHETIC_LAUNCH = '2030-01-01';

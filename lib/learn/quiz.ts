@@ -13,12 +13,12 @@
 // offered, because the name alone would give the answer away.
 //
 // Pure and dependency-light. Client code imports only its types (zod and the catalog stay
-// on the server); the one read that feeds it is getRecentRuns in lib/strategies/queries.ts.
+// on the server); the one read that feeds it is getRecentRuns in lib/strategies/page-store.ts.
 
 import {z} from 'zod';
 import type {GlossaryKey} from '@/lib/learn/glossary';
 import {decodeReason, type ReasonClause} from '@/lib/learn/reasons';
-import {explainVerdict, pickQuizRows} from '@/lib/learn/verdict';
+import {explainVerdict, pickQuizRows} from '@/lib/strategies/learn/verdict';
 import {ASKABLE_STATES, STATE_MEANING} from '@/lib/learn/copy/verdict';
 import {addCalendarDays} from '@/lib/prices/calendar-days';
 import {formatSignalValue, STATE_LABEL, visibleSignalColumns} from '@/lib/strategies/views';

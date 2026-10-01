@@ -1,4 +1,4 @@
-import {auth} from "@/lib/better-auth/auth";
+import {auth} from "@/lib/auth/server";
 import {headers} from "next/headers";
 import {redirect} from "next/navigation";
 import AuthShell from "@/components/auth/AuthShell";

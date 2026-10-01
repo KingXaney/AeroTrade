@@ -32,7 +32,7 @@ import {
     type IncomeMonth,
     type IncomeTrade,
     type LedgerFill,
-} from '@/lib/trading/income';
+} from '@/lib/income/accrual';
 
 const cents = (amount: number): number => Math.round(amount * 100);
 const dollars = (printed: string): number => Number(printed.replace(/[$,]/g, ''));

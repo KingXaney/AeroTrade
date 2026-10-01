@@ -14,10 +14,10 @@ import {
     shapeQuantLeaderboard,
     shapeQuantStrategy,
     shapeUnknownStrategy,
-} from '@/lib/ai/quant-strategies';
+} from '@/lib/chat/quant-strategies';
 import {GLOSSARY} from '@/lib/learn/glossary';
 import {findBanned} from '@/lib/learn/banned';
-import {narrateBoard} from '@/lib/learn/board-narration';
+import {narrateBoard} from '@/lib/strategies/learn/board-narration';
 import {STRATEGIES, strategyBySlug} from '@/lib/strategies/catalog';
 import {sortBoard, type LiveRecord, type StrategyLeaderboardRow, type StrategyRunView} from '@/lib/strategies/views';
 import type {RowState, SignalRow, StrategyDefinition, StrategyId} from '@/lib/strategies/types';

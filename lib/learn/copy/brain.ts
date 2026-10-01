@@ -1,4 +1,4 @@
-// Copy for /brain: the legend under System Status (composed by lib/learn/brain-legend.ts from
+// Copy for /brain: the legend under System Status (composed by lib/brain/legend.ts from
 // the brain's and the Navigator's constants), the leaderboard's thesis dot, the evidence
 // list's label disclosure and the "since thesis" line on Active Theses. Mechanism only: every
 // sentence says what the brain counts and what the Navigator's arithmetic does, never that

@@ -2,7 +2,7 @@
 // the template leaves no placeholder behind — whatever the sections contain.
 
 import {describe, expect, it} from 'vitest';
-import {NEWS_SUMMARY_EMAIL_TEMPLATE, renderNewsSummaryEmail} from '@/lib/nodemailer/templates';
+import {NEWS_SUMMARY_EMAIL_TEMPLATE, renderNewsSummaryEmail} from '@/lib/email/templates';
 
 describe('renderNewsSummaryEmail', () => {
     const sections = {

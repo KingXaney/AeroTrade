@@ -6,10 +6,10 @@
 // text, and its rules are phrased as prohibitions the shared list already ignores.
 
 import {describe, expect, it} from 'vitest';
-import {ADVISOR_SYSTEM_PROMPT} from '@/lib/ai/system-prompt';
-import {TOOL_DESCRIPTIONS} from '@/lib/ai/tool-copy';
+import {ADVISOR_SYSTEM_PROMPT} from '@/lib/chat/system-prompt';
+import {TOOL_DESCRIPTIONS} from '@/lib/chat/tool-copy';
 import {CHAT_SUGGESTIONS, CHAT_WELCOME_MESSAGE} from '@/lib/constants';
-import {NEWS_SUMMARY_EMAIL_PROMPT, PERSONALIZED_WELCOME_EMAIL_PROMPT} from '@/lib/inngest/prompts';
+import {NEWS_SUMMARY_EMAIL_PROMPT, PERSONALIZED_WELCOME_EMAIL_PROMPT} from '@/lib/jobs/prompts';
 import {RATIONALE_PROMPT} from '@/lib/brain/prompts';
 import {findBanned} from '@/lib/learn/banned';
 
