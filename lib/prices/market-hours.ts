@@ -61,6 +61,16 @@ export const NYSE_HOLIDAYS: Readonly<Record<string, string>> = {
     '2027-09-06': 'Labor Day',
     '2027-11-25': 'Thanksgiving',
     '2027-12-24': 'Christmas (observed)',
+    // 2028 — New Year's Day falls on a Saturday and is not observed (NYSE Rule 7.2).
+    '2028-01-17': 'Martin Luther King Jr. Day',
+    '2028-02-21': "Presidents' Day",
+    '2028-04-14': 'Good Friday',
+    '2028-05-29': 'Memorial Day',
+    '2028-06-19': 'Juneteenth',
+    '2028-07-04': 'Independence Day',
+    '2028-09-04': 'Labor Day',
+    '2028-11-23': 'Thanksgiving',
+    '2028-12-25': 'Christmas',
 };
 
 // 1:00 p.m. ET closes.
@@ -68,6 +78,7 @@ export const NYSE_HALF_DAYS: ReadonlySet<string> = new Set([
     '2025-07-03', '2025-11-28', '2025-12-24',
     '2026-11-27', '2026-12-24',
     '2027-11-26',
+    '2028-07-03', '2028-11-24',
 ]);
 
 // ---- Eastern wall clock ---------------------------------------------------------

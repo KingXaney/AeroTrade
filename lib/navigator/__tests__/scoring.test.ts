@@ -362,3 +362,53 @@ describe("score weights", () => {
         expect(total).toBeCloseTo(1, 10);
     });
 });
+
+// A symbol the brain has no entity for (SPY, SMH: the extractor tags companies and
+// sectors, and neither ETF maps to a sector) has no news signal at all. Ranking its
+// weight of zero with everyone else's put it last on news every week, so the benchmark
+// and the semis proxy could never be bought on their momentum. Absent news is neutral.
+describe("scoreUniverse news coverage", () => {
+    const covered = (symbol: string, newsWeightSlow: number) => makeInput({symbol, newsWeightSlow});
+
+    it("gives a symbol with no brain entity a neutral news component", () => {
+        const scored = scoreUniverse([covered("A", 10), covered("B", 20), covered("C", 30), makeInput({symbol: "SPY", newsWeightSlow: null})]);
+        expect(bySymbol(scored, "SPY").score).toBeCloseTo(0, 10);
+    });
+
+    it("ranks news only across the symbols the brain covers", () => {
+        const withGap = scoreUniverse([covered("A", 10), covered("B", 20), covered("C", 30), makeInput({symbol: "SPY", newsWeightSlow: null})]);
+        const without = scoreUniverse([covered("A", 10), covered("B", 20), covered("C", 30)]);
+        for (const symbol of ["A", "B", "C"]) {
+            expect(bySymbol(withGap, symbol).score).toBeCloseTo(bySymbol(without, symbol).score, 10);
+        }
+        expect(bySymbol(withGap, "C").score).toBeCloseTo(SCORE_WEIGHTS.newsSlow, 10);
+        expect(bySymbol(withGap, "A").score).toBeCloseTo(-SCORE_WEIGHTS.newsSlow, 10);
+    });
+
+    it("still ranks a covered symbol whose news has faded to zero, below the others", () => {
+        const scored = scoreUniverse([covered("FADED", 0), covered("B", 20), covered("C", 30)]);
+        expect(bySymbol(scored, "FADED").score).toBeCloseTo(-SCORE_WEIGHTS.newsSlow, 10);
+    });
+
+    it("lets momentum alone decide between two uncovered symbols", () => {
+        const scored = scoreUniverse([
+            covered("A", 10), covered("B", 20),
+            makeInput({symbol: "SPY", newsWeightSlow: null, signals: makeSignals({r126: 0.10})}),
+            makeInput({symbol: "SMH", newsWeightSlow: null, signals: makeSignals({r126: 0.30})}),
+        ]);
+        expect(bySymbol(scored, "SMH").score).toBeGreaterThan(bySymbol(scored, "SPY").score);
+        expect(bySymbol(scored, "SMH").score).toBeCloseTo(SCORE_WEIGHTS.momentumLong, 10);
+    });
+
+    it("says so in the reason, and ranks the covered symbols among themselves", () => {
+        const scored = scoreUniverse([covered("A", 10), covered("B", 20), makeInput({symbol: "SPY", newsWeightSlow: null})]);
+        expect(bySymbol(scored, "SPY").reasons).toContain("no brain coverage — news neutral");
+        expect(bySymbol(scored, "B").reasons).toContain("slow news weight 20.0 (rank 1/2)");
+        expect(bySymbol(scored, "A").reasons).toContain("slow news weight 10.0 (rank 2/2)");
+    });
+
+    it("scores a universe with no coverage at all on everything but news", () => {
+        const scored = scoreUniverse([makeInput({symbol: "SPY", newsWeightSlow: null}), makeInput({symbol: "SMH", newsWeightSlow: null})]);
+        expect(scored.map((s) => s.score)).toEqual([0, 0]);
+    });
+});

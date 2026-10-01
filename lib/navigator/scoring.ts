@@ -15,7 +15,11 @@ import type {Signals} from "@/lib/prices/signals";
 
 export type ScoringInput = {
     symbol: string;
-    newsWeightSlow: number;
+    // null when the brain has no entity for the symbol at all (SPY and SMH: the
+    // extractor tags companies and sectors, and neither ETF maps to a sector). That is
+    // an absence of evidence, not bad news, so it scores as neutral rather than last.
+    // A covered symbol whose weight has decayed to zero is still ranked, below the rest.
+    newsWeightSlow: number | null;
     sentimentSlow: number;
     signals: Signals;
     // Rank-normalized standing of this symbol's sector across the sector universe,
@@ -104,10 +108,33 @@ const formatSignedPercent = (value: number): string => {
     return scaled < 0 ? `${formatted}%` : `+${formatted}%`;
 };
 
-const newsReason = (input: ScoringInput, universe: ScoringInput[]): string => {
+const NO_COVERAGE_REASON = "no brain coverage — news neutral";
+
+const newsReason = (weight: number | null, coveredWeights: number[]): string => {
+    if (weight === null) {
+        return NO_COVERAGE_REASON;
+    }
     // Ties share the same displayed rank (count of strictly higher weights + 1).
-    const rank = universe.filter((other) => other.newsWeightSlow > input.newsWeightSlow).length + 1;
-    return `slow news weight ${input.newsWeightSlow.toFixed(REASON_DECIMALS)} (rank ${rank}/${universe.length})`;
+    const rank = coveredWeights.filter((other) => other > weight).length + 1;
+    return `slow news weight ${weight.toFixed(REASON_DECIMALS)} (rank ${rank}/${coveredWeights.length})`;
+};
+
+// News is rank-normalized over the symbols the brain covers, the way each momentum
+// horizon is ranked over the symbols that have it; an uncovered symbol sits at 0, the
+// middle of [-1, 1].
+const computeNewsComponents = (inputs: ScoringInput[]): number[] => {
+    const covered: {index: number; weight: number}[] = [];
+    inputs.forEach((input, index) => {
+        if (input.newsWeightSlow !== null) {
+            covered.push({index, weight: input.newsWeightSlow});
+        }
+    });
+    const normalized = rankNormalize(covered.map((entry) => entry.weight));
+    const components = new Array<number>(inputs.length).fill(0);
+    covered.forEach((entry, position) => {
+        components[entry.index] = normalized[position];
+    });
+    return components;
 };
 
 const computeMomentumByIndex = (inputs: ScoringInput[]): MomentumResult[] => {
@@ -171,12 +198,15 @@ const topQuintileVolCutoff = (inputs: ScoringInput[]): number | null => {
 };
 
 export const scoreUniverse = (inputs: ScoringInput[]): ScoredSymbol[] => {
-    const newsComponents = rankNormalize(inputs.map((input) => input.newsWeightSlow));
+    const newsComponents = computeNewsComponents(inputs);
+    const coveredWeights = inputs
+        .map((input) => input.newsWeightSlow)
+        .filter((weight): weight is number => weight !== null);
     const momentumByIndex = computeMomentumByIndex(inputs);
     const volCutoff = topQuintileVolCutoff(inputs);
 
     return inputs.map((input, index) => {
-        const reasons: string[] = [newsReason(input, inputs)];
+        const reasons: string[] = [newsReason(input.newsWeightSlow, coveredWeights)];
 
         const momentum = momentumByIndex[index];
         reasons.push(momentum.reason);
