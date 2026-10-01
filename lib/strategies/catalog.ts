@@ -1,14 +1,49 @@
-// The eight quant strategies: data only (rules live in lib/strategies/rules), so
-// client components can import names, explainers and board columns freely.
+// The quant strategies: data only (rules live in lib/strategies/rules), so client
+// components can import names, explainers and board columns freely.
 // Every sentence here is shown to readers as written — plain, accurate, no hype.
+//
+// Each rule's parameters are CATALOG_PARAMS, and every explainer sentence and board-column
+// label that states one is built from them by buildStrategies, as are the cash floor and the
+// drift band (lib/strategies/config). Three kinds of spelling stay literal, each held equal to
+// the params by lib/strategies/__tests__/catalog-params.test.ts rather than built: the names
+// ('Donchian 55/20 Breakout' is also the strategy account's name), the board's value keys
+// ('high55', 'sma200' — the rules write them and stored runs carry them), and the glossary
+// entries those keys point at (the glossary is imported here, so it cannot import back).
 
-import {DEFAULT_DRIFT_BAND, ENGINE_VERSION} from '@/lib/strategies/config';
+import {CASH_FLOOR, DEFAULT_DRIFT_BAND, ENGINE_VERSION, slotWeight} from '@/lib/strategies/config';
 import type {StrategyDefinition, StrategyId} from '@/lib/strategies/types';
 import {shortHelp} from '@/lib/learn/glossary';
+import {numberWord} from '@/lib/text';
+
+export const CATALOG_PARAMS = {
+    'buy-and-hold-spy': {allocation: 0.99},
+    'sixty-forty': {spyWeight: 0.6, aggWeight: 0.4},
+    'golden-cross': {fast: 50, slow: 200},
+    'dual-momentum': {lookback: 252},
+    'momentum-12-1': {lookback: 252, skip: 21, top: 8},
+    'rsi2-mean-reversion': {rsiPeriod: 2, entryRsi: 10, exitSma: 5, trendSma: 200},
+    'donchian-breakout': {entryChannel: 55, exitChannel: 20},
+    'low-volatility': {volWindow: 63, top: 10},
+} as const satisfies Record<StrategyId, Readonly<Record<string, number>>>;
+
+export type CatalogParams = {readonly [Id in keyof typeof CATALOG_PARAMS]: {readonly [Key in keyof (typeof CATALOG_PARAMS)[Id]]: number}};
+
+// 0.12375 → 12.4, 0.09 → 9: one decimal, dropped when it is zero; pct adds the sign.
+const percent = (fraction: number): number => Number((fraction * 100).toFixed(1));
+const pct = (fraction: number): string => `${percent(fraction)}%`;
+// A lookback in trading days as months: 252 → 12, 21 → 1.
+const TRADING_DAYS_PER_MONTH = 21;
+const months = (bars: number): number => Math.round(bars / TRADING_DAYS_PER_MONTH);
 
 // Rendered once per strategy page, never twice. It used to appear at the foot of the
 // detail page AND inside the reading guide, which is how a disclaimer stops being read.
 export const STRATEGIES_DISCLAIMER = 'Deterministic rules · no AI · paper money · not financial advice';
+
+const INVESTED = pct(1 - CASH_FLOOR);
+const FLOOR = pct(CASH_FLOOR);
+const BAND = pct(DEFAULT_DRIFT_BAND);
+// What each of `slots` equal positions gets: '12.4% of equity (99% ÷ 8)'.
+const slotShare = (slots: number): string => `${pct(slotWeight(slots))} of equity (${INVESTED} ÷ ${slots})`;
 
 const COMMON_CAVEATS: readonly string[] = [
     'Orders fill at the next session, not at the close that produced the signal.',
@@ -24,7 +59,25 @@ const TOTAL_RETURN_CAVEAT =
 
 const CLOSE_COLUMN = {key: 'close', label: 'Last close', format: 'price', glossary: 'close', help: shortHelp('close')} as const;
 
-export const STRATEGIES: readonly StrategyDefinition[] = [
+// The catalog for a set of parameters: CATALOG_PARAMS for the app, another set for a test
+// that moves one and reads the prose follow it.
+export const buildStrategies = (params: CatalogParams = CATALOG_PARAMS): readonly StrategyDefinition[] => {
+    const hold = params['buy-and-hold-spy'];
+    const mix = params['sixty-forty'];
+    const cross = params['golden-cross'];
+    const gem = params['dual-momentum'];
+    const gemMonths = months(gem.lookback);
+    const mom = params['momentum-12-1'];
+    const momLabel = `${months(mom.lookback)}-${months(mom.skip)}`;
+    const rsi = params['rsi2-mean-reversion'];
+    const rsiLabel = `RSI(${rsi.rsiPeriod})`;
+    const turtle = params['donchian-breakout'];
+    const lowVol = params['low-volatility'];
+    const SECTOR_SLOTS = 11;
+    const RSI_SLOTS = 5;
+    const TURTLE_SLOTS = 8;
+
+    return [
     {
         id: 'buy-and-hold-spy',
         name: 'Buy & Hold SPY',
@@ -33,7 +86,7 @@ export const STRATEGIES: readonly StrategyDefinition[] = [
         universe: 'spy',
         slots: 1,
         version: '1',
-        params: {allocation: 0.99},
+        params: hold,
         driftBand: DEFAULT_DRIFT_BAND,
         signalColumns: [
             CLOSE_COLUMN,
@@ -42,7 +95,7 @@ export const STRATEGIES: readonly StrategyDefinition[] = [
         explainer: {
             summary: 'Buys the S&P 500 ETF on its first run and never trades again — the bar every other strategy has to clear.',
             how: [
-                'On the first run, puts 99% of the account into SPY and keeps a 1% cash floor.',
+                `On the first run, puts ${pct(hold.allocation)} of the account into SPY and keeps a ${FLOOR} cash floor.`,
                 'Never sells, never rebalances, never adds.',
                 'If SPY has no fresh bar on the first run, the purchase is deferred to the next day rather than made on stale numbers.',
             ],
@@ -71,7 +124,7 @@ export const STRATEGIES: readonly StrategyDefinition[] = [
         universe: 'sixty-forty',
         slots: 2,
         version: '1',
-        params: {spyWeight: 0.6, aggWeight: 0.4},
+        params: mix,
         driftBand: DEFAULT_DRIFT_BAND,
         signalColumns: [
             CLOSE_COLUMN,
@@ -80,11 +133,11 @@ export const STRATEGIES: readonly StrategyDefinition[] = [
             {key: 'drift', label: 'Drift', format: 'pct', glossary: 'drift', help: shortHelp('drift')},
         ],
         explainer: {
-            summary: 'The classic balanced portfolio: 60% stocks (SPY), 40% bonds (AGG), put back to target every quarter.',
+            summary: `The classic balanced portfolio: ${pct(mix.spyWeight)} stocks (SPY), ${pct(mix.aggWeight)} bonds (AGG), put back to target every quarter.`,
             how: [
-                'Targets 60% SPY and 40% AGG of the invested 99%, which is 59.4% and 39.6% of equity.',
+                `Targets ${pct(mix.spyWeight)} SPY and ${pct(mix.aggWeight)} AGG of the invested ${INVESTED}, which is ${pct(mix.spyWeight * (1 - CASH_FLOOR))} and ${pct(mix.aggWeight * (1 - CASH_FLOOR))} of equity.`,
                 'On the first trading day of January, April, July and October it compares each leg with its target.',
-                'A leg is traded only when it has drifted more than 2% of equity from target; smaller drifts are left alone.',
+                `A leg is traded only when it has drifted more than ${BAND} of equity from target; smaller drifts are left alone.`,
                 'Between rebalances it does nothing, whatever the market does.',
             ],
             why: [
@@ -93,7 +146,7 @@ export const STRATEGIES: readonly StrategyDefinition[] = [
             ],
             fails: [
                 'When stocks and bonds fall together, as in 2022, there is nowhere to hide and the bond leg cushions nothing.',
-                'In long bull markets the bond leg is a drag: 60/40 lags an all-stock portfolio by design.',
+                `In long bull markets the bond leg is a drag: ${percent(mix.spyWeight)}/${percent(mix.aggWeight)} lags an all-stock portfolio by design.`,
                 'Quarterly rebalancing is slow; a crash and recovery inside one quarter is simply ridden out.',
             ],
             watching: 'Each leg\'s current weight, its target and the drift between them.',
@@ -101,7 +154,7 @@ export const STRATEGIES: readonly StrategyDefinition[] = [
             cashReason: 'In cash — the first quarterly allocation has not been made yet; it fills on the next session when both SPY and AGG have fresh bars.',
             caveats: [
                 ...COMMON_CAVEATS,
-                'The 1% cash floor makes the actual targets 59.4% and 39.6% of equity, and the reasons on this page quote those numbers.',
+                `The ${FLOOR} cash floor makes the actual targets ${pct(mix.spyWeight * (1 - CASH_FLOOR))} and ${pct(mix.aggWeight * (1 - CASH_FLOOR))} of equity, and the reasons on this page quote those numbers.`,
             ],
         },
     },
@@ -111,25 +164,25 @@ export const STRATEGIES: readonly StrategyDefinition[] = [
         family: 'Trend following',
         cadence: 'daily',
         universe: 'sectors',
-        slots: 11,
+        slots: SECTOR_SLOTS,
         version: '1',
-        params: {fast: 50, slow: 200},
+        params: cross,
         driftBand: DEFAULT_DRIFT_BAND,
         signalColumns: [
             CLOSE_COLUMN,
-            {key: 'sma50', label: 'SMA50', format: 'price', glossary: 'sma50', help: shortHelp('sma50')},
-            {key: 'sma200', label: 'SMA200', format: 'price', glossary: 'sma200', help: shortHelp('sma200')},
-            {key: 'spread', label: 'SMA50 vs SMA200', format: 'pct', glossary: 'spread', help: shortHelp('spread')},
+            {key: 'sma50', label: `SMA${cross.fast}`, format: 'price', glossary: 'sma50', help: shortHelp('sma50')},
+            {key: 'sma200', label: `SMA${cross.slow}`, format: 'price', glossary: 'sma200', help: shortHelp('sma200')},
+            {key: 'spread', label: `SMA${cross.fast} vs SMA${cross.slow}`, format: 'pct', glossary: 'spread', help: shortHelp('spread')},
             {key: 'trendOn', label: 'Trend on', format: 'bool', glossary: 'trend-on', help: shortHelp('trend-on')},
         ],
         explainer: {
-            summary: 'Holds each of the eleven S&P sector ETFs while its 50-day average is above its 200-day average, and steps out when it is not.',
+            summary: `Holds each of the ${numberWord(SECTOR_SLOTS)} S&P sector ETFs while its ${cross.fast}-day average is above its ${cross.slow}-day average, and steps out when it is not.`,
             how: [
-                'Every trading day computes the 50-day and 200-day simple moving averages of each sector ETF\'s close.',
-                'A sector is on while SMA50 is strictly above SMA200 (a golden cross) and off otherwise (a death cross).',
-                'Each sector that is on gets an equal slot of 9% of equity (99% ÷ 11); a sector that turns off is sold in full at the next session.',
+                `Every trading day computes the ${cross.fast}-day and ${cross.slow}-day simple moving averages of each sector ETF's close.`,
+                `A sector is on while SMA${cross.fast} is strictly above SMA${cross.slow} (a golden cross) and off otherwise (a death cross).`,
+                `Each sector that is on gets an equal slot of ${slotShare(SECTOR_SLOTS)}; a sector that turns off is sold in full at the next session.`,
                 'On the first run it buys every sector already trending — it does not wait for fresh crosses.',
-                'Held slots are not resized on small drift; only a move beyond the 2% band triggers a top-up or trim.',
+                `Held slots are not resized on small drift; only a move beyond the ${BAND} band triggers a top-up or trim.`,
             ],
             why: [
                 'Trends persist more often than chance would suggest, partly because investors under-react to news and then pile in slowly.',
@@ -137,12 +190,12 @@ export const STRATEGIES: readonly StrategyDefinition[] = [
             ],
             fails: [
                 'Whipsaws: in a sideways market the averages cross and re-cross, and each round trip loses a little.',
-                'It is late by design — a 200-day average confirms a trend months after it started and exits months after it ended.',
+                `It is late by design — a ${cross.slow}-day average confirms a trend months after it started and exits months after it ended.`,
                 'A V-shaped crash and recovery (March 2020) sells near the bottom and buys back well above it.',
             ],
-            watching: 'Each sector\'s close, SMA50, SMA200, the spread between the averages and whether the trend is on.',
+            watching: `Each sector's close, SMA${cross.fast}, SMA${cross.slow}, the spread between the averages and whether the trend is on.`,
             beginnerLine: 'Owns what is trending up, steps aside from what is trending down, and accepts being late both ways.',
-            cashReason: 'In cash — no sector ETF has its 50-day average above its 200-day average right now.',
+            cashReason: `In cash — no sector ETF has its ${cross.fast}-day average above its ${cross.slow}-day average right now.`,
             caveats: [...COMMON_CAVEATS],
         },
     },
@@ -154,21 +207,21 @@ export const STRATEGIES: readonly StrategyDefinition[] = [
         universe: 'gem',
         slots: 1,
         version: '1',
-        params: {lookback: 252},
+        params: gem,
         driftBand: DEFAULT_DRIFT_BAND,
         signalColumns: [
             CLOSE_COLUMN,
-            {key: 'r12', label: '12m total return', format: 'pct', glossary: 'r12', help: shortHelp('r12')},
+            {key: 'r12', label: `${gemMonths}m total return`, format: 'pct', glossary: 'r12', help: shortHelp('r12')},
             {key: 'aboveHurdle', label: 'Beats T-bills', format: 'bool', glossary: 'above-hurdle', help: shortHelp('above-hurdle')},
             {key: 'pick', label: 'Would be chosen', format: 'bool', glossary: 'pick', help: shortHelp('pick')},
         ],
         explainer: {
             summary: 'Gary Antonacci\'s Global Equities Momentum: each month hold US or international stocks if stocks beat T-bills over the past year, otherwise bonds.',
             how: [
-                'On the first trading day of each month computes 12-month (252-bar) total returns, dividends included, for SPY, EFA, AGG and BIL.',
-                'Absolute momentum: if SPY\'s 12-month return is above BIL\'s (the T-bill hurdle), stocks are on; otherwise the whole position goes to AGG.',
-                'Relative momentum: with stocks on, hold whichever of SPY and EFA has the higher 12-month return; a tie goes to SPY.',
-                'The chosen ETF gets 99% of equity; whatever else is held is sold at the next session.',
+                `On the first trading day of each month computes ${gemMonths}-month (${gem.lookback}-bar) total returns, dividends included, for SPY, EFA, AGG and BIL.`,
+                `Absolute momentum: if SPY's ${gemMonths}-month return is above BIL's (the T-bill hurdle), stocks are on; otherwise the whole position goes to AGG.`,
+                `Relative momentum: with stocks on, hold whichever of SPY and EFA has the higher ${gemMonths}-month return; a tie goes to SPY.`,
+                `The chosen ETF gets ${INVESTED} of equity; whatever else is held is sold at the next session.`,
                 'If a return cannot be computed or the chosen ETF has no fresh bar, the rebalance is deferred rather than executed on partial data.',
             ],
             why: [
@@ -177,11 +230,11 @@ export const STRATEGIES: readonly StrategyDefinition[] = [
                 'Comparing with T-bills rather than with zero means "stocks are up" is not enough — they have to beat the risk-free alternative.',
             ],
             fails: [
-                'Monthly checks and a 12-month lookback mean it can hold stocks through the first months of a crash and switch to bonds near the bottom.',
+                `Monthly checks and a ${gemMonths}-month lookback mean it can hold stocks through the first months of a crash and switch to bonds near the bottom.`,
                 'Sharp V-reversals whipsaw it: out after the fall, back in after the recovery.',
                 'In 2022 bonds fell too, so the "safe" leg lost money as well.',
             ],
-            watching: 'The 12-month total return of each of the four ETFs, whether SPY clears the T-bill hurdle, and which ETF the rule would choose today.',
+            watching: `The ${gemMonths}-month total return of each of the four ETFs, whether SPY clears the T-bill hurdle, and which ETF the rule would choose today.`,
             beginnerLine: 'Owns the past year\'s winner — unless the winner is cash, in which case it owns bonds.',
             cashReason: 'In cash — the first monthly allocation has not been made yet; it fills on the next session when the chosen ETF has a fresh bar.',
             caveats: [...COMMON_CAVEATS, TOTAL_RETURN_CAVEAT],
@@ -193,22 +246,22 @@ export const STRATEGIES: readonly StrategyDefinition[] = [
         family: 'Momentum',
         cadence: 'monthly',
         universe: 'largecaps',
-        slots: 8,
+        slots: mom.top,
         version: '1',
-        params: {lookback: 252, skip: 21, top: 8},
+        params: mom,
         driftBand: DEFAULT_DRIFT_BAND,
         signalColumns: [
             CLOSE_COLUMN,
-            {key: 'momentum', label: '12-1 return', format: 'pct', glossary: 'momentum-12-1', help: shortHelp('momentum-12-1')},
+            {key: 'momentum', label: `${momLabel} return`, format: 'pct', glossary: 'momentum-12-1', help: shortHelp('momentum-12-1')},
             {key: 'rank', label: 'Rank', format: 'rank', glossary: 'momentum-rank', help: shortHelp('momentum-rank')},
         ],
         explainer: {
-            summary: 'Each month buys the eight large caps with the strongest return over the past twelve months, skipping the most recent month.',
+            summary: `Each month buys the ${numberWord(mom.top)} large caps with the strongest return over the past twelve months, skipping the most recent month.`,
             how: [
-                'On the first trading day of each month ranks the 40-stock universe by the return from 252 trading days ago to 21 trading days ago (12-1 momentum).',
-                'The top 8 each get 12.4% of equity (99% ÷ 8); ties are broken alphabetically.',
-                'A held stock that falls out of the top 8 is sold at the next session; a kept one is topped up or trimmed only past the 2% drift band.',
-                'Stocks with fewer than 253 bars of history are not ranked.',
+                `On the first trading day of each month ranks the 40-stock universe by the return from ${mom.lookback} trading days ago to ${mom.skip} trading days ago (${momLabel} momentum).`,
+                `The top ${mom.top} each get ${slotShare(mom.top)}; ties are broken alphabetically.`,
+                `A held stock that falls out of the top ${mom.top} is sold at the next session; a kept one is topped up or trimmed only past the ${BAND} drift band.`,
+                `Stocks with fewer than ${mom.lookback + 1} bars of history are not ranked.`,
                 'Between rebalances it publishes the ranking daily but does not trade.',
             ],
             why: [
@@ -219,9 +272,9 @@ export const STRATEGIES: readonly StrategyDefinition[] = [
             fails: [
                 'Momentum crashes: after a sharp bear market the strategy is loaded with defensive names and misses the violent rebound (2009, April 2020).',
                 'It is a crowded trade; when momentum unwinds, everyone is selling the same stocks.',
-                'High turnover — a monthly reshuffle of eight names racks up trading costs the paper account does not charge.',
+                `High turnover — a monthly reshuffle of ${numberWord(mom.top)} names racks up trading costs the paper account does not charge.`,
             ],
-            watching: 'Each stock\'s 12-1 return and its rank in the universe.',
+            watching: `Each stock's ${momLabel} return and its rank in the universe.`,
             beginnerLine: 'Owns what has been going up for a year, ignores the last month, and reshuffles monthly.',
             cashReason: 'In cash — the first monthly ranking has not been traded yet; it fills on the next session once enough history is available.',
             caveats: [...COMMON_CAVEATS, SURVIVORSHIP_CAVEAT],
@@ -233,39 +286,39 @@ export const STRATEGIES: readonly StrategyDefinition[] = [
         family: 'Mean reversion',
         cadence: 'daily',
         universe: 'largecaps',
-        slots: 5,
+        slots: RSI_SLOTS,
         version: '1',
-        params: {rsiPeriod: 2, entryRsi: 10, exitSma: 5, trendSma: 200},
+        params: rsi,
         driftBand: DEFAULT_DRIFT_BAND,
         signalColumns: [
             CLOSE_COLUMN,
-            {key: 'rsi2', label: 'RSI(2)', format: 'number', glossary: 'rsi2', help: shortHelp('rsi2')},
-            {key: 'sma5', label: 'SMA5', format: 'price', glossary: 'sma5', help: shortHelp('sma5')},
-            {key: 'sma200', label: 'SMA200', format: 'price', glossary: 'sma200', help: shortHelp('sma200')},
-            {key: 'aboveSma200', label: 'Above SMA200', format: 'bool', glossary: 'above-sma200', help: shortHelp('above-sma200')},
+            {key: 'rsi2', label: rsiLabel, format: 'number', glossary: 'rsi2', help: shortHelp('rsi2')},
+            {key: 'sma5', label: `SMA${rsi.exitSma}`, format: 'price', glossary: 'sma5', help: shortHelp('sma5')},
+            {key: 'sma200', label: `SMA${rsi.trendSma}`, format: 'price', glossary: 'sma200', help: shortHelp('sma200')},
+            {key: 'aboveSma200', label: `Above SMA${rsi.trendSma}`, format: 'bool', glossary: 'above-sma200', help: shortHelp('above-sma200')},
         ],
         explainer: {
-            summary: 'Larry Connors\' RSI-2: buy large caps in an uptrend after a sharp two-day dip and sell them on the first bounce above the 5-day average.',
+            summary: `Larry Connors' RSI-${rsi.rsiPeriod}: buy large caps in an uptrend after a sharp ${numberWord(rsi.rsiPeriod)}-day dip and sell them on the first bounce above the ${rsi.exitSma}-day average.`,
             how: [
-                'Every trading day computes the 2-period RSI, the 5-day and the 200-day simple moving averages of each stock in the 40-name universe.',
-                'Entry: not held, close above SMA200 (long-term uptrend) and RSI(2) below 10 (oversold); candidates are ranked by RSI, lowest first.',
-                'Exit: held and close above SMA5; exits are decided before entries on the same day.',
-                'Up to 5 positions of 19.8% of equity each (99% ÷ 5); open slots are filled by the lowest-RSI candidates.',
+                `Every trading day computes the ${rsi.rsiPeriod}-period RSI, the ${rsi.exitSma}-day and the ${rsi.trendSma}-day simple moving averages of each stock in the 40-name universe.`,
+                `Entry: not held, close above SMA${rsi.trendSma} (long-term uptrend) and ${rsiLabel} below ${rsi.entryRsi} (oversold); candidates are ranked by RSI, lowest first.`,
+                `Exit: held and close above SMA${rsi.exitSma}; exits are decided before entries on the same day.`,
+                `Up to ${RSI_SLOTS} positions of ${pct(slotWeight(RSI_SLOTS))} of equity each (${INVESTED} ÷ ${RSI_SLOTS}); open slots are filled by the lowest-RSI candidates.`,
                 'A stock sold today is not bought back the same day, and held positions are never resized.',
             ],
             why: [
                 'Over one to five days, sharp drops in strong stocks tend to bounce (short-term over-reaction) — the mirror image of medium-term momentum.',
-                'Requiring the 200-day trend filters out stocks that are dropping because something is actually wrong.',
+                `Requiring the ${rsi.trendSma}-day trend filters out stocks that are dropping because something is actually wrong.`,
                 'Holding periods are days, so the strategy spends much of its time in cash and sidesteps long declines.',
             ],
             fails: [
-                'Catching falling knives: a two-day drop that keeps falling — the exit rule waits for a bounce that may come much lower.',
-                'In a bear market almost nothing is above its SMA200, so the strategy sits in cash while a rally starts without it.',
+                `Catching falling knives: a ${numberWord(rsi.rsiPeriod)}-day drop that keeps falling — the exit rule waits for a bounce that may come much lower.`,
+                `In a bear market almost nothing is above its SMA${rsi.trendSma}, so the strategy sits in cash while a rally starts without it.`,
                 'Many small trades: the paper account ignores the slippage and commissions that would erode a real version.',
             ],
-            watching: 'Each stock\'s RSI(2), close, SMA5 and SMA200, and whether it is above its long-term average.',
-            beginnerLine: 'Buys a strong stock on a two-day dip and sells the bounce.',
-            cashReason: 'In cash — no large cap in an uptrend is oversold (RSI(2) below 10) right now.',
+            watching: `Each stock's ${rsiLabel}, close, SMA${rsi.exitSma} and SMA${rsi.trendSma}, and whether it is above its long-term average.`,
+            beginnerLine: `Buys a strong stock on a ${numberWord(rsi.rsiPeriod)}-day dip and sells the bounce.`,
+            cashReason: `In cash — no large cap in an uptrend is oversold (${rsiLabel} below ${rsi.entryRsi}) right now.`,
             caveats: [...COMMON_CAVEATS, SURVIVORSHIP_CAVEAT],
         },
     },
@@ -275,38 +328,38 @@ export const STRATEGIES: readonly StrategyDefinition[] = [
         family: 'Breakout',
         cadence: 'daily',
         universe: 'largecaps',
-        slots: 8,
+        slots: TURTLE_SLOTS,
         version: '1',
-        params: {entryChannel: 55, exitChannel: 20},
+        params: turtle,
         driftBand: DEFAULT_DRIFT_BAND,
         signalColumns: [
             CLOSE_COLUMN,
-            {key: 'high55', label: '55-day high', format: 'price', glossary: 'high55', help: shortHelp('high55')},
-            {key: 'low20', label: '20-day low', format: 'price', glossary: 'low20', help: shortHelp('low20')},
-            {key: 'vsHigh', label: 'vs 55-day high', format: 'pct', glossary: 'vs-high', help: shortHelp('vs-high')},
+            {key: 'high55', label: `${turtle.entryChannel}-day high`, format: 'price', glossary: 'high55', help: shortHelp('high55')},
+            {key: 'low20', label: `${turtle.exitChannel}-day low`, format: 'price', glossary: 'low20', help: shortHelp('low20')},
+            {key: 'vsHigh', label: `vs ${turtle.entryChannel}-day high`, format: 'pct', glossary: 'vs-high', help: shortHelp('vs-high')},
         ],
         explainer: {
-            summary: 'The Turtle traders\' channel rule: buy a large cap when it closes above its 55-day high, sell when it closes below its 20-day low.',
+            summary: `The Turtle traders' channel rule: buy a large cap when it closes above its ${turtle.entryChannel}-day high, sell when it closes below its ${turtle.exitChannel}-day low.`,
             how: [
-                'Every trading day computes each stock\'s highest high of the prior 55 bars and lowest low of the prior 20 bars, today\'s bar excluded.',
-                'Entry: not held and today\'s close strictly above the 55-day high; candidates are ranked by how far above the channel they closed.',
-                'Exit: held and today\'s close strictly below the 20-day low; exits are decided before entries.',
-                'Up to 8 positions of 12.4% of equity each (99% ÷ 8); held positions are never resized.',
-                'A stock needs 56 bars with highs and lows; without them it is not traded, and a held one is kept.',
+                `Every trading day computes each stock's highest high of the prior ${turtle.entryChannel} bars and lowest low of the prior ${turtle.exitChannel} bars, today's bar excluded.`,
+                `Entry: not held and today's close strictly above the ${turtle.entryChannel}-day high; candidates are ranked by how far above the channel they closed.`,
+                `Exit: held and today's close strictly below the ${turtle.exitChannel}-day low; exits are decided before entries.`,
+                `Up to ${TURTLE_SLOTS} positions of ${pct(slotWeight(TURTLE_SLOTS))} of equity each (${INVESTED} ÷ ${TURTLE_SLOTS}); held positions are never resized.`,
+                `A stock needs ${turtle.entryChannel + 1} bars with highs and lows; without them it is not traded, and a held one is kept.`,
             ],
             why: [
-                'A new 55-day high is information: every holder is in profit and there is no overhead supply of trapped sellers.',
+                `A new ${turtle.entryChannel}-day high is information: every holder is in profit and there is no overhead supply of trapped sellers.`,
                 'Trend followers profit from the fat right tail — a few large winners pay for many small losses.',
-                'The wide exit (20-day low) gives a trend room to breathe instead of shaking the position out on noise.',
+                `The wide exit (${turtle.exitChannel}-day low) gives a trend room to breathe instead of shaking the position out on noise.`,
             ],
             fails: [
                 'Sideways chop: repeated false breakouts that reverse into the exit produce a string of small losses.',
                 'It is late by design — entries come after a move is under way and exits give back a chunk of the gain.',
-                'A gap down through the 20-day low fills far below the trigger.',
+                `A gap down through the ${turtle.exitChannel}-day low fills far below the trigger.`,
             ],
-            watching: 'Each stock\'s close, 55-day high, 20-day low and distance from the entry channel.',
+            watching: `Each stock's close, ${turtle.entryChannel}-day high, ${turtle.exitChannel}-day low and distance from the entry channel.`,
             beginnerLine: 'Buys new highs, sells new lows, and lets the winners run.',
-            cashReason: 'In cash — no large cap has closed above its 55-day high right now.',
+            cashReason: `In cash — no large cap has closed above its ${turtle.entryChannel}-day high right now.`,
             caveats: [
                 ...COMMON_CAVEATS,
                 SURVIVORSHIP_CAVEAT,
@@ -320,22 +373,22 @@ export const STRATEGIES: readonly StrategyDefinition[] = [
         family: 'Defensive factor',
         cadence: 'monthly',
         universe: 'largecaps',
-        slots: 10,
+        slots: lowVol.top,
         version: '1',
-        params: {volWindow: 63, top: 10},
+        params: lowVol,
         driftBand: DEFAULT_DRIFT_BAND,
         signalColumns: [
             CLOSE_COLUMN,
-            {key: 'vol63', label: '63-day vol', format: 'pct', glossary: 'vol63', help: shortHelp('vol63')},
+            {key: 'vol63', label: `${lowVol.volWindow}-day vol`, format: 'pct', glossary: 'vol63', help: shortHelp('vol63')},
             {key: 'rank', label: 'Rank', format: 'rank', glossary: 'vol-rank', help: shortHelp('vol-rank')},
         ],
         explainer: {
-            summary: 'Each month holds the ten large caps with the lowest realised volatility over the past quarter.',
+            summary: `Each month holds the ${numberWord(lowVol.top)} large caps with the lowest realised volatility over the past quarter.`,
             how: [
-                'On the first trading day of each month computes each stock\'s 63-day realised volatility (annualised standard deviation of daily log returns).',
-                'The 10 least volatile each get 9.9% of equity (99% ÷ 10); ties are broken alphabetically.',
-                'A held stock that drops out of the ten is sold at the next session; kept ones are topped up or trimmed only past the 2% drift band.',
-                'Stocks with fewer than 64 bars are not ranked.',
+                `On the first trading day of each month computes each stock's ${lowVol.volWindow}-day realised volatility (annualised standard deviation of daily log returns).`,
+                `The ${lowVol.top} least volatile each get ${slotShare(lowVol.top)}; ties are broken alphabetically.`,
+                `A held stock that drops out of the ${numberWord(lowVol.top)} is sold at the next session; kept ones are topped up or trimmed only past the ${BAND} drift band.`,
+                `Stocks with fewer than ${lowVol.volWindow + 1} bars are not ranked.`,
             ],
             why: [
                 'The low-volatility anomaly: boring stocks have delivered similar or better returns than exciting ones with much less drawdown, contrary to the textbook risk-return trade-off.',
@@ -343,16 +396,19 @@ export const STRATEGIES: readonly StrategyDefinition[] = [
             ],
             fails: [
                 'It trails badly in strong bull markets and sharp rebounds, when the most volatile names lead.',
-                'Sector concentration: the calm ten are often staples, utilities and health care, so it is a rates and sector bet in disguise.',
+                `Sector concentration: the calm ${numberWord(lowVol.top)} are often staples, utilities and health care, so it is a rates and sector bet in disguise.`,
                 'Volatility is backward-looking — a calm stock can become a volatile one the day after it is bought.',
             ],
-            watching: 'Each stock\'s 63-day realised volatility and its rank from calmest to wildest.',
+            watching: `Each stock's ${lowVol.volWindow}-day realised volatility and its rank from calmest to wildest.`,
             beginnerLine: 'Owns the stocks that do not make headlines.',
             cashReason: 'In cash — the first monthly ranking has not been traded yet; it fills on the next session once enough history is available.',
             caveats: [...COMMON_CAVEATS, SURVIVORSHIP_CAVEAT],
         },
     },
-];
+    ];
+};
+
+export const STRATEGIES: readonly StrategyDefinition[] = buildStrategies();
 
 export const STRATEGY_SLUGS: readonly StrategyId[] = STRATEGIES.map((def) => def.id);
 

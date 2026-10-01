@@ -27,3 +27,19 @@ export const hashId = (input: string): number => {
     // >>> 0 coerces to unsigned so ids are always positive 32-bit integers, stable across runs.
     return hash >>> 0;
 };
+
+const UNITS = ['zero', 'one', 'two', 'three', 'four', 'five', 'six', 'seven', 'eight', 'nine', 'ten',
+    'eleven', 'twelve', 'thirteen', 'fourteen', 'fifteen', 'sixteen', 'seventeen', 'eighteen', 'nineteen'];
+const TENS = ['', '', 'twenty', 'thirty', 'forty', 'fifty', 'sixty', 'seventy', 'eighty', 'ninety'];
+
+// A whole count as prose writes it: 'eight', 'eleven', 'forty', 'forty-two'; from a hundred
+// (or for anything but a whole number) the digits.
+export const numberWord = (n: number): string => {
+    if (!Number.isInteger(n) || n < 0 || n >= 100) return String(n);
+    if (n < 20) return UNITS[n];
+    const tens = TENS[Math.floor(n / 10)];
+    return n % 10 === 0 ? tens : `${tens}-${UNITS[n % 10]}`;
+};
+
+// 'eight' → 'Eight', for a count that opens a sentence.
+export const capitalize = (text: string): string => text.charAt(0).toUpperCase() + text.slice(1);

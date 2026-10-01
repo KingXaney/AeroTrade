@@ -1,4 +1,4 @@
-import {describe, expect, it} from 'vitest';
+import {afterEach, describe, expect, it, vi} from 'vitest';
 import {findBanned} from '@/lib/learn/banned';
 import {
     conceptForTerm,
@@ -114,5 +114,43 @@ describe('lookups', () => {
         expect(conceptForTerm('federal reserve')?.key).toBe('fomc');
         expect(conceptForTerm('nvidia')).toBeNull();
         expect(conceptForTerm('max drawdown')).toBeNull();
+    });
+});
+
+describe('the rails the glossary quotes', () => {
+    afterEach(() => {
+        vi.doUnmock('@/lib/navigator/config');
+        vi.doUnmock('@/lib/strategies/config');
+        vi.resetModules();
+    });
+
+    it('states the Navigator\'s cap and floor and the strategies\' band as their constants are today', () => {
+        expect(GLOSSARY['position-cap'].short).toBe('The largest share of the account the AI Navigator allows in one name: 20%.');
+        expect(GLOSSARY['position-cap'].long).toContain('will not put more than a fifth of the account in it');
+        expect(GLOSSARY['cash-floor'].short).toBe('The share of the account the AI Navigator always keeps in cash: 10%.');
+        expect(GLOSSARY.concentration.long).toContain('caps itself at 20% per name');
+        expect(GLOSSARY.drift.long).toContain('exceeds the band (2% of equity)');
+    });
+
+    it('moves each figure with its constant', async () => {
+        vi.resetModules();
+        vi.doMock('@/lib/navigator/config', async (importOriginal) => ({
+            ...(await importOriginal<typeof import('@/lib/navigator/config')>()),
+            MAX_POSITION_WEIGHT: 0.17,
+            MIN_CASH_WEIGHT: 0.13,
+        }));
+        vi.doMock('@/lib/strategies/config', async (importOriginal) => ({
+            ...(await importOriginal<typeof import('@/lib/strategies/config')>()),
+            DEFAULT_DRIFT_BAND: 0.035,
+        }));
+        const mocked = (await import('@/lib/learn/glossary')).GLOSSARY;
+        expect(mocked['position-cap'].short).toBe('The largest share of the account the AI Navigator allows in one name: 17%.');
+        expect(mocked['position-cap'].long).toContain('will not put more than 17% of the account in it');
+        expect(mocked['cash-floor'].short).toBe('The share of the account the AI Navigator always keeps in cash: 13%.');
+        expect(mocked.concentration.long).toContain('caps itself at 17% per name');
+        expect(mocked.drift.long).toContain('exceeds the band (4% of equity)');
+        for (const key of ['position-cap', 'cash-floor', 'concentration', 'drift'] as const) {
+            expect(findBanned(`${mocked[key].short} ${mocked[key].long}`, 'copy'), key).toEqual([]);
+        }
     });
 });

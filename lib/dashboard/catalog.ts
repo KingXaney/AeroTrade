@@ -11,6 +11,9 @@
 // - EvidenceList: driven by the ?entity= query param.
 // - Pinned advanced chart: needs per-widget settings (v2).
 
+import {STRATEGIES} from '@/lib/strategies/catalog';
+import {numberWord} from '@/lib/text';
+
 export const WIDGET_SPANS = [3, 4, 6, 8, 12] as const;
 export type WidgetSpan = (typeof WIDGET_SPANS)[number];
 
@@ -496,7 +499,7 @@ export const WIDGETS: {readonly [K in WidgetId]: WidgetDefinition & {id: K}} = {
     'quant-strategies': define({
         id: 'quant-strategies',
         title: 'Quant Strategies',
-        description: 'Live leaderboard of the eight classic strategies — deterministic rules, no AI. Followed ones first.',
+        description: `Live leaderboard of the ${numberWord(STRATEGIES.length)} classic strategies — deterministic rules, no AI. Followed ones first.`,
         category: 'strategies',
         icon: 'auto_graph',
         spans: [4, 6, 8, 12],

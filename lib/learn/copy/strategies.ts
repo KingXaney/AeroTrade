@@ -6,13 +6,26 @@
 // record is, how it was produced or when it arrives — never which rule to follow. The test
 // holds each one to the 'copy' tier of lib/learn/banned.ts.
 //
-// Client-safe: StrategyPerformance renders from a client tree.
+// Client-safe: StrategyPerformance renders from a client tree. Every count and rail it states
+// — how many strategies, the starting balance, the price buffer, the cash floor, the backtest's
+// length, the universe's sizes — is read from the constant the code trades on.
+
+import {STRATEGIES} from "@/lib/strategies/catalog";
+import {CASH_FLOOR, PRICE_BUFFER, SIM_RESULT_BARS, STRATEGY_STARTING_BALANCE} from "@/lib/strategies/config";
+import {UNIVERSES} from "@/lib/strategies/universe";
+import {capitalize, numberWord} from "@/lib/text";
 
 const plural = (n: number, one: string, many: string): string => `${n} ${n === 1 ? one : many}`;
+const pct = (fraction: number): string => `${Number((fraction * 100).toFixed(1))}%`;
+
+const COUNT = numberWord(STRATEGIES.length);
+const TRADING_DAYS_PER_YEAR = 252;
+const SIM_YEARS = numberWord(Math.round(SIM_RESULT_BARS / TRADING_DAYS_PER_YEAR));
+const STARTING_BALANCE = `$${STRATEGY_STARTING_BALANCE.toLocaleString('en-US')}`;
 
 export const STRATEGIES_PAGE_COPY = {
-    subtitle: 'Eight classic rules, paper-traded live against the S&P 500.',
-    loadingSubtitle: 'Valuing eight strategy accounts…',
+    subtitle: `${capitalize(COUNT)} classic rules, paper-traded live against the S&P 500.`,
+    loadingSubtitle: `Valuing ${COUNT} strategy accounts…`,
     // The leaderboard's label: what the live column ranks by and what price it is valued at.
     valuation: (state: 'open' | 'closed' | 'not-started'): string => {
         if (state === 'not-started') return 'no live records yet';
@@ -20,7 +33,7 @@ export const STRATEGIES_PAGE_COPY = {
     },
     rankedBy: (valuation: string): string => `ranked by live return · ${valuation}`,
     young: (days: number): string =>
-        `Live records are under ${days} days old — the simulated column shows each rule's three-year backtest for context.`,
+        `Live records are under ${days} days old — the simulated column shows each rule's ${SIM_YEARS}-year backtest for context.`,
     notRun: 'The strategies have not run yet. Their accounts open on the first trading morning after deployment.',
     // A simulated cell's tooltip on the leaderboard.
     backtestTitle: (from: string, to: string): string => `Backtest ${from} → ${to}, next-open fills, no fees`,
@@ -46,12 +59,12 @@ export const STRATEGY_PAGE_COPY = {
 export const HOW_TO_READ_COPY = {
     summary: 'How to read this — live vs simulated, fills, sizing, costs, universe',
     points: [
-        {title: 'Live', body: 'A real paper account per strategy, opened on the launch date with $100,000 and traded by the rule every trading morning. Ranked by return since launch, measured against SPY over the same days.'},
-        {title: 'Simulated', body: 'The same rule run over three years of stored daily closes ending the day before launch. A backtest: hypothetical, shown apart from live results and never blended into them.'},
+        {title: 'Live', body: `A real paper account per strategy, opened on the launch date with ${STARTING_BALANCE} and traded by the rule every trading morning. Ranked by return since launch, measured against SPY over the same days.`},
+        {title: 'Simulated', body: `The same rule run over ${SIM_YEARS} years of stored daily closes ending the day before launch. A backtest: hypothetical, shown apart from live results and never blended into them.`},
         {title: 'Fills', body: 'A decision is made on the previous close and filled at the next session — live about five minutes after the open at the last price, simulated at the next day\'s open. No look-ahead.'},
-        {title: 'Sizing', body: 'Whole shares only, sized from the previous close with a 1% buffer, keeping at least 1% cash. Small cash residues are normal.'},
+        {title: 'Sizing', body: `Whole shares only, sized from the previous close with a ${pct(PRICE_BUFFER)} buffer, keeping at least ${pct(CASH_FLOOR)} cash. Small cash residues are normal.`},
         {title: 'Costs and income', body: 'No commissions and no slippage. Both records earn like a brokerage account: cash earns the 13-week T-bill rate and holdings are paid their dividends. The benchmark is SPY\'s total return, dividends reinvested.'},
-        {title: 'Universe', body: 'A fixed list chosen in 2026: SPY and other core ETFs, the eleven sector ETFs and forty large caps. Applied to earlier years it carries survivorship bias, which the simulated numbers inherit.'},
+        {title: 'Universe', body: `A fixed list chosen in 2026: SPY and other core ETFs, the ${numberWord(UNIVERSES.sectors.length)} sector ETFs and ${numberWord(UNIVERSES.largecaps.length)} large caps. Applied to earlier years it carries survivorship bias, which the simulated numbers inherit.`},
     ] as readonly {title: string; body: string}[],
 } as const;
 
@@ -70,7 +83,7 @@ export const EXPLAINER_COPY = {
     checks: 'Checks',
     nextRebalance: 'Next rebalance',
     cashFloor: 'Cash floor',
-    cashFloorValue: '1%',
+    cashFloorValue: pct(CASH_FLOOR),
 } as const;
 
 export const SIGNAL_BOARD_COPY = {

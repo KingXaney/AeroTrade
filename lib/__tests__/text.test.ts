@@ -1,5 +1,5 @@
 import {describe, expect, it} from 'vitest';
-import {escapeRegExp, hashId, normalizeUrl} from '@/lib/text';
+import {capitalize, escapeRegExp, hashId, normalizeUrl, numberWord} from '@/lib/text';
 
 describe('escapeRegExp', () => {
     it('escapes every regex metacharacter, so user text matches only itself', () => {
@@ -24,5 +24,14 @@ describe('hashId', () => {
         const id = hashId('https://example.com/story');
         expect(id).toBe(hashId('https://example.com/story'));
         expect(Number.isInteger(id) && id >= 0 && id < 2 ** 32).toBe(true);
+    });
+});
+
+describe('numberWord', () => {
+    it('spells a whole count under a hundred and leaves anything else as digits', () => {
+        expect([0, 1, 8, 11, 12, 19, 20, 40, 42, 99].map(numberWord))
+            .toEqual(['zero', 'one', 'eight', 'eleven', 'twelve', 'nineteen', 'twenty', 'forty', 'forty-two', 'ninety-nine']);
+        expect([100, 2.5, -1].map(numberWord)).toEqual(['100', '2.5', '-1']);
+        expect(capitalize(numberWord(8))).toBe('Eight');
     });
 });

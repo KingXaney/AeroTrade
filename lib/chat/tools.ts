@@ -24,6 +24,7 @@ import {resolveTerm} from "@/lib/learn/glossary";
 import {decodeQuotedReason, shapeExplain} from "@/lib/chat/explain";
 import {resolveStrategy, shapeQuantLeaderboard, shapeQuantStrategy, shapeUnknownStrategy} from "@/lib/chat/quant-strategies";
 import {STRATEGY_SLUGS} from "@/lib/strategies/catalog";
+import {numberWord} from "@/lib/text";
 import {getLatestRun, getStrategyLeaderboard} from "@/lib/strategies/page-store";
 import {priceLargestHoldings, readLearnerValue} from "@/lib/chat/learner-hooks";
 import type {ChatToolName} from '@/lib/chat/types';
@@ -358,7 +359,7 @@ export const buildTools = (userId: string) => ({
         description: TOOL_DESCRIPTIONS.getQuantStrategies,
         inputSchema: z.object({
             slug: z.string().max(QUANT_SLUG_MAX).optional()
-                .describe(`One strategy's slug: ${STRATEGY_SLUGS.join(', ')}. Omit it for all eight.`),
+                .describe(`One strategy's slug: ${STRATEGY_SLUGS.join(', ')}. Omit it for all ${numberWord(STRATEGY_SLUGS.length)}.`),
         }),
         execute: async ({slug}) => {
             try {
