@@ -1,14 +1,12 @@
 'use client';
 
 import {useState} from "react";
-import {usePathname, useRouter, useSearchParams} from "next/navigation";
-import {toast} from "sonner";
 import {cn} from "@/lib/utils";
 import {formatChangePercent, getChangeColorClass} from "@/lib/format";
-import {setActiveAccount} from "@/lib/actions/accounts.actions";
 import {unpricedLabel} from "@/lib/trading/analytics";
 import type {SwitcherAccount} from "@/lib/trading/active-account";
 import CreateAccountDialog from "@/components/trading/accounts/CreateAccountDialog";
+import useSwitchAccount from "@/components/trading/accounts/useSwitchAccount";
 import {
     DropdownMenu,
     DropdownMenuContent,
@@ -20,36 +18,10 @@ import {
 // Dropdown to switch between strategy accounts. Lives in the /trade and /portfolio headers
 // and on the dashboard; the active account is stored in an HTTP-only cookie.
 const AccountSwitcher = ({accounts, activeId}: {accounts: SwitcherAccount[]; activeId: string}) => {
-    const router = useRouter();
-    const pathname = usePathname();
-    const searchParams = useSearchParams();
+    const {switching, switchTo} = useSwitchAccount(activeId);
     const [creating, setCreating] = useState(false);
-    const [switching, setSwitching] = useState(false);
 
     const active = accounts.find((a) => a.id === activeId) ?? accounts[0];
-
-    const onPick = async (id: string) => {
-        if (switching || id === activeId) return;
-        setSwitching(true);
-        try {
-            const result = await setActiveAccount(id);
-            if (result.success) {
-                // A ?account= param outranks the cookie — clear it, or the switch
-                // silently no-ops on bookmarked/deep-linked URLs.
-                const params = new URLSearchParams(searchParams);
-                if (params.has('account')) {
-                    params.delete('account');
-                    router.replace(params.size > 0 ? `${pathname}?${params.toString()}` : pathname);
-                } else {
-                    router.refresh();
-                }
-            } else {
-                toast.error(result.message || 'Could not switch accounts');
-            }
-        } finally {
-            setSwitching(false);
-        }
-    };
 
     return (
         <>
@@ -70,7 +42,7 @@ const AccountSwitcher = ({accounts, activeId}: {accounts: SwitcherAccount[]; act
                     {accounts.map((a) => (
                         <DropdownMenuItem
                             key={a.id}
-                            onSelect={() => void onPick(a.id)}
+                            onSelect={() => void switchTo(a.id)}
                             className="flex items-center justify-between gap-4 cursor-pointer focus:bg-brand-strong/6"
                         >
                             <span className={cn('text-sm', a.id === activeId ? 'text-brand font-bold' : 'text-fg')}

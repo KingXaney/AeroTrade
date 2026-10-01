@@ -1,44 +1,15 @@
 'use client';
 
-import {useState} from "react";
-import {usePathname, useRouter, useSearchParams} from "next/navigation";
-import {toast} from "sonner";
 import {cn} from "@/lib/utils";
 import {formatDrawdown, formatPct, roundPct, formatPrice, getChangeColorClass} from "@/lib/format";
-import {setActiveAccount} from "@/lib/actions/accounts.actions";
 import {unpricedLabel} from "@/lib/trading/analytics";
 import type {ComparisonRow} from "@/lib/trading/active-account";
+import useSwitchAccount from "@/components/trading/accounts/useSwitchAccount";
 
 // The "which strategy wins" view: every strategy account side by side.
 // Clicking a row makes that strategy the active one.
 const AccountComparisonTable = ({rows, activeId}: {rows: ComparisonRow[]; activeId: string}) => {
-    const router = useRouter();
-    const pathname = usePathname();
-    const searchParams = useSearchParams();
-    const [switching, setSwitching] = useState(false);
-
-    const onPick = async (id: string) => {
-        if (switching || id === activeId) return;
-        setSwitching(true);
-        try {
-            const result = await setActiveAccount(id);
-            if (result.success) {
-                // A ?account= param outranks the cookie — clear it, or the switch
-                // silently no-ops on bookmarked/deep-linked URLs.
-                const params = new URLSearchParams(searchParams);
-                if (params.has('account')) {
-                    params.delete('account');
-                    router.replace(params.size > 0 ? `${pathname}?${params.toString()}` : pathname);
-                } else {
-                    router.refresh();
-                }
-            } else {
-                toast.error(result.message || 'Could not switch accounts');
-            }
-        } finally {
-            setSwitching(false);
-        }
-    };
+    const {switching, switchTo} = useSwitchAccount(activeId);
 
     const ranked = [...rows].sort((a, b) => b.totalReturnPct - a.totalReturnPct);
 
@@ -57,7 +28,7 @@ const AccountComparisonTable = ({rows, activeId}: {rows: ComparisonRow[]; active
                 <button
                     key={row.id}
                     type="button"
-                    onClick={() => void onPick(row.id)}
+                    onClick={() => void switchTo(row.id)}
                     disabled={switching}
                     className={cn(
                         'w-full grid grid-cols-1 md:grid-cols-[2fr_1fr_1fr_1fr_1fr] gap-1.5 md:gap-4 items-center px-4 py-3 rounded-xl border text-left transition-colors disabled:opacity-60',
