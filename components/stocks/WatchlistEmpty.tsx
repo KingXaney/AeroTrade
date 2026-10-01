@@ -1,6 +1,7 @@
 import Panel from "@/components/primitives/Panel";
 
-
+// Not EmptyState: the watchlist's first-run panel is its own design (a ringed icon, a
+// larger title, a call to search) and EmptyState would flatten it.
 const WatchlistEmpty = () => {
     return (
         <Panel as="div" pad={12} className="flex flex-col items-center justify-center text-center">

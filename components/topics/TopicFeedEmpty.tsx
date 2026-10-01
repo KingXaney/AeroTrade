@@ -17,6 +17,8 @@ type Props = {now: number} & (   // now: the server render instant, for the refr
 
 const secondary = actionButton({variant: 'secondary'});
 
+// Not EmptyState: its actions sit closer (gap-2) and the note under them is larger and
+// tighter than EmptyState's, which would visibly change this panel.
 // Empty feed for one topic or for the merged view. Both get real actions now: the
 // merged version used to be text only, telling the user to wait for a job they had no
 // way to trigger.
