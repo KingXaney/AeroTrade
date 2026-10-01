@@ -3,7 +3,6 @@
 // endpoint, and lib code (trading, news, dashboard, chat, jobs) calls these directly. The two
 // fetches client components need are wrapped, one-to-one, in lib/actions/stocks.actions.ts.
 
-import {getDateRange} from "@/lib/utils";
 import {validateArticle, formatArticle} from "@/lib/news/article";
 import {formatPrice, formatChangePercent, formatMarketCapValue} from "@/lib/format";
 import {POPULAR_STOCK_SYMBOLS} from "@/lib/stocks/popular";
@@ -31,6 +30,17 @@ const fetchJSON = async <T>(url: string, revalidateSeconds?: number): Promise<T>
 // ============================================================================
 // --- News ---
 // ============================================================================
+
+// The last `days` days as Finnhub's from/to query dates.
+const getDateRange = (days: number) => {
+    const toDate = new Date();
+    const fromDate = new Date();
+    fromDate.setDate(toDate.getDate() - days);
+    return {
+        to: toDate.toISOString().split('T')[0],
+        from: fromDate.toISOString().split('T')[0],
+    };
+};
 
 // Fetches up to 6 news articles — personalized per watchlist symbols, or general market news as fallback
 export const getNews = async (symbols?: string[]): Promise<MarketNewsArticle[]> => {

@@ -1,6 +1,6 @@
 import {inngest} from "@/lib/jobs/client";
 import {buildWelcomePrompt, NEWS_SUMMARY_EMAIL_PROMPT} from "@/lib/jobs/prompts"
-import {mailerReady, sendNewsSummaryEmail, sendWelcomeEmail} from "@/lib/email/send";
+import {getFormattedTodayDate, mailerReady, sendNewsSummaryEmail, sendWelcomeEmail} from "@/lib/email/send";
 import {getAllUsersForNewsEmail} from "@/lib/email/recipients";
 import {getWatchlistSymbolsByEmail} from "@/lib/stocks/watchlist-store";
 import {getQuote, searchStocks} from "@/lib/prices/finnhub";
@@ -47,7 +47,6 @@ import {
 } from "@/lib/navigator/store";
 import {executeOrder} from "@/lib/trading/orders";
 import BrainEntity from "@/database/models/brain-entity.model";
-import {getFormattedTodayDate} from "@/lib/utils";
 import {connectToDatabase} from "@/database/mongoose";
 import PaperAccount from "@/database/models/paper-account.model";
 import AccountSnapshot from "@/database/models/account-snapshot.model";

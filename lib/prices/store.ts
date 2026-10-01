@@ -18,7 +18,6 @@ import {
     STOOQ_DELAY_MS,
     YAHOO_DELAY_MS,
 } from "@/lib/prices/config";
-import {delay} from "@/lib/utils";
 import {previousTradingDay} from "@/lib/prices/market-hours";
 import {addCalendarDays, getEasternDateString} from "@/lib/dates";
 
@@ -51,6 +50,9 @@ const OVERLAP_MISMATCH_TOLERANCE = 0.005;
 // A full backfill always asks Yahoo for its longest daily range; the calendar
 // window only bounds what Stooq is asked for and what "deep enough" means.
 const YAHOO_BACKFILL_RANGE: YahooRange = "5y";
+
+// The spacing between provider calls (YAHOO_DELAY_MS, STOOQ_DELAY_MS).
+const delay = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
 
 type StoredCoverage = {dividendsFrom?: string; dividendsThrough?: string} | null;
 
