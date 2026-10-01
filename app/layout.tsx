@@ -1,5 +1,5 @@
 import type { Metadata } from "next";
-import { Sora, Hanken_Grotesk, JetBrains_Mono, Space_Grotesk, Inter, IBM_Plex_Mono } from "next/font/google";
+import localFont from "next/font/local";
 import { cookies } from "next/headers";
 import "./globals.css";
 import {Toaster} from "@/components/ui/sonner"
@@ -8,43 +8,61 @@ import ThemeBackdrop from "@/components/theme/ThemeBackdrop";
 import {PALETTE_CSS} from "@/lib/theme/palettes";
 import {decodeThemeCookie, modeOfTheme, THEME_COOKIE} from "@/lib/theme/resolve";
 
-const sora = Sora({
+// The six faces ship with the app (app/fonts, SIL Open Font License — app/fonts/licenses) instead
+// of being fetched from Google Fonts during the build: when that fetch failed, the whole Vercel
+// build failed with it. Latin subset. Each face is declared at exactly the weights Google served
+// it at — a variable face's one file listed once per weight, as Google's CSS does — so a weight
+// in between (font-medium on a 400/600 face) still renders as it did, not as a true 500.
+const sora = localFont({
+  src: [
+    {path: "./fonts/sora-latin.woff2", weight: "400", style: "normal"},
+    {path: "./fonts/sora-latin.woff2", weight: "600", style: "normal"},
+    {path: "./fonts/sora-latin.woff2", weight: "700", style: "normal"},
+  ],
   variable: "--font-sora",
-  subsets: ["latin"],
-  weight: ["400", "600", "700"],
 });
 
-const hankenGrotesk = Hanken_Grotesk({
+const hankenGrotesk = localFont({
+  src: [
+    {path: "./fonts/hanken-grotesk-latin.woff2", weight: "400", style: "normal"},
+    {path: "./fonts/hanken-grotesk-latin.woff2", weight: "600", style: "normal"},
+  ],
   variable: "--font-hanken",
-  subsets: ["latin"],
-  weight: ["400", "600"],
 });
 
-const jetbrainsMono = JetBrains_Mono({
+const jetbrainsMono = localFont({
+  src: [
+    {path: "./fonts/jetbrains-mono-latin.woff2", weight: "500", style: "normal"},
+    {path: "./fonts/jetbrains-mono-latin.woff2", weight: "700", style: "normal"},
+  ],
   variable: "--font-jetbrains",
-  subsets: ["latin"],
-  weight: ["500", "700"],
 });
 
 // Style-specific faces. Not preloaded: only the default stack above is on the critical path.
-const spaceGrotesk = Space_Grotesk({
+const spaceGrotesk = localFont({
+  src: [
+    {path: "./fonts/space-grotesk-latin.woff2", weight: "500", style: "normal"},
+    {path: "./fonts/space-grotesk-latin.woff2", weight: "700", style: "normal"},
+  ],
   variable: "--font-space-grotesk",
-  subsets: ["latin"],
-  weight: ["500", "700"],
   preload: false,
 });
 
-const inter = Inter({
+const inter = localFont({
+  src: [
+    {path: "./fonts/inter-latin.woff2", weight: "400", style: "normal"},
+    {path: "./fonts/inter-latin.woff2", weight: "600", style: "normal"},
+  ],
   variable: "--font-inter",
-  subsets: ["latin"],
-  weight: ["400", "600"],
   preload: false,
 });
 
-const plexMono = IBM_Plex_Mono({
+const plexMono = localFont({
+  src: [
+    {path: "./fonts/ibm-plex-mono-latin-500.woff2", weight: "500", style: "normal"},
+    {path: "./fonts/ibm-plex-mono-latin-700.woff2", weight: "700", style: "normal"},
+  ],
   variable: "--font-plex-mono",
-  subsets: ["latin"],
-  weight: ["500", "700"],
   preload: false,
 });
 
