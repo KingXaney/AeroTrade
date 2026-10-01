@@ -1,6 +1,6 @@
 import {redirect} from "next/navigation";
 import {getSessionUser} from "@/lib/auth/session";
-import {getNotificationPreferences} from "@/lib/actions/preferences.actions";
+import {getNotificationPreferences} from "@/lib/settings/preferences-store";
 import AppearanceSettings from "@/components/settings/AppearanceSettings";
 import NotificationSettings from "@/components/settings/NotificationSettings";
 import AccountSection from "@/components/settings/AccountSection";
@@ -26,7 +26,7 @@ const SettingsPage = async () => {
     if (!user) redirect('/sign-in');
 
     const [notifications, {layout: visibleLayout, availableIds}, topics, newsFeed] = await Promise.all([
-        getNotificationPreferences(),
+        getNotificationPreferences(user.id),
         getVisibleLayout(user.id),   // the same view as the dashboard
         getCachedTopicsOverview(user.id),
         getNewsFeedPrefs(user.id),

@@ -4,7 +4,8 @@ import {useState, useTransition} from "react";
 import {Mail, Newspaper, Rss} from "lucide-react";
 import {toast} from "sonner";
 import {Switch} from "@/components/ui/switch";
-import {setDigestMode, setTopicsInDigest, toggleEmailNotifications, type NotificationPreferences} from "@/lib/actions/preferences.actions";
+import {setDigestMode, setTopicsInDigest, toggleEmailNotifications} from "@/lib/actions/preferences.actions";
+import type {NotificationPreferences} from "@/lib/settings/preferences-store";
 
 const switchClass = "data-[state=checked]:!bg-brand-strong data-[state=unchecked]:!bg-surface-4 data-[state=unchecked]:!border data-[state=unchecked]:!border-line-strong transition-colors duration-200";
 

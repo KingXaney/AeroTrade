@@ -7,38 +7,6 @@ import {getCurrentUserId} from "@/lib/auth/session";
 // Every action derives the user from the session: preferences are never
 // readable or writable for an arbitrary userId supplied by the caller.
 
-export type NotificationPreferences = {
-    emailNotifications: boolean;
-    digestMode: 'personalized' | 'general';
-    topicsInDigest: boolean;
-};
-
-const DEFAULT_NOTIFICATION_PREFERENCES: NotificationPreferences = {
-    emailNotifications: true,
-    digestMode: 'personalized',
-    topicsInDigest: true,
-};
-
-export const getNotificationPreferences = async (): Promise<NotificationPreferences> => {
-    try {
-        const userId = await getCurrentUserId();
-        if (!userId) return DEFAULT_NOTIFICATION_PREFERENCES;
-
-        await connectToDatabase();
-        const prefs = await UserPreferencesModel.findOne({userId}).lean();
-        if (!prefs) return DEFAULT_NOTIFICATION_PREFERENCES;
-
-        return {
-            emailNotifications: prefs.emailNotifications !== false,
-            digestMode: prefs.digestMode === 'general' ? 'general' : 'personalized',
-            topicsInDigest: prefs.topicsInDigest !== false,
-        };
-    } catch (e) {
-        console.error('Error fetching notification preferences:', e);
-        return DEFAULT_NOTIFICATION_PREFERENCES;
-    }
-};
-
 export const toggleEmailNotifications = async (enabled: boolean): Promise<{ success: boolean; enabled: boolean }> => {
     try {
         const userId = await getCurrentUserId();
