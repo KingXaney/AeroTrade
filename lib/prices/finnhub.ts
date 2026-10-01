@@ -11,7 +11,7 @@ import {
     formatChangePercent,
     formatMarketCapValue,
 } from "@/lib/utils";
-import {POPULAR_STOCK_SYMBOLS} from "@/lib/constants";
+import {POPULAR_STOCK_SYMBOLS} from "@/lib/stocks/popular";
 import {FINANCIALS_REVALIDATE_SECONDS, PROFILE_REVALIDATE_SECONDS} from "@/lib/prices/config";
 
 const FINNHUB_BASE_URL = 'https://finnhub.io/api/v1';
@@ -138,7 +138,7 @@ export const searchStocks = async (query?: string): Promise<Stock[]> => {
         if (!q) {
             // Fallback: present popular symbols as cards. We don't burn API calls for names here —
             // the user can click through to /stocks/[symbol] to load the full profile.
-            return POPULAR_STOCK_SYMBOLS.slice(0, 15).map((symbol) => ({
+            return POPULAR_STOCK_SYMBOLS.map((symbol) => ({
                 symbol,
                 name: symbol,
                 exchange: '',
