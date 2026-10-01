@@ -1,6 +1,7 @@
 import {redirect} from "next/navigation";
 import {getCurrentUserId} from "@/lib/actions/watchlist.actions";
 import {ensureTopicHasArticles, getMergedTopicFeed, getTopicsOverview} from "@/lib/topics/store";
+import {getCachedTopicsOverview} from "@/lib/dashboard/cached";
 import {pickFirstRunTopic} from "@/lib/topics/first-run";
 import {seedDefaultTopics, shouldSeedDefaults} from "@/lib/topics/seed";
 import {isUntouchedDefaultSet} from "@/lib/topics/starters";
@@ -34,7 +35,9 @@ const TopicsPage = async () => {
     const userId = await getCurrentUserId();
     if (!userId) redirect('/sign-in');
 
-    let overview = await getTopicsOverview(userId);
+    // The layout's sidebar card already read this for the request; the re-reads after
+    // seeding and the inline fetch below must see those writes, so they skip the cache.
+    let overview = await getCachedTopicsOverview(userId);
 
     // The safety net behind the sign-up seed: it catches every account that predates
     // default topics, and any sign-up where seeding failed. Guarded by topicsSeededAt, so
