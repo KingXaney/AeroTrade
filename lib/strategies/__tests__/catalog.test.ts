@@ -3,7 +3,7 @@ import {effectiveVersion, STRATEGIES, STRATEGY_SLUGS, strategyBySlug} from '@/li
 import {DEFAULT_DRIFT_BAND, ENGINE_VERSION} from '@/lib/strategies/config';
 import {STRATEGY_RULES} from '@/lib/strategies/rules';
 import {SECTOR_ETFS, UNIVERSES} from '@/lib/strategies/universe';
-import {SECTOR_TO_ETF} from '@/lib/navigator/config';
+import {SECTOR_TO_ETF} from '@/lib/prices/sectors';
 import {findBanned} from '@/lib/learn/banned';
 import {isGlossaryKey, shortHelp} from '@/lib/learn/glossary';
 

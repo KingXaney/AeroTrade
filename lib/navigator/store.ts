@@ -16,12 +16,9 @@ import {computeSignals} from "@/lib/prices/signals";
 import {dominantSectorKey, rankNormalize, scoreUniverse, type ScoredSymbol, type ScoringInput} from "@/lib/navigator/scoring";
 import {diffToOrders, HOLDING_REASON, type HeldPosition, type PlannedOrder, type TargetWeight} from "@/lib/navigator/allocator";
 import {selectNavigatorUniverse, type NavigatorUniverse} from "@/lib/navigator/universe";
-import {
-    ALWAYS_ELIGIBLE_SYMBOLS,
-    ELIGIBILITY_LOOKBACK_DAYS,
-    ETF_TO_SECTOR_KEY,
-    SECTOR_KEY_PREFIX,
-} from "@/lib/navigator/config";
+import {ALWAYS_ELIGIBLE_SYMBOLS, ELIGIBILITY_LOOKBACK_DAYS} from "@/lib/navigator/config";
+import {SECTOR_KEY_PREFIX} from "@/lib/brain/config";
+import {ETF_TO_SECTOR_KEY} from "@/lib/prices/sectors";
 import {getOwnedAccount} from "@/lib/trading/accounts";
 import {buildPriceMap, computePortfolio} from "@/lib/trading/valuation";
 import {getEasternDateString} from "@/lib/dates";

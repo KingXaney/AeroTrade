@@ -4,7 +4,7 @@
 // whitelist, theme key convergence, bounded scores).
 
 import {z} from "zod";
-import {EXTRACTION_BATCH_SIZE, REDDIT_IMPORTANCE_CAP, SECTOR_SLUGS} from "@/lib/brain/config";
+import {EXTRACTION_BATCH_SIZE, REDDIT_IMPORTANCE_CAP, SECTOR_KEY_PREFIX, SECTOR_SLUGS} from "@/lib/brain/config";
 
 export const ExtractionBatchSchema = z.object({
     articles: z.array(z.object({
@@ -26,7 +26,6 @@ export type SanitizedExtraction = {id: string; eventType: ExtractionBatch["artic
 
 const TICKER_KEY_PATTERN = /^[A-Z.]{1,5}$/;
 const THEME_MAX_WORDS = 3;
-const SECTOR_KEY_PREFIX = "sector:";
 const THEME_KEY_PREFIX = "theme:";
 const SENTIMENT_MIN = -1;
 const SENTIMENT_MAX = 1;
