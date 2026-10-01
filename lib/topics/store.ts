@@ -1,6 +1,7 @@
 // Server-only reads for followed topics. Plain module (not 'use server') so the
 // reads are never exposed as POST endpoints; the actions live in lib/actions.
 
+import {cache} from "react";
 import type {Document} from "mongoose";
 import {connectToDatabase} from "@/database/mongoose";
 import Topic, {type TopicDoc} from "@/database/models/topic.model";
@@ -107,6 +108,10 @@ export const getTopicsOverview = async (userId: string): Promise<TopicsOverview>
     });
     return {topics: items, unseenTotal: items.reduce((sum, t) => sum + t.unseenCount, 0)};
 };
+
+// The sidebar card, the topics widgets, /settings and the /topics pages all read this once per
+// request; a page that has just written topics or articles re-reads getTopicsOverview directly.
+export const getCachedTopicsOverview = cache((userId: string) => getTopicsOverview(userId));
 
 export const getTopicArticles = async (
     keywordSetHash: number,

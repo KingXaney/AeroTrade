@@ -1,7 +1,6 @@
 import {notFound} from "next/navigation";
 import {requireUserId} from "@/lib/auth/session";
-import {ensureTopicHasArticles, getTopicArticles, getTopicsOverview} from "@/lib/topics/store";
-import {getCachedTopicsOverview} from "@/lib/dashboard/cached";
+import {ensureTopicHasArticles, getCachedTopicsOverview, getTopicArticles, getTopicsOverview} from "@/lib/topics/store";
 import TopicsShell from "@/components/topics/TopicsShell";
 import TopicHeader from "@/components/topics/TopicHeader";
 import TopicBrief from "@/components/topics/TopicBrief";

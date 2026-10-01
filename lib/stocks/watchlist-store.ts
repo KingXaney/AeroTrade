@@ -3,6 +3,7 @@
 // a userId would let any caller read anyone's watchlist. The writes, session-derived, are
 // lib/actions/watchlist.actions.ts.
 
+import {cache} from "react";
 import {connectToDatabase} from "@/database/mongoose";
 import Watchlist from "@/database/models/watchlist.model";
 
@@ -38,6 +39,9 @@ export const getWatchlistSymbolsByUserId = async (userId: string): Promise<strin
         return [];
     }
 };
+
+// Per-request dedupe shared by the (root) layout, the dashboard loaders and the news feed.
+export const getCachedWatchlistSymbols = cache((userId: string) => getWatchlistSymbolsByUserId(userId));
 
 // null when the read failed: callers say so rather than showing the empty state.
 export const getWatchlistForUser = async (userId: string): Promise<WatchlistEntry[] | null> => {

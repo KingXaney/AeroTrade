@@ -9,7 +9,7 @@ import DashboardSettings from "@/components/settings/DashboardSettings";
 import TopicsSettings from "@/components/settings/TopicsSettings";
 import NewsFeedSettings from "@/components/settings/NewsFeedSettings";
 import {getNewsFeedPrefs} from "@/lib/news/feed-store";
-import {getCachedTopicsOverview} from "@/lib/dashboard/cached";
+import {getCachedTopicsOverview} from "@/lib/topics/store";
 import {getVisibleLayout} from "@/lib/dashboard/availability";
 
 const SECTIONS = [

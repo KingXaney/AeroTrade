@@ -1,5 +1,5 @@
 import {requireUserId} from "@/lib/auth/session";
-import {getCachedWatchlistSymbols} from "@/lib/dashboard/cached";
+import {getCachedWatchlistSymbols} from "@/lib/stocks/watchlist-store";
 import {getNewsFeedForPrefs, getNewsFeedPrefs, getTopicFeedBatch} from "@/lib/news/feed-store";
 import {NEWS_PAGE_SIZE} from "@/lib/news/config";
 import {describeNewsFeed} from "@/lib/news/feed-prefs";

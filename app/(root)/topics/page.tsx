@@ -1,6 +1,5 @@
 import {requireUserId} from "@/lib/auth/session";
-import {ensureTopicHasArticles, getMergedTopicFeed, getTopicsOverview} from "@/lib/topics/store";
-import {getCachedTopicsOverview} from "@/lib/dashboard/cached";
+import {ensureTopicHasArticles, getCachedTopicsOverview, getMergedTopicFeed, getTopicsOverview} from "@/lib/topics/store";
 import {pickFirstRunTopic} from "@/lib/topics/first-run";
 import {seedDefaultTopics, shouldSeedDefaults} from "@/lib/topics/seed";
 import {isUntouchedDefaultSet} from "@/lib/topics/starters";
