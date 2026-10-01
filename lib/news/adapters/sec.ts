@@ -11,6 +11,7 @@ import {
 } from "@/lib/news/config";
 import {hashId} from "@/lib/text";
 import {formatArticle, FULL_SUMMARY_MAX_CHARS, validateArticle} from "@/lib/news/article";
+import type {MarketNewsArticle, RawNewsArticle} from '@/lib/news/types';
 
 // Shape of one <entry> from EDGAR's browse Atom feed when parsed with ignoreAttributes: false.
 // The <content> block carries structured filing metadata that is far more informative

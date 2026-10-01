@@ -15,6 +15,7 @@ import {
     unpricedLabel,
     winStatsFromCounts,
 } from '@/lib/trading/analytics';
+import type {PaperPosition} from '@/lib/trading/types';
 
 const pt = (date: string, value: number) => ({date, value});
 

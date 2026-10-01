@@ -13,6 +13,7 @@ import {SEARCH_FALLBACK_WINDOW} from "@/lib/news/config";
 import type {TopicBriefArticle} from "@/lib/topics/prompts";
 import {parseBriefText, type TopicBriefContent} from "@/lib/topics/brief";
 import {getEasternDateString} from "@/lib/dates";
+import type {NewsSourceType} from '@/lib/news/types';
 
 type KeywordGroup = {keywordSetHash: number; keywords: string[]; exclude: string[]};
 type RefreshResult = {fetched: number; matched: number; inserted: number};

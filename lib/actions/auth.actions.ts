@@ -22,6 +22,7 @@ import {
 } from "@/lib/auth/limits";
 import {SIGN_UP_PROFILE_INVALID_MESSAGE, signUpProfile} from "@/lib/auth/sign-up-profile";
 import {seedDefaultTopics} from "@/lib/topics/seed";
+import type {SignInFormData, SignUpFormData} from '@/lib/auth/types';
 
 // Better-auth throws APIError-shaped objects with body.message; fall back to .message or a generic string.
 const extractAuthError = (e: unknown, fallback: string): string => {

@@ -24,6 +24,7 @@ import {
 } from "@/lib/news/feed-prefs";
 import {toFeedArticles} from "@/lib/news/topic-batch";
 import {getMergedTopicFeed} from "@/lib/topics/store";
+import type {MarketNewsArticle} from '@/lib/news/types';
 
 type NewsFeedResult = {
     articles: MarketNewsArticle[];

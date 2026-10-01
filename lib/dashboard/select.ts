@@ -3,6 +3,9 @@
 // (types/global.d.ts) and a type-only import, so vitest can load this without mongoose or React.
 
 import type {SuggestionSetView} from '@/lib/navigator/store';
+import type {BrainEntitySummary} from '@/lib/brain/types';
+import type {StockWithData} from '@/lib/stocks/types';
+import type {AccountWithPortfolio} from '@/lib/trading/types';
 
 export type BestStrategy = {name: string; totalReturnPct: number};
 

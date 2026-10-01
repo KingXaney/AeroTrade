@@ -20,6 +20,7 @@ import {
     type NewsFeedPrefs,
     type NewsRegionId,
 } from '@/lib/news/feed-prefs';
+import type {MarketNewsArticle} from '@/lib/news/types';
 
 // 'topics' is not a request — it is the stored followed-topic articles, injected straight
 // into the merge. It has no URL and never reaches feedRequestsFor or planFeedSlots.

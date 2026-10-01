@@ -1,8 +1,7 @@
-/* eslint-disable @typescript-eslint/no-explicit-any */
 'use client';
 
 import { useState } from 'react';
-import { Control, Controller, FieldError } from 'react-hook-form';
+import { Control, Controller, FieldError, FieldValues, Path } from 'react-hook-form';
 import {
     Popover,
     PopoverContent,
@@ -23,10 +22,11 @@ import { cn } from '@/lib/utils';
 import countryList from 'react-select-country-list';
 import * as Flags from 'country-flag-icons/react/3x2';
 
-type CountrySelectProps = {
-    name: string;
+// Generic over the form's values, so `name` must be one of its fields and `control` is that form's.
+type CountrySelectProps<T extends FieldValues> = {
+    name: Path<T>;
     label: string;
-    control: Control<any>;
+    control: Control<T>;
     error?: FieldError;
     required?: boolean;
 };
@@ -114,13 +114,13 @@ const CountrySelect = ({
     );
 };
 
-export const CountrySelectField = ({
+export const CountrySelectField = <T extends FieldValues>({
                                        name,
                                        label,
                                        control,
                                        error,
                                        required = false,
-                                   }: CountrySelectProps) => {
+                                   }: CountrySelectProps<T>) => {
     return (
         <div className='space-y-2'>
             <Label htmlFor={name} className='form-label'>

@@ -4,6 +4,7 @@ import {useTopicsUi} from "@/components/topics/TopicsShell";
 import RefreshTopicButton from "@/components/topics/RefreshTopicButton";
 import {refreshCooldownUntil} from "@/lib/topics/config";
 import {pickStalestTopic} from "@/lib/topics/first-run";
+import type {TopicOverviewItem} from '@/lib/topics/types';
 
 const mono = {fontFamily: 'var(--type-mono)'} as const;
 

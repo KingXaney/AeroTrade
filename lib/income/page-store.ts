@@ -10,6 +10,7 @@ import {apyFromDiscount, groupIncomeActivity, usableRate, withReceipts, type Inc
 import {getOwnedAccount} from "@/lib/trading/accounts";
 import {getTradeLedger} from "@/lib/trading/ledger";
 import {accountEpoch} from "@/lib/trading/epoch";
+import type {AccountIncomeSummary} from '@/lib/income/types';
 
 // The APY idle cash earns at the latest stored T-bill rate; null until a rate is stored, and
 // null again once that rate is stale by the income job's own rule (usableRate) — never a zero

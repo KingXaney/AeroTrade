@@ -8,6 +8,7 @@ import AccountSnapshot from "@/database/models/account-snapshot.model";
 import {getQuote} from "@/lib/prices/finnhub";
 import {enrichPosition, type PriceInfo} from "@/lib/trading/analytics";
 import {getAccountsForUser, getCachedAccountsForUser, getOwnedAccount, toAccountSummary, toPlainPositions} from "@/lib/trading/accounts";
+import type {AccountWithPortfolio, EnrichedPosition, PaperPosition, PortfolioSummary} from '@/lib/trading/types';
 
 // Minimal plain shape used to compute a portfolio (works for Mongoose docs after
 // mapping, lean docs, or a synthesized default account).

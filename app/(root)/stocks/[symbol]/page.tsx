@@ -21,6 +21,12 @@ import {getBoardRowsForSymbol} from "@/lib/strategies/page-store";
 import {strategiesWatching} from "@/lib/strategies/universe";
 import {cn} from "@/lib/utils";
 
+type StockDetailsPageProps = {
+    params: Promise<{
+        symbol: string;
+    }>;
+};
+
 // A failed board read hides "What the rules see" rather than reading as "no stored row".
 const readBoardRows = async (symbol: string): Promise<SymbolBoardRead[] | null> => {
     try {

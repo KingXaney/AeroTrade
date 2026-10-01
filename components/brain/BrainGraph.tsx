@@ -3,6 +3,7 @@
 import {useMemo, useState} from "react";
 import Link from "next/link";
 import {evidenceHref} from "@/lib/brain/links";
+import type {BrainEntitySummary, BrainEntityType} from '@/lib/brain/types';
 
 type GraphNode = BrainEntitySummary;
 type GraphEdge = {source: string; target: string; weight: number};

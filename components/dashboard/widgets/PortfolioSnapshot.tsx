@@ -2,6 +2,7 @@ import {cn} from "@/lib/utils";
 import {formatPct, formatPrice, getChangeColorClass} from "@/lib/format";
 import type {BestStrategy} from "@/lib/dashboard/select";
 import UnpricedNote from "@/components/trade/UnpricedNote";
+import type {PortfolioSummary} from '@/lib/trading/types';
 
 // Card body only: the widget shell provides the <Link> chrome and eyebrow label.
 const PortfolioSnapshot = ({portfolio, best}: {portfolio: PortfolioSummary; best?: BestStrategy}) => {

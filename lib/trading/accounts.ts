@@ -10,6 +10,7 @@ import PaperAccount, {type PaperAccountDoc} from "@/database/models/paper-accoun
 import PaperTrade from "@/database/models/paper-trade.model";
 import {PAPER_STARTING_BALANCE} from "@/lib/trading/starting-balance";
 import {accountEpoch} from "@/lib/trading/epoch";
+import type {PaperAccountSummary, PaperPosition} from '@/lib/trading/types';
 
 export const DEFAULT_ACCOUNT_NAME = 'Main Strategy';
 

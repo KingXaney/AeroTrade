@@ -7,6 +7,7 @@ import SellPositionDialog from "@/components/trade/SellPositionDialog";
 import type {Lot} from "@/lib/trading/lots";
 import UnpricedNote from "@/components/trade/UnpricedNote";
 import TradeLink from "@/components/trade/TradeLink";
+import type {EnrichedPosition} from '@/lib/trading/types';
 
 // Compact, horizontally-scrolling open-positions strip for the Trade page and the
 // dashboard's positions widget.

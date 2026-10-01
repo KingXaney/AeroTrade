@@ -5,6 +5,7 @@ import {formatEasternTimestamp, formatSignedPrice, formatPrice, getChangeColorCl
 import {REPLAY_COPY} from "@/lib/learn/copy/replay";
 import {boughtForLine, receiptLine} from "@/lib/learn/copy/receipts";
 import type {FillReceipt} from "@/lib/trading/receipts";
+import type {PaperTradeRecord, TradeSource} from '@/lib/trading/types';
 
 // Only automated fills get a chip: 'user' is the default reading of a trade log, and
 // rows from before the field existed carry no source at all — that absence is honest

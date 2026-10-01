@@ -1,5 +1,6 @@
 import {Document, model, models, Schema} from "mongoose";
 import {TRADE_REASON_MAX} from "@/lib/trading/config";
+import type {TradeSource} from '@/lib/trading/types';
 
 export interface PaperTradeDoc extends Document {
     userId: string;

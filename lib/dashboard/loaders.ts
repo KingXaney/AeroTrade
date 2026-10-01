@@ -24,6 +24,13 @@ import type {LearnFacts, OnboardingFacts} from "@/lib/learn/facts";
 import {getTodaysLesson} from "@/lib/learn/lesson-store";
 import type {Lesson} from "@/lib/learn/lesson";
 import {getDailyQuiz, type DailyQuizView} from "@/lib/learn/quiz-store";
+import type {BrainEntitySummary} from '@/lib/brain/types';
+import type {LeaderboardEntry} from '@/lib/friends/types';
+import type {NavigatorStatus} from '@/lib/navigator/types';
+import type {MarketNewsArticle} from '@/lib/news/types';
+import type {StockWithData} from '@/lib/stocks/types';
+import type {MergedTopicArticle, TopicsOverview} from '@/lib/topics/types';
+import type {AccountAnalytics, AccountWithPortfolio, PaperTradeRecord} from '@/lib/trading/types';
 
 // Followed strategies first, then the top of the ranking.
 const STRATEGY_WIDGET_LIMIT = 5;

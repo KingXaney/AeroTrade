@@ -11,6 +11,7 @@ import {signUpWithEmail} from "@/lib/actions/auth.actions";
 import {EMAIL_RULE, PASSWORD_RULE} from "@/lib/auth/validation";
 import {useRouter} from "next/navigation";
 import {toast} from "sonner";
+import type {SignUpFormData} from '@/lib/auth/types';
 
 const SignUp = () => {
     const router = useRouter();
@@ -87,7 +88,7 @@ const SignUp = () => {
                 <CountrySelectField
                     name="country"
                     label="Country"
-                    control={control as never}
+                    control={control}
                     error={errors.country}
                     required
                 />

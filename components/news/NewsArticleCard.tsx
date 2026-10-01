@@ -1,5 +1,6 @@
 import {cn} from "@/lib/utils";
 import {formatTimeAgoSeconds} from "@/lib/format";
+import type {MarketNewsArticle} from '@/lib/news/types';
 
 // One card for every headline surface — the News page, the dashboard widget and
 // /history. This markup used to live twice, inline. The summary is shown only when it

@@ -3,6 +3,9 @@ import NavItems from "@/components/NavItems";
 import UserDropdown from "@/components/UserDropdown";
 import MobileNav from "@/components/MobileNav";
 import type {NavBadges} from "@/lib/shell/navigation";
+import type {User} from '@/lib/auth/types';
+import type {Stock} from '@/lib/stocks/types';
+import type {TopicLink} from '@/lib/topics/types';
 
 type HeaderProps = {
     user: User;

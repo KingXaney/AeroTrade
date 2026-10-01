@@ -1,3 +1,5 @@
+import type {LeaderboardEntry} from '@/lib/friends/types';
+
 const FriendsRank = ({leaderboard}: {leaderboard: LeaderboardEntry[]}) => {
     const myRank = leaderboard.findIndex((e) => e.isYou) + 1;
     const hasFriends = leaderboard.length > 1;

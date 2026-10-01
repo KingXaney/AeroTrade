@@ -26,6 +26,13 @@ import {resolveStrategy, shapeQuantLeaderboard, shapeQuantStrategy, shapeUnknown
 import {STRATEGY_SLUGS} from "@/lib/strategies/catalog";
 import {getLatestRun, getStrategyLeaderboard} from "@/lib/strategies/page-store";
 import {priceLargestHoldings, readLearnerValue} from "@/lib/chat/learner-hooks";
+import type {ChatToolName} from '@/lib/chat/types';
+import type {Stock} from '@/lib/stocks/types';
+import type {TopicView} from '@/lib/topics/types';
+
+type StockWithWatchlistStatus = Stock & {
+    isInWatchlist: boolean;
+};
 
 const TOPIC_FEED_DEFAULT = 5;
 const TOPIC_FEED_MAX = 10;

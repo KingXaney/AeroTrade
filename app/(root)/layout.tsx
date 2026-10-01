@@ -12,6 +12,7 @@ import ThemeSync from "@/components/theme/ThemeSync";
 import {getAppearanceForUser} from "@/lib/theme/store";
 import {countIncomingRequests} from "@/lib/friends/store";
 import type {NavBadges} from "@/lib/shell/navigation";
+import type {TopicsOverview} from '@/lib/topics/types';
 
 // Every page under (root) reads the session from request headers, so they can never be
 // statically prerendered. Declaring this avoids a build-time dynamic-usage error.

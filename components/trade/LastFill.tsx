@@ -3,6 +3,7 @@ import MicroLabel from "@/components/primitives/MicroLabel";
 import {cn} from "@/lib/utils";
 import {LAST_FILL_COPY, receiptLine} from "@/lib/learn/copy/receipts";
 import type {FillReceipt} from "@/lib/trading/receipts";
+import type {PaperTradeRecord} from '@/lib/trading/types';
 
 // The trade desk's most recent fill in the active account: what it was, what it did to the
 // account (the receipt) and, when the learner wrote one, their why. Server component; the

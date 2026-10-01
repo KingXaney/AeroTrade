@@ -7,6 +7,8 @@ import {toast} from "sonner";
 import {enrollAiNavigator, pauseAiNavigator, resumeAiNavigator, runAiNavigatorNow, unenrollAiNavigator} from "@/lib/actions/navigator.actions";
 import {PAPER_STARTING_BALANCE, STARTING_BALANCE_RANGE, resolveStartingBalance} from "@/lib/trading/starting-balance";
 import {runWithToast} from "@/lib/action-toast";
+import type {ActionResult} from '@/lib/actions/types';
+import type {NavigatorStatus} from '@/lib/navigator/types';
 
 // Enrollment + kill switch for the AI-managed paper account.
 const NavigatorCard = ({status}: {status: NavigatorStatus}) => {
@@ -18,7 +20,7 @@ const NavigatorCard = ({status}: {status: NavigatorStatus}) => {
     const balanceNum = startBalance === '' ? 0 : parseInt(startBalance, 10);
     const balanceValid = resolveStartingBalance(balanceNum) !== null;
 
-    const run = async (action: () => Promise<OrderResult>) => {
+    const run = async (action: () => Promise<ActionResult>) => {
         if (busy) return;
         setBusy(true);
         try {

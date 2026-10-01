@@ -3,3 +3,15 @@
 
 export type RatePoint = {date: string; discountPct: number};
 export type DividendPoint = {symbol: string; exDate: string; perShare: number};
+
+export type FinnhubSearchResult = {
+    symbol: string;
+    description: string;
+    displaySymbol?: string;
+    type: string;
+};
+
+export type QuoteData = {
+    c?: number;
+    dp?: number;
+};

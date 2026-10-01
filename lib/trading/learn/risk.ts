@@ -7,6 +7,7 @@
 // days in three move less than it.
 
 import {isTradingDay} from "@/lib/prices/market-hours";
+import type {PerfPoint} from '@/lib/trading/types';
 
 // Two daily changes are the fewest a spread can be measured from.
 export const MIN_SWING_POINTS = 3;

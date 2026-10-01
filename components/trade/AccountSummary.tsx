@@ -4,6 +4,8 @@ import {formatPct, formatSignedPrice, formatPrice, getChangeColorClass} from "@/
 import UnpricedNote from "@/components/trade/UnpricedNote";
 import Term from "@/components/primitives/Term";
 import WhatTheseMean from "@/components/learn/WhatTheseMean";
+import type {AccountIncomeSummary} from '@/lib/income/types';
+import type {PortfolioSummary} from '@/lib/trading/types';
 
 const Stat = ({label, value, valueClass, hint}: {label: ReactNode; value: string; valueClass?: string; hint?: string}) => (
     <div className="flex flex-col gap-1">

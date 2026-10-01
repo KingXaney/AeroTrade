@@ -10,6 +10,8 @@ import {getOwnedAccount, toPlainPositions} from "@/lib/trading/accounts";
 import {applyFill, type FillRejection} from "@/lib/trading/fill";
 import {TRADE_REASON_MAX} from "@/lib/trading/config";
 import {isOrderSide} from "@/lib/trading/order-math";
+import type {ActionResult} from '@/lib/actions/types';
+import type {PaperPosition, TradeSource} from '@/lib/trading/types';
 
 type OrderRequest = {
     accountId: string;
@@ -37,7 +39,7 @@ export const FUNDING_SELL_FAILED = 'Skipped: a funding sell failed this run';
 export const executeOrder = async (
     userId: string,
     {accountId, symbol, side, quantity, minCashAfter, source, reason, idempotencyKey}: OrderRequest,
-): Promise<OrderResult & {price?: number}> => {
+): Promise<ActionResult & {price?: number}> => {
     try {
         // Checked before anything else: any other value used to run the sell branch, commit the
         // account update, and only then fail the trade row's enum — cash moved, no trade.

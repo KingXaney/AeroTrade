@@ -4,6 +4,7 @@ import {formatDrawdown, formatPrice, formatSignedPrice, roundPct, getChangeColor
 import Term from "@/components/primitives/Term";
 import WhatTheseMean from "@/components/learn/WhatTheseMean";
 import {DRAWDOWN_COPY, drawdownLine} from "@/lib/learn/copy/portfolio";
+import type {AccountAnalytics} from '@/lib/trading/types';
 
 // The one analytics tile: exported so the risk lens (components/learn/RiskLens.tsx) is built
 // from it rather than from a third copy.

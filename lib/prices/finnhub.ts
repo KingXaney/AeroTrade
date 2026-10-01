@@ -7,6 +7,23 @@ import {validateArticle, formatArticle} from "@/lib/news/article";
 import {formatPrice, formatChangePercent, formatMarketCapValue} from "@/lib/format";
 import {POPULAR_STOCK_SYMBOLS} from "@/lib/stocks/popular";
 import {FINANCIALS_REVALIDATE_SECONDS, PROFILE_REVALIDATE_SECONDS} from "@/lib/prices/config";
+import type {MarketNewsArticle, RawNewsArticle} from '@/lib/news/types';
+import type {FinnhubSearchResult, QuoteData} from '@/lib/prices/types';
+import type {Stock, StockWithData} from '@/lib/stocks/types';
+
+type ProfileData = {
+    name?: string;
+    marketCapitalization?: number;
+};
+
+type FinancialsData = {
+    metric?: { [key: string]: number };
+};
+
+type FinnhubSearchResponse = {
+    count: number;
+    result: FinnhubSearchResult[];
+};
 
 const FINNHUB_BASE_URL = 'https://finnhub.io/api/v1';
 // Server-only. NEXT_PUBLIC_FINNHUB_API_KEY is still honoured for existing deployments.

@@ -1,3 +1,5 @@
+import type {DrawdownWindow, EnrichedPosition, PaperPosition, PerfPoint, SnapshotPoint} from '@/lib/trading/types';
+
 // Per-account performance math. Deliberately PURE — no DB, no server imports —
 // so vitest can cover it without a database. The server reads that feed these
 // live in analytics-store.ts (getAccountAnalytics, getComparisonStats).

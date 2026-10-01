@@ -12,6 +12,17 @@ import {PAPER_STARTING_BALANCE} from "@/lib/trading/starting-balance";
 import {countUnpriced} from "@/lib/trading/analytics";
 import {DEFAULT_ACCOUNT_NAME} from "@/lib/trading/accounts";
 import {buildPriceMap, computePortfolio, getPortfoliosForUser, type AccountLike} from "@/lib/trading/valuation";
+import type {FriendRequest, FriendSummary, LeaderboardEntry, SentFriendRequest} from '@/lib/friends/types';
+import type {PaperPosition, PortfolioSummary} from '@/lib/trading/types';
+
+type FriendProfile = {
+    id: string;
+    name: string;
+    email: string;
+    portfolio: PortfolioSummary;  // the friend's best strategy account
+    accountName: string;
+    accounts: {name: string; totalValue: number; totalReturnPct: number; unpriced: number; holdings: number}[];
+};
 
 // ============================================================================
 // --- Helpers ---

@@ -13,6 +13,7 @@ import {
 
 import {LogOut, ChevronDown, Newspaper, Settings} from "lucide-react";
 import {useSignOut} from "@/hooks/useSignOut";
+import type {User} from '@/lib/auth/types';
 
 // No longer needs the stock/topic lists: it used to render a duplicate NavItems for
 // mobile, which the hamburger drawer replaces.

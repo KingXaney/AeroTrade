@@ -11,6 +11,15 @@ import {createTopic} from "@/lib/actions/topics.actions";
 import {NAME_MAX} from "@/lib/topics/config";
 import {useDebounce} from "@/hooks/useDebounce";
 import {searchGlossary} from "@/lib/learn/glossary";
+import type {Stock} from '@/lib/stocks/types';
+import type {TopicLink} from '@/lib/topics/types';
+
+type SearchCommandProps = {
+    renderAs?: 'button' | 'text';
+    label?: string;
+    initialStocks: Stock[];
+    initialTopics?: TopicLink[];   // followed topics, so ⌘K opens instead of duplicating
+};
 
 // Anything shorter reads as a ticker prefix, not a topic.
 const TOPIC_MIN_CHARS = 3;

@@ -2,6 +2,7 @@
 // its decisions — it never picks positions or sizes.
 
 import {injectJson} from "@/lib/ai/prompt-utils";
+import type {SuggestionItem} from '@/lib/navigator/types';
 
 // Shared by the weekly run and the enrollment bootstrap, which must narrate
 // identically. Goes through injectJson for the same reason the extraction prompt

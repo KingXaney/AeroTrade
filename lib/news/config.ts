@@ -1,3 +1,5 @@
+import type {NewsSourceType} from '@/lib/news/types';
+
 // Single knob file for the multi-source news digest — feeds, caps, and identity strings are swappable here without code changes.
 
 // `name` identifies the feed in logs; `outlet` is the publisher as the news feed's outlet

@@ -3,6 +3,7 @@
 
 import {formatPrice} from "@/lib/format";
 import type {Cadence, RowState, SeriesPoint, SeriesStats, SignalColumn, SignalFormat, SignalRow, StrategyFamily, StrategyId} from "@/lib/strategies/types";
+import type {PerfPoint} from '@/lib/trading/types';
 
 export type LiveRecord = {
     totalValue: number;

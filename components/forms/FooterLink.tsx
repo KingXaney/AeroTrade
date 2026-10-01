@@ -1,5 +1,11 @@
 import Link from "next/link";
 
+type FooterLinkProps = {
+    text: string;
+    linkText: string;
+    href: string;
+};
+
 const FooterLink = ({ text, linkText, href }: FooterLinkProps) => {
     return (
         <div className="text-center pt-4">

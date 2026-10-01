@@ -1,3 +1,5 @@
+import type {RawNewsArticle} from '@/lib/news/types';
+
 // Shaping a raw news item (Finnhub, RSS, Reddit, SEC, Google News search) into the article the
 // digest, the feed and the news brain read: which raw items qualify, and the one formatted shape.
 // Pure — it imports nothing.

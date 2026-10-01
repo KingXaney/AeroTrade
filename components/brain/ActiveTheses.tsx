@@ -9,6 +9,7 @@ import WhatTheseMean from "@/components/learn/WhatTheseMean";
 import {BRAIN_COPY} from "@/lib/learn/copy/brain";
 import type {SinceThesisLegs} from "@/lib/brain/since-thesis";
 import {evidenceHref} from "@/lib/brain/links";
+import type {BrainEntitySummary} from '@/lib/brain/types';
 
 const MS_PER_WEEK = 7 * 24 * 60 * 60 * 1000;
 

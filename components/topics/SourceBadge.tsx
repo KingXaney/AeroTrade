@@ -1,3 +1,5 @@
+import type {NewsSourceType} from '@/lib/news/types';
+
 const LABELS: Record<NewsSourceType, string> = {
     finance: 'Markets',
     rss: 'News',

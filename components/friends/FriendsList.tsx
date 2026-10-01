@@ -6,6 +6,7 @@ import {useRouter} from "next/navigation";
 import {toast} from "sonner";
 import {removeFriend} from "@/lib/actions/friends.actions";
 import ConfirmDialog from "@/components/ui/ConfirmDialog";
+import type {FriendSummary} from '@/lib/friends/types';
 
 const FriendsList = ({friends}: {friends: FriendSummary[]}) => {
     const router = useRouter();

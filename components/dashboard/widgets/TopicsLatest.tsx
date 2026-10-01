@@ -1,4 +1,5 @@
 import TopicArticleCard from "@/components/topics/TopicArticleCard";
+import type {MergedTopicArticle} from '@/lib/topics/types';
 
 // The merged feed, each card tagged with the topic it matched.
 const TopicsLatest = ({articles, span}: {articles: MergedTopicArticle[]; span: number}) => (

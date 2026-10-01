@@ -5,6 +5,7 @@ import {useRouter} from "next/navigation";
 import {toast} from "sonner";
 import {formatTimeAgoMs} from "@/lib/format";
 import {removeFriend} from "@/lib/actions/friends.actions";
+import type {SentFriendRequest} from '@/lib/friends/types';
 
 // After sending a request the user had no view of it at all: a toast, and then nothing.
 // Did it reach the right person? Were they ignoring it? Was the address a typo? And since

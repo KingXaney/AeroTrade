@@ -11,6 +11,7 @@ import {
     toSwitcherAccounts,
 } from '@/lib/trading/active-account';
 import {ACTIVE_ACCOUNT_COOKIE} from '@/lib/trading/config';
+import type {AccountWithPortfolio, PortfolioSummary} from '@/lib/trading/types';
 
 const summary = (overrides: Partial<PortfolioSummary> = {}): PortfolioSummary => ({
     startingBalance: 100_000,

@@ -7,8 +7,21 @@ import {
     SelectTrigger,
     SelectValue,
 } from "@/components/ui/select"
+import type {Control, FieldError, FieldValues, Path} from 'react-hook-form';
+import type {Option} from '@/components/forms/types';
 
-const SelectField = ({ name, label, placeholder, options, control, error, required = false }: SelectFieldProps) => {
+// Generic over the form's values, so `name` must be one of its fields and `control` is that form's.
+type SelectFieldProps<T extends FieldValues> = {
+    name: Path<T>;
+    label: string;
+    placeholder: string;
+    options: readonly Option[];
+    control: Control<T>;
+    error?: FieldError;
+    required?: boolean;
+};
+
+const SelectField = <T extends FieldValues>({ name, label, placeholder, options, control, error, required = false }: SelectFieldProps<T>) => {
     return (
         <div className="space-y-2">
             <Label htmlFor={name} className="form-label">{label}</Label>

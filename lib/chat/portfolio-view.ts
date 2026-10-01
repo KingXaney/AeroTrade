@@ -1,3 +1,5 @@
+import type {AccountWithPortfolio, EnrichedPosition, PaperTradeRecord, PortfolioSummary} from '@/lib/trading/types';
+
 // Shaping the paper accounts into something the chat model can read.
 //
 // Pure on purpose: the account reads it shapes (lib/trading/accounts, valuation) are

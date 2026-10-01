@@ -7,6 +7,7 @@ import {fetchRssNews} from "@/lib/news/adapters/rss";
 import {fetchSecFilings} from "@/lib/news/adapters/sec";
 import {SOURCE_CAPS, TOTAL_ARTICLE_CAP} from "@/lib/news/config";
 import {dedupeArticles} from "@/lib/news/dedupe";
+import type {MarketNewsArticle, NewsSourceType} from '@/lib/news/types';
 
 // Email sections render in this order — finance wires lead, social chatter closes.
 // 'web' is capped at 0 by default (topics never reach the digest); it sits in these

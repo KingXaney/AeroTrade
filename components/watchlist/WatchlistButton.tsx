@@ -6,6 +6,14 @@ import {toast} from "sonner";
 import {cn} from "@/lib/utils";
 import {addToWatchlist, removeFromWatchlist} from "@/lib/actions/watchlist.actions";
 
+type WatchlistButtonProps = {
+    symbol: string;
+    company: string;
+    isInWatchlist: boolean;
+    showTrashIcon?: boolean;
+    type?: 'button' | 'icon';
+};
+
 const WatchlistButton = ({
     symbol,
     company,

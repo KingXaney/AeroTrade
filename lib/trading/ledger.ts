@@ -9,6 +9,7 @@ import PaperAccount from "@/database/models/paper-account.model";
 import PaperTrade from "@/database/models/paper-trade.model";
 import {DEFAULT_ACCOUNT_NAME, getOwnedAccount} from "@/lib/trading/accounts";
 import type {CsvTrade} from "@/lib/trading/csv";
+import type {PaperTradeRecord, TradeSource} from '@/lib/trading/types';
 
 type LeanTrade = {
     _id: unknown; symbol: string; company?: string; side: 'buy' | 'sell'; quantity: number; price: number; total: number;

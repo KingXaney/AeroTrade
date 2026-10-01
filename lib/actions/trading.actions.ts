@@ -4,6 +4,7 @@ import {revalidatePath} from "next/cache";
 import {getCurrentUserId} from "@/lib/auth/session";
 import {executeOrder} from "@/lib/trading/orders";
 import {sanitizeTradeNote} from "@/lib/trading/order-math";
+import type {ActionResult} from '@/lib/actions/types';
 
 // Every surface that shows account data — trade desk, portfolio hub, dashboard, friends.
 // The account lifecycle (create, rename, reset, delete) is accounts.actions.ts.
@@ -21,7 +22,7 @@ const revalidateTradingPaths = () => {
 // arrive from the client unchecked; sanitizeTradeNote keeps only a bounded one-line string.
 export const placeOrder = async (
     {symbol, side, quantity, accountId, note}: {symbol: string; side: 'buy' | 'sell'; quantity: number; accountId: string; note?: unknown},
-): Promise<OrderResult> => {
+): Promise<ActionResult> => {
     const userId = await getCurrentUserId();
     if (!userId) return {success: false, message: 'Not authenticated'};
 

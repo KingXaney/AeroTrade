@@ -11,6 +11,7 @@ import type {Lot} from "@/lib/trading/lots";
 import {SELL_NOTES_COPY} from "@/lib/learn/copy/receipts";
 import MicroLabel from "@/components/primitives/MicroLabel";
 import {Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle} from "@/components/ui/dialog";
+import type {EnrichedPosition} from '@/lib/trading/types';
 
 // Sell dialog for one open position — pick how many shares to sell via free
 // entry or 25/50/75/Max presets. Parents mount it conditionally per selected

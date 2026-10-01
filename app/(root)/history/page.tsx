@@ -8,6 +8,7 @@ import TradeHistory from "@/components/trade/TradeHistory";
 import NewsArticleCard from "@/components/news/NewsArticleCard";
 import {WATCHLIST_COPY} from "@/lib/learn/copy/watchlist";
 import {formatEasternTimestamp} from "@/lib/format";
+import type {MarketNewsArticle} from '@/lib/news/types';
 
 const HistoryPage = async () => {
     const userId = await requireUserId();

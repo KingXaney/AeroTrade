@@ -4,6 +4,8 @@ import Link from "next/link";
 import {usePathname} from "next/navigation";
 import SearchCommand from "@/components/search/SearchCommand";
 import {HEADER_NAV_ITEMS, isActiveNav} from "@/lib/shell/navigation";
+import type {Stock} from '@/lib/stocks/types';
+import type {TopicLink} from '@/lib/topics/types';
 
 type NavItemsProps = {
     initialStocks: Stock[];

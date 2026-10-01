@@ -5,6 +5,7 @@
 import {headers} from "next/headers";
 import {redirect} from "next/navigation";
 import {auth} from "@/lib/auth/server";
+import type {User} from '@/lib/auth/types';
 
 // The signed-in user as the (root) layout hands it to the shell, or null when signed out.
 // A failed session read throws, as better-auth's does: a page fails rather than signing out.

@@ -13,6 +13,7 @@ import {orderEffectLine, queueLine} from "@/lib/learn/copy/trade";
 import {NOTE_COPY} from "@/lib/learn/copy/receipts";
 import {TRADE_REASON_MAX} from "@/lib/trading/config";
 import WhatTheseMean from "@/components/learn/WhatTheseMean";
+import type {Stock} from '@/lib/stocks/types';
 
 type OrderPanelProps = {
     defaultSymbol?: string;

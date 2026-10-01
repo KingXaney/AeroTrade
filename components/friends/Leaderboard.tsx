@@ -2,6 +2,7 @@ import Link from "next/link";
 import {cn} from "@/lib/utils";
 import {formatPct, formatPrice, getChangeColorClass} from "@/lib/format";
 import {unpricedLabel} from "@/lib/trading/analytics";
+import type {LeaderboardEntry} from '@/lib/friends/types';
 
 // Medal colours come from --rank-* in globals.css, not the palette registry: gold is a
 // material, not a semantic role, so it stays gold in every theme (darkened under the

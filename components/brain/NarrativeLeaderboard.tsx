@@ -5,6 +5,7 @@ import FollowTopicButton from "@/components/topics/FollowTopicButton";
 import {THESIS_WEIGHT_THRESHOLD} from "@/lib/brain/config";
 import {evidenceHref} from "@/lib/brain/links";
 import {BRAIN_COPY} from "@/lib/learn/copy/brain";
+import type {BrainEntitySummary, BrainEntityType} from '@/lib/brain/types';
 
 // Lower-cased topic name -> the user's topic; only the /brain page passes it.
 export type FollowedByName = Record<string, {id: string; slug: string}>;

@@ -40,6 +40,7 @@ import {
     type StrategyLeaderboardRow,
     type StrategyRunView,
 } from "@/lib/strategies/views";
+import type {AccountAnalytics, PaperTradeRecord, SnapshotPoint} from '@/lib/trading/types';
 
 const DETAIL_TRADE_LIMIT = 100;
 

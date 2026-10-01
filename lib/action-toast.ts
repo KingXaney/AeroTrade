@@ -1,3 +1,5 @@
+import type {ActionResult} from '@/lib/actions/types';
+
 // A server action called from a client button, with its outcome toasted. Pure and
 // client-safe: the caller hands in sonner's `toast`, so vitest can pass a recorder.
 //
@@ -12,7 +14,7 @@ type Toaster = {success: (message: string) => unknown; error: (message: string) 
 
 // True when the action succeeded, so the caller can refresh.
 export const runWithToast = async (
-    action: () => Promise<OrderResult>,
+    action: () => Promise<ActionResult>,
     toaster: Toaster,
     fallbacks: {success: string; error: string},
 ): Promise<boolean> => {

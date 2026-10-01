@@ -1,12 +1,13 @@
 import Link from "next/link";
 import {formatTimeAgoSeconds} from "@/lib/format";
+import type {TopicsOverview as TopicsOverviewData} from "@/lib/topics/types";
 
 const MAX_ROWS = 6;
 const mono = {fontFamily: 'var(--type-mono)'} as const;
 
 // Same order as the /topics rail: unseen first, then most recently updated.
 // Wider spans get the latest headline under each name.
-const TopicsOverview = ({overview, span}: {overview: TopicsOverview; span: number}) => {
+const TopicsOverview = ({overview, span}: {overview: TopicsOverviewData; span: number}) => {
     const rows = [...overview.topics]
         .sort((a, b) => b.unseenCount - a.unseenCount || (b.latest?.datetime ?? 0) - (a.latest?.datetime ?? 0))
         .slice(0, MAX_ROWS);

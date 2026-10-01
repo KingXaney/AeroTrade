@@ -12,10 +12,12 @@ import {keywordSetHash, slugify} from "@/lib/topics/normalize";
 import {requestTopicFirstRun, requestTopicRefresh} from "@/lib/topics/events";
 import {seedDefaultTopics} from "@/lib/topics/seed";
 import {getTopicArticles, toTopicView} from "@/lib/topics/store";
+import type {ActionResult} from '@/lib/actions/types';
+import type {TopicArticleView, TopicView} from '@/lib/topics/types';
 
-type TopicResult = OrderResult & {topic?: TopicView};
+type TopicResult = ActionResult & {topic?: TopicView};
 type TopicFeedPageResult = {success: boolean; message?: string; articles: TopicArticleView[]};
-type RefreshTopicResult = OrderResult & {cooldownUntil?: number};   // epoch ms; present whenever a cooldown applies
+type RefreshTopicResult = ActionResult & {cooldownUntil?: number};   // epoch ms; present whenever a cooldown applies
 type FollowTopicsResult = {success: boolean; message?: string; created: number; firstSlug: string | null};
 
 const FEED_PAGE_MAX = 50;
@@ -140,7 +142,7 @@ export const updateTopic = async (topicId: string, input: unknown): Promise<Topi
     }
 };
 
-export const deleteTopic = async (topicId: string): Promise<OrderResult> => {
+export const deleteTopic = async (topicId: string): Promise<ActionResult> => {
     const userId = await getCurrentUserId();
     if (!userId) return {success: false, message: 'Not authenticated'};
     if (!isValidObjectId(topicId)) return {success: false, message: 'Unknown topic'};
@@ -161,7 +163,7 @@ export const deleteTopic = async (topicId: string): Promise<OrderResult> => {
     }
 };
 
-export const markTopicSeen = async (topicId: string): Promise<OrderResult> => {
+export const markTopicSeen = async (topicId: string): Promise<ActionResult> => {
     const userId = await getCurrentUserId();
     if (!userId) return {success: false, message: 'Not authenticated'};
     if (!isValidObjectId(topicId)) return {success: false, message: 'Unknown topic'};

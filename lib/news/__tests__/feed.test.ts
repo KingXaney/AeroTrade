@@ -29,6 +29,7 @@ import {
     type NewsFeedPrefs,
 } from '@/lib/news/feed-prefs';
 import {FEED_DIGEST_CAP, GOOGLE_NEWS_BASE, MAX_FEED_REQUESTS, RSS_FEEDS, TOTAL_ARTICLE_CAP, yahooSymbolFeed} from '@/lib/news/config';
+import type {MarketNewsArticle} from '@/lib/news/types';
 
 const NOW = 1_800_000_000;
 

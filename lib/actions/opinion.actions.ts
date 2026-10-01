@@ -19,12 +19,13 @@ import {
     SECOND_OPINION_MAX_CHARS,
 } from "@/lib/brain/opinion-text";
 import {buildStandaloneSecondOpinionPrompt} from "@/lib/brain/prompts";
+import type {ActionResult} from '@/lib/actions/types';
 
 const MIN_PASTED_CHARS = 40;
 
 // Path 1 — API key configured: queue the background Claude call. Paid, so it
 // sits behind a session and a cool-down that stops the button becoming a bill.
-export const requestSecondOpinion = async (): Promise<OrderResult> => {
+export const requestSecondOpinion = async (): Promise<ActionResult> => {
     try {
         const userId = await getCurrentUserId();
         if (!userId) return {success: false, message: 'Not authenticated'};
@@ -92,7 +93,7 @@ export const getSecondOpinionPrompt = async (): Promise<{success: boolean; promp
 
 // Path 2 (return leg): save what Claude answered on claude.ai. Scoped to the
 // pasting user, link-stripped, and rendered as markdown without raw HTML.
-export const saveManualSecondOpinion = async (opinionMd: string): Promise<OrderResult> => {
+export const saveManualSecondOpinion = async (opinionMd: string): Promise<ActionResult> => {
     try {
         const userId = await getCurrentUserId();
         if (!userId) return {success: false, message: 'Not authenticated'};

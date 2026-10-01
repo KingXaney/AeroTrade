@@ -6,6 +6,11 @@ import TradeLink from "@/components/trade/TradeLink";
 import Term from "@/components/primitives/Term";
 import WhatTheseMean from "@/components/learn/WhatTheseMean";
 import Panel from "@/components/primitives/Panel";
+import type {StockWithData} from '@/lib/stocks/types';
+
+type WatchlistTableProps = {
+    watchlist: StockWithData[];
+};
 
 const WatchlistTable = ({watchlist}: WatchlistTableProps) => {
     return (

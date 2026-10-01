@@ -7,6 +7,8 @@ import {toFeedArticles} from '@/lib/news/topic-batch';
 import {feedUrlKey, mergeFeed, type FeedBatch} from '@/lib/news/feed';
 import {FEED_MAX_AGE_SECONDS} from '@/lib/news/config';
 import {hashId} from '@/lib/text';
+import type {MarketNewsArticle} from '@/lib/news/types';
+import type {MergedTopicArticle} from '@/lib/topics/types';
 
 const NOW = 1_700_000_000;
 

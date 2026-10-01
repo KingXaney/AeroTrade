@@ -6,6 +6,7 @@
 
 import {ACTIVE_ACCOUNT_COOKIE} from '@/lib/trading/config';
 import {countUnpriced} from '@/lib/trading/analytics';
+import type {AccountWithPortfolio} from '@/lib/trading/types';
 
 // SuggestionPanel's "apply to" picker.
 export type ApplyAccount = {id: string; name: string};

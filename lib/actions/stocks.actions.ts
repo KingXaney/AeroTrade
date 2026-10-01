@@ -5,6 +5,8 @@
 // They take no user id, so they read nothing of anyone's.
 
 import {getQuote as fetchQuote, searchStocks as fetchStocks} from "@/lib/prices/finnhub";
+import type {QuoteData} from '@/lib/prices/types';
+import type {Stock} from '@/lib/stocks/types';
 
 export const searchStocks = async (query?: string): Promise<Stock[]> => fetchStocks(query);
 

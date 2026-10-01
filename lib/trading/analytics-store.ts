@@ -24,6 +24,7 @@ import {getOwnedAccount, toAccountSummary, toPlainPositions} from "@/lib/trading
 import {buildPriceMap, computePortfolio} from "@/lib/trading/valuation";
 import {epochTradesOf, getTradeLedger} from "@/lib/trading/ledger";
 import {getIncomeSummary} from "@/lib/income/page-store";
+import type {AccountAnalytics, SnapshotPoint} from '@/lib/trading/types';
 
 // Everything the /portfolio analytics section needs for one account: current
 // summary, %-return series vs the SPY benchmark, drawdown and trade stats.

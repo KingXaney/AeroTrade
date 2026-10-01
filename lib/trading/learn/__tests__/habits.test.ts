@@ -14,6 +14,7 @@ import {
 } from '@/lib/trading/learn/habits';
 import type {LedgerTrade} from '@/lib/trading/lots';
 import {STRATEGIES} from '@/lib/strategies/catalog';
+import type {TradeSource} from '@/lib/trading/types';
 
 const DAY = 86_400_000;
 // Noon ET on Monday Sep 28 2026 (16:00 UTC).

@@ -7,6 +7,7 @@ import MarketStatus from "@/components/system/MarketStatus";
 import Panel from "@/components/primitives/Panel";
 import {WATCHLIST_COPY} from "@/lib/learn/copy/watchlist";
 import {marketStatus} from "@/lib/prices/market-hours";
+import type {StockWithData} from '@/lib/stocks/types';
 
 const WatchlistPage = async () => {
     const userId = await requireUserId();

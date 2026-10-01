@@ -12,6 +12,7 @@ import {BENCHMARK_SYMBOL} from "@/lib/prices/config";
 import {buildPriceMap, computePortfolio} from "@/lib/trading/valuation";
 import {type PriceInfo} from "@/lib/trading/analytics";
 import {accountEpoch} from "@/lib/trading/epoch";
+import type {PaperPosition} from '@/lib/trading/types';
 
 // One account as the job memoizes it between steps (plain JSON).
 type SnapshotAccount = {

@@ -32,6 +32,7 @@ import TimeInMarket from "@/components/strategies/TimeInMarket";
 import WhatIfLab from "@/components/strategies/WhatIfLab";
 import {TIME_IN_MARKET_STRATEGY} from "@/lib/strategies/learn/time-in-market";
 import {getTimeInMarket} from "@/lib/strategies/learn/time-in-market-store";
+import type {PaperTradeRecord} from '@/lib/trading/types';
 
 type StrategyPageProps = {
     params: Promise<{slug: string}>;

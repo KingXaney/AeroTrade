@@ -6,10 +6,11 @@ import {connectToDatabase} from "@/database/mongoose";
 import Friendship from "@/database/models/friendship.model";
 import {getCurrentUserId} from "@/lib/auth/session";
 import {findUserByEmail} from "@/lib/friends/store";
+import type {ActionResult} from '@/lib/actions/types';
 
 // The friends' writes, each for the signed-in user. The reads are lib/friends/store.ts.
 
-export const sendFriendRequest = async (email: string): Promise<OrderResult> => {
+export const sendFriendRequest = async (email: string): Promise<ActionResult> => {
     try {
         const userId = await getCurrentUserId();
         if (!userId) return {success: false, message: 'Not authenticated'};
@@ -40,7 +41,7 @@ export const sendFriendRequest = async (email: string): Promise<OrderResult> => 
     }
 };
 
-export const respondToFriendRequest = async (friendshipId: string, accept: boolean): Promise<OrderResult> => {
+export const respondToFriendRequest = async (friendshipId: string, accept: boolean): Promise<ActionResult> => {
     try {
         const userId = await getCurrentUserId();
         if (!userId) return {success: false, message: 'Not authenticated'};
@@ -66,7 +67,7 @@ export const respondToFriendRequest = async (friendshipId: string, accept: boole
     }
 };
 
-export const removeFriend = async (friendshipId: string): Promise<OrderResult> => {
+export const removeFriend = async (friendshipId: string): Promise<ActionResult> => {
     try {
         const userId = await getCurrentUserId();
         if (!userId) return {success: false, message: 'Not authenticated'};

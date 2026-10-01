@@ -10,6 +10,7 @@ import AccountIncome from "@/database/models/account-income.model";
 import AiNavigator from "@/database/models/ai-navigator.model";
 import {getEasternDateString} from "@/lib/dates";
 import {getOwnedAccount} from "@/lib/trading/accounts";
+import type {ActionResult} from '@/lib/actions/types';
 
 // Write today's baseline snapshot for a fresh (created or just-reset) account so the
 // performance chart has a day-0 point immediately instead of waiting for the cron.
@@ -77,7 +78,7 @@ export const restartAccount = async (
 export const deleteOwnedAccount = async (
     userId: string,
     accountId: string,
-): Promise<OrderResult & {deletedId?: string}> => {
+): Promise<ActionResult & {deletedId?: string}> => {
     const account = await getOwnedAccount(userId, accountId);
     if (!account) return {success: false, message: 'Strategy account not found'};
 

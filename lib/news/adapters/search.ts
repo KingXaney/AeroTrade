@@ -15,6 +15,7 @@ import {
 } from "@/lib/news/config";
 import {parseRssXml} from "@/lib/news/adapters/rss";
 import {formatArticle, validateArticle} from "@/lib/news/article";
+import type {MarketNewsArticle, RawNewsArticle} from '@/lib/news/types';
 
 type NextFetchInit = RequestInit & {next?: {revalidate: number}};
 

@@ -4,13 +4,14 @@ import {connectToDatabase} from "@/database/mongoose";
 import {getCurrentUserId} from "@/lib/auth/session";
 import {unsetPreference, upsertPreferences} from "@/lib/settings/preferences-store";
 import {DashboardLayoutSchema, normalizeLayout, resetLayout, type DashboardLayout} from "@/lib/dashboard/layout";
+import type {ActionResult} from '@/lib/actions/types';
 
 // Writes only. Reads live in lib/dashboard/layout-store.ts (a plain server module),
 // so they are not exposed as POST endpoints. Neither action revalidates a path:
 // an action-triggered re-render would remount the dashboard grid before the
 // client finishes its own save flow, so callers refresh explicitly.
 
-type LayoutResult = OrderResult & {layout?: DashboardLayout};
+type LayoutResult = ActionResult & {layout?: DashboardLayout};
 
 export const saveDashboardLayout = async (input: unknown): Promise<LayoutResult> => {
     const userId = await getCurrentUserId();

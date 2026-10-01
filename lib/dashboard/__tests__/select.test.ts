@@ -1,6 +1,9 @@
 import {describe, expect, it} from 'vitest';
 import {bestStrategy, newsBrainSummary, topMovers} from '@/lib/dashboard/select';
 import type {SuggestionSetView} from '@/lib/navigator/store';
+import type {BrainEntitySummary} from '@/lib/brain/types';
+import type {StockWithData} from '@/lib/stocks/types';
+import type {AccountWithPortfolio, PortfolioSummary} from '@/lib/trading/types';
 
 const summary = (overrides: Partial<PortfolioSummary> = {}): PortfolioSummary => ({
     startingBalance: 100_000,

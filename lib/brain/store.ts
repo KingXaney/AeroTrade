@@ -11,6 +11,7 @@ import {createDayMemo, remember} from "@/lib/day-memo";
 import {addCalendarDays, getEasternDateString} from "@/lib/dates";
 import {countPricedSymbols, getBarsFrom, getLatestBars} from "@/lib/prices/store";
 import {getAllJobHealth, type JobHealth} from "@/lib/jobs/health";
+import type {BrainEntitySummary, BrainEntityType} from '@/lib/brain/types';
 
 const toEntitySummary = (e: BrainEntityDoc): BrainEntitySummary => ({
     key: e.key,

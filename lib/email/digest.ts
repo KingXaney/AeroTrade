@@ -20,6 +20,8 @@ import {getActiveTheses} from "@/lib/brain/store";
 import {getTopicsDigestData} from "@/lib/topics/store";
 import {readLearnFacts} from "@/lib/learn/facts-store";
 import {readLessonForDigest} from "@/lib/learn/lesson-store";
+import type {SuggestionItem} from '@/lib/navigator/types';
+import type {MarketNewsArticle} from '@/lib/news/types';
 
 // Bound the personalized symbol universe so per-user news fan-out stays cheap.
 const PERSONALIZED_SYMBOL_CAP = 10;

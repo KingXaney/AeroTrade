@@ -3,6 +3,7 @@
 import {formatArticle, validateArticle} from "@/lib/news/article";
 import {FEED_REVALIDATE_SECONDS, REDDIT_POST_LIMIT, redditUserAgent, SUBREDDITS} from "@/lib/news/config";
 import {hashId, escapeRegExp} from "@/lib/text";
+import type {MarketNewsArticle, RawNewsArticle} from '@/lib/news/types';
 
 export type RedditPost = {
     title: string;

@@ -41,6 +41,8 @@ vi.mock('@/lib/chat/learner-hooks', () => ({priceLargestHoldings: vi.fn(), readL
 
 import {buildTools} from '@/lib/chat/tools';
 import {FEED_WATCHLIST_SYMBOL_CAP} from '@/lib/news/config';
+import type {SuggestionItem} from '@/lib/navigator/types';
+import type {Stock} from '@/lib/stocks/types';
 
 const tools = buildTools('user-1');
 

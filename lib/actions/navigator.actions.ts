@@ -14,6 +14,8 @@ import {getQuote} from "@/lib/prices/finnhub";
 import {AI_NAVIGATOR_ACCOUNT_NAME} from "@/lib/navigator/config";
 import {inngest} from "@/lib/jobs/client";
 import {JOBS} from "@/lib/jobs/registry";
+import type {ActionResult} from '@/lib/actions/types';
+import type {SuggestionAction} from '@/lib/navigator/types';
 
 const revalidateNavigatorPaths = () => {
     revalidatePath('/brain');
@@ -26,7 +28,7 @@ const revalidateNavigatorPaths = () => {
 // user picks how much the AI starts with (default $100k).
 export const enrollAiNavigator = async (
     {startingBalance}: {startingBalance?: number} = {},
-): Promise<OrderResult> => {
+): Promise<ActionResult> => {
     try {
         const userId = await getCurrentUserId();
         if (!userId) return {success: false, message: 'Not authenticated'};
@@ -88,7 +90,7 @@ export const enrollAiNavigator = async (
     }
 };
 
-const setNavigatorStatus = async (status: 'active' | 'paused'): Promise<OrderResult> => {
+const setNavigatorStatus = async (status: 'active' | 'paused'): Promise<ActionResult> => {
     try {
         const userId = await getCurrentUserId();
         if (!userId) return {success: false, message: 'Not authenticated'};
@@ -105,13 +107,13 @@ const setNavigatorStatus = async (status: 'active' | 'paused'): Promise<OrderRes
     }
 };
 
-export const pauseAiNavigator = async (): Promise<OrderResult> => setNavigatorStatus('paused');
-export const resumeAiNavigator = async (): Promise<OrderResult> => setNavigatorStatus('active');
+export const pauseAiNavigator = async (): Promise<ActionResult> => setNavigatorStatus('paused');
+export const resumeAiNavigator = async (): Promise<ActionResult> => setNavigatorStatus('active');
 
 // Manual "Run AI now": trades if this week's budget is still unclaimed (the weekly
 // run happening early), otherwise produces a badged preview analysis — so it's
 // always safe to press for a health check or a point-in-time read.
-export const runAiNavigatorNow = async (): Promise<OrderResult> => {
+export const runAiNavigatorNow = async (): Promise<ActionResult> => {
     try {
         const userId = await getCurrentUserId();
         if (!userId) return {success: false, message: 'Not authenticated'};
@@ -131,7 +133,7 @@ export const runAiNavigatorNow = async (): Promise<OrderResult> => {
 
 // Unenroll keeps the paper account (least destructive) — delete it via the normal
 // account management flow if desired.
-export const unenrollAiNavigator = async (): Promise<OrderResult> => {
+export const unenrollAiNavigator = async (): Promise<ActionResult> => {
     try {
         const userId = await getCurrentUserId();
         if (!userId) return {success: false, message: 'Not authenticated'};
@@ -152,7 +154,7 @@ export const unenrollAiNavigator = async (): Promise<OrderResult> => {
 // account and execute through the exact same path the AI trader uses.
 export const applySuggestion = async (
     {symbol, action, targetWeight, accountId}: {symbol: string; action: SuggestionAction; targetWeight: number; accountId: string},
-): Promise<OrderResult> => {
+): Promise<ActionResult> => {
     try {
         const userId = await getCurrentUserId();
         if (!userId) return {success: false, message: 'Not authenticated'};

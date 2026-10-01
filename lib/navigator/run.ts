@@ -22,6 +22,8 @@ import {navigatorTargets, type NavigatorUniverse} from "@/lib/navigator/universe
 import {buildHoldItems, buildOrderItem, planAccountOrders, type AccountPlan} from "@/lib/navigator/store";
 import type {TargetWeight} from "@/lib/navigator/allocator";
 import type {ScoredSymbol} from "@/lib/navigator/scoring";
+import type {ActionResult} from '@/lib/actions/types';
+import type {SuggestionItem} from '@/lib/navigator/types';
 
 // One step per chunk of the universe: a single 40-symbol step with Yahoo's spacing would
 // exceed the route's 60 s budget and be retried from scratch. Steps are `${stepPrefix}-${i}`.
@@ -99,7 +101,7 @@ export const executeNavigatorPlan = async (
     const items: SuggestionItem[] = [];
     let sellFailed = false;
     for (const order of plan.planned) {
-        let result: OrderResult & {price?: number};
+        let result: ActionResult & {price?: number};
         if (sellFailed && order.side === 'buy') {
             // The plan funded buys with sell proceeds — without them, buying could drain
             // cash through the floor.

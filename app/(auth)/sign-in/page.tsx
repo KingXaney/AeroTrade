@@ -9,6 +9,7 @@ import { signInWithEmail } from "@/lib/actions/auth.actions";
 import { EMAIL_RULE, PASSWORD_RULE } from "@/lib/auth/validation";
 import { useRouter } from "next/navigation";
 import { toast } from "sonner";
+import type {SignInFormData} from '@/lib/auth/types';
 
 const SignIn = () => {
     const router = useRouter();

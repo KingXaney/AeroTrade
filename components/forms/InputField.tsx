@@ -2,8 +2,22 @@ import React from 'react'
 import {Label} from "@/components/ui/label";
 import {Input} from "@/components/ui/input";
 import {cn} from "@/lib/utils";
+import type {FieldError, FieldValues, Path, RegisterOptions, UseFormRegister} from 'react-hook-form';
 
-const InputField = ({ name, label, placeholder, type = "text", register, error, validation, disabled, value }: FormInputProps) => {
+// Generic over the form's values, so `name` must be one of its fields and `register` is that form's.
+type FormInputProps<T extends FieldValues> = {
+    name: Path<T>;
+    label: string;
+    placeholder: string;
+    type?: string;
+    register: UseFormRegister<T>;
+    error?: FieldError;
+    validation?: RegisterOptions<T, Path<T>>;
+    disabled?: boolean;
+    value?: string;
+};
+
+const InputField = <T extends FieldValues>({ name, label, placeholder, type = "text", register, error, validation, disabled, value }: FormInputProps<T>) => {
     return (
         <div className="space-y-2">
             <Label htmlFor={name} className="form-label">
