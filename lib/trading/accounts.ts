@@ -7,7 +7,7 @@ import {Types} from "mongoose";
 import {connectToDatabase} from "@/database/mongoose";
 import PaperAccount, {type PaperAccountDoc} from "@/database/models/paper-account.model";
 import PaperTrade from "@/database/models/paper-trade.model";
-import {PAPER_STARTING_BALANCE} from "@/lib/trading/config";
+import {PAPER_STARTING_BALANCE} from "@/lib/trading/starting-balance";
 
 export const DEFAULT_ACCOUNT_NAME = 'Main Strategy';
 

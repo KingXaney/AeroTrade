@@ -4,16 +4,11 @@ import {revalidatePath} from "next/cache";
 import {cookies} from "next/headers";
 import PaperAccount from "@/database/models/paper-account.model";
 import {connectToDatabase} from "@/database/mongoose";
-import {
-    ACTIVE_ACCOUNT_COOKIE,
-    MAX_PAPER_ACCOUNTS,
-    MAX_STARTING_BALANCE,
-    MIN_STARTING_BALANCE,
-} from "@/lib/trading/config";
+import {ACTIVE_ACCOUNT_COOKIE, MAX_PAPER_ACCOUNTS} from "@/lib/trading/config";
 import {getCurrentUserId} from "@/lib/auth/session";
 import {getAccountsForUser, getOwnedAccount} from "@/lib/trading/accounts";
-import {resolveStartingBalance} from "@/lib/trading/starting-balance";
-import {deleteOwnedAccount, seedDayZeroSnapshot} from "@/lib/trading/lifecycle";
+import {PAPER_STARTING_BALANCE, STARTING_BALANCE_RANGE, resolveStartingBalance} from "@/lib/trading/starting-balance";
+import {deleteOwnedAccount, restartAccount, seedDayZeroSnapshot} from "@/lib/trading/lifecycle";
 
 const ACCOUNT_NAME_MAX_LENGTH = 40;
 const ACTIVE_COOKIE_MAX_AGE_SECONDS = 60 * 60 * 24 * 365;
@@ -83,7 +78,7 @@ export const createPaperAccount = async (
 
         const balance = resolveStartingBalance(startingBalance);
         if (balance === null) {
-            return {success: false, message: `Starting balance must be between $${MIN_STARTING_BALANCE.toLocaleString('en-US')} and $${MAX_STARTING_BALANCE.toLocaleString('en-US')}`};
+            return {success: false, message: `Starting balance must be between ${STARTING_BALANCE_RANGE}`};
         }
 
         const accounts = await getAccountsForUser(userId);
@@ -159,6 +154,32 @@ export const renamePaperAccount = async ({accountId, name}: {accountId: string; 
         }
         console.error('Error renaming account:', error);
         return {success: false, message: 'Could not rename the account'};
+    }
+};
+
+// Reset one strategy account: back to starting cash, no positions, cleared trade log
+// and performance history, with inception re-anchored to now. Preserves the account's
+// own starting balance unless a new one is passed.
+export const resetPaperAccount = async (accountId: string, startingBalance?: number): Promise<OrderResult> => {
+    try {
+        const userId = await getCurrentUserId();
+        if (!userId) return {success: false, message: 'Not authenticated'};
+
+        const account = await getOwnedAccount(userId, accountId);
+        if (!account) return {success: false, message: 'Strategy account not found'};
+
+        const balance = startingBalance === undefined
+            ? (account.startingBalance || PAPER_STARTING_BALANCE)
+            : resolveStartingBalance(startingBalance);
+        if (balance === null) return {success: false, message: 'Invalid starting balance'};
+
+        await restartAccount(userId, account, balance, {sweepLegacyTrades: true});
+
+        revalidateAccountPaths();
+        return {success: true, message: `${account.name || 'Strategy'} reset to $${balance.toLocaleString('en-US')}`};
+    } catch (error) {
+        console.error('Error resetting account:', error);
+        return {success: false, message: 'Reset failed'};
     }
 };
 

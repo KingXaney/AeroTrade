@@ -4,7 +4,7 @@ import {useState} from "react";
 import {useRouter} from "next/navigation";
 import {toast} from "sonner";
 import {createPaperAccount} from "@/lib/actions/accounts.actions";
-import {MAX_STARTING_BALANCE, MIN_STARTING_BALANCE, PAPER_STARTING_BALANCE} from "@/lib/trading/config";
+import {PAPER_STARTING_BALANCE, STARTING_BALANCE_RANGE, resolveStartingBalance} from "@/lib/trading/starting-balance";
 import {Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle} from "@/components/ui/dialog";
 
 // Name a new strategy account and pick its starting balance. Mounted conditionally
@@ -17,7 +17,7 @@ const CreateAccountDialog = ({onClose}: {onClose: () => void}) => {
     const [submitting, setSubmitting] = useState(false);
 
     const balanceNum = balance === '' ? 0 : parseInt(balance, 10);
-    const balanceValid = balanceNum >= MIN_STARTING_BALANCE && balanceNum <= MAX_STARTING_BALANCE;
+    const balanceValid = resolveStartingBalance(balanceNum) !== null;
     const valid = name.trim().length > 0 && name.trim().length <= 40 && balanceValid;
 
     const onConfirm = async () => {
@@ -82,7 +82,7 @@ const CreateAccountDialog = ({onClose}: {onClose: () => void}) => {
                         />
                         {!balanceValid && balance !== '' && (
                             <p className="mt-1 text-xs text-negative">
-                                Between ${MIN_STARTING_BALANCE.toLocaleString('en-US')} and ${MAX_STARTING_BALANCE.toLocaleString('en-US')}
+                                Between {STARTING_BALANCE_RANGE}
                             </p>
                         )}
                     </div>

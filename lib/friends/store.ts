@@ -8,7 +8,7 @@ import type {Db} from "mongodb";
 import {connectToDatabase} from "@/database/mongoose";
 import Friendship from "@/database/models/friendship.model";
 import PaperAccount from "@/database/models/paper-account.model";
-import {PAPER_STARTING_BALANCE} from "@/lib/trading/config";
+import {PAPER_STARTING_BALANCE} from "@/lib/trading/starting-balance";
 import {countUnpriced} from "@/lib/trading/analytics";
 import {DEFAULT_ACCOUNT_NAME} from "@/lib/trading/accounts";
 import {buildPriceMap, computePortfolio, getPortfoliosForUser, type AccountLike} from "@/lib/trading/valuation";

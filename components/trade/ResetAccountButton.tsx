@@ -3,7 +3,7 @@
 import {useState} from "react";
 import {useRouter} from "next/navigation";
 import {toast} from "sonner";
-import {resetPaperAccount} from "@/lib/actions/trading.actions";
+import {resetPaperAccount} from "@/lib/actions/accounts.actions";
 import {formatPrice} from "@/lib/format";
 import ConfirmDialog from "@/components/ui/ConfirmDialog";
 

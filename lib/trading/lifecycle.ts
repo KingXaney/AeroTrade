@@ -1,6 +1,7 @@
 // An account's lifecycle writes outside the 'use server' module: the day-zero snapshot a fresh
-// account starts with, and the delete behind deletePaperAccount, whose refusals are unit-tested
-// with the models stubbed. Server-only (DB-bound).
+// account starts with, the restart behind resetting an account and re-enrolling the AI
+// Navigator, and the delete behind deletePaperAccount, whose refusals are unit-tested with the
+// models stubbed. Server-only (DB-bound).
 
 import PaperAccount, {type PaperAccountDoc} from "@/database/models/paper-account.model";
 import PaperTrade from "@/database/models/paper-trade.model";
@@ -26,6 +27,40 @@ export const seedDayZeroSnapshot = async (account: PaperAccountDoc): Promise<voi
         },
         {upsert: true},
     );
+};
+
+// Restart an account at `balance`: cash only, no positions, inception re-anchored to now, and
+// its trades, snapshots and income rows deleted, then a day-zero snapshot at the new balance.
+// The watermark and totals are unset in the same update — a restarted account must never keep
+// a watermark claiming its old income.
+//
+// `sweepLegacyTrades` also deletes the user's pre-migration trades (no accountId). Before the
+// migration a user had exactly one account (the old unique index), so those rows are that
+// account's, and the migration's backfill would otherwise resurrect "deleted" history onto it.
+// Only the account a learner resets can be that one; the AI Navigator's never is.
+export const restartAccount = async (
+    userId: string,
+    account: PaperAccountDoc,
+    balance: number,
+    {sweepLegacyTrades = false}: {sweepLegacyTrades?: boolean} = {},
+): Promise<void> => {
+    const id = String(account._id);
+    await PaperAccount.updateOne(
+        {_id: account._id, userId},
+        {
+            $set: {cash: balance, startingBalance: balance, positions: [], inceptionAt: new Date()},
+            $unset: {incomeThrough: 1, incomeTotals: 1},
+        },
+    );
+    await PaperTrade.deleteMany(sweepLegacyTrades
+        ? {userId, $or: [{accountId: id}, {accountId: {$exists: false}}]}
+        : {accountId: id});
+    await AccountSnapshot.deleteMany({accountId: id});
+    await AccountIncome.deleteMany({accountId: id});
+
+    // Re-read so the day-0 snapshot reflects the restarted balances.
+    const fresh = await getOwnedAccount(userId, id);
+    if (fresh) await seedDayZeroSnapshot(fresh);
 };
 
 // Delete a strategy account and everything scoped to it (trades, snapshots, income).

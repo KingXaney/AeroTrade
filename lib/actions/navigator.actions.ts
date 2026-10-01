@@ -5,14 +5,10 @@ import AiNavigator from "@/database/models/ai-navigator.model";
 import {connectToDatabase} from "@/database/mongoose";
 import {getCurrentUserId} from "@/lib/auth/session";
 import {createPaperAccount} from "@/lib/actions/accounts.actions";
-import PaperAccount from "@/database/models/paper-account.model";
-import PaperTrade from "@/database/models/paper-trade.model";
-import AccountSnapshot from "@/database/models/account-snapshot.model";
-import AccountIncome from "@/database/models/account-income.model";
 import {getAccountsForUser, getOwnedAccount} from "@/lib/trading/accounts";
 import {getPortfolio} from "@/lib/trading/valuation";
 import {resolveStartingBalance} from "@/lib/trading/starting-balance";
-import {seedDayZeroSnapshot} from "@/lib/trading/lifecycle";
+import {restartAccount} from "@/lib/trading/lifecycle";
 import {executeOrder} from "@/lib/trading/orders";
 import {getQuote} from "@/lib/prices/finnhub";
 import {AI_NAVIGATOR_ACCOUNT_NAME} from "@/lib/navigator/config";
@@ -52,21 +48,11 @@ export const enrollAiNavigator = async (
         let accountId = reusable ? String(reusable._id) : undefined;
         if (accountId && reusable && startingBalance !== undefined) {
             // Re-enrollment with a chosen balance: the reclaimed account is empty
-            // (guarded above), so restart it cleanly at the requested amount.
+            // (guarded above), so restart it cleanly at the requested amount. No legacy-trade
+            // sweep: this account was created after the migration, so those rows are not its.
             const balance = resolveStartingBalance(startingBalance);
             if (balance === null) return {success: false, message: 'Invalid starting balance'};
-            await PaperAccount.updateOne(
-                {_id: reusable._id, userId},
-                {
-                    $set: {cash: balance, startingBalance: balance, positions: [], inceptionAt: new Date()},
-                    $unset: {incomeThrough: 1, incomeTotals: 1},
-                },
-            );
-            await PaperTrade.deleteMany({accountId});
-            await AccountSnapshot.deleteMany({accountId});
-            await AccountIncome.deleteMany({accountId});
-            const fresh = await getOwnedAccount(userId, accountId);
-            if (fresh) await seedDayZeroSnapshot(fresh);
+            await restartAccount(userId, reusable, balance);
         }
         if (!accountId) {
             const created = await createPaperAccount({name: AI_NAVIGATOR_ACCOUNT_NAME, startingBalance});
