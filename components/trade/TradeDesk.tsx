@@ -8,7 +8,6 @@ import type {PositionLike} from "@/lib/trading/order-math";
 import {TRADE_CHART_WIDGET_CONFIG, tvScript} from "@/lib/stocks/tradingview";
 import {useDebounce} from "@/hooks/useDebounce";
 
-const SCRIPT_URL = tvScript('advanced-chart');
 const URL_SYNC_DELAY_MS = 300;
 
 type Props = {
@@ -58,7 +57,7 @@ const TradeDesk = ({chartSymbol, orderSymbol, cash, accountId, positions, queueN
                 <TradingViewWidget
                     key={symbol}
                     title="Advanced Chart"
-                    scriptUrl={SCRIPT_URL}
+                    scriptUrl={tvScript('advanced-chart')}
                     config={TRADE_CHART_WIDGET_CONFIG(symbol)}
                     height={560}
                 />
