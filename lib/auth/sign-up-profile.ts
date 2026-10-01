@@ -4,7 +4,7 @@
 // counter is spent or any account exists.
 
 import countryList from 'react-select-country-list';
-import {INVESTMENT_GOALS, PREFERRED_INDUSTRIES, RISK_TOLERANCE_OPTIONS} from '@/lib/constants';
+import {INVESTMENT_GOALS, PREFERRED_INDUSTRIES, RISK_TOLERANCE_OPTIONS} from '@/lib/auth/sign-up-options';
 
 export type SignUpProfile = {
     country: string;

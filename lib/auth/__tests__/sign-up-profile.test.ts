@@ -1,6 +1,6 @@
 import {describe, expect, it} from 'vitest';
 import countryList from 'react-select-country-list';
-import {INVESTMENT_GOALS, PREFERRED_INDUSTRIES, RISK_TOLERANCE_OPTIONS} from '@/lib/constants';
+import {INVESTMENT_GOALS, PREFERRED_INDUSTRIES, RISK_TOLERANCE_OPTIONS} from '@/lib/auth/sign-up-options';
 import {signUpProfile} from '@/lib/auth/sign-up-profile';
 
 const valid = {country: 'US', investmentGoals: 'Growth', riskTolerance: 'Medium', preferredIndustry: 'Technology'};
