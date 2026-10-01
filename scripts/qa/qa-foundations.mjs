@@ -2,17 +2,9 @@
 // the warning token resolving, route boundaries, and the in-app 404 keeping its chrome.
 // Run against the harness in README.md (in-memory Mongo on :27117 + `npm run dev`).
 import {chromium} from 'playwright';
-import {mkdirSync} from 'node:fs';
+import {BASE, DASHBOARD_URL, check, outDir, signUp, summary} from './lib.mjs';
 
-const BASE = 'http://localhost:3000';
-const OUT = new URL('./output/foundations/', import.meta.url).pathname;
-mkdirSync(OUT, {recursive: true});
-
-let failures = 0;
-const check = (name, ok, detail = '') => {
-    if (!ok) failures++;
-    console.log(`${ok ? 'PASS' : 'FAIL'}  ${name}${detail ? `  — ${detail}` : ''}`);
-};
+const OUT = outDir('foundations');
 
 const browser = await chromium.launch({channel: 'chrome'});
 const page = await browser.newPage({viewport: {width: 1440, height: 900}});
@@ -20,13 +12,8 @@ const shot = (n) => page.screenshot({path: `${OUT}${n}.png`, fullPage: true});
 
 try {
     // --- sign up ---------------------------------------------------------------
-    await page.goto(`${BASE}/sign-up`, {waitUntil: 'load'});
-    await page.fill('#fullName', 'QA Foundations');
-    await page.fill('#email', `qa${Date.now()}@example.com`);
-    await page.fill('#password', 'Passw0rd!Passw0rd!');
-    await page.click('button[type="submit"]');
-    await page.waitForURL(new RegExp(`^${BASE}/(\\?.*)?$`), {timeout: 90000});
-    check('sign-up lands on the dashboard', new RegExp(`^${BASE}/(\\?.*)?$`).test(page.url()), page.url());
+    await signUp(page, 'Foundations');
+    check('sign-up lands on the dashboard', DASHBOARD_URL.test(page.url()), page.url());
 
     // --- the warning token actually resolves (both globals.css edits landed) ----
     const warning = await page.evaluate(() =>
@@ -123,12 +110,10 @@ try {
     }
     await shot('04-mobile-portfolio');
 } catch (err) {
-    failures++;
-    console.log(`FAIL  threw: ${err.message}`);
+    check(`threw: ${err.message}`, false);
     await shot('99-error').catch(() => {});
 } finally {
     await browser.close();
 }
 
-console.log(failures === 0 ? '\nAll foundations checks passed.' : `\n${failures} check(s) failed.`);
-process.exit(failures === 0 ? 0 : 1);
+summary('foundations');

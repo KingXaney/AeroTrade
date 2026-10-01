@@ -11,15 +11,12 @@
 // Run against the harness in README.md (in-memory Mongo on :27117 + `npm run dev`).
 import {chromium} from 'playwright';
 import {MongoClient, ObjectId} from 'mongodb';
-import {mkdirSync} from 'node:fs';
 // The repo's own TypeScript loader (a dev dependency of the app's toolchain), so the checks below
 // can call the job's store functions as the job does, through Mongoose, on this harness database.
 import {createJiti} from 'jiti';
+import {BASE, MONGO, check, outDir, signUp, summary} from './lib.mjs';
 
-const BASE = 'http://localhost:3000';
-const MONGO = 'mongodb://127.0.0.1:27117/aerotrade';
-const OUT = new URL('./output/strategies/', import.meta.url).pathname;
-mkdirSync(OUT, {recursive: true});
+const OUT = outDir('strategies');
 
 const OWNER = 'system:strategies';
 // Mirrors lib/strategies/catalog.ts (slug → account name); the page reads the catalog itself.
@@ -34,12 +31,6 @@ const CATALOG = [
     ['low-volatility', 'Low Volatility Top 10'],
 ];
 
-let failures = 0;
-const check = (name, ok, detail = '') => {
-    if (!ok) failures++;
-    console.log(`${ok ? 'PASS' : 'FAIL'}  ${name}${detail ? `  — ${detail}` : ''}`);
-};
-
 const browser = await chromium.launch({channel: 'chrome'});
 const page = await browser.newPage({viewport: {width: 1440, height: 900}});
 const shot = (n) => page.screenshot({path: `${OUT}${n}.png`, fullPage: true});
@@ -53,14 +44,8 @@ const isoDaysAgo = (n) => new Date(Date.now() - n * 24 * 60 * 60 * 1000).toLocal
 
 try {
     await mongo.connect();
-    const db = mongo.db('aerotrade');
-    const email = `qastrat${Date.now()}@example.com`;
-    await page.goto(`${BASE}/sign-up`, {waitUntil: 'load'});
-    await page.fill('#fullName', 'QA Strategies');
-    await page.fill('#email', email);
-    await page.fill('#password', 'Passw0rd!Passw0rd!');
-    await page.click('button[type="submit"]');
-    await page.waitForURL(new RegExp(`^${BASE}/(\\?.*)?$`), {timeout: 90000});
+    const db = mongo.db();
+    const email = await signUp(page, 'Strategies');
     const userDoc = await db.collection('user').findOne({email});
     const userId = String(userDoc?._id ?? userDoc?.id ?? '');
     check('signed up', userId.length > 0);
@@ -431,7 +416,6 @@ try {
     check('…and persists nothing', (await storedDoc()) === docBefore && (await db.collection('papertrades').countDocuments({})) === tradesBefore);
     await shot('03b-whatif');
 
-
     // --- follow persists and drives the widget ------------------------------------------
     await page.locator('#strategy-follow').click();
     await page.getByText('Following — pinned on your dashboard widget').waitFor({timeout: 30000});
@@ -620,13 +604,11 @@ try {
         spyRules.replace(/\s+/g, ' ').slice(0, 200));
 
 } catch (err) {
-    failures++;
-    console.log(`FAIL  threw: ${err.message}`);
+    check(`threw: ${err.message}`, false);
     await shot('99-error').catch(() => {});
 } finally {
     await mongo.close().catch(() => {});
     await browser.close();
 }
 
-console.log(failures === 0 ? '\nAll strategies checks passed.' : `\n${failures} check(s) failed.`);
-process.exit(failures === 0 ? 0 : 1);
+summary('strategies');

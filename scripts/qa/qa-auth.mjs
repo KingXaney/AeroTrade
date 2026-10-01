@@ -14,27 +14,18 @@
 // session token its cookie carries, and the tab icon loads logged out.
 import {chromium} from 'playwright';
 import {MongoClient} from 'mongodb';
-import {mkdirSync} from 'node:fs';
+import {BASE, DASHBOARD_URL, MONGO, PASSWORD, check, outDir, summary} from './lib.mjs';
 
-const BASE = 'http://localhost:3000';
-const MONGO = 'mongodb://127.0.0.1:27117/aerotrade';
-const OUT = new URL('./output/auth/', import.meta.url).pathname;
-mkdirSync(OUT, {recursive: true});
+const OUT = outDir('auth');
 
 const NEUTRAL = 'If an account exists for that address, a reset link is on its way. It expires in 30 minutes.';
-const P1 = 'Passw0rd!Passw0rd!';
+const P1 = PASSWORD;
 const P2 = 'N3wPassw0rd!N3wPassw0rd!';
 // lib/auth/limits.ts: SIGN_IN_LIMITED_MESSAGE, SIGN_IN_EMAIL_LIMIT, SIGN_IN_CLIENT_LIMIT.
 const LIMITED = 'Too many sign-in attempts. Try again in a few minutes.';
 const SIGN_UP_LIMITED = 'Too many sign-up attempts from this network. Try again later.';
 const EMAIL_LIMIT = 10;
 const CLIENT_LIMIT = 30;
-
-let failures = 0;
-const check = (name, ok, detail = '') => {
-    if (!ok) failures++;
-    console.log(`${ok ? 'PASS' : 'FAIL'}  ${name}${detail ? `  — ${detail}` : ''}`);
-};
 
 const browser = await chromium.launch({channel: 'chrome'});
 const mongo = new MongoClient(MONGO);
@@ -62,7 +53,7 @@ const requestReset = async (email) => {
 
 try {
     await mongo.connect();
-    const db = mongo.db('aerotrade');
+    const db = mongo.db();
     const verification = db.collection('verification');
     limits = db.collection('ratelimits');
 
@@ -78,7 +69,7 @@ try {
     await page.click('button[type="submit"]');
     // Read before the page moves on, while the body is still the browser's to hand over.
     const signUpBody = await (await signUpAction).text();
-    await page.waitForURL(new RegExp(`^${BASE}/(\\?.*)?$`), {timeout: 90000});
+    await page.waitForURL(DASHBOARD_URL, {timeout: 90000});
     const signUpToken = await sessionToken(signedIn);
     check('the sign-up action returns no session token', Boolean(signUpToken) && signUpBody.length > 0 && !signUpBody.includes(signUpToken),
         signUpToken ? '' : 'no session cookie');
@@ -161,7 +152,7 @@ try {
     const signInAction = actionResponse();
     await page.click('button[type="submit"]');
     const signInBody = await (await signInAction).text();
-    await page.waitForURL(new RegExp(`^${BASE}/(\\?.*)?$`), {timeout: 60000});
+    await page.waitForURL(DASHBOARD_URL, {timeout: 60000});
     check('the new password signs in', true);
     const signInToken = await sessionToken(loggedOut);
     check('…and the sign-in action returns no session token', Boolean(signInToken) && signInBody.length > 0 && !signInBody.includes(signInToken),
@@ -259,8 +250,7 @@ try {
         await shot('05-sign-up-limited');
     }
 } catch (err) {
-    failures++;
-    console.log(`FAIL  threw: ${err.message}`);
+    check(`threw: ${err.message}`, false);
     if (page) await shot('99-error').catch(() => {});
 } finally {
     // Later suites sign in and sign up from this same client: leave no window open behind.
@@ -269,5 +259,4 @@ try {
     await browser.close();
 }
 
-console.log(failures === 0 ? '\nAll auth checks passed.' : `\n${failures} check(s) failed.`);
-process.exit(failures === 0 ? 0 : 1);
+summary('auth');

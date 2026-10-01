@@ -5,19 +5,9 @@
 // everything about the preference itself is deterministic.
 import {chromium} from 'playwright';
 import {MongoClient} from 'mongodb';
-import {mkdirSync} from 'node:fs';
+import {BASE, MONGO, check, note, outDir, signUp, summary} from './lib.mjs';
 
-const BASE = 'http://localhost:3000';
-const MONGO = 'mongodb://127.0.0.1:27117/aerotrade';
-const OUT = new URL('./output/news-feed/', import.meta.url).pathname;
-mkdirSync(OUT, {recursive: true});
-
-let failures = 0;
-const check = (name, ok, detail = '') => {
-    if (!ok) failures++;
-    console.log(`${ok ? 'PASS' : 'FAIL'}  ${name}${detail ? `  — ${detail}` : ''}`);
-};
-const note = (name, detail = '') => console.log(`NOTE  ${name}${detail ? `  — ${detail}` : ''}`);
+const OUT = outDir('news-feed');
 
 const browser = await chromium.launch({channel: 'chrome'});
 const page = await browser.newPage({viewport: {width: 1440, height: 900}});
@@ -32,19 +22,13 @@ const mongo = new MongoClient(MONGO);
 
 try {
     await mongo.connect();
-    const db = mongo.db('aerotrade');
+    const db = mongo.db();
     // Topic articles are shared by keywordSetHash, so a previous run's seeded story is
     // still in the feed — and because topics lead the rotation it would be the first
     // outlet the hidden-outlet section below picks, hiding the very source we seed.
     const QA_TOPIC_SOURCE = 'QA Topic Wire';
     await db.collection('topicarticles').deleteMany({source: {$in: [QA_TOPIC_SOURCE, 'QA Wire']}});
-    const email = `qanews${Date.now()}@example.com`;
-    await page.goto(`${BASE}/sign-up`, {waitUntil: 'load'});
-    await page.fill('#fullName', 'QA News');
-    await page.fill('#email', email);
-    await page.fill('#password', 'Passw0rd!Passw0rd!');
-    await page.click('button[type="submit"]');
-    await page.waitForURL(new RegExp(`^${BASE}/(\\?.*)?$`), {timeout: 90000});
+    const email = await signUp(page, 'News');
     const userDoc = await db.collection('user').findOne({email});
     const userId = String(userDoc?._id ?? userDoc?.id ?? '');
     check('signed up', userId.length > 0);
@@ -184,13 +168,11 @@ try {
     check('saving the default unsets the field again', (await prefsDoc())?.newsFeed === undefined);
     await shot('04-back-to-default');
 } catch (err) {
-    failures++;
-    console.log(`FAIL  threw: ${err.message}`);
+    check(`threw: ${err.message}`, false);
     await shot('99-error').catch(() => {});
 } finally {
     await mongo.close().catch(() => {});
     await browser.close();
 }
 
-console.log(failures === 0 ? '\nAll news-feed checks passed.' : `\n${failures} check(s) failed.`);
-process.exit(failures === 0 ? 0 : 1);
+summary('news-feed');

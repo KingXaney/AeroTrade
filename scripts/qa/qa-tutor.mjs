@@ -5,22 +5,13 @@
 // harness in README.md.
 import {chromium} from 'playwright';
 import {MongoClient} from 'mongodb';
-import {mkdirSync} from 'node:fs';
+import {BASE, MONGO, check, outDir, signUp, summary} from './lib.mjs';
 
-const BASE = 'http://localhost:3000';
-const MONGO = 'mongodb://127.0.0.1:27117/aerotrade';
-const OUT = new URL('./output/tutor/', import.meta.url).pathname;
-mkdirSync(OUT, {recursive: true});
+const OUT = outDir('tutor');
 
 const CHAT_DIALOG = '[role="dialog"][aria-label="AeroTrade assistant"]';
 const LIMITED = /a lot of messages/i;
 const CAPACITY = /shared budget/i;
-
-let failures = 0;
-const check = (name, ok, detail = '') => {
-    if (!ok) failures++;
-    console.log(`${ok ? 'PASS' : 'FAIL'}  ${name}${detail ? `  — ${detail}` : ''}`);
-};
 
 const browser = await chromium.launch({channel: 'chrome'});
 const page = await browser.newPage({viewport: {width: 1440, height: 900}});
@@ -29,14 +20,8 @@ const mongo = new MongoClient(MONGO);
 
 try {
     await mongo.connect();
-    const db = mongo.db('aerotrade');
-    const email = `qatutor${Date.now()}@example.com`;
-    await page.goto(`${BASE}/sign-up`, {waitUntil: 'load'});
-    await page.fill('#fullName', 'QA Tutor');
-    await page.fill('#email', email);
-    await page.fill('#password', 'Passw0rd!Passw0rd!');
-    await page.click('button[type="submit"]');
-    await page.waitForURL(new RegExp(`^${BASE}/(\\?.*)?$`), {timeout: 90000});
+    const db = mongo.db();
+    const email = await signUp(page, 'Tutor');
     const userDoc = await db.collection('user').findOne({email});
     const userId = String(userDoc?._id ?? userDoc?.id ?? '');
     check('signed up', userId.length > 0);
@@ -242,13 +227,11 @@ try {
     await page.unroute('**/api/chat');
     await shot('06-quant-chips');
 } catch (err) {
-    failures++;
-    console.log(`FAIL  threw: ${err.message}`);
+    check(`threw: ${err.message}`, false);
     await shot('99-error').catch(() => {});
 } finally {
     await mongo.close().catch(() => {});
     await browser.close();
 }
 
-console.log(failures === 0 ? '\nAll tutor checks passed.' : `\n${failures} check(s) failed.`);
-process.exit(failures === 0 ? 0 : 1);
+summary('tutor');
