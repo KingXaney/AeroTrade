@@ -1,15 +1,8 @@
 import Link from "next/link";
 import {notFound} from "next/navigation";
 import {requireUserId} from "@/lib/auth/session";
-import {getEasternDateString} from "@/lib/dates";
 import {STRATEGIES_DISCLAIMER} from "@/lib/strategies/catalog";
-import {getStrategyDetail} from "@/lib/strategies/page-store";
-import {formatSignalValue, pickPerfMode, toPerfSeries, visibleSignalColumns} from "@/lib/strategies/views";
-import {UNIVERSES} from "@/lib/strategies/universe";
-import {describeReplay, fillDate, isReplayExpired, matchFillToRun, replayReason} from "@/lib/strategies/learn/replay";
-import {explainVerdict, pickQuizRows} from "@/lib/strategies/learn/verdict";
-import {decodeReason} from "@/lib/learn/reasons";
-import {narrateBoard} from "@/lib/strategies/learn/board-narration";
+import {getStrategyPageView} from "@/lib/strategies/page-store";
 import {BOARD_COPY} from "@/lib/learn/copy/board";
 import {EXPORT_COPY} from "@/lib/learn/copy/export";
 import MicroLabel from "@/components/primitives/MicroLabel";
@@ -25,13 +18,11 @@ import SignalBoard from "@/components/strategies/SignalBoard";
 import SimulatedTradeList from "@/components/strategies/SimulatedTradeList";
 import StrategyExplainer from "@/components/strategies/StrategyExplainer";
 import StrategyPerformance from "@/components/strategies/StrategyPerformance";
-import VerdictQuiz, {type QuizRow} from "@/components/strategies/VerdictQuiz";
+import VerdictQuiz from "@/components/strategies/VerdictQuiz";
 import WhatTheseMean from "@/components/learn/WhatTheseMean";
 import BoardReading from "@/components/strategies/BoardReading";
 import TimeInMarket from "@/components/strategies/TimeInMarket";
 import WhatIfLab from "@/components/strategies/WhatIfLab";
-import {TIME_IN_MARKET_STRATEGY} from "@/lib/strategies/learn/time-in-market";
-import {getTimeInMarket} from "@/lib/strategies/learn/time-in-market-store";
 import type {PaperTradeRecord} from '@/lib/trading/types';
 
 type StrategyPageProps = {
@@ -40,61 +31,21 @@ type StrategyPageProps = {
     searchParams: Promise<{from?: string | string[]}>;
 };
 
-const CADENCE_LABEL = {once: 'buys once', daily: 'checked daily', monthly: 'rebalances monthly', quarterly: 'rebalances quarterly'} as const;
-
+// What this page shows is worked out in lib/strategies/detail-view.ts and read by
+// getStrategyPageView (lib/strategies/page-store.ts); the page only composes it.
 const StrategyPage = async ({params, searchParams}: StrategyPageProps) => {
     const userId = await requireUserId();
 
     const {slug} = await params;
-    const [detail, timeInMarket] = await Promise.all([
-        getStrategyDetail(slug, userId),
-        slug === TIME_IN_MARKET_STRATEGY ? searchParams.then(({from}) => getTimeInMarket(userId, from)) : null,
-    ]);
-    if (!detail) notFound();
+    const view = await getStrategyPageView(slug, userId, () => searchParams.then(({from}) => from));
+    if (!view) notFound();
 
-    const {def, state, analytics, trades, latestRun, backtest} = detail;
-    const started = state !== null && analytics !== null;
-    const liveSince = analytics ? getEasternDateString(new Date(analytics.account.inceptionAt)) : null;
-    const liveSeries = analytics?.series ?? [];
-    const simulatedSeries = backtest ? toPerfSeries(backtest.points, backtest.benchmark) : [];
-    const universeSize = UNIVERSES[def.universe].length;
-    const today = getEasternDateString();
+    const {def, state, analytics, trades, latestRun, backtest, timeInMarket, started, liveSince, boardReading, quizRows} = view;
 
-    // Only the columns the board actually shows get a definition or a quiz cell — a hidden
-    // column is not there to explain.
-    const shownColumns = visibleSignalColumns(def.signalColumns, latestRun?.board ?? []);
-    const boardTerms = shownColumns.map((column) => column.glossary ?? column.key);
-    // "Read this board": the row the board lists first, read by the rule's own narrator.
-    const boardReading = narrateBoard(def, latestRun);
-    const quizRows: QuizRow[] = latestRun && latestRun.board.length > 0
-        ? pickQuizRows(latestRun.board).map((row) => {
-            const verdict = explainVerdict(row, latestRun);
-            return {
-                symbol: row.symbol,
-                cells: shownColumns.map((column) => ({label: column.label, value: formatSignalValue(row.values[column.key], column.format)})),
-                ...verdict,
-                gloss: decodeReason(verdict.explanation, {def}).clauses,
-            };
-        })
-        : [];
-
-    // The one disclosure an automated fill carries: the stored row and planned order the
-    // rule looked at that morning, and that order's reason decoded.
+    // The one disclosure an automated fill carries (a server render prop on the trade log).
     const replayFor = (trade: PaperTradeRecord) => {
-        if (trade.source !== 'strategy') return null;
-        const date = fillDate(trade.createdAt);
-        const run = detail.replays[date] ?? null;
-        const match = run ? matchFillToRun(run, trade.symbol, trade.side) : null;
-        return (
-            <DecisionReplay
-                def={def}
-                row={match?.row ?? null}
-                order={match?.order ?? null}
-                caption={describeReplay(match, run?.asOf ?? null, isReplayExpired(date, today))}
-                reason={replayReason(match, trade.reason)}
-                symbol={trade.symbol}
-            />
-        );
+        const replay = view.fillReplays[trade.id];
+        return replay ? <DecisionReplay def={def} {...replay} /> : null;
     };
 
     return (
@@ -109,42 +60,24 @@ const StrategyPage = async ({params, searchParams}: StrategyPageProps) => {
                     <div className="min-w-0">
                         <h1 className="font-heading text-2xl font-semibold text-fg tracking-tight">{def.name}</h1>
                         <p className="font-mono text-xs text-fg-muted mt-1" id="strategy-meta">
-                            {def.family} · {CADENCE_LABEL[def.cadence]} · {universeSize} symbol{universeSize === 1 ? '' : 's'} ·{' '}
+                            {view.meta} ·{' '}
                             {started ? `live since ${liveSince}` : <span className="text-warning">not started</span>}
                         </p>
                         <p className="text-sm text-fg-soft mt-2 max-w-2xl">{def.explainer.summary}</p>
                         <p className="font-mono text-[11px] text-fg-muted mt-1" id="strategy-beginner-line">In one line: {def.explainer.beginnerLine}</p>
                     </div>
                 </div>
-                <FollowButton slug={def.id} followed={detail.followed} />
+                <FollowButton slug={def.id} followed={view.followed} />
             </div>
 
             <StrategyExplainer def={def} lastRebalanceDate={state?.lastRebalanceDate ?? null} defaultOpen={!started} />
 
             {analytics && <AccountSummary portfolio={analytics.summary} definitions />}
 
-            <StrategyPerformance
-                name={def.name}
-                initialMode={pickPerfMode(liveSeries.length, simulatedSeries.length)}
-                live={analytics && liveSince ? {
-                    series: liveSeries,
-                    stats: analytics,
-                    since: liveSince,
-                    snapshotDays: detail.snapshotDays,
-                    benchmarkReturnPct: detail.benchmarkReturnPct,
-                    totalReturnPct: analytics.summary.totalReturnPct,
-                } : null}
-                simulated={backtest ? {
-                    series: simulatedSeries,
-                    stats: backtest.stats,
-                    from: backtest.from,
-                    to: backtest.to,
-                    closeFills: backtest.closeFills,
-                } : null}
-            />
+            <StrategyPerformance name={def.name} {...view.performance} />
 
             {/* Every rule with a knob (not buy-and-hold): the nightly grid beside the stored backtest. */}
-            {detail.whatIf && <WhatIfLab view={detail.whatIf} />}
+            {view.whatIf && <WhatIfLab view={view.whatIf} />}
 
             {/* Buy-and-hold only; a failed read hides it rather than showing zeros. */}
             {timeInMarket && <TimeInMarket view={timeInMarket} path={`/strategies/${def.id}`} />}
@@ -165,7 +98,7 @@ const StrategyPage = async ({params, searchParams}: StrategyPageProps) => {
                     <LatestDecision
                         run={latestRun}
                         def={def}
-                        headline={latestRun ? detail.lastActionLine : undefined}
+                        headline={latestRun ? view.lastActionLine : undefined}
                         signals={(
                             /* While the quiz is open, LatestDecision hides everything in the panel that
                                states a verdict — the board's verdict cells, the top row's reading, the
@@ -176,7 +109,7 @@ const StrategyPage = async ({params, searchParams}: StrategyPageProps) => {
                             <div id="strategy-signals">
                                 <SignalBoard columns={def.signalColumns} run={latestRun} />
                                 {boardReading && (
-                                    <WhatTheseMean id="board-terms" keys={boardTerms} label={BOARD_COPY.summary(boardReading.symbol)}>
+                                    <WhatTheseMean id="board-terms" keys={view.boardTerms} label={BOARD_COPY.summary(boardReading.symbol)}>
                                         <BoardReading reading={boardReading} />
                                     </WhatTheseMean>
                                 )}

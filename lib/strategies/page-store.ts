@@ -28,6 +28,9 @@ import type {SeriesStats, SignalRow, StrategyDefinition, StrategyId} from "@/lib
 import {strategiesWatching} from "@/lib/strategies/universe";
 import {BENCHMARK_SYMBOL} from "@/lib/prices/config";
 import {whatIfLab, type StoredWhatIfVariant, type WhatIfLabView} from "@/lib/strategies/whatif";
+import {toStrategyDetailView, type StrategyDetailView} from "@/lib/strategies/detail-view";
+import {TIME_IN_MARKET_STRATEGY} from "@/lib/strategies/learn/time-in-market";
+import {getTimeInMarket, type TimeInMarketRead} from "@/lib/strategies/learn/time-in-market-store";
 import {
     describeLastRun,
     downsample,
@@ -330,7 +333,7 @@ export type StrategyBacktestView = {
     computedAt: number;
 };
 
-type StrategyDetail = {
+export type StrategyDetail = {
     def: StrategyDefinition;
     state: StrategyStateView | null;
     analytics: AccountAnalytics | null;
@@ -407,6 +410,27 @@ export const getStrategyDetail = cache(async (slug: string, userId: string | nul
         };
     }
 });
+
+export type StrategyPageView = StrategyDetail & StrategyDetailView & {
+    // "Time in the market" — buy-and-hold only; null elsewhere and when its read fails.
+    timeInMarket: TimeInMarketRead | null;
+};
+
+// The detail page's one read: the stored detail and, for buy-and-hold, "Time in the market",
+// in parallel, shaped by detail-view. `readFrom` yields the page's ?from= and is called only
+// for buy-and-hold, the one strategy whose panel reads it. Null for a slug the catalog does not know.
+export const getStrategyPageView = async (
+    slug: string,
+    userId: string,
+    readFrom: () => Promise<string | string[] | undefined>,
+): Promise<StrategyPageView | null> => {
+    const [detail, timeInMarket] = await Promise.all([
+        getStrategyDetail(slug, userId),
+        slug === TIME_IN_MARKET_STRATEGY ? readFrom().then((from) => getTimeInMarket(userId, from)) : null,
+    ]);
+    if (!detail) return null;
+    return {...detail, ...toStrategyDetailView(detail, getEasternDateString()), timeInMarket};
+};
 
 // A strategy's whole live ledger, for its CSV export: the system account's current epoch, oldest
 // first, uncapped (getTradeLedger — an export is complete by definition, unlike the page's
