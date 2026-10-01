@@ -37,8 +37,8 @@ The other scripts follow the same shape, one per change set: `qa-foundations.mjs
 404 waits for the rendered page, and a symbol no strategy watches still 404s keyless with no
 stock panels),
 `qa-navigation.mjs`, `qa-ai-surfaces.mjs`, `qa-truthful-data.mjs`, `qa-trade-desk.mjs` (the ticket,
-the CSV export and the comparison table — neither counts a row from before the account's
-inception — and the note, read back from `placeOrder`'s own request; for the "earning ≈$x/month" clause it answers the page's `getQuote`
+the CSV export, the comparison table and `/history`'s trade feed — none counts a row from before
+the account's inception — and the note, read back from `placeOrder`'s own request; for the "earning ≈$x/month" clause it answers the page's `getQuote`
 server action with a fixed price, since the harness has no quote provider, and removes the ^IRX
 row it seeds; `/stocks/AAPL` renders keyless because a strategy watches it),
 `qa-news-feed.mjs`, `qa-strategies.mjs` (seeds the system-owned strategy accounts directly — the

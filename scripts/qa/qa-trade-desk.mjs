@@ -2,7 +2,8 @@
 // the order ticket's presets and advisory checks, chart-follows-ticker (and the
 // dashboard widget that must NOT navigate), the trade `source` chip + CSV columns (a note that
 // looks like a formula exports as text), the order note's 200-character limit, and
-// brain rows that drill into evidence with valid markup.
+// brain rows that drill into evidence with valid markup. /history's trade feed, like every other
+// trade read, leaves out a row from before its account's inception, in its list and its count.
 // Run against the harness in README.md (in-memory Mongo on :27117 + `npm run dev`; no
 // Finnhub key, so prices are unknown and the ticket's price-based paths stay open).
 import {chromium} from 'playwright';
@@ -131,6 +132,27 @@ try {
     check('a note starting with = exports as quoted text, not a formula', rows.some((r) => r.endsWith(`,"user","'=1+1"`)), rows.map((r) => r.split(',').slice(-2).join(',')).join('|'));
     check('numbers stay bare and strings are quoted', rows.some((r) => /^"[^"]+","AAPL","Apple Inc","sell",2,160,320,20,"user",/.test(r)), rows.join(' | '));
     check('the export is this epoch\'s: no row from before the account\'s inception', rows.length === 4 && !rows.some((r) => r.includes('ZZOLD')), rows.map((r) => r.split(',')[1]).join('|'));
+
+    // --- /history: every account's current epoch, in its list and in its count ------------
+    const historyTrades = () => page.locator('section', {has: page.getByRole('heading', {name: /^trades$/i})});
+    await page.goto(`${BASE}/history`, {waitUntil: 'load'});
+    await page.getByRole('heading', {name: 'History', exact: true}).waitFor({timeout: 30000});
+    check('/history lists this epoch\'s fills and not the old epoch\'s',
+        await historyTrades().locator('a[href="/stocks/AAPL"]').count() === 4 && await historyTrades().locator('a[href="/stocks/ZZOLD"]').count() === 0,
+        (await historyTrades().innerText()).replace(/\s+/g, ' ').slice(0, 200));
+    // Past the 50-row page the feed states its total: 4 + 50 this epoch, not 55 with the old row.
+    // The 50 go to the second account, newer than everything else, and are removed straight after.
+    const value = await accounts.findOne({userId, name: 'Value'});
+    const filler = await db.collection('papertrades').insertMany(Array.from({length: 50}, (_, k) => ({
+        userId, accountId: String(value._id), symbol: 'MSFT', company: 'Microsoft', side: 'buy', quantity: 1, price: 300, total: 300,
+        source: 'user', createdAt: new Date(Date.now() - 1000 + k),
+    })));
+    await page.reload({waitUntil: 'load'});
+    await page.getByRole('heading', {name: 'History', exact: true}).waitFor({timeout: 30000});
+    const historyText = await historyTrades().innerText();
+    check('…and counts only this epoch\'s fills', /Showing the latest 50 of 54 trades/.test(historyText),
+        historyText.match(/Showing[^\n]*/)?.[0] ?? historyText.replace(/\s+/g, ' ').slice(-160));
+    await db.collection('papertrades').deleteMany({_id: {$in: Object.values(filler.insertedIds)}});
 
     // --- watchlist + stock page affordances --------------------------------------------
     await page.goto(`${BASE}/watchlist`, {waitUntil: 'load'});

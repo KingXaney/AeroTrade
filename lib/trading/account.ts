@@ -295,14 +295,17 @@ export const getTradeHistory = async (userId: string, accountId: string, limit =
 };
 
 // Newest fills across every strategy account, each tagged with its account's name —
-// the /history page's trade feed. Read-only (no lazy account creation).
+// the /history page's trade feed. Read-only (no lazy account creation). The list and its count
+// are each account's current epoch (epochTradesOf), as every per-account read is: a reset that
+// crashed before deleting the old epoch's fills must not bring them back here either.
 export const getRecentTradesForUser = async (userId: string, limit = 50): Promise<{trades: PaperTradeRecord[]; total: number}> => {
     try {
         await connectToDatabase();
-        const [trades, total, accounts] = await Promise.all([
-            PaperTrade.find({userId}).sort({createdAt: -1}).limit(limit).lean<LeanTrade[]>(),
-            PaperTrade.countDocuments({userId}),
-            PaperAccount.find({userId}).select('name').lean<{_id: unknown; name?: string}[]>(),
+        const accounts = await PaperAccount.find({userId}).select('name inceptionAt').lean<{_id: unknown; name?: string; inceptionAt?: Date}[]>();
+        const epoch = epochTradesOf(userId, accounts);
+        const [trades, total] = await Promise.all([
+            PaperTrade.find(epoch).sort({createdAt: -1, _id: -1}).limit(limit).lean<LeanTrade[]>(),
+            PaperTrade.countDocuments(epoch),
         ]);
         const names = new Map(accounts.map((a) => [String(a._id), a.name || DEFAULT_ACCOUNT_NAME]));
         return {trades: trades.map((t) => toTradeRecord(t, t.accountId ? names.get(t.accountId) : undefined)), total};
