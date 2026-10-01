@@ -24,7 +24,7 @@ const Layout = async ({children}: {children: React.ReactNode}) => {
     if (!user) redirect('/sign-in')
 
     // Pre-load the popular-stocks list once for the SearchCommand fallback.
-    // All strategy accounts power the compact sidebar card, priced from one shared
+    // All the user's accounts power the compact sidebar card, priced from one shared
     // quote map (getQuote caches 30s, so this stays cheap across navigations).
     // The topics card must never take the whole shell down with it.
     const [initialStocks, watchlistSymbols, accountPortfolios, savedTheme, topicsOverview, friendRequests] = await Promise.all([
@@ -47,7 +47,7 @@ const Layout = async ({children}: {children: React.ReactNode}) => {
         totalValue: portfolio.totalValue,
         totalReturnPct: portfolio.totalReturnPct,
         cash: portfolio.cash,
-        strategiesCount: accountPortfolios.length,
+        accountsCount: accountPortfolios.length,
         unpriced: countUnpriced(portfolio.positions),
         top: portfolio.positions.slice(0, 3).map((p) => ({
             symbol: p.symbol,

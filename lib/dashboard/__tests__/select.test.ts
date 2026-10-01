@@ -1,5 +1,5 @@
 import {describe, expect, it} from 'vitest';
-import {bestStrategy, newsBrainSummary, topMovers} from '@/lib/dashboard/select';
+import {bestAccount, newsBrainSummary, topMovers} from '@/lib/dashboard/select';
 import type {SuggestionSetView} from '@/lib/navigator/store';
 import type {BrainEntitySummary} from '@/lib/brain/types';
 import type {StockWithData} from '@/lib/stocks/types';
@@ -60,27 +60,27 @@ const main = entry('a1', 'Main Strategy', 4.2);
 const growth = entry('a2', 'Growth', 9.5, {totalValue: 109_500});
 const value = entry('a3', 'Value', -2.1, {totalValue: 97_900});
 
-describe('bestStrategy', () => {
+describe('bestAccount', () => {
     it('does not throw on an empty list', () => {
-        expect(() => bestStrategy([])).not.toThrow();
-        expect(bestStrategy([])).toBeUndefined();
+        expect(() => bestAccount([])).not.toThrow();
+        expect(bestAccount([])).toBeUndefined();
     });
 
     it('is undefined with a single account', () => {
-        expect(bestStrategy([main])).toBeUndefined();
+        expect(bestAccount([main])).toBeUndefined();
     });
 
     it('picks the highest return among several accounts', () => {
-        expect(bestStrategy([main, growth, value])).toEqual({name: 'Growth', totalReturnPct: 9.5});
-        expect(bestStrategy([value, main])).toEqual({name: 'Main Strategy', totalReturnPct: 4.2});
+        expect(bestAccount([main, growth, value])).toEqual({name: 'Growth', totalReturnPct: 9.5});
+        expect(bestAccount([value, main])).toEqual({name: 'Main Strategy', totalReturnPct: 4.2});
     });
 
     it('keeps the first account on a tie', () => {
-        expect(bestStrategy([entry('x', 'First', 3), entry('y', 'Second', 3)])?.name).toBe('First');
+        expect(bestAccount([entry('x', 'First', 3), entry('y', 'Second', 3)])?.name).toBe('First');
     });
 
     it('handles all-negative returns', () => {
-        expect(bestStrategy([entry('x', 'Bad', -8), entry('y', 'Less bad', -1)])?.name).toBe('Less bad');
+        expect(bestAccount([entry('x', 'Bad', -8), entry('y', 'Less bad', -1)])?.name).toBe('Less bad');
     });
 });
 

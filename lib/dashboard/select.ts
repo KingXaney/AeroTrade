@@ -7,7 +7,7 @@ import type {BrainEntitySummary} from '@/lib/brain/types';
 import type {StockWithData} from '@/lib/stocks/types';
 import type {AccountWithPortfolio} from '@/lib/trading/types';
 
-export type BestStrategy = {name: string; totalReturnPct: number};
+export type BestAccount = {name: string; totalReturnPct: number};
 
 export type LatestSuggestions = {user: SuggestionSetView | null; global: SuggestionSetView | null};
 
@@ -16,9 +16,9 @@ export type NewsBrainSummary = {
     decisions: {count: number; date: string; kind: SuggestionSetView['kind']} | null;
 };
 
-// "Best strategy" only means something against other strategies, so a single
+// "Best account" only means something against other accounts, so a single
 // account (or none — no reduce on an empty array) yields nothing.
-export const bestStrategy = (portfolios: readonly AccountWithPortfolio[]): BestStrategy | undefined => {
+export const bestAccount = (portfolios: readonly AccountWithPortfolio[]): BestAccount | undefined => {
     if (portfolios.length < 2) return undefined;
     let top = portfolios[0];
     for (const x of portfolios) {

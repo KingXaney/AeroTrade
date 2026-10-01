@@ -8,7 +8,7 @@ export type SidebarPortfolio = {
     totalValue: number;
     totalReturnPct: number;
     cash: number;
-    strategiesCount: number;
+    accountsCount: number;
     unpriced: number;      // holdings with no live quote, across every account
     top: {symbol: string; quantity: number; unrealizedPnlPct: number; priceStale: boolean}[];
 };
@@ -47,9 +47,9 @@ const PortfolioSidebarCard = ({portfolio}: {portfolio: SidebarPortfolio}) => {
                         <span className="text-warning text-xs"> · {portfolio.unpriced} unpriced</span>
                     )}
                 </p>
-                {portfolio.strategiesCount > 1 && (
+                {portfolio.accountsCount > 1 && (
                     <p className="text-[10px] uppercase tracking-[0.08em] text-fg-muted mt-1" style={{fontFamily: 'var(--type-mono)'}}>
-                        All accounts · {portfolio.strategiesCount} strategies
+                        All {portfolio.accountsCount} accounts
                     </p>
                 )}
 

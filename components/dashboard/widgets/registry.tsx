@@ -2,7 +2,7 @@ import {Suspense, type ReactNode} from "react";
 import {WIDGETS, type DataKey, type WidgetId, type WidgetSpan} from "@/lib/dashboard/catalog";
 import Panel from "@/components/primitives/Panel";
 import {LOADERS, type DashboardData, type LoaderCtx} from "@/lib/dashboard/loaders";
-import {bestStrategy, newsBrainSummary, topMovers} from "@/lib/dashboard/select";
+import {bestAccount, newsBrainSummary, topMovers} from "@/lib/dashboard/select";
 import {toApplyAccounts, toComparisonRows} from "@/lib/trading/active-account";
 import {aggregatePortfolios} from "@/lib/trading/valuation";
 import WidgetErrorBoundary from "@/components/dashboard/WidgetErrorBoundary";
@@ -149,7 +149,7 @@ const WIDGET_RENDERERS: Record<WidgetId, Renderer> = {
         return <Suspense fallback={skeleton('todays-lesson')}><TodaysLessonAsync ctx={r.ctx} /></Suspense>;
     },
     'daily-quiz': (r) => <Suspense fallback={skeleton('daily-quiz', 4)}><DailyQuizAsync ctx={r.ctx} /></Suspense>,
-    'portfolio-snapshot': (r) => need(r, 'portfolios', (p) => <PortfolioSnapshot portfolio={aggregatePortfolios(p)} best={bestStrategy(p)} />),
+    'portfolio-snapshot': (r) => need(r, 'portfolios', (p) => <PortfolioSnapshot portfolio={aggregatePortfolios(p)} best={bestAccount(p)} />),
     'watchlist-movers': (r) => <Suspense fallback={skeleton('watchlist-movers', 4)}><WatchlistMoversAsync ctx={r.ctx} /></Suspense>,
     'friends-rank': (r) => need(r, 'leaderboard', (l) => <FriendsRank leaderboard={l} />),
     'news-brain-tile': (r) => (
