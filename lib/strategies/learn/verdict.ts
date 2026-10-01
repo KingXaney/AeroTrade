@@ -24,7 +24,7 @@ export const pickQuizRows = (board: readonly SignalRow[], n = QUIZ_ROWS): Signal
         .sort((a, b) => bucket(a) - bucket(b) || a.symbol.localeCompare(b.symbol))
         .slice(0, n);
 
-export type VerdictAnswer = {answer: RowState; explanation: string};
+type VerdictAnswer = {answer: RowState; explanation: string};
 
 type OrderLike = {symbol: string; side: 'buy' | 'sell'; reason: string};
 

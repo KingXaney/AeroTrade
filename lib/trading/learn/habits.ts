@@ -23,7 +23,7 @@ export const HAD_YOU_HELD_MAX_SYMBOLS = 5;
 
 const DAY_MS = 24 * 60 * 60 * 1000;
 
-export type ClosedLot = {
+type ClosedLot = {
     sellId: string;
     symbol: string;
     quantity: number;
@@ -33,7 +33,7 @@ export type ClosedLot = {
     soldAt: number;
 };
 
-export const userFills = (ledger: readonly LedgerTrade[]): LedgerTrade[] => ledger.filter((t) => t.source === 'user');
+const userFills = (ledger: readonly LedgerTrade[]): LedgerTrade[] => ledger.filter((t) => t.source === 'user');
 
 // Every lot (or part of one) a learner's sell closed, in the order the sells happened.
 export const closedLots = (ledger: readonly LedgerTrade[]): ClosedLot[] => {

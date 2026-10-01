@@ -13,7 +13,7 @@ export const EVENT_TYPES = [
     'earnings', 'guidance', 'mna', 'product', 'macro', 'regulatory', 'analyst', 'legal', 'other',
 ] as const;
 
-export type EventType = (typeof EVENT_TYPES)[number];
+type EventType = (typeof EVENT_TYPES)[number];
 
 export type EventBadge = {label: string; term: GlossaryKey};
 

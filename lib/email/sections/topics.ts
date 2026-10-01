@@ -22,9 +22,9 @@ export const HEADING_STYLE = 'margin: 30px 0 15px 0; font-size: 20px; font-weigh
 export const TOPIC_NAME_STYLE = 'margin: 0 0 4px 0; font-size: 18px; font-weight: 600; color: #f8f9fa; line-height: 1.3;';
 export const META_STYLE = 'margin: 0 0 10px 0; font-size: 13px; line-height: 1.4; color: #8a9ba0;';
 export const TEXT_STYLE = 'margin: 0 0 10px 0; font-size: 16px; line-height: 1.6; color: #CCDADC;';
-export const LIST_STYLE = 'margin: 0 0 12px 0; padding: 0 0 0 20px; font-size: 15px; line-height: 1.5; color: #CCDADC;';
+const LIST_STYLE = 'margin: 0 0 12px 0; padding: 0 0 0 20px; font-size: 15px; line-height: 1.5; color: #CCDADC;';
 export const ARTICLE_STYLE = 'margin: 0 0 6px 0; font-size: 15px; line-height: 1.5; color: #CCDADC;';
-export const LINK_STYLE = 'color: #FDD458; text-decoration: none;';
+const LINK_STYLE = 'color: #FDD458; text-decoration: none;';
 export const FOOTER_STYLE = 'margin: 20px 0 0 0; font-size: 14px; line-height: 1.5; color: #CCDADC;';
 
 const isHttpUrl = (value: string): boolean => {

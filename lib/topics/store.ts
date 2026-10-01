@@ -70,7 +70,7 @@ export const getTopicsForUser = async (userId: string): Promise<TopicView[]> => 
     return docs.map(toTopicView);
 };
 
-export const getTopicBySlug = async (userId: string, slug: string): Promise<TopicView | null> => {
+const getTopicBySlug = async (userId: string, slug: string): Promise<TopicView | null> => {
     await connectToDatabase();
     const doc = await Topic.findOne({userId, slug}).lean<LeanTopic | null>();
     return doc ? toTopicView(doc) : null;

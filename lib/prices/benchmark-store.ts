@@ -10,7 +10,7 @@ import {addCalendarDays} from "@/lib/dates";
 import {getBarsForSymbols} from "@/lib/prices/store";
 import {totalReturnIndex, type IndexPoint} from "@/lib/prices/total-return";
 
-export type BenchmarkIndex = {points: IndexPoint[]; lastClose: number | null};
+type BenchmarkIndex = {points: IndexPoint[]; lastClose: number | null};
 
 // Bars from a little before `from`, so a dividend with its ex-date just before the window —
 // paid inside it — is still reinvested where an account holding SPY would receive it.

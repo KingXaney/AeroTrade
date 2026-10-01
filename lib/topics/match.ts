@@ -12,15 +12,15 @@ import {escapeRegExp} from "@/lib/text";
 export const termPattern = (term: string): RegExp =>
     new RegExp(`(^|[^\\p{L}\\p{N}$])${escapeRegExp(term)}(?=$|[^\\p{L}\\p{N}])`, 'iu');
 
-export const countHits = (text: string, pattern: RegExp): number => {
+const countHits = (text: string, pattern: RegExp): number => {
     const global = pattern.global ? pattern : new RegExp(pattern.source, `${pattern.flags}g`);
     return (text.match(global) ?? []).length;
 };
 
-export const HEADLINE_WEIGHT = 3;
-export const SUMMARY_WEIGHT = 1;
+const HEADLINE_WEIGHT = 3;
+const SUMMARY_WEIGHT = 1;
 // A long summary that repeats the term should not outrank a headline mention.
-export const SUMMARY_HITS_CAP = 5;
+const SUMMARY_HITS_CAP = 5;
 
 export type MatchInput = {
     headline: string;
@@ -31,7 +31,7 @@ export type MatchInput = {
     sourceType?: string;
 };
 
-export type MatchResult<T> = {article: T; score: number; matchedTerms: string[]};
+type MatchResult<T> = {article: T; score: number; matchedTerms: string[]};
 
 type Scored = {score: number; matchedTerms: string[]};
 type CompiledTerm = {term: string; pattern: RegExp};

@@ -17,8 +17,8 @@ export const chatUserHourKey = (userId: string): string => `chat:${userId}`;
 export const chatUserDayKey = (userId: string): string => `chat:${userId}:day`;
 export const CHAT_GLOBAL_KEY = 'chat:global';
 
-export type ChatLimit = {limit: number; windowMs: number};
-export type ChatLimits = {
+type ChatLimit = {limit: number; windowMs: number};
+type ChatLimits = {
     userHour: ChatLimit;
     userDay: ChatLimit;
     global: ChatLimit;
@@ -34,7 +34,7 @@ const positiveInt = (raw: string | undefined, fallback: number, name: string): {
     return {value: parsed};
 };
 
-export type EnvLike = Record<string, string | undefined>;
+type EnvLike = Record<string, string | undefined>;
 
 export const resolveChatLimits = (env: EnvLike = process.env): ChatLimits => {
     const hour = positiveInt(env.CHAT_USER_HOURLY_LIMIT, CHAT_USER_HOURLY_LIMIT, 'CHAT_USER_HOURLY_LIMIT');

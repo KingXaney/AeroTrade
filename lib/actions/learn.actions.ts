@@ -53,7 +53,7 @@ export const markLessonSeen = async (input: unknown): Promise<OrderResult> => {
     }
 };
 
-export type QuizAnswerResult = {success: true; daysAnswered: number} | {success: false; message: string};
+type QuizAnswerResult = {success: true; daysAnswered: number} | {success: false; message: string};
 
 // The Daily quiz's answer: counts the day once. The argument arrives from the client, so it is
 // `unknown` until parseQuizDate says it is today's ET date, exactly — a question left open past

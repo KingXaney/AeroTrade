@@ -75,7 +75,7 @@ export const fetchAndPersistNews = async (): Promise<number> => {
 };
 
 // One queued article as the job memoizes it between steps (plain JSON).
-export type QueuedArticle = {
+type QueuedArticle = {
     id: string;
     headline: string;
     summary: string;
@@ -84,7 +84,7 @@ export type QueuedArticle = {
     sourceType: string;
 };
 
-export type ExtractionQueue = {articles: QueuedArticle[]; activeThemes: string[]};
+type ExtractionQueue = {articles: QueuedArticle[]; activeThemes: string[]};
 
 // Extraction queue: newest unextracted articles first, hard daily budget.
 export const loadExtractionQueue = async (): Promise<ExtractionQueue> => {
@@ -125,7 +125,7 @@ export const buildExtractionPrompt = (batch: readonly QueuedArticle[], activeThe
         '{{activeThemes}}', activeThemes,
     );
 
-export type AppliedBatch = {folds: ArticleFold[]; ids: string[]};
+type AppliedBatch = {folds: ArticleFold[]; ids: string[]};
 
 // One batch's model answer, sanitized and stamped on its articles. Returns the folds instead of
 // writing them anywhere else: the job must carry fold data through the step's RETURN value,

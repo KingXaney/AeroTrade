@@ -4,8 +4,8 @@
 // Paper-trading: default starting virtual cash; users may pick a custom amount
 // at account creation / AI enrollment within these bounds.
 export const PAPER_STARTING_BALANCE = 100_000;
-export const MIN_STARTING_BALANCE = 1_000;
-export const MAX_STARTING_BALANCE = 10_000_000;
+const MIN_STARTING_BALANCE = 1_000;
+const MAX_STARTING_BALANCE = 10_000_000;
 
 // "$1,000 and $10,000,000": the dialogs say "Between …", the server STARTING_BALANCE_ERROR.
 export const STARTING_BALANCE_RANGE = `$${MIN_STARTING_BALANCE.toLocaleString('en-US')} and $${MAX_STARTING_BALANCE.toLocaleString('en-US')}`;

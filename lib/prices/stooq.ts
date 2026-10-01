@@ -10,7 +10,7 @@ import {type Bar} from "@/lib/prices/signals";
 import {addCalendarDays} from "@/lib/dates";
 
 // Both providers now produce the same shape; the alias survives for older imports.
-export type StooqBar = Bar;
+type StooqBar = Bar;
 
 // CSV layout is 'Date,Open,High,Low,Close,Volume'.
 const OPEN_FIELD_INDEX = 1;
@@ -84,7 +84,7 @@ const parseUtcDate = (dateStr: string): Date => new Date(`${dateStr}T00:00:00Z`)
 // Stooq's d1/d2 query params want compact YYYYMMDD.
 const toStooqDate = (date: string): string => date.replace(/-/g, "");
 
-export type FetchWindowOptions = {
+type FetchWindowOptions = {
     // When known, a stored history that does not reach far enough back also
     // triggers a backfill (a caller asking for 3 years must not settle for 2).
     earliestBarDate?: string | null;

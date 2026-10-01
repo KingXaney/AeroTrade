@@ -46,7 +46,7 @@ const tradeEpoch = cache(async (userId: string, accountId: string): Promise<{sin
 // The one PaperTrade filter for an account's current epoch. Exported for readers that already
 // hold the account (the CSV export, the chat's learner figures) — they apply the same rule
 // without reading the account again.
-export const epochTrades = (userId: string, accountId: string, since: Date | null | undefined) =>
+const epochTrades = (userId: string, accountId: string, since: Date | null | undefined) =>
     ({userId, accountId, ...(since ? {createdAt: {$gte: since}} : {})});
 
 // The same rule over several accounts at once: each account's trades from its own inceptionAt.

@@ -15,7 +15,7 @@ import {formatArticle, FULL_SUMMARY_MAX_CHARS, validateArticle} from "@/lib/news
 // Shape of one <entry> from EDGAR's browse Atom feed when parsed with ignoreAttributes: false.
 // The <content> block carries structured filing metadata that is far more informative
 // than the title — notably items-desc, which names what an 8-K is actually about.
-export type EdgarContent = {
+type EdgarContent = {
     "accession-number"?: string;
     "filing-date"?: string;
     "filing-href"?: string;
@@ -131,11 +131,11 @@ export const mapEdgarEntry = (entry: EdgarEntry, symbol: string, body = ""): Raw
 
 // --- Filing document text ----------------------------------------------------
 
-export type EdgarDirectoryFile = {name?: string; size?: number | string};
+type EdgarDirectoryFile = {name?: string; size?: number | string};
 
 // The filing-href points at the human index page; its sibling index.json lists the
 // directory, which is far more robust to parse than the HTML.
-export const filingDirectoryUrl = (filingHref: string): string =>
+const filingDirectoryUrl = (filingHref: string): string =>
     filingHref.replace(/\/[^/]*$/, "/index.json");
 
 // Exhibits are where the prose lives. A modern filing's *primary* document is inline

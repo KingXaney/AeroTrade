@@ -21,7 +21,7 @@ export const MAX_WIDGETS = 24;
 // normalizeLayout walk thousands of items before trimming.
 const MAX_INPUT_WIDGETS = 64;
 
-export const LayoutItemSchema = z.object({
+const LayoutItemSchema = z.object({
     id: z.enum(WIDGET_IDS),
     span: z.literal([...WIDGET_SPANS]),
 });

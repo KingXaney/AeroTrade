@@ -37,7 +37,7 @@ const SPECS: Record<ChatErrorCode, Spec> = {
 };
 
 /** What the panel should offer the user next. */
-export type ChatErrorAction = 'retry' | 'clear' | 'sign_in' | 'none';
+type ChatErrorAction = 'retry' | 'clear' | 'sign_in' | 'none';
 
 const ACTIONS: Record<ChatErrorCode, ChatErrorAction> = {
     unauthorized: 'sign_in',
@@ -56,7 +56,7 @@ export const chatErrorBody = (code: ChatErrorCode) => ({
 
 export const chatErrorStatus = (code: ChatErrorCode): number => SPECS[code].status;
 
-export type ChatErrorDescription = {
+type ChatErrorDescription = {
     code: ChatErrorCode | 'unknown';
     message: string;
     action: ChatErrorAction;

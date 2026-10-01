@@ -6,7 +6,7 @@
 // Entries are kept until the day turns, at most `limit` of them, the oldest dropped first.
 // `day` is any string that names the period (an ET date; the digest passes its run id).
 
-export type DayMemo<T> = {
+type DayMemo<T> = {
     get: (key: string, day: string) => T | undefined;
     set: (key: string, day: string, value: T) => void;
 };

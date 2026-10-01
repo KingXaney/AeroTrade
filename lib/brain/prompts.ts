@@ -54,10 +54,10 @@ Give your second opinion.`;
 // (scripts/second-opinion-local.mjs) imports it directly under Node's TypeScript
 // stripping, so every path — API job, Claude Code CLI, clipboard — asks the same
 // question in the same words.
-export type SecondOpinionThesis = {name: string; type: string; weightSlow: number; sentimentSlow: number; activeSinceMs: number | null};
-export type SecondOpinionNarrative = {key: string; type: string; displayName: string; weightSlow: number; sentimentSlow: number; thesisActive: boolean};
-export type SecondOpinionDecisionItem = {symbol: string; action: string; targetWeightPct: number; reasons: string[]};
-export type SecondOpinionHeadline = {headline: string; source: string; kind: string; date: string};
+type SecondOpinionThesis = {name: string; type: string; weightSlow: number; sentimentSlow: number; activeSinceMs: number | null};
+type SecondOpinionNarrative = {key: string; type: string; displayName: string; weightSlow: number; sentimentSlow: number; thesisActive: boolean};
+type SecondOpinionDecisionItem = {symbol: string; action: string; targetWeightPct: number; reasons: string[]};
+type SecondOpinionHeadline = {headline: string; source: string; kind: string; date: string};
 
 export type SecondOpinionContext = {
     theses: SecondOpinionThesis[];

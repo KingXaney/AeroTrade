@@ -65,7 +65,7 @@ export const AI_TIERS: AiTier[] = ['free', 'basic', 'pro'];
 
 const isTier = (value: string): value is AiTier => (AI_TIERS as string[]).includes(value);
 
-export type TierResolution = {tier: AiTier; warning?: string};
+type TierResolution = {tier: AiTier; warning?: string};
 
 // Named `free`, never `subscription`: a server-side job cannot use a Claude
 // subscription, and labelling a deployment variable that way invites exactly the
@@ -84,7 +84,7 @@ export const resolveTier = (env: NodeJS.ProcessEnv = process.env): TierResolutio
     return {tier: raw};
 };
 
-export type ResolvedModel = ModelSpec & {task: AiTask; tier: AiTier; warning?: string};
+type ResolvedModel = ModelSpec & {task: AiTask; tier: AiTier; warning?: string};
 
 export const resolveModel = (task: AiTask, env: NodeJS.ProcessEnv = process.env): ResolvedModel => {
     const {tier, warning} = resolveTier(env);

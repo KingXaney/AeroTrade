@@ -5,7 +5,7 @@
 // NEVER rename an id, event or cron here: Inngest keys a function's runs and memoized steps
 // on its id, and a renamed event or cron silently stops the job from firing.
 
-export type JobDefinition = {
+type JobDefinition = {
     // The Inngest function id, and the JobRun key its completion stamp is written under.
     id: string;
     // The event that fires it (every job has one: crons included, so it can be fired by hand).

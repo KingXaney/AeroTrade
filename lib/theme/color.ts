@@ -2,7 +2,7 @@
 // consumers that need rgb() rather than hex. Dependency-free so the unit tests
 // never pull in React or the database.
 
-export type Rgb = {r: number; g: number; b: number};
+type Rgb = {r: number; g: number; b: number};
 
 const HEX6 = /^#[0-9a-f]{6}$/i;
 

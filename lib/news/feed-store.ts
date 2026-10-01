@@ -25,7 +25,7 @@ import {
 import {toFeedArticles} from "@/lib/news/topic-batch";
 import {getMergedTopicFeed} from "@/lib/topics/store";
 
-export type NewsFeedResult = {
+type NewsFeedResult = {
     articles: MarketNewsArticle[];
     /** True when the feed is not what the user asked for: Google News is off or answered with nothing. */
     fallback: boolean;
@@ -141,7 +141,7 @@ export const getNewsFeedForPrefs = async (
 
 // How many stored topic articles are offered to the merge. The round-robin bounds their
 // actual share; this only decides how deep the topic queue is when wires run dry.
-export const TOPIC_FEED_BATCH = 12;
+const TOPIC_FEED_BATCH = 12;
 
 // The user's followed topics as feed articles. Best effort: a news page must never break
 // because the topics collection is unreachable.

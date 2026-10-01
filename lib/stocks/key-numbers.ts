@@ -11,11 +11,11 @@
 import {KEY_NUMBERS_COPY as COPY} from '@/lib/learn/copy/key-numbers';
 import type {GlossaryKey} from '@/lib/learn/glossary';
 
-export type KeyNumberKey = Extract<GlossaryKey, 'market-cap' | 'pe-ratio' | 'dividend-yield' | 'beta' | 'fifty-two-week-range'>;
+type KeyNumberKey = Extract<GlossaryKey, 'market-cap' | 'pe-ratio' | 'dividend-yield' | 'beta' | 'fifty-two-week-range'>;
 
 export type KeyNumber = {key: KeyNumberKey; value: string; sentence: string};
 
-export type KeyNumbersInput = {
+type KeyNumbersInput = {
     // Finnhub's profile reports market cap in millions of dollars.
     marketCapMillions?: number | null;
     metric?: Readonly<Record<string, unknown>> | null;

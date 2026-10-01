@@ -45,7 +45,7 @@ import NarrativeLeaderboard from "@/components/brain/NarrativeLeaderboard";
 import BrainGraph from "@/components/brain/BrainGraph";
 import SystemStatus from "@/components/brain/SystemStatus";
 
-export type WidgetRenderCtx = {
+type WidgetRenderCtx = {
     ctx: LoaderCtx;
     data: DashboardData;
     failed: ReadonlySet<DataKey>;
@@ -133,7 +133,7 @@ const BrainStatusAsync = async ({ctx}: {ctx: LoaderCtx}) => {
     return <SystemStatus status={status} />;
 };
 
-export const WIDGET_RENDERERS: Record<WidgetId, Renderer> = {
+const WIDGET_RENDERERS: Record<WidgetId, Renderer> = {
     'topics-overview': (r) => need(r, 'topicsOverview', (o) => (
         o.topics.length > 0 ? <TopicsOverview overview={o} span={r.span} /> : <TopicsWidgetEmpty />
     )),

@@ -6,7 +6,7 @@ import type {GetStepTools, Inngest} from "inngest";
 
 import {resolveModel, type AiProvider, type AiTask, type ModelSpec} from "@/lib/ai/models";
 
-export type InferResult = {
+type InferResult = {
     // '' rather than a throw when nothing usable came back: every call site already
     // has a correct fallback, and throwing here would change Inngest retry semantics
     // for the whole enclosing run.

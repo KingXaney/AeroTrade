@@ -61,7 +61,7 @@ const toIncomeTrade = (trade: LeanTrade): IncomeTrade => ({
 // Planning: which symbols need a deep refetch before their dividends can be trusted
 // ---------------------------------------------------------------------------
 
-export type IncomePlan = {accountIds: string[]; backfill: string[]; topup: string[]};
+type IncomePlan = {accountIds: string[]; backfill: string[]; topup: string[]};
 
 export const planIncomeRun = async ({accountIds}: {accountIds?: string[] | null} = {}): Promise<IncomePlan> => {
     await connectToDatabase();
@@ -106,14 +106,14 @@ export const planIncomeRun = async ({accountIds}: {accountIds?: string[] | null}
 // Inputs shared by a batch of accounts
 // ---------------------------------------------------------------------------
 
-export type IncomeInputs = {
+type IncomeInputs = {
     rateOn: RateLookup;
     dividends: Map<string, DividendPoint[]>;
     coverage: (symbol: string) => CoverageRange | null;
     released: Set<string>;
 };
 
-export const loadIncomeInputs = async (symbols: string[], end: string): Promise<IncomeInputs> => {
+const loadIncomeInputs = async (symbols: string[], end: string): Promise<IncomeInputs> => {
     const unique = [...new Set(symbols.map((s) => s.toUpperCase()))];
     const [rates, dividends, metas] = await Promise.all([getRatePoints(), getDividendPoints(unique), getSeriesMeta(unique)]);
     const releaseBefore = addCalendarDays(end, -SYMBOL_RELEASE_DAYS);
@@ -255,7 +255,7 @@ export const creditAccountIncome = async (accountId: string, {end, inputs}: {end
 
 // A snapshot on day s should contain every row dated before s. Each records which rows it
 // already contains (`incomeThrough`), so topping it up is exact and happens once.
-export const catchUpSnapshots = async (accountId: string, epoch: number, through: string): Promise<number> => {
+const catchUpSnapshots = async (accountId: string, epoch: number, through: string): Promise<number> => {
     // Still the same account? A reset since the credit means this history is not ours to edit.
     const current = await PaperAccount.findById(accountId).select('inceptionAt createdAt').lean<{inceptionAt?: Date; createdAt: Date} | null>();
     if (!current || accountEpoch(current).getTime() !== epoch) return 0;

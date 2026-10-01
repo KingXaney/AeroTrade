@@ -46,7 +46,7 @@ const MAX_NAME_ECHO = 60;
 const MAX_TEXT_VALUE = 60;
 const MIN_PARTIAL_MATCH = 3;
 
-export type QuantLive = {
+type QuantLive = {
     returnPct: number;
     spyReturnPct: number | null;
     vsSpyPct: number | null;
@@ -58,9 +58,9 @@ export type QuantLive = {
     since: string;
 };
 
-export type QuantSimulated = {returnPct: number | null; from: string; to: string; fills: number};
+type QuantSimulated = {returnPct: number | null; from: string; to: string; fills: number};
 
-export type QuantRow = {
+type QuantRow = {
     slug: StrategyId;
     name: string;
     family: StrategyFamily;
@@ -70,9 +70,9 @@ export type QuantRow = {
     simulated: QuantSimulated | null;
 };
 
-export type QuantDecoded = {text: string; decoded: ExplainReason};
+type QuantDecoded = {text: string; decoded: ExplainReason};
 
-export type QuantOrder = {
+type QuantOrder = {
     side: 'buy' | 'sell';
     symbol: string;
     quantity: number;
@@ -84,9 +84,9 @@ export type QuantOrder = {
     decoded: ExplainReason;
 };
 
-export type QuantBoardValue = number | boolean | string | null;
+type QuantBoardValue = number | boolean | string | null;
 
-export type QuantBoardRow = {
+type QuantBoardRow = {
     symbol: string;
     state: RowState;
     // Keyed by the board's column labels; a percentage column's label ends "(%)".
@@ -94,7 +94,7 @@ export type QuantBoardRow = {
     note?: QuantDecoded;
 };
 
-export type QuantRun = {
+type QuantRun = {
     date: string;
     asOf: string;
     mode: StrategyRunView['mode'];
@@ -112,9 +112,9 @@ export type QuantRun = {
     };
 };
 
-export type QuantListResult = {stance: string; strategies: QuantRow[]; notes: string[]};
-export type QuantStrategyResult = {stance: string; strategy: QuantRow & {slots: number}; latestRun: QuantRun | null; notes: string[]};
-export type QuantUnknownResult = {stance: string; strategy: null; asked: string; known: {slug: StrategyId; name: string}[]; notes: string[]};
+type QuantListResult = {stance: string; strategies: QuantRow[]; notes: string[]};
+type QuantStrategyResult = {stance: string; strategy: QuantRow & {slots: number}; latestRun: QuantRun | null; notes: string[]};
+type QuantUnknownResult = {stance: string; strategy: null; asked: string; known: {slug: StrategyId; name: string}[]; notes: string[]};
 
 // Rounded to cents of a percent; -0 folds to 0.
 const round2 = (n: number): number => Math.round(n * 100) / 100 || 0;

@@ -39,9 +39,9 @@ export type LearnerValue = {accounts: readonly LearnerAccountValue[]};
 export type ReasonWriter = 'strategy' | 'navigator';
 
 // One grammar's reading of a quoted reason.
-export type QuotedReading = {writer: ReasonWriter; decoded: DecodedReason};
+type QuotedReading = {writer: ReasonWriter; decoded: DecodedReason};
 
-export type ExplainParts = {
+type ExplainParts = {
     term?: string;
     reason?: string;
     entry: GlossaryEntry | null;
@@ -50,7 +50,7 @@ export type ExplainParts = {
     yours: LearnerValue | null;
 };
 
-export type ExplainEntry = {
+type ExplainEntry = {
     key: string;
     kind: GlossaryKind;
     term: string;
@@ -60,15 +60,15 @@ export type ExplainEntry = {
     seeAlso: string[];
 };
 
-export type ExplainClause = {text: string; gloss: string; term?: string; definition?: string};
+type ExplainClause = {text: string; gloss: string; term?: string; definition?: string};
 
 export type ExplainReason = {clauses: ExplainClause[]; unrecognised: string[]};
 
-export type ExplainReading = ExplainReason & {writer: ReasonWriter};
+type ExplainReading = ExplainReason & {writer: ReasonWriter};
 
 // One reading, labelled with the engine whose grammar decoded it (unlabelled when none did);
 // or, for a shape both engines write when no writer was named, both readings, each labelled.
-export type ExplainReasonResult = (ExplainReason & {writer?: ReasonWriter}) | {readings: ExplainReading[]};
+type ExplainReasonResult = (ExplainReason & {writer?: ReasonWriter}) | {readings: ExplainReading[]};
 
 export type ExplainResult = {
     stance: string;

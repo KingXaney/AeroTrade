@@ -14,7 +14,7 @@ import {type PriceInfo} from "@/lib/trading/analytics";
 import {accountEpoch} from "@/lib/trading/epoch";
 
 // One account as the job memoizes it between steps (plain JSON).
-export type SnapshotAccount = {
+type SnapshotAccount = {
     id: string;
     userId: string;
     cash: number;

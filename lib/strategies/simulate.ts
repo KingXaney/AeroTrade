@@ -21,7 +21,7 @@ import {STRATEGY_RULES} from "@/lib/strategies/rules";
 import type {SeriesPoint, SimTrade, SimulationResult, StrategyDefinition} from "@/lib/strategies/types";
 import {BENCHMARK_SYMBOL} from "@/lib/prices/config";
 
-export type SimulationOptions = {
+type SimulationOptions = {
     startingBalance: number;
     launchDate: string;
     resultBars?: number;

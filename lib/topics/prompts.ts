@@ -5,7 +5,7 @@ import {injectJson} from "@/lib/ai/prompt-utils";
 
 export type TopicBriefArticle = {headline: string; source: string; publishedAt: string};
 
-export const TOPIC_BRIEF_PROMPT = `You write a short daily brief for a reader who follows the topic "{{topicName}}".
+const TOPIC_BRIEF_PROMPT = `You write a short daily brief for a reader who follows the topic "{{topicName}}".
 
 ARTICLES (headlines from the last day, newest first):
 {{articles}}

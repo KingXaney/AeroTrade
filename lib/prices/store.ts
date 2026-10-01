@@ -21,7 +21,7 @@ import {
 import {previousTradingDay} from "@/lib/prices/market-hours";
 import {addCalendarDays, getEasternDateString} from "@/lib/dates";
 
-export type EnsureBarsOptions = {
+type EnsureBarsOptions = {
     limit?: number;
     backfillCalendarDays?: number;
     // Strategies that fill at the open or read Donchian channels cannot run on
@@ -32,7 +32,7 @@ export type EnsureBarsOptions = {
     forceBackfill?: boolean;
 };
 
-export type EnsureBarsResult = {
+type EnsureBarsResult = {
     updated: number;
     failed: string[];
     providers: Record<PriceBarSource, number>;
@@ -253,7 +253,7 @@ export const getBarsFrom = async (requests: readonly {symbol: string; from: stri
 
 // What each symbol's series record says: the dividend range a Yahoo payload vouched for, and
 // the first day of a failing streak. A symbol with no record is absent.
-export type SeriesMeta = {dividendsFrom?: string; dividendsThrough?: string; failingSince?: string};
+type SeriesMeta = {dividendsFrom?: string; dividendsThrough?: string; failingSince?: string};
 
 export const getSeriesMeta = async (symbols: readonly string[]): Promise<Map<string, SeriesMeta>> => {
     await connectToDatabase();

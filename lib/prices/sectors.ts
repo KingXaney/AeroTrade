@@ -5,7 +5,7 @@
 
 import {SECTOR_KEY_PREFIX, type SectorSlug} from "@/lib/brain/config";
 
-export const sectorKeyFor = (slug: SectorSlug): string => `${SECTOR_KEY_PREFIX}${slug}`;
+const sectorKeyFor = (slug: SectorSlug): string => `${SECTOR_KEY_PREFIX}${slug}`;
 
 export const SECTOR_TO_ETF: Record<SectorSlug, string> = {
     'energy': 'XLE',

@@ -6,7 +6,7 @@
 //
 // Pure module: no React, no DB, no next/navigation. Tested in lib/shell/__tests__/navigation.test.ts.
 
-export type NavBadgeKey = 'watchlist' | 'friendRequests';
+type NavBadgeKey = 'watchlist' | 'friendRequests';
 
 export type NavItem = {
     href: string;

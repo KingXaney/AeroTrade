@@ -8,7 +8,7 @@ export const STYLE_IDS = ['minimal', 'futuristic', 'liquid-glass', 'brutalist', 
 
 export type StyleId = (typeof STYLE_IDS)[number];
 
-export type StyleFonts = {display: string; body: string; mono: string};
+type StyleFonts = {display: string; body: string; mono: string};
 
 export type Style = {
     id: StyleId;

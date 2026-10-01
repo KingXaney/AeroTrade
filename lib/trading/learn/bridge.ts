@@ -11,7 +11,7 @@
 
 export type BridgeLineKey = 'price' | 'realized' | 'interest' | 'dividends' | 'residual';
 
-export type BridgeLine = {key: BridgeLineKey; amount: number; cents: number};
+type BridgeLine = {key: BridgeLineKey; amount: number; cents: number};
 
 export type ReturnBridge = {
     total: number;

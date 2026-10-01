@@ -2,7 +2,7 @@ import nodemailer from 'nodemailer';
 import {escapeHtml} from "@/lib/news/sanitize";
 import {WELCOME_EMAIL_TEMPLATE, PASSWORD_RESET_EMAIL_TEMPLATE, renderNewsSummaryEmail} from "@/lib/email/templates";
 
-export const transporter = nodemailer.createTransport({
+const transporter = nodemailer.createTransport({
     service: 'gmail',
     auth: {
         user: process.env.NODEMAILER_EMAIL!,
@@ -13,7 +13,7 @@ export const transporter = nodemailer.createTransport({
 // Absolute links in email need the deployment's public URL (the same one better-auth uses).
 export const appUrl = (): string => (process.env.BETTER_AUTH_URL ?? '').replace(/\/$/, '') || 'http://localhost:3000';
 
-export const mailerConfigured = (): boolean => Boolean(process.env.NODEMAILER_EMAIL && process.env.NODEMAILER_PASSWORD);
+const mailerConfigured = (): boolean => Boolean(process.env.NODEMAILER_EMAIL && process.env.NODEMAILER_PASSWORD);
 
 // Dev and the QA harness have no Gmail credentials, and an unconfigured transport rejects inside
 // whichever Inngest step called it, to be retried. So every sender — and every job, before it
@@ -27,7 +27,7 @@ export const mailerReady = (what: string, devDetail?: string): boolean => {
     return false;
 };
 
-export const PASSWORD_RESET_TTL_MINUTES = 30;
+const PASSWORD_RESET_TTL_MINUTES = 30;
 
 // Everything the senders below interpolate into their templates becomes HTML in an email sent
 // from this product's own address. `name` comes straight from an unverified signup form and the

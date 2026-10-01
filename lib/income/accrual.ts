@@ -137,14 +137,14 @@ export const createIncomeClock = ({rateOn, dividends}: {rateOn: RateLookup; divi
     };
 };
 
-export const tradeCashEffect = (trade: IncomeTrade): number => (trade.side === 'sell' ? trade.total : -trade.total);
+const tradeCashEffect = (trade: IncomeTrade): number => (trade.side === 'sell' ? trade.total : -trade.total);
 
 // Money paid into the account from outside it (a monthly contribution). It lands at the start
 // of its day, before that day's trades — a transfer that arrived overnight — so a deposit
 // spent the same day is never idle at the close and earns nothing.
 export type Deposit = {date: string; amount: number};
 
-export type ReplayInput = {
+type ReplayInput = {
     from: string;
     to: string;
     startCash: number;
@@ -158,7 +158,7 @@ export type ReplayInput = {
     deposits?: readonly Deposit[];
 };
 
-export type ReplayResult = {
+type ReplayResult = {
     rows: IncomeRow[];
     // End-of-day state of `to`; rows dated `to` are not in `cash` yet (they land at the next open).
     cash: number;
@@ -229,7 +229,7 @@ export const reconcile = ({startingBalance, cash, positions, trades, creditedTot
     return {ok: true};
 };
 
-export type HoldingSpan = {symbol: string; firstHeld: string; lastHeld: string | null};
+type HoldingSpan = {symbol: string; firstHeld: string; lastHeld: string | null};
 
 // The first and last day each symbol was held at a close; lastHeld is null while still held.
 // One span per symbol (a sell-and-rebuy stays one span) — conservative for readiness.

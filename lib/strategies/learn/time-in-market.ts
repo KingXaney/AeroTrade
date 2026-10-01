@@ -41,23 +41,23 @@ export const MIN_WINDOW_DAYS = 91;
 // As far back as the strategies keep SPY's daily bars.
 export const MAX_LOOKBACK_DAYS = STRATEGY_BACKFILL_CALENDAR_DAYS;
 // With no paper account to date the window from, it starts a year back.
-export const FALLBACK_LOOKBACK_DAYS = 365;
+const FALLBACK_LOOKBACK_DAYS = 365;
 // "Why the start date matters": eight starts, a quarter apart, all to the same end.
-export const TABLE_ROWS = 8;
-export const TABLE_STEP_MONTHS = 3;
+const TABLE_ROWS = 8;
+const TABLE_STEP_MONTHS = 3;
 
 const HOLDING = 'SPY';
 
 export type WayKey = 'lumpSum' | 'dollarCostAverage' | 'cashOnly';
 export const WAY_KEYS: readonly WayKey[] = ['lumpSum', 'dollarCostAverage', 'cashOnly'];
 
-export type DateWindow = {start: string; end: string};
+type DateWindow = {start: string; end: string};
 // SPY's stored daily closes (value = the close) and its stored dividends per share by ex-date.
 export type SpyHistory = {closes: readonly IndexPoint[]; dividends: readonly DividendPoint[]};
 // End-of-day value on one session (cash, the income rows dated that day, and shares × the
 // close) beside the dollars deposited so far.
 export type WayPoint = {date: string; value: number; contributed: number};
-export type WaySeries = {points: WayPoint[]; deposits: Deposit[]};
+type WaySeries = {points: WayPoint[]; deposits: Deposit[]};
 
 // ---- the start date ---------------------------------------------------------------------
 
@@ -74,7 +74,7 @@ const isCalendarDate = (value: string): boolean => {
 const START_PARAM = z.string().max(10).refine(isCalendarDate);
 
 export type StartSource = 'requested' | 'inception' | 'fallback';
-export type ResolvedStart = {
+type ResolvedStart = {
     from: string;
     source: StartSource;
     // A typed date that fell outside [floor, ceiling] and was moved to the nearer end.
@@ -247,7 +247,7 @@ export const summarizeWay = (series: WaySeries | null): WaySummary | null => {
 };
 
 // The change as a share of what was put in, from the same cents the tiles print.
-export const changePct = (summary: WaySummary | null): number | null =>
+const changePct = (summary: WaySummary | null): number | null =>
     summary && summary.contributedCents > 0 ? summary.changeCents / summary.contributedCents * 100 : null;
 
 // ---- why the start date matters -------------------------------------------------------------
@@ -291,7 +291,7 @@ export const startDateTable = (spy: SpyHistory, rateOn: RateLookup, starts: read
 
 // ---- the panel's view -----------------------------------------------------------------------
 
-export type ChartLine = {key: WayKey; values: number[]};
+type ChartLine = {key: WayKey; values: number[]};
 
 export type TimeInMarketView = {
     status: 'ok' | 'no-history';

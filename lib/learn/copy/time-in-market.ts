@@ -40,8 +40,8 @@ export const changePctText = (changeCents: number, contributedCents: number): st
 const day = (date: string) => shortDate(date, true);
 const plural = (n: number, one: string, many: string) => `${n} ${n === 1 ? one : many}`;
 
-export type TileText = {value: string; hint?: string};
-export type WayTiles = {end: TileText; change: TileText; underwater: TileText};
+type TileText = {value: string; hint?: string};
+type WayTiles = {end: TileText; change: TileText; underwater: TileText};
 
 const UNPRICED: WayTiles = {end: {value: '—'}, change: {value: '—'}, underwater: {value: '—'}};
 

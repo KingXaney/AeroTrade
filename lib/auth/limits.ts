@@ -38,7 +38,7 @@ export const signInClientKey = (ip: string): string => `signin:ip:${ip}`;
 // still holds); sign-up has no second counter, so every such request shares one key.
 export const signUpClientKey = (ip: string | null): string => `signup:ip:${ip ?? 'unknown'}`;
 
-export type HeaderReader = {get(name: string): string | null};
+type HeaderReader = {get(name: string): string | null};
 
 // IPv4, IPv6 or IPv4-mapped IPv6 characters only, at most an IPv6 address's length. A value
 // that is anything else ("unknown", a proxy's hostname, a padded header) names no client.

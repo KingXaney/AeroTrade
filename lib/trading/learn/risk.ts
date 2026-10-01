@@ -11,7 +11,7 @@ import {isTradingDay} from "@/lib/prices/market-hours";
 // Two daily changes are the fewest a spread can be measured from.
 export const MIN_SWING_POINTS = 3;
 
-export type DailySwing = {
+type DailySwing = {
     dollars: number;   // at today's value
     pct: number;       // as a % of the account
     days: number;      // daily changes it was measured over

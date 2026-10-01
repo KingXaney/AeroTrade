@@ -10,7 +10,7 @@ import {daysBetween} from "@/lib/learn/facts";
 import {REPLAY_COPY} from "@/lib/learn/copy/replay";
 
 export type ReplayRun = {asOf: string; board: readonly SignalRow[]; orders: readonly RunOrderView[]};
-export type ReplayMatch = {row: SignalRow | null; order: RunOrderView | null};
+type ReplayMatch = {row: SignalRow | null; order: RunOrderView | null};
 
 // A strategy fills on the morning of its run date, so the ET date of the fill is the
 // run's date.

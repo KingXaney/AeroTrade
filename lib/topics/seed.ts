@@ -12,7 +12,7 @@ import {insertTopic} from "@/lib/topics/insert";
 import {defaultTopics} from "@/lib/topics/starters";
 import {requestTopicFirstRun} from "@/lib/topics/events";
 
-export type SeedResult = {created: number; firstSlug: string | null};
+type SeedResult = {created: number; firstSlug: string | null};
 
 const EMPTY: SeedResult = {created: 0, firstSlug: null};
 

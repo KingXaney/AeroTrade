@@ -23,7 +23,7 @@ import {
 
 // 'topics' is not a request — it is the stored followed-topic articles, injected straight
 // into the merge. It has no URL and never reaches feedRequestsFor or planFeedSlots.
-export type FeedRequestKind = FeedSlot['kind'] | 'finnhub' | 'topics';
+type FeedRequestKind = FeedSlot['kind'] | 'finnhub' | 'topics';
 
 export type FeedRequest = {
     kind: FeedRequestKind;

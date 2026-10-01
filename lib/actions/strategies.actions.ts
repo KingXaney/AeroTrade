@@ -10,7 +10,7 @@ import {getFollowedStrategies} from "@/lib/strategies/follows";
 // Writes only: which quant strategies a user pins on the dashboard. Reads live in
 // lib/strategies/follows.ts. Absence is the default, so emptying the list unsets it.
 
-export type FollowResult = OrderResult & {followed?: string[]};
+type FollowResult = OrderResult & {followed?: string[]};
 
 export const followStrategy = async (slug: unknown): Promise<FollowResult> => {
     const userId = await getCurrentUserId();

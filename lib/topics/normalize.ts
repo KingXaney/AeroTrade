@@ -38,7 +38,7 @@ export const topicInputSchema = z.object({
     color: z.string().regex(/^#[0-9a-f]{6}$/i, {error: 'Colour must be a hex value'}).optional(),
 });
 
-export type TopicInput = z.infer<typeof topicInputSchema>;
+type TopicInput = z.infer<typeof topicInputSchema>;
 
 // The name alone is a usable keyword when the user gives none. Null means nothing
 // survived normalisation, which the caller reports instead of storing an empty set.

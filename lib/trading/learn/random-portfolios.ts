@@ -81,7 +81,7 @@ export const samplePortfolios = (
 
 // ---- holding over the window ----------------------------------------------------------------
 
-export type EdgeBar = {symbol: string; date: string; close: number};
+type EdgeBar = {symbol: string; date: string; close: number};
 // incomePerShare: the cash one share bought at the window's first close has brought in by its
 // last day — its dividends, paid on their pay dates, and the interest they have earned since.
 export type HoldInput = {symbol: string; startClose: number; endClose: number; incomePerShare: number};
@@ -136,7 +136,7 @@ export const holdWindow = ({bars, dividends, rates, from, to}: {
 };
 
 // cash: the remainder the whole-share rule left at the first close.
-export type HoldResult = {endValue: number; cash: number; returnPct: number};
+type HoldResult = {endValue: number; cash: number; returnPct: number};
 
 // Equal dollar slices, whole shares, the remainder as cash; each share brings its income, the
 // remainder grows by the window's cash factor. Null when a name has no prices (the caller
@@ -238,14 +238,14 @@ export const completeSession = ({latest, universe, benchmark}: {
     return served.reduce((end, date) => (date < end ? date : end), spy);
 };
 
-export type SnapshotReading = {date: string; totalValue: number; startingBalance: number};
+type SnapshotReading = {date: string; totalValue: number; startingBalance: number};
 
 // Why the learner's marker is not drawn: a holding with no quote and no snapshot on the last
 // session, no snapshot at all, or an account none of whose fills the learner placed (the AI
 // Navigator's account, or one never traded) — its return is a rule's, not "your return".
-export type LuckWithheld = 'unpriced' | 'no-snapshot' | 'not-yours';
+type LuckWithheld = 'unpriced' | 'no-snapshot' | 'not-yours';
 
-export type LuckWindow = {
+type LuckWindow = {
     start: string;          // the session whose close the portfolios buy at
     end: string;            // the session whose close they are valued at
     sessions: number;

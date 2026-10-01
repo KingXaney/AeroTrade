@@ -14,8 +14,8 @@ import type {TopicBriefArticle} from "@/lib/topics/prompts";
 import {parseBriefText, type TopicBriefContent} from "@/lib/topics/brief";
 import {getEasternDateString} from "@/lib/dates";
 
-export type KeywordGroup = {keywordSetHash: number; keywords: string[]; exclude: string[]};
-export type RefreshResult = {fetched: number; matched: number; inserted: number};
+type KeywordGroup = {keywordSetHash: number; keywords: string[]; exclude: string[]};
+type RefreshResult = {fetched: number; matched: number; inserted: number};
 
 const WEB_FETCH_LIMIT = 40;
 
@@ -117,7 +117,7 @@ export const refreshKeywordGroup = async (group: KeywordGroup): Promise<RefreshR
 
 const BRIEF_ARTICLES = 12;
 
-export type BriefCandidate = {
+type BriefCandidate = {
     keywordSetHash: number;
     name: string;                 // the first topic's name; users sharing a keyword set share the brief
     articles: TopicBriefArticle[];
@@ -164,7 +164,7 @@ export const loadBriefCandidates = async (limit: number): Promise<BriefCandidate
 };
 
 // Writes the brief to every topic sharing the keyword set that still lacks a fresh one.
-export const saveTopicBrief = async (
+const saveTopicBrief = async (
     keywordSetHash: number,
     content: TopicBriefContent,
     articleHashes: number[],

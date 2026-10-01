@@ -40,7 +40,7 @@ import {addCalendarDays} from '@/lib/dates';
 import {BRAIN_LEGEND_COPY as C} from '@/lib/learn/copy/brain';
 import {shareText} from '@/lib/learn/copy/reasons';
 
-export type LegendSection = {heading: string; lines: string[]};
+type LegendSection = {heading: string; lines: string[]};
 export type BrainLegend = {summary: string; sections: LegendSection[]};
 
 const weightText = (weight: number): string => weight.toFixed(2);

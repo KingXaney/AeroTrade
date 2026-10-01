@@ -5,7 +5,7 @@
 // every one to the 'copy' tier of lib/learn/banned.ts. Pure: values arrive already
 // formatted the way the board prints them, so a sentence can never disagree with its cell.
 
-export type RankOrder = 'strongest' | 'calmest';
+type RankOrder = 'strongest' | 'calmest';
 
 export const BOARD_COPY = {
     // The one disclosure beside the board, which also carries its definitions.

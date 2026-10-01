@@ -29,7 +29,7 @@ const shares = (n: number): string => `${qty(n)} ${n === 1 ? 'share' : 'shares'}
 // 'Win rate: Sells that locked in a profit, as a share of all sells.' — the glossary's own line.
 const defined = (key: GlossaryKey): string => `${GLOSSARY[key].term}: ${GLOSSARY[key].short}`;
 
-export type MomentCopy = {
+type MomentCopy = {
     label: string;
     title: string;
     // The row's own numbers, one line.

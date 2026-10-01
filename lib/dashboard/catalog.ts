@@ -16,7 +16,7 @@ export type WidgetSpan = (typeof WIDGET_SPANS)[number];
 
 export const SPAN_LABELS: Record<WidgetSpan, string> = {3: 'XS', 4: 'S', 6: 'M', 8: 'L', 12: 'XL'};
 
-export type WidgetCategory = 'topics' | 'learn' | 'personal' | 'markets' | 'strategy' | 'social' | 'brain' | 'tools';
+type WidgetCategory = 'topics' | 'learn' | 'personal' | 'markets' | 'strategy' | 'social' | 'brain' | 'tools';
 
 // Library grouping order; WIDGET_IDS below is kept in this order too.
 export const CATEGORY_ORDER: readonly WidgetCategory[] = ['topics', 'learn', 'personal', 'markets', 'strategy', 'social', 'brain', 'tools'];
@@ -97,11 +97,11 @@ export const LAZY_DATA_KEYS: readonly DataKey[] = ['movers', 'news', 'analytics'
 // 'link' = the clickable PersonalRow card · 'panel' = glass-panel + heading ·
 // 'panel-lg' / 'panel-sm' = panel with the TradingView paddings · 'bare' = the
 // component already draws its own glass-panel.
-export type WidgetChrome = 'link' | 'panel' | 'panel-lg' | 'panel-sm' | 'bare';
+type WidgetChrome = 'link' | 'panel' | 'panel-lg' | 'panel-sm' | 'bare';
 
 // 'onboarding' = the First-week checklist: shown while lib/learn/missions.ts says the
 // account is still in its first month with missions left, gone afterwards.
-export type WidgetAvailability = 'always' | 'multiAccount' | 'advanced' | 'onboarding';
+type WidgetAvailability = 'always' | 'multiAccount' | 'advanced' | 'onboarding';
 
 export type AvailabilityContext = {
     accountCount: number;
@@ -673,7 +673,7 @@ export const isWidgetAvailable = (def: WidgetDefinition, ctx: AvailabilityContex
     }
 };
 
-export type ResolvedDataKeys = {
+type ResolvedDataKeys = {
     eager: DataKey[];
     lazy: DataKey[];
     needsActiveAccount: boolean;

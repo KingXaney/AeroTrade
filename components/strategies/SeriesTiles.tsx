@@ -8,7 +8,7 @@ import {Stat} from "@/components/analytics/AnalyticsStats";
 // way of owning SPY; nothing here colours a value by how it compares with the others.
 // Server-safe and client-safe: no hooks, no server imports.
 
-export type SeriesTile = {label: ReactNode; value: string; hint?: string};
+type SeriesTile = {label: ReactNode; value: string; hint?: string};
 
 type Props = {
     title: ReactNode;

@@ -40,7 +40,7 @@ export const universeIsTooStale = (staleCount: number, universeSize: number): bo
 export const ORDER_BURST = 25;
 export const throttleDue = (ordersSoFar: number): boolean => ordersSoFar > 0 && ordersSoFar % ORDER_BURST === 0;
 
-export type RunSummaryInput = {
+type RunSummaryInput = {
     ran: number;
     total: number;
     preview: boolean;

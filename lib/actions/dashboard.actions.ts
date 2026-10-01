@@ -10,7 +10,7 @@ import {DashboardLayoutSchema, normalizeLayout, resetLayout, type DashboardLayou
 // an action-triggered re-render would remount the dashboard grid before the
 // client finishes its own save flow, so callers refresh explicitly.
 
-export type LayoutResult = OrderResult & {layout?: DashboardLayout};
+type LayoutResult = OrderResult & {layout?: DashboardLayout};
 
 export const saveDashboardLayout = async (input: unknown): Promise<LayoutResult> => {
     const userId = await getCurrentUserId();

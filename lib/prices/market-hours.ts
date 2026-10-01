@@ -5,8 +5,8 @@
 
 import {addCalendarDays} from "@/lib/dates";
 
-export type MarketState = 'open' | 'closed';
-export type ClosedReason = 'pre-open' | 'after-close' | 'weekend' | 'holiday';
+type MarketState = 'open' | 'closed';
+type ClosedReason = 'pre-open' | 'after-close' | 'weekend' | 'holiday';
 
 export type MarketStatus = {
     at: number;                  // the instant this status was computed for (epoch ms)
@@ -76,7 +76,7 @@ export const NYSE_HOLIDAYS: Readonly<Record<string, string>> = {
 };
 
 // 1:00 p.m. ET closes.
-export const NYSE_HALF_DAYS: ReadonlySet<string> = new Set([
+const NYSE_HALF_DAYS: ReadonlySet<string> = new Set([
     '2025-07-03', '2025-11-28', '2025-12-24',
     '2026-11-27', '2026-12-24',
     '2027-11-26',

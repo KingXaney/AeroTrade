@@ -3,7 +3,7 @@
 import TradingViewWidget from "@/components/TradingViewWidget";
 import {MARKET_EMBEDS} from "@/lib/stocks/tradingview";
 
-export type TradingViewKind = 'tv-heatmap' | 'tv-top-stories' | 'tv-ticker-tape' | 'tv-market-screener' | 'tv-crypto-screener' | 'tv-forex';
+type TradingViewKind = 'tv-heatmap' | 'tv-top-stories' | 'tv-ticker-tape' | 'tv-market-screener' | 'tv-crypto-screener' | 'tv-forex';
 
 // The embeds come from lib/stocks/tradingview; the heights are this surface's own. Heatmap and
 // top stories share a dashboard row at 460px, shorter than /markets renders the heatmap.

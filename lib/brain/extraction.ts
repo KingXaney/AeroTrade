@@ -22,7 +22,7 @@ export const ExtractionBatchSchema = z.object({
 
 export type ExtractionBatch = z.infer<typeof ExtractionBatchSchema>;
 export type ExtractedEntity = {key: string; type: "ticker" | "sector" | "theme"; sentiment: number; relevance: number};
-export type SanitizedExtraction = {id: string; eventType: ExtractionBatch["articles"][number]["eventType"]; importance: number; entities: ExtractedEntity[]};
+type SanitizedExtraction = {id: string; eventType: ExtractionBatch["articles"][number]["eventType"]; importance: number; entities: ExtractedEntity[]};
 
 const TICKER_KEY_PATTERN = /^[A-Z.]{1,5}$/;
 const THEME_MAX_WORDS = 3;

@@ -48,10 +48,10 @@ import {findParam} from '@/lib/strategies/params';
 import type {StrategyDefinition, StrategyId} from '@/lib/strategies/types';
 
 // The lib/strategies/config.ts constant a clause turns on, by its name there.
-export type EngineRail = 'CASH_FLOOR' | 'DEFAULT_DRIFT_BAND' | 'STALE_SKIP_FRACTION';
+type EngineRail = 'CASH_FLOOR' | 'DEFAULT_DRIFT_BAND' | 'STALE_SKIP_FRACTION';
 
 // The lib/navigator/config.ts constant a Navigator clause turns on, by its name there.
-export type NavigatorRail =
+type NavigatorRail =
     | 'SCORE_WEIGHTS' | 'MOMENTUM_MIX' | 'VOLATILITY_HAIRCUT' | 'MIN_ARTICLES_FOR_ELIGIBILITY'
     | 'EXIT_SCORE_THRESHOLD' | 'HARD_STOP_DRAWDOWN' | 'REBALANCE_BAND' | 'MAX_POSITION_WEIGHT' | 'ENTRY_SCORE_THRESHOLD';
 
@@ -67,7 +67,7 @@ export type DecodedReason = {clauses: ReasonClause[]; unknown: string[]};
 
 type Decode = (match: RegExpExecArray, def: StrategyDefinition | undefined) => ReasonClause[] | null;
 
-export type ReasonTemplate = {
+type ReasonTemplate = {
     id: string;
     // The rule that writes this shape; its catalog definition supplies the parameters when
     // the caller passed none, or passed another strategy's.

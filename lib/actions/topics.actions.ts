@@ -13,10 +13,10 @@ import {requestTopicFirstRun, requestTopicRefresh} from "@/lib/topics/events";
 import {seedDefaultTopics} from "@/lib/topics/seed";
 import {getTopicArticles, toTopicView} from "@/lib/topics/store";
 
-export type TopicResult = OrderResult & {topic?: TopicView};
-export type TopicFeedPageResult = {success: boolean; message?: string; articles: TopicArticleView[]};
-export type RefreshTopicResult = OrderResult & {cooldownUntil?: number};   // epoch ms; present whenever a cooldown applies
-export type FollowTopicsResult = {success: boolean; message?: string; created: number; firstSlug: string | null};
+type TopicResult = OrderResult & {topic?: TopicView};
+type TopicFeedPageResult = {success: boolean; message?: string; articles: TopicArticleView[]};
+type RefreshTopicResult = OrderResult & {cooldownUntil?: number};   // epoch ms; present whenever a cooldown applies
+type FollowTopicsResult = {success: boolean; message?: string; created: number; firstSlug: string | null};
 
 const FEED_PAGE_MAX = 50;
 

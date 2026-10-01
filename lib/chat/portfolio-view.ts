@@ -7,7 +7,7 @@
 /** Money the model is going to read aloud — never hand it 1234.5600000001. */
 const money = (n: number): number => Math.round(n * 100) / 100;
 
-export type ChatPosition = {
+type ChatPosition = {
     symbol: string;
     company: string;
     quantity: number;
@@ -19,7 +19,7 @@ export type ChatPosition = {
     priceStale: boolean;
 };
 
-export type ChatAccount = {
+type ChatAccount = {
     name: string;
     inceptionAt: string;
     startingBalance: number;
@@ -31,7 +31,7 @@ export type ChatAccount = {
     positions: ChatPosition[];
 };
 
-export type ChatTrade = {
+type ChatTrade = {
     symbol: string;
     side: 'buy' | 'sell';
     quantity: number;
@@ -41,7 +41,7 @@ export type ChatTrade = {
     at: string;
 };
 
-export type ChatPortfolio = {
+type ChatPortfolio = {
     paper: true;
     currency: 'USD';
     total: {
@@ -70,7 +70,7 @@ export const toChatPosition = (p: EnrichedPosition): ChatPosition => ({
     priceStale: p.priceStale,
 });
 
-export const toChatAccount = (entry: AccountWithPortfolio): ChatAccount => ({
+const toChatAccount = (entry: AccountWithPortfolio): ChatAccount => ({
     name: entry.account.name,
     inceptionAt: new Date(entry.account.inceptionAt).toISOString(),
     startingBalance: money(entry.summary.startingBalance),

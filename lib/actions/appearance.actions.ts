@@ -7,7 +7,7 @@ import {isPaletteId, resolveTheme, type Theme} from "@/lib/theme/resolve";
 import {isStyleId} from "@/lib/theme/styles";
 import {getAppearanceForUser, setThemeCookie} from "@/lib/theme/store";
 
-export type AppearanceResult = OrderResult & {theme?: Theme};
+type AppearanceResult = OrderResult & {theme?: Theme};
 
 const isThemeInput = (input: unknown): input is Theme =>
     typeof input === 'object' && input !== null

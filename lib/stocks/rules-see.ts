@@ -18,10 +18,10 @@ import {formatSignalValue, visibleSignalColumns} from '@/lib/strategies/views';
 // run's board has no row for it).
 export type SymbolBoardRead = {strategyId: StrategyId; date: string; asOf: string; row: SignalRow | null};
 
-export type RulesSeeStamp = {asOf: string; date: string};
+type RulesSeeStamp = {asOf: string; date: string};
 export type RulesSeeCell = {column: SignalColumn; value: string};
 
-export type RulesSeeEntry = {
+type RulesSeeEntry = {
     strategyId: StrategyId;
     name: string;
     state: RowState;

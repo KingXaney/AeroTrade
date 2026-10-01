@@ -11,7 +11,7 @@ import {BRAIN_COPY} from "@/lib/learn/copy/brain";
 // Ticker keys are bare symbols; sectors and themes carry a "sector:" / "theme:" prefix.
 const isTickerKey = (key: string): boolean => /^[A-Z][A-Z0-9.\-]{0,9}$/.test(key);
 
-export type EvidenceItem = {
+type EvidenceItem = {
     headline: string;
     source: string;
     sourceType: string;

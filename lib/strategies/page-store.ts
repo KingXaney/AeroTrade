@@ -329,7 +329,7 @@ export type StrategyBacktestView = {
     computedAt: number;
 };
 
-export type StrategyDetail = {
+type StrategyDetail = {
     def: StrategyDefinition;
     state: StrategyStateView | null;
     analytics: AccountAnalytics | null;

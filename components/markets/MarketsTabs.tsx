@@ -12,7 +12,7 @@ const TABS = [
     {id: 'forex', label: 'Forex', ...MARKET_EMBEDS.forex, height: 540},
 ] as const;
 
-export type MarketsTabId = typeof TABS[number]['id'];
+type MarketsTabId = typeof TABS[number]['id'];
 
 export const isMarketsTabId = (value: unknown): value is MarketsTabId =>
     typeof value === 'string' && TABS.some((t) => t.id === value);

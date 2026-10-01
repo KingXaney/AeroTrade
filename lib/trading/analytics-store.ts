@@ -88,7 +88,7 @@ export const getAccountAnalytics = async (userId: string, accountId: string): Pr
     }
 };
 
-export type ComparisonStats = {winRatePct: number | null; maxDrawdownPct: number | null; tradeCount: number};
+type ComparisonStats = {winRatePct: number | null; maxDrawdownPct: number | null; tradeCount: number};
 
 // Win rate + max drawdown (and the fill count behind the win rate) for every account of a
 // user in bulk queries (feeds the strategy comparison table without N per-account round trips).

@@ -10,18 +10,18 @@ import {daysBetween, type LearnDividend, type LearnDrawdown, type LearnFacts, ty
 import {STRATEGY_SLUGS, strategyBySlug} from "@/lib/strategies/catalog";
 import type {StrategyId} from "@/lib/strategies/types";
 
-export const MOMENT_WINDOW_DAYS = 7;
-export const REBALANCE_WINDOW_DAYS = 3;
+const MOMENT_WINDOW_DAYS = 7;
+const REBALANCE_WINDOW_DAYS = 3;
 // A fall from the running peak at least this deep is "the first 5% drop".
 export const DRAWDOWN_MOMENT_THRESHOLD = 0.05;
 // `learn.lessonsSeen` keeps the newest keys only ($push {$each, $slice: -LESSONS_SEEN_CAP}).
 export const LESSONS_SEEN_CAP = 32;
 export const MAX_LESSON_KEY_CHARS = 64;
 
-export const FIRST_KINDS = ['first-dividend', 'first-drawdown', 'first-sell', 'first-fill'] as const;
-export type FirstKind = (typeof FIRST_KINDS)[number];
-export type MomentKind = FirstKind | 'rebalance';
-export type RebalanceLessonId = {kind: 'rebalance'; strategyId: StrategyId; date: string};
+const FIRST_KINDS = ['first-dividend', 'first-drawdown', 'first-sell', 'first-fill'] as const;
+type FirstKind = (typeof FIRST_KINDS)[number];
+type MomentKind = FirstKind | 'rebalance';
+type RebalanceLessonId = {kind: 'rebalance'; strategyId: StrategyId; date: string};
 export type LessonId = FirstKind | RebalanceLessonId;
 
 export const MOMENT_PRIORITY: readonly MomentKind[] = [...FIRST_KINDS, 'rebalance'];
@@ -50,7 +50,7 @@ const etDateSchema = z.string().refine(isCalendarDate);
 
 // The one shape markLessonSeen accepts: one of the four firsts, or a rebalance named by a
 // catalog strategy and a real ET date. Strict, so a stray field (or an operator) never rides in.
-export const lessonIdSchema = z.union([
+const lessonIdSchema = z.union([
     z.enum(FIRST_KINDS),
     z.strictObject({kind: z.literal('rebalance'), strategyId: z.enum(STRATEGY_SLUGS), date: etDateSchema}),
 ]).refine((id) => lessonKey(id).length <= MAX_LESSON_KEY_CHARS);

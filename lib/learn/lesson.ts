@@ -13,7 +13,7 @@ export type LessonHeadline = {contentHash: number; headline: string; url: string
 // One aggregate row: a matched term, the distinct articles that matched it, their headlines.
 export type TermRow = {term: string; hashes: readonly number[]; headlines: readonly LessonHeadline[]};
 
-export type ConceptCount = {key: GlossaryKey; count: number; headlines: LessonHeadline[]};
+type ConceptCount = {key: GlossaryKey; count: number; headlines: LessonHeadline[]};
 
 export type Lesson = {
     // 'feed' = picked from today's articles; 'day' = nothing matched, the day-of-year concept.

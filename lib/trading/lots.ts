@@ -22,7 +22,7 @@ export type LedgerTrade = {
 
 export type Lot = {buyId: string; symbol: string; quantity: number; price: number; note?: string; createdAt: number};
 
-export type LotMatches = {
+type LotMatches = {
     // sell id -> the lots (or parts of lots) it closed, oldest first
     matches: Record<string, Lot[]>;
     // what is still held, oldest first

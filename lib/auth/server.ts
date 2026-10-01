@@ -54,7 +54,7 @@ function createAuthInstance(db: Parameters<typeof mongodbAdapter>[0]) {
 
 let authInstance: ReturnType<typeof createAuthInstance> | null = null;
 
-export const getAuth = async () => {
+const getAuth = async () => {
     if(authInstance) return authInstance;
 
     const mongoose = await connectToDatabase();

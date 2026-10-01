@@ -138,7 +138,7 @@ export const toSearchArticles = (raw: RawNewsArticle[], {keepFeedOrder = false}:
     return keepFeedOrder ? articles : articles.sort((a, b) => b.datetime - a.datetime);
 };
 
-export type GoogleFeedOptions = {limit?: number; keepFeedOrder?: boolean};
+type GoogleFeedOptions = {limit?: number; keepFeedOrder?: boolean};
 
 // Any Google News RSS URL — search, front page or topic section. NEWS_SEARCH_ENABLED is the
 // one kill switch for all of them. The URL must sit under the Google News base: this is the

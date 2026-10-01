@@ -33,11 +33,11 @@ export type LoaderCtx = {
     preferredAccountId?: string;   // ?account= ?? ACTIVE_ACCOUNT_COOKIE
 };
 
-export const MOVERS_SYMBOL_CAP = 8;   // 3 Finnhub calls per symbol — keep the fan-out bounded
-export const RECENT_TRADES_LIMIT = 8;
-export const TOP_ENTITIES_PER_TYPE = 5;
-export const GRAPH_NODE_LIMIT = 16;
-export const TOPICS_LATEST_LIMIT = 6;
+const MOVERS_SYMBOL_CAP = 8;   // 3 Finnhub calls per symbol — keep the fan-out bounded
+const RECENT_TRADES_LIMIT = 8;
+const TOP_ENTITIES_PER_TYPE = 5;
+const GRAPH_NODE_LIMIT = 16;
+const TOPICS_LATEST_LIMIT = 6;
 
 export type DashboardData = Partial<{
     portfolios: AccountWithPortfolio[];
@@ -119,7 +119,7 @@ export const LOADERS: {[K in DataKey]: Loader<K>} = {
     dailyQuiz: ({userId}) => getDailyQuiz(userId),
 };
 
-export type LoadedDashboard = {data: DashboardData; failed: Set<DataKey>};
+type LoadedDashboard = {data: DashboardData; failed: Set<DataKey>};
 
 // One parallel pass over the eager keys. A failing loader never rejects the
 // page: it lands in `failed` and only its widgets render an error state.

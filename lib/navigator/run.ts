@@ -33,7 +33,7 @@ export const ensureUniverseBars = async (step: JobStep, symbols: readonly string
     }
 };
 
-export type NavigatorDecisionInputs = {targets: TargetWeight[]; scoreBySymbol: Map<string, ScoredSymbol>};
+type NavigatorDecisionInputs = {targets: TargetWeight[]; scoreBySymbol: Map<string, ScoredSymbol>};
 
 // The week's targets, picked from the targetable part of the scored universe.
 export const decisionInputs = (scored: ScoredSymbol[], universe: NavigatorUniverse): NavigatorDecisionInputs => ({

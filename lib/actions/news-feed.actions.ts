@@ -10,7 +10,7 @@ import {formatIssue} from "@/lib/topics/normalize";
 // not exposed as POST endpoints. Neither action revalidates a path: the editor refreshes
 // once its own state is settled, the same way the dashboard editor does.
 
-export type NewsFeedSaveResult = OrderResult & {feed?: NewsFeedPrefs};
+type NewsFeedSaveResult = OrderResult & {feed?: NewsFeedPrefs};
 
 export const saveNewsFeed = async (input: unknown): Promise<NewsFeedSaveResult> => {
     const userId = await getCurrentUserId();

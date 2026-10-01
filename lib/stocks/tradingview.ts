@@ -5,7 +5,7 @@
 
 const SCRIPT_BASE = 'https://s3.tradingview.com/external-embedding/embed-widget-';
 
-export type TradingViewScript =
+type TradingViewScript =
     | 'advanced-chart'
     | 'financials'
     | 'forex-cross-rates'

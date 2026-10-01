@@ -138,9 +138,9 @@ export const concentration = (
     };
 };
 
-export type TradeForStats = {side: string; realizedPnl?: number};
+type TradeForStats = {side: string; realizedPnl?: number};
 
-export type WinStats = {wins: number; losses: number; winRatePct: number | null};
+type WinStats = {wins: number; losses: number; winRatePct: number | null};
 
 // Win rate from the two counts it needs — what a database $group returns, so a reader that
 // only wants the rate never pulls the trades back to count them.

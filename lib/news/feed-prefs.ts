@@ -19,14 +19,14 @@ export type NewsCategoryId =
     | 'top' | 'world' | 'nation' | 'business' | 'technology' | 'science' | 'health' | 'sports' | 'entertainment' | 'markets';
 export type NewsRegionId = 'US' | 'GB' | 'CA' | 'AU' | 'IN' | 'SG' | 'IE' | 'NZ' | 'ZA';
 
-export type NewsCategory = {
+type NewsCategory = {
     id: NewsCategoryId;
     label: string;
     hint: string;
     /** Google News topic section id, or null for the front page ('top') and the markets wires. */
     section: string | null;
 };
-export type NewsRegion = {id: NewsRegionId; label: string; edition: GoogleEdition};
+type NewsRegion = {id: NewsRegionId; label: string; edition: GoogleEdition};
 
 // Canonical order. Normalisation re-sorts into it, so 'top' always leads a feed and the
 // planner's priority (top first, then sections) falls out of the array order.

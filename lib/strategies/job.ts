@@ -20,7 +20,7 @@ import type {StrategyDefinition} from "@/lib/strategies/types";
 
 export type StrategiesEventData = {dryRun?: boolean; resimulate?: boolean; force?: boolean};
 
-export type StrategiesDay = {
+type StrategiesDay = {
     today: string;
     // Why the whole day is skipped (a holiday's name, or 'weekend'); null on a session day or a forced run.
     closed: string | null;
@@ -62,7 +62,7 @@ export const rebuildPending = (states: readonly StrategyStateView[], versions: R
 // on every distribution, so their top-up window is deep.
 const TOTAL_RETURN_TOPUP_RANGE = '2y';
 
-export type BarChunk = {symbols: string[]; topupRange: '2y' | '1mo'; forceBackfill: boolean};
+type BarChunk = {symbols: string[]; topupRange: '2y' | '1mo'; forceBackfill: boolean};
 
 export const strategyBarChunks = (heldOutside: readonly string[], {rebuildNeeded, resimulate}: {rebuildNeeded: boolean; resimulate: boolean}): BarChunk[] => [
     {symbols: [...CORE_ETFS], topupRange: TOTAL_RETURN_TOPUP_RANGE as '2y', forceBackfill: rebuildNeeded},
@@ -80,7 +80,7 @@ export const dividendCoverageWindow = (states: readonly StrategyStateView[], tod
     };
 };
 
-export type BarsOutcome = {providers: {yahoo: number; stooq: number}; failed: string[]};
+type BarsOutcome = {providers: {yahoo: number; stooq: number}; failed: string[]};
 
 export const ensureStrategyBars = async (
     barChunk: BarChunk,

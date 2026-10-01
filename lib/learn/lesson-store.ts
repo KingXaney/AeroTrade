@@ -17,7 +17,7 @@ import {createDayMemo, remember} from "@/lib/day-memo";
 import {CONCEPT_TERMS, pickLesson, termCountsFromRows, type Lesson, type TermRow} from "@/lib/learn/lesson";
 import {getEasternDateString} from "@/lib/dates";
 
-export const LESSON_ARTICLE_CAP = 300;
+const LESSON_ARTICLE_CAP = 300;
 // Per term, before concepts merge and headlines dedupe down to LESSON_HEADLINES.
 const HEADLINES_PER_TERM = 8;
 

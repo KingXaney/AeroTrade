@@ -7,7 +7,7 @@
 
 import {pctOneDecimal, shortDate} from '@/lib/learn/copy/portfolio';
 
-export type ScoreParts = {news: string; sentiment: string; momentum: string; thesis: string; sector: string};
+type ScoreParts = {news: string; sentiment: string; momentum: string; thesis: string; sector: string};
 
 export const BRAIN_LEGEND_COPY = {
     summary: 'How the brain weighs the news and the Navigator scores it',

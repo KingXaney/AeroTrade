@@ -25,7 +25,7 @@ import {readLessonForDigest} from "@/lib/learn/lesson-store";
 const PERSONALIZED_SYMBOL_CAP = 10;
 
 // One recipient as lib/email/recipients.ts lists them.
-export type DigestUser = {
+type DigestUser = {
     id: string;
     email: string;
     name: string;
@@ -61,7 +61,7 @@ export const fetchDigestNews = async (user: DigestUser): Promise<MarketNewsArtic
     return pickDigestArticles(aggregated, feedArticles);
 };
 
-export type NavigatorDigest = {
+type NavigatorDigest = {
     date: string;
     items: {action: string; symbol: string; targetWeightPct: number; executed: boolean; reasons: string[]}[];
     rationale: string | null;
@@ -95,7 +95,7 @@ export const fetchNavigatorDigest = async (userId: string): Promise<NavigatorDig
     }
 };
 
-export type DigestSections = {topicsSection: string; lessonSection: string};
+type DigestSections = {topicsSection: string; lessonSection: string};
 
 // Two deterministic sections (no LLM), read together: followed topics (off per user), every
 // string escaped and links allow-listed to the articles it lists; and Today's lesson — a first

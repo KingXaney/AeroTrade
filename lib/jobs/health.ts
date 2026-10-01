@@ -18,7 +18,7 @@ export type JobHealth = {
 // Cadence-aware staleness (lib/jobs/registry.ts): daily jobs get slack for one miss; the
 // weekday jobs skip weekends; the navigator is weekly; on-demand jobs never go stale.
 // Every job that stamps a JobRun, in registry order.
-export const JOB_DEFINITIONS: Array<Omit<JobHealth, 'lastRunAt' | 'lastMessage'>> = JOB_LIST.flatMap((job) =>
+const JOB_DEFINITIONS: Array<Omit<JobHealth, 'lastRunAt' | 'lastMessage'>> = JOB_LIST.flatMap((job) =>
     job.health ? [{jobId: job.id, ...job.health}] : []);
 
 const withStamps = (defs: typeof JOB_DEFINITIONS, runs: {jobId: string; lastRunAt: Date; lastMessage?: string}[]): JobHealth[] => {

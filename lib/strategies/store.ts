@@ -114,7 +114,7 @@ export const releaseRun = async (strategyId: string, today: string): Promise<voi
     await StrategyState.updateOne({strategyId, lastRunDate: today}, {$unset: {lastRunDate: ''}});
 };
 
-export type DecisionInput = {
+type DecisionInput = {
     barsBySymbol: Map<string, Bar[]>;
     positions: {symbol: string; quantity: number; avgCost: number}[];
     cash: number;
@@ -135,7 +135,7 @@ export const loadDecisionInput = async (def: StrategyDefinition, state: Strategy
     return {barsBySymbol, positions, cash: account.cash, isFirstRun: tradeCount === 0};
 };
 
-export type PlannedRunRecord = {
+type PlannedRunRecord = {
     strategyId: string;
     date: string;
     asOf: string;

@@ -11,7 +11,7 @@ import {applyFill, type FillRejection} from "@/lib/trading/fill";
 import {TRADE_REASON_MAX} from "@/lib/trading/config";
 import {isOrderSide} from "@/lib/trading/order-math";
 
-export type OrderRequest = {
+type OrderRequest = {
     accountId: string;
     symbol: string;
     side: 'buy' | 'sell';

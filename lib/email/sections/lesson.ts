@@ -26,7 +26,7 @@ export const DIGEST_MAX_HEADLINE_CHARS = 200;
 
 const FIGURE_STYLE = 'margin: 0 0 10px 0; font-size: 16px; font-weight: 600; line-height: 1.5; color: #f8f9fa;';
 
-export type LessonSectionInput = {moment: Moment | null; term: Lesson | null};
+type LessonSectionInput = {moment: Moment | null; term: Lesson | null};
 
 // The digest goes out from a noon cron. A fill at 09:40 or a 09:35 rebalance is dated today at
 // that noon and yesterday at the next, so only a moment dated exactly yesterday is mailed —

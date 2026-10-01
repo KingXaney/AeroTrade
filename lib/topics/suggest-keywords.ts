@@ -4,7 +4,7 @@
 
 import {KEYWORD_MAX, normalizeKeyword} from "@/lib/news/keywords";
 
-export const STOPWORDS = new Set([
+const STOPWORDS = new Set([
     'a', 'an', 'the', 'of', 'in', 'on', 'at', 'and', 'or', 'for', 'to', 'vs', 'with', 'from', 'by', 'is', 'are',
     'news', 'about', 'latest', 'update', 'updates', 'today', 'daily', 'week', 'weekly', 'new', 'report', 'reports',
 ]);

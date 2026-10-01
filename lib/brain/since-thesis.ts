@@ -18,7 +18,7 @@ import {getEasternDateString} from '@/lib/dates';
 export const SINCE_THESIS_MAX = 10;
 
 export type ThesisRef = {key: string; type: BrainEntityType; weightSlow: number; thesisSince: number | null};
-export type SinceThesisTarget = {symbol: string; since: string};
+type SinceThesisTarget = {symbol: string; since: string};
 export type SinceThesisLegs = {from: string; to: string; symbolPct: number; spyPct: number};
 
 export const sinceThesisTargets = (theses: readonly ThesisRef[]): SinceThesisTarget[] =>

@@ -23,7 +23,7 @@ import {getEasternDateString} from "@/lib/dates";
 // doesn't need every tail position priced to the cent, so price the largest holdings and
 // report how many were left at cost. (getQuote caches 30s, so repeat calls in one
 // conversation are close to free — this bounds the first one.)
-export const CHAT_MAX_PRICED_SYMBOLS = 25;
+const CHAT_MAX_PRICED_SYMBOLS = 25;
 
 // The largest holdings by cost across the given accounts, quoted; the rest fall back to cost
 // basis in computePortfolio and are counted as unpriced.

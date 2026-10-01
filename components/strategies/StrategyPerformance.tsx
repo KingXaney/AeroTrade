@@ -11,7 +11,7 @@ import SimulatedStats from "@/components/strategies/SimulatedStats";
 // Live and simulated curves side by side but never on one axis: a toggle, and each
 // panel says which basis it shows and how far it reaches.
 
-export type LivePanel = {
+type LivePanel = {
     series: PerfPoint[];
     stats: AnalyticsStatFields;
     since: string;
@@ -20,7 +20,7 @@ export type LivePanel = {
     totalReturnPct: number;
 };
 
-export type SimulatedPanel = {
+type SimulatedPanel = {
     series: PerfPoint[];
     stats: SeriesStats;
     from: string;

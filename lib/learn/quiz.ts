@@ -35,7 +35,7 @@ export type QuizTemplate = (typeof QUIZ_TEMPLATES)[number];
 const MIN_OPTIONS = 3;
 const MAX_SYMBOL_OPTIONS = 4;
 
-export type QuizRunOrder = {symbol: string; side: 'buy' | 'sell'; reason: string};
+type QuizRunOrder = {symbol: string; side: 'buy' | 'sell'; reason: string};
 export type QuizRun = {date: string; board: readonly SignalRow[]; orders: readonly QuizRunOrder[]};
 
 export type QuizCell = {label: string; value: string; term?: GlossaryKey};
@@ -47,7 +47,7 @@ export type QuizOption = {
     // A row's numbers as the board prints them ("which symbol" only).
     cells: QuizCell[];
 };
-export type QuizReveal = {symbol: string; verdict: RowState; explanation: string; gloss: ReasonClause[]};
+type QuizReveal = {symbol: string; verdict: RowState; explanation: string; gloss: ReasonClause[]};
 
 export type DailyQuiz = {
     // The ET day the question is for; recordQuizAnswer accepts only this, and only today.

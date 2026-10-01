@@ -10,7 +10,7 @@
 // Symbols match exactly. executeOrder upper-cases the order's symbol and looks the holding up
 // case-insensitively, then fills under the holding's own spelling, so a stored position keeps it.
 
-export type SimPosition = {
+type SimPosition = {
     symbol: string;
     quantity: number;
     avgCost: number;
@@ -20,7 +20,7 @@ export type SimPosition = {
 
 export type SimAccount = {cash: number; positions: SimPosition[]};
 
-export type FillOrder = {
+type FillOrder = {
     symbol: string;
     side: 'buy' | 'sell';
     quantity: number;
@@ -31,7 +31,7 @@ export type FillOrder = {
 
 export type FillRejection = 'invalid quantity' | 'no price' | 'insufficient cash' | 'cash floor' | 'not held';
 
-export type FillResult =
+type FillResult =
     | {ok: true; account: SimAccount; realizedPnl?: number; total: number}
     | {ok: false; reason: FillRejection};
 
