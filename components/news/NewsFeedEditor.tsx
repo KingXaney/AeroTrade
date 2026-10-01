@@ -35,15 +35,14 @@ import ActionButton from "@/components/primitives/ActionButton";
 // Imports lib/news/feed-prefs, never lib/news/feed: the latter reaches the XML parser
 // through the search adapter and has no business in the client bundle.
 
-const mono = {fontFamily: 'var(--type-mono)'} as const;
 const chipClass = (on: boolean) => cn(
-    'rounded-full border px-3 py-1.5 text-xs transition-colors',
+    'rounded-full border px-3 py-1.5 font-mono text-xs transition-colors',
     on ? 'border-brand bg-brand/10 text-brand' : 'border-line-strong/30 bg-surface-2/40 text-fg-soft hover:text-fg hover:border-brand/40',
 );
 
 const Group = ({label, hint, children}: {label: string; hint?: string; children: React.ReactNode}) => (
     <div>
-        <div className="text-[10px] uppercase tracking-[0.14em] text-fg-muted mb-2" style={mono}>{label}</div>
+        <div className="text-[10px] uppercase tracking-[0.14em] text-fg-muted mb-2 font-mono">{label}</div>
         {children}
         {hint && <p className="mt-1.5 text-[11px] text-fg-muted">{hint}</p>}
     </div>
@@ -103,8 +102,8 @@ const NewsFeedEditor = ({initial, startOpen = false}: Props) => {
         <Panel>
             <div className="flex items-center justify-between gap-3 flex-wrap">
                 <div className="min-w-0">
-                    <h2 className="text-sm font-bold uppercase tracking-[0.1em] text-brand" style={mono}>Your feed</h2>
-                    <p className="text-xs text-fg-muted mt-1" style={mono}>{describeNewsFeed(normalized)}{dirty ? ' · unsaved' : ''}</p>
+                    <h2 className="text-sm font-bold uppercase tracking-[0.1em] text-brand font-mono">Your feed</h2>
+                    <p className="text-xs text-fg-muted mt-1 font-mono">{describeNewsFeed(normalized)}{dirty ? ' · unsaved' : ''}</p>
                 </div>
                 <ActionButton id="news-feed-edit" variant="secondary" aria-expanded={open} onClick={() => setOpen((o) => !o)}>
                     {open ? 'Close' : 'Edit feed'}
@@ -117,7 +116,7 @@ const NewsFeedEditor = ({initial, startOpen = false}: Props) => {
                         <div className="flex flex-wrap gap-2" role="group" aria-label="Categories">
                             {NEWS_CATEGORIES.map((c) => (
                                 <button key={c.id} id={`news-cat-${c.id}`} type="button" aria-pressed={draft.categories.includes(c.id)}
-                                        title={c.hint} onClick={() => toggleCategory(c.id)} className={chipClass(draft.categories.includes(c.id))} style={mono}>
+                                        title={c.hint} onClick={() => toggleCategory(c.id)} className={chipClass(draft.categories.includes(c.id))}>
                                     {c.label}
                                 </button>
                             ))}
@@ -128,7 +127,7 @@ const NewsFeedEditor = ({initial, startOpen = false}: Props) => {
                         <div className="flex flex-wrap gap-2" role="group" aria-label="Regions">
                             {NEWS_REGIONS.map((r) => (
                                 <button key={r.id} id={`news-region-${r.id}`} type="button" aria-pressed={draft.regions.includes(r.id)}
-                                        onClick={() => toggleRegion(r.id)} className={chipClass(draft.regions.includes(r.id))} style={mono}>
+                                        onClick={() => toggleRegion(r.id)} className={chipClass(draft.regions.includes(r.id))}>
                                     {r.label}
                                 </button>
                             ))}
@@ -138,7 +137,7 @@ const NewsFeedEditor = ({initial, startOpen = false}: Props) => {
                     <Group label="Preferred outlets" hint="Only these outlets are shown when the list is not empty — it narrows every feed. Use Hide for a lighter touch.">
                         <div className="flex flex-wrap gap-2 mb-2" role="group" aria-label="Suggested outlets">
                             {SUGGESTED_OUTLETS.map((name) => (
-                                <button key={name} type="button" aria-pressed={hasOutlet(name)} onClick={() => toggleSuggested(name)} className={chipClass(hasOutlet(name))} style={mono}>
+                                <button key={name} type="button" aria-pressed={hasOutlet(name)} onClick={() => toggleSuggested(name)} className={chipClass(hasOutlet(name))}>
                                     {name}
                                 </button>
                             ))}
@@ -170,12 +169,12 @@ const NewsFeedEditor = ({initial, startOpen = false}: Props) => {
                     </RowCard>
 
                     {dropped > 0 && (
-                        <p role="status" className="text-[11px] text-warning" style={mono}>
+                        <p role="status" className="text-[11px] text-warning font-mono">
                             {slots.length} of {slots.length + dropped} feeds will be fetched — remove a region or category to cover everything.
                         </p>
                     )}
 
-                    <div className="flex items-center justify-between gap-2 pt-3 border-t border-line-strong/20" style={mono}>
+                    <div className="flex items-center justify-between gap-2 pt-3 border-t border-line-strong/20 font-mono">
                         <button id="news-feed-reset" type="button" onClick={askReset}
                                 className="text-xs uppercase tracking-[0.1em] text-fg-muted hover:text-negative transition-colors">
                             Reset to top stories

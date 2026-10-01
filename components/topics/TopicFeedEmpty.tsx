@@ -8,8 +8,6 @@ import type {TopicOverviewItem} from '@/lib/topics/types';
 import Panel from '@/components/primitives/Panel';
 import {actionButton} from "@/components/primitives/ActionButton";
 
-const mono = {fontFamily: 'var(--type-mono)'} as const;
-
 type Props = {now: number} & (   // now: the server render instant, for the refresh button's cooldown
     | {scope: 'topic'; topic: TopicOverviewItem}
     | {scope: 'all'; topics: TopicOverviewItem[]}
@@ -29,13 +27,13 @@ const TopicFeedEmpty = (props: Props) => {
     return (
         <Panel pad={8} className="text-center">
             <span className="material-symbols-outlined text-3xl text-fg-muted">manage_search</span>
-            <h3 className="mt-2 text-base font-semibold text-fg" style={{fontFamily: 'var(--type-display)'}}>No articles yet</h3>
+            <h3 className="mt-2 text-base font-semibold text-fg font-heading">No articles yet</h3>
             <p className="mt-1 text-sm text-fg-muted max-w-md mx-auto">
                 {props.scope === 'topic'
                     ? 'We check for matches every few hours. Refresh now, or broaden the keywords if nothing turns up.'
                     : `Nothing has matched across your ${props.topics.length === 1 ? 'topic' : `${props.topics.length} topics`} yet. We check every few hours; refresh now or follow something broader.`}
             </p>
-            <div className="mt-4 flex flex-wrap justify-center gap-2" style={mono}>
+            <div className="mt-4 flex flex-wrap justify-center gap-2 font-mono">
                 {target && (
                     <RefreshTopicButton key={target.id} topicId={target.id} cooldownUntil={refreshCooldownUntil(target.refreshRequestedAt)}
                                         serverNow={props.now} variant="primary" />
@@ -45,7 +43,7 @@ const TopicFeedEmpty = (props: Props) => {
                     : <button type="button" onClick={() => openComposer('create')} className={secondary}>Follow a topic</button>}
             </div>
             {props.scope === 'all' && target && props.topics.length > 1 && (
-                <p className="mt-2 text-[11px] text-fg-muted" style={mono}>
+                <p className="mt-2 text-[11px] text-fg-muted font-mono">
                     Refreshes &ldquo;{target.name}&rdquo; — the topic that has waited longest.
                 </p>
             )}

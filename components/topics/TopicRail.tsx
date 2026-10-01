@@ -15,11 +15,9 @@ type Props = {
     onNewTopic: () => void;
 };
 
-const mono = {fontFamily: 'var(--type-mono)'} as const;
-
 const UnseenPill = ({count}: {count: number}) => (
     count > 0
-        ? <span className="ml-auto rounded-full bg-brand px-1.5 py-0.5 text-[10px] font-bold text-on-brand" style={mono} aria-label={`${count} unseen`}>{count}</span>
+        ? <span className="ml-auto rounded-full bg-brand px-1.5 py-0.5 text-[10px] font-bold text-on-brand font-mono" aria-label={`${count} unseen`}>{count}</span>
         : null
 );
 
@@ -28,13 +26,13 @@ const TopicRail = ({topics, activeSlug, unseenTotal, onNewTopic}: Props) => {
     const sorted = sortTopicsForRail(topics);
 
     const rowClass = (active: boolean) => cn(
-        'flex items-center gap-2 rounded-lg px-3 py-2 text-xs font-bold uppercase tracking-[0.08em] transition-colors shrink-0 lg:shrink',
+        'flex items-center gap-2 rounded-lg px-3 py-2 font-mono text-xs font-bold uppercase tracking-[0.08em] transition-colors shrink-0 lg:shrink',
         active ? 'bg-brand/10 text-brand' : 'text-fg-soft hover:text-fg hover:bg-surface-3',
     );
 
     return (
         <Panel as="nav" pad={2} aria-label="Your topics" className="flex lg:flex-col gap-1 overflow-x-auto lg:overflow-visible scrollbar-hide">
-            <Link href="/topics" aria-current={!activeSlug ? 'page' : undefined} className={rowClass(!activeSlug)} style={mono}>
+            <Link href="/topics" aria-current={!activeSlug ? 'page' : undefined} className={rowClass(!activeSlug)}>
                 <span className="material-symbols-outlined text-base">interests</span>
                 <span className="truncate">All topics</span>
                 <UnseenPill count={unseenTotal} />
@@ -42,7 +40,7 @@ const TopicRail = ({topics, activeSlug, unseenTotal, onNewTopic}: Props) => {
             {sorted.map((t) => {
                 const active = t.slug === activeSlug;
                 return (
-                    <Link key={t.id} href={`/topics/${t.slug}`} aria-current={active ? 'page' : undefined} className={rowClass(active)} style={mono}>
+                    <Link key={t.id} href={`/topics/${t.slug}`} aria-current={active ? 'page' : undefined} className={rowClass(active)}>
                         <span className="h-2 w-2 rounded-full shrink-0" style={{background: t.color ?? 'var(--brand)'}} aria-hidden="true" />
                         <span className="truncate">{t.name}</span>
                         {t.latest && <span className="hidden lg:inline text-[10px] font-normal normal-case tracking-normal text-fg-muted ml-1 truncate">{formatTimeAgoSeconds(t.latest.datetime)}</span>}
@@ -51,8 +49,7 @@ const TopicRail = ({topics, activeSlug, unseenTotal, onNewTopic}: Props) => {
                 );
             })}
             <button type="button" onClick={onNewTopic}
-                    className="flex items-center gap-2 rounded-lg px-3 py-2 text-xs font-bold uppercase tracking-[0.08em] text-brand hover:bg-brand/10 shrink-0 lg:mt-1 lg:border-t lg:border-line-strong/20 lg:rounded-t-none lg:pt-3"
-                    style={mono}>
+                    className="flex items-center gap-2 rounded-lg px-3 py-2 text-xs font-bold uppercase tracking-[0.08em] text-brand hover:bg-brand/10 shrink-0 lg:mt-1 lg:border-t lg:border-line-strong/20 lg:rounded-t-none lg:pt-3 font-mono">
                 <Plus className="size-4" />
                 New topic
             </button>

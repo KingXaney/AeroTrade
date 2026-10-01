@@ -10,8 +10,8 @@ const AllTopicsHeader = ({count, unseenTotal, preinstalled}: {count: number; uns
     return (
         <Panel className="flex items-center justify-between gap-3">
             <div>
-                <h2 className="text-xl font-semibold text-fg" style={{fontFamily: 'var(--type-display)'}}>All topics</h2>
-                <p className="text-[11px] text-fg-muted mt-1" style={{fontFamily: 'var(--type-mono)'}}>
+                <h2 className="text-xl font-semibold text-fg font-heading">All topics</h2>
+                <p className="text-[11px] text-fg-muted mt-1 font-mono">
                     {count} followed · {unseenTotal} unseen
                 </p>
                 {/* Self-extinguishing: it disappears the moment the set stops being ours,

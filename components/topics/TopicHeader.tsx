@@ -15,8 +15,6 @@ import {formatTimeAgoMs} from "@/lib/format";
 import type {TopicOverviewItem} from '@/lib/topics/types';
 import Panel from '@/components/primitives/Panel';
 
-const mono = {fontFamily: 'var(--type-mono)'} as const;
-
 // `now` is the server render instant, so the refresh button's cooldown hydrates deterministically.
 const TopicHeader = ({topic, now}: {topic: TopicOverviewItem; now: number}) => {
     const router = useRouter();
@@ -42,9 +40,9 @@ const TopicHeader = ({topic, now}: {topic: TopicOverviewItem; now: number}) => {
                 <div className="min-w-0">
                     <div className="flex items-center gap-2">
                         <span className="h-2.5 w-2.5 rounded-full shrink-0" style={{background: topic.color ?? 'var(--brand)'}} aria-hidden="true" />
-                        <h2 className="text-xl font-semibold text-fg truncate" style={{fontFamily: 'var(--type-display)'}}>{topic.name}</h2>
+                        <h2 className="text-xl font-semibold text-fg truncate font-heading">{topic.name}</h2>
                     </div>
-                    <p className="text-[11px] text-fg-muted mt-1" style={mono}>
+                    <p className="text-[11px] text-fg-muted mt-1 font-mono">
                         {topic.unseenCount} unseen · {topic.articleCount} tracked · {refreshed}
                     </p>
                 </div>

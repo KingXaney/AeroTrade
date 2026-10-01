@@ -3,17 +3,16 @@ import Panel from '@/components/primitives/Panel';
 
 // The AI "what changed today" summary. Plain text only — never rendered as HTML.
 // `compact` is for lists that already carry a heading (widgets, digests).
-const mono = {fontFamily: 'var(--type-mono)'} as const;
 
 const TopicBrief = ({brief, compact = false}: {brief: TopicBriefView; compact?: boolean}) => {
     const body = (
         <>
             {!compact && (
                 <div className="flex items-center justify-between gap-2 mb-2">
-                    <h2 className="text-sm font-bold uppercase tracking-[0.1em] text-brand" style={mono}>
+                    <h2 className="text-sm font-bold uppercase tracking-[0.1em] text-brand font-mono">
                         What changed today
                     </h2>
-                    <span className="text-[10px] text-fg-muted" style={mono}>{brief.date}</span>
+                    <span className="text-[10px] text-fg-muted font-mono">{brief.date}</span>
                 </div>
             )}
             <p className="text-sm text-fg-soft leading-relaxed">{brief.summary}</p>
@@ -27,7 +26,7 @@ const TopicBrief = ({brief, compact = false}: {brief: TopicBriefView; compact?: 
                     ))}
                 </ul>
             )}
-            <p className="mt-3 text-[10px] uppercase tracking-[0.1em] text-fg-muted" style={mono}>
+            <p className="mt-3 text-[10px] uppercase tracking-[0.1em] text-fg-muted font-mono">
                 {compact ? `${brief.date} · AI summary · may contain errors` : 'AI summary · may contain errors'}
             </p>
         </>
