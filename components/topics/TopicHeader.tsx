@@ -13,6 +13,7 @@ import {deleteTopic} from "@/lib/actions/topics.actions";
 import {refreshCooldownUntil} from "@/lib/topics/config";
 import {formatTimeAgoMs} from "@/lib/format";
 import type {TopicOverviewItem} from '@/lib/topics/types';
+import Panel from '@/components/primitives/Panel';
 
 const mono = {fontFamily: 'var(--type-mono)'} as const;
 
@@ -36,7 +37,7 @@ const TopicHeader = ({topic, now}: {topic: TopicOverviewItem; now: number}) => {
     const refreshed = topic.lastFetchedAt ? `refreshed ${formatTimeAgoMs(topic.lastFetchedAt)}` : 'never refreshed';
 
     return (
-        <section className="glass-panel rounded-xl p-5">
+        <Panel>
             <div className="flex items-start justify-between gap-3">
                 <div className="min-w-0">
                     <div className="flex items-center gap-2">
@@ -67,7 +68,7 @@ const TopicHeader = ({topic, now}: {topic: TopicOverviewItem; now: number}) => {
                 {topic.exclude.length > 0 && <KeywordChips values={topic.exclude} variant="exclude" ariaLabel="Exclusions" />}
             </div>
             <UnfollowTopicDialog name={topic.name} open={confirming} onOpenChange={setConfirming} onConfirm={remove} />
-        </section>
+        </Panel>
     );
 };
 

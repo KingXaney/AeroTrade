@@ -5,6 +5,7 @@ import {useRouter} from "next/navigation";
 import {toast} from "sonner";
 import {respondToFriendRequest} from "@/lib/actions/friends.actions";
 import type {FriendRequest} from '@/lib/friends/types';
+import Panel from '@/components/primitives/Panel';
 
 const FriendRequests = ({requests}: {requests: FriendRequest[]}) => {
     const router = useRouter();
@@ -29,7 +30,7 @@ const FriendRequests = ({requests}: {requests: FriendRequest[]}) => {
     };
 
     return (
-        <div className="glass-panel rounded-xl p-5">
+        <Panel as="div">
             <h2 className="text-sm font-bold uppercase tracking-[0.1em] text-brand mb-3" style={{fontFamily: 'var(--type-mono)'}}>
                 Pending Requests ({requests.length})
             </h2>
@@ -64,7 +65,7 @@ const FriendRequests = ({requests}: {requests: FriendRequest[]}) => {
                     </div>
                 ))}
             </div>
-        </div>
+        </Panel>
     );
 };
 

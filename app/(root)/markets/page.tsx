@@ -1,6 +1,7 @@
 import TradingViewWidget from "@/components/stocks/TradingViewWidget";
 import {MARKET_EMBEDS} from "@/lib/stocks/tradingview";
 import MarketsTabs, {isMarketsTabId} from "@/components/stocks/MarketsTabs";
+import Panel from "@/components/primitives/Panel";
 
 type MarketsPageProps = {searchParams: Promise<{view?: string}>};
 
@@ -21,13 +22,13 @@ const MarketsPage = async ({searchParams}: MarketsPageProps) => {
             </div>
 
             {/* Persistent ticker tape */}
-            <section className="glass-panel rounded-xl p-3">
+            <Panel pad={3}>
                 <TradingViewWidget
                     scriptUrl={MARKET_EMBEDS.tickerTape.script}
                     config={MARKET_EMBEDS.tickerTape.config}
                     height={70}
                 />
-            </section>
+            </Panel>
 
             {/* Tabbed: Stocks / Heatmap / Crypto / Forex — one widget at a time */}
             <MarketsTabs active={active} />

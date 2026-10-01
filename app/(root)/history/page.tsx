@@ -9,6 +9,7 @@ import NewsArticleCard from "@/components/news/NewsArticleCard";
 import {WATCHLIST_COPY} from "@/lib/learn/copy/watchlist";
 import {formatEasternTimestamp} from "@/lib/format";
 import type {MarketNewsArticle} from '@/lib/news/types';
+import Panel from '@/components/primitives/Panel';
 
 const HistoryPage = async () => {
     const userId = await requireUserId();
@@ -41,7 +42,7 @@ const HistoryPage = async () => {
             {/* A page called History used to contain no trades. Removals are not recorded
                 (the watchlist model hard-deletes), so the list below is honest about being
                 "by date added", not a timeline. */}
-            <section className="glass-panel rounded-xl p-6">
+            <Panel pad={6}>
                 <h2 className="text-xs font-bold uppercase tracking-[0.1em] text-brand mb-4"
                     style={{ fontFamily: 'var(--type-mono)' }}>
                     Trades
@@ -51,11 +52,11 @@ const HistoryPage = async () => {
                 ) : (
                     <p className="text-sm text-fg-muted p-4">Your trades could not be loaded right now — try again in a few minutes.</p>
                 )}
-            </section>
+            </Panel>
 
             <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
                 {/* Watchlist, by date added */}
-                <section className="lg:col-span-1 glass-panel rounded-xl p-6">
+                <Panel pad={6} className="lg:col-span-1">
                     <h2 className="text-xs font-bold uppercase tracking-[0.1em] text-brand mb-4"
                         style={{ fontFamily: 'var(--type-mono)' }}>
                         On your watchlist, by date added
@@ -86,7 +87,7 @@ const HistoryPage = async () => {
                             ))}
                         </ol>
                     )}
-                </section>
+                </Panel>
 
                 {/* The user's news feed */}
                 <section className="lg:col-span-2 space-y-4">
@@ -101,9 +102,9 @@ const HistoryPage = async () => {
                     </div>
 
                     {news.length === 0 ? (
-                        <div className="glass-panel rounded-xl p-6">
+                        <Panel as="div" pad={6}>
                             <p className="text-sm text-fg-muted">No headlines right now — try again in a few minutes.</p>
-                        </div>
+                        </Panel>
                     ) : (
                         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                             {news.map((article) => <NewsArticleCard key={article.id} article={article} />)}

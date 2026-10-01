@@ -67,18 +67,18 @@ const PortfolioPage = async ({searchParams}: PortfolioPageProps) => {
 
             {/* Which account wins — all accounts side by side */}
             {view.multiAccount && (
-                <section className="glass-panel rounded-xl p-5">
+                <Panel>
                     <h2 className="text-sm font-bold uppercase tracking-[0.1em] text-brand mb-4" style={{fontFamily: 'var(--type-mono)'}}>
                         Account Comparison
                     </h2>
                     <AccountComparisonTable rows={view.comparisonRows} activeId={account.id} />
-                </section>
+                </Panel>
             )}
 
             {/* Performance vs benchmark + analytics */}
             {analytics && (
                 <>
-                    <section className="glass-panel rounded-xl p-5">
+                    <Panel>
                         <h2 className="text-sm font-bold uppercase tracking-[0.1em] text-brand mb-1" style={{fontFamily: 'var(--type-mono)'}}>
                             Performance vs S&amp;P 500
                         </h2>
@@ -86,7 +86,7 @@ const PortfolioPage = async ({searchParams}: PortfolioPageProps) => {
                             Returns include interest on cash and dividends · benchmark is SPY&apos;s total return, dividends reinvested
                         </p>
                         <PerformanceChart series={analytics.series} accountName={account.name} band={view.chartBand} />
-                    </section>
+                    </Panel>
                     <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
                         <ReturnBridge accountId={account.id} bridge={bridge} />
                         <RiskLens series={analytics.series} snapshotThrough={analytics.snapshotThrough} portfolio={portfolio} />
@@ -108,12 +108,12 @@ const PortfolioPage = async ({searchParams}: PortfolioPageProps) => {
             <AccountSummary portfolio={portfolio} income={analytics?.income} definitions />
 
             {/* Holdings */}
-            <section className="glass-panel rounded-xl p-5">
+            <Panel>
                 <h2 className="text-sm font-bold uppercase tracking-[0.1em] text-brand mb-4" style={{fontFamily: 'var(--type-mono)'}}>
                     Holdings
                 </h2>
                 <PositionsTable positions={portfolio.positions} accountId={account.id} lotNotes={view.lotNotes} />
-            </section>
+            </Panel>
 
             {/* What the account earned without trading */}
             {income && (
@@ -126,12 +126,12 @@ const PortfolioPage = async ({searchParams}: PortfolioPageProps) => {
 
             {/* Trade history — only from a ledger that was read */}
             {tradeLog && (
-                <section className="glass-panel rounded-xl p-5">
+                <Panel>
                     <h2 className="text-sm font-bold uppercase tracking-[0.1em] text-brand mb-4" style={{fontFamily: 'var(--type-mono)'}}>
                         Trade History
                     </h2>
                     <TradeHistory trades={tradeLog.trades} totalCount={analytics?.tradeCount} exportHref={tradeLog.exportHref} receipts={tradeLog.receipts} buyNotesBySellId={tradeLog.buyNotesBySellId} />
-                </section>
+                </Panel>
             )}
         </div>
     );

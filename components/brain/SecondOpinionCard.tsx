@@ -8,6 +8,7 @@ import {formatTimeAgoMs} from "@/lib/format";
 import {getSecondOpinionPrompt, requestSecondOpinion, saveManualSecondOpinion} from "@/lib/actions/opinion.actions";
 import {runWithToast, UNREACHABLE_MESSAGE} from "@/lib/action-toast";
 import type {SecondOpinionView} from "@/lib/brain/opinion";
+import Panel from "@/components/primitives/Panel";
 
 // The API path generates in the background, so refresh a couple of times after
 // queueing instead of making the user hunt for the reload button.
@@ -96,7 +97,7 @@ const SecondOpinionCard = ({configured, opinion}: {configured: boolean; opinion:
     };
 
     return (
-        <section className="glass-panel rounded-xl p-5">
+        <Panel>
             <div className="flex items-center justify-between gap-3 mb-3 flex-wrap">
                 <h2 className="text-sm font-bold uppercase tracking-[0.1em] text-brand" style={{fontFamily: 'var(--type-mono)'}}>
                     Claude Second Opinion
@@ -185,7 +186,7 @@ const SecondOpinionCard = ({configured, opinion}: {configured: boolean; opinion:
             ) : (
                 <p className="text-sm text-fg-muted">No opinion yet — copy the prompt above, or ask Claude Code to fetch one.</p>
             )}
-        </section>
+        </Panel>
     );
 };
 

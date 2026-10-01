@@ -6,6 +6,7 @@ import {cn} from "@/lib/utils";
 import {formatTimeAgoSeconds} from "@/lib/format";
 import {sortTopicsForRail} from "@/lib/topics/rail";
 import type {TopicOverviewItem} from '@/lib/topics/types';
+import Panel from '@/components/primitives/Panel';
 
 type Props = {
     topics: TopicOverviewItem[];
@@ -32,7 +33,7 @@ const TopicRail = ({topics, activeSlug, unseenTotal, onNewTopic}: Props) => {
     );
 
     return (
-        <nav aria-label="Your topics" className="glass-panel rounded-xl p-2 flex lg:flex-col gap-1 overflow-x-auto lg:overflow-visible scrollbar-hide">
+        <Panel as="nav" pad={2} aria-label="Your topics" className="flex lg:flex-col gap-1 overflow-x-auto lg:overflow-visible scrollbar-hide">
             <Link href="/topics" aria-current={!activeSlug ? 'page' : undefined} className={rowClass(!activeSlug)} style={mono}>
                 <span className="material-symbols-outlined text-base">interests</span>
                 <span className="truncate">All topics</span>
@@ -55,7 +56,7 @@ const TopicRail = ({topics, activeSlug, unseenTotal, onNewTopic}: Props) => {
                 <Plus className="size-4" />
                 New topic
             </button>
-        </nav>
+        </Panel>
     );
 };
 

@@ -28,6 +28,7 @@ import {
 } from "@/lib/news/feed-prefs";
 import {KEYWORD_MAX} from "@/lib/news/keywords";
 import {cn} from "@/lib/utils";
+import Panel from "@/components/primitives/Panel";
 
 // Imports lib/news/feed-prefs, never lib/news/feed: the latter reaches the XML parser
 // through the search adapter and has no business in the client bundle.
@@ -98,7 +99,7 @@ const NewsFeedEditor = ({initial, startOpen = false}: Props) => {
     });
 
     return (
-        <section className="glass-panel rounded-xl p-5">
+        <Panel>
             <div className="flex items-center justify-between gap-3 flex-wrap">
                 <div className="min-w-0">
                     <h2 className="text-sm font-bold uppercase tracking-[0.1em] text-brand" style={mono}>Your feed</h2>
@@ -188,7 +189,7 @@ const NewsFeedEditor = ({initial, startOpen = false}: Props) => {
             )}
 
             {resetDialog}
-        </section>
+        </Panel>
     );
 };
 

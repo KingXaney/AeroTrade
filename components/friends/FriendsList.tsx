@@ -7,6 +7,7 @@ import {toast} from "sonner";
 import {removeFriend} from "@/lib/actions/friends.actions";
 import ConfirmDialog from "@/components/primitives/ConfirmDialog";
 import type {FriendSummary} from '@/lib/friends/types';
+import Panel from '@/components/primitives/Panel';
 
 const FriendsList = ({friends}: {friends: FriendSummary[]}) => {
     const router = useRouter();
@@ -34,7 +35,7 @@ const FriendsList = ({friends}: {friends: FriendSummary[]}) => {
     };
 
     return (
-        <div className="glass-panel rounded-xl p-5">
+        <Panel as="div">
             <h2 className="text-sm font-bold uppercase tracking-[0.1em] text-brand mb-3" style={{fontFamily: 'var(--type-mono)'}}>
                 Your Friends ({friends.length})
             </h2>
@@ -84,7 +85,7 @@ const FriendsList = ({friends}: {friends: FriendSummary[]}) => {
                     }}
                 />
             )}
-        </div>
+        </Panel>
     );
 };
 

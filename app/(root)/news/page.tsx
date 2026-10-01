@@ -5,6 +5,7 @@ import {NEWS_PAGE_SIZE} from "@/lib/news/config";
 import {describeNewsFeed} from "@/lib/news/feed-prefs";
 import NewsArticleCard from "@/components/news/NewsArticleCard";
 import NewsFeedEditor from "@/components/news/NewsFeedEditor";
+import Panel from "@/components/primitives/Panel";
 
 type NewsPageProps = {
     searchParams: Promise<{edit?: string}>;
@@ -45,10 +46,10 @@ const NewsPage = async ({searchParams}: NewsPageProps) => {
             )}
 
             {feed.articles.length === 0 ? (
-                <section className="glass-panel rounded-xl p-8 text-center">
+                <Panel pad={8} className="text-center">
                     <span className="material-symbols-outlined text-3xl text-fg-muted">feed</span>
                     <p className="mt-2 text-sm text-fg-muted">No headlines right now — try again in a few minutes.</p>
-                </section>
+                </Panel>
             ) : (
                 <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
                     {feed.articles.map((article) => <NewsArticleCard key={article.id} article={article} />)}

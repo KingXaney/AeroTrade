@@ -9,6 +9,7 @@ import {PAPER_STARTING_BALANCE, STARTING_BALANCE_RANGE, resolveStartingBalance} 
 import {runWithToast} from "@/lib/action-toast";
 import type {ActionResult} from '@/lib/actions/types';
 import type {NavigatorStatus} from '@/lib/navigator/types';
+import Panel from '@/components/primitives/Panel';
 
 // Enrollment + kill switch for the AI-managed paper account.
 const NavigatorCard = ({status}: {status: NavigatorStatus}) => {
@@ -34,7 +35,7 @@ const NavigatorCard = ({status}: {status: NavigatorStatus}) => {
     };
 
     return (
-        <div className="glass-panel rounded-xl p-5">
+        <Panel as="div">
             <div className="flex items-center justify-between mb-3">
                 <div className="flex items-center gap-2">
                     <span className="material-symbols-outlined text-brand">smart_toy</span>
@@ -131,7 +132,7 @@ const NavigatorCard = ({status}: {status: NavigatorStatus}) => {
                     Last run error: {status.lastError}
                 </p>
             )}
-        </div>
+        </Panel>
     );
 };
 

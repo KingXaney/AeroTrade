@@ -14,6 +14,7 @@ import {NOTE_COPY} from "@/lib/learn/copy/receipts";
 import {TRADE_REASON_MAX} from "@/lib/trading/config";
 import WhatTheseMean from "@/components/learn/WhatTheseMean";
 import type {Stock} from '@/lib/stocks/types';
+import Panel from '@/components/primitives/Panel';
 
 type OrderPanelProps = {
     defaultSymbol?: string;
@@ -158,7 +159,7 @@ const OrderPanel = ({defaultSymbol = '', cash, accountId, positions = [], onSymb
     };
 
     return (
-        <form onSubmit={onSubmit} className="glass-panel rounded-xl p-5 flex flex-col gap-4">
+        <Panel as="form" onSubmit={onSubmit} className="flex flex-col gap-4">
             <div className="flex items-center justify-between">
                 <h3 className="text-sm font-bold uppercase tracking-[0.1em] text-brand" style={{fontFamily: 'var(--type-mono)'}}>
                     Order Entry
@@ -324,7 +325,7 @@ const OrderPanel = ({defaultSymbol = '', cash, accountId, positions = [], onSymb
             </button>
             {/* The one definitions disclosure: APY joins it only while the buy line states it. */}
             {!compact && <WhatTheseMean keys={ticketTerms(effect)} className="mt-0" />}
-        </form>
+        </Panel>
     );
 };
 

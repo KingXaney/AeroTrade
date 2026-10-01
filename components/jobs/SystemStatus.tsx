@@ -1,6 +1,7 @@
 import {type BrainSystemStatus} from "@/lib/brain/store";
 import JobStamp, {jobHealth} from "@/components/jobs/JobStamp";
 import StatTile from "@/components/primitives/StatTile";
+import Panel from "@/components/primitives/Panel";
 
 // Pipeline observability for the /brain page: is each Inngest job actually
 // running, and is the brain actually learning? Health is derived from job-stamp
@@ -18,7 +19,7 @@ const SystemStatus = ({status}: {status: BrainSystemStatus}) => {
     const anyNever = status.jobs.some((j) => j.staleAfterHours !== Number.POSITIVE_INFINITY && jobHealth(j) === 'never');
 
     return (
-        <section className="glass-panel rounded-xl p-5">
+        <Panel>
             <div className="flex items-center justify-between mb-4">
                 <h2 className="text-sm font-bold uppercase tracking-[0.1em] text-brand" style={{fontFamily: 'var(--type-mono)'}}>
                     System Status
@@ -47,7 +48,7 @@ const SystemStatus = ({status}: {status: BrainSystemStatus}) => {
             <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-2">
                 {status.jobs.map((job) => <JobStamp key={job.jobId} job={job} />)}
             </div>
-        </section>
+        </Panel>
     );
 };
 

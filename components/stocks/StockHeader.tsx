@@ -3,6 +3,7 @@ import {roundPct, formatPrice, formatChangePercent} from "@/lib/format";
 import WatchlistButton from "@/components/stocks/WatchlistButton";
 import FollowTopicButton from "@/components/topics/FollowTopicButton";
 import TradeLink from "@/components/trading/TradeLink";
+import Panel from "@/components/primitives/Panel";
 
 type StockHeaderProps = {
     symbol: string;
@@ -24,7 +25,7 @@ const StockHeader = ({
     followedTopic = null,
 }: StockHeaderProps) => {
     return (
-        <div className="glass-panel rounded-xl p-6 flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+        <Panel as="div" pad={6} className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
             <div>
                 <div className="flex items-baseline gap-3">
                     <h1 className="text-3xl font-semibold text-fg"
@@ -81,7 +82,7 @@ const StockHeader = ({
                     <FollowTopicButton name={company} keywords={[company, symbol]} followed={followedTopic} type="button" />
                 </div>
             </div>
-        </div>
+        </Panel>
     );
 };
 

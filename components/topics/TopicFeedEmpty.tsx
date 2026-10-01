@@ -5,6 +5,7 @@ import RefreshTopicButton from "@/components/topics/RefreshTopicButton";
 import {refreshCooldownUntil} from "@/lib/topics/config";
 import {pickStalestTopic} from "@/lib/topics/first-run";
 import type {TopicOverviewItem} from '@/lib/topics/types';
+import Panel from '@/components/primitives/Panel';
 
 const mono = {fontFamily: 'var(--type-mono)'} as const;
 
@@ -23,7 +24,7 @@ const TopicFeedEmpty = (props: Props) => {
     const target = props.scope === 'topic' ? props.topic : pickStalestTopic(props.topics);
 
     return (
-        <section className="glass-panel rounded-xl p-8 text-center">
+        <Panel pad={8} className="text-center">
             <span className="material-symbols-outlined text-3xl text-fg-muted">manage_search</span>
             <h3 className="mt-2 text-base font-semibold text-fg" style={{fontFamily: 'var(--type-display)'}}>No articles yet</h3>
             <p className="mt-1 text-sm text-fg-muted max-w-md mx-auto">
@@ -45,7 +46,7 @@ const TopicFeedEmpty = (props: Props) => {
                     Refreshes &ldquo;{target.name}&rdquo; — the topic that has waited longest.
                 </p>
             )}
-        </section>
+        </Panel>
     );
 };
 

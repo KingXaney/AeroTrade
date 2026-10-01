@@ -3,6 +3,7 @@ import {cn} from "@/lib/utils";
 import {formatPct, formatPrice, getChangeColorClass} from "@/lib/format";
 import {unpricedLabel} from "@/lib/trading/analytics";
 import type {LeaderboardEntry} from '@/lib/friends/types';
+import Panel from '@/components/primitives/Panel';
 
 // Medal colours come from --rank-* in globals.css, not the palette registry: gold is a
 // material, not a semantic role, so it stays gold in every theme (darkened under the
@@ -14,7 +15,7 @@ const rankClass = (rank: number) => (rank >= 1 && rank <= 3 ? '' : 'text-fg-mute
 
 const Leaderboard = ({entries}: {entries: LeaderboardEntry[]}) => {
     return (
-        <div className="glass-panel rounded-xl p-5 shimmer">
+        <Panel as="div" className="shimmer">
             <div className="flex items-center gap-2 mb-4">
                 <span className="material-symbols-outlined text-brand">emoji_events</span>
                 <h2 className="text-sm font-bold uppercase tracking-[0.1em] text-brand" style={{fontFamily: 'var(--type-mono)'}}>
@@ -70,7 +71,7 @@ const Leaderboard = ({entries}: {entries: LeaderboardEntry[]}) => {
                     })}
                 </div>
             )}
-        </div>
+        </Panel>
     );
 };
 

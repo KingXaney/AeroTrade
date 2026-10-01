@@ -14,6 +14,7 @@ import MarketStatus from "@/components/stocks/MarketStatus";
 import {describeQueuedFill, marketStatus} from "@/lib/prices/market-hours";
 import OpenPositionsStrip from "@/components/trading/desk/OpenPositionsStrip";
 import AccountSwitcher from "@/components/trading/accounts/AccountSwitcher";
+import Panel from "@/components/primitives/Panel";
 
 type TradePageProps = {
     searchParams: Promise<{symbol?: string; account?: string}>;
@@ -90,7 +91,7 @@ const TradePage = async ({searchParams}: TradePageProps) => {
             {ledger && <LastFill trade={lastTrade} receipt={lastReceipt} />}
 
             {/* Open positions — compact quick-sell; full holdings & history live on /portfolio */}
-            <section className="glass-panel rounded-xl p-5">
+            <Panel>
                 <div className="flex items-center justify-between mb-4">
                     <h2 className="text-sm font-bold uppercase tracking-[0.1em] text-brand" style={{fontFamily: 'var(--type-mono)'}}>
                         Open Positions
@@ -100,7 +101,7 @@ const TradePage = async ({searchParams}: TradePageProps) => {
                     </Link>
                 </div>
                 <OpenPositionsStrip positions={portfolio.positions} accountId={activeId} lotNotes={ledger ? openLotNotes(ledger) : undefined} />
-            </section>
+            </Panel>
         </div>
     );
 };

@@ -7,6 +7,7 @@ import {getFriendProfile} from "@/lib/friends/store";
 import {unpricedLabel} from "@/lib/trading/analytics";
 import AccountSummary from "@/components/trading/portfolio/AccountSummary";
 import HoldingsTable from "@/components/trading/portfolio/HoldingsTable";
+import Panel from "@/components/primitives/Panel";
 
 type FriendProfilePageProps = {
     params: Promise<{id: string}>;
@@ -51,7 +52,7 @@ const FriendProfilePage = async ({params}: FriendProfilePageProps) => {
 
             {/* All accounts at a glance */}
             {profile.accounts.length > 1 && (
-                <section className="glass-panel rounded-xl p-5">
+                <Panel>
                     <h2 className="text-sm font-bold uppercase tracking-[0.1em] text-brand mb-4" style={{fontFamily: 'var(--type-mono)'}}>
                         Accounts
                     </h2>
@@ -72,15 +73,15 @@ const FriendProfilePage = async ({params}: FriendProfilePageProps) => {
                             </div>
                         ))}
                     </div>
-                </section>
+                </Panel>
             )}
 
-            <section className="glass-panel rounded-xl p-5">
+            <Panel>
                 <h2 className="text-sm font-bold uppercase tracking-[0.1em] text-brand mb-4" style={{fontFamily: 'var(--type-mono)'}}>
                     {profile.name}&apos;s Holdings
                 </h2>
                 <HoldingsTable positions={profile.portfolio.positions} emptyText={`${profile.name} has no open positions yet.`} />
-            </section>
+            </Panel>
         </div>
     );
 };

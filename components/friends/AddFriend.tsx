@@ -4,6 +4,7 @@ import {useState} from "react";
 import {useRouter} from "next/navigation";
 import {toast} from "sonner";
 import {sendFriendRequest} from "@/lib/actions/friends.actions";
+import Panel from "@/components/primitives/Panel";
 
 const AddFriend = () => {
     const router = useRouter();
@@ -30,7 +31,7 @@ const AddFriend = () => {
     };
 
     return (
-        <form onSubmit={onSubmit} className="glass-panel rounded-xl p-5">
+        <Panel as="form" onSubmit={onSubmit}>
             <h2 className="text-sm font-bold uppercase tracking-[0.1em] text-brand mb-3" style={{fontFamily: 'var(--type-mono)'}}>
                 Add a Friend
             </h2>
@@ -53,7 +54,7 @@ const AddFriend = () => {
                 </button>
             </div>
             <p className="text-[11px] text-fg-muted mt-2">They must accept before either of you can see the other&apos;s portfolio.</p>
-        </form>
+        </Panel>
     );
 };
 

@@ -8,6 +8,7 @@ import type {SeriesStats} from "@/lib/strategies/types";
 import {formatPct} from "@/lib/format";
 import SimulatedStats from "@/components/strategies/SimulatedStats";
 import type {PerfPoint} from '@/lib/trading/types';
+import Panel from '@/components/primitives/Panel';
 
 // Live and simulated curves side by side but never on one axis: a toggle, and each
 // panel says which basis it shows and how far it reaches.
@@ -53,7 +54,7 @@ const StrategyPerformance = ({name, live, simulated, initialMode}: {name: string
 
     return (
         <section className="space-y-3" id="strategy-performance">
-            <div className="glass-panel rounded-xl p-5">
+            <Panel as="div">
                 <div className="flex flex-wrap items-center justify-between gap-3 mb-3">
                     <h2 className="text-sm font-bold uppercase tracking-[0.1em] text-brand" style={{fontFamily: 'var(--type-mono)'}}>
                         Performance vs SPY
@@ -109,7 +110,7 @@ const StrategyPerformance = ({name, live, simulated, initialMode}: {name: string
                         <p className="py-10 text-center text-sm text-fg-muted">Backtest not computed yet — it is built on the first run.</p>
                     )
                 )}
-            </div>
+            </Panel>
 
             {showingLive && live && <AnalyticsStats analytics={live.stats} definitions />}
             {!showingLive && simulated && <SimulatedStats stats={simulated.stats} />}

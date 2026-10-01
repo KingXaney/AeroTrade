@@ -20,6 +20,7 @@ import {buildRulesSee, type SymbolBoardRead} from "@/lib/stocks/rules-see";
 import {getBoardRowsForSymbol} from "@/lib/strategies/page-store";
 import {strategiesWatching} from "@/lib/strategies/universe";
 import {cn} from "@/lib/utils";
+import Panel from "@/components/primitives/Panel";
 
 type StockDetailsPageProps = {
     params: Promise<{
@@ -81,52 +82,52 @@ const StockDetailsPage = async ({params}: StockDetailsPageProps) => {
             </div>
 
             {/* Symbol Info */}
-            <section className="glass-panel rounded-xl p-4 shimmer">
+            <Panel pad={4} className="shimmer">
                 <TradingViewWidget
                     scriptUrl={tvScript('symbol-info')}
                     config={SYMBOL_INFO_WIDGET_CONFIG(symbol)}
                     height={170}
                 />
-            </section>
+            </Panel>
 
             {/* Chart + Technical Analysis */}
             <div className="grid gap-4 xl:grid-cols-3">
-                <section className="xl:col-span-2 glass-panel rounded-xl p-4 shimmer">
+                <Panel pad={4} className="xl:col-span-2 shimmer">
                     <TradingViewWidget
                         title="Advanced Chart"
                         scriptUrl={tvScript('advanced-chart')}
                         config={CANDLE_CHART_WIDGET_CONFIG(symbol)}
                         height={600}
                     />
-                </section>
-                <section className="xl:col-span-1 glass-panel rounded-xl p-4">
+                </Panel>
+                <Panel pad={4} className="xl:col-span-1">
                     <TradingViewWidget
                         title="Technical Analysis"
                         scriptUrl={tvScript('technical-analysis')}
                         config={TECHNICAL_ANALYSIS_WIDGET_CONFIG(symbol)}
                         height={400}
                     />
-                </section>
+                </Panel>
             </div>
 
             {/* Company Profile + Financials */}
             <div className="grid gap-4 xl:grid-cols-2">
-                <section className="glass-panel rounded-xl p-4 shimmer">
+                <Panel pad={4} className="shimmer">
                     <TradingViewWidget
                         title="Company Profile"
                         scriptUrl={tvScript('symbol-profile')}
                         config={COMPANY_PROFILE_WIDGET_CONFIG(symbol)}
                         height={440}
                     />
-                </section>
-                <section className="glass-panel rounded-xl p-4">
+                </Panel>
+                <Panel pad={4}>
                     <TradingViewWidget
                         title="Financials"
                         scriptUrl={tvScript('financials')}
                         config={COMPANY_FINANCIALS_WIDGET_CONFIG(symbol)}
                         height={464}
                     />
-                </section>
+                </Panel>
             </div>
         </div>
     );

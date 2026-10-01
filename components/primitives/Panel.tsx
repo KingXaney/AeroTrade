@@ -1,4 +1,4 @@
-import type {CSSProperties, ReactNode} from "react";
+import type {CSSProperties, ReactNode, SubmitEventHandler} from "react";
 import {cn} from "@/lib/utils";
 
 // The one framed surface in the app. `.glass-panel` (app/globals.css) carries the
@@ -26,7 +26,7 @@ const PAD: Record<PanelPad, string> = {
 };
 
 type Props = {
-    as?: 'section' | 'div' | 'article' | 'aside' | 'nav' | 'li';
+    as?: 'section' | 'div' | 'article' | 'aside' | 'nav' | 'li' | 'form';
     pad?: PanelPad;
     // For a panel that is itself a link or a button. Renders data-interactive, which
     // globals.css hovers — a `hover:border-*` utility would lose to the unlayered rule.
@@ -35,6 +35,8 @@ type Props = {
     className?: string;
     // Measured values only (a drag ghost's pixel width). Never frame properties — see above.
     style?: CSSProperties;
+    // For `as="form"`: a form that is itself the framed surface (an order ticket).
+    onSubmit?: SubmitEventHandler<HTMLElement>;
     'aria-label'?: string;
     'aria-labelledby'?: string;
     'data-testid'?: string;
