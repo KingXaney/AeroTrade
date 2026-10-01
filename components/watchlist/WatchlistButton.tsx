@@ -12,7 +12,6 @@ const WatchlistButton = ({
     isInWatchlist,
     showTrashIcon = false,
     type = 'icon',
-    onWatchlistChange,
 }: WatchlistButtonProps) => {
     const [optimistic, setOptimistic] = useState(isInWatchlist);
     const [isPending, startTransition] = useTransition();
@@ -37,7 +36,6 @@ const WatchlistButton = ({
             }
 
             toast.success(next ? `${symbol} added to watchlist` : `${symbol} removed from watchlist`);
-            onWatchlistChange?.(symbol, next);
         });
     };
 
