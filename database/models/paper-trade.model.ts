@@ -1,4 +1,5 @@
 import {Document, model, models, Schema} from "mongoose";
+import {TRADE_REASON_MAX} from "@/lib/trading/config";
 
 export interface PaperTradeDoc extends Document {
     userId: string;
@@ -27,7 +28,7 @@ const PaperTradeSchema = new Schema<PaperTradeDoc>({
     total: {type: Number, required: true},
     realizedPnl: {type: Number},
     source: {type: String, enum: ['user', 'ai-navigator', 'ai-suggestion', 'strategy']},
-    reason: {type: String, maxlength: 200},
+    reason: {type: String, maxlength: TRADE_REASON_MAX},
     idempotencyKey: {type: String},
     createdAt: {type: Date, default: Date.now, index: true},
 });

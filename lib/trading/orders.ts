@@ -8,7 +8,7 @@ import PaperTrade from "@/database/models/paper-trade.model";
 import {getQuote, getCompanyProfile} from "@/lib/prices/finnhub";
 import {getOwnedAccount, toPlainPositions} from "@/lib/trading/accounts";
 import {applyFill, type FillRejection} from "@/lib/trading/fill";
-import {TRADE_REASON_MAX} from "@/lib/strategies/config";
+import {TRADE_REASON_MAX} from "@/lib/trading/config";
 import {isOrderSide} from "@/lib/trading/order-math";
 
 export type OrderRequest = {

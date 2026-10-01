@@ -11,7 +11,7 @@ import {placeOrder} from "@/lib/actions/trading.actions";
 import {checkOrder, describeOrderEffect, presetQuantities, ticketTerms, type PositionLike} from "@/lib/trading/order-math";
 import {orderEffectLine, queueLine} from "@/lib/learn/copy/trade";
 import {NOTE_COPY} from "@/lib/learn/copy/receipts";
-import {TRADE_REASON_MAX} from "@/lib/strategies/config";
+import {TRADE_REASON_MAX} from "@/lib/trading/config";
 import WhatTheseMean from "@/components/learn/WhatTheseMean";
 
 type OrderPanelProps = {

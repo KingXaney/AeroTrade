@@ -2,7 +2,7 @@
 // order can obviously not fill. Pure on purpose so it is unit-tested; the server
 // (executeOrder) re-checks everything with the live price and stays authoritative.
 
-import {TRADE_REASON_MAX} from "@/lib/strategies/config";
+import {TRADE_REASON_MAX} from "@/lib/trading/config";
 import {interestOverDays} from "@/lib/income/accrual";
 
 export type OrderSide = 'buy' | 'sell';

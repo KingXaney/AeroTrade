@@ -1,7 +1,7 @@
 import {describe, expect, it} from 'vitest';
 import {CASH_YIELD_DAYS, TICKET_TERMS, affordableShares, checkOrder, describeOrderEffect, estRealizedPnl, isOrderSide, presetQuantities, sanitizeTradeNote, ticketTerms} from '@/lib/trading/order-math';
 import {interestOverDays} from '@/lib/income/accrual';
-import {TRADE_REASON_MAX} from '@/lib/strategies/config';
+import {TRADE_REASON_MAX} from '@/lib/trading/config';
 
 const positions = [
     {symbol: 'AAPL', quantity: 10, marketValue: 1_800, avgCost: 150},
