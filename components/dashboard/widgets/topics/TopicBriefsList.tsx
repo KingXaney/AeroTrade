@@ -29,7 +29,7 @@ const TopicBriefsList = ({overview}: {overview: TopicsOverview}) => {
         <div className="space-y-3">
             {briefed.map((t) => t.brief && (
                 <RowCard key={t.id} className="p-4">
-                    <Link href={`/topics/${t.slug}`} className="mb-2 inline-flex items-center gap-2 text-sm font-semibold text-fg transition-colors hover:text-brand" style={{fontFamily: 'var(--type-display)'}}>
+                    <Link href={`/topics/${t.slug}`} className="mb-2 inline-flex items-center gap-2 text-sm font-semibold text-fg transition-colors hover:text-brand font-heading">
                         <span className="h-2 w-2 rounded-full" style={{background: t.color ?? 'var(--brand)'}} aria-hidden="true" />
                         {t.name}
                     </Link>

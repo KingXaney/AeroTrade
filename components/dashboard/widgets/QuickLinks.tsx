@@ -11,7 +11,7 @@ const QuickLinks = () => (
             <Link key={l.href} href={l.href}
                   className={rowCard({className: 'flex flex-col items-center gap-1.5 px-2 py-3 text-fg-soft hover:text-brand hover:border-brand/40 transition-colors'})}>
                 <span className="material-symbols-outlined">{l.icon}</span>
-                <span className="text-[10px] font-bold uppercase tracking-[0.1em]" style={{fontFamily: 'var(--type-mono)'}}>{l.label}</span>
+                <span className="text-[10px] font-bold uppercase tracking-[0.1em] font-mono">{l.label}</span>
             </Link>
         ))}
     </div>

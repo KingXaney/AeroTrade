@@ -15,7 +15,7 @@ type Props = {
 };
 
 const Badge = ({children}: {children: React.ReactNode}) => (
-    <span className="rounded px-1.5 py-0.5 text-[9px] uppercase tracking-[0.08em] bg-surface-3 text-fg-muted" style={{fontFamily: 'var(--type-mono)'}}>{children}</span>
+    <span className="rounded px-1.5 py-0.5 text-[9px] uppercase tracking-[0.08em] bg-surface-3 text-fg-muted font-mono">{children}</span>
 );
 
 const WidgetLibrary = ({open, onOpenChange, ids, count, onAdd}: Props) => {
@@ -24,7 +24,7 @@ const WidgetLibrary = ({open, onOpenChange, ids, count, onAdd}: Props) => {
         <Dialog open={open} onOpenChange={onOpenChange}>
             <DialogContent className="sm:max-w-2xl max-h-[85vh] overflow-y-auto scrollbar-hide-default">
                 <DialogHeader>
-                    <DialogTitle style={{fontFamily: 'var(--type-display)'}}>Add widgets</DialogTitle>
+                    <DialogTitle className="font-heading">Add widgets</DialogTitle>
                     <DialogDescription>
                         {full ? `Your dashboard holds ${MAX_WIDGETS} widgets — remove one to add another.` : 'Added widgets load once you save the layout.'}
                     </DialogDescription>
@@ -38,7 +38,7 @@ const WidgetLibrary = ({open, onOpenChange, ids, count, onAdd}: Props) => {
                             if (inCategory.length === 0) return null;
                             return (
                                 <div key={category}>
-                                    <div className="text-[10px] uppercase tracking-[0.14em] text-fg-muted mb-2" style={{fontFamily: 'var(--type-mono)'}}>
+                                    <div className="text-[10px] uppercase tracking-[0.14em] text-fg-muted mb-2 font-mono">
                                         {CATEGORY_LABELS[category]}
                                     </div>
                                     <div className="space-y-1.5">
@@ -50,7 +50,7 @@ const WidgetLibrary = ({open, onOpenChange, ids, count, onAdd}: Props) => {
                                                         <span className="material-symbols-outlined text-brand mt-0.5">{def.icon}</span>
                                                         <div className="min-w-0">
                                                             <div className="flex items-center gap-2 flex-wrap">
-                                                                <span className="text-sm font-semibold text-fg" style={{fontFamily: 'var(--type-display)'}}>{def.title}</span>
+                                                                <span className="text-sm font-semibold text-fg font-heading">{def.title}</span>
                                                                 {def.isNew && <Badge>New</Badge>}
                                                                 {def.isClient && <Badge>Live embed</Badge>}
                                                                 {def.heavy && <Badge>Extra API calls</Badge>}

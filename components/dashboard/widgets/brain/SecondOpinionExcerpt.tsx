@@ -19,12 +19,12 @@ const SecondOpinionExcerpt = ({opinion}: {opinion: SecondOpinionView | null}) =>
     }
     return (
         <div>
-            <div className="flex items-center justify-between gap-2 mb-2 text-[10px] uppercase tracking-[0.1em] text-fg-muted" style={{fontFamily: 'var(--type-mono)'}}>
+            <div className="flex items-center justify-between gap-2 mb-2 text-[10px] uppercase tracking-[0.1em] text-fg-muted font-mono">
                 <span>{opinion.model}</span>
                 <span>{formatTimeAgoMs(opinion.generatedAt)}</span>
             </div>
             <p className="text-sm text-fg-soft leading-relaxed">{excerpt(opinion.opinionMd)}</p>
-            <Link href="/brain" className="inline-block mt-3 text-xs text-brand hover:underline" style={{fontFamily: 'var(--type-mono)'}}>
+            <Link href="/brain" className="inline-block mt-3 text-xs text-brand hover:underline font-mono">
                 Read the full opinion →
             </Link>
         </div>

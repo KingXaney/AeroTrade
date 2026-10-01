@@ -22,7 +22,7 @@ const ghost = actionButton({variant: 'secondary', className: press});
 const primary = actionButton({className: press});
 
 const DashboardToolbar = ({editing, dirty, pending, onCustomize, onAdd, onReset, onSave, onCancel, extra}: Props) => (
-    <div className="flex flex-wrap items-center gap-2" style={{fontFamily: 'var(--type-mono)'}}>
+    <div className="flex flex-wrap items-center gap-2 font-mono">
         {extra}
         {!editing ? (
             <button type="button" onClick={onCustomize} className={ghost}>

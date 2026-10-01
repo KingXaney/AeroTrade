@@ -9,10 +9,10 @@ const TopHoldings = ({positions, accountName}: {positions: EnrichedPosition[]; a
     const sorted = [...positions].sort((a, b) => b.marketValue - a.marketValue);
     return (
         <div>
-            <div className="text-[10px] uppercase tracking-[0.1em] text-fg-muted mb-2" style={{fontFamily: 'var(--type-mono)'}}>{accountName}</div>
+            <div className="text-[10px] uppercase tracking-[0.1em] text-fg-muted mb-2 font-mono">{accountName}</div>
             <HoldingsTable positions={sorted.slice(0, TOP_HOLDINGS_COUNT)} emptyText="No open positions yet — start trading." />
             {sorted.length > TOP_HOLDINGS_COUNT && (
-                <Link href="/portfolio" className="inline-block mt-3 text-xs text-brand hover:underline" style={{fontFamily: 'var(--type-mono)'}}>
+                <Link href="/portfolio" className="inline-block mt-3 text-xs text-brand hover:underline font-mono">
                     View all {sorted.length} holdings →
                 </Link>
             )}
