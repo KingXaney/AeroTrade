@@ -55,15 +55,10 @@ const WatchlistButton = ({
                 disabled={isPending}
                 className={cn(
                     'font-mono inline-flex items-center gap-2 rounded-md px-3 py-2 text-sm font-medium transition-all',
-                    optimistic
-                        ? 'text-brand hover:bg-brand/15'
-                        : 'text-fg hover:bg-surface-3/80',
+                    optimistic ? 'bg-brand/10 text-brand' : 'bg-surface-3 text-fg',
                     isPending && 'opacity-60 cursor-not-allowed',
                 )}
-                style={{
-                    backgroundColor: optimistic ? 'color-mix(in srgb, var(--brand) 10%, transparent)' : 'var(--surface-3)',
-                    letterSpacing: '0.02em',
-                }}
+                style={{letterSpacing: '0.02em'}}
                 aria-pressed={optimistic}
             >
                 <Star className={cn('size-4', optimistic && 'fill-current')} />

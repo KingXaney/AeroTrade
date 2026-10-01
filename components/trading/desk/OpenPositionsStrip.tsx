@@ -43,8 +43,7 @@ const OpenPositionsStrip = ({positions, accountId, lotNotes}: {positions: Enrich
                         <button
                             type="button"
                             onClick={() => setSellTarget(p)}
-                            className="px-2.5 py-1 rounded text-[11px] font-bold uppercase tracking-wider transition-colors font-mono"
-                            style={{color: 'var(--negative)', border: '1px solid color-mix(in srgb, var(--negative) 30%, transparent)', backgroundColor: 'color-mix(in srgb, var(--negative) 6%, transparent)'}}
+                            className="px-2.5 py-1 rounded text-[11px] font-bold uppercase tracking-wider transition-colors font-mono text-negative border border-negative/30 bg-negative/6"
                         >
                             Sell
                         </button>

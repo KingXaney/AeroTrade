@@ -30,8 +30,7 @@ const AccountSwitcher = ({accounts, activeId}: {accounts: SwitcherAccount[]; act
                     <button
                         type="button"
                         disabled={switching}
-                        className="inline-flex items-center gap-2 px-3 py-2 rounded-lg text-xs font-bold uppercase tracking-[0.1em] text-fg hover:text-brand transition-colors disabled:opacity-50 font-mono"
-                        style={{border: '1px solid color-mix(in srgb, var(--line-strong) 40%, transparent)', backgroundColor: 'color-mix(in srgb, var(--surface-2) 40%, transparent)'}}
+                        className="inline-flex items-center gap-2 px-3 py-2 rounded-lg text-xs font-bold uppercase tracking-[0.1em] text-fg hover:text-brand transition-colors disabled:opacity-50 font-mono border border-line-strong/40 bg-surface-2/40"
                     >
                         <span className="material-symbols-outlined text-base">account_tree</span>
                         {active?.name ?? 'Account'}

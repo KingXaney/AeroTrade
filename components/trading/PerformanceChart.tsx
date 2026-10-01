@@ -78,12 +78,12 @@ const ReturnChart = ({series, accountName, band}: {series: PerfPoint[]; accountN
             {/* Legend + current values */}
             <div className="flex flex-wrap items-center gap-4 mb-3 text-xs font-mono">
                 <span className="flex items-center gap-1.5">
-                    <span className="inline-block w-3 h-0.5 rounded" style={{backgroundColor: 'var(--brand)'}} />
+                    <span className="inline-block w-3 h-0.5 rounded bg-brand" />
                     <span className="text-fg">{accountName}</span>
                     <span className="text-brand">{formatPct((hover ?? last).accountPct)}</span>
                 </span>
                 <span className="flex items-center gap-1.5">
-                    <span className="inline-block w-3 h-0.5 rounded" style={{backgroundColor: 'var(--fg-muted)'}} />
+                    <span className="inline-block w-3 h-0.5 rounded bg-fg-muted" />
                     <span className="text-fg-muted">S&amp;P 500 (SPY, total return)</span>
                     <span className="text-fg-soft">
                         {(hover ?? last).benchmarkPct === null ? '—' : formatPct((hover ?? last).benchmarkPct as number)}

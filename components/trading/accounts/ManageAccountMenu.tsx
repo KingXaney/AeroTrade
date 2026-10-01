@@ -118,8 +118,7 @@ const ManageAccountMenu = ({accountId, accountName, canDelete}: {accountId: stri
                     <button
                         type="button"
                         aria-label="Manage account"
-                        className="px-2 py-2 rounded-lg text-fg-muted hover:text-fg transition-colors"
-                        style={{border: '1px solid color-mix(in srgb, var(--line-strong) 40%, transparent)'}}
+                        className="px-2 py-2 rounded-lg text-fg-muted hover:text-fg transition-colors border border-line-strong/40"
                     >
                         <span className="material-symbols-outlined text-base">more_vert</span>
                     </button>

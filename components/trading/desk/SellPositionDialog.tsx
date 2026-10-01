@@ -84,7 +84,7 @@ const SellPositionDialog = ({position, accountId, notes, onClose}: {position: En
                         )}
                     </div>
 
-                    <div className="grid grid-cols-4 gap-1 p-1 rounded-lg" style={{backgroundColor: 'var(--surface-2)'}}>
+                    <div className="grid grid-cols-4 gap-1 p-1 rounded-lg bg-surface-2">
                         {presets.map((preset) => (
                             <button
                                 key={preset.label}

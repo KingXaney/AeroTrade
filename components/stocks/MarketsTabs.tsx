@@ -25,7 +25,7 @@ const MarketsTabs = ({active}: {active: MarketsTabId}) => {
 
     return (
         <Panel pad={4} className="md:p-6">
-            <div className="flex gap-1 mb-5 p-1 rounded-lg w-fit" style={{backgroundColor: 'var(--surface-0)'}} role="tablist" aria-label="Market views">
+            <div className="flex gap-1 mb-5 p-1 rounded-lg w-fit bg-surface-0" role="tablist" aria-label="Market views">
                 {TABS.map((t) => (
                     <Link
                         key={t.id}

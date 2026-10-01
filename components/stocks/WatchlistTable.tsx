@@ -16,8 +16,8 @@ const WatchlistTable = ({watchlist}: WatchlistTableProps) => {
     return (
         <div className="space-y-2">
             {/* Table Header */}
-            <div className="hidden md:grid grid-cols-[2fr_1fr_1fr_1fr_1fr_112px] gap-4 px-4 py-2 border-b border-line-strong/30 font-mono"
-                 style={{ fontSize: '10px', letterSpacing: '0.1em', textTransform: 'uppercase', color: 'var(--fg-muted)' }}>
+            <div className="hidden md:grid grid-cols-[2fr_1fr_1fr_1fr_1fr_112px] gap-4 px-4 py-2 border-b border-line-strong/30 font-mono text-fg-muted"
+                 style={{ fontSize: '10px', letterSpacing: '0.1em', textTransform: 'uppercase' }}>
                 <div>Asset</div>
                 <div className="text-right">Price (USD)</div>
                 <div className="text-right">24h Chg</div>
@@ -40,12 +40,7 @@ const WatchlistTable = ({watchlist}: WatchlistTableProps) => {
 
                     {/* Asset Info */}
                     <div className="flex items-center gap-3">
-                        <div className="w-8 h-8 rounded flex items-center justify-center text-xs font-bold font-heading"
-                             style={{
-                                 backgroundColor: 'var(--surface-4)',
-                                 color: 'var(--brand)',
-                                 border: '1px solid color-mix(in srgb, var(--brand) 20%, transparent)',
-                             }}>
+                        <div className="w-8 h-8 rounded flex items-center justify-center text-xs font-bold font-heading bg-surface-4 text-brand border border-brand/20">
                             {row.symbol.slice(0, 2)}
                         </div>
                         <div>

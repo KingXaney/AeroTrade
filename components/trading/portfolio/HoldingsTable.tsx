@@ -33,8 +33,8 @@ const HoldingsTable = ({positions, emptyText = 'No open positions.', showUnprice
 
     return (
         <div className="space-y-2">
-            <div className={`hidden md:grid ${columns} gap-4 px-4 py-2 border-b border-line-strong/30 font-mono`}
-                 style={{fontSize: '10px', letterSpacing: '0.1em', textTransform: 'uppercase', color: 'var(--fg-muted)'}}>
+            <div className={`hidden md:grid ${columns} gap-4 px-4 py-2 border-b border-line-strong/30 font-mono text-fg-muted`}
+                 style={{fontSize: '10px', letterSpacing: '0.1em', textTransform: 'uppercase'}}>
                 <div>Asset</div>
                 <div className="text-right">Qty</div>
                 <div className="text-right"><Term k="avg-cost">Avg Cost</Term></div>
@@ -46,8 +46,7 @@ const HoldingsTable = ({positions, emptyText = 'No open positions.', showUnprice
             {positions.map((p) => (
                 <RowCard key={p.symbol} className={`grid grid-cols-1 ${rowColumns} gap-2 md:gap-4 items-center rounded-xl${rowHover}`}>
                     <div className="flex items-center gap-3">
-                        <div className="w-8 h-8 rounded flex items-center justify-center text-xs font-bold font-heading"
-                             style={{backgroundColor: 'var(--surface-4)', color: 'var(--brand)', border: '1px solid color-mix(in srgb, var(--brand) 20%, transparent)'}}>
+                        <div className="w-8 h-8 rounded flex items-center justify-center text-xs font-bold font-heading bg-surface-4 text-brand border border-brand/20">
                             {p.symbol.slice(0, 2)}
                         </div>
                         <div>

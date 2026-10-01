@@ -173,7 +173,7 @@ const OrderPanel = ({defaultSymbol = '', cash, accountId, positions = [], onSymb
             </div>
 
             {/* Buy / Sell toggle */}
-            <div className="grid grid-cols-2 gap-1 p-1 rounded-lg" style={{backgroundColor: 'var(--surface-2)'}}>
+            <div className="grid grid-cols-2 gap-1 p-1 rounded-lg bg-surface-2">
                 {(['buy', 'sell'] as const).map((s) => (
                     <button
                         key={s}
@@ -208,8 +208,7 @@ const OrderPanel = ({defaultSymbol = '', cash, accountId, positions = [], onSymb
                     className="w-full mt-1"
                 />
                 {results.length > 0 && (
-                    <div className="mt-1 w-full rounded-lg overflow-y-auto max-h-44 shadow-2xl"
-                         style={{backgroundColor: 'color-mix(in srgb, var(--surface-0) 98%, transparent)', border: '1px solid color-mix(in srgb, var(--line-strong) 50%, transparent)'}}>
+                    <div className="mt-1 w-full rounded-lg overflow-y-auto max-h-44 shadow-2xl bg-surface-0/98 border border-line-strong/50">
                         {results.map((r) => (
                             <button
                                 key={r.symbol}
@@ -238,7 +237,7 @@ const OrderPanel = ({defaultSymbol = '', cash, accountId, positions = [], onSymb
                     className="w-full mt-1"
                 />
                 {presets && (
-                    <div className="mt-1.5 grid grid-cols-4 gap-1 p-1 rounded-lg" style={{backgroundColor: 'var(--surface-2)'}}>
+                    <div className="mt-1.5 grid grid-cols-4 gap-1 p-1 rounded-lg bg-surface-2">
                         {presets.map((preset) => (
                             <button
                                 key={preset.label}
@@ -310,10 +309,9 @@ const OrderPanel = ({defaultSymbol = '', cash, accountId, positions = [], onSymb
                 disabled={submitting || blocked}
                 className={cn(
                     'font-mono w-full py-3 rounded-lg text-sm font-bold uppercase tracking-wider transition-all active:scale-[0.98] disabled:opacity-50',
-                    side === 'buy' ? 'text-on-brand' : 'text-on-negative',
+                    side === 'buy' ? 'bg-brand-strong text-on-brand' : 'bg-negative text-on-negative',
                 )}
                 style={{
-                    backgroundColor: side === 'buy' ? 'var(--brand-strong)' : 'var(--negative)',
                     boxShadow: side === 'buy' ? '0 0 15px color-mix(in srgb, var(--brand-strong) 30%, transparent)' : '0 0 15px color-mix(in srgb, var(--negative) 25%, transparent)',
                 }}
             >

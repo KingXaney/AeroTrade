@@ -5,11 +5,7 @@ import Panel from "@/components/primitives/Panel";
 const WatchlistEmpty = () => {
     return (
         <Panel as="div" pad={12} className="flex flex-col items-center justify-center text-center">
-            <div className="w-16 h-16 rounded-full flex items-center justify-center mb-6"
-                 style={{
-                     backgroundColor: 'color-mix(in srgb, var(--brand-strong) 8%, transparent)',
-                     border: '1px solid color-mix(in srgb, var(--brand) 15%, transparent)',
-                 }}>
+            <div className="w-16 h-16 rounded-full flex items-center justify-center mb-6 bg-brand-strong/8 border border-brand/15">
                 <span className="material-symbols-outlined text-3xl text-brand">bookmark</span>
             </div>
             <h3 className="text-xl font-semibold text-fg mb-2 font-heading">
