@@ -57,7 +57,8 @@ export const getWatchlistSymbolsByUserId = async (userId: string): Promise<strin
     }
 };
 
-export const getWatchlistForUser = async (userId: string): Promise<WatchlistEntry[]> => {
+// null when the read failed: callers say so rather than showing the empty state.
+export const getWatchlistForUser = async (userId: string): Promise<WatchlistEntry[] | null> => {
     try {
         await connectToDatabase();
         const items = await Watchlist.find({userId}).sort({addedAt: -1}).lean();
@@ -68,7 +69,7 @@ export const getWatchlistForUser = async (userId: string): Promise<WatchlistEntr
         }));
     } catch (error) {
         console.error('Error fetching watchlist for user:', error);
-        return [];
+        return null;
     }
 };
 

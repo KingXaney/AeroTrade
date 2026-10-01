@@ -1,6 +1,7 @@
 'use client';
 
 import {useMemo, useRef, useState} from "react";
+import {formatPct} from "@/lib/format";
 
 // Hand-rolled SVG performance chart: the strategy's %-return since inception
 // (cyan) vs SPY's total return (muted, lib/prices/total-return.ts). Deliberately
@@ -10,8 +11,6 @@ const WIDTH = 720;
 const HEIGHT = 240;
 const PAD_X = 44;
 const PAD_Y = 18;
-
-const formatPct = (v: number) => `${v >= 0 ? '+' : ''}${v.toFixed(2)}%`;
 
 // An optional shaded stretch of the x-axis — /portfolio passes the account's worst drawdown,
 // peak date to trough date — with its legend text supplied by the caller (copy lives in

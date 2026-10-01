@@ -1,5 +1,6 @@
 import Link from "next/link";
 import {cn, getChangeColorClass} from "@/lib/utils";
+import {formatSigned} from "@/lib/format";
 import TradeLink from "@/components/trade/TradeLink";
 import FollowTopicButton from "@/components/topics/FollowTopicButton";
 import type {FollowedByName} from "@/components/brain/NarrativeLeaderboard";
@@ -7,10 +8,11 @@ import Term from "@/components/primitives/Term";
 import WhatTheseMean from "@/components/learn/WhatTheseMean";
 import {BRAIN_COPY} from "@/lib/learn/copy/brain";
 import type {SinceThesisLegs} from "@/lib/brain/since-thesis";
+import {evidenceHref} from "@/lib/brain/links";
 
 const MS_PER_WEEK = 7 * 24 * 60 * 60 * 1000;
 
-// Same pattern as formatTimeAgo — time-relative display computed in a helper.
+// Same pattern as formatTimeAgoMs — time-relative display computed in a helper.
 const weeksActive = (thesisSince: number | null): number =>
     thesisSince ? Math.max(1, Math.round((Date.now() - thesisSince) / MS_PER_WEEK)) : 0;
 
@@ -50,7 +52,7 @@ const ActiveTheses = ({theses, followedByName, sinceThesis, definitions = false}
                             <div>
                                 {/* A row used to be a dead end. The name opens the evidence behind
                                     the thesis; the follow button stays a sibling, never nested. */}
-                                <Link href={`/brain?entity=${encodeURIComponent(t.key)}#evidence`}
+                                <Link href={evidenceHref(t.key)}
                                       className="text-sm font-semibold text-fg hover:text-brand transition-colors" style={{fontFamily: 'var(--type-display)'}}>
                                     {t.displayName}
                                 </Link>
@@ -72,7 +74,7 @@ const ActiveTheses = ({theses, followedByName, sinceThesis, definitions = false}
                             <div className="text-right" style={{fontFamily: 'var(--type-mono)'}}>
                                 <div className="text-sm text-fg"><Term k="news-weight">weight</Term> {t.weightSlow.toFixed(1)}</div>
                                 <div className={cn('text-xs', getChangeColorClass(t.sentimentSlow || undefined))}>
-                                    <Term k="news-sentiment">sentiment</Term> {t.sentimentSlow >= 0 ? '+' : ''}{t.sentimentSlow.toFixed(2)}
+                                    <Term k="news-sentiment">sentiment</Term> {formatSigned(t.sentimentSlow)}
                                 </div>
                             </div>
                             {t.type === 'ticker' && <TradeLink symbol={t.key} variant="icon" className="size-7" />}

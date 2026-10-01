@@ -1,13 +1,18 @@
 import { clsx, type ClassValue } from 'clsx';
 import { twMerge } from 'tailwind-merge';
 
+// Display formatting lives in lib/format; re-exported for the many components that import it here.
+export { formatChangePercent, formatPrice, getChangeColorClass } from '@/lib/format';
+
 export function cn(...inputs: ClassValue[]) {
   return twMerge(clsx(inputs));
 }
 
-export const formatTimeAgo = (timestamp: number) => {
-  const now = Date.now();
-  const diffInMs = now - timestamp * 1000; // Convert to milliseconds
+// Two readers, the unit in the name: feed items (Finnhub `datetime`, topic articles) are unix
+// seconds, while our own stamps (Date#getTime, job runs, friend requests) are epoch ms. One
+// seconds-only helper read a ms stamp as a date far in the future, which prints "just now".
+export const formatTimeAgoMs = (epochMs: number) => {
+  const diffInMs = Date.now() - epochMs;
   const diffInHours = Math.floor(diffInMs / (1000 * 60 * 60));
   const diffInMinutes = Math.floor(diffInMs / (1000 * 60));
 
@@ -22,6 +27,8 @@ export const formatTimeAgo = (timestamp: number) => {
     return `${diffInMinutes} minute${diffInMinutes > 1 ? 's' : ''} ago`;
   }
 };
+
+export const formatTimeAgoSeconds = (unixSeconds: number) => formatTimeAgoMs(unixSeconds * 1000);
 
 export function delay(ms: number) {
   return new Promise((resolve) => setTimeout(resolve, ms));
@@ -88,25 +95,6 @@ export const formatArticle = (
   category: isCompanyNews ? 'company' : article.category || 'general',
   related: isCompanyNews ? symbol! : article.related || '',
 });
-
-export const formatChangePercent = (changePercent?: number) => {
-  if (!changePercent) return '';
-  const sign = changePercent > 0 ? '+' : '';
-  return `${sign}${changePercent.toFixed(2)}%`;
-};
-
-export const getChangeColorClass = (changePercent?: number) => {
-  if (!changePercent) return 'text-fg-muted';
-  return changePercent > 0 ? 'text-positive' : 'text-negative';
-};
-
-export const formatPrice = (price: number) => {
-  return new Intl.NumberFormat('en-US', {
-    style: 'currency',
-    currency: 'USD',
-    minimumFractionDigits: 2,
-  }).format(price);
-};
 
 export const getFormattedTodayDate = () => new Date().toLocaleDateString('en-US', {
   weekday: 'long',

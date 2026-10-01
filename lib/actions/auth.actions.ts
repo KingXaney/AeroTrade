@@ -19,6 +19,7 @@ import {
     withinSignInLimits,
     withinSignUpLimit,
 } from "@/lib/auth/limits";
+import {SIGN_UP_PROFILE_INVALID_MESSAGE, signUpProfile} from "@/lib/auth/sign-up-profile";
 import {seedDefaultTopics} from "@/lib/topics/seed";
 
 // Better-auth throws APIError-shaped objects with body.message; fall back to .message or a generic string.
@@ -30,7 +31,13 @@ const extractAuthError = (e: unknown, fallback: string): string => {
     return fallback;
 }
 
-export const signUpWithEmail = async ({ email, password, fullName, country, investmentGoals, riskTolerance, preferredIndustry }: SignUpFormData) => {
+export const signUpWithEmail = async (input: SignUpFormData) => {
+    const { email, password, fullName } = input;
+    // The form only offers listed answers, so one outside its list means a direct call: refused
+    // before any counter is spent, and only the checked answers reach the welcome prompt.
+    const profile = signUpProfile(input);
+    if (!profile) return { success: false, error: SIGN_UP_PROFILE_INVALID_MESSAGE }
+
     try {
         // Every attempt counts, refused before better-auth is asked: a refused one creates
         // nothing, queues no welcome email and says nothing about whether the address is taken.
@@ -55,11 +62,13 @@ export const signUpWithEmail = async ({ email, password, fullName, country, inve
 
             await inngest.send({
                 name: 'app/user.created',
-                data: { email, name: fullName, country, investmentGoals, riskTolerance, preferredIndustry }
+                data: { email, name: fullName, ...profile }
             }).catch((e) => console.error('Failed to queue welcome email', e))
         }
 
-        return { success: true, data: response }
+        // Never better-auth's response: it carries the raw session token, and whatever an
+        // action returns is serialised to the browser. The session travels in its cookie only.
+        return { success: true }
     } catch (e) {
         console.error('Sign up failed', e)
         return { success: false, error: extractAuthError(e, 'Sign up failed') }
@@ -87,7 +96,8 @@ export const signInWithEmail = async (input: SignInFormData) => {
             await syncThemeCookieForUser(response.user.id).catch((e) => console.error('Theme cookie sync failed', e));
         }
 
-        return { success: true, data: response }
+        // Not the response itself: see signUpWithEmail.
+        return { success: true }
     } catch (e) {
         console.error('Sign in failed', e)
         return { success: false, error: extractAuthError(e, SIGN_IN_INVALID_MESSAGE) }
@@ -125,10 +135,11 @@ export const resetPassword = async ({ token, newPassword }: { token: string; new
     }
 }
 
-export const signOut = async () => {
+export const signOut = async (): Promise<{ success: true } | { success: false; error: string }> => {
     try {
         await auth.api.signOut({ headers: await headers() });
         (await cookies()).delete(THEME_COOKIE);
+        return { success: true }
     } catch (e) {
         console.error('Sign out failed', e)
         return { success: false, error: 'Sign out failed' }

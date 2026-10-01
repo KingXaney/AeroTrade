@@ -4,8 +4,9 @@ import {useEffect, useRef, useState} from "react";
 import {useRouter} from "next/navigation";
 import SafeMarkdown from "@/components/markdown/SafeMarkdown";
 import {toast} from "sonner";
-import {formatTimeAgo} from "@/lib/utils";
+import {formatTimeAgoMs} from "@/lib/utils";
 import {getSecondOpinionPrompt, requestSecondOpinion, saveManualSecondOpinion} from "@/lib/actions/opinion.actions";
+import {runWithToast, UNREACHABLE_MESSAGE} from "@/lib/action-toast";
 import type {SecondOpinionView} from "@/lib/brain/opinion";
 
 // The API path generates in the background, so refresh a couple of times after
@@ -43,19 +44,11 @@ const SecondOpinionCard = ({configured, opinion}: {configured: boolean; opinion:
         if (busy) return;
         setPending('ask');
         try {
-            const result = await requestSecondOpinion();
-            if (result.success) {
-                toast.success(result.message || 'Queued');
+            if (await runWithToast(requestSecondOpinion, toast, {success: 'Queued', error: 'Could not queue the request'})) {
                 refreshTimers.current.push(
                     ...REFRESH_DELAYS_MS.map((delay) => setTimeout(() => router.refresh(), delay)),
                 );
-            } else {
-                toast.error(result.message || 'Could not queue the request');
             }
-        } catch {
-            // Without this the promise rejects into nothing and the button just
-            // stops looking busy, as if the click had never happened.
-            toast.error('Could not reach the server — check your connection and try again');
         } finally {
             setPending(null);
         }
@@ -81,9 +74,7 @@ const SecondOpinionCard = ({configured, opinion}: {configured: boolean; opinion:
                 toast.message('Clipboard blocked — copy the prompt from the box below');
             }
         } catch {
-            // Without this the promise rejects into nothing and the button just
-            // stops looking busy, as if the click had never happened.
-            toast.error('Could not reach the server — check your connection and try again');
+            toast.error(UNREACHABLE_MESSAGE);
         } finally {
             setPending(null);
         }
@@ -93,20 +84,12 @@ const SecondOpinionCard = ({configured, opinion}: {configured: boolean; opinion:
         if (busy) return;
         setPending('save');
         try {
-            const result = await saveManualSecondOpinion(pasted);
-            if (result.success) {
-                toast.success(result.message || 'Saved');
+            if (await runWithToast(() => saveManualSecondOpinion(pasted), toast, {success: 'Saved', error: 'Could not save'})) {
                 setPasted('');
                 setPasteOpen(false);
                 setPromptFallback('');
                 router.refresh();
-            } else {
-                toast.error(result.message || 'Could not save');
             }
-        } catch {
-            // Without this the promise rejects into nothing and the button just
-            // stops looking busy, as if the click had never happened.
-            toast.error('Could not reach the server — check your connection and try again');
         } finally {
             setPending(null);
         }
@@ -120,7 +103,7 @@ const SecondOpinionCard = ({configured, opinion}: {configured: boolean; opinion:
                 </h2>
                 {opinion && (
                     <span className="text-[11px] text-fg-muted" style={{fontFamily: 'var(--type-mono)'}}>
-                        {opinion.model} · {SOURCE_LABELS[opinion.source]} · {formatTimeAgo(Math.floor(opinion.generatedAt / 1000))}
+                        {opinion.model} · {SOURCE_LABELS[opinion.source]} · {formatTimeAgoMs(opinion.generatedAt)}
                     </span>
                 )}
             </div>

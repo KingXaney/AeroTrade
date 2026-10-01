@@ -7,6 +7,7 @@ import {Button} from '@/components/ui/button';
 import InputField from '@/components/forms/InputField';
 import FooterLink from '@/components/forms/FooterLink';
 import {resetPassword} from "@/lib/actions/auth.actions";
+import {MIN_PASSWORD_LENGTH, PASSWORD_RULE} from "@/lib/auth/validation";
 
 type ResetPasswordFormData = {password: string; confirm: string};
 
@@ -44,11 +45,11 @@ const ResetPasswordForm = ({token}: {token: string | null}) => {
                 <InputField
                     name="password"
                     label="New password"
-                    placeholder="At least 8 characters"
+                    placeholder={`At least ${MIN_PASSWORD_LENGTH} characters`}
                     type="password"
                     register={register}
                     error={errors.password}
-                    validation={{required: 'Password is required', minLength: {value: 8, message: 'Password must be at least 8 characters'}, maxLength: {value: 128, message: 'Password must be at most 128 characters'}}}
+                    validation={PASSWORD_RULE}
                 />
                 <InputField
                     name="confirm"

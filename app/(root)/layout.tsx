@@ -28,12 +28,12 @@ const Layout = async ({children}: {children: React.ReactNode}) => {
         email: session.user.email,
     }
 
-    // Pre-load the popular-stocks list once for the SearchCommand fallback, joined with this user's watchlist.
+    // Pre-load the popular-stocks list once for the SearchCommand fallback.
     // All strategy accounts power the compact sidebar card, priced from one shared
     // quote map (getQuote caches 30s, so this stays cheap across navigations).
     // The topics card must never take the whole shell down with it.
     const [initialStocks, watchlistSymbols, accountPortfolios, savedTheme, topicsOverview, friendRequests] = await Promise.all([
-        searchStocks(undefined, user.id),
+        searchStocks(),
         getCachedWatchlistSymbols(user.id),
         getPortfoliosForUser(user.id),
         getAppearanceForUser(user.id),

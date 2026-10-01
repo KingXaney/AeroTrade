@@ -1,6 +1,7 @@
 // Browser QA for followed topics, the topics-first dashboard and the theme-picker hover fix.
 // Prints one PASS/FAIL line per check and exits non-zero on any failure. Screenshots go to ./output.
 import {chromium} from 'playwright';
+import {MongoClient} from 'mongodb';
 import fs from 'node:fs';
 import path from 'node:path';
 import {fileURLToPath} from 'node:url';
@@ -8,6 +9,9 @@ import {fileURLToPath} from 'node:url';
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
 const BASE = process.env.QA_BASE_URL || 'http://localhost:3000';
+const MONGO = 'mongodb://127.0.0.1:27117/aerotrade';
+// Articles this suite seeds straight into Mongo, removed by source before and after the run.
+const QA_FEED_SOURCE = 'QA Feed Wire';
 const OUT = path.resolve(__dirname, 'output');
 fs.mkdirSync(OUT, {recursive: true});
 
@@ -37,12 +41,19 @@ const settleToasts = async (page) => {
     page.on('pageerror', (e) => consoleErrors.push(`pageerror: ${e.message} @ ${(e.stack || '').split('\n').slice(1, 3).join(' <- ').trim()}`));
     const shot = async (name) => { await page.waitForTimeout(600); await page.screenshot({path: `${OUT}/${name}.png`, fullPage: true}); };
     const widgetOrder = () => page.$$eval('[data-widget-id]', (els) => els.map((e) => e.getAttribute('data-widget-id')));
+    const mongo = new MongoClient(MONGO);
+    await mongo.connect();
+    const db = mongo.db('aerotrade');
+    // Topic articles are shared by keywordSetHash, so a previous run's seeded rows would
+    // still be in this run's climate-policy feed.
+    await db.collection('topicarticles').deleteMany({source: QA_FEED_SOURCE});
 
     // --- sign up: lands on the dashboard with topics already installed ---
     const dashboardUrl = new RegExp(`^${BASE}/(\\?.*)?$`);
     await page.goto(`${BASE}/sign-up`, {waitUntil: 'load'});
     await page.fill('#fullName', 'QA Tester');
-    await page.fill('#email', `qa${Date.now()}@example.com`);
+    const email = `qa${Date.now()}@example.com`;
+    await page.fill('#email', email);
     await page.fill('#password', 'Passw0rd!Passw0rd!');
     await page.click('button[type=submit]');
     await page.waitForURL(dashboardUrl, {timeout: 90000}).catch(async (e) => { await shot('00-sign-up-failed'); throw e; });
@@ -187,6 +198,44 @@ const settleToasts = async (page) => {
     check('⌘K shows Open topic for an existing topic', await page.getByText(/Open topic: AI chips/).count() === 1);
     await page.keyboard.press('Escape');
 
+    // --- a refresh that brings new articles shows them ---
+    // TopicFeed copies its first page into state for "Load more"; the page keys it on that
+    // page, so a router.refresh() with a newer article must remount it. Seeded straight
+    // into Mongo so it does not depend on Google News, and triggered by saving the topic
+    // unchanged — same slug, same keyword set — which refreshes the page in place.
+    const qaUser = await db.collection('user').findOne({email});
+    const climate = await db.collection('topics').findOne({userId: String(qaUser?._id ?? ''), slug: 'climate-policy'});
+    check('the palette topic is stored', !!climate);
+    const seedArticle = (headline, ageSeconds) => db.collection('topicarticles').insertOne({
+        keywordSetHash: climate.keywordSetHash,
+        contentHash: Math.floor(Math.random() * 1e9),
+        headline,
+        summary: 'Seeded by the QA harness.',
+        url: `https://example.com/qa-feed-${Date.now()}-${ageSeconds}`,
+        source: QA_FEED_SOURCE,
+        sourceType: 'web',
+        datetime: Math.floor(Date.now() / 1000) - ageSeconds,
+        publishedDate: new Date().toISOString().slice(0, 10),
+        score: 12,
+        matchedTerms: ['climate policy'],
+        createdAt: new Date(),
+    });
+    const OLD_HEADLINE = 'QA feed: the story already on screen';
+    const NEW_HEADLINE = 'QA feed: a story that landed after the page loaded';
+    const headlineShown = (h) => page.locator('.news-title', {hasText: h}).first()
+        .waitFor({state: 'visible', timeout: 15000}).then(() => true, () => false);
+    if (climate) {
+        await seedArticle(OLD_HEADLINE, 120);
+        await page.goto(`${BASE}/topics/climate-policy`, {waitUntil: 'load'});
+        check('the seeded article is on the topic page', await headlineShown(OLD_HEADLINE));
+        await seedArticle(NEW_HEADLINE, 0);
+        await page.getByRole('button', {name: 'Topic actions'}).click();
+        await page.getByRole('menuitem', {name: 'Edit keywords'}).click();
+        await page.getByRole('button', {name: 'Save changes'}).click();
+        check('a refresh with a newer article shows it, not the page the feed first got', await headlineShown(NEW_HEADLINE));
+        await settleToasts(page);
+    }
+
     // --- edit keywords via the header menu ---
     await page.goto(`${BASE}/topics/climate-policy`, {waitUntil: 'load'});
     await page.waitForTimeout(800);
@@ -199,6 +248,12 @@ const settleToasts = async (page) => {
     await page.getByRole('button', {name: 'Save changes'}).click();
     await page.waitForTimeout(1500);
     check('edited keyword appears on the topic page', /carbon tax/i.test(await page.locator('body').innerText()));
+    // The seeded rows belong to the old keyword set. Whether or not Google answered for the
+    // new one, none of them may stay on screen above "Load more" pages from the new set.
+    const oldSet = page.locator('.news-title', {hasText: /^QA feed: /});
+    await oldSet.first().waitFor({state: 'detached', timeout: 20000}).catch(() => {});
+    const oldSetShown = await oldSet.count();
+    check('after a keyword edit, no article from the old set stays on screen', oldSetShown === 0, `${oldSetShown} left`);
 
     // --- index rail, then delete via the header menu ---
     await page.goto(`${BASE}/topics`, {waitUntil: 'load'});
@@ -244,6 +299,8 @@ const settleToasts = async (page) => {
     const relevantErrors = consoleErrors.filter((e) => !/tradingview|_replaceScript|embed-widget|ERR_BLOCKED|favicon|hydrat/i.test(e));
     check('no unexpected console/page errors', relevantErrors.length === 0, relevantErrors.slice(0, 5).join(' || ').slice(0, 600));
 
+    await db.collection('topicarticles').deleteMany({source: QA_FEED_SOURCE});
+    await mongo.close();
     await browser.close();
     const failed = results.filter((r) => !r.ok);
     console.log(`\n${results.length - failed.length}/${results.length} checks passed`);

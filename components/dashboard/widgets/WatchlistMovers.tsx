@@ -6,7 +6,7 @@ const WatchlistMovers = ({movers}: {movers: StockWithData[]}) => (
             {movers.map((m) => (
                 <div key={m.symbol} className="flex items-center justify-between">
                     <span className="text-sm font-bold text-fg" style={{fontFamily: 'var(--type-mono)'}}>{m.symbol}</span>
-                    <span className={cn('text-xs', getChangeColorClass(m.changePercent || undefined))}
+                    <span className={cn('text-xs', getChangeColorClass(m.changePercent))}
                           style={{fontFamily: 'var(--type-mono)'}}>
                         {formatChangePercent(m.changePercent) || '—'}
                     </span>

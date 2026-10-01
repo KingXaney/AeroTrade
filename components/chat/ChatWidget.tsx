@@ -1,6 +1,6 @@
 'use client';
 
-import {useCallback, useEffect, useState} from "react";
+import {useCallback, useEffect, useRef, useState} from "react";
 import {createPortal} from "react-dom";
 import type {UIMessage} from "ai";
 import ChatPanel from "@/components/chat/ChatPanel";
@@ -33,7 +33,12 @@ const ChatWidget = ({userId}: ChatWidgetProps) => {
     const [pendingInput, setPendingInput] = useState<string | null>(null);
     // Lazily restore persisted messages on first render. The launcher button renders identically
     // on server and client, so reading localStorage here causes no hydration mismatch.
-    const [initialMessages] = useState<UIMessage[]>(() => loadMessages(userId));
+    const [initialMessages, setInitialMessages] = useState<UIMessage[]>(() => loadMessages(userId));
+    // The panel's live list. ChatPanel unmounts on close and useChat seeds a new Chat from
+    // initialMessages on every mount, so the list is handed back on close: otherwise a reopen
+    // showed the page-load conversation, dropping new turns and restoring a cleared one.
+    // A ref, not state, so a streaming reply does not re-render the widget on every token.
+    const latestMessages = useRef<UIMessage[] | null>(null);
 
     // Render through a portal to <body> so the widget's fixed position is anchored to the
     // viewport and can never be displaced by an ancestor's transform/filter/overflow.
@@ -49,6 +54,7 @@ const ChatWidget = ({userId}: ChatWidgetProps) => {
     }), []);
 
     const persist = useCallback((messages: UIMessage[]) => {
+        latestMessages.current = messages;
         if (typeof window === 'undefined') return;
         try {
             window.localStorage.setItem(storageKey(userId), JSON.stringify(messages));
@@ -56,6 +62,12 @@ const ChatWidget = ({userId}: ChatWidgetProps) => {
             // Quota or serialization error — ignore.
         }
     }, [userId]);
+
+    const close = () => {
+        if (latestMessages.current) setInitialMessages(latestMessages.current);
+        setOpen(false);
+        setPendingInput(null);
+    };
 
     if (!mounted) return null;
 
@@ -85,7 +97,7 @@ const ChatWidget = ({userId}: ChatWidgetProps) => {
                     initialMessages={initialMessages}
                     onMessagesChange={persist}
                     initialInput={pendingInput}
-                    onClose={() => { setOpen(false); setPendingInput(null); }}
+                    onClose={close}
                 />
             )}
         </>,

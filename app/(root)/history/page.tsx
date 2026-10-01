@@ -6,15 +6,8 @@ import {NEWS_HISTORY_LIMIT} from "@/lib/news/config";
 import {getRecentTradesForUser} from "@/lib/trading/account";
 import TradeHistory from "@/components/trade/TradeHistory";
 import NewsArticleCard from "@/components/news/NewsArticleCard";
-
-const formatAddedAt = (date: Date) =>
-    new Date(date).toLocaleString('en-US', {
-        month: 'short',
-        day: 'numeric',
-        year: 'numeric',
-        hour: 'numeric',
-        minute: '2-digit',
-    });
+import {WATCHLIST_COPY} from "@/lib/learn/copy/watchlist";
+import {formatEasternTimestamp} from "@/lib/format";
 
 const HistoryPage = async () => {
     const userId = await getCurrentUserId();
@@ -68,7 +61,9 @@ const HistoryPage = async () => {
                         On your watchlist, by date added
                     </h2>
 
-                    {items.length === 0 ? (
+                    {!items ? (
+                        <p className="text-sm text-fg-muted">{WATCHLIST_COPY.unavailable}</p>
+                    ) : items.length === 0 ? (
                         <p className="text-sm text-fg-muted">
                             Nothing yet. Add a stock to your watchlist and it appears here with the date you added it.
                         </p>
@@ -84,7 +79,7 @@ const HistoryPage = async () => {
                                         </p>
                                         <p className="text-[10px] text-fg-muted mt-0.5"
                                            style={{ fontFamily: 'var(--type-mono)', letterSpacing: '0.02em' }}>
-                                            {formatAddedAt(item.addedAt)}
+                                            {formatEasternTimestamp(item.addedAt, {year: true})}
                                         </p>
                                     </Link>
                                 </li>

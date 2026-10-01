@@ -25,7 +25,7 @@ export default function SearchCommand({
     const [open, setOpen] = useState(false);
     const [searchTerm, setSearchTerm] = useState("");
     const [loading, setLoading] = useState(false);
-    const [stocks, setStocks] = useState<StockWithWatchlistStatus[]>(initialStocks);
+    const [stocks, setStocks] = useState<Stock[]>(initialStocks);
     const [following, startFollow] = useTransition();
 
     const isSearchMode = !!searchTerm.trim();

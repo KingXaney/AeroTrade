@@ -4,6 +4,8 @@ import {getStocksWithData} from "@/lib/actions/finnhub.actions";
 import WatchlistTable from "@/components/watchlist/WatchlistTable";
 import WatchlistEmpty from "@/components/watchlist/WatchlistEmpty";
 import MarketStatus from "@/components/system/MarketStatus";
+import Panel from "@/components/primitives/Panel";
+import {WATCHLIST_COPY} from "@/lib/learn/copy/watchlist";
 import {marketStatus} from "@/lib/prices/market-hours";
 
 const WatchlistPage = async () => {
@@ -13,7 +15,8 @@ const WatchlistPage = async () => {
     const items = await getWatchlistForUser(userId);
     const status = marketStatus();
 
-    if (items.length === 0) {
+    // A failed read (null) is not an empty watchlist: say so instead of "No Assets Tracked".
+    if (!items || items.length === 0) {
         return (
             <div className="space-y-6">
                 <div className="flex flex-col md:flex-row justify-between items-start md:items-end gap-4">
@@ -29,7 +32,11 @@ const WatchlistPage = async () => {
                     </div>
                     <MarketStatus status={status} />
                 </div>
-                <WatchlistEmpty />
+                {items ? <WatchlistEmpty /> : (
+                    <Panel pad={6}>
+                        <p className="text-sm text-fg-muted">{WATCHLIST_COPY.unavailable}</p>
+                    </Panel>
+                )}
             </div>
         );
     }

@@ -1,8 +1,8 @@
 'use client';
 
 import Link from "next/link";
-import { usePathname, useRouter } from "next/navigation";
-import { signOut } from "@/lib/actions/auth.actions";
+import { usePathname } from "next/navigation";
+import { useSignOut } from "@/hooks/useSignOut";
 import PortfolioSidebarCard, { type SidebarPortfolio } from "@/components/PortfolioSidebarCard";
 import TopicsSidebarCard, { type SidebarTopics } from "@/components/topics/TopicsSidebarCard";
 import NavList from "@/components/nav/NavList";
@@ -17,12 +17,7 @@ type SidebarProps = {
 
 function Sidebar({ portfolio, topics, badges }: SidebarProps) {
     const pathname = usePathname();
-    const router = useRouter();
-
-    const handleSignOut = async () => {
-        await signOut();
-        router.push('/sign-in');
-    };
+    const handleSignOut = useSignOut();
 
     return (
         <aside className="hidden lg:flex fixed left-0 top-16 bottom-0 z-40 flex-col w-64 border-r border-outline-variant/20"

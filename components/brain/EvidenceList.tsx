@@ -1,5 +1,6 @@
 import Link from "next/link";
-import {cn, formatTimeAgo, getChangeColorClass} from "@/lib/utils";
+import {cn, formatTimeAgoSeconds, getChangeColorClass} from "@/lib/utils";
+import {formatSigned} from "@/lib/format";
 import TradeLink from "@/components/trade/TradeLink";
 import Badge from "@/components/primitives/Badge";
 import Term from "@/components/primitives/Term";
@@ -62,12 +63,12 @@ const EvidenceList = ({entityKey, items}: {entityKey: string; items: EvidenceIte
                             <span className="text-sm text-fg">{item.headline}</span>
                             <span className={cn('text-xs shrink-0', getChangeColorClass(item.sentiment || undefined))}
                                   style={{fontFamily: 'var(--type-mono)'}}>
-                                {item.sentiment >= 0 ? '+' : ''}{item.sentiment.toFixed(2)}
+                                {formatSigned(item.sentiment)}
                             </span>
                         </div>
                         <div className="flex flex-wrap items-center gap-2 text-[11px] text-fg-muted mt-1" style={{fontFamily: 'var(--type-mono)'}}>
                             <EventBadge eventType={item.eventType} />
-                            <span>{item.source} · {formatTimeAgo(item.datetime)}</span>
+                            <span>{item.source} · {formatTimeAgoSeconds(item.datetime)}</span>
                             {item.sourceType === 'reddit' && <span className="text-negative">community sentiment</span>}
                         </div>
                     </a>

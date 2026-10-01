@@ -1,5 +1,6 @@
 import Link from "next/link";
 import {cn, formatPrice, getChangeColorClass} from "@/lib/utils";
+import {formatPct} from "@/lib/format";
 import {unpricedLabel} from "@/lib/trading/analytics";
 
 // Medal colours come from --rank-* in globals.css, not the palette registry: gold is a
@@ -54,8 +55,8 @@ const Leaderboard = ({entries}: {entries: LeaderboardEntry[]}) => {
                                 </div>
                                 <div className="text-right" style={{fontFamily: 'var(--type-mono)'}}>
                                     <div className="text-sm text-fg">{formatPrice(e.totalValue)}</div>
-                                    <div className={cn('text-xs', getChangeColorClass(e.totalReturnPct || undefined))}>
-                                        {e.totalReturnPct >= 0 ? '+' : ''}{e.totalReturnPct.toFixed(2)}%
+                                    <div className={cn('text-xs', getChangeColorClass(e.totalReturnPct))}>
+                                        {formatPct(e.totalReturnPct)}
                                     </div>
                                 </div>
                             </div>

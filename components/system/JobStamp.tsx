@@ -1,4 +1,4 @@
-import {formatTimeAgo} from "@/lib/utils";
+import {formatTimeAgoMs} from "@/lib/utils";
 import {type JobHealth} from "@/lib/brain/queries";
 
 // One Inngest job's health card, derived from its completion stamp: a crashed job
@@ -31,7 +31,7 @@ const JobStamp = ({job}: {job: JobHealth}) => {
                 <div className="text-[11px] text-fg-muted truncate" style={{fontFamily: 'var(--type-mono)'}}>
                     {job.lastRunAt === null
                         ? (job.staleAfterHours === Number.POSITIVE_INFINITY ? 'not run yet' : 'never ran')
-                        : `${formatTimeAgo(Math.floor(job.lastRunAt / 1000))}${health === 'stale' ? ' — overdue' : ''}`}
+                        : `${formatTimeAgoMs(job.lastRunAt)}${health === 'stale' ? ' — overdue' : ''}`}
                 </div>
                 {job.lastMessage && (
                     <div className="text-[11px] text-fg-soft truncate" title={job.lastMessage} style={{fontFamily: 'var(--type-mono)'}}>

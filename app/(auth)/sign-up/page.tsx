@@ -7,7 +7,8 @@ import SelectField from "@/components/forms/SelectField";
 import {INVESTMENT_GOALS, PREFERRED_INDUSTRIES, RISK_TOLERANCE_OPTIONS} from "@/lib/constants";
 import {CountrySelectField} from "@/components/forms/CountrySelectField";
 import FooterLink from "@/components/forms/FooterLink";
-import {signUpWithEmail} from "../../../lib/actions/auth.actions";
+import {signUpWithEmail} from "@/lib/actions/auth.actions";
+import {EMAIL_RULE, PASSWORD_RULE} from "@/lib/auth/validation";
 import {useRouter} from "next/navigation";
 import {toast} from "sonner";
 
@@ -70,7 +71,7 @@ const SignUp = () => {
                     placeholder="you@example.com"
                     register={register}
                     error={errors.email}
-                    validation={{ required: 'Email is required', pattern: { value: /^[^\s@]+@[^\s@]+\.[^\s@]+$/, message: 'Enter a valid email address' } }}
+                    validation={EMAIL_RULE}
                 />
 
                 <InputField
@@ -80,7 +81,7 @@ const SignUp = () => {
                     type="password"
                     register={register}
                     error={errors.password}
-                    validation={{ required: 'Password is required', minLength: { value: 8, message: 'Password must be at least 8 characters' } }}
+                    validation={PASSWORD_RULE}
                 />
 
                 <CountrySelectField

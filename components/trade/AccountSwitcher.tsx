@@ -85,8 +85,8 @@ const AccountSwitcher = ({accounts, activeId}: {accounts: SwitcherAccount[]; act
                             </span>
                             {typeof a.totalReturnPct === 'number' && (
                                 <span className="text-xs text-right" style={{fontFamily: 'var(--type-mono)'}}>
-                                    <span className={getChangeColorClass(a.totalReturnPct || undefined)}>
-                                        {formatChangePercent(a.totalReturnPct) || '0.00%'}
+                                    <span className={getChangeColorClass(a.totalReturnPct)}>
+                                        {formatChangePercent(a.totalReturnPct)}
                                     </span>
                                     {unpricedLabel(a.unpriced ?? 0, a.holdings ?? 0) && (
                                         <span className="block text-[10px] text-warning">{unpricedLabel(a.unpriced ?? 0, a.holdings ?? 0)}</span>

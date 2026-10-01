@@ -1,10 +1,12 @@
 import Link from "next/link";
 import {cn, formatPrice, formatChangePercent, getChangeColorClass} from "@/lib/utils";
+import {formatSignedPrice} from "@/lib/format";
 import UnpricedNote from "@/components/trade/UnpricedNote";
 import Term from "@/components/primitives/Term";
 
-// Read-only holdings table — used on the friend profile page (and as the visual base
-// the interactive PositionsTable mirrors on the trade page).
+// Read-only holdings table — used on the friend profile page, the strategy detail page and
+// the dashboard's Top Holdings widget (and as the visual base the interactive PositionsTable
+// mirrors on /portfolio).
 //
 // showUnpricedNote exists because the strategy detail page already carries the same
 // sentence on its headline tiles, and the identical amber line twice on one screen is
@@ -62,8 +64,8 @@ const PortfolioHoldings = ({positions, emptyText = 'No open positions.', showUnp
                         {p.priceStale ? (
                             <div className="text-xs text-fg-muted" title="No live quote — value shown at cost">—</div>
                         ) : (
-                            <div className={cn('text-xs', getChangeColorClass(p.unrealizedPnl || undefined))}>
-                                {p.unrealizedPnl >= 0 ? '+' : ''}{formatPrice(p.unrealizedPnl)} ({formatChangePercent(p.unrealizedPnlPct) || '0.00%'})
+                            <div className={cn('text-xs', getChangeColorClass(p.unrealizedPnl))}>
+                                {formatSignedPrice(p.unrealizedPnl)} ({formatChangePercent(p.unrealizedPnlPct)})
                             </div>
                         )}
                         </div>

@@ -43,7 +43,7 @@ const OrderPanel = ({defaultSymbol = '', cash, accountId, positions = [], onSymb
     const [quantity, setQuantity] = useState('1');
     const [price, setPrice] = useState<number | null>(null);
     const [priceLoading, setPriceLoading] = useState(false);
-    const [results, setResults] = useState<StockWithWatchlistStatus[]>([]);
+    const [results, setResults] = useState<Stock[]>([]);
     const [submitting, setSubmitting] = useState(false);
     // The learner's own "why"; the server sanitises it (sanitizeTradeNote) and stores it on the fill.
     const [note, setNote] = useState('');
@@ -108,7 +108,7 @@ const OrderPanel = ({defaultSymbol = '', cash, accountId, positions = [], onSymb
         debouncedPrice(upper);
     };
 
-    const pickResult = (s: StockWithWatchlistStatus) => {
+    const pickResult = (s: Stock) => {
         setSymbol(s.symbol);
         setResults([]);
         void loadPrice(s.symbol);

@@ -1,10 +1,15 @@
 // PR 2 (App shell) checks: the mobile drawer reaches the four routes the sidebar owned,
-// the ⌘K palette is keyboard-drivable, and the friend-request badge appears.
+// the ⌘K palette is keyboard-drivable, the friend-request badge appears, and the drawer's
+// Logout signs out and lands on /sign-in. A sent request backdated three days in Mongo reads
+// "sent 3 days ago" (its stamp is epoch ms, which the old seconds-only formatter read as the
+// future: every request said "sent just now").
 // Run against the harness in README.md (in-memory Mongo on :27117 + `npm run dev`).
 import {chromium} from 'playwright';
+import {MongoClient} from 'mongodb';
 import {mkdirSync} from 'node:fs';
 
 const BASE = 'http://localhost:3000';
+const MONGO = 'mongodb://127.0.0.1:27117/aerotrade';
 const OUT = new URL('./output/navigation/', import.meta.url).pathname;
 mkdirSync(OUT, {recursive: true});
 
@@ -28,8 +33,11 @@ const signUp = async (page, tag) => {
 const browser = await chromium.launch({channel: 'chrome'});
 const page = await browser.newPage({viewport: {width: 1440, height: 900}});
 const shot = (n) => page.screenshot({path: `${OUT}${n}.png`, fullPage: true});
+const mongo = new MongoClient(MONGO);
 
 try {
+    await mongo.connect();
+    const db = mongo.db('aerotrade');
     const firstEmail = await signUp(page, 'one');
 
     // --- desktop nav unchanged -------------------------------------------------
@@ -75,7 +83,7 @@ try {
 
     // --- friend-request badge --------------------------------------------------
     const second = await browser.newPage({viewport: {width: 1440, height: 900}});
-    await signUp(second, 'two');
+    const secondEmail = await signUp(second, 'two');
     await second.goto(`${BASE}/friends`, {waitUntil: 'networkidle'});
     await second.fill('input[type="email"]', firstEmail);
     await second.locator('form button[type="submit"], button:has-text("Send")').first().click();
@@ -84,6 +92,14 @@ try {
         await second.getByText('Sent (1)').count() > 0);
     await second.screenshot({path: `${OUT}03-sent-requests.png`, fullPage: true});
 
+    const sender = await db.collection('user').findOne({email: secondEmail});
+    const backdated = await db.collection('friendships').updateOne(
+        {requesterId: String(sender?._id), status: 'pending'},
+        {$set: {createdAt: new Date(Date.now() - 3 * 86_400_000)}});
+    await second.reload({waitUntil: 'networkidle'});
+    const waiting = await second.getByText(/Waiting · sent/).first().innerText().catch(() => '');
+    check('a three-day-old sent request says so', backdated.modifiedCount === 1 && /sent 3 days ago/.test(waiting), waiting);
+
     // The recipient should now see a badge without visiting /friends.
     await page.setViewportSize({width: 1440, height: 900});
     await page.goto(`${BASE}/`, {waitUntil: 'networkidle'});
@@ -91,11 +107,25 @@ try {
     check('friend-request badge appears in the sidebar', badge === 1, String(badge));
     await shot('04-friend-badge');
     await second.close();
+
+    // --- logout from the mobile drawer --------------------------------------------
+    // Its Logout used to close the drawer and stay on the page; every logout button now goes
+    // through one hook that lands on /sign-in only once the sign-out succeeded.
+    await page.setViewportSize({width: 390, height: 844});
+    await page.goto(`${BASE}/portfolio`, {waitUntil: 'networkidle'});
+    await page.locator('button[aria-label="Open navigation"]').click();
+    await page.waitForTimeout(400);
+    await page.locator('[data-slot="sheet-content"] button:has-text("Logout")').click();
+    await page.waitForURL(/\/sign-in/, {timeout: 15000}).catch(() => {});
+    check('drawer logout lands on /sign-in', /\/sign-in/.test(page.url()), page.url());
+    await page.goto(`${BASE}/`, {waitUntil: 'load'});
+    check('…and the session is gone', /\/sign-in/.test(page.url()), page.url());
 } catch (err) {
     failures++;
     console.log(`FAIL  threw: ${err.message}`);
     await shot('99-error').catch(() => {});
 } finally {
+    await mongo.close().catch(() => {});
     await browser.close();
 }
 

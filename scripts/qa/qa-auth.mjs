@@ -10,7 +10,8 @@
 // no later suite starts inside this one's window. Sign-up is limited per client address: this
 // suite's own sign-up is counted, and a client over the limit (its counter seeded past any
 // SIGN_UP_CLIENT_LIMIT the harness sets) gets one fixed sentence and no account; every signup:*
-// row is removed at the end too.
+// row is removed at the end too. Neither the sign-up nor the sign-in action hands the browser the
+// session token its cookie carries, and the tab icon loads logged out.
 import {chromium} from 'playwright';
 import {MongoClient} from 'mongodb';
 import {mkdirSync} from 'node:fs';
@@ -41,6 +42,16 @@ let page;
 let limits;
 const shot = (n) => page.screenshot({path: `${OUT}${n}.png`, fullPage: true});
 
+// A server action is a POST carrying a Next-Action header; its response is what the page's
+// JavaScript receives.
+const actionResponse = () => page.waitForResponse(
+    (r) => r.request().method() === 'POST' && Boolean(r.request().headers()['next-action']), {timeout: 90000});
+// better-auth's cookie is `<token>.<signature>`; the token alone must never reach the page.
+const sessionToken = async (context) => {
+    const cookie = (await context.cookies(BASE)).find((c) => c.name.endsWith('session_token'));
+    return cookie ? decodeURIComponent(cookie.value).split('.')[0] : null;
+};
+
 const requestReset = async (email) => {
     await page.goto(`${BASE}/forgot-password`, {waitUntil: 'load'});
     await page.fill('#email', email);
@@ -63,8 +74,14 @@ try {
     await page.fill('#fullName', 'QA Auth');
     await page.fill('#email', email);
     await page.fill('#password', P1);
+    const signUpAction = actionResponse();
     await page.click('button[type="submit"]');
+    // Read before the page moves on, while the body is still the browser's to hand over.
+    const signUpBody = await (await signUpAction).text();
     await page.waitForURL(new RegExp(`^${BASE}/(\\?.*)?$`), {timeout: 90000});
+    const signUpToken = await sessionToken(signedIn);
+    check('the sign-up action returns no session token', Boolean(signUpToken) && signUpBody.length > 0 && !signUpBody.includes(signUpToken),
+        signUpToken ? '' : 'no session cookie');
     const user = await db.collection('user').findOne({email});
     const userId = String(user._id);
 
@@ -102,6 +119,9 @@ try {
     page = await loggedOut.newPage();
     await page.goto(`${BASE}/reset-password?token=bogus`, {waitUntil: 'load'});
     check('the reset page is reachable logged out (proxy matcher)', /\/reset-password/.test(page.url()) && await page.getByText('Choose a new password').count() === 1, page.url());
+    const icon = await loggedOut.request.get(`${BASE}/icon.svg`, {maxRedirects: 0});
+    check('…and so is the tab icon, not redirected to /sign-in', icon.status() === 200 && /image\/svg\+xml/.test(icon.headers()['content-type'] ?? ''),
+        `${icon.status()} ${icon.headers()['content-type'] ?? ''} ${icon.headers().location ?? ''}`);
     await page.goto(`${BASE}/reset-password`, {waitUntil: 'load'});
     check('a link without a token explains itself', await page.getByRole('alert').filter({hasText: 'missing its reset token'}).count() === 1);
 
@@ -137,9 +157,15 @@ try {
     await page.getByText('Sign in failed').waitFor({timeout: 30000});
     check('the old password no longer works', true);
     await page.mouse.move(5, 700); await page.waitForTimeout(800);
-    await page.fill('#password', P2); await page.click('button[type="submit"]');
+    await page.fill('#password', P2);
+    const signInAction = actionResponse();
+    await page.click('button[type="submit"]');
+    const signInBody = await (await signInAction).text();
     await page.waitForURL(new RegExp(`^${BASE}/(\\?.*)?$`), {timeout: 60000});
     check('the new password signs in', true);
+    const signInToken = await sessionToken(loggedOut);
+    check('…and the sign-in action returns no session token', Boolean(signInToken) && signInBody.length > 0 && !signInBody.includes(signInToken),
+        signInToken ? '' : 'no session cookie');
 
     await page.goto(`${BASE}/reset-password?token=${encodeURIComponent(token)}`, {waitUntil: 'load'});
     check('a signed-in user can still open the reset page', await page.getByText('Choose a new password').count() === 1);

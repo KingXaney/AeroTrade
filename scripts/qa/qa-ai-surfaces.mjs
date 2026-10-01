@@ -1,5 +1,6 @@
-// PR 3 (AI surfaces + confirmations): chat error recovery, safe markdown rendering,
-// the read-only portfolio tool, and the three destructive actions that now confirm.
+// PR 3 (AI surfaces + confirmations): chat error recovery, a conversation that survives
+// closing the panel, safe markdown rendering, the read-only portfolio tool, and the three
+// destructive actions that now confirm.
 // Run against the harness in README.md (in-memory Mongo on :27117 + `npm run dev`).
 import {chromium} from 'playwright';
 import {MongoClient} from 'mongodb';
@@ -76,6 +77,27 @@ try {
     await page.waitForTimeout(400);
     check('Escape closes the chat panel',
         await page.locator('[role="dialog"][aria-label="AeroTrade assistant"]').count() === 0);
+
+    // --- the conversation outlives closing the panel, and a cleared one stays cleared --
+    // The panel unmounts on close; it used to be reseeded from the page-load snapshot, so
+    // reopening lost the exchange and brought a cleared conversation back.
+    await openChat();
+    check('a sent message is still there after close and reopen',
+        await page.locator('[role="dialog"] >> text=/hello again/').count() > 0);
+    await page.locator('[role="dialog"] button[title="Clear chat"]').click();
+    await page.keyboard.press('Escape');
+    await page.waitForTimeout(400);
+    await openChat();
+    check('a cleared conversation stays cleared after close and reopen',
+        await page.locator('[role="dialog"] >> text=/hello again|how am I doing/').count() === 0);
+    const storedChats = await page.evaluate(() => Object.keys(localStorage)
+        .filter((key) => key.startsWith('aero-chat:'))
+        .map((key) => localStorage.getItem(key)));
+    check('what is stored is the cleared conversation',
+        storedChats.length === 1 && storedChats[0] === '[]', JSON.stringify(storedChats));
+    await shot('02b-chat-cleared-reopened');
+    await page.keyboard.press('Escape');
+    await page.waitForTimeout(400);
 
     // --- markdown actually renders as a list ---------------------------------------
     // Rendering is exercised via the brain's weekly rationale, which is seeded markdown
