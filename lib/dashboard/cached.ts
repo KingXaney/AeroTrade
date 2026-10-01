@@ -6,5 +6,6 @@ import {getTopicsOverview} from "@/lib/topics/store";
 // Kept in its own tiny module so the layout doesn't pull the whole loader graph.
 export const getCachedWatchlistSymbols = cache((userId: string) => getWatchlistSymbolsByUserId(userId));
 
-// The sidebar card, the topics widgets and the /topics pages all read this once per request.
+// The sidebar card, the topics widgets and the /topics pages all read this once per request;
+// a page that has just written topics or articles re-reads getTopicsOverview directly.
 export const getCachedTopicsOverview = cache((userId: string) => getTopicsOverview(userId));

@@ -11,6 +11,7 @@ import {
     drawdownBandLabel,
     drawdownLine,
     DRAWDOWN_COPY,
+    HOLDINGS_COPY,
     pctOneDecimal,
     RISK_COPY,
     shortDate,
@@ -161,5 +162,18 @@ describe('RISK_COPY', () => {
         for (const dollars of [0, 12.4, 640, 99_999]) clean(RISK_COPY.swingValue(dollars));
         for (const pct of [0, 0.64, 3.2]) clean(RISK_COPY.swingHint(pct));
         clean(RISK_COPY.largestHint('SPY', 41_020, true));
+    });
+});
+
+describe('HOLDINGS_COPY', () => {
+    // /portfolio has no order panel: the empty Holdings table points at the Trade Desk, the
+    // page that does, and PositionsTable links the second sentence to /trade.
+    it('points an empty Holdings table at the Trade Desk, not at an order panel', () => {
+        expect(HOLDINGS_COPY.empty).toBe('No open positions.');
+        expect(HOLDINGS_COPY.toTradeDesk).toBe('Orders are placed on the Trade Desk.');
+        for (const text of [HOLDINGS_COPY.empty, HOLDINGS_COPY.toTradeDesk]) {
+            expect(text).not.toMatch(/order panel/i);
+            clean(text);
+        }
     });
 });

@@ -1,6 +1,6 @@
 // Copy for the learning surfaces on /portfolio: "Where the return came from" (the return
-// bridge and its guess), the risk lens, and the dated drawdown the Max Drawdown tile and the
-// chart band carry. Every sentence is a measurement — what moved the account, how much it
+// bridge and its guess), the risk lens, the dated drawdown the Max Drawdown tile and the
+// chart band carry, and the empty Holdings table. Every sentence is a measurement — what moved the account, how much it
 // swings, where its value sits — and none says what to do about it; the test holds each one
 // to the 'copy' tier of lib/learn/banned.ts on a grid of inputs.
 //
@@ -83,6 +83,15 @@ export const drawdownBandLabel = (window: DrawdownWindow): string => `Shaded: th
 // shade, the same test the tile's hint applies.
 export const drawdownBand = (window: DrawdownWindow | null | undefined): {from: string; to: string; label: string} | null =>
     window && isVisibleDrawdown(window) ? {from: window.peakDate, to: window.troughDate, label: drawdownBandLabel(window)} : null;
+
+// ---- the holdings table ------------------------------------------------------------------
+
+// PositionsTable with nothing held. /portfolio has no order panel, so the second sentence is
+// the link to /trade, the page that has one.
+export const HOLDINGS_COPY = {
+    empty: 'No open positions.',
+    toTradeDesk: 'Orders are placed on the Trade Desk.',
+};
 
 // ---- where the return came from ------------------------------------------------------------
 

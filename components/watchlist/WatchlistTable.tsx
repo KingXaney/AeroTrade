@@ -5,6 +5,7 @@ import WatchlistButton from "@/components/watchlist/WatchlistButton";
 import TradeLink from "@/components/trade/TradeLink";
 import Term from "@/components/primitives/Term";
 import WhatTheseMean from "@/components/learn/WhatTheseMean";
+import Panel from "@/components/primitives/Panel";
 
 const WatchlistTable = ({watchlist}: WatchlistTableProps) => {
     return (
@@ -12,7 +13,7 @@ const WatchlistTable = ({watchlist}: WatchlistTableProps) => {
             {/* Table Header */}
             <div className="hidden md:grid grid-cols-[2fr_1fr_1fr_1fr_1fr_112px] gap-4 px-4 py-2 border-b border-line-strong/30"
                  style={{ fontFamily: 'var(--type-mono)', fontSize: '10px', letterSpacing: '0.1em', textTransform: 'uppercase', color: 'var(--fg-muted)' }}>
-                <div>Asset / Protocol</div>
+                <div>Asset</div>
                 <div className="text-right">Price (USD)</div>
                 <div className="text-right">24h Chg</div>
                 <div className="text-right"><Term k="market-cap">Market Cap</Term></div>
@@ -20,14 +21,14 @@ const WatchlistTable = ({watchlist}: WatchlistTableProps) => {
                 <div className="text-right">Actions</div>
             </div>
 
-            {/* Asset Rows */}
+            {/* Asset Rows — the theme's own surface, so every visual style frames them. The
+                symbol, company and action links navigate; the row itself does not. */}
             {watchlist.map((row) => (
-                <div
+                <Panel
+                    as="div"
+                    pad={4}
                     key={row.symbol}
-                    className="group grid grid-cols-1 md:grid-cols-[2fr_1fr_1fr_1fr_1fr_112px] gap-2 md:gap-4 items-center px-4 py-4 rounded-xl transition-all cursor-pointer relative overflow-hidden border bg-surface-2/40 border-line-strong/20 hover:bg-surface-2/60 hover:border-line-strong/60"
-                    style={{
-                        backdropFilter: 'blur(12px)',
-                    }}
+                    className="group grid grid-cols-1 md:grid-cols-[2fr_1fr_1fr_1fr_1fr_112px] gap-2 md:gap-4 items-center"
                 >
                     {/* Active Edge Glow */}
                     <div className="absolute left-0 top-0 bottom-0 w-[2px] bg-gradient-to-b from-transparent via-brand/50 to-transparent opacity-0 group-hover:opacity-100 transition-opacity"></div>
@@ -112,7 +113,7 @@ const WatchlistTable = ({watchlist}: WatchlistTableProps) => {
                             type="icon"
                         />
                     </div>
-                </div>
+                </Panel>
             ))}
             <WhatTheseMean keys={['market-cap', 'pe-ratio']} />
         </div>

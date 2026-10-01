@@ -18,6 +18,8 @@ type Props = {
 const isMerged = (a: MergedOrPlain): a is MergedTopicArticle => 'topicSlug' in a;
 
 const TopicFeed = ({topicId, initial, unseenCount = 0, pageSize = 20, showTopicTag = false}: Props) => {
+    // Seeded once. The pages key this component with topicFeedKey, so a refresh that
+    // hands it a different first page remounts it rather than being ignored here.
     const [articles, setArticles] = useState<MergedOrPlain[]>(initial);
     const [exhausted, setExhausted] = useState(initial.length < pageSize);
     const [pending, startTransition] = useTransition();
