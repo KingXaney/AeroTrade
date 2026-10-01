@@ -54,10 +54,10 @@ const ActiveTheses = ({theses, followedByName, sinceThesis, definitions = false}
                                 {/* A row used to be a dead end. The name opens the evidence behind
                                     the thesis; the follow button stays a sibling, never nested. */}
                                 <Link href={evidenceHref(t.key)}
-                                      className="text-sm font-semibold text-fg hover:text-brand transition-colors" style={{fontFamily: 'var(--type-display)'}}>
+                                      className="text-sm font-semibold text-fg hover:text-brand transition-colors font-heading">
                                     {t.displayName}
                                 </Link>
-                                <div className="text-[10px] uppercase tracking-[0.08em] text-fg-muted" style={{fontFamily: 'var(--type-mono)'}}>
+                                <div className="text-[10px] uppercase tracking-[0.08em] text-fg-muted font-mono">
                                     {t.type} · active {weeks} {weeks === 1 ? 'week' : 'weeks'}
                                     {t.type === 'ticker' && (
                                         <> · <Link href={`/stocks/${encodeURIComponent(t.key)}`} className="text-brand hover:underline normal-case tracking-normal">stock page</Link></>
@@ -72,7 +72,7 @@ const ActiveTheses = ({theses, followedByName, sinceThesis, definitions = false}
                             </div>
                         </div>
                         <div className="flex items-center gap-3">
-                            <div className="text-right" style={{fontFamily: 'var(--type-mono)'}}>
+                            <div className="text-right font-mono">
                                 <div className="text-sm text-fg"><Term k="news-weight">weight</Term> {t.weightSlow.toFixed(1)}</div>
                                 <div className={cn('text-xs', getChangeColorClass(t.sentimentSlow || undefined))}>
                                     <Term k="news-sentiment">sentiment</Term> {formatSigned(t.sentimentSlow)}

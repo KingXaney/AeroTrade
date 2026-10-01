@@ -102,14 +102,14 @@ const BrainGraph = ({nodes, edges}: {nodes: GraphNode[]; edges: GraphEdge[]}) =>
                                 fillOpacity={node.thesisSince !== null ? 0.35 : 0.15}
                                 strokeWidth={node.thesisSince !== null ? 2 : 1} />
                         <text x={x} y={y + r + 11} textAnchor="middle" fontSize="9"
-                              style={{fill: hoverKey === node.key ? 'var(--fg)' : 'var(--fg-muted)', fontFamily: 'var(--type-mono)'}}>
+                              className="font-mono" style={{fill: hoverKey === node.key ? 'var(--fg)' : 'var(--fg-muted)'}}>
                             {node.displayName.length > 14 ? `${node.displayName.slice(0, 13)}…` : node.displayName}
                         </text>
                     </Link>
                 ))}
             </svg>
 
-            <div className="flex items-center justify-between mt-2 text-[10px] text-fg-muted" style={{fontFamily: 'var(--type-mono)'}}>
+            <div className="flex items-center justify-between mt-2 text-[10px] text-fg-muted font-mono">
                 <span>rings: themes · sectors · tickers — size = persistent attention, bold ring = active thesis</span>
                 <span>{hovered ? `${hovered.node.displayName} · weight ${hovered.node.weightSlow.toFixed(1)}` : 'click a node for evidence'}</span>
             </div>

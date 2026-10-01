@@ -34,7 +34,7 @@ const AddFriend = () => {
 
     return (
         <Panel as="form" onSubmit={onSubmit}>
-            <h2 className="text-sm font-bold uppercase tracking-[0.1em] text-brand mb-3" style={{fontFamily: 'var(--type-mono)'}}>
+            <h2 className="text-sm font-bold uppercase tracking-[0.1em] text-brand mb-3 font-mono">
                 Add a Friend
             </h2>
             <div className="flex flex-col sm:flex-row gap-2">

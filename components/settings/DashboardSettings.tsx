@@ -83,8 +83,8 @@ const DashboardSettings = ({initialLayout, availableIds}: Props) => {
         <div className="space-y-6">
             <div>
                 <div className="flex items-center justify-between mb-2">
-                    <div className="text-[10px] uppercase tracking-[0.14em] text-fg-muted" style={{fontFamily: 'var(--type-mono)'}}>Your widgets · {layout.widgets.length}</div>
-                    <Link href="/?customize=1" className="text-xs text-brand hover:underline" style={{fontFamily: 'var(--type-mono)'}}>Arrange on dashboard →</Link>
+                    <div className="text-[10px] uppercase tracking-[0.14em] text-fg-muted font-mono">Your widgets · {layout.widgets.length}</div>
+                    <Link href="/?customize=1" className="text-xs text-brand hover:underline font-mono">Arrange on dashboard →</Link>
                 </div>
                 {layout.widgets.length === 0 ? (
                     <p className="text-sm text-fg-muted">No widgets — add some below or reset to the default layout.</p>
@@ -96,13 +96,12 @@ const DashboardSettings = ({initialLayout, availableIds}: Props) => {
                                 <RowCard key={w.id} className="flex items-center justify-between gap-3 px-3 py-2">
                                     <div className="flex items-center gap-2 min-w-0">
                                         <span className="material-symbols-outlined text-base text-brand">{def.icon}</span>
-                                        <span className="text-sm text-fg truncate" style={{fontFamily: 'var(--type-display)'}}>{def.title}</span>
+                                        <span className="text-sm text-fg truncate font-heading">{def.title}</span>
                                     </div>
                                     <div className="flex items-center gap-1">
                                         <select aria-label={`${def.title} width`} value={w.span}
                                                 onChange={(e) => setLayout((l) => setSpan(l, w.id, Number(e.target.value)))}
-                                                className="h-7 rounded-md border border-line-strong/30 bg-surface-0 px-1.5 text-[10px] uppercase tracking-[0.08em] text-fg"
-                                                style={{fontFamily: 'var(--type-mono)'}}>
+                                                className="h-7 rounded-md border border-line-strong/30 bg-surface-0 px-1.5 text-[10px] uppercase tracking-[0.08em] text-fg font-mono">
                                             {def.spans.map((s) => <option key={s} value={s}>{SPAN_LABELS[s]} · {s}/12</option>)}
                                         </select>
                                         <button id={`dash-up-${w.id}`} type="button" className={iconButton} disabled={index === 0} aria-label="Move up"
@@ -120,7 +119,7 @@ const DashboardSettings = ({initialLayout, availableIds}: Props) => {
             </div>
 
             <div>
-                <div className="text-[10px] uppercase tracking-[0.14em] text-fg-muted mb-2" style={{fontFamily: 'var(--type-mono)'}}>Add widgets</div>
+                <div className="text-[10px] uppercase tracking-[0.14em] text-fg-muted mb-2 font-mono">Add widgets</div>
                 {missing.length === 0 ? (
                     <p className="text-sm text-fg-muted">Every widget is on your dashboard.</p>
                 ) : (
@@ -130,7 +129,7 @@ const DashboardSettings = ({initialLayout, availableIds}: Props) => {
                             if (inCategory.length === 0) return null;
                             return (
                                 <div key={category}>
-                                    <div className="text-[10px] text-fg-muted mb-1.5" style={{fontFamily: 'var(--type-mono)'}}>{CATEGORY_LABELS[category]}</div>
+                                    <div className="text-[10px] text-fg-muted mb-1.5 font-mono">{CATEGORY_LABELS[category]}</div>
                                     <div className="grid grid-cols-1 md:grid-cols-2 gap-1.5">
                                         {inCategory.map((id) => {
                                             const def = WIDGETS[id];
@@ -139,7 +138,7 @@ const DashboardSettings = ({initialLayout, availableIds}: Props) => {
                                                     <div className="flex items-center gap-2 min-w-0">
                                                         <span className="material-symbols-outlined text-base text-brand">{def.icon}</span>
                                                         <div className="min-w-0">
-                                                            <div className="text-sm text-fg truncate" style={{fontFamily: 'var(--type-display)'}}>{def.title}</div>
+                                                            <div className="text-sm text-fg truncate font-heading">{def.title}</div>
                                                             <div className="text-[11px] text-fg-muted truncate">{def.description}</div>
                                                         </div>
                                                     </div>
@@ -158,7 +157,7 @@ const DashboardSettings = ({initialLayout, availableIds}: Props) => {
             <div className="flex items-center justify-between pt-2 border-t border-line-strong/20">
                 <p className="text-[11px] text-fg-muted">Changes save automatically.</p>
                 <button type="button" onClick={() => setConfirmingReset(true)}
-                        className="text-xs uppercase tracking-[0.1em] text-fg-muted hover:text-negative transition-colors" style={{fontFamily: 'var(--type-mono)'}}>
+                        className="text-xs uppercase tracking-[0.1em] text-fg-muted hover:text-negative transition-colors font-mono">
                     Reset to default
                 </button>
             </div>

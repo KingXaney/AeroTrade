@@ -39,10 +39,9 @@ const Tab = ({active, onClick, children, id}: {active: boolean; onClick: () => v
         onClick={onClick}
         aria-pressed={active}
         className={cn(
-            'px-3 py-1 rounded-md text-[11px] font-bold uppercase tracking-[0.08em] transition-colors',
+            'font-mono px-3 py-1 rounded-md text-[11px] font-bold uppercase tracking-[0.08em] transition-colors',
             active ? 'bg-brand/10 text-brand' : 'text-fg-muted hover:text-fg',
         )}
-        style={{fontFamily: 'var(--type-mono)'}}
     >
         {children}
     </button>
@@ -56,7 +55,7 @@ const StrategyPerformance = ({name, live, simulated, initialMode}: {name: string
         <section className="space-y-3" id="strategy-performance">
             <Panel as="div">
                 <div className="flex flex-wrap items-center justify-between gap-3 mb-3">
-                    <h2 className="text-sm font-bold uppercase tracking-[0.1em] text-brand" style={{fontFamily: 'var(--type-mono)'}}>
+                    <h2 className="text-sm font-bold uppercase tracking-[0.1em] text-brand font-mono">
                         Performance vs SPY
                     </h2>
                     <div className="flex items-center gap-1 rounded-lg border border-line-strong/20 p-0.5">
@@ -68,7 +67,7 @@ const StrategyPerformance = ({name, live, simulated, initialMode}: {name: string
                 {showingLive ? (
                     live ? (
                         <>
-                            <p className="text-[11px] text-fg-muted mb-2" style={{fontFamily: 'var(--type-mono)'}}>
+                            <p className="text-[11px] text-fg-muted mb-2 font-mono">
                                 Live since {live.since} · {live.snapshotDays} daily snapshot{live.snapshotDays === 1 ? '' : 's'} at 16:10 ET ·
                                 return {formatPct(live.totalReturnPct)} vs SPY {formatPct(live.benchmarkReturnPct)}
                             </p>
@@ -77,7 +76,7 @@ const StrategyPerformance = ({name, live, simulated, initialMode}: {name: string
                             ) : (
                                 <div className="py-10 text-center">
                                     <p className="text-sm text-fg-muted">The live record starts on {live.since}.</p>
-                                    <p className="text-xs text-fg-muted mt-1" style={{fontFamily: 'var(--type-mono)'}}>
+                                    <p className="text-xs text-fg-muted mt-1 font-mono">
                                         A curve appears after the second daily snapshot; until then the simulated tab shows the rule&apos;s history.
                                     </p>
                                 </div>
@@ -92,10 +91,10 @@ const StrategyPerformance = ({name, live, simulated, initialMode}: {name: string
                     simulated ? (
                         <>
                             <div className="flex flex-wrap items-center gap-2 mb-2">
-                                <span className="px-2 py-0.5 rounded text-[10px] uppercase tracking-[0.08em] text-warning bg-warning/10" style={{fontFamily: 'var(--type-mono)'}}>
+                                <span className="px-2 py-0.5 rounded text-[10px] uppercase tracking-[0.08em] text-warning bg-warning/10 font-mono">
                                     Simulated — backtest, not live
                                 </span>
-                                <span className="text-[11px] text-fg-muted" style={{fontFamily: 'var(--type-mono)'}}>
+                                <span className="text-[11px] text-fg-muted font-mono">
                                     {simulated.from} → {simulated.to} · next-open fills · no fees or slippage · interest and dividends included
                                     {simulated.closeFills > 0 ? ` · ${simulated.closeFills} fill${simulated.closeFills === 1 ? '' : 's'} used the close` : ''}
                                 </span>

@@ -21,11 +21,11 @@ const SystemStatus = ({status}: {status: BrainSystemStatus}) => {
     return (
         <Panel>
             <div className="flex items-center justify-between mb-4">
-                <h2 className="text-sm font-bold uppercase tracking-[0.1em] text-brand" style={{fontFamily: 'var(--type-mono)'}}>
+                <h2 className="text-sm font-bold uppercase tracking-[0.1em] text-brand font-mono">
                     System Status
                 </h2>
                 {anyNever && (
-                    <span className="text-[10px] uppercase tracking-[0.08em] text-negative" style={{fontFamily: 'var(--type-mono)'}}>
+                    <span className="text-[10px] uppercase tracking-[0.08em] text-negative font-mono">
                         Some jobs have never run — check the Inngest connection
                     </span>
                 )}

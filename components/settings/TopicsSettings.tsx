@@ -3,8 +3,6 @@ import {MAX_TOPICS_PER_USER} from "@/lib/topics/config";
 import {MAX_KEYWORDS} from "@/lib/news/keywords";
 import type {TopicsOverview} from '@/lib/topics/types';
 
-const mono = {fontFamily: 'var(--type-mono)'} as const;
-
 // Read-only summary; editing lives on /topics where the composer and feeds are.
 const TopicsSettings = ({overview}: {overview: TopicsOverview}) => {
     const count = overview.topics.length;
@@ -16,7 +14,7 @@ const TopicsSettings = ({overview}: {overview: TopicsOverview}) => {
                         ? "You're not following any topics yet."
                         : `${count} of ${MAX_TOPICS_PER_USER} topics · ${overview.unseenTotal} new ${overview.unseenTotal === 1 ? 'article' : 'articles'}`}
                 </p>
-                <Link href="/topics" className="text-xs uppercase tracking-[0.1em] text-brand hover:underline" style={mono}>
+                <Link href="/topics" className="text-xs uppercase tracking-[0.1em] text-brand hover:underline font-mono">
                     {count === 0 ? 'Follow a topic →' : 'Manage topics →'}
                 </Link>
             </div>
@@ -27,8 +25,8 @@ const TopicsSettings = ({overview}: {overview: TopicsOverview}) => {
                             <Link href={`/topics/${t.slug}`}
                                   className="inline-flex items-center gap-2 rounded-full border border-line-strong/20 bg-surface-2/40 px-3 py-1.5 text-xs text-fg transition-colors hover:border-brand/40 hover:text-brand">
                                 <span className="h-2 w-2 rounded-full" style={{background: t.color ?? 'var(--brand)'}} aria-hidden="true" />
-                                <span style={{fontFamily: 'var(--type-display)'}}>{t.name}</span>
-                                {t.unseenCount > 0 && <span className="text-brand" style={mono}>{t.unseenCount}</span>}
+                                <span className="font-heading">{t.name}</span>
+                                {t.unseenCount > 0 && <span className="text-brand font-mono">{t.unseenCount}</span>}
                             </Link>
                         </li>
                     ))}

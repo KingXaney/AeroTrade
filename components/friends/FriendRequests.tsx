@@ -33,7 +33,7 @@ const FriendRequests = ({requests}: {requests: FriendRequest[]}) => {
 
     return (
         <Panel as="div">
-            <h2 className="text-sm font-bold uppercase tracking-[0.1em] text-brand mb-3" style={{fontFamily: 'var(--type-mono)'}}>
+            <h2 className="text-sm font-bold uppercase tracking-[0.1em] text-brand mb-3 font-mono">
                 Pending Requests ({requests.length})
             </h2>
             <div className="space-y-2">

@@ -17,25 +17,24 @@ const SimulatedTradeList = ({trades, def}: {trades: StrategyBacktestView['trades
     const recent = [...trades].reverse().slice(0, SHOW);
     return (
         <div className="space-y-1.5" id="simulated-trades">
-            <p className="text-[11px] text-warning mb-2" style={{fontFamily: 'var(--type-mono)'}}>
+            <p className="text-[11px] text-warning mb-2 font-mono">
                 Simulated — hypothetical fills at the next day&apos;s open, no fees or slippage.
             </p>
             {recent.map((t, i) => (
                 <RowCard key={`${t.date}-${t.symbol}-${t.side}-${i}`} className="flex items-center justify-between py-2">
                     <div className="min-w-0">
-                        <span className={cn('px-2 py-0.5 rounded text-[10px] font-bold uppercase tracking-wider border mr-2',
-                            t.side === 'buy' ? 'bg-brand/10 text-brand border-brand/20' : 'bg-negative/10 text-negative border-negative/20')}
-                              style={{fontFamily: 'var(--type-mono)'}}>
+                        <span className={cn('font-mono px-2 py-0.5 rounded text-[10px] font-bold uppercase tracking-wider border mr-2',
+                            t.side === 'buy' ? 'bg-brand/10 text-brand border-brand/20' : 'bg-negative/10 text-negative border-negative/20')}>
                             {t.side}
                         </span>
-                        <span className="text-sm font-bold text-fg" style={{fontFamily: 'var(--type-mono)'}}>{t.symbol}</span>
+                        <span className="text-sm font-bold text-fg font-mono">{t.symbol}</span>
                         <span className="text-xs text-fg-muted ml-2">{t.quantity} @ {formatPrice(t.price)}{t.fill === 'close' ? ' (close)' : ''}</span>
                         <p className="text-[11px] text-fg-muted leading-snug">{t.reason}</p>
                         <ReasonDisclosure reason={t.reason} symbol={t.symbol} def={def} />
                     </div>
                     <div className="text-right shrink-0">
-                        <div className="text-sm text-fg" style={{fontFamily: 'var(--type-mono)'}}>{formatPrice(t.total)}</div>
-                        <div className="text-[10px] text-fg-muted" style={{fontFamily: 'var(--type-mono)'}}>
+                        <div className="text-sm text-fg font-mono">{formatPrice(t.total)}</div>
+                        <div className="text-[10px] text-fg-muted font-mono">
                             {t.date}
                             {typeof t.realizedPnl === 'number' && (
                                 <span className={cn('ml-2', getChangeColorClass(t.realizedPnl))}>
@@ -47,7 +46,7 @@ const SimulatedTradeList = ({trades, def}: {trades: StrategyBacktestView['trades
                 </RowCard>
             ))}
             {trades.length > SHOW && (
-                <p className="px-4 pt-2 text-[11px] text-fg-muted" style={{fontFamily: 'var(--type-mono)'}}>
+                <p className="px-4 pt-2 text-[11px] text-fg-muted font-mono">
                     Showing the latest {SHOW} of {trades.length} simulated fills
                 </p>
             )}

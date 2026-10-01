@@ -25,17 +25,17 @@ const JobStamp = ({job}: {job: JobHealth}) => {
         <RowCard className="flex items-start gap-2.5 px-3 py-2">
             <span className="mt-1 inline-block w-2 h-2 rounded-full shrink-0" style={{backgroundColor: DOT_COLORS[health]}} />
             <div className="min-w-0">
-                <div className="text-xs font-semibold text-fg" style={{fontFamily: 'var(--type-mono)'}}>
+                <div className="text-xs font-semibold text-fg font-mono">
                     {job.label}
                     <span className="ml-2 font-normal text-fg-muted">{job.schedule}</span>
                 </div>
-                <div className="text-[11px] text-fg-muted truncate" style={{fontFamily: 'var(--type-mono)'}}>
+                <div className="text-[11px] text-fg-muted truncate font-mono">
                     {job.lastRunAt === null
                         ? (job.staleAfterHours === Number.POSITIVE_INFINITY ? 'not run yet' : 'never ran')
                         : `${formatTimeAgoMs(job.lastRunAt)}${health === 'stale' ? ' — overdue' : ''}`}
                 </div>
                 {job.lastMessage && (
-                    <div className="text-[11px] text-fg-soft truncate" title={job.lastMessage} style={{fontFamily: 'var(--type-mono)'}}>
+                    <div className="text-[11px] text-fg-soft truncate font-mono" title={job.lastMessage}>
                         {job.lastMessage}
                     </div>
                 )}

@@ -41,13 +41,12 @@ const NavigatorCard = ({status}: {status: NavigatorStatus}) => {
             <div className="flex items-center justify-between mb-3">
                 <div className="flex items-center gap-2">
                     <span className="material-symbols-outlined text-brand">smart_toy</span>
-                    <h2 className="text-sm font-bold uppercase tracking-[0.1em] text-brand" style={{fontFamily: 'var(--type-mono)'}}>
+                    <h2 className="text-sm font-bold uppercase tracking-[0.1em] text-brand font-mono">
                         AI Navigator
                     </h2>
                 </div>
                 {status.enrolled && (
-                    <span className={`text-[10px] font-bold uppercase tracking-[0.1em] px-2 py-1 rounded ${status.status === 'active' ? 'text-brand bg-brand-strong/8' : 'text-negative bg-negative/8'}`}
-                          style={{fontFamily: 'var(--type-mono)'}}>
+                    <span className={`text-[10px] font-bold uppercase tracking-[0.1em] px-2 py-1 rounded ${status.status === 'active' ? 'text-brand bg-brand-strong/8' : 'text-negative bg-negative/8'} font-mono`}>
                         {status.status === 'active' ? 'Active' : 'Paused'}
                     </span>
                 )}
@@ -62,7 +61,7 @@ const NavigatorCard = ({status}: {status: NavigatorStatus}) => {
             {!status.enrolled ? (
                 <div className="flex flex-col gap-3">
                     <div>
-                        <label htmlFor="navigator-balance" className="text-[10px] uppercase tracking-[0.1em] text-fg-muted" style={{fontFamily: 'var(--type-mono)'}}>
+                        <label htmlFor="navigator-balance" className="text-[10px] uppercase tracking-[0.1em] text-fg-muted font-mono">
                             The AI starts with ($)
                         </label>
                         <TextField
@@ -102,15 +101,14 @@ const NavigatorCard = ({status}: {status: NavigatorStatus}) => {
                         </ActionButton>
                     ) : (
                         <button type="button" onClick={() => void run(resumeAiNavigator)} disabled={busy}
-                                className="px-3 py-2 rounded-lg text-xs font-bold uppercase tracking-wider text-brand transition-colors disabled:opacity-50"
-                                style={{border: '1px solid color-mix(in srgb, var(--brand) 35%, transparent)', fontFamily: 'var(--type-mono)'}}>
+                                className="px-3 py-2 rounded-lg text-xs font-bold uppercase tracking-wider text-brand transition-colors disabled:opacity-50 font-mono"
+                                style={{border: '1px solid color-mix(in srgb, var(--brand) 35%, transparent)'}}>
                             Resume trading
                         </button>
                     )}
                     {status.accountId && (
                         <Link href={`/portfolio?account=${status.accountId}`}
-                              className="px-3 py-2 rounded-lg text-xs font-bold uppercase tracking-wider text-brand hover:underline"
-                              style={{fontFamily: 'var(--type-mono)'}}>
+                              className="px-3 py-2 rounded-lg text-xs font-bold uppercase tracking-wider text-brand hover:underline font-mono">
                             View performance vs SPY →
                         </Link>
                     )}
@@ -118,14 +116,13 @@ const NavigatorCard = ({status}: {status: NavigatorStatus}) => {
                             onClick={() => confirmingUnenroll ? void run(unenrollAiNavigator) : setConfirmingUnenroll(true)}
                             onBlur={() => setConfirmingUnenroll(false)}
                             disabled={busy}
-                            className="ml-auto px-3 py-2 rounded-lg text-xs font-bold uppercase tracking-wider text-fg-muted hover:text-negative transition-colors disabled:opacity-50"
-                            style={{fontFamily: 'var(--type-mono)'}}>
+                            className="ml-auto px-3 py-2 rounded-lg text-xs font-bold uppercase tracking-wider text-fg-muted hover:text-negative transition-colors disabled:opacity-50 font-mono">
                         {confirmingUnenroll ? 'Confirm unenroll' : 'Unenroll'}
                     </button>
                 </div>
             )}
             {status.lastError && (
-                <p className="mt-3 text-xs text-negative" style={{fontFamily: 'var(--type-mono)'}}>
+                <p className="mt-3 text-xs text-negative font-mono">
                     Last run error: {status.lastError}
                 </p>
             )}

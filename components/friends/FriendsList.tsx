@@ -37,7 +37,7 @@ const FriendsList = ({friends}: {friends: FriendSummary[]}) => {
 
     return (
         <Panel as="div">
-            <h2 className="text-sm font-bold uppercase tracking-[0.1em] text-brand mb-3" style={{fontFamily: 'var(--type-mono)'}}>
+            <h2 className="text-sm font-bold uppercase tracking-[0.1em] text-brand mb-3 font-mono">
                 Your Friends ({friends.length})
             </h2>
             {friends.length === 0 ? (
@@ -47,8 +47,8 @@ const FriendsList = ({friends}: {friends: FriendSummary[]}) => {
                     {friends.map((f) => (
                         <RowCard key={f.friendshipId} className="flex items-center justify-between py-2.5">
                             <Link href={`/friends/${f.id}`} className="group flex items-center gap-3 min-w-0">
-                                <div className="w-8 h-8 rounded-full flex items-center justify-center text-xs font-bold shrink-0"
-                                     style={{backgroundColor: 'var(--brand-strong)', color: 'var(--on-brand)', fontFamily: 'var(--type-display)'}}>
+                                <div className="w-8 h-8 rounded-full flex items-center justify-center text-xs font-bold shrink-0 font-heading"
+                                     style={{backgroundColor: 'var(--brand-strong)', color: 'var(--on-brand)'}}>
                                     {f.name?.[0]?.toUpperCase() ?? '?'}
                                 </div>
                                 <div className="min-w-0">

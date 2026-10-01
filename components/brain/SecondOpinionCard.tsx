@@ -102,11 +102,11 @@ const SecondOpinionCard = ({configured, opinion}: {configured: boolean; opinion:
     return (
         <Panel>
             <div className="flex items-center justify-between gap-3 mb-3 flex-wrap">
-                <h2 className="text-sm font-bold uppercase tracking-[0.1em] text-brand" style={{fontFamily: 'var(--type-mono)'}}>
+                <h2 className="text-sm font-bold uppercase tracking-[0.1em] text-brand font-mono">
                     Claude Second Opinion
                 </h2>
                 {opinion && (
-                    <span className="text-[11px] text-fg-muted" style={{fontFamily: 'var(--type-mono)'}}>
+                    <span className="text-[11px] text-fg-muted font-mono">
                         {opinion.model} · {SOURCE_LABELS[opinion.source]} · {formatTimeAgoMs(opinion.generatedAt)}
                     </span>
                 )}
@@ -136,7 +136,7 @@ const SecondOpinionCard = ({configured, opinion}: {configured: boolean; opinion:
                 )}
             </div>
 
-            <p className="text-xs text-fg-muted mb-4" style={{fontFamily: 'var(--type-mono)'}}>
+            <p className="text-xs text-fg-muted mb-4 font-mono">
                 {configured
                     ? 'The API button bills Anthropic per use. To spend a Claude subscription instead, copy the prompt into claude.ai and paste the answer back.'
                     : 'No API key configured — copy the prompt into claude.ai (covered by your Claude subscription) and paste the answer back.'}
@@ -145,7 +145,7 @@ const SecondOpinionCard = ({configured, opinion}: {configured: boolean; opinion:
 
             {promptFallback && (
                 <div className="mb-3">
-                    <label htmlFor="second-opinion-prompt" className="text-[10px] uppercase tracking-[0.1em] text-fg-muted" style={{fontFamily: 'var(--type-mono)'}}>
+                    <label htmlFor="second-opinion-prompt" className="text-[10px] uppercase tracking-[0.1em] text-fg-muted font-mono">
                         Prompt — select all and copy
                     </label>
                     <TextArea id="second-opinion-prompt" readOnly value={promptFallback} rows={6} onFocus={(e) => e.currentTarget.select()}
@@ -155,7 +155,7 @@ const SecondOpinionCard = ({configured, opinion}: {configured: boolean; opinion:
 
             {pasteOpen && (
                 <div className="mb-4">
-                    <label htmlFor="second-opinion-answer" className="text-[10px] uppercase tracking-[0.1em] text-fg-muted" style={{fontFamily: 'var(--type-mono)'}}>
+                    <label htmlFor="second-opinion-answer" className="text-[10px] uppercase tracking-[0.1em] text-fg-muted font-mono">
                         Claude&apos;s answer
                     </label>
                     <TextArea id="second-opinion-answer" value={pasted} onChange={(e) => setPasted(e.target.value)} rows={5}
@@ -168,8 +168,7 @@ const SecondOpinionCard = ({configured, opinion}: {configured: boolean; opinion:
                             {pending === 'save' ? 'Saving…' : 'Save opinion'}
                         </button>
                         <button type="button" onClick={() => {setPasteOpen(false); setPromptFallback('');}} disabled={busy}
-                                className="px-3 py-2 rounded-lg text-xs font-bold uppercase tracking-wider text-fg-muted hover:text-negative transition-colors disabled:opacity-50"
-                                style={{fontFamily: 'var(--type-mono)'}}>
+                                className="px-3 py-2 rounded-lg text-xs font-bold uppercase tracking-wider text-fg-muted hover:text-negative transition-colors disabled:opacity-50 font-mono">
                             Cancel
                         </button>
                     </div>

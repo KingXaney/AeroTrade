@@ -16,7 +16,7 @@ const topicKeywords = (e: BrainEntitySummary): string[] => (e.type === 'ticker' 
 
 const TypeColumn = ({title, entities, followedByName}: {title: string; entities: BrainEntitySummary[]; followedByName?: FollowedByName}) => (
     <div>
-        <h3 className="text-[10px] uppercase tracking-[0.14em] text-fg-muted mb-2" style={{fontFamily: 'var(--type-mono)'}}>
+        <h3 className="text-[10px] uppercase tracking-[0.14em] text-fg-muted mb-2 font-mono">
             {title}
         </h3>
         {entities.length === 0 ? (
@@ -29,11 +29,11 @@ const TypeColumn = ({title, entities, followedByName}: {title: string; entities:
                     // link and the button is its sibling.
                     <RowCard key={e.key} interactive className="flex items-center justify-between gap-2 px-3 py-2">
                         <Link href={evidenceHref(e.key)}
-                              className="text-xs font-semibold text-fg hover:text-brand truncate max-w-[55%]" style={{fontFamily: 'var(--type-mono)'}}>
+                              className="text-xs font-semibold text-fg hover:text-brand truncate max-w-[55%] font-mono">
                             {e.displayName}
                             {e.thesisSince !== null && <span className="ml-1 text-brand">●</span>}
                         </Link>
-                        <span className="flex items-center gap-1 text-[11px]" style={{fontFamily: 'var(--type-mono)'}}>
+                        <span className="flex items-center gap-1 text-[11px] font-mono">
                             <span className="text-fg-soft">{e.weightSlow.toFixed(1)}</span>{' '}
                             <span className={cn(getChangeColorClass(e.sentimentSlow || undefined))}>
                                 {formatSigned(e.sentimentSlow)}

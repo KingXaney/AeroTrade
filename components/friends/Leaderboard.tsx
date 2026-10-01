@@ -19,7 +19,7 @@ const Leaderboard = ({entries}: {entries: LeaderboardEntry[]}) => {
         <Panel as="div" className="shimmer">
             <div className="flex items-center gap-2 mb-4">
                 <span className="material-symbols-outlined text-brand">emoji_events</span>
-                <h2 className="text-sm font-bold uppercase tracking-[0.1em] text-brand" style={{fontFamily: 'var(--type-mono)'}}>
+                <h2 className="text-sm font-bold uppercase tracking-[0.1em] text-brand font-mono">
                     Leaderboard
                 </h2>
             </div>
@@ -39,14 +39,14 @@ const Leaderboard = ({entries}: {entries: LeaderboardEntry[]}) => {
                                 className: 'flex items-center justify-between transition-colors',
                             })}>
                                 <div className="flex items-center gap-3">
-                                    <span className={cn('w-5 text-center font-bold', rankClass(rank))} style={{fontFamily: 'var(--type-mono)', ...rankStyle(rank)}}>
+                                    <span className={cn('font-mono w-5 text-center font-bold', rankClass(rank))} style={{...rankStyle(rank)}}>
                                         {rank}
                                     </span>
                                     <div>
-                                        <span className="text-sm font-semibold text-fg" style={{fontFamily: 'var(--type-display)'}}>
+                                        <span className="text-sm font-semibold text-fg font-heading">
                                             {e.name}
                                         </span>
-                                        <div className="text-[10px] text-fg-muted uppercase tracking-[0.08em]" style={{fontFamily: 'var(--type-mono)'}}>
+                                        <div className="text-[10px] text-fg-muted uppercase tracking-[0.08em] font-mono">
                                             {e.accountName}
                                             {unpricedLabel(e.unpriced, e.holdings) && (
                                                 <span className="text-warning normal-case tracking-normal"> · {unpricedLabel(e.unpriced, e.holdings)}</span>
@@ -55,7 +55,7 @@ const Leaderboard = ({entries}: {entries: LeaderboardEntry[]}) => {
                                     </div>
                                     {!e.isYou && <span className="material-symbols-outlined text-sm text-fg-muted">chevron_right</span>}
                                 </div>
-                                <div className="text-right" style={{fontFamily: 'var(--type-mono)'}}>
+                                <div className="text-right font-mono">
                                     <div className="text-sm text-fg">{formatPrice(e.totalValue)}</div>
                                     <div className={cn('text-xs', getChangeColorClass(e.totalReturnPct))}>
                                         {formatPct(e.totalReturnPct)}

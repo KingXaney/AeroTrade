@@ -50,23 +50,22 @@ const ItemRow = ({item, showApply, accounts}: {item: GlossedItem; showApply: boo
         <RowCard>
             <div className="flex items-center justify-between gap-3 flex-wrap">
                 <div className="flex items-center gap-3">
-                    <span className={cn('text-[10px] font-bold uppercase tracking-[0.1em] px-2 py-1 rounded', ACTION_STYLES[item.action])}
-                          style={{fontFamily: 'var(--type-mono)'}}>
+                    <span className={cn('font-mono text-[10px] font-bold uppercase tracking-[0.1em] px-2 py-1 rounded', ACTION_STYLES[item.action])}>
                         {item.action}
                     </span>
-                    <span className="text-sm font-bold text-fg" style={{fontFamily: 'var(--type-mono)'}}>{item.symbol}</span>
-                    <span className="text-xs text-fg-muted" style={{fontFamily: 'var(--type-mono)'}}>
+                    <span className="text-sm font-bold text-fg font-mono">{item.symbol}</span>
+                    <span className="text-xs text-fg-muted font-mono">
                         target {(item.targetWeight * 100).toFixed(0)}% · score {item.score.toFixed(2)}
                     </span>
                 </div>
                 <div className="flex items-center gap-2">
                     {item.executed && (
-                        <span className="text-[11px] text-brand" style={{fontFamily: 'var(--type-mono)'}}>
+                        <span className="text-[11px] text-brand font-mono">
                             filled{typeof item.executionPrice === 'number' ? ` @ ${formatPrice(item.executionPrice)}` : ''}
                         </span>
                     )}
                     {item.error && (
-                        <span className="text-[11px] text-negative" style={{fontFamily: 'var(--type-mono)'}}>{item.error}</span>
+                        <span className="text-[11px] text-negative font-mono">{item.error}</span>
                     )}
                     {showApply && item.action !== 'hold' && accounts.length > 0 && (
                         <>
@@ -75,8 +74,8 @@ const ItemRow = ({item, showApply, accounts}: {item: GlossedItem; showApply: boo
                                 {accounts.map((a) => <option key={a.id} value={a.id}>{a.name}</option>)}
                             </select>
                             <button type="button" onClick={() => void onApply()} disabled={applying}
-                                    className="px-2.5 py-1 rounded text-[11px] font-bold uppercase tracking-wider transition-colors disabled:opacity-50"
-                                    style={{color: 'var(--brand)', border: '1px solid color-mix(in srgb, var(--brand) 35%, transparent)', backgroundColor: 'color-mix(in srgb, var(--brand-strong) 6%, transparent)', fontFamily: 'var(--type-mono)'}}>
+                                    className="px-2.5 py-1 rounded text-[11px] font-bold uppercase tracking-wider transition-colors disabled:opacity-50 font-mono"
+                                    style={{color: 'var(--brand)', border: '1px solid color-mix(in srgb, var(--brand) 35%, transparent)', backgroundColor: 'color-mix(in srgb, var(--brand-strong) 6%, transparent)'}}>
                                 {applying ? 'Applying…' : 'Apply'}
                             </button>
                         </>
@@ -86,7 +85,7 @@ const ItemRow = ({item, showApply, accounts}: {item: GlossedItem; showApply: boo
             {item.reasons.length > 0 && (
                 <ul className="mt-2 space-y-0.5">
                     {item.reasons.map((reason) => (
-                        <li key={reason} className="text-[11px] text-fg-muted" style={{fontFamily: 'var(--type-mono)'}}>
+                        <li key={reason} className="text-[11px] text-fg-muted font-mono">
                             <span className={getChangeColorClass(1)}>·</span> {reason}
                         </li>
                     ))}
@@ -120,7 +119,7 @@ const SuggestionPanel = ({userSet, globalSet, accounts}: {userSet: SetView | nul
     const showApply = userSet === null || userSet.kind === 'preview';
     return (
         <div className="space-y-3">
-            <p className="text-[11px] text-fg-muted" style={{fontFamily: 'var(--type-mono)'}}>
+            <p className="text-[11px] text-fg-muted font-mono">
                 {userSet ? 'Your AI account' : 'Global model portfolio'} · {set.date}
                 {set.kind === 'preview' && (
                     <span className="ml-2 px-1.5 py-0.5 rounded text-[10px] font-bold uppercase tracking-[0.08em] text-warning bg-warning/10">
@@ -138,7 +137,7 @@ const SuggestionPanel = ({userSet, globalSet, accounts}: {userSet: SetView | nul
                     {set.rationaleMd}
                 </SafeMarkdown>
             )}
-            <p className="text-[10px] uppercase tracking-[0.08em] text-fg-muted" style={{fontFamily: 'var(--type-mono)'}}>
+            <p className="text-[10px] uppercase tracking-[0.08em] text-fg-muted font-mono">
                 Automated paper-trading experiment — not financial advice.
             </p>
         </div>

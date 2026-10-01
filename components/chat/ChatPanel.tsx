@@ -209,8 +209,7 @@ const ChatPanel = ({userId, onClose, initialMessages, onMessagesChange, initialI
                  }}>
                 <div className="flex items-center gap-2">
                     <span className="material-symbols-outlined text-brand animate-pulse">smart_toy</span>
-                    <span className="text-xs font-bold tracking-[0.1em] uppercase text-brand"
-                          style={{ fontFamily: 'var(--type-mono)' }}>
+                    <span className="text-xs font-bold tracking-[0.1em] uppercase text-brand font-mono">
                         Aero-AI Assistant
                     </span>
                 </div>
@@ -292,28 +291,27 @@ const ChatPanel = ({userId, onClose, initialMessages, onMessagesChange, initialI
                             <div className="flex items-center gap-2">
                                 {described.action === 'retry' && (
                                     <button type="button" onClick={onRetry} disabled={isBusy}
-                                            className="px-2 py-1 rounded font-bold uppercase tracking-wider text-[10px] text-negative disabled:opacity-50"
-                                            style={{border: '1px solid color-mix(in srgb, var(--negative) 40%, transparent)', fontFamily: 'var(--type-mono)'}}>
+                                            className="px-2 py-1 rounded font-bold uppercase tracking-wider text-[10px] text-negative disabled:opacity-50 font-mono"
+                                            style={{border: '1px solid color-mix(in srgb, var(--negative) 40%, transparent)'}}>
                                         Try again
                                     </button>
                                 )}
                                 {described.action === 'clear' && (
                                     <button type="button" onClick={onClear}
-                                            className="px-2 py-1 rounded font-bold uppercase tracking-wider text-[10px] text-negative"
-                                            style={{border: '1px solid color-mix(in srgb, var(--negative) 40%, transparent)', fontFamily: 'var(--type-mono)'}}>
+                                            className="px-2 py-1 rounded font-bold uppercase tracking-wider text-[10px] text-negative font-mono"
+                                            style={{border: '1px solid color-mix(in srgb, var(--negative) 40%, transparent)'}}>
                                         Clear chat
                                     </button>
                                 )}
                                 {described.action === 'sign_in' && (
                                     <Link href="/sign-in"
-                                          className="px-2 py-1 rounded font-bold uppercase tracking-wider text-[10px] text-negative"
-                                          style={{border: '1px solid color-mix(in srgb, var(--negative) 40%, transparent)', fontFamily: 'var(--type-mono)'}}>
+                                          className="px-2 py-1 rounded font-bold uppercase tracking-wider text-[10px] text-negative font-mono"
+                                          style={{border: '1px solid color-mix(in srgb, var(--negative) 40%, transparent)'}}>
                                         Sign in
                                     </Link>
                                 )}
                                 <button type="button" onClick={() => clearError()}
-                                        className="px-2 py-1 rounded font-bold uppercase tracking-wider text-[10px] text-fg-muted hover:text-fg-soft"
-                                        style={{fontFamily: 'var(--type-mono)'}}>
+                                        className="px-2 py-1 rounded font-bold uppercase tracking-wider text-[10px] text-fg-muted hover:text-fg-soft font-mono">
                                     Dismiss
                                 </button>
                             </div>
@@ -334,10 +332,9 @@ const ChatPanel = ({userId, onClose, initialMessages, onMessagesChange, initialI
                     // focus fell to <body> after every message — you had to click back in,
                     // and Escape stopped reaching the panel. send() already refuses to
                     // submit while a reply is streaming, and composing ahead is useful.
-                    className="flex-1 rounded-lg px-3 py-2 text-sm text-fg outline-none field-focus border-none"
+                    className="flex-1 rounded-lg px-3 py-2 text-sm text-fg outline-none field-focus border-none font-sans"
                     style={{
                         backgroundColor: 'var(--surface-2)',
-                        fontFamily: 'var(--type-body)',
                     }}
                 />
                 <button

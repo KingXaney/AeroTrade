@@ -42,7 +42,7 @@ const SentRequests = ({requests}: {requests: SentFriendRequest[]}) => {
 
     return (
         <Panel as="div">
-            <h2 className="text-sm font-bold uppercase tracking-[0.1em] text-brand mb-3" style={{fontFamily: 'var(--type-mono)'}}>
+            <h2 className="text-sm font-bold uppercase tracking-[0.1em] text-brand mb-3 font-mono">
                 Sent ({requests.length})
             </h2>
             <div className="space-y-2">
@@ -51,7 +51,7 @@ const SentRequests = ({requests}: {requests: SentFriendRequest[]}) => {
                         <div className="min-w-0">
                             <div className="text-sm font-semibold text-fg truncate">{r.name}</div>
                             <div className="text-[11px] text-fg-muted truncate">{r.email}</div>
-                            <div className="text-[10px] text-fg-muted" style={{fontFamily: 'var(--type-mono)'}}>
+                            <div className="text-[10px] text-fg-muted font-mono">
                                 Waiting · sent {formatTimeAgoMs(r.createdAt)}
                             </div>
                         </div>

@@ -19,10 +19,9 @@ const FollowButton = ({slug, followed}: {slug: string; followed: boolean}) => {
             disabled={pending}
             aria-pressed={on}
             className={cn(
-                'inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg border text-xs font-bold uppercase tracking-[0.08em] transition-colors disabled:opacity-60',
+                'font-mono inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg border text-xs font-bold uppercase tracking-[0.08em] transition-colors disabled:opacity-60',
                 on ? 'bg-brand/10 text-brand border-brand/30' : 'bg-surface-2/40 text-fg-soft border-line-strong/30 hover:text-fg hover:border-brand/30',
             )}
-            style={{fontFamily: 'var(--type-mono)'}}
         >
             <span className="material-symbols-outlined text-[16px] leading-none" aria-hidden="true" style={on ? {fontVariationSettings: "'FILL' 1"} : undefined}>star</span>
             {on ? 'Following' : 'Follow'}
