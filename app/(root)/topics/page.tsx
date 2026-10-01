@@ -11,6 +11,7 @@ import AllTopicsHeader from "@/components/topics/AllTopicsHeader";
 import TopicFeed from "@/components/topics/TopicFeed";
 import TopicFeedEmpty from "@/components/topics/TopicFeedEmpty";
 import TopicsEmptyState, {type SuggestedTopic} from "@/components/topics/TopicsEmptyState";
+import {topicFeedKey} from "@/lib/topics/feed-key";
 
 const MERGED_FEED_SIZE = 24;
 const BRAIN_SUGGESTIONS = 6;
@@ -74,7 +75,7 @@ const TopicsPage = async () => {
             <AllTopicsHeader count={overview.topics.length} unseenTotal={overview.unseenTotal}
                              preinstalled={isUntouchedDefaultSet(overview.topics.map((t) => t.slug))} />
             {articles.length > 0
-                ? <TopicFeed initial={articles} showTopicTag pageSize={MERGED_FEED_SIZE} />
+                ? <TopicFeed key={topicFeedKey(articles)} initial={articles} showTopicTag pageSize={MERGED_FEED_SIZE} />
                 : <TopicFeedEmpty scope="all" topics={overview.topics} now={now} />}
         </TopicsShell>
     );

@@ -7,6 +7,7 @@ import TopicBrief from "@/components/topics/TopicBrief";
 import TopicFeed from "@/components/topics/TopicFeed";
 import TopicFeedEmpty from "@/components/topics/TopicFeedEmpty";
 import TopicSeenMarker from "@/components/topics/TopicSeenMarker";
+import {topicFeedKey} from "@/lib/topics/feed-key";
 
 const PAGE_SIZE = 20;
 
@@ -43,7 +44,8 @@ const TopicPage = async ({params}: TopicPageProps) => {
                     </p>
                 )}
             {articles.length > 0
-                ? <TopicFeed topicId={topic.id} initial={articles} unseenCount={topic.unseenCount} pageSize={PAGE_SIZE} />
+                ? <TopicFeed key={topicFeedKey(articles, topic.keywordSetHash)} topicId={topic.id} initial={articles}
+                             unseenCount={topic.unseenCount} pageSize={PAGE_SIZE} />
                 : <TopicFeedEmpty scope="topic" topic={topic} now={now} />}
         </TopicsShell>
     );
