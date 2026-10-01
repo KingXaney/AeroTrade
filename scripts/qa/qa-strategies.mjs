@@ -486,7 +486,8 @@ try {
     // earlier build or another version; the next night variantsDue finds nothing to do, and a
     // rebuilt backtest (saveBacktest) makes the grid due again and hides the old one on the page.
     const ROOT = new URL('../../', import.meta.url).pathname;
-    process.env.MONGODB_URI ??= MONGO;
+    // Always the harness database the checks read, never a MONGODB_URI left in the shell.
+    process.env.MONGODB_URI = MONGO;
     process.env.BETTER_AUTH_SECRET ??= 'local-qa-secret-at-least-32-characters-long';
     process.env.BETTER_AUTH_URL ??= BASE;
     const jiti = createJiti(import.meta.url, {alias: {'@': ROOT.replace(/\/$/, '')}, fsCache: false});

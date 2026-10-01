@@ -1,107 +1,79 @@
 # Browser QA
 
-End-to-end checks against a throwaway database. Nothing here needs a `.env`, an
-API key, or a real MongoDB: the recipe starts an in-memory MongoDB, runs the dev
-server with inline environment variables, and drives Google Chrome with Playwright.
+End-to-end checks against a throwaway database. Nothing here needs a `.env`, an API key or a
+real MongoDB: the harness starts an in-memory MongoDB, runs the dev server with inline
+environment variables beside the Inngest dev server, and drives Google Chrome with Playwright.
 
-Unit tests (`npm test`) cover the pure modules. This is how the database-bound
-parts — server actions, Mongoose reads, the pages themselves — get exercised.
+Unit tests (`npm test`) cover the pure modules. This is how the database-bound parts — server
+actions, Mongoose reads, the pages themselves — get exercised.
 
 ## One-time setup
 
 ```bash
 cd scripts/qa
-npm install            # mongodb-memory-server + playwright (kept out of the root package.json on purpose)
+npm ci                 # mongodb-memory-server, playwright, jiti … (kept out of the root package.json on purpose)
 ```
 
-Google Chrome must be installed; the scripts use `channel: 'chrome'` so no
-browser download is needed.
+Google Chrome must be installed; the suites use `channel: 'chrome'`, so no browser download is
+needed.
 
 ## Run
 
-Three terminals from `scripts/qa`:
+From the repo root, with ports 3000, 27117 and 8288 free:
 
 ```bash
-node start-mongo.mjs                       # 1. throwaway MongoDB on :27117 (prints READY)
-
-MONGODB_URI='mongodb://127.0.0.1:27117/aerotrade' \
-BETTER_AUTH_SECRET='local-qa-secret-at-least-32-characters-long' \
-BETTER_AUTH_URL='http://localhost:3000' \
-SIGN_UP_CLIENT_LIMIT=1000 \
-INNGEST_DEV=1 npm run dev --prefix ../..   # 2. the app, from the repo root
-
-node qa-topics.mjs                         # 3. the checks (screenshots land in ./output)
-node screenshots.mjs                       # or: capture the README screenshots
+npm run qa                         # every suite, in run.sh's order (~25 min)
+npm run qa -- learn income         # just these; "qa-" and ".mjs" are optional
+npm run qa -- --up                 # start the harness and keep it up until Ctrl-C
+npm run qa -- --up topics          # run a suite, then keep the harness up to poke at what it left
 ```
 
-`SIGN_UP_CLIENT_LIMIT` lifts the per-client sign-up limit (10 an hour) for the run: every suite
-signs up its own user, all from localhost.
+`run.sh` starts the harness — MongoDB on :27117, `next dev` on :3000 (with
+`SIGN_UP_CLIENT_LIMIT=1000`, since every suite signs up its own users from localhost), the
+Inngest dev server on :8288 — runs the suites one after another, stops everything it started and
+prints one line per suite. Each suite prints one `PASS`/`FAIL` line per check and exits non-zero
+when any fails. Logs land in `output/logs/` (`<suite>.log`, the harness's `_dev.log`,
+`_mongo.log`, `_inngest.log`, and `SUMMARY`); screenshots in `output/<suite>/`.
 
-The other scripts follow the same shape, one per change set: `qa-styles.mjs` (its in-app
-404 waits for the rendered page, and a symbol no strategy watches still 404s keyless with no
-stock panels),
-`qa-shell.mjs`, `qa-chat.mjs`, `qa-topics-refresh.mjs`, `qa-trading.mjs` (the ticket,
-the CSV export, the account wording — "Main account", Account Comparison, the library's Accounts and
-Quant Strategies groups, a layout saved with the old `strategy-comparison` id read as the account
-comparison — the comparison table and `/history`'s trade feed — none counts a row from before
-the account's inception — and the note, read back from `placeOrder`'s own request; for the "earning ≈$x/month" clause it answers the page's `getQuote`
-server action with a fixed price, since the harness has no quote provider, and removes the ^IRX
-row it seeds; `/stocks/AAPL` renders keyless because a strategy watches it),
-`qa-news-feed.mjs`, `qa-strategies.mjs` (seeds the system-owned strategy accounts directly — the
-daily job never runs in this harness; the what-if lab from a seeded grid — two knobs on golden
-cross, a slider on 60/40, "computed overnight" before a grid exists, none on buy-and-hold — then
-the job's own what-if store, `saveVariants` / `variantStamps` / `saveBacktest`, called through
-Mongoose on the harness database: the app's TypeScript is loaded with `jiti`, resolved from the
-repo's `node_modules`, with `MONGODB_URI` pointed at the harness; and the stock page: keyless
-empty key numbers, each rule's newest seeded row under "What the rules see" on `/stocks/NVDA`,
-three watchers on `/stocks/SPY`, none on `/stocks/ZZZ`; the live trade log's CSV export — this
-epoch's fills only, 404 for an unknown slug, 401 signed out), `qa-income.mjs` (interest and dividends: runs the REAL nightly
-income job through the Inngest dev server, scoped to its own account; without the dev server on :8288
-it runs only the page checks),
-`qa-learn.mjs` (the First-week checklist, /learn, the ⌘K glossary rows, Guess the Verdict,
-"What the rule saw" with the decoded reason and "Read this board" on a seeded strategy page, an
-"Ask in chat" prefill, Today's lesson added from the library, the Daily quiz — one board inside
-its ten-day window, the reveal and its gloss, a day counted once (two tabs answering at once
-included), each kind of question forced from a board only it can use, the empty state; it wipes
-`strategyruns` and seeds its own, so it runs late — Time in the market on a seeded V-shaped SPY
-from the earlier of two accounts' current records, every way and each of the table's eight starts
-checked against values computed in the script (it snapshots and restores the SPY and ^IRX bars
-it replaces), and `/brain`: the legend's
-constants, one event badge, "since thesis" once bars are stored, each Navigator decision
-decoded, titles only on the widgets), `qa-learn-account.mjs` (the
-portfolio surfaces on a seeded account: a fresh account's empty states first, then seeded
-snapshots, a sell, an unpriced holding and income totals for the dated drawdown and its shaded
-band, the return bridge's guess and lines that add up to the Total Return tile to the cent, the
-risk lens, buy notes under the sell, fill receipts, `/trade`'s Last fill, a receipt per
-income month, Luck or skill — edge closes seeded for the 40 large caps, dividends on SPY and on
-them over a flat ^IRX of its own, and the seeded sample replayed in the script with the income
-convention and the app's NYSE calendar (loaded with `jiti`), so the printed window, rank, SPY, the
-median and each marker's place on the axis are checked against numbers computed outside the app;
-the marker withheld with an unpriced holding, placed from a snapshot on the last session, and
-ended on a stale snapshot's date — and Trading habits over four closed lots with a strategy round
-trip and a sale before its 30-day window left out; it removes the large-cap bars it seeded and
-puts back the ^IRX points and any other suite's large-cap dividends it set aside), `qa-chat-tutor.mjs` (the
-chat's three rate-limit windows via seeded `ratelimits` rows, the prefill, then the `explainTerm`
-and `getQuantStrategies` chips from stubbed UI-message streams — the tutor's answers themselves need
-a Gemini key and are checked by hand)
-and `qa-auth.mjs` (password reset end to end — it reads the token out of the
-throwaway Mongo, since the harness has no SMTP — and the sign-in limits: eleven attempts on one
-address, the per-client counter seeded to its limit, every `signin:*` row removed at the end). They share one database, so each
-scopes its assertions to the user it signs up.
+With the harness up (`--up`), a single suite also runs on its own: `node qa-topics.mjs` from
+`scripts/qa`. `QA_BASE_URL`, `QA_MONGO_URL` and `QA_INNGEST_URL` point the suites elsewhere.
 
-`qa-topics.mjs` signs up a fresh user, follows a starter topic, waits for the
-first live Google News fetch, then walks the dashboard, widget library,
-settings, theme picker (including the hover-sweep regression check), the ⌘K
-palette, topic editing and deletion, and the chat suggestions. It exits non-zero
-if any check fails and prints one `PASS`/`FAIL` line per check.
+## Suites
 
-Without a Finnhub key the trade and markets pages show empty quotes, which is
-fine for these checks — `qa-topics-refresh.mjs` relies on it to assert that unpriced
-holdings are labelled rather than shown as a flat P&L. The Inngest jobs are not part
-of this recipe; fire them with `npx inngest-cli dev` and `npm run trigger -- <job>`. The daily
-digest has no suite: it sends only after a news pull, a model's summary and SMTP, so its topics
-and lesson sections are pure builders covered by unit tests instead.
-`qa-topics-refresh.mjs` detects a dev server on :8288 and, when one is running,
-exercises the queued path (the first-run fill lands every starter, "Refresh now"
-runs the on-demand job) instead of the dead-queue path (honest failure, cooldown
-rolled back). Run it both ways before shipping a topics change.
+All suites share one database, so each scopes its assertions to the users it signs up; the shared
+setup (where the harness is, `check`/`summary`, `signUp`) is `lib.mjs`. A full run takes them in
+`run.sh`'s order, which matters where a suite says so below.
+
+| Suite | Feature | What it seeds | Needs |
+|---|---|---|---|
+| `qa-auth` | Sign-up, sign-in and password reset: the reset link opens logged out, the token is single-use and revokes old sessions, the per-address and per-client sign-in limits, the per-client sign-up limit, no session token handed to the page. Also the market-status badge on /trade and /watchlist, the /markets tab in the URL, /history's headings | `ratelimits` counters past their limits; removes every `signin:*`/`signup:*` row at the end | reads the reset token out of Mongo (no SMTP); runs first, so no later sign-in starts inside its window |
+| `qa-styles` | Styles and the page frame: the warning token and its utility, no phantom scroll on six pages, a focus ring on the order ticket, TradingView embeds under a dark palette. Also the global and in-app 404s and a keyless symbol no strategy watches | a theme cookie | the TradingView embed script (network) |
+| `qa-shell` | The app shell: sidebar routes, ⌘K by keyboard, the mobile drawer and its Logout. Also friends: "sent 3 days ago", the friend-request badge | a second user; a friend request backdated three days | — |
+| `qa-chat` | The chat panel: error recovery, a conversation that survives closing, the read-only portfolio tool, model markdown rendered safely (on /brain's rationale). Also the confirm dialogs of Reset Account and Reset to default | today's global Navigator rationale as markdown (`suggestionsets`, upserted) | no Gemini key: a failure is forced by aborting `/api/chat` |
+| `qa-topics-refresh` | When topics fetch: the six defaults seeded once and unfollowing sticking, /topics fetching at most once per view, Refresh now and its cooldown. Also unpriced holdings labelled on /portfolio, /trade, the sidebar and the dashboard | holdings with no quote | the Inngest dev server for the queued path; without it, the dead-queue path |
+| `qa-trading` | Paper trading: the ticket (presets, checks, note, the cash interest line), deep links, the `source` chip, the CSV export, "Main account" and the account comparison (a layout with the old `strategy-comparison` id), /history's feed from inception. Also the brain's rows drilling into their evidence | trades before and after inception, a watchlist, a brain entity, a ^IRX row (removed at the end) | answers the ticket's `getQuote` with a fixed price (no quote provider) |
+| `qa-topics` | Followed topics: six preinstalled, a topic page's live fetch, ⌘K follow, refresh, edit and delete. Also the topics-first dashboard and widget library, the settings Topics section, the chat's topic suggestion, the theme picker's hover sweep | topic articles from "QA Feed Wire" (removed before and after) | Google News reachable for the live fetch |
+| `qa-news-feed` | The personal news feed: default top stories, every control saved and reloaded, the four surfaces that follow it, a followed topic in the feed, reset | a topic article from "QA Topic Wire" | Google News for the headline counts (NOTEs, not checks) |
+| `qa-strategies` | The quant strategies: leaderboard and detail pages empty then seeded, the signal board, trade reasons, simulated record, follow, the what-if lab, the job's own what-if store, the stock page's "What the rules see", the CSV export | the system-owned strategy accounts, states, runs, a backtest and its grid (the daily job never runs here) | `jiti`, to call the job's store through Mongoose on the harness database |
+| `qa-income` | Brokerage income: interest on idle cash, dividends, the back-credit; the panel's receipts held to the stored rows to the cent; reset | an account with trades across two ex-dates, ^IRX/SPY/AAPL bars with coverage, legacy snapshots | the Inngest dev server — it fires the real nightly job, scoped to its account; without it the job checks are skipped and noted |
+| `qa-learn` | The learn surfaces: First-week checklist, /learn and ⌘K glossary, Guess the Verdict, "What the rule saw", "Read this board", Ask in chat, Today's lesson, the Daily quiz, Time in the market, /brain's legend, badges, "since thesis" and decoded Navigator decisions | wipes and reseeds `strategyruns`; accounts, trades, snapshots, topics, news, a thesis, Navigator decisions; snapshots and restores the SPY and ^IRX bars it replaces | runs after `qa-strategies` |
+| `qa-learn-account` | Learning from your own account on /portfolio: empty states, the dated drawdown, the return bridge, the risk lens, buy notes, fill receipts, /trade's Last fill, income receipts, Luck or skill against numbers computed in the script, Trading habits | snapshots, trades and income on its account; edge closes for the 40 large caps (removed at the end, ^IRX points and other suites' dividends put back) | `jiti`, for the app's NYSE calendar |
+| `qa-chat-tutor` | The chat as tutor: the three rate-limit windows, Ask in chat's prefill, the `explainTerm` and `getQuantStrategies` chips from stubbed streams | `ratelimits` rows for its user and the shared budget | no Gemini key (the tutor's answers are checked by hand) |
+
+The daily digest has no suite: it sends only after a news pull, a model's summary and SMTP, so
+its topics and lesson sections are pure builders covered by unit tests instead.
+
+## Screenshots
+
+- **README images** — `npm run qa -- screenshots` writes `output/screenshots/*.png`; downscale
+  with `sips -Z 1200 output/screenshots/dashboard.png --out ../../docs/screenshots/dashboard.png`.
+- **Visual sweep** — `npm run qa -- visual-sweep` screenshots every page, signed out and signed
+  in, at 1440 px and 390 px into `output/sweep/`. For a change meant to look identical: run it on
+  the base, move `output/sweep` aside, run it on the change, then compare:
+
+  ```bash
+  node scripts/qa/visual-diff.mjs before/ scripts/qa/output/sweep/ [--out diffs/] [--max 0.1]
+  ```
+
+  It prints the share of changed pixels per image, worst first, writes a diff image beside each
+  changed one and exits 1 when any image differs by more than `--max` percent or changed size.

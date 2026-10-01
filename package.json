@@ -21,7 +21,8 @@
     "migrate:accounts": "node scripts/migrate-multi-account.mjs",
     "build:check": "next build --experimental-build-mode compile",
     "trigger": "node scripts/trigger.mjs",
-    "opinion:local": "node scripts/second-opinion-local.mjs"
+    "opinion:local": "node scripts/second-opinion-local.mjs",
+    "qa": "bash scripts/qa/run.sh"
   },
   "dependencies": {
     "@ai-sdk/google": "^3.0.130",

@@ -126,9 +126,10 @@ npm test              # vitest, ~1s
 npm run typecheck
 npm run lint
 npx next build --experimental-build-mode compile   # proves the app builds without any keys
+npm run qa            # browser QA: every suite in scripts/qa against a throwaway harness
 ```
 
-Unit tests cover the pure modules — the layout engine, theme tokens, news aggregation and sanitisation, the topic matcher and query builder, brief parsing, model selection. Database-bound modules (Mongoose reads, server actions, the pages) are exercised through the browser QA recipe in [`scripts/qa/`](scripts/qa/README.md) instead: an in-memory MongoDB, the dev server with inline env vars, and a Playwright script that signs up, follows topics, and walks every surface — no keys needed. `docs/specs/` holds the design documents for the larger features.
+Unit tests cover the pure modules — the layout engine, theme tokens, news aggregation and sanitisation, the topic matcher and query builder, brief parsing, model selection. Database-bound modules (Mongoose reads, server actions, the pages) are exercised through the browser QA recipe in [`scripts/qa/`](scripts/qa/README.md) instead: `npm run qa` starts an in-memory MongoDB, the dev server with inline env vars and the Inngest dev server, then runs one Playwright suite per feature (`qa-topics`, `qa-trading`, `qa-learn`, …), each signing up its own user and walking its surfaces — no keys needed. `docs/specs/` holds the design documents for the larger features.
 
 ## Project structure
 
