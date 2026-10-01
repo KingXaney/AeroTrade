@@ -10,30 +10,35 @@ export const transporter = nodemailer.createTransport({
     }
 })
 
-// Everything interpolated into these templates becomes HTML in an email sent from
-// this product's own address. `name` comes straight from an unverified signup form
-// and the recipient is whatever address that form was given, so without escaping a
-// signup is enough to mail arbitrary markup — a phishing link, say — to anyone.
-// Replacer functions rather than replacement strings: '$&' in a name would otherwise
-// be expanded by String.replace.
-
 // Absolute links in email need the deployment's public URL (the same one better-auth uses).
 const appUrl = () => (process.env.BETTER_AUTH_URL ?? '').replace(/\/$/, '') || 'http://localhost:3000';
 
 export const mailerConfigured = (): boolean => Boolean(process.env.NODEMAILER_EMAIL && process.env.NODEMAILER_PASSWORD);
 
+// Dev and the QA harness have no Gmail credentials, and an unconfigured transport rejects inside
+// whichever Inngest step called it, to be retried. So every sender — and every job, before it
+// pays for a model call to write the email — asks here first, and an unconfigured mailer costs
+// one log line: an error in production, a warning elsewhere. `devDetail` (the reset link) is
+// printed only outside production, which keeps the flow testable locally without leaking it.
+export const mailerReady = (what: string, devDetail?: string): boolean => {
+    if (mailerConfigured()) return true;
+    if (process.env.NODE_ENV === 'production') console.error(`[mailer] NODEMAILER_EMAIL/PASSWORD unset — ${what} not sent`);
+    else console.warn(`[mailer] NODEMAILER_EMAIL/PASSWORD unset — ${what} not sent${devDetail ? `: ${devDetail}` : ''}`);
+    return false;
+};
+
 export const PASSWORD_RESET_TTL_MINUTES = 30;
+
+// Everything the senders below interpolate into their templates becomes HTML in an email sent
+// from this product's own address. `name` comes straight from an unverified signup form and the
+// recipient is whatever address that form was given, so without escaping a signup is enough to
+// mail arbitrary markup — a phishing link, say — to anyone. Replacer functions rather than
+// replacement strings: '$&' in a name would otherwise be expanded by String.replace.
 
 // The token lands in an href: URL-encode it first, then HTML-escape the whole URL.
 export const sendPasswordResetEmail = async ({ email, name, token }: { email: string; name?: string | null; token: string }): Promise<void> => {
     const resetUrl = `${appUrl()}/reset-password?token=${encodeURIComponent(token)}`;
-    if (!mailerConfigured()) {
-        // Dev and the QA harness have no Gmail credentials. The flow stays testable
-        // locally; in production a missing mailer is logged without leaking the token.
-        if (process.env.NODE_ENV === 'production') console.error('[mailer] NODEMAILER_EMAIL/PASSWORD unset — a password reset email could not be sent');
-        else console.warn(`[mailer] NODEMAILER_EMAIL/PASSWORD unset — password reset link for ${email}: ${resetUrl}`);
-        return;
-    }
+    if (!mailerReady('the password reset email', `link for ${email}: ${resetUrl}`)) return;
     const htmlTemplate = PASSWORD_RESET_EMAIL_TEMPLATE
         .replaceAll('{{appUrl}}', () => appUrl())
         .replace('{{name}}', () => escapeHtml(name?.trim() || 'there'))
@@ -49,7 +54,8 @@ export const sendPasswordResetEmail = async ({ email, name, token }: { email: st
     });
 };
 
-export const sendWelcomeEmail = async ({ email, name, intro }: WelcomeEmailData) => {
+export const sendWelcomeEmail = async ({ email, name, intro }: WelcomeEmailData): Promise<void> => {
+    if (!mailerReady('the welcome email')) return;
     const htmlTemplate = WELCOME_EMAIL_TEMPLATE
         .replaceAll('{{appUrl}}', () => appUrl())
         .replace('{{name}}', () => escapeHtml(name))
@@ -70,6 +76,7 @@ export const sendWelcomeEmail = async ({ email, name, intro }: WelcomeEmailData)
 export const sendNewsSummaryEmail = async (
     { email, date, newsContent, topicsSection = '', lessonSection = '' }: { email: string; date: string; newsContent: string; topicsSection?: string; lessonSection?: string }
 ): Promise<void> => {
+    if (!mailerReady('the daily news summary')) return;
     const htmlTemplate = renderNewsSummaryEmail({appUrl: appUrl(), date, newsContent, topicsSection, lessonSection});
 
     const mailOptions = {

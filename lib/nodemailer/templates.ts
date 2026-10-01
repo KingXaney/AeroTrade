@@ -307,8 +307,6 @@ export const NEWS_SUMMARY_EMAIL_TEMPLATE = `<!DOCTYPE html>
 </body>
 </html>`;
 
-// Password reset. Same palette as the welcome email; the link is the whole point, so it
-// is repeated in plain text for clients that strip buttons.
 // The daily digest, filled in. Pure, so the order of its sections and the absence of a leftover
 // placeholder are tested (sendNewsSummaryEmail mails exactly this). Replacer functions rather
 // than replacement strings: a "$&" in a section would otherwise be expanded by String.replace.
@@ -327,6 +325,8 @@ export const renderNewsSummaryEmail = ({appUrl, date, newsContent, topicsSection
     .replace('{{topicsSection}}', () => topicsSection)
     .replace('{{lessonSection}}', () => lessonSection);
 
+// Password reset. Same palette as the welcome email; the link is the whole point, so it
+// is repeated in plain text for clients that strip buttons.
 export const PASSWORD_RESET_EMAIL_TEMPLATE = `<!DOCTYPE html>
 <html lang="en">
 <head>
