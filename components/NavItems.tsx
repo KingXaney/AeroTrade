@@ -6,7 +6,7 @@ import SearchCommand from "@/components/search/SearchCommand";
 import {HEADER_NAV_ITEMS, isActiveNav} from "@/lib/navigation";
 
 type NavItemsProps = {
-    initialStocks: StockWithWatchlistStatus[];
+    initialStocks: Stock[];
     initialTopics?: TopicLink[];
 };
 

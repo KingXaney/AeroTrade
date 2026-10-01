@@ -6,7 +6,7 @@ import type {NavBadges} from "@/lib/navigation";
 
 type HeaderProps = {
     user: User;
-    initialStocks: StockWithWatchlistStatus[];
+    initialStocks: Stock[];
     initialTopics: TopicLink[];
     navBadges: NavBadges;
 };

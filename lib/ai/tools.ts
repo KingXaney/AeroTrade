@@ -12,13 +12,14 @@ import {
     addToWatchlist,
     removeFromWatchlist,
     getWatchlistForUser,
+    getWatchlistSymbolsByUserId,
 } from "@/lib/actions/watchlist.actions";
-import {connectToDatabase} from "@/database/mongoose";
-import SuggestionSet, {GLOBAL_SUGGESTIONS_USER} from "@/database/models/suggestion-set.model";
+import {getLatestSuggestions, type SuggestionSetView} from "@/lib/navigator/service";
 import {getActiveTheses, getBrainDigestData} from "@/lib/brain/queries";
 import {getTopicFeed, getTopicsForUser, getTopicsOverview} from "@/lib/topics/store";
 import {createTopic, deleteTopic} from "@/lib/actions/topics.actions";
 import {MAX_KEYWORDS} from "@/lib/topics/config";
+import {FEED_WATCHLIST_SYMBOL_CAP} from "@/lib/news/config";
 import {
     aggregatePortfolios,
     computePortfolio,
@@ -67,8 +68,10 @@ export const buildTools = (userId: string) => ({
             query: z.string().describe('Company name or ticker, e.g. "Apple" or "AAPL"'),
         }),
         execute: async ({query}) => {
-            const results = await searchStocks(query, userId);
-            return results.slice(0, 10);
+            // The search action is public and takes no user id; the watchlist join is done here.
+            const [results, watched] = await Promise.all([searchStocks(query), getWatchlistSymbolsByUserId(userId)]);
+            const watchedSet = new Set(watched);
+            return results.slice(0, 10).map((stock): StockWithWatchlistStatus => ({...stock, isInWatchlist: watchedSet.has(stock.symbol)}));
         },
     }),
 
@@ -120,6 +123,7 @@ export const buildTools = (userId: string) => ({
         inputSchema: z.object({}),
         execute: async () => {
             const items = await getWatchlistForUser(userId);
+            if (!items) return {error: 'Could not read your watchlist right now.'};
             return items.map((i) => ({
                 symbol: i.symbol,
                 company: i.company,
@@ -152,10 +156,13 @@ export const buildTools = (userId: string) => ({
     getMarketNews: tool({
         description: TOOL_DESCRIPTIONS.getMarketNews,
         inputSchema: z.object({
-            symbols: z.array(z.string()).optional().describe('Optional list of ticker symbols'),
+            // getNews makes one Finnhub call per symbol, in turn, on the shared key: the same cap as /news.
+            symbols: z.array(z.string()).max(FEED_WATCHLIST_SYMBOL_CAP).optional()
+                .describe(`Optional list of ticker symbols, at most ${FEED_WATCHLIST_SYMBOL_CAP}`),
         }),
         execute: async ({symbols}) => {
-            const articles = await getNews(symbols && symbols.length > 0 ? symbols : undefined);
+            const capped = symbols?.slice(0, FEED_WATCHLIST_SYMBOL_CAP);
+            const articles = await getNews(capped && capped.length > 0 ? capped : undefined);
             return articles.map((a) => ({
                 headline: a.headline,
                 summary: a.summary,
@@ -188,13 +195,8 @@ export const buildTools = (userId: string) => ({
         description: TOOL_DESCRIPTIONS.getAiSuggestions,
         inputSchema: z.object({}),
         execute: async () => {
-            await connectToDatabase();
-            type LeanSet = {date: string; kind?: string; items: SuggestionItem[]; rationaleMd?: string} | null;
-            const [globalSet, userSet] = await Promise.all([
-                SuggestionSet.findOne({userId: GLOBAL_SUGGESTIONS_USER}).sort({date: -1}).lean<LeanSet>(),
-                SuggestionSet.findOne({userId}).sort({date: -1}).lean<LeanSet>(),
-            ]);
-            const shape = (set: LeanSet) =>
+            const {global, user} = await getLatestSuggestions(userId);
+            const shape = (set: SuggestionSetView | null) =>
                 set ? {
                     date: set.date,
                     // Previews are manual analysis runs — nothing was traded.
@@ -206,9 +208,9 @@ export const buildTools = (userId: string) => ({
                         executed: i.executed,
                         reasons: i.reasons,
                     })),
-                    rationale: set.rationaleMd ?? null,
+                    rationale: set.rationaleMd,
                 } : null;
-            return {global: shape(globalSet), yours: shape(userSet)};
+            return {global: shape(global), yours: shape(user)};
         },
     }),
 

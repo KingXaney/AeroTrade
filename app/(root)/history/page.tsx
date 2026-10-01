@@ -6,6 +6,7 @@ import {NEWS_HISTORY_LIMIT} from "@/lib/news/config";
 import {getRecentTradesForUser} from "@/lib/trading/account";
 import TradeHistory from "@/components/trade/TradeHistory";
 import NewsArticleCard from "@/components/news/NewsArticleCard";
+import {WATCHLIST_COPY} from "@/lib/learn/copy/watchlist";
 
 const formatAddedAt = (date: Date) =>
     new Date(date).toLocaleString('en-US', {
@@ -68,7 +69,9 @@ const HistoryPage = async () => {
                         On your watchlist, by date added
                     </h2>
 
-                    {items.length === 0 ? (
+                    {!items ? (
+                        <p className="text-sm text-fg-muted">{WATCHLIST_COPY.unavailable}</p>
+                    ) : items.length === 0 ? (
                         <p className="text-sm text-fg-muted">
                             Nothing yet. Add a stock to your watchlist and it appears here with the date you added it.
                         </p>
