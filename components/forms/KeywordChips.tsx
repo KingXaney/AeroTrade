@@ -44,7 +44,7 @@ const KeywordChips = ({values, variant = 'include', editable = false, onChange, 
     return (
         <div className="flex flex-wrap items-center gap-1.5" role="group" aria-label={ariaLabel}>
             {values.map((v) => (
-                <span key={v} className={cn('inline-flex items-center gap-1 rounded-full border px-2.5 py-1 text-xs', chipClass)} style={{fontFamily: 'var(--type-mono)'}}>
+                <span key={v} className={cn('font-mono inline-flex items-center gap-1 rounded-full border px-2.5 py-1 text-xs', chipClass)}>
                     {variant === 'exclude' && <span aria-hidden="true">−</span>}
                     {v}
                     {editable && (
@@ -63,8 +63,7 @@ const KeywordChips = ({values, variant = 'include', editable = false, onChange, 
                     maxLength={maxLength}
                     placeholder={placeholder ?? 'Add a keyword…'}
                     aria-label={`Add to ${ariaLabel}`}
-                    className="min-w-[10rem] flex-1 bg-transparent px-2 py-1 text-xs text-fg outline-none field-focus placeholder:text-fg-muted"
-                    style={{fontFamily: 'var(--type-mono)'}}
+                    className="min-w-[10rem] flex-1 bg-transparent px-2 py-1 text-xs text-fg outline-none field-focus placeholder:text-fg-muted font-mono"
                 />
             )}
         </div>

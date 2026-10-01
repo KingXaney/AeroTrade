@@ -39,10 +39,10 @@ const ConfirmDialog = ({open, onOpenChange, title, description, confirmLabel, de
         <Dialog open={open} onOpenChange={(next) => { if (!next && busy) return; onOpenChange(next); }}>
             <DialogContent className="sm:max-w-md">
                 <DialogHeader>
-                    <DialogTitle style={{fontFamily: 'var(--type-display)'}}>{title}</DialogTitle>
+                    <DialogTitle className="font-heading">{title}</DialogTitle>
                     <DialogDescription>{description}</DialogDescription>
                 </DialogHeader>
-                <div className="mt-2 flex justify-end gap-2" style={{fontFamily: 'var(--type-mono)'}}>
+                <div className="mt-2 flex justify-end gap-2 font-mono">
                     {/* Cancel first so keyboard users land on the safe action. */}
                     <ActionButton variant="secondary" autoFocus onClick={() => onOpenChange(false)} disabled={busy}>
                         Cancel

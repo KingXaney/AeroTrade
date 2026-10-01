@@ -39,9 +39,8 @@ function Sidebar({ portfolio, topics, badges }: SidebarProps) {
             <div className="mt-auto p-4 border-t border-line-strong/15">
                 <Link
                     href="/trade"
-                    className="w-full py-3 rounded-lg mb-4 flex justify-center items-center gap-2 text-xs font-bold tracking-[0.1em] uppercase transition-all active:scale-[0.98] animate-glow"
+                    className="w-full py-3 rounded-lg mb-4 flex justify-center items-center gap-2 text-xs font-bold tracking-[0.1em] uppercase transition-all active:scale-[0.98] animate-glow font-mono"
                     style={{
-                        fontFamily: 'var(--type-mono)',
                         backgroundColor: 'var(--brand)',
                         color: 'var(--on-brand)',
                         boxShadow: '0 0 15px color-mix(in srgb, var(--brand) 30%, transparent)',
@@ -53,8 +52,7 @@ function Sidebar({ portfolio, topics, badges }: SidebarProps) {
                 <button
                     type="button"
                     onClick={handleSignOut}
-                    className="w-full flex items-center gap-4 px-4 py-2 text-fg-soft hover:text-negative transition-colors text-xs font-bold tracking-[0.1em] uppercase"
-                    style={{ fontFamily: 'var(--type-mono)' }}
+                    className="w-full flex items-center gap-4 px-4 py-2 text-fg-soft hover:text-negative transition-colors text-xs font-bold tracking-[0.1em] uppercase font-mono"
                 >
                     <span className="material-symbols-outlined text-sm">logout</span>
                     <span>Logout</span>

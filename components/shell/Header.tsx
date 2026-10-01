@@ -28,8 +28,7 @@ function Header({user, initialStocks, initialTopics, navBadges}: HeaderProps) {
                               style={{ fontVariationSettings: "'FILL' 1" }}>
                             terminal
                         </span>
-                        <span className="text-xl font-semibold tracking-tighter text-brand"
-                              style={{ fontFamily: 'var(--type-display)' }}>
+                        <span className="text-xl font-semibold tracking-tighter text-brand font-heading">
                             AeroTrade
                         </span>
                     </Link>

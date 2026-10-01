@@ -1,10 +1,6 @@
 import Link from "next/link";
 import type {SidebarTopics} from "@/lib/shell/sidebar";
 
-
-const mono = {fontFamily: 'var(--type-mono)'} as const;
-const display = {fontFamily: 'var(--type-display)'} as const;
-
 // The sidebar's headline card: what you follow and what's new. Rows aren't links
 // (the whole card is one) — the /topics rail is where you pick a topic.
 const TopicsSidebarCard = ({topics}: {topics: SidebarTopics}) => (
@@ -19,22 +15,22 @@ const TopicsSidebarCard = ({topics}: {topics: SidebarTopics}) => (
         <div className="relative z-10">
             <div className="flex items-center gap-3 mb-2">
                 <span className="material-symbols-outlined text-brand" style={{fontVariationSettings: "'FILL' 1"}}>interests</span>
-                <span className="text-brand text-xs font-bold tracking-[0.1em] uppercase" style={mono}>Topics</span>
+                <span className="text-brand text-xs font-bold tracking-[0.1em] uppercase font-mono">Topics</span>
                 {topics.unseen > 0 && (
-                    <span className="ml-auto rounded-full bg-brand px-1.5 py-0.5 text-[10px] font-bold text-on-brand" style={mono}>
+                    <span className="ml-auto rounded-full bg-brand px-1.5 py-0.5 text-[10px] font-bold text-on-brand font-mono">
                         {topics.unseen} new
                     </span>
                 )}
             </div>
             {topics.followed === 0 ? (
                 <>
-                    <p className="text-sm text-fg" style={display}>Follow what you care about</p>
-                    <p className="text-xs text-fg-muted mt-1" style={mono}>Markets, tech, politics, sport — anything</p>
+                    <p className="text-sm text-fg font-heading">Follow what you care about</p>
+                    <p className="text-xs text-fg-muted mt-1 font-mono">Markets, tech, politics, sport — anything</p>
                 </>
             ) : (
                 <>
-                    <p className="text-2xl font-semibold text-fg" style={display}>{topics.followed}</p>
-                    <p className="text-sm text-brand-dim" style={mono}>
+                    <p className="text-2xl font-semibold text-fg font-heading">{topics.followed}</p>
+                    <p className="text-sm text-brand-dim font-mono">
                         {topics.followed === 1 ? 'topic' : 'topics'} <span className="text-fg-muted text-xs">followed</span>
                     </p>
                     {topics.top.length > 0 && (
@@ -43,7 +39,7 @@ const TopicsSidebarCard = ({topics}: {topics: SidebarTopics}) => (
                                 <li key={t.slug} className="flex items-center gap-2 text-xs text-fg-soft">
                                     <span className="h-1.5 w-1.5 shrink-0 rounded-full" style={{background: t.color ?? 'var(--brand)'}} aria-hidden="true" />
                                     <span className="truncate">{t.name}</span>
-                                    {t.unseenCount > 0 && <span className="ml-auto text-brand" style={mono}>{t.unseenCount}</span>}
+                                    {t.unseenCount > 0 && <span className="ml-auto text-brand font-mono">{t.unseenCount}</span>}
                                 </li>
                             ))}
                         </ul>

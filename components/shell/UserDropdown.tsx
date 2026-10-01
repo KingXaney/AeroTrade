@@ -31,11 +31,10 @@ function UserDropdown({user}: {user: User}) {
                 >
                     <Avatar className="h-9 w-9 ring-1 ring-line-strong group-hover:ring-brand-strong transition-all">
                         <AvatarFallback
-                            className="text-sm font-bold"
+                            className="text-sm font-bold font-heading"
                             style={{
                                 backgroundColor: 'var(--brand-strong)',
                                 color: 'var(--on-brand)',
-                                fontFamily: 'var(--type-display)',
                             }}
                         >
                             {initial}
@@ -44,12 +43,11 @@ function UserDropdown({user}: {user: User}) {
                     {/* The header's nav items (HEADER_NAV_ITEMS) plus Search leave no room for a name below xl; the avatar
                         and chevron still mark the menu. */}
                     <div className="hidden xl:flex flex-col items-start leading-tight whitespace-nowrap">
-                        <span className="text-sm font-medium text-fg"
-                              style={{ fontFamily: 'var(--type-display)' }}>
+                        <span className="text-sm font-medium text-fg font-heading">
                             {user.name}
                         </span>
-                        <span className="text-[10px] text-fg-muted"
-                              style={{ fontFamily: 'var(--type-mono)', letterSpacing: '0.02em' }}>
+                        <span className="text-[10px] text-fg-muted font-mono"
+                              style={{ letterSpacing: '0.02em' }}>
                             Paper trading
                         </span>
                     </div>
@@ -76,19 +74,17 @@ function UserDropdown({user}: {user: User}) {
                          style={{ backgroundColor: 'color-mix(in srgb, var(--surface-2) 50%, transparent)' }}>
                         <Avatar className="h-11 w-11 ring-1 ring-line-strong">
                                 <AvatarFallback
-                                className="text-base font-bold"
-                                style={{ backgroundColor: 'var(--brand-strong)', color: 'var(--on-brand)', fontFamily: 'var(--type-display)' }}
+                                className="text-base font-bold font-heading"
+                                style={{ backgroundColor: 'var(--brand-strong)', color: 'var(--on-brand)' }}
                             >
                                 {initial}
                             </AvatarFallback>
                         </Avatar>
                         <div className="flex flex-col min-w-0">
-                            <span className="text-sm font-semibold text-fg truncate"
-                                  style={{ fontFamily: 'var(--type-display)' }}>
+                            <span className="text-sm font-semibold text-fg truncate font-heading">
                                 {user.name}
                             </span>
-                            <span className="text-xs text-fg-muted truncate"
-                                  style={{ fontFamily: 'var(--type-mono)' }}>
+                            <span className="text-xs text-fg-muted truncate font-mono">
                                 {user.email}
                             </span>
                         </div>
