@@ -6,7 +6,7 @@ import {cache} from "react";
 import {getAccountAnalytics, getComparisonStats, getPortfoliosForUser, getTradeHistory} from "@/lib/trading/account";
 import {getCachedTopicsOverview, getCachedWatchlistSymbols} from "@/lib/dashboard/cached";
 import {getMergedTopicFeed} from "@/lib/topics/store";
-import {getStocksWithData} from "@/lib/actions/finnhub.actions";
+import {getStocksWithData} from "@/lib/prices/finnhub";
 import {getNewsFeed} from "@/lib/news/feed-store";
 import {NEWS_WIDGET_LIMIT} from "@/lib/news/config";
 import {getLeaderboard} from "@/lib/actions/friends.actions";

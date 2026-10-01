@@ -13,7 +13,7 @@ const stubs = vi.hoisted(() => ({
     getWatchlistForUser: vi.fn(),
 }));
 
-vi.mock('@/lib/actions/finnhub.actions', () => ({
+vi.mock('@/lib/prices/finnhub', () => ({
     searchStocks: stubs.searchStocks,
     getQuote: vi.fn(),
     getCompanyProfile: vi.fn(),

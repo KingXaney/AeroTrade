@@ -1,4 +1,7 @@
-'use server';
+// The Finnhub client: quotes, company profiles, financials, symbol search and company news.
+// A plain server module, NOT 'use server' — every export of a 'use server' file is a public
+// endpoint, and lib code (trading, news, dashboard, chat, jobs) calls these directly. The two
+// fetches client components need are wrapped, one-to-one, in lib/actions/stocks.actions.ts.
 
 import {
     getDateRange,
@@ -126,7 +129,7 @@ const toStock = (hit: FinnhubSearchResult): Stock => {
 };
 
 // Searches Finnhub for stocks matching the query. Empty query → POPULAR_STOCK_SYMBOLS as a curated default.
-// Takes no user id: client components import this, which makes it a public endpoint, and an id
+// Takes no user id: client components call it through lib/actions/stocks.actions, a public endpoint, and an id
 // passed in would let anyone read another user's watchlist. The chat tool joins its own user's.
 export const searchStocks = async (query?: string): Promise<Stock[]> => {
     try {

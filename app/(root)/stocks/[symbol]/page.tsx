@@ -10,7 +10,7 @@ import {
 } from "@/lib/constants";
 import KeyNumbers from "@/components/stock/KeyNumbers";
 import RulesSee from "@/components/stock/RulesSee";
-import {getCompanyProfile, getFinancials, getQuote} from "@/lib/actions/finnhub.actions";
+import {getCompanyProfile, getFinancials, getQuote} from "@/lib/prices/finnhub";
 import {requireUserId} from "@/lib/auth/session";
 import {isInWatchlist} from "@/lib/actions/watchlist.actions";
 import {getTopicsForUser} from "@/lib/topics/store";

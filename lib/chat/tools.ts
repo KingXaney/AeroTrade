@@ -7,7 +7,7 @@ import {
     getCompanyProfile,
     getFinancials,
     getNews,
-} from "@/lib/actions/finnhub.actions";
+} from "@/lib/prices/finnhub";
 import {
     addToWatchlist,
     removeFromWatchlist,

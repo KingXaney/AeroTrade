@@ -5,7 +5,7 @@ import {useRouter} from "next/navigation";
 import {toast} from "sonner";
 import {cn, formatPrice} from "@/lib/utils";
 import {useDebounce} from "@/hooks/useDebounce";
-import {getQuote, searchStocks} from "@/lib/actions/finnhub.actions";
+import {getQuote, searchStocks} from "@/lib/actions/stocks.actions";
 import {placeOrder} from "@/lib/actions/trading.actions";
 import {checkOrder, describeOrderEffect, presetQuantities, ticketTerms, type PositionLike} from "@/lib/trading/order-math";
 import {orderEffectLine, queueLine} from "@/lib/learn/copy/trade";

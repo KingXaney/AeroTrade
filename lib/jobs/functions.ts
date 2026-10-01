@@ -3,7 +3,7 @@ import {buildWelcomePrompt, NEWS_SUMMARY_EMAIL_PROMPT} from "@/lib/jobs/prompts"
 import {mailerReady, sendNewsSummaryEmail, sendWelcomeEmail} from "@/lib/email/send";
 import {getAllUsersForNewsEmail} from "@/lib/actions/user.actions";
 import {getWatchlistSymbolsByEmail} from "@/lib/actions/watchlist.actions";
-import {getQuote} from "@/lib/actions/finnhub.actions";
+import {getQuote, searchStocks} from "@/lib/prices/finnhub";
 import {getAggregatedNews, normalizeUrl} from "@/lib/news/aggregate";
 import {sanitizeDigestHtml, sanitizeWelcomeIntroHtml} from "@/lib/news/sanitize";
 import {BRAIN_SOURCE_CAPS, BRAIN_TOTAL_CAP, FEED_DIGEST_CAP, hashId} from "@/lib/news/config";
@@ -47,7 +47,6 @@ import {
 } from "@/lib/navigator/store";
 import {executeOrder} from "@/lib/trading/orders";
 import BrainEntity from "@/database/models/brain-entity.model";
-import {searchStocks} from "@/lib/actions/finnhub.actions";
 import {getEasternDateString, getEasternWeekKey, getFormattedTodayDate} from "@/lib/utils";
 import {connectToDatabase} from "@/database/mongoose";
 import PaperAccount from "@/database/models/paper-account.model";

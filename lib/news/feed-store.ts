@@ -5,7 +5,7 @@
 
 import {connectToDatabase} from "@/database/mongoose";
 import UserPreferencesModel from "@/database/models/user-preferences.model";
-import {getNews} from "@/lib/actions/finnhub.actions";
+import {getNews} from "@/lib/prices/finnhub";
 import {getCachedWatchlistSymbols} from "@/lib/dashboard/cached";
 import {fetchGoogleNewsFeed} from "@/lib/news/adapters/search";
 import {fetchRssNews} from "@/lib/news/adapters/rss";

@@ -6,7 +6,7 @@ import {toast} from "sonner";
 import {CommandDialog, CommandEmpty, CommandInput, CommandItem, CommandList} from "@/components/ui/command";
 import {Button} from "@/components/ui/button";
 import {BookOpen, Loader2, Search, Sparkles, TrendingUp} from "lucide-react";
-import {searchStocks} from "@/lib/actions/finnhub.actions";
+import {searchStocks} from "@/lib/actions/stocks.actions";
 import {createTopic} from "@/lib/actions/topics.actions";
 import {NAME_MAX} from "@/lib/topics/config";
 import {useDebounce} from "@/hooks/useDebounce";

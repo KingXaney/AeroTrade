@@ -11,7 +11,7 @@ import AccountSnapshot from "@/database/models/account-snapshot.model";
 import AccountIncome from "@/database/models/account-income.model";
 import {getAccountsForUser, getOwnedAccount, getPortfolio, resolveStartingBalance, seedDayZeroSnapshot} from "@/lib/trading/account";
 import {executeOrder} from "@/lib/trading/orders";
-import {getQuote} from "@/lib/actions/finnhub.actions";
+import {getQuote} from "@/lib/prices/finnhub";
 import {AI_NAVIGATOR_ACCOUNT_NAME} from "@/lib/navigator/config";
 import {inngest} from "@/lib/jobs/client";
 

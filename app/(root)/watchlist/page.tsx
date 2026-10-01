@@ -1,6 +1,6 @@
 import {requireUserId} from "@/lib/auth/session";
 import {getWatchlistForUser} from "@/lib/actions/watchlist.actions";
-import {getStocksWithData} from "@/lib/actions/finnhub.actions";
+import {getStocksWithData} from "@/lib/prices/finnhub";
 import WatchlistTable from "@/components/watchlist/WatchlistTable";
 import WatchlistEmpty from "@/components/watchlist/WatchlistEmpty";
 import MarketStatus from "@/components/system/MarketStatus";

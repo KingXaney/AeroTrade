@@ -2,7 +2,7 @@ import Header from "@/components/Header";
 import Sidebar from "@/components/Sidebar";
 import {getSessionUser} from "@/lib/auth/session";
 import {redirect} from "next/navigation";
-import {searchStocks} from "@/lib/actions/finnhub.actions";
+import {searchStocks} from "@/lib/prices/finnhub";
 import {getCachedTopicsOverview, getCachedWatchlistSymbols} from "@/lib/dashboard/cached";
 import {aggregatePortfolios, getPortfoliosForUser} from "@/lib/trading/account";
 import {countUnpriced} from "@/lib/trading/analytics";
