@@ -6,6 +6,7 @@ import {describeNewsFeed} from "@/lib/news/feed-prefs";
 import NewsArticleCard from "@/components/news/NewsArticleCard";
 import NewsFeedEditor from "@/components/news/NewsFeedEditor";
 import Panel from "@/components/primitives/Panel";
+import PageTitle from "@/components/primitives/PageTitle";
 
 type NewsPageProps = {
     searchParams: Promise<{edit?: string}>;
@@ -28,14 +29,7 @@ const NewsPage = async ({searchParams}: NewsPageProps) => {
 
     return (
         <div className="space-y-4">
-            <div className="mb-2">
-                <h1 className="text-2xl font-semibold text-fg mb-1 font-heading">
-                    News
-                </h1>
-                <p id="news-feed-summary" className="text-sm text-fg-muted font-mono">
-                    {describeNewsFeed(prefs)}
-                </p>
-            </div>
+            <PageTitle title="News" subtitle={<span id="news-feed-summary">{describeNewsFeed(prefs)}</span>} />
 
             <NewsFeedEditor initial={prefs} startOpen={edit === '1'} />
 

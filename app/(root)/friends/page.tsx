@@ -5,6 +5,7 @@ import FriendRequests from "@/components/friends/FriendRequests";
 import SentRequests from "@/components/friends/SentRequests";
 import FriendsList from "@/components/friends/FriendsList";
 import Leaderboard from "@/components/friends/Leaderboard";
+import PageTitle from "@/components/primitives/PageTitle";
 
 const FriendsPage = async () => {
     const userId = await requireUserId();
@@ -18,14 +19,7 @@ const FriendsPage = async () => {
 
     return (
         <div className="space-y-6">
-            <div className="mb-2">
-                <h1 className="text-2xl font-semibold text-fg mb-1 tracking-tight font-heading">
-                    Friends &amp; Competition
-                </h1>
-                <p className="text-sm text-fg-muted font-mono" style={{letterSpacing: '0.02em'}}>
-                    Connect with friends and see who&apos;s the best trader
-                </p>
-            </div>
+            <PageTitle title="Friends & Competition" subtitle="Connect with friends and see who's the best trader" />
 
             <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
                 {/* Left: leaderboard (the competition) */}

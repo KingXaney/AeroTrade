@@ -1,4 +1,3 @@
-import type {ReactNode} from "react";
 import {cn} from "@/lib/utils";
 import PageTitle from "@/components/primitives/PageTitle";
 import Panel from "@/components/primitives/Panel";
@@ -9,14 +8,12 @@ import WidgetSkeleton from "@/components/primitives/Skeleton";
 // click read as ignored and people clicked again. Keeping the heading in the skeleton
 // means the title doesn't pop in after the content.
 //
-// PageTitle owns the h1 here and on the real page, so the title no longer reflows the
-// moment the skeleton is replaced (the two used to disagree about tracking-tight).
-// A page whose header is not PageTitle yet (/news, /topics) passes its own as `header`,
-// for the same reason.
+// PageTitle owns the h1 here and on every page that has a titled skeleton, so the title
+// does not reflow the moment the skeleton is replaced (the two used to disagree about
+// tracking-tight and the subtitle's font and colour).
 type Props = {
     title?: string;
     subtitle?: string;
-    header?: ReactNode;
     panels?: number;
     // Row height of the wide skeleton above the grid.
     lead?: number;
@@ -26,7 +23,7 @@ type Props = {
     rail?: boolean;
 };
 
-const RouteLoading = ({title, subtitle, header, panels = 3, lead = 80, columns = 'md:grid-cols-2', rail}: Props) => {
+const RouteLoading = ({title, subtitle, panels = 3, lead = 80, columns = 'md:grid-cols-2', rail}: Props) => {
     const body = (
         <>
             <Panel>
@@ -44,7 +41,7 @@ const RouteLoading = ({title, subtitle, header, panels = 3, lead = 80, columns =
 
     return (
         <div className="space-y-4">
-            {header ?? (title && <PageTitle title={title} subtitle={subtitle} />)}
+            {title && <PageTitle title={title} subtitle={subtitle} />}
             {rail ? (
                 <div className="grid grid-cols-1 lg:grid-cols-12 gap-4 items-start">
                     <Panel pad={4} className="lg:col-span-3">

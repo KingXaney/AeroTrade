@@ -17,6 +17,7 @@ import SecondOpinionCard from "@/components/brain/SecondOpinionCard";
 import SuggestionPanel from "@/components/navigator/SuggestionPanel";
 import SystemStatus from "@/components/jobs/SystemStatus";
 import Panel from "@/components/primitives/Panel";
+import PageTitle from "@/components/primitives/PageTitle";
 import SectionHeading from "@/components/primitives/SectionHeading";
 
 // Each decision's reasons decoded here, on the server, so the client panel renders clauses
@@ -57,15 +58,10 @@ const BrainPage = async ({searchParams}: BrainPageProps) => {
 
     return (
         <div className="space-y-4">
-            {/* Header */}
-            <div className="mb-2">
-                <h1 className="text-2xl font-semibold text-fg mb-1 font-heading">
-                    News Brain
-                </h1>
-                <p className="text-sm text-fg-muted">
-                    Persistent market narratives from every ingested article — slow-building theses drive the AI Navigator
-                </p>
-            </div>
+            <PageTitle
+                title="News Brain"
+                subtitle="Persistent market narratives from every ingested article — slow-building theses drive the AI Navigator"
+            />
 
             {/* Is the machinery actually running? */}
             <SystemStatus status={systemStatus} />
