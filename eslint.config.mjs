@@ -13,6 +13,20 @@ const eslintConfig = defineConfig([
       }],
     },
   },
+  {
+    // AGENTS.md invariant 5: a font comes from the font-mono / font-heading / font-sans
+    // utilities. An inline fontFamily beats every class, so one left in a component stops a
+    // theme's type change from reaching it — and a `const mono = {fontFamily}` is the same thing.
+    files: ["**/*.tsx", "**/*.jsx"],
+    rules: {
+      // Any fontFamily key, not only one written inside style={{…}}: a JSX style object
+      // with fontFamily is rejected wherever the object literal was written.
+      "no-restricted-syntax": ["error", {
+        selector: "Property[key.name='fontFamily'], Property[key.value='fontFamily']",
+        message: "Use the font-mono / font-heading / font-sans utility, not an inline fontFamily (AGENTS.md invariant 5).",
+      }],
+    },
+  },
   // Override default ignores of eslint-config-next.
   globalIgnores([
     // Default ignores of eslint-config-next:

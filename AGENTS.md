@@ -50,8 +50,10 @@ before the rename keep the name "Main Strategy" (new ones are "Main account", `D
 4. LLM output is untrusted: JSON-parse with zod and clamp; email HTML goes through `sanitizeDigestHtml`
    with an allow-list of article URLs; briefs render as plain text.
 5. Colours and fonts come from the semantic theme tokens (`text-fg`, `bg-brand/10`, `font-mono`),
-   never hex literals in `.tsx`. New code uses the `font-mono` / `font-heading` utilities rather
-   than `style={{fontFamily}}` — the older inline spelling is still widespread and is being retired.
+   never hex literals in `.tsx`. A font is the `font-mono` / `font-heading` / `font-sans` utility,
+   never `style={{fontFamily}}` — the inline spelling is retired, and an ESLint `no-restricted-syntax`
+   rule (eslint.config.mjs) rejects a `fontFamily` key in any `.tsx` object. A token colour is a
+   class too (`hover:` for hover); only a runtime value (a topic's stored colour, chart data) is inline.
 6. `normalizeLayout` stays pure; the legacy-default migration and the renamed widget ids
    (`LEGACY_WIDGET_IDS`) run only where saved layouts are read (`readSavedLayout`). A stored widget
    id never changes meaning: a clearer id is a new entry there, never a rename in place.
