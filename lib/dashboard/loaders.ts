@@ -1,6 +1,5 @@
 // Server-only data loaders for the dashboard widgets. Never imported by tests:
-// the action modules below reach lib/auth/server.ts, whose top-level
-// await needs a database.
+// every loader reads the database or a market-data feed (scripts/qa covers them).
 
 import {cache} from "react";
 import {getAccountAnalytics, getComparisonStats, getPortfoliosForUser, getTradeHistory} from "@/lib/trading/account";
@@ -11,8 +10,7 @@ import {getNewsFeed} from "@/lib/news/feed-store";
 import {NEWS_WIDGET_LIMIT} from "@/lib/news/config";
 import {getLeaderboard} from "@/lib/friends/store";
 import {getActiveTheses, getBrainGraph, getBrainSystemStatus, getTopEntities, type BrainSystemStatus} from "@/lib/brain/store";
-import {getLatestSuggestions} from "@/lib/navigator/store";
-import {getNavigatorStatus} from "@/lib/actions/navigator.actions";
+import {getLatestSuggestions, getNavigatorStatus} from "@/lib/navigator/store";
 import {getLatestSecondOpinion, type SecondOpinionView} from "@/lib/brain/opinion";
 import {pickActiveAccount, type ComparisonStat, type LatestSuggestions} from "@/lib/dashboard/select";
 import type {DataKey} from "@/lib/dashboard/catalog";

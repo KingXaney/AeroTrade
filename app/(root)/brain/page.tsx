@@ -1,10 +1,9 @@
 import {requireUserId} from "@/lib/auth/session";
-import {getNavigatorStatus} from "@/lib/actions/navigator.actions";
 import {getActiveTheses, getBrainGraph, getBrainSystemStatus, getEntityEvidence, getSinceThesis, getTopEntities} from "@/lib/brain/store";
 import {glossNavigatorReasons} from "@/lib/learn/reasons";
 import type {SuggestionSetView} from "@/lib/navigator/store";
 import {getLatestSecondOpinion, isSecondOpinionConfigured} from "@/lib/brain/opinion";
-import {getLatestSuggestions} from "@/lib/navigator/store";
+import {getLatestSuggestions, getNavigatorStatus} from "@/lib/navigator/store";
 import {getTopicsForUser} from "@/lib/topics/store";
 import {getAccountsForUser, toAccountSummary} from "@/lib/trading/account";
 import ActiveTheses from "@/components/brain/ActiveTheses";

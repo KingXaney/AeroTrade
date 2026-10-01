@@ -280,3 +280,23 @@ export const getLatestSuggestions = async (userId: string): Promise<{global: Sug
         return {global: null, user: null};
     }
 };
+
+// The user's enrollment, for /brain and the dashboard; a failed read reads as not enrolled.
+export const getNavigatorStatus = async (userId: string): Promise<NavigatorStatus> => {
+    try {
+        await connectToDatabase();
+        const doc = await AiNavigator.findOne({userId});
+        if (!doc) return {enrolled: false};
+        return {
+            enrolled: true,
+            status: doc.status,
+            accountId: doc.accountId,
+            enrolledAt: new Date(doc.enrolledAt).getTime(),
+            lastRunDate: doc.lastRunDate,
+            lastError: doc.lastError,
+        };
+    } catch (error) {
+        console.error('Error reading navigator status:', error);
+        return {enrolled: false};
+    }
+};

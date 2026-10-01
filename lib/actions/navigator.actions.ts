@@ -21,25 +21,6 @@ const revalidateNavigatorPaths = () => {
     revalidatePath('/portfolio');
 };
 
-export const getNavigatorStatus = async (userId: string): Promise<NavigatorStatus> => {
-    try {
-        await connectToDatabase();
-        const doc = await AiNavigator.findOne({userId});
-        if (!doc) return {enrolled: false};
-        return {
-            enrolled: true,
-            status: doc.status,
-            accountId: doc.accountId,
-            enrolledAt: new Date(doc.enrolledAt).getTime(),
-            lastRunDate: doc.lastRunDate,
-            lastError: doc.lastError,
-        };
-    } catch (error) {
-        console.error('Error reading navigator status:', error);
-        return {enrolled: false};
-    }
-};
-
 // Opt in: the AI gets its own dedicated paper account, created (or reclaimed on
 // re-enrollment) through the normal account flow so caps/seeding all apply. The
 // user picks how much the AI starts with (default $100k).
