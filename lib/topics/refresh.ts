@@ -11,7 +11,7 @@ import {matchArticles, type MatchInput} from "@/lib/topics/match";
 import {BRIEF_MIN_AGE_HOURS, BRIEF_MIN_NEW_ARTICLES, MATCH_CAP_PER_FETCH, MAX_ARTICLES_PER_TOPIC_PER_DAY, TOPIC_SEARCH_FALLBACK_WINDOW} from "@/lib/topics/config";
 import type {TopicBriefArticle} from "@/lib/topics/prompts";
 import type {TopicBriefContent} from "@/lib/topics/brief";
-import {getEasternDateString} from "@/lib/utils";
+import {getEasternDateString} from "@/lib/dates";
 
 export type KeywordGroup = {keywordSetHash: number; keywords: string[]; exclude: string[]};
 export type RefreshResult = {fetched: number; matched: number; inserted: number};

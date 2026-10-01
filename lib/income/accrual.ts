@@ -14,7 +14,7 @@
 // looks at an account on day s — a snapshot, a strategy decision — sees every row dated < s.
 
 import {DIVIDEND_PAY_LAG_DAYS} from "@/lib/prices/config";
-import {addCalendarDays, eachCalendarDay} from "@/lib/prices/calendar-days";
+import {addCalendarDays, eachCalendarDay} from "@/lib/dates";
 import {easternParts, previousTradingDay} from "@/lib/prices/market-hours";
 import type {CoverageRange} from "@/lib/prices/coverage";
 

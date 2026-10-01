@@ -9,9 +9,8 @@ import PriceBar from "@/database/models/price-bar.model";
 import {earliestSince, sinceThesisBySymbol, sinceThesisTargets, type SinceThesisLegs} from "@/lib/brain/since-thesis";
 import {BENCHMARK_SYMBOL} from "@/lib/prices/config";
 import {createDayMemo, remember} from "@/lib/day-memo";
-import {addCalendarDays} from "@/lib/prices/calendar-days";
+import {addCalendarDays, getEasternDateString} from "@/lib/dates";
 import {getBarsFrom, getLatestBars} from "@/lib/prices/store";
-import {getEasternDateString} from "@/lib/utils";
 
 const safeAvg = (sum: number, weight: number): number => (Math.abs(weight) < 1e-9 ? 0 : sum / weight);
 

@@ -6,7 +6,7 @@
 
 import BenchmarkSnapshot from "@/database/models/benchmark-snapshot.model";
 import {BENCHMARK_SYMBOL} from "@/lib/prices/config";
-import {addCalendarDays} from "@/lib/prices/calendar-days";
+import {addCalendarDays} from "@/lib/dates";
 import {getBarsForSymbols} from "@/lib/prices/store";
 import {totalReturnIndex, type IndexPoint} from "@/lib/prices/total-return";
 

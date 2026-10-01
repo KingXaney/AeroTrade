@@ -19,7 +19,7 @@ import {
     toAccountSummary,
 } from "@/lib/trading/account";
 import {countUnpriced, mergeLivePoint} from "@/lib/trading/analytics";
-import {getEasternDateString} from "@/lib/utils";
+import {getEasternDateString} from "@/lib/dates";
 import {getBenchmarkIndex} from "@/lib/prices/benchmark-store";
 import {appendLive, indexReturnPct} from "@/lib/prices/total-return";
 import {STRATEGIES, strategyBySlug} from "@/lib/strategies/catalog";

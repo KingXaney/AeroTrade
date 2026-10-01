@@ -36,12 +36,6 @@ export type Moment =
 export const lessonKey = (id: LessonId): string =>
     typeof id === 'string' ? id : `rebalance:${id.strategyId}:${id.date}`;
 
-const MS_PER_DAY = 24 * 60 * 60 * 1000;
-
-// 'YYYY-MM-DD' moved by whole calendar days; string arithmetic in UTC, so no zone moves it.
-export const shiftDate = (date: string, days: number): string =>
-    new Date(Date.UTC(+date.slice(0, 4), +date.slice(5, 7) - 1, +date.slice(8, 10)) + days * MS_PER_DAY).toISOString().slice(0, 10);
-
 const DATE_SHAPE = /^\d{4}-\d{2}-\d{2}$/;
 
 // Shape first: zod runs a refinement even after the regex check failed, and a malformed

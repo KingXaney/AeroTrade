@@ -1,21 +1,18 @@
 import {describe, expect, it, vi} from 'vitest';
+import {addCalendarDays} from '@/lib/dates';
 import type {Bar} from '@/lib/prices/signals';
 import {LOOKBACK_BARS, STALE_SKIP_FRACTION} from '@/lib/strategies/config';
 import {applyFill, buildContext, runStrategyDay, type SimAccount} from '@/lib/strategies/engine';
 import type {Decide, Decision, StrategyContext, StrategyDefinition} from '@/lib/strategies/types';
 import {UNIVERSES, type UniverseKey} from '@/lib/strategies/universe';
 
-const MS_PER_DAY = 24 * 60 * 60 * 1000;
 const AS_OF = '2026-09-21';
 const TRADE_DATE = '2026-09-22';
-
-const shiftDate = (date: string, days: number): string =>
-    new Date(new Date(`${date}T00:00:00Z`).getTime() + days * MS_PER_DAY).toISOString().slice(0, 10);
 
 // n ascending daily bars ending on endDate, closing at `close` (+1 per bar so a slice
 // boundary is visible in the values).
 const series = (n: number, endDate: string, close = 100): Bar[] =>
-    Array.from({length: n}, (_, i) => ({date: shiftDate(endDate, i - (n - 1)), close: close + i}));
+    Array.from({length: n}, (_, i) => ({date: addCalendarDays(endDate, i - (n - 1)), close: close + i}));
 
 const defFor = (universe: UniverseKey, overrides: Partial<StrategyDefinition> = {}): StrategyDefinition => ({
     id: 'buy-and-hold-spy',
@@ -64,13 +61,13 @@ const stubDecide = (decision: Decision): Decide => vi.fn(() => decision);
 describe('buildContext', () => {
     it('keeps only bars on or before asOf and at most LOOKBACK_BARS of them', () => {
         // 300 bars ending four days AFTER asOf: 296 are ≤ asOf, sliced to the last 260.
-        const bars = new Map([['SPY', series(300, shiftDate(AS_OF, 4))]]);
+        const bars = new Map([['SPY', series(300, addCalendarDays(AS_OF, 4))]]);
         const ctx = build(defFor('spy'), bars);
         const spy = ctx.bars.get('SPY') ?? [];
         expect(LOOKBACK_BARS).toBe(260);
         expect(spy).toHaveLength(260);
         expect(spy[spy.length - 1].date).toBe(AS_OF);
-        expect(spy[0].date).toBe(shiftDate(AS_OF, -259));
+        expect(spy[0].date).toBe(addCalendarDays(AS_OF, -259));
         expect(spy.every((bar) => bar.date <= AS_OF)).toBe(true);
         expect(ctx.asOf).toBe(AS_OF);
         expect(ctx.tradeDate).toBe(TRADE_DATE);
@@ -81,7 +78,7 @@ describe('buildContext', () => {
     it('classifies universe symbols as eligible or stale, counting a missing series as stale', () => {
         const bars = new Map<string, Bar[]>([
             ['SPY', series(30, AS_OF)],
-            ['EFA', series(30, shiftDate(AS_OF, -1))], // latest bar a day old
+            ['EFA', series(30, addCalendarDays(AS_OF, -1))], // latest bar a day old
             ['BIL', series(30, AS_OF)],
             // AGG has no bars at all
         ]);
@@ -103,7 +100,7 @@ describe('buildContext', () => {
     it('prices a holding at its close on asOf, null when its bar is stale, and marks equity accordingly', () => {
         const bars = new Map<string, Bar[]>([
             ['SPY', series(30, AS_OF, 100)],                 // last close 129
-            ['EFA', series(30, shiftDate(AS_OF, -1), 50)],   // stale → null
+            ['EFA', series(30, addCalendarDays(AS_OF, -1), 50)],   // stale → null
         ]);
         const ctx = build(defFor('gem'), bars, {
             cash: 1_000,
@@ -126,7 +123,7 @@ describe('buildContext', () => {
 describe('runStrategyDay — stale-data skip', () => {
     it('skips a GEM-sized universe when one of four symbols is stale, without calling decide', () => {
         const bars = freshFor(UNIVERSES.gem);
-        bars.set('EFA', series(30, shiftDate(AS_OF, -1)));
+        bars.set('EFA', series(30, addCalendarDays(AS_OF, -1)));
         const decide = stubDecide(decisionOf([{symbol: 'SPY', weight: 0.99, reason: 'x'}]));
         const result = runStrategyDay(defFor('gem'), build(defFor('gem'), bars), decide);
         expect(decide).not.toHaveBeenCalled();
@@ -199,7 +196,7 @@ describe('runStrategyDay — deciding and planning', () => {
 
     it('never sells a left-universe holding whose own bar is stale', () => {
         const def = defFor('spy');
-        const bars = new Map<string, Bar[]>([['SPY', series(30, AS_OF)], ['GLD', series(30, shiftDate(AS_OF, -1), 200)]]);
+        const bars = new Map<string, Bar[]>([['SPY', series(30, AS_OF)], ['GLD', series(30, addCalendarDays(AS_OF, -1), 200)]]);
         const ctx = build(def, bars, {cash: 1_000, positions: [{symbol: 'GLD', quantity: 10, avgCost: 150}]});
         const result = runStrategyDay(def, ctx, stubDecide(decisionOf([])));
         expect(result.orders).toEqual([]);

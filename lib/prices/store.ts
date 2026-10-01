@@ -18,9 +18,9 @@ import {
     STOOQ_DELAY_MS,
     YAHOO_DELAY_MS,
 } from "@/lib/prices/config";
-import {delay, getEasternDateString} from "@/lib/utils";
+import {delay} from "@/lib/utils";
 import {previousTradingDay} from "@/lib/prices/market-hours";
-import {addCalendarDays} from "@/lib/prices/calendar-days";
+import {addCalendarDays, getEasternDateString} from "@/lib/dates";
 
 export type EnsureBarsOptions = {
     limit?: number;
@@ -45,16 +45,12 @@ type StoredBarEdge = {date: string; close: number} | null;
 type FetchMode = FetchWindow["mode"];
 type FetchOutcome = {bars: Bar[]; source: PriceBarSource} | null;
 
-const MS_PER_DAY = 24 * 60 * 60 * 1000;
 // Beyond this, a fetched close on a stored date is a split re-adjustment, not
 // a provider rounding difference — the whole history must be replaced.
 const OVERLAP_MISMATCH_TOLERANCE = 0.005;
 // A full backfill always asks Yahoo for its longest daily range; the calendar
 // window only bounds what Stooq is asked for and what "deep enough" means.
 const YAHOO_BACKFILL_RANGE: YahooRange = "5y";
-
-const minusCalendarDays = (isoDate: string, days: number): string =>
-    new Date(new Date(`${isoDate}T00:00:00Z`).getTime() - days * MS_PER_DAY).toISOString().slice(0, 10);
 
 type StoredCoverage = {dividendsFrom?: string; dividendsThrough?: string} | null;
 
@@ -127,7 +123,7 @@ export const ensureBars = async (
     await connectToDatabase();
     const unique = Array.from(new Set(symbols.map((s) => s.toUpperCase()))).filter(Boolean).slice(0, limit);
     const today = getEasternDateString();
-    const requiredFrom = minusCalendarDays(today, backfillCalendarDays);
+    const requiredFrom = addCalendarDays(today, -backfillCalendarDays);
     let updated = 0;
     let fresh = 0;
     const failed: string[] = [];

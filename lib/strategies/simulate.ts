@@ -9,7 +9,7 @@
 // makes a strategy's backtest and its live record earn identically (see the parity test).
 
 import type {Bar} from "@/lib/prices/signals";
-import {addCalendarDays, eachCalendarDay} from "@/lib/prices/calendar-days";
+import {addCalendarDays, eachCalendarDay} from "@/lib/dates";
 import {totalReturnIndex} from "@/lib/prices/total-return";
 import {createIncomeClock, dividendsByExDate, makeRateLookup, type IncomeClock, type IncomeRow, type RatePoint} from "@/lib/income/accrual";
 import {CASH_FLOOR, SIM_RESULT_BARS, WARMUP_BARS} from "@/lib/strategies/config";

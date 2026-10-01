@@ -2,7 +2,7 @@
 // the rule looked at that morning. Pure; the read (getBoardRowsForFills) lives in
 // lib/strategies/page-store.ts.
 
-import {getEasternDateString} from "@/lib/utils";
+import {getEasternDateString} from "@/lib/dates";
 import {STRATEGY_RUN_TTL_DAYS} from "@/lib/strategies/config";
 import type {SignalRow} from "@/lib/strategies/types";
 import type {RunOrderView} from "@/lib/strategies/views";

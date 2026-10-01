@@ -1,7 +1,9 @@
 // NYSE regular-session hours, computed for an instant. Pure and Intl-based: the app
-// already establishes the pattern in getEasternDateString (lib/utils.ts), and a
+// already establishes the pattern in getEasternDateString (lib/dates.ts), and a
 // hand-rolled UTC offset would be wrong for half the year. Nine surfaces used to say
 // "live" at 3 a.m. on a Sunday; this is what lets them stop.
+
+import {addCalendarDays} from "@/lib/dates";
 
 export type MarketState = 'open' | 'closed';
 export type ClosedReason = 'pre-open' | 'after-close' | 'weekend' | 'holiday';
@@ -122,10 +124,6 @@ export const easternToInstant = (date: string, hh: number, mm: number): number =
     return guess;
 };
 
-const shiftDate = (date: string, days: number): string => {
-    const [y, m, d] = date.split('-').map(Number);
-    return new Date(Date.UTC(y, m - 1, d + days)).toISOString().slice(0, 10);
-};
 const weekdayOf = (date: string): number => new Date(`${date}T00:00:00Z`).getUTCDay();
 
 export const isTradingDay = (date: string): boolean => {
@@ -136,10 +134,10 @@ export const isTradingDay = (date: string): boolean => {
 // The last session strictly before `date` (bounded: the longest closure in the table is
 // a few days). Only valid inside the years the holiday table covers.
 export const previousTradingDay = (date: string): string => {
-    let cursor = shiftDate(date, -1);
+    let cursor = addCalendarDays(date, -1);
     for (let i = 0; i < 14; i += 1) {
         if (isTradingDay(cursor)) return cursor;
-        cursor = shiftDate(cursor, -1);
+        cursor = addCalendarDays(cursor, -1);
     }
     return cursor;
 };
@@ -151,7 +149,7 @@ export const closeMinutesFor = (date: string): number => (NYSE_HALF_DAYS.has(dat
 const nextOpenFrom = (date: string, minutes: number): number | null => {
     if (isTradingDay(date) && minutes < OPEN_MINUTES) return easternToInstant(date, 9, 30);
     for (let i = 1; i <= SEARCH_DAYS; i++) {
-        const candidate = shiftDate(date, i);
+        const candidate = addCalendarDays(date, i);
         if (isTradingDay(candidate)) return easternToInstant(candidate, 9, 30);
     }
     return null;

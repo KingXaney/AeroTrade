@@ -6,7 +6,7 @@
 // makes the way null, never zero.
 
 import {describe, expect, it} from 'vitest';
-import {addCalendarDays, eachCalendarDay} from '@/lib/prices/calendar-days';
+import {addCalendarDays, eachCalendarDay} from '@/lib/dates';
 import {createIncomeClock, makeRateLookup, payDateFor, replayIncome, type RatePoint} from '@/lib/income/accrual';
 import {
     buildTimeInMarket,

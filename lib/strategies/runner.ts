@@ -13,7 +13,7 @@ import type {PlannedOrder, StrategyDefinition} from "@/lib/strategies/types";
 import {BENCHMARK_SYMBOL, UNIVERSES} from "@/lib/strategies/universe";
 import {applyOverrides, gridFor, toWhatIfView, type StoredWhatIfVariant} from "@/lib/strategies/whatif";
 import {getRatePoints, symbolsLackingDividendCoverage} from "@/lib/prices/store";
-import {addCalendarDays} from "@/lib/prices/calendar-days";
+import {addCalendarDays} from "@/lib/dates";
 import {RATE_MAX_STALENESS_DAYS, type RatePoint} from "@/lib/income/accrual";
 
 // Small enough to cross an Inngest step boundary: never the bars.

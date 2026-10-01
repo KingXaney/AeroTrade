@@ -14,7 +14,8 @@ import {ARTICLE_STYLE, FOOTER_STYLE, HEADING_STYLE, META_STYLE, TEXT_STYLE, TOPI
 import {GLOSSARY} from "@/lib/learn/glossary";
 import type {LearnFacts} from "@/lib/learn/facts";
 import {safeArticleUrl, type Lesson, type LessonHeadline} from "@/lib/learn/lesson";
-import {deriveMoments, shiftDate, type Moment} from "@/lib/learn/moments";
+import {deriveMoments, type Moment} from "@/lib/learn/moments";
+import {addCalendarDays} from "@/lib/dates";
 import {LESSON_COPY, lessonCountLine, lessonLearnHref, momentCopy} from "@/lib/learn/copy/lesson";
 
 // A moment's own copy is two or three sentences; the cap holds if one ever grows.
@@ -32,7 +33,7 @@ export type LessonSectionInput = {moment: Moment | null; term: Lesson | null};
 // each one once. Otherwise the same order Today's lesson uses (priority, then newest), and a
 // moment already marked "Got it" is never mailed.
 export const pickDigestMoment = (facts: LearnFacts, today: string): Moment | null => {
-    const yesterday = shiftDate(today, -1);
+    const yesterday = addCalendarDays(today, -1);
     return deriveMoments(facts, today).find((moment) => moment.occurredOn === yesterday) ?? null;
 };
 

@@ -12,8 +12,7 @@
 
 import {byTime, matchLots, type LedgerTrade} from "@/lib/trading/lots";
 import {isTradingDay} from "@/lib/prices/market-hours";
-import {addCalendarDays} from "@/lib/prices/calendar-days";
-import {getEasternDateString} from "@/lib/utils";
+import {addCalendarDays, getEasternDateString} from "@/lib/dates";
 import type {Cadence} from "@/lib/strategies/types";
 
 // Fewer closed lots than this and a median or a share is one trade's anecdote.

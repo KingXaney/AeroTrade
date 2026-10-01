@@ -17,9 +17,8 @@ import AccountIncome from "@/database/models/account-income.model";
 import PriceBar from "@/database/models/price-bar.model";
 import PriceSeriesMeta from "@/database/models/price-series-meta.model";
 import {DIVIDEND_PAY_LAG_DAYS, RATE_SYMBOL, BENCHMARK_SYMBOL} from "@/lib/prices/config";
-import {addCalendarDays} from "@/lib/prices/calendar-days";
+import {addCalendarDays, getEasternDateString} from "@/lib/dates";
 import type {CoverageRange} from "@/lib/prices/coverage";
-import {getEasternDateString} from "@/lib/utils";
 import {
     SYMBOL_RELEASE_DAYS,
     createIncomeClock,

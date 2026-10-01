@@ -11,6 +11,7 @@ import StrategyRun, {type StrategyRunOrderDoc} from "@/database/models/strategy-
 import StrategyState from "@/database/models/strategy-state.model";
 import {type Bar} from "@/lib/prices/signals";
 import {getBarsForSymbols} from "@/lib/prices/store";
+import {addCalendarDays} from "@/lib/dates";
 import {getOwnedAccount, seedDayZeroSnapshot} from "@/lib/trading/account";
 import {STRATEGIES, effectiveVersion} from "@/lib/strategies/catalog";
 import {STRATEGY_OWNER_ID, STRATEGY_STARTING_BALANCE} from "@/lib/strategies/config";
@@ -34,10 +35,6 @@ export type StrategyStateView = {
 // Bars older than this never reach a decision (LOOKBACK_BARS trading days ≈ 370
 // calendar days; the margin covers long holiday stretches).
 const LIVE_LOOKBACK_CALENDAR_DAYS = 420;
-const MS_PER_DAY = 24 * 60 * 60 * 1000;
-
-const minusDays = (date: string, days: number): string =>
-    new Date(new Date(`${date}T00:00:00Z`).getTime() - days * MS_PER_DAY).toISOString().slice(0, 10);
 
 const toView = (doc: {
     strategyId: string; accountId: string; status: 'active' | 'paused'; version: string; launchDate: string;
@@ -141,7 +138,7 @@ export const loadDecisionInput = async (def: StrategyDefinition, state: Strategy
     const positions = account.positions.map((p) => ({symbol: p.symbol.toUpperCase(), quantity: p.quantity, avgCost: p.avgCost}));
     const symbols = Array.from(new Set([...UNIVERSES[def.universe], ...positions.map((p) => p.symbol)]));
     const [barsBySymbol, tradeCount] = await Promise.all([
-        getBarsForSymbols(symbols, {from: minusDays(today, LIVE_LOOKBACK_CALENDAR_DAYS), to: asOf}),
+        getBarsForSymbols(symbols, {from: addCalendarDays(today, -LIVE_LOOKBACK_CALENDAR_DAYS), to: asOf}),
         PaperTrade.countDocuments({accountId: state.accountId}),
     ]);
     return {barsBySymbol, positions, cash: account.cash, isFirstRun: tradeCount === 0};

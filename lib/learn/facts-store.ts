@@ -20,10 +20,10 @@ import Topic from "@/database/models/topic.model";
 import UserPreferencesModel from "@/database/models/user-preferences.model";
 import Watchlist from "@/database/models/watchlist.model";
 import {readAccountsForUser} from "@/lib/trading/account";
-import {getEasternDateString} from "@/lib/utils";
+import {addCalendarDays, getEasternDateString} from "@/lib/dates";
 import {daysBetween, type LearnDividend, type LearnFacts, type LearnFill, type LearnRebalance, type LearnSell, type OnboardingFacts} from "@/lib/learn/facts";
 import {ONBOARDING_MAX_DAYS} from "@/lib/learn/missions";
-import {firstDrawdownCrossing, shiftDate} from "@/lib/learn/moments";
+import {firstDrawdownCrossing} from "@/lib/learn/moments";
 import {STRATEGY_SLUGS} from "@/lib/strategies/catalog";
 import type {StrategyId} from "@/lib/strategies/types";
 
@@ -87,7 +87,7 @@ const isStrategyId = (value: string): value is StrategyId => (STRATEGY_SLUGS as 
 const learnFactsFrom = async (userId: string, {accounts, prefs}: LearnRows, onboardingFacts: Promise<OnboardingFacts>): Promise<LearnFacts> => {
     const followed = (prefs?.followedStrategies ?? []).filter(isStrategyId);
     const today = getEasternDateString();
-    const cutoff = shiftDate(today, -ONBOARDING_MAX_DAYS);
+    const cutoff = addCalendarDays(today, -ONBOARDING_MAX_DAYS);
     const young = accounts.filter((a) => daysBetween(getEasternDateString(new Date(a.createdAt)), today) <= ONBOARDING_MAX_DAYS);
     const credited = accounts.filter((a) => typeof a.incomeThrough === 'string' && a.incomeThrough.length > 0);
 

@@ -12,12 +12,11 @@
 // than showing zeros.
 
 import {createDayMemo, remember} from "@/lib/day-memo";
-import {addCalendarDays} from "@/lib/prices/calendar-days";
+import {addCalendarDays, getEasternDateString} from "@/lib/dates";
 import {RATE_SYMBOL, BENCHMARK_SYMBOL} from "@/lib/prices/config";
 import {getBarsForSymbols, getLatestBars, getRatePoints} from "@/lib/prices/store";
 import {readAccountsForUser} from "@/lib/trading/account";
 import {makeRateLookup, RATE_MAX_STALENESS_DAYS, type RatePoint} from "@/lib/income/accrual";
-import {getEasternDateString} from "@/lib/utils";
 import {
     buildTimeInMarket,
     resolveStart,

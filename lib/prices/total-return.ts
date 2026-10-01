@@ -11,7 +11,7 @@
 // showing a gap of one quarterly dividend for a week.
 
 import {DIVIDEND_PAY_LAG_DAYS} from "@/lib/prices/config";
-import {addCalendarDays} from "@/lib/prices/calendar-days";
+import {addCalendarDays} from "@/lib/dates";
 import type {Bar} from "@/lib/prices/signals";
 
 export type IndexPoint = {date: string; value: number};

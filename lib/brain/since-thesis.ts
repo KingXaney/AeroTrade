@@ -12,7 +12,7 @@
 
 import type {Bar} from '@/lib/prices/signals';
 import {totalReturnIndex, type IndexPoint} from '@/lib/prices/total-return';
-import {getEasternDateString} from '@/lib/utils';
+import {getEasternDateString} from '@/lib/dates';
 
 // The heaviest ten ticker theses get a line; the rest of the list is read without one.
 export const SINCE_THESIS_MAX = 10;

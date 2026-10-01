@@ -4,7 +4,7 @@
 
 import {describe, expect, it} from "vitest";
 import type {Bar} from "@/lib/prices/signals";
-import {addCalendarDays, eachCalendarDay} from "@/lib/prices/calendar-days";
+import {addCalendarDays, eachCalendarDay} from "@/lib/dates";
 import {strategyBySlug} from "@/lib/strategies/catalog";
 import {simulateStrategy} from "@/lib/strategies/simulate";
 import {applyOverrides} from "@/lib/strategies/whatif";

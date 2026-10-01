@@ -3,7 +3,7 @@
 // untrusted and any non-conforming shape yields [] rather than a throw.
 
 import {type Bar} from "@/lib/prices/signals";
-import {getEasternDateString} from "@/lib/utils";
+import {getEasternDateString} from "@/lib/dates";
 
 export type YahooRange = "1mo" | "2y" | "5y";
 

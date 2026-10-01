@@ -34,7 +34,7 @@ import {
 import {recordJobRun} from "@/lib/jobs/job-runs";
 import {creditAccounts, planIncomeRun, type CreditOutcome} from "@/lib/income/store";
 import {describeIncomeRun} from "@/lib/income/accrual";
-import {addCalendarDays} from "@/lib/prices/calendar-days";
+import {addCalendarDays, getEasternDateString, getEasternWeekKey} from "@/lib/dates";
 import {ensureBars, symbolsLackingDividendCoverage} from "@/lib/prices/store";
 import {navigatorTargets} from "@/lib/navigator/universe";
 import {ALWAYS_ELIGIBLE_SYMBOLS, MAX_POSITIONS, MIN_CASH_WEIGHT} from "@/lib/navigator/config";
@@ -47,7 +47,7 @@ import {
 } from "@/lib/navigator/store";
 import {executeOrder} from "@/lib/trading/orders";
 import BrainEntity from "@/database/models/brain-entity.model";
-import {getEasternDateString, getEasternWeekKey, getFormattedTodayDate} from "@/lib/utils";
+import {getFormattedTodayDate} from "@/lib/utils";
 import {connectToDatabase} from "@/database/mongoose";
 import PaperAccount from "@/database/models/paper-account.model";
 import AccountSnapshot from "@/database/models/account-snapshot.model";

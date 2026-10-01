@@ -19,7 +19,7 @@
 // definitions (the survivorship-bias entry) say so.
 
 import {isTradingDay, previousTradingDay} from "@/lib/prices/market-hours";
-import {addCalendarDays} from "@/lib/prices/calendar-days";
+import {addCalendarDays} from "@/lib/dates";
 import {fnv1a} from "@/lib/learn/quiz";
 import {
     createIncomeClock,

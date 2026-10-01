@@ -9,7 +9,7 @@
 // here would stop a client panel reusing it.
 
 import {shortDate} from "@/lib/learn/copy/portfolio";
-import {addCalendarDays} from "@/lib/prices/calendar-days";
+import {addCalendarDays} from "@/lib/dates";
 import {isTradingDay} from "@/lib/prices/market-hours";
 import {DIVIDEND_PAY_LAG_DAYS} from "@/lib/prices/config";
 import {dailyFactor, type DividendReceipt, type IncomeActivity, type IncomeMonth, type MissedExDate} from "@/lib/income/accrual";

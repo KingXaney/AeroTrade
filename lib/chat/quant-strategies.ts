@@ -23,7 +23,7 @@ import {
     type StrategyLeaderboardRow,
     type StrategyRunView,
 } from '@/lib/strategies/views';
-import {getEasternDateString} from '@/lib/utils';
+import {getEasternDateString} from '@/lib/dates';
 
 export const QUANT_STANCE =
     "These are the app's eight rule-based paper strategies, read from its own records: each live record since its account started, SPY's total return over the same days, a simulated backtest kept apart from the live one, and a rule's latest decision with its own reasons decoded. Describe what each rule did and what its numbers measure. The list comes in the /strategies page's order, by live return; that order describes the past and names no winner.";

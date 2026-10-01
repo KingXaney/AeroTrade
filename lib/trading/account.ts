@@ -12,7 +12,7 @@ import PaperTrade from "@/database/models/paper-trade.model";
 import AccountSnapshot from "@/database/models/account-snapshot.model";
 import {BENCHMARK_SYMBOL} from "@/lib/prices/config";
 import {MAX_STARTING_BALANCE, MIN_STARTING_BALANCE, PAPER_STARTING_BALANCE} from "@/lib/trading/config";
-import {getEasternDateString} from "@/lib/utils";
+import {getEasternDateString} from "@/lib/dates";
 import {getBenchmarkIndex} from "@/lib/prices/benchmark-store";
 import {getDividendPoints, getLatestRatePoint} from "@/lib/prices/store";
 import AccountIncome from "@/database/models/account-income.model";

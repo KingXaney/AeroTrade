@@ -15,13 +15,12 @@
 // page hides the panel rather than showing zeros.
 
 import {createDayMemo, remember} from "@/lib/day-memo";
-import {addCalendarDays} from "@/lib/prices/calendar-days";
+import {addCalendarDays, getEasternDateString} from "@/lib/dates";
 import {RATE_SYMBOL, BENCHMARK_SYMBOL} from "@/lib/prices/config";
 import {getHoldWindowBars, getLatestBars, getRatePoints} from "@/lib/prices/store";
 import {getLastSnapshotBetween} from "@/lib/trading/account";
 import {RATE_MAX_STALENESS_DAYS} from "@/lib/income/accrual";
 import {LARGE_CAPS} from "@/lib/strategies/universe";
-import {getEasternDateString} from "@/lib/utils";
 import {
     buildLuckView,
     completeSession,

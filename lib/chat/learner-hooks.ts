@@ -15,7 +15,7 @@ import type {LearnerAccountValue, LearnerFigure, LearnerValue} from "@/lib/chat/
 import type {GlossaryKey} from "@/lib/learn/glossary";
 import {buildPriceMap, computePortfolio, epochTradesOf, readAccountsForUser, toAccountSummary} from "@/lib/trading/account";
 import {countUnpriced, drawdownWindow, mergeLivePoint, winStatsFromCounts} from "@/lib/trading/analytics";
-import {getEasternDateString} from "@/lib/utils";
+import {getEasternDateString} from "@/lib/dates";
 
 // buildPriceMap is one Finnhub quote per unique symbol with no ceiling. A chat answer
 // doesn't need every tail position priced to the cent, so price the largest holdings and

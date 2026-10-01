@@ -11,7 +11,7 @@
 // usable T-bill rate makes the way null, never zero; a day that holds no cash needs no rate.
 
 import {z} from "zod";
-import {addCalendarDays, eachCalendarDay} from "@/lib/prices/calendar-days";
+import {addCalendarDays, eachCalendarDay} from "@/lib/dates";
 import {STRATEGY_BACKFILL_CALENDAR_DAYS} from "@/lib/prices/config";
 import type {IndexPoint} from "@/lib/prices/total-return";
 import type {StrategyId} from "@/lib/strategies/types";

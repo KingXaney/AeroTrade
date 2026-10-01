@@ -23,7 +23,7 @@ import {
     SECTOR_KEY_PREFIX,
 } from "@/lib/navigator/config";
 import {buildPriceMap, computePortfolio, getOwnedAccount} from "@/lib/trading/account";
-import {getEasternDateString} from "@/lib/utils";
+import {getEasternDateString} from "@/lib/dates";
 
 export type SuggestionSetView = {
     date: string;

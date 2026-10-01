@@ -36,7 +36,7 @@ import {
     VOLATILITY_HAIRCUT,
 } from '@/lib/navigator/config';
 import {TOP_QUINTILE_FRACTION} from '@/lib/navigator/scoring';
-import {addCalendarDays} from '@/lib/prices/calendar-days';
+import {addCalendarDays} from '@/lib/dates';
 import {BRAIN_LEGEND_COPY as C} from '@/lib/learn/copy/brain';
 import {shareText} from '@/lib/learn/copy/reasons';
 

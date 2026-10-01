@@ -15,7 +15,7 @@ import {createDayMemo, remember} from "@/lib/day-memo";
 import {buildDailyQuiz, quizDaysFrom, quizRunWindow, type DailyQuiz} from "@/lib/learn/quiz";
 import {STRATEGIES, STRATEGY_SLUGS} from "@/lib/strategies/catalog";
 import {getRecentRunDates, getRecentRuns} from "@/lib/strategies/page-store";
-import {getEasternDateString} from "@/lib/utils";
+import {getEasternDateString} from "@/lib/dates";
 
 export type DailyQuizView = {
     // null when no strategy has a usable board in the window.

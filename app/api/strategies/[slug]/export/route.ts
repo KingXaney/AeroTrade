@@ -2,7 +2,7 @@ import {NextResponse} from "next/server";
 import {getSessionUser} from "@/lib/auth/session";
 import {getStrategyLedger} from "@/lib/strategies/page-store";
 import {csvDownloadHeaders, tradesCsv, tradesCsvFilename} from "@/lib/trading/csv";
-import {getEasternDateString} from "@/lib/utils";
+import {getEasternDateString} from "@/lib/dates";
 
 // One quant strategy's live fills as a CSV download: its system account's current epoch, in
 // the account export's columns (tradesCsv), named for the strategy and the Eastern date. The

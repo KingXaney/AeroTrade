@@ -23,19 +23,6 @@ export const getDateRange = (days: number) => {
 export const validateArticle = (article: RawNewsArticle) =>
     article.headline && article.summary && article.url && article.datetime;
 
-// Today's date in America/New_York as 'YYYY-MM-DD' (en-CA locale formats ISO-style).
-// Snapshot rows are keyed on market days, not server-timezone days.
-export const getEasternDateString = (date: Date = new Date()) =>
-    new Intl.DateTimeFormat('en-CA', {timeZone: 'America/New_York'}).format(date);
-
-// The Monday of the given ET date's week, as 'YYYY-MM-DD'. Weekly-budget claims
-// (AI navigator) key on this so a mid-week re-fire can't grant a fresh budget.
-export const getEasternWeekKey = (easternDate: string): string => {
-    const d = new Date(easternDate + 'T00:00:00Z');
-    d.setUTCDate(d.getUTCDate() - ((d.getUTCDay() + 6) % 7));
-    return d.toISOString().slice(0, 10);
-};
-
 // The news brain persists articles and wants more context than the email needs.
 export const FULL_SUMMARY_MAX_CHARS = 1500;
 

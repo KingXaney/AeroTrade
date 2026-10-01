@@ -1,7 +1,8 @@
 'use client';
 
 import {useEffect, useState} from "react";
-import {cn, getEasternDateString} from "@/lib/utils";
+import {cn} from "@/lib/utils";
+import {getEasternDateString} from "@/lib/dates";
 import type {BridgeLineKey, ReturnBridge as Bridge} from "@/lib/trading/learn/bridge";
 import type {GlossaryKey} from "@/lib/learn/glossary";
 import {BRIDGE_COPY, signedMoney} from "@/lib/learn/copy/portfolio";

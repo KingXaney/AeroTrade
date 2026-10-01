@@ -10,7 +10,7 @@ import {parseQuizDate} from "@/lib/learn/quiz";
 import {DAILY_QUIZ_COPY} from "@/lib/learn/copy/quiz";
 import {readQuizDaysAnswered} from "@/lib/learn/quiz-store";
 import UserPreferencesModel from "@/database/models/user-preferences.model";
-import {getEasternDateString} from "@/lib/utils";
+import {getEasternDateString} from "@/lib/dates";
 
 // Writes only; the reads live in lib/learn/facts-store.ts (a plain server module).
 

@@ -20,7 +20,7 @@ import type {GlossaryKey} from '@/lib/learn/glossary';
 import {decodeReason, type ReasonClause} from '@/lib/learn/reasons';
 import {explainVerdict, pickQuizRows} from '@/lib/strategies/learn/verdict';
 import {ASKABLE_STATES, STATE_MEANING} from '@/lib/learn/copy/verdict';
-import {addCalendarDays} from '@/lib/prices/calendar-days';
+import {addCalendarDays} from '@/lib/dates';
 import {formatSignalValue, STATE_LABEL, visibleSignalColumns} from '@/lib/strategies/views';
 import type {RowState, SignalRow, StrategyDefinition, StrategyId} from '@/lib/strategies/types';
 

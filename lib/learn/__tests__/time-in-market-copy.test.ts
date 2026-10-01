@@ -6,7 +6,7 @@
 
 import {describe, expect, it} from 'vitest';
 import {findBanned} from '@/lib/learn/banned';
-import {eachCalendarDay} from '@/lib/prices/calendar-days';
+import {eachCalendarDay} from '@/lib/dates';
 import {makeRateLookup} from '@/lib/income/accrual';
 import {
     cashOnly,
