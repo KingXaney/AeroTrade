@@ -3,6 +3,7 @@
 import {useMemo, useState} from "react";
 import Link from "next/link";
 import {evidenceHref} from "@/lib/brain/links";
+import {cn} from "@/lib/utils";
 import type {BrainEntitySummary, BrainEntityType} from '@/lib/brain/types';
 
 type GraphNode = BrainEntitySummary;
@@ -82,7 +83,7 @@ const BrainGraph = ({nodes, edges}: {nodes: GraphNode[]; edges: GraphEdge[]}) =>
                     const active = hoverKey === e.source || hoverKey === e.target;
                     return (
                         <line key={`${e.source}|${e.target}`} x1={a.x} y1={a.y} x2={b.x} y2={b.y}
-                              style={{stroke: active ? 'var(--brand)' : 'var(--line-strong)'}}
+                              className={active ? 'stroke-brand' : 'stroke-line-strong'}
                               strokeOpacity={active ? 0.8 : 0.25 + 0.5 * (e.weight / layout.maxEdge)}
                               strokeWidth={active ? 1.5 : 1} />
                     );
@@ -102,7 +103,7 @@ const BrainGraph = ({nodes, edges}: {nodes: GraphNode[]; edges: GraphEdge[]}) =>
                                 fillOpacity={node.thesisSince !== null ? 0.35 : 0.15}
                                 strokeWidth={node.thesisSince !== null ? 2 : 1} />
                         <text x={x} y={y + r + 11} textAnchor="middle" fontSize="9"
-                              className="font-mono" style={{fill: hoverKey === node.key ? 'var(--fg)' : 'var(--fg-muted)'}}>
+                              className={cn('font-mono', hoverKey === node.key ? 'fill-fg' : 'fill-fg-muted')}>
                             {node.displayName.length > 14 ? `${node.displayName.slice(0, 13)}…` : node.displayName}
                         </text>
                     </Link>

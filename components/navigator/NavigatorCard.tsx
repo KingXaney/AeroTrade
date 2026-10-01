@@ -101,8 +101,7 @@ const NavigatorCard = ({status}: {status: NavigatorStatus}) => {
                         </ActionButton>
                     ) : (
                         <button type="button" onClick={() => void run(resumeAiNavigator)} disabled={busy}
-                                className="px-3 py-2 rounded-lg text-xs font-bold uppercase tracking-wider text-brand transition-colors disabled:opacity-50 font-mono"
-                                style={{border: '1px solid color-mix(in srgb, var(--brand) 35%, transparent)'}}>
+                                className="px-3 py-2 rounded-lg text-xs font-bold uppercase tracking-wider text-brand transition-colors disabled:opacity-50 font-mono border border-brand/35">
                             Resume trading
                         </button>
                     )}

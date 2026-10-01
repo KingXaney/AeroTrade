@@ -47,8 +47,7 @@ const FriendsList = ({friends}: {friends: FriendSummary[]}) => {
                     {friends.map((f) => (
                         <RowCard key={f.friendshipId} className="flex items-center justify-between py-2.5">
                             <Link href={`/friends/${f.id}`} className="group flex items-center gap-3 min-w-0">
-                                <div className="w-8 h-8 rounded-full flex items-center justify-center text-xs font-bold shrink-0 font-heading"
-                                     style={{backgroundColor: 'var(--brand-strong)', color: 'var(--on-brand)'}}>
+                                <div className="w-8 h-8 rounded-full flex items-center justify-center text-xs font-bold shrink-0 font-heading bg-brand-strong text-on-brand">
                                     {f.name?.[0]?.toUpperCase() ?? '?'}
                                 </div>
                                 <div className="min-w-0">

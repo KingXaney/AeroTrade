@@ -23,7 +23,7 @@ const SOURCE_LABELS: Record<SecondOpinionView['source'], string> = {
     manual: 'pasted',
 };
 
-const BUTTON_STYLE = {fontFamily: 'var(--type-mono)', border: '1px solid color-mix(in srgb, var(--brand) 35%, transparent)', backgroundColor: 'color-mix(in srgb, var(--brand-strong) 6%, transparent)'};
+const BUTTON_CLASS = 'px-3 py-2 rounded-lg font-mono text-xs font-bold uppercase tracking-wider text-brand border border-brand/35 bg-brand-strong/6 transition-all active:scale-[0.98] disabled:opacity-50';
 
 const SecondOpinionCard = ({configured, opinion}: {configured: boolean; opinion: SecondOpinionView | null}) => {
     const router = useRouter();
@@ -125,8 +125,7 @@ const SecondOpinionCard = ({configured, opinion}: {configured: boolean; opinion:
                     </ActionButton>
                 )}
                 <button type="button" onClick={() => void onCopyPrompt()} disabled={busy}
-                        className="px-3 py-2 rounded-lg text-xs font-bold uppercase tracking-wider text-brand transition-all active:scale-[0.98] disabled:opacity-50"
-                        style={BUTTON_STYLE}>
+                        className={BUTTON_CLASS}>
                     {pending === 'copy' ? 'Building…' : 'Copy prompt for claude.ai'}
                 </button>
                 {!pasteOpen && (
@@ -163,8 +162,7 @@ const SecondOpinionCard = ({configured, opinion}: {configured: boolean; opinion:
                               className="w-full mt-1" />
                     <div className="flex items-center gap-2 mt-2">
                         <button type="button" onClick={() => void onSavePasted()} disabled={busy || pasted.trim().length === 0}
-                                className="px-3 py-2 rounded-lg text-xs font-bold uppercase tracking-wider text-brand transition-all active:scale-[0.98] disabled:opacity-50"
-                                style={BUTTON_STYLE}>
+                                className={BUTTON_CLASS}>
                             {pending === 'save' ? 'Saving…' : 'Save opinion'}
                         </button>
                         <button type="button" onClick={() => {setPasteOpen(false); setPromptFallback('');}} disabled={busy}

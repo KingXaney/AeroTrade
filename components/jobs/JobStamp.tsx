@@ -1,6 +1,7 @@
 import {formatTimeAgoMs} from "@/lib/format";
 import {type JobHealth} from "@/lib/jobs/health";
 import RowCard from "@/components/primitives/RowCard";
+import {cn} from "@/lib/utils";
 
 // One Inngest job's health card, derived from its completion stamp: a crashed job
 // shows up because its stamp stops moving. Shared by /brain and /strategies.
@@ -14,16 +15,16 @@ export const jobHealth = (job: JobHealth, now = Date.now()): JobHealthState => {
 };
 
 const DOT_COLORS: Record<JobHealthState, string> = {
-    ok: 'var(--brand)',
-    stale: 'var(--warning)',
-    never: 'var(--negative)',
+    ok: 'bg-brand',
+    stale: 'bg-warning',
+    never: 'bg-negative',
 };
 
 const JobStamp = ({job}: {job: JobHealth}) => {
     const health = jobHealth(job);
     return (
         <RowCard className="flex items-start gap-2.5 px-3 py-2">
-            <span className="mt-1 inline-block w-2 h-2 rounded-full shrink-0" style={{backgroundColor: DOT_COLORS[health]}} />
+            <span className={cn('mt-1 inline-block w-2 h-2 rounded-full shrink-0', DOT_COLORS[health])} />
             <div className="min-w-0">
                 <div className="text-xs font-semibold text-fg font-mono">
                     {job.label}
