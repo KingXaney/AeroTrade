@@ -9,13 +9,14 @@ import PageTitle from "@/components/primitives/PageTitle";
 import {WATCHLIST_COPY} from "@/lib/learn/copy/watchlist";
 
 // The same PageTitle as watchlist/loading.tsx, so the title does not reflow when the skeleton
-// is replaced. mb-0: the page's space-y-6 already spaces it.
+// is replaced. mb-6: Tailwind v4's space-y is a margin-bottom on each child, which PageTitle's
+// own mb-2 would override, so the class restates the page's space-y-6 gap.
 const header = (actions: ReactNode) => (
     <PageTitle
         title="Active Watchlist"
         subtitle="Quotes, market cap and P/E for the stocks you track"
         actions={actions}
-        className="mb-0"
+        className="mb-6"
     />
 );
 
