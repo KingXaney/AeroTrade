@@ -11,10 +11,9 @@ import {createTopic, updateTopic} from "@/lib/actions/topics.actions";
 import {MAX_EXCLUDES, NAME_MAX} from "@/lib/topics/config";
 import {KEYWORD_MAX, MAX_KEYWORDS} from "@/lib/news/keywords";
 import {suggestKeywords} from "@/lib/topics/suggest-keywords";
+import {TOPIC_COLORS} from "@/lib/topics/colors";
 import type {TopicView} from '@/lib/topics/types';
 import ActionButton from "@/components/primitives/ActionButton";
-
-const TOPIC_COLORS = ['#7df4ff', '#a6e3a1', '#f9e2af', '#fab387', '#f38ba8', '#cba6f7', '#89b4fa', '#94e2d5'];
 
 export type ComposerMode = 'create' | 'edit';
 
