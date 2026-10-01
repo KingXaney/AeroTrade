@@ -97,6 +97,22 @@ describe('drawdownLine', () => {
     });
 });
 
+describe('HOLDINGS_COPY.summary', () => {
+    it('counts the holdings and names the basis they are valued on', () => {
+        expect(HOLDINGS_COPY.summary(0, 0, true)).toBe('No open positions yet');
+        expect(HOLDINGS_COPY.summary(1, 0, true)).toBe('1 holding · live valuation');
+        expect(HOLDINGS_COPY.summary(3, 0, false)).toBe('3 holdings · valued at last close');
+        expect(HOLDINGS_COPY.summary(3, 3, true)).toBe('3 holdings · valued at cost');
+        expect(HOLDINGS_COPY.summary(5, 2, false)).toBe('5 holdings · 2 of 5 valued at cost');
+    });
+
+    it('never advises', () => {
+        for (const [h, u] of [[0, 0], [1, 0], [1, 1], [4, 1], [4, 4]]) {
+            for (const open of [true, false]) clean(HOLDINGS_COPY.summary(h, u, open));
+        }
+    });
+});
+
 describe('BRIDGE_COPY', () => {
     it('names every line in plain words', () => {
         expect(BRIDGE_COPY.line).toEqual({

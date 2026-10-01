@@ -10,6 +10,7 @@
 
 import {MAX_POSITION_WEIGHT, MIN_CASH_WEIGHT} from "@/lib/navigator/config";
 import type {BridgeLineKey} from "@/lib/trading/learn/bridge";
+import {unpricedText} from "@/lib/learn/copy/unpriced";
 import type {DrawdownWindow} from '@/lib/trading/types';
 
 const MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
@@ -92,6 +93,13 @@ export const drawdownBand = (window: DrawdownWindow | null | undefined): {from: 
 export const HOLDINGS_COPY = {
     empty: 'No open positions.',
     toTradeDesk: 'Orders are placed on the Trade Desk.',
+    // The /portfolio header's line under the account name: how many holdings, and on what basis
+    // they are valued — live, at the last close, or (some or all) at cost.
+    summary: (holdings: number, unpriced: number, marketOpen: boolean): string => {
+        if (holdings === 0) return 'No open positions yet';
+        const basis = unpricedText(unpriced, holdings) ?? (marketOpen ? 'live valuation' : 'valued at last close');
+        return `${holdings} ${holdings === 1 ? 'holding' : 'holdings'} · ${basis}`;
+    },
 };
 
 // ---- where the return came from ------------------------------------------------------------
@@ -118,10 +126,7 @@ export const BRIDGE_COPY = {
     },
     // Once per panel, beside the price line: a holding with no live quote is valued at cost,
     // so its price move counts as zero here.
-    unpriced: (unpriced: number, holdings: number): string | null => {
-        if (unpriced <= 0 || holdings <= 0) return null;
-        return unpriced >= holdings ? 'valued at cost' : `${unpriced} of ${holdings} valued at cost`;
-    },
+    unpriced: (unpriced: number, holdings: number): string | null => unpricedText(unpriced, holdings),
 };
 
 // ---- the risk lens ------------------------------------------------------------------------
