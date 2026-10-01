@@ -18,6 +18,7 @@ import PriceBar from "@/database/models/price-bar.model";
 import PriceSeriesMeta from "@/database/models/price-series-meta.model";
 import {DIVIDEND_PAY_LAG_DAYS, RATE_SYMBOL, BENCHMARK_SYMBOL} from "@/lib/prices/config";
 import {addCalendarDays, getEasternDateString} from "@/lib/dates";
+import {ensureBars} from "@/lib/prices/store";
 import type {CoverageRange} from "@/lib/prices/coverage";
 import {
     SYMBOL_RELEASE_DAYS,
@@ -334,4 +335,28 @@ export const creditAccounts = async (accountIds: string[], {end}: {end: string})
         }
     }
     return outcomes;
+};
+
+// The nightly credit's price passes (lib/jobs/functions/income.ts), one step per chunk: a deep
+// backfill for the symbols planIncomeRun found without dividend coverage, a routine top-up
+// for the rest.
+export const backfillIncomeBars = async (symbols: string[]): Promise<{updated: number; failed: string[]}> => {
+    const r = await ensureBars(symbols, {limit: symbols.length, forceBackfill: true});
+    return {updated: r.updated, failed: r.failed};
+};
+
+export const topUpIncomeBars = async (symbols: string[]): Promise<{updated: number; fresh: number; failed: string[]}> => {
+    const r = await ensureBars(symbols, {limit: symbols.length});
+    return {updated: r.updated, fresh: r.fresh, failed: r.failed};
+};
+
+// Accounts never credited replay from inception — heavy, so the job credits them in small
+// batches; the rest are routine.
+export const splitByWatermark = async (accountIds: string[]): Promise<{backCredit: string[]; routine: string[]}> => {
+    await connectToDatabase();
+    const docs = await PaperAccount.find({_id: {$in: accountIds}}).select('_id incomeThrough').lean<{_id: unknown; incomeThrough?: string}[]>();
+    return {
+        backCredit: docs.filter((d) => !d.incomeThrough).map((d) => String(d._id)),
+        routine: docs.filter((d) => d.incomeThrough).map((d) => String(d._id)),
+    };
 };
