@@ -85,7 +85,7 @@ try {
     await page.fill('#password', 'Passw0rd!Passw0rd!');
     await page.click('button[type="submit"]');
     await page.waitForURL(new RegExp(`^${BASE}/(\\?.*)?$`), {timeout: 90000});
-    await page.goto(`${BASE}/portfolio`, {waitUntil: 'load'});   // lazily creates "Main Strategy"
+    await page.goto(`${BASE}/portfolio`, {waitUntil: 'load'});   // lazily creates "Main account"
     const user = await db.collection('user').findOne({email: email.toLowerCase()});
     const userId = String(user?._id ?? user?.id);
     const account = await until(() => db.collection('paperaccounts').findOne({userId}), 30000);

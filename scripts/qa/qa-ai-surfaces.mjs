@@ -127,7 +127,7 @@ try {
 
     // --- destructive actions confirm ------------------------------------------------
     await page.goto(`${BASE}/portfolio`, {waitUntil: 'networkidle'});
-    await page.getByRole('button', {name: /Reset Strategy/i}).click();
+    await page.getByRole('button', {name: /Reset Account/i}).click();
     await page.waitForTimeout(500);
     const resetCopy = await page.locator('[role="dialog"]').innerText();
     check('reset asks first', /Reset .*\?/i.test(resetCopy));

@@ -69,7 +69,7 @@ try {
     await page.fill('#password', 'Passw0rd!Passw0rd!');
     await page.click('button[type="submit"]');
     await page.waitForURL(new RegExp(`^${BASE}/(\\?.*)?$`), {timeout: 90000});
-    await page.goto(`${BASE}/portfolio`, {waitUntil: 'load'});   // lazily creates "Main Strategy"
+    await page.goto(`${BASE}/portfolio`, {waitUntil: 'load'});   // lazily creates "Main account"
     const user = await db.collection('user').findOne({email});
     const userId = String(user?._id ?? user?.id);
     const account = await until(() => db.collection('paperaccounts').findOne({userId}), 30000);
@@ -192,8 +192,8 @@ try {
         await shot('01-portfolio-with-income');
 
         // --- reset clears it all -------------------------------------------------------------
-        await page.getByRole('button', {name: /Reset Strategy/i}).click();
-        await page.locator('[role="dialog"]').getByRole('button', {name: /Reset strategy/i}).click();
+        await page.getByRole('button', {name: /Reset Account/i}).click();
+        await page.locator('[role="dialog"]').getByRole('button', {name: /Reset account/i}).click();
         await until(async () => (await db.collection('papertrades').countDocuments({accountId})) === 0, 30000);
         const reset = await db.collection('paperaccounts').findOne({_id: account._id});
         check('a reset clears the watermark and totals', reset.incomeThrough === undefined && reset.incomeTotals === undefined);

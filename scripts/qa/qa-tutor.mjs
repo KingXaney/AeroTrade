@@ -154,7 +154,7 @@ try {
         stance: STANCE,
         entry: {key: 'max-drawdown', kind: 'metric', term: 'Max drawdown', short: 'The largest fall from a previous peak to a later low.', long: '…', seeAlso: ['Recovery', 'Volatility']},
         reason: null,
-        yours: {paper: true, accounts: [{account: 'Main Strategy', figures: {maxDrawdownPct: 5.88, peakDate: '2026-09-19', troughDate: '2026-09-23', recovered: false}}]},
+        yours: {paper: true, accounts: [{account: 'Main account', figures: {maxDrawdownPct: 5.88, peakDate: '2026-09-19', troughDate: '2026-09-23', recovered: false}}]},
         notes: [],
     }, 'Stubbed answer one.'));
     await dialog.getByRole('button', {name: 'Dismiss'}).click().catch(() => {});

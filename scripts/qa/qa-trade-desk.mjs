@@ -64,6 +64,7 @@ try {
     const accounts = db.collection('paperaccounts');
     const main = await accounts.findOne({userId});   // lazily created by the first render
     check('a paper account exists for the user', !!main);
+    check('a new user\'s first account is named "Main account"', main?.name === 'Main account', main?.name);
     // The account began a minute ago, so the fills seeded below (a few seconds old) fall inside
     // its current epoch: every trade read starts at inceptionAt.
     const mainInception = new Date(Date.now() - 60_000);
@@ -99,11 +100,17 @@ try {
     check('trade history symbols link to the stock page', await page.locator('a[href="/stocks/AAPL"]').count() >= 2);
     check('an AI-placed trade carries a chip; user and legacy rows do not', await page.getByText('AI suggestion', {exact: true}).count() === 1);
     check('a trade from before the account\'s inception is not in its trade log', await page.locator('a[href="/stocks/ZZOLD"]').count() === 0);
-    check('strategy comparison renders both accounts', await page.getByRole('button', {name: /Value/}).count() >= 1);
+    check('account comparison renders both accounts', await page.getByRole('button', {name: /Value/}).count() >= 1);
+    // A user's paper account is an account; "strategy" names only the eight quant strategies.
+    check('the comparison panel and its first column say account',
+        await page.getByRole('heading', {name: 'Account Comparison'}).count() === 1 && await page.getByText('Account', {exact: true}).count() >= 1);
+    check('the sidebar card counts accounts', await page.getByText('All 2 accounts', {exact: true}).count() >= 1);
+    check('no account surface calls an account a strategy',
+        await page.getByRole('button', {name: /Reset Account/}).count() === 1 && await page.getByText(/Strategy Comparison|Reset Strategy|New strategy account/).count() === 0);
     // The table's win rate is this epoch's, like the tile's: one winning sell, the old losing one unread.
     // A comparison row is the one button carrying its cells' own labels (the header's account
-    // switcher is also named "Main Strategy").
-    const mainRow = page.locator('button', {hasText: 'Main Strategy'}).filter({hasText: 'Max Drawdown'}).first();
+    // switcher is also named "Main account").
+    const mainRow = page.locator('button', {hasText: 'Main account'}).filter({hasText: 'Max Drawdown'}).first();
     const mainWinRate = (await mainRow.locator(':scope > div').nth(3).innerText()).trim();
     check('the comparison table counts only this epoch\'s sells', mainWinRate === '100%', mainWinRate);
     // The sell dialog's realized-result line reads '—' without a quote.
