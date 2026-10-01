@@ -34,7 +34,6 @@ export const UNIVERSES: Record<UniverseKey, readonly string[]> = {
     'largecaps': LARGE_CAPS,
 };
 
-export {BENCHMARK_SYMBOL};
 
 export const ALL_STRATEGY_SYMBOLS: readonly string[] = Array.from(new Set([
     ...CORE_ETFS, ...SECTOR_ETFS, ...LARGE_CAPS,

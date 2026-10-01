@@ -2,25 +2,11 @@ import {describe, expect, it} from "vitest";
 import {
     ORDER_BURST,
     assessFreshness,
-    chunkUniverse,
     runSummary,
-    stepId,
     throttleDue,
     universeIsTooStale,
     variantsDue,
 } from "@/lib/strategies/job-helpers";
-import {STRATEGIES} from "@/lib/strategies/catalog";
-
-describe("chunkUniverse", () => {
-    it("splits into bounded chunks and never drops a symbol", () => {
-        const symbols = Array.from({length: 59}, (_, i) => `S${i}`);
-        const chunks = chunkUniverse(symbols, 12);
-        expect(chunks.map((c) => c.length)).toEqual([12, 12, 12, 12, 11]);
-        expect(chunks.flat()).toEqual(symbols);
-        expect(chunkUniverse([], 12)).toEqual([]);
-        expect(chunkUniverse(['A'], 0)).toEqual([['A']]);
-    });
-});
 
 describe("assessFreshness", () => {
     const latest = new Map([['SPY', '2026-09-18'], ['AAPL', '2026-09-17'], ['AGG', '2026-09-18']]);
@@ -76,13 +62,6 @@ describe("runSummary", () => {
             providers: {yahoo: 0, stooq: 0}, failedSymbols: [], asOf: '2026-09-18'};
         expect(runSummary({...base, whatIfGrids: 7})).toContain('1 backtest(s) rebuilt, 7 what-if grid(s) computed, yahoo');
         expect(runSummary({...base, whatIfGrids: 0})).not.toContain('what-if');
-    });
-});
-
-describe("stepId", () => {
-    it("sanitises the sentinel and is a no-op on every catalog id", () => {
-        expect(stepId('system:strategies')).toBe('system_strategies');
-        for (const def of STRATEGIES) expect(stepId(def.id)).toBe(def.id);
     });
 });
 

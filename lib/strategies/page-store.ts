@@ -24,7 +24,8 @@ import type {ReplayRun} from "@/lib/strategies/learn/replay";
 import type {QuizRun} from "@/lib/learn/quiz";
 import type {SymbolBoardRead} from "@/lib/stocks/rules-see";
 import type {SeriesStats, SignalRow, StrategyDefinition, StrategyId} from "@/lib/strategies/types";
-import {BENCHMARK_SYMBOL, strategiesWatching} from "@/lib/strategies/universe";
+import {strategiesWatching} from "@/lib/strategies/universe";
+import {BENCHMARK_SYMBOL} from "@/lib/prices/config";
 import {whatIfLab, type StoredWhatIfVariant, type WhatIfLabView} from "@/lib/strategies/whatif";
 import {
     describeLastRun,

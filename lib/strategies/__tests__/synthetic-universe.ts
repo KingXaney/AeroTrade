@@ -10,7 +10,8 @@
 import type {Bar} from '@/lib/prices/signals';
 import {addCalendarDays} from '@/lib/dates';
 import type {RatePoint} from '@/lib/income/accrual';
-import {BENCHMARK_SYMBOL, UNIVERSES} from '@/lib/strategies/universe';
+import {UNIVERSES} from '@/lib/strategies/universe';
+import {BENCHMARK_SYMBOL} from '@/lib/prices/config';
 
 export const SYNTHETIC_LAUNCH = '2030-01-01';
 

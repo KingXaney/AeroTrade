@@ -18,7 +18,7 @@ import {applyFill, type SimAccount} from "@/lib/trading/fill";
 import {summarizeSeries} from "@/lib/strategies/metrics";
 import {STRATEGY_RULES} from "@/lib/strategies/rules";
 import type {SeriesPoint, SimTrade, SimulationResult, StrategyDefinition} from "@/lib/strategies/types";
-import {BENCHMARK_SYMBOL} from "@/lib/strategies/universe";
+import {BENCHMARK_SYMBOL} from "@/lib/prices/config";
 
 export type SimulationOptions = {
     startingBalance: number;

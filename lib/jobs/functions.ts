@@ -69,7 +69,8 @@ import {readLessonForDigest} from "@/lib/learn/lesson-store";
 import {STRATEGIES, effectiveVersion} from "@/lib/strategies/catalog";
 import {STRATEGY_OWNER_ID} from "@/lib/strategies/config";
 import {previousTradingDay} from "@/lib/strategies/calendar";
-import {assessFreshness, chunkUniverse, runSummary, stepId, throttleDue, variantsDue} from "@/lib/strategies/job-helpers";
+import {assessFreshness, runSummary, throttleDue, variantsDue} from "@/lib/strategies/job-helpers";
+import {chunk, stepId} from "@/lib/jobs/steps";
 import {SIM_INCOME_CALENDAR_DAYS, backtestDataReady, decideForStrategy, isUniverseTooStale, simulateForStrategy, simulateVariantsForStrategy} from "@/lib/strategies/runner";
 import {gridFor} from "@/lib/strategies/whatif";
 import {
@@ -84,7 +85,7 @@ import {
     variantStamps,
     type OrderOutcome,
 } from "@/lib/strategies/store";
-import {ALL_STRATEGY_SYMBOLS, BENCHMARK_SYMBOL as STRATEGY_BENCHMARK, CORE_ETFS, LARGE_CAPS, SECTOR_ETFS} from "@/lib/strategies/universe";
+import {ALL_STRATEGY_SYMBOLS, CORE_ETFS, LARGE_CAPS, SECTOR_ETFS} from "@/lib/strategies/universe";
 import {PRICE_CHUNK_SIZE, RATE_SYMBOL, STRATEGY_BACKFILL_CALENDAR_DAYS, BENCHMARK_SYMBOL} from "@/lib/prices/config";
 import {NYSE_HOLIDAYS, isTradingDay, marketStatus} from "@/lib/prices/market-hours";
 
@@ -121,10 +122,6 @@ export const sendSignUpEmail = inngest.createFunction(
     }
 )
 
-
-// Sanitize a value for use as an Inngest step ID (only [a-zA-Z0-9_-] are safe).
-const stepIdFor = (user: { id: string; email: string }) =>
-    (user.id || user.email).replace(/[^a-zA-Z0-9_-]/g, '_');
 
 // Bound the personalized symbol universe so per-user news fan-out stays cheap.
 const PERSONALIZED_SYMBOL_CAP = 10;
@@ -295,14 +292,14 @@ export const creditDailyIncome = inngest.createFunction(
 
         const plan = await step.run('plan-income', async () => planIncomeRun({accountIds: scope}));
 
-        const backfills = chunkUniverse(plan.backfill, INCOME_SYMBOL_CHUNK);
+        const backfills = chunk(plan.backfill, INCOME_SYMBOL_CHUNK);
         for (let i = 0; i < backfills.length; i += 1) {
             await step.run(`income-backfill-${i}`, async () => {
                 const r = await ensureBars(backfills[i], {limit: backfills[i].length, forceBackfill: true});
                 return {updated: r.updated, failed: r.failed};
             });
         }
-        const topups = chunkUniverse(plan.topup, PRICE_CHUNK_SIZE);
+        const topups = chunk(plan.topup, PRICE_CHUNK_SIZE);
         for (let i = 0; i < topups.length; i += 1) {
             await step.run(`income-topup-${i}`, async () => {
                 const r = await ensureBars(topups[i], {limit: topups[i].length});
@@ -320,8 +317,8 @@ export const creditDailyIncome = inngest.createFunction(
             };
         });
         const batches = [
-            ...chunkUniverse(credit.backCredit, INCOME_BACK_CREDIT_BATCH),
-            ...chunkUniverse(credit.routine, INCOME_ROUTINE_BATCH),
+            ...chunk(credit.backCredit, INCOME_BACK_CREDIT_BATCH),
+            ...chunk(credit.routine, INCOME_ROUTINE_BATCH),
         ];
         const outcomes: CreditOutcome[] = [];
         for (let i = 0; i < batches.length; i += 1) {
@@ -533,7 +530,7 @@ export const runWeeklyNavigator = inngest.createFunction(
 
         // One step per chunk: a single 40-symbol step with Yahoo's spacing would exceed the
         // route's 60 s budget and be retried from scratch.
-        const navigatorChunks = chunkUniverse(universe.symbols, PRICE_CHUNK_SIZE);
+        const navigatorChunks = chunk(universe.symbols, PRICE_CHUNK_SIZE);
         for (let i = 0; i < navigatorChunks.length; i += 1) {
             const symbols = navigatorChunks[i];
             await step.run(`ensure-price-bars-${i}`, async () => ensureBars(symbols, {limit: symbols.length}));
@@ -571,7 +568,7 @@ export const runWeeklyNavigator = inngest.createFunction(
         const weekKey = getEasternWeekKey(today);
 
         for (const nav of universe.navigators) {
-            const safeId = nav.userId.replace(/[^a-zA-Z0-9_-]/g, '_');
+            const safeId = stepId(nav.userId);
             try {
                 // Atomic run claim — replays and double-fires skip instead of double-trading.
                 const claimed = await step.run(`claim-run-${safeId}`, async () => {
@@ -605,7 +602,7 @@ export const runWeeklyNavigator = inngest.createFunction(
                         // could drain cash through the floor.
                         result = {success: false, message: 'Skipped: a funding sell failed this run'};
                     } else {
-                        const orderStepId = `execute-order-${safeId}-${order.side}-${order.symbol}`.replace(/[^a-zA-Z0-9_-]/g, '_');
+                        const orderStepId = stepId(`execute-order-${safeId}-${order.side}-${order.symbol}`);
                         result = await step.run(orderStepId, async () =>
                             executeOrder(nav.userId, {
                                 accountId: nav.accountId,
@@ -673,7 +670,7 @@ export const sendDailyNewsSummary = inngest.createFunction(
         // failing user doesn't block the rest, and Inngest can retry just that user.
         let sentCount = 0;
         for (const user of users) {
-            const safeId = stepIdFor(user);
+            const safeId = stepId(user.id || user.email);
 
             try {
                 const news = await step.run(`fetch-news-${safeId}`, async () => {
@@ -822,7 +819,7 @@ export const bootstrapAiNavigator = inngest.createFunction(
     async ({ step, event }) => {
         const userId = typeof event.data?.userId === 'string' ? event.data.userId : null;
         if (!userId) return {success: false, message: 'Missing userId'};
-        const safeId = userId.replace(/[^a-zA-Z0-9_-]/g, '_');
+        const safeId = stepId(userId);
         const today = getEasternDateString();
         const weekKey = getEasternWeekKey(today);
 
@@ -856,7 +853,7 @@ export const bootstrapAiNavigator = inngest.createFunction(
         }
 
         const universe = await step.run('bootstrap-universe', async () => buildNavigatorUniverse());
-        const bootstrapChunks = chunkUniverse(universe.symbols, PRICE_CHUNK_SIZE);
+        const bootstrapChunks = chunk(universe.symbols, PRICE_CHUNK_SIZE);
         for (let i = 0; i < bootstrapChunks.length; i += 1) {
             const symbols = bootstrapChunks[i];
             await step.run(`bootstrap-price-bars-${i}`, async () => ensureBars(symbols, {limit: symbols.length}));
@@ -893,7 +890,7 @@ export const bootstrapAiNavigator = inngest.createFunction(
                 if (sellFailed && order.side === 'buy') {
                     result = {success: false, message: 'Skipped: a funding sell failed this run'};
                 } else {
-                    const orderStepId = `bootstrap-order-${safeId}-${order.side}-${order.symbol}`.replace(/[^a-zA-Z0-9_-]/g, '_');
+                    const orderStepId = stepId(`bootstrap-order-${safeId}-${order.side}-${order.symbol}`);
                     result = await step.run(orderStepId, async () =>
                         executeOrder(userId, {
                             accountId: nav.accountId,
@@ -1229,7 +1226,7 @@ export const runStrategiesDaily = inngest.createFunction(
 
         const chunks = [
             {symbols: [...CORE_ETFS], topupRange: TOTAL_RETURN_TOPUP_RANGE as '2y', forceBackfill: rebuildNeeded},
-            ...chunkUniverse([...SECTOR_ETFS, ...LARGE_CAPS, ...heldOutside], PRICE_CHUNK_SIZE).map((symbols) => ({symbols, topupRange: '1mo' as const, forceBackfill: resimulate})),
+            ...chunk([...SECTOR_ETFS, ...LARGE_CAPS, ...heldOutside], PRICE_CHUNK_SIZE).map((symbols) => ({symbols, topupRange: '1mo' as const, forceBackfill: resimulate})),
         ];
         // A rebuild pays dividends across the whole backtest window, so any symbol whose
         // dividends are not yet covered that far back is refetched deep — only those, not all
@@ -1274,7 +1271,7 @@ export const runStrategiesDaily = inngest.createFunction(
         const trackedSymbols = [...ALL_STRATEGY_SYMBOLS, ...heldOutside];
         const freshness = await step.run('check-freshness', async () => {
             const latest = await getLatestBarDates(trackedSymbols);
-            return assessFreshness(latest, trackedSymbols, STRATEGY_BENCHMARK, asOf);
+            return assessFreshness(latest, trackedSymbols, BENCHMARK_SYMBOL, asOf);
         });
 
         let ran = 0;
@@ -1283,7 +1280,7 @@ export const runStrategiesDaily = inngest.createFunction(
         let ordersSoFar = 0;
 
         if (!freshness.benchmarkFresh) {
-            const detail = `benchmark stale (latest ${STRATEGY_BENCHMARK} bar ${freshness.benchmarkLatest ?? 'none'}, needed ${asOf})`;
+            const detail = `benchmark stale (latest ${BENCHMARK_SYMBOL} bar ${freshness.benchmarkLatest ?? 'none'}, needed ${asOf})`;
             await step.run('record-skipped', async () => recordSkippedRuns(states, today, asOf, detail));
         } else {
             for (const def of STRATEGIES) {
