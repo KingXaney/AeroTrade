@@ -1,14 +1,12 @@
 import {cookies} from "next/headers";
 import type {ReactNode} from "react";
 import {requireUserId} from "@/lib/auth/session";
-import {getDashboardLayoutForUser} from "@/lib/dashboard/layout-store";
 import {getPortfoliosForUser} from "@/lib/trading/valuation";
-import {WIDGET_IDS, WIDGETS, isWidgetAvailable, resolveDataKeys, type WidgetId} from "@/lib/dashboard/catalog";
-import {filterAvailable, layoutFingerprint} from "@/lib/dashboard/layout";
+import {resolveDataKeys, type WidgetId} from "@/lib/dashboard/catalog";
+import {layoutFingerprint} from "@/lib/dashboard/layout";
+import {getVisibleLayout} from "@/lib/dashboard/availability";
 import {loadDashboardData, type LoaderCtx} from "@/lib/dashboard/loaders";
 import {pickActiveAccount, preferredAccountId, toSwitcherAccounts} from "@/lib/trading/active-account";
-import {getOnboardingFacts} from "@/lib/learn/facts-store";
-import {onboardingActive} from "@/lib/learn/missions";
 import {renderWidgetBody} from "@/components/dashboard/widgets/registry";
 import DashboardGrid from "@/components/dashboard/DashboardGrid";
 import AccountSwitcher from "@/components/trade/AccountSwitcher";
@@ -26,11 +24,9 @@ const Home = async ({searchParams}: HomeProps) => {
     const {customize, account} = await searchParams;
     const ctx: LoaderCtx = {userId, preferredAccountId: preferredAccountId(account, await cookies())};
 
-    // Portfolios are cache()-deduped with the (root) layout, so this costs nothing extra.
-    const [stored, portfolios, facts] = await Promise.all([getDashboardLayoutForUser(userId), getPortfoliosForUser(userId), getOnboardingFacts(userId)]);
-    const availability = {accountCount: portfolios.length, advanced: true, onboarding: onboardingActive(facts)};
-    const layout = filterAvailable(stored, availability);
-    const availableIds = WIDGET_IDS.filter((id) => isWidgetAvailable(WIDGETS[id], availability));
+    // Portfolios are cache()-deduped with the (root) layout and the availability read, so this
+    // costs nothing extra.
+    const [{layout, availableIds}, portfolios] = await Promise.all([getVisibleLayout(userId), getPortfoliosForUser(userId)]);
 
     const {eager, needsActiveAccount} = resolveDataKeys(layout.widgets.map((w) => w.id));
     const {data, failed} = await loadDashboardData(eager, ctx);

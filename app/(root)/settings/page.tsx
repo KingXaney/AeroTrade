@@ -10,12 +10,7 @@ import TopicsSettings from "@/components/settings/TopicsSettings";
 import NewsFeedSettings from "@/components/settings/NewsFeedSettings";
 import {getNewsFeedPrefs} from "@/lib/news/feed-store";
 import {getCachedTopicsOverview} from "@/lib/dashboard/cached";
-import {getDashboardLayoutForUser} from "@/lib/dashboard/layout-store";
-import {filterAvailable} from "@/lib/dashboard/layout";
-import {getPortfoliosForUser} from "@/lib/trading/valuation";
-import {WIDGET_IDS, WIDGETS, isWidgetAvailable} from "@/lib/dashboard/catalog";
-import {getOnboardingFacts} from "@/lib/learn/facts-store";
-import {onboardingActive} from "@/lib/learn/missions";
+import {getVisibleLayout} from "@/lib/dashboard/availability";
 
 const SECTIONS = [
     {id: 'topics', label: 'Topics', icon: 'interests'},
@@ -30,17 +25,12 @@ const SettingsPage = async () => {
     const user = await getSessionUser();
     if (!user) redirect('/sign-in');
 
-    const [notifications, layout, portfolios, topics, newsFeed, facts] = await Promise.all([
+    const [notifications, {layout: visibleLayout, availableIds}, topics, newsFeed] = await Promise.all([
         getNotificationPreferences(),
-        getDashboardLayoutForUser(user.id),
-        getPortfoliosForUser(user.id),
+        getVisibleLayout(user.id),   // the same view as the dashboard
         getCachedTopicsOverview(user.id),
         getNewsFeedPrefs(user.id),
-        getOnboardingFacts(user.id),
     ]);
-    const availability = {accountCount: portfolios.length, advanced: true, onboarding: onboardingActive(facts)};
-    const availableIds = WIDGET_IDS.filter((id) => isWidgetAvailable(WIDGETS[id], availability));
-    const visibleLayout = filterAvailable(layout, availability);   // same view as the dashboard
 
     return (
         <div className="space-y-4">
