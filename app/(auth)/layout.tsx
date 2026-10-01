@@ -1,13 +1,12 @@
-import {auth} from "@/lib/auth/server";
-import {headers} from "next/headers";
+import {getSessionUser} from "@/lib/auth/session";
 import {redirect} from "next/navigation";
 import AuthShell from "@/components/auth/AuthShell";
 
 const Layout = async ({children}:{children : React.ReactNode}) => {
-    const session = await auth.api.getSession({headers: await headers()});
+    const user = await getSessionUser();
     // The dashboard, not /topics: topics are seeded at sign-up, so there is nothing to
     // set up and the default layout already leads with them.
-    if(session?.user) redirect('/')
+    if(user) redirect('/')
     return <AuthShell>{children}</AuthShell>;
 }
 

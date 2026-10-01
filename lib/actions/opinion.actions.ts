@@ -3,7 +3,7 @@
 import {revalidatePath} from "next/cache";
 import SecondOpinion from "@/database/models/second-opinion.model";
 import {connectToDatabase} from "@/database/mongoose";
-import {getCurrentUserId} from "@/lib/actions/watchlist.actions";
+import {getCurrentUserId} from "@/lib/auth/session";
 import {inngest} from "@/lib/jobs/client";
 import {
     gatherOpinionContext,

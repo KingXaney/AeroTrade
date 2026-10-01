@@ -1,7 +1,6 @@
 import Header from "@/components/Header";
 import Sidebar from "@/components/Sidebar";
-import {auth} from "@/lib/auth/server";
-import {headers} from "next/headers";
+import {getSessionUser} from "@/lib/auth/session";
 import {redirect} from "next/navigation";
 import {searchStocks} from "@/lib/actions/finnhub.actions";
 import {getCachedTopicsOverview, getCachedWatchlistSymbols} from "@/lib/dashboard/cached";
@@ -18,15 +17,9 @@ import type {NavBadges} from "@/lib/shell/navigation";
 export const dynamic = 'force-dynamic';
 
 const Layout = async ({children}: {children: React.ReactNode}) => {
-    const session = await auth.api.getSession({headers: await headers()})
+    const user = await getSessionUser()
 
-    if (!session?.user) redirect('/sign-in')
-
-    const user = {
-        id: session.user.id,
-        name: session.user.name,
-        email: session.user.email,
-    }
+    if (!user) redirect('/sign-in')
 
     // Pre-load the popular-stocks list once for the SearchCommand fallback.
     // All strategy accounts power the compact sidebar card, priced from one shared

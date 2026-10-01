@@ -10,7 +10,7 @@ import {
     MAX_STARTING_BALANCE,
     MIN_STARTING_BALANCE,
 } from "@/lib/constants";
-import {getCurrentUserId} from "@/lib/actions/watchlist.actions";
+import {getCurrentUserId} from "@/lib/auth/session";
 import {getAccountsForUser, getOwnedAccount, resolveStartingBalance, seedDayZeroSnapshot} from "@/lib/trading/account";
 import {deleteOwnedAccount} from "@/lib/trading/account-delete";
 

@@ -1,8 +1,7 @@
-import {redirect} from "next/navigation";
 import {cookies} from "next/headers";
 import Link from "next/link";
 import {ACTIVE_ACCOUNT_COOKIE} from "@/lib/constants";
-import {getCurrentUserId} from "@/lib/actions/watchlist.actions";
+import {requireUserId} from "@/lib/auth/session";
 import {getAccountsForUser, getCashApy, getPortfolio, getTradeLedger, toAccountSummary} from "@/lib/trading/account";
 import {replayReceipts} from "@/lib/trading/receipts";
 import {openLotNotes} from "@/lib/trading/lots";
@@ -18,8 +17,7 @@ type TradePageProps = {
 };
 
 const TradePage = async ({searchParams}: TradePageProps) => {
-    const userId = await getCurrentUserId();
-    if (!userId) redirect('/sign-in');
+    const userId = await requireUserId();
 
     const {symbol: raw, account: accountParam} = await searchParams;
     const chartSymbol = (raw || 'NASDAQ:AAPL').toUpperCase();

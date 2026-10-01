@@ -1,6 +1,5 @@
-import {headers} from "next/headers";
 import {redirect} from "next/navigation";
-import {auth} from "@/lib/auth/server";
+import {getSessionUser} from "@/lib/auth/session";
 import {getNotificationPreferences} from "@/lib/actions/preferences.actions";
 import AppearanceSettings from "@/components/settings/AppearanceSettings";
 import NotificationSettings from "@/components/settings/NotificationSettings";
@@ -28,9 +27,8 @@ const SECTIONS = [
 ];
 
 const SettingsPage = async () => {
-    const session = await auth.api.getSession({headers: await headers()});
-    if (!session?.user) redirect('/sign-in');
-    const user: User = {id: session.user.id, name: session.user.name, email: session.user.email};
+    const user = await getSessionUser();
+    if (!user) redirect('/sign-in');
 
     const [notifications, layout, portfolios, topics, newsFeed, facts] = await Promise.all([
         getNotificationPreferences(),

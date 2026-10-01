@@ -1,6 +1,6 @@
 import Link from "next/link";
-import {notFound, redirect} from "next/navigation";
-import {getCurrentUserId} from "@/lib/actions/watchlist.actions";
+import {notFound} from "next/navigation";
+import {requireUserId} from "@/lib/auth/session";
 import {getEasternDateString} from "@/lib/utils";
 import {STRATEGIES_DISCLAIMER} from "@/lib/strategies/catalog";
 import {getStrategyDetail} from "@/lib/strategies/page-store";
@@ -42,8 +42,7 @@ type StrategyPageProps = {
 const CADENCE_LABEL = {once: 'buys once', daily: 'checked daily', monthly: 'rebalances monthly', quarterly: 'rebalances quarterly'} as const;
 
 const StrategyPage = async ({params, searchParams}: StrategyPageProps) => {
-    const userId = await getCurrentUserId();
-    if (!userId) redirect('/sign-in');
+    const userId = await requireUserId();
 
     const {slug} = await params;
     const [detail, timeInMarket] = await Promise.all([

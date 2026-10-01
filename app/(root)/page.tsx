@@ -1,8 +1,7 @@
-import {redirect} from "next/navigation";
 import {cookies} from "next/headers";
 import type {ReactNode} from "react";
 import {ACTIVE_ACCOUNT_COOKIE} from "@/lib/constants";
-import {getCurrentUserId} from "@/lib/actions/watchlist.actions";
+import {requireUserId} from "@/lib/auth/session";
 import {getDashboardLayoutForUser} from "@/lib/dashboard/layout-store";
 import {getPortfoliosForUser} from "@/lib/trading/account";
 import {WIDGET_IDS, WIDGETS, isWidgetAvailable, resolveDataKeys, type WidgetId} from "@/lib/dashboard/catalog";
@@ -23,8 +22,7 @@ type HomeProps = {
 // stays a Server Component: every widget body is rendered here and handed to
 // the client grid, which only owns order/span/edit state.
 const Home = async ({searchParams}: HomeProps) => {
-    const userId = await getCurrentUserId();
-    if (!userId) redirect('/sign-in');
+    const userId = await requireUserId();
 
     const {customize, account} = await searchParams;
     const cookieStore = await cookies();

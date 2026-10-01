@@ -2,7 +2,7 @@
 
 import {connectToDatabase} from "@/database/mongoose";
 import UserPreferencesModel from "@/database/models/user-preferences.model";
-import {getCurrentUserId} from "@/lib/actions/watchlist.actions";
+import {getCurrentUserId} from "@/lib/auth/session";
 import {unsetPreference, upsertPreferences} from "@/lib/settings/preferences-store";
 import {strategyBySlug} from "@/lib/strategies/catalog";
 import {getFollowedStrategies} from "@/lib/strategies/follows";

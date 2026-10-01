@@ -7,7 +7,7 @@ import {connectToDatabase} from "@/database/mongoose";
 import Friendship from "@/database/models/friendship.model";
 import PaperAccount from "@/database/models/paper-account.model";
 import {PAPER_STARTING_BALANCE} from "@/lib/constants";
-import {getCurrentUserId} from "@/lib/actions/watchlist.actions";
+import {getCurrentUserId} from "@/lib/auth/session";
 import {countUnpriced} from "@/lib/trading/analytics";
 import {
     buildPriceMap,

@@ -1,7 +1,7 @@
 'use server';
 
 import {connectToDatabase} from "@/database/mongoose";
-import {getCurrentUserId} from "@/lib/actions/watchlist.actions";
+import {getCurrentUserId} from "@/lib/auth/session";
 import {unsetPreference, upsertPreferences} from "@/lib/settings/preferences-store";
 import {DashboardLayoutSchema, normalizeLayout, resetLayout, type DashboardLayout} from "@/lib/dashboard/layout";
 

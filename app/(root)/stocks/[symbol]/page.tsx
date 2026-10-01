@@ -1,4 +1,4 @@
-import {notFound, redirect} from "next/navigation";
+import {notFound} from "next/navigation";
 import TradingViewWidget from "@/components/TradingViewWidget";
 import StockHeader from "@/components/stock/StockHeader";
 import {
@@ -11,7 +11,8 @@ import {
 import KeyNumbers from "@/components/stock/KeyNumbers";
 import RulesSee from "@/components/stock/RulesSee";
 import {getCompanyProfile, getFinancials, getQuote} from "@/lib/actions/finnhub.actions";
-import {getCurrentUserId, isInWatchlist} from "@/lib/actions/watchlist.actions";
+import {requireUserId} from "@/lib/auth/session";
+import {isInWatchlist} from "@/lib/actions/watchlist.actions";
 import {getTopicsForUser} from "@/lib/topics/store";
 import {readKeyNumbers} from "@/lib/stocks/key-numbers";
 import {buildRulesSee, type SymbolBoardRead} from "@/lib/stocks/rules-see";
@@ -32,8 +33,7 @@ const readBoardRows = async (symbol: string): Promise<SymbolBoardRead[] | null> 
 };
 
 const StockDetailsPage = async ({params}: StockDetailsPageProps) => {
-    const userId = await getCurrentUserId();
-    if (!userId) redirect('/sign-in');
+    const userId = await requireUserId();
 
     const {symbol: raw} = await params;
     const symbol = raw.toUpperCase();

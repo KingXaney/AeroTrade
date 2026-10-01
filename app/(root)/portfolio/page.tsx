@@ -1,8 +1,7 @@
-import {redirect} from "next/navigation";
 import {cookies} from "next/headers";
 import Link from "next/link";
 import {ACTIVE_ACCOUNT_COOKIE} from "@/lib/constants";
-import {getCurrentUserId} from "@/lib/actions/watchlist.actions";
+import {requireUserId} from "@/lib/auth/session";
 import {getAccountAnalytics, getComparisonStats, getIncomeActivity, getPortfoliosForUser, getTradeLedger, TRADE_HISTORY_LIMIT} from "@/lib/trading/account";
 import {replayReceipts} from "@/lib/trading/receipts";
 import {buyNotesBySellId, openLotNotes} from "@/lib/trading/lots";
@@ -37,8 +36,7 @@ type PortfolioPageProps = {
 };
 
 const PortfolioPage = async ({searchParams}: PortfolioPageProps) => {
-    const userId = await getCurrentUserId();
-    if (!userId) redirect('/sign-in');
+    const userId = await requireUserId();
 
     // Active strategy account: ?account= wins, then the cookie, then the first account.
     const {account: accountParam} = await searchParams;

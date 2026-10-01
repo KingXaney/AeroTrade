@@ -4,7 +4,7 @@ import {z} from "zod";
 import {ADVISOR_SYSTEM_PROMPT} from "@/lib/chat/system-prompt";
 import {buildTools} from "@/lib/chat/tools";
 import {chatErrorBody, chatErrorStatus, type ChatErrorCode} from "@/lib/chat/errors";
-import {getCurrentUserId} from "@/lib/actions/watchlist.actions";
+import {getCurrentUserId} from "@/lib/auth/session";
 import {takeRateLimit} from "@/lib/rate-limit";
 import {CHAT_GLOBAL_KEY, chatUserDayKey, chatUserHourKey, resolveChatLimits} from "@/lib/chat/limits";
 

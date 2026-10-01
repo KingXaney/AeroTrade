@@ -1,5 +1,5 @@
-import {notFound, redirect} from "next/navigation";
-import {getCurrentUserId} from "@/lib/actions/watchlist.actions";
+import {notFound} from "next/navigation";
+import {requireUserId} from "@/lib/auth/session";
 import {ensureTopicHasArticles, getTopicArticles, getTopicsOverview} from "@/lib/topics/store";
 import {getCachedTopicsOverview} from "@/lib/dashboard/cached";
 import TopicsShell from "@/components/topics/TopicsShell";
@@ -15,8 +15,7 @@ const PAGE_SIZE = 20;
 type TopicPageProps = {params: Promise<{slug: string}>};
 
 const TopicPage = async ({params}: TopicPageProps) => {
-    const userId = await getCurrentUserId();
-    if (!userId) redirect('/sign-in');
+    const userId = await requireUserId();
 
     const {slug} = await params;
     // The layout's sidebar card already read this for the request; only a read after a

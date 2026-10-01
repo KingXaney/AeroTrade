@@ -1,24 +1,9 @@
 'use server';
 
 import {revalidatePath} from "next/cache";
-import {headers} from "next/headers";
 import {connectToDatabase} from "@/database/mongoose";
 import Watchlist from "@/database/models/watchlist.model";
-import {auth} from "@/lib/auth/server";
-
-// ============================================================================
-// --- Session ---
-// ============================================================================
-
-export const getCurrentUserId = async (): Promise<string | null> => {
-    try {
-        const session = await auth.api.getSession({headers: await headers()});
-        return session?.user?.id ?? null;
-    } catch (error) {
-        console.error('Error reading session:', error);
-        return null;
-    }
-};
+import {getCurrentUserId} from "@/lib/auth/session";
 
 // ============================================================================
 // --- Reads ---

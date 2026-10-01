@@ -1,5 +1,4 @@
-import {redirect} from "next/navigation";
-import {getCurrentUserId} from "@/lib/actions/watchlist.actions";
+import {requireUserId} from "@/lib/auth/session";
 import {ensureTopicHasArticles, getMergedTopicFeed, getTopicsOverview} from "@/lib/topics/store";
 import {getCachedTopicsOverview} from "@/lib/dashboard/cached";
 import {pickFirstRunTopic} from "@/lib/topics/first-run";
@@ -32,8 +31,7 @@ const brainSuggestions = async (): Promise<SuggestedTopic[]> => {
 };
 
 const TopicsPage = async () => {
-    const userId = await getCurrentUserId();
-    if (!userId) redirect('/sign-in');
+    const userId = await requireUserId();
 
     // The layout's sidebar card already read this for the request; the re-reads after
     // seeding and the inline fetch below must see those writes, so they skip the cache.

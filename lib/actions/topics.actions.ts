@@ -5,7 +5,7 @@ import {isValidObjectId} from "mongoose";
 import {connectToDatabase} from "@/database/mongoose";
 import Topic, {type TopicDoc} from "@/database/models/topic.model";
 import TopicArticle from "@/database/models/topic-article.model";
-import {getCurrentUserId} from "@/lib/actions/watchlist.actions";
+import {getCurrentUserId} from "@/lib/auth/session";
 import {MAX_TOPICS_PER_USER, REFRESH_COOLDOWN_MS, refreshCooldownMessage, refreshCooldownRemainingMs} from "@/lib/topics/config";
 import {insertTopic, parseTopicInput} from "@/lib/topics/insert";
 import {keywordSetHash, slugify} from "@/lib/topics/normalize";

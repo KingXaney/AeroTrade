@@ -2,7 +2,7 @@
 
 import {connectToDatabase} from "@/database/mongoose";
 import UserPreferencesModel from "@/database/models/user-preferences.model";
-import {getCurrentUserId} from "@/lib/actions/watchlist.actions";
+import {getCurrentUserId} from "@/lib/auth/session";
 
 // Every action derives the user from the session: preferences are never
 // readable or writable for an arbitrary userId supplied by the caller.

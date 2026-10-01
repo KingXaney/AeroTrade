@@ -1,5 +1,4 @@
-import {redirect} from "next/navigation";
-import {getCurrentUserId} from "@/lib/actions/watchlist.actions";
+import {requireUserId} from "@/lib/auth/session";
 import {getNavigatorStatus} from "@/lib/actions/navigator.actions";
 import {getActiveTheses, getBrainGraph, getBrainSystemStatus, getEntityEvidence, getSinceThesis, getTopEntities} from "@/lib/brain/store";
 import {glossNavigatorReasons} from "@/lib/learn/reasons";
@@ -30,8 +29,7 @@ type BrainPageProps = {
 };
 
 const BrainPage = async ({searchParams}: BrainPageProps) => {
-    const userId = await getCurrentUserId();
-    if (!userId) redirect('/sign-in');
+    const userId = await requireUserId();
 
     const {entity} = await searchParams;
 

@@ -2,7 +2,7 @@
 
 import {revalidatePath} from "next/cache";
 import {connectToDatabase} from "@/database/mongoose";
-import {getCurrentUserId} from "@/lib/actions/watchlist.actions";
+import {getCurrentUserId} from "@/lib/auth/session";
 import {upsertPreferences} from "@/lib/settings/preferences-store";
 import {LESSONS_SEEN_CAP, lessonKey, parseLessonId} from "@/lib/learn/moments";
 import {LESSON_COPY} from "@/lib/learn/copy/lesson";

@@ -1,8 +1,8 @@
 import Link from "next/link";
-import {notFound, redirect} from "next/navigation";
+import {notFound} from "next/navigation";
 import {cn, formatPrice, getChangeColorClass} from "@/lib/utils";
 import {formatPct} from "@/lib/format";
-import {getCurrentUserId} from "@/lib/actions/watchlist.actions";
+import {requireUserId} from "@/lib/auth/session";
 import {getFriendProfile} from "@/lib/actions/friends.actions";
 import {unpricedLabel} from "@/lib/trading/analytics";
 import AccountSummary from "@/components/trade/AccountSummary";
@@ -13,8 +13,7 @@ type FriendProfilePageProps = {
 };
 
 const FriendProfilePage = async ({params}: FriendProfilePageProps) => {
-    const viewerId = await getCurrentUserId();
-    if (!viewerId) redirect('/sign-in');
+    const viewerId = await requireUserId();
 
     const {id} = await params;
     const profile = await getFriendProfile(id, viewerId);

@@ -1,5 +1,4 @@
-import {redirect} from "next/navigation";
-import {getCurrentUserId} from "@/lib/actions/watchlist.actions";
+import {requireUserId} from "@/lib/auth/session";
 import {getCachedWatchlistSymbols} from "@/lib/dashboard/cached";
 import {getNewsFeedForPrefs, getNewsFeedPrefs, getTopicFeedBatch} from "@/lib/news/feed-store";
 import {NEWS_PAGE_SIZE} from "@/lib/news/config";
@@ -12,8 +11,7 @@ type NewsPageProps = {
 };
 
 const NewsPage = async ({searchParams}: NewsPageProps) => {
-    const userId = await getCurrentUserId();
-    if (!userId) redirect('/sign-in');
+    const userId = await requireUserId();
 
     const {edit} = await searchParams;
     const prefs = await getNewsFeedPrefs(userId);

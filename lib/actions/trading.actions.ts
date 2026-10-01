@@ -6,7 +6,7 @@ import PaperTrade from "@/database/models/paper-trade.model";
 import AccountSnapshot from "@/database/models/account-snapshot.model";
 import AccountIncome from "@/database/models/account-income.model";
 import {PAPER_STARTING_BALANCE} from "@/lib/constants";
-import {getCurrentUserId} from "@/lib/actions/watchlist.actions";
+import {getCurrentUserId} from "@/lib/auth/session";
 import {getOwnedAccount, resolveStartingBalance, seedDayZeroSnapshot} from "@/lib/trading/account";
 import {executeOrder} from "@/lib/trading/orders";
 import {sanitizeTradeNote} from "@/lib/trading/order-math";

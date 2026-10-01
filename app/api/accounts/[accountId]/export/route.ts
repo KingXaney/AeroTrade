@@ -1,6 +1,5 @@
-import {headers} from "next/headers";
 import {NextResponse} from "next/server";
-import {auth} from "@/lib/auth/server";
+import {getSessionUser} from "@/lib/auth/session";
 import PaperTrade from "@/database/models/paper-trade.model";
 import {epochTrades, getOwnedAccount} from "@/lib/trading/account";
 import {csvDownloadHeaders, tradesCsv, tradesCsvFilename, type CsvTrade} from "@/lib/trading/csv";
@@ -11,8 +10,7 @@ import {csvDownloadHeaders, tradesCsv, tradesCsvFilename, type CsvTrade} from "@
 // them) are no more this account's than they are on /portfolio. The rows are written by
 // tradesCsv, which the quant strategies' export (/api/strategies/[slug]/export) shares.
 export async function GET(request: Request, {params}: {params: Promise<{accountId: string}>}) {
-    const session = await auth.api.getSession({headers: await headers()});
-    const userId = session?.user?.id;
+    const userId = (await getSessionUser())?.id;
     if (!userId) {
         return NextResponse.json({error: 'Not authenticated'}, {status: 401});
     }
