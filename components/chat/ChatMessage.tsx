@@ -71,14 +71,9 @@ const ChatMessage = ({message}: ChatMessageProps) => {
                 className={cn(
                     'max-w-[85%] rounded-xl px-3 py-2 text-sm leading-relaxed',
                     isUser
-                        ? 'rounded-tr-none'
-                        : 'rounded-tl-none',
+                        ? 'rounded-tr-none bg-brand-strong/15 text-brand border border-brand-strong/20'
+                        : 'rounded-tl-none bg-surface-3 text-fg',
                 )}
-                style={{
-                    backgroundColor: isUser ? 'color-mix(in srgb, var(--brand-strong) 15%, transparent)' : 'var(--surface-3)',
-                    color: isUser ? 'var(--brand)' : 'var(--fg)',
-                    border: isUser ? '1px solid color-mix(in srgb, var(--brand-strong) 20%, transparent)' : 'none',
-                }}
             >
                 {message.parts.map((part, idx) => {
                     if (part.type === 'text') {

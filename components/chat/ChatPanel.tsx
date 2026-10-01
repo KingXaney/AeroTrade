@@ -166,17 +166,15 @@ const ChatPanel = ({userId, onClose, initialMessages, onMessagesChange, initialI
 
     return (
         <div
-            className="fixed bottom-5 right-5 z-[80] flex max-w-[calc(100vw-2rem)] max-h-[calc(100dvh-2rem)] flex-col rounded-2xl shadow-2xl sm:bottom-6 sm:right-6 overflow-hidden"
+            className="fixed bottom-5 right-5 z-[80] flex max-w-[calc(100vw-2rem)] max-h-[calc(100dvh-2rem)] flex-col rounded-2xl shadow-2xl sm:bottom-6 sm:right-6 overflow-hidden bg-surface-0/95 border border-brand/15"
             role="dialog"
             aria-label="AeroTrade assistant"
             onKeyDown={(e) => { if (e.key === 'Escape') { e.stopPropagation(); onClose(); } }}
             style={{
                 width: `${size.width}px`,
                 height: `${size.height}px`,
-                backgroundColor: 'color-mix(in srgb, var(--surface-0) 95%, transparent)',
                 backdropFilter: 'blur(24px)',
                 WebkitBackdropFilter: 'blur(24px)',
-                border: '1px solid color-mix(in srgb, var(--brand) 15%, transparent)',
                 boxShadow: '0 0 40px color-mix(in srgb, var(--brand-strong) 8%, transparent)',
             }}
         >
@@ -202,11 +200,7 @@ const ChatPanel = ({userId, onClose, initialMessages, onMessagesChange, initialI
             />
 
             {/* Header */}
-            <div className="flex items-center justify-between px-4 py-3"
-                 style={{
-                     backgroundColor: 'color-mix(in srgb, var(--brand-strong) 8%, transparent)',
-                     borderBottom: '1px solid color-mix(in srgb, var(--line-strong) 30%, transparent)',
-                 }}>
+            <div className="flex items-center justify-between px-4 py-3 bg-brand-strong/8 border-b border-line-strong/30">
                 <div className="flex items-center gap-2">
                     <span className="material-symbols-outlined text-brand animate-pulse">smart_toy</span>
                     <span className="text-xs font-bold tracking-[0.1em] uppercase text-brand font-mono">
@@ -237,8 +231,7 @@ const ChatPanel = ({userId, onClose, initialMessages, onMessagesChange, initialI
             <div ref={listRef} className="flex-1 overflow-y-auto px-4 py-3 space-y-3 scrollbar-hide">
                 {messages.length === 0 && (
                     <div className="space-y-3">
-                        <div className="rounded-xl rounded-tl-none px-3 py-2 text-sm text-fg max-w-[85%]"
-                             style={{ backgroundColor: 'var(--surface-3)' }}>
+                        <div className="rounded-xl rounded-tl-none px-3 py-2 text-sm text-fg max-w-[85%] bg-surface-3">
                             {CHAT_WELCOME_MESSAGE}
                         </div>
                         <div className="flex flex-col gap-2">
@@ -247,13 +240,7 @@ const ChatPanel = ({userId, onClose, initialMessages, onMessagesChange, initialI
                                     key={s}
                                     type="button"
                                     onClick={() => onSuggestion(s)}
-                                    className="text-left rounded-md px-3 py-1.5 text-xs text-fg-soft hover:text-fg transition-colors"
-                                    style={{
-                                        backgroundColor: 'color-mix(in srgb, var(--surface-2) 40%, transparent)',
-                                        border: '1px solid color-mix(in srgb, var(--line-strong) 30%, transparent)',
-                                    }}
-                                    onMouseEnter={(e) => { e.currentTarget.style.backgroundColor = 'color-mix(in srgb, var(--surface-2) 80%, transparent)'; }}
-                                    onMouseLeave={(e) => { e.currentTarget.style.backgroundColor = 'color-mix(in srgb, var(--surface-2) 40%, transparent)'; }}
+                                    className="text-left rounded-md px-3 py-1.5 text-xs text-fg-soft hover:text-fg transition-colors bg-surface-2/40 hover:bg-surface-2/80 border border-line-strong/30"
                                 >
                                     {s}
                                 </button>
@@ -267,8 +254,7 @@ const ChatPanel = ({userId, onClose, initialMessages, onMessagesChange, initialI
                 ))}
 
                 {isBusy && messages[messages.length - 1]?.role === 'user' && (
-                    <div className="flex items-center gap-1.5 p-3 rounded-xl rounded-tl-none w-fit text-brand/60"
-                         style={{ backgroundColor: 'var(--surface-3)' }}>
+                    <div className="flex items-center gap-1.5 p-3 rounded-xl rounded-tl-none w-fit text-brand/60 bg-surface-3">
                         <div className="typing-dot"></div>
                         <div className="typing-dot"></div>
                         <div className="typing-dot"></div>
@@ -281,32 +267,24 @@ const ChatPanel = ({userId, onClose, initialMessages, onMessagesChange, initialI
                     // leaks infrastructure detail.
                     const described = describeChatError(error);
                     return (
-                        <div className="rounded-md px-3 py-2 text-xs space-y-2"
-                             style={{
-                                 backgroundColor: 'color-mix(in srgb, var(--negative) 15%, transparent)',
-                                 border: '1px solid color-mix(in srgb, var(--negative) 30%, transparent)',
-                                 color: 'var(--negative)',
-                             }}>
+                        <div className="rounded-md px-3 py-2 text-xs space-y-2 bg-negative/15 border border-negative/30 text-negative">
                             <p>{described.message}</p>
                             <div className="flex items-center gap-2">
                                 {described.action === 'retry' && (
                                     <button type="button" onClick={onRetry} disabled={isBusy}
-                                            className="px-2 py-1 rounded font-bold uppercase tracking-wider text-[10px] text-negative disabled:opacity-50 font-mono"
-                                            style={{border: '1px solid color-mix(in srgb, var(--negative) 40%, transparent)'}}>
+                                            className="px-2 py-1 rounded font-bold uppercase tracking-wider text-[10px] text-negative disabled:opacity-50 font-mono border border-negative/40">
                                         Try again
                                     </button>
                                 )}
                                 {described.action === 'clear' && (
                                     <button type="button" onClick={onClear}
-                                            className="px-2 py-1 rounded font-bold uppercase tracking-wider text-[10px] text-negative font-mono"
-                                            style={{border: '1px solid color-mix(in srgb, var(--negative) 40%, transparent)'}}>
+                                            className="px-2 py-1 rounded font-bold uppercase tracking-wider text-[10px] text-negative font-mono border border-negative/40">
                                         Clear chat
                                     </button>
                                 )}
                                 {described.action === 'sign_in' && (
                                     <Link href="/sign-in"
-                                          className="px-2 py-1 rounded font-bold uppercase tracking-wider text-[10px] text-negative font-mono"
-                                          style={{border: '1px solid color-mix(in srgb, var(--negative) 40%, transparent)'}}>
+                                          className="px-2 py-1 rounded font-bold uppercase tracking-wider text-[10px] text-negative font-mono border border-negative/40">
                                         Sign in
                                     </Link>
                                 )}
@@ -321,8 +299,7 @@ const ChatPanel = ({userId, onClose, initialMessages, onMessagesChange, initialI
             </div>
 
             {/* Input */}
-            <form onSubmit={onSubmit} className="flex items-center gap-2 px-3 py-3"
-                  style={{ borderTop: '1px solid color-mix(in srgb, var(--line-strong) 30%, transparent)' }}>
+            <form onSubmit={onSubmit} className="flex items-center gap-2 px-3 py-3 border-t border-line-strong/30">
                 <input
                     ref={inputRef}
                     value={input}
@@ -332,22 +309,15 @@ const ChatPanel = ({userId, onClose, initialMessages, onMessagesChange, initialI
                     // focus fell to <body> after every message — you had to click back in,
                     // and Escape stopped reaching the panel. send() already refuses to
                     // submit while a reply is streaming, and composing ahead is useful.
-                    className="flex-1 rounded-lg px-3 py-2 text-sm text-fg outline-none field-focus border-none font-sans"
-                    style={{
-                        backgroundColor: 'var(--surface-2)',
-                    }}
+                    className="flex-1 rounded-lg px-3 py-2 text-sm text-fg outline-none field-focus border-none font-sans bg-surface-2"
                 />
                 <button
                     type="submit"
                     disabled={isBusy || !input.trim()}
                     className={cn(
-                        'inline-flex size-9 items-center justify-center rounded-md transition-colors',
+                        'inline-flex size-9 items-center justify-center rounded-md transition-colors bg-brand-strong text-on-brand',
                         (isBusy || !input.trim()) && 'opacity-50 cursor-not-allowed',
                     )}
-                    style={{
-                        backgroundColor: 'var(--brand-strong)',
-                        color: 'var(--on-brand)',
-                    }}
                     aria-label="Send message"
                 >
                     <span className="material-symbols-outlined text-lg">send</span>
