@@ -4,6 +4,7 @@ import Link from "next/link";
 import {Plus} from "lucide-react";
 import {cn} from "@/lib/utils";
 import {formatTimeAgoSeconds} from "@/lib/format";
+import {sortTopicsForRail} from "@/lib/topics/rail";
 import type {TopicOverviewItem} from '@/lib/topics/types';
 
 type Props = {
@@ -23,8 +24,7 @@ const UnseenPill = ({count}: {count: number}) => (
 
 // Desktop: a sticky vertical rail. Mobile: the same items as a scrolling chip row.
 const TopicRail = ({topics, activeSlug, unseenTotal, onNewTopic}: Props) => {
-    const sorted = [...topics].sort((a, b) =>
-        b.unseenCount - a.unseenCount || (b.latest?.datetime ?? 0) - (a.latest?.datetime ?? 0));
+    const sorted = sortTopicsForRail(topics);
 
     const rowClass = (active: boolean) => cn(
         'flex items-center gap-2 rounded-lg px-3 py-2 text-xs font-bold uppercase tracking-[0.08em] transition-colors shrink-0 lg:shrink',
