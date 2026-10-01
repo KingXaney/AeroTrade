@@ -9,6 +9,7 @@ import PaperAccount from "@/database/models/paper-account.model";
 import PaperTrade from "@/database/models/paper-trade.model";
 import {DEFAULT_ACCOUNT_NAME, getOwnedAccount} from "@/lib/trading/accounts";
 import type {CsvTrade} from "@/lib/trading/csv";
+import {TRADE_HISTORY_LIMIT} from "@/lib/trading/config";
 import type {PaperTradeRecord, TradeSource} from '@/lib/trading/types';
 
 type LeanTrade = {
@@ -71,9 +72,6 @@ export const getTradeLedger = cache(async (userId: string, accountId: string): P
     const trades = await PaperTrade.find(epochTrades(userId, accountId, epoch.since)).sort({createdAt: 1, _id: 1}).lean<LeanTrade[]>();
     return trades.map((t) => toTradeRecord(t));
 });
-
-// The trade log's page size, for getTradeHistory and for pages that slice their ledger.
-export const TRADE_HISTORY_LIMIT = 50;
 
 // The newest `limit` fills of the current epoch, newest first, in a bounded read of their own
 // (the same index, walked backwards, `limit` rows) — for callers that do not hold the ledger:

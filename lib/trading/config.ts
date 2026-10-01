@@ -12,3 +12,7 @@ export const ACTIVE_ACCOUNT_COOKIE = 'aero-active-account';
 // automated caller's explanation. The ticket's field, sanitizeTradeNote, executeOrder and the
 // PaperTrade schema all cap at this.
 export const TRADE_REASON_MAX = 200;
+
+// The trade log's page size: getTradeHistory's bounded read, and the tail a page slices from the
+// ledger it already holds (/portfolio).
+export const TRADE_HISTORY_LIMIT = 50;
