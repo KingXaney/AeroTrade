@@ -9,7 +9,7 @@ import {getNews} from "@/lib/prices/finnhub";
 import {getCachedWatchlistSymbols} from "@/lib/dashboard/cached";
 import {fetchGoogleNewsFeed} from "@/lib/news/adapters/search";
 import {fetchRssNews} from "@/lib/news/adapters/rss";
-import {FEED_FETCH_LIMIT, FEED_WATCHLIST_SYMBOL_CAP} from "@/lib/news/config";
+import {FEED_FETCH_LIMIT, FEED_WATCHLIST_SYMBOL_CAP, newsSearchEnabled} from "@/lib/news/config";
 import {
     defaultNewsFeed,
     feedRequestsFor,
@@ -22,7 +22,6 @@ import {
 } from "@/lib/news/feed";
 import {toFeedArticles} from "@/lib/news/topic-batch";
 import {getMergedTopicFeed} from "@/lib/topics/store";
-import {newsSearchEnabled} from "@/lib/topics/config";
 
 export type NewsFeedResult = {
     articles: MarketNewsArticle[];

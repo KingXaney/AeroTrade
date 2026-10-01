@@ -2,10 +2,10 @@
 // (since the personal news feed) the query-less front page and topic sections too. No key
 // needed; results are opaque redirect links, so headlines (not URLs) carry the identity.
 
-import {FEED_REVALIDATE_SECONDS, GOOGLE_NEWS_BASE, GOOGLE_NEWS_SEARCH_BASE, searchUserAgent, US_EDITION, type GoogleEdition} from "@/lib/news/config";
+import {FEED_REVALIDATE_SECONDS, GOOGLE_NEWS_BASE, GOOGLE_NEWS_SEARCH_BASE, searchUserAgent, US_EDITION, type GoogleEdition, newsSearchEnabled} from "@/lib/news/config";
 import {parseRssXml} from "@/lib/news/adapters/rss";
 import {formatArticle, validateArticle} from "@/lib/news/article";
-import {QUERY_MAX_CHARS, TOPIC_SEARCH_WINDOW, newsSearchEnabled} from "@/lib/topics/config";
+import {QUERY_MAX_CHARS, TOPIC_SEARCH_WINDOW} from "@/lib/topics/config";
 
 type NextFetchInit = RequestInit & {next?: {revalidate: number}};
 

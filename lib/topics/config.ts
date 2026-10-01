@@ -61,10 +61,3 @@ export const refreshCooldownMessage = (remainingMs: number): string => {
         ? 'Refreshed recently — try again in a minute.'
         : `Refreshed recently — try again in ${minutes} minutes.`;
 };
-
-// Kill switch for the Google News search adapter. Enabled unless explicitly turned
-// off so a missing env var in a new environment never silently disables topics.
-export const newsSearchEnabled = (): boolean => {
-    const raw = (process.env.NEWS_SEARCH_ENABLED ?? '').trim().toLowerCase();
-    return raw !== '0' && raw !== 'false';
-};

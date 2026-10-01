@@ -57,6 +57,14 @@ export const secUserAgent = (): string => "AeroTrade " + contactEmail();
 export const GOOGLE_NEWS_BASE = "https://news.google.com/rss";
 export const GOOGLE_NEWS_SEARCH_BASE = `${GOOGLE_NEWS_BASE}/search`;
 
+// Kill switch for the Google News search adapter (followed topics' fetches and the /news
+// feed's Google slots). Enabled unless explicitly turned off so a missing env var in a new
+// environment never silently disables topics.
+export const newsSearchEnabled = (): boolean => {
+    const raw = (process.env.NEWS_SEARCH_ENABLED ?? '').trim().toLowerCase();
+    return raw !== '0' && raw !== 'false';
+};
+
 // A Google News edition: interface language, country, and the combined edition id.
 export type GoogleEdition = {hl: string; gl: string; ceid: string};
 export const US_EDITION: GoogleEdition = {hl: "en-US", gl: "US", ceid: "US:en"};
