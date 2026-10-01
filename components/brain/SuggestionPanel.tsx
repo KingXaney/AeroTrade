@@ -6,6 +6,7 @@ import SafeMarkdown from "@/components/markdown/SafeMarkdown";
 import {toast} from "sonner";
 import {cn, formatPrice, getChangeColorClass} from "@/lib/utils";
 import {applySuggestion} from "@/lib/actions/navigator.actions";
+import {runWithToast} from "@/lib/action-toast";
 import type {ReasonClause} from "@/lib/learn/reasons";
 import {NAVIGATOR_COPY} from "@/lib/learn/copy/navigator";
 import ReasonGloss from "@/components/learn/ReasonGloss";
@@ -31,12 +32,9 @@ const ItemRow = ({item, showApply, accounts}: {item: GlossedItem; showApply: boo
         if (applying || !accountId) return;
         setApplying(true);
         try {
-            const result = await applySuggestion({symbol: item.symbol, action: item.action, targetWeight: item.targetWeight, accountId});
-            if (result.success) {
-                toast.success(result.message || 'Applied');
+            const apply = () => applySuggestion({symbol: item.symbol, action: item.action, targetWeight: item.targetWeight, accountId});
+            if (await runWithToast(apply, toast, {success: 'Applied', error: 'Could not apply'})) {
                 router.refresh();
-            } else {
-                toast.error(result.message || 'Could not apply');
             }
         } finally {
             setApplying(false);

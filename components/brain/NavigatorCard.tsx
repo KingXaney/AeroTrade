@@ -6,6 +6,7 @@ import Link from "next/link";
 import {toast} from "sonner";
 import {enrollAiNavigator, pauseAiNavigator, resumeAiNavigator, runAiNavigatorNow, unenrollAiNavigator} from "@/lib/actions/navigator.actions";
 import {MAX_STARTING_BALANCE, MIN_STARTING_BALANCE, PAPER_STARTING_BALANCE} from "@/lib/constants";
+import {runWithToast} from "@/lib/action-toast";
 
 // Enrollment + kill switch for the AI-managed paper account.
 const NavigatorCard = ({status}: {status: NavigatorStatus}) => {
@@ -21,12 +22,8 @@ const NavigatorCard = ({status}: {status: NavigatorStatus}) => {
         if (busy) return;
         setBusy(true);
         try {
-            const result = await action();
-            if (result.success) {
-                toast.success(result.message || 'Done');
+            if (await runWithToast(action, toast, {success: 'Done', error: 'Something went wrong'})) {
                 router.refresh();
-            } else {
-                toast.error(result.message || 'Something went wrong');
             }
         } finally {
             setBusy(false);

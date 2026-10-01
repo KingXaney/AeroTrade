@@ -3,9 +3,6 @@
 import {revalidatePath} from "next/cache";
 import {cookies} from "next/headers";
 import PaperAccount from "@/database/models/paper-account.model";
-import PaperTrade from "@/database/models/paper-trade.model";
-import AccountSnapshot from "@/database/models/account-snapshot.model";
-import AccountIncome from "@/database/models/account-income.model";
 import {connectToDatabase} from "@/database/mongoose";
 import {
     ACTIVE_ACCOUNT_COOKIE,
@@ -15,6 +12,7 @@ import {
 } from "@/lib/constants";
 import {getCurrentUserId} from "@/lib/actions/watchlist.actions";
 import {getAccountsForUser, getOwnedAccount, resolveStartingBalance, seedDayZeroSnapshot} from "@/lib/trading/account";
+import {deleteOwnedAccount} from "@/lib/trading/account-delete";
 
 const ACCOUNT_NAME_MAX_LENGTH = 40;
 const ACTIVE_COOKIE_MAX_AGE_SECONDS = 60 * 60 * 24 * 365;
@@ -163,34 +161,22 @@ export const renamePaperAccount = async ({accountId, name}: {accountId: string; 
     }
 };
 
-// Delete a strategy account and everything scoped to it (trades + snapshots).
+// Delete a strategy account and everything scoped to it (lib/trading/account-delete).
 export const deletePaperAccount = async (accountId: string): Promise<OrderResult> => {
     try {
         const userId = await getCurrentUserId();
         if (!userId) return {success: false, message: 'Not authenticated'};
 
-        const account = await getOwnedAccount(userId, accountId);
-        if (!account) return {success: false, message: 'Strategy account not found'};
-
-        const count = await PaperAccount.countDocuments({userId});
-        if (count <= 1) return {success: false, message: 'You need at least one strategy account'};
-
-        // Children first, parent last: a crash mid-cascade leaves the account intact and
-        // the delete retryable, instead of permanently orphaning trades/snapshots behind
-        // an ownership gate that can no longer resolve the account.
-        const id = String(account._id);
-        await PaperTrade.deleteMany({accountId: id});
-        await AccountSnapshot.deleteMany({accountId: id});
-        await AccountIncome.deleteMany({accountId: id});
-        await PaperAccount.deleteOne({_id: account._id, userId});
+        const {deletedId, ...result} = await deleteOwnedAccount(userId, accountId);
+        if (!deletedId) return result;
 
         const store = await cookies();
-        if (store.get(ACTIVE_ACCOUNT_COOKIE)?.value === id) {
+        if (store.get(ACTIVE_ACCOUNT_COOKIE)?.value === deletedId) {
             store.delete(ACTIVE_ACCOUNT_COOKIE);
         }
 
         revalidateAccountPaths();
-        return {success: true, message: `Deleted "${account.name || 'strategy'}"`};
+        return result;
     } catch (error) {
         console.error('Error deleting account:', error);
         return {success: false, message: 'Could not delete the account'};

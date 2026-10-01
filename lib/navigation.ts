@@ -4,7 +4,7 @@
 // was the only one carrying /watchlist, /friends, /history and /settings, and it is
 // `hidden lg:flex`, so those four pages were unreachable by click below 1024px.
 //
-// Pure module: no React, no DB, no next/navigation. Tested in lib/__tests__/navigation.ts.
+// Pure module: no React, no DB, no next/navigation. Tested in lib/__tests__/navigation.test.ts.
 
 export type NavBadgeKey = 'watchlist' | 'friendRequests';
 
