@@ -2,30 +2,15 @@
 
 import {useState} from "react";
 import Link from "next/link";
-import {useRouter} from "next/navigation";
-import {toast} from "sonner";
-import ConfirmDialog from "@/components/primitives/ConfirmDialog";
-import {resetNewsFeed} from "@/lib/actions/news-feed.actions";
-import {defaultNewsFeed, describeNewsFeed, isDefaultNewsFeed, type NewsFeedPrefs} from "@/lib/news/feed-prefs";
+import useResetNewsFeed from "@/components/news/useResetNewsFeed";
+import {describeNewsFeed, isDefaultNewsFeed, type NewsFeedPrefs} from "@/lib/news/feed-prefs";
 
 const mono = {fontFamily: 'var(--type-mono)'} as const;
 
 // Read-mostly summary; editing lives on /news, next to the feed it changes.
 const NewsFeedSettings = ({initial}: {initial: NewsFeedPrefs}) => {
-    const router = useRouter();
     const [feed, setFeed] = useState(initial);
-    const [confirming, setConfirming] = useState(false);
-
-    const reset = async () => {
-        const result = await resetNewsFeed();
-        if (!result.success) {
-            toast.error(result.message ?? 'Could not reset your news feed');
-            return;
-        }
-        setFeed(result.feed ?? defaultNewsFeed());
-        toast.success('News feed reset to top stories');
-        router.refresh();
-    };
+    const {askReset, resetDialog} = useResetNewsFeed(setFeed);
 
     return (
         <div className="space-y-4">
@@ -39,19 +24,11 @@ const NewsFeedSettings = ({initial}: {initial: NewsFeedPrefs}) => {
                 Your feed fills the News page, the News feed dashboard widget, the History page and the daily digest.
                 By default it is Google News&apos; front page for the United States.
             </p>
-            <button id="settings-news-reset" type="button" onClick={() => setConfirming(true)} disabled={isDefaultNewsFeed(feed)}
+            <button id="settings-news-reset" type="button" onClick={askReset} disabled={isDefaultNewsFeed(feed)}
                     className="text-xs uppercase tracking-[0.1em] text-fg-muted hover:text-negative transition-colors disabled:opacity-40 disabled:hover:text-fg-muted" style={mono}>
                 Reset to top stories
             </button>
-            <ConfirmDialog
-                open={confirming}
-                onOpenChange={setConfirming}
-                title="Reset your news feed?"
-                description="Back to Google News top stories for the United States. Your categories, regions, outlets and keywords are cleared."
-                confirmLabel="Reset feed"
-                destructive
-                onConfirm={reset}
-            />
+            {resetDialog}
         </div>
     );
 };

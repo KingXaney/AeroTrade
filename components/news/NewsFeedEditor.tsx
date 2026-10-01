@@ -5,11 +5,10 @@ import {useRouter} from "next/navigation";
 import {toast} from "sonner";
 import {Loader2} from "lucide-react";
 import Switch from "@/components/primitives/Switch";
-import ConfirmDialog from "@/components/primitives/ConfirmDialog";
 import KeywordChips from "@/components/forms/KeywordChips";
-import {resetNewsFeed, saveNewsFeed} from "@/lib/actions/news-feed.actions";
+import useResetNewsFeed from "@/components/news/useResetNewsFeed";
+import {saveNewsFeed} from "@/lib/actions/news-feed.actions";
 import {
-    defaultNewsFeed,
     describeNewsFeed,
     MAX_FEED_CATEGORIES,
     MAX_FEED_KEYWORDS,
@@ -58,7 +57,6 @@ const NewsFeedEditor = ({initial, startOpen = false}: Props) => {
     const [open, setOpen] = useState(startOpen);
     const [draft, setDraft] = useState<NewsFeedPrefs>(initial);
     const [saved, setSaved] = useState<NewsFeedPrefs>(initial);
-    const [confirmingReset, setConfirmingReset] = useState(false);
     const [pending, startTransition] = useTransition();
 
     const normalized = normalizeNewsFeed(draft);
@@ -94,18 +92,10 @@ const NewsFeedEditor = ({initial, startOpen = false}: Props) => {
         router.refresh();
     });
 
-    const reset = async () => {
-        const result = await resetNewsFeed();
-        if (!result.success) {
-            toast.error(result.message ?? 'Could not reset your news feed');
-            return;
-        }
-        const feed = result.feed ?? defaultNewsFeed();
+    const {askReset, resetDialog} = useResetNewsFeed((feed) => {
         setSaved(feed);
         setDraft(feed);
-        toast.success('News feed reset to top stories');
-        router.refresh();
-    };
+    });
 
     return (
         <section className="glass-panel rounded-xl p-5">
@@ -184,7 +174,7 @@ const NewsFeedEditor = ({initial, startOpen = false}: Props) => {
                     )}
 
                     <div className="flex items-center justify-between gap-2 pt-3 border-t border-line-strong/20" style={mono}>
-                        <button id="news-feed-reset" type="button" onClick={() => setConfirmingReset(true)}
+                        <button id="news-feed-reset" type="button" onClick={askReset}
                                 className="text-xs uppercase tracking-[0.1em] text-fg-muted hover:text-negative transition-colors">
                             Reset to top stories
                         </button>
@@ -197,15 +187,7 @@ const NewsFeedEditor = ({initial, startOpen = false}: Props) => {
                 </div>
             )}
 
-            <ConfirmDialog
-                open={confirmingReset}
-                onOpenChange={setConfirmingReset}
-                title="Reset your news feed?"
-                description="Back to Google News top stories for the United States. Your categories, regions, outlets and keywords are cleared."
-                confirmLabel="Reset feed"
-                destructive
-                onConfirm={reset}
-            />
+            {resetDialog}
         </section>
     );
 };
