@@ -1,5 +1,5 @@
 import Link from "next/link";
-import {formatTimeAgoMs} from "@/lib/utils";
+import {formatTimeAgoMs} from "@/lib/format";
 import type {SecondOpinionView} from "@/lib/brain/opinion";
 
 const EXCERPT_MAX_CHARS = 420;

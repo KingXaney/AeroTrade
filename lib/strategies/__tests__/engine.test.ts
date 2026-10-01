@@ -1,21 +1,18 @@
 import {describe, expect, it, vi} from 'vitest';
+import {addCalendarDays} from '@/lib/dates';
 import type {Bar} from '@/lib/prices/signals';
 import {LOOKBACK_BARS, STALE_SKIP_FRACTION} from '@/lib/strategies/config';
-import {applyFill, buildContext, runStrategyDay, type SimAccount} from '@/lib/strategies/engine';
+import {buildContext, runStrategyDay} from '@/lib/strategies/engine';
 import type {Decide, Decision, StrategyContext, StrategyDefinition} from '@/lib/strategies/types';
 import {UNIVERSES, type UniverseKey} from '@/lib/strategies/universe';
 
-const MS_PER_DAY = 24 * 60 * 60 * 1000;
 const AS_OF = '2026-09-21';
 const TRADE_DATE = '2026-09-22';
-
-const shiftDate = (date: string, days: number): string =>
-    new Date(new Date(`${date}T00:00:00Z`).getTime() + days * MS_PER_DAY).toISOString().slice(0, 10);
 
 // n ascending daily bars ending on endDate, closing at `close` (+1 per bar so a slice
 // boundary is visible in the values).
 const series = (n: number, endDate: string, close = 100): Bar[] =>
-    Array.from({length: n}, (_, i) => ({date: shiftDate(endDate, i - (n - 1)), close: close + i}));
+    Array.from({length: n}, (_, i) => ({date: addCalendarDays(endDate, i - (n - 1)), close: close + i}));
 
 const defFor = (universe: UniverseKey, overrides: Partial<StrategyDefinition> = {}): StrategyDefinition => ({
     id: 'buy-and-hold-spy',
@@ -64,13 +61,13 @@ const stubDecide = (decision: Decision): Decide => vi.fn(() => decision);
 describe('buildContext', () => {
     it('keeps only bars on or before asOf and at most LOOKBACK_BARS of them', () => {
         // 300 bars ending four days AFTER asOf: 296 are ≤ asOf, sliced to the last 260.
-        const bars = new Map([['SPY', series(300, shiftDate(AS_OF, 4))]]);
+        const bars = new Map([['SPY', series(300, addCalendarDays(AS_OF, 4))]]);
         const ctx = build(defFor('spy'), bars);
         const spy = ctx.bars.get('SPY') ?? [];
         expect(LOOKBACK_BARS).toBe(260);
         expect(spy).toHaveLength(260);
         expect(spy[spy.length - 1].date).toBe(AS_OF);
-        expect(spy[0].date).toBe(shiftDate(AS_OF, -259));
+        expect(spy[0].date).toBe(addCalendarDays(AS_OF, -259));
         expect(spy.every((bar) => bar.date <= AS_OF)).toBe(true);
         expect(ctx.asOf).toBe(AS_OF);
         expect(ctx.tradeDate).toBe(TRADE_DATE);
@@ -81,7 +78,7 @@ describe('buildContext', () => {
     it('classifies universe symbols as eligible or stale, counting a missing series as stale', () => {
         const bars = new Map<string, Bar[]>([
             ['SPY', series(30, AS_OF)],
-            ['EFA', series(30, shiftDate(AS_OF, -1))], // latest bar a day old
+            ['EFA', series(30, addCalendarDays(AS_OF, -1))], // latest bar a day old
             ['BIL', series(30, AS_OF)],
             // AGG has no bars at all
         ]);
@@ -103,7 +100,7 @@ describe('buildContext', () => {
     it('prices a holding at its close on asOf, null when its bar is stale, and marks equity accordingly', () => {
         const bars = new Map<string, Bar[]>([
             ['SPY', series(30, AS_OF, 100)],                 // last close 129
-            ['EFA', series(30, shiftDate(AS_OF, -1), 50)],   // stale → null
+            ['EFA', series(30, addCalendarDays(AS_OF, -1), 50)],   // stale → null
         ]);
         const ctx = build(defFor('gem'), bars, {
             cash: 1_000,
@@ -126,7 +123,7 @@ describe('buildContext', () => {
 describe('runStrategyDay — stale-data skip', () => {
     it('skips a GEM-sized universe when one of four symbols is stale, without calling decide', () => {
         const bars = freshFor(UNIVERSES.gem);
-        bars.set('EFA', series(30, shiftDate(AS_OF, -1)));
+        bars.set('EFA', series(30, addCalendarDays(AS_OF, -1)));
         const decide = stubDecide(decisionOf([{symbol: 'SPY', weight: 0.99, reason: 'x'}]));
         const result = runStrategyDay(defFor('gem'), build(defFor('gem'), bars), decide);
         expect(decide).not.toHaveBeenCalled();
@@ -199,7 +196,7 @@ describe('runStrategyDay — deciding and planning', () => {
 
     it('never sells a left-universe holding whose own bar is stale', () => {
         const def = defFor('spy');
-        const bars = new Map<string, Bar[]>([['SPY', series(30, AS_OF)], ['GLD', series(30, shiftDate(AS_OF, -1), 200)]]);
+        const bars = new Map<string, Bar[]>([['SPY', series(30, AS_OF)], ['GLD', series(30, addCalendarDays(AS_OF, -1), 200)]]);
         const ctx = build(def, bars, {cash: 1_000, positions: [{symbol: 'GLD', quantity: 10, avgCost: 150}]});
         const result = runStrategyDay(def, ctx, stubDecide(decisionOf([])));
         expect(result.orders).toEqual([]);
@@ -234,86 +231,5 @@ describe('runStrategyDay — deciding and planning', () => {
         // Target 0.3 → drift 18 870 − 12 900 = 5 970 = 9.5 % < 50 % → held still.
         const still = runStrategyDay(wide, ctx, stubDecide(decisionOf([{symbol: 'SPY', weight: 0.3, reason: 'x'}])));
         expect(still.orders).toEqual([]);
-    });
-});
-
-describe('applyFill', () => {
-    const account: SimAccount = {cash: 10_000, positions: [{symbol: 'AAPL', quantity: 10, avgCost: 100}]};
-
-    it('rejects a non-positive or fractional-to-zero quantity and a bad price', () => {
-        expect(applyFill(account, {symbol: 'AAPL', side: 'buy', quantity: 0}, 100)).toEqual({ok: false, reason: 'invalid quantity'});
-        expect(applyFill(account, {symbol: 'AAPL', side: 'buy', quantity: 0.9}, 100)).toEqual({ok: false, reason: 'invalid quantity'});
-        expect(applyFill(account, {symbol: 'AAPL', side: 'buy', quantity: 1}, 0)).toEqual({ok: false, reason: 'no price'});
-        expect(applyFill(account, {symbol: 'AAPL', side: 'buy', quantity: 1}, Number.NaN)).toEqual({ok: false, reason: 'no price'});
-    });
-
-    it('floors a fractional quantity to whole shares', () => {
-        const result = applyFill(account, {symbol: 'MSFT', side: 'buy', quantity: 2.7}, 100);
-        expect(result.ok && result.total).toBe(200);
-        expect(result.ok && result.account.positions.find((p) => p.symbol === 'MSFT')?.quantity).toBe(2);
-    });
-
-    it('rejects a buy above available cash', () => {
-        expect(applyFill(account, {symbol: 'MSFT', side: 'buy', quantity: 101}, 100)).toEqual({ok: false, reason: 'insufficient cash'});
-        // Exactly all the cash is allowed (total > cash is the rejection, not >=).
-        const all = applyFill(account, {symbol: 'MSFT', side: 'buy', quantity: 100}, 100);
-        expect(all.ok && all.account.cash).toBe(0);
-    });
-
-    it('rejects a buy that would breach the cash floor, and checks cash before the floor', () => {
-        expect(applyFill(account, {symbol: 'MSFT', side: 'buy', quantity: 95}, 100, 1_000)).toEqual({ok: false, reason: 'cash floor'});
-        expect(applyFill(account, {symbol: 'MSFT', side: 'buy', quantity: 200}, 100, 1_000)).toEqual({ok: false, reason: 'insufficient cash'});
-        const atFloor = applyFill(account, {symbol: 'MSFT', side: 'buy', quantity: 90}, 100, 1_000);
-        expect(atFloor.ok && atFloor.account.cash).toBe(1_000);
-    });
-
-    it('averages cost by VWAP on an add', () => {
-        // 10 @ 100 + 10 @ 120 → 20 @ 110.
-        const result = applyFill(account, {symbol: 'AAPL', side: 'buy', quantity: 10}, 120);
-        expect(result).toEqual({
-            ok: true,
-            total: 1_200,
-            account: {cash: 8_800, positions: [{symbol: 'AAPL', quantity: 20, avgCost: 110}]},
-        });
-    });
-
-    it('opens a new position at the fill price', () => {
-        const result = applyFill(account, {symbol: 'MSFT', side: 'buy', quantity: 5}, 200);
-        expect(result.ok && result.account).toEqual({
-            cash: 9_000,
-            positions: [{symbol: 'AAPL', quantity: 10, avgCost: 100}, {symbol: 'MSFT', quantity: 5, avgCost: 200}],
-        });
-    });
-
-    it('rejects a sell of more than is held or of an unheld symbol', () => {
-        expect(applyFill(account, {symbol: 'AAPL', side: 'sell', quantity: 11}, 100)).toEqual({ok: false, reason: 'not held'});
-        expect(applyFill(account, {symbol: 'MSFT', side: 'sell', quantity: 1}, 100)).toEqual({ok: false, reason: 'not held'});
-    });
-
-    it('realises P&L against the average cost on a partial sell', () => {
-        // Sell 4 @ 130: P&L = (130 − 100) × 4 = 120; cash + 520.
-        const result = applyFill(account, {symbol: 'AAPL', side: 'sell', quantity: 4}, 130);
-        expect(result).toEqual({
-            ok: true,
-            total: 520,
-            realizedPnl: 120,
-            account: {cash: 10_520, positions: [{symbol: 'AAPL', quantity: 6, avgCost: 100}]},
-        });
-    });
-
-    it('removes a position sold down to zero, with a negative P&L intact', () => {
-        const result = applyFill(account, {symbol: 'AAPL', side: 'sell', quantity: 10}, 90);
-        expect(result).toEqual({ok: true, total: 900, realizedPnl: -100, account: {cash: 10_900, positions: []}});
-    });
-
-    it('never mutates the account it was given', () => {
-        const frozenPositions = account.positions.map((position) => ({...position}));
-        applyFill(account, {symbol: 'AAPL', side: 'buy', quantity: 5}, 120);
-        applyFill(account, {symbol: 'AAPL', side: 'sell', quantity: 10}, 120);
-        expect(account.cash).toBe(10_000);
-        expect(account.positions).toEqual(frozenPositions);
-        const result = applyFill(account, {symbol: 'AAPL', side: 'buy', quantity: 1}, 100);
-        expect(result.ok && result.account).not.toBe(account);
-        expect(result.ok && result.account.positions[0]).not.toBe(account.positions[0]);
     });
 });

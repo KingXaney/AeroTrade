@@ -9,7 +9,7 @@ import {findBanned} from '@/lib/learn/banned';
 import {STATE_MEANING} from '@/lib/learn/copy/verdict';
 import {quizPrompt} from '@/lib/learn/copy/quiz';
 import {decodeReason} from '@/lib/learn/reasons';
-import {explainVerdict} from '@/lib/learn/verdict';
+import {explainVerdict} from '@/lib/strategies/learn/verdict';
 import {
     buildDailyQuiz,
     fnv1a,

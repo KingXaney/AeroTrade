@@ -20,7 +20,7 @@ export interface SecondOpinionDoc extends Document {
 }
 
 const SecondOpinionSchema = new Schema<SecondOpinionDoc>({
-    scope: {type: String, required: true, unique: true, index: true},
+    scope: {type: String, required: true, unique: true},
     opinionMd: {type: String},
     modelUsed: {type: String},
     source: {type: String, enum: ['api', 'cli', 'manual'], default: 'api'},

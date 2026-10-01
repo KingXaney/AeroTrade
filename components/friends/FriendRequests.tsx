@@ -4,6 +4,7 @@ import {useState} from "react";
 import {useRouter} from "next/navigation";
 import {toast} from "sonner";
 import {respondToFriendRequest} from "@/lib/actions/friends.actions";
+import type {FriendRequest} from '@/lib/friends/types';
 
 const FriendRequests = ({requests}: {requests: FriendRequest[]}) => {
     const router = useRouter();

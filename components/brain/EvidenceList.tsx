@@ -1,17 +1,17 @@
 import Link from "next/link";
-import {cn, formatTimeAgoSeconds, getChangeColorClass} from "@/lib/utils";
-import {formatSigned} from "@/lib/format";
+import {cn} from "@/lib/utils";
+import {formatSigned, formatTimeAgoSeconds, getChangeColorClass} from "@/lib/format";
 import TradeLink from "@/components/trade/TradeLink";
 import Badge from "@/components/primitives/Badge";
 import Term from "@/components/primitives/Term";
 import WhatTheseMean from "@/components/learn/WhatTheseMean";
-import {eventBadge, eventTermsShown} from "@/lib/learn/event-types";
+import {eventBadge, eventTermsShown} from "@/lib/brain/event-types";
 import {BRAIN_COPY} from "@/lib/learn/copy/brain";
 
 // Ticker keys are bare symbols; sectors and themes carry a "sector:" / "theme:" prefix.
 const isTickerKey = (key: string): boolean => /^[A-Z][A-Z0-9.\-]{0,9}$/.test(key);
 
-export type EvidenceItem = {
+type EvidenceItem = {
     headline: string;
     source: string;
     sourceType: string;

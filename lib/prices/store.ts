@@ -10,7 +10,7 @@ import {dividendCoverage, fetchYahooDaily, type YahooRange} from "@/lib/prices/y
 import {mergeCoverage, type CoverageRange} from "@/lib/prices/coverage";
 import {type Bar} from "@/lib/prices/signals";
 import {BAR_PROJECTION, toBar, toSetFields, type LeanPriceBar} from "@/lib/prices/bar-fields";
-import type {DividendPoint} from "@/lib/trading/income";
+import type {DividendPoint, RatePoint} from "@/lib/prices/types";
 import {
     BACKFILL_CALENDAR_DAYS,
     MAX_TRACKED_SYMBOLS,
@@ -18,11 +18,10 @@ import {
     STOOQ_DELAY_MS,
     YAHOO_DELAY_MS,
 } from "@/lib/prices/config";
-import {delay, getEasternDateString} from "@/lib/utils";
 import {previousTradingDay} from "@/lib/prices/market-hours";
-import {addCalendarDays} from "@/lib/prices/calendar-days";
+import {addCalendarDays, getEasternDateString} from "@/lib/dates";
 
-export type EnsureBarsOptions = {
+type EnsureBarsOptions = {
     limit?: number;
     backfillCalendarDays?: number;
     // Strategies that fill at the open or read Donchian channels cannot run on
@@ -33,7 +32,7 @@ export type EnsureBarsOptions = {
     forceBackfill?: boolean;
 };
 
-export type EnsureBarsResult = {
+type EnsureBarsResult = {
     updated: number;
     failed: string[];
     providers: Record<PriceBarSource, number>;
@@ -45,7 +44,6 @@ type StoredBarEdge = {date: string; close: number} | null;
 type FetchMode = FetchWindow["mode"];
 type FetchOutcome = {bars: Bar[]; source: PriceBarSource} | null;
 
-const MS_PER_DAY = 24 * 60 * 60 * 1000;
 // Beyond this, a fetched close on a stored date is a split re-adjustment, not
 // a provider rounding difference — the whole history must be replaced.
 const OVERLAP_MISMATCH_TOLERANCE = 0.005;
@@ -53,8 +51,8 @@ const OVERLAP_MISMATCH_TOLERANCE = 0.005;
 // window only bounds what Stooq is asked for and what "deep enough" means.
 const YAHOO_BACKFILL_RANGE: YahooRange = "5y";
 
-const minusCalendarDays = (isoDate: string, days: number): string =>
-    new Date(new Date(`${isoDate}T00:00:00Z`).getTime() - days * MS_PER_DAY).toISOString().slice(0, 10);
+// The spacing between provider calls (YAHOO_DELAY_MS, STOOQ_DELAY_MS).
+const delay = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
 
 type StoredCoverage = {dividendsFrom?: string; dividendsThrough?: string} | null;
 
@@ -127,7 +125,7 @@ export const ensureBars = async (
     await connectToDatabase();
     const unique = Array.from(new Set(symbols.map((s) => s.toUpperCase()))).filter(Boolean).slice(0, limit);
     const today = getEasternDateString();
-    const requiredFrom = minusCalendarDays(today, backfillCalendarDays);
+    const requiredFrom = addCalendarDays(today, -backfillCalendarDays);
     let updated = 0;
     let fresh = 0;
     const failed: string[] = [];
@@ -253,27 +251,40 @@ export const getBarsFrom = async (requests: readonly {symbol: string; from: stri
 // Readiness for income: which symbols' dividends can be trusted over a window
 // ---------------------------------------------------------------------------
 
+// What each symbol's series record says: the dividend range a Yahoo payload vouched for, and
+// the first day of a failing streak. A symbol with no record is absent.
+type SeriesMeta = {dividendsFrom?: string; dividendsThrough?: string; failingSince?: string};
+
+export const getSeriesMeta = async (symbols: readonly string[]): Promise<Map<string, SeriesMeta>> => {
+    await connectToDatabase();
+    const metas = await PriceSeriesMeta.find({symbol: {$in: [...symbols]}})
+        .lean<({symbol: string} & SeriesMeta)[]>();
+    return new Map(metas.map(({symbol, dividendsFrom, dividendsThrough, failingSince}) => [symbol, {dividendsFrom, dividendsThrough, failingSince}]));
+};
+
 // Symbols whose stored dividends cannot be vouched for over [from, through] — they need a
 // deep refetch before anything that pays dividends (a backtest rebuild) may rely on them.
 export const symbolsLackingDividendCoverage = async (symbols: string[], from: string, through: string): Promise<string[]> => {
-    await connectToDatabase();
     const unique = Array.from(new Set(symbols.map((s) => s.toUpperCase()))).filter(Boolean);
-    const metas = await PriceSeriesMeta.find({symbol: {$in: unique}}).lean<{symbol: string; dividendsFrom?: string; dividendsThrough?: string}[]>();
-    const covered = new Set(metas
-        .filter((m) => m.dividendsFrom !== undefined && m.dividendsThrough !== undefined && m.dividendsFrom <= from && m.dividendsThrough >= through)
-        .map((m) => m.symbol));
-    return unique.filter((symbol) => !covered.has(symbol));
+    const metas = await getSeriesMeta(unique);
+    const covered = (meta: SeriesMeta | undefined): boolean =>
+        meta?.dividendsFrom !== undefined && meta.dividendsThrough !== undefined && meta.dividendsFrom <= from && meta.dividendsThrough >= through;
+    return unique.filter((symbol) => !covered(metas.get(symbol)));
 };
 
-// Dividends per share on their ex-dates, for the given symbols and inclusive dates. Narrow on
-// purpose — three fields of the few bars that paid, answered from the partial index — so a
-// request path (the Income panel's "Missed by a day") can afford it.
-export const getDividendPoints = async (symbols: string[], from: string, to: string): Promise<DividendPoint[]> => {
+// Dividends per share on their ex-dates, ascending, for the given symbols and inclusive dates.
+// Narrow on purpose — three fields of the few bars that paid, answered from the partial index —
+// so a request path (the Income panel's "Missed by a day") can afford it. The income job reads
+// a batch's whole history: no bounds.
+export const getDividendPoints = async (symbols: string[], {from, to}: {from?: string; to?: string} = {}): Promise<DividendPoint[]> => {
     const unique = Array.from(new Set(symbols.map((s) => s.toUpperCase()))).filter(Boolean);
-    if (unique.length === 0 || from > to) return [];
+    if (unique.length === 0 || (from !== undefined && to !== undefined && from > to)) return [];
     await connectToDatabase();
+    const date: Record<string, string> = {};
+    if (from !== undefined) date.$gte = from;
+    if (to !== undefined) date.$lte = to;
     const bars = await PriceBar.find(
-        {symbol: {$in: unique}, dividend: {$gt: 0}, date: {$gte: from, $lte: to}},
+        {symbol: {$in: unique}, dividend: {$gt: 0}, ...(Object.keys(date).length > 0 ? {date} : {})},
         {_id: 0, symbol: 1, date: 1, dividend: 1},
     ).sort({date: 1}).lean<{symbol: string; date: string; dividend: number}[]>();
     return bars.map((bar) => ({symbol: bar.symbol, exDate: bar.date, perShare: bar.dividend}));
@@ -295,19 +306,36 @@ export const getHoldWindowBars = async (
     const [bars, dividends] = await Promise.all([
         PriceBar.find({symbol: {$in: unique}, date: {$in: [from, to]}}, {_id: 0, symbol: 1, date: 1, close: 1})
             .lean<{symbol: string; date: string; close: number}[]>(),
-        getDividendPoints(unique, addCalendarDays(from, 1), to),
+        getDividendPoints(unique, {from: addCalendarDays(from, 1), to}),
     ]);
     return {bars, dividends};
 };
 
-// The latest stored bar date for a symbol on or before `onOrBefore` — the last session the
-// price job has stored. One point read on the unique index.
-export const getLatestBarDate = async (symbol: string, onOrBefore: string): Promise<string | null> => {
+// The latest stored bar date for a symbol — the last session the price job has stored. One
+// point read on the unique index.
+export const getLatestBarDate = async (symbol: string): Promise<string | null> => {
     await connectToDatabase();
-    const bar = await PriceBar.findOne({symbol: symbol.toUpperCase(), date: {$lte: onOrBefore}}, {_id: 0, date: 1})
+    const bar = await PriceBar.findOne({symbol: symbol.toUpperCase()}, {_id: 0, date: 1})
         .sort({date: -1})
         .lean<{date: string} | null>();
     return bar?.date ?? null;
+};
+
+// Each symbol's latest stored bar date, for the strategies job's freshness check. A symbol with
+// no bars is absent.
+export const getLatestBarDates = async (symbols: readonly string[]): Promise<Map<string, string>> => {
+    await connectToDatabase();
+    const rows = await PriceBar.aggregate<{_id: string; latest: string}>([
+        {$match: {symbol: {$in: [...symbols]}}},
+        {$group: {_id: '$symbol', latest: {$max: '$date'}}},
+    ]);
+    return new Map(rows.map((r) => [r._id, r.latest]));
+};
+
+// How many symbols have any stored bars (the /brain status strip).
+export const countPricedSymbols = async (): Promise<number> => {
+    await connectToDatabase();
+    return (await PriceBar.distinct('symbol')).length;
 };
 
 // Each symbol's latest stored bar (date and close) from `since` through `onOrBefore`, in one
@@ -331,7 +359,7 @@ export const getLatestBars = async (
 
 // The stored T-bill series as rate points (a discount yield, annualised %). The jobs read it
 // whole; a request path passes inclusive `from`/`to` so the read stays bounded.
-export const getRatePoints = async ({from, to}: {from?: string; to?: string} = {}): Promise<{date: string; discountPct: number}[]> => {
+export const getRatePoints = async ({from, to}: {from?: string; to?: string} = {}): Promise<RatePoint[]> => {
     await connectToDatabase();
     const date: Record<string, string> = {};
     if (from !== undefined) date.$gte = from;
@@ -342,7 +370,7 @@ export const getRatePoints = async ({from, to}: {from?: string; to?: string} = {
 };
 
 // The latest stored T-bill rate point, for the "earning X% APY" line.
-export const getLatestRatePoint = async (): Promise<{date: string; discountPct: number} | null> => {
+export const getLatestRatePoint = async (): Promise<RatePoint | null> => {
     await connectToDatabase();
     const bar = await PriceBar.findOne({symbol: RATE_SYMBOL}, {_id: 0, date: 1, close: 1}).sort({date: -1}).lean<{date: string; close: number} | null>();
     return bar ? {date: bar.date, discountPct: bar.close} : null;

@@ -10,7 +10,7 @@ import {slugify} from "@/lib/topics/normalize";
 
 export type StarterGroup = 'finance' | 'world';
 
-export type StarterTopic = {name: string; keywords: string[]; exclude?: string[]; group: StarterGroup};
+type StarterTopic = {name: string; keywords: string[]; exclude?: string[]; group: StarterGroup};
 
 export const STARTER_TOPICS: StarterTopic[] = [
     {

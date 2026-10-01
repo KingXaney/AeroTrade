@@ -10,7 +10,7 @@ export interface JobRunDoc extends Document {
 }
 
 const JobRunSchema = new Schema<JobRunDoc>({
-    jobId: {type: String, required: true, unique: true, index: true},
+    jobId: {type: String, required: true, unique: true},
     lastRunAt: {type: Date, required: true},
     lastMessage: {type: String, default: ''},
 });

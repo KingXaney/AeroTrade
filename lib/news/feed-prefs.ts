@@ -10,8 +10,7 @@
 // normalizeNewsFeed, so a tampered document degrades to a valid feed, never to an error.
 
 import {z} from 'zod';
-import {normalizeKeywordList} from '@/lib/topics/normalize';
-import {KEYWORD_MAX, MAX_KEYWORDS} from '@/lib/topics/config';
+import {KEYWORD_MAX, MAX_KEYWORDS, normalizeKeywordList} from '@/lib/news/keywords';
 import {MAX_FEED_REQUESTS, US_EDITION, type GoogleEdition} from '@/lib/news/config';
 
 export type {GoogleEdition};
@@ -20,14 +19,14 @@ export type NewsCategoryId =
     | 'top' | 'world' | 'nation' | 'business' | 'technology' | 'science' | 'health' | 'sports' | 'entertainment' | 'markets';
 export type NewsRegionId = 'US' | 'GB' | 'CA' | 'AU' | 'IN' | 'SG' | 'IE' | 'NZ' | 'ZA';
 
-export type NewsCategory = {
+type NewsCategory = {
     id: NewsCategoryId;
     label: string;
     hint: string;
     /** Google News topic section id, or null for the front page ('top') and the markets wires. */
     section: string | null;
 };
-export type NewsRegion = {id: NewsRegionId; label: string; edition: GoogleEdition};
+type NewsRegion = {id: NewsRegionId; label: string; edition: GoogleEdition};
 
 // Canonical order. Normalisation re-sorts into it, so 'top' always leads a feed and the
 // planner's priority (top first, then sections) falls out of the array order.
@@ -115,16 +114,9 @@ export const NewsFeedSchema = z.object({
     includeWatchlist: z.boolean().default(false),
 });
 
-export type NewsFeedInput = z.infer<typeof NewsFeedSchema>;
-
 const CATEGORY_INDEX = new Map(NEWS_CATEGORIES.map((c, i) => [c.id as string, i]));
 const REGION_INDEX = new Map(NEWS_REGIONS.map((r, i) => [r.id as string, i]));
 const CATEGORY_LABEL = new Map(NEWS_CATEGORIES.map((c) => [c.id, c.label]));
-
-export const isCategoryId = (value: unknown): value is NewsCategoryId =>
-    typeof value === 'string' && CATEGORY_INDEX.has(value);
-export const isRegionId = (value: unknown): value is NewsRegionId =>
-    typeof value === 'string' && REGION_INDEX.has(value);
 
 const pickIds = <T extends string>(raw: unknown, index: Map<string, number>, max: number): T[] => {
     if (!Array.isArray(raw)) return [];

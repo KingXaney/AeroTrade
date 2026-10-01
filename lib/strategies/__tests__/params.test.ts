@@ -1,7 +1,6 @@
 import {describe, expect, it} from 'vitest';
 import {STRATEGIES, strategyBySlug} from '@/lib/strategies/catalog';
 import {findParam, readParam} from '@/lib/strategies/params';
-import {readParam as readParamFromRules} from '@/lib/strategies/rules/shared';
 import type {StrategyDefinition} from '@/lib/strategies/types';
 
 const rsi2 = strategyBySlug('rsi2-mean-reversion') as StrategyDefinition;
@@ -14,10 +13,6 @@ describe('readParam', () => {
 
     it('treats a missing parameter as a catalog bug', () => {
         expect(() => readParam(rsi2, 'noSuchParam')).toThrow(/missing numeric param "noSuchParam"/);
-    });
-
-    it('is the one the rules layer re-exports', () => {
-        expect(readParamFromRules).toBe(readParam);
     });
 
     it('covers every parameter the catalog declares', () => {

@@ -1,6 +1,6 @@
-import {cn, formatPrice, getChangeColorClass} from "@/lib/utils";
-import {formatSignedPrice} from "@/lib/format";
-import type {StrategyBacktestView} from "@/lib/strategies/queries";
+import {cn} from "@/lib/utils";
+import {formatSignedPrice, formatPrice, getChangeColorClass} from "@/lib/format";
+import type {StrategyBacktestView} from "@/lib/strategies/page-store";
 import type {StrategyDefinition} from "@/lib/strategies/types";
 import ReasonDisclosure from "@/components/strategies/ReasonDisclosure";
 

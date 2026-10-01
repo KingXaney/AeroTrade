@@ -2,6 +2,7 @@
 
 import {LogOut} from "lucide-react";
 import {useSignOut} from "@/hooks/useSignOut";
+import type {User} from '@/lib/auth/types';
 
 const AccountSection = ({user}: {user: User}) => {
     const handleSignOut = useSignOut();

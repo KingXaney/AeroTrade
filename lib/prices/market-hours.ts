@@ -1,10 +1,12 @@
 // NYSE regular-session hours, computed for an instant. Pure and Intl-based: the app
-// already establishes the pattern in getEasternDateString (lib/utils.ts), and a
+// already establishes the pattern in getEasternDateString (lib/dates.ts), and a
 // hand-rolled UTC offset would be wrong for half the year. Nine surfaces used to say
 // "live" at 3 a.m. on a Sunday; this is what lets them stop.
 
-export type MarketState = 'open' | 'closed';
-export type ClosedReason = 'pre-open' | 'after-close' | 'weekend' | 'holiday';
+import {addCalendarDays} from "@/lib/dates";
+
+type MarketState = 'open' | 'closed';
+type ClosedReason = 'pre-open' | 'after-close' | 'weekend' | 'holiday';
 
 export type MarketStatus = {
     at: number;                  // the instant this status was computed for (epoch ms)
@@ -74,7 +76,7 @@ export const NYSE_HOLIDAYS: Readonly<Record<string, string>> = {
 };
 
 // 1:00 p.m. ET closes.
-export const NYSE_HALF_DAYS: ReadonlySet<string> = new Set([
+const NYSE_HALF_DAYS: ReadonlySet<string> = new Set([
     '2025-07-03', '2025-11-28', '2025-12-24',
     '2026-11-27', '2026-12-24',
     '2027-11-26',
@@ -122,10 +124,6 @@ export const easternToInstant = (date: string, hh: number, mm: number): number =
     return guess;
 };
 
-const shiftDate = (date: string, days: number): string => {
-    const [y, m, d] = date.split('-').map(Number);
-    return new Date(Date.UTC(y, m - 1, d + days)).toISOString().slice(0, 10);
-};
 const weekdayOf = (date: string): number => new Date(`${date}T00:00:00Z`).getUTCDay();
 
 export const isTradingDay = (date: string): boolean => {
@@ -136,10 +134,10 @@ export const isTradingDay = (date: string): boolean => {
 // The last session strictly before `date` (bounded: the longest closure in the table is
 // a few days). Only valid inside the years the holiday table covers.
 export const previousTradingDay = (date: string): string => {
-    let cursor = shiftDate(date, -1);
+    let cursor = addCalendarDays(date, -1);
     for (let i = 0; i < 14; i += 1) {
         if (isTradingDay(cursor)) return cursor;
-        cursor = shiftDate(cursor, -1);
+        cursor = addCalendarDays(cursor, -1);
     }
     return cursor;
 };
@@ -151,7 +149,7 @@ export const closeMinutesFor = (date: string): number => (NYSE_HALF_DAYS.has(dat
 const nextOpenFrom = (date: string, minutes: number): number | null => {
     if (isTradingDay(date) && minutes < OPEN_MINUTES) return easternToInstant(date, 9, 30);
     for (let i = 1; i <= SEARCH_DAYS; i++) {
-        const candidate = shiftDate(date, i);
+        const candidate = addCalendarDays(date, i);
         if (isTradingDay(candidate)) return easternToInstant(candidate, 9, 30);
     }
     return null;
@@ -170,8 +168,6 @@ export const marketStatus = (at: Date = new Date()): MarketStatus => {
     return {at: at.getTime(), state: 'closed', reason, holiday, easternDate: date, nextOpen: nextOpenFrom(date, minutes), nextClose: null};
 };
 
-export const isMarketOpen = (at: Date = new Date()): boolean => marketStatus(at).state === 'open';
-export const nextOpen = (at: Date = new Date()): number | null => marketStatus(at).nextOpen;
 
 // ---- Copy ---------------------------------------------------------------------
 const TIME = new Intl.DateTimeFormat('en-US', {timeZone: ZONE, hour: 'numeric', minute: '2-digit'});

@@ -1,5 +1,5 @@
 import Link from "next/link";
-import type {RulesSeeCell, RulesSeeView} from "@/lib/learn/rules-see";
+import type {RulesSeeCell, RulesSeeView} from "@/lib/stocks/rules-see";
 import {RULES_SEE_COPY} from "@/lib/learn/copy/rules-see";
 import {STATE_LABEL, STATE_TONE} from "@/lib/strategies/views";
 import {cn} from "@/lib/utils";
@@ -12,7 +12,7 @@ import WhatTheseMean from "@/components/learn/WhatTheseMean";
 
 // The stock page's "What the rules see": for each strategy that watches this symbol, the row it
 // stored on its latest board — verdict and values as that strategy's own signal board prints
-// them (lib/learn/rules-see.ts). Dates and values every row shares are stated once above the
+// them (lib/stocks/rules-see.ts). Dates and values every row shares are stated once above the
 // rows; strategies with no stored row are named once below them. The panel's one disclosure
 // reads each row in plain words, then lists the definitions of the columns shown. Omitted by
 // the page for a symbol no strategy watches. Server component; no inline prose.

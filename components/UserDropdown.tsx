@@ -13,6 +13,7 @@ import {
 
 import {LogOut, ChevronDown, Newspaper, Settings} from "lucide-react";
 import {useSignOut} from "@/hooks/useSignOut";
+import type {User} from '@/lib/auth/types';
 
 // No longer needs the stock/topic lists: it used to render a duplicate NavItems for
 // mobile, which the hamburger drawer replaces.
@@ -40,7 +41,7 @@ function UserDropdown({user}: {user: User}) {
                             {initial}
                         </AvatarFallback>
                     </Avatar>
-                    {/* Seven nav items plus Search leave no room for a name below xl; the avatar
+                    {/* The header's nav items (HEADER_NAV_ITEMS) plus Search leave no room for a name below xl; the avatar
                         and chevron still mark the menu. */}
                     <div className="hidden xl:flex flex-col items-start leading-tight whitespace-nowrap">
                         <span className="text-sm font-medium text-fg"

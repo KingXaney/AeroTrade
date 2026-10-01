@@ -2,8 +2,6 @@
 // Every trading decision flows through these deterministic constants; the LLM never
 // picks positions or sizes.
 
-import {type SectorSlug} from "@/lib/brain/config";
-
 export const AI_NAVIGATOR_ACCOUNT_NAME = 'AI Navigator';
 
 export const MAX_POSITIONS = 8;
@@ -40,29 +38,3 @@ export const ALWAYS_ELIGIBLE_SYMBOLS = [
     'XLE', 'XLK', 'XLF', 'XLV', 'XLI', 'XLP', 'XLY', 'XLU', 'XLB', 'XLRE', 'XLC',
     'SPY', 'SMH',
 ];
-
-// The brain stores sectors as 'sector:<slug>' entities, but the tradable universe
-// holds ETFs. Without this bridge a sector narrative — often the heaviest thing in
-// the brain — cannot reach any symbol the allocator is allowed to buy.
-export const SECTOR_KEY_PREFIX = 'sector:';
-export const sectorKeyFor = (slug: SectorSlug): string => `${SECTOR_KEY_PREFIX}${slug}`;
-
-export const SECTOR_TO_ETF: Record<SectorSlug, string> = {
-    'energy': 'XLE',
-    'technology': 'XLK',
-    'financials': 'XLF',
-    'healthcare': 'XLV',
-    'industrials': 'XLI',
-    'consumer-staples': 'XLP',
-    'consumer-discretionary': 'XLY',
-    'utilities': 'XLU',
-    'materials': 'XLB',
-    'real-estate': 'XLRE',
-    'communication-services': 'XLC',
-};
-
-// Reverse view for scoring: an ETF is a proxy for its sector, so it inherits that
-// sector's narrative rather than looking like a symbol nobody has written about.
-export const ETF_TO_SECTOR_KEY: Record<string, string> = Object.fromEntries(
-    (Object.entries(SECTOR_TO_ETF) as [SectorSlug, string][]).map(([slug, etf]) => [etf, sectorKeyFor(slug)]),
-);

@@ -6,7 +6,7 @@
 // sentence with nothing around it, so it has no entry here. The test holds every line to the
 // 'copy' tier of lib/learn/banned.ts.
 
-import {formatPrice} from "@/lib/utils";
+import {formatPrice} from "@/lib/format";
 import type {RunOrderView, StrategyRunView} from "@/lib/strategies/views";
 
 export const DECISION_COPY = {

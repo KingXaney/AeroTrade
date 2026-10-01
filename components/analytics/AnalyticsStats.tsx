@@ -1,9 +1,10 @@
 import type {ReactNode} from "react";
-import {cn, getChangeColorClass} from "@/lib/utils";
-import {formatDrawdown, formatPrice, formatSignedPrice, roundPct} from "@/lib/format";
+import {cn} from "@/lib/utils";
+import {formatDrawdown, formatPrice, formatSignedPrice, roundPct, getChangeColorClass} from "@/lib/format";
 import Term from "@/components/primitives/Term";
 import WhatTheseMean from "@/components/learn/WhatTheseMean";
 import {DRAWDOWN_COPY, drawdownLine} from "@/lib/learn/copy/portfolio";
+import type {AccountAnalytics} from '@/lib/trading/types';
 
 // The one analytics tile: exported so the risk lens (components/learn/RiskLens.tsx) is built
 // from it rather than from a third copy.
@@ -36,7 +37,7 @@ export type AnalyticsStatFields = Pick<AccountAnalytics, 'maxDrawdownPct' | 'win
 // `definitions` opts a page into the panel's "What these mean" disclosure. The dashboard
 // widget that mounts these tiles never passes it: the disclosure carries "Ask in chat"
 // links, which invariant 12 keeps off widgets. The Term titles stay either way.
-const AnalyticsStats = ({analytics, tradesHint = 'Buys + sells, all time', definitions = false}: {analytics: AnalyticsStatFields; tradesHint?: string; definitions?: boolean}) => {
+const AnalyticsStats = ({analytics, definitions = false}: {analytics: AnalyticsStatFields; definitions?: boolean}) => {
     const {maxDrawdownPct, winRatePct, wins, losses, realizedPnl, tradeCount, income, drawdown, benchmarkOverDrawdownPct} = analytics;
     const realizedClass = getChangeColorClass(realizedPnl);
     const earned = income ? income.interest + income.dividends : 0;
@@ -78,7 +79,7 @@ const AnalyticsStats = ({analytics, tradesHint = 'Buys + sells, all time', defin
             <Stat
                 label={<Term k="trades">Trades</Term>}
                 value={String(tradeCount)}
-                hint={tradesHint}
+                hint="Buys + sells, all time"
             />
             </div>
             {definitions && <WhatTheseMean keys={['max-drawdown', ...(dated ? ['recovery'] : []), 'win-rate', 'realized-pnl', ...(income ? ['income'] : []), 'trades']} />}

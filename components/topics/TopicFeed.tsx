@@ -4,6 +4,7 @@ import {useState, useTransition} from "react";
 import {Loader2} from "lucide-react";
 import TopicArticleCard from "@/components/topics/TopicArticleCard";
 import {fetchTopicFeedPage} from "@/lib/actions/topics.actions";
+import type {MergedTopicArticle, TopicArticleView} from '@/lib/topics/types';
 
 type MergedOrPlain = TopicArticleView | MergedTopicArticle;
 

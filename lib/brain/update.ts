@@ -16,7 +16,7 @@ import {
 } from "@/lib/brain/decay";
 import {buildDisplayName} from "@/lib/brain/extraction";
 import {ENTITY_EPSILON} from "@/lib/brain/config";
-import {getEasternDateString} from "@/lib/utils";
+import {getEasternDateString} from "@/lib/dates";
 
 export type ArticleFold = {
     importance: number;

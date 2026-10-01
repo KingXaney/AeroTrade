@@ -4,30 +4,19 @@
 // Six of these are seeded for every new account (lib/topics/starters.ts), so the cap is
 // the user's own budget plus the defaults — 12 would have left them only six slots.
 export const MAX_TOPICS_PER_USER = 16;
-export const MAX_KEYWORDS = 8;
 export const MAX_EXCLUDES = 8;
 export const NAME_MIN = 2;
 export const NAME_MAX = 60;
-export const KEYWORD_MIN = 2;
-export const KEYWORD_MAX = 40;
 
 // User keywords become (escaped) regexes run over every candidate article. Capping
 // the text per article bounds that work no matter how long a feed description is.
 export const MAX_MATCH_TEXT_CHARS = 2000;
 export const MATCH_CAP_PER_FETCH = 40;
 export const MAX_ARTICLES_PER_TOPIC_PER_DAY = 60;
-export const QUERY_MAX_CHARS = 200;
 
-// How far back a topic search asks Google News to look. Without a window, Google News
-// search ranks by RELEVANCE, not date: the unbounded "big tech earnings" query measured a
-// median result age of 25 days and a worst case of 149. Since the matcher caps at 40 and
-// never scores recency, that staleness landed straight in the store and the topic read as
-// the same news every day. Measured across five topic sets, `when:1d` returns 100% of
-// results inside 24 hours and still finds 27 for the quietest of them.
-export const TOPIC_SEARCH_WINDOW = '1d';
-// Widen once when a day's window comes back empty, so a genuinely quiet topic still fills
-// on its first fetch instead of starting blank.
-export const TOPIC_SEARCH_FALLBACK_WINDOW = '7d';
+// The three-hourly sweep refreshes at most this many keyword sets, the ones longest without a
+// fetch (one search a second).
+export const TOPIC_GROUPS_PER_RUN = 60;
 
 // Briefs run on the free Gemini tier with a 15 s sleep between calls; 20 keeps the
 // daily job well inside the quota.
@@ -60,11 +49,4 @@ export const refreshCooldownMessage = (remainingMs: number): string => {
     return minutes <= 1
         ? 'Refreshed recently — try again in a minute.'
         : `Refreshed recently — try again in ${minutes} minutes.`;
-};
-
-// Kill switch for the Google News search adapter. Enabled unless explicitly turned
-// off so a missing env var in a new environment never silently disables topics.
-export const newsSearchEnabled = (): boolean => {
-    const raw = (process.env.NEWS_SEARCH_ENABLED ?? '').trim().toLowerCase();
-    return raw !== '0' && raw !== 'false';
 };

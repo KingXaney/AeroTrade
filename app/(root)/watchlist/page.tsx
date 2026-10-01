@@ -1,16 +1,16 @@
-import {redirect} from "next/navigation";
-import {getCurrentUserId, getWatchlistForUser} from "@/lib/actions/watchlist.actions";
-import {getStocksWithData} from "@/lib/actions/finnhub.actions";
+import {requireUserId} from "@/lib/auth/session";
+import {getWatchlistForUser} from "@/lib/stocks/watchlist-store";
+import {getStocksWithData} from "@/lib/prices/finnhub";
 import WatchlistTable from "@/components/watchlist/WatchlistTable";
 import WatchlistEmpty from "@/components/watchlist/WatchlistEmpty";
 import MarketStatus from "@/components/system/MarketStatus";
 import Panel from "@/components/primitives/Panel";
 import {WATCHLIST_COPY} from "@/lib/learn/copy/watchlist";
 import {marketStatus} from "@/lib/prices/market-hours";
+import type {StockWithData} from '@/lib/stocks/types';
 
 const WatchlistPage = async () => {
-    const userId = await getCurrentUserId();
-    if (!userId) redirect('/sign-in');
+    const userId = await requireUserId();
 
     const items = await getWatchlistForUser(userId);
     const status = marketStatus();

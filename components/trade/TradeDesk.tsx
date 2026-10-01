@@ -5,10 +5,9 @@ import {usePathname, useRouter, useSearchParams} from "next/navigation";
 import TradingViewWidget from "@/components/TradingViewWidget";
 import OrderPanel from "@/components/trade/OrderPanel";
 import type {PositionLike} from "@/lib/trading/order-math";
-import {TRADE_CHART_WIDGET_CONFIG} from "@/lib/constants";
+import {TRADE_CHART_WIDGET_CONFIG, tvScript} from "@/lib/stocks/tradingview";
 import {useDebounce} from "@/hooks/useDebounce";
 
-const SCRIPT_URL = 'https://s3.tradingview.com/external-embedding/embed-widget-advanced-chart.js';
 const URL_SYNC_DELAY_MS = 300;
 
 type Props = {
@@ -58,7 +57,7 @@ const TradeDesk = ({chartSymbol, orderSymbol, cash, accountId, positions, queueN
                 <TradingViewWidget
                     key={symbol}
                     title="Advanced Chart"
-                    scriptUrl={SCRIPT_URL}
+                    scriptUrl={tvScript('advanced-chart')}
                     config={TRADE_CHART_WIDGET_CONFIG(symbol)}
                     height={560}
                 />

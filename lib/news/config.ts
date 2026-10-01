@@ -1,3 +1,5 @@
+import type {NewsSourceType} from '@/lib/news/types';
+
 // Single knob file for the multi-source news digest — feeds, caps, and identity strings are swappable here without code changes.
 
 // `name` identifies the feed in logs; `outlet` is the publisher as the news feed's outlet
@@ -48,7 +50,7 @@ export const BRAIN_TOTAL_CAP = 80;
 
 export const FEED_REVALIDATE_SECONDS = 900;
 
-export const contactEmail = (): string => process.env.SEC_CONTACT_EMAIL || "contact@aerotrade.local";
+const contactEmail = (): string => process.env.SEC_CONTACT_EMAIL || "contact@aerotrade.local";
 
 export const redditUserAgent = (): string => "AeroTrade/1.0 (paper-trading news digest; contact " + contactEmail() + ")";
 
@@ -56,6 +58,28 @@ export const secUserAgent = (): string => "AeroTrade " + contactEmail();
 
 export const GOOGLE_NEWS_BASE = "https://news.google.com/rss";
 export const GOOGLE_NEWS_SEARCH_BASE = `${GOOGLE_NEWS_BASE}/search`;
+
+// Kill switch for the Google News search adapter (followed topics' fetches and the /news
+// feed's Google slots). Enabled unless explicitly turned off so a missing env var in a new
+// environment never silently disables topics.
+export const newsSearchEnabled = (): boolean => {
+    const raw = (process.env.NEWS_SEARCH_ENABLED ?? '').trim().toLowerCase();
+    return raw !== '0' && raw !== 'false';
+};
+
+// A search query's length budget; the recency window is reserved from it (buildSearchQuery).
+export const SEARCH_QUERY_MAX_CHARS = 200;
+
+// How far back a keyword search (a followed topic's, a /news keyword slot's) asks Google
+// News to look. Without a window, Google News search ranks by RELEVANCE, not date: the unbounded "big tech earnings" query measured a
+// median result age of 25 days and a worst case of 149. Since the matcher caps at 40 and
+// never scores recency, that staleness landed straight in the store and the topic read as
+// the same news every day. Measured across five topic sets, `when:1d` returns 100% of
+// results inside 24 hours and still finds 27 for the quietest of them.
+export const SEARCH_WINDOW = '1d';
+// Widen once when a day's window comes back empty, so a genuinely quiet topic still fills
+// on its first fetch instead of starting blank.
+export const SEARCH_FALLBACK_WINDOW = '7d';
 
 // A Google News edition: interface language, country, and the combined edition id.
 export type GoogleEdition = {hl: string; gl: string; ceid: string};
@@ -79,26 +103,3 @@ export const NEWS_HISTORY_LIMIT = 6;
 export const NEWS_PAGE_SIZE = 24;
 
 export const searchUserAgent = (): string => "AeroTrade/1.0 (followed-topics; contact " + contactEmail() + ")";
-
-// djb2 constants — named so the hash stays auditable without magic numbers inline.
-// Lives here, not in aggregate.ts, so the sanitizers can reuse it without dragging
-// the fetch adapters (and through them better-auth and mongoose) into their import
-// graph. Pairs with hashId below: together they form the article dedupe key.
-export const normalizeUrl = (url: string): string => {
-    // Query strings carry tracking params (utm_*) that make identical stories look distinct.
-    const withoutQuery = url.toLowerCase().split("?")[0];
-    return withoutQuery.replace(/\/+$/, "");
-};
-
-const DJB2_SEED = 5381;
-const DJB2_SHIFT = 5;
-
-export const hashId = (input: string): number => {
-    let hash = DJB2_SEED;
-    for (let i = 0; i < input.length; i++) {
-        // hash * 33 + charCode, forced into 32-bit space each step to stay deterministic.
-        hash = ((hash << DJB2_SHIFT) + hash + input.charCodeAt(i)) | 0;
-    }
-    // >>> 0 coerces to unsigned so ids are always positive 32-bit integers, stable across runs.
-    return hash >>> 0;
-};

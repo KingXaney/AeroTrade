@@ -1,11 +1,12 @@
 import {describe, expect, it} from "vitest";
 import {
     describeNextRebalance,
-    isFirstSessionOfPeriod,
     isRebalanceDue,
     periodKey,
-    previousTradingDay,
 } from "@/lib/strategies/calendar";
+import {
+    previousTradingDay,
+} from "@/lib/prices/market-hours";
 
 describe("periodKey", () => {
     it("keys each cadence at its own granularity", () => {
@@ -48,16 +49,6 @@ describe("isRebalanceDue", () => {
     it("daily is due every day", () => {
         expect(isRebalanceDue('daily', '2026-09-22', '2026-09-21')).toBe(true);
         expect(isRebalanceDue('daily', '2026-09-21', '2026-09-21')).toBe(false);
-    });
-});
-
-describe("isFirstSessionOfPeriod", () => {
-    it("compares the trade date with the previous bar", () => {
-        expect(isFirstSessionOfPeriod('monthly', '2026-10-01', '2026-09-30')).toBe(true);
-        expect(isFirstSessionOfPeriod('monthly', '2026-10-02', '2026-10-01')).toBe(false);
-        expect(isFirstSessionOfPeriod('quarterly', '2026-10-01', '2026-09-30')).toBe(true);
-        expect(isFirstSessionOfPeriod('quarterly', '2026-11-02', '2026-10-30')).toBe(false);
-        expect(isFirstSessionOfPeriod('daily', '2026-10-01', '2026-09-30')).toBe(false);
     });
 });
 

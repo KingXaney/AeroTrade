@@ -1,28 +1,36 @@
 // Server-only data loaders for the dashboard widgets. Never imported by tests:
-// the action modules below reach lib/better-auth/auth.ts, whose top-level
-// await needs a database.
+// every loader reads the database or a market-data feed (scripts/qa covers them).
 
 import {cache} from "react";
-import {getAccountAnalytics, getComparisonStats, getPortfoliosForUser, getTradeHistory} from "@/lib/trading/account";
-import {getCachedTopicsOverview, getCachedWatchlistSymbols} from "@/lib/dashboard/cached";
-import {getMergedTopicFeed} from "@/lib/topics/store";
-import {getStocksWithData} from "@/lib/actions/finnhub.actions";
+import {getPortfoliosForUser} from "@/lib/trading/valuation";
+import {getTradeHistory} from "@/lib/trading/ledger";
+import {getAccountAnalytics, getComparisonStats} from "@/lib/trading/analytics-store";
+import {getCachedWatchlistSymbols} from "@/lib/stocks/watchlist-store";
+import {getCachedTopicsOverview, getMergedTopicFeed} from "@/lib/topics/store";
+import {getStocksWithData} from "@/lib/prices/finnhub";
 import {getNewsFeed} from "@/lib/news/feed-store";
 import {NEWS_WIDGET_LIMIT} from "@/lib/news/config";
-import {getLeaderboard} from "@/lib/actions/friends.actions";
-import {getActiveTheses, getBrainGraph, getBrainSystemStatus, getTopEntities, type BrainSystemStatus} from "@/lib/brain/queries";
-import {getLatestSuggestions} from "@/lib/navigator/service";
-import {getNavigatorStatus} from "@/lib/actions/navigator.actions";
+import {getLeaderboard} from "@/lib/friends/store";
+import {getActiveTheses, getBrainGraph, getBrainSystemStatus, getTopEntities, type BrainSystemStatus} from "@/lib/brain/store";
+import {getLatestSuggestions, getNavigatorStatus} from "@/lib/navigator/store";
 import {getLatestSecondOpinion, type SecondOpinionView} from "@/lib/brain/opinion";
-import {pickActiveAccount, type ComparisonStat, type LatestSuggestions} from "@/lib/dashboard/select";
-import type {DataKey} from "@/lib/dashboard/widgets";
-import {getStrategyWidgetRows} from "@/lib/strategies/queries";
+import type {LatestSuggestions} from "@/lib/dashboard/select";
+import {pickActiveAccount, type ComparisonStat} from "@/lib/trading/active-account";
+import type {DataKey} from "@/lib/dashboard/catalog";
+import {getStrategyWidgetRows} from "@/lib/strategies/page-store";
 import type {StrategyLeaderboardRow} from "@/lib/strategies/views";
 import {getLearnFacts, getOnboardingFacts} from "@/lib/learn/facts-store";
 import type {LearnFacts, OnboardingFacts} from "@/lib/learn/facts";
 import {getTodaysLesson} from "@/lib/learn/lesson-store";
 import type {Lesson} from "@/lib/learn/lesson";
-import {getDailyQuiz, type DailyQuizView} from "@/lib/learn/quiz-read";
+import {getDailyQuiz, type DailyQuizView} from "@/lib/learn/quiz-store";
+import type {BrainEntitySummary} from '@/lib/brain/types';
+import type {LeaderboardEntry} from '@/lib/friends/types';
+import type {NavigatorStatus} from '@/lib/navigator/types';
+import type {MarketNewsArticle} from '@/lib/news/types';
+import type {StockWithData} from '@/lib/stocks/types';
+import type {MergedTopicArticle, TopicsOverview} from '@/lib/topics/types';
+import type {AccountAnalytics, AccountWithPortfolio, PaperTradeRecord} from '@/lib/trading/types';
 
 // Followed strategies first, then the top of the ranking.
 const STRATEGY_WIDGET_LIMIT = 5;
@@ -32,11 +40,11 @@ export type LoaderCtx = {
     preferredAccountId?: string;   // ?account= ?? ACTIVE_ACCOUNT_COOKIE
 };
 
-export const MOVERS_SYMBOL_CAP = 8;   // 3 Finnhub calls per symbol — keep the fan-out bounded
-export const RECENT_TRADES_LIMIT = 8;
-export const TOP_ENTITIES_PER_TYPE = 5;
-export const GRAPH_NODE_LIMIT = 16;
-export const TOPICS_LATEST_LIMIT = 6;
+const MOVERS_SYMBOL_CAP = 8;   // 3 Finnhub calls per symbol — keep the fan-out bounded
+const RECENT_TRADES_LIMIT = 8;
+const TOP_ENTITIES_PER_TYPE = 5;
+const GRAPH_NODE_LIMIT = 16;
+const TOPICS_LATEST_LIMIT = 6;
 
 export type DashboardData = Partial<{
     portfolios: AccountWithPortfolio[];
@@ -118,7 +126,7 @@ export const LOADERS: {[K in DataKey]: Loader<K>} = {
     dailyQuiz: ({userId}) => getDailyQuiz(userId),
 };
 
-export type LoadedDashboard = {data: DashboardData; failed: Set<DataKey>};
+type LoadedDashboard = {data: DashboardData; failed: Set<DataKey>};
 
 // One parallel pass over the eager keys. A failing loader never rejects the
 // page: it lands in `failed` and only its widgets render an error state.

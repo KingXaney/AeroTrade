@@ -8,9 +8,10 @@
 // channels break and RSI dips: every knob in lib/strategies/whatif.ts has something to act on.
 
 import type {Bar} from '@/lib/prices/signals';
-import {addCalendarDays} from '@/lib/prices/calendar-days';
-import type {RatePoint} from '@/lib/trading/income';
-import {BENCHMARK_SYMBOL, UNIVERSES} from '@/lib/strategies/universe';
+import {addCalendarDays} from '@/lib/dates';
+import type {RatePoint} from '@/lib/prices/types';
+import {UNIVERSES} from '@/lib/strategies/universe';
+import {BENCHMARK_SYMBOL} from '@/lib/prices/config';
 
 export const SYNTHETIC_LAUNCH = '2030-01-01';
 

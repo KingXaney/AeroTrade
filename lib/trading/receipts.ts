@@ -1,13 +1,13 @@
-// Fill receipts: what each fill did to the account, replayed from the ledger with the same
-// applyFill the strategy simulator uses (the mirror of executeOrder), never a second copy of
-// the fill arithmetic. Pure.
+// Fill receipts: what each fill did to the account, replayed from the ledger through the same
+// applyFill (lib/trading/fill) that executeOrder and the strategy simulator fill with, never a
+// second copy of the fill arithmetic. Pure.
 //
 // Deltas and position state only. Absolute cash is not replayed: interest and dividends move
 // cash between fills (AccountIncome, not PaperTrade), so a cash balance rebuilt from trades
 // alone would be wrong. Starting the replay with unlimited cash also means no historical buy
 // is refused here for want of money the account really had.
 
-import {applyFill, type SimAccount} from "@/lib/strategies/engine";
+import {applyFill, type SimAccount} from "@/lib/trading/fill";
 import {byTime, type LedgerTrade} from "@/lib/trading/lots";
 
 export type FillReceipt = {

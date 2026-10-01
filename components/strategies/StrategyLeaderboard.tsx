@@ -1,11 +1,10 @@
 import Link from "next/link";
 import type {CSSProperties} from "react";
-import {cn, getChangeColorClass} from "@/lib/utils";
+import {cn} from "@/lib/utils";
+import {getChangeColorClass, formatPct, signedForColor} from "@/lib/format";
 import {
     columnHasSpark,
     excessReturnPct,
-    formatPct,
-    signedForColor,
     sparkDomain,
     unpricedNote,
     type StrategyLeaderboardRow,

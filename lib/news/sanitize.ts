@@ -5,7 +5,7 @@
 //      (anything else — e.g. an injected phishing link — collapses to its inner text)
 //   2. actively dangerous containers (script/style/iframe/object/embed) are removed
 
-import {normalizeUrl} from "@/lib/news/config";
+import {normalizeUrl} from "@/lib/text";
 
 // Match any anchor first, then pull the href out of its attributes. Requiring quotes
 // in the anchor pattern itself left a hole: <a href=https://evil.test> matched nothing

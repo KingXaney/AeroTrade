@@ -2,6 +2,7 @@
 
 import {useMemo, useRef, useState} from "react";
 import {formatPct} from "@/lib/format";
+import type {PerfPoint} from '@/lib/trading/types';
 
 // Hand-rolled SVG performance chart: the strategy's %-return since inception
 // (cyan) vs SPY's total return (muted, lib/prices/total-return.ts). Deliberately
@@ -15,7 +16,7 @@ const PAD_Y = 18;
 // An optional shaded stretch of the x-axis — /portfolio passes the account's worst drawdown,
 // peak date to trough date — with its legend text supplied by the caller (copy lives in
 // lib/learn/copy). Dates not on the series draw nothing.
-export type ChartBand = {from: string; to: string; label: string};
+type ChartBand = {from: string; to: string; label: string};
 
 const ReturnChart = ({series, accountName, band}: {series: PerfPoint[]; accountName: string; band?: ChartBand | null}) => {
     const svgRef = useRef<SVGSVGElement>(null);
@@ -154,7 +155,7 @@ const ReturnChart = ({series, accountName, band}: {series: PerfPoint[]; accountN
 
 export type DollarLineTone = 'brand' | 'secondary' | 'muted';
 export type DollarLine = {key: string; label: string; tone: DollarLineTone; values: readonly number[]};
-export type DollarSeries = {dates: readonly string[]; lines: readonly DollarLine[]; baseline: number; ariaLabel: string};
+type DollarSeries = {dates: readonly string[]; lines: readonly DollarLine[]; baseline: number; ariaLabel: string};
 
 const TONES: Record<DollarLineTone, {stroke: string; swatch: string; width: number; dash?: string}> = {
     brand: {stroke: 'stroke-brand', swatch: 'bg-brand', width: 1.75},

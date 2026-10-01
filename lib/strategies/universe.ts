@@ -2,8 +2,8 @@
 // applied to earlier bars in the simulation, so the large-cap list carries
 // survivorship bias — every large-cap strategy's explainer says so.
 
-import {BENCHMARK_SYMBOL} from "@/lib/constants";
-import {SECTOR_TO_ETF} from "@/lib/navigator/config";
+import {BENCHMARK_SYMBOL} from "@/lib/prices/config";
+import {SECTOR_TO_ETF} from "@/lib/prices/sectors";
 import {STRATEGIES} from "@/lib/strategies/catalog";
 import type {StrategyDefinition} from "@/lib/strategies/types";
 
@@ -22,10 +22,6 @@ export const LARGE_CAPS: readonly string[] = [
     'AMD', 'INTC', 'TMO', 'ACN', 'MCD', 'DIS', 'PFE', 'CAT', 'HON', 'LIN',
 ];
 
-// Dual momentum's hurdle and legs need total return; their adjusted closes are
-// re-based on every distribution, so these are topped up with a deep window.
-export const TOTAL_RETURN_SYMBOLS: readonly string[] = CORE_ETFS;
-
 export const UNIVERSES: Record<UniverseKey, readonly string[]> = {
     'spy': [BENCHMARK_SYMBOL],
     'sixty-forty': [BENCHMARK_SYMBOL, 'AGG'],
@@ -34,7 +30,6 @@ export const UNIVERSES: Record<UniverseKey, readonly string[]> = {
     'largecaps': LARGE_CAPS,
 };
 
-export {BENCHMARK_SYMBOL};
 
 export const ALL_STRATEGY_SYMBOLS: readonly string[] = Array.from(new Set([
     ...CORE_ETFS, ...SECTOR_ETFS, ...LARGE_CAPS,

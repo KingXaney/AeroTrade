@@ -46,3 +46,6 @@ export const SECTOR_SLUGS = [
 ] as const;
 
 export type SectorSlug = (typeof SECTOR_SLUGS)[number];
+
+// A sector is stored as the entity 'sector:<slug>'.
+export const SECTOR_KEY_PREFIX = 'sector:';

@@ -1,6 +1,7 @@
-// Thin adapter over the existing Finnhub action — tags articles with sourceType for the digest aggregator.
+// Thin adapter over the Finnhub client's news fetch — tags articles with sourceType for the digest aggregator.
 
-import {getNews} from "@/lib/actions/finnhub.actions";
+import {getNews} from "@/lib/prices/finnhub";
+import type {MarketNewsArticle} from '@/lib/news/types';
 
 export const fetchFinnhubNews = async (symbols?: string[]): Promise<MarketNewsArticle[]> => {
     try {

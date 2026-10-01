@@ -4,7 +4,7 @@
 
 import {isRebalanceDue} from '@/lib/strategies/calendar';
 import type {Decide, SignalRow, Target} from '@/lib/strategies/types';
-import {BENCHMARK_SYMBOL} from '@/lib/strategies/universe';
+import {BENCHMARK_SYMBOL} from '@/lib/prices/config';
 import {
     FULL_WEIGHT,
     finishDecision,
@@ -12,9 +12,11 @@ import {
     heldPositions,
     holdingWeight,
     lastClose,
-    readParam,
     staleNote,
 } from '@/lib/strategies/rules/shared';
+import {
+    readParam,
+} from '@/lib/strategies/params';
 
 const BOND_ETF = 'AGG';
 

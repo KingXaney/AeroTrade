@@ -14,6 +14,8 @@
 //   npm run trigger -- topic <userId> <keywordSetHash>   one on-demand topic refresh
 import { Inngest } from "inngest";
 
+// Each job's event as lib/jobs/registry.ts names it; lib/jobs/__tests__/registry.test.ts holds
+// this table to the registry, so a renamed event fails there instead of firing nothing.
 const EVENTS = {
     brain: 'app/update.news.brain',
     navigator: 'app/run.ai.navigator',
@@ -41,7 +43,7 @@ if (!name || (job === 'topic' && (!userId || !Number.isFinite(Number(hash))))) {
 }
 const data = job === 'topic' ? { userId, keywordSetHash: Number(hash) } : (STRATEGY_DATA[job] ?? {});
 
-// The id must match lib/inngest/client.ts so the event lands in the same app.
+// The id must match lib/jobs/client.ts so the event lands in the same app.
 const inngest = new Inngest({ id: 'aerotrade' });
 inngest.send({ name, data })
     .then(() => console.log(`Triggered '${name}' locally.`))

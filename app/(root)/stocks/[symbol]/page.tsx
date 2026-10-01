@@ -1,4 +1,4 @@
-import {notFound, redirect} from "next/navigation";
+import {notFound} from "next/navigation";
 import TradingViewWidget from "@/components/TradingViewWidget";
 import StockHeader from "@/components/stock/StockHeader";
 import {
@@ -7,19 +7,25 @@ import {
     COMPANY_PROFILE_WIDGET_CONFIG,
     TECHNICAL_ANALYSIS_WIDGET_CONFIG,
     COMPANY_FINANCIALS_WIDGET_CONFIG,
-} from "@/lib/constants";
+    tvScript,
+} from "@/lib/stocks/tradingview";
 import KeyNumbers from "@/components/stock/KeyNumbers";
 import RulesSee from "@/components/stock/RulesSee";
-import {getCompanyProfile, getFinancials, getQuote} from "@/lib/actions/finnhub.actions";
-import {getCurrentUserId, isInWatchlist} from "@/lib/actions/watchlist.actions";
+import {getCompanyProfile, getFinancials, getQuote} from "@/lib/prices/finnhub";
+import {requireUserId} from "@/lib/auth/session";
+import {isInWatchlist} from "@/lib/stocks/watchlist-store";
 import {getTopicsForUser} from "@/lib/topics/store";
-import {readKeyNumbers} from "@/lib/learn/key-numbers";
-import {buildRulesSee, type SymbolBoardRead} from "@/lib/learn/rules-see";
-import {getBoardRowsForSymbol} from "@/lib/strategies/queries";
+import {readKeyNumbers} from "@/lib/stocks/key-numbers";
+import {buildRulesSee, type SymbolBoardRead} from "@/lib/stocks/rules-see";
+import {getBoardRowsForSymbol} from "@/lib/strategies/page-store";
 import {strategiesWatching} from "@/lib/strategies/universe";
 import {cn} from "@/lib/utils";
 
-const TRADINGVIEW_SCRIPT = 'https://s3.tradingview.com/external-embedding/embed-widget-';
+type StockDetailsPageProps = {
+    params: Promise<{
+        symbol: string;
+    }>;
+};
 
 // A failed board read hides "What the rules see" rather than reading as "no stored row".
 const readBoardRows = async (symbol: string): Promise<SymbolBoardRead[] | null> => {
@@ -32,8 +38,7 @@ const readBoardRows = async (symbol: string): Promise<SymbolBoardRead[] | null> 
 };
 
 const StockDetailsPage = async ({params}: StockDetailsPageProps) => {
-    const userId = await getCurrentUserId();
-    if (!userId) redirect('/sign-in');
+    const userId = await requireUserId();
 
     const {symbol: raw} = await params;
     const symbol = raw.toUpperCase();
@@ -78,7 +83,7 @@ const StockDetailsPage = async ({params}: StockDetailsPageProps) => {
             {/* Symbol Info */}
             <section className="glass-panel rounded-xl p-4 shimmer">
                 <TradingViewWidget
-                    scriptUrl={`${TRADINGVIEW_SCRIPT}symbol-info.js`}
+                    scriptUrl={tvScript('symbol-info')}
                     config={SYMBOL_INFO_WIDGET_CONFIG(symbol)}
                     height={170}
                 />
@@ -89,7 +94,7 @@ const StockDetailsPage = async ({params}: StockDetailsPageProps) => {
                 <section className="xl:col-span-2 glass-panel rounded-xl p-4 shimmer">
                     <TradingViewWidget
                         title="Advanced Chart"
-                        scriptUrl={`${TRADINGVIEW_SCRIPT}advanced-chart.js`}
+                        scriptUrl={tvScript('advanced-chart')}
                         config={CANDLE_CHART_WIDGET_CONFIG(symbol)}
                         height={600}
                     />
@@ -97,7 +102,7 @@ const StockDetailsPage = async ({params}: StockDetailsPageProps) => {
                 <section className="xl:col-span-1 glass-panel rounded-xl p-4">
                     <TradingViewWidget
                         title="Technical Analysis"
-                        scriptUrl={`${TRADINGVIEW_SCRIPT}technical-analysis.js`}
+                        scriptUrl={tvScript('technical-analysis')}
                         config={TECHNICAL_ANALYSIS_WIDGET_CONFIG(symbol)}
                         height={400}
                     />
@@ -109,7 +114,7 @@ const StockDetailsPage = async ({params}: StockDetailsPageProps) => {
                 <section className="glass-panel rounded-xl p-4 shimmer">
                     <TradingViewWidget
                         title="Company Profile"
-                        scriptUrl={`${TRADINGVIEW_SCRIPT}symbol-profile.js`}
+                        scriptUrl={tvScript('symbol-profile')}
                         config={COMPANY_PROFILE_WIDGET_CONFIG(symbol)}
                         height={440}
                     />
@@ -117,7 +122,7 @@ const StockDetailsPage = async ({params}: StockDetailsPageProps) => {
                 <section className="glass-panel rounded-xl p-4">
                     <TradingViewWidget
                         title="Financials"
-                        scriptUrl={`${TRADINGVIEW_SCRIPT}financials.js`}
+                        scriptUrl={tvScript('financials')}
                         config={COMPANY_FINANCIALS_WIDGET_CONFIG(symbol)}
                         height={464}
                     />

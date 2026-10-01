@@ -1,6 +1,6 @@
 // What one Inngest step does for one strategy: load the decision input, run the ONE
 // shared decision path, persist the plan; or rebuild the simulated record, or its what-if
-// grid. Server module; the job in lib/inngest/functions.ts sequences these into steps.
+// grid. Server module; the job in lib/jobs/functions/strategies.ts sequences these into steps.
 
 import {buildContext, runStrategyDay} from "@/lib/strategies/engine";
 import {STRATEGY_RULES} from "@/lib/strategies/rules";
@@ -10,11 +10,13 @@ import {CASH_FLOOR, STRATEGY_STARTING_BALANCE} from "@/lib/strategies/config";
 import {universeIsTooStale} from "@/lib/strategies/job-helpers";
 import {loadDecisionInput, loadSimulationBars, saveBacktest, savePlannedRun, saveVariants, type StrategyStateView} from "@/lib/strategies/store";
 import type {PlannedOrder, StrategyDefinition} from "@/lib/strategies/types";
-import {BENCHMARK_SYMBOL, UNIVERSES} from "@/lib/strategies/universe";
+import {UNIVERSES} from "@/lib/strategies/universe";
+import {BENCHMARK_SYMBOL} from "@/lib/prices/config";
 import {applyOverrides, gridFor, toWhatIfView, type StoredWhatIfVariant} from "@/lib/strategies/whatif";
 import {getRatePoints, symbolsLackingDividendCoverage} from "@/lib/prices/store";
-import {addCalendarDays} from "@/lib/prices/calendar-days";
-import {RATE_MAX_STALENESS_DAYS, type RatePoint} from "@/lib/trading/income";
+import {addCalendarDays} from "@/lib/dates";
+import {RATE_MAX_STALENESS_DAYS} from "@/lib/income/accrual";
+import type {RatePoint} from "@/lib/prices/types";
 
 // Small enough to cross an Inngest step boundary: never the bars.
 export type StrategyDayPlan = {
@@ -105,7 +107,7 @@ export const backtestDataReady = async (def: StrategyDefinition, launchDate: str
 
 export const simulateForStrategy = async (def: StrategyDefinition, launchDate: string): Promise<{points: number; trades: number}> => {
     const [bars, rates] = await Promise.all([loadSimulationBars(def, BENCHMARK_SYMBOL), getRatePoints()]);
-    // Income on, exactly as the live account earns it (lib/trading/income.ts).
+    // Income on, exactly as the live account earns it (lib/income/accrual.ts).
     const result = simulateStrategy(def, bars, {startingBalance: STRATEGY_STARTING_BALANCE, launchDate, rates});
     await saveBacktest(def.id, effectiveVersion(def), result);
     return {points: result.points.length, trades: result.trades.length};

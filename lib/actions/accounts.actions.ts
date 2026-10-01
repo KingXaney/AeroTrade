@@ -4,15 +4,12 @@ import {revalidatePath} from "next/cache";
 import {cookies} from "next/headers";
 import PaperAccount from "@/database/models/paper-account.model";
 import {connectToDatabase} from "@/database/mongoose";
-import {
-    ACTIVE_ACCOUNT_COOKIE,
-    MAX_PAPER_ACCOUNTS,
-    MAX_STARTING_BALANCE,
-    MIN_STARTING_BALANCE,
-} from "@/lib/constants";
-import {getCurrentUserId} from "@/lib/actions/watchlist.actions";
-import {getAccountsForUser, getOwnedAccount, resolveStartingBalance, seedDayZeroSnapshot} from "@/lib/trading/account";
-import {deleteOwnedAccount} from "@/lib/trading/account-delete";
+import {ACTIVE_ACCOUNT_COOKIE, MAX_PAPER_ACCOUNTS} from "@/lib/trading/config";
+import {getCurrentUserId} from "@/lib/auth/session";
+import {getAccountsForUser, getOwnedAccount} from "@/lib/trading/accounts";
+import {PAPER_STARTING_BALANCE, STARTING_BALANCE_ERROR, resolveStartingBalance} from "@/lib/trading/starting-balance";
+import {deleteOwnedAccount, restartAccount, seedDayZeroSnapshot} from "@/lib/trading/lifecycle";
+import type {ActionResult} from '@/lib/actions/types';
 
 const ACCOUNT_NAME_MAX_LENGTH = 40;
 const ACTIVE_COOKIE_MAX_AGE_SECONDS = 60 * 60 * 24 * 365;
@@ -72,7 +69,7 @@ const dropLegacySingleAccountIndex = async (): Promise<boolean> => {
 // Create a new strategy account (default or custom starting balance) and make it active.
 export const createPaperAccount = async (
     {name, startingBalance}: {name: string; startingBalance?: number},
-): Promise<OrderResult & {accountId?: string}> => {
+): Promise<ActionResult & {accountId?: string}> => {
     try {
         const userId = await getCurrentUserId();
         if (!userId) return {success: false, message: 'Not authenticated'};
@@ -82,7 +79,7 @@ export const createPaperAccount = async (
 
         const balance = resolveStartingBalance(startingBalance);
         if (balance === null) {
-            return {success: false, message: `Starting balance must be between $${MIN_STARTING_BALANCE.toLocaleString('en-US')} and $${MAX_STARTING_BALANCE.toLocaleString('en-US')}`};
+            return {success: false, message: STARTING_BALANCE_ERROR};
         }
 
         const accounts = await getAccountsForUser(userId);
@@ -93,7 +90,7 @@ export const createPaperAccount = async (
             return {success: false, message: `You already have a strategy named "${clean}"`};
         }
 
-        const insertAndActivate = async (): Promise<OrderResult & {accountId?: string}> => {
+        const insertAndActivate = async (): Promise<ActionResult & {accountId?: string}> => {
             const created = await PaperAccount.create({
                 userId,
                 name: clean,
@@ -129,7 +126,7 @@ export const createPaperAccount = async (
     }
 };
 
-export const renamePaperAccount = async ({accountId, name}: {accountId: string; name: string}): Promise<OrderResult> => {
+export const renamePaperAccount = async ({accountId, name}: {accountId: string; name: string}): Promise<ActionResult> => {
     try {
         const userId = await getCurrentUserId();
         if (!userId) return {success: false, message: 'Not authenticated'};
@@ -161,8 +158,34 @@ export const renamePaperAccount = async ({accountId, name}: {accountId: string; 
     }
 };
 
-// Delete a strategy account and everything scoped to it (lib/trading/account-delete).
-export const deletePaperAccount = async (accountId: string): Promise<OrderResult> => {
+// Reset one strategy account: back to starting cash, no positions, cleared trade log
+// and performance history, with inception re-anchored to now. Preserves the account's
+// own starting balance unless a new one is passed.
+export const resetPaperAccount = async (accountId: string, startingBalance?: number): Promise<ActionResult> => {
+    try {
+        const userId = await getCurrentUserId();
+        if (!userId) return {success: false, message: 'Not authenticated'};
+
+        const account = await getOwnedAccount(userId, accountId);
+        if (!account) return {success: false, message: 'Strategy account not found'};
+
+        const balance = startingBalance === undefined
+            ? (account.startingBalance || PAPER_STARTING_BALANCE)
+            : resolveStartingBalance(startingBalance);
+        if (balance === null) return {success: false, message: STARTING_BALANCE_ERROR};
+
+        await restartAccount(userId, account, balance, {sweepLegacyTrades: true});
+
+        revalidateAccountPaths();
+        return {success: true, message: `${account.name || 'Strategy'} reset to $${balance.toLocaleString('en-US')}`};
+    } catch (error) {
+        console.error('Error resetting account:', error);
+        return {success: false, message: 'Reset failed'};
+    }
+};
+
+// Delete a strategy account and everything scoped to it (lib/trading/lifecycle).
+export const deletePaperAccount = async (accountId: string): Promise<ActionResult> => {
     try {
         const userId = await getCurrentUserId();
         if (!userId) return {success: false, message: 'Not authenticated'};
@@ -184,7 +207,7 @@ export const deletePaperAccount = async (accountId: string): Promise<OrderResult
 };
 
 // Switch which strategy account the trade/portfolio pages operate on.
-export const setActiveAccount = async (accountId: string): Promise<OrderResult> => {
+export const setActiveAccount = async (accountId: string): Promise<ActionResult> => {
     try {
         const userId = await getCurrentUserId();
         if (!userId) return {success: false, message: 'Not authenticated'};

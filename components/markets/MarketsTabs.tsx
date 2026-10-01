@@ -1,25 +1,18 @@
 import Link from "next/link";
 import TradingViewWidget from "@/components/TradingViewWidget";
 import {cn} from "@/lib/utils";
-import {
-    MARKET_SCREENER_WIDGET_CONFIG,
-    CRYPTO_SCREENER_WIDGET_CONFIG,
-    FOREX_CROSS_RATES_WIDGET_CONFIG,
-    HEATMAP_WIDGET_CONFIG,
-} from "@/lib/constants";
-
-const scriptBase = 'https://s3.tradingview.com/external-embedding/embed-widget-';
+import {MARKET_EMBEDS} from "@/lib/stocks/tradingview";
 
 // One screener/heatmap/forex widget at a time. Only the active tab's widget mounts,
 // so the page loads light and stays calm (vs. the old 5-widgets-at-once stack).
 const TABS = [
-    {id: 'stocks', label: 'Stocks', script: `${scriptBase}screener.js`, config: MARKET_SCREENER_WIDGET_CONFIG, height: 600},
-    {id: 'heatmap', label: 'Heatmap', script: `${scriptBase}stock-heatmap.js`, config: HEATMAP_WIDGET_CONFIG, height: 540},
-    {id: 'crypto', label: 'Crypto', script: `${scriptBase}screener.js`, config: CRYPTO_SCREENER_WIDGET_CONFIG, height: 540},
-    {id: 'forex', label: 'Forex', script: `${scriptBase}forex-cross-rates.js`, config: FOREX_CROSS_RATES_WIDGET_CONFIG, height: 540},
+    {id: 'stocks', label: 'Stocks', ...MARKET_EMBEDS.stockScreener, height: 600},
+    {id: 'heatmap', label: 'Heatmap', ...MARKET_EMBEDS.heatmap, height: 540},
+    {id: 'crypto', label: 'Crypto', ...MARKET_EMBEDS.cryptoScreener, height: 540},
+    {id: 'forex', label: 'Forex', ...MARKET_EMBEDS.forex, height: 540},
 ] as const;
 
-export type MarketsTabId = typeof TABS[number]['id'];
+type MarketsTabId = typeof TABS[number]['id'];
 
 export const isMarketsTabId = (value: unknown): value is MarketsTabId =>
     typeof value === 'string' && TABS.some((t) => t.id === value);

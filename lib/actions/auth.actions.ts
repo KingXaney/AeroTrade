@@ -1,11 +1,12 @@
 'use server';
 
-import {auth} from "@/lib/better-auth/auth";
-import {inngest} from "@/lib/inngest/client";
+import {auth} from "@/lib/auth/server";
+import {inngest} from "@/lib/jobs/client";
+import {JOBS} from "@/lib/jobs/registry";
 import {cookies, headers} from "next/headers";
 import {THEME_COOKIE} from "@/lib/theme/resolve";
-import {syncThemeCookieForUser} from "@/lib/actions/appearance.actions";
-import {takeRateLimit} from "@/lib/auth/rate-limit";
+import {syncThemeCookieForUser} from "@/lib/theme/store";
+import {takeRateLimit} from "@/lib/rate-limit";
 import {
     PASSWORD_RESET_LIMIT,
     PASSWORD_RESET_WINDOW_MS,
@@ -21,6 +22,7 @@ import {
 } from "@/lib/auth/limits";
 import {SIGN_UP_PROFILE_INVALID_MESSAGE, signUpProfile} from "@/lib/auth/sign-up-profile";
 import {seedDefaultTopics} from "@/lib/topics/seed";
+import type {SignInFormData, SignUpFormData} from '@/lib/auth/types';
 
 // Better-auth throws APIError-shaped objects with body.message; fall back to .message or a generic string.
 const extractAuthError = (e: unknown, fallback: string): string => {
@@ -61,7 +63,7 @@ export const signUpWithEmail = async (input: SignUpFormData) => {
             }
 
             await inngest.send({
-                name: 'app/user.created',
+                name: JOBS.signUpEmail.event,
                 data: { email, name: fullName, ...profile }
             }).catch((e) => console.error('Failed to queue welcome email', e))
         }

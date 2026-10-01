@@ -3,6 +3,7 @@
 
 import {formatPrice} from "@/lib/format";
 import type {Cadence, RowState, SeriesPoint, SeriesStats, SignalColumn, SignalFormat, SignalRow, StrategyFamily, StrategyId} from "@/lib/strategies/types";
+import type {PerfPoint} from '@/lib/trading/types';
 
 export type LiveRecord = {
     totalValue: number;
@@ -168,7 +169,7 @@ export const STATE_TONE: Record<RowState, 'brand' | 'positive' | 'negative' | 'n
     held: 'brand', enter: 'positive', exit: 'negative', watch: 'neutral', excluded: 'neutral',
 };
 // Acted-on rows first, then what the rule holds, then what it merely watches.
-export const STATE_ORDER: Record<RowState, number> = {enter: 0, exit: 1, held: 2, watch: 3, excluded: 4};
+const STATE_ORDER: Record<RowState, number> = {enter: 0, exit: 1, held: 2, watch: 3, excluded: 4};
 export const sortBoard = (board: readonly SignalRow[]): SignalRow[] =>
     [...board].sort((a, b) => STATE_ORDER[a.state] - STATE_ORDER[b.state] || a.symbol.localeCompare(b.symbol));
 
@@ -191,10 +192,6 @@ export const describeLastRun = (run: StrategyRunView | null): string => {
 };
 
 const withSign = (value: number, digits: number): string => `${value >= 0 ? '+' : ''}${value.toFixed(digits)}`;
-
-// The rounded percent formatters moved to lib/format, the app-wide home; kept here for the
-// strategy pages that import them from this module.
-export {formatDrawdown, formatPct, roundPct, signedForColor} from "@/lib/format";
 
 export const formatSignalValue = (value: number | string | boolean | null | undefined, format: SignalFormat): string => {
     if (value === null || value === undefined) return '—';

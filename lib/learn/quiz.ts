@@ -13,14 +13,14 @@
 // offered, because the name alone would give the answer away.
 //
 // Pure and dependency-light. Client code imports only its types (zod and the catalog stay
-// on the server); the one read that feeds it is getRecentRuns in lib/strategies/queries.ts.
+// on the server); the one read that feeds it is getRecentRuns in lib/strategies/page-store.ts.
 
 import {z} from 'zod';
 import type {GlossaryKey} from '@/lib/learn/glossary';
 import {decodeReason, type ReasonClause} from '@/lib/learn/reasons';
-import {explainVerdict, pickQuizRows} from '@/lib/learn/verdict';
+import {explainVerdict, pickQuizRows} from '@/lib/strategies/learn/verdict';
 import {ASKABLE_STATES, STATE_MEANING} from '@/lib/learn/copy/verdict';
-import {addCalendarDays} from '@/lib/prices/calendar-days';
+import {addCalendarDays} from '@/lib/dates';
 import {formatSignalValue, STATE_LABEL, visibleSignalColumns} from '@/lib/strategies/views';
 import type {RowState, SignalRow, StrategyDefinition, StrategyId} from '@/lib/strategies/types';
 
@@ -35,7 +35,7 @@ export type QuizTemplate = (typeof QUIZ_TEMPLATES)[number];
 const MIN_OPTIONS = 3;
 const MAX_SYMBOL_OPTIONS = 4;
 
-export type QuizRunOrder = {symbol: string; side: 'buy' | 'sell'; reason: string};
+type QuizRunOrder = {symbol: string; side: 'buy' | 'sell'; reason: string};
 export type QuizRun = {date: string; board: readonly SignalRow[]; orders: readonly QuizRunOrder[]};
 
 export type QuizCell = {label: string; value: string; term?: GlossaryKey};
@@ -47,7 +47,7 @@ export type QuizOption = {
     // A row's numbers as the board prints them ("which symbol" only).
     cells: QuizCell[];
 };
-export type QuizReveal = {symbol: string; verdict: RowState; explanation: string; gloss: ReasonClause[]};
+type QuizReveal = {symbol: string; verdict: RowState; explanation: string; gloss: ReasonClause[]};
 
 export type DailyQuiz = {
     // The ET day the question is for; recordQuizAnswer accepts only this, and only today.

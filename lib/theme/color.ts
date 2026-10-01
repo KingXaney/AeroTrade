@@ -2,7 +2,7 @@
 // consumers that need rgb() rather than hex. Dependency-free so the unit tests
 // never pull in React or the database.
 
-export type Rgb = {r: number; g: number; b: number};
+type Rgb = {r: number; g: number; b: number};
 
 const HEX6 = /^#[0-9a-f]{6}$/i;
 
@@ -20,12 +20,6 @@ export function hexToRgb(hex: string): Rgb {
         g: parseInt(hex.slice(3, 5), 16),
         b: parseInt(hex.slice(5, 7), 16),
     };
-}
-
-// 'r g b' — the space-separated form that `rgb(var(--x) / alpha)` accepts in CSS.
-export function rgbString(hex: string): string {
-    const {r, g, b} = hexToRgb(hex);
-    return `${r} ${g} ${b}`;
 }
 
 // WCAG 2.2 sRGB linearisation. 2.0 used 0.03928 as the cutoff; the difference in

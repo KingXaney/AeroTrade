@@ -3,7 +3,8 @@
 
 import {closesOf, laggedReturn} from '@/lib/strategies/indicators';
 import type {Decide} from '@/lib/strategies/types';
-import {decideRanked, fmtPct, fmtRank, readParam} from '@/lib/strategies/rules/shared';
+import {decideRanked, fmtPct, fmtRank} from '@/lib/strategies/rules/shared';
+import {readParam} from '@/lib/strategies/params';
 
 export const decide: Decide = (def, ctx) => {
     const lookback = readParam(def, 'lookback');

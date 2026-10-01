@@ -1,16 +1,12 @@
-import {redirect} from "next/navigation";
 import {cookies} from "next/headers";
 import type {ReactNode} from "react";
-import {ACTIVE_ACCOUNT_COOKIE} from "@/lib/constants";
-import {getCurrentUserId} from "@/lib/actions/watchlist.actions";
-import {getDashboardLayoutForUser} from "@/lib/dashboard/layout-store";
-import {getPortfoliosForUser} from "@/lib/trading/account";
-import {WIDGET_IDS, WIDGETS, isWidgetAvailable, resolveDataKeys, type WidgetId} from "@/lib/dashboard/widgets";
-import {filterAvailable, layoutFingerprint} from "@/lib/dashboard/layout";
+import {requireUserId} from "@/lib/auth/session";
+import {getPortfoliosForUser} from "@/lib/trading/valuation";
+import {resolveDataKeys, type WidgetId} from "@/lib/dashboard/catalog";
+import {layoutFingerprint} from "@/lib/dashboard/layout";
+import {getVisibleLayout} from "@/lib/dashboard/availability";
 import {loadDashboardData, type LoaderCtx} from "@/lib/dashboard/loaders";
-import {pickActiveAccount, toSwitcherAccounts} from "@/lib/dashboard/select";
-import {getOnboardingFacts} from "@/lib/learn/facts-store";
-import {onboardingActive} from "@/lib/learn/missions";
+import {pickActiveAccount, preferredAccountId, toSwitcherAccounts} from "@/lib/trading/active-account";
 import {renderWidgetBody} from "@/components/dashboard/widgets/registry";
 import DashboardGrid from "@/components/dashboard/DashboardGrid";
 import AccountSwitcher from "@/components/trade/AccountSwitcher";
@@ -23,18 +19,14 @@ type HomeProps = {
 // stays a Server Component: every widget body is rendered here and handed to
 // the client grid, which only owns order/span/edit state.
 const Home = async ({searchParams}: HomeProps) => {
-    const userId = await getCurrentUserId();
-    if (!userId) redirect('/sign-in');
+    const userId = await requireUserId();
 
     const {customize, account} = await searchParams;
-    const cookieStore = await cookies();
-    const ctx: LoaderCtx = {userId, preferredAccountId: account ?? cookieStore.get(ACTIVE_ACCOUNT_COOKIE)?.value};
+    const ctx: LoaderCtx = {userId, preferredAccountId: preferredAccountId(account, await cookies())};
 
-    // Portfolios are cache()-deduped with the (root) layout, so this costs nothing extra.
-    const [stored, portfolios, facts] = await Promise.all([getDashboardLayoutForUser(userId), getPortfoliosForUser(userId), getOnboardingFacts(userId)]);
-    const availability = {accountCount: portfolios.length, advanced: true, onboarding: onboardingActive(facts)};
-    const layout = filterAvailable(stored, availability);
-    const availableIds = WIDGET_IDS.filter((id) => isWidgetAvailable(WIDGETS[id], availability));
+    // Portfolios are cache()-deduped with the (root) layout and the availability read, so this
+    // costs nothing extra.
+    const [{layout, availableIds}, portfolios] = await Promise.all([getVisibleLayout(userId), getPortfoliosForUser(userId)]);
 
     const {eager, needsActiveAccount} = resolveDataKeys(layout.widgets.map((w) => w.id));
     const {data, failed} = await loadDashboardData(eager, ctx);

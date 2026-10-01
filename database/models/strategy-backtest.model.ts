@@ -95,7 +95,7 @@ const VariantSchema = new Schema<BacktestVariantDoc>(
 
 // Stats are nullable numbers; Mixed keeps null distinct from absent.
 const StrategyBacktestSchema = new Schema<StrategyBacktestDoc>({
-    strategyId: {type: String, required: true, unique: true, index: true},
+    strategyId: {type: String, required: true, unique: true},
     version: {type: String, required: true},
     from: {type: String, required: true},
     to: {type: String, required: true},

@@ -88,7 +88,7 @@ Which surfaces get topics falls out of which function they call:
 | dashboard `news` widget | `lib/dashboard/loaders.ts` → `getNewsFeed` | yes |
 | `/history` | `app/(root)/history/page.tsx` → `getNewsFeed` | yes |
 | `/news` | `getNewsFeedForPrefs` (it needs the prefs for the editor) | yes, passed explicitly |
-| daily digest | `lib/inngest/functions.ts` → `getNewsFeedForPrefs` | **no, on purpose** |
+| daily digest | `lib/jobs/functions.ts` → `getNewsFeedForPrefs` | **no, on purpose** |
 
 `NewsArticleCard` gives its tag slot to the topic when there is one. The slot answers "what
 is this about", and for a topic article the topic is the answer; without it the user cannot

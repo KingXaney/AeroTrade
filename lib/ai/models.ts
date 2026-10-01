@@ -62,11 +62,10 @@ const PRO: Record<AiTask, ModelSpec> = {
 export const MODEL_MATRIX: Record<AiTier, Record<AiTask, ModelSpec>> = {free: FREE, basic: BASIC, pro: PRO};
 
 export const AI_TIERS: AiTier[] = ['free', 'basic', 'pro'];
-export const AI_TASKS: AiTask[] = ['extraction', 'digest', 'rationale', 'welcome', 'topicBrief'];
 
 const isTier = (value: string): value is AiTier => (AI_TIERS as string[]).includes(value);
 
-export type TierResolution = {tier: AiTier; warning?: string};
+type TierResolution = {tier: AiTier; warning?: string};
 
 // Named `free`, never `subscription`: a server-side job cannot use a Claude
 // subscription, and labelling a deployment variable that way invites exactly the
@@ -85,12 +84,9 @@ export const resolveTier = (env: NodeJS.ProcessEnv = process.env): TierResolutio
     return {tier: raw};
 };
 
-export type ResolvedModel = ModelSpec & {task: AiTask; tier: AiTier; warning?: string};
+type ResolvedModel = ModelSpec & {task: AiTask; tier: AiTier; warning?: string};
 
 export const resolveModel = (task: AiTask, env: NodeJS.ProcessEnv = process.env): ResolvedModel => {
     const {tier, warning} = resolveTier(env);
     return {...MODEL_MATRIX[tier][task], task, tier, ...(warning ? {warning} : {})};
 };
-
-export const isProviderConfigured = (provider: AiProvider, env: NodeJS.ProcessEnv = process.env): boolean =>
-    provider === 'anthropic' ? Boolean(env.ANTHROPIC_API_KEY) : Boolean(env.GEMINI_API_KEY);

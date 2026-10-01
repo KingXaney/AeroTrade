@@ -1,16 +1,17 @@
 'use server';
 
 import {connectToDatabase} from "@/database/mongoose";
-import {getCurrentUserId} from "@/lib/actions/watchlist.actions";
-import {unsetPreference, upsertPreferences} from "@/lib/preferences/upsert";
+import {getCurrentUserId} from "@/lib/auth/session";
+import {unsetPreference, upsertPreferences} from "@/lib/settings/preferences-store";
 import {defaultNewsFeed, isDefaultNewsFeed, NewsFeedSchema, normalizeNewsFeed, type NewsFeedPrefs} from "@/lib/news/feed-prefs";
 import {formatIssue} from "@/lib/topics/normalize";
+import type {ActionResult} from '@/lib/actions/types';
 
 // Writes only. Reads live in lib/news/feed-store.ts (a plain server module), so they are
 // not exposed as POST endpoints. Neither action revalidates a path: the editor refreshes
 // once its own state is settled, the same way the dashboard editor does.
 
-export type NewsFeedSaveResult = OrderResult & {feed?: NewsFeedPrefs};
+type NewsFeedSaveResult = ActionResult & {feed?: NewsFeedPrefs};
 
 export const saveNewsFeed = async (input: unknown): Promise<NewsFeedSaveResult> => {
     const userId = await getCurrentUserId();

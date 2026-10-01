@@ -7,8 +7,8 @@ import {afterEach, describe, expect, it, vi} from 'vitest';
 import {findBanned} from '@/lib/learn/banned';
 import {daysHeld, HABITS_COPY, lotShare, turnoverShare} from '@/lib/learn/copy/habits';
 import {landedShare, LUCK_COPY, LUCK_TERMS} from '@/lib/learn/copy/luck';
-import {cadenceControls, HABITS_MIN_CLOSED_LOTS, PACE_WINDOW_DAYS, type Habits} from '@/lib/trading/habits';
-import {histogram, LUCK_MIN_SESSIONS, type LuckReady} from '@/lib/learn/random-portfolios';
+import {cadenceControls, HABITS_MIN_CLOSED_LOTS, PACE_WINDOW_DAYS, type Habits} from '@/lib/trading/learn/habits';
+import {histogram, LUCK_MIN_SESSIONS, type LuckReady} from '@/lib/trading/learn/random-portfolios';
 import {GLOSSARY} from '@/lib/learn/glossary';
 import {STRATEGIES} from '@/lib/strategies/catalog';
 
@@ -193,7 +193,7 @@ describe('Luck or skill copy', () => {
 
 describe('copy that follows its constants', () => {
     afterEach(() => {
-        vi.doUnmock('@/lib/trading/habits');
+        vi.doUnmock('@/lib/trading/learn/habits');
         vi.resetModules();
     });
 
@@ -209,7 +209,7 @@ describe('copy that follows its constants', () => {
 
     it('moves the pace window with PACE_WINDOW_DAYS', async () => {
         vi.resetModules();
-        vi.doMock('@/lib/trading/habits', async (importOriginal) => ({...(await importOriginal<typeof import('@/lib/trading/habits')>()), PACE_WINDOW_DAYS: 28}));
+        vi.doMock('@/lib/trading/learn/habits', async (importOriginal) => ({...(await importOriginal<typeof import('@/lib/trading/learn/habits')>()), PACE_WINDOW_DAYS: 28}));
         const mocked = await import('@/lib/learn/copy/habits');
         expect(mocked.HABITS_COPY.paceHint({fills: 7, days: 5, windowDays: 28, sessions: 20, since: '2026-09-01', full: true})).toBe('in the last 28 days');
     });

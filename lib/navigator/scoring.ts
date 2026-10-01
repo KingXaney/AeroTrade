@@ -8,9 +8,9 @@ import {
     MIN_PRICE_BARS,
     MOMENTUM_MIX,
     SCORE_WEIGHTS,
-    SECTOR_KEY_PREFIX,
     VOLATILITY_HAIRCUT,
 } from "@/lib/navigator/config";
+import {SECTOR_KEY_PREFIX} from "@/lib/brain/config";
 import type {Signals} from "@/lib/prices/signals";
 
 export type ScoringInput = {

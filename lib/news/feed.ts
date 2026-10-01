@@ -7,7 +7,8 @@
 
 import {buildSearchQuery, searchUrlFor} from '@/lib/news/adapters/search';
 import {dedupeArticles} from '@/lib/news/dedupe';
-import {FEED_DIGEST_CAP, FEED_MAX_AGE_SECONDS, GOOGLE_NEWS_BASE, hashId, TOTAL_ARTICLE_CAP} from '@/lib/news/config';
+import {FEED_DIGEST_CAP, FEED_MAX_AGE_SECONDS, GOOGLE_NEWS_BASE, TOTAL_ARTICLE_CAP} from '@/lib/news/config';
+import {hashId} from '@/lib/text';
 import {
     NEWS_CATEGORIES,
     NEWS_REGIONS,
@@ -19,12 +20,11 @@ import {
     type NewsFeedPrefs,
     type NewsRegionId,
 } from '@/lib/news/feed-prefs';
-
-export * from '@/lib/news/feed-prefs';
+import type {MarketNewsArticle} from '@/lib/news/types';
 
 // 'topics' is not a request — it is the stored followed-topic articles, injected straight
 // into the merge. It has no URL and never reaches feedRequestsFor or planFeedSlots.
-export type FeedRequestKind = FeedSlot['kind'] | 'finnhub' | 'topics';
+type FeedRequestKind = FeedSlot['kind'] | 'finnhub' | 'topics';
 
 export type FeedRequest = {
     kind: FeedRequestKind;

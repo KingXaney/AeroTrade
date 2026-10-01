@@ -42,10 +42,6 @@ export const staleNote = (asOf: string): string => `stale: no bar for ${asOf}`;
 
 export const universeOf = (def: StrategyDefinition): readonly string[] => UNIVERSES[def.universe];
 
-// The one reader of def.params, kept in its own tiny module so the reason decoder
-// (lib/learn/reasons.ts) can read the same parameters without importing the rules.
-export {readParam} from '@/lib/strategies/params';
-
 export const heldPositions = (ctx: StrategyContext): ReadonlyMap<string, Holding> =>
     new Map(ctx.holdings.filter((holding) => holding.quantity > 0).map((holding) => [holding.symbol, holding]));
 
@@ -54,7 +50,7 @@ export const lastClose = (bars: readonly Bar[]): number | null => {
     return bar && Number.isFinite(bar.close) ? bar.close : null;
 };
 
-export const nullValues = (def: StrategyDefinition): SignalRow['values'] =>
+const nullValues = (def: StrategyDefinition): SignalRow['values'] =>
     Object.fromEntries(def.signalColumns.map((column) => [column.key, null]));
 
 // Share of equity a holding represents at its last close (null when unpriced).
@@ -63,7 +59,7 @@ export const holdingWeight = (ctx: StrategyContext, holding: Holding | undefined
         ? (holding.quantity * holding.lastClose) / ctx.equity
         : null;
 
-export type PartialDecision = {
+type PartialDecision = {
     rebalanceTriggered: boolean;
     targets: readonly Target[];
     rows: ReadonlyMap<string, SignalRow>;
@@ -100,7 +96,7 @@ export const finishDecision = (def: StrategyDefinition, ctx: StrategyContext, pa
 // Full re-rank on due days (12-1 momentum, low volatility): the top `slots` by
 // score are targeted, held names outside them exit, everything else watches.
 
-export type RankedSpec = {
+type RankedSpec = {
     score: (bars: readonly Bar[]) => number | null;
     direction: 'asc' | 'desc';
     // Board note for a symbol whose score is null (not enough history).
@@ -163,7 +159,7 @@ export const decideRanked = (def: StrategyDefinition, ctx: StrategyContext, spec
 // the strongest candidates. Held names that stay get no target, so the engine
 // never resizes them.
 
-export type SlotEvaluation = {
+type SlotEvaluation = {
     close: number;
     values: SignalRow['values'];
     // Set when the symbol cannot be scored today; a held one is kept.

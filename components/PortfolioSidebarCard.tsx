@@ -1,9 +1,9 @@
 import Link from "next/link";
-import {cn, formatPrice, getChangeColorClass} from "@/lib/utils";
-import {formatPct} from "@/lib/format";
+import {cn} from "@/lib/utils";
+import {formatPct, formatPrice, getChangeColorClass} from "@/lib/format";
 
-// Compact, glanceable portfolio summary for the left sidebar. Mirrors the
-// watchlist card pattern in Sidebar.tsx; links through to the full /portfolio page.
+// Compact, glanceable portfolio summary for the left sidebar, under the topics card
+// (Sidebar.tsx); links through to the full /portfolio page.
 export type SidebarPortfolio = {
     totalValue: number;
     totalReturnPct: number;

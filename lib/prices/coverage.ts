@@ -15,6 +15,3 @@ export const mergeCoverage = (stored: CoverageRange | null, payload: CoverageRan
         through: payload.through > stored.through ? payload.through : stored.through,
     };
 };
-
-export const coversRange = (coverage: CoverageRange | null, from: string, through: string): boolean =>
-    coverage !== null && coverage.from <= from && coverage.through >= through;

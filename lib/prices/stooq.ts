@@ -7,9 +7,10 @@ import {
     TOPUP_CALENDAR_DAYS,
 } from "@/lib/prices/config";
 import {type Bar} from "@/lib/prices/signals";
+import {addCalendarDays} from "@/lib/dates";
 
 // Both providers now produce the same shape; the alias survives for older imports.
-export type StooqBar = Bar;
+type StooqBar = Bar;
 
 // CSV layout is 'Date,Open,High,Low,Close,Volume'.
 const OPEN_FIELD_INDEX = 1;
@@ -80,13 +81,10 @@ export const parseStooqCsv = (csv: string): StooqBar[] => {
 // All date math runs on UTC midnights so results never depend on host TZ.
 const parseUtcDate = (dateStr: string): Date => new Date(`${dateStr}T00:00:00Z`);
 
-const minusCalendarDays = (date: Date, days: number): Date =>
-    new Date(date.getTime() - days * MS_PER_DAY);
-
 // Stooq's d1/d2 query params want compact YYYYMMDD.
-const toStooqDate = (date: Date): string => date.toISOString().slice(0, 10).replace(/-/g, "");
+const toStooqDate = (date: string): string => date.replace(/-/g, "");
 
-export type FetchWindowOptions = {
+type FetchWindowOptions = {
     // When known, a stored history that does not reach far enough back also
     // triggers a backfill (a caller asking for 3 years must not settle for 2).
     earliestBarDate?: string | null;
@@ -105,17 +103,15 @@ export const decideFetchWindow = (
     const gapDays = latestBarDate === null
         ? Number.POSITIVE_INFINITY
         : Math.round((todayUtc.getTime() - parseUtcDate(latestBarDate).getTime()) / MS_PER_DAY);
-    const requiredEarliest = minusCalendarDays(todayUtc, backfillCalendarDays - BACKFILL_DEPTH_TOLERANCE_DAYS)
-        .toISOString()
-        .slice(0, 10);
+    const requiredEarliest = addCalendarDays(today, -(backfillCalendarDays - BACKFILL_DEPTH_TOLERANCE_DAYS));
     const tooShallow = earliestBarDate !== null && earliestBarDate > requiredEarliest;
     // A gap of exactly BACKFILL_TRIGGER_GAP_DAYS is still fresh enough to top up.
     const mode: "backfill" | "topup" = gapDays > BACKFILL_TRIGGER_GAP_DAYS || tooShallow ? "backfill" : "topup";
     const windowDays = mode === "backfill" ? backfillCalendarDays : TOPUP_CALENDAR_DAYS;
     return {
         mode,
-        fromDate: toStooqDate(minusCalendarDays(todayUtc, windowDays)),
-        toDate: toStooqDate(todayUtc),
+        fromDate: toStooqDate(addCalendarDays(today, -windowDays)),
+        toDate: toStooqDate(today),
     };
 };
 

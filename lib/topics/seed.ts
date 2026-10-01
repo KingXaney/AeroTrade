@@ -7,12 +7,12 @@
 import {connectToDatabase} from "@/database/mongoose";
 import Topic from "@/database/models/topic.model";
 import UserPreferencesModel from "@/database/models/user-preferences.model";
-import {upsertPreferences} from "@/lib/preferences/upsert";
+import {upsertPreferences} from "@/lib/settings/preferences-store";
 import {insertTopic} from "@/lib/topics/insert";
 import {defaultTopics} from "@/lib/topics/starters";
 import {requestTopicFirstRun} from "@/lib/topics/events";
 
-export type SeedResult = {created: number; firstSlug: string | null};
+type SeedResult = {created: number; firstSlug: string | null};
 
 const EMPTY: SeedResult = {created: 0, firstSlug: null};
 

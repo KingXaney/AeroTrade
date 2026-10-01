@@ -1,7 +1,6 @@
-import {redirect} from "next/navigation";
-import {getCurrentUserId} from "@/lib/actions/watchlist.actions";
+import {requireUserId} from "@/lib/auth/session";
 import {marketStatus} from "@/lib/prices/market-hours";
-import {getStrategiesSystemStatus, getStrategyLeaderboard} from "@/lib/strategies/queries";
+import {getStrategiesSystemStatus, getStrategyLeaderboard} from "@/lib/strategies/page-store";
 import {everyLiveRecordYoung, LIVE_YOUNG_DAYS} from "@/lib/strategies/views";
 import MicroLabel from "@/components/primitives/MicroLabel";
 import PageTitle from "@/components/primitives/PageTitle";
@@ -12,8 +11,7 @@ import StrategyLeaderboard from "@/components/strategies/StrategyLeaderboard";
 import StrategyStatusStrip from "@/components/strategies/StrategyStatusStrip";
 
 const StrategiesPage = async () => {
-    const userId = await getCurrentUserId();
-    if (!userId) redirect('/sign-in');
+    const userId = await requireUserId();
 
     const [leaderboard, status] = await Promise.all([
         getStrategyLeaderboard(userId),

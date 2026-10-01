@@ -7,8 +7,8 @@ import WhatTheseMean from "@/components/learn/WhatTheseMean";
 import SeriesTiles from "@/components/strategies/SeriesTiles";
 import {TIM_COPY, TIM_TERMS, wayTiles} from "@/lib/learn/copy/time-in-market";
 import type {GlossaryKey} from "@/lib/learn/glossary";
-import {WAY_KEYS, type WayKey} from "@/lib/learn/time-in-market";
-import type {TimeInMarketRead} from "@/lib/learn/time-in-market-read";
+import {WAY_KEYS, type WayKey} from "@/lib/strategies/learn/time-in-market";
+import type {TimeInMarketRead} from "@/lib/strategies/learn/time-in-market-store";
 
 // "Time in the market", on the buy-and-hold SPY page only: the same money owned three ways
 // over a window the learner picks with a native GET form (?from=, validated and clamped on the

@@ -1,4 +1,5 @@
 import {Document, model, models, Schema} from "mongoose";
+import type {NewsSourceType} from '@/lib/news/types';
 
 // Matched articles are stored per keyword set, not per user: everyone following
 // the same set shares one fetch and one row, and the data expires on its own TTL

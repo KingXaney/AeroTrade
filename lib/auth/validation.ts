@@ -1,5 +1,5 @@
 // The auth forms' field rules, in react-hook-form's shape, and the password lengths
-// lib/better-auth/auth.ts enforces on the server. One copy, so a form cannot accept a password
+// lib/auth/server.ts enforces on the server. One copy, so a form cannot accept a password
 // the server will refuse — and spend a rate-limited attempt finding that out.
 //
 // Import-free and client-safe: the four auth forms and the better-auth config all read it.

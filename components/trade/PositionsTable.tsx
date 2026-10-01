@@ -2,14 +2,15 @@
 
 import {useState} from "react";
 import Link from "next/link";
-import {cn, formatPrice, formatChangePercent, getChangeColorClass} from "@/lib/utils";
-import {formatSignedPrice} from "@/lib/format";
+import {cn} from "@/lib/utils";
+import {formatSignedPrice, formatPrice, formatChangePercent, getChangeColorClass} from "@/lib/format";
 import SellPositionDialog from "@/components/trade/SellPositionDialog";
 import type {Lot} from "@/lib/trading/lots";
 import UnpricedNote from "@/components/trade/UnpricedNote";
 import Term from "@/components/primitives/Term";
 import TradeLink from "@/components/trade/TradeLink";
 import {HOLDINGS_COPY} from "@/lib/learn/copy/portfolio";
+import type {EnrichedPosition} from '@/lib/trading/types';
 
 // Interactive holdings table for /portfolio's Holdings panel (its only caller; /trade shows
 // OpenPositionsStrip) — each row opens a sell dialog where the user picks how many shares

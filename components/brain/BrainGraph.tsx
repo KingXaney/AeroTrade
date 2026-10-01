@@ -3,9 +3,10 @@
 import {useMemo, useState} from "react";
 import Link from "next/link";
 import {evidenceHref} from "@/lib/brain/links";
+import type {BrainEntitySummary, BrainEntityType} from '@/lib/brain/types';
 
-export type GraphNode = BrainEntitySummary;
-export type GraphEdge = {source: string; target: string; weight: number};
+type GraphNode = BrainEntitySummary;
+type GraphEdge = {source: string; target: string; weight: number};
 
 // Hand-rolled SVG knowledge graph (PerformanceChart precedent — no chart deps).
 // Deterministic concentric-ring layout: themes inner, sectors middle, tickers outer;

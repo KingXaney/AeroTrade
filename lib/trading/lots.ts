@@ -1,3 +1,5 @@
+import type {TradeSource} from '@/lib/trading/types';
+
 // First-in, first-out lots over one account's trade ledger. Pure: the ledger is read once
 // on the server (getTradeLedger) and handed in. A lot carries the buy's own note, so a sell
 // can show what the learner wrote when they bought the shares it closed. Only a learner's
@@ -22,7 +24,7 @@ export type LedgerTrade = {
 
 export type Lot = {buyId: string; symbol: string; quantity: number; price: number; note?: string; createdAt: number};
 
-export type LotMatches = {
+type LotMatches = {
     // sell id -> the lots (or parts of lots) it closed, oldest first
     matches: Record<string, Lot[]>;
     // what is still held, oldest first

@@ -19,13 +19,14 @@ import StrategyState from "@/database/models/strategy-state.model";
 import Topic from "@/database/models/topic.model";
 import UserPreferencesModel from "@/database/models/user-preferences.model";
 import Watchlist from "@/database/models/watchlist.model";
-import {readAccountsForUser} from "@/lib/trading/account";
-import {getEasternDateString} from "@/lib/utils";
+import {readAccountsForUser} from "@/lib/trading/accounts";
+import {addCalendarDays, getEasternDateString} from "@/lib/dates";
 import {daysBetween, type LearnDividend, type LearnFacts, type LearnFill, type LearnRebalance, type LearnSell, type OnboardingFacts} from "@/lib/learn/facts";
 import {ONBOARDING_MAX_DAYS} from "@/lib/learn/missions";
-import {firstDrawdownCrossing, shiftDate} from "@/lib/learn/moments";
+import {firstDrawdownCrossing} from "@/lib/learn/moments";
 import {STRATEGY_SLUGS} from "@/lib/strategies/catalog";
 import type {StrategyId} from "@/lib/strategies/types";
+import {accountEpoch} from "@/lib/trading/epoch";
 
 type LearnPrefs = {followedStrategies?: string[]; learn?: {missionsDismissedAt?: Date; lessonsSeen?: string[]}} | null;
 type LearnRows = {accounts: Awaited<ReturnType<typeof readAccountsForUser>>; prefs: LearnPrefs};
@@ -87,7 +88,7 @@ const isStrategyId = (value: string): value is StrategyId => (STRATEGY_SLUGS as 
 const learnFactsFrom = async (userId: string, {accounts, prefs}: LearnRows, onboardingFacts: Promise<OnboardingFacts>): Promise<LearnFacts> => {
     const followed = (prefs?.followedStrategies ?? []).filter(isStrategyId);
     const today = getEasternDateString();
-    const cutoff = shiftDate(today, -ONBOARDING_MAX_DAYS);
+    const cutoff = addCalendarDays(today, -ONBOARDING_MAX_DAYS);
     const young = accounts.filter((a) => daysBetween(getEasternDateString(new Date(a.createdAt)), today) <= ONBOARDING_MAX_DAYS);
     const credited = accounts.filter((a) => typeof a.incomeThrough === 'string' && a.incomeThrough.length > 0);
 
@@ -98,7 +99,7 @@ const learnFactsFrom = async (userId: string, {accounts, prefs}: LearnRows, onbo
         credited.length === 0 ? null : AccountIncome.findOne({
             $or: credited.map((a) => ({
                 accountId: String(a._id),
-                epoch: new Date(a.inceptionAt || a.createdAt).getTime(),
+                epoch: accountEpoch(a).getTime(),
                 kind: 'dividend',
                 date: {$lte: a.incomeThrough},
             })),

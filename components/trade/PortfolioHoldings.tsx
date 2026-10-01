@@ -1,8 +1,9 @@
 import Link from "next/link";
-import {cn, formatPrice, formatChangePercent, getChangeColorClass} from "@/lib/utils";
-import {formatSignedPrice} from "@/lib/format";
+import {cn} from "@/lib/utils";
+import {formatSignedPrice, formatPrice, formatChangePercent, getChangeColorClass} from "@/lib/format";
 import UnpricedNote from "@/components/trade/UnpricedNote";
 import Term from "@/components/primitives/Term";
+import type {EnrichedPosition} from '@/lib/trading/types';
 
 // Read-only holdings table — used on the friend profile page, the strategy detail page and
 // the dashboard's Top Holdings widget (and as the visual base the interactive PositionsTable

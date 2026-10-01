@@ -2,15 +2,16 @@
 
 import {connectToDatabase} from "@/database/mongoose";
 import UserPreferencesModel from "@/database/models/user-preferences.model";
-import {getCurrentUserId} from "@/lib/actions/watchlist.actions";
-import {unsetPreference, upsertPreferences} from "@/lib/preferences/upsert";
+import {getCurrentUserId} from "@/lib/auth/session";
+import {unsetPreference, upsertPreferences} from "@/lib/settings/preferences-store";
 import {strategyBySlug} from "@/lib/strategies/catalog";
 import {getFollowedStrategies} from "@/lib/strategies/follows";
+import type {ActionResult} from '@/lib/actions/types';
 
 // Writes only: which quant strategies a user pins on the dashboard. Reads live in
 // lib/strategies/follows.ts. Absence is the default, so emptying the list unsets it.
 
-export type FollowResult = OrderResult & {followed?: string[]};
+type FollowResult = ActionResult & {followed?: string[]};
 
 export const followStrategy = async (slug: unknown): Promise<FollowResult> => {
     const userId = await getCurrentUserId();

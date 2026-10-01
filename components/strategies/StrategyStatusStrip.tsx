@@ -1,7 +1,7 @@
 import JobStamp from "@/components/system/JobStamp";
 import Badge from "@/components/primitives/Badge";
 import Panel from "@/components/primitives/Panel";
-import type {StrategiesSystemStatus} from "@/lib/strategies/queries";
+import type {StrategiesSystemStatus} from "@/lib/strategies/page-store";
 
 // Is the machinery running, and on which day's prices? One line, always visible, so a
 // stale feed or a skipped run is the first thing a reader sees — never a silent number.

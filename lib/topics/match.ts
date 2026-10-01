@@ -3,9 +3,7 @@
 // (capped) text length.
 
 import {MATCH_CAP_PER_FETCH, MAX_MATCH_TEXT_CHARS} from "@/lib/topics/config";
-
-// Regex metacharacters must be escaped so symbols like BRK.B match literally.
-export const escapeRegExp = (value: string): string => value.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+import {escapeRegExp} from "@/lib/text";
 
 // Unicode-aware whole-word boundary. \b only knows ASCII word characters, so it would
 // let 'ai' match inside 'said' in accented text and never match a CJK term at all.
@@ -14,15 +12,15 @@ export const escapeRegExp = (value: string): string => value.replace(/[.*+?^${}(
 export const termPattern = (term: string): RegExp =>
     new RegExp(`(^|[^\\p{L}\\p{N}$])${escapeRegExp(term)}(?=$|[^\\p{L}\\p{N}])`, 'iu');
 
-export const countHits = (text: string, pattern: RegExp): number => {
+const countHits = (text: string, pattern: RegExp): number => {
     const global = pattern.global ? pattern : new RegExp(pattern.source, `${pattern.flags}g`);
     return (text.match(global) ?? []).length;
 };
 
-export const HEADLINE_WEIGHT = 3;
-export const SUMMARY_WEIGHT = 1;
+const HEADLINE_WEIGHT = 3;
+const SUMMARY_WEIGHT = 1;
 // A long summary that repeats the term should not outrank a headline mention.
-export const SUMMARY_HITS_CAP = 5;
+const SUMMARY_HITS_CAP = 5;
 
 export type MatchInput = {
     headline: string;
@@ -33,7 +31,7 @@ export type MatchInput = {
     sourceType?: string;
 };
 
-export type MatchResult<T> = {article: T; score: number; matchedTerms: string[]};
+type MatchResult<T> = {article: T; score: number; matchedTerms: string[]};
 
 type Scored = {score: number; matchedTerms: string[]};
 type CompiledTerm = {term: string; pattern: RegExp};
@@ -67,9 +65,6 @@ const scoreCompiled = (article: MatchInput, include: CompiledTerm[], exclude: Co
 
     return matchedTerms.length > 0 ? {score, matchedTerms} : null;
 };
-
-export const scoreArticle = (article: MatchInput, keywords: string[], exclude: string[]): Scored | null =>
-    scoreCompiled(article, compileTerms(keywords), compileTerms(exclude));
 
 export const matchArticles = <T extends MatchInput>(
     articles: T[],

@@ -1,4 +1,4 @@
-// The rule for every catalog id. The engine looks its `decide` up here; the
+// The rule for every catalog id. The simulator and the live runner look its `decide` up here; the
 // catalog itself never imports this module so client code can stay light.
 
 import type {Decide, StrategyId} from '@/lib/strategies/types';

@@ -1,7 +1,8 @@
+import type {DrawdownWindow, EnrichedPosition, PaperPosition, PerfPoint, SnapshotPoint} from '@/lib/trading/types';
+
 // Per-account performance math. Deliberately PURE — no DB, no server imports —
-// so vitest can cover it without a database (the import chain through
-// account.ts reaches better-auth's top-level connection). The server fetcher
-// that feeds these lives in account.ts (getAccountAnalytics).
+// so vitest can cover it without a database. The server reads that feed these
+// live in analytics-store.ts (getAccountAnalytics, getComparisonStats).
 
 export const toReturnPct = (value: number, base: number): number =>
     base > 0 ? (value / base - 1) * 100 : 0;
@@ -139,9 +140,9 @@ export const concentration = (
     };
 };
 
-export type TradeForStats = {side: string; realizedPnl?: number};
+type TradeForStats = {side: string; realizedPnl?: number};
 
-export type WinStats = {wins: number; losses: number; winRatePct: number | null};
+type WinStats = {wins: number; losses: number; winRatePct: number | null};
 
 // Win rate from the two counts it needs — what a database $group returns, so a reader that
 // only wants the rate never pulls the trades back to count them.

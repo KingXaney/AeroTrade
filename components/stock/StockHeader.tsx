@@ -1,5 +1,5 @@
-import {cn, formatPrice, formatChangePercent} from "@/lib/utils";
-import {roundPct} from "@/lib/format";
+import {cn} from "@/lib/utils";
+import {roundPct, formatPrice, formatChangePercent} from "@/lib/format";
 import WatchlistButton from "@/components/watchlist/WatchlistButton";
 import FollowTopicButton from "@/components/topics/FollowTopicButton";
 import TradeLink from "@/components/trade/TradeLink";

@@ -6,10 +6,7 @@
 // skipped day (stale data, an outage) it catches up on the next fresh day instead of
 // silently losing the whole month.
 
-import {previousTradingDay} from "@/lib/prices/market-hours";
 import type {Cadence} from "@/lib/strategies/types";
-
-export {previousTradingDay};
 
 const MONTH_NAMES = ['January', 'February', 'March', 'April', 'May', 'June', 'July',
     'August', 'September', 'October', 'November', 'December'];
@@ -31,11 +28,6 @@ export const periodKey = (date: string, cadence: Cadence): string => {
 
 export const isRebalanceDue = (cadence: Cadence, tradeDate: string, lastRebalanceDate: string | null): boolean =>
     lastRebalanceDate === null || periodKey(tradeDate, cadence) !== periodKey(lastRebalanceDate, cadence);
-
-// Display only: is this trade date the first session of its period? (Compares with the
-// previous completed bar, so it never depends on stored state.)
-export const isFirstSessionOfPeriod = (cadence: Cadence, tradeDate: string, previousBarDate: string): boolean =>
-    cadence !== 'daily' && cadence !== 'once' && periodKey(tradeDate, cadence) !== periodKey(previousBarDate, cadence);
 
 const shiftMonths = (date: string, months: number): {year: number; month: number} => {
     const year = Number(date.slice(0, 4));

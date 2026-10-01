@@ -3,7 +3,8 @@
 
 import {closesOf, sma, wilderRsi} from '@/lib/strategies/indicators';
 import type {Decide} from '@/lib/strategies/types';
-import {decideSlots, fmtPrice, lastClose, readParam} from '@/lib/strategies/rules/shared';
+import {decideSlots, fmtPrice, lastClose} from '@/lib/strategies/rules/shared';
+import {readParam} from '@/lib/strategies/params';
 
 export const decide: Decide = (def, ctx) => {
     const rsiPeriod = readParam(def, 'rsiPeriod');

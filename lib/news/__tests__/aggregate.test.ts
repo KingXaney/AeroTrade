@@ -13,6 +13,7 @@ import {fetchRssNews} from "@/lib/news/adapters/rss";
 import {fetchSecFilings} from "@/lib/news/adapters/sec";
 import {capAndOrder, getAggregatedNews} from "@/lib/news/aggregate";
 import {BRAIN_SOURCE_CAPS, SOURCE_CAPS} from "@/lib/news/config";
+import type {MarketNewsArticle, NewsSourceType} from '@/lib/news/types';
 
 const finnhubMock = vi.mocked(fetchFinnhubNews);
 const rssMock = vi.mocked(fetchRssNews);

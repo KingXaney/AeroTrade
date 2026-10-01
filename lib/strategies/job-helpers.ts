@@ -1,15 +1,7 @@
 // Pure helpers the daily strategies job is built from, kept out of the Inngest function
-// body so vitest can pin them.
+// body so vitest can pin them. Its chunking and step-id sanitising are lib/jobs/steps.
 
 import {STALE_SKIP_FRACTION} from "@/lib/strategies/config";
-
-export const chunkUniverse = (symbols: readonly string[], size: number): string[][] => {
-    const chunks: string[][] = [];
-    for (let i = 0; i < symbols.length; i += Math.max(1, size)) {
-        chunks.push(symbols.slice(i, i + Math.max(1, size)));
-    }
-    return chunks;
-};
 
 export type Freshness = {
     // The benchmark's latest bar equals asOf — without it there is no calendar to trust.
@@ -48,7 +40,7 @@ export const universeIsTooStale = (staleCount: number, universeSize: number): bo
 export const ORDER_BURST = 25;
 export const throttleDue = (ordersSoFar: number): boolean => ordersSoFar > 0 && ordersSoFar % ORDER_BURST === 0;
 
-export type RunSummaryInput = {
+type RunSummaryInput = {
     ran: number;
     total: number;
     preview: boolean;
@@ -79,9 +71,6 @@ export const runSummary = (s: RunSummaryInput): string => {
     if (s.failedSymbols.length > 0) parts.push(`failed: ${s.failedSymbols.join(', ')}`);
     return parts.join(', ');
 };
-
-// Inngest step ids must be [a-zA-Z0-9_-]; the sentinel owner and slugs carry ':' and '-'.
-export const stepId = (raw: string): string => raw.replace(/[^a-zA-Z0-9_-]/g, '_');
 
 // What the nightly job knows about a strategy's stored what-if variants: the stored backtest's
 // version and build (its computedAt, in ms), the version and build its variants were computed

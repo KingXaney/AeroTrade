@@ -5,12 +5,15 @@
 
 import PaperAccount from "@/database/models/paper-account.model";
 import PaperTrade from "@/database/models/paper-trade.model";
-import {getQuote, getCompanyProfile} from "@/lib/actions/finnhub.actions";
-import {getOwnedAccount} from "@/lib/trading/account";
-import {TRADE_REASON_MAX} from "@/lib/strategies/config";
+import {getQuote, getCompanyProfile} from "@/lib/prices/finnhub";
+import {getOwnedAccount, toPlainPositions} from "@/lib/trading/accounts";
+import {applyFill, type FillRejection} from "@/lib/trading/fill";
+import {TRADE_REASON_MAX} from "@/lib/trading/config";
 import {isOrderSide} from "@/lib/trading/order-math";
+import type {ActionResult} from '@/lib/actions/types';
+import type {PaperPosition, TradeSource} from '@/lib/trading/types';
 
-export type OrderRequest = {
+type OrderRequest = {
     accountId: string;
     symbol: string;
     side: 'buy' | 'sell';
@@ -27,11 +30,16 @@ export type OrderRequest = {
     idempotencyKey?: string;
 };
 
+// What an automated run records for a buy it never sent because a sell meant to fund it failed
+// (the AI Navigator and the quant strategies): without the proceeds, buying could drain cash
+// through the floor.
+export const FUNDING_SELL_FAILED = 'Skipped: a funding sell failed this run';
+
 // Market order at the current live price. Whole shares, long-only.
 export const executeOrder = async (
     userId: string,
     {accountId, symbol, side, quantity, minCashAfter, source, reason, idempotencyKey}: OrderRequest,
-): Promise<OrderResult & {price?: number}> => {
+): Promise<ActionResult & {price?: number}> => {
     try {
         // Checked before anything else: any other value used to run the sell branch, commit the
         // account update, and only then fail the trade row's enum — cash moved, no trade.
@@ -63,43 +71,34 @@ export const executeOrder = async (
         const company = profile.name || sym;
         const total = qty * price;
 
-        // Work on a plain copy of positions, then persist atomically with updateOne.
-        const positions: PaperPosition[] = account.positions.map((p) => ({
+        // The holding this order adds to or sells from, matched case-insensitively; the fill
+        // goes under the holding's own spelling, so a stored position keeps it.
+        const held = account.positions.find((p) => p.symbol.toUpperCase() === sym);
+        const fill = applyFill(
+            {cash: account.cash, positions: toPlainPositions(account)},
+            {symbol: held?.symbol ?? sym, side, quantity: qty, company},
+            price,
+            minCashAfter,
+        );
+        if (!fill.ok) {
+            const message: Record<FillRejection, string> = {
+                'invalid quantity': 'Enter a whole number of shares greater than 0',
+                'no price': `Couldn't fetch a live price for ${sym}`,
+                'insufficient cash': `Insufficient buying power — need $${total.toFixed(2)}, have $${account.cash.toFixed(2)}`,
+                'cash floor': `Buy skipped — would leave $${(account.cash - total).toFixed(2)} cash, below the $${(minCashAfter ?? 0).toFixed(2)} floor`,
+                'not held': `You only own ${held?.quantity ?? 0} share(s) of ${sym}`,
+            };
+            return {success: false, message: message[fill.reason]};
+        }
+        const {realizedPnl} = fill;
+        const newCash = fill.account.cash;
+        // Every position here came in with a company (toPlainPositions, or the buy's own).
+        const finalPositions: PaperPosition[] = fill.account.positions.map((p) => ({
             symbol: p.symbol,
-            company: p.company || p.symbol,
+            company: p.company ?? p.symbol,
             quantity: p.quantity,
             avgCost: p.avgCost,
         }));
-        let newCash = account.cash;
-        let realizedPnl: number | undefined;
-        const existing = positions.find((p) => p.symbol.toUpperCase() === sym);
-
-        if (side === 'buy') {
-            if (total > newCash) {
-                return {success: false, message: `Insufficient buying power — need $${total.toFixed(2)}, have $${newCash.toFixed(2)}`};
-            }
-            if (typeof minCashAfter === 'number' && newCash - total < minCashAfter) {
-                return {success: false, message: `Buy skipped — would leave $${(newCash - total).toFixed(2)} cash, below the $${minCashAfter.toFixed(2)} floor`};
-            }
-            if (existing) {
-                const newQty = existing.quantity + qty;
-                existing.avgCost = (existing.avgCost * existing.quantity + price * qty) / newQty;
-                existing.quantity = newQty;
-                existing.company = company;
-            } else {
-                positions.push({symbol: sym, company, quantity: qty, avgCost: price});
-            }
-            newCash -= total;
-        } else {
-            if (!existing || existing.quantity < qty) {
-                return {success: false, message: `You only own ${existing?.quantity ?? 0} share(s) of ${sym}`};
-            }
-            realizedPnl = (price - existing.avgCost) * qty;
-            existing.quantity -= qty;
-            newCash += total;
-        }
-
-        const finalPositions = positions.filter((p) => p.quantity > 0);
         // The trade row is stamped with the moment its cash moved, not when the row was
         // inserted after it: the income job rebuilds each day's cash and holdings from trade
         // times, and an order spanning midnight must land on the day it actually filled.

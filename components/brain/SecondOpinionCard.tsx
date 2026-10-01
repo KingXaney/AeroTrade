@@ -4,7 +4,7 @@ import {useEffect, useRef, useState} from "react";
 import {useRouter} from "next/navigation";
 import SafeMarkdown from "@/components/markdown/SafeMarkdown";
 import {toast} from "sonner";
-import {formatTimeAgoMs} from "@/lib/utils";
+import {formatTimeAgoMs} from "@/lib/format";
 import {getSecondOpinionPrompt, requestSecondOpinion, saveManualSecondOpinion} from "@/lib/actions/opinion.actions";
 import {runWithToast, UNREACHABLE_MESSAGE} from "@/lib/action-toast";
 import type {SecondOpinionView} from "@/lib/brain/opinion";

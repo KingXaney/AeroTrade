@@ -1,4 +1,6 @@
 import {Document, model, models, Schema} from "mongoose";
+import {TRADE_REASON_MAX} from "@/lib/trading/config";
+import type {TradeSource} from '@/lib/trading/types';
 
 export interface PaperTradeDoc extends Document {
     userId: string;
@@ -11,7 +13,7 @@ export interface PaperTradeDoc extends Document {
     total: number;
     realizedPnl?: number;
     source?: TradeSource;  // no schema default on purpose — Mongoose applies defaults on hydration, which would repaint every pre-existing row as 'user'
-    reason?: string;       // an automated fill's own explanation (quant strategies); absent on user trades
+    reason?: string;       // an automated fill's own explanation (quant strategies), or the learner's own note on a user trade
     idempotencyKey?: string; // one fill per key per account — a job step replay finds the earlier fill
     createdAt: Date;
 }
@@ -27,7 +29,7 @@ const PaperTradeSchema = new Schema<PaperTradeDoc>({
     total: {type: Number, required: true},
     realizedPnl: {type: Number},
     source: {type: String, enum: ['user', 'ai-navigator', 'ai-suggestion', 'strategy']},
-    reason: {type: String, maxlength: 200},
+    reason: {type: String, maxlength: TRADE_REASON_MAX},
     idempotencyKey: {type: String},
     createdAt: {type: Date, default: Date.now, index: true},
 });

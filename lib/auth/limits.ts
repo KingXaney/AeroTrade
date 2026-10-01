@@ -1,6 +1,6 @@
 // How often the sign-in-adjacent server actions may be called, and the counter keys they
-// spend. better-auth's own rateLimit never runs here (see lib/better-auth/auth.ts), so these
-// are the app's only limits on them; lib/auth/rate-limit.ts takeRateLimit does the counting.
+// spend. better-auth's own rateLimit never runs here (see lib/auth/server.ts), so these
+// are the app's only limits on them; lib/rate-limit.ts takeRateLimit does the counting.
 //
 // Import-free so the keys, the client-address reading, the sign-in input check and the order
 // the two sign-in counters are spent in are unit-tested like chat-limits.
@@ -38,7 +38,7 @@ export const signInClientKey = (ip: string): string => `signin:ip:${ip}`;
 // still holds); sign-up has no second counter, so every such request shares one key.
 export const signUpClientKey = (ip: string | null): string => `signup:ip:${ip ?? 'unknown'}`;
 
-export type HeaderReader = {get(name: string): string | null};
+type HeaderReader = {get(name: string): string | null};
 
 // IPv4, IPv6 or IPv4-mapped IPv6 characters only, at most an IPv6 address's length. A value
 // that is anything else ("unknown", a proxy's hostname, a padded header) names no client.

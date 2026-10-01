@@ -11,7 +11,7 @@ export const NAVIGATOR_COPY = {
     glossSummary: 'What the Navigator saw',
 } as const;
 
-export type EligibilityNeed = {articles: number; sources: number; days: number; bars: number};
+type EligibilityNeed = {articles: number; sources: number; days: number; bars: number};
 
 export const NAVIGATOR_GLOSS = {
     // ---- scoreUniverse -------------------------------------------------------------------

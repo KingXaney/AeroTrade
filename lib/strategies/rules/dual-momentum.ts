@@ -6,17 +6,19 @@
 import {isRebalanceDue} from '@/lib/strategies/calendar';
 import {closesOf, trailingReturn} from '@/lib/strategies/indicators';
 import type {Decide, SignalRow, Target} from '@/lib/strategies/types';
-import {BENCHMARK_SYMBOL} from '@/lib/strategies/universe';
+import {BENCHMARK_SYMBOL} from '@/lib/prices/config';
 import {
     FULL_WEIGHT,
     finishDecision,
     fmtPct,
     heldPositions,
     lastClose,
-    readParam,
     staleNote,
     universeOf,
 } from '@/lib/strategies/rules/shared';
+import {
+    readParam,
+} from '@/lib/strategies/params';
 
 const INTERNATIONAL_ETF = 'EFA';
 const BOND_ETF = 'AGG';

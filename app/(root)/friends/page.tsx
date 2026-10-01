@@ -1,6 +1,5 @@
-import {redirect} from "next/navigation";
-import {getCurrentUserId} from "@/lib/actions/watchlist.actions";
-import {getFriends, getIncomingRequests, getLeaderboard, getOutgoingRequests} from "@/lib/actions/friends.actions";
+import {requireUserId} from "@/lib/auth/session";
+import {getFriends, getIncomingRequests, getLeaderboard, getOutgoingRequests} from "@/lib/friends/store";
 import AddFriend from "@/components/friends/AddFriend";
 import FriendRequests from "@/components/friends/FriendRequests";
 import SentRequests from "@/components/friends/SentRequests";
@@ -8,8 +7,7 @@ import FriendsList from "@/components/friends/FriendsList";
 import Leaderboard from "@/components/friends/Leaderboard";
 
 const FriendsPage = async () => {
-    const userId = await getCurrentUserId();
-    if (!userId) redirect('/sign-in');
+    const userId = await requireUserId();
 
     const [friends, requests, sent, leaderboard] = await Promise.all([
         getFriends(userId),

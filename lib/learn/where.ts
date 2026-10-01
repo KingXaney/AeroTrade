@@ -28,7 +28,7 @@ const HOMES = {
     rails: {href: '/brain', label: 'The News Brain'},
 } as const;
 
-export type GroupId = keyof typeof HOMES;
+type GroupId = keyof typeof HOMES;
 
 export const groupOf = (entry: GlossaryEntry): GroupId => {
     if (entry.kind === 'concept') return 'concepts';
@@ -39,9 +39,7 @@ export const groupOf = (entry: GlossaryEntry): GroupId => {
     return 'portfolio';
 };
 
-export const whereItLives = (entry: GlossaryEntry): Home => HOMES[groupOf(entry)];
-
-export type GlossaryGroup = {id: GroupId; label: string; home: Home; keys: GlossaryKey[]};
+type GlossaryGroup = {id: GroupId; label: string; home: Home; keys: GlossaryKey[]};
 
 const GROUP_LABELS: Record<GroupId, string> = {
     board: 'On a strategy board',

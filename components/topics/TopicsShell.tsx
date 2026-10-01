@@ -3,6 +3,7 @@
 import {createContext, useContext, useMemo, useState, type ReactNode} from "react";
 import TopicRail from "@/components/topics/TopicRail";
 import TopicComposer, {type ComposerMode} from "@/components/topics/TopicComposer";
+import type {TopicView, TopicsOverview} from '@/lib/topics/types';
 
 type TopicsUi = {openComposer: (mode: ComposerMode, initial?: TopicView | null) => void};
 

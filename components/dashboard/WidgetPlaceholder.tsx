@@ -1,4 +1,4 @@
-import type {WidgetDefinition} from "@/lib/dashboard/widgets";
+import type {WidgetDefinition} from "@/lib/dashboard/catalog";
 
 // A widget added during an edit session has no server-rendered body until Save;
 // live embeds are also swapped for this while arranging so iframes don't reload on every move.

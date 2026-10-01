@@ -4,7 +4,7 @@
 // median stand beside it as markers, unranked. The test holds every line to the 'copy' tier of
 // lib/learn/banned.ts and parses the printed rank back against the counts it came from.
 
-import type {LuckReady} from "@/lib/learn/random-portfolios";
+import type {LuckReady} from "@/lib/trading/learn/random-portfolios";
 import type {GlossaryKey} from "@/lib/learn/glossary";
 import {pctOneDecimal, shortDate} from "@/lib/learn/copy/portfolio";
 

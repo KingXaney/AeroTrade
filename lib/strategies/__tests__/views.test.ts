@@ -126,24 +126,6 @@ describe("toPerfSeries", () => {
     });
 });
 
-describe("rounded percent formatting", () => {
-    it("never shows a signed zero and colours by the rounded value", async () => {
-        const {formatDrawdown, formatPct, roundPct, signedForColor} = await import("@/lib/strategies/views");
-        expect(formatPct(-0.003)).toBe('0.00%');
-        expect(formatPct(0.004)).toBe('0.00%');
-        expect(formatPct(0.005)).toBe('+0.01%');
-        expect(formatPct(-12.346)).toBe('-12.35%');
-        expect(formatPct(null)).toBe('—');
-        expect(formatDrawdown(0.003)).toBe('0.00%');
-        expect(formatDrawdown(2.5)).toBe('−2.50%');
-        expect(formatDrawdown(null)).toBe('—');
-        expect(roundPct(1.23456, 1)).toBe(1.2);
-        expect(signedForColor(-0.003)).toBeUndefined();
-        expect(signedForColor(0.5)).toBe(0.5);
-        expect(signedForColor(null)).toBeUndefined();
-    });
-});
-
 describe("downsample", () => {
     it("returns nothing for an empty input or a non-positive target", () => {
         expect(downsample([], 10)).toEqual([]);

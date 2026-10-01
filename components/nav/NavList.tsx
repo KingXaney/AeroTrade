@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import {cn} from "@/lib/utils";
-import {NAV_ITEMS, isActiveNav, type NavBadges, type NavItem} from "@/lib/navigation";
+import {NAV_ITEMS, isActiveNav, type NavBadges, type NavItem} from "@/lib/shell/navigation";
 
 // The row renderer shared by the desktop sidebar and the mobile drawer. Extracted so the
 // two can't drift the way the three hard-coded nav arrays did — the sidebar was the only

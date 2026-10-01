@@ -2,6 +2,7 @@ import Link from "next/link";
 import TopicBrief from "@/components/topics/TopicBrief";
 import TopicsWidgetEmpty from "@/components/dashboard/widgets/TopicsWidgetEmpty";
 import WidgetUnavailable from "@/components/dashboard/WidgetUnavailable";
+import type {TopicsOverview} from '@/lib/topics/types';
 
 const MAX_BRIEFS = 3;
 

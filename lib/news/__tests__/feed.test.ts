@@ -4,6 +4,13 @@
 
 import {describe, expect, it} from 'vitest';
 import {
+    feedRequestsFor,
+    feedUrlKey,
+    filterBySources,
+    mergeFeed,
+    pickDigestArticles,
+} from '@/lib/news/feed';
+import {
     DEFAULT_NEWS_FEED,
     MAX_FEED_CATEGORIES,
     MAX_FEED_KEYWORDS,
@@ -14,19 +21,15 @@ import {
     NewsFeedSchema,
     defaultNewsFeed,
     describeNewsFeed,
-    feedRequestsFor,
-    feedUrlKey,
-    filterBySources,
     isDefaultNewsFeed,
-    mergeFeed,
     newsFeedEqual,
     normalizeNewsFeed,
     outletKey,
-    pickDigestArticles,
     planFeedSlots,
     type NewsFeedPrefs,
-} from '@/lib/news/feed';
+} from '@/lib/news/feed-prefs';
 import {FEED_DIGEST_CAP, GOOGLE_NEWS_BASE, MAX_FEED_REQUESTS, RSS_FEEDS, TOTAL_ARTICLE_CAP, yahooSymbolFeed} from '@/lib/news/config';
+import type {MarketNewsArticle} from '@/lib/news/types';
 
 const NOW = 1_800_000_000;
 

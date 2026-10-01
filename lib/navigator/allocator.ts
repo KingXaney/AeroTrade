@@ -58,7 +58,7 @@ export type HeldPosition = {
 export type PlannedOrder = {symbol: string; side: 'buy' | 'sell'; quantity: number; reason: string};
 
 // The reason a kept position carries when the week's scoring has none for it
-// (service.ts buildHoldItems): no order was planned, so no trigger fired.
+// (lib/navigator/store buildHoldItems): no order was planned, so no trigger fired.
 export const HOLDING_REASON = 'holding — no exit trigger';
 
 type OrderCandidate = {

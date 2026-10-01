@@ -14,7 +14,7 @@ import type {SeriesPoint, SeriesStats, SimulationResult, StrategyDefinition, Str
 import {downsample} from '@/lib/strategies/views';
 
 // Values a knob takes: min, min + step, …, max.
-export type ParamRange = {min: number; max: number; step: number};
+type ParamRange = {min: number; max: number; step: number};
 
 // Every max is at most LOOKBACK_BARS (the decision never sees more bars than that), and the
 // indicator each window feeds still reads at its max (the test runs every rule there). Knobs
@@ -131,7 +131,7 @@ const GRID: Readonly<Record<StrategyId, readonly (readonly [knob: string, value:
     'low-volatility': [['volWindow', 21], ['volWindow', 126], ['top', 5], ['top', 20]],
 };
 
-export type WhatIfVariant = {
+type WhatIfVariant = {
     // Stable across nights, e.g. "entryRsi=5". Store variants as an array: the id holds a dot
     // for weights, so it is never a Mongo field name.
     id: string;
@@ -164,7 +164,7 @@ export const WHATIF_VIEW_POINTS = 120;
 export const whatIfPoints = (points: readonly SeriesPoint[]): SeriesPoint[] =>
     downsample(points, WHATIF_VIEW_POINTS).map((point) => ({date: point.date, value: point.value}));
 
-export type WhatIfView = {
+type WhatIfView = {
     from: string;
     to: string;
     stats: SeriesStats;
@@ -219,7 +219,7 @@ export type WhatIfBacktest = {
 };
 
 // Two stamps name the same build: both present and the same instant.
-export const sameBuild = (a: Date | number | string | undefined | null, b: Date | number | string | undefined | null): boolean => {
+const sameBuild = (a: Date | number | string | undefined | null, b: Date | number | string | undefined | null): boolean => {
     if (a === undefined || a === null || b === undefined || b === null) return false;
     const [x, y] = [new Date(a).getTime(), new Date(b).getTime()];
     return Number.isFinite(x) && x === y;

@@ -1,7 +1,6 @@
-import {headers} from "next/headers";
 import {redirect} from "next/navigation";
-import {auth} from "@/lib/better-auth/auth";
-import {getNotificationPreferences} from "@/lib/actions/preferences.actions";
+import {getSessionUser} from "@/lib/auth/session";
+import {getNotificationPreferences} from "@/lib/settings/preferences-store";
 import AppearanceSettings from "@/components/settings/AppearanceSettings";
 import NotificationSettings from "@/components/settings/NotificationSettings";
 import AccountSection from "@/components/settings/AccountSection";
@@ -10,13 +9,8 @@ import DashboardSettings from "@/components/settings/DashboardSettings";
 import TopicsSettings from "@/components/settings/TopicsSettings";
 import NewsFeedSettings from "@/components/settings/NewsFeedSettings";
 import {getNewsFeedPrefs} from "@/lib/news/feed-store";
-import {getCachedTopicsOverview} from "@/lib/dashboard/cached";
-import {getDashboardLayoutForUser} from "@/lib/dashboard/layout-store";
-import {filterAvailable} from "@/lib/dashboard/layout";
-import {getPortfoliosForUser} from "@/lib/trading/account";
-import {WIDGET_IDS, WIDGETS, isWidgetAvailable} from "@/lib/dashboard/widgets";
-import {getOnboardingFacts} from "@/lib/learn/facts-store";
-import {onboardingActive} from "@/lib/learn/missions";
+import {getCachedTopicsOverview} from "@/lib/topics/store";
+import {getVisibleLayout} from "@/lib/dashboard/availability";
 
 const SECTIONS = [
     {id: 'topics', label: 'Topics', icon: 'interests'},
@@ -28,21 +22,15 @@ const SECTIONS = [
 ];
 
 const SettingsPage = async () => {
-    const session = await auth.api.getSession({headers: await headers()});
-    if (!session?.user) redirect('/sign-in');
-    const user: User = {id: session.user.id, name: session.user.name, email: session.user.email};
+    const user = await getSessionUser();
+    if (!user) redirect('/sign-in');
 
-    const [notifications, layout, portfolios, topics, newsFeed, facts] = await Promise.all([
-        getNotificationPreferences(),
-        getDashboardLayoutForUser(user.id),
-        getPortfoliosForUser(user.id),
+    const [notifications, {layout: visibleLayout, availableIds}, topics, newsFeed] = await Promise.all([
+        getNotificationPreferences(user.id),
+        getVisibleLayout(user.id),   // the same view as the dashboard
         getCachedTopicsOverview(user.id),
         getNewsFeedPrefs(user.id),
-        getOnboardingFacts(user.id),
     ]);
-    const availability = {accountCount: portfolios.length, advanced: true, onboarding: onboardingActive(facts)};
-    const availableIds = WIDGET_IDS.filter((id) => isWidgetAvailable(WIDGETS[id], availability));
-    const visibleLayout = filterAvailable(layout, availability);   // same view as the dashboard
 
     return (
         <div className="space-y-4">

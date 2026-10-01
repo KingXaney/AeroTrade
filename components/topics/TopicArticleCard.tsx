@@ -1,5 +1,6 @@
-import {formatTimeAgoSeconds} from "@/lib/utils";
+import {formatTimeAgoSeconds} from "@/lib/format";
 import SourceBadge from "@/components/topics/SourceBadge";
+import type {TopicArticleView} from '@/lib/topics/types';
 
 const MAX_TERM_CHIPS = 3;
 

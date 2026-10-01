@@ -4,18 +4,20 @@ import {useState} from "react";
 import {useRouter} from "next/navigation";
 import SafeMarkdown from "@/components/markdown/SafeMarkdown";
 import {toast} from "sonner";
-import {cn, formatPrice, getChangeColorClass} from "@/lib/utils";
+import {cn} from "@/lib/utils";
+import {formatPrice, getChangeColorClass} from "@/lib/format";
 import {applySuggestion} from "@/lib/actions/navigator.actions";
 import {runWithToast} from "@/lib/action-toast";
 import type {ReasonClause} from "@/lib/learn/reasons";
+import type {ApplyAccount} from "@/lib/trading/active-account";
 import {NAVIGATOR_COPY} from "@/lib/learn/copy/navigator";
 import ReasonGloss from "@/components/learn/ReasonGloss";
+import type {SuggestionAction, SuggestionItem} from '@/lib/navigator/types';
 
 // `gloss`: the item's reasons decoded on the server (glossNavigatorReasons), so this client
 // file never bundles the grammar. /brain passes it; the weekly-decisions widget does not.
 type GlossedItem = SuggestionItem & {gloss?: ReasonClause[]};
 type SetView = {date: string; kind: 'executed' | 'preview'; items: GlossedItem[]; rationaleMd: string | null};
-type ApplyAccount = {id: string; name: string};
 
 const ACTION_STYLES: Record<SuggestionAction, string> = {
     buy: 'text-brand bg-brand-strong/8',

@@ -5,12 +5,12 @@
 // alone would flatter every account by SPY's ~1.3% a year yield.
 
 import BenchmarkSnapshot from "@/database/models/benchmark-snapshot.model";
-import {BENCHMARK_SYMBOL} from "@/lib/constants";
-import {addCalendarDays} from "@/lib/prices/calendar-days";
+import {BENCHMARK_SYMBOL} from "@/lib/prices/config";
+import {addCalendarDays} from "@/lib/dates";
 import {getBarsForSymbols} from "@/lib/prices/store";
 import {totalReturnIndex, type IndexPoint} from "@/lib/prices/total-return";
 
-export type BenchmarkIndex = {points: IndexPoint[]; lastClose: number | null};
+type BenchmarkIndex = {points: IndexPoint[]; lastClose: number | null};
 
 // Bars from a little before `from`, so a dividend with its ex-date just before the window —
 // paid inside it — is still reinvested where an account holding SPY would receive it.

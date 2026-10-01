@@ -26,7 +26,7 @@ export type PaletteId = (typeof PALETTE_IDS)[number];
 
 export type PaletteMode = 'dark' | 'light';
 
-export type PaletteTokens = {
+type PaletteTokens = {
     bg: string;
     chrome: string;
     surface0: string;

@@ -1,5 +1,6 @@
 import Link from "next/link";
 import PortfolioHoldings from "@/components/trade/PortfolioHoldings";
+import type {EnrichedPosition} from '@/lib/trading/types';
 
 const TOP_HOLDINGS_COUNT = 6;
 

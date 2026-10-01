@@ -1,7 +1,7 @@
 'use client';
 
 import {Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle} from "@/components/ui/dialog";
-import {CATEGORY_LABELS, CATEGORY_ORDER, WIDGETS, type WidgetId} from "@/lib/dashboard/widgets";
+import {CATEGORY_LABELS, CATEGORY_ORDER, WIDGETS, type WidgetId} from "@/lib/dashboard/catalog";
 import {MAX_WIDGETS} from "@/lib/dashboard/layout";
 
 type Props = {

@@ -1,8 +1,6 @@
 import TradingViewWidget from "@/components/TradingViewWidget";
-import {TICKER_TAPE_WIDGET_CONFIG} from "@/lib/constants";
+import {MARKET_EMBEDS} from "@/lib/stocks/tradingview";
 import MarketsTabs, {isMarketsTabId} from "@/components/markets/MarketsTabs";
-
-const scriptUrl = 'https://s3.tradingview.com/external-embedding/embed-widget-';
 
 type MarketsPageProps = {searchParams: Promise<{view?: string}>};
 
@@ -25,8 +23,8 @@ const MarketsPage = async ({searchParams}: MarketsPageProps) => {
             {/* Persistent ticker tape */}
             <section className="glass-panel rounded-xl p-3">
                 <TradingViewWidget
-                    scriptUrl={`${scriptUrl}ticker-tape.js`}
-                    config={TICKER_TAPE_WIDGET_CONFIG}
+                    scriptUrl={MARKET_EMBEDS.tickerTape.script}
+                    config={MARKET_EMBEDS.tickerTape.config}
                     height={70}
                 />
             </section>

@@ -9,8 +9,8 @@ import {
     firstDrawdownCrossing,
     lessonKey,
     parseLessonId,
-    shiftDate,
 } from '@/lib/learn/moments';
+import {addCalendarDays} from '@/lib/dates';
 
 const TODAY = '2026-09-29';
 
@@ -134,7 +134,7 @@ describe('lessonKey and parseLessonId', () => {
 
 describe('firstDrawdownCrossing', () => {
     const series = (accountId: string, start: string, values: number[]) =>
-        values.map((totalValue, i) => ({accountId, date: shiftDate(start, i), totalValue}));
+        values.map((totalValue, i) => ({accountId, date: addCalendarDays(start, i), totalValue}));
 
     it('dates the first day the account stood 5% below its running peak', () => {
         const points = series('a', '2026-09-10', [100_000, 102_000, 99_000, 96_900, 95_000]);
@@ -173,13 +173,5 @@ describe('firstDrawdownCrossing', () => {
             {accountId: 'a', date: '2026-09-11', totalValue: 0},
         ];
         expect(firstDrawdownCrossing(points)).toMatchObject({date: '2026-09-12', peakDate: '2026-09-10'});
-    });
-});
-
-describe('shiftDate', () => {
-    it('moves an ET date by whole days across month and year ends', () => {
-        expect(shiftDate('2026-09-29', -30)).toBe('2026-08-30');
-        expect(shiftDate('2026-12-31', 1)).toBe('2027-01-01');
-        expect(shiftDate('2026-03-01', -1)).toBe('2026-02-28');
     });
 });

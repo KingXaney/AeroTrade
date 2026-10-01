@@ -6,8 +6,8 @@
 
 import {describe, expect, it} from 'vitest';
 import {findBanned} from '@/lib/learn/banned';
-import {eachCalendarDay} from '@/lib/prices/calendar-days';
-import {makeRateLookup} from '@/lib/trading/income';
+import {eachCalendarDay} from '@/lib/dates';
+import {makeRateLookup} from '@/lib/income/accrual';
 import {
     cashOnly,
     dollarCostAverage,
@@ -18,7 +18,7 @@ import {
     WAY_KEYS,
     type StartSource,
     type WaySummary,
-} from '@/lib/learn/time-in-market';
+} from '@/lib/strategies/learn/time-in-market';
 import {changePctText, moneyFromCents, signedCents, TIM_COPY, wayTiles} from '@/lib/learn/copy/time-in-market';
 
 const clean = (text: string | null) => {

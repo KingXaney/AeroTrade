@@ -33,7 +33,6 @@ export const SIM_RESULT_BARS = 756;
 export const STALE_SKIP_FRACTION = 0.10;
 
 export const STRATEGY_RUN_TTL_DAYS = 400;
-export const TRADE_REASON_MAX = 200;
 
 // Bump when rebalance/simulation/indicator semantics change; a strategy's own
 // `version` bumps for a rule or parameter change. Either re-runs its backtest.

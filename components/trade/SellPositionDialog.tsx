@@ -3,14 +3,15 @@
 import {useState} from "react";
 import {useRouter} from "next/navigation";
 import {toast} from "sonner";
-import {cn, formatPrice} from "@/lib/utils";
-import {formatSignedPrice} from "@/lib/format";
+import {cn} from "@/lib/utils";
+import {formatSignedPrice, formatPrice} from "@/lib/format";
 import {placeOrder} from "@/lib/actions/trading.actions";
 import {estRealizedPnl} from "@/lib/trading/order-math";
 import type {Lot} from "@/lib/trading/lots";
 import {SELL_NOTES_COPY} from "@/lib/learn/copy/receipts";
 import MicroLabel from "@/components/primitives/MicroLabel";
 import {Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle} from "@/components/ui/dialog";
+import type {EnrichedPosition} from '@/lib/trading/types';
 
 // Sell dialog for one open position — pick how many shares to sell via free
 // entry or 25/50/75/Max presets. Parents mount it conditionally per selected

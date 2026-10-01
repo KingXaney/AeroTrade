@@ -8,7 +8,7 @@ const SUMMARY_MAX = 600;
 const BULLET_MAX = 240;
 const BULLETS_MAX = 4;
 
-export const briefSchema = z.object({
+const briefSchema = z.object({
     summary: z.string().trim().min(1).max(SUMMARY_MAX),
     bullets: z.array(z.string().trim().min(1).max(BULLET_MAX)).max(BULLETS_MAX).default([]),
 });

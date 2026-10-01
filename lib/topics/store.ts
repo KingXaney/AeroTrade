@@ -1,12 +1,14 @@
 // Server-only reads for followed topics. Plain module (not 'use server') so the
 // reads are never exposed as POST endpoints; the actions live in lib/actions.
 
+import {cache} from "react";
 import type {Document} from "mongoose";
 import {connectToDatabase} from "@/database/mongoose";
 import Topic, {type TopicDoc} from "@/database/models/topic.model";
 import TopicArticle, {type TopicArticleDoc} from "@/database/models/topic-article.model";
 import {refreshKeywordGroup} from "@/lib/topics/refresh";
-import type {TopicDigestInput} from "@/lib/topics/digest-section";
+import type {TopicDigestInput} from "@/lib/email/sections/topics";
+import type {MergedTopicArticle, TopicArticleView, TopicOverviewItem, TopicView, TopicsOverview} from '@/lib/topics/types';
 
 const DAY_SECONDS = 24 * 60 * 60;
 const DIGEST_TOPIC_CAP = 6;
@@ -69,7 +71,7 @@ export const getTopicsForUser = async (userId: string): Promise<TopicView[]> => 
     return docs.map(toTopicView);
 };
 
-export const getTopicBySlug = async (userId: string, slug: string): Promise<TopicView | null> => {
+const getTopicBySlug = async (userId: string, slug: string): Promise<TopicView | null> => {
     await connectToDatabase();
     const doc = await Topic.findOne({userId, slug}).lean<LeanTopic | null>();
     return doc ? toTopicView(doc) : null;
@@ -107,6 +109,10 @@ export const getTopicsOverview = async (userId: string): Promise<TopicsOverview>
     });
     return {topics: items, unseenTotal: items.reduce((sum, t) => sum + t.unseenCount, 0)};
 };
+
+// The sidebar card, the topics widgets, /settings and the /topics pages all read this once per
+// request; a page that has just written topics or articles re-reads getTopicsOverview directly.
+export const getCachedTopicsOverview = cache((userId: string) => getTopicsOverview(userId));
 
 export const getTopicArticles = async (
     keywordSetHash: number,
@@ -183,6 +189,10 @@ export const getTopicsDigestData = async (userId: string): Promise<TopicDigestIn
 
 // First visit to a brand-new topic: one bounded live fetch so the page isn't empty
 // until the next scheduled refresh. Never called from dashboard loaders.
+// A user's topics never fetched yet: what the first-run job fills after onboarding.
+export const getUnfetchedTopics = async (userId: string): Promise<TopicView[]> =>
+    (await getTopicsForUser(userId)).filter((t) => t.lastFetchedAt === null);
+
 export const ensureTopicHasArticles = async (topic: TopicView): Promise<boolean> => {
     if (topic.lastFetchedAt !== null) return false;
     await connectToDatabase();

@@ -3,15 +3,17 @@
 import {useCallback, useEffect, useState, type FormEvent, type KeyboardEvent} from "react";
 import {useRouter} from "next/navigation";
 import {toast} from "sonner";
-import {cn, formatPrice} from "@/lib/utils";
+import {cn} from "@/lib/utils";
+import {formatPrice} from "@/lib/format";
 import {useDebounce} from "@/hooks/useDebounce";
-import {getQuote, searchStocks} from "@/lib/actions/finnhub.actions";
+import {getQuote, searchStocks} from "@/lib/actions/stocks.actions";
 import {placeOrder} from "@/lib/actions/trading.actions";
 import {checkOrder, describeOrderEffect, presetQuantities, ticketTerms, type PositionLike} from "@/lib/trading/order-math";
 import {orderEffectLine, queueLine} from "@/lib/learn/copy/trade";
 import {NOTE_COPY} from "@/lib/learn/copy/receipts";
-import {TRADE_REASON_MAX} from "@/lib/strategies/config";
+import {TRADE_REASON_MAX} from "@/lib/trading/config";
 import WhatTheseMean from "@/components/learn/WhatTheseMean";
+import type {Stock} from '@/lib/stocks/types';
 
 type OrderPanelProps = {
     defaultSymbol?: string;

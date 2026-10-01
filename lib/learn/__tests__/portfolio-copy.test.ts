@@ -18,6 +18,7 @@ import {
     signedMoney,
 } from '@/lib/learn/copy/portfolio';
 import {MAX_POSITION_WEIGHT, MIN_CASH_WEIGHT} from '@/lib/navigator/config';
+import type {DrawdownWindow} from '@/lib/trading/types';
 
 const clean = (text: string) => {
     expect(text, text).not.toMatch(/undefined|NaN|null|\[object|Infinity/);

@@ -2,7 +2,7 @@
 //
 // A plain server module, deliberately NOT 'use server': a server-action export taking a
 // userId would be an unauthenticated write endpoint (the same reason spelled out in
-// lib/preferences/upsert.ts). Callers derive userId from the session, or are themselves
+// lib/settings/preferences-store.ts). Callers derive userId from the session, or are themselves
 // the account-creation path. It queues nothing: every caller differs in exactly that.
 
 import Topic, {type TopicDoc} from "@/database/models/topic.model";

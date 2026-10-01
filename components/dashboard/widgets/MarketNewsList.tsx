@@ -1,5 +1,6 @@
 import Link from "next/link";
 import NewsArticleCard from "@/components/news/NewsArticleCard";
+import type {MarketNewsArticle} from '@/lib/news/types';
 
 // Two columns from `md`, so the count steps in pairs with the widget's width.
 const countForSpan = (span: number): number => (span >= 12 ? 8 : span >= 8 ? 6 : 4);

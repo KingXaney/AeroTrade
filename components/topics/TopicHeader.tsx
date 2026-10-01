@@ -11,7 +11,8 @@ import RefreshTopicButton from "@/components/topics/RefreshTopicButton";
 import {useTopicsUi} from "@/components/topics/TopicsShell";
 import {deleteTopic} from "@/lib/actions/topics.actions";
 import {refreshCooldownUntil} from "@/lib/topics/config";
-import {formatTimeAgoMs} from "@/lib/utils";
+import {formatTimeAgoMs} from "@/lib/format";
+import type {TopicOverviewItem} from '@/lib/topics/types';
 
 const mono = {fontFamily: 'var(--type-mono)'} as const;
 

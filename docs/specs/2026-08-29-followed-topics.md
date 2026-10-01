@@ -24,13 +24,13 @@ surfaces = `/topics` page, dashboard widgets, daily email section, per-topic AI 
 | TopicArticle (per keyword set) | `database/models/topic-article.model.ts` | unique `{keywordSetHash, contentHash}`, TTL 30 days; `sourceType: 'web'` for search hits |
 | Search source | `lib/news/adapters/search.ts` | Google News RSS search, no key; query built only by `buildSearchQuery`; `web` capped to 0 in the general digest/brain |
 | Matching | `lib/topics/match.ts` | `escapeRegExp` + unicode word boundaries; 3×headline + 1×summary; exclusions veto |
-| Refresh | `lib/topics/refresh.ts` + `lib/inngest/functions.ts` | `refresh-topic-feeds` cron every 3h (≤60 sets, 1s gaps) · `refresh-topic-on-demand` event (concurrency per set, 6/h per user) · first visit does one bounded inline fetch |
+| Refresh | `lib/topics/refresh.ts` + `lib/jobs/functions.ts` | `refresh-topic-feeds` cron every 3h (≤60 sets, 1s gaps) · `refresh-topic-on-demand` event (concurrency per set, 6/h per user) · first visit does one bounded inline fetch |
 | Briefs | `generate-topic-briefs` 08:00 ET | ≤20 Gemini calls/run, `topicBrief` task in `lib/ai/models.ts`; parsed by `lib/topics/brief.ts`; rendered as text only |
 | Reads / actions | `lib/topics/store.ts`, `lib/actions/topics.actions.ts` | session-derived, `isValidObjectId`, `{_id, userId}` scoping, limits from `lib/topics/config.ts` |
 | UI | `app/(root)/topics/**`, `components/topics/*` | rail, header (refresh / edit / delete), composer, brief, feed with load-more, empty state with starters + brain suggestions |
-| Dashboard | `lib/dashboard/widgets.ts`, `components/dashboard/widgets/Topics*.tsx` | `topics-overview`, `topics-latest` (lazy), `topic-briefs`; `LEGACY_DEFAULT_LAYOUT_V1` → `migrateLegacyDefault` at read time (no version bump) |
-| Email | `lib/topics/digest-section.ts`, `sendDailyNewsSummary` | deterministic HTML, every string escaped, links allow-listed; per-user `topicsInDigest` toggle |
-| Chat | `lib/ai/tools.ts` | `getFollowedTopics`, `getTopicFeed`, `followTopic`, `unfollowTopic`; the model never supplies ids |
+| Dashboard | `lib/dashboard/catalog.ts`, `components/dashboard/widgets/Topics*.tsx` | `topics-overview`, `topics-latest` (lazy), `topic-briefs`; `LEGACY_DEFAULT_LAYOUT_V1` → `migrateLegacyDefault` at read time (no version bump) |
+| Email | `lib/email/sections/topics.ts`, `sendDailyNewsSummary` | deterministic HTML, every string escaped, links allow-listed; per-user `topicsInDigest` toggle |
+| Chat | `lib/chat/tools.ts` | `getFollowedTopics`, `getTopicFeed`, `followTopic`, `unfollowTopic`; the model never supplies ids |
 | Entry points | ⌘K "Follow topic: …", Follow buttons on `/brain` rows and the stock header, Settings › Topics | |
 
 ## Guardrails

@@ -1,35 +1,11 @@
-// Canonical forms for topic names and keywords. Everything the matcher, the query
-// builder and the shared keyword-set hash see goes through here, so two users typing
-// "Fed Rate" and " fed rate " share one fetch and one article set.
+// Canonical forms for topic names and the topic input schema. Keywords normalise through
+// lib/news/keywords, so everything the matcher, the query builder and the shared keyword-set
+// hash see is the same term the /news feed searches for.
 
 import {z} from 'zod';
-import {hashId} from "@/lib/news/config";
-import {KEYWORD_MAX, KEYWORD_MIN, MAX_EXCLUDES, MAX_KEYWORDS, NAME_MAX, NAME_MIN} from "@/lib/topics/config";
-
-const SURROUNDING_QUOTES = /^["'“”‘’]+|["'“”‘’]+$/g;
-
-export const normalizeKeyword = (raw: string): string =>
-    String(raw ?? '')
-        .normalize('NFKC')
-        .replace(/\s+/g, ' ')
-        .trim()
-        .toLowerCase()
-        .replace(SURROUNDING_QUOTES, '')
-        .replace(/^-+/, '')   // a leading '-' is the exclusion syntax, never part of a term
-        .trim();
-
-// Normalised, length-checked, case-insensitively deduped, sorted, capped.
-export const normalizeKeywordList = (raw: string[], max: number): string[] => {
-    const seen = new Set<string>();
-    const out: string[] = [];
-    for (const item of raw ?? []) {
-        const term = normalizeKeyword(item);
-        if (term.length < KEYWORD_MIN || term.length > KEYWORD_MAX || seen.has(term)) continue;
-        seen.add(term);
-        out.push(term);
-    }
-    return out.sort().slice(0, Math.max(0, max));
-};
+import {hashId} from "@/lib/text";
+import {MAX_EXCLUDES, NAME_MAX, NAME_MIN} from "@/lib/topics/config";
+import {KEYWORD_MAX, KEYWORD_MIN, MAX_KEYWORDS, normalizeKeywordList} from "@/lib/news/keywords";
 
 export const slugify = (name: string): string => {
     const slug = String(name ?? '')
@@ -62,7 +38,7 @@ export const topicInputSchema = z.object({
     color: z.string().regex(/^#[0-9a-f]{6}$/i, {error: 'Colour must be a hex value'}).optional(),
 });
 
-export type TopicInput = z.infer<typeof topicInputSchema>;
+type TopicInput = z.infer<typeof topicInputSchema>;
 
 // The name alone is a usable keyword when the user gives none. Null means nothing
 // survived normalisation, which the caller reports instead of storing an empty set.

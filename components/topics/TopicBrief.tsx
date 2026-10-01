@@ -1,3 +1,5 @@
+import type {TopicBriefView} from '@/lib/topics/types';
+
 // The AI "what changed today" summary. Plain text only — never rendered as HTML.
 // `compact` is for lists that already carry a heading (widgets, digests).
 const mono = {fontFamily: 'var(--type-mono)'} as const;

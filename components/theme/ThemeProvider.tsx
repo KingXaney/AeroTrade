@@ -12,7 +12,7 @@ const PREVIEW_DELAY_MS = 60;
 // Crossing the gutter between two cards must never flash the committed theme in between.
 const CANCEL_DELAY_MS = 150;
 
-export type ThemeTokens = {
+type ThemeTokens = {
     mode: PaletteMode;
     surface0: string;
     brand: string;

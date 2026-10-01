@@ -3,21 +3,11 @@
 import {useState} from "react";
 import {usePathname, useRouter, useSearchParams} from "next/navigation";
 import {toast} from "sonner";
-import {cn, formatPrice, getChangeColorClass} from "@/lib/utils";
-import {formatDrawdown, formatPct, roundPct} from "@/lib/format";
+import {cn} from "@/lib/utils";
+import {formatDrawdown, formatPct, roundPct, formatPrice, getChangeColorClass} from "@/lib/format";
 import {setActiveAccount} from "@/lib/actions/accounts.actions";
 import {unpricedLabel} from "@/lib/trading/analytics";
-
-export type ComparisonRow = {
-    id: string;
-    name: string;
-    totalValue: number;
-    totalReturnPct: number;
-    winRatePct: number | null;
-    maxDrawdownPct: number | null;
-    unpriced?: number;        // holdings with no live quote — the return is partly at cost
-    holdings?: number;
-};
+import type {ComparisonRow} from "@/lib/trading/active-account";
 
 // The "which strategy wins" view: every strategy account side by side.
 // Clicking a row makes that strategy the active one.
@@ -96,8 +86,8 @@ const AccountComparisonTable = ({rows, activeId}: {rows: ComparisonRow[]; active
                         </div>
                         {/* Ranked on the at-cost fallback like everything else; say so per row,
                             because the page-level note only covers the active strategy. */}
-                        {unpricedLabel(row.unpriced ?? 0, row.holdings ?? 0) && (
-                            <div className="text-[10px] text-warning">{unpricedLabel(row.unpriced ?? 0, row.holdings ?? 0)}</div>
+                        {unpricedLabel(row.unpriced, row.holdings) && (
+                            <div className="text-[10px] text-warning">{unpricedLabel(row.unpriced, row.holdings)}</div>
                         )}
                         </div>
                     </div>

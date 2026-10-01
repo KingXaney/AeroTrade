@@ -3,25 +3,29 @@
 import {revalidatePath} from "next/cache";
 import SecondOpinion from "@/database/models/second-opinion.model";
 import {connectToDatabase} from "@/database/mongoose";
-import {getCurrentUserId} from "@/lib/actions/watchlist.actions";
-import {inngest} from "@/lib/inngest/client";
+import {getCurrentUserId} from "@/lib/auth/session";
+import {inngest} from "@/lib/jobs/client";
+import {JOBS} from "@/lib/jobs/registry";
 import {
     gatherOpinionContext,
     isSecondOpinionConfigured,
-    MANUAL_MODEL_LABEL,
     saveSecondOpinion,
     SECOND_OPINION_GLOBAL_USER_CAP,
     SECOND_OPINION_GLOBAL_WINDOW_MS,
-    SECOND_OPINION_MAX_CHARS,
     SECOND_OPINION_MIN_INTERVAL_MS,
 } from "@/lib/brain/opinion";
+import {
+    MANUAL_MODEL_LABEL,
+    SECOND_OPINION_MAX_CHARS,
+} from "@/lib/brain/opinion-text";
 import {buildStandaloneSecondOpinionPrompt} from "@/lib/brain/prompts";
+import type {ActionResult} from '@/lib/actions/types';
 
 const MIN_PASTED_CHARS = 40;
 
 // Path 1 — API key configured: queue the background Claude call. Paid, so it
 // sits behind a session and a cool-down that stops the button becoming a bill.
-export const requestSecondOpinion = async (): Promise<OrderResult> => {
+export const requestSecondOpinion = async (): Promise<ActionResult> => {
     try {
         const userId = await getCurrentUserId();
         if (!userId) return {success: false, message: 'Not authenticated'};
@@ -60,7 +64,7 @@ export const requestSecondOpinion = async (): Promise<OrderResult> => {
             return {success: false, message: 'A request is already in flight — give it a few minutes'};
         }
 
-        await inngest.send({name: 'app/generate.second.opinion', data: {userId}});
+        await inngest.send({name: JOBS.secondOpinion.event, data: {userId}});
         return {success: true, message: 'Claude is reading the brain — the opinion appears here in a minute or two'};
     } catch (error) {
         console.error('Error requesting second opinion:', error);
@@ -89,7 +93,7 @@ export const getSecondOpinionPrompt = async (): Promise<{success: boolean; promp
 
 // Path 2 (return leg): save what Claude answered on claude.ai. Scoped to the
 // pasting user, link-stripped, and rendered as markdown without raw HTML.
-export const saveManualSecondOpinion = async (opinionMd: string): Promise<OrderResult> => {
+export const saveManualSecondOpinion = async (opinionMd: string): Promise<ActionResult> => {
     try {
         const userId = await getCurrentUserId();
         if (!userId) return {success: false, message: 'Not authenticated'};

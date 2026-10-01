@@ -1,6 +1,5 @@
 import Link from "next/link";
-import {redirect} from "next/navigation";
-import {getCurrentUserId} from "@/lib/actions/watchlist.actions";
+import {requireUserId} from "@/lib/auth/session";
 import {STRATEGIES, STRATEGIES_DISCLAIMER} from "@/lib/strategies/catalog";
 import {GLOSSARY} from "@/lib/learn/glossary";
 import {GLOSSARY_GROUPS} from "@/lib/learn/where";
@@ -14,8 +13,7 @@ import SectionHeading from "@/components/primitives/SectionHeading";
 // sits in the sidebar rather than the header; the ⌘K palette deep-links to an entry.
 
 const LearnPage = async () => {
-    const userId = await getCurrentUserId();
-    if (!userId) redirect('/sign-in');
+    await requireUserId();
 
     return (
         <div className="space-y-4">

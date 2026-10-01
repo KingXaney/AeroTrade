@@ -1,10 +1,10 @@
-import {formatTimeAgoMs} from "@/lib/utils";
-import {type JobHealth} from "@/lib/brain/queries";
+import {formatTimeAgoMs} from "@/lib/format";
+import {type JobHealth} from "@/lib/jobs/health";
 
 // One Inngest job's health card, derived from its completion stamp: a crashed job
 // shows up because its stamp stops moving. Shared by /brain and /strategies.
 
-export type JobHealthState = 'ok' | 'stale' | 'never';
+type JobHealthState = 'ok' | 'stale' | 'never';
 
 export const jobHealth = (job: JobHealth, now = Date.now()): JobHealthState => {
     if (job.lastRunAt === null) return 'never';

@@ -4,13 +4,14 @@ import {useForm} from "react-hook-form";
 import {Button} from "@/components/ui/button";
 import InputField from "@/components/forms/InputField";
 import SelectField from "@/components/forms/SelectField";
-import {INVESTMENT_GOALS, PREFERRED_INDUSTRIES, RISK_TOLERANCE_OPTIONS} from "@/lib/constants";
+import {INVESTMENT_GOALS, PREFERRED_INDUSTRIES, RISK_TOLERANCE_OPTIONS} from "@/lib/auth/sign-up-options";
 import {CountrySelectField} from "@/components/forms/CountrySelectField";
 import FooterLink from "@/components/forms/FooterLink";
 import {signUpWithEmail} from "@/lib/actions/auth.actions";
 import {EMAIL_RULE, PASSWORD_RULE} from "@/lib/auth/validation";
 import {useRouter} from "next/navigation";
 import {toast} from "sonner";
+import type {SignUpFormData} from '@/lib/auth/types';
 
 const SignUp = () => {
     const router = useRouter();
@@ -87,7 +88,7 @@ const SignUp = () => {
                 <CountrySelectField
                     name="country"
                     label="Country"
-                    control={control as never}
+                    control={control}
                     error={errors.country}
                     required
                 />

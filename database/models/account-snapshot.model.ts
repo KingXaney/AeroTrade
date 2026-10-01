@@ -8,10 +8,12 @@ export interface AccountSnapshotDoc extends Document {
     cash: number;
     holdingsValue: number;
     startingBalance: number;
+    // The account epoch (accountEpoch, epoch ms) whose income this snapshot's cash counts;
+    // stamped when the income job first tops it up, so a top-up never mixes epochs.
+    epoch?: number;
     // Which income this snapshot's cash already contains: every row of this account epoch
     // dated on or before `incomeThrough`. Absent = none (written before income existed, or
     // before the account's first credit). The income job tops snapshots up from here.
-    epoch?: number;
     incomeThrough?: string;
 }
 

@@ -16,7 +16,8 @@ type Props = {
     className?: string;
 };
 
-// Same optimistic pattern as WatchlistButton: flip first, roll back on failure.
+// Unfollow is optimistic, as WatchlistButton is: flip first, roll back on failure. Follow
+// waits for the server, which returns the new topic's id and slug the button then links to.
 const FollowTopicButton = ({name, keywords, followed = null, type = 'icon', className}: Props) => {
     const router = useRouter();
     const [state, setState] = useState(followed);

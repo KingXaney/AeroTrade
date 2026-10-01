@@ -1,6 +1,6 @@
 // "since thesis: NVDA +4.1% · SPY +6.0%" on /brain's Active Theses: what a ticker and SPY
 // each returned from the first close on or after the day its thesis began. The maths is here
-// and pure; the batched read that feeds it is lib/brain/queries.ts getSinceThesis (each thesis
+// and pure; the batched read that feeds it is lib/brain/store.ts getSinceThesis (each thesis
 // ticker's bars from its own thesis date, SPY's from the earliest one).
 //
 // Both legs are total returns on the same footing — closes with stored dividends reinvested on
@@ -12,13 +12,14 @@
 
 import type {Bar} from '@/lib/prices/signals';
 import {totalReturnIndex, type IndexPoint} from '@/lib/prices/total-return';
-import {getEasternDateString} from '@/lib/utils';
+import {getEasternDateString} from '@/lib/dates';
+import type {BrainEntityType} from '@/lib/brain/types';
 
 // The heaviest ten ticker theses get a line; the rest of the list is read without one.
 export const SINCE_THESIS_MAX = 10;
 
 export type ThesisRef = {key: string; type: BrainEntityType; weightSlow: number; thesisSince: number | null};
-export type SinceThesisTarget = {symbol: string; since: string};
+type SinceThesisTarget = {symbol: string; since: string};
 export type SinceThesisLegs = {from: string; to: string; symbolPct: number; spyPct: number};
 
 export const sinceThesisTargets = (theses: readonly ThesisRef[]): SinceThesisTarget[] =>

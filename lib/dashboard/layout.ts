@@ -13,7 +13,7 @@ import {
     isWidgetId,
     type AvailabilityContext,
     type WidgetId,
-} from '@/lib/dashboard/widgets';
+} from '@/lib/dashboard/catalog';
 
 export const LAYOUT_VERSION = 1;
 export const MAX_WIDGETS = 24;
@@ -21,7 +21,7 @@ export const MAX_WIDGETS = 24;
 // normalizeLayout walk thousands of items before trimming.
 const MAX_INPUT_WIDGETS = 64;
 
-export const LayoutItemSchema = z.object({
+const LayoutItemSchema = z.object({
     id: z.enum(WIDGET_IDS),
     span: z.literal([...WIDGET_SPANS]),
 });

@@ -1,14 +1,9 @@
 import {describe, expect, it} from 'vitest';
-import {
-    bestStrategy,
-    newsBrainSummary,
-    pickActiveAccount,
-    toApplyAccounts,
-    toComparisonRows,
-    toSwitcherAccounts,
-    topMovers,
-} from '@/lib/dashboard/select';
-import type {SuggestionSetView} from '@/lib/navigator/service';
+import {bestStrategy, newsBrainSummary, topMovers} from '@/lib/dashboard/select';
+import type {SuggestionSetView} from '@/lib/navigator/store';
+import type {BrainEntitySummary} from '@/lib/brain/types';
+import type {StockWithData} from '@/lib/stocks/types';
+import type {AccountWithPortfolio, PortfolioSummary} from '@/lib/trading/types';
 
 const summary = (overrides: Partial<PortfolioSummary> = {}): PortfolioSummary => ({
     startingBalance: 100_000,
@@ -65,25 +60,6 @@ const main = entry('a1', 'Main Strategy', 4.2);
 const growth = entry('a2', 'Growth', 9.5, {totalValue: 109_500});
 const value = entry('a3', 'Value', -2.1, {totalValue: 97_900});
 
-describe('pickActiveAccount', () => {
-    it('prefers the requested account when it exists', () => {
-        expect(pickActiveAccount([main, growth, value], 'a2')).toBe(growth);
-    });
-
-    it('falls back to the first account otherwise', () => {
-        expect(pickActiveAccount([main, growth], 'missing')).toBe(main);
-        expect(pickActiveAccount([main, growth], undefined)).toBe(main);
-        expect(pickActiveAccount([main, growth], null)).toBe(main);
-        expect(pickActiveAccount([main, growth], '')).toBe(main);
-        expect(pickActiveAccount([main, growth])).toBe(main);
-    });
-
-    it('is undefined when the user has no accounts', () => {
-        expect(pickActiveAccount([])).toBeUndefined();
-        expect(pickActiveAccount([], 'a1')).toBeUndefined();
-    });
-});
-
 describe('bestStrategy', () => {
     it('does not throw on an empty list', () => {
         expect(() => bestStrategy([])).not.toThrow();
@@ -132,36 +108,6 @@ describe('topMovers', () => {
         expect(() => topMovers(frozen)).not.toThrow();
         expect(frozen.map((m) => m.symbol)).toEqual(['AAPL', 'TSLA', 'NVDA', 'MSFT', 'AMD', 'META']);
         expect(topMovers([])).toEqual([]);
-    });
-});
-
-describe('account projections', () => {
-    it('toApplyAccounts keeps only id and name', () => {
-        expect(toApplyAccounts([main, growth])).toEqual([{id: 'a1', name: 'Main Strategy'}, {id: 'a2', name: 'Growth'}]);
-        expect(toApplyAccounts([])).toEqual([]);
-    });
-
-    it('toSwitcherAccounts adds the return and the unpriced count', () => {
-        expect(toSwitcherAccounts([main, growth])).toEqual([
-            {id: 'a1', name: 'Main Strategy', totalReturnPct: 4.2, unpriced: 0, holdings: 0},
-            {id: 'a2', name: 'Growth', totalReturnPct: 9.5, unpriced: 0, holdings: 0},
-        ]);
-        const stale = {symbol: 'X', company: 'X', quantity: 1, avgCost: 1, costBasis: 1, marketValue: 1, unrealizedPnl: 0, unrealizedPnlPct: 0, priceStale: true};
-        const live = {...stale, symbol: 'Y', currentPrice: 2, marketValue: 2, unrealizedPnl: 1, unrealizedPnlPct: 100, priceStale: false};
-        expect(toSwitcherAccounts([entry('a9', 'Mixed', 1, {positions: [stale, live]})])[0]).toMatchObject({unpriced: 1, holdings: 2});
-    });
-
-    it('toComparisonRows merges stats and nulls what is missing', () => {
-        const rows = toComparisonRows([main, growth, value], {
-            a1: {winRatePct: 60, maxDrawdownPct: 12.5},
-            a3: {winRatePct: null, maxDrawdownPct: 3},
-        });
-        expect(rows).toEqual([
-            {id: 'a1', name: 'Main Strategy', totalValue: 100_000, totalReturnPct: 4.2, winRatePct: 60, maxDrawdownPct: 12.5, unpriced: 0, holdings: 0},
-            {id: 'a2', name: 'Growth', totalValue: 109_500, totalReturnPct: 9.5, winRatePct: null, maxDrawdownPct: null, unpriced: 0, holdings: 0},
-            {id: 'a3', name: 'Value', totalValue: 97_900, totalReturnPct: -2.1, winRatePct: null, maxDrawdownPct: 3, unpriced: 0, holdings: 0},
-        ]);
-        expect(toComparisonRows([], {})).toEqual([]);
     });
 });
 

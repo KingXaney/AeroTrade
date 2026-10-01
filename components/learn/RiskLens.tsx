@@ -1,11 +1,12 @@
 import {concentration} from "@/lib/trading/analytics";
-import {dailySwingDollars} from "@/lib/trading/risk";
+import {dailySwingDollars} from "@/lib/trading/learn/risk";
 import {RISK_COPY} from "@/lib/learn/copy/portfolio";
 import {Stat} from "@/components/analytics/AnalyticsStats";
 import Panel from "@/components/primitives/Panel";
 import SectionHeading from "@/components/primitives/SectionHeading";
 import Term from "@/components/primitives/Term";
 import WhatTheseMean from "@/components/learn/WhatTheseMean";
+import type {PerfPoint, PortfolioSummary} from '@/lib/trading/types';
 
 // Two measurements of how exposed the account is, from numbers the page already has: how far
 // its value moves on an ordinary day (from its own daily closes), and how much of it sits in one

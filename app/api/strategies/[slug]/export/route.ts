@@ -1,17 +1,16 @@
-import {headers} from "next/headers";
 import {NextResponse} from "next/server";
-import {auth} from "@/lib/better-auth/auth";
-import {getStrategyLedger} from "@/lib/strategies/queries";
+import {getSessionUser} from "@/lib/auth/session";
+import {getStrategyLedger} from "@/lib/strategies/page-store";
 import {csvDownloadHeaders, tradesCsv, tradesCsvFilename} from "@/lib/trading/csv";
-import {getEasternDateString} from "@/lib/utils";
+import {getEasternDateString} from "@/lib/dates";
 
 // One quant strategy's live fills as a CSV download: its system account's current epoch, in
 // the account export's columns (tradesCsv), named for the strategy and the Eastern date. The
 // account belongs to the sentinel owner, so the account export's ownership check can never
 // pass for it; any signed-in user may read these, as every strategy page shows them.
 export async function GET(_request: Request, {params}: {params: Promise<{slug: string}>}) {
-    const session = await auth.api.getSession({headers: await headers()});
-    if (!session?.user?.id) {
+    const user = await getSessionUser();
+    if (!user?.id) {
         return NextResponse.json({error: 'Not authenticated'}, {status: 401});
     }
 

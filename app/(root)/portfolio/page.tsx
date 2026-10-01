@@ -1,17 +1,19 @@
-import {redirect} from "next/navigation";
 import {cookies} from "next/headers";
 import Link from "next/link";
-import {ACTIVE_ACCOUNT_COOKIE} from "@/lib/constants";
-import {getCurrentUserId} from "@/lib/actions/watchlist.actions";
-import {getAccountAnalytics, getComparisonStats, getIncomeActivity, getPortfoliosForUser, getTradeLedger, TRADE_HISTORY_LIMIT} from "@/lib/trading/account";
+import {requireUserId} from "@/lib/auth/session";
+import {getPortfoliosForUser} from "@/lib/trading/valuation";
+import {getTradeLedger, TRADE_HISTORY_LIMIT} from "@/lib/trading/ledger";
+import {getAccountAnalytics, getComparisonStats} from "@/lib/trading/analytics-store";
+import {getIncomeActivity} from "@/lib/income/page-store";
 import {replayReceipts} from "@/lib/trading/receipts";
+import {accountExportHref} from "@/lib/trading/csv";
 import {buyNotesBySellId, openLotNotes} from "@/lib/trading/lots";
 import {countUnpriced} from "@/lib/trading/analytics";
-import {buildReturnBridge} from "@/lib/trading/bridge";
+import {buildReturnBridge} from "@/lib/trading/learn/bridge";
 import {drawdownBand} from "@/lib/learn/copy/portfolio";
-import {getLuckOrSkill} from "@/lib/learn/luck-read";
-import {getTradingHabits} from "@/lib/learn/habits-read";
-import {toComparisonRows, toSwitcherAccounts} from "@/lib/dashboard/select";
+import {getLuckOrSkill} from "@/lib/trading/learn/luck-store";
+import {getTradingHabits} from "@/lib/trading/learn/habits-store";
+import {pickActiveAccount, preferredAccountId, toComparisonRows, toSwitcherAccounts} from "@/lib/trading/active-account";
 import {marketStatus} from "@/lib/prices/market-hours";
 import AccountSummary from "@/components/trade/AccountSummary";
 import PositionsTable from "@/components/trade/PositionsTable";
@@ -37,16 +39,13 @@ type PortfolioPageProps = {
 };
 
 const PortfolioPage = async ({searchParams}: PortfolioPageProps) => {
-    const userId = await getCurrentUserId();
-    if (!userId) redirect('/sign-in');
+    const userId = await requireUserId();
 
-    // Active strategy account: ?account= wins, then the cookie, then the first account.
     const {account: accountParam} = await searchParams;
-    const cookieStore = await cookies();
-    const preferredId = accountParam ?? cookieStore.get(ACTIVE_ACCOUNT_COOKIE)?.value;
-
     const all = await getPortfoliosForUser(userId);
-    const activeEntry = (preferredId && all.find((x) => x.account.id === preferredId)) || all[0];
+    const activeEntry = pickActiveAccount(all, preferredAccountId(accountParam, await cookies()));
+    // getPortfoliosForUser creates the first account, so there always is one.
+    if (!activeEntry) throw new Error('No strategy account');
     const {account, summary: portfolio} = activeEntry;
 
     // The page's one ledger read, shared (cache()) with getAccountAnalytics and getIncomeActivity,
@@ -202,7 +201,7 @@ const PortfolioPage = async ({searchParams}: PortfolioPageProps) => {
                     <h2 className="text-sm font-bold uppercase tracking-[0.1em] text-brand mb-4" style={{fontFamily: 'var(--type-mono)'}}>
                         Trade History
                     </h2>
-                    <TradeHistory trades={trades} totalCount={analytics?.tradeCount} exportHref={`/api/accounts/${account.id}/export`} receipts={receipts} buyNotesBySellId={buyNotesBySellId(ledger)} />
+                    <TradeHistory trades={trades} totalCount={analytics?.tradeCount} exportHref={accountExportHref(account.id)} receipts={receipts} buyNotesBySellId={buyNotesBySellId(ledger)} />
                 </section>
             )}
         </div>

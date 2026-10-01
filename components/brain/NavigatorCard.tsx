@@ -5,8 +5,10 @@ import {useRouter} from "next/navigation";
 import Link from "next/link";
 import {toast} from "sonner";
 import {enrollAiNavigator, pauseAiNavigator, resumeAiNavigator, runAiNavigatorNow, unenrollAiNavigator} from "@/lib/actions/navigator.actions";
-import {MAX_STARTING_BALANCE, MIN_STARTING_BALANCE, PAPER_STARTING_BALANCE} from "@/lib/constants";
+import {PAPER_STARTING_BALANCE, STARTING_BALANCE_RANGE, resolveStartingBalance} from "@/lib/trading/starting-balance";
 import {runWithToast} from "@/lib/action-toast";
+import type {ActionResult} from '@/lib/actions/types';
+import type {NavigatorStatus} from '@/lib/navigator/types';
 
 // Enrollment + kill switch for the AI-managed paper account.
 const NavigatorCard = ({status}: {status: NavigatorStatus}) => {
@@ -16,9 +18,9 @@ const NavigatorCard = ({status}: {status: NavigatorStatus}) => {
     const [startBalance, setStartBalance] = useState(String(PAPER_STARTING_BALANCE));
 
     const balanceNum = startBalance === '' ? 0 : parseInt(startBalance, 10);
-    const balanceValid = balanceNum >= MIN_STARTING_BALANCE && balanceNum <= MAX_STARTING_BALANCE;
+    const balanceValid = resolveStartingBalance(balanceNum) !== null;
 
-    const run = async (action: () => Promise<OrderResult>) => {
+    const run = async (action: () => Promise<ActionResult>) => {
         if (busy) return;
         setBusy(true);
         try {
@@ -71,7 +73,7 @@ const NavigatorCard = ({status}: {status: NavigatorStatus}) => {
                         />
                         {!balanceValid && startBalance !== '' && (
                             <p className="mt-1 text-xs text-negative">
-                                Between ${MIN_STARTING_BALANCE.toLocaleString('en-US')} and ${MAX_STARTING_BALANCE.toLocaleString('en-US')}
+                                Between {STARTING_BALANCE_RANGE}
                             </p>
                         )}
                     </div>

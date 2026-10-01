@@ -1,17 +1,17 @@
 import Link from "next/link";
-import {redirect} from "next/navigation";
-import {getCurrentUserId, getWatchlistForUser} from "@/lib/actions/watchlist.actions";
+import {requireUserId} from "@/lib/auth/session";
+import {getWatchlistForUser} from "@/lib/stocks/watchlist-store";
 import {getNewsFeed} from "@/lib/news/feed-store";
 import {NEWS_HISTORY_LIMIT} from "@/lib/news/config";
-import {getRecentTradesForUser} from "@/lib/trading/account";
+import {getRecentTradesForUser} from "@/lib/trading/ledger";
 import TradeHistory from "@/components/trade/TradeHistory";
 import NewsArticleCard from "@/components/news/NewsArticleCard";
 import {WATCHLIST_COPY} from "@/lib/learn/copy/watchlist";
 import {formatEasternTimestamp} from "@/lib/format";
+import type {MarketNewsArticle} from '@/lib/news/types';
 
 const HistoryPage = async () => {
-    const userId = await getCurrentUserId();
-    if (!userId) redirect('/sign-in');
+    const userId = await requireUserId();
 
     const [items, recent] = await Promise.all([getWatchlistForUser(userId), getRecentTradesForUser(userId)]);
 

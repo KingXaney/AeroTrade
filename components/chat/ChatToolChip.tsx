@@ -1,5 +1,6 @@
 import {Check, Loader2, AlertCircle, Wrench} from "lucide-react";
 import {cn} from "@/lib/utils";
+import type {ChatToolName} from '@/lib/chat/types';
 
 type ToolState = 'input-streaming' | 'input-available' | 'output-available' | 'output-error';
 

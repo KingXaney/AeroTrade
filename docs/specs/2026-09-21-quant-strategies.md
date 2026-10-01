@@ -58,7 +58,7 @@ day instead of losing the month.
   the in-progress bar dropped); `stooq.ts` stays as the fallback; `ensureBars` is provider-
   aware with a deep OHLC backfill, an overlap check for split re-adjustments and a bounded
   `getBarsForSymbols`.
-- `lib/inngest/functions.ts` `strategies-daily` — 09:35 ET weekdays plus a 10:30 retry for
+- `lib/jobs/functions.ts` `strategies-daily` — 09:35 ET weekdays plus a 10:30 retry for
   provider lag; phases: accounts → bars (chunked steps) → freshness gate → per-strategy claim /
   decide / fills / record → backtests on version change → job stamp. `app/run.strategies`
   with `{dryRun, resimulate, force}` via `npm run trigger -- strategies|strategies-preview|strategies-resimulate`.

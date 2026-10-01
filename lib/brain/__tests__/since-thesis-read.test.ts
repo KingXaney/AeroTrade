@@ -21,7 +21,7 @@ vi.mock('@/lib/prices/store', () => ({
     },
 }));
 
-import {getSinceThesis} from '@/lib/brain/queries';
+import {getSinceThesis} from '@/lib/brain/store';
 
 const thesis = (key: string, weightSlow: number, since: string) => ({
     key, type: 'ticker' as const, displayName: key, weightFast: 1, weightSlow, sentimentFast: 0, sentimentSlow: 0,

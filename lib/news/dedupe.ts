@@ -2,7 +2,8 @@
 // it without importing aggregate.ts, whose adapters reach the database connection.
 // Wires get republished across outlets: one URL or one headline is one story.
 
-import {normalizeUrl} from "@/lib/news/config";
+import {normalizeUrl} from "@/lib/text";
+import type {MarketNewsArticle} from '@/lib/news/types';
 
 export const dedupeArticles = (articles: MarketNewsArticle[]): MarketNewsArticle[] => {
     const seenUrls = new Set<string>();

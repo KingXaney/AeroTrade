@@ -1,6 +1,6 @@
 import Link from "next/link";
-import {cn, getChangeColorClass} from "@/lib/utils";
-import {formatSigned} from "@/lib/format";
+import {cn} from "@/lib/utils";
+import {formatSigned, getChangeColorClass} from "@/lib/format";
 import TradeLink from "@/components/trade/TradeLink";
 import FollowTopicButton from "@/components/topics/FollowTopicButton";
 import type {FollowedByName} from "@/components/brain/NarrativeLeaderboard";
@@ -9,6 +9,7 @@ import WhatTheseMean from "@/components/learn/WhatTheseMean";
 import {BRAIN_COPY} from "@/lib/learn/copy/brain";
 import type {SinceThesisLegs} from "@/lib/brain/since-thesis";
 import {evidenceHref} from "@/lib/brain/links";
+import type {BrainEntitySummary} from '@/lib/brain/types';
 
 const MS_PER_WEEK = 7 * 24 * 60 * 60 * 1000;
 

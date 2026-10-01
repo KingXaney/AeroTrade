@@ -6,15 +6,17 @@ import NewsItem from "@/database/models/news-item.model";
 import Topic from "@/database/models/topic.model";
 import TopicArticle from "@/database/models/topic-article.model";
 import {buildSearchQuery, fetchNewsForQuery} from "@/lib/news/adapters/search";
-import {hashId, normalizeUrl} from "@/lib/news/config";
+import {hashId, normalizeUrl} from "@/lib/text";
 import {matchArticles, type MatchInput} from "@/lib/topics/match";
-import {BRIEF_MIN_AGE_HOURS, BRIEF_MIN_NEW_ARTICLES, MATCH_CAP_PER_FETCH, MAX_ARTICLES_PER_TOPIC_PER_DAY, TOPIC_SEARCH_FALLBACK_WINDOW} from "@/lib/topics/config";
+import {BRIEF_MIN_AGE_HOURS, BRIEF_MIN_NEW_ARTICLES, MATCH_CAP_PER_FETCH, MAX_ARTICLES_PER_TOPIC_PER_DAY} from "@/lib/topics/config";
+import {SEARCH_FALLBACK_WINDOW} from "@/lib/news/config";
 import type {TopicBriefArticle} from "@/lib/topics/prompts";
-import type {TopicBriefContent} from "@/lib/topics/brief";
-import {getEasternDateString} from "@/lib/utils";
+import {parseBriefText, type TopicBriefContent} from "@/lib/topics/brief";
+import {getEasternDateString} from "@/lib/dates";
+import type {NewsSourceType} from '@/lib/news/types';
 
-export type KeywordGroup = {keywordSetHash: number; keywords: string[]; exclude: string[]};
-export type RefreshResult = {fetched: number; matched: number; inserted: number};
+type KeywordGroup = {keywordSetHash: number; keywords: string[]; exclude: string[]};
+type RefreshResult = {fetched: number; matched: number; inserted: number};
 
 const WEB_FETCH_LIMIT = 40;
 
@@ -33,6 +35,13 @@ export const loadStaleKeywordGroups = async (limit: number): Promise<KeywordGrou
 
 type Candidate = MatchInput & {sourceType: NewsSourceType; summary: string};
 
+// One keyword set as the on-demand refresh reads it; null once no topic follows it.
+export const loadKeywordGroup = async (keywordSetHash: number): Promise<KeywordGroup | null> => {
+    await connectToDatabase();
+    const topic = await Topic.findOne({keywordSetHash}).select('keywords exclude').lean<{keywords: string[]; exclude: string[]} | null>();
+    return topic ? {keywordSetHash, keywords: topic.keywords ?? [], exclude: topic.exclude ?? []} : null;
+};
+
 export const refreshKeywordGroup = async (group: KeywordGroup): Promise<RefreshResult> => {
     await connectToDatabase();
 
@@ -41,7 +50,7 @@ export const refreshKeywordGroup = async (group: KeywordGroup): Promise<RefreshR
     const query = buildSearchQuery(group.keywords, group.exclude);
     let web = query ? await fetchNewsForQuery(query, {limit: WEB_FETCH_LIMIT}) : [];
     if (query && web.length === 0) {
-        const wider = buildSearchQuery(group.keywords, group.exclude, {window: TOPIC_SEARCH_FALLBACK_WINDOW});
+        const wider = buildSearchQuery(group.keywords, group.exclude, {window: SEARCH_FALLBACK_WINDOW});
         web = wider ? await fetchNewsForQuery(wider, {limit: WEB_FETCH_LIMIT}) : [];
     }
     // The brain's own sweep is read-only input here: finance/RSS/Reddit/SEC rows from
@@ -109,7 +118,7 @@ export const refreshKeywordGroup = async (group: KeywordGroup): Promise<RefreshR
 
 const BRIEF_ARTICLES = 12;
 
-export type BriefCandidate = {
+type BriefCandidate = {
     keywordSetHash: number;
     name: string;                 // the first topic's name; users sharing a keyword set share the brief
     articles: TopicBriefArticle[];
@@ -156,7 +165,7 @@ export const loadBriefCandidates = async (limit: number): Promise<BriefCandidate
 };
 
 // Writes the brief to every topic sharing the keyword set that still lacks a fresh one.
-export const saveTopicBrief = async (
+const saveTopicBrief = async (
     keywordSetHash: number,
     content: TopicBriefContent,
     articleHashes: number[],
@@ -168,4 +177,12 @@ export const saveTopicBrief = async (
         {$set: {brief: {summary: content.summary, bullets: content.bullets, date: getEasternDateString(), generatedAt: new Date(), articleHashes, model}}},
     );
     return result.modifiedCount;
+};
+
+// The briefs job's save step: the model's text parsed (briefs render as plain text) and written
+// to every topic on the keyword set; 0 when it did not parse.
+export const saveBriefFromText = async (candidate: BriefCandidate, text: string, model: string): Promise<number> => {
+    const parsed = parseBriefText(text);
+    if (!parsed) return 0;
+    return saveTopicBrief(candidate.keywordSetHash, parsed, candidate.articleHashes, model);
 };

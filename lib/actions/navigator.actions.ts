@@ -3,17 +3,19 @@
 import {revalidatePath} from "next/cache";
 import AiNavigator from "@/database/models/ai-navigator.model";
 import {connectToDatabase} from "@/database/mongoose";
-import {getCurrentUserId} from "@/lib/actions/watchlist.actions";
+import {getCurrentUserId} from "@/lib/auth/session";
 import {createPaperAccount} from "@/lib/actions/accounts.actions";
-import PaperAccount from "@/database/models/paper-account.model";
-import PaperTrade from "@/database/models/paper-trade.model";
-import AccountSnapshot from "@/database/models/account-snapshot.model";
-import AccountIncome from "@/database/models/account-income.model";
-import {getAccountsForUser, getOwnedAccount, getPortfolio, resolveStartingBalance, seedDayZeroSnapshot} from "@/lib/trading/account";
+import {getAccountsForUser, getOwnedAccount} from "@/lib/trading/accounts";
+import {getPortfolio} from "@/lib/trading/valuation";
+import {STARTING_BALANCE_ERROR, resolveStartingBalance} from "@/lib/trading/starting-balance";
+import {restartAccount} from "@/lib/trading/lifecycle";
 import {executeOrder} from "@/lib/trading/orders";
-import {getQuote} from "@/lib/actions/finnhub.actions";
+import {getQuote} from "@/lib/prices/finnhub";
 import {AI_NAVIGATOR_ACCOUNT_NAME} from "@/lib/navigator/config";
-import {inngest} from "@/lib/inngest/client";
+import {inngest} from "@/lib/jobs/client";
+import {JOBS} from "@/lib/jobs/registry";
+import type {ActionResult} from '@/lib/actions/types';
+import type {SuggestionAction} from '@/lib/navigator/types';
 
 const revalidateNavigatorPaths = () => {
     revalidatePath('/brain');
@@ -21,31 +23,12 @@ const revalidateNavigatorPaths = () => {
     revalidatePath('/portfolio');
 };
 
-export const getNavigatorStatus = async (userId: string): Promise<NavigatorStatus> => {
-    try {
-        await connectToDatabase();
-        const doc = await AiNavigator.findOne({userId});
-        if (!doc) return {enrolled: false};
-        return {
-            enrolled: true,
-            status: doc.status,
-            accountId: doc.accountId,
-            enrolledAt: new Date(doc.enrolledAt).getTime(),
-            lastRunDate: doc.lastRunDate,
-            lastError: doc.lastError,
-        };
-    } catch (error) {
-        console.error('Error reading navigator status:', error);
-        return {enrolled: false};
-    }
-};
-
 // Opt in: the AI gets its own dedicated paper account, created (or reclaimed on
 // re-enrollment) through the normal account flow so caps/seeding all apply. The
 // user picks how much the AI starts with (default $100k).
 export const enrollAiNavigator = async (
     {startingBalance}: {startingBalance?: number} = {},
-): Promise<OrderResult> => {
+): Promise<ActionResult> => {
     try {
         const userId = await getCurrentUserId();
         if (!userId) return {success: false, message: 'Not authenticated'};
@@ -68,21 +51,11 @@ export const enrollAiNavigator = async (
         let accountId = reusable ? String(reusable._id) : undefined;
         if (accountId && reusable && startingBalance !== undefined) {
             // Re-enrollment with a chosen balance: the reclaimed account is empty
-            // (guarded above), so restart it cleanly at the requested amount.
+            // (guarded above), so restart it cleanly at the requested amount. No legacy-trade
+            // sweep: this account was created after the migration, so those rows are not its.
             const balance = resolveStartingBalance(startingBalance);
-            if (balance === null) return {success: false, message: 'Invalid starting balance'};
-            await PaperAccount.updateOne(
-                {_id: reusable._id, userId},
-                {
-                    $set: {cash: balance, startingBalance: balance, positions: [], inceptionAt: new Date()},
-                    $unset: {incomeThrough: 1, incomeTotals: 1},
-                },
-            );
-            await PaperTrade.deleteMany({accountId});
-            await AccountSnapshot.deleteMany({accountId});
-            await AccountIncome.deleteMany({accountId});
-            const fresh = await getOwnedAccount(userId, accountId);
-            if (fresh) await seedDayZeroSnapshot(fresh);
+            if (balance === null) return {success: false, message: STARTING_BALANCE_ERROR};
+            await restartAccount(userId, reusable, balance);
         }
         if (!accountId) {
             const created = await createPaperAccount({name: AI_NAVIGATOR_ACCOUNT_NAME, startingBalance});
@@ -98,7 +71,7 @@ export const enrollAiNavigator = async (
         // instead of waiting for Monday. Failure to enqueue must not fail enrollment.
         let bootstrapQueued = false;
         try {
-            await inngest.send({name: 'app/bootstrap.ai.navigator', data: {userId}});
+            await inngest.send({name: JOBS.navigatorBootstrap.event, data: {userId}});
             bootstrapQueued = true;
         } catch (error) {
             console.error('Could not queue navigator bootstrap:', error);
@@ -117,7 +90,7 @@ export const enrollAiNavigator = async (
     }
 };
 
-const setNavigatorStatus = async (status: 'active' | 'paused'): Promise<OrderResult> => {
+const setNavigatorStatus = async (status: 'active' | 'paused'): Promise<ActionResult> => {
     try {
         const userId = await getCurrentUserId();
         if (!userId) return {success: false, message: 'Not authenticated'};
@@ -134,13 +107,13 @@ const setNavigatorStatus = async (status: 'active' | 'paused'): Promise<OrderRes
     }
 };
 
-export const pauseAiNavigator = async (): Promise<OrderResult> => setNavigatorStatus('paused');
-export const resumeAiNavigator = async (): Promise<OrderResult> => setNavigatorStatus('active');
+export const pauseAiNavigator = async (): Promise<ActionResult> => setNavigatorStatus('paused');
+export const resumeAiNavigator = async (): Promise<ActionResult> => setNavigatorStatus('active');
 
 // Manual "Run AI now": trades if this week's budget is still unclaimed (the weekly
 // run happening early), otherwise produces a badged preview analysis — so it's
 // always safe to press for a health check or a point-in-time read.
-export const runAiNavigatorNow = async (): Promise<OrderResult> => {
+export const runAiNavigatorNow = async (): Promise<ActionResult> => {
     try {
         const userId = await getCurrentUserId();
         if (!userId) return {success: false, message: 'Not authenticated'};
@@ -150,7 +123,7 @@ export const runAiNavigatorNow = async (): Promise<OrderResult> => {
         if (!doc) return {success: false, message: 'Not enrolled'};
         if (doc.status !== 'active') return {success: false, message: 'AI Navigator is paused — resume it first'};
 
-        await inngest.send({name: 'app/bootstrap.ai.navigator', data: {userId}});
+        await inngest.send({name: JOBS.navigatorBootstrap.event, data: {userId}});
         return {success: true, message: 'AI run queued — results appear under Weekly Decisions in a few minutes'};
     } catch (error) {
         console.error('Error queueing manual navigator run:', error);
@@ -160,7 +133,7 @@ export const runAiNavigatorNow = async (): Promise<OrderResult> => {
 
 // Unenroll keeps the paper account (least destructive) — delete it via the normal
 // account management flow if desired.
-export const unenrollAiNavigator = async (): Promise<OrderResult> => {
+export const unenrollAiNavigator = async (): Promise<ActionResult> => {
     try {
         const userId = await getCurrentUserId();
         if (!userId) return {success: false, message: 'Not authenticated'};
@@ -181,7 +154,7 @@ export const unenrollAiNavigator = async (): Promise<OrderResult> => {
 // account and execute through the exact same path the AI trader uses.
 export const applySuggestion = async (
     {symbol, action, targetWeight, accountId}: {symbol: string; action: SuggestionAction; targetWeight: number; accountId: string},
-): Promise<OrderResult> => {
+): Promise<ActionResult> => {
     try {
         const userId = await getCurrentUserId();
         if (!userId) return {success: false, message: 'Not authenticated'};

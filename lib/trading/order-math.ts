@@ -2,15 +2,15 @@
 // order can obviously not fill. Pure on purpose so it is unit-tested; the server
 // (executeOrder) re-checks everything with the live price and stays authoritative.
 
-import {TRADE_REASON_MAX} from "@/lib/strategies/config";
-import {interestOverDays} from "@/lib/trading/income";
+import {TRADE_REASON_MAX} from "@/lib/trading/config";
+import {interestOverDays} from "@/lib/income/accrual";
 
-export type OrderSide = 'buy' | 'sell';
+type OrderSide = 'buy' | 'sell';
 
 // A side from outside the type system (a server action's argument): exactly 'buy' or 'sell'.
 export const isOrderSide = (value: unknown): value is OrderSide => value === 'buy' || value === 'sell';
 
-export type OrderInputs = {
+type OrderInputs = {
     side: OrderSide;
     quantity: number;          // whatever the user typed, already coerced to a number
     price: number | null;      // last quote, or null when none is available
@@ -18,7 +18,7 @@ export type OrderInputs = {
     owned: number;             // shares of this symbol held in the active account
 };
 
-export type OrderCheck = {
+type OrderCheck = {
     ok: boolean;               // false only for a *definite* problem; an unknown price never blocks
     message: string | null;    // what to tell the user, when there is something to say
     estTotal: number | null;   // cost or proceeds at the last price, when there is one
@@ -50,7 +50,7 @@ export const presetQuantities = (side: OrderSide, {cash, price, owned}: Pick<Ord
 
 export type PositionLike = {symbol: string; quantity: number; marketValue?: number; avgCost?: number};
 
-export type OrderEffectInputs = {
+type OrderEffectInputs = {
     side: OrderSide;
     symbol: string;
     quantity: number;
@@ -131,7 +131,7 @@ export const describeOrderEffect = ({side, symbol, quantity, price, cash, positi
 // always uses, and APY only while the buy line carries the interest clause (a sell, a buy with
 // no price yet, no stored rate or no cash left says nothing about interest).
 export const TICKET_TERMS = ['buying-power', 'market-order', 'avg-cost'] as const;
-export type TicketTerm = (typeof TICKET_TERMS)[number] | 'apy';
+type TicketTerm = (typeof TICKET_TERMS)[number] | 'apy';
 
 export const ticketTerms = (effect: OrderEffect | null): TicketTerm[] =>
     effect?.side === 'buy' && effect.cashYield ? [...TICKET_TERMS, 'apy'] : [...TICKET_TERMS];

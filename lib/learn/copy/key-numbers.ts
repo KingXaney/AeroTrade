@@ -1,11 +1,11 @@
-// Copy for the stock page's "Key numbers" panel (lib/learn/key-numbers.ts builds the rows).
+// Copy for the stock page's "Key numbers" panel (lib/stocks/key-numbers.ts builds the rows).
 // Each sentence says what its figure divides — or, for market cap, multiplies — and repeats
 // the figure exactly as the value beside it prints it. Nothing here calls a number high, low,
 // cheap or anything else: the definitions (lib/learn/glossary.ts) say what a figure measures,
 // and the panel's one "What these mean" carries them. Held to the 'copy' tier of
 // lib/learn/banned.ts and a list of evaluative words by key-numbers.test.ts.
 
-import {FINANCIALS_REVALIDATE_SECONDS, PROFILE_REVALIDATE_SECONDS} from '@/lib/constants';
+import {FINANCIALS_REVALIDATE_SECONDS, PROFILE_REVALIDATE_SECONDS} from '@/lib/prices/config';
 
 // 'once an hour', 'once a day', 'every 6 hours', 'every 30 minutes': a cache's revalidation.
 const everyText = (seconds: number): string => {

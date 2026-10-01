@@ -2,7 +2,6 @@ import {describe, expect, it} from 'vitest';
 import {findBanned} from '@/lib/learn/banned';
 import {
     conceptForTerm,
-    entriesOfKind,
     GLOSSARY,
     GLOSSARY_KEYS,
     isGlossaryKey,
@@ -64,10 +63,11 @@ describe('GLOSSARY', () => {
 
     it('keys every concept to a starter-topic keyword so a matched term is a glossary key', () => {
         const keywords = new Set(STARTER_TOPICS.flatMap((topic) => topic.keywords.map((k) => k.toLowerCase())));
-        for (const entry of entriesOfKind('concept')) {
+        const concepts = Object.values(GLOSSARY).filter((entry) => entry.kind === 'concept');
+        for (const entry of concepts) {
             expect(keywords.has(entry.key), entry.key).toBe(true);
         }
-        expect(entriesOfKind('concept').length).toBeGreaterThanOrEqual(20);
+        expect(concepts.length).toBeGreaterThanOrEqual(20);
     });
 
     it('lists the keys a review can diff', () => {

@@ -15,7 +15,7 @@
 // before matching, so a prompt may say "Never recommend a stock" and a lesson may say
 // "No fee is charged".
 
-export type BannedTier = 'advice' | 'copy';
+type BannedTier = 'advice' | 'copy';
 
 export const BANNED_ADVICE: readonly RegExp[] = [
     /\bshould (i|you|we|they|one|anyone|investors?) (buy|sell|add|avoid|hold|own|invest|trim|dump|short)\b/i,

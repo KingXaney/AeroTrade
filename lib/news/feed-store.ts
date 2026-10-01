@@ -5,26 +5,28 @@
 
 import {connectToDatabase} from "@/database/mongoose";
 import UserPreferencesModel from "@/database/models/user-preferences.model";
-import {getNews} from "@/lib/actions/finnhub.actions";
-import {getCachedWatchlistSymbols} from "@/lib/dashboard/cached";
+import {getNews} from "@/lib/prices/finnhub";
+import {getCachedWatchlistSymbols} from "@/lib/stocks/watchlist-store";
 import {fetchGoogleNewsFeed} from "@/lib/news/adapters/search";
 import {fetchRssNews} from "@/lib/news/adapters/rss";
-import {FEED_FETCH_LIMIT, FEED_WATCHLIST_SYMBOL_CAP} from "@/lib/news/config";
+import {FEED_FETCH_LIMIT, FEED_WATCHLIST_SYMBOL_CAP, newsSearchEnabled} from "@/lib/news/config";
 import {
-    defaultNewsFeed,
     feedRequestsFor,
     filterBySources,
     mergeFeed,
-    normalizeNewsFeed,
     type FeedBatch,
     type FeedRequest,
-    type NewsFeedPrefs,
 } from "@/lib/news/feed";
+import {
+    defaultNewsFeed,
+    normalizeNewsFeed,
+    type NewsFeedPrefs,
+} from "@/lib/news/feed-prefs";
 import {toFeedArticles} from "@/lib/news/topic-batch";
 import {getMergedTopicFeed} from "@/lib/topics/store";
-import {newsSearchEnabled} from "@/lib/topics/config";
+import type {MarketNewsArticle} from '@/lib/news/types';
 
-export type NewsFeedResult = {
+type NewsFeedResult = {
     articles: MarketNewsArticle[];
     /** True when the feed is not what the user asked for: Google News is off or answered with nothing. */
     fallback: boolean;
@@ -140,7 +142,7 @@ export const getNewsFeedForPrefs = async (
 
 // How many stored topic articles are offered to the merge. The round-robin bounds their
 // actual share; this only decides how deep the topic queue is when wires run dry.
-export const TOPIC_FEED_BATCH = 12;
+const TOPIC_FEED_BATCH = 12;
 
 // The user's followed topics as feed articles. Best effort: a news page must never break
 // because the topics collection is unreachable.

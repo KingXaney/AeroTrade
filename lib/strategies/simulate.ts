@@ -9,17 +9,19 @@
 // makes a strategy's backtest and its live record earn identically (see the parity test).
 
 import type {Bar} from "@/lib/prices/signals";
-import {addCalendarDays, eachCalendarDay} from "@/lib/prices/calendar-days";
+import {addCalendarDays, eachCalendarDay} from "@/lib/dates";
 import {totalReturnIndex} from "@/lib/prices/total-return";
-import {createIncomeClock, dividendsByExDate, makeRateLookup, type IncomeClock, type IncomeRow, type RatePoint} from "@/lib/trading/income";
+import {createIncomeClock, dividendsByExDate, makeRateLookup, type IncomeClock, type IncomeRow} from "@/lib/income/accrual";
+import type {RatePoint} from "@/lib/prices/types";
 import {CASH_FLOOR, SIM_RESULT_BARS, WARMUP_BARS} from "@/lib/strategies/config";
-import {applyFill, buildContext, runStrategyDay, type SimAccount} from "@/lib/strategies/engine";
+import {buildContext, runStrategyDay} from "@/lib/strategies/engine";
+import {applyFill, type SimAccount} from "@/lib/trading/fill";
 import {summarizeSeries} from "@/lib/strategies/metrics";
 import {STRATEGY_RULES} from "@/lib/strategies/rules";
 import type {SeriesPoint, SimTrade, SimulationResult, StrategyDefinition} from "@/lib/strategies/types";
-import {BENCHMARK_SYMBOL} from "@/lib/strategies/universe";
+import {BENCHMARK_SYMBOL} from "@/lib/prices/config";
 
-export type SimulationOptions = {
+type SimulationOptions = {
     startingBalance: number;
     launchDate: string;
     resultBars?: number;

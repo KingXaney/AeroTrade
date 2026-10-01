@@ -2,21 +2,22 @@
 
 import {revalidatePath} from "next/cache";
 import {connectToDatabase} from "@/database/mongoose";
-import {getCurrentUserId} from "@/lib/actions/watchlist.actions";
-import {upsertPreferences} from "@/lib/preferences/upsert";
+import {getCurrentUserId} from "@/lib/auth/session";
+import {upsertPreferences} from "@/lib/settings/preferences-store";
 import {LESSONS_SEEN_CAP, lessonKey, parseLessonId} from "@/lib/learn/moments";
 import {LESSON_COPY} from "@/lib/learn/copy/lesson";
 import {parseQuizDate} from "@/lib/learn/quiz";
 import {DAILY_QUIZ_COPY} from "@/lib/learn/copy/quiz";
-import {readQuizDaysAnswered} from "@/lib/learn/quiz-read";
+import {readQuizDaysAnswered} from "@/lib/learn/quiz-store";
 import UserPreferencesModel from "@/database/models/user-preferences.model";
-import {getEasternDateString} from "@/lib/utils";
+import {getEasternDateString} from "@/lib/dates";
+import type {ActionResult} from '@/lib/actions/types';
 
 // Writes only; the reads live in lib/learn/facts-store.ts (a plain server module).
 
 // The one-time "Hide" on the First-week checklist. A stamp, never a recomputation:
 // a dismissed checklist stays dismissed however fresh the account still looks.
-export const dismissMissions = async (): Promise<OrderResult> => {
+export const dismissMissions = async (): Promise<ActionResult> => {
     const userId = await getCurrentUserId();
     if (!userId) return {success: false, message: 'Not authenticated'};
     try {
@@ -34,7 +35,7 @@ export const dismissMissions = async (): Promise<OrderResult> => {
 // The argument arrives from the client, so it is `unknown` until the zod schema in
 // lib/learn/moments.ts says it is one of the four firsts or a real rebalance id; only the
 // key derived from the parsed value is written.
-export const markLessonSeen = async (input: unknown): Promise<OrderResult> => {
+export const markLessonSeen = async (input: unknown): Promise<ActionResult> => {
     const userId = await getCurrentUserId();
     if (!userId) return {success: false, message: LESSON_COPY.notSignedIn};
     const id = parseLessonId(input);
@@ -53,7 +54,7 @@ export const markLessonSeen = async (input: unknown): Promise<OrderResult> => {
     }
 };
 
-export type QuizAnswerResult = {success: true; daysAnswered: number} | {success: false; message: string};
+type QuizAnswerResult = {success: true; daysAnswered: number} | {success: false; message: string};
 
 // The Daily quiz's answer: counts the day once. The argument arrives from the client, so it is
 // `unknown` until parseQuizDate says it is today's ET date, exactly — a question left open past

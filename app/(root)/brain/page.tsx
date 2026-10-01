@@ -1,13 +1,12 @@
-import {redirect} from "next/navigation";
-import {getCurrentUserId} from "@/lib/actions/watchlist.actions";
-import {getNavigatorStatus} from "@/lib/actions/navigator.actions";
-import {getActiveTheses, getBrainGraph, getBrainSystemStatus, getEntityEvidence, getSinceThesis, getTopEntities} from "@/lib/brain/queries";
+import {requireUserId} from "@/lib/auth/session";
+import {getActiveTheses, getBrainGraph, getBrainSystemStatus, getEntityEvidence, getSinceThesis, getTopEntities} from "@/lib/brain/store";
 import {glossNavigatorReasons} from "@/lib/learn/reasons";
-import type {SuggestionSetView} from "@/lib/navigator/service";
+import type {SuggestionSetView} from "@/lib/navigator/store";
 import {getLatestSecondOpinion, isSecondOpinionConfigured} from "@/lib/brain/opinion";
-import {getLatestSuggestions} from "@/lib/navigator/service";
+import {getLatestSuggestions, getNavigatorStatus} from "@/lib/navigator/store";
 import {getTopicsForUser} from "@/lib/topics/store";
-import {getAccountsForUser, toAccountSummary} from "@/lib/trading/account";
+import {getPortfoliosForUser} from "@/lib/trading/valuation";
+import {toApplyAccounts} from "@/lib/trading/active-account";
 import ActiveTheses from "@/components/brain/ActiveTheses";
 import BrainLegend from "@/components/brain/BrainLegend";
 import BrainGraph from "@/components/brain/BrainGraph";
@@ -30,18 +29,17 @@ type BrainPageProps = {
 };
 
 const BrainPage = async ({searchParams}: BrainPageProps) => {
-    const userId = await getCurrentUserId();
-    if (!userId) redirect('/sign-in');
+    const userId = await requireUserId();
 
     const {entity} = await searchParams;
 
-    const [navigatorStatus, theses, topEntities, graph, suggestions, accounts, systemStatus, secondOpinion, topics] = await Promise.all([
+    const [navigatorStatus, theses, topEntities, graph, suggestions, portfolios, systemStatus, secondOpinion, topics] = await Promise.all([
         getNavigatorStatus(userId),
         getActiveTheses(),
         getTopEntities(),
         getBrainGraph(),
         getLatestSuggestions(userId),
-        getAccountsForUser(userId),
+        getPortfoliosForUser(userId),
         getBrainSystemStatus(),
         getLatestSecondOpinion(userId),
         getTopicsForUser(userId),
@@ -53,10 +51,7 @@ const BrainPage = async ({searchParams}: BrainPageProps) => {
         entity ? getEntityEvidence(entity) : null,
         getSinceThesis(theses),
     ]);
-    const applyAccounts = accounts.map((a) => {
-        const s = toAccountSummary(a);
-        return {id: s.id, name: s.name};
-    });
+    const applyAccounts = toApplyAccounts(portfolios);
 
     return (
         <div className="space-y-4">

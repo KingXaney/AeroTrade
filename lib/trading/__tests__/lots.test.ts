@@ -1,5 +1,6 @@
 import {describe, expect, it} from 'vitest';
 import {buyNotesBySellId, matchLots, openLotNotes, type LedgerTrade} from '@/lib/trading/lots';
+import type {TradeSource} from '@/lib/trading/types';
 
 let clock = 0;
 const trade = (id: string, side: 'buy' | 'sell', symbol: string, quantity: number, price: number, reason?: string, source: TradeSource = 'user'): LedgerTrade => ({

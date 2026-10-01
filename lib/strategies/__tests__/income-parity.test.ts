@@ -4,12 +4,13 @@
 
 import {describe, expect, it} from "vitest";
 import type {Bar} from "@/lib/prices/signals";
-import {addCalendarDays, eachCalendarDay} from "@/lib/prices/calendar-days";
+import {addCalendarDays, eachCalendarDay} from "@/lib/dates";
 import {strategyBySlug} from "@/lib/strategies/catalog";
 import {simulateStrategy} from "@/lib/strategies/simulate";
 import {applyOverrides} from "@/lib/strategies/whatif";
 import {SYNTHETIC_LAUNCH, syntheticMarket} from "@/lib/strategies/__tests__/synthetic-universe";
-import {createIncomeClock, dividendsByExDate, makeRateLookup, replayIncome, type RatePoint} from "@/lib/trading/income";
+import {createIncomeClock, dividendsByExDate, makeRateLookup, replayIncome} from "@/lib/income/accrual";
+import type {RatePoint} from "@/lib/prices/types";
 
 const weekdays = (count: number, from: string): string[] => {
     const dates: string[] = [];

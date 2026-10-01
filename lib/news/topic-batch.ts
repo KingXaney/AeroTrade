@@ -5,8 +5,10 @@
 // read — not another network request. That is why topics never become a FeedRequest and
 // nothing about URL planning, MAX_FEED_REQUESTS or the Google kill switch changes.
 
-import {hashId} from "@/lib/news/config";
+import {hashId} from "@/lib/text";
 import {feedUrlKey} from "@/lib/news/feed";
+import type {MarketNewsArticle} from '@/lib/news/types';
+import type {MergedTopicArticle} from '@/lib/topics/types';
 
 // `id` is keyed exactly as mergeFeed re-keys its output, so a topic article and the same
 // story arriving from a wire collapse into one row instead of appearing twice.

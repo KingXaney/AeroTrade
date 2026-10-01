@@ -48,6 +48,10 @@ export const tradeCsvRow = (t: CsvTrade): string => [
 export const tradesCsv = (trades: readonly CsvTrade[]): string =>
     [TRADE_CSV_HEADER.map(csvField).join(','), ...trades.map(tradeCsvRow)].join('\n') + '\n';
 
+// Where one account's CSV export is served (app/api/accounts/[accountId]/export); every link to
+// it is built here.
+export const accountExportHref = (accountId: string): string => `/api/accounts/${accountId}/export`;
+
 const slugify = (name: string): string =>
     name.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '') || 'strategy';
 
