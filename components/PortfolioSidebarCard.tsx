@@ -1,5 +1,6 @@
 import Link from "next/link";
 import {cn, formatPrice, getChangeColorClass} from "@/lib/utils";
+import {formatPct} from "@/lib/format";
 
 // Compact, glanceable portfolio summary for the left sidebar. Mirrors the
 // watchlist card pattern in Sidebar.tsx; links through to the full /portfolio page.
@@ -13,8 +14,6 @@ export type SidebarPortfolio = {
 };
 
 const PortfolioSidebarCard = ({portfolio}: {portfolio: SidebarPortfolio}) => {
-    const sign = portfolio.totalReturnPct >= 0 ? '+' : '';
-
     return (
         <Link
             href="/portfolio"
@@ -38,8 +37,8 @@ const PortfolioSidebarCard = ({portfolio}: {portfolio: SidebarPortfolio}) => {
                    style={{fontFamily: 'var(--type-display)'}}
                 >{formatPrice(portfolio.totalValue)}</p>
                 <p className="text-sm" style={{fontFamily: 'var(--type-mono)'}}>
-                    <span className={getChangeColorClass(portfolio.totalReturnPct || undefined)}>
-                        {sign}{portfolio.totalReturnPct.toFixed(2)}%
+                    <span className={getChangeColorClass(portfolio.totalReturnPct)}>
+                        {formatPct(portfolio.totalReturnPct)}
                     </span>
                     <span className="text-fg-muted text-xs"> total return</span>
                     {/* The headline return includes holdings valued at cost; say so in the
@@ -72,9 +71,9 @@ const PortfolioSidebarCard = ({portfolio}: {portfolio: SidebarPortfolio}) => {
                                 {h.priceStale ? (
                                     <span className="text-xs text-fg-muted" style={{fontFamily: 'var(--type-mono)'}} title="No live quote">—</span>
                                 ) : (
-                                    <span className={cn('text-xs', getChangeColorClass(h.unrealizedPnlPct || undefined))}
+                                    <span className={cn('text-xs', getChangeColorClass(h.unrealizedPnlPct))}
                                           style={{fontFamily: 'var(--type-mono)'}}>
-                                        {h.unrealizedPnlPct >= 0 ? '+' : ''}{h.unrealizedPnlPct.toFixed(2)}%
+                                        {formatPct(h.unrealizedPnlPct)}
                                     </span>
                                 )}
                             </div>

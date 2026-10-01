@@ -3,7 +3,7 @@
 import {useState} from "react";
 import {useRouter} from "next/navigation";
 import {toast} from "sonner";
-import {formatTimeAgo} from "@/lib/utils";
+import {formatTimeAgoMs} from "@/lib/utils";
 import {removeFriend} from "@/lib/actions/friends.actions";
 
 // After sending a request the user had no view of it at all: a toast, and then nothing.
@@ -49,7 +49,7 @@ const SentRequests = ({requests}: {requests: SentFriendRequest[]}) => {
                             <div className="text-sm font-semibold text-fg truncate">{r.name}</div>
                             <div className="text-[11px] text-fg-muted truncate">{r.email}</div>
                             <div className="text-[10px] text-fg-muted" style={{fontFamily: 'var(--type-mono)'}}>
-                                Waiting · sent {formatTimeAgo(r.createdAt)}
+                                Waiting · sent {formatTimeAgoMs(r.createdAt)}
                             </div>
                         </div>
                         <button

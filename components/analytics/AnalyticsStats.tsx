@@ -1,5 +1,6 @@
 import type {ReactNode} from "react";
-import {cn, formatPrice, getChangeColorClass} from "@/lib/utils";
+import {cn, getChangeColorClass} from "@/lib/utils";
+import {formatDrawdown, formatPrice, formatSignedPrice, roundPct} from "@/lib/format";
 import Term from "@/components/primitives/Term";
 import WhatTheseMean from "@/components/learn/WhatTheseMean";
 import {DRAWDOWN_COPY, drawdownLine} from "@/lib/learn/copy/portfolio";
@@ -37,7 +38,7 @@ export type AnalyticsStatFields = Pick<AccountAnalytics, 'maxDrawdownPct' | 'win
 // links, which invariant 12 keeps off widgets. The Term titles stay either way.
 const AnalyticsStats = ({analytics, tradesHint = 'Buys + sells, all time', definitions = false}: {analytics: AnalyticsStatFields; tradesHint?: string; definitions?: boolean}) => {
     const {maxDrawdownPct, winRatePct, wins, losses, realizedPnl, tradeCount, income, drawdown, benchmarkOverDrawdownPct} = analytics;
-    const realizedClass = getChangeColorClass(realizedPnl || undefined);
+    const realizedClass = getChangeColorClass(realizedPnl);
     const earned = income ? income.interest + income.dividends : 0;
     const drawdownHint = drawdownLine({maxDrawdownPct, drawdown, benchmarkOverDrawdownPct});
     // A dated hint says what the climb back takes, so its definition joins the disclosure.
@@ -48,19 +49,19 @@ const AnalyticsStats = ({analytics, tradesHint = 'Buys + sells, all time', defin
             <div className={cn('grid grid-cols-2 gap-4', income ? 'md:grid-cols-5' : 'md:grid-cols-4')}>
             <Stat
                 label={<Term k="max-drawdown">Max Drawdown</Term>}
-                value={maxDrawdownPct === null ? '—' : `−${maxDrawdownPct.toFixed(2)}%`}
-                valueClass={maxDrawdownPct !== null && maxDrawdownPct > 0 ? 'text-negative' : undefined}
+                value={formatDrawdown(maxDrawdownPct)}
+                valueClass={maxDrawdownPct !== null && roundPct(maxDrawdownPct) > 0 ? 'text-negative' : undefined}
                 hint={drawdownHint}
             />
             <Stat
                 label={<Term k="win-rate">Win Rate</Term>}
                 value={winRatePct === null ? '—' : `${winRatePct.toFixed(0)}%`}
-                valueClass={winRatePct !== null ? getChangeColorClass(winRatePct - 50 || undefined) : undefined}
+                valueClass={winRatePct !== null ? getChangeColorClass(winRatePct - 50) : undefined}
                 hint={winRatePct === null ? 'No closed trades yet' : `${wins}W / ${losses}L`}
             />
             <Stat
                 label={<Term k="realized-pnl">Realized P&L</Term>}
-                value={`${realizedPnl >= 0 ? '+' : ''}${formatPrice(realizedPnl)}`}
+                value={formatSignedPrice(realizedPnl)}
                 valueClass={realizedClass}
                 hint="From closed positions"
             />

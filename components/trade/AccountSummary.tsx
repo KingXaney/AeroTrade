@@ -1,5 +1,6 @@
 import type {ReactNode} from "react";
 import {cn, formatPrice, getChangeColorClass} from "@/lib/utils";
+import {formatPct, formatSignedPrice} from "@/lib/format";
 import UnpricedNote from "@/components/trade/UnpricedNote";
 import Term from "@/components/primitives/Term";
 import WhatTheseMean from "@/components/learn/WhatTheseMean";
@@ -29,8 +30,7 @@ const AccountSummary = ({portfolio, income, definitions = false}: {portfolio: Po
         : undefined;
     const cashHint = income?.apy != null ? `earning ${(income.apy * 100).toFixed(2)}% APY` : undefined;
 
-    const returnClass = getChangeColorClass(portfolio.totalReturnPct || undefined);
-    const sign = portfolio.totalReturnAbs >= 0 ? '+' : '';
+    const returnClass = getChangeColorClass(portfolio.totalReturnPct);
 
     return (
         <div className="glass-panel rounded-xl p-5 shimmer">
@@ -38,7 +38,7 @@ const AccountSummary = ({portfolio, income, definitions = false}: {portfolio: Po
                 <Stat label={<Term k="net-worth">Net Worth</Term>} value={formatPrice(portfolio.totalValue)} valueClass="text-brand" />
                 <Stat
                     label={<Term k="total-return">Total Return</Term>}
-                    value={`${sign}${formatPrice(portfolio.totalReturnAbs)} (${sign}${portfolio.totalReturnPct.toFixed(2)}%)`}
+                    value={`${formatSignedPrice(portfolio.totalReturnAbs)} (${formatPct(portfolio.totalReturnPct)})`}
                     valueClass={returnClass}
                     hint={returnHint}
                 />

@@ -1,4 +1,4 @@
-import {cn, formatTimeAgo} from "@/lib/utils";
+import {cn, formatTimeAgoSeconds} from "@/lib/utils";
 
 // One card for every headline surface — the News page, the dashboard widget and
 // /history. This markup used to live twice, inline. The summary is shown only when it
@@ -20,7 +20,7 @@ const NewsArticleCard = ({article}: {article: MarketNewsArticle}) => {
                 {topic ? topic.name : (article.related || article.source)}
             </span>
             <h3 className="news-title">{article.headline}</h3>
-            <p className="news-meta">{formatTimeAgo(article.datetime)} · {article.source}</p>
+            <p className="news-meta">{formatTimeAgoSeconds(article.datetime)} · {article.source}</p>
             {showSummary && <p className="news-summary">{article.summary}</p>}
             <span className="news-cta mt-auto">Read more →</span>
         </a>

@@ -4,6 +4,7 @@ import {useState} from "react";
 import {usePathname, useRouter, useSearchParams} from "next/navigation";
 import {toast} from "sonner";
 import {cn, formatPrice, getChangeColorClass} from "@/lib/utils";
+import {formatDrawdown, formatPct, roundPct} from "@/lib/format";
 import {setActiveAccount} from "@/lib/actions/accounts.actions";
 import {unpricedLabel} from "@/lib/trading/analytics";
 
@@ -90,8 +91,8 @@ const AccountComparisonTable = ({rows, activeId}: {rows: ComparisonRow[]; active
                     <div className="flex justify-between md:block md:text-right" style={{fontFamily: 'var(--type-mono)'}}>
                         <span className="md:hidden text-[10px] uppercase tracking-[0.1em] text-fg-muted mr-2">Total Return</span>
                         <div className="text-right">
-                        <div className={cn('text-sm', getChangeColorClass(row.totalReturnPct || undefined))}>
-                            {row.totalReturnPct >= 0 ? '+' : ''}{row.totalReturnPct.toFixed(2)}%
+                        <div className={cn('text-sm', getChangeColorClass(row.totalReturnPct))}>
+                            {formatPct(row.totalReturnPct)}
                         </div>
                         {/* Ranked on the at-cost fallback like everything else; say so per row,
                             because the page-level note only covers the active strategy. */}
@@ -110,7 +111,7 @@ const AccountComparisonTable = ({rows, activeId}: {rows: ComparisonRow[]; active
                         <span className="md:hidden text-[10px] uppercase tracking-[0.1em] text-fg-muted mr-2">Max Drawdown</span>
                         {row.maxDrawdownPct === null
                             ? <span className="text-fg-soft">—</span>
-                            : <span className={row.maxDrawdownPct > 0 ? 'text-negative' : 'text-fg-soft'}>−{row.maxDrawdownPct.toFixed(2)}%</span>}
+                            : <span className={roundPct(row.maxDrawdownPct) > 0 ? 'text-negative' : 'text-fg-soft'}>{formatDrawdown(row.maxDrawdownPct)}</span>}
                     </div>
                 </button>
             ))}

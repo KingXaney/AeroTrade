@@ -11,7 +11,7 @@ import RefreshTopicButton from "@/components/topics/RefreshTopicButton";
 import {useTopicsUi} from "@/components/topics/TopicsShell";
 import {deleteTopic} from "@/lib/actions/topics.actions";
 import {refreshCooldownUntil} from "@/lib/topics/config";
-import {formatTimeAgo} from "@/lib/utils";
+import {formatTimeAgoMs} from "@/lib/utils";
 
 const mono = {fontFamily: 'var(--type-mono)'} as const;
 
@@ -32,7 +32,7 @@ const TopicHeader = ({topic, now}: {topic: TopicOverviewItem; now: number}) => {
         router.refresh();
     };
 
-    const refreshed = topic.lastFetchedAt ? `refreshed ${formatTimeAgo(Math.floor(topic.lastFetchedAt / 1000))}` : 'never refreshed';
+    const refreshed = topic.lastFetchedAt ? `refreshed ${formatTimeAgoMs(topic.lastFetchedAt)}` : 'never refreshed';
 
     return (
         <section className="glass-panel rounded-xl p-5">

@@ -1,5 +1,6 @@
 import Link from "next/link";
 import {cn} from "@/lib/utils";
+import {roundPct} from "@/lib/format";
 import WatchlistButton from "@/components/watchlist/WatchlistButton";
 import TradeLink from "@/components/trade/TradeLink";
 import Term from "@/components/primitives/Term";
@@ -71,9 +72,9 @@ const WatchlistTable = ({watchlist}: WatchlistTableProps) => {
                             <span
                                 className={cn(
                                     "inline-block px-2 py-0.5 rounded text-xs",
-                                    row.changePercent > 0
+                                    roundPct(row.changePercent) > 0
                                         ? "bg-positive/10 text-positive border border-positive/20"
-                                        : row.changePercent < 0
+                                        : roundPct(row.changePercent) < 0
                                         ? "bg-negative/10 text-negative border border-negative/20"
                                         : "text-fg-muted"
                                 )}

@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import {Plus} from "lucide-react";
-import {cn, formatTimeAgo} from "@/lib/utils";
+import {cn, formatTimeAgoSeconds} from "@/lib/utils";
 
 type Props = {
     topics: TopicOverviewItem[];
@@ -42,7 +42,7 @@ const TopicRail = ({topics, activeSlug, unseenTotal, onNewTopic}: Props) => {
                     <Link key={t.id} href={`/topics/${t.slug}`} aria-current={active ? 'page' : undefined} className={rowClass(active)} style={mono}>
                         <span className="h-2 w-2 rounded-full shrink-0" style={{background: t.color ?? 'var(--brand)'}} aria-hidden="true" />
                         <span className="truncate">{t.name}</span>
-                        {t.latest && <span className="hidden lg:inline text-[10px] font-normal normal-case tracking-normal text-fg-muted ml-1 truncate">{formatTimeAgo(t.latest.datetime)}</span>}
+                        {t.latest && <span className="hidden lg:inline text-[10px] font-normal normal-case tracking-normal text-fg-muted ml-1 truncate">{formatTimeAgoSeconds(t.latest.datetime)}</span>}
                         <UnseenPill count={t.unseenCount} />
                     </Link>
                 );

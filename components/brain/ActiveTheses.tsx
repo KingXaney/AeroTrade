@@ -1,5 +1,6 @@
 import Link from "next/link";
 import {cn, getChangeColorClass} from "@/lib/utils";
+import {formatSigned} from "@/lib/format";
 import TradeLink from "@/components/trade/TradeLink";
 import FollowTopicButton from "@/components/topics/FollowTopicButton";
 import type {FollowedByName} from "@/components/brain/NarrativeLeaderboard";
@@ -10,7 +11,7 @@ import type {SinceThesisLegs} from "@/lib/brain/since-thesis";
 
 const MS_PER_WEEK = 7 * 24 * 60 * 60 * 1000;
 
-// Same pattern as formatTimeAgo — time-relative display computed in a helper.
+// Same pattern as formatTimeAgoMs — time-relative display computed in a helper.
 const weeksActive = (thesisSince: number | null): number =>
     thesisSince ? Math.max(1, Math.round((Date.now() - thesisSince) / MS_PER_WEEK)) : 0;
 
@@ -72,7 +73,7 @@ const ActiveTheses = ({theses, followedByName, sinceThesis, definitions = false}
                             <div className="text-right" style={{fontFamily: 'var(--type-mono)'}}>
                                 <div className="text-sm text-fg"><Term k="news-weight">weight</Term> {t.weightSlow.toFixed(1)}</div>
                                 <div className={cn('text-xs', getChangeColorClass(t.sentimentSlow || undefined))}>
-                                    <Term k="news-sentiment">sentiment</Term> {t.sentimentSlow >= 0 ? '+' : ''}{t.sentimentSlow.toFixed(2)}
+                                    <Term k="news-sentiment">sentiment</Term> {formatSigned(t.sentimentSlow)}
                                 </div>
                             </div>
                             {t.type === 'ticker' && <TradeLink symbol={t.key} variant="icon" className="size-7" />}

@@ -2,6 +2,7 @@
 
 import {useState} from "react";
 import {cn, getChangeColorClass} from "@/lib/utils";
+import {formatPct} from "@/lib/format";
 import SellPositionDialog from "@/components/trade/SellPositionDialog";
 import type {Lot} from "@/lib/trading/lots";
 import UnpricedNote from "@/components/trade/UnpricedNote";
@@ -31,9 +32,9 @@ const OpenPositionsStrip = ({positions, accountId, lotNotes}: {positions: Enrich
                             {p.priceStale ? (
                                 <span className="text-[11px] text-fg-muted" style={{fontFamily: 'var(--type-mono)'}} title="No live quote — value shown at cost">—</span>
                             ) : (
-                                <span className={cn('text-[11px]', getChangeColorClass(p.unrealizedPnlPct || undefined))}
+                                <span className={cn('text-[11px]', getChangeColorClass(p.unrealizedPnlPct))}
                                       style={{fontFamily: 'var(--type-mono)'}}>
-                                    {p.unrealizedPnlPct >= 0 ? '+' : ''}{p.unrealizedPnlPct.toFixed(2)}%
+                                    {formatPct(p.unrealizedPnlPct)}
                                 </span>
                             )}
                         </div>

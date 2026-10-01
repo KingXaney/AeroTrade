@@ -1,6 +1,7 @@
 import Link from "next/link";
 import {notFound, redirect} from "next/navigation";
 import {cn, formatPrice, getChangeColorClass} from "@/lib/utils";
+import {formatPct} from "@/lib/format";
 import {getCurrentUserId} from "@/lib/actions/watchlist.actions";
 import {getFriendProfile} from "@/lib/actions/friends.actions";
 import {unpricedLabel} from "@/lib/trading/analytics";
@@ -62,8 +63,8 @@ const FriendProfilePage = async ({params}: FriendProfilePageProps) => {
                                 <span className="text-sm text-fg" style={{fontFamily: 'var(--type-mono)'}}>{a.name}</span>
                                 <div className="text-right" style={{fontFamily: 'var(--type-mono)'}}>
                                     <span className="text-sm text-fg mr-3">{formatPrice(a.totalValue)}</span>
-                                    <span className={cn('text-xs', getChangeColorClass(a.totalReturnPct || undefined))}>
-                                        {a.totalReturnPct >= 0 ? '+' : ''}{a.totalReturnPct.toFixed(2)}%
+                                    <span className={cn('text-xs', getChangeColorClass(a.totalReturnPct))}>
+                                        {formatPct(a.totalReturnPct)}
                                     </span>
                                     {unpricedLabel(a.unpriced, a.holdings) && (
                                         <span className="block text-[10px] text-warning">{unpricedLabel(a.unpriced, a.holdings)}</span>

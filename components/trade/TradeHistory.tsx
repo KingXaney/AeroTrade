@@ -1,14 +1,10 @@
 import Link from "next/link";
 import type {ReactNode} from "react";
 import {cn, formatPrice, getChangeColorClass} from "@/lib/utils";
+import {formatEasternTimestamp, formatSignedPrice} from "@/lib/format";
 import {REPLAY_COPY} from "@/lib/learn/copy/replay";
 import {boughtForLine, receiptLine} from "@/lib/learn/copy/receipts";
 import type {FillReceipt} from "@/lib/trading/receipts";
-
-// Eastern time, named: the server may sit in UTC and every fill time on this app is
-// described in ET.
-const formatWhen = (ms: number) =>
-    `${new Date(ms).toLocaleString('en-US', {timeZone: 'America/New_York', month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit'})} ET`;
 
 // Only automated fills get a chip: 'user' is the default reading of a trade log, and
 // rows from before the field existed carry no source at all — that absence is honest
@@ -100,10 +96,10 @@ const TradeHistory = ({trades, totalCount, exportHref, detail, receipts, buyNote
                         <div className="text-right shrink-0">
                             <div className="text-sm text-fg" style={{fontFamily: 'var(--type-mono)'}}>{formatPrice(t.total)}</div>
                             <div className="text-[10px] text-fg-muted">
-                                {formatWhen(t.createdAt)}
+                                {formatEasternTimestamp(t.createdAt)}
                                 {typeof t.realizedPnl === 'number' && (
-                                    <span className={cn('ml-2', getChangeColorClass(t.realizedPnl || undefined))}>
-                                        {t.realizedPnl >= 0 ? '+' : ''}{formatPrice(t.realizedPnl)}
+                                    <span className={cn('ml-2', getChangeColorClass(t.realizedPnl))}>
+                                        {formatSignedPrice(t.realizedPnl)}
                                     </span>
                                 )}
                             </div>

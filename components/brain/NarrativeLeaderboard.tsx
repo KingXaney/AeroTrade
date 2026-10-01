@@ -1,5 +1,6 @@
 import Link from "next/link";
 import {cn, getChangeColorClass} from "@/lib/utils";
+import {formatSigned} from "@/lib/format";
 import FollowTopicButton from "@/components/topics/FollowTopicButton";
 import {THESIS_WEIGHT_THRESHOLD} from "@/lib/brain/config";
 import {BRAIN_COPY} from "@/lib/learn/copy/brain";
@@ -33,7 +34,7 @@ const TypeColumn = ({title, entities, followedByName}: {title: string; entities:
                         <span className="flex items-center gap-1 text-[11px]" style={{fontFamily: 'var(--type-mono)'}}>
                             <span className="text-fg-soft">{e.weightSlow.toFixed(1)}</span>{' '}
                             <span className={cn(getChangeColorClass(e.sentimentSlow || undefined))}>
-                                {e.sentimentSlow >= 0 ? '+' : ''}{e.sentimentSlow.toFixed(2)}
+                                {formatSigned(e.sentimentSlow)}
                             </span>
                             {followedByName && (
                                 <FollowTopicButton name={e.displayName} keywords={topicKeywords(e)}
