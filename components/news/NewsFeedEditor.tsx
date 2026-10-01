@@ -31,6 +31,7 @@ import {cn} from "@/lib/utils";
 import Panel from "@/components/primitives/Panel";
 import RowCard from "@/components/primitives/RowCard";
 import ActionButton from "@/components/primitives/ActionButton";
+import SectionHeading from "@/components/primitives/SectionHeading";
 
 // Imports lib/news/feed-prefs, never lib/news/feed: the latter reaches the XML parser
 // through the search adapter and has no business in the client bundle.
@@ -102,7 +103,7 @@ const NewsFeedEditor = ({initial, startOpen = false}: Props) => {
         <Panel>
             <div className="flex items-center justify-between gap-3 flex-wrap">
                 <div className="min-w-0">
-                    <h2 className="text-sm font-bold uppercase tracking-[0.1em] text-brand font-mono">Your feed</h2>
+                    <SectionHeading spacing="none">Your feed</SectionHeading>
                     <p className="text-xs text-fg-muted mt-1 font-mono">{describeNewsFeed(normalized)}{dirty ? ' · unsaved' : ''}</p>
                 </div>
                 <ActionButton id="news-feed-edit" variant="secondary" aria-expanded={open} onClick={() => setOpen((o) => !o)}>

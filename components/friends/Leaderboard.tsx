@@ -5,6 +5,7 @@ import {unpricedLabel} from "@/lib/trading/analytics";
 import type {LeaderboardEntry} from '@/lib/friends/types';
 import Panel from '@/components/primitives/Panel';
 import {rowCard} from "@/components/primitives/RowCard";
+import SectionHeading from "@/components/primitives/SectionHeading";
 
 // Medal colours come from --rank-* in globals.css, not the palette registry: gold is a
 // material, not a semantic role, so it stays gold in every theme (darkened under the
@@ -19,9 +20,9 @@ const Leaderboard = ({entries}: {entries: LeaderboardEntry[]}) => {
         <Panel as="div" className="shimmer">
             <div className="flex items-center gap-2 mb-4">
                 <span className="material-symbols-outlined text-brand">emoji_events</span>
-                <h2 className="text-sm font-bold uppercase tracking-[0.1em] text-brand font-mono">
+                <SectionHeading spacing="none">
                     Leaderboard
-                </h2>
+                </SectionHeading>
             </div>
 
             {entries.length <= 1 ? (

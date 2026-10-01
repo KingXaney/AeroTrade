@@ -12,6 +12,7 @@ import Panel from "@/components/primitives/Panel";
 import {rowCard} from "@/components/primitives/RowCard";
 import ActionButton from "@/components/primitives/ActionButton";
 import {TextArea} from "@/components/primitives/TextField";
+import SectionHeading from "@/components/primitives/SectionHeading";
 
 // The API path generates in the background, so refresh a couple of times after
 // queueing instead of making the user hunt for the reload button.
@@ -102,9 +103,9 @@ const SecondOpinionCard = ({configured, opinion}: {configured: boolean; opinion:
     return (
         <Panel>
             <div className="flex items-center justify-between gap-3 mb-3 flex-wrap">
-                <h2 className="text-sm font-bold uppercase tracking-[0.1em] text-brand font-mono">
+                <SectionHeading spacing="none">
                     Claude Second Opinion
-                </h2>
+                </SectionHeading>
                 {opinion && (
                     <span className="text-[11px] text-fg-muted font-mono">
                         {opinion.model} · {SOURCE_LABELS[opinion.source]} · {formatTimeAgoMs(opinion.generatedAt)}

@@ -2,6 +2,7 @@ import {type BrainSystemStatus} from "@/lib/brain/store";
 import JobStamp, {jobHealth} from "@/components/jobs/JobStamp";
 import StatTile from "@/components/primitives/StatTile";
 import Panel from "@/components/primitives/Panel";
+import SectionHeading from "@/components/primitives/SectionHeading";
 
 // Pipeline observability for the /brain page: is each Inngest job actually
 // running, and is the brain actually learning? Health is derived from job-stamp
@@ -21,9 +22,9 @@ const SystemStatus = ({status}: {status: BrainSystemStatus}) => {
     return (
         <Panel>
             <div className="flex items-center justify-between mb-4">
-                <h2 className="text-sm font-bold uppercase tracking-[0.1em] text-brand font-mono">
+                <SectionHeading spacing="none">
                     System Status
-                </h2>
+                </SectionHeading>
                 {anyNever && (
                     <span className="text-[10px] uppercase tracking-[0.08em] text-negative font-mono">
                         Some jobs have never run — check the Inngest connection

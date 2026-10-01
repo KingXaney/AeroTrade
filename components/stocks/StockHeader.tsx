@@ -4,6 +4,7 @@ import WatchlistButton from "@/components/stocks/WatchlistButton";
 import FollowTopicButton from "@/components/topics/FollowTopicButton";
 import TradeLink from "@/components/trading/TradeLink";
 import Panel from "@/components/primitives/Panel";
+import MicroLabel from "@/components/primitives/MicroLabel";
 
 type StockHeaderProps = {
     symbol: string;
@@ -32,9 +33,9 @@ const StockHeader = ({
                         {symbol}
                     </h1>
                     {exchange && (
-                        <span className="text-[10px] uppercase text-fg-muted tracking-[0.1em] font-mono">
+                        <MicroLabel>
                             {exchange}
-                        </span>
+                        </MicroLabel>
                     )}
                 </div>
                 <p className="mt-1 text-base text-fg-soft font-sans">

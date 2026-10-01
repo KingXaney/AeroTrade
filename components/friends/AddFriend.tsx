@@ -7,6 +7,7 @@ import {sendFriendRequest} from "@/lib/actions/friends.actions";
 import Panel from "@/components/primitives/Panel";
 import ActionButton from "@/components/primitives/ActionButton";
 import TextField from "@/components/primitives/TextField";
+import SectionHeading from "@/components/primitives/SectionHeading";
 
 const AddFriend = () => {
     const router = useRouter();
@@ -34,9 +35,9 @@ const AddFriend = () => {
 
     return (
         <Panel as="form" onSubmit={onSubmit}>
-            <h2 className="text-sm font-bold uppercase tracking-[0.1em] text-brand mb-3 font-mono">
+            <SectionHeading spacing="sm">
                 Add a Friend
-            </h2>
+            </SectionHeading>
             <div className="flex flex-col sm:flex-row gap-2">
                 <TextField
                     type="email"

@@ -12,6 +12,7 @@ import type {NavigatorStatus} from '@/lib/navigator/types';
 import Panel from '@/components/primitives/Panel';
 import ActionButton from '@/components/primitives/ActionButton';
 import TextField from '@/components/primitives/TextField';
+import SectionHeading from "@/components/primitives/SectionHeading";
 
 // Enrollment + kill switch for the AI-managed paper account.
 const NavigatorCard = ({status}: {status: NavigatorStatus}) => {
@@ -41,9 +42,9 @@ const NavigatorCard = ({status}: {status: NavigatorStatus}) => {
             <div className="flex items-center justify-between mb-3">
                 <div className="flex items-center gap-2">
                     <span className="material-symbols-outlined text-brand">smart_toy</span>
-                    <h2 className="text-sm font-bold uppercase tracking-[0.1em] text-brand font-mono">
+                    <SectionHeading spacing="none">
                         AI Navigator
-                    </h2>
+                    </SectionHeading>
                 </div>
                 {status.enrolled && (
                     <span className={`text-[10px] font-bold uppercase tracking-[0.1em] px-2 py-1 rounded ${status.status === 'active' ? 'text-brand bg-brand-strong/8' : 'text-negative bg-negative/8'} font-mono`}>

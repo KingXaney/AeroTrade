@@ -10,6 +10,7 @@ import Badge from "@/components/primitives/Badge";
 import Disclosure from "@/components/primitives/Disclosure";
 import ReasonGloss from "@/components/learn/ReasonGloss";
 import RowCard from "@/components/primitives/RowCard";
+import MicroLabel from "@/components/primitives/MicroLabel";
 
 // Guess the Verdict: today's real board rows with the verdict hidden. The reader calls
 // each row, then the stored verdict and the rule's own reason are revealed, the reason
@@ -36,7 +37,7 @@ const VerdictQuiz = ({rows}: {rows: QuizRow[]}) => {
                             <span className="font-mono text-sm font-bold text-fg">{row.symbol}</span>
                             {row.cells.map((cell) => (
                                 <span key={cell.label} className="text-xs">
-                                    <span className="font-mono text-[10px] uppercase tracking-[0.1em] text-fg-muted">{cell.label} </span>
+                                    <MicroLabel>{cell.label} </MicroLabel>
                                     <span className="font-mono text-fg-soft">{cell.value}</span>
                                 </span>
                             ))}

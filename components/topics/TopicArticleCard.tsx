@@ -1,6 +1,7 @@
 import ArticleCard from "@/components/news/ArticleCard";
 import SourceBadge from "@/components/topics/SourceBadge";
 import type {TopicArticleView} from '@/lib/topics/types';
+import MicroLabel from "@/components/primitives/MicroLabel";
 
 const MAX_TERM_CHIPS = 3;
 
@@ -31,16 +32,16 @@ const TopicArticleCard = ({article, isNew = false, topic}: Props) => {
                 <div className="flex items-center gap-2 mb-4 flex-wrap">
                     <SourceBadge sourceType={article.sourceType} source={article.source} />
                     {topic && (
-                        <span className="inline-flex items-center gap-1.5 text-[10px] uppercase tracking-[0.1em] text-fg-muted font-mono">
+                        <MicroLabel className="inline-flex items-center gap-1.5">
                             <span className="h-1.5 w-1.5 rounded-full" style={{background: topic.color ?? 'var(--brand)'}} aria-hidden="true" />
                             {topic.name}
-                        </span>
+                        </MicroLabel>
                     )}
                     {isNew && (
-                        <span className="ml-auto inline-flex items-center gap-1 text-[10px] uppercase tracking-[0.1em] text-brand font-mono">
+                        <MicroLabel tone="brand" className="ml-auto inline-flex items-center gap-1">
                             <span className="h-1.5 w-1.5 rounded-full bg-brand" aria-hidden="true" />
                             New
-                        </span>
+                        </MicroLabel>
                     )}
                 </div>
             )}

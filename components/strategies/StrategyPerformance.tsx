@@ -9,6 +9,7 @@ import {formatPct} from "@/lib/format";
 import SimulatedStats from "@/components/strategies/SimulatedStats";
 import type {PerfPoint} from '@/lib/trading/types';
 import Panel from '@/components/primitives/Panel';
+import SectionHeading from "@/components/primitives/SectionHeading";
 
 // Live and simulated curves side by side but never on one axis: a toggle, and each
 // panel says which basis it shows and how far it reaches.
@@ -55,9 +56,9 @@ const StrategyPerformance = ({name, live, simulated, initialMode}: {name: string
         <section className="space-y-3" id="strategy-performance">
             <Panel as="div">
                 <div className="flex flex-wrap items-center justify-between gap-3 mb-3">
-                    <h2 className="text-sm font-bold uppercase tracking-[0.1em] text-brand font-mono">
+                    <SectionHeading spacing="none">
                         Performance vs SPY
-                    </h2>
+                    </SectionHeading>
                     <div className="flex items-center gap-1 rounded-lg border border-line-strong/20 p-0.5">
                         <Tab id="perf-live" active={showingLive} onClick={() => setMode('live')}>Live</Tab>
                         <Tab id="perf-simulated" active={!showingLive} onClick={() => setMode('simulated')}>Simulated</Tab>

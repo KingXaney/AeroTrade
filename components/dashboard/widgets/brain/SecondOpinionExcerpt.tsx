@@ -1,6 +1,7 @@
 import Link from "next/link";
 import {formatTimeAgoMs} from "@/lib/format";
 import type {SecondOpinionView} from "@/lib/brain/opinion";
+import MicroLabel from "@/components/primitives/MicroLabel";
 
 const EXCERPT_MAX_CHARS = 420;
 
@@ -19,10 +20,10 @@ const SecondOpinionExcerpt = ({opinion}: {opinion: SecondOpinionView | null}) =>
     }
     return (
         <div>
-            <div className="flex items-center justify-between gap-2 mb-2 text-[10px] uppercase tracking-[0.1em] text-fg-muted font-mono">
+            <MicroLabel as="div" className="flex items-center justify-between gap-2 mb-2">
                 <span>{opinion.model}</span>
                 <span>{formatTimeAgoMs(opinion.generatedAt)}</span>
-            </div>
+            </MicroLabel>
             <p className="text-sm text-fg-soft leading-relaxed">{excerpt(opinion.opinionMd)}</p>
             <Link href="/brain" className="inline-block mt-3 text-xs text-brand hover:underline font-mono">
                 Read the full opinion →

@@ -16,6 +16,7 @@ import WhatTheseMean from "@/components/learn/WhatTheseMean";
 import type {Stock} from '@/lib/stocks/types';
 import Panel from '@/components/primitives/Panel';
 import TextField from '@/components/primitives/TextField';
+import SectionHeading from "@/components/primitives/SectionHeading";
 
 type OrderPanelProps = {
     defaultSymbol?: string;
@@ -162,9 +163,9 @@ const OrderPanel = ({defaultSymbol = '', cash, accountId, positions = [], onSymb
     return (
         <Panel as="form" onSubmit={onSubmit} className="flex flex-col gap-4">
             <div className="flex items-center justify-between">
-                <h3 className="text-sm font-bold uppercase tracking-[0.1em] text-brand font-mono">
+                <SectionHeading as="h3" spacing="none">
                     Order Entry
-                </h3>
+                </SectionHeading>
                 <span className="text-[10px] text-fg-muted font-mono">
                     {side === 'buy'
                         ? <>Buying Power {formatPrice(cash)}</>

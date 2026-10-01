@@ -8,6 +8,7 @@ import type {FriendRequest} from '@/lib/friends/types';
 import Panel from '@/components/primitives/Panel';
 import RowCard from "@/components/primitives/RowCard";
 import ActionButton from "@/components/primitives/ActionButton";
+import SectionHeading from "@/components/primitives/SectionHeading";
 
 const FriendRequests = ({requests}: {requests: FriendRequest[]}) => {
     const router = useRouter();
@@ -33,9 +34,9 @@ const FriendRequests = ({requests}: {requests: FriendRequest[]}) => {
 
     return (
         <Panel as="div">
-            <h2 className="text-sm font-bold uppercase tracking-[0.1em] text-brand mb-3 font-mono">
+            <SectionHeading spacing="sm">
                 Pending Requests ({requests.length})
-            </h2>
+            </SectionHeading>
             <div className="space-y-2">
                 {requests.map((r) => (
                     <RowCard key={r.friendshipId} className="flex items-center justify-between">

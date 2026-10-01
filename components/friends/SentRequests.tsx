@@ -9,6 +9,7 @@ import type {SentFriendRequest} from '@/lib/friends/types';
 import Panel from '@/components/primitives/Panel';
 import RowCard from "@/components/primitives/RowCard";
 import ActionButton from "@/components/primitives/ActionButton";
+import SectionHeading from "@/components/primitives/SectionHeading";
 
 // After sending a request the user had no view of it at all: a toast, and then nothing.
 // Did it reach the right person? Were they ignoring it? Was the address a typo? And since
@@ -42,9 +43,9 @@ const SentRequests = ({requests}: {requests: SentFriendRequest[]}) => {
 
     return (
         <Panel as="div">
-            <h2 className="text-sm font-bold uppercase tracking-[0.1em] text-brand mb-3 font-mono">
+            <SectionHeading spacing="sm">
                 Sent ({requests.length})
-            </h2>
+            </SectionHeading>
             <div className="space-y-2">
                 {requests.map((r) => (
                     <RowCard key={r.friendshipId} className="flex items-center justify-between gap-3">

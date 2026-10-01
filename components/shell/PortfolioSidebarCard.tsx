@@ -2,6 +2,7 @@ import Link from "next/link";
 import {cn} from "@/lib/utils";
 import {formatPct, formatPrice, getChangeColorClass} from "@/lib/format";
 import type {SidebarPortfolio} from "@/lib/shell/sidebar";
+import MicroLabel from "@/components/primitives/MicroLabel";
 
 // Compact, glanceable portfolio summary for the left sidebar, under the topics card
 // (Sidebar.tsx); links through to the full /portfolio page.
@@ -40,7 +41,7 @@ const PortfolioSidebarCard = ({portfolio}: {portfolio: SidebarPortfolio}) => {
                 )}
 
                 <div className="mt-3 pt-3 border-t border-brand/12 flex items-center justify-between">
-                    <span className="text-[10px] uppercase tracking-[0.1em] text-fg-muted font-mono">Cash</span>
+                    <MicroLabel>Cash</MicroLabel>
                     <span className="text-xs text-fg-soft font-mono">{formatPrice(portfolio.cash)}</span>
                 </div>
 

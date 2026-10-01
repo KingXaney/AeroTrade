@@ -1,6 +1,7 @@
 import {STRATEGIES_DISCLAIMER} from "@/lib/strategies/catalog";
 import Panel from "@/components/primitives/Panel";
 import Disclosure from "@/components/primitives/Disclosure";
+import MicroLabel from "@/components/primitives/MicroLabel";
 
 // The reading guide for the leaderboard: what "live" and "simulated" mean here and
 // every simplification the numbers carry. Plain statements, no hedging language.
@@ -32,9 +33,9 @@ const HowToRead = () => (
         </Disclosure>
         {/* Outside the disclosure on purpose: a disclaimer nobody can see without
             expanding a panel is not a disclaimer. Rendered once per page. */}
-        <p className="font-mono mt-4 text-[10px] uppercase tracking-[0.1em] text-fg-muted">
+        <MicroLabel as="p" className="mt-4">
             {STRATEGIES_DISCLAIMER}
-        </p>
+        </MicroLabel>
     </Panel>
 );
 

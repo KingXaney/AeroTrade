@@ -9,6 +9,7 @@ import ConfirmDialog from "@/components/primitives/ConfirmDialog";
 import type {FriendSummary} from '@/lib/friends/types';
 import Panel from '@/components/primitives/Panel';
 import RowCard from "@/components/primitives/RowCard";
+import SectionHeading from "@/components/primitives/SectionHeading";
 
 const FriendsList = ({friends}: {friends: FriendSummary[]}) => {
     const router = useRouter();
@@ -37,9 +38,9 @@ const FriendsList = ({friends}: {friends: FriendSummary[]}) => {
 
     return (
         <Panel as="div">
-            <h2 className="text-sm font-bold uppercase tracking-[0.1em] text-brand mb-3 font-mono">
+            <SectionHeading spacing="sm">
                 Your Friends ({friends.length})
-            </h2>
+            </SectionHeading>
             {friends.length === 0 ? (
                 <p className="text-sm text-fg-muted">No friends yet — add someone by email to compete.</p>
             ) : (
