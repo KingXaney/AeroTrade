@@ -43,7 +43,7 @@ const CreateAccountDialog = ({onClose}: {onClose: () => void}) => {
         <Dialog open onOpenChange={(open) => { if (!open && !submitting) onClose(); }}>
             <DialogContent className="bg-surface-1 ring-line sm:max-w-sm">
                 <DialogHeader>
-                    <DialogTitle className="text-sm font-bold uppercase tracking-[0.1em] text-brand" style={{fontFamily: 'var(--type-mono)'}}>
+                    <DialogTitle className="text-sm font-bold uppercase tracking-[0.1em] text-brand font-mono">
                         New Account
                     </DialogTitle>
                     <DialogDescription className="text-fg-muted">
@@ -53,7 +53,7 @@ const CreateAccountDialog = ({onClose}: {onClose: () => void}) => {
 
                 <form className="flex flex-col gap-4" onSubmit={(e) => { e.preventDefault(); void onConfirm(); }}>
                     <div>
-                        <label htmlFor="account-name" className="text-[10px] uppercase tracking-[0.1em] text-fg-muted" style={{fontFamily: 'var(--type-mono)'}}>
+                        <label htmlFor="account-name" className="text-[10px] uppercase tracking-[0.1em] text-fg-muted font-mono">
                             Account name
                         </label>
                         <TextField
@@ -69,7 +69,7 @@ const CreateAccountDialog = ({onClose}: {onClose: () => void}) => {
                     </div>
 
                     <div>
-                        <label htmlFor="account-balance" className="text-[10px] uppercase tracking-[0.1em] text-fg-muted" style={{fontFamily: 'var(--type-mono)'}}>
+                        <label htmlFor="account-balance" className="text-[10px] uppercase tracking-[0.1em] text-fg-muted font-mono">
                             Starting balance ($)
                         </label>
                         <TextField

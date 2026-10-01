@@ -36,10 +36,9 @@ const MarketsTabs = ({active}: {active: MarketsTabId}) => {
                         aria-selected={tab.id === t.id}
                         aria-current={tab.id === t.id ? 'page' : undefined}
                         className={cn(
-                            'px-4 py-1.5 rounded-md text-xs font-semibold transition-colors',
+                            'font-mono px-4 py-1.5 rounded-md text-xs font-semibold transition-colors',
                             tab.id === t.id ? 'bg-brand text-on-brand' : 'text-fg-muted hover:text-fg',
                         )}
-                        style={{fontFamily: 'var(--type-mono)'}}
                     >
                         {t.label}
                     </Link>

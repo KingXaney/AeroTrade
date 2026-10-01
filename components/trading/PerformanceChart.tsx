@@ -54,7 +54,7 @@ const ReturnChart = ({series, accountName, band}: {series: PerfPoint[]; accountN
                 <p className="text-sm text-fg-muted">
                     Collecting daily performance data — check back tomorrow.
                 </p>
-                <p className="text-xs text-fg-muted mt-1" style={{fontFamily: 'var(--type-mono)'}}>
+                <p className="text-xs text-fg-muted mt-1 font-mono">
                     A value snapshot is recorded every market day at close.
                 </p>
             </div>
@@ -76,7 +76,7 @@ const ReturnChart = ({series, accountName, band}: {series: PerfPoint[]; accountN
     return (
         <div>
             {/* Legend + current values */}
-            <div className="flex flex-wrap items-center gap-4 mb-3 text-xs" style={{fontFamily: 'var(--type-mono)'}}>
+            <div className="flex flex-wrap items-center gap-4 mb-3 text-xs font-mono">
                 <span className="flex items-center gap-1.5">
                     <span className="inline-block w-3 h-0.5 rounded" style={{backgroundColor: 'var(--brand)'}} />
                     <span className="text-fg">{accountName}</span>
@@ -116,11 +116,11 @@ const ReturnChart = ({series, accountName, band}: {series: PerfPoint[]; accountN
                 <line x1={PAD_X} x2={WIDTH - PAD_X} y1={geometry.zeroY} y2={geometry.zeroY}
                       className="stroke-line-strong/50" strokeDasharray="4 4" strokeWidth="1" />
                 <text x={PAD_X - 6} y={geometry.zeroY + 3} textAnchor="end" fontSize="9"
-                      className="fill-fg-muted" style={{fontFamily: 'var(--type-mono)'}}>0%</text>
+                      className="fill-fg-muted font-mono">0%</text>
                 <text x={PAD_X - 6} y={PAD_Y + 3} textAnchor="end" fontSize="9"
-                      className="fill-fg-muted" style={{fontFamily: 'var(--type-mono)'}}>{formatPct(geometry.max)}</text>
+                      className="fill-fg-muted font-mono">{formatPct(geometry.max)}</text>
                 <text x={PAD_X - 6} y={HEIGHT - PAD_Y + 3} textAnchor="end" fontSize="9"
-                      className="fill-fg-muted" style={{fontFamily: 'var(--type-mono)'}}>{formatPct(geometry.min)}</text>
+                      className="fill-fg-muted font-mono">{formatPct(geometry.min)}</text>
 
                 {/* Benchmark line (under the account line) */}
                 {geometry.benchPath && (

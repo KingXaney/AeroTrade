@@ -35,8 +35,8 @@ const PositionsTable = ({positions, accountId, lotNotes}: {positions: EnrichedPo
                         <button
                             type="button"
                             onClick={() => setSellTarget(p)}
-                            className="px-3 py-1.5 rounded text-xs font-bold uppercase tracking-wider transition-colors"
-                            style={{color: 'var(--negative)', border: '1px solid color-mix(in srgb, var(--negative) 30%, transparent)', backgroundColor: 'color-mix(in srgb, var(--negative) 6%, transparent)', fontFamily: 'var(--type-mono)'}}
+                            className="px-3 py-1.5 rounded text-xs font-bold uppercase tracking-wider transition-colors font-mono"
+                            style={{color: 'var(--negative)', border: '1px solid color-mix(in srgb, var(--negative) 30%, transparent)', backgroundColor: 'color-mix(in srgb, var(--negative) 6%, transparent)'}}
                         >
                             Sell
                         </button>

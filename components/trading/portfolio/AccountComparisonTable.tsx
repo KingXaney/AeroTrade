@@ -16,8 +16,8 @@ const AccountComparisonTable = ({rows, activeId}: {rows: ComparisonRow[]; active
 
     return (
         <div className="space-y-2">
-            <div className="hidden md:grid grid-cols-[2fr_1fr_1fr_1fr_1fr] gap-4 px-4 py-2 border-b border-line-strong/30"
-                 style={{fontFamily: 'var(--type-mono)', fontSize: '10px', letterSpacing: '0.1em', textTransform: 'uppercase', color: 'var(--fg-muted)'}}>
+            <div className="hidden md:grid grid-cols-[2fr_1fr_1fr_1fr_1fr] gap-4 px-4 py-2 border-b border-line-strong/30 font-mono"
+                 style={{fontSize: '10px', letterSpacing: '0.1em', textTransform: 'uppercase', color: 'var(--fg-muted)'}}>
                 <div>Account</div>
                 <div className="text-right">Value</div>
                 <div className="text-right">Total Return</div>
@@ -38,18 +38,17 @@ const AccountComparisonTable = ({rows, activeId}: {rows: ComparisonRow[]; active
                     })}
                 >
                     <div className="flex items-center gap-2">
-                        <span className="text-xs w-4 text-fg-muted" style={{fontFamily: 'var(--type-mono)'}}>{i + 1}</span>
-                        <span className={cn('text-sm font-semibold', row.id === activeId ? 'text-brand' : 'text-fg')}
-                              style={{fontFamily: 'var(--type-display)'}}>
+                        <span className="text-xs w-4 text-fg-muted font-mono">{i + 1}</span>
+                        <span className={cn('font-heading text-sm font-semibold', row.id === activeId ? 'text-brand' : 'text-fg')}>
                             {row.name}
                         </span>
                     </div>
                     {/* Below md the header row is hidden, so each cell names itself. */}
-                    <div className="flex justify-between md:block md:text-right text-sm text-fg" style={{fontFamily: 'var(--type-mono)'}}>
+                    <div className="flex justify-between md:block md:text-right text-sm text-fg font-mono">
                         <span className="md:hidden text-[10px] uppercase tracking-[0.1em] text-fg-muted mr-2">Value</span>
                         {formatPrice(row.totalValue)}
                     </div>
-                    <div className="flex justify-between md:block md:text-right" style={{fontFamily: 'var(--type-mono)'}}>
+                    <div className="flex justify-between md:block md:text-right font-mono">
                         <span className="md:hidden text-[10px] uppercase tracking-[0.1em] text-fg-muted mr-2">Total Return</span>
                         <div className="text-right">
                         <div className={cn('text-sm', getChangeColorClass(row.totalReturnPct))}>
@@ -64,11 +63,11 @@ const AccountComparisonTable = ({rows, activeId}: {rows: ComparisonRow[]; active
                     </div>
                     {/* These two used to be hidden below md — the very numbers that make a
                         account comparison a comparison. */}
-                    <div className="flex justify-between md:block md:text-right text-sm text-fg-soft" style={{fontFamily: 'var(--type-mono)'}}>
+                    <div className="flex justify-between md:block md:text-right text-sm text-fg-soft font-mono">
                         <span className="md:hidden text-[10px] uppercase tracking-[0.1em] text-fg-muted mr-2">Win Rate</span>
                         {row.winRatePct === null ? '—' : `${row.winRatePct.toFixed(0)}%`}
                     </div>
-                    <div className="flex justify-between md:block md:text-right text-sm" style={{fontFamily: 'var(--type-mono)'}}>
+                    <div className="flex justify-between md:block md:text-right text-sm font-mono">
                         <span className="md:hidden text-[10px] uppercase tracking-[0.1em] text-fg-muted mr-2">Max Drawdown</span>
                         {row.maxDrawdownPct === null
                             ? <span className="text-fg-soft">—</span>

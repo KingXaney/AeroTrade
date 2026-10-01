@@ -30,8 +30,8 @@ const AccountSwitcher = ({accounts, activeId}: {accounts: SwitcherAccount[]; act
                     <button
                         type="button"
                         disabled={switching}
-                        className="inline-flex items-center gap-2 px-3 py-2 rounded-lg text-xs font-bold uppercase tracking-[0.1em] text-fg hover:text-brand transition-colors disabled:opacity-50"
-                        style={{border: '1px solid color-mix(in srgb, var(--line-strong) 40%, transparent)', backgroundColor: 'color-mix(in srgb, var(--surface-2) 40%, transparent)', fontFamily: 'var(--type-mono)'}}
+                        className="inline-flex items-center gap-2 px-3 py-2 rounded-lg text-xs font-bold uppercase tracking-[0.1em] text-fg hover:text-brand transition-colors disabled:opacity-50 font-mono"
+                        style={{border: '1px solid color-mix(in srgb, var(--line-strong) 40%, transparent)', backgroundColor: 'color-mix(in srgb, var(--surface-2) 40%, transparent)'}}
                     >
                         <span className="material-symbols-outlined text-base">account_tree</span>
                         {active?.name ?? 'Account'}
@@ -45,12 +45,11 @@ const AccountSwitcher = ({accounts, activeId}: {accounts: SwitcherAccount[]; act
                             onSelect={() => void switchTo(a.id)}
                             className="flex items-center justify-between gap-4 cursor-pointer focus:bg-brand-strong/6"
                         >
-                            <span className={cn('text-sm', a.id === activeId ? 'text-brand font-bold' : 'text-fg')}
-                                  style={{fontFamily: 'var(--type-mono)'}}>
+                            <span className={cn('font-mono text-sm', a.id === activeId ? 'text-brand font-bold' : 'text-fg')}>
                                 {a.name}
                             </span>
                             {typeof a.totalReturnPct === 'number' && (
-                                <span className="text-xs text-right" style={{fontFamily: 'var(--type-mono)'}}>
+                                <span className="text-xs text-right font-mono">
                                     <span className={getChangeColorClass(a.totalReturnPct)}>
                                         {formatChangePercent(a.totalReturnPct)}
                                     </span>
@@ -66,7 +65,7 @@ const AccountSwitcher = ({accounts, activeId}: {accounts: SwitcherAccount[]; act
                         onSelect={() => setCreating(true)}
                         className="cursor-pointer text-brand focus:bg-brand-strong/6"
                     >
-                        <span className="text-sm" style={{fontFamily: 'var(--type-mono)'}}>＋ New account</span>
+                        <span className="text-sm font-mono">＋ New account</span>
                     </DropdownMenuItem>
                 </DropdownMenuContent>
             </DropdownMenu>

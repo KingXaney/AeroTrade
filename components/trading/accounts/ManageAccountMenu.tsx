@@ -42,7 +42,7 @@ const RenameDialog = ({accountId, currentName, onClose}: {accountId: string; cur
         <Dialog open onOpenChange={(open) => { if (!open && !submitting) onClose(); }}>
             <DialogContent className="bg-surface-1 ring-line sm:max-w-sm">
                 <DialogHeader>
-                    <DialogTitle className="text-sm font-bold uppercase tracking-[0.1em] text-brand" style={{fontFamily: 'var(--type-mono)'}}>
+                    <DialogTitle className="text-sm font-bold uppercase tracking-[0.1em] text-brand font-mono">
                         Rename Account
                     </DialogTitle>
                     <DialogDescription className="text-fg-muted">Pick a new name for this account.</DialogDescription>
@@ -91,7 +91,7 @@ const DeleteDialog = ({accountId, accountName, onClose}: {accountId: string; acc
         <Dialog open onOpenChange={(open) => { if (!open && !submitting) onClose(); }}>
             <DialogContent className="bg-surface-1 ring-line sm:max-w-sm">
                 <DialogHeader>
-                    <DialogTitle className="text-sm font-bold uppercase tracking-[0.1em] text-negative" style={{fontFamily: 'var(--type-mono)'}}>
+                    <DialogTitle className="text-sm font-bold uppercase tracking-[0.1em] text-negative font-mono">
                         Delete “{accountName}”?
                     </DialogTitle>
                     <DialogDescription className="text-fg-muted">
@@ -126,11 +126,11 @@ const ManageAccountMenu = ({accountId, accountName, canDelete}: {accountId: stri
                 </DropdownMenuTrigger>
                 <DropdownMenuContent align="end" className="bg-surface-1 border-line-strong/50">
                     <DropdownMenuItem onSelect={() => setDialog('rename')} className="cursor-pointer text-fg focus:bg-brand-strong/6">
-                        <span className="text-sm" style={{fontFamily: 'var(--type-mono)'}}>Rename</span>
+                        <span className="text-sm font-mono">Rename</span>
                     </DropdownMenuItem>
                     {canDelete && (
                         <DropdownMenuItem onSelect={() => setDialog('delete')} className="cursor-pointer text-negative focus:bg-negative/8">
-                            <span className="text-sm" style={{fontFamily: 'var(--type-mono)'}}>Delete</span>
+                            <span className="text-sm font-mono">Delete</span>
                         </DropdownMenuItem>
                     )}
                 </DropdownMenuContent>

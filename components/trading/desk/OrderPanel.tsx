@@ -162,10 +162,10 @@ const OrderPanel = ({defaultSymbol = '', cash, accountId, positions = [], onSymb
     return (
         <Panel as="form" onSubmit={onSubmit} className="flex flex-col gap-4">
             <div className="flex items-center justify-between">
-                <h3 className="text-sm font-bold uppercase tracking-[0.1em] text-brand" style={{fontFamily: 'var(--type-mono)'}}>
+                <h3 className="text-sm font-bold uppercase tracking-[0.1em] text-brand font-mono">
                     Order Entry
                 </h3>
-                <span className="text-[10px] text-fg-muted" style={{fontFamily: 'var(--type-mono)'}}>
+                <span className="text-[10px] text-fg-muted font-mono">
                     {side === 'buy'
                         ? <>Buying Power {formatPrice(cash)}</>
                         : <>You own {owned} {owned === 1 ? 'share' : 'shares'}{symbol ? ` of ${symbol}` : ''}</>}
@@ -181,14 +181,13 @@ const OrderPanel = ({defaultSymbol = '', cash, accountId, positions = [], onSymb
                         onClick={() => setSide(s)}
                         aria-pressed={side === s}
                         className={cn(
-                            'py-2 rounded-md text-xs font-bold uppercase tracking-wider transition-colors',
+                            'font-mono py-2 rounded-md text-xs font-bold uppercase tracking-wider transition-colors',
                             side === s
                                 ? s === 'buy'
                                     ? 'bg-brand-strong/15 text-brand'
                                     : 'bg-negative/15 text-negative'
                                 : 'text-fg-muted hover:text-fg',
                         )}
-                        style={{fontFamily: 'var(--type-mono)'}}
                     >
                         {s}
                     </button>
@@ -197,7 +196,7 @@ const OrderPanel = ({defaultSymbol = '', cash, accountId, positions = [], onSymb
 
             {/* Symbol */}
             <div className="relative">
-                <label htmlFor="order-symbol" className="text-[10px] uppercase tracking-[0.1em] text-fg-muted" style={{fontFamily: 'var(--type-mono)'}}>Symbol</label>
+                <label htmlFor="order-symbol" className="text-[10px] uppercase tracking-[0.1em] text-fg-muted font-mono">Symbol</label>
                 <TextField
                     id="order-symbol"
                     value={symbol}
@@ -219,7 +218,7 @@ const OrderPanel = ({defaultSymbol = '', cash, accountId, positions = [], onSymb
                                 onClick={() => pickResult(r)}
                                 className="w-full text-left px-3 py-2 hover:bg-brand-strong/6 flex items-center justify-between"
                             >
-                                <span className="text-sm font-bold text-fg" style={{fontFamily: 'var(--type-mono)'}}>{r.symbol}</span>
+                                <span className="text-sm font-bold text-fg font-mono">{r.symbol}</span>
                                 <span className="text-xs text-fg-muted truncate max-w-[55%]">{r.name}</span>
                             </button>
                         ))}
@@ -229,7 +228,7 @@ const OrderPanel = ({defaultSymbol = '', cash, accountId, positions = [], onSymb
 
             {/* Quantity + presets */}
             <div>
-                <label htmlFor="order-shares" className="text-[10px] uppercase tracking-[0.1em] text-fg-muted" style={{fontFamily: 'var(--type-mono)'}}>Shares</label>
+                <label htmlFor="order-shares" className="text-[10px] uppercase tracking-[0.1em] text-fg-muted font-mono">Shares</label>
                 <TextField
                     id="order-shares"
                     value={quantity}
@@ -247,12 +246,11 @@ const OrderPanel = ({defaultSymbol = '', cash, accountId, positions = [], onSymb
                                 onClick={() => setQuantity(String(preset.value))}
                                 title={side === 'buy' ? `${preset.value} shares at the last price` : `${preset.value} of your ${owned} shares`}
                                 className={cn(
-                                    'py-1.5 rounded-md text-xs font-bold uppercase tracking-wider transition-colors',
+                                    'font-mono py-1.5 rounded-md text-xs font-bold uppercase tracking-wider transition-colors',
                                     qtyNum === preset.value
                                         ? side === 'buy' ? 'bg-brand-strong/15 text-brand' : 'bg-negative/15 text-negative'
                                         : 'text-fg-muted hover:text-fg',
                                 )}
-                                style={{fontFamily: 'var(--type-mono)'}}
                             >
                                 {preset.label}
                             </button>
@@ -263,12 +261,12 @@ const OrderPanel = ({defaultSymbol = '', cash, accountId, positions = [], onSymb
                     <p role="alert" className="mt-1 text-xs text-negative">{check.message}</p>
                 )}
                 {effect && (
-                    <p className="mt-1.5 text-[11px] text-fg-muted" style={{fontFamily: 'var(--type-mono)'}} data-testid="order-effect">
+                    <p className="mt-1.5 text-[11px] text-fg-muted font-mono" data-testid="order-effect">
                         {orderEffectLine(effect, compact)}
                     </p>
                 )}
                 {!compact && queueNote && (
-                    <p className="mt-1 text-[11px] text-fg-muted" style={{fontFamily: 'var(--type-mono)'}} data-testid="order-queue">
+                    <p className="mt-1 text-[11px] text-fg-muted font-mono" data-testid="order-queue">
                         {queueLine(queueNote)}
                     </p>
                 )}
@@ -296,13 +294,13 @@ const OrderPanel = ({defaultSymbol = '', cash, accountId, positions = [], onSymb
             {/* Last price + estimate */}
             <div className="flex items-center justify-between text-sm">
                 <span className="text-fg-muted">Last Price</span>
-                <span className="text-fg" style={{fontFamily: 'var(--type-mono)'}}>
+                <span className="text-fg font-mono">
                     {priceLoading ? '…' : price !== null ? formatPrice(price) : '—'}
                 </span>
             </div>
             <div className="flex items-center justify-between text-sm border-t border-line-strong/30 pt-3">
                 <span className="text-fg-muted">Est. {side === 'buy' ? 'Cost' : 'Proceeds'}</span>
-                <span className="text-brand font-semibold" style={{fontFamily: 'var(--type-mono)'}}>
+                <span className="text-brand font-semibold font-mono">
                     {check.estTotal !== null ? formatPrice(check.estTotal) : '—'}
                 </span>
             </div>
@@ -311,11 +309,10 @@ const OrderPanel = ({defaultSymbol = '', cash, accountId, positions = [], onSymb
                 type="submit"
                 disabled={submitting || blocked}
                 className={cn(
-                    'w-full py-3 rounded-lg text-sm font-bold uppercase tracking-wider transition-all active:scale-[0.98] disabled:opacity-50',
+                    'font-mono w-full py-3 rounded-lg text-sm font-bold uppercase tracking-wider transition-all active:scale-[0.98] disabled:opacity-50',
                     side === 'buy' ? 'text-on-brand' : 'text-on-negative',
                 )}
                 style={{
-                    fontFamily: 'var(--type-mono)',
                     backgroundColor: side === 'buy' ? 'var(--brand-strong)' : 'var(--negative)',
                     boxShadow: side === 'buy' ? '0 0 15px color-mix(in srgb, var(--brand-strong) 30%, transparent)' : '0 0 15px color-mix(in srgb, var(--negative) 25%, transparent)',
                 }}

@@ -8,7 +8,7 @@ const UnpricedNote = ({positions, className}: {positions: readonly {priceStale: 
     const text = describeUnpriced(countUnpriced(positions), positions.length);
     if (!text) return null;
     return (
-        <p role="status" className={cn('text-[11px] text-warning', className)} style={{fontFamily: 'var(--type-mono)'}}>
+        <p role="status" className={cn('font-mono text-[11px] text-warning', className)}>
             {text}
         </p>
     );
