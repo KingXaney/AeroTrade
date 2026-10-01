@@ -6,6 +6,7 @@ import {Button} from '@/components/ui/button';
 import InputField from '@/components/forms/InputField';
 import FooterLink from '@/components/forms/FooterLink';
 import {requestPasswordReset} from "@/lib/actions/auth.actions";
+import {EMAIL_RULE} from "@/lib/auth/validation";
 
 type ForgotPasswordFormData = {email: string};
 
@@ -42,7 +43,7 @@ const ForgotPassword = () => {
                         placeholder="you@example.com"
                         register={register}
                         error={errors.email}
-                        validation={{required: 'Email is required', pattern: {value: /^[^\s@]+@[^\s@]+\.[^\s@]+$/, message: 'Enter a valid email address'}}}
+                        validation={EMAIL_RULE}
                     />
                     <Button type="submit" disabled={isSubmitting} className="yellow-btn w-full mt-5">
                         {isSubmitting ? 'Sending' : 'Send reset link'}

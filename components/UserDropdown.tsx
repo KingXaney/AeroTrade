@@ -11,19 +11,13 @@ import {
     DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 
-import {useRouter} from "next/navigation";
 import {LogOut, ChevronDown, Newspaper, Settings} from "lucide-react";
-import {signOut} from "@/lib/actions/auth.actions";
+import {useSignOut} from "@/hooks/useSignOut";
 
 // No longer needs the stock/topic lists: it used to render a duplicate NavItems for
 // mobile, which the hamburger drawer replaces.
 function UserDropdown({user}: {user: User}) {
-    const router = useRouter();
-
-    const handleSignOut = async () => {
-        await signOut();
-        router.push("/sign-in");
-    };
+    const handleSignOut = useSignOut();
 
     const initial = user.name?.[0]?.toUpperCase() ?? '?';
 

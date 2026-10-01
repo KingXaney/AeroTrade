@@ -1,6 +1,6 @@
 import {inngest} from "@/lib/inngest/client";
-import {NEWS_SUMMARY_EMAIL_PROMPT, PERSONALIZED_WELCOME_EMAIL_PROMPT} from "@/lib/inngest/prompts"
-import {sendNewsSummaryEmail, sendWelcomeEmail} from "@/lib/nodemailer";
+import {buildWelcomePrompt, NEWS_SUMMARY_EMAIL_PROMPT} from "@/lib/inngest/prompts"
+import {mailerReady, sendNewsSummaryEmail, sendWelcomeEmail} from "@/lib/nodemailer";
 import {getAllUsersForNewsEmail} from "@/lib/actions/user.actions";
 import {getWatchlistSymbolsByEmail} from "@/lib/actions/watchlist.actions";
 import {getQuote} from "@/lib/actions/finnhub.actions";
@@ -94,13 +94,11 @@ const APP_URL = (process.env.BETTER_AUTH_URL ?? '').replace(/\/$/, '') || 'http:
 export const sendSignUpEmail = inngest.createFunction(
     { id: 'sign-up-email', triggers: [{ event: 'app/user.created' }] },
     async ({ event, step }) => {
-        const userProfile = `
-            - Country: ${event.data.country}
-            - Investment goals: ${event.data.investmentGoals}
-            - Risk tolerance: ${event.data.riskTolerance}
-            - Preferred industry: ${event.data.preferredIndustry}
-        `
-        const prompt = PERSONALIZED_WELCOME_EMAIL_PROMPT.replace('{{userProfile}}', userProfile)
+        // No mailer, no email to write: skipped before the model call, with mailerReady's one line.
+        if (!mailerReady('the welcome email')) return {success: false, message: 'Mailer not configured: welcome email skipped'};
+
+        const {country, investmentGoals, riskTolerance, preferredIndustry} = event.data;
+        const prompt = buildWelcomePrompt({country, investmentGoals, riskTolerance, preferredIndustry})
 
         const response = await inferText(step, {task: 'welcome', stepId: 'generate-welcome-intro', prompt})
         await step.run('send-welcome-email', async () => {
@@ -663,6 +661,9 @@ export const runWeeklyNavigator = inngest.createFunction(
 export const sendDailyNewsSummary = inngest.createFunction(
     { id: 'daily-news-summary', triggers: [{ event: 'app/send.daily.news' }, { cron: 'TZ=America/New_York 0 12 * * *' }] },
     async ({ step, runId }) => {
+        // No mailer, no digest: skipped before any user's news is read or summarised by the model.
+        if (!mailerReady('the daily news summary')) return {success: false, message: 'Mailer not configured: daily news summary skipped'};
+
         // Step #1: Get all users for news delivery
         const users = await step.run('get-all-users', getAllUsersForNewsEmail)
 
