@@ -1,4 +1,6 @@
-// The two helpers every scheduled job builds its steps with. Pure, so vitest pins them.
+// The helpers every scheduled job builds its steps with. Pure, so vitest pins them.
+
+import {getEasternDateString} from "@/lib/dates";
 
 // Inngest step ids must be [a-zA-Z0-9_-]; user ids, emails, the strategies' sentinel owner and
 // symbols such as BRK.B carry other characters. Idempotent: a sanitised id passes unchanged.
@@ -13,3 +15,9 @@ export const chunk = <T>(items: readonly T[], size: number): T[][] => {
     }
     return chunks;
 };
+
+// A job's ET day comes from its triggering event, never the clock: Inngest replays the
+// function body for every step, so a run that crosses midnight ET would otherwise save under
+// one day and later look for another. The clock is the fallback only for an event with no ts.
+export const eventDay = (ts: unknown): string =>
+    getEasternDateString(new Date(typeof ts === 'number' ? ts : Date.now()));

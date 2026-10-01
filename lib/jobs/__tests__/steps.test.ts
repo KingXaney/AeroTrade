@@ -1,5 +1,7 @@
-import {describe, expect, it} from "vitest";
-import {chunk, stepId} from "@/lib/jobs/steps";
+import {readFileSync, readdirSync} from "node:fs";
+import path from "node:path";
+import {afterEach, describe, expect, it, vi} from "vitest";
+import {chunk, eventDay, stepId} from "@/lib/jobs/steps";
 import {STRATEGIES} from "@/lib/strategies/catalog";
 
 describe("chunk", () => {
@@ -23,5 +25,37 @@ describe("stepId", () => {
         expect(stepId('execute-order-u:1-buy-BRK.B')).toBe('execute-order-u_1-buy-BRK_B');
         expect(stepId('a+b@c.com')).toBe('a_b_c_com');
         expect(stepId(stepId('x y.z'))).toBe(stepId('x y.z'));
+    });
+});
+
+describe("eventDay", () => {
+    afterEach(() => vi.useRealTimers());
+
+    it("is the ET day of the triggering event, whenever the step replays", () => {
+        // 23:30 EDT on Monday 28 September is already Tuesday in UTC.
+        const ts = Date.UTC(2026, 8, 29, 3, 30);
+        vi.useFakeTimers();
+        vi.setSystemTime(Date.UTC(2026, 8, 29, 5, 0)); // a replay after midnight ET
+        expect(eventDay(ts)).toBe('2026-09-28');
+    });
+
+    it("falls back to the clock only when the event carries no timestamp", () => {
+        vi.useFakeTimers();
+        vi.setSystemTime(Date.UTC(2026, 8, 29, 5, 0));
+        expect(eventDay(undefined)).toBe('2026-09-29');
+    });
+});
+
+describe("job days", () => {
+    // A job whose steps each read the wall clock saves under one day and later looks for
+    // another when a replay crosses midnight ET. Every job takes its day from its event.
+    const root = path.resolve(__dirname, '../../..');
+    const files = [
+        ...readdirSync(path.join(root, 'lib/jobs/functions')).map((f) => `lib/jobs/functions/${f}`),
+        'lib/trading/snapshots.ts',
+        'lib/navigator/run.ts',
+    ];
+    it.each(files)("%s never reads today from the clock", (file) => {
+        expect(readFileSync(path.join(root, file), 'utf8')).not.toMatch(/getEasternDateString\(\s*\)/);
     });
 });

@@ -9,7 +9,6 @@ import AccountSnapshot from "@/database/models/account-snapshot.model";
 import BenchmarkSnapshot from "@/database/models/benchmark-snapshot.model";
 import {getQuote} from "@/lib/prices/finnhub";
 import {BENCHMARK_SYMBOL} from "@/lib/prices/config";
-import {getEasternDateString} from "@/lib/dates";
 import {buildPriceMap, computePortfolio} from "@/lib/trading/valuation";
 import {type PriceInfo} from "@/lib/trading/analytics";
 
@@ -24,7 +23,8 @@ export type SnapshotAccount = {
     positions: {symbol: string; company: string; quantity: number; avgCost: number}[];
 };
 
-export const snapshotBenchmark = async (): Promise<{recorded: boolean}> => {
+// `date` is the job's ET day (lib/jobs/steps.eventDay), the same on every replay.
+export const snapshotBenchmark = async (date: string): Promise<{recorded: boolean}> => {
     const quote = await getQuote(BENCHMARK_SYMBOL);
     if (typeof quote.c !== 'number' || !(quote.c > 0)) {
         console.warn(`Benchmark snapshot skipped: no quote for ${BENCHMARK_SYMBOL}`);
@@ -32,7 +32,7 @@ export const snapshotBenchmark = async (): Promise<{recorded: boolean}> => {
     }
     await connectToDatabase();
     await BenchmarkSnapshot.updateOne(
-        {symbol: BENCHMARK_SYMBOL, date: getEasternDateString()},
+        {symbol: BENCHMARK_SYMBOL, date},
         {$set: {close: quote.c}},
         {upsert: true},
     );
@@ -71,10 +71,9 @@ export const snapshotSymbols = (accounts: readonly SnapshotAccount[]): string[] 
 export const quoteEntries = async (symbols: string[]): Promise<Array<[string, PriceInfo]>> =>
     Array.from((await buildPriceMap(symbols)).entries());
 
-export const writeSnapshots = async (accounts: readonly SnapshotAccount[], priceEntries: Array<[string, PriceInfo]>): Promise<number> => {
+export const writeSnapshots = async (accounts: readonly SnapshotAccount[], priceEntries: Array<[string, PriceInfo]>, date: string): Promise<number> => {
     await connectToDatabase();
     const priceMap = new Map(priceEntries);
-    const date = getEasternDateString();
 
     // Re-read inception times: an account reset between load-accounts and here
     // re-anchors inceptionAt and seeds a fresh day-0 snapshot that the memoized

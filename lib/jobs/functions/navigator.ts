@@ -1,9 +1,9 @@
 import {inngest} from "@/lib/jobs/client";
 import {recordJobRun} from "@/lib/jobs/job-runs";
 import {JOBS, triggersOf} from "@/lib/jobs/registry";
-import {stepId} from "@/lib/jobs/steps";
+import {eventDay, stepId} from "@/lib/jobs/steps";
 import {updateNewsBrain} from "@/lib/jobs/functions/brain";
-import {getEasternDateString, getEasternWeekKey} from "@/lib/dates";
+import {getEasternWeekKey} from "@/lib/dates";
 import {MAX_POSITIONS} from "@/lib/navigator/config";
 import {buildNavigatorUniverse, computeNavigatorScores} from "@/lib/navigator/store";
 import {
@@ -31,7 +31,8 @@ const RATIONALE_THROTTLE_DELAY = '5s';
 // The run itself is lib/navigator/run.ts, shared with the bootstrap below.
 export const runWeeklyNavigator = inngest.createFunction(
     { id: JOBS.navigatorWeekly.id, triggers: triggersOf(JOBS.navigatorWeekly) },
-    async ({ step }) => {
+    async ({ step, event }) => {
+        const today = eventDay(event.ts);
         const universe = await step.run('build-universe', async () => buildNavigatorUniverse());
 
         await ensureUniverseBars(step, universe.symbols, 'ensure-price-bars');
@@ -39,7 +40,6 @@ export const runWeeklyNavigator = inngest.createFunction(
         // Deterministic scoring inputs: brain slow layer + eligibility counts + signals.
         const scored = await step.run('compute-global-scores', async () => computeNavigatorScores(universe.symbols));
 
-        const today = getEasternDateString();
         const inputs = decisionInputs(scored, universe);
 
         await step.run('save-global-suggestions', async () => saveGlobalSuggestions(inputs.targets, today));
@@ -101,7 +101,7 @@ export const bootstrapAiNavigator = inngest.createFunction(
         const userId = typeof event.data?.userId === 'string' ? event.data.userId : null;
         if (!userId) return {success: false, message: 'Missing userId'};
         const safeId = stepId(userId);
-        const today = getEasternDateString();
+        const today = eventDay(event.ts);
         const weekKey = getEasternWeekKey(today);
 
         const nav = await step.run('load-navigator', async () => loadEnrollment(userId));

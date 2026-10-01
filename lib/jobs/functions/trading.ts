@@ -1,7 +1,7 @@
 import {inngest} from "@/lib/jobs/client";
 import {recordJobRun} from "@/lib/jobs/job-runs";
 import {JOBS, triggersOf} from "@/lib/jobs/registry";
-import {chunk} from "@/lib/jobs/steps";
+import {chunk, eventDay} from "@/lib/jobs/steps";
 import {BENCHMARK_SYMBOL} from "@/lib/prices/config";
 import {type PriceInfo} from "@/lib/trading/analytics";
 import {loadSnapshotAccounts, quoteEntries, snapshotBenchmark, snapshotSymbols, writeSnapshots} from "@/lib/trading/snapshots";
@@ -16,8 +16,9 @@ const QUOTE_THROTTLE_DELAY = '30s';
 // (lib/trading/snapshots.ts).
 export const recordDailySnapshots = inngest.createFunction(
     { id: JOBS.snapshots.id, triggers: triggersOf(JOBS.snapshots) },
-    async ({ step }) => {
-        await step.run('snapshot-benchmark', snapshotBenchmark);
+    async ({ step, event }) => {
+        const today = eventDay(event.ts);
+        await step.run('snapshot-benchmark', async () => snapshotBenchmark(today));
 
         const accounts = await step.run('load-accounts', loadSnapshotAccounts);
         if (accounts.length === 0) {
@@ -37,7 +38,7 @@ export const recordDailySnapshots = inngest.createFunction(
             priceEntries.push(...entries);
         }
 
-        const written = await step.run('write-snapshots', async () => writeSnapshots(accounts, priceEntries));
+        const written = await step.run('write-snapshots', async () => writeSnapshots(accounts, priceEntries, today));
 
         const summary = `Snapshotted ${written} account(s) + ${BENCHMARK_SYMBOL}`;
         await step.run('record-job-run', async () => recordJobRun(JOBS.snapshots.id, summary));

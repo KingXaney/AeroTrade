@@ -3,8 +3,8 @@ import {recordJobRun} from "@/lib/jobs/job-runs";
 import {JOBS, triggersOf} from "@/lib/jobs/registry";
 import {backfillIncomeBars, creditAccounts, planIncomeRun, splitByWatermark, topUpIncomeBars, type CreditOutcome} from "@/lib/income/store";
 import {describeIncomeRun} from "@/lib/income/accrual";
-import {addCalendarDays, getEasternDateString} from "@/lib/dates";
-import {chunk} from "@/lib/jobs/steps";
+import {addCalendarDays} from "@/lib/dates";
+import {chunk, eventDay} from "@/lib/jobs/steps";
 import {PRICE_CHUNK_SIZE} from "@/lib/prices/config";
 
 // Interest on idle cash and dividends on holdings, for every paper account — users', the AI
@@ -25,7 +25,7 @@ export const creditDailyIncome = inngest.createFunction(
     },
     async ({event, step}) => {
         // Anchored to the event, not the wall clock, so a retry an hour later credits the same day.
-        const today = getEasternDateString(new Date(event.ts ?? Date.now()));
+        const today = eventDay(event.ts);
         const end = addCalendarDays(today, -1);
         const data = (event.data ?? {}) as {accountIds?: unknown};
         // A scoped run (QA) touches only the named accounts, never another suite's fixtures.
