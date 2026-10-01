@@ -54,7 +54,7 @@ const EvidenceList = ({entityKey, items}: {entityKey: string; items: EvidenceIte
             )}
         </div>
         {items.length === 0 ? (
-            <p className="text-sm text-fg-muted">No recent articles mention this entity.</p>
+            <p className="text-sm text-fg-muted">{BRAIN_COPY.evidenceEmpty}</p>
         ) : (
             <div className="space-y-2">
                 {items.map((item) => (

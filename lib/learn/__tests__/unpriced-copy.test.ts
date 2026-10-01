@@ -2,7 +2,7 @@
 
 import {describe, expect, it} from 'vitest';
 import {findBanned} from '@/lib/learn/banned';
-import {unpricedText} from '@/lib/learn/copy/unpriced';
+import {UNPRICED_CELL_TITLE, unpricedText} from '@/lib/learn/copy/unpriced';
 
 describe('unpricedText', () => {
     it('says nothing when every holding is priced or there are none', () => {
@@ -31,5 +31,6 @@ describe('unpricedText', () => {
                 expect(findBanned(text, 'copy'), text).toEqual([]);
             }
         }
+        expect(findBanned(UNPRICED_CELL_TITLE, 'copy')).toEqual([]);
     });
 });

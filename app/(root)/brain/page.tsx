@@ -19,6 +19,7 @@ import SystemStatus from "@/components/jobs/SystemStatus";
 import Panel from "@/components/primitives/Panel";
 import PageTitle from "@/components/primitives/PageTitle";
 import SectionHeading from "@/components/primitives/SectionHeading";
+import {BRAIN_COPY} from "@/lib/learn/copy/brain";
 
 // Each decision's reasons decoded here, on the server, so the client panel renders clauses
 // without bundling the grammar.
@@ -60,7 +61,7 @@ const BrainPage = async ({searchParams}: BrainPageProps) => {
         <div className="space-y-4">
             <PageTitle
                 title="News Brain"
-                subtitle="Persistent market narratives from every ingested article — slow-building theses drive the AI Navigator"
+                subtitle={BRAIN_COPY.pageSubtitle}
             />
 
             {/* Is the machinery actually running? */}

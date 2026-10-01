@@ -12,6 +12,7 @@ import EmptyState from "@/components/primitives/EmptyState";
 import MicroLabel from "@/components/primitives/MicroLabel";
 import Sparkline from "@/components/strategies/Sparkline";
 import {rowCard} from "@/components/primitives/RowCard";
+import {QUANT_WIDGET_COPY} from "@/lib/learn/copy/strategies";
 
 // The leaderboard's top rows for the dashboard: followed strategies first, then the
 // best live returns — so no position number, which would read as a rank. Panel chrome,
@@ -34,8 +35,8 @@ const QuantStrategiesList = ({rows, span}: {rows: StrategyLeaderboardRow[]; span
         <div>
             {rows.length === 0 ? (
                 <EmptyState
-                    title="The strategies have not run yet."
-                    description="The leaderboard fills on the first trading morning."
+                    title={QUANT_WIDGET_COPY.emptyTitle}
+                    description={QUANT_WIDGET_COPY.emptyDescription}
                     className="p-0"
                 />
             ) : (

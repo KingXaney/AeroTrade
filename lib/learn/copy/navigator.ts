@@ -9,6 +9,13 @@
 export const NAVIGATOR_COPY = {
     // The one disclosure per decision on /brain's Weekly Decisions.
     glossSummary: 'What the Navigator saw',
+    // NavigatorCard: what the AI Navigator is, before and after enrolling.
+    about: 'A dedicated paper account traded weekly by the news brain — long-horizon theses, strict rails, measured honestly against the S&P 500. An experiment, not financial advice.',
+    // Weekly Decisions before the first run, and the line under every decision set.
+    decisionsEmpty: 'No decisions yet — the navigator runs every Monday morning after the brain updates.',
+    decisionsFooter: 'Automated paper-trading experiment — not financial advice.',
+    // The dashboard's News Brain strip before the first decision set.
+    tileSchedule: 'Navigator runs Mondays',
 } as const;
 
 type EligibilityNeed = {articles: number; sources: number; days: number; bars: number};

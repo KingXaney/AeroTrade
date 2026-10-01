@@ -22,6 +22,7 @@ import WhatTheseMean from "@/components/learn/WhatTheseMean";
 import Panel from "@/components/primitives/Panel";
 import SectionHeading from "@/components/primitives/SectionHeading";
 import {actionButton} from "@/components/primitives/ActionButton";
+import {PERFORMANCE_COPY} from "@/lib/learn/copy/portfolio";
 
 type PortfolioPageProps = {
     searchParams: Promise<{account?: string}>;
@@ -83,7 +84,7 @@ const PortfolioPage = async ({searchParams}: PortfolioPageProps) => {
                             Performance vs S&amp;P 500
                         </SectionHeading>
                         <p className="font-mono text-[11px] text-fg-muted mb-4">
-                            Returns include interest on cash and dividends · benchmark is SPY&apos;s total return, dividends reinvested
+                            {PERFORMANCE_COPY.caption}
                         </p>
                         <PerformanceChart series={analytics.series} accountName={account.name} band={view.chartBand} />
                     </Panel>

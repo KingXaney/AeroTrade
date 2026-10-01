@@ -14,6 +14,7 @@ import ActionButton from '@/components/primitives/ActionButton';
 import TextField from '@/components/primitives/TextField';
 import SectionHeading from "@/components/primitives/SectionHeading";
 import MicroLabel from "@/components/primitives/MicroLabel";
+import {NAVIGATOR_COPY} from "@/lib/learn/copy/navigator";
 
 // Enrollment + kill switch for the AI-managed paper account.
 const NavigatorCard = ({status}: {status: NavigatorStatus}) => {
@@ -55,9 +56,7 @@ const NavigatorCard = ({status}: {status: NavigatorStatus}) => {
             </div>
 
             <p className="text-sm text-fg-muted mb-4">
-                A dedicated paper account traded weekly by the news brain — long-horizon
-                theses, strict rails, measured honestly against the S&amp;P 500. An experiment,
-                not financial advice.
+                {NAVIGATOR_COPY.about}
             </p>
 
             {!status.enrolled ? (

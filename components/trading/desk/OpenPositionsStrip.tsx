@@ -9,6 +9,7 @@ import UnpricedNote from "@/components/trading/UnpricedNote";
 import TradeLink from "@/components/trading/TradeLink";
 import type {EnrichedPosition} from '@/lib/trading/types';
 import RowCard from "@/components/primitives/RowCard";
+import {UNPRICED_CELL_TITLE} from "@/lib/learn/copy/unpriced";
 
 // Compact, horizontally-scrolling open-positions strip for the Trade page and the
 // dashboard's positions widget.
@@ -32,7 +33,7 @@ const OpenPositionsStrip = ({positions, accountId, lotNotes}: {positions: Enrich
                                 {p.symbol} <span className="text-fg-muted font-normal">×{p.quantity}</span>
                             </span>
                             {p.priceStale ? (
-                                <span className="text-[11px] text-fg-muted font-mono" title="No live quote — value shown at cost">—</span>
+                                <span className="text-[11px] text-fg-muted font-mono" title={UNPRICED_CELL_TITLE}>—</span>
                             ) : (
                                 <span className={cn('font-mono text-[11px]', getChangeColorClass(p.unrealizedPnlPct))}>
                                     {formatPct(p.unrealizedPnlPct)}

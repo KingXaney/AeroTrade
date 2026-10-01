@@ -34,6 +34,9 @@ export const INCOME_COPY = {
     dividendsHeading: 'Dividends',
     noDividends: 'None yet — a holding pays after its ex-dividend date.',
     missedHeading: 'Missed by a day',
+    // The account summary's hints under Total Return and Buying Power; amounts arrive formatted.
+    returnHint: (interest: string, dividends: string): string => `incl. ${interest} interest · ${dividends} dividends`,
+    cashHint: (apy: number): string => `earning ${apyPct(apy)} APY`,
 } as const;
 
 // '2026-09' → 'September 2026'

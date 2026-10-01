@@ -86,6 +86,18 @@ export const drawdownBandLabel = (window: DrawdownWindow): string => `Shaded: th
 export const drawdownBand = (window: DrawdownWindow | null | undefined): {from: string; to: string; label: string} | null =>
     window && isVisibleDrawdown(window) ? {from: window.peakDate, to: window.troughDate, label: drawdownBandLabel(window)} : null;
 
+// ---- the performance chart ----------------------------------------------------------------
+
+// The chart's caption on /portfolio, and what stands in for a curve before there are two
+// daily snapshots to draw (the chart itself, and the dashboard's chart and analytics widgets).
+export const PERFORMANCE_COPY = {
+    caption: 'Returns include interest on cash and dividends · benchmark is SPY\'s total return, dividends reinvested',
+    collecting: 'Collecting daily performance data — check back tomorrow.',
+    snapshotNote: 'A value snapshot is recorded every market day at close.',
+    widgetNoHistory: 'No performance history yet — snapshots start tomorrow.',
+    widgetNoAnalytics: 'No analytics yet — they appear once a daily snapshot exists.',
+} as const;
+
 // ---- the holdings table ------------------------------------------------------------------
 
 // PositionsTable with nothing held. /portfolio has no order panel, so the second sentence is

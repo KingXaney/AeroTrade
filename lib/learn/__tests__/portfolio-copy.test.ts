@@ -12,6 +12,7 @@ import {
     drawdownLine,
     DRAWDOWN_COPY,
     HOLDINGS_COPY,
+    PERFORMANCE_COPY,
     pctOneDecimal,
     RISK_COPY,
     shortDate,
@@ -192,5 +193,11 @@ describe('HOLDINGS_COPY', () => {
             expect(text).not.toMatch(/order panel/i);
             clean(text);
         }
+    });
+});
+
+describe('PERFORMANCE_COPY', () => {
+    it('never advises', () => {
+        for (const text of Object.values(PERFORMANCE_COPY)) clean(text);
     });
 });

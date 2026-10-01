@@ -5,6 +5,7 @@ import {formatSignalValue, sortBoard, STATE_LABEL, STATE_TONE, visibleSignalColu
 import Badge from "@/components/primitives/Badge";
 import EmptyState from "@/components/primitives/EmptyState";
 import MicroLabel from "@/components/primitives/MicroLabel";
+import {SIGNAL_BOARD_COPY} from "@/lib/learn/copy/strategies";
 
 // "What it is watching": the indicator values the rule looked at on its last run,
 // one row per symbol, columns declared by the catalog. Verdicts come from the rule.
@@ -85,8 +86,8 @@ const SignalBoard = ({columns, run}: {columns: readonly SignalColumn[]; run: Str
     if (!run || run.board.length === 0) {
         return (
             <EmptyState
-                title="No signals yet."
-                description="The board fills on the first run, every trading morning after that."
+                title={SIGNAL_BOARD_COPY.emptyTitle}
+                description={SIGNAL_BOARD_COPY.emptyDescription}
                 className="p-0"
             />
         );
@@ -101,8 +102,7 @@ const SignalBoard = ({columns, run}: {columns: readonly SignalColumn[]; run: Str
     return (
         <div className="space-y-1.5" id="signal-board">
             <p className="font-mono text-[11px] text-fg-muted mb-2">
-                As of the {run.asOf} close · decided for {run.date}
-                {run.staleCount > 0 ? ` · ${run.staleCount} of ${run.universeSize} symbols had no fresh bar` : ''}
+                {SIGNAL_BOARD_COPY.stamp(run.asOf, run.date, run.staleCount, run.universeSize)}
             </p>
             <Body columns={shownColumns} rows={head} />
             {rest.length > 0 && (

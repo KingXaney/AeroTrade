@@ -74,3 +74,5 @@ export const MISSIONS_FOOTER = (done: number, total: number): string =>
 
 export const MISSIONS_LESSON_LABEL = '60-second lesson';
 export const MISSIONS_HIDE_LABEL = 'Hide';
+export const MISSIONS_HIDING = 'Hiding…';
+export const MISSIONS_HIDE_FAILED = 'Could not hide the checklist';

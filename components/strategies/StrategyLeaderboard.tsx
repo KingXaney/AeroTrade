@@ -12,6 +12,7 @@ import {
 import MicroLabel from "@/components/primitives/MicroLabel";
 import {shortHelp, type GlossaryKey} from "@/lib/learn/glossary";
 import {CADENCE_COPY} from "@/lib/learn/copy/cadence";
+import {STRATEGIES_PAGE_COPY} from "@/lib/learn/copy/strategies";
 import FollowStar from "@/components/strategies/FollowStar";
 import Sparkline from "@/components/strategies/Sparkline";
 
@@ -129,7 +130,7 @@ const StrategyLeaderboard = ({rows, canFollow}: {rows: StrategyLeaderboardRow[];
                                             <Sparkline values={row.simulated.spark} min={simDomain.min} max={simDomain.max} basis="simulated"
                                                        label={`${row.name}: simulated three-year curve, ending ${formatPct(row.simulated.stats.totalReturnPct, 1)}`} />
                                         )}
-                                        <span title={`Backtest ${row.simulated.from} → ${row.simulated.to}, next-open fills, no fees`}>
+                                        <span title={STRATEGIES_PAGE_COPY.backtestTitle(row.simulated.from, row.simulated.to)}>
                                             {formatPct(row.simulated.stats.totalReturnPct, 1)}
                                         </span>
                                     </>

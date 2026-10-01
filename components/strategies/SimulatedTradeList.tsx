@@ -4,6 +4,7 @@ import type {StrategyBacktestView} from "@/lib/strategies/page-store";
 import type {StrategyDefinition} from "@/lib/strategies/types";
 import ReasonDisclosure from "@/components/strategies/ReasonDisclosure";
 import RowCard from "@/components/primitives/RowCard";
+import {SIMULATED_TRADES_COPY} from "@/lib/learn/copy/strategies";
 
 // Backtest fills, newest first, dated by bar (no clock time: a simulated fill is "the
 // open of that day", not an instant). Capped; the count says how many there were. Each
@@ -12,13 +13,13 @@ const SHOW = 40;
 
 const SimulatedTradeList = ({trades, def}: {trades: StrategyBacktestView['trades']; def: StrategyDefinition}) => {
     if (trades.length === 0) {
-        return <p className="text-sm text-fg-muted p-4">No simulated fills — the rule never triggered over the window.</p>;
+        return <p className="text-sm text-fg-muted p-4">{SIMULATED_TRADES_COPY.none}</p>;
     }
     const recent = [...trades].reverse().slice(0, SHOW);
     return (
         <div className="space-y-1.5" id="simulated-trades">
             <p className="text-[11px] text-warning mb-2 font-mono">
-                Simulated — hypothetical fills at the next day&apos;s open, no fees or slippage.
+                {SIMULATED_TRADES_COPY.banner}
             </p>
             {recent.map((t, i) => (
                 <RowCard key={`${t.date}-${t.symbol}-${t.side}-${i}`} className="flex items-center justify-between py-2">

@@ -1,4 +1,6 @@
 import type {NewsBrainSummary} from "@/lib/dashboard/select";
+import {BRAIN_COPY} from "@/lib/learn/copy/brain";
+import {NAVIGATOR_COPY} from "@/lib/learn/copy/navigator";
 
 // Full-width strip linking to /brain (the shell provides the <Link> chrome).
 const NewsBrainTile = ({summary}: {summary: NewsBrainSummary}) => (
@@ -12,12 +14,12 @@ const NewsBrainTile = ({summary}: {summary: NewsBrainSummary}) => (
                 <div className="text-sm text-fg font-heading">
                     {summary.topThesis
                         ? <>Top thesis: <span className="text-brand">{summary.topThesis}</span></>
-                        : 'Building market narratives from daily news'}
+                        : BRAIN_COPY.tileBuilding}
                 </div>
             </div>
         </div>
         <span className="text-xs text-fg-muted font-mono">
-            {summary.decisions ? `${summary.decisions.count} decisions · ${summary.decisions.date}` : 'Navigator runs Mondays'} →
+            {summary.decisions ? `${summary.decisions.count} decisions · ${summary.decisions.date}` : NAVIGATOR_COPY.tileSchedule} →
         </span>
     </div>
 );

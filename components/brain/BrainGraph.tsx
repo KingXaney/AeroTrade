@@ -5,6 +5,7 @@ import Link from "next/link";
 import {evidenceHref} from "@/lib/brain/links";
 import {cn} from "@/lib/utils";
 import type {BrainEntitySummary, BrainEntityType} from '@/lib/brain/types';
+import {BRAIN_COPY} from "@/lib/learn/copy/brain";
 
 type GraphNode = BrainEntitySummary;
 type GraphEdge = {source: string; target: string; weight: number};
@@ -56,7 +57,7 @@ const BrainGraph = ({nodes, edges}: {nodes: GraphNode[]; edges: GraphEdge[]}) =>
         return (
             <div className="flex flex-col items-center justify-center py-12 text-center">
                 <span className="material-symbols-outlined text-3xl text-fg-muted mb-2">neurology</span>
-                <p className="text-sm text-fg-muted">The brain is empty — it fills up as daily news is ingested.</p>
+                <p className="text-sm text-fg-muted">{BRAIN_COPY.graphEmpty}</p>
             </div>
         );
     }
@@ -111,8 +112,8 @@ const BrainGraph = ({nodes, edges}: {nodes: GraphNode[]; edges: GraphEdge[]}) =>
             </svg>
 
             <div className="flex items-center justify-between mt-2 text-[10px] text-fg-muted font-mono">
-                <span>rings: themes · sectors · tickers — size = persistent attention, bold ring = active thesis</span>
-                <span>{hovered ? `${hovered.node.displayName} · weight ${hovered.node.weightSlow.toFixed(1)}` : 'click a node for evidence'}</span>
+                <span>{BRAIN_COPY.graphLegend}</span>
+                <span>{hovered ? `${hovered.node.displayName} · weight ${hovered.node.weightSlow.toFixed(1)}` : BRAIN_COPY.graphHint}</span>
             </div>
         </div>
     );

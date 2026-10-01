@@ -3,6 +3,7 @@ import {requireUserId} from "@/lib/auth/session";
 import {STRATEGIES, STRATEGIES_DISCLAIMER} from "@/lib/strategies/catalog";
 import {GLOSSARY} from "@/lib/learn/glossary";
 import {GLOSSARY_GROUPS} from "@/lib/learn/where";
+import {LEARN_PAGE_COPY} from "@/lib/learn/copy/learn";
 import MicroLabel from "@/components/primitives/MicroLabel";
 import PageTitle from "@/components/primitives/PageTitle";
 import Panel from "@/components/primitives/Panel";
@@ -19,12 +20,12 @@ const LearnPage = async () => {
         <div className="space-y-4">
             <PageTitle
                 title="Learn"
-                subtitle="What every number in AeroTrade measures, in the app's own words — and where to see the real one on your account."
-                note="Definitions describe; none of them is a recommendation."
+                subtitle={LEARN_PAGE_COPY.subtitle}
+                note={LEARN_PAGE_COPY.note}
             />
 
             <Panel id="learn-strategies">
-                <SectionHeading>The eight strategies, one line each</SectionHeading>
+                <SectionHeading>{LEARN_PAGE_COPY.strategiesHeading}</SectionHeading>
                 <ul className="grid grid-cols-1 md:grid-cols-2 gap-x-6 gap-y-3">
                     {STRATEGIES.map((def) => (
                         <li key={def.id} className="min-w-0">

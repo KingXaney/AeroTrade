@@ -14,6 +14,7 @@ import ActionButton from "@/components/primitives/ActionButton";
 import {TextArea} from "@/components/primitives/TextField";
 import SectionHeading from "@/components/primitives/SectionHeading";
 import MicroLabel from "@/components/primitives/MicroLabel";
+import {BRAIN_COPY} from "@/lib/learn/copy/brain";
 
 // The API path generates in the background, so refresh a couple of times after
 // queueing instead of making the user hunt for the reload button.
@@ -115,9 +116,7 @@ const SecondOpinionCard = ({configured, opinion}: {configured: boolean; opinion:
             </div>
 
             <p className="text-sm text-fg-muted mb-4">
-                A stronger model reads the same theses, decisions and headlines — and argues with them:
-                where the narratives look crowded or stale, what contradicts them, and what to watch next.
-                It only critiques; the deterministic rails still make every trade.
+                {BRAIN_COPY.secondOpinionAbout}
             </p>
 
             <div className="flex flex-wrap items-center gap-2 mb-4">
@@ -180,7 +179,7 @@ const SecondOpinionCard = ({configured, opinion}: {configured: boolean; opinion:
                     {opinion.opinionMd}
                 </SafeMarkdown>
             ) : (
-                <p className="text-sm text-fg-muted">No opinion yet — copy the prompt above, or ask Claude Code to fetch one.</p>
+                <p className="text-sm text-fg-muted">{BRAIN_COPY.secondOpinionEmpty}</p>
             )}
         </Panel>
     );

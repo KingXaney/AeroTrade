@@ -108,7 +108,7 @@ const SuggestionPanel = ({userSet, globalSet, accounts}: {userSet: SetView | nul
     if (!set) {
         return (
             <p className="text-sm text-fg-muted">
-                No decisions yet — the navigator runs every Monday morning after the brain updates.
+                {NAVIGATOR_COPY.decisionsEmpty}
             </p>
         );
     }
@@ -137,7 +137,7 @@ const SuggestionPanel = ({userSet, globalSet, accounts}: {userSet: SetView | nul
                 </SafeMarkdown>
             )}
             <p className="text-[10px] uppercase tracking-[0.08em] text-fg-muted font-mono">
-                Automated paper-trading experiment — not financial advice.
+                {NAVIGATOR_COPY.decisionsFooter}
             </p>
         </div>
     );

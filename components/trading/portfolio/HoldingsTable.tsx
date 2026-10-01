@@ -7,6 +7,7 @@ import Term from "@/components/primitives/Term";
 import type {EnrichedPosition} from '@/lib/trading/types';
 import RowCard from "@/components/primitives/RowCard";
 import MicroLabel from "@/components/primitives/MicroLabel";
+import {UNPRICED_CELL_TITLE} from "@/lib/learn/copy/unpriced";
 
 // The one holdings table. Read-only as rendered by the friend profile page, the strategy
 // detail page and the dashboard's Top Holdings widget; /portfolio's PositionsTable passes
@@ -70,7 +71,7 @@ const HoldingsTable = ({positions, emptyText = 'No open positions.', showUnprice
                         <div className="text-right">
                         <div className="text-fg">{formatPrice(p.marketValue)}</div>
                         {p.priceStale ? (
-                            <div className="text-xs text-fg-muted" title="No live quote — value shown at cost">—</div>
+                            <div className="text-xs text-fg-muted" title={UNPRICED_CELL_TITLE}>—</div>
                         ) : (
                             <div className={cn('text-xs', getChangeColorClass(p.unrealizedPnl))}>
                                 {formatSignedPrice(p.unrealizedPnl)} ({formatChangePercent(p.unrealizedPnlPct)})

@@ -3,6 +3,7 @@
 import {useMemo, useRef, useState} from "react";
 import {formatPct} from "@/lib/format";
 import type {PerfPoint} from '@/lib/trading/types';
+import {PERFORMANCE_COPY} from "@/lib/learn/copy/portfolio";
 
 // Hand-rolled SVG performance chart: an account's (or a quant strategy's) %-return since inception
 // (cyan) vs SPY's total return (muted, lib/prices/total-return.ts). Deliberately
@@ -52,10 +53,10 @@ const ReturnChart = ({series, accountName, band}: {series: PerfPoint[]; accountN
             <div className="flex flex-col items-center justify-center py-12 text-center">
                 <span className="material-symbols-outlined text-3xl text-fg-muted mb-2">monitoring</span>
                 <p className="text-sm text-fg-muted">
-                    Collecting daily performance data — check back tomorrow.
+                    {PERFORMANCE_COPY.collecting}
                 </p>
                 <p className="text-xs text-fg-muted mt-1 font-mono">
-                    A value snapshot is recorded every market day at close.
+                    {PERFORMANCE_COPY.snapshotNote}
                 </p>
             </div>
         );

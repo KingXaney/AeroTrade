@@ -34,8 +34,7 @@ const ActiveTheses = ({theses, followedByName, sinceThesis, definitions = false}
     if (theses.length === 0) {
         return (
             <p className="text-sm text-fg-muted">
-                No active theses yet. A narrative becomes a thesis once it keeps accumulating
-                attention for several weeks — check back as the brain ingests more news.
+                {BRAIN_COPY.thesesEmpty}
             </p>
         );
     }

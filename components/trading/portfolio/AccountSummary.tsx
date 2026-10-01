@@ -4,6 +4,7 @@ import StatTile from "@/components/primitives/StatTile";
 import Term from "@/components/primitives/Term";
 import WhatTheseMean from "@/components/learn/WhatTheseMean";
 import type {AccountIncomeSummary} from '@/lib/income/types';
+import {INCOME_COPY} from '@/lib/learn/copy/income';
 import type {PortfolioSummary} from '@/lib/trading/types';
 import Panel from '@/components/primitives/Panel';
 
@@ -14,9 +15,9 @@ import Panel from '@/components/primitives/Panel';
 const AccountSummary = ({portfolio, income, definitions = false}: {portfolio: PortfolioSummary; income?: AccountIncomeSummary; definitions?: boolean}) => {
     const earned = income ? income.interest + income.dividends : 0;
     const returnHint = income && earned > 0
-        ? `incl. ${formatPrice(income.interest)} interest · ${formatPrice(income.dividends)} dividends`
+        ? INCOME_COPY.returnHint(formatPrice(income.interest), formatPrice(income.dividends))
         : undefined;
-    const cashHint = income?.apy != null ? `earning ${(income.apy * 100).toFixed(2)}% APY` : undefined;
+    const cashHint = income?.apy != null ? INCOME_COPY.cashHint(income.apy) : undefined;
 
     const returnClass = getChangeColorClass(portfolio.totalReturnPct);
 

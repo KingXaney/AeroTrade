@@ -9,6 +9,7 @@ import {Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle} fro
 import ActionButton from "@/components/primitives/ActionButton";
 import TextField from "@/components/primitives/TextField";
 import MicroLabel from "@/components/primitives/MicroLabel";
+import {ACCOUNT_COPY} from "@/lib/learn/copy/trade";
 
 // Name a new paper account and pick its starting balance. Mounted conditionally
 // by AccountSwitcher so every open starts with fresh state (same pattern as
@@ -48,7 +49,7 @@ const CreateAccountDialog = ({onClose}: {onClose: () => void}) => {
                         New Account
                     </DialogTitle>
                     <DialogDescription className="text-fg-muted">
-                        Each account holds its own cash, positions and record, so you can compare how they perform. Returns are tracked in %, so any starting balance stays comparable.
+                        {ACCOUNT_COPY.about}
                     </DialogDescription>
                 </DialogHeader>
 

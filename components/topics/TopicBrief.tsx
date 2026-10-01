@@ -2,6 +2,7 @@ import type {TopicBriefView} from '@/lib/topics/types';
 import Panel from '@/components/primitives/Panel';
 import SectionHeading from "@/components/primitives/SectionHeading";
 import MicroLabel from "@/components/primitives/MicroLabel";
+import {TOPIC_BRIEF_COPY} from "@/lib/learn/copy/topics";
 
 // The AI "what changed today" summary. Plain text only — never rendered as HTML.
 // `compact` is for lists that already carry a heading (widgets, digests).
@@ -29,7 +30,7 @@ const TopicBrief = ({brief, compact = false}: {brief: TopicBriefView; compact?: 
                 </ul>
             )}
             <MicroLabel as="p" className="mt-3">
-                {compact ? `${brief.date} · AI summary · may contain errors` : 'AI summary · may contain errors'}
+                {compact ? TOPIC_BRIEF_COPY.datedCaveat(brief.date) : TOPIC_BRIEF_COPY.caveat}
             </MicroLabel>
         </>
     );
