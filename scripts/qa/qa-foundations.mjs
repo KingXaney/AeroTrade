@@ -84,9 +84,15 @@ try {
 
     // notFound() called from inside (root) — an unpriceable ticker — keeps the chrome.
     // With no FINNHUB_API_KEY every symbol takes this path, which makes it easy to hit.
+    // A notFound() thrown after the shell has streamed is drawn by the not-found boundary
+    // once the page hydrates, which can land after domcontentloaded: wait for the rendered
+    // 404 (or 30s) instead of racing it.
     await page.goto(`${BASE}/stocks/ZZZZNOTREAL`, {waitUntil: 'domcontentloaded'});
+    await page.getByText('Not found').first().waitFor({timeout: 30000}).catch(() => {});
     check('in-app 404 renders', await page.getByText('Not found').count() > 0);
     check('in-app 404 keeps the header chrome', await page.locator('header').count() > 0);
+    // Keyless, only a symbol some strategy watches gets a stock page (qa-strategies covers those).
+    check('a symbol no strategy watches gets no stock panels', await page.locator('#key-numbers, #rules-see').count() === 0);
     await shot('03-not-found-in-app');
 
     // --- TradingView embeds keep their transparency under a dark palette -----------

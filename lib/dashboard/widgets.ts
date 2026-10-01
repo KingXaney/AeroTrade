@@ -55,6 +55,7 @@ export const DATA_KEYS = [
     'onboardingFacts',
     'learnFacts',
     'lesson',
+    'dailyQuiz',
 ] as const;
 export type DataKey = (typeof DATA_KEYS)[number];
 
@@ -83,13 +84,15 @@ export const DATA_KEY_DEPS: Record<DataKey, readonly DataKey[]> = {
     onboardingFacts: [],
     learnFacts: [],
     lesson: [],
+    dailyQuiz: [],
 };
 
 // Streamed under <Suspense> because they are slow or fan out to third parties;
 // their loaders resolve their own dependencies, so those never join the eager pass.
 // 'lesson' is lazy for a different reason: Today's lesson needs it only on a day when no
-// moment from the learn facts wins, so it is read only when that body renders.
-export const LAZY_DATA_KEYS: readonly DataKey[] = ['movers', 'news', 'analytics', 'brainStatus', 'topicsLatest', 'strategies', 'lesson'];
+// moment from the learn facts wins, so it is read only when that body renders. 'dailyQuiz'
+// is lazy because a question is never above-the-fold critical.
+export const LAZY_DATA_KEYS: readonly DataKey[] = ['movers', 'news', 'analytics', 'brainStatus', 'topicsLatest', 'strategies', 'lesson', 'dailyQuiz'];
 
 // 'link' = the clickable PersonalRow card · 'panel' = glass-panel + heading ·
 // 'panel-lg' / 'panel-sm' = panel with the TradingView paddings · 'bare' = the
@@ -135,6 +138,7 @@ export const WIDGET_IDS = [
     // learn
     'getting-started',
     'todays-lesson',
+    'daily-quiz',
     // personal
     'portfolio-snapshot',
     'watchlist-movers',
@@ -256,6 +260,21 @@ export const WIDGETS: {readonly [K in WidgetId]: WidgetDefinition & {id: K}} = {
         defaultSpan: 6,
         minHeight: 220,
         dataKeys: ['learnFacts', 'lesson'],
+        isNew: true,
+    }),
+    // Library-only too: one question a day from a strategy's recent signal board, the answer
+    // revealed from the stored record. It counts the days answered and nothing else, and like
+    // every widget it carries no "What these mean" and no "Ask in chat" (invariant 12).
+    'daily-quiz': define({
+        id: 'daily-quiz',
+        title: 'Daily quiz',
+        description: 'One question a day from a strategy\'s recent signal board: which verdict a row got, which reading explains it, or which symbol carried it.',
+        category: 'learn',
+        icon: 'quiz',
+        spans: [4, 6, 8, 12],
+        defaultSpan: 6,
+        minHeight: 240,
+        dataKeys: ['dailyQuiz'],
         isNew: true,
     }),
 

@@ -141,18 +141,12 @@ try {
     await page.locator('a[aria-label="Trade AAPL"]').first().waitFor({timeout: 30000});
     check('at 390px watchlist cells name themselves', await page.getByText('Market Cap', {exact: true}).filter({visible: true}).count() >= 1);
     await page.setViewportSize({width: 1440, height: 900});
-    // Without a Finnhub key the stock page has no profile and renders the app's own
-    // not-found (pre-existing behaviour), so this check only runs when a key is set.
+    // AAPL is on the large-cap strategies' boards, so its stock page renders even without a
+    // Finnhub key (a symbol no strategy watches still 404s keyless — qa-foundations).
     await page.goto(`${BASE}/stocks/AAPL`, {waitUntil: 'domcontentloaded'});
-    await Promise.race([
-        page.locator('a[href="/trade?symbol=AAPL"]').first().waitFor({timeout: 30000}),
-        page.getByText("We couldn't find that page").waitFor({timeout: 30000}),
-    ]);
-    if (await page.getByText("We couldn't find that page").count() > 0) {
-        console.log('SKIP  the stock page has an explicit Trade button  — no quote provider in this harness');
-    } else {
-        check('the stock page has an explicit Trade button', /Trade/.test(await page.locator('a[href="/trade?symbol=AAPL"]').first().innerText()));
-    }
+    await page.locator('a[href="/trade?symbol=AAPL"]').first().waitFor({timeout: 30000});
+    // The button is uppercased by CSS, and innerText follows it.
+    check('the stock page has an explicit Trade button', /trade/i.test(await page.locator('a[href="/trade?symbol=AAPL"]').first().innerText()));
 
     // --- the order ticket ---------------------------------------------------------------
     await page.goto(`${BASE}/trade?symbol=AAPL`, {waitUntil: 'domcontentloaded'});

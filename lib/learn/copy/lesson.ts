@@ -1,12 +1,13 @@
-// Copy for Today's lesson (components/dashboard/widgets/TodaysLesson.tsx): a first from the
-// learner's own account, a followed strategy's rebalance, or a concept today's topic articles
-// used. Every sentence describes what happened or what a term measures — none says what to do
-// — and is held to the 'copy' tier of lib/learn/banned.ts by lesson-copy.test.ts on a grid of
-// rows. A rebalance is described by the catalog's cadence and the StrategyState outcome only;
-// the beginner line is never quoted here (it belongs to the strategy header, the wide
-// quant-strategies widget and /learn). A term the lesson defines is quoted from the glossary
-// ("Win rate: …", GLOSSARY[key].short), never restated in the lesson's own words, so the two
-// cannot drift apart; the lesson's own sentences carry only the row's facts.
+// Copy for Today's lesson (components/dashboard/widgets/TodaysLesson.tsx, and the digest email's
+// section in lib/learn/digest-section.ts): a first from the learner's own account, a followed
+// strategy's rebalance, or a concept today's topic articles used. Every sentence describes what
+// happened or what a term measures — none says what to do — and is held to the 'copy' tier of
+// lib/learn/banned.ts by lesson-copy.test.ts on a grid of rows. A rebalance is described by the
+// catalog's cadence and the StrategyState outcome only; the beginner line is never quoted here
+// (it belongs to the strategy header, the wide quant-strategies widget and /learn). A term the
+// lesson defines is quoted from the glossary ("Win rate: …", GLOSSARY[key].short), never
+// restated in the lesson's own words, so the two cannot drift apart; the lesson's own sentences
+// carry only the row's facts.
 //
 // Import-free of server code: the widget renders it on the server, the Got it button on the client.
 
@@ -41,6 +42,8 @@ export type MomentCopy = {
 };
 
 export const LESSON_COPY = {
+    // The daily digest email's section heading (lib/learn/digest-section.ts).
+    emailHeading: 'Today\'s lesson',
     accountLabel: 'From your account',
     strategyLabel: 'A strategy you follow',
     feedLabel: 'In your topics today',

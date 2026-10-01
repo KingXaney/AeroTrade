@@ -14,7 +14,9 @@ import {getBarsForSymbols} from "@/lib/prices/store";
 import {getOwnedAccount, seedDayZeroSnapshot} from "@/lib/trading/account";
 import {STRATEGIES, effectiveVersion} from "@/lib/strategies/catalog";
 import {STRATEGY_OWNER_ID, STRATEGY_STARTING_BALANCE} from "@/lib/strategies/config";
+import type {VariantStamp} from "@/lib/strategies/job-helpers";
 import type {DayResult, SimulationResult, StrategyDefinition} from "@/lib/strategies/types";
+import type {StoredWhatIfVariant} from "@/lib/strategies/whatif";
 import {UNIVERSES} from "@/lib/strategies/universe";
 
 export type StrategyStateView = {
@@ -284,6 +286,38 @@ export const saveBacktest = async (strategyId: string, version: string, result: 
         },
         {upsert: true},
     );
+};
+
+// What the nightly job needs to decide whether a strategy's what-if grid is due: the stored
+// backtest's version and build, the version and build its variants were computed beside and
+// their ids. One small projected read across the eight backtests — never the points.
+export const variantStamps = async (): Promise<Record<string, VariantStamp>> => {
+    await connectToDatabase();
+    const docs = await StrategyBacktest
+        .find({}, {strategyId: 1, version: 1, computedAt: 1, variantsVersion: 1, variantsFor: 1, 'variants.id': 1})
+        .lean<{strategyId: string; version: string; computedAt?: Date; variantsVersion?: string; variantsFor?: Date; variants?: {id: string}[]}[]>();
+    const ms = (date: Date | undefined): number | null => (date ? new Date(date).getTime() : null);
+    return Object.fromEntries(docs.map((d) => [d.strategyId, {
+        version: d.version,
+        variantsVersion: d.variantsVersion ?? null,
+        variantIds: d.variants ? d.variants.map((v) => v.id) : null,
+        computedAt: ms(d.computedAt),
+        variantsFor: ms(d.variantsFor),
+    }]));
+};
+
+// Attaches a what-if grid to the backtest build it was computed beside, and only to that one:
+// the filter on version and computedAt means a backtest rebuilt meanwhile — by a new engine
+// version or a resimulate on the same one — keeps no variants from another build. Never
+// touches the backtest itself (that is saveBacktest's) or any account.
+export const saveVariants = async (strategyId: string, version: string, computedAt: number, variants: readonly StoredWhatIfVariant[]): Promise<boolean> => {
+    await connectToDatabase();
+    const build = new Date(computedAt);
+    const result = await StrategyBacktest.updateOne(
+        {strategyId, version, computedAt: build},
+        {$set: {variants, variantsVersion: version, variantsFor: build}},
+    );
+    return result.matchedCount === 1;
 };
 
 // Full stored history for a simulation (bounded by what the backfill stored).

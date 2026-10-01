@@ -20,6 +20,7 @@ import {
 } from "@/lib/prices/config";
 import {delay, getEasternDateString} from "@/lib/utils";
 import {previousTradingDay} from "@/lib/prices/market-hours";
+import {addCalendarDays} from "@/lib/prices/calendar-days";
 
 export type EnsureBarsOptions = {
     limit?: number;
@@ -223,6 +224,31 @@ export const getBarsForSymbols = async (
     return map;
 };
 
+// Each symbol's bars from its own date through `to`, ascending, in one query: an $or of
+// per-symbol ranges on the {symbol, date} index, for a read whose symbols start on different
+// days ("since thesis": each ticker from its own thesis date). Overlapping ranges for one
+// symbol come back once, from the earliest of them.
+export const getBarsFrom = async (requests: readonly {symbol: string; from: string}[], to?: string): Promise<Map<string, Bar[]>> => {
+    const earliest = new Map<string, string>();
+    for (const {symbol, from} of requests) {
+        const key = symbol.toUpperCase();
+        if (!key) continue;
+        const current = earliest.get(key);
+        if (current === undefined || from < current) earliest.set(key, from);
+    }
+    const map = new Map<string, Bar[]>();
+    if (earliest.size === 0) return map;
+    await connectToDatabase();
+    const ranges = [...earliest].map(([symbol, from]) => ({symbol, date: {$gte: from, ...(to !== undefined ? {$lte: to} : {})}}));
+    const docs = await PriceBar.find({$or: ranges}, BAR_PROJECTION).sort({date: 1}).lean<LeanPriceBar[]>();
+    for (const doc of docs) {
+        const list = map.get(doc.symbol) ?? [];
+        list.push(toBar(doc));
+        map.set(doc.symbol, list);
+    }
+    return map;
+};
+
 // ---------------------------------------------------------------------------
 // Readiness for income: which symbols' dividends can be trusted over a window
 // ---------------------------------------------------------------------------
@@ -253,10 +279,65 @@ export const getDividendPoints = async (symbols: string[], from: string, to: str
     return bars.map((bar) => ({symbol: bar.symbol, exDate: bar.date, perShare: bar.dividend}));
 };
 
-// The stored T-bill series as rate points (a discount yield, annualised %).
-export const getRatePoints = async (): Promise<{date: string; discountPct: number}[]> => {
+// A buy-at-`from`, sell-at-`to` hold needs only two closes per symbol and the dividends paid in
+// between: the bars dated exactly `from` and `to` (the unique {symbol, date} index, at most two
+// documents a symbol) and the dividend rows with ex-dates after `from` through `to` (the partial
+// dividend index, via getDividendPoints). Never the bars in between. `from` and `to` are
+// sessions; a symbol with no bar on either one is simply missing from `bars`.
+export const getHoldWindowBars = async (
+    symbols: string[],
+    from: string,
+    to: string,
+): Promise<{bars: {symbol: string; date: string; close: number}[]; dividends: DividendPoint[]}> => {
+    const unique = Array.from(new Set(symbols.map((s) => s.toUpperCase()))).filter(Boolean);
+    if (unique.length === 0 || from > to) return {bars: [], dividends: []};
     await connectToDatabase();
-    const bars = await PriceBar.find({symbol: RATE_SYMBOL}, {_id: 0, date: 1, close: 1}).sort({date: 1}).lean<{date: string; close: number}[]>();
+    const [bars, dividends] = await Promise.all([
+        PriceBar.find({symbol: {$in: unique}, date: {$in: [from, to]}}, {_id: 0, symbol: 1, date: 1, close: 1})
+            .lean<{symbol: string; date: string; close: number}[]>(),
+        getDividendPoints(unique, addCalendarDays(from, 1), to),
+    ]);
+    return {bars, dividends};
+};
+
+// The latest stored bar date for a symbol on or before `onOrBefore` — the last session the
+// price job has stored. One point read on the unique index.
+export const getLatestBarDate = async (symbol: string, onOrBefore: string): Promise<string | null> => {
+    await connectToDatabase();
+    const bar = await PriceBar.findOne({symbol: symbol.toUpperCase(), date: {$lte: onOrBefore}}, {_id: 0, date: 1})
+        .sort({date: -1})
+        .lean<{date: string} | null>();
+    return bar?.date ?? null;
+};
+
+// Each symbol's latest stored bar (date and close) from `since` through `onOrBefore`, in one
+// aggregate on the unique {symbol, date} index — at most the bars inside that short range, never
+// a history. A symbol with no bar in the range is absent. What a request-path read keys its day
+// memo on (the data's own stamp), and how Luck or skill finds the last session its whole pool has.
+export const getLatestBars = async (
+    symbols: string[],
+    {since, onOrBefore}: {since: string; onOrBefore: string},
+): Promise<Map<string, {date: string; close: number}>> => {
+    const unique = Array.from(new Set(symbols.map((s) => s.toUpperCase()))).filter(Boolean);
+    if (unique.length === 0 || since > onOrBefore) return new Map();
+    await connectToDatabase();
+    const rows = await PriceBar.aggregate<{_id: string; date: string; close: number}>([
+        {$match: {symbol: {$in: unique}, date: {$gte: since, $lte: onOrBefore}}},
+        {$sort: {symbol: -1, date: -1}},
+        {$group: {_id: '$symbol', date: {$first: '$date'}, close: {$first: '$close'}}},
+    ]);
+    return new Map(rows.map((row) => [row._id, {date: row.date, close: row.close}]));
+};
+
+// The stored T-bill series as rate points (a discount yield, annualised %). The jobs read it
+// whole; a request path passes inclusive `from`/`to` so the read stays bounded.
+export const getRatePoints = async ({from, to}: {from?: string; to?: string} = {}): Promise<{date: string; discountPct: number}[]> => {
+    await connectToDatabase();
+    const date: Record<string, string> = {};
+    if (from !== undefined) date.$gte = from;
+    if (to !== undefined) date.$lte = to;
+    const filter = {symbol: RATE_SYMBOL, ...(Object.keys(date).length > 0 ? {date} : {})};
+    const bars = await PriceBar.find(filter, {_id: 0, date: 1, close: 1}).sort({date: 1}).lean<{date: string; close: number}[]>();
     return bars.map((bar) => ({date: bar.date, discountPct: bar.close}));
 };
 

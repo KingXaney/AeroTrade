@@ -3,6 +3,7 @@ import {describeNextRebalance} from "@/lib/strategies/calendar";
 import {UNIVERSES} from "@/lib/strategies/universe";
 import Panel from "@/components/primitives/Panel";
 import SectionHeading from "@/components/primitives/SectionHeading";
+import {formatParamValue, paramLabel} from "@/lib/learn/copy/whatif";
 
 // The teaching panel: the rule in plain words, why anyone believes in it, when it
 // breaks, and every simplification the numbers on this page carry. All of it is
@@ -26,27 +27,6 @@ const List = ({title, items}: {title: string; items: readonly string[]}) => (
         </ul>
     </div>
 );
-
-const PARAM_LABELS: Record<string, string> = {
-    allocation: 'Target allocation',
-    spyWeight: 'SPY weight',
-    aggWeight: 'AGG weight',
-    fast: 'Fast average (days)',
-    slow: 'Slow average (days)',
-    lookback: 'Lookback (trading days)',
-    skip: 'Skip most recent (days)',
-    top: 'Positions held',
-    rsiPeriod: 'RSI period',
-    entryRsi: 'Entry: RSI below',
-    exitSma: 'Exit: close above SMA (days)',
-    trendSma: 'Trend filter SMA (days)',
-    entryChannel: 'Entry channel (days)',
-    exitChannel: 'Exit channel (days)',
-    volWindow: 'Volatility window (days)',
-};
-
-const formatParam = (value: number | string): string =>
-    typeof value === 'number' && value > 0 && value < 1 ? `${(value * 100).toFixed(0)}%` : String(value);
 
 type Props = {
     def: StrategyDefinition;
@@ -77,8 +57,8 @@ const StrategyExplainer = ({def, lastRebalanceDate, defaultOpen = false}: Props)
                             <dl className="font-mono grid grid-cols-[auto_1fr] gap-x-4 gap-y-1 text-xs">
                                 {Object.entries(def.params).map(([key, value]) => (
                                     <div key={key} className="contents">
-                                        <dt className="text-fg-muted">{PARAM_LABELS[key] ?? key}</dt>
-                                        <dd className="text-fg text-right">{formatParam(value)}</dd>
+                                        <dt className="text-fg-muted">{paramLabel(key)}</dt>
+                                        <dd className="text-fg text-right">{formatParamValue(value)}</dd>
                                     </div>
                                 ))}
                                 <dt className="text-fg-muted">Universe</dt>

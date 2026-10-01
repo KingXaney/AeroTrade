@@ -3,6 +3,10 @@ import {cn, getChangeColorClass} from "@/lib/utils";
 import TradeLink from "@/components/trade/TradeLink";
 import FollowTopicButton from "@/components/topics/FollowTopicButton";
 import type {FollowedByName} from "@/components/brain/NarrativeLeaderboard";
+import Term from "@/components/primitives/Term";
+import WhatTheseMean from "@/components/learn/WhatTheseMean";
+import {BRAIN_COPY} from "@/lib/learn/copy/brain";
+import type {SinceThesisLegs} from "@/lib/brain/since-thesis";
 
 const MS_PER_WEEK = 7 * 24 * 60 * 60 * 1000;
 
@@ -10,9 +14,19 @@ const MS_PER_WEEK = 7 * 24 * 60 * 60 * 1000;
 const weeksActive = (thesisSince: number | null): number =>
     thesisSince ? Math.max(1, Math.round((Date.now() - thesisSince) / MS_PER_WEEK)) : 0;
 
+type Props = {
+    theses: BrainEntitySummary[];
+    followedByName?: FollowedByName;
+    // Ticker key → both legs of "since thesis"; a thesis without an entry shows no line.
+    sinceThesis?: Record<string, SinceThesisLegs>;
+    // Opts the page into the panel's "What these mean". The active-theses widget never passes
+    // it (no definitions or "Ask in chat" on a dashboard widget, invariant 12) nor sinceThesis.
+    definitions?: boolean;
+};
+
 // The centerpiece of /brain: narratives whose SLOW-layer weight has sustained above
 // the thesis threshold — "where the market's favor has been shifting for weeks".
-const ActiveTheses = ({theses, followedByName}: {theses: BrainEntitySummary[]; followedByName?: FollowedByName}) => {
+const ActiveTheses = ({theses, followedByName, sinceThesis, definitions = false}: Props) => {
     if (theses.length === 0) {
         return (
             <p className="text-sm text-fg-muted">
@@ -22,10 +36,12 @@ const ActiveTheses = ({theses, followedByName}: {theses: BrainEntitySummary[]; f
         );
     }
 
+    const anySince = theses.some((t) => sinceThesis?.[t.key] !== undefined);
     return (
         <div className="space-y-1.5">
             {theses.map((t) => {
                 const weeks = weeksActive(t.thesisSince);
+                const since = sinceThesis?.[t.key];
                 return (
                     <div key={t.key}
                          className="flex items-center justify-between px-4 py-3 rounded-lg border bg-surface-2/40 border-brand/15">
@@ -44,13 +60,19 @@ const ActiveTheses = ({theses, followedByName}: {theses: BrainEntitySummary[]; f
                                         <> · <Link href={`/stocks/${encodeURIComponent(t.key)}`} className="text-brand hover:underline normal-case tracking-normal">stock page</Link></>
                                     )}
                                 </div>
+                                {since && (
+                                    <div data-testid="since-thesis" className="font-mono text-[11px] text-fg-soft"
+                                         title={BRAIN_COPY.sinceThesisWindow(since.from, since.to)}>
+                                        <Term k="since-thesis">{BRAIN_COPY.sinceThesisLabel}</Term>: {BRAIN_COPY.sinceThesisFigures(t.key, since.symbolPct, since.spyPct)}
+                                    </div>
+                                )}
                             </div>
                         </div>
                         <div className="flex items-center gap-3">
                             <div className="text-right" style={{fontFamily: 'var(--type-mono)'}}>
-                                <div className="text-sm text-fg">weight {t.weightSlow.toFixed(1)}</div>
+                                <div className="text-sm text-fg"><Term k="news-weight">weight</Term> {t.weightSlow.toFixed(1)}</div>
                                 <div className={cn('text-xs', getChangeColorClass(t.sentimentSlow || undefined))}>
-                                    sentiment {t.sentimentSlow >= 0 ? '+' : ''}{t.sentimentSlow.toFixed(2)}
+                                    <Term k="news-sentiment">sentiment</Term> {t.sentimentSlow >= 0 ? '+' : ''}{t.sentimentSlow.toFixed(2)}
                                 </div>
                             </div>
                             {t.type === 'ticker' && <TradeLink symbol={t.key} variant="icon" className="size-7" />}
@@ -62,6 +84,7 @@ const ActiveTheses = ({theses, followedByName}: {theses: BrainEntitySummary[]; f
                     </div>
                 );
             })}
+            {definitions && <WhatTheseMean keys={['thesis', 'news-weight', 'news-sentiment', ...(anySince ? ['since-thesis'] : [])]} />}
         </div>
     );
 };

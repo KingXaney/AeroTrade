@@ -10,14 +10,21 @@ const BOARD: readonly GlossaryKey[] = [
     'close', 'since-entry', 'weight', 'target', 'drift', 'sma50', 'sma200', 'sma5', 'spread', 'trend-on',
     'r12', 'above-hurdle', 'pick', 'momentum-12-1', 'momentum-rank', 'rsi2', 'above-sma200',
     'high55', 'low20', 'vs-high', 'vol63', 'vol-rank', 'simulated-record',
+    // Time in the market lives on a strategy page (buy-and-hold SPY), so it homes with them.
+    'lump-sum', 'dollar-cost-averaging', 'cash-only', 'underwater',
 ];
 const MARKET: readonly GlossaryKey[] = ['market-cap', 'pe-ratio', 'dividend-yield', 'beta', 'fifty-two-week-range'];
+const BRAIN: readonly GlossaryKey[] = [
+    'news-weight', 'news-sentiment', 'thesis', 'since-thesis',
+    'event-earnings', 'event-guidance', 'event-mna', 'event-product', 'event-macro', 'event-regulatory', 'event-analyst', 'event-legal',
+];
 
 const HOMES = {
     board: {href: '/strategies', label: 'Strategy boards'},
     portfolio: {href: '/portfolio', label: 'Your portfolio'},
     market: {href: '/watchlist', label: 'Watchlist and stock pages'},
     concepts: {href: '/topics', label: 'Your topics'},
+    brain: {href: '/brain', label: 'The News Brain'},
     rails: {href: '/brain', label: 'The News Brain'},
 } as const;
 
@@ -28,6 +35,7 @@ export const groupOf = (entry: GlossaryEntry): GroupId => {
     if (entry.kind === 'rail') return 'rails';
     if ((BOARD as readonly string[]).includes(entry.key)) return 'board';
     if ((MARKET as readonly string[]).includes(entry.key)) return 'market';
+    if ((BRAIN as readonly string[]).includes(entry.key)) return 'brain';
     return 'portfolio';
 };
 
@@ -40,11 +48,12 @@ const GROUP_LABELS: Record<GroupId, string> = {
     portfolio: 'On your portfolio',
     market: 'On the watchlist and stock pages',
     concepts: 'Terms in the news',
+    brain: 'On the News Brain',
     rails: "The Navigator's rails",
 };
 
 // Registry order within each group, groups in reading order.
-export const GLOSSARY_GROUPS: readonly GlossaryGroup[] = (['board', 'portfolio', 'market', 'concepts', 'rails'] as const).map((id) => ({
+export const GLOSSARY_GROUPS: readonly GlossaryGroup[] = (['board', 'portfolio', 'market', 'concepts', 'brain', 'rails'] as const).map((id) => ({
     id,
     label: GROUP_LABELS[id],
     home: HOMES[id],

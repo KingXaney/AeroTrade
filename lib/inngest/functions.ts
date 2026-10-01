@@ -63,11 +63,15 @@ import {MAX_BRIEF_CALLS_PER_RUN, newsSearchEnabled} from "@/lib/topics/config";
 import {TOPIC_BRIEFS_EVENT, TOPIC_FEEDS_EVENT, TOPIC_FIRST_RUN_EVENT, TOPIC_REFRESH_EVENT} from "@/lib/topics/events";
 import {ensureTopicHasArticles, getTopicsDigestData, getTopicsForUser} from "@/lib/topics/store";
 import {buildTopicsSectionHtml} from "@/lib/topics/digest-section";
+import {lessonSectionFor} from "@/lib/learn/digest-section";
+import {readLearnFacts} from "@/lib/learn/facts-store";
+import {readLessonForDigest} from "@/lib/learn/lesson-store";
 import {STRATEGIES, effectiveVersion} from "@/lib/strategies/catalog";
 import {STRATEGY_OWNER_ID} from "@/lib/strategies/config";
 import {previousTradingDay} from "@/lib/strategies/calendar";
-import {assessFreshness, chunkUniverse, runSummary, stepId, throttleDue} from "@/lib/strategies/job-helpers";
-import {SIM_INCOME_CALENDAR_DAYS, backtestDataReady, decideForStrategy, isUniverseTooStale, simulateForStrategy} from "@/lib/strategies/runner";
+import {assessFreshness, chunkUniverse, runSummary, stepId, throttleDue, variantsDue} from "@/lib/strategies/job-helpers";
+import {SIM_INCOME_CALENDAR_DAYS, backtestDataReady, decideForStrategy, isUniverseTooStale, simulateForStrategy, simulateVariantsForStrategy} from "@/lib/strategies/runner";
+import {gridFor} from "@/lib/strategies/whatif";
 import {
     backtestVersions,
     claimRun,
@@ -77,6 +81,7 @@ import {
     markStrategyError,
     recordSkippedRuns,
     releaseRun,
+    variantStamps,
     type OrderOutcome,
 } from "@/lib/strategies/store";
 import {ALL_STRATEGY_SYMBOLS, BENCHMARK_SYMBOL as STRATEGY_BENCHMARK, CORE_ETFS, LARGE_CAPS, SECTOR_ETFS} from "@/lib/strategies/universe";
@@ -657,7 +662,7 @@ export const runWeeklyNavigator = inngest.createFunction(
 
 export const sendDailyNewsSummary = inngest.createFunction(
     { id: 'daily-news-summary', triggers: [{ event: 'app/send.daily.news' }, { cron: 'TZ=America/New_York 0 12 * * *' }] },
-    async ({ step }) => {
+    async ({ step, runId }) => {
         // Step #1: Get all users for news delivery
         const users = await step.run('get-all-users', getAllUsersForNewsEmail)
 
@@ -730,22 +735,39 @@ export const sendDailyNewsSummary = inngest.createFunction(
                     }
                 });
 
-                // Followed topics: a deterministic section (no LLM), every string escaped
-                // and links allow-listed to the articles it lists. Off per user, and a
-                // failure here only drops the section.
-                const topicsSection = await step.run(`fetch-topics-${safeId}`, async () => {
-                    if (!user.topicsInDigest) return '';
-                    try {
-                        const data = await getTopicsDigestData(user.id);
-                        if (data.length === 0) return '';
-                        const manageUrl = `${APP_URL}/topics`;
-                        const section = buildTopicsSectionHtml(data, manageUrl);
-                        const allowed = [manageUrl, ...data.flatMap((t) => t.articles.map((a) => a.url))];
-                        return sanitizeDigestHtml(section, allowed);
-                    } catch (error) {
-                        console.error('Topics email section failed:', error);
-                        return '';
-                    }
+                // Two deterministic sections (no LLM), in one step: followed topics (off per user),
+                // every string escaped and links allow-listed to the articles it lists; and Today's
+                // lesson — a first from the learner's own account (or a followed strategy's
+                // rebalance) dated exactly yesterday (this noon run would otherwise mail a morning
+                // fill or a 09:35 rebalance twice), else the day's glossary concept, read once per
+                // distinct keyword set in this run (lessonSectionFor, lib/learn/digest-section.ts).
+                // Both ride under the same emailNotifications opt-out as the rest, and a failure
+                // in either only drops that section.
+                const {topicsSection, lessonSection} = await step.run(`fetch-sections-${safeId}`, async () => {
+                    const topics = async (): Promise<string> => {
+                        if (!user.topicsInDigest) return '';
+                        try {
+                            const data = await getTopicsDigestData(user.id);
+                            if (data.length === 0) return '';
+                            const manageUrl = `${APP_URL}/topics`;
+                            const section = buildTopicsSectionHtml(data, manageUrl);
+                            const allowed = [manageUrl, ...data.flatMap((t) => t.articles.map((a) => a.url))];
+                            return sanitizeDigestHtml(section, allowed);
+                        } catch (error) {
+                            console.error('Topics email section failed:', error);
+                            return '';
+                        }
+                    };
+                    const lesson = async (): Promise<string> => {
+                        try {
+                            return await lessonSectionFor({facts: await readLearnFacts(user.id), loadTerm: () => readLessonForDigest(user.id, runId), appUrl: APP_URL});
+                        } catch (error) {
+                            console.error('Lesson email section failed:', error);
+                            return '';
+                        }
+                    };
+                    const [topicsHtml, lessonHtml] = await Promise.all([topics(), lesson()]);
+                    return {topicsSection: topicsHtml, lessonSection: lessonHtml};
                 });
 
                 // fullSummary is for the news brain — JSON.stringify drops undefined values,
@@ -772,6 +794,7 @@ export const sendDailyNewsSummary = inngest.createFunction(
                         // to point at URLs from the actual article set.
                         newsContent: sanitizeDigestHtml(newsContent, news.map((n) => n.url)),
                         topicsSection,
+                        lessonSection,
                     });
                 });
 
@@ -1366,6 +1389,26 @@ export const runStrategiesDaily = inngest.createFunction(
             }
         }
 
+        // The what-if grid (lib/strategies/whatif.ts), beside the backtest each strategy has NOW —
+        // so read after the rebuilds above. One step per strategy, and only when its backtest was
+        // rebuilt since the grid was computed or the grid changed: not every night. The step
+        // keeps the backtest's readiness guard and writes StrategyBacktest.variants alone.
+        let whatIfGrids = 0;
+        const stamps = await step.run('check-variants', async () => variantStamps());
+        for (const def of STRATEGIES) {
+            const state = states.find((s) => s.strategyId === def.id);
+            if (!state || !variantsDue(stamps[def.id], effectiveVersion(def), gridFor(def).map((v) => v.id), resimulate)) continue;
+            try {
+                const grid = await step.run(`variants-${stepId(def.id)}`, async () => simulateVariantsForStrategy(def, state.launchDate, stamps[def.id]?.computedAt ?? null));
+                if (grid.waiting) console.warn(`What-if grid for ${def.id} waiting: ${grid.waiting}`);
+                if (grid.computed > 0) whatIfGrids += 1;
+            } catch (error) {
+                // A missing grid only leaves the lab's "computed overnight" state up; it never
+                // marks the strategy, whose trading and backtest are untouched.
+                console.error('What-if grid failed:', def.id, error);
+            }
+        }
+
         const summary = runSummary({
             ran,
             total: STRATEGIES.length,
@@ -1375,6 +1418,7 @@ export const runStrategiesDaily = inngest.createFunction(
             staleSymbols: freshness.staleSymbols.length,
             backtestsRebuilt,
             backtestsWaiting,
+            whatIfGrids,
             providers,
             failedSymbols,
             asOf,

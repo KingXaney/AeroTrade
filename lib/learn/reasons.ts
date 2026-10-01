@@ -10,12 +10,38 @@
 // and drift band, and the engine's CASH_FLOOR and STALE_SKIP_FRACTION, so a parameter
 // change moves the prose with it.
 //
+// NAVIGATOR_GRAMMAR does the same for the AI Navigator (decodeNavigatorReason): every string
+// scoreUniverse, diffToOrders and the weekly job's kept-position fallback write, glossed with
+// lib/navigator/config.ts and the brain's slow half-life. It is a separate list because the
+// two engines share one shape ("rebalance +3.8% drift toward 12.0% target") under different
+// bands, so the caller, who knows which engine wrote the string, picks the grammar.
+//
 // Pure and client-importable. Never throws and never builds a RegExp from its input
 // (invariant 2): the chat's explain tool passes it model- and user-supplied text, and a
 // string it does not recognise, a truncated one included, comes back whole as `unknown`.
 
 import type {GlossaryKey} from '@/lib/learn/glossary';
 import {REASON_GLOSS, shareText, type LegSplit} from '@/lib/learn/copy/reasons';
+import {NAVIGATOR_GLOSS, thesisSubject} from '@/lib/learn/copy/navigator';
+import {HALF_LIFE_SLOW_DAYS} from '@/lib/brain/config';
+import {
+    ELIGIBILITY_LOOKBACK_DAYS,
+    ENTRY_SCORE_THRESHOLD,
+    EXIT_SCORE_THRESHOLD,
+    HARD_STOP_DRAWDOWN,
+    MAX_POSITION_WEIGHT,
+    MAX_POSITIONS,
+    MIN_ARTICLES_FOR_ELIGIBILITY,
+    MIN_CASH_WEIGHT,
+    MIN_DISTINCT_SOURCES,
+    MIN_HOLDING_TRADING_DAYS,
+    MIN_PRICE_BARS,
+    MOMENTUM_MIX,
+    REBALANCE_BAND,
+    SCORE_WEIGHTS,
+    VOLATILITY_HAIRCUT,
+} from '@/lib/navigator/config';
+import {TOP_QUINTILE_FRACTION} from '@/lib/navigator/scoring';
 import {strategyBySlug} from '@/lib/strategies/catalog';
 import {CASH_FLOOR, DEFAULT_DRIFT_BAND, STALE_SKIP_FRACTION} from '@/lib/strategies/config';
 import {findParam} from '@/lib/strategies/params';
@@ -24,12 +50,17 @@ import type {StrategyDefinition, StrategyId} from '@/lib/strategies/types';
 // The lib/strategies/config.ts constant a clause turns on, by its name there.
 export type EngineRail = 'CASH_FLOOR' | 'DEFAULT_DRIFT_BAND' | 'STALE_SKIP_FRACTION';
 
+// The lib/navigator/config.ts constant a Navigator clause turns on, by its name there.
+export type NavigatorRail =
+    | 'SCORE_WEIGHTS' | 'MOMENTUM_MIX' | 'VOLATILITY_HAIRCUT' | 'MIN_ARTICLES_FOR_ELIGIBILITY'
+    | 'EXIT_SCORE_THRESHOLD' | 'HARD_STOP_DRAWDOWN' | 'REBALANCE_BAND' | 'MAX_POSITION_WEIGHT' | 'ENTRY_SCORE_THRESHOLD';
+
 export type ReasonClause = {
     // A verbatim slice of the reason.
     text: string;
     gloss: string;
     term?: GlossaryKey;
-    rail?: EngineRail;
+    rail?: EngineRail | NavigatorRail;
 };
 
 export type DecodedReason = {clauses: ReasonClause[]; unknown: string[]};
@@ -428,10 +459,193 @@ export const REASON_GRAMMAR: readonly ReasonTemplate[] = [
     },
 ];
 
-export const decodeReason = (reason: string, opts: {def?: StrategyDefinition} = {}): DecodedReason => {
+// ---- The AI Navigator ----------------------------------------------------------------------
+
+// A score weight or momentum mix share as the config spells it: 0.2 → "0.20".
+const weightText = (weight: number): string => weight.toFixed(2);
+
+type Horizon = keyof typeof MOMENTUM_MIX;
+
+// 'r126' → 126 sessions → 6 months: the horizon names scoring.ts prints.
+const sessionsOf = (horizon: Horizon): number => Number(horizon.slice(1));
+const monthsOf = (sessions: number): number => Math.round(sessions / 21);
+
+const horizonsByWeight = (): Horizon[] =>
+    (Object.keys(MOMENTUM_MIX) as Horizon[]).sort((a, b) => MOMENTUM_MIX[b] - MOMENTUM_MIX[a]);
+
+// "6-month change 0.50, 12-month 0.30, 3-month 0.20", heaviest first.
+const mixText = (): string => horizonsByWeight()
+    .map((horizon, i) => `${monthsOf(sessionsOf(horizon))}-month${i === 0 ? ' change' : ''} ${weightText(MOMENTUM_MIX[horizon])}`)
+    .join(', ');
+
+const shortestHorizon = (): number => Math.min(...(Object.keys(MOMENTUM_MIX) as Horizon[]).map(sessionsOf));
+
+const EXIT_CLAUSE = (): ReasonClause => ({text: 'exit', gloss: NAVIGATOR_GLOSS.exit(MIN_HOLDING_TRADING_DAYS)});
+
+export const NAVIGATOR_GRAMMAR: readonly ReasonTemplate[] = [
+    // ---- scoreUniverse ---------------------------------------------------------------
+    {
+        id: 'nav-news-rank',
+        pattern: anchored('slow news weight (\\d+\\.\\d) \\(rank (\\d+)/(\\d+)\\)'),
+        decode: (m) => [
+            {text: `slow news weight ${m[1]}`, gloss: NAVIGATOR_GLOSS.newsWeight(m[1], HALF_LIFE_SLOW_DAYS), term: 'news-weight'},
+            {text: `(rank ${m[2]}/${m[3]})`, gloss: NAVIGATOR_GLOSS.newsRank(m[2], m[3], weightText(SCORE_WEIGHTS.newsSlow)), rail: 'SCORE_WEIGHTS'},
+        ],
+    },
+    {
+        // Written by the fix/navigator-neutral-news branch (PR #26) for a symbol the brain
+        // has no entity for; decoded here ahead of that merge.
+        id: 'nav-news-neutral',
+        pattern: anchored('no brain coverage — news neutral'),
+        decode: (m) => [{text: m[0], gloss: NAVIGATOR_GLOSS.newsNeutral(weightText(SCORE_WEIGHTS.newsSlow)), term: 'news-weight', rail: 'SCORE_WEIGHTS'}],
+    },
+    {
+        id: 'nav-momentum',
+        pattern: anchored(`(\\d+)-month momentum (${SIGNED_PCT})`),
+        decode: (m) => {
+            const horizon = horizonsByWeight().find((h) => String(monthsOf(sessionsOf(h))) === m[1]);
+            if (!horizon) return null;
+            const sessions = sessionsOf(horizon);
+            return [{
+                text: m[0],
+                gloss: NAVIGATOR_GLOSS.momentum(m[2], sessions, monthsOf(sessions), weightText(SCORE_WEIGHTS.momentumLong), mixText()),
+                rail: 'MOMENTUM_MIX',
+            }];
+        },
+    },
+    {
+        id: 'nav-momentum-missing',
+        pattern: anchored('insufficient price history for momentum'),
+        decode: (m) => [{text: m[0], gloss: NAVIGATOR_GLOSS.momentumMissing(shortestHorizon() + 1), rail: 'MOMENTUM_MIX'}],
+    },
+    {
+        // The entity key the thesis belongs to (a ticker, 'sector:…' or 'theme:…'), or
+        // "active" when scoring was given none.
+        id: 'nav-thesis',
+        pattern: anchored('thesis ([A-Za-z0-9.:\\-]{1,64})'),
+        decode: (m) => [{
+            text: m[0],
+            gloss: NAVIGATOR_GLOSS.thesis(m[1] === 'active' ? null : thesisSubject(m[1]), weightText(SCORE_WEIGHTS.thesis)),
+            term: 'thesis',
+            rail: 'SCORE_WEIGHTS',
+        }],
+    },
+    {
+        id: 'nav-sector-standing',
+        pattern: anchored('([A-Za-z][A-Za-z &\\-]{0,40}) sector standing (-?\\d+\\.\\d)'),
+        decode: (m) => [{text: m[0], gloss: NAVIGATOR_GLOSS.sectorStanding(m[1], m[2], weightText(SCORE_WEIGHTS.sectorSlow)), rail: 'SCORE_WEIGHTS'}],
+    },
+    {
+        id: 'nav-trend-cap',
+        pattern: anchored('below 200d MA — capped'),
+        decode: (m) => [{text: m[0], gloss: NAVIGATOR_GLOSS.trendCap(), term: 'sma200'}],
+    },
+    {
+        id: 'nav-vol-haircut',
+        pattern: anchored('high volatility haircut'),
+        decode: (m) => [{
+            text: m[0],
+            gloss: NAVIGATOR_GLOSS.volHaircut(shareText(TOP_QUINTILE_FRACTION), String(VOLATILITY_HAIRCUT)),
+            term: 'vol63',
+            rail: 'VOLATILITY_HAIRCUT',
+        }],
+    },
+    {
+        id: 'nav-ineligible',
+        pattern: anchored('ineligible \\((\\d+) articles, (\\d+) sources, (\\d+) bars\\)'),
+        decode: (m) => [{
+            text: m[0],
+            gloss: NAVIGATOR_GLOSS.ineligible(
+                {articles: MIN_ARTICLES_FOR_ELIGIBILITY, sources: MIN_DISTINCT_SOURCES, days: ELIGIBILITY_LOOKBACK_DAYS, bars: MIN_PRICE_BARS},
+                m[1], m[2], m[3],
+            ),
+            rail: 'MIN_ARTICLES_FOR_ELIGIBILITY',
+        }],
+    },
+
+    // ---- diffToOrders ----------------------------------------------------------------
+    {
+        id: 'nav-exit-score',
+        pattern: anchored('exit: (score (-?\\d+\\.\\d{2}) below exit threshold -?\\d+(?:\\.\\d+)?)'),
+        decode: (m) => [
+            EXIT_CLAUSE(),
+            {text: m[1], gloss: NAVIGATOR_GLOSS.exitScore(m[2], String(EXIT_SCORE_THRESHOLD)), rail: 'EXIT_SCORE_THRESHOLD'},
+        ],
+    },
+    {
+        id: 'nav-exit-thesis',
+        pattern: anchored('exit: thesis broken'),
+        decode: () => [EXIT_CLAUSE(), {text: 'thesis broken', gloss: NAVIGATOR_GLOSS.thesisBroken(), term: 'thesis'}],
+    },
+    {
+        id: 'nav-hard-stop',
+        pattern: anchored('exit: (hard stop -?(\\d+)% vs cost)'),
+        decode: (m) => [
+            EXIT_CLAUSE(),
+            {text: m[1], gloss: NAVIGATOR_GLOSS.hardStop(`${m[2]}%`, shareText(HARD_STOP_DRAWDOWN)), rail: 'HARD_STOP_DRAWDOWN'},
+        ],
+    },
+    {
+        // The strategies' planOrders writes the same shape under its own band; this template
+        // is reached only through decodeNavigatorReason.
+        id: 'nav-rebalance',
+        pattern: anchored('rebalance ([+-]\\d+\\.\\d)% drift toward (\\d+\\.\\d)% target'),
+        decode: (m) => {
+            const [, drift, target] = m;
+            const magnitude = `${unsigned(drift)}%`;
+            return [
+                {text: 'rebalance', gloss: NAVIGATOR_GLOSS.rebalanceBand(shareText(REBALANCE_BAND), MIN_HOLDING_TRADING_DAYS), rail: 'REBALANCE_BAND'},
+                {
+                    text: `${drift}% drift`,
+                    gloss: drift.startsWith('-') ? NAVIGATOR_GLOSS.rebalanceOver(magnitude) : NAVIGATOR_GLOSS.rebalanceUnder(magnitude),
+                },
+                {
+                    text: `toward ${target}% target`,
+                    gloss: NAVIGATOR_GLOSS.target(`${target}%`, shareText(MAX_POSITION_WEIGHT), shareText(MIN_CASH_WEIGHT)),
+                    term: 'position-cap',
+                    rail: 'MAX_POSITION_WEIGHT',
+                },
+            ];
+        },
+    },
+    {
+        id: 'nav-enter',
+        pattern: anchored('enter: (score (-?\\d+\\.\\d{2}))'),
+        decode: (m) => [
+            {text: 'enter', gloss: NAVIGATOR_GLOSS.enter()},
+            {
+                text: m[1],
+                gloss: NAVIGATOR_GLOSS.enterScore(m[2], String(ENTRY_SCORE_THRESHOLD), MAX_POSITIONS, String(EXIT_SCORE_THRESHOLD)),
+                rail: 'ENTRY_SCORE_THRESHOLD',
+            },
+        ],
+    },
+    {
+        // service.ts buildHoldItems (allocator.ts HOLDING_REASON).
+        id: 'nav-holding',
+        pattern: anchored('holding — no exit trigger'),
+        decode: (m) => [{text: m[0], gloss: NAVIGATOR_GLOSS.holding()}],
+    },
+];
+
+// ---- Entry points ------------------------------------------------------------------------
+
+const decodeGuarded = (reason: string, decode: (text: string) => ReasonClause[] | null): DecodedReason => {
     const text = typeof reason === 'string' ? reason.trim() : '';
     if (!text) return {clauses: [], unknown: []};
     if (text.length > MAX_REASON_CHARS) return {clauses: [], unknown: [text]};
-    const clauses = decodeWith(REASON_GRAMMAR, text, opts.def);
+    const clauses = decode(text);
     return clauses ? {clauses, unknown: []} : {clauses: [], unknown: [text]};
 };
+
+export const decodeReason = (reason: string, opts: {def?: StrategyDefinition} = {}): DecodedReason =>
+    decodeGuarded(reason, (text) => decodeWith(REASON_GRAMMAR, text, opts.def));
+
+// A reason the AI Navigator wrote (a SuggestionSet item's `reasons`).
+export const decodeNavigatorReason = (reason: string): DecodedReason =>
+    decodeGuarded(reason, (text) => decodeWith(NAVIGATOR_GRAMMAR, text, undefined));
+
+// Every clause of every reason a decision lists, in order; a reason the grammar does not
+// know adds nothing (the raw reason is printed beside the gloss either way).
+export const glossNavigatorReasons = (reasons: readonly string[]): ReasonClause[] =>
+    reasons.flatMap((reason) => decodeNavigatorReason(reason).clauses);

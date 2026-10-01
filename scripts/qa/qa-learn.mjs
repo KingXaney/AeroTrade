@@ -6,8 +6,20 @@
 // clause by clause wherever a fill or an order shows it, and nowhere else. Today's lesson,
 // added from the widget library, teaches the term of the day, then a concept today's topic
 // articles used, then a fresh first from the account (a drop, a credited dividend) until
-// "Got it", then a followed monthly strategy's rebalance. Run against the harness in
-// README.md (in-memory Mongo on :27117 + `npm run dev`).
+// "Got it", then a followed monthly strategy's rebalance. The Daily quiz, added the same way,
+// asks one question from the one board inside its ten-day window (a skipped day and older
+// boards are passed over), reveals the seeded reason and its gloss, counts an answered day
+// once however often it is answered (two tabs at once included), asks each kind of question
+// from a board only that kind can use, and says plainly when there is no board to ask about.
+// On the buy-and-hold page, Time in the market sets three ways of owning a seeded V-shaped SPY
+// side by side from the earliest current record of the learner's two accounts, moves with a
+// start typed inside the dip, holds every way and each of the table's eight starts to values
+// computed by hand, and prints a dash for the ways holding cash once ^IRX is gone.
+// On /brain, the legend sits collapsed under System Status and states the constants (60, 0.35);
+// an earnings article carries the one badge and the evidence one "What these labels mean"; a
+// thesis gets "since thesis" only once its bars and SPY's are stored; each Navigator decision
+// opens to its reasons in plain words; the same panels as widgets carry titles only.
+// Run against the harness in README.md (in-memory Mongo on :27117 + `npm run dev`).
 import {chromium} from 'playwright';
 import {MongoClient, ObjectId} from 'mongodb';
 import {mkdirSync} from 'node:fs';
@@ -482,6 +494,640 @@ try {
     check('/ and /settings agree on the First-week checklist', onDashboard && /First week/.test(settingsText), `dashboard=${onDashboard}`);
     check('…and list Today\'s lesson in the saved layout', /Today's lesson/.test(settingsText));
     await contextC.close();
+
+    // --- Daily quiz: library-only; one question from a recent board, a day counted once ------
+    // The board is RSI-2's from yesterday, the only usable one in the ten-day window: today's
+    // RSI-2 run is a skipped day, and every other strategy's board is twelve days old. Every
+    // askable row carries a reason the decoder reads, so whichever question today's date
+    // seeds, its reveal quotes a seeded reason and its gloss.
+    await db.collection('strategyruns').deleteMany({});
+    const quizExit = 'exit: close 130.00 > SMA5 128.00';
+    const quizRows = {
+        AAPL: {state: 'enter', reason: rsiReason, gloss: /under the entry level of 10/},
+        MSFT: {state: 'watch', reason: 'signal, but no open slot', gloss: /all 5 slots were taken/},
+        NVDA: {state: 'exit', reason: quizExit, gloss: /rose above the 5-day average \(128\.00\)/},
+    };
+    const quizRun = (strategyId, date, extra) => ({
+        strategyId, date, asOf: date, mode: 'live', status: 'done', staleCount: 0, universeSize: 40, rebalanceTriggered: true,
+        board: [], orders: [], skippedOrders: [], dataIssues: [], equity: 100_000, summary: '', createdAt: new Date(), ...extra,
+    });
+    await db.collection('strategyruns').insertMany([
+        quizRun('rsi2-mean-reversion', isoDaysAgo(1), {
+            board: [
+                {symbol: 'AAPL', state: 'enter', values: {close: 123.45, rsi2: 3.4, sma5: 126.1, sma200: 110, aboveSma200: true}},
+                {symbol: 'MSFT', state: 'watch', values: {close: 410, rsi2: 6.2, sma5: 415, sma200: 380, aboveSma200: true}, note: quizRows.MSFT.reason},
+                {symbol: 'NVDA', state: 'exit', values: {close: 130, rsi2: 81.5, sma5: 128, sma200: 100, aboveSma200: true}},
+                {symbol: 'KO', state: 'excluded', values: {close: null, rsi2: null, sma5: null, sma200: null, aboveSma200: null}, note: 'needs 200 bars'},
+            ],
+            orders: [
+                {symbol: 'AAPL', side: 'buy', quantity: 160, kind: 'enter', reason: rsiReason, executed: true, price: 123.6},
+                {symbol: 'NVDA', side: 'sell', quantity: 10, kind: 'exit', reason: quizExit, executed: true, price: 130},
+            ],
+        }),
+        quizRun('rsi2-mean-reversion', today, {mode: 'skipped', status: 'skipped', summary: 'skipped: stale data'}),
+        ...['buy-and-hold-spy', 'sixty-forty', 'golden-cross', 'dual-momentum', 'momentum-12-1', 'donchian-breakout', 'low-volatility'].map((id) =>
+            quizRun(id, isoDaysAgo(12), {board: [{symbol: 'SPY', state: 'held', values: {close: 500}}, {symbol: 'QQQ', state: 'watch', values: {close: 400}}]})),
+    ]);
+
+    const contextD = await browser.newContext({viewport: {width: 1440, height: 900}});
+    const pageD = await contextD.newPage();
+    const emailD = await signUp(pageD, 'learnD');
+    const userD = await userIdFor(emailD);
+    await pageD.locator('[data-widget-id]').first().waitFor({timeout: 30000});
+    check('the Daily quiz is not on the default dashboard', await pageD.locator('[data-widget-id="daily-quiz"]').count() === 0);
+    await pageD.goto(`${BASE}/?customize=1`, {waitUntil: 'load'});
+    await pageD.getByRole('button', {name: /Add widget/i}).first().click();
+    const libraryD = pageD.locator('[role="dialog"]');
+    await libraryD.waitFor({timeout: 15000});
+    // Read from the Daily quiz's own row: its badges, and the heading of the group that holds it.
+    const libraryRow = await libraryD.evaluate((dialog) => {
+        const title = [...dialog.querySelectorAll('span')].find((el) => el.textContent?.trim() === 'Daily quiz');
+        let row = title?.parentElement ?? null;
+        while (row && !row.querySelector('button')) row = row.parentElement;
+        const group = row?.parentElement?.parentElement;
+        return {
+            badges: row ? [...row.querySelectorAll('span')].map((el) => el.textContent?.trim()).filter((text) => text === 'New').length : 0,
+            group: group?.firstElementChild?.textContent?.trim() ?? '',
+        };
+    });
+    check('the library lists the Daily quiz under Learn, its own row badged New', libraryRow.badges === 1 && /^learn$/i.test(libraryRow.group), JSON.stringify(libraryRow));
+    await libraryD.locator('div')
+        .filter({has: pageD.getByText('Daily quiz', {exact: true})})
+        .filter({has: pageD.getByRole('button', {name: 'Add', exact: true})})
+        .last().getByRole('button', {name: 'Add', exact: true}).click();
+    await pageD.keyboard.press('Escape');
+    await pageD.getByRole('button', {name: 'Save', exact: true}).click();
+    const quizWidget = pageD.locator('[data-widget-id="daily-quiz"]');
+    const quiz = quizWidget.locator('#daily-quiz');
+    await quiz.waitFor({timeout: 60000});
+    const savedD = await db.collection('userpreferences').findOne({userId: userD});
+    check('adding it from the library saves it into the layout', (savedD?.dashboardLayout?.widgets ?? []).some((w) => w.id === 'daily-quiz'));
+
+    const [, runMonth, runDay] = isoDaysAgo(1).split('-');
+    const runLabel = `${['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'][Number(runMonth) - 1]} ${Number(runDay)}`;
+    check('the question comes from the one board inside the window, past today\'s skipped day',
+        await quiz.getAttribute('data-quiz-strategy') === 'rsi2-mean-reversion'
+        && (await quiz.innerText()).toUpperCase().includes(`RSI-2 MEAN REVERSION · ${runLabel}`.toUpperCase()),
+        `${await quiz.getAttribute('data-quiz-strategy')} · ${runLabel}`);
+    const template = await quiz.getAttribute('data-quiz-template');
+    check('today\'s date seeds one of the three kinds of question', ['which-verdict', 'why-this-verdict', 'which-symbol'].includes(template), template);
+    check('no count before the first answer', await quiz.locator('[data-quiz-days]').count() === 0);
+    const noHandOffD = async () => await quizWidget.locator('[data-what-these-mean], [data-ask], details').count() === 0;
+    check('the widget carries no "What these mean", no "Ask in chat" and no disclosure', await noHandOffD());
+    const prompt = await quiz.locator('[data-quiz-prompt]').innerText();
+    const optionIds = await quiz.locator('[data-quiz-option]').evaluateAll((els) => els.map((e) => e.getAttribute('data-quiz-option')));
+    check('no answer is marked before one is given', await quiz.locator('[data-quiz-correct]').count() === 0 && optionIds.length >= 3, JSON.stringify(optionIds));
+    const optionTexts = await quiz.locator('[data-quiz-option]').allInnerTexts();
+    if (template === 'which-verdict') {
+        const symbol = await quiz.locator('[data-quiz-row]').getAttribute('data-quiz-row');
+        check('which verdict: one seeded row with its numbers, the four decisions as options',
+            symbol in quizRows && prompt === `What did the rule decide for ${symbol}?` && /RSI\(2\)/.test(await quiz.locator('[data-quiz-row]').innerText())
+            && JSON.stringify(optionIds) === JSON.stringify(['enter', 'exit', 'held', 'watch']), `${symbol} · ${prompt}`);
+    } else if (template === 'why-this-verdict') {
+        check('why this verdict: four plain-English readings, never the raw strings',
+            optionTexts.length === 4 && optionTexts.every((t) => !Object.values(quizRows).some((r) => t.trim() === r.reason))
+            && /^The rule marked (AAPL|MSFT|NVDA) “(enter|watch|exit)”\. Which reading explains that verdict\?$/.test(prompt),
+            `${prompt} · ${optionTexts.join(' | ').slice(0, 300)}`);
+    } else {
+        check('which symbol: seeded rows with their numbers as options',
+            optionIds.every((id) => id in quizRows) && /^Which of these did the rule mark “(enter|watch|exit)”\?$/.test(prompt)
+            && optionTexts.every((t) => /RSI\(2\)/.test(t)), `${prompt} · ${optionIds.join(',')}`);
+    }
+
+    // The first answer: the reveal is the stored verdict and reason, decoded; the day counts once.
+    const waitText = async (locator, pattern, ms = 15000) => {
+        const until = Date.now() + ms;
+        let text = '';
+        while (Date.now() < until) {
+            text = (await locator.count()) > 0 ? await locator.first().innerText() : '';
+            if (pattern.test(text)) return text;
+            await new Promise((r) => setTimeout(r, 200));
+        }
+        return text;
+    };
+    const answerWith = async (id) => {
+        await Promise.all([
+            pageD.waitForResponse((r) => r.request().method() === 'POST' && !!r.request().headers()['next-action'], {timeout: 15000}),
+            quiz.locator(`[data-quiz-option="${id}"]`).click(),
+        ]);
+        await quiz.locator('[data-quiz-reveal]').waitFor({timeout: 15000});
+    };
+    await answerWith(optionIds[0]);
+    const reveal = quiz.locator('[data-quiz-reveal]');
+    const revealedSymbol = await reveal.getAttribute('data-quiz-reveal');
+    const seeded = quizRows[revealedSymbol];
+    const explanation = await reveal.locator('[data-quiz-explanation]').innerText();
+    const glossText = (await reveal.locator('[data-reason-gloss]').count()) === 1 ? await reveal.locator('[data-reason-gloss]').innerText() : '';
+    check('the reveal quotes the seeded reason', !!seeded && explanation === seeded.reason, `${revealedSymbol}: ${explanation}`);
+    check('…decodes it clause by clause', !!seeded && seeded.gloss.test(glossText), glossText.replace(/\s+/g, ' ').slice(0, 200));
+    check('…under the stored verdict', !!seeded && await reveal.getAttribute('data-quiz-verdict') === seeded.state);
+    const correctIds = await quiz.locator('[data-quiz-correct="true"]').evaluateAll((els) => els.map((e) => e.getAttribute('data-quiz-option')));
+    const expectedCorrect = template === 'which-symbol' ? revealedSymbol : seeded?.state;
+    check('exactly one option is the rule\'s answer, and it is the stored one', correctIds.length === 1 && correctIds[0] === expectedCorrect, `${correctIds} vs ${expectedCorrect}`);
+    check('…about the row or the verdict the question named',
+        template === 'which-symbol' ? prompt.includes(`“${seeded?.state}”`) : prompt.includes(revealedSymbol ?? '—'), prompt);
+    const outcome = await reveal.locator('[data-quiz-outcome]').innerText();
+    check('the outcome says whether the answer matched', (optionIds[0] === correctIds[0]) === /^Matched the rule$/.test(outcome.trim()), outcome);
+    check('…and the pick is pressed, the rest locked', await quiz.locator(`[data-quiz-option="${optionIds[0]}"][aria-pressed="true"]`).count() === 1
+        && await quiz.locator('[data-quiz-option]:not([disabled])').count() === 0);
+    check('…linking to the whole board', await reveal.locator('a[href="/strategies/rsi2-mean-reversion"]').count() === 1);
+    check('the first answer counts the day', await waitText(quiz.locator('[data-quiz-days]'), /^Days answered: 1$/) === 'Days answered: 1');
+    let prefsD = await db.collection('userpreferences').findOne({userId: userD});
+    check('…once, dated today in ET', prefsD?.learn?.quizDaysAnswered === 1 && prefsD?.learn?.quizLastAnsweredDate === today, JSON.stringify(prefsD?.learn));
+    check('…and still no hand-off after the reveal', await noHandOffD());
+    await pageD.screenshot({path: `${OUT}08-daily-quiz.png`, fullPage: true});
+
+    // Answering again the same day — after a reload, with another option — counts nothing.
+    await pageD.reload({waitUntil: 'load'});
+    await quiz.waitFor({timeout: 30000});
+    check('a reload asks the same question', await quiz.getAttribute('data-quiz-template') === template && (await quiz.locator('[data-quiz-prompt]').innerText()) === prompt);
+    check('…and shows the count before an answer', (await quiz.locator('[data-quiz-days]').innerText()) === 'Days answered: 1');
+    await answerWith(optionIds[optionIds.length - 1]);
+    check('answering twice the same day counts once', await waitText(quiz.locator('[data-quiz-days]'), /^Days answered: \d+$/) === 'Days answered: 1');
+    check('…and says nothing failed: the second answer was accepted, not refused', await quiz.locator('[data-quiz-note]').count() === 0);
+    prefsD = await db.collection('userpreferences').findOne({userId: userD});
+    check('…in the stored count too', prefsD?.learn?.quizDaysAnswered === 1 && prefsD?.learn?.quizLastAnsweredDate === today, JSON.stringify(prefsD?.learn));
+
+    // A day last counted yesterday: today's first answer counts.
+    await db.collection('userpreferences').updateOne({userId: userD}, {$set: {'learn.quizLastAnsweredDate': isoDaysAgo(1)}});
+    await pageD.reload({waitUntil: 'load'});
+    await quiz.waitFor({timeout: 30000});
+    await answerWith(optionIds[0]);
+    check('the next day\'s answer counts a second day', await waitText(quiz.locator('[data-quiz-days]'), /^Days answered: 2$/) === 'Days answered: 2');
+    prefsD = await db.collection('userpreferences').findOne({userId: userD});
+    check('…stored as two, dated today', prefsD?.learn?.quizDaysAnswered === 2 && prefsD?.learn?.quizLastAnsweredDate === today, JSON.stringify(prefsD?.learn));
+
+    // Two tabs answering the same day at the same moment: one atomic write counts it once, and
+    // the tab that lost the race is told nothing failed.
+    await db.collection('userpreferences').updateOne({userId: userD}, {$set: {'learn.quizLastAnsweredDate': isoDaysAgo(1)}});
+    const pageD2 = await contextD.newPage();
+    await Promise.all([pageD.reload({waitUntil: 'load'}), pageD2.goto(`${BASE}/`, {waitUntil: 'load'})]);
+    const quiz2 = pageD2.locator('[data-widget-id="daily-quiz"] #daily-quiz');
+    await Promise.all([quiz.waitFor({timeout: 30000}), quiz2.waitFor({timeout: 30000})]);
+    const isQuizAction = (r) => r.request().method() === 'POST' && !!r.request().headers()['next-action'];
+    await Promise.all([
+        pageD.waitForResponse(isQuizAction, {timeout: 15000}),
+        pageD2.waitForResponse(isQuizAction, {timeout: 15000}),
+        quiz.locator(`[data-quiz-option="${optionIds[0]}"]`).click(),
+        quiz2.locator(`[data-quiz-option="${optionIds[1]}"]`).click(),
+    ]);
+    const bothDays = await Promise.all([quiz, quiz2].map((q) => waitText(q.locator('[data-quiz-days]'), /^Days answered: \d+$/)));
+    prefsD = await db.collection('userpreferences').findOne({userId: userD});
+    check('two tabs answering at once count the day once', prefsD?.learn?.quizDaysAnswered === 3 && prefsD?.learn?.quizLastAnsweredDate === today
+        && bothDays.every((text) => text === 'Days answered: 3'), `${JSON.stringify(prefsD?.learn)} · ${bothDays.join(' | ')}`);
+    check('…and neither tab says its answer could not be counted', await quiz.locator('[data-quiz-note]').count() === 0 && await quiz2.locator('[data-quiz-note]').count() === 0);
+    await pageD2.close();
+
+    // Each kind of question, whatever today's date seeds: RSI-2's only usable board is replaced by
+    // one on which a single kind can be built (a new run date, so the day's memo reads it afresh).
+    // "Which symbol" needs rows with numbers, so "which verdict" can always be built from its board
+    // too; it is asked only when today's rotation tries it before "which verdict" (two days in three).
+    const fnv1a = (text) => {
+        let hash = 0x811c9dc5;
+        for (let i = 0; i < text.length; i++) {
+            hash ^= text.charCodeAt(i);
+            hash = Math.imul(hash, 0x01000193);
+        }
+        return hash >>> 0;
+    };
+    const symbolAskable = fnv1a(`${today}|template`) % 3 !== 0;
+    const blankValues = {close: null, rsi2: null, sma5: null, sma200: null, aboveSma200: null};
+    const forcedBoards = [
+        {template: 'which-verdict', date: isoDaysAgo(2), orders: [],
+            board: [{symbol: 'KO', state: 'held', values: {close: 62, rsi2: 40, sma5: 61.5, sma200: 60, aboveSma200: true}}]},
+        // Rows the board prints without a number: only a reading can be asked about.
+        {template: 'why-this-verdict', date: isoDaysAgo(3),
+            board: [
+                {symbol: 'AAPL', state: 'enter', values: blankValues},
+                {symbol: 'MSFT', state: 'watch', values: blankValues, note: quizRows.MSFT.reason},
+                {symbol: 'NVDA', state: 'exit', values: blankValues},
+            ],
+            orders: [
+                {symbol: 'AAPL', side: 'buy', quantity: 160, kind: 'enter', reason: rsiReason, executed: true, price: 123.6},
+                {symbol: 'NVDA', side: 'sell', quantity: 10, kind: 'exit', reason: quizExit, executed: true, price: 130},
+            ]},
+        // Numbers on every row and no reason the decoder reads: no reading to ask about.
+        {template: symbolAskable ? 'which-symbol' : 'which-verdict', date: isoDaysAgo(4), orders: [],
+            board: [
+                {symbol: 'AAPL', state: 'enter', values: {close: 123.45, rsi2: 3.4, sma5: 126.1, sma200: 110, aboveSma200: true}},
+                {symbol: 'KO', state: 'held', values: {close: 62, rsi2: 40, sma5: 61.5, sma200: 60, aboveSma200: true}},
+                {symbol: 'PEP', state: 'watch', values: {close: 170, rsi2: 55, sma5: 168, sma200: 160, aboveSma200: true}},
+                {symbol: 'NVDA', state: 'exit', values: {close: 130, rsi2: 81.5, sma5: 128, sma200: 100, aboveSma200: true}},
+            ]},
+    ];
+    const askedTemplates = new Set([template]);
+    for (const forced of forcedBoards) {
+        await db.collection('strategyruns').deleteMany({strategyId: 'rsi2-mean-reversion', date: {$ne: today}});
+        await db.collection('strategyruns').insertOne(quizRun('rsi2-mean-reversion', forced.date, {board: forced.board, orders: forced.orders}));
+        await pageD.reload({waitUntil: 'load'});
+        await quiz.waitFor({timeout: 30000});
+        const asked = await quiz.getAttribute('data-quiz-template');
+        askedTemplates.add(asked);
+        const forcedPrompt = await quiz.locator('[data-quiz-prompt]').innerText();
+        const forcedIds = await quiz.locator('[data-quiz-option]').evaluateAll((els) => els.map((e) => e.getAttribute('data-quiz-option')));
+        const forcedTexts = (await quiz.locator('[data-quiz-option]').allInnerTexts()).map((t) => t.replace(/\s+/g, ' ').trim());
+        const boardSymbols = forced.board.map((row) => row.symbol);
+        let rendered = false;
+        if (asked === 'which-verdict') {
+            const row = await quiz.locator('[data-quiz-row]').getAttribute('data-quiz-row');
+            rendered = boardSymbols.includes(row) && /RSI\(2\)/.test(await quiz.locator('[data-quiz-row]').innerText())
+                && JSON.stringify(forcedIds) === JSON.stringify(['enter', 'exit', 'held', 'watch'])
+                // The verdict badges are uppercased by CSS, which innerText follows.
+                && JSON.stringify(forcedTexts.map((t) => t.toLowerCase())) === JSON.stringify(['enter', 'exit', 'held', 'watch']);
+        } else if (asked === 'why-this-verdict') {
+            rendered = await quiz.locator('[data-quiz-row]').count() === 0 && forcedTexts.length === 4
+                && forcedTexts.every((t) => t.length > 20 && ![rsiReason, quizExit, quizRows.MSFT.reason].includes(t));
+        } else {
+            rendered = await quiz.locator('[data-quiz-row]').count() === 0 && forcedIds.length === 4 && forcedIds.every((id) => boardSymbols.includes(id))
+                && forcedTexts.every((t, i) => t.startsWith(forcedIds[i]) && /RSI\(2\)/.test(t));
+        }
+        check(`a board only "${forced.template}" can be asked from asks it, its options drawn that way`, asked === forced.template && rendered,
+            `${asked} · ${forcedPrompt} · ${forcedTexts.join(' | ').slice(0, 240)}`);
+        await answerWith(forcedIds[0]);
+        const forcedReveal = quiz.locator('[data-quiz-reveal]');
+        const correct = await quiz.locator('[data-quiz-correct="true"]').evaluateAll((els) => els.map((e) => e.getAttribute('data-quiz-option')));
+        const revealSymbol = await forcedReveal.getAttribute('data-quiz-reveal');
+        const revealVerdict = await forcedReveal.getAttribute('data-quiz-verdict');
+        const verdictOf = (symbol) => forced.board.find((row) => row.symbol === symbol)?.state;
+        const afterTexts = (await quiz.locator('[data-quiz-option]').allInnerTexts()).map((t) => t.replace(/\s+/g, ' ').trim());
+        check(`…and its reveal names one right answer, the board's own verdict${asked === 'which-verdict' ? '' : ', each option now showing the verdict it stands for'}`,
+            correct.length === 1 && verdictOf(revealSymbol) === revealVerdict
+            && correct[0] === (asked === 'which-symbol' ? revealSymbol : revealVerdict)
+            && (asked === 'which-verdict' || afterTexts.every((t) => / (enter|exit|held|watch)$/i.test(t)))
+            && await quiz.locator('[data-quiz-note]').count() === 0,
+            `${revealSymbol} ${revealVerdict} · ${correct} · ${afterTexts.join(' | ').slice(0, 200)}`);
+    }
+    if (!symbolAskable) console.log(`NOTE  today's rotation tries "which verdict" before "which symbol", so "which symbol" is not askable today (${today}); the unit tests cover it`);
+    check('every kind of question was asked in this run, or is not askable today', ['which-verdict', 'why-this-verdict', ...(symbolAskable ? ['which-symbol'] : [])].every((t) => askedTemplates.has(t)),
+        [...askedTemplates].join(','));
+    prefsD = await db.collection('userpreferences').findOne({userId: userD});
+    check('…answering them on a day already counted leaves the count at three', prefsD?.learn?.quizDaysAnswered === 3, JSON.stringify(prefsD?.learn));
+
+    // With no usable board in the window: an honest empty state that still shows the count.
+    await db.collection('strategyruns').deleteMany({strategyId: 'rsi2-mean-reversion', date: {$ne: today}});
+    await pageD.reload({waitUntil: 'load'});
+    await quizWidget.getByText('No question today').waitFor({timeout: 30000});
+    const emptyText = await quizWidget.innerText();
+    check('twelve-day-old boards and a skipped day ask nothing: the empty state says why',
+        await quizWidget.locator('#daily-quiz').count() === 0 && /signal board of the last 10 days/.test(emptyText) && /Days answered: 3/.test(emptyText),
+        emptyText.replace(/\s+/g, ' ').slice(0, 200));
+    await pageD.goto(`${BASE}/settings`, {waitUntil: 'load'});
+    await pageD.locator('#dashboard').waitFor({timeout: 30000});
+    check('/settings lists the Daily quiz in the saved layout', /Daily quiz/.test(await pageD.locator('#dashboard').innerText()));
+    await contextD.close();
+
+    // --- user E: time in the market on the buy-and-hold page -------------------------------
+    // Seeds a V in SPY (a rise to a peak about a year ago, a 30% fall over 60 sessions, a long
+    // climb) with no dividends, so the total-return index is the closes, and a flat ^IRX. The
+    // bars already stored are put back afterwards, so later suites see the database they expect.
+    const pricebars = db.collection('pricebars');
+    const savedBars = await pricebars.find({symbol: {$in: ['SPY', '^IRX']}}).toArray();
+    try {
+        const addDays = (date, n) => { const [y, m, d] = date.split('-').map(Number); return new Date(Date.UTC(y, m - 1, d + n)).toISOString().slice(0, 10); };
+        const weekday = (date) => ![0, 6].includes(new Date(`${date}T12:00:00Z`).getUTCDay());
+        const MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+        const long = (date) => `${MONTHS[Number(date.slice(5, 7)) - 1]} ${Number(date.slice(8, 10))}, ${date.slice(0, 4)}`;
+        const cents = (x) => Math.round(x * 100);
+        const money = (c) => `$${(c / 100).toLocaleString('en-US', {minimumFractionDigits: 2, maximumFractionDigits: 2})}`;
+        const parseMoney = (text) => { const m = /^([+−]?)\$([\d,]+\.\d{2})$/.exec(text.trim()); return m ? (m[1] === '−' ? -1 : 1) * Math.round(Number(m[2].replace(/,/g, '')) * 100) : NaN; };
+        const addMonths = (date, k) => {
+            const [y, m, d] = date.split('-').map(Number);
+            const first = new Date(Date.UTC(y, m - 1 + k, 1));
+            const last = new Date(Date.UTC(first.getUTCFullYear(), first.getUTCMonth() + 1, 0)).getUTCDate();
+            return new Date(Date.UTC(first.getUTCFullYear(), first.getUTCMonth(), Math.min(d, last))).toISOString().slice(0, 10);
+        };
+
+        const todayE = isoDaysAgo(0);
+        const sessions = [];
+        for (let d = addDays(todayE, -800); d < todayE; d = addDays(d, 1)) if (weekday(d)) sessions.push(d);
+        const N = sessions.length;
+        const P = N - 250;             // the peak, about a year back
+        const T = P + 60;              // the low, 60 sessions later
+        const close = (i) => (i <= P ? 500 - (P - i) * 0.25 : i <= T ? 500 - (i - P) * 2.5 : 350 + (i - T) * 1.5);
+        const PEAK_DATE = sessions[P];
+        const LOW_DATE = sessions[T];
+        const LAST = sessions[N - 1];
+        await pricebars.deleteMany({symbol: {$in: ['SPY', '^IRX']}});
+        const bar = (symbol, date, value) => ({symbol, date, close: value, open: value, high: value, low: value, source: 'yahoo', dividend: 0});
+        await pricebars.insertMany([...sessions.map((d, i) => bar('SPY', d, close(i))), ...sessions.map((d) => bar('^IRX', d, 4.07))]);
+
+        const contextE = await browser.newContext({viewport: {width: 1440, height: 900}});
+        const pageE = await contextE.newPage();
+        const emailE = await signUp(pageE, 'learnE');
+        const userE = await userIdFor(emailE);
+        await pageE.locator('[data-widget-id]').first().waitFor({timeout: 30000});
+        let accountE = null;
+        for (let i = 0; i < 30 && !accountE; i++) { accountE = await db.collection('paperaccounts').findOne({userId: userE}); if (!accountE) await pageE.waitForTimeout(1000); }
+        await db.collection('paperaccounts').updateOne({_id: accountE._id}, {$set: {inceptionAt: new Date(`${PEAK_DATE}T16:00:00Z`)}});
+        // A second account, opened a day earlier but reset inside the dip: the window starts on
+        // the earliest current record of the two (the first account's), not the first account opened.
+        await db.collection('paperaccounts').insertOne({
+            userId: userE, name: 'QA Reset Record', cash: 100_000, startingBalance: 100_000, positions: [],
+            inceptionAt: new Date(`${LOW_DATE}T16:00:00Z`), createdAt: new Date(new Date(accountE.createdAt).getTime() - 86_400_000), updatedAt: new Date(),
+        });
+
+        const panel = pageE.locator('#time-in-market');
+        const openPage = async (query = '') => {
+            await pageE.goto(`${BASE}/strategies/buy-and-hold-spy${query}`, {waitUntil: 'load'});
+            await panel.waitFor({timeout: 60000});
+        };
+        const tiles = async (way) => {
+            const read = async (i) => (await pageE.locator(`#time-in-market-${way} [data-tile="${i}"]`).innerText()).split('\n').map((s) => s.trim()).filter(Boolean);
+            const [end, change, under] = [await read(0), await read(1), await read(2)];
+            return {end: end[1], endHint: end[2] ?? null, change: change[1], pct: change[2] ?? '', under: under[1], underHint: under[2] ?? ''};
+        };
+        // The amount is stated once, in the window line; every way's tiles add up against it.
+        const PUT_IN = cents(10_000);
+        const addsUp = (t) => parseMoney(t.end) - PUT_IN === parseMoney(t.change);
+        // The three ways by hand, off the seeded closes and the flat 4.07% ^IRX: the rate's daily
+        // factor (discount → bond-equivalent − 0.25%), compounded once per calendar day, the
+        // day's interest counted in that day's value. Monthly deposits (the amount split into
+        // whole cents, the leftover cents first) each buy at the close of the first session on
+        // or after them; one on a weekend earns interest until Monday and that interest stays cash.
+        const f = (1 + (365 * 0.0407 / (360 - 91 * 0.0407) - 0.0025)) ** (1 / 365) - 1;
+        const daysBetween = (a, b) => Math.round((Date.parse(`${b}T12:00:00Z`) - Date.parse(`${a}T12:00:00Z`)) / 86_400_000);
+        const closeOn = new Map(sessions.map((d, i) => [d, close(i)]));
+        const pctOneDecimal = (pct) => { const r = Math.round(pct * 10) / 10; return r === 0 ? '0.0%' : `${r < 0 ? '−' : '+'}${Math.abs(r).toFixed(1)}%`; };
+        const pctOf = (value) => (cents(value) - PUT_IN) / PUT_IN * 100;
+        const monthly = (start, end) => {
+            const dates = [];
+            for (let k = 0, d = start; d <= end; k++, d = addMonths(start, k)) dates.push(d);
+            const base = Math.floor(PUT_IN / dates.length);
+            const extra = PUT_IN - base * dates.length;
+            return dates.map((date, i) => ({date, amount: (base + (i < extra ? 1 : 0)) / 100}));
+        };
+        const dcaByHand = (start) => {
+            const inWindow = sessions.filter((d) => d >= start);
+            const buys = monthly(start, LAST).map((deposit) => {
+                const session = inWindow.find((d) => d >= deposit.date);
+                return {deposit, session, shares: deposit.amount / closeOn.get(session), idle: deposit.amount * ((1 + f) ** daysBetween(deposit.date, session) - 1)};
+            });
+            return inWindow.map((d) => {
+                const made = buys.filter((b) => b.deposit.date <= d);
+                return {date: d, value: made.reduce((sum, b) => sum + b.shares * closeOn.get(d) + b.idle * (1 + f) ** (daysBetween(b.session, d) + 1), 0),
+                    contributed: made.reduce((sum, b) => sum + b.deposit.amount, 0)};
+            });
+        };
+        const lumpByHand = (start) => 10_000 * closeOn.get(LAST) / closeOn.get(start);
+        const cashByHand = (start) => 10_000 * (1 + f) ** (daysBetween(start, LAST) + 1);
+
+        await openPage();
+        check('buy-and-hold carries Time in the market, starting on the earliest current record of the learner\'s two accounts', await pageE.inputValue('#time-in-market-from') === PEAK_DATE
+            && (await panel.locator('[data-testid="time-in-market-source"]').innerText()) === "Starts the day your paper account's current record began.");
+        check('…over the seeded window', (await pageE.locator('#time-in-market-window').innerText()) === `$10,000 each way · ${long(PEAK_DATE)} → ${long(LAST)} · ${N - P} trading days`,
+            await pageE.locator('#time-in-market-window').innerText());
+        check('three ways render side by side', await pageE.locator('#time-in-market-ways > *').count() === 3
+            && await pageE.locator('#time-in-market-ways [data-term="lump-sum"][title], #time-in-market-ways [data-term="dollar-cost-averaging"][title], #time-in-market-ways [data-term="cash-only"][title]').count() === 3);
+
+        const lumpPeak = await tiles('lumpSum');
+        check('all at once from the peak: the closes\' own ratio, to the cent', parseMoney(lumpPeak.end) === cents(10_000 * close(N - 1) / close(P)) && lumpPeak.endHint === null,
+            `${lumpPeak.end} vs ${money(cents(10_000 * close(N - 1) / close(P)))}`);
+        const firstBack = sessions.findIndex((d, i) => i > T && close(i) >= 500);
+        check('…below the dollars put in from the day after the peak until the climb back', lumpPeak.under === `${firstBack - P - 1} of ${N - P} days`
+            && lumpPeak.underHint === `longest ${long(sessions[P + 1])} → ${long(sessions[firstBack - 1])}, ${firstBack - P - 1} trading days`, `${lumpPeak.under} · ${lumpPeak.underHint}`);
+        const cashPeak = await tiles('cashOnly');
+        check('cash only: daily compounding at the seeded rate for every calendar day, to the cent', parseMoney(cashPeak.end) === cents(cashByHand(PEAK_DATE))
+            && cashPeak.under === `0 of ${N - P} days` && cashPeak.underHint === 'not one trading day', `${cashPeak.end} vs ${money(cents(cashByHand(PEAK_DATE)))}`);
+        const dca = await tiles('dollarCostAverage');
+        const deposits = monthly(PEAK_DATE, LAST).length;
+        check('monthly deposits: the whole amount, in one deposit a month', dca.endHint === null
+            && (await pageE.locator('#time-in-market-dollarCostAverage').innerText()).includes(`${deposits} monthly deposits into SPY`));
+        const dcaPeak = dcaByHand(PEAK_DATE);
+        check('…worth the deposits\' shares at the last close plus their weekend interest, to the cent', parseMoney(dca.end) === cents(dcaPeak.at(-1).value),
+            `${dca.end} vs ${money(cents(dcaPeak.at(-1).value))}`);
+        const dcaBelow = dcaPeak.filter((p) => cents(p.value) < cents(p.contributed)).length;
+        check('…below the dollars deposited so far (not below its own high) on the sessions counted by hand', dcaBelow > 0 && dca.under === `${dcaBelow} of ${N - P} days`,
+            `${dca.under} vs ${dcaBelow} of ${N - P} days`);
+        const shownText = await panel.innerText();
+        check('the amount is stated once, in the window line, never under a way',
+            (shownText.match(/\$10,000(?:\.00)?(?![\d,.])/g) ?? []).length === 1, (shownText.match(/\$10,000[^\n]*/g) ?? []).join(' | '));
+        check('every way\'s printed end minus the stated amount is its printed change', [lumpPeak, cashPeak, dca].every(addsUp), JSON.stringify([lumpPeak, cashPeak, dca].map((t) => [t.end, t.change])));
+        check('…and the printed percentage is that change over the stated amount', [lumpPeak, cashPeak, dca].every((t) => {
+            const pct = Math.round(parseMoney(t.change) / PUT_IN * 10_000) / 100;
+            return t.pct === `${pct > 0 ? '+' : pct < 0 ? '−' : ''}${Math.abs(pct).toFixed(2)}% of the dollars put in`;
+        }), [lumpPeak, cashPeak, dca].map((t) => t.pct).join(' | '));
+        const chart = panel.locator('[data-testid="dollar-chart"]');
+        check('the chart draws the three ways as dollars per dollar put in', await chart.locator('path[data-line]').count() === 3
+            && (await chart.locator('[data-line="lumpSum"] [data-line-value]').innerText()) === `$${(close(N - 1) / close(P)).toFixed(2)}`);
+        const dcaLegend = await chart.locator('span[data-line="dollarCostAverage"] [data-line-value]').innerText();
+        check('…the monthly line ending on its end over the dollars it took in, not rebased to its first deposit',
+            dcaLegend === `$${(parseMoney(dca.end) / PUT_IN).toFixed(2)}` && dcaLegend === `$${(dcaPeak.at(-1).value / 10_000).toFixed(2)}`, `${dcaLegend} vs ${dca.end} ÷ $10,000`);
+        const panelText = await panel.innerText();
+        check('"growth of each dollar contributed" is said once, the caveat once', (panelText.match(/Growth of each dollar contributed/g) ?? []).length === 1
+            && (panelText.match(/In hindsight/g) ?? []).length === 1);
+        check('one disclosure, "Why the start date matters", holding the definitions', await panel.locator('details').count() === 1
+            && /Why the start date matters/.test(await panel.locator('details summary').innerText()));
+        await panel.locator('details').evaluate((d) => { d.open = true; });
+        const rows = panel.locator('[data-testid="time-in-market-table"] tbody tr');
+        // Eight starts, a quarter apart back from today, each on the first session on or after it
+        // (the history reaches 800 days back, so none is left out).
+        const tableStarts = Array.from({length: 8}, (_, k) => sessions.find((d) => d >= addMonths(todayE, -3 * (k + 1))));
+        const tableRows = await rows.evaluateAll((trs) => trs.map((tr) => ({
+            start: tr.dataset.start,
+            from: new URL(tr.querySelector('a')?.getAttribute('href') ?? '', 'http://x').searchParams.get('from'),
+            path: new URL(tr.querySelector('a')?.getAttribute('href') ?? '', 'http://x').pathname,
+            cells: Object.fromEntries([...tr.querySelectorAll('td[data-way]')].map((td) => [td.dataset.way, td.textContent.trim()])),
+        })));
+        check('…with eight earlier starts a quarter apart, each on the first session on or after its date', tableRows.map((r) => r.start).join() === tableStarts.join(),
+            `${tableRows.map((r) => r.start).join(' ')} vs ${tableStarts.join(' ')}`);
+        check('…each a link to that start', tableRows.every((r) => r.path === '/strategies/buy-and-hold-spy' && r.from === r.start), JSON.stringify(tableRows.map((r) => [r.start, r.from])));
+        const expectedCells = (start) => ({
+            lumpSum: pctOneDecimal(pctOf(lumpByHand(start))),
+            dollarCostAverage: pctOneDecimal(pctOf(dcaByHand(start).at(-1).value)),
+            cashOnly: pctOneDecimal(pctOf(cashByHand(start))),
+        });
+        check('…every row\'s three ways computed by hand to the same end', tableRows.length === 8
+            && tableRows.every((r) => JSON.stringify(r.cells) === JSON.stringify(expectedCells(r.start))),
+            tableRows.filter((r) => JSON.stringify(r.cells) !== JSON.stringify(expectedCells(r.start))).map((r) => `${r.start} ${JSON.stringify(r.cells)} vs ${JSON.stringify(expectedCells(r.start))}`).join(' | '));
+        const tableCaption = await panel.locator('[data-testid="time-in-market-table"] caption').innerText();
+        check('…captioned with the rows it has', tableCaption.includes(`from ${await rows.count()} earlier start`) && !/\$/.test(tableCaption), tableCaption);
+        await pageE.screenshot({path: `${OUT}09-time-in-market.png`, fullPage: true});
+
+        // A start inside the dip: the native form, then the same three ways from the low.
+        await pageE.fill('#time-in-market-from', LOW_DATE);
+        await Promise.all([pageE.waitForURL(new RegExp(`from=${LOW_DATE}`), {timeout: 30000}), pageE.click('#time-in-market-form button[type="submit"]')]);
+        await panel.waitFor({timeout: 60000});
+        const lumpLow = await tiles('lumpSum');
+        check('a start inside the dip changes the numbers', parseMoney(lumpLow.end) === cents(10_000 * close(N - 1) / close(T)) && lumpLow.end !== lumpPeak.end
+            && lumpLow.under === `0 of ${N - T} days`, `${lumpLow.end} · ${lumpLow.under}`);
+        check('…and a typed start says nothing about the account', await panel.locator('[data-testid="time-in-market-source"]').count() === 0);
+
+        await openPage('?from=not-a-date');
+        check('a malformed ?from= falls back to the inception date', await pageE.inputValue('#time-in-market-from') === PEAK_DATE && await panel.locator('[data-testid="time-in-market-moved"]').count() === 0);
+        await openPage('?from=1990-01-01');
+        check('a start before the stored history is clamped, and says so', /^1990-01-01 is outside the stored range; showing /.test(await panel.locator('[data-testid="time-in-market-moved"]').innerText())
+            && (await pageE.locator('#time-in-market-window').innerText()).includes(`${long(sessions[0])} → ${long(LAST)}`));
+
+        // No stored ^IRX: the ways that hold cash cannot be priced — a dash, never a zero.
+        await pricebars.deleteMany({symbol: '^IRX'});
+        await openPage();
+        const cashNoRate = await tiles('cashOnly');
+        check('removing ^IRX shows — for cash only', cashNoRate.end === '—' && cashNoRate.change === '—' && cashNoRate.under === '—', JSON.stringify(cashNoRate));
+        // Monthly deposits hold cash only while a weekend deposit waits, and keep its interest
+        // after: with any such deposit the way is unpriced too, never a zero rate.
+        const dcaNoRate = await tiles('dollarCostAverage');
+        const waited = monthly(PEAK_DATE, LAST).some((d) => !weekday(d.date));
+        check(`…and — for monthly deposits too, ${waited ? 'a weekend deposit having held cash' : 'or its value, no deposit having waited'}`,
+            waited ? dcaNoRate.end === '—' && dcaNoRate.change === '—' && dcaNoRate.under === '—' : parseMoney(dcaNoRate.end) === cents(dcaPeak.at(-1).value), JSON.stringify(dcaNoRate));
+        check('…says why once, and keeps all at once, which never holds cash', /No usable T-bill rate is stored for /.test(await panel.locator('[data-testid="time-in-market-rate-gap"]').innerText())
+            && parseMoney((await tiles('lumpSum')).end) === cents(10_000 * close(N - 1) / close(P))
+            && await panel.locator('[data-testid="dollar-chart"] path[data-line="cashOnly"]').count() === 0);
+
+        await pageE.goto(`${BASE}/strategies/golden-cross`, {waitUntil: 'load'});
+        await pageE.locator('#strategy-explainer').waitFor({timeout: 30000});
+        check('no other strategy page carries it', await pageE.locator('#time-in-market').count() === 0);
+        await contextE.close();
+    } finally {
+        await pricebars.deleteMany({symbol: {$in: ['SPY', '^IRX']}});
+        if (savedBars.length > 0) await pricebars.insertMany(savedBars);
+    }
+    // --- user F: /brain — the legend, event badges, "since thesis", the Navigator's reasons ---
+    // A made-up ticker, QATH, with the heaviest active thesis (three weeks old), two articles
+    // about it (one labelled earnings, one other) and a decision set of the user's own carrying
+    // Navigator reasons. Bars for QATH and SPY are seeded only after the first look; everything
+    // seeded is removed again and the stored SPY bars are put back.
+    const THESIS_KEY = 'QATH';
+    const pricebarsF = db.collection('pricebars');
+    const savedSpyF = await pricebarsF.find({symbol: 'SPY'}).toArray();
+    let userF = null;
+    let newsIdsF = [];
+    try {
+        const addDaysF = (date, n) => { const [y, m, d] = date.split('-').map(Number); return new Date(Date.UTC(y, m - 1, d + n)).toISOString().slice(0, 10); };
+        const weekdayF = (date) => ![0, 6].includes(new Date(`${date}T12:00:00Z`).getUTCDay());
+        const pctText = (pct) => { const r = Math.round(pct * 10) / 10; return r === 0 ? '0.0%' : `${r < 0 ? '−' : '+'}${Math.abs(r).toFixed(1)}%`; };
+        const todayF = isoDaysAgo(0);
+        const thesisDate = isoDaysAgo(21);
+
+        const contextF = await browser.newContext({viewport: {width: 1440, height: 900}});
+        const pageF = await contextF.newPage();
+        const emailF = await signUp(pageF, 'learnF');
+        userF = await userIdFor(emailF);
+        await db.collection('brainentities').updateOne({key: THESIS_KEY}, {$set: {
+            key: THESIS_KEY, type: 'ticker', displayName: THESIS_KEY, weightFast: 4, sentimentSumFast: 1, weightSlow: 900, sentimentSumSlow: 270,
+            decayedTo: todayF, lastSeenAt: new Date(), verified: true,
+            thesisSince: new Date(`${thesisDate}T11:30:00Z`), peakSlowWeight: 900, links: [],
+        }}, {upsert: true});
+        const article = (n, eventType, sentiment) => ({
+            contentHash: 700_000_000 + Math.floor(Math.random() * 1_000_000) * 10 + n,
+            headline: `QA brain article ${n}`, summary: 'QA', source: 'QA Wire', sourceType: 'finance',
+            url: `https://example.com/qa-brain-${Date.now()}-${n}`, datetime: Math.floor(Date.now() / 1000) - n * 3600, publishedDate: todayF,
+            category: '', related: '', createdAt: new Date(),
+            extraction: {eventType, importance: 0.73, entities: [{key: THESIS_KEY, type: 'ticker', sentiment, relevance: 0.9}], model: 'qa', extractedAt: new Date()},
+        });
+        const articlesF = [article(1, 'earnings', 0.4), article(2, 'other', -0.25)];
+        const insertedNews = await db.collection('newsitems').insertMany(articlesF);
+        newsIdsF = Object.values(insertedNews.insertedIds);
+        const item = (symbol, action, reasons, extra = {}) => ({symbol, action, targetWeight: 0.1, currentWeight: 0, score: 0.3, reasons, executed: false, ...extra});
+        await db.collection('suggestionsets').insertOne({userId: userF, date: todayF, kind: 'executed', createdAt: new Date(), items: [
+            item(THESIS_KEY, 'buy', ['enter: score 0.42', 'slow news weight 12.3 (rank 1/25)', '6-month momentum +12.0%', `thesis ${THESIS_KEY}`],
+                {quantity: 10, targetWeight: 0.12, score: 0.42, executed: true, executionPrice: 100}),
+            item('SPY', 'hold', ['no brain coverage — news neutral', 'a reason the grammar has never seen']),
+            item('ZZQA', 'hold', ['a reason the grammar has never seen']),
+        ]});
+
+        const openBrain = async (query = '') => {
+            await pageF.goto(`${BASE}/brain${query}`, {waitUntil: 'domcontentloaded'});
+            await pageF.getByText('Active Theses').first().waitFor({timeout: 60000});
+        };
+        const panelOf = (heading) => pageF.locator('section', {has: pageF.locator('h2', {hasText: heading})});
+        const sinceLine = () => pageF.locator('[data-testid="since-thesis"]', {hasText: THESIS_KEY});
+
+        await openBrain();
+        const legend = pageF.locator('#brain-legend');
+        check('the legend sits right under System Status, collapsed', await legend.count() === 1
+            && await legend.evaluate((el) => /System Status/i.test(el.previousElementSibling?.textContent ?? ''))
+            && !(await legend.locator('details').evaluate((d) => d.open)));
+        await legend.locator('details').evaluate((d) => { d.open = true; });
+        const legendText = await legend.innerText();
+        check('…and opens to the constants: the 60-day half-life and momentum\'s 0.35', /halves every 60 days/.test(legendText) && /momentum 0\.35/.test(legendText),
+            legendText.replace(/\s+/g, ' ').slice(0, 160));
+        check('…describing mechanism, never a result', !/\b(works?|fails?|beat|outperform)/i.test(legendText));
+
+        const theses = panelOf('Active Theses');
+        check('Active Theses labels weight and sentiment with their definitions', await theses.locator('[data-term="news-weight"][title]').count() >= 1
+            && await theses.locator('[data-term="news-sentiment"][title]').count() >= 1);
+        check('…with one "What these mean" for the panel', await theses.locator('[data-what-these-mean]').count() === 1);
+        check('no "since thesis" line before any bars are stored', await sinceLine().count() === 0);
+        check('the leaderboard says what the dot means, once', (await pageF.locator('[data-testid="thesis-legend"]').allInnerTexts()).join('|')
+            === '● thesis: the news about this name has stayed strong for weeks (its slow weight reached 5)');
+
+        const decisions = panelOf('Weekly Decisions');
+        const glosses = decisions.locator('[data-navigator-gloss]');
+        check('each decision with a readable reason has one closed "What the Navigator saw"', await glosses.count() === 2
+            && (await glosses.evaluateAll((all) => all.every((d) => !d.open))), String(await glosses.count()));
+        check('…the raw reasons still listed', /enter: score 0\.42/.test(await decisions.innerText()) && /a reason the grammar has never seen/.test(await decisions.innerText()));
+        await glosses.evaluateAll((all) => all.forEach((d) => { d.open = true; }));
+        const [enterGloss, spyGloss] = await glosses.allInnerTexts();
+        check('…reading the entry with the config\'s rails', /entry line of 0\.15/.test(enterGloss) && /halves every 60 days/.test(enterGloss) && /An active thesis on QATH/.test(enterGloss),
+            enterGloss.replace(/\s+/g, ' ').slice(0, 200));
+        check('…and the neutral-news reason for a symbol the brain does not cover', /set to 0, the middle/.test(spyGloss), spyGloss.replace(/\s+/g, ' ').slice(0, 160));
+        await pageF.screenshot({path: `${OUT}10-brain.png`, fullPage: true});
+
+        // Evidence: one badge for the earnings article, none for "other", one label disclosure.
+        await openBrain(`?entity=${THESIS_KEY}#evidence`);
+        const evidence = pageF.locator('#evidence');
+        await evidence.waitFor({timeout: 30000});
+        check('the evidence lists both articles', (await evidence.innerText()).includes('QA brain article 1') && (await evidence.innerText()).includes('QA brain article 2'));
+        check('one badge, for the earnings article', await evidence.locator('[data-term^="event-"]').count() === 1
+            && await evidence.locator('[data-term="event-earnings"][title*="8-K"]').count() === 1);
+        const labels = evidence.locator('details');
+        check('…and one "What these labels mean", listing only that label', await labels.count() === 1
+            && (await labels.locator('summary').innerText()).includes('What these labels mean'));
+        await labels.evaluate((d) => { d.open = true; });
+        const labelText = await labels.innerText();
+        check('…which names the filings', /Earnings news/.test(labelText) && /10-Q/.test(labelText) && /10-K/.test(labelText) && !/Legal news/.test(labelText));
+        check('an article\'s importance is never printed', !/0\.73|importance/i.test(await evidence.innerText()));
+        // Each row is its own article's link, printing that article's sentiment for this name.
+        const rowFor = (a) => evidence.locator(`a[href="${a.url}"]`);
+        const rowTexts = await Promise.all(articlesF.map(async (a) => ((await rowFor(a).count()) === 1 ? (await rowFor(a).innerText()).replace(/\s+/g, ' ') : '')));
+        check('each evidence row links to its article and prints its sentiment for the name',
+            // The badge is uppercased by CSS, which innerText follows.
+            /QA brain article 1/.test(rowTexts[0]) && /\+0\.40/.test(rowTexts[0]) && /Earnings/i.test(rowTexts[0])
+            && /QA brain article 2/.test(rowTexts[1]) && /-0\.25/.test(rowTexts[1]) && !/Earnings/i.test(rowTexts[1]), rowTexts.join(' | '));
+
+        // Bars for QATH and SPY from before the thesis: the line appears, both legs over the same sessions.
+        const sessionsF = [];
+        for (let d = addDaysF(thesisDate, -10); d <= isoDaysAgo(1); d = addDaysF(d, 1)) if (weekdayF(d)) sessionsF.push(d);
+        const qathClose = (i) => 100 * (1 + 0.004 * i);
+        const spyClose = (i) => 500 * (1 + 0.001 * i);
+        const b = sessionsF.findIndex((d) => d >= thesisDate);
+        const e = sessionsF.length - 1;
+        const barF = (symbol, date, value) => ({symbol, date, close: value, open: value, high: value, low: value, source: 'yahoo', dividend: 0});
+        await pricebarsF.deleteMany({symbol: {$in: [THESIS_KEY, 'SPY']}});
+        await pricebarsF.insertMany([...sessionsF.map((d, i) => barF(THESIS_KEY, d, qathClose(i))), ...sessionsF.map((d, i) => barF('SPY', d, spyClose(i)))]);
+        const expected = `since thesis: ${THESIS_KEY} ${pctText((qathClose(e) / qathClose(b) - 1) * 100)} · SPY ${pctText((spyClose(e) / spyClose(b) - 1) * 100)}`;
+        await openBrain();
+        await sinceLine().waitFor({timeout: 30000}).catch(() => {});
+        check('with bars stored, "since thesis" appears with both legs', await sinceLine().count() === 1 && (await sinceLine().innerText()).trim() === expected,
+            `${await sinceLine().count() === 1 ? (await sinceLine().innerText()).trim() : 'no line'} vs ${expected}`);
+        const MONTHS_F = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+        const longF = (date) => `${MONTHS_F[Number(date.slice(5, 7)) - 1]} ${Number(date.slice(8, 10))}, ${date.slice(0, 4)}`;
+        const windowTitle = `From the close of ${longF(sessionsF[b])} to the close of ${longF(sessionsF[e])}.`;
+        check('…dated from the first close on or after the thesis day to the last close both have',
+            (await sinceLine().getAttribute('title')) === windowTitle && await sinceLine().locator('[data-term="since-thesis"][title]').count() === 1,
+            `${await sinceLine().getAttribute('title')} vs ${windowTitle}`);
+
+        // The same panels as dashboard widgets: titles only — no definitions, no Ask link, no gloss, no line.
+        await pageF.goto(`${BASE}/settings`, {waitUntil: 'load'});
+        await pageF.getByLabel('Add Active Theses').click();
+        await pageF.getByLabel('Add Weekly Decisions').click();
+        await pageF.waitForTimeout(1200);   // debounced autosave
+        await pageF.goto(`${BASE}/`, {waitUntil: 'domcontentloaded'});
+        const thesesWidget = pageF.locator('[data-widget-id="active-theses"]');
+        const decisionsWidget = pageF.locator('[data-widget-id="weekly-decisions"]');
+        await thesesWidget.getByText(THESIS_KEY).first().waitFor({timeout: 30000});
+        await decisionsWidget.getByText('enter: score 0.42').waitFor({timeout: 30000});
+        check('the Active Theses widget keeps its titles and nothing else', await thesesWidget.locator('[data-term="news-weight"][title]').count() >= 1
+            && await thesesWidget.locator('[data-what-these-mean], [data-ask], [data-testid="since-thesis"]').count() === 0);
+        check('the Weekly Decisions widget carries no gloss', await decisionsWidget.locator('[data-navigator-gloss], [data-ask]').count() === 0);
+        await contextF.close();
+    } finally {
+        await db.collection('brainentities').deleteOne({key: THESIS_KEY});
+        if (newsIdsF.length > 0) await db.collection('newsitems').deleteMany({_id: {$in: newsIdsF}});
+        if (userF) await db.collection('suggestionsets').deleteMany({userId: userF});
+        await pricebarsF.deleteMany({symbol: {$in: [THESIS_KEY, 'SPY']}});
+        if (savedSpyF.length > 0) await pricebarsF.insertMany(savedSpyF);
+    }
 } catch (err) {
     failures++;
     console.log(`FAIL  threw: ${err.message}`);

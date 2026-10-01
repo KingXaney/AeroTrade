@@ -27,19 +27,28 @@ import StrategyPerformance from "@/components/strategies/StrategyPerformance";
 import VerdictQuiz, {type QuizRow} from "@/components/strategies/VerdictQuiz";
 import WhatTheseMean from "@/components/learn/WhatTheseMean";
 import BoardReading from "@/components/learn/BoardReading";
+import TimeInMarket from "@/components/strategies/TimeInMarket";
+import WhatIfLab from "@/components/strategies/WhatIfLab";
+import {TIME_IN_MARKET_STRATEGY} from "@/lib/learn/time-in-market";
+import {getTimeInMarket} from "@/lib/learn/time-in-market-read";
 
 type StrategyPageProps = {
     params: Promise<{slug: string}>;
+    // ?from= — the start of "Time in the market" (buy-and-hold only), validated and clamped there.
+    searchParams: Promise<{from?: string | string[]}>;
 };
 
 const CADENCE_LABEL = {once: 'buys once', daily: 'checked daily', monthly: 'rebalances monthly', quarterly: 'rebalances quarterly'} as const;
 
-const StrategyPage = async ({params}: StrategyPageProps) => {
+const StrategyPage = async ({params, searchParams}: StrategyPageProps) => {
     const userId = await getCurrentUserId();
     if (!userId) redirect('/sign-in');
 
     const {slug} = await params;
-    const detail = await getStrategyDetail(slug, userId);
+    const [detail, timeInMarket] = await Promise.all([
+        getStrategyDetail(slug, userId),
+        slug === TIME_IN_MARKET_STRATEGY ? searchParams.then(({from}) => getTimeInMarket(userId, from)) : null,
+    ]);
     if (!detail) notFound();
 
     const {def, state, analytics, trades, latestRun, backtest} = detail;
@@ -132,6 +141,12 @@ const StrategyPage = async ({params}: StrategyPageProps) => {
                     closeFills: backtest.closeFills,
                 } : null}
             />
+
+            {/* Every rule with a knob (not buy-and-hold): the nightly grid beside the stored backtest. */}
+            {detail.whatIf && <WhatIfLab view={detail.whatIf} />}
+
+            {/* Buy-and-hold only; a failed read hides it rather than showing zeros. */}
+            {timeInMarket && <TimeInMarket view={timeInMarket} path={`/strategies/${def.id}`} />}
 
             <div className="grid grid-cols-1 xl:grid-cols-2 gap-4">
                 <Panel id="strategy-holdings">

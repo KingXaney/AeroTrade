@@ -312,6 +312,21 @@ export const getRecentTradesForUser = async (userId: string, limit = 50): Promis
     }
 };
 
+// The account's latest stored daily snapshot dated from `from` through `to` — a closing value
+// the snapshot job wrote with every holding priced, never a live one. One point read on the
+// {accountId, date} index; null when there is none in the range.
+export const getLastSnapshotBetween = async (
+    accountId: string,
+    from: string,
+    to: string,
+): Promise<{date: string; totalValue: number; startingBalance: number} | null> => {
+    if (from > to) return null;
+    await connectToDatabase();
+    return AccountSnapshot.findOne({accountId, date: {$gte: from, $lte: to}}, {_id: 0, date: 1, totalValue: 1, startingBalance: 1})
+        .sort({date: -1})
+        .lean<{date: string; totalValue: number; startingBalance: number} | null>();
+};
+
 // Write today's baseline snapshot for a fresh (created or just-reset) account so the
 // performance chart has a day-0 point immediately instead of waiting for the cron.
 export const seedDayZeroSnapshot = async (account: PaperAccountDoc): Promise<void> => {

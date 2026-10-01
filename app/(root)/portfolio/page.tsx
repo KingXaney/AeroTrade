@@ -9,6 +9,8 @@ import {buyNotesBySellId, openLotNotes} from "@/lib/trading/lots";
 import {countUnpriced} from "@/lib/trading/analytics";
 import {buildReturnBridge} from "@/lib/trading/bridge";
 import {drawdownBand} from "@/lib/learn/copy/portfolio";
+import {getLuckOrSkill} from "@/lib/learn/luck-read";
+import {getTradingHabits} from "@/lib/learn/habits-read";
 import {toComparisonRows, toSwitcherAccounts} from "@/lib/dashboard/select";
 import {marketStatus} from "@/lib/prices/market-hours";
 import AccountSummary from "@/components/trade/AccountSummary";
@@ -24,6 +26,8 @@ import ExportCsvButton from "@/components/analytics/ExportCsvButton";
 import IncomeActivity from "@/components/trade/IncomeActivity";
 import ReturnBridge from "@/components/learn/ReturnBridge";
 import RiskLens from "@/components/learn/RiskLens";
+import TradingHabits from "@/components/learn/TradingHabits";
+import LuckOrSkill from "@/components/learn/LuckOrSkill";
 import WhatTheseMean from "@/components/learn/WhatTheseMean";
 import Panel from "@/components/primitives/Panel";
 import SectionHeading from "@/components/primitives/SectionHeading";
@@ -49,14 +53,37 @@ const PortfolioPage = async ({searchParams}: PortfolioPageProps) => {
     // which hide their own sections when it fails. A failed read hides everything drawn from it
     // here too — the trade log with its receipts and buy notes, the lot notes — rather than
     // showing an empty ledger as "0 trades".
-    const [ledger, analytics, comparisonStats, income] = await Promise.all([
-        getTradeLedger(userId, account.id).catch((error) => {
-            console.error('Portfolio: reading the trade ledger failed:', error);
-            return null;
-        }),
+    const ledgerRead = getTradeLedger(userId, account.id).catch((error) => {
+        console.error('Portfolio: reading the trade ledger failed:', error);
+        return null;
+    });
+    // Habits derive from the same ledger — no second trade read — and hide with it; their few
+    // quotes start the moment it resolves, alongside the page's other reads rather than after
+    // them. Luck or skill starts then too: it places the return as the learner's only when the
+    // learner placed a fill in this account (not on the Navigator's), the scope habits count.
+    const habitsRead = ledgerRead.then((ledger) => (ledger ? getTradingHabits({
+        ledger,
+        positions: portfolio.positions,
+        inceptionAt: account.inceptionAt,
+        startingBalance: portfolio.startingBalance,
+    }) : null));
+    // Its own bounded reads (null = panel hidden); the learner's return is a stored snapshot's.
+    const luckRead = ledgerRead.then((ledger) => getLuckOrSkill({
+        accountId: account.id,
+        inceptionAt: account.inceptionAt,
+        startingBalance: portfolio.startingBalance,
+        unpriced: countUnpriced(portfolio.positions),
+        holdings: portfolio.positions.length,
+        // A ledger that could not be read cannot say whose fills these are; the panel reads as before.
+        ownFills: ledger === null || ledger.some((trade) => trade.source === 'user'),
+    }));
+    const [ledger, analytics, comparisonStats, income, luck, habits] = await Promise.all([
+        ledgerRead,
         getAccountAnalytics(userId, account.id),
         getComparisonStats(userId, Object.fromEntries(all.map((x) => [x.account.id, x.summary.totalValue]))),
         getIncomeActivity(userId, account.id),
+        luckRead,
+        habitsRead,
     ]);
 
     // The trade log is the ledger's tail, newest first.
@@ -138,6 +165,15 @@ const PortfolioPage = async ({searchParams}: PortfolioPageProps) => {
                     </div>
                     <AnalyticsStats analytics={analytics} definitions />
                 </>
+            )}
+
+            {/* The learner's own trading, measured: habits over their lots, and where the return
+                landed among random portfolios held over the same days */}
+            {(habits || luck) && (
+                <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+                    {habits && <TradingHabits read={habits} />}
+                    {luck && <LuckOrSkill luck={luck} />}
+                </div>
             )}
 
             {/* Account summary */}

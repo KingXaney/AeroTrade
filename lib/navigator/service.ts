@@ -12,7 +12,7 @@ import {getTopVerifiedTickers} from "@/lib/brain/queries";
 import {getBarsForSymbols} from "@/lib/prices/store";
 import {computeSignals} from "@/lib/prices/signals";
 import {dominantSectorKey, rankNormalize, scoreUniverse, type ScoredSymbol, type ScoringInput} from "@/lib/navigator/scoring";
-import {diffToOrders, type HeldPosition, type PlannedOrder, type TargetWeight} from "@/lib/navigator/allocator";
+import {diffToOrders, HOLDING_REASON, type HeldPosition, type PlannedOrder, type TargetWeight} from "@/lib/navigator/allocator";
 import {
     ALWAYS_ELIGIBLE_SYMBOLS,
     ELIGIBILITY_LOOKBACK_DAYS,
@@ -253,7 +253,7 @@ export const buildHoldItems = (
             targetWeight: target?.weight ?? (p.price !== null && plan.totalValue > 0 ? (p.quantity * p.price) / plan.totalValue : 0),
             currentWeight: p.price !== null && plan.totalValue > 0 ? (p.quantity * p.price) / plan.totalValue : 0,
             score: p.score ?? 0,
-            reasons: (scoreBySymbol.get(p.symbol)?.reasons ?? ['holding — no exit trigger']).slice(0, 3),
+            reasons: (scoreBySymbol.get(p.symbol)?.reasons ?? [HOLDING_REASON]).slice(0, 3),
             executed: false,
         });
     }

@@ -1,3 +1,5 @@
+import {escapeHtml} from "@/lib/news/sanitize";
+
 export const WELCOME_EMAIL_TEMPLATE = `<!DOCTYPE html>
 <html lang="en">
 <head>
@@ -280,6 +282,7 @@ export const NEWS_SUMMARY_EMAIL_TEMPLATE = `<!DOCTYPE html>
                             <!-- News Summary -->
                             {{newsContent}}
             {{topicsSection}}
+            {{lessonSection}}
                             
                             <!-- Footer Text -->
                             <div style="text-align: center; margin: 40px 0 0 0;">
@@ -306,6 +309,24 @@ export const NEWS_SUMMARY_EMAIL_TEMPLATE = `<!DOCTYPE html>
 
 // Password reset. Same palette as the welcome email; the link is the whole point, so it
 // is repeated in plain text for clients that strip buttons.
+// The daily digest, filled in. Pure, so the order of its sections and the absence of a leftover
+// placeholder are tested (sendNewsSummaryEmail mails exactly this). Replacer functions rather
+// than replacement strings: a "$&" in a section would otherwise be expanded by String.replace.
+// newsContent, topicsSection and lessonSection are deliberately HTML — sanitizeDigestHtml has
+// already run on each of them; the date is text and is escaped.
+export const renderNewsSummaryEmail = ({appUrl, date, newsContent, topicsSection = '', lessonSection = ''}: {
+    appUrl: string;
+    date: string;
+    newsContent: string;
+    topicsSection?: string;
+    lessonSection?: string;
+}): string => NEWS_SUMMARY_EMAIL_TEMPLATE
+    .replaceAll('{{appUrl}}', () => appUrl)
+    .replace('{{date}}', () => escapeHtml(date))
+    .replace('{{newsContent}}', () => newsContent)
+    .replace('{{topicsSection}}', () => topicsSection)
+    .replace('{{lessonSection}}', () => lessonSection);
+
 export const PASSWORD_RESET_EMAIL_TEMPLATE = `<!DOCTYPE html>
 <html lang="en">
 <head>

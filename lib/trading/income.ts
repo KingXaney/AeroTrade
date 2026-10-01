@@ -140,6 +140,11 @@ export const createIncomeClock = ({rateOn, dividends}: {rateOn: RateLookup; divi
 
 export const tradeCashEffect = (trade: IncomeTrade): number => (trade.side === 'sell' ? trade.total : -trade.total);
 
+// Money paid into the account from outside it (a monthly contribution). It lands at the start
+// of its day, before that day's trades — a transfer that arrived overnight — so a deposit
+// spent the same day is never idle at the close and earns nothing.
+export type Deposit = {date: string; amount: number};
+
 export type ReplayInput = {
     from: string;
     to: string;
@@ -150,6 +155,8 @@ export type ReplayInput = {
     // What was actually credited for rows dated `date`, once paid. History must move cash by
     // what the account really received, not by what would be computed from today's data.
     credited?: (date: string) => number | undefined;
+    // Optional; every paper-account caller passes none and replays exactly as before.
+    deposits?: readonly Deposit[];
 };
 
 export type ReplayResult = {
@@ -159,19 +166,25 @@ export type ReplayResult = {
     holdings: Map<string, number>;
 };
 
-export const replayIncome = ({from, to, startCash, startHoldings, trades, clock, credited}: ReplayInput): ReplayResult => {
+export const replayIncome = ({from, to, startCash, startHoldings, trades, clock, credited, deposits}: ReplayInput): ReplayResult => {
     const tradesByDate = new Map<string, IncomeTrade[]>();
     for (const trade of trades) {
         const list = tradesByDate.get(trade.date) ?? [];
         list.push(trade);
         tradesByDate.set(trade.date, list);
     }
+    const depositsByDate = new Map<string, number>();
+    for (const deposit of deposits ?? []) depositsByDate.set(deposit.date, (depositsByDate.get(deposit.date) ?? 0) + deposit.amount);
     let cash = startCash;
     const holdings = new Map(startHoldings);
     const rows: IncomeRow[] = [];
     let due = 0;
     for (const day of eachCalendarDay(from, to)) {
         cash += due;
+        // Only a day that has a deposit touches cash here, so a replay without deposits does
+        // the same arithmetic, in the same order, as it always did.
+        const deposit = depositsByDate.get(day);
+        if (deposit !== undefined) cash += deposit;
         clock.open(day, holdings);
         for (const trade of tradesByDate.get(day) ?? []) {
             cash += tradeCashEffect(trade);

@@ -6,6 +6,11 @@ import BrainEntity, {type BrainEntityDoc} from "@/database/models/brain-entity.m
 import NewsItem from "@/database/models/news-item.model";
 import JobRun from "@/database/models/job-run.model";
 import PriceBar from "@/database/models/price-bar.model";
+import {earliestSince, sinceThesisBySymbol, sinceThesisTargets, type SinceThesisLegs} from "@/lib/brain/since-thesis";
+import {BENCHMARK_SYMBOL} from "@/lib/constants";
+import {createDayMemo, remember} from "@/lib/day-memo";
+import {addCalendarDays} from "@/lib/prices/calendar-days";
+import {getBarsFrom, getLatestBars} from "@/lib/prices/store";
 import {getEasternDateString} from "@/lib/utils";
 
 const safeAvg = (sum: number, weight: number): number => (Math.abs(weight) < 1e-9 ? 0 : sum / weight);
@@ -40,6 +45,18 @@ export const getActiveTheses = async (): Promise<BrainEntitySummary[]> => {
     return docs.map(toEntitySummary);
 };
 
+// What the evidence rows print, and the one extraction field behind the event badge. The
+// article's importance is deliberately left out: nothing on the page prints it.
+const EVIDENCE_PROJECTION = {
+    headline: 1, source: 1, sourceType: 1, url: 1, datetime: 1, publishedDate: 1,
+    'extraction.entities': 1, 'extraction.eventType': 1,
+} as const;
+
+type EvidenceDoc = {
+    headline: string; source: string; sourceType: string; url: string; datetime: number; publishedDate: string;
+    extraction?: {entities?: {key: string; sentiment: number; relevance: number}[]; eventType?: string};
+};
+
 // Recent articles mentioning an entity — the evidence drill-down.
 export const getEntityEvidence = async (entityKey: string, lookbackDays = 21, limit = 20) => {
     await connectToDatabase();
@@ -47,10 +64,10 @@ export const getEntityEvidence = async (entityKey: string, lookbackDays = 21, li
     const items = await NewsItem.find({
         'extraction.entities.key': entityKey,
         publishedDate: {$gte: from},
-    }).sort({publishedDate: -1, datetime: -1}).limit(limit).lean();
+    }, EVIDENCE_PROJECTION).sort({publishedDate: -1, datetime: -1}).limit(limit).lean<EvidenceDoc[]>();
 
     return items.map((item) => {
-        const mention = (item.extraction?.entities ?? []).find((m: {key: string}) => m.key === entityKey);
+        const mention = (item.extraction?.entities ?? []).find((m) => m.key === entityKey);
         return {
             headline: item.headline,
             source: item.source,
@@ -60,8 +77,45 @@ export const getEntityEvidence = async (entityKey: string, lookbackDays = 21, li
             publishedDate: item.publishedDate,
             sentiment: mention?.sentiment ?? 0,
             relevance: mention?.relevance ?? 0,
+            eventType: item.extraction?.eventType ?? null,
         };
     });
+};
+
+// "since thesis" for Active Theses: the heaviest ticker theses (lib/brain/since-thesis.ts),
+// read in one batch — each thesis ticker's bars from its own thesis date and SPY's from the
+// earliest of them, one $or query (getBarsFrom) — then measured in memory. A second read on
+// /brain, after the theses resolve, because it needs their keys and dates. The lines depend on
+// no viewer, so they are memoised for the ET day per (the theses, the latest stored close of
+// each symbol): one small aggregate stamps the data, a close stored later moves the stamp and is
+// read, and a read taken before the morning's prices land is not pinned. A failed read hides the
+// lines rather than breaking the page.
+const STAMP_LOOKBACK_DAYS = 31;
+const sinceMemo = createDayMemo<Record<string, SinceThesisLegs>>(16);
+
+export const getSinceThesis = async (theses: readonly BrainEntitySummary[]): Promise<Record<string, SinceThesisLegs>> => {
+    const targets = sinceThesisTargets(theses);
+    const earliest = earliestSince(targets);
+    if (earliest === null) return {};
+    try {
+        const today = getEasternDateString();
+        const symbols = [...new Set([...targets.map((t) => t.symbol.toUpperCase()), BENCHMARK_SYMBOL])];
+        const latest = await getLatestBars(symbols, {since: addCalendarDays(today, -STAMP_LOOKBACK_DAYS), onOrBefore: today});
+        const key = [
+            targets.map((t) => `${t.symbol}@${t.since}`).join(','),
+            symbols.map((symbol) => {
+                const bar = latest.get(symbol);
+                return bar ? `${symbol}:${bar.date}:${bar.close}` : `${symbol}:-`;
+            }).join(','),
+        ].join('|');
+        return await remember(sinceMemo, key, today, async () => {
+            const bars = await getBarsFrom([...targets.map((t) => ({symbol: t.symbol, from: t.since})), {symbol: BENCHMARK_SYMBOL, from: earliest}]);
+            return sinceThesisBySymbol(targets, bars, bars.get(BENCHMARK_SYMBOL) ?? []);
+        });
+    } catch (error) {
+        console.error('Error reading since-thesis returns:', error);
+        return {};
+    }
 };
 
 // Graph payload for the /brain SVG: top entities + the links among them.

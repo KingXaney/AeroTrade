@@ -26,8 +26,11 @@ import {STRATEGY_OWNER_ID} from "@/lib/strategies/config";
 import {getFollowedStrategies} from "@/lib/strategies/follows";
 import {getStrategyStates, type StrategyStateView} from "@/lib/strategies/store";
 import type {ReplayRun} from "@/lib/learn/replay";
-import type {SeriesStats, SignalRow, StrategyDefinition} from "@/lib/strategies/types";
-import {BENCHMARK_SYMBOL} from "@/lib/strategies/universe";
+import type {QuizRun} from "@/lib/learn/quiz";
+import type {SymbolBoardRead} from "@/lib/learn/rules-see";
+import type {SeriesStats, SignalRow, StrategyDefinition, StrategyId} from "@/lib/strategies/types";
+import {BENCHMARK_SYMBOL, strategiesWatching} from "@/lib/strategies/universe";
+import {whatIfLab, type StoredWhatIfVariant, type WhatIfLabView} from "@/lib/strategies/whatif";
 import {
     describeLastRun,
     downsample,
@@ -117,6 +120,73 @@ export const getBoardRowsForFills = async (
         orders: (r.orders ?? []).map(toOrderView),
     }]));
 };
+
+type LeanQuizRun = {strategyId: StrategyId; date: string; board?: SignalRow[]; orders?: {symbol: string; side: 'buy' | 'sell'; reason: string}[]};
+
+// The Daily quiz's read: the newest usable run per strategy dated from `since` up to (not
+// including) `before`, as one point read per strategy on the {strategyId, date} index (eight
+// at most, each scanning no further back than `since`) — never the board-carrying aggregate
+// over every run. A skipped day or an empty board is passed over for the day before it;
+// orders are projected to what the reveal quotes.
+const usableRunFilter = (strategyId: StrategyId, since: string, before: string) =>
+    ({strategyId, date: {$gte: since, $lt: before}, status: {$ne: 'skipped'}, 'board.0': {$exists: true}});
+
+export const getRecentRuns = async (
+    strategyIds: readonly StrategyId[],
+    {since, before}: {since: string; before: string},
+): Promise<Partial<Record<StrategyId, QuizRun>>> => {
+    await connectToDatabase();
+    const runs = await Promise.all(strategyIds.map((strategyId) => StrategyRun
+        .findOne(usableRunFilter(strategyId, since, before))
+        .sort({date: -1})
+        .select({_id: 0, strategyId: 1, date: 1, board: 1, 'orders.symbol': 1, 'orders.side': 1, 'orders.reason': 1})
+        .lean<LeanQuizRun | null>()));
+    return Object.fromEntries(runs.flatMap((run) => (run ? [[run.strategyId, {
+        date: run.date,
+        board: (run.board ?? []).map(toBoardRow),
+        orders: (run.orders ?? []).map((o) => ({symbol: o.symbol, side: o.side, reason: o.reason})),
+    } satisfies QuizRun]] : [])));
+};
+
+// The same eight point reads, projected to the date alone (no board crosses the wire): which
+// run getRecentRuns would return per strategy — the stamp the quiz's day memo is keyed on.
+export const getRecentRunDates = async (
+    strategyIds: readonly StrategyId[],
+    {since, before}: {since: string; before: string},
+): Promise<Partial<Record<StrategyId, string>>> => {
+    await connectToDatabase();
+    const runs = await Promise.all(strategyIds.map((strategyId) => StrategyRun
+        .findOne(usableRunFilter(strategyId, since, before))
+        .sort({date: -1})
+        .select({_id: 0, strategyId: 1, date: 1})
+        .lean<{strategyId: StrategyId; date: string} | null>()));
+    return Object.fromEntries(runs.flatMap((run) => (run ? [[run.strategyId, run.date]] : [])));
+};
+
+type LeanSymbolRun = {date: string; asOf: string; board?: SignalRow[]};
+
+// The stock page's "What the rules see": for each strategy watching `symbol`, its newest run —
+// the run that strategy's own signal board shows — with the board projected by $elemMatch to
+// this symbol's one row. One findOne per watching strategy (four at most, each the first entry
+// of a backward walk down the {strategyId, date} index) in one Promise.all; never the
+// board-carrying aggregate. A strategy with no run yet is left out; a run whose board has no
+// row for the symbol comes back with `row: null`.
+export const getBoardRowsForSymbol = cache(async (symbol: string): Promise<SymbolBoardRead[]> => {
+    const wanted = symbol.trim().toUpperCase();
+    const watching = strategiesWatching(wanted);
+    if (watching.length === 0) return [];
+    await connectToDatabase();
+    const runs = await Promise.all(watching.map((def) => StrategyRun
+        .findOne({strategyId: def.id}, {_id: 0, date: 1, asOf: 1, board: {$elemMatch: {symbol: wanted}}})
+        .sort({date: -1})
+        .lean<LeanSymbolRun | null>()));
+    return watching.flatMap((def, i) => {
+        const run = runs[i];
+        if (!run) return [];
+        const row = run.board?.[0];
+        return [{strategyId: def.id, date: run.date, asOf: run.asOf, row: row ? toBoardRow(row) : null}];
+    });
+});
 
 type LeanBacktestStats = {strategyId: string; from: string; to: string; stats: SeriesStats; closeFills: number; points?: {value: number}[]};
 
@@ -281,6 +351,8 @@ export type StrategyDetail = {
     lastActionLine: string;
     // The stored board row and planned order behind each strategy fill on this page, by run date.
     replays: Record<string, ReplayRun>;
+    // The what-if lab: the precomputed grid beside this backtest (null: the rule has no knob).
+    whatIf: WhatIfLabView | null;
 };
 
 export const getStrategyDetail = cache(async (slug: string, userId: string | null): Promise<StrategyDetail | null> => {
@@ -296,7 +368,9 @@ export const getStrategyDetail = cache(async (slug: string, userId: string | nul
         state ? getAccountAnalytics(STRATEGY_OWNER_ID, state.accountId) : Promise.resolve(null),
         state ? getTradeHistory(STRATEGY_OWNER_ID, state.accountId, DETAIL_TRADE_LIMIT) : Promise.resolve([] as PaperTradeRecord[]),
         getLatestRuns([def.id]),
-        StrategyBacktest.findOne({strategyId: def.id}).lean<(StrategyBacktestView & {computedAt: Date}) | null>(),
+        // One document: the page's backtest and the ≤4 what-if variants stored with it.
+        StrategyBacktest.findOne({strategyId: def.id})
+            .lean<(StrategyBacktestView & {computedAt: Date; variants?: StoredWhatIfVariant[]; variantsVersion?: string; variantsFor?: Date}) | null>(),
         state ? snapshotSeriesByAccount([state.accountId]) : Promise.resolve(new Map<string, SnapshotSeries>()),
     ]);
     const inception = analytics ? getEasternDateString(new Date(analytics.account.inceptionAt)) : null;
@@ -335,6 +409,7 @@ export const getStrategyDetail = cache(async (slug: string, userId: string | nul
             benchmarkReturnPct: inception ? (benchmarkReturns.get(inception) ?? null) : null,
             snapshotDays: state ? (snapshotDays.get(state.accountId)?.days ?? 0) : 0,
             replays,
+            whatIf: whatIfLab(def, backtestDoc),
         };
     }
 });

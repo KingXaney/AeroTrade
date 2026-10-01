@@ -19,6 +19,10 @@ export interface LearnPrefs {
     // Today's lesson "Got it" keys (lib/learn/moments.ts lessonKey), newest last, capped at
     // LESSONS_SEEN_CAP by the $push {$each, $slice} that writes them.
     lessonsSeen?: string[];
+    // Daily quiz: days with at least one answer, and the last such ET day ('YYYY-MM-DD').
+    // Written together by one atomic update filtered on the date, so a day counts once.
+    quizDaysAnswered?: number;
+    quizLastAnsweredDate?: string;
 }
 
 export interface UserPreferences extends Document {
@@ -31,7 +35,7 @@ export interface UserPreferences extends Document {
     newsFeed?: NewsFeedPrefs;          // absent = the default feed (lib/news/feed-prefs.ts)
     followedStrategies?: string[];     // quant-strategy slugs pinned on the dashboard; absent = none
     topicsSeededAt?: Date;             // default topics installed once; absent = never seeded
-    learn?: LearnPrefs;                // learn-surface stamps (checklist hidden, lessons seen); absent = none
+    learn?: LearnPrefs;                // learn-surface stamps (checklist hidden, lessons seen, quiz days); absent = none
     updatedAt: Date;
 }
 
@@ -75,6 +79,8 @@ const LearnSchema = new Schema<LearnPrefs>(
     {
         missionsDismissedAt: {type: Date, required: false},
         lessonsSeen: {type: [String], default: undefined},
+        quizDaysAnswered: {type: Number, required: false},
+        quizLastAnsweredDate: {type: String, required: false},
     },
     {_id: false},
 );

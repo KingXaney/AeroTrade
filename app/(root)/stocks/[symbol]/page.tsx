@@ -8,11 +8,28 @@ import {
     TECHNICAL_ANALYSIS_WIDGET_CONFIG,
     COMPANY_FINANCIALS_WIDGET_CONFIG,
 } from "@/lib/constants";
-import {getCompanyProfile, getQuote} from "@/lib/actions/finnhub.actions";
+import KeyNumbers from "@/components/stock/KeyNumbers";
+import RulesSee from "@/components/stock/RulesSee";
+import {getCompanyProfile, getFinancials, getQuote} from "@/lib/actions/finnhub.actions";
 import {getCurrentUserId, isInWatchlist} from "@/lib/actions/watchlist.actions";
 import {getTopicsForUser} from "@/lib/topics/store";
+import {readKeyNumbers} from "@/lib/learn/key-numbers";
+import {buildRulesSee, type SymbolBoardRead} from "@/lib/learn/rules-see";
+import {getBoardRowsForSymbol} from "@/lib/strategies/queries";
+import {strategiesWatching} from "@/lib/strategies/universe";
+import {cn} from "@/lib/utils";
 
 const TRADINGVIEW_SCRIPT = 'https://s3.tradingview.com/external-embedding/embed-widget-';
+
+// A failed board read hides "What the rules see" rather than reading as "no stored row".
+const readBoardRows = async (symbol: string): Promise<SymbolBoardRead[] | null> => {
+    try {
+        return await getBoardRowsForSymbol(symbol);
+    } catch (error) {
+        console.error(`Error reading board rows for ${symbol}:`, error);
+        return null;
+    }
+};
 
 const StockDetailsPage = async ({params}: StockDetailsPageProps) => {
     const userId = await getCurrentUserId();
@@ -21,15 +38,22 @@ const StockDetailsPage = async ({params}: StockDetailsPageProps) => {
     const {symbol: raw} = await params;
     const symbol = raw.toUpperCase();
 
-    const [profile, quote, inWatchlist, topics] = await Promise.all([
+    const watching = strategiesWatching(symbol);
+    const [profile, quote, inWatchlist, topics, financials, boardRows] = await Promise.all([
         getCompanyProfile(symbol),
         getQuote(symbol),
         isInWatchlist(userId, symbol),
         getTopicsForUser(userId),
+        getFinancials(symbol),
+        watching.length > 0 ? readBoardRows(symbol) : Promise.resolve([] as SymbolBoardRead[]),
     ]);
 
-    // Finnhub returns an empty object for unknown symbols; treat that as 404.
-    if (!profile.name && typeof quote.c !== 'number') notFound();
+    // Finnhub returns an empty object for unknown symbols; treat that as 404 — unless a strategy
+    // watches the symbol: its stored board rows are content of the page's own, key or no key.
+    if (!profile.name && typeof quote.c !== 'number' && watching.length === 0) notFound();
+
+    const keyNumbers = readKeyNumbers({marketCapMillions: profile.marketCapitalization, metric: financials.metric});
+    const rulesSee = boardRows ? buildRulesSee(symbol, watching, boardRows) : null;
 
     const company = profile.name || symbol;
     const followedTopic = topics.find((t) => t.name.toLowerCase() === company.toLowerCase() || t.keywords.includes(symbol.toLowerCase()));
@@ -44,6 +68,12 @@ const StockDetailsPage = async ({params}: StockDetailsPageProps) => {
                 isInWatchlist={inWatchlist}
                 followedTopic={followedTopic ? {id: followedTopic.id, slug: followedTopic.slug} : null}
             />
+
+            {/* In plain words: the feed's key figures, and what the rule-based strategies see */}
+            <div className={cn('grid gap-4', rulesSee && 'xl:grid-cols-2')}>
+                <KeyNumbers symbol={symbol} rows={keyNumbers} />
+                {rulesSee && <RulesSee view={rulesSee} />}
+            </div>
 
             {/* Symbol Info */}
             <section className="glass-panel rounded-xl p-4 shimmer">

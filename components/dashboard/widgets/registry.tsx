@@ -23,6 +23,10 @@ import TopicBriefsList from "@/components/dashboard/widgets/TopicBriefsList";
 import TopicsWidgetEmpty from "@/components/dashboard/widgets/TopicsWidgetEmpty";
 import GettingStarted from "@/components/dashboard/widgets/GettingStarted";
 import TodaysLesson from "@/components/dashboard/widgets/TodaysLesson";
+import DailyQuiz from "@/components/dashboard/widgets/DailyQuiz";
+import EmptyState from "@/components/primitives/EmptyState";
+import {QUIZ_RUN_WINDOW_DAYS} from "@/lib/learn/quiz";
+import {DAILY_QUIZ_COPY, daysAnsweredLine, quizEmptyDescription} from "@/lib/learn/copy/quiz";
 import {deriveMissions} from "@/lib/learn/missions";
 import {deriveMoments} from "@/lib/learn/moments";
 import AccountSummary from "@/components/trade/AccountSummary";
@@ -104,6 +108,24 @@ const TodaysLessonAsync = async ({ctx}: {ctx: LoaderCtx}) => {
     });
     return lesson ? <TodaysLesson lesson={lesson} /> : <WidgetUnavailable failed />;
 };
+// Lazy: a question is never above-the-fold critical. A failed read shows "unavailable", and a
+// window with no usable board says so plainly (the count still shows once there is one).
+const DailyQuizAsync = async ({ctx}: {ctx: LoaderCtx}) => {
+    const view = await LOADERS.dailyQuiz(ctx).catch((error) => {
+        console.error('Dashboard loader "dailyQuiz" failed:', error);
+        return undefined;
+    });
+    if (!view) return <WidgetUnavailable failed />;
+    if (view.quiz) return <DailyQuiz quiz={view.quiz} daysAnswered={view.daysAnswered} />;
+    return (
+        <EmptyState
+            title={DAILY_QUIZ_COPY.emptyTitle}
+            description={quizEmptyDescription(QUIZ_RUN_WINDOW_DAYS)}
+            note={daysAnsweredLine(view.daysAnswered)}
+            className="p-0"
+        />
+    );
+};
 const BrainStatusAsync = async ({ctx}: {ctx: LoaderCtx}) => {
     const status = await LOADERS.brainStatus(ctx);
     if (!status) return framed('brain-status', <WidgetUnavailable failed />);
@@ -125,6 +147,7 @@ export const WIDGET_RENDERERS: Record<WidgetId, Renderer> = {
         if (moment) return <TodaysLesson moment={moment} />;
         return <Suspense fallback={skeleton('todays-lesson')}><TodaysLessonAsync ctx={r.ctx} /></Suspense>;
     },
+    'daily-quiz': (r) => <Suspense fallback={skeleton('daily-quiz', 4)}><DailyQuizAsync ctx={r.ctx} /></Suspense>,
     'portfolio-snapshot': (r) => need(r, 'portfolios', (p) => <PortfolioSnapshot portfolio={aggregatePortfolios(p)} best={bestStrategy(p)} />),
     'watchlist-movers': (r) => <Suspense fallback={skeleton('watchlist-movers', 4)}><WatchlistMoversAsync ctx={r.ctx} /></Suspense>,
     'friends-rank': (r) => need(r, 'leaderboard', (l) => <FriendsRank leaderboard={l} />),

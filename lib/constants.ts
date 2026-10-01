@@ -19,6 +19,11 @@ export const MAX_STARTING_BALANCE = 10_000_000;
 // Paper-trading: max strategy accounts per user.
 export const MAX_PAPER_ACCOUNTS = 10;
 
+// How long the market-data fetches behind the stock page's "Key numbers" are cached
+// (lib/actions/finnhub.actions.ts); the panel's source line states both, from these.
+export const FINANCIALS_REVALIDATE_SECONDS = 60 * 60;
+export const PROFILE_REVALIDATE_SECONDS = 24 * 60 * 60;
+
 // Benchmark ETF snapshotted daily for the performance comparison chart.
 export const BENCHMARK_SYMBOL = 'SPY';
 

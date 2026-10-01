@@ -6,8 +6,14 @@ import SafeMarkdown from "@/components/markdown/SafeMarkdown";
 import {toast} from "sonner";
 import {cn, formatPrice, getChangeColorClass} from "@/lib/utils";
 import {applySuggestion} from "@/lib/actions/navigator.actions";
+import type {ReasonClause} from "@/lib/learn/reasons";
+import {NAVIGATOR_COPY} from "@/lib/learn/copy/navigator";
+import ReasonGloss from "@/components/learn/ReasonGloss";
 
-type SetView = {date: string; kind: 'executed' | 'preview'; items: SuggestionItem[]; rationaleMd: string | null};
+// `gloss`: the item's reasons decoded on the server (glossNavigatorReasons), so this client
+// file never bundles the grammar. /brain passes it; the weekly-decisions widget does not.
+type GlossedItem = SuggestionItem & {gloss?: ReasonClause[]};
+type SetView = {date: string; kind: 'executed' | 'preview'; items: GlossedItem[]; rationaleMd: string | null};
 type ApplyAccount = {id: string; name: string};
 
 const ACTION_STYLES: Record<SuggestionAction, string> = {
@@ -16,7 +22,7 @@ const ACTION_STYLES: Record<SuggestionAction, string> = {
     hold: 'text-fg-soft bg-line-strong/25',
 };
 
-const ItemRow = ({item, showApply, accounts}: {item: SuggestionItem; showApply: boolean; accounts: ApplyAccount[]}) => {
+const ItemRow = ({item, showApply, accounts}: {item: GlossedItem; showApply: boolean; accounts: ApplyAccount[]}) => {
     const router = useRouter();
     const [applying, setApplying] = useState(false);
     const [accountId, setAccountId] = useState(accounts[0]?.id ?? '');
@@ -83,6 +89,16 @@ const ItemRow = ({item, showApply, accounts}: {item: SuggestionItem; showApply: 
                         </li>
                     ))}
                 </ul>
+            )}
+            {/* One disclosure per decision: each reason's clauses read in plain words. */}
+            {item.gloss && item.gloss.length > 0 && (
+                <details className="group mt-2" data-navigator-gloss>
+                    <summary className="font-mono cursor-pointer list-none marker:content-none [&::-webkit-details-marker]:hidden text-[11px] text-brand hover:underline inline-flex items-center gap-1">
+                        <span className="material-symbols-outlined text-sm transition-transform group-open:rotate-90" aria-hidden="true">chevron_right</span>
+                        {NAVIGATOR_COPY.glossSummary}
+                    </summary>
+                    <ReasonGloss clauses={item.gloss} className="mt-2" />
+                </details>
             )}
         </div>
     );
