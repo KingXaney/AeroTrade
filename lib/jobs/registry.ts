@@ -115,8 +115,6 @@ export const JOBS = {
     },
 } as const satisfies Record<string, JobDefinition>;
 
-export type JobKey = keyof typeof JOBS;
-
 // In declaration order — the status strip's row order.
 export const JOB_LIST: readonly JobDefinition[] = Object.values(JOBS);
 

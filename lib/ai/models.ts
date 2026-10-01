@@ -62,7 +62,6 @@ const PRO: Record<AiTask, ModelSpec> = {
 export const MODEL_MATRIX: Record<AiTier, Record<AiTask, ModelSpec>> = {free: FREE, basic: BASIC, pro: PRO};
 
 export const AI_TIERS: AiTier[] = ['free', 'basic', 'pro'];
-export const AI_TASKS: AiTask[] = ['extraction', 'digest', 'rationale', 'welcome', 'topicBrief'];
 
 const isTier = (value: string): value is AiTier => (AI_TIERS as string[]).includes(value);
 
@@ -91,6 +90,3 @@ export const resolveModel = (task: AiTask, env: NodeJS.ProcessEnv = process.env)
     const {tier, warning} = resolveTier(env);
     return {...MODEL_MATRIX[tier][task], task, tier, ...(warning ? {warning} : {})};
 };
-
-export const isProviderConfigured = (provider: AiProvider, env: NodeJS.ProcessEnv = process.env): boolean =>
-    provider === 'anthropic' ? Boolean(env.ANTHROPIC_API_KEY) : Boolean(env.GEMINI_API_KEY);

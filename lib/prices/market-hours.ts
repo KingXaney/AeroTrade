@@ -168,8 +168,6 @@ export const marketStatus = (at: Date = new Date()): MarketStatus => {
     return {at: at.getTime(), state: 'closed', reason, holiday, easternDate: date, nextOpen: nextOpenFrom(date, minutes), nextClose: null};
 };
 
-export const isMarketOpen = (at: Date = new Date()): boolean => marketStatus(at).state === 'open';
-export const nextOpen = (at: Date = new Date()): number | null => marketStatus(at).nextOpen;
 
 // ---- Copy ---------------------------------------------------------------------
 const TIME = new Intl.DateTimeFormat('en-US', {timeZone: ZONE, hour: 'numeric', minute: '2-digit'});

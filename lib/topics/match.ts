@@ -66,9 +66,6 @@ const scoreCompiled = (article: MatchInput, include: CompiledTerm[], exclude: Co
     return matchedTerms.length > 0 ? {score, matchedTerms} : null;
 };
 
-export const scoreArticle = (article: MatchInput, keywords: string[], exclude: string[]): Scored | null =>
-    scoreCompiled(article, compileTerms(keywords), compileTerms(exclude));
-
 export const matchArticles = <T extends MatchInput>(
     articles: T[],
     keywords: string[],

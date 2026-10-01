@@ -22,10 +22,6 @@ export const LARGE_CAPS: readonly string[] = [
     'AMD', 'INTC', 'TMO', 'ACN', 'MCD', 'DIS', 'PFE', 'CAT', 'HON', 'LIN',
 ];
 
-// Dual momentum's hurdle and legs need total return; their adjusted closes are
-// re-based on every distribution, so these are topped up with a deep window.
-export const TOTAL_RETURN_SYMBOLS: readonly string[] = CORE_ETFS;
-
 export const UNIVERSES: Record<UniverseKey, readonly string[]> = {
     'spy': [BENCHMARK_SYMBOL],
     'sixty-forty': [BENCHMARK_SYMBOL, 'AGG'],

@@ -114,16 +114,9 @@ export const NewsFeedSchema = z.object({
     includeWatchlist: z.boolean().default(false),
 });
 
-export type NewsFeedInput = z.infer<typeof NewsFeedSchema>;
-
 const CATEGORY_INDEX = new Map(NEWS_CATEGORIES.map((c, i) => [c.id as string, i]));
 const REGION_INDEX = new Map(NEWS_REGIONS.map((r, i) => [r.id as string, i]));
 const CATEGORY_LABEL = new Map(NEWS_CATEGORIES.map((c) => [c.id, c.label]));
-
-export const isCategoryId = (value: unknown): value is NewsCategoryId =>
-    typeof value === 'string' && CATEGORY_INDEX.has(value);
-export const isRegionId = (value: unknown): value is NewsRegionId =>
-    typeof value === 'string' && REGION_INDEX.has(value);
 
 const pickIds = <T extends string>(raw: unknown, index: Map<string, number>, max: number): T[] => {
     if (!Array.isArray(raw)) return [];

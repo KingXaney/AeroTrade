@@ -29,11 +29,6 @@ export const periodKey = (date: string, cadence: Cadence): string => {
 export const isRebalanceDue = (cadence: Cadence, tradeDate: string, lastRebalanceDate: string | null): boolean =>
     lastRebalanceDate === null || periodKey(tradeDate, cadence) !== periodKey(lastRebalanceDate, cadence);
 
-// Display only: is this trade date the first session of its period? (Compares with the
-// previous completed bar, so it never depends on stored state.)
-export const isFirstSessionOfPeriod = (cadence: Cadence, tradeDate: string, previousBarDate: string): boolean =>
-    cadence !== 'daily' && cadence !== 'once' && periodKey(tradeDate, cadence) !== periodKey(previousBarDate, cadence);
-
 const shiftMonths = (date: string, months: number): {year: number; month: number} => {
     const year = Number(date.slice(0, 4));
     const monthIndex = Number(date.slice(5, 7)) - 1 + months;

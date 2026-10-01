@@ -4,18 +4,19 @@
 import {describe, expect, it} from "vitest";
 
 import {
-    AI_TASKS,
     AI_TIERS,
     GEMINI_FLASH_LITE,
     MODEL_MATRIX,
-    isProviderConfigured,
     resolveModel,
     resolveTier,
+    type AiTask,
     type AiTier,
 } from "@/lib/ai/models";
 
 const env = (overrides: Record<string, string> = {}) => overrides as NodeJS.ProcessEnv;
 const WITH_KEY = {ANTHROPIC_API_KEY: "sk-test"};
+// Every task the matrix prices (the AiTask union, read from the matrix itself).
+const AI_TASKS = Object.keys(MODEL_MATRIX.free) as AiTask[];
 
 describe("the matrix", () => {
     it("covers every task in every tier", () => {
@@ -122,14 +123,5 @@ describe("resolveModel", () => {
 
     it("carries the downgrade warning through to the caller", () => {
         expect(resolveModel("digest", env({AI_TIER: "basic"})).warning).toBeDefined();
-    });
-});
-
-describe("isProviderConfigured", () => {
-    it("checks the key each provider actually uses", () => {
-        expect(isProviderConfigured("anthropic", env(WITH_KEY))).toBe(true);
-        expect(isProviderConfigured("anthropic", env())).toBe(false);
-        expect(isProviderConfigured("gemini", env({GEMINI_API_KEY: "g"}))).toBe(true);
-        expect(isProviderConfigured("gemini", env())).toBe(false);
     });
 });

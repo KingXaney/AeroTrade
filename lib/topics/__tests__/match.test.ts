@@ -1,5 +1,5 @@
 import {describe, expect, it} from 'vitest';
-import {matchArticles, scoreArticle, termPattern} from '@/lib/topics/match';
+import {matchArticles, termPattern} from '@/lib/topics/match';
 
 const article = (headline: string, summary = '', datetime = 1_700_000_000) =>
     ({headline, summary, url: `https://example.com/${datetime}`, source: 'Test', datetime});
@@ -29,15 +29,15 @@ describe('termPattern', () => {
     });
 });
 
-describe('scoreArticle', () => {
+describe('scoring', () => {
     it('weights headline hits 3 and summary hits 1, capping summary hits', () => {
-        const scored = scoreArticle(article('Nvidia beats', 'nvidia nvidia nvidia nvidia nvidia nvidia nvidia'), ['nvidia'], []);
-        expect(scored).toEqual({score: 3 + 5, matchedTerms: ['nvidia']});
+        const [scored] = matchArticles([article('Nvidia beats', 'nvidia nvidia nvidia nvidia nvidia nvidia nvidia')], ['nvidia'], []);
+        expect(scored).toMatchObject({score: 3 + 5, matchedTerms: ['nvidia']});
     });
 
-    it('returns null with no include hit or any exclude hit', () => {
-        expect(scoreArticle(article('Nothing here'), ['nvidia'], [])).toBeNull();
-        expect(scoreArticle(article('Nvidia crypto mining'), ['nvidia'], ['crypto'])).toBeNull();
+    it('drops an article with no include hit or any exclude hit', () => {
+        expect(matchArticles([article('Nothing here')], ['nvidia'], [])).toEqual([]);
+        expect(matchArticles([article('Nvidia crypto mining')], ['nvidia'], ['crypto'])).toEqual([]);
     });
 });
 
@@ -56,7 +56,7 @@ describe('matchArticles', () => {
     it('handles a very large input quickly', () => {
         const big = article('Nothing', 'lorem ipsum '.repeat(10_000));
         const started = performance.now();
-        expect(scoreArticle(big, ['nvidia', 'amd', 'tsmc'], ['crypto'])).toBeNull();
+        expect(matchArticles([big], ['nvidia', 'amd', 'tsmc'], ['crypto'])).toEqual([]);
         expect(performance.now() - started).toBeLessThan(50);
     });
 });

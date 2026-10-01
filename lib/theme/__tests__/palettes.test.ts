@@ -4,7 +4,7 @@
 
 import {describe, expect, it} from 'vitest';
 
-import {contrastRatio, hexToRgb, isHex6, relativeLuminance, rgbString} from '@/lib/theme/color';
+import {contrastRatio, hexToRgb, isHex6, relativeLuminance} from '@/lib/theme/color';
 import {
     CSS_VAR_BY_TOKEN,
     PALETTES,
@@ -46,7 +46,6 @@ describe('colour helpers', () => {
     it('parses 6-digit hex in either case', () => {
         expect(hexToRgb('#ff8000')).toEqual({r: 255, g: 128, b: 0});
         expect(hexToRgb('#FF8000')).toEqual({r: 255, g: 128, b: 0});
-        expect(rgbString('#ff8000')).toBe('255 128 0');
     });
 
     it('rejects anything that is not a 6-digit hex', () => {

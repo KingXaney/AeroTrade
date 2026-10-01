@@ -39,8 +39,6 @@ export const groupOf = (entry: GlossaryEntry): GroupId => {
     return 'portfolio';
 };
 
-export const whereItLives = (entry: GlossaryEntry): Home => HOMES[groupOf(entry)];
-
 export type GlossaryGroup = {id: GroupId; label: string; home: Home; keys: GlossaryKey[]};
 
 const GROUP_LABELS: Record<GroupId, string> = {

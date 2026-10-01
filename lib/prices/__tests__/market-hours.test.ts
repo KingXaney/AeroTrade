@@ -5,10 +5,8 @@ import {
     describeQueuedFill,
     easternParts,
     easternToInstant,
-    isMarketOpen,
     isTradingDay,
     marketStatus,
-    nextOpen,
 } from '@/lib/prices/market-hours';
 
 // All fixtures are ISO instants; the Eastern wall time is stated in the test name.
@@ -63,13 +61,13 @@ describe('marketStatus', () => {
     });
 
     it('is open until 16:00 exclusive', () => {
-        expect(isMarketOpen(at('2026-09-14T19:59:59Z'))).toBe(true);
+        expect(marketStatus(at('2026-09-14T19:59:59Z')).state).toBe('open');
         expect(marketStatus(at('2026-09-14T20:00:00Z'))).toMatchObject({state: 'closed', reason: 'after-close'});
     });
 
     it('closes at 13:00 on a half day', () => {
-        expect(isMarketOpen(at('2026-11-27T17:59:00Z'))).toBe(true);    // 12:59 EST
-        expect(isMarketOpen(at('2026-11-27T18:00:00Z'))).toBe(false);   // 13:00 EST
+        expect(marketStatus(at('2026-11-27T17:59:00Z')).state).toBe('open');    // 12:59 EST
+        expect(marketStatus(at('2026-11-27T18:00:00Z')).state).toBe('closed');   // 13:00 EST
     });
 
     it('is closed on weekends and holidays, and names the holiday', () => {
@@ -78,11 +76,11 @@ describe('marketStatus', () => {
     });
 
     it('points at the next open: later today, Monday after a weekend, Friday after Thanksgiving', () => {
-        expect(nextOpen(at('2026-09-14T12:00:00Z'))).toBe(Date.parse('2026-09-14T13:30:00Z'));
-        expect(nextOpen(at('2026-09-12T15:00:00Z'))).toBe(Date.parse('2026-09-14T13:30:00Z'));
-        expect(nextOpen(at('2026-11-26T15:00:00Z'))).toBe(Date.parse('2026-11-27T14:30:00Z'));
+        expect(marketStatus(at('2026-09-14T12:00:00Z')).nextOpen).toBe(Date.parse('2026-09-14T13:30:00Z'));
+        expect(marketStatus(at('2026-09-12T15:00:00Z')).nextOpen).toBe(Date.parse('2026-09-14T13:30:00Z'));
+        expect(marketStatus(at('2026-11-26T15:00:00Z')).nextOpen).toBe(Date.parse('2026-11-27T14:30:00Z'));
         // Labor Day weekend 2026: Fri 4 Sep after close → Tue 8 Sep
-        expect(nextOpen(at('2026-09-04T21:00:00Z'))).toBe(Date.parse('2026-09-08T13:30:00Z'));
+        expect(marketStatus(at('2026-09-04T21:00:00Z')).nextOpen).toBe(Date.parse('2026-09-08T13:30:00Z'));
     });
 
     it('still works across the DST boundaries', () => {

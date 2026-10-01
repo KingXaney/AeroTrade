@@ -368,5 +368,3 @@ export const buildTools = (userId: string) => ({
         },
     }),
 }) satisfies Record<ChatToolName, unknown>;
-
-export type ChatTools = ReturnType<typeof buildTools>;

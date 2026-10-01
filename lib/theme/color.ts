@@ -22,12 +22,6 @@ export function hexToRgb(hex: string): Rgb {
     };
 }
 
-// 'r g b' — the space-separated form that `rgb(var(--x) / alpha)` accepts in CSS.
-export function rgbString(hex: string): string {
-    const {r, g, b} = hexToRgb(hex);
-    return `${r} ${g} ${b}`;
-}
-
 // WCAG 2.2 sRGB linearisation. 2.0 used 0.03928 as the cutoff; the difference in
 // the resulting ratio is below 0.001 and 2.2 is the current text.
 function linearise(channel: number): number {

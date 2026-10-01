@@ -505,8 +505,6 @@ export const lookupTerm = (key: string): GlossaryEntry | null => (isGlossaryKey(
 
 export const shortHelp = (key: GlossaryKey): string => GLOSSARY[key].short;
 
-export const entriesOfKind = (kind: GlossaryKind): GlossaryEntry[] => ENTRIES.filter((entry) => entry.kind === kind);
-
 const ALIAS_INDEX: ReadonlyMap<string, GlossaryEntry> = new Map(
     ENTRIES.flatMap((entry) => [
         [entry.key, entry] as const,
