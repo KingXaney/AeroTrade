@@ -11,7 +11,7 @@ export const transporter = nodemailer.createTransport({
 })
 
 // Absolute links in email need the deployment's public URL (the same one better-auth uses).
-const appUrl = () => (process.env.BETTER_AUTH_URL ?? '').replace(/\/$/, '') || 'http://localhost:3000';
+export const appUrl = (): string => (process.env.BETTER_AUTH_URL ?? '').replace(/\/$/, '') || 'http://localhost:3000';
 
 export const mailerConfigured = (): boolean => Boolean(process.env.NODEMAILER_EMAIL && process.env.NODEMAILER_PASSWORD);
 
