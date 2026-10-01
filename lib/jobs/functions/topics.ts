@@ -3,17 +3,13 @@ import {newsSearchEnabled} from "@/lib/news/config";
 import {inferText} from "@/lib/ai/infer";
 import {recordJobRun} from "@/lib/jobs/job-runs";
 import {JOBS, triggersOf} from "@/lib/jobs/registry";
-import {connectToDatabase} from "@/database/mongoose";
-import Topic from "@/database/models/topic.model";
-import {loadBriefCandidates, loadStaleKeywordGroups, refreshKeywordGroup, saveTopicBrief, type KeywordGroup} from "@/lib/topics/refresh";
+import {loadBriefCandidates, loadKeywordGroup, loadStaleKeywordGroups, refreshKeywordGroup, saveBriefFromText} from "@/lib/topics/refresh";
 import {buildTopicBriefPrompt} from "@/lib/topics/prompts";
-import {parseBriefText} from "@/lib/topics/brief";
-import {MAX_BRIEF_CALLS_PER_RUN} from "@/lib/topics/config";
-import {ensureTopicHasArticles, getTopicsForUser} from "@/lib/topics/store";
+import {MAX_BRIEF_CALLS_PER_RUN, TOPIC_GROUPS_PER_RUN} from "@/lib/topics/config";
+import {ensureTopicHasArticles, getUnfetchedTopics} from "@/lib/topics/store";
 
-// ─── Followed topics ────────────────────────────────────────────────────────────
+// The followed topics' four jobs (lib/topics/refresh.ts, lib/topics/store.ts).
 
-const TOPIC_GROUPS_PER_RUN = 60;
 const TOPIC_GROUP_THROTTLE = '1s';    // Google News etiquette: one search per second
 const BRIEF_THROTTLE_DELAY = '15s';   // same pacing as extraction on the free tier
 
@@ -70,11 +66,7 @@ export const refreshTopicOnDemand = inngest.createFunction(
         if (!Number.isFinite(keywordSetHash) || !userId) return {success: false, message: 'Skipped — no keyword set on the event'};
         if (!newsSearchEnabled()) return {success: false, message: 'Skipped — NEWS_SEARCH_ENABLED is off'};
 
-        const group = await step.run('load-group', async (): Promise<KeywordGroup | null> => {
-            await connectToDatabase();
-            const topic = await Topic.findOne({keywordSetHash}).select('keywords exclude').lean<{keywords: string[]; exclude: string[]} | null>();
-            return topic ? {keywordSetHash, keywords: topic.keywords ?? [], exclude: topic.exclude ?? []} : null;
-        });
+        const group = await step.run('load-group', async () => loadKeywordGroup(keywordSetHash));
         if (!group) return {success: false, message: 'Skipped — the topic no longer exists'};
 
         const result = await step.run(`refresh-group-${keywordSetHash}`, async () => refreshKeywordGroup(group));
@@ -100,8 +92,7 @@ export const fillFirstRunTopics = inngest.createFunction(
         if (!userId) return {success: false, message: 'Skipped — no user on the event'};
         if (!newsSearchEnabled()) return {success: false, message: 'Skipped — NEWS_SEARCH_ENABLED is off'};
 
-        const topics = await step.run('load-unfetched-topics', async () =>
-            (await getTopicsForUser(userId)).filter((t) => t.lastFetchedAt === null));
+        const topics = await step.run('load-unfetched-topics', async () => getUnfetchedTopics(userId));
 
         let filled = 0;
         let failed = 0;
@@ -139,11 +130,7 @@ export const generateTopicBriefs = inngest.createFunction(
             const prompt = buildTopicBriefPrompt(candidate.name, candidate.articles);
             const response = await inferText(step, {task: 'topicBrief', stepId: `brief-${candidate.keywordSetHash}`, prompt});
 
-            written += await step.run(`save-brief-${candidate.keywordSetHash}`, async () => {
-                const parsed = parseBriefText(response.text);
-                if (!parsed) return 0;
-                return saveTopicBrief(candidate.keywordSetHash, parsed, candidate.articleHashes, response.model);
-            });
+            written += await step.run(`save-brief-${candidate.keywordSetHash}`, async () => saveBriefFromText(candidate, response.text, response.model));
         }
 
         const summary = `Wrote ${written} topic briefs from ${candidates.length} keyword sets`;

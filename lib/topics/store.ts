@@ -188,6 +188,10 @@ export const getTopicsDigestData = async (userId: string): Promise<TopicDigestIn
 
 // First visit to a brand-new topic: one bounded live fetch so the page isn't empty
 // until the next scheduled refresh. Never called from dashboard loaders.
+// A user's topics never fetched yet: what the first-run job fills after onboarding.
+export const getUnfetchedTopics = async (userId: string): Promise<TopicView[]> =>
+    (await getTopicsForUser(userId)).filter((t) => t.lastFetchedAt === null);
+
 export const ensureTopicHasArticles = async (topic: TopicView): Promise<boolean> => {
     if (topic.lastFetchedAt !== null) return false;
     await connectToDatabase();

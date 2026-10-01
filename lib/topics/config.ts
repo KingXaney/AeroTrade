@@ -29,6 +29,10 @@ export const TOPIC_SEARCH_WINDOW = '1d';
 // on its first fetch instead of starting blank.
 export const TOPIC_SEARCH_FALLBACK_WINDOW = '7d';
 
+// The three-hourly sweep refreshes at most this many keyword sets, the ones longest without a
+// fetch (one search a second).
+export const TOPIC_GROUPS_PER_RUN = 60;
+
 // Briefs run on the free Gemini tier with a 15 s sleep between calls; 20 keeps the
 // daily job well inside the quota.
 export const MAX_BRIEF_CALLS_PER_RUN = 20;

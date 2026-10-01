@@ -10,7 +10,7 @@ import {hashId, normalizeUrl} from "@/lib/text";
 import {matchArticles, type MatchInput} from "@/lib/topics/match";
 import {BRIEF_MIN_AGE_HOURS, BRIEF_MIN_NEW_ARTICLES, MATCH_CAP_PER_FETCH, MAX_ARTICLES_PER_TOPIC_PER_DAY, TOPIC_SEARCH_FALLBACK_WINDOW} from "@/lib/topics/config";
 import type {TopicBriefArticle} from "@/lib/topics/prompts";
-import type {TopicBriefContent} from "@/lib/topics/brief";
+import {parseBriefText, type TopicBriefContent} from "@/lib/topics/brief";
 import {getEasternDateString} from "@/lib/dates";
 
 export type KeywordGroup = {keywordSetHash: number; keywords: string[]; exclude: string[]};
@@ -32,6 +32,13 @@ export const loadStaleKeywordGroups = async (limit: number): Promise<KeywordGrou
 };
 
 type Candidate = MatchInput & {sourceType: NewsSourceType; summary: string};
+
+// One keyword set as the on-demand refresh reads it; null once no topic follows it.
+export const loadKeywordGroup = async (keywordSetHash: number): Promise<KeywordGroup | null> => {
+    await connectToDatabase();
+    const topic = await Topic.findOne({keywordSetHash}).select('keywords exclude').lean<{keywords: string[]; exclude: string[]} | null>();
+    return topic ? {keywordSetHash, keywords: topic.keywords ?? [], exclude: topic.exclude ?? []} : null;
+};
 
 export const refreshKeywordGroup = async (group: KeywordGroup): Promise<RefreshResult> => {
     await connectToDatabase();
@@ -168,4 +175,12 @@ export const saveTopicBrief = async (
         {$set: {brief: {summary: content.summary, bullets: content.bullets, date: getEasternDateString(), generatedAt: new Date(), articleHashes, model}}},
     );
     return result.modifiedCount;
+};
+
+// The briefs job's save step: the model's text parsed (briefs render as plain text) and written
+// to every topic on the keyword set; 0 when it did not parse.
+export const saveBriefFromText = async (candidate: BriefCandidate, text: string, model: string): Promise<number> => {
+    const parsed = parseBriefText(text);
+    if (!parsed) return 0;
+    return saveTopicBrief(candidate.keywordSetHash, parsed, candidate.articleHashes, model);
 };
