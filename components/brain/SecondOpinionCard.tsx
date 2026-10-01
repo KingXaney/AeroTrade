@@ -4,7 +4,7 @@ import {useEffect, useRef, useState} from "react";
 import {useRouter} from "next/navigation";
 import SafeMarkdown from "@/components/markdown/SafeMarkdown";
 import {toast} from "sonner";
-import {formatTimeAgo} from "@/lib/utils";
+import {formatTimeAgoMs} from "@/lib/utils";
 import {getSecondOpinionPrompt, requestSecondOpinion, saveManualSecondOpinion} from "@/lib/actions/opinion.actions";
 import type {SecondOpinionView} from "@/lib/brain/opinion";
 
@@ -120,7 +120,7 @@ const SecondOpinionCard = ({configured, opinion}: {configured: boolean; opinion:
                 </h2>
                 {opinion && (
                     <span className="text-[11px] text-fg-muted" style={{fontFamily: 'var(--type-mono)'}}>
-                        {opinion.model} · {SOURCE_LABELS[opinion.source]} · {formatTimeAgo(Math.floor(opinion.generatedAt / 1000))}
+                        {opinion.model} · {SOURCE_LABELS[opinion.source]} · {formatTimeAgoMs(opinion.generatedAt)}
                     </span>
                 )}
             </div>

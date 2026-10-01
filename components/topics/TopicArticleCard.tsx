@@ -1,4 +1,4 @@
-import {formatTimeAgo} from "@/lib/utils";
+import {formatTimeAgoSeconds} from "@/lib/utils";
 import SourceBadge from "@/components/topics/SourceBadge";
 
 const MAX_TERM_CHIPS = 3;
@@ -36,7 +36,7 @@ const TopicArticleCard = ({article, isNew = false, topic}: Props) => {
                 )}
             </div>
             <h3 className="news-title">{article.headline}</h3>
-            <p className="news-meta">{formatTimeAgo(article.datetime)} · {article.source || 'Unknown source'}</p>
+            <p className="news-meta">{formatTimeAgoSeconds(article.datetime)} · {article.source || 'Unknown source'}</p>
             {showSummary && <p className="news-summary">{article.summary}</p>}
             <div className="mt-auto flex items-center justify-between gap-2 flex-wrap">
                 <div className="flex items-center gap-1.5 flex-wrap">

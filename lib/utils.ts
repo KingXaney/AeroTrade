@@ -5,9 +5,11 @@ export function cn(...inputs: ClassValue[]) {
   return twMerge(clsx(inputs));
 }
 
-export const formatTimeAgo = (timestamp: number) => {
-  const now = Date.now();
-  const diffInMs = now - timestamp * 1000; // Convert to milliseconds
+// Two readers, the unit in the name: feed items (Finnhub `datetime`, topic articles) are unix
+// seconds, while our own stamps (Date#getTime, job runs, friend requests) are epoch ms. One
+// seconds-only helper read a ms stamp as a date far in the future, which prints "just now".
+export const formatTimeAgoMs = (epochMs: number) => {
+  const diffInMs = Date.now() - epochMs;
   const diffInHours = Math.floor(diffInMs / (1000 * 60 * 60));
   const diffInMinutes = Math.floor(diffInMs / (1000 * 60));
 
@@ -22,6 +24,8 @@ export const formatTimeAgo = (timestamp: number) => {
     return `${diffInMinutes} minute${diffInMinutes > 1 ? 's' : ''} ago`;
   }
 };
+
+export const formatTimeAgoSeconds = (unixSeconds: number) => formatTimeAgoMs(unixSeconds * 1000);
 
 export function delay(ms: number) {
   return new Promise((resolve) => setTimeout(resolve, ms));

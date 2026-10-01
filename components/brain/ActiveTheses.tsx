@@ -10,7 +10,7 @@ import type {SinceThesisLegs} from "@/lib/brain/since-thesis";
 
 const MS_PER_WEEK = 7 * 24 * 60 * 60 * 1000;
 
-// Same pattern as formatTimeAgo — time-relative display computed in a helper.
+// Same pattern as formatTimeAgoMs — time-relative display computed in a helper.
 const weeksActive = (thesisSince: number | null): number =>
     thesisSince ? Math.max(1, Math.round((Date.now() - thesisSince) / MS_PER_WEEK)) : 0;
 

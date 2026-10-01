@@ -1,5 +1,5 @@
 import Link from "next/link";
-import {formatTimeAgo} from "@/lib/utils";
+import {formatTimeAgoMs} from "@/lib/utils";
 import type {SecondOpinionView} from "@/lib/brain/opinion";
 
 const EXCERPT_MAX_CHARS = 420;
@@ -21,7 +21,7 @@ const SecondOpinionExcerpt = ({opinion}: {opinion: SecondOpinionView | null}) =>
         <div>
             <div className="flex items-center justify-between gap-2 mb-2 text-[10px] uppercase tracking-[0.1em] text-fg-muted" style={{fontFamily: 'var(--type-mono)'}}>
                 <span>{opinion.model}</span>
-                <span>{formatTimeAgo(Math.floor(opinion.generatedAt / 1000))}</span>
+                <span>{formatTimeAgoMs(opinion.generatedAt)}</span>
             </div>
             <p className="text-sm text-fg-soft leading-relaxed">{excerpt(opinion.opinionMd)}</p>
             <Link href="/brain" className="inline-block mt-3 text-xs text-brand hover:underline" style={{fontFamily: 'var(--type-mono)'}}>

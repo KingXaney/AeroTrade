@@ -1,5 +1,5 @@
 import Link from "next/link";
-import {cn, formatTimeAgo, getChangeColorClass} from "@/lib/utils";
+import {cn, formatTimeAgoSeconds, getChangeColorClass} from "@/lib/utils";
 import TradeLink from "@/components/trade/TradeLink";
 import Badge from "@/components/primitives/Badge";
 import Term from "@/components/primitives/Term";
@@ -67,7 +67,7 @@ const EvidenceList = ({entityKey, items}: {entityKey: string; items: EvidenceIte
                         </div>
                         <div className="flex flex-wrap items-center gap-2 text-[11px] text-fg-muted mt-1" style={{fontFamily: 'var(--type-mono)'}}>
                             <EventBadge eventType={item.eventType} />
-                            <span>{item.source} · {formatTimeAgo(item.datetime)}</span>
+                            <span>{item.source} · {formatTimeAgoSeconds(item.datetime)}</span>
                             {item.sourceType === 'reddit' && <span className="text-negative">community sentiment</span>}
                         </div>
                     </a>

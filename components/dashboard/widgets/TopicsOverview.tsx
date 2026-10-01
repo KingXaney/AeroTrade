@@ -1,5 +1,5 @@
 import Link from "next/link";
-import {formatTimeAgo} from "@/lib/utils";
+import {formatTimeAgoSeconds} from "@/lib/utils";
 
 const MAX_ROWS = 6;
 const mono = {fontFamily: 'var(--type-mono)'} as const;
@@ -24,7 +24,7 @@ const TopicsOverview = ({overview, span}: {overview: TopicsOverview; span: numbe
                                 <span className="block truncate text-sm text-fg" style={{fontFamily: 'var(--type-display)'}}>{t.name}</span>
                                 {wide && (
                                     <span className="block truncate text-xs text-fg-muted">
-                                        {t.latest ? `${t.latest.headline} · ${formatTimeAgo(t.latest.datetime)}` : 'No articles yet'}
+                                        {t.latest ? `${t.latest.headline} · ${formatTimeAgoSeconds(t.latest.datetime)}` : 'No articles yet'}
                                     </span>
                                 )}
                             </span>
