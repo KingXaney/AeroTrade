@@ -12,6 +12,7 @@ import {
     addToWatchlist,
     removeFromWatchlist,
     getWatchlistForUser,
+    getWatchlistSymbolsByUserId,
 } from "@/lib/actions/watchlist.actions";
 import {connectToDatabase} from "@/database/mongoose";
 import SuggestionSet, {GLOBAL_SUGGESTIONS_USER} from "@/database/models/suggestion-set.model";
@@ -67,8 +68,10 @@ export const buildTools = (userId: string) => ({
             query: z.string().describe('Company name or ticker, e.g. "Apple" or "AAPL"'),
         }),
         execute: async ({query}) => {
-            const results = await searchStocks(query, userId);
-            return results.slice(0, 10);
+            // The search action is public and takes no user id; the watchlist join is done here.
+            const [results, watched] = await Promise.all([searchStocks(query), getWatchlistSymbolsByUserId(userId)]);
+            const watchedSet = new Set(watched);
+            return results.slice(0, 10).map((stock): StockWithWatchlistStatus => ({...stock, isInWatchlist: watchedSet.has(stock.symbol)}));
         },
     }),
 

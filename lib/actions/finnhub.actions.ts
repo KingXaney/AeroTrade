@@ -9,7 +9,6 @@ import {
     formatMarketCapValue,
 } from "@/lib/utils";
 import {FINANCIALS_REVALIDATE_SECONDS, POPULAR_STOCK_SYMBOLS, PROFILE_REVALIDATE_SECONDS} from "@/lib/constants";
-import {getWatchlistSymbolsByUserId} from "@/lib/actions/watchlist.actions";
 
 const FINNHUB_BASE_URL = 'https://finnhub.io/api/v1';
 // Server-only. NEXT_PUBLIC_FINNHUB_API_KEY is still honoured for existing deployments.
@@ -127,16 +126,10 @@ const toStock = (hit: FinnhubSearchResult): Stock => {
 };
 
 // Searches Finnhub for stocks matching the query. Empty query → POPULAR_STOCK_SYMBOLS as a curated default.
-// Joins results with the caller's watchlist to populate `isInWatchlist`.
-export const searchStocks = async (
-    query?: string,
-    userId?: string,
-): Promise<StockWithWatchlistStatus[]> => {
+// Takes no user id: client components import this, which makes it a public endpoint, and an id
+// passed in would let anyone read another user's watchlist. The chat tool joins its own user's.
+export const searchStocks = async (query?: string): Promise<Stock[]> => {
     try {
-        const watchlistSymbols = userId
-            ? new Set(await getWatchlistSymbolsByUserId(userId))
-            : new Set<string>();
-
         const q = (query || '').trim();
         if (!q) {
             // Fallback: present popular symbols as cards. We don't burn API calls for names here —
@@ -146,7 +139,6 @@ export const searchStocks = async (
                 name: symbol,
                 exchange: '',
                 type: 'Common Stock',
-                isInWatchlist: watchlistSymbols.has(symbol),
             }));
         }
 
@@ -156,12 +148,12 @@ export const searchStocks = async (
 
         // De-dupe by base symbol; cap at 25 results
         const seen = new Set<string>();
-        const out: StockWithWatchlistStatus[] = [];
+        const out: Stock[] = [];
         for (const hit of hits) {
             const stock = toStock(hit);
             if (!stock.symbol || seen.has(stock.symbol)) continue;
             seen.add(stock.symbol);
-            out.push({ ...stock, isInWatchlist: watchlistSymbols.has(stock.symbol) });
+            out.push(stock);
             if (out.length >= 25) break;
         }
         return out;
