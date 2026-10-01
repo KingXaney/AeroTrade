@@ -5,10 +5,10 @@ import {usePathname, useRouter, useSearchParams} from "next/navigation";
 import TradingViewWidget from "@/components/TradingViewWidget";
 import OrderPanel from "@/components/trade/OrderPanel";
 import type {PositionLike} from "@/lib/trading/order-math";
-import {TRADE_CHART_WIDGET_CONFIG} from "@/lib/constants";
+import {TRADE_CHART_WIDGET_CONFIG, tvScript} from "@/lib/stocks/tradingview";
 import {useDebounce} from "@/hooks/useDebounce";
 
-const SCRIPT_URL = 'https://s3.tradingview.com/external-embedding/embed-widget-advanced-chart.js';
+const SCRIPT_URL = tvScript('advanced-chart');
 const URL_SYNC_DELAY_MS = 300;
 
 type Props = {
