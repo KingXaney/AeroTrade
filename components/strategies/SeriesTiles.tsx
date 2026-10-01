@@ -1,6 +1,6 @@
 import type {ReactNode} from "react";
 import Panel from "@/components/primitives/Panel";
-import {Stat} from "@/components/trading/portfolio/AnalyticsStats";
+import StatTile from "@/components/primitives/StatTile";
 
 // Three tiles about one series — a title, one line of detail, then three measurements —
 // framed as a <Panel>, so it follows the visual style like every other surface (never a
@@ -24,7 +24,7 @@ const SeriesTiles = ({title, detail, tiles, id}: Props) => (
         <div className="grid grid-cols-3 gap-3 mt-3">
             {tiles.map((tile, i) => (
                 <div key={i} data-tile={i}>
-                    <Stat label={tile.label} value={tile.value} hint={tile.hint} />
+                    <StatTile label={tile.label} value={tile.value} hint={tile.hint} />
                 </div>
             ))}
         </div>

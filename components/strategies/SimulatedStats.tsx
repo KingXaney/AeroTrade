@@ -1,8 +1,8 @@
-import {cn} from "@/lib/utils";
 import type {SeriesStats} from "@/lib/strategies/types";
 import {formatDrawdown, formatPct, roundPct} from "@/lib/format";
 import {SIM_STATS_COPY as COPY} from "@/lib/learn/copy/simulated";
 import Panel from "@/components/primitives/Panel";
+import StatTile from "@/components/primitives/StatTile";
 import Term from "@/components/primitives/Term";
 import WhatTheseMean from "@/components/learn/WhatTheseMean";
 
@@ -13,14 +13,6 @@ import WhatTheseMean from "@/components/learn/WhatTheseMean";
 // lab ranks nothing, so no tile carries a sign colour. Every label and hint is from
 // lib/learn/copy/simulated.ts. Client-safe: no hooks, no server imports (StrategyPerformance
 // and WhatIfLab are client trees).
-
-const SimStat = ({label, value, className, hint}: {label: React.ReactNode; value: string; className?: string; hint?: string}) => (
-    <div className="flex flex-col gap-1">
-        <span className="font-mono text-[10px] uppercase tracking-[0.1em] text-fg-muted">{label}</span>
-        <span className={cn('font-heading text-lg font-semibold text-fg', className)}>{value}</span>
-        {hint && <span className="font-mono text-[10px] text-fg-muted">{hint}</span>}
-    </div>
-);
 
 const signClass = (value: number | null): string | undefined => {
     if (value === null) return undefined;
@@ -36,12 +28,12 @@ const SimulatedStats = ({stats, id = 'simulated-stats', neutral = false}: Props)
     return (
         <Panel as="div" id={id}>
             <div className="grid grid-cols-2 md:grid-cols-6 gap-4">
-                <SimStat label={<Term k="total-return">{COPY.totalReturn}</Term>} value={formatPct(stats.totalReturnPct)} className={sign(stats.totalReturnPct)} hint={COPY.totalReturnHint} />
-                <SimStat label={<Term k="vs-spy">{COPY.vsSpy}</Term>} value={formatPct(stats.excessReturnPct)} className={sign(stats.excessReturnPct)} hint={COPY.vsSpyHint(formatPct(stats.benchmarkReturnPct))} />
-                <SimStat label={<Term k="cagr">{COPY.cagr}</Term>} value={formatPct(stats.cagrPct)} hint={COPY.cagrHint} />
-                <SimStat label={<Term k="max-drawdown">{COPY.maxDrawdown}</Term>} value={formatDrawdown(stats.maxDrawdownPct)} className={drawdownClass} hint={COPY.maxDrawdownHint} />
-                <SimStat label={<Term k="volatility">{COPY.volatility}</Term>} value={stats.annualizedVolPct === null ? '—' : `${stats.annualizedVolPct.toFixed(1)}%`} hint={COPY.volatilityHint} />
-                <SimStat label={<Term k="win-rate">{COPY.winRate}</Term>} value={stats.winRatePct === null ? '—' : `${stats.winRatePct.toFixed(0)}%`} hint={stats.winRatePct === null ? COPY.winRateNone : COPY.winRateHint(stats)} />
+                <StatTile label={<Term k="total-return">{COPY.totalReturn}</Term>} value={formatPct(stats.totalReturnPct)} valueClass={sign(stats.totalReturnPct)} hint={COPY.totalReturnHint} />
+                <StatTile label={<Term k="vs-spy">{COPY.vsSpy}</Term>} value={formatPct(stats.excessReturnPct)} valueClass={sign(stats.excessReturnPct)} hint={COPY.vsSpyHint(formatPct(stats.benchmarkReturnPct))} />
+                <StatTile label={<Term k="cagr">{COPY.cagr}</Term>} value={formatPct(stats.cagrPct)} hint={COPY.cagrHint} />
+                <StatTile label={<Term k="max-drawdown">{COPY.maxDrawdown}</Term>} value={formatDrawdown(stats.maxDrawdownPct)} valueClass={drawdownClass} hint={COPY.maxDrawdownHint} />
+                <StatTile label={<Term k="volatility">{COPY.volatility}</Term>} value={stats.annualizedVolPct === null ? '—' : `${stats.annualizedVolPct.toFixed(1)}%`} hint={COPY.volatilityHint} />
+                <StatTile label={<Term k="win-rate">{COPY.winRate}</Term>} value={stats.winRatePct === null ? '—' : `${stats.winRatePct.toFixed(0)}%`} hint={stats.winRatePct === null ? COPY.winRateNone : COPY.winRateHint(stats)} />
             </div>
             <WhatTheseMean keys={['total-return', 'vs-spy', 'simulated-record', 'cagr', 'max-drawdown', 'volatility', 'win-rate']} />
         </Panel>

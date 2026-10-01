@@ -1,7 +1,7 @@
 import {concentration} from "@/lib/trading/analytics";
 import {dailySwingDollars} from "@/lib/trading/learn/risk";
 import {RISK_COPY} from "@/lib/learn/copy/portfolio";
-import {Stat} from "@/components/trading/portfolio/AnalyticsStats";
+import StatTile from "@/components/primitives/StatTile";
 import Panel from "@/components/primitives/Panel";
 import SectionHeading from "@/components/primitives/SectionHeading";
 import Term from "@/components/primitives/Term";
@@ -25,14 +25,14 @@ const RiskLens = ({series, snapshotThrough, portfolio}: {series: readonly PerfPo
             <SectionHeading id="risk-lens-heading" spacing="sm">{RISK_COPY.heading}</SectionHeading>
             <div className="grid grid-cols-2 gap-4">
                 <div data-testid="risk-swing">
-                    <Stat
+                    <StatTile
                         label={<Term k="daily-swing">{RISK_COPY.swingLabel}</Term>}
                         value={swing ? RISK_COPY.swingValue(swing.dollars) : '—'}
                         hint={swing ? RISK_COPY.swingHint(swing.pct) : RISK_COPY.swingNeedsHistory}
                     />
                 </div>
                 <div data-testid="risk-largest">
-                    <Stat
+                    <StatTile
                         label={<Term k="concentration">{RISK_COPY.largestLabel}</Term>}
                         value={largest ? RISK_COPY.largestValue(largest.weight) : '—'}
                         hint={largest ? RISK_COPY.largestHint(largest.symbol, largest.marketValue, largest.priceStale) : RISK_COPY.allCash}

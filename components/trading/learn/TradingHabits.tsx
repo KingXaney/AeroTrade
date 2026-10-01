@@ -2,7 +2,7 @@ import type {HabitsRead} from "@/lib/trading/learn/habits-store";
 import {cadenceControls, HABITS_MIN_CLOSED_LOTS} from "@/lib/trading/learn/habits";
 import {STRATEGIES} from "@/lib/strategies/catalog";
 import {HABITS_COPY, HABITS_TERMS} from "@/lib/learn/copy/habits";
-import {Stat} from "@/components/trading/portfolio/AnalyticsStats";
+import StatTile from "@/components/primitives/StatTile";
 import Panel from "@/components/primitives/Panel";
 import SectionHeading from "@/components/primitives/SectionHeading";
 import EmptyState from "@/components/primitives/EmptyState";
@@ -33,20 +33,20 @@ const TradingHabits = ({read}: {read: HabitsRead}) => {
             <SectionHeading id="habits-heading" spacing="sm">{HABITS_COPY.heading}</SectionHeading>
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <div data-testid="habits-hold">
-                    <Stat label={<Term k="hold-time">{HABITS_COPY.holdLabel}</Term>} value={HABITS_COPY.holdValue(habits.hold)} hint={HABITS_COPY.holdHint(habits.hold)} />
+                    <StatTile label={<Term k="hold-time">{HABITS_COPY.holdLabel}</Term>} value={HABITS_COPY.holdValue(habits.hold)} hint={HABITS_COPY.holdHint(habits.hold)} />
                 </div>
                 <div data-testid="habits-sold">
-                    <Stat label={<Term k="disposition-effect">{HABITS_COPY.soldLabel}</Term>} value={HABITS_COPY.soldValue(habits.sold)} hint={HABITS_COPY.soldHint(habits.sold)} />
+                    <StatTile label={<Term k="disposition-effect">{HABITS_COPY.soldLabel}</Term>} value={HABITS_COPY.soldValue(habits.sold)} hint={HABITS_COPY.soldHint(habits.sold)} />
                 </div>
                 <div data-testid="habits-pace">
-                    <Stat label={<Term k="trades">{HABITS_COPY.paceLabel}</Term>} value={HABITS_COPY.paceValue(habits.pace)} hint={HABITS_COPY.paceHint(habits.pace)} />
+                    <StatTile label={<Term k="trades">{HABITS_COPY.paceLabel}</Term>} value={HABITS_COPY.paceValue(habits.pace)} hint={HABITS_COPY.paceHint(habits.pace)} />
                 </div>
                 <div data-testid="habits-turnover">
-                    <Stat label={<Term k="turnover">{HABITS_COPY.turnoverLabel}</Term>} value={HABITS_COPY.turnoverValue(habits.turnover)} hint={HABITS_COPY.turnoverHint(habits.turnover)} />
+                    <StatTile label={<Term k="turnover">{HABITS_COPY.turnoverLabel}</Term>} value={HABITS_COPY.turnoverValue(habits.turnover)} hint={HABITS_COPY.turnoverHint(habits.turnover)} />
                 </div>
                 {held && (
                     <div data-testid="habits-held">
-                        <Stat label={<Term k="had-you-held">{HABITS_COPY.heldLabel}</Term>} value={HABITS_COPY.heldValue(held)} hint={HABITS_COPY.heldHint(held)} />
+                        <StatTile label={<Term k="had-you-held">{HABITS_COPY.heldLabel}</Term>} value={HABITS_COPY.heldValue(held)} hint={HABITS_COPY.heldHint(held)} />
                         <p className="mt-0.5 font-mono text-[10px] text-fg-muted">{HABITS_COPY.heldScope(held)}</p>
                     </div>
                 )}

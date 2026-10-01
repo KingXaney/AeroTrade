@@ -1,5 +1,6 @@
 import {type BrainSystemStatus} from "@/lib/brain/store";
 import JobStamp, {jobHealth} from "@/components/jobs/JobStamp";
+import StatTile from "@/components/primitives/StatTile";
 
 // Pipeline observability for the /brain page: is each Inngest job actually
 // running, and is the brain actually learning? Health is derived from job-stamp
@@ -12,16 +13,6 @@ const extractionHint = (status: BrainSystemStatus): string => {
     if (status.articlesUnextracted > 0) return `${status.articlesUnextracted} waiting to be read`;
     return 'all caught up';
 };
-
-const Stat = ({label, value, hint}: {label: string; value: string; hint?: string}) => (
-    <div className="flex flex-col gap-0.5">
-        <span className="text-[10px] uppercase tracking-[0.1em] text-fg-muted" style={{fontFamily: 'var(--type-mono)'}}>
-            {label}
-        </span>
-        <span className="text-sm font-semibold text-fg" style={{fontFamily: 'var(--type-display)'}}>{value}</span>
-        {hint && <span className="text-[10px] text-fg-muted" style={{fontFamily: 'var(--type-mono)'}}>{hint}</span>}
-    </div>
-);
 
 const SystemStatus = ({status}: {status: BrainSystemStatus}) => {
     const anyNever = status.jobs.some((j) => j.staleAfterHours !== Number.POSITIVE_INFINITY && jobHealth(j) === 'never');
@@ -41,15 +32,15 @@ const SystemStatus = ({status}: {status: BrainSystemStatus}) => {
 
             {/* Pipeline counters */}
             <div className="grid grid-cols-2 md:grid-cols-5 gap-4 mb-4">
-                <Stat label="Articles" value={String(status.articlesTotal)} hint={`${status.articlesLast24h} in last 24h`} />
-                <Stat
+                <StatTile size="sm" label="Articles" value={String(status.articlesTotal)} hint={`${status.articlesLast24h} in last 24h`} />
+                <StatTile size="sm"
                     label="Extracted"
                     value={String(status.articlesExtracted)}
                     hint={extractionHint(status)}
                 />
-                <Stat label="Entities" value={String(status.entityCount)} hint="knowledge graph nodes" />
-                <Stat label="Theses" value={String(status.thesisCount)} hint="sustained narratives" />
-                <Stat label="Priced symbols" value={String(status.pricedSymbols)} hint="daily history (Yahoo, Stooq fallback)" />
+                <StatTile size="sm" label="Entities" value={String(status.entityCount)} hint="knowledge graph nodes" />
+                <StatTile size="sm" label="Theses" value={String(status.thesisCount)} hint="sustained narratives" />
+                <StatTile size="sm" label="Priced symbols" value={String(status.pricedSymbols)} hint="daily history (Yahoo, Stooq fallback)" />
             </div>
 
             {/* Job stamps */}
