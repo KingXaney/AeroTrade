@@ -9,7 +9,7 @@ Follow the topics you care about, test trading strategies with virtual money, an
 [![License: MIT](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
 ![Next.js 16](https://img.shields.io/badge/Next.js-16-black)
 ![TypeScript](https://img.shields.io/badge/TypeScript-strict-3178c6)
-![Tests](https://img.shields.io/badge/tests-446%20passing-brightgreen)
+![Tests](https://img.shields.io/badge/tests-916%20passing-brightgreen)
 
 <img src="docs/screenshots/dashboard.png" alt="AeroTrade dashboard: followed topics, portfolio, latest articles, market heatmap" width="900">
 
@@ -78,11 +78,11 @@ flowchart LR
 |---|---|
 | App | Next.js 16 (App Router, Server Actions, Turbopack), React 19, TypeScript strict |
 | UI | Tailwind v4 with semantic theme tokens, shadcn/radix primitives, dnd-kit, TradingView embeds |
-| Data | MongoDB + Mongoose 9 (20 models), better-auth for email/password sessions |
-| Jobs | Inngest (7 crons + on-demand events), idempotent steps, per-user rate limits |
+| Data | MongoDB + Mongoose 9 (22 models), better-auth for email/password sessions |
+| Jobs | Inngest (8 scheduled jobs + on-demand events), idempotent steps, per-user rate limits |
 | AI | Vercel AI SDK; Gemini 2.5 Flash-Lite on the free tier for every scheduled job, optional Claude tiers, Claude for the second opinion |
 | Market data | Finnhub (quotes, profiles, search, news), Google News RSS, SEC EDGAR, Reddit |
-| Quality | Vitest (25 files / 446 tests), ESLint, `tsc --noEmit`, GitHub Actions, Playwright browser QA against an in-memory Mongo |
+| Quality | Vitest (61 files / 916 tests), ESLint, `tsc --noEmit`, GitHub Actions, Playwright browser QA against an in-memory Mongo |
 
 ## Getting started
 
