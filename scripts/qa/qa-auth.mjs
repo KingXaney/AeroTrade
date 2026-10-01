@@ -7,7 +7,10 @@
 // per client address (30): the refusal is one fixed sentence, identical for an address with an
 // account and one without, it holds even for the right password, and another address is not
 // touched. The per-client check seeds its counter; every signin:* row is removed at the end so
-// no later suite starts inside this one's window.
+// no later suite starts inside this one's window. Sign-up is limited per client address: this
+// suite's own sign-up is counted, and a client over the limit (its counter seeded past any
+// SIGN_UP_CLIENT_LIMIT the harness sets) gets one fixed sentence and no account; every signup:*
+// row is removed at the end too.
 import {chromium} from 'playwright';
 import {MongoClient} from 'mongodb';
 import {mkdirSync} from 'node:fs';
@@ -22,6 +25,7 @@ const P1 = 'Passw0rd!Passw0rd!';
 const P2 = 'N3wPassw0rd!N3wPassw0rd!';
 // lib/auth/limits.ts: SIGN_IN_LIMITED_MESSAGE, SIGN_IN_EMAIL_LIMIT, SIGN_IN_CLIENT_LIMIT.
 const LIMITED = 'Too many sign-in attempts. Try again in a few minutes.';
+const SIGN_UP_LIMITED = 'Too many sign-up attempts from this network. Try again later.';
 const EMAIL_LIMIT = 10;
 const CLIENT_LIMIT = 30;
 
@@ -206,13 +210,35 @@ try {
         check('…before its address is counted', (await limits.countDocuments({key: `signin:email:${fresh}`})) === 0);
     }
     await shot('04-sign-in-limited');
+
+    // --- sign-up, per client --------------------------------------------------------------
+    const signUpRows = await limits.find({key: /^signup:ip:/}).toArray();
+    check('this suite\'s sign-up was counted against its client', signUpRows.length === 1 && signUpRows[0].count >= 1,
+        signUpRows.map((r) => `${r.key}=${r.count}`).join(', '));
+    if (signUpRows.length === 1) {
+        await limits.updateOne({_id: signUpRows[0]._id}, {$set: {count: 1_000_000}});
+        const late = await browser.newContext({viewport: {width: 1440, height: 900}});
+        page = await late.newPage();
+        const lateEmail = `qaauth-late${Date.now()}@example.com`;
+        await page.goto(`${BASE}/sign-up`, {waitUntil: 'load'});
+        await page.fill('#fullName', 'QA Late');
+        await page.fill('#email', lateEmail);
+        await page.fill('#password', P1);
+        await page.click('button[type="submit"]');
+        const toast = page.getByText(SIGN_UP_LIMITED);
+        await toast.waitFor({timeout: 30000}).catch(() => {});
+        check('a client over the sign-up limit is refused with the fixed sentence', await toast.isVisible());
+        check('…stays on /sign-up', /\/sign-up/.test(page.url()), page.url());
+        check('…and no account was created', (await db.collection('user').countDocuments({email: lateEmail})) === 0);
+        await shot('05-sign-up-limited');
+    }
 } catch (err) {
     failures++;
     console.log(`FAIL  threw: ${err.message}`);
     if (page) await shot('99-error').catch(() => {});
 } finally {
-    // Later suites sign in from this same client: leave no sign-in window open behind.
-    if (limits) await limits.deleteMany({key: /^signin:/}).catch(() => {});
+    // Later suites sign in and sign up from this same client: leave no window open behind.
+    if (limits) await limits.deleteMany({key: /^sign(in|up):/}).catch(() => {});
     await mongo.close().catch(() => {});
     await browser.close();
 }

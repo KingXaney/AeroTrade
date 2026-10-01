@@ -27,11 +27,15 @@ node start-mongo.mjs                       # 1. throwaway MongoDB on :27117 (pri
 MONGODB_URI='mongodb://127.0.0.1:27117/aerotrade' \
 BETTER_AUTH_SECRET='local-qa-secret-at-least-32-characters-long' \
 BETTER_AUTH_URL='http://localhost:3000' \
+SIGN_UP_CLIENT_LIMIT=1000 \
 INNGEST_DEV=1 npm run dev --prefix ../..   # 2. the app, from the repo root
 
 node qa-topics.mjs                         # 3. the checks (screenshots land in ./output)
 node screenshots.mjs                       # or: capture the README screenshots
 ```
+
+`SIGN_UP_CLIENT_LIMIT` lifts the per-client sign-up limit (10 an hour) for the run: every suite
+signs up its own user, all from localhost.
 
 The other scripts follow the same shape, one per change set: `qa-foundations.mjs` (its in-app
 404 waits for the rendered page, and a symbol no strategy watches still 404s keyless with no

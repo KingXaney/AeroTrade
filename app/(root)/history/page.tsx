@@ -53,7 +53,11 @@ const HistoryPage = async () => {
                     style={{ fontFamily: 'var(--type-mono)' }}>
                     Trades
                 </h2>
-                <TradeHistory trades={recent.trades} totalCount={recent.total} />
+                {recent ? (
+                    <TradeHistory trades={recent.trades} totalCount={recent.total} />
+                ) : (
+                    <p className="text-sm text-fg-muted p-4">Your trades could not be loaded right now — try again in a few minutes.</p>
+                )}
             </section>
 
             <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">

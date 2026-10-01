@@ -11,10 +11,13 @@ import {
     PASSWORD_RESET_WINDOW_MS,
     SIGN_IN_INVALID_MESSAGE,
     SIGN_IN_LIMITED_MESSAGE,
+    SIGN_UP_LIMITED_MESSAGE,
     clientIpFrom,
     passwordResetKey,
+    resolveSignUpLimit,
     signInCredentials,
     withinSignInLimits,
+    withinSignUpLimit,
 } from "@/lib/auth/limits";
 import {seedDefaultTopics} from "@/lib/topics/seed";
 
@@ -29,6 +32,15 @@ const extractAuthError = (e: unknown, fallback: string): string => {
 
 export const signUpWithEmail = async ({ email, password, fullName, country, investmentGoals, riskTolerance, preferredIndustry }: SignUpFormData) => {
     try {
+        // Every attempt counts, refused before better-auth is asked: a refused one creates
+        // nothing, queues no welcome email and says nothing about whether the address is taken.
+        const {limit, warning} = resolveSignUpLimit();
+        if (warning) console.warn(warning);
+        if (!(await withinSignUpLimit({ ip: clientIpFrom(await headers()) }, takeRateLimit, limit))) {
+            console.warn('Sign-up rate limit reached');
+            return { success: false, error: SIGN_UP_LIMITED_MESSAGE }
+        }
+
         const response = await auth.api.signUpEmail({ body: { email, password, name: fullName } })
 
         if(response) {

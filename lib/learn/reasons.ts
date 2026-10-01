@@ -493,8 +493,8 @@ export const NAVIGATOR_GRAMMAR: readonly ReasonTemplate[] = [
         ],
     },
     {
-        // Written by the fix/navigator-neutral-news branch (PR #26) for a symbol the brain
-        // has no entity for; decoded here ahead of that merge.
+        // Written by scoreUniverse (lib/navigator/scoring.ts) for a symbol the brain has no
+        // entity for: news neutral, outside the news rank.
         id: 'nav-news-neutral',
         pattern: anchored('no brain coverage — news neutral'),
         decode: (m) => [{text: m[0], gloss: NAVIGATOR_GLOSS.newsNeutral(weightText(SCORE_WEIGHTS.newsSlow)), term: 'news-weight', rail: 'SCORE_WEIGHTS'}],

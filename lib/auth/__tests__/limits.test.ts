@@ -7,12 +7,18 @@ import {
     SIGN_IN_INVALID_MESSAGE,
     SIGN_IN_LIMITED_MESSAGE,
     SIGN_IN_WINDOW_MS,
+    SIGN_UP_CLIENT_LIMIT,
+    SIGN_UP_LIMITED_MESSAGE,
+    SIGN_UP_WINDOW_MS,
     clientIpFrom,
     passwordResetKey,
+    resolveSignUpLimit,
     signInClientKey,
     signInCredentials,
     signInEmailKey,
+    signUpClientKey,
     withinSignInLimits,
+    withinSignUpLimit,
     type TakeCounter,
 } from '@/lib/auth/limits';
 
@@ -193,5 +199,64 @@ describe('withinSignInLimits', () => {
         }
         expect(lockedOut.length).toBeGreaterThan(0);
         expect(lockedOut.length).toBeLessThanOrEqual(Math.floor(SIGN_IN_CLIENT_LIMIT / SIGN_IN_EMAIL_LIMIT));
+    });
+});
+
+describe('the sign-up limit', () => {
+    // Each sign-up creates an account, seeds its topics and queues a model-written welcome email,
+    // and its answer says whether an address already has an account: counted per client, by the
+    // hour, with room for a household or an office behind one address.
+    it('allows ten sign-ups per client an hour, with one fixed answer past that', () => {
+        expect(SIGN_UP_CLIENT_LIMIT).toBe(10);
+        expect(SIGN_UP_WINDOW_MS).toBe(60 * 60 * 1000);
+        expect(SIGN_UP_LIMITED_MESSAGE).toBe('Too many sign-up attempts from this network. Try again later.');
+    });
+
+    it('keys on the client, apart from every sign-in counter', () => {
+        expect(signUpClientKey('203.0.113.7')).toBe('signup:ip:203.0.113.7');
+        expect(signUpClientKey('203.0.113.7')).not.toBe(signInClientKey('203.0.113.7'));
+        expect(signUpClientKey('a@b.co')).not.toBe(signInEmailKey('a@b.co'));
+    });
+
+    // Sign-in skips its client counter when no header names a client, because its per-address
+    // counter still holds. Sign-up has no second counter, so such requests share one key.
+    it('counts every request no header names a client for against one shared key', () => {
+        expect(signUpClientKey(null)).toBe('signup:ip:unknown');
+        expect(clientIpFrom(headersOf({'x-forwarded-for': 'unknown'}))).toBeNull();
+    });
+
+    it('spends the client counter once, at the sign-up limit and window', async () => {
+        const {take, spent} = memoryCounter();
+        expect(await withinSignUpLimit({ip: '203.0.113.7'}, take)).toBe(true);
+        expect(spent).toEqual([[signUpClientKey('203.0.113.7'), SIGN_UP_CLIENT_LIMIT, SIGN_UP_WINDOW_MS]]);
+    });
+
+    // The browser QA signs up a user per suite from one address; the harness raises the limit
+    // through the environment, as the chat's limits are tuned, and production keeps the default.
+    it('reads an override from SIGN_UP_CLIENT_LIMIT and falls back, with a warning, on anything but a positive integer', () => {
+        expect(resolveSignUpLimit({})).toEqual({limit: SIGN_UP_CLIENT_LIMIT});
+        expect(resolveSignUpLimit({SIGN_UP_CLIENT_LIMIT: ''})).toEqual({limit: SIGN_UP_CLIENT_LIMIT});
+        expect(resolveSignUpLimit({SIGN_UP_CLIENT_LIMIT: '500'})).toEqual({limit: 500});
+        for (const raw of ['0', '-3', '2.5', 'lots']) {
+            const resolved = resolveSignUpLimit({SIGN_UP_CLIENT_LIMIT: raw});
+            expect(resolved.limit, raw).toBe(SIGN_UP_CLIENT_LIMIT);
+            expect(resolved.warning, raw).toContain(`SIGN_UP_CLIENT_LIMIT="${raw}"`);
+        }
+    });
+
+    it('spends the counter at the limit it is handed', async () => {
+        const {take, spent} = memoryCounter();
+        expect(await withinSignUpLimit({ip: '203.0.113.7'}, take, 2)).toBe(true);
+        expect(await withinSignUpLimit({ip: '203.0.113.7'}, take, 2)).toBe(true);
+        expect(await withinSignUpLimit({ip: '203.0.113.7'}, take, 2)).toBe(false);
+        expect(spent[0]).toEqual([signUpClientKey('203.0.113.7'), 2, SIGN_UP_WINDOW_MS]);
+    });
+
+    it('refuses a client past its limit and leaves every other client its own', async () => {
+        const {take} = memoryCounter();
+        for (let i = 0; i < SIGN_UP_CLIENT_LIMIT; i++) expect(await withinSignUpLimit({ip: '203.0.113.7'}, take)).toBe(true);
+        expect(await withinSignUpLimit({ip: '203.0.113.7'}, take)).toBe(false);
+        expect(await withinSignUpLimit({ip: '198.51.100.2'}, take)).toBe(true);
+        expect(await withinSignUpLimit({ip: null}, take)).toBe(true);
     });
 });

@@ -298,7 +298,8 @@ export const getTradeHistory = async (userId: string, accountId: string, limit =
 // the /history page's trade feed. Read-only (no lazy account creation). The list and its count
 // are each account's current epoch (epochTradesOf), as every per-account read is: a reset that
 // crashed before deleting the old epoch's fills must not bring them back here either.
-export const getRecentTradesForUser = async (userId: string, limit = 50): Promise<{trades: PaperTradeRecord[]; total: number}> => {
+// Null when the read fails, so the page can say so instead of showing an empty ledger.
+export const getRecentTradesForUser = async (userId: string, limit = 50): Promise<{trades: PaperTradeRecord[]; total: number} | null> => {
     try {
         await connectToDatabase();
         const accounts = await PaperAccount.find({userId}).select('name inceptionAt').lean<{_id: unknown; name?: string; inceptionAt?: Date}[]>();
@@ -311,7 +312,7 @@ export const getRecentTradesForUser = async (userId: string, limit = 50): Promis
         return {trades: trades.map((t) => toTradeRecord(t, t.accountId ? names.get(t.accountId) : undefined)), total};
     } catch (error) {
         console.error('Error fetching recent trades:', error);
-        return {trades: [], total: 0};
+        return null;
     }
 };
 
