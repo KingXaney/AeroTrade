@@ -14,7 +14,7 @@ import {getLatestSuggestions, type SuggestionSetView} from "@/lib/navigator/stor
 import {getActiveTheses, getBrainDigestData} from "@/lib/brain/store";
 import {getTopicFeed, getTopicsForUser, getTopicsOverview} from "@/lib/topics/store";
 import {createTopic, deleteTopic} from "@/lib/actions/topics.actions";
-import {MAX_KEYWORDS} from "@/lib/topics/config";
+import {MAX_KEYWORDS} from "@/lib/news/keywords";
 import {FEED_WATCHLIST_SYMBOL_CAP} from "@/lib/news/config";
 import {readAccountsForUser, toAccountSummary} from "@/lib/trading/accounts";
 import {aggregatePortfolios, computePortfolio} from "@/lib/trading/valuation";

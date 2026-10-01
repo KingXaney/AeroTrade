@@ -65,6 +65,20 @@ export const newsSearchEnabled = (): boolean => {
     return raw !== '0' && raw !== 'false';
 };
 
+// A search query's length budget; the recency window is reserved from it (buildSearchQuery).
+export const SEARCH_QUERY_MAX_CHARS = 200;
+
+// How far back a keyword search (a followed topic's, a /news keyword slot's) asks Google
+// News to look. Without a window, Google News search ranks by RELEVANCE, not date: the unbounded "big tech earnings" query measured a
+// median result age of 25 days and a worst case of 149. Since the matcher caps at 40 and
+// never scores recency, that staleness landed straight in the store and the topic read as
+// the same news every day. Measured across five topic sets, `when:1d` returns 100% of
+// results inside 24 hours and still finds 27 for the quietest of them.
+export const SEARCH_WINDOW = '1d';
+// Widen once when a day's window comes back empty, so a genuinely quiet topic still fills
+// on its first fetch instead of starting blank.
+export const SEARCH_FALLBACK_WINDOW = '7d';
+
 // A Google News edition: interface language, country, and the combined edition id.
 export type GoogleEdition = {hl: string; gl: string; ceid: string};
 export const US_EDITION: GoogleEdition = {hl: "en-US", gl: "US", ceid: "US:en"};

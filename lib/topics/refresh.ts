@@ -8,7 +8,8 @@ import TopicArticle from "@/database/models/topic-article.model";
 import {buildSearchQuery, fetchNewsForQuery} from "@/lib/news/adapters/search";
 import {hashId, normalizeUrl} from "@/lib/text";
 import {matchArticles, type MatchInput} from "@/lib/topics/match";
-import {BRIEF_MIN_AGE_HOURS, BRIEF_MIN_NEW_ARTICLES, MATCH_CAP_PER_FETCH, MAX_ARTICLES_PER_TOPIC_PER_DAY, TOPIC_SEARCH_FALLBACK_WINDOW} from "@/lib/topics/config";
+import {BRIEF_MIN_AGE_HOURS, BRIEF_MIN_NEW_ARTICLES, MATCH_CAP_PER_FETCH, MAX_ARTICLES_PER_TOPIC_PER_DAY} from "@/lib/topics/config";
+import {SEARCH_FALLBACK_WINDOW} from "@/lib/news/config";
 import type {TopicBriefArticle} from "@/lib/topics/prompts";
 import {parseBriefText, type TopicBriefContent} from "@/lib/topics/brief";
 import {getEasternDateString} from "@/lib/dates";
@@ -48,7 +49,7 @@ export const refreshKeywordGroup = async (group: KeywordGroup): Promise<RefreshR
     const query = buildSearchQuery(group.keywords, group.exclude);
     let web = query ? await fetchNewsForQuery(query, {limit: WEB_FETCH_LIMIT}) : [];
     if (query && web.length === 0) {
-        const wider = buildSearchQuery(group.keywords, group.exclude, {window: TOPIC_SEARCH_FALLBACK_WINDOW});
+        const wider = buildSearchQuery(group.keywords, group.exclude, {window: SEARCH_FALLBACK_WINDOW});
         web = wider ? await fetchNewsForQuery(wider, {limit: WEB_FETCH_LIMIT}) : [];
     }
     // The brain's own sweep is read-only input here: finance/RSS/Reddit/SEC rows from

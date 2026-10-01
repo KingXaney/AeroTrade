@@ -1,5 +1,6 @@
 import Link from "next/link";
-import {MAX_KEYWORDS, MAX_TOPICS_PER_USER} from "@/lib/topics/config";
+import {MAX_TOPICS_PER_USER} from "@/lib/topics/config";
+import {MAX_KEYWORDS} from "@/lib/news/keywords";
 
 const mono = {fontFamily: 'var(--type-mono)'} as const;
 

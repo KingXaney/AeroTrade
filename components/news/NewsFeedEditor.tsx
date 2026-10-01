@@ -27,7 +27,7 @@ import {
     type NewsFeedPrefs,
     type NewsRegionId,
 } from "@/lib/news/feed-prefs";
-import {KEYWORD_MAX} from "@/lib/topics/config";
+import {KEYWORD_MAX} from "@/lib/news/keywords";
 import {cn} from "@/lib/utils";
 
 // Imports lib/news/feed-prefs, never lib/news/feed: the latter reaches the XML parser

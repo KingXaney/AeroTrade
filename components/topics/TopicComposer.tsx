@@ -8,7 +8,8 @@ import {Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle} fro
 import KeywordChips from "@/components/topics/KeywordChips";
 import {cn} from "@/lib/utils";
 import {createTopic, updateTopic} from "@/lib/actions/topics.actions";
-import {KEYWORD_MAX, MAX_EXCLUDES, MAX_KEYWORDS, NAME_MAX} from "@/lib/topics/config";
+import {MAX_EXCLUDES, NAME_MAX} from "@/lib/topics/config";
+import {KEYWORD_MAX, MAX_KEYWORDS} from "@/lib/news/keywords";
 import {suggestKeywords} from "@/lib/topics/suggest-keywords";
 
 export const TOPIC_COLORS = ['#7df4ff', '#a6e3a1', '#f9e2af', '#fab387', '#f38ba8', '#cba6f7', '#89b4fa', '#94e2d5'];

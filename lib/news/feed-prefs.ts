@@ -10,8 +10,7 @@
 // normalizeNewsFeed, so a tampered document degrades to a valid feed, never to an error.
 
 import {z} from 'zod';
-import {normalizeKeywordList} from '@/lib/topics/normalize';
-import {KEYWORD_MAX, MAX_KEYWORDS} from '@/lib/topics/config';
+import {KEYWORD_MAX, MAX_KEYWORDS, normalizeKeywordList} from '@/lib/news/keywords';
 import {MAX_FEED_REQUESTS, US_EDITION, type GoogleEdition} from '@/lib/news/config';
 
 export type {GoogleEdition};

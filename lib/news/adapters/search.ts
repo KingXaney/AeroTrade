@@ -2,10 +2,19 @@
 // (since the personal news feed) the query-less front page and topic sections too. No key
 // needed; results are opaque redirect links, so headlines (not URLs) carry the identity.
 
-import {FEED_REVALIDATE_SECONDS, GOOGLE_NEWS_BASE, GOOGLE_NEWS_SEARCH_BASE, searchUserAgent, US_EDITION, type GoogleEdition, newsSearchEnabled} from "@/lib/news/config";
+import {
+    FEED_REVALIDATE_SECONDS,
+    GOOGLE_NEWS_BASE,
+    GOOGLE_NEWS_SEARCH_BASE,
+    SEARCH_QUERY_MAX_CHARS,
+    SEARCH_WINDOW,
+    searchUserAgent,
+    US_EDITION,
+    type GoogleEdition,
+    newsSearchEnabled,
+} from "@/lib/news/config";
 import {parseRssXml} from "@/lib/news/adapters/rss";
 import {formatArticle, validateArticle} from "@/lib/news/article";
-import {QUERY_MAX_CHARS, TOPIC_SEARCH_WINDOW} from "@/lib/topics/config";
 
 type NextFetchInit = RequestInit & {next?: {revalidate: number}};
 
@@ -32,13 +41,13 @@ const quoteTerm = (term: string): string => (/\s/.test(term) ? `"${term}"` : ter
 export const buildSearchQuery = (
     keywords: string[],
     exclude: string[],
-    {window = TOPIC_SEARCH_WINDOW}: {window?: string | null} = {},
+    {window = SEARCH_WINDOW}: {window?: string | null} = {},
 ): string => {
     const include = (keywords ?? []).map(cleanTerm).filter(Boolean);
     if (include.length === 0) return '';
 
     const suffix = window ? ` when:${window}` : '';
-    const budget = QUERY_MAX_CHARS - suffix.length;
+    const budget = SEARCH_QUERY_MAX_CHARS - suffix.length;
 
     const kept: string[] = [];
     for (const term of include) {

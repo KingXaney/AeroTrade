@@ -1,6 +1,6 @@
 import {describe, expect, it} from 'vitest';
 import {buildSearchQuery, decodeEntities, parseSearchFeed, searchUrlFor, toSearchArticles} from '@/lib/news/adapters/search';
-import {TOPIC_SEARCH_WINDOW} from '@/lib/topics/config';
+import {SEARCH_WINDOW} from '@/lib/news/config';
 
 const FIXTURE = `<?xml version="1.0" encoding="UTF-8"?>
 <rss version="2.0"><channel><title>"nvidia" - Google News</title>
@@ -54,8 +54,8 @@ describe('buildSearchQuery', () => {
     // result age for an earnings query was 25 days — which is what made a followed topic
     // read as the same news every morning.
     it('bounds the search to recent news by default', () => {
-        expect(buildSearchQuery(['fed rate', 'fomc'], ['crypto'])).toBe(`("fed rate" OR fomc) -crypto when:${TOPIC_SEARCH_WINDOW}`);
-        expect(buildSearchQuery(['nvidia'], [])).toBe(`nvidia when:${TOPIC_SEARCH_WINDOW}`);
+        expect(buildSearchQuery(['fed rate', 'fomc'], ['crypto'])).toBe(`("fed rate" OR fomc) -crypto when:${SEARCH_WINDOW}`);
+        expect(buildSearchQuery(['nvidia'], [])).toBe(`nvidia when:${SEARCH_WINDOW}`);
         expect(buildSearchQuery(['nvidia'], [], {window: '7d'})).toBe('nvidia when:7d');
     });
 
@@ -63,7 +63,7 @@ describe('buildSearchQuery', () => {
     // cleanTerm flattens ':' out of every user term before it is quoted.
     it('cannot be given a second window by user text', () => {
         const query = buildSearchQuery(['when:30d'], []);
-        expect(query).toBe(`"when 30d" when:${TOPIC_SEARCH_WINDOW}`);
+        expect(query).toBe(`"when 30d" when:${SEARCH_WINDOW}`);
         expect((query.match(/when:/g) ?? []).length).toBe(1);
     });
 
@@ -72,7 +72,7 @@ describe('buildSearchQuery', () => {
         expect(query.length).toBeLessThanOrEqual(200);
         expect((query.match(/"/g) ?? []).length % 2).toBe(0);
         // The window is reserved from the budget, so truncation can never eat it.
-        expect(query.endsWith(` when:${TOPIC_SEARCH_WINDOW}`)).toBe(true);
+        expect(query.endsWith(` when:${SEARCH_WINDOW}`)).toBe(true);
     });
 });
 

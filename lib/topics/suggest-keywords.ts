@@ -2,8 +2,7 @@
 // phrase goes first because it is the most precise term; single tokens follow as
 // broader fallbacks the user can keep or discard.
 
-import {KEYWORD_MAX} from "@/lib/topics/config";
-import {normalizeKeyword} from "@/lib/topics/normalize";
+import {KEYWORD_MAX, normalizeKeyword} from "@/lib/news/keywords";
 
 export const STOPWORDS = new Set([
     'a', 'an', 'the', 'of', 'in', 'on', 'at', 'and', 'or', 'for', 'to', 'vs', 'with', 'from', 'by', 'is', 'are',

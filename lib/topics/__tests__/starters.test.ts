@@ -6,8 +6,9 @@ import {
     defaultTopics,
     isUntouchedDefaultSet,
 } from '@/lib/topics/starters';
-import {KEYWORD_MAX, KEYWORD_MIN, MAX_KEYWORDS, MAX_TOPICS_PER_USER, NAME_MAX} from '@/lib/topics/config';
-import {normalizeKeywordList, slugify} from '@/lib/topics/normalize';
+import {MAX_TOPICS_PER_USER, NAME_MAX} from '@/lib/topics/config';
+import {KEYWORD_MAX, KEYWORD_MIN, MAX_KEYWORDS, normalizeKeywordList} from '@/lib/news/keywords';
+import {slugify} from '@/lib/topics/normalize';
 
 describe('STARTER_TOPICS', () => {
     // The file header promises normalizeKeywordList drops nothing. It re-sorts, so this
