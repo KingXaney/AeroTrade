@@ -9,7 +9,7 @@ Follow the topics you care about, test trading strategies with virtual money, an
 [![License: MIT](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
 ![Next.js 16](https://img.shields.io/badge/Next.js-16-black)
 ![TypeScript](https://img.shields.io/badge/TypeScript-strict-3178c6)
-![Tests](https://img.shields.io/badge/tests-1487%20passing-brightgreen)
+![Tests](https://img.shields.io/badge/tests-1511%20passing-brightgreen)
 
 <img src="docs/screenshots/dashboard.png" alt="AeroTrade dashboard: followed topics, portfolio, latest articles, market heatmap" width="900">
 
@@ -19,7 +19,7 @@ Follow the topics you care about, test trading strategies with virtual money, an
 
 **Follow the news, not just the tape.** Create a topic for anything — "Fed rate decisions", "AI chips", "NBA trade deadline" — and AeroTrade builds a feed for it from Google News search plus every source the news brain already reads. Each topic gets a daily AI *"what changed today"* brief, a slot in the daily email, and a place in the chat assistant.
 
-**Paper-trade strategies side by side.** Open several strategy accounts with their own starting balance, place market orders at the last price, and compare them on return, drawdown, win rate and a daily benchmark curve against SPY. Export any account's fills as CSV.
+**Paper-trade strategies side by side.** Open several strategy accounts with their own starting balance, place market orders at the last price, and compare them on return, drawdown, win rate and a daily benchmark curve against SPY. Export any account's fills — or a quant strategy's — as CSV.
 
 **A news brain that builds market narratives.** Every morning a job ingests finance news, RSS, Reddit and SEC filings, has Gemini extract tickers, sectors and themes with sentiment, and folds them into an entity graph with *fast* (5-day) and *slow* (60-day) attention weights. Narratives whose slow weight stays high become **theses**.
 
@@ -78,11 +78,11 @@ flowchart LR
 |---|---|
 | App | Next.js 16 (App Router, Server Actions, Turbopack), React 19, TypeScript strict |
 | UI | Tailwind v4 with semantic theme tokens, shadcn/radix primitives, dnd-kit, TradingView embeds |
-| Data | MongoDB + Mongoose 9 (20 models), better-auth for email/password sessions |
+| Data | MongoDB + Mongoose 9 (20 models), better-auth for email/password sessions, sign-in and password reset rate-limited on a Mongo counter |
 | Jobs | Inngest (7 crons + on-demand events), idempotent steps, per-user rate limits |
 | AI | Vercel AI SDK; Gemini 2.5 Flash-Lite on the free tier for every scheduled job, optional Claude tiers, Claude for the second opinion |
 | Market data | Finnhub (quotes, profiles, search, news), Google News RSS, SEC EDGAR, Reddit |
-| Quality | Vitest (107 files / 1487 tests), ESLint, `tsc --noEmit`, GitHub Actions, Playwright browser QA against an in-memory Mongo |
+| Quality | Vitest (110 files / 1511 tests), ESLint, `tsc --noEmit`, GitHub Actions, Playwright browser QA against an in-memory Mongo |
 
 ## Getting started
 
@@ -133,7 +133,7 @@ Unit tests cover the pure modules — the layout engine, theme tokens, news aggr
 ## Project structure
 
 ```
-app/            routes: (auth) sign-in/up · (root) dashboard, topics, brain, strategies, strategies/[slug], trade, portfolio, markets, news, watchlist, friends, history, learn, settings · api/{chat,inngest,accounts}
+app/            routes: (auth) sign-in/up · (root) dashboard, topics, brain, strategies, strategies/[slug], trade, portfolio, markets, news, watchlist, friends, history, learn, settings · api/{chat,inngest,accounts,strategies}
 components/     UI by feature: dashboard (widget grid + 35 widgets), topics, brain, strategies, stock, trade, analytics, learn, settings, chat, theme, primitives, ui (shadcn)
 lib/
   news/         source adapters (Finnhub, RSS, Reddit, SEC, Google News search), dedupe, HTML sanitiser
