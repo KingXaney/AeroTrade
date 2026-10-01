@@ -3,7 +3,7 @@ import {notFound} from "next/navigation";
 import {cn, formatPrice, getChangeColorClass} from "@/lib/utils";
 import {formatPct} from "@/lib/format";
 import {requireUserId} from "@/lib/auth/session";
-import {getFriendProfile} from "@/lib/actions/friends.actions";
+import {getFriendProfile} from "@/lib/friends/store";
 import {unpricedLabel} from "@/lib/trading/analytics";
 import AccountSummary from "@/components/trade/AccountSummary";
 import PortfolioHoldings from "@/components/trade/PortfolioHoldings";

@@ -1,5 +1,5 @@
 import {requireUserId} from "@/lib/auth/session";
-import {getFriends, getIncomingRequests, getLeaderboard, getOutgoingRequests} from "@/lib/actions/friends.actions";
+import {getFriends, getIncomingRequests, getLeaderboard, getOutgoingRequests} from "@/lib/friends/store";
 import AddFriend from "@/components/friends/AddFriend";
 import FriendRequests from "@/components/friends/FriendRequests";
 import SentRequests from "@/components/friends/SentRequests";

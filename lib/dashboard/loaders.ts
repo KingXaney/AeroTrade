@@ -9,7 +9,7 @@ import {getMergedTopicFeed} from "@/lib/topics/store";
 import {getStocksWithData} from "@/lib/prices/finnhub";
 import {getNewsFeed} from "@/lib/news/feed-store";
 import {NEWS_WIDGET_LIMIT} from "@/lib/news/config";
-import {getLeaderboard} from "@/lib/actions/friends.actions";
+import {getLeaderboard} from "@/lib/friends/store";
 import {getActiveTheses, getBrainGraph, getBrainSystemStatus, getTopEntities, type BrainSystemStatus} from "@/lib/brain/store";
 import {getLatestSuggestions} from "@/lib/navigator/store";
 import {getNavigatorStatus} from "@/lib/actions/navigator.actions";

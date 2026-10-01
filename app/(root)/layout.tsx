@@ -9,7 +9,7 @@ import {countUnpriced} from "@/lib/trading/analytics";
 import ChatWidget from "@/components/chat/ChatWidget";
 import ThemeSync from "@/components/theme/ThemeSync";
 import {getAppearanceForUser} from "@/lib/actions/appearance.actions";
-import {countIncomingRequests} from "@/lib/actions/friends.actions";
+import {countIncomingRequests} from "@/lib/friends/store";
 import type {NavBadges} from "@/lib/shell/navigation";
 
 // Every page under (root) reads the session from request headers, so they can never be

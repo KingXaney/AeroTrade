@@ -1,6 +1,6 @@
 // Server-only paper-trading helpers (NOT a 'use server' module — these are plain
 // async functions used by server components and by the server actions in
-// lib/actions/trading.actions.ts, accounts.actions.ts and friends.actions.ts).
+// lib/actions/trading.actions.ts and accounts.actions.ts, and by lib/friends/store.ts).
 // Keeping the non-serializable bits (Mongoose docs, price Maps) out of the
 // 'use server' boundary.
 
