@@ -2,8 +2,8 @@
 
 import {useState} from "react";
 import Link from "next/link";
-import {cn, formatPrice, formatChangePercent, getChangeColorClass} from "@/lib/utils";
-import {formatSignedPrice} from "@/lib/format";
+import {cn} from "@/lib/utils";
+import {formatSignedPrice, formatPrice, formatChangePercent, getChangeColorClass} from "@/lib/format";
 import SellPositionDialog from "@/components/trade/SellPositionDialog";
 import type {Lot} from "@/lib/trading/lots";
 import UnpricedNote from "@/components/trade/UnpricedNote";

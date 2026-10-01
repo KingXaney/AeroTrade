@@ -1,4 +1,4 @@
-import {formatTimeAgoMs} from "@/lib/utils";
+import {formatTimeAgoMs} from "@/lib/format";
 import {type JobHealth} from "@/lib/brain/store";
 
 // One Inngest job's health card, derived from its completion stamp: a crashed job

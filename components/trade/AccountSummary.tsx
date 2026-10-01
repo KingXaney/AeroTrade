@@ -1,6 +1,6 @@
 import type {ReactNode} from "react";
-import {cn, formatPrice, getChangeColorClass} from "@/lib/utils";
-import {formatPct, formatSignedPrice} from "@/lib/format";
+import {cn} from "@/lib/utils";
+import {formatPct, formatSignedPrice, formatPrice, getChangeColorClass} from "@/lib/format";
 import UnpricedNote from "@/components/trade/UnpricedNote";
 import Term from "@/components/primitives/Term";
 import WhatTheseMean from "@/components/learn/WhatTheseMean";

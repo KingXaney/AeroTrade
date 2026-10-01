@@ -2,7 +2,8 @@
 
 import Link from "next/link";
 import {Plus} from "lucide-react";
-import {cn, formatTimeAgoSeconds} from "@/lib/utils";
+import {cn} from "@/lib/utils";
+import {formatTimeAgoSeconds} from "@/lib/format";
 
 type Props = {
     topics: TopicOverviewItem[];

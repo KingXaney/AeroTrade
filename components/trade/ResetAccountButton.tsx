@@ -4,7 +4,7 @@ import {useState} from "react";
 import {useRouter} from "next/navigation";
 import {toast} from "sonner";
 import {resetPaperAccount} from "@/lib/actions/trading.actions";
-import {formatPrice} from "@/lib/utils";
+import {formatPrice} from "@/lib/format";
 import ConfirmDialog from "@/components/ui/ConfirmDialog";
 
 // Resets one strategy account to its starting balance. This was a click-twice toggle

@@ -1,6 +1,6 @@
 import {cn} from "@/lib/utils";
 import type {SeriesStats} from "@/lib/strategies/types";
-import {formatDrawdown, formatPct, roundPct} from "@/lib/strategies/views";
+import {formatDrawdown, formatPct, roundPct} from "@/lib/format";
 import {SIM_STATS_COPY as COPY} from "@/lib/learn/copy/simulated";
 import Panel from "@/components/primitives/Panel";
 import Term from "@/components/primitives/Term";

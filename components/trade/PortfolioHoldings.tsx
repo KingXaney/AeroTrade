@@ -1,6 +1,6 @@
 import Link from "next/link";
-import {cn, formatPrice, formatChangePercent, getChangeColorClass} from "@/lib/utils";
-import {formatSignedPrice} from "@/lib/format";
+import {cn} from "@/lib/utils";
+import {formatSignedPrice, formatPrice, formatChangePercent, getChangeColorClass} from "@/lib/format";
 import UnpricedNote from "@/components/trade/UnpricedNote";
 import Term from "@/components/primitives/Term";
 

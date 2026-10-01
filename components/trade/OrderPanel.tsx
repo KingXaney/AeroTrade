@@ -3,7 +3,8 @@
 import {useCallback, useEffect, useState, type FormEvent, type KeyboardEvent} from "react";
 import {useRouter} from "next/navigation";
 import {toast} from "sonner";
-import {cn, formatPrice} from "@/lib/utils";
+import {cn} from "@/lib/utils";
+import {formatPrice} from "@/lib/format";
 import {useDebounce} from "@/hooks/useDebounce";
 import {getQuote, searchStocks} from "@/lib/actions/stocks.actions";
 import {placeOrder} from "@/lib/actions/trading.actions";

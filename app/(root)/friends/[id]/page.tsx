@@ -1,7 +1,7 @@
 import Link from "next/link";
 import {notFound} from "next/navigation";
-import {cn, formatPrice, getChangeColorClass} from "@/lib/utils";
-import {formatPct} from "@/lib/format";
+import {cn} from "@/lib/utils";
+import {formatPct, formatPrice, getChangeColorClass} from "@/lib/format";
 import {requireUserId} from "@/lib/auth/session";
 import {getFriendProfile} from "@/lib/friends/store";
 import {unpricedLabel} from "@/lib/trading/analytics";

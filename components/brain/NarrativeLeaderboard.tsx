@@ -1,6 +1,6 @@
 import Link from "next/link";
-import {cn, getChangeColorClass} from "@/lib/utils";
-import {formatSigned} from "@/lib/format";
+import {cn} from "@/lib/utils";
+import {formatSigned, getChangeColorClass} from "@/lib/format";
 import FollowTopicButton from "@/components/topics/FollowTopicButton";
 import {THESIS_WEIGHT_THRESHOLD} from "@/lib/brain/config";
 import {evidenceHref} from "@/lib/brain/links";

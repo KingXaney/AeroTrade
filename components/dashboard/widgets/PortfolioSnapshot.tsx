@@ -1,5 +1,5 @@
-import {cn, formatPrice, getChangeColorClass} from "@/lib/utils";
-import {formatPct} from "@/lib/format";
+import {cn} from "@/lib/utils";
+import {formatPct, formatPrice, getChangeColorClass} from "@/lib/format";
 import type {BestStrategy} from "@/lib/dashboard/select";
 import UnpricedNote from "@/components/trade/UnpricedNote";
 

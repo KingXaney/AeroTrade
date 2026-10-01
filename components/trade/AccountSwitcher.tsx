@@ -3,7 +3,8 @@
 import {useState} from "react";
 import {usePathname, useRouter, useSearchParams} from "next/navigation";
 import {toast} from "sonner";
-import {cn, formatChangePercent, getChangeColorClass} from "@/lib/utils";
+import {cn} from "@/lib/utils";
+import {formatChangePercent, getChangeColorClass} from "@/lib/format";
 import {setActiveAccount} from "@/lib/actions/accounts.actions";
 import {unpricedLabel} from "@/lib/trading/analytics";
 import CreateAccountDialog from "@/components/trade/CreateAccountDialog";

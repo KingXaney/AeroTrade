@@ -3,7 +3,7 @@
 import {useState} from "react";
 import {useRouter} from "next/navigation";
 import {toast} from "sonner";
-import {formatTimeAgoMs} from "@/lib/utils";
+import {formatTimeAgoMs} from "@/lib/format";
 import {removeFriend} from "@/lib/actions/friends.actions";
 
 // After sending a request the user had no view of it at all: a toast, and then nothing.

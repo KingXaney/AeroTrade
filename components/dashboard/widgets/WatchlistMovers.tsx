@@ -1,4 +1,5 @@
-import {cn, formatChangePercent, getChangeColorClass} from "@/lib/utils";
+import {cn} from "@/lib/utils";
+import {formatChangePercent, getChangeColorClass} from "@/lib/format";
 
 const WatchlistMovers = ({movers}: {movers: StockWithData[]}) => (
     movers.length > 0 ? (

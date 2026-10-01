@@ -1,7 +1,7 @@
 import Link from "next/link";
 import type {ReactNode} from "react";
-import {cn, formatPrice, getChangeColorClass} from "@/lib/utils";
-import {formatEasternTimestamp, formatSignedPrice} from "@/lib/format";
+import {cn} from "@/lib/utils";
+import {formatEasternTimestamp, formatSignedPrice, formatPrice, getChangeColorClass} from "@/lib/format";
 import {REPLAY_COPY} from "@/lib/learn/copy/replay";
 import {boughtForLine, receiptLine} from "@/lib/learn/copy/receipts";
 import type {FillReceipt} from "@/lib/trading/receipts";

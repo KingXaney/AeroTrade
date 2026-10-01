@@ -192,10 +192,6 @@ export const describeLastRun = (run: StrategyRunView | null): string => {
 
 const withSign = (value: number, digits: number): string => `${value >= 0 ? '+' : ''}${value.toFixed(digits)}`;
 
-// The rounded percent formatters moved to lib/format, the app-wide home; kept here for the
-// strategy pages that import them from this module.
-export {formatDrawdown, formatPct, roundPct, signedForColor} from "@/lib/format";
-
 export const formatSignalValue = (value: number | string | boolean | null | undefined, format: SignalFormat): string => {
     if (value === null || value === undefined) return '—';
     switch (format) {

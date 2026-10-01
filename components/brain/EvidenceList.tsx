@@ -1,6 +1,6 @@
 import Link from "next/link";
-import {cn, formatTimeAgoSeconds, getChangeColorClass} from "@/lib/utils";
-import {formatSigned} from "@/lib/format";
+import {cn} from "@/lib/utils";
+import {formatSigned, formatTimeAgoSeconds, getChangeColorClass} from "@/lib/format";
 import TradeLink from "@/components/trade/TradeLink";
 import Badge from "@/components/primitives/Badge";
 import Term from "@/components/primitives/Term";

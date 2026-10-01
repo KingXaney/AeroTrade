@@ -1,6 +1,6 @@
 import Link from "next/link";
-import {cn, formatPrice, getChangeColorClass} from "@/lib/utils";
-import {formatPct} from "@/lib/format";
+import {cn} from "@/lib/utils";
+import {formatPct, formatPrice, getChangeColorClass} from "@/lib/format";
 import {unpricedLabel} from "@/lib/trading/analytics";
 
 // Medal colours come from --rank-* in globals.css, not the palette registry: gold is a

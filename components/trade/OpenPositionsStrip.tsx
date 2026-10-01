@@ -1,8 +1,8 @@
 'use client';
 
 import {useState} from "react";
-import {cn, getChangeColorClass} from "@/lib/utils";
-import {formatPct} from "@/lib/format";
+import {cn} from "@/lib/utils";
+import {formatPct, getChangeColorClass} from "@/lib/format";
 import SellPositionDialog from "@/components/trade/SellPositionDialog";
 import type {Lot} from "@/lib/trading/lots";
 import UnpricedNote from "@/components/trade/UnpricedNote";

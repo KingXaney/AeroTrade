@@ -8,7 +8,7 @@
 import {describe, expect, it} from 'vitest';
 import {applyFill, type SimAccount} from '@/lib/strategies/engine';
 import {buildReturnBridge, toCents, type BridgeInput, type ReturnBridge} from '@/lib/trading/learn/bridge';
-import {formatPrice} from '@/lib/utils';
+import {formatPrice} from '@/lib/format';
 
 const held = (unrealizedPnl: number, priceStale = false) => ({unrealizedPnl, priceStale});
 

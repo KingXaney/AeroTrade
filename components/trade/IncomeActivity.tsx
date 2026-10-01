@@ -1,4 +1,4 @@
-import {formatPrice} from "@/lib/utils";
+import {formatPrice} from "@/lib/format";
 import MicroLabel from "@/components/primitives/MicroLabel";
 import EmptyState from "@/components/primitives/EmptyState";
 import {

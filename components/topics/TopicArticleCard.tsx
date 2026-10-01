@@ -1,4 +1,4 @@
-import {formatTimeAgoSeconds} from "@/lib/utils";
+import {formatTimeAgoSeconds} from "@/lib/format";
 import SourceBadge from "@/components/topics/SourceBadge";
 
 const MAX_TERM_CHIPS = 3;

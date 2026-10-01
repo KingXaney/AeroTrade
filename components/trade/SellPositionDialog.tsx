@@ -3,8 +3,8 @@
 import {useState} from "react";
 import {useRouter} from "next/navigation";
 import {toast} from "sonner";
-import {cn, formatPrice} from "@/lib/utils";
-import {formatSignedPrice} from "@/lib/format";
+import {cn} from "@/lib/utils";
+import {formatSignedPrice, formatPrice} from "@/lib/format";
 import {placeOrder} from "@/lib/actions/trading.actions";
 import {estRealizedPnl} from "@/lib/trading/order-math";
 import type {Lot} from "@/lib/trading/lots";

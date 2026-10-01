@@ -1,6 +1,6 @@
 import Link from "next/link";
-import {cn, getChangeColorClass} from "@/lib/utils";
-import {formatSigned} from "@/lib/format";
+import {cn} from "@/lib/utils";
+import {formatSigned, getChangeColorClass} from "@/lib/format";
 import TradeLink from "@/components/trade/TradeLink";
 import FollowTopicButton from "@/components/topics/FollowTopicButton";
 import type {FollowedByName} from "@/components/brain/NarrativeLeaderboard";

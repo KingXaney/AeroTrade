@@ -5,7 +5,7 @@ import PerformanceChart from "@/components/analytics/PerformanceChart";
 import AnalyticsStats, {type AnalyticsStatFields} from "@/components/analytics/AnalyticsStats";
 import {cn} from "@/lib/utils";
 import type {SeriesStats} from "@/lib/strategies/types";
-import {formatPct} from "@/lib/strategies/views";
+import {formatPct} from "@/lib/format";
 import SimulatedStats from "@/components/strategies/SimulatedStats";
 
 // Live and simulated curves side by side but never on one axis: a toggle, and each

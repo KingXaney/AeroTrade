@@ -1,5 +1,5 @@
 import Link from "next/link";
-import {formatTimeAgoSeconds} from "@/lib/utils";
+import {formatTimeAgoSeconds} from "@/lib/format";
 
 const MAX_ROWS = 6;
 const mono = {fontFamily: 'var(--type-mono)'} as const;
