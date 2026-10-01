@@ -22,7 +22,7 @@ describe('replayReceipts', () => {
     });
 
     it('reproduces the realized P&L the live order path stored', () => {
-        // executeOrder books (price - avgCost) * qty; applyFill is its mirror, so the replay agrees.
+        // executeOrder books (price - avgCost) * qty through applyFill, so the replay agrees.
         // Written out by hand on purpose: replayReceipts IS a fold of applyFill, so a fixture folded
         // through applyFill would hold it to itself and pass whatever the fill arithmetic did.
         const ledger = [trade('b1', 'buy', 'MSFT', 3, 301.17), trade('b2', 'buy', 'MSFT', 7, 288.4), trade('s1', 'sell', 'MSFT', 4, 310.05)];

@@ -1,12 +1,12 @@
 // The return bridge: an account's total return split into what moved it — price moves on
 // shares still held, results locked in by sells, interest on cash and dividends — adding
-// up to the Total Return tile to the cent. The ledger below is folded through the engine's
-// applyFill (lib/strategies/engine.ts, the mirror of executeOrder), never a copy of the fill
+// up to the Total Return tile to the cent. The ledger below is folded through applyFill
+// (lib/trading/fill.ts, the arithmetic executeOrder fills with), never a copy of the fill
 // arithmetic, so an account whose every sell recorded its result has nothing left over; only a
 // legacy sell stored without one shows as residual.
 
 import {describe, expect, it} from 'vitest';
-import {applyFill, type SimAccount} from '@/lib/strategies/engine';
+import {applyFill, type SimAccount} from '@/lib/trading/fill';
 import {buildReturnBridge, toCents, type BridgeInput, type ReturnBridge} from '@/lib/trading/learn/bridge';
 import {formatPrice} from '@/lib/format';
 

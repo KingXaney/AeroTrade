@@ -2,7 +2,7 @@ import {describe, expect, it, vi} from 'vitest';
 import {addCalendarDays} from '@/lib/dates';
 import type {Bar} from '@/lib/prices/signals';
 import {LOOKBACK_BARS, STALE_SKIP_FRACTION} from '@/lib/strategies/config';
-import {applyFill, buildContext, runStrategyDay, type SimAccount} from '@/lib/strategies/engine';
+import {buildContext, runStrategyDay} from '@/lib/strategies/engine';
 import type {Decide, Decision, StrategyContext, StrategyDefinition} from '@/lib/strategies/types';
 import {UNIVERSES, type UniverseKey} from '@/lib/strategies/universe';
 
@@ -231,86 +231,5 @@ describe('runStrategyDay — deciding and planning', () => {
         // Target 0.3 → drift 18 870 − 12 900 = 5 970 = 9.5 % < 50 % → held still.
         const still = runStrategyDay(wide, ctx, stubDecide(decisionOf([{symbol: 'SPY', weight: 0.3, reason: 'x'}])));
         expect(still.orders).toEqual([]);
-    });
-});
-
-describe('applyFill', () => {
-    const account: SimAccount = {cash: 10_000, positions: [{symbol: 'AAPL', quantity: 10, avgCost: 100}]};
-
-    it('rejects a non-positive or fractional-to-zero quantity and a bad price', () => {
-        expect(applyFill(account, {symbol: 'AAPL', side: 'buy', quantity: 0}, 100)).toEqual({ok: false, reason: 'invalid quantity'});
-        expect(applyFill(account, {symbol: 'AAPL', side: 'buy', quantity: 0.9}, 100)).toEqual({ok: false, reason: 'invalid quantity'});
-        expect(applyFill(account, {symbol: 'AAPL', side: 'buy', quantity: 1}, 0)).toEqual({ok: false, reason: 'no price'});
-        expect(applyFill(account, {symbol: 'AAPL', side: 'buy', quantity: 1}, Number.NaN)).toEqual({ok: false, reason: 'no price'});
-    });
-
-    it('floors a fractional quantity to whole shares', () => {
-        const result = applyFill(account, {symbol: 'MSFT', side: 'buy', quantity: 2.7}, 100);
-        expect(result.ok && result.total).toBe(200);
-        expect(result.ok && result.account.positions.find((p) => p.symbol === 'MSFT')?.quantity).toBe(2);
-    });
-
-    it('rejects a buy above available cash', () => {
-        expect(applyFill(account, {symbol: 'MSFT', side: 'buy', quantity: 101}, 100)).toEqual({ok: false, reason: 'insufficient cash'});
-        // Exactly all the cash is allowed (total > cash is the rejection, not >=).
-        const all = applyFill(account, {symbol: 'MSFT', side: 'buy', quantity: 100}, 100);
-        expect(all.ok && all.account.cash).toBe(0);
-    });
-
-    it('rejects a buy that would breach the cash floor, and checks cash before the floor', () => {
-        expect(applyFill(account, {symbol: 'MSFT', side: 'buy', quantity: 95}, 100, 1_000)).toEqual({ok: false, reason: 'cash floor'});
-        expect(applyFill(account, {symbol: 'MSFT', side: 'buy', quantity: 200}, 100, 1_000)).toEqual({ok: false, reason: 'insufficient cash'});
-        const atFloor = applyFill(account, {symbol: 'MSFT', side: 'buy', quantity: 90}, 100, 1_000);
-        expect(atFloor.ok && atFloor.account.cash).toBe(1_000);
-    });
-
-    it('averages cost by VWAP on an add', () => {
-        // 10 @ 100 + 10 @ 120 → 20 @ 110.
-        const result = applyFill(account, {symbol: 'AAPL', side: 'buy', quantity: 10}, 120);
-        expect(result).toEqual({
-            ok: true,
-            total: 1_200,
-            account: {cash: 8_800, positions: [{symbol: 'AAPL', quantity: 20, avgCost: 110}]},
-        });
-    });
-
-    it('opens a new position at the fill price', () => {
-        const result = applyFill(account, {symbol: 'MSFT', side: 'buy', quantity: 5}, 200);
-        expect(result.ok && result.account).toEqual({
-            cash: 9_000,
-            positions: [{symbol: 'AAPL', quantity: 10, avgCost: 100}, {symbol: 'MSFT', quantity: 5, avgCost: 200}],
-        });
-    });
-
-    it('rejects a sell of more than is held or of an unheld symbol', () => {
-        expect(applyFill(account, {symbol: 'AAPL', side: 'sell', quantity: 11}, 100)).toEqual({ok: false, reason: 'not held'});
-        expect(applyFill(account, {symbol: 'MSFT', side: 'sell', quantity: 1}, 100)).toEqual({ok: false, reason: 'not held'});
-    });
-
-    it('realises P&L against the average cost on a partial sell', () => {
-        // Sell 4 @ 130: P&L = (130 − 100) × 4 = 120; cash + 520.
-        const result = applyFill(account, {symbol: 'AAPL', side: 'sell', quantity: 4}, 130);
-        expect(result).toEqual({
-            ok: true,
-            total: 520,
-            realizedPnl: 120,
-            account: {cash: 10_520, positions: [{symbol: 'AAPL', quantity: 6, avgCost: 100}]},
-        });
-    });
-
-    it('removes a position sold down to zero, with a negative P&L intact', () => {
-        const result = applyFill(account, {symbol: 'AAPL', side: 'sell', quantity: 10}, 90);
-        expect(result).toEqual({ok: true, total: 900, realizedPnl: -100, account: {cash: 10_900, positions: []}});
-    });
-
-    it('never mutates the account it was given', () => {
-        const frozenPositions = account.positions.map((position) => ({...position}));
-        applyFill(account, {symbol: 'AAPL', side: 'buy', quantity: 5}, 120);
-        applyFill(account, {symbol: 'AAPL', side: 'sell', quantity: 10}, 120);
-        expect(account.cash).toBe(10_000);
-        expect(account.positions).toEqual(frozenPositions);
-        const result = applyFill(account, {symbol: 'AAPL', side: 'buy', quantity: 1}, 100);
-        expect(result.ok && result.account).not.toBe(account);
-        expect(result.ok && result.account.positions[0]).not.toBe(account.positions[0]);
     });
 });
