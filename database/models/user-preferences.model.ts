@@ -25,7 +25,7 @@ export interface LearnPrefs {
     quizLastAnsweredDate?: string;
 }
 
-export interface UserPreferences extends Document {
+export interface UserPreferencesDoc extends Document {
     userId: string;
     emailNotifications: boolean;
     digestMode: 'personalized' | 'general';
@@ -85,8 +85,8 @@ const LearnSchema = new Schema<LearnPrefs>(
     {_id: false},
 );
 
-const UserPreferencesSchema = new Schema<UserPreferences>({
-    userId: {type: String, required: true, unique: true, index: true},
+const UserPreferencesSchema = new Schema<UserPreferencesDoc>({
+    userId: {type: String, required: true, unique: true},
     emailNotifications: {type: Boolean, default: true},
     digestMode: {type: String, enum: ['personalized', 'general'], default: 'personalized'},
     topicsInDigest: {type: Boolean, default: true},
@@ -103,6 +103,6 @@ const UserPreferencesSchema = new Schema<UserPreferences>({
     updatedAt: {type: Date, default: Date.now},
 });
 
-const UserPreferencesModel = models?.UserPreferences || model<UserPreferences>('UserPreferences', UserPreferencesSchema);
+const UserPreferences = models?.UserPreferences || model<UserPreferencesDoc>('UserPreferences', UserPreferencesSchema);
 
-export default UserPreferencesModel;
+export default UserPreferences;

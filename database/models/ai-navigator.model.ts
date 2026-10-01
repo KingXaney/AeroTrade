@@ -14,7 +14,7 @@ export interface AiNavigatorDoc extends Document {
 }
 
 const AiNavigatorSchema = new Schema<AiNavigatorDoc>({
-    userId: {type: String, required: true, unique: true, index: true},
+    userId: {type: String, required: true, unique: true},
     accountId: {type: String, required: true},
     status: {type: String, required: true, enum: ['active', 'paused'], default: 'active'},
     enrolledAt: {type: Date, required: true},

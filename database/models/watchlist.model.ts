@@ -1,13 +1,13 @@
 import {Document, model, models, Schema} from "mongoose";
 
-export interface WatchlistItem extends Document {
+export interface WatchlistDoc extends Document {
     userId: string;
     symbol: string;
     company: string;
     addedAt: Date;
 }
 
-const WatchlistSchema = new Schema<WatchlistItem>({
+const WatchlistSchema = new Schema<WatchlistDoc>({
     userId: {type: String, required: true, index: true},
     symbol: {type: String, required: true, uppercase: true, trim: true},
     company: {type: String, required: true, trim: true},
@@ -16,6 +16,6 @@ const WatchlistSchema = new Schema<WatchlistItem>({
 
 WatchlistSchema.index({userId: 1, symbol: 1}, {unique: true});
 
-const Watchlist = models?.Watchlist || model<WatchlistItem>('Watchlist', WatchlistSchema);
+const Watchlist = models?.Watchlist || model<WatchlistDoc>('Watchlist', WatchlistSchema);
 
 export default Watchlist;

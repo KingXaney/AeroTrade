@@ -21,7 +21,7 @@ export interface StrategyStateDoc extends Document {
 
 const StrategyStateSchema = new Schema<StrategyStateDoc>(
     {
-        strategyId: {type: String, required: true, unique: true, index: true},
+        strategyId: {type: String, required: true, unique: true},
         accountId: {type: String, required: true},
         status: {type: String, required: true, enum: ['active', 'paused'], default: 'active'},
         version: {type: String, required: true},
