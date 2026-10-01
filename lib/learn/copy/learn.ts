@@ -8,6 +8,6 @@ import {numberWord} from "@/lib/text";
 
 export const LEARN_PAGE_COPY = {
     subtitle: 'What every number in AeroTrade measures, in the app\'s own words — and where to see the real one on your account.',
-    note: 'Definitions describe; none of them is a recommendation.',
+    note: 'Definitions describe. No definition is a recommendation.',
     strategiesHeading: `The ${numberWord(STRATEGIES.length)} strategies, one line each`,
 } as const;

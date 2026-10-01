@@ -15,14 +15,9 @@ describe('LEARN_PAGE_COPY', () => {
     it('never advises', () => {
         clean(LEARN_PAGE_COPY.subtitle);
         clean(LEARN_PAGE_COPY.strategiesHeading);
-    });
-
-    // Known and reported, not reworded: banned.ts drops a clause only when it opens with a
-    // prohibition word, and "none" is not one, so the disclaimer is caught by the very word it
-    // disclaims. Pinned so that either fix — new wording, or "none" taught to PROHIBITION —
-    // turns this test red and moves the note into the clean list above.
-    it('flags the page note on the word it disclaims', () => {
-        expect(findBanned(LEARN_PAGE_COPY.note, 'copy')).toEqual(['recommendation']);
+        // The disclaimer's second sentence opens with "No", a prohibition banned.ts drops,
+        // so the note can name the word it disclaims.
+        clean(LEARN_PAGE_COPY.note);
     });
 });
 
