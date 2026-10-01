@@ -1,6 +1,6 @@
 # Default topics, and topics that drive the news
 
-**Status:** implemented on `feat/default-topics` (2026-09-25).
+**Status:** implemented; merged to `main` in `c24c766` (PR #22, 2026-09-25).
 
 ## Why
 

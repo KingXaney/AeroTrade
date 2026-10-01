@@ -1,6 +1,6 @@
 # Brokerage income: interest on cash, real dividends, a total-return benchmark
 
-**Status:** implemented on `feat/brokerage-income` (2026-09-25).
+**Status:** implemented; merged to `main` in `e1ac613` (PR #23, 2026-09-28).
 
 ## Why
 
