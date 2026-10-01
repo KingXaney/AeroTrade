@@ -9,7 +9,7 @@ import {X, Trash2} from "lucide-react";
 import ChatMessage from "@/components/chat/ChatMessage";
 import {describeChatError} from "@/lib/chat/errors";
 import {subscribeAsk} from "@/lib/chat/ask";
-import {CHAT_WELCOME_MESSAGE, CHAT_SUGGESTIONS} from "@/lib/constants";
+import {CHAT_WELCOME_MESSAGE, CHAT_SUGGESTIONS} from "@/lib/learn/copy/chat";
 import {cn} from "@/lib/utils";
 
 // Tools that change what the surrounding pages show; the router refreshes after they run.

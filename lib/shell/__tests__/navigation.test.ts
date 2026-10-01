@@ -5,7 +5,6 @@
 import {describe, expect, it} from 'vitest';
 
 import {HEADER_NAV_ITEMS, NAV_ITEMS, isActiveNav} from '@/lib/shell/navigation';
-import * as constants from '@/lib/constants';
 
 describe('NAV_ITEMS', () => {
     it('has no duplicate hrefs', () => {
@@ -21,10 +20,6 @@ describe('NAV_ITEMS', () => {
             expect(item.href, item.label).toMatch(/^\/[a-z-]*$/);
         }
         expect(NAV_ITEMS.map((i) => i.href)).not.toContain('/search');
-    });
-
-    it('is the only NAV_ITEMS — lib/constants keeps no copy to edit or auto-import by mistake', () => {
-        expect(constants).not.toHaveProperty('NAV_ITEMS');
     });
 
     it('gives every item an icon and a label', () => {

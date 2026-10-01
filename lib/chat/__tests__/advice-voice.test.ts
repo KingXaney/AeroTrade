@@ -8,7 +8,7 @@
 import {describe, expect, it} from 'vitest';
 import {ADVISOR_SYSTEM_PROMPT} from '@/lib/chat/system-prompt';
 import {TOOL_DESCRIPTIONS} from '@/lib/chat/tool-copy';
-import {CHAT_SUGGESTIONS, CHAT_WELCOME_MESSAGE} from '@/lib/constants';
+import {CHAT_SUGGESTIONS, CHAT_WELCOME_MESSAGE} from '@/lib/learn/copy/chat';
 import {NEWS_SUMMARY_EMAIL_PROMPT, PERSONALIZED_WELCOME_EMAIL_PROMPT} from '@/lib/jobs/prompts';
 import {RATIONALE_PROMPT} from '@/lib/brain/prompts';
 import {findBanned} from '@/lib/learn/banned';

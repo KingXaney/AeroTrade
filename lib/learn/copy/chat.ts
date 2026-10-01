@@ -1,4 +1,7 @@
-// --- Chat assistant ---
+// What the chat panel says before the learner types: the welcome line and the suggestion chips
+// (components/chat/ChatPanel.tsx). lib/chat/__tests__/advice-voice.test.ts holds both to
+// lib/learn/banned.ts with the prompts and tool descriptions. Import-free.
+
 export const CHAT_WELCOME_MESSAGE =
     "Hi — I'm your AeroTrade Advisor. Ask what's new in your topics, follow something new, look up a stock, or press \"Ask in chat\" beside any definition to have it explained.";
 
