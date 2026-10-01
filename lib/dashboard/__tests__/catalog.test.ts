@@ -92,6 +92,19 @@ describe('registry invariants', () => {
         }
     });
 
+    it('files the paper-account widgets under accounts and the quant strategies under strategies', () => {
+        // "Strategy" names only the eight quant strategies; a user's paper account is an account.
+        expect(defs.filter((d) => d.category === 'accounts').map((d) => d.id)).toEqual([
+            'account-summary', 'top-holdings', 'open-positions', 'recent-trades', 'performance-chart', 'analytics-stats', 'strategy-comparison',
+        ]);
+        expect(defs.filter((d) => d.category === 'strategies').map((d) => d.id)).toEqual(['quant-strategies']);
+        expect(CATEGORY_LABELS.accounts).toBe('Accounts');
+        expect(CATEGORY_LABELS.strategies).toBe('Quant Strategies');
+        for (const def of defs.filter((d) => d.category === 'accounts')) {
+            expect(`${def.title} ${def.description}`, def.id).not.toMatch(/strateg/i);
+        }
+    });
+
     it('the topics widgets are plain panels flagged as new', () => {
         const topics = defs.filter((d) => d.category === 'topics').map((d) => d.id).sort();
         expect(topics).toEqual(['topic-briefs', 'topics-latest', 'topics-overview']);

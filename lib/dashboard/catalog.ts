@@ -16,17 +16,20 @@ export type WidgetSpan = (typeof WIDGET_SPANS)[number];
 
 export const SPAN_LABELS: Record<WidgetSpan, string> = {3: 'XS', 4: 'S', 6: 'M', 8: 'L', 12: 'XL'};
 
-type WidgetCategory = 'topics' | 'learn' | 'personal' | 'markets' | 'strategy' | 'social' | 'brain' | 'tools';
+// 'accounts' holds the widgets over the user's own paper accounts; 'strategies' the eight
+// rule-based quant strategies (lib/strategies), which are not the user's and use no AI.
+type WidgetCategory = 'topics' | 'learn' | 'personal' | 'markets' | 'accounts' | 'strategies' | 'social' | 'brain' | 'tools';
 
 // Library grouping order; WIDGET_IDS below is kept in this order too.
-export const CATEGORY_ORDER: readonly WidgetCategory[] = ['topics', 'learn', 'personal', 'markets', 'strategy', 'social', 'brain', 'tools'];
+export const CATEGORY_ORDER: readonly WidgetCategory[] = ['topics', 'learn', 'personal', 'markets', 'accounts', 'strategies', 'social', 'brain', 'tools'];
 
 export const CATEGORY_LABELS: Record<WidgetCategory, string> = {
     topics: 'Topics',
     learn: 'Learn',
     personal: 'Personal',
     markets: 'Markets',
-    strategy: 'Strategy',
+    accounts: 'Accounts',
+    strategies: 'Quant Strategies',
     social: 'Social',
     brain: 'News Brain & AI',
     tools: 'Tools',
@@ -151,7 +154,7 @@ export const WIDGET_IDS = [
     'tv-market-screener',
     'tv-crypto-screener',
     'tv-forex',
-    // strategy
+    // accounts
     'account-summary',
     'top-holdings',
     'open-positions',
@@ -159,6 +162,8 @@ export const WIDGET_IDS = [
     'performance-chart',
     'analytics-stats',
     'strategy-comparison',
+    // strategies
+    'quant-strategies',
     // social
     'leaderboard',
     // brain
@@ -169,7 +174,6 @@ export const WIDGET_IDS = [
     'knowledge-graph',
     'second-opinion',
     'brain-status',
-    'quant-strategies',
     // tools
     'quick-trade',
     'market-news',
@@ -282,7 +286,7 @@ export const WIDGETS: {readonly [K in WidgetId]: WidgetDefinition & {id: K}} = {
     'portfolio-snapshot': define({
         id: 'portfolio-snapshot',
         title: 'Portfolio',
-        description: 'Total value, return and cash across all your strategy accounts.',
+        description: 'Total value, return and cash across all your accounts.',
         category: 'personal',
         icon: 'account_balance_wallet',
         spans: [3, 4, 6],
@@ -400,12 +404,12 @@ export const WIDGETS: {readonly [K in WidgetId]: WidgetDefinition & {id: K}} = {
         minHeight: 400,
     }),
 
-    // --- Strategy ---
+    // --- Accounts (the user's own paper accounts) ---
     'account-summary': define({
         id: 'account-summary',
         title: 'Account Summary',
-        description: 'Cash, holdings value, total value and return across all strategies.',
-        category: 'strategy',
+        description: 'Cash, holdings value, total value and return across all your accounts.',
+        category: 'accounts',
         icon: 'account_balance',
         spans: [6, 8, 12],
         defaultSpan: 12,
@@ -417,8 +421,8 @@ export const WIDGETS: {readonly [K in WidgetId]: WidgetDefinition & {id: K}} = {
     'top-holdings': define({
         id: 'top-holdings',
         title: 'Top Holdings',
-        description: 'Your six largest positions in the active strategy, with a link to the full list.',
-        category: 'strategy',
+        description: 'Your six largest positions in the active account, with a link to the full list.',
+        category: 'accounts',
         icon: 'pie_chart',
         spans: [6, 8, 12],
         defaultSpan: 8,
@@ -428,8 +432,8 @@ export const WIDGETS: {readonly [K in WidgetId]: WidgetDefinition & {id: K}} = {
     'open-positions': define({
         id: 'open-positions',
         title: 'Open Positions',
-        description: 'Every open position in the active strategy, with quick sell.',
-        category: 'strategy',
+        description: 'Every open position in the active account, with quick sell.',
+        category: 'accounts',
         icon: 'candlestick_chart',
         spans: [8, 12],
         defaultSpan: 12,
@@ -440,8 +444,8 @@ export const WIDGETS: {readonly [K in WidgetId]: WidgetDefinition & {id: K}} = {
     'recent-trades': define({
         id: 'recent-trades',
         title: 'Recent Trades',
-        description: 'The last eight fills in the active strategy.',
-        category: 'strategy',
+        description: 'The last eight fills in the active account.',
+        category: 'accounts',
         icon: 'history',
         spans: [4, 6, 8, 12],
         defaultSpan: 6,
@@ -451,8 +455,8 @@ export const WIDGETS: {readonly [K in WidgetId]: WidgetDefinition & {id: K}} = {
     'performance-chart': define({
         id: 'performance-chart',
         title: 'Performance vs S&P 500',
-        description: 'Return since inception versus the S&P 500 for the active strategy.',
-        category: 'strategy',
+        description: 'Return since inception versus the S&P 500 for the active account.',
+        category: 'accounts',
         icon: 'show_chart',
         spans: [6, 8, 12],
         defaultSpan: 8,
@@ -464,8 +468,8 @@ export const WIDGETS: {readonly [K in WidgetId]: WidgetDefinition & {id: K}} = {
     'analytics-stats': define({
         id: 'analytics-stats',
         title: 'Analytics',
-        description: 'Win rate, max drawdown, realised P&L and trade count for the active strategy.',
-        category: 'strategy',
+        description: 'Win rate, max drawdown, realised P&L and trade count for the active account.',
+        category: 'accounts',
         icon: 'analytics',
         spans: [6, 8, 12],
         defaultSpan: 12,
@@ -476,9 +480,9 @@ export const WIDGETS: {readonly [K in WidgetId]: WidgetDefinition & {id: K}} = {
     }),
     'strategy-comparison': define({
         id: 'strategy-comparison',
-        title: 'Strategy Comparison',
-        description: 'Every strategy account side by side — which one is winning.',
-        category: 'strategy',
+        title: 'Account Comparison',
+        description: 'Every account side by side — which one is winning.',
+        category: 'accounts',
         icon: 'compare_arrows',
         spans: [8, 12],
         defaultSpan: 12,
@@ -486,6 +490,22 @@ export const WIDGETS: {readonly [K in WidgetId]: WidgetDefinition & {id: K}} = {
         dataKeys: ['activeAccount', 'comparisonStats'],
         availability: 'multiAccount',
         isClient: true,
+    }),
+
+    // --- Quant strategies (the eight rule-based strategies, not the user's accounts) ---
+    'quant-strategies': define({
+        id: 'quant-strategies',
+        title: 'Quant Strategies',
+        description: 'Live leaderboard of the eight classic strategies — deterministic rules, no AI. Followed ones first.',
+        category: 'strategies',
+        icon: 'auto_graph',
+        spans: [4, 6, 8, 12],
+        defaultSpan: 6,
+        minHeight: 260,
+        dataKeys: ['strategies'],
+        heavy: true,
+        isNew: true,
+        href: '/strategies',
     }),
 
     // --- Social ---
@@ -590,26 +610,12 @@ export const WIDGETS: {readonly [K in WidgetId]: WidgetDefinition & {id: K}} = {
         chrome: 'bare',
         showTitle: false,
     }),
-    'quant-strategies': define({
-        id: 'quant-strategies',
-        title: 'Quant Strategies',
-        description: 'Live leaderboard of the eight classic strategies — deterministic rules, no AI. Followed ones first.',
-        category: 'brain',
-        icon: 'auto_graph',
-        spans: [4, 6, 8, 12],
-        defaultSpan: 6,
-        minHeight: 260,
-        dataKeys: ['strategies'],
-        heavy: true,
-        isNew: true,
-        href: '/strategies',
-    }),
 
     // --- Tools ---
     'quick-trade': define({
         id: 'quick-trade',
         title: 'Quick Trade',
-        description: 'Place a paper order in the active strategy without leaving the dashboard.',
+        description: 'Place a paper order in the active account without leaving the dashboard.',
         category: 'tools',
         icon: 'bolt',
         spans: [3, 4, 6],
