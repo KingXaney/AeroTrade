@@ -28,6 +28,11 @@ export type OrderRequest = {
     idempotencyKey?: string;
 };
 
+// What an automated run records for a buy it never sent because a sell meant to fund it failed
+// (the AI Navigator and the quant strategies): without the proceeds, buying could drain cash
+// through the floor.
+export const FUNDING_SELL_FAILED = 'Skipped: a funding sell failed this run';
+
 // Market order at the current live price. Whole shares, long-only.
 export const executeOrder = async (
     userId: string,

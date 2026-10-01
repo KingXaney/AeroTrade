@@ -129,8 +129,6 @@ export const skipStrategyDay = async (strategyId: string, reason: string, {today
 
 type DayOrder = StrategyDayPlan['orders'][number];
 
-export const FUNDING_SELL_FAILED = 'Skipped: a funding sell failed this run';
-
 // The fill request for one of the day's orders, through the same path users trade on.
 export const strategyOrderRequest = (def: StrategyDefinition, state: StrategyStateView, order: DayOrder, plan: StrategyDayPlan, today: string) => ({
     accountId: state.accountId,

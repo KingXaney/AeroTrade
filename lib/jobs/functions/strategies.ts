@@ -2,7 +2,7 @@ import {inngest} from "@/lib/jobs/client";
 import {recordJobRun} from "@/lib/jobs/job-runs";
 import {JOBS, triggersOf} from "@/lib/jobs/registry";
 import {stepId} from "@/lib/jobs/steps";
-import {executeOrder} from "@/lib/trading/orders";
+import {executeOrder, FUNDING_SELL_FAILED} from "@/lib/trading/orders";
 import {STRATEGIES} from "@/lib/strategies/catalog";
 import {STRATEGY_OWNER_ID} from "@/lib/strategies/config";
 import {runSummary, throttleDue} from "@/lib/strategies/job-helpers";
@@ -10,7 +10,6 @@ import {backtestDataReady, decideForStrategy, isUniverseTooStale, simulateForStr
 import {backtestVersions, claimRun, completeRun, ensureStrategyAccounts, markStrategyError, recordSkippedRuns, variantStamps, type OrderOutcome} from "@/lib/strategies/store";
 import {ALL_STRATEGY_SYMBOLS} from "@/lib/strategies/universe";
 import {
-    FUNDING_SELL_FAILED,
     backtestDue,
     checkFreshness,
     dividendCoverageWindow,

@@ -1,6 +1,6 @@
 // Navigator read/assembly + decision helpers (NOT a 'use server' module — plain
-// server code shared by the /brain page and BOTH Inngest jobs: the weekly run and
-// the one-time enrollment bootstrap, which must make identical decisions).
+// server code shared by the /brain page and lib/navigator/run.ts, the one run both
+// Inngest jobs — the weekly run and the enrollment bootstrap — make their decisions with).
 
 import {Types} from "mongoose";
 import {connectToDatabase} from "@/database/mongoose";
