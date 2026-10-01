@@ -1,7 +1,8 @@
 'use client';
 
 import {useMemo, useState} from "react";
-import {useRouter} from "next/navigation";
+import Link from "next/link";
+import {evidenceHref} from "@/lib/brain/links";
 
 export type GraphNode = BrainEntitySummary;
 export type GraphEdge = {source: string; target: string; weight: number};
@@ -9,6 +10,8 @@ export type GraphEdge = {source: string; target: string; weight: number};
 // Hand-rolled SVG knowledge graph (PerformanceChart precedent — no chart deps).
 // Deterministic concentric-ring layout: themes inner, sectors middle, tickers outer;
 // angle by slow-weight rank within the ring. No physics sim — stable between renders.
+// Each node is a link to its evidence (evidenceHref), so Tab reaches it and Enter opens it;
+// focus lights it the way hover does.
 
 const WIDTH = 720;
 const HEIGHT = 440;
@@ -21,7 +24,6 @@ const MAX_NODE_R = 22;
 const sentimentColor = (s: number) => (s > 0.05 ? 'var(--positive)' : s < -0.05 ? 'var(--negative)' : 'var(--fg-muted)');
 
 const BrainGraph = ({nodes, edges}: {nodes: GraphNode[]; edges: GraphEdge[]}) => {
-    const router = useRouter();
     const [hoverKey, setHoverKey] = useState<string | null>(null);
 
     const layout = useMemo(() => {
@@ -33,7 +35,7 @@ const BrainGraph = ({nodes, edges}: {nodes: GraphNode[]; edges: GraphEdge[]}) =>
         for (const type of ['theme', 'sector', 'ticker'] as const) {
             const ring = byType[type].sort((a, b) => b.weightSlow - a.weightSlow);
             ring.forEach((node, i) => {
-                // Golden-angle-ish spread keeps neighbors from clustering at 0°.
+                // Evenly spaced by rank, heaviest at 12 o'clock.
                 const angle = (i / Math.max(ring.length, 1)) * 2 * Math.PI - Math.PI / 2;
                 const radius = RING_RADII[type];
                 positions.set(node.key, {
@@ -61,7 +63,9 @@ const BrainGraph = ({nodes, edges}: {nodes: GraphNode[]; edges: GraphEdge[]}) =>
 
     return (
         <div>
-            <svg viewBox={`0 0 ${WIDTH} ${HEIGHT}`} className="w-full h-auto" role="img"
+            {/* role="group", not "img": an img's descendants are presentational, which would hide
+                every node link from assistive technology. */}
+            <svg viewBox={`0 0 ${WIDTH} ${HEIGHT}`} className="w-full h-auto" role="group"
                  aria-label="News brain knowledge graph — themes inner ring, sectors middle, tickers outer">
                 {/* Ring guides */}
                 {(['theme', 'sector', 'ticker'] as const).map((type) => (
@@ -85,11 +89,13 @@ const BrainGraph = ({nodes, edges}: {nodes: GraphNode[]; edges: GraphEdge[]}) =>
 
                 {/* Nodes */}
                 {Array.from(layout.positions.values()).map(({x, y, r, node}) => (
-                    <g key={node.key}
-                       onMouseEnter={() => setHoverKey(node.key)}
-                       onMouseLeave={() => setHoverKey(null)}
-                       onClick={() => router.push(`/brain?entity=${encodeURIComponent(node.key)}`)}
-                       style={{cursor: 'pointer'}}>
+                    <Link key={node.key} href={evidenceHref(node.key)}
+                          aria-label={`${node.displayName} — evidence`}
+                          className="cursor-pointer focus-visible:outline-2 focus-visible:outline-brand"
+                          onMouseEnter={() => setHoverKey(node.key)}
+                          onMouseLeave={() => setHoverKey(null)}
+                          onFocus={() => setHoverKey(node.key)}
+                          onBlur={() => setHoverKey(null)}>
                         <circle cx={x} cy={y} r={r}
                                 style={{fill: sentimentColor(node.sentimentSlow), stroke: sentimentColor(node.sentimentSlow)}}
                                 fillOpacity={node.thesisSince !== null ? 0.35 : 0.15}
@@ -98,7 +104,7 @@ const BrainGraph = ({nodes, edges}: {nodes: GraphNode[]; edges: GraphEdge[]}) =>
                               style={{fill: hoverKey === node.key ? 'var(--fg)' : 'var(--fg-muted)', fontFamily: 'var(--type-mono)'}}>
                             {node.displayName.length > 14 ? `${node.displayName.slice(0, 13)}…` : node.displayName}
                         </text>
-                    </g>
+                    </Link>
                 ))}
             </svg>
 

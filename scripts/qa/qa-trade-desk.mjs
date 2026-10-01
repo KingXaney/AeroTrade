@@ -381,6 +381,27 @@ try {
     check('a ticker thesis links to the stock page and the ticket',
         await page.locator('a[href="/stocks/NVDA"]').count() >= 1 && await page.locator('a[href="/trade?symbol=NVDA"]').count() >= 1);
     check('no button is nested inside a link on /brain', await page.locator('a button').count() === 0);
+    // The knowledge graph's nodes are real links to the same evidence: a keyboard reaches them,
+    // and opening one lands on #evidence rather than on /brain's top.
+    const evidenceInView = () => page.waitForFunction(() => {
+        const el = document.getElementById('evidence');
+        if (!el) return false;
+        const r = el.getBoundingClientRect();
+        return r.top < innerHeight && r.bottom > 0;
+    }, null, {timeout: 15000}).then(() => true, () => false);
+    const graphNode = page.locator('svg a[href="/brain?entity=NVDA#evidence"]');
+    check('a graph node links to its evidence', await graphNode.count() === 1);
+    check('the graph is not role="img", so its links stay exposed', await page.locator('svg[role="img"]:has(a)').count() === 0);
+    await graphNode.focus();
+    check('a graph node takes keyboard focus', await graphNode.evaluate((el) => el === document.activeElement));
+    await page.keyboard.press('Enter');
+    check('Enter on a graph node opens its evidence, scrolled into view',
+        await page.waitForURL(/\?entity=NVDA#evidence$/, {timeout: 15000}).then(() => true, () => false) && await evidenceInView(), page.url());
+    await page.goto(`${BASE}/brain`, {waitUntil: 'domcontentloaded'});
+    await graphNode.scrollIntoViewIfNeeded();
+    await graphNode.click();
+    check('a click on a graph node opens its evidence, scrolled into view',
+        await page.waitForURL(/\?entity=NVDA#evidence$/, {timeout: 15000}).then(() => true, () => false) && await evidenceInView(), page.url());
     await page.goto(`${BASE}/brain?entity=NVDA#evidence`, {waitUntil: 'domcontentloaded'});
     await page.locator('#evidence').waitFor({timeout: 30000});
     check('the evidence section is an anchor target', true);

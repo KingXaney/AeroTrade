@@ -2,6 +2,7 @@ import Link from "next/link";
 import {cn, getChangeColorClass} from "@/lib/utils";
 import FollowTopicButton from "@/components/topics/FollowTopicButton";
 import {THESIS_WEIGHT_THRESHOLD} from "@/lib/brain/config";
+import {evidenceHref} from "@/lib/brain/links";
 import {BRAIN_COPY} from "@/lib/learn/copy/brain";
 
 // Lower-cased topic name -> the user's topic; only the /brain page passes it.
@@ -25,7 +26,7 @@ const TypeColumn = ({title, entities, followedByName}: {title: string; entities:
                     // link and the button is its sibling.
                     <div key={e.key}
                          className="flex items-center justify-between gap-2 px-3 py-2 rounded-lg border bg-surface-2/40 border-line-strong/20 hover:border-brand/30 transition-colors">
-                        <Link href={`/brain?entity=${encodeURIComponent(e.key)}#evidence`}
+                        <Link href={evidenceHref(e.key)}
                               className="text-xs font-semibold text-fg hover:text-brand truncate max-w-[55%]" style={{fontFamily: 'var(--type-mono)'}}>
                             {e.displayName}
                             {e.thesisSince !== null && <span className="ml-1 text-brand">●</span>}

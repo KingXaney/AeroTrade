@@ -7,6 +7,7 @@ import Term from "@/components/primitives/Term";
 import WhatTheseMean from "@/components/learn/WhatTheseMean";
 import {BRAIN_COPY} from "@/lib/learn/copy/brain";
 import type {SinceThesisLegs} from "@/lib/brain/since-thesis";
+import {evidenceHref} from "@/lib/brain/links";
 
 const MS_PER_WEEK = 7 * 24 * 60 * 60 * 1000;
 
@@ -50,7 +51,7 @@ const ActiveTheses = ({theses, followedByName, sinceThesis, definitions = false}
                             <div>
                                 {/* A row used to be a dead end. The name opens the evidence behind
                                     the thesis; the follow button stays a sibling, never nested. */}
-                                <Link href={`/brain?entity=${encodeURIComponent(t.key)}#evidence`}
+                                <Link href={evidenceHref(t.key)}
                                       className="text-sm font-semibold text-fg hover:text-brand transition-colors" style={{fontFamily: 'var(--type-display)'}}>
                                     {t.displayName}
                                 </Link>
