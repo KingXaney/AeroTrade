@@ -35,6 +35,7 @@ import {
     UNEXTRACTED_PICKUP_LIMIT,
 } from "@/lib/brain/config";
 import {recordJobRun} from "@/lib/jobs/job-runs";
+import {JOBS, triggersOf} from "@/lib/jobs/registry";
 import {creditAccounts, planIncomeRun, type CreditOutcome} from "@/lib/income/store";
 import {describeIncomeRun} from "@/lib/income/accrual";
 import {addCalendarDays, getEasternDateString, getEasternWeekKey} from "@/lib/dates";
@@ -62,7 +63,6 @@ import {loadBriefCandidates, loadStaleKeywordGroups, refreshKeywordGroup, saveTo
 import {buildTopicBriefPrompt} from "@/lib/topics/prompts";
 import {parseBriefText} from "@/lib/topics/brief";
 import {MAX_BRIEF_CALLS_PER_RUN} from "@/lib/topics/config";
-import {TOPIC_BRIEFS_EVENT, TOPIC_FEEDS_EVENT, TOPIC_FIRST_RUN_EVENT, TOPIC_REFRESH_EVENT} from "@/lib/topics/events";
 import {ensureTopicHasArticles, getTopicsDigestData, getTopicsForUser} from "@/lib/topics/store";
 import {buildTopicsSectionHtml} from "@/lib/email/sections/topics";
 import {lessonSectionFor} from "@/lib/email/sections/lesson";
@@ -95,7 +95,7 @@ import {NYSE_HOLIDAYS, isTradingDay, marketStatus} from "@/lib/prices/market-hou
 const APP_URL = (process.env.BETTER_AUTH_URL ?? '').replace(/\/$/, '') || 'http://localhost:3000';
 
 export const sendSignUpEmail = inngest.createFunction(
-    { id: 'sign-up-email', triggers: [{ event: 'app/user.created' }] },
+    { id: JOBS.signUpEmail.id, triggers: triggersOf(JOBS.signUpEmail) },
     async ({ event, step }) => {
         // No mailer, no email to write: skipped before the model call, with mailerReady's one line.
         if (!mailerReady('the welcome email')) return {success: false, message: 'Mailer not configured: welcome email skipped'};
@@ -139,7 +139,7 @@ const QUOTE_THROTTLE_DELAY = '30s';
 // {accountId, date} unique index makes re-runs (event replays, manual triggers)
 // harmless upserts.
 export const recordDailySnapshots = inngest.createFunction(
-    { id: 'daily-account-snapshots', triggers: [{ event: 'app/record.daily.snapshots' }, { cron: 'TZ=America/New_York 10 16 * * 1-5' }] },
+    { id: JOBS.snapshots.id, triggers: triggersOf(JOBS.snapshots) },
     async ({ step }) => {
         await step.run('snapshot-benchmark', async () => {
             const quote = await getQuote(BENCHMARK_SYMBOL);
@@ -263,7 +263,7 @@ export const recordDailySnapshots = inngest.createFunction(
         });
 
         const summary = `Snapshotted ${written} account(s) + ${BENCHMARK_SYMBOL}`;
-        await step.run('record-job-run', async () => recordJobRun('daily-account-snapshots', summary));
+        await step.run('record-job-run', async () => recordJobRun(JOBS.snapshots.id, summary));
         return {success: true, message: summary};
     },
 )
@@ -280,9 +280,9 @@ const INCOME_ROUTINE_BATCH = 25;
 
 export const creditDailyIncome = inngest.createFunction(
     {
-        id: 'daily-account-income',
+        id: JOBS.income.id,
         concurrency: [{limit: 1}],
-        triggers: [{event: 'app/credit.account.income'}, {cron: 'TZ=America/New_York 5 0 * * *'}],
+        triggers: triggersOf(JOBS.income),
     },
     async ({event, step}) => {
         // Anchored to the event, not the wall clock, so a retry an hour later credits the same day.
@@ -328,7 +328,7 @@ export const creditDailyIncome = inngest.createFunction(
         }
 
         const summary = describeIncomeRun(outcomes, end);
-        await step.run('record-job-run', async () => recordJobRun('daily-account-income', summary));
+        await step.run('record-job-run', async () => recordJobRun(JOBS.income.id, summary));
         return {success: true, message: summary};
     },
 )
@@ -342,7 +342,7 @@ const TARGETED_SYMBOL_LIMIT = 10;
 // entities/sentiment via Gemini (schema-validated; deterministic code decides
 // everything downstream), then fold the dual-timescale entity graph.
 export const updateNewsBrain = inngest.createFunction(
-    { id: 'daily-brain-update', triggers: [{ event: 'app/update.news.brain' }, { cron: 'TZ=America/New_York 30 7 * * *' }] },
+    { id: JOBS.newsBrain.id, triggers: triggersOf(JOBS.newsBrain) },
     async ({ step, runId }) => {
         // Ingest: one general sweep + one targeted at what the brain already tracks.
         const inserted = await step.run('fetch-and-persist', async () => {
@@ -517,7 +517,7 @@ export const updateNewsBrain = inngest.createFunction(
             foldExtractionsIntoBrain(folds, new Set(verifiedTickers), runId));
 
         const summary = `Brain updated: ${inserted} articles ingested, ${extractedIds.length} extracted, ${foldResult.entitiesTouched} entities touched, ${foldResult.deleted} pruned`;
-        await step.run('record-job-run', async () => recordJobRun('daily-brain-update', summary));
+        await step.run('record-job-run', async () => recordJobRun(JOBS.newsBrain.id, summary));
         return {success: true, message: summary};
     },
 )
@@ -526,7 +526,7 @@ export const updateNewsBrain = inngest.createFunction(
 // momentum, then per-enrolled-user allocation under strict holding rails. All
 // decisions are deterministic; the single LLM call per user only writes rationale.
 export const runWeeklyNavigator = inngest.createFunction(
-    { id: 'ai-navigator-weekly', triggers: [{ event: 'app/run.ai.navigator' }, { cron: 'TZ=America/New_York 0 10 * * 1' }] },
+    { id: JOBS.navigatorWeekly.id, triggers: triggersOf(JOBS.navigatorWeekly) },
     async ({ step }) => {
         const universe = await step.run('build-universe', async () => buildNavigatorUniverse());
 
@@ -652,13 +652,13 @@ export const runWeeklyNavigator = inngest.createFunction(
         }
 
         const summary = `Navigator ran for ${usersProcessed}/${universe.navigators.length} user(s), ${ordersExecuted} order(s) executed`;
-        await step.run('record-job-run', async () => recordJobRun('ai-navigator-weekly', summary));
+        await step.run('record-job-run', async () => recordJobRun(JOBS.navigatorWeekly.id, summary));
         return {success: true, message: summary};
     },
 )
 
 export const sendDailyNewsSummary = inngest.createFunction(
-    { id: 'daily-news-summary', triggers: [{ event: 'app/send.daily.news' }, { cron: 'TZ=America/New_York 0 12 * * *' }] },
+    { id: JOBS.newsDigest.id, triggers: triggersOf(JOBS.newsDigest) },
     async ({ step, runId }) => {
         // No mailer, no digest: skipped before any user's news is read or summarised by the model.
         if (!mailerReady('the daily news summary')) return {success: false, message: 'Mailer not configured: daily news summary skipped'};
@@ -805,7 +805,7 @@ export const sendDailyNewsSummary = inngest.createFunction(
         }
 
         const summary = `Daily news summary sent to ${sentCount}/${users.length} users`;
-        await step.run('record-job-run', async () => recordJobRun('daily-news-summary', summary));
+        await step.run('record-job-run', async () => recordJobRun(JOBS.newsDigest.id, summary));
         return {success: true, message: summary}
     }
 )
@@ -817,7 +817,7 @@ export const sendDailyNewsSummary = inngest.createFunction(
 // produces a PREVIEW instead: full scoring, planned orders and rationale, badged
 // and never executed — analysis without a churn loophole.
 export const bootstrapAiNavigator = inngest.createFunction(
-    { id: 'ai-navigator-bootstrap', triggers: [{ event: 'app/bootstrap.ai.navigator' }] },
+    { id: JOBS.navigatorBootstrap.id, triggers: triggersOf(JOBS.navigatorBootstrap) },
     async ({ step, event }) => {
         const userId = typeof event.data?.userId === 'string' ? event.data.userId : null;
         if (!userId) return {success: false, message: 'Missing userId'};
@@ -948,7 +948,7 @@ export const bootstrapAiNavigator = inngest.createFunction(
         const summary = claimed
             ? `Run traded ${executed.filter((i) => i.executed).length} order(s)`
             : 'Preview saved (nothing traded)';
-        await step.run('record-job-run', async () => recordJobRun('ai-navigator-bootstrap', summary));
+        await step.run('record-job-run', async () => recordJobRun(JOBS.navigatorBootstrap.id, summary));
         return {success: true, message: `${summary} for ${userId}`};
     },
 )
@@ -959,8 +959,8 @@ export const bootstrapAiNavigator = inngest.createFunction(
 // this is a critique layer for the human reading the /brain page.
 export const generateSecondOpinion = inngest.createFunction(
     {
-        id: 'claude-second-opinion',
-        triggers: [{ event: 'app/generate.second.opinion' }],
+        id: JOBS.secondOpinion.id,
+        triggers: triggersOf(JOBS.secondOpinion),
         // The action already claims a slot before enqueueing, but that guard lives
         // outside the queue: a replayed or hand-crafted event would never touch it.
         // These bound the spend at the only place every run must pass through —
@@ -973,12 +973,12 @@ export const generateSecondOpinion = inngest.createFunction(
         const userId = String(event.data?.userId ?? '');
         if (!userId) {
             const message = 'Skipped — no requesting user on the event';
-            await step.run('record-job-run', async () => recordJobRun('claude-second-opinion', message));
+            await step.run('record-job-run', async () => recordJobRun(JOBS.secondOpinion.id, message));
             return {success: false, message};
         }
         if (!isSecondOpinionConfigured()) {
             const message = 'Skipped — ANTHROPIC_API_KEY is not set';
-            await step.run('record-job-run', async () => recordJobRun('claude-second-opinion', message));
+            await step.run('record-job-run', async () => recordJobRun(JOBS.secondOpinion.id, message));
             return {success: false, message};
         }
 
@@ -986,7 +986,7 @@ export const generateSecondOpinion = inngest.createFunction(
 
         if (!Array.isArray(context.narratives) || context.narratives.length === 0) {
             const message = 'Skipped — the brain is empty, run a brain update first';
-            await step.run('record-job-run', async () => recordJobRun('claude-second-opinion', message));
+            await step.run('record-job-run', async () => recordJobRun(JOBS.secondOpinion.id, message));
             return {success: false, message};
         }
 
@@ -1019,7 +1019,7 @@ export const generateSecondOpinion = inngest.createFunction(
             return `Second opinion written (${text.length} chars)`;
         });
 
-        await step.run('record-job-run', async () => recordJobRun('claude-second-opinion', summary));
+        await step.run('record-job-run', async () => recordJobRun(JOBS.secondOpinion.id, summary));
         return {success: true, message: summary};
     },
 )
@@ -1033,11 +1033,11 @@ const BRIEF_THROTTLE_DELAY = '15s';   // same pacing as extraction on the free t
 // Every three hours, re-fetch the keyword sets that have gone longest without one.
 // Sets are shared across users, so this is bounded by distinct topics, not by users.
 export const refreshTopicFeeds = inngest.createFunction(
-    { id: 'refresh-topic-feeds', triggers: [{ event: TOPIC_FEEDS_EVENT }, { cron: 'TZ=America/New_York 0 */3 * * *' }] },
+    { id: JOBS.topicFeeds.id, triggers: triggersOf(JOBS.topicFeeds) },
     async ({ step }) => {
         if (!newsSearchEnabled()) {
             const message = 'Skipped — NEWS_SEARCH_ENABLED is off';
-            await step.run('record-job-run', async () => recordJobRun('refresh-topic-feeds', message));
+            await step.run('record-job-run', async () => recordJobRun(JOBS.topicFeeds.id, message));
             return {success: false, message};
         }
 
@@ -1061,7 +1061,7 @@ export const refreshTopicFeeds = inngest.createFunction(
         }
 
         const summary = `Refreshed ${refreshed}/${groups.length} keyword sets, ${inserted} new articles${failed ? `, ${failed} failed` : ''}`;
-        await step.run('record-job-run', async () => recordJobRun('refresh-topic-feeds', summary));
+        await step.run('record-job-run', async () => recordJobRun(JOBS.topicFeeds.id, summary));
         return {success: true, message: summary};
     },
 );
@@ -1072,8 +1072,8 @@ export const refreshTopicFeeds = inngest.createFunction(
 // events are dropped — which would make that promise a lie past six an hour).
 export const refreshTopicOnDemand = inngest.createFunction(
     {
-        id: 'refresh-topic-on-demand',
-        triggers: [{ event: TOPIC_REFRESH_EVENT }],
+        id: JOBS.topicOnDemand.id,
+        triggers: triggersOf(JOBS.topicOnDemand),
         concurrency: [{ limit: 1, key: 'event.data.keywordSetHash' }],
         throttle: { limit: 6, period: '1h', key: 'event.data.userId' },
     },
@@ -1092,7 +1092,7 @@ export const refreshTopicOnDemand = inngest.createFunction(
 
         const result = await step.run(`refresh-group-${keywordSetHash}`, async () => refreshKeywordGroup(group));
         const summary = `On-demand refresh: ${result.inserted} new of ${result.matched} matched`;
-        await step.run('record-job-run', async () => recordJobRun('refresh-topic-on-demand', summary));
+        await step.run('record-job-run', async () => recordJobRun(JOBS.topicOnDemand.id, summary));
         return {success: true, message: summary};
     },
 );
@@ -1103,8 +1103,8 @@ export const refreshTopicOnDemand = inngest.createFunction(
 // excess events rather than queueing them, so a batch of eight starters lost two.
 export const fillFirstRunTopics = inngest.createFunction(
     {
-        id: 'fill-first-run-topics',
-        triggers: [{ event: TOPIC_FIRST_RUN_EVENT }],
+        id: JOBS.topicFirstRun.id,
+        triggers: triggersOf(JOBS.topicFirstRun),
         concurrency: [{ limit: 1, key: 'event.data.userId' }],
         rateLimit: { limit: 3, period: '1h', key: 'event.data.userId' },
     },
@@ -1132,7 +1132,7 @@ export const fillFirstRunTopics = inngest.createFunction(
         }
 
         const summary = `Filled ${filled}/${topics.length} new topics${failed ? `, ${failed} failed` : ''}`;
-        await step.run('record-job-run', async () => recordJobRun('fill-first-run-topics', summary));
+        await step.run('record-job-run', async () => recordJobRun(JOBS.topicFirstRun.id, summary));
         return {success: true, message: summary};
     },
 );
@@ -1140,7 +1140,7 @@ export const fillFirstRunTopics = inngest.createFunction(
 // Daily "what changed today" per keyword set, after the morning refresh and before the
 // noon digest. Bounded calls on the free tier; one brief serves every user on that set.
 export const generateTopicBriefs = inngest.createFunction(
-    { id: 'generate-topic-briefs', triggers: [{ event: TOPIC_BRIEFS_EVENT }, { cron: 'TZ=America/New_York 0 8 * * *' }] },
+    { id: JOBS.topicBriefs.id, triggers: triggersOf(JOBS.topicBriefs) },
     async ({ step }) => {
         const candidates = await step.run('load-candidates', async () => loadBriefCandidates(MAX_BRIEF_CALLS_PER_RUN));
 
@@ -1160,7 +1160,7 @@ export const generateTopicBriefs = inngest.createFunction(
         }
 
         const summary = `Wrote ${written} topic briefs from ${candidates.length} keyword sets`;
-        await step.run('record-job-run', async () => recordJobRun('generate-topic-briefs', summary));
+        await step.run('record-job-run', async () => recordJobRun(JOBS.topicBriefs.id, summary));
         return {success: true, message: summary};
     },
 );
@@ -1170,8 +1170,6 @@ export const generateTopicBriefs = inngest.createFunction(
 // the previous close and fill them through the same path users trade on. The engine
 // (lib/strategies) is the only place a decision is made; this function sequences
 // accounts → bars → freshness → per-strategy decide/fill → backtests → stamp.
-export const STRATEGIES_EVENT = 'app/run.strategies';
-const STRATEGIES_JOB = 'strategies-daily';
 const ORDER_THROTTLE_DELAY = '60s';
 const QUOTE_RETRY_DELAY = '15s';
 // The first chunk is the core ETFs: total-return legs whose adjusted closes are re-based
@@ -1182,13 +1180,9 @@ type StrategiesEventData = {dryRun?: boolean; resimulate?: boolean; force?: bool
 
 export const runStrategiesDaily = inngest.createFunction(
     {
-        id: STRATEGIES_JOB,
-        triggers: [
-            {event: STRATEGIES_EVENT},
-            {cron: 'TZ=America/New_York 35 9 * * 1-5'},
-            // Retry for provider lag: a successful 09:35 run leaves every claim taken.
-            {cron: 'TZ=America/New_York 30 10 * * 1-5'},
-        ],
+        id: JOBS.strategies.id,
+        // Its 10:30 cron is the retry for provider lag (lib/jobs/registry.ts).
+        triggers: triggersOf(JOBS.strategies),
         concurrency: [{limit: 1}],
     },
     async ({step, event}) => {
@@ -1203,7 +1197,7 @@ export const runStrategiesDaily = inngest.createFunction(
         if (!force && !isTradingDay(today)) {
             const why = NYSE_HOLIDAYS[today] ?? 'weekend';
             const message = `Skipped — market closed (${why})`;
-            await step.run('record-job-run', async () => recordJobRun(STRATEGIES_JOB, message));
+            await step.run('record-job-run', async () => recordJobRun(JOBS.strategies.id, message));
             return {success: true, message};
         }
         const asOf = previousTradingDay(today);
@@ -1423,7 +1417,7 @@ export const runStrategiesDaily = inngest.createFunction(
             failedSymbols,
             asOf,
         });
-        await step.run('record-job-run', async () => recordJobRun(STRATEGIES_JOB, summary));
+        await step.run('record-job-run', async () => recordJobRun(JOBS.strategies.id, summary));
         return {success: true, message: summary};
     },
 );

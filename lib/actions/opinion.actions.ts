@@ -5,6 +5,7 @@ import SecondOpinion from "@/database/models/second-opinion.model";
 import {connectToDatabase} from "@/database/mongoose";
 import {getCurrentUserId} from "@/lib/auth/session";
 import {inngest} from "@/lib/jobs/client";
+import {JOBS} from "@/lib/jobs/registry";
 import {
     gatherOpinionContext,
     isSecondOpinionConfigured,
@@ -60,7 +61,7 @@ export const requestSecondOpinion = async (): Promise<OrderResult> => {
             return {success: false, message: 'A request is already in flight — give it a few minutes'};
         }
 
-        await inngest.send({name: 'app/generate.second.opinion', data: {userId}});
+        await inngest.send({name: JOBS.secondOpinion.event, data: {userId}});
         return {success: true, message: 'Claude is reading the brain — the opinion appears here in a minute or two'};
     } catch (error) {
         console.error('Error requesting second opinion:', error);

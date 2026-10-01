@@ -13,6 +13,7 @@ import {executeOrder} from "@/lib/trading/orders";
 import {getQuote} from "@/lib/prices/finnhub";
 import {AI_NAVIGATOR_ACCOUNT_NAME} from "@/lib/navigator/config";
 import {inngest} from "@/lib/jobs/client";
+import {JOBS} from "@/lib/jobs/registry";
 
 const revalidateNavigatorPaths = () => {
     revalidatePath('/brain');
@@ -68,7 +69,7 @@ export const enrollAiNavigator = async (
         // instead of waiting for Monday. Failure to enqueue must not fail enrollment.
         let bootstrapQueued = false;
         try {
-            await inngest.send({name: 'app/bootstrap.ai.navigator', data: {userId}});
+            await inngest.send({name: JOBS.navigatorBootstrap.event, data: {userId}});
             bootstrapQueued = true;
         } catch (error) {
             console.error('Could not queue navigator bootstrap:', error);
@@ -120,7 +121,7 @@ export const runAiNavigatorNow = async (): Promise<OrderResult> => {
         if (!doc) return {success: false, message: 'Not enrolled'};
         if (doc.status !== 'active') return {success: false, message: 'AI Navigator is paused — resume it first'};
 
-        await inngest.send({name: 'app/bootstrap.ai.navigator', data: {userId}});
+        await inngest.send({name: JOBS.navigatorBootstrap.event, data: {userId}});
         return {success: true, message: 'AI run queued — results appear under Weekly Decisions in a few minutes'};
     } catch (error) {
         console.error('Error queueing manual navigator run:', error);

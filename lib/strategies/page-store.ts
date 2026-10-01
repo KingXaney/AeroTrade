@@ -7,7 +7,8 @@ import AccountSnapshot from "@/database/models/account-snapshot.model";
 import StrategyBacktest from "@/database/models/strategy-backtest.model";
 import StrategyRun from "@/database/models/strategy-run.model";
 import PriceBar from "@/database/models/price-bar.model";
-import {getJobHealth, type JobHealth} from "@/lib/brain/store";
+import {getJobHealth, type JobHealth} from "@/lib/jobs/health";
+import {JOBS} from "@/lib/jobs/registry";
 import {readAccountsForUser, toAccountSummary} from "@/lib/trading/accounts";
 import {buildPriceMap, computePortfolio} from "@/lib/trading/valuation";
 import {getTradeHistory, getTradeLedger} from "@/lib/trading/ledger";
@@ -40,7 +41,6 @@ import {
     type StrategyRunView,
 } from "@/lib/strategies/views";
 
-export const STRATEGIES_JOB_ID = 'strategies-daily';
 const DETAIL_TRADE_LIMIT = 100;
 
 type LeanRun = {
@@ -431,7 +431,7 @@ export const getStrategiesSystemStatus = cache(async (): Promise<StrategiesSyste
     {
         await connectToDatabase();
         const [jobs, latestBar, states] = await Promise.all([
-            getJobHealth([STRATEGIES_JOB_ID]),
+            getJobHealth([JOBS.strategies.id]),
             PriceBar.findOne({symbol: BENCHMARK_SYMBOL}).sort({date: -1}).select('date').lean<{date: string} | null>(),
             getStrategyStates(),
         ]);

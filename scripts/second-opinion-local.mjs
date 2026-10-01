@@ -63,7 +63,8 @@ const {
     stripMarkdownLinks,
 } = await import('../lib/brain/opinion-text.ts');
 
-const JOB_ID = 'claude-second-opinion';
+const {JOBS} = await import('../lib/jobs/registry.ts');
+const JOB_ID = JOBS.secondOpinion.id;
 const CLI_TIMEOUT_MS = 10 * 60 * 1000;
 // Claude Code picks a credential by precedence, and your subscription login is
 // LAST. In -p mode an API key in the environment is used with no prompt at all —

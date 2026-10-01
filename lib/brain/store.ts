@@ -4,13 +4,13 @@
 import {connectToDatabase} from "@/database/mongoose";
 import BrainEntity, {type BrainEntityDoc} from "@/database/models/brain-entity.model";
 import NewsItem from "@/database/models/news-item.model";
-import JobRun from "@/database/models/job-run.model";
 import PriceBar from "@/database/models/price-bar.model";
 import {earliestSince, sinceThesisBySymbol, sinceThesisTargets, type SinceThesisLegs} from "@/lib/brain/since-thesis";
 import {BENCHMARK_SYMBOL} from "@/lib/prices/config";
 import {createDayMemo, remember} from "@/lib/day-memo";
 import {addCalendarDays, getEasternDateString} from "@/lib/dates";
 import {getBarsFrom, getLatestBars} from "@/lib/prices/store";
+import {getAllJobHealth, type JobHealth} from "@/lib/jobs/health";
 
 const safeAvg = (sum: number, weight: number): number => (Math.abs(weight) < 1e-9 ? 0 : sum / weight);
 
@@ -155,17 +155,7 @@ export const getBrainDigestData = async (limit = 8) => {
 };
 
 // System-health snapshot for the /brain status strip: live pipeline counters plus
-// each background job's last completion stamp. Health is derived from staleness —
-// a crashed or never-wired job stops refreshing its stamp.
-export type JobHealth = {
-    jobId: string;
-    label: string;
-    schedule: string;
-    lastRunAt: number | null;     // epoch ms
-    lastMessage: string | null;
-    staleAfterHours: number;
-};
-
+// each background job's last completion stamp (lib/jobs/health.ts).
 export type BrainSystemStatus = {
     articlesTotal: number;
     articlesLast24h: number;
@@ -179,55 +169,17 @@ export type BrainSystemStatus = {
     jobs: JobHealth[];
 };
 
-// Cadence-aware staleness: daily jobs get slack for one miss; snapshots skip
-// weekends (so Monday morning is ~66h after Friday's run); the navigator is weekly.
-export const JOB_DEFINITIONS: Array<Omit<JobHealth, 'lastRunAt' | 'lastMessage'>> = [
-    {jobId: 'daily-brain-update', label: 'Brain update', schedule: 'daily 07:30 ET', staleAfterHours: 30},
-    {jobId: 'daily-news-summary', label: 'News email', schedule: 'daily 12:00 ET', staleAfterHours: 30},
-    {jobId: 'daily-account-snapshots', label: 'Account snapshots', schedule: 'weekdays 16:10 ET', staleAfterHours: 80},
-    {jobId: 'ai-navigator-weekly', label: 'AI navigator (weekly)', schedule: 'Mondays 10:00 ET', staleAfterHours: 8 * 24},
-    {jobId: 'ai-navigator-bootstrap', label: 'AI run (manual/enroll)', schedule: 'on demand', staleAfterHours: Number.POSITIVE_INFINITY},
-    {jobId: 'claude-second-opinion', label: 'Claude second opinion', schedule: 'on demand', staleAfterHours: Number.POSITIVE_INFINITY},
-    {jobId: 'refresh-topic-feeds', label: 'Topic feeds', schedule: 'every 3h', staleAfterHours: 7},
-    {jobId: 'generate-topic-briefs', label: 'Topic briefs', schedule: 'daily 08:00 ET', staleAfterHours: 30},
-    {jobId: 'refresh-topic-on-demand', label: 'Topic refresh (manual)', schedule: 'on demand', staleAfterHours: Number.POSITIVE_INFINITY},
-    // Weekdays only, so a Monday-morning view is ~72h after Friday's run.
-    {jobId: 'strategies-daily', label: 'Quant strategies', schedule: 'weekdays 09:35 ET', staleAfterHours: 80},
-    // Every day including weekends; its message names any account it could not credit.
-    {jobId: 'daily-account-income', label: 'Interest & dividends', schedule: 'daily 00:05 ET', staleAfterHours: 30},
-];
-
-const withStamps = (defs: typeof JOB_DEFINITIONS, runs: {jobId: string; lastRunAt: Date; lastMessage?: string}[]): JobHealth[] => {
-    const runByJob = new Map(runs.map((r) => [r.jobId, r]));
-    return defs.map((def) => {
-        const run = runByJob.get(def.jobId);
-        return {
-            ...def,
-            lastRunAt: run ? new Date(run.lastRunAt).getTime() : null,
-            lastMessage: run?.lastMessage ?? null,
-        };
-    });
-};
-
-// Job stamps for a subset of jobs, without the brain's counters (the strategies page
-// only needs its own row).
-export const getJobHealth = async (jobIds: readonly string[]): Promise<JobHealth[]> => {
-    await connectToDatabase();
-    const runs = await JobRun.find({jobId: {$in: jobIds}}).lean();
-    return withStamps(JOB_DEFINITIONS.filter((def) => jobIds.includes(def.jobId)), runs);
-};
-
 export const getBrainSystemStatus = async (): Promise<BrainSystemStatus> => {
     await connectToDatabase();
     const dayAgo = new Date(Date.now() - 24 * 60 * 60 * 1000);
-    const [articlesTotal, articlesLast24h, articlesExtracted, entityCount, thesisCount, pricedSymbols, runs] = await Promise.all([
+    const [articlesTotal, articlesLast24h, articlesExtracted, entityCount, thesisCount, pricedSymbols, jobs] = await Promise.all([
         NewsItem.countDocuments({}),
         NewsItem.countDocuments({createdAt: {$gte: dayAgo}}),
         NewsItem.countDocuments({extraction: {$exists: true}}),
         BrainEntity.countDocuments({}),
         BrainEntity.countDocuments({thesisSince: {$ne: null}}),
         PriceBar.distinct('symbol').then((symbols) => symbols.length),
-        JobRun.find({}).lean(),
+        getAllJobHealth(),
     ]);
     return {
         articlesTotal,
@@ -239,7 +191,7 @@ export const getBrainSystemStatus = async (): Promise<BrainSystemStatus> => {
         entityCount,
         thesisCount,
         pricedSymbols,
-        jobs: withStamps(JOB_DEFINITIONS, runs),
+        jobs,
     };
 };
 

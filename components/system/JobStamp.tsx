@@ -1,5 +1,5 @@
 import {formatTimeAgoMs} from "@/lib/format";
-import {type JobHealth} from "@/lib/brain/store";
+import {type JobHealth} from "@/lib/jobs/health";
 
 // One Inngest job's health card, derived from its completion stamp: a crashed job
 // shows up because its stamp stops moving. Shared by /brain and /strategies.

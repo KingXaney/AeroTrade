@@ -2,6 +2,7 @@
 
 import {auth} from "@/lib/auth/server";
 import {inngest} from "@/lib/jobs/client";
+import {JOBS} from "@/lib/jobs/registry";
 import {cookies, headers} from "next/headers";
 import {THEME_COOKIE} from "@/lib/theme/resolve";
 import {syncThemeCookieForUser} from "@/lib/theme/store";
@@ -61,7 +62,7 @@ export const signUpWithEmail = async (input: SignUpFormData) => {
             }
 
             await inngest.send({
-                name: 'app/user.created',
+                name: JOBS.signUpEmail.event,
                 data: { email, name: fullName, ...profile }
             }).catch((e) => console.error('Failed to queue welcome email', e))
         }
