@@ -8,15 +8,22 @@ import type {Lot} from "@/lib/trading/lots";
 import UnpricedNote from "@/components/trade/UnpricedNote";
 import Term from "@/components/primitives/Term";
 import TradeLink from "@/components/trade/TradeLink";
+import {HOLDINGS_COPY} from "@/lib/learn/copy/portfolio";
 
-// Interactive holdings table for the trade page — each row opens a sell
-// dialog where the user picks how many shares to sell.
+// Interactive holdings table for /portfolio's Holdings panel (its only caller; /trade shows
+// OpenPositionsStrip) — each row opens a sell dialog where the user picks how many shares
+// to sell. /portfolio has no order panel, so the empty state links to the Trade Desk.
 // lotNotes: the learner's notes on the shares still held, by symbol (pages only).
 const PositionsTable = ({positions, accountId, lotNotes}: {positions: EnrichedPosition[]; accountId: string; lotNotes?: Readonly<Record<string, readonly Lot[]>>}) => {
     const [sellTarget, setSellTarget] = useState<EnrichedPosition | null>(null);
 
     if (positions.length === 0) {
-        return <p className="text-sm text-fg-muted p-4">No open positions. Use the order panel to buy your first stock.</p>;
+        return (
+            <p className="text-sm text-fg-muted p-4" data-testid="positions-empty">
+                {HOLDINGS_COPY.empty}{' '}
+                <Link href="/trade" className="text-brand hover:underline">{HOLDINGS_COPY.toTradeDesk}</Link>
+            </p>
+        );
     }
 
     return (

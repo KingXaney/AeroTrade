@@ -98,6 +98,12 @@ try {
     check('a fresh account has nothing to split yet', /Nothing to split yet/.test(await text('#return-bridge')), await text('#return-bridge'));
     check('a fresh account has no swing yet', /Needs 3\+ days of history/.test(await text('[data-testid=risk-swing]')), await text('[data-testid=risk-swing]'));
     check('an all-cash account says so', /cash 100% · no holdings yet/.test(await text('[data-testid=risk-largest]')), await text('[data-testid=risk-largest]'));
+    // /portfolio has no order ticket, so the empty Holdings table links to the page that does.
+    check('the empty Holdings table links to the Trade Desk, not to an order panel',
+        await page.locator('[data-testid=positions-empty] a[href="/trade"]').count() === 1
+            && !/order panel/i.test(await text('[data-testid=positions-empty]'))
+            && await page.locator('#order-symbol').count() === 0,
+        await text('[data-testid=positions-empty]'));
     check('an all-cash account has no concentration caption', (await page.locator('[data-testid=risk-caption]').count()) === 0);
     check('a fresh account shades no band', (await page.locator('[data-testid=drawdown-band]').count()) === 0);
     check('a fresh account has no income and no missed block', /No income yet/.test(await text('#income')) && (await page.locator('[data-testid=income-missed]').count()) === 0, await text('#income'));

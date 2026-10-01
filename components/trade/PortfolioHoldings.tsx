@@ -3,8 +3,9 @@ import {cn, formatPrice, formatChangePercent, getChangeColorClass} from "@/lib/u
 import UnpricedNote from "@/components/trade/UnpricedNote";
 import Term from "@/components/primitives/Term";
 
-// Read-only holdings table — used on the friend profile page (and as the visual base
-// the interactive PositionsTable mirrors on the trade page).
+// Read-only holdings table — used on the friend profile page, the strategy detail page and
+// the dashboard's Top Holdings widget (and as the visual base the interactive PositionsTable
+// mirrors on /portfolio).
 //
 // showUnpricedNote exists because the strategy detail page already carries the same
 // sentence on its headline tiles, and the identical amber line twice on one screen is
