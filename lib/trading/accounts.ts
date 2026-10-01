@@ -3,6 +3,7 @@
 // Server-only, NOT a 'use server' module: plain async functions for server components, the
 // server actions, the jobs and the chat tools, keeping Mongoose docs out of that boundary.
 
+import {cache} from "react";
 import {Types} from "mongoose";
 import {connectToDatabase} from "@/database/mongoose";
 import PaperAccount, {type PaperAccountDoc} from "@/database/models/paper-account.model";
@@ -58,6 +59,10 @@ export const getAccountsForUser = async (userId: string): Promise<PaperAccountDo
     });
     return [created];
 };
+
+// One read per server render: getPortfoliosForUser and a page that resolves its account
+// before pricing (/trade) share it. cache() is a pass-through outside React.
+export const getCachedAccountsForUser = cache(getAccountsForUser);
 
 // Read-only sibling of getAccountsForUser: no lazy create, no legacy backfill.
 //

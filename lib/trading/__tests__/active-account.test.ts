@@ -4,6 +4,7 @@
 import {describe, expect, it} from 'vitest';
 import {
     pickActiveAccount,
+    pickActiveAccountId,
     preferredAccountId,
     toApplyAccounts,
     toComparisonRows,
@@ -60,6 +61,17 @@ describe('pickActiveAccount', () => {
     it('is undefined when the user has no accounts', () => {
         expect(pickActiveAccount([])).toBeUndefined();
         expect(pickActiveAccount([], 'a1')).toBeUndefined();
+    });
+});
+
+describe('pickActiveAccountId', () => {
+    // The same rule over bare ids, so /trade can start the ledger read before pricing.
+    it('agrees with pickActiveAccount for every preference', () => {
+        const ids = ['a1', 'a2', 'a3'];
+        for (const preferred of ['a2', 'missing', '', null, undefined]) {
+            expect(pickActiveAccountId(ids, preferred)).toBe(pickActiveAccount([main, growth, value], preferred)?.account.id);
+        }
+        expect(pickActiveAccountId([], 'a1')).toBeUndefined();
     });
 });
 

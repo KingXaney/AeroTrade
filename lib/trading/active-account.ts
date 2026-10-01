@@ -38,11 +38,17 @@ export const preferredAccountId = (
 
 // ?account= or the cookie wins when it names one of the user's accounts;
 // otherwise the first account. Undefined only when the user has none.
+export const pickActiveAccountId = (ids: readonly string[], preferredId?: string | null): string | undefined =>
+    (preferredId && ids.includes(preferredId) ? preferredId : undefined) ?? ids[0];
+
+// The same rule over the priced accounts.
 export const pickActiveAccount = (
     portfolios: readonly AccountWithPortfolio[],
     preferredId?: string | null,
-): AccountWithPortfolio | undefined =>
-    (preferredId ? portfolios.find((x) => x.account.id === preferredId) : undefined) ?? portfolios[0];
+): AccountWithPortfolio | undefined => {
+    const id = pickActiveAccountId(portfolios.map((x) => x.account.id), preferredId);
+    return portfolios.find((x) => x.account.id === id);
+};
 
 export const toApplyAccounts = (portfolios: readonly AccountWithPortfolio[]): ApplyAccount[] =>
     portfolios.map((x) => ({id: x.account.id, name: x.account.name}));

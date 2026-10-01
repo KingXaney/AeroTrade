@@ -7,7 +7,7 @@ import {connectToDatabase} from "@/database/mongoose";
 import AccountSnapshot from "@/database/models/account-snapshot.model";
 import {getQuote} from "@/lib/prices/finnhub";
 import {enrichPosition, type PriceInfo} from "@/lib/trading/analytics";
-import {getAccountsForUser, getOwnedAccount, toAccountSummary, toPlainPositions} from "@/lib/trading/accounts";
+import {getAccountsForUser, getCachedAccountsForUser, getOwnedAccount, toAccountSummary, toPlainPositions} from "@/lib/trading/accounts";
 
 // Minimal plain shape used to compute a portfolio (works for Mongoose docs after
 // mapping, lean docs, or a synthesized default account).
@@ -72,7 +72,7 @@ export const getPortfolio = async (userId: string, accountId?: string): Promise<
 // cache() dedupes within one server render (layout + dashboard widgets); it is a
 // pass-through outside React, so Inngest callers are unaffected.
 export const getPortfoliosForUser = cache(async (userId: string): Promise<AccountWithPortfolio[]> => {
-    const accounts = await getAccountsForUser(userId);
+    const accounts = await getCachedAccountsForUser(userId);
     const allSymbols = accounts.flatMap((a) => a.positions.map((p) => p.symbol));
     const priceMap = await buildPriceMap(allSymbols);
     return accounts.map((a) => ({

@@ -2,7 +2,8 @@ import {cookies} from "next/headers";
 import Link from "next/link";
 import {requireUserId} from "@/lib/auth/session";
 import {getPortfoliosForUser} from "@/lib/trading/valuation";
-import {pickActiveAccount, preferredAccountId, toApplyAccounts} from "@/lib/trading/active-account";
+import {getCachedAccountsForUser} from "@/lib/trading/accounts";
+import {pickActiveAccount, pickActiveAccountId, preferredAccountId, toApplyAccounts} from "@/lib/trading/active-account";
 import {getTradeLedger} from "@/lib/trading/ledger";
 import {getCashApy} from "@/lib/income/page-store";
 import {replayReceipts} from "@/lib/trading/receipts";
@@ -26,23 +27,27 @@ const TradePage = async ({searchParams}: TradePageProps) => {
     // Bare ticker (drop exchange prefix) seeds the order panel.
     const orderSymbol = chartSymbol.includes(':') ? chartSymbol.split(':').pop()! : chartSymbol;
 
-    // Every account, priced: the same cache()d read the (root) layout's sidebar already made.
-    const all = await getPortfoliosForUser(userId);
-    const active = pickActiveAccount(all, preferredAccountId(accountParam, await cookies()));
-    // getPortfoliosForUser creates the first account, so there always is one.
-    if (!active) throw new Error('No strategy account');
-    const activeId = active.account.id;
-    const portfolio = active.summary;
+    // The active account is resolved from the unpriced accounts, so the ledger read runs beside
+    // the pricing instead of after it. Both reads are the render's cache()d ones the (root)
+    // layout's sidebar already made; getAccountsForUser creates the first account, so there
+    // always is one.
+    const accounts = await getCachedAccountsForUser(userId);
+    const activeId = pickActiveAccountId(accounts.map((a) => String(a._id)), preferredAccountId(accountParam, await cookies()));
+    if (!activeId) throw new Error('No strategy account');
 
     // A failed ledger read hides what is drawn from it (the last fill, the lot notes) instead of
     // reading as an account with no fills.
-    const [ledger, apy] = await Promise.all([
+    const [all, ledger, apy] = await Promise.all([
+        getPortfoliosForUser(userId),
         getTradeLedger(userId, activeId).catch((error) => {
             console.error('Trade desk: reading the trade ledger failed:', error);
             return null;
         }),
         getCashApy(),
     ]);
+    const active = pickActiveAccount(all, activeId);
+    if (!active) throw new Error('No strategy account');
+    const portfolio = active.summary;
     const lastTrade = ledger?.at(-1) ?? null;
     const lastReceipt = ledger && lastTrade ? replayReceipts(ledger)[lastTrade.id] : undefined;
     const status = marketStatus();
