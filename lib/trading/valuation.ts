@@ -7,7 +7,7 @@ import {connectToDatabase} from "@/database/mongoose";
 import AccountSnapshot from "@/database/models/account-snapshot.model";
 import {getQuote} from "@/lib/prices/finnhub";
 import {enrichPosition, type PriceInfo} from "@/lib/trading/analytics";
-import {getAccountsForUser, getOwnedAccount, resolveActiveAccount, toAccountSummary, toPlainPositions} from "@/lib/trading/accounts";
+import {getAccountsForUser, getOwnedAccount, toAccountSummary, toPlainPositions} from "@/lib/trading/accounts";
 
 // Minimal plain shape used to compute a portfolio (works for Mongoose docs after
 // mapping, lean docs, or a synthesized default account).
@@ -58,11 +58,11 @@ export const computePortfolio = (
     };
 };
 
-// Full portfolio for one account (prices fetched fresh). Without an accountId this
-// falls back to the user's first/active account.
+// Full portfolio for one account (prices fetched fresh). Without an owned accountId this
+// falls back to the user's first account.
 export const getPortfolio = async (userId: string, accountId?: string): Promise<PortfolioSummary> => {
     const account = (accountId ? await getOwnedAccount(userId, accountId) : null)
-        ?? await resolveActiveAccount(userId);
+        ?? (await getAccountsForUser(userId))[0];
     const positions = toPlainPositions(account);
     const priceMap = await buildPriceMap(positions.map((p) => p.symbol));
     return computePortfolio({cash: account.cash, startingBalance: account.startingBalance, positions}, priceMap);

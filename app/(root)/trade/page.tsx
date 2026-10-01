@@ -1,9 +1,8 @@
 import {cookies} from "next/headers";
 import Link from "next/link";
-import {ACTIVE_ACCOUNT_COOKIE} from "@/lib/trading/config";
 import {requireUserId} from "@/lib/auth/session";
-import {getAccountsForUser, toAccountSummary} from "@/lib/trading/accounts";
-import {getPortfolio} from "@/lib/trading/valuation";
+import {getPortfoliosForUser} from "@/lib/trading/valuation";
+import {pickActiveAccount, preferredAccountId, toApplyAccounts} from "@/lib/trading/active-account";
 import {getTradeLedger} from "@/lib/trading/ledger";
 import {getCashApy} from "@/lib/income/page-store";
 import {replayReceipts} from "@/lib/trading/receipts";
@@ -27,17 +26,17 @@ const TradePage = async ({searchParams}: TradePageProps) => {
     // Bare ticker (drop exchange prefix) seeds the order panel.
     const orderSymbol = chartSymbol.includes(':') ? chartSymbol.split(':').pop()! : chartSymbol;
 
-    // Active strategy account: ?account= wins, then the cookie, then the first account.
-    const cookieStore = await cookies();
-    const preferredId = accountParam ?? cookieStore.get(ACTIVE_ACCOUNT_COOKIE)?.value;
-    const accounts = await getAccountsForUser(userId);
-    const active = (preferredId && accounts.find((a) => String(a._id) === preferredId)) || accounts[0];
-    const activeId = String(active._id);
+    // Every account, priced: the same cache()d read the (root) layout's sidebar already made.
+    const all = await getPortfoliosForUser(userId);
+    const active = pickActiveAccount(all, preferredAccountId(accountParam, await cookies()));
+    // getPortfoliosForUser creates the first account, so there always is one.
+    if (!active) throw new Error('No strategy account');
+    const activeId = active.account.id;
+    const portfolio = active.summary;
 
     // A failed ledger read hides what is drawn from it (the last fill, the lot notes) instead of
     // reading as an account with no fills.
-    const [portfolio, ledger, apy] = await Promise.all([
-        getPortfolio(userId, activeId),
+    const [ledger, apy] = await Promise.all([
         getTradeLedger(userId, activeId).catch((error) => {
             console.error('Trade desk: reading the trade ledger failed:', error);
             return null;
@@ -47,10 +46,8 @@ const TradePage = async ({searchParams}: TradePageProps) => {
     const lastTrade = ledger?.at(-1) ?? null;
     const lastReceipt = ledger && lastTrade ? replayReceipts(ledger)[lastTrade.id] : undefined;
     const status = marketStatus();
-    const switcherAccounts = accounts.map((a) => {
-        const s = toAccountSummary(a);
-        return {id: s.id, name: s.name};
-    });
+    // Names only: the trade desk's switcher has never shown each account's return.
+    const switcherAccounts = toApplyAccounts(all);
 
     return (
         <div className="space-y-4">

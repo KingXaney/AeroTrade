@@ -77,17 +77,6 @@ export const getOwnedAccount = async (userId: string, accountId: string): Promis
     return PaperAccount.findOne({_id: accountId, userId});
 };
 
-// The account the UI operates on: the preferred one (cookie / ?account= param) when
-// owned, else the user's first account.
-export const resolveActiveAccount = async (userId: string, preferredId?: string | null): Promise<PaperAccountDoc> => {
-    const accounts = await getAccountsForUser(userId);
-    if (preferredId) {
-        const match = accounts.find((a) => String(a._id) === preferredId);
-        if (match) return match;
-    }
-    return accounts[0];
-};
-
 // Distinct symbols held across ALL of a user's accounts (news digest personalization).
 export const getHeldSymbolsByUserId = async (userId: string): Promise<string[]> => {
     try {

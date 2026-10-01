@@ -1,13 +1,12 @@
 import {cookies} from "next/headers";
 import type {ReactNode} from "react";
-import {ACTIVE_ACCOUNT_COOKIE} from "@/lib/trading/config";
 import {requireUserId} from "@/lib/auth/session";
 import {getDashboardLayoutForUser} from "@/lib/dashboard/layout-store";
 import {getPortfoliosForUser} from "@/lib/trading/valuation";
 import {WIDGET_IDS, WIDGETS, isWidgetAvailable, resolveDataKeys, type WidgetId} from "@/lib/dashboard/catalog";
 import {filterAvailable, layoutFingerprint} from "@/lib/dashboard/layout";
 import {loadDashboardData, type LoaderCtx} from "@/lib/dashboard/loaders";
-import {pickActiveAccount, toSwitcherAccounts} from "@/lib/dashboard/select";
+import {pickActiveAccount, preferredAccountId, toSwitcherAccounts} from "@/lib/trading/active-account";
 import {getOnboardingFacts} from "@/lib/learn/facts-store";
 import {onboardingActive} from "@/lib/learn/missions";
 import {renderWidgetBody} from "@/components/dashboard/widgets/registry";
@@ -25,8 +24,7 @@ const Home = async ({searchParams}: HomeProps) => {
     const userId = await requireUserId();
 
     const {customize, account} = await searchParams;
-    const cookieStore = await cookies();
-    const ctx: LoaderCtx = {userId, preferredAccountId: account ?? cookieStore.get(ACTIVE_ACCOUNT_COOKIE)?.value};
+    const ctx: LoaderCtx = {userId, preferredAccountId: preferredAccountId(account, await cookies())};
 
     // Portfolios are cache()-deduped with the (root) layout, so this costs nothing extra.
     const [stored, portfolios, facts] = await Promise.all([getDashboardLayoutForUser(userId), getPortfoliosForUser(userId), getOnboardingFacts(userId)]);

@@ -7,6 +7,7 @@ import {cn} from "@/lib/utils";
 import {formatChangePercent, getChangeColorClass} from "@/lib/format";
 import {setActiveAccount} from "@/lib/actions/accounts.actions";
 import {unpricedLabel} from "@/lib/trading/analytics";
+import type {SwitcherAccount} from "@/lib/trading/active-account";
 import CreateAccountDialog from "@/components/trade/CreateAccountDialog";
 import {
     DropdownMenu,
@@ -15,14 +16,6 @@ import {
     DropdownMenuSeparator,
     DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
-
-export type SwitcherAccount = {
-    id: string;
-    name: string;
-    totalReturnPct?: number;
-    unpriced?: number;        // holdings with no live quote — the return is partly at cost
-    holdings?: number;
-};
 
 // Dropdown to switch between strategy accounts. Lives in the /trade and
 // /portfolio headers; the active account is stored in an HTTP-only cookie.
