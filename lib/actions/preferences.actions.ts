@@ -39,12 +39,6 @@ export const getNotificationPreferences = async (): Promise<NotificationPreferen
     }
 };
 
-export const getEmailNotificationPreference = async (): Promise<boolean> =>
-    (await getNotificationPreferences()).emailNotifications;
-
-export const getDigestMode = async (): Promise<'personalized' | 'general'> =>
-    (await getNotificationPreferences()).digestMode;
-
 export const toggleEmailNotifications = async (enabled: boolean): Promise<{ success: boolean; enabled: boolean }> => {
     try {
         const userId = await getCurrentUserId();

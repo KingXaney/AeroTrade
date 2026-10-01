@@ -4,7 +4,7 @@ import {auth} from "@/lib/auth/server";
 import {inngest} from "@/lib/jobs/client";
 import {cookies, headers} from "next/headers";
 import {THEME_COOKIE} from "@/lib/theme/resolve";
-import {syncThemeCookieForUser} from "@/lib/actions/appearance.actions";
+import {syncThemeCookieForUser} from "@/lib/theme/store";
 import {takeRateLimit} from "@/lib/rate-limit";
 import {
     PASSWORD_RESET_LIMIT,

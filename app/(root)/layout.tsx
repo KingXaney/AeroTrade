@@ -8,7 +8,7 @@ import {aggregatePortfolios, getPortfoliosForUser} from "@/lib/trading/account";
 import {countUnpriced} from "@/lib/trading/analytics";
 import ChatWidget from "@/components/chat/ChatWidget";
 import ThemeSync from "@/components/theme/ThemeSync";
-import {getAppearanceForUser} from "@/lib/actions/appearance.actions";
+import {getAppearanceForUser} from "@/lib/theme/store";
 import {countIncomingRequests} from "@/lib/friends/store";
 import type {NavBadges} from "@/lib/shell/navigation";
 
