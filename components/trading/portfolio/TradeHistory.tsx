@@ -6,6 +6,7 @@ import {REPLAY_COPY} from "@/lib/learn/copy/replay";
 import {boughtForLine, receiptLine} from "@/lib/learn/copy/receipts";
 import type {FillReceipt} from "@/lib/trading/receipts";
 import type {PaperTradeRecord, TradeSource} from '@/lib/trading/types';
+import Disclosure from "@/components/primitives/Disclosure";
 
 // Only automated fills get a chip: 'user' is the default reading of a trade log, and
 // rows from before the field existed carry no source at all — that absence is honest
@@ -85,12 +86,9 @@ const TradeHistory = ({trades, totalCount, exportHref, detail, receipts, buyNote
                                     <p data-testid="fill-receipt" className="mt-0.5 font-mono text-[11px] text-fg-muted leading-snug">{receiptLine(receipt)}</p>
                                 )}
                                 {detailNode && (
-                                    <details data-replay className="mt-1">
-                                        <summary className="font-mono cursor-pointer list-none marker:content-none [&::-webkit-details-marker]:hidden text-[11px] text-brand hover:underline">
-                                            {REPLAY_COPY.summary}
-                                        </summary>
+                                    <Disclosure data-replay className="mt-1" chevron={false} summary={REPLAY_COPY.summary}>
                                         {detailNode}
-                                    </details>
+                                    </Disclosure>
                                 )}
                             </div>
                         </div>

@@ -3,6 +3,7 @@
 import {useState} from "react";
 import {useRouter} from "next/navigation";
 import SafeMarkdown from "@/components/primitives/SafeMarkdown";
+import Disclosure from "@/components/primitives/Disclosure";
 import {toast} from "sonner";
 import {cn} from "@/lib/utils";
 import {formatPrice, getChangeColorClass} from "@/lib/format";
@@ -92,13 +93,9 @@ const ItemRow = ({item, showApply, accounts}: {item: GlossedItem; showApply: boo
             )}
             {/* One disclosure per decision: each reason's clauses read in plain words. */}
             {item.gloss && item.gloss.length > 0 && (
-                <details className="group mt-2" data-navigator-gloss>
-                    <summary className="font-mono cursor-pointer list-none marker:content-none [&::-webkit-details-marker]:hidden text-[11px] text-brand hover:underline inline-flex items-center gap-1">
-                        <span className="material-symbols-outlined text-sm transition-transform group-open:rotate-90" aria-hidden="true">chevron_right</span>
-                        {NAVIGATOR_COPY.glossSummary}
-                    </summary>
+                <Disclosure className="mt-2" data-navigator-gloss summary={NAVIGATOR_COPY.glossSummary}>
                     <ReasonGloss clauses={item.gloss} className="mt-2" />
-                </details>
+                </Disclosure>
             )}
         </div>
     );

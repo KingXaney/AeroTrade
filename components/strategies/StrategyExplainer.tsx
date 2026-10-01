@@ -2,7 +2,7 @@ import type {StrategyDefinition} from "@/lib/strategies/types";
 import {describeNextRebalance} from "@/lib/strategies/calendar";
 import {UNIVERSES} from "@/lib/strategies/universe";
 import Panel from "@/components/primitives/Panel";
-import SectionHeading from "@/components/primitives/SectionHeading";
+import Disclosure from "@/components/primitives/Disclosure";
 import {formatParamValue, paramLabel} from "@/lib/learn/copy/whatif";
 
 // The teaching panel: the rule in plain words, why anyone believes in it, when it
@@ -41,14 +41,7 @@ const StrategyExplainer = ({def, lastRebalanceDate, defaultOpen = false}: Props)
 
     return (
         <Panel as="div" id="strategy-explainer">
-            <details className="group" open={defaultOpen}>
-                <summary className="cursor-pointer list-none marker:content-none [&::-webkit-details-marker]:hidden">
-                    <SectionHeading as="h2" spacing="none" className="inline-flex items-center gap-2">
-                        <span className="material-symbols-outlined text-base transition-transform group-open:rotate-90" aria-hidden="true">chevron_right</span>
-                        How it works — the rule, its parameters and when it fails
-                    </SectionHeading>
-                </summary>
-
+            <Disclosure variant="panel" open={defaultOpen} summary="How it works — the rule, its parameters and when it fails">
                 <div className="mt-4 space-y-5">
                     <div className="grid grid-cols-1 lg:grid-cols-[1.4fr_1fr] gap-5">
                         <List title="The rule" items={explainer.how} />
@@ -85,7 +78,7 @@ const StrategyExplainer = ({def, lastRebalanceDate, defaultOpen = false}: Props)
 
                     <List title="Read the numbers with this in mind" items={explainer.caveats} />
                 </div>
-            </details>
+            </Disclosure>
         </Panel>
     );
 };
