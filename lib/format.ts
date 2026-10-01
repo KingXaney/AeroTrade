@@ -87,7 +87,7 @@ export const formatTimeAgoMs = (epochMs: number) => {
 
 export const formatTimeAgoSeconds = (unixSeconds: number) => formatTimeAgoMs(unixSeconds * 1000);
 
-// Formatted string like "$3.10T", "$900.00B", "$25.00M" or "$999,999.99"
+// Formatted string like "$3.10T", "$900.00B", "$25.00M" or "$999999.99" (no thousands separator below a million)
 export function formatMarketCapValue(marketCapUsd: number): string {
     if (!Number.isFinite(marketCapUsd) || marketCapUsd <= 0) return 'N/A';
 

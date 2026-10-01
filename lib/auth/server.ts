@@ -39,11 +39,11 @@ function createAuthInstance(db: Parameters<typeof mongodbAdapter>[0]) {
             // so anyone who visits regularly effectively never gets logged out.
             updateAge: 60 * 60 * 24,
         },
-        // NOTE: this only runs inside better-auth's HTTP router, which this app bypasses
-        // (every call goes through auth.api.* from a server action) — so it limits
-        // nothing here. The server actions limit themselves through lib/rate-limit.ts
-        // with the limits in lib/auth/limits.ts: password reset per address, sign-in per
-        // address and per client address. Sign-up is not limited yet.
+        // NOTE: inert. This only runs inside better-auth's HTTP router, which this app
+        // bypasses (every call goes through auth.api.* from a server action), so it limits
+        // nothing. The server actions limit themselves through lib/rate-limit.ts with the
+        // limits in lib/auth/limits.ts: password reset per address, sign-in per address and
+        // per client address, sign-up per client address.
         rateLimit: {
             enabled: true,
             storage: 'database',

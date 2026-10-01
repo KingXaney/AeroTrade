@@ -12,7 +12,7 @@ export interface PaperTradeDoc extends Document {
     total: number;
     realizedPnl?: number;
     source?: TradeSource;  // no schema default on purpose — Mongoose applies defaults on hydration, which would repaint every pre-existing row as 'user'
-    reason?: string;       // an automated fill's own explanation (quant strategies); absent on user trades
+    reason?: string;       // an automated fill's own explanation (quant strategies), or the learner's own note on a user trade
     idempotencyKey?: string; // one fill per key per account — a job step replay finds the earlier fill
     createdAt: Date;
 }

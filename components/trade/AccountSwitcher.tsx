@@ -17,8 +17,8 @@ import {
     DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 
-// Dropdown to switch between strategy accounts. Lives in the /trade and
-// /portfolio headers; the active account is stored in an HTTP-only cookie.
+// Dropdown to switch between strategy accounts. Lives in the /trade and /portfolio headers
+// and on the dashboard; the active account is stored in an HTTP-only cookie.
 const AccountSwitcher = ({accounts, activeId}: {accounts: SwitcherAccount[]; activeId: string}) => {
     const router = useRouter();
     const pathname = usePathname();

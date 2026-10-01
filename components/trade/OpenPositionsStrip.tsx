@@ -8,7 +8,8 @@ import type {Lot} from "@/lib/trading/lots";
 import UnpricedNote from "@/components/trade/UnpricedNote";
 import TradeLink from "@/components/trade/TradeLink";
 
-// Compact, horizontally-scrolling open-positions strip for the Trade page.
+// Compact, horizontally-scrolling open-positions strip for the Trade page and the
+// dashboard's positions widget.
 // Each chip shows symbol · qty · P&L%; Sell opens the shared partial-sell
 // dialog. The full positions table + trade history live on /portfolio.
 // lotNotes: the learner's notes on the shares still held, by symbol (pages only).

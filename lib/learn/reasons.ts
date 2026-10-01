@@ -621,7 +621,7 @@ export const NAVIGATOR_GRAMMAR: readonly ReasonTemplate[] = [
         ],
     },
     {
-        // service.ts buildHoldItems (allocator.ts HOLDING_REASON).
+        // lib/navigator/store buildHoldItems (allocator.ts HOLDING_REASON).
         id: 'nav-holding',
         pattern: anchored('holding — no exit trigger'),
         decode: (m) => [{text: m[0], gloss: NAVIGATOR_GLOSS.holding()}],

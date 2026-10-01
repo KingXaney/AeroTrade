@@ -40,7 +40,7 @@ function UserDropdown({user}: {user: User}) {
                             {initial}
                         </AvatarFallback>
                     </Avatar>
-                    {/* Seven nav items plus Search leave no room for a name below xl; the avatar
+                    {/* The header's nav items (HEADER_NAV_ITEMS) plus Search leave no room for a name below xl; the avatar
                         and chevron still mark the menu. */}
                     <div className="hidden xl:flex flex-col items-start leading-tight whitespace-nowrap">
                         <span className="text-sm font-medium text-fg"

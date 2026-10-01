@@ -4,7 +4,7 @@
 // quote it verbatim and gloss it in narration that passes the 'advice' tier and says nothing
 // about the Navigator working, failing or beating anything. The grammar may not carry a
 // template nothing emits. One string is fed as a literal: the kept-position fallback
-// (allocator.ts HOLDING_REASON, written by service.ts, which reads the database).
+// (allocator.ts HOLDING_REASON, written by lib/navigator/store, which reads the database).
 
 import {afterEach, describe, expect, it, vi} from 'vitest';
 import {findBanned} from '@/lib/learn/banned';
@@ -48,7 +48,7 @@ const UNIVERSE: ScoringInput[] = [
         hasActiveThesis: true, thesisLabel: 'sector:technology'}),
     input('DDD', {newsWeightSlow: 0, signals: {r63: null, r126: null, r252: null, vol63: null, ma200dist: null},
         hasActiveThesis: true, thesisLabel: 'theme:ai-capex', articleCount: 1, sourceCount: 1, barsCount: 40}),
-    // No brain entity, as service.ts passes SPY and SMH: news neutral, outside the news rank.
+    // No brain entity, as lib/navigator/store passes SPY and SMH: news neutral, outside the news rank.
     input('SPY', {newsWeightSlow: null, alwaysEligible: true}),
 ];
 

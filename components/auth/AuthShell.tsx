@@ -1,7 +1,7 @@
 import Link from "next/link";
 
 // The two-column chrome around every auth form. Shared by the (auth) group, which
-// bounces signed-in users to /topics, and the (reset) group, which must not: a
+// bounces signed-in users to /, and the (reset) group, which must not: a
 // signed-in user has to be able to finish resetting their own password.
 const AuthShell = ({children}: {children: React.ReactNode}) => (
     <main className="auth-layout">
