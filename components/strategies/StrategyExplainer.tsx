@@ -4,6 +4,7 @@ import {UNIVERSES} from "@/lib/strategies/universe";
 import Panel from "@/components/primitives/Panel";
 import Disclosure from "@/components/primitives/Disclosure";
 import {formatParamValue, paramLabel} from "@/lib/learn/copy/whatif";
+import {CADENCE_COPY} from "@/lib/learn/copy/cadence";
 
 // The teaching panel: the rule in plain words, why anyone believes in it, when it
 // breaks, and every simplification the numbers on this page carry. All of it is
@@ -57,7 +58,7 @@ const StrategyExplainer = ({def, lastRebalanceDate, defaultOpen = false}: Props)
                                 <dt className="text-fg-muted">Universe</dt>
                                 <dd className="text-fg text-right">{universeSize} symbol{universeSize === 1 ? '' : 's'}</dd>
                                 <dt className="text-fg-muted">Checks</dt>
-                                <dd className="text-fg text-right">{def.cadence === 'once' ? 'once' : def.cadence}</dd>
+                                <dd className="text-fg text-right">{CADENCE_COPY.short[def.cadence]}</dd>
                                 <dt className="text-fg-muted">Next rebalance</dt>
                                 <dd className="text-fg text-right">{describeNextRebalance(def.cadence, lastRebalanceDate)}</dd>
                                 <dt className="text-fg-muted">Cash floor</dt>

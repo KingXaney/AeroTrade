@@ -11,6 +11,7 @@ import {
 } from "@/lib/strategies/views";
 import MicroLabel from "@/components/primitives/MicroLabel";
 import {shortHelp, type GlossaryKey} from "@/lib/learn/glossary";
+import {CADENCE_COPY} from "@/lib/learn/copy/cadence";
 import FollowStar from "@/components/strategies/FollowStar";
 import Sparkline from "@/components/strategies/Sparkline";
 
@@ -27,13 +28,6 @@ import Sparkline from "@/components/strategies/Sparkline";
 
 const rankStyle = (rank: number): CSSProperties | undefined =>
     rank >= 1 && rank <= 3 ? {color: `var(--rank-${rank})`} : undefined;
-
-const CADENCE_LABEL: Record<StrategyLeaderboardRow['cadence'], string> = {
-    once: 'buy once',
-    daily: 'daily',
-    monthly: 'monthly',
-    quarterly: 'quarterly',
-};
 
 // One source for the header and the cells, so the two cannot drift apart. (They had:
 // the header set its type in an inline style object while the rows used Tailwind.)
@@ -100,7 +94,7 @@ const StrategyLeaderboard = ({rows, canFollow}: {rows: StrategyLeaderboardRow[];
                                         {canFollow && <FollowStar slug={row.id} name={row.name} followed={row.followed} className="relative z-10" />}
                                     </div>
                                     <MicroLabel as="div">
-                                        {row.family} · {CADENCE_LABEL[row.cadence]}
+                                        {row.family} · {CADENCE_COPY.short[row.cadence]}
                                         {live && <span className="normal-case tracking-normal"> · {live.holdings} holding{live.holdings === 1 ? '' : 's'}</span>}
                                         {!started && <span className="text-warning normal-case tracking-normal"> · not started</span>}
                                     </MicroLabel>
