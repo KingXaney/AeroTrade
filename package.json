@@ -2,7 +2,7 @@
   "name": "aerotrade",
   "version": "0.1.0",
   "private": true,
-  "description": "Paper-trading terminal with an AI news brain: follow topics, test strategies, and let scheduled AI jobs read the news for you.",
+  "description": "Paper-trading terminal with an AI news brain: follow topics, paper-trade beside eight quant strategies, and let scheduled AI jobs read the news for you.",
   "license": "MIT",
   "repository": "github:KingXaney/AeroTrade",
   "engines": {
