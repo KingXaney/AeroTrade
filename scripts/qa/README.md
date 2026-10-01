@@ -37,10 +37,10 @@ node screenshots.mjs                       # or: capture the README screenshots
 `SIGN_UP_CLIENT_LIMIT` lifts the per-client sign-up limit (10 an hour) for the run: every suite
 signs up its own user, all from localhost.
 
-The other scripts follow the same shape, one per change set: `qa-foundations.mjs` (its in-app
+The other scripts follow the same shape, one per change set: `qa-styles.mjs` (its in-app
 404 waits for the rendered page, and a symbol no strategy watches still 404s keyless with no
 stock panels),
-`qa-navigation.mjs`, `qa-ai-surfaces.mjs`, `qa-truthful-data.mjs`, `qa-trade-desk.mjs` (the ticket,
+`qa-shell.mjs`, `qa-chat.mjs`, `qa-topics-refresh.mjs`, `qa-trading.mjs` (the ticket,
 the CSV export, the account wording — "Main account", Account Comparison, the library's Accounts and
 Quant Strategies groups, a layout saved with the old `strategy-comparison` id read as the account
 comparison — the comparison table and `/history`'s trade feed — none counts a row from before
@@ -80,7 +80,7 @@ median and each marker's place on the axis are checked against numbers computed 
 the marker withheld with an unpriced holding, placed from a snapshot on the last session, and
 ended on a stale snapshot's date — and Trading habits over four closed lots with a strategy round
 trip and a sale before its 30-day window left out; it removes the large-cap bars it seeded and
-puts back the ^IRX points and any other suite's large-cap dividends it set aside), `qa-tutor.mjs` (the
+puts back the ^IRX points and any other suite's large-cap dividends it set aside), `qa-chat-tutor.mjs` (the
 chat's three rate-limit windows via seeded `ratelimits` rows, the prefill, then the `explainTerm`
 and `getQuantStrategies` chips from stubbed UI-message streams — the tutor's answers themselves need
 a Gemini key and are checked by hand)
@@ -96,12 +96,12 @@ palette, topic editing and deletion, and the chat suggestions. It exits non-zero
 if any check fails and prints one `PASS`/`FAIL` line per check.
 
 Without a Finnhub key the trade and markets pages show empty quotes, which is
-fine for these checks — `qa-truthful-data.mjs` relies on it to assert that unpriced
+fine for these checks — `qa-topics-refresh.mjs` relies on it to assert that unpriced
 holdings are labelled rather than shown as a flat P&L. The Inngest jobs are not part
 of this recipe; fire them with `npx inngest-cli dev` and `npm run trigger -- <job>`. The daily
 digest has no suite: it sends only after a news pull, a model's summary and SMTP, so its topics
 and lesson sections are pure builders covered by unit tests instead.
-`qa-truthful-data.mjs` detects a dev server on :8288 and, when one is running,
+`qa-topics-refresh.mjs` detects a dev server on :8288 and, when one is running,
 exercises the queued path (the first-run fill lands every starter, "Refresh now"
 runs the on-demand job) instead of the dead-queue path (honest failure, cooldown
 rolled back). Run it both ways before shipping a topics change.

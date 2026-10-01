@@ -1,5 +1,6 @@
-// The learn surfaces, keyless: the First-week checklist reads its own progress and
-// leaves; /learn and the ⌘K palette reach the glossary; a strategy page carries the
+// The learn surfaces (lib/learn; /learn, the strategy pages, the dashboard's learn widgets,
+// /brain), keyless: the First-week checklist reads its own progress and leaves; /learn and the
+// ⌘K palette reach the glossary; a strategy page carries the
 // beginner line, column definitions led by "Read this board" (its top row in plain words,
 // hidden while the quiz is open), Guess the Verdict and "What the rule saw"; an
 // "Ask in chat" link prefills the assistant without sending; a rule's reason is decoded
@@ -19,7 +20,7 @@
 // an earnings article carries the one badge and the evidence one "What these labels mean"; a
 // thesis gets "since thesis" only once its bars and SPY's are stored; each Navigator decision
 // opens to its reasons in plain words; the same panels as widgets carry titles only.
-// Run against the harness in README.md (in-memory Mongo on :27117 + `npm run dev`).
+// Run: npm run qa -- learn   (the harness: README.md)
 import {chromium} from 'playwright';
 import {MongoClient, ObjectId} from 'mongodb';
 import {BASE, MONGO, check, outDir, signUp, summary} from './lib.mjs';

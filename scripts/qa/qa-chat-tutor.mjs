@@ -1,13 +1,13 @@
-// The chat tutor's guard rails, keyless: the three rate-limit windows refuse in order
-// with honest copy and no retry, an "Ask in chat" link prefills the composer without
-// sending, and the explainTerm and getQuantStrategies chips render from stubbed streams.
-// The tutor's actual answers need a Gemini key and are checked by hand. Run against the
-// harness in README.md.
+// The chat as tutor, keyless (lib/chat, the chat's rate limits): the three rate-limit windows
+// refuse in order with honest copy and no retry, an "Ask in chat" link prefills the composer
+// without sending, and the explainTerm and getQuantStrategies chips render from stubbed
+// UI-message streams. The tutor's actual answers need a Gemini key and are checked by hand.
+// Run: npm run qa -- chat-tutor   (the harness: README.md)
 import {chromium} from 'playwright';
 import {MongoClient} from 'mongodb';
 import {BASE, MONGO, check, outDir, signUp, summary} from './lib.mjs';
 
-const OUT = outDir('tutor');
+const OUT = outDir('chat-tutor');
 
 const CHAT_DIALOG = '[role="dialog"][aria-label="AeroTrade assistant"]';
 const LIMITED = /a lot of messages/i;
@@ -234,4 +234,4 @@ try {
     await browser.close();
 }
 
-summary('tutor');
+summary('chat-tutor');

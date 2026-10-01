@@ -99,8 +99,8 @@ day instead of losing the month.
 
 - `npm run check` (lint, typecheck, unit tests incl. indicators, calendar, rebalance, engine,
   catalog, rules, simulate, metrics, views, job helpers, Yahoo parser).
-- `scripts/qa/qa-strategies.mjs` plus the nav pins in `qa-topics`, `qa-navigation`,
-  `qa-news-feed` and `qa-foundations`.
+- `scripts/qa/qa-strategies.mjs` plus the nav pins in `qa-topics`, `qa-shell`,
+  `qa-news-feed` and `qa-styles`.
 - A real run: `.env` with `MONGODB_URI` and `FINNHUB_API_KEY`, `npm run dev`, the Inngest dev
   server, `npm run trigger -- strategies-preview` then `-- strategies` during the session.
 

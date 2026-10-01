@@ -1,6 +1,6 @@
-// The personal news feed: default = Google News top stories, every control persists
+// The personal news feed (lib/news, /news): default = Google News top stories, every control persists
 // through a real save + reload, the four surfaces follow it, and reset returns to absence.
-// Run against the harness in README.md (in-memory Mongo on :27117 + `npm run dev`).
+// Run: npm run qa -- news-feed   (the harness: README.md)
 // Headline counts depend on Google News being reachable, so they are NOTEs, not FAILs;
 // everything about the preference itself is deterministic.
 import {chromium} from 'playwright';

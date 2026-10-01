@@ -1,8 +1,7 @@
-// PR 6 (Honest copy + account recovery): the market-hours badge, the /markets tab in
-// the URL, the trades on /history, and password reset end to end — the emailed link
-// opens logged out (proxy matcher), the token is read out of the throwaway Mongo (no
-// SMTP in the harness), the request answers identically for every address, the
-// rate limiter stops the fourth request, old sessions are revoked, a token is single-use.
+// Accounts and sign-in (lib/auth, app/(auth), app/(reset)): password reset end to end — the
+// emailed link opens logged out (proxy matcher), the token is read out of the throwaway Mongo (no
+// SMTP in the harness), the request answers identically for every address, the rate limiter stops
+// the fourth request, old sessions are revoked, a token is single-use.
 // Sign-in is limited per address (10 in 15 minutes, every spelling of it counted together) and
 // per client address (30): the refusal is one fixed sentence, identical for an address with an
 // account and one without, it holds even for the right password, and another address is not
@@ -12,6 +11,9 @@
 // SIGN_UP_CLIENT_LIMIT the harness sets) gets one fixed sentence and no account; every signup:*
 // row is removed at the end too. Neither the sign-up nor the sign-in action hands the browser the
 // session token its cookie carries, and the tab icon loads logged out.
+// Also, signed in first: the market-status badge on /trade and /watchlist (no "live prices"), the
+// /markets tab kept in the URL, and /history's Trades section.
+// Run: npm run qa -- auth   (the harness: README.md)
 import {chromium} from 'playwright';
 import {MongoClient} from 'mongodb';
 import {BASE, DASHBOARD_URL, MONGO, PASSWORD, check, outDir, summary} from './lib.mjs';

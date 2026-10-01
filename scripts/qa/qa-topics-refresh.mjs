@@ -1,16 +1,16 @@
-// PR 4 (Truthful data): a missing quote is labelled, never faked as a flat P&L; a new
-// user's starter batch lands on articles; /topics fetches at most once per view and
-// stops; the refresh button tells the truth about the queue and the cooldown.
-// Run against the harness in README.md (in-memory Mongo on :27117 + `npm run dev`,
-// no Finnhub key — so every position is unpriced). With no Inngest dev server it
-// exercises the dead-queue path (honest failure, claim rolled back); with one on :8288
-// it exercises the queued path (first-run fill lands every starter, the on-demand job
-// runs, the cooldown is kept).
+// When followed topics fetch (lib/topics, /topics): sign-up seeds the six default topics once and
+// unfollowing them all sticks; /topics fetches at most once per view and stops; Refresh now tells
+// the truth about the queue and the 10-minute cooldown. With no Inngest dev server it exercises the
+// dead-queue path (honest failure, claim rolled back); with one (run.sh starts it) the queued path
+// (the first-run fill lands every default, the on-demand job runs, the cooldown is kept).
+// Also unpriced holdings (no Finnhub key, so every position is unpriced): a missing quote is
+// labelled on /portfolio, /trade, the sidebar and the dashboard, never faked as a flat P&L.
+// Run: npm run qa -- topics-refresh   (the harness: README.md)
 import {chromium} from 'playwright';
 import {MongoClient} from 'mongodb';
 import {BASE, DASHBOARD_URL, INNGEST, MONGO, check, outDir, signUp, summary} from './lib.mjs';
 
-const OUT = outDir('truthful-data');
+const OUT = outDir('topics-refresh');
 
 // The six topics seeded for every new account (lib/topics/starters.ts DEFAULT_TOPIC_NAMES).
 const DEFAULTS = ['Fed rate decisions', 'AI chips', 'Stock market', 'Oil & energy', 'Geopolitics', 'World economy'];
@@ -192,4 +192,4 @@ try {
     await browser.close();
 }
 
-summary('truthful-data');
+summary('topics-refresh');

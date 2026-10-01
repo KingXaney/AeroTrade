@@ -1,4 +1,4 @@
-// The quant-strategies tab: the nav carries it, the leaderboard and detail pages render
+// The quant strategies (lib/strategies; /strategies, /stocks/[symbol]): the nav carries it, the leaderboard and detail pages render
 // honestly with nothing seeded (the job never runs in this harness), then with a seeded
 // system state they rank by the seeded live return, label unpriced holdings, show the
 // explainer / signal board / trade reasons / simulated record, and follow persists. The
@@ -8,7 +8,7 @@
 // TypeScript through jiti, writes a grid only beside the build it was computed for, finds nothing
 // due the next night, and re-queues it after a rebuild. The stock page shows each rule's newest run.
 // A strategy's live fills download as CSV (this epoch only, signed-in users, known slugs only).
-// Run against the harness in README.md (in-memory Mongo on :27117 + `npm run dev`).
+// Run: npm run qa -- strategies   (the harness: README.md)
 import {chromium} from 'playwright';
 import {MongoClient, ObjectId} from 'mongodb';
 // The repo's own TypeScript loader (a dev dependency of the app's toolchain), so the checks below

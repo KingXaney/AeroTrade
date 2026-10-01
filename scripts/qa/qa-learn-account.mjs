@@ -1,4 +1,4 @@
-// Browser QA for learning from your own account (learn Wave 2, slice 2.3). Seeds an account
+// Learning from your own account (lib/learn, components/learn on /portfolio). Seeds an account
 // whose snapshots rise to a peak on day 4 and fall to a low on day 8, plus SPY bars deep
 // enough that the benchmark store never refetches, and checks that the Max Drawdown tile's
 // hint dates that stretch, sets SPY beside it and says what the climb back takes, and that
@@ -14,6 +14,7 @@
 // ended on the last snapshot's date and seeded from it when everything is priced), and Trading
 // habits measures the learner's own lots over its window, a strategy round trip and an older
 // sale left out. A fresh account first shows every empty state.
+// Run: npm run qa -- learn-account   (the harness: README.md)
 
 import {chromium} from 'playwright';
 import {MongoClient} from 'mongodb';

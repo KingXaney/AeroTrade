@@ -1,14 +1,15 @@
-// PR 2 (App shell) checks: the mobile drawer reaches the four routes the sidebar owned,
-// the ⌘K palette is keyboard-drivable, the friend-request badge appears, and the drawer's
-// Logout signs out and lands on /sign-in. A sent request backdated three days in Mongo reads
-// "sent 3 days ago" (its stamp is epoch ms, which the old seconds-only formatter read as the
-// future: every request said "sent just now").
-// Run against the harness in README.md (in-memory Mongo on :27117 + `npm run dev`).
+// The app shell (components/shell, lib/shell): the sidebar lists every route and the hamburger
+// hides at desktop width, the ⌘K palette is keyboard-drivable, the mobile drawer reaches the routes
+// only the sidebar carries and closes after navigating, and the drawer's Logout signs out and lands
+// on /sign-in. Also friends: a sent request backdated three days in Mongo reads "sent 3 days ago"
+// (its stamp is epoch ms, which a seconds-only formatter read as the future), and the recipient's
+// sidebar shows the friend-request badge.
+// Run: npm run qa -- shell   (the harness: README.md)
 import {chromium} from 'playwright';
 import {MongoClient} from 'mongodb';
 import {BASE, MONGO, check, outDir, signUp, summary} from './lib.mjs';
 
-const OUT = outDir('navigation');
+const OUT = outDir('shell');
 
 const browser = await chromium.launch({channel: 'chrome'});
 const page = await browser.newPage({viewport: {width: 1440, height: 900}});
@@ -108,4 +109,4 @@ try {
     await browser.close();
 }
 
-summary('navigation');
+summary('shell');

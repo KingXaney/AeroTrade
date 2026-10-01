@@ -1,16 +1,19 @@
-// PR 5 (Trade desk + brain): trade deep links, tables that label themselves below md,
-// the order ticket's presets and advisory checks, chart-follows-ticker (and the
-// dashboard widget that must NOT navigate), the trade `source` chip + CSV columns (a note that
-// looks like a formula exports as text), the order note's 200-character limit, and
-// brain rows that drill into evidence with valid markup. /history's trade feed, like every other
-// trade read, leaves out a row from before its account's inception, in its list and its count.
-// Run against the harness in README.md (in-memory Mongo on :27117 + `npm run dev`; no
-// Finnhub key, so prices are unknown and the ticket's price-based paths stay open).
+// Paper trading (lib/trading, /trade, /portfolio, /history): a new user's "Main account", trade
+// deep links and the trade `source` chip, the CSV export (a note that looks like a formula exports
+// as text), the order ticket's presets, advisory checks and 200-character note, what the cash left
+// would earn, chart-follows-ticker (and the dashboard quick-trade widget that must not navigate),
+// tables that label themselves below md, the account comparison (a layout saved with the old
+// 'strategy-comparison' id included), and /history's trade feed, which, like every trade read,
+// leaves out a row from before its account's inception. Also the brain's rows, which drill into
+// their evidence with valid markup.
+// No Finnhub key, so prices are unknown and the ticket's price-based paths stay open; the ticket's
+// getQuote is answered with a fixed price for the interest line.
+// Run: npm run qa -- trading   (the harness: README.md)
 import {chromium} from 'playwright';
 import {MongoClient} from 'mongodb';
 import {BASE, MONGO, check, outDir, signUp, summary} from './lib.mjs';
 
-const OUT = outDir('trade-desk');
+const OUT = outDir('trading');
 
 const browser = await chromium.launch({channel: 'chrome'});
 const page = await browser.newPage({viewport: {width: 1440, height: 900}});
@@ -169,7 +172,7 @@ try {
     check('at 390px watchlist cells name themselves', await page.getByText('Market Cap', {exact: true}).filter({visible: true}).count() >= 1);
     await page.setViewportSize({width: 1440, height: 900});
     // AAPL is on the large-cap strategies' boards, so its stock page renders even without a
-    // Finnhub key (a symbol no strategy watches still 404s keyless — qa-foundations).
+    // Finnhub key (a symbol no strategy watches still 404s keyless — qa-styles).
     await page.goto(`${BASE}/stocks/AAPL`, {waitUntil: 'domcontentloaded'});
     await page.locator('a[href="/trade?symbol=AAPL"]').first().waitFor({timeout: 30000});
     // The button is uppercased by CSS, and innerText follows it.
@@ -428,4 +431,4 @@ try {
     await browser.close();
 }
 
-summary('trade-desk');
+summary('trading');

@@ -1,5 +1,10 @@
-// Browser QA for followed topics, the topics-first dashboard and the theme-picker hover fix.
-// Prints one PASS/FAIL line per check and exits non-zero on any failure. Screenshots go to ./output.
+// Followed topics (lib/topics, /topics): six topics preinstalled at sign-up, a topic page's first
+// live fetch, the sidebar card, ⌘K following a topic and opening one, a refresh that brings new
+// articles, editing keywords and deleting from the header menu. Also the surfaces topics lead: the
+// topics-first dashboard and the widget library's Topics group, the settings page's Topics section
+// and email toggle, the chat launcher's topic suggestion, the header nav order, and the theme
+// picker's hover sweep (the committed style never flashes).
+// Run: npm run qa -- topics   (the harness: README.md)
 import {chromium} from 'playwright';
 import {MongoClient} from 'mongodb';
 import {BASE, DASHBOARD_URL, MONGO, check, note, outDir, signUp, summary} from './lib.mjs';

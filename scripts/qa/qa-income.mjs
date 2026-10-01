@@ -1,4 +1,4 @@
-// Browser + job QA for brokerage income: interest on idle cash, dividends on holdings, and
+// Brokerage income (lib/income, the Income panel on /portfolio): interest on idle cash, dividends on holdings, and
 // the retroactive back-credit. Seeds an account with trades across two ex-dates, fresh ^IRX,
 // SPY and AAPL bars (with dividend fields and coverage, so the job's bar step finds nothing
 // to fetch and never overwrites the fixtures), and legacy snapshots — then fires the REAL
@@ -6,8 +6,8 @@
 // The panel's receipts are then held to the rows the job stored: each month's interest to the
 // cent from average cash × the daily factor × days, each dividend from the entitled close.
 //
-// Needs the Inngest dev server on :8288 (`npx inngest-cli@latest dev -u
-// http://localhost:3000/api/inngest`); without it the job checks are skipped and noted.
+// Needs the Inngest dev server (run.sh starts it); without it the job checks are skipped and noted.
+// Run: npm run qa -- income   (the harness: README.md)
 
 import {chromium} from 'playwright';
 import {MongoClient} from 'mongodb';

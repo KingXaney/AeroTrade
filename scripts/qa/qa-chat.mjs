@@ -1,12 +1,14 @@
-// PR 3 (AI surfaces + confirmations): chat error recovery, a conversation that survives
-// closing the panel, safe markdown rendering, the read-only portfolio tool, and the three
-// destructive actions that now confirm.
-// Run against the harness in README.md (in-memory Mongo on :27117 + `npm run dev`).
+// The chat panel (components/chat, app/api/chat): it opens with the composer focused, a failed
+// request shows human copy and a Try again that works, the read-only portfolio tool creates no
+// account, a conversation outlives closing the panel and a cleared one stays cleared, and model
+// markdown renders as a list with links neutralised and images dropped. Also the destructive
+// actions that confirm first: Reset Account on /portfolio and Reset to default on /settings.
+// Run: npm run qa -- chat   (the harness: README.md)
 import {chromium} from 'playwright';
 import {MongoClient} from 'mongodb';
 import {BASE, MONGO, check, outDir, signUp, summary} from './lib.mjs';
 
-const OUT = outDir('ai-surfaces');
+const OUT = outDir('chat');
 
 const browser = await chromium.launch({channel: 'chrome'});
 const page = await browser.newPage({viewport: {width: 1440, height: 900}});
@@ -140,4 +142,4 @@ try {
     await browser.close();
 }
 
-summary('AI-surface');
+summary('chat');

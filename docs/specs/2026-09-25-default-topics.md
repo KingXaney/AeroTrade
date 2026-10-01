@@ -148,7 +148,7 @@ refresh for the whole install, not one per account.
   swamp the feed.
 - `scripts/qa/qa-topics.mjs` — sign-up lands on the dashboard, six topics preinstalled,
   no picker, the notice appears and extinguishes, seeding is idempotent across reloads.
-- `scripts/qa/qa-truthful-data.mjs` — one first-run event fills every default, and
+- `scripts/qa/qa-topics-refresh.mjs` — one first-run event fills every default, and
   **deleting them all is not undone on the next view**.
 - `scripts/qa/qa-news-feed.mjs` — a followed topic reaches `/news` and `/history`, is
   printed once, does not swamp the feed, and respects a hidden outlet.
