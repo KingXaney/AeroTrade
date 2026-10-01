@@ -3,9 +3,8 @@
 // driven into every order it can place. Each string must decode completely into clauses that
 // quote it verbatim and gloss it in narration that passes the 'advice' tier and says nothing
 // about the Navigator working, failing or beating anything. The grammar may not carry a
-// template nothing emits. Two strings are fed as literals: the kept-position fallback
-// (allocator.ts HOLDING_REASON, written by service.ts, which reads the database) and the
-// neutral-news reason of the unmerged fix/navigator-neutral-news branch (PR #26).
+// template nothing emits. One string is fed as a literal: the kept-position fallback
+// (allocator.ts HOLDING_REASON, written by service.ts, which reads the database).
 
 import {afterEach, describe, expect, it, vi} from 'vitest';
 import {findBanned} from '@/lib/learn/banned';
@@ -21,7 +20,6 @@ import {
 import {diffToOrders, HOLDING_REASON, type HeldPosition} from '@/lib/navigator/allocator';
 import {scoreUniverse, type ScoringInput} from '@/lib/navigator/scoring';
 
-const NEUTRAL_NEWS_REASON = 'no brain coverage — news neutral';
 const MECHANISM_ONLY = /\b(works?|worked|working|fails?|failed|beat(s|en|ing)?|outperform\w*|underperform\w*|lags?|lagged)\b/i;
 
 const input = (symbol: string, patch: Partial<ScoringInput> = {}): ScoringInput => ({
@@ -40,7 +38,7 @@ const input = (symbol: string, patch: Partial<ScoringInput> = {}): ScoringInput 
 
 // Every branch of scoreUniverse's reasons: each momentum horizon and none, a thesis by name,
 // by sector and theme key and unnamed, both signs of sector standing, the 200-day cap, the
-// volatility haircut and ineligibility.
+// volatility haircut, ineligibility and a symbol the brain does not cover.
 const UNIVERSE: ScoringInput[] = [
     input('AAA', {newsWeightSlow: 12.3, sentimentSlow: 0.3, signals: {r63: 0.05, r126: 0.12, r252: 0.3, vol63: 0.9, ma200dist: 0.05},
         sectorTilt: 0.8, sectorLabel: 'Technology', hasActiveThesis: true, thesisLabel: 'AAA'}),
@@ -50,7 +48,8 @@ const UNIVERSE: ScoringInput[] = [
         hasActiveThesis: true, thesisLabel: 'sector:technology'}),
     input('DDD', {newsWeightSlow: 0, signals: {r63: null, r126: null, r252: null, vol63: null, ma200dist: null},
         hasActiveThesis: true, thesisLabel: 'theme:ai-capex', articleCount: 1, sourceCount: 1, barsCount: 40}),
-    input('SPY', {newsWeightSlow: 0, alwaysEligible: true}),
+    // No brain entity, as service.ts passes SPY and SMH: news neutral, outside the news rank.
+    input('SPY', {newsWeightSlow: null, alwaysEligible: true}),
 ];
 
 const position = (symbol: string, patch: Partial<HeldPosition> = {}): HeldPosition => ({
@@ -79,8 +78,9 @@ const ORDERS = diffToOrders({
 });
 
 const SCORE_REASONS = scoreUniverse(UNIVERSE).flatMap((scored) => scored.reasons);
+const NEUTRAL_NEWS_REASON = scoreUniverse(UNIVERSE).find((scored) => scored.symbol === 'SPY')?.reasons[0] ?? '';
 const ORDER_REASONS = ORDERS.map((order) => order.reason);
-const EMITTED = [...SCORE_REASONS, ...ORDER_REASONS, HOLDING_REASON, NEUTRAL_NEWS_REASON];
+const EMITTED = [...SCORE_REASONS, ...ORDER_REASONS, HOLDING_REASON];
 
 const expectClausesQuote = (text: string, clauses: readonly ReasonClause[]) => {
     expect(clauses.length, text).toBeGreaterThan(0);
@@ -102,8 +102,9 @@ describe('decodeNavigatorReason round trip', () => {
             'thesis AAA', 'thesis active', 'thesis sector:technology', 'thesis theme:ai-capex',
             'Technology sector standing 0.8', 'Consumer Discretionary sector standing -0.5',
             'below 200d MA — capped', 'high volatility haircut', 'ineligible (1 articles, 1 sources, 40 bars)',
+            'no brain coverage — news neutral',
         ]));
-        expect(SCORE_REASONS.some((reason) => /^slow news weight 12\.3 \(rank 1\/5\)$/.test(reason))).toBe(true);
+        expect(SCORE_REASONS.some((reason) => /^slow news weight 12\.3 \(rank 1\/4\)$/.test(reason))).toBe(true);
         expect(ORDER_REASONS).toEqual(expect.arrayContaining([
             'exit: score -0.20 below exit threshold 0', 'exit: thesis broken', 'exit: hard stop -30% vs cost',
             'rebalance +10.0% drift toward 15.0% target', 'rebalance -10.0% drift toward 10.0% target', 'enter: score 0.42',
@@ -125,7 +126,7 @@ describe('decodeNavigatorReason round trip', () => {
         expect(new Set(NAVIGATOR_GRAMMAR.map((template) => template.id)).size).toBe(NAVIGATOR_GRAMMAR.length);
     });
 
-    it('reads the unmerged neutral-news reason as its own clause', () => {
+    it('reads the neutral-news reason scoreUniverse writes as its own clause', () => {
         const {clauses} = decodeNavigatorReason(NEUTRAL_NEWS_REASON);
         expect(clauses).toHaveLength(1);
         expect(clauses[0]).toMatchObject({text: NEUTRAL_NEWS_REASON, term: 'news-weight', rail: 'SCORE_WEIGHTS'});
