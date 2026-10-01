@@ -158,6 +158,17 @@ try {
     await page.goto(`${BASE}/watchlist`, {waitUntil: 'load'});
     await page.locator('a[aria-label="Trade AAPL"]').first().waitFor({timeout: 30000});
     check('watchlist rows offer a Trade action', true);
+    check('the watchlist header says Asset, with no crypto "Protocol" left in it',
+        await page.getByText('Asset', {exact: true}).count() === 1 && await page.getByText(/Protocol/).count() === 0);
+    // Only the symbol, company and action links navigate, so the row itself must not look
+    // clickable; and it is the theme's own surface, so the default (minimal) style's
+    // --panel-blur: none reaches it instead of a blur written inline.
+    const watchRow = page.locator('a[aria-label="Trade AAPL"]').first().locator('xpath=ancestor::div[contains(@class, "md:grid-cols-")][1]');
+    const rowStyle = await watchRow.evaluate((el) => ({
+        cursor: getComputedStyle(el).cursor, blur: getComputedStyle(el).backdropFilter, panel: el.classList.contains('glass-panel'),
+    }));
+    check('a watchlist row has no pointer cursor of its own', rowStyle.cursor !== 'pointer', rowStyle.cursor);
+    check('a watchlist row is a theme surface: no blur under the minimal style', rowStyle.panel && rowStyle.blur === 'none', JSON.stringify(rowStyle));
     await page.setViewportSize({width: 390, height: 844});
     await page.reload({waitUntil: 'load'});
     await page.locator('a[aria-label="Trade AAPL"]').first().waitFor({timeout: 30000});
