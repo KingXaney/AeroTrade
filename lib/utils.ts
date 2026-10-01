@@ -1,6 +1,9 @@
 import { clsx, type ClassValue } from 'clsx';
 import { twMerge } from 'tailwind-merge';
 
+// Display formatting lives in lib/format; re-exported for the many components that import it here.
+export { formatChangePercent, formatPrice, getChangeColorClass } from '@/lib/format';
+
 export function cn(...inputs: ClassValue[]) {
   return twMerge(clsx(inputs));
 }
@@ -92,25 +95,6 @@ export const formatArticle = (
   category: isCompanyNews ? 'company' : article.category || 'general',
   related: isCompanyNews ? symbol! : article.related || '',
 });
-
-export const formatChangePercent = (changePercent?: number) => {
-  if (!changePercent) return '';
-  const sign = changePercent > 0 ? '+' : '';
-  return `${sign}${changePercent.toFixed(2)}%`;
-};
-
-export const getChangeColorClass = (changePercent?: number) => {
-  if (!changePercent) return 'text-fg-muted';
-  return changePercent > 0 ? 'text-positive' : 'text-negative';
-};
-
-export const formatPrice = (price: number) => {
-  return new Intl.NumberFormat('en-US', {
-    style: 'currency',
-    currency: 'USD',
-    minimumFractionDigits: 2,
-  }).format(price);
-};
 
 export const getFormattedTodayDate = () => new Date().toLocaleDateString('en-US', {
   weekday: 'long',

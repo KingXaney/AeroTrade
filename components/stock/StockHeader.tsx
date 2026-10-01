@@ -1,4 +1,5 @@
 import {cn, formatPrice, formatChangePercent} from "@/lib/utils";
+import {roundPct} from "@/lib/format";
 import WatchlistButton from "@/components/watchlist/WatchlistButton";
 import FollowTopicButton from "@/components/topics/FollowTopicButton";
 import TradeLink from "@/components/trade/TradeLink";
@@ -54,9 +55,9 @@ const StockHeader = ({
                             <span
                                 className={cn(
                                     "inline-block px-2 py-0.5 rounded text-xs font-medium",
-                                    changePercent > 0
+                                    roundPct(changePercent) > 0
                                         ? "bg-positive/10 text-positive border border-positive/20"
-                                        : changePercent < 0
+                                        : roundPct(changePercent) < 0
                                         ? "bg-negative/10 text-negative border border-negative/20"
                                         : "text-fg-muted"
                                 )}

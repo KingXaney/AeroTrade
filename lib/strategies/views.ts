@@ -1,7 +1,7 @@
 // Page-facing shapes and the pure presenters that rank, label and format them.
 // Client-safe: types plus arithmetic on plain data, nothing from the DB or the engine.
 
-import {formatPrice} from "@/lib/utils";
+import {formatPrice} from "@/lib/format";
 import type {Cadence, RowState, SeriesPoint, SeriesStats, SignalColumn, SignalFormat, SignalRow, StrategyFamily, StrategyId} from "@/lib/strategies/types";
 
 export type LiveRecord = {
@@ -192,25 +192,9 @@ export const describeLastRun = (run: StrategyRunView | null): string => {
 
 const withSign = (value: number, digits: number): string => `${value >= 0 ? '+' : ''}${value.toFixed(digits)}`;
 
-// Round first, then decide the sign and the colour, so a $3 loss on $100,000 reads "0.00%"
-// in neutral rather than "-0.00%" in red. (-0).toFixed(2) is already "0.00".
-export const roundPct = (value: number, digits = 2): number => Math.round(value * 10 ** digits) / 10 ** digits;
-
-export const formatPct = (value: number | null, digits = 2): string => {
-    if (value === null) return '—';
-    const rounded = roundPct(value, digits);
-    return `${rounded > 0 ? '+' : ''}${rounded.toFixed(digits)}%`;
-};
-
-export const formatDrawdown = (value: number | null): string => {
-    if (value === null) return '—';
-    const rounded = roundPct(value);
-    return rounded > 0 ? `−${rounded.toFixed(2)}%` : '0.00%';
-};
-
-// The colour input for getChangeColorClass: zero after rounding reads neutral.
-export const signedForColor = (value: number | null): number | undefined =>
-    value === null ? undefined : roundPct(value) || undefined;
+// The rounded percent formatters moved to lib/format, the app-wide home; kept here for the
+// strategy pages that import them from this module.
+export {formatDrawdown, formatPct, roundPct, signedForColor} from "@/lib/format";
 
 export const formatSignalValue = (value: number | string | boolean | null | undefined, format: SignalFormat): string => {
     if (value === null || value === undefined) return '—';

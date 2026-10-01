@@ -63,7 +63,7 @@ const PositionsTable = ({positions, accountId, lotNotes}: {positions: EnrichedPo
                             <div className="text-xs text-fg-muted" title="No live quote — value shown at cost">—</div>
                         ) : (
                             <div className={cn('text-xs', getChangeColorClass(p.unrealizedPnl || undefined))}>
-                                {p.unrealizedPnl >= 0 ? '+' : ''}{formatPrice(p.unrealizedPnl)} ({formatChangePercent(p.unrealizedPnlPct) || '0.00%'})
+                                {p.unrealizedPnl >= 0 ? '+' : ''}{formatPrice(p.unrealizedPnl)} ({formatChangePercent(p.unrealizedPnlPct)})
                             </div>
                         )}
                         </div>

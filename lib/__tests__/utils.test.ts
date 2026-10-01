@@ -74,10 +74,10 @@ describe('formatMarketCapValue', () => {
 });
 
 describe('formatChangePercent + getChangeColorClass', () => {
-    it('signs gains, leaves losses signed by the number, hides zero', () => {
+    it('signs gains, leaves losses signed by the number, prints a flat 0.00%', () => {
         expect(formatChangePercent(2.345)).toBe('+2.35%');
         expect(formatChangePercent(-0.5)).toBe('-0.50%');
-        expect(formatChangePercent(0)).toBe('');
+        expect(formatChangePercent(0)).toBe('0.00%');
         expect(formatChangePercent(undefined)).toBe('');
     });
 
