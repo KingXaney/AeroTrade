@@ -12,7 +12,7 @@ import {getNewsFeedPrefs} from "@/lib/news/feed-store";
 import {getCachedTopicsOverview} from "@/lib/dashboard/cached";
 import {getDashboardLayoutForUser} from "@/lib/dashboard/layout-store";
 import {filterAvailable} from "@/lib/dashboard/layout";
-import {getPortfoliosForUser} from "@/lib/trading/account";
+import {getPortfoliosForUser} from "@/lib/trading/valuation";
 import {WIDGET_IDS, WIDGETS, isWidgetAvailable} from "@/lib/dashboard/catalog";
 import {getOnboardingFacts} from "@/lib/learn/facts-store";
 import {onboardingActive} from "@/lib/learn/missions";

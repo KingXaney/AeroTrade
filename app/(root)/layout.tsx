@@ -4,7 +4,7 @@ import {getSessionUser} from "@/lib/auth/session";
 import {redirect} from "next/navigation";
 import {searchStocks} from "@/lib/prices/finnhub";
 import {getCachedTopicsOverview, getCachedWatchlistSymbols} from "@/lib/dashboard/cached";
-import {aggregatePortfolios, getPortfoliosForUser} from "@/lib/trading/account";
+import {aggregatePortfolios, getPortfoliosForUser} from "@/lib/trading/valuation";
 import {countUnpriced} from "@/lib/trading/analytics";
 import ChatWidget from "@/components/chat/ChatWidget";
 import ThemeSync from "@/components/theme/ThemeSync";

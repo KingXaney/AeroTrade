@@ -3,7 +3,7 @@ import {requireUserId} from "@/lib/auth/session";
 import {getWatchlistForUser} from "@/lib/stocks/watchlist-store";
 import {getNewsFeed} from "@/lib/news/feed-store";
 import {NEWS_HISTORY_LIMIT} from "@/lib/news/config";
-import {getRecentTradesForUser} from "@/lib/trading/account";
+import {getRecentTradesForUser} from "@/lib/trading/ledger";
 import TradeHistory from "@/components/trade/TradeHistory";
 import NewsArticleCard from "@/components/news/NewsArticleCard";
 import {WATCHLIST_COPY} from "@/lib/learn/copy/watchlist";

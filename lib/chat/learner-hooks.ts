@@ -13,7 +13,9 @@ import PaperTrade from "@/database/models/paper-trade.model";
 import type {PaperAccountDoc} from "@/database/models/paper-account.model";
 import type {LearnerAccountValue, LearnerFigure, LearnerValue} from "@/lib/chat/explain";
 import type {GlossaryKey} from "@/lib/learn/glossary";
-import {buildPriceMap, computePortfolio, epochTradesOf, readAccountsForUser, toAccountSummary} from "@/lib/trading/account";
+import {readAccountsForUser, toAccountSummary} from "@/lib/trading/accounts";
+import {buildPriceMap, computePortfolio} from "@/lib/trading/valuation";
+import {epochTradesOf} from "@/lib/trading/ledger";
 import {countUnpriced, drawdownWindow, mergeLivePoint, winStatsFromCounts} from "@/lib/trading/analytics";
 import {getEasternDateString} from "@/lib/dates";
 

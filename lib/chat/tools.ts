@@ -16,13 +16,9 @@ import {getTopicFeed, getTopicsForUser, getTopicsOverview} from "@/lib/topics/st
 import {createTopic, deleteTopic} from "@/lib/actions/topics.actions";
 import {MAX_KEYWORDS} from "@/lib/topics/config";
 import {FEED_WATCHLIST_SYMBOL_CAP} from "@/lib/news/config";
-import {
-    aggregatePortfolios,
-    computePortfolio,
-    getTradeHistory,
-    readAccountsForUser,
-    toAccountSummary,
-} from "@/lib/trading/account";
+import {readAccountsForUser, toAccountSummary} from "@/lib/trading/accounts";
+import {aggregatePortfolios, computePortfolio} from "@/lib/trading/valuation";
+import {getTradeHistory} from "@/lib/trading/ledger";
 import {findAccountByName, toChatPortfolio} from "@/lib/chat/portfolio-view";
 import {resolveTerm} from "@/lib/learn/glossary";
 import {decodeQuotedReason, shapeExplain} from "@/lib/chat/explain";

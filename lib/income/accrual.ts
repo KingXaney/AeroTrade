@@ -66,7 +66,7 @@ export type RateLookup = (date: string) => RatePoint | null;
 
 // The rate that counts on `date`: the latest point no older than RATE_MAX_STALENESS_DAYS, else
 // none. The one staleness rule — readyThrough holds the income watermark with it, and the APY
-// the Income panel and the order ticket quote (account.getCashApy) goes blank with it, so a
+// the Income panel and the order ticket quote (page-store.getCashApy) goes blank with it, so a
 // rate the job would not credit at is never quoted as today's rate either.
 export const usableRate = <P extends {date: string}>(point: P | null, date: string): P | null =>
     point !== null && point.date >= addCalendarDays(date, -RATE_MAX_STALENESS_DAYS) ? point : null;
@@ -395,7 +395,7 @@ export const groupIncomeActivity = (
 // Receipts — why each credit is the number it is, read back from the same convention
 // ---------------------------------------------------------------------------
 
-// A fill as the trade ledger (account.getTradeLedger) carries it. Dated in Eastern time, the
+// A fill as the trade ledger (ledger.getTradeLedger) carries it. Dated in Eastern time, the
 // way the income job dates every trade, so "the close before the ex-date" means the same day
 // here as it did when the clock decided who was paid.
 export type LedgerFill = {symbol: string; side: 'buy' | 'sell'; quantity: number; createdAt: number};

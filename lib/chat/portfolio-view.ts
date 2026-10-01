@@ -1,9 +1,8 @@
 // Shaping the paper accounts into something the chat model can read.
 //
-// Pure on purpose: lib/trading/account.ts reaches lib/actions/* and therefore
-// lib/auth/server.ts, whose top-level await opens a DB connection — so anything
-// importing it is untestable under vitest (AGENTS.md invariant 1). The mapping and the
-// account-name resolution live here so they can be.
+// Pure on purpose: the account reads it shapes (lib/trading/accounts, valuation) are
+// DB-bound, so anything importing them is untestable under vitest (AGENTS.md invariant 1).
+// The mapping and the account-name resolution live here so they can be.
 
 /** Money the model is going to read aloud — never hand it 1234.5600000001. */
 const money = (n: number): number => Math.round(n * 100) / 100;

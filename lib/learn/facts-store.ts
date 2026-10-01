@@ -19,7 +19,7 @@ import StrategyState from "@/database/models/strategy-state.model";
 import Topic from "@/database/models/topic.model";
 import UserPreferencesModel from "@/database/models/user-preferences.model";
 import Watchlist from "@/database/models/watchlist.model";
-import {readAccountsForUser} from "@/lib/trading/account";
+import {readAccountsForUser} from "@/lib/trading/accounts";
 import {addCalendarDays, getEasternDateString} from "@/lib/dates";
 import {daysBetween, type LearnDividend, type LearnFacts, type LearnFill, type LearnRebalance, type LearnSell, type OnboardingFacts} from "@/lib/learn/facts";
 import {ONBOARDING_MAX_DAYS} from "@/lib/learn/missions";

@@ -32,13 +32,9 @@ vi.mock('@/database/mongoose', () => ({connectToDatabase: async () => undefined}
 vi.mock('@/lib/brain/store', () => ({getActiveTheses: vi.fn(), getBrainDigestData: vi.fn()}));
 vi.mock('@/lib/topics/store', () => ({getTopicFeed: vi.fn(), getTopicsForUser: vi.fn(), getTopicsOverview: vi.fn()}));
 vi.mock('@/lib/actions/topics.actions', () => ({createTopic: vi.fn(), deleteTopic: vi.fn()}));
-vi.mock('@/lib/trading/account', () => ({
-    aggregatePortfolios: vi.fn(),
-    computePortfolio: vi.fn(),
-    getTradeHistory: vi.fn(),
-    readAccountsForUser: vi.fn(),
-    toAccountSummary: vi.fn(),
-}));
+vi.mock('@/lib/trading/accounts', () => ({readAccountsForUser: vi.fn(), toAccountSummary: vi.fn()}));
+vi.mock('@/lib/trading/valuation', () => ({aggregatePortfolios: vi.fn(), computePortfolio: vi.fn()}));
+vi.mock('@/lib/trading/ledger', () => ({getTradeHistory: vi.fn()}));
 vi.mock('@/lib/strategies/page-store', () => ({getLatestRun: vi.fn(), getStrategyLeaderboard: vi.fn()}));
 vi.mock('@/lib/navigator/store', () => ({getLatestSuggestions: stubs.getLatestSuggestions}));
 vi.mock('@/lib/chat/learner-hooks', () => ({priceLargestHoldings: vi.fn(), readLearnerValue: vi.fn()}));

@@ -15,7 +15,7 @@ import {createDayMemo, remember} from "@/lib/day-memo";
 import {addCalendarDays, getEasternDateString} from "@/lib/dates";
 import {RATE_SYMBOL, BENCHMARK_SYMBOL} from "@/lib/prices/config";
 import {getBarsForSymbols, getLatestBars, getRatePoints} from "@/lib/prices/store";
-import {readAccountsForUser} from "@/lib/trading/account";
+import {readAccountsForUser} from "@/lib/trading/accounts";
 import {makeRateLookup, RATE_MAX_STALENESS_DAYS, type RatePoint} from "@/lib/income/accrual";
 import {
     buildTimeInMarket,

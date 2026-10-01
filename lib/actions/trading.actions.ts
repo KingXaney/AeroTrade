@@ -7,7 +7,9 @@ import AccountSnapshot from "@/database/models/account-snapshot.model";
 import AccountIncome from "@/database/models/account-income.model";
 import {PAPER_STARTING_BALANCE} from "@/lib/trading/config";
 import {getCurrentUserId} from "@/lib/auth/session";
-import {getOwnedAccount, resolveStartingBalance, seedDayZeroSnapshot} from "@/lib/trading/account";
+import {getOwnedAccount} from "@/lib/trading/accounts";
+import {resolveStartingBalance} from "@/lib/trading/starting-balance";
+import {seedDayZeroSnapshot} from "@/lib/trading/lifecycle";
 import {executeOrder} from "@/lib/trading/orders";
 import {sanitizeTradeNote} from "@/lib/trading/order-math";
 

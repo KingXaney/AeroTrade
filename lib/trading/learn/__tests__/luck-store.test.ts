@@ -34,7 +34,7 @@ vi.mock('@/lib/prices/store', () => ({
     },
     getRatePoints: async () => [],
 }));
-vi.mock('@/lib/trading/account', () => ({
+vi.mock('@/lib/trading/valuation', () => ({
     getLastSnapshotBetween: async (_accountId: string, _from: string, to: string) => {
         stored.snapshotReads.push(to);
         return {date: stored.snapshotDate ?? to, totalValue: 105_000, startingBalance: 100_000};

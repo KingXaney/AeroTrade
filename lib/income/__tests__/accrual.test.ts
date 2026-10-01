@@ -231,7 +231,7 @@ describe('holdingSpans', () => {
 });
 
 // One staleness rule for every reader of the rate: the job's watermark (readyThrough) and the
-// APY the Income panel and the ticket quote (account.getCashApy) agree on when it stops counting.
+// APY the Income panel and the ticket quote (page-store.getCashApy) agree on when it stops counting.
 describe('usableRate', () => {
     const point = {date: '2026-09-10', discountPct: 4.07};
 

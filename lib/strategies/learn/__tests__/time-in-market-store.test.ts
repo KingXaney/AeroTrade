@@ -38,7 +38,7 @@ vi.mock('@/lib/prices/store', () => ({
         ).sort((a, b) => a.date.localeCompare(b.date)) : [];
     },
 }));
-vi.mock('@/lib/trading/account', () => ({
+vi.mock('@/lib/trading/accounts', () => ({
     readAccountsForUser: async () => stored.accounts,
 }));
 

@@ -2,7 +2,9 @@
 // every loader reads the database or a market-data feed (scripts/qa covers them).
 
 import {cache} from "react";
-import {getAccountAnalytics, getComparisonStats, getPortfoliosForUser, getTradeHistory} from "@/lib/trading/account";
+import {getPortfoliosForUser} from "@/lib/trading/valuation";
+import {getTradeHistory} from "@/lib/trading/ledger";
+import {getAccountAnalytics, getComparisonStats} from "@/lib/trading/analytics-store";
 import {getCachedTopicsOverview, getCachedWatchlistSymbols} from "@/lib/dashboard/cached";
 import {getMergedTopicFeed} from "@/lib/topics/store";
 import {getStocksWithData} from "@/lib/prices/finnhub";

@@ -1,7 +1,8 @@
 import {NextResponse} from "next/server";
 import {getSessionUser} from "@/lib/auth/session";
 import PaperTrade from "@/database/models/paper-trade.model";
-import {epochTrades, getOwnedAccount} from "@/lib/trading/account";
+import {getOwnedAccount} from "@/lib/trading/accounts";
+import {epochTrades} from "@/lib/trading/ledger";
 import {csvDownloadHeaders, tradesCsv, tradesCsvFilename, type CsvTrade} from "@/lib/trading/csv";
 
 // Full trade history of one strategy account's current epoch as a CSV download. Deliberately

@@ -5,7 +5,7 @@ import type {SuggestionSetView} from "@/lib/navigator/store";
 import {getLatestSecondOpinion, isSecondOpinionConfigured} from "@/lib/brain/opinion";
 import {getLatestSuggestions, getNavigatorStatus} from "@/lib/navigator/store";
 import {getTopicsForUser} from "@/lib/topics/store";
-import {getAccountsForUser, toAccountSummary} from "@/lib/trading/account";
+import {getAccountsForUser, toAccountSummary} from "@/lib/trading/accounts";
 import ActiveTheses from "@/components/brain/ActiveTheses";
 import BrainLegend from "@/components/brain/BrainLegend";
 import BrainGraph from "@/components/brain/BrainGraph";

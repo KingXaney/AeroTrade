@@ -10,7 +10,7 @@ const db = vi.hoisted(() => ({
 }));
 
 vi.mock('@/database/mongoose', () => ({connectToDatabase: async () => undefined}));
-vi.mock('@/lib/trading/account', () => ({
+vi.mock('@/lib/trading/accounts', () => ({
     getOwnedAccount: async (userId: string, accountId: string) => {
         const a = db.accounts.get(accountId);
         return a && a.userId === userId ? {_id: accountId, name: a.name} : null;
@@ -36,7 +36,7 @@ vi.mock('@/database/models/account-income.model', () => ({
     default: {deleteMany: async ({accountId}: {accountId: string}) => { db.deletes.push(`income:${accountId}`); }},
 }));
 
-import {deleteOwnedAccount} from '@/lib/trading/account-delete';
+import {deleteOwnedAccount} from '@/lib/trading/lifecycle';
 
 describe('deleteOwnedAccount', () => {
     beforeEach(() => {

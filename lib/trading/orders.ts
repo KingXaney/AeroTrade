@@ -6,7 +6,7 @@
 import PaperAccount from "@/database/models/paper-account.model";
 import PaperTrade from "@/database/models/paper-trade.model";
 import {getQuote, getCompanyProfile} from "@/lib/prices/finnhub";
-import {getOwnedAccount} from "@/lib/trading/account";
+import {getOwnedAccount} from "@/lib/trading/accounts";
 import {TRADE_REASON_MAX} from "@/lib/strategies/config";
 import {isOrderSide} from "@/lib/trading/order-math";
 

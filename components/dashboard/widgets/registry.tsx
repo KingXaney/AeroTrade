@@ -3,7 +3,7 @@ import {WIDGETS, type DataKey, type WidgetId, type WidgetSpan} from "@/lib/dashb
 import Panel from "@/components/primitives/Panel";
 import {LOADERS, type DashboardData, type LoaderCtx} from "@/lib/dashboard/loaders";
 import {bestStrategy, newsBrainSummary, toApplyAccounts, toComparisonRows, topMovers} from "@/lib/dashboard/select";
-import {aggregatePortfolios} from "@/lib/trading/account";
+import {aggregatePortfolios} from "@/lib/trading/valuation";
 import WidgetErrorBoundary from "@/components/dashboard/WidgetErrorBoundary";
 import WidgetSkeleton from "@/components/dashboard/WidgetSkeleton";
 import WidgetUnavailable from "@/components/dashboard/WidgetUnavailable";

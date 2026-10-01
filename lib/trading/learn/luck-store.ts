@@ -18,7 +18,7 @@ import {createDayMemo, remember} from "@/lib/day-memo";
 import {addCalendarDays, getEasternDateString} from "@/lib/dates";
 import {RATE_SYMBOL, BENCHMARK_SYMBOL} from "@/lib/prices/config";
 import {getHoldWindowBars, getLatestBars, getRatePoints} from "@/lib/prices/store";
-import {getLastSnapshotBetween} from "@/lib/trading/account";
+import {getLastSnapshotBetween} from "@/lib/trading/valuation";
 import {RATE_MAX_STALENESS_DAYS} from "@/lib/income/accrual";
 import {LARGE_CAPS} from "@/lib/strategies/universe";
 import {

@@ -3,7 +3,7 @@ import type {ReactNode} from "react";
 import {ACTIVE_ACCOUNT_COOKIE} from "@/lib/trading/config";
 import {requireUserId} from "@/lib/auth/session";
 import {getDashboardLayoutForUser} from "@/lib/dashboard/layout-store";
-import {getPortfoliosForUser} from "@/lib/trading/account";
+import {getPortfoliosForUser} from "@/lib/trading/valuation";
 import {WIDGET_IDS, WIDGETS, isWidgetAvailable, resolveDataKeys, type WidgetId} from "@/lib/dashboard/catalog";
 import {filterAvailable, layoutFingerprint} from "@/lib/dashboard/layout";
 import {loadDashboardData, type LoaderCtx} from "@/lib/dashboard/loaders";

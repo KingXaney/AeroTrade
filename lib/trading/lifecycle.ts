@@ -1,12 +1,32 @@
-// The delete behind deletePaperAccount, kept out of the 'use server' module so its
-// refusals are unit-tested with the models stubbed. Server-only (DB-bound).
+// An account's lifecycle writes outside the 'use server' module: the day-zero snapshot a fresh
+// account starts with, and the delete behind deletePaperAccount, whose refusals are unit-tested
+// with the models stubbed. Server-only (DB-bound).
 
-import PaperAccount from "@/database/models/paper-account.model";
+import PaperAccount, {type PaperAccountDoc} from "@/database/models/paper-account.model";
 import PaperTrade from "@/database/models/paper-trade.model";
 import AccountSnapshot from "@/database/models/account-snapshot.model";
 import AccountIncome from "@/database/models/account-income.model";
 import AiNavigator from "@/database/models/ai-navigator.model";
-import {getOwnedAccount} from "@/lib/trading/account";
+import {getEasternDateString} from "@/lib/dates";
+import {getOwnedAccount} from "@/lib/trading/accounts";
+
+// Write today's baseline snapshot for a fresh (created or just-reset) account so the
+// performance chart has a day-0 point immediately instead of waiting for the cron.
+export const seedDayZeroSnapshot = async (account: PaperAccountDoc): Promise<void> => {
+    await AccountSnapshot.updateOne(
+        {accountId: String(account._id), date: getEasternDateString()},
+        {
+            $set: {
+                userId: account.userId,
+                totalValue: account.startingBalance,
+                cash: account.startingBalance,
+                holdingsValue: 0,
+                startingBalance: account.startingBalance,
+            },
+        },
+        {upsert: true},
+    );
+};
 
 // Delete a strategy account and everything scoped to it (trades, snapshots, income).
 // `deletedId` lets the action clear the active-account cookie when it named this one.

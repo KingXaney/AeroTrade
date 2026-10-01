@@ -22,7 +22,8 @@ import {
     ETF_TO_SECTOR_KEY,
     SECTOR_KEY_PREFIX,
 } from "@/lib/navigator/config";
-import {buildPriceMap, computePortfolio, getOwnedAccount} from "@/lib/trading/account";
+import {getOwnedAccount} from "@/lib/trading/accounts";
+import {buildPriceMap, computePortfolio} from "@/lib/trading/valuation";
 import {getEasternDateString} from "@/lib/dates";
 
 export type SuggestionSetView = {

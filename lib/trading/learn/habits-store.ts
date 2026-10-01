@@ -4,7 +4,7 @@
 // (at most HAD_YOU_HELD_MAX_SYMBOLS) that the portfolio does not already price. A plain server
 // module; the maths is lib/trading/learn/habits.ts.
 
-import {buildPriceMap} from "@/lib/trading/account";
+import {buildPriceMap} from "@/lib/trading/valuation";
 import {closedLots, computeHabits, HABITS_MIN_CLOSED_LOTS, hadYouHeldSymbols, type Habits} from "@/lib/trading/learn/habits";
 import type {LedgerTrade} from "@/lib/trading/lots";
 

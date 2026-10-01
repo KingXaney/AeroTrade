@@ -1,7 +1,6 @@
 // Per-account performance math. Deliberately PURE — no DB, no server imports —
-// so vitest can cover it without a database (the import chain through
-// account.ts reaches better-auth's top-level connection). The server fetcher
-// that feeds these lives in account.ts (getAccountAnalytics).
+// so vitest can cover it without a database. The server reads that feed these
+// live in analytics-store.ts (getAccountAnalytics, getComparisonStats).
 
 export const toReturnPct = (value: number, base: number): number =>
     base > 0 ? (value / base - 1) * 100 : 0;

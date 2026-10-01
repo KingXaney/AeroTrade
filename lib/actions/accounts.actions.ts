@@ -11,8 +11,9 @@ import {
     MIN_STARTING_BALANCE,
 } from "@/lib/trading/config";
 import {getCurrentUserId} from "@/lib/auth/session";
-import {getAccountsForUser, getOwnedAccount, resolveStartingBalance, seedDayZeroSnapshot} from "@/lib/trading/account";
-import {deleteOwnedAccount} from "@/lib/trading/account-delete";
+import {getAccountsForUser, getOwnedAccount} from "@/lib/trading/accounts";
+import {resolveStartingBalance} from "@/lib/trading/starting-balance";
+import {deleteOwnedAccount, seedDayZeroSnapshot} from "@/lib/trading/lifecycle";
 
 const ACCOUNT_NAME_MAX_LENGTH = 40;
 const ACTIVE_COOKIE_MAX_AGE_SECONDS = 60 * 60 * 24 * 365;
@@ -161,7 +162,7 @@ export const renamePaperAccount = async ({accountId, name}: {accountId: string; 
     }
 };
 
-// Delete a strategy account and everything scoped to it (lib/trading/account-delete).
+// Delete a strategy account and everything scoped to it (lib/trading/lifecycle).
 export const deletePaperAccount = async (accountId: string): Promise<OrderResult> => {
     try {
         const userId = await getCurrentUserId();

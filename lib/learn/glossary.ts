@@ -126,7 +126,7 @@ const ENTRIES = [
     {key: 'net-worth', kind: 'metric', term: 'Net worth', aliases: ['net worth', 'total value', 'account value', 'equity'],
         short: 'Cash plus the market value of every holding at the last quote.',
         long: 'The one number that says what the account is worth. A holding with no live quote is counted at what was paid for it, and the page says how many are valued that way.',
-        formula: 'cash + Σ shares × last price', computedIn: 'lib/trading/account.ts computePortfolio', seeAlso: ['holdings-value', 'buying-power']},
+        formula: 'cash + Σ shares × last price', computedIn: 'lib/trading/valuation.ts computePortfolio', seeAlso: ['holdings-value', 'buying-power']},
     {key: 'holdings-value', kind: 'metric', term: 'Holdings value', aliases: ['holdings value', 'market value'],
         short: 'Shares × last price, summed over every open position.',
         long: 'Net worth minus cash. It moves with every quote; cash does not.',
