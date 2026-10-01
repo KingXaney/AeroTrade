@@ -9,14 +9,12 @@ import {takeRateLimit} from "@/lib/auth/rate-limit";
 import {
     PASSWORD_RESET_LIMIT,
     PASSWORD_RESET_WINDOW_MS,
-    SIGN_IN_CLIENT_LIMIT,
-    SIGN_IN_EMAIL_LIMIT,
+    SIGN_IN_INVALID_MESSAGE,
     SIGN_IN_LIMITED_MESSAGE,
-    SIGN_IN_WINDOW_MS,
     clientIpFrom,
     passwordResetKey,
-    signInClientKey,
-    signInEmailKey,
+    signInCredentials,
+    withinSignInLimits,
 } from "@/lib/auth/limits";
 import {seedDefaultTopics} from "@/lib/topics/seed";
 
@@ -56,21 +54,18 @@ export const signUpWithEmail = async ({ email, password, fullName, country, inve
     }
 }
 
-// Client first, then address: a client already over its limit spends nothing of the address's
-// budget, so one machine walking a list of addresses can lock out no more of them than its own
-// client limit allows.
-// A request with no client address (see clientIpFrom) is counted per address only.
-const withinSignInLimits = async (email: string): Promise<boolean> => {
-    const ip = clientIpFrom(await headers());
-    if (ip && !(await takeRateLimit(signInClientKey(ip), SIGN_IN_CLIENT_LIMIT, SIGN_IN_WINDOW_MS))) return false;
-    return takeRateLimit(signInEmailKey(email ?? ''), SIGN_IN_EMAIL_LIMIT, SIGN_IN_WINDOW_MS);
-}
+export const signInWithEmail = async (input: SignInFormData) => {
+    // Input that is not two strings gets a wrong password's answer before any counter is
+    // spent, so it neither burns a client's budget nor returns a raw error's text.
+    const credentials = signInCredentials(input);
+    if (!credentials) return { success: false, error: SIGN_IN_INVALID_MESSAGE }
+    const { email, password } = credentials;
 
-export const signInWithEmail = async ({ email, password }: SignInFormData) => {
     try {
         // Refused before better-auth is asked, so the answer cannot differ between an address
         // with an account and one without — and a correct password does not get through either.
-        if (!(await withinSignInLimits(email))) {
+        // The order the two counters are spent in is withinSignInLimits' (lib/auth/limits.ts).
+        if (!(await withinSignInLimits({ ip: clientIpFrom(await headers()), email }, takeRateLimit))) {
             console.warn('Sign-in rate limit reached');
             return { success: false, error: SIGN_IN_LIMITED_MESSAGE }
         }
@@ -83,7 +78,7 @@ export const signInWithEmail = async ({ email, password }: SignInFormData) => {
         return { success: true, data: response }
     } catch (e) {
         console.error('Sign in failed', e)
-        return { success: false, error: extractAuthError(e, 'Invalid email or password') }
+        return { success: false, error: extractAuthError(e, SIGN_IN_INVALID_MESSAGE) }
     }
 }
 

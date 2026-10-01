@@ -2,7 +2,8 @@
 // spend. better-auth's own rateLimit never runs here (see lib/better-auth/auth.ts), so these
 // are the app's only limits on them; lib/auth/rate-limit.ts takeRateLimit does the counting.
 //
-// Import-free so the keys and the client-address reading are unit-tested like chat-limits.
+// Import-free so the keys, the client-address reading, the sign-in input check and the order
+// the two sign-in counters are spent in are unit-tested like chat-limits.
 
 export const PASSWORD_RESET_LIMIT = 3;
 export const PASSWORD_RESET_WINDOW_MS = 15 * 60 * 1000;
@@ -17,6 +18,9 @@ export const SIGN_IN_WINDOW_MS = 15 * 60 * 1000;
 // The one answer to a refused attempt. Refused before better-auth is asked anything, so it is
 // the same whether the account exists or not.
 export const SIGN_IN_LIMITED_MESSAGE = 'Too many sign-in attempts. Try again in a few minutes.';
+
+// better-auth's answer to a wrong password, and the action's to input it cannot read.
+export const SIGN_IN_INVALID_MESSAGE = 'Invalid email or password';
 
 const normaliseEmail = (email: string): string => email.trim().toLowerCase();
 
@@ -35,10 +39,42 @@ const asIp = (raw: string | null | undefined): string | null => {
     return IP_SHAPE.test(value) ? value : null;
 };
 
-// The requesting client's address: the first x-forwarded-for entry (the client; later entries
-// are the proxies it passed through), else x-real-ip. On Vercel both are set by the platform,
-// which overwrites whatever the client sent; `next dev` sets x-forwarded-for from the socket.
-// Null when neither names an address — the caller then skips the per-client limit rather than
-// counting every such request against one shared key.
+const firstEntry = (headers: HeaderReader, name: string): string | null =>
+    asIp(headers.get(name)?.split(',')[0]);
+
+// The requesting client's address: x-vercel-forwarded-for, else the first x-forwarded-for
+// entry (the client; later entries are the proxies it passed through), else x-real-ip.
+// It names the client only behind a proxy that overwrites these headers, such as Vercel —
+// which also documents x-vercel-forwarded-for as the copy a proxy in front of it cannot
+// overwrite, hence first. Anywhere else the client chooses its own key: Next's server fills
+// x-forwarded-for from the socket only when the request carries none (`??=` in its
+// base-server), so the per-address limit is the one that holds there.
+// Null when no header names an address — the caller then skips the per-client limit rather
+// than counting every such request against one shared key.
 export const clientIpFrom = (headers: HeaderReader): string | null =>
-    asIp(headers.get('x-forwarded-for')?.split(',')[0]) ?? asIp(headers.get('x-real-ip'));
+    firstEntry(headers, 'x-vercel-forwarded-for')
+    ?? firstEntry(headers, 'x-forwarded-for')
+    ?? asIp(headers.get('x-real-ip'));
+
+// A server action's argument is whatever the client posted, whatever its type says. Sign-in
+// reads two strings and nothing else; anything else reads as no credentials at all.
+export const signInCredentials = (input: unknown): {email: string; password: string} | null => {
+    if (typeof input !== 'object' || input === null) return null;
+    const {email, password} = input as {email?: unknown; password?: unknown};
+    return typeof email === 'string' && typeof password === 'string' ? {email, password} : null;
+};
+
+// One counter step, as takeRateLimit takes it: true while `key` is within `limit` for its window.
+export type TakeCounter = (key: string, limit: number, windowMs: number) => Promise<boolean>;
+
+// Client first, then address: a client already over its limit spends nothing of the address's
+// budget, so one machine walking a list of addresses can lock out no more of them than its own
+// client limit allows. A request with no client address (see clientIpFrom) is counted per
+// address only.
+export const withinSignInLimits = async (
+    {ip, email}: {ip: string | null; email: string},
+    take: TakeCounter,
+): Promise<boolean> => {
+    if (ip && !(await take(signInClientKey(ip), SIGN_IN_CLIENT_LIMIT, SIGN_IN_WINDOW_MS))) return false;
+    return take(signInEmailKey(email), SIGN_IN_EMAIL_LIMIT, SIGN_IN_WINDOW_MS);
+};

@@ -4,12 +4,16 @@ import {
     PASSWORD_RESET_WINDOW_MS,
     SIGN_IN_CLIENT_LIMIT,
     SIGN_IN_EMAIL_LIMIT,
+    SIGN_IN_INVALID_MESSAGE,
     SIGN_IN_LIMITED_MESSAGE,
     SIGN_IN_WINDOW_MS,
     clientIpFrom,
     passwordResetKey,
     signInClientKey,
+    signInCredentials,
     signInEmailKey,
+    withinSignInLimits,
+    type TakeCounter,
 } from '@/lib/auth/limits';
 
 const headersOf = (entries: Record<string, string>) => new Headers(entries);
@@ -32,6 +36,10 @@ describe('the auth limits', () => {
 
     it('says the same fixed thing for every refused attempt', () => {
         expect(SIGN_IN_LIMITED_MESSAGE).toBe('Too many sign-in attempts. Try again in a few minutes.');
+    });
+
+    it('answers malformed input as it answers a wrong password', () => {
+        expect(SIGN_IN_INVALID_MESSAGE).toBe('Invalid email or password');
     });
 });
 
@@ -83,5 +91,107 @@ describe('clientIpFrom', () => {
         expect(clientIpFrom(headersOf({'x-forwarded-for': 'unknown'}))).toBeNull();
         expect(clientIpFrom(headersOf({'x-forwarded-for': 'x'.repeat(200)}))).toBeNull();
         expect(clientIpFrom(headersOf({'x-forwarded-for': 'unknown', 'x-real-ip': '198.51.100.2'}))).toBe('198.51.100.2');
+    });
+
+    // Next's own server fills x-forwarded-for only when the request carries none, so off
+    // Vercel a client chooses its key; Vercel overwrites it, and documents
+    // x-vercel-forwarded-for as the copy a proxy in front of Vercel cannot overwrite.
+    it('reads x-vercel-forwarded-for first, then x-forwarded-for, then x-real-ip', () => {
+        const all = {'x-vercel-forwarded-for': '203.0.113.9', 'x-forwarded-for': '198.51.100.7, 10.0.0.1', 'x-real-ip': '192.0.2.4'};
+        expect(clientIpFrom(headersOf(all))).toBe('203.0.113.9');
+        expect(clientIpFrom(headersOf({'x-forwarded-for': '198.51.100.7', 'x-real-ip': '192.0.2.4'}))).toBe('198.51.100.7');
+        expect(clientIpFrom(headersOf({'x-vercel-forwarded-for': '203.0.113.9', 'x-real-ip': '192.0.2.4'}))).toBe('203.0.113.9');
+    });
+
+    it('reads x-vercel-forwarded-for as it reads x-forwarded-for, and passes over one naming no address', () => {
+        expect(clientIpFrom(headersOf({'x-vercel-forwarded-for': ' 203.0.113.9 , 10.0.0.1'}))).toBe('203.0.113.9');
+        expect(clientIpFrom(headersOf({'x-vercel-forwarded-for': '2001:DB8::2'}))).toBe('2001:db8::2');
+        expect(clientIpFrom(headersOf({'x-vercel-forwarded-for': 'unknown', 'x-forwarded-for': '198.51.100.7'}))).toBe('198.51.100.7');
+        expect(clientIpFrom(headersOf({'x-vercel-forwarded-for': '', 'x-real-ip': '192.0.2.4'}))).toBe('192.0.2.4');
+    });
+});
+
+// A server action's argument is whatever the client posted, whatever its type says.
+describe('signInCredentials', () => {
+    it('reads two strings as posted, and nothing else from the payload', () => {
+        expect(signInCredentials({email: 'A@b.co ', password: ' pw'})).toEqual({email: 'A@b.co ', password: ' pw'});
+        expect(signInCredentials({email: 'a@b.co', password: 'pw', role: 'admin'})).toEqual({email: 'a@b.co', password: 'pw'});
+    });
+
+    it('reads no credentials from anything but two strings', () => {
+        const malformed: unknown[] = [
+            null, undefined, 'a@b.co', 42, [],
+            {email: 42, password: 'pw'}, {email: ['a@b.co'], password: 'pw'}, {email: {toString: () => 'a@b.co'}, password: 'pw'},
+            {email: 'a@b.co'}, {email: 'a@b.co', password: null}, {email: 'a@b.co', password: {length: 8}},
+        ];
+        for (const input of malformed) expect(signInCredentials(input), String(JSON.stringify(input))).toBeNull();
+    });
+});
+
+// takeRateLimit's contract on one never-ending window, recording every key it is asked to spend.
+const memoryCounter = () => {
+    const counts = new Map<string, number>();
+    const spent: [string, number, number][] = [];
+    const take: TakeCounter = async (key, limit, windowMs) => {
+        spent.push([key, limit, windowMs]);
+        const count = (counts.get(key) ?? 0) + 1;
+        counts.set(key, count);
+        return count <= limit;
+    };
+    return {take, counts, spent};
+};
+
+describe('withinSignInLimits', () => {
+    it('spends the client counter, then the address counter, each at its own limit', async () => {
+        const {take, spent} = memoryCounter();
+        expect(await withinSignInLimits({ip: '203.0.113.7', email: ' Owner@Example.com'}, take)).toBe(true);
+        expect(spent).toEqual([
+            [signInClientKey('203.0.113.7'), SIGN_IN_CLIENT_LIMIT, SIGN_IN_WINDOW_MS],
+            [signInEmailKey('owner@example.com'), SIGN_IN_EMAIL_LIMIT, SIGN_IN_WINDOW_MS],
+        ]);
+    });
+
+    it('counts a request with no client address against its address only', async () => {
+        const {take, spent} = memoryCounter();
+        expect(await withinSignInLimits({ip: null, email: 'a@b.co'}, take)).toBe(true);
+        expect(spent.map(([key]) => key)).toEqual([signInEmailKey('a@b.co')]);
+    });
+
+    it('refuses an address past its limit, whichever client asks', async () => {
+        const {take} = memoryCounter();
+        for (let i = 0; i < SIGN_IN_EMAIL_LIMIT; i++) {
+            expect(await withinSignInLimits({ip: `198.51.100.${i}`, email: 'a@b.co'}, take)).toBe(true);
+        }
+        expect(await withinSignInLimits({ip: '198.51.100.99', email: ' A@B.co'}, take)).toBe(false);
+        expect(await withinSignInLimits({ip: null, email: 'a@b.co'}, take)).toBe(false);
+    });
+
+    it('spends nothing of an address\'s budget once the client is over its own limit', async () => {
+        const {take, counts} = memoryCounter();
+        const ip = '203.0.113.7';
+        for (let i = 0; i < SIGN_IN_CLIENT_LIMIT; i++) {
+            expect(await withinSignInLimits({ip, email: `walk${i}@example.com`}, take)).toBe(true);
+        }
+        for (let i = 0; i < SIGN_IN_EMAIL_LIMIT * 5; i++) {
+            expect(await withinSignInLimits({ip, email: 'owner@example.com'}, take)).toBe(false);
+        }
+        expect(counts.has(signInEmailKey('owner@example.com'))).toBe(false);
+        expect(await withinSignInLimits({ip: '198.51.100.2', email: 'owner@example.com'}, take)).toBe(true);
+    });
+
+    // The point of the order: one machine walking a list of addresses, each past its limit,
+    // locks out at most as many accounts as its own budget covers.
+    it('lets one client lock out no more addresses than its own limit allows', async () => {
+        const {take} = memoryCounter();
+        const victims = Array.from({length: 20}, (_, i) => `victim${i}@example.com`);
+        for (const email of victims) {
+            for (let i = 0; i <= SIGN_IN_EMAIL_LIMIT; i++) await withinSignInLimits({ip: '203.0.113.7', email}, take);
+        }
+        const lockedOut: string[] = [];
+        for (const email of victims) {
+            if (!(await withinSignInLimits({ip: '198.51.100.2', email}, take))) lockedOut.push(email);
+        }
+        expect(lockedOut.length).toBeGreaterThan(0);
+        expect(lockedOut.length).toBeLessThanOrEqual(Math.floor(SIGN_IN_CLIENT_LIMIT / SIGN_IN_EMAIL_LIMIT));
     });
 });

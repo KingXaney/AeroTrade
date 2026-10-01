@@ -10,6 +10,8 @@ import {
     EXPLAIN_STANCE,
     MAX_ECHO_CHARS,
     shapeExplain,
+    shapeReason,
+    type ExplainResult,
     type LearnerValue,
     type ReasonWriter,
 } from '@/lib/ai/explain';
@@ -21,8 +23,14 @@ import {MAX_PAPER_ACCOUNTS} from '@/lib/constants';
 // What the tool does with its inputs, minus the database read.
 const explain = (input: {term?: string; reason?: string; writer?: ReasonWriter}, yours: LearnerValue | null = null) => {
     const entry = input.term ? resolveTerm(input.term) : null;
-    const quoted = input.reason ? decodeQuotedReason(input.reason, input.writer) : null;
-    return shapeExplain({term: input.term, reason: input.reason, entry, decoded: quoted?.decoded ?? null, writer: quoted?.writer ?? null, yours: entry ? yours : null});
+    const readings = input.reason ? decodeQuotedReason(input.reason, input.writer) : null;
+    return shapeExplain({term: input.term, reason: input.reason, entry, readings, yours: entry ? yours : null});
+};
+
+// The reason's one reading; a reason read both ways fails the test that expected one.
+const oneReading = (out: ExplainResult) => {
+    if (out.reason && 'readings' in out.reason) throw new Error('the reason came back read both ways');
+    return out.reason;
 };
 
 const GOLDEN_CROSS = 'enter: SMA50 42.10 > SMA200 40.00 (+5.3%)';
@@ -67,11 +75,11 @@ describe('shapeExplain', () => {
     // directly so its own guard is what keeps figures away from a term it could not define.
     it('drops the learner\'s figures itself when there is no entry to attach them to', () => {
         const yours: LearnerValue = {accounts: [{account: 'Main Strategy', figures: {maxDrawdownPct: 5.88}}]};
-        const out = shapeExplain({term: 'zorblax ratio', entry: null, decoded: null, yours});
+        const out = shapeExplain({term: 'zorblax ratio', entry: null, readings: null, yours});
         expect(out.entry).toBeNull();
         expect(out.yours).toBeNull();
         expect(out.notes).toEqual([EXPLAIN_NOTES.noEntry]);
-        const reasonOnly = shapeExplain({reason: GOLDEN_CROSS, entry: null, decoded: decodeReason(GOLDEN_CROSS), yours});
+        const reasonOnly = shapeExplain({reason: GOLDEN_CROSS, entry: null, readings: decodeQuotedReason(GOLDEN_CROSS), yours});
         expect(reasonOnly.yours).toBeNull();
         expect(JSON.stringify(reasonOnly)).not.toContain('5.88');
     });
@@ -85,13 +93,14 @@ describe('shapeExplain', () => {
 
     it('decodes a strategy reason clause by clause, each with its definition', () => {
         const out = explain({reason: GOLDEN_CROSS});
+        const reason = oneReading(out);
         expect(out.entry).toBeNull();
-        expect(out.reason?.unrecognised).toEqual([]);
-        expect(out.reason?.clauses.map((clause) => clause.text)).toEqual(['enter', 'SMA50 42.10 > SMA200 40.00', '(+5.3%)']);
-        expect(out.reason?.clauses[0]).not.toHaveProperty('term');
-        expect(out.reason?.clauses[1]).toMatchObject({term: GLOSSARY['trend-on'].term, definition: GLOSSARY['trend-on'].short});
-        expect(out.reason?.clauses[2]).toMatchObject({term: GLOSSARY.spread.term, definition: GLOSSARY.spread.short});
-        expect(out.reason?.writer).toBe('strategy');
+        expect(reason?.unrecognised).toEqual([]);
+        expect(reason?.clauses.map((clause) => clause.text)).toEqual(['enter', 'SMA50 42.10 > SMA200 40.00', '(+5.3%)']);
+        expect(reason?.clauses[0]).not.toHaveProperty('term');
+        expect(reason?.clauses[1]).toMatchObject({term: GLOSSARY['trend-on'].term, definition: GLOSSARY['trend-on'].short});
+        expect(reason?.clauses[2]).toMatchObject({term: GLOSSARY.spread.term, definition: GLOSSARY.spread.short});
+        expect(reason?.writer).toBe('strategy');
         expect(out.notes).toEqual([]);
     });
 
@@ -100,16 +109,16 @@ describe('shapeExplain', () => {
         expect(hunch.reason).toEqual({clauses: [], unrecognised: ['bought on a hunch']});
         expect(hunch.notes).toEqual([EXPLAIN_NOTES.undecoded]);
 
-        const long = explain({reason: 'x'.repeat(900)});
-        expect(long.reason?.unrecognised[0].length).toBe(MAX_ECHO_CHARS);
-        expect(long.reason?.unrecognised[0].endsWith('…')).toBe(true);
+        const long = oneReading(explain({reason: 'x'.repeat(900)}));
+        expect(long?.unrecognised[0].length).toBe(MAX_ECHO_CHARS);
+        expect(long?.unrecognised[0].endsWith('…')).toBe(true);
     });
 
     it('answers a term and a reason in one call', () => {
         const out = explain({term: 'fomc', reason: GOLDEN_CROSS});
         expect(out.entry?.key).toBe('fomc');
         expect(out.entry?.kind).toBe('concept');
-        expect(out.reason?.clauses).toHaveLength(3);
+        expect(oneReading(out)?.clauses).toHaveLength(3);
     });
 
     it('asks for input when given nothing', () => {
@@ -123,8 +132,8 @@ describe('shapeExplain', () => {
 });
 
 // The AI Navigator writes its own reasons (getAiSuggestions hands them to the model), in a
-// grammar of its own; the strategies' grammar reads a quoted reason first and the Navigator's
-// reads what it leaves whole, unless the caller says who wrote it.
+// grammar of its own. Named, the writer's grammar reads a quoted reason first and the other
+// reads only what it leaves whole; unnamed, a shape both grammars read is read both ways.
 describe('decodeQuotedReason — strategy or Navigator', () => {
     const NAV_NEWS = 'slow news weight 3.2 (rank 4/59)';
     const NAV_NEUTRAL = 'no brain coverage — news neutral';
@@ -132,62 +141,83 @@ describe('decodeQuotedReason — strategy or Navigator', () => {
     const SHARED = 'rebalance +3.8% drift toward 12.0% target';
 
     it('reads a strategy reason with the strategies\' grammar', () => {
-        const out = decodeQuotedReason(GOLDEN_CROSS);
-        expect(out.writer).toBe('strategy');
-        expect(out.decoded).toEqual(decodeReason(GOLDEN_CROSS));
+        expect(decodeQuotedReason(GOLDEN_CROSS)).toEqual([{writer: 'strategy', decoded: decodeReason(GOLDEN_CROSS)}]);
     });
 
     it('reads a Navigator reason the strategies\' grammar leaves whole', () => {
         for (const reason of [NAV_NEWS, NAV_NEUTRAL, NAV_ENTER, 'exit: thesis broken', 'holding — no exit trigger']) {
             expect(decodeReason(reason).clauses, reason).toEqual([]);
-            const out = decodeQuotedReason(reason);
-            expect(out.writer, reason).toBe('navigator');
-            expect(out.decoded, reason).toEqual(decodeNavigatorReason(reason));
-            expect(out.decoded.clauses.length, reason).toBeGreaterThan(0);
+            expect(decodeQuotedReason(reason), reason).toEqual([{writer: 'navigator', decoded: decodeNavigatorReason(reason)}]);
+            expect(decodeNavigatorReason(reason).clauses.length, reason).toBeGreaterThan(0);
         }
     });
 
-    it('leaves garbage unrecognised, whole', () => {
+    it('reads garbage no way at all, and hands it back whole', () => {
         for (const reason of ['bought on a hunch', '(.*)+[', 'rebalance lots']) {
-            const out = decodeQuotedReason(reason);
-            expect(out.writer, reason).toBeNull();
-            expect(out.decoded, reason).toEqual({clauses: [], unknown: [reason]});
+            expect(decodeQuotedReason(reason), reason).toEqual([]);
+            expect(decodeQuotedReason(reason, 'navigator'), reason).toEqual([]);
+            expect(oneReading(explain({reason}))?.unrecognised, reason).toEqual([reason]);
         }
     });
 
-    it('reads a shape both engines write by the hint, the strategies\' band without one', () => {
-        expect(decodeQuotedReason(SHARED).writer).toBe('strategy');
-        expect(decodeQuotedReason(SHARED).decoded).toEqual(decodeReason(SHARED));
-        expect(decodeQuotedReason(SHARED, 'strategy').decoded).toEqual(decodeReason(SHARED));
-        const nav = decodeQuotedReason(SHARED, 'navigator');
-        expect(nav.writer).toBe('navigator');
-        expect(nav.decoded).toEqual(decodeNavigatorReason(SHARED));
-        expect(nav.decoded).not.toEqual(decodeReason(SHARED));
+    // The two engines write this shape under different bands, so without a writer neither
+    // reading is the reason's: the strategies' is not a default.
+    it('reads a shape both engines write both ways when no writer is named', () => {
+        expect(decodeQuotedReason(SHARED)).toEqual([
+            {writer: 'strategy', decoded: decodeReason(SHARED)},
+            {writer: 'navigator', decoded: decodeNavigatorReason(SHARED)},
+        ]);
+        expect(decodeNavigatorReason(SHARED)).not.toEqual(decodeReason(SHARED));
+    });
+
+    it('reads a shape both engines write by the named writer alone', () => {
+        expect(decodeQuotedReason(SHARED, 'strategy')).toEqual([{writer: 'strategy', decoded: decodeReason(SHARED)}]);
+        expect(decodeQuotedReason(SHARED, 'navigator')).toEqual([{writer: 'navigator', decoded: decodeNavigatorReason(SHARED)}]);
     });
 
     it('falls back to the other grammar when the hint names the wrong writer', () => {
-        expect(decodeQuotedReason(GOLDEN_CROSS, 'navigator')).toEqual({writer: 'strategy', decoded: decodeReason(GOLDEN_CROSS)});
-        expect(decodeQuotedReason(NAV_ENTER, 'strategy')).toEqual({writer: 'navigator', decoded: decodeNavigatorReason(NAV_ENTER)});
+        expect(decodeQuotedReason(GOLDEN_CROSS, 'navigator')).toEqual([{writer: 'strategy', decoded: decodeReason(GOLDEN_CROSS)}]);
+        expect(decodeQuotedReason(NAV_ENTER, 'strategy')).toEqual([{writer: 'navigator', decoded: decodeNavigatorReason(NAV_ENTER)}]);
     });
 
     it('keeps the decoders\' length guard: an overlong reason is not read at all', () => {
         const stale = `12/40 symbols stale: ${'ABC, '.repeat(120)}`;
         expect(stale.length).toBeGreaterThan(MAX_REASON_CHARS);
-        const out = decodeQuotedReason(stale);
-        expect(out.writer).toBeNull();
-        expect(out.decoded.clauses).toEqual([]);
+        expect(decodeQuotedReason(stale)).toEqual([]);
+    });
+
+    it('hands the model both readings of a shared shape, with no one writer and a note saying why', () => {
+        const out = explain({reason: SHARED});
+        expect(out.reason).toEqual({
+            readings: [
+                {writer: 'strategy', ...shapeReason(decodeReason(SHARED))},
+                {writer: 'navigator', ...shapeReason(decodeNavigatorReason(SHARED))},
+            ],
+        });
+        expect(out.reason).not.toHaveProperty('writer');
+        expect(out.notes).toEqual([EXPLAIN_NOTES.sharedShape]);
+        // The band clause is where the two readings part.
+        const [strategy, navigator] = out.reason && 'readings' in out.reason ? out.reason.readings : [];
+        expect(strategy?.clauses[0].gloss).not.toBe(navigator?.clauses[0].gloss);
+
+        for (const writer of ['strategy', 'navigator'] as const) {
+            const named = explain({reason: SHARED, writer});
+            expect(oneReading(named)?.writer, writer).toBe(writer);
+            expect(named.notes, writer).toEqual([]);
+        }
     });
 
     it('hands the model the Navigator\'s clauses with the glossary\'s definitions', () => {
         const out = explain({reason: NAV_NEWS});
-        expect(out.reason?.writer).toBe('navigator');
-        expect(out.reason?.unrecognised).toEqual([]);
-        expect(out.reason?.clauses[0]).toMatchObject({text: 'slow news weight 3.2', term: GLOSSARY['news-weight'].term, definition: GLOSSARY['news-weight'].short});
+        const reason = oneReading(out);
+        expect(reason?.writer).toBe('navigator');
+        expect(reason?.unrecognised).toEqual([]);
+        expect(reason?.clauses[0]).toMatchObject({text: 'slow news weight 3.2', term: GLOSSARY['news-weight'].term, definition: GLOSSARY['news-weight'].short});
         expect(out.notes).toEqual([]);
 
-        const neutral = explain({reason: NAV_NEUTRAL});
-        expect(neutral.reason?.clauses).toHaveLength(1);
-        expect(neutral.reason?.clauses[0].text).toBe(NAV_NEUTRAL);
+        const neutral = oneReading(explain({reason: NAV_NEUTRAL}));
+        expect(neutral?.clauses).toHaveLength(1);
+        expect(neutral?.clauses[0].text).toBe(NAV_NEUTRAL);
 
         const hunch = explain({reason: 'bought on a hunch', writer: 'navigator'});
         expect(hunch.reason).toEqual({clauses: [], unrecognised: ['bought on a hunch']});

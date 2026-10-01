@@ -193,7 +193,8 @@ try {
     const otherAnswer = await signInAttempt(other, P2);
     check('a different address is unaffected', /Invalid email or password/i.test(otherAnswer) && !otherAnswer.includes(LIMITED), otherAnswer);
 
-    // Per client: `next dev` sets x-forwarded-for from the socket, so this run has one key.
+    // Per client: `next dev` fills x-forwarded-for from the socket when the browser sends none,
+    // so this run has one key.
     const clientRows = await limits.find({key: /^signin:ip:/}).toArray();
     check('the client address is counted too', clientRows.length === 1 && clientRows[0].count >= EMAIL_LIMIT + 3,
         clientRows.map((r) => `${r.key}=${r.count}`).join(', '));

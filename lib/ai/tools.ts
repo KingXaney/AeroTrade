@@ -341,15 +341,15 @@ export const buildTools = (userId: string) => ({
         inputSchema: z.object({
             term: z.string().max(EXPLAIN_TERM_MAX).optional().describe('The term as the user wrote it, e.g. "max drawdown" or "my win rate"'),
             reason: z.string().max(EXPLAIN_REASON_MAX).optional().describe('A reason a quant strategy or the AI Navigator wrote, quoted exactly, e.g. "enter: SMA50 42.10 > SMA200 40.00 (+5.3%)" or "slow news weight 3.2 (rank 4/59)"'),
-            writer: z.enum(['strategy', 'navigator']).optional().describe('Who wrote the reason: "navigator" for the AI Navigator\'s decisions (getAiSuggestions), "strategy" for a quant strategy\'s. Omit it when unsure.'),
+            writer: z.enum(['strategy', 'navigator']).optional().describe('Who wrote the reason: "navigator" for the AI Navigator\'s decisions (getAiSuggestions), "strategy" for a quant strategy\'s. Omit it when unsure; a shape both engines write then comes back read both ways, one reading per writer.'),
         }),
         execute: async ({term, reason, writer}) => {
             // The glossary's one resolver and the two reason grammars; none builds a RegExp
             // from what the model passed (invariant 2).
             const entry = term ? resolveTerm(term) : null;
-            const quoted = reason ? decodeQuotedReason(reason, writer) : null;
+            const readings = reason ? decodeQuotedReason(reason, writer) : null;
             const yours = entry ? await readLearnerValue(userId, entry.key) : null;
-            return shapeExplain({term, reason, entry, decoded: quoted?.decoded ?? null, writer: quoted?.writer ?? null, yours});
+            return shapeExplain({term, reason, entry, readings, yours});
         },
     }),
 
