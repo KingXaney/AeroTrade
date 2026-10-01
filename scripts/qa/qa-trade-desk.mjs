@@ -104,7 +104,9 @@ try {
     // A user's paper account is an account; "strategy" names only the eight quant strategies.
     check('the comparison panel and its first column say account',
         await page.getByRole('heading', {name: 'Account Comparison'}).count() === 1 && await page.getByText('Account', {exact: true}).count() >= 1);
-    check('the sidebar card counts accounts', await page.getByText('All 2 accounts', {exact: true}).count() >= 1);
+    const sidebarCard = page.locator('a[href="/portfolio"]').filter({hasText: 'total return'}).first();
+    const sidebarText = (await sidebarCard.textContent().catch(() => '')) ?? '';
+    check('the sidebar card counts accounts', sidebarText.includes('All 2 accounts'), sidebarText.slice(0, 120));
     check('no account surface calls an account a strategy',
         await page.getByRole('button', {name: /Reset Account/}).count() === 1 && await page.getByText(/Strategy Comparison|Reset Strategy|New strategy account/).count() === 0);
     // The table's win rate is this epoch's, like the tile's: one winning sell, the old losing one unread.
@@ -355,6 +357,13 @@ try {
 
     // --- the dashboard quick-trade widget must not navigate -----------------------------
     await page.goto(`${BASE}/settings`, {waitUntil: 'load'});
+    // The library files the paper-account widgets under Accounts and the eight quant
+    // strategies under their own heading, not under the news brain's.
+    await page.getByLabel('Add Quick Trade').waitFor({timeout: 30000});
+    check('the widget library has an Accounts and a Quant Strategies group, and no Strategy one',
+        await page.getByText('Accounts', {exact: true}).count() >= 1 && await page.getByText('Quant Strategies', {exact: true}).count() >= 1
+        && await page.getByText('Strategy', {exact: true}).count() === 0);
+    check('the account comparison is offered as Account Comparison', await page.getByLabel('Add Account Comparison').count() === 1);
     await page.getByLabel('Add Quick Trade').click();
     await page.getByLabel('Add Recent Trades').click();
     await page.waitForTimeout(1200);   // debounced autosave
@@ -380,6 +389,17 @@ try {
     // the first half can fail here; trade-copy.test.ts owns the compact line's interest rule.
     check('the compact ticket states no cash left', compactText !== '' && !/cash left/.test(compactText), compactText || 'no line');
     await page.unroute(onTicketPages, quoteStub);
+
+    // --- a layout saved with the old 'strategy-comparison' id reads as the account comparison --
+    await db.collection('userpreferences').updateOne({userId}, {$set: {dashboardLayout: {version: 1, widgets: [{id: 'strategy-comparison', span: 8}]}}});
+    await page.goto(`${BASE}/`, {waitUntil: 'domcontentloaded'});
+    const comparison = page.locator('[data-widget-id="account-comparison"]');
+    await comparison.waitFor({timeout: 30000}).catch(() => {});
+    const comparisonText = await comparison.count() === 1 ? await comparison.innerText() : '';
+    check('a saved strategy-comparison widget renders as Account Comparison, both accounts in it',
+        /Account Comparison/i.test(comparisonText) && /Main account/i.test(comparisonText) && /Value/i.test(comparisonText), comparisonText.replace(/\s+/g, ' ').slice(0, 120));
+    check('…and reading it left the stored id alone',
+        (await db.collection('userpreferences').findOne({userId}))?.dashboardLayout?.widgets?.[0]?.id === 'strategy-comparison');
 
     // --- brain drill-downs --------------------------------------------------------------
     await page.goto(`${BASE}/brain`, {waitUntil: 'domcontentloaded'});
