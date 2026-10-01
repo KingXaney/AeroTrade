@@ -6,11 +6,7 @@ import type {SidebarTopics} from "@/lib/shell/sidebar";
 const TopicsSidebarCard = ({topics}: {topics: SidebarTopics}) => (
     <Link
         href="/topics"
-        className="relative block rounded-xl p-4 mb-6 shimmer overflow-hidden transition-all hover:brightness-110"
-        style={{
-            backgroundColor: 'color-mix(in srgb, var(--brand-strong) 6%, transparent)',
-            border: '1px solid color-mix(in srgb, var(--brand) 15%, transparent)',
-        }}
+        className="relative block rounded-xl p-4 mb-6 shimmer overflow-hidden transition-all hover:brightness-110 bg-brand-strong/6 border border-brand/15"
     >
         <div className="relative z-10">
             <div className="flex items-center gap-3 mb-2">

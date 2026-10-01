@@ -37,10 +37,9 @@ const AuthShell = ({children}: {children: React.ReactNode}) => (
                          background: 'radial-gradient(circle at 30% 50%, color-mix(in srgb, var(--brand-strong) 15%, transparent), transparent 70%)',
                      }}>
                 </div>
-                <div className="absolute top-8 left-8 right-8 bottom-8 rounded-2xl overflow-hidden"
+                <div className="absolute top-8 left-8 right-8 bottom-8 rounded-2xl overflow-hidden border border-brand/10"
                      style={{
                          background: 'linear-gradient(135deg, color-mix(in srgb, var(--brand-strong) 5%, transparent), color-mix(in srgb, var(--secondary-tint) 5%, transparent))',
-                         border: '1px solid color-mix(in srgb, var(--brand) 10%, transparent)',
                          backdropFilter: 'blur(8px)',
                      }}>
                     {/* Terminal-like decorative content */}
@@ -50,19 +49,19 @@ const AuthShell = ({children}: {children: React.ReactNode}) => (
                             <div className="w-3 h-3 rounded-full bg-brand-strong"></div>
                             <div className="w-3 h-3 rounded-full bg-brand"></div>
                         </div>
-                        <p className="font-mono" style={{ fontSize: '11px', color: 'var(--brand)' }}>
+                        <p className="font-mono text-brand" style={{ fontSize: '11px' }}>
                             &gt; SYSTEM.INIT: AeroTrade Terminal v2.44
                         </p>
-                        <p className="font-mono" style={{ fontSize: '11px', color: 'var(--fg-muted)' }}>
+                        <p className="font-mono text-fg-muted" style={{ fontSize: '11px' }}>
                             &gt; Connecting to market nodes...
                         </p>
-                        <p className="font-mono" style={{ fontSize: '11px', color: 'var(--brand-dim)' }}>
+                        <p className="font-mono text-brand-dim" style={{ fontSize: '11px' }}>
                             &gt; 47 nodes online · Latency: 0.8ms
                         </p>
-                        <p className="font-mono" style={{ fontSize: '11px', color: 'var(--fg-muted)' }}>
+                        <p className="font-mono text-fg-muted" style={{ fontSize: '11px' }}>
                             &gt; Portfolio sync: COMPLETE
                         </p>
-                        <p className="font-mono" style={{ fontSize: '11px', color: 'var(--brand)' }}>
+                        <p className="font-mono text-brand" style={{ fontSize: '11px' }}>
                             &gt; AI Assistant: READY
                         </p>
                     </div>

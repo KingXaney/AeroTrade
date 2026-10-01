@@ -31,11 +31,7 @@ function UserDropdown({user}: {user: User}) {
                 >
                     <Avatar className="h-9 w-9 ring-1 ring-line-strong group-hover:ring-brand-strong transition-all">
                         <AvatarFallback
-                            className="text-sm font-bold font-heading"
-                            style={{
-                                backgroundColor: 'var(--brand-strong)',
-                                color: 'var(--on-brand)',
-                            }}
+                            className="text-sm font-bold font-heading bg-brand-strong text-on-brand"
                         >
                             {initial}
                         </AvatarFallback>
@@ -59,23 +55,18 @@ function UserDropdown({user}: {user: User}) {
                 align="end"
                 side="bottom"
                 sideOffset={10}
-                className="w-64 !shadow-2xl !p-2"
+                className="w-64 !shadow-2xl !p-2 bg-chrome/95 border border-line-strong/40 text-fg"
                 style={{
-                    backgroundColor: 'color-mix(in srgb, var(--chrome) 95%, transparent)',
                     backdropFilter: 'blur(24px)',
                     WebkitBackdropFilter: 'blur(24px)',
-                    border: '1px solid color-mix(in srgb, var(--line-strong) 40%, transparent)',
-                    color: 'var(--fg)',
                 }}
             >
                 {/* Profile card */}
                 <DropdownMenuLabel className="!p-0">
-                    <div className="flex items-center gap-3 rounded-md p-3"
-                         style={{ backgroundColor: 'color-mix(in srgb, var(--surface-2) 50%, transparent)' }}>
+                    <div className="flex items-center gap-3 rounded-md p-3 bg-surface-2/50">
                         <Avatar className="h-11 w-11 ring-1 ring-line-strong">
                                 <AvatarFallback
-                                className="text-base font-bold font-heading"
-                                style={{ backgroundColor: 'var(--brand-strong)', color: 'var(--on-brand)' }}
+                                className="text-base font-bold font-heading bg-brand-strong text-on-brand"
                             >
                                 {initial}
                             </AvatarFallback>
@@ -91,7 +82,7 @@ function UserDropdown({user}: {user: User}) {
                     </div>
                 </DropdownMenuLabel>
 
-                <DropdownMenuSeparator style={{ backgroundColor: 'var(--surface-2)', margin: '8px 0' }}/>
+                <DropdownMenuSeparator className="bg-surface-2" style={{ margin: '8px 0' }}/>
 
                 <DropdownMenuItem asChild className="group cursor-pointer rounded-md px-3 py-2 text-sm font-medium text-fg focus:!bg-brand-strong/8 focus:!text-brand transition-colors">
                     <Link href="/topics">
@@ -108,7 +99,7 @@ function UserDropdown({user}: {user: User}) {
                     </Link>
                 </DropdownMenuItem>
 
-                <DropdownMenuSeparator style={{ backgroundColor: 'var(--surface-2)', margin: '8px 0' }}/>
+                <DropdownMenuSeparator className="bg-surface-2" style={{ margin: '8px 0' }}/>
 
                 {/* Logout — destructive intent */}
                 <DropdownMenuItem

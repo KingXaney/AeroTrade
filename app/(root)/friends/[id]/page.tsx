@@ -29,8 +29,7 @@ const FriendProfilePage = async ({params}: FriendProfilePageProps) => {
                     <span className="material-symbols-outlined">arrow_back</span>
                 </Link>
                 <div className="flex items-center gap-3">
-                    <div className="w-11 h-11 rounded-full flex items-center justify-center text-base font-bold font-heading"
-                         style={{backgroundColor: 'var(--brand-strong)', color: 'var(--on-brand)'}}>
+                    <div className="w-11 h-11 rounded-full flex items-center justify-center text-base font-bold font-heading bg-brand-strong text-on-brand">
                         {profile.name?.[0]?.toUpperCase() ?? '?'}
                     </div>
                     <div>

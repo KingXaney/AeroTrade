@@ -3,7 +3,7 @@ import {actionButton} from "@/components/primitives/ActionButton";
 
 // The 404 outside the app shell: no panel to frame, so not EmptyState.
 const NotFound = () => (
-    <main className="min-h-screen flex items-center justify-center px-6" style={{color: 'var(--fg-soft)'}}>
+    <main className="min-h-screen flex items-center justify-center px-6 text-fg-soft">
         <div className="text-center max-w-md">
             <h1 className="text-2xl font-semibold text-fg mb-2 tracking-tight font-heading">
                 Not found

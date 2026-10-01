@@ -52,11 +52,7 @@ const MobileNav = ({badges}: {badges?: NavBadges}) => {
                     <Link
                         href="/trade"
                         onClick={() => setOpen(false)}
-                        className="w-full py-3 rounded-lg mb-3 flex justify-center items-center gap-2 text-xs font-bold tracking-[0.1em] uppercase transition-all active:scale-[0.98] font-mono"
-                        style={{
-                            backgroundColor: 'var(--brand)',
-                            color: 'var(--on-brand)',
-                        }}
+                        className="w-full py-3 rounded-lg mb-3 flex justify-center items-center gap-2 text-xs font-bold tracking-[0.1em] uppercase transition-all active:scale-[0.98] font-mono bg-brand text-on-brand"
                     >
                         <span className="material-symbols-outlined text-base">candlestick_chart</span>
                         Trade Now
