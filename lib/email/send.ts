@@ -73,13 +73,14 @@ export const sendWelcomeEmail = async ({ email, name, intro }: WelcomeEmailData)
     await transporter.sendMail(mailOptions);
 }
 
-// The daily digest's date line and subject date, e.g. "Thursday, October 1, 2026".
+// The daily digest's date line and subject date, e.g. "Thursday, October 1, 2026" — the ET day,
+// like every other date the app prints.
 export const getFormattedTodayDate = () => new Date().toLocaleDateString('en-US', {
     weekday: 'long',
     year: 'numeric',
     month: 'long',
     day: 'numeric',
-    timeZone: 'UTC',
+    timeZone: 'America/New_York',
 });
 
 export const sendNewsSummaryEmail = async (
