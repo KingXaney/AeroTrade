@@ -6,15 +6,7 @@ import {NEWS_HISTORY_LIMIT} from "@/lib/news/config";
 import {getRecentTradesForUser} from "@/lib/trading/account";
 import TradeHistory from "@/components/trade/TradeHistory";
 import NewsArticleCard from "@/components/news/NewsArticleCard";
-
-const formatAddedAt = (date: Date) =>
-    new Date(date).toLocaleString('en-US', {
-        month: 'short',
-        day: 'numeric',
-        year: 'numeric',
-        hour: 'numeric',
-        minute: '2-digit',
-    });
+import {formatEasternTimestamp} from "@/lib/format";
 
 const HistoryPage = async () => {
     const userId = await getCurrentUserId();
@@ -84,7 +76,7 @@ const HistoryPage = async () => {
                                         </p>
                                         <p className="text-[10px] text-fg-muted mt-0.5"
                                            style={{ fontFamily: 'var(--type-mono)', letterSpacing: '0.02em' }}>
-                                            {formatAddedAt(item.addedAt)}
+                                            {formatEasternTimestamp(item.addedAt, {year: true})}
                                         </p>
                                     </Link>
                                 </li>

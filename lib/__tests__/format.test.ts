@@ -1,7 +1,7 @@
 import {readdirSync, readFileSync} from 'node:fs';
 import {fileURLToPath} from 'node:url';
 import {describe, expect, it} from 'vitest';
-import {formatChangePercent, formatDrawdown, formatSigned, formatSignedPrice, getChangeColorClass} from '@/lib/format';
+import {formatChangePercent, formatDrawdown, formatEasternTimestamp, formatSigned, formatSignedPrice, getChangeColorClass} from '@/lib/format';
 
 describe('formatChangePercent', () => {
     // A flat stock printed nothing at all (StockHeader's pill went blank), and a move inside
@@ -81,5 +81,22 @@ describe('no hand-rolled signs in the UI', () => {
         });
         expect(sources.length).toBeGreaterThan(50);
         expect(handRolled).toEqual([]);
+    });
+});
+
+describe('formatEasternTimestamp', () => {
+    // Vercel renders in UTC: an add made at 8:30 PM ET read as the next day at 1:30 AM with no
+    // zone, beside trade times labelled ET. Both now pin the zone and name it.
+    const plain = (text: string) => text.replace(/\u202f/g, ' ');
+
+    it('prints Eastern time with an ET label, whatever zone the server runs in', () => {
+        const instant = new Date('2026-03-02T01:30:00Z');
+        expect(plain(formatEasternTimestamp(instant))).toBe('Mar 1, 8:30 PM ET');
+        expect(plain(formatEasternTimestamp(instant.getTime()))).toBe('Mar 1, 8:30 PM ET');
+        expect(plain(formatEasternTimestamp(instant, {year: true}))).toBe('Mar 1, 2026, 8:30 PM ET');
+    });
+
+    it('follows daylight saving time', () => {
+        expect(plain(formatEasternTimestamp(new Date('2026-07-01T00:30:00Z')))).toBe('Jun 30, 8:30 PM ET');
     });
 });

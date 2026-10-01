@@ -52,3 +52,15 @@ export const getChangeColorClass = (changePercent?: number | null) => {
     if (!rounded) return 'text-fg-muted';
     return rounded > 0 ? 'text-positive' : 'text-negative';
 };
+
+// A time of day, in Eastern time and named as such: the server may run in UTC, and every time
+// the app shows (fills, watchlist adds) is read in ET.
+export const formatEasternTimestamp = (when: Date | number, {year = false}: {year?: boolean} = {}): string =>
+    `${new Date(when).toLocaleString('en-US', {
+        timeZone: 'America/New_York',
+        month: 'short',
+        day: 'numeric',
+        ...(year ? {year: 'numeric' as const} : {}),
+        hour: 'numeric',
+        minute: '2-digit',
+    })} ET`;
