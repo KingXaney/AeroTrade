@@ -5,7 +5,7 @@
 // alone would flatter every account by SPY's ~1.3% a year yield.
 
 import BenchmarkSnapshot from "@/database/models/benchmark-snapshot.model";
-import {BENCHMARK_SYMBOL} from "@/lib/constants";
+import {BENCHMARK_SYMBOL} from "@/lib/prices/config";
 import {addCalendarDays} from "@/lib/prices/calendar-days";
 import {getBarsForSymbols} from "@/lib/prices/store";
 import {totalReturnIndex, type IndexPoint} from "@/lib/prices/total-return";

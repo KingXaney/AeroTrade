@@ -2,7 +2,7 @@
 // applied to earlier bars in the simulation, so the large-cap list carries
 // survivorship bias — every large-cap strategy's explainer says so.
 
-import {BENCHMARK_SYMBOL} from "@/lib/constants";
+import {BENCHMARK_SYMBOL} from "@/lib/prices/config";
 import {SECTOR_TO_ETF} from "@/lib/navigator/config";
 import {STRATEGIES} from "@/lib/strategies/catalog";
 import type {StrategyDefinition} from "@/lib/strategies/types";

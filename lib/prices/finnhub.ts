@@ -11,7 +11,8 @@ import {
     formatChangePercent,
     formatMarketCapValue,
 } from "@/lib/utils";
-import {FINANCIALS_REVALIDATE_SECONDS, POPULAR_STOCK_SYMBOLS, PROFILE_REVALIDATE_SECONDS} from "@/lib/constants";
+import {POPULAR_STOCK_SYMBOLS} from "@/lib/constants";
+import {FINANCIALS_REVALIDATE_SECONDS, PROFILE_REVALIDATE_SECONDS} from "@/lib/prices/config";
 
 const FINNHUB_BASE_URL = 'https://finnhub.io/api/v1';
 // Server-only. NEXT_PUBLIC_FINNHUB_API_KEY is still honoured for existing deployments.

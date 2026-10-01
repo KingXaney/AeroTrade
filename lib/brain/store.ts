@@ -7,7 +7,7 @@ import NewsItem from "@/database/models/news-item.model";
 import JobRun from "@/database/models/job-run.model";
 import PriceBar from "@/database/models/price-bar.model";
 import {earliestSince, sinceThesisBySymbol, sinceThesisTargets, type SinceThesisLegs} from "@/lib/brain/since-thesis";
-import {BENCHMARK_SYMBOL} from "@/lib/constants";
+import {BENCHMARK_SYMBOL} from "@/lib/prices/config";
 import {createDayMemo, remember} from "@/lib/day-memo";
 import {addCalendarDays} from "@/lib/prices/calendar-days";
 import {getBarsFrom, getLatestBars} from "@/lib/prices/store";

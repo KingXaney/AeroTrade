@@ -11,10 +11,9 @@
 // lib/strategies/learn/time-in-market.ts. A failed read returns null and the page hides the panel rather
 // than showing zeros.
 
-import {BENCHMARK_SYMBOL} from "@/lib/constants";
 import {createDayMemo, remember} from "@/lib/day-memo";
 import {addCalendarDays} from "@/lib/prices/calendar-days";
-import {RATE_SYMBOL} from "@/lib/prices/config";
+import {RATE_SYMBOL, BENCHMARK_SYMBOL} from "@/lib/prices/config";
 import {getBarsForSymbols, getLatestBars, getRatePoints} from "@/lib/prices/store";
 import {readAccountsForUser} from "@/lib/trading/account";
 import {makeRateLookup, RATE_MAX_STALENESS_DAYS, type RatePoint} from "@/lib/income/accrual";

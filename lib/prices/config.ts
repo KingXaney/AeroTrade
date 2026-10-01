@@ -21,3 +21,11 @@ export const RATE_SYMBOL = '^IRX';
 // (the bar fetched the next morning may not carry Yahoo's rebase yet). Accounts, the SPY
 // total-return benchmark and the strategy simulator all use this one number.
 export const DIVIDEND_PAY_LAG_DAYS = 5;
+
+// Benchmark ETF snapshotted daily for the performance comparison chart.
+export const BENCHMARK_SYMBOL = 'SPY';
+
+// How long the Finnhub fetches behind the stock page's "Key numbers" are cached
+// (lib/prices/finnhub.ts); the panel's source line states both, from these.
+export const FINANCIALS_REVALIDATE_SECONDS = 60 * 60;
+export const PROFILE_REVALIDATE_SECONDS = 24 * 60 * 60;

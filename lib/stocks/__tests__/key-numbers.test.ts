@@ -6,7 +6,7 @@
 // every figure a sentence repeats is parsed back and checked against the value beside it.
 
 import {afterEach, describe, expect, it, vi} from 'vitest';
-import {FINANCIALS_REVALIDATE_SECONDS, PROFILE_REVALIDATE_SECONDS} from '@/lib/constants';
+import {FINANCIALS_REVALIDATE_SECONDS, PROFILE_REVALIDATE_SECONDS} from '@/lib/prices/config';
 import {findBanned} from '@/lib/learn/banned';
 import {isGlossaryKey} from '@/lib/learn/glossary';
 import {KEY_NUMBER_KEYS, readKeyNumbers, type KeyNumber} from '@/lib/stocks/key-numbers';
@@ -181,7 +181,7 @@ describe('readKeyNumbers', () => {
 
 describe('the source line follows the cache it describes', () => {
     afterEach(() => {
-        vi.doUnmock('@/lib/constants');
+        vi.doUnmock('@/lib/prices/config');
         vi.resetModules();
     });
 
@@ -193,8 +193,8 @@ describe('the source line follows the cache it describes', () => {
 
     it('moves with the constants', async () => {
         vi.resetModules();
-        vi.doMock('@/lib/constants', async (importOriginal) => ({
-            ...(await importOriginal<typeof import('@/lib/constants')>()),
+        vi.doMock('@/lib/prices/config', async (importOriginal) => ({
+            ...(await importOriginal<typeof import('@/lib/prices/config')>()),
             FINANCIALS_REVALIDATE_SECONDS: 30 * 60,
             PROFILE_REVALIDATE_SECONDS: 6 * 60 * 60,
         }));

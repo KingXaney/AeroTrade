@@ -14,10 +14,9 @@
 // never pinned. The maths is lib/trading/learn/random-portfolios.ts. A failed read returns null and the
 // page hides the panel rather than showing zeros.
 
-import {BENCHMARK_SYMBOL} from "@/lib/constants";
 import {createDayMemo, remember} from "@/lib/day-memo";
 import {addCalendarDays} from "@/lib/prices/calendar-days";
-import {RATE_SYMBOL} from "@/lib/prices/config";
+import {RATE_SYMBOL, BENCHMARK_SYMBOL} from "@/lib/prices/config";
 import {getHoldWindowBars, getLatestBars, getRatePoints} from "@/lib/prices/store";
 import {getLastSnapshotBetween} from "@/lib/trading/account";
 import {RATE_MAX_STALENESS_DAYS} from "@/lib/income/accrual";

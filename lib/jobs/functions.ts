@@ -52,7 +52,6 @@ import {connectToDatabase} from "@/database/mongoose";
 import PaperAccount from "@/database/models/paper-account.model";
 import AccountSnapshot from "@/database/models/account-snapshot.model";
 import BenchmarkSnapshot from "@/database/models/benchmark-snapshot.model";
-import {BENCHMARK_SYMBOL} from "@/lib/constants";
 import {buildPriceMap, computePortfolio, getHeldSymbolsByUserId, getOwnedAccount, type PriceInfo} from "@/lib/trading/account";
 import Topic from "@/database/models/topic.model";
 import {loadBriefCandidates, loadStaleKeywordGroups, refreshKeywordGroup, saveTopicBrief, type KeywordGroup} from "@/lib/topics/refresh";
@@ -84,7 +83,7 @@ import {
     type OrderOutcome,
 } from "@/lib/strategies/store";
 import {ALL_STRATEGY_SYMBOLS, BENCHMARK_SYMBOL as STRATEGY_BENCHMARK, CORE_ETFS, LARGE_CAPS, SECTOR_ETFS} from "@/lib/strategies/universe";
-import {PRICE_CHUNK_SIZE, RATE_SYMBOL, STRATEGY_BACKFILL_CALENDAR_DAYS} from "@/lib/prices/config";
+import {PRICE_CHUNK_SIZE, RATE_SYMBOL, STRATEGY_BACKFILL_CALENDAR_DAYS, BENCHMARK_SYMBOL} from "@/lib/prices/config";
 import {NYSE_HOLIDAYS, isTradingDay, marketStatus} from "@/lib/prices/market-hours";
 
 // Absolute links in email need the deployment's public URL (the same one better-auth uses).
