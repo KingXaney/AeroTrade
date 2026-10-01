@@ -20,7 +20,7 @@ const MarketNewsList = ({news, span = 6}: {news: MarketNewsArticle[]; span?: num
             <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
                 {news.slice(0, countForSpan(span)).map((article) => <NewsArticleCard key={article.id} article={article} />)}
             </div>
-            <Link href="/news" className="inline-block mt-3 text-xs text-brand hover:underline" style={{fontFamily: 'var(--type-mono)'}}>
+            <Link href="/news" className="inline-block mt-3 text-xs text-brand hover:underline font-mono">
                 Edit your feed →
             </Link>
         </div>

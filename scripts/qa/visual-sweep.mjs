@@ -1,0 +1,78 @@
+// A screenshot of every page, signed out and signed in as a fresh user, at a desktop and a phone
+// width — the before/after record for a change meant to look identical (a refactor, a styling
+// migration). Saves to ./output/sweep/<width>/<name>.png. Run it on the base, copy the folder
+// aside, run it on the change, then compare with `node visual-diff.mjs <before> <after>`.
+// Needs the harness from README.md (in-memory Mongo + `npm run dev`).
+import {chromium} from 'playwright';
+import {mkdirSync} from 'node:fs';
+
+const BASE = process.env.QA_BASE_URL ?? 'http://localhost:3000';
+const OUT = new URL('./output/sweep/', import.meta.url).pathname;
+const WIDTHS = [{name: 'desktop', width: 1440, height: 900}, {name: 'phone', width: 390, height: 844}];
+
+const SIGNED_OUT = [
+    ['sign-in', '/sign-in'],
+    ['sign-up', '/sign-up'],
+    ['forgot-password', '/forgot-password'],
+    ['reset-password-bad-token', '/reset-password?token=not-a-token'],
+];
+const SIGNED_IN = [
+    ['dashboard', '/'],
+    ['topics', '/topics'],
+    ['news', '/news'],
+    ['brain', '/brain'],
+    ['portfolio', '/portfolio'],
+    ['trade', '/trade'],
+    ['markets', '/markets'],
+    ['watchlist', '/watchlist'],
+    ['friends', '/friends'],
+    ['history', '/history'],
+    ['settings', '/settings'],
+    ['learn', '/learn'],
+    ['strategies', '/strategies'],
+    ['strategy-rsi2', '/strategies/rsi2-mean-reversion'],
+    ['strategy-buy-and-hold', '/strategies/buy-and-hold-spy'],
+    ['stock-spy', '/stocks/SPY'],
+    ['not-found', '/this-page-does-not-exist'],
+];
+
+// Animated and time-dependent pieces would make every run differ; hide them so a diff means markup.
+const STILL = `
+  *, *::before, *::after { animation: none !important; transition: none !important; caret-color: transparent !important; }
+  canvas, iframe, .tradingview-widget-container, [data-testid="market-status"] { visibility: hidden !important; }
+`;
+
+const shoot = async (page, width, name, path) => {
+    await page.goto(`${BASE}${path}`, {waitUntil: 'load'});
+    await page.waitForLoadState('networkidle', {timeout: 15000}).catch(() => {});
+    await page.addStyleTag({content: STILL}).catch(() => {});
+    await page.evaluate(() => document.fonts.ready).catch(() => {});
+    await page.waitForTimeout(600);
+    await page.screenshot({path: `${OUT}${width.name}/${name}.png`, fullPage: true});
+};
+
+const browser = await chromium.launch({channel: 'chrome'});
+let shots = 0;
+try {
+    for (const width of WIDTHS) {
+        mkdirSync(`${OUT}${width.name}`, {recursive: true});
+        const out = await browser.newPage({viewport: {width: width.width, height: width.height}});
+        for (const [name, path] of SIGNED_OUT) { await shoot(out, width, name, path); shots++; }
+        await out.close();
+    }
+    const page = await browser.newPage({viewport: {width: 1440, height: 900}});
+    const email = `qasweep${Date.now()}@example.com`;
+    await page.goto(`${BASE}/sign-up`, {waitUntil: 'load'});
+    await page.fill('#fullName', 'QA Sweep');
+    await page.fill('#email', email);
+    await page.fill('#password', 'Passw0rd!Passw0rd!');
+    await page.click('button[type="submit"]');
+    await page.waitForURL(new RegExp(`^${BASE}/(\\?.*)?$`), {timeout: 90000});
+    for (const width of WIDTHS) {
+        await page.setViewportSize({width: width.width, height: width.height});
+        for (const [name, path] of SIGNED_IN) { await shoot(page, width, name, path); shots++; }
+    }
+} finally {
+    await browser.close();
+}
+console.log(`saved ${shots} screenshots to ${OUT}`);

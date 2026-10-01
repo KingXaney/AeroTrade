@@ -1,5 +1,6 @@
 import type {ReactNode} from "react";
 import {cn} from "@/lib/utils";
+import MicroLabel from "@/components/primitives/MicroLabel";
 
 // The one label / value / hint tile: the account summary, the analytics and simulated tiles,
 // the learn lenses and the brain's system status are all built from it. `sm` is the denser
@@ -14,7 +15,7 @@ type Props = {
 
 const StatTile = ({label, value, valueClass, hint, size = 'md'}: Props) => (
     <div className={cn('flex flex-col', size === 'sm' ? 'gap-0.5' : 'gap-1')}>
-        <span className="font-mono text-[10px] uppercase tracking-[0.1em] text-fg-muted">{label}</span>
+        <MicroLabel>{label}</MicroLabel>
         <span className={cn('font-heading font-semibold text-fg', size === 'sm' ? 'text-sm' : 'text-lg', valueClass)}>{value}</span>
         {hint && <span className="font-mono text-[10px] text-fg-muted">{hint}</span>}
     </div>

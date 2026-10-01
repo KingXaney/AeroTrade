@@ -41,8 +41,7 @@ const MobileNav = ({badges}: {badges?: NavBadges}) => {
                 <div className="flex items-center gap-2 px-4 h-16 border-b border-line-strong/15">
                     <span className="material-symbols-outlined text-brand-strong"
                           style={{fontVariationSettings: "'FILL' 1"}}>terminal</span>
-                    <span className="text-lg font-semibold tracking-tighter text-brand"
-                          style={{fontFamily: 'var(--type-display)'}}>AeroTrade</span>
+                    <span className="text-lg font-semibold tracking-tighter text-brand font-heading">AeroTrade</span>
                 </div>
 
                 <div className="flex-1 overflow-y-auto py-4">
@@ -53,12 +52,7 @@ const MobileNav = ({badges}: {badges?: NavBadges}) => {
                     <Link
                         href="/trade"
                         onClick={() => setOpen(false)}
-                        className="w-full py-3 rounded-lg mb-3 flex justify-center items-center gap-2 text-xs font-bold tracking-[0.1em] uppercase transition-all active:scale-[0.98]"
-                        style={{
-                            fontFamily: 'var(--type-mono)',
-                            backgroundColor: 'var(--brand)',
-                            color: 'var(--on-brand)',
-                        }}
+                        className="w-full py-3 rounded-lg mb-3 flex justify-center items-center gap-2 text-xs font-bold tracking-[0.1em] uppercase transition-all active:scale-[0.98] font-mono bg-brand text-on-brand"
                     >
                         <span className="material-symbols-outlined text-base">candlestick_chart</span>
                         Trade Now
@@ -68,8 +62,7 @@ const MobileNav = ({badges}: {badges?: NavBadges}) => {
                         onClick={async () => {
                             if (await signOut()) setOpen(false);
                         }}
-                        className="w-full flex items-center gap-4 px-4 py-2 text-fg-soft hover:text-negative transition-colors text-xs font-bold tracking-[0.1em] uppercase"
-                        style={{fontFamily: 'var(--type-mono)'}}
+                        className="w-full flex items-center gap-4 px-4 py-2 text-fg-soft hover:text-negative transition-colors text-xs font-bold tracking-[0.1em] uppercase font-mono"
                     >
                         <span className="material-symbols-outlined text-sm">logout</span>
                         <span>Logout</span>

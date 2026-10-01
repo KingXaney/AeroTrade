@@ -11,6 +11,7 @@ import NewsFeedSettings from "@/components/settings/NewsFeedSettings";
 import {getNewsFeedPrefs} from "@/lib/news/feed-store";
 import {getCachedTopicsOverview} from "@/lib/topics/store";
 import {getVisibleLayout} from "@/lib/dashboard/availability";
+import Panel from "@/components/primitives/Panel";
 
 const SECTIONS = [
     {id: 'topics', label: 'Topics', icon: 'interests'},
@@ -35,54 +36,53 @@ const SettingsPage = async () => {
     return (
         <div className="space-y-4">
             <div className="mb-2">
-                <h1 className="text-2xl font-semibold text-fg mb-1" style={{fontFamily: 'var(--type-display)'}}>
+                <h1 className="text-2xl font-semibold text-fg mb-1 font-heading">
                     Settings
                 </h1>
                 <p className="text-sm text-fg-muted">Topics, your news feed, appearance, dashboard layout, notifications and your account</p>
             </div>
 
             <div className="grid grid-cols-1 lg:grid-cols-12 gap-4 items-start">
-                <nav className="lg:col-span-3 lg:sticky lg:top-24 glass-panel rounded-xl p-2" aria-label="Settings sections">
+                <Panel as="nav" pad={2} className="lg:col-span-3 lg:sticky lg:top-24" aria-label="Settings sections">
                     {SECTIONS.map((s) => (
                         <a key={s.id} href={`#${s.id}`}
-                           className="flex items-center gap-3 px-3 py-2.5 rounded-lg text-xs font-bold tracking-[0.1em] uppercase text-fg-soft hover:text-fg hover:bg-surface-3 transition-colors"
-                           style={{fontFamily: 'var(--type-mono)'}}>
+                           className="flex items-center gap-3 px-3 py-2.5 rounded-lg text-xs font-bold tracking-[0.1em] uppercase text-fg-soft hover:text-fg hover:bg-surface-3 transition-colors font-mono">
                             <span className="material-symbols-outlined text-base">{s.icon}</span>
                             {s.label}
                         </a>
                     ))}
-                </nav>
+                </Panel>
 
                 <div className="lg:col-span-9 space-y-4">
-                    <section id="topics" className="glass-panel rounded-xl p-5 scroll-mt-24">
+                    <Panel id="topics" className="scroll-mt-24">
                         <SectionHeading>Topics</SectionHeading>
                         <TopicsSettings overview={topics} />
-                    </section>
+                    </Panel>
 
-                    <section id="news" className="glass-panel rounded-xl p-5 scroll-mt-24">
+                    <Panel id="news" className="scroll-mt-24">
                         <SectionHeading>News feed</SectionHeading>
                         <NewsFeedSettings initial={newsFeed} />
-                    </section>
+                    </Panel>
 
-                    <section id="appearance" className="glass-panel rounded-xl p-5 scroll-mt-24">
+                    <Panel id="appearance" className="scroll-mt-24">
                         <SectionHeading>Appearance</SectionHeading>
                         <AppearanceSettings />
-                    </section>
+                    </Panel>
 
-                    <section id="dashboard" className="glass-panel rounded-xl p-5 scroll-mt-24">
+                    <Panel id="dashboard" className="scroll-mt-24">
                         <SectionHeading>Dashboard</SectionHeading>
                         <DashboardSettings initialLayout={visibleLayout} availableIds={availableIds} />
-                    </section>
+                    </Panel>
 
-                    <section id="notifications" className="glass-panel rounded-xl p-5 scroll-mt-24">
+                    <Panel id="notifications" className="scroll-mt-24">
                         <SectionHeading>Notifications</SectionHeading>
                         <NotificationSettings initial={notifications} />
-                    </section>
+                    </Panel>
 
-                    <section id="account" className="glass-panel rounded-xl p-5 scroll-mt-24">
+                    <Panel id="account" className="scroll-mt-24">
                         <SectionHeading>Account</SectionHeading>
                         <AccountSection user={user} />
-                    </section>
+                    </Panel>
                 </div>
             </div>
         </div>

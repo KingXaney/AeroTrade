@@ -4,6 +4,8 @@
 // the Navigator's own constants so the copy cannot drift from the code.
 
 import {HARD_STOP_DRAWDOWN, MAX_POSITION_WEIGHT, MIN_CASH_WEIGHT} from "@/lib/navigator/config";
+import {STRATEGIES} from "@/lib/strategies/catalog";
+import {capitalize, numberWord} from "@/lib/text";
 
 const pct = (fraction: number): string => `${Math.round(fraction * 100)}%`;
 
@@ -32,7 +34,7 @@ export const MISSION_COPY: readonly MissionCopy[] = [
         title: 'Follow a quant strategy',
         href: '/strategies',
         lesson: [
-            'Eight rule-based strategies trade their own paper accounts every trading morning, with no AI involved.',
+            `${capitalize(numberWord(STRATEGIES.length))} rule-based strategies trade their own paper accounts every trading morning, with no AI involved.`,
             'Each page states the rule in one line, shows what it is watching, and lists every fill with the reason the rule gave.',
             'A followed strategy is pinned at the top of the Quant Strategies widget; its live record is measured against SPY over the same days.',
         ],
@@ -74,3 +76,5 @@ export const MISSIONS_FOOTER = (done: number, total: number): string =>
 
 export const MISSIONS_LESSON_LABEL = '60-second lesson';
 export const MISSIONS_HIDE_LABEL = 'Hide';
+export const MISSIONS_HIDING = 'Hiding…';
+export const MISSIONS_HIDE_FAILED = 'Could not hide the checklist';

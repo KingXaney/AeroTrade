@@ -4,7 +4,9 @@ import StatTile from "@/components/primitives/StatTile";
 import Term from "@/components/primitives/Term";
 import WhatTheseMean from "@/components/learn/WhatTheseMean";
 import type {AccountIncomeSummary} from '@/lib/income/types';
+import {INCOME_COPY} from '@/lib/learn/copy/income';
 import type {PortfolioSummary} from '@/lib/trading/types';
+import Panel from '@/components/primitives/Panel';
 
 // Income is optional: the aggregated dashboard and a friend's page show the headline numbers
 // only; the account's own page says where part of the return came from.
@@ -13,14 +15,14 @@ import type {PortfolioSummary} from '@/lib/trading/types';
 const AccountSummary = ({portfolio, income, definitions = false}: {portfolio: PortfolioSummary; income?: AccountIncomeSummary; definitions?: boolean}) => {
     const earned = income ? income.interest + income.dividends : 0;
     const returnHint = income && earned > 0
-        ? `incl. ${formatPrice(income.interest)} interest · ${formatPrice(income.dividends)} dividends`
+        ? INCOME_COPY.returnHint(formatPrice(income.interest), formatPrice(income.dividends))
         : undefined;
-    const cashHint = income?.apy != null ? `earning ${(income.apy * 100).toFixed(2)}% APY` : undefined;
+    const cashHint = income?.apy != null ? INCOME_COPY.cashHint(income.apy) : undefined;
 
     const returnClass = getChangeColorClass(portfolio.totalReturnPct);
 
     return (
-        <div className="glass-panel rounded-xl p-5 shimmer">
+        <Panel as="div" className="shimmer">
             <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
                 <StatTile label={<Term k="net-worth">Net Worth</Term>} value={formatPrice(portfolio.totalValue)} valueClass="text-brand" />
                 <StatTile
@@ -41,7 +43,7 @@ const AccountSummary = ({portfolio, income, definitions = false}: {portfolio: Po
                     'buying-power', ...(cashHint ? ['apy'] : []), 'holdings-value',
                 ]} />
             )}
-        </div>
+        </Panel>
     );
 };
 

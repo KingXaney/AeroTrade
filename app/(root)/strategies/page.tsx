@@ -9,6 +9,7 @@ import SectionHeading from "@/components/primitives/SectionHeading";
 import HowToRead from "@/components/strategies/HowToRead";
 import StrategyLeaderboard from "@/components/strategies/StrategyLeaderboard";
 import StrategyStatusStrip from "@/components/strategies/StrategyStatusStrip";
+import {STRATEGIES_PAGE_COPY} from "@/lib/learn/copy/strategies";
 
 const StrategiesPage = async () => {
     const userId = await requireUserId();
@@ -21,9 +22,7 @@ const StrategiesPage = async () => {
     // eslint-disable-next-line react-hooks/purity -- the age note is informational and re-renders every request
     const young = everyLiveRecordYoung(leaderboard.rows, Date.now());
 
-    const valuation = leaderboard.started
-        ? (marketOpen ? 'live valuation at the last price' : 'valued at the last close')
-        : 'no live records yet';
+    const valuation = STRATEGIES_PAGE_COPY.valuation(leaderboard.started ? (marketOpen ? 'open' : 'closed') : 'not-started');
 
     return (
         <div className="space-y-4">
@@ -31,7 +30,7 @@ const StrategiesPage = async () => {
                 live and simulated mean is one click away in the reading guide below. */}
             <PageTitle
                 title="Quant Strategies"
-                subtitle="Eight classic rules, paper-traded live against the S&P 500."
+                subtitle={STRATEGIES_PAGE_COPY.subtitle}
             />
 
             <StrategyStatusStrip status={status} />
@@ -40,7 +39,7 @@ const StrategiesPage = async () => {
                 <div className="flex items-center justify-between mb-4 gap-3">
                     <SectionHeading spacing="none">Leaderboard</SectionHeading>
                     <MicroLabel id="strategies-valuation" className="text-right">
-                        ranked by live return · {valuation}
+                        {STRATEGIES_PAGE_COPY.rankedBy(valuation)}
                     </MicroLabel>
                 </div>
 
@@ -48,12 +47,12 @@ const StrategiesPage = async () => {
                     Amber is reserved for something actually being wrong. */}
                 {young && (
                     <p role="status" className="font-mono mb-3 text-[11px] text-fg-muted">
-                        Live records are under {LIVE_YOUNG_DAYS} days old — the simulated column shows each rule&apos;s three-year backtest for context.
+                        {STRATEGIES_PAGE_COPY.young(LIVE_YOUNG_DAYS)}
                     </p>
                 )}
                 {!leaderboard.started && (
                     <p role="status" className="font-mono mb-3 text-[11px] text-warning">
-                        The strategies have not run yet. Their accounts open on the first trading morning after deployment.
+                        {STRATEGIES_PAGE_COPY.notRun}
                     </p>
                 )}
 

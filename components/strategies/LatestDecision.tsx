@@ -6,6 +6,7 @@ import Badge from "@/components/primitives/Badge";
 import EmptyState from "@/components/primitives/EmptyState";
 import MicroLabel from "@/components/primitives/MicroLabel";
 import ReasonDisclosure from "@/components/strategies/ReasonDisclosure";
+import RowCard from "@/components/primitives/RowCard";
 
 // The most recent run's plan and what came of it: every order with the rule's own
 // reason, whether it filled and at what price, and anything it could not do. An order that
@@ -69,7 +70,7 @@ const LatestDecision = ({run, headline, signals, def}: Props) => {
             {run.orders.length > 0 && (
                 <ul className="space-y-1.5">
                     {run.orders.map((o) => (
-                        <li key={`${o.side}-${o.symbol}`} data-run-verdict className="px-3 py-2 rounded-lg border bg-surface-2/40 border-line-strong/20">
+                        <RowCard as="li" key={`${o.side}-${o.symbol}`} data-run-verdict className="px-3 py-2">
                             <div className="flex items-center justify-between gap-3">
                                 <div className="flex items-center gap-2 min-w-0">
                                     <Badge tone={o.side === 'buy' ? 'brand' : 'negative'} variant="outline">{o.side}</Badge>
@@ -82,7 +83,7 @@ const LatestDecision = ({run, headline, signals, def}: Props) => {
                             </div>
                             <p data-order-reason className="mt-1 text-[11px] text-fg-muted leading-snug">{o.reason}</p>
                             {!o.executed && <ReasonDisclosure reason={o.reason} symbol={o.symbol} def={def} />}
-                        </li>
+                        </RowCard>
                     ))}
                 </ul>
             )}

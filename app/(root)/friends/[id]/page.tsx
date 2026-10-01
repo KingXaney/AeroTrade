@@ -7,6 +7,9 @@ import {getFriendProfile} from "@/lib/friends/store";
 import {unpricedLabel} from "@/lib/trading/analytics";
 import AccountSummary from "@/components/trading/portfolio/AccountSummary";
 import HoldingsTable from "@/components/trading/portfolio/HoldingsTable";
+import Panel from "@/components/primitives/Panel";
+import RowCard from "@/components/primitives/RowCard";
+import SectionHeading from "@/components/primitives/SectionHeading";
 
 type FriendProfilePageProps = {
     params: Promise<{id: string}>;
@@ -27,15 +30,14 @@ const FriendProfilePage = async ({params}: FriendProfilePageProps) => {
                     <span className="material-symbols-outlined">arrow_back</span>
                 </Link>
                 <div className="flex items-center gap-3">
-                    <div className="w-11 h-11 rounded-full flex items-center justify-center text-base font-bold"
-                         style={{backgroundColor: 'var(--brand-strong)', color: 'var(--on-brand)', fontFamily: 'var(--type-display)'}}>
+                    <div className="w-11 h-11 rounded-full flex items-center justify-center text-base font-bold font-heading bg-brand-strong text-on-brand">
                         {profile.name?.[0]?.toUpperCase() ?? '?'}
                     </div>
                     <div>
-                        <h1 className="text-2xl font-semibold text-fg tracking-tight" style={{fontFamily: 'var(--type-display)'}}>
+                        <h1 className="text-2xl font-semibold text-fg tracking-tight font-heading">
                             {profile.name}
                         </h1>
-                        <p className="text-xs text-fg-muted" style={{fontFamily: 'var(--type-mono)'}}>{profile.email}</p>
+                        <p className="text-xs text-fg-muted font-mono">{profile.email}</p>
                     </div>
                 </div>
             </div>
@@ -43,7 +45,7 @@ const FriendProfilePage = async ({params}: FriendProfilePageProps) => {
             {/* Best account, shown in full */}
             <div className="flex items-center gap-2">
                 <span className="material-symbols-outlined text-base text-brand">account_tree</span>
-                <span className="text-xs uppercase tracking-[0.1em] text-fg-muted" style={{fontFamily: 'var(--type-mono)'}}>
+                <span className="text-xs uppercase tracking-[0.1em] text-fg-muted font-mono">
                     Best account · <span className="text-fg">{profile.accountName}</span>
                 </span>
             </div>
@@ -51,16 +53,15 @@ const FriendProfilePage = async ({params}: FriendProfilePageProps) => {
 
             {/* All accounts at a glance */}
             {profile.accounts.length > 1 && (
-                <section className="glass-panel rounded-xl p-5">
-                    <h2 className="text-sm font-bold uppercase tracking-[0.1em] text-brand mb-4" style={{fontFamily: 'var(--type-mono)'}}>
+                <Panel>
+                    <SectionHeading>
                         Accounts
-                    </h2>
+                    </SectionHeading>
                     <div className="space-y-1.5">
                         {profile.accounts.map((a) => (
-                            <div key={a.name}
-                                 className="flex items-center justify-between px-4 py-3 rounded-lg border bg-surface-2/40 border-line-strong/20">
-                                <span className="text-sm text-fg" style={{fontFamily: 'var(--type-mono)'}}>{a.name}</span>
-                                <div className="text-right" style={{fontFamily: 'var(--type-mono)'}}>
+                            <RowCard key={a.name} className="flex items-center justify-between">
+                                <span className="text-sm text-fg font-mono">{a.name}</span>
+                                <div className="text-right font-mono">
                                     <span className="text-sm text-fg mr-3">{formatPrice(a.totalValue)}</span>
                                     <span className={cn('text-xs', getChangeColorClass(a.totalReturnPct))}>
                                         {formatPct(a.totalReturnPct)}
@@ -69,18 +70,18 @@ const FriendProfilePage = async ({params}: FriendProfilePageProps) => {
                                         <span className="block text-[10px] text-warning">{unpricedLabel(a.unpriced, a.holdings)}</span>
                                     )}
                                 </div>
-                            </div>
+                            </RowCard>
                         ))}
                     </div>
-                </section>
+                </Panel>
             )}
 
-            <section className="glass-panel rounded-xl p-5">
-                <h2 className="text-sm font-bold uppercase tracking-[0.1em] text-brand mb-4" style={{fontFamily: 'var(--type-mono)'}}>
+            <Panel>
+                <SectionHeading>
                     {profile.name}&apos;s Holdings
-                </h2>
+                </SectionHeading>
                 <HoldingsTable positions={profile.portfolio.positions} emptyText={`${profile.name} has no open positions yet.`} />
-            </section>
+            </Panel>
         </div>
     );
 };

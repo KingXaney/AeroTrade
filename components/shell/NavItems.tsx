@@ -26,8 +26,7 @@ function NavItems({initialStocks, initialTopics}: NavItemsProps) {
                             isActiveNav(pathName, href)
                                 ? 'text-brand border-b-2 border-brand pb-1'
                                 : 'text-fg-soft hover:text-fg'
-                        }`}
-                        style={{fontFamily: 'var(--type-mono)'}}
+                        } font-mono`}
                     >
                         {label}
                     </Link>

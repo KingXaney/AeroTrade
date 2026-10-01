@@ -20,7 +20,7 @@ const Layout = async ({children}: {children: React.ReactNode}) => {
     const shell = await getShellView(user.id);
 
     return (
-        <main className="min-h-screen" style={{ color: 'var(--fg-soft)' }}>
+        <main className="min-h-screen text-fg-soft">
             <Header
                 user={user}
                 initialStocks={shell.initialStocks}

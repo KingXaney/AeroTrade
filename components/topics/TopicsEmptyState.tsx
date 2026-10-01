@@ -12,6 +12,7 @@ import {cn} from "@/lib/utils";
 import {followStarterTopics, restoreDefaultTopics} from "@/lib/actions/topics.actions";
 import {STARTER_TOPICS, type StarterGroup} from "@/lib/topics/starters";
 import type {SuggestedTopic} from "@/lib/topics/types";
+import ActionButton from "@/components/primitives/ActionButton";
 
 const GROUP_LABEL: Record<StarterGroup, string> = {finance: 'Markets & macro', world: 'World news'};
 const GROUPS: StarterGroup[] = ['finance', 'world'];
@@ -102,21 +103,18 @@ const TopicsEmptyState = ({brainSuggestions, canRestoreDefaults = false}: {brain
                 </div>
 
                 <div className="font-mono mt-6 flex flex-wrap items-center gap-2">
-                    <button type="button" onClick={followSelected} disabled={pending || selected.size === 0}
-                            className="inline-flex items-center gap-2 px-4 py-2 rounded-lg text-xs font-bold uppercase tracking-[0.1em] bg-brand text-on-brand disabled:opacity-50">
+                    <ActionButton size="md" className="inline-flex items-center gap-2" onClick={followSelected} disabled={pending || selected.size === 0}>
                         {pending && <Loader2 className="size-3.5 animate-spin" />}
                         Follow {selected.size > 0 ? `${selected.size} selected` : 'selected'}
-                    </button>
+                    </ActionButton>
                     {canRestoreDefaults && (
-                        <button type="button" onClick={restoreDefaults} disabled={pending}
-                                className="px-4 py-2 rounded-lg text-xs font-bold uppercase tracking-[0.1em] text-fg-soft hover:text-fg border border-line-strong/40 disabled:opacity-50">
+                        <ActionButton variant="secondary" size="md" onClick={restoreDefaults} disabled={pending}>
                             Restore the default topics
-                        </button>
+                        </ActionButton>
                     )}
-                    <button type="button" onClick={() => setComposerOpen(true)}
-                            className="px-4 py-2 rounded-lg text-xs font-bold uppercase tracking-[0.1em] text-fg-soft hover:text-fg border border-line-strong/40">
+                    <ActionButton variant="secondary" size="md" onClick={() => setComposerOpen(true)}>
                         Write my own
-                    </button>
+                    </ActionButton>
                 </div>
             </Panel>
             <TopicComposer open={composerOpen} onOpenChange={setComposerOpen} mode="create" />

@@ -10,6 +10,8 @@ import {estRealizedPnl} from "@/lib/trading/order-math";
 import type {Lot} from "@/lib/trading/lots";
 import {SELL_NOTES_COPY} from "@/lib/learn/copy/receipts";
 import MicroLabel from "@/components/primitives/MicroLabel";
+import ActionButton from "@/components/primitives/ActionButton";
+import TextField from "@/components/primitives/TextField";
 import {Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle} from "@/components/ui/dialog";
 import type {EnrichedPosition} from '@/lib/trading/types';
 
@@ -56,7 +58,7 @@ const SellPositionDialog = ({position, accountId, notes, onClose}: {position: En
         <Dialog open onOpenChange={(open) => { if (!open && !submitting) onClose(); }}>
             <DialogContent className="bg-surface-1 ring-line sm:max-w-sm">
                 <DialogHeader>
-                    <DialogTitle className="text-sm font-bold uppercase tracking-[0.1em] text-negative" style={{fontFamily: 'var(--type-mono)'}}>
+                    <DialogTitle className="text-sm font-bold uppercase tracking-[0.1em] text-negative font-mono">
                         Sell {position.symbol}
                     </DialogTitle>
                     <DialogDescription className="text-fg-muted">
@@ -66,36 +68,34 @@ const SellPositionDialog = ({position, accountId, notes, onClose}: {position: En
 
                 <form className="flex flex-col gap-4" onSubmit={(e) => { e.preventDefault(); void onConfirm(); }}>
                     <div>
-                        <label htmlFor="sell-qty" className="text-[10px] uppercase tracking-[0.1em] text-fg-muted" style={{fontFamily: 'var(--type-mono)'}}>
+                        <MicroLabel as="label" htmlFor="sell-qty">
                             Shares to sell
-                        </label>
-                        <input
+                        </MicroLabel>
+                        <TextField
                             id="sell-qty"
                             value={qty}
                             onChange={(e) => setQty(e.target.value.replace(/[^0-9]/g, ''))}
                             inputMode="numeric"
                             autoComplete="off"
-                            className="w-full mt-1 rounded-lg px-3 py-2 text-sm text-fg outline-none field-focus"
-                            style={{backgroundColor: 'var(--surface-0)', border: '1px solid color-mix(in srgb, var(--line-strong) 40%, transparent)', fontFamily: 'var(--type-mono)'}}
+                            className="w-full mt-1"
                         />
                         {qtyNum > owned && (
                             <p className="mt-1 text-xs text-negative">You only own {owned} share{owned === 1 ? '' : 's'}</p>
                         )}
                     </div>
 
-                    <div className="grid grid-cols-4 gap-1 p-1 rounded-lg" style={{backgroundColor: 'var(--surface-2)'}}>
+                    <div className="grid grid-cols-4 gap-1 p-1 rounded-lg bg-surface-2">
                         {presets.map((preset) => (
                             <button
                                 key={preset.label}
                                 type="button"
                                 onClick={() => setQty(String(preset.value))}
                                 className={cn(
-                                    'py-1.5 rounded-md text-xs font-bold uppercase tracking-wider transition-colors',
+                                    'font-mono py-1.5 rounded-md text-xs font-bold uppercase tracking-wider transition-colors',
                                     qtyNum === preset.value
                                         ? 'bg-negative/15 text-negative'
                                         : 'text-fg-muted hover:text-fg',
                                 )}
-                                style={{fontFamily: 'var(--type-mono)'}}
                             >
                                 {preset.label}
                             </button>
@@ -104,13 +104,13 @@ const SellPositionDialog = ({position, accountId, notes, onClose}: {position: En
 
                     <div className="flex items-center justify-between text-sm">
                         <span className="text-fg-muted">Last Price</span>
-                        <span className="text-fg" style={{fontFamily: 'var(--type-mono)'}}>
+                        <span className="text-fg font-mono">
                             {typeof price === 'number' ? formatPrice(price) : '—'}
                         </span>
                     </div>
                     <div className="flex items-center justify-between text-sm border-t border-line-strong/30 pt-3">
                         <span className="text-fg-muted">Est. Proceeds</span>
-                        <span className="text-brand font-semibold" style={{fontFamily: 'var(--type-mono)'}}>
+                        <span className="text-brand font-semibold font-mono">
                             {estProceeds !== null ? formatPrice(estProceeds) : '—'}
                         </span>
                     </div>
@@ -118,7 +118,7 @@ const SellPositionDialog = ({position, accountId, notes, onClose}: {position: En
                     {(() => {
                         const pnl = estRealizedPnl(typeof price === 'number' ? price : null, position.avgCost, qtyNum);
                         return (
-                            <div className="flex items-center justify-between text-[11px] text-fg-muted" style={{fontFamily: 'var(--type-mono)'}} data-testid="sell-est-pnl">
+                            <div className="flex items-center justify-between text-[11px] text-fg-muted font-mono" data-testid="sell-est-pnl">
                                 <span>Est. realized P&L</span>
                                 <span>{pnl === null ? '—' : `${formatSignedPrice(pnl)} · avg cost ${formatPrice(position.avgCost)}`}</span>
                             </div>
@@ -136,18 +136,9 @@ const SellPositionDialog = ({position, accountId, notes, onClose}: {position: En
                         </div>
                     )}
 
-                    <button
-                        type="submit"
-                        disabled={submitting || !valid}
-                        className="w-full py-3 rounded-lg text-sm font-bold uppercase tracking-wider transition-all active:scale-[0.98] disabled:opacity-50 text-on-negative"
-                        style={{
-                            fontFamily: 'var(--type-mono)',
-                            backgroundColor: 'var(--negative)',
-                            boxShadow: '0 0 15px color-mix(in srgb, var(--negative) 25%, transparent)',
-                        }}
-                    >
+                    <ActionButton type="submit" variant="destructive" size="block" glow disabled={submitting || !valid}>
                         {submitting ? 'Selling…' : `Sell ${qtyNum || 0} share${qtyNum === 1 ? '' : 's'}`}
-                    </button>
+                    </ActionButton>
                 </form>
             </DialogContent>
         </Dialog>

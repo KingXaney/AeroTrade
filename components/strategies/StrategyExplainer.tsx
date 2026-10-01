@@ -5,6 +5,7 @@ import Panel from "@/components/primitives/Panel";
 import Disclosure from "@/components/primitives/Disclosure";
 import {formatParamValue, paramLabel} from "@/lib/learn/copy/whatif";
 import {CADENCE_COPY} from "@/lib/learn/copy/cadence";
+import {EXPLAINER_COPY} from "@/lib/learn/copy/strategies";
 
 // The teaching panel: the rule in plain words, why anyone believes in it, when it
 // breaks, and every simplification the numbers on this page carry. All of it is
@@ -42,12 +43,12 @@ const StrategyExplainer = ({def, lastRebalanceDate, defaultOpen = false}: Props)
 
     return (
         <Panel as="div" id="strategy-explainer">
-            <Disclosure variant="panel" open={defaultOpen} summary="How it works — the rule, its parameters and when it fails">
+            <Disclosure variant="panel" open={defaultOpen} summary={EXPLAINER_COPY.summary}>
                 <div className="mt-4 space-y-5">
                     <div className="grid grid-cols-1 lg:grid-cols-[1.4fr_1fr] gap-5">
-                        <List title="The rule" items={explainer.how} />
+                        <List title={EXPLAINER_COPY.rule} items={explainer.how} />
                         <div>
-                            <h3 className="font-heading text-xs font-semibold text-fg mb-1.5">Parameters</h3>
+                            <h3 className="font-heading text-xs font-semibold text-fg mb-1.5">{EXPLAINER_COPY.parameters}</h3>
                             <dl className="font-mono grid grid-cols-[auto_1fr] gap-x-4 gap-y-1 text-xs">
                                 {Object.entries(def.params).map(([key, value]) => (
                                     <div key={key} className="contents">
@@ -55,29 +56,29 @@ const StrategyExplainer = ({def, lastRebalanceDate, defaultOpen = false}: Props)
                                         <dd className="text-fg text-right">{formatParamValue(value)}</dd>
                                     </div>
                                 ))}
-                                <dt className="text-fg-muted">Universe</dt>
-                                <dd className="text-fg text-right">{universeSize} symbol{universeSize === 1 ? '' : 's'}</dd>
-                                <dt className="text-fg-muted">Checks</dt>
+                                <dt className="text-fg-muted">{EXPLAINER_COPY.universe}</dt>
+                                <dd className="text-fg text-right">{EXPLAINER_COPY.universeSize(universeSize)}</dd>
+                                <dt className="text-fg-muted">{EXPLAINER_COPY.checks}</dt>
                                 <dd className="text-fg text-right">{CADENCE_COPY.short[def.cadence]}</dd>
-                                <dt className="text-fg-muted">Next rebalance</dt>
+                                <dt className="text-fg-muted">{EXPLAINER_COPY.nextRebalance}</dt>
                                 <dd className="text-fg text-right">{describeNextRebalance(def.cadence, lastRebalanceDate)}</dd>
-                                <dt className="text-fg-muted">Cash floor</dt>
-                                <dd className="text-fg text-right">1%</dd>
+                                <dt className="text-fg-muted">{EXPLAINER_COPY.cashFloor}</dt>
+                                <dd className="text-fg text-right">{EXPLAINER_COPY.cashFloorValue}</dd>
                             </dl>
                         </div>
                     </div>
 
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
-                        <List title="Why it might work" items={explainer.why} />
-                        <List title="When it fails" items={explainer.fails} />
+                        <List title={EXPLAINER_COPY.why} items={explainer.why} />
+                        <List title={EXPLAINER_COPY.fails} items={explainer.fails} />
                     </div>
 
                     <div>
-                        <h3 className="font-heading text-xs font-semibold text-fg mb-1">What it is watching</h3>
+                        <h3 className="font-heading text-xs font-semibold text-fg mb-1">{EXPLAINER_COPY.watching}</h3>
                         <p className="text-xs text-fg-muted leading-relaxed">{explainer.watching}</p>
                     </div>
 
-                    <List title="Read the numbers with this in mind" items={explainer.caveats} />
+                    <List title={EXPLAINER_COPY.caveats} items={explainer.caveats} />
                 </div>
             </Disclosure>
         </Panel>

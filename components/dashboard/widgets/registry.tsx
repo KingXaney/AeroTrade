@@ -44,6 +44,7 @@ import ActiveTheses from "@/components/brain/ActiveTheses";
 import NarrativeLeaderboard from "@/components/brain/NarrativeLeaderboard";
 import BrainGraph from "@/components/brain/BrainGraph";
 import SystemStatus from "@/components/jobs/SystemStatus";
+import {PERFORMANCE_COPY} from "@/lib/learn/copy/portfolio";
 
 type WidgetRenderCtx = {
     ctx: LoaderCtx;
@@ -78,12 +79,12 @@ const WatchlistMoversAsync = async ({ctx}: {ctx: LoaderCtx}) => (
 const MarketNewsAsync = async ({ctx, span}: {ctx: LoaderCtx; span: number}) => <MarketNewsList news={(await LOADERS.news(ctx)) ?? []} span={span} />;
 const PerformanceChartAsync = async ({ctx}: {ctx: LoaderCtx}) => {
     const analytics = await LOADERS.analytics(ctx);
-    if (!analytics) return <WidgetUnavailable text="No performance history yet — snapshots start tomorrow." />;
+    if (!analytics) return <WidgetUnavailable text={PERFORMANCE_COPY.widgetNoHistory} />;
     return <PerformanceChart series={analytics.series} accountName={analytics.account.name} />;
 };
 const AnalyticsStatsAsync = async ({ctx}: {ctx: LoaderCtx}) => {
     const analytics = await LOADERS.analytics(ctx);
-    if (!analytics) return framed('analytics-stats', <WidgetUnavailable text="No analytics yet — they appear once a daily snapshot exists." />);
+    if (!analytics) return framed('analytics-stats', <WidgetUnavailable text={PERFORMANCE_COPY.widgetNoAnalytics} />);
     return <AnalyticsStats analytics={analytics} />;
 };
 // Empty feed + zero topics is the onboarding nudge; empty feed + topics is just "nothing matched yet".

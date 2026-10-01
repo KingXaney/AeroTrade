@@ -2,14 +2,16 @@
 
 import {Plus} from "lucide-react";
 import {useTopicsUi} from "@/components/topics/TopicsShell";
+import Panel from "@/components/primitives/Panel";
+import ActionButton from "@/components/primitives/ActionButton";
 
 const AllTopicsHeader = ({count, unseenTotal, preinstalled}: {count: number; unseenTotal: number; preinstalled: boolean}) => {
     const {openComposer} = useTopicsUi();
     return (
-        <section className="glass-panel rounded-xl p-5 flex items-center justify-between gap-3">
+        <Panel className="flex items-center justify-between gap-3">
             <div>
-                <h2 className="text-xl font-semibold text-fg" style={{fontFamily: 'var(--type-display)'}}>All topics</h2>
-                <p className="text-[11px] text-fg-muted mt-1" style={{fontFamily: 'var(--type-mono)'}}>
+                <h2 className="text-xl font-semibold text-fg font-heading">All topics</h2>
+                <p className="text-[11px] text-fg-muted mt-1 font-mono">
                     {count} followed · {unseenTotal} unseen
                 </p>
                 {/* Self-extinguishing: it disappears the moment the set stops being ours,
@@ -20,13 +22,11 @@ const AllTopicsHeader = ({count, unseenTotal, preinstalled}: {count: number; uns
                     </p>
                 )}
             </div>
-            <button type="button" onClick={() => openComposer('create')}
-                    className="inline-flex items-center gap-2 px-3 py-2 rounded-lg text-xs font-bold uppercase tracking-[0.1em] bg-brand text-on-brand"
-                    style={{fontFamily: 'var(--type-mono)'}}>
+            <ActionButton className="inline-flex items-center gap-2" onClick={() => openComposer('create')}>
                 <Plus className="size-4" />
                 New topic
-            </button>
-        </section>
+            </ActionButton>
+        </Panel>
     );
 };
 

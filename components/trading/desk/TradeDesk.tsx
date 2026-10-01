@@ -7,6 +7,7 @@ import OrderPanel from "@/components/trading/desk/OrderPanel";
 import type {PositionLike} from "@/lib/trading/order-math";
 import {TRADE_CHART_WIDGET_CONFIG, tvScript} from "@/lib/stocks/tradingview";
 import {useDebounce} from "@/hooks/useDebounce";
+import Panel from "@/components/primitives/Panel";
 
 const URL_SYNC_DELAY_MS = 300;
 
@@ -52,7 +53,7 @@ const TradeDesk = ({chartSymbol, orderSymbol, cash, accountId, positions, queueN
 
     return (
         <div className="grid gap-4 xl:grid-cols-3">
-            <section className="xl:col-span-2 glass-panel rounded-xl p-4">
+            <Panel pad={4} className="xl:col-span-2">
                 {/* Keyed so a new symbol tears the embed down and rebuilds it. */}
                 <TradingViewWidget
                     key={symbol}
@@ -61,7 +62,7 @@ const TradeDesk = ({chartSymbol, orderSymbol, cash, accountId, positions, queueN
                     config={TRADE_CHART_WIDGET_CONFIG(symbol)}
                     height={560}
                 />
-            </section>
+            </Panel>
             <div className="xl:col-span-1">
                 <OrderPanel defaultSymbol={orderSymbol} cash={cash} accountId={accountId} positions={positions} onSymbolCommit={onSymbolCommit} queueNote={queueNote} apy={apy} />
             </div>

@@ -7,6 +7,9 @@ import {toast} from "sonner";
 import {removeFriend} from "@/lib/actions/friends.actions";
 import ConfirmDialog from "@/components/primitives/ConfirmDialog";
 import type {FriendSummary} from '@/lib/friends/types';
+import Panel from '@/components/primitives/Panel';
+import RowCard from "@/components/primitives/RowCard";
+import SectionHeading from "@/components/primitives/SectionHeading";
 
 const FriendsList = ({friends}: {friends: FriendSummary[]}) => {
     const router = useRouter();
@@ -34,20 +37,18 @@ const FriendsList = ({friends}: {friends: FriendSummary[]}) => {
     };
 
     return (
-        <div className="glass-panel rounded-xl p-5">
-            <h2 className="text-sm font-bold uppercase tracking-[0.1em] text-brand mb-3" style={{fontFamily: 'var(--type-mono)'}}>
+        <Panel as="div">
+            <SectionHeading spacing="sm">
                 Your Friends ({friends.length})
-            </h2>
+            </SectionHeading>
             {friends.length === 0 ? (
                 <p className="text-sm text-fg-muted">No friends yet — add someone by email to compete.</p>
             ) : (
                 <div className="space-y-2">
                     {friends.map((f) => (
-                        <div key={f.friendshipId}
-                             className="flex items-center justify-between px-4 py-2.5 rounded-lg border bg-surface-2/40 border-line-strong/20">
+                        <RowCard key={f.friendshipId} className="flex items-center justify-between py-2.5">
                             <Link href={`/friends/${f.id}`} className="group flex items-center gap-3 min-w-0">
-                                <div className="w-8 h-8 rounded-full flex items-center justify-center text-xs font-bold shrink-0"
-                                     style={{backgroundColor: 'var(--brand-strong)', color: 'var(--on-brand)', fontFamily: 'var(--type-display)'}}>
+                                <div className="w-8 h-8 rounded-full flex items-center justify-center text-xs font-bold shrink-0 font-heading bg-brand-strong text-on-brand">
                                     {f.name?.[0]?.toUpperCase() ?? '?'}
                                 </div>
                                 <div className="min-w-0">
@@ -65,7 +66,7 @@ const FriendsList = ({friends}: {friends: FriendSummary[]}) => {
                             >
                                 <span className="material-symbols-outlined text-base" aria-hidden="true">person_remove</span>
                             </button>
-                        </div>
+                        </RowCard>
                     ))}
                 </div>
             )}
@@ -84,7 +85,7 @@ const FriendsList = ({friends}: {friends: FriendSummary[]}) => {
                     }}
                 />
             )}
-        </div>
+        </Panel>
     );
 };
 

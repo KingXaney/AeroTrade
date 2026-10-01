@@ -18,7 +18,7 @@ export type MarketStatus = {
     nextClose: number | null;    // epoch ms when the current session ends; null when closed
 };
 
-const ZONE = 'America/New_York';
+export const ZONE = 'America/New_York';
 const OPEN_MINUTES = 9 * 60 + 30;
 const CLOSE_MINUTES = 16 * 60;
 const HALF_DAY_CLOSE_MINUTES = 13 * 60;
@@ -166,32 +166,4 @@ export const marketStatus = (at: Date = new Date()): MarketStatus => {
     }
     const reason: ClosedReason = holiday ? 'holiday' : (weekday === 0 || weekday === 6) ? 'weekend' : minutes < OPEN_MINUTES ? 'pre-open' : 'after-close';
     return {at: at.getTime(), state: 'closed', reason, holiday, easternDate: date, nextOpen: nextOpenFrom(date, minutes), nextClose: null};
-};
-
-
-// ---- Copy ---------------------------------------------------------------------
-const TIME = new Intl.DateTimeFormat('en-US', {timeZone: ZONE, hour: 'numeric', minute: '2-digit'});
-const DAY = new Intl.DateTimeFormat('en-US', {timeZone: ZONE, weekday: 'short'});
-
-// "Open · closes 4:00 PM ET" / "Closed · opens Mon 9:30 AM ET" / "Closed · Thanksgiving · opens Fri 9:30 AM ET".
-// "Mon 9:30 AM ET" / "today 9:30 AM ET": when a real broker would fill an order placed
-// now, or null while the session is open. The holiday is named when that is the reason.
-export const describeQueuedFill = (status: MarketStatus): string | null => {
-    if (status.state === 'open' || !status.nextOpen) return null;
-    const sameDay = easternParts(new Date(status.nextOpen)).date === status.easternDate;
-    const when = `${sameDay ? 'today' : DAY.format(status.nextOpen)} ${TIME.format(status.nextOpen)} ET`;
-    return status.holiday ? `${when} (${status.holiday})` : when;
-};
-
-export const describeMarketStatus = (status: MarketStatus): string => {
-    if (status.state === 'open') {
-        return status.nextClose ? `Open · closes ${TIME.format(status.nextClose)} ET` : 'Open';
-    }
-    const parts = ['Closed'];
-    if (status.holiday) parts.push(status.holiday);
-    if (status.nextOpen) {
-        const sameDay = easternParts(new Date(status.nextOpen)).date === status.easternDate;
-        parts.push(`opens ${sameDay ? 'today' : DAY.format(status.nextOpen)} ${TIME.format(status.nextOpen)} ET`);
-    }
-    return parts.join(' · ');
 };

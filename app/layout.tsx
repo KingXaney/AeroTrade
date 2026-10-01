@@ -107,8 +107,7 @@ export default async function RootLayout({
         <style id="aero-palettes" dangerouslySetInnerHTML={{ __html: PALETTE_CSS }} />
       </head>
       <body
-          className="min-h-full flex flex-col"
-          style={{ fontFamily: 'var(--type-body), sans-serif' }}
+          className="min-h-full flex flex-col font-sans"
           suppressHydrationWarning
       >
         <ThemeProvider initial={theme}>

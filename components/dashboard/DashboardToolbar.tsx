@@ -3,6 +3,7 @@
 import type {ReactNode} from "react";
 import {Loader2, Plus, RotateCcw, Settings2} from "lucide-react";
 import {cn} from "@/lib/utils";
+import {actionButton} from "@/components/primitives/ActionButton";
 
 type Props = {
     editing: boolean;
@@ -16,12 +17,12 @@ type Props = {
     extra?: ReactNode;
 };
 
-const base = 'inline-flex items-center gap-2 px-3 py-2 rounded-lg text-xs font-bold uppercase tracking-[0.1em] transition-all active:scale-[0.98] disabled:opacity-50 disabled:active:scale-100';
-const ghost = `${base} text-fg-soft hover:text-fg border border-line-strong/40`;
-const primary = `${base} bg-brand text-on-brand`;
+const press = 'inline-flex items-center gap-2 transition-all active:scale-[0.98] disabled:active:scale-100';
+const ghost = actionButton({variant: 'secondary', className: press});
+const primary = actionButton({className: press});
 
 const DashboardToolbar = ({editing, dirty, pending, onCustomize, onAdd, onReset, onSave, onCancel, extra}: Props) => (
-    <div className="flex flex-wrap items-center gap-2" style={{fontFamily: 'var(--type-mono)'}}>
+    <div className="flex flex-wrap items-center gap-2 font-mono">
         {extra}
         {!editing ? (
             <button type="button" onClick={onCustomize} className={ghost}>

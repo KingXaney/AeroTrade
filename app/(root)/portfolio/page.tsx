@@ -21,6 +21,8 @@ import LuckOrSkill from "@/components/trading/learn/LuckOrSkill";
 import WhatTheseMean from "@/components/learn/WhatTheseMean";
 import Panel from "@/components/primitives/Panel";
 import SectionHeading from "@/components/primitives/SectionHeading";
+import {actionButton} from "@/components/primitives/ActionButton";
+import {PERFORMANCE_COPY} from "@/lib/learn/copy/portfolio";
 
 type PortfolioPageProps = {
     searchParams: Promise<{account?: string}>;
@@ -40,7 +42,7 @@ const PortfolioPage = async ({searchParams}: PortfolioPageProps) => {
             {/* Header */}
             <div className="flex flex-col md:flex-row md:items-end md:justify-between gap-4 mb-2">
                 <div>
-                    <h1 className="text-2xl font-semibold text-fg mb-1" style={{fontFamily: 'var(--type-display)'}}>
+                    <h1 className="text-2xl font-semibold text-fg mb-1 font-heading">
                         {account.name}
                     </h1>
                     <p className="text-sm text-fg-muted">{view.summaryLine}</p>
@@ -51,8 +53,7 @@ const PortfolioPage = async ({searchParams}: PortfolioPageProps) => {
                     <ExportCsvButton accountId={account.id} />
                     <Link
                         href="/trade"
-                        className="inline-flex items-center gap-2 px-4 py-2 rounded-lg text-xs font-bold uppercase tracking-[0.1em] transition-all active:scale-[0.98]"
-                        style={{fontFamily: 'var(--type-mono)', backgroundColor: 'var(--brand)', color: 'var(--on-brand)'}}
+                        className={actionButton({size: 'md', className: 'inline-flex items-center gap-2 transition-all active:scale-[0.98]'})}
                     >
                         <span className="material-symbols-outlined text-base">candlestick_chart</span>
                         Trade Desk
@@ -67,26 +68,26 @@ const PortfolioPage = async ({searchParams}: PortfolioPageProps) => {
 
             {/* Which account wins — all accounts side by side */}
             {view.multiAccount && (
-                <section className="glass-panel rounded-xl p-5">
-                    <h2 className="text-sm font-bold uppercase tracking-[0.1em] text-brand mb-4" style={{fontFamily: 'var(--type-mono)'}}>
+                <Panel>
+                    <SectionHeading>
                         Account Comparison
-                    </h2>
+                    </SectionHeading>
                     <AccountComparisonTable rows={view.comparisonRows} activeId={account.id} />
-                </section>
+                </Panel>
             )}
 
             {/* Performance vs benchmark + analytics */}
             {analytics && (
                 <>
-                    <section className="glass-panel rounded-xl p-5">
-                        <h2 className="text-sm font-bold uppercase tracking-[0.1em] text-brand mb-1" style={{fontFamily: 'var(--type-mono)'}}>
+                    <Panel>
+                        <SectionHeading spacing="none" className="mb-1">
                             Performance vs S&amp;P 500
-                        </h2>
+                        </SectionHeading>
                         <p className="font-mono text-[11px] text-fg-muted mb-4">
-                            Returns include interest on cash and dividends · benchmark is SPY&apos;s total return, dividends reinvested
+                            {PERFORMANCE_COPY.caption}
                         </p>
                         <PerformanceChart series={analytics.series} accountName={account.name} band={view.chartBand} />
-                    </section>
+                    </Panel>
                     <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
                         <ReturnBridge accountId={account.id} bridge={bridge} />
                         <RiskLens series={analytics.series} snapshotThrough={analytics.snapshotThrough} portfolio={portfolio} />
@@ -108,12 +109,12 @@ const PortfolioPage = async ({searchParams}: PortfolioPageProps) => {
             <AccountSummary portfolio={portfolio} income={analytics?.income} definitions />
 
             {/* Holdings */}
-            <section className="glass-panel rounded-xl p-5">
-                <h2 className="text-sm font-bold uppercase tracking-[0.1em] text-brand mb-4" style={{fontFamily: 'var(--type-mono)'}}>
+            <Panel>
+                <SectionHeading>
                     Holdings
-                </h2>
+                </SectionHeading>
                 <PositionsTable positions={portfolio.positions} accountId={account.id} lotNotes={view.lotNotes} />
-            </section>
+            </Panel>
 
             {/* What the account earned without trading */}
             {income && (
@@ -126,12 +127,12 @@ const PortfolioPage = async ({searchParams}: PortfolioPageProps) => {
 
             {/* Trade history — only from a ledger that was read */}
             {tradeLog && (
-                <section className="glass-panel rounded-xl p-5">
-                    <h2 className="text-sm font-bold uppercase tracking-[0.1em] text-brand mb-4" style={{fontFamily: 'var(--type-mono)'}}>
+                <Panel>
+                    <SectionHeading>
                         Trade History
-                    </h2>
+                    </SectionHeading>
                     <TradeHistory trades={tradeLog.trades} totalCount={analytics?.tradeCount} exportHref={tradeLog.exportHref} receipts={tradeLog.receipts} buyNotesBySellId={tradeLog.buyNotesBySellId} />
-                </section>
+                </Panel>
             )}
         </div>
     );

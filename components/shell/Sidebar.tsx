@@ -21,9 +21,8 @@ function Sidebar({ portfolio, topics, badges }: SidebarProps) {
     const handleSignOut = useSignOut();
 
     return (
-        <aside className="hidden lg:flex fixed left-0 top-16 bottom-0 z-40 flex-col w-64 border-r border-outline-variant/20"
+        <aside className="hidden lg:flex fixed left-0 top-16 bottom-0 z-40 flex-col w-64 border-r border-outline-variant/20 bg-surface-2/90"
                style={{
-                   backgroundColor: 'color-mix(in srgb, var(--surface-2) 90%, transparent)',
                    backdropFilter: 'blur(16px)',
                    WebkitBackdropFilter: 'blur(16px)',
                }}
@@ -39,11 +38,8 @@ function Sidebar({ portfolio, topics, badges }: SidebarProps) {
             <div className="mt-auto p-4 border-t border-line-strong/15">
                 <Link
                     href="/trade"
-                    className="w-full py-3 rounded-lg mb-4 flex justify-center items-center gap-2 text-xs font-bold tracking-[0.1em] uppercase transition-all active:scale-[0.98] animate-glow"
+                    className="w-full py-3 rounded-lg mb-4 flex justify-center items-center gap-2 text-xs font-bold tracking-[0.1em] uppercase transition-all active:scale-[0.98] animate-glow font-mono bg-brand text-on-brand"
                     style={{
-                        fontFamily: 'var(--type-mono)',
-                        backgroundColor: 'var(--brand)',
-                        color: 'var(--on-brand)',
                         boxShadow: '0 0 15px color-mix(in srgb, var(--brand) 30%, transparent)',
                     }}
                 >
@@ -53,8 +49,7 @@ function Sidebar({ portfolio, topics, badges }: SidebarProps) {
                 <button
                     type="button"
                     onClick={handleSignOut}
-                    className="w-full flex items-center gap-4 px-4 py-2 text-fg-soft hover:text-negative transition-colors text-xs font-bold tracking-[0.1em] uppercase"
-                    style={{ fontFamily: 'var(--type-mono)' }}
+                    className="w-full flex items-center gap-4 px-4 py-2 text-fg-soft hover:text-negative transition-colors text-xs font-bold tracking-[0.1em] uppercase font-mono"
                 >
                     <span className="material-symbols-outlined text-sm">logout</span>
                     <span>Logout</span>

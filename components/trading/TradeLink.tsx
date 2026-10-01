@@ -24,8 +24,7 @@ const TradeLink = ({symbol, variant = 'chip', className}: Props) => {
     if (variant === 'button') {
         return (
             <Link href={href}
-                  className={cn('inline-flex items-center gap-2 px-3 py-2 rounded-lg text-xs font-bold uppercase tracking-[0.1em] border border-brand/40 text-brand hover:bg-brand/10 transition-colors', className)}
-                  style={{fontFamily: 'var(--type-mono)'}}>
+                  className={cn('font-mono inline-flex items-center gap-2 px-3 py-2 rounded-lg text-xs font-bold uppercase tracking-[0.1em] border border-brand/40 text-brand hover:bg-brand/10 transition-colors', className)}>
                 <span className="material-symbols-outlined text-base">candlestick_chart</span>
                 Trade
             </Link>
@@ -33,8 +32,7 @@ const TradeLink = ({symbol, variant = 'chip', className}: Props) => {
     }
     return (
         <Link href={href}
-              className={cn('inline-flex items-center px-3 py-1.5 rounded text-xs font-bold uppercase tracking-wider border border-brand/30 text-brand hover:bg-brand/10 transition-colors', className)}
-              style={{fontFamily: 'var(--type-mono)'}}>
+              className={cn('font-mono inline-flex items-center px-3 py-1.5 rounded text-xs font-bold uppercase tracking-wider border border-brand/30 text-brand hover:bg-brand/10 transition-colors', className)}>
             Trade
         </Link>
     );

@@ -7,6 +7,7 @@ import Term from "@/components/primitives/Term";
 import WhatTheseMean from "@/components/learn/WhatTheseMean";
 import {eventBadge, eventTermsShown} from "@/lib/brain/event-types";
 import {BRAIN_COPY} from "@/lib/learn/copy/brain";
+import {rowCard} from "@/components/primitives/RowCard";
 
 // Ticker keys are bare symbols; sectors and themes carry a "sector:" / "theme:" prefix.
 const isTickerKey = (key: string): boolean => /^[A-Z][A-Z0-9.\-]{0,9}$/.test(key);
@@ -40,12 +41,12 @@ const EventBadge = ({eventType}: {eventType: string | null}) => {
 const EvidenceList = ({entityKey, items}: {entityKey: string; items: EvidenceItem[]}) => (
     <div>
         <div className="flex flex-wrap items-center justify-between gap-2 mb-3">
-            <p className="text-xs text-fg-muted" style={{fontFamily: 'var(--type-mono)'}}>
+            <p className="text-xs text-fg-muted font-mono">
                 Evidence for <span className="text-brand">{entityKey}</span> · last 21 days
             </p>
             {isTickerKey(entityKey) && (
                 <span className="flex items-center gap-2">
-                    <Link href={`/stocks/${encodeURIComponent(entityKey)}`} className="text-xs text-brand hover:underline" style={{fontFamily: 'var(--type-mono)'}}>
+                    <Link href={`/stocks/${encodeURIComponent(entityKey)}`} className="text-xs text-brand hover:underline font-mono">
                         Stock page →
                     </Link>
                     <TradeLink symbol={entityKey} />
@@ -53,20 +54,19 @@ const EvidenceList = ({entityKey, items}: {entityKey: string; items: EvidenceIte
             )}
         </div>
         {items.length === 0 ? (
-            <p className="text-sm text-fg-muted">No recent articles mention this entity.</p>
+            <p className="text-sm text-fg-muted">{BRAIN_COPY.evidenceEmpty}</p>
         ) : (
             <div className="space-y-2">
                 {items.map((item) => (
                     <a key={item.url} href={item.url} target="_blank" rel="noopener noreferrer"
-                       className="block px-4 py-3 rounded-lg border bg-surface-2/40 border-line-strong/20 hover:border-brand/30 transition-colors">
+                       className={rowCard({interactive: true, className: 'block'})}>
                         <div className="flex items-start justify-between gap-3">
                             <span className="text-sm text-fg">{item.headline}</span>
-                            <span className={cn('text-xs shrink-0', getChangeColorClass(item.sentiment || undefined))}
-                                  style={{fontFamily: 'var(--type-mono)'}}>
+                            <span className={cn('font-mono text-xs shrink-0', getChangeColorClass(item.sentiment || undefined))}>
                                 {formatSigned(item.sentiment)}
                             </span>
                         </div>
-                        <div className="flex flex-wrap items-center gap-2 text-[11px] text-fg-muted mt-1" style={{fontFamily: 'var(--type-mono)'}}>
+                        <div className="flex flex-wrap items-center gap-2 text-[11px] text-fg-muted mt-1 font-mono">
                             <EventBadge eventType={item.eventType} />
                             <span>{item.source} · {formatTimeAgoSeconds(item.datetime)}</span>
                             {item.sourceType === 'reddit' && <span className="text-negative">community sentiment</span>}

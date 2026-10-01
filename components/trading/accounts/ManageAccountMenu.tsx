@@ -11,6 +11,8 @@ import {
     DropdownMenuItem,
     DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
+import ActionButton from "@/components/primitives/ActionButton";
+import TextField from "@/components/primitives/TextField";
 
 // Rename dialog — mounted conditionally so state resets per open.
 const RenameDialog = ({accountId, currentName, onClose}: {accountId: string; currentName: string; onClose: () => void}) => {
@@ -40,29 +42,23 @@ const RenameDialog = ({accountId, currentName, onClose}: {accountId: string; cur
         <Dialog open onOpenChange={(open) => { if (!open && !submitting) onClose(); }}>
             <DialogContent className="bg-surface-1 ring-line sm:max-w-sm">
                 <DialogHeader>
-                    <DialogTitle className="text-sm font-bold uppercase tracking-[0.1em] text-brand" style={{fontFamily: 'var(--type-mono)'}}>
+                    <DialogTitle className="text-sm font-bold uppercase tracking-[0.1em] text-brand font-mono">
                         Rename Account
                     </DialogTitle>
                     <DialogDescription className="text-fg-muted">Pick a new name for this account.</DialogDescription>
                 </DialogHeader>
                 <form className="flex flex-col gap-4" onSubmit={(e) => { e.preventDefault(); void onConfirm(); }}>
-                    <input
+                    <TextField
                         value={name}
                         onChange={(e) => setName(e.target.value)}
                         maxLength={40}
                         autoComplete="off"
                         autoFocus
-                        className="w-full rounded-lg px-3 py-2 text-sm text-fg outline-none field-focus"
-                        style={{backgroundColor: 'var(--surface-0)', border: '1px solid color-mix(in srgb, var(--line-strong) 40%, transparent)', fontFamily: 'var(--type-mono)'}}
+                        className="w-full"
                     />
-                    <button
-                        type="submit"
-                        disabled={submitting || !valid}
-                        className="w-full py-3 rounded-lg text-sm font-bold uppercase tracking-wider transition-all active:scale-[0.98] disabled:opacity-50 text-on-brand"
-                        style={{fontFamily: 'var(--type-mono)', backgroundColor: 'var(--brand-strong)'}}
-                    >
+                    <ActionButton type="submit" variant="strong" size="block" disabled={submitting || !valid}>
                         {submitting ? 'Renaming…' : 'Rename'}
-                    </button>
+                    </ActionButton>
                 </form>
             </DialogContent>
         </Dialog>
@@ -95,22 +91,16 @@ const DeleteDialog = ({accountId, accountName, onClose}: {accountId: string; acc
         <Dialog open onOpenChange={(open) => { if (!open && !submitting) onClose(); }}>
             <DialogContent className="bg-surface-1 ring-line sm:max-w-sm">
                 <DialogHeader>
-                    <DialogTitle className="text-sm font-bold uppercase tracking-[0.1em] text-negative" style={{fontFamily: 'var(--type-mono)'}}>
+                    <DialogTitle className="text-sm font-bold uppercase tracking-[0.1em] text-negative font-mono">
                         Delete “{accountName}”?
                     </DialogTitle>
                     <DialogDescription className="text-fg-muted">
                         This permanently removes the account, its positions, its trade history and its performance record. This cannot be undone.
                     </DialogDescription>
                 </DialogHeader>
-                <button
-                    type="button"
-                    onClick={() => void onConfirm()}
-                    disabled={submitting}
-                    className="w-full py-3 rounded-lg text-sm font-bold uppercase tracking-wider transition-all active:scale-[0.98] disabled:opacity-50 text-on-negative"
-                    style={{fontFamily: 'var(--type-mono)', backgroundColor: 'var(--negative)'}}
-                >
+                <ActionButton variant="destructive" size="block" onClick={() => void onConfirm()} disabled={submitting}>
                     {submitting ? 'Deleting…' : 'Delete Account'}
-                </button>
+                </ActionButton>
             </DialogContent>
         </Dialog>
     );
@@ -128,19 +118,18 @@ const ManageAccountMenu = ({accountId, accountName, canDelete}: {accountId: stri
                     <button
                         type="button"
                         aria-label="Manage account"
-                        className="px-2 py-2 rounded-lg text-fg-muted hover:text-fg transition-colors"
-                        style={{border: '1px solid color-mix(in srgb, var(--line-strong) 40%, transparent)'}}
+                        className="px-2 py-2 rounded-lg text-fg-muted hover:text-fg transition-colors border border-line-strong/40"
                     >
                         <span className="material-symbols-outlined text-base">more_vert</span>
                     </button>
                 </DropdownMenuTrigger>
                 <DropdownMenuContent align="end" className="bg-surface-1 border-line-strong/50">
                     <DropdownMenuItem onSelect={() => setDialog('rename')} className="cursor-pointer text-fg focus:bg-brand-strong/6">
-                        <span className="text-sm" style={{fontFamily: 'var(--type-mono)'}}>Rename</span>
+                        <span className="text-sm font-mono">Rename</span>
                     </DropdownMenuItem>
                     {canDelete && (
                         <DropdownMenuItem onSelect={() => setDialog('delete')} className="cursor-pointer text-negative focus:bg-negative/8">
-                            <span className="text-sm" style={{fontFamily: 'var(--type-mono)'}}>Delete</span>
+                            <span className="text-sm font-mono">Delete</span>
                         </DropdownMenuItem>
                     )}
                 </DropdownMenuContent>

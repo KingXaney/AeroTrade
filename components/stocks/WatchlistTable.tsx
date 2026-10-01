@@ -7,6 +7,7 @@ import Term from "@/components/primitives/Term";
 import WhatTheseMean from "@/components/learn/WhatTheseMean";
 import Panel from "@/components/primitives/Panel";
 import type {StockWithData} from '@/lib/stocks/types';
+import MicroLabel from "@/components/primitives/MicroLabel";
 
 type WatchlistTableProps = {
     watchlist: StockWithData[];
@@ -16,8 +17,8 @@ const WatchlistTable = ({watchlist}: WatchlistTableProps) => {
     return (
         <div className="space-y-2">
             {/* Table Header */}
-            <div className="hidden md:grid grid-cols-[2fr_1fr_1fr_1fr_1fr_112px] gap-4 px-4 py-2 border-b border-line-strong/30"
-                 style={{ fontFamily: 'var(--type-mono)', fontSize: '10px', letterSpacing: '0.1em', textTransform: 'uppercase', color: 'var(--fg-muted)' }}>
+            <div className="hidden md:grid grid-cols-[2fr_1fr_1fr_1fr_1fr_112px] gap-4 px-4 py-2 border-b border-line-strong/30 font-mono text-fg-muted"
+                 style={{ fontSize: '10px', letterSpacing: '0.1em', textTransform: 'uppercase' }}>
                 <div>Asset</div>
                 <div className="text-right">Price (USD)</div>
                 <div className="text-right">24h Chg</div>
@@ -40,23 +41,16 @@ const WatchlistTable = ({watchlist}: WatchlistTableProps) => {
 
                     {/* Asset Info */}
                     <div className="flex items-center gap-3">
-                        <div className="w-8 h-8 rounded flex items-center justify-center text-xs font-bold"
-                             style={{
-                                 backgroundColor: 'var(--surface-4)',
-                                 color: 'var(--brand)',
-                                 fontFamily: 'var(--type-display)',
-                                 border: '1px solid color-mix(in srgb, var(--brand) 20%, transparent)',
-                             }}>
+                        <div className="w-8 h-8 rounded flex items-center justify-center text-xs font-bold font-heading bg-surface-4 text-brand border border-brand/20">
                             {row.symbol.slice(0, 2)}
                         </div>
                         <div>
                             <Link href={`/stocks/${row.symbol}`}
-                                  className="font-bold text-sm text-fg hover:text-brand transition-colors"
-                                  style={{ fontFamily: 'var(--type-mono)', letterSpacing: '0.02em' }}>
+                                  className="font-bold text-sm text-fg hover:text-brand transition-colors font-mono"
+                                  style={{ letterSpacing: '0.02em' }}>
                                 {row.symbol}
                             </Link>
-                            <div className="text-[11px] leading-tight mt-0.5 text-fg-soft"
-                                 style={{ fontFamily: 'var(--type-body)' }}>
+                            <div className="text-[11px] leading-tight mt-0.5 text-fg-soft font-sans">
                                 <Link href={`/stocks/${row.symbol}`} className="hover:text-brand transition-colors">
                                     {row.company}
                                 </Link>
@@ -65,9 +59,9 @@ const WatchlistTable = ({watchlist}: WatchlistTableProps) => {
                     </div>
 
                     {/* Below md the header row is hidden, so each cell names itself. */}
-                    <div className="flex justify-between md:block md:text-right text-fg"
-                         style={{ fontFamily: 'var(--type-mono)', letterSpacing: '0.02em' }}>
-                        <span className="md:hidden text-[10px] uppercase tracking-[0.1em] text-fg-muted mr-2">Price</span>
+                    <div className="flex justify-between md:block md:text-right text-fg font-mono"
+                         style={{ letterSpacing: '0.02em' }}>
+                        <MicroLabel className="md:hidden mr-2">Price</MicroLabel>
                         {row.priceFormatted ?? '—'}
                     </div>
 
@@ -77,14 +71,14 @@ const WatchlistTable = ({watchlist}: WatchlistTableProps) => {
                         {row.changePercent !== undefined ? (
                             <span
                                 className={cn(
-                                    "inline-block px-2 py-0.5 rounded text-xs",
+                                    "font-mono inline-block px-2 py-0.5 rounded text-xs",
                                     roundPct(row.changePercent) > 0
                                         ? "bg-positive/10 text-positive border border-positive/20"
                                         : roundPct(row.changePercent) < 0
                                         ? "bg-negative/10 text-negative border border-negative/20"
                                         : "text-fg-muted"
                                 )}
-                                style={{ fontFamily: 'var(--type-mono)', letterSpacing: '0.02em' }}
+                                style={{ letterSpacing: '0.02em' }}
                             >
                                 {row.changeFormatted ?? '—'}
                             </span>
@@ -94,16 +88,16 @@ const WatchlistTable = ({watchlist}: WatchlistTableProps) => {
                     </div>
 
                     {/* Market Cap */}
-                    <div className="flex justify-between md:block md:text-right text-fg-soft"
-                         style={{ fontFamily: 'var(--type-mono)', letterSpacing: '0.02em', fontSize: '14px' }}>
-                        <span className="md:hidden text-[10px] uppercase tracking-[0.1em] text-fg-muted mr-2">Market Cap</span>
+                    <div className="flex justify-between md:block md:text-right text-fg-soft font-mono"
+                         style={{ letterSpacing: '0.02em', fontSize: '14px' }}>
+                        <MicroLabel className="md:hidden mr-2">Market Cap</MicroLabel>
                         {row.marketCap ?? '—'}
                     </div>
 
                     {/* P/E Ratio */}
-                    <div className="flex justify-between md:block md:text-right text-fg-soft"
-                         style={{ fontFamily: 'var(--type-mono)', letterSpacing: '0.02em', fontSize: '14px' }}>
-                        <span className="md:hidden text-[10px] uppercase tracking-[0.1em] text-fg-muted mr-2">P/E Ratio</span>
+                    <div className="flex justify-between md:block md:text-right text-fg-soft font-mono"
+                         style={{ letterSpacing: '0.02em', fontSize: '14px' }}>
+                        <MicroLabel className="md:hidden mr-2">P/E Ratio</MicroLabel>
                         {row.peRatio ?? '—'}
                     </div>
 

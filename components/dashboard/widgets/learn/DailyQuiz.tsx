@@ -23,9 +23,9 @@ const Cells = ({cells}: {cells: readonly QuizCell[]}) => (
     <span className="flex flex-wrap gap-x-3 gap-y-0.5">
         {cells.map((cell) => (
             <span key={cell.label} className="text-xs">
-                <span className="font-mono text-[10px] uppercase tracking-[0.1em] text-fg-muted">
+                <MicroLabel>
                     {cell.term ? <Term k={cell.term}>{cell.label}</Term> : cell.label}{' '}
-                </span>
+                </MicroLabel>
                 <span className="font-mono text-fg-soft">{cell.value}</span>
             </span>
         ))}

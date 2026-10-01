@@ -16,6 +16,10 @@ import NavigatorCard from "@/components/navigator/NavigatorCard";
 import SecondOpinionCard from "@/components/brain/SecondOpinionCard";
 import SuggestionPanel from "@/components/navigator/SuggestionPanel";
 import SystemStatus from "@/components/jobs/SystemStatus";
+import Panel from "@/components/primitives/Panel";
+import PageTitle from "@/components/primitives/PageTitle";
+import SectionHeading from "@/components/primitives/SectionHeading";
+import {BRAIN_COPY} from "@/lib/learn/copy/brain";
 
 // Each decision's reasons decoded here, on the server, so the client panel renders clauses
 // without bundling the grammar.
@@ -55,15 +59,10 @@ const BrainPage = async ({searchParams}: BrainPageProps) => {
 
     return (
         <div className="space-y-4">
-            {/* Header */}
-            <div className="mb-2">
-                <h1 className="text-2xl font-semibold text-fg mb-1" style={{fontFamily: 'var(--type-display)'}}>
-                    News Brain
-                </h1>
-                <p className="text-sm text-fg-muted">
-                    Persistent market narratives from every ingested article — slow-building theses drive the AI Navigator
-                </p>
-            </div>
+            <PageTitle
+                title="News Brain"
+                subtitle={BRAIN_COPY.pageSubtitle}
+            />
 
             {/* Is the machinery actually running? */}
             <SystemStatus status={systemStatus} />
@@ -71,22 +70,22 @@ const BrainPage = async ({searchParams}: BrainPageProps) => {
 
             <div className="grid grid-cols-1 xl:grid-cols-2 gap-4">
                 {/* Active theses — the centerpiece */}
-                <section className="glass-panel rounded-xl p-5">
-                    <h2 className="text-sm font-bold uppercase tracking-[0.1em] text-brand mb-4" style={{fontFamily: 'var(--type-mono)'}}>
+                <Panel>
+                    <SectionHeading>
                         Active Theses
-                    </h2>
+                    </SectionHeading>
                     <ActiveTheses theses={theses} followedByName={followedByName} sinceThesis={sinceThesis} definitions />
-                </section>
+                </Panel>
 
                 {/* Navigator enrollment + weekly decisions */}
                 <div className="space-y-4">
                     <NavigatorCard status={navigatorStatus} />
-                    <section className="glass-panel rounded-xl p-5">
-                        <h2 className="text-sm font-bold uppercase tracking-[0.1em] text-brand mb-4" style={{fontFamily: 'var(--type-mono)'}}>
+                    <Panel>
+                        <SectionHeading>
                             Weekly Decisions
-                        </h2>
+                        </SectionHeading>
                         <SuggestionPanel userSet={withGloss(suggestions.user)} globalSet={withGloss(suggestions.global)} accounts={applyAccounts} />
-                    </section>
+                    </Panel>
                 </div>
             </div>
 
@@ -94,30 +93,30 @@ const BrainPage = async ({searchParams}: BrainPageProps) => {
             <SecondOpinionCard configured={isSecondOpinionConfigured()} opinion={secondOpinion} />
 
             {/* Knowledge graph */}
-            <section className="glass-panel rounded-xl p-5">
-                <h2 className="text-sm font-bold uppercase tracking-[0.1em] text-brand mb-4" style={{fontFamily: 'var(--type-mono)'}}>
+            <Panel>
+                <SectionHeading>
                     Knowledge Graph
-                </h2>
+                </SectionHeading>
                 <BrainGraph nodes={graph.nodes} edges={graph.edges} />
-            </section>
+            </Panel>
 
             {/* Evidence drill-down for ?entity= */}
             {entity && evidence && (
-                <section id="evidence" className="glass-panel rounded-xl p-5 scroll-mt-24">
-                    <h2 className="text-sm font-bold uppercase tracking-[0.1em] text-brand mb-4" style={{fontFamily: 'var(--type-mono)'}}>
+                <Panel id="evidence" className="scroll-mt-24">
+                    <SectionHeading>
                         Evidence
-                    </h2>
+                    </SectionHeading>
                     <EvidenceList entityKey={entity} items={evidence} />
-                </section>
+                </Panel>
             )}
 
             {/* Narrative leaderboard */}
-            <section className="glass-panel rounded-xl p-5">
-                <h2 className="text-sm font-bold uppercase tracking-[0.1em] text-brand mb-4" style={{fontFamily: 'var(--type-mono)'}}>
+            <Panel>
+                <SectionHeading>
                     Narrative Leaderboard
-                </h2>
+                </SectionHeading>
                 <NarrativeLeaderboard entities={topEntities} followedByName={followedByName} />
-            </section>
+            </Panel>
         </div>
     );
 };

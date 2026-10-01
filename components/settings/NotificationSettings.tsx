@@ -6,6 +6,7 @@ import {toast} from "sonner";
 import Switch from "@/components/primitives/Switch";
 import {setDigestMode, setTopicsInDigest, toggleEmailNotifications} from "@/lib/actions/preferences.actions";
 import type {NotificationPreferences} from "@/lib/settings/preferences-store";
+import RowCard from "@/components/primitives/RowCard";
 
 
 const NotificationSettings = ({initial}: {initial: NotificationPreferences}) => {
@@ -56,7 +57,7 @@ const NotificationSettings = ({initial}: {initial: NotificationPreferences}) => 
 
     return (
         <div className="space-y-2">
-            <div className="flex items-center justify-between rounded-lg border border-line-strong/20 bg-surface-2/40 px-4 py-3">
+            <RowCard className="flex items-center justify-between">
                 <div className="flex items-center gap-3">
                     <Mail className="size-4 text-fg-soft"/>
                     <div>
@@ -65,8 +66,8 @@ const NotificationSettings = ({initial}: {initial: NotificationPreferences}) => 
                     </div>
                 </div>
                 <Switch id="email-notifications-toggle" checked={emailEnabled} onCheckedChange={handleToggleEmail} disabled={isPending}/>
-            </div>
-            <div className="flex items-center justify-between rounded-lg border border-line-strong/20 bg-surface-2/40 px-4 py-3">
+            </RowCard>
+            <RowCard className="flex items-center justify-between">
                 <div className="flex items-center gap-3">
                     <Newspaper className="size-4 text-fg-soft"/>
                     <div>
@@ -77,8 +78,8 @@ const NotificationSettings = ({initial}: {initial: NotificationPreferences}) => 
                     </div>
                 </div>
                 <Switch id="digest-mode-toggle" checked={personalizedDigest} onCheckedChange={handleToggleDigestMode} disabled={isPending || !emailEnabled}/>
-            </div>
-            <div className="flex items-center justify-between rounded-lg border border-line-strong/20 bg-surface-2/40 px-4 py-3">
+            </RowCard>
+            <RowCard className="flex items-center justify-between">
                 <div className="flex items-center gap-3">
                     <Rss className="size-4 text-fg-soft"/>
                     <div>
@@ -89,7 +90,7 @@ const NotificationSettings = ({initial}: {initial: NotificationPreferences}) => 
                     </div>
                 </div>
                 <Switch id="topics-digest-toggle" checked={topicsInDigest} onCheckedChange={handleToggleTopics} disabled={isPending || !emailEnabled}/>
-            </div>
+            </RowCard>
         </div>
     );
 };

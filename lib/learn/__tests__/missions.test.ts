@@ -1,7 +1,7 @@
 import {describe, expect, it} from 'vitest';
 import {findBanned} from '@/lib/learn/banned';
 import {daysBetween, type OnboardingFacts} from '@/lib/learn/facts';
-import {MISSION_COPY, MISSIONS_FOOTER} from '@/lib/learn/copy/missions';
+import {MISSION_COPY, MISSIONS_FOOTER, MISSIONS_HIDE_FAILED, MISSIONS_HIDE_LABEL, MISSIONS_HIDING} from '@/lib/learn/copy/missions';
 import {deriveMissions, missionsComplete, onboardingActive, ONBOARDING_MAX_DAYS} from '@/lib/learn/missions';
 
 const fresh: OnboardingFacts = {
@@ -43,6 +43,7 @@ describe('MISSION_COPY', () => {
             expect(tickers.filter((t) => !['SPY', 'RSI', 'ETF'].includes(t)), mission.id).toEqual([]);
         }
         expect(findBanned(MISSIONS_FOOTER(2, 5), 'copy')).toEqual([]);
+        for (const text of [MISSIONS_HIDE_LABEL, MISSIONS_HIDING, MISSIONS_HIDE_FAILED]) expect(findBanned(text, 'copy'), text).toEqual([]);
     });
 
     it('quotes the Navigator rails from the config, not from memory', () => {

@@ -3,7 +3,9 @@
 import {useMemo, useState} from "react";
 import Link from "next/link";
 import {evidenceHref} from "@/lib/brain/links";
+import {cn} from "@/lib/utils";
 import type {BrainEntitySummary, BrainEntityType} from '@/lib/brain/types';
+import {BRAIN_COPY} from "@/lib/learn/copy/brain";
 
 type GraphNode = BrainEntitySummary;
 type GraphEdge = {source: string; target: string; weight: number};
@@ -55,7 +57,7 @@ const BrainGraph = ({nodes, edges}: {nodes: GraphNode[]; edges: GraphEdge[]}) =>
         return (
             <div className="flex flex-col items-center justify-center py-12 text-center">
                 <span className="material-symbols-outlined text-3xl text-fg-muted mb-2">neurology</span>
-                <p className="text-sm text-fg-muted">The brain is empty — it fills up as daily news is ingested.</p>
+                <p className="text-sm text-fg-muted">{BRAIN_COPY.graphEmpty}</p>
             </div>
         );
     }
@@ -82,7 +84,7 @@ const BrainGraph = ({nodes, edges}: {nodes: GraphNode[]; edges: GraphEdge[]}) =>
                     const active = hoverKey === e.source || hoverKey === e.target;
                     return (
                         <line key={`${e.source}|${e.target}`} x1={a.x} y1={a.y} x2={b.x} y2={b.y}
-                              style={{stroke: active ? 'var(--brand)' : 'var(--line-strong)'}}
+                              className={active ? 'stroke-brand' : 'stroke-line-strong'}
                               strokeOpacity={active ? 0.8 : 0.25 + 0.5 * (e.weight / layout.maxEdge)}
                               strokeWidth={active ? 1.5 : 1} />
                     );
@@ -102,16 +104,16 @@ const BrainGraph = ({nodes, edges}: {nodes: GraphNode[]; edges: GraphEdge[]}) =>
                                 fillOpacity={node.thesisSince !== null ? 0.35 : 0.15}
                                 strokeWidth={node.thesisSince !== null ? 2 : 1} />
                         <text x={x} y={y + r + 11} textAnchor="middle" fontSize="9"
-                              style={{fill: hoverKey === node.key ? 'var(--fg)' : 'var(--fg-muted)', fontFamily: 'var(--type-mono)'}}>
+                              className={cn('font-mono', hoverKey === node.key ? 'fill-fg' : 'fill-fg-muted')}>
                             {node.displayName.length > 14 ? `${node.displayName.slice(0, 13)}…` : node.displayName}
                         </text>
                     </Link>
                 ))}
             </svg>
 
-            <div className="flex items-center justify-between mt-2 text-[10px] text-fg-muted" style={{fontFamily: 'var(--type-mono)'}}>
-                <span>rings: themes · sectors · tickers — size = persistent attention, bold ring = active thesis</span>
-                <span>{hovered ? `${hovered.node.displayName} · weight ${hovered.node.weightSlow.toFixed(1)}` : 'click a node for evidence'}</span>
+            <div className="flex items-center justify-between mt-2 text-[10px] text-fg-muted font-mono">
+                <span>{BRAIN_COPY.graphLegend}</span>
+                <span>{hovered ? `${hovered.node.displayName} · weight ${hovered.node.weightSlow.toFixed(1)}` : BRAIN_COPY.graphHint}</span>
             </div>
         </div>
     );

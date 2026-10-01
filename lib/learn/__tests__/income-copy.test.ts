@@ -212,13 +212,22 @@ describe('dividend receipts', () => {
 
     it('never advises, on any line', () => {
         const lines = [
-            ...Object.values(INCOME_COPY),
+            ...(Object.values(INCOME_COPY) as unknown[]).filter((value): value is string => typeof value === 'string'),
+            INCOME_COPY.returnHint('$12.34', '$5.60'), INCOME_COPY.cashHint(0.0392),
             ...view.dividends.flatMap((d) => [dividendSummary(d), d.receipt ? dividendReceipt(d.receipt) : '']),
             ...view.missed.map(missedLine),
             interestReceipt(month({})), interestReceipt(month({averageCash: null, cashWeightedApy: null})),
             interestSummary(month({})), rateMovedNote(month({minApy: 0.03, maxApy: 0.05})) ?? '',
         ];
         for (const line of lines) expect(findBanned(line, 'copy'), line).toEqual([]);
+    });
+});
+
+describe('the account summary hints', () => {
+    it('reads what the summary printed before, its APY to two decimals', () => {
+        expect(INCOME_COPY.returnHint('$12.34', '$5.60')).toBe('incl. $12.34 interest · $5.60 dividends');
+        expect(INCOME_COPY.cashHint(0.0392)).toBe('earning 3.92% APY');
+        expect(INCOME_COPY.cashHint(0.04125)).toBe(`earning ${(0.04125 * 100).toFixed(2)}% APY`);
     });
 });
 

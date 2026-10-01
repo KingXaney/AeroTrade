@@ -6,6 +6,7 @@ import {THESIS_WEIGHT_THRESHOLD} from "@/lib/brain/config";
 import {evidenceHref} from "@/lib/brain/links";
 import {BRAIN_COPY} from "@/lib/learn/copy/brain";
 import type {BrainEntitySummary, BrainEntityType} from '@/lib/brain/types';
+import RowCard from "@/components/primitives/RowCard";
 
 // Lower-cased topic name -> the user's topic; only the /brain page passes it.
 export type FollowedByName = Record<string, {id: string; slug: string}>;
@@ -15,7 +16,7 @@ const topicKeywords = (e: BrainEntitySummary): string[] => (e.type === 'ticker' 
 
 const TypeColumn = ({title, entities, followedByName}: {title: string; entities: BrainEntitySummary[]; followedByName?: FollowedByName}) => (
     <div>
-        <h3 className="text-[10px] uppercase tracking-[0.14em] text-fg-muted mb-2" style={{fontFamily: 'var(--type-mono)'}}>
+        <h3 className="text-[10px] uppercase tracking-[0.14em] text-fg-muted mb-2 font-mono">
             {title}
         </h3>
         {entities.length === 0 ? (
@@ -26,14 +27,13 @@ const TypeColumn = ({title, entities, followedByName}: {title: string; entities:
                     // The row used to be one <Link> with the follow <button> nested inside it —
                     // invalid markup, and the two fought over the click. Now the name is the
                     // link and the button is its sibling.
-                    <div key={e.key}
-                         className="flex items-center justify-between gap-2 px-3 py-2 rounded-lg border bg-surface-2/40 border-line-strong/20 hover:border-brand/30 transition-colors">
+                    <RowCard key={e.key} interactive className="flex items-center justify-between gap-2 px-3 py-2">
                         <Link href={evidenceHref(e.key)}
-                              className="text-xs font-semibold text-fg hover:text-brand truncate max-w-[55%]" style={{fontFamily: 'var(--type-mono)'}}>
+                              className="text-xs font-semibold text-fg hover:text-brand truncate max-w-[55%] font-mono">
                             {e.displayName}
                             {e.thesisSince !== null && <span className="ml-1 text-brand">●</span>}
                         </Link>
-                        <span className="flex items-center gap-1 text-[11px]" style={{fontFamily: 'var(--type-mono)'}}>
+                        <span className="flex items-center gap-1 text-[11px] font-mono">
                             <span className="text-fg-soft">{e.weightSlow.toFixed(1)}</span>{' '}
                             <span className={cn(getChangeColorClass(e.sentimentSlow || undefined))}>
                                 {formatSigned(e.sentimentSlow)}
@@ -43,7 +43,7 @@ const TypeColumn = ({title, entities, followedByName}: {title: string; entities:
                                                    followed={followedByName[e.displayName.toLowerCase()] ?? null} className="size-6" />
                             )}
                         </span>
-                    </div>
+                    </RowCard>
                 ))}
             </div>
         )}

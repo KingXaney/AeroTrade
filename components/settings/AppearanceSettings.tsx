@@ -8,6 +8,7 @@ import {PALETTE_IDS, PALETTES, type PaletteId} from "@/lib/theme/palettes";
 import {PRESETS, findPreset, type Preset} from "@/lib/theme/presets";
 import {STYLE_IDS, STYLES, type StyleId} from "@/lib/theme/styles";
 import {DEFAULT_THEME, themeEquals, type Theme} from "@/lib/theme/resolve";
+import RowCard from "@/components/primitives/RowCard";
 
 // Tiny rendition of a palette × style combination for the preset cards.
 const ThemeSwatch = ({palette, style}: {palette: PaletteId; style: StyleId}) => {
@@ -79,8 +80,7 @@ const AppearanceSettings = () => {
                     <button type="button"
                             onClick={() => apply({...DEFAULT_THEME, reduceMotion: theme.reduceMotion})}
                             disabled={pending || (theme.palette === DEFAULT_THEME.palette && theme.style === DEFAULT_THEME.style)}
-                            className="text-xs uppercase tracking-[0.1em] text-fg-muted hover:text-brand transition-colors disabled:opacity-40"
-                            style={{fontFamily: 'var(--type-mono)'}}>
+                            className="text-xs uppercase tracking-[0.1em] text-fg-muted hover:text-brand transition-colors disabled:opacity-40 font-mono">
                         Reset to default
                     </button>
                 </div>
@@ -99,7 +99,7 @@ const AppearanceSettings = () => {
                                 <ThemeSwatch palette={p.palette} style={p.style} />
                                 <div className="mt-2.5 flex items-start justify-between gap-2">
                                     <div className="min-w-0">
-                                        <div className="text-sm font-semibold text-fg truncate" style={{fontFamily: 'var(--type-display)'}}>{p.label}</div>
+                                        <div className="text-sm font-semibold text-fg truncate font-heading">{p.label}</div>
                                         <div className="text-[11px] text-fg-muted leading-snug mt-0.5">{p.description}</div>
                                     </div>
                                     {selected && <span className="material-symbols-outlined text-brand text-base shrink-0">check_circle</span>}
@@ -112,7 +112,7 @@ const AppearanceSettings = () => {
 
             {/* Palette */}
             <div>
-                <div className="text-[10px] uppercase tracking-[0.14em] text-fg-muted mb-2" style={{fontFamily: 'var(--type-mono)'}}>Palette</div>
+                <div className="text-[10px] uppercase tracking-[0.14em] text-fg-muted mb-2 font-mono">Palette</div>
                 <div role="radiogroup" aria-label="Colour palette" className="flex flex-wrap gap-2" {...groupProps}>
                     {PALETTE_IDS.map((id) => {
                         const p = PALETTES[id];
@@ -122,10 +122,9 @@ const AppearanceSettings = () => {
                             <button key={id} type="button" role="radio" aria-checked={selected} disabled={pending}
                                     onClick={() => apply(next)} {...previewProps(next)}
                                     className={cn(
-                                        'inline-flex items-center gap-2 rounded-full border px-3 py-1.5 text-xs transition-colors bg-surface-2/40 border-line-strong/20 text-fg-soft hover:border-brand/40 hover:text-fg focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand',
+                                        'font-mono inline-flex items-center gap-2 rounded-full border px-3 py-1.5 text-xs transition-colors bg-surface-2/40 border-line-strong/20 text-fg-soft hover:border-brand/40 hover:text-fg focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand',
                                         selected && 'border-brand text-fg',
-                                    )}
-                                    style={{fontFamily: 'var(--type-mono)'}}>
+                                    )}>
                                 <span className="flex -space-x-1" aria-hidden="true">
                                     {p.swatch.map((c, i) => (
                                         <span key={i} className="h-3 w-3 rounded-full border border-black/30" style={{background: c}} />
@@ -141,7 +140,7 @@ const AppearanceSettings = () => {
 
             {/* Style */}
             <div>
-                <div className="text-[10px] uppercase tracking-[0.14em] text-fg-muted mb-2" style={{fontFamily: 'var(--type-mono)'}}>Style</div>
+                <div className="text-[10px] uppercase tracking-[0.14em] text-fg-muted mb-2 font-mono">Style</div>
                 <div role="radiogroup" aria-label="Visual style" className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-2" {...groupProps}>
                     {STYLE_IDS.map((id) => {
                         const s = STYLES[id];
@@ -154,9 +153,9 @@ const AppearanceSettings = () => {
                                         'text-left rounded-lg border px-3 py-2.5 transition-colors bg-surface-2/40 border-line-strong/20 hover:border-brand/40 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand',
                                         selected && 'border-brand ring-1 ring-brand',
                                     )}>
-                                <div className="text-sm font-semibold text-fg" style={{fontFamily: 'var(--type-display)'}}>{s.label}</div>
+                                <div className="text-sm font-semibold text-fg font-heading">{s.label}</div>
                                 <div className="text-[11px] text-fg-muted leading-snug mt-0.5">{s.description}</div>
-                                <div className="text-[10px] text-fg-muted mt-1.5" style={{fontFamily: 'var(--type-mono)'}}>
+                                <div className="text-[10px] text-fg-muted mt-1.5 font-mono">
                                     {s.fonts.display} · {s.fonts.body}
                                 </div>
                             </button>
@@ -166,7 +165,7 @@ const AppearanceSettings = () => {
             </div>
 
             {/* Motion */}
-            <div className="flex items-center justify-between rounded-lg border border-line-strong/20 bg-surface-2/40 px-4 py-3">
+            <RowCard className="flex items-center justify-between">
                 <div>
                     <div className="text-sm font-medium text-fg">Reduce motion</div>
                     <div className="text-[11px] text-fg-muted">Stops shimmer, particles and drifting backdrops. Your OS setting is always respected too.</div>
@@ -177,7 +176,7 @@ const AppearanceSettings = () => {
                     disabled={pending}
                     onCheckedChange={(checked) => apply({...theme, reduceMotion: checked})}
                 />
-            </div>
+            </RowCard>
         </div>
     );
 };

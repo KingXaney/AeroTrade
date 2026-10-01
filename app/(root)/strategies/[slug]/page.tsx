@@ -5,6 +5,7 @@ import {STRATEGIES_DISCLAIMER} from "@/lib/strategies/catalog";
 import {getStrategyPageView} from "@/lib/strategies/page-store";
 import {BOARD_COPY} from "@/lib/learn/copy/board";
 import {EXPORT_COPY} from "@/lib/learn/copy/export";
+import {STRATEGY_PAGE_COPY} from "@/lib/learn/copy/strategies";
 import MicroLabel from "@/components/primitives/MicroLabel";
 import Panel from "@/components/primitives/Panel";
 import SectionHeading from "@/components/primitives/SectionHeading";
@@ -61,10 +62,10 @@ const StrategyPage = async ({params, searchParams}: StrategyPageProps) => {
                         <h1 className="font-heading text-2xl font-semibold text-fg tracking-tight">{def.name}</h1>
                         <p className="font-mono text-xs text-fg-muted mt-1" id="strategy-meta">
                             {view.meta} ·{' '}
-                            {started ? `live since ${liveSince}` : <span className="text-warning">not started</span>}
+                            {started && liveSince ? STRATEGY_PAGE_COPY.liveSince(liveSince) : <span className="text-warning">{STRATEGY_PAGE_COPY.notStarted}</span>}
                         </p>
                         <p className="text-sm text-fg-soft mt-2 max-w-2xl">{def.explainer.summary}</p>
-                        <p className="font-mono text-[11px] text-fg-muted mt-1" id="strategy-beginner-line">In one line: {def.explainer.beginnerLine}</p>
+                        <p className="font-mono text-[11px] text-fg-muted mt-1" id="strategy-beginner-line">{STRATEGY_PAGE_COPY.oneLine(def.explainer.beginnerLine)}</p>
                     </div>
                 </div>
                 <FollowButton slug={def.id} followed={view.followed} />
@@ -87,7 +88,7 @@ const StrategyPage = async ({params, searchParams}: StrategyPageProps) => {
                     <SectionHeading>Current holdings</SectionHeading>
                     <HoldingsTable
                         positions={analytics?.summary.positions ?? []}
-                        emptyText={started ? def.explainer.cashReason : 'Not started — the account opens on the first run.'}
+                        emptyText={started ? def.explainer.cashReason : STRATEGY_PAGE_COPY.holdingsNotStarted}
                         showUnpricedNote={false}
                     />
                 </Panel>
@@ -144,28 +145,28 @@ const StrategyPage = async ({params, searchParams}: StrategyPageProps) => {
                     </div>
                 </div>
                 {trades.length === 0
-                    ? <p className="text-sm text-fg-muted p-4">No fills yet — the first orders are placed on the next run that finds a signal.</p>
+                    ? <p className="text-sm text-fg-muted p-4">{STRATEGY_PAGE_COPY.noFills}</p>
                     : <TradeHistory trades={trades} totalCount={analytics?.tradeCount} detail={replayFor} />}
 
                 {/* Hypothetical fills fold away under the real ones, never beside them. */}
                 <div className="mt-4 pt-4 border-t border-line-strong/20" id="strategy-simulated-trades">
                     <details className="group">
                         <summary className="font-mono cursor-pointer text-[11px] text-brand hover:underline">
-                            Simulated trade log — {backtest ? `${backtest.trades.length} hypothetical fills at the next day's open` : 'not computed yet'}
+                            {STRATEGY_PAGE_COPY.simulatedLog(backtest ? backtest.trades.length : null)}
                         </summary>
                         <div className="pt-3">
                             {backtest
                                 ? <SimulatedTradeList trades={backtest.trades} def={def} />
-                                : <p className="text-sm text-fg-muted">Backtest not computed yet — it is built on the first run.</p>}
+                                : <p className="text-sm text-fg-muted">{STRATEGY_PAGE_COPY.backtestPending}</p>}
                         </div>
                     </details>
                 </div>
             </Panel>
 
             {/* Once per page, and always visible — it used to be rendered twice. */}
-            <p className="font-mono text-[10px] uppercase tracking-[0.1em] text-fg-muted text-center">
+            <MicroLabel as="p" className="text-center">
                 {STRATEGIES_DISCLAIMER}
-            </p>
+            </MicroLabel>
         </div>
     );
 };

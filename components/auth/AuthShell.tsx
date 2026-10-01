@@ -11,8 +11,7 @@ const AuthShell = ({children}: {children: React.ReactNode}) => (
                       style={{ fontVariationSettings: "'FILL' 1" }}>
                     terminal
                 </span>
-                <span className="text-xl font-semibold tracking-tighter text-brand"
-                      style={{ fontFamily: 'var(--type-display)' }}>
+                <span className="text-xl font-semibold tracking-tighter text-brand font-heading">
                     AeroTrade
                 </span>
             </Link>
@@ -25,8 +24,8 @@ const AuthShell = ({children}: {children: React.ReactNode}) => (
                 <p className="auth-blockquote">
                     Paper-trade in practice accounts of your own, follow the news topics you care about, and let a news brain that reads hundreds of articles a day tell you what the market is paying attention to.
                 </p>
-                <p className="max-md:text-xs text-fg-muted"
-                   style={{ fontFamily: 'var(--type-mono)', letterSpacing: '0.02em' }}>
+                <p className="max-md:text-xs text-fg-muted font-mono"
+                   style={{ letterSpacing: '0.02em' }}>
                     Open source · built by Xinnan Huang
                 </p>
             </div>
@@ -38,10 +37,9 @@ const AuthShell = ({children}: {children: React.ReactNode}) => (
                          background: 'radial-gradient(circle at 30% 50%, color-mix(in srgb, var(--brand-strong) 15%, transparent), transparent 70%)',
                      }}>
                 </div>
-                <div className="absolute top-8 left-8 right-8 bottom-8 rounded-2xl overflow-hidden"
+                <div className="absolute top-8 left-8 right-8 bottom-8 rounded-2xl overflow-hidden border border-brand/10"
                      style={{
                          background: 'linear-gradient(135deg, color-mix(in srgb, var(--brand-strong) 5%, transparent), color-mix(in srgb, var(--secondary-tint) 5%, transparent))',
-                         border: '1px solid color-mix(in srgb, var(--brand) 10%, transparent)',
                          backdropFilter: 'blur(8px)',
                      }}>
                     {/* Terminal-like decorative content */}
@@ -51,19 +49,19 @@ const AuthShell = ({children}: {children: React.ReactNode}) => (
                             <div className="w-3 h-3 rounded-full bg-brand-strong"></div>
                             <div className="w-3 h-3 rounded-full bg-brand"></div>
                         </div>
-                        <p style={{ fontFamily: 'var(--type-mono)', fontSize: '11px', color: 'var(--brand)' }}>
+                        <p className="font-mono text-brand" style={{ fontSize: '11px' }}>
                             &gt; SYSTEM.INIT: AeroTrade Terminal v2.44
                         </p>
-                        <p style={{ fontFamily: 'var(--type-mono)', fontSize: '11px', color: 'var(--fg-muted)' }}>
+                        <p className="font-mono text-fg-muted" style={{ fontSize: '11px' }}>
                             &gt; Connecting to market nodes...
                         </p>
-                        <p style={{ fontFamily: 'var(--type-mono)', fontSize: '11px', color: 'var(--brand-dim)' }}>
+                        <p className="font-mono text-brand-dim" style={{ fontSize: '11px' }}>
                             &gt; 47 nodes online · Latency: 0.8ms
                         </p>
-                        <p style={{ fontFamily: 'var(--type-mono)', fontSize: '11px', color: 'var(--fg-muted)' }}>
+                        <p className="font-mono text-fg-muted" style={{ fontSize: '11px' }}>
                             &gt; Portfolio sync: COMPLETE
                         </p>
-                        <p style={{ fontFamily: 'var(--type-mono)', fontSize: '11px', color: 'var(--brand)' }}>
+                        <p className="font-mono text-brand" style={{ fontSize: '11px' }}>
                             &gt; AI Assistant: READY
                         </p>
                     </div>

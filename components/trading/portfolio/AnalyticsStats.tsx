@@ -5,6 +5,7 @@ import Term from "@/components/primitives/Term";
 import WhatTheseMean from "@/components/learn/WhatTheseMean";
 import {DRAWDOWN_COPY, drawdownLine} from "@/lib/learn/copy/portfolio";
 import type {AccountAnalytics} from '@/lib/trading/types';
+import Panel from '@/components/primitives/Panel';
 
 // Account analytics tiles — mirrors the AccountSummary visual pattern.
 // Win rate and drawdown show em-dashes until there is enough history to
@@ -26,7 +27,7 @@ const AnalyticsStats = ({analytics, definitions = false}: {analytics: AnalyticsS
     const dated = drawdownHint !== DRAWDOWN_COPY.undated && drawdownHint !== DRAWDOWN_COPY.needsHistory;
 
     return (
-        <div className="glass-panel rounded-xl p-5">
+        <Panel as="div">
             <div className={cn('grid grid-cols-2 gap-4', income ? 'md:grid-cols-5' : 'md:grid-cols-4')}>
             <StatTile
                 label={<Term k="max-drawdown">Max Drawdown</Term>}
@@ -63,7 +64,7 @@ const AnalyticsStats = ({analytics, definitions = false}: {analytics: AnalyticsS
             />
             </div>
             {definitions && <WhatTheseMean keys={['max-drawdown', ...(dated ? ['recovery'] : []), 'win-rate', 'realized-pnl', ...(income ? ['income'] : []), 'trades']} />}
-        </div>
+        </Panel>
     );
 };
 

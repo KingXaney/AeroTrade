@@ -11,9 +11,9 @@ import {createTopic, updateTopic} from "@/lib/actions/topics.actions";
 import {MAX_EXCLUDES, NAME_MAX} from "@/lib/topics/config";
 import {KEYWORD_MAX, MAX_KEYWORDS} from "@/lib/news/keywords";
 import {suggestKeywords} from "@/lib/topics/suggest-keywords";
+import {TOPIC_COLORS} from "@/lib/topics/colors";
 import type {TopicView} from '@/lib/topics/types';
-
-const TOPIC_COLORS = ['#7df4ff', '#a6e3a1', '#f9e2af', '#fab387', '#f38ba8', '#cba6f7', '#89b4fa', '#94e2d5'];
+import ActionButton from "@/components/primitives/ActionButton";
 
 export type ComposerMode = 'create' | 'edit';
 
@@ -25,8 +25,7 @@ type Props = {
     onSaved?: (topic: TopicView) => void;
 };
 
-const labelClass = 'text-[10px] uppercase tracking-[0.14em] text-fg-muted';
-const mono = {fontFamily: 'var(--type-mono)'} as const;
+const labelClass = 'font-mono text-[10px] uppercase tracking-[0.14em] text-fg-muted';
 
 // The form lives in its own component so its state initialises from props on every
 // open (Radix unmounts dialog content when closed) — no reset effect required.
@@ -72,7 +71,7 @@ const ComposerForm = ({mode, initial, onClose, onSaved}: {mode: ComposerMode; in
     return (
         <form onSubmit={submit} className="space-y-5">
             <div className="space-y-1.5">
-                <label htmlFor="topic-name" className={labelClass} style={mono}>Name</label>
+                <label htmlFor="topic-name" className={labelClass}>Name</label>
                 <input
                     id="topic-name"
                     value={name}
@@ -86,8 +85,8 @@ const ComposerForm = ({mode, initial, onClose, onSaved}: {mode: ComposerMode; in
 
             <div className="space-y-1.5">
                 <div className="flex items-center justify-between">
-                    <span className={labelClass} style={mono}>Match any of</span>
-                    <span className="text-[10px] text-fg-muted" style={mono}>{keywords.length}/{MAX_KEYWORDS}</span>
+                    <span className={labelClass}>Match any of</span>
+                    <span className="text-[10px] text-fg-muted font-mono">{keywords.length}/{MAX_KEYWORDS}</span>
                 </div>
                 <div className="rounded-lg border border-line-strong/30 bg-surface-0 px-2 py-1.5">
                     <KeywordChips
@@ -106,7 +105,7 @@ const ComposerForm = ({mode, initial, onClose, onSaved}: {mode: ComposerMode; in
             </div>
 
             <button type="button" onClick={() => setAdvanced((v) => !v)} aria-expanded={advanced}
-                    className="text-[10px] uppercase tracking-[0.14em] text-fg-muted hover:text-fg" style={mono}>
+                    className="text-[10px] uppercase tracking-[0.14em] text-fg-muted hover:text-fg font-mono">
                 {advanced ? '− Hide advanced' : '+ Advanced (exclusions, colour)'}
             </button>
 
@@ -114,8 +113,8 @@ const ComposerForm = ({mode, initial, onClose, onSaved}: {mode: ComposerMode; in
                 <div className="space-y-4">
                     <div className="space-y-1.5">
                         <div className="flex items-center justify-between">
-                            <span className={labelClass} style={mono}>But not</span>
-                            <span className="text-[10px] text-fg-muted" style={mono}>{exclude.length}/{MAX_EXCLUDES}</span>
+                            <span className={labelClass}>But not</span>
+                            <span className="text-[10px] text-fg-muted font-mono">{exclude.length}/{MAX_EXCLUDES}</span>
                         </div>
                         <div className="rounded-lg border border-line-strong/30 bg-surface-0 px-2 py-1.5">
                             <KeywordChips values={exclude} variant="exclude" editable max={MAX_EXCLUDES} maxLength={KEYWORD_MAX}
@@ -123,7 +122,7 @@ const ComposerForm = ({mode, initial, onClose, onSaved}: {mode: ComposerMode; in
                         </div>
                     </div>
                     <div className="space-y-1.5">
-                        <span className={labelClass} style={mono}>Colour</span>
+                        <span className={labelClass}>Colour</span>
                         <div className="flex items-center gap-2" role="radiogroup" aria-label="Topic colour">
                             {TOPIC_COLORS.map((c) => (
                                 <button key={c} type="button" role="radio" aria-checked={color === c} aria-label={c}
@@ -138,16 +137,14 @@ const ComposerForm = ({mode, initial, onClose, onSaved}: {mode: ComposerMode; in
 
             {error && <p className="text-sm text-negative">{error}</p>}
 
-            <div className="flex justify-end gap-2" style={mono}>
-                <button type="button" onClick={onClose} disabled={pending}
-                        className="px-3 py-2 rounded-lg text-xs font-bold uppercase tracking-[0.1em] text-fg-soft hover:text-fg border border-line-strong/40">
+            <div className="flex justify-end gap-2 font-mono">
+                <ActionButton variant="secondary" onClick={onClose} disabled={pending}>
                     Cancel
-                </button>
-                <button type="submit" disabled={pending || name.trim().length < 2}
-                        className="inline-flex items-center gap-2 px-3 py-2 rounded-lg text-xs font-bold uppercase tracking-[0.1em] bg-brand text-on-brand disabled:opacity-50">
+                </ActionButton>
+                <ActionButton type="submit" className="inline-flex items-center gap-2" disabled={pending || name.trim().length < 2}>
                     {pending && <Loader2 className="size-3.5 animate-spin" />}
                     {mode === 'edit' ? 'Save changes' : 'Follow topic'}
-                </button>
+                </ActionButton>
             </div>
         </form>
     );
@@ -157,7 +154,7 @@ const TopicComposer = ({open, onOpenChange, mode, initial = null, onSaved}: Prop
     <Dialog open={open} onOpenChange={onOpenChange}>
         <DialogContent className="sm:max-w-lg">
             <DialogHeader>
-                <DialogTitle style={{fontFamily: 'var(--type-display)'}}>{mode === 'edit' ? 'Edit topic' : 'Follow a topic'}</DialogTitle>
+                <DialogTitle className="font-heading">{mode === 'edit' ? 'Edit topic' : 'Follow a topic'}</DialogTitle>
                 <DialogDescription>
                     We match headlines and summaries against these keywords. Add exclusions to cut noise.
                 </DialogDescription>

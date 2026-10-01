@@ -36,12 +36,11 @@ const NavList = ({pathname, badges = {}, onNavigate, items = NAV_ITEMS}: Props) 
                     onClick={onNavigate}
                     aria-current={active ? 'page' : undefined}
                     className={cn(
-                        "flex items-center gap-4 px-4 py-3 transition-all text-xs font-bold tracking-[0.1em] uppercase",
+                        "font-mono flex items-center gap-4 px-4 py-3 transition-all text-xs font-bold tracking-[0.1em] uppercase",
                         active
                             ? "text-brand border-l-4 border-brand"
                             : "text-fg-soft hover:text-fg hover:bg-surface-3",
                     )}
-                    style={{fontFamily: 'var(--type-mono)'}}
                 >
                     <span
                         className="material-symbols-outlined"

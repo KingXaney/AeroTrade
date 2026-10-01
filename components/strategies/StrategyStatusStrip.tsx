@@ -1,6 +1,7 @@
 import JobStamp from "@/components/jobs/JobStamp";
 import Badge from "@/components/primitives/Badge";
 import Panel from "@/components/primitives/Panel";
+import {STRATEGY_STATUS_COPY} from "@/lib/learn/copy/strategies";
 import type {StrategiesSystemStatus} from "@/lib/strategies/page-store";
 
 // Is the machinery running, and on which day's prices? One line, always visible, so a
@@ -29,7 +30,7 @@ const StrategyStatusStrip = ({status}: {status: StrategiesSystemStatus}) => (
                 <Field label="Valued" value="16:10 ET" last />
             </p>
             {!status.started && (
-                <Badge tone="warning">Preview of the catalog — has not run yet</Badge>
+                <Badge tone="warning">{STRATEGY_STATUS_COPY.preview}</Badge>
             )}
         </div>
 

@@ -3,6 +3,7 @@
 import {useMemo, useRef, useState} from "react";
 import {formatPct} from "@/lib/format";
 import type {PerfPoint} from '@/lib/trading/types';
+import {PERFORMANCE_COPY} from "@/lib/learn/copy/portfolio";
 
 // Hand-rolled SVG performance chart: an account's (or a quant strategy's) %-return since inception
 // (cyan) vs SPY's total return (muted, lib/prices/total-return.ts). Deliberately
@@ -52,10 +53,10 @@ const ReturnChart = ({series, accountName, band}: {series: PerfPoint[]; accountN
             <div className="flex flex-col items-center justify-center py-12 text-center">
                 <span className="material-symbols-outlined text-3xl text-fg-muted mb-2">monitoring</span>
                 <p className="text-sm text-fg-muted">
-                    Collecting daily performance data — check back tomorrow.
+                    {PERFORMANCE_COPY.collecting}
                 </p>
-                <p className="text-xs text-fg-muted mt-1" style={{fontFamily: 'var(--type-mono)'}}>
-                    A value snapshot is recorded every market day at close.
+                <p className="text-xs text-fg-muted mt-1 font-mono">
+                    {PERFORMANCE_COPY.snapshotNote}
                 </p>
             </div>
         );
@@ -76,14 +77,14 @@ const ReturnChart = ({series, accountName, band}: {series: PerfPoint[]; accountN
     return (
         <div>
             {/* Legend + current values */}
-            <div className="flex flex-wrap items-center gap-4 mb-3 text-xs" style={{fontFamily: 'var(--type-mono)'}}>
+            <div className="flex flex-wrap items-center gap-4 mb-3 text-xs font-mono">
                 <span className="flex items-center gap-1.5">
-                    <span className="inline-block w-3 h-0.5 rounded" style={{backgroundColor: 'var(--brand)'}} />
+                    <span className="inline-block w-3 h-0.5 rounded bg-brand" />
                     <span className="text-fg">{accountName}</span>
                     <span className="text-brand">{formatPct((hover ?? last).accountPct)}</span>
                 </span>
                 <span className="flex items-center gap-1.5">
-                    <span className="inline-block w-3 h-0.5 rounded" style={{backgroundColor: 'var(--fg-muted)'}} />
+                    <span className="inline-block w-3 h-0.5 rounded bg-fg-muted" />
                     <span className="text-fg-muted">S&amp;P 500 (SPY, total return)</span>
                     <span className="text-fg-soft">
                         {(hover ?? last).benchmarkPct === null ? '—' : formatPct((hover ?? last).benchmarkPct as number)}
@@ -116,11 +117,11 @@ const ReturnChart = ({series, accountName, band}: {series: PerfPoint[]; accountN
                 <line x1={PAD_X} x2={WIDTH - PAD_X} y1={geometry.zeroY} y2={geometry.zeroY}
                       className="stroke-line-strong/50" strokeDasharray="4 4" strokeWidth="1" />
                 <text x={PAD_X - 6} y={geometry.zeroY + 3} textAnchor="end" fontSize="9"
-                      className="fill-fg-muted" style={{fontFamily: 'var(--type-mono)'}}>0%</text>
+                      className="fill-fg-muted font-mono">0%</text>
                 <text x={PAD_X - 6} y={PAD_Y + 3} textAnchor="end" fontSize="9"
-                      className="fill-fg-muted" style={{fontFamily: 'var(--type-mono)'}}>{formatPct(geometry.max)}</text>
+                      className="fill-fg-muted font-mono">{formatPct(geometry.max)}</text>
                 <text x={PAD_X - 6} y={HEIGHT - PAD_Y + 3} textAnchor="end" fontSize="9"
-                      className="fill-fg-muted" style={{fontFamily: 'var(--type-mono)'}}>{formatPct(geometry.min)}</text>
+                      className="fill-fg-muted font-mono">{formatPct(geometry.min)}</text>
 
                 {/* Benchmark line (under the account line) */}
                 {geometry.benchPath && (

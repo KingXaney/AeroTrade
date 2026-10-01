@@ -9,6 +9,9 @@
 
 export type UnpricedForm = 'atCost' | 'marker';
 
+// The tooltip on an unpriced holding's empty price cell.
+export const UNPRICED_CELL_TITLE = 'No live quote — value shown at cost';
+
 export const unpricedText = (unpriced: number, holdings: number, form: UnpricedForm = 'atCost'): string | null => {
     if (unpriced <= 0 || holdings <= 0) return null;
     const all = unpriced >= holdings;

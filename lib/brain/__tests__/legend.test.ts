@@ -147,6 +147,10 @@ describe('the rest of /brain\'s copy', () => {
             BRAIN_COPY.labelsSummary, BRAIN_COPY.thesisDot(5), BRAIN_COPY.sinceThesisLabel,
             BRAIN_COPY.sinceThesisFigures('NVDA', 4.1, 6), BRAIN_COPY.sinceThesisWindow('2026-09-08', '2026-09-26'),
             NAVIGATOR_COPY.glossSummary, BRAIN_LEGEND_COPY.summary,
+            BRAIN_COPY.pageSubtitle, BRAIN_COPY.thesesEmpty, BRAIN_COPY.graphEmpty, BRAIN_COPY.graphLegend,
+            BRAIN_COPY.graphHint, BRAIN_COPY.evidenceEmpty, BRAIN_COPY.secondOpinionAbout, BRAIN_COPY.secondOpinionEmpty,
+            BRAIN_COPY.tileBuilding, NAVIGATOR_COPY.about, NAVIGATOR_COPY.decisionsEmpty, NAVIGATOR_COPY.decisionsFooter,
+            NAVIGATOR_COPY.tileSchedule,
         ]) {
             clean(text);
         }

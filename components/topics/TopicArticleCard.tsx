@@ -1,6 +1,7 @@
 import ArticleCard from "@/components/news/ArticleCard";
 import SourceBadge from "@/components/topics/SourceBadge";
 import type {TopicArticleView} from '@/lib/topics/types';
+import MicroLabel from "@/components/primitives/MicroLabel";
 
 const MAX_TERM_CHIPS = 3;
 
@@ -31,25 +32,25 @@ const TopicArticleCard = ({article, isNew = false, topic}: Props) => {
                 <div className="flex items-center gap-2 mb-4 flex-wrap">
                     <SourceBadge sourceType={article.sourceType} source={article.source} />
                     {topic && (
-                        <span className="inline-flex items-center gap-1.5 text-[10px] uppercase tracking-[0.1em] text-fg-muted" style={{fontFamily: 'var(--type-mono)'}}>
+                        <MicroLabel className="inline-flex items-center gap-1.5">
                             <span className="h-1.5 w-1.5 rounded-full" style={{background: topic.color ?? 'var(--brand)'}} aria-hidden="true" />
                             {topic.name}
-                        </span>
+                        </MicroLabel>
                     )}
                     {isNew && (
-                        <span className="ml-auto inline-flex items-center gap-1 text-[10px] uppercase tracking-[0.1em] text-brand" style={{fontFamily: 'var(--type-mono)'}}>
+                        <MicroLabel tone="brand" className="ml-auto inline-flex items-center gap-1">
                             <span className="h-1.5 w-1.5 rounded-full bg-brand" aria-hidden="true" />
                             New
-                        </span>
+                        </MicroLabel>
                     )}
                 </div>
             )}
             chips={(
                 <div className="flex items-center gap-1.5 flex-wrap">
                     {terms.map((t) => (
-                        <span key={t} className="rounded px-1.5 py-0.5 text-[10px] bg-surface-3 text-fg-muted" style={{fontFamily: 'var(--type-mono)'}}>{t}</span>
+                        <span key={t} className="rounded px-1.5 py-0.5 text-[10px] bg-surface-3 text-fg-muted font-mono">{t}</span>
                     ))}
-                    {extraTerms > 0 && <span className="text-[10px] text-fg-muted" style={{fontFamily: 'var(--type-mono)'}}>+{extraTerms}</span>}
+                    {extraTerms > 0 && <span className="text-[10px] text-fg-muted font-mono">+{extraTerms}</span>}
                     <span className="inline-flex items-center gap-0.5 ml-1" title={`Relevance ${article.score}`} aria-label={`Relevance ${dots} of 3`}>
                         {[1, 2, 3].map((i) => (
                             <span key={i} className={i <= dots ? 'h-1.5 w-1.5 rounded-full bg-brand' : 'h-1.5 w-1.5 rounded-full bg-surface-4'} />

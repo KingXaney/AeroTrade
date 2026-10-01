@@ -6,6 +6,7 @@ import {toast} from "sonner";
 import {resetPaperAccount} from "@/lib/actions/accounts.actions";
 import {formatPrice} from "@/lib/format";
 import ConfirmDialog from "@/components/primitives/ConfirmDialog";
+import ActionButton from "@/components/primitives/ActionButton";
 
 // Resets one paper account to its starting balance. This was a click-twice toggle
 // labelled "Click to confirm" that disarmed on blur — so it was really hover-and-click-
@@ -40,15 +41,9 @@ const ResetAccountButton = ({accountId, accountName, startingBalance}: Props) =>
 
     return (
         <>
-            <button
-                type="button"
-                onClick={() => setOpen(true)}
-                disabled={busy}
-                className="px-3 py-2 rounded-lg text-xs font-bold uppercase tracking-wider text-fg-soft hover:text-negative transition-colors disabled:opacity-50"
-                style={{border: '1px solid color-mix(in srgb, var(--line-strong) 40%, transparent)', fontFamily: 'var(--type-mono)'}}
-            >
+            <ActionButton variant="danger" className="tracking-wider" onClick={() => setOpen(true)} disabled={busy}>
                 {busy ? 'Resetting…' : 'Reset Account'}
-            </button>
+            </ActionButton>
             <ConfirmDialog
                 open={open}
                 onOpenChange={setOpen}

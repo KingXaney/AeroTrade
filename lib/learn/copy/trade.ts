@@ -36,5 +36,10 @@ export const orderEffectLine = (effect: OrderEffect, compact = false): string =>
 };
 
 // Paper orders fill at once at the last quote; the line says what would happen for real.
+// The new-account dialog: what an account is, and why returns are compared in %.
+export const ACCOUNT_COPY = {
+    about: 'Each account holds its own cash, positions and record, so you can compare how they perform. Returns are tracked in %, so any starting balance stays comparable.',
+} as const;
+
 export const queueLine = (nextOpenLabel: string): string =>
     `Paper fills now at the last close · a real broker would queue this to ${nextOpenLabel}`;

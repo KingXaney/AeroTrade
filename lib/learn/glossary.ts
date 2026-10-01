@@ -1,5 +1,7 @@
 // The one registry of what every number and term in the app means, in the app's own
-// convention. Client-importable and import-free: the catalog reads it for column help,
+// convention. Client-importable, and its only imports are the import-free rail constants
+// its sentences quote (the Navigator's position cap and cash floor, the strategies' drift
+// band), so a moved constant moves the definition. The catalog reads it for column help,
 // components read it for title= text and the per-panel "What these mean" disclosures,
 // the chat's explain tool reads it so definitions come from tested content rather than
 // the model's memory, and the dashboard's lesson widget reads the concept entries.
@@ -14,6 +16,9 @@
 //   concept — a news term, keyed EXACTLY as lib/topics/starters.ts spells the keyword,
 //             so a matched article term is a glossary key;
 //   rail    — a constant the AI Navigator or the news brain trades under.
+
+import {MAX_POSITION_WEIGHT, MIN_CASH_WEIGHT} from '@/lib/navigator/config';
+import {DEFAULT_DRIFT_BAND} from '@/lib/strategies/config';
 
 export type GlossaryKind = 'metric' | 'concept' | 'rail';
 
@@ -30,6 +35,11 @@ export type GlossaryEntry = {
     computedIn?: string;
     seeAlso?: readonly string[];
 };
+
+const pct = (fraction: number): string => `${Math.round(fraction * 100)}%`;
+// A share as a sentence says it — 'a fifth' — or its percentage when it has no plain name.
+const SHARE_NAMES: Readonly<Record<string, string>> = {'0.5': 'half', '0.25': 'a quarter', '0.2': 'a fifth', '0.1': 'a tenth'};
+const shareName = (fraction: number): string => SHARE_NAMES[String(fraction)] ?? pct(fraction);
 
 const ENTRIES = [
     // ---- signal board columns -------------------------------------------------------
@@ -51,7 +61,7 @@ const ENTRIES = [
         seeAlso: ['weight', 'drift']},
     {key: 'drift', kind: 'metric', term: 'Drift', aliases: ['drift'],
         short: 'Current weight minus target weight.',
-        long: 'A leg is traded only when its drift exceeds the band (2% of equity). Smaller drifts are left alone so the rule does not churn on every small price move.',
+        long: `A leg is traded only when its drift exceeds the band (${pct(DEFAULT_DRIFT_BAND)} of equity). Smaller drifts are left alone so the rule does not churn on every small price move.`,
         computedIn: 'lib/strategies/rebalance.ts planOrders', seeAlso: ['weight', 'target']},
     {key: 'sma50', kind: 'metric', term: 'SMA50', aliases: ['sma50', '50-day average', '50-day moving average'],
         short: 'Simple moving average: the mean of the last 50 closes.',
@@ -229,7 +239,7 @@ const ENTRIES = [
         formula: '1 / Σ weight²', seeAlso: ['concentration']},
     {key: 'concentration', kind: 'metric', term: 'Concentration', aliases: ['concentration', 'largest position'],
         short: 'The share of the account sitting in its largest position.',
-        long: 'A measurement of how much of the account moves with one company\'s news. The AI Navigator, for comparison, caps itself at 20% per name.',
+        long: `A measurement of how much of the account moves with one company's news. The AI Navigator, for comparison, caps itself at ${pct(MAX_POSITION_WEIGHT)} per name.`,
         seeAlso: ['effective-holdings']},
     // ---- time in the market (the buy-and-hold page) -------------------------------------
     {key: 'lump-sum', kind: 'metric', term: 'All at once (lump sum)', aliases: ['lump sum', 'lump-sum investing', 'all at once'],
@@ -482,11 +492,11 @@ const ENTRIES = [
 
     // ---- rails --------------------------------------------------------------------------
     {key: 'position-cap', kind: 'rail', term: 'Position cap', aliases: ['position cap', 'max position weight'],
-        short: 'The largest share of the account the AI Navigator allows in one name: 20%.',
-        long: 'A rail, not a forecast. Whatever the news says about a company, the Navigator\'s allocator will not put more than a fifth of the account in it.',
+        short: `The largest share of the account the AI Navigator allows in one name: ${pct(MAX_POSITION_WEIGHT)}.`,
+        long: `A rail, not a forecast. Whatever the news says about a company, the Navigator's allocator will not put more than ${shareName(MAX_POSITION_WEIGHT)} of the account in it.`,
         computedIn: 'lib/navigator/config.ts MAX_POSITION_WEIGHT', seeAlso: ['concentration', 'cash-floor']},
     {key: 'cash-floor', kind: 'rail', term: 'Cash floor', aliases: ['cash floor', 'minimum cash'],
-        short: 'The share of the account the AI Navigator always keeps in cash: 10%.',
+        short: `The share of the account the AI Navigator always keeps in cash: ${pct(MIN_CASH_WEIGHT)}.`,
         long: 'The floor is kept even when every candidate scores well, so the account is never fully invested.',
         computedIn: 'lib/navigator/config.ts MIN_CASH_WEIGHT', seeAlso: ['position-cap']},
 ] as const satisfies readonly GlossaryEntry[];

@@ -10,6 +10,7 @@ import {BRAIN_COPY} from "@/lib/learn/copy/brain";
 import type {SinceThesisLegs} from "@/lib/brain/since-thesis";
 import {evidenceHref} from "@/lib/brain/links";
 import type {BrainEntitySummary} from '@/lib/brain/types';
+import RowCard from "@/components/primitives/RowCard";
 
 const MS_PER_WEEK = 7 * 24 * 60 * 60 * 1000;
 
@@ -33,8 +34,7 @@ const ActiveTheses = ({theses, followedByName, sinceThesis, definitions = false}
     if (theses.length === 0) {
         return (
             <p className="text-sm text-fg-muted">
-                No active theses yet. A narrative becomes a thesis once it keeps accumulating
-                attention for several weeks — check back as the brain ingests more news.
+                {BRAIN_COPY.thesesEmpty}
             </p>
         );
     }
@@ -46,18 +46,17 @@ const ActiveTheses = ({theses, followedByName, sinceThesis, definitions = false}
                 const weeks = weeksActive(t.thesisSince);
                 const since = sinceThesis?.[t.key];
                 return (
-                    <div key={t.key}
-                         className="flex items-center justify-between px-4 py-3 rounded-lg border bg-surface-2/40 border-brand/15">
+                    <RowCard key={t.key} tone="brand" className="flex items-center justify-between">
                         <div className="flex items-center gap-3">
                             <span className="material-symbols-outlined text-base text-brand">trending_up</span>
                             <div>
                                 {/* A row used to be a dead end. The name opens the evidence behind
                                     the thesis; the follow button stays a sibling, never nested. */}
                                 <Link href={evidenceHref(t.key)}
-                                      className="text-sm font-semibold text-fg hover:text-brand transition-colors" style={{fontFamily: 'var(--type-display)'}}>
+                                      className="text-sm font-semibold text-fg hover:text-brand transition-colors font-heading">
                                     {t.displayName}
                                 </Link>
-                                <div className="text-[10px] uppercase tracking-[0.08em] text-fg-muted" style={{fontFamily: 'var(--type-mono)'}}>
+                                <div className="text-[10px] uppercase tracking-[0.08em] text-fg-muted font-mono">
                                     {t.type} · active {weeks} {weeks === 1 ? 'week' : 'weeks'}
                                     {t.type === 'ticker' && (
                                         <> · <Link href={`/stocks/${encodeURIComponent(t.key)}`} className="text-brand hover:underline normal-case tracking-normal">stock page</Link></>
@@ -72,7 +71,7 @@ const ActiveTheses = ({theses, followedByName, sinceThesis, definitions = false}
                             </div>
                         </div>
                         <div className="flex items-center gap-3">
-                            <div className="text-right" style={{fontFamily: 'var(--type-mono)'}}>
+                            <div className="text-right font-mono">
                                 <div className="text-sm text-fg"><Term k="news-weight">weight</Term> {t.weightSlow.toFixed(1)}</div>
                                 <div className={cn('text-xs', getChangeColorClass(t.sentimentSlow || undefined))}>
                                     <Term k="news-sentiment">sentiment</Term> {formatSigned(t.sentimentSlow)}
@@ -84,7 +83,7 @@ const ActiveTheses = ({theses, followedByName, sinceThesis, definitions = false}
                                                    followed={followedByName[t.displayName.toLowerCase()] ?? null} />
                             )}
                         </div>
-                    </div>
+                    </RowCard>
                 );
             })}
             {definitions && <WhatTheseMean keys={['thesis', 'news-weight', 'news-sentiment', ...(anySince ? ['since-thesis'] : [])]} />}

@@ -42,13 +42,11 @@ function SheetContent({
         className={cn(
           // z-[60] so it clears .header, which is z-50 — portal DOM order happens to win
           // today, but that is not something to rely on.
-          "fixed inset-y-0 left-0 z-[60] flex h-full w-72 max-w-[85vw] flex-col duration-150 outline-none",
+          "fixed inset-y-0 left-0 z-[60] flex h-full w-72 max-w-[85vw] flex-col duration-150 outline-none bg-chrome/97 border-r border-line-strong/30",
           "data-open:animate-in data-open:slide-in-from-left data-closed:animate-out data-closed:slide-out-to-left",
           className
         )}
         style={{
-          backgroundColor: 'color-mix(in srgb, var(--chrome) 97%, transparent)',
-          borderRight: '1px solid color-mix(in srgb, var(--line-strong) 30%, transparent)',
           backdropFilter: 'blur(16px)',
           WebkitBackdropFilter: 'blur(16px)',
         }}

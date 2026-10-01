@@ -4,6 +4,7 @@ import {useEffect} from "react";
 import Link from "next/link";
 import EmptyState from "@/components/primitives/EmptyState";
 import PageTitle from "@/components/primitives/PageTitle";
+import ActionButton, {actionButton} from "@/components/primitives/ActionButton";
 
 // The shared route error boundary. Before this existed only /topics had one, so a failed
 // price call on /portfolio blanked the whole app — header, sidebar and chat included —
@@ -16,8 +17,6 @@ type Props = {
     title?: string;
     message?: string;
 };
-
-const action = 'font-mono px-4 py-2 rounded-[var(--control-radius)] text-xs font-bold uppercase tracking-[0.1em]';
 
 const RouteError = ({error, reset, title = 'Something went wrong', message}: Props) => {
     useEffect(() => {
@@ -34,10 +33,10 @@ const RouteError = ({error, reset, title = 'Something went wrong', message}: Pro
                 description={message ?? "It's usually a hiccup talking to the market data provider."}
                 action={
                     <>
-                        <button type="button" onClick={reset} className={`${action} bg-brand text-on-brand`}>
+                        <ActionButton size="md" onClick={reset}>
                             Try again
-                        </button>
-                        <Link href="/" className={`${action} text-fg-soft border border-line-strong/40 hover:text-fg transition-colors`}>
+                        </ActionButton>
+                        <Link href="/" className={actionButton({variant: 'secondary', size: 'md'})}>
                             Dashboard
                         </Link>
                     </>

@@ -5,6 +5,9 @@ import {formatSignedPrice, formatPrice, formatChangePercent, getChangeColorClass
 import UnpricedNote from "@/components/trading/UnpricedNote";
 import Term from "@/components/primitives/Term";
 import type {EnrichedPosition} from '@/lib/trading/types';
+import RowCard from "@/components/primitives/RowCard";
+import MicroLabel from "@/components/primitives/MicroLabel";
+import {UNPRICED_CELL_TITLE} from "@/lib/learn/copy/unpriced";
 
 // The one holdings table. Read-only as rendered by the friend profile page, the strategy
 // detail page and the dashboard's Top Holdings widget; /portfolio's PositionsTable passes
@@ -32,8 +35,8 @@ const HoldingsTable = ({positions, emptyText = 'No open positions.', showUnprice
 
     return (
         <div className="space-y-2">
-            <div className={`hidden md:grid ${columns} gap-4 px-4 py-2 border-b border-line-strong/30`}
-                 style={{fontFamily: 'var(--type-mono)', fontSize: '10px', letterSpacing: '0.1em', textTransform: 'uppercase', color: 'var(--fg-muted)'}}>
+            <div className={`hidden md:grid ${columns} gap-4 px-4 py-2 border-b border-line-strong/30 font-mono text-fg-muted`}
+                 style={{fontSize: '10px', letterSpacing: '0.1em', textTransform: 'uppercase'}}>
                 <div>Asset</div>
                 <div className="text-right">Qty</div>
                 <div className="text-right"><Term k="avg-cost">Avg Cost</Term></div>
@@ -43,35 +46,32 @@ const HoldingsTable = ({positions, emptyText = 'No open positions.', showUnprice
             </div>
 
             {positions.map((p) => (
-                <div key={p.symbol}
-                     className={`grid grid-cols-1 ${rowColumns} gap-2 md:gap-4 items-center px-4 py-3 rounded-xl border bg-surface-2/40 border-line-strong/20${rowHover}`}>
+                <RowCard key={p.symbol} className={`grid grid-cols-1 ${rowColumns} gap-2 md:gap-4 items-center rounded-xl${rowHover}`}>
                     <div className="flex items-center gap-3">
-                        <div className="w-8 h-8 rounded flex items-center justify-center text-xs font-bold"
-                             style={{backgroundColor: 'var(--surface-4)', color: 'var(--brand)', fontFamily: 'var(--type-display)', border: '1px solid color-mix(in srgb, var(--brand) 20%, transparent)'}}>
+                        <div className="w-8 h-8 rounded flex items-center justify-center text-xs font-bold font-heading bg-surface-4 text-brand border border-brand/20">
                             {p.symbol.slice(0, 2)}
                         </div>
                         <div>
                             <Link href={`/stocks/${p.symbol}`}
-                                  className="font-bold text-sm text-fg hover:text-brand transition-colors"
-                                  style={{fontFamily: 'var(--type-mono)'}}>
+                                  className="font-bold text-sm text-fg hover:text-brand transition-colors font-mono">
                                 {p.symbol}
                             </Link>
                             <div className="text-[11px] text-fg-soft truncate max-w-[160px]">{p.company}</div>
                         </div>
                     </div>
                     {/* Below md the header row is hidden, so each cell names itself. */}
-                    <div className="flex justify-between md:block md:text-right text-fg" style={{fontFamily: 'var(--type-mono)'}}><span className="md:hidden text-[10px] uppercase tracking-[0.1em] text-fg-muted mr-2">Qty</span>{p.quantity}</div>
-                    <div className="flex justify-between md:block md:text-right text-fg-soft" style={{fontFamily: 'var(--type-mono)'}}><span className="md:hidden text-[10px] uppercase tracking-[0.1em] text-fg-muted mr-2">Avg Cost</span>{formatPrice(p.avgCost)}</div>
-                    <div className="flex justify-between md:block md:text-right text-fg" style={{fontFamily: 'var(--type-mono)'}}>
-                        <span className="md:hidden text-[10px] uppercase tracking-[0.1em] text-fg-muted mr-2">Price</span>
+                    <div className="flex justify-between md:block md:text-right text-fg font-mono"><MicroLabel className="md:hidden mr-2">Qty</MicroLabel>{p.quantity}</div>
+                    <div className="flex justify-between md:block md:text-right text-fg-soft font-mono"><MicroLabel className="md:hidden mr-2">Avg Cost</MicroLabel>{formatPrice(p.avgCost)}</div>
+                    <div className="flex justify-between md:block md:text-right text-fg font-mono">
+                        <MicroLabel className="md:hidden mr-2">Price</MicroLabel>
                         {typeof p.currentPrice === 'number' ? formatPrice(p.currentPrice) : '—'}
                     </div>
-                    <div className="flex justify-between md:block md:text-right" style={{fontFamily: 'var(--type-mono)'}}>
-                        <span className="md:hidden text-[10px] uppercase tracking-[0.1em] text-fg-muted mr-2">Value / P&L</span>
+                    <div className="flex justify-between md:block md:text-right font-mono">
+                        <MicroLabel className="md:hidden mr-2">Value / P&L</MicroLabel>
                         <div className="text-right">
                         <div className="text-fg">{formatPrice(p.marketValue)}</div>
                         {p.priceStale ? (
-                            <div className="text-xs text-fg-muted" title="No live quote — value shown at cost">—</div>
+                            <div className="text-xs text-fg-muted" title={UNPRICED_CELL_TITLE}>—</div>
                         ) : (
                             <div className={cn('text-xs', getChangeColorClass(p.unrealizedPnl))}>
                                 {formatSignedPrice(p.unrealizedPnl)} ({formatChangePercent(p.unrealizedPnlPct)})
@@ -80,7 +80,7 @@ const HoldingsTable = ({positions, emptyText = 'No open positions.', showUnprice
                         </div>
                     </div>
                     {actions && <div className="flex md:justify-end gap-2">{actions(p)}</div>}
-                </div>
+                </RowCard>
             ))}
             {showUnpricedNote && <UnpricedNote positions={positions} className="px-4 pt-1" />}
         </div>

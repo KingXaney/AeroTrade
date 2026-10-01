@@ -1,6 +1,6 @@
 import {describe, expect, it} from 'vitest';
 import {findBanned} from '@/lib/learn/banned';
-import {orderEffectLine, queueLine} from '@/lib/learn/copy/trade';
+import {ACCOUNT_COPY, orderEffectLine, queueLine} from '@/lib/learn/copy/trade';
 import {describeOrderEffect} from '@/lib/trading/order-math';
 
 const positions = [
@@ -59,5 +59,6 @@ describe('orderEffectLine', () => {
             }
         }
         expect(findBanned(queueLine('Mon 9:30 AM ET'), 'copy')).toEqual([]);
+        expect(findBanned(ACCOUNT_COPY.about, 'copy')).toEqual([]);
     });
 });

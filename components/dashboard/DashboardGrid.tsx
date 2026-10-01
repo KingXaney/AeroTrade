@@ -30,6 +30,7 @@ import WidgetPlaceholder from "@/components/dashboard/WidgetPlaceholder";
 import DashboardToolbar from "@/components/dashboard/DashboardToolbar";
 import WidgetLibrary from "@/components/dashboard/WidgetLibrary";
 import DragGhost from "@/components/dashboard/DragGhost";
+import Panel from "@/components/primitives/Panel";
 
 type Props = {
     initialLayout: DashboardLayout;
@@ -174,9 +175,9 @@ const DashboardGrid = ({initialLayout, bodies, availableIds, headerActions, star
             </DndContext>
 
             {layout.widgets.length === 0 && (
-                <div className="glass-panel rounded-xl p-8 text-center">
+                <Panel as="div" pad={8} className="text-center">
                     <p className="text-sm text-fg-muted">Your dashboard is empty. Add a widget or reset to the default layout.</p>
-                </div>
+                </Panel>
             )}
 
             <WidgetLibrary open={libraryOpen} onOpenChange={setLibraryOpen}

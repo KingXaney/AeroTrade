@@ -24,12 +24,15 @@ import {
     type StrategyRunView,
 } from '@/lib/strategies/views';
 import {getEasternDateString} from '@/lib/dates';
+import {numberWord} from '@/lib/text';
+
+const STRATEGY_COUNT = numberWord(STRATEGIES.length);
 
 export const QUANT_STANCE =
-    "These are the app's eight rule-based paper strategies, read from its own records: each live record since its account started, SPY's total return over the same days, a simulated backtest kept apart from the live one, and a rule's latest decision with its own reasons decoded. Describe what each rule did and what its numbers measure. The list comes in the /strategies page's order, by live return; that order describes the past and names no winner.";
+    `These are the app's ${STRATEGY_COUNT} rule-based paper strategies, read from its own records: each live record since its account started, SPY's total return over the same days, a simulated backtest kept apart from the live one, and a rule's latest decision with its own reasons decoded. Describe what each rule did and what its numbers measure. The list comes in the /strategies page's order, by live return; that order describes the past and names no winner.`;
 
 export const QUANT_NOTES = {
-    unknown: 'No single strategy matches that name. These are the eight, by slug and name.',
+    unknown: `No single strategy matches that name. These are the ${STRATEGY_COUNT}, by slug and name.`,
     noneStarted: 'No strategy has a live record yet; the first run happens on the next trading morning.',
     notStarted: 'This strategy has no live record yet; its first run happens on the next trading morning.',
     unpriced: 'Some holdings had no live quote, so those returns count them at what they cost.',

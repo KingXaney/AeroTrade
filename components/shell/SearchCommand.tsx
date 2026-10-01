@@ -112,8 +112,7 @@ export default function SearchCommand({
                 <button type="button" onClick={() => setOpen(true)} className="search-text inline-flex items-center gap-2">
                     <Search className="size-3.5 opacity-70" aria-hidden="true"/>
                     {label}
-                    <kbd className="hidden md:inline text-[10px] px-1.5 py-0.5 rounded border border-line-strong/40 text-fg-muted"
-                         style={{fontFamily: 'var(--type-mono)'}}>⌘K</kbd>
+                    <kbd className="hidden md:inline text-[10px] px-1.5 py-0.5 rounded border border-line-strong/40 text-fg-muted font-mono">⌘K</kbd>
                 </button>
             ) : (
                 <Button onClick={() => setOpen(true)} className="search-btn">
@@ -148,7 +147,7 @@ export default function SearchCommand({
                                     <BookOpen className="h-4 w-4 text-brand" />
                                     <div className="flex-1">
                                         <div className="search-item-name">{entry.term}</div>
-                                        <div className="text-sm text-fg-muted" style={{fontFamily: 'var(--type-mono)', fontSize: '11px', letterSpacing: '0.02em'}}>
+                                        <div className="text-sm text-fg-muted font-mono" style={{fontSize: '11px', letterSpacing: '0.02em'}}>
                                             {entry.short}
                                         </div>
                                     </div>
@@ -174,7 +173,7 @@ export default function SearchCommand({
                                     <div className="search-item-name">
                                         {existingTopic ? `Open topic: ${existingTopic.name}` : `Follow topic: “${topicQuery}”`}
                                     </div>
-                                    <div className="text-sm text-fg-muted" style={{fontFamily: 'var(--type-mono)', fontSize: '11px', letterSpacing: '0.02em'}}>
+                                    <div className="text-sm text-fg-muted font-mono" style={{fontSize: '11px', letterSpacing: '0.02em'}}>
                                         {existingTopic ? 'You already follow this' : 'News about anything — markets, tech, politics, sport'}
                                     </div>
                                 </div>
@@ -205,8 +204,8 @@ export default function SearchCommand({
                                         <div className="search-item-name">
                                             {stock.name}
                                         </div>
-                                        <div className="text-sm text-fg-muted"
-                                             style={{ fontFamily: 'var(--type-mono)', fontSize: '11px', letterSpacing: '0.02em' }}>
+                                        <div className="text-sm text-fg-muted font-mono"
+                                             style={{ fontSize: '11px', letterSpacing: '0.02em' }}>
                                             {stock.symbol} | {stock.exchange} | {stock.type}
                                         </div>
                                     </div>

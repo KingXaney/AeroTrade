@@ -58,4 +58,16 @@ export const BRAIN_COPY = {
         `${symbol} ${pctOneDecimal(symbolPct)} · SPY ${pctOneDecimal(spyPct)}`,
     sinceThesisWindow: (from: string, to: string): string =>
         `From the close of ${shortDate(from, true)} to the close of ${shortDate(to, true)}.`,
+
+    // ---- /brain's page title, empty states and graph legend ---------------------------
+    pageSubtitle: 'Persistent market narratives from every ingested article — slow-building theses drive the AI Navigator',
+    thesesEmpty: 'No active theses yet. A narrative becomes a thesis once it keeps accumulating attention for several weeks — check back as the brain ingests more news.',
+    graphEmpty: 'The brain is empty — it fills up as daily news is ingested.',
+    graphLegend: 'rings: themes · sectors · tickers — size = persistent attention, bold ring = active thesis',
+    graphHint: 'click a node for evidence',
+    evidenceEmpty: 'No recent articles mention this entity.',
+    secondOpinionAbout: 'A stronger model reads the same theses, decisions and headlines — and argues with them: where the narratives look crowded or stale, what contradicts them, and what to watch next. It only critiques; the deterministic rails still make every trade.',
+    secondOpinionEmpty: 'No opinion yet — copy the prompt above, or ask Claude Code to fetch one.',
+    // The dashboard's News Brain strip before the brain has a thesis.
+    tileBuilding: 'Building market narratives from daily news',
 } as const;

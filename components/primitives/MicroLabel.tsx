@@ -1,21 +1,25 @@
 import type {ReactNode} from "react";
 import {cn} from "@/lib/utils";
 
-// The small uppercase caption over a value, a column or a row — the app had 28 spellings
-// of this one idea at four sizes and five trackings. One spelling now: 10px, 0.1em, mono,
-// which is what 128 of the 175 sites already used and which matches SectionHeading, so an
-// eyebrow and a section heading read as the same idea at two sizes.
+// The small uppercase caption over a value, a column, a row or a form field: 10px, 0.1em,
+// mono, which matches SectionHeading, so an eyebrow and a section heading read as the same
+// idea at two sizes. Every hand-written site of exactly this recipe uses it. Labels still
+// spelled by hand are other recipes (9-11px; 0.08em, 0.14em or tracking-wider; no tone of
+// their own) — moving them here would change how they look, so that is a design decision,
+// not a refactor.
 //
 // Scope: uppercase eyebrows only. Small *body* copy (10-11px sentence case) is not a
 // label and must not be migrated here.
 
 type Props = {
-    as?: 'span' | 'div' | 'p' | 'dt';
+    as?: 'span' | 'div' | 'p' | 'dt' | 'label';
     tone?: 'muted' | 'soft' | 'fg' | 'brand' | 'warning';
     id?: string;
     className?: string;
     // Column headers carry the catalog's `help` text as a native tooltip.
     title?: string;
+    // Only with as="label".
+    htmlFor?: string;
     children: ReactNode;
 };
 

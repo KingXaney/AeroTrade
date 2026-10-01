@@ -300,11 +300,10 @@ html[data-mode="light"] {
   border-color: color-mix(in srgb, var(--brand) 25%, transparent);
 }
 
-/* Quiet Cyber redesign: shimmer, breathing pulse, and glow pulse are disabled.
-   Kept as no-ops so existing .shimmer / .node-pulse / .animate-glow usages render
-   flat and calm without having to edit every consumer component. */
+/* Quiet Cyber redesign: shimmer and glow pulse are disabled. Kept as no-ops so the
+   .shimmer / .animate-glow usages render flat and calm; the futuristic style turns
+   them back on. */
 .shimmer::after { content: none; }
-.node-pulse { animation: none; }
 .animate-glow { animation: none; }
 
 /* Typing Indicator Animation */
@@ -323,17 +322,6 @@ html[data-mode="light"] {
   40% { transform: scale(1); }
 }
 
-/* Chat Entrance Animation */
-.chat-panel-enter {
-  transition: transform 0.5s cubic-bezier(0.34, 1.56, 0.64, 1), opacity 0.3s ease;
-  transform-origin: bottom right;
-}
-.chat-panel-hidden {
-  transform: translateY(100px) scale(0.9);
-  opacity: 0;
-  pointer-events: none;
-}
-
 /* Particle Background Canvas */
 #bg-canvas {
   position: fixed;
@@ -349,9 +337,7 @@ html[data-mode="light"] {
 /* Reduced Motion */
 @media (prefers-reduced-motion: reduce) {
   .shimmer::after,
-  .node-pulse,
   .typing-dot,
-  .chat-panel-enter,
   .animate-glow {
     animation: none !important;
     transition: none !important;
@@ -362,10 +348,6 @@ html[data-mode="light"] {
    UTILITY CLASSES — AeroTrade Design System
    ═══════════════════════════════════════ */
 @layer utilities {
-  .container {
-    @apply mx-auto max-w-screen-2xl px-4 md:px-6 lg:px-8;
-  }
-
   /* ─── PRIMARY CTA BUTTON ─── */
   .yellow-btn {
     @apply h-12 cursor-pointer font-medium text-base rounded-lg disabled:opacity-50;
@@ -374,15 +356,6 @@ html[data-mode="light"] {
   }
   .yellow-btn:hover {
     filter: brightness(1.08);
-  }
-
-  /* ─── HOME / DASHBOARD ─── */
-  .home-wrapper {
-    @apply flex-col gap-4 md:gap-6 items-center sm:items-start;
-    color: var(--fg-soft);
-  }
-  .home-section {
-    @apply w-full gap-4 grid-cols-1 md:grid-cols-2 xl:grid-cols-3;
   }
 
   /* ─── HEADER ─── */
@@ -416,15 +389,6 @@ html[data-mode="light"] {
     @apply text-sm md:text-xl lg:text-2xl font-medium mb-1 md:mb-6 lg:mb-8;
     color: var(--fg-soft);
     font-family: var(--type-body);
-  }
-  .auth-testimonial-author {
-    @apply text-xs md:text-lg font-bold not-italic;
-    color: var(--brand);
-    font-family: var(--type-display);
-  }
-  .auth-dashboard-preview {
-    @apply left-0 hidden w-[1024px] h-auto max-w-none lg:block rounded-xl shadow-2xl;
-    border: 2px solid color-mix(in srgb, var(--brand-strong) 10%, transparent);
   }
 
   /* ─── FORMS ─── */
@@ -576,12 +540,6 @@ html[data-mode="light"] {
     text-transform: uppercase;
     letter-spacing: 0.1em;
   }
-  .search-item {
-    @apply rounded-none my-3 px-1 w-full;
-  }
-  .search-item[data-selected="true"] {
-    background-color: color-mix(in srgb, var(--brand-strong) 5%, transparent);
-  }
   .search-item-link {
     @apply px-2 w-full cursor-pointer last:border-b-0 transition-colors flex items-center gap-3;
     border-bottom: 1px solid color-mix(in srgb, var(--line-strong) 20%, transparent);
@@ -591,211 +549,7 @@ html[data-mode="light"] {
     color: var(--fg);
   }
 
-  /* ─── NAV ─── */
-  .nav-list {
-    @apply flex flex-col sm:flex-row p-2 gap-3 sm:gap-10 font-medium;
-  }
-
-  /* ─── STOCK DETAILS ─── */
-  .stock-details-container {
-    @apply w-full grid-cols-1 gap-6 xl:grid-cols-3 space-y-6 sm:space-y-8;
-  }
-
-  /* ─── WATCHLIST ─── */
-  .watchlist-btn {
-    @apply text-base w-full rounded h-11 font-semibold cursor-pointer;
-    background-color: var(--brand);
-    color: var(--on-brand);
-  }
-  .watchlist-btn:hover {
-    background-color: var(--brand-dim);
-  }
-  .watchlist-remove {
-    background-color: var(--negative) !important;
-    color: var(--on-negative) !important;
-    box-shadow: none;
-  }
-  .watchlist-remove:hover {
-    background-color: color-mix(in srgb, var(--negative) 88%, white) !important;
-  }
-  .watchlist-empty-container {
-    @apply container gap-8 flex-col items-center md:mt-10 p-6 text-center;
-  }
-  .watchlist-empty {
-    @apply flex flex-col items-center justify-center text-center;
-  }
-  .watchlist-star {
-    @apply h-16 w-16 mb-4;
-    color: var(--fg-muted);
-  }
-  .empty-title {
-    @apply text-xl font-semibold mb-2;
-    color: var(--fg);
-    font-family: var(--type-display);
-  }
-  .empty-description {
-    @apply mb-6 max-w-md;
-    color: var(--fg-muted);
-  }
-  .watchlist-container {
-    @apply flex flex-col-reverse lg:grid lg:grid-cols-3 gap-8;
-  }
-  .watchlist {
-    @apply lg:col-span-2 space-y-8;
-  }
-  .watchlist-alerts {
-    @apply items-start gap-6 h-full flex-col w-full lg:col-span-1;
-  }
-  .watchlist-icon-btn {
-    @apply w-fit cursor-pointer;
-    color: var(--fg-soft);
-    background-color: transparent !important;
-  }
-  .watchlist-icon-btn:hover {
-    color: var(--brand-strong);
-    background-color: transparent !important;
-  }
-  .watchlist-icon-added {
-    color: var(--brand-strong) !important;
-  }
-  .watchlist-icon-added:hover {
-    color: var(--brand-dim) !important;
-  }
-  .watchlist-icon {
-    @apply w-8 h-8 rounded-full flex items-center justify-center;
-    background-color: color-mix(in srgb, var(--surface-4) 50%, transparent);
-  }
-  .trash-icon {
-    @apply h-4 w-4;
-    color: var(--fg-soft);
-  }
-  .trash-icon:hover {
-    color: var(--negative);
-  }
-  .star-icon {
-    @apply h-4 w-4;
-  }
-  .watchlist-title {
-    @apply text-xl md:text-2xl font-bold;
-    color: var(--fg);
-    font-family: var(--type-display);
-  }
-  .watchlist-table {
-    @apply !relative overflow-hidden !w-full;
-    border-radius: var(--panel-radius);
-    background-color: color-mix(in srgb, var(--surface-0) 70%, transparent);
-    backdrop-filter: var(--panel-blur);
-    border: 1px solid color-mix(in srgb, var(--fg) 8%, transparent);
-  }
-  .table-header-row {
-    @apply font-medium;
-    color: var(--fg-soft);
-    background-color: var(--surface-2);
-    border-bottom: 1px solid color-mix(in srgb, var(--line-strong) 30%, transparent);
-    font-family: var(--type-mono);
-    text-transform: uppercase;
-    letter-spacing: 0.1em;
-    font-size: 10px;
-  }
-  .table-header-row:hover {
-    background-color: var(--surface-2);
-  }
-  .table-header:first-child {
-    @apply pl-4;
-  }
-  .table-row {
-    @apply cursor-pointer transition-all;
-    color: var(--fg);
-    border-bottom: 1px solid color-mix(in srgb, var(--line-strong) 20%, transparent);
-  }
-  .table-row:hover {
-    background-color: color-mix(in srgb, var(--brand-strong) 3%, transparent);
-    border-color: color-mix(in srgb, var(--brand-dim) 20%, transparent);
-  }
-  .table-cell {
-    @apply font-medium text-base;
-  }
-
-  /* ─── ALERTS ─── */
-  .add-alert {
-    @apply flex text-sm items-center whitespace-nowrap gap-1.5 px-3 w-fit py-2 rounded font-medium cursor-pointer transition-colors;
-    color: var(--brand-strong);
-    border: 1px solid color-mix(in srgb, var(--brand-strong) 20%, transparent);
-    background-color: transparent;
-  }
-  .add-alert:hover {
-    background-color: color-mix(in srgb, var(--brand-strong) 5%, transparent);
-  }
-  .alert-dialog {
-    @apply max-w-md;
-    background-color: var(--surface-2);
-    border: 1px solid color-mix(in srgb, var(--line-strong) 40%, transparent);
-    color: var(--fg-soft);
-  }
-  .alert-title {
-    @apply text-xl font-semibold;
-    color: var(--fg);
-    font-family: var(--type-display);
-  }
-  .alert-list {
-    @apply overflow-y-auto w-full max-h-[911px] rounded-xl flex flex-col gap-4 p-3 flex-1;
-    background-color: color-mix(in srgb, var(--surface-0) 70%, transparent);
-    backdrop-filter: var(--panel-blur);
-    border: 1px solid color-mix(in srgb, var(--fg) 8%, transparent);
-  }
-  .alert-empty {
-    @apply px-6 py-8 text-center;
-    color: color-mix(in srgb, var(--fg-muted) 50%, transparent);
-  }
-  .alert-item {
-    @apply p-4 rounded-lg;
-    background-color: var(--surface-2);
-    border: 1px solid color-mix(in srgb, var(--line-strong) 30%, transparent);
-  }
-  .alert-name {
-    @apply mb-2 text-lg font-semibold;
-    color: var(--brand-strong);
-    font-family: var(--type-display);
-  }
-  .alert-details {
-    @apply flex pb-3 items-center justify-between gap-3 mb-2;
-    border-bottom: 1px solid color-mix(in srgb, var(--line-strong) 30%, transparent);
-  }
-  .alert-company {
-    @apply text-base;
-    color: var(--fg-soft);
-  }
-  .alert-price {
-    @apply font-bold;
-    color: var(--fg);
-    font-family: var(--type-mono);
-  }
-  .alert-actions {
-    @apply flex items-end justify-between;
-  }
-  .alert-update-btn {
-    @apply rounded-full cursor-pointer;
-    color: var(--fg-soft);
-    background-color: transparent;
-  }
-  .alert-update-btn:hover {
-    background-color: color-mix(in srgb, var(--brand-strong) 10%, transparent);
-    color: var(--brand-strong);
-  }
-  .alert-delete-btn {
-    @apply rounded-full cursor-pointer transition-colors;
-    color: var(--fg-soft);
-    background-color: transparent;
-  }
-  .alert-delete-btn:hover {
-    background-color: color-mix(in srgb, var(--negative) 10%, transparent);
-    color: var(--negative);
-  }
-
   /* ─── NEWS ─── */
-  .watchlist-news {
-    @apply grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4;
-  }
   .news-item {
     @apply rounded-xl w-full p-4 duration-200 cursor-pointer;
     background-color: color-mix(in srgb, var(--surface-0) 70%, transparent);
@@ -1004,16 +758,14 @@ html[data-mode="light"] {
   background-size: 250% 250%;
   animation: shimmer-sweep 8s linear infinite;
 }
-[data-style="futuristic"] .node-pulse { animation: breathe 4s ease-in-out infinite; }
 [data-style="futuristic"] .animate-glow { animation: subtle-glow 3s ease-in-out infinite; }
-[data-style="futuristic"] :is(.yellow-btn, .search-btn, .watchlist-btn) { box-shadow: var(--glow); }
+[data-style="futuristic"] :is(.yellow-btn, .search-btn) { box-shadow: var(--glow); }
 [data-style="futuristic"] :is(.form-input, .select-trigger):focus {
   border-color: var(--brand-strong) !important;
   box-shadow: 0 0 0 1px color-mix(in srgb, var(--brand-strong) 20%, transparent), 0 0 12px color-mix(in srgb, var(--brand-strong) 20%, transparent);
 }
 [data-style="futuristic"] :is(h1, h2) { text-shadow: 0 0 24px color-mix(in srgb, var(--brand-strong) 20%, transparent); }
 @keyframes shimmer-sweep { 0% { background-position: 200% 0; } 100% { background-position: -100% 0; } }
-@keyframes breathe { 0%, 100% { transform: scale(1); } 50% { transform: scale(1.02); } }
 @keyframes subtle-glow {
   0%, 100% { box-shadow: 0 0 15px color-mix(in srgb, var(--brand-strong) 25%, transparent); }
   50% { box-shadow: 0 0 25px color-mix(in srgb, var(--brand-strong) 45%, transparent); }
@@ -1032,9 +784,9 @@ html[data-mode="light"] {
   --type-body: var(--font-inter);
   --type-mono: var(--font-jetbrains);
 }
-[data-style="liquid-glass"] :is(.glass-panel, .news-item, .alert-list, .watchlist-table) { position: relative; overflow: hidden; isolation: isolate; }
+[data-style="liquid-glass"] :is(.glass-panel, .news-item) { position: relative; overflow: hidden; isolation: isolate; }
 /* z-index -1 inside the panel's own stacking context: above its background, below its children. */
-[data-style="liquid-glass"] :is(.glass-panel, .news-item, .alert-list, .watchlist-table)::before {
+[data-style="liquid-glass"] :is(.glass-panel, .news-item)::before {
   content: "";
   position: absolute;
   inset: 0;
@@ -1054,7 +806,7 @@ html[data-mode="light"] {
   backdrop-filter: var(--panel-blur);
   -webkit-backdrop-filter: var(--panel-blur);
 }
-[data-style="liquid-glass"] :is(.yellow-btn, .search-btn, .watchlist-btn) { box-shadow: var(--glow); }
+[data-style="liquid-glass"] :is(.yellow-btn, .search-btn) { box-shadow: var(--glow); }
 @keyframes blob-drift {
   0% { transform: translate3d(0, 0, 0) scale(1); }
   33% { transform: translate3d(6vw, -4vh, 0) scale(1.08); }
@@ -1089,7 +841,7 @@ html[data-mode="light"] {
 }
 [data-style="brutalist"] :not(.rounded-full):not(.typing-dot):not(.theme-blob) { border-radius: 0; }
 [data-style="brutalist"] :is(h1, h2, h3) { text-transform: uppercase; letter-spacing: 0.04em; font-weight: 700; }
-[data-style="brutalist"] :is(.yellow-btn, .search-btn, .watchlist-btn) {
+[data-style="brutalist"] :is(.yellow-btn, .search-btn) {
   border: 2px solid var(--fg);
   box-shadow: var(--glow);
   font-family: var(--type-mono);
@@ -1097,7 +849,7 @@ html[data-mode="light"] {
   text-transform: uppercase;
   transition: transform 0.08s linear, box-shadow 0.08s linear;
 }
-[data-style="brutalist"] :is(.yellow-btn, .search-btn, .watchlist-btn):active { transform: translate(3px, 3px); box-shadow: 1px 1px 0 var(--fg); }
+[data-style="brutalist"] :is(.yellow-btn, .search-btn):active { transform: translate(3px, 3px); box-shadow: 1px 1px 0 var(--fg); }
 [data-style="brutalist"] :is(.form-input, .select-trigger, .country-select-trigger) { border: 2px solid color-mix(in srgb, var(--fg) 60%, transparent); }
 [data-style="brutalist"] :is(.form-input, .select-trigger):focus { border-color: var(--fg) !important; box-shadow: 4px 4px 0 var(--brand); }
 [data-style="brutalist"] .header { border-bottom: 2px solid color-mix(in srgb, var(--fg) 60%, transparent); }
@@ -1118,20 +870,20 @@ html[data-mode="light"] {
 [data-style="soft"] :is(.glass-panel, .news-item) { transition: transform 0.2s ease, box-shadow 0.2s ease; }
 [data-style="soft"] :is(.glass-panel, .news-item):hover { transform: translateY(-1px); box-shadow: 0 2px 4px var(--shade-1), 0 16px 40px var(--shade-2); }
 [data-style="soft"] :is(.form-input, .select-trigger):focus { border-color: var(--brand) !important; box-shadow: 0 0 0 4px color-mix(in srgb, var(--brand) 18%, transparent); }
-[data-style="soft"] :is(.news-tag, .watchlist-icon) { border-radius: 999px; }
-[data-style="soft"] :is(.yellow-btn, .search-btn, .watchlist-btn) { box-shadow: var(--glow); }
+[data-style="soft"] .news-tag { border-radius: 999px; }
+[data-style="soft"] :is(.yellow-btn, .search-btn) { box-shadow: var(--glow); }
 [data-style="soft"] .header { border-bottom-color: transparent; box-shadow: 0 1px 0 color-mix(in srgb, var(--fg) 5%, transparent), 0 4px 16px var(--shade-1); }
 
 /* ─── motion guards: OS setting or the in-app toggle (html[data-motion="reduced"]) ─── */
 @media (prefers-reduced-motion: reduce) {
   .theme-blob,
-  [data-style] :is(.glass-panel, .news-item, .yellow-btn, .search-btn, .watchlist-btn) {
+  [data-style] :is(.glass-panel, .news-item, .yellow-btn, .search-btn) {
     animation: none !important;
     transition: none !important;
   }
   [data-style="futuristic"] .shimmer::after { content: none; }
 }
-html[data-motion="reduced"] :is(.node-pulse, .animate-glow, .typing-dot, .chat-panel-enter, .theme-blob, .glass-panel, .news-item, .yellow-btn, .search-btn, .watchlist-btn) {
+html[data-motion="reduced"] :is(.animate-glow, .typing-dot, .theme-blob, .glass-panel, .news-item, .yellow-btn, .search-btn) {
   animation: none !important;
   transition: none !important;
 }
