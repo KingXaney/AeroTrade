@@ -1,3 +1,5 @@
+import type {SignUpProfile} from "@/lib/auth/sign-up-profile";
+
 export const PERSONALIZED_WELCOME_EMAIL_PROMPT = `Generate highly personalized HTML content that will be inserted into an email template at the {{intro}} placeholder.
 
 User profile data:
@@ -46,6 +48,18 @@ Example personalized outputs (showing obvious customization with TWO sentences):
 <p class="mobile-text" style="margin: 0 0 30px 0; font-size: 16px; line-height: 1.6; color: #CCDADC;">Great to have you aboard! Perfect for your <strong>conservative retirement strategy</strong> — the news brain reads hundreds of articles a day so you can follow the companies you already care about without the noise. Track a practice portfolio against the S&amp;P 500 and let the numbers build your confidence.</p>
 
 <p class="mobile-text" style="margin: 0 0 30px 0; font-size: 16px; line-height: 1.6; color: #CCDADC;">You're all set! Since you're new to investing, start with a paper portfolio and a couple of topics in the <strong>healthcare sector</strong> you're interested in. The daily brief explains what moved in plain language, with none of the jargon.</p>`
+
+// The profile is the user's own sign-up answers, so it goes in through a replacer function: a
+// replacement string would expand a "$&", "$`" or "$'" in an answer into pieces of the prompt.
+export const buildWelcomePrompt = (profile: SignUpProfile): string => {
+    const lines = [
+        `- Country: ${profile.country}`,
+        `- Investment goals: ${profile.investmentGoals}`,
+        `- Risk tolerance: ${profile.riskTolerance}`,
+        `- Preferred industry: ${profile.preferredIndustry}`,
+    ].join('\n');
+    return PERSONALIZED_WELCOME_EMAIL_PROMPT.replace('{{userProfile}}', () => lines);
+};
 
 export const NEWS_SUMMARY_EMAIL_PROMPT = `Generate HTML content for a market news summary email that will be inserted into the NEWS_SUMMARY_EMAIL_TEMPLATE at the {{newsContent}} placeholder.
 

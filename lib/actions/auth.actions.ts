@@ -19,6 +19,7 @@ import {
     withinSignInLimits,
     withinSignUpLimit,
 } from "@/lib/auth/limits";
+import {SIGN_UP_PROFILE_INVALID_MESSAGE, signUpProfile} from "@/lib/auth/sign-up-profile";
 import {seedDefaultTopics} from "@/lib/topics/seed";
 
 // Better-auth throws APIError-shaped objects with body.message; fall back to .message or a generic string.
@@ -30,7 +31,13 @@ const extractAuthError = (e: unknown, fallback: string): string => {
     return fallback;
 }
 
-export const signUpWithEmail = async ({ email, password, fullName, country, investmentGoals, riskTolerance, preferredIndustry }: SignUpFormData) => {
+export const signUpWithEmail = async (input: SignUpFormData) => {
+    const { email, password, fullName } = input;
+    // The form only offers listed answers, so one outside its list means a direct call: refused
+    // before any counter is spent, and only the checked answers reach the welcome prompt.
+    const profile = signUpProfile(input);
+    if (!profile) return { success: false, error: SIGN_UP_PROFILE_INVALID_MESSAGE }
+
     try {
         // Every attempt counts, refused before better-auth is asked: a refused one creates
         // nothing, queues no welcome email and says nothing about whether the address is taken.
@@ -55,7 +62,7 @@ export const signUpWithEmail = async ({ email, password, fullName, country, inve
 
             await inngest.send({
                 name: 'app/user.created',
-                data: { email, name: fullName, country, investmentGoals, riskTolerance, preferredIndustry }
+                data: { email, name: fullName, ...profile }
             }).catch((e) => console.error('Failed to queue welcome email', e))
         }
 

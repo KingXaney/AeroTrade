@@ -1,5 +1,5 @@
 import {inngest} from "@/lib/inngest/client";
-import {NEWS_SUMMARY_EMAIL_PROMPT, PERSONALIZED_WELCOME_EMAIL_PROMPT} from "@/lib/inngest/prompts"
+import {buildWelcomePrompt, NEWS_SUMMARY_EMAIL_PROMPT} from "@/lib/inngest/prompts"
 import {sendNewsSummaryEmail, sendWelcomeEmail} from "@/lib/nodemailer";
 import {getAllUsersForNewsEmail} from "@/lib/actions/user.actions";
 import {getWatchlistSymbolsByEmail} from "@/lib/actions/watchlist.actions";
@@ -94,13 +94,8 @@ const APP_URL = (process.env.BETTER_AUTH_URL ?? '').replace(/\/$/, '') || 'http:
 export const sendSignUpEmail = inngest.createFunction(
     { id: 'sign-up-email', triggers: [{ event: 'app/user.created' }] },
     async ({ event, step }) => {
-        const userProfile = `
-            - Country: ${event.data.country}
-            - Investment goals: ${event.data.investmentGoals}
-            - Risk tolerance: ${event.data.riskTolerance}
-            - Preferred industry: ${event.data.preferredIndustry}
-        `
-        const prompt = PERSONALIZED_WELCOME_EMAIL_PROMPT.replace('{{userProfile}}', userProfile)
+        const {country, investmentGoals, riskTolerance, preferredIndustry} = event.data;
+        const prompt = buildWelcomePrompt({country, investmentGoals, riskTolerance, preferredIndustry})
 
         const response = await inferText(step, {task: 'welcome', stepId: 'generate-welcome-intro', prompt})
         await step.run('send-welcome-email', async () => {
