@@ -1,12 +1,3 @@
-// Paper-trading: default starting virtual cash; users may pick a custom amount
-// at account creation / AI enrollment within these bounds.
-export const PAPER_STARTING_BALANCE = 100_000;
-export const MIN_STARTING_BALANCE = 1_000;
-export const MAX_STARTING_BALANCE = 10_000_000;
-
-// Paper-trading: max strategy accounts per user.
-export const MAX_PAPER_ACCOUNTS = 10;
-
 // How long the market-data fetches behind the stock page's "Key numbers" are cached
 // (lib/prices/finnhub.ts); the panel's source line states both, from these.
 export const FINANCIALS_REVALIDATE_SECONDS = 60 * 60;
@@ -14,9 +5,6 @@ export const PROFILE_REVALIDATE_SECONDS = 24 * 60 * 60;
 
 // Benchmark ETF snapshotted daily for the performance comparison chart.
 export const BENCHMARK_SYMBOL = 'SPY';
-
-// HTTP-only cookie holding the id of the strategy account the UI operates on.
-export const ACTIVE_ACCOUNT_COOKIE = 'aero-active-account';
 
 // Sign-up form select options
 export const INVESTMENT_GOALS = [

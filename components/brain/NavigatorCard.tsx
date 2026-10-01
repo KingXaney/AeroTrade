@@ -5,7 +5,7 @@ import {useRouter} from "next/navigation";
 import Link from "next/link";
 import {toast} from "sonner";
 import {enrollAiNavigator, pauseAiNavigator, resumeAiNavigator, runAiNavigatorNow, unenrollAiNavigator} from "@/lib/actions/navigator.actions";
-import {MAX_STARTING_BALANCE, MIN_STARTING_BALANCE, PAPER_STARTING_BALANCE} from "@/lib/constants";
+import {MAX_STARTING_BALANCE, MIN_STARTING_BALANCE, PAPER_STARTING_BALANCE} from "@/lib/trading/config";
 import {runWithToast} from "@/lib/action-toast";
 
 // Enrollment + kill switch for the AI-managed paper account.

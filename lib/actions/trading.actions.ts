@@ -5,7 +5,7 @@ import PaperAccount from "@/database/models/paper-account.model";
 import PaperTrade from "@/database/models/paper-trade.model";
 import AccountSnapshot from "@/database/models/account-snapshot.model";
 import AccountIncome from "@/database/models/account-income.model";
-import {PAPER_STARTING_BALANCE} from "@/lib/constants";
+import {PAPER_STARTING_BALANCE} from "@/lib/trading/config";
 import {getCurrentUserId} from "@/lib/auth/session";
 import {getOwnedAccount, resolveStartingBalance, seedDayZeroSnapshot} from "@/lib/trading/account";
 import {executeOrder} from "@/lib/trading/orders";

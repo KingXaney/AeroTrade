@@ -18,7 +18,7 @@ import {
 import {GLOSSARY, resolveTerm} from '@/lib/learn/glossary';
 import {decodeNavigatorReason, decodeReason, MAX_REASON_CHARS} from '@/lib/learn/reasons';
 import {findBanned} from '@/lib/learn/banned';
-import {MAX_PAPER_ACCOUNTS} from '@/lib/constants';
+import {MAX_PAPER_ACCOUNTS} from '@/lib/trading/config';
 
 // What the tool does with its inputs, minus the database read.
 const explain = (input: {term?: string; reason?: string; writer?: ReasonWriter}, yours: LearnerValue | null = null) => {

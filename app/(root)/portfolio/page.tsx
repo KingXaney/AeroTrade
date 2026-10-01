@@ -1,6 +1,6 @@
 import {cookies} from "next/headers";
 import Link from "next/link";
-import {ACTIVE_ACCOUNT_COOKIE} from "@/lib/constants";
+import {ACTIVE_ACCOUNT_COOKIE} from "@/lib/trading/config";
 import {requireUserId} from "@/lib/auth/session";
 import {getAccountAnalytics, getComparisonStats, getIncomeActivity, getPortfoliosForUser, getTradeLedger, TRADE_HISTORY_LIMIT} from "@/lib/trading/account";
 import {replayReceipts} from "@/lib/trading/receipts";

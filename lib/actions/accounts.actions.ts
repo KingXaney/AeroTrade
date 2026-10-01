@@ -9,7 +9,7 @@ import {
     MAX_PAPER_ACCOUNTS,
     MAX_STARTING_BALANCE,
     MIN_STARTING_BALANCE,
-} from "@/lib/constants";
+} from "@/lib/trading/config";
 import {getCurrentUserId} from "@/lib/auth/session";
 import {getAccountsForUser, getOwnedAccount, resolveStartingBalance, seedDayZeroSnapshot} from "@/lib/trading/account";
 import {deleteOwnedAccount} from "@/lib/trading/account-delete";

@@ -12,7 +12,7 @@
 
 import {lookupTerm, type GlossaryEntry, type GlossaryKind} from '@/lib/learn/glossary';
 import {decodeNavigatorReason, decodeReason, type DecodedReason} from '@/lib/learn/reasons';
-import {MAX_PAPER_ACCOUNTS} from '@/lib/constants';
+import {MAX_PAPER_ACCOUNTS} from '@/lib/trading/config';
 
 export const EXPLAIN_STANCE =
     "These are the app's own definitions, and the learner's own paper-account figures where the app computes them. Define the term from this entry first, then apply it to their figure. The figures describe what already happened; no forecast or verdict on any stock follows from them.";

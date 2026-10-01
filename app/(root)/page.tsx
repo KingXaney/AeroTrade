@@ -1,6 +1,6 @@
 import {cookies} from "next/headers";
 import type {ReactNode} from "react";
-import {ACTIVE_ACCOUNT_COOKIE} from "@/lib/constants";
+import {ACTIVE_ACCOUNT_COOKIE} from "@/lib/trading/config";
 import {requireUserId} from "@/lib/auth/session";
 import {getDashboardLayoutForUser} from "@/lib/dashboard/layout-store";
 import {getPortfoliosForUser} from "@/lib/trading/account";
