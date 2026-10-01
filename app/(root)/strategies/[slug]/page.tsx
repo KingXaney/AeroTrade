@@ -16,7 +16,7 @@ import MicroLabel from "@/components/primitives/MicroLabel";
 import Panel from "@/components/primitives/Panel";
 import SectionHeading from "@/components/primitives/SectionHeading";
 import AccountSummary from "@/components/trading/portfolio/AccountSummary";
-import PortfolioHoldings from "@/components/trading/portfolio/PortfolioHoldings";
+import HoldingsTable from "@/components/trading/portfolio/HoldingsTable";
 import TradeHistory from "@/components/trading/portfolio/TradeHistory";
 import DecisionReplay from "@/components/strategies/DecisionReplay";
 import FollowButton from "@/components/strategies/FollowButton";
@@ -152,7 +152,7 @@ const StrategyPage = async ({params, searchParams}: StrategyPageProps) => {
             <div className="grid grid-cols-1 xl:grid-cols-2 gap-4">
                 <Panel id="strategy-holdings">
                     <SectionHeading>Current holdings</SectionHeading>
-                    <PortfolioHoldings
+                    <HoldingsTable
                         positions={analytics?.summary.positions ?? []}
                         emptyText={started ? def.explainer.cashReason : 'Not started — the account opens on the first run.'}
                         showUnpricedNote={false}

@@ -6,7 +6,7 @@ import {requireUserId} from "@/lib/auth/session";
 import {getFriendProfile} from "@/lib/friends/store";
 import {unpricedLabel} from "@/lib/trading/analytics";
 import AccountSummary from "@/components/trading/portfolio/AccountSummary";
-import PortfolioHoldings from "@/components/trading/portfolio/PortfolioHoldings";
+import HoldingsTable from "@/components/trading/portfolio/HoldingsTable";
 
 type FriendProfilePageProps = {
     params: Promise<{id: string}>;
@@ -79,7 +79,7 @@ const FriendProfilePage = async ({params}: FriendProfilePageProps) => {
                 <h2 className="text-sm font-bold uppercase tracking-[0.1em] text-brand mb-4" style={{fontFamily: 'var(--type-mono)'}}>
                     {profile.name}&apos;s Holdings
                 </h2>
-                <PortfolioHoldings positions={profile.portfolio.positions} emptyText={`${profile.name} has no open positions yet.`} />
+                <HoldingsTable positions={profile.portfolio.positions} emptyText={`${profile.name} has no open positions yet.`} />
             </section>
         </div>
     );
