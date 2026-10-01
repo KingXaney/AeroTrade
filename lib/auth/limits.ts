@@ -15,6 +15,13 @@ export const SIGN_IN_EMAIL_LIMIT = 10;
 export const SIGN_IN_CLIENT_LIMIT = 30;
 export const SIGN_IN_WINDOW_MS = 15 * 60 * 1000;
 
+// Sign-up is counted per client, by the hour: each one creates an account, seeds its topics and
+// queues a model-written welcome email, and its answer says whether an address already has an
+// account. Ten leaves room for a household or an office behind one address.
+export const SIGN_UP_CLIENT_LIMIT = 10;
+export const SIGN_UP_WINDOW_MS = 60 * 60 * 1000;
+export const SIGN_UP_LIMITED_MESSAGE = 'Too many sign-up attempts from this network. Try again later.';
+
 // The one answer to a refused attempt. Refused before better-auth is asked anything, so it is
 // the same whether the account exists or not.
 export const SIGN_IN_LIMITED_MESSAGE = 'Too many sign-in attempts. Try again in a few minutes.';
@@ -27,6 +34,9 @@ const normaliseEmail = (email: string): string => email.trim().toLowerCase();
 export const passwordResetKey = (email: string): string => `pwreset:${normaliseEmail(email)}`;
 export const signInEmailKey = (email: string): string => `signin:email:${normaliseEmail(email)}`;
 export const signInClientKey = (ip: string): string => `signin:ip:${ip}`;
+// Sign-in can skip its client counter when no header names a client (its per-address counter
+// still holds); sign-up has no second counter, so every such request shares one key.
+export const signUpClientKey = (ip: string | null): string => `signup:ip:${ip ?? 'unknown'}`;
 
 export type HeaderReader = {get(name: string): string | null};
 
@@ -78,3 +88,18 @@ export const withinSignInLimits = async (
     if (ip && !(await take(signInClientKey(ip), SIGN_IN_CLIENT_LIMIT, SIGN_IN_WINDOW_MS))) return false;
     return take(signInEmailKey(email), SIGN_IN_EMAIL_LIMIT, SIGN_IN_WINDOW_MS);
 };
+
+// The sign-up limit in force: SIGN_UP_CLIENT_LIMIT from the environment when it is a positive
+// integer — the browser QA signs up a user per suite from one address and raises it — else the
+// default, with a warning naming what was ignored.
+export const resolveSignUpLimit = (env: Record<string, string | undefined> = process.env): {limit: number; warning?: string} => {
+    const raw = env.SIGN_UP_CLIENT_LIMIT;
+    if (raw === undefined || raw === '') return {limit: SIGN_UP_CLIENT_LIMIT};
+    const parsed = Number(raw);
+    if (Number.isInteger(parsed) && parsed >= 1) return {limit: parsed};
+    return {limit: SIGN_UP_CLIENT_LIMIT, warning: `SIGN_UP_CLIENT_LIMIT="${raw}" is not a positive integer — using ${SIGN_UP_CLIENT_LIMIT}.`};
+};
+
+// One step of the client's sign-up counter: true while it is within `limit`.
+export const withinSignUpLimit = ({ip}: {ip: string | null}, take: TakeCounter, limit: number = SIGN_UP_CLIENT_LIMIT): Promise<boolean> =>
+    take(signUpClientKey(ip), limit, SIGN_UP_WINDOW_MS);
