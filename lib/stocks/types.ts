@@ -19,3 +19,10 @@ export type StockWithData = {
     marketCap?: string;
     peRatio?: string;
 };
+
+// One saved watchlist row as the database holds it, before any quote is merged in.
+export type WatchlistEntry = {
+    symbol: string;
+    company: string;
+    addedAt: Date;
+};

@@ -2,8 +2,9 @@ import type {StrategyDefinition} from "@/lib/strategies/types";
 import {describeNextRebalance} from "@/lib/strategies/calendar";
 import {UNIVERSES} from "@/lib/strategies/universe";
 import Panel from "@/components/primitives/Panel";
-import SectionHeading from "@/components/primitives/SectionHeading";
+import Disclosure from "@/components/primitives/Disclosure";
 import {formatParamValue, paramLabel} from "@/lib/learn/copy/whatif";
+import {CADENCE_COPY} from "@/lib/learn/copy/cadence";
 
 // The teaching panel: the rule in plain words, why anyone believes in it, when it
 // breaks, and every simplification the numbers on this page carry. All of it is
@@ -41,14 +42,7 @@ const StrategyExplainer = ({def, lastRebalanceDate, defaultOpen = false}: Props)
 
     return (
         <Panel as="div" id="strategy-explainer">
-            <details className="group" open={defaultOpen}>
-                <summary className="cursor-pointer list-none marker:content-none [&::-webkit-details-marker]:hidden">
-                    <SectionHeading as="h2" spacing="none" className="inline-flex items-center gap-2">
-                        <span className="material-symbols-outlined text-base transition-transform group-open:rotate-90" aria-hidden="true">chevron_right</span>
-                        How it works — the rule, its parameters and when it fails
-                    </SectionHeading>
-                </summary>
-
+            <Disclosure variant="panel" open={defaultOpen} summary="How it works — the rule, its parameters and when it fails">
                 <div className="mt-4 space-y-5">
                     <div className="grid grid-cols-1 lg:grid-cols-[1.4fr_1fr] gap-5">
                         <List title="The rule" items={explainer.how} />
@@ -64,7 +58,7 @@ const StrategyExplainer = ({def, lastRebalanceDate, defaultOpen = false}: Props)
                                 <dt className="text-fg-muted">Universe</dt>
                                 <dd className="text-fg text-right">{universeSize} symbol{universeSize === 1 ? '' : 's'}</dd>
                                 <dt className="text-fg-muted">Checks</dt>
-                                <dd className="text-fg text-right">{def.cadence === 'once' ? 'once' : def.cadence}</dd>
+                                <dd className="text-fg text-right">{CADENCE_COPY.short[def.cadence]}</dd>
                                 <dt className="text-fg-muted">Next rebalance</dt>
                                 <dd className="text-fg text-right">{describeNextRebalance(def.cadence, lastRebalanceDate)}</dd>
                                 <dt className="text-fg-muted">Cash floor</dt>
@@ -85,7 +79,7 @@ const StrategyExplainer = ({def, lastRebalanceDate, defaultOpen = false}: Props)
 
                     <List title="Read the numbers with this in mind" items={explainer.caveats} />
                 </div>
-            </details>
+            </Disclosure>
         </Panel>
     );
 };

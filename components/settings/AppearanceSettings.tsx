@@ -2,7 +2,7 @@
 
 import {useEffect, type FocusEvent} from "react";
 import {useTheme} from "@/components/theme/ThemeProvider";
-import {Switch} from "@/components/ui/switch";
+import Switch from "@/components/primitives/Switch";
 import {cn} from "@/lib/utils";
 import {PALETTE_IDS, PALETTES, type PaletteId} from "@/lib/theme/palettes";
 import {PRESETS, findPreset, type Preset} from "@/lib/theme/presets";
@@ -176,7 +176,6 @@ const AppearanceSettings = () => {
                     checked={theme.reduceMotion}
                     disabled={pending}
                     onCheckedChange={(checked) => apply({...theme, reduceMotion: checked})}
-                    className="data-[state=checked]:!bg-brand-strong data-[state=unchecked]:!bg-surface-4 data-[state=unchecked]:!border data-[state=unchecked]:!border-line-strong transition-colors duration-200"
                 />
             </div>
         </div>

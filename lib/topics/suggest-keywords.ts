@@ -3,6 +3,7 @@
 // broader fallbacks the user can keep or discard.
 
 import {KEYWORD_MAX, normalizeKeyword} from "@/lib/news/keywords";
+import type {SuggestedTopic} from "@/lib/topics/types";
 
 const STOPWORDS = new Set([
     'a', 'an', 'the', 'of', 'in', 'on', 'at', 'and', 'or', 'for', 'to', 'vs', 'with', 'from', 'by', 'is', 'are',
@@ -32,3 +33,15 @@ export const suggestKeywords = (name: string, max = 6): string[] => {
 
     return suggestions.slice(0, max);
 };
+
+// Themes and sectors the brain is already tracking make good first topics: themes first, then
+// sectors, at most `max`, each with the keywords its name suggests — a name that suggests none
+// is dropped rather than offered empty.
+export const brainTopicSuggestions = (
+    top: {theme: readonly {displayName: string}[]; sector: readonly {displayName: string}[]},
+    max: number,
+): SuggestedTopic[] =>
+    [...top.theme, ...top.sector]
+        .slice(0, max)
+        .map((e) => ({name: e.displayName, keywords: suggestKeywords(e.displayName)}))
+        .filter((s) => s.keywords.length > 0);

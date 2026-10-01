@@ -5,9 +5,9 @@ import {useRouter} from "next/navigation";
 import {toast} from "sonner";
 import {MoreHorizontal} from "lucide-react";
 import {DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger} from "@/components/ui/dropdown-menu";
-import KeywordChips from "@/components/topics/KeywordChips";
-import ConfirmDialog from "@/components/ui/ConfirmDialog";
+import KeywordChips from "@/components/forms/KeywordChips";
 import RefreshTopicButton from "@/components/topics/RefreshTopicButton";
+import UnfollowTopicDialog from "@/components/topics/UnfollowTopicDialog";
 import {useTopicsUi} from "@/components/topics/TopicsShell";
 import {deleteTopic} from "@/lib/actions/topics.actions";
 import {refreshCooldownUntil} from "@/lib/topics/config";
@@ -66,15 +66,7 @@ const TopicHeader = ({topic, now}: {topic: TopicOverviewItem; now: number}) => {
                 <KeywordChips values={topic.keywords} ariaLabel="Keywords" />
                 {topic.exclude.length > 0 && <KeywordChips values={topic.exclude} variant="exclude" ariaLabel="Exclusions" />}
             </div>
-            <ConfirmDialog
-                open={confirming}
-                onOpenChange={setConfirming}
-                title={`Stop following “${topic.name}”?`}
-                description="Its matched articles are removed. This cannot be undone."
-                confirmLabel="Stop following"
-                destructive
-                onConfirm={remove}
-            />
+            <UnfollowTopicDialog name={topic.name} open={confirming} onOpenChange={setConfirming} onConfirm={remove} />
         </section>
     );
 };

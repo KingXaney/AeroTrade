@@ -12,7 +12,9 @@ import {PAPER_STARTING_BALANCE} from "@/lib/trading/starting-balance";
 import {accountEpoch} from "@/lib/trading/epoch";
 import type {PaperAccountSummary, PaperPosition} from '@/lib/trading/types';
 
-export const DEFAULT_ACCOUNT_NAME = 'Main Strategy';
+// The name a user's first paper account is created with. Only new accounts get it: an
+// account already stored keeps its own name (older ones were created as "Main Strategy").
+export const DEFAULT_ACCOUNT_NAME = 'Main account';
 
 // Pre-migration accounts may lack name/inceptionAt in the DB — fall back gracefully.
 export const toAccountSummary = (account: PaperAccountDoc): PaperAccountSummary => ({
@@ -32,7 +34,7 @@ export const toPlainPositions = (account: {positions: PaperPosition[]}): PaperPo
         avgCost: p.avgCost,
     }));
 
-// All strategy accounts for a user, oldest first. Creates "Main Strategy" on first use
+// All paper accounts for a user, oldest first. Creates DEFAULT_ACCOUNT_NAME on first use
 // (preserves the original lazy-create behavior).
 export const getAccountsForUser = async (userId: string): Promise<PaperAccountDoc[]> => {
     await connectToDatabase();

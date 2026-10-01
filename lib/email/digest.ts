@@ -37,7 +37,7 @@ type DigestUser = {
 
 export const fetchDigestNews = async (user: DigestUser): Promise<MarketNewsArticle[]> => {
     // Holdings-aware: union of the watchlist and every symbol held across the
-    // user's strategy accounts. Read in both digest modes now — the user's own
+    // user's paper accounts. Read in both digest modes now — the user's own
     // feed may ask for watchlist company news whatever the mode.
     const [watchlist, held] = await Promise.all([
         getWatchlistSymbolsByEmail(user.email),

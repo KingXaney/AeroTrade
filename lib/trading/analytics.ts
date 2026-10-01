@@ -1,4 +1,5 @@
 import type {DrawdownWindow, EnrichedPosition, PaperPosition, PerfPoint, SnapshotPoint} from '@/lib/trading/types';
+import {unpricedText} from "@/lib/learn/copy/unpriced";
 
 // Per-account performance math. Deliberately PURE — no DB, no server imports —
 // so vitest can cover it without a database. The server reads that feed these
@@ -45,10 +46,8 @@ export const countUnpriced = (positions: readonly {priceStale: boolean}[]): numb
 // Compact marker for rows that quote a return (leaderboard, strategy comparison,
 // account switcher): "unpriced" when nothing behind the number is live, "partly
 // unpriced" when some of it is, nothing when it all is.
-export const unpricedLabel = (unpriced: number, holdings: number): string | null => {
-    if (unpriced <= 0 || holdings <= 0) return null;
-    return unpriced >= holdings ? 'unpriced' : 'partly unpriced';
-};
+export const unpricedLabel = (unpriced: number, holdings: number): string | null =>
+    unpricedText(unpriced, holdings, 'marker');
 
 // One note per panel rather than one per row: the QA harness runs without a Finnhub
 // key, so every position is unpriced there and a per-row warning becomes a wall.

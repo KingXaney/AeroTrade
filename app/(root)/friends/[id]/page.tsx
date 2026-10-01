@@ -5,8 +5,8 @@ import {formatPct, formatPrice, getChangeColorClass} from "@/lib/format";
 import {requireUserId} from "@/lib/auth/session";
 import {getFriendProfile} from "@/lib/friends/store";
 import {unpricedLabel} from "@/lib/trading/analytics";
-import AccountSummary from "@/components/trade/AccountSummary";
-import PortfolioHoldings from "@/components/trade/PortfolioHoldings";
+import AccountSummary from "@/components/trading/portfolio/AccountSummary";
+import HoldingsTable from "@/components/trading/portfolio/HoldingsTable";
 
 type FriendProfilePageProps = {
     params: Promise<{id: string}>;
@@ -40,20 +40,20 @@ const FriendProfilePage = async ({params}: FriendProfilePageProps) => {
                 </div>
             </div>
 
-            {/* Best strategy, shown in full */}
+            {/* Best account, shown in full */}
             <div className="flex items-center gap-2">
                 <span className="material-symbols-outlined text-base text-brand">account_tree</span>
                 <span className="text-xs uppercase tracking-[0.1em] text-fg-muted" style={{fontFamily: 'var(--type-mono)'}}>
-                    Best strategy · <span className="text-fg">{profile.accountName}</span>
+                    Best account · <span className="text-fg">{profile.accountName}</span>
                 </span>
             </div>
             <AccountSummary portfolio={profile.portfolio} definitions />
 
-            {/* All strategies at a glance */}
+            {/* All accounts at a glance */}
             {profile.accounts.length > 1 && (
                 <section className="glass-panel rounded-xl p-5">
                     <h2 className="text-sm font-bold uppercase tracking-[0.1em] text-brand mb-4" style={{fontFamily: 'var(--type-mono)'}}>
-                        Strategies
+                        Accounts
                     </h2>
                     <div className="space-y-1.5">
                         {profile.accounts.map((a) => (
@@ -79,7 +79,7 @@ const FriendProfilePage = async ({params}: FriendProfilePageProps) => {
                 <h2 className="text-sm font-bold uppercase tracking-[0.1em] text-brand mb-4" style={{fontFamily: 'var(--type-mono)'}}>
                     {profile.name}&apos;s Holdings
                 </h2>
-                <PortfolioHoldings positions={profile.portfolio.positions} emptyText={`${profile.name} has no open positions yet.`} />
+                <HoldingsTable positions={profile.portfolio.positions} emptyText={`${profile.name} has no open positions yet.`} />
             </section>
         </div>
     );

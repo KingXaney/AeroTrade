@@ -1,4 +1,4 @@
-import RouteLoading from "@/components/system/RouteLoading";
+import RouteLoading from "@/components/shell/RouteLoading";
 
 // One quote, profile and financials call per tracked symbol before first paint.
 const Loading = () => (

@@ -1,4 +1,4 @@
-import RouteLoading from "@/components/system/RouteLoading";
+import RouteLoading from "@/components/shell/RouteLoading";
 
 // Eight accounts priced from one quote map plus the run and backtest joins.
 const Loading = () => (

@@ -1,4 +1,4 @@
-// Copy for the Daily quiz widget (components/dashboard/widgets/DailyQuiz.tsx): one question a
+// Copy for the Daily quiz widget (components/dashboard/widgets/learn/DailyQuiz.tsx): one question a
 // day about a strategy's recent signal board. The questions ask what the rule decided and why;
 // the answers are the stored record, so nothing here predicts or judges. It counts the days a
 // learner answered and nothing else — no streak, no score, no reward. Held to the 'copy' tier

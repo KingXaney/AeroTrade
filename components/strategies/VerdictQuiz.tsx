@@ -3,10 +3,11 @@
 import {useState} from "react";
 import {cn} from "@/lib/utils";
 import type {RowState} from "@/lib/strategies/types";
-import type {ReasonClause} from "@/lib/learn/reasons";
+import type {QuizRow} from "@/lib/strategies/detail-view";
 import {STATE_LABEL, STATE_TONE} from "@/lib/strategies/views";
 import {ASKABLE_STATES, VERDICT_QUIZ_COPY} from "@/lib/learn/copy/verdict";
 import Badge from "@/components/primitives/Badge";
+import Disclosure from "@/components/primitives/Disclosure";
 import ReasonGloss from "@/components/learn/ReasonGloss";
 
 // Guess the Verdict: today's real board rows with the verdict hidden. The reader calls
@@ -15,15 +16,6 @@ import ReasonGloss from "@/components/learn/ReasonGloss";
 // disclosure is open, the page hides the board's verdict column with CSS (:has), so the
 // server-rendered board needs no state of its own. Nothing is persisted.
 
-export type QuizRow = {
-    symbol: string;
-    cells: {label: string; value: string}[];
-    answer: RowState;
-    explanation: string;
-    // decodeReason(explanation).clauses — empty when the explanation is not a rule string.
-    gloss: readonly ReasonClause[];
-};
-
 const VerdictQuiz = ({rows}: {rows: QuizRow[]}) => {
     const [guesses, setGuesses] = useState<Record<string, RowState>>({});
     const [revealed, setRevealed] = useState(false);
@@ -31,11 +23,7 @@ const VerdictQuiz = ({rows}: {rows: QuizRow[]}) => {
     const matched = rows.filter((row) => guesses[row.symbol] === row.answer).length;
 
     return (
-        <details id="verdict-quiz" data-verdict-quiz className="group mt-3">
-            <summary className="font-mono cursor-pointer list-none marker:content-none [&::-webkit-details-marker]:hidden text-[11px] text-brand hover:underline inline-flex items-center gap-1">
-                <span className="material-symbols-outlined text-sm transition-transform group-open:rotate-90" aria-hidden="true">chevron_right</span>
-                {VERDICT_QUIZ_COPY.summary}
-            </summary>
+        <Disclosure id="verdict-quiz" data-verdict-quiz className="mt-3" summary={VERDICT_QUIZ_COPY.summary}>
             <p className="mt-2 text-xs text-fg-muted">{VERDICT_QUIZ_COPY.intro}</p>
             <ul className="mt-2 space-y-2">
                 {rows.map((row) => {
@@ -92,7 +80,7 @@ const VerdictQuiz = ({rows}: {rows: QuizRow[]}) => {
                         </button>
                     )}
             </div>
-        </details>
+        </Disclosure>
     );
 };
 

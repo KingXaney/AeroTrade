@@ -1,32 +1,15 @@
 'use client';
 
-import {useState, useTransition} from "react";
-import {useRouter} from "next/navigation";
 import {toast} from "sonner";
-import {followStrategy, unfollowStrategy} from "@/lib/actions/strategies.actions";
 import {cn} from "@/lib/utils";
+import useFollowStrategy from "@/components/strategies/useFollowStrategy";
 
 // The detail page's follow control. Following pins the strategy at the top of the
 // Quant Strategies dashboard widget; it never changes what the strategy does.
 const FollowButton = ({slug, followed}: {slug: string; followed: boolean}) => {
-    const router = useRouter();
-    const [on, setOn] = useState(followed);
-    const [pending, startTransition] = useTransition();
-
-    const toggle = () => {
-        const next = !on;
-        setOn(next);
-        startTransition(async () => {
-            const result = next ? await followStrategy(slug) : await unfollowStrategy(slug);
-            if (!result.success) {
-                setOn(!next);
-                toast.error(result.message || 'Could not update your follows');
-                return;
-            }
-            toast.success(next ? 'Following — pinned on your dashboard widget' : 'Unfollowed');
-            router.refresh();
-        });
-    };
+    const {on, pending, toggle} = useFollowStrategy(slug, followed, (next) => {
+        toast.success(next ? 'Following — pinned on your dashboard widget' : 'Unfollowed');
+    });
 
     return (
         <button

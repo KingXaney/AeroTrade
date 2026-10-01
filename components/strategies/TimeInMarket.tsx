@@ -1,4 +1,4 @@
-import PerformanceChart, {type DollarLineTone} from "@/components/analytics/PerformanceChart";
+import PerformanceChart, {type DollarLineTone} from "@/components/trading/PerformanceChart";
 import MicroLabel from "@/components/primitives/MicroLabel";
 import Panel from "@/components/primitives/Panel";
 import SectionHeading from "@/components/primitives/SectionHeading";

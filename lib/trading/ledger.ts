@@ -9,6 +9,7 @@ import PaperAccount from "@/database/models/paper-account.model";
 import PaperTrade from "@/database/models/paper-trade.model";
 import {DEFAULT_ACCOUNT_NAME, getOwnedAccount} from "@/lib/trading/accounts";
 import type {CsvTrade} from "@/lib/trading/csv";
+import {TRADE_HISTORY_LIMIT} from "@/lib/trading/config";
 import type {PaperTradeRecord, TradeSource} from '@/lib/trading/types';
 
 type LeanTrade = {
@@ -72,9 +73,6 @@ export const getTradeLedger = cache(async (userId: string, accountId: string): P
     return trades.map((t) => toTradeRecord(t));
 });
 
-// The trade log's page size, for getTradeHistory and for pages that slice their ledger.
-export const TRADE_HISTORY_LIMIT = 50;
-
 // The newest `limit` fills of the current epoch, newest first, in a bounded read of their own
 // (the same index, walked backwards, `limit` rows) — for callers that do not hold the ledger:
 // the chat tool, the recent-trades widget, a strategy page. /portfolio and /trade already read
@@ -94,7 +92,7 @@ export const getTradeHistory = async (userId: string, accountId: string, limit =
     }
 };
 
-// Newest fills across every strategy account, each tagged with its account's name —
+// Newest fills across every one of the user's accounts, each tagged with its account's name —
 // the /history page's trade feed. Read-only (no lazy account creation). The list and its count
 // are each account's current epoch (epochTradesOf), as every per-account read is: a reset that
 // crashed before deleting the old epoch's fills must not bring them back here either.

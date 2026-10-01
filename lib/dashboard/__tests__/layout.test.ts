@@ -4,6 +4,7 @@ import {
     DashboardLayoutSchema,
     LAYOUT_VERSION,
     LEGACY_DEFAULT_LAYOUT_V1,
+    LEGACY_WIDGET_IDS,
     MAX_WIDGETS,
     addWidget,
     filterAvailable,
@@ -13,7 +14,9 @@ import {
     missingWidgetIds,
     moveWidget,
     normalizeLayout,
+    readSavedLayout,
     removeWidget,
+    renameLegacyWidgetIds,
     resetLayout,
     setSpan,
     type DashboardLayout,
@@ -98,6 +101,42 @@ describe('migrateLegacyDefault', () => {
         expect(migrateLegacyDefault(normalizeLayout(stillLegacy))).toEqual(DEFAULT_LAYOUT);
         const customised = {version: 1, widgets: LEGACY_DEFAULT_LAYOUT_V1.widgets.map((w) => (w.id === 'tv-heatmap' ? {...w, span: 7} : w))};
         expect(migrateLegacyDefault(normalizeLayout(customised)).widgets.map((w) => w.id)).toEqual(LEGACY_DEFAULT_LAYOUT_V1.widgets.map((w) => w.id));
+    });
+});
+
+describe('renameLegacyWidgetIds + readSavedLayout', () => {
+    it('maps every old id to a current widget, and never to another old id', () => {
+        for (const [old, next] of Object.entries(LEGACY_WIDGET_IDS)) {
+            expect(WIDGET_IDS as readonly string[]).not.toContain(old);
+            expect(WIDGET_IDS).toContain(next);
+        }
+    });
+
+    it('reads a layout saved with the old account-comparison id as the renamed widget, span and place kept', () => {
+        const stored = {version: 1, widgets: [{id: 'portfolio-snapshot', span: 4}, {id: 'strategy-comparison', span: 8}, {id: 'leaderboard', span: 6}]};
+        expect(readSavedLayout(stored).widgets).toEqual([
+            {id: 'portfolio-snapshot', span: 4}, {id: 'account-comparison', span: 8}, {id: 'leaderboard', span: 6},
+        ]);
+        // The stored value itself is never touched.
+        expect(stored.widgets[1].id).toBe('strategy-comparison');
+    });
+
+    it('keeps one copy when both the old and the new id were saved', () => {
+        const stored = {version: 1, widgets: [{id: 'account-comparison', span: 12}, {id: 'strategy-comparison', span: 8}]};
+        expect(readSavedLayout(stored).widgets).toEqual([{id: 'account-comparison', span: 12}]);
+    });
+
+    it('hands back the same reference when nothing is renamed, and leaves garbage to normalizeLayout', () => {
+        const current = {version: 1, widgets: [{id: 'account-comparison', span: 12}]};
+        expect(renameLegacyWidgetIds(current)).toBe(current);
+        for (const junk of [undefined, null, 'x', {version: 1}, {version: 1, widgets: 'no'}]) {
+            expect(renameLegacyWidgetIds(junk)).toBe(junk);
+            expect(readSavedLayout(junk)).toEqual(resetLayout());
+        }
+    });
+
+    it('still upgrades the untouched old default', () => {
+        expect(readSavedLayout(JSON.parse(JSON.stringify(LEGACY_DEFAULT_LAYOUT_V1)))).toEqual(DEFAULT_LAYOUT);
     });
 });
 
@@ -235,13 +274,13 @@ describe('normalizeLayout', () => {
 describe('filterAvailable', () => {
     const mixed = layout([
         {id: 'leaderboard', span: 6},
-        {id: 'strategy-comparison', span: 12},
+        {id: 'account-comparison', span: 12},
         {id: 'brain-status', span: 12},
     ]);
 
     it('removes widgets the user cannot use', () => {
         expect(ids(filterAvailable(mixed, {accountCount: 1, advanced: false}))).toEqual(['leaderboard']);
-        expect(ids(filterAvailable(mixed, {accountCount: 2, advanced: false}))).toEqual(['leaderboard', 'strategy-comparison']);
+        expect(ids(filterAvailable(mixed, {accountCount: 2, advanced: false}))).toEqual(['leaderboard', 'account-comparison']);
         expect(ids(filterAvailable(mixed, {accountCount: 1, advanced: true}))).toEqual(['leaderboard', 'brain-status']);
     });
 
@@ -401,10 +440,10 @@ describe('missingWidgetIds', () => {
 
     it('hides unavailable widgets when a context is given', () => {
         const missing = missingWidgetIds(DEFAULT_LAYOUT, {accountCount: 1, advanced: false});
-        expect(missing).not.toContain('strategy-comparison');
+        expect(missing).not.toContain('account-comparison');
         expect(missing).not.toContain('brain-status');
         expect(missing).toHaveLength(WIDGET_IDS.length - DEFAULT_LAYOUT.widgets.length - 2);
-        expect(missingWidgetIds(DEFAULT_LAYOUT, {accountCount: 2, advanced: true})).toContain('strategy-comparison');
+        expect(missingWidgetIds(DEFAULT_LAYOUT, {accountCount: 2, advanced: true})).toContain('account-comparison');
         // Present in the layout, so never in the missing list — whichever way the flag points.
         expect(missingWidgetIds(DEFAULT_LAYOUT, {accountCount: 1, advanced: false, onboarding: true})).not.toContain('getting-started');
         expect(missingWidgetIds({version: 1, widgets: []}, {accountCount: 1, advanced: false})).not.toContain('getting-started');

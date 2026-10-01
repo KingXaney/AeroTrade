@@ -3,14 +3,14 @@
 
 import {connectToDatabase} from "@/database/mongoose";
 import UserPreferencesModel from "@/database/models/user-preferences.model";
-import {migrateLegacyDefault, normalizeLayout, resetLayout, type DashboardLayout} from "@/lib/dashboard/layout";
+import {readSavedLayout, resetLayout, type DashboardLayout} from "@/lib/dashboard/layout";
 
 // Any failure -> default layout: the page never breaks on preferences.
 export const getDashboardLayoutForUser = async (userId: string): Promise<DashboardLayout> => {
     try {
         await connectToDatabase();
         const prefs = await UserPreferencesModel.findOne({userId}).select('dashboardLayout').lean();
-        return migrateLegacyDefault(normalizeLayout(prefs?.dashboardLayout));
+        return readSavedLayout(prefs?.dashboardLayout);
     } catch (error) {
         console.error('Error reading dashboard layout:', error);
         return resetLayout();

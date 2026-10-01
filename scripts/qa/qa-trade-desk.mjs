@@ -64,6 +64,7 @@ try {
     const accounts = db.collection('paperaccounts');
     const main = await accounts.findOne({userId});   // lazily created by the first render
     check('a paper account exists for the user', !!main);
+    check('a new user\'s first account is named "Main account"', main?.name === 'Main account', main?.name);
     // The account began a minute ago, so the fills seeded below (a few seconds old) fall inside
     // its current epoch: every trade read starts at inceptionAt.
     const mainInception = new Date(Date.now() - 60_000);
@@ -99,11 +100,19 @@ try {
     check('trade history symbols link to the stock page', await page.locator('a[href="/stocks/AAPL"]').count() >= 2);
     check('an AI-placed trade carries a chip; user and legacy rows do not', await page.getByText('AI suggestion', {exact: true}).count() === 1);
     check('a trade from before the account\'s inception is not in its trade log', await page.locator('a[href="/stocks/ZZOLD"]').count() === 0);
-    check('strategy comparison renders both accounts', await page.getByRole('button', {name: /Value/}).count() >= 1);
+    check('account comparison renders both accounts', await page.getByRole('button', {name: /Value/}).count() >= 1);
+    // A user's paper account is an account; "strategy" names only the eight quant strategies.
+    check('the comparison panel and its first column say account',
+        await page.getByRole('heading', {name: 'Account Comparison'}).count() === 1 && await page.getByText('Account', {exact: true}).count() >= 1);
+    const sidebarCard = page.locator('a[href="/portfolio"]').filter({hasText: 'total return'}).first();
+    const sidebarText = (await sidebarCard.textContent().catch(() => '')) ?? '';
+    check('the sidebar card counts accounts', sidebarText.includes('All 2 accounts'), sidebarText.slice(0, 120));
+    check('no account surface calls an account a strategy',
+        await page.getByRole('button', {name: /Reset Account/}).count() === 1 && await page.getByText(/Strategy Comparison|Reset Strategy|New strategy account/).count() === 0);
     // The table's win rate is this epoch's, like the tile's: one winning sell, the old losing one unread.
     // A comparison row is the one button carrying its cells' own labels (the header's account
-    // switcher is also named "Main Strategy").
-    const mainRow = page.locator('button', {hasText: 'Main Strategy'}).filter({hasText: 'Max Drawdown'}).first();
+    // switcher is also named "Main account").
+    const mainRow = page.locator('button', {hasText: 'Main account'}).filter({hasText: 'Max Drawdown'}).first();
     const mainWinRate = (await mainRow.locator(':scope > div').nth(3).innerText()).trim();
     check('the comparison table counts only this epoch\'s sells', mainWinRate === '100%', mainWinRate);
     // The sell dialog's realized-result line reads '—' without a quote.
@@ -348,6 +357,13 @@ try {
 
     // --- the dashboard quick-trade widget must not navigate -----------------------------
     await page.goto(`${BASE}/settings`, {waitUntil: 'load'});
+    // The library files the paper-account widgets under Accounts and the eight quant
+    // strategies under their own heading, not under the news brain's.
+    await page.getByLabel('Add Quick Trade').waitFor({timeout: 30000});
+    check('the widget library has an Accounts and a Quant Strategies group, and no Strategy one',
+        await page.getByText('Accounts', {exact: true}).count() >= 1 && await page.getByText('Quant Strategies', {exact: true}).count() >= 1
+        && await page.getByText('Strategy', {exact: true}).count() === 0);
+    check('the account comparison is offered as Account Comparison', await page.getByLabel('Add Account Comparison').count() === 1);
     await page.getByLabel('Add Quick Trade').click();
     await page.getByLabel('Add Recent Trades').click();
     await page.waitForTimeout(1200);   // debounced autosave
@@ -373,6 +389,17 @@ try {
     // the first half can fail here; trade-copy.test.ts owns the compact line's interest rule.
     check('the compact ticket states no cash left', compactText !== '' && !/cash left/.test(compactText), compactText || 'no line');
     await page.unroute(onTicketPages, quoteStub);
+
+    // --- a layout saved with the old 'strategy-comparison' id reads as the account comparison --
+    await db.collection('userpreferences').updateOne({userId}, {$set: {dashboardLayout: {version: 1, widgets: [{id: 'strategy-comparison', span: 8}]}}});
+    await page.goto(`${BASE}/`, {waitUntil: 'domcontentloaded'});
+    const comparison = page.locator('[data-widget-id="account-comparison"]');
+    await comparison.waitFor({timeout: 30000}).catch(() => {});
+    const comparisonText = await comparison.count() === 1 ? await comparison.innerText() : '';
+    check('a saved strategy-comparison widget renders as Account Comparison, both accounts in it',
+        /Account Comparison/i.test(comparisonText) && /Main account/i.test(comparisonText) && /Value/i.test(comparisonText), comparisonText.replace(/\s+/g, ' ').slice(0, 120));
+    check('…and reading it left the stored id alone',
+        (await db.collection('userpreferences').findOne({userId}))?.dashboardLayout?.widgets?.[0]?.id === 'strategy-comparison');
 
     // --- brain drill-downs --------------------------------------------------------------
     await page.goto(`${BASE}/brain`, {waitUntil: 'domcontentloaded'});

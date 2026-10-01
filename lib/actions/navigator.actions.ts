@@ -161,7 +161,7 @@ export const applySuggestion = async (
         if (action === 'hold') return {success: false, message: 'Nothing to apply for a hold'};
 
         const account = await getOwnedAccount(userId, accountId);
-        if (!account) return {success: false, message: 'Strategy account not found'};
+        if (!account) return {success: false, message: 'Account not found'};
 
         const portfolio = await getPortfolio(userId, accountId);
         const held = portfolio.positions.find((p) => p.symbol.toUpperCase() === symbol.toUpperCase());

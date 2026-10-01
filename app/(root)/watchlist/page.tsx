@@ -1,22 +1,21 @@
 import {requireUserId} from "@/lib/auth/session";
-import {getWatchlistForUser} from "@/lib/stocks/watchlist-store";
-import {getStocksWithData} from "@/lib/prices/finnhub";
-import WatchlistTable from "@/components/watchlist/WatchlistTable";
-import WatchlistEmpty from "@/components/watchlist/WatchlistEmpty";
-import MarketStatus from "@/components/system/MarketStatus";
+import {getWatchlistPageView} from "@/lib/stocks/watchlist-page-store";
+import WatchlistTable from "@/components/stocks/WatchlistTable";
+import WatchlistEmpty from "@/components/stocks/WatchlistEmpty";
+import MarketStatus from "@/components/stocks/MarketStatus";
 import Panel from "@/components/primitives/Panel";
 import {WATCHLIST_COPY} from "@/lib/learn/copy/watchlist";
-import {marketStatus} from "@/lib/prices/market-hours";
-import type {StockWithData} from '@/lib/stocks/types';
 
+// The reads and the merge of saved rows with quotes live in getWatchlistPageView
+// (lib/stocks/watchlist-page-store.ts, lib/stocks/watchlist.ts); the page only composes.
 const WatchlistPage = async () => {
     const userId = await requireUserId();
 
-    const items = await getWatchlistForUser(userId);
-    const status = marketStatus();
+    const view = await getWatchlistPageView(userId);
+    const {status} = view;
 
-    // A failed read (null) is not an empty watchlist: say so instead of "No Assets Tracked".
-    if (!items || items.length === 0) {
+    // A failed read is not an empty watchlist: say so instead of "No Assets Tracked".
+    if (view.kind !== 'rows') {
         return (
             <div className="space-y-6">
                 <div className="flex flex-col md:flex-row justify-between items-start md:items-end gap-4">
@@ -32,7 +31,7 @@ const WatchlistPage = async () => {
                     </div>
                     <MarketStatus status={status} />
                 </div>
-                {items ? <WatchlistEmpty /> : (
+                {view.kind === 'empty' ? <WatchlistEmpty /> : (
                     <Panel pad={6}>
                         <p className="text-sm text-fg-muted">{WATCHLIST_COPY.unavailable}</p>
                     </Panel>
@@ -40,19 +39,6 @@ const WatchlistPage = async () => {
             </div>
         );
     }
-
-    const enriched = await getStocksWithData(items.map((i) => i.symbol));
-    // Merge DB-side company/addedAt onto each row so the table shows the user's saved company name.
-    const byDbSymbol = new Map(items.map((i) => [i.symbol.toUpperCase(), i]));
-    const rows: StockWithData[] = enriched.map((row) => {
-        const fromDb = byDbSymbol.get(row.symbol.toUpperCase());
-        return {
-            ...row,
-            userId,
-            company: fromDb?.company || row.company,
-            addedAt: fromDb?.addedAt ?? row.addedAt,
-        };
-    });
 
     return (
         <div className="space-y-6">
@@ -71,11 +57,11 @@ const WatchlistPage = async () => {
                     <MarketStatus status={status} />
                     <div className="text-[10px] text-fg-muted"
                          style={{ fontFamily: 'var(--type-mono)', letterSpacing: '0.02em' }}>
-                        {items.length} TRACKED
+                        {view.tracked} TRACKED
                     </div>
                 </div>
             </div>
-            <WatchlistTable watchlist={rows} />
+            <WatchlistTable watchlist={view.rows} />
         </div>
     );
 };

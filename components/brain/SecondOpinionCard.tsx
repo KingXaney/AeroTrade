@@ -2,7 +2,7 @@
 
 import {useEffect, useRef, useState} from "react";
 import {useRouter} from "next/navigation";
-import SafeMarkdown from "@/components/markdown/SafeMarkdown";
+import SafeMarkdown from "@/components/primitives/SafeMarkdown";
 import {toast} from "sonner";
 import {formatTimeAgoMs} from "@/lib/format";
 import {getSecondOpinionPrompt, requestSecondOpinion, saveManualSecondOpinion} from "@/lib/actions/opinion.actions";

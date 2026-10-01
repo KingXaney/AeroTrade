@@ -1,5 +1,5 @@
 // One registry for every nav surface. Before this there were three copies — NAV_ITEMS in the
-// since-deleted constants file (header), sidebarNavItems in components/Sidebar.tsx, and LINKS in
+// since-deleted constants file (header), sidebarNavItems in components/shell/Sidebar.tsx, and LINKS in
 // components/dashboard/widgets/QuickLinks.tsx — and they had already drifted: the sidebar
 // was the only one carrying /watchlist, /friends, /history and /settings, and it is
 // `hidden lg:flex`, so those four pages were unreachable by click below 1024px.

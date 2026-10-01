@@ -1,4 +1,4 @@
-import JobStamp from "@/components/system/JobStamp";
+import JobStamp from "@/components/jobs/JobStamp";
 import Badge from "@/components/primitives/Badge";
 import Panel from "@/components/primitives/Panel";
 import type {StrategiesSystemStatus} from "@/lib/strategies/page-store";

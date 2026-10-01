@@ -1,35 +1,23 @@
 import {cookies} from "next/headers";
 import Link from "next/link";
 import {requireUserId} from "@/lib/auth/session";
-import {getPortfoliosForUser} from "@/lib/trading/valuation";
-import {getTradeLedger, TRADE_HISTORY_LIMIT} from "@/lib/trading/ledger";
-import {getAccountAnalytics, getComparisonStats} from "@/lib/trading/analytics-store";
-import {getIncomeActivity} from "@/lib/income/page-store";
-import {replayReceipts} from "@/lib/trading/receipts";
-import {accountExportHref} from "@/lib/trading/csv";
-import {buyNotesBySellId, openLotNotes} from "@/lib/trading/lots";
-import {countUnpriced} from "@/lib/trading/analytics";
-import {buildReturnBridge} from "@/lib/trading/learn/bridge";
-import {drawdownBand} from "@/lib/learn/copy/portfolio";
-import {getLuckOrSkill} from "@/lib/trading/learn/luck-store";
-import {getTradingHabits} from "@/lib/trading/learn/habits-store";
-import {pickActiveAccount, preferredAccountId, toComparisonRows, toSwitcherAccounts} from "@/lib/trading/active-account";
-import {marketStatus} from "@/lib/prices/market-hours";
-import AccountSummary from "@/components/trade/AccountSummary";
-import PositionsTable from "@/components/trade/PositionsTable";
-import TradeHistory from "@/components/trade/TradeHistory";
-import ResetAccountButton from "@/components/trade/ResetAccountButton";
-import AccountSwitcher from "@/components/trade/AccountSwitcher";
-import ManageAccountMenu from "@/components/trade/ManageAccountMenu";
-import AccountComparisonTable from "@/components/analytics/AccountComparisonTable";
-import AnalyticsStats from "@/components/analytics/AnalyticsStats";
-import PerformanceChart from "@/components/analytics/PerformanceChart";
-import ExportCsvButton from "@/components/analytics/ExportCsvButton";
-import IncomeActivity from "@/components/trade/IncomeActivity";
-import ReturnBridge from "@/components/learn/ReturnBridge";
-import RiskLens from "@/components/learn/RiskLens";
-import TradingHabits from "@/components/learn/TradingHabits";
-import LuckOrSkill from "@/components/learn/LuckOrSkill";
+import {preferredAccountId} from "@/lib/trading/active-account";
+import {getPortfolioPageView} from "@/lib/trading/portfolio-page-store";
+import AccountSummary from "@/components/trading/portfolio/AccountSummary";
+import PositionsTable from "@/components/trading/portfolio/PositionsTable";
+import TradeHistory from "@/components/trading/portfolio/TradeHistory";
+import ResetAccountButton from "@/components/trading/accounts/ResetAccountButton";
+import AccountSwitcher from "@/components/trading/accounts/AccountSwitcher";
+import ManageAccountMenu from "@/components/trading/accounts/ManageAccountMenu";
+import AccountComparisonTable from "@/components/trading/portfolio/AccountComparisonTable";
+import AnalyticsStats from "@/components/trading/portfolio/AnalyticsStats";
+import PerformanceChart from "@/components/trading/PerformanceChart";
+import ExportCsvButton from "@/components/trading/portfolio/ExportCsvButton";
+import IncomeActivity from "@/components/income/IncomeActivity";
+import ReturnBridge from "@/components/trading/learn/ReturnBridge";
+import RiskLens from "@/components/trading/learn/RiskLens";
+import TradingHabits from "@/components/trading/learn/TradingHabits";
+import LuckOrSkill from "@/components/trading/learn/LuckOrSkill";
 import WhatTheseMean from "@/components/learn/WhatTheseMean";
 import Panel from "@/components/primitives/Panel";
 import SectionHeading from "@/components/primitives/SectionHeading";
@@ -38,69 +26,14 @@ type PortfolioPageProps = {
     searchParams: Promise<{account?: string}>;
 };
 
+// The reads and everything worked out from them live in getPortfolioPageView
+// (lib/trading/portfolio-page-store.ts, lib/trading/portfolio-page.ts); the page only composes.
 const PortfolioPage = async ({searchParams}: PortfolioPageProps) => {
     const userId = await requireUserId();
 
     const {account: accountParam} = await searchParams;
-    const all = await getPortfoliosForUser(userId);
-    const activeEntry = pickActiveAccount(all, preferredAccountId(accountParam, await cookies()));
-    // getPortfoliosForUser creates the first account, so there always is one.
-    if (!activeEntry) throw new Error('No strategy account');
-    const {account, summary: portfolio} = activeEntry;
-
-    // The page's one ledger read, shared (cache()) with getAccountAnalytics and getIncomeActivity,
-    // which hide their own sections when it fails. A failed read hides everything drawn from it
-    // here too — the trade log with its receipts and buy notes, the lot notes — rather than
-    // showing an empty ledger as "0 trades".
-    const ledgerRead = getTradeLedger(userId, account.id).catch((error) => {
-        console.error('Portfolio: reading the trade ledger failed:', error);
-        return null;
-    });
-    // Habits derive from the same ledger — no second trade read — and hide with it; their few
-    // quotes start the moment it resolves, alongside the page's other reads rather than after
-    // them. Luck or skill starts then too: it places the return as the learner's only when the
-    // learner placed a fill in this account (not on the Navigator's), the scope habits count.
-    const habitsRead = ledgerRead.then((ledger) => (ledger ? getTradingHabits({
-        ledger,
-        positions: portfolio.positions,
-        inceptionAt: account.inceptionAt,
-        startingBalance: portfolio.startingBalance,
-    }) : null));
-    // Its own bounded reads (null = panel hidden); the learner's return is a stored snapshot's.
-    const luckRead = ledgerRead.then((ledger) => getLuckOrSkill({
-        accountId: account.id,
-        inceptionAt: account.inceptionAt,
-        startingBalance: portfolio.startingBalance,
-        unpriced: countUnpriced(portfolio.positions),
-        holdings: portfolio.positions.length,
-        // A ledger that could not be read cannot say whose fills these are; the panel reads as before.
-        ownFills: ledger === null || ledger.some((trade) => trade.source === 'user'),
-    }));
-    const [ledger, analytics, comparisonStats, income, luck, habits] = await Promise.all([
-        ledgerRead,
-        getAccountAnalytics(userId, account.id),
-        getComparisonStats(userId, Object.fromEntries(all.map((x) => [x.account.id, x.summary.totalValue]))),
-        getIncomeActivity(userId, account.id),
-        luckRead,
-        habitsRead,
-    ]);
-
-    // The trade log is the ledger's tail, newest first.
-    const trades = ledger ? ledger.slice(-TRADE_HISTORY_LIMIT).reverse() : null;
-    const receipts = ledger ? replayReceipts(ledger) : undefined;
-    const count = portfolio.positions.length;
-    const unpriced = countUnpriced(portfolio.positions);
-    const marketOpen = marketStatus().state === 'open';
-    const switcherAccounts = toSwitcherAccounts(all);
-    const comparisonRows = toComparisonRows(all, comparisonStats);
-    // Split from the same summary the Total Return tile prints, so the lines add up to it.
-    const bridge = analytics ? buildReturnBridge({
-        totalReturn: portfolio.totalReturnAbs,
-        positions: portfolio.positions,
-        realizedPnl: analytics.realizedPnl,
-        income: analytics.income,
-        tradeCount: analytics.tradeCount,
-    }) : null;
+    const view = await getPortfolioPageView(userId, preferredAccountId(accountParam, await cookies()));
+    const {account, portfolio, analytics, bridge, habits, luck, income, tradeLog} = view;
 
     return (
         <div className="space-y-4">
@@ -110,15 +43,11 @@ const PortfolioPage = async ({searchParams}: PortfolioPageProps) => {
                     <h1 className="text-2xl font-semibold text-fg mb-1" style={{fontFamily: 'var(--type-display)'}}>
                         {account.name}
                     </h1>
-                    <p className="text-sm text-fg-muted">
-                        {count === 0
-                            ? 'No open positions yet'
-                            : `${count} ${count === 1 ? 'holding' : 'holdings'} · ${unpriced === 0 ? (marketOpen ? 'live valuation' : 'valued at last close') : unpriced === count ? 'valued at cost' : `${unpriced} valued at cost`}`}
-                    </p>
+                    <p className="text-sm text-fg-muted">{view.summaryLine}</p>
                 </div>
                 <div className="flex flex-wrap items-center gap-3">
-                    <AccountSwitcher accounts={switcherAccounts} activeId={account.id} />
-                    <ManageAccountMenu accountId={account.id} accountName={account.name} canDelete={all.length > 1} />
+                    <AccountSwitcher accounts={view.switcherAccounts} activeId={account.id} />
+                    <ManageAccountMenu accountId={account.id} accountName={account.name} canDelete={view.multiAccount} />
                     <ExportCsvButton accountId={account.id} />
                     <Link
                         href="/trade"
@@ -136,13 +65,13 @@ const PortfolioPage = async ({searchParams}: PortfolioPageProps) => {
                 </div>
             </div>
 
-            {/* Which strategy wins — all accounts side by side */}
-            {all.length > 1 && (
+            {/* Which account wins — all accounts side by side */}
+            {view.multiAccount && (
                 <section className="glass-panel rounded-xl p-5">
                     <h2 className="text-sm font-bold uppercase tracking-[0.1em] text-brand mb-4" style={{fontFamily: 'var(--type-mono)'}}>
-                        Strategy Comparison
+                        Account Comparison
                     </h2>
-                    <AccountComparisonTable rows={comparisonRows} activeId={account.id} />
+                    <AccountComparisonTable rows={view.comparisonRows} activeId={account.id} />
                 </section>
             )}
 
@@ -156,7 +85,7 @@ const PortfolioPage = async ({searchParams}: PortfolioPageProps) => {
                         <p className="font-mono text-[11px] text-fg-muted mb-4">
                             Returns include interest on cash and dividends · benchmark is SPY&apos;s total return, dividends reinvested
                         </p>
-                        <PerformanceChart series={analytics.series} accountName={account.name} band={drawdownBand(analytics.drawdown)} />
+                        <PerformanceChart series={analytics.series} accountName={account.name} band={view.chartBand} />
                     </section>
                     <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
                         <ReturnBridge accountId={account.id} bridge={bridge} />
@@ -183,7 +112,7 @@ const PortfolioPage = async ({searchParams}: PortfolioPageProps) => {
                 <h2 className="text-sm font-bold uppercase tracking-[0.1em] text-brand mb-4" style={{fontFamily: 'var(--type-mono)'}}>
                     Holdings
                 </h2>
-                <PositionsTable positions={portfolio.positions} accountId={account.id} lotNotes={ledger ? openLotNotes(ledger) : undefined} />
+                <PositionsTable positions={portfolio.positions} accountId={account.id} lotNotes={view.lotNotes} />
             </section>
 
             {/* What the account earned without trading */}
@@ -196,12 +125,12 @@ const PortfolioPage = async ({searchParams}: PortfolioPageProps) => {
             )}
 
             {/* Trade history — only from a ledger that was read */}
-            {ledger && trades && (
+            {tradeLog && (
                 <section className="glass-panel rounded-xl p-5">
                     <h2 className="text-sm font-bold uppercase tracking-[0.1em] text-brand mb-4" style={{fontFamily: 'var(--type-mono)'}}>
                         Trade History
                     </h2>
-                    <TradeHistory trades={trades} totalCount={analytics?.tradeCount} exportHref={accountExportHref(account.id)} receipts={receipts} buyNotesBySellId={buyNotesBySellId(ledger)} />
+                    <TradeHistory trades={tradeLog.trades} totalCount={analytics?.tradeCount} exportHref={tradeLog.exportHref} receipts={tradeLog.receipts} buyNotesBySellId={tradeLog.buyNotesBySellId} />
                 </section>
             )}
         </div>

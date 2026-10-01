@@ -1,7 +1,7 @@
 'use client';
 
 import {LogOut} from "lucide-react";
-import {useSignOut} from "@/hooks/useSignOut";
+import {useSignOut} from "@/components/shell/useSignOut";
 import type {User} from '@/lib/auth/types';
 
 const AccountSection = ({user}: {user: User}) => {

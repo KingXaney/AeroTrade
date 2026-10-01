@@ -1,6 +1,6 @@
-import TradingViewWidget from "@/components/TradingViewWidget";
+import TradingViewWidget from "@/components/stocks/TradingViewWidget";
 import {MARKET_EMBEDS} from "@/lib/stocks/tradingview";
-import MarketsTabs, {isMarketsTabId} from "@/components/markets/MarketsTabs";
+import MarketsTabs, {isMarketsTabId} from "@/components/stocks/MarketsTabs";
 
 type MarketsPageProps = {searchParams: Promise<{view?: string}>};
 

@@ -4,7 +4,7 @@ import {useEffect, useRef, useState, useTransition} from "react";
 import Link from "next/link";
 import {toast} from "sonner";
 import {ArrowDown, ArrowUp, X} from "lucide-react";
-import {Switch} from "@/components/ui/switch";
+import Switch from "@/components/primitives/Switch";
 import {CATEGORY_LABELS, CATEGORY_ORDER, SPAN_LABELS, WIDGETS, type WidgetId} from "@/lib/dashboard/catalog";
 import {
     addWidget, layoutsEqual, missingWidgetIds, moveWidget, removeWidget, resetLayout, setSpan, type DashboardLayout,
@@ -12,11 +12,10 @@ import {
 import {resetDashboardLayout, saveDashboardLayout} from "@/lib/actions/dashboard.actions";
 import {cn} from "@/lib/utils";
 import {iconButton} from "@/components/primitives/iconButton";
-import ConfirmDialog from "@/components/ui/ConfirmDialog";
+import ConfirmDialog from "@/components/primitives/ConfirmDialog";
 
 const SAVE_DEBOUNCE_MS = 300;
 
-const switchClass = "data-[state=checked]:!bg-brand-strong data-[state=unchecked]:!bg-surface-4 data-[state=unchecked]:!border data-[state=unchecked]:!border-line-strong transition-colors duration-200";
 
 type Props = {initialLayout: DashboardLayout; availableIds: WidgetId[]};
 
@@ -143,7 +142,7 @@ const DashboardSettings = ({initialLayout, availableIds}: Props) => {
                                                             <div className="text-[11px] text-fg-muted truncate">{def.description}</div>
                                                         </div>
                                                     </div>
-                                                    <Switch checked={false} onCheckedChange={() => setLayout((l) => addWidget(l, id))} className={switchClass} aria-label={`Add ${def.title}`} />
+                                                    <Switch checked={false} onCheckedChange={() => setLayout((l) => addWidget(l, id))} aria-label={`Add ${def.title}`} />
                                                 </label>
                                             );
                                         })}

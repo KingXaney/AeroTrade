@@ -12,10 +12,10 @@ import BrainLegend from "@/components/brain/BrainLegend";
 import BrainGraph from "@/components/brain/BrainGraph";
 import EvidenceList from "@/components/brain/EvidenceList";
 import NarrativeLeaderboard from "@/components/brain/NarrativeLeaderboard";
-import NavigatorCard from "@/components/brain/NavigatorCard";
+import NavigatorCard from "@/components/navigator/NavigatorCard";
 import SecondOpinionCard from "@/components/brain/SecondOpinionCard";
-import SuggestionPanel from "@/components/brain/SuggestionPanel";
-import SystemStatus from "@/components/brain/SystemStatus";
+import SuggestionPanel from "@/components/navigator/SuggestionPanel";
+import SystemStatus from "@/components/jobs/SystemStatus";
 
 // Each decision's reasons decoded here, on the server, so the client panel renders clauses
 // without bundling the grammar.

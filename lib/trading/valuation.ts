@@ -85,7 +85,7 @@ export const getPortfoliosForUser = cache(async (userId: string): Promise<Accoun
     }));
 });
 
-// Pure: collapse all of a user's strategy accounts into one summary (sidebar/dashboard).
+// Pure: collapse all of a user's paper accounts into one summary (sidebar/dashboard).
 export const aggregatePortfolios = (list: AccountWithPortfolio[]): PortfolioSummary => {
     const cash = list.reduce((sum, x) => sum + x.summary.cash, 0);
     const startingBalance = list.reduce((sum, x) => sum + x.summary.startingBalance, 0);

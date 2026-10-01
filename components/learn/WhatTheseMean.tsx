@@ -4,6 +4,7 @@ import {GLOSSARY, isGlossaryKey, type GlossaryKey} from "@/lib/learn/glossary";
 import {DEFINITIONS_COPY} from "@/lib/learn/copy/definitions";
 import AskLink from "@/components/chat/AskLink";
 import MicroLabel from "@/components/primitives/MicroLabel";
+import Disclosure from "@/components/primitives/Disclosure";
 
 // The touch-reachable twin of every Term title= on a panel: one collapsed disclosure at
 // the panel's foot listing the definitions of the terms that panel shows, and only those
@@ -30,11 +31,7 @@ const WhatTheseMean = ({keys, id, label = DEFINITIONS_COPY.label, className, chi
     const entries = Array.from(new Set(keys.filter(isGlossaryKey))).map((key) => GLOSSARY[key]);
     if (entries.length === 0 && !children) return null;
     return (
-        <details id={id} className={cn('group mt-3', className)} data-what-these-mean>
-            <summary className="font-mono cursor-pointer list-none marker:content-none [&::-webkit-details-marker]:hidden text-[11px] text-brand hover:underline inline-flex items-center gap-1">
-                <span className="material-symbols-outlined text-sm transition-transform group-open:rotate-90" aria-hidden="true">chevron_right</span>
-                {label}
-            </summary>
+        <Disclosure id={id} className={cn('mt-3', className)} data-what-these-mean summary={label}>
             {children && <div className="mt-2">{children}</div>}
             {children && entries.length > 0 && <MicroLabel as="p" className="mt-3">{DEFINITIONS_COPY.label}</MicroLabel>}
             {entries.length > 0 && (
@@ -55,7 +52,7 @@ const WhatTheseMean = ({keys, id, label = DEFINITIONS_COPY.label, className, chi
                     ))}
                 </dl>
             )}
-        </details>
+        </Disclosure>
     );
 };
 

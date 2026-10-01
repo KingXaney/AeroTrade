@@ -23,7 +23,7 @@ const AuthShell = ({children}: {children: React.ReactNode}) => (
         <section className="auth-right-section">
             <div className="z-10 relative lg:mt-4 lg:mb-16">
                 <p className="auth-blockquote">
-                    Paper-trade your strategies, follow the news topics you care about, and let a news brain that reads hundreds of articles a day tell you what the market is paying attention to.
+                    Paper-trade in practice accounts of your own, follow the news topics you care about, and let a news brain that reads hundreds of articles a day tell you what the market is paying attention to.
                 </p>
                 <p className="max-md:text-xs text-fg-muted"
                    style={{ fontFamily: 'var(--type-mono)', letterSpacing: '0.02em' }}>

@@ -30,7 +30,7 @@ export type LeaderboardEntry = {
     isYou: boolean;
     totalValue: number;
     totalReturnPct: number;
-    accountName: string;      // name of the user's best strategy account
+    accountName: string;      // name of the user's best paper account
     unpriced: number;         // holdings in that account with no live quote (their value is at cost)
     holdings: number;
 };

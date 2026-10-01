@@ -41,7 +41,9 @@ The other scripts follow the same shape, one per change set: `qa-foundations.mjs
 404 waits for the rendered page, and a symbol no strategy watches still 404s keyless with no
 stock panels),
 `qa-navigation.mjs`, `qa-ai-surfaces.mjs`, `qa-truthful-data.mjs`, `qa-trade-desk.mjs` (the ticket,
-the CSV export, the comparison table and `/history`'s trade feed — none counts a row from before
+the CSV export, the account wording — "Main account", Account Comparison, the library's Accounts and
+Quant Strategies groups, a layout saved with the old `strategy-comparison` id read as the account
+comparison — the comparison table and `/history`'s trade feed — none counts a row from before
 the account's inception — and the note, read back from `placeOrder`'s own request; for the "earning ≈$x/month" clause it answers the page's `getQuote`
 server action with a fixed price, since the harness has no quote provider, and removes the ^IRX
 row it seeds; `/stocks/AAPL` renders keyless because a strategy watches it),

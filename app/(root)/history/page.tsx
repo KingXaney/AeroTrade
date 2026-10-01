@@ -4,7 +4,7 @@ import {getWatchlistForUser} from "@/lib/stocks/watchlist-store";
 import {getNewsFeed} from "@/lib/news/feed-store";
 import {NEWS_HISTORY_LIMIT} from "@/lib/news/config";
 import {getRecentTradesForUser} from "@/lib/trading/ledger";
-import TradeHistory from "@/components/trade/TradeHistory";
+import TradeHistory from "@/components/trading/portfolio/TradeHistory";
 import NewsArticleCard from "@/components/news/NewsArticleCard";
 import {WATCHLIST_COPY} from "@/lib/learn/copy/watchlist";
 import {formatEasternTimestamp} from "@/lib/format";
@@ -34,7 +34,7 @@ const HistoryPage = async () => {
                 </h1>
                 <p className="text-sm text-fg-muted"
                    style={{ fontFamily: 'var(--type-mono)', letterSpacing: '0.02em' }}>
-                    Your trades across every strategy, and what you have added to your watchlist
+                    Your trades across every account, and what you have added to your watchlist
                 </p>
             </div>
 

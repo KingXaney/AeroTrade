@@ -5,7 +5,7 @@ import {usePathname, useRouter} from "next/navigation";
 import {toast} from "sonner";
 import {Loader2} from "lucide-react";
 import {Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle} from "@/components/ui/dialog";
-import KeywordChips from "@/components/topics/KeywordChips";
+import KeywordChips from "@/components/forms/KeywordChips";
 import {cn} from "@/lib/utils";
 import {createTopic, updateTopic} from "@/lib/actions/topics.actions";
 import {MAX_EXCLUDES, NAME_MAX} from "@/lib/topics/config";

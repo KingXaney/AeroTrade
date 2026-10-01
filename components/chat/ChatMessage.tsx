@@ -3,7 +3,7 @@
 import type {UIMessage} from "ai";
 import {cn} from "@/lib/utils";
 import ChatToolChip from "@/components/chat/ChatToolChip";
-import SafeMarkdown from "@/components/markdown/SafeMarkdown";
+import SafeMarkdown from "@/components/primitives/SafeMarkdown";
 
 type ChatMessageProps = {
     message: UIMessage;

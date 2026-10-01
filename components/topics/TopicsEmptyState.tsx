@@ -11,8 +11,7 @@ import MicroLabel from "@/components/primitives/MicroLabel";
 import {cn} from "@/lib/utils";
 import {followStarterTopics, restoreDefaultTopics} from "@/lib/actions/topics.actions";
 import {STARTER_TOPICS, type StarterGroup} from "@/lib/topics/starters";
-
-export type SuggestedTopic = {name: string; keywords: string[]; exclude?: string[]};
+import type {SuggestedTopic} from "@/lib/topics/types";
 
 const GROUP_LABEL: Record<StarterGroup, string> = {finance: 'Markets & macro', world: 'World news'};
 const GROUPS: StarterGroup[] = ['finance', 'world'];

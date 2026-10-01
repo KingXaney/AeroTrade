@@ -58,7 +58,7 @@ import {deleteOwnedAccount, restartAccount} from '@/lib/trading/lifecycle';
 describe('deleteOwnedAccount', () => {
     beforeEach(() => {
         db.accounts = new Map([
-            ['main', {userId: 'u1', name: 'Main Strategy'}],
+            ['main', {userId: 'u1', name: 'Main account'}],
             ['nav', {userId: 'u1', name: 'AI Navigator'}],
         ]);
         db.navigators = [{userId: 'u1', accountId: 'nav'}];
@@ -83,7 +83,7 @@ describe('deleteOwnedAccount', () => {
         db.accounts.delete('nav');
         db.navigators = [];
         expect((await deleteOwnedAccount('u1', 'main')).success).toBe(false);
-        expect((await deleteOwnedAccount('u2', 'main')).message).toBe('Strategy account not found');
+        expect((await deleteOwnedAccount('u2', 'main')).message).toBe('Account not found');
         expect(db.deletes).toEqual([]);
     });
 });
@@ -91,7 +91,7 @@ describe('deleteOwnedAccount', () => {
 describe('restartAccount', () => {
     beforeEach(() => {
         db.accounts = new Map([
-            ['main', {userId: 'u1', name: 'Main Strategy'}],
+            ['main', {userId: 'u1', name: 'Main account'}],
             ['nav', {userId: 'u1', name: 'AI Navigator'}],
         ]);
         db.deletes = [];
@@ -111,7 +111,7 @@ describe('restartAccount', () => {
 
     it('leaves the pre-migration trades alone when the reset account is not the user\'s oldest', async () => {
         db.accounts = new Map([
-            ['main', {userId: 'u1', name: 'Main Strategy'}],
+            ['main', {userId: 'u1', name: 'Main account'}],
             ['second', {userId: 'u1', name: 'Second'}],
         ]);
         await restartAccount('u1', {_id: 'second'} as never, 100_000, {sweepLegacyTrades: true});

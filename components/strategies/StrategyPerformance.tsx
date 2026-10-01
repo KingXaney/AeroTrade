@@ -1,8 +1,8 @@
 'use client';
 
 import {useState} from "react";
-import PerformanceChart from "@/components/analytics/PerformanceChart";
-import AnalyticsStats, {type AnalyticsStatFields} from "@/components/analytics/AnalyticsStats";
+import PerformanceChart from "@/components/trading/PerformanceChart";
+import AnalyticsStats, {type AnalyticsStatFields} from "@/components/trading/portfolio/AnalyticsStats";
 import {cn} from "@/lib/utils";
 import type {SeriesStats} from "@/lib/strategies/types";
 import {formatPct} from "@/lib/format";

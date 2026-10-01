@@ -216,14 +216,14 @@ export const buildTools = (userId: string) => ({
     getPaperPortfolio: tool({
         description: TOOL_DESCRIPTIONS.getPaperPortfolio,
         inputSchema: z.object({
-            account: z.string().optional().describe('Strategy account name, e.g. "AI Navigator". Omit for every account combined.'),
+            account: z.string().optional().describe('Paper account name, e.g. "AI Navigator". Omit for every account combined.'),
             includeRecentTrades: z.boolean().optional().describe('Set true for "what did I trade", "why is my P&L X", "did I sell Y"'),
             tradeLimit: z.number().int().min(1).max(CHAT_TRADES_MAX).optional().describe(`Trades to return (default ${CHAT_TRADES_DEFAULT})`),
         }),
         execute: async ({account, includeRecentTrades, tradeLimit}) => {
             try {
                 // readAccountsForUser, NOT getAccountsForUser: the latter lazily creates a
-                // "Main Strategy" account and backfills legacy trades. Asking the assistant
+                // default account (DEFAULT_ACCOUNT_NAME) and backfills legacy trades. Asking the assistant
                 // a question must not materialise an account for someone who never traded.
                 const docs = await readAccountsForUser(userId);
                 if (docs.length === 0) {
@@ -233,7 +233,7 @@ export const buildTools = (userId: string) => ({
                 const summaries = docs.map(toAccountSummary);
                 const picked = account ? findAccountByName(summaries, account) : undefined;
                 if (account && !picked) {
-                    return {error: `No strategy account named "${account}". They have: ${summaries.map((s) => s.name).join(', ')}.`};
+                    return {error: `No account named "${account}". They have: ${summaries.map((s) => s.name).join(', ')}.`};
                 }
                 const chosen = picked ? docs.filter((d) => String(d._id) === picked.id) : docs;
 

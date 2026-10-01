@@ -54,3 +54,6 @@ export type MergedTopicArticle = TopicArticleView & {
     topicSlug: string;
     topicColor: string | null;
 };
+
+// A topic the empty state offers to follow: a curated starter or one of the brain's entities.
+export type SuggestedTopic = {name: string; keywords: string[]; exclude?: string[]};

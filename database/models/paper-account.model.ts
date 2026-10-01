@@ -40,7 +40,7 @@ const PaperPositionSchema = new Schema<PaperPositionDoc>(
 const PaperAccountSchema = new Schema<PaperAccountDoc>(
     {
         userId: {type: String, required: true, index: true},
-        name: {type: String, required: true, trim: true, maxlength: 40, default: 'Main Strategy'},
+        name: {type: String, required: true, trim: true, maxlength: 40, default: 'Main account'},  // = DEFAULT_ACCOUNT_NAME (lib/trading/accounts imports this model)
         cash: {type: Number, required: true},
         startingBalance: {type: Number, required: true},
         // No default: Mongoose applies defaults on hydration too, which would mask a
@@ -59,7 +59,7 @@ const PaperAccountSchema = new Schema<PaperAccountDoc>(
     {timestamps: true},
 );
 
-// One strategy account per name per user. The old single-account `userId_1` unique
+// One paper account per name per user. The old single-account `userId_1` unique
 // index must be dropped by scripts/migrate-multi-account.mjs before second accounts
 // can be created (Mongoose adds indexes but never drops them).
 PaperAccountSchema.index({userId: 1, name: 1}, {unique: true});

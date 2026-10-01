@@ -8,12 +8,12 @@ import {getTradeLedger} from "@/lib/trading/ledger";
 import {getCashApy} from "@/lib/income/page-store";
 import {replayReceipts} from "@/lib/trading/receipts";
 import {openLotNotes} from "@/lib/trading/lots";
-import LastFill from "@/components/trade/LastFill";
-import TradeDesk from "@/components/trade/TradeDesk";
-import MarketStatus from "@/components/system/MarketStatus";
+import LastFill from "@/components/trading/desk/LastFill";
+import TradeDesk from "@/components/trading/desk/TradeDesk";
+import MarketStatus from "@/components/stocks/MarketStatus";
 import {describeQueuedFill, marketStatus} from "@/lib/prices/market-hours";
-import OpenPositionsStrip from "@/components/trade/OpenPositionsStrip";
-import AccountSwitcher from "@/components/trade/AccountSwitcher";
+import OpenPositionsStrip from "@/components/trading/desk/OpenPositionsStrip";
+import AccountSwitcher from "@/components/trading/accounts/AccountSwitcher";
 
 type TradePageProps = {
     searchParams: Promise<{symbol?: string; account?: string}>;
@@ -33,7 +33,7 @@ const TradePage = async ({searchParams}: TradePageProps) => {
     // always is one.
     const accounts = await getCachedAccountsForUser(userId);
     const activeId = pickActiveAccountId(accounts.map((a) => String(a._id)), preferredAccountId(accountParam, await cookies()));
-    if (!activeId) throw new Error('No strategy account');
+    if (!activeId) throw new Error('No paper account');
 
     // A failed ledger read hides what is drawn from it (the last fill, the lot notes) instead of
     // reading as an account with no fills.
@@ -46,7 +46,7 @@ const TradePage = async ({searchParams}: TradePageProps) => {
         getCashApy(),
     ]);
     const active = pickActiveAccount(all, activeId);
-    if (!active) throw new Error('No strategy account');
+    if (!active) throw new Error('No paper account');
     const portfolio = active.summary;
     const lastTrade = ledger?.at(-1) ?? null;
     const lastReceipt = ledger && lastTrade ? replayReceipts(ledger)[lastTrade.id] : undefined;

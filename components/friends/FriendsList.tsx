@@ -5,7 +5,7 @@ import Link from "next/link";
 import {useRouter} from "next/navigation";
 import {toast} from "sonner";
 import {removeFriend} from "@/lib/actions/friends.actions";
-import ConfirmDialog from "@/components/ui/ConfirmDialog";
+import ConfirmDialog from "@/components/primitives/ConfirmDialog";
 import type {FriendSummary} from '@/lib/friends/types';
 
 const FriendsList = ({friends}: {friends: FriendSummary[]}) => {

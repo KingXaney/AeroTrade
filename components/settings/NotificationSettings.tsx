@@ -3,11 +3,10 @@
 import {useState, useTransition} from "react";
 import {Mail, Newspaper, Rss} from "lucide-react";
 import {toast} from "sonner";
-import {Switch} from "@/components/ui/switch";
+import Switch from "@/components/primitives/Switch";
 import {setDigestMode, setTopicsInDigest, toggleEmailNotifications} from "@/lib/actions/preferences.actions";
 import type {NotificationPreferences} from "@/lib/settings/preferences-store";
 
-const switchClass = "data-[state=checked]:!bg-brand-strong data-[state=unchecked]:!bg-surface-4 data-[state=unchecked]:!border data-[state=unchecked]:!border-line-strong transition-colors duration-200";
 
 const NotificationSettings = ({initial}: {initial: NotificationPreferences}) => {
     const [emailEnabled, setEmailEnabled] = useState(initial.emailNotifications);
@@ -65,7 +64,7 @@ const NotificationSettings = ({initial}: {initial: NotificationPreferences}) => 
                         <div className="text-[11px] text-fg-muted">Daily news & updates</div>
                     </div>
                 </div>
-                <Switch id="email-notifications-toggle" checked={emailEnabled} onCheckedChange={handleToggleEmail} disabled={isPending} className={switchClass}/>
+                <Switch id="email-notifications-toggle" checked={emailEnabled} onCheckedChange={handleToggleEmail} disabled={isPending}/>
             </div>
             <div className="flex items-center justify-between rounded-lg border border-line-strong/20 bg-surface-2/40 px-4 py-3">
                 <div className="flex items-center gap-3">
@@ -77,7 +76,7 @@ const NotificationSettings = ({initial}: {initial: NotificationPreferences}) => 
                         </div>
                     </div>
                 </div>
-                <Switch id="digest-mode-toggle" checked={personalizedDigest} onCheckedChange={handleToggleDigestMode} disabled={isPending || !emailEnabled} className={switchClass}/>
+                <Switch id="digest-mode-toggle" checked={personalizedDigest} onCheckedChange={handleToggleDigestMode} disabled={isPending || !emailEnabled}/>
             </div>
             <div className="flex items-center justify-between rounded-lg border border-line-strong/20 bg-surface-2/40 px-4 py-3">
                 <div className="flex items-center gap-3">
@@ -89,7 +88,7 @@ const NotificationSettings = ({initial}: {initial: NotificationPreferences}) => 
                         </div>
                     </div>
                 </div>
-                <Switch id="topics-digest-toggle" checked={topicsInDigest} onCheckedChange={handleToggleTopics} disabled={isPending || !emailEnabled} className={switchClass}/>
+                <Switch id="topics-digest-toggle" checked={topicsInDigest} onCheckedChange={handleToggleTopics} disabled={isPending || !emailEnabled}/>
             </div>
         </div>
     );

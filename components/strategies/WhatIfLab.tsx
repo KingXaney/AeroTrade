@@ -1,7 +1,7 @@
 'use client';
 
 import {useState} from "react";
-import PerformanceChart, {type DollarLine} from "@/components/analytics/PerformanceChart";
+import PerformanceChart, {type DollarLine} from "@/components/trading/PerformanceChart";
 import MicroLabel from "@/components/primitives/MicroLabel";
 import Panel from "@/components/primitives/Panel";
 import SectionHeading from "@/components/primitives/SectionHeading";
