@@ -3,12 +3,15 @@
 import {useState} from "react";
 import {cn} from "@/lib/utils";
 import type {RowState} from "@/lib/strategies/types";
+import type {ReasonClause} from "@/lib/learn/reasons";
 import {STATE_LABEL, STATE_TONE} from "@/lib/strategies/views";
 import {ASKABLE_STATES, VERDICT_QUIZ_COPY} from "@/lib/learn/copy/verdict";
 import Badge from "@/components/primitives/Badge";
+import ReasonGloss from "@/components/learn/ReasonGloss";
 
 // Guess the Verdict: today's real board rows with the verdict hidden. The reader calls
-// each row, then the stored verdict and the rule's own reason are revealed. While the
+// each row, then the stored verdict and the rule's own reason are revealed, the reason
+// decoded clause by clause beneath it (decoded on the server; plain data here). While the
 // disclosure is open, the page hides the board's verdict column with CSS (:has), so the
 // server-rendered board needs no state of its own. Nothing is persisted.
 
@@ -17,6 +20,8 @@ export type QuizRow = {
     cells: {label: string; value: string}[];
     answer: RowState;
     explanation: string;
+    // decodeReason(explanation).clauses — empty when the explanation is not a rule string.
+    gloss: readonly ReasonClause[];
 };
 
 const VerdictQuiz = ({rows}: {rows: QuizRow[]}) => {
@@ -67,6 +72,7 @@ const VerdictQuiz = ({rows}: {rows: QuizRow[]}) => {
                                     <span>· {row.explanation}</span>
                                 </span>
                             )}
+                            {revealed && <ReasonGloss clauses={row.gloss} quoted={row.explanation} className="basis-full pl-1" />}
                         </li>
                     );
                 })}

@@ -3,7 +3,10 @@ import {cookies} from "next/headers";
 import Link from "next/link";
 import {ACTIVE_ACCOUNT_COOKIE} from "@/lib/constants";
 import {getCurrentUserId} from "@/lib/actions/watchlist.actions";
-import {getAccountsForUser, getPortfolio, toAccountSummary} from "@/lib/trading/account";
+import {getAccountsForUser, getCashApy, getPortfolio, getTradeLedger, toAccountSummary} from "@/lib/trading/account";
+import {replayReceipts} from "@/lib/trading/receipts";
+import {openLotNotes} from "@/lib/trading/lots";
+import LastFill from "@/components/trade/LastFill";
 import TradeDesk from "@/components/trade/TradeDesk";
 import MarketStatus from "@/components/system/MarketStatus";
 import {describeQueuedFill, marketStatus} from "@/lib/prices/market-hours";
@@ -30,7 +33,18 @@ const TradePage = async ({searchParams}: TradePageProps) => {
     const active = (preferredId && accounts.find((a) => String(a._id) === preferredId)) || accounts[0];
     const activeId = String(active._id);
 
-    const portfolio = await getPortfolio(userId, activeId);
+    // A failed ledger read hides what is drawn from it (the last fill, the lot notes) instead of
+    // reading as an account with no fills.
+    const [portfolio, ledger, apy] = await Promise.all([
+        getPortfolio(userId, activeId),
+        getTradeLedger(userId, activeId).catch((error) => {
+            console.error('Trade desk: reading the trade ledger failed:', error);
+            return null;
+        }),
+        getCashApy(),
+    ]);
+    const lastTrade = ledger?.at(-1) ?? null;
+    const lastReceipt = ledger && lastTrade ? replayReceipts(ledger)[lastTrade.id] : undefined;
     const status = marketStatus();
     const switcherAccounts = accounts.map((a) => {
         const s = toAccountSummary(a);
@@ -67,7 +81,10 @@ const TradePage = async ({searchParams}: TradePageProps) => {
                 accountId={activeId}
                 positions={portfolio.positions.map((p) => ({symbol: p.symbol, quantity: p.quantity, marketValue: p.marketValue, avgCost: p.avgCost}))}
                 queueNote={describeQueuedFill(status)}
+                apy={apy}
             />
+
+            {ledger && <LastFill trade={lastTrade} receipt={lastReceipt} />}
 
             {/* Open positions — compact quick-sell; full holdings & history live on /portfolio */}
             <section className="glass-panel rounded-xl p-5">
@@ -79,7 +96,7 @@ const TradePage = async ({searchParams}: TradePageProps) => {
                         Full holdings &amp; history →
                     </Link>
                 </div>
-                <OpenPositionsStrip positions={portfolio.positions} accountId={activeId} />
+                <OpenPositionsStrip positions={portfolio.positions} accountId={activeId} lotNotes={ledger ? openLotNotes(ledger) : undefined} />
             </section>
         </div>
     );

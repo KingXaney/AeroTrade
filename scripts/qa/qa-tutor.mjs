@@ -1,7 +1,7 @@
 // The chat tutor's guard rails, keyless: the three rate-limit windows refuse in order
-// with honest copy and no retry, and an "Ask in chat" link prefills the composer
-// without sending. The tutor's actual answers need a Gemini key and are checked by
-// hand. Run against the harness in README.md.
+// with honest copy and no retry, an "Ask in chat" link prefills the composer without
+// sending, and explainTerm's chip renders from a stubbed stream. The tutor's actual
+// answers need a Gemini key and are checked by hand. Run against the harness in README.md.
 import {chromium} from 'playwright';
 import {MongoClient} from 'mongodb';
 import {mkdirSync} from 'node:fs';
@@ -94,7 +94,9 @@ try {
 
     // --- Ask in chat prefills and never sends ----------------------------------------------
     await page.goto(`${BASE}/portfolio`, {waitUntil: 'load'});
-    const terms = page.locator('[data-what-these-mean]').first();
+    // The analytics panel's disclosure: full width and on the left, so its links stay clear of the
+    // open chat dialog (the Risk lens, first on the page since slice 2.3b, sits beneath it).
+    const terms = page.locator('[data-what-these-mean]').filter({hasText: 'Win rate'}).first();
     await terms.waitFor({timeout: 30000});
     await terms.locator('summary').click();
     await terms.locator('[data-ask="term"]').first().click();
@@ -103,10 +105,87 @@ try {
     check('the link opens the chat with the question typed', /^What does ".+" mean here\?$/.test(typed), typed);
     check('nothing was sent', !/mean here/.test(await dialog.innerText()));
     check('the composer is focused', await page.evaluate(() => document.activeElement?.getAttribute('placeholder')) === 'Query market data...');
-    await terms.locator('[data-ask="term"]').nth(1).click();
+    await terms.locator('[data-ask="term"]').nth(2).click();
     await page.waitForTimeout(200);
     check('a second link while open replaces the draft', (await composer().inputValue()) !== typed);
     await shot('03-ask');
+
+    // --- explainTerm's chip, from a stubbed stream ------------------------------------------
+    // The real answer needs a Gemini key; the stream is stubbed in the AI SDK's UI-message
+    // format with an output in lib/ai/explain.ts's shape, so what is checked here is the
+    // chip: its label, the glossary name as summary, the quoted term when there is no entry,
+    // and nothing repeated for a reason.
+    const STANCE = "These are the app's own definitions, and the learner's own paper-account figures where the app computes them.";
+    const explainStream = (id, input, output, reply) => [
+        {type: 'start', messageId: `qa-explain-${id}`},
+        {type: 'start-step'},
+        {type: 'tool-input-start', toolCallId: `call-${id}`, toolName: 'explainTerm'},
+        {type: 'tool-input-available', toolCallId: `call-${id}`, toolName: 'explainTerm', input},
+        {type: 'tool-output-available', toolCallId: `call-${id}`, output},
+        {type: 'finish-step'},
+        {type: 'start-step'},
+        {type: 'text-start', id: `text-${id}`},
+        {type: 'text-delta', id: `text-${id}`, delta: reply},
+        {type: 'text-end', id: `text-${id}`},
+        {type: 'finish-step'},
+        {type: 'finish', finishReason: 'stop'},
+    ].map((chunk) => `data: ${JSON.stringify(chunk)}\n\n`).join('') + 'data: [DONE]\n\n';
+    const sentBodies = [];
+    const stubOnce = async (body) => {
+        await page.unroute('**/api/chat').catch(() => {});
+        await page.route('**/api/chat', async (route) => {
+            sentBodies.push(route.request().postDataJSON());
+            await route.fulfill({
+                status: 200,
+                headers: {'content-type': 'text/event-stream', 'cache-control': 'no-cache', 'x-vercel-ai-ui-message-stream': 'v1'},
+                body,
+            });
+        });
+    };
+    const explainChips = () => dialog.locator('div.rounded-full').filter({hasText: 'Looking up the definition'});
+    const windowCounts = async () => JSON.stringify(
+        (await limits.find({key: {$in: [`chat:${userId}`, `chat:${userId}:day`, 'chat:global']}}).sort({key: 1}).toArray())
+            .map((row) => [row.key, row.count]));
+    const countsBefore = await windowCounts();
+
+    await stubOnce(explainStream('1', {term: 'my max drawdown'}, {
+        stance: STANCE,
+        entry: {key: 'max-drawdown', kind: 'metric', term: 'Max drawdown', short: 'The largest fall from a previous peak to a later low.', long: '…', seeAlso: ['Recovery', 'Volatility']},
+        reason: null,
+        yours: {paper: true, accounts: [{account: 'Main Strategy', figures: {maxDrawdownPct: 5.88, peakDate: '2026-09-19', troughDate: '2026-09-23', recovered: false}}]},
+        notes: [],
+    }, 'Stubbed answer one.'));
+    await dialog.getByRole('button', {name: 'Dismiss'}).click().catch(() => {});
+    await send('What is my max drawdown?');
+    await dialog.getByText('Stubbed answer one.').waitFor({timeout: 30000});
+    const chip = explainChips().last();
+    check('the explainTerm chip reads "Looking up the definition"', await explainChips().count() === 1);
+    check('its summary is the glossary name', (await chip.locator('span.text-fg-muted').innerText()).trim() === '— Max drawdown',
+        await chip.innerText());
+    check('a finished lookup shows as done, not pending or failed', /text-positive/.test(await chip.getAttribute('class') ?? ''));
+    check('the question went out as typed', JSON.stringify(sentBodies.at(-1) ?? {}).includes('What is my max drawdown?'));
+    await shot('04-explain-chip');
+
+    await stubOnce(explainStream('2', {term: 'zorblax ratio'}, {
+        stance: STANCE, entry: null, reason: null, yours: null, notes: ['The app has no glossary entry for this term.'],
+    }, 'Stubbed answer two.'));
+    await send('What is a zorblax ratio?');
+    await dialog.getByText('Stubbed answer two.').waitFor({timeout: 30000});
+    check('with no entry the chip quotes the term as asked',
+        (await explainChips().last().locator('span.text-fg-muted').innerText()).trim() === '— "zorblax ratio"');
+
+    await stubOnce(explainStream('3', {reason: 'enter: SMA50 42.10 > SMA200 40.00 (+5.3%)'}, {
+        stance: STANCE, entry: null,
+        reason: {clauses: [{text: 'enter', gloss: 'The trend condition held.'}], unrecognised: []},
+        yours: null, notes: [],
+    }, 'Stubbed answer three.'));
+    await send('Explain this reason: enter: SMA50 42.10 > SMA200 40.00 (+5.3%)');
+    await dialog.getByText('Stubbed answer three.').waitFor({timeout: 30000});
+    check('a reason lookup shows the label alone',
+        await explainChips().count() === 3 && await explainChips().last().locator('span.text-fg-muted').count() === 0);
+    check('a stubbed stream never reached the server (no window counted it)', await windowCounts() === countsBefore, countsBefore);
+    await page.unroute('**/api/chat');
+    await shot('05-explain-chips');
 } catch (err) {
     failures++;
     console.log(`FAIL  threw: ${err.message}`);

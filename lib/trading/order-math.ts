@@ -2,7 +2,13 @@
 // order can obviously not fill. Pure on purpose so it is unit-tested; the server
 // (executeOrder) re-checks everything with the live price and stays authoritative.
 
+import {TRADE_REASON_MAX} from "@/lib/strategies/config";
+import {interestOverDays} from "@/lib/trading/income";
+
 export type OrderSide = 'buy' | 'sell';
+
+// A side from outside the type system (a server action's argument): exactly 'buy' or 'sell'.
+export const isOrderSide = (value: unknown): value is OrderSide => value === 'buy' || value === 'sell';
 
 export type OrderInputs = {
     side: OrderSide;
@@ -51,11 +57,27 @@ export type OrderEffectInputs = {
     price: number | null;
     cash: number;
     positions: readonly PositionLike[];
+    // The cash APY at the latest stored T-bill rate (getCashApy); null or absent when no rate
+    // is stored yet, and then nothing is said about interest.
+    apy?: number | null;
 };
 
+// The ticket's "month": 30 days of daily compounding on the cash left after the order.
+export const CASH_YIELD_DAYS = 30;
+
+// What the cash left would earn over CASH_YIELD_DAYS at today's APY if nothing else moved.
+export type CashYield = {apy: number; days: number; amount: number};
+
 export type OrderEffect =
-    | {side: 'buy'; estTotal: number; shareOfAccount: number; largestAfter: {symbol: string; weight: number} | null; cashAfter: number; cashAfterWeight: number}
+    | {side: 'buy'; estTotal: number; shareOfAccount: number; largestAfter: {symbol: string; weight: number} | null; cashAfter: number; cashAfterWeight: number; cashYield: CashYield | null}
     | {side: 'sell'; quantity: number; owned: number; sharesAfter: number; avgCost: number | null; estRealizedPnl: number | null};
+
+// A rate that is unknown stays unknown: no zero is invented for it, and cash that the order
+// spends past zero earns nothing to describe.
+const cashYieldOf = (cashAfter: number, apy: number | null | undefined): CashYield | null =>
+    typeof apy === 'number' && Number.isFinite(apy) && apy >= 0 && cashAfter > 0
+        ? {apy, days: CASH_YIELD_DAYS, amount: interestOverDays(cashAfter, apy, CASH_YIELD_DAYS)}
+        : null;
 
 // (sell price − average cost) × shares, the same arithmetic executeOrder records.
 export const estRealizedPnl = (price: number | null, avgCost: number | null | undefined, quantity: number): number | null =>
@@ -68,7 +90,7 @@ const valueOf = (p: PositionLike): number =>
 
 // What the order does to the account, at the last price. Advisory like checkOrder: the
 // server is the authority on the fill. A buy with no price has no effect to describe.
-export const describeOrderEffect = ({side, symbol, quantity, price, cash, positions}: OrderEffectInputs): OrderEffect | null => {
+export const describeOrderEffect = ({side, symbol, quantity, price, cash, positions, apy}: OrderEffectInputs): OrderEffect | null => {
     const qty = Math.floor(quantity);
     if (!Number.isFinite(qty) || qty < 1) return null;
     const upper = symbol.toUpperCase();
@@ -101,8 +123,18 @@ export const describeOrderEffect = ({side, symbol, quantity, price, cash, positi
         largestAfter: largest && largest.value > 0 ? {symbol: largest.symbol, weight: largest.value / totalValue} : null,
         cashAfter,
         cashAfterWeight: cashAfter / totalValue,
+        cashYield: cashYieldOf(cashAfter, apy),
     };
 };
+
+// The ticket's one "What these mean" disclosure lists what its lines show: the three terms it
+// always uses, and APY only while the buy line carries the interest clause (a sell, a buy with
+// no price yet, no stored rate or no cash left says nothing about interest).
+export const TICKET_TERMS = ['buying-power', 'market-order', 'avg-cost'] as const;
+export type TicketTerm = (typeof TICKET_TERMS)[number] | 'apy';
+
+export const ticketTerms = (effect: OrderEffect | null): TicketTerm[] =>
+    effect?.side === 'buy' && effect.cashYield ? [...TICKET_TERMS, 'apy'] : [...TICKET_TERMS];
 
 export const checkOrder = ({side, quantity, price, cash, owned}: OrderInputs): OrderCheck => {
     const qty = Math.floor(quantity);
@@ -123,4 +155,20 @@ export const checkOrder = ({side, quantity, price, cash, owned}: OrderInputs): O
         return {ok: false, message: `Not enough buying power — need ${money(estTotal)}, have ${money(cash)}`, estTotal};
     }
     return {ok: true, message: null, estTotal};
+};
+
+// A learner's own "why" for an order: plain text, one line, bounded. Control characters
+// (which includes newlines and tabs) become spaces before whitespace collapses, so a pasted
+// paragraph reads as one line in the trade log. Markup is left as text — every surface
+// renders the note as a React text node, never as HTML. The clip counts UTF-16 units like
+// the textarea's maxLength does, and drops a surrogate half it would leave behind.
+// Undefined means "no note".
+const CONTROL_CHARS = /[\u0000-\u001f\u007f-\u009f]/g;
+const TRAILING_HIGH_SURROGATE = /[\ud800-\udbff]$/;
+
+export const sanitizeTradeNote = (input: unknown): string | undefined => {
+    if (typeof input !== 'string') return undefined;
+    const note = input.replace(CONTROL_CHARS, ' ').replace(/\s+/g, ' ').trim()
+        .slice(0, TRADE_REASON_MAX).replace(TRAILING_HIGH_SURROGATE, '').trim();
+    return note === '' ? undefined : note;
 };

@@ -42,13 +42,9 @@ export const staleNote = (asOf: string): string => `stale: no bar for ${asOf}`;
 
 export const universeOf = (def: StrategyDefinition): readonly string[] => UNIVERSES[def.universe];
 
-// Rule parameters live in the catalog so the explainer's table and the code cannot
-// drift apart; a missing one is a catalog bug, not a runtime condition.
-export const readParam = (def: StrategyDefinition, key: string): number => {
-    const value = Number(def.params[key]);
-    if (!Number.isFinite(value)) throw new Error(`strategy ${def.id}: missing numeric param "${key}"`);
-    return value;
-};
+// The one reader of def.params, kept in its own tiny module so the reason decoder
+// (lib/learn/reasons.ts) can read the same parameters without importing the rules.
+export {readParam} from '@/lib/strategies/params';
 
 export const heldPositions = (ctx: StrategyContext): ReadonlyMap<string, Holding> =>
     new Map(ctx.holdings.filter((holding) => holding.quantity > 0).map((holding) => [holding.symbol, holding]));

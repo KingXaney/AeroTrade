@@ -59,30 +59,100 @@ export const describeUnpriced = (stale: number, total: number): string | null =>
     return `${scope} — valued at cost, P&L withheld`;
 };
 
+// The worst peak-to-trough stretch over the series, dated: the peak before it, the low, the
+// fall as a positive percentage, whether a later point got back to the peak, and the gain the
+// low needed to get there (peak / trough − 1 — a 20% fall needs 25%). Null until there are at
+// least two points (a single day can't draw down); a series that never fell gets a zero
+// window rather than null, so "no drawdown yet" and "not enough history" stay distinct. Of
+// two equally deep stretches, the first is kept. The peak is the LATEST of equal highs: days
+// spent flat at the top are not part of the fall, and a window that started on the first of
+// them would date the band, the hint and "SPY same days" across a stretch that never fell.
+export const drawdownWindow = (series: readonly SnapshotPoint[]): DrawdownWindow | null => {
+    if (series.length < 2) return null;
+    let peak = series[0];
+    let worst = {pct: 0, peak: series[0], trough: series[0], troughIndex: 0};
+    series.forEach((point, index) => {
+        if (point.value >= peak.value) peak = point;
+        if (!(peak.value > 0)) return;
+        const pct = ((peak.value - point.value) / peak.value) * 100;
+        if (pct > worst.pct) worst = {pct, peak, trough: point, troughIndex: index};
+    });
+    if (worst.pct === 0) {
+        const first = series[0];
+        return {pct: 0, peakDate: first.date, peakValue: first.value, troughDate: first.date, troughValue: first.value, recovered: true, recoveryPctNeeded: 0};
+    }
+    const recovered = series.slice(worst.troughIndex + 1).some((point) => point.value >= worst.peak.value);
+    return {
+        pct: worst.pct,
+        peakDate: worst.peak.date,
+        peakValue: worst.peak.value,
+        troughDate: worst.trough.date,
+        troughValue: worst.trough.value,
+        recovered,
+        recoveryPctNeeded: worst.trough.value > 0 ? (worst.peak.value / worst.trough.value - 1) * 100 : null,
+    };
+};
+
 // Largest peak-to-trough decline over the series, as a positive percentage.
 // Null until there are at least two points (a single day can't draw down).
-export const computeMaxDrawdown = (series: SnapshotPoint[]): number | null => {
-    if (series.length < 2) return null;
-    let peak = series[0].value;
-    let maxDrawdown = 0;
-    for (const point of series) {
-        if (point.value > peak) peak = point.value;
-        if (peak > 0) {
-            maxDrawdown = Math.max(maxDrawdown, ((peak - point.value) / peak) * 100);
+export const computeMaxDrawdown = (series: SnapshotPoint[]): number | null => drawdownWindow(series)?.pct ?? null;
+
+// SPY's total return between two dates of a performance series, compounded from the two
+// since-inception figures (1.0659 / 1.10 − 1, not 6.59 − 10). Each date reads the last point
+// on or before it — the same forward fill buildPerfSeries applies across holidays. Null where
+// either end has no benchmark value.
+export const benchmarkReturnBetween = (series: readonly PerfPoint[], from: string, to: string): number | null => {
+    const at = (date: string): number | null => {
+        let found: PerfPoint | undefined;
+        for (const point of series) {
+            if (point.date > date) break;
+            found = point;
         }
-    }
-    return maxDrawdown;
+        return found?.benchmarkPct ?? null;
+    };
+    const start = at(from);
+    const end = at(to);
+    if (start === null || end === null || !(1 + start / 100 > 0)) return null;
+    return ((1 + end / 100) / (1 + start / 100) - 1) * 100;
+};
+
+export type Concentration = {
+    largest: {symbol: string; weight: number; marketValue: number; priceStale: boolean} | null;
+    cashWeight: number;
+    holdings: number;
+};
+
+// How much of the account sits in its largest position and in cash, each as a share of the
+// whole account (cash included). A position with no live quote weighs in at cost, as it does
+// in net worth, and says so through priceStale.
+export const concentration = (
+    positions: readonly {symbol: string; marketValue: number; priceStale?: boolean}[],
+    cash: number,
+    totalValue: number,
+): Concentration => {
+    const share = (value: number) => (totalValue > 0 ? value / totalValue : 0);
+    const top = positions.reduce<(typeof positions)[number] | null>((best, p) => (best === null || p.marketValue > best.marketValue ? p : best), null);
+    return {
+        largest: top ? {symbol: top.symbol, weight: share(top.marketValue), marketValue: top.marketValue, priceStale: top.priceStale === true} : null,
+        cashWeight: share(cash),
+        holdings: positions.length,
+    };
 };
 
 export type TradeForStats = {side: string; realizedPnl?: number};
 
+export type WinStats = {wins: number; losses: number; winRatePct: number | null};
+
+// Win rate from the two counts it needs — what a database $group returns, so a reader that
+// only wants the rate never pulls the trades back to count them.
+export const winStatsFromCounts = ({closed, wins}: {closed: number; wins: number}): WinStats =>
+    ({wins, losses: closed - wins, winRatePct: closed > 0 ? (wins / closed) * 100 : null});
+
 // Closed trades are sells with a recorded realizedPnl; a win is a positive one.
 // Win rate is null until at least one position has been (partially) closed.
-export const computeWinStats = (trades: TradeForStats[]): {wins: number; losses: number; winRatePct: number | null} => {
+export const computeWinStats = (trades: TradeForStats[]): WinStats => {
     const closed = trades.filter((t) => t.side === 'sell' && typeof t.realizedPnl === 'number');
-    const wins = closed.filter((t) => (t.realizedPnl as number) > 0).length;
-    const losses = closed.length - wins;
-    return {wins, losses, winRatePct: closed.length > 0 ? (wins / closed.length) * 100 : null};
+    return winStatsFromCounts({closed: closed.length, wins: closed.filter((t) => (t.realizedPnl as number) > 0).length});
 };
 
 export const computeRealizedPnl = (trades: TradeForStats[]): number =>

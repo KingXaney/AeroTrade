@@ -3,6 +3,8 @@
 // SPY and AAPL bars (with dividend fields and coverage, so the job's bar step finds nothing
 // to fetch and never overwrites the fixtures), and legacy snapshots — then fires the REAL
 // job through the Inngest dev server, scoped to this suite's own account.
+// The panel's receipts are then held to the rows the job stored: each month's interest to the
+// cent from average cash × the daily factor × days, each dividend from the entitled close.
 //
 // Needs the Inngest dev server on :8288 (`npx inngest-cli@latest dev -u
 // http://localhost:3000/api/inngest`); without it the job checks are skipped and noted.
@@ -29,6 +31,11 @@ const addDays = (date, n) => { const [y, m, d] = date.split('-').map(Number); re
 const isWeekday = (date) => { const wd = new Date(`${date}T12:00:00Z`).getUTCDay(); return wd !== 0 && wd !== 6; };
 const weekdayOnOrBefore = (date) => { let d = date; while (!isWeekday(d)) d = addDays(d, -1); return d; };
 const etNoon = (date) => new Date(`${date}T16:00:00Z`);
+const MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+const short = (date) => `${MONTHS[Number(date.slice(5, 7)) - 1]} ${Number(date.slice(8, 10))}`;
+const dollars = (text) => Number(text.replace(/[$,]/g, ''));
+const cents = (amount) => Math.round(amount * 100);
+const dailyFactor = (apy) => (1 + apy) ** (1 / 365) - 1;
 
 const TODAY = etDate();
 const YESTERDAY = addDays(TODAY, -1);
@@ -152,8 +159,32 @@ try {
         check('Buying Power shows the rate cash is earning', /earning \d+\.\d{2}% APY/.test(main));
         check('Total Return says how much came from income', /incl\. \$[\d,.]+ interest · \$[\d,.]+ dividends/.test(main));
         const panel = await page.locator('#income').innerText();
-        check('the panel lists both dividends', /SPY/.test(panel) && /AAPL/.test(panel) && /10 × \$1\.89/.test(panel), panel.replace(/\n/g, ' | ').slice(0, 200));
-        check('interest is one line a month, not one per day', (await page.locator('[data-testid="income-interest"] li').count()) <= 2);
+        check('the panel lists both dividends at their declared amount', /SPY/.test(panel) && /AAPL/.test(panel) && /10 × \$1\.889 · paid/.test(panel) && /20 × \$0\.26 · paid/.test(panel), panel.replace(/\n/g, ' | ').slice(0, 200));
+        const months = [...new Set(interest.map((r) => r.date.slice(0, 7)))];
+        check('interest is one line per month, not one per day', (await page.locator('[data-testid="income-interest"] li').count()) === months.length, `${await page.locator('[data-testid="income-interest"] li').count()} li for ${months.length} month(s)`);
+
+        // --- receipts: each one reproduces the stored rows to the cent ------------------------
+        await page.locator('#income details[data-income-receipt]').evaluateAll((els) => els.forEach((d) => { d.open = true; }));
+        // The daily rate prints to 6–12 decimals: the fewest at which the printed numbers multiply back.
+        const RECEIPT = /^average cash (\$[\d,]+\.\d{2}) × (0\.\d{6,12})%\/day \(\(1 \+ (\d+\.\d{2})%\)\^\(1\/365\) − 1\) × (\d+) days? = (\$[\d,]+\.\d{2})$/;
+        for (const month of months) {
+            const text = (await page.locator(`[data-income-month="${month}"] details p`).first().innerText().catch(() => '')).trim();
+            const stored = interest.filter((r) => r.date.startsWith(month));
+            const sum = stored.reduce((s, r) => s + r.amount, 0);
+            const averageCash = stored.reduce((s, r) => s + r.amount / dailyFactor(r.apy), 0) / stored.length;
+            const m = RECEIPT.exec(text);
+            check(`${month}: the receipt prints the daily factor, not ÷ 365`, m !== null && !/÷/.test(text), text);
+            if (m === null) continue;
+            check(`${month}: its total is the stored rows to the cent`, cents(dollars(m[5])) === cents(sum), `${m[5]} vs ${sum.toFixed(4)}`);
+            check(`${month}: its average cash is rebuilt from the stored rows`, cents(dollars(m[1])) === cents(averageCash) && Number(m[4]) === stored.length, `${m[1]} vs ${averageCash.toFixed(4)}, ${m[4]} days`);
+            check(`${month}: the printed numbers multiply back to the stored cent`, cents(dollars(m[1]) * Number(m[2]) / 100 * Number(m[4])) === cents(sum), `${(dollars(m[1]) * Number(m[2]) / 100 * Number(m[4])).toFixed(4)} vs ${sum.toFixed(4)}`);
+        }
+        const dividendReceipt = async (symbol) => (await page.locator(`[data-income-dividend="${symbol}"] details p`).first().innerText().catch(() => '')).trim();
+        check('the SPY receipt reads the entitled close, the arithmetic and the pay lag',
+            await dividendReceipt('SPY') === `10 shares held at the end of ${short(addDays(EX_SPY, -1))}, the day before the ${short(EX_SPY)} ex-date (held since ${short(BUY_SPY)}) · 10 × $1.889 = $18.89 · paid ${short(addDays(EX_SPY, 5))}, 5 days after the ex-date`,
+            await dividendReceipt('SPY'));
+        check('the AAPL receipt too', /^20 shares held at the end of .* · 20 × \$0\.26 = \$5\.20 · paid .*, 5 days after the ex-date$/.test(await dividendReceipt('AAPL')), await dividendReceipt('AAPL'));
+        check('no fill missed an ex-date, so there is no missed block', (await page.locator('#income [data-testid=income-missed]').count()) === 0);
         check('the chart is against SPY total return', /SPY, total return/.test(main) && /benchmark is SPY/.test(main));
         check('trade count is unchanged by income', /Trades\s*2\b/i.test(main.replace(/\n/g, ' ')), main.match(/Trades[\s\S]{0,20}/)?.[0]);
         const csv = await (await page.request.get(`${BASE}/api/accounts/${accountId}/export`)).text();

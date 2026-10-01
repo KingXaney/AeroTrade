@@ -34,15 +34,26 @@ node screenshots.mjs                       # or: capture the README screenshots
 ```
 
 The other scripts follow the same shape, one per change set: `qa-foundations.mjs`,
-`qa-navigation.mjs`, `qa-ai-surfaces.mjs`, `qa-truthful-data.mjs`, `qa-trade-desk.mjs`,
+`qa-navigation.mjs`, `qa-ai-surfaces.mjs`, `qa-truthful-data.mjs`, `qa-trade-desk.mjs` (the ticket,
+the CSV export and the comparison table — neither counts a row from before the account's
+inception — and the note, read back from `placeOrder`'s own request; for the "earning ≈$x/month" clause it answers the page's `getQuote`
+server action with a fixed price, since the harness has no quote provider, and removes the ^IRX
+row it seeds),
 `qa-news-feed.mjs`, `qa-strategies.mjs` (seeds the system-owned strategy accounts directly — the
 daily job never runs in this harness), `qa-income.mjs` (interest and dividends: runs the REAL nightly
 income job through the Inngest dev server, scoped to its own account; without the dev server on :8288
 it runs only the page checks),
-`qa-learn.mjs` (the First-week checklist, /learn, the ⌘K glossary rows, Guess the Verdict and
-"What the rule saw" on a seeded strategy page, an "Ask in chat" prefill), `qa-tutor.mjs` (the
-chat's three rate-limit windows via seeded `ratelimits` rows, then the prefill — the tutor's
-answers themselves need a Gemini key and are checked by hand)
+`qa-learn.mjs` (the First-week checklist, /learn, the ⌘K glossary rows, Guess the Verdict,
+"What the rule saw" with the decoded reason and "Read this board" on a seeded strategy page, an
+"Ask in chat" prefill, and Today's lesson added from the library), `qa-learn-account.mjs` (the
+portfolio surfaces on a seeded account: a fresh account's empty states first, then seeded
+snapshots, a sell, an unpriced holding and income totals for the dated drawdown and its shaded
+band, the return bridge's guess and lines that add up to the Total Return tile to the cent, the
+risk lens, buy notes under the sell, fill receipts, `/trade`'s Last fill and a receipt per
+income month), `qa-tutor.mjs` (the
+chat's three rate-limit windows via seeded `ratelimits` rows, the prefill, then the `explainTerm`
+chip from a stubbed UI-message stream — the tutor's answers themselves need a Gemini key and are
+checked by hand)
 and `qa-auth.mjs` (password reset end to end — it reads the token out of the
 throwaway Mongo, since the harness has no SMTP). They share one database, so each
 scopes its assertions to the user it signs up.

@@ -10,6 +10,7 @@ import {dividendCoverage, fetchYahooDaily, type YahooRange} from "@/lib/prices/y
 import {mergeCoverage, type CoverageRange} from "@/lib/prices/coverage";
 import {type Bar} from "@/lib/prices/signals";
 import {BAR_PROJECTION, toBar, toSetFields, type LeanPriceBar} from "@/lib/prices/bar-fields";
+import type {DividendPoint} from "@/lib/trading/income";
 import {
     BACKFILL_CALENDAR_DAYS,
     MAX_TRACKED_SYMBOLS,
@@ -236,6 +237,20 @@ export const symbolsLackingDividendCoverage = async (symbols: string[], from: st
         .filter((m) => m.dividendsFrom !== undefined && m.dividendsThrough !== undefined && m.dividendsFrom <= from && m.dividendsThrough >= through)
         .map((m) => m.symbol));
     return unique.filter((symbol) => !covered.has(symbol));
+};
+
+// Dividends per share on their ex-dates, for the given symbols and inclusive dates. Narrow on
+// purpose — three fields of the few bars that paid, answered from the partial index — so a
+// request path (the Income panel's "Missed by a day") can afford it.
+export const getDividendPoints = async (symbols: string[], from: string, to: string): Promise<DividendPoint[]> => {
+    const unique = Array.from(new Set(symbols.map((s) => s.toUpperCase()))).filter(Boolean);
+    if (unique.length === 0 || from > to) return [];
+    await connectToDatabase();
+    const bars = await PriceBar.find(
+        {symbol: {$in: unique}, dividend: {$gt: 0}, date: {$gte: from, $lte: to}},
+        {_id: 0, symbol: 1, date: 1, dividend: 1},
+    ).sort({date: 1}).lean<{symbol: string; date: string; dividend: number}[]>();
+    return bars.map((bar) => ({symbol: bar.symbol, exDate: bar.date, perShare: bar.dividend}));
 };
 
 // The stored T-bill series as rate points (a discount yield, annualised %).

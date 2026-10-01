@@ -18,8 +18,10 @@ import {pickActiveAccount, type ComparisonStat, type LatestSuggestions} from "@/
 import type {DataKey} from "@/lib/dashboard/widgets";
 import {getStrategyWidgetRows} from "@/lib/strategies/queries";
 import type {StrategyLeaderboardRow} from "@/lib/strategies/views";
-import {getOnboardingFacts} from "@/lib/learn/facts-store";
-import type {OnboardingFacts} from "@/lib/learn/facts";
+import {getLearnFacts, getOnboardingFacts} from "@/lib/learn/facts-store";
+import type {LearnFacts, OnboardingFacts} from "@/lib/learn/facts";
+import {getTodaysLesson} from "@/lib/learn/lesson-store";
+import type {Lesson} from "@/lib/learn/lesson";
 
 // Followed strategies first, then the top of the ranking.
 const STRATEGY_WIDGET_LIMIT = 5;
@@ -55,7 +57,9 @@ export type DashboardData = Partial<{
     strategies: StrategyLeaderboardRow[];
     topicsOverview: TopicsOverview;
     topicsLatest: MergedTopicArticle[];
-    learnFacts: OnboardingFacts;
+    onboardingFacts: OnboardingFacts;
+    learnFacts: LearnFacts;
+    lesson: Lesson;
 }>;
 
 type Loader<K extends DataKey> = (ctx: LoaderCtx) => Promise<DashboardData[K]>;
@@ -102,8 +106,12 @@ export const LOADERS: {[K in DataKey]: Loader<K>} = {
     secondOpinion: ({userId}) => getLatestSecondOpinion(userId),
     topicsOverview: ({userId}) => getCachedTopicsOverview(userId),
     topicsLatest: ({userId}) => getMergedTopicFeed(userId, {limit: TOPICS_LATEST_LIMIT}),
-    // cache()-shared with the page, which reads the same facts for widget availability.
-    learnFacts: ({userId}) => getOnboardingFacts(userId),
+    // cache()-shared with the page, which reads it for widget availability: the checklist costs no read.
+    onboardingFacts: ({userId}) => getOnboardingFacts(userId),
+    // The onboarding half is the same cached read; the lesson reads are Today's lesson's alone.
+    learnFacts: ({userId}) => getLearnFacts(userId),
+    // Lazy: awaited under Suspense only when no moment wins (components/dashboard/widgets/registry.tsx).
+    lesson: ({userId}) => getTodaysLesson(userId),
 };
 
 export type LoadedDashboard = {data: DashboardData; failed: Set<DataKey>};

@@ -23,9 +23,9 @@ const spanSet = new Set<number>(WIDGET_SPANS);
 const dataKeySet = new Set<string>(DATA_KEYS);
 
 describe('registry invariants', () => {
-    it('has 33 unique ids whose table keys match their id field', () => {
-        expect(WIDGET_IDS).toHaveLength(33);
-        expect(new Set(WIDGET_IDS).size).toBe(33);
+    it('has 34 unique ids whose table keys match their id field', () => {
+        expect(WIDGET_IDS).toHaveLength(34);
+        expect(new Set(WIDGET_IDS).size).toBe(34);
         expect(Object.keys(WIDGETS).sort()).toEqual([...WIDGET_IDS].sort());
         for (const id of WIDGET_IDS) {
             expect(WIDGETS[id].id).toBe(id);
@@ -100,7 +100,7 @@ describe('registry invariants', () => {
             expect(WIDGETS[id].isNew, id).toBe(true);
         }
         // The quant-strategies panel shipped after the layout system too.
-        expect(defs.filter((d) => d.isNew).map((d) => d.id).sort()).toEqual([...topics, 'quant-strategies', 'getting-started'].sort());
+        expect(defs.filter((d) => d.isNew).map((d) => d.id).sort()).toEqual([...topics, 'quant-strategies', 'getting-started', 'todays-lesson'].sort());
         expect(WIDGETS['topics-latest'].dataKeys).toEqual(['topicsLatest']);
         expect(WIDGETS['topic-briefs'].dataKeys).toEqual(['topicsOverview']);
     });
@@ -131,13 +131,28 @@ describe('registry invariants', () => {
         expect(defs.filter((d) => d.availability !== 'always').map((d) => d.id).sort())
             .toEqual(['brain-status', 'getting-started', 'strategy-comparison']);
         expect(WIDGETS['getting-started'].availability).toBe('onboarding');
-        expect(WIDGETS['getting-started'].dataKeys).toEqual(['learnFacts']);
+        // The checklist reads the onboarding facts only (a cache() hit on the page's own
+        // availability read), never the lesson reads that Today's lesson needs.
+        expect(WIDGETS['getting-started'].dataKeys).toEqual(['onboardingFacts']);
+        expect(resolveDataKeys(['getting-started'])).toEqual({eager: ['onboardingFacts'], lazy: [], needsActiveAccount: false});
+    });
+
+    it('Today\'s lesson is a library-only learn panel on the learn facts and the day\'s lesson', () => {
+        const lesson = WIDGETS['todays-lesson'];
+        expect(lesson.category).toBe('learn');
+        expect(lesson.availability).toBe('always');
+        expect(lesson.chrome).toBe('panel');
+        expect(lesson.dataKeys).toEqual(['learnFacts', 'lesson']);
+        // The day's concept streams in only when no moment from the facts wins.
+        expect(resolveDataKeys(['todays-lesson'])).toEqual({eager: ['learnFacts'], lazy: ['lesson'], needsActiveAccount: false});
+        expect(DEFAULT_LAYOUT.widgets.map((w) => w.id)).not.toContain('todays-lesson');
+        expect(defs.filter((d) => d.category === 'learn').map((d) => d.id)).toEqual(['getting-started', 'todays-lesson']);
     });
 
     it('default spans follow the plan table', () => {
         const expected: Record<WidgetId, number> = {
             'topics-overview': 4, 'topics-latest': 8, 'topic-briefs': 6,
-            'getting-started': 12,
+            'getting-started': 12, 'todays-lesson': 6,
             'portfolio-snapshot': 4, 'watchlist-movers': 4, 'friends-rank': 4, 'news-brain-tile': 12,
             'tv-heatmap': 8, 'tv-top-stories': 4, 'tv-ticker-tape': 12, 'tv-market-screener': 12,
             'tv-crypto-screener': 8, 'tv-forex': 6,
@@ -180,7 +195,7 @@ describe('data key graph', () => {
     });
 
     it('lazy keys are known and match the plan', () => {
-        expect([...LAZY_DATA_KEYS].sort()).toEqual(['analytics', 'brainStatus', 'movers', 'news', 'strategies', 'topicsLatest']);
+        expect([...LAZY_DATA_KEYS].sort()).toEqual(['analytics', 'brainStatus', 'lesson', 'movers', 'news', 'strategies', 'topicsLatest']);
         for (const key of LAZY_DATA_KEYS) {
             expect(dataKeySet.has(key)).toBe(true);
         }
@@ -291,7 +306,7 @@ describe('resolveDataKeys', () => {
 
     it('resolves the default layout to the plan\'s key sets', () => {
         const result = resolveDataKeys(DEFAULT_LAYOUT.widgets.map((w) => w.id));
-        expect(new Set(result.eager)).toEqual(new Set(['portfolios', 'leaderboard', 'theses', 'suggestions', 'topicsOverview', 'learnFacts']));
+        expect(new Set(result.eager)).toEqual(new Set(['portfolios', 'leaderboard', 'theses', 'suggestions', 'topicsOverview', 'onboardingFacts']));
         expect(result.lazy).toEqual(['movers', 'topicsLatest']);
         expect(result.needsActiveAccount).toBe(false);
     });

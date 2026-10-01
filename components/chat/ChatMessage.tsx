@@ -14,6 +14,14 @@ const summarizeTool = (toolName: string, part: {input?: unknown; output?: unknow
     const input = part.input as Record<string, unknown> | undefined;
     const output = part.output as unknown;
 
+    // The glossary's name for what was found, else the term as asked; a reason alone
+    // (quoted strategy text) is not repeated in the chip.
+    if (toolName === 'explainTerm') {
+        const entry = output && typeof output === 'object' ? (output as {entry?: {term?: unknown} | null}).entry : undefined;
+        if (entry && typeof entry.term === 'string') return entry.term;
+        return input && typeof input.term === 'string' && input.term.trim() ? `"${input.term.trim()}"` : undefined;
+    }
+
     if (input && typeof input === 'object') {
         if (typeof input.symbol === 'string') return input.symbol;
         if (typeof input.query === 'string') return `"${input.query}"`;

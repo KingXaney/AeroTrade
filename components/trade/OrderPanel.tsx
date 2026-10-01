@@ -7,8 +7,10 @@ import {cn, formatPrice} from "@/lib/utils";
 import {useDebounce} from "@/hooks/useDebounce";
 import {getQuote, searchStocks} from "@/lib/actions/finnhub.actions";
 import {placeOrder} from "@/lib/actions/trading.actions";
-import {checkOrder, describeOrderEffect, presetQuantities, type PositionLike} from "@/lib/trading/order-math";
+import {checkOrder, describeOrderEffect, presetQuantities, ticketTerms, type PositionLike} from "@/lib/trading/order-math";
 import {orderEffectLine, queueLine} from "@/lib/learn/copy/trade";
+import {NOTE_COPY} from "@/lib/learn/copy/receipts";
+import {TRADE_REASON_MAX} from "@/lib/strategies/config";
 import WhatTheseMean from "@/components/learn/WhatTheseMean";
 
 type OrderPanelProps = {
@@ -24,13 +26,17 @@ type OrderPanelProps = {
     // The 360px dashboard ticket: the first two facts of the consequence line, no queue
     // line, no definitions.
     compact?: boolean;
+    // The cash APY at the latest T-bill rate (getCashApy), for the buy line's "earning
+    // ≈$x/month" clause on the cash left. Null or unset: no clause. The dashboard widget
+    // leaves it unset — its compact line drops the cash left the clause describes.
+    apy?: number | null;
     // Called when the user *commits* a symbol (picks a search hit, or leaves the field
     // with a new one). The trade desk uses it to move the chart; the dashboard's
     // quick-trade widget leaves it unset, so it never navigates anyone anywhere.
     onSymbolCommit?: (symbol: string) => void;
 };
 
-const OrderPanel = ({defaultSymbol = '', cash, accountId, positions = [], onSymbolCommit, queueNote = null, compact = false}: OrderPanelProps) => {
+const OrderPanel = ({defaultSymbol = '', cash, accountId, positions = [], onSymbolCommit, queueNote = null, compact = false, apy = null}: OrderPanelProps) => {
     const router = useRouter();
     const [symbol, setSymbol] = useState(defaultSymbol.toUpperCase());
     const [side, setSide] = useState<'buy' | 'sell'>('buy');
@@ -39,6 +45,8 @@ const OrderPanel = ({defaultSymbol = '', cash, accountId, positions = [], onSymb
     const [priceLoading, setPriceLoading] = useState(false);
     const [results, setResults] = useState<StockWithWatchlistStatus[]>([]);
     const [submitting, setSubmitting] = useState(false);
+    // The learner's own "why"; the server sanitises it (sanitizeTradeNote) and stores it on the fill.
+    const [note, setNote] = useState('');
     const [committed, setCommitted] = useState(defaultSymbol.toUpperCase());
     // Same-route deep links reuse this instance with a new defaultSymbol (see TradeDesk).
     // Adopt an external symbol; ignore the echo of our own commit so a symbol the user is
@@ -121,7 +129,7 @@ const OrderPanel = ({defaultSymbol = '', cash, accountId, positions = [], onSymb
     const check = checkOrder({side, quantity: qtyNum, price, cash, owned});
     const presets = presetQuantities(side, {cash, price, owned});
     // Numbers, not a lesson: what this order does to the account at the last price.
-    const effect = symbol ? describeOrderEffect({side, symbol, quantity: qtyNum, price, cash, positions}) : null;
+    const effect = symbol ? describeOrderEffect({side, symbol, quantity: qtyNum, price, cash, positions, apy}) : null;
     // Advisory only: a definite problem (over-sell, over-budget at the last price)
     // blocks the button; an unknown price never does — executeOrder is the authority.
     const blocked = symbol !== '' && !check.ok;
@@ -134,9 +142,10 @@ const OrderPanel = ({defaultSymbol = '', cash, accountId, positions = [], onSymb
 
         setSubmitting(true);
         try {
-            const result = await placeOrder({symbol, side, quantity: Math.floor(qtyNum), accountId});
+            const result = await placeOrder({symbol, side, quantity: Math.floor(qtyNum), accountId, ...(!compact && note.trim() ? {note} : {})});
             if (result.success) {
                 toast.success(result.message || 'Order filled');
+                setNote('');
                 router.refresh();
             } else {
                 toast.error(result.message || 'Order failed');
@@ -263,6 +272,25 @@ const OrderPanel = ({defaultSymbol = '', cash, accountId, positions = [], onSymb
                 )}
             </div>
 
+            {/* The learner's "why": a line they will see again at the sell. Not on the compact ticket. */}
+            {!compact && (
+                <div>
+                    <div className="flex items-center justify-between">
+                        <label htmlFor="order-note" className="font-mono text-[10px] uppercase tracking-[0.1em] text-fg-muted">{NOTE_COPY.label}</label>
+                        <span className="font-mono text-[10px] text-fg-muted" aria-hidden>{NOTE_COPY.counter(note.length, TRADE_REASON_MAX)}</span>
+                    </div>
+                    <textarea
+                        id="order-note"
+                        value={note}
+                        onChange={(e) => setNote(e.target.value)}
+                        maxLength={TRADE_REASON_MAX}
+                        rows={2}
+                        placeholder={NOTE_COPY.placeholder}
+                        className="w-full mt-1 rounded-lg px-3 py-2 text-xs text-fg outline-none field-focus resize-none bg-surface-0 border border-line-strong/40"
+                    />
+                </div>
+            )}
+
             {/* Last price + estimate */}
             <div className="flex items-center justify-between text-sm">
                 <span className="text-fg-muted">Last Price</span>
@@ -292,7 +320,8 @@ const OrderPanel = ({defaultSymbol = '', cash, accountId, positions = [], onSymb
             >
                 {submitting ? 'Placing…' : `${side === 'buy' ? 'Buy' : 'Sell'} ${symbol || ''}`.trim()}
             </button>
-            {!compact && <WhatTheseMean keys={['buying-power', 'market-order', 'avg-cost']} className="mt-0" />}
+            {/* The one definitions disclosure: APY joins it only while the buy line states it. */}
+            {!compact && <WhatTheseMean keys={ticketTerms(effect)} className="mt-0" />}
         </form>
     );
 };

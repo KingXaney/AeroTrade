@@ -16,7 +16,10 @@ import {
     reconcile,
     describeIncomeRun,
     groupIncomeActivity,
+    interestOverDays,
     replayIncome,
+    usableRate,
+    RATE_MAX_STALENESS_DAYS,
     type DividendPoint,
     type IncomeTrade,
     type RatePoint,
@@ -52,6 +55,30 @@ describe('rates', () => {
         expect(rateOn('2026-09-17')).toBeNull();
         expect(rateOn('2026-09-19')?.discountPct).toBe(4.0);   // Saturday: Friday's rate
         expect(rateOn('2026-09-21')?.discountPct).toBe(4.1);
+    });
+});
+
+describe('interestOverDays', () => {
+    // The ticket's "earning ≈$x/month" is this, so it must be what the clock would credit.
+    it('is exactly what the clock credits over those nights at a constant rate, with no trades', () => {
+        const {rows} = replayIncome({
+            from: '2026-09-01', to: '2026-09-30', startCash: 94_700, startHoldings: new Map(), trades: [], clock: clockWith(),
+        });
+        const credited = rows.reduce((sum, r) => sum + r.amount, 0);
+        expect(rows).toHaveLength(30);
+        expect(interestOverDays(94_700, apyFromDiscount(4.07), 30)).toBeCloseTo(credited, 9);
+    });
+
+    it('compounds daily: 30 days is (1 + APY)^(30/365) − 1 of the cash', () => {
+        expect(interestOverDays(94_700, 0.0392, 30)).toBeCloseTo(94_700 * ((1.0392) ** (30 / 365) - 1), 9);
+        expect(interestOverDays(94_700, 0.0392, 30)).toBeCloseTo(299.76, 2);
+    });
+
+    it('is zero, never negative, for no cash, no days or a zero rate', () => {
+        expect(interestOverDays(0, 0.0392, 30)).toBe(0);
+        expect(interestOverDays(-500, 0.0392, 30)).toBe(0);
+        expect(interestOverDays(94_700, 0.0392, 0)).toBe(0);
+        expect(interestOverDays(94_700, 0, 30)).toBe(0);
     });
 });
 
@@ -142,6 +169,31 @@ describe('holdingSpans', () => {
             {symbol: 'SPY', firstHeld: '2026-09-01', lastHeld: '2026-09-10'},
             {symbol: 'XLE', firstHeld: '2026-09-05', lastHeld: null},
         ]);
+    });
+});
+
+// One staleness rule for every reader of the rate: the job's watermark (readyThrough) and the
+// APY the Income panel and the ticket quote (account.getCashApy) agree on when it stops counting.
+describe('usableRate', () => {
+    const point = {date: '2026-09-10', discountPct: 4.07};
+
+    it('is the point while it is at most a week old', () => {
+        expect(RATE_MAX_STALENESS_DAYS).toBe(7);
+        expect(usableRate(point, '2026-09-10')).toBe(point);
+        expect(usableRate(point, '2026-09-17')).toBe(point);
+    });
+
+    it('is null once it is older than that, and null without a point', () => {
+        expect(usableRate(point, '2026-09-18')).toBeNull();
+        expect(usableRate(null, '2026-09-10')).toBeNull();
+    });
+
+    it('is the rule readyThrough holds the watermark with', () => {
+        const rateOn = makeRateLookup([point]);
+        const ready = readyThrough({start: '2026-09-11', end: '2026-09-30', rateOn, spans: [], coverage: () => null, released: new Set<string>()});
+        expect(ready).toBe('2026-09-17');
+        expect(usableRate(rateOn(ready as string), ready as string)).toBe(point);
+        expect(usableRate(rateOn('2026-09-18'), '2026-09-18')).toBeNull();
     });
 });
 

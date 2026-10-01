@@ -13,7 +13,12 @@ const PAD_Y = 18;
 
 const formatPct = (v: number) => `${v >= 0 ? '+' : ''}${v.toFixed(2)}%`;
 
-const PerformanceChart = ({series, accountName}: {series: PerfPoint[]; accountName: string}) => {
+// An optional shaded stretch of the x-axis — /portfolio passes the account's worst drawdown,
+// peak date to trough date — with its legend text supplied by the caller (copy lives in
+// lib/learn/copy). Dates not on the series draw nothing.
+export type ChartBand = {from: string; to: string; label: string};
+
+const PerformanceChart = ({series, accountName, band}: {series: PerfPoint[]; accountName: string; band?: ChartBand | null}) => {
     const svgRef = useRef<SVGSVGElement>(null);
     const [hoverIdx, setHoverIdx] = useState<number | null>(null);
 
@@ -36,8 +41,11 @@ const PerformanceChart = ({series, accountName}: {series: PerfPoint[]; accountNa
             }, {path: '', drawing: false}).path.trim();
 
         const zeroY = y(0);
-        return {x, y, accountPath, benchPath, zeroY, min, max};
-    }, [series]);
+        const bandFrom = band ? series.findIndex((p) => p.date === band.from) : -1;
+        const bandTo = band ? series.findIndex((p) => p.date === band.to) : -1;
+        const shade = bandFrom >= 0 && bandTo > bandFrom ? {x: x(bandFrom), width: x(bandTo) - x(bandFrom)} : null;
+        return {x, y, accountPath, benchPath, zeroY, min, max, shade};
+    }, [series, band]);
 
     if (!geometry) {
         return (
@@ -81,6 +89,12 @@ const PerformanceChart = ({series, accountName}: {series: PerfPoint[]; accountNa
                         {(hover ?? last).benchmarkPct === null ? '—' : formatPct((hover ?? last).benchmarkPct as number)}
                     </span>
                 </span>
+                {geometry.shade && band && (
+                    <span className="flex items-center gap-1.5" data-testid="drawdown-band-legend">
+                        <span className="inline-block w-3 h-2.5 rounded-sm bg-negative/15" />
+                        <span className="text-fg-muted">{band.label}</span>
+                    </span>
+                )}
                 <span className="ml-auto text-fg-muted">{(hover ?? last).date}</span>
             </div>
 
@@ -93,6 +107,11 @@ const PerformanceChart = ({series, accountName}: {series: PerfPoint[]; accountNa
                 onMouseMove={onMove}
                 onMouseLeave={() => setHoverIdx(null)}
             >
+                {/* Shaded band (under everything else) */}
+                {geometry.shade && (
+                    <rect data-testid="drawdown-band" x={geometry.shade.x} width={geometry.shade.width} y={PAD_Y} height={HEIGHT - PAD_Y * 2}
+                          className="fill-negative/10" />
+                )}
                 {/* Zero line */}
                 <line x1={PAD_X} x2={WIDTH - PAD_X} y1={geometry.zeroY} y2={geometry.zeroY}
                       className="stroke-line-strong/50" strokeDasharray="4 4" strokeWidth="1" />

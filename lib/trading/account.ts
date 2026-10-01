@@ -13,16 +13,18 @@ import AccountSnapshot from "@/database/models/account-snapshot.model";
 import {BENCHMARK_SYMBOL, MAX_STARTING_BALANCE, MIN_STARTING_BALANCE, PAPER_STARTING_BALANCE} from "@/lib/constants";
 import {getEasternDateString} from "@/lib/utils";
 import {getBenchmarkIndex} from "@/lib/prices/benchmark-store";
-import {getLatestRatePoint} from "@/lib/prices/store";
+import {getDividendPoints, getLatestRatePoint} from "@/lib/prices/store";
 import AccountIncome from "@/database/models/account-income.model";
-import {apyFromDiscount, groupIncomeActivity, type IncomeActivity} from "@/lib/trading/income";
+import {apyFromDiscount, groupIncomeActivity, usableRate, withReceipts, type IncomeView} from "@/lib/trading/income";
 import {appendLive} from "@/lib/prices/total-return";
 import {getQuote} from "@/lib/actions/finnhub.actions";
 import {
+    benchmarkReturnBetween,
     buildPerfSeries,
     computeMaxDrawdown,
     computeRealizedPnl,
     computeWinStats,
+    drawdownWindow,
     enrichPosition,
     mergeLivePoint,
     type PriceInfo,
@@ -229,10 +231,62 @@ const toTradeRecord = (t: LeanTrade, accountName?: string): PaperTradeRecord => 
     createdAt: new Date(t.createdAt).getTime(),
 });
 
-export const getTradeHistory = async (userId: string, accountId: string, limit = 50): Promise<PaperTradeRecord[]> => {
+// Where an account's current epoch starts, for every per-account trade read. A reset
+// re-anchors inceptionAt and then deletes the old epoch's trades; one that crashed between the
+// two leaves rows behind that must not feed a receipt, a lot note or a count, so reads start at
+// inceptionAt, as creditAccountIncome's do. Accounts from before inceptionAt existed have none
+// and keep their migrated history. Undefined when the account is not this user's — nothing of
+// theirs to read. cache() shares it between a render's ledger and history reads.
+const tradeEpoch = cache(async (userId: string, accountId: string): Promise<{since: Date | null} | undefined> => {
+    if (!Types.ObjectId.isValid(accountId)) return undefined;
+    await connectToDatabase();
+    const account = await PaperAccount.findOne({_id: accountId, userId}).select('inceptionAt').lean<{inceptionAt?: Date} | null>();
+    return account ? {since: account.inceptionAt ?? null} : undefined;
+});
+
+// The one PaperTrade filter for an account's current epoch. Exported for readers that already
+// hold the account (the CSV export, the chat's learner figures) — they apply the same rule
+// without reading the account again.
+export const epochTrades = (userId: string, accountId: string, since: Date | null | undefined) =>
+    ({userId, accountId, ...(since ? {createdAt: {$gte: since}} : {})});
+
+// The same rule over several accounts at once: each account's trades from its own inceptionAt.
+// No accounts match nothing (MongoDB rejects an empty $or).
+export const epochTradesOf = (userId: string, accounts: readonly {_id: unknown; inceptionAt?: Date | null}[]) =>
+    (accounts.length === 0
+        ? {userId, accountId: {$in: [] as string[]}}
+        : {$or: accounts.map((a) => epochTrades(userId, String(a._id), a.inceptionAt))});
+
+// One account's whole trade ledger for its current epoch, oldest first — the one PaperTrade
+// read a page makes for an account: analytics (trade count, realized P&L, win rate), the trade
+// log's tail, fill receipts and the buy notes all derive from it. cache() dedupes it within a
+// render. Unbounded on purpose (analytics sums every trade, as the income job reads the whole
+// epoch), and walked on the {accountId, createdAt, _id} index, so it never sorts in memory.
+// A failed read THROWS: an empty ledger would read as "0 trades", $0 realized and "No trades
+// yet". getAccountAnalytics and getIncomeActivity catch it and hide their sections; a page that
+// calls it directly catches it and hides what it draws from it.
+export const getTradeLedger = cache(async (userId: string, accountId: string): Promise<PaperTradeRecord[]> => {
+    const epoch = await tradeEpoch(userId, accountId);
+    if (!epoch) return [];
+    const trades = await PaperTrade.find(epochTrades(userId, accountId, epoch.since)).sort({createdAt: 1, _id: 1}).lean<LeanTrade[]>();
+    return trades.map((t) => toTradeRecord(t));
+});
+
+// The trade log's page size, for getTradeHistory and for pages that slice their ledger.
+export const TRADE_HISTORY_LIMIT = 50;
+
+// The newest `limit` fills of the current epoch, newest first, in a bounded read of their own
+// (the same index, walked backwards, `limit` rows) — for callers that do not hold the ledger:
+// the chat tool, the recent-trades widget, a strategy page. /portfolio and /trade already read
+// the ledger and slice it instead.
+export const getTradeHistory = async (userId: string, accountId: string, limit = TRADE_HISTORY_LIMIT): Promise<PaperTradeRecord[]> => {
     try {
-        await connectToDatabase();
-        const trades = await PaperTrade.find({userId, accountId}).sort({createdAt: -1}).limit(limit).lean<LeanTrade[]>();
+        const epoch = await tradeEpoch(userId, accountId);
+        if (!epoch) return [];
+        const trades = await PaperTrade.find(epochTrades(userId, accountId, epoch.since))
+            .sort({createdAt: -1, _id: -1})
+            .limit(limit)
+            .lean<LeanTrade[]>();
         return trades.map((t) => toTradeRecord(t));
     } catch (error) {
         console.error('Error fetching trade history:', error);
@@ -276,31 +330,53 @@ export const seedDayZeroSnapshot = async (account: PaperAccountDoc): Promise<voi
     );
 };
 
+// The APY idle cash earns at the latest stored T-bill rate; null until a rate is stored, and
+// null again once that rate is stale by the income job's own rule (usableRate) — never a zero
+// for missing data, never a rate the job would not credit at. One read per render, shared by
+// the Income panel's figure (every account in view) and the /trade ticket's "earning ≈$x/month"
+// clause, so the two agree.
+export const getCashApy = cache(async (): Promise<number | null> => {
+    const rate = usableRate(await getLatestRatePoint().catch((error) => {
+        console.error('Error reading the T-bill rate:', error);
+        return null;
+    }), getEasternDateString());
+    return rate ? apyFromDiscount(rate.discountPct) : null;
+});
+
 // Running totals live on the account (kept in step with cash by the income job), so this is
 // one small read for the rate, not a scan of the ledger.
-const getIncomeSummary = async (account: {incomeTotals?: {interest?: number; dividends?: number}; incomeThrough?: string}): Promise<AccountIncomeSummary> => {
-    const rate = await getLatestRatePoint().catch(() => null);
-    return {
-        interest: account.incomeTotals?.interest ?? 0,
-        dividends: account.incomeTotals?.dividends ?? 0,
-        apy: rate ? apyFromDiscount(rate.discountPct) : null,
-        through: account.incomeThrough ?? null,
-    };
-};
+const getIncomeSummary = async (account: {incomeTotals?: {interest?: number; dividends?: number}; incomeThrough?: string}): Promise<AccountIncomeSummary> => ({
+    interest: account.incomeTotals?.interest ?? 0,
+    dividends: account.incomeTotals?.dividends ?? 0,
+    apy: await getCashApy(),
+    through: account.incomeThrough ?? null,
+});
 
 // The Income panel's rows: this account's current epoch only (a reset starts a new one), and
-// only dates already credited — a row a crashed run left behind is not income yet.
-export const getIncomeActivity = async (userId: string, accountId: string): Promise<IncomeActivity | null> => {
+// only dates already credited — a row a crashed run left behind is not income yet. Each row
+// comes with its receipt, read from the render's one ledger read (getTradeLedger) and the
+// narrow dividend read for the symbols it traded, bounded to [inception, incomeThrough]. No
+// rate series and no price metas: every interest receipt rebuilds from its own rows.
+export const getIncomeActivity = async (userId: string, accountId: string): Promise<IncomeView | null> => {
     try {
         const account = await getOwnedAccount(userId, accountId);
         if (!account) return null;
-        if (!account.incomeThrough) return {interestByMonth: [], dividends: []};
-        const epoch = new Date(account.inceptionAt || account.createdAt).getTime();
-        const rows = await AccountIncome.find(
-            {accountId: String(account._id), epoch, date: {$lte: account.incomeThrough}},
-            {_id: 0, kind: 1, date: 1, symbol: 1, amount: 1, apy: 1, exDate: 1, perShare: 1, quantity: 1},
-        ).lean<Parameters<typeof groupIncomeActivity>[0][number][]>();
-        return groupIncomeActivity(rows);
+        if (!account.incomeThrough) return {interestByMonth: [], dividends: [], missed: []};
+        const inceptionAt = new Date(account.inceptionAt || account.createdAt);
+        const epoch = inceptionAt.getTime();
+        const key = String(account._id);
+        const [rows, ledger] = await Promise.all([
+            AccountIncome.find(
+                {accountId: key, epoch, date: {$lte: account.incomeThrough}},
+                {_id: 0, kind: 1, date: 1, symbol: 1, amount: 1, apy: 1, exDate: 1, perShare: 1, quantity: 1},
+            ).lean<Parameters<typeof groupIncomeActivity>[0][number][]>(),
+            getTradeLedger(userId, key),
+        ]);
+        // The trades the income job replays: this epoch's, by timestamp (creditAccountIncome). The
+        // ledger already starts at inceptionAt; an account without one starts at createdAt here.
+        const fills = ledger.filter((t) => t.createdAt >= epoch);
+        const points = await getDividendPoints(fills.map((t) => t.symbol), getEasternDateString(inceptionAt), account.incomeThrough);
+        return withReceipts(groupIncomeActivity(rows), fills, points);
     } catch (error) {
         console.error('Error reading income activity:', error);
         return null;
@@ -322,7 +398,7 @@ export const getAccountAnalytics = async (userId: string, accountId: string): Pr
         const [snapshots, benchmark, trades] = await Promise.all([
             AccountSnapshot.find({accountId: key}).sort({date: 1}).lean(),
             getBenchmarkIndex(inceptionDate),
-            PaperTrade.find({accountId: key}).lean(),
+            getTradeLedger(userId, key),
         ]);
 
         const positions = toPlainPositions(account);
@@ -340,15 +416,24 @@ export const getAccountAnalytics = async (userId: string, accountId: string): Pr
         const benchmarkPoints: SnapshotPoint[] = appendLive(benchmark.points, benchmark.lastClose, priceMap.get(BENCHMARK_SYMBOL)?.price, today);
         const livePoint: SnapshotPoint = {date: today, value: summary.totalValue};
 
-        const tradeStats = trades.map((t) => ({side: t.side as string, realizedPnl: t.realizedPnl as number | undefined}));
+        const tradeStats = trades.map((t) => ({side: t.side as string, realizedPnl: t.realizedPnl}));
         const winStats = computeWinStats(tradeStats);
+        // One window, dated, over the same points the chart draws: the tile's number, its hint
+        // and the chart's shaded band all describe the same stretch.
+        const series = buildPerfSeries(snapshotPoints, benchmarkPoints, livePoint);
+        const drawdown = drawdownWindow(mergeLivePoint(snapshotPoints, livePoint));
 
         return {
             account: summaryInfo,
             summary,
             income: await getIncomeSummary(account),
-            series: buildPerfSeries(snapshotPoints, benchmarkPoints, livePoint),
-            maxDrawdownPct: computeMaxDrawdown(mergeLivePoint(snapshotPoints, livePoint)),
+            series,
+            snapshotThrough: snapshotPoints.at(-1)?.date ?? null,
+            maxDrawdownPct: drawdown?.pct ?? null,
+            drawdown,
+            benchmarkOverDrawdownPct: drawdown && drawdown.pct > 0
+                ? benchmarkReturnBetween(series, drawdown.peakDate, drawdown.troughDate)
+                : null,
             winRatePct: winStats.winRatePct,
             wins: winStats.wins,
             losses: winStats.losses,
@@ -361,18 +446,25 @@ export const getAccountAnalytics = async (userId: string, accountId: string): Pr
     }
 };
 
-// Win rate + max drawdown for every account of a user in two bulk queries
+// Win rate + max drawdown for every account of a user in bulk queries
 // (feeds the strategy comparison table without N per-account round trips).
 // liveValues (accountId -> current total value) folds today's live valuation
-// into each drawdown series the same way getAccountAnalytics does.
+// into each drawdown series the same way getAccountAnalytics does. Trades are each
+// account's current epoch (epochTradesOf), so the table's win rate is the tile's.
 export const getComparisonStats = async (
     userId: string,
     liveValues?: Record<string, number>,
 ): Promise<Record<string, {winRatePct: number | null; maxDrawdownPct: number | null}>> => {
     try {
         await connectToDatabase();
+        const epochTradesForUser = async () => {
+            const accounts = await PaperAccount.find({userId}).select('inceptionAt').lean<{_id: unknown; inceptionAt?: Date}[]>();
+            return PaperTrade.find(epochTradesOf(userId, accounts))
+                .select('accountId side realizedPnl')
+                .lean<{accountId?: string; side: string; realizedPnl?: number}[]>();
+        };
         const [trades, snapshots] = await Promise.all([
-            PaperTrade.find({userId}).lean(),
+            epochTradesForUser(),
             AccountSnapshot.find({userId}).sort({date: 1}).lean(),
         ]);
 

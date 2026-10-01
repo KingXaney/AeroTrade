@@ -243,10 +243,28 @@ try {
     check('latest decision shows the filled order and its reason', /filled/.test(decision) && /seeded fill for golden-cross/.test(decision));
     const log = await page.locator('#strategy-trades').innerText();
     check('trade log carries the Strategy chip and the reason line', /strategy/i.test(log) && /seeded fill for golden-cross/.test(log));
+    // "Read this board" leads the board's one disclosure: the top row, read by the rule's narrator.
+    const boardTerms = page.locator('#board-terms');
+    check('the board\'s disclosure is titled by its top row', (await boardTerms.locator('summary').innerText()).includes('Read this board — XLK'));
+    await boardTerms.locator('summary').click();
+    const heldReading = await boardTerms.locator('[data-board-row-reading]').innerText();
+    check('…and reads a held sector in its own averages', /already owns XLK/.test(heldReading) && /\$205\.10/.test(heldReading) && /Trend on reads yes/.test(heldReading),
+        heldReading.replace(/\s+/g, ' ').slice(0, 200));
+    await boardTerms.locator('summary').click();
     await page.locator('#perf-simulated').click();
     const sim = await page.locator('#strategy-performance').innerText();
     check('simulated tab is labelled and shows the seeded stats', /backtest, not live/i.test(sim) && /\+11\.60%/.test(sim) && /\+9\.10%/.test(sim));
     check('simulated trade log is present and labelled', /hypothetical/i.test(await page.locator('#strategy-simulated-trades').innerText()));
+    // The seeded live reasons are not rule strings, so they get no empty disclosure; the
+    // seeded simulated fill is one, and decodes by the rule that wrote it.
+    check('an order whose reason the decoder does not know gets no disclosure',
+        await page.locator('#latest-decision details[data-decoded]').count() === 0);
+    await page.locator('#strategy-simulated-trades > details > summary').click();
+    const simDecoded = page.locator('#simulated-trades details[data-decoded]');
+    check('the simulated fill carries one "What the rule saw"', await simDecoded.count() === 1);
+    await simDecoded.locator('summary').click();
+    check('…reading its reason in plain words', /99% of the account into SPY, with a 1% cash floor/.test(await simDecoded.innerText()));
+    await page.locator('#strategy-simulated-trades > details > summary').click();
 
     // The editorial requirement, asserted: once a strategy has numbers, the chart is near
     // the top of the page instead of below ~800px of static explanation.
@@ -296,6 +314,14 @@ try {
     const height = await page.evaluate(() => document.body.scrollHeight);
     check('the detail page is not a scroll marathon', height < 2800, `${height}px`);
     await shot('05-rsi2');
+    // This board was seeded under golden-cross columns: RSI-2's narrator finds none of its
+    // numbers and says so, rather than printing blanks.
+    const rsiBoardTerms = page.locator('#board-terms');
+    check('a board without the rule\'s numbers is still read from its top row', (await rsiBoardTerms.locator('summary').innerText()).includes('Read this board — SYM00'));
+    await rsiBoardTerms.locator('summary').click();
+    const fallbackReading = await rsiBoardTerms.locator('[data-board-row-reading]').innerText();
+    check('…honestly, by its verdict alone', /does not have every number this rule reads for SYM00/.test(fallbackReading)
+        && /verdict for SYM00 is held/.test(fallbackReading) && !/undefined|NaN|null/.test(fallbackReading), fallbackReading.replace(/\s+/g, ' ').slice(0, 200));
 
 } catch (err) {
     failures++;

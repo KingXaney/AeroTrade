@@ -1,11 +1,14 @@
 import {cn, formatPrice, getChangeColorClass} from "@/lib/utils";
 import type {StrategyBacktestView} from "@/lib/strategies/queries";
+import type {StrategyDefinition} from "@/lib/strategies/types";
+import ReasonDisclosure from "@/components/strategies/ReasonDisclosure";
 
 // Backtest fills, newest first, dated by bar (no clock time: a simulated fill is "the
-// open of that day", not an instant). Capped; the count says how many there were.
+// open of that day", not an instant). Capped; the count says how many there were. Each
+// fill carries one "What the rule saw" disclosure decoding its reason.
 const SHOW = 40;
 
-const SimulatedTradeList = ({trades}: {trades: StrategyBacktestView['trades']}) => {
+const SimulatedTradeList = ({trades, def}: {trades: StrategyBacktestView['trades']; def: StrategyDefinition}) => {
     if (trades.length === 0) {
         return <p className="text-sm text-fg-muted p-4">No simulated fills — the rule never triggered over the window.</p>;
     }
@@ -26,6 +29,7 @@ const SimulatedTradeList = ({trades}: {trades: StrategyBacktestView['trades']}) 
                         <span className="text-sm font-bold text-fg" style={{fontFamily: 'var(--type-mono)'}}>{t.symbol}</span>
                         <span className="text-xs text-fg-muted ml-2">{t.quantity} @ {formatPrice(t.price)}{t.fill === 'close' ? ' (close)' : ''}</span>
                         <p className="text-[11px] text-fg-muted leading-snug">{t.reason}</p>
+                        <ReasonDisclosure reason={t.reason} symbol={t.symbol} def={def} />
                     </div>
                     <div className="text-right shrink-0">
                         <div className="text-sm text-fg" style={{fontFamily: 'var(--type-mono)'}}>{formatPrice(t.total)}</div>

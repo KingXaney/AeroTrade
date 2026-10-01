@@ -8,6 +8,7 @@ import PaperTrade from "@/database/models/paper-trade.model";
 import {getQuote, getCompanyProfile} from "@/lib/actions/finnhub.actions";
 import {getOwnedAccount} from "@/lib/trading/account";
 import {TRADE_REASON_MAX} from "@/lib/strategies/config";
+import {isOrderSide} from "@/lib/trading/order-math";
 
 export type OrderRequest = {
     accountId: string;
@@ -32,6 +33,10 @@ export const executeOrder = async (
     {accountId, symbol, side, quantity, minCashAfter, source, reason, idempotencyKey}: OrderRequest,
 ): Promise<OrderResult & {price?: number}> => {
     try {
+        // Checked before anything else: any other value used to run the sell branch, commit the
+        // account update, and only then fail the trade row's enum — cash moved, no trade.
+        if (!isOrderSide(side)) return {success: false, message: 'Choose buy or sell'};
+
         const sym = (symbol || '').trim().toUpperCase();
         if (!sym) return {success: false, message: 'Enter a stock symbol'};
 

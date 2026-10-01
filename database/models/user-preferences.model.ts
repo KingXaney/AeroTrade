@@ -16,6 +16,9 @@ export interface DashboardLayoutPrefs {
 // derived state. No defaults anywhere in the sub-schema.
 export interface LearnPrefs {
     missionsDismissedAt?: Date;
+    // Today's lesson "Got it" keys (lib/learn/moments.ts lessonKey), newest last, capped at
+    // LESSONS_SEEN_CAP by the $push {$each, $slice} that writes them.
+    lessonsSeen?: string[];
 }
 
 export interface UserPreferences extends Document {
@@ -28,7 +31,7 @@ export interface UserPreferences extends Document {
     newsFeed?: NewsFeedPrefs;          // absent = the default feed (lib/news/feed-prefs.ts)
     followedStrategies?: string[];     // quant-strategy slugs pinned on the dashboard; absent = none
     topicsSeededAt?: Date;             // default topics installed once; absent = never seeded
-    learn?: LearnPrefs;                // First-week checklist hidden by the user; absent = never
+    learn?: LearnPrefs;                // learn-surface stamps (checklist hidden, lessons seen); absent = none
     updatedAt: Date;
 }
 
@@ -71,6 +74,7 @@ const NewsFeedSchema = new Schema<NewsFeedPrefs>(
 const LearnSchema = new Schema<LearnPrefs>(
     {
         missionsDismissedAt: {type: Date, required: false},
+        lessonsSeen: {type: [String], default: undefined},
     },
     {_id: false},
 );

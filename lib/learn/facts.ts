@@ -4,6 +4,8 @@
 // account is older than the first month. Pure types and date maths only; the reads
 // live in facts-store.ts.
 
+import type {StrategyId} from "@/lib/strategies/types";
+
 export type OnboardingFacts = {
     // ET calendar dates, 'YYYY-MM-DD'.
     today: string;
@@ -16,6 +18,28 @@ export type OnboardingFacts = {
     navigatorEnrolled: boolean;
     // ISO timestamp of the one-time "Hide" click, or null.
     missionsDismissedAt: string | null;
+};
+
+// The firsts Today's lesson can point at, read from rows (lib/learn/facts-store.ts
+// getLearnFacts). Every date is an ET calendar date, 'YYYY-MM-DD'.
+export type LearnFill = {date: string; symbol: string; side: 'buy' | 'sell'; quantity: number; price: number};
+export type LearnSell = {date: string; symbol: string; quantity: number; price: number; realizedPnl: number | null};
+// A credited dividend row (dated on or before its account's incomeThrough watermark).
+export type LearnDividend = {date: string; symbol: string; amount: number; perShare: number | null; quantity: number | null; exDate: string | null};
+// The first day an account's snapshots stood DRAWDOWN_MOMENT_THRESHOLD or more below their
+// running peak (lib/learn/moments.ts firstDrawdownCrossing).
+export type LearnDrawdown = {date: string; peakDate: string; peakValue: number; value: number; pct: number};
+// A followed strategy's last evaluated rebalance; `traded` = it also placed orders that day.
+export type LearnRebalance = {strategyId: StrategyId; date: string; traded: boolean};
+
+export type LearnFacts = OnboardingFacts & {
+    firstFill: LearnFill | null;
+    firstSell: LearnSell | null;
+    firstDividend: LearnDividend | null;
+    firstDrawdown: LearnDrawdown | null;
+    rebalances: readonly LearnRebalance[];
+    // Stamp-once "Got it" keys (lib/learn/moments.ts lessonKey), newest last, capped.
+    lessonsSeen: readonly string[];
 };
 
 const MS_PER_DAY = 24 * 60 * 60 * 1000;

@@ -6,8 +6,11 @@ import {STRATEGIES_DISCLAIMER} from "@/lib/strategies/catalog";
 import {getStrategyDetail} from "@/lib/strategies/queries";
 import {formatSignalValue, pickPerfMode, toPerfSeries, visibleSignalColumns} from "@/lib/strategies/views";
 import {UNIVERSES} from "@/lib/strategies/universe";
-import {describeReplay, fillDate, isReplayExpired, matchFillToRun} from "@/lib/learn/replay";
+import {describeReplay, fillDate, isReplayExpired, matchFillToRun, replayReason} from "@/lib/learn/replay";
 import {explainVerdict, pickQuizRows} from "@/lib/learn/verdict";
+import {decodeReason} from "@/lib/learn/reasons";
+import {narrateBoard} from "@/lib/learn/board-narration";
+import {BOARD_COPY} from "@/lib/learn/copy/board";
 import MicroLabel from "@/components/primitives/MicroLabel";
 import Panel from "@/components/primitives/Panel";
 import SectionHeading from "@/components/primitives/SectionHeading";
@@ -23,6 +26,7 @@ import StrategyExplainer from "@/components/strategies/StrategyExplainer";
 import StrategyPerformance from "@/components/strategies/StrategyPerformance";
 import VerdictQuiz, {type QuizRow} from "@/components/strategies/VerdictQuiz";
 import WhatTheseMean from "@/components/learn/WhatTheseMean";
+import BoardReading from "@/components/learn/BoardReading";
 
 type StrategyPageProps = {
     params: Promise<{slug: string}>;
@@ -50,16 +54,22 @@ const StrategyPage = async ({params}: StrategyPageProps) => {
     // column is not there to explain.
     const shownColumns = visibleSignalColumns(def.signalColumns, latestRun?.board ?? []);
     const boardTerms = shownColumns.map((column) => column.glossary ?? column.key);
+    // "Read this board": the row the board lists first, read by the rule's own narrator.
+    const boardReading = narrateBoard(def, latestRun);
     const quizRows: QuizRow[] = latestRun && latestRun.board.length > 0
-        ? pickQuizRows(latestRun.board).map((row) => ({
-            symbol: row.symbol,
-            cells: shownColumns.map((column) => ({label: column.label, value: formatSignalValue(row.values[column.key], column.format)})),
-            ...explainVerdict(row, latestRun),
-        }))
+        ? pickQuizRows(latestRun.board).map((row) => {
+            const verdict = explainVerdict(row, latestRun);
+            return {
+                symbol: row.symbol,
+                cells: shownColumns.map((column) => ({label: column.label, value: formatSignalValue(row.values[column.key], column.format)})),
+                ...verdict,
+                gloss: decodeReason(verdict.explanation, {def}).clauses,
+            };
+        })
         : [];
 
     // The one disclosure an automated fill carries: the stored row and planned order the
-    // rule looked at that morning.
+    // rule looked at that morning, and that order's reason decoded.
     const replayFor = (trade: PaperTradeRecord) => {
         if (trade.source !== 'strategy') return null;
         const date = fillDate(trade.createdAt);
@@ -67,11 +77,12 @@ const StrategyPage = async ({params}: StrategyPageProps) => {
         const match = run ? matchFillToRun(run, trade.symbol, trade.side) : null;
         return (
             <DecisionReplay
-                columns={def.signalColumns}
+                def={def}
                 row={match?.row ?? null}
                 order={match?.order ?? null}
                 caption={describeReplay(match, run?.asOf ?? null, isReplayExpired(date, today))}
-                strategyName={def.name}
+                reason={replayReason(match, trade.reason)}
+                symbol={trade.symbol}
             />
         );
     };
@@ -137,14 +148,22 @@ const StrategyPage = async ({params}: StrategyPageProps) => {
                     <SectionHeading>Latest decision</SectionHeading>
                     <LatestDecision
                         run={latestRun}
+                        def={def}
                         headline={latestRun ? detail.lastActionLine : undefined}
                         signals={(
-                            /* While the quiz is open, the board's verdict cells are hidden with CSS so the
-                               server-rendered board needs no state. The definitions and the quiz are
-                               siblings of #signal-board: it keeps exactly one disclosure of its own. */
-                            <div id="strategy-signals" className="[&:has([data-verdict-quiz][open])_[data-verdict]]:invisible">
+                            /* While the quiz is open, LatestDecision hides everything in the panel that
+                               states a verdict — the board's verdict cells, the top row's reading, the
+                               run's headline and its orders — with one CSS switch on #latest-decision.
+                               The reading, the definitions and the quiz are siblings of #signal-board: it
+                               keeps exactly one disclosure of its own, and the reading leads the panel's
+                               one "What these mean", titled "Read this board — SYMBOL". */
+                            <div id="strategy-signals">
                                 <SignalBoard columns={def.signalColumns} run={latestRun} />
-                                {latestRun && latestRun.board.length > 0 && <WhatTheseMean id="board-terms" keys={boardTerms} />}
+                                {boardReading && (
+                                    <WhatTheseMean id="board-terms" keys={boardTerms} label={BOARD_COPY.summary(boardReading.symbol)}>
+                                        <BoardReading reading={boardReading} />
+                                    </WhatTheseMean>
+                                )}
                                 {quizRows.length > 0 && <VerdictQuiz rows={quizRows} />}
                             </div>
                         )}
@@ -171,7 +190,7 @@ const StrategyPage = async ({params}: StrategyPageProps) => {
                         </summary>
                         <div className="pt-3">
                             {backtest
-                                ? <SimulatedTradeList trades={backtest.trades} />
+                                ? <SimulatedTradeList trades={backtest.trades} def={def} />
                                 : <p className="text-sm text-fg-muted">Backtest not computed yet — it is built on the first run.</p>}
                         </div>
                     </details>

@@ -4,13 +4,15 @@ import {useState} from "react";
 import Link from "next/link";
 import {cn, formatPrice, formatChangePercent, getChangeColorClass} from "@/lib/utils";
 import SellPositionDialog from "@/components/trade/SellPositionDialog";
+import type {Lot} from "@/lib/trading/lots";
 import UnpricedNote from "@/components/trade/UnpricedNote";
 import Term from "@/components/primitives/Term";
 import TradeLink from "@/components/trade/TradeLink";
 
 // Interactive holdings table for the trade page — each row opens a sell
 // dialog where the user picks how many shares to sell.
-const PositionsTable = ({positions, accountId}: {positions: EnrichedPosition[]; accountId: string}) => {
+// lotNotes: the learner's notes on the shares still held, by symbol (pages only).
+const PositionsTable = ({positions, accountId, lotNotes}: {positions: EnrichedPosition[]; accountId: string; lotNotes?: Readonly<Record<string, readonly Lot[]>>}) => {
     const [sellTarget, setSellTarget] = useState<EnrichedPosition | null>(null);
 
     if (positions.length === 0) {
@@ -82,7 +84,7 @@ const PositionsTable = ({positions, accountId}: {positions: EnrichedPosition[]; 
 
             <UnpricedNote positions={positions} className="px-4 pt-1" />
 
-            {sellTarget && <SellPositionDialog position={sellTarget} accountId={accountId} onClose={() => setSellTarget(null)} />}
+            {sellTarget && <SellPositionDialog position={sellTarget} accountId={accountId} notes={lotNotes?.[sellTarget.symbol]} onClose={() => setSellTarget(null)} />}
         </div>
     );
 };
