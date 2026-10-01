@@ -32,3 +32,12 @@ export const formatArticle = (
   category: isCompanyNews ? 'company' : article.category || 'general',
   related: isCompanyNews ? symbol! : article.related || '',
 });
+
+// Whether a card prints an article's summary under its headline. Google News items carry none,
+// so formatArticle hands back the headline itself, cut and closed with "..." — a summary that
+// is the headline, a prefix of it, or a cut of it ("..." or "…") that the headline starts with
+// says nothing the headline does not, and is hidden.
+export const showSummary = (headline: string, summary: string | null | undefined): boolean => {
+    const said = (summary ?? '').trim().replace(/(?:\.{3}|…)$/, '').trim();
+    return said.length > 0 && !headline.trim().startsWith(said);
+};
