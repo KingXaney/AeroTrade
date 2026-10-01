@@ -78,8 +78,8 @@ flowchart LR
 |---|---|
 | App | Next.js 16 (App Router, Server Actions, Turbopack), React 19, TypeScript strict |
 | UI | Tailwind v4 with semantic theme tokens, shadcn/radix primitives, dnd-kit, TradingView embeds |
-| Data | MongoDB + Mongoose 9 (20 models), better-auth for email/password sessions |
-| Jobs | Inngest (7 crons + on-demand events), idempotent steps, per-user rate limits |
+| Data | MongoDB + Mongoose 9 (22 models), better-auth for email/password sessions |
+| Jobs | Inngest (8 scheduled jobs + on-demand events), idempotent steps, per-user rate limits |
 | AI | Vercel AI SDK; Gemini 2.5 Flash-Lite on the free tier for every scheduled job, optional Claude tiers, Claude for the second opinion |
 | Market data | Finnhub (quotes, profiles, search, news), Google News RSS, SEC EDGAR, Reddit |
 | Quality | Vitest (77 files / 1124 tests), ESLint, `tsc --noEmit`, GitHub Actions, Playwright browser QA against an in-memory Mongo |

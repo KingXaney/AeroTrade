@@ -41,6 +41,19 @@ describe('calendar', () => {
         expect(closeMinutesFor('2026-11-27')).toBe(13 * 60);
         expect(closeMinutesFor('2026-11-30')).toBe(16 * 60);
     });
+
+    // NYSE's published 2028 schedule: New Year's Day is a Saturday and is not observed on
+    // the Friday before, and July 3 closes early ahead of a Tuesday Independence Day.
+    it('carries the 2028 schedule', () => {
+        expect(isTradingDay('2027-12-31')).toBe(true);
+        expect(isTradingDay('2028-01-03')).toBe(true);
+        expect(isTradingDay('2028-04-14')).toBe(false);   // Good Friday
+        expect(isTradingDay('2028-07-04')).toBe(false);
+        expect(isTradingDay('2028-11-23')).toBe(false);   // Thanksgiving
+        expect(closeMinutesFor('2028-07-03')).toBe(13 * 60);
+        expect(closeMinutesFor('2028-11-24')).toBe(13 * 60);
+        expect(closeMinutesFor('2028-12-26')).toBe(16 * 60);
+    });
 });
 
 describe('marketStatus', () => {
