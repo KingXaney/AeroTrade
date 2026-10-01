@@ -9,6 +9,7 @@ import AccountSummary from "@/components/trading/portfolio/AccountSummary";
 import HoldingsTable from "@/components/trading/portfolio/HoldingsTable";
 import Panel from "@/components/primitives/Panel";
 import RowCard from "@/components/primitives/RowCard";
+import SectionHeading from "@/components/primitives/SectionHeading";
 
 type FriendProfilePageProps = {
     params: Promise<{id: string}>;
@@ -53,9 +54,9 @@ const FriendProfilePage = async ({params}: FriendProfilePageProps) => {
             {/* All accounts at a glance */}
             {profile.accounts.length > 1 && (
                 <Panel>
-                    <h2 className="text-sm font-bold uppercase tracking-[0.1em] text-brand mb-4 font-mono">
+                    <SectionHeading>
                         Accounts
-                    </h2>
+                    </SectionHeading>
                     <div className="space-y-1.5">
                         {profile.accounts.map((a) => (
                             <RowCard key={a.name} className="flex items-center justify-between">
@@ -76,9 +77,9 @@ const FriendProfilePage = async ({params}: FriendProfilePageProps) => {
             )}
 
             <Panel>
-                <h2 className="text-sm font-bold uppercase tracking-[0.1em] text-brand mb-4 font-mono">
+                <SectionHeading>
                     {profile.name}&apos;s Holdings
-                </h2>
+                </SectionHeading>
                 <HoldingsTable positions={profile.portfolio.positions} emptyText={`${profile.name} has no open positions yet.`} />
             </Panel>
         </div>

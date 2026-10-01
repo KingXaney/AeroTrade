@@ -17,6 +17,7 @@ import SecondOpinionCard from "@/components/brain/SecondOpinionCard";
 import SuggestionPanel from "@/components/navigator/SuggestionPanel";
 import SystemStatus from "@/components/jobs/SystemStatus";
 import Panel from "@/components/primitives/Panel";
+import SectionHeading from "@/components/primitives/SectionHeading";
 
 // Each decision's reasons decoded here, on the server, so the client panel renders clauses
 // without bundling the grammar.
@@ -73,9 +74,9 @@ const BrainPage = async ({searchParams}: BrainPageProps) => {
             <div className="grid grid-cols-1 xl:grid-cols-2 gap-4">
                 {/* Active theses — the centerpiece */}
                 <Panel>
-                    <h2 className="text-sm font-bold uppercase tracking-[0.1em] text-brand mb-4 font-mono">
+                    <SectionHeading>
                         Active Theses
-                    </h2>
+                    </SectionHeading>
                     <ActiveTheses theses={theses} followedByName={followedByName} sinceThesis={sinceThesis} definitions />
                 </Panel>
 
@@ -83,9 +84,9 @@ const BrainPage = async ({searchParams}: BrainPageProps) => {
                 <div className="space-y-4">
                     <NavigatorCard status={navigatorStatus} />
                     <Panel>
-                        <h2 className="text-sm font-bold uppercase tracking-[0.1em] text-brand mb-4 font-mono">
+                        <SectionHeading>
                             Weekly Decisions
-                        </h2>
+                        </SectionHeading>
                         <SuggestionPanel userSet={withGloss(suggestions.user)} globalSet={withGloss(suggestions.global)} accounts={applyAccounts} />
                     </Panel>
                 </div>
@@ -96,27 +97,27 @@ const BrainPage = async ({searchParams}: BrainPageProps) => {
 
             {/* Knowledge graph */}
             <Panel>
-                <h2 className="text-sm font-bold uppercase tracking-[0.1em] text-brand mb-4 font-mono">
+                <SectionHeading>
                     Knowledge Graph
-                </h2>
+                </SectionHeading>
                 <BrainGraph nodes={graph.nodes} edges={graph.edges} />
             </Panel>
 
             {/* Evidence drill-down for ?entity= */}
             {entity && evidence && (
                 <Panel id="evidence" className="scroll-mt-24">
-                    <h2 className="text-sm font-bold uppercase tracking-[0.1em] text-brand mb-4 font-mono">
+                    <SectionHeading>
                         Evidence
-                    </h2>
+                    </SectionHeading>
                     <EvidenceList entityKey={entity} items={evidence} />
                 </Panel>
             )}
 
             {/* Narrative leaderboard */}
             <Panel>
-                <h2 className="text-sm font-bold uppercase tracking-[0.1em] text-brand mb-4 font-mono">
+                <SectionHeading>
                     Narrative Leaderboard
-                </h2>
+                </SectionHeading>
                 <NarrativeLeaderboard entities={topEntities} followedByName={followedByName} />
             </Panel>
         </div>

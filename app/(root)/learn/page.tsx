@@ -76,9 +76,9 @@ const LearnPage = async () => {
                 </Panel>
             ))}
 
-            <p className="font-mono text-[10px] uppercase tracking-[0.1em] text-fg-muted text-center">
+            <MicroLabel as="p" className="text-center">
                 {STRATEGIES_DISCLAIMER}
-            </p>
+            </MicroLabel>
         </div>
     );
 };

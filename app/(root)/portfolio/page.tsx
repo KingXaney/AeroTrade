@@ -68,9 +68,9 @@ const PortfolioPage = async ({searchParams}: PortfolioPageProps) => {
             {/* Which account wins — all accounts side by side */}
             {view.multiAccount && (
                 <Panel>
-                    <h2 className="text-sm font-bold uppercase tracking-[0.1em] text-brand mb-4 font-mono">
+                    <SectionHeading>
                         Account Comparison
-                    </h2>
+                    </SectionHeading>
                     <AccountComparisonTable rows={view.comparisonRows} activeId={account.id} />
                 </Panel>
             )}
@@ -79,9 +79,9 @@ const PortfolioPage = async ({searchParams}: PortfolioPageProps) => {
             {analytics && (
                 <>
                     <Panel>
-                        <h2 className="text-sm font-bold uppercase tracking-[0.1em] text-brand mb-1 font-mono">
+                        <SectionHeading spacing="none" className="mb-1">
                             Performance vs S&amp;P 500
-                        </h2>
+                        </SectionHeading>
                         <p className="font-mono text-[11px] text-fg-muted mb-4">
                             Returns include interest on cash and dividends · benchmark is SPY&apos;s total return, dividends reinvested
                         </p>
@@ -109,9 +109,9 @@ const PortfolioPage = async ({searchParams}: PortfolioPageProps) => {
 
             {/* Holdings */}
             <Panel>
-                <h2 className="text-sm font-bold uppercase tracking-[0.1em] text-brand mb-4 font-mono">
+                <SectionHeading>
                     Holdings
-                </h2>
+                </SectionHeading>
                 <PositionsTable positions={portfolio.positions} accountId={account.id} lotNotes={view.lotNotes} />
             </Panel>
 
@@ -127,9 +127,9 @@ const PortfolioPage = async ({searchParams}: PortfolioPageProps) => {
             {/* Trade history — only from a ledger that was read */}
             {tradeLog && (
                 <Panel>
-                    <h2 className="text-sm font-bold uppercase tracking-[0.1em] text-brand mb-4 font-mono">
+                    <SectionHeading>
                         Trade History
-                    </h2>
+                    </SectionHeading>
                     <TradeHistory trades={tradeLog.trades} totalCount={analytics?.tradeCount} exportHref={tradeLog.exportHref} receipts={tradeLog.receipts} buyNotesBySellId={tradeLog.buyNotesBySellId} />
                 </Panel>
             )}

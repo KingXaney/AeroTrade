@@ -10,6 +10,7 @@ import {WATCHLIST_COPY} from "@/lib/learn/copy/watchlist";
 import {formatEasternTimestamp} from "@/lib/format";
 import type {MarketNewsArticle} from '@/lib/news/types';
 import Panel from '@/components/primitives/Panel';
+import SectionHeading from "@/components/primitives/SectionHeading";
 
 const HistoryPage = async () => {
     const userId = await requireUserId();
@@ -42,9 +43,9 @@ const HistoryPage = async () => {
                 (the watchlist model hard-deletes), so the list below is honest about being
                 "by date added", not a timeline. */}
             <Panel pad={6}>
-                <h2 className="text-xs font-bold uppercase tracking-[0.1em] text-brand mb-4 font-mono">
+                <SectionHeading size="xs">
                     Trades
-                </h2>
+                </SectionHeading>
                 {recent ? (
                     <TradeHistory trades={recent.trades} totalCount={recent.total} />
                 ) : (
@@ -55,9 +56,9 @@ const HistoryPage = async () => {
             <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
                 {/* Watchlist, by date added */}
                 <Panel pad={6} className="lg:col-span-1">
-                    <h2 className="text-xs font-bold uppercase tracking-[0.1em] text-brand mb-4 font-mono">
+                    <SectionHeading size="xs">
                         On your watchlist, by date added
-                    </h2>
+                    </SectionHeading>
 
                     {!items ? (
                         <p className="text-sm text-fg-muted">{WATCHLIST_COPY.unavailable}</p>
@@ -89,9 +90,9 @@ const HistoryPage = async () => {
                 {/* The user's news feed */}
                 <section className="lg:col-span-2 space-y-4">
                     <div className="flex items-center justify-between gap-3">
-                        <h2 className="text-xs font-bold uppercase tracking-[0.1em] text-brand font-mono">
+                        <SectionHeading size="xs" spacing="none">
                             Your news feed
-                        </h2>
+                        </SectionHeading>
                         <Link href="/news?edit=1" className="text-xs text-brand hover:underline font-mono">
                             Edit feed →
                         </Link>

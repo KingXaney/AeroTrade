@@ -15,6 +15,7 @@ import {describeQueuedFill, marketStatus} from "@/lib/prices/market-hours";
 import OpenPositionsStrip from "@/components/trading/desk/OpenPositionsStrip";
 import AccountSwitcher from "@/components/trading/accounts/AccountSwitcher";
 import Panel from "@/components/primitives/Panel";
+import SectionHeading from "@/components/primitives/SectionHeading";
 
 type TradePageProps = {
     searchParams: Promise<{symbol?: string; account?: string}>;
@@ -93,9 +94,9 @@ const TradePage = async ({searchParams}: TradePageProps) => {
             {/* Open positions — compact quick-sell; full holdings & history live on /portfolio */}
             <Panel>
                 <div className="flex items-center justify-between mb-4">
-                    <h2 className="text-sm font-bold uppercase tracking-[0.1em] text-brand font-mono">
+                    <SectionHeading spacing="none">
                         Open Positions
-                    </h2>
+                    </SectionHeading>
                     <Link href="/portfolio" className="text-xs text-fg-muted hover:text-brand font-mono">
                         Full holdings &amp; history →
                     </Link>
