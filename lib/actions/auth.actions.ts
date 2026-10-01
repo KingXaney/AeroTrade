@@ -59,7 +59,9 @@ export const signUpWithEmail = async ({ email, password, fullName, country, inve
             }).catch((e) => console.error('Failed to queue welcome email', e))
         }
 
-        return { success: true, data: response }
+        // Never better-auth's response: it carries the raw session token, and whatever an
+        // action returns is serialised to the browser. The session travels in its cookie only.
+        return { success: true }
     } catch (e) {
         console.error('Sign up failed', e)
         return { success: false, error: extractAuthError(e, 'Sign up failed') }
@@ -87,7 +89,8 @@ export const signInWithEmail = async (input: SignInFormData) => {
             await syncThemeCookieForUser(response.user.id).catch((e) => console.error('Theme cookie sync failed', e));
         }
 
-        return { success: true, data: response }
+        // Not the response itself: see signUpWithEmail.
+        return { success: true }
     } catch (e) {
         console.error('Sign in failed', e)
         return { success: false, error: extractAuthError(e, SIGN_IN_INVALID_MESSAGE) }
