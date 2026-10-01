@@ -7,6 +7,14 @@ updates:
     groups:
       minor-and-patch:
         update-types: [minor, patch]
+  # The browser QA tooling (playwright, mongodb-memory-server, jiti), installed apart from the app.
+  - package-ecosystem: npm
+    directory: /scripts/qa
+    schedule:
+      interval: monthly
+    groups:
+      qa-tooling:
+        patterns: ['*']
   - package-ecosystem: github-actions
     directory: /
     schedule:

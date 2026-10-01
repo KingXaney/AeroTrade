@@ -3,6 +3,8 @@
   "private": true,
   "description": "Browser QA tooling for AeroTrade: in-memory MongoDB + Playwright. Separate from the app's package.json so a plain `npm install` stays light.",
   "devDependencies": {
+    "jiti": "^2.6.1",
+    "mongodb": "^6.21.0",
     "mongodb-memory-server": "^10.4.3",
     "pixelmatch": "^7.2.0",
     "playwright": "^1.62.1",

@@ -11,7 +11,7 @@
 // Run: npm run qa -- strategies   (the harness: README.md)
 import {chromium} from 'playwright';
 import {MongoClient, ObjectId} from 'mongodb';
-// The repo's own TypeScript loader (a dev dependency of the app's toolchain), so the checks below
+// A TypeScript loader (declared in scripts/qa/package.json), so the checks below
 // can call the job's store functions as the job does, through Mongoose, on this harness database.
 import {createJiti} from 'jiti';
 import {BASE, MONGO, check, outDir, signUp, summary} from './lib.mjs';

@@ -18,7 +18,8 @@
 
 import {chromium} from 'playwright';
 import {MongoClient} from 'mongodb';
-// The repo's own TypeScript loader, for the app's NYSE holiday table (lib/prices/market-hours.ts).
+// A TypeScript loader (declared in scripts/qa/package.json), for the app's NYSE holiday table
+// (lib/prices/market-hours.ts).
 import {createJiti} from 'jiti';
 import {BASE, MONGO, check, outDir, signUp, summary} from './lib.mjs';
 
