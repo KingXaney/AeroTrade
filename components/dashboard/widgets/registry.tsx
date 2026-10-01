@@ -171,7 +171,7 @@ const WIDGET_RENDERERS: Record<WidgetId, Renderer> = {
             <AnalyticsStatsAsync ctx={r.ctx} />
         </Suspense>
     ),
-    'strategy-comparison': (r) => need(r, 'comparisonStats', (stats) => (
+    'account-comparison': (r) => need(r, 'comparisonStats', (stats) => (
         r.data.portfolios && r.data.activeAccount
             ? <AccountComparisonTable rows={toComparisonRows(r.data.portfolios, stats)} activeId={r.data.activeAccount.account.id} />
             : <WidgetUnavailable failed={r.failed.has('portfolios')} />

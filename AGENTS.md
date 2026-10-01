@@ -43,7 +43,9 @@ product tour and docs/specs/ for the design documents behind the larger features
 5. Colours and fonts come from the semantic theme tokens (`text-fg`, `bg-brand/10`, `font-mono`),
    never hex literals in `.tsx`. New code uses the `font-mono` / `font-heading` utilities rather
    than `style={{fontFamily}}` — the older inline spelling is still widespread and is being retired.
-6. `normalizeLayout` stays pure; the legacy-default migration runs only where saved layouts are read.
+6. `normalizeLayout` stays pure; the legacy-default migration and the renamed widget ids
+   (`LEGACY_WIDGET_IDS`) run only where saved layouts are read (`readSavedLayout`). A stored widget
+   id never changes meaning: a clearer id is a new entry there, never a rename in place.
 7. Framed surfaces are `<Panel>`, never a hand-rolled `bg-surface-2/40 + border` — only `.glass-panel`
    reads `--panel-bg/-border/-blur/-shadow/-radius`, so anything else silently ignores four of the
    five visual styles. `.glass-panel` is declared **outside any cascade layer**, so `rounded-*`,

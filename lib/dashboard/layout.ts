@@ -109,6 +109,34 @@ export const normalizeLayout = (input: unknown): DashboardLayout => {
 export const migrateLegacyDefault = (layout: DashboardLayout): DashboardLayout =>
     layoutsEqual(layout, LEGACY_DEFAULT_LAYOUT_V1) ? resetLayout() : layout;
 
+// Widget ids renamed after layouts were saved under the old one. The stored id keeps its
+// meaning: it is read as the new id here, and the user's next save writes the new one.
+// 'strategy-comparison' compared the user's paper accounts, not the quant strategies.
+export const LEGACY_WIDGET_IDS: Readonly<Record<string, WidgetId>> = {
+    'strategy-comparison': 'account-comparison',
+};
+
+// Runs on the raw stored value, before normalizeLayout would drop the old id as unknown.
+// Same reference back when nothing was renamed. Read side only, like migrateLegacyDefault.
+export const renameLegacyWidgetIds = (input: unknown): unknown => {
+    const parsed = LooseLayoutSchema.safeParse(input);
+    if (!parsed.success) return input;
+    let renamed = false;
+    const widgets = parsed.data.widgets.map((raw) => {
+        const item = LooseItemSchema.safeParse(raw);
+        const next = item.success && Object.hasOwn(LEGACY_WIDGET_IDS, item.data.id) ? LEGACY_WIDGET_IDS[item.data.id] : undefined;
+        if (!next) return raw;
+        renamed = true;
+        return {...(raw as object), id: next};
+    });
+    return renamed ? {...(input as object), widgets} : input;
+};
+
+// What a saved layout reads as: old ids renamed, then normalised, then the untouched old
+// default upgraded. The one composition layout-store.ts applies to a stored layout.
+export const readSavedLayout = (input: unknown): DashboardLayout =>
+    migrateLegacyDefault(normalizeLayout(renameLegacyWidgetIds(input)));
+
 export const filterAvailable = (layout: DashboardLayout, ctx: AvailabilityContext): DashboardLayout => {
     const widgets = layout.widgets.filter((w) => isWidgetAvailable(WIDGETS[w.id], ctx));
     return widgets.length === layout.widgets.length ? layout : {...layout, widgets};

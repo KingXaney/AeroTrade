@@ -161,7 +161,7 @@ export const WIDGET_IDS = [
     'recent-trades',
     'performance-chart',
     'analytics-stats',
-    'strategy-comparison',
+    'account-comparison',
     // strategies
     'quant-strategies',
     // social
@@ -478,8 +478,8 @@ export const WIDGETS: {readonly [K in WidgetId]: WidgetDefinition & {id: K}} = {
         chrome: 'bare',
         showTitle: false,
     }),
-    'strategy-comparison': define({
-        id: 'strategy-comparison',
+    'account-comparison': define({
+        id: 'account-comparison',
         title: 'Account Comparison',
         description: 'Every account side by side — which one is winning.',
         category: 'accounts',

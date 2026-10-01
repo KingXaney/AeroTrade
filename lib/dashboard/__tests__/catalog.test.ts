@@ -95,7 +95,7 @@ describe('registry invariants', () => {
     it('files the paper-account widgets under accounts and the quant strategies under strategies', () => {
         // "Strategy" names only the eight quant strategies; a user's paper account is an account.
         expect(defs.filter((d) => d.category === 'accounts').map((d) => d.id)).toEqual([
-            'account-summary', 'top-holdings', 'open-positions', 'recent-trades', 'performance-chart', 'analytics-stats', 'strategy-comparison',
+            'account-summary', 'top-holdings', 'open-positions', 'recent-trades', 'performance-chart', 'analytics-stats', 'account-comparison',
         ]);
         expect(defs.filter((d) => d.category === 'strategies').map((d) => d.id)).toEqual(['quant-strategies']);
         expect(CATEGORY_LABELS.accounts).toBe('Accounts');
@@ -131,7 +131,7 @@ describe('registry invariants', () => {
 
     it('matches the plan table for the special cases', () => {
         expect(WIDGETS['quick-trade'].dataKeys).toEqual(['activeAccount']);
-        expect(WIDGETS['strategy-comparison'].availability).toBe('multiAccount');
+        expect(WIDGETS['account-comparison'].availability).toBe('multiAccount');
         expect(WIDGETS['brain-status'].availability).toBe('advanced');
         for (const id of ['portfolio-snapshot', 'watchlist-movers', 'friends-rank', 'news-brain-tile'] as const) {
             expect(WIDGETS[id].chrome, id).toBe('link');
@@ -142,7 +142,7 @@ describe('registry invariants', () => {
         const heavy = defs.filter((d) => d.heavy).map((d) => d.id).sort();
         expect(heavy).toEqual(['market-news', 'quant-strategies', 'tv-crypto-screener', 'tv-market-screener', 'watchlist-movers']);
         expect(defs.filter((d) => d.availability !== 'always').map((d) => d.id).sort())
-            .toEqual(['brain-status', 'getting-started', 'strategy-comparison']);
+            .toEqual(['account-comparison', 'brain-status', 'getting-started']);
         expect(WIDGETS['getting-started'].availability).toBe('onboarding');
         // The checklist reads the onboarding facts only (a cache() hit on the page's own
         // availability read), never the lesson reads that Today's lesson needs.
@@ -183,7 +183,7 @@ describe('registry invariants', () => {
             'tv-heatmap': 8, 'tv-top-stories': 4, 'tv-ticker-tape': 12, 'tv-market-screener': 12,
             'tv-crypto-screener': 8, 'tv-forex': 6,
             'account-summary': 12, 'top-holdings': 8, 'open-positions': 12, 'recent-trades': 6,
-            'performance-chart': 8, 'analytics-stats': 12, 'strategy-comparison': 12,
+            'performance-chart': 8, 'analytics-stats': 12, 'account-comparison': 12,
             leaderboard: 6,
             'ai-navigator': 4, 'weekly-decisions': 6, 'active-theses': 6, 'narrative-leaderboard': 12,
             'knowledge-graph': 12, 'second-opinion': 6, 'brain-status': 12, 'quant-strategies': 6,
@@ -290,8 +290,8 @@ describe('isWidgetAvailable', () => {
     });
 
     it('multiAccount needs more than one account', () => {
-        expect(isWidgetAvailable(WIDGETS['strategy-comparison'], single)).toBe(false);
-        expect(isWidgetAvailable(WIDGETS['strategy-comparison'], multi)).toBe(true);
+        expect(isWidgetAvailable(WIDGETS['account-comparison'], single)).toBe(false);
+        expect(isWidgetAvailable(WIDGETS['account-comparison'], multi)).toBe(true);
     });
 
     it('advanced needs the advanced flag', () => {
