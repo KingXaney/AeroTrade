@@ -9,7 +9,7 @@ import {loadDashboardData, type LoaderCtx} from "@/lib/dashboard/loaders";
 import {pickActiveAccount, preferredAccountId, toSwitcherAccounts} from "@/lib/trading/active-account";
 import {renderWidgetBody} from "@/components/dashboard/widgets/registry";
 import DashboardGrid from "@/components/dashboard/DashboardGrid";
-import AccountSwitcher from "@/components/trade/AccountSwitcher";
+import AccountSwitcher from "@/components/trading/accounts/AccountSwitcher";
 
 type HomeProps = {
     searchParams: Promise<{customize?: string; account?: string}>;

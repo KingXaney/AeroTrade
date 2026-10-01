@@ -1,6 +1,6 @@
 'use client';
 
-import ParticleBackground from "@/components/ParticleBackground";
+import ParticleBackground from "@/components/theme/ParticleBackground";
 import {useTheme} from "@/components/theme/ThemeProvider";
 
 // Ambient layer behind the app for styles that have one. Mounted once in the

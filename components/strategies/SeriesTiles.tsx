@@ -1,6 +1,6 @@
 import type {ReactNode} from "react";
 import Panel from "@/components/primitives/Panel";
-import {Stat} from "@/components/analytics/AnalyticsStats";
+import {Stat} from "@/components/trading/portfolio/AnalyticsStats";
 
 // Three tiles about one series — a title, one line of detail, then three measurements —
 // framed as a <Panel>, so it follows the visual style like every other surface (never a

@@ -1,5 +1,5 @@
-import Header from "@/components/Header";
-import Sidebar from "@/components/Sidebar";
+import Header from "@/components/shell/Header";
+import Sidebar from "@/components/shell/Sidebar";
 import {getSessionUser} from "@/lib/auth/session";
 import {redirect} from "next/navigation";
 import {searchStocks} from "@/lib/prices/finnhub";

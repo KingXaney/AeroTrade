@@ -1,4 +1,4 @@
-import RouteLoading from "@/components/system/RouteLoading";
+import RouteLoading from "@/components/shell/RouteLoading";
 
 // Prices across every friend's positions before the leaderboard can rank.
 const Loading = () => (

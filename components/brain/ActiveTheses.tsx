@@ -1,7 +1,7 @@
 import Link from "next/link";
 import {cn} from "@/lib/utils";
 import {formatSigned, getChangeColorClass} from "@/lib/format";
-import TradeLink from "@/components/trade/TradeLink";
+import TradeLink from "@/components/trading/TradeLink";
 import FollowTopicButton from "@/components/topics/FollowTopicButton";
 import type {FollowedByName} from "@/components/brain/NarrativeLeaderboard";
 import Term from "@/components/primitives/Term";

@@ -1,4 +1,4 @@
-import RouteLoading from "@/components/system/RouteLoading";
+import RouteLoading from "@/components/shell/RouteLoading";
 
 // Nine parallel brain queries before first paint.
 const Loading = () => (

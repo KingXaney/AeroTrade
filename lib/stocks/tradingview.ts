@@ -1,5 +1,5 @@
 // Every TradingView embed the app shows: the script each one loads and the settings it starts
-// from. components/TradingViewWidget themes a config as it renders (colour mode, surface colour)
+// from. components/stocks/TradingViewWidget themes a config as it renders (colour mode, surface colour)
 // and each surface picks the height, so one embed can sit taller on /markets than in a dashboard
 // tile. Pure and client-safe — the dashboard widgets and the trade desk are client components.
 

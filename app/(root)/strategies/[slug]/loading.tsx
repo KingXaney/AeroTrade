@@ -1,4 +1,4 @@
-import RouteLoading from "@/components/system/RouteLoading";
+import RouteLoading from "@/components/shell/RouteLoading";
 
 const Loading = () => (
     <RouteLoading title="Strategy" subtitle="Loading the rule, its holdings and its record…" panels={4}/>

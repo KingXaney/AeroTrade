@@ -8,12 +8,12 @@ import {getTradeLedger} from "@/lib/trading/ledger";
 import {getCashApy} from "@/lib/income/page-store";
 import {replayReceipts} from "@/lib/trading/receipts";
 import {openLotNotes} from "@/lib/trading/lots";
-import LastFill from "@/components/trade/LastFill";
-import TradeDesk from "@/components/trade/TradeDesk";
-import MarketStatus from "@/components/system/MarketStatus";
+import LastFill from "@/components/trading/desk/LastFill";
+import TradeDesk from "@/components/trading/desk/TradeDesk";
+import MarketStatus from "@/components/stocks/MarketStatus";
 import {describeQueuedFill, marketStatus} from "@/lib/prices/market-hours";
-import OpenPositionsStrip from "@/components/trade/OpenPositionsStrip";
-import AccountSwitcher from "@/components/trade/AccountSwitcher";
+import OpenPositionsStrip from "@/components/trading/desk/OpenPositionsStrip";
+import AccountSwitcher from "@/components/trading/accounts/AccountSwitcher";
 
 type TradePageProps = {
     searchParams: Promise<{symbol?: string; account?: string}>;

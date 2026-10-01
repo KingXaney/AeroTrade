@@ -1,6 +1,6 @@
 'use client';
 
-import RouteError from "@/components/system/RouteError";
+import RouteError from "@/components/shell/RouteError";
 
 const TopicError = ({error, reset}: {error: Error & {digest?: string}; reset: () => void}) => (
     <RouteError

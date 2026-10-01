@@ -4,7 +4,7 @@ import {useState} from "react";
 import Link from "next/link";
 import {useRouter} from "next/navigation";
 import {toast} from "sonner";
-import ConfirmDialog from "@/components/ui/ConfirmDialog";
+import ConfirmDialog from "@/components/primitives/ConfirmDialog";
 import {resetNewsFeed} from "@/lib/actions/news-feed.actions";
 import {defaultNewsFeed, describeNewsFeed, isDefaultNewsFeed, type NewsFeedPrefs} from "@/lib/news/feed-prefs";
 

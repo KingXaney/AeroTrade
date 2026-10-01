@@ -5,8 +5,8 @@ import {useRouter} from "next/navigation";
 import {toast} from "sonner";
 import {Loader2} from "lucide-react";
 import {Switch} from "@/components/ui/switch";
-import ConfirmDialog from "@/components/ui/ConfirmDialog";
-import KeywordChips from "@/components/topics/KeywordChips";
+import ConfirmDialog from "@/components/primitives/ConfirmDialog";
+import KeywordChips from "@/components/forms/KeywordChips";
 import {resetNewsFeed, saveNewsFeed} from "@/lib/actions/news-feed.actions";
 import {
     defaultNewsFeed,

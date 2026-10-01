@@ -5,8 +5,8 @@ import {formatPct, formatPrice, getChangeColorClass} from "@/lib/format";
 import {requireUserId} from "@/lib/auth/session";
 import {getFriendProfile} from "@/lib/friends/store";
 import {unpricedLabel} from "@/lib/trading/analytics";
-import AccountSummary from "@/components/trade/AccountSummary";
-import PortfolioHoldings from "@/components/trade/PortfolioHoldings";
+import AccountSummary from "@/components/trading/portfolio/AccountSummary";
+import PortfolioHoldings from "@/components/trading/portfolio/PortfolioHoldings";
 
 type FriendProfilePageProps = {
     params: Promise<{id: string}>;

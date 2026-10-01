@@ -1,4 +1,4 @@
-import WidgetSkeleton from "@/components/dashboard/WidgetSkeleton";
+import WidgetSkeleton from "@/components/primitives/Skeleton";
 
 const NewsLoading = () => (
     <div className="space-y-4">

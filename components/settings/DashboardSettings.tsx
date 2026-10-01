@@ -12,7 +12,7 @@ import {
 import {resetDashboardLayout, saveDashboardLayout} from "@/lib/actions/dashboard.actions";
 import {cn} from "@/lib/utils";
 import {iconButton} from "@/components/primitives/iconButton";
-import ConfirmDialog from "@/components/ui/ConfirmDialog";
+import ConfirmDialog from "@/components/primitives/ConfirmDialog";
 
 const SAVE_DEBOUNCE_MS = 300;
 

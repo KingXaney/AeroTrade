@@ -1,4 +1,4 @@
-// Copy for Today's lesson (components/dashboard/widgets/TodaysLesson.tsx, and the digest email's
+// Copy for Today's lesson (components/dashboard/widgets/learn/TodaysLesson.tsx, and the digest email's
 // section in lib/email/sections/lesson.ts): a first from the learner's own account, a followed
 // strategy's rebalance, or a concept today's topic articles used. Every sentence describes what
 // happened or what a term measures — none says what to do — and is held to the 'copy' tier of

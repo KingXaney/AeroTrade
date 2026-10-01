@@ -1,6 +1,6 @@
 import {notFound} from "next/navigation";
-import TradingViewWidget from "@/components/TradingViewWidget";
-import StockHeader from "@/components/stock/StockHeader";
+import TradingViewWidget from "@/components/stocks/TradingViewWidget";
+import StockHeader from "@/components/stocks/StockHeader";
 import {
     SYMBOL_INFO_WIDGET_CONFIG,
     CANDLE_CHART_WIDGET_CONFIG,
@@ -9,8 +9,8 @@ import {
     COMPANY_FINANCIALS_WIDGET_CONFIG,
     tvScript,
 } from "@/lib/stocks/tradingview";
-import KeyNumbers from "@/components/stock/KeyNumbers";
-import RulesSee from "@/components/stock/RulesSee";
+import KeyNumbers from "@/components/stocks/KeyNumbers";
+import RulesSee from "@/components/stocks/RulesSee";
 import {getCompanyProfile, getFinancials, getQuote} from "@/lib/prices/finnhub";
 import {requireUserId} from "@/lib/auth/session";
 import {isInWatchlist} from "@/lib/stocks/watchlist-store";
