@@ -3,18 +3,10 @@
 // allocator already decided. A stronger narrator, never a second trader.
 
 import SecondOpinion, {type SecondOpinionSource} from "@/database/models/second-opinion.model";
-import NewsItem from "@/database/models/news-item.model";
-import SuggestionSet, {GLOBAL_SUGGESTIONS_USER} from "@/database/models/suggestion-set.model";
 import {connectToDatabase} from "@/database/mongoose";
-import {getActiveTheses, getBrainDigestData} from "@/lib/brain/store";
+import {readOpinionContext} from "@/lib/brain/opinion-context";
 import type {SecondOpinionContext} from "@/lib/brain/prompts";
-import {
-    SECOND_OPINION_HEADLINE_COUNT,
-    SECOND_OPINION_MAX_CHARS,
-    SECOND_OPINION_NARRATIVE_COUNT,
-    SECOND_OPINION_THESIS_COUNT,
-    stripMarkdownLinks,
-} from "@/lib/brain/opinion-text";
+import {SECOND_OPINION_MAX_CHARS, stripMarkdownLinks} from "@/lib/brain/opinion-text";
 
 export const SECOND_OPINION_MODEL = 'claude-opus-5';
 // On Claude Opus 5 thinking is on by default and shares this cap with the
@@ -31,52 +23,12 @@ export const SECOND_OPINION_GLOBAL_USER_CAP = 8;
 
 export const isSecondOpinionConfigured = (): boolean => Boolean(process.env.ANTHROPIC_API_KEY);
 
-// What Claude gets to look at: the theses, the narrative leaderboard, the latest
-// model-portfolio decisions and the raw recent headlines. scripts/second-opinion-local.mjs
-// reproduces these reads with the raw driver — keep the two in step.
+// What Claude gets to look at: lib/brain/opinion-context, the one reader the local CLI
+// script shares.
 export const gatherOpinionContext = async (): Promise<SecondOpinionContext> => {
-    await connectToDatabase();
-    const [theses, narratives, latestSet, headlines] = await Promise.all([
-        getActiveTheses(),
-        getBrainDigestData(SECOND_OPINION_NARRATIVE_COUNT),
-        SuggestionSet.findOne({userId: GLOBAL_SUGGESTIONS_USER}).sort({date: -1})
-            .lean<{date: string; kind?: string; items: SuggestionItem[]}>(),
-        // datetime is unindexed, so this is a top-K sort over the whole
-        // collection — project narrowly, since the clipboard path runs it inside
-        // a click-synchronous server action.
-        NewsItem.find({}, {headline: 1, source: 1, sourceType: 1, publishedDate: 1, _id: 0})
-            .sort({datetime: -1}).limit(SECOND_OPINION_HEADLINE_COUNT)
-            .lean<Array<{headline: string; source: string; sourceType: string; publishedDate: string}>>(),
-    ]);
-
-    return {
-        theses: theses.slice(0, SECOND_OPINION_THESIS_COUNT).map((t) => ({
-            name: t.displayName,
-            type: t.type,
-            weightSlow: Number(t.weightSlow.toFixed(2)),
-            sentimentSlow: Number(t.sentimentSlow.toFixed(2)),
-            activeSinceMs: t.thesisSince,
-        })),
-        narratives,
-        decisions: latestSet
-            ? {
-                date: latestSet.date,
-                kind: latestSet.kind ?? 'executed',
-                items: latestSet.items.map((i) => ({
-                    symbol: i.symbol,
-                    action: i.action,
-                    targetWeightPct: Math.round(i.targetWeight * 100),
-                    reasons: i.reasons,
-                })),
-            }
-            : null,
-        headlines: headlines.map((h) => ({
-            headline: h.headline,
-            source: h.source,
-            kind: h.sourceType,
-            date: h.publishedDate,
-        })),
-    };
+    const db = (await connectToDatabase()).connection.db;
+    if (!db) throw new Error('Mongoose connection not connected');
+    return readOpinionContext(db);
 };
 
 export type SecondOpinionView = {

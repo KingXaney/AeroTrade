@@ -25,8 +25,8 @@
 //   CLAUDE_CODE_OAUTH_TOKEN=... npm run opinion:local
 // Re-mint the token before it expires or the job goes quiet.
 //
-// The prompt and the text rules are imported from the app itself, so this path
-// asks exactly the same question as the API path.
+// The prompt, the text rules and the context reader are imported from the app itself, so
+// this path asks exactly the same question, over the same data, as the API path.
 import 'dotenv/config';
 import mongoose from 'mongoose';
 import {spawn} from 'node:child_process';
@@ -54,14 +54,9 @@ process.emitWarning = (warning, ...rest) => {
 };
 
 const {buildStandaloneSecondOpinionPrompt} = await import('../lib/brain/prompts.ts');
-const {
-    CLI_MODEL_LABEL,
-    SECOND_OPINION_HEADLINE_COUNT,
-    SECOND_OPINION_MAX_CHARS,
-    SECOND_OPINION_NARRATIVE_COUNT,
-    SECOND_OPINION_THESIS_COUNT,
-    stripMarkdownLinks,
-} = await import('../lib/brain/opinion-text.ts');
+const {CLI_MODEL_LABEL, SECOND_OPINION_MAX_CHARS, stripMarkdownLinks} = await import('../lib/brain/opinion-text.ts');
+// The same reader the server's gatherOpinionContext calls, handed this script's connection.
+const {readOpinionContext} = await import('../lib/brain/opinion-context.ts');
 
 const {JOBS} = await import('../lib/jobs/registry.ts');
 const JOB_ID = JOBS.secondOpinion.id;
@@ -87,61 +82,6 @@ const argFor = (name) => {
     const idx = process.argv.indexOf(`--${name}`);
     return idx !== -1 ? process.argv[idx + 1] : undefined;
 };
-
-const safeAvg = (sum, weight) => (Math.abs(weight) < 1e-9 ? 0 : sum / weight);
-const round2 = (n) => Number((n ?? 0).toFixed(2));
-
-// Mirrors lib/brain/opinion.ts gatherOpinionContext, using the raw driver
-// because this script cannot resolve the app's "@/" path aliases.
-async function gatherContext(db) {
-    const [thesisDocs, narrativeDocs, latestSet, headlines] = await Promise.all([
-        db.collection('brainentities').find({thesisSince: {$ne: null}}).sort({weightSlow: -1})
-            .limit(SECOND_OPINION_THESIS_COUNT).toArray(),
-        db.collection('brainentities').find({}).sort({weightSlow: -1}).limit(SECOND_OPINION_NARRATIVE_COUNT).toArray(),
-        db.collection('suggestionsets').findOne({userId: 'global'}, {sort: {date: -1}}),
-        // datetime is unix SECONDS and is not indexed — project narrowly so the
-        // top-K sort stays cheap.
-        db.collection('newsitems')
-            .find({}, {projection: {headline: 1, source: 1, sourceType: 1, publishedDate: 1, _id: 0}})
-            .sort({datetime: -1}).limit(SECOND_OPINION_HEADLINE_COUNT).toArray(),
-    ]);
-
-    return {
-        theses: thesisDocs.map((e) => ({
-            name: e.displayName,
-            type: e.type,
-            weightSlow: round2(e.weightSlow),
-            sentimentSlow: round2(safeAvg(e.sentimentSumSlow ?? 0, e.weightSlow ?? 0)),
-            activeSinceMs: e.thesisSince ? new Date(e.thesisSince).getTime() : null,
-        })),
-        narratives: narrativeDocs.map((e) => ({
-            key: e.key,
-            type: e.type,
-            displayName: e.displayName,
-            weightSlow: round2(e.weightSlow),
-            sentimentSlow: round2(safeAvg(e.sentimentSumSlow ?? 0, e.weightSlow ?? 0)),
-            thesisActive: Boolean(e.thesisSince),
-        })),
-        decisions: latestSet
-            ? {
-                date: latestSet.date,
-                kind: latestSet.kind ?? 'executed',
-                items: (latestSet.items ?? []).map((i) => ({
-                    symbol: i.symbol,
-                    action: i.action,
-                    targetWeightPct: Math.round((i.targetWeight ?? 0) * 100),
-                    reasons: i.reasons ?? [],
-                })),
-            }
-            : null,
-        headlines: headlines.map((h) => ({
-            headline: h.headline,
-            source: h.source,
-            kind: h.sourceType,
-            date: h.publishedDate,
-        })),
-    };
-}
 
 // Whose /brain page should show this? Opinions are stored per user.
 async function resolveUserId(db) {
@@ -269,7 +209,7 @@ async function main() {
 
     try {
         const userId = await resolveUserId(db);
-        const context = await gatherContext(db);
+        const context = await readOpinionContext(db);
         if (context.narratives.length === 0) {
             throw new Error('The brain is empty — run the brain update job before asking for an opinion.');
         }

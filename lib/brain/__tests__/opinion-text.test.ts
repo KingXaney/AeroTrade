@@ -1,12 +1,14 @@
 import {describe, expect, it} from "vitest";
 
 import {
-    SECOND_OPINION_HEADLINE_COUNT,
     SECOND_OPINION_MAX_CHARS,
-    SECOND_OPINION_NARRATIVE_COUNT,
-    SECOND_OPINION_THESIS_COUNT,
     stripMarkdownLinks,
 } from "@/lib/brain/opinion-text";
+import {
+    SECOND_OPINION_HEADLINE_COUNT,
+    SECOND_OPINION_NARRATIVE_COUNT,
+    SECOND_OPINION_THESIS_COUNT,
+} from "@/lib/brain/opinion-context";
 import {
     buildSecondOpinionPrompt,
     buildStandaloneSecondOpinionPrompt,

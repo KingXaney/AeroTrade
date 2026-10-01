@@ -4,11 +4,6 @@
 // server paths instead of a drifting copy.
 
 export const SECOND_OPINION_MAX_CHARS = 8000;
-export const SECOND_OPINION_HEADLINE_COUNT = 15;
-export const SECOND_OPINION_NARRATIVE_COUNT = 12;
-// Active theses are unbounded in the brain; cap what reaches the prompt so a
-// busy narrative period can't balloon the request (and the bill with it).
-export const SECOND_OPINION_THESIS_COUNT = 20;
 
 // Provenance labels shown next to a stored opinion.
 export const CLI_MODEL_LABEL = 'Claude Code (Max plan)';
