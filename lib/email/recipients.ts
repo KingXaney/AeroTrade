@@ -1,4 +1,7 @@
-'use server';
+// Who the daily news email goes to: every user with a name and an address who has not opted
+// out, with their digest mode and topics-in-digest choice. A plain server module, NOT 'use
+// server' — as a server action it would hand every opted-in user's email to any caller. Read
+// by the daily-news job only.
 
 import {connectToDatabase} from "@/database/mongoose";
 import UserPreferencesModel from "@/database/models/user-preferences.model";

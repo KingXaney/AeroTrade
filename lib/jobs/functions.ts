@@ -1,7 +1,7 @@
 import {inngest} from "@/lib/jobs/client";
 import {buildWelcomePrompt, NEWS_SUMMARY_EMAIL_PROMPT} from "@/lib/jobs/prompts"
 import {mailerReady, sendNewsSummaryEmail, sendWelcomeEmail} from "@/lib/email/send";
-import {getAllUsersForNewsEmail} from "@/lib/actions/user.actions";
+import {getAllUsersForNewsEmail} from "@/lib/email/recipients";
 import {getWatchlistSymbolsByEmail} from "@/lib/stocks/watchlist-store";
 import {getQuote, searchStocks} from "@/lib/prices/finnhub";
 import {getAggregatedNews, normalizeUrl} from "@/lib/news/aggregate";
