@@ -123,6 +123,7 @@ export const buildTools = (userId: string) => ({
         inputSchema: z.object({}),
         execute: async () => {
             const items = await getWatchlistForUser(userId);
+            if (!items) return {error: 'Could not read your watchlist right now.'};
             return items.map((i) => ({
                 symbol: i.symbol,
                 company: i.company,

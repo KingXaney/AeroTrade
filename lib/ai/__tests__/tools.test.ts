@@ -10,6 +10,7 @@ const stubs = vi.hoisted(() => ({
     getWatchlistSymbolsByUserId: vi.fn(),
     getNews: vi.fn(),
     getLatestSuggestions: vi.fn(),
+    getWatchlistForUser: vi.fn(),
 }));
 
 vi.mock('@/lib/actions/finnhub.actions', () => ({
@@ -22,7 +23,7 @@ vi.mock('@/lib/actions/finnhub.actions', () => ({
 vi.mock('@/lib/actions/watchlist.actions', () => ({
     addToWatchlist: vi.fn(),
     removeFromWatchlist: vi.fn(),
-    getWatchlistForUser: vi.fn(),
+    getWatchlistForUser: stubs.getWatchlistForUser,
     getWatchlistSymbolsByUserId: stubs.getWatchlistSymbolsByUserId,
 }));
 vi.mock('@/database/mongoose', () => ({connectToDatabase: async () => undefined}));
@@ -128,5 +129,28 @@ describe('getAiSuggestions', () => {
             },
             yours: null,
         });
+    });
+});
+
+describe('getWatchlist', () => {
+    it('lists the closure user\'s watchlist', async () => {
+        stubs.getWatchlistForUser.mockResolvedValue([
+            {symbol: 'NVDA', company: 'NVIDIA Corp', addedAt: new Date('2026-09-01T14:00:00Z')},
+        ]);
+
+        expect(await run('getWatchlist', {})).toEqual([{symbol: 'NVDA', company: 'NVIDIA Corp', addedAt: '2026-09-01T14:00:00.000Z'}]);
+        expect(stubs.getWatchlistForUser).toHaveBeenCalledWith('user-1');
+    });
+
+    it('says an empty watchlist is empty', async () => {
+        stubs.getWatchlistForUser.mockResolvedValue([]);
+
+        expect(await run('getWatchlist', {})).toEqual([]);
+    });
+
+    it('reports a failed read as an error, never as an empty watchlist', async () => {
+        stubs.getWatchlistForUser.mockResolvedValue(null);
+
+        expect(await run('getWatchlist', {})).toEqual({error: 'Could not read your watchlist right now.'});
     });
 });
