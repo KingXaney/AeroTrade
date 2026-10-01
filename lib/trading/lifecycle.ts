@@ -29,6 +29,12 @@ export const seedDayZeroSnapshot = async (account: PaperAccountDoc): Promise<voi
     );
 };
 
+// The user's oldest account: the one their pre-migration trades belong to.
+const isOriginalAccount = async (userId: string, accountId: string): Promise<boolean> => {
+    const oldest = await PaperAccount.findOne({userId}).sort({createdAt: 1}).select('_id').lean<{_id: unknown} | null>();
+    return oldest !== null && String(oldest._id) === accountId;
+};
+
 // Restart an account at `balance`: cash only, no positions, inception re-anchored to now, and
 // its trades, snapshots and income rows deleted, then a day-zero snapshot at the new balance.
 // The watermark and totals are unset in the same update — a restarted account must never keep
@@ -36,8 +42,10 @@ export const seedDayZeroSnapshot = async (account: PaperAccountDoc): Promise<voi
 //
 // `sweepLegacyTrades` also deletes the user's pre-migration trades (no accountId). Before the
 // migration a user had exactly one account (the old unique index), so those rows are that
-// account's, and the migration's backfill would otherwise resurrect "deleted" history onto it.
-// Only the account a learner resets can be that one; the AI Navigator's never is.
+// account's — the user's oldest — and the migration's backfill would otherwise resurrect
+// "deleted" history onto it. Only a learner's reset asks (the AI Navigator's account is never
+// that one), and the sweep happens only when the account reset is the oldest: resetting a
+// second account must not delete the original's history.
 export const restartAccount = async (
     userId: string,
     account: PaperAccountDoc,
@@ -45,6 +53,7 @@ export const restartAccount = async (
     {sweepLegacyTrades = false}: {sweepLegacyTrades?: boolean} = {},
 ): Promise<void> => {
     const id = String(account._id);
+    const claimsLegacy = sweepLegacyTrades && await isOriginalAccount(userId, id);
     await PaperAccount.updateOne(
         {_id: account._id, userId},
         {
@@ -52,7 +61,7 @@ export const restartAccount = async (
             $unset: {incomeThrough: 1, incomeTotals: 1},
         },
     );
-    await PaperTrade.deleteMany(sweepLegacyTrades
+    await PaperTrade.deleteMany(claimsLegacy
         ? {userId, $or: [{accountId: id}, {accountId: {$exists: false}}]}
         : {accountId: id});
     await AccountSnapshot.deleteMany({accountId: id});

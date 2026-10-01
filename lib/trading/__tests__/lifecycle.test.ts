@@ -1,6 +1,7 @@
 // The strategy-account delete and restart, with the models stubbed. The delete refuses an account
 // the AI Navigator trades in before anything is removed; any other owned account goes, children
-// first. The restart sweeps the pre-migration trades only when asked.
+// first. The restart sweeps the pre-migration trades only when asked, and only into the user's
+// original (oldest) account — the one those rows belonged to.
 
 import {beforeEach, describe, expect, it, vi} from 'vitest';
 
@@ -25,6 +26,12 @@ vi.mock('@/database/models/ai-navigator.model', () => ({
 vi.mock('@/database/models/paper-account.model', () => ({
     default: {
         countDocuments: async ({userId}: {userId: string}) => [...db.accounts.values()].filter((a) => a.userId === userId).length,
+        // The map's insertion order stands for createdAt: the first entry is the oldest.
+        findOne: ({userId}: {userId: string}) => {
+            const oldest = [...db.accounts].find(([, a]) => a.userId === userId);
+            const chain = {sort: () => chain, select: () => chain, lean: async () => (oldest ? {_id: oldest[0]} : null)};
+            return chain;
+        },
         deleteOne: async ({_id}: {_id: string}) => { db.deletes.push(`account:${_id}`); },
         updateOne: async ({_id}: {_id: string}, update: {$set: {cash: number}}) => { db.writes.push(`account:${_id}:${update.$set.cash}`); },
     },
@@ -100,5 +107,14 @@ describe('restartAccount', () => {
     it('sweeps the user\'s pre-migration trades only when asked (the learner\'s reset)', async () => {
         await restartAccount('u1', {_id: 'main'} as never, 100_000, {sweepLegacyTrades: true});
         expect(db.deletes).toEqual(['trades:u1:main+legacy', 'snapshots:main', 'income:main']);
+    });
+
+    it('leaves the pre-migration trades alone when the reset account is not the user\'s oldest', async () => {
+        db.accounts = new Map([
+            ['main', {userId: 'u1', name: 'Main Strategy'}],
+            ['second', {userId: 'u1', name: 'Second'}],
+        ]);
+        await restartAccount('u1', {_id: 'second'} as never, 100_000, {sweepLegacyTrades: true});
+        expect(db.deletes).toEqual(['trades:second', 'snapshots:second', 'income:second']);
     });
 });
