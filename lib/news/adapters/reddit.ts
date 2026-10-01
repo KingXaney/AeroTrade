@@ -1,6 +1,6 @@
 // Reddit adapter — pulls hot posts from finance subreddits and shapes them into MarketNewsArticle.
 
-import {formatArticle, validateArticle} from "@/lib/utils";
+import {formatArticle, validateArticle} from "@/lib/news/article";
 import {FEED_REVALIDATE_SECONDS, hashId, REDDIT_POST_LIMIT, redditUserAgent, SUBREDDITS} from "@/lib/news/config";
 import {escapeRegExp} from "@/lib/topics/match";
 

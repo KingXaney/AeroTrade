@@ -4,7 +4,7 @@
 
 import {FEED_REVALIDATE_SECONDS, GOOGLE_NEWS_BASE, GOOGLE_NEWS_SEARCH_BASE, searchUserAgent, US_EDITION, type GoogleEdition} from "@/lib/news/config";
 import {parseRssXml} from "@/lib/news/adapters/rss";
-import {formatArticle, validateArticle} from "@/lib/utils";
+import {formatArticle, validateArticle} from "@/lib/news/article";
 import {QUERY_MAX_CHARS, TOPIC_SEARCH_WINDOW, newsSearchEnabled} from "@/lib/topics/config";
 
 type NextFetchInit = RequestInit & {next?: {revalidate: number}};

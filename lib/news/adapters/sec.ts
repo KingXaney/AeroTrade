@@ -10,7 +10,7 @@ import {
     hashId,
     secUserAgent,
 } from "@/lib/news/config";
-import {formatArticle, FULL_SUMMARY_MAX_CHARS, validateArticle} from "@/lib/utils";
+import {formatArticle, FULL_SUMMARY_MAX_CHARS, validateArticle} from "@/lib/news/article";
 
 // Shape of one <entry> from EDGAR's browse Atom feed when parsed with ignoreAttributes: false.
 // The <content> block carries structured filing metadata that is far more informative

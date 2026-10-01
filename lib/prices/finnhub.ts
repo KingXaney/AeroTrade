@@ -3,7 +3,8 @@
 // endpoint, and lib code (trading, news, dashboard, chat, jobs) calls these directly. The two
 // fetches client components need are wrapped, one-to-one, in lib/actions/stocks.actions.ts.
 
-import {getDateRange, validateArticle, formatArticle} from "@/lib/utils";
+import {getDateRange} from "@/lib/utils";
+import {validateArticle, formatArticle} from "@/lib/news/article";
 import {formatPrice, formatChangePercent, formatMarketCapValue} from "@/lib/format";
 import {POPULAR_STOCK_SYMBOLS} from "@/lib/stocks/popular";
 import {FINANCIALS_REVALIDATE_SECONDS, PROFILE_REVALIDATE_SECONDS} from "@/lib/prices/config";

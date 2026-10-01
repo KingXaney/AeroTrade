@@ -1,6 +1,6 @@
 import {XMLParser} from "fast-xml-parser";
 import {FEED_REVALIDATE_SECONDS, MAX_SYMBOL_FEEDS, RSS_FEEDS, hashId, yahooSymbolFeed, type NewsFeed} from "@/lib/news/config";
-import {formatArticle, validateArticle} from "@/lib/utils";
+import {formatArticle, validateArticle} from "@/lib/news/article";
 
 // Next's fetch accepts a `next` key that plain RequestInit doesn't know about.
 type NextFetchInit = RequestInit & {next?: {revalidate: number}};
