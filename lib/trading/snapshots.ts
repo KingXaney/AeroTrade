@@ -11,6 +11,7 @@ import {getQuote} from "@/lib/prices/finnhub";
 import {BENCHMARK_SYMBOL} from "@/lib/prices/config";
 import {buildPriceMap, computePortfolio} from "@/lib/trading/valuation";
 import {type PriceInfo} from "@/lib/trading/analytics";
+import {accountEpoch} from "@/lib/trading/epoch";
 
 // One account as the job memoizes it between steps (plain JSON).
 export type SnapshotAccount = {
@@ -49,7 +50,7 @@ export const loadSnapshotAccounts = async (): Promise<SnapshotAccount[]> => {
         startingBalance: a.startingBalance,
         // Memoized so write-snapshots can detect a reset that landed mid-run
         // (reset always re-anchors inceptionAt).
-        inceptionAt: new Date(a.inceptionAt || a.createdAt).getTime(),
+        inceptionAt: accountEpoch(a).getTime(),
         // Read with `cash` from the same document, so the snapshot records exactly
         // which income its cash contains (lib/income/store.ts tops it up).
         incomeThrough: a.incomeThrough ?? null,
@@ -84,7 +85,7 @@ export const writeSnapshots = async (accounts: readonly SnapshotAccount[], price
     ).lean();
     const freshInception = new Map(fresh.map((f) => [
         String(f._id),
-        new Date(f.inceptionAt || f.createdAt).getTime(),
+        accountEpoch(f).getTime(),
     ]));
 
     let count = 0;

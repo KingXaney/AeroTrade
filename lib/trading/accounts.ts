@@ -9,6 +9,7 @@ import {connectToDatabase} from "@/database/mongoose";
 import PaperAccount, {type PaperAccountDoc} from "@/database/models/paper-account.model";
 import PaperTrade from "@/database/models/paper-trade.model";
 import {PAPER_STARTING_BALANCE} from "@/lib/trading/starting-balance";
+import {accountEpoch} from "@/lib/trading/epoch";
 
 export const DEFAULT_ACCOUNT_NAME = 'Main Strategy';
 
@@ -16,7 +17,7 @@ export const DEFAULT_ACCOUNT_NAME = 'Main Strategy';
 export const toAccountSummary = (account: PaperAccountDoc): PaperAccountSummary => ({
     id: String(account._id),
     name: account.name || DEFAULT_ACCOUNT_NAME,
-    inceptionAt: new Date(account.inceptionAt || account.createdAt).getTime(),
+    inceptionAt: accountEpoch(account).getTime(),
     createdAt: new Date(account.createdAt).getTime(),
     ...(account.incomeTotals ? {income: {interest: account.incomeTotals.interest ?? 0, dividends: account.incomeTotals.dividends ?? 0}} : {}),
 });

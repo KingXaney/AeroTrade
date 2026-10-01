@@ -26,6 +26,7 @@ import {ONBOARDING_MAX_DAYS} from "@/lib/learn/missions";
 import {firstDrawdownCrossing} from "@/lib/learn/moments";
 import {STRATEGY_SLUGS} from "@/lib/strategies/catalog";
 import type {StrategyId} from "@/lib/strategies/types";
+import {accountEpoch} from "@/lib/trading/epoch";
 
 type LearnPrefs = {followedStrategies?: string[]; learn?: {missionsDismissedAt?: Date; lessonsSeen?: string[]}} | null;
 type LearnRows = {accounts: Awaited<ReturnType<typeof readAccountsForUser>>; prefs: LearnPrefs};
@@ -98,7 +99,7 @@ const learnFactsFrom = async (userId: string, {accounts, prefs}: LearnRows, onbo
         credited.length === 0 ? null : AccountIncome.findOne({
             $or: credited.map((a) => ({
                 accountId: String(a._id),
-                epoch: new Date(a.inceptionAt || a.createdAt).getTime(),
+                epoch: accountEpoch(a).getTime(),
                 kind: 'dividend',
                 date: {$lte: a.incomeThrough},
             })),

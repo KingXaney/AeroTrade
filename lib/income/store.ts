@@ -32,6 +32,7 @@ import {
     type RateLookup,
 } from "@/lib/income/accrual";
 import type {DividendPoint} from "@/lib/prices/types";
+import {accountEpoch} from "@/lib/trading/epoch";
 
 type LeanAccount = {
     _id: unknown;
@@ -47,8 +48,6 @@ type LeanAccount = {
 type LeanTrade = {symbol: string; side: 'buy' | 'sell'; quantity: number; total: number; createdAt: Date};
 type LeanRow = {date: string; kind: 'interest' | 'dividend'; amount: number};
 
-// The code still falls back to createdAt for accounts from before inceptionAt existed.
-const inceptionOf = (account: {inceptionAt?: Date; createdAt: Date}): Date => account.inceptionAt ?? account.createdAt;
 
 const toIncomeTrade = (trade: LeanTrade): IncomeTrade => ({
     date: getEasternDateString(new Date(trade.createdAt)),
@@ -85,7 +84,7 @@ export const planIncomeRun = async ({accountIds}: {accountIds?: string[] | null}
         if (current === undefined || from < current) neededFrom.set(symbol, from);
     };
     for (const account of accounts) {
-        const inception = getEasternDateString(inceptionOf(account));
+        const inception = getEasternDateString(accountEpoch(account));
         const from = account.incomeThrough ? addCalendarDays(account.incomeThrough, 1 - DIVIDEND_PAY_LAG_DAYS) : inception;
         const symbols = new Set([...(tradedBy.get(String(account._id)) ?? []), ...(account.positions ?? []).map((p) => p.symbol.toUpperCase())]);
         for (const symbol of symbols) need(symbol, from);
@@ -172,7 +171,7 @@ export const creditAccountIncome = async (accountId: string, {end, inputs}: {end
     const account = await PaperAccount.findById(accountId).lean<LeanAccount | null>();
     if (!account) return {accountId, status: 'raced', reason: 'account gone'};
 
-    const inceptionAt = inceptionOf(account);
+    const inceptionAt = accountEpoch(account);
     const epoch = new Date(inceptionAt).getTime();
     const inceptionDate = getEasternDateString(new Date(inceptionAt));
     const watermark = account.incomeThrough ?? null;
@@ -259,7 +258,7 @@ export const creditAccountIncome = async (accountId: string, {end, inputs}: {end
 export const catchUpSnapshots = async (accountId: string, epoch: number, through: string): Promise<number> => {
     // Still the same account? A reset since the credit means this history is not ours to edit.
     const current = await PaperAccount.findById(accountId).select('inceptionAt createdAt').lean<{inceptionAt?: Date; createdAt: Date} | null>();
-    if (!current || new Date(inceptionOf(current)).getTime() !== epoch) return 0;
+    if (!current || accountEpoch(current).getTime() !== epoch) return 0;
 
     const rows = await AccountIncome.find({accountId, epoch, date: {$lte: through}}).sort({date: 1}).lean<LeanRow[]>();
     const dates: string[] = [];

@@ -28,6 +28,7 @@ import {
     type StartRow,
     type TimeInMarketView,
 } from "@/lib/strategies/learn/time-in-market";
+import {accountEpoch} from "@/lib/trading/epoch";
 
 export type TimeInMarketRead = TimeInMarketView & {inception: string | null};
 
@@ -70,7 +71,7 @@ export const getTimeInMarket = async (userId: string, requested: unknown): Promi
         // The current epoch of the oldest account: inceptionAt, else createdAt for accounts from
         // before inceptionAt existed (as the income and trade reads date an epoch).
         const inception = accounts
-            .map((account) => getEasternDateString(new Date(account.inceptionAt || account.createdAt)))
+            .map((account) => getEasternDateString(accountEpoch(account)))
             .reduce<string | null>((earliest, date) => (earliest === null || date < earliest ? date : earliest), null);
         const resolved = resolveStart({requested, inception, today});
         const starts = tableStarts(today);

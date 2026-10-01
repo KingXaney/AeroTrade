@@ -4,6 +4,7 @@
 import {connectToDatabase} from "@/database/mongoose";
 import BrainEntity, {type BrainEntityDoc} from "@/database/models/brain-entity.model";
 import NewsItem from "@/database/models/news-item.model";
+import {sentimentAvg} from "@/lib/brain/decay";
 import {earliestSince, sinceThesisBySymbol, sinceThesisTargets, type SinceThesisLegs} from "@/lib/brain/since-thesis";
 import {BENCHMARK_SYMBOL} from "@/lib/prices/config";
 import {createDayMemo, remember} from "@/lib/day-memo";
@@ -11,16 +12,14 @@ import {addCalendarDays, getEasternDateString} from "@/lib/dates";
 import {countPricedSymbols, getBarsFrom, getLatestBars} from "@/lib/prices/store";
 import {getAllJobHealth, type JobHealth} from "@/lib/jobs/health";
 
-const safeAvg = (sum: number, weight: number): number => (Math.abs(weight) < 1e-9 ? 0 : sum / weight);
-
 export const toEntitySummary = (e: BrainEntityDoc): BrainEntitySummary => ({
     key: e.key,
     type: e.type,
     displayName: e.displayName,
     weightFast: e.weightFast,
     weightSlow: e.weightSlow,
-    sentimentFast: safeAvg(e.sentimentSumFast, e.weightFast),
-    sentimentSlow: safeAvg(e.sentimentSumSlow, e.weightSlow),
+    sentimentFast: sentimentAvg(e.sentimentSumFast, e.weightFast),
+    sentimentSlow: sentimentAvg(e.sentimentSumSlow, e.weightSlow),
     thesisSince: e.thesisSince ? new Date(e.thesisSince).getTime() : null,
     lastSeenAt: new Date(e.lastSeenAt).getTime(),
 });

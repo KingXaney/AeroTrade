@@ -9,6 +9,7 @@ import {getDividendPoints, getLatestRatePoint} from "@/lib/prices/store";
 import {apyFromDiscount, groupIncomeActivity, usableRate, withReceipts, type IncomeView} from "@/lib/income/accrual";
 import {getOwnedAccount} from "@/lib/trading/accounts";
 import {getTradeLedger} from "@/lib/trading/ledger";
+import {accountEpoch} from "@/lib/trading/epoch";
 
 // The APY idle cash earns at the latest stored T-bill rate; null until a rate is stored, and
 // null again once that rate is stale by the income job's own rule (usableRate) — never a zero
@@ -42,7 +43,7 @@ export const getIncomeActivity = async (userId: string, accountId: string): Prom
         const account = await getOwnedAccount(userId, accountId);
         if (!account) return null;
         if (!account.incomeThrough) return {interestByMonth: [], dividends: [], missed: []};
-        const inceptionAt = new Date(account.inceptionAt || account.createdAt);
+        const inceptionAt = accountEpoch(account);
         const epoch = inceptionAt.getTime();
         const key = String(account._id);
         const [rows, ledger] = await Promise.all([
