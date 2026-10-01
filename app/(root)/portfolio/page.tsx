@@ -6,6 +6,7 @@ import {getTradeLedger, TRADE_HISTORY_LIMIT} from "@/lib/trading/ledger";
 import {getAccountAnalytics, getComparisonStats} from "@/lib/trading/analytics-store";
 import {getIncomeActivity} from "@/lib/income/page-store";
 import {replayReceipts} from "@/lib/trading/receipts";
+import {accountExportHref} from "@/lib/trading/csv";
 import {buyNotesBySellId, openLotNotes} from "@/lib/trading/lots";
 import {countUnpriced} from "@/lib/trading/analytics";
 import {buildReturnBridge} from "@/lib/trading/learn/bridge";
@@ -200,7 +201,7 @@ const PortfolioPage = async ({searchParams}: PortfolioPageProps) => {
                     <h2 className="text-sm font-bold uppercase tracking-[0.1em] text-brand mb-4" style={{fontFamily: 'var(--type-mono)'}}>
                         Trade History
                     </h2>
-                    <TradeHistory trades={trades} totalCount={analytics?.tradeCount} exportHref={`/api/accounts/${account.id}/export`} receipts={receipts} buyNotesBySellId={buyNotesBySellId(ledger)} />
+                    <TradeHistory trades={trades} totalCount={analytics?.tradeCount} exportHref={accountExportHref(account.id)} receipts={receipts} buyNotesBySellId={buyNotesBySellId(ledger)} />
                 </section>
             )}
         </div>

@@ -1,14 +1,10 @@
 import {NextResponse} from "next/server";
 import {getSessionUser} from "@/lib/auth/session";
-import PaperTrade from "@/database/models/paper-trade.model";
-import {getOwnedAccount} from "@/lib/trading/accounts";
-import {epochTrades} from "@/lib/trading/ledger";
-import {csvDownloadHeaders, tradesCsv, tradesCsvFilename, type CsvTrade} from "@/lib/trading/csv";
+import {getAccountExport} from "@/lib/trading/ledger";
+import {csvDownloadHeaders, tradesCsv, tradesCsvFilename} from "@/lib/trading/csv";
 
-// Full trade history of one strategy account's current epoch as a CSV download. Deliberately
-// bypasses getTradeHistory's 50-row cap — exports are complete by definition — but not the
-// epoch: rows from before the account's inceptionAt (a reset that crashed before deleting
-// them) are no more this account's than they are on /portfolio. The rows are written by
+// Full trade history of one strategy account's current epoch as a CSV download, read by
+// getAccountExport (the whole epoch, not the trade log's page). The rows are written by
 // tradesCsv, which the quant strategies' export (/api/strategies/[slug]/export) shares.
 export async function GET(request: Request, {params}: {params: Promise<{accountId: string}>}) {
     const userId = (await getSessionUser())?.id;
@@ -17,14 +13,12 @@ export async function GET(request: Request, {params}: {params: Promise<{accountI
     }
 
     const {accountId} = await params;
-    const account = await getOwnedAccount(userId, accountId);
-    if (!account) {
+    const exported = await getAccountExport(userId, accountId);
+    if (!exported) {
         return NextResponse.json({error: 'Account not found'}, {status: 404});
     }
 
-    const trades = await PaperTrade.find(epochTrades(userId, String(account._id), account.inceptionAt)).sort({createdAt: 1, _id: 1}).lean<CsvTrade[]>();
-
-    return new NextResponse(tradesCsv(trades), {
-        headers: csvDownloadHeaders(tradesCsvFilename(account.name || 'strategy')),
+    return new NextResponse(tradesCsv(exported.trades), {
+        headers: csvDownloadHeaders(tradesCsvFilename(exported.name || 'strategy')),
     });
 }

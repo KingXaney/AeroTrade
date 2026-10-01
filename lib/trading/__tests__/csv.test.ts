@@ -1,6 +1,7 @@
 import {describe, expect, it} from 'vitest';
 import {
     TRADE_CSV_HEADER,
+    accountExportHref,
     csvDownloadHeaders,
     csvField,
     neutraliseFormula,
@@ -101,5 +102,11 @@ describe('csvDownloadHeaders', () => {
             'Content-Type': 'text/csv; charset=utf-8',
             'Content-Disposition': 'attachment; filename="golden-cross-trades-2026-09-30.csv"',
         });
+    });
+});
+
+describe('accountExportHref', () => {
+    it('is the account export route for that account', () => {
+        expect(accountExportHref('65f0c0ffee0000000000abcd')).toBe('/api/accounts/65f0c0ffee0000000000abcd/export');
     });
 });

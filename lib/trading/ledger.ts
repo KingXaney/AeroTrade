@@ -7,7 +7,8 @@ import {Types} from "mongoose";
 import {connectToDatabase} from "@/database/mongoose";
 import PaperAccount from "@/database/models/paper-account.model";
 import PaperTrade from "@/database/models/paper-trade.model";
-import {DEFAULT_ACCOUNT_NAME} from "@/lib/trading/accounts";
+import {DEFAULT_ACCOUNT_NAME, getOwnedAccount} from "@/lib/trading/accounts";
+import type {CsvTrade} from "@/lib/trading/csv";
 
 type LeanTrade = {
     _id: unknown; symbol: string; company?: string; side: 'buy' | 'sell'; quantity: number; price: number; total: number;
@@ -112,4 +113,15 @@ export const getRecentTradesForUser = async (userId: string, limit = 50): Promis
         console.error('Error fetching recent trades:', error);
         return null;
     }
+};
+
+// One account's whole current epoch for its CSV export, oldest first, with the account's name
+// for the file. Deliberately not getTradeHistory's page (an export is complete by definition),
+// but still the epoch: rows from before inceptionAt (a reset that crashed before deleting them)
+// are no more this account's than they are on /portfolio. Null when the account is not the user's.
+export const getAccountExport = async (userId: string, accountId: string): Promise<{name: string; trades: CsvTrade[]} | null> => {
+    const account = await getOwnedAccount(userId, accountId);
+    if (!account) return null;
+    const trades = await PaperTrade.find(epochTrades(userId, String(account._id), account.inceptionAt)).sort({createdAt: 1, _id: 1}).lean<CsvTrade[]>();
+    return {name: account.name, trades};
 };
