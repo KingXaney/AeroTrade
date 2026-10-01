@@ -4,8 +4,10 @@ import {
     isFirstSessionOfPeriod,
     isRebalanceDue,
     periodKey,
-    previousTradingDay,
 } from "@/lib/strategies/calendar";
+import {
+    previousTradingDay,
+} from "@/lib/prices/market-hours";
 
 describe("periodKey", () => {
     it("keys each cadence at its own granularity", () => {

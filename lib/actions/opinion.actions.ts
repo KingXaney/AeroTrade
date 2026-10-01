@@ -9,13 +9,15 @@ import {JOBS} from "@/lib/jobs/registry";
 import {
     gatherOpinionContext,
     isSecondOpinionConfigured,
-    MANUAL_MODEL_LABEL,
     saveSecondOpinion,
     SECOND_OPINION_GLOBAL_USER_CAP,
     SECOND_OPINION_GLOBAL_WINDOW_MS,
-    SECOND_OPINION_MAX_CHARS,
     SECOND_OPINION_MIN_INTERVAL_MS,
 } from "@/lib/brain/opinion";
+import {
+    MANUAL_MODEL_LABEL,
+    SECOND_OPINION_MAX_CHARS,
+} from "@/lib/brain/opinion-text";
 import {buildStandaloneSecondOpinionPrompt} from "@/lib/brain/prompts";
 
 const MIN_PASTED_CHARS = 40;

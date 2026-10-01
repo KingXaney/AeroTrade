@@ -11,15 +11,17 @@ import {fetchGoogleNewsFeed} from "@/lib/news/adapters/search";
 import {fetchRssNews} from "@/lib/news/adapters/rss";
 import {FEED_FETCH_LIMIT, FEED_WATCHLIST_SYMBOL_CAP, newsSearchEnabled} from "@/lib/news/config";
 import {
-    defaultNewsFeed,
     feedRequestsFor,
     filterBySources,
     mergeFeed,
-    normalizeNewsFeed,
     type FeedBatch,
     type FeedRequest,
-    type NewsFeedPrefs,
 } from "@/lib/news/feed";
+import {
+    defaultNewsFeed,
+    normalizeNewsFeed,
+    type NewsFeedPrefs,
+} from "@/lib/news/feed-prefs";
 import {toFeedArticles} from "@/lib/news/topic-batch";
 import {getMergedTopicFeed} from "@/lib/topics/store";
 

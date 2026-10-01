@@ -42,10 +42,6 @@ export const staleNote = (asOf: string): string => `stale: no bar for ${asOf}`;
 
 export const universeOf = (def: StrategyDefinition): readonly string[] => UNIVERSES[def.universe];
 
-// The one reader of def.params, kept in its own tiny module so the reason decoder
-// (lib/learn/reasons.ts) can read the same parameters without importing the rules.
-export {readParam} from '@/lib/strategies/params';
-
 export const heldPositions = (ctx: StrategyContext): ReadonlyMap<string, Holding> =>
     new Map(ctx.holdings.filter((holding) => holding.quantity > 0).map((holding) => [holding.symbol, holding]));
 

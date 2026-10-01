@@ -13,10 +13,12 @@ import {
     fmtPct,
     heldPositions,
     lastClose,
-    readParam,
     staleNote,
     universeOf,
 } from '@/lib/strategies/rules/shared';
+import {
+    readParam,
+} from '@/lib/strategies/params';
 
 const INTERNATIONAL_ETF = 'EFA';
 const BOND_ETF = 'AGG';

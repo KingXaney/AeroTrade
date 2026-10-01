@@ -16,14 +16,6 @@ import {
     stripMarkdownLinks,
 } from "@/lib/brain/opinion-text";
 
-export {
-    CLI_MODEL_LABEL,
-    MANUAL_MODEL_LABEL,
-    SECOND_OPINION_HEADLINE_COUNT,
-    SECOND_OPINION_MAX_CHARS,
-    stripMarkdownLinks,
-} from "@/lib/brain/opinion-text";
-
 export const SECOND_OPINION_MODEL = 'claude-opus-5';
 // On Claude Opus 5 thinking is on by default and shares this cap with the
 // visible text — leave headroom so the answer never truncates mid-thought.

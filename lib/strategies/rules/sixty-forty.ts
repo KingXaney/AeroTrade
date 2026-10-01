@@ -12,9 +12,11 @@ import {
     heldPositions,
     holdingWeight,
     lastClose,
-    readParam,
     staleNote,
 } from '@/lib/strategies/rules/shared';
+import {
+    readParam,
+} from '@/lib/strategies/params';
 
 const BOND_ETF = 'AGG';
 

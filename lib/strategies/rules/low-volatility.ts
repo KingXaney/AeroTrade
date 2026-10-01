@@ -3,7 +3,8 @@
 
 import {closesOf, realizedVol} from '@/lib/strategies/indicators';
 import type {Decide} from '@/lib/strategies/types';
-import {decideRanked, fmtPctUnsigned, fmtRank, readParam} from '@/lib/strategies/rules/shared';
+import {decideRanked, fmtPctUnsigned, fmtRank} from '@/lib/strategies/rules/shared';
+import {readParam} from '@/lib/strategies/params';
 
 export const decide: Decide = (def, ctx) => {
     const window = readParam(def, 'volWindow');

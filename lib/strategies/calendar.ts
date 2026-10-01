@@ -6,10 +6,7 @@
 // skipped day (stale data, an outage) it catches up on the next fresh day instead of
 // silently losing the whole month.
 
-import {previousTradingDay} from "@/lib/prices/market-hours";
 import type {Cadence} from "@/lib/strategies/types";
-
-export {previousTradingDay};
 
 const MONTH_NAMES = ['January', 'February', 'March', 'April', 'May', 'June', 'July',
     'August', 'September', 'October', 'November', 'December'];

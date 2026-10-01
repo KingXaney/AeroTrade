@@ -11,9 +11,11 @@ import {
     fmtPrice,
     heldPositions,
     lastClose,
-    readParam,
     universeOf,
 } from '@/lib/strategies/rules/shared';
+import {
+    readParam,
+} from '@/lib/strategies/params';
 
 export const decide: Decide = (def, ctx) => {
     const fast = readParam(def, 'fast');

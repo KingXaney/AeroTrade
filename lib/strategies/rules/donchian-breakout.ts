@@ -4,7 +4,8 @@
 
 import {rollingHigh, rollingLow} from '@/lib/strategies/indicators';
 import type {Decide} from '@/lib/strategies/types';
-import {decideSlots, fmtPct, fmtPrice, lastClose, readParam} from '@/lib/strategies/rules/shared';
+import {decideSlots, fmtPct, fmtPrice, lastClose} from '@/lib/strategies/rules/shared';
+import {readParam} from '@/lib/strategies/params';
 
 export const decide: Decide = (def, ctx) => {
     const entryChannel = readParam(def, 'entryChannel');

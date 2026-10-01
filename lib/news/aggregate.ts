@@ -8,8 +8,6 @@ import {fetchSecFilings} from "@/lib/news/adapters/sec";
 import {SOURCE_CAPS, TOTAL_ARTICLE_CAP} from "@/lib/news/config";
 import {dedupeArticles} from "@/lib/news/dedupe";
 
-export {dedupeArticles};
-
 // Email sections render in this order — finance wires lead, social chatter closes.
 // 'web' is capped at 0 by default (topics never reach the digest); it sits in these
 // tables so they stay exhaustive and a caller-supplied cap can opt it in.
