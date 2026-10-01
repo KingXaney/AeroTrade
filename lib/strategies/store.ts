@@ -5,7 +5,6 @@
 import {connectToDatabase} from "@/database/mongoose";
 import PaperAccount from "@/database/models/paper-account.model";
 import PaperTrade from "@/database/models/paper-trade.model";
-import PriceBar from "@/database/models/price-bar.model";
 import StrategyBacktest from "@/database/models/strategy-backtest.model";
 import StrategyRun, {type StrategyRunOrderDoc} from "@/database/models/strategy-run.model";
 import StrategyState from "@/database/models/strategy-state.model";
@@ -113,15 +112,6 @@ export const claimRun = async (strategyId: string, today: string): Promise<boole
 export const releaseRun = async (strategyId: string, today: string): Promise<void> => {
     await connectToDatabase();
     await StrategyState.updateOne({strategyId, lastRunDate: today}, {$unset: {lastRunDate: ''}});
-};
-
-export const getLatestBarDates = async (symbols: readonly string[]): Promise<Map<string, string>> => {
-    await connectToDatabase();
-    const rows = await PriceBar.aggregate<{_id: string; latest: string}>([
-        {$match: {symbol: {$in: [...symbols]}}},
-        {$group: {_id: '$symbol', latest: {$max: '$date'}}},
-    ]);
-    return new Map(rows.map((r) => [r._id, r.latest]));
 };
 
 export type DecisionInput = {

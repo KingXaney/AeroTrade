@@ -7,7 +7,8 @@
 
 import {describe, expect, it} from 'vitest';
 import {addCalendarDays, eachCalendarDay} from '@/lib/dates';
-import {createIncomeClock, makeRateLookup, payDateFor, replayIncome, type RatePoint} from '@/lib/income/accrual';
+import {createIncomeClock, makeRateLookup, payDateFor, replayIncome} from '@/lib/income/accrual';
+import type {RatePoint} from '@/lib/prices/types';
 import {
     buildTimeInMarket,
     cashOnly,

@@ -4,7 +4,7 @@
 // the rules) is the only place a decision is made; the pure helpers are job-helpers.ts.
 
 import {addCalendarDays, getEasternDateString} from "@/lib/dates";
-import {ensureBars, symbolsLackingDividendCoverage} from "@/lib/prices/store";
+import {ensureBars, getLatestBarDates, symbolsLackingDividendCoverage} from "@/lib/prices/store";
 import {BENCHMARK_SYMBOL, PRICE_CHUNK_SIZE, RATE_SYMBOL, STRATEGY_BACKFILL_CALENDAR_DAYS} from "@/lib/prices/config";
 import {NYSE_HOLIDAYS, isTradingDay, marketStatus, previousTradingDay} from "@/lib/prices/market-hours";
 import {getHeldSymbolsByUserId} from "@/lib/trading/accounts";
@@ -13,7 +13,7 @@ import {STRATEGIES, effectiveVersion} from "@/lib/strategies/catalog";
 import {STRATEGY_OWNER_ID} from "@/lib/strategies/config";
 import {assessFreshness, variantsDue, type Freshness, type VariantStamp} from "@/lib/strategies/job-helpers";
 import {SIM_INCOME_CALENDAR_DAYS, type StrategyDayPlan} from "@/lib/strategies/runner";
-import {getLatestBarDates, markStrategyError, releaseRun, type OrderOutcome, type StrategyStateView} from "@/lib/strategies/store";
+import {markStrategyError, releaseRun, type OrderOutcome, type StrategyStateView} from "@/lib/strategies/store";
 import {ALL_STRATEGY_SYMBOLS, CORE_ETFS, LARGE_CAPS, SECTOR_ETFS} from "@/lib/strategies/universe";
 import {gridFor} from "@/lib/strategies/whatif";
 import type {StrategyDefinition} from "@/lib/strategies/types";

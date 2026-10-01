@@ -6,7 +6,6 @@ import {connectToDatabase} from "@/database/mongoose";
 import AccountSnapshot from "@/database/models/account-snapshot.model";
 import StrategyBacktest from "@/database/models/strategy-backtest.model";
 import StrategyRun from "@/database/models/strategy-run.model";
-import PriceBar from "@/database/models/price-bar.model";
 import {getJobHealth, type JobHealth} from "@/lib/jobs/health";
 import {JOBS} from "@/lib/jobs/registry";
 import {readAccountsForUser, toAccountSummary} from "@/lib/trading/accounts";
@@ -16,6 +15,7 @@ import {getAccountAnalytics, getComparisonStats} from "@/lib/trading/analytics-s
 import {countUnpriced, mergeLivePoint} from "@/lib/trading/analytics";
 import {getEasternDateString} from "@/lib/dates";
 import {getBenchmarkIndex} from "@/lib/prices/benchmark-store";
+import {getLatestBarDate} from "@/lib/prices/store";
 import {appendLive, indexReturnPct} from "@/lib/prices/total-return";
 import {STRATEGIES, strategyBySlug} from "@/lib/strategies/catalog";
 import {STRATEGY_OWNER_ID} from "@/lib/strategies/config";
@@ -432,14 +432,14 @@ export const getStrategiesSystemStatus = cache(async (): Promise<StrategiesSyste
         await connectToDatabase();
         const [jobs, latestBar, states] = await Promise.all([
             getJobHealth([JOBS.strategies.id]),
-            PriceBar.findOne({symbol: BENCHMARK_SYMBOL}).sort({date: -1}).select('date').lean<{date: string} | null>(),
+            getLatestBarDate(BENCHMARK_SYMBOL),
             getStrategyStates(),
         ]);
         const lastRunDates = states.map((s) => s.lastRunDate).filter((d): d is string => d !== null).sort();
         const launchDates = states.map((s) => s.launchDate).sort();
         return {
             job: jobs[0] ?? null,
-            latestBarDate: latestBar?.date ?? null,
+            latestBarDate: latestBar,
             started: states.length > 0,
             launchDate: launchDates[0] ?? null,
             lastRunDate: lastRunDates.length > 0 ? lastRunDates[lastRunDates.length - 1] : null,

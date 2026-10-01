@@ -11,7 +11,8 @@
 import type {Bar} from "@/lib/prices/signals";
 import {addCalendarDays, eachCalendarDay} from "@/lib/dates";
 import {totalReturnIndex} from "@/lib/prices/total-return";
-import {createIncomeClock, dividendsByExDate, makeRateLookup, type IncomeClock, type IncomeRow, type RatePoint} from "@/lib/income/accrual";
+import {createIncomeClock, dividendsByExDate, makeRateLookup, type IncomeClock, type IncomeRow} from "@/lib/income/accrual";
+import type {RatePoint} from "@/lib/prices/types";
 import {CASH_FLOOR, SIM_RESULT_BARS, WARMUP_BARS} from "@/lib/strategies/config";
 import {buildContext, runStrategyDay} from "@/lib/strategies/engine";
 import {applyFill, type SimAccount} from "@/lib/trading/fill";

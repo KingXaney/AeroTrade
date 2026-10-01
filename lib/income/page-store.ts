@@ -55,7 +55,7 @@ export const getIncomeActivity = async (userId: string, accountId: string): Prom
         // The trades the income job replays: this epoch's, by timestamp (creditAccountIncome). The
         // ledger already starts at inceptionAt; an account without one starts at createdAt here.
         const fills = ledger.filter((t) => t.createdAt >= epoch);
-        const points = await getDividendPoints(fills.map((t) => t.symbol), getEasternDateString(inceptionAt), account.incomeThrough);
+        const points = await getDividendPoints(fills.map((t) => t.symbol), {from: getEasternDateString(inceptionAt), to: account.incomeThrough});
         return withReceipts(groupIncomeActivity(rows), fills, points);
     } catch (error) {
         console.error('Error reading income activity:', error);

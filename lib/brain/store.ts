@@ -4,12 +4,11 @@
 import {connectToDatabase} from "@/database/mongoose";
 import BrainEntity, {type BrainEntityDoc} from "@/database/models/brain-entity.model";
 import NewsItem from "@/database/models/news-item.model";
-import PriceBar from "@/database/models/price-bar.model";
 import {earliestSince, sinceThesisBySymbol, sinceThesisTargets, type SinceThesisLegs} from "@/lib/brain/since-thesis";
 import {BENCHMARK_SYMBOL} from "@/lib/prices/config";
 import {createDayMemo, remember} from "@/lib/day-memo";
 import {addCalendarDays, getEasternDateString} from "@/lib/dates";
-import {getBarsFrom, getLatestBars} from "@/lib/prices/store";
+import {countPricedSymbols, getBarsFrom, getLatestBars} from "@/lib/prices/store";
 import {getAllJobHealth, type JobHealth} from "@/lib/jobs/health";
 
 const safeAvg = (sum: number, weight: number): number => (Math.abs(weight) < 1e-9 ? 0 : sum / weight);
@@ -178,7 +177,7 @@ export const getBrainSystemStatus = async (): Promise<BrainSystemStatus> => {
         NewsItem.countDocuments({extraction: {$exists: true}}),
         BrainEntity.countDocuments({}),
         BrainEntity.countDocuments({thesisSince: {$ne: null}}),
-        PriceBar.distinct('symbol').then((symbols) => symbols.length),
+        countPricedSymbols(),
         getAllJobHealth(),
     ]);
     return {

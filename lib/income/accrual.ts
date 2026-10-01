@@ -17,6 +17,7 @@ import {DIVIDEND_PAY_LAG_DAYS} from "@/lib/prices/config";
 import {addCalendarDays, eachCalendarDay} from "@/lib/dates";
 import {easternParts, previousTradingDay} from "@/lib/prices/market-hours";
 import type {CoverageRange} from "@/lib/prices/coverage";
+import type {DividendPoint, RatePoint} from "@/lib/prices/types";
 
 // Real sweep accounts pay somewhat below T-bills; one named number, not a hidden fudge.
 export const CASH_YIELD_SPREAD = 0.0025;
@@ -26,8 +27,6 @@ export const RATE_MAX_STALENESS_DAYS = 7;
 export const SYMBOL_RELEASE_DAYS = 30;
 const DAYS_PER_YEAR = 365;
 
-export type RatePoint = {date: string; discountPct: number};
-export type DividendPoint = {symbol: string; exDate: string; perShare: number};
 export type IncomeTrade = {date: string; symbol: string; side: 'buy' | 'sell'; quantity: number; total: number};
 
 export type IncomeRow = {

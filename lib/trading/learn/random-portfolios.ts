@@ -27,9 +27,8 @@ import {
     makeRateLookup,
     replayIncome,
     usableRate,
-    type DividendPoint,
-    type RatePoint,
 } from "@/lib/income/accrual";
+import type {DividendPoint, RatePoint} from "@/lib/prices/types";
 
 export const LUCK_SAMPLE_COUNT = 1000;
 export const LUCK_PORTFOLIO_SIZE = 5;

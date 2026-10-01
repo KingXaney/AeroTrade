@@ -20,10 +20,9 @@ import {
     replayIncome,
     usableRate,
     RATE_MAX_STALENESS_DAYS,
-    type DividendPoint,
     type IncomeTrade,
-    type RatePoint,
 } from '@/lib/income/accrual';
+import type {DividendPoint, RatePoint} from '@/lib/prices/types';
 
 const RATES: RatePoint[] = [{date: '2026-09-01', discountPct: 4.07}];
 const clockWith = (dividends: DividendPoint[] = [], rates: RatePoint[] = RATES) =>

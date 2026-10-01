@@ -24,12 +24,11 @@ import {
     replayIncome,
     usableRate,
     type Deposit,
-    type DividendPoint,
     type IncomeClock,
     type IncomeTrade,
     type RateLookup,
-    type RatePoint,
 } from "@/lib/income/accrual";
+import type {DividendPoint, RatePoint} from "@/lib/prices/types";
 
 // The one page that carries the lesson: owning SPY and doing nothing is itself a strategy.
 export const TIME_IN_MARKET_STRATEGY: StrategyId = 'buy-and-hold-spy';

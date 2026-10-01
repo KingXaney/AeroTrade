@@ -15,11 +15,10 @@ import {
     missedExDates,
     replayIncome,
     withReceipts,
-    type DividendPoint,
     type IncomeTrade,
     type LedgerFill,
-    type RatePoint,
 } from '@/lib/income/accrual';
+import type {DividendPoint, RatePoint} from '@/lib/prices/types';
 
 // Noon in New York in September (EDT), so the Eastern date is the date written.
 const at = (date: string): number => Date.parse(`${date}T16:00:00Z`);

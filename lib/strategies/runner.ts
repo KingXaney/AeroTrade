@@ -15,7 +15,8 @@ import {BENCHMARK_SYMBOL} from "@/lib/prices/config";
 import {applyOverrides, gridFor, toWhatIfView, type StoredWhatIfVariant} from "@/lib/strategies/whatif";
 import {getRatePoints, symbolsLackingDividendCoverage} from "@/lib/prices/store";
 import {addCalendarDays} from "@/lib/dates";
-import {RATE_MAX_STALENESS_DAYS, type RatePoint} from "@/lib/income/accrual";
+import {RATE_MAX_STALENESS_DAYS} from "@/lib/income/accrual";
+import type {RatePoint} from "@/lib/prices/types";
 
 // Small enough to cross an Inngest step boundary: never the bars.
 export type StrategyDayPlan = {

@@ -14,11 +14,9 @@ import PaperAccount from "@/database/models/paper-account.model";
 import PaperTrade from "@/database/models/paper-trade.model";
 import AccountSnapshot from "@/database/models/account-snapshot.model";
 import AccountIncome from "@/database/models/account-income.model";
-import PriceBar from "@/database/models/price-bar.model";
-import PriceSeriesMeta from "@/database/models/price-series-meta.model";
 import {DIVIDEND_PAY_LAG_DAYS, RATE_SYMBOL, BENCHMARK_SYMBOL} from "@/lib/prices/config";
 import {addCalendarDays, getEasternDateString} from "@/lib/dates";
-import {ensureBars} from "@/lib/prices/store";
+import {ensureBars, getDividendPoints, getRatePoints, getSeriesMeta} from "@/lib/prices/store";
 import type {CoverageRange} from "@/lib/prices/coverage";
 import {
     SYMBOL_RELEASE_DAYS,
@@ -29,11 +27,11 @@ import {
     readyThrough,
     reconcile,
     replayIncome,
-    type DividendPoint,
     type IncomeRow,
     type IncomeTrade,
     type RateLookup,
 } from "@/lib/income/accrual";
+import type {DividendPoint} from "@/lib/prices/types";
 
 type LeanAccount = {
     _id: unknown;
@@ -95,12 +93,11 @@ export const planIncomeRun = async ({accountIds}: {accountIds?: string[] | null}
         need(BENCHMARK_SYMBOL, inception);
     }
 
-    const metas = await PriceSeriesMeta.find({symbol: {$in: [...neededFrom.keys()]}}).lean<{symbol: string; dividendsFrom?: string}[]>();
-    const coveredFrom = new Map(metas.map((m) => [m.symbol, m.dividendsFrom]));
+    const metas = await getSeriesMeta([...neededFrom.keys()]);
     const backfill: string[] = [];
     const topup: string[] = [RATE_SYMBOL];
     for (const [symbol, from] of neededFrom) {
-        const covered = coveredFrom.get(symbol);
+        const covered = metas.get(symbol)?.dividendsFrom;
         (covered === undefined || covered > from ? backfill : topup).push(symbol);
     }
     return {accountIds: ids, backfill, topup};
@@ -119,21 +116,17 @@ export type IncomeInputs = {
 
 export const loadIncomeInputs = async (symbols: string[], end: string): Promise<IncomeInputs> => {
     const unique = [...new Set(symbols.map((s) => s.toUpperCase()))];
-    const [rates, dividendBars, metas] = await Promise.all([
-        PriceBar.find({symbol: RATE_SYMBOL}, {_id: 0, date: 1, close: 1}).sort({date: 1}).lean<{date: string; close: number}[]>(),
-        PriceBar.find({symbol: {$in: unique}, dividend: {$gt: 0}}, {_id: 0, symbol: 1, date: 1, dividend: 1}).lean<{symbol: string; date: string; dividend: number}[]>(),
-        PriceSeriesMeta.find({symbol: {$in: unique}}).lean<{symbol: string; dividendsFrom?: string; dividendsThrough?: string; failingSince?: string}[]>(),
-    ]);
+    const [rates, dividends, metas] = await Promise.all([getRatePoints(), getDividendPoints(unique), getSeriesMeta(unique)]);
     const releaseBefore = addCalendarDays(end, -SYMBOL_RELEASE_DAYS);
     const ranges = new Map<string, CoverageRange>();
     const released = new Set<string>();
-    for (const meta of metas) {
-        if (meta.dividendsFrom && meta.dividendsThrough) ranges.set(meta.symbol, {from: meta.dividendsFrom, through: meta.dividendsThrough});
-        if (meta.failingSince && meta.failingSince <= releaseBefore) released.add(meta.symbol);
+    for (const [symbol, meta] of metas) {
+        if (meta.dividendsFrom && meta.dividendsThrough) ranges.set(symbol, {from: meta.dividendsFrom, through: meta.dividendsThrough});
+        if (meta.failingSince && meta.failingSince <= releaseBefore) released.add(symbol);
     }
     return {
-        rateOn: makeRateLookup(rates.map((r) => ({date: r.date, discountPct: r.close}))),
-        dividends: dividendsByExDate(dividendBars.map((b) => ({symbol: b.symbol, exDate: b.date, perShare: b.dividend}))),
+        rateOn: makeRateLookup(rates),
+        dividends: dividendsByExDate(dividends),
         coverage: (symbol) => ranges.get(symbol) ?? null,
         released,
     };
