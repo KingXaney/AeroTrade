@@ -68,9 +68,9 @@ const SellPositionDialog = ({position, accountId, notes, onClose}: {position: En
 
                 <form className="flex flex-col gap-4" onSubmit={(e) => { e.preventDefault(); void onConfirm(); }}>
                     <div>
-                        <label htmlFor="sell-qty" className="text-[10px] uppercase tracking-[0.1em] text-fg-muted font-mono">
+                        <MicroLabel as="label" htmlFor="sell-qty">
                             Shares to sell
-                        </label>
+                        </MicroLabel>
                         <TextField
                             id="sell-qty"
                             value={qty}

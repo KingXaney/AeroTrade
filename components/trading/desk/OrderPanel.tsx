@@ -17,6 +17,7 @@ import type {Stock} from '@/lib/stocks/types';
 import Panel from '@/components/primitives/Panel';
 import TextField from '@/components/primitives/TextField';
 import SectionHeading from "@/components/primitives/SectionHeading";
+import MicroLabel from "@/components/primitives/MicroLabel";
 
 type OrderPanelProps = {
     defaultSymbol?: string;
@@ -197,7 +198,7 @@ const OrderPanel = ({defaultSymbol = '', cash, accountId, positions = [], onSymb
 
             {/* Symbol */}
             <div className="relative">
-                <label htmlFor="order-symbol" className="text-[10px] uppercase tracking-[0.1em] text-fg-muted font-mono">Symbol</label>
+                <MicroLabel as="label" htmlFor="order-symbol">Symbol</MicroLabel>
                 <TextField
                     id="order-symbol"
                     value={symbol}
@@ -228,7 +229,7 @@ const OrderPanel = ({defaultSymbol = '', cash, accountId, positions = [], onSymb
 
             {/* Quantity + presets */}
             <div>
-                <label htmlFor="order-shares" className="text-[10px] uppercase tracking-[0.1em] text-fg-muted font-mono">Shares</label>
+                <MicroLabel as="label" htmlFor="order-shares">Shares</MicroLabel>
                 <TextField
                     id="order-shares"
                     value={quantity}
@@ -276,7 +277,7 @@ const OrderPanel = ({defaultSymbol = '', cash, accountId, positions = [], onSymb
             {!compact && (
                 <div>
                     <div className="flex items-center justify-between">
-                        <label htmlFor="order-note" className="font-mono text-[10px] uppercase tracking-[0.1em] text-fg-muted">{NOTE_COPY.label}</label>
+                        <MicroLabel as="label" htmlFor="order-note">{NOTE_COPY.label}</MicroLabel>
                         <span className="font-mono text-[10px] text-fg-muted" aria-hidden>{NOTE_COPY.counter(note.length, TRADE_REASON_MAX)}</span>
                     </div>
                     <textarea

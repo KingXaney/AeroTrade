@@ -6,6 +6,7 @@ import UnpricedNote from "@/components/trading/UnpricedNote";
 import Term from "@/components/primitives/Term";
 import type {EnrichedPosition} from '@/lib/trading/types';
 import RowCard from "@/components/primitives/RowCard";
+import MicroLabel from "@/components/primitives/MicroLabel";
 
 // The one holdings table. Read-only as rendered by the friend profile page, the strategy
 // detail page and the dashboard's Top Holdings widget; /portfolio's PositionsTable passes
@@ -58,14 +59,14 @@ const HoldingsTable = ({positions, emptyText = 'No open positions.', showUnprice
                         </div>
                     </div>
                     {/* Below md the header row is hidden, so each cell names itself. */}
-                    <div className="flex justify-between md:block md:text-right text-fg font-mono"><span className="md:hidden text-[10px] uppercase tracking-[0.1em] text-fg-muted mr-2">Qty</span>{p.quantity}</div>
-                    <div className="flex justify-between md:block md:text-right text-fg-soft font-mono"><span className="md:hidden text-[10px] uppercase tracking-[0.1em] text-fg-muted mr-2">Avg Cost</span>{formatPrice(p.avgCost)}</div>
+                    <div className="flex justify-between md:block md:text-right text-fg font-mono"><MicroLabel className="md:hidden mr-2">Qty</MicroLabel>{p.quantity}</div>
+                    <div className="flex justify-between md:block md:text-right text-fg-soft font-mono"><MicroLabel className="md:hidden mr-2">Avg Cost</MicroLabel>{formatPrice(p.avgCost)}</div>
                     <div className="flex justify-between md:block md:text-right text-fg font-mono">
-                        <span className="md:hidden text-[10px] uppercase tracking-[0.1em] text-fg-muted mr-2">Price</span>
+                        <MicroLabel className="md:hidden mr-2">Price</MicroLabel>
                         {typeof p.currentPrice === 'number' ? formatPrice(p.currentPrice) : '—'}
                     </div>
                     <div className="flex justify-between md:block md:text-right font-mono">
-                        <span className="md:hidden text-[10px] uppercase tracking-[0.1em] text-fg-muted mr-2">Value / P&L</span>
+                        <MicroLabel className="md:hidden mr-2">Value / P&L</MicroLabel>
                         <div className="text-right">
                         <div className="text-fg">{formatPrice(p.marketValue)}</div>
                         {p.priceStale ? (

@@ -7,6 +7,7 @@ import Term from "@/components/primitives/Term";
 import WhatTheseMean from "@/components/learn/WhatTheseMean";
 import Panel from "@/components/primitives/Panel";
 import type {StockWithData} from '@/lib/stocks/types';
+import MicroLabel from "@/components/primitives/MicroLabel";
 
 type WatchlistTableProps = {
     watchlist: StockWithData[];
@@ -60,7 +61,7 @@ const WatchlistTable = ({watchlist}: WatchlistTableProps) => {
                     {/* Below md the header row is hidden, so each cell names itself. */}
                     <div className="flex justify-between md:block md:text-right text-fg font-mono"
                          style={{ letterSpacing: '0.02em' }}>
-                        <span className="md:hidden text-[10px] uppercase tracking-[0.1em] text-fg-muted mr-2">Price</span>
+                        <MicroLabel className="md:hidden mr-2">Price</MicroLabel>
                         {row.priceFormatted ?? '—'}
                     </div>
 
@@ -89,14 +90,14 @@ const WatchlistTable = ({watchlist}: WatchlistTableProps) => {
                     {/* Market Cap */}
                     <div className="flex justify-between md:block md:text-right text-fg-soft font-mono"
                          style={{ letterSpacing: '0.02em', fontSize: '14px' }}>
-                        <span className="md:hidden text-[10px] uppercase tracking-[0.1em] text-fg-muted mr-2">Market Cap</span>
+                        <MicroLabel className="md:hidden mr-2">Market Cap</MicroLabel>
                         {row.marketCap ?? '—'}
                     </div>
 
                     {/* P/E Ratio */}
                     <div className="flex justify-between md:block md:text-right text-fg-soft font-mono"
                          style={{ letterSpacing: '0.02em', fontSize: '14px' }}>
-                        <span className="md:hidden text-[10px] uppercase tracking-[0.1em] text-fg-muted mr-2">P/E Ratio</span>
+                        <MicroLabel className="md:hidden mr-2">P/E Ratio</MicroLabel>
                         {row.peRatio ?? '—'}
                     </div>
 

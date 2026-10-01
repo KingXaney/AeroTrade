@@ -6,6 +6,7 @@ import {unpricedLabel} from "@/lib/trading/analytics";
 import type {ComparisonRow} from "@/lib/trading/active-account";
 import useSwitchAccount from "@/components/trading/accounts/useSwitchAccount";
 import {rowCard} from "@/components/primitives/RowCard";
+import MicroLabel from "@/components/primitives/MicroLabel";
 
 // The "which account wins" view: every one of the user's paper accounts side by side.
 // Clicking a row makes that account the active one.
@@ -45,11 +46,11 @@ const AccountComparisonTable = ({rows, activeId}: {rows: ComparisonRow[]; active
                     </div>
                     {/* Below md the header row is hidden, so each cell names itself. */}
                     <div className="flex justify-between md:block md:text-right text-sm text-fg font-mono">
-                        <span className="md:hidden text-[10px] uppercase tracking-[0.1em] text-fg-muted mr-2">Value</span>
+                        <MicroLabel className="md:hidden mr-2">Value</MicroLabel>
                         {formatPrice(row.totalValue)}
                     </div>
                     <div className="flex justify-between md:block md:text-right font-mono">
-                        <span className="md:hidden text-[10px] uppercase tracking-[0.1em] text-fg-muted mr-2">Total Return</span>
+                        <MicroLabel className="md:hidden mr-2">Total Return</MicroLabel>
                         <div className="text-right">
                         <div className={cn('text-sm', getChangeColorClass(row.totalReturnPct))}>
                             {formatPct(row.totalReturnPct)}
@@ -64,11 +65,11 @@ const AccountComparisonTable = ({rows, activeId}: {rows: ComparisonRow[]; active
                     {/* These two used to be hidden below md — the very numbers that make a
                         account comparison a comparison. */}
                     <div className="flex justify-between md:block md:text-right text-sm text-fg-soft font-mono">
-                        <span className="md:hidden text-[10px] uppercase tracking-[0.1em] text-fg-muted mr-2">Win Rate</span>
+                        <MicroLabel className="md:hidden mr-2">Win Rate</MicroLabel>
                         {row.winRatePct === null ? '—' : `${row.winRatePct.toFixed(0)}%`}
                     </div>
                     <div className="flex justify-between md:block md:text-right text-sm font-mono">
-                        <span className="md:hidden text-[10px] uppercase tracking-[0.1em] text-fg-muted mr-2">Max Drawdown</span>
+                        <MicroLabel className="md:hidden mr-2">Max Drawdown</MicroLabel>
                         {row.maxDrawdownPct === null
                             ? <span className="text-fg-soft">—</span>
                             : <span className={roundPct(row.maxDrawdownPct) > 0 ? 'text-negative' : 'text-fg-soft'}>{formatDrawdown(row.maxDrawdownPct)}</span>}

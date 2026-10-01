@@ -8,6 +8,7 @@ import {PAPER_STARTING_BALANCE, STARTING_BALANCE_RANGE, resolveStartingBalance} 
 import {Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle} from "@/components/ui/dialog";
 import ActionButton from "@/components/primitives/ActionButton";
 import TextField from "@/components/primitives/TextField";
+import MicroLabel from "@/components/primitives/MicroLabel";
 
 // Name a new paper account and pick its starting balance. Mounted conditionally
 // by AccountSwitcher so every open starts with fresh state (same pattern as
@@ -53,9 +54,9 @@ const CreateAccountDialog = ({onClose}: {onClose: () => void}) => {
 
                 <form className="flex flex-col gap-4" onSubmit={(e) => { e.preventDefault(); void onConfirm(); }}>
                     <div>
-                        <label htmlFor="account-name" className="text-[10px] uppercase tracking-[0.1em] text-fg-muted font-mono">
+                        <MicroLabel as="label" htmlFor="account-name">
                             Account name
-                        </label>
+                        </MicroLabel>
                         <TextField
                             id="account-name"
                             value={name}
@@ -69,9 +70,9 @@ const CreateAccountDialog = ({onClose}: {onClose: () => void}) => {
                     </div>
 
                     <div>
-                        <label htmlFor="account-balance" className="text-[10px] uppercase tracking-[0.1em] text-fg-muted font-mono">
+                        <MicroLabel as="label" htmlFor="account-balance">
                             Starting balance ($)
-                        </label>
+                        </MicroLabel>
                         <TextField
                             id="account-balance"
                             value={balance}

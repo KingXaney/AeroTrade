@@ -13,6 +13,7 @@ import Panel from '@/components/primitives/Panel';
 import ActionButton from '@/components/primitives/ActionButton';
 import TextField from '@/components/primitives/TextField';
 import SectionHeading from "@/components/primitives/SectionHeading";
+import MicroLabel from "@/components/primitives/MicroLabel";
 
 // Enrollment + kill switch for the AI-managed paper account.
 const NavigatorCard = ({status}: {status: NavigatorStatus}) => {
@@ -62,9 +63,9 @@ const NavigatorCard = ({status}: {status: NavigatorStatus}) => {
             {!status.enrolled ? (
                 <div className="flex flex-col gap-3">
                     <div>
-                        <label htmlFor="navigator-balance" className="text-[10px] uppercase tracking-[0.1em] text-fg-muted font-mono">
+                        <MicroLabel as="label" htmlFor="navigator-balance">
                             The AI starts with ($)
-                        </label>
+                        </MicroLabel>
                         <TextField
                             id="navigator-balance"
                             value={startBalance}

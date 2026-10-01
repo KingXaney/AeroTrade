@@ -13,6 +13,7 @@ import {rowCard} from "@/components/primitives/RowCard";
 import ActionButton from "@/components/primitives/ActionButton";
 import {TextArea} from "@/components/primitives/TextField";
 import SectionHeading from "@/components/primitives/SectionHeading";
+import MicroLabel from "@/components/primitives/MicroLabel";
 
 // The API path generates in the background, so refresh a couple of times after
 // queueing instead of making the user hunt for the reload button.
@@ -145,9 +146,9 @@ const SecondOpinionCard = ({configured, opinion}: {configured: boolean; opinion:
 
             {promptFallback && (
                 <div className="mb-3">
-                    <label htmlFor="second-opinion-prompt" className="text-[10px] uppercase tracking-[0.1em] text-fg-muted font-mono">
+                    <MicroLabel as="label" htmlFor="second-opinion-prompt">
                         Prompt — select all and copy
-                    </label>
+                    </MicroLabel>
                     <TextArea id="second-opinion-prompt" readOnly value={promptFallback} rows={6} onFocus={(e) => e.currentTarget.select()}
                               className="w-full mt-1 text-xs text-fg-soft" />
                 </div>
@@ -155,9 +156,9 @@ const SecondOpinionCard = ({configured, opinion}: {configured: boolean; opinion:
 
             {pasteOpen && (
                 <div className="mb-4">
-                    <label htmlFor="second-opinion-answer" className="text-[10px] uppercase tracking-[0.1em] text-fg-muted font-mono">
+                    <MicroLabel as="label" htmlFor="second-opinion-answer">
                         Claude&apos;s answer
-                    </label>
+                    </MicroLabel>
                     <TextArea id="second-opinion-answer" value={pasted} onChange={(e) => setPasted(e.target.value)} rows={5}
                               placeholder="Paste Claude's answer here…"
                               className="w-full mt-1" />
