@@ -8,6 +8,7 @@ import type {ToolExecutionOptions} from 'ai';
 const stubs = vi.hoisted(() => ({
     searchStocks: vi.fn(),
     getWatchlistSymbolsByUserId: vi.fn(),
+    getNews: vi.fn(),
 }));
 
 vi.mock('@/lib/actions/finnhub.actions', () => ({
@@ -15,7 +16,7 @@ vi.mock('@/lib/actions/finnhub.actions', () => ({
     getQuote: vi.fn(),
     getCompanyProfile: vi.fn(),
     getFinancials: vi.fn(),
-    getNews: vi.fn(),
+    getNews: stubs.getNews,
 }));
 vi.mock('@/lib/actions/watchlist.actions', () => ({
     addToWatchlist: vi.fn(),
@@ -39,6 +40,7 @@ vi.mock('@/lib/strategies/queries', () => ({getLatestRun: vi.fn(), getStrategyLe
 vi.mock('@/lib/ai/learner-hooks', () => ({priceLargestHoldings: vi.fn(), readLearnerValue: vi.fn()}));
 
 import {buildTools} from '@/lib/ai/tools';
+import {FEED_WATCHLIST_SYMBOL_CAP} from '@/lib/news/config';
 
 const tools = buildTools('user-1');
 
@@ -73,5 +75,31 @@ describe('searchStock', () => {
         stubs.getWatchlistSymbolsByUserId.mockResolvedValue([]);
 
         expect(await run('searchStock', {query: 's'})).toHaveLength(10);
+    });
+});
+
+describe('getMarketNews', () => {
+    const tickers = (n: number) => Array.from({length: n}, (_, i) => `S${i}`);
+
+    it('takes no more symbols than the news feed fetches', () => {
+        const schema = tools.getMarketNews.inputSchema as unknown as {safeParse: (v: unknown) => {success: boolean}};
+        expect(schema.safeParse({symbols: tickers(FEED_WATCHLIST_SYMBOL_CAP)}).success).toBe(true);
+        expect(schema.safeParse({symbols: tickers(FEED_WATCHLIST_SYMBOL_CAP + 1)}).success).toBe(false);
+    });
+
+    it('hands getNews at most the cap even when the schema is bypassed', async () => {
+        stubs.getNews.mockResolvedValue([]);
+
+        await run('getMarketNews', {symbols: tickers(20)});
+
+        expect(stubs.getNews).toHaveBeenCalledWith(tickers(FEED_WATCHLIST_SYMBOL_CAP));
+    });
+
+    it('asks for general news when no symbols are given', async () => {
+        stubs.getNews.mockResolvedValue([]);
+
+        await run('getMarketNews', {symbols: []});
+
+        expect(stubs.getNews).toHaveBeenCalledWith(undefined);
     });
 });

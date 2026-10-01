@@ -20,6 +20,7 @@ import {getActiveTheses, getBrainDigestData} from "@/lib/brain/queries";
 import {getTopicFeed, getTopicsForUser, getTopicsOverview} from "@/lib/topics/store";
 import {createTopic, deleteTopic} from "@/lib/actions/topics.actions";
 import {MAX_KEYWORDS} from "@/lib/topics/config";
+import {FEED_WATCHLIST_SYMBOL_CAP} from "@/lib/news/config";
 import {
     aggregatePortfolios,
     computePortfolio,
@@ -155,10 +156,13 @@ export const buildTools = (userId: string) => ({
     getMarketNews: tool({
         description: TOOL_DESCRIPTIONS.getMarketNews,
         inputSchema: z.object({
-            symbols: z.array(z.string()).optional().describe('Optional list of ticker symbols'),
+            // getNews makes one Finnhub call per symbol, in turn, on the shared key: the same cap as /news.
+            symbols: z.array(z.string()).max(FEED_WATCHLIST_SYMBOL_CAP).optional()
+                .describe(`Optional list of ticker symbols, at most ${FEED_WATCHLIST_SYMBOL_CAP}`),
         }),
         execute: async ({symbols}) => {
-            const articles = await getNews(symbols && symbols.length > 0 ? symbols : undefined);
+            const capped = symbols?.slice(0, FEED_WATCHLIST_SYMBOL_CAP);
+            const articles = await getNews(capped && capped.length > 0 ? capped : undefined);
             return articles.map((a) => ({
                 headline: a.headline,
                 summary: a.summary,
