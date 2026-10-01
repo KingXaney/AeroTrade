@@ -14,12 +14,17 @@ before the rename keep the name "Main Strategy" (new ones are "Main account", `D
 
 ## Commands
 
-- `npm run check` — lint + typecheck + unit tests (what CI runs)
+- `npm run check` — lint + typecheck + unit tests; CI runs these, then `build:check`
+- `npm run lint` / `npm run typecheck` — eslint / `tsc --noEmit`, the first two parts of `check`
 - `npm test` / `npm run test:watch` — vitest, node environment, `lib/**/__tests__` only
 - `npm run build:check` — compile-only Next build; needs no database or keys
+- `npm run build` / `npm start` — the production build and its server
 - `npm run dev` + `npx inngest-cli@latest dev -u http://localhost:3000/api/inngest` — app + jobs
 - `npm run trigger -- <brain|navigator|news|snapshots|income|topics|briefs|strategies|strategies-preview|strategies-resimulate>` — fire a job locally
-- `scripts/qa/` — browser QA against an in-memory MongoDB (see its README)
+- `npm run test:db` — connect to `MONGODB_URI` (from `.env`) and print the database and host it reached
+- `npm run migrate:accounts` — the idempotent multi-account migration: builds the indexes in `scripts/migration-indexes.mjs` and drops the ones they replaced (run it on every database, again whenever that list changes)
+- `npm run opinion:local` — the brain's Second Opinion from your Claude subscription through the Claude Code CLI, written straight to the database (`.env.example` lists the other ways)
+- `npm run qa` — browser QA (`scripts/qa/run.sh`): an in-memory MongoDB, `next dev` and the Inngest dev server, then every suite or the named ones (`npm run qa -- learn`); one suite per feature, listed in `scripts/qa/README.md`
 
 ## Where things live
 

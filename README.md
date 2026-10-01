@@ -121,11 +121,11 @@ npm run trigger -- news         # send today's digest emails
 ## Development
 
 ```bash
-npm run check         # lint + typecheck + unit tests (what CI runs)
+npm run check         # lint + typecheck + unit tests (CI runs these, then build:check)
 npm test              # vitest, ~1s
 npm run typecheck
 npm run lint
-npx next build --experimental-build-mode compile   # proves the app builds without any keys
+npm run build:check   # compile-only build: proves the app builds without any keys
 npm run qa            # browser QA: every suite in scripts/qa against a throwaway harness
 ```
 

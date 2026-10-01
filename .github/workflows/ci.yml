@@ -35,6 +35,6 @@ jobs:
 
       # Compile-only build: no database or API keys are needed to prove the app builds.
       - name: Build (compile)
-        run: npx next build --experimental-build-mode compile
+        run: npm run build:check
         env:
           NEXT_TELEMETRY_DISABLED: '1'
