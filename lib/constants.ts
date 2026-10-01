@@ -1,15 +1,3 @@
-// Header order: topics first, then the dashboard and the market pages. Watchlist,
-// Friends and History stay reachable from the sidebar, the dropdown and ⌘K.
-export const NAV_ITEMS = [
-    { href: '/topics', label: 'Topics' },
-    { href: '/', label: 'Dashboard' },
-    { href: '/brain', label: 'Brain' },
-    { href: '/portfolio', label: 'Portfolio' },
-    { href: '/trade', label: 'Trade' },
-    { href: '/markets', label: 'Markets' },
-    { href: '/search', label: 'Search' },
-];
-
 // Paper-trading: default starting virtual cash; users may pick a custom amount
 // at account creation / AI enrollment within these bounds.
 export const PAPER_STARTING_BALANCE = 100_000;
