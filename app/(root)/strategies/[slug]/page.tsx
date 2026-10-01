@@ -11,6 +11,7 @@ import {explainVerdict, pickQuizRows} from "@/lib/learn/verdict";
 import {decodeReason} from "@/lib/learn/reasons";
 import {narrateBoard} from "@/lib/learn/board-narration";
 import {BOARD_COPY} from "@/lib/learn/copy/board";
+import {EXPORT_COPY} from "@/lib/learn/copy/export";
 import MicroLabel from "@/components/primitives/MicroLabel";
 import Panel from "@/components/primitives/Panel";
 import SectionHeading from "@/components/primitives/SectionHeading";
@@ -189,9 +190,25 @@ const StrategyPage = async ({params, searchParams}: StrategyPageProps) => {
             <Panel id="strategy-trades">
                 <div className="flex items-center justify-between gap-3 mb-4">
                     <SectionHeading spacing="none">Live trade log</SectionHeading>
-                    <MicroLabel>
-                        {analytics ? `${analytics.tradeCount} fill${analytics.tradeCount === 1 ? '' : 's'}` : ''}
-                    </MicroLabel>
+                    <div className="flex items-center gap-3">
+                        <MicroLabel>
+                            {analytics ? `${analytics.tradeCount} fill${analytics.tradeCount === 1 ? '' : 's'}` : ''}
+                        </MicroLabel>
+                        {/* The whole current epoch, uncapped — the log above shows its tail. Nothing to
+                            export before the first fill, so no link either. */}
+                        {trades.length > 0 && (
+                            <a
+                                href={`/api/strategies/${def.id}/export`}
+                                download
+                                title={EXPORT_COPY.strategyTitle(def.name)}
+                                data-testid="strategy-export"
+                                className="font-mono inline-flex items-center gap-1 text-[11px] text-brand hover:underline"
+                            >
+                                <span className="material-symbols-outlined text-sm" aria-hidden="true">download</span>
+                                {EXPORT_COPY.label}
+                            </a>
+                        )}
+                    </div>
                 </div>
                 {trades.length === 0
                     ? <p className="text-sm text-fg-muted p-4">No fills yet — the first orders are placed on the next run that finds a signal.</p>

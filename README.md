@@ -9,7 +9,7 @@ Follow the topics you care about, test trading strategies with virtual money, an
 [![License: MIT](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
 ![Next.js 16](https://img.shields.io/badge/Next.js-16-black)
 ![TypeScript](https://img.shields.io/badge/TypeScript-strict-3178c6)
-![Tests](https://img.shields.io/badge/tests-1461%20passing-brightgreen)
+![Tests](https://img.shields.io/badge/tests-1523%20passing-brightgreen)
 
 <img src="docs/screenshots/dashboard.png" alt="AeroTrade dashboard: followed topics, portfolio, latest articles, market heatmap" width="900">
 
@@ -19,7 +19,7 @@ Follow the topics you care about, test trading strategies with virtual money, an
 
 **Follow the news, not just the tape.** Create a topic for anything — "Fed rate decisions", "AI chips", "NBA trade deadline" — and AeroTrade builds a feed for it from Google News search plus every source the news brain already reads. Each topic gets a daily AI *"what changed today"* brief, a slot in the daily email, and a place in the chat assistant.
 
-**Paper-trade strategies side by side.** Open several strategy accounts with their own starting balance, place market orders at the last price, and compare them on return, drawdown, win rate and a daily benchmark curve against SPY. Export any account's fills as CSV.
+**Paper-trade strategies side by side.** Open several strategy accounts with their own starting balance, place market orders at the last price, and compare them on return, drawdown, win rate and a daily benchmark curve against SPY. Export any account's fills — or a quant strategy's — as CSV.
 
 **A news brain that builds market narratives.** Every morning a job ingests finance news, RSS, Reddit and SEC filings, has Gemini extract tickers, sectors and themes with sentiment, and folds them into an entity graph with *fast* (5-day) and *slow* (60-day) attention weights. Narratives whose slow weight stays high become **theses**.
 
@@ -27,9 +27,9 @@ Follow the topics you care about, test trading strategies with virtual money, an
 
 **Eight classic quant strategies, paper-traded live and explained.** Buy & hold, 60/40, golden cross, dual momentum, 12-1 momentum, RSI-2 mean reversion, Donchian breakouts and low volatility each run in their own system account every trading morning, decided from the previous close and filled at the open through the same order path you use. A leaderboard ranks them by live return against SPY; each page explains the rule, shows what it is watching, its holdings and every fill with its reason, alongside a clearly labelled three-year simulated record. Deterministic rules, no AI.
 
-**Learn from the numbers in front of you.** Every figure in the app carries its own definition — hover a column or open a panel's *"What these mean"* — from one glossary whose formulas are cited from the code that computes them, and `/learn` lists it all with a link to the real number on your account. A strategy page lets you call today's verdicts before the rule reveals them, reads its signal board in plain words, and opens any fill to the exact board row the rule looked at that morning, its reason decoded clause by clause; its what-if lab moves one setting of the rule and redraws the three years beside the stored backtest, and the buy-and-hold page sets three ways of owning SPY — all at once, monthly, or kept as cash — side by side from a start date you pick. Your own account explains itself too: guess how much of your return came from interest and dividends, then see it split to the cent; every fill and every income line has a receipt, the "why" you wrote for a buy comes back when you sell, your trading habits (how long winners and losers were held, how many of each were sold) sit beside the strategies' cadences, and a histogram shows where your return landed among 1,000 random five-stock portfolios over the same days. `/brain` carries a legend of how articles become weights and theses, and every Navigator decision reads in plain words; a stock page says what each key number divides and what each strategy watching it sees. A First-week checklist ticks itself from what you actually did, a Today's lesson widget (and the daily email) picks up your first dividend or the term your topics used today, a Daily quiz asks one question a day from a strategy's latest board and reveals the rule's own reason, the order ticket says what an order does to the account before you place it (down to what the cash left would earn), and the chat tutor answers "what is my max drawdown?" from the same glossary, with your own figure. Descriptions only — a unit test keeps every sentence, chip and prompt free of advice.
+**Learn from the numbers in front of you.** Every figure in the app carries its own definition — hover a column or open a panel's *"What these mean"* — from one glossary whose formulas are cited from the code that computes them, and `/learn` lists it all with a link to the real number on your account. A strategy page lets you call today's verdicts before the rule reveals them, reads its signal board in plain words, and opens any fill to the exact board row the rule looked at that morning, its reason decoded clause by clause; its what-if lab moves one setting of the rule and redraws the three years beside the stored backtest, and the buy-and-hold page sets three ways of owning SPY — all at once, monthly, or kept as cash — side by side from a start date you pick. Your own account explains itself too: guess how much of your return came from interest and dividends, then see it split to the cent; every fill and every income line has a receipt, the "why" you wrote for a buy comes back when you sell, your trading habits (how long winners and losers were held, how many of each were sold) sit beside the strategies' cadences, and a histogram shows where your return landed among 1,000 random five-stock portfolios over the same days. `/brain` carries a legend of how articles become weights and theses, and every Navigator decision reads in plain words; a stock page says what each key number divides and what each strategy watching it sees. A First-week checklist ticks itself from what you actually did, a Today's lesson widget (and the daily email) picks up your first dividend or the term your topics used today, a Daily quiz asks one question a day from a strategy's latest board and reveals the rule's own reason, the order ticket says what an order does to the account before you place it (down to what the cash left would earn), and the chat tutor answers "what is my max drawdown?" from the same glossary, with your own figure, and decodes a quant strategy's or the Navigator's reason clause by clause. Descriptions only — a unit test keeps every sentence, chip and prompt free of advice.
 
-**A second opinion, a chat advisor, and a digest.** Claude can critique the brain's current picture; a tool-using chat assistant (16 tools) answers "what's new in my topics?" or "what does max drawdown mean?"; a daily email summarises the market for each user, personalised to their holdings, then adds their topics and the day's lesson, with links allow-listed to the actual articles and the app's own pages.
+**A second opinion, a chat advisor, and a digest.** Claude can critique the brain's current picture; a tool-using chat assistant (17 tools) answers "what's new in my topics?", "what does max drawdown mean?" or "why did RSI-2 buy?"; a daily email summarises the market for each user, personalised to their holdings, then adds their topics and the day's lesson, with links allow-listed to the actual articles and the app's own pages.
 
 **Make it yours.** 12 colour palettes × 5 visual styles (minimal, futuristic, liquid glass, brutalist, soft), saved per account and rendered without a flash. A 35-widget dashboard you can drag, resize and extend.
 
@@ -78,11 +78,11 @@ flowchart LR
 |---|---|
 | App | Next.js 16 (App Router, Server Actions, Turbopack), React 19, TypeScript strict |
 | UI | Tailwind v4 with semantic theme tokens, shadcn/radix primitives, dnd-kit, TradingView embeds |
-| Data | MongoDB + Mongoose 9 (22 models), better-auth for email/password sessions |
+| Data | MongoDB + Mongoose 9 (22 models), better-auth for email/password sessions, sign-in and password reset rate-limited on a Mongo counter |
 | Jobs | Inngest (8 scheduled jobs + on-demand events), idempotent steps, per-user rate limits |
 | AI | Vercel AI SDK; Gemini 2.5 Flash-Lite on the free tier for every scheduled job, optional Claude tiers, Claude for the second opinion |
 | Market data | Finnhub (quotes, profiles, search, news), Google News RSS, SEC EDGAR, Reddit |
-| Quality | Vitest (106 files / 1461 tests), ESLint, `tsc --noEmit`, GitHub Actions, Playwright browser QA against an in-memory Mongo |
+| Quality | Vitest (110 files / 1523 tests), ESLint, `tsc --noEmit`, GitHub Actions, Playwright browser QA against an in-memory Mongo |
 
 ## Getting started
 
@@ -133,7 +133,7 @@ Unit tests cover the pure modules — the layout engine, theme tokens, news aggr
 ## Project structure
 
 ```
-app/            routes: (auth) sign-in/up · (root) dashboard, topics, brain, strategies, strategies/[slug], trade, portfolio, markets, news, watchlist, friends, history, learn, settings · api/{chat,inngest,accounts}
+app/            routes: (auth) sign-in/up · (root) dashboard, topics, brain, strategies, strategies/[slug], trade, portfolio, markets, news, watchlist, friends, history, learn, settings · api/{chat,inngest,accounts,strategies}
 components/     UI by feature: dashboard (widget grid + 35 widgets), topics, brain, strategies, stock, trade, analytics, learn, settings, chat, theme, primitives, ui (shadcn)
 lib/
   news/         source adapters (Finnhub, RSS, Reddit, SEC, Google News search), dedupe, HTML sanitiser

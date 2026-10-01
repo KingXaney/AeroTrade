@@ -1,11 +1,9 @@
 // Fixed-window rate limiting on a database counter. Server-only (Mongoose); the
-// server actions that guard sign-in-adjacent endpoints call this at the top.
+// server actions that guard sign-in-adjacent endpoints call this at the top. The limits and
+// keys they pass live in lib/auth/limits.ts (import-free, unit-tested).
 
 import {connectToDatabase} from "@/database/mongoose";
 import RateLimit from "@/database/models/rate-limit.model";
-
-export const PASSWORD_RESET_LIMIT = 3;
-export const PASSWORD_RESET_WINDOW_MS = 15 * 60 * 1000;
 
 const isDuplicateKey = (error: unknown): boolean =>
     typeof error === 'object' && error !== null && (error as {code?: number}).code === 11000;
@@ -38,5 +36,3 @@ export const takeRateLimit = async (key: string, limit: number, windowMs: number
         return (bumped?.count ?? 1) <= limit;
     }
 };
-
-export const passwordResetKey = (email: string): string => `pwreset:${email.trim().toLowerCase()}`;

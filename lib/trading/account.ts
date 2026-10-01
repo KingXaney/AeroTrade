@@ -295,14 +295,17 @@ export const getTradeHistory = async (userId: string, accountId: string, limit =
 };
 
 // Newest fills across every strategy account, each tagged with its account's name —
-// the /history page's trade feed. Read-only (no lazy account creation).
+// the /history page's trade feed. Read-only (no lazy account creation). The list and its count
+// are each account's current epoch (epochTradesOf), as every per-account read is: a reset that
+// crashed before deleting the old epoch's fills must not bring them back here either.
 export const getRecentTradesForUser = async (userId: string, limit = 50): Promise<{trades: PaperTradeRecord[]; total: number}> => {
     try {
         await connectToDatabase();
-        const [trades, total, accounts] = await Promise.all([
-            PaperTrade.find({userId}).sort({createdAt: -1}).limit(limit).lean<LeanTrade[]>(),
-            PaperTrade.countDocuments({userId}),
-            PaperAccount.find({userId}).select('name').lean<{_id: unknown; name?: string}[]>(),
+        const accounts = await PaperAccount.find({userId}).select('name inceptionAt').lean<{_id: unknown; name?: string; inceptionAt?: Date}[]>();
+        const epoch = epochTradesOf(userId, accounts);
+        const [trades, total] = await Promise.all([
+            PaperTrade.find(epoch).sort({createdAt: -1, _id: -1}).limit(limit).lean<LeanTrade[]>(),
+            PaperTrade.countDocuments(epoch),
         ]);
         const names = new Map(accounts.map((a) => [String(a._id), a.name || DEFAULT_ACCOUNT_NAME]));
         return {trades: trades.map((t) => toTradeRecord(t, t.accountId ? names.get(t.accountId) : undefined)), total};
@@ -461,15 +464,17 @@ export const getAccountAnalytics = async (userId: string, accountId: string): Pr
     }
 };
 
-// Win rate + max drawdown for every account of a user in bulk queries
-// (feeds the strategy comparison table without N per-account round trips).
+export type ComparisonStats = {winRatePct: number | null; maxDrawdownPct: number | null; tradeCount: number};
+
+// Win rate + max drawdown (and the fill count behind the win rate) for every account of a
+// user in bulk queries (feeds the strategy comparison table without N per-account round trips).
 // liveValues (accountId -> current total value) folds today's live valuation
 // into each drawdown series the same way getAccountAnalytics does. Trades are each
 // account's current epoch (epochTradesOf), so the table's win rate is the tile's.
 export const getComparisonStats = async (
     userId: string,
     liveValues?: Record<string, number>,
-): Promise<Record<string, {winRatePct: number | null; maxDrawdownPct: number | null}>> => {
+): Promise<Record<string, ComparisonStats>> => {
     try {
         await connectToDatabase();
         const epochTradesForUser = async () => {
@@ -499,16 +504,18 @@ export const getComparisonStats = async (
 
         const today = getEasternDateString();
         const ids = new Set([...tradesByAccount.keys(), ...snapshotsByAccount.keys(), ...Object.keys(liveValues ?? {})]);
-        const result: Record<string, {winRatePct: number | null; maxDrawdownPct: number | null}> = {};
+        const result: Record<string, ComparisonStats> = {};
         for (const id of ids) {
             const live = liveValues?.[id];
             const points = mergeLivePoint(
                 snapshotsByAccount.get(id) ?? [],
                 typeof live === 'number' ? {date: today, value: live} : undefined,
             );
+            const accountTrades = tradesByAccount.get(id) ?? [];
             result[id] = {
-                winRatePct: computeWinStats(tradesByAccount.get(id) ?? []).winRatePct,
+                winRatePct: computeWinStats(accountTrades).winRatePct,
                 maxDrawdownPct: computeMaxDrawdown(points),
+                tradeCount: accountTrades.length,
             };
         }
         return result;

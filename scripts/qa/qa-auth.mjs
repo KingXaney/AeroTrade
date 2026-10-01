@@ -3,6 +3,11 @@
 // opens logged out (proxy matcher), the token is read out of the throwaway Mongo (no
 // SMTP in the harness), the request answers identically for every address, the
 // rate limiter stops the fourth request, old sessions are revoked, a token is single-use.
+// Sign-in is limited per address (10 in 15 minutes, every spelling of it counted together) and
+// per client address (30): the refusal is one fixed sentence, identical for an address with an
+// account and one without, it holds even for the right password, and another address is not
+// touched. The per-client check seeds its counter; every signin:* row is removed at the end so
+// no later suite starts inside this one's window.
 import {chromium} from 'playwright';
 import {MongoClient} from 'mongodb';
 import {mkdirSync} from 'node:fs';
@@ -15,6 +20,10 @@ mkdirSync(OUT, {recursive: true});
 const NEUTRAL = 'If an account exists for that address, a reset link is on its way. It expires in 30 minutes.';
 const P1 = 'Passw0rd!Passw0rd!';
 const P2 = 'N3wPassw0rd!N3wPassw0rd!';
+// lib/auth/limits.ts: SIGN_IN_LIMITED_MESSAGE, SIGN_IN_EMAIL_LIMIT, SIGN_IN_CLIENT_LIMIT.
+const LIMITED = 'Too many sign-in attempts. Try again in a few minutes.';
+const EMAIL_LIMIT = 10;
+const CLIENT_LIMIT = 30;
 
 let failures = 0;
 const check = (name, ok, detail = '') => {
@@ -25,6 +34,7 @@ const check = (name, ok, detail = '') => {
 const browser = await chromium.launch({channel: 'chrome'});
 const mongo = new MongoClient(MONGO);
 let page;
+let limits;
 const shot = (n) => page.screenshot({path: `${OUT}${n}.png`, fullPage: true});
 
 const requestReset = async (email) => {
@@ -39,6 +49,7 @@ try {
     await mongo.connect();
     const db = mongo.db('aerotrade');
     const verification = db.collection('verification');
+    limits = db.collection('ratelimits');
 
     // --- signed-in checks: badge, markets tab, history --------------------------------
     const signedIn = await browser.newContext({viewport: {width: 1440, height: 900}});
@@ -137,11 +148,71 @@ try {
     page = await signedIn.newPage();
     await page.goto(`${BASE}/topics`, {waitUntil: 'load'});
     check('the pre-reset session was revoked', /\/sign-in/.test(page.url()), page.url());
+
+    // --- sign-in rate limit ------------------------------------------------------------
+    const limiter = await browser.newContext({viewport: {width: 1440, height: 900}});
+    page = await limiter.newPage();
+    // A fresh page per attempt, so the one toast on it is this attempt's answer.
+    const signInAttempt = async (address, password) => {
+        await page.goto(`${BASE}/sign-in`, {waitUntil: 'load'});
+        await page.fill('#email', address);
+        await page.fill('#password', password);
+        await page.click('button[type="submit"]');
+        const toast = page.locator('[data-sonner-toast]').first();
+        await toast.waitFor({timeout: 30000});
+        return (await toast.innerText()).replace(/\s+/g, ' ').trim();
+    };
+    const sessionsOf = () => db.collection('session').countDocuments({$or: [{userId: user._id}, {userId}]});
+    const sessionsBefore = await sessionsOf();
+    // The two sign-ins after the reset above counted into this address's window: start it at zero.
+    await limits.deleteMany({key: `signin:email:${email}`});
+
+    const answers = [];
+    for (let i = 0; i < EMAIL_LIMIT; i += 1) {
+        // Every other attempt in capitals: the counter is keyed on the lower-cased address.
+        answers.push(await signInAttempt(i % 2 ? email.toUpperCase() : email, `Wrong${i}Passw0rd!`));
+    }
+    check(`${EMAIL_LIMIT} wrong passwords on one address are each answered as usual`,
+        answers.every((a) => /Invalid email or password/i.test(a) && !a.includes(LIMITED)), answers.find((a) => !/Invalid email or password/i.test(a)) ?? '');
+    const emailRow = await limits.findOne({key: `signin:email:${email}`});
+    check('…and counted under one key for every spelling of the address', emailRow?.count === EMAIL_LIMIT, JSON.stringify(emailRow?.count));
+
+    const refusedKnown = await signInAttempt(email, P2);
+    check(`attempt ${EMAIL_LIMIT + 1} is refused with the fixed message, even with the right password`,
+        refusedKnown.includes(LIMITED) && /\/sign-in/.test(page.url()), refusedKnown);
+    check('…and no session was created', (await sessionsOf()) === sessionsBefore);
+
+    // An address with no account, at the same count: the answer must not tell them apart.
+    const stranger = `nobody-limit${Date.now()}@example.com`;
+    const now = new Date();
+    await limits.insertOne({key: `signin:email:${stranger}`, count: EMAIL_LIMIT, windowStartedAt: now, expiresAt: new Date(now.getTime() + 15 * 60 * 1000)});
+    const refusedStranger = await signInAttempt(stranger, P2);
+    check('an address with no account is refused with the identical answer', refusedStranger === refusedKnown, refusedStranger);
+
+    const other = `other-limit${Date.now()}@example.com`;
+    const otherAnswer = await signInAttempt(other, P2);
+    check('a different address is unaffected', /Invalid email or password/i.test(otherAnswer) && !otherAnswer.includes(LIMITED), otherAnswer);
+
+    // Per client: `next dev` fills x-forwarded-for from the socket when the browser sends none,
+    // so this run has one key.
+    const clientRows = await limits.find({key: /^signin:ip:/}).toArray();
+    check('the client address is counted too', clientRows.length === 1 && clientRows[0].count >= EMAIL_LIMIT + 3,
+        clientRows.map((r) => `${r.key}=${r.count}`).join(', '));
+    if (clientRows.length === 1) {
+        await limits.updateOne({_id: clientRows[0]._id}, {$set: {count: CLIENT_LIMIT}});
+        const fresh = `fresh-limit${Date.now()}@example.com`;
+        const refusedClient = await signInAttempt(fresh, P2);
+        check(`a client over ${CLIENT_LIMIT} attempts is refused with the same answer`, refusedClient === refusedKnown, refusedClient);
+        check('…before its address is counted', (await limits.countDocuments({key: `signin:email:${fresh}`})) === 0);
+    }
+    await shot('04-sign-in-limited');
 } catch (err) {
     failures++;
     console.log(`FAIL  threw: ${err.message}`);
     if (page) await shot('99-error').catch(() => {});
 } finally {
+    // Later suites sign in from this same client: leave no sign-in window open behind.
+    if (limits) await limits.deleteMany({key: /^signin:/}).catch(() => {});
     await mongo.close().catch(() => {});
     await browser.close();
 }

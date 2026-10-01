@@ -37,8 +37,8 @@ The other scripts follow the same shape, one per change set: `qa-foundations.mjs
 404 waits for the rendered page, and a symbol no strategy watches still 404s keyless with no
 stock panels),
 `qa-navigation.mjs`, `qa-ai-surfaces.mjs`, `qa-truthful-data.mjs`, `qa-trade-desk.mjs` (the ticket,
-the CSV export and the comparison table — neither counts a row from before the account's
-inception — and the note, read back from `placeOrder`'s own request; for the "earning ≈$x/month" clause it answers the page's `getQuote`
+the CSV export, the comparison table and `/history`'s trade feed — none counts a row from before
+the account's inception — and the note, read back from `placeOrder`'s own request; for the "earning ≈$x/month" clause it answers the page's `getQuote`
 server action with a fixed price, since the harness has no quote provider, and removes the ^IRX
 row it seeds; `/stocks/AAPL` renders keyless because a strategy watches it),
 `qa-news-feed.mjs`, `qa-strategies.mjs` (seeds the system-owned strategy accounts directly — the
@@ -48,7 +48,8 @@ the job's own what-if store, `saveVariants` / `variantStamps` / `saveBacktest`, 
 Mongoose on the harness database: the app's TypeScript is loaded with `jiti`, resolved from the
 repo's `node_modules`, with `MONGODB_URI` pointed at the harness; and the stock page: keyless
 empty key numbers, each rule's newest seeded row under "What the rules see" on `/stocks/NVDA`,
-three watchers on `/stocks/SPY`, none on `/stocks/ZZZ`), `qa-income.mjs` (interest and dividends: runs the REAL nightly
+three watchers on `/stocks/SPY`, none on `/stocks/ZZZ`; the live trade log's CSV export — this
+epoch's fills only, 404 for an unknown slug, 401 signed out), `qa-income.mjs` (interest and dividends: runs the REAL nightly
 income job through the Inngest dev server, scoped to its own account; without the dev server on :8288
 it runs only the page checks),
 `qa-learn.mjs` (the First-week checklist, /learn, the ⌘K glossary rows, Guess the Verdict,
@@ -75,10 +76,11 @@ ended on a stale snapshot's date — and Trading habits over four closed lots wi
 trip and a sale before its 30-day window left out; it removes the large-cap bars it seeded and
 puts back the ^IRX points and any other suite's large-cap dividends it set aside), `qa-tutor.mjs` (the
 chat's three rate-limit windows via seeded `ratelimits` rows, the prefill, then the `explainTerm`
-chip from a stubbed UI-message stream — the tutor's answers themselves need a Gemini key and are
-checked by hand)
+and `getQuantStrategies` chips from stubbed UI-message streams — the tutor's answers themselves need
+a Gemini key and are checked by hand)
 and `qa-auth.mjs` (password reset end to end — it reads the token out of the
-throwaway Mongo, since the harness has no SMTP). They share one database, so each
+throwaway Mongo, since the harness has no SMTP — and the sign-in limits: eleven attempts on one
+address, the per-client counter seeded to its limit, every `signin:*` row removed at the end). They share one database, so each
 scopes its assertions to the user it signs up.
 
 `qa-topics.mjs` signs up a fresh user, follows a starter topic, waits for the

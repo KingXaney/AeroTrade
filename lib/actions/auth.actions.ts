@@ -5,7 +5,17 @@ import {inngest} from "@/lib/inngest/client";
 import {cookies, headers} from "next/headers";
 import {THEME_COOKIE} from "@/lib/theme/resolve";
 import {syncThemeCookieForUser} from "@/lib/actions/appearance.actions";
-import {PASSWORD_RESET_LIMIT, PASSWORD_RESET_WINDOW_MS, passwordResetKey, takeRateLimit} from "@/lib/auth/rate-limit";
+import {takeRateLimit} from "@/lib/auth/rate-limit";
+import {
+    PASSWORD_RESET_LIMIT,
+    PASSWORD_RESET_WINDOW_MS,
+    SIGN_IN_INVALID_MESSAGE,
+    SIGN_IN_LIMITED_MESSAGE,
+    clientIpFrom,
+    passwordResetKey,
+    signInCredentials,
+    withinSignInLimits,
+} from "@/lib/auth/limits";
 import {seedDefaultTopics} from "@/lib/topics/seed";
 
 // Better-auth throws APIError-shaped objects with body.message; fall back to .message or a generic string.
@@ -44,8 +54,22 @@ export const signUpWithEmail = async ({ email, password, fullName, country, inve
     }
 }
 
-export const signInWithEmail = async ({ email, password }: SignInFormData) => {
+export const signInWithEmail = async (input: SignInFormData) => {
+    // Input that is not two strings gets a wrong password's answer before any counter is
+    // spent, so it neither burns a client's budget nor returns a raw error's text.
+    const credentials = signInCredentials(input);
+    if (!credentials) return { success: false, error: SIGN_IN_INVALID_MESSAGE }
+    const { email, password } = credentials;
+
     try {
+        // Refused before better-auth is asked, so the answer cannot differ between an address
+        // with an account and one without — and a correct password does not get through either.
+        // The order the two counters are spent in is withinSignInLimits' (lib/auth/limits.ts).
+        if (!(await withinSignInLimits({ ip: clientIpFrom(await headers()), email }, takeRateLimit))) {
+            console.warn('Sign-in rate limit reached');
+            return { success: false, error: SIGN_IN_LIMITED_MESSAGE }
+        }
+
         const response = await auth.api.signInEmail({ body: { email, password } })
         if (response?.user?.id) {
             await syncThemeCookieForUser(response.user.id).catch((e) => console.error('Theme cookie sync failed', e));
@@ -54,7 +78,7 @@ export const signInWithEmail = async ({ email, password }: SignInFormData) => {
         return { success: true, data: response }
     } catch (e) {
         console.error('Sign in failed', e)
-        return { success: false, error: extractAuthError(e, 'Invalid email or password') }
+        return { success: false, error: extractAuthError(e, SIGN_IN_INVALID_MESSAGE) }
     }
 }
 

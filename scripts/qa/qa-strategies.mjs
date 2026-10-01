@@ -7,6 +7,7 @@
 // nightly job's own store (saveVariants, variantStamps, saveBacktest), loaded from the app's
 // TypeScript through jiti, writes a grid only beside the build it was computed for, finds nothing
 // due the next night, and re-queues it after a rebuild. The stock page shows each rule's newest run.
+// A strategy's live fills download as CSV (this epoch only, signed-in users, known slugs only).
 // Run against the harness in README.md (in-memory Mongo on :27117 + `npm run dev`).
 import {chromium} from 'playwright';
 import {MongoClient, ObjectId} from 'mongodb';
@@ -288,6 +289,37 @@ try {
     check('latest decision shows the filled order and its reason', /filled/.test(decision) && /seeded fill for golden-cross/.test(decision));
     const log = await page.locator('#strategy-trades').innerText();
     check('trade log carries the Strategy chip and the reason line', /strategy/i.test(log) && /seeded fill for golden-cross/.test(log));
+
+    // --- the live trade log's CSV export ------------------------------------------------
+    // A fill from before the account's inception: what a reset that re-anchored inceptionAt but
+    // crashed before deleting the old epoch's trades leaves behind. Removed again right after.
+    const goldenAccountId = seeded.find((x) => x.slug === 'golden-cross').accountId;
+    const oldEpochFill = await db.collection('papertrades').insertOne({
+        userId: OWNER, accountId: goldenAccountId, symbol: 'ZZOLD', company: 'Old Epoch Co', side: 'sell', quantity: 1, price: 100,
+        total: 100, realizedPnl: -5, source: 'strategy', reason: 'exit: old epoch', createdAt: new Date(inception.getTime() - 24 * 60 * 60 * 1000),
+    });
+    const exportLink = page.locator('#strategy-trades a[data-testid="strategy-export"]');
+    check('the live trade log offers its CSV export',
+        await exportLink.count() === 1 && (await exportLink.getAttribute('href')) === '/api/strategies/golden-cross/export'
+        && (await exportLink.getAttribute('download')) !== null && /Export CSV/.test(await exportLink.innerText()));
+    const exported = await page.request.get(`${BASE}/api/strategies/golden-cross/export`);
+    const disposition = exported.headers()['content-disposition'] ?? '';
+    check('…a CSV named for the strategy and the day',
+        exported.status() === 200 && /^text\/csv/.test(exported.headers()['content-type'] ?? '') && disposition.includes(`filename="golden-cross-trades-${today}.csv"`),
+        `${exported.status()} ${disposition}`);
+    const [csvHeader, ...csvRows] = (await exported.text()).trim().split('\n');
+    check('…in the account export\'s columns', csvHeader === '"date","symbol","company","side","quantity","price","total","realized_pnl","source","reason"', csvHeader);
+    check('…with the seeded fill, numbers bare and strings quoted',
+        csvRows.length === 1 && /^"\d{4}-\d\d-\d\dT[^"]+Z","SPY","SPDR S&P 500","buy",40,500,20000,"","strategy","enter: seeded fill for golden-cross"$/.test(csvRows[0]),
+        csvRows.join(' | '));
+    check('…and no row from before the account\'s inception', !csvRows.some((r) => r.includes('ZZOLD')));
+    await db.collection('papertrades').deleteOne({_id: oldEpochFill.insertedId});
+    const unknownExport = await page.request.get(`${BASE}/api/strategies/no-such-rule/export`);
+    check('an unknown strategy has no export', unknownExport.status() === 404, String(unknownExport.status()));
+    const signedOut = await browser.newContext();
+    const signedOutExport = await signedOut.request.get(`${BASE}/api/strategies/golden-cross/export`);
+    check('a signed-out request is refused', signedOutExport.status() === 401 && !/SPY/.test(await signedOutExport.text()), String(signedOutExport.status()));
+    await signedOut.close();
     // "Read this board" leads the board's one disclosure: the top row, read by the rule's narrator.
     const boardTerms = page.locator('#board-terms');
     check('the board\'s disclosure is titled by its top row', (await boardTerms.locator('summary').innerText()).includes('Read this board — XLK'));
