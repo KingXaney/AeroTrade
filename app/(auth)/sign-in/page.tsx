@@ -5,7 +5,8 @@ import { useForm } from 'react-hook-form';
 import { Button } from '@/components/ui/button';
 import InputField from '@/components/forms/InputField';
 import FooterLink from '@/components/forms/FooterLink';
-import { signInWithEmail } from "../../../lib/actions/auth.actions";
+import { signInWithEmail } from "@/lib/actions/auth.actions";
+import { EMAIL_RULE, PASSWORD_RULE } from "@/lib/auth/validation";
 import { useRouter } from "next/navigation";
 import { toast } from "sonner";
 
@@ -52,7 +53,7 @@ const SignIn = () => {
                     placeholder="you@example.com"
                     register={register}
                     error={errors.email}
-                    validation={{ required: 'Email is required', pattern: { value: /^[^\s@]+@[^\s@]+\.[^\s@]+$/, message: 'Enter a valid email address' } }}
+                    validation={EMAIL_RULE}
                 />
 
                 <InputField
@@ -62,7 +63,7 @@ const SignIn = () => {
                     type="password"
                     register={register}
                     error={errors.password}
-                    validation={{ required: 'Password is required', minLength: { value: 8, message: 'Password must be at least 8 characters' } }}
+                    validation={PASSWORD_RULE}
                 />
                 <div className="-mt-2 text-right">
                     <Link href="/forgot-password" className="footer-link text-sm">Forgot your password?</Link>

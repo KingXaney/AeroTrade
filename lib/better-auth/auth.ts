@@ -4,6 +4,7 @@ import { connectToDatabase} from "@/database/mongoose";
 import { nextCookies} from "better-auth/next-js";
 import { after } from "next/server";
 import { sendPasswordResetEmail } from "@/lib/nodemailer";
+import { MAX_PASSWORD_LENGTH, MIN_PASSWORD_LENGTH } from "@/lib/auth/validation";
 
 function createAuthInstance(db: Parameters<typeof mongodbAdapter>[0]) {
     return betterAuth({
@@ -14,8 +15,9 @@ function createAuthInstance(db: Parameters<typeof mongodbAdapter>[0]) {
             enabled: true,
             disableSignUp: false,
             requireEmailVerification: false,
-            minPasswordLength: 8,
-            maxPasswordLength: 128,
+            // The auth forms hold passwords to the same lengths (lib/auth/validation.ts).
+            minPasswordLength: MIN_PASSWORD_LENGTH,
+            maxPasswordLength: MAX_PASSWORD_LENGTH,
             autoSignIn: true,
             resetPasswordTokenExpiresIn: 30 * 60,
             revokeSessionsOnPasswordReset: true,
