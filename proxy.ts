@@ -13,7 +13,8 @@ export function proxy(request: NextRequest) {
 export const config = {
     matcher: [
         // forgot-password and reset-password are public by design: the emailed reset link
-        // is opened logged out, and bouncing it to /sign-in would drop the token.
-        '/((?!api|_next/static|_next/image|favicon.ico|sign-in|sign-up|forgot-password|reset-password|assets).*)',
+        // is opened logged out, and bouncing it to /sign-in would drop the token. icon.svg is
+        // app/icon.svg's tab icon, which the logged-out pages need too.
+        '/((?!api|_next/static|_next/image|icon.svg|sign-in|sign-up|forgot-password|reset-password|assets).*)',
     ],
 };

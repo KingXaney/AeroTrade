@@ -11,7 +11,7 @@
 // suite's own sign-up is counted, and a client over the limit (its counter seeded past any
 // SIGN_UP_CLIENT_LIMIT the harness sets) gets one fixed sentence and no account; every signup:*
 // row is removed at the end too. Neither the sign-up nor the sign-in action hands the browser the
-// session token its cookie carries.
+// session token its cookie carries, and the tab icon loads logged out.
 import {chromium} from 'playwright';
 import {MongoClient} from 'mongodb';
 import {mkdirSync} from 'node:fs';
@@ -119,6 +119,9 @@ try {
     page = await loggedOut.newPage();
     await page.goto(`${BASE}/reset-password?token=bogus`, {waitUntil: 'load'});
     check('the reset page is reachable logged out (proxy matcher)', /\/reset-password/.test(page.url()) && await page.getByText('Choose a new password').count() === 1, page.url());
+    const icon = await loggedOut.request.get(`${BASE}/icon.svg`, {maxRedirects: 0});
+    check('…and so is the tab icon, not redirected to /sign-in', icon.status() === 200 && /image\/svg\+xml/.test(icon.headers()['content-type'] ?? ''),
+        `${icon.status()} ${icon.headers()['content-type'] ?? ''} ${icon.headers().location ?? ''}`);
     await page.goto(`${BASE}/reset-password`, {waitUntil: 'load'});
     check('a link without a token explains itself', await page.getByRole('alert').filter({hasText: 'missing its reset token'}).count() === 1);
 
