@@ -1,4 +1,4 @@
-// Browser + job QA for brokerage income: interest on idle cash, dividends on holdings, and
+// Brokerage income (lib/income, the Income panel on /portfolio): interest on idle cash, dividends on holdings, and
 // the retroactive back-credit. Seeds an account with trades across two ex-dates, fresh ^IRX,
 // SPY and AAPL bars (with dividend fields and coverage, so the job's bar step finds nothing
 // to fetch and never overwrites the fixtures), and legacy snapshots — then fires the REAL
@@ -6,24 +6,14 @@
 // The panel's receipts are then held to the rows the job stored: each month's interest to the
 // cent from average cash × the daily factor × days, each dividend from the entitled close.
 //
-// Needs the Inngest dev server on :8288 (`npx inngest-cli@latest dev -u
-// http://localhost:3000/api/inngest`); without it the job checks are skipped and noted.
+// Needs the Inngest dev server (run.sh starts it); without it the job checks are skipped and noted.
+// Run: npm run qa -- income   (the harness: README.md)
 
 import {chromium} from 'playwright';
 import {MongoClient} from 'mongodb';
-import {mkdirSync} from 'node:fs';
+import {BASE, INNGEST, MONGO, check, note, outDir, signUp, summary} from './lib.mjs';
 
-const BASE = 'http://localhost:3000';
-const MONGO = 'mongodb://127.0.0.1:27117/aerotrade';
-const OUT = new URL('./output/income/', import.meta.url).pathname;
-mkdirSync(OUT, {recursive: true});
-
-let failures = 0;
-const check = (name, ok, detail = '') => {
-    if (!ok) failures++;
-    console.log(`${ok ? 'PASS' : 'FAIL'}  ${name}${detail ? `  — ${detail}` : ''}`);
-};
-const note = (name, detail = '') => console.log(`NOTE  ${name}${detail ? ` — ${detail}` : ''}`);
+const OUT = outDir('income');
 
 // ET calendar helpers — the job dates everything in America/New_York.
 const etDate = (d = new Date()) => new Intl.DateTimeFormat('en-CA', {timeZone: 'America/New_York'}).format(d);
@@ -52,23 +42,17 @@ const browser = await chromium.launch({channel: 'chrome'});
 const page = await browser.newPage({viewport: {width: 1440, height: 900}});
 const shot = (n) => page.screenshot({path: `${OUT}${n}.png`, fullPage: true});
 const mongo = new MongoClient(MONGO);
-const inngestUp = await fetch('http://localhost:8288/').then(() => true).catch(() => false);
-console.log(inngestUp ? 'Inngest dev server on :8288 — running the real job' : 'No Inngest dev server — job checks skipped');
+const inngestUp = await fetch(`${INNGEST}/`).then(() => true).catch(() => false);
+console.log(inngestUp ? `Inngest dev server on ${INNGEST} — running the real job` : 'No Inngest dev server — job checks skipped');
 
 const until = async (fn, ms) => { const end = Date.now() + ms; let v = await fn(); while (!v && Date.now() < end) { await page.waitForTimeout(1000); v = await fn(); } return v; };
 
 try {
     await mongo.connect();
-    const db = mongo.db('aerotrade');
+    const db = mongo.db();
 
     // --- account ------------------------------------------------------------------------
-    const email = `qaincome${Date.now()}@example.com`;
-    await page.goto(`${BASE}/sign-up`, {waitUntil: 'load'});
-    await page.fill('#fullName', 'QA Income');
-    await page.fill('#email', email);
-    await page.fill('#password', 'Passw0rd!Passw0rd!');
-    await page.click('button[type="submit"]');
-    await page.waitForURL(new RegExp(`^${BASE}/(\\?.*)?$`), {timeout: 90000});
+    const email = await signUp(page, 'Income');
     await page.goto(`${BASE}/portfolio`, {waitUntil: 'load'});   // lazily creates "Main account"
     const user = await db.collection('user').findOne({email});
     const userId = String(user?._id ?? user?.id);
@@ -117,7 +101,7 @@ try {
     check('the Income tile says the first credit is tonight', /First credit tonight/.test(await page.locator('main').innerText()));
 
     if (inngestUp) {
-        const fire = () => fetch('http://localhost:8288/e/qa', {
+        const fire = () => fetch(`${INNGEST}/e/qa`, {
             method: 'POST', headers: {'Content-Type': 'application/json'},
             body: JSON.stringify({name: 'app/credit.account.income', data: {accountIds: [accountId]}}),
         });
@@ -202,13 +186,11 @@ try {
         note('job, idempotency, snapshots and panel checks', 'start the Inngest dev server to run them');
     }
 } catch (err) {
-    failures++;
-    console.log(`FAIL  threw: ${err.message}`);
+    check(`threw: ${err.message}`, false);
     await shot('99-error').catch(() => {});
 } finally {
     await mongo.close().catch(() => {});
     await browser.close();
 }
 
-console.log(failures === 0 ? '\nAll income checks passed.' : `\n${failures} check(s) failed.`);
-process.exit(failures === 0 ? 0 : 1);
+summary('income');

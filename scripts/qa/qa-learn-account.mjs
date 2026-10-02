@@ -1,4 +1,4 @@
-// Browser QA for learning from your own account (learn Wave 2, slice 2.3). Seeds an account
+// Learning from your own account (lib/learn, components/learn on /portfolio). Seeds an account
 // whose snapshots rise to a peak on day 4 and fall to a low on day 8, plus SPY bars deep
 // enough that the benchmark store never refetches, and checks that the Max Drawdown tile's
 // hint dates that stretch, sets SPY beside it and says what the climb back takes, and that
@@ -14,23 +14,16 @@
 // ended on the last snapshot's date and seeded from it when everything is priced), and Trading
 // habits measures the learner's own lots over its window, a strategy round trip and an older
 // sale left out. A fresh account first shows every empty state.
+// Run: npm run qa -- learn-account   (the harness: README.md)
 
 import {chromium} from 'playwright';
 import {MongoClient} from 'mongodb';
-import {mkdirSync} from 'node:fs';
-// The repo's own TypeScript loader, for the app's NYSE holiday table (lib/prices/market-hours.ts).
+// A TypeScript loader (declared in scripts/qa/package.json), for the app's NYSE holiday table
+// (lib/prices/market-hours.ts).
 import {createJiti} from 'jiti';
+import {BASE, MONGO, check, outDir, signUp, summary} from './lib.mjs';
 
-const BASE = 'http://localhost:3000';
-const MONGO = 'mongodb://127.0.0.1:27117/aerotrade';
-const OUT = new URL('./output/learn-account/', import.meta.url).pathname;
-mkdirSync(OUT, {recursive: true});
-
-let failures = 0;
-const check = (name, ok, detail = '') => {
-    if (!ok) failures++;
-    console.log(`${ok ? 'PASS' : 'FAIL'}  ${name}${detail ? `  — ${detail}` : ''}`);
-};
+const OUT = outDir('learn-account');
 
 const etDate = (d = new Date()) => new Intl.DateTimeFormat('en-CA', {timeZone: 'America/New_York'}).format(d);
 const addDays = (date, n) => { const [y, m, d] = date.split('-').map(Number); return new Date(Date.UTC(y, m - 1, d + n)).toISOString().slice(0, 10); };
@@ -75,16 +68,10 @@ const tileValue = async () => (await page.locator('main').getByText(/^−\d+\.\d
 
 try {
     await mongo.connect();
-    const db = mongo.db('aerotrade');
+    const db = mongo.db();
 
     // --- a fresh account -------------------------------------------------------------------
-    const email = `qalearnaccount${Date.now()}@example.com`;
-    await page.goto(`${BASE}/sign-up`, {waitUntil: 'load'});
-    await page.fill('#fullName', 'QA Learn Account');
-    await page.fill('#email', email);
-    await page.fill('#password', 'Passw0rd!Passw0rd!');
-    await page.click('button[type="submit"]');
-    await page.waitForURL(new RegExp(`^${BASE}/(\\?.*)?$`), {timeout: 90000});
+    const email = await signUp(page, 'Learn Account');
     await page.goto(`${BASE}/portfolio`, {waitUntil: 'load'});   // lazily creates "Main account"
     const user = await db.collection('user').findOne({email: email.toLowerCase()});
     const userId = String(user?._id ?? user?.id);
@@ -557,8 +544,7 @@ try {
     await shot('10-trading-habits');
     await restoreLuck();
 } catch (err) {
-    failures++;
-    console.log(`FAIL  threw: ${err.message}`);
+    check(`threw: ${err.message}`, false);
     await shot('99-error').catch(() => {});
 } finally {
     await restoreLuck().catch(() => {});
@@ -566,5 +552,4 @@ try {
     await browser.close();
 }
 
-console.log(failures === 0 ? '\nAll learn-account checks passed.' : `\n${failures} check(s) failed.`);
-process.exit(failures === 0 ? 0 : 1);
+summary('learn-account');

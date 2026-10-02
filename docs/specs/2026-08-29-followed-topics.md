@@ -4,7 +4,7 @@
 > account is seeded with six default topics and lands on the dashboard. See
 > [2026-09-25-default-topics.md](2026-09-25-default-topics.md).
 
-**Status:** implemented 2026-08-29 on `feature/themes-dashboard-widgets` (ships with the themes + widgets work).
+**Status:** Implemented — `076d910` (2026-08-29), shipped with the themes + widgets work; superseded in part by [Default topics](2026-09-25-default-topics.md).
 **Scope:** theme-picker hover fix (P0) and the followed-topics feature (P1–P5: pipeline, jobs, dashboard, email/chat, entry points).
 
 ## Why

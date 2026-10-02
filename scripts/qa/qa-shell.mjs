@@ -1,34 +1,15 @@
-// PR 2 (App shell) checks: the mobile drawer reaches the four routes the sidebar owned,
-// the ⌘K palette is keyboard-drivable, the friend-request badge appears, and the drawer's
-// Logout signs out and lands on /sign-in. A sent request backdated three days in Mongo reads
-// "sent 3 days ago" (its stamp is epoch ms, which the old seconds-only formatter read as the
-// future: every request said "sent just now").
-// Run against the harness in README.md (in-memory Mongo on :27117 + `npm run dev`).
+// The app shell (components/shell, lib/shell): the sidebar lists every route and the hamburger
+// hides at desktop width, the ⌘K palette is keyboard-drivable, the mobile drawer reaches the routes
+// only the sidebar carries and closes after navigating, and the drawer's Logout signs out and lands
+// on /sign-in. Also friends: a sent request backdated three days in Mongo reads "sent 3 days ago"
+// (its stamp is epoch ms, which a seconds-only formatter read as the future), and the recipient's
+// sidebar shows the friend-request badge.
+// Run: npm run qa -- shell   (the harness: README.md)
 import {chromium} from 'playwright';
 import {MongoClient} from 'mongodb';
-import {mkdirSync} from 'node:fs';
+import {BASE, MONGO, check, outDir, signUp, summary} from './lib.mjs';
 
-const BASE = 'http://localhost:3000';
-const MONGO = 'mongodb://127.0.0.1:27117/aerotrade';
-const OUT = new URL('./output/navigation/', import.meta.url).pathname;
-mkdirSync(OUT, {recursive: true});
-
-let failures = 0;
-const check = (name, ok, detail = '') => {
-    if (!ok) failures++;
-    console.log(`${ok ? 'PASS' : 'FAIL'}  ${name}${detail ? `  — ${detail}` : ''}`);
-};
-
-const signUp = async (page, tag) => {
-    const email = `qa${tag}${Date.now()}@example.com`;
-    await page.goto(`${BASE}/sign-up`, {waitUntil: 'load'});
-    await page.fill('#fullName', `QA ${tag}`);
-    await page.fill('#email', email);
-    await page.fill('#password', 'Passw0rd!Passw0rd!');
-    await page.click('button[type="submit"]');
-    await page.waitForURL(new RegExp(`^${BASE}/(\\?.*)?$`), {timeout: 90000});
-    return email;
-};
+const OUT = outDir('shell');
 
 const browser = await chromium.launch({channel: 'chrome'});
 const page = await browser.newPage({viewport: {width: 1440, height: 900}});
@@ -37,7 +18,7 @@ const mongo = new MongoClient(MONGO);
 
 try {
     await mongo.connect();
-    const db = mongo.db('aerotrade');
+    const db = mongo.db();
     const firstEmail = await signUp(page, 'one');
 
     // --- desktop nav unchanged -------------------------------------------------
@@ -121,13 +102,11 @@ try {
     await page.goto(`${BASE}/`, {waitUntil: 'load'});
     check('…and the session is gone', /\/sign-in/.test(page.url()), page.url());
 } catch (err) {
-    failures++;
-    console.log(`FAIL  threw: ${err.message}`);
+    check(`threw: ${err.message}`, false);
     await shot('99-error').catch(() => {});
 } finally {
     await mongo.close().catch(() => {});
     await browser.close();
 }
 
-console.log(failures === 0 ? '\nAll navigation checks passed.' : `\n${failures} check(s) failed.`);
-process.exit(failures === 0 ? 0 : 1);
+summary('shell');

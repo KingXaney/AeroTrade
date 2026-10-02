@@ -1,25 +1,19 @@
-// PR 5 (Trade desk + brain): trade deep links, tables that label themselves below md,
-// the order ticket's presets and advisory checks, chart-follows-ticker (and the
-// dashboard widget that must NOT navigate), the trade `source` chip + CSV columns (a note that
-// looks like a formula exports as text), the order note's 200-character limit, and
-// brain rows that drill into evidence with valid markup. /history's trade feed, like every other
-// trade read, leaves out a row from before its account's inception, in its list and its count.
-// Run against the harness in README.md (in-memory Mongo on :27117 + `npm run dev`; no
-// Finnhub key, so prices are unknown and the ticket's price-based paths stay open).
+// Paper trading (lib/trading, /trade, /portfolio, /history): a new user's "Main account", trade
+// deep links and the trade `source` chip, the CSV export (a note that looks like a formula exports
+// as text), the order ticket's presets, advisory checks and 200-character note, what the cash left
+// would earn, chart-follows-ticker (and the dashboard quick-trade widget that must not navigate),
+// tables that label themselves below md, the account comparison (a layout saved with the old
+// 'strategy-comparison' id included), and /history's trade feed, which, like every trade read,
+// leaves out a row from before its account's inception. Also the brain's rows, which drill into
+// their evidence with valid markup.
+// No Finnhub key, so prices are unknown and the ticket's price-based paths stay open; the ticket's
+// getQuote is answered with a fixed price for the interest line.
+// Run: npm run qa -- trading   (the harness: README.md)
 import {chromium} from 'playwright';
 import {MongoClient} from 'mongodb';
-import {mkdirSync} from 'node:fs';
+import {BASE, MONGO, check, outDir, signUp, summary} from './lib.mjs';
 
-const BASE = 'http://localhost:3000';
-const MONGO = 'mongodb://127.0.0.1:27117/aerotrade';
-const OUT = new URL('./output/trade-desk/', import.meta.url).pathname;
-mkdirSync(OUT, {recursive: true});
-
-let failures = 0;
-const check = (name, ok, detail = '') => {
-    if (!ok) failures++;
-    console.log(`${ok ? 'PASS' : 'FAIL'}  ${name}${detail ? `  — ${detail}` : ''}`);
-};
+const OUT = outDir('trading');
 
 const browser = await chromium.launch({channel: 'chrome'});
 const page = await browser.newPage({viewport: {width: 1440, height: 900}});
@@ -50,15 +44,9 @@ let seededRate = null;
 
 try {
     await mongo.connect();
-    const db = mongo.db('aerotrade');
+    const db = mongo.db();
 
-    const email = `qatrade${Date.now()}@example.com`;
-    await page.goto(`${BASE}/sign-up`, {waitUntil: 'load'});
-    await page.fill('#fullName', 'QA Trade');
-    await page.fill('#email', email);
-    await page.fill('#password', 'Passw0rd!Passw0rd!');
-    await page.click('button[type="submit"]');
-    await page.waitForURL(new RegExp(`^${BASE}/(\\?.*)?$`), {timeout: 90000});
+    const email = await signUp(page, 'Trade');
     const user = await db.collection('user').findOne({email});
     const userId = String(user._id);
     const accounts = db.collection('paperaccounts');
@@ -184,7 +172,7 @@ try {
     check('at 390px watchlist cells name themselves', await page.getByText('Market Cap', {exact: true}).filter({visible: true}).count() >= 1);
     await page.setViewportSize({width: 1440, height: 900});
     // AAPL is on the large-cap strategies' boards, so its stock page renders even without a
-    // Finnhub key (a symbol no strategy watches still 404s keyless — qa-foundations).
+    // Finnhub key (a symbol no strategy watches still 404s keyless — qa-styles).
     await page.goto(`${BASE}/stocks/AAPL`, {waitUntil: 'domcontentloaded'});
     await page.locator('a[href="/trade?symbol=AAPL"]').first().waitFor({timeout: 30000});
     // The button is uppercased by CSS, and innerText follows it.
@@ -435,14 +423,12 @@ try {
     check('the evidence header offers stock page + Trade for a ticker', /Stock page/.test(await page.locator('#evidence').innerText()) && await page.locator('#evidence a[href="/trade?symbol=NVDA"]').count() === 1);
     await shot('05-brain');
 } catch (err) {
-    failures++;
-    console.log(`FAIL  threw: ${err.message}`);
+    check(`threw: ${err.message}`, false);
     await shot('99-error').catch(() => {});
 } finally {
-    if (seededRate) await mongo.db('aerotrade').collection('pricebars').deleteOne(seededRate).catch(() => {});
+    if (seededRate) await mongo.db().collection('pricebars').deleteOne(seededRate).catch(() => {});
     await mongo.close().catch(() => {});
     await browser.close();
 }
 
-console.log(failures === 0 ? '\nAll trade-desk checks passed.' : `\n${failures} check(s) failed.`);
-process.exit(failures === 0 ? 0 : 1);
+summary('trading');

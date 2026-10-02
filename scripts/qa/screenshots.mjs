@@ -1,15 +1,10 @@
 // Captures the README screenshots: sign up, follow two starter topics, then the main screens at 1440x900.
-// Output: ./output/*.png. Downscale for the README with `sips -Z 1200 output/dashboard.png --out ../../docs/screenshots/dashboard.png`.
+// Output: ./output/screenshots/*.png. Downscale for the README with
+// `sips -Z 1200 output/screenshots/dashboard.png --out ../../docs/screenshots/dashboard.png`.
 import {chromium} from 'playwright';
-import fs from 'node:fs';
-import path from 'node:path';
-import {fileURLToPath} from 'node:url';
+import {BASE, outDir, signUp} from './lib.mjs';
 
-const __dirname = path.dirname(fileURLToPath(import.meta.url));
-
-const BASE = process.env.QA_BASE_URL || 'http://localhost:3000';
-const OUT = path.resolve(__dirname, 'output');
-fs.mkdirSync(OUT, {recursive: true});
+const OUT = outDir('screenshots');
 
 (async () => {
     const browser = await chromium.launch({channel: 'chrome', headless: true});
@@ -17,19 +12,14 @@ fs.mkdirSync(OUT, {recursive: true});
     const page = await context.newPage();
     const shot = async (name, wait = 1200) => {
         await page.waitForTimeout(wait);
-        await page.screenshot({path: `${OUT}/${name}.png`, fullPage: false});
+        await page.screenshot({path: `${OUT}${name}.png`, fullPage: false});
         console.log('shot', name);
     };
 
-    await page.goto(`${BASE}/sign-up`, {waitUntil: 'load'});
-    await page.fill('#fullName', 'Ada Lovelace');
-    await page.fill('#email', `ada${Date.now()}@example.com`);
-    await page.fill('#password', 'Passw0rd!Passw0rd!');
-    await page.click('button[type=submit]');
     // Sign-up lands on the dashboard now, with the default topics already seeded — no
     // starter picking to do. Visiting each page triggers its bounded live fetch, so the
     // topics surfaces have real content in the shots.
-    await page.waitForURL(new RegExp(`^${BASE}/(\\?.*)?$`), {timeout: 90000});
+    await signUp(page, 'Ada', {name: 'Ada Lovelace'});
     await page.waitForTimeout(1000);
 
     for (const slug of ['ai-chips', 'fed-rate-decisions']) {

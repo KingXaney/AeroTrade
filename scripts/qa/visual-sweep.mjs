@@ -2,12 +2,12 @@
 // width — the before/after record for a change meant to look identical (a refactor, a styling
 // migration). Saves to ./output/sweep/<width>/<name>.png. Run it on the base, copy the folder
 // aside, run it on the change, then compare with `node visual-diff.mjs <before> <after>`.
-// Needs the harness from README.md (in-memory Mongo + `npm run dev`).
+// Run it inside the harness: `npm run qa -- visual-sweep` (README.md).
 import {chromium} from 'playwright';
 import {mkdirSync} from 'node:fs';
+import {BASE, outDir, signUp} from './lib.mjs';
 
-const BASE = process.env.QA_BASE_URL ?? 'http://localhost:3000';
-const OUT = new URL('./output/sweep/', import.meta.url).pathname;
+const OUT = outDir('sweep');
 const WIDTHS = [{name: 'desktop', width: 1440, height: 900}, {name: 'phone', width: 390, height: 844}];
 
 const SIGNED_OUT = [
@@ -61,13 +61,7 @@ try {
         await out.close();
     }
     const page = await browser.newPage({viewport: {width: 1440, height: 900}});
-    const email = `qasweep${Date.now()}@example.com`;
-    await page.goto(`${BASE}/sign-up`, {waitUntil: 'load'});
-    await page.fill('#fullName', 'QA Sweep');
-    await page.fill('#email', email);
-    await page.fill('#password', 'Passw0rd!Passw0rd!');
-    await page.click('button[type="submit"]');
-    await page.waitForURL(new RegExp(`^${BASE}/(\\?.*)?$`), {timeout: 90000});
+    await signUp(page, 'Sweep');
     for (const width of WIDTHS) {
         await page.setViewportSize({width: width.width, height: width.height});
         for (const [name, path] of SIGNED_IN) { await shoot(page, width, name, path); shots++; }

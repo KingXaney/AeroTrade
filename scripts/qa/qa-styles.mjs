@@ -1,18 +1,14 @@
-// PR 1 (Foundations) checks: no phantom scroll, focus rings on the hand-rolled inputs,
-// the warning token resolving, route boundaries, and the in-app 404 keeping its chrome.
-// Run against the harness in README.md (in-memory Mongo on :27117 + `npm run dev`).
+// Styles and the page frame (app/globals.css, lib/theme, the route boundaries): the warning
+// token and its utility resolve, six pages carry no phantom scroll below their content, the order
+// ticket's hand-rolled input shows a focus ring, and TradingView embeds keep the light scheme their
+// documents use under a dark palette. Also the not-found pages: an unmatched URL gets the global
+// 404, a notFound() inside the app keeps the header, and a symbol no strategy watches renders
+// keyless with no stock panels.
+// Run: npm run qa -- styles   (the harness: README.md)
 import {chromium} from 'playwright';
-import {mkdirSync} from 'node:fs';
+import {BASE, DASHBOARD_URL, check, outDir, signUp, summary} from './lib.mjs';
 
-const BASE = 'http://localhost:3000';
-const OUT = new URL('./output/foundations/', import.meta.url).pathname;
-mkdirSync(OUT, {recursive: true});
-
-let failures = 0;
-const check = (name, ok, detail = '') => {
-    if (!ok) failures++;
-    console.log(`${ok ? 'PASS' : 'FAIL'}  ${name}${detail ? `  — ${detail}` : ''}`);
-};
+const OUT = outDir('styles');
 
 const browser = await chromium.launch({channel: 'chrome'});
 const page = await browser.newPage({viewport: {width: 1440, height: 900}});
@@ -20,13 +16,8 @@ const shot = (n) => page.screenshot({path: `${OUT}${n}.png`, fullPage: true});
 
 try {
     // --- sign up ---------------------------------------------------------------
-    await page.goto(`${BASE}/sign-up`, {waitUntil: 'load'});
-    await page.fill('#fullName', 'QA Foundations');
-    await page.fill('#email', `qa${Date.now()}@example.com`);
-    await page.fill('#password', 'Passw0rd!Passw0rd!');
-    await page.click('button[type="submit"]');
-    await page.waitForURL(new RegExp(`^${BASE}/(\\?.*)?$`), {timeout: 90000});
-    check('sign-up lands on the dashboard', new RegExp(`^${BASE}/(\\?.*)?$`).test(page.url()), page.url());
+    await signUp(page, 'Foundations');
+    check('sign-up lands on the dashboard', DASHBOARD_URL.test(page.url()), page.url());
 
     // --- the warning token actually resolves (both globals.css edits landed) ----
     const warning = await page.evaluate(() =>
@@ -100,7 +91,7 @@ try {
     // element's color-scheme differs from the embedded document's (TradingView never
     // declares one). Under a dark palette <html> is color-scheme: dark, so every
     // isTransparent widget went white and read as a broken light theme.
-    await page.context().addCookies([{name: 'aero-theme', value: 'v1:nord:minimal:0', domain: 'localhost', path: '/'}]);
+    await page.context().addCookies([{name: 'aero-theme', value: 'v1:nord:minimal:0', domain: new URL(BASE).hostname, path: '/'}]);
     await page.goto(`${BASE}/markets`, {waitUntil: 'domcontentloaded'});
     await page.waitForSelector('.tradingview-widget-container iframe', {timeout: 30000});
     const schemes = await page.evaluate(() => ({
@@ -112,23 +103,21 @@ try {
         schemes.iframes.length > 0 && schemes.iframes.every((c) => c === 'light'), schemes.iframes.join(','));
     await shot('03-tradingview-dark-palette');
 
-    // --- mobile nav gap: baseline for PR 2 --------------------------------------
+    // --- mobile nav gap: the links only the drawer carries (qa-shell opens it) ----------
     // From the dashboard the QuickLinks widget happens to carry a /watchlist link, so
     // measure from a page that has no widgets — that is the real gap.
     await page.setViewportSize({width: 390, height: 844});
     await page.goto(`${BASE}/portfolio`, {waitUntil: 'networkidle'});
     for (const href of ['/watchlist', '/friends', '/history']) {
         const n = await page.locator(`a[href="${href}"]:visible`).count();
-        console.log(`NOTE  ${href} visible links at 390px on /portfolio: ${n}  (PR 2 makes this > 0)`);
+        console.log(`NOTE  ${href} visible links at 390px on /portfolio: ${n}  (inside the closed drawer)`);
     }
     await shot('04-mobile-portfolio');
 } catch (err) {
-    failures++;
-    console.log(`FAIL  threw: ${err.message}`);
+    check(`threw: ${err.message}`, false);
     await shot('99-error').catch(() => {});
 } finally {
     await browser.close();
 }
 
-console.log(failures === 0 ? '\nAll foundations checks passed.' : `\n${failures} check(s) failed.`);
-process.exit(failures === 0 ? 0 : 1);
+summary('styles');

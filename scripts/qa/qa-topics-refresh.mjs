@@ -1,30 +1,21 @@
-// PR 4 (Truthful data): a missing quote is labelled, never faked as a flat P&L; a new
-// user's starter batch lands on articles; /topics fetches at most once per view and
-// stops; the refresh button tells the truth about the queue and the cooldown.
-// Run against the harness in README.md (in-memory Mongo on :27117 + `npm run dev`,
-// no Finnhub key — so every position is unpriced). With no Inngest dev server it
-// exercises the dead-queue path (honest failure, claim rolled back); with one on :8288
-// it exercises the queued path (first-run fill lands every starter, the on-demand job
-// runs, the cooldown is kept).
+// When followed topics fetch (lib/topics, /topics): sign-up seeds the six default topics once and
+// unfollowing them all sticks; /topics fetches at most once per view and stops; Refresh now tells
+// the truth about the queue and the 10-minute cooldown. With no Inngest dev server it exercises the
+// dead-queue path (honest failure, claim rolled back); with one (run.sh starts it) the queued path
+// (the first-run fill lands every default, the on-demand job runs, the cooldown is kept).
+// Also unpriced holdings (no Finnhub key, so every position is unpriced): a missing quote is
+// labelled on /portfolio, /trade, the sidebar and the dashboard, never faked as a flat P&L.
+// Run: npm run qa -- topics-refresh   (the harness: README.md)
 import {chromium} from 'playwright';
 import {MongoClient} from 'mongodb';
-import {mkdirSync} from 'node:fs';
+import {BASE, DASHBOARD_URL, INNGEST, MONGO, check, outDir, signUp, summary} from './lib.mjs';
 
-const BASE = 'http://localhost:3000';
-const MONGO = 'mongodb://127.0.0.1:27117/aerotrade';
-const OUT = new URL('./output/truthful-data/', import.meta.url).pathname;
-mkdirSync(OUT, {recursive: true});
+const OUT = outDir('topics-refresh');
 
 // The six topics seeded for every new account (lib/topics/starters.ts DEFAULT_TOPIC_NAMES).
 const DEFAULTS = ['Fed rate decisions', 'AI chips', 'Stock market', 'Oil & energy', 'Geopolitics', 'World economy'];
 // The per-row placeholder the old code rendered for a quote-less position.
 const FAKE_FLAT = /\+\$0\.00 \(0\.00%\)/;
-
-let failures = 0;
-const check = (name, ok, detail = '') => {
-    if (!ok) failures++;
-    console.log(`${ok ? 'PASS' : 'FAIL'}  ${name}${detail ? `  — ${detail}` : ''}`);
-};
 
 const browser = await chromium.launch({channel: 'chrome'});
 const page = await browser.newPage({viewport: {width: 1440, height: 900}});
@@ -32,30 +23,24 @@ const shot = (n) => page.screenshot({path: `${OUT}${n}.png`, fullPage: true});
 // sonner pauses dismissal while the pointer hovers a toast; park the mouse elsewhere.
 const settleToasts = async () => { await page.mouse.move(5, 700); await page.waitForTimeout(600); };
 const mongo = new MongoClient(MONGO);
-const inngestUp = await fetch('http://localhost:8288/').then(() => true).catch(() => false);
-console.log(inngestUp ? 'Inngest dev server on :8288 — exercising the queued path' : 'No Inngest dev server — exercising the dead-queue path');
+const inngestUp = await fetch(`${INNGEST}/`).then(() => true).catch(() => false);
+console.log(inngestUp ? `Inngest dev server on ${INNGEST} — exercising the queued path` : 'No Inngest dev server — exercising the dead-queue path');
 
 // Poll a predicate with Playwright's clock (no bash sleeps).
 const until = async (fn, ms) => { const end = Date.now() + ms; let v = await fn(); while (!v && Date.now() < end) { await page.waitForTimeout(1000); v = await fn(); } return v; };
 
 try {
     await mongo.connect();
-    const db = mongo.db('aerotrade');
+    const db = mongo.db();
     const topics = db.collection('topics');
 
-    const email = `qatruth${Date.now()}@example.com`;
-    await page.goto(`${BASE}/sign-up`, {waitUntil: 'load'});
-    await page.fill('#fullName', 'QA Truth');
-    await page.fill('#email', email);
-    await page.fill('#password', 'Passw0rd!Passw0rd!');
-    await page.click('button[type="submit"]');
     // Sign-up lands on the dashboard now: topics are seeded, so there is nothing to set up.
-    await page.waitForURL(new RegExp(`^${BASE}/(\\?.*)?$`), {timeout: 90000});
+    await signUp(page, 'Truth');
 
     // --- the defaults are installed, and no setup screen was shown -------------------
     // Earlier harness runs leave other users' topics behind; ours is the newest.
     const userId = (await topics.find({slug: 'fed-rate-decisions'}).sort({createdAt: -1}).limit(1).next())?.userId;
-    check('sign-up lands on the dashboard, not a setup screen', new RegExp(`^${BASE}/(\\?.*)?$`).test(page.url()), page.url());
+    check('sign-up lands on the dashboard, not a setup screen', DASHBOARD_URL.test(page.url()), page.url());
     check(`all ${DEFAULTS.length} default topics were seeded`, await topics.countDocuments({userId}) === DEFAULTS.length,
         String(await topics.countDocuments({userId})));
     const seededNames = (await topics.find({userId}).toArray()).map((t) => t.name).sort();
@@ -200,13 +185,11 @@ try {
         /unpriced/.test(await page.locator('[data-widget-id="portfolio-snapshot"]').innerText()));
     await shot('06-dashboard-unpriced');
 } catch (err) {
-    failures++;
-    console.log(`FAIL  threw: ${err.message}`);
+    check(`threw: ${err.message}`, false);
     await shot('99-error').catch(() => {});
 } finally {
     await mongo.close().catch(() => {});
     await browser.close();
 }
 
-console.log(failures === 0 ? '\nAll truthful-data checks passed.' : `\n${failures} check(s) failed.`);
-process.exit(failures === 0 ? 0 : 1);
+summary('topics-refresh');

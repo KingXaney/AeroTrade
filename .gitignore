@@ -56,4 +56,3 @@ next-env.d.ts
 
 # browser QA output
 scripts/qa/output/
-scripts/qa/package-lock.json

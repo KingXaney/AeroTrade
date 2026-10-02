@@ -1,21 +1,14 @@
-// PR 3 (AI surfaces + confirmations): chat error recovery, a conversation that survives
-// closing the panel, safe markdown rendering, the read-only portfolio tool, and the three
-// destructive actions that now confirm.
-// Run against the harness in README.md (in-memory Mongo on :27117 + `npm run dev`).
+// The chat panel (components/chat, app/api/chat): it opens with the composer focused, a failed
+// request shows human copy and a Try again that works, the read-only portfolio tool creates no
+// account, a conversation outlives closing the panel and a cleared one stays cleared, and model
+// markdown renders as a list with links neutralised and images dropped. Also the destructive
+// actions that confirm first: Reset Account on /portfolio and Reset to default on /settings.
+// Run: npm run qa -- chat   (the harness: README.md)
 import {chromium} from 'playwright';
 import {MongoClient} from 'mongodb';
-import {mkdirSync} from 'node:fs';
+import {BASE, MONGO, check, outDir, signUp, summary} from './lib.mjs';
 
-const BASE = 'http://localhost:3000';
-const MONGO = 'mongodb://127.0.0.1:27117/aerotrade';
-const OUT = new URL('./output/ai-surfaces/', import.meta.url).pathname;
-mkdirSync(OUT, {recursive: true});
-
-let failures = 0;
-const check = (name, ok, detail = '') => {
-    if (!ok) failures++;
-    console.log(`${ok ? 'PASS' : 'FAIL'}  ${name}${detail ? `  — ${detail}` : ''}`);
-};
+const OUT = outDir('chat');
 
 const browser = await chromium.launch({channel: 'chrome'});
 const page = await browser.newPage({viewport: {width: 1440, height: 900}});
@@ -24,15 +17,9 @@ const mongo = new MongoClient(MONGO);
 
 try {
     await mongo.connect();
-    const db = mongo.db('aerotrade');
+    const db = mongo.db();
 
-    await page.goto(`${BASE}/sign-up`, {waitUntil: 'load'});
-    await page.fill('#fullName', 'QA AI');
-    const email = `qaai${Date.now()}@example.com`;
-    await page.fill('#email', email);
-    await page.fill('#password', 'Passw0rd!Passw0rd!');
-    await page.click('button[type="submit"]');
-    await page.waitForURL(new RegExp(`^${BASE}/(\\?.*)?$`), {timeout: 90000});
+    const email = await signUp(page, 'AI');
 
     const openChat = async () => {
         await page.locator('button[aria-label*="ssistant" i], button[aria-label*="chat" i]').first().click();
@@ -148,13 +135,11 @@ try {
         /Reset your dashboard\?/i.test(await page.locator('[role="dialog"]').innerText()));
     await shot('05-dashboard-reset-confirm');
 } catch (err) {
-    failures++;
-    console.log(`FAIL  threw: ${err.message}`);
+    check(`threw: ${err.message}`, false);
     await shot('99-error').catch(() => {});
 } finally {
     await mongo.close().catch(() => {});
     await browser.close();
 }
 
-console.log(failures === 0 ? '\nAll AI-surface checks passed.' : `\n${failures} check(s) failed.`);
-process.exit(failures === 0 ? 0 : 1);
+summary('chat');

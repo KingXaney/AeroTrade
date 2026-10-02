@@ -9,7 +9,7 @@ Follow the topics you care about, test trading strategies with virtual money, an
 [![License: MIT](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
 ![Next.js 16](https://img.shields.io/badge/Next.js-16-black)
 ![TypeScript](https://img.shields.io/badge/TypeScript-strict-3178c6)
-![Tests](https://img.shields.io/badge/tests-1537%20passing-brightgreen)
+![Tests](https://img.shields.io/badge/tests-1728%20passing-brightgreen)
 
 <img src="docs/screenshots/dashboard.png" alt="AeroTrade dashboard: followed topics, portfolio, latest articles, market heatmap" width="900">
 
@@ -34,7 +34,7 @@ Follow the topics you care about, test trading strategies with virtual money, an
 **Make it yours.** 12 colour palettes × 5 visual styles (minimal, futuristic, liquid glass, brutalist, soft), saved per account and rendered without a flash. A 35-widget dashboard you can drag, resize and extend.
 
 <div align="center">
-<img src="docs/screenshots/topic-ai-chips.png" alt="A followed topic: keyword chips, refresh, matched articles" width="440"> <img src="docs/screenshots/trade.png" alt="Trade desk: price chart and paper order entry and paper order entry" width="440">
+<img src="docs/screenshots/topic-ai-chips.png" alt="A followed topic: keyword chips, refresh, matched articles" width="440"> <img src="docs/screenshots/trade.png" alt="Trade desk: price chart and paper order entry" width="440">
 <br>
 <img src="docs/screenshots/settings-themes.png" alt="Theme picker in settings" width="440"> <img src="docs/screenshots/topics-paper.png" alt="The topics page in the Paper light theme" width="440">
 </div>
@@ -81,12 +81,12 @@ flowchart LR
 | Data | MongoDB + Mongoose 9 (22 models), better-auth for email/password sessions, sign-up, sign-in and password reset rate-limited on a Mongo counter |
 | Jobs | Inngest (8 scheduled jobs + on-demand events), idempotent steps, per-user rate limits |
 | AI | Vercel AI SDK; Gemini 2.5 Flash-Lite on the free tier for every scheduled job, optional Claude tiers, Claude for the second opinion |
-| Market data | Finnhub (quotes, profiles, search, news), Google News RSS, SEC EDGAR, Reddit |
-| Quality | Vitest (110 files / 1537 tests), ESLint, `tsc --noEmit`, GitHub Actions, Playwright browser QA against an in-memory Mongo |
+| Market data | Yahoo Finance daily bars and dividends (Stooq as the fallback), the 13-week T-bill rate, Finnhub (quotes, profiles, financials, search, news), Google News RSS, SEC EDGAR, Reddit |
+| Quality | Vitest (151 files / 1728 tests), ESLint, `tsc --noEmit`, a compile-only build, GitHub Actions; Playwright browser QA (13 suites, `npm run qa`) against an in-memory Mongo |
 
 ## Getting started
 
-Prerequisites: Node 20+, a MongoDB connection string (Atlas free tier works), a free [Finnhub](https://finnhub.io) key and a free [Gemini](https://aistudio.google.com) key.
+Prerequisites: Node 22 (`.nvmrc`), a MongoDB connection string (Atlas free tier works), a free [Finnhub](https://finnhub.io) key and a free [Gemini](https://aistudio.google.com) key.
 
 ```bash
 git clone https://github.com/KingXaney/AeroTrade.git
@@ -104,6 +104,7 @@ npm run trigger -- brain        # build the news brain now
 npm run trigger -- topics       # refresh every followed topic (briefs: the AI briefs)
 npm run trigger -- navigator    # run the weekly AI Navigator
 npm run trigger -- strategies   # run the quant strategies (-preview decides without filling)
+npm run trigger -- income       # credit interest + dividends through yesterday
 npm run trigger -- news         # send today's digest emails
 ```
 
@@ -121,37 +122,56 @@ npm run trigger -- news         # send today's digest emails
 ## Development
 
 ```bash
-npm run check         # lint + typecheck + unit tests (what CI runs)
-npm test              # vitest, ~1s
+npm run check         # lint + typecheck + unit tests (CI runs these, then build:check)
+npm test              # vitest, a few seconds
 npm run typecheck
 npm run lint
-npx next build --experimental-build-mode compile   # proves the app builds without any keys
+npm run build:check   # compile-only build: proves the app builds without any keys
+npm run qa            # browser QA: all 13 suites in scripts/qa against a throwaway harness (~5 min)
 ```
 
-Unit tests cover the pure modules — the layout engine, theme tokens, news aggregation and sanitisation, the topic matcher and query builder, brief parsing, model selection. Database-bound modules (Mongoose reads, server actions, the pages) are exercised through the browser QA recipe in [`scripts/qa/`](scripts/qa/README.md) instead: an in-memory MongoDB, the dev server with inline env vars, and a Playwright script that signs up, follows topics, and walks every surface — no keys needed. `docs/specs/` holds the design documents for the larger features.
+Unit tests (151 files / 1728 tests) cover every pure module, next to the code in `lib/<feature>/__tests__/`: fills, lots and account analytics, the interest and dividend accrual clock (with a parity test holding the strategy simulator to the live credit), the quant strategies' rules, engine, simulator and what-if grid, the AI Navigator's scoring and rails, the news brain's decay and extraction parsing, news aggregation and sanitising, the topic matcher and briefs, every learner-facing sentence (held to one no-advice word list) and the reason decoder's round trips, the chat tools' shaping, the email sections, dashboard layouts and theme tokens. Database-bound modules (Mongoose reads, server actions, the pages) are exercised through the browser QA in [`scripts/qa/`](scripts/qa/README.md) instead: `npm run qa` starts an in-memory MongoDB, the dev server with inline env vars and the Inngest dev server, then runs 13 Playwright suites, one per feature (`qa-auth`, `qa-trading`, `qa-income`, `qa-strategies`, `qa-learn`, `qa-topics`, …), each signing up its own user and walking its surfaces — no keys needed. `docs/specs/` holds the design documents for the larger features.
 
 ## Project structure
 
+Every feature has one folder name in every layer — `lib/trading/`, `components/trading/`, `lib/actions/trading.actions.ts`, `lib/learn/copy/trade.ts`, `scripts/qa/qa-trading.mjs`. [`docs/MAP.md`](docs/MAP.md) lists each feature's files in every layer and what to edit to change what.
+
 ```
-app/            routes: (auth) sign-in/up · (root) dashboard, topics, brain, strategies, strategies/[slug], trade, portfolio, markets, news, watchlist, friends, history, learn, settings · api/{chat,inngest,accounts,strategies}
-components/     UI by feature: dashboard (widget grid + 35 widgets), topics, brain, strategies, stock, trade, analytics, learn, settings, chat, theme, primitives, ui (shadcn)
-lib/
-  news/         source adapters (Finnhub, RSS, Reddit, SEC, Google News search), dedupe, HTML sanitiser
-  brain/        extraction prompts + parsing, entity graph update with dual-timescale decay, queries, second opinion
-  navigator/    universe eligibility, composite scoring, allocation rails, order planning
-  strategies/   the quant strategies: catalog + rules, indicators, calendar, rebalancer, engine, simulator, what-if grid, job + page reads
-  prices/       daily bars (Yahoo first, Stooq fallback), dividends + the T-bill rate, momentum/vol signals, the NYSE calendar
-  topics/       keyword normalisation, matcher, search query builder, refresh, briefs, digest section
-  trading/      paper accounts, orders, portfolio maths, analytics, snapshots, interest + dividends (income), receipts, habits
-  learn/        the glossary (every metric, concept and rail), the no-advice word list, learner copy, the reason decoder, missions / verdict / replay / quiz, lessons + the digest section, time in the market, random portfolios, the brain legend, stock-page readings
-  dashboard/    widget registry, layout normalisation + legacy migration, loaders
-  theme/        palettes, styles, token generation
-  ai/           model matrix by task and tier, chat tools, system prompt
-  inngest/      the scheduled jobs
-  actions/      'use server' entry points (session-derived, userId-scoped)
-database/       Mongoose models and the cached connection
-scripts/        trigger.mjs (fire any job locally), qa/ (browser QA), account migration, local Claude second-opinion runner
-docs/specs/     design docs
+app/            routes — (auth) sign-in, sign-up, forgot-password · (reset) reset-password
+                (root) dashboard, topics, topics/[slug], brain, strategies, strategies/[slug], stocks/[symbol],
+                trade, portfolio, history, markets, news, watchlist, friends, friends/[id], learn, settings
+                api/ chat, inngest, accounts/[accountId]/export, strategies/[slug]/export
+components/     UI by feature (auth, dashboard, trading, income, strategies, navigator, brain, news, topics, learn,
+                chat, jobs, stocks, friends, settings, theme), plus primitives/ (the shared surface vocabulary),
+                shell/ (header, sidebar, search), forms/ and ui/ (shadcn output)
+lib/            one folder per feature, named as in components/:
+  auth/         better-auth server, the one session read, sign-in / sign-up rate limits and validation
+  dashboard/    widget catalog, layout normalisation + legacy migration, loaders
+  trading/      paper accounts, orders and fills, the ledger, analytics, snapshots, CSV, /portfolio's learn panels
+  income/       interest on idle cash + dividends: the accrual clock, the nightly credit, the Income panel
+  strategies/   the quant strategies: catalog + rules, indicators, engine, simulator, what-if grid, job + page reads
+  navigator/    universe eligibility, composite scoring, allocation rails, the weekly run
+  brain/        extraction prompts + parsing, entity graph with dual-timescale decay, theses, second opinion, legend
+  news/         source adapters (Finnhub, RSS, Reddit, SEC, Google News search), dedupe, sanitiser, the per-user feed
+  topics/       keyword normalisation, matcher, search query builder, refresh, briefs, the starter set
+  learn/        the glossary, the no-advice word list, every learner-facing sentence (copy/), the reason decoder,
+                missions, today's lesson, the daily quiz
+  chat/         the chat assistant: system prompt, tools and what they hand the model, rate limits
+  email/        transport, templates, the daily digest with its topics + lesson sections, the welcome email
+  jobs/         the Inngest client, the job registry, one file of thin job wrappers per feature, the status read
+  prices/       daily bars (Yahoo first, Stooq fallback), dividends + the T-bill rate, signals, NYSE hours, Finnhub
+  stocks/       the watchlist, the stock page's key numbers and "what the rules see", TradingView embeds
+  friends/ · settings/ · shell/ · theme/   friends and their leaderboard · preferences · nav + sidebar · palettes + styles
+  actions/      'use server' entry points (session-derived, userId-scoped), one file per feature
+  ai/           model matrix by task and tier, inference, prompt helpers
+  *.ts          shared: format, dates, text, rate-limit, day-memo, action-toast
+database/       Mongoose models (one per file; its README maps model → feature) and the cached connection
+hooks/          shared client hooks
+public/         static images
+scripts/        trigger.mjs (fire any job locally), qa/ (browser QA), the account migration, move.mjs (moves a
+                file and rewrites every reference), the database check, the local second-opinion runner
+docs/           MAP.md, specs/ (design docs), screenshots/
+proxy.ts        signed-out redirect before render (the (root) layout re-checks the session)
 ```
 
 ## Origins

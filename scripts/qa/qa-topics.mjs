@@ -1,26 +1,17 @@
-// Browser QA for followed topics, the topics-first dashboard and the theme-picker hover fix.
-// Prints one PASS/FAIL line per check and exits non-zero on any failure. Screenshots go to ./output.
+// Followed topics (lib/topics, /topics): six topics preinstalled at sign-up, a topic page's first
+// live fetch, the sidebar card, ⌘K following a topic and opening one, a refresh that brings new
+// articles, editing keywords and deleting from the header menu. Also the surfaces topics lead: the
+// topics-first dashboard and the widget library's Topics group, the settings page's Topics section
+// and email toggle, the chat launcher's topic suggestion, the header nav order, and the theme
+// picker's hover sweep (the committed style never flashes).
+// Run: npm run qa -- topics   (the harness: README.md)
 import {chromium} from 'playwright';
 import {MongoClient} from 'mongodb';
-import fs from 'node:fs';
-import path from 'node:path';
-import {fileURLToPath} from 'node:url';
+import {BASE, DASHBOARD_URL, MONGO, check, note, outDir, signUp, summary} from './lib.mjs';
 
-const __dirname = path.dirname(fileURLToPath(import.meta.url));
-
-const BASE = process.env.QA_BASE_URL || 'http://localhost:3000';
-const MONGO = 'mongodb://127.0.0.1:27117/aerotrade';
 // Articles this suite seeds straight into Mongo, removed by source before and after the run.
 const QA_FEED_SOURCE = 'QA Feed Wire';
-const OUT = path.resolve(__dirname, 'output');
-fs.mkdirSync(OUT, {recursive: true});
-
-const results = [];
-const check = (name, ok, detail = '') => {
-    results.push({name, ok, detail});
-    console.log(`${ok ? 'PASS' : 'FAIL'}  ${name}${detail ? '  — ' + detail : ''}`);
-};
-const note = (name, detail) => console.log(`NOTE  ${name} — ${detail}`);
+const OUT = outDir('topics');
 
 // Toasts render top-center, directly over the header nav — including the search trigger.
 // Sonner also pauses its dismiss timer while the pointer is over a toast, and the theme
@@ -39,26 +30,19 @@ const settleToasts = async (page) => {
     page.on('console', (m) => { if (m.type() === 'error') consoleErrors.push(m.text()); });
     // Keep the stack: TradingView's embed script throws on unmount and is filtered out by name below.
     page.on('pageerror', (e) => consoleErrors.push(`pageerror: ${e.message} @ ${(e.stack || '').split('\n').slice(1, 3).join(' <- ').trim()}`));
-    const shot = async (name) => { await page.waitForTimeout(600); await page.screenshot({path: `${OUT}/${name}.png`, fullPage: true}); };
+    const shot = async (name) => { await page.waitForTimeout(600); await page.screenshot({path: `${OUT}${name}.png`, fullPage: true}); };
     const widgetOrder = () => page.$$eval('[data-widget-id]', (els) => els.map((e) => e.getAttribute('data-widget-id')));
     const mongo = new MongoClient(MONGO);
     await mongo.connect();
-    const db = mongo.db('aerotrade');
+    const db = mongo.db();
     // Topic articles are shared by keywordSetHash, so a previous run's seeded rows would
     // still be in this run's climate-policy feed.
     await db.collection('topicarticles').deleteMany({source: QA_FEED_SOURCE});
 
     // --- sign up: lands on the dashboard with topics already installed ---
-    const dashboardUrl = new RegExp(`^${BASE}/(\\?.*)?$`);
-    await page.goto(`${BASE}/sign-up`, {waitUntil: 'load'});
-    await page.fill('#fullName', 'QA Tester');
-    const email = `qa${Date.now()}@example.com`;
-    await page.fill('#email', email);
-    await page.fill('#password', 'Passw0rd!Passw0rd!');
-    await page.click('button[type=submit]');
-    await page.waitForURL(dashboardUrl, {timeout: 90000}).catch(async (e) => { await shot('00-sign-up-failed'); throw e; });
+    const email = await signUp(page, 'Tester').catch(async (e) => { await shot('00-sign-up-failed'); throw e; });
     await page.waitForTimeout(1200);
-    check('sign-up lands on the dashboard, not a setup screen', dashboardUrl.test(page.url()), page.url());
+    check('sign-up lands on the dashboard, not a setup screen', DASHBOARD_URL.test(page.url()), page.url());
 
     // --- the defaults are there, and the picker never appeared ---
     await page.goto(`${BASE}/topics`, {waitUntil: 'load'});
@@ -302,10 +286,8 @@ const settleToasts = async (page) => {
     await db.collection('topicarticles').deleteMany({source: QA_FEED_SOURCE});
     await mongo.close();
     await browser.close();
-    const failed = results.filter((r) => !r.ok);
-    console.log(`\n${results.length - failed.length}/${results.length} checks passed`);
-    process.exit(failed.length ? 1 : 0);
+    summary('topics');
 })().catch((e) => {
-    console.error('QA crashed:', e);
-    process.exit(2);
+    check(`threw: ${e.message}`, false);
+    summary('topics');
 });

@@ -1,5 +1,6 @@
-// The learn surfaces, keyless: the First-week checklist reads its own progress and
-// leaves; /learn and the ⌘K palette reach the glossary; a strategy page carries the
+// The learn surfaces (lib/learn; /learn, the strategy pages, the dashboard's learn widgets,
+// /brain), keyless: the First-week checklist reads its own progress and leaves; /learn and the
+// ⌘K palette reach the glossary; a strategy page carries the
 // beginner line, column definitions led by "Read this board" (its top row in plain words,
 // hidden while the quiz is open), Guess the Verdict and "What the rule saw"; an
 // "Ask in chat" link prefills the assistant without sending; a rule's reason is decoded
@@ -19,44 +20,24 @@
 // an earnings article carries the one badge and the evidence one "What these labels mean"; a
 // thesis gets "since thesis" only once its bars and SPY's are stored; each Navigator decision
 // opens to its reasons in plain words; the same panels as widgets carry titles only.
-// Run against the harness in README.md (in-memory Mongo on :27117 + `npm run dev`).
+// Run: npm run qa -- learn   (the harness: README.md)
 import {chromium} from 'playwright';
 import {MongoClient, ObjectId} from 'mongodb';
-import {mkdirSync} from 'node:fs';
+import {BASE, MONGO, check, outDir, signUp, summary} from './lib.mjs';
 
-const BASE = 'http://localhost:3000';
-const MONGO = 'mongodb://127.0.0.1:27117/aerotrade';
-const OUT = new URL('./output/learn/', import.meta.url).pathname;
-mkdirSync(OUT, {recursive: true});
+const OUT = outDir('learn');
 
 const OWNER = 'system:strategies';
 const CHAT_DIALOG = '[role="dialog"][aria-label="AeroTrade assistant"]';
-
-let failures = 0;
-const check = (name, ok, detail = '') => {
-    if (!ok) failures++;
-    console.log(`${ok ? 'PASS' : 'FAIL'}  ${name}${detail ? `  — ${detail}` : ''}`);
-};
 
 const browser = await chromium.launch({channel: 'chrome'});
 const mongo = new MongoClient(MONGO);
 const isoDaysAgo = (n) => new Date(Date.now() - n * 24 * 60 * 60 * 1000).toLocaleDateString('en-CA', {timeZone: 'America/New_York'});
 
-const signUp = async (page, name) => {
-    const email = `${name}${Date.now()}@example.com`.toLowerCase();
-    await page.goto(`${BASE}/sign-up`, {waitUntil: 'load'});
-    await page.fill('#fullName', `QA ${name}`);
-    await page.fill('#email', email);
-    await page.fill('#password', 'Passw0rd!Passw0rd!');
-    await page.click('button[type="submit"]');
-    await page.waitForURL(new RegExp(`^${BASE}/(\\?.*)?$`), {timeout: 90000});
-    return email;
-};
-
 let page;
 try {
     await mongo.connect();
-    const db = mongo.db('aerotrade');
+    const db = mongo.db();
     page = await browser.newPage({viewport: {width: 1440, height: 900}});
     const shot = (n) => page.screenshot({path: `${OUT}${n}.png`, fullPage: true});
     const userIdFor = async (email) => {
@@ -1129,13 +1110,11 @@ try {
         if (savedSpyF.length > 0) await pricebarsF.insertMany(savedSpyF);
     }
 } catch (err) {
-    failures++;
-    console.log(`FAIL  threw: ${err.message}`);
+    check(`threw: ${err.message}`, false);
     if (page) await page.screenshot({path: `${OUT}99-error.png`, fullPage: true}).catch(() => {});
 } finally {
     await mongo.close().catch(() => {});
     await browser.close();
 }
 
-console.log(failures === 0 ? '\nAll learn checks passed.' : `\n${failures} check(s) failed.`);
-process.exit(failures === 0 ? 0 : 1);
+summary('learn');

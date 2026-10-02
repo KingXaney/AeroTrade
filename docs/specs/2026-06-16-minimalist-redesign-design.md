@@ -1,7 +1,7 @@
 # Minimalist Redesign — Design Spec
 
 **Date:** 2026-06-16
-**Status:** Approved (via visual-companion brainstorming)
+**Status:** Implemented — `064689e` (2026-06-16). Superseded in part by [Themes + dashboard widgets](2026-08-24-themes-and-dashboard-widgets.md): this look is now the `quiet-cyber` palette, one of twelve.
 
 ## Context
 
