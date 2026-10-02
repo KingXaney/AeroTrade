@@ -1,3 +1,4 @@
+import type {Metadata} from "next";
 import {notFound} from "next/navigation";
 import TradingViewWidget from "@/components/stocks/TradingViewWidget";
 import StockHeader from "@/components/stocks/StockHeader";
@@ -21,6 +22,10 @@ import {strategiesWatching} from "@/lib/strategies/universe";
 import {cn} from "@/lib/utils";
 import Panel from "@/components/primitives/Panel";
 import Tabs from "@/components/primitives/Tabs";
+
+// The browser tab's title: the symbol, as typed in the address.
+export const generateMetadata = async ({params}: {params: Promise<{symbol: string}>}): Promise<Metadata> =>
+    ({title: decodeURIComponent((await params).symbol).toUpperCase()});
 
 type StockDetailsPageProps = {
     params: Promise<{

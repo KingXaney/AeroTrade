@@ -1,3 +1,4 @@
+import type {Metadata} from "next";
 import {requireUserId} from "@/lib/auth/session";
 import {marketStatus} from "@/lib/prices/market-hours";
 import {getStrategiesSystemStatus, getStrategyLeaderboard} from "@/lib/strategies/page-store";
@@ -10,6 +11,9 @@ import HowToRead from "@/components/strategies/HowToRead";
 import StrategyLeaderboard from "@/components/strategies/StrategyLeaderboard";
 import StrategyStatusStrip from "@/components/strategies/StrategyStatusStrip";
 import {STRATEGIES_PAGE_COPY} from "@/lib/learn/copy/strategies";
+
+// The browser tab's title; app/layout.tsx appends the app's name.
+export const metadata: Metadata = {title: "Strategies"};
 
 const StrategiesPage = async () => {
     const userId = await requireUserId();

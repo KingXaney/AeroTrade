@@ -1,3 +1,4 @@
+import type {Metadata} from "next";
 import type {ReactNode} from "react";
 import {requireUserId} from "@/lib/auth/session";
 import {getWatchlistPageView} from "@/lib/stocks/watchlist-page-store";
@@ -7,6 +8,9 @@ import MarketStatus from "@/components/stocks/MarketStatus";
 import Panel from "@/components/primitives/Panel";
 import PageTitle from "@/components/primitives/PageTitle";
 import {WATCHLIST_COPY} from "@/lib/learn/copy/watchlist";
+
+// The browser tab's title; app/layout.tsx appends the app's name.
+export const metadata: Metadata = {title: "Watchlist"};
 
 // The same PageTitle as watchlist/loading.tsx, so the title does not reflow when the skeleton
 // is replaced. mb-6: Tailwind v4's space-y is a margin-bottom on each child, which PageTitle's

@@ -67,8 +67,8 @@ its topics and lesson sections are pure builders covered by unit tests instead.
 
 ## Screenshots
 
-- **README images** — `npm run qa -- screenshots` writes `output/screenshots/*.png`; downscale
-  with `sips -Z 1200 output/screenshots/dashboard.png --out ../../docs/screenshots/dashboard.png`.
+- **README images** — `npm run qa -- screenshots` writes `output/screenshots/*.png`; copy the
+  ones the README uses into `docs/screenshots/`.
 - **Visual sweep** — `npm run qa -- visual-sweep` screenshots every page, signed out and signed
   in, at 1440 px and 390 px into `output/sweep/`. For a change meant to look identical: run it on
   the base, move `output/sweep` aside, run it on the change, then compare:

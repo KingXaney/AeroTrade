@@ -1,3 +1,4 @@
+import type {Metadata} from "next";
 import {requireUserId} from "@/lib/auth/session";
 import {getActiveTheses, getBrainGraph, getBrainSystemStatus, getEntityEvidence, getSinceThesis, getTopEntities} from "@/lib/brain/store";
 import {glossNavigatorReasons} from "@/lib/learn/reasons";
@@ -21,6 +22,9 @@ import PageTitle from "@/components/primitives/PageTitle";
 import SectionHeading from "@/components/primitives/SectionHeading";
 import Tabs from "@/components/primitives/Tabs";
 import {BRAIN_COPY} from "@/lib/learn/copy/brain";
+
+// The browser tab's title; app/layout.tsx appends the app's name.
+export const metadata: Metadata = {title: "News Brain"};
 
 // Each decision's reasons decoded here, on the server, so the client panel renders clauses
 // without bundling the grammar.

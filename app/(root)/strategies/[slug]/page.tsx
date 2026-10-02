@@ -1,3 +1,5 @@
+import type {Metadata} from "next";
+import {strategyBySlug as strategyForTitle} from "@/lib/strategies/catalog";
 import Link from "next/link";
 import {notFound} from "next/navigation";
 import {requireUserId} from "@/lib/auth/session";
@@ -25,6 +27,10 @@ import BoardReading from "@/components/strategies/BoardReading";
 import TimeInMarket from "@/components/strategies/TimeInMarket";
 import WhatIfLab from "@/components/strategies/WhatIfLab";
 import type {PaperTradeRecord} from '@/lib/trading/types';
+
+// The browser tab's title: the strategy's name, from the catalog.
+export const generateMetadata = async ({params}: {params: Promise<{slug: string}>}): Promise<Metadata> =>
+    ({title: strategyForTitle((await params).slug)?.name ?? 'Strategies'});
 
 type StrategyPageProps = {
     params: Promise<{slug: string}>;

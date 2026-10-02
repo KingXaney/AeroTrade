@@ -1,3 +1,4 @@
+import type {Metadata} from "next";
 import {cookies} from "next/headers";
 import type {ReactNode} from "react";
 import {requireUserId} from "@/lib/auth/session";
@@ -10,6 +11,9 @@ import {pickActiveAccount, preferredAccountId, toSwitcherAccounts} from "@/lib/t
 import {renderWidgetBody} from "@/components/dashboard/widgets/registry";
 import DashboardGrid from "@/components/dashboard/DashboardGrid";
 import AccountSwitcher from "@/components/trading/accounts/AccountSwitcher";
+
+// The browser tab's title; app/layout.tsx appends the app's name.
+export const metadata: Metadata = {title: "Dashboard"};
 
 type DashboardProps = {
     searchParams: Promise<{customize?: string; account?: string}>;

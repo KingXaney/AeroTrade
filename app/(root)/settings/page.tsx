@@ -1,3 +1,4 @@
+import type {Metadata} from "next";
 import Link from "next/link";
 import {redirect} from "next/navigation";
 import {getSessionUser} from "@/lib/auth/session";
@@ -17,6 +18,9 @@ import {getVisibleLayout} from "@/lib/dashboard/availability";
 import Panel from "@/components/primitives/Panel";
 import {cn} from "@/lib/utils";
 import type {User} from "@/lib/auth/types";
+
+// The browser tab's title; app/layout.tsx appends the app's name.
+export const metadata: Metadata = {title: "Settings"};
 
 const SECTIONS = [
     {id: 'topics', label: 'Topics', icon: 'interests'},
@@ -71,7 +75,10 @@ const SettingsPage = async ({searchParams}: SettingsPageProps) => {
             <PageTitle title="Settings" subtitle="Topics, your news feed, appearance, dashboard layout, notifications and your account" />
 
             <div className="grid grid-cols-1 lg:grid-cols-12 gap-4 items-start">
-                <Panel as="nav" pad={2} className="lg:col-span-3 lg:sticky lg:top-24" aria-label="Settings sections">
+                {/* The wrapper is what sticks: .glass-panel sets position itself, so `sticky` on the Panel
+                    lost to it and its `top` pushed the nav 96px down the page instead. */}
+                <div className="lg:col-span-3 lg:sticky lg:top-24">
+                <Panel as="nav" pad={2} aria-label="Settings sections">
                     {SECTIONS.map((s) => (
                         <Link key={s.id} href={hrefOf(s.id)} replace scroll={false}
                               aria-current={s.id === active ? 'page' : undefined}
@@ -85,6 +92,7 @@ const SettingsPage = async ({searchParams}: SettingsPageProps) => {
                         </Link>
                     ))}
                 </Panel>
+                </div>
 
                 <div className="lg:col-span-9">
                     <Panel id={section.id} className="scroll-mt-24">

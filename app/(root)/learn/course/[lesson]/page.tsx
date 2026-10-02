@@ -1,3 +1,4 @@
+import type {Metadata} from "next";
 import Link from "next/link";
 import {notFound} from "next/navigation";
 import {requireUserId} from "@/lib/auth/session";
@@ -12,6 +13,10 @@ import PageTitle from "@/components/primitives/PageTitle";
 import Panel from "@/components/primitives/Panel";
 import SectionHeading from "@/components/primitives/SectionHeading";
 import {actionButton} from "@/components/primitives/ActionButton";
+
+// The browser tab's title: the lesson's.
+export const generateMetadata = async ({params}: {params: Promise<{lesson: string}>}): Promise<Metadata> =>
+    ({title: lessonById((await params).lesson)?.title ?? 'Learn'});
 
 type LessonPageProps = {params: Promise<{lesson: string}>};
 

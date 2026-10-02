@@ -1,7 +1,11 @@
+import type {Metadata} from "next";
 import TradingViewWidget from "@/components/stocks/TradingViewWidget";
 import {MARKET_EMBEDS} from "@/lib/stocks/tradingview";
 import MarketsTabs, {isMarketsTabId} from "@/components/stocks/MarketsTabs";
 import Panel from "@/components/primitives/Panel";
+
+// The browser tab's title; app/layout.tsx appends the app's name.
+export const metadata: Metadata = {title: "Markets"};
 
 type MarketsPageProps = {searchParams: Promise<{view?: string}>};
 

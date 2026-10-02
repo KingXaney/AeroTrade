@@ -1,6 +1,6 @@
 // Captures the README screenshots: sign up, follow two starter topics, then the main screens at 1440x900.
-// Output: ./output/screenshots/*.png. Downscale for the README with
-// `sips -Z 1200 output/screenshots/dashboard.png --out ../../docs/screenshots/dashboard.png`.
+// Output: ./output/screenshots/*.png, at the size the README shows them; copy the ones it uses
+// into docs/screenshots/.
 import {chromium} from 'playwright';
 import {BASE, outDir, signUp} from './lib.mjs';
 
@@ -31,6 +31,8 @@ const OUT = outDir('screenshots');
     await shot('topics', 2000);
     await page.goto(`${BASE}/topics/ai-chips`, {waitUntil: 'load'});
     await shot('topic-ai-chips', 2000);
+    await page.goto(`${BASE}/`, {waitUntil: 'load'});
+    await shot('home', 2500);
     await page.goto(`${BASE}/dashboard`, {waitUntil: 'load'});
     await shot('dashboard', 3500);
     await page.goto(`${BASE}/brain`, {waitUntil: 'load'});

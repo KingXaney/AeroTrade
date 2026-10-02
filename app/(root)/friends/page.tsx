@@ -1,3 +1,4 @@
+import type {Metadata} from "next";
 import {requireUserId} from "@/lib/auth/session";
 import {getFriends, getIncomingRequests, getLeaderboard, getOutgoingRequests} from "@/lib/friends/store";
 import AddFriend from "@/components/friends/AddFriend";
@@ -6,6 +7,9 @@ import SentRequests from "@/components/friends/SentRequests";
 import FriendsList from "@/components/friends/FriendsList";
 import Leaderboard from "@/components/friends/Leaderboard";
 import PageTitle from "@/components/primitives/PageTitle";
+
+// The browser tab's title; app/layout.tsx appends the app's name.
+export const metadata: Metadata = {title: "Friends"};
 
 const FriendsPage = async () => {
     const userId = await requireUserId();

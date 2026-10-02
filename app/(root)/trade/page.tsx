@@ -1,3 +1,4 @@
+import type {Metadata} from "next";
 import {cookies} from "next/headers";
 import Link from "next/link";
 import {requireUserId} from "@/lib/auth/session";
@@ -17,6 +18,9 @@ import OpenPositionsStrip from "@/components/trading/desk/OpenPositionsStrip";
 import AccountSwitcher from "@/components/trading/accounts/AccountSwitcher";
 import Panel from "@/components/primitives/Panel";
 import SectionHeading from "@/components/primitives/SectionHeading";
+
+// The browser tab's title; app/layout.tsx appends the app's name.
+export const metadata: Metadata = {title: "Trade"};
 
 type TradePageProps = {
     searchParams: Promise<{symbol?: string; account?: string}>;

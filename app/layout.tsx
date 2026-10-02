@@ -67,7 +67,9 @@ const plexMono = localFont({
 });
 
 export const metadata: Metadata = {
-  title: "AeroTrade Terminal",
+  // A page names itself ("Portfolio") and this appends the app; a page with no title of its own
+  // is the app.
+  title: {default: "AeroTrade", template: "%s · AeroTrade"},
   description: "Paper-trading terminal with an AI news brain: follow the topics you care about, paper-trade with virtual money beside eight rule-based quant strategies, and let scheduled AI jobs read the news for you.",
 };
 

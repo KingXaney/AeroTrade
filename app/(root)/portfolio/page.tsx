@@ -1,3 +1,4 @@
+import type {Metadata} from "next";
 import {cookies} from "next/headers";
 import Link from "next/link";
 import {requireUserId} from "@/lib/auth/session";
@@ -23,6 +24,9 @@ import Panel from "@/components/primitives/Panel";
 import SectionHeading from "@/components/primitives/SectionHeading";
 import {actionButton} from "@/components/primitives/ActionButton";
 import {PERFORMANCE_COPY} from "@/lib/learn/copy/portfolio";
+
+// The browser tab's title; app/layout.tsx appends the app's name.
+export const metadata: Metadata = {title: "Portfolio"};
 
 type PortfolioPageProps = {
     searchParams: Promise<{account?: string}>;

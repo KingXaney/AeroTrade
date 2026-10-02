@@ -19,7 +19,8 @@ import {rowCard} from "@/components/primitives/RowCard";
 // a screen, never a claim about a market or an account.
 
 export const metadata: Metadata = {
-    title: LANDING_COPY.metaTitle,
+    // Absolute: it already names the app, so the layout's template must not add it again.
+    title: {absolute: LANDING_COPY.metaTitle},
     description: LANDING_COPY.metaDescription,
 };
 

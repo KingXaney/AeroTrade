@@ -1,3 +1,4 @@
+import type {Metadata} from "next";
 import Link from "next/link";
 import {requireUserId} from "@/lib/auth/session";
 import {getNewsFeedPrefs} from "@/lib/news/feed-store";
@@ -17,6 +18,9 @@ import PageTitle from "@/components/primitives/PageTitle";
 import Panel from "@/components/primitives/Panel";
 import SectionHeading from "@/components/primitives/SectionHeading";
 import Term from "@/components/primitives/Term";
+
+// The browser tab's title; app/layout.tsx appends the app's name.
+export const metadata: Metadata = {title: "News"};
 
 type NewsPageProps = {
     searchParams: Promise<{edit?: string}>;

@@ -1,3 +1,4 @@
+import type {Metadata} from "next";
 import {notFound} from "next/navigation";
 import {requireUserId} from "@/lib/auth/session";
 import {getTopicPageView, TOPIC_PAGE_SIZE} from "@/lib/topics/page-store";
@@ -8,6 +9,9 @@ import TopicFeed from "@/components/topics/TopicFeed";
 import TopicFeedEmpty from "@/components/topics/TopicFeedEmpty";
 import TopicSeenMarker from "@/components/topics/TopicSeenMarker";
 import {TOPIC_BRIEF_COPY} from "@/lib/learn/copy/topics";
+
+// The browser tab's title; app/layout.tsx appends the app's name.
+export const metadata: Metadata = {title: "Topics"};
 
 type TopicPageProps = {params: Promise<{slug: string}>};
 

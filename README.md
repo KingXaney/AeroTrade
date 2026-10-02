@@ -9,13 +9,19 @@ Follow the topics you care about, test trading strategies with virtual money, an
 [![License: MIT](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
 ![Next.js 16](https://img.shields.io/badge/Next.js-16-black)
 ![TypeScript](https://img.shields.io/badge/TypeScript-strict-3178c6)
-![Tests](https://img.shields.io/badge/tests-1728%20passing-brightgreen)
+![Tests](https://img.shields.io/badge/tests-1817%20passing-brightgreen)
 
-<img src="docs/screenshots/dashboard.png" alt="AeroTrade dashboard: followed topics, portfolio, latest articles, market heatmap" width="900">
+<img src="docs/screenshots/home.png" alt="AeroTrade Home: your accounts, the next step, your topics and the next lesson, beside a slim icon rail" width="900">
 
 </div>
 
 ## What it does
+
+**A front door and a home.** A visitor sees what AeroTrade is before making an account; after sign-in, Home shows your accounts under one total, what changed in your topics, the morning's briefing, the next lesson and one thing to look at next. Navigation is eight icons on a slim rail, with a section's other pages as tabs above the page.
+
+**A morning briefing.** Once a day a scheduled job condenses the most important articles the news brain read into a few points, each linked to the articles it draws on, and the news page sets it above your topics, the stories that name what you hold or watch, and a handful of top headlines.
+
+**A beginner course.** Sixteen short lessons in four modules — how the market works, placing a trade, building a portfolio, reading the news — each quoting the app's own glossary, linking to the real screen and ending on one question.
 
 **Follow the news, not just the tape.** Create a topic for anything — "Fed rate decisions", "AI chips", "NBA trade deadline" — and AeroTrade builds a feed for it from Google News search plus every source the news brain already reads. Each topic gets a daily AI *"what changed today"* brief, a slot in the daily email, and a place in the chat assistant.
 
@@ -78,11 +84,11 @@ flowchart LR
 |---|---|
 | App | Next.js 16 (App Router, Server Actions, Turbopack), React 19, TypeScript strict |
 | UI | Tailwind v4 with semantic theme tokens, shadcn/radix primitives, dnd-kit, TradingView embeds |
-| Data | MongoDB + Mongoose 9 (22 models), better-auth for email/password sessions, sign-up, sign-in and password reset rate-limited on a Mongo counter |
-| Jobs | Inngest (8 scheduled jobs + on-demand events), idempotent steps, per-user rate limits |
+| Data | MongoDB + Mongoose 9 (23 models), better-auth for email/password sessions, sign-up, sign-in and password reset rate-limited on a Mongo counter |
+| Jobs | Inngest (9 scheduled jobs + on-demand events), idempotent steps, per-user rate limits |
 | AI | Vercel AI SDK; Gemini 2.5 Flash-Lite on the free tier for every scheduled job, optional Claude tiers, Claude for the second opinion |
 | Market data | Yahoo Finance daily bars and dividends (Stooq as the fallback), the 13-week T-bill rate, Finnhub (quotes, profiles, financials, search, news), Google News RSS, SEC EDGAR, Reddit |
-| Quality | Vitest (151 files / 1728 tests), ESLint, `tsc --noEmit`, a compile-only build, GitHub Actions; Playwright browser QA (13 suites, `npm run qa`) against an in-memory Mongo |
+| Quality | Vitest (159 files / 1817 tests), ESLint, `tsc --noEmit`, a compile-only build, GitHub Actions; Playwright browser QA (14 suites, `npm run qa`) against an in-memory Mongo |
 
 ## Getting started
 
@@ -129,10 +135,10 @@ npm test              # vitest, a few seconds
 npm run typecheck
 npm run lint
 npm run build:check   # compile-only build: proves the app builds without any keys
-npm run qa            # browser QA: all 13 suites in scripts/qa against a throwaway harness (~5 min)
+npm run qa            # browser QA: all 14 suites in scripts/qa against a throwaway harness (~5 min)
 ```
 
-Unit tests (151 files / 1728 tests) cover every pure module, next to the code in `lib/<feature>/__tests__/`: fills, lots and account analytics, the interest and dividend accrual clock (with a parity test holding the strategy simulator to the live credit), the quant strategies' rules, engine, simulator and what-if grid, the AI Navigator's scoring and rails, the news brain's decay and extraction parsing, news aggregation and sanitising, the topic matcher and briefs, every learner-facing sentence (held to one no-advice word list) and the reason decoder's round trips, the chat tools' shaping, the email sections, dashboard layouts and theme tokens. Database-bound modules (Mongoose reads, server actions, the pages) are exercised through the browser QA in [`scripts/qa/`](scripts/qa/README.md) instead: `npm run qa` starts an in-memory MongoDB, the dev server with inline env vars and the Inngest dev server, then runs 13 Playwright suites, one per feature (`qa-auth`, `qa-trading`, `qa-income`, `qa-strategies`, `qa-learn`, `qa-topics`, …), each signing up its own user and walking its surfaces — no keys needed. `docs/specs/` holds the design documents for the larger features.
+Unit tests (159 files / 1817 tests) cover every pure module, next to the code in `lib/<feature>/__tests__/`: fills, lots and account analytics, the interest and dividend accrual clock (with a parity test holding the strategy simulator to the live credit), the quant strategies' rules, engine, simulator and what-if grid, the AI Navigator's scoring and rails, the news brain's decay and extraction parsing, news aggregation and sanitising, the topic matcher and briefs, every learner-facing sentence (held to one no-advice word list) and the reason decoder's round trips, the chat tools' shaping, the email sections, dashboard layouts and theme tokens. Database-bound modules (Mongoose reads, server actions, the pages) are exercised through the browser QA in [`scripts/qa/`](scripts/qa/README.md) instead: `npm run qa` starts an in-memory MongoDB, the dev server with inline env vars and the Inngest dev server, then runs 14 Playwright suites, one per feature (`qa-auth`, `qa-home`, `qa-trading`, `qa-income`, `qa-strategies`, `qa-learn`, `qa-topics`, …), each signing up its own user and walking its surfaces — no keys needed. `docs/specs/` holds the design documents for the larger features.
 
 ## Project structure
 
@@ -140,8 +146,10 @@ Every feature has one folder name in every layer — `lib/trading/`, `components
 
 ```
 app/            routes — (auth) sign-in, sign-up, forgot-password · (reset) reset-password
-                (root) dashboard, topics, topics/[slug], brain, strategies, strategies/[slug], stocks/[symbol],
-                trade, portfolio, history, markets, news, watchlist, friends, friends/[id], learn, settings
+                (marketing) welcome — the landing page a signed-out visitor sees at /
+                (root) home (/), dashboard, topics, topics/[slug], brain, strategies, strategies/[slug], stocks/[symbol],
+                trade, portfolio, history, markets, news, watchlist, friends, friends/[id], learn,
+                learn/course/[lesson], settings
                 api/ chat, inngest, accounts/[accountId]/export, strategies/[slug]/export
 components/     UI by feature (auth, dashboard, trading, income, strategies, navigator, brain, news, topics, learn,
                 chat, jobs, stocks, friends, settings, theme), plus primitives/ (the shared surface vocabulary),

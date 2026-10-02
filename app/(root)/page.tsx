@@ -1,3 +1,4 @@
+import type {Metadata} from "next";
 import {Suspense} from "react";
 import Link from "next/link";
 import {redirect} from "next/navigation";
@@ -24,6 +25,9 @@ import PageTitle from "@/components/primitives/PageTitle";
 import Panel from "@/components/primitives/Panel";
 import SectionHeading from "@/components/primitives/SectionHeading";
 import {actionButton} from "@/components/primitives/ActionButton";
+
+// The browser tab's title; app/layout.tsx appends the app's name.
+export const metadata: Metadata = {title: "Home"};
 
 // Home shows the briefing's first points; the news page has all of them.
 const HOME_BRIEFING_POINTS = 3;

@@ -1,3 +1,4 @@
+import type {Metadata} from "next";
 import Link from "next/link";
 import {requireUserId} from "@/lib/auth/session";
 import {getWatchlistForUser} from "@/lib/stocks/watchlist-store";
@@ -8,6 +9,9 @@ import {formatEasternTimestamp} from "@/lib/format";
 import PageTitle from "@/components/primitives/PageTitle";
 import Panel from '@/components/primitives/Panel';
 import SectionHeading from "@/components/primitives/SectionHeading";
+
+// The browser tab's title; app/layout.tsx appends the app's name.
+export const metadata: Metadata = {title: "Activity"};
 
 // Portfolio's Activity tab: what you did, across every account — the fills, and what you put on
 // your watchlist and when. It used to end on six cards of the news feed, which has a page of

@@ -1,3 +1,4 @@
+import type {Metadata} from "next";
 import Link from "next/link";
 import {notFound} from "next/navigation";
 import {cn} from "@/lib/utils";
@@ -10,6 +11,9 @@ import HoldingsTable from "@/components/trading/portfolio/HoldingsTable";
 import Panel from "@/components/primitives/Panel";
 import RowCard from "@/components/primitives/RowCard";
 import SectionHeading from "@/components/primitives/SectionHeading";
+
+// The browser tab's title; app/layout.tsx appends the app's name.
+export const metadata: Metadata = {title: "Friends"};
 
 type FriendProfilePageProps = {
     params: Promise<{id: string}>;

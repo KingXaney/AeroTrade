@@ -1,3 +1,4 @@
+import type {Metadata} from "next";
 import {Suspense} from "react";
 import Link from "next/link";
 import {requireUserId} from "@/lib/auth/session";
@@ -28,6 +29,9 @@ import Tabs from "@/components/primitives/Tabs";
 import {actionButton} from "@/components/primitives/ActionButton";
 import {rowCard} from "@/components/primitives/RowCard";
 import {cn} from "@/lib/utils";
+
+// The browser tab's title; app/layout.tsx appends the app's name.
+export const metadata: Metadata = {title: "Learn"};
 
 // Everything the app teaches, in one place: the beginner course, today's lesson and question,
 // the glossary every label on every page quotes, and the strategies in a line each. One view at
