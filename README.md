@@ -9,7 +9,7 @@ Follow the topics you care about, test trading strategies with virtual money, an
 [![License: MIT](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
 ![Next.js 16](https://img.shields.io/badge/Next.js-16-black)
 ![TypeScript](https://img.shields.io/badge/TypeScript-strict-3178c6)
-![Tests](https://img.shields.io/badge/tests-1723%20passing-brightgreen)
+![Tests](https://img.shields.io/badge/tests-1728%20passing-brightgreen)
 
 <img src="docs/screenshots/dashboard.png" alt="AeroTrade dashboard: followed topics, portfolio, latest articles, market heatmap" width="900">
 
@@ -82,7 +82,7 @@ flowchart LR
 | Jobs | Inngest (8 scheduled jobs + on-demand events), idempotent steps, per-user rate limits |
 | AI | Vercel AI SDK; Gemini 2.5 Flash-Lite on the free tier for every scheduled job, optional Claude tiers, Claude for the second opinion |
 | Market data | Yahoo Finance daily bars and dividends (Stooq as the fallback), the 13-week T-bill rate, Finnhub (quotes, profiles, financials, search, news), Google News RSS, SEC EDGAR, Reddit |
-| Quality | Vitest (150 files / 1723 tests), ESLint, `tsc --noEmit`, a compile-only build, GitHub Actions; Playwright browser QA (13 suites, `npm run qa`) against an in-memory Mongo |
+| Quality | Vitest (151 files / 1728 tests), ESLint, `tsc --noEmit`, a compile-only build, GitHub Actions; Playwright browser QA (13 suites, `npm run qa`) against an in-memory Mongo |
 
 ## Getting started
 
@@ -130,7 +130,7 @@ npm run build:check   # compile-only build: proves the app builds without any ke
 npm run qa            # browser QA: all 13 suites in scripts/qa against a throwaway harness (~5 min)
 ```
 
-Unit tests (150 files / 1723 tests) cover every pure module, next to the code in `lib/<feature>/__tests__/`: fills, lots and account analytics, the interest and dividend accrual clock (with a parity test holding the strategy simulator to the live credit), the quant strategies' rules, engine, simulator and what-if grid, the AI Navigator's scoring and rails, the news brain's decay and extraction parsing, news aggregation and sanitising, the topic matcher and briefs, every learner-facing sentence (held to one no-advice word list) and the reason decoder's round trips, the chat tools' shaping, the email sections, dashboard layouts and theme tokens. Database-bound modules (Mongoose reads, server actions, the pages) are exercised through the browser QA in [`scripts/qa/`](scripts/qa/README.md) instead: `npm run qa` starts an in-memory MongoDB, the dev server with inline env vars and the Inngest dev server, then runs 13 Playwright suites, one per feature (`qa-auth`, `qa-trading`, `qa-income`, `qa-strategies`, `qa-learn`, `qa-topics`, …), each signing up its own user and walking its surfaces — no keys needed. `docs/specs/` holds the design documents for the larger features.
+Unit tests (151 files / 1728 tests) cover every pure module, next to the code in `lib/<feature>/__tests__/`: fills, lots and account analytics, the interest and dividend accrual clock (with a parity test holding the strategy simulator to the live credit), the quant strategies' rules, engine, simulator and what-if grid, the AI Navigator's scoring and rails, the news brain's decay and extraction parsing, news aggregation and sanitising, the topic matcher and briefs, every learner-facing sentence (held to one no-advice word list) and the reason decoder's round trips, the chat tools' shaping, the email sections, dashboard layouts and theme tokens. Database-bound modules (Mongoose reads, server actions, the pages) are exercised through the browser QA in [`scripts/qa/`](scripts/qa/README.md) instead: `npm run qa` starts an in-memory MongoDB, the dev server with inline env vars and the Inngest dev server, then runs 13 Playwright suites, one per feature (`qa-auth`, `qa-trading`, `qa-income`, `qa-strategies`, `qa-learn`, `qa-topics`, …), each signing up its own user and walking its surfaces — no keys needed. `docs/specs/` holds the design documents for the larger features.
 
 ## Project structure
 
