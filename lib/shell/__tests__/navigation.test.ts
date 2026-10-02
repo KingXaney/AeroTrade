@@ -64,12 +64,14 @@ describe('the navigation registry', () => {
         expect(label('/portfolio')).toBe('Portfolio');
         expect(label('/history')).toBe('Activity');
         expect(label('/news')).toBe('News');
+        expect(label('/')).toBe('Home');
+        expect(label('/dashboard')).toBe('My dashboard');
         expect(label('/topics')).toBe('Topics');
     });
 });
 
 describe('isActiveNav', () => {
-    it('matches the dashboard only on exactly /', () => {
+    it('matches Home only on exactly /', () => {
         expect(isActiveNav('/', '/')).toBe(true);
         expect(isActiveNav('/topics', '/')).toBe(false);
         expect(isActiveNav('/portfolio', '/')).toBe(false);

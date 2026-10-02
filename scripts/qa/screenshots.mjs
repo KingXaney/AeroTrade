@@ -31,7 +31,7 @@ const OUT = outDir('screenshots');
     await shot('topics', 2000);
     await page.goto(`${BASE}/topics/ai-chips`, {waitUntil: 'load'});
     await shot('topic-ai-chips', 2000);
-    await page.goto(`${BASE}/`, {waitUntil: 'load'});
+    await page.goto(`${BASE}/dashboard`, {waitUntil: 'load'});
     await shot('dashboard', 3500);
     await page.goto(`${BASE}/brain`, {waitUntil: 'load'});
     await shot('brain', 2000);

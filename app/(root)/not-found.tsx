@@ -19,7 +19,7 @@ const NotFound = () => (
                     My topics
                 </Link>
                 <Link href="/" className={actionButton({variant: 'secondary', size: 'md'})}>
-                    Dashboard
+                    Home
                 </Link>
             </div>
         </Panel>

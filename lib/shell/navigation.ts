@@ -37,8 +37,11 @@ export type NavSection = {
 
 export const NAV_SECTIONS: readonly NavSection[] = [
     {
-        id: 'home', label: 'Dashboard', icon: 'space_dashboard',
-        pages: [{href: '/', label: 'Dashboard', icon: 'space_dashboard'}],
+        id: 'home', label: 'Home', icon: 'home',
+        pages: [
+            {href: '/', label: 'Today', icon: 'home'},
+            {href: '/dashboard', label: 'My dashboard', icon: 'space_dashboard'},
+        ],
     },
     {
         id: 'news', label: 'News', icon: 'feed', badge: 'topicsUnseen', flyout: 'topics',

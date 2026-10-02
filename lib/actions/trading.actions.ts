@@ -10,6 +10,7 @@ import type {ActionResult} from '@/lib/actions/types';
 // The account lifecycle (create, rename, reset, delete) is accounts.actions.ts.
 const revalidateTradingPaths = () => {
     revalidatePath('/');
+    revalidatePath('/dashboard');
     revalidatePath('/trade');
     revalidatePath('/portfolio');
     revalidatePath('/friends');

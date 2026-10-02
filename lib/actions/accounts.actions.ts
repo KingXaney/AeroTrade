@@ -16,6 +16,7 @@ const ACTIVE_COOKIE_MAX_AGE_SECONDS = 60 * 60 * 24 * 365;
 
 const revalidateAccountPaths = () => {
     revalidatePath('/');
+    revalidatePath('/dashboard');
     revalidatePath('/trade');
     revalidatePath('/portfolio');
     revalidatePath('/friends');
@@ -217,6 +218,7 @@ export const setActiveAccount = async (accountId: string): Promise<ActionResult>
 
         await setActiveAccountCookie(String(account._id));
         revalidatePath('/');
+        revalidatePath('/dashboard');
         revalidatePath('/trade');
         revalidatePath('/portfolio');
         return {success: true, message: `Switched to "${account.name || 'account'}"`};

@@ -6,7 +6,7 @@
 // keyless with no stock panels.
 // Run: npm run qa -- styles   (the harness: README.md)
 import {chromium} from 'playwright';
-import {BASE, DASHBOARD_URL, check, outDir, signUp, summary} from './lib.mjs';
+import {BASE, check, outDir, signUp, summary} from './lib.mjs';
 
 const OUT = outDir('styles');
 
@@ -17,7 +17,7 @@ const shot = (n) => page.screenshot({path: `${OUT}${n}.png`, fullPage: true});
 try {
     // --- sign up ---------------------------------------------------------------
     await signUp(page, 'Foundations');
-    check('sign-up lands on the dashboard', DASHBOARD_URL.test(page.url()), page.url());
+    check('sign-up lands in the app', page.url().endsWith('/dashboard'), page.url());
 
     // --- the warning token actually resolves (both globals.css edits landed) ----
     const warning = await page.evaluate(() =>
@@ -37,7 +37,7 @@ try {
     check('text-warning utility is generated', warningUtility === 'rgb(255, 209, 102)', warningUtility);
 
     // --- no phantom scroll on the pages that carried a doubled min-h-screen -----
-    for (const path of ['/', '/portfolio', '/settings', '/brain', '/strategies', '/markets']) {
+    for (const path of ['/', '/dashboard', '/portfolio', '/settings', '/brain', '/strategies', '/markets']) {
         await page.goto(`${BASE}${path}`, {waitUntil: 'networkidle'}).catch(() => {});
         // The bug was a doubled min-h-screen: scrollable space with nothing in it. So
         // measure the gap between the document's scroll height and the bottom of the

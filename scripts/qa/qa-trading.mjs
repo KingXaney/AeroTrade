@@ -27,7 +27,7 @@ const mongo = new MongoClient(MONGO);
 // and every other action pass through, and the server's own quote (placeOrder) is untouched.
 const STUB_PRICE = 150;
 let quotesStubbed = 0;
-const onTicketPages = (url) => url.pathname === '/trade' || url.pathname === '/';
+const onTicketPages = (url) => url.pathname === '/trade' || url.pathname === '/dashboard';
 const quoteStub = async (route) => {
     const request = route.request();
     // getQuote(symbol) posts its one argument: ["AAPL"].
@@ -358,7 +358,7 @@ try {
     await page.getByLabel('Add Quick Trade').click();
     await page.getByLabel('Add Recent Trades').click();
     await page.waitForTimeout(1200);   // debounced autosave
-    await page.goto(`${BASE}/`, {waitUntil: 'domcontentloaded'});
+    await page.goto(`${BASE}/dashboard`, {waitUntil: 'domcontentloaded'});
     const widget = page.locator('[data-widget-id="quick-trade"]');
     await widget.waitFor({timeout: 30000});
     // The widget's own bounded read (the newest eight of the current epoch), not the ledger.
@@ -369,7 +369,7 @@ try {
     await widget.locator('#order-symbol').fill('TSLA');
     await widget.locator('#order-symbol').press('Enter');
     await page.waitForTimeout(1500);
-    check('the dashboard widget never navigates to /trade', new URL(page.url()).pathname === '/', page.url());
+    check('the dashboard widget never navigates to /trade', new URL(page.url()).pathname === '/dashboard', page.url());
     check('the dashboard ticket keeps the queue line and definitions off', await widget.locator('[data-testid="order-queue"]').count() === 0 && await widget.locator('[data-what-these-mean]').count() === 0);
     check('the compact ticket has no note field', await widget.locator('#order-note').count() === 0);
     // Still priced by the stub, with ^IRX stored: the 360px line keeps its first two facts only.
@@ -383,7 +383,7 @@ try {
 
     // --- a layout saved with the old 'strategy-comparison' id reads as the account comparison --
     await db.collection('userpreferences').updateOne({userId}, {$set: {dashboardLayout: {version: 1, widgets: [{id: 'strategy-comparison', span: 8}]}}});
-    await page.goto(`${BASE}/`, {waitUntil: 'domcontentloaded'});
+    await page.goto(`${BASE}/dashboard`, {waitUntil: 'domcontentloaded'});
     const comparison = page.locator('[data-widget-id="account-comparison"]');
     await comparison.waitFor({timeout: 30000}).catch(() => {});
     const comparisonText = await comparison.count() === 1 ? await comparison.innerText() : '';

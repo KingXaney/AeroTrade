@@ -105,14 +105,14 @@ const DashboardGrid = ({initialLayout, bodies, availableIds, headerActions, star
         // The action deliberately doesn't revalidate; re-render here so new widgets get
         // their data and the fingerprint key remounts the grid in view mode. Leaving
         // ?customize=1 first guarantees the remounted grid doesn't start in edit mode.
-        if (startInEditMode) router.replace('/');
+        if (startInEditMode) router.replace('/dashboard');
         else router.refresh();
     });
 
     const cancel = useCallback(() => {
         setLayout(saved);
         setEditing(false);
-        if (startInEditMode) router.replace('/');
+        if (startInEditMode) router.replace('/dashboard');
     }, [saved, startInEditMode, router]);
 
     const activeDef = activeId ? WIDGETS[activeId] : null;
@@ -122,7 +122,7 @@ const DashboardGrid = ({initialLayout, bodies, availableIds, headerActions, star
         <div className="space-y-4">
             <PageTitle
                 title="Dashboard"
-                subtitle={editing ? 'Drag widgets by their handle, resize, remove, or add new ones — then save.' : 'Your topics, portfolio, watchlist and friends at a glance'}
+                subtitle={editing ? 'Drag widgets by their handle, resize, remove, or add new ones — then save.' : 'The widgets you chose, in the order you put them'}
                 actions={
                     <DashboardToolbar
                         editing={editing} dirty={dirty} pending={pending}

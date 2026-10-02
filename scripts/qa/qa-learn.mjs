@@ -80,7 +80,7 @@ try {
     // dashboard they keep their Term titles but get neither the disclosure nor its "Ask in
     // chat" links (invariant 12). Neither is in the default layout, so put them there.
     await db.collection('userpreferences').updateOne({userId: userA}, {$set: {dashboardLayout: {version: 1, widgets: [{id: 'account-summary', span: 12}, {id: 'analytics-stats', span: 12}]}, updatedAt: new Date()}}, {upsert: true});
-    await page.goto(`${BASE}/`, {waitUntil: 'load'});
+    await page.goto(`${BASE}/dashboard`, {waitUntil: 'load'});
     await page.locator('[data-widget-id="account-summary"] [data-term]').first().waitFor({timeout: 30000});
     check('the account-summary widget keeps its Term titles', await page.locator('[data-widget-id="account-summary"] [data-term]').count() >= 4);
     check('no "What these mean" disclosure on any dashboard widget', await page.locator('[data-widget-id] [data-what-these-mean]').count() === 0);
@@ -365,7 +365,7 @@ try {
     check('Today\'s lesson is not on the default dashboard', await pageC.locator('[data-widget-id="todays-lesson"]').count() === 0);
     // A deterministic feed: no topics at all, so nothing in them can have used a term today.
     await db.collection('topics').deleteMany({userId: userC});
-    await pageC.goto(`${BASE}/?customize=1`, {waitUntil: 'load'});
+    await pageC.goto(`${BASE}/dashboard?customize=1`, {waitUntil: 'load'});
     await pageC.getByRole('button', {name: /Add widget/i}).first().click();
     const library = pageC.locator('[role="dialog"]');
     await library.waitFor({timeout: 15000});
@@ -466,7 +466,7 @@ try {
     await pageC.screenshot({path: `${OUT}07-todays-lesson.png`, fullPage: true});
 
     // The page and the settings editor read the same onboarding facts.
-    await pageC.goto(`${BASE}/`, {waitUntil: 'load'});
+    await pageC.goto(`${BASE}/dashboard`, {waitUntil: 'load'});
     await pageC.locator('[data-widget-id]').first().waitFor({timeout: 30000});
     const onDashboard = await pageC.locator('[data-widget-id="getting-started"]').count() === 1;
     await pageC.goto(`${BASE}/settings`, {waitUntil: 'load'});
@@ -516,7 +516,7 @@ try {
     const userD = await userIdFor(emailD);
     await pageD.locator('[data-widget-id]').first().waitFor({timeout: 30000});
     check('the Daily quiz is not on the default dashboard', await pageD.locator('[data-widget-id="daily-quiz"]').count() === 0);
-    await pageD.goto(`${BASE}/?customize=1`, {waitUntil: 'load'});
+    await pageD.goto(`${BASE}/dashboard?customize=1`, {waitUntil: 'load'});
     await pageD.getByRole('button', {name: /Add widget/i}).first().click();
     const libraryD = pageD.locator('[role="dialog"]');
     await libraryD.waitFor({timeout: 15000});
@@ -642,7 +642,7 @@ try {
     // the tab that lost the race is told nothing failed.
     await db.collection('userpreferences').updateOne({userId: userD}, {$set: {'learn.quizLastAnsweredDate': isoDaysAgo(1)}});
     const pageD2 = await contextD.newPage();
-    await Promise.all([pageD.reload({waitUntil: 'load'}), pageD2.goto(`${BASE}/`, {waitUntil: 'load'})]);
+    await Promise.all([pageD.reload({waitUntil: 'load'}), pageD2.goto(`${BASE}/dashboard`, {waitUntil: 'load'})]);
     const quiz2 = pageD2.locator('[data-widget-id="daily-quiz"] #daily-quiz');
     await Promise.all([quiz.waitFor({timeout: 30000}), quiz2.waitFor({timeout: 30000})]);
     const isQuizAction = (r) => r.request().method() === 'POST' && !!r.request().headers()['next-action'];
@@ -1093,7 +1093,7 @@ try {
         await pageF.getByLabel('Add Active Theses').click();
         await pageF.getByLabel('Add Weekly Decisions').click();
         await pageF.waitForTimeout(1200);   // debounced autosave
-        await pageF.goto(`${BASE}/`, {waitUntil: 'domcontentloaded'});
+        await pageF.goto(`${BASE}/dashboard`, {waitUntil: 'domcontentloaded'});
         const thesesWidget = pageF.locator('[data-widget-id="active-theses"]');
         const decisionsWidget = pageF.locator('[data-widget-id="weekly-decisions"]');
         await thesesWidget.getByText(THESIS_KEY).first().waitFor({timeout: 30000});

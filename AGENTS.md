@@ -72,6 +72,15 @@ and friends keep none beyond Shared and the invariants).
   `scripts/migration-indexes.mjs`, which `migrate:accounts` builds and
   `lib/__tests__/migration-indexes.test.ts` holds equal to the models.
 
+### home
+
+- `/` is Home for a signed-in reader: `lib/home/page-store.getHomeView` (the accounts' valuation and
+  the topics overview are the shell's own request-cached reads) shaped by `lib/home/view`. It
+  adapts from rows, never a flag: `nextStep` is the first first-week mission not yet done, then
+  the session (the trade desk while the market is open, the news while it is closed); a box with
+  nothing to say is not drawn. The widget grid is `/dashboard`; every action that revalidates
+  `/` revalidates it too (`lib/__tests__/home-revalidate.test.ts`).
+
 ### shell
 
 - `lib/shell/navigation` is the one nav registry. A section (`NAV_SECTIONS`) is one icon on the

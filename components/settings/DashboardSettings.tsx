@@ -84,7 +84,7 @@ const DashboardSettings = ({initialLayout, availableIds}: Props) => {
             <div>
                 <div className="flex items-center justify-between mb-2">
                     <div className="label-type text-[length:var(--label-size)] text-fg-muted">Your widgets · {layout.widgets.length}</div>
-                    <Link href="/?customize=1" className="text-xs text-brand hover:underline font-mono">Arrange on dashboard →</Link>
+                    <Link href="/dashboard?customize=1" className="text-xs text-brand hover:underline font-mono">Arrange on dashboard →</Link>
                 </div>
                 {layout.widgets.length === 0 ? (
                     <p className="text-sm text-fg-muted">No widgets — add some below or reset to the default layout.</p>

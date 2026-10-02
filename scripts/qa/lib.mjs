@@ -13,8 +13,8 @@ export const MONGO = process.env.QA_MONGO_URL || 'mongodb://127.0.0.1:27117/aero
 export const INNGEST = (process.env.QA_INNGEST_URL || 'http://localhost:8288').replace(/\/+$/, '');
 
 export const PASSWORD = 'Passw0rd!Passw0rd!';
-// Where sign-up and sign-in land: the dashboard, with or without a query string.
-export const DASHBOARD_URL = new RegExp(`^${BASE.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}/(\\?.*)?$`);
+// Where sign-up and sign-in land: Home, with or without a query string.
+export const HOME_URL = new RegExp(`^${BASE.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}/(\\?.*)?$`);
 
 // A directory beside or above this file as a path with forward slashes and a trailing slash.
 // fileURLToPath, not URL.pathname: on Windows the pathname is "/C:/…", which resolves to "C:\C:\…".
@@ -46,13 +46,16 @@ export const summary = (suite) => {
 
 // Signs a fresh user up through the form and waits for the dashboard. The tag names the user
 // ("QA <tag>") and its address (qa<tag><ms>@example.com), so a suite's users are easy to find.
-export const signUp = async (page, tag, {name = `QA ${tag}`} = {}) => {
+export const signUp = async (page, tag, {name = `QA ${tag}`, stay = false} = {}) => {
     const email = `qa${tag.toLowerCase().replace(/[^a-z0-9]/g, '')}${Date.now()}@example.com`;
     await page.goto(`${BASE}/sign-up`, {waitUntil: 'load'});
     await page.fill('#fullName', name);
     await page.fill('#email', email);
     await page.fill('#password', PASSWORD);
     await page.click('button[type="submit"]');
-    await page.waitForURL(DASHBOARD_URL, {timeout: 90000});
+    await page.waitForURL(HOME_URL, {timeout: 90000});
+    // Sign-up lands on Home. Most suites start from the widget dashboard, so go there unless
+    // the caller is checking Home itself.
+    if (!stay) await page.goto(`${BASE}/dashboard`, {waitUntil: 'load'});
     return email;
 };

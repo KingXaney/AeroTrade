@@ -16,7 +16,7 @@
 // Run: npm run qa -- auth   (the harness: README.md)
 import {chromium} from 'playwright';
 import {MongoClient} from 'mongodb';
-import {BASE, DASHBOARD_URL, MONGO, PASSWORD, check, outDir, summary} from './lib.mjs';
+import {BASE, HOME_URL, MONGO, PASSWORD, check, outDir, summary} from './lib.mjs';
 
 const OUT = outDir('auth');
 
@@ -71,7 +71,7 @@ try {
     await page.click('button[type="submit"]');
     // Read before the page moves on, while the body is still the browser's to hand over.
     const signUpBody = await (await signUpAction).text();
-    await page.waitForURL(DASHBOARD_URL, {timeout: 90000});
+    await page.waitForURL(HOME_URL, {timeout: 90000});
     const signUpToken = await sessionToken(signedIn);
     check('the sign-up action returns no session token', Boolean(signUpToken) && signUpBody.length > 0 && !signUpBody.includes(signUpToken),
         signUpToken ? '' : 'no session cookie');
@@ -154,7 +154,7 @@ try {
     const signInAction = actionResponse();
     await page.click('button[type="submit"]');
     const signInBody = await (await signInAction).text();
-    await page.waitForURL(DASHBOARD_URL, {timeout: 60000});
+    await page.waitForURL(HOME_URL, {timeout: 60000});
     check('the new password signs in', true);
     const signInToken = await sessionToken(loggedOut);
     check('…and the sign-in action returns no session token', Boolean(signInToken) && signInBody.length > 0 && !signInBody.includes(signInToken),

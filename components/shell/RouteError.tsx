@@ -37,7 +37,7 @@ const RouteError = ({error, reset, title = 'Something went wrong', message}: Pro
                             Try again
                         </ActionButton>
                         <Link href="/" className={actionButton({variant: 'secondary', size: 'md'})}>
-                            Dashboard
+                            Home
                         </Link>
                     </>
                 }

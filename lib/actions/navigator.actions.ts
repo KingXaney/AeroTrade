@@ -20,6 +20,7 @@ import type {SuggestionAction} from '@/lib/navigator/types';
 const revalidateNavigatorPaths = () => {
     revalidatePath('/brain');
     revalidatePath('/');
+    revalidatePath('/dashboard');
     revalidatePath('/portfolio');
 };
 

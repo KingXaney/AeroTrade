@@ -422,7 +422,7 @@ try {
     await settleToasts();
     check('follow stored the slug', ((await prefsDoc())?.followedStrategies ?? []).includes('golden-cross'));
     await db.collection('userpreferences').updateOne({userId}, {$set: {dashboardLayout: {version: 1, widgets: [{id: 'quant-strategies', span: 6}]}}});
-    await page.goto(`${BASE}/`, {waitUntil: 'load'});
+    await page.goto(`${BASE}/dashboard`, {waitUntil: 'load'});
     // While streaming, React keeps the resolved content in a hidden template next to the
     // fallback for a moment, so two matches can exist: wait for the visible one.
     await page.locator('[data-testid="quant-strategies-widget"]:visible').first().waitFor({timeout: 30000});

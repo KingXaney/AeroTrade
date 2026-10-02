@@ -7,7 +7,7 @@
 // Run: npm run qa -- topics   (the harness: README.md)
 import {chromium} from 'playwright';
 import {MongoClient} from 'mongodb';
-import {BASE, DASHBOARD_URL, MONGO, check, note, outDir, signUp, summary} from './lib.mjs';
+import {BASE, MONGO, check, note, outDir, signUp, summary} from './lib.mjs';
 
 // Articles this suite seeds straight into Mongo, removed by source before and after the run.
 const QA_FEED_SOURCE = 'QA Feed Wire';
@@ -42,7 +42,7 @@ const settleToasts = async (page) => {
     // --- sign up: lands on the dashboard with topics already installed ---
     const email = await signUp(page, 'Tester').catch(async (e) => { await shot('00-sign-up-failed'); throw e; });
     await page.waitForTimeout(1200);
-    check('sign-up lands on the dashboard, not a setup screen', DASHBOARD_URL.test(page.url()), page.url());
+    check('sign-up lands in the app, not a setup screen', page.url().endsWith('/dashboard'), page.url());
 
     // --- the defaults are there, and the picker never appeared ---
     await page.goto(`${BASE}/topics`, {waitUntil: 'load'});
@@ -84,7 +84,7 @@ const settleToasts = async (page) => {
     await page.mouse.move(700, 500);
     const railNav = await page.$$eval('aside.rail nav a', (as) => as.map((a) => a.getAttribute('aria-label')?.split(',')[0]));
     // All eight come from lib/shell/navigation.ts; the account pages are in the avatar menu.
-    check('the rail runs Dashboard · News · Markets … Learn', railNav.join(',') === 'Dashboard,News,Markets,Trade,Portfolio,Strategies,Brain,Learn', railNav.join(','));
+    check('the rail runs Home · News · Markets … Learn', railNav.join(',') === 'Home,News,Markets,Trade,Portfolio,Strategies,Brain,Learn', railNav.join(','));
     const tabHrefs = await page.$$eval('[data-section-tabs="news"] a', (as) => as.map((a) => `${a.getAttribute('href')}${a.getAttribute('aria-current') === 'page' ? '*' : ''}`));
     check('a topic page sits under News, on its Topics tab', tabHrefs.join(',') === '/news,/topics*', tabHrefs.join(','));
     // Search is a palette trigger, not a route — it used to be a fake '/search' NAV_ITEMS entry.
@@ -93,7 +93,7 @@ const settleToasts = async (page) => {
     check('no /search route link anywhere', await page.locator('a[href="/search"]').count() === 0);
 
     // --- dashboard: topics-first default + widgets ---
-    await page.goto(`${BASE}/`, {waitUntil: 'load'});
+    await page.goto(`${BASE}/dashboard`, {waitUntil: 'load'});
     await page.waitForTimeout(2500);
     const order = await widgetOrder();
     check('default layout is checklist-then-topics', order.join(',') === 'getting-started,topics-overview,portfolio-snapshot,watchlist-movers,topics-latest,friends-rank,news-brain-tile,tv-heatmap,tv-top-stories', order.join(','));
@@ -101,7 +101,7 @@ const settleToasts = async (page) => {
     await shot('03-dashboard');
 
     // --- widget library: Topics group first, New badge ---
-    await page.goto(`${BASE}/?customize=1`, {waitUntil: 'load'});
+    await page.goto(`${BASE}/dashboard?customize=1`, {waitUntil: 'load'});
     await page.waitForTimeout(1500);
     const addBtn = page.getByRole('button', {name: /Add widget/i}).first();
     if (await addBtn.count()) {

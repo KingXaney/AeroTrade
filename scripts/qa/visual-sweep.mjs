@@ -32,7 +32,8 @@ const SIGNED_OUT = [
     ['reset-password-bad-token', '/reset-password?token=not-a-token'],
 ];
 const SIGNED_IN = [
-    ['dashboard', '/'],
+    ['home', '/'],
+    ['dashboard', '/dashboard'],
     ['topics', '/topics'],
     ['news', '/news'],
     ['brain', '/brain'],

@@ -24,6 +24,7 @@ export const dismissMissions = async (): Promise<ActionResult> => {
         await connectToDatabase();
         await upsertPreferences(userId, {$set: {'learn.missionsDismissedAt': new Date(), updatedAt: new Date()}});
         revalidatePath('/');
+        revalidatePath('/dashboard');
         return {success: true};
     } catch (error) {
         console.error('Error dismissing missions:', error);
@@ -47,6 +48,7 @@ export const markLessonSeen = async (input: unknown): Promise<ActionResult> => {
             $set: {updatedAt: new Date()},
         });
         revalidatePath('/');
+        revalidatePath('/dashboard');
         return {success: true};
     } catch (error) {
         console.error('Error marking a lesson seen:', error);

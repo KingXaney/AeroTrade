@@ -25,6 +25,7 @@ const FEED_PAGE_MAX = 50;
 const revalidateTopics = () => {
     revalidatePath('/topics');
     revalidatePath('/');
+    revalidatePath('/dashboard');
 };
 
 

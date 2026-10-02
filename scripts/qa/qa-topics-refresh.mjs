@@ -8,7 +8,7 @@
 // Run: npm run qa -- topics-refresh   (the harness: README.md)
 import {chromium} from 'playwright';
 import {MongoClient} from 'mongodb';
-import {BASE, DASHBOARD_URL, INNGEST, MONGO, check, outDir, signUp, summary} from './lib.mjs';
+import {BASE, INNGEST, MONGO, check, outDir, signUp, summary} from './lib.mjs';
 
 const OUT = outDir('topics-refresh');
 
@@ -40,7 +40,7 @@ try {
     // --- the defaults are installed, and no setup screen was shown -------------------
     // Earlier harness runs leave other users' topics behind; ours is the newest.
     const userId = (await topics.find({slug: 'fed-rate-decisions'}).sort({createdAt: -1}).limit(1).next())?.userId;
-    check('sign-up lands on the dashboard, not a setup screen', DASHBOARD_URL.test(page.url()), page.url());
+    check('sign-up lands in the app, not a setup screen', page.url().endsWith('/dashboard'), page.url());
     check(`all ${DEFAULTS.length} default topics were seeded`, await topics.countDocuments({userId}) === DEFAULTS.length,
         String(await topics.countDocuments({userId})));
     const seededNames = (await topics.find({userId}).toArray()).map((t) => t.name).sort();
@@ -184,7 +184,7 @@ try {
     check('…and its headline return admits the unpriced holdings', /· 2 unpriced/.test(flat));
     await page.mouse.move(700, 500);
 
-    await page.goto(`${BASE}/`, {waitUntil: 'load'});
+    await page.goto(`${BASE}/dashboard`, {waitUntil: 'load'});
     await page.locator('[data-widget-id="portfolio-snapshot"]').waitFor({timeout: 30000});
     check('dashboard snapshot widget admits the holdings are unpriced',
         /unpriced/.test(await page.locator('[data-widget-id="portfolio-snapshot"]').innerText()));
