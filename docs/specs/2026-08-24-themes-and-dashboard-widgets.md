@@ -1,7 +1,7 @@
 # Themes + Customizable Dashboard Widgets — Design Spec
 
 **Date:** 2026-08-24
-**Status:** Implemented on `feature/themes-dashboard-widgets`
+**Status:** Implemented — `22ea56c` (2026-08-28).
 
 ## Context
 

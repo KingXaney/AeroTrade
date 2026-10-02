@@ -1,6 +1,6 @@
 # Quant strategies
 
-**Status:** implemented on `feat/quant-strategies` (2026-09-21).
+**Status:** Implemented — merged to `main` in `4ea3fa0` (PR #19, 2026-09-21).
 
 ## Why
 
