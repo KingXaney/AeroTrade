@@ -23,6 +23,9 @@ export interface LearnPrefs {
     // Written together by one atomic update filtered on the date, so a day counts once.
     quizDaysAnswered?: number;
     quizLastAnsweredDate?: string;
+    // Beginner-course lessons whose check was answered (lib/learn/course.ts ids), each once
+    // ($addToSet). A field of its own: lessonsSeen is capped and churns with rebalance keys.
+    courseDone?: string[];
 }
 
 export interface UserPreferencesDoc extends Document {
@@ -81,6 +84,7 @@ const LearnSchema = new Schema<LearnPrefs>(
         lessonsSeen: {type: [String], default: undefined},
         quizDaysAnswered: {type: Number, required: false},
         quizLastAnsweredDate: {type: String, required: false},
+        courseDone: {type: [String], default: undefined},
     },
     {_id: false},
 );

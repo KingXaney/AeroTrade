@@ -128,6 +128,23 @@ const Welcome = () => (
                 </ol>
             </section>
 
+            {/* The course */}
+            <section aria-labelledby="landing-course">
+                <h2 id="landing-course" className="font-heading text-2xl font-semibold text-fg">{LANDING_COPY.courseHeading}</h2>
+                <p className="mt-2 max-w-2xl text-sm leading-relaxed text-fg-soft">{LANDING_COPY.courseBody}</p>
+                <div className="mt-5 grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+                    {LANDING_COPY.course.map((section, i) => (
+                        <Panel key={section.id} as="div" data-landing-module={section.id}>
+                            <MicroLabel tone="brand">{`0${i + 1}`}</MicroLabel>
+                            <h3 className="mt-2 font-heading text-base font-semibold text-fg">{section.title}</h3>
+                            <ul className="mt-2 space-y-1">
+                                {section.lessons.map((lesson) => <li key={lesson} className="text-sm text-fg-muted">{lesson}</li>)}
+                            </ul>
+                        </Panel>
+                    ))}
+                </div>
+            </section>
+
             {/* Themes */}
             <Panel pad={6} aria-labelledby="landing-themes" className="grid items-center gap-6 lg:grid-cols-2">
                 <div>

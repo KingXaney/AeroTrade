@@ -39,7 +39,9 @@ describe('LANDING_COPY', () => {
         const practise = LANDING_COPY.pillars.find((p) => p.id === 'practise');
         expect(practise?.points[0]).toContain(`${STRATEGIES.length} rule-based strategies`);
         const learn = LANDING_COPY.pillars.find((p) => p.id === 'learn');
-        expect(learn?.points[0]).toContain(`${GLOSSARY_KEYS.length} terms`);
+        expect(learn?.points[0]).toContain('16 short lessons');
+        expect(learn?.points[1]).toContain(`${GLOSSARY_KEYS.length} terms`);
+        expect(LANDING_COPY.course.map((m) => m.lessons.length)).toEqual([4, 4, 4, 4]);
     });
 
     it('says plainly that no real money is involved', () => {

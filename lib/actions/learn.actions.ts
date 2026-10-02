@@ -8,6 +8,8 @@ import {LESSONS_SEEN_CAP, lessonKey, parseLessonId} from "@/lib/learn/moments";
 import {LESSON_COPY} from "@/lib/learn/copy/lesson";
 import {parseQuizDate} from "@/lib/learn/quiz";
 import {DAILY_QUIZ_COPY} from "@/lib/learn/copy/quiz";
+import {COURSE_LESSON_IDS} from "@/lib/learn/course";
+import {COURSE_COPY} from "@/lib/learn/copy/learn";
 import {readQuizDaysAnswered} from "@/lib/learn/quiz-store";
 import UserPreferencesModel from "@/database/models/user-preferences.model";
 import {getEasternDateString} from "@/lib/dates";
@@ -86,5 +88,25 @@ export const recordQuizAnswer = async (input: unknown): Promise<QuizAnswerResult
     } catch (error) {
         console.error('Error recording a quiz answer:', error);
         return {success: false, message: DAILY_QUIZ_COPY.notSaved};
+    }
+};
+
+// The beginner course: answering a lesson's question stamps its id, once ($addToSet). The
+// argument arrives from the client, so it is `unknown` until it is one of the registry's ids;
+// only that id is written.
+export const markCourseLessonDone = async (input: unknown): Promise<ActionResult> => {
+    const userId = await getCurrentUserId();
+    if (!userId) return {success: false, message: COURSE_COPY.notSignedIn};
+    if (typeof input !== 'string' || !COURSE_LESSON_IDS.includes(input)) return {success: false, message: COURSE_COPY.invalid};
+    try {
+        await connectToDatabase();
+        await upsertPreferences(userId, {$addToSet: {'learn.courseDone': input}, $set: {updatedAt: new Date()}});
+        revalidatePath('/');
+        revalidatePath('/dashboard');
+        revalidatePath('/learn');
+        return {success: true};
+    } catch (error) {
+        console.error('Error marking a course lesson done:', error);
+        return {success: false, message: COURSE_COPY.notSaved};
     }
 };

@@ -7,6 +7,8 @@ import {getLearnFacts} from "@/lib/learn/facts-store";
 import {getTodaysLesson} from "@/lib/learn/lesson-store";
 import {deriveMoments} from "@/lib/learn/moments";
 import {HOME_COPY} from "@/lib/learn/copy/home";
+import {COURSE_COPY} from "@/lib/learn/copy/learn";
+import {getCourseProgress} from "@/lib/learn/course-store";
 import {NEWS_COPY} from "@/lib/learn/copy/news";
 import MarketStatus from "@/components/stocks/MarketStatus";
 import HomeAccounts from "@/components/home/HomeAccounts";
@@ -50,10 +52,9 @@ const Home = async ({searchParams}: HomeProps) => {
 
     const view = await getHomeView(user.id);
     const {step} = view;
-    // The box beside the topics: the market briefing, else the topics' own briefs, else (once
-    // the first-week list is gone) today's lesson.
+    // The box beside the topics: the market briefing, else the topics' own briefs, else the
+    // course's next lesson (today's lesson once the course is done).
     const hasBriefing = view.briefing !== null || view.hasBriefs;
-    const beside = hasBriefing || !view.missions;
 
     return (
         <div className="space-y-4" data-home>
@@ -86,13 +87,12 @@ const Home = async ({searchParams}: HomeProps) => {
             </div>
 
             <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
-                {/* Alone in its row (a new account: no brief yet, the lesson still to come), it takes the row. */}
-                <Panel id="home-topics" aria-labelledby="home-topics-heading" className={beside ? undefined : 'lg:col-span-2'}>
+                <Panel id="home-topics" aria-labelledby="home-topics-heading">
                     <SectionHeading id="home-topics-heading">{HOME_COPY.topicsHeading}</SectionHeading>
                     {view.topics.topics.length > 0 ? <TopicsOverview overview={view.topics} span={6}/> : <TopicsWidgetEmpty/>}
                 </Panel>
 
-                {/* A box with nothing to say is not shown: until a topic has a brief, the lesson
+                {/* A box with nothing to say is not shown: until there is a briefing, the course
                     takes this place beside the topics. */}
                 {view.briefing ? (
                     <Panel id="home-briefing" aria-labelledby="home-briefing-heading">
@@ -124,7 +124,7 @@ const Home = async ({searchParams}: HomeProps) => {
                         <p className="mb-3 text-xs text-fg-muted">{HOME_COPY.briefingNote}</p>
                         <TopicBriefsList overview={view.topics}/>
                     </Panel>
-                ) : !view.missions && (
+                ) : (
                     <Panel id="home-learn" aria-labelledby="home-learn-heading">
                         <LearnBox userId={user.id}/>
                     </Panel>
@@ -145,6 +145,23 @@ const Home = async ({searchParams}: HomeProps) => {
     );
 };
 
+// The beginner course's next lesson while there is one; today's lesson once the course is done.
+const LearnBody = async ({userId}: {userId: string}) => {
+    const progress = await getCourseProgress(userId);
+    if (!progress.next) return <LessonAsync userId={userId}/>;
+    return (
+        <div data-home-course={progress.next.id}>
+            <MicroLabel>{progress.next.moduleTitle} · {COURSE_COPY.lessonOf(progress.next.number, progress.total)}</MicroLabel>
+            <h3 className="mt-1 font-heading text-lg font-semibold text-fg">{progress.next.title}</h3>
+            <p className="mt-2 text-sm leading-relaxed text-fg-soft">{progress.next.intro[0]}</p>
+            <div className="mt-4 flex flex-wrap items-center gap-3">
+                <Link href={`/learn/course/${progress.next.id}`} className={actionButton({variant: 'secondary', size: 'md'})}>{COURSE_COPY.continueCta}</Link>
+                <MicroLabel>{COURSE_COPY.progress(progress.done, progress.total)}</MicroLabel>
+            </div>
+        </div>
+    );
+};
+
 const LearnBox = ({userId}: {userId: string}) => (
     <>
         <div className="mb-4 flex items-center justify-between gap-3">
@@ -152,7 +169,7 @@ const LearnBox = ({userId}: {userId: string}) => (
             <Link href="/learn" className="label-type text-xs text-brand hover:underline">{HOME_COPY.learnLink} →</Link>
         </div>
         <Suspense fallback={<WidgetSkeleton height={160} rows={3}/>}>
-            <LessonAsync userId={userId}/>
+            <LearnBody userId={userId}/>
         </Suspense>
     </>
 );

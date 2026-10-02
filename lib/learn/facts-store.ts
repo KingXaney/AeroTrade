@@ -28,7 +28,7 @@ import {STRATEGY_SLUGS} from "@/lib/strategies/catalog";
 import type {StrategyId} from "@/lib/strategies/types";
 import {accountEpoch} from "@/lib/trading/epoch";
 
-type LearnPrefs = {followedStrategies?: string[]; learn?: {missionsDismissedAt?: Date; lessonsSeen?: string[]}} | null;
+type LearnPrefs = {followedStrategies?: string[]; learn?: {missionsDismissedAt?: Date; lessonsSeen?: string[]; courseDone?: string[]}} | null;
 type LearnRows = {accounts: Awaited<ReturnType<typeof readAccountsForUser>>; prefs: LearnPrefs};
 
 const readRowsNow = async (userId: string): Promise<LearnRows> => {

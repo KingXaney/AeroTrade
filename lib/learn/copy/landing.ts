@@ -7,6 +7,7 @@
 // return figure — there is none to quote.
 
 import {GLOSSARY_KEYS} from "@/lib/learn/glossary";
+import {COURSE_LESSONS, COURSE_MODULES} from "@/lib/learn/course";
 import {STRATEGIES} from "@/lib/strategies/catalog";
 import {PALETTE_IDS} from "@/lib/theme/palettes";
 import {STYLE_IDS} from "@/lib/theme/styles";
@@ -53,8 +54,8 @@ export const LANDING_COPY = {
             title: 'Learn how the market works',
             body: 'Start from nothing: what a share is, how an order fills, what a portfolio is made of. Every figure on screen carries its own definition, and the app teaches from your own account as you use it.',
             points: [
+                `A beginner course of ${COURSE_LESSONS.length} short lessons, each ending on one question and a link to the real screen.`,
                 `One glossary of ${GLOSSARY_KEYS.length} terms, each defined in plain words beside the number it explains.`,
-                'A first-week list walks through a first paper trade, a watchlist and a followed strategy.',
                 'One short lesson and one quiz question each day, drawn from that day\'s news and trades.',
             ],
         },
@@ -77,6 +78,11 @@ export const LANDING_COPY = {
         {title: 'Follow topics and place a paper trade', body: 'The first-week list shows where each thing is, with a one-minute lesson behind every step.'},
         {title: 'Read what changed each day', body: 'Home shows your accounts, what moved in your topics and one thing to look at next.'},
     ] as const,
+
+    courseHeading: 'What the course covers',
+    courseBody: `${COURSE_MODULES.length} modules, a minute or two a lesson. Nothing in it says what to own; it explains how the pieces work.`,
+    // The syllabus itself: the course registry's own module and lesson titles.
+    course: COURSE_MODULES.map((section) => ({id: section.id, title: section.title, lessons: section.lessons.map((lesson) => lesson.title)})),
 
     themesHeading: 'Make it look like yours',
     themesBody: `${PALETTE_IDS.length} colour palettes and ${STYLE_IDS.length} visual styles, saved to your account. Try one here.`,

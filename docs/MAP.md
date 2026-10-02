@@ -20,7 +20,7 @@ Shared pieces that belong to no single feature:
 
 | Path | What |
 |---|---|
-| `components/primitives/` | The UI vocabulary: `Panel`, `PageTitle`, `SectionHeading`, `MicroLabel`, `StatTile`, `ActionButton`, `TextField`, `RowCard`, `Disclosure`, `Switch`, `Badge`, `EmptyState`, `ConfirmDialog`, `Sheet`, `Skeleton`, `SafeMarkdown`, `Term` |
+| `components/primitives/` | The UI vocabulary: `Panel`, `PageTitle`, `SectionHeading`, `MicroLabel`, `StatTile`, `ActionButton`, `TextField`, `RowCard`, `Disclosure`, `Switch`, `Badge`, `EmptyState`, `ConfirmDialog`, `Sheet`, `Skeleton`, `SafeMarkdown`, `Term`, `Tabs` (views inside one page, in the URL) |
 | `components/shell/` | The app frame: the top bar, the icon rail and its hover cards, a section's tabs, the mobile drawer, ⌘K search, route error/loading, sign-out |
 | `components/forms/` | Form fields (generic over react-hook-form values), keyword chips |
 | `components/ui/` | shadcn output only — regenerable, never hand-edited |
@@ -47,7 +47,7 @@ Shared pieces that belong to no single feature:
 | **brain** | `/brain` | `brain/` | `lib/brain/` — `config` (half-lives, thresholds), `decay`, `extraction`, `ingest`, `update`, `store`, `opinion`, `legend`, `event-types`, `since-thesis` | `opinion.actions` | `brain` | `copy/brain` | `qa-learn`, `qa-trading` |
 | **news** | `/news` | `news/` | `lib/news/` — `config` (`RSS_FEEDS`, kill switch), `adapters/`, `feed`, `feed-store`, `article`, `sanitize`, `briefing`, `briefing-store`, `prompts`, `page`, `page-store` | `news-feed.actions` | `news` (the morning briefing) | `copy/news` | `qa-news-feed` |
 | **topics** | `/topics`, `/topics/[slug]` | `topics/` | `lib/topics/` — `starters` (curated set), `seed`, `insert`, `refresh`, `brief`, `match`, `store`, `page-store` | `topics.actions` | `topics` | `copy/topics` | `qa-topics`, `qa-topics-refresh` |
-| **learn** | `/learn` | `learn/`, `dashboard/widgets/learn/` | `lib/learn/` — `glossary`, `banned`, `reasons`, `missions`, `moments`, `lesson(-store)`, `quiz(-store)`, `facts(-store)`, `copy/` | `learn.actions` | — | `copy/*` | `qa-learn`, `qa-learn-account` |
+| **learn** | `/learn`, `/learn/course/[lesson]` | `learn/`, `dashboard/widgets/learn/` | `lib/learn/` — `glossary`, `banned`, `reasons`, `course(-store)`, `missions`, `moments`, `lesson(-store)`, `quiz(-store)`, `facts(-store)`, `copy/` | `learn.actions` | — | `copy/*` | `qa-learn`, `qa-learn-account` |
 | **chat** | `api/chat` | `chat/` | `lib/chat/` — `system-prompt`, `tools`, `tool-copy`, `limits`, `errors`, `explain`, `learner-hooks`, `ask` | — | — | `copy/chat` | `qa-chat`, `qa-chat-tutor` |
 | **email** | — | — | `lib/email/` — `send` (transport), `templates`, `prompts`, `digest`, `welcome`, `recipients`, `sections/` | — | `email` | lesson section reuses `copy/lesson` | — (unit tests: the sections are pure) |
 | **jobs** | `api/inngest`, `/brain` (status strip) | `jobs/` | `lib/jobs/` — `registry` (every job's id, event, cron, status label), `functions/`, `health`, `job-runs`, `steps`, `client` | — | — | — | `qa-income`, `qa-strategies` |
@@ -71,6 +71,7 @@ Shared pieces that belong to no single feature:
 | A theme's colours, or add a theme | `lib/theme/palettes.ts` (palettes), `lib/theme/styles.ts` + `app/globals.css` (visual styles) |
 | Add a dashboard widget | Its entry in `lib/dashboard/catalog.ts`, its data in `lib/dashboard/loaders.ts`, its component in `components/dashboard/widgets/<feature>/` and one line in `components/dashboard/widgets/registry.tsx` (`Record<WidgetId, …>` makes the compiler insist) |
 | A sentence the app teaches, or a definition | `lib/learn/copy/<feature>.ts`; definitions only in `lib/learn/glossary.ts` |
+| A course lesson, or add one | Its text in `lib/learn/copy/course/<module>.ts` (an id is never renamed); the order and the modules in `lib/learn/course.ts`; the landing page's syllabus and Home's next lesson follow |
 | How every panel / button / heading looks | `components/primitives/` (`Panel`, `ActionButton`, `PageTitle`, …) and the tokens in `app/globals.css` — per visual style: the `--panel-*`, `--card-*`, `--chrome-*`, `--label-*`, `--heading-*`, `--control-*` and `--motion-*` tokens in each `[data-style]` block |
 | The order ticket | `components/trading/desk/OrderPanel.tsx`, its maths in `lib/trading/order-math.ts`, the fill in `lib/trading/orders.ts` + `fill.ts`, the action in `lib/actions/trading.actions.ts` |
 | How interest and dividends are credited | `lib/income/accrual.ts` (the only accrual clock — AGENTS.md invariant 11), `lib/income/store.ts` (the nightly job) |

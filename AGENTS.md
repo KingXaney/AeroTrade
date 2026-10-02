@@ -280,6 +280,20 @@ and friends keep none beyond Shared and the invariants).
   the AI Navigator's own list — the two engines share the rebalance shape under different bands,
   so the caller picks — glossed from `lib/navigator/config.ts` and round-tripped over
   `scoreUniverse`/`diffToOrders`.
+- `/learn` is the hub, one view at a time in the URL (`?tab=`, `components/primitives/Tabs`): the
+  course, Today (the lesson, the quiz, the first-week list), the glossary, the strategies. A
+  `/learn#term` address — ⌘K, Today's lesson and the daily email hand it out — is sent to the
+  glossary tab by `components/learn/GlossaryHashRedirect`, since the server never sees a hash.
+- The beginner course, `lib/learn/course` (pure): four modules of four lessons in one fixed
+  order, text in `lib/learn/copy/course/<module>`. A lesson is two or three framing sentences,
+  the glossary's own definitions of its terms printed beside them (never a paraphrase — the
+  test rejects a five-word run shared with a listed definition), a link to the real screen and
+  one question. It is done when its question was answered, whichever option was chosen
+  (`lib/actions/learn.actions.markCourseLessonDone` stamps `learn.courseDone` once, with
+  `$addToSet`, after checking the id against the registry) or when the reader did the thing it is
+  about (`doneFrom`, read off the first-week facts). A lesson id is its address and its stamp and
+  is never renamed. `lib/learn/course-store.getCourseProgress` is the one read; progress is a
+  count, never a bar or a score.
 - Today's lesson (`lib/learn/moments`, `lib/learn/lesson`; the
   `components/dashboard/widgets/learn/TodaysLesson` widget): a fresh moment first, from the account
   or a followed strategy's rebalance, stamped seen in `learn.lessonsSeen` by
