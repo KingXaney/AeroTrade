@@ -103,7 +103,7 @@ friends and shell keep none beyond Shared and the invariants).
   - `lib/trading/learn/habits` (Trading habits) runs over the learner's own lots: `matchLots` over
     every fill in the account, then a closed lot counts when its sell is `source: 'user'`, an open
     one when its buy is; null under 3 closed lots; the pace set beside the catalog's cadences only
-    (`cadenceControls`). `lib/trading/learn/habits-store` reads only the page's ledger plus at most
+    (`cadenceControls`); drawn by `TradingHabits`. `lib/trading/learn/habits-store` reads only the page's ledger plus at most
     five quotes for "had you held".
   - `lib/trading/learn/random-portfolios` (Luck or skill): a seeded thousand random five-stock
     portfolios from the large caps, equal dollars in whole shares, earning on the income clock —
@@ -213,7 +213,8 @@ friends and shell keep none beyond Shared and the invariants).
 - `lib/learn/copy/<feature>` is every learner-facing sentence, as pure exports. A panel whose one
   `WhatTheseMean` is led by its own paragraph keeps its term list beside that paragraph —
   `LUCK_TERMS`, `HABITS_TERMS`, `TIM_TERMS` — and the paragraph says only what those definitions
-  do not, held by `lib/learn/__tests__/panel-method.test.ts`.
+  do not, held by `lib/learn/__tests__/panel-method.test.ts`. That disclosure is
+  `components/learn/WhatTheseMean`; a label's definition is `components/primitives/Term`.
 - `lib/learn/reasons` is the reason decoder: one ordered grammar over every string the rules,
   `planOrders` and the engine write. A round-trip test runs every rule's branches through it, so a
   reworded reason fails there, not on the page. `NAVIGATOR_GRAMMAR`/`decodeNavigatorReason` are
