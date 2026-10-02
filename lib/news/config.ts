@@ -99,7 +99,6 @@ export const FEED_WATCHLIST_SYMBOL_CAP = 5;
 // pool alone already fills the cap when every wire is healthy).
 export const FEED_DIGEST_CAP = 5;
 export const NEWS_WIDGET_LIMIT = 8;
-export const NEWS_HISTORY_LIMIT = 6;
 export const NEWS_PAGE_SIZE = 24;
 
 export const searchUserAgent = (): string => "AeroTrade/1.0 (followed-topics; contact " + contactEmail() + ")";

@@ -101,7 +101,7 @@ try {
     check('the tab survives a reload', (await page.getByRole('tab', {name: 'Crypto'}).getAttribute('aria-selected')) === 'true');
 
     await page.goto(`${BASE}/history`, {waitUntil: 'load'});
-    await page.getByRole('heading', {name: 'History', exact: true}).waitFor({timeout: 30000});
+    await page.getByRole('heading', {name: 'Activity', exact: true}).waitFor({timeout: 30000});
     const hist = await page.locator('main').innerText();
     check('/history has a Trades section and honest headings',
         await page.getByRole('heading', {name: /^trades$/i}).count() === 1 && await page.getByRole('heading', {name: /^on your watchlist, by date added$/i}).count() === 1 && !/Activity History/i.test(hist));

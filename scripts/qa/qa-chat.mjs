@@ -100,7 +100,7 @@ try {
         },
         {upsert: true},
     );
-    await page.goto(`${BASE}/brain`, {waitUntil: 'domcontentloaded'});
+    await page.goto(`${BASE}/brain?view=navigator`, {waitUntil: 'domcontentloaded'});
     // /brain now has a loading.tsx, so a fixed timeout can land on the skeleton.
     await page.getByText('Weekly Decisions').waitFor({timeout: 30000});
     await page.waitForTimeout(500);
@@ -128,7 +128,7 @@ try {
     const trades = await db.collection('papertrades').countDocuments({userId: String(me._id)});
     check('cancelling the reset changed nothing', trades === 0);
 
-    await page.goto(`${BASE}/settings`, {waitUntil: 'networkidle'});
+    await page.goto(`${BASE}/settings?tab=dashboard`, {waitUntil: 'networkidle'});
     await page.locator('#dashboard').getByRole('button', {name: /Reset to default/i}).click();
     await page.waitForTimeout(500);
     check('dashboard reset asks first',

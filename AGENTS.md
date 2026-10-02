@@ -231,9 +231,12 @@ and friends keep none beyond Shared and the invariants).
   ticker from its own thesis date, SPY from the earliest), memoised for the day on the latest
   closes' stamp. `components/brain/ActiveTheses` takes the opt-in `definitions` and `sinceThesis`
   only from the page, never on the dashboard widget.
+- `/brain` is three views, one at a time in the URL (`?view=`): narratives (the default, and
+  where an evidence link `?entity=` always lands), the AI Navigator, and system. Each view reads
+  only its own data.
 - `lib/brain/legend` is the /brain legend: every figure from the brain's and the Navigator's
   constants, the fading example worked by `lib/brain/decay.ts`; mechanism only.
-  `components/brain/BrainLegend` shows it collapsed, under System Status.
+  `components/brain/BrainLegend` shows it collapsed, at the foot of every view.
 - `lib/brain/event-types` are the evidence badges: eight of the extractor's nine labels, 'other'
   none, each a glossary `event-*` entry.
 
@@ -357,6 +360,10 @@ and friends keep none beyond Shared and the invariants).
 - `components/stocks/KeyNumbers` and `components/stocks/RulesSee` are one disclosure each.
 
 ### settings
+
+- `/settings` shows one section at a time (`?tab=`), each reading only its own data. The daily
+  email's `/settings#notifications` is sent to its section by
+  `components/settings/SettingsHashRedirect`, as `/learn#term` is by its own.
 
 - `lib/theme/store` is the saved theme's read and its cookie mirror.
 

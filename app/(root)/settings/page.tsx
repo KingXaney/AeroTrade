@@ -1,10 +1,13 @@
+import Link from "next/link";
 import {redirect} from "next/navigation";
 import {getSessionUser} from "@/lib/auth/session";
 import {getNotificationPreferences} from "@/lib/settings/preferences-store";
 import AppearanceSettings from "@/components/settings/AppearanceSettings";
 import NotificationSettings from "@/components/settings/NotificationSettings";
 import AccountSection from "@/components/settings/AccountSection";
+import SettingsHashRedirect from "@/components/settings/SettingsHashRedirect";
 import SectionHeading from "@/components/primitives/SectionHeading";
+import PageTitle from "@/components/primitives/PageTitle";
 import DashboardSettings from "@/components/settings/DashboardSettings";
 import TopicsSettings from "@/components/settings/TopicsSettings";
 import NewsFeedSettings from "@/components/settings/NewsFeedSettings";
@@ -12,6 +15,8 @@ import {getNewsFeedPrefs} from "@/lib/news/feed-store";
 import {getCachedTopicsOverview} from "@/lib/topics/store";
 import {getVisibleLayout} from "@/lib/dashboard/availability";
 import Panel from "@/components/primitives/Panel";
+import {cn} from "@/lib/utils";
+import type {User} from "@/lib/auth/types";
 
 const SECTIONS = [
     {id: 'topics', label: 'Topics', icon: 'interests'},
@@ -20,68 +25,71 @@ const SECTIONS = [
     {id: 'dashboard', label: 'Dashboard', icon: 'space_dashboard'},
     {id: 'notifications', label: 'Notifications', icon: 'notifications'},
     {id: 'account', label: 'Account', icon: 'person'},
-];
+] as const;
 
-const SettingsPage = async () => {
+type SectionId = (typeof SECTIONS)[number]['id'];
+const SECTION_IDS: readonly string[] = SECTIONS.map((s) => s.id);
+const isSection = (value: unknown): value is SectionId => typeof value === 'string' && SECTION_IDS.includes(value);
+const hrefOf = (id: SectionId) => (id === SECTIONS[0].id ? '/settings' : `/settings?tab=${id}`);
+
+type SettingsPageProps = {searchParams: Promise<{tab?: string}>};
+
+// One section at a time, chosen in the URL (?tab=). It used to be six editors stacked on one
+// scroll — about a hundred controls on screen at once — and each section now reads only its
+// own data.
+const Section = async ({id, user}: {id: SectionId; user: User}) => {
+    switch (id) {
+        case 'topics':
+            return <TopicsSettings overview={await getCachedTopicsOverview(user.id)} />;
+        case 'news':
+            return <NewsFeedSettings initial={await getNewsFeedPrefs(user.id)} />;
+        case 'appearance':
+            return <AppearanceSettings />;
+        case 'dashboard': {
+            // The same view as the dashboard.
+            const {layout, availableIds} = await getVisibleLayout(user.id);
+            return <DashboardSettings initialLayout={layout} availableIds={availableIds} />;
+        }
+        case 'notifications':
+            return <NotificationSettings initial={await getNotificationPreferences(user.id)} />;
+        case 'account':
+            return <AccountSection user={user} />;
+    }
+};
+
+const SettingsPage = async ({searchParams}: SettingsPageProps) => {
     const user = await getSessionUser();
     if (!user) redirect('/sign-in');
 
-    const [notifications, {layout: visibleLayout, availableIds}, topics, newsFeed] = await Promise.all([
-        getNotificationPreferences(user.id),
-        getVisibleLayout(user.id),   // the same view as the dashboard
-        getCachedTopicsOverview(user.id),
-        getNewsFeedPrefs(user.id),
-    ]);
+    const {tab} = await searchParams;
+    const active: SectionId = isSection(tab) ? tab : SECTIONS[0].id;
+    const section = SECTIONS.find((s) => s.id === active) ?? SECTIONS[0];
 
     return (
         <div className="space-y-4">
-            <div className="mb-2">
-                <h1 className="text-2xl font-semibold text-fg mb-1 font-heading">
-                    Settings
-                </h1>
-                <p className="text-sm text-fg-muted">Topics, your news feed, appearance, dashboard layout, notifications and your account</p>
-            </div>
+            <SettingsHashRedirect sections={SECTION_IDS} active={active}/>
+            <PageTitle title="Settings" subtitle="Topics, your news feed, appearance, dashboard layout, notifications and your account" />
 
             <div className="grid grid-cols-1 lg:grid-cols-12 gap-4 items-start">
                 <Panel as="nav" pad={2} className="lg:col-span-3 lg:sticky lg:top-24" aria-label="Settings sections">
                     {SECTIONS.map((s) => (
-                        <a key={s.id} href={`#${s.id}`}
-                           className="control-type flex items-center gap-3 px-3 py-2.5 rounded-lg text-xs text-fg-soft hover:text-fg hover:bg-surface-3 transition-colors">
-                            <span className="material-symbols-outlined text-base">{s.icon}</span>
+                        <Link key={s.id} href={hrefOf(s.id)} replace scroll={false}
+                              aria-current={s.id === active ? 'page' : undefined}
+                              data-settings-tab={s.id}
+                              className={cn(
+                                  'control-type flex items-center gap-3 px-3 py-2.5 rounded-lg text-xs transition-colors',
+                                  s.id === active ? 'bg-brand/10 text-brand' : 'text-fg-soft hover:text-fg hover:bg-surface-3',
+                              )}>
+                            <span className="material-symbols-outlined text-base" aria-hidden="true">{s.icon}</span>
                             {s.label}
-                        </a>
+                        </Link>
                     ))}
                 </Panel>
 
-                <div className="lg:col-span-9 space-y-4">
-                    <Panel id="topics" className="scroll-mt-24">
-                        <SectionHeading>Topics</SectionHeading>
-                        <TopicsSettings overview={topics} />
-                    </Panel>
-
-                    <Panel id="news" className="scroll-mt-24">
-                        <SectionHeading>News feed</SectionHeading>
-                        <NewsFeedSettings initial={newsFeed} />
-                    </Panel>
-
-                    <Panel id="appearance" className="scroll-mt-24">
-                        <SectionHeading>Appearance</SectionHeading>
-                        <AppearanceSettings />
-                    </Panel>
-
-                    <Panel id="dashboard" className="scroll-mt-24">
-                        <SectionHeading>Dashboard</SectionHeading>
-                        <DashboardSettings initialLayout={visibleLayout} availableIds={availableIds} />
-                    </Panel>
-
-                    <Panel id="notifications" className="scroll-mt-24">
-                        <SectionHeading>Notifications</SectionHeading>
-                        <NotificationSettings initial={notifications} />
-                    </Panel>
-
-                    <Panel id="account" className="scroll-mt-24">
-                        <SectionHeading>Account</SectionHeading>
-                        <AccountSection user={user} />
+                <div className="lg:col-span-9">
+                    <Panel id={section.id} className="scroll-mt-24">
+                        <SectionHeading>{section.label}</SectionHeading>
+                        <Section id={active} user={user}/>
                     </Panel>
                 </div>
             </div>

@@ -61,6 +61,8 @@ export const BRAIN_COPY = {
 
     // ---- /brain's page title, empty states and graph legend ---------------------------
     pageSubtitle: 'Persistent market narratives from every ingested article — slow-building theses drive the AI Navigator',
+    // The page's three views.
+    views: {narratives: 'Narratives', navigator: 'AI Navigator', system: 'System'},
     thesesEmpty: 'No active theses yet. A narrative becomes a thesis once it keeps accumulating attention for several weeks — check back as the brain ingests more news.',
     graphEmpty: 'The brain is empty — it fills up as daily news is ingested.',
     graphLegend: 'rings: themes · sectors · tickers — size = persistent attention, bold ring = active thesis',

@@ -2,7 +2,6 @@ import {notFound} from "next/navigation";
 import TradingViewWidget from "@/components/stocks/TradingViewWidget";
 import StockHeader from "@/components/stocks/StockHeader";
 import {
-    SYMBOL_INFO_WIDGET_CONFIG,
     CANDLE_CHART_WIDGET_CONFIG,
     COMPANY_PROFILE_WIDGET_CONFIG,
     TECHNICAL_ANALYSIS_WIDGET_CONFIG,
@@ -21,12 +20,22 @@ import {getBoardRowsForSymbol} from "@/lib/strategies/page-store";
 import {strategiesWatching} from "@/lib/strategies/universe";
 import {cn} from "@/lib/utils";
 import Panel from "@/components/primitives/Panel";
+import Tabs from "@/components/primitives/Tabs";
 
 type StockDetailsPageProps = {
     params: Promise<{
         symbol: string;
     }>;
+    searchParams: Promise<{view?: string}>;
 };
+
+// The three reference embeds, one at a time (?view=): mounting all of them stacked five
+// third-party frames on one page, and the price showed three times.
+const REFERENCE = [
+    {id: 'technicals', label: 'Technicals', script: 'technical-analysis', config: TECHNICAL_ANALYSIS_WIDGET_CONFIG, height: 400},
+    {id: 'profile', label: 'Company profile', script: 'symbol-profile', config: COMPANY_PROFILE_WIDGET_CONFIG, height: 440},
+    {id: 'financials', label: 'Financials', script: 'financials', config: COMPANY_FINANCIALS_WIDGET_CONFIG, height: 464},
+] as const;
 
 // A failed board read hides "What the rules see" rather than reading as "no stored row".
 const readBoardRows = async (symbol: string): Promise<SymbolBoardRead[] | null> => {
@@ -38,11 +47,14 @@ const readBoardRows = async (symbol: string): Promise<SymbolBoardRead[] | null> 
     }
 };
 
-const StockDetailsPage = async ({params}: StockDetailsPageProps) => {
+const StockDetailsPage = async ({params, searchParams}: StockDetailsPageProps) => {
     const userId = await requireUserId();
 
     const {symbol: raw} = await params;
     const symbol = raw.toUpperCase();
+    const {view} = await searchParams;
+    const reference = REFERENCE.find((r) => r.id === view) ?? REFERENCE[0];
+    const path = `/stocks/${encodeURIComponent(symbol)}`;
 
     const watching = strategiesWatching(symbol);
     const [profile, quote, inWatchlist, topics, financials, boardRows] = await Promise.all([
@@ -75,60 +87,38 @@ const StockDetailsPage = async ({params}: StockDetailsPageProps) => {
                 followedTopic={followedTopic ? {id: followedTopic.id, slug: followedTopic.slug} : null}
             />
 
+            {/* The chart, straight under the price */}
+            <Panel pad={4} className="shimmer">
+                <TradingViewWidget
+                    title="Advanced Chart"
+                    scriptUrl={tvScript('advanced-chart')}
+                    config={CANDLE_CHART_WIDGET_CONFIG(symbol)}
+                    height={560}
+                />
+            </Panel>
+
             {/* In plain words: the feed's key figures, and what the rule-based strategies see */}
             <div className={cn('grid gap-4', rulesSee && 'xl:grid-cols-2')}>
                 <KeyNumbers symbol={symbol} rows={keyNumbers} />
                 {rulesSee && <RulesSee view={rulesSee} />}
             </div>
 
-            {/* Symbol Info */}
-            <Panel pad={4} className="shimmer">
+            {/* Reference, one embed at a time */}
+            <Panel pad={4} id="stock-reference">
+                <Tabs
+                    className="mb-4"
+                    label="Reference views"
+                    active={reference.id}
+                    tabs={REFERENCE.map((r) => ({id: r.id, label: r.label, href: r.id === REFERENCE[0].id ? path : `${path}?view=${r.id}`}))}
+                />
+                {/* key forces a clean remount so the previous embed's DOM is torn down on a switch */}
                 <TradingViewWidget
-                    scriptUrl={tvScript('symbol-info')}
-                    config={SYMBOL_INFO_WIDGET_CONFIG(symbol)}
-                    height={170}
+                    key={reference.id}
+                    scriptUrl={tvScript(reference.script)}
+                    config={reference.config(symbol)}
+                    height={reference.height}
                 />
             </Panel>
-
-            {/* Chart + Technical Analysis */}
-            <div className="grid gap-4 xl:grid-cols-3">
-                <Panel pad={4} className="xl:col-span-2 shimmer">
-                    <TradingViewWidget
-                        title="Advanced Chart"
-                        scriptUrl={tvScript('advanced-chart')}
-                        config={CANDLE_CHART_WIDGET_CONFIG(symbol)}
-                        height={600}
-                    />
-                </Panel>
-                <Panel pad={4} className="xl:col-span-1">
-                    <TradingViewWidget
-                        title="Technical Analysis"
-                        scriptUrl={tvScript('technical-analysis')}
-                        config={TECHNICAL_ANALYSIS_WIDGET_CONFIG(symbol)}
-                        height={400}
-                    />
-                </Panel>
-            </div>
-
-            {/* Company Profile + Financials */}
-            <div className="grid gap-4 xl:grid-cols-2">
-                <Panel pad={4} className="shimmer">
-                    <TradingViewWidget
-                        title="Company Profile"
-                        scriptUrl={tvScript('symbol-profile')}
-                        config={COMPANY_PROFILE_WIDGET_CONFIG(symbol)}
-                        height={440}
-                    />
-                </Panel>
-                <Panel pad={4}>
-                    <TradingViewWidget
-                        title="Financials"
-                        scriptUrl={tvScript('financials')}
-                        config={COMPANY_FINANCIALS_WIDGET_CONFIG(symbol)}
-                        height={464}
-                    />
-                </Panel>
-            </div>
         </div>
     );
 };

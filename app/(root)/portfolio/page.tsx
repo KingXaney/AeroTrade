@@ -66,6 +66,9 @@ const PortfolioPage = async ({searchParams}: PortfolioPageProps) => {
                 </div>
             </div>
 
+            {/* The account's numbers come first: what it is worth, what it returned, what is in it. */}
+            <AccountSummary portfolio={portfolio} income={analytics?.income} definitions />
+
             {/* Which account wins — all accounts side by side */}
             {view.multiAccount && (
                 <Panel>
@@ -88,6 +91,20 @@ const PortfolioPage = async ({searchParams}: PortfolioPageProps) => {
                         </p>
                         <PerformanceChart series={analytics.series} accountName={account.name} band={view.chartBand} />
                     </Panel>
+                </>
+            )}
+
+            {/* Holdings */}
+            <Panel>
+                <SectionHeading>
+                    Holdings
+                </SectionHeading>
+                <PositionsTable positions={portfolio.positions} accountId={account.id} lotNotes={view.lotNotes} />
+            </Panel>
+
+            {/* What the app works out from them */}
+            {analytics && (
+                <>
                     <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
                         <ReturnBridge accountId={account.id} bridge={bridge} />
                         <RiskLens series={analytics.series} snapshotThrough={analytics.snapshotThrough} portfolio={portfolio} />
@@ -104,17 +121,6 @@ const PortfolioPage = async ({searchParams}: PortfolioPageProps) => {
                     {luck && <LuckOrSkill luck={luck} />}
                 </div>
             )}
-
-            {/* Account summary */}
-            <AccountSummary portfolio={portfolio} income={analytics?.income} definitions />
-
-            {/* Holdings */}
-            <Panel>
-                <SectionHeading>
-                    Holdings
-                </SectionHeading>
-                <PositionsTable positions={portfolio.positions} accountId={account.id} lotNotes={view.lotNotes} />
-            </Panel>
 
             {/* What the account earned without trading */}
             {income && (

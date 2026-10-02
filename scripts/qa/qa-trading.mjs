@@ -136,7 +136,7 @@ try {
     // --- /history: every account's current epoch, in its list and in its count ------------
     const historyTrades = () => page.locator('section', {has: page.getByRole('heading', {name: /^trades$/i})});
     await page.goto(`${BASE}/history`, {waitUntil: 'load'});
-    await page.getByRole('heading', {name: 'History', exact: true}).waitFor({timeout: 30000});
+    await page.getByRole('heading', {name: 'Activity', exact: true}).waitFor({timeout: 30000});
     check('/history lists this epoch\'s fills and not the old epoch\'s',
         await historyTrades().locator('a[href="/stocks/AAPL"]').count() === 4 && await historyTrades().locator('a[href="/stocks/ZZOLD"]').count() === 0,
         (await historyTrades().innerText()).replace(/\s+/g, ' ').slice(0, 200));
@@ -148,7 +148,7 @@ try {
         source: 'user', createdAt: new Date(Date.now() - 1000 + k),
     })));
     await page.reload({waitUntil: 'load'});
-    await page.getByRole('heading', {name: 'History', exact: true}).waitFor({timeout: 30000});
+    await page.getByRole('heading', {name: 'Activity', exact: true}).waitFor({timeout: 30000});
     const historyText = await historyTrades().innerText();
     check('…and counts only this epoch\'s fills', /Showing the latest 50 of 54 trades/.test(historyText),
         historyText.match(/Showing[^\n]*/)?.[0] ?? historyText.replace(/\s+/g, ' ').slice(-160));
@@ -347,7 +347,7 @@ try {
     await settleToasts();
 
     // --- the dashboard quick-trade widget must not navigate -----------------------------
-    await page.goto(`${BASE}/settings`, {waitUntil: 'load'});
+    await page.goto(`${BASE}/settings?tab=dashboard`, {waitUntil: 'load'});
     // The library files the paper-account widgets under Accounts and the eight quant
     // strategies under their own heading, not under the news brain's.
     await page.getByLabel('Add Quick Trade').waitFor({timeout: 30000});

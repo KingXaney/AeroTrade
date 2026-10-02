@@ -19,6 +19,7 @@ import SystemStatus from "@/components/jobs/SystemStatus";
 import Panel from "@/components/primitives/Panel";
 import PageTitle from "@/components/primitives/PageTitle";
 import SectionHeading from "@/components/primitives/SectionHeading";
+import Tabs from "@/components/primitives/Tabs";
 import {BRAIN_COPY} from "@/lib/learn/copy/brain";
 
 // Each decision's reasons decoded here, on the server, so the client panel renders clauses
@@ -28,24 +29,26 @@ const withGloss = (set: SuggestionSetView | null) => set && {
     items: set.items.map((item) => ({...item, gloss: glossNavigatorReasons(item.reasons)})),
 };
 
+// The page was seven purposes stacked on one scroll, with job schedules above the first
+// narrative. It is three views now, one at a time in the URL, and each reads only its own data:
+//   narratives — what the news is paying attention to (theses, the graph, evidence, the board)
+//   navigator  — what the AI did about it (enrolment, the week's decisions, the second opinion)
+//   system     — whether the machinery ran (pipeline counters, every job's last stamp)
+const VIEW_IDS = ['narratives', 'navigator', 'system'] as const;
+type ViewId = (typeof VIEW_IDS)[number];
+const isView = (value: unknown): value is ViewId => typeof value === 'string' && (VIEW_IDS as readonly string[]).includes(value);
+
+const TABS = VIEW_IDS.map((id) => ({id, label: BRAIN_COPY.views[id], href: id === 'narratives' ? '/brain' : `/brain?view=${id}`}));
+
 type BrainPageProps = {
-    searchParams: Promise<{entity?: string}>;
+    searchParams: Promise<{entity?: string; view?: string}>;
 };
 
-const BrainPage = async ({searchParams}: BrainPageProps) => {
-    const userId = await requireUserId();
-
-    const {entity} = await searchParams;
-
-    const [navigatorStatus, theses, topEntities, graph, suggestions, portfolios, systemStatus, secondOpinion, topics] = await Promise.all([
-        getNavigatorStatus(userId),
+const NarrativesView = async ({userId, entity}: {userId: string; entity?: string}) => {
+    const [theses, topEntities, graph, topics] = await Promise.all([
         getActiveTheses(),
         getTopEntities(),
         getBrainGraph(),
-        getLatestSuggestions(userId),
-        getPortfoliosForUser(userId),
-        getBrainSystemStatus(),
-        getLatestSecondOpinion(userId),
         getTopicsForUser(userId),
     ]);
     // Lets a narrative row show "following" when a topic of the same name exists.
@@ -55,19 +58,9 @@ const BrainPage = async ({searchParams}: BrainPageProps) => {
         entity ? getEntityEvidence(entity) : null,
         getSinceThesis(theses),
     ]);
-    const applyAccounts = toApplyAccounts(portfolios);
 
     return (
-        <div className="space-y-4">
-            <PageTitle
-                title="News Brain"
-                subtitle={BRAIN_COPY.pageSubtitle}
-            />
-
-            {/* Is the machinery actually running? */}
-            <SystemStatus status={systemStatus} />
-            <BrainLegend />
-
+        <>
             <div className="grid grid-cols-1 xl:grid-cols-2 gap-4">
                 {/* Active theses — the centerpiece */}
                 <Panel>
@@ -77,28 +70,13 @@ const BrainPage = async ({searchParams}: BrainPageProps) => {
                     <ActiveTheses theses={theses} followedByName={followedByName} sinceThesis={sinceThesis} definitions />
                 </Panel>
 
-                {/* Navigator enrollment + weekly decisions */}
-                <div className="space-y-4">
-                    <NavigatorCard status={navigatorStatus} />
-                    <Panel>
-                        <SectionHeading>
-                            Weekly Decisions
-                        </SectionHeading>
-                        <SuggestionPanel userSet={withGloss(suggestions.user)} globalSet={withGloss(suggestions.global)} accounts={applyAccounts} />
-                    </Panel>
-                </div>
+                <Panel>
+                    <SectionHeading>
+                        Knowledge Graph
+                    </SectionHeading>
+                    <BrainGraph nodes={graph.nodes} edges={graph.edges} />
+                </Panel>
             </div>
-
-            {/* Claude's critique of the brain's current picture */}
-            <SecondOpinionCard configured={isSecondOpinionConfigured()} opinion={secondOpinion} />
-
-            {/* Knowledge graph */}
-            <Panel>
-                <SectionHeading>
-                    Knowledge Graph
-                </SectionHeading>
-                <BrainGraph nodes={graph.nodes} edges={graph.edges} />
-            </Panel>
 
             {/* Evidence drill-down for ?entity= */}
             {entity && evidence && (
@@ -110,13 +88,66 @@ const BrainPage = async ({searchParams}: BrainPageProps) => {
                 </Panel>
             )}
 
-            {/* Narrative leaderboard */}
             <Panel>
                 <SectionHeading>
                     Narrative Leaderboard
                 </SectionHeading>
                 <NarrativeLeaderboard entities={topEntities} followedByName={followedByName} />
             </Panel>
+        </>
+    );
+};
+
+const NavigatorView = async ({userId}: {userId: string}) => {
+    const [navigatorStatus, suggestions, portfolios, secondOpinion] = await Promise.all([
+        getNavigatorStatus(userId),
+        getLatestSuggestions(userId),
+        getPortfoliosForUser(userId),
+        getLatestSecondOpinion(userId),
+    ]);
+
+    return (
+        <>
+            <div className="grid grid-cols-1 xl:grid-cols-2 gap-4">
+                <NavigatorCard status={navigatorStatus} />
+                <Panel>
+                    <SectionHeading>
+                        Weekly Decisions
+                    </SectionHeading>
+                    <SuggestionPanel userSet={withGloss(suggestions.user)} globalSet={withGloss(suggestions.global)} accounts={toApplyAccounts(portfolios)} />
+                </Panel>
+            </div>
+
+            {/* Claude's critique of the brain's current picture */}
+            <SecondOpinionCard configured={isSecondOpinionConfigured()} opinion={secondOpinion} />
+        </>
+    );
+};
+
+// Is the machinery actually running?
+const SystemView = async () => <SystemStatus status={await getBrainSystemStatus()} />;
+
+const BrainPage = async ({searchParams}: BrainPageProps) => {
+    const userId = await requireUserId();
+
+    const {entity, view: viewParam} = await searchParams;
+    // An evidence link (?entity=) always means the narratives view, whatever else the URL says.
+    const view: ViewId = !entity && isView(viewParam) ? viewParam : 'narratives';
+
+    return (
+        <div className="space-y-4">
+            <PageTitle
+                title="News Brain"
+                subtitle={BRAIN_COPY.pageSubtitle}
+            />
+            <Tabs tabs={TABS} active={view} label="News Brain views"/>
+
+            {view === 'narratives' && <NarrativesView userId={userId} entity={entity}/>}
+            {view === 'navigator' && <NavigatorView userId={userId}/>}
+            {view === 'system' && <SystemView/>}
+
+            {/* How the weights and the scores are made: reference for every view, collapsed. */}
+            <BrainLegend />
         </div>
     );
 };

@@ -120,6 +120,13 @@ const settleToasts = async (page) => {
     const sections = await page.$$eval('nav[aria-label="Settings sections"] a', (as) => as.map((a) => a.textContent.trim()));
     check('settings sections start with Topics', sections[0]?.endsWith('Topics') === true, sections.join(','));
     check('settings topics section lists the topic', /AI chips/.test(await page.locator('#topics').innerText()));
+    check('settings shows one section at a time', await page.locator('#topics').count() === 1
+        && await page.locator('#news, #appearance, #dashboard, #notifications, #account').count() === 0);
+    // The address the daily email's footer has always used.
+    await page.goto(`${BASE}/settings#notifications`, {waitUntil: 'load'});
+    await page.waitForURL(/\/settings\?tab=notifications/, {timeout: 15000}).catch(() => {});
+    await page.locator('#topics-digest-toggle').waitFor({timeout: 15000}).catch(() => {});
+    check('an old /settings#notifications link opens that section', /\?tab=notifications/.test(page.url()) && await page.locator('#notifications').count() === 1, page.url());
     const toggle = page.locator('#topics-digest-toggle');
     check('topics email toggle present + on', (await toggle.getAttribute('data-state')) === 'checked');
     await toggle.click();
@@ -128,6 +135,8 @@ const settleToasts = async (page) => {
     await page.waitForTimeout(800);
     check('topics email toggle persists after reload', (await page.locator('#topics-digest-toggle').getAttribute('data-state')) === 'unchecked');
     await shot('04-settings');
+    await page.goto(`${BASE}/settings?tab=appearance`, {waitUntil: 'load'});
+    await page.waitForTimeout(800);
 
     // --- theme hover: sweep across the gutter between two style cards; the committed style must never flash ---
     await page.evaluate(() => {

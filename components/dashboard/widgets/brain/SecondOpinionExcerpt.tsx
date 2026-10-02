@@ -25,7 +25,7 @@ const SecondOpinionExcerpt = ({opinion}: {opinion: SecondOpinionView | null}) =>
                 <span>{formatTimeAgoMs(opinion.generatedAt)}</span>
             </MicroLabel>
             <p className="text-sm text-fg-soft leading-relaxed">{excerpt(opinion.opinionMd)}</p>
-            <Link href="/brain" className="inline-block mt-3 text-xs text-brand hover:underline font-mono">
+            <Link href="/brain?view=navigator" className="inline-block mt-3 text-xs text-brand hover:underline font-mono">
                 Read the full opinion →
             </Link>
         </div>

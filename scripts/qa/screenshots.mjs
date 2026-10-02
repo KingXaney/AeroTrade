@@ -38,13 +38,13 @@ const OUT = outDir('screenshots');
     await page.goto(`${BASE}/trade`, {waitUntil: 'load'});
     await shot('trade', 2500);
 
-    await page.goto(`${BASE}/settings`, {waitUntil: 'load'});
+    await page.goto(`${BASE}/settings?tab=appearance`, {waitUntil: 'load'});
     await page.waitForTimeout(800);
     await page.getByRole('radio', {name: /^Neon Terminal/}).first().click();
     await page.waitForTimeout(1500);
-    await page.goto(`${BASE}/settings`, {waitUntil: 'load'});
+    await page.goto(`${BASE}/settings?tab=appearance`, {waitUntil: 'load'});
     await shot('settings-themes', 1500);
-    await page.goto(`${BASE}/settings`, {waitUntil: 'load'});
+    await page.goto(`${BASE}/settings?tab=appearance`, {waitUntil: 'load'});
     await page.waitForTimeout(800);
     await page.getByRole('radio', {name: /^Paper/}).first().click();
     await page.waitForTimeout(1500);

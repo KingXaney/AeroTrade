@@ -11,7 +11,6 @@ type TradingViewScript =
     | 'forex-cross-rates'
     | 'screener'
     | 'stock-heatmap'
-    | 'symbol-info'
     | 'symbol-profile'
     | 'technical-analysis'
     | 'ticker-tape'
@@ -49,15 +48,6 @@ const TOP_STORIES_WIDGET_CONFIG = {
     width: '100%',
     height: '600',
 };
-
-export const SYMBOL_INFO_WIDGET_CONFIG = (symbol: string) => ({
-    symbol: symbol.toUpperCase(),
-    colorTheme: 'dark',
-    isTransparent: true,
-    locale: 'en',
-    width: '100%',
-    height: 170,
-});
 
 export const CANDLE_CHART_WIDGET_CONFIG = (symbol: string) => ({
     allow_symbol_change: false,

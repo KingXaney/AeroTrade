@@ -73,7 +73,7 @@ try {
     await page.reload({waitUntil: 'load'});
     await page.locator('[data-widget-id]').first().waitFor({timeout: 30000});
     check('with every row present the checklist leaves the dashboard', await page.locator('[data-widget-id="getting-started"]').count() === 0);
-    await page.goto(`${BASE}/settings`, {waitUntil: 'load'});
+    await page.goto(`${BASE}/settings?tab=dashboard`, {waitUntil: 'load'});
     await page.locator('#dashboard').waitFor({timeout: 30000});
     check('…and the settings editor agrees', !/First week/.test(await page.locator('#dashboard').innerText()));
     // The two widgets that reuse page panels carrying a "What these mean" disclosure: on the
@@ -531,7 +531,7 @@ try {
     await pageC.goto(`${BASE}/dashboard`, {waitUntil: 'load'});
     await pageC.locator('[data-widget-id]').first().waitFor({timeout: 30000});
     const onDashboard = await pageC.locator('[data-widget-id="getting-started"]').count() === 1;
-    await pageC.goto(`${BASE}/settings`, {waitUntil: 'load'});
+    await pageC.goto(`${BASE}/settings?tab=dashboard`, {waitUntil: 'load'});
     await pageC.locator('#dashboard').waitFor({timeout: 30000});
     const settingsText = await pageC.locator('#dashboard').innerText();
     check('/ and /settings agree on the First-week checklist', onDashboard && /First week/.test(settingsText), `dashboard=${onDashboard}`);
@@ -814,7 +814,7 @@ try {
     check('twelve-day-old boards and a skipped day ask nothing: the empty state says why',
         await quizWidget.locator('#daily-quiz').count() === 0 && /signal board of the last 10 days/.test(emptyText) && /Days answered: 3/.test(emptyText),
         emptyText.replace(/\s+/g, ' ').slice(0, 200));
-    await pageD.goto(`${BASE}/settings`, {waitUntil: 'load'});
+    await pageD.goto(`${BASE}/settings?tab=dashboard`, {waitUntil: 'load'});
     await pageD.locator('#dashboard').waitFor({timeout: 30000});
     check('/settings lists the Daily quiz in the saved layout', /Daily quiz/.test(await pageD.locator('#dashboard').innerText()));
     await contextD.close();
@@ -1077,8 +1077,11 @@ try {
 
         await openBrain();
         const legend = pageF.locator('#brain-legend');
-        check('the legend sits right under System Status, collapsed', await legend.count() === 1
-            && await legend.evaluate((el) => /System Status/i.test(el.previousElementSibling?.textContent ?? ''))
+        const viewTabs = await pageF.locator('[role="tab"]').evaluateAll((tabs) => tabs.map((t) => `${t.getAttribute('data-tab')}${t.getAttribute('aria-selected') === 'true' ? '*' : ''}`));
+        check('/brain opens on its narratives, one view of three', viewTabs.join(',') === 'narratives*,navigator,system', viewTabs.join(','));
+        check('…with no job schedule above them', await pageF.getByText('System Status').count() === 0);
+        check('the legend sits collapsed at the foot of the view', await legend.count() === 1
+            && await legend.evaluate((el) => el.nextElementSibling === null)
             && !(await legend.locator('details').evaluate((d) => d.open)));
         await legend.locator('details').evaluate((d) => { d.open = true; });
         const legendText = await legend.innerText();
@@ -1094,6 +1097,14 @@ try {
         check('the leaderboard says what the dot means, once', (await pageF.locator('[data-testid="thesis-legend"]').allInnerTexts()).join('|')
             === '● thesis: the news about this name has stayed strong for weeks (its slow weight reached 5)');
 
+        // What the AI did about them is the second view; whether the jobs ran, the third.
+        await pageF.goto(`${BASE}/brain?view=system`, {waitUntil: 'domcontentloaded'});
+        await pageF.getByText('System Status').first().waitFor({timeout: 60000});
+        check('the system view holds the pipeline and the job stamps, and nothing else',
+            await pageF.getByText('Active Theses').count() === 0 && await pageF.getByText('Weekly Decisions').count() === 0
+            && await pageF.locator('#brain-legend').count() === 1);
+        await pageF.goto(`${BASE}/brain?view=navigator`, {waitUntil: 'domcontentloaded'});
+        await pageF.getByText('Weekly Decisions').first().waitFor({timeout: 60000});
         const decisions = panelOf('Weekly Decisions');
         const glosses = decisions.locator('[data-navigator-gloss]');
         check('each decision with a readable reason has one closed "What the Navigator saw"', await glosses.count() === 2
@@ -1151,7 +1162,7 @@ try {
             `${await sinceLine().getAttribute('title')} vs ${windowTitle}`);
 
         // The same panels as dashboard widgets: titles only — no definitions, no Ask link, no gloss, no line.
-        await pageF.goto(`${BASE}/settings`, {waitUntil: 'load'});
+        await pageF.goto(`${BASE}/settings?tab=dashboard`, {waitUntil: 'load'});
         await pageF.getByLabel('Add Active Theses').click();
         await pageF.getByLabel('Add Weekly Decisions').click();
         await pageF.waitForTimeout(1200);   // debounced autosave

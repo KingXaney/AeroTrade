@@ -1,5 +1,5 @@
 // The personal news feed (lib/news, /news): default = Google News top stories, every control persists
-// through a real save + reload, the four surfaces follow it, and reset returns to absence.
+// through a real save + reload, the surfaces that show it follow it, and reset returns to absence.
 // Run: npm run qa -- news-feed   (the harness: README.md)
 // Headline counts depend on Google News being reachable, so they are NOTEs, not FAILs;
 // everything about the preference itself is deterministic.
@@ -87,15 +87,13 @@ try {
         JSON.stringify(stored));
 
     // --- the other surfaces follow the feed ---------------------------------------------
+    // The activity page used to repeat six of the feed's cards under its trades; the news has
+    // one page now.
     await page.goto(`${BASE}/history`, {waitUntil: 'load'});
-    // The page streams past its loading boundary after `load`; wait for the section itself.
-    await page.getByRole('heading', {name: /^your news feed$/i}).waitFor({timeout: 30000});
-    check('/history shows the feed heading with an edit link',
-        await page.getByRole('heading', {name: /^your news feed$/i}).count() === 1 && await page.locator('a[href="/news?edit=1"]').count() >= 1);
-    const historyMetas = await page.locator('.news-item .news-meta').allTextContents();
-    check('/history respects the hidden outlet', historyMetas.every((m) => !m.endsWith(` · ${hidden}`)), `${historyMetas.length} cards`);
+    await page.getByRole('heading', {name: /^trades$/i}).waitFor({timeout: 30000});
+    check('the activity page no longer repeats the news feed', await page.locator('.news-item').count() === 0);
 
-    await page.goto(`${BASE}/settings`, {waitUntil: 'load'});
+    await page.goto(`${BASE}/settings?tab=news`, {waitUntil: 'load'});
     await page.locator('#settings-news-summary').waitFor({timeout: 30000});
     check('settings has a News feed section with the summary',
         /World/.test(await page.locator('#news').innerText()) && await page.locator('#settings-news-summary').count() === 1);
@@ -134,13 +132,8 @@ try {
             `${await topicCards.count()}/${hrefs.length}`);
         await shot('05-topic-in-feed');
 
-        // /history takes the same getNewsFeed path, so the topic reaches it too.
-        await page.goto(`${BASE}/history`, {waitUntil: 'load'});
-        await page.getByRole('heading', {name: /^your news feed$/i}).waitFor({timeout: 30000});
-        check('/history carries followed topics as well', await page.locator('.news-item [data-topic]').count() > 0);
-
         // Back to settings: the reset section below picks up where this one left off.
-        await page.goto(`${BASE}/settings`, {waitUntil: 'load'});
+        await page.goto(`${BASE}/settings?tab=news`, {waitUntil: 'load'});
         await page.locator('#settings-news-summary').waitFor({timeout: 30000});
     }
 

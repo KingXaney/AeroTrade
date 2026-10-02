@@ -62,7 +62,7 @@ export const MISSION_COPY: readonly MissionCopy[] = [
     {
         id: 'enrol-navigator',
         title: 'Enrol the AI Navigator',
-        href: '/brain',
+        href: '/brain?view=navigator',
         lesson: [
             'The Navigator is a separate paper account, re-decided once a week from the news brain\'s theses.',
             `It trades inside fixed rails: at most ${pct(MAX_POSITION_WEIGHT)} of the account in one name, at least ${pct(MIN_CASH_WEIGHT)} in cash, and an exit at ${pct(HARD_STOP_DRAWDOWN)} below what it paid.`,
