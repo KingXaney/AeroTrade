@@ -1,12 +1,12 @@
 import type {ReactNode} from "react";
 import {cn} from "@/lib/utils";
 
-// The heading every panel uses. Brand cyan, mono, uppercase — deliberately no `tone`
-// prop: a section heading is one thing, and the dashboard's three competing treatments
-// (10px muted eyebrow / 14px brand heading / 12px edit label) were the whole defect.
+// The heading every panel uses — deliberately no `tone` prop: a section heading is one
+// thing, and the dashboard's three competing treatments (10px muted eyebrow / 14px brand
+// heading / 12px edit label) were the whole defect.
 //
-// font-mono resolves to var(--type-mono) via the @theme inline block in globals.css, so
-// it follows the style axis (JetBrains in most styles, IBM Plex Mono in brutalist).
+// Its face, weight, case, tracking and colour are the active style's heading tokens
+// (.heading-type in app/globals.css), so each visual style words its panels its own way.
 
 type Props = {
     as?: 'h2' | 'h3';
@@ -23,7 +23,7 @@ const SectionHeading = ({as: Tag = 'h2', size = 'sm', spacing = 'md', id, classN
     <Tag
         id={id}
         className={cn(
-            'font-mono font-bold uppercase tracking-[0.1em] text-brand',
+            'heading-type',
             size === 'sm' ? 'text-sm' : 'text-xs',
             SPACING[spacing],
             className,

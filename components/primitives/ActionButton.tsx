@@ -1,8 +1,9 @@
 import type {ComponentProps, CSSProperties} from "react";
 import {cn} from "@/lib/utils";
 
-// The one labelled button: mono, bold, uppercase, on the control radius (rounded-lg is
-// var(--radius) = var(--control-radius), so it follows the style axis). Restyling every
+// The one labelled button, on the control radius (rounded-lg is var(--radius) =
+// var(--control-radius)) and in the active style's control type (.control-type in
+// app/globals.css), so both follow the style axis. Restyling every
 // call-to-action in the app is an edit to VARIANT or SIZE below.
 //
 // Use it for a button with a text label. Not for: an icon-only affordance (`iconButton`),
@@ -24,7 +25,7 @@ import {cn} from "@/lib/utils";
 export type ActionVariant = 'primary' | 'strong' | 'secondary' | 'danger' | 'destructive';
 export type ActionSize = 'xs' | 'sm' | 'md' | 'block';
 
-const BASE = 'font-mono rounded-lg text-xs font-bold uppercase tracking-[0.1em] disabled:opacity-50';
+const BASE = 'control-type rounded-lg text-xs disabled:opacity-50';
 
 const VARIANT: Record<ActionVariant, string> = {
     primary: 'bg-brand text-on-brand',

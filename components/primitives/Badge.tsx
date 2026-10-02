@@ -53,14 +53,14 @@ const STYLES: Record<Tone, Record<Variant, string>> = {
 };
 
 const SHAPE = {
-    tag: 'px-2 py-0.5 rounded-[var(--control-radius)] font-bold uppercase tracking-[0.1em]',
-    pill: 'px-1.5 py-0.5 rounded-full font-bold tabular-nums',
+    tag: 'label-type px-2 py-0.5 rounded-[var(--control-radius)] font-bold',
+    pill: 'font-mono text-[10px] px-1.5 py-0.5 rounded-full font-bold tabular-nums',
 } as const;
 
 const Badge = ({tone = 'neutral', variant = 'soft', shape = 'tag', className, children, ...rest}: Props) => (
     <span
         className={cn(
-            'inline-flex items-center gap-1 shrink-0 whitespace-nowrap font-mono text-[10px]',
+            'inline-flex items-center gap-1 shrink-0 whitespace-nowrap',
             SHAPE[shape],
             STYLES[tone][variant],
             className,

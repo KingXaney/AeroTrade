@@ -2,7 +2,8 @@ import type {CSSProperties, ReactNode} from "react";
 import {cn} from "@/lib/utils";
 
 // One row inside a panel: a friend, a trade, a holding, a setting with its switch, a job
-// stamp. A small bordered tile on bg-surface-2/40 with the control radius.
+// stamp. A small bordered tile whose fill, border and radius are the active style's card
+// tokens (.row-card in app/globals.css).
 //
 // RowCard vs Panel: a Panel is a top-level framed surface and follows the visual style
 // axis (.glass-panel: blur, shadow, the panel radius). A RowCard sits *inside* a Panel
@@ -20,11 +21,11 @@ import {cn} from "@/lib/utils";
 
 export type RowTone = 'plain' | 'brand' | 'selected';
 
-const BASE = 'rounded-lg border px-4 py-3';
+const BASE = 'row-card px-4 py-3';
 
 const TONE: Record<RowTone, string> = {
-    plain: 'bg-surface-2/40 border-line-strong/20',
-    brand: 'bg-surface-2/40 border-brand/15',
+    plain: '',
+    brand: 'border-brand/15',
     selected: 'bg-brand-strong/6 border-brand/25',
 };
 

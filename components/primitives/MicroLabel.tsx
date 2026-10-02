@@ -1,9 +1,9 @@
 import type {ReactNode} from "react";
 import {cn} from "@/lib/utils";
 
-// The small uppercase caption over a value, a column, a row or a form field: 10px, 0.1em,
-// mono, which matches SectionHeading, so an eyebrow and a section heading read as the same
-// idea at two sizes. Every hand-written site of exactly this recipe uses it. Labels still
+// The small caption over a value, a column, a row or a form field. Its face, size, case and
+// tracking are the active style's label tokens (.label-type in app/globals.css): uppercase mono
+// in a terminal style, plain words in a quiet one. Every hand-written site of exactly this recipe uses it. Labels still
 // spelled by hand are other recipes (9-11px; 0.08em, 0.14em or tracking-wider; no tone of
 // their own) — moving them here would change how they look, so that is a design decision,
 // not a refactor.
@@ -32,7 +32,7 @@ const TONE = {
 } as const;
 
 const MicroLabel = ({as: Tag = 'span', tone = 'muted', className, children, ...rest}: Props) => (
-    <Tag className={cn('font-mono text-[10px] uppercase tracking-[0.1em]', TONE[tone], className)} {...rest}>
+    <Tag className={cn('label-type', TONE[tone], className)} {...rest}>
         {children}
     </Tag>
 );

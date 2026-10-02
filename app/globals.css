@@ -55,6 +55,35 @@
   --type-display: var(--font-sora);
   --type-body: var(--font-hanken);
   --type-mono: var(--font-jetbrains);
+
+  /* Type roles. A caption (MicroLabel, a Badge tag), a panel's heading (SectionHeading) and a
+     labelled control (ActionButton) each read their own tokens, so a style decides whether they
+     are terminal captions or plain words. Style blocks set these and only these: a palette block
+     (html[data-palette]) outranks [data-style], so a style must never write a palette token. */
+  --label-font: var(--type-mono);
+  --label-size: 10px;
+  --label-transform: uppercase;
+  --label-tracking: 0.1em;
+  --heading-font: var(--type-mono);
+  --heading-weight: 700;
+  --heading-transform: uppercase;
+  --heading-tracking: 0.1em;
+  --heading-color: var(--brand);
+  --control-font: var(--type-mono);
+  --control-weight: 700;
+  --control-transform: uppercase;
+  --control-tracking: 0.1em;
+
+  /* The row inside a panel (RowCard). */
+  --card-bg: color-mix(in oklab, var(--surface-2) 40%, transparent);
+  --card-border-width: 1px;
+  --card-border-color: color-mix(in oklab, var(--line-strong) 20%, transparent);
+  --card-radius: var(--control-radius);
+
+  /* Motion. Both reduced-motion guards at the foot of this file zero them. */
+  --motion-fast: 120ms;
+  --motion-base: 200ms;
+  --motion-ease: cubic-bezier(0.2, 0, 0, 1);
 }
 
 html[data-mode="light"] {
@@ -274,6 +303,38 @@ html[data-mode="light"] {
     @apply text-foreground;
     overflow-x: hidden;
     position: relative;
+  }
+}
+
+/* ═══════════════════════════════════════
+   TYPE ROLES AND THE ROW — in the components layer, so a utility written at a call site
+   (normal-case, tracking-normal, text-fg, a border colour) still wins. Unlayered, they would
+   beat every utility, which is the trap .glass-panel documents below.
+   ═══════════════════════════════════════ */
+@layer components {
+  .label-type {
+    font-family: var(--label-font);
+    font-size: var(--label-size);
+    text-transform: var(--label-transform);
+    letter-spacing: var(--label-tracking);
+  }
+  .heading-type {
+    font-family: var(--heading-font);
+    font-weight: var(--heading-weight);
+    text-transform: var(--heading-transform);
+    letter-spacing: var(--heading-tracking);
+    color: var(--heading-color);
+  }
+  .control-type {
+    font-family: var(--control-font);
+    font-weight: var(--control-weight);
+    text-transform: var(--control-transform);
+    letter-spacing: var(--control-tracking);
+  }
+  .row-card {
+    background-color: var(--card-bg);
+    border: var(--card-border-width) solid var(--card-border-color);
+    border-radius: var(--card-radius);
   }
 }
 
