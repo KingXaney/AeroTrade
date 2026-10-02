@@ -3,6 +3,7 @@
 // the real form. The harness itself (in-memory Mongo, `next dev`, the Inngest dev server) is
 // started by run.sh; see README.md.
 import {mkdirSync} from 'node:fs';
+import {fileURLToPath} from 'node:url';
 
 // The app under test. Override with QA_BASE_URL to point the suites at another server.
 export const BASE = (process.env.QA_BASE_URL || 'http://localhost:3000').replace(/\/+$/, '');
@@ -15,9 +16,16 @@ export const PASSWORD = 'Passw0rd!Passw0rd!';
 // Where sign-up and sign-in land: the dashboard, with or without a query string.
 export const DASHBOARD_URL = new RegExp(`^${BASE.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}/(\\?.*)?$`);
 
+// A directory beside or above this file as a path with forward slashes and a trailing slash.
+// fileURLToPath, not URL.pathname: on Windows the pathname is "/C:/…", which resolves to "C:\C:\…".
+const dirPath = (relative) => fileURLToPath(new URL(relative, import.meta.url)).replace(/\\/g, '/');
+
+// The repository root, for the suites that load app modules through jiti.
+export const REPO_ROOT = dirPath('../../');
+
 // ./output/<name>/, created, with a trailing slash: `${outDir('learn')}01-checklist.png`.
 export const outDir = (name) => {
-    const dir = new URL(`./output/${name}/`, import.meta.url).pathname;
+    const dir = dirPath(`./output/${name}/`);
     mkdirSync(dir, {recursive: true});
     return dir;
 };

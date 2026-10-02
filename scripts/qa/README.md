@@ -78,3 +78,13 @@ its topics and lesson sections are pure builders covered by unit tests instead.
 
   It prints the share of changed pixels per image, worst first, writes a diff image beside each
   changed one and exits 1 when any image differs by more than `--max` percent or changed size.
+
+  The sweep runs under the default theme. `QA_THEME=<palette>:<style> npm run qa -- visual-sweep`
+  (say `nord:brutalist`) runs it under that one instead, into `output/sweep-<palette>-<style>/` —
+  a change to a visual style is checked one style at a time.
+
+## Windows
+
+`npm run qa` runs from Git Bash. Git Bash has no `pgrep`, and its `kill` does not reach the node,
+mongod and inngest processes the harness starts, so on Windows `run.sh` stops whatever listens on
+its three ports with `taskkill` when it exits.

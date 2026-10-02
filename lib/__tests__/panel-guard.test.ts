@@ -12,7 +12,8 @@ describe('framed surfaces go through Panel', () => {
     const sources = ['components', 'app'].flatMap((dir) =>
         readdirSync(`${root}${dir}`, {recursive: true, encoding: 'utf8'})
             .filter((f) => f.endsWith('.tsx'))
-            .map((f) => `${dir}/${f}`));
+            // Windows lists nested entries with backslashes; the paths below use forward slashes.
+            .map((f) => `${dir}/${f.replace(/\\/g, '/')}`));
 
     const code = (text: string) => text
         .replace(/\/\*[\s\S]*?\*\//g, '')

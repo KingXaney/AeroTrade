@@ -14,7 +14,7 @@ import {MongoClient, ObjectId} from 'mongodb';
 // A TypeScript loader (declared in scripts/qa/package.json), so the checks below
 // can call the job's store functions as the job does, through Mongoose, on this harness database.
 import {createJiti} from 'jiti';
-import {BASE, MONGO, check, outDir, signUp, summary} from './lib.mjs';
+import {BASE, MONGO, REPO_ROOT, check, outDir, signUp, summary} from './lib.mjs';
 
 const OUT = outDir('strategies');
 
@@ -485,7 +485,7 @@ try {
     // the build variantStamps reported and saves it with saveVariants, whose filter must refuse an
     // earlier build or another version; the next night variantsDue finds nothing to do, and a
     // rebuilt backtest (saveBacktest) makes the grid due again and hides the old one on the page.
-    const ROOT = new URL('../../', import.meta.url).pathname;
+    const ROOT = REPO_ROOT;
     // Always the harness database the checks read, never a MONGODB_URI left in the shell.
     process.env.MONGODB_URI = MONGO;
     process.env.BETTER_AUTH_SECRET ??= 'local-qa-secret-at-least-32-characters-long';

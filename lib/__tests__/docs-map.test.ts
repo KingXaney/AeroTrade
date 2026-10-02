@@ -20,7 +20,8 @@ const IDENTIFIER = /^(.*)\.([A-Za-z_$][\w$]*)$/;
 
 const tree = ROOTS.flatMap((dir) =>
     readdirSync(`${root}${dir}`, {recursive: true, encoding: 'utf8'})
-        .map((f) => `${dir}/${f}`)
+        // Windows lists nested entries with backslashes; the docs write forward slashes.
+        .map((f) => `${dir}/${f.replace(/\\/g, '/')}`)
         .filter((f) => !f.includes('node_modules')));
 
 const pathsIn = (markdown: string): string[] =>

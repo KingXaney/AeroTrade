@@ -21,7 +21,7 @@ import {MongoClient} from 'mongodb';
 // A TypeScript loader (declared in scripts/qa/package.json), for the app's NYSE holiday table
 // (lib/prices/market-hours.ts).
 import {createJiti} from 'jiti';
-import {BASE, MONGO, check, outDir, signUp, summary} from './lib.mjs';
+import {BASE, MONGO, REPO_ROOT, check, outDir, signUp, summary} from './lib.mjs';
 
 const OUT = outDir('learn-account');
 
@@ -282,7 +282,7 @@ try {
     const mulberry32 = (seed) => { let s = seed >>> 0; return () => { s = (s + 0x6d2b79f5) >>> 0; let t = s; t = Math.imul(t ^ (t >>> 15), t | 1); t ^= t + Math.imul(t ^ (t >>> 7), t | 61); return ((t ^ (t >>> 14)) >>> 0) / 4294967296; }; };
     // The app's NYSE calendar, loaded through jiti for its holiday table (a table, not what these
     // checks test); the window's rule is applied here with it.
-    const ROOT = new URL('../../', import.meta.url).pathname;
+    const ROOT = REPO_ROOT;
     const jiti = createJiti(import.meta.url, {alias: {'@': ROOT.replace(/\/$/, '')}, fsCache: false});
     const {isTradingDay} = await jiti.import(`${ROOT}lib/prices/market-hours.ts`);
     const sessionOnOrBefore = (date) => { let d = date; while (!isTradingDay(d)) d = addDays(d, -1); return d; };

@@ -95,10 +95,23 @@ tree() {
     echo "$1"
     for child in $(pgrep -P "$1" 2>/dev/null); do tree "$child"; done
 }
+# Git Bash on Windows has no pgrep, and its kill reaches only the shell's own wrapper, never the
+# node, mongod and inngest processes under it. The ports were free when the run began (checked
+# above), so whatever listens on them now was started here: stop those, each with its children.
+on_windows() { case "$(uname -s)" in MINGW*|MSYS*|CYGWIN*) return 0 ;; *) return 1 ;; esac; }
+stop_windows_listeners() {
+    local port pid
+    for port in $APP_PORT $MONGO_PORT $INNGEST_PORT; do
+        for pid in $(netstat -ano -p TCP 2>/dev/null | awk -v p=":$port" '$2 ~ p"$" && $4 == "LISTENING" {print $5}' | sort -u); do
+            taskkill //F //T //PID "$pid" >/dev/null 2>&1
+        done
+    done
+}
 stop() {
     local all="" pid
     for pid in ${PIDS[@]+"${PIDS[@]}"}; do all="$all $(tree "$pid")"; done
     [ -z "${all// /}" ] && return 0
+    on_windows && stop_windows_listeners
     kill $all 2>/dev/null
     sleep 2
     for pid in $all; do kill -0 "$pid" 2>/dev/null && kill -9 "$pid" 2>/dev/null; done
