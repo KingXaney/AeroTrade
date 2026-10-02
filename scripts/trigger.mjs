@@ -24,6 +24,7 @@ const EVENTS = {
     income: 'app/credit.account.income',
     topics: 'app/refresh.topic.feeds',
     briefs: 'app/generate.topic.briefs',
+    briefing: 'app/generate.market.briefing',
     topic: 'topic/refresh.requested',
     strategies: 'app/run.strategies',
     'strategies-preview': 'app/run.strategies',

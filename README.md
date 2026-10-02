@@ -102,6 +102,7 @@ Background jobs run through Inngest. For local development start its dev server 
 npx inngest-cli@latest dev -u http://localhost:3000/api/inngest
 npm run trigger -- brain        # build the news brain now
 npm run trigger -- topics       # refresh every followed topic (briefs: the AI briefs)
+npm run trigger -- briefing     # write this morning's market briefing
 npm run trigger -- navigator    # run the weekly AI Navigator
 npm run trigger -- strategies   # run the quant strategies (-preview decides without filling)
 npm run trigger -- income       # credit interest + dividends through yesterday
@@ -112,6 +113,7 @@ npm run trigger -- news         # send today's digest emails
 |---|---|---|
 | `daily-brain-update` | 07:30 daily | ingest → extract → fold into the entity graph → detect theses |
 | `refresh-topic-feeds` | every 3 h | fetch + match articles for every followed keyword set |
+| `generate-market-briefing` | 07:50 daily | one briefing for everyone from the brain's most important articles of the day, each point citing its articles |
 | `generate-topic-briefs` | 08:00 daily | one "what changed today" brief per topic with fresh news |
 | `ai-navigator-weekly` | Mondays 10:00 | score the universe and rebalance the Navigator account |
 | `daily-news-summary` | 12:00 daily | per-user digest email with a topics section |

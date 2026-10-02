@@ -5,7 +5,7 @@
 // Import-free on purpose: resolution is pure and unit-tested, and the "default costs
 // nothing" contract is an assertion in that suite rather than a comment here.
 
-export type AiTask = 'extraction' | 'digest' | 'rationale' | 'welcome' | 'topicBrief';
+export type AiTask = 'extraction' | 'digest' | 'rationale' | 'welcome' | 'topicBrief' | 'marketBriefing';
 export type AiTier = 'free' | 'basic' | 'pro';
 export type AiProvider = 'gemini' | 'anthropic';
 
@@ -32,6 +32,7 @@ const FREE: Record<AiTask, ModelSpec> = {
     rationale: {provider: 'gemini', model: GEMINI_FLASH_LITE, maxTokens: 2048},
     welcome: {provider: 'gemini', model: GEMINI_FLASH_LITE, maxTokens: 1024},
     topicBrief: {provider: 'gemini', model: GEMINI_FLASH_LITE, maxTokens: 1024, jsonMode: true},
+    marketBriefing: {provider: 'gemini', model: GEMINI_FLASH_LITE, maxTokens: 2048, jsonMode: true},
 };
 
 // Haiku has no adaptive thinking and rejects `effort`, so this tier needs no spend
@@ -42,6 +43,7 @@ const BASIC: Record<AiTask, ModelSpec> = {
     rationale: {provider: 'anthropic', model: 'claude-haiku-4-5', maxTokens: 2048},
     welcome: {provider: 'anthropic', model: 'claude-haiku-4-5', maxTokens: 1024},
     topicBrief: {provider: 'anthropic', model: 'claude-haiku-4-5', maxTokens: 1024, jsonMode: true},
+    marketBriefing: {provider: 'anthropic', model: 'claude-haiku-4-5', maxTokens: 2048, jsonMode: true},
 };
 
 // Only the two tasks where model quality reaches a decision or a human get upgraded.
@@ -57,6 +59,8 @@ const PRO: Record<AiTask, ModelSpec> = {
     welcome: {provider: 'anthropic', model: 'claude-haiku-4-5', maxTokens: 1024},
     // A topic brief never reaches a trading decision; the cheap model is the right one.
     topicBrief: {provider: 'anthropic', model: 'claude-haiku-4-5', maxTokens: 1024, jsonMode: true},
+    // Nor does the morning briefing: one call a day, restating headlines.
+    marketBriefing: {provider: 'anthropic', model: 'claude-haiku-4-5', maxTokens: 2048, jsonMode: true},
 };
 
 export const MODEL_MATRIX: Record<AiTier, Record<AiTask, ModelSpec>> = {free: FREE, basic: BASIC, pro: PRO};

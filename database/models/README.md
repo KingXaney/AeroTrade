@@ -21,6 +21,7 @@ reads and writes live. Change a field here, then in the store module named besid
 | `brain-entity` | brain | `lib/brain/store`, `update`, `ingest` |
 | `news-item` | brain | `lib/brain/ingest` (the daily sweep), `store` (evidence reads) |
 | `second-opinion` | brain | `lib/brain/opinion` |
+| `market-briefing` | news | `lib/news/briefing-store` (the morning job's write, the page's read) |
 | `topic` | topics | `lib/topics/store`, `insert` (the one write path), `seed`, `refresh` |
 | `topic-article` | topics | `lib/topics/store`, `refresh` |
 | `watchlist` | stocks | `lib/stocks/watchlist-store`; `lib/actions/watchlist.actions` adds and removes |

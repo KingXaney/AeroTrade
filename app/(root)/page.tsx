@@ -7,6 +7,7 @@ import {getLearnFacts} from "@/lib/learn/facts-store";
 import {getTodaysLesson} from "@/lib/learn/lesson-store";
 import {deriveMoments} from "@/lib/learn/moments";
 import {HOME_COPY} from "@/lib/learn/copy/home";
+import {NEWS_COPY} from "@/lib/learn/copy/news";
 import MarketStatus from "@/components/stocks/MarketStatus";
 import HomeAccounts from "@/components/home/HomeAccounts";
 import TopicsOverview from "@/components/dashboard/widgets/topics/TopicsOverview";
@@ -16,10 +17,14 @@ import GettingStarted from "@/components/dashboard/widgets/learn/GettingStarted"
 import TodaysLesson from "@/components/dashboard/widgets/learn/TodaysLesson";
 import WidgetSkeleton from "@/components/primitives/Skeleton";
 import MicroLabel from "@/components/primitives/MicroLabel";
+import RowCard from "@/components/primitives/RowCard";
 import PageTitle from "@/components/primitives/PageTitle";
 import Panel from "@/components/primitives/Panel";
 import SectionHeading from "@/components/primitives/SectionHeading";
 import {actionButton} from "@/components/primitives/ActionButton";
+
+// Home shows the briefing's first points; the news page has all of them.
+const HOME_BRIEFING_POINTS = 3;
 
 type HomeProps = {
     searchParams: Promise<{customize?: string}>;
@@ -45,6 +50,10 @@ const Home = async ({searchParams}: HomeProps) => {
 
     const view = await getHomeView(user.id);
     const {step} = view;
+    // The box beside the topics: the market briefing, else the topics' own briefs, else (once
+    // the first-week list is gone) today's lesson.
+    const hasBriefing = view.briefing !== null || view.hasBriefs;
+    const beside = hasBriefing || !view.missions;
 
     return (
         <div className="space-y-4" data-home>
@@ -78,14 +87,35 @@ const Home = async ({searchParams}: HomeProps) => {
 
             <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
                 {/* Alone in its row (a new account: no brief yet, the lesson still to come), it takes the row. */}
-                <Panel id="home-topics" aria-labelledby="home-topics-heading" className={view.hasBriefs || !view.missions ? undefined : 'lg:col-span-2'}>
+                <Panel id="home-topics" aria-labelledby="home-topics-heading" className={beside ? undefined : 'lg:col-span-2'}>
                     <SectionHeading id="home-topics-heading">{HOME_COPY.topicsHeading}</SectionHeading>
                     {view.topics.topics.length > 0 ? <TopicsOverview overview={view.topics} span={6}/> : <TopicsWidgetEmpty/>}
                 </Panel>
 
                 {/* A box with nothing to say is not shown: until a topic has a brief, the lesson
                     takes this place beside the topics. */}
-                {view.hasBriefs ? (
+                {view.briefing ? (
+                    <Panel id="home-briefing" aria-labelledby="home-briefing-heading">
+                        <div className="mb-3 flex items-center justify-between gap-3">
+                            <SectionHeading id="home-briefing-heading" spacing="none">{HOME_COPY.briefingHeading}</SectionHeading>
+                            <Link href="/news" className="label-type text-xs text-brand hover:underline">{HOME_COPY.newsLink} →</Link>
+                        </div>
+                        {/* Model output: text nodes only, under the caveat every summary carries. */}
+                        {view.briefing.headline && <p className="mb-3 font-heading text-base font-semibold leading-snug text-fg">{view.briefing.headline}</p>}
+                        <ul className="space-y-2">
+                            {view.briefing.bullets.slice(0, HOME_BRIEFING_POINTS).map((bullet) => (
+                                <RowCard as="li" key={bullet.text} tone="brand" className="text-sm leading-relaxed text-fg">
+                                    {bullet.text}
+                                    <span className="mt-1 block font-mono text-[11px] text-fg-muted">{bullet.sources.map((s) => s.source).filter(Boolean).join(' · ')}</span>
+                                </RowCard>
+                            ))}
+                        </ul>
+                        <MicroLabel as="p" className="mt-3">
+                            {NEWS_COPY.briefingCaveat(view.briefing.date)}
+                            {view.briefing.bullets.length > HOME_BRIEFING_POINTS ? ` · ${HOME_COPY.morePoints(view.briefing.bullets.length - HOME_BRIEFING_POINTS)}` : ''}
+                        </MicroLabel>
+                    </Panel>
+                ) : view.hasBriefs ? (
                     <Panel id="home-briefing" aria-labelledby="home-briefing-heading">
                         <div className="mb-4 flex items-center justify-between gap-3">
                             <SectionHeading id="home-briefing-heading" spacing="none">{HOME_COPY.briefingHeading}</SectionHeading>
@@ -106,7 +136,7 @@ const Home = async ({searchParams}: HomeProps) => {
                     <SectionHeading id="home-first-week-heading">{HOME_COPY.firstWeekHeading}</SectionHeading>
                     <GettingStarted missions={view.missions}/>
                 </Panel>
-            ) : view.hasBriefs && (
+            ) : hasBriefing && (
                 <Panel id="home-learn" aria-labelledby="home-learn-heading">
                     <LearnBox userId={user.id}/>
                 </Panel>

@@ -28,6 +28,7 @@ import {
 } from "@/lib/news/feed-prefs";
 import {KEYWORD_MAX} from "@/lib/news/keywords";
 import {cn} from "@/lib/utils";
+import {NEWS_COPY} from "@/lib/learn/copy/news";
 import Panel from "@/components/primitives/Panel";
 import RowCard from "@/components/primitives/RowCard";
 import ActionButton from "@/components/primitives/ActionButton";
@@ -51,7 +52,9 @@ const Group = ({label, hint, children}: {label: string; hint?: string; children:
 
 type Props = {initial: NewsFeedPrefs; startOpen?: boolean};
 
-// The whole preference in one panel, saved explicitly. The draft is normalised on every
+// Closed, it is one button beside the page's title: the feed's summary is the title's subtitle,
+// and a panel that only repeated it sat above the news on every visit. Open, it is
+// the whole preference in one panel, saved explicitly. The draft is normalised on every
 // render so the summary line, the fetch-budget hint and the Save button all describe what
 // will actually be stored, not what was typed.
 const NewsFeedEditor = ({initial, startOpen = false}: Props) => {
@@ -99,6 +102,14 @@ const NewsFeedEditor = ({initial, startOpen = false}: Props) => {
         setDraft(feed);
     });
 
+    const toggle = (
+        <ActionButton id="news-feed-edit" variant="secondary" aria-expanded={open} onClick={() => setOpen((o) => !o)}>
+            {open ? NEWS_COPY.closeEditor : NEWS_COPY.customize}
+        </ActionButton>
+    );
+
+    if (!open) return <div className="flex justify-end md:-mt-14 md:mb-6">{toggle}{resetDialog}</div>;
+
     return (
         <Panel>
             <div className="flex items-center justify-between gap-3 flex-wrap">
@@ -106,9 +117,7 @@ const NewsFeedEditor = ({initial, startOpen = false}: Props) => {
                     <SectionHeading spacing="none">Your feed</SectionHeading>
                     <p className="text-xs text-fg-muted mt-1 font-mono">{describeNewsFeed(normalized)}{dirty ? ' · unsaved' : ''}</p>
                 </div>
-                <ActionButton id="news-feed-edit" variant="secondary" aria-expanded={open} onClick={() => setOpen((o) => !o)}>
-                    {open ? 'Close' : 'Edit feed'}
-                </ActionButton>
+                {toggle}
             </div>
 
             {open && (

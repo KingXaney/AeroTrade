@@ -26,6 +26,8 @@ export const HOME_COPY = {
     topicsHeading: 'Your topics',
     briefingHeading: "Today's briefing",
     briefingNote: 'What changed in the topics you follow, written each morning.',
+    // "+2 more points" under the market briefing's first ones.
+    morePoints: (count: number): string => `+${count} more ${count === 1 ? 'point' : 'points'} in the news`,
     newsLink: 'Open the news',
 
     learnHeading: 'Keep learning',

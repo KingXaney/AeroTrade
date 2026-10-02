@@ -80,6 +80,65 @@ export const getEntityEvidence = async (entityKey: string, lookbackDays = 21, li
     });
 };
 
+// The articles the morning briefing may cite (lib/news/briefing.ts): the day's and the day
+// before's tagged articles, most important first. Sorted on the extractor's importance and
+// never projecting it — it orders the read, and nothing prints it. Reddit is left out: its
+// importance is capped, and a briefing built on forum posts is not one. Bounded by the
+// publishedDate index to two days of rows.
+type BriefingDoc = {
+    headline: string; source: string; url: string; datetime: number;
+    extraction?: {eventType?: string; entities?: {key: string; type: string}[]};
+};
+
+const tickersOf = (doc: BriefingDoc): string[] =>
+    (doc.extraction?.entities ?? []).filter((e) => e.type === 'ticker').map((e) => e.key.toUpperCase());
+
+export const getBriefingCandidates = async (today: string, limit = 30) => {
+    await connectToDatabase();
+    const items = await NewsItem.find({
+        publishedDate: {$gte: addCalendarDays(today, -1), $lte: today},
+        'extraction.importance': {$exists: true},
+        sourceType: {$ne: 'reddit'},
+    }, {headline: 1, source: 1, url: 1, datetime: 1, 'extraction.eventType': 1, 'extraction.entities.key': 1, 'extraction.entities.type': 1})
+        .sort({'extraction.importance': -1, datetime: -1})
+        .limit(limit)
+        .lean<BriefingDoc[]>();
+    return items.map((item) => ({
+        headline: item.headline,
+        source: item.source,
+        url: item.url,
+        datetime: item.datetime,
+        eventType: item.extraction?.eventType ?? null,
+        tickers: tickersOf(item),
+    }));
+};
+
+// Recent tagged articles that name any of a reader's symbols — the news page's "your holdings and
+// watchlist". One read on the entities index, newest first, each row with the symbols of the
+// reader's it names.
+export const getNewsForSymbols = async (symbols: readonly string[], {days = 3, limit = 8}: {days?: number; limit?: number} = {}) => {
+    const wanted = [...new Set(symbols.map((s) => s.toUpperCase()))];
+    if (wanted.length === 0) return [];
+    await connectToDatabase();
+    const from = addCalendarDays(getEasternDateString(), -days);
+    const items = await NewsItem.find({
+        'extraction.entities': {$elemMatch: {type: 'ticker', key: {$in: wanted}}},
+        publishedDate: {$gte: from},
+    }, {headline: 1, source: 1, url: 1, datetime: 1, 'extraction.eventType': 1, 'extraction.entities.key': 1, 'extraction.entities.type': 1})
+        .sort({publishedDate: -1, datetime: -1})
+        .limit(limit)
+        .lean<BriefingDoc[]>();
+    const mine = new Set(wanted);
+    return items.map((item) => ({
+        headline: item.headline,
+        source: item.source,
+        url: item.url,
+        datetime: item.datetime,
+        eventType: item.extraction?.eventType ?? null,
+        symbols: tickersOf(item).filter((t) => mine.has(t)),
+    }));
+};
+
 // "since thesis" for Active Theses: the heaviest ticker theses (lib/brain/since-thesis.ts),
 // read in one batch — each thesis ticker's bars from its own thesis date and SPY's from the
 // earliest of them, one $or query (getBarsFrom) — then measured in memory. A second read on

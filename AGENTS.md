@@ -20,7 +20,7 @@ before the rename keep the name "Main Strategy" (new ones are "Main account", `D
 - `npm run build:check` — compile-only Next build; needs no database or keys
 - `npm run build` / `npm start` — the production build and its server
 - `npm run dev` + `npx inngest-cli@latest dev -u http://localhost:3000/api/inngest` — app + jobs
-- `npm run trigger -- <brain|navigator|news|snapshots|income|topics|briefs|strategies|strategies-preview|strategies-resimulate>` — fire a job locally
+- `npm run trigger -- <brain|navigator|news|snapshots|income|topics|briefs|briefing|strategies|strategies-preview|strategies-resimulate>` — fire a job locally
 - `npm run test:db` — connect to `MONGODB_URI` (from `.env`) and print the database and host it reached
 - `npm run migrate:accounts` — the idempotent multi-account migration: builds the indexes in `scripts/migration-indexes.mjs` and drops the ones they replaced (run it on every database, again whenever that list changes)
 - `npm run opinion:local` — the brain's Second Opinion from your Claude subscription through the Claude Code CLI, written straight to the database (`.env.example` lists the other ways)
@@ -242,6 +242,20 @@ and friends keep none beyond Shared and the invariants).
 - `lib/news/feed-prefs` is client-safe, `lib/news/feed` pure, `lib/news/feed-store` the server side.
 - `lib/news/article.showSummary` is whether a headline card prints its summary —
   `components/news/ArticleCard`, behind both article cards.
+- The morning briefing: `lib/jobs/functions/news` makes one model call a day over the brain's
+  most important tagged articles (`lib/brain/store.getBriefingCandidates`, which sorts on
+  importance and never projects it) and writes one global `MarketBriefing` per ET day. The model
+  sees numbered headlines and no URLs (`lib/news/prompts`) and cites by number;
+  `lib/news/briefing.parseBriefingText` keeps only citations that name an article it was shown,
+  drops a point left with none, and snapshots each cited article into the document. The page
+  renders the text as text nodes under the AI caveat; a link is always a stored article's own.
+- `/news` composes `lib/news/page-store.getNewsPageView`, shaped by the pure `lib/news/page`:
+  the briefing, then the followed topics (each topic's own brief and newest stories), then tagged
+  articles naming a held or watched symbol (`lib/brain/store.getNewsForSymbols`), then the feed
+  — a few leading, the rest behind one disclosure. A story prints once, a section with nothing
+  is absent, and every section passes `lib/news/feed.outletAllowed`, the one outlet rule. The
+  feed itself (`getNewsFeedForPrefs`: kill switch, outage fallback, the topic batch for the widget
+  and /history) is untouched.
 
 ### topics
 

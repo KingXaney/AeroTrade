@@ -113,6 +113,15 @@ export const JOBS = {
         trigger: 'income',
         health: {label: 'Interest & dividends', schedule: 'daily 00:05 ET', staleAfterHours: 30},
     },
+    // Twenty minutes after the brain update, whose tagged articles it reads; before the topic
+    // briefs at 08:00, so the three model jobs never run at once on the free tier.
+    marketBriefing: {
+        id: 'generate-market-briefing',
+        event: 'app/generate.market.briefing',
+        crons: ['TZ=America/New_York 50 7 * * *'],
+        trigger: 'briefing',
+        health: {label: 'Market briefing', schedule: 'daily 07:50 ET', staleAfterHours: 30},
+    },
 } as const satisfies Record<string, JobDefinition>;
 
 // In declaration order — the status strip's row order.

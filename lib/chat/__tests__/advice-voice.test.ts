@@ -11,6 +11,7 @@ import {TOOL_DESCRIPTIONS} from '@/lib/chat/tool-copy';
 import {CHAT_SUGGESTIONS, CHAT_WELCOME_MESSAGE} from '@/lib/learn/copy/chat';
 import {NEWS_SUMMARY_EMAIL_PROMPT, PERSONALIZED_WELCOME_EMAIL_PROMPT} from '@/lib/email/prompts';
 import {RATIONALE_PROMPT} from '@/lib/navigator/prompts';
+import {MARKET_BRIEFING_PROMPT} from '@/lib/news/prompts';
 import {findBanned} from '@/lib/learn/banned';
 
 // Bumped when a tool is added; the Record type already forces the copy to exist.
@@ -28,6 +29,7 @@ const corpus: [string, string][] = [
     ['PERSONALIZED_WELCOME_EMAIL_PROMPT', PERSONALIZED_WELCOME_EMAIL_PROMPT],
     ['NEWS_SUMMARY_EMAIL_PROMPT', NEWS_SUMMARY_EMAIL_PROMPT],
     ['RATIONALE_PROMPT', RATIONALE_PROMPT],
+    ['MARKET_BRIEFING_PROMPT', MARKET_BRIEFING_PROMPT],
 ];
 
 describe('advice voice', () => {

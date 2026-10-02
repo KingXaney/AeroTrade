@@ -79,19 +79,28 @@ const toRequest = (prefs: NewsFeedPrefs, slot: FeedSlot): FeedRequest | null => 
 export const feedRequestsFor = (prefs: NewsFeedPrefs): FeedRequest[] =>
     planFeedSlots(prefs).slots.map((slot) => toRequest(prefs, slot)).filter((r): r is FeedRequest => r !== null);
 
+// The one outlet rule, as a test of an outlet's name: include narrows to the listed outlets;
+// hide removes. Everything that prints a headline asks it — the feed's batches, and the news
+// page's briefing citations and tagged articles.
+export const outletAllowed = (prefs: Pick<NewsFeedPrefs, 'includeSources' | 'excludeSources'>): ((source: string | undefined) => boolean) => {
+    if (prefs.includeSources.length === 0 && prefs.excludeSources.length === 0) return () => true;
+    const include = new Set(prefs.includeSources.map(outletKey));
+    const exclude = new Set(prefs.excludeSources.map(outletKey));
+    return (source) => {
+        const key = outletKey(source ?? '');
+        if (include.size > 0 && !include.has(key)) return false;
+        return !exclude.has(key);
+    };
+};
+
 // Include narrows to the listed outlets; hide removes. Empty lists hand back the same array.
 export const filterBySources = (
     articles: MarketNewsArticle[],
     prefs: Pick<NewsFeedPrefs, 'includeSources' | 'excludeSources'>,
 ): MarketNewsArticle[] => {
     if (prefs.includeSources.length === 0 && prefs.excludeSources.length === 0) return articles;
-    const include = new Set(prefs.includeSources.map(outletKey));
-    const exclude = new Set(prefs.excludeSources.map(outletKey));
-    return articles.filter((a) => {
-        const key = outletKey(a.source ?? '');
-        if (include.size > 0 && !include.has(key)) return false;
-        return !exclude.has(key);
-    });
+    const allowed = outletAllowed(prefs);
+    return articles.filter((a) => allowed(a.source));
 };
 
 // Google article ids are case-sensitive base64url, so this keeps case where normalizeUrl

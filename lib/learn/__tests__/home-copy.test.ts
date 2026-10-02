@@ -24,13 +24,15 @@ describe('HOME_COPY', () => {
         expect(HOME_COPY.holdings(3)).toBe('3 holdings');
         expect(HOME_COPY.stepsDone(2, 5)).toBe('2 of 5 first-week steps done');
         expect(HOME_COPY.accountsTotal(2)).toBe('All 2 accounts');
+        expect(HOME_COPY.morePoints(1)).toBe('+1 more point in the news');
+        expect(HOME_COPY.morePoints(2)).toBe('+2 more points in the news');
     });
 
     it('never advises', () => {
         for (const value of Object.values(HOME_COPY)) {
             if (typeof value === 'string') clean(value);
         }
-        for (const text of [HOME_COPY.greeting('Ada'), HOME_COPY.stepsDone(1, 5), HOME_COPY.accountsTotal(3), HOME_COPY.holdings(0), HOME_COPY.holdings(2)]) clean(text);
+        for (const text of [HOME_COPY.greeting('Ada'), HOME_COPY.stepsDone(1, 5), HOME_COPY.accountsTotal(3), HOME_COPY.holdings(0), HOME_COPY.holdings(2), HOME_COPY.morePoints(2)]) clean(text);
         for (const step of Object.values(HOME_STEPS)) {
             clean(step.title);
             clean(step.body);

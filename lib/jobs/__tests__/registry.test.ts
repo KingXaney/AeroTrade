@@ -28,6 +28,7 @@ describe('job registry', () => {
             ['fill-first-run-topics', 'topic/first-run.requested'],
             ['strategies-daily', 'app/run.strategies', 'TZ=America/New_York 35 9 * * 1-5', 'TZ=America/New_York 30 10 * * 1-5'],
             ['daily-account-income', 'app/credit.account.income', 'TZ=America/New_York 5 0 * * *'],
+            ['generate-market-briefing', 'app/generate.market.briefing', 'TZ=America/New_York 50 7 * * *'],
         ]);
     });
 

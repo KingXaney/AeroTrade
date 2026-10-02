@@ -47,7 +47,7 @@ try {
     if (cards > 0) check('default feed shows headlines', true, `${cards} cards`);
     else note('default feed showed no headlines (Google News unreachable?)');
     if (cards > 0) {
-        const metas = await page.locator('.news-item .news-meta').allInnerTexts();
+        const metas = await page.locator('.news-item .news-meta').allTextContents();
         check('every card names its outlet', metas.every((m) => / · .+/.test(m)), metas[0]);
     }
     check('nothing is stored for the default feed', (await prefsDoc())?.newsFeed === undefined);
@@ -78,7 +78,7 @@ try {
     await page.locator('#news-feed-edit').click();
     check('chips persist after reload', (await page.locator('#news-cat-world').getAttribute('aria-pressed')) === 'true'
         && (await page.locator('#news-region-GB').getAttribute('aria-pressed')) === 'true');
-    const metasAfter = await page.locator('.news-item .news-meta').allInnerTexts();
+    const metasAfter = await page.locator('.news-item .news-meta').allTextContents();
     check('the hidden outlet is gone from the feed', metasAfter.every((m) => !m.endsWith(` · ${hidden}`)), `${hidden} · ${metasAfter.length} cards`);
     const stored = (await prefsDoc())?.newsFeed;
     check('preference persisted in Mongo', !!stored
@@ -92,7 +92,7 @@ try {
     await page.getByRole('heading', {name: /^your news feed$/i}).waitFor({timeout: 30000});
     check('/history shows the feed heading with an edit link',
         await page.getByRole('heading', {name: /^your news feed$/i}).count() === 1 && await page.locator('a[href="/news?edit=1"]').count() >= 1);
-    const historyMetas = await page.locator('.news-item .news-meta').allInnerTexts();
+    const historyMetas = await page.locator('.news-item .news-meta').allTextContents();
     check('/history respects the hidden outlet', historyMetas.every((m) => !m.endsWith(` · ${hidden}`)), `${historyMetas.length} cards`);
 
     await page.goto(`${BASE}/settings`, {waitUntil: 'load'});
@@ -166,6 +166,71 @@ try {
     await settleToasts();
     check('saving the default unsets the field again', (await prefsDoc())?.newsFeed === undefined);
     await shot('04-back-to-default');
+
+    // --- the morning briefing: seeded, since the harness has no model key ---------------
+    // One global document a day, each point carrying the articles it cites. A point's text is
+    // model output, so a tag inside it must print as text.
+    const etDate = new Intl.DateTimeFormat('en-CA', {timeZone: 'America/New_York'}).format(new Date());
+    const cite = (n, source) => ({headline: `QA cited headline ${n}`, source, url: `https://example.com/qa-briefing/${n}`, datetime: Math.floor(Date.now() / 1000) - n * 60});
+    await db.collection('marketbriefings').deleteMany({writtenBy: 'qa'});
+    check('before any briefing exists the section is absent, not empty', await (async () => {
+        await db.collection('marketbriefings').deleteMany({date: etDate});
+        await page.goto(`${BASE}/news`, {waitUntil: 'load'});
+        await page.getByRole('heading', {name: 'News', level: 1}).waitFor({timeout: 30000});
+        return await page.locator('#news-briefing').count() === 0;
+    })());
+    await db.collection('marketbriefings').insertOne({
+        date: etDate,
+        headline: 'QA briefing headline',
+        bullets: [
+            {text: 'A point with a <b>tag</b> in it.', sources: [cite(1, 'QA Briefing Wire'), cite(2, 'QA Second Wire'), cite(3, 'QA Third Wire')]},
+            {text: 'A point from one outlet.', sources: [cite(4, 'QA Second Wire')]},
+        ],
+        stories: [{title: 'QA story title', summary: 'QA story summary.', eventType: 'earnings', tickers: ['SPY'], sources: [cite(5, 'QA Briefing Wire')]}],
+        writtenBy: 'qa',
+        generatedAt: new Date(),
+        createdAt: new Date(),
+    });
+    await page.goto(`${BASE}/news`, {waitUntil: 'load'});
+    await page.locator('#news-briefing').waitFor({timeout: 30000});
+    const briefing = page.locator('#news-briefing');
+    check('the briefing leads the page, above every headline card',
+        ((await briefing.boundingBox())?.y ?? 9999) < ((await page.locator('.news-item').first().boundingBox().catch(() => null))?.y ?? 99999));
+    check('…with its headline, its points and the AI caveat dated today',
+        (await briefing.locator('[data-briefing-headline]').innerText()) === 'QA briefing headline'
+        && await briefing.locator('[data-briefing-bullet]').count() === 2
+        && (await briefing.innerText()).includes(`${etDate} · AI summary · may contain errors`.toUpperCase())
+        || (await briefing.innerText()).includes(`${etDate} · AI summary · may contain errors`));
+    check('a tag in a point prints as text, never as markup',
+        (await briefing.locator('[data-briefing-bullet]').first().innerText()) === 'A point with a <b>tag</b> in it.' && await briefing.locator('b').count() === 0);
+    const firstSources = briefing.locator('[data-briefing-sources]').first();
+    check('a point names two outlets as links to the cited articles, then counts the rest',
+        await firstSources.locator('a[href^="https://example.com/qa-briefing/"]').count() === 2 && /\+1 more/.test(await firstSources.innerText()));
+    await briefing.locator('#news-briefing-stories > summary').click();
+    check('the stories open in place, with the event badge the glossary defines',
+        /QA story title/.test(await briefing.locator('#news-briefing-stories').innerText())
+        && await briefing.locator('#news-briefing-stories [data-term="event-earnings"]').count() === 1);
+    await shot('06-briefing');
+
+    await page.goto(`${BASE}/`, {waitUntil: 'load'});
+    await page.locator('#home-briefing').waitFor({timeout: 30000});
+    check('Home shows the briefing too, as text',
+        /QA briefing headline/.test(await page.locator('#home-briefing').innerText()) && await page.locator('#home-briefing b').count() === 0);
+
+    // A hidden outlet is hidden in the briefing as well: its citations go, and a point that
+    // stood only on it goes with them.
+    await page.goto(`${BASE}/news?edit=1`, {waitUntil: 'load'});
+    await page.getByLabel('Add to Hidden outlets').fill('QA Second Wire');
+    await page.getByLabel('Add to Hidden outlets').press('Enter');
+    await page.locator('#news-feed-save').click();
+    await page.getByText('News feed saved').waitFor({timeout: 30000});
+    await settleToasts();
+    await page.goto(`${BASE}/news`, {waitUntil: 'load'});
+    await page.locator('#news-briefing').waitFor({timeout: 30000});
+    check('hiding an outlet removes its citations and the point that stood on it alone',
+        await briefing.locator('[data-briefing-bullet]').count() === 1 && !/QA Second Wire/.test(await briefing.innerText()));
+    await db.collection('marketbriefings').deleteMany({writtenBy: 'qa'});
+    await db.collection('userpreferences').updateOne({userId}, {$unset: {newsFeed: ''}});
 } catch (err) {
     check(`threw: ${err.message}`, false);
     await shot('99-error').catch(() => {});

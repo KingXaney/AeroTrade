@@ -70,6 +70,14 @@ describe("the matrix", () => {
             expect(MODEL_MATRIX[tier].topicBrief.jsonMode, tier).toBe(true);
         }
     });
+
+    // The briefing parser reads citations out of a JSON object; prose has none, so it would
+    // drop the whole briefing.
+    it("keeps JSON mode on the market briefing in every tier", () => {
+        for (const tier of AI_TIERS) {
+            expect(MODEL_MATRIX[tier].marketBriefing.jsonMode, tier).toBe(true);
+        }
+    });
 });
 
 describe("resolveTier", () => {
