@@ -117,7 +117,7 @@ try {
     check('/learn anchors every entry', await page.locator('#max-drawdown').count() === 1 && await page.locator('#fomc').count() === 1);
     check('/learn lists the eight strategies in one line each', await page.locator('#learn-strategies a[href^="/strategies/"]').count() === 8);
     check('/learn states the disclaimer once', ((await page.locator('body').innerText()).match(/not financial advice/gi) ?? []).length === 1);
-    check('/learn is in the sidebar', await page.locator('aside a[href="/learn"], nav a[href="/learn"]').count() >= 1);
+    check('/learn is on the rail', await page.locator('aside.rail nav a[href="/learn"][aria-current="page"]').count() === 1);
     await shot('02-learn');
     await page.keyboard.press('Meta+k');
     const palette = page.locator('input[placeholder*="term to learn"]');

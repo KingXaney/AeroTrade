@@ -11,13 +11,14 @@ import {
     DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 
-import {LogOut, ChevronDown, Newspaper, Settings} from "lucide-react";
+import {LogOut, ChevronDown, Settings, Users} from "lucide-react";
 import {useSignOut} from "@/components/shell/useSignOut";
 import type {User} from '@/lib/auth/types';
 
-// No longer needs the stock/topic lists: it used to render a duplicate NavItems for
-// mobile, which the hamburger drawer replaces.
-function UserDropdown({user}: {user: User}) {
+// The account menu: the pages about the person (Friends, Settings) and Log out. A pending
+// friend request shows as a dot on the avatar — it used to be a badge on a sidebar row, and an
+// ask nobody can see leaves both sides waiting.
+function UserDropdown({user, friendRequests = 0}: {user: User; friendRequests?: number}) {
     const handleSignOut = useSignOut();
 
     const initial = user.name?.[0]?.toUpperCase() ?? '?';
@@ -27,8 +28,13 @@ function UserDropdown({user}: {user: User}) {
             <DropdownMenuTrigger asChild>
                 <button
                     type="button"
-                    className="group inline-flex items-center gap-3 rounded-full px-2 py-1.5 text-fg-soft hover:bg-surface-3/60 hover:text-fg transition-colors outline-none focus-visible:ring-2 focus-visible:ring-brand-strong"
+                    aria-label={friendRequests > 0 ? `Account menu, ${friendRequests} pending friend ${friendRequests === 1 ? 'request' : 'requests'}` : 'Account menu'}
+                    className="group relative inline-flex items-center gap-3 rounded-full px-2 py-1.5 text-fg-soft hover:bg-surface-3/60 hover:text-fg transition-colors outline-none focus-visible:ring-2 focus-visible:ring-brand-strong"
                 >
+                    {friendRequests > 0 && (
+                        <span aria-hidden="true" data-friend-requests={friendRequests}
+                              className="absolute left-8 top-1 z-10 size-2.5 rounded-full bg-brand outline-2 outline-chrome"/>
+                    )}
                     <Avatar className="h-9 w-9 ring-1 ring-line-strong group-hover:ring-brand-strong transition-all">
                         <AvatarFallback
                             className="text-sm font-bold font-heading bg-brand-strong text-on-brand"
@@ -36,8 +42,7 @@ function UserDropdown({user}: {user: User}) {
                             {initial}
                         </AvatarFallback>
                     </Avatar>
-                    {/* The header's nav items (HEADER_NAV_ITEMS) plus Search leave no room for a name below xl; the avatar
-                        and chevron still mark the menu. */}
+                    {/* Search takes the bar's middle, so the name shows only where there is room for both. */}
                     <div className="hidden xl:flex flex-col items-start leading-tight whitespace-nowrap">
                         <span className="text-sm font-medium text-fg font-heading">
                             {user.name}
@@ -81,9 +86,13 @@ function UserDropdown({user}: {user: User}) {
                 <DropdownMenuSeparator className="bg-surface-2" style={{ margin: '8px 0' }}/>
 
                 <DropdownMenuItem asChild className="group cursor-pointer rounded-md px-3 py-2 text-sm font-medium text-fg focus:!bg-brand-strong/8 focus:!text-brand transition-colors">
-                    <Link href="/topics">
-                        <Newspaper className="size-4 text-fg-soft group-focus:text-brand transition-colors"/>
-                        My topics
+                    <Link href="/friends">
+                        <Users className="size-4 text-fg-soft group-focus:text-brand transition-colors"/>
+                        Friends
+                        {friendRequests > 0 && (
+                            <span className="ml-auto rounded-full bg-brand/15 px-1.5 py-0.5 font-mono text-[10px] text-brand"
+                                  aria-label={`${friendRequests} pending friend ${friendRequests === 1 ? 'request' : 'requests'}`}>{friendRequests}</span>
+                        )}
                     </Link>
                 </DropdownMenuItem>
 
@@ -106,9 +115,6 @@ function UserDropdown({user}: {user: User}) {
                     Log out
                 </DropdownMenuItem>
 
-                {/* The mobile nav lives in the hamburger drawer now. This block used to
-                    render NavItems here, which made the gap look covered while showing
-                    only the six header routes — never the four the sidebar owned. */}
             </DropdownMenuContent>
         </DropdownMenu>
     );

@@ -11,6 +11,7 @@ import {createTopic} from "@/lib/actions/topics.actions";
 import {NAME_MAX} from "@/lib/topics/config";
 import {useDebounce} from "@/hooks/useDebounce";
 import {searchGlossary} from "@/lib/learn/glossary";
+import {searchPages} from "@/lib/shell/navigation";
 import type {Stock} from '@/lib/stocks/types';
 import type {TopicLink} from '@/lib/topics/types';
 
@@ -47,6 +48,9 @@ export default function SearchCommand({
     const existingTopic = canFollow ? initialTopics.find((t) => t.name.toLowerCase() === topicQuery.toLowerCase()) : undefined;
     // Glossary rows are matched client-side against a pure registry: no request, no key.
     const learnHits = searchGlossary(topicQuery, 4);
+    // Pages are matched the same way, against the navigation registry: with the rail showing
+    // icons only, the palette is also how a page is reached by name.
+    const pageHits = searchPages(topicQuery, 4);
 
     useEffect(() => {
         const onKeyDown = (e: KeyboardEvent) => {
@@ -109,9 +113,10 @@ export default function SearchCommand({
             {renderAs === 'text' ? (
                 // Was a bare <span onClick> — Tab skipped it and screen readers announced
                 // it as inert text. The ⌘K hint is the only place the shortcut is advertised.
-                <button type="button" onClick={() => setOpen(true)} className="search-text inline-flex items-center gap-2">
-                    <Search className="size-3.5 opacity-70" aria-hidden="true"/>
-                    {label}
+                <button type="button" onClick={() => setOpen(true)} aria-label={label}
+                        className="search-text inline-flex h-9 w-9 shrink-0 items-center justify-center gap-2 rounded-lg border border-line-strong/30 bg-surface-0/60 text-sm transition-colors md:w-full md:max-w-md md:shrink md:justify-start md:px-3">
+                    <Search className="size-4 opacity-70 shrink-0" aria-hidden="true"/>
+                    <span className="hidden md:inline flex-1 truncate text-left text-fg-muted">{label}</span>
                     <kbd className="hidden md:inline text-[10px] px-1.5 py-0.5 rounded border border-line-strong/40 text-fg-muted font-mono">⌘K</kbd>
                 </button>
             ) : (
@@ -127,12 +132,36 @@ export default function SearchCommand({
                     <CommandInput
                         value={searchTerm}
                         onValueChange={setSearchTerm}
-                        placeholder="Search stocks, a term to learn, or a topic to follow..."
+                        placeholder="Search stocks, a page, a term to learn, or a topic to follow..."
                         className="search-input"
                     />
                     {loading && <Loader2 className="search-loader" />}
                 </div>
                 <CommandList className="search-list">
+                    {pageHits.length > 0 && (
+                        <>
+                            <div className="search-count">Pages</div>
+                            {pageHits.map((page) => (
+                                <CommandItem
+                                    key={page.href}
+                                    value={`page-${page.href}`}
+                                    onSelect={() => goTo(page.href)}
+                                    className="search-item-link"
+                                    data-page-hit={page.href}
+                                >
+                                    <span className="material-symbols-outlined text-base text-brand" aria-hidden="true">{page.icon}</span>
+                                    <div className="flex-1">
+                                        <div className="search-item-name">{page.label}</div>
+                                        {page.section !== page.label && (
+                                            <div className="text-sm text-fg-muted font-mono" style={{fontSize: '11px', letterSpacing: '0.02em'}}>
+                                                {page.section}
+                                            </div>
+                                        )}
+                                    </div>
+                                </CommandItem>
+                            ))}
+                        </>
+                    )}
                     {learnHits.length > 0 && (
                         <>
                             <div className="search-count">Learn</div>

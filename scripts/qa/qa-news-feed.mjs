@@ -35,8 +35,7 @@ try {
     const prefsDoc = () => db.collection('userpreferences').findOne({userId});
 
     // --- navigation carries the new page ------------------------------------------------
-    const headerHrefs = await page.$$eval('header nav ul li a', (as) => as.map((a) => a.getAttribute('href')));
-    check('header nav ends with /news', headerHrefs.join(',') === '/topics,/,/brain,/strategies,/portfolio,/trade,/markets,/news', headerHrefs.join(','));
+    check('the rail carries News', await page.locator('aside.rail nav a[data-rail="news"][href="/news"]').count() === 1);
 
     // --- default: top stories, nothing stored -------------------------------------------
     await page.goto(`${BASE}/news`, {waitUntil: 'load'});

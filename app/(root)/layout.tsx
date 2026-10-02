@@ -1,5 +1,6 @@
 import Header from "@/components/shell/Header";
-import Sidebar from "@/components/shell/Sidebar";
+import Rail from "@/components/shell/Rail";
+import SectionTabs from "@/components/shell/SectionTabs";
 import {getSessionUser} from "@/lib/auth/session";
 import {redirect} from "next/navigation";
 import {getShellView} from "@/lib/shell/shell-store";
@@ -27,8 +28,9 @@ const Layout = async ({children}: {children: React.ReactNode}) => {
                 initialTopics={shell.initialTopics}
                 navBadges={shell.navBadges}
             />
-            <Sidebar portfolio={shell.portfolio} topics={shell.topics} badges={shell.navBadges} />
-            <div className="pt-20 lg:ml-64 px-6 pb-8">
+            <Rail portfolio={shell.portfolio} topics={shell.topics} badges={shell.navBadges} />
+            <div className="pt-20 lg:ml-16 px-6 pb-8">
+                <SectionTabs badges={shell.navBadges} />
                 {children}
             </div>
             <ChatWidget userId={user.id}/>

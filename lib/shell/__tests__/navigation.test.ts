@@ -1,56 +1,70 @@
-// The registry drives three separate nav surfaces, and active-state is the one piece of
-// logic in it that is easy to get subtly wrong — a naive startsWith lights two rows at
-// once, and '/' lights on every page.
+// The registry drives every nav surface, and active-state is the one piece of logic in it that
+// is easy to get subtly wrong — a naive startsWith lights two rows at once, and '/' lights on
+// every page.
 
 import {describe, expect, it} from 'vitest';
+import {existsSync} from 'node:fs';
+import {fileURLToPath} from 'node:url';
 
-import {HEADER_NAV_ITEMS, NAV_ITEMS, isActiveNav} from '@/lib/shell/navigation';
+import {ACCOUNT_PAGES, NAV_PAGES, NAV_SECTIONS, isActiveNav, searchPages, sectionFor} from '@/lib/shell/navigation';
 
-describe('NAV_ITEMS', () => {
+const root = fileURLToPath(new URL('../../..', import.meta.url));
+const pageFile = (href: string) => `${root}app/(root)${href === '/' ? '' : href}/page.tsx`;
+
+describe('the navigation registry', () => {
     it('has no duplicate hrefs', () => {
-        const hrefs = NAV_ITEMS.map((i) => i.href);
+        const hrefs = NAV_PAGES.map((p) => p.href);
         expect(new Set(hrefs).size).toBe(hrefs.length);
     });
 
-    it('points only at real routes', () => {
-        // '/search' used to sit in NAV_ITEMS as a fake entry the header special-cased into
-        // the command palette. It is not a route, and proxy.ts sent it through the session
-        // gate — so middle-clicking it landed a signed-in user on a 404.
-        for (const item of NAV_ITEMS) {
-            expect(item.href, item.label).toMatch(/^\/[a-z-]*$/);
+    it('points only at pages that exist', () => {
+        // '/search' once sat in the registry as a fake entry the header special-cased into the
+        // command palette; proxy.ts sent it through the session gate, so a middle-click landed
+        // on a 404. A tab is a page file, or it is not in the registry.
+        for (const page of NAV_PAGES) {
+            expect(page.href, page.label).toMatch(/^\/[a-z-]*$/);
+            expect(existsSync(pageFile(page.href)), page.href).toBe(true);
         }
-        expect(NAV_ITEMS.map((i) => i.href)).not.toContain('/search');
+        expect(NAV_PAGES.map((p) => p.href)).not.toContain('/search');
     });
 
-    it('gives every item an icon and a label', () => {
-        for (const item of NAV_ITEMS) {
-            expect(item.icon, item.href).toBeTruthy();
-            expect(item.label, item.href).toBeTruthy();
+    it('gives every section and page an icon and a label', () => {
+        for (const section of NAV_SECTIONS) {
+            expect(section.icon, section.id).toBeTruthy();
+            expect(section.label, section.id).toBeTruthy();
+            expect(section.pages.length, section.id).toBeGreaterThan(0);
         }
-    });
-
-    it('keeps the four account pages out of the header but in the registry', () => {
-        // These are exactly the routes that were unreachable below 1024px.
-        for (const href of ['/watchlist', '/friends', '/history', '/settings']) {
-            const item = NAV_ITEMS.find((i) => i.href === href);
-            expect(item, href).toBeDefined();
-            expect(item?.inHeader, href).toBe(false);
+        for (const page of NAV_PAGES) {
+            expect(page.icon, page.href).toBeTruthy();
+            expect(page.label, page.href).toBeTruthy();
         }
     });
 
-    it('keeps the glossary index in the sidebar, not the header', () => {
-        const learn = NAV_ITEMS.find((i) => i.href === '/learn');
-        expect(learn?.inHeader).toBe(false);
-        expect(learn?.label).toBe('Learn');
+    it('keeps the rail short', () => {
+        // The shell this replaced carried 8 header tabs and 13 sidebar links on every page.
+        expect(NAV_SECTIONS.length).toBeLessThanOrEqual(8);
+        expect(new Set(NAV_SECTIONS.map((s) => s.id)).size).toBe(NAV_SECTIONS.length);
     });
 
-    it('derives the header list from the same array', () => {
-        expect(HEADER_NAV_ITEMS).toHaveLength(8);
-        expect(HEADER_NAV_ITEMS.map((i) => i.href)).toContain('/news');
-        expect(HEADER_NAV_ITEMS.map((i) => i.href)).toContain('/strategies');
-        for (const item of HEADER_NAV_ITEMS) {
-            expect(NAV_ITEMS).toContain(item);
+    it('still reaches every page the old sidebar listed', () => {
+        const hrefs = NAV_PAGES.map((p) => p.href);
+        for (const href of ['/topics', '/', '/brain', '/strategies', '/portfolio', '/trade', '/markets', '/news',
+            '/watchlist', '/friends', '/history', '/learn', '/settings']) {
+            expect(hrefs, href).toContain(href);
         }
+    });
+
+    it('keeps the account pages in the account menu, off the rail', () => {
+        expect(ACCOUNT_PAGES.map((p) => p.href)).toEqual(['/friends', '/settings']);
+        for (const page of ACCOUNT_PAGES) expect(sectionFor(page.href), page.href).toBeUndefined();
+    });
+
+    it("names a section's first page after the section, its other tabs after themselves", () => {
+        const label = (href: string) => NAV_PAGES.find((p) => p.href === href)?.label;
+        expect(label('/portfolio')).toBe('Portfolio');
+        expect(label('/history')).toBe('Activity');
+        expect(label('/news')).toBe('News');
+        expect(label('/topics')).toBe('Topics');
     });
 });
 
@@ -75,9 +89,57 @@ describe('isActiveNav', () => {
     });
 
     it('lights exactly one row for every registry route', () => {
-        for (const item of NAV_ITEMS) {
-            const lit = NAV_ITEMS.filter((candidate) => isActiveNav(item.href, candidate.href));
-            expect(lit.map((l) => l.href), item.href).toEqual([item.href]);
+        for (const page of NAV_PAGES) {
+            const lit = NAV_PAGES.filter((candidate) => isActiveNav(page.href, candidate.href));
+            expect(lit.map((l) => l.href), page.href).toEqual([page.href]);
         }
+    });
+});
+
+describe('sectionFor', () => {
+    it('puts every tab in exactly one section', () => {
+        for (const section of NAV_SECTIONS) {
+            for (const page of section.pages) {
+                expect(NAV_SECTIONS.filter((s) => s.pages.some((p) => isActiveNav(page.href, p.href))).map((s) => s.id), page.href)
+                    .toEqual([section.id]);
+                expect(sectionFor(page.href)?.id, page.href).toBe(section.id);
+            }
+        }
+    });
+
+    it('follows a page into its children and into the routes a section claims', () => {
+        expect(sectionFor('/topics/ai-chips')?.id).toBe('news');
+        expect(sectionFor('/strategies/rsi2-mean-reversion')?.id).toBe('strategies');
+        // /stocks alone is not a page, so it is a match prefix and never a tab.
+        expect(sectionFor('/stocks/AAPL')?.id).toBe('markets');
+        expect(NAV_PAGES.map((p) => p.href)).not.toContain('/stocks');
+    });
+
+    it('claims nothing it does not own', () => {
+        expect(sectionFor('/this-page-does-not-exist')).toBeUndefined();
+        expect(sectionFor('/stocks-archive')).toBeUndefined();
+    });
+});
+
+describe('searchPages', () => {
+    it('finds a page by the start of a word in its name', () => {
+        expect(searchPages('port').map((p) => p.href)).toEqual(['/portfolio', '/history']);
+        expect(searchPages('act').map((p) => p.href)).toEqual(['/history']);
+        expect(searchPages('SETT').map((p) => p.href)).toEqual(['/settings']);
+    });
+
+    it('offers nothing for an empty query or one that starts no word', () => {
+        expect(searchPages('')).toEqual([]);
+        expect(searchPages('   ')).toEqual([]);
+        expect(searchPages('ortfolio')).toEqual([]);
+    });
+
+    it('treats the query as text, never as a pattern', () => {
+        expect(searchPages('.*')).toEqual([]);
+        expect(searchPages('(')).toEqual([]);
+    });
+
+    it('stops at its limit', () => {
+        expect(searchPages('s', 2)).toHaveLength(2);
     });
 });

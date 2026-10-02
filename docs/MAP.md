@@ -21,7 +21,7 @@ Shared pieces that belong to no single feature:
 | Path | What |
 |---|---|
 | `components/primitives/` | The UI vocabulary: `Panel`, `PageTitle`, `SectionHeading`, `MicroLabel`, `StatTile`, `ActionButton`, `TextField`, `RowCard`, `Disclosure`, `Switch`, `Badge`, `EmptyState`, `ConfirmDialog`, `Sheet`, `Skeleton`, `SafeMarkdown`, `Term` |
-| `components/shell/` | The app frame: header, sidebar, mobile drawer, ⌘K search, route error/loading, sign-out |
+| `components/shell/` | The app frame: the top bar, the icon rail and its hover cards, a section's tabs, the mobile drawer, ⌘K search, route error/loading, sign-out |
 | `components/forms/` | Form fields (generic over react-hook-form values), keyword chips |
 | `components/ui/` | shadcn output only — regenerable, never hand-edited |
 | `lib/format.ts` | Every display formatter: money, signed %, drawdown, time-ago, ET timestamps |
@@ -73,7 +73,7 @@ Shared pieces that belong to no single feature:
 | The order ticket | `components/trading/desk/OrderPanel.tsx`, its maths in `lib/trading/order-math.ts`, the fill in `lib/trading/orders.ts` + `fill.ts`, the action in `lib/actions/trading.actions.ts` |
 | How interest and dividends are credited | `lib/income/accrual.ts` (the only accrual clock — AGENTS.md invariant 11), `lib/income/store.ts` (the nightly job) |
 | News sources | `lib/news/config.ts` (`RSS_FEEDS`, caps, the Google kill switch), `lib/news/adapters/` |
-| Add a page to the nav | `lib/shell/navigation.ts` (`NAV_ITEMS` — header, sidebar, drawer and ⌘K all read it) |
+| Add a page to the nav | `lib/shell/navigation.ts` — a page of a section in `NAV_SECTIONS` (the rail, the section's tabs, the drawer) or an account page in `ACCOUNT_PAGES` (the avatar menu); ⌘K and Quick Links read both through `NAV_PAGES` |
 | The stock page | `app/(root)/stocks/[symbol]/page.tsx`, `components/stocks/`, the embeds in `lib/stocks/tradingview.ts` |
 | Sign-in / sign-up rules | `lib/auth/validation.ts` (email/password rules), `lib/auth/limits.ts` (rate limits), `lib/auth/server.ts` (better-auth), `lib/actions/auth.actions.ts` |
 | A stored field | `database/models/<model>.model.ts`, its type in `lib/<feature>/types.ts`, the store named in `database/models/README.md` |

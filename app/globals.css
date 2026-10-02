@@ -465,6 +465,15 @@ details[open] > :not(summary) { animation: disclosure-in var(--motion-base) var(
     -webkit-backdrop-filter: var(--chrome-blur);
     box-shadow: var(--chrome-shadow);
   }
+  /* The section rail (components/shell/Rail.tsx): the header's chrome, down the left edge. */
+  .rail {
+    @apply z-40 w-16 fixed left-0 top-16 bottom-0 flex-col;
+    background: var(--chrome-bg);
+    border-right: var(--chrome-border);
+    backdrop-filter: var(--chrome-blur);
+    -webkit-backdrop-filter: var(--chrome-blur);
+    box-shadow: var(--chrome-shadow);
+  }
   .header-wrapper {
     @apply flex justify-between items-center px-6 py-3;
     color: var(--fg-soft);

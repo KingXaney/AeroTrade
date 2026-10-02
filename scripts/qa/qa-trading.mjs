@@ -92,9 +92,12 @@ try {
     // A user's paper account is an account; "strategy" names only the eight quant strategies.
     check('the comparison panel and its first column say account',
         await page.getByRole('heading', {name: 'Account Comparison'}).count() === 1 && await page.getByText('Account', {exact: true}).count() >= 1);
-    const sidebarCard = page.locator('a[href="/portfolio"]').filter({hasText: 'total return'}).first();
-    const sidebarText = (await sidebarCard.textContent().catch(() => '')) ?? '';
-    check('the sidebar card counts accounts', sidebarText.includes('All 2 accounts'), sidebarText.slice(0, 120));
+    await page.locator('aside.rail a[data-rail="portfolio"]').hover();
+    const railCard = page.locator('[data-rail-flyout="portfolio"]');
+    await railCard.waitFor({timeout: 5000}).catch(() => {});
+    const sidebarText = (await railCard.textContent().catch(() => '')) ?? '';
+    check('the rail card counts accounts', sidebarText.includes('All 2 accounts'), sidebarText.slice(0, 120));
+    await page.mouse.move(700, 500);
     check('no account surface calls an account a strategy',
         await page.getByRole('button', {name: /Reset Account/}).count() === 1 && await page.getByText(/Strategy Comparison|Reset Strategy|New strategy account/).count() === 0);
     // The table's win rate is this epoch's, like the tile's: one winning sell, the old losing one unread.

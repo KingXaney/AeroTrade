@@ -1,4 +1,4 @@
-// The (root) layout's one read: everything the header, sidebar, chat and theme sync need
+// The (root) layout's one read: everything the header, rail, chat and theme sync need
 // beside the session, in one parallel pass. Server only; the sidebar's view-models are
 // lib/shell/sidebar.ts.
 
@@ -41,12 +41,15 @@ export const getShellView = async (userId: string): Promise<ShellView> => {
         countIncomingRequests(userId).catch(() => 0),
     ]);
 
+    const portfolio = toSidebarPortfolio(aggregatePortfolios(accountPortfolios), accountPortfolios.length);
+    const topics = toSidebarTopics(topicsOverview);
     return {
         initialStocks,
         initialTopics: topicsOverview.topics.map((t) => ({name: t.name, slug: t.slug})),
-        navBadges: {watchlist: watchlistSymbols.length, friendRequests},
-        portfolio: toSidebarPortfolio(aggregatePortfolios(accountPortfolios), accountPortfolios.length),
-        topics: toSidebarTopics(topicsOverview),
+        // The rail's dots stand where the sidebar's cards showed these all the time.
+        navBadges: {watchlist: watchlistSymbols.length, friendRequests, topicsUnseen: topics.unseen, unpriced: portfolio.unpriced},
+        portfolio,
+        topics,
         savedTheme,
     };
 };

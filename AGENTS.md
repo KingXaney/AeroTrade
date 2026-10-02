@@ -29,8 +29,8 @@ before the rename keep the name "Main Strategy" (new ones are "Main account", `D
 ## Where things live
 
 [docs/MAP.md](docs/MAP.md) is the map: every feature's folder in every layer, and "To change…,
-edit…". Below, by the same feature names, are only the contracts a map cannot show (dashboard,
-friends and shell keep none beyond Shared and the invariants).
+edit…". Below, by the same feature names, are only the contracts a map cannot show (dashboard
+and friends keep none beyond Shared and the invariants).
 `lib/__tests__/docs-map.test.ts` fails when a path named here or in the map stops existing.
 
 ### Shared
@@ -39,7 +39,8 @@ friends and shell keep none beyond Shared and the invariants).
   `lib/trading/portfolio-page-store` (`lib/trading/portfolio-page`), `/strategies/[slug]`
   `lib/strategies/page-store.getStrategyPageView` (`lib/strategies/detail-view`), both topics pages
   `lib/topics/page-store`, `/watchlist` `lib/stocks/watchlist-page-store` (`lib/stocks/watchlist`),
-  the `(root)` layout `lib/shell/shell-store` (`lib/shell/sidebar`).
+  the `(root)` layout `lib/shell/shell-store` (`lib/shell/sidebar`, the view-models of the rail's
+  two hover cards).
 - A read that takes a user id or email is never an action; it lives in its feature's plain store —
   `lib/stocks/watchlist-store`, `lib/friends/store`, `lib/navigator/store`, `lib/theme/store`,
   `lib/email/recipients`.
@@ -70,6 +71,20 @@ friends and shell keep none beyond Shared and the invariants).
 - `database/models/`: the paper account, trade and snapshot models' indexes are also listed in
   `scripts/migration-indexes.mjs`, which `migrate:accounts` builds and
   `lib/__tests__/migration-indexes.test.ts` holds equal to the models.
+
+### shell
+
+- `lib/shell/navigation` is the one nav registry. A section (`NAV_SECTIONS`) is one icon on the
+  rail (`components/shell/Rail`) and one row of the mobile drawer; its pages are the tabs
+  `components/shell/SectionTabs` shows above the page (none for a section of one page), and
+  `match` names routes it owns that are not tabs (`/stocks/AAPL` lights Markets). Friends and
+  Settings are `ACCOUNT_PAGES`, in the avatar menu. Every `href` is a page file — the test checks.
+- The rail never widens: a name is a tooltip, a summary (Portfolio, News) a portaled hover card,
+  and anything the reader must see without hovering — unread articles, a holding valued at
+  cost, a pending friend request — is a dot on the icon or the avatar (invariant 8).
+- The header repeats no section: logo, the one `components/shell/SearchCommand` trigger (which
+  also finds pages, `searchPages`), the account menu. `components/chat/ChatWidget`'s button
+  takes the bar's end at `lg`, which the header keeps clear.
 
 ### auth
 

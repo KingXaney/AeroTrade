@@ -79,10 +79,13 @@ const ChatWidget = ({userId}: ChatWidgetProps) => {
                     onClick={() => setOpen(true)}
                     aria-label="Open Aero-AI Assistant"
                     className={cn(
+                        // Floating over the page below lg; at lg it takes the end of the top bar, which
+                        // Header keeps clear for it, so it no longer sits on a panel's corner.
                         'fixed bottom-5 right-5 z-[80] inline-flex size-14 items-center justify-center rounded-full transition-all hover:scale-110 active:scale-95 sm:bottom-6 sm:right-6 group bg-brand-strong text-on-brand [box-shadow:var(--glow)]',
+                        'lg:bottom-auto lg:top-3 lg:right-6 lg:size-10',
                     )}
                 >
-                    <span className="material-symbols-outlined text-3xl">smart_toy</span>
+                    <span className="material-symbols-outlined text-3xl lg:text-2xl">smart_toy</span>
                 </button>
             )}
 

@@ -1,9 +1,9 @@
-// The app shell (components/shell, lib/shell): the sidebar lists every route and the hamburger
-// hides at desktop width, the ⌘K palette is keyboard-drivable, the mobile drawer reaches the routes
-// only the sidebar carries and closes after navigating, and the drawer's Logout signs out and lands
-// on /sign-in. Also friends: a sent request backdated three days in Mongo reads "sent 3 days ago"
-// (its stamp is epoch ms, which a seconds-only formatter read as the future), and the recipient's
-// sidebar shows the friend-request badge.
+// The app shell (components/shell, lib/shell): the icon rail lists the eight sections and names
+// each on hover, Portfolio opens its summary card, a section's other pages are tabs on the page,
+// ⌘K works by keyboard alone and finds a page by name, the mobile drawer stands in for the rail
+// and closes after navigating, and the drawer's Logout signs out and lands on /sign-in. Also
+// friends: a sent request is listed with its age, and the recipient sees a dot on the avatar and
+// a count in the account menu.
 // Run: npm run qa -- shell   (the harness: README.md)
 import {chromium} from 'playwright';
 import {MongoClient} from 'mongodb';
@@ -21,18 +21,44 @@ try {
     const db = mongo.db();
     const firstEmail = await signUp(page, 'one');
 
-    // --- desktop nav unchanged -------------------------------------------------
-    const sideHrefs = await page.$$eval('aside nav a', (as) => as.map((a) => a.getAttribute('href')));
-    check('sidebar still lists all thirteen routes',
-        sideHrefs.join(',') === '/topics,/,/brain,/strategies,/portfolio,/trade,/markets,/news,/watchlist,/friends,/history,/learn,/settings',
-        sideHrefs.join(','));
+    // --- the desktop rail: one icon per section, nothing repeated in the header ---
+    const railHrefs = await page.$$eval('aside.rail nav a', (as) => as.map((a) => a.getAttribute('href')));
+    check('the rail lists the eight sections',
+        railHrefs.join(',') === '/,/news,/markets,/trade,/portfolio,/strategies,/brain,/learn', railHrefs.join(','));
+    check('…each named for a screen reader, with the dashboard lit',
+        await page.locator('aside.rail nav a[aria-label]').count() === 8
+        && await page.locator('aside.rail nav a[aria-current="page"]').getAttribute('data-rail') === 'home');
+    check('the header carries no section links',
+        await page.locator('header nav a').count() === 0 && await page.locator('header a[href="/"]').count() === 1);
     check('hamburger is hidden at desktop width',
         !(await page.locator('button[aria-label="Open navigation"]').isVisible()));
+    await page.locator('aside.rail a[data-rail="trade"]').hover();
+    const tip = page.locator('[data-rail-tip="trade"]');
+    await tip.waitFor({timeout: 5000}).catch(() => {});
+    check('an icon names itself on hover', (await tip.innerText().catch(() => '')).includes('Trade'));
+    await page.locator('aside.rail a[data-rail="portfolio"]').hover();
+    const flyout = page.locator('[data-rail-flyout="portfolio"]');
+    await flyout.waitFor({timeout: 5000}).catch(() => {});
+    check('…and Portfolio opens its summary beside the rail', /total return/.test(await flyout.innerText().catch(() => '')));
+    await page.mouse.move(700, 500);
+
+    // --- a section's other pages are tabs on the page ---
+    await page.goto(`${BASE}/portfolio`, {waitUntil: 'load'});
+    const tabs = await page.$$eval('[data-section-tabs="portfolio"] a', (as) => as.map((a) => `${a.getAttribute('href')}${a.getAttribute('aria-current') === 'page' ? '*' : ''}`));
+    check('Portfolio shows Overview and Activity, Overview current', tabs.join(',') === '/portfolio*,/history', tabs.join(','));
+    await page.goto(`${BASE}/trade`, {waitUntil: 'load'});
+    check('a section of one page shows no tabs', await page.locator('[data-section-tabs]').count() === 0);
+    await page.goto(`${BASE}/stocks/SPY`, {waitUntil: 'load'});
+    check('a stock page lights Markets', await page.locator('aside.rail nav a[aria-current="page"]').getAttribute('data-rail') === 'markets');
+    await page.goto(`${BASE}/`, {waitUntil: 'load'});
 
     // --- ⌘K is keyboard-drivable ----------------------------------------------
     await page.keyboard.press('Meta+k');
     await page.waitForSelector('[cmdk-input]', {timeout: 5000});
     check('⌘K opens the palette', await page.locator('[cmdk-input]').isVisible());
+    await page.keyboard.type('act');
+    check('…and finds a page by name', await page.locator('[data-page-hit="/history"]').count() === 1);
+    for (let i = 0; i < 3; i++) await page.keyboard.press('Backspace');
     await page.keyboard.type('AAPL');
     await page.waitForTimeout(1200); // debounced server search
     // Arrow + Enter alone — never a mouse. This is what the raw <li>/<Link> rows broke.
@@ -42,25 +68,29 @@ try {
     check('arrow + Enter navigates from the palette', /\/(stocks|topics)\//.test(page.url()), page.url());
     await shot('01-palette-keyboard');
 
-    // --- mobile drawer reaches the four sidebar-only routes --------------------
+    // --- below lg: the drawer stands in for the rail ---------------------------
     await page.setViewportSize({width: 390, height: 844});
     await page.goto(`${BASE}/portfolio`, {waitUntil: 'networkidle'});
-    const before = await page.locator('a[href="/watchlist"]:visible').count();
-    check('watchlist still has no visible link before opening the drawer', before === 0, String(before));
+    check('the rail is gone and search is still one tap away',
+        !(await page.locator('aside.rail').isVisible()) && await page.locator('header button.search-text').isVisible());
+    check('Activity is a tab on the page, without opening anything', await page.locator('[data-section-tabs] a[href="/history"]:visible').count() === 1);
+    const before = await page.locator('a[href="/markets"]:visible').count();
+    check('markets has no visible link before opening the drawer', before === 0, String(before));
 
     await page.locator('button[aria-label="Open navigation"]').click();
     await page.waitForTimeout(400);
-    for (const href of ['/watchlist', '/friends', '/history', '/settings']) {
+    for (const href of ['/', '/news', '/markets', '/trade', '/portfolio', '/strategies', '/brain', '/learn', '/friends', '/settings']) {
         check(`drawer reaches ${href}`, await page.locator(`[data-slot="sheet-content"] a[href="${href}"]`).count() === 1);
     }
     await shot('02-mobile-drawer');
 
     // Closing on navigation is manual — Radix does not do it for us.
-    await page.locator('[data-slot="sheet-content"] a[href="/watchlist"]').click();
-    await page.waitForURL(/\/watchlist/, {timeout: 15000});
+    await page.locator('[data-slot="sheet-content"] a[href="/markets"]').click();
+    await page.waitForURL(/\/markets/, {timeout: 15000});
     await page.waitForTimeout(600);
     check('drawer closes after navigating', await page.locator('[data-slot="sheet-content"]').count() === 0);
-    check('landed on /watchlist', page.url().endsWith('/watchlist'));
+    check('landed on /markets, where Watchlist is a tab',
+        page.url().endsWith('/markets') && await page.locator('[data-section-tabs="markets"] a[href="/watchlist"]:visible').count() === 1);
 
     // --- friend-request badge --------------------------------------------------
     const second = await browser.newPage({viewport: {width: 1440, height: 900}});
@@ -84,8 +114,12 @@ try {
     // The recipient should now see a badge without visiting /friends.
     await page.setViewportSize({width: 1440, height: 900});
     await page.goto(`${BASE}/`, {waitUntil: 'networkidle'});
-    const badge = await page.locator('aside nav a[href="/friends"] span[aria-label*="friend request"]').count();
-    check('friend-request badge appears in the sidebar', badge === 1, String(badge));
+    const badge = await page.locator('header [data-friend-requests="1"]').count();
+    check('a pending friend request puts a dot on the avatar', badge === 1, String(badge));
+    await page.getByRole('button', {name: /Account menu, 1 pending friend request/}).click();
+    check('…and a count beside Friends in the account menu',
+        await page.locator('[data-slot="dropdown-menu-content"] a[href="/friends"] span[aria-label="1 pending friend request"]').count() === 1);
+    await page.keyboard.press('Escape');
     await shot('04-friend-badge');
     await second.close();
 

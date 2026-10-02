@@ -1,12 +1,12 @@
 import Link from "next/link";
 import type {SidebarTopics} from "@/lib/shell/sidebar";
 
-// The sidebar's headline card: what you follow and what's new. Rows aren't links
-// (the whole card is one) — the /topics rail is where you pick a topic.
+// What you follow and what's new, in the rail's hover card over News (components/shell/Rail.tsx).
+// Rows aren't links (the whole card is one) — the /topics rail is where you pick a topic.
 const TopicsSidebarCard = ({topics}: {topics: SidebarTopics}) => (
     <Link
         href="/topics"
-        className="relative block rounded-xl p-4 mb-6 shimmer overflow-hidden transition-all hover:brightness-110 bg-brand-strong/6 border border-brand/15"
+        className="relative block rounded-xl p-4 shimmer overflow-hidden transition-all hover:brightness-110 bg-brand-strong/6 border border-brand/15"
     >
         <div className="relative z-10">
             <div className="flex items-center gap-3 mb-2">

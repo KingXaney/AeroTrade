@@ -75,15 +75,18 @@ const settleToasts = async (page) => {
     note('article cards on first visit (needs Google News reachability)', String(await page.locator('.news-item').count()));
     await shot('02-topic-ai-chips');
 
-    // --- sidebar card + nav order ---
-    const sideCard = (await page.locator('aside a[href="/topics"]').first().innerText()).replace(/\n/g, ' ');
-    check('sidebar topics card shows the six followed topics', /6\s*topics\s*followed/i.test(sideCard), sideCard);
-    const sideNav = await page.$$eval('aside nav a', (as) => as.map((a) => a.textContent.trim()));
-    check('sidebar nav starts Topics · Dashboard · Brain', sideNav.join(',').startsWith('interestsTopics,space_dashboardDashboard,neurologyBrain'), sideNav.join(','));
-    // The sidebar is the surface that owns the account pages; all thirteen come from lib/shell/navigation.ts.
-    check('sidebar nav lists all thirteen routes', sideNav.length === 13, String(sideNav.length));
-    const headerHrefs = await page.$$eval('header nav ul li a', (as) => as.map((a) => a.getAttribute('href')));
-    check('header nav order', headerHrefs.join(',') === '/topics,/,/brain,/strategies,/portfolio,/trade,/markets,/news', headerHrefs.join(','));
+    // --- the rail's News card + the section's tabs ---
+    await page.locator('aside.rail a[data-rail="news"]').hover();
+    const newsCard = page.locator('[data-rail-flyout="news"]');
+    await newsCard.waitFor({timeout: 5000}).catch(() => {});
+    const sideCard = (await newsCard.innerText().catch(() => '')).replace(/\n/g, ' ');
+    check('the rail card over News shows the six followed topics', /6\s*topics\s*followed/i.test(sideCard), sideCard);
+    await page.mouse.move(700, 500);
+    const railNav = await page.$$eval('aside.rail nav a', (as) => as.map((a) => a.getAttribute('aria-label')?.split(',')[0]));
+    // All eight come from lib/shell/navigation.ts; the account pages are in the avatar menu.
+    check('the rail runs Dashboard · News · Markets … Learn', railNav.join(',') === 'Dashboard,News,Markets,Trade,Portfolio,Strategies,Brain,Learn', railNav.join(','));
+    const tabHrefs = await page.$$eval('[data-section-tabs="news"] a', (as) => as.map((a) => `${a.getAttribute('href')}${a.getAttribute('aria-current') === 'page' ? '*' : ''}`));
+    check('a topic page sits under News, on its Topics tab', tabHrefs.join(',') === '/news,/topics*', tabHrefs.join(','));
     // Search is a palette trigger, not a route — it used to be a fake '/search' NAV_ITEMS entry.
     check('header search is a real button with a ⌘K hint',
         await page.locator('header button.search-text kbd').count() === 1);

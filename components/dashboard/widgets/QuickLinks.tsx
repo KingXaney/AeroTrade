@@ -1,9 +1,9 @@
 import Link from "next/link";
-import {NAV_ITEMS} from "@/lib/shell/navigation";
+import {NAV_PAGES} from "@/lib/shell/navigation";
 import {rowCard} from "@/components/primitives/RowCard";
 
 // Every route except the dashboard itself — you are already on it.
-const LINKS = NAV_ITEMS.filter((i) => i.href !== '/');
+const LINKS = NAV_PAGES.filter((i) => i.href !== '/');
 
 const QuickLinks = () => (
     <div className="grid grid-cols-3 gap-2">

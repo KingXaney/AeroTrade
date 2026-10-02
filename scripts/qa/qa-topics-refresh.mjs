@@ -174,10 +174,15 @@ try {
         await page.locator('[title="No live quote — value shown at cost"]').count() === 2);
     check('trade desk strip carries the note', /unpriced — valued at cost/.test(tradeText));
 
-    const sidebar = await page.locator('aside a[href="/portfolio"]').first().innerText();
-    const flat = sidebar.replace(/\s+/g, ' ');
-    check('sidebar top holdings read — instead of +0.00%', /AAPL ×10 —/.test(flat) && /MSFT ×5 —/.test(flat), flat.slice(0, 140));
-    check('sidebar headline return admits the unpriced holdings', /· 2 unpriced/.test(flat));
+    check('the rail marks Portfolio while a holding is valued at cost',
+        /2 holdings valued at cost/.test(await page.locator('aside.rail a[data-rail="portfolio"]').getAttribute('aria-label') ?? ''));
+    await page.locator('aside.rail a[data-rail="portfolio"]').hover();
+    const railCard = page.locator('[data-rail-flyout="portfolio"]');
+    await railCard.waitFor({timeout: 5000}).catch(() => {});
+    const flat = (await railCard.innerText().catch(() => '')).replace(/\s+/g, ' ');
+    check('the rail card\'s top holdings read — instead of +0.00%', /AAPL ×10 —/.test(flat) && /MSFT ×5 —/.test(flat), flat.slice(0, 140));
+    check('…and its headline return admits the unpriced holdings', /· 2 unpriced/.test(flat));
+    await page.mouse.move(700, 500);
 
     await page.goto(`${BASE}/`, {waitUntil: 'load'});
     await page.locator('[data-widget-id="portfolio-snapshot"]').waitFor({timeout: 30000});

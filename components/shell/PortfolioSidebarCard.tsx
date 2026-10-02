@@ -4,13 +4,13 @@ import {formatPct, formatPrice, getChangeColorClass} from "@/lib/format";
 import type {SidebarPortfolio} from "@/lib/shell/sidebar";
 import MicroLabel from "@/components/primitives/MicroLabel";
 
-// Compact, glanceable portfolio summary for the left sidebar, under the topics card
-// (Sidebar.tsx); links through to the full /portfolio page.
+// Compact, glanceable portfolio summary in the rail's hover card over Portfolio
+// (components/shell/Rail.tsx); links through to the full /portfolio page.
 const PortfolioSidebarCard = ({portfolio}: {portfolio: SidebarPortfolio}) => {
     return (
         <Link
             href="/portfolio"
-            className="relative block rounded-xl p-4 mb-6 shimmer overflow-hidden transition-all hover:brightness-110 bg-brand/6 border border-brand/15"
+            className="relative block rounded-xl p-4 shimmer overflow-hidden transition-all hover:brightness-110 bg-brand/6 border border-brand/15"
         >
             <div className="relative z-10">
                 <div className="flex items-center gap-3 mb-2">

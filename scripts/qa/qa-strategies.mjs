@@ -60,10 +60,8 @@ try {
     await db.collection('jobruns').deleteMany({jobId: 'strategies-daily'});
 
     // --- navigation ------------------------------------------------------------------
-    const headerHrefs = await page.$$eval('header nav ul li a', (as) => as.map((a) => a.getAttribute('href')));
-    check('header nav carries /strategies after /brain',
-        headerHrefs.join(',') === '/topics,/,/brain,/strategies,/portfolio,/trade,/markets,/news', headerHrefs.join(','));
-    // Eight items must still fit a 1024px bar without pushing the account controls off it.
+    check('the rail carries Strategies', await page.locator('aside.rail nav a[data-rail="strategies"][href="/strategies"]').count() === 1);
+    // The bar (logo, search, account menu) must fit at 1024px, the narrowest width with the rail.
     // The narrow page must carry the session (or it lands on /sign-in): copy the cookies
     // into a fresh context, since a page made by browser.newPage() cannot spawn siblings.
     const narrowContext = await browser.newContext({viewport: {width: 1024, height: 768}});
@@ -74,13 +72,15 @@ try {
         const header = document.querySelector('header');
         if (!header) return {ok: false, detail: 'no header'};
         const right = header.querySelector('.header-wrapper > div:last-child');
-        const nav = header.querySelector('nav');
-        if (!right || !nav) return {ok: false, detail: 'no nav/right group'};
+        const search = header.querySelector('button.search-text');
+        if (!right || !search) return {ok: false, detail: 'no search/right group'};
         const r = right.getBoundingClientRect();
-        const n = nav.getBoundingClientRect();
-        return {ok: n.right <= r.left && r.right <= window.innerWidth && header.scrollWidth <= window.innerWidth + 1, detail: `nav right ${Math.round(n.right)}, controls left ${Math.round(r.left)}, header scroll ${header.scrollWidth}`};
+        const n = search.getBoundingClientRect();
+        return {ok: n.right <= r.left && r.right <= window.innerWidth && header.scrollWidth <= window.innerWidth + 1, detail: `search right ${Math.round(n.right)}, controls left ${Math.round(r.left)}, header scroll ${header.scrollWidth}`};
     });
-    check('header fits at 1024px with eight items', overflow.ok, overflow.detail);
+    check('header fits at 1024px', overflow.ok, overflow.detail);
+    check('…with the strategies section lit on the rail',
+        await narrow.locator('aside.rail nav a[aria-current="page"]').getAttribute('data-rail') === 'strategies');
     await narrow.screenshot({path: `${OUT}00-header-1024.png`});
     await narrowContext.close();
 

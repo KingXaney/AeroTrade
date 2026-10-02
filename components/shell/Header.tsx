@@ -1,5 +1,5 @@
 import Link from "next/link";
-import NavItems from "@/components/shell/NavItems";
+import SearchCommand from "@/components/shell/SearchCommand";
 import UserDropdown from "@/components/shell/UserDropdown";
 import MobileNav from "@/components/shell/MobileNav";
 import type {NavBadges} from "@/lib/shell/navigation";
@@ -14,14 +14,14 @@ type HeaderProps = {
     navBadges: NavBadges;
 };
 
+// The top bar: where you are (the logo), how to get anywhere (search) and who you are (the
+// account menu). The sections live on the rail (components/shell/Rail.tsx) at lg and in the
+// drawer below it; the bar repeats none of them.
 function Header({user, initialStocks, initialTopics, navBadges}: HeaderProps) {
     return (
         <header className='header'>
-            <div className='header-wrapper'>
-                {/* Brand */}
-                <div className="flex items-center gap-4 sm:gap-6 xl:gap-8">
-                    {/* The sidebar is hidden below lg and carries the only links to
-                        /watchlist, /friends, /history and /settings. */}
+            <div className='header-wrapper gap-3'>
+                <div className="flex items-center gap-3 shrink-0">
                     <MobileNav badges={navBadges}/>
                     <Link href="/" className="flex items-center gap-2">
                         <span className="material-symbols-outlined text-brand-strong"
@@ -32,16 +32,16 @@ function Header({user, initialStocks, initialTopics, navBadges}: HeaderProps) {
                             AeroTrade
                         </span>
                     </Link>
-                    {/* Below lg the drawer carries every route; showing the header list too
-                        overflowed the bar between 640 and 1023px. */}
-                    <nav className="hidden lg:block">
-                        <NavItems initialStocks={initialStocks} initialTopics={initialTopics}/>
-                    </nav>
                 </div>
 
-                {/* Right Section */}
-                <div className="flex items-center gap-3">
-                    <UserDropdown user={user}/>
+                {/* The one search trigger, at every width: ⌘K is a keyboard's shortcut, and a
+                    phone has none. */}
+                <SearchCommand renderAs="text" label="Search stocks, topics and pages" initialStocks={initialStocks} initialTopics={initialTopics}/>
+
+                {/* lg:mr-14 leaves the bar's end to the assistant's button (components/chat/ChatWidget),
+                    which sits there at lg instead of floating over the page. */}
+                <div className="flex items-center gap-3 shrink-0 lg:mr-14">
+                    <UserDropdown user={user} friendRequests={navBadges.friendRequests ?? 0}/>
                 </div>
             </div>
         </header>

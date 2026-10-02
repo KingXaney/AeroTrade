@@ -2,16 +2,15 @@
 
 import {useEffect, useState} from "react";
 import {usePathname} from "next/navigation";
-import Link from "next/link";
 import {Menu} from "lucide-react";
 import {Sheet, SheetContent, SheetTrigger} from "@/components/primitives/Sheet";
 import NavList from "@/components/shell/NavList";
 import {useSignOut} from "@/components/shell/useSignOut";
 import type {NavBadges} from "@/lib/shell/navigation";
 
-// Below lg the sidebar is hidden, and it was the only surface linking /watchlist,
-// /friends, /history and /settings — so on a phone (or a narrow window) those four pages
-// had no link anywhere. This drawer renders the same registry the sidebar does.
+// Below lg there is no rail, so this drawer stands in for it: the same sections from the same
+// registry, then the account pages and Log out. A section's other pages are the tabs on the
+// page itself (SectionTabs).
 const MobileNav = ({badges}: {badges?: NavBadges}) => {
     const pathname = usePathname();
     const [open, setOpen] = useState(false);
@@ -49,14 +48,6 @@ const MobileNav = ({badges}: {badges?: NavBadges}) => {
                 </div>
 
                 <div className="mt-auto p-4 border-t border-line-strong/15">
-                    <Link
-                        href="/trade"
-                        onClick={() => setOpen(false)}
-                        className="control-type w-full py-3 rounded-lg mb-3 flex justify-center items-center gap-2 text-xs transition-all active:scale-[0.98] bg-brand text-on-brand"
-                    >
-                        <span className="material-symbols-outlined text-base">candlestick_chart</span>
-                        Trade Now
-                    </Link>
                     <button
                         type="button"
                         onClick={async () => {

@@ -143,7 +143,7 @@ app/            routes — (auth) sign-in, sign-up, forgot-password · (reset) r
                 api/ chat, inngest, accounts/[accountId]/export, strategies/[slug]/export
 components/     UI by feature (auth, dashboard, trading, income, strategies, navigator, brain, news, topics, learn,
                 chat, jobs, stocks, friends, settings, theme), plus primitives/ (the shared surface vocabulary),
-                shell/ (header, sidebar, search), forms/ and ui/ (shadcn output)
+                shell/ (top bar, icon rail, search), forms/ and ui/ (shadcn output)
 lib/            one folder per feature, named as in components/:
   auth/         better-auth server, the one session read, sign-in / sign-up rate limits and validation
   dashboard/    widget catalog, layout normalisation + legacy migration, loaders
@@ -161,7 +161,7 @@ lib/            one folder per feature, named as in components/:
   jobs/         the Inngest client, the job registry, one file of thin job wrappers per feature, the status read
   prices/       daily bars (Yahoo first, Stooq fallback), dividends + the T-bill rate, signals, NYSE hours, Finnhub
   stocks/       the watchlist, the stock page's key numbers and "what the rules see", TradingView embeds
-  friends/ · settings/ · shell/ · theme/   friends and their leaderboard · preferences · nav + sidebar · palettes + styles
+  friends/ · settings/ · shell/ · theme/   friends and their leaderboard · preferences · nav sections + the rail cards · palettes + styles
   actions/      'use server' entry points (session-derived, userId-scoped), one file per feature
   ai/           model matrix by task and tier, inference, prompt helpers
   *.ts          shared: format, dates, text, rate-limit, day-memo, action-toast
