@@ -35,7 +35,7 @@ const PositionsTable = ({positions, accountId, lotNotes}: {positions: EnrichedPo
                         <button
                             type="button"
                             onClick={() => setSellTarget(p)}
-                            className="px-3 py-1.5 rounded text-xs font-bold uppercase tracking-wider transition-colors font-mono text-negative border border-negative/30 bg-negative/6"
+                            className="control-type px-3 py-1.5 rounded text-xs transition-colors text-negative border border-negative/30 bg-negative/6"
                         >
                             Sell
                         </button>

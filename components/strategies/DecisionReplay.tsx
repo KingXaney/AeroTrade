@@ -28,7 +28,7 @@ const DecisionReplay = ({def, row, order, caption, reason, symbol}: Props) => (
         {row && <SignalRowLine columns={visibleSignalColumns(def.signalColumns, [row])} row={row} />}
         {order && (
             <p className="text-[11px] text-fg-muted leading-snug">
-                <span className="font-mono uppercase tracking-[0.1em] text-[10px]">{REPLAY_COPY.plannedOrder} · </span>
+                <span className="label-type text-[length:var(--label-size)]">{REPLAY_COPY.plannedOrder} · </span>
                 {order.reason}
             </p>
         )}

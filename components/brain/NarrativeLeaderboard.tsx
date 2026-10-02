@@ -16,7 +16,7 @@ const topicKeywords = (e: BrainEntitySummary): string[] => (e.type === 'ticker' 
 
 const TypeColumn = ({title, entities, followedByName}: {title: string; entities: BrainEntitySummary[]; followedByName?: FollowedByName}) => (
     <div>
-        <h3 className="text-[10px] uppercase tracking-[0.14em] text-fg-muted mb-2 font-mono">
+        <h3 className="label-type text-[length:var(--label-size)] text-fg-muted mb-2">
             {title}
         </h3>
         {entities.length === 0 ? (

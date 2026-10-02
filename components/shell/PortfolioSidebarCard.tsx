@@ -17,7 +17,7 @@ const PortfolioSidebarCard = ({portfolio}: {portfolio: SidebarPortfolio}) => {
                     <span className="material-symbols-outlined text-brand"
                           style={{fontVariationSettings: "'FILL' 1"}}
                     >account_balance_wallet</span>
-                    <span className="text-brand text-xs font-bold tracking-[0.1em] uppercase font-mono"
+                    <span className="label-type text-brand text-xs font-bold"
                     >Portfolio</span>
                 </div>
 
@@ -35,7 +35,7 @@ const PortfolioSidebarCard = ({portfolio}: {portfolio: SidebarPortfolio}) => {
                     )}
                 </p>
                 {portfolio.accountsCount > 1 && (
-                    <p className="text-[10px] uppercase tracking-[0.08em] text-fg-muted mt-1 font-mono">
+                    <p className="label-type text-[length:var(--label-size)] text-fg-muted mt-1">
                         All {portfolio.accountsCount} accounts
                     </p>
                 )}

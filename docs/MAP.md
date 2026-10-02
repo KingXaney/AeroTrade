@@ -69,7 +69,7 @@ Shared pieces that belong to no single feature:
 | A theme's colours, or add a theme | `lib/theme/palettes.ts` (palettes), `lib/theme/styles.ts` + `app/globals.css` (visual styles) |
 | Add a dashboard widget | Its entry in `lib/dashboard/catalog.ts`, its data in `lib/dashboard/loaders.ts`, its component in `components/dashboard/widgets/<feature>/` and one line in `components/dashboard/widgets/registry.tsx` (`Record<WidgetId, …>` makes the compiler insist) |
 | A sentence the app teaches, or a definition | `lib/learn/copy/<feature>.ts`; definitions only in `lib/learn/glossary.ts` |
-| How every panel / button / heading looks | `components/primitives/` (`Panel`, `ActionButton`, `PageTitle`, …) and the tokens in `app/globals.css` |
+| How every panel / button / heading looks | `components/primitives/` (`Panel`, `ActionButton`, `PageTitle`, …) and the tokens in `app/globals.css` — per visual style: the `--panel-*`, `--card-*`, `--chrome-*`, `--label-*`, `--heading-*`, `--control-*` and `--motion-*` tokens in each `[data-style]` block |
 | The order ticket | `components/trading/desk/OrderPanel.tsx`, its maths in `lib/trading/order-math.ts`, the fill in `lib/trading/orders.ts` + `fill.ts`, the action in `lib/actions/trading.actions.ts` |
 | How interest and dividends are credited | `lib/income/accrual.ts` (the only accrual clock — AGENTS.md invariant 11), `lib/income/store.ts` (the nightly job) |
 | News sources | `lib/news/config.ts` (`RSS_FEEDS`, caps, the Google kill switch), `lib/news/adapters/` |

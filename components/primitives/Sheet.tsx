@@ -42,14 +42,10 @@ function SheetContent({
         className={cn(
           // z-[60] so it clears .header, which is z-50 — portal DOM order happens to win
           // today, but that is not something to rely on.
-          "fixed inset-y-0 left-0 z-[60] flex h-full w-72 max-w-[85vw] flex-col duration-150 outline-none bg-chrome/97 border-r border-line-strong/30",
+          "fixed inset-y-0 left-0 z-[60] flex h-full w-72 max-w-[85vw] flex-col duration-150 outline-none chrome-surface",
           "data-open:animate-in data-open:slide-in-from-left data-closed:animate-out data-closed:slide-out-to-left",
           className
         )}
-        style={{
-          backdropFilter: 'blur(16px)',
-          WebkitBackdropFilter: 'blur(16px)',
-        }}
         {...props}
       >
         {/* Radix logs an a11y warning on every open without a title. */}

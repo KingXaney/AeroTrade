@@ -47,7 +47,7 @@ const Leaderboard = ({entries}: {entries: LeaderboardEntry[]}) => {
                                         <span className="text-sm font-semibold text-fg font-heading">
                                             {e.name}
                                         </span>
-                                        <div className="text-[10px] text-fg-muted uppercase tracking-[0.08em] font-mono">
+                                        <div className="label-type text-[length:var(--label-size)] text-fg-muted">
                                             {e.accountName}
                                             {unpricedLabel(e.unpriced, e.holdings) && (
                                                 <span className="text-warning normal-case tracking-normal"> · {unpricedLabel(e.unpriced, e.holdings)}</span>

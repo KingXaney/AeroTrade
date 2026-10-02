@@ -55,7 +55,7 @@ const TradeHistory = ({trades, totalCount, exportHref, detail, receipts, buyNote
                     <RowCard key={t.id} className="flex items-center justify-between py-2.5">
                         <div className="flex items-center gap-3 min-w-0">
                             <span className={cn(
-                                'font-mono px-2 py-0.5 rounded text-[10px] font-bold uppercase tracking-wider border shrink-0',
+                                'control-type capitalize px-2 py-0.5 rounded text-[10px] border shrink-0',
                                 isBuy
                                     ? 'bg-brand/10 text-brand border-brand/20'
                                     : 'bg-negative/10 text-negative border-negative/20',
@@ -68,10 +68,10 @@ const TradeHistory = ({trades, totalCount, exportHref, detail, receipts, buyNote
                                 </Link>
                                 <span className="text-xs text-fg-muted ml-2">{t.quantity} @ {formatPrice(t.price)}</span>
                                 {t.accountName && (
-                                    <span className="ml-2 text-[10px] uppercase tracking-[0.08em] text-fg-muted font-mono">{t.accountName}</span>
+                                    <span className="label-type ml-2 text-[length:var(--label-size)] text-fg-muted">{t.accountName}</span>
                                 )}
                                 {source && (
-                                    <span className="ml-2 px-1.5 py-0.5 rounded text-[10px] uppercase tracking-wider whitespace-nowrap border border-line-strong/40 text-fg-soft font-mono" title={sourceTitle}>
+                                    <span className="label-type ml-2 px-1.5 py-0.5 rounded text-[length:var(--label-size)] whitespace-nowrap border border-line-strong/40 text-fg-soft" title={sourceTitle}>
                                         {source}
                                     </span>
                                 )}

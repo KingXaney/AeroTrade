@@ -36,7 +36,7 @@ const NavList = ({pathname, badges = {}, onNavigate, items = NAV_ITEMS}: Props) 
                     onClick={onNavigate}
                     aria-current={active ? 'page' : undefined}
                     className={cn(
-                        "font-mono flex items-center gap-4 px-4 py-3 transition-all text-xs font-bold tracking-[0.1em] uppercase",
+                        "control-type flex items-center gap-4 px-4 py-3 transition-all text-xs",
                         active
                             ? "text-brand border-l-4 border-brand"
                             : "text-fg-soft hover:text-fg hover:bg-surface-3",

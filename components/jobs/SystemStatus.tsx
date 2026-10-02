@@ -26,7 +26,7 @@ const SystemStatus = ({status}: {status: BrainSystemStatus}) => {
                     System Status
                 </SectionHeading>
                 {anyNever && (
-                    <span className="text-[10px] uppercase tracking-[0.08em] text-negative font-mono">
+                    <span className="label-type text-[length:var(--label-size)] text-negative">
                         Some jobs have never run — check the Inngest connection
                     </span>
                 )}

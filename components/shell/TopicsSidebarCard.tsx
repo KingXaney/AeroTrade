@@ -11,7 +11,7 @@ const TopicsSidebarCard = ({topics}: {topics: SidebarTopics}) => (
         <div className="relative z-10">
             <div className="flex items-center gap-3 mb-2">
                 <span className="material-symbols-outlined text-brand" style={{fontVariationSettings: "'FILL' 1"}}>interests</span>
-                <span className="text-brand text-xs font-bold tracking-[0.1em] uppercase font-mono">Topics</span>
+                <span className="label-type text-brand text-xs font-bold">Topics</span>
                 {topics.unseen > 0 && (
                     <span className="ml-auto rounded-full bg-brand px-1.5 py-0.5 text-[10px] font-bold text-on-brand font-mono">
                         {topics.unseen} new

@@ -49,6 +49,16 @@ friends and shell keep none beyond Shared and the invariants).
   strong, secondary, danger, destructive; `actionButton()` for a Link), `Switch` the themed toggle
   over `components/ui/switch`, `TextField`/`TextArea` the compact form field, `iconButton` the
   square icon affordance's class string.
+- A caption, a panel heading and a labelled control take their face, case, tracking and colour
+  from the active visual style, through `.label-type`, `.heading-type` and `.control-type`
+  (`app/globals.css`, the components layer — a utility at the call site still wins): `MicroLabel`,
+  `SectionHeading`, `ActionButton` and `Badge` carry them, and a hand-written label uses the
+  class, never `font-mono uppercase tracking-[…]`. A label's text is written as it should read in
+  sentence case; a style that wants capitals applies them. `RowCard` and `.news-item` read the
+  style's `--card-*` tokens; the header and everything that floats (menus, dialogs, the drawer,
+  the chat window: `.chrome-surface` and the shadcn `data-slot` contents) read `--chrome-*`. A
+  style block sets only style tokens — a palette block outranks it, so it never writes a
+  palette token.
 - `lib/ai/prompt-utils.injectJson` is every prompt's JSON fill; `lib/brain/prompts` keeps an
   import-free copy.
 - `lib/action-toast.runWithToast`: a client button's server action with its outcome toasted, a

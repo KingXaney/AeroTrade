@@ -49,7 +49,7 @@ const NavigatorCard = ({status}: {status: NavigatorStatus}) => {
                     </SectionHeading>
                 </div>
                 {status.enrolled && (
-                    <span className={`text-[10px] font-bold uppercase tracking-[0.1em] px-2 py-1 rounded ${status.status === 'active' ? 'text-brand bg-brand-strong/8' : 'text-negative bg-negative/8'} font-mono`}>
+                    <span className={`control-type text-[10px] px-2 py-1 rounded ${status.status === 'active' ? 'text-brand bg-brand-strong/8' : 'text-negative bg-negative/8'}`}>
                         {status.status === 'active' ? 'Active' : 'Paused'}
                     </span>
                 )}
@@ -102,13 +102,13 @@ const NavigatorCard = ({status}: {status: NavigatorStatus}) => {
                         </ActionButton>
                     ) : (
                         <button type="button" onClick={() => void run(resumeAiNavigator)} disabled={busy}
-                                className="px-3 py-2 rounded-lg text-xs font-bold uppercase tracking-wider text-brand transition-colors disabled:opacity-50 font-mono border border-brand/35">
+                                className="control-type px-3 py-2 rounded-lg text-xs text-brand transition-colors disabled:opacity-50 border border-brand/35">
                             Resume trading
                         </button>
                     )}
                     {status.accountId && (
                         <Link href={`/portfolio?account=${status.accountId}`}
-                              className="px-3 py-2 rounded-lg text-xs font-bold uppercase tracking-wider text-brand hover:underline font-mono">
+                              className="control-type px-3 py-2 rounded-lg text-xs text-brand hover:underline">
                             View performance vs SPY →
                         </Link>
                     )}
@@ -116,7 +116,7 @@ const NavigatorCard = ({status}: {status: NavigatorStatus}) => {
                             onClick={() => confirmingUnenroll ? void run(unenrollAiNavigator) : setConfirmingUnenroll(true)}
                             onBlur={() => setConfirmingUnenroll(false)}
                             disabled={busy}
-                            className="ml-auto px-3 py-2 rounded-lg text-xs font-bold uppercase tracking-wider text-fg-muted hover:text-negative transition-colors disabled:opacity-50 font-mono">
+                            className="control-type ml-auto px-3 py-2 rounded-lg text-xs text-fg-muted hover:text-negative transition-colors disabled:opacity-50">
                         {confirmingUnenroll ? 'Confirm unenroll' : 'Unenroll'}
                     </button>
                 </div>

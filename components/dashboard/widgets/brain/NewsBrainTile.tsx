@@ -8,7 +8,7 @@ const NewsBrainTile = ({summary}: {summary: NewsBrainSummary}) => (
         <div className="flex items-center gap-3">
             <span className="material-symbols-outlined text-brand">neurology</span>
             <div>
-                <div className="text-[10px] uppercase tracking-[0.14em] text-fg-muted font-mono">
+                <div className="label-type text-[length:var(--label-size)] text-fg-muted">
                     News Brain
                 </div>
                 <div className="text-sm text-fg font-heading">

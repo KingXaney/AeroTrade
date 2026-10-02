@@ -26,7 +26,7 @@ const TopicRail = ({topics, activeSlug, unseenTotal, onNewTopic}: Props) => {
     const sorted = sortTopicsForRail(topics);
 
     const rowClass = (active: boolean) => cn(
-        'flex items-center gap-2 rounded-lg px-3 py-2 font-mono text-xs font-bold uppercase tracking-[0.08em] transition-colors shrink-0 lg:shrink',
+        'control-type flex items-center gap-2 rounded-lg px-3 py-2 text-xs transition-colors shrink-0 lg:shrink',
         active ? 'bg-brand/10 text-brand' : 'text-fg-soft hover:text-fg hover:bg-surface-3',
     );
 
@@ -49,7 +49,7 @@ const TopicRail = ({topics, activeSlug, unseenTotal, onNewTopic}: Props) => {
                 );
             })}
             <button type="button" onClick={onNewTopic}
-                    className="flex items-center gap-2 rounded-lg px-3 py-2 text-xs font-bold uppercase tracking-[0.08em] text-brand hover:bg-brand/10 shrink-0 lg:mt-1 lg:border-t lg:border-line-strong/20 lg:rounded-t-none lg:pt-3 font-mono">
+                    className="control-type flex items-center gap-2 rounded-lg px-3 py-2 text-xs text-brand hover:bg-brand/10 shrink-0 lg:mt-1 lg:border-t lg:border-line-strong/20 lg:rounded-t-none lg:pt-3">
                 <Plus className="size-4" />
                 New topic
             </button>

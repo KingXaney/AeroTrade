@@ -55,11 +55,7 @@ function UserDropdown({user}: {user: User}) {
                 align="end"
                 side="bottom"
                 sideOffset={10}
-                className="w-64 !shadow-2xl !p-2 bg-chrome/95 border border-line-strong/40 text-fg"
-                style={{
-                    backdropFilter: 'blur(24px)',
-                    WebkitBackdropFilter: 'blur(24px)',
-                }}
+                className="w-64 !p-2 text-fg"
             >
                 {/* Profile card */}
                 <DropdownMenuLabel className="!p-0">

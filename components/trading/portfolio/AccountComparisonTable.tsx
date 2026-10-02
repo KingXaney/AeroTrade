@@ -17,8 +17,7 @@ const AccountComparisonTable = ({rows, activeId}: {rows: ComparisonRow[]; active
 
     return (
         <div className="space-y-2">
-            <div className="hidden md:grid grid-cols-[2fr_1fr_1fr_1fr_1fr] gap-4 px-4 py-2 border-b border-line-strong/30 font-mono text-fg-muted"
-                 style={{fontSize: '10px', letterSpacing: '0.1em', textTransform: 'uppercase'}}>
+            <div className="hidden md:grid grid-cols-[2fr_1fr_1fr_1fr_1fr] gap-4 px-4 py-2 border-b border-line-strong/30 label-type text-[length:var(--label-size)] text-fg-muted">
                 <div>Account</div>
                 <div className="text-right">Value</div>
                 <div className="text-right">Total Return</div>

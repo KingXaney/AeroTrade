@@ -73,7 +73,7 @@ const LatestDecision = ({run, headline, signals, def}: Props) => {
                         <RowCard as="li" key={`${o.side}-${o.symbol}`} data-run-verdict className="px-3 py-2">
                             <div className="flex items-center justify-between gap-3">
                                 <div className="flex items-center gap-2 min-w-0">
-                                    <Badge tone={o.side === 'buy' ? 'brand' : 'negative'} variant="outline">{o.side}</Badge>
+                                    <Badge tone={o.side === 'buy' ? 'brand' : 'negative'} variant="outline" className="capitalize">{o.side}</Badge>
                                     <span className="font-mono text-sm font-bold text-fg">{o.symbol}</span>
                                     <span className="text-xs text-fg-muted">{DECISION_COPY.orderSize(o.quantity, o.kind)}</span>
                                 </div>

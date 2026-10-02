@@ -22,6 +22,8 @@ const SPACING = {none: '', sm: 'mb-3', md: 'mb-4'} as const;
 const SectionHeading = ({as: Tag = 'h2', size = 'sm', spacing = 'md', id, className, children}: Props) => (
     <Tag
         id={id}
+        // The hook each style decorates a panel's heading through (app/globals.css).
+        data-panel-title=""
         className={cn(
             'heading-type',
             size === 'sm' ? 'text-sm' : 'text-xs',

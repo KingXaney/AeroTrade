@@ -36,7 +36,7 @@ const TopicsOverview = ({overview, span}: {overview: TopicsOverviewData; span: n
                     </li>
                 ))}
             </ul>
-            <Link href="/topics" className="mt-auto pt-3 text-xs uppercase tracking-[0.1em] text-brand hover:underline font-mono">
+            <Link href="/topics" className="label-type mt-auto pt-3 text-xs text-brand hover:underline">
                 {overview.unseenTotal > 0 ? `${overview.unseenTotal} new` : 'All topics'}{hidden > 0 ? ` · +${hidden} more` : ''} →
             </Link>
         </div>

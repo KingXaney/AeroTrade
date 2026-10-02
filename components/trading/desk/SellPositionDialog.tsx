@@ -58,7 +58,7 @@ const SellPositionDialog = ({position, accountId, notes, onClose}: {position: En
         <Dialog open onOpenChange={(open) => { if (!open && !submitting) onClose(); }}>
             <DialogContent className="bg-surface-1 ring-line sm:max-w-sm">
                 <DialogHeader>
-                    <DialogTitle className="text-sm font-bold uppercase tracking-[0.1em] text-negative font-mono">
+                    <DialogTitle className="heading-type text-sm text-negative">
                         Sell {position.symbol}
                     </DialogTitle>
                     <DialogDescription className="text-fg-muted">
@@ -91,7 +91,7 @@ const SellPositionDialog = ({position, accountId, notes, onClose}: {position: En
                                 type="button"
                                 onClick={() => setQty(String(preset.value))}
                                 className={cn(
-                                    'font-mono py-1.5 rounded-md text-xs font-bold uppercase tracking-wider transition-colors',
+                                    'control-type py-1.5 rounded-md text-xs transition-colors',
                                     qtyNum === preset.value
                                         ? 'bg-negative/15 text-negative'
                                         : 'text-fg-muted hover:text-fg',

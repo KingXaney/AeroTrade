@@ -52,7 +52,7 @@ const MobileNav = ({badges}: {badges?: NavBadges}) => {
                     <Link
                         href="/trade"
                         onClick={() => setOpen(false)}
-                        className="w-full py-3 rounded-lg mb-3 flex justify-center items-center gap-2 text-xs font-bold tracking-[0.1em] uppercase transition-all active:scale-[0.98] font-mono bg-brand text-on-brand"
+                        className="control-type w-full py-3 rounded-lg mb-3 flex justify-center items-center gap-2 text-xs transition-all active:scale-[0.98] bg-brand text-on-brand"
                     >
                         <span className="material-symbols-outlined text-base">candlestick_chart</span>
                         Trade Now
@@ -62,7 +62,7 @@ const MobileNav = ({badges}: {badges?: NavBadges}) => {
                         onClick={async () => {
                             if (await signOut()) setOpen(false);
                         }}
-                        className="w-full flex items-center gap-4 px-4 py-2 text-fg-soft hover:text-negative transition-colors text-xs font-bold tracking-[0.1em] uppercase font-mono"
+                        className="control-type w-full flex items-center gap-4 px-4 py-2 text-fg-soft hover:text-negative transition-colors text-xs"
                     >
                         <span className="material-symbols-outlined text-sm">logout</span>
                         <span>Logout</span>

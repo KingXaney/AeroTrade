@@ -60,25 +60,34 @@
      labelled control (ActionButton) each read their own tokens, so a style decides whether they
      are terminal captions or plain words. Style blocks set these and only these: a palette block
      (html[data-palette]) outranks [data-style], so a style must never write a palette token. */
-  --label-font: var(--type-mono);
-  --label-size: 10px;
-  --label-transform: uppercase;
-  --label-tracking: 0.1em;
-  --heading-font: var(--type-mono);
-  --heading-weight: 700;
-  --heading-transform: uppercase;
-  --heading-tracking: 0.1em;
-  --heading-color: var(--brand);
-  --control-font: var(--type-mono);
-  --control-weight: 700;
-  --control-transform: uppercase;
-  --control-tracking: 0.1em;
+  --label-font: var(--type-body);
+  --label-size: 11px;
+  --label-transform: none;
+  --label-tracking: 0.01em;
+  --heading-font: var(--type-display);
+  --heading-weight: 600;
+  --heading-transform: none;
+  --heading-tracking: -0.005em;
+  --heading-color: var(--fg);
+  --control-font: var(--type-body);
+  --control-weight: 600;
+  --control-transform: none;
+  --control-tracking: 0;
 
   /* The row inside a panel (RowCard). */
   --card-bg: color-mix(in oklab, var(--surface-2) 40%, transparent);
   --card-border-width: 1px;
   --card-border-color: color-mix(in oklab, var(--line-strong) 20%, transparent);
   --card-radius: var(--control-radius);
+
+  /* The app frame (the header, the navigation) and what floats over the page (menus, popovers,
+     dialogs, the drawer, the chat window). */
+  --chrome-bg: var(--chrome);
+  --chrome-border: 1px solid var(--line);
+  --chrome-blur: none;
+  --chrome-shadow: none;
+  --chrome-float-bg: var(--surface-2);
+  --chrome-float-shadow: 0 12px 32px var(--shade-2);
 
   /* Motion. Both reduced-motion guards at the foot of this file zero them. */
   --motion-fast: 120ms;
@@ -314,7 +323,6 @@ html[data-mode="light"] {
 @layer components {
   .label-type {
     font-family: var(--label-font);
-    font-size: var(--label-size);
     text-transform: var(--label-transform);
     letter-spacing: var(--label-tracking);
   }
@@ -359,6 +367,35 @@ html[data-mode="light"] {
    utility loses to it and the hover reads as dead. Hence the attribute hook. */
 .glass-panel[data-interactive]:hover {
   border-color: color-mix(in srgb, var(--brand) 25%, transparent);
+}
+/* A panel arrives rather than appears. One short rise, in the style's own tempo. */
+.glass-panel { animation: panel-in var(--motion-base) var(--motion-ease) both; }
+@keyframes panel-in {
+  from { opacity: 0; transform: translateY(6px); }
+}
+
+/* Floating chrome. Unlayered like .glass-panel, and for the same reason turned around: the
+   shadcn surfaces carry bg-popover, shadow-md and ring-1 as utilities, which would beat a
+   layered rule — so the frame is set here, whole, and a utility beside it does nothing. */
+.chrome-surface,
+[data-slot="dropdown-menu-content"],
+[data-slot="dropdown-menu-sub-content"],
+[data-slot="popover-content"],
+[data-slot="select-content"],
+[data-slot="dialog-content"] {
+  background: var(--chrome-float-bg);
+  border: var(--chrome-border);
+  backdrop-filter: var(--chrome-blur);
+  -webkit-backdrop-filter: var(--chrome-blur);
+  box-shadow: var(--chrome-float-shadow);
+}
+
+/* What a disclosure holds settles in when it opens. An animation on the content, not a
+   transition on ::details-content: that one keeps the content out of the page (and out of
+   innerText) until it ends, and the content is what was asked for. */
+details[open] > :not(summary) { animation: disclosure-in var(--motion-base) var(--motion-ease) both; }
+@keyframes disclosure-in {
+  from { opacity: 0; transform: translateY(-4px); }
 }
 
 /* Quiet Cyber redesign: shimmer and glow pulse are disabled. Kept as no-ops so the
@@ -422,8 +459,11 @@ html[data-mode="light"] {
   /* ─── HEADER ─── */
   .header {
     @apply z-50 w-full h-16 fixed top-0;
-    background: var(--chrome);
-    border-bottom: 1px solid var(--line);
+    background: var(--chrome-bg);
+    border-bottom: var(--chrome-border);
+    backdrop-filter: var(--chrome-blur);
+    -webkit-backdrop-filter: var(--chrome-blur);
+    box-shadow: var(--chrome-shadow);
   }
   .header-wrapper {
     @apply flex justify-between items-center px-6 py-3;
@@ -611,11 +651,13 @@ html[data-mode="light"] {
   }
 
   /* ─── NEWS ─── */
+  /* A headline card sits inside a panel, so it takes the style's card tokens (a step larger than
+     a row), not a frame of its own — and no second blur over the panel's. */
   .news-item {
-    @apply rounded-xl w-full p-4 duration-200 cursor-pointer;
-    background-color: color-mix(in srgb, var(--surface-0) 70%, transparent);
-    backdrop-filter: var(--panel-blur);
-    border: 1px solid color-mix(in srgb, var(--fg) 8%, transparent);
+    @apply w-full p-4 duration-200 cursor-pointer;
+    background-color: var(--card-bg);
+    border: var(--card-border-width) solid var(--card-border-color);
+    border-radius: calc(var(--card-radius) + 4px);
   }
   .news-item:hover {
     border-color: color-mix(in srgb, var(--brand) 25%, transparent);
@@ -793,7 +835,39 @@ html[data-mode="light"] {
   --type-display: var(--font-space-grotesk);
   --type-body: var(--font-hanken);
   --type-mono: var(--font-jetbrains);
+  --label-font: var(--type-mono);
+  --label-size: 10px;
+  --label-transform: uppercase;
+  --label-tracking: 0.1em;
+  --heading-font: var(--type-mono);
+  --heading-weight: 700;
+  --heading-transform: uppercase;
+  --heading-tracking: 0.1em;
+  --heading-color: var(--brand);
+  --control-font: var(--type-mono);
+  --control-weight: 700;
+  --control-transform: uppercase;
+  --control-tracking: 0.1em;
+  --card-bg: color-mix(in srgb, var(--surface-0) 55%, transparent);
+  --card-border-color: color-mix(in srgb, var(--brand) 14%, transparent);
+  --chrome-bg: color-mix(in srgb, var(--chrome) 82%, transparent);
+  --chrome-border: 1px solid color-mix(in srgb, var(--brand) 16%, transparent);
+  --chrome-blur: blur(14px);
+  --chrome-shadow: 0 0 24px color-mix(in srgb, var(--brand-strong) 6%, transparent);
+  --chrome-float-bg: color-mix(in srgb, var(--surface-0) 88%, transparent);
+  --chrome-float-shadow: 0 0 0 1px color-mix(in srgb, var(--brand-strong) 8%, transparent), 0 16px 40px var(--shade-2);
 }
+/* An accent line along each panel's top edge, and a rule beside its heading. ::before — the
+   shimmer sweep owns ::after. */
+[data-style="futuristic"] .glass-panel::before {
+  content: "";
+  position: absolute;
+  inset: 0 0 auto 0;
+  height: 1px;
+  pointer-events: none;
+  background: linear-gradient(90deg, transparent, color-mix(in srgb, var(--brand) 55%, transparent) 30%, color-mix(in srgb, var(--brand) 55%, transparent) 70%, transparent);
+}
+[data-style="futuristic"] [data-panel-title] { border-left: 2px solid var(--brand); padding-left: 0.5rem; }
 /* grid + vignette layer, below the particle canvas (#bg-canvas is z-index -1) */
 [data-style="futuristic"] body::before {
   content: "";
@@ -844,6 +918,14 @@ html[data-mode="light"] {
   --type-display: var(--font-sora);
   --type-body: var(--font-inter);
   --type-mono: var(--font-jetbrains);
+  --card-bg: color-mix(in srgb, var(--fg) 5%, transparent);
+  --card-border-color: color-mix(in srgb, var(--fg) 10%, transparent);
+  --card-radius: 0.875rem;
+  --chrome-bg: color-mix(in srgb, var(--chrome) 60%, transparent);
+  --chrome-border: 1px solid color-mix(in srgb, var(--fg) 14%, transparent);
+  --chrome-blur: blur(24px) saturate(160%);
+  --chrome-float-bg: color-mix(in srgb, var(--surface-1) 70%, transparent);
+  --chrome-float-shadow: inset 0 1px 0 color-mix(in srgb, var(--fg) 10%, transparent), 0 12px 40px var(--shade-2);
 }
 [data-style="liquid-glass"] :is(.glass-panel, .news-item) { position: relative; overflow: hidden; isolation: isolate; }
 /* z-index -1 inside the panel's own stacking context: above its background, below its children. */
@@ -861,11 +943,6 @@ html[data-mode="light"] {
   background-color: color-mix(in srgb, var(--surface-0) 60%, transparent);
   backdrop-filter: blur(12px);
   border-color: color-mix(in srgb, var(--fg) 12%, transparent);
-}
-[data-style="liquid-glass"] .header {
-  background: color-mix(in srgb, var(--chrome) 60%, transparent);
-  backdrop-filter: var(--panel-blur);
-  -webkit-backdrop-filter: var(--panel-blur);
 }
 [data-style="liquid-glass"] :is(.yellow-btn, .search-btn) { box-shadow: var(--glow); }
 @keyframes blob-drift {
@@ -899,6 +976,39 @@ html[data-mode="light"] {
   --type-display: var(--font-plex-mono);
   --type-body: var(--font-inter);
   --type-mono: var(--font-plex-mono);
+  --label-font: var(--type-mono);
+  --label-size: 10px;
+  --label-transform: uppercase;
+  --label-tracking: 0.08em;
+  --heading-font: var(--type-mono);
+  --heading-weight: 700;
+  --heading-transform: uppercase;
+  --heading-tracking: 0.04em;
+  --control-font: var(--type-mono);
+  --control-weight: 700;
+  --control-transform: uppercase;
+  --control-tracking: 0.06em;
+  --card-bg: var(--surface-2);
+  --card-border-width: 2px;
+  --card-border-color: color-mix(in srgb, var(--fg) 35%, transparent);
+  --chrome-border: 2px solid color-mix(in srgb, var(--fg) 60%, transparent);
+  --chrome-float-bg: var(--surface-1);
+  --chrome-float-shadow: 4px 4px 0 color-mix(in srgb, var(--fg) 60%, transparent);
+  --motion-fast: 0ms;
+  --motion-base: 0ms;
+}
+/* A panel's heading is a label stuck on it. */
+[data-style="brutalist"] [data-panel-title] {
+  width: fit-content;
+  background: var(--fg);
+  color: var(--bg);
+  padding: 0.125rem 0.5rem;
+}
+/* A panel that is a link moves when touched; a fainter border would say "disabled". */
+[data-style="brutalist"] .glass-panel[data-interactive]:hover {
+  border-color: var(--brand);
+  transform: translate(-2px, -2px);
+  box-shadow: 6px 6px 0 color-mix(in srgb, var(--fg) 60%, transparent);
 }
 [data-style="brutalist"] :not(.rounded-full):not(.typing-dot):not(.theme-blob) { border-radius: 0; }
 [data-style="brutalist"] :is(h1, h2, h3) { text-transform: uppercase; letter-spacing: 0.04em; font-weight: 700; }
@@ -913,30 +1023,54 @@ html[data-mode="light"] {
 [data-style="brutalist"] :is(.yellow-btn, .search-btn):active { transform: translate(3px, 3px); box-shadow: 1px 1px 0 var(--fg); }
 [data-style="brutalist"] :is(.form-input, .select-trigger, .country-select-trigger) { border: 2px solid color-mix(in srgb, var(--fg) 60%, transparent); }
 [data-style="brutalist"] :is(.form-input, .select-trigger):focus { border-color: var(--fg) !important; box-shadow: 4px 4px 0 var(--brand); }
-[data-style="brutalist"] .header { border-bottom: 2px solid color-mix(in srgb, var(--fg) 60%, transparent); }
 
 /* ─── soft: generous radius, quiet borders, layered shadows ─── */
 [data-style="soft"] {
-  --panel-bg: var(--surface-1);
+  /* A breath of the palette's accent in the fill and the shadow: on a dark palette a black shadow
+     over a near-black page is invisible, and the style read as minimal with rounder corners. */
+  --panel-bg: color-mix(in srgb, var(--brand) 4%, var(--surface-1));
   --panel-border: 1px solid color-mix(in srgb, var(--fg) 5%, transparent);
   --panel-blur: none;
-  --panel-shadow: 0 1px 2px var(--shade-1), 0 8px 24px var(--shade-1), 0 24px 48px var(--shade-2);
+  --panel-shadow: inset 0 1px 0 color-mix(in srgb, var(--fg) 6%, transparent), 0 1px 2px var(--shade-1), 0 10px 28px color-mix(in srgb, var(--brand) 7%, var(--shade-1)), 0 24px 48px var(--shade-2);
   --panel-radius: 1.25rem;
   --control-radius: 0.875rem;
   --glow: 0 6px 20px color-mix(in srgb, var(--brand) 22%, transparent);
   --type-display: var(--font-sora);
   --type-body: var(--font-inter);
   --type-mono: var(--font-jetbrains);
+  --label-size: 12px;
+  --card-bg: color-mix(in srgb, var(--fg) 4%, transparent);
+  --card-border-color: transparent;
+  --card-radius: 1rem;
+  --chrome-border: 1px solid transparent;
+  --chrome-shadow: 0 1px 0 color-mix(in srgb, var(--fg) 5%, transparent), 0 4px 16px var(--shade-1);
+  --chrome-float-bg: var(--surface-2);
+  --chrome-float-shadow: 0 2px 4px var(--shade-1), 0 16px 40px var(--shade-2);
 }
-[data-style="soft"] :is(.glass-panel, .news-item) { transition: transform 0.2s ease, box-shadow 0.2s ease; }
-[data-style="soft"] :is(.glass-panel, .news-item):hover { transform: translateY(-1px); box-shadow: 0 2px 4px var(--shade-1), 0 16px 40px var(--shade-2); }
+/* Only what can be clicked lifts: a settings section that rose under the pointer promised a
+   link that was not there. */
+[data-style="soft"] :is(.glass-panel[data-interactive], .news-item) { transition: transform var(--motion-base) var(--motion-ease), box-shadow var(--motion-base) var(--motion-ease); }
+[data-style="soft"] :is(.glass-panel[data-interactive], .news-item):hover { transform: translateY(-2px); box-shadow: 0 2px 4px var(--shade-1), 0 16px 40px var(--shade-2); }
+[data-style="soft"] [data-panel-title]::before {
+  content: "";
+  display: inline-block;
+  width: 0.375rem;
+  height: 0.375rem;
+  margin-right: 0.5rem;
+  border-radius: 9999px;
+  vertical-align: middle;
+  background: var(--brand);
+}
+/* A disclosure's summary already leads with its chevron. */
+[data-style="soft"] summary [data-panel-title]::before { content: none; }
 [data-style="soft"] :is(.form-input, .select-trigger):focus { border-color: var(--brand) !important; box-shadow: 0 0 0 4px color-mix(in srgb, var(--brand) 18%, transparent); }
 [data-style="soft"] .news-tag { border-radius: 999px; }
 [data-style="soft"] :is(.yellow-btn, .search-btn) { box-shadow: var(--glow); }
-[data-style="soft"] .header { border-bottom-color: transparent; box-shadow: 0 1px 0 color-mix(in srgb, var(--fg) 5%, transparent), 0 4px 16px var(--shade-1); }
 
 /* ─── motion guards: OS setting or the in-app toggle (html[data-motion="reduced"]) ─── */
 @media (prefers-reduced-motion: reduce) {
+  :root { --motion-fast: 0ms; --motion-base: 0ms; }
+  .glass-panel, details[open] > :not(summary) { animation: none !important; }
   .theme-blob,
   [data-style] :is(.glass-panel, .news-item, .yellow-btn, .search-btn) {
     animation: none !important;
@@ -949,4 +1083,5 @@ html[data-motion="reduced"] :is(.animate-glow, .typing-dot, .theme-blob, .glass-
   transition: none !important;
 }
 html[data-motion="reduced"] .shimmer::after { content: none; }
+html[data-motion="reduced"] { --motion-fast: 0ms; --motion-base: 0ms; }
 html[data-mode="light"] #bg-canvas { opacity: 0.2; }

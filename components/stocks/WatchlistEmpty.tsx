@@ -14,10 +14,9 @@ const WatchlistEmpty = () => {
             <p className="text-fg-muted mb-6 max-w-md font-sans">
                 Search for stocks to add them to your watchlist. See their quotes, market cap and P/E in one place, jump to the trade desk, or follow their news as a topic.
             </p>
-            <div className="flex items-center gap-2 text-[10px] text-fg-muted font-mono"
-                 style={{ letterSpacing: '0.1em', textTransform: 'uppercase' }}>
+            <div className="label-type text-[length:var(--label-size)] flex items-center gap-2 text-fg-muted">
                 <span className="material-symbols-outlined text-sm text-brand-strong">search</span>
-                USE SEARCH TO ADD ASSETS
+                Use search to add assets
             </div>
         </Panel>
     );

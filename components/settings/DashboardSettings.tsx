@@ -83,7 +83,7 @@ const DashboardSettings = ({initialLayout, availableIds}: Props) => {
         <div className="space-y-6">
             <div>
                 <div className="flex items-center justify-between mb-2">
-                    <div className="text-[10px] uppercase tracking-[0.14em] text-fg-muted font-mono">Your widgets · {layout.widgets.length}</div>
+                    <div className="label-type text-[length:var(--label-size)] text-fg-muted">Your widgets · {layout.widgets.length}</div>
                     <Link href="/?customize=1" className="text-xs text-brand hover:underline font-mono">Arrange on dashboard →</Link>
                 </div>
                 {layout.widgets.length === 0 ? (
@@ -101,7 +101,7 @@ const DashboardSettings = ({initialLayout, availableIds}: Props) => {
                                     <div className="flex items-center gap-1">
                                         <select aria-label={`${def.title} width`} value={w.span}
                                                 onChange={(e) => setLayout((l) => setSpan(l, w.id, Number(e.target.value)))}
-                                                className="h-7 rounded-md border border-line-strong/30 bg-surface-0 px-1.5 text-[10px] uppercase tracking-[0.08em] text-fg font-mono">
+                                                className="label-type h-7 rounded-md border border-line-strong/30 bg-surface-0 px-1.5 text-[length:var(--label-size)] text-fg">
                                             {def.spans.map((s) => <option key={s} value={s}>{SPAN_LABELS[s]} · {s}/12</option>)}
                                         </select>
                                         <button id={`dash-up-${w.id}`} type="button" className={iconButton} disabled={index === 0} aria-label="Move up"
@@ -119,7 +119,7 @@ const DashboardSettings = ({initialLayout, availableIds}: Props) => {
             </div>
 
             <div>
-                <div className="text-[10px] uppercase tracking-[0.14em] text-fg-muted mb-2 font-mono">Add widgets</div>
+                <div className="label-type text-[length:var(--label-size)] text-fg-muted mb-2">Add widgets</div>
                 {missing.length === 0 ? (
                     <p className="text-sm text-fg-muted">Every widget is on your dashboard.</p>
                 ) : (
@@ -157,7 +157,7 @@ const DashboardSettings = ({initialLayout, availableIds}: Props) => {
             <div className="flex items-center justify-between pt-2 border-t border-line-strong/20">
                 <p className="text-[11px] text-fg-muted">Changes save automatically.</p>
                 <button type="button" onClick={() => setConfirmingReset(true)}
-                        className="text-xs uppercase tracking-[0.1em] text-fg-muted hover:text-negative transition-colors font-mono">
+                        className="label-type text-xs text-fg-muted hover:text-negative transition-colors">
                     Reset to default
                 </button>
             </div>

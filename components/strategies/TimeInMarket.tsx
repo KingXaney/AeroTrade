@@ -42,7 +42,7 @@ const TimeInMarket = ({view, path}: {view: TimeInMarketRead; path: string}) => {
                                 className="rounded-lg px-3 py-1.5 text-sm text-fg font-mono bg-surface-0 border border-line-strong/40 outline-none field-focus"
                             />
                         </label>
-                        <button type="submit" className="px-3 py-2 rounded-md font-mono text-[11px] font-bold uppercase tracking-[0.08em] bg-brand/10 text-brand hover:bg-brand/20 transition-colors">
+                        <button type="submit" className="control-type px-3 py-2 rounded-md text-[11px] bg-brand/10 text-brand hover:bg-brand/20 transition-colors">
                             {TIM_COPY.submit}
                         </button>
                     </form>

@@ -15,7 +15,7 @@ type Props = {
 };
 
 const Badge = ({children}: {children: React.ReactNode}) => (
-    <span className="rounded px-1.5 py-0.5 text-[9px] uppercase tracking-[0.08em] bg-surface-3 text-fg-muted font-mono">{children}</span>
+    <span className="label-type rounded px-1.5 py-0.5 text-[9px] bg-surface-3 text-fg-muted">{children}</span>
 );
 
 const WidgetLibrary = ({open, onOpenChange, ids, count, onAdd}: Props) => {
@@ -38,7 +38,7 @@ const WidgetLibrary = ({open, onOpenChange, ids, count, onAdd}: Props) => {
                             if (inCategory.length === 0) return null;
                             return (
                                 <div key={category}>
-                                    <div className="text-[10px] uppercase tracking-[0.14em] text-fg-muted mb-2 font-mono">
+                                    <div className="label-type text-[length:var(--label-size)] text-fg-muted mb-2">
                                         {CATEGORY_LABELS[category]}
                                     </div>
                                     <div className="space-y-1.5">

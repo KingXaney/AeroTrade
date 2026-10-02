@@ -53,7 +53,7 @@ const STYLES: Record<Tone, Record<Variant, string>> = {
 };
 
 const SHAPE = {
-    tag: 'label-type px-2 py-0.5 rounded-[var(--control-radius)] font-bold',
+    tag: 'label-type text-[length:var(--label-size)] px-2 py-0.5 rounded-[var(--control-radius)] font-bold',
     pill: 'font-mono text-[10px] px-1.5 py-0.5 rounded-full font-bold tabular-nums',
 } as const;
 

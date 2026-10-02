@@ -32,7 +32,7 @@ const TONE = {
 } as const;
 
 const MicroLabel = ({as: Tag = 'span', tone = 'muted', className, children, ...rest}: Props) => (
-    <Tag className={cn('label-type', TONE[tone], className)} {...rest}>
+    <Tag className={cn('label-type text-[length:var(--label-size)]', TONE[tone], className)} {...rest}>
         {children}
     </Tag>
 );

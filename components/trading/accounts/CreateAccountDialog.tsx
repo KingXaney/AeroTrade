@@ -45,7 +45,7 @@ const CreateAccountDialog = ({onClose}: {onClose: () => void}) => {
         <Dialog open onOpenChange={(open) => { if (!open && !submitting) onClose(); }}>
             <DialogContent className="bg-surface-1 ring-line sm:max-w-sm">
                 <DialogHeader>
-                    <DialogTitle className="text-sm font-bold uppercase tracking-[0.1em] text-brand font-mono">
+                    <DialogTitle className="heading-type text-sm">
                         New Account
                     </DialogTitle>
                     <DialogDescription className="text-fg-muted">

@@ -4,7 +4,7 @@ import Link from "next/link";
 const TopicsWidgetEmpty = () => (
     <div className="flex flex-col gap-2">
         <p className="text-sm text-fg-muted">You&apos;re not following anything yet.</p>
-        <Link href="/topics" className="text-xs uppercase tracking-[0.1em] text-brand hover:underline font-mono">
+        <Link href="/topics" className="label-type text-xs text-brand hover:underline">
             Follow a topic →
         </Link>
     </div>

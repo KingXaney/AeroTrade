@@ -80,7 +80,7 @@ const AppearanceSettings = () => {
                     <button type="button"
                             onClick={() => apply({...DEFAULT_THEME, reduceMotion: theme.reduceMotion})}
                             disabled={pending || (theme.palette === DEFAULT_THEME.palette && theme.style === DEFAULT_THEME.style)}
-                            className="text-xs uppercase tracking-[0.1em] text-fg-muted hover:text-brand transition-colors disabled:opacity-40 font-mono">
+                            className="label-type text-xs text-fg-muted hover:text-brand transition-colors disabled:opacity-40">
                         Reset to default
                     </button>
                 </div>
@@ -112,7 +112,7 @@ const AppearanceSettings = () => {
 
             {/* Palette */}
             <div>
-                <div className="text-[10px] uppercase tracking-[0.14em] text-fg-muted mb-2 font-mono">Palette</div>
+                <div className="label-type text-[length:var(--label-size)] text-fg-muted mb-2">Palette</div>
                 <div role="radiogroup" aria-label="Colour palette" className="flex flex-wrap gap-2" {...groupProps}>
                     {PALETTE_IDS.map((id) => {
                         const p = PALETTES[id];
@@ -140,7 +140,7 @@ const AppearanceSettings = () => {
 
             {/* Style */}
             <div>
-                <div className="text-[10px] uppercase tracking-[0.14em] text-fg-muted mb-2 font-mono">Style</div>
+                <div className="label-type text-[length:var(--label-size)] text-fg-muted mb-2">Style</div>
                 <div role="radiogroup" aria-label="Visual style" className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-2" {...groupProps}>
                     {STYLE_IDS.map((id) => {
                         const s = STYLES[id];

@@ -42,7 +42,7 @@ const RenameDialog = ({accountId, currentName, onClose}: {accountId: string; cur
         <Dialog open onOpenChange={(open) => { if (!open && !submitting) onClose(); }}>
             <DialogContent className="bg-surface-1 ring-line sm:max-w-sm">
                 <DialogHeader>
-                    <DialogTitle className="text-sm font-bold uppercase tracking-[0.1em] text-brand font-mono">
+                    <DialogTitle className="heading-type text-sm">
                         Rename Account
                     </DialogTitle>
                     <DialogDescription className="text-fg-muted">Pick a new name for this account.</DialogDescription>
@@ -91,7 +91,7 @@ const DeleteDialog = ({accountId, accountName, onClose}: {accountId: string; acc
         <Dialog open onOpenChange={(open) => { if (!open && !submitting) onClose(); }}>
             <DialogContent className="bg-surface-1 ring-line sm:max-w-sm">
                 <DialogHeader>
-                    <DialogTitle className="text-sm font-bold uppercase tracking-[0.1em] text-negative font-mono">
+                    <DialogTitle className="heading-type text-sm text-negative">
                         Delete “{accountName}”?
                     </DialogTitle>
                     <DialogDescription className="text-fg-muted">

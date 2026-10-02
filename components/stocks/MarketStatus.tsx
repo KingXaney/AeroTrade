@@ -7,7 +7,7 @@ import {cn} from "@/lib/utils";
 const MarketStatus = ({status, className}: {status: Status; className?: string}) => {
     const open = status.state === 'open';
     return (
-        <span className={cn('font-mono inline-flex items-center gap-2 text-[10px] uppercase tracking-[0.1em]', open ? 'text-positive' : 'text-warning', className)}
+        <span className={cn('label-type inline-flex items-center gap-2 text-[length:var(--label-size)]', open ? 'text-positive' : 'text-warning', className)}
               title={open ? MARKET_COPY.openTitle : MARKET_COPY.closedTitle}>
             <span className={cn('inline-block size-2 rounded-full', open ? 'bg-positive animate-pulse' : 'bg-warning')} aria-hidden="true" />
             {describeMarketStatus(status)}

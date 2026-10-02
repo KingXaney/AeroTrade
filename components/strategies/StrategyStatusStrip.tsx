@@ -14,7 +14,7 @@ import type {StrategiesSystemStatus} from "@/lib/strategies/page-store";
 
 const Field = ({label, value, last}: {label: string; value: string; last?: boolean}) => (
     <span className="whitespace-nowrap">
-        <span className="uppercase tracking-[0.1em] text-fg-muted">{label} </span>
+        <span className="label-type text-fg-muted">{label} </span>
         <span className="text-fg-soft">{value}</span>
         {!last && <span className="text-fg-muted" aria-hidden="true"> ·</span>}
     </span>

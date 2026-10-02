@@ -79,11 +79,8 @@ const ChatWidget = ({userId}: ChatWidgetProps) => {
                     onClick={() => setOpen(true)}
                     aria-label="Open Aero-AI Assistant"
                     className={cn(
-                        'fixed bottom-5 right-5 z-[80] inline-flex size-14 items-center justify-center rounded-full transition-all hover:scale-110 active:scale-95 sm:bottom-6 sm:right-6 group bg-brand-strong text-on-brand',
+                        'fixed bottom-5 right-5 z-[80] inline-flex size-14 items-center justify-center rounded-full transition-all hover:scale-110 active:scale-95 sm:bottom-6 sm:right-6 group bg-brand-strong text-on-brand [box-shadow:var(--glow)]',
                     )}
-                    style={{
-                        boxShadow: '0 0 20px color-mix(in srgb, var(--brand-strong) 40%, transparent)',
-                    }}
                 >
                     <span className="material-symbols-outlined text-3xl">smart_toy</span>
                 </button>

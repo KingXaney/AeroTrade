@@ -183,7 +183,7 @@ const OrderPanel = ({defaultSymbol = '', cash, accountId, positions = [], onSymb
                         onClick={() => setSide(s)}
                         aria-pressed={side === s}
                         className={cn(
-                            'font-mono py-2 rounded-md text-xs font-bold uppercase tracking-wider transition-colors',
+                            'control-type capitalize py-2 rounded-md text-xs transition-colors',
                             side === s
                                 ? s === 'buy'
                                     ? 'bg-brand-strong/15 text-brand'
@@ -247,7 +247,7 @@ const OrderPanel = ({defaultSymbol = '', cash, accountId, positions = [], onSymb
                                 onClick={() => setQuantity(String(preset.value))}
                                 title={side === 'buy' ? `${preset.value} shares at the last price` : `${preset.value} of your ${owned} shares`}
                                 className={cn(
-                                    'font-mono py-1.5 rounded-md text-xs font-bold uppercase tracking-wider transition-colors',
+                                    'control-type py-1.5 rounded-md text-xs transition-colors',
                                     qtyNum === preset.value
                                         ? side === 'buy' ? 'bg-brand-strong/15 text-brand' : 'bg-negative/15 text-negative'
                                         : 'text-fg-muted hover:text-fg',
@@ -310,7 +310,7 @@ const OrderPanel = ({defaultSymbol = '', cash, accountId, positions = [], onSymb
                 type="submit"
                 disabled={submitting || blocked}
                 className={cn(
-                    'font-mono w-full py-3 rounded-lg text-sm font-bold uppercase tracking-wider transition-all active:scale-[0.98] disabled:opacity-50',
+                    'control-type w-full py-3 rounded-lg text-sm transition-all active:scale-[0.98] disabled:opacity-50',
                     side === 'buy' ? 'bg-brand-strong text-on-brand' : 'bg-negative text-on-negative',
                 )}
                 style={{

@@ -17,8 +17,7 @@ const WatchlistTable = ({watchlist}: WatchlistTableProps) => {
     return (
         <div className="space-y-2">
             {/* Table Header */}
-            <div className="hidden md:grid grid-cols-[2fr_1fr_1fr_1fr_1fr_112px] gap-4 px-4 py-2 border-b border-line-strong/30 font-mono text-fg-muted"
-                 style={{ fontSize: '10px', letterSpacing: '0.1em', textTransform: 'uppercase' }}>
+            <div className="hidden md:grid grid-cols-[2fr_1fr_1fr_1fr_1fr_112px] gap-4 px-4 py-2 border-b border-line-strong/30 label-type text-[length:var(--label-size)] text-fg-muted">
                 <div>Asset</div>
                 <div className="text-right">Price (USD)</div>
                 <div className="text-right">24h Chg</div>
@@ -67,7 +66,7 @@ const WatchlistTable = ({watchlist}: WatchlistTableProps) => {
 
                     {/* Change */}
                     <div className="flex justify-between md:block md:text-right">
-                        <span className="md:hidden text-[10px] uppercase tracking-[0.1em] text-fg-muted mr-2">24h Chg</span>
+                        <span className="label-type md:hidden text-[length:var(--label-size)] text-fg-muted mr-2">24h Chg</span>
                         {row.changePercent !== undefined ? (
                             <span
                                 className={cn(

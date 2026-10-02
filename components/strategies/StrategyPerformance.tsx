@@ -41,7 +41,7 @@ const Tab = ({active, onClick, children, id}: {active: boolean; onClick: () => v
         onClick={onClick}
         aria-pressed={active}
         className={cn(
-            'font-mono px-3 py-1 rounded-md text-[11px] font-bold uppercase tracking-[0.08em] transition-colors',
+            'control-type px-3 py-1 rounded-md text-[11px] transition-colors',
             active ? 'bg-brand/10 text-brand' : 'text-fg-muted hover:text-fg',
         )}
     >
@@ -92,7 +92,7 @@ const StrategyPerformance = ({name, live, simulated, initialMode}: {name: string
                     simulated ? (
                         <>
                             <div className="flex flex-wrap items-center gap-2 mb-2">
-                                <span className="px-2 py-0.5 rounded text-[10px] uppercase tracking-[0.08em] text-warning bg-warning/10 font-mono">
+                                <span className="label-type px-2 py-0.5 rounded text-[length:var(--label-size)] text-warning bg-warning/10">
                                     {STRATEGY_PERFORMANCE_COPY.simulatedBadge}
                                 </span>
                                 <span className="text-[11px] text-fg-muted font-mono">

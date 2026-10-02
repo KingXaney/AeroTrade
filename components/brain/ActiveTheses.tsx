@@ -56,7 +56,7 @@ const ActiveTheses = ({theses, followedByName, sinceThesis, definitions = false}
                                       className="text-sm font-semibold text-fg hover:text-brand transition-colors font-heading">
                                     {t.displayName}
                                 </Link>
-                                <div className="text-[10px] uppercase tracking-[0.08em] text-fg-muted font-mono">
+                                <div className="label-type text-[length:var(--label-size)] text-fg-muted">
                                     {t.type} · active {weeks} {weeks === 1 ? 'week' : 'weeks'}
                                     {t.type === 'ticker' && (
                                         <> · <Link href={`/stocks/${encodeURIComponent(t.key)}`} className="text-brand hover:underline normal-case tracking-normal">stock page</Link></>

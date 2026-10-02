@@ -25,7 +25,7 @@ type Props = {
     onSaved?: (topic: TopicView) => void;
 };
 
-const labelClass = 'font-mono text-[10px] uppercase tracking-[0.14em] text-fg-muted';
+const labelClass = 'label-type text-[length:var(--label-size)] text-fg-muted';
 
 // The form lives in its own component so its state initialises from props on every
 // open (Radix unmounts dialog content when closed) — no reset effect required.
@@ -105,7 +105,7 @@ const ComposerForm = ({mode, initial, onClose, onSaved}: {mode: ComposerMode; in
             </div>
 
             <button type="button" onClick={() => setAdvanced((v) => !v)} aria-expanded={advanced}
-                    className="text-[10px] uppercase tracking-[0.14em] text-fg-muted hover:text-fg font-mono">
+                    className="label-type text-[length:var(--label-size)] text-fg-muted hover:text-fg">
                 {advanced ? '− Hide advanced' : '+ Advanced (exclusions, colour)'}
             </button>
 

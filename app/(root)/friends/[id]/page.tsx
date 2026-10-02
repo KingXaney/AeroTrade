@@ -45,7 +45,7 @@ const FriendProfilePage = async ({params}: FriendProfilePageProps) => {
             {/* Best account, shown in full */}
             <div className="flex items-center gap-2">
                 <span className="material-symbols-outlined text-base text-brand">account_tree</span>
-                <span className="text-xs uppercase tracking-[0.1em] text-fg-muted font-mono">
+                <span className="label-type text-xs text-fg-muted">
                     Best account · <span className="text-fg">{profile.accountName}</span>
                 </span>
             </div>

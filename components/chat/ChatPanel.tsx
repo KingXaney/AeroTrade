@@ -166,16 +166,13 @@ const ChatPanel = ({userId, onClose, initialMessages, onMessagesChange, initialI
 
     return (
         <div
-            className="fixed bottom-5 right-5 z-[80] flex max-w-[calc(100vw-2rem)] max-h-[calc(100dvh-2rem)] flex-col rounded-2xl shadow-2xl sm:bottom-6 sm:right-6 overflow-hidden bg-surface-0/95 border border-brand/15"
+            className="fixed bottom-5 right-5 z-[80] flex max-w-[calc(100vw-2rem)] max-h-[calc(100dvh-2rem)] flex-col rounded-xl sm:bottom-6 sm:right-6 overflow-hidden chrome-surface"
             role="dialog"
             aria-label="AeroTrade assistant"
             onKeyDown={(e) => { if (e.key === 'Escape') { e.stopPropagation(); onClose(); } }}
             style={{
                 width: `${size.width}px`,
                 height: `${size.height}px`,
-                backdropFilter: 'blur(24px)',
-                WebkitBackdropFilter: 'blur(24px)',
-                boxShadow: '0 0 40px color-mix(in srgb, var(--brand-strong) 8%, transparent)',
             }}
         >
             {/* Resize handles */}
@@ -203,7 +200,7 @@ const ChatPanel = ({userId, onClose, initialMessages, onMessagesChange, initialI
             <div className="flex items-center justify-between px-4 py-3 bg-brand-strong/8 border-b border-line-strong/30">
                 <div className="flex items-center gap-2">
                     <span className="material-symbols-outlined text-brand animate-pulse">smart_toy</span>
-                    <span className="text-xs font-bold tracking-[0.1em] uppercase text-brand font-mono">
+                    <span className="label-type text-xs font-bold text-brand">
                         Aero-AI Assistant
                     </span>
                 </div>
@@ -272,24 +269,24 @@ const ChatPanel = ({userId, onClose, initialMessages, onMessagesChange, initialI
                             <div className="flex items-center gap-2">
                                 {described.action === 'retry' && (
                                     <button type="button" onClick={onRetry} disabled={isBusy}
-                                            className="px-2 py-1 rounded font-bold uppercase tracking-wider text-[10px] text-negative disabled:opacity-50 font-mono border border-negative/40">
+                                            className="control-type px-2 py-1 rounded text-[10px] text-negative disabled:opacity-50 border border-negative/40">
                                         Try again
                                     </button>
                                 )}
                                 {described.action === 'clear' && (
                                     <button type="button" onClick={onClear}
-                                            className="px-2 py-1 rounded font-bold uppercase tracking-wider text-[10px] text-negative font-mono border border-negative/40">
+                                            className="control-type px-2 py-1 rounded text-[10px] text-negative border border-negative/40">
                                         Clear chat
                                     </button>
                                 )}
                                 {described.action === 'sign_in' && (
                                     <Link href="/sign-in"
-                                          className="px-2 py-1 rounded font-bold uppercase tracking-wider text-[10px] text-negative font-mono border border-negative/40">
+                                          className="control-type px-2 py-1 rounded text-[10px] text-negative border border-negative/40">
                                         Sign in
                                     </Link>
                                 )}
                                 <button type="button" onClick={() => clearError()}
-                                        className="px-2 py-1 rounded font-bold uppercase tracking-wider text-[10px] text-fg-muted hover:text-fg-soft font-mono">
+                                        className="control-type px-2 py-1 rounded text-[10px] text-fg-muted hover:text-fg-soft">
                                     Dismiss
                                 </button>
                             </div>

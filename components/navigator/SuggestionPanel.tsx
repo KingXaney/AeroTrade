@@ -50,7 +50,7 @@ const ItemRow = ({item, showApply, accounts}: {item: GlossedItem; showApply: boo
         <RowCard>
             <div className="flex items-center justify-between gap-3 flex-wrap">
                 <div className="flex items-center gap-3">
-                    <span className={cn('font-mono text-[10px] font-bold uppercase tracking-[0.1em] px-2 py-1 rounded', ACTION_STYLES[item.action])}>
+                    <span className={cn('control-type capitalize text-[10px] px-2 py-1 rounded', ACTION_STYLES[item.action])}>
                         {item.action}
                     </span>
                     <span className="text-sm font-bold text-fg font-mono">{item.symbol}</span>
@@ -74,7 +74,7 @@ const ItemRow = ({item, showApply, accounts}: {item: GlossedItem; showApply: boo
                                 {accounts.map((a) => <option key={a.id} value={a.id}>{a.name}</option>)}
                             </select>
                             <button type="button" onClick={() => void onApply()} disabled={applying}
-                                    className="px-2.5 py-1 rounded text-[11px] font-bold uppercase tracking-wider transition-colors disabled:opacity-50 font-mono text-brand border border-brand/35 bg-brand-strong/6">
+                                    className="control-type px-2.5 py-1 rounded text-[11px] transition-colors disabled:opacity-50 text-brand border border-brand/35 bg-brand-strong/6">
                                 {applying ? 'Applying…' : 'Apply'}
                             </button>
                         </>
@@ -121,7 +121,7 @@ const SuggestionPanel = ({userSet, globalSet, accounts}: {userSet: SetView | nul
             <p className="text-[11px] text-fg-muted font-mono">
                 {userSet ? 'Your AI account' : 'Global model portfolio'} · {set.date}
                 {set.kind === 'preview' && (
-                    <span className="ml-2 px-1.5 py-0.5 rounded text-[10px] font-bold uppercase tracking-[0.08em] text-warning bg-warning/10">
+                    <span className="control-type ml-2 px-1.5 py-0.5 rounded text-[10px] text-warning bg-warning/10">
                         Preview — nothing traded
                     </span>
                 )}
@@ -136,7 +136,7 @@ const SuggestionPanel = ({userSet, globalSet, accounts}: {userSet: SetView | nul
                     {set.rationaleMd}
                 </SafeMarkdown>
             )}
-            <p className="text-[10px] uppercase tracking-[0.08em] text-fg-muted font-mono">
+            <p className="label-type text-[length:var(--label-size)] text-fg-muted">
                 {NAVIGATOR_COPY.decisionsFooter}
             </p>
         </div>

@@ -1,4 +1,4 @@
-import type {ComponentProps, CSSProperties} from "react";
+import type {ComponentProps} from "react";
 import {cn} from "@/lib/utils";
 
 // The one labelled button, on the control radius (rounded-lg is var(--radius) =
@@ -29,10 +29,10 @@ const BASE = 'control-type rounded-lg text-xs disabled:opacity-50';
 
 const VARIANT: Record<ActionVariant, string> = {
     primary: 'bg-brand text-on-brand',
-    strong: 'bg-brand-strong text-on-brand tracking-wider transition-all active:scale-[0.98]',
+    strong: 'bg-brand-strong text-on-brand transition-all active:scale-[0.98]',
     secondary: 'text-fg-soft hover:text-fg border border-line-strong/40 transition-colors',
     danger: 'text-fg-soft hover:text-negative border border-line-strong/40 transition-colors',
-    destructive: 'bg-negative text-on-negative tracking-wider transition-all active:scale-[0.98]',
+    destructive: 'bg-negative text-on-negative transition-all active:scale-[0.98]',
 };
 
 const SIZE: Record<ActionSize, string> = {
@@ -42,11 +42,9 @@ const SIZE: Record<ActionSize, string> = {
     block: 'w-full py-3 text-sm',
 };
 
-// The halo under a form's commit button. Inline because it is one shadow, not a ring.
-const GLOW: Record<'strong' | 'destructive', CSSProperties['boxShadow']> = {
-    strong: '0 0 15px color-mix(in srgb, var(--brand-strong) 30%, transparent)',
-    destructive: '0 0 15px color-mix(in srgb, var(--negative) 25%, transparent)',
-};
+// The halo under a form's commit button: the active style's --glow, so a style with no
+// effects draws none and a brutalist one draws its hard offset.
+const GLOW = '[box-shadow:var(--glow)]';
 
 type Recipe = {variant?: ActionVariant; size?: ActionSize; className?: string};
 
@@ -58,12 +56,9 @@ type Props = ComponentProps<'button'> & Recipe & {
     glow?: boolean;
 };
 
-const ActionButton = ({variant = 'primary', size, glow, className, style, type = 'button', ...rest}: Props) => {
-    const halo = glow && (variant === 'strong' || variant === 'destructive') ? {boxShadow: GLOW[variant]} : undefined;
-    return (
-        <button type={type} className={actionButton({variant, size, className})}
-                style={halo || style ? {...halo, ...style} : undefined} {...rest} />
-    );
+const ActionButton = ({variant = 'primary', size, glow, className, type = 'button', ...rest}: Props) => {
+    const halo = glow && (variant === 'strong' || variant === 'destructive');
+    return <button type={type} className={actionButton({variant, size, className: cn(halo && GLOW, className)})} {...rest} />;
 };
 
 export default ActionButton;

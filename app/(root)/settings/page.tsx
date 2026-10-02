@@ -46,7 +46,7 @@ const SettingsPage = async () => {
                 <Panel as="nav" pad={2} className="lg:col-span-3 lg:sticky lg:top-24" aria-label="Settings sections">
                     {SECTIONS.map((s) => (
                         <a key={s.id} href={`#${s.id}`}
-                           className="flex items-center gap-3 px-3 py-2.5 rounded-lg text-xs font-bold tracking-[0.1em] uppercase text-fg-soft hover:text-fg hover:bg-surface-3 transition-colors font-mono">
+                           className="control-type flex items-center gap-3 px-3 py-2.5 rounded-lg text-xs text-fg-soft hover:text-fg hover:bg-surface-3 transition-colors">
                             <span className="material-symbols-outlined text-base">{s.icon}</span>
                             {s.label}
                         </a>

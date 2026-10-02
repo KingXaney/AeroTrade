@@ -24,7 +24,7 @@ const SimulatedTradeList = ({trades, def}: {trades: StrategyBacktestView['trades
             {recent.map((t, i) => (
                 <RowCard key={`${t.date}-${t.symbol}-${t.side}-${i}`} className="flex items-center justify-between py-2">
                     <div className="min-w-0">
-                        <span className={cn('font-mono px-2 py-0.5 rounded text-[10px] font-bold uppercase tracking-wider border mr-2',
+                        <span className={cn('control-type capitalize px-2 py-0.5 rounded text-[10px] border mr-2',
                             t.side === 'buy' ? 'bg-brand/10 text-brand border-brand/20' : 'bg-negative/10 text-negative border-negative/20')}>
                             {t.side}
                         </span>

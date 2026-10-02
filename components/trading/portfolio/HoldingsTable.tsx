@@ -35,8 +35,7 @@ const HoldingsTable = ({positions, emptyText = 'No open positions.', showUnprice
 
     return (
         <div className="space-y-2">
-            <div className={`hidden md:grid ${columns} gap-4 px-4 py-2 border-b border-line-strong/30 font-mono text-fg-muted`}
-                 style={{fontSize: '10px', letterSpacing: '0.1em', textTransform: 'uppercase'}}>
+            <div className={`hidden md:grid ${columns} gap-4 px-4 py-2 border-b border-line-strong/30 label-type text-[length:var(--label-size)] text-fg-muted`}>
                 <div>Asset</div>
                 <div className="text-right">Qty</div>
                 <div className="text-right"><Term k="avg-cost">Avg Cost</Term></div>

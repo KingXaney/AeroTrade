@@ -26,7 +26,7 @@ const SOURCE_LABELS: Record<SecondOpinionView['source'], string> = {
     manual: 'pasted',
 };
 
-const BUTTON_CLASS = 'px-3 py-2 rounded-lg font-mono text-xs font-bold uppercase tracking-wider text-brand border border-brand/35 bg-brand-strong/6 transition-all active:scale-[0.98] disabled:opacity-50';
+const BUTTON_CLASS = 'control-type px-3 py-2 rounded-lg text-xs text-brand border border-brand/35 bg-brand-strong/6 transition-all active:scale-[0.98] disabled:opacity-50';
 
 const SecondOpinionCard = ({configured, opinion}: {configured: boolean; opinion: SecondOpinionView | null}) => {
     const router = useRouter();
@@ -167,7 +167,7 @@ const SecondOpinionCard = ({configured, opinion}: {configured: boolean; opinion:
                             {pending === 'save' ? 'Saving…' : 'Save opinion'}
                         </button>
                         <button type="button" onClick={() => {setPasteOpen(false); setPromptFallback('');}} disabled={busy}
-                                className="px-3 py-2 rounded-lg text-xs font-bold uppercase tracking-wider text-fg-muted hover:text-negative transition-colors disabled:opacity-50 font-mono">
+                                className="control-type px-3 py-2 rounded-lg text-xs text-fg-muted hover:text-negative transition-colors disabled:opacity-50">
                             Cancel
                         </button>
                     </div>

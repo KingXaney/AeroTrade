@@ -139,7 +139,7 @@ const ReturnBridge = ({accountId, bridge}: {accountId: string; bridge: Bridge | 
                                 />
                                 <output htmlFor="bridge-guess" className="font-mono text-sm text-fg w-10 text-right">{draft}%</output>
                                 <button type="button" id="bridge-reveal" onClick={reveal}
-                                        className="font-mono text-[11px] font-bold uppercase tracking-[0.08em] px-3 py-1.5 rounded-md bg-brand/10 text-brand hover:bg-brand/20">
+                                        className="control-type text-[11px] px-3 py-1.5 rounded-md bg-brand/10 text-brand hover:bg-brand/20">
                                     {BRIDGE_COPY.reveal}
                                 </button>
                             </div>

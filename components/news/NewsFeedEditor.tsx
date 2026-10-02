@@ -43,7 +43,7 @@ const chipClass = (on: boolean) => cn(
 
 const Group = ({label, hint, children}: {label: string; hint?: string; children: React.ReactNode}) => (
     <div>
-        <div className="text-[10px] uppercase tracking-[0.14em] text-fg-muted mb-2 font-mono">{label}</div>
+        <div className="label-type text-[length:var(--label-size)] text-fg-muted mb-2">{label}</div>
         {children}
         {hint && <p className="mt-1.5 text-[11px] text-fg-muted">{hint}</p>}
     </div>
@@ -177,7 +177,7 @@ const NewsFeedEditor = ({initial, startOpen = false}: Props) => {
 
                     <div className="flex items-center justify-between gap-2 pt-3 border-t border-line-strong/20 font-mono">
                         <button id="news-feed-reset" type="button" onClick={askReset}
-                                className="text-xs uppercase tracking-[0.1em] text-fg-muted hover:text-negative transition-colors">
+                                className="label-type text-xs text-fg-muted hover:text-negative transition-colors">
                             Reset to top stories
                         </button>
                         <ActionButton id="news-feed-save" size="md" className="inline-flex items-center gap-2" onClick={save} disabled={pending || !dirty}>

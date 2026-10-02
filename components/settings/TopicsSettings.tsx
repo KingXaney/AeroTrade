@@ -14,7 +14,7 @@ const TopicsSettings = ({overview}: {overview: TopicsOverview}) => {
                         ? "You're not following any topics yet."
                         : `${count} of ${MAX_TOPICS_PER_USER} topics · ${overview.unseenTotal} new ${overview.unseenTotal === 1 ? 'article' : 'articles'}`}
                 </p>
-                <Link href="/topics" className="text-xs uppercase tracking-[0.1em] text-brand hover:underline font-mono">
+                <Link href="/topics" className="label-type text-xs text-brand hover:underline">
                     {count === 0 ? 'Follow a topic →' : 'Manage topics →'}
                 </Link>
             </div>
