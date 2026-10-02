@@ -26,6 +26,7 @@ const OUT = outDir(THEME ? `sweep-${THEME.replace(':', '-')}` : 'sweep');
 const WIDTHS = [{name: 'desktop', width: 1440, height: 900}, {name: 'phone', width: 390, height: 844}];
 
 const SIGNED_OUT = [
+    ['landing', '/'],
     ['sign-in', '/sign-in'],
     ['sign-up', '/sign-up'],
     ['forgot-password', '/forgot-password'],

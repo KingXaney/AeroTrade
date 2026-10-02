@@ -72,6 +72,17 @@ and friends keep none beyond Shared and the invariants).
   `scripts/migration-indexes.mjs`, which `migrate:accounts` builds and
   `lib/__tests__/migration-indexes.test.ts` holds equal to the models.
 
+### landing
+
+- `/` has two faces. `proxy.ts` rewrites a request with no session cookie for exactly `/` to
+  `app/(marketing)/welcome` (the address stays `/`) and redirects every other gated path to
+  /sign-in; with a cookie it is Home. The landing page reads nothing — no session, no database.
+- Its sentences, and the auth pages' right column (`components/auth/AuthShell`), are
+  `lib/learn/copy/landing`: numbers only from the app's own constants, no return figure, user
+  count or testimonial, and the no-advice list applies as everywhere. The example screen is
+  the app's own primitives, labelled as an example. `components/landing/ThemeDemo` previews a
+  theme and saves nothing.
+
 ### home
 
 - `/` is Home for a signed-in reader: `lib/home/page-store.getHomeView` (the accounts' valuation and

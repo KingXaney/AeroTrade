@@ -37,7 +37,8 @@ Shared pieces that belong to no single feature:
 | Feature | Pages | Components | Logic | Actions | Jobs | Wording | Browser QA |
 |---|---|---|---|---|---|---|---|
 | **auth** | `(auth)/sign-in`, `sign-up`, `forgot-password`, `(reset)/reset-password` | `auth/`, `forms/` | `lib/auth/` — `server` (better-auth), `session`, `limits`, `validation`, `sign-up-options`, `sign-up-profile` | `auth.actions` | `email` (welcome) | — | `qa-auth` |
-| **home** | `/` | `home/` (and the topics and learn widgets' bodies) | `lib/home/` — `view` (accounts as rows, the next step), `page-store` | — | — | `copy/home` | `qa-home` |
+| **landing** | `/` signed out (`app/(marketing)/welcome`, shown there by `proxy.ts`) | `landing/` | — | — | — | `copy/landing` | `qa-shell` |
+| **home** | `/` signed in | `home/` (and the topics and learn widgets' bodies) | `lib/home/` — `view` (accounts as rows, the next step), `page-store` | — | — | `copy/home` | `qa-home` |
 | **dashboard** | `/dashboard` | `dashboard/`, `dashboard/widgets/<feature>/`, `widgets/registry.tsx` | `lib/dashboard/` — `catalog` (every widget), `loaders`, `layout`, `layout-store`, `availability` | `dashboard.actions` | — | — | `qa-topics`, `qa-styles` |
 | **trading** | `/trade`, `/portfolio`, `/history`, `api/accounts/[accountId]/export` | `trading/desk`, `trading/portfolio`, `trading/accounts`, `trading/learn` | `lib/trading/` — `accounts`, `orders`, `fill`, `ledger`, `valuation`, `analytics(-store)`, `lifecycle`, `active-account`, `snapshots`, `csv`, `portfolio-page(-store)`, `learn/` | `trading.actions`, `accounts.actions` | `trading` (daily snapshots) | `copy/trade`, `portfolio`, `receipts`, `habits`, `luck`, `unpriced` | `qa-trading`, `qa-learn-account`, `qa-topics-refresh` |
 | **income** | `/portfolio` (Income panel) | `income/` | `lib/income/` — `accrual` (the one accrual clock), `store` (nightly credit), `page-store` | — | `income` | `copy/income` | `qa-income` |

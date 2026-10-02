@@ -1,8 +1,13 @@
 import Link from "next/link";
+import {LANDING_COPY} from "@/lib/learn/copy/landing";
 
 // The two-column chrome around every auth form. Shared by the (auth) group, which
 // bounces signed-in users to /, and the (reset) group, which must not: a
 // signed-in user has to be able to finish resetting their own password.
+//
+// The right column says what the app is, in the landing page's own words
+// (lib/learn/copy/landing.ts). It used to hold a mock terminal printing a node count and a
+// latency the app never measured.
 const AuthShell = ({children}: {children: React.ReactNode}) => (
     <main className="auth-layout">
         <section className="auth-left-section scrollbar-hide-default">
@@ -20,52 +25,21 @@ const AuthShell = ({children}: {children: React.ReactNode}) => (
         </section>
 
         <section className="auth-right-section">
-            <div className="z-10 relative lg:mt-4 lg:mb-16">
-                <p className="auth-blockquote">
-                    Paper-trade in practice accounts of your own, follow the news topics you care about, and let a news brain that reads hundreds of articles a day tell you what the market is paying attention to.
-                </p>
-                <p className="max-md:text-xs text-fg-muted font-mono"
-                   style={{ letterSpacing: '0.02em' }}>
-                    Open source · built by Xinnan Huang
-                </p>
-            </div>
-
-            {/* Decorative elements */}
-            <div className="flex-1 relative">
-                <div className="absolute top-0 left-0 w-full h-full opacity-20"
-                     style={{
-                         background: 'radial-gradient(circle at 30% 50%, color-mix(in srgb, var(--brand-strong) 15%, transparent), transparent 70%)',
-                     }}>
-                </div>
-                <div className="absolute top-8 left-8 right-8 bottom-8 rounded-2xl overflow-hidden border border-brand/10"
-                     style={{
-                         background: 'linear-gradient(135deg, color-mix(in srgb, var(--brand-strong) 5%, transparent), color-mix(in srgb, var(--secondary-tint) 5%, transparent))',
-                         backdropFilter: 'blur(8px)',
-                     }}>
-                    {/* Terminal-like decorative content */}
-                    <div className="p-6 space-y-3 opacity-40">
-                        <div className="flex items-center gap-2 mb-4">
-                            <div className="w-3 h-3 rounded-full bg-negative"></div>
-                            <div className="w-3 h-3 rounded-full bg-brand-strong"></div>
-                            <div className="w-3 h-3 rounded-full bg-brand"></div>
-                        </div>
-                        <p className="font-mono text-brand" style={{ fontSize: '11px' }}>
-                            &gt; SYSTEM.INIT: AeroTrade Terminal v2.44
-                        </p>
-                        <p className="font-mono text-fg-muted" style={{ fontSize: '11px' }}>
-                            &gt; Connecting to market nodes...
-                        </p>
-                        <p className="font-mono text-brand-dim" style={{ fontSize: '11px' }}>
-                            &gt; 47 nodes online · Latency: 0.8ms
-                        </p>
-                        <p className="font-mono text-fg-muted" style={{ fontSize: '11px' }}>
-                            &gt; Portfolio sync: COMPLETE
-                        </p>
-                        <p className="font-mono text-brand" style={{ fontSize: '11px' }}>
-                            &gt; AI Assistant: READY
-                        </p>
-                    </div>
-                </div>
+            <div className="z-10 relative lg:mt-4">
+                <p className="auth-blockquote">{LANDING_COPY.title}</p>
+                <ul className="hidden md:block space-y-5 max-w-xl">
+                    {LANDING_COPY.pillars.map((pillar) => (
+                        <li key={pillar.id} className="flex gap-4">
+                            <span className="material-symbols-outlined text-2xl text-brand shrink-0" aria-hidden="true">{pillar.icon}</span>
+                            <div>
+                                <p className="font-heading text-base font-semibold text-fg">{pillar.title}</p>
+                                <p className="mt-1 text-sm leading-relaxed text-fg-muted">{pillar.points[0]}</p>
+                            </div>
+                        </li>
+                    ))}
+                </ul>
+                <p className="mt-6 max-md:mt-2 max-md:text-xs text-xs text-fg-muted">{LANDING_COPY.disclaimer}</p>
+                <p className="mt-2 max-md:text-xs text-fg-muted font-mono text-xs">{LANDING_COPY.credit}</p>
             </div>
         </section>
     </main>

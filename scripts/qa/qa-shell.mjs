@@ -133,8 +133,35 @@ try {
     await page.locator('[data-slot="sheet-content"] button:has-text("Logout")').click();
     await page.waitForURL(/\/sign-in/, {timeout: 15000}).catch(() => {});
     check('drawer logout lands on /sign-in', /\/sign-in/.test(page.url()), page.url());
-    await page.goto(`${BASE}/`, {waitUntil: 'load'});
+    await page.goto(`${BASE}/portfolio`, {waitUntil: 'load'});
     check('…and the session is gone', /\/sign-in/.test(page.url()), page.url());
+
+    // --- the front door, signed out ---------------------------------------------------
+    await page.setViewportSize({width: 1440, height: 900});
+    await page.goto(`${BASE}/`, {waitUntil: 'load'});
+    check('signed out, "/" is the landing page under its own address',
+        new URL(page.url()).pathname === '/' && await page.locator('[data-landing]').count() === 1, page.url());
+    check('…with one h1, the sign-up button and no app chrome',
+        await page.locator('h1').count() === 1 && await page.locator('a[data-landing-cta][href="/sign-up"]').count() === 1
+        && await page.locator('aside.rail').count() === 0);
+    check('…the three pillars and the not-advice line',
+        await page.locator('#landing-news, #landing-learn, #landing-practise').count() === 3
+        && /never gives financial advice/.test(await page.locator('[data-landing-disclaimer]').innerText()));
+    const styleBefore = await page.evaluate(() => document.documentElement.dataset.style);
+    await page.locator('[data-theme-demo="gruvbox-brutal"]').click();
+    await page.waitForFunction(() => document.documentElement.dataset.style === 'brutalist', null, {timeout: 5000}).catch(() => {});
+    check('a theme button repaints the page, saving nothing',
+        styleBefore === 'minimal' && await page.evaluate(() => document.documentElement.dataset.style) === 'brutalist'
+        && !(await page.context().cookies()).some((c) => c.name === 'aero-theme'));
+    await shot('05-landing');
+    await page.setViewportSize({width: 390, height: 844});
+    await page.goto(`${BASE}/`, {waitUntil: 'load'});
+    check('the landing page fits a phone without sideways scroll',
+        await page.evaluate(() => document.documentElement.scrollWidth - window.innerWidth) <= 1);
+    await page.locator('a[data-landing-cta]').click();
+    await page.waitForURL(/\/sign-up/, {timeout: 15000}).catch(() => {});
+    check('its button opens sign-up, whose logo leads back to it', /\/sign-up/.test(page.url())
+        && await page.locator('a.auth-logo[href="/"]').count() === 1);
 } catch (err) {
     check(`threw: ${err.message}`, false);
     await shot('99-error').catch(() => {});
