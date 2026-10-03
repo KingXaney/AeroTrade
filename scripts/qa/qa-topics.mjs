@@ -1,9 +1,10 @@
 // Followed topics (lib/topics, /topics): six topics preinstalled at sign-up, a topic page's first
 // live fetch, the rail's News card and its dot (a seeded headline, "since you last looked", the
 // dot that lights for an article the reader has not looked at and clears on opening the topics
-// index or /news without a reload), ⌘K following a topic and opening one, a refresh that brings
-// new articles, editing keywords and deleting from the header menu. Also the surfaces topics
-// lead: the topics-first dashboard and the widget library's Topics group, the settings page's
+// index or /news without a reload — on the rail and in the mobile drawer), ⌘K following a topic
+// and opening one, a refresh that brings new articles, editing keywords and deleting from the
+// header menu. Also the surfaces topics lead: the topics-first dashboard and the widget
+// library's Topics group, the settings page's
 // Topics section and email toggle, the chat launcher's topic suggestion, the header nav order,
 // and the theme picker's hover sweep (the committed style never flashes).
 // Run: npm run qa -- topics   (the harness: README.md)
@@ -152,6 +153,32 @@ const settleToasts = async (page) => {
     await newsCard.waitFor({timeout: 5000}).catch(() => {});
     check('the card then says the look was just now', /Since you last looked · just now/i.test(await cardText()), await cardText());
     await page.mouse.move(700, 500);
+
+    // --- below lg the drawer carries the same dot, and a drawer opened after the stamp is clear ---
+    // Its rows exist only while the sheet is open and it closes on every navigation, so the stamp
+    // always lands while they are gone; MobileNav, mounted all session, holds the cleared state.
+    // A full second after the last stamp: article times are whole seconds, the stamp is not.
+    await page.waitForTimeout(1100);
+    if (geo) await seedInto(geo.keywordSetHash, 'QA feed: a third geopolitics story', 0, 'sanctions');
+    await page.setViewportSize({width: 390, height: 844});
+    await page.goto(`${BASE}/dashboard`, {waitUntil: 'load'});
+    // The rail is display:none at this width but still in the DOM, so its sentence is read and
+    // waited on as at desktop width.
+    await page.locator(newsRail).waitFor({state: 'attached', timeout: 30000});
+    const drawerNews = '[data-slot="sheet-content"] a[href="/news"]';
+    const drawerLabel = async () => (await page.locator(drawerNews).getAttribute('aria-label')) ?? '';
+    await page.locator('button[aria-label="Open navigation"]').click();
+    await page.locator(drawerNews).waitFor({timeout: 5000}).catch(() => {});
+    check('below lg, the drawer row for News carries the dot and its sentence', NEWS_DOT.test(await drawerLabel()), await drawerLabel());
+    await page.locator(drawerNews).click();
+    await page.waitForURL(/\/news$/, {timeout: 15000}).catch(() => {});
+    await waitForDotCleared();
+    await page.locator('[data-slot="sheet-content"]').waitFor({state: 'detached', timeout: 5000}).catch(() => {});
+    await page.locator('button[aria-label="Open navigation"]').click();
+    await page.locator(drawerNews).waitFor({timeout: 5000}).catch(() => {});
+    check('a drawer opened after the stamp shows no dot, without a reload', (await drawerLabel()) === '', await drawerLabel());
+    await page.setViewportSize({width: 1440, height: 900});
+
     await page.goto(`${BASE}/topics/ai-chips`, {waitUntil: 'load'});
     await page.waitForTimeout(800);
     const railNav = await page.$$eval('aside.rail nav a', (as) => as.map((a) => a.getAttribute('aria-label')?.split(',')[0]));

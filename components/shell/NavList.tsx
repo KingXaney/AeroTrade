@@ -4,12 +4,12 @@ import Link from "next/link";
 import {cn} from "@/lib/utils";
 import {ACCOUNT_PAGES, NAV_SECTIONS, isActiveNav, sectionFor, type NavBadges, type NavSection} from "@/lib/shell/navigation";
 import {dotLabel} from "@/lib/learn/copy/shell";
-import {useNewsSeen} from "@/components/shell/useNewsSeen";
 
 // The mobile drawer's rows: the rail's sections by name, then the account pages. A section's
 // other pages are the tabs on the page itself (SectionTabs), so the drawer stays as short as
-// the rail it stands in for. A section's dot is the rail's (same key, same sentence), cleared
-// locally the moment a News page stamps the look, as the rail clears its own.
+// the rail it stands in for. A section's dot is the rail's (same key, same sentence). This list
+// exists only while the drawer is open, so it listens for nothing itself: MobileNav, mounted for
+// the whole session, zeroes the News count once a News page stamps the look.
 type Props = {
     pathname: string;
     /** Counts to show; an absent or zero key renders nothing. */
@@ -24,12 +24,7 @@ const rowTone = (active: boolean) => active ? 'text-brand border-l-4 border-bran
 const NavList = ({pathname, badges = {}, onNavigate}: Props) => {
     const current = sectionFor(pathname);
     const requests = badges.friendRequests ?? 0;
-    const clearedAt = useNewsSeen();
-    const countFor = (section: NavSection): number => {
-        if (!section.badge) return 0;
-        if (section.badge === 'newsNew' && clearedAt !== null) return 0;
-        return badges[section.badge] ?? 0;
-    };
+    const countFor = (section: NavSection): number => (section.badge ? badges[section.badge] ?? 0 : 0);
     return (
         <nav aria-label="Sections" className="space-y-1">
             {NAV_SECTIONS.map((section) => {
