@@ -54,9 +54,9 @@ export const LANDING_COPY = {
             title: 'Learn how the market works',
             body: 'Start from nothing: what a share is, how an order fills, what a portfolio is made of. Every figure on screen carries its own definition, and the app teaches from your own account as you use it.',
             points: [
-                `A beginner course of ${COURSE_LESSONS.length} short lessons, each ending on one question and a link to the real screen.`,
+                `A beginner course of ${COURSE_LESSONS.length} short lessons, each with a link to the real screen it is about.`,
                 `One glossary of ${GLOSSARY_KEYS.length} terms, each defined in plain words beside the number it explains.`,
-                'One short lesson and one quiz question each day, drawn from that day\'s news and trades.',
+                'One short lesson each day, drawn from that day\'s news and trades.',
             ],
         },
         {

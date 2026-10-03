@@ -1,7 +1,7 @@
 // The beginner course: four modules of four short lessons, in one fixed order. Pure — the text
 // is lib/learn/copy/course/*, the stamps are read by lib/learn/course-store.ts.
 //
-// A lesson is done when its check was answered (a stamp-once id in the `learn` preference
+// A lesson is done when the reader marked it done (a stamp-once id in the `learn` preference
 // sub-schema, written by lib/actions/learn.actions.markCourseLessonDone) or when the reader has
 // done the thing it is about — a first paper trade completes "The order ticket". Derived from
 // rows first, a stamp second (invariant 9); no flag says "is a learner".

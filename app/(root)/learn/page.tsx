@@ -12,14 +12,9 @@ import {getLearnFacts, getOnboardingFacts} from "@/lib/learn/facts-store";
 import {getTodaysLesson} from "@/lib/learn/lesson-store";
 import {deriveMissions, onboardingActive} from "@/lib/learn/missions";
 import {deriveMoments} from "@/lib/learn/moments";
-import {getDailyQuiz} from "@/lib/learn/quiz-store";
-import {QUIZ_RUN_WINDOW_DAYS} from "@/lib/learn/quiz";
-import {DAILY_QUIZ_COPY, daysAnsweredLine, quizEmptyDescription} from "@/lib/learn/copy/quiz";
 import GlossaryHashRedirect from "@/components/learn/GlossaryHashRedirect";
-import DailyQuiz from "@/components/dashboard/widgets/learn/DailyQuiz";
 import GettingStarted from "@/components/dashboard/widgets/learn/GettingStarted";
 import TodaysLesson from "@/components/dashboard/widgets/learn/TodaysLesson";
-import EmptyState from "@/components/primitives/EmptyState";
 import MicroLabel from "@/components/primitives/MicroLabel";
 import PageTitle from "@/components/primitives/PageTitle";
 import Panel from "@/components/primitives/Panel";
@@ -33,9 +28,9 @@ import {cn} from "@/lib/utils";
 // The browser tab's title; app/layout.tsx appends the app's name.
 export const metadata: Metadata = {title: "Learn"};
 
-// Everything the app teaches, in one place: the beginner course, today's lesson and question,
-// the glossary every label on every page quotes, and the strategies in a line each. One view at
-// a time, kept in the URL (?tab=), so only the open view's data is read.
+// Everything the app teaches, in one place: the beginner course, today's lesson, the glossary
+// every label on every page quotes, and the strategies in a line each. One view at a time, kept
+// in the URL (?tab=), so only the open view's data is read.
 
 const TAB_IDS = ['course', 'today', 'glossary', 'strategies'] as const;
 type TabId = (typeof TAB_IDS)[number];
@@ -104,33 +99,14 @@ const LessonAsync = async ({userId}: {userId: string}) => {
     return <TodaysLesson lesson={await getTodaysLesson(userId)}/>;
 };
 
-const QuizAsync = async ({userId}: {userId: string}) => {
-    const view = await getDailyQuiz(userId);
-    if (view.quiz) return <DailyQuiz quiz={view.quiz} daysAnswered={view.daysAnswered}/>;
-    return (
-        <EmptyState
-            title={DAILY_QUIZ_COPY.emptyTitle}
-            description={quizEmptyDescription(QUIZ_RUN_WINDOW_DAYS)}
-            note={daysAnsweredLine(view.daysAnswered)}
-            className="p-0"
-        />
-    );
-};
-
 const TodayView = async ({userId}: {userId: string}) => {
     const facts = await getOnboardingFacts(userId);
     return (
         <div className="space-y-4" id="learn-today">
-            <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
-                <Panel aria-labelledby="today-lesson-heading">
-                    <SectionHeading id="today-lesson-heading">{LEARN_PAGE_COPY.todayLesson}</SectionHeading>
-                    <Suspense fallback={<WidgetSkeleton height={200} rows={3}/>}><LessonAsync userId={userId}/></Suspense>
-                </Panel>
-                <Panel aria-labelledby="today-quiz-heading">
-                    <SectionHeading id="today-quiz-heading">{LEARN_PAGE_COPY.todayQuiz}</SectionHeading>
-                    <Suspense fallback={<WidgetSkeleton height={200} rows={4}/>}><QuizAsync userId={userId}/></Suspense>
-                </Panel>
-            </div>
+            <Panel aria-labelledby="today-lesson-heading">
+                <SectionHeading id="today-lesson-heading">{LEARN_PAGE_COPY.todayLesson}</SectionHeading>
+                <Suspense fallback={<WidgetSkeleton height={200} rows={3}/>}><LessonAsync userId={userId}/></Suspense>
+            </Panel>
             {onboardingActive(facts) && (
                 <Panel aria-labelledby="today-first-week-heading">
                     <SectionHeading id="today-first-week-heading">{LEARN_PAGE_COPY.todayFirstWeek}</SectionHeading>

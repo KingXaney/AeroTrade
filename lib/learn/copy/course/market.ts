@@ -22,12 +22,6 @@ export const MARKET_LESSONS: readonly CourseLessonCopy[] = [
         ],
         terms: ['close', 'market-cap', 'fifty-two-week-range'],
         tryIt: {label: 'Open a stock page', href: '/stocks/SPY'},
-        check: {
-            question: 'A company has 1,000 shares, and each last traded at $50. What does the market value the whole company at?',
-            options: ['$50', '$50,000', '$1,000'],
-            answer: 1,
-            explain: 'Price times shares: $50 × 1,000 = $50,000.',
-        },
     },
     {
         id: 'when-the-market-is-open',
@@ -39,12 +33,6 @@ export const MARKET_LESSONS: readonly CourseLessonCopy[] = [
         ],
         terms: ['market-order', 'close'],
         tryIt: {label: 'Open the trade desk', href: '/trade'},
-        check: {
-            question: 'It is Saturday. What does a stock\'s quote show?',
-            options: ['The price it last closed at', 'A live price', 'Nothing at all'],
-            answer: 0,
-            explain: 'Nobody is trading, so the quote is Friday\'s close until the market reopens.',
-        },
     },
     {
         id: 'indexes-and-the-benchmark',
@@ -56,12 +44,6 @@ export const MARKET_LESSONS: readonly CourseLessonCopy[] = [
         ],
         terms: ['s&p 500', 'nasdaq', 'dow jones', 'benchmark', 'vs-spy'],
         tryIt: {label: 'Open the buy-and-hold strategy', href: '/strategies/buy-and-hold-spy'},
-        check: {
-            question: 'An account is up 4% while SPY is up 6% over the same days. What does "vs SPY" read?',
-            options: ['+4 points', '−2 points', '+10 points'],
-            answer: 1,
-            explain: 'The account\'s return minus the benchmark\'s: 4 − 6 = −2 percentage points.',
-        },
     },
     {
         id: 'reading-a-stock-page',
@@ -74,11 +56,5 @@ export const MARKET_LESSONS: readonly CourseLessonCopy[] = [
         terms: ['pe-ratio', 'dividend-yield', 'beta'],
         tryIt: {label: 'Open the watchlist', href: '/watchlist'},
         doneFrom: 'hasWatchlist',
-        check: {
-            question: 'A stock trades at $100 and earned $5 per share over the last year. What is its P/E ratio?',
-            options: ['5', '20', '500'],
-            answer: 1,
-            explain: 'Price divided by earnings per share: 100 ÷ 5 = 20.',
-        },
     },
 ];

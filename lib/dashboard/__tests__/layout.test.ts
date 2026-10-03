@@ -6,6 +6,7 @@ import {
     LEGACY_DEFAULT_LAYOUT_V1,
     LEGACY_WIDGET_IDS,
     MAX_WIDGETS,
+    RETIRED_WIDGET_IDS,
     addWidget,
     filterAvailable,
     layoutFingerprint,
@@ -137,6 +138,20 @@ describe('renameLegacyWidgetIds + readSavedLayout', () => {
 
     it('still upgrades the untouched old default', () => {
         expect(readSavedLayout(JSON.parse(JSON.stringify(LEGACY_DEFAULT_LAYOUT_V1)))).toEqual(DEFAULT_LAYOUT);
+    });
+});
+
+describe('retired widget ids', () => {
+    it('are never a current widget, nor an old name for one', () => {
+        for (const id of RETIRED_WIDGET_IDS) {
+            expect(WIDGET_IDS as readonly string[]).not.toContain(id);
+            expect(Object.keys(LEGACY_WIDGET_IDS)).not.toContain(id);
+        }
+    });
+
+    it('drop out of a saved layout, the rest kept in place', () => {
+        const stored = {version: 1, widgets: [{id: 'getting-started', span: 12}, {id: 'daily-quiz', span: 6}, {id: 'todays-lesson', span: 6}]};
+        expect(readSavedLayout(stored).widgets).toEqual([{id: 'getting-started', span: 12}, {id: 'todays-lesson', span: 6}]);
     });
 });
 

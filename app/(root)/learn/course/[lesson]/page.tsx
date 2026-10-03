@@ -6,7 +6,7 @@ import {COURSE_LESSONS, lessonById, neighbours} from "@/lib/learn/course";
 import {getCourseProgress} from "@/lib/learn/course-store";
 import {COURSE_COPY} from "@/lib/learn/copy/learn";
 import {GLOSSARY} from "@/lib/learn/glossary";
-import LessonCheck from "@/components/learn/LessonCheck";
+import LessonDone from "@/components/learn/LessonDone";
 import Badge from "@/components/primitives/Badge";
 import MicroLabel from "@/components/primitives/MicroLabel";
 import PageTitle from "@/components/primitives/PageTitle";
@@ -22,7 +22,7 @@ type LessonPageProps = {params: Promise<{lesson: string}>};
 
 // One lesson of the beginner course: a few framing sentences, the glossary's own definitions of
 // the words it uses (quoted from lib/learn/glossary.ts, never paraphrased — invariant 12), a
-// link to the real screen, and one question. Its text is lib/learn/copy/course/*.
+// link to the real screen, and a button that marks it done. Its text is lib/learn/copy/course/*.
 const LessonPage = async ({params}: LessonPageProps) => {
     const userId = await requireUserId();
     const lesson = lessonById((await params).lesson);
@@ -66,9 +66,9 @@ const LessonPage = async ({params}: LessonPageProps) => {
                 <Link href={lesson.tryIt.href} className={actionButton({variant: 'secondary', size: 'md'})} data-lesson-try>{lesson.tryIt.label}</Link>
             </Panel>
 
-            <Panel aria-labelledby="lesson-check">
-                <SectionHeading id="lesson-check">{COURSE_COPY.checkHeading}</SectionHeading>
-                <LessonCheck lessonId={lesson.id} check={lesson.check} done={done}/>
+            <Panel aria-labelledby="lesson-finish">
+                <SectionHeading id="lesson-finish">{COURSE_COPY.doneHeading}</SectionHeading>
+                <LessonDone lessonId={lesson.id} done={done} next={next ? {id: next.id, title: next.title} : null}/>
             </Panel>
 
             <nav aria-label="Lessons" className="flex items-center justify-between gap-3 pt-2">

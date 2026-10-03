@@ -19,12 +19,9 @@ export interface LearnPrefs {
     // Today's lesson "Got it" keys (lib/learn/moments.ts lessonKey), newest last, capped at
     // LESSONS_SEEN_CAP by the $push {$each, $slice} that writes them.
     lessonsSeen?: string[];
-    // Daily quiz: days with at least one answer, and the last such ET day ('YYYY-MM-DD').
-    // Written together by one atomic update filtered on the date, so a day counts once.
-    quizDaysAnswered?: number;
-    quizLastAnsweredDate?: string;
-    // Beginner-course lessons whose check was answered (lib/learn/course.ts ids), each once
-    // ($addToSet). A field of its own: lessonsSeen is capped and churns with rebalance keys.
+    // Beginner-course lessons marked done (lib/learn/course.ts ids), each once ($addToSet). A
+    // field of its own: lessonsSeen is capped and churns with rebalance keys. (The retired Daily
+    // quiz's quizDaysAnswered / quizLastAnsweredDate may still sit in old documents; nothing reads them.)
     courseDone?: string[];
 }
 
@@ -39,7 +36,7 @@ export interface UserPreferencesDoc extends Document {
     followedStrategies?: string[];     // quant-strategy slugs pinned on the dashboard; absent = none
     topicsSeededAt?: Date;             // default topics installed once; absent = never seeded
     newsSeenAt?: Date;                 // the reader last opened News (/news or the /topics index); absent = never — the rail dot's and the News card's stamp
-    learn?: LearnPrefs;                // learn-surface stamps (checklist hidden, lessons seen, quiz days); absent = none
+    learn?: LearnPrefs;                // learn-surface stamps (checklist hidden, lessons seen, course lessons done); absent = none
     updatedAt: Date;
 }
 
@@ -83,8 +80,6 @@ const LearnSchema = new Schema<LearnPrefs>(
     {
         missionsDismissedAt: {type: Date, required: false},
         lessonsSeen: {type: [String], default: undefined},
-        quizDaysAnswered: {type: Number, required: false},
-        quizLastAnsweredDate: {type: String, required: false},
         courseDone: {type: [String], default: undefined},
     },
     {_id: false},

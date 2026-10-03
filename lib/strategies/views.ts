@@ -160,7 +160,7 @@ export const unpricedNote = (rows: readonly {live: LiveRecord | null}[]): Unpric
         : {mode: 'marker', legend: '* partly unpriced — valued at cost until the next quote'};
 };
 
-// The verdict vocabulary, in one place: the board, the quiz and the replay all read it,
+// The verdict vocabulary, in one place: the board and the replay both read it,
 // so a chip can never say something the table it explains does not.
 export const STATE_LABEL: Record<RowState, string> = {
     held: 'held', enter: 'enter', exit: 'exit', watch: 'watch', excluded: 'excluded',

@@ -23,7 +23,6 @@ import {getLearnFacts, getOnboardingFacts} from "@/lib/learn/facts-store";
 import type {LearnFacts, OnboardingFacts} from "@/lib/learn/facts";
 import {getTodaysLesson} from "@/lib/learn/lesson-store";
 import type {Lesson} from "@/lib/learn/lesson";
-import {getDailyQuiz, type DailyQuizView} from "@/lib/learn/quiz-store";
 import type {BrainEntitySummary} from '@/lib/brain/types';
 import type {LeaderboardEntry} from '@/lib/friends/types';
 import type {NavigatorStatus} from '@/lib/navigator/types';
@@ -69,7 +68,6 @@ export type DashboardData = Partial<{
     onboardingFacts: OnboardingFacts;
     learnFacts: LearnFacts;
     lesson: Lesson;
-    dailyQuiz: DailyQuizView;
 }>;
 
 type Loader<K extends DataKey> = (ctx: LoaderCtx) => Promise<DashboardData[K]>;
@@ -122,8 +120,6 @@ export const LOADERS: {[K in DataKey]: Loader<K>} = {
     learnFacts: ({userId}) => getLearnFacts(userId),
     // Lazy: awaited under Suspense only when no moment wins (components/dashboard/widgets/registry.tsx).
     lesson: ({userId}) => getTodaysLesson(userId),
-    // Lazy: eight bounded point reads for the recent boards plus the learner's count of answered days.
-    dailyQuiz: ({userId}) => getDailyQuiz(userId),
 };
 
 type LoadedDashboard = {data: DashboardData; failed: Set<DataKey>};

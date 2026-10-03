@@ -20,12 +20,6 @@ export const NEWS_LESSONS: readonly CourseLessonCopy[] = [
         ],
         terms: ['event-earnings', 'event-guidance', 'event-macro', 'event-analyst'],
         tryIt: {label: 'Open the News Brain', href: '/brain'},
-        check: {
-            question: 'A company says it expects lower sales next quarter. Which kind of event is that?',
-            options: ['Guidance', 'Earnings', 'M&A'],
-            answer: 0,
-            explain: 'A report of results already in is earnings; the company\'s own forecast of what comes next is guidance.',
-        },
     },
     {
         id: 'the-fed-and-rates',
@@ -38,12 +32,6 @@ export const NEWS_LESSONS: readonly CourseLessonCopy[] = [
         terms: ['fomc', 'fed funds rate', 'rate cut', 'rate hike'],
         tryIt: {label: 'Open your topics', href: '/topics'},
         doneFrom: 'topicOpened',
-        check: {
-            question: 'What does the Fed\'s committee decide at its meetings?',
-            options: ['The target for a key interest rate', 'Which stocks join the S&P 500', 'Company tax rates'],
-            answer: 0,
-            explain: 'It sets a target range for one overnight rate, and other borrowing costs follow.',
-        },
     },
     {
         id: 'todays-briefing',
@@ -55,12 +43,6 @@ export const NEWS_LESSONS: readonly CourseLessonCopy[] = [
         ],
         terms: ['earnings season', 'market rally'],
         tryIt: {label: 'Open the news', href: '/news'},
-        check: {
-            question: 'Where does a point in the briefing come from?',
-            options: ['Articles the app read that morning, linked beside it', 'A forecast of tomorrow\'s prices', 'Other people\'s trades'],
-            answer: 0,
-            explain: 'Each point cites the articles it summarises. Nothing in it is a forecast.',
-        },
     },
     {
         id: 'from-headlines-to-a-thesis',
@@ -72,11 +54,5 @@ export const NEWS_LESSONS: readonly CourseLessonCopy[] = [
         ],
         terms: ['news-weight', 'news-sentiment', 'thesis'],
         tryIt: {label: 'Open the News Brain', href: '/brain'},
-        check: {
-            question: 'Which of these is more likely to become a thesis?',
-            options: ['A subject covered steadily for weeks', 'A single viral headline', 'A stock with a high price'],
-            answer: 0,
-            explain: 'Lasting attention is what counts: the slower tally only stays high while coverage keeps coming.',
-        },
     },
 ];

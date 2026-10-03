@@ -18,23 +18,9 @@ import RowCard from "@/components/primitives/RowCard";
 // own: what the rule saw and what it then did are one story, and giving them two
 // identical frames side by side is what made the page read as a template.
 //
-// Guess the Verdict renders inside `signals` too, and while it is open everything here that
-// states a row's verdict is hidden with CSS, so the server render needs no state: the board's
-// verdict cells, the top row's reading (swapped for a line saying why), and [data-run-verdict]
-// — the headline, every order (side, kind, raw reason [data-order-reason], decoded reason
-// [data-decoded]) and every skipped order. `invisible` keeps their space, so the quiz does
-// not move under the pointer.
-//
 // Every sentence here is DECISION_COPY (lib/learn/copy/decision.ts); what the run stored — its
 // summary, the orders' reasons and messages, skipped orders' reasons, data issues — is quoted
 // as stored.
-const QUIZ_SWITCH = [
-    '[&:has([data-verdict-quiz][open])_[data-verdict]]:invisible',
-    '[&:has([data-verdict-quiz][open])_[data-run-verdict]]:invisible',
-    '[&:has([data-verdict-quiz][open])_[data-board-row-reading]]:hidden',
-    '[&:has([data-verdict-quiz][open])_[data-board-reading-paused]]:block',
-].join(' ');
-
 type Props = {
     run: StrategyRunView | null;
     // One-line summary of the run (describeLastRun), lifted off the old ranking column.
@@ -55,7 +41,7 @@ const LatestDecision = ({run, headline, signals, def}: Props) => {
         );
     }
     return (
-        <div className={cn('space-y-3', QUIZ_SWITCH)} id="latest-decision">
+        <div className="space-y-3" id="latest-decision">
             {headline && <p data-run-verdict className="font-mono text-sm text-fg">{headline}</p>}
             <div className="font-mono flex flex-wrap items-center gap-2 text-[11px]">
                 <Badge tone={run.mode === 'live' ? 'brand' : 'warning'}>{DECISION_COPY.mode[run.mode]}</Badge>

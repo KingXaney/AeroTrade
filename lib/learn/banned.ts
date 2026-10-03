@@ -1,5 +1,5 @@
 // The one list of words that turn a description into advice. Every learner-facing string
-// in the app (glossary, lessons, receipts, quiz copy), the chat chips and the model prompts
+// in the app (glossary, lessons, receipts), the chat chips and the model prompts
 // are held to it by a unit test, so "descriptive, never prescriptive" is enforced rather
 // than reviewed.
 //

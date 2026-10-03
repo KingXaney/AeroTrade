@@ -1,5 +1,5 @@
 // A small in-process memo that lives for one ET day. Pure; the request-path reads that keep
-// one (Luck or skill, Time in the market, "since thesis", the Daily quiz, the digest's lesson)
+// one (Luck or skill, Time in the market, "since thesis", the digest's lesson)
 // each put what their answer depends on into the key — the data's own stamp, never only the
 // clock — so a read taken before a price job lands is not pinned for the rest of the day.
 //

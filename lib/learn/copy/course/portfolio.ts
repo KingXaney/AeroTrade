@@ -23,12 +23,6 @@ export const PORTFOLIO_LESSONS: readonly CourseLessonCopy[] = [
         ],
         terms: ['weight', 'concentration', 'effective-holdings'],
         tryIt: {label: 'Open the risk lens', href: '/portfolio'},
-        check: {
-            question: 'An account holds $8,000 of one stock and $2,000 of cash. What is the stock\'s weight?',
-            options: ['20%', '80%', '8%'],
-            answer: 1,
-            explain: '8,000 of 10,000 is 80%: the account\'s day is mostly that one stock\'s day.',
-        },
     },
     {
         id: 'return-against-a-benchmark',
@@ -40,12 +34,6 @@ export const PORTFOLIO_LESSONS: readonly CourseLessonCopy[] = [
         ],
         terms: ['total-return', 'vs-spy', 'cagr'],
         tryIt: {label: 'Open the performance chart', href: '/portfolio'},
-        check: {
-            question: 'An account started at $100,000 and is worth $103,000. What is its total return?',
-            options: ['+3%', '+103%', '+30%'],
-            answer: 0,
-            explain: '(103,000 − 100,000) ÷ 100,000 = +3%.',
-        },
     },
     {
         id: 'swings-and-drawdowns',
@@ -57,12 +45,6 @@ export const PORTFOLIO_LESSONS: readonly CourseLessonCopy[] = [
         ],
         terms: ['volatility', 'daily-swing', 'max-drawdown', 'recovery'],
         tryIt: {label: 'Open your portfolio', href: '/portfolio'},
-        check: {
-            question: 'An account peaks at $120,000, falls to $90,000, then climbs to $110,000. What was its drawdown at the low?',
-            options: ['−25%', '−8%', '−30%'],
-            answer: 0,
-            explain: 'From the peak to the low: (90,000 − 120,000) ÷ 120,000 = −25%.',
-        },
     },
     {
         id: 'a-rule-instead-of-a-hunch',
@@ -75,11 +57,5 @@ export const PORTFOLIO_LESSONS: readonly CourseLessonCopy[] = [
         terms: ['target', 'drift', 'dollar-cost-averaging'],
         tryIt: {label: 'Open the 60/40 strategy', href: '/strategies/sixty-forty'},
         doneFrom: 'followedStrategies',
-        check: {
-            question: 'A 60/40 rule finds that stocks have grown to 70% of the account. What does its next rebalance do?',
-            options: ['Brings stocks back toward 60%', 'Moves everything into stocks', 'Nothing'],
-            answer: 0,
-            explain: 'The rule\'s split is fixed, so it trades back toward it.',
-        },
     },
 ];

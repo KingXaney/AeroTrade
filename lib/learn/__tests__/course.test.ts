@@ -60,15 +60,6 @@ describe('the course registry', () => {
             expect(existsSync(`${root}${file}`), `${lesson.id}: ${lesson.tryIt.href}`).toBe(true);
         }
     });
-
-    it('asks one question with one right answer among three', () => {
-        for (const lesson of COURSE_LESSONS) {
-            const {check} = lesson;
-            expect(check.options.length, lesson.id).toBe(3);
-            expect(new Set(check.options).size, lesson.id).toBe(3);
-            expect(Number.isInteger(check.answer) && check.answer >= 0 && check.answer < 3, lesson.id).toBe(true);
-        }
-    });
 });
 
 describe('the course text', () => {
@@ -81,14 +72,11 @@ describe('the course text', () => {
             clean(lesson.title);
             lesson.intro.forEach(clean);
             clean(lesson.tryIt.label);
-            clean(lesson.check.question);
-            lesson.check.options.forEach(clean);
-            clean(lesson.check.explain);
         }
         for (const value of Object.values(COURSE_COPY)) {
             if (typeof value === 'string') clean(value);
         }
-        for (const text of [COURSE_COPY.progress(3, 16), COURSE_COPY.lessonOf(2, 16), COURSE_COPY.moduleDone(2, 4)]) clean(text);
+        for (const text of [COURSE_COPY.progress(3, 16), COURSE_COPY.lessonOf(2, 16), COURSE_COPY.moduleDone(2, 4), COURSE_COPY.nextLesson('The order ticket')]) clean(text);
     });
 
     it('frames in two or three sentences', () => {

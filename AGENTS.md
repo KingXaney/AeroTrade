@@ -208,7 +208,7 @@ and friends keep none beyond Shared and the invariants).
   was computed with; the client `components/strategies/WhatIfLab` renders it with `SimulatedStats`
   as `#whatif-stats`, `neutral` — no sign colour says which setting is ahead; the tiles' labels are
   `lib/learn/copy/simulated`.
-- `lib/strategies/learn/`: `verdict` and `replay` are pure; `board-narration` is "Read this board"
+- `lib/strategies/learn/`: `replay` is pure; `board-narration` is "Read this board"
   (`components/strategies/BoardReading`) — the signal board's top row read by a narrator per
   strategy from `row.values` and the catalog's parameters (its `readBoardRow` also serves the stock
   page).
@@ -317,15 +317,15 @@ and friends keep none beyond Shared and the invariants).
   so the caller picks — glossed from `lib/navigator/config.ts` and round-tripped over
   `scoreUniverse`/`diffToOrders`.
 - `/learn` is the hub, one view at a time in the URL (`?tab=`, `components/primitives/Tabs`): the
-  course, Today (the lesson, the quiz, the first-week list), the glossary, the strategies. A
+  course, Today (the lesson and the first-week list), the glossary, the strategies. A
   `/learn#term` address — ⌘K, Today's lesson and the daily email hand it out — is sent to the
   glossary tab by `components/learn/GlossaryHashRedirect`, since the server never sees a hash.
 - The beginner course, `lib/learn/course` (pure): four modules of four lessons in one fixed
   order, text in `lib/learn/copy/course/<module>`. A lesson is two or three framing sentences,
   the glossary's own definitions of its terms printed beside them (never a paraphrase — the
   test rejects a five-word run shared with a listed definition), a link to the real screen and
-  one question. It is done when its question was answered, whichever option was chosen
-  (`lib/actions/learn.actions.markCourseLessonDone` stamps `learn.courseDone` once, with
+  a "Mark as done" button (`components/learn/LessonDone`). It is done when the reader marks it
+  done (`lib/actions/learn.actions.markCourseLessonDone` stamps `learn.courseDone` once, with
   `$addToSet`, after checking the id against the registry) or when the reader did the thing it is
   about (`doneFrom`, read off the first-week facts). A lesson id is its address and its stamp and
   is never renamed. `lib/learn/course-store.getCourseProgress` is the one read; progress is a
@@ -336,12 +336,6 @@ and friends keep none beyond Shared and the invariants).
   `lib/actions/learn.actions`; else the concept today's topic articles used, matched by equality.
   The server reads are `lib/learn/facts-store` and `lib/learn/lesson-store`; `lib/learn/missions`
   is pure.
-- Daily quiz, `lib/learn/quiz`: one question a day from a strategy's recent board, seeded by the
-  date through FNV-1a. `lib/learn/quiz-store` reads over `lib/strategies/page-store.getRecentRuns`
-  — boards dated before today (`quizRunWindow`), one bounded point read per strategy — built once
-  per ET day and keyed on `getRecentRunDates`' stamp. The client
-  `components/dashboard/widgets/learn/DailyQuiz` renders it; a day is counted once by
-  `lib/actions/learn.actions.recordQuizAnswer`.
 
 ### chat
 
@@ -481,9 +475,7 @@ and friends keep none beyond Shared and the invariants).
    preference sub-schema (no learner flag), and read with bounded queries — no board-carrying
    aggregate on a request path. `#signal-board` keeps exactly one `<details>` of its own; new
    disclosures are siblings inside `#strategy-signals`. The board's one `<WhatTheseMean>` is led by
-   "Read this board — SYMBOL", and anything in the panel that states a board verdict hides while Guess
-   the Verdict is open — the verdict cells, the top row's reading, the run's headline and every order
-   (`[data-run-verdict]`): one `:has` switch on `#latest-decision`, with `invisible` so nothing moves.
+   "Read this board — SYMBOL".
 
 ## Next.js 16
 

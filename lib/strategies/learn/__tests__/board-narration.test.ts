@@ -309,12 +309,14 @@ describe('the narration follows the definition', () => {
 describe('board copy', () => {
     it('describes without advising on the branches the rows above do not reach', () => {
         const texts = [
-            BOARD_COPY.summary('XLF'), BOARD_COPY.paused, BOARD_COPY.genericKey,
+            BOARD_COPY.summary('XLF'), BOARD_COPY.genericKey,
             BOARD_COPY.numbersMissing('XLF'), BOARD_COPY.boardVerdict('XLF', 'held'),
             BOARD_COPY.verdictOnly('XLF', 'watch', STATE_MEANING.watch),
             BOARD_COPY.rankPosition('3', null, 'strongest'), BOARD_COPY.rankPosition('3', '40', 'calmest'),
             BOARD_COPY.crossLevel(), BOARD_COPY.bhWatch('SPY'), BOARD_COPY.gemWatch('EFA'),
             BOARD_COPY.sixtyFortyKey(null, '2%'), BOARD_COPY.legWatch('AGG'),
+            // What each verdict means, quoted for a row whose numbers are missing.
+            ...Object.values(STATE_MEANING),
         ];
         for (const text of texts) {
             expect(findBanned(text, 'copy'), text).toEqual([]);
