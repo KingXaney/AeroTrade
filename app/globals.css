@@ -420,6 +420,42 @@ details[open] > :not(summary) { animation: disclosure-in var(--motion-base) var(
   40% { transform: scale(1); }
 }
 
+/* The assistant's robot (components/chat/RobotMascot, the launcher in components/chat/ChatWidget):
+   CSS keyframes only, so both motion guards at the foot stop them — no SMIL, no Web Animations.
+   The hover tilt and the disc's scale ride the motion tokens; the loops are timed in seconds, so
+   brutalist stops them by name below (a zeroed token does not stop a keyframe: the .theme-blob
+   lesson). lib/theme/__tests__/motion-guards.test.ts pins every class to both guard lists. */
+.robot-launcher { transition: scale var(--motion-base) var(--motion-ease); }
+.robot-mascot { transition: transform var(--motion-base) var(--motion-ease); }
+.robot-launcher:hover .robot-mascot,
+.robot-launcher:focus-visible .robot-mascot { transform: rotate(-8deg); }
+.robot-bob { animation: robot-bob 3.2s ease-in-out infinite; }
+.robot-eyes { transform-box: fill-box; transform-origin: 50% 50%; animation: robot-blink 4.4s infinite; }
+.robot-antenna { animation: robot-glow 2.4s ease-in-out infinite; }
+.robot-tip-in { animation: robot-tip-in var(--motion-base) var(--motion-ease) both; }
+@keyframes robot-bob {
+  0%, 100% { transform: translateY(0); }
+  50% { transform: translateY(-3px); }
+}
+@keyframes robot-blink {
+  0%, 92%, 100% { transform: scaleY(1); }
+  95% { transform: scaleY(0.12); }
+}
+@keyframes robot-glow {
+  0%, 100% { opacity: 0.45; }
+  50% { opacity: 1; }
+}
+@keyframes robot-tip-in {
+  from { opacity: 0; transform: translateY(4px); }
+}
+/* The speech bubble's tail (components/chat/RobotTipBubble): a rotated square in the floating
+   chrome's own fill and hairline, whose right and bottom edges form the point. */
+.chrome-tail {
+  background: var(--chrome-float-bg);
+  border-right: var(--chrome-border);
+  border-bottom: var(--chrome-border);
+}
+
 /* Particle Background Canvas */
 #bg-canvas {
   position: fixed;
@@ -1020,6 +1056,10 @@ details[open] > :not(summary) { animation: disclosure-in var(--motion-base) var(
   box-shadow: 6px 6px 0 color-mix(in srgb, var(--fg) 60%, transparent);
 }
 [data-style="brutalist"] :not(.rounded-full):not(.typing-dot):not(.theme-blob) { border-radius: 0; }
+/* The robot stands still, squared off; the blink stays — a hard cut suits the style. Stopped by
+   name: the loops are timed in seconds, which the zeroed motion tokens do not reach. */
+[data-style="brutalist"] :is(.robot-bob, .robot-antenna) { animation: none; }
+[data-style="brutalist"] .robot-mascot rect { rx: 0; ry: 0; }
 [data-style="brutalist"] :is(h1, h2, h3) { text-transform: uppercase; letter-spacing: 0.04em; font-weight: 700; }
 [data-style="brutalist"] :is(.yellow-btn, .search-btn) {
   border: 2px solid var(--fg);
@@ -1080,14 +1120,14 @@ details[open] > :not(summary) { animation: disclosure-in var(--motion-base) var(
 @media (prefers-reduced-motion: reduce) {
   :root { --motion-fast: 0ms; --motion-base: 0ms; }
   .glass-panel, details[open] > :not(summary) { animation: none !important; }
-  .theme-blob,
+  .theme-blob, .robot-bob, .robot-eyes, .robot-antenna, .robot-mascot, .robot-tip-in,
   [data-style] :is(.glass-panel, .news-item, .yellow-btn, .search-btn) {
     animation: none !important;
     transition: none !important;
   }
   [data-style="futuristic"] .shimmer::after { content: none; }
 }
-html[data-motion="reduced"] :is(.animate-glow, .typing-dot, .theme-blob, .glass-panel, .news-item, .yellow-btn, .search-btn) {
+html[data-motion="reduced"] :is(.animate-glow, .typing-dot, .theme-blob, .robot-bob, .robot-eyes, .robot-antenna, .robot-mascot, .robot-tip-in, .glass-panel, .news-item, .yellow-btn, .search-btn) {
   animation: none !important;
   transition: none !important;
 }
