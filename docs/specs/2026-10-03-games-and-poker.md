@@ -1,8 +1,9 @@
 # Games and a poker solver: Learn becomes a place to play
 
-**Status:** In progress — the quizzes were removed in `30a6da0` (PR #39, 2026-10-03); the games hub,
-the daily puzzle and its streak are the second of six pull requests. The arithmetic sprint, the
-Kelly, market-making and correlation games and the poker solver follow, in that order.
+**Status:** In progress — the quizzes were removed in `30a6da0` (PR #39, 2026-10-03), and the games
+hub, the daily puzzle and its streak shipped in `989e0ff` (PR #40). The arithmetic sprint and its
+interview mode are the third of six pull requests; the Kelly, market-making and correlation games
+and the poker solver follow.
 
 ## Why
 
@@ -67,10 +68,24 @@ nothing else. The no-advice word list still holds every sentence ("record" and "
   - It shows on Home beside the market status (never as a bare 0), on the hub with this week's
     dots and a 12-week grid, on Learn › Today, and in a library-only `daily-puzzle` widget.
 
+## The arithmetic sprint and interview mode
+
+- **The sprint** is Zetamac's game: sums of 2–100 and 2–100, products of 2–12 and 2–100, both in
+  reverse, for two minutes. Each problem moves on the moment the typed answer is right.
+- **Custom** chooses the operations, ranges and time (30 s to 10 min). A record is kept per
+  settings key ("zetamac" for the defaults), so a round on easier settings never stands beside one
+  on the defaults.
+- **Interview** is eighty multiple-choice problems in eight minutes, in the style of trading
+  firms' mental-maths tests. The four wrong options sit where a slip would land — a digit, a place,
+  a near fraction — and keys 1–5 choose.
+- **The round** is a pure reducer: the seed and the clock arrive in its actions, and each problem
+  is drawn from the seed and its place, so a round replays exactly.
+- **Records:** the browser counts the round and reports it when it ends. The server keeps it only
+  if a person could have played it — at most four answers a second, a real duration, known
+  settings. A record is the top score read back from the rows.
+
 ## What follows
 
-- **Arithmetic:** a Zetamac-style sprint, with its default ranges, custom settings and an interview
-  mode.
 - **Three more quant games:** Kelly coin (the Haghani–Dewey setup), market making on four dice,
   and Guess the correlation. Each records a reader's rounds and their own record.
 - **The poker solver:** computed in the browser, in a Web Worker, after a spike proves the worker

@@ -362,6 +362,16 @@ and friends keep none beyond Shared and the invariants).
 - The streak shows on Home (`components/games/StreakChip`, beside the market status), on the
   hub's `components/games/StreakPanel`, and in `components/games/DailyPuzzleCard` on Learn › Today
   and the library-only `daily-puzzle` widget — all from the reads in `lib/games/store`.
+- A scored game's round is counted in the browser and reported when it ends;
+  `lib/games/rounds.keptRound` keeps only what a person could have played (bounded counts, a real
+  duration, known settings). These are one reader's practice records, not a leaderboard. A record
+  is the top score per game and settings key, read from `GameRound` rows
+  (`lib/games/store.readGameSummary`); `lib/games/arithmetic.settingsKey` names Zetamac's defaults
+  "zetamac".
+- The arithmetic round is the pure reducer `lib/games/arithmetic-round`: the seed and the clock
+  arrive in its actions, a problem is drawn from the seed and its place
+  (`lib/games/arithmetic.problemAt`), and `components/games/ArithmeticGame` owns only the
+  interval, the 1–5 keys (never with ⌘, Ctrl or Alt) and the one report a round sends.
 
 ### chat
 
