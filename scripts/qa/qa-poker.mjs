@@ -11,7 +11,7 @@
 import {chromium} from 'playwright';
 import {readFileSync} from 'node:fs';
 import {createJiti} from 'jiti';
-import {BASE, REPO_ROOT, check, outDir, signUp, summary} from './lib.mjs';
+import {BASE, REPO_ROOT, check, note, outDir, signUp, summary} from './lib.mjs';
 
 const OUT = outDir('poker');
 const jiti = createJiti(import.meta.url, {alias: {'@': REPO_ROOT.replace(/\/$/, '')}, fsCache: false});
@@ -262,6 +262,23 @@ try {
     await page.locator('[data-river-pot]').fill('12');
     check('editing the spot marks the result as for the spot as it was', await page.locator('[data-river-stale]').count() === 1);
     check('the river tab says nothing that advises', findBanned(await page.locator('main').innerText(), 'copy').length === 0);
+
+    // Two full ranges (every combo, 1,081 live a side) on a tree of about forty nodes: recorded, not
+    // checked, since it depends on the machine.
+    await page.locator('[data-range-text="oop"]').fill('random');
+    await page.locator('[data-range-text="ip"]').fill('random');
+    await page.locator('[data-river-bets="0"]').fill('33, 75');
+    await page.locator('[data-river-bets="1"]').fill('33, 75');
+    await page.locator('[data-river-raises="0"]').fill('100');
+    await page.locator('[data-river-raises="1"]').fill('100');
+    await page.locator('[data-river-raise-cap]').selectOption('1');
+    const fullSummary = await page.locator('[data-river-summary]').innerText();
+    const fullStart = Date.now();
+    await page.locator('[data-river-solve]').click();
+    await page.locator('[data-river-result="done"] [data-river-iterations]').waitFor({timeout: 180000});
+    const fullIterations = await page.locator('[data-river-iterations]').getAttribute('data-river-iterations');
+    const fullExploitability = Number(await page.locator('[data-river-exploitability]').getAttribute('data-river-exploitability'));
+    note('two full ranges on the river', `${fullSummary.replace(/\s+/g, ' ')} — ${fullIterations} iterations in ${Date.now() - fullStart} ms, ${fullExploitability.toFixed(3)}% of the pot`);
 
     // --- a phone ---------------------------------------------------------------------------------
     const phone = await browser.newPage({viewport: {width: 390, height: 844}});

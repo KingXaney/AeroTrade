@@ -166,7 +166,8 @@ Everything is worked out in the browser and nothing is stored: the page reads on
   strategy so far.
 - **Speed.** Random against random (1,081 hands a side) on a 69-node tree with three sizes, raises
   and an all-in takes about 3 ms an iteration in Node. It reaches 0.19% of the pot in 150
-  iterations.
+  iterations. In Chrome's worker, the same two ranges on a 39-node tree reach 0.23% in 75
+  iterations, about a quarter of a second; `qa-poker` records this as a note, not a check.
 - **Checked against what is known:**
   - **Polarized versus bluff-catcher:** aces and four bluffs against three bluff-catchers on Ah Kd 7c
     4s 2h. At bets of 3.3, 7.5, 15 and 40 into 10, the bettor bluffs B/(P + 2B) of its bets and the
