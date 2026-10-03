@@ -9,9 +9,10 @@ import {TOPICS_MANAGE_COPY} from "@/lib/learn/copy/topics";
 
 const AllTopicsHeader = ({count, unseenTotal, preinstalled}: {count: number; unseenTotal: number; preinstalled: boolean}) => {
     const {openComposer} = useTopicsUi();
+    // Two buttons no longer fit beside the heading on a phone: below `sm` they drop under it.
     return (
-        <Panel className="flex items-center justify-between gap-3">
-            <div>
+        <Panel className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
+            <div className="min-w-0">
                 <h2 className="text-xl font-semibold text-fg font-heading">All topics</h2>
                 <p className="text-[11px] text-fg-muted mt-1 font-mono">
                     {count} followed · {unseenTotal} unseen

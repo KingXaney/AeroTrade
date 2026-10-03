@@ -44,8 +44,8 @@ export const TOPICS_MANAGE_COPY = {
         if (exclude.length > 0) parts.push(exclude.length === 1 ? '1 excluded' : `${exclude.length} excluded`);
         return parts.join(' · ');
     },
-    // "3 new"
-    newCount: (count: number): string => `${count} new`,
+    // "3 new"; a count already formatted for print ("99+") passes through as it is.
+    newCount: (count: number | string): string => `${count} new`,
     edit: 'Edit',
     editRow: (name: string): string => `Edit ${name}`,
     remove: 'Remove',

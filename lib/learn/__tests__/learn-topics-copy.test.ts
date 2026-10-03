@@ -71,6 +71,7 @@ describe('TOPICS_MANAGE_COPY', () => {
         expect(TOPICS_MANAGE_COPY.keywordLine(['nvidia'], ['crypto'])).toBe('nvidia · 1 excluded');
         expect(TOPICS_MANAGE_COPY.keywordLine(['a', 'b'], ['c', 'd'])).toBe('a · b · 2 excluded');
         expect(TOPICS_MANAGE_COPY.newCount(3)).toBe('3 new');
+        expect(TOPICS_MANAGE_COPY.newCount('99+')).toBe('99+ new');
         expect(TOPICS_MANAGE_COPY.removeRow('AI chips')).toBe('Remove AI chips');
         expect(TOPICS_MANAGE_COPY.removed('AI chips')).toBe('Stopped following "AI chips"');
         expect(TOPICS_MANAGE_COPY.restored('AI chips')).toBe('Following "AI chips" again');
