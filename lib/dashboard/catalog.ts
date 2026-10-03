@@ -61,6 +61,7 @@ export const DATA_KEYS = [
     'onboardingFacts',
     'learnFacts',
     'lesson',
+    'dailyPuzzle',
 ] as const;
 export type DataKey = (typeof DATA_KEYS)[number];
 
@@ -89,13 +90,15 @@ export const DATA_KEY_DEPS: Record<DataKey, readonly DataKey[]> = {
     onboardingFacts: [],
     learnFacts: [],
     lesson: [],
+    dailyPuzzle: [],
 };
 
 // Streamed under <Suspense> because they are slow or fan out to third parties;
 // their loaders resolve their own dependencies, so those never join the eager pass.
 // 'lesson' is lazy for a different reason: Today's lesson needs it only on a day when no
-// moment from the learn facts wins, so it is read only when that body renders.
-export const LAZY_DATA_KEYS: readonly DataKey[] = ['movers', 'news', 'analytics', 'brainStatus', 'topicsLatest', 'strategies', 'lesson'];
+// moment from the learn facts wins, so it is read only when that body renders. 'dailyPuzzle'
+// is lazy because a puzzle is never above-the-fold critical.
+export const LAZY_DATA_KEYS: readonly DataKey[] = ['movers', 'news', 'analytics', 'brainStatus', 'topicsLatest', 'strategies', 'lesson', 'dailyPuzzle'];
 
 // 'link' = the clickable PersonalRow card · 'panel' = glass-panel + heading ·
 // 'panel-lg' / 'panel-sm' = panel with the TradingView paddings · 'bare' = the
@@ -141,6 +144,7 @@ export const WIDGET_IDS = [
     // learn
     'getting-started',
     'todays-lesson',
+    'daily-puzzle',
     // personal
     'portfolio-snapshot',
     'watchlist-movers',
@@ -263,6 +267,21 @@ export const WIDGETS: {readonly [K in WidgetId]: WidgetDefinition & {id: K}} = {
         defaultSpan: 6,
         minHeight: 220,
         dataKeys: ['learnFacts', 'lesson'],
+        isNew: true,
+    }),
+    // Library-only too: today's quant puzzle and the streak, with the way to /games/puzzle. Like
+    // every widget it carries no "What these mean" and no "Ask in chat" (invariant 12). A new id:
+    // 'daily-quiz' is retired (RETIRED_WIDGET_IDS) and never reused.
+    'daily-puzzle': define({
+        id: 'daily-puzzle',
+        title: 'Daily puzzle',
+        description: "Today's quant puzzle and your streak of days solved, with the way to the puzzle.",
+        category: 'learn',
+        icon: 'extension',
+        spans: [4, 6, 8, 12],
+        defaultSpan: 6,
+        minHeight: 220,
+        dataKeys: ['dailyPuzzle'],
         isNew: true,
     }),
 

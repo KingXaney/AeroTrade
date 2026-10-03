@@ -337,6 +337,32 @@ and friends keep none beyond Shared and the invariants).
   The server reads are `lib/learn/facts-store` and `lib/learn/lesson-store`; `lib/learn/missions`
   is pure.
 
+### games
+
+- The games are the one place the app keeps a score: the daily-puzzle streak counts days, and a
+  record is a reader's own top score. The learn surfaces stay count-only (a course's progress is a
+  count, never a bar or a score). Every games sentence is still held to the no-advice list
+  (invariant 12): "record" and "highest", never "best"; nothing says what to do with money.
+- The puzzle bank `lib/learn/copy/puzzles` is server-only: an answer reaches the page only once
+  the puzzle is solved or revealed, every answer is checked in `lib/actions/games.actions`, and
+  `lib/games/__tests__/puzzle-guard.test.ts` fails if a client file — or anything under
+  `components/` — imports the bank, `lib/games/puzzles` or `lib/games/store`. Every answer key has
+  an independent check in `lib/games/__tests__/puzzle-checks.ts` (a simulation, an enumeration or
+  a direct computation), so a wrong key fails CI.
+- `lib/games/puzzles.dailyPuzzleFor`: day 1 is `PUZZLES_START_DATE`, the days walk
+  `PUZZLE_SCHEDULE` — append-only, its first sixty pinned by a hash — and cycle. A `PuzzleSolve`
+  row stores its own puzzle id and ET `day` (null in the archive), one per puzzle per context, so
+  no streak depends on the schedule. The streak is the distinct days of solved rows
+  (`lib/games/streak.streakFrom`), never stored; a revealed solution or an archive solve counts
+  nothing toward it.
+- Each write is one atomic update filtered on the row still being open — a double click or a
+  second tab cannot count twice — and every games action is counted per user by
+  `lib/rate-limit.takeRateLimit`. A solve or a reveal revalidates `/`, `/dashboard`, the `/games`
+  subtree and `/learn`.
+- The streak shows on Home (`components/games/StreakChip`, beside the market status), on the
+  hub's `components/games/StreakPanel`, and in `components/games/DailyPuzzleCard` on Learn › Today
+  and the library-only `daily-puzzle` widget — all from the reads in `lib/games/store`.
+
 ### chat
 
 - `lib/chat/explain` shapes what `explainTerm` hands the model, with `lib/chat/learner-hooks` its

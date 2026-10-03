@@ -12,6 +12,9 @@ import {getLearnFacts, getOnboardingFacts} from "@/lib/learn/facts-store";
 import {getTodaysLesson} from "@/lib/learn/lesson-store";
 import {deriveMissions, onboardingActive} from "@/lib/learn/missions";
 import {deriveMoments} from "@/lib/learn/moments";
+import {getDailyPuzzleCard} from "@/lib/games/store";
+import {GAMES_COPY} from "@/lib/learn/copy/games";
+import DailyPuzzleCard from "@/components/games/DailyPuzzleCard";
 import GlossaryHashRedirect from "@/components/learn/GlossaryHashRedirect";
 import GettingStarted from "@/components/dashboard/widgets/learn/GettingStarted";
 import TodaysLesson from "@/components/dashboard/widgets/learn/TodaysLesson";
@@ -28,8 +31,8 @@ import {cn} from "@/lib/utils";
 // The browser tab's title; app/layout.tsx appends the app's name.
 export const metadata: Metadata = {title: "Learn"};
 
-// Everything the app teaches, in one place: the beginner course, today's lesson, the glossary
-// every label on every page quotes, and the strategies in a line each. One view at a time, kept
+// Everything the app teaches, in one place: the beginner course, today's lesson and puzzle, the
+// glossary every label on every page quotes, and the strategies in a line each. One view at a time, kept
 // in the URL (?tab=), so only the open view's data is read.
 
 const TAB_IDS = ['course', 'today', 'glossary', 'strategies'] as const;
@@ -99,14 +102,25 @@ const LessonAsync = async ({userId}: {userId: string}) => {
     return <TodaysLesson lesson={await getTodaysLesson(userId)}/>;
 };
 
+const PuzzleAsync = async ({userId}: {userId: string}) => <DailyPuzzleCard card={await getDailyPuzzleCard(userId)}/>;
+
 const TodayView = async ({userId}: {userId: string}) => {
     const facts = await getOnboardingFacts(userId);
     return (
         <div className="space-y-4" id="learn-today">
-            <Panel aria-labelledby="today-lesson-heading">
-                <SectionHeading id="today-lesson-heading">{LEARN_PAGE_COPY.todayLesson}</SectionHeading>
-                <Suspense fallback={<WidgetSkeleton height={200} rows={3}/>}><LessonAsync userId={userId}/></Suspense>
-            </Panel>
+            <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
+                <Panel aria-labelledby="today-lesson-heading">
+                    <SectionHeading id="today-lesson-heading">{LEARN_PAGE_COPY.todayLesson}</SectionHeading>
+                    <Suspense fallback={<WidgetSkeleton height={200} rows={3}/>}><LessonAsync userId={userId}/></Suspense>
+                </Panel>
+                <Panel id="learn-today-puzzle" aria-labelledby="today-puzzle-heading">
+                    <div className="mb-4 flex items-center justify-between gap-3">
+                        <SectionHeading id="today-puzzle-heading" spacing="none">{GAMES_COPY.dailyHeading}</SectionHeading>
+                        <Link href="/games" className="label-type text-xs text-brand hover:underline">{GAMES_COPY.allGames} →</Link>
+                    </div>
+                    <Suspense fallback={<WidgetSkeleton height={200} rows={3}/>}><PuzzleAsync userId={userId}/></Suspense>
+                </Panel>
+            </div>
             {onboardingActive(facts) && (
                 <Panel aria-labelledby="today-first-week-heading">
                     <SectionHeading id="today-first-week-heading">{LEARN_PAGE_COPY.todayFirstWeek}</SectionHeading>

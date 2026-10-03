@@ -83,7 +83,10 @@ export const NAV_SECTIONS: readonly NavSection[] = [
     },
     {
         id: 'learn', label: 'Learn', icon: 'school',
-        pages: [{href: '/learn', label: 'Learn', icon: 'school'}],
+        pages: [
+            {href: '/learn', label: 'Learn', icon: 'school'},
+            {href: '/games', label: 'Games', icon: 'sports_esports'},
+        ],
     },
 ] as const;
 

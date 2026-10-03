@@ -35,6 +35,8 @@ Follow the topics you care about, test trading strategies with virtual money, an
 
 **Learn from the numbers in front of you.** Every figure in the app carries its own definition — hover a column or open a panel's *"What these mean"* — from one glossary whose formulas are cited from the code that computes them, and `/learn` lists it all with a link to the real number on your account. A strategy page reads its signal board in plain words, and opens any fill to the exact board row the rule looked at that morning, its reason decoded clause by clause; its what-if lab moves one setting of the rule and redraws the three years beside the stored backtest, and the buy-and-hold page sets three ways of owning SPY — all at once, monthly, or kept as cash — side by side from a start date you pick. Your own account explains itself too: guess how much of your return came from interest and dividends, then see it split to the cent; every fill and every income line has a receipt, the "why" you wrote for a buy comes back when you sell, your trading habits (how long winners and losers were held, how many of each were sold) sit beside the strategies' cadences, and a histogram shows where your return landed among 1,000 random five-stock portfolios over the same days. `/brain` carries a legend of how articles become weights and theses, and every Navigator decision reads in plain words; a stock page says what each key number divides and what each strategy watching it sees. A First-week checklist ticks itself from what you actually did, a Today's lesson widget (and the daily email) picks up your first dividend or the term your topics used today, the order ticket says what an order does to the account before you place it (down to what the cash left would earn), and the chat tutor answers "what is my max drawdown?" from the same glossary, with your own figure, and decodes a quant strategy's or the Navigator's reason clause by clause. Descriptions only — a unit test keeps every sentence, chip and prompt free of advice.
 
+**Play with the numbers.** Learn's Games page posts a quant puzzle every day — probability, expected value, counting, logic, estimation and strategy — answered against a server-side key, with hints one at a time and a worked solution. Solving the day's puzzle on its day keeps a Duolingo-style streak, shown on Home beside the market status; every past puzzle stays playable in the archive, and every answer key is checked by simulation or brute force in the unit tests.
+
 **A second opinion, a chat advisor, and a digest.** Claude can critique the brain's current picture; a tool-using chat assistant (17 tools) — behind the robot in the bottom-right corner, which offers tips about the app on the topics pages — answers "what's new in my topics?", "what does max drawdown mean?" or "why did RSI-2 buy?"; a daily email summarises the market for each user, personalised to their holdings, then adds their topics and the day's lesson, with links allow-listed to the actual articles and the app's own pages.
 
 **Make it yours.** 12 colour palettes × 5 visual styles (minimal, futuristic, liquid glass, brutalist, soft), saved per account and rendered without a flash. A 35-widget dashboard you can drag, resize and extend.
@@ -88,7 +90,7 @@ flowchart LR
 | Jobs | Inngest (9 scheduled jobs + on-demand events), idempotent steps, per-user rate limits |
 | AI | Vercel AI SDK; Gemini 2.5 Flash-Lite on the free tier for every scheduled job, optional Claude tiers, Claude for the second opinion |
 | Market data | Yahoo Finance daily bars and dividends (Stooq as the fallback), the 13-week T-bill rate, Finnhub (quotes, profiles, financials, search, news), Google News RSS, SEC EDGAR, Reddit |
-| Quality | Vitest (163 files / 1864 tests), ESLint, `tsc --noEmit`, a compile-only build, GitHub Actions; Playwright browser QA (14 suites, `npm run qa`) against an in-memory Mongo |
+| Quality | Vitest (168 files / 1964 tests), ESLint, `tsc --noEmit`, a compile-only build, GitHub Actions; Playwright browser QA (15 suites, `npm run qa`) against an in-memory Mongo |
 
 ## Getting started
 
@@ -135,10 +137,10 @@ npm test              # vitest, a few seconds
 npm run typecheck
 npm run lint
 npm run build:check   # compile-only build: proves the app builds without any keys
-npm run qa            # browser QA: all 14 suites in scripts/qa against a throwaway harness (~5 min)
+npm run qa            # browser QA: all 15 suites in scripts/qa against a throwaway harness (~5 min)
 ```
 
-Unit tests (163 files / 1864 tests) cover every pure module, next to the code in `lib/<feature>/__tests__/`: fills, lots and account analytics, the interest and dividend accrual clock (with a parity test holding the strategy simulator to the live credit), the quant strategies' rules, engine, simulator and what-if grid, the AI Navigator's scoring and rails, the news brain's decay and extraction parsing, news aggregation and sanitising, the topic matcher and briefs, every learner-facing sentence (held to one no-advice word list) and the reason decoder's round trips, the chat tools' shaping, the email sections, dashboard layouts and theme tokens. Database-bound modules (Mongoose reads, server actions, the pages) are exercised through the browser QA in [`scripts/qa/`](scripts/qa/README.md) instead: `npm run qa` starts an in-memory MongoDB, the dev server with inline env vars and the Inngest dev server, then runs 14 Playwright suites, one per feature (`qa-auth`, `qa-home`, `qa-trading`, `qa-income`, `qa-strategies`, `qa-learn`, `qa-topics`, …), each signing up its own user and walking its surfaces — no keys needed. `docs/specs/` holds the design documents for the larger features.
+Unit tests (168 files / 1964 tests) cover every pure module, next to the code in `lib/<feature>/__tests__/`: fills, lots and account analytics, the interest and dividend accrual clock (with a parity test holding the strategy simulator to the live credit), the quant strategies' rules, engine, simulator and what-if grid, the AI Navigator's scoring and rails, the news brain's decay and extraction parsing, news aggregation and sanitising, the topic matcher and briefs, every learner-facing sentence (held to one no-advice word list) and the reason decoder's round trips, the chat tools' shaping, the email sections, dashboard layouts and theme tokens. Database-bound modules (Mongoose reads, server actions, the pages) are exercised through the browser QA in [`scripts/qa/`](scripts/qa/README.md) instead: `npm run qa` starts an in-memory MongoDB, the dev server with inline env vars and the Inngest dev server, then runs 15 Playwright suites, one per feature (`qa-auth`, `qa-home`, `qa-trading`, `qa-income`, `qa-strategies`, `qa-learn`, `qa-topics`, …), each signing up its own user and walking its surfaces — no keys needed. `docs/specs/` holds the design documents for the larger features.
 
 ## Project structure
 
@@ -166,6 +168,7 @@ lib/            one folder per feature, named as in components/:
   topics/       keyword normalisation, matcher, search query builder, refresh, briefs, the starter set
   learn/        the glossary, the no-advice word list, every learner-facing sentence (copy/), the reason decoder,
                 missions, today's lesson, the beginner course
+  games/        the daily quant puzzle: its schedule, the answer reader, the streak
   chat/         the chat assistant: system prompt, tools and what they hand the model, rate limits and the caption that shows what is left of them
   email/        transport, templates, the daily digest with its topics + lesson sections, the welcome email
   jobs/         the Inngest client, the job registry, one file of thin job wrappers per feature, the status read

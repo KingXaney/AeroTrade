@@ -24,6 +24,7 @@ import TopicBriefsList from "@/components/dashboard/widgets/topics/TopicBriefsLi
 import TopicsWidgetEmpty from "@/components/dashboard/widgets/topics/TopicsWidgetEmpty";
 import GettingStarted from "@/components/dashboard/widgets/learn/GettingStarted";
 import TodaysLesson from "@/components/dashboard/widgets/learn/TodaysLesson";
+import DailyPuzzleCard from "@/components/games/DailyPuzzleCard";
 import {deriveMissions} from "@/lib/learn/missions";
 import {deriveMoments} from "@/lib/learn/moments";
 import AccountSummary from "@/components/trading/portfolio/AccountSummary";
@@ -106,6 +107,14 @@ const TodaysLessonAsync = async ({ctx}: {ctx: LoaderCtx}) => {
     });
     return lesson ? <TodaysLesson lesson={lesson} /> : <WidgetUnavailable failed />;
 };
+// Lazy: a puzzle is never above-the-fold critical. A failed read shows "unavailable".
+const DailyPuzzleAsync = async ({ctx}: {ctx: LoaderCtx}) => {
+    const card = await LOADERS.dailyPuzzle(ctx).catch((error) => {
+        console.error('Dashboard loader "dailyPuzzle" failed:', error);
+        return undefined;
+    });
+    return card ? <DailyPuzzleCard card={card} /> : <WidgetUnavailable failed />;
+};
 const BrainStatusAsync = async ({ctx}: {ctx: LoaderCtx}) => {
     const status = await LOADERS.brainStatus(ctx);
     if (!status) return framed('brain-status', <WidgetUnavailable failed />);
@@ -127,6 +136,7 @@ const WIDGET_RENDERERS: Record<WidgetId, Renderer> = {
         if (moment) return <TodaysLesson moment={moment} />;
         return <Suspense fallback={skeleton('todays-lesson')}><TodaysLessonAsync ctx={r.ctx} /></Suspense>;
     },
+    'daily-puzzle': (r) => <Suspense fallback={skeleton('daily-puzzle', 4)}><DailyPuzzleAsync ctx={r.ctx} /></Suspense>,
     'portfolio-snapshot': (r) => need(r, 'portfolios', (p) => <PortfolioSnapshot portfolio={aggregatePortfolios(p)} best={bestAccount(p)} />),
     'watchlist-movers': (r) => <Suspense fallback={skeleton('watchlist-movers', 4)}><WatchlistMoversAsync ctx={r.ctx} /></Suspense>,
     'friends-rank': (r) => need(r, 'leaderboard', (l) => <FriendsRank leaderboard={l} />),

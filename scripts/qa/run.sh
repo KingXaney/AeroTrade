@@ -25,7 +25,7 @@ APP_URL=http://localhost:$APP_PORT
 # Every suite, in the order a full run takes. The order is load-bearing: qa-auth removes the
 # sign-in and sign-up counters it fills before anyone else signs in, and qa-learn wipes and
 # reseeds strategyruns, so it runs after qa-strategies. A suite missing here runs last.
-ALL=(auth styles shell home chat topics-refresh trading topics news-feed strategies income learn learn-account chat-tutor)
+ALL=(auth styles shell home chat topics-refresh trading topics news-feed strategies income learn learn-account games chat-tutor)
 
 KEEP_UP=0
 NAMES=()
