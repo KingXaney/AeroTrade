@@ -3,6 +3,9 @@
 
 import {describe, expect, it} from 'vitest';
 import {ZETAMAC_DEFAULTS} from '@/lib/games/arithmetic';
+import {replayKelly, type Bet} from '@/lib/games/kelly';
+import {replayMarket} from '@/lib/games/market-making';
+import {scattersFor} from '@/lib/games/correlation';
 import {isNewRecord, keptRound, recordOf, sparkline} from '@/lib/games/rounds';
 
 const sprint = (over: Record<string, unknown> = {}) => ({
@@ -38,6 +41,40 @@ describe('keptRound', () => {
         expect(keptRound({game: 'interview', score: 75, wrong: 10, durationMs: 400_000})).toBeNull();
         expect(keptRound({game: 'interview', score: 81, wrong: 0, durationMs: 400_000})).toBeNull();
         expect(keptRound({game: 'interview', score: 10, wrong: 0, durationMs: 600_000})).toBeNull();
+    });
+});
+
+describe('a game the server replays', () => {
+    it('scores a Kelly game from its seed and bets, whatever the report claims', () => {
+        const bets: Bet[] = Array.from({length: 25}, () => ({side: 'heads', cents: 100}));
+        const kept = keptRound({game: 'kelly', seed: 12, bets, durationMs: 60_000, score: 999_999});
+        const replayed = replayKelly(12, bets);
+        expect(kept).toMatchObject({key: 'kelly', score: replayed.bankroll});
+        expect(kept?.detail.flips).toBe(25);
+    });
+
+    it('refuses a Kelly report whose bets the game would not have taken', () => {
+        expect(keptRound({game: 'kelly', seed: 12, bets: [{side: 'heads', cents: 1_000_000}], durationMs: 1000})).toBeNull();
+        expect(keptRound({game: 'kelly', seed: 12, bets: [], durationMs: 1000})).toBeNull();
+        expect(keptRound({game: 'kelly', seed: -1, bets: [{side: 'heads', cents: 1}], durationMs: 1000})).toBeNull();
+    });
+
+    it('scores a market-making game at its settlement, and only a whole one', () => {
+        const quotes = [{bid: 13, ask: 15}, {bid: 13, ask: 15}, {bid: 12, ask: 14}, {bid: 13, ask: 14}];
+        expect(keptRound({game: 'market-making', seed: 3, quotes, durationMs: 90_000})).toMatchObject({key: 'market-making', score: replayMarket(3, quotes).pnl});
+        expect(keptRound({game: 'market-making', seed: 3, quotes: quotes.slice(0, 3), durationMs: 90_000})).toBeNull();
+        expect(keptRound({game: 'market-making', seed: 3, quotes: [{bid: 10, ask: 20}, ...quotes.slice(1)], durationMs: 90_000})).toBeNull();
+    });
+
+    it('scores Guess the correlation as the mean miss, lower being the record', () => {
+        const truth = scattersFor(8).map((s) => Math.round(s.r * 100) / 100);
+        const kept = keptRound({game: 'correlation', seed: 8, guesses: truth, durationMs: 50_000});
+        expect(kept?.key).toBe('correlation');
+        expect(kept?.score).toBeLessThanOrEqual(5);
+        expect(keptRound({game: 'correlation', seed: 8, guesses: truth.slice(0, 9), durationMs: 50_000})).toBeNull();
+        expect(recordOf('correlation', [80, 41, 120])).toBe(41);
+        expect(isNewRecord('correlation', 40, 41)).toBe(true);
+        expect(isNewRecord('correlation', 41, 41)).toBe(false);
     });
 });
 

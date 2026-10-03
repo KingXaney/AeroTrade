@@ -34,6 +34,13 @@ describe('where each term lives', () => {
             expect(groupOf(GLOSSARY[key]), key).toBe('brain');
             expect(homeOf(key), key).toBe('/brain');
         }
-        expect(GLOSSARY_GROUPS.map((group) => group.id)).toEqual(['board', 'portfolio', 'market', 'concepts', 'brain', 'rails']);
+        expect(GLOSSARY_GROUPS.map((group) => group.id)).toEqual(['board', 'portfolio', 'market', 'concepts', 'brain', 'rails', 'games']);
+    });
+
+    it('homes the games\' terms on /games', () => {
+        for (const key of ['kelly-criterion', 'fair-value', 'bid-ask-spread', 'adverse-selection', 'correlation'] as const) {
+            expect(groupOf(GLOSSARY[key]), key).toBe('games');
+            expect(homeOf(key), key).toBe('/games');
+        }
     });
 });

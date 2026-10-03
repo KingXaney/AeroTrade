@@ -6,6 +6,7 @@
 
 import type {PuzzleCategory, PuzzleDifficulty, PuzzleStatus} from "@/lib/games/types";
 import {shortDate} from "@/lib/learn/copy/portfolio";
+import {formatSigned} from "@/lib/format";
 
 const plural = (n: number, one: string, many: string): string => `${n.toLocaleString('en-US')} ${n === 1 ? one : many}`;
 
@@ -165,4 +166,109 @@ export const ARITHMETIC_COPY = {
     cardInterview: 'Interview record',
     cardNone: 'No round yet',
     play: 'Play',
+} as const;
+
+const dollars = (cents: number): string =>
+    `$${(cents / 100).toLocaleString('en-US', {minimumFractionDigits: 2, maximumFractionDigits: 2})}`;
+
+export const KELLY_COPY = {
+    title: 'Kelly coin',
+    subtitle: 'A coin that lands heads 60% of the time, $25 to start and any bet you like each flip — the experiment Haghani and Dewey ran with finance students in 2016.',
+    rules: [
+        'The coin lands heads 60% of the time, and every bet pays even money.',
+        'You start with $25. Winnings stop at $250: the game ends there, at $0, or after 300 flips.',
+        'Bet any amount up to the bankroll on heads or tails each flip, or stop whenever you like.',
+    ],
+    start: 'Start a game',
+    bankroll: 'Bankroll',
+    flipOf: (n: number): string => `Flip ${n} of 300`,
+    betLabel: 'Bet ($)',
+    presets: 'Of the bankroll',
+    all: 'All',
+    onHeads: 'Bet on heads',
+    onTails: 'Bet on tails',
+    invalidBet: 'A bet is at least $0.01 and at most the bankroll.',
+    lastFlip: (heads: boolean, won: boolean, cents: number): string =>
+        `${heads ? 'Heads' : 'Tails'}: the bet ${won ? 'won' : 'lost'} ${dollars(cents)}.`,
+    stop: 'Stop here',
+    ended: {
+        bust: 'The bankroll reached $0.',
+        cap: 'The bankroll reached the $250 cap.',
+        flips: 'All 300 flips are played.',
+        stopped: 'You stopped the game.',
+    },
+    final: (cents: number): string => `Finished at ${dollars(cents)}.`,
+    money: dollars,
+    comparisonHeading: 'The same flips, three fixed rules',
+    comparisonLead: 'Each rule below bet on heads every flip of your game, by its own rule.',
+    ruleNames: {
+        kelly: 'Kelly: 20% of the bankroll on heads',
+        'half-kelly': 'Half Kelly: 10% on heads',
+        'all-in': 'Everything on heads',
+    },
+    growth: (growth: number): string =>
+        (Number.isFinite(growth) ? `expected log growth ${(growth * 100).toFixed(2)}% a flip` : 'one tails ends it'),
+    pathLabel: 'The bankroll after each flip, yours and the fixed rules\'',
+    recordLabel: 'Highest finish',
+    cardTitle: 'Kelly coin',
+    cardBody: 'Bet on a 60% coin from $25, with winnings capped at $250, beside the Kelly fraction on the same flips.',
+} as const;
+
+export const MARKET_COPY = {
+    title: 'Market making',
+    subtitle: 'Make a market on the sum of four hidden dice. Three traders come by each round, and one of them knows the sum to within one.',
+    rules: [
+        'Four dice are rolled and hidden. Their sum, 4 to 24, settles the market at the end.',
+        'Each round you quote a bid and an ask, 1 to 4 apart. A trader buys one from you at the ask when they believe the sum is higher, and sells one to you at the bid when they believe it is lower.',
+        'After each round one die is shown. Your position stays within 10 either way.',
+    ],
+    start: 'Start a game',
+    roundOf: (n: number): string => `Round ${n} of 4`,
+    shown: 'Dice shown',
+    hiddenDie: 'hidden',
+    bid: 'Bid',
+    ask: 'Ask',
+    quote: 'Quote',
+    invalid: 'A bid and an ask are whole numbers 1 to 4 apart, the ask above the bid.',
+    traderBought: (trader: number, price: number): string => `Trader ${trader} bought one from you at ${price}.`,
+    traderSold: (trader: number, price: number): string => `Trader ${trader} sold one to you at ${price}.`,
+    noTrades: 'No one traded at that quote.',
+    fairValueLabel: 'Fair value now',
+    positionLabel: 'Position',
+    pnlLabel: 'Profit and loss',
+    // A whole signed figure: "+7", "−4", "0".
+    signed: (n: number): string => (n === 0 ? '0' : formatSigned(n, 0)),
+    settled: (dice: readonly number[], sum: number): string => `The dice were ${dice.join(', ')}: the sum is ${sum}.`,
+    tradersHeading: 'What each trader believed',
+    informed: 'Informed: knew the sum to within one',
+    noise: 'Knew only the dice shown, give or take',
+    believed: (belief: number): string => `believed ${belief.toFixed(1)}`,
+    fromInformed: (n: number): string => `Trades with the informed traders: ${n === 0 ? '0' : formatSigned(n, 0)}`,
+    fromNoise: (n: number): string => `Trades with the others: ${n === 0 ? '0' : formatSigned(n, 0)}`,
+    recordLabel: 'Highest profit',
+    cardTitle: 'Market making',
+    cardBody: 'Quote a market on four hidden dice against three traders, one of whom knows the sum.',
+} as const;
+
+export const CORRELATION_COPY = {
+    title: 'Guess the correlation',
+    subtitle: 'Ten scatter plots of fifty points. Guess how correlated each one is; the score is the average miss, and lower is the record.',
+    start: 'Start a game',
+    plotOf: (n: number): string => `Plot ${n} of 10`,
+    guessLabel: 'Your guess',
+    guess: 'Guess',
+    next: 'Next plot',
+    finish: 'See the score',
+    reveal: (r: number, miss: number): string => `r = ${r.toFixed(2)} · off by ${miss.toFixed(2)}`,
+    close: 'Close: within 0.05.',
+    run: (n: number): string => `${n} close in a row`,
+    score: (thousandths: number): string => `Average miss: ${(thousandths / 1000).toFixed(3)}`,
+    closeCount: (n: number): string => `${n} of 10 within 0.05`,
+    longestRun: (n: number): string => `Longest run: ${n}`,
+    record: (thousandths: number): string => `Record: ${(thousandths / 1000).toFixed(3)}`,
+    recordLabel: 'Lowest average miss',
+    scoreLabel: 'Average miss',
+    plotLabel: (n: number): string => `Scatter plot ${n}: fifty points`,
+    cardTitle: 'Guess the correlation',
+    cardBody: 'Read the correlation off ten scatter plots; the score is the average miss.',
 } as const;

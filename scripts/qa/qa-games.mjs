@@ -315,8 +315,83 @@ try {
     const card = await pageE.locator('[data-game-card="arithmetic"]').innerText();
     check('the hub shows both records', /Sprint record\s*12/i.test(card) && /Interview record\s*3/i.test(card), card.replace(/\s+/g, ' '));
 
+    // --- user F: Kelly coin, market making, guess the correlation -----------------------------
+    // Each game sends its seed and its moves; the server replays them for the score, so the row's
+    // score is checked against what the page shows.
+    const pageF = await browser.newPage({viewport: {width: 1440, height: 900}});
+    pageF.on('pageerror', (error) => errors.push(String(error)));
+    const userF = await userIdFor(await signUp(pageF, 'gamesF', {stay: true}));
+    await pageF.goto(`${BASE}/games/kelly`, {waitUntil: 'networkidle'});
+    await pageF.locator('[data-kelly-start]').click();
+    await pageF.locator('[data-kelly-game]').waitFor({timeout: 15000});
+    await pageF.locator('[data-kelly-preset="0.2"]').click();
+    check('a preset stakes a share of the bankroll', await pageF.locator('[data-kelly-amount]').inputValue() === '5.00');
+    for (let i = 0; i < 5; i++) {
+        await pageF.locator(`[data-kelly-bet="${i % 2 ? 'tails' : 'heads'}"]`).click();
+        await pageF.locator(`[data-kelly-flips="${i + 1}"]`).waitFor({timeout: 15000});
+    }
+    check('every flip says what it did', /the bet (won|lost) \$/.test(await pageF.locator('[data-kelly-last]').innerText()));
+    await pageF.locator('[data-kelly-stop]').click();
+    await pageF.locator('[data-round-record]').waitFor({timeout: 15000});
+    const kellyShown = await pageF.locator('[data-kelly-bankroll]').getAttribute('data-kelly-bankroll');
+    const kellyRow = await rounds.findOne({userId: userF, game: 'kelly'});
+    check('a stopped game is kept at the bankroll the server replays', kellyRow && String(kellyRow.score) === kellyShown && kellyRow.detail.flips === 5,
+        `${kellyShown} vs ${kellyRow?.score}`);
+    check('…beside the three fixed rules on the same flips', await pageF.locator('[data-kelly-rule]').count() === 3
+        && await pageF.locator('[data-path-chart] polyline').count() === 4);
+    await pageF.screenshot({path: `${OUT}07-kelly.png`, fullPage: true});
+
+    await pageF.goto(`${BASE}/games/market-making`, {waitUntil: 'networkidle'});
+    await pageF.locator('[data-market-start]').click();
+    await pageF.locator('[data-market-form]').waitFor({timeout: 15000});
+    await pageF.locator('[data-market-bid]').fill('10');
+    await pageF.locator('[data-market-ask]').fill('20');
+    await pageF.locator('[data-market-quote]').click();
+    await pageF.waitForTimeout(500);
+    check('a quote more than 4 apart is refused', await pageF.locator('[data-market-round="0"]').count() === 1);
+    for (let round = 0; round < 4; round++) {
+        await pageF.locator('[data-market-bid]').fill('13');
+        await pageF.locator('[data-market-ask]').fill('15');
+        await pageF.locator('[data-market-quote]').click();
+        await pageF.locator(`[data-market-round="${round + 1}"]`).waitFor({timeout: 15000});
+        if (round === 0) check('a round reports its trades and shows a die', await pageF.locator('[data-market-trades]').count() === 1
+            && (await pageF.locator('[data-market-dice]').getAttribute('data-market-dice')).split(',').length === 1);
+    }
+    await pageF.locator('[data-round-record]').waitFor({timeout: 15000});
+    const marketRow = await rounds.findOne({userId: userF, game: 'market-making'});
+    check('the settlement is kept at the profit the server replays', marketRow && String(marketRow.score) === await pageF.locator('[data-market-summary]').getAttribute('data-market-pnl'),
+        String(marketRow?.score));
+    check('…and says what each trader believed, one informed a round', await pageF.locator('[data-trader-kind="informed"]').count() === 4
+        && await pageF.locator('[data-trader-kind="noise"]').count() === 8);
+    await pageF.screenshot({path: `${OUT}08-market.png`, fullPage: true});
+
+    await pageF.goto(`${BASE}/games/correlation`, {waitUntil: 'networkidle'});
+    await pageF.locator('[data-correlation-start]').click();
+    for (let plot = 0; plot < 10; plot++) {
+        await pageF.locator(`[data-correlation-plot="${plot}"]`).waitFor({timeout: 15000});
+        if (plot === 0) {
+            check('a plot is fifty points', await pageF.locator('[data-scatter="50"] circle').count() === 50);
+            await pageF.locator('[data-correlation-slider]').fill('0.35');
+            check('the slider reads its guess', await pageF.locator('[data-correlation-guess]').innerText() === '0.35');
+        }
+        await pageF.locator('[data-correlation-reveal]').click();
+        await pageF.locator('[data-correlation-miss]').waitFor({timeout: 15000});
+        await pageF.locator('[data-correlation-next]').click();
+    }
+    await pageF.locator('[data-round-record]').waitFor({timeout: 15000});
+    const correlationRow = await rounds.findOne({userId: userF, game: 'correlation'});
+    check('ten guesses are kept at the miss the server replays', correlationRow && String(correlationRow.score) === await pageF.locator('[data-correlation-summary]').getAttribute('data-correlation-score'),
+        String(correlationRow?.score));
+    await pageF.goto(`${BASE}/games`, {waitUntil: 'load'});
+    check('the hub shows a record for each game played', !/no round yet/i.test(await pageF.locator('[data-game-card="kelly"]').innerText())
+        && !/no round yet/i.test(await pageF.locator('[data-game-card="market-making"]').innerText())
+        && !/no round yet/i.test(await pageF.locator('[data-game-card="correlation"]').innerText()));
+    await pageF.goto(`${BASE}/learn?tab=glossary`, {waitUntil: 'load'});
+    check('the glossary homes the games\' terms on /games', await pageF.locator('#learn-games [data-learn-entry="kelly-criterion"]').count() === 1
+        && await pageF.locator('#learn-games a[href="/games"]').count() === 1);
+
     // --- every page in plain words ---------------------------------------------------------
-    for (const path of ['/games', '/games/puzzle', '/games/puzzles', '/games/arithmetic', '/games/arithmetic?mode=interview']) {
+    for (const path of ['/games', '/games/puzzle', '/games/puzzles', '/games/arithmetic', '/games/arithmetic?mode=interview', '/games/kelly', '/games/market-making', '/games/correlation']) {
         await page.goto(`${BASE}${path}`, {waitUntil: 'load'});
         const banned = findBanned(await page.locator('main').innerText().catch(() => page.locator('body').innerText()), 'copy');
         check(`${path} reads as description, never advice`, banned.length === 0, banned.join(', '));
