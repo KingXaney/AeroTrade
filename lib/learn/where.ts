@@ -19,6 +19,7 @@ const POKER: readonly GlossaryKey[] = [
     'hand-equity', 'hand-range', 'combination', 'hand-class', 'card-removal', 'exact-enumeration', 'monte-carlo', 'standard-error',
     'pot-odds', 'minimum-defense-frequency', 'expected-value', 'big-blind', 'ante', 'effective-stack', 'push-fold',
     'nash-equilibrium', 'mixed-strategy', 'cfr', 'exploitability',
+    'bluff-catcher', 'polarized-range', 'game-tree', 'showdown', 'value-bet', 'bluff',
 ];
 const BRAIN: readonly GlossaryKey[] = [
     'news-weight', 'news-sentiment', 'thesis', 'since-thesis',

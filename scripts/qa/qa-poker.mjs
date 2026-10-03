@@ -4,8 +4,9 @@
 // (1,410,336 wins and 9,308 ties over 1,712,304 boards); a flop spot matches Node; Monte Carlo
 // repeats itself for a seed and lands near the table; Stop answers within a second; push/fold at
 // 10 bb matches a Node solve, plays everything at 1 bb, and widens with an ante; pot odds read
-// 25% and 66.7% for a half-pot bet. Then the range editor, the session across tabs, a phone's width
-// and the no-advice list over every tab's text.
+// 25% and 66.7% for a half-pot bet; the river's polarized example bluffs and calls at its closed form
+// on both engines. Then the range editor, the session across tabs, a phone's width and the no-advice
+// list over every tab's text.
 // Run: npm run qa -- poker   (the harness: README.md)
 import {chromium} from 'playwright';
 import {readFileSync} from 'node:fs';
@@ -74,7 +75,7 @@ try {
     await page.goto(`${BASE}/poker`, {waitUntil: 'load'});
     await page.locator('[data-poker-tab="equity"]').waitFor({timeout: 30000});
     check('/poker opens on Equity, under one h1', await page.locator('h1').count() === 1 && /poker solver/i.test(await page.locator('h1').innerText()));
-    check('…with three tabs', (await page.$$eval('[role="tablist"] [role="tab"]', (tabs) => tabs.map((t) => t.getAttribute('data-tab')))).join(',') === 'equity,push-fold,pot-odds');
+    check('…with four tabs', (await page.$$eval('[role="tablist"] [role="tab"]', (tabs) => tabs.map((t) => t.getAttribute('data-tab')))).join(',') === 'equity,push-fold,pot-odds,river');
     check('…and lights the Poker solver tab under Learn', await page.locator('[data-section-tabs="learn"] a[href="/poker"][aria-current="page"]').count() === 1);
     await page.locator('[data-poker-engine="worker"]').waitFor({timeout: 15000});
     check('the solver runs in a Web Worker', true);
@@ -206,11 +207,67 @@ try {
     check('a bet of 0 is named', /bet is a number above 0/i.test(await page.locator('[data-pot-odds-issues]').innerText()));
     check('the pot odds tab says nothing that advises', findBanned(await page.locator('main').innerText(), 'copy').length === 0);
 
+    // --- the river -------------------------------------------------------------------------------
+    // The polarized example has a closed form: at a bet of 7.5 into 10 the bettor bluffs 7.5/25 = 30%
+    // of its bets and the bluff-catcher calls 10/17.5 = 57.1% of the time. The page shows each
+    // class's strategy in its cell's title, to a tenth of a point.
+    const titleIn = (target, grid, label) => target.locator(`[data-hand-grid="${grid}"] [data-class-id="${classFromLabel(label)}"]`).getAttribute('title');
+    const shareIn = (title, action) => Number(new RegExp(`${action} ([\\d.]+)%`).exec(title ?? '')?.[1]) / 100;
+    const combosIn = (title) => Number(/: ([\d.]+) combos/.exec(title ?? '')?.[1]);
+    const solveRiver = async (target, preset) => {
+        await target.locator(`[data-river-preset="${preset}"]`).click();
+        await target.locator('[data-river-solve]').click();
+        await target.locator('[data-river-result="done"] [data-river-iterations]').waitFor({timeout: 120000});
+    };
+    const bluffShareOn = async (target) => {
+        const aces = await titleIn(target, 'river-0', 'AA');
+        const air = await titleIn(target, 'river-0', '65s');
+        const bluffs = combosIn(air) * shareIn(air, 'Bet 7.5');
+        return {share: bluffs / (bluffs + combosIn(aces) * shareIn(aces, 'Bet 7.5')), aces, air};
+    };
+    await page.goto(`${BASE}/poker?tab=river`, {waitUntil: 'load'});
+    await page.locator('[data-poker-tab="river"]').waitFor({timeout: 30000});
+    await page.locator('[data-poker-engine="worker"]').waitFor({timeout: 15000});
+    await page.locator('[data-river-preset="polarized"]').click();
+    check('the polarized example builds its three-decision tree', await page.locator('[data-river-summary="3"]').count() === 1,
+        await page.locator('[data-river-summary]').innerText().catch(() => ''));
+    await solveRiver(page, 'polarized');
+    const toyWorker = await bluffShareOn(page);
+    check('the polarized example bluffs 29–31% of its bets', toyWorker.share >= 0.29 && toyWorker.share <= 0.31, `${toyWorker.share} · ${toyWorker.aces} · ${toyWorker.air}`);
+    const toyExploitability = Number(await page.locator('[data-river-exploitability]').getAttribute('data-river-exploitability'));
+    check('…and is within 0.5% of the pot of the equilibrium', toyExploitability < 0.5, String(toyExploitability));
+    await page.locator('[data-river-goto][data-river-action="bet"]').click();
+    await page.locator('[data-hand-grid="river-1"]').waitFor({timeout: 10000});
+    const catcher = await titleIn(page, 'river-1', 'KQs');
+    check('Bet 7.5 opens the in-position grid, which calls 56–58.5% of the time', shareIn(catcher, 'Call 7.5') >= 0.56 && shareIn(catcher, 'Call 7.5') <= 0.585, catcher);
+    await shot('05-river-polarized');
+    await page.locator('[data-river-crumb="0"]').click();
+    check('…and the breadcrumb leads back to the start of the river', await page.locator('[data-river-node="0"] [data-hand-grid="river-0"]').count() === 1);
+
+    const mainRiver = await browser.newPage({viewport: {width: 1440, height: 900}});
+    watch(mainRiver);
+    await mainRiver.context().addCookies(await page.context().cookies());
+    await mainRiver.goto(`${BASE}/poker?tab=river&engine=main`, {waitUntil: 'load'});
+    await mainRiver.locator('[data-poker-engine="main"]').waitFor({timeout: 15000});
+    await solveRiver(mainRiver, 'polarized');
+    const toyMain = await bluffShareOn(mainRiver);
+    check('the page-thread engine solves it to the same strategy', toyMain.aces === toyWorker.aces && toyMain.air === toyWorker.air, `${toyMain.air} vs ${toyWorker.air}`);
+    await mainRiver.close();
+
+    await solveRiver(page, 'realistic');
+    const realistic = Number(await page.locator('[data-river-exploitability]').getAttribute('data-river-exploitability'));
+    check('a realistic spot solves to under 0.3% of the pot', realistic <= 0.3, String(realistic));
+    check('…and draws its exploitability as it fell', await page.locator('[data-exploitability-chart]').count() === 1);
+    await shot('06-river-realistic');
+    await page.locator('[data-river-pot]').fill('12');
+    check('editing the spot marks the result as for the spot as it was', await page.locator('[data-river-stale]').count() === 1);
+    check('the river tab says nothing that advises', findBanned(await page.locator('main').innerText(), 'copy').length === 0);
+
     // --- a phone ---------------------------------------------------------------------------------
     const phone = await browser.newPage({viewport: {width: 390, height: 844}});
     watch(phone);
     await phone.context().addCookies(await page.context().cookies());
-    for (const tab of ['equity', 'push-fold', 'pot-odds']) {
+    for (const tab of ['equity', 'push-fold', 'pot-odds', 'river']) {
         await phone.goto(`${BASE}/poker?tab=${tab}`, {waitUntil: 'load'});
         await phone.locator(`[data-poker-tab="${tab}"]`).waitFor({timeout: 30000});
         if (tab === 'push-fold') await phone.locator('[data-push-fold-status="solved"]').waitFor({timeout: 30000});

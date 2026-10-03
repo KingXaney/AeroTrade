@@ -46,8 +46,8 @@ describe('where each term lives', () => {
 
     it('homes the poker solver\'s terms on /poker', () => {
         const poker = GLOSSARY_GROUPS.find((group) => group.id === 'poker');
-        expect(poker?.keys).toHaveLength(19);
-        for (const key of ['hand-equity', 'hand-range', 'pot-odds', 'push-fold', 'nash-equilibrium', 'exploitability'] as const) {
+        expect(poker?.keys).toHaveLength(25);
+        for (const key of ['hand-equity', 'hand-range', 'pot-odds', 'push-fold', 'nash-equilibrium', 'exploitability', 'bluff-catcher', 'game-tree'] as const) {
             expect(groupOf(GLOSSARY[key]), key).toBe('poker');
             expect(homeOf(key), key).toBe('/poker');
         }

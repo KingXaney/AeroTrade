@@ -1,10 +1,10 @@
 # Games and a poker solver: Learn becomes a place to play
 
-**Status:** In progress — the quizzes were removed in `30a6da0` (PR #39, 2026-10-03), and the games
-hub, the daily puzzle and its streak shipped in `989e0ff` (PR #40), the arithmetic sprint and its
-interview mode in `639ef94` (PR #41), and the Kelly, market-making and correlation games in
-`30acbd8` (PR #42). The poker solver's equity, push/fold and pot odds are the fifth of six pull
-requests; the river solver follows.
+**Status:** Shipped 2026-10-03 in six pull requests: the quizzes removed in `30a6da0` (#39), the
+games hub, the daily puzzle and its streak in `989e0ff` (#40), the arithmetic sprint and its
+interview mode in `639ef94` (#41), the Kelly, market-making and correlation games in `30acbd8`
+(#42), the poker solver's equity, push/fold and pot odds in `754fd48` (#43), and the river solver
+in #44.
 
 ## Why
 
@@ -147,7 +147,38 @@ Everything is worked out in the browser and nothing is stored: the page reads on
 - **Pot odds:** the break-even equity, the odds, the minimum defense frequency, the folds a bluff
   needs, and a call's expected result.
 
-## What follows
+## The river solver
 
-- **The river solver:** discounted CFR over a betting tree, checked against the polarized
-  range-versus-bluff-catcher toy game.
+- **The tree.** A betting tree is built from:
+  - the pot and the stack behind
+  - each player's bets and raises, as shares of the pot
+  - an all-in, if offered
+  - a cap of 0 to 4 raises a line
+
+  It is held as flat arrays, so a walk allocates nothing. Sizes past the stack become the all-in,
+  equal amounts merge, and a raise adds at least the last increment. A tree holds at most 400
+  decisions, or 120 on the page thread, and 64 MB.
+- **The solve.** Discounted CFR (α 1.5, β 0, γ 2), with CFR+ as the other method, runs vectorised
+  over each side's live hands. A fold pays from per-card sums and a showdown from the same sorted
+  sweep exact equity uses, both with card removal.
+- **Stopping.** Exploitability is measured at fixed iterations, and the solve stops under 0.3% of
+  the pot or at 1,000 iterations. Stop sends 'stop' into the job, which still returns the average
+  strategy so far.
+- **Speed.** Random against random (1,081 hands a side) on a 69-node tree with three sizes, raises
+  and an all-in takes about 3 ms an iteration in Node. It reaches 0.19% of the pot in 150
+  iterations.
+- **Checked against what is known:**
+  - **Polarized versus bluff-catcher:** aces and four bluffs against three bluff-catchers on Ah Kd 7c
+    4s 2h. At bets of 3.3, 7.5, 15 and 40 into 10, the bettor bluffs B/(P + 2B) of its bets and the
+    catcher calls P/(P + B), within half a point under either method.
+  - **Brute force:** the vectorised counter-strategy equals a brute force over every pure strategy,
+    card removal included.
+  - **Symmetry:** relabelling the suits changes nothing.
+  - **A tied board:** every hand ties on a royal-flush board, so each side keeps half the pot.
+  - **No betting:** a tree with no bets is worth the pot times plain equity.
+- **The River tab** has:
+  - two presets: the polarized example and a realistic spot
+  - a tree summary before Solve: decisions, nodes, memory and time an iteration
+  - the strategy at each decision, browsable from a breadcrumb, with each class's actions as one
+    stacked bar
+  - each side's result, and exploitability on a log scale as it fell

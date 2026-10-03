@@ -8,6 +8,8 @@ import type {EquityIssue, EquityMethod, EquityPlan} from "@/lib/poker/equity";
 import type {PotOddsIssue} from "@/lib/poker/pot-odds";
 import type {PushFoldIssue} from "@/lib/poker/pushfold";
 import type {RangeIssueKind} from "@/lib/poker/range";
+import type {RiverIssue, RiverMethod} from "@/lib/poker/river/solver";
+import type {ActionKind} from "@/lib/poker/river/tree";
 import {formatSigned} from "@/lib/format";
 
 const count = (n: number): string => n.toLocaleString('en-US', {maximumFractionDigits: 2});
@@ -19,10 +21,10 @@ const roughly = (n: number): string => (n >= 1e6 ? `${(n / 1e6).toFixed(1)} mill
 
 export const POKER_COPY = {
     title: 'Poker solver',
-    subtitle: 'Equity between hands and ranges, heads-up push or fold at equilibrium, and pot odds, all worked out in this browser.',
+    subtitle: 'Equity between hands and ranges, heads-up push or fold and river play at equilibrium, and pot odds, all worked out in this browser.',
     note: 'Nothing here is saved, and no figure is a recommendation: the solver describes how cards and bets behave.',
     tabsLabel: 'Poker solver tools',
-    tabs: {equity: 'Equity', 'push-fold': 'Push or fold', 'pot-odds': 'Pot odds'},
+    tabs: {equity: 'Equity', 'push-fold': 'Push or fold', 'pot-odds': 'Pot odds', river: 'River'},
     engine: {
         starting: 'Starting the solver…',
         worker: 'Solving in a background thread',
@@ -189,3 +191,84 @@ export const POT_ODDS_COPY = {
         }
     },
 } as const;
+
+const chips = (n: number): string => count(Math.round(n * 100) / 100);
+
+export type RiverPreset = 'polarized' | 'realistic';
+
+export const RIVER_COPY = {
+    heading: 'River solver',
+    lead: 'Two ranges on a finished board and a betting tree: the equilibrium strategy for every hand at every decision, by discounted CFR.',
+    presetsLabel: 'Start from',
+    presets: {polarized: 'Polarized example', realistic: 'A realistic spot'} satisfies Record<RiverPreset, string>,
+    presetLines: {
+        polarized: 'Aces and four bluffs against three king-queens that only catch bluffs, one bet of 75% of the pot: the spot with an answer in closed form.',
+        realistic: 'Two wide ranges on a queen-high board, two bet sizes, raises and an all-in.',
+    } satisfies Record<RiverPreset, string>,
+    players: ['Out of position', 'In position'] as const,
+    playerNotes: ['Acts first', 'Acts second'] as const,
+    boardHint: 'Five cards',
+    potLabel: 'Pot',
+    stackLabel: 'Stack behind, each',
+    betsLabel: (player: string): string => `${player}: bets, % of the pot`,
+    raisesLabel: (player: string): string => `${player}: raises, % of the pot`,
+    sizesHint: 'Up to four sizes, such as 33, 75',
+    allInLabel: 'All-in offered',
+    raiseCapLabel: 'Raises a line allows',
+    methodLabel: 'Method',
+    methods: {dcfr: 'Discounted CFR', 'cfr+': 'CFR+'} satisfies Record<RiverMethod, string>,
+    summary: (decisions: number, nodes: number, megabytes: number, msPerIteration: number): string =>
+        `${plural(decisions, 'decision', 'decisions')} and ${plural(nodes, 'node', 'nodes')} · ${megabytes < 1 ? 'under 1 MB' : `about ${count(Math.round(megabytes))} MB`} · ${msPerIteration < 1 ? 'under 1 ms' : `about ${count(Math.round(msPerIteration))} ms`} an iteration`,
+    solve: 'Solve',
+    stop: 'Stop',
+    solving: 'Solving…',
+    progress: (iterations: number, pct: number | null): string =>
+        pct === null ? plural(iterations, 'iteration', 'iterations') : `${plural(iterations, 'iteration', 'iterations')} · exploitability ${pct.toFixed(2)}% of the pot`,
+    stopped: (iterations: number): string => `Stopped after ${plural(iterations, 'iteration', 'iterations')}: the strategy shown is the average so far.`,
+    sizesUnreadable: (text: string): string => `"${text}" is not a list of sizes such as 33, 75.`,
+    issue: (issue: RiverIssue, maxDecisions: number): string => {
+        switch (issue) {
+            case 'pot': return 'The pot is a number above 0.';
+            case 'stack': return 'The stack is a number from 0 up.';
+            case 'sizes': return 'Each size is above 0% and at most 1,000% of the pot, four at most a list.';
+            case 'raise-cap': return 'Raises a line allows is a whole number from 0 to 4.';
+            case 'too-big': return `The tree is over ${count(maxDecisions)} decisions or 64 MB; with fewer sizes or raises it fits.`;
+            case 'board': return 'A river board is five different cards.';
+            case 'empty-side': return 'One side has no hand left once the board is out.';
+            case 'no-pairs': return 'Every hand on one side shares a card with every hand on the other.';
+        }
+    },
+    resultHeading: 'Equilibrium',
+    nothingYet: 'The equilibrium shows here once the spot is solved.',
+    stale: 'These figures are for the spot as it was when solved.',
+    evLabel: (player: string): string => `${player}: result a hand`,
+    ev: (value: number, pot: number): string => `${chips(value)} · ${percent(value / pot, 1)} of the pot`,
+    exploitabilityLabel: 'Exploitability',
+    exploitability: (pct: number): string => `${pct.toFixed(3)}% of the pot`,
+    iterationsLabel: 'Iterations',
+    treeHeading: 'The tree',
+    root: 'River',
+    toAct: (player: string): string => `${player} to act`,
+    action: (kind: ActionKind, amount: number, total: number): string => {
+        switch (kind) {
+            case 'check': return 'Check';
+            case 'bet': return `Bet ${chips(amount)}`;
+            case 'call': return `Call ${chips(amount)}`;
+            case 'fold': return 'Fold';
+            case 'raise': return `Raise to ${chips(total)}`;
+            case 'all-in': return `All in for ${chips(total)}`;
+        }
+    },
+    ends: {fold: 'ends the hand', showdown: 'goes to showdown'},
+    actionShare: (share: number): string => percent(share, 1),
+    gridLabel: (player: string): string => `${player}: the strategy of each starting hand here`,
+    cell: (label: string, combos: number, parts: readonly {action: string; share: number}[], ev: number | null): string =>
+        combos <= 0 ? `${label}: does not reach here`
+            : `${label}: ${count(Math.round(combos * 100) / 100)} combos · ${parts.map((part) => `${part.action} ${percent(part.share, 1)}`).join(', ')}${ev === null ? '' : ` · result ${chips(ev)}`}`,
+    noneReach: 'No hand of this player reaches this decision.',
+    chartHeading: 'Exploitability as it solves',
+    chartLabel: 'Exploitability after each check, % of the pot, on a log scale',
+    target: (pct: number): string => `stops under ${pct}%`,
+    iterationsAxis: 'iterations',
+} as const;
+

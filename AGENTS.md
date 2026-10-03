@@ -382,7 +382,7 @@ and friends keep none beyond Shared and the invariants).
 
 ### poker
 
-- The poker solver (`/poker`: Equity, Push or fold, Pot odds) works everything out in the browser
+- The poker solver (`/poker`: Equity, Push or fold, Pot odds, River) works everything out in the browser
   and stores nothing: no model, action or store; the page reads only the session. Every
   `lib/poker` module is pure and unit-tested; `lib/poker/cards` and `lib/poker/evaluator` import
   nothing, so the worker, the page and the Node table script share them.
@@ -408,6 +408,16 @@ and friends keep none beyond Shared and the invariants).
   measures the strategies it returns afresh, so the exploitability shown is that of the charts
   drawn. The shares are not monotone at fine steps — one seat can widen as the other tightens — so
   tests pin a coarse ladder of stacks.
+- The river solver: `lib/poker/river/tree` builds the betting tree as flat arrays (sizes past the
+  stack become the all-in, a raise adds at least the last increment, at most
+  `RIVER_LIMITS.maxDecisions` decisions — `maxDecisionsOnPage` on the page thread); and
+  `lib/poker/river/solver` solves it by discounted CFR (or CFR+), vectorised over each side's live
+  hands, its folds and showdowns through `lib/poker/showdown`. Exploitability is measured at fixed
+  iterations (10, 20, 30, 50, 75, 100, then every 50) and the solve stops under `RIVER_TARGET_PCT`
+  of the pot. A stop sends 'stop' into the job (`lib/poker/drive`'s `finishOnStop`), which returns
+  the average strategy so far; `lib/poker/river/view` reads a decision's per-class strategy.
+  `lib/poker/__tests__/river-solver.test.ts` holds it to the polarized-range-against-a-bluff-catcher
+  closed form and to a brute force over every pure strategy.
 - Wording (invariant 12 applies): an equilibrium, never "optimal" or "GTO"; a hand wins against
   another, never "beats" it; "stronger", never "better"; no sentence opens on "Hold'em", which
   `findBanned` reads as "hold". The terms are the glossary's `poker` group, homed at `/poker`;
