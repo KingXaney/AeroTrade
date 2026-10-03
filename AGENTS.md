@@ -112,8 +112,10 @@ and friends keep none beyond Shared and the invariants).
   from `lib/shell/news-seen` (the `aero:news-seen` window event, as `lib/chat/ask` opens the chat)
   and settles on the next full load. The shell's own sentences are `lib/learn/copy/shell`.
 - The header repeats no section: logo, the one `components/shell/SearchCommand` trigger (which
-  also finds pages, `searchPages`), the account menu. `components/chat/ChatWidget`'s button
-  takes the bar's end at `lg`, which the header keeps clear.
+  also finds pages, `searchPages`), the account menu. The assistant's launcher is not in the bar:
+  `components/chat/ChatWidget` floats the robot (`components/chat/RobotMascot`) fixed bottom-right
+  at every width, over the page, and the `(root)` layout's content wrapper (`app/(root)/layout.tsx`)
+  ends in `pb-24` so it never covers a page's last panel.
 
 ### auth
 
@@ -349,6 +351,18 @@ and friends keep none beyond Shared and the invariants).
   through `getStrategyLeaderboard`, or one strategy's latest run from
   `lib/strategies/page-store.getLatestRun`, with each reason decoded with its def and the board cut
   to its top rows.
+- `components/chat/ChatWidget` mounts the one launcher — the robot, aria-label "Open Aero-AI
+  Assistant", the QA's handle — and, on `/topics` pages only while the panel is closed, its speech
+  bubble `components/chat/RobotTipBubble`. The tips are `lib/learn/copy/robot` (`ROBOT_TIPS`: the
+  lead tip first, the rest in the day's order, none twice in a browser session —
+  `lib/chat/robot-tips`, sessionStorage `aero-robot:shown`, never an `aero-chat:` key); a tip the
+  reader is on — the pointer resting on it, focus inside it — is not taken away
+  (`lib/chat/robot-tips.ROBOT_TIP_HOLD_MS`), and the launcher takes the focus a leaving bubble still
+  holds; "Try it" prefills the composer through `lib/chat/ask.askAdvisor` and sends nothing, so a
+  tip's prompt is chat input and held to the advice tier like a chip. The robot moves by CSS keyframes only
+  (`.robot-bob`, `.robot-eyes`, `.robot-antenna`, `.robot-tip-in` in `app/globals.css`), each
+  listed in both reduced-motion guards; brutalist stops the loops by name because the zeroed tokens
+  do not stop a keyframe. No SMIL, no WAAPI: the sweep's STILL css and the guards stop only CSS.
 
 ### email
 

@@ -3,6 +3,10 @@
 // list can be asserted over it and no scraped text (a headline, an entity name) can
 // enter a prompt through this door. Prefill only — nothing here ever sends.
 //
+// Two callers: components/chat/AskLink (buildAskPrompt over a typed input) and the robot's tips
+// (components/chat/RobotTipBubble), whose prompts are copy in lib/learn/copy/robot and held to
+// the same list.
+//
 // A window CustomEvent rather than a React context: the chat widget is mounted once
 // through a portal in the (root) layout and the links that call this live inside server
 // components on five different pages. Client-safe, no React.

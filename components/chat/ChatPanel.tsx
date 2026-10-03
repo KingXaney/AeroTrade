@@ -7,6 +7,7 @@ import {useRouter} from "next/navigation";
 import Link from "next/link";
 import {X, Trash2} from "lucide-react";
 import ChatMessage from "@/components/chat/ChatMessage";
+import RobotMascot from "@/components/chat/RobotMascot";
 import {describeChatError} from "@/lib/chat/errors";
 import {subscribeAsk} from "@/lib/chat/ask";
 import {CHAT_WELCOME_MESSAGE, CHAT_SUGGESTIONS} from "@/lib/learn/copy/chat";
@@ -199,7 +200,7 @@ const ChatPanel = ({userId, onClose, initialMessages, onMessagesChange, initialI
             {/* Header */}
             <div className="flex items-center justify-between px-4 py-3 bg-brand-strong/8 border-b border-line-strong/30">
                 <div className="flex items-center gap-2">
-                    <span className="material-symbols-outlined text-brand animate-pulse">smart_toy</span>
+                    <RobotMascot className="size-5 text-brand" still/>
                     <span className="label-type text-xs font-bold text-brand">
                         Aero-AI Assistant
                     </span>

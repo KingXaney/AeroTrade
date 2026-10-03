@@ -38,9 +38,7 @@ function Header({user, initialStocks, initialTopics, navBadges}: HeaderProps) {
                     phone has none. */}
                 <SearchCommand renderAs="text" label="Search stocks, topics and pages" initialStocks={initialStocks} initialTopics={initialTopics}/>
 
-                {/* lg:mr-14 leaves the bar's end to the assistant's button (components/chat/ChatWidget),
-                    which sits there at lg instead of floating over the page. */}
-                <div className="flex items-center gap-3 shrink-0 lg:mr-14">
+                <div className="flex items-center gap-3 shrink-0">
                     <UserDropdown user={user} friendRequests={navBadges.friendRequests ?? 0}/>
                 </div>
             </div>

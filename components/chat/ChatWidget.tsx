@@ -2,10 +2,24 @@
 
 import {useCallback, useEffect, useRef, useState} from "react";
 import {createPortal} from "react-dom";
+import {usePathname} from "next/navigation";
 import type {UIMessage} from "ai";
 import ChatPanel from "@/components/chat/ChatPanel";
-import {subscribeAsk} from "@/lib/chat/ask";
-import {cn} from "@/lib/utils";
+import RobotMascot from "@/components/chat/RobotMascot";
+import RobotTipBubble, {type RobotTipAttention} from "@/components/chat/RobotTipBubble";
+import {askAdvisor, subscribeAsk} from "@/lib/chat/ask";
+import {
+    ROBOT_TIP_GAP_MS,
+    ROBOT_TIP_HOLD_MS,
+    ROBOT_TIP_VISIBLE_MS,
+    nextRobotTip,
+    readShownTips,
+    rememberShownTip,
+    robotTipDelay,
+    robotTipsOn,
+} from "@/lib/chat/robot-tips";
+import {getEasternDateString} from "@/lib/dates";
+import type {RobotTip} from "@/lib/learn/copy/robot";
 
 type ChatWidgetProps = {
     userId: string;
@@ -23,6 +37,15 @@ const loadMessages = (userId: string): UIMessage[] => {
         return Array.isArray(parsed) ? (parsed as UIMessage[]) : [];
     } catch {
         return [];
+    }
+};
+
+// The tips' memory for this tab; a private window may refuse even the read.
+const sessionStorageOrNull = (): Storage | null => {
+    try {
+        return window.sessionStorage;
+    } catch {
+        return null;
     }
 };
 
@@ -53,6 +76,63 @@ const ChatWidget = ({userId}: ChatWidgetProps) => {
         setOpen(true);
     }), []);
 
+    // The robot's tips (lib/chat/robot-tips): on the topics pages, while the panel is closed, one
+    // tip at a time — the first after ROBOT_TIP_FIRST_MS, each shown for ROBOT_TIP_VISIBLE_MS, the
+    // next ROBOT_TIP_GAP_MS later — and none twice in a browser session. Every setTip runs in a
+    // timer callback or the cleanup, never in the effect body, and the date and the storage are
+    // read inside the timers, after mount; the widget renders nothing until mounted anyway.
+    const pathname = usePathname();
+    const onTopics = robotTipsOn(pathname);
+    const [tip, setTip] = useState<RobotTip | null>(null);
+    // Bumped by Dismiss: the effect restarts and waits the gap before the next tip.
+    const [tipRound, setTipRound] = useState(0);
+    const launcherRef = useRef<HTMLButtonElement>(null);
+    const bubbleRef = useRef<HTMLDivElement>(null);
+    // The reader's attention on the bubble, as it reports it: while either is up the hide waits,
+    // so a tip never leaves mid-read or from under the keyboard.
+    const attention = useRef({hover: false, focus: false});
+    useEffect(() => {
+        if (!onTopics || open) return;
+        const storage = sessionStorageOrNull();
+        let timer: ReturnType<typeof setTimeout>;
+        function hide() {
+            if (attention.current.hover || attention.current.focus) {
+                timer = setTimeout(hide, ROBOT_TIP_HOLD_MS);
+                return;
+            }
+            // Focus can still sit inside with neither up — the window lost focus while a control had
+            // it — so the launcher takes it before the bubble goes, as Dismiss hands it over.
+            if (bubbleRef.current?.contains(document.activeElement)) launcherRef.current?.focus();
+            setTip(null);
+            timer = setTimeout(show, ROBOT_TIP_GAP_MS);
+        }
+        function show() {
+            const next = nextRobotTip(getEasternDateString(), readShownTips(storage));
+            if (!next) return; // every tip heard this session: the robot keeps quiet
+            rememberShownTip(storage, next.id);
+            setTip(next);
+            timer = setTimeout(hide, ROBOT_TIP_VISIBLE_MS);
+        }
+        timer = setTimeout(show, robotTipDelay(readShownTips(storage)));
+        return () => {
+            clearTimeout(timer);
+            // A bubble unmounted from here sends no pointerleave or blur of its own.
+            attention.current = {hover: false, focus: false};
+            setTip(null);
+        };
+    }, [onTopics, open, tipRound]);
+
+    // "Try it" goes through the same door as an Ask link: the subscribeAsk handler above opens the
+    // panel with the prompt typed, and nothing is sent until the reader presses Send.
+    const tryTip = (prompt: string) => askAdvisor(prompt);
+    const dismissTip = () => {
+        launcherRef.current?.focus();
+        setTipRound((n) => n + 1);
+    };
+    const attend = (kind: RobotTipAttention, on: boolean) => {
+        attention.current[kind] = on;
+    };
+
     const persist = useCallback((messages: UIMessage[]) => {
         latestMessages.current = messages;
         if (typeof window === 'undefined') return;
@@ -75,18 +155,22 @@ const ChatWidget = ({userId}: ChatWidgetProps) => {
         <>
             {!open && (
                 <button
+                    ref={launcherRef}
                     type="button"
                     onClick={() => setOpen(true)}
                     aria-label="Open Aero-AI Assistant"
-                    className={cn(
-                        // Floating over the page below lg; at lg it takes the end of the top bar, which
-                        // Header keeps clear for it, so it no longer sits on a panel's corner.
-                        'fixed bottom-5 right-5 z-[80] inline-flex size-14 items-center justify-center rounded-full transition-all hover:scale-110 active:scale-95 sm:bottom-6 sm:right-6 group bg-brand-strong text-on-brand [box-shadow:var(--glow)]',
-                        'lg:bottom-auto lg:top-3 lg:right-6 lg:size-10',
-                    )}
+                    // The robot floats bottom-right at every width — the panel opens in the same
+                    // corner — and the (root) layout's content wrapper ends in pb-24 so it never
+                    // sits on a page's last panel. .robot-launcher carries the scale transition.
+                    className="robot-launcher fixed bottom-5 right-5 z-[80] inline-flex size-14 items-center justify-center rounded-full bg-brand-strong text-on-brand [box-shadow:var(--glow)] hover:scale-105 active:scale-95 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand sm:bottom-6 sm:right-6"
                 >
-                    <span className="material-symbols-outlined text-3xl lg:text-2xl">smart_toy</span>
+                    <RobotMascot className="size-9"/>
                 </button>
+            )}
+
+            {/* After the launcher, so a QA selector's .first() is always the launcher. */}
+            {!open && onTopics && tip && (
+                <RobotTipBubble ref={bubbleRef} tip={tip} onTry={tryTip} onDismiss={dismissTip} onAttention={attend}/>
             )}
 
             {open && (
