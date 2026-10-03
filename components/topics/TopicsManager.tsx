@@ -14,7 +14,8 @@ import ActionButton, {actionButton} from "@/components/primitives/ActionButton";
 import {rowCard} from "@/components/primitives/RowCard";
 import {createTopic, deleteTopic, followStarterTopics} from "@/lib/actions/topics.actions";
 import {runWithToast, UNREACHABLE_MESSAGE} from "@/lib/action-toast";
-import {MAX_TOPICS_PER_USER} from "@/lib/topics/config";
+import {formatCapped} from "@/lib/format";
+import {MAX_TOPICS_PER_USER, UNSEEN_COUNT_CAP} from "@/lib/topics/config";
 import {OFFER_GROUPS, offeredTopics, slotsLeft, toFollowInputs, toggleSelection, topicToInput} from "@/lib/topics/manage";
 import {TOPIC_PICKER_COPY, TOPICS_MANAGE_COPY} from "@/lib/learn/copy/topics";
 import type {SuggestedTopic, TopicOverviewItem, TopicView} from "@/lib/topics/types";
@@ -119,7 +120,7 @@ const TopicsManager = ({topics, preinstalled, brainSuggestions}: Props) => {
                                     {/* Plain text: the rail beside it already links every topic. */}
                                     <span className="text-sm font-medium text-fg truncate">{t.name}</span>
                                     {t.unseenCount > 0 && (
-                                        <Badge tone="brand" shape="pill">{TOPICS_MANAGE_COPY.newCount(t.unseenCount)}</Badge>
+                                        <Badge tone="brand" shape="pill">{TOPICS_MANAGE_COPY.newCount(formatCapped(t.unseenCount, UNSEEN_COUNT_CAP))}</Badge>
                                     )}
                                 </div>
                                 <p className="text-[11px] text-fg-muted font-mono truncate">
