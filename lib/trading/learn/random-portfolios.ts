@@ -20,7 +20,7 @@
 
 import {isTradingDay, previousTradingDay} from "@/lib/prices/market-hours";
 import {addCalendarDays} from "@/lib/dates";
-import {fnv1a} from "@/lib/learn/quiz";
+import {fnv1a, mulberry32} from "@/lib/random";
 import {
     createIncomeClock,
     dividendsByExDate,
@@ -45,17 +45,9 @@ export const LUCK_STALE_DAYS = 7;
 
 // ---- seeded randomness ----------------------------------------------------------------------
 
-// A small, well-mixed 32-bit generator: the same seed always yields the same stream in [0, 1).
-export const mulberry32 = (seed: number): (() => number) => {
-    let state = seed >>> 0;
-    return () => {
-        state = (state + 0x6d2b79f5) >>> 0;
-        let t = state;
-        t = Math.imul(t ^ (t >>> 15), t | 1);
-        t ^= t + Math.imul(t ^ (t >>> 7), t | 61);
-        return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
-    };
-};
+// The generator and the hash live in lib/random.ts, import-free; the generator is re-exported
+// so this module's callers keep one import.
+export {mulberry32};
 
 export const seedFrom = (accountId: string, date: string): number => fnv1a(`${accountId}|${date}`);
 

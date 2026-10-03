@@ -8,20 +8,19 @@ import {STRATEGIES} from "@/lib/strategies/catalog";
 import {numberWord} from "@/lib/text";
 
 export const LEARN_PAGE_COPY = {
-    subtitle: 'A short course from the start, a lesson and a question each day, and what every number in AeroTrade measures.',
+    subtitle: 'A short course from the start, a lesson each day, and what every number in AeroTrade measures.',
     glossaryLead: 'What every number in AeroTrade measures, in the app\'s own words — and where to see the real one on your account.',
     note: 'Definitions describe. No definition is a recommendation.',
     strategiesHeading: `The ${numberWord(STRATEGIES.length)} strategies, one line each`,
     tabs: {course: 'Course', today: 'Today', glossary: 'Glossary', strategies: 'Strategies'},
     todayLesson: "Today's lesson",
-    todayQuiz: 'Daily quiz',
     todayFirstWeek: 'First week',
 } as const;
 
 // The beginner course's frame: the lines around the lessons.
 export const COURSE_COPY = {
     heading: 'The beginner course',
-    lead: 'Sixteen short lessons, from what a share is to how a headline becomes a narrative. Each takes a minute or two and ends on one question.',
+    lead: 'Sixteen short lessons, from what a share is to how a headline becomes a narrative. Each takes a minute or two to read.',
     // "3 of 16 lessons done"
     progress: (done: number, total: number): string => `${done} of ${total} lessons done`,
     // "2 of 4 done"
@@ -34,10 +33,14 @@ export const COURSE_COPY = {
     backToCourse: 'All lessons',
     termsHeading: 'Words in this lesson',
     tryHeading: 'See it on a real screen',
-    checkHeading: 'One question',
-    right: 'That is it.',
-    wrong: 'Not that one.',
-    saved: 'Lesson marked done',
+    // The end of a lesson: one button, then the way on.
+    doneHeading: 'Done with this lesson',
+    markLead: 'Marking it done counts it in the course, and the course moves on to the next lesson.',
+    markDone: 'Mark as done',
+    marking: 'Saving…',
+    doneLine: 'This lesson is done.',
+    // "Next lesson: The order ticket"
+    nextLesson: (title: string): string => `Next lesson: ${title}`,
     notSaved: 'Could not save that — the lesson is not marked done yet',
     notSignedIn: 'Not authenticated',
     invalid: 'That is not a lesson',

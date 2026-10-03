@@ -10,8 +10,6 @@ type RankOrder = 'strongest' | 'calmest';
 export const BOARD_COPY = {
     // The one disclosure beside the board, which also carries its definitions.
     summary: (symbol: string): string => `Read this board — ${symbol}`,
-    // Shown in place of the reading while Guess the Verdict is open: it would give the answers away.
-    paused: 'The reading of the top row is hidden while the quiz is open, so it cannot give the answers away.',
     genericKey: 'Each row is one symbol the rule scores every morning; the verdict is what it decided from those numbers.',
 
     // ---- When the row does not carry the rule's numbers ------------------------------

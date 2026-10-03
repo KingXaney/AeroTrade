@@ -116,6 +116,11 @@ export const LEGACY_WIDGET_IDS: Readonly<Record<string, WidgetId>> = {
     'strategy-comparison': 'account-comparison',
 };
 
+// Widget ids whose widget was removed. A layout still holding one drops it as unknown
+// (normalizeLayout), and the id is never given to another widget: a stored id never changes
+// meaning. 'daily-quiz' was the Daily quiz, removed with the learn quizzes in 2026-10.
+export const RETIRED_WIDGET_IDS: readonly string[] = ['daily-quiz'];
+
 // Runs on the raw stored value, before normalizeLayout would drop the old id as unknown.
 // Same reference back when nothing was renamed. Read side only, like migrateLegacyDefault.
 export const renameLegacyWidgetIds = (input: unknown): unknown => {

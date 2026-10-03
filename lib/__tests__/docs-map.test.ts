@@ -40,7 +40,7 @@ const problemWith = (path: string): string | null => {
     }
     let candidate = path.replace(/\/$/, '');
     const symbols: string[] = [];
-    // A path may carry up to two dotted names (`lib/actions/learn.actions.recordQuizAnswer`).
+    // A path may carry up to two dotted names (`lib/actions/learn.actions.markLessonSeen`).
     for (let attempt = 0; attempt < 3; attempt++) {
         const file = EXTENSIONS.map((ext) => `${root}${candidate}${ext}`).find((full) => existsSync(full));
         if (file) {
@@ -77,7 +77,7 @@ describe('the repo map points at files that exist', () => {
     it('resolves extensions, symbols, placeholders and Next segments', () => {
         expect(problemWith('lib/trading/ledger')).toBeNull();
         expect(problemWith('lib/trading/ledger.getTradeLedger')).toBeNull();
-        expect(problemWith('lib/actions/learn.actions.recordQuizAnswer')).toBeNull();
+        expect(problemWith('lib/actions/learn.actions.markLessonSeen')).toBeNull();
         expect(problemWith('lib/<feature>/types.ts')).toBeNull();
         expect(problemWith('scripts/qa/qa-<feature>.mjs')).toBeNull();
         expect(problemWith('app/(root)/stocks/[symbol]/page.tsx')).toBeNull();

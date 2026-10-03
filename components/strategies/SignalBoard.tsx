@@ -16,8 +16,8 @@ import {SIGNAL_BOARD_COPY} from "@/lib/learn/copy/strategies";
 // of scroll and the single biggest reason its page ran to five screens.
 //
 // The verdict vocabulary (labels, tones, order) lives in lib/strategies/views so the
-// quiz and the replay cannot drift from this table; `data-verdict` marks the cells the
-// quiz hides while a reader is guessing.
+// replay cannot drift from this table; `data-verdict` marks each verdict cell for the
+// browser QA.
 
 const SHOWN = 12;
 

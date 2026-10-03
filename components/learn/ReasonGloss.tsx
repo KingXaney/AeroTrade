@@ -5,7 +5,7 @@ import Term from "@/components/primitives/Term";
 // A decoded reason (lib/learn/reasons.ts decodeReason), clause by clause: the rule's own
 // words in mono, carrying the glossary definition as a title where one applies, and the
 // plain-English reading beneath. Presentational and client-safe (no hooks, no server
-// imports) so the client VerdictQuiz renders it as well as the server panels. Renders
+// imports), so a client component can render it as well as the server panels. Renders
 // nothing for a reason the grammar does not know; the raw reason is always shown by the
 // caller, so there is nothing to apologise for. A clause that is the whole of the reason
 // the caller already printed ("signal, but no open slot") keeps its label for screen

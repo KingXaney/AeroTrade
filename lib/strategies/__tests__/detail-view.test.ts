@@ -2,7 +2,7 @@ import {describe, expect, it} from 'vitest';
 import {strategyBySlug} from '@/lib/strategies/catalog';
 import {UNIVERSES} from '@/lib/strategies/universe';
 import {REPLAY_COPY} from '@/lib/learn/copy/replay';
-import {fillReplayFor, quizRowsFor, strategyMetaLine, toStrategyDetailView, type StrategyDetailInput} from '@/lib/strategies/detail-view';
+import {fillReplayFor, strategyMetaLine, toStrategyDetailView, type StrategyDetailInput} from '@/lib/strategies/detail-view';
 import type {StrategyRunView} from '@/lib/strategies/views';
 import type {SeriesStats} from '@/lib/strategies/types';
 import type {PaperTradeRecord} from '@/lib/trading/types';
@@ -40,21 +40,6 @@ describe('strategyMetaLine', () => {
     it('names the family, the long cadence and the universe size', () => {
         expect(strategyMetaLine(goldenCross)).toBe(`Trend following · checked daily · ${UNIVERSES.sectors.length} symbols`);
         expect(strategyMetaLine(def('buy-and-hold-spy'))).toBe('Baseline · buys once · 1 symbol');
-    });
-});
-
-describe('quizRowsFor', () => {
-    it('is empty with no run or an empty board', () => {
-        expect(quizRowsFor(goldenCross, null)).toEqual([]);
-        expect(quizRowsFor(goldenCross, {...run, board: []})).toEqual([]);
-    });
-
-    it('fills only the columns the board shows and decodes the verdict', () => {
-        const rows = quizRowsFor(goldenCross, run);
-        const xlf = rows.find((r) => r.symbol === 'XLF');
-        expect(xlf?.answer).toBe('enter');
-        expect(xlf?.cells.map((c) => c.label)).toEqual(goldenCross.signalColumns.map((c) => c.label));
-        expect(xlf?.gloss.length).toBeGreaterThan(0);
     });
 });
 

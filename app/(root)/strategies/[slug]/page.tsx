@@ -21,7 +21,6 @@ import SignalBoard from "@/components/strategies/SignalBoard";
 import SimulatedTradeList from "@/components/strategies/SimulatedTradeList";
 import StrategyExplainer from "@/components/strategies/StrategyExplainer";
 import StrategyPerformance from "@/components/strategies/StrategyPerformance";
-import VerdictQuiz from "@/components/strategies/VerdictQuiz";
 import WhatTheseMean from "@/components/learn/WhatTheseMean";
 import BoardReading from "@/components/strategies/BoardReading";
 import TimeInMarket from "@/components/strategies/TimeInMarket";
@@ -47,7 +46,7 @@ const StrategyPage = async ({params, searchParams}: StrategyPageProps) => {
     const view = await getStrategyPageView(slug, userId, () => searchParams.then(({from}) => from));
     if (!view) notFound();
 
-    const {def, state, analytics, trades, latestRun, backtest, timeInMarket, started, liveSince, boardReading, quizRows} = view;
+    const {def, state, analytics, trades, latestRun, backtest, timeInMarket, started, liveSince, boardReading} = view;
 
     // The one disclosure an automated fill carries (a server render prop on the trade log).
     const replayFor = (trade: PaperTradeRecord) => {
@@ -107,12 +106,9 @@ const StrategyPage = async ({params, searchParams}: StrategyPageProps) => {
                         def={def}
                         headline={latestRun ? view.lastActionLine : undefined}
                         signals={(
-                            /* While the quiz is open, LatestDecision hides everything in the panel that
-                               states a verdict — the board's verdict cells, the top row's reading, the
-                               run's headline and its orders — with one CSS switch on #latest-decision.
-                               The reading, the definitions and the quiz are siblings of #signal-board: it
-                               keeps exactly one disclosure of its own, and the reading leads the panel's
-                               one "What these mean", titled "Read this board — SYMBOL". */
+                            /* The reading and the definitions are siblings of #signal-board: it keeps
+                               exactly one disclosure of its own, and the reading leads the panel's one
+                               "What these mean", titled "Read this board — SYMBOL". */
                             <div id="strategy-signals">
                                 <SignalBoard columns={def.signalColumns} run={latestRun} />
                                 {boardReading && (
@@ -120,7 +116,6 @@ const StrategyPage = async ({params, searchParams}: StrategyPageProps) => {
                                         <BoardReading reading={boardReading} />
                                     </WhatTheseMean>
                                 )}
-                                {quizRows.length > 0 && <VerdictQuiz rows={quizRows} />}
                             </div>
                         )}
                     />

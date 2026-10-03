@@ -53,7 +53,7 @@ export const ROBOT_TIPS: readonly RobotTip[] = [
     },
     {
         id: 'learn-course',
-        text: "The Learn page has a beginner course — four modules of four short lessons, each quoting the app's own definitions — and a daily quiz.",
+        text: "The Learn page has a beginner course: four modules of four short lessons, each quoting the app's own definitions.",
     },
     {
         id: 'rail-portfolio',
