@@ -147,7 +147,8 @@ try {
     // fastForward jumps it by the module's own constants, firing each due one-shot timer once —
     // exactly the show → hide → show chain.
     const jiti = createJiti(import.meta.url, {alias: {'@': REPO_ROOT.replace(/\/$/, '')}, fsCache: false});
-    const {ROBOT_TIP_FIRST_MS, ROBOT_TIP_GAP_MS, ROBOT_SHOWN_KEY} = await jiti.import(`${REPO_ROOT}lib/chat/robot-tips.ts`);
+    const {ROBOT_TIP_FIRST_MS, ROBOT_TIP_VISIBLE_MS, ROBOT_TIP_GAP_MS, ROBOT_TIP_HOLD_MS, ROBOT_SHOWN_KEY} =
+        await jiti.import(`${REPO_ROOT}lib/chat/robot-tips.ts`);
     const {ROBOT_TIPS} = await jiti.import(`${REPO_ROOT}lib/learn/copy/robot.ts`);
     const robotCtx = await browser.newContext({viewport: {width: 1440, height: 900}});
     await robotCtx.addCookies(await page.context().cookies());
@@ -204,6 +205,17 @@ try {
     await bubble.waitFor({timeout: 10000});
     const thirdId = await bubble.getAttribute('data-robot-tip');
     check('a tip is not repeated within the session, even across a reload', ![firstId, secondId].includes(thirdId), thirdId);
+    // A tip the reader is on stays (ROBOT_TIP_HOLD_MS): the pointer resting on the bubble holds its
+    // hide past its time — the jump fires the hide once and it only looks again — and once the
+    // pointer has left, the next look takes it away.
+    await bubble.hover();
+    await robot.clock.fastForward(ROBOT_TIP_VISIBLE_MS * 2);
+    await robot.waitForTimeout(300);
+    check('a tip under the pointer outlives its time', await bubble.count() === 1);
+    await robot.mouse.move(8, 8);
+    await robot.clock.fastForward(ROBOT_TIP_HOLD_MS * 2);
+    await bubble.waitFor({state: 'detached', timeout: 10000});
+    check('…and leaves once the pointer has', await bubble.count() === 0);
     await robot.goto(`${BASE}/news`, {waitUntil: 'load'});
     await launcher.waitFor({timeout: 30000});
     await robot.waitForTimeout(300);

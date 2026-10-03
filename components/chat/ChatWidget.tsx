@@ -6,10 +6,11 @@ import {usePathname} from "next/navigation";
 import type {UIMessage} from "ai";
 import ChatPanel from "@/components/chat/ChatPanel";
 import RobotMascot from "@/components/chat/RobotMascot";
-import RobotTipBubble from "@/components/chat/RobotTipBubble";
+import RobotTipBubble, {type RobotTipAttention} from "@/components/chat/RobotTipBubble";
 import {askAdvisor, subscribeAsk} from "@/lib/chat/ask";
 import {
     ROBOT_TIP_GAP_MS,
+    ROBOT_TIP_HOLD_MS,
     ROBOT_TIP_VISIBLE_MS,
     nextRobotTip,
     readShownTips,
@@ -86,11 +87,22 @@ const ChatWidget = ({userId}: ChatWidgetProps) => {
     // Bumped by Dismiss: the effect restarts and waits the gap before the next tip.
     const [tipRound, setTipRound] = useState(0);
     const launcherRef = useRef<HTMLButtonElement>(null);
+    const bubbleRef = useRef<HTMLDivElement>(null);
+    // The reader's attention on the bubble, as it reports it: while either is up the hide waits,
+    // so a tip never leaves mid-read or from under the keyboard.
+    const attention = useRef({hover: false, focus: false});
     useEffect(() => {
         if (!onTopics || open) return;
         const storage = sessionStorageOrNull();
         let timer: ReturnType<typeof setTimeout>;
         function hide() {
+            if (attention.current.hover || attention.current.focus) {
+                timer = setTimeout(hide, ROBOT_TIP_HOLD_MS);
+                return;
+            }
+            // Focus can still sit inside with neither up — the window lost focus while a control had
+            // it — so the launcher takes it before the bubble goes, as Dismiss hands it over.
+            if (bubbleRef.current?.contains(document.activeElement)) launcherRef.current?.focus();
             setTip(null);
             timer = setTimeout(show, ROBOT_TIP_GAP_MS);
         }
@@ -104,6 +116,8 @@ const ChatWidget = ({userId}: ChatWidgetProps) => {
         timer = setTimeout(show, robotTipDelay(readShownTips(storage)));
         return () => {
             clearTimeout(timer);
+            // A bubble unmounted from here sends no pointerleave or blur of its own.
+            attention.current = {hover: false, focus: false};
             setTip(null);
         };
     }, [onTopics, open, tipRound]);
@@ -114,6 +128,9 @@ const ChatWidget = ({userId}: ChatWidgetProps) => {
     const dismissTip = () => {
         launcherRef.current?.focus();
         setTipRound((n) => n + 1);
+    };
+    const attend = (kind: RobotTipAttention, on: boolean) => {
+        attention.current[kind] = on;
     };
 
     const persist = useCallback((messages: UIMessage[]) => {
@@ -153,7 +170,7 @@ const ChatWidget = ({userId}: ChatWidgetProps) => {
 
             {/* After the launcher, so a QA selector's .first() is always the launcher. */}
             {!open && onTopics && tip && (
-                <RobotTipBubble tip={tip} onTry={tryTip} onDismiss={dismissTip}/>
+                <RobotTipBubble ref={bubbleRef} tip={tip} onTry={tryTip} onDismiss={dismissTip} onAttention={attend}/>
             )}
 
             {open && (

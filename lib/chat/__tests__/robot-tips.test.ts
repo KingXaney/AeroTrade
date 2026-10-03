@@ -3,6 +3,7 @@ import {
     ROBOT_SHOWN_KEY,
     ROBOT_TIP_FIRST_MS,
     ROBOT_TIP_GAP_MS,
+    ROBOT_TIP_HOLD_MS,
     ROBOT_TIP_VISIBLE_MS,
     nextRobotTip,
     readShownTips,
@@ -116,6 +117,11 @@ describe('the timings and the key', () => {
         expect(ROBOT_TIP_FIRST_MS).toBeGreaterThanOrEqual(10_000);
         expect(ROBOT_TIP_VISIBLE_MS).toBeGreaterThanOrEqual(8_000);
         expect(ROBOT_TIP_GAP_MS).toBeGreaterThan(ROBOT_TIP_VISIBLE_MS);
+    });
+
+    it('looks again soon, not at once, while the reader is on a tip', () => {
+        expect(ROBOT_TIP_HOLD_MS).toBeGreaterThanOrEqual(250);
+        expect(ROBOT_TIP_HOLD_MS).toBeLessThan(ROBOT_TIP_VISIBLE_MS);
     });
 
     it('keeps its storage key out of the chat conversations qa-chat counts', () => {

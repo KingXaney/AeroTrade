@@ -1,8 +1,8 @@
 // When the robot speaks (components/chat/ChatWidget): on the topics pages only, while the panel is
 // closed — the first tip ROBOT_TIP_FIRST_MS after the page is entered, each shown for
-// ROBOT_TIP_VISIBLE_MS, the next ROBOT_TIP_GAP_MS later — and no tip twice in a browser session:
-// the ids shown are kept in sessionStorage under ROBOT_SHOWN_KEY. Pure and client-safe; it imports
-// the copy and lib/text.hashId, nothing else.
+// ROBOT_TIP_VISIBLE_MS (longer while the reader is on it), the next ROBOT_TIP_GAP_MS later — and no
+// tip twice in a browser session: the ids shown are kept in sessionStorage under ROBOT_SHOWN_KEY.
+// Pure and client-safe; it imports the copy and lib/text.hashId, nothing else.
 
 import {ROBOT_TIPS, type RobotTip} from "@/lib/learn/copy/robot";
 import {hashId} from "@/lib/text";
@@ -12,6 +12,9 @@ import {hashId} from "@/lib/text";
 export const ROBOT_TIP_FIRST_MS = 15_000;
 export const ROBOT_TIP_VISIBLE_MS = 12_000;
 export const ROBOT_TIP_GAP_MS = 90_000;
+// A tip the reader is on — the pointer resting on it, or a control in it holding focus — is not
+// taken away mid-read or from under the keyboard: the hide looks again this often until they leave.
+export const ROBOT_TIP_HOLD_MS = 1_000;
 // sessionStorage, so a tab remembers and a new one starts over. Not under 'aero-chat:' —
 // scripts/qa/qa-chat.mjs counts those keys as stored conversations.
 export const ROBOT_SHOWN_KEY = 'aero-robot:shown';
