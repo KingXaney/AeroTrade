@@ -23,7 +23,7 @@ Follow the topics you care about, test trading strategies with virtual money, an
 
 **A beginner course.** Sixteen short lessons in four modules — how the market works, placing a trade, building a portfolio, reading the news — each quoting the app's own glossary, linking to the real screen and ending on one question.
 
-**Follow the news, not just the tape.** Create a topic for anything — "Fed rate decisions", "AI chips", "NBA trade deadline" — and AeroTrade builds a feed for it from Google News search plus every source the news brain already reads. Each topic gets a daily AI *"what changed today"* brief, a slot in the daily email, and a place in the chat assistant.
+**Follow the news, not just the tape.** Create a topic for anything — "Fed rate decisions", "AI chips", "NBA trade deadline" — and AeroTrade builds a feed for it from Google News search plus every source the news brain already reads. Each topic gets a daily AI *"what changed today"* brief, a slot in the daily email, and a place in the chat assistant. The topics page's **Edit topics** view adds starters in one click, removes a topic without a dialog (Undo from the toast) and shows how many of the 16 slots are in use.
 
 **Paper-trade in accounts side by side.** Open several paper accounts with their own starting balance, place market orders at the last price, and compare them on return, drawdown, win rate and a daily benchmark curve against SPY. Export any account's fills — or a quant strategy's — as CSV.
 

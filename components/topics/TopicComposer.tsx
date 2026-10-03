@@ -23,13 +23,23 @@ type Props = {
     mode: ComposerMode;
     initial?: TopicView | null;
     onSaved?: (topic: TopicView) => void;
+    // Stay where the composer was opened (the manage view) instead of going to the topic's page.
+    stayOnSave?: boolean;
 };
 
 const labelClass = 'label-type text-[length:var(--label-size)] text-fg-muted';
 
+type FormProps = {
+    mode: ComposerMode;
+    initial: TopicView | null;
+    onClose: () => void;
+    onSaved?: (topic: TopicView) => void;
+    stayOnSave?: boolean;
+};
+
 // The form lives in its own component so its state initialises from props on every
 // open (Radix unmounts dialog content when closed) — no reset effect required.
-const ComposerForm = ({mode, initial, onClose, onSaved}: {mode: ComposerMode; initial: TopicView | null; onClose: () => void; onSaved?: (topic: TopicView) => void}) => {
+const ComposerForm = ({mode, initial, onClose, onSaved, stayOnSave = false}: FormProps) => {
     const router = useRouter();
     const pathname = usePathname();
     const [name, setName] = useState(initial?.name ?? '');
@@ -60,6 +70,9 @@ const ComposerForm = ({mode, initial, onClose, onSaved}: {mode: ComposerMode; in
             toast.success(mode === 'edit' ? 'Topic updated' : `Following "${result.topic.name}"`);
             onClose();
             onSaved?.(result.topic);
+            // The action's revalidatePath('/topics') already re-rendered the current URL in its
+            // own response, so the manage view shows the saved topic with no navigation at all.
+            if (stayOnSave) return;
             // One render of the destination, not two: a new topic's page runs a live
             // fetch on first visit, and push()+refresh() would run it twice concurrently.
             const target = `/topics/${result.topic.slug}`;
@@ -150,7 +163,7 @@ const ComposerForm = ({mode, initial, onClose, onSaved}: {mode: ComposerMode; in
     );
 };
 
-const TopicComposer = ({open, onOpenChange, mode, initial = null, onSaved}: Props) => (
+const TopicComposer = ({open, onOpenChange, mode, initial = null, onSaved, stayOnSave}: Props) => (
     <Dialog open={open} onOpenChange={onOpenChange}>
         <DialogContent className="sm:max-w-lg">
             <DialogHeader>
@@ -159,7 +172,7 @@ const TopicComposer = ({open, onOpenChange, mode, initial = null, onSaved}: Prop
                     We match headlines and summaries against these keywords. Add exclusions to cut noise.
                 </DialogDescription>
             </DialogHeader>
-            {open && <ComposerForm mode={mode} initial={initial} onClose={() => onOpenChange(false)} onSaved={onSaved} />}
+            {open && <ComposerForm mode={mode} initial={initial} onClose={() => onOpenChange(false)} onSaved={onSaved} stayOnSave={stayOnSave} />}
         </DialogContent>
     </Dialog>
 );

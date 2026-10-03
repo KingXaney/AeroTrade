@@ -3,10 +3,11 @@
 // dot that lights for an article the reader has not looked at and clears on opening the topics
 // index or /news without a reload — on the rail and in the mobile drawer), ⌘K following a topic
 // and opening one, a refresh that brings new articles, editing keywords and deleting from the
-// header menu. Also the surfaces topics lead: the topics-first dashboard and the widget
-// library's Topics group, the settings page's
-// Topics section and email toggle, the chat launcher's topic suggestion, the header nav order,
-// and the theme picker's hover sweep (the committed style never flashes).
+// header menu, and the manage view (/topics?edit=1): an immediate remove and its Undo, two
+// starters followed at once, Add your own staying on the page, the 16-topic cap. Also the
+// surfaces topics lead: the topics-first dashboard and the widget library's Topics group, the
+// settings page's Topics section and email toggle, the chat launcher's topic suggestion, the
+// header nav order, and the theme picker's hover sweep (the committed style never flashes).
 // Run: npm run qa -- topics   (the harness: README.md)
 import {chromium} from 'playwright';
 import {MongoClient} from 'mongodb';
@@ -23,6 +24,14 @@ const OUT = outDir('topics');
 const settleToasts = async (page) => {
     await page.mouse.move(5, 700);
     await page.locator('[data-sonner-toast]').first().waitFor({state: 'detached', timeout: 10000}).catch(() => {});
+};
+
+// Poll a predicate with Playwright's clock (no bash sleeps), as qa-topics-refresh does.
+const until = async (page, fn, ms) => {
+    const end = Date.now() + ms;
+    let v = await fn();
+    while (!v && Date.now() < end) { await page.waitForTimeout(500); v = await fn(); }
+    return v;
 };
 
 (async () => {
@@ -105,6 +114,7 @@ const settleToasts = async (page) => {
     check('the set is finance-led', /Fed rate decisions/.test(railText) && /AI chips/.test(railText), railText);
     check('…with major world news in it', /Geopolitics/.test(railText) && /World economy/.test(railText), railText);
     check('the preinstalled notice is shown', /came preinstalled/i.test(await page.locator('main').innerText()));
+    check('the overview offers Edit topics', await page.locator('a[href="/topics?edit=1"]').count() === 1);
     await shot('01-topics-preinstalled');
 
     // Seeding runs once per account, not once per page view.
@@ -362,6 +372,79 @@ const settleToasts = async (page) => {
     await page.waitForTimeout(1000);
     // notFound() streams behind loading.tsx, so the status is 200; the not-found UI is what matters.
     check('deleted topic slug shows the not-found UI', /not found|could not be found|doesn.t exist/i.test(await page.locator('body').innerText()));
+
+    // --- the manage view: add and remove topics on /topics?edit=1 ---
+    // Rows, rail, count and chips all update from the action's own re-render of the current URL
+    // (revalidatePath('/topics')); nothing here reloads, so a stale rail is a regression. Chips are
+    // located by data-topic-chip, never by role name: "Remove Big Tech earnings" contains the chip's name.
+    const railCount = () => page.$$eval(railSel, (as) => as.length);
+    const rowCount = () => page.locator('[data-manage-row]').count();
+    const countLine = () => page.locator('[data-manage-count]').innerText();
+    const counts = async () => `${await rowCount()} rows, ${await railCount()} in the rail`;
+    await page.goto(`${BASE}/topics?edit=1`, {waitUntil: 'load'});
+    await page.locator('[data-manage-row]').first().waitFor({timeout: 30000});
+    check('manage view: one row per followed topic, the rail still beside it', await rowCount() === 6 && await railCount() === 6, await counts());
+    check('the manage view is not the picker', await page.getByRole('button', {name: 'Write my own'}).count() === 0);
+    check('the count line reads 6 of 16', /6 of 16/.test(await countLine()), await countLine());
+    check('followed starters are not offered, unfollowed ones are',
+        await page.locator('[data-topic-chip="ai-chips"]').count() === 0
+        && await page.locator('#topics-add [data-topic-chip="big-tech-earnings"]').count() === 1);
+    await shot('05-manage');
+
+    // Remove is immediate — no dialog — and the toast carries Undo, which re-creates the topic.
+    await page.locator('[data-manage-row="geopolitics"] [data-manage-remove]').click();
+    await page.locator('[data-manage-row="geopolitics"]').waitFor({state: 'detached', timeout: 15000});
+    check('remove is immediate — no dialog', await page.locator('[role="alertdialog"], [role="dialog"]').count() === 0);
+    await until(page, async () => (await railCount()) === 5, 15000);
+    check('the rail follows the removal', await railCount() === 5, await counts());
+    check('the preinstalled notice leaves with the set', !/came preinstalled/i.test(await page.locator('main').innerText()));
+    const undo = page.locator('[data-sonner-toast] button[data-action]', {hasText: 'Undo'});
+    check('the removal toast offers Undo', await undo.count() === 1);
+    await undo.click();
+    await page.locator('[data-manage-row="geopolitics"]').waitFor({timeout: 30000});
+    await until(page, async () => (await railCount()) === 6, 15000);
+    check('Undo brings the topic and its rail entry back', await rowCount() === 6 && await railCount() === 6, await counts());
+    check('back at the defaults, the derived notice returns', /came preinstalled/i.test(await page.locator('main').innerText()));
+    await settleToasts(page);
+
+    // Two starters in one call: one first-run event for both, and the view stays.
+    await page.locator('[data-topic-chip="big-tech-earnings"]').click();
+    await page.locator('[data-topic-chip="housing-market"]').click();
+    check('chips toggle aria-pressed', (await page.locator('[data-topic-chip="housing-market"]').getAttribute('aria-pressed')) === 'true');
+    await page.getByRole('button', {name: 'Follow 2 selected'}).click();
+    await page.locator('[data-manage-row="housing-market"]').waitFor({timeout: 30000});
+    await until(page, async () => (await railCount()) === 8, 15000);
+    check('Follow 2 selected adds both and stays on the manage view',
+        /edit=1/.test(page.url()) && await rowCount() === 8 && await railCount() === 8, `${page.url()} · ${await counts()}`);
+    check('followed starters leave the chips', await page.locator('[data-topic-chip="housing-market"]').count() === 0);
+    check('the count line follows', /8 of 16/.test(await countLine()), await countLine());
+    await settleToasts(page);
+
+    // Add your own opens the shell's one composer, which saves and stays.
+    await page.getByRole('button', {name: 'Add your own'}).click();
+    await page.locator('#topic-name').fill('Carbon markets');
+    await page.getByRole('button', {name: 'Follow topic'}).click();
+    await page.locator('[data-manage-row="carbon-markets"]').waitFor({timeout: 30000});
+    check('the composer saves and stays on the manage view', /\/topics\?edit=1$/.test(page.url()) && await rowCount() === 9, `${page.url()} · ${await counts()}`);
+    await settleToasts(page);
+
+    // The cap: seven fillers straight into Mongo make 16 of 16 (shape as qa-learn's seeded topic).
+    const uid = String(qaUser?._id ?? '');
+    await db.collection('topics').insertMany(Array.from({length: 7}, (_, i) => ({
+        userId: uid, name: `QA cap ${i + 1}`, slug: `qa-cap-${i + 1}`, keywords: [`qa cap ${i + 1}`], exclude: [],
+        keywordSetHash: 777000 + i, createdAt: new Date(), updatedAt: new Date(),
+    })));
+    await page.goto(`${BASE}/topics?edit=1`, {waitUntil: 'load'});
+    await page.locator('[data-manage-row]').first().waitFor({timeout: 30000});
+    check('at the cap the count reads 16 of 16', /16 of 16/.test(await countLine()), await countLine());
+    check('at the cap every chip is disabled',
+        await page.locator('[data-topic-chip]').count() > 0 && await page.locator('[data-topic-chip]:not([disabled])').count() === 0);
+    check('at the cap Add your own and Follow selected are disabled',
+        await page.getByRole('button', {name: 'Add your own'}).isDisabled()
+        && await page.getByRole('button', {name: /^Follow (\d+ )?selected$/}).isDisabled());
+    check('the panel says so', /Remove one to add another/.test(await page.locator('#topics-add').innerText()));
+    await shot('06-manage-cap');
+    await db.collection('topics').deleteMany({userId: uid, slug: /^qa-cap-/});
 
     // --- chat launcher copy ---
     await page.goto(`${BASE}/topics`, {waitUntil: 'load'});

@@ -6,17 +6,23 @@ import AllTopicsHeader from "@/components/topics/AllTopicsHeader";
 import TopicFeed from "@/components/topics/TopicFeed";
 import TopicFeedEmpty from "@/components/topics/TopicFeedEmpty";
 import TopicsEmptyState from "@/components/topics/TopicsEmptyState";
+import TopicsManager from "@/components/topics/TopicsManager";
 import NewsSeenMarker from "@/components/news/NewsSeenMarker";
 
 // The browser tab's title; app/layout.tsx appends the app's name.
 export const metadata: Metadata = {title: "Topics"};
 
+type TopicsPageProps = {searchParams: Promise<{edit?: string}>};
+
 // The seed safety net, the first-run fetch and the brain's suggestions live in
-// getTopicsPageView (lib/topics/page-store.ts); the page only composes its view. Opening the
-// index stamps "last opened News" (TopicsShell carries the marker; the empty state has no shell).
-const TopicsPage = async () => {
+// getTopicsPageView (lib/topics/page-store.ts); the page only composes its view. `?edit=1` is
+// the manage view: the same shell and rail, the feed column replaced by the rows and the picker.
+// Opening the index, in either view, stamps "last opened News" (TopicsShell carries the marker;
+// the empty state has no shell, so it mounts its own).
+const TopicsPage = async ({searchParams}: TopicsPageProps) => {
     const userId = await requireUserId();
-    const view = await getTopicsPageView(userId);
+    const {edit} = await searchParams;
+    const view = await getTopicsPageView(userId, {manage: edit === '1'});
 
     if (view.kind === 'empty') {
         return (
@@ -24,6 +30,14 @@ const TopicsPage = async () => {
                 <NewsSeenMarker />
                 <TopicsEmptyState brainSuggestions={view.brainSuggestions} canRestoreDefaults />
             </>
+        );
+    }
+
+    if (view.kind === 'manage') {
+        return (
+            <TopicsShell overview={view.overview} stayOnSave>
+                <TopicsManager topics={view.overview.topics} preinstalled={view.preinstalled} brainSuggestions={view.brainSuggestions} />
+            </TopicsShell>
         );
     }
 
