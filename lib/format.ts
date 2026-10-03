@@ -87,6 +87,18 @@ export const formatTimeAgoMs = (epochMs: number) => {
 
 export const formatTimeAgoSeconds = (unixSeconds: number) => formatTimeAgoMs(unixSeconds * 1000);
 
+// The same age in a few characters — 'now', '59m', '3h', '2d' — for a row with no room for the
+// words (the rail's News card prints it beside a truncating headline). Same thresholds and the
+// same clock as formatTimeAgoMs; unix seconds in, like the feed items it is for.
+export const formatTimeAgoCompactSeconds = (unixSeconds: number, now: number = Date.now()): string => {
+    const minutes = Math.floor((now - unixSeconds * 1000) / 60_000);
+    if (minutes < 1) return 'now';
+    if (minutes < 60) return `${minutes}m`;
+    const hours = Math.floor(minutes / 60);
+    if (hours <= 24) return `${hours}h`;
+    return `${Math.floor(hours / 24)}d`;
+};
+
 // A bounded count: the store counts to cap + 1 at most, so anything past the cap prints as "99+".
 // Here rather than at the call sites, so the no-hand-rolled-signs scan over components and app
 // stays clean.

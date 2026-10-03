@@ -1,7 +1,7 @@
 import Link from "next/link";
 import Badge from "@/components/primitives/Badge";
 import MicroLabel from "@/components/primitives/MicroLabel";
-import {formatCapped, formatTimeAgoMs, formatTimeAgoSeconds} from "@/lib/format";
+import {formatCapped, formatTimeAgoCompactSeconds, formatTimeAgoMs} from "@/lib/format";
 import {UNSEEN_COUNT_CAP} from "@/lib/topics/config";
 import {NEWS_COPY} from "@/lib/learn/copy/news";
 import {SHELL_COPY} from "@/lib/learn/copy/shell";
@@ -54,7 +54,11 @@ const NewsSidebarCard = ({news, seenAt}: {news: SidebarNews; seenAt: number | nu
                                     )}
                                 </div>
                                 {t.headline !== null && t.datetime !== null && (
-                                    <p className="mt-0.5 truncate pl-3.5 text-fg-muted">{t.headline} · {formatTimeAgoSeconds(t.datetime)}</p>
+                                    // The time keeps its place when a long headline is cut short.
+                                    <p className="mt-0.5 flex min-w-0 gap-1 pl-3.5 text-fg-muted">
+                                        <span className="truncate">{t.headline}</span>
+                                        <span className="shrink-0">· {formatTimeAgoCompactSeconds(t.datetime)}</span>
+                                    </p>
                                 )}
                             </li>
                         ))}

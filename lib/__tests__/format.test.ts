@@ -2,7 +2,7 @@ import {readdirSync, readFileSync} from 'node:fs';
 import {fileURLToPath} from 'node:url';
 import {afterEach, describe, expect, it, vi} from 'vitest';
 import {
-    formatCapped, formatChangePercent, formatDrawdown, formatEasternTimestamp, formatMarketCapValue, formatPct, formatPrice,
+    formatCapped, formatChangePercent, formatDrawdown, formatEasternTimestamp, formatMarketCapValue, formatPct, formatPrice, formatTimeAgoCompactSeconds,
     formatSigned, formatSignedPrice, formatTimeAgoMs, formatTimeAgoSeconds, formatTimeUntilMs, getChangeColorClass, roundPct, signedForColor,
 } from '@/lib/format';
 
@@ -172,6 +172,23 @@ describe('formatTimeAgoMs', () => {
         vi.setSystemTime(new Date('2026-09-05T12:00:00Z'));
         const then = Date.now() - 26 * 3_600_000;
         expect(formatTimeAgoMs(then)).toBe(formatTimeAgoSeconds(then / 1000));
+    });
+});
+
+describe('formatTimeAgoCompactSeconds', () => {
+    // The rail's News card prints the age beside a truncating headline, so the words become
+    // 'now' / '59m' / '3h' / '2d' at the same thresholds as formatTimeAgoMs.
+    const now = Date.UTC(2026, 8, 5, 12, 0, 0);
+    const at = (msAgo: number) => (now - msAgo) / 1000;
+
+    it('shortens the age at the same thresholds as the long form', () => {
+        expect(formatTimeAgoCompactSeconds(at(30_000), now)).toBe('now');
+        expect(formatTimeAgoCompactSeconds(at(-90_000), now)).toBe('now');
+        expect(formatTimeAgoCompactSeconds(at(59 * 60_000), now)).toBe('59m');
+        expect(formatTimeAgoCompactSeconds(at(3 * 3_600_000), now)).toBe('3h');
+        expect(formatTimeAgoCompactSeconds(at(24 * 3_600_000), now)).toBe('24h');
+        expect(formatTimeAgoCompactSeconds(at(26 * 3_600_000), now)).toBe('1d');
+        expect(formatTimeAgoCompactSeconds(at(3 * 86_400_000), now)).toBe('3d');
     });
 });
 
