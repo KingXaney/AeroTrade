@@ -490,6 +490,28 @@ const ENTRIES = [
         long: 'Legal articles cover disputes in court, as distinct from regulatory ones, which cover the agencies and their rules.',
         seeAlso: ['event-regulatory']},
 
+    // ---- the games ----------------------------------------------------------------------
+    {key: 'kelly-criterion', kind: 'metric', term: 'Kelly criterion', aliases: ['kelly criterion', 'kelly fraction', 'kelly bet'],
+        short: 'The share of a bankroll to stake on a favourable bet that gives the highest expected growth of its logarithm.',
+        long: 'For an even-money bet that wins with probability p, the Kelly fraction is 2p − 1: a coin that lands heads 60% of the time gives 20% of the bankroll a flip. Staking more than that lowers the expected growth even though every bet has an edge, and staking everything ends at the first loss.',
+        formula: 'f* = p − q for an even-money bet; growth = p·ln(1 + f) + q·ln(1 − f)', computedIn: 'lib/games/kelly.ts logGrowth'},
+    {key: 'fair-value', kind: 'metric', term: 'Fair value', aliases: ['fair value', 'expected settlement'],
+        short: 'The expected value of what a contract settles at, given what is known now.',
+        long: 'In the market-making game the contract settles at the sum of four dice. Before any die is shown its fair value is 4 × 3.5 = 14; each die revealed replaces one 3.5 with its face.',
+        formula: 'revealed dice + 3.5 × hidden dice', computedIn: 'lib/games/market-making.ts fairValue', seeAlso: ['bid-ask-spread', 'adverse-selection']},
+    {key: 'bid-ask-spread', kind: 'metric', term: 'Bid–ask spread', aliases: ['bid-ask spread', 'bid ask spread', 'bid–ask spread', 'quoted spread'],
+        short: 'The gap between the price a market maker pays (the bid) and the price it asks (the ask).',
+        long: 'A market maker quotes both sides: it buys at its bid and sells at its ask, so a buy and a sell together earn the gap. A wide spread is traded less often and is safer against traders who know more; a narrow one trades more and earns less on each trade.',
+        seeAlso: ['fair-value', 'adverse-selection']},
+    {key: 'adverse-selection', kind: 'metric', term: 'Adverse selection', aliases: ['adverse selection', 'informed trader'],
+        short: 'Trading against someone who knows more: the trades they choose are the ones that cost the other side.',
+        long: 'An informed trader trades only when a quote is on the wrong side of what they know, so a market maker loses on those fills on average even when its quotes look fair. In the market-making game one trader a round knows the sum to within one.',
+        seeAlso: ['bid-ask-spread', 'fair-value']},
+    {key: 'correlation', kind: 'metric', term: 'Correlation', aliases: ['correlation', 'correlation coefficient', 'pearson correlation'],
+        short: 'How closely two quantities move together along a line, from −1 (opposite) through 0 to 1 (together).',
+        long: "Pearson's r measures only the straight-line part of a relationship: 1 is a perfect upward line, −1 a perfect downward one and 0 no linear relationship. Fifty points drawn with a given correlation scatter around it, so the r of the points drawn is what the picture shows.",
+        formula: 'r = Σ(x − x̄)(y − ȳ) / √(Σ(x − x̄)² · Σ(y − ȳ)²)', computedIn: 'lib/games/correlation.ts sampleCorrelation'},
+
     // ---- rails --------------------------------------------------------------------------
     {key: 'position-cap', kind: 'rail', term: 'Position cap', aliases: ['position cap', 'max position weight'],
         short: `The largest share of the account the AI Navigator allows in one name: ${pct(MAX_POSITION_WEIGHT)}.`,

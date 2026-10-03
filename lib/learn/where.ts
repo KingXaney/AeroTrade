@@ -14,6 +14,7 @@ const BOARD: readonly GlossaryKey[] = [
     'lump-sum', 'dollar-cost-averaging', 'cash-only', 'underwater',
 ];
 const MARKET: readonly GlossaryKey[] = ['market-cap', 'pe-ratio', 'dividend-yield', 'beta', 'fifty-two-week-range'];
+const GAMES: readonly GlossaryKey[] = ['kelly-criterion', 'fair-value', 'bid-ask-spread', 'adverse-selection', 'correlation'];
 const BRAIN: readonly GlossaryKey[] = [
     'news-weight', 'news-sentiment', 'thesis', 'since-thesis',
     'event-earnings', 'event-guidance', 'event-mna', 'event-product', 'event-macro', 'event-regulatory', 'event-analyst', 'event-legal',
@@ -26,6 +27,7 @@ const HOMES = {
     concepts: {href: '/topics', label: 'Your topics'},
     brain: {href: '/brain', label: 'The News Brain'},
     rails: {href: '/brain', label: 'The News Brain'},
+    games: {href: '/games', label: 'The games'},
 } as const;
 
 type GroupId = keyof typeof HOMES;
@@ -36,6 +38,7 @@ export const groupOf = (entry: GlossaryEntry): GroupId => {
     if ((BOARD as readonly string[]).includes(entry.key)) return 'board';
     if ((MARKET as readonly string[]).includes(entry.key)) return 'market';
     if ((BRAIN as readonly string[]).includes(entry.key)) return 'brain';
+    if ((GAMES as readonly string[]).includes(entry.key)) return 'games';
     return 'portfolio';
 };
 
@@ -48,10 +51,11 @@ const GROUP_LABELS: Record<GroupId, string> = {
     concepts: 'Terms in the news',
     brain: 'On the News Brain',
     rails: "The Navigator's rails",
+    games: 'In the games',
 };
 
 // Registry order within each group, groups in reading order.
-export const GLOSSARY_GROUPS: readonly GlossaryGroup[] = (['board', 'portfolio', 'market', 'concepts', 'brain', 'rails'] as const).map((id) => ({
+export const GLOSSARY_GROUPS: readonly GlossaryGroup[] = (['board', 'portfolio', 'market', 'concepts', 'brain', 'rails', 'games'] as const).map((id) => ({
     id,
     label: GROUP_LABELS[id],
     home: HOMES[id],

@@ -1,9 +1,9 @@
 # Games and a poker solver: Learn becomes a place to play
 
 **Status:** In progress — the quizzes were removed in `30a6da0` (PR #39, 2026-10-03), and the games
-hub, the daily puzzle and its streak shipped in `989e0ff` (PR #40). The arithmetic sprint and its
-interview mode are the third of six pull requests; the Kelly, market-making and correlation games
-and the poker solver follow.
+hub, the daily puzzle and its streak shipped in `989e0ff` (PR #40), and the arithmetic sprint and its
+interview mode in `639ef94` (PR #41). The Kelly, market-making and correlation games are the fourth
+of six pull requests; the poker solver follows.
 
 ## Why
 
@@ -84,10 +84,28 @@ nothing else. The no-advice word list still holds every sentence ("record" and "
   if a person could have played it — at most four answers a second, a real duration, known
   settings. A record is the top score read back from the rows.
 
+## Kelly coin, market making, Guess the correlation
+
+- **Kelly coin** is the Haghani–Dewey experiment. A coin lands heads 60% of the time; you start
+  with $25, winnings are capped at $250, and you get at most 300 flips with any bet you like.
+  - When the game ends, the same flips are run under three fixed rules: the Kelly fraction (20% on
+    heads), half of it, and everything on heads.
+  - Each rule shows its expected log growth a flip; it is highest at the Kelly fraction.
+- **Market making** settles on the sum of four hidden dice, over four rounds.
+  - Each round you quote a bid and an ask, 1–4 apart, and three traders come by. One knows the
+    sum to within one; the other two know only the dice shown, give or take.
+  - A die is shown after each round. The end splits your profit and loss by trader, so adverse
+    selection shows in numbers.
+  - A test checks that quoting at the fair value loses to the informed trader on average.
+- **Guess the correlation** is ten scatter plots of fifty points each.
+  - The truth is each plot's own sample r. The score is the average miss, and the lowest score is
+    the record.
+- **Scoring:** each of these games draws everything random from one seed before the first move.
+  The page reports the seed and the moves, and the server replays them for the score; a reported
+  score is never taken on trust.
+
 ## What follows
 
-- **Three more quant games:** Kelly coin (the Haghani–Dewey setup), market making on four dice,
-  and Guess the correlation. Each records a reader's rounds and their own record.
 - **The poker solver:** computed in the browser, in a Web Worker, after a spike proves the worker
   builds and runs under Turbopack.
   - A bitmask 7-card evaluator, tested over every 5- and 7-card hand.

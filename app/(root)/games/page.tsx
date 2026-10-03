@@ -2,7 +2,7 @@ import type {Metadata} from "next";
 import Link from "next/link";
 import {requireUserId} from "@/lib/auth/session";
 import {getDailyPuzzleCard, getPuzzleArchive, readGameSummary} from "@/lib/games/store";
-import {ARCHIVE_COPY, ARITHMETIC_COPY, GAMES_COPY} from "@/lib/learn/copy/games";
+import {ARCHIVE_COPY, ARITHMETIC_COPY, CORRELATION_COPY, GAMES_COPY, KELLY_COPY, MARKET_COPY} from "@/lib/learn/copy/games";
 import DailyPuzzleCard from "@/components/games/DailyPuzzleCard";
 import GameCard from "@/components/games/GameCard";
 import StreakPanel from "@/components/games/StreakPanel";
@@ -18,13 +18,17 @@ export const metadata: Metadata = {title: "Games"};
 // with the way in. The one place the app keeps a score (lib/learn/copy/games.ts says why).
 const GamesPage = async () => {
     const userId = await requireUserId();
-    const [card, archive, sprint, interview] = await Promise.all([
+    const [card, archive, sprint, interview, kelly, market, correlation] = await Promise.all([
         getDailyPuzzleCard(userId),
         getPuzzleArchive(userId),
         readGameSummary(userId, 'arithmetic', 'zetamac'),
         readGameSummary(userId, 'interview', 'interview'),
+        readGameSummary(userId, 'kelly', 'kelly'),
+        readGameSummary(userId, 'market-making', 'market-making'),
+        readGameSummary(userId, 'correlation', 'correlation'),
     ]);
-    const recordStat = (label: string, record: number | null) => ({label, value: record === null ? '—' : record.toLocaleString('en-US'), hint: record === null ? ARITHMETIC_COPY.cardNone : undefined});
+    const recordStat = (label: string, record: number | null, print: (n: number) => string = (n) => n.toLocaleString('en-US')) =>
+        ({label, value: record === null ? '—' : print(record), hint: record === null ? ARITHMETIC_COPY.cardNone : undefined});
     const solved = archive.filter((row) => row.status === 'solved').length;
 
     return (
@@ -52,6 +56,12 @@ const GamesPage = async () => {
                     href="/games/arithmetic"
                     cta={ARITHMETIC_COPY.play}
                 />
+                <GameCard id="kelly" title={KELLY_COPY.cardTitle} body={KELLY_COPY.cardBody}
+                          stats={[recordStat(KELLY_COPY.recordLabel, kelly.record, KELLY_COPY.money)]} href="/games/kelly" cta={ARITHMETIC_COPY.play}/>
+                <GameCard id="market-making" title={MARKET_COPY.cardTitle} body={MARKET_COPY.cardBody}
+                          stats={[recordStat(MARKET_COPY.recordLabel, market.record, MARKET_COPY.signed)]} href="/games/market-making" cta={ARITHMETIC_COPY.play}/>
+                <GameCard id="correlation" title={CORRELATION_COPY.cardTitle} body={CORRELATION_COPY.cardBody}
+                          stats={[recordStat(CORRELATION_COPY.recordLabel, correlation.record, (n) => (n / 1000).toFixed(3))]} href="/games/correlation" cta={ARITHMETIC_COPY.play}/>
             </div>
         </div>
     );

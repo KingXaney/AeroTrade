@@ -368,6 +368,12 @@ and friends keep none beyond Shared and the invariants).
   is the top score per game and settings key, read from `GameRound` rows
   (`lib/games/store.readGameSummary`); `lib/games/arithmetic.settingsKey` names Zetamac's defaults
   "zetamac".
+- The Kelly coin, market-making and correlation games (`lib/games/kelly`, `market-making`,
+  `correlation`) draw everything random from one seed before the first move, so a game is its seed
+  and its moves. The page reports those, and `lib/games/rounds.keptRound` replays them for the
+  score — a reported score is never taken on trust, and a move the game would have refused voids
+  the report. Their terms (`kelly-criterion`, `fair-value`, `bid-ask-spread`, `adverse-selection`,
+  `correlation`) are the glossary's `games` group, homed at `/games`.
 - The arithmetic round is the pure reducer `lib/games/arithmetic-round`: the seed and the clock
   arrive in its actions, a problem is drawn from the seed and its place
   (`lib/games/arithmetic.problemAt`), and `components/games/ArithmeticGame` owns only the
