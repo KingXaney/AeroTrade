@@ -1,6 +1,7 @@
 // Fixed-window rate limiting on a database counter. Server-only (Mongoose); the
 // server actions that guard sign-in-adjacent endpoints call this at the top. The limits and
-// keys they pass live in lib/auth/limits.ts (import-free, unit-tested).
+// keys they pass live in lib/auth/limits.ts (import-free, unit-tested). peekRateLimit reads
+// a window without spending it (the chat's usage caption).
 
 import {connectToDatabase} from "@/database/mongoose";
 import RateLimit from "@/database/models/rate-limit.model";
@@ -35,4 +36,14 @@ export const takeRateLimit = async (key: string, limit: number, windowMs: number
         const bumped = await RateLimit.findOneAndUpdate({key}, {$inc: {count: 1}}, {new: true}).lean<{count: number} | null>();
         return (bumped?.count ?? 1) <= limit;
     }
+};
+
+export type RateLimitPeek = {count: number; expiresAt: number};
+
+// Read-only pair of takeRateLimit: one findOne, never a write. A missing row, or one whose
+// window has passed (the TTL monitor deletes lazily), is null.
+export const peekRateLimit = async (key: string): Promise<RateLimitPeek | null> => {
+    await connectToDatabase();
+    const row = await RateLimit.findOne({key, expiresAt: {$gt: new Date()}}).lean<{count: number; expiresAt: Date} | null>();
+    return row ? {count: row.count, expiresAt: new Date(row.expiresAt).getTime()} : null;
 };

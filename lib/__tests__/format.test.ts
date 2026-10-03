@@ -3,7 +3,7 @@ import {fileURLToPath} from 'node:url';
 import {afterEach, describe, expect, it, vi} from 'vitest';
 import {
     formatCapped, formatChangePercent, formatDrawdown, formatEasternTimestamp, formatMarketCapValue, formatPct, formatPrice,
-    formatSigned, formatSignedPrice, formatTimeAgoMs, formatTimeAgoSeconds, getChangeColorClass, roundPct, signedForColor,
+    formatSigned, formatSignedPrice, formatTimeAgoMs, formatTimeAgoSeconds, formatTimeUntilMs, getChangeColorClass, roundPct, signedForColor,
 } from '@/lib/format';
 
 describe('formatChangePercent', () => {
@@ -184,6 +184,24 @@ describe('formatCapped', () => {
         expect(formatCapped(99, 99)).toBe('99');
         expect(formatCapped(100, 99)).toBe('99+');
         expect(formatCapped(1600, 99)).toBe('99+');
+    });
+});
+
+describe('formatTimeUntilMs', () => {
+    // The chat's rate-limit windows roll from their first hit, so "resets in 2h 10m" is exact in
+    // every zone where an ET clock time would not be. `now` is passed in: nothing reads the clock.
+    const now = Date.UTC(2026, 9, 2, 14, 0, 0);
+
+    it('counts whole minutes, then hours and minutes, dropping a zero remainder', () => {
+        expect(formatTimeUntilMs(now + 12 * 60_000 + 30_000, now)).toBe('12m');
+        expect(formatTimeUntilMs(now + 59 * 60_000 + 59_000, now)).toBe('59m');
+        expect(formatTimeUntilMs(now + 2 * 3_600_000 + 10 * 60_000, now)).toBe('2h 10m');
+        expect(formatTimeUntilMs(now + 9 * 3_600_000 + 30_000, now)).toBe('9h');
+    });
+
+    it('says "under a minute" for anything closer, including a stamp already passed', () => {
+        expect(formatTimeUntilMs(now + 30_000, now)).toBe('under a minute');
+        expect(formatTimeUntilMs(now - 5_000, now)).toBe('under a minute');
     });
 });
 

@@ -28,7 +28,7 @@ reads and writes live. Change a field here, then in the store module named besid
 | `friendship` | friends | `lib/friends/store`; `lib/actions/friends.actions` writes |
 | `user-preferences` | settings | `lib/settings/preferences-store`, plus each feature's own sub-document: `lib/dashboard/layout-store` (layout), `lib/theme/store` (appearance), `lib/news/feed-store` (feed, the `newsSeenAt` stamp), `lib/strategies/follows`, `lib/learn` stores (`learn`) |
 | `job-run` | jobs | `lib/jobs/job-runs` (each run's stamp), `lib/jobs/health` (the status strip) |
-| `rate-limit` | auth | `lib/rate-limit` — the one counter sign-in, sign-up, password reset and the chat spend |
+| `rate-limit` | auth | `lib/rate-limit` — the one counter sign-in, sign-up, password reset and the chat spend; `peekRateLimit` reads a window for the chat's caption without spending it |
 
 Indexes the paper account, trade and snapshot models declare are also listed in
 `scripts/migration-indexes.mjs`, which `npm run migrate:accounts` builds and

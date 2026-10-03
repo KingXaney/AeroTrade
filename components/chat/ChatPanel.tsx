@@ -8,7 +8,10 @@ import Link from "next/link";
 import {X, Trash2} from "lucide-react";
 import ChatMessage from "@/components/chat/ChatMessage";
 import RobotMascot from "@/components/chat/RobotMascot";
+import {useChatUsage} from "@/components/chat/useChatUsage";
+import MicroLabel from "@/components/primitives/MicroLabel";
 import {describeChatError} from "@/lib/chat/errors";
+import {describeChatUsage} from "@/lib/chat/usage";
 import {subscribeAsk} from "@/lib/chat/ask";
 import {CHAT_WELCOME_MESSAGE, CHAT_SUGGESTIONS} from "@/lib/learn/copy/chat";
 import {cn} from "@/lib/utils";
@@ -92,6 +95,11 @@ const ChatPanel = ({userId, onClose, initialMessages, onMessagesChange, initialI
         dragRef.current = null;
     }, []);
 
+    // What is left of the chat's rate-limit windows, re-read after every request settles. The
+    // caption renders from the server's clock (`usage.at`), so nothing here reads Date.now().
+    const {usage, refreshUsage} = useChatUsage();
+    const caption = usage ? describeChatUsage(usage) : null;
+
     const {messages, sendMessage, status, error, setMessages, clearError, regenerate} = useChat({
         id: `chat-${userId}`,
         messages: initialMessages,
@@ -103,7 +111,11 @@ const ChatPanel = ({userId, onClose, initialMessages, onMessagesChange, initialI
                 return MUTATING_TOOLS.has(name);
             });
             if (hasMutation) router.refresh();
+            refreshUsage();
         },
+        // A refused request (429) and a dropped one both land here; the route has spent its
+        // windows before it streams, so a read taken now sees the final counts.
+        onError: () => refreshUsage(),
     });
 
     // Persist messages upstream whenever they change.
@@ -224,6 +236,19 @@ const ChatPanel = ({userId, onClose, initialMessages, onMessagesChange, initialI
                     </button>
                 </div>
             </div>
+
+            {/* What is left of the rate-limit windows; absent while unread. A <div>, never a <p>:
+                qa-chat-tutor reads the panel's error copy from its <p> elements. */}
+            {caption && (
+                <MicroLabel
+                    as="div"
+                    tone={caption.exhausted ? 'warning' : 'muted'}
+                    className="px-4 py-1.5 border-b border-line-strong/30"
+                    data-chat-usage={caption.binding}
+                >
+                    {caption.text}
+                </MicroLabel>
+            )}
 
             {/* Message list */}
             <div ref={listRef} className="flex-1 overflow-y-auto px-4 py-3 space-y-3 scrollbar-hide">

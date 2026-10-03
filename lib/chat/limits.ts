@@ -17,8 +17,8 @@ export const chatUserHourKey = (userId: string): string => `chat:${userId}`;
 export const chatUserDayKey = (userId: string): string => `chat:${userId}:day`;
 export const CHAT_GLOBAL_KEY = 'chat:global';
 
-type ChatLimit = {limit: number; windowMs: number};
-type ChatLimits = {
+export type ChatLimit = {limit: number; windowMs: number};
+export type ChatLimits = {
     userHour: ChatLimit;
     userDay: ChatLimit;
     global: ChatLimit;

@@ -92,6 +92,19 @@ export const formatTimeAgoSeconds = (unixSeconds: number) => formatTimeAgoMs(uni
 // stays clean.
 export const formatCapped = (count: number, cap: number): string => (count > cap ? `${cap}+` : String(count));
 
+// How long until a stamp, for "resets in …": 'under a minute', '12m', '2h 10m', '9h'. Relative,
+// not a clock time, because the chat's windows roll from their first hit rather than ending at
+// an ET midnight. Takes `now` explicitly: callers render it (no Date.now() in render).
+export const formatTimeUntilMs = (epochMs: number, now: number): string => {
+    const ms = epochMs - now;
+    if (ms < 60_000) return 'under a minute';
+    const minutes = Math.floor(ms / 60_000);
+    if (minutes < 60) return `${minutes}m`;
+    const hours = Math.floor(minutes / 60);
+    const rest = minutes % 60;
+    return rest === 0 ? `${hours}h` : `${hours}h ${rest}m`;
+};
+
 // Formatted string like "$3.10T", "$900.00B", "$25.00M" or "$999999.99" (no thousands separator below a million)
 export function formatMarketCapValue(marketCapUsd: number): string {
     if (!Number.isFinite(marketCapUsd) || marketCapUsd <= 0) return 'N/A';
