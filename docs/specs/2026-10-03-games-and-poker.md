@@ -1,9 +1,10 @@
 # Games and a poker solver: Learn becomes a place to play
 
 **Status:** In progress — the quizzes were removed in `30a6da0` (PR #39, 2026-10-03), and the games
-hub, the daily puzzle and its streak shipped in `989e0ff` (PR #40), and the arithmetic sprint and its
-interview mode in `639ef94` (PR #41). The Kelly, market-making and correlation games are the fourth
-of six pull requests; the poker solver follows.
+hub, the daily puzzle and its streak shipped in `989e0ff` (PR #40), the arithmetic sprint and its
+interview mode in `639ef94` (PR #41), and the Kelly, market-making and correlation games in
+`30acbd8` (PR #42). The poker solver's equity, push/fold and pot odds are the fifth of six pull
+requests; the river solver follows.
 
 ## Why
 
@@ -104,12 +105,49 @@ nothing else. The no-advice word list still holds every sentence ("record" and "
   The page reports the seed and the moves, and the server replays them for the score; a reported
   score is never taken on trust.
 
+## The poker solver
+
+Everything is worked out in the browser and nothing is stored: the page reads only the session.
+
+- **The engine.** A Web Worker when it starts and answers within four seconds, else the page
+  thread running the same jobs; `?engine=main` forces the page thread for QA. A spike proved the
+  worker builds and runs under Turbopack in dev and in a production build before anything else
+  was written. A job is a generator that yields progress: the worker drives it in 50 ms slices,
+  the page thread in 12 ms slices, so a stop or a newer job is heard between them and the latest
+  job wins. A stop the worker does not answer within a second ends the worker.
+- **The evaluator** reads 5 to 7 cards as four 13-bit suit masks and five small tables, and is
+  tested over every 5- and 7-card hand and against a slow best-of-21 reference.
+- **Equity** picks one of three methods:
+  - **Preflop table:** for whole-class ranges, exact and instant.
+  - **Exact enumeration:** used within 40 million hand values. A sorted showdown sweep makes each
+    board linear in the hands.
+  - **Seeded Monte Carlo:** fixed blocks of 65,536 deals, run until the standard error is under
+    0.05 points.
+
+  AsAh against KsKh reproduces the known 1,410,336 wins and 9,308 ties over 1,712,304 boards on
+  both engines. An enumeration yields at least every 50,000 hand values, which brought Stop under
+  a second (227 ms in QA) for two full ranges.
+- **The preflop table:** every class against every class, exact. Every combo pair is reduced to
+  its suit pattern under the 24 relabelings of the suits, leaving 46,683 patterns, and each pattern
+  is played over every board on every core. That took about seven minutes. The table reproduces
+  the published figures: AA against KK is 81.946%, and against a random hand AA scores 85.20%, KK
+  82.40%, AKs 67.04%, 72o 34.58% and 32o 32.30%.
+- **Push or fold:** solved by discounted CFR rather than the CFR+ first planned.
+  - **Why:** across 241 spots, at a tolerance of 10⁻⁵, it took 47 iterations on average against
+    CFR+'s 345, and its averages carry less early noise. The solver also takes the current strategies when
+    they already meet the tolerance, and they carry none.
+  - **Clean charts:** every hand whose gain is clearly signed is then set to its pure action, but
+    only when that profile still measures within the tolerance. The tolerance is 10⁻⁶ bb a hand,
+    which keeps any wrong-signed gain on a pure hand under 0.001 bb.
+  - **Speed:** at that tolerance a solve takes about 130 iterations, 12 ms on average and under
+    50 ms at most in Node, so the stack slider re-solves live.
+  - **Figures:** 10 bb gives 58.3% pushed and 37.4% called; 20 bb gives 40.2% and 21.7%. The
+    shares are not monotone at fine steps — a seat can widen by a fraction of a point when the
+    other tightens — so the tests pin a coarse ladder.
+- **Pot odds:** the break-even equity, the odds, the minimum defense frequency, the folds a bluff
+  needs, and a call's expected result.
+
 ## What follows
 
-- **The poker solver:** computed in the browser, in a Web Worker, after a spike proves the worker
-  builds and runs under Turbopack.
-  - A bitmask 7-card evaluator, tested over every 5- and 7-card hand.
-  - Exact or seeded Monte Carlo equity.
-  - Push/fold Nash by CFR+ over a precomputed 169×169 equity table.
-  - Pot odds.
-  - A river solver by discounted CFR, checked against the polarized-versus-bluff-catcher toy game.
+- **The river solver:** discounted CFR over a betting tree, checked against the polarized
+  range-versus-bluff-catcher toy game.

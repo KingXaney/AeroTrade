@@ -34,13 +34,22 @@ describe('where each term lives', () => {
             expect(groupOf(GLOSSARY[key]), key).toBe('brain');
             expect(homeOf(key), key).toBe('/brain');
         }
-        expect(GLOSSARY_GROUPS.map((group) => group.id)).toEqual(['board', 'portfolio', 'market', 'concepts', 'brain', 'rails', 'games']);
+        expect(GLOSSARY_GROUPS.map((group) => group.id)).toEqual(['board', 'portfolio', 'market', 'concepts', 'brain', 'rails', 'games', 'poker']);
     });
 
     it('homes the games\' terms on /games', () => {
         for (const key of ['kelly-criterion', 'fair-value', 'bid-ask-spread', 'adverse-selection', 'correlation'] as const) {
             expect(groupOf(GLOSSARY[key]), key).toBe('games');
             expect(homeOf(key), key).toBe('/games');
+        }
+    });
+
+    it('homes the poker solver\'s terms on /poker', () => {
+        const poker = GLOSSARY_GROUPS.find((group) => group.id === 'poker');
+        expect(poker?.keys).toHaveLength(19);
+        for (const key of ['hand-equity', 'hand-range', 'pot-odds', 'push-fold', 'nash-equilibrium', 'exploitability'] as const) {
+            expect(groupOf(GLOSSARY[key]), key).toBe('poker');
+            expect(homeOf(key), key).toBe('/poker');
         }
     });
 });
