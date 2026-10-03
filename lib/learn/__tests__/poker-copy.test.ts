@@ -3,7 +3,9 @@
 
 import {describe, expect, it} from 'vitest';
 import {findBanned} from '@/lib/learn/banned';
-import {CARDS_COPY, EQUITY_COPY, POKER_COPY, POT_ODDS_COPY, PUSH_FOLD_ANTES, PUSH_FOLD_COPY, RANGE_COPY} from '@/lib/learn/copy/poker';
+import {CARDS_COPY, EQUITY_COPY, POKER_COPY, POT_ODDS_COPY, PUSH_FOLD_ANTES, PUSH_FOLD_COPY, RANGE_COPY, RIVER_COPY} from '@/lib/learn/copy/poker';
+import type {RiverIssue} from '@/lib/poker/river/solver';
+import {ACTIONS} from '@/lib/poker/river/tree';
 import type {EquityIssue, EquityMethod} from '@/lib/poker/equity';
 import type {PotOddsIssue} from '@/lib/poker/pot-odds';
 import type {PushFoldIssue} from '@/lib/poker/pushfold';
@@ -21,7 +23,7 @@ const strings = (table: object): string[] =>
 
 describe('the poker copy', () => {
     it('says every fixed line in plain words', () => {
-        for (const table of [POKER_COPY, RANGE_COPY, CARDS_COPY, EQUITY_COPY, PUSH_FOLD_COPY, POT_ODDS_COPY]) {
+        for (const table of [POKER_COPY, RANGE_COPY, CARDS_COPY, EQUITY_COPY, PUSH_FOLD_COPY, POT_ODDS_COPY, RIVER_COPY]) {
             for (const text of strings(table)) clean(text);
         }
     });
@@ -57,6 +59,16 @@ describe('the poker copy', () => {
                 POT_ODDS_COPY.callResultHow(0.3, pot, bet), POT_ODDS_COPY.odds((pot + bet) / bet), POT_ODDS_COPY.callResult(0.3 * (pot + 2 * bet) - bet)].forEach(clean);
         }
         clean(POKER_COPY.failed('The solver could not start.'));
+        for (const player of RIVER_COPY.players) [RIVER_COPY.betsLabel(player), RIVER_COPY.raisesLabel(player), RIVER_COPY.evLabel(player), RIVER_COPY.toAct(player), RIVER_COPY.gridLabel(player)].forEach(clean);
+        for (const [decisions, nodes, mb, ms] of [[1, 3, 0.2, 0.4], [24, 69, 1.6, 3], [400, 1200, 63.9, 120]]) clean(RIVER_COPY.summary(decisions, nodes, mb, ms));
+        for (const [iterations, pct] of [[1, null], [10, 16.1], [1000, 0.0123]] as const) clean(RIVER_COPY.progress(iterations, pct));
+        [RIVER_COPY.stopped(1), RIVER_COPY.stopped(250), RIVER_COPY.sizesUnreadable('7x'), RIVER_COPY.ev(6.122, 10), RIVER_COPY.ev(-2.5, 10),
+            RIVER_COPY.exploitability(0.189), RIVER_COPY.actionShare(0.3), RIVER_COPY.target(0.3)].forEach(clean);
+        for (const issue of ['pot', 'stack', 'sizes', 'raise-cap', 'too-big', 'board', 'empty-side', 'no-pairs'] as RiverIssue[]) for (const max of [120, 400]) clean(RIVER_COPY.issue(issue, max));
+        for (const kind of ACTIONS) clean(RIVER_COPY.action(kind, 7.5, 22.5));
+        clean(RIVER_COPY.cell('AKs', 3, [{action: 'Check', share: 0.4}, {action: 'Bet 7.5', share: 0.6}], 12.4));
+        clean(RIVER_COPY.cell('72o', 0, [], null));
+        clean(RIVER_COPY.cell('65s', 2.4, [{action: 'Bet 7.5', share: 1}], null));
     });
 
     it('prints the figures it is given, and reads right at one and at many', () => {
@@ -78,5 +90,12 @@ describe('the poker copy', () => {
         expect(POT_ODDS_COPY.odds(1.5)).toBe('1.5 to 1');
         expect(POT_ODDS_COPY.breakEvenHow(100, 50)).toBe('50 ÷ (100 + 2 × 50)');
         expect(POT_ODDS_COPY.callResult(10)).toBe('+10.00');
+        expect(RIVER_COPY.action('raise', 15, 22.5)).toBe('Raise to 22.5');
+        expect(RIVER_COPY.action('bet', 7.5, 7.5)).toBe('Bet 7.5');
+        expect(RIVER_COPY.action('all-in', 30, 30)).toBe('All in for 30');
+        expect(RIVER_COPY.summary(24, 69, 1.6, 3)).toBe('24 decisions and 69 nodes · about 2 MB · about 3 ms an iteration');
+        expect(RIVER_COPY.summary(1, 3, 0.2, 0.4)).toBe('1 decision and 3 nodes · under 1 MB · under 1 ms an iteration');
+        expect(RIVER_COPY.ev(6.1224, 10)).toBe('6.12 · 61.2% of the pot');
+        expect(RIVER_COPY.cell('AKs', 3, [{action: 'Check', share: 0.4}, {action: 'Bet 7.5', share: 0.6}], 12.4)).toBe('AKs: 3 combos · Check 40.0%, Bet 7.5 60.0% · result 12.4');
     });
 });

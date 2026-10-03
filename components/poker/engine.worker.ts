@@ -7,7 +7,7 @@
 // slices, so a stop is heard between them; progress goes out at most every 100 ms.
 
 import {drive} from "@/lib/poker/drive";
-import {needsTable, pokerJob} from "@/lib/poker/jobs";
+import {finishesOnStop, needsTable, pokerJob} from "@/lib/poker/jobs";
 import {ENGINE_PROTOCOL, type FromEngine, type ToEngine} from "@/lib/poker/protocol";
 import {loadPreflopTable, yieldToLoop} from "@/components/poker/preflop-table";
 
@@ -25,7 +25,7 @@ const start = async (id: number, message: Extract<ToEngine, {type: 'start'}>) =>
         const table = needsTable(message.request) ? await loadPreflopTable() : null;
         // A newer start may have come in while the table loaded.
         if (id !== latest) {
-            scope.postMessage({type: 'stopped', id, progress: null});
+            scope.postMessage({type: 'stopped', id, progress: null, result: null});
             return;
         }
         const run = drive(pokerJob(message.request, table), {
@@ -34,10 +34,13 @@ const start = async (id: number, message: Extract<ToEngine, {type: 'start'}>) =>
             onProgress: (progress) => scope.postMessage({type: 'progress', id, progress}),
             now: () => performance.now(),
             pause: yieldToLoop,
+            finishOnStop: finishesOnStop(message.request),
         });
         stopCurrent = run.stop;
         const outcome = await run.promise;
-        scope.postMessage(outcome.status === 'done' ? {type: 'done', id, result: outcome.result} : {type: 'stopped', id, progress: outcome.progress});
+        scope.postMessage(outcome.status === 'done'
+            ? {type: 'done', id, result: outcome.result}
+            : {type: 'stopped', id, progress: outcome.progress, result: outcome.result});
     } catch (error) {
         scope.postMessage({type: 'failed', id, message: error instanceof Error ? error.message : String(error)});
     } finally {

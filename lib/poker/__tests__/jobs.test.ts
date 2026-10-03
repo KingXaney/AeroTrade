@@ -5,7 +5,7 @@
 import {describe, expect, it} from 'vitest';
 import {drive} from '@/lib/poker/drive';
 import {runToEnd} from '@/lib/poker/equity';
-import {needsTable, pokerJob, type PokerProgress, type PokerRequest} from '@/lib/poker/jobs';
+import {finishesOnStop, needsTable, pokerJob, type PokerProgress, type PokerRequest} from '@/lib/poker/jobs';
 import {decodePreflop, type PreflopFile} from '@/lib/poker/preflop';
 import {parseCard} from '@/lib/poker/cards';
 import {parseRange} from '@/lib/poker/range';
@@ -29,6 +29,7 @@ describe('pokerJob', () => {
         expect(needsTable(equity('AA', 'KK'))).toBe(true);
         expect(needsTable(equity('AA', 'KK', ['Ah', '7c', '2d']))).toBe(false);
         expect(needsTable({kind: 'push-fold', input: {stack: 10, ante: 0}})).toBe(true);
+        expect(finishesOnStop({kind: 'push-fold', input: {stack: 10, ante: 0}})).toBe(false);
         const eq = runToEnd(pokerJob(equity('AA', 'KK'), table));
         expect(eq.kind === 'equity' && eq.result.method).toBe('table');
         const pf = runToEnd(pokerJob({kind: 'push-fold', input: {stack: 10, ante: 0}}, table));
@@ -72,8 +73,26 @@ describe('drive', () => {
         const run = drive(counting(), {sliceMs: 5, progressMs: 0, onProgress: () => {}, now: clock(), pause});
         expect(pulled).toBe(0);
         run.stop();
-        expect(await run.promise).toEqual({status: 'stopped', progress: null});
+        expect(await run.promise).toEqual({status: 'stopped', progress: null, result: null});
         expect(pulled).toBe(0);
+    });
+
+    it('lets a job that finishes on stop hand back what it has', async () => {
+        function* counting(): Generator<number, string, unknown> {
+            let n = 0;
+            for (;;) {
+                n++;
+                const command = yield n;
+                if (command === 'stop') return `stopped at ${n}`;
+            }
+        }
+        let reports = 0;
+        const run = drive(counting(), {sliceMs: 0, progressMs: 0, onProgress: () => { reports++; }, now: clock(), pause, finishOnStop: true});
+        while (reports < 3) await pause();
+        run.stop();
+        const outcome = await run.promise;
+        expect(outcome.status).toBe('stopped');
+        expect(outcome.status === 'stopped' && outcome.result).toMatch(/^stopped at \d+$/);
     });
 
     it('rejects when the job throws', async () => {

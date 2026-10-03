@@ -12,7 +12,12 @@ import {classKind, classLabel} from "@/lib/poker/cards";
 // Painting: a mouse or pen paints as it drags across cells; a touch paints one cell a tap, so the
 // page still scrolls under a finger; the keyboard paints the focused cell with Enter or Space.
 
-export type GridCell = {fill: number; text?: string; title: string; muted?: boolean};
+// A strategy cell draws its actions side by side instead of one fill: each a share of the bar and a
+// tone from SEGMENT_TONES (literal classes, so the build sees them).
+export type GridSegment = {share: number; tone: number};
+export type GridCell = {fill: number; text?: string; title: string; muted?: boolean; segments?: readonly GridSegment[]};
+
+export const SEGMENT_TONES = ['bg-surface-4', 'bg-fg-muted/60', 'bg-positive/80', 'bg-brand/45', 'bg-brand/75', 'bg-brand', 'bg-warning/80', 'bg-negative/80'] as const;
 
 type Props = {
     cells: readonly GridCell[];
@@ -60,7 +65,16 @@ const HandGrid = ({cells, label, id, onPaint, dataAttr}: Props) => {
                         // The label sits mid-cell, so from half full it is over the fill and takes the
                         // brand's own text colour, as the active tab does.
                         const onFill = cell.fill >= 0.5;
-                        const face = (
+                        const face = cell.segments ? (
+                            <>
+                                <span className={cn('relative font-mono text-[8px] leading-none sm:text-[10px]', cell.muted ? 'text-fg-muted' : 'text-fg')}>{classLabel(classId)}</span>
+                                <span aria-hidden="true" className="absolute inset-x-0 bottom-0 flex h-2/5">
+                                    {cell.segments.map((segment, i) => (
+                                        <span key={i} className={SEGMENT_TONES[segment.tone % SEGMENT_TONES.length]} style={{width: `${Math.max(0, Math.min(1, segment.share)) * 100}%`}}/>
+                                    ))}
+                                </span>
+                            </>
+                        ) : (
                             <>
                                 <span aria-hidden="true" className="absolute inset-x-0 bottom-0 bg-brand" style={{height: `${Math.max(0, Math.min(1, cell.fill)) * 100}%`}}/>
                                 <span className={cn('relative font-mono text-[8px] leading-none sm:text-[10px]', onFill ? 'text-on-brand' : cell.muted ? 'text-fg-muted' : 'text-fg')}>{classLabel(classId)}</span>

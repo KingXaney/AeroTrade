@@ -3,7 +3,8 @@
 
 import type {PokerProgress, PokerRequest, PokerResult} from "@/lib/poker/jobs";
 
-export const ENGINE_PROTOCOL = 1;
+// 2: the river job, and a stopped job's result.
+export const ENGINE_PROTOCOL = 2;
 
 export type ToEngine =
     | {type: 'hello'}
@@ -15,5 +16,6 @@ export type FromEngine =
     | {type: 'ready'; protocol: number}
     | {type: 'progress'; id: number; progress: PokerProgress}
     | {type: 'done'; id: number; result: PokerResult}
-    | {type: 'stopped'; id: number; progress: PokerProgress | null}
+    // A job that finishes on stop (the river solver) still sends its result.
+    | {type: 'stopped'; id: number; progress: PokerProgress | null; result: PokerResult | null}
     | {type: 'failed'; id: number; message: string};

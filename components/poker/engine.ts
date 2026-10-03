@@ -6,7 +6,7 @@
 // A stop the worker does not answer within a second ends the worker; the next job starts a new one.
 
 import {drive, type DriveOutcome} from "@/lib/poker/drive";
-import {needsTable, pokerJob, type PokerProgress, type PokerRequest, type PokerResult} from "@/lib/poker/jobs";
+import {finishesOnStop, needsTable, pokerJob, type PokerProgress, type PokerRequest, type PokerResult} from "@/lib/poker/jobs";
 import {ENGINE_PROTOCOL, type FromEngine, type ToEngine} from "@/lib/poker/protocol";
 import {loadPreflopTable, yieldToLoop} from "@/components/poker/preflop-table";
 
@@ -30,13 +30,14 @@ const mainEngine = (): Engine => ({
         let stopDriven: (() => void) | null = null;
         const promise = (async (): Promise<JobOutcome> => {
             const table = needsTable(request) ? await loadPreflopTable() : null;
-            if (stopped) return {status: 'stopped', progress: null};
+            if (stopped) return {status: 'stopped', progress: null, result: null};
             const run = drive(pokerJob(request, table), {
                 sliceMs: 12,
                 progressMs: 100,
                 onProgress,
                 now: () => performance.now(),
                 pause: yieldToLoop,
+                finishOnStop: finishesOnStop(request),
             });
             stopDriven = run.stop;
             return run.promise;
@@ -106,7 +107,7 @@ const workerEngine = (first: Worker): Engine => {
             }
             pending.delete(message.id);
             if (message.type === 'done') job.resolve({status: 'done', result: message.result});
-            else if (message.type === 'stopped') job.resolve({status: 'stopped', progress: message.progress ?? job.last});
+            else if (message.type === 'stopped') job.resolve({status: 'stopped', progress: message.progress ?? job.last, result: message.result});
             else job.reject(new Error(message.message));
         });
         // A worker that crashes fails what it held; the next job starts a new one.
@@ -128,7 +129,7 @@ const workerEngine = (first: Worker): Engine => {
         worker = null;
         for (const [id, job] of pending) {
             pending.delete(id);
-            job.resolve({status: 'stopped', progress: job.last});
+            job.resolve({status: 'stopped', progress: job.last, result: null});
         }
     };
 
@@ -157,7 +158,7 @@ const workerEngine = (first: Worker): Engine => {
                     }
                     if (stopRequested) {
                         pending.delete(id);
-                        resolve({status: 'stopped', progress: null});
+                        resolve({status: 'stopped', progress: null, result: null});
                         return;
                     }
                     const start: ToEngine = {type: 'start', id, request};
