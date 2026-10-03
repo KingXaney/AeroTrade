@@ -57,11 +57,13 @@ try {
     check('a section of one page shows no tabs', await page.locator('[data-section-tabs]').count() === 0);
     await page.goto(`${BASE}/stocks/SPY`, {waitUntil: 'load'});
     check('a stock page lights Markets', await page.locator('aside.rail nav a[aria-current="page"]').getAttribute('data-rail') === 'markets');
-    await page.goto(`${BASE}/`, {waitUntil: 'load'});
+    // The palette listens for ⌘K from an effect, so a press before Home has hydrated is lost —
+    // on a cold dev server that is seconds after 'load'. Wait for the network to settle first.
+    await page.goto(`${BASE}/`, {waitUntil: 'networkidle'});
 
     // --- ⌘K is keyboard-drivable ----------------------------------------------
     await page.keyboard.press('Meta+k');
-    await page.waitForSelector('[cmdk-input]', {timeout: 5000});
+    await page.waitForSelector('[cmdk-input]', {timeout: 15000});
     check('⌘K opens the palette', await page.locator('[cmdk-input]').isVisible());
     await page.keyboard.type('act');
     check('…and finds a page by name', await page.locator('[data-page-hit="/history"]').count() === 1);
