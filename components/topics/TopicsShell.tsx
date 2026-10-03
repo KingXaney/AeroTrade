@@ -4,6 +4,7 @@ import {createContext, useContext, useMemo, useState, type ReactNode} from "reac
 import TopicRail from "@/components/topics/TopicRail";
 import PageTitle from "@/components/primitives/PageTitle";
 import TopicComposer, {type ComposerMode} from "@/components/topics/TopicComposer";
+import NewsSeenMarker from "@/components/news/NewsSeenMarker";
 import type {TopicView, TopicsOverview} from '@/lib/topics/types';
 
 type TopicsUi = {openComposer: (mode: ComposerMode, initial?: TopicView | null) => void};
@@ -23,6 +24,10 @@ type Props = {
 };
 
 // One composer instance for the whole page; the rail, headers and empty feeds open it.
+//
+// The index (no activeSlug) is "opening News": it stamps `newsSeenAt`, the stamp behind the rail's
+// News dot, so any view of the whole set inherits the marker. A topic's own page stamps the topic
+// instead (TopicSeenMarker, on the page).
 const TopicsShell = ({overview, activeSlug, children}: Props) => {
     const [composer, setComposer] = useState<{open: boolean; mode: ComposerMode; initial: TopicView | null}>({open: false, mode: 'create', initial: null});
     const ui = useMemo<TopicsUi>(() => ({
@@ -33,6 +38,7 @@ const TopicsShell = ({overview, activeSlug, children}: Props) => {
         <TopicsUiContext.Provider value={ui}>
             <div className="space-y-4">
                 <PageTitle title="Topics" subtitle="Everything you follow, from every source we read" />
+                {!activeSlug && <NewsSeenMarker />}
                 <div className="grid grid-cols-1 lg:grid-cols-12 gap-4 items-start">
                     <div className="lg:col-span-3 lg:sticky lg:top-24">
                         <TopicRail topics={overview.topics} activeSlug={activeSlug} unseenTotal={overview.unseenTotal}

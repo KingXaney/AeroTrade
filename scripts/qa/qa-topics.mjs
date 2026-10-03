@@ -1,9 +1,12 @@
 // Followed topics (lib/topics, /topics): six topics preinstalled at sign-up, a topic page's first
-// live fetch, the sidebar card, ⌘K following a topic and opening one, a refresh that brings new
-// articles, editing keywords and deleting from the header menu. Also the surfaces topics lead: the
-// topics-first dashboard and the widget library's Topics group, the settings page's Topics section
-// and email toggle, the chat launcher's topic suggestion, the header nav order, and the theme
-// picker's hover sweep (the committed style never flashes).
+// live fetch, the rail's News card and its dot (a seeded headline, "since you last looked", the
+// dot that lights for an article the reader has not looked at and clears on opening the topics
+// index or /news without a reload — on the rail and in the mobile drawer), ⌘K following a topic
+// and opening one, a refresh that brings new articles, editing keywords and deleting from the
+// header menu. Also the surfaces topics lead: the topics-first dashboard and the widget
+// library's Topics group, the settings page's
+// Topics section and email toggle, the chat launcher's topic suggestion, the header nav order,
+// and the theme picker's hover sweep (the committed style never flashes).
 // Run: npm run qa -- topics   (the harness: README.md)
 import {chromium} from 'playwright';
 import {MongoClient} from 'mongodb';
@@ -43,11 +46,56 @@ const settleToasts = async (page) => {
     const email = await signUp(page, 'Tester').catch(async (e) => { await shot('00-sign-up-failed'); throw e; });
     await page.waitForTimeout(1200);
     check('sign-up lands in the app, not a setup screen', page.url().endsWith('/dashboard'), page.url());
+    const qaUser = await db.collection('user').findOne({email});
+    const userId = String(qaUser?._id ?? '');
+
+    // Topic articles seeded straight into Mongo, so nothing here depends on Google News. One
+    // document each, `source: QA_FEED_SOURCE`, removed before and after the run.
+    const seedInto = (keywordSetHash, headline, ageSeconds, matchedTerm) => db.collection('topicarticles').insertOne({
+        keywordSetHash,
+        contentHash: Math.floor(Math.random() * 1e9),
+        headline,
+        summary: 'Seeded by the QA harness.',
+        url: `https://example.com/qa-feed-${Date.now()}-${Math.floor(Math.random() * 1e6)}`,
+        source: QA_FEED_SOURCE,
+        sourceType: 'web',
+        datetime: Math.floor(Date.now() / 1000) - ageSeconds,
+        publishedDate: new Date().toISOString().slice(0, 10),
+        score: 12,
+        matchedTerms: [matchedTerm],
+        createdAt: new Date(),
+    });
+
+    // --- the rail's News dot: an article the reader has never looked at lights it ---
+    // Seeded into a default the first-run job may also fill, so the checks are regexes over the
+    // dot's sentence, never exact counts. A hundred rows (the cap plus one) so Geopolitics sorts
+    // first in the card whatever Google answered for the other defaults — and so the capped
+    // "99+" is seen end to end; the headline seeded last is the newest, so it is the row's own.
+    const geo = await db.collection('topics').findOne({userId, slug: 'geopolitics'});
+    check('the default topics are stored', !!geo);
+    const GEO_HEADLINE = 'QA feed: a geopolitics story for the News card';
+    if (geo) {
+        for (let i = 0; i < 99; i++) await seedInto(geo.keywordSetHash, `QA feed: geopolitics filler ${i}`, 60, 'sanctions');
+        await seedInto(geo.keywordSetHash, GEO_HEADLINE, 0, 'sanctions');
+    }
+    const newsRail = 'aside.rail a[data-rail="news"]';
+    const newsLabel = async () => (await page.locator(newsRail).getAttribute('aria-label')) ?? '';
+    const NEWS_DOT = /^News, new in \d+ topics? since you last looked$/;
+    // The dot clears in place when a News page stamps the look, with no reload (a window event,
+    // lib/shell/news-seen.ts); the pages stream past their loading boundary, hence the wait.
+    const waitForDotCleared = () => page.waitForFunction(
+        (sel) => document.querySelector(sel)?.getAttribute('aria-label') === 'News', newsRail, {timeout: 30000},
+    ).catch(() => {});
+    await page.goto(`${BASE}/dashboard`, {waitUntil: 'load'});
+    await page.locator(newsRail).waitFor({timeout: 30000});
+    check('an article the reader has never looked at lights the News dot', NEWS_DOT.test(await newsLabel()), await newsLabel());
 
     // --- the defaults are there, and the picker never appeared ---
     await page.goto(`${BASE}/topics`, {waitUntil: 'load'});
     await page.waitForSelector('nav[aria-label="Your topics"]', {timeout: 60000});
     await page.waitForTimeout(800);
+    await waitForDotCleared();
+    check('opening the topics index clears the News dot without a reload', (await newsLabel()) === 'News', await newsLabel());
     check('no setup wall: /topics opens on the feed', await page.getByRole('button', {name: 'Write my own'}).count() === 0);
     // The rail leads with an "All topics" link, so key on the per-topic hrefs, not on `a`.
     const railSel = 'nav[aria-label="Your topics"] a[href^="/topics/"]';
@@ -64,6 +112,8 @@ const settleToasts = async (page) => {
     await page.waitForSelector('nav[aria-label="Your topics"]', {timeout: 60000});
     check('seeding is idempotent across reloads',
         (await page.$$eval(railSel, (as) => as.length)) === 6);
+    // Server truth: the stamp outlives the session, so nothing seeded before it lights the dot.
+    check('…and the next load agrees the News dot is off', (await newsLabel()) === 'News', await newsLabel());
 
     // --- single topic page (first visit triggers the bounded live fetch) ---
     await page.goto(`${BASE}/topics/ai-chips`, {waitUntil: 'load'});
@@ -76,12 +126,61 @@ const settleToasts = async (page) => {
     await shot('02-topic-ai-chips');
 
     // --- the rail's News card + the section's tabs ---
-    await page.locator('aside.rail a[data-rail="news"]').hover();
+    // `/i` throughout: MicroLabel lines may be uppercased by the style, which innerText reflects.
+    await page.locator(newsRail).hover();
     const newsCard = page.locator('[data-rail-flyout="news"]');
     await newsCard.waitFor({timeout: 5000}).catch(() => {});
-    const sideCard = (await newsCard.innerText().catch(() => '')).replace(/\n/g, ' ');
-    check('the rail card over News shows the six followed topics', /6\s*topics\s*followed/i.test(sideCard), sideCard);
+    const cardText = async () => (await newsCard.innerText().catch(() => '')).replace(/\n/g, ' ');
+    const sideCard = await cardText();
+    check('the News card leads with when the reader last looked', /Since you last looked/i.test(sideCard), sideCard);
+    check('…names the topic with something new, its newest headline and how many',
+        /Geopolitics/i.test(sideCard) && sideCard.includes(GEO_HEADLINE) && /\d+\+? new/i.test(sideCard), sideCard);
+    check('…prints a count past the cap as 99+', /99\+ new/i.test(sideCard), sideCard);
+    check('…and is the way to the news', /Open the news/i.test(sideCard) && await newsCard.locator('a[href="/news"]').count() === 1, sideCard);
+    // The briefing is one global document a day (qa-news-feed seeds and removes its own).
+    if (await db.collection('marketbriefings').countDocuments() === 0) check('…with no briefing line when none exists', !/AI summary/i.test(sideCard), sideCard);
     await page.mouse.move(700, 500);
+
+    // --- a newer article re-lights the dot; opening /news clears it, and the card says so ---
+    if (geo) await seedInto(geo.keywordSetHash, 'QA feed: a second geopolitics story', 0, 'sanctions');
+    await page.goto(`${BASE}/dashboard`, {waitUntil: 'load'});
+    await page.locator(newsRail).waitFor({timeout: 30000});
+    check('a newer article re-lights the dot after the last look', NEWS_DOT.test(await newsLabel()), await newsLabel());
+    await page.goto(`${BASE}/news`, {waitUntil: 'load'});
+    await waitForDotCleared();
+    check('opening News clears it without a reload', (await newsLabel()) === 'News', await newsLabel());
+    await page.locator(newsRail).hover();
+    await newsCard.waitFor({timeout: 5000}).catch(() => {});
+    check('the card then says the look was just now', /Since you last looked · just now/i.test(await cardText()), await cardText());
+    await page.mouse.move(700, 500);
+
+    // --- below lg the drawer carries the same dot, and a drawer opened after the stamp is clear ---
+    // Its rows exist only while the sheet is open and it closes on every navigation, so the stamp
+    // always lands while they are gone; MobileNav, mounted all session, holds the cleared state.
+    // A full second after the last stamp: article times are whole seconds, the stamp is not.
+    await page.waitForTimeout(1100);
+    if (geo) await seedInto(geo.keywordSetHash, 'QA feed: a third geopolitics story', 0, 'sanctions');
+    await page.setViewportSize({width: 390, height: 844});
+    await page.goto(`${BASE}/dashboard`, {waitUntil: 'load'});
+    // The rail is display:none at this width but still in the DOM, so its sentence is read and
+    // waited on as at desktop width.
+    await page.locator(newsRail).waitFor({state: 'attached', timeout: 30000});
+    const drawerNews = '[data-slot="sheet-content"] a[href="/news"]';
+    const drawerLabel = async () => (await page.locator(drawerNews).getAttribute('aria-label')) ?? '';
+    await page.locator('button[aria-label="Open navigation"]').click();
+    await page.locator(drawerNews).waitFor({timeout: 5000}).catch(() => {});
+    check('below lg, the drawer row for News carries the dot and its sentence', NEWS_DOT.test(await drawerLabel()), await drawerLabel());
+    await page.locator(drawerNews).click();
+    await page.waitForURL(/\/news$/, {timeout: 15000}).catch(() => {});
+    await waitForDotCleared();
+    await page.locator('[data-slot="sheet-content"]').waitFor({state: 'detached', timeout: 5000}).catch(() => {});
+    await page.locator('button[aria-label="Open navigation"]').click();
+    await page.locator(drawerNews).waitFor({timeout: 5000}).catch(() => {});
+    check('a drawer opened after the stamp shows no dot, without a reload', (await drawerLabel()) === '', await drawerLabel());
+    await page.setViewportSize({width: 1440, height: 900});
+
+    await page.goto(`${BASE}/topics/ai-chips`, {waitUntil: 'load'});
+    await page.waitForTimeout(800);
     const railNav = await page.$$eval('aside.rail nav a', (as) => as.map((a) => a.getAttribute('aria-label')?.split(',')[0]));
     // All eight come from lib/shell/navigation.ts; the account pages are in the avatar menu.
     check('the rail runs Home · News · Markets … Learn', railNav.join(',') === 'Home,News,Markets,Trade,Portfolio,Strategies,Brain,Learn', railNav.join(','));
@@ -199,32 +298,17 @@ const settleToasts = async (page) => {
     // page, so a router.refresh() with a newer article must remount it. Seeded straight
     // into Mongo so it does not depend on Google News, and triggered by saving the topic
     // unchanged — same slug, same keyword set — which refreshes the page in place.
-    const qaUser = await db.collection('user').findOne({email});
-    const climate = await db.collection('topics').findOne({userId: String(qaUser?._id ?? ''), slug: 'climate-policy'});
+    const climate = await db.collection('topics').findOne({userId, slug: 'climate-policy'});
     check('the palette topic is stored', !!climate);
-    const seedArticle = (headline, ageSeconds) => db.collection('topicarticles').insertOne({
-        keywordSetHash: climate.keywordSetHash,
-        contentHash: Math.floor(Math.random() * 1e9),
-        headline,
-        summary: 'Seeded by the QA harness.',
-        url: `https://example.com/qa-feed-${Date.now()}-${ageSeconds}`,
-        source: QA_FEED_SOURCE,
-        sourceType: 'web',
-        datetime: Math.floor(Date.now() / 1000) - ageSeconds,
-        publishedDate: new Date().toISOString().slice(0, 10),
-        score: 12,
-        matchedTerms: ['climate policy'],
-        createdAt: new Date(),
-    });
     const OLD_HEADLINE = 'QA feed: the story already on screen';
     const NEW_HEADLINE = 'QA feed: a story that landed after the page loaded';
     const headlineShown = (h) => page.locator('.news-title', {hasText: h}).first()
         .waitFor({state: 'visible', timeout: 15000}).then(() => true, () => false);
     if (climate) {
-        await seedArticle(OLD_HEADLINE, 120);
+        await seedInto(climate.keywordSetHash, OLD_HEADLINE, 120, 'climate policy');
         await page.goto(`${BASE}/topics/climate-policy`, {waitUntil: 'load'});
         check('the seeded article is on the topic page', await headlineShown(OLD_HEADLINE));
-        await seedArticle(NEW_HEADLINE, 0);
+        await seedInto(climate.keywordSetHash, NEW_HEADLINE, 0, 'climate policy');
         await page.getByRole('button', {name: 'Topic actions'}).click();
         await page.getByRole('menuitem', {name: 'Edit keywords'}).click();
         await page.getByRole('button', {name: 'Save changes'}).click();

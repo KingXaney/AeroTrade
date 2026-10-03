@@ -1,5 +1,6 @@
 import Link from "next/link";
-import {MAX_TOPICS_PER_USER} from "@/lib/topics/config";
+import {formatCapped} from "@/lib/format";
+import {MAX_TOPICS_PER_USER, UNSEEN_COUNT_CAP} from "@/lib/topics/config";
 import {MAX_KEYWORDS} from "@/lib/news/keywords";
 import type {TopicsOverview} from '@/lib/topics/types';
 
@@ -12,7 +13,7 @@ const TopicsSettings = ({overview}: {overview: TopicsOverview}) => {
                 <p className="text-sm text-fg-soft">
                     {count === 0
                         ? "You're not following any topics yet."
-                        : `${count} of ${MAX_TOPICS_PER_USER} topics · ${overview.unseenTotal} new ${overview.unseenTotal === 1 ? 'article' : 'articles'}`}
+                        : `${count} of ${MAX_TOPICS_PER_USER} topics · ${formatCapped(overview.unseenTotal, UNSEEN_COUNT_CAP)} new ${overview.unseenTotal === 1 ? 'article' : 'articles'}`}
                 </p>
                 <Link href="/topics" className="label-type text-xs text-brand hover:underline">
                     {count === 0 ? 'Follow a topic →' : 'Manage topics →'}
@@ -26,7 +27,7 @@ const TopicsSettings = ({overview}: {overview: TopicsOverview}) => {
                                   className="inline-flex items-center gap-2 rounded-full border border-line-strong/20 bg-surface-2/40 px-3 py-1.5 text-xs text-fg transition-colors hover:border-brand/40 hover:text-brand">
                                 <span className="h-2 w-2 rounded-full" style={{background: t.color ?? 'var(--brand)'}} aria-hidden="true" />
                                 <span className="font-heading">{t.name}</span>
-                                {t.unseenCount > 0 && <span className="text-brand font-mono">{t.unseenCount}</span>}
+                                {t.unseenCount > 0 && <span className="text-brand font-mono">{formatCapped(t.unseenCount, UNSEEN_COUNT_CAP)}</span>}
                             </Link>
                         </li>
                     ))}

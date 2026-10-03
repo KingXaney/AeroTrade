@@ -205,6 +205,20 @@ try {
         && await briefing.locator('#news-briefing-stories [data-term="event-earnings"]').count() === 1);
     await shot('06-briefing');
 
+    // The rail's News card carries the same headline as a text node under the dated caveat. The
+    // card is portaled and mounted only while open, with no `data-briefing-*` or `#news-briefing`
+    // of its own, so the page-scoped checks above never see it. `/i`: the caveat is a MicroLabel,
+    // which a style may uppercase.
+    await page.locator('aside.rail a[data-rail="news"]').hover();
+    const railCard = page.locator('[data-rail-flyout="news"]');
+    await railCard.waitFor({timeout: 5000}).catch(() => {});
+    const railText = (await railCard.innerText().catch(() => '')).replace(/\n/g, ' ');
+    check("the rail's News card carries the briefing headline under the dated AI caveat",
+        /QA briefing headline/.test(railText)
+        && new RegExp(`${etDate} · AI summary · may contain errors`, 'i').test(railText)
+        && await railCard.locator('b').count() === 0, railText);
+    await page.mouse.move(700, 500);
+
     await page.goto(`${BASE}/`, {waitUntil: 'load'});
     await page.locator('#home-briefing').waitFor({timeout: 30000});
     check('Home shows the briefing too, as text',
@@ -222,6 +236,23 @@ try {
     await page.locator('#news-briefing').waitFor({timeout: 30000});
     check('hiding an outlet removes its citations and the point that stood on it alone',
         await briefing.locator('[data-briefing-bullet]').count() === 1 && !/QA Second Wire/.test(await briefing.innerText()));
+    // With every cited outlet hidden the briefing is absent on the page and in the rail's card alike.
+    await page.goto(`${BASE}/news?edit=1`, {waitUntil: 'load'});
+    for (const outlet of ['QA Briefing Wire', 'QA Third Wire']) {
+        await page.getByLabel('Add to Hidden outlets').fill(outlet);
+        await page.getByLabel('Add to Hidden outlets').press('Enter');
+    }
+    await page.locator('#news-feed-save').click();
+    await page.getByText('News feed saved').waitFor({timeout: 30000});
+    await settleToasts();
+    await page.goto(`${BASE}/news`, {waitUntil: 'load'});
+    await page.getByRole('heading', {name: 'News', level: 1}).waitFor({timeout: 30000});
+    await page.locator('aside.rail a[data-rail="news"]').hover();
+    await railCard.waitFor({timeout: 5000}).catch(() => {});
+    const railTextHidden = (await railCard.innerText().catch(() => '')).replace(/\n/g, ' ');
+    check('with every cited outlet hidden the briefing is absent on the page and in the card',
+        await page.locator('#news-briefing').count() === 0 && /Open the news/i.test(railTextHidden) && !/QA briefing headline/.test(railTextHidden), railTextHidden);
+    await page.mouse.move(700, 500);
     await db.collection('marketbriefings').deleteMany({writtenBy: 'qa'});
     await db.collection('userpreferences').updateOne({userId}, {$unset: {newsFeed: ''}});
 } catch (err) {

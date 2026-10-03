@@ -6,18 +6,25 @@ import AllTopicsHeader from "@/components/topics/AllTopicsHeader";
 import TopicFeed from "@/components/topics/TopicFeed";
 import TopicFeedEmpty from "@/components/topics/TopicFeedEmpty";
 import TopicsEmptyState from "@/components/topics/TopicsEmptyState";
+import NewsSeenMarker from "@/components/news/NewsSeenMarker";
 
 // The browser tab's title; app/layout.tsx appends the app's name.
 export const metadata: Metadata = {title: "Topics"};
 
 // The seed safety net, the first-run fetch and the brain's suggestions live in
-// getTopicsPageView (lib/topics/page-store.ts); the page only composes its view.
+// getTopicsPageView (lib/topics/page-store.ts); the page only composes its view. Opening the
+// index stamps "last opened News" (TopicsShell carries the marker; the empty state has no shell).
 const TopicsPage = async () => {
     const userId = await requireUserId();
     const view = await getTopicsPageView(userId);
 
     if (view.kind === 'empty') {
-        return <TopicsEmptyState brainSuggestions={view.brainSuggestions} canRestoreDefaults />;
+        return (
+            <>
+                <NewsSeenMarker />
+                <TopicsEmptyState brainSuggestions={view.brainSuggestions} canRestoreDefaults />
+            </>
+        );
     }
 
     const {overview, articles} = view;

@@ -28,7 +28,7 @@ const Layout = async ({children}: {children: React.ReactNode}) => {
                 initialTopics={shell.initialTopics}
                 navBadges={shell.navBadges}
             />
-            <Rail portfolio={shell.portfolio} topics={shell.topics} badges={shell.navBadges} />
+            <Rail portfolio={shell.portfolio} news={shell.news} badges={shell.navBadges} />
             <div className="pt-20 lg:ml-16 px-6 pb-8">
                 <SectionTabs badges={shell.navBadges} />
                 {children}

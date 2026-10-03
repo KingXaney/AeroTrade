@@ -87,6 +87,11 @@ export const formatTimeAgoMs = (epochMs: number) => {
 
 export const formatTimeAgoSeconds = (unixSeconds: number) => formatTimeAgoMs(unixSeconds * 1000);
 
+// A bounded count: the store counts to cap + 1 at most, so anything past the cap prints as "99+".
+// Here rather than at the call sites, so the no-hand-rolled-signs scan over components and app
+// stays clean.
+export const formatCapped = (count: number, cap: number): string => (count > cap ? `${cap}+` : String(count));
+
 // Formatted string like "$3.10T", "$900.00B", "$25.00M" or "$999999.99" (no thousands separator below a million)
 export function formatMarketCapValue(marketCapUsd: number): string {
     if (!Number.isFinite(marketCapUsd) || marketCapUsd <= 0) return 'N/A';

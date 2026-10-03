@@ -100,8 +100,17 @@ and friends keep none beyond Shared and the invariants).
   `match` names routes it owns that are not tabs (`/stocks/AAPL` lights Markets). Friends and
   Settings are `ACCOUNT_PAGES`, in the avatar menu. Every `href` is a page file — the test checks.
 - The rail never widens: a name is a tooltip, a summary (Portfolio, News) a portaled hover card,
-  and anything the reader must see without hovering — unread articles, a holding valued at
-  cost, a pending friend request — is a dot on the icon or the avatar (invariant 8).
+  and anything the reader must see without hovering — something new in a followed topic since
+  they last opened News, a holding valued at cost, a pending friend request — is a dot on the
+  icon or the avatar (invariant 8). The News card (`components/shell/NewsSidebarCard`, the pure
+  `lib/shell/sidebar.toSidebarNews`) is the day's briefing headline through the reader's outlet
+  filter, "since you last looked", and three topics with their newest allowed headline — never
+  "0 new". The dot's stamp is `newsSeenAt` in `database/models/user-preferences.model.ts`, written
+  once per visit by `components/news/NewsSeenMarker` (on `/news` and the `/topics` index) through
+  `lib/actions/news-feed.actions.markNewsSeen` and read with the outlet filter by
+  `lib/news/feed-store.getNewsReaderPrefs`; the stamp never revalidates — the shell clears its dot
+  from `lib/shell/news-seen` (the `aero:news-seen` window event, as `lib/chat/ask` opens the chat)
+  and settles on the next full load. The shell's own sentences are `lib/learn/copy/shell`.
 - The header repeats no section: logo, the one `components/shell/SearchCommand` trigger (which
   also finds pages, `searchPages`), the account menu. `components/chat/ChatWidget`'s button
   takes the bar's end at `lg`, which the header keeps clear.
@@ -267,6 +276,12 @@ and friends keep none beyond Shared and the invariants).
 - `lib/topics/feed-key` is the key both topics pages give `TopicFeed`, so a refresh with a new
   first page remounts it.
 - `lib/topics/rail.sortTopicsForRail` is the order of the /topics rail and the Topics widget.
+- What "new" means on every topic badge is `lib/topics/config.unseenFloor`: articles published
+  after the reader last opened the topic, counting back at most `UNSEEN_WINDOW_HOURS` (24, the
+  daily email's window), counted to `UNSEEN_COUNT_CAP` + 1 at most and printed through
+  `lib/format.formatCapped` ("99+"). `Topic.lastSeenAt` means only "the reader opened this topic":
+  `components/topics/TopicSeenMarker` stamps it on every topic view, and `lib/learn/facts-store`
+  reads it as the first-week step; the News dot has its own stamp (shell).
 
 ### learn
 

@@ -10,8 +10,8 @@ import RefreshTopicButton from "@/components/topics/RefreshTopicButton";
 import UnfollowTopicDialog from "@/components/topics/UnfollowTopicDialog";
 import {useTopicsUi} from "@/components/topics/TopicsShell";
 import {deleteTopic} from "@/lib/actions/topics.actions";
-import {refreshCooldownUntil} from "@/lib/topics/config";
-import {formatTimeAgoMs} from "@/lib/format";
+import {UNSEEN_COUNT_CAP, refreshCooldownUntil} from "@/lib/topics/config";
+import {formatCapped, formatTimeAgoMs} from "@/lib/format";
 import type {TopicOverviewItem} from '@/lib/topics/types';
 import Panel from '@/components/primitives/Panel';
 
@@ -43,7 +43,7 @@ const TopicHeader = ({topic, now}: {topic: TopicOverviewItem; now: number}) => {
                         <h2 className="text-xl font-semibold text-fg truncate font-heading">{topic.name}</h2>
                     </div>
                     <p className="text-[11px] text-fg-muted mt-1 font-mono">
-                        {topic.unseenCount} unseen · {topic.articleCount} tracked · {refreshed}
+                        {formatCapped(topic.unseenCount, UNSEEN_COUNT_CAP)} unseen · {topic.articleCount} tracked · {refreshed}
                     </p>
                 </div>
                 <div className="flex items-center gap-1 shrink-0">

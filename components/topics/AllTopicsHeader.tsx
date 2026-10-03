@@ -2,6 +2,8 @@
 
 import {Plus} from "lucide-react";
 import {useTopicsUi} from "@/components/topics/TopicsShell";
+import {formatCapped} from "@/lib/format";
+import {UNSEEN_COUNT_CAP} from "@/lib/topics/config";
 import Panel from "@/components/primitives/Panel";
 import ActionButton from "@/components/primitives/ActionButton";
 
@@ -12,7 +14,7 @@ const AllTopicsHeader = ({count, unseenTotal, preinstalled}: {count: number; uns
             <div>
                 <h2 className="text-xl font-semibold text-fg font-heading">All topics</h2>
                 <p className="text-[11px] text-fg-muted mt-1 font-mono">
-                    {count} followed · {unseenTotal} unseen
+                    {count} followed · {formatCapped(unseenTotal, UNSEEN_COUNT_CAP)} unseen
                 </p>
                 {/* Self-extinguishing: it disappears the moment the set stops being ours,
                     so there is no dismissal flag to store and nothing to keep in sync. */}

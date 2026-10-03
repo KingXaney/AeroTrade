@@ -1,12 +1,45 @@
 import {describe, expect, it} from 'vitest';
 import {
     REFRESH_COOLDOWN_MS,
+    UNSEEN_COUNT_CAP,
+    UNSEEN_WINDOW_HOURS,
+    UNSEEN_WINDOW_SECONDS,
     refreshCooldownMessage,
     refreshCooldownRemainingMs,
     refreshCooldownUntil,
+    unseenFloor,
 } from '@/lib/topics/config';
 
 const NOW = 1_800_000_000_000;
+const NOW_S = NOW / 1000;
+const HOUR_MS = 60 * 60 * 1000;
+
+// A topic never opened used to count every stored article, up to the TTL — "thousands unread" on
+// the rail. The count now starts at the later of the reader's last look and the window's start.
+describe('unseenFloor', () => {
+    it('counts back a day, the daily email\'s window, to at most 99+', () => {
+        expect(UNSEEN_WINDOW_HOURS).toBe(24);
+        expect(UNSEEN_WINDOW_SECONDS).toBe(24 * 60 * 60);
+        expect(UNSEEN_COUNT_CAP).toBe(99);
+    });
+
+    it('starts at the window when the topic was never opened', () => {
+        expect(unseenFloor(null, NOW_S)).toBe(NOW_S - UNSEEN_WINDOW_SECONDS);
+    });
+
+    it('starts at a recent look, in whole seconds', () => {
+        expect(unseenFloor(NOW - HOUR_MS, NOW_S)).toBe(Math.floor((NOW - HOUR_MS) / 1000));
+        expect(unseenFloor(NOW - HOUR_MS + 500, NOW_S)).toBe(Math.floor((NOW - HOUR_MS) / 1000));
+    });
+
+    it('lets the window win over an old look', () => {
+        expect(unseenFloor(NOW - 3 * 24 * HOUR_MS, NOW_S)).toBe(NOW_S - UNSEEN_WINDOW_SECONDS);
+    });
+
+    it('never counts from before a look, even one stamped ahead of this clock', () => {
+        expect(unseenFloor(NOW + HOUR_MS, NOW_S)).toBe(NOW_S + 3600);
+    });
+});
 
 describe('refreshCooldownRemainingMs', () => {
     it('is zero when there is no claim', () => {

@@ -2,11 +2,14 @@
 
 import Link from "next/link";
 import {cn} from "@/lib/utils";
-import {ACCOUNT_PAGES, NAV_SECTIONS, isActiveNav, sectionFor, type NavBadges} from "@/lib/shell/navigation";
+import {ACCOUNT_PAGES, NAV_SECTIONS, isActiveNav, sectionFor, type NavBadges, type NavSection} from "@/lib/shell/navigation";
+import {dotLabel} from "@/lib/learn/copy/shell";
 
 // The mobile drawer's rows: the rail's sections by name, then the account pages. A section's
 // other pages are the tabs on the page itself (SectionTabs), so the drawer stays as short as
-// the rail it stands in for.
+// the rail it stands in for. A section's dot is the rail's (same key, same sentence). This list
+// exists only while the drawer is open, so it listens for nothing itself: MobileNav, mounted for
+// the whole session, zeroes the News count once a News page stamps the look.
 type Props = {
     pathname: string;
     /** Counts to show; an absent or zero key renders nothing. */
@@ -21,16 +24,23 @@ const rowTone = (active: boolean) => active ? 'text-brand border-l-4 border-bran
 const NavList = ({pathname, badges = {}, onNavigate}: Props) => {
     const current = sectionFor(pathname);
     const requests = badges.friendRequests ?? 0;
+    const countFor = (section: NavSection): number => (section.badge ? badges[section.badge] ?? 0 : 0);
     return (
         <nav aria-label="Sections" className="space-y-1">
             {NAV_SECTIONS.map((section) => {
                 const active = current?.id === section.id;
+                const count = countFor(section);
                 return (
                     <Link key={section.id} href={section.pages[0].href} onClick={onNavigate}
+                          aria-label={count > 0 && section.badge ? `${section.label}, ${dotLabel(section.badge, count)}` : undefined}
                           aria-current={active ? 'page' : undefined} className={cn(ROW, rowTone(active))}>
                         <span className="material-symbols-outlined" aria-hidden="true"
                               style={active ? {fontVariationSettings: "'FILL' 1"} : undefined}>{section.icon}</span>
                         <span>{section.label}</span>
+                        {count > 0 && (
+                            <span aria-hidden="true"
+                                  className={cn('ml-auto size-2 rounded-full', section.badge === 'unpriced' ? 'bg-warning' : 'bg-brand')}/>
+                        )}
                     </Link>
                 );
             })}

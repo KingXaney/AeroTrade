@@ -6,10 +6,13 @@ import {getNewsPageView} from "@/lib/news/page-store";
 import {describeNewsFeed} from "@/lib/news/feed-prefs";
 import {eventBadge, eventTermsShown} from "@/lib/brain/event-types";
 import {NEWS_COPY} from "@/lib/learn/copy/news";
+import {formatCapped} from "@/lib/format";
+import {UNSEEN_COUNT_CAP} from "@/lib/topics/config";
 import ArticleCard from "@/components/news/ArticleCard";
 import NewsArticleCard from "@/components/news/NewsArticleCard";
 import NewsBriefing from "@/components/news/NewsBriefing";
 import NewsFeedEditor from "@/components/news/NewsFeedEditor";
+import NewsSeenMarker from "@/components/news/NewsSeenMarker";
 import WhatTheseMean from "@/components/learn/WhatTheseMean";
 import Badge from "@/components/primitives/Badge";
 import Disclosure from "@/components/primitives/Disclosure";
@@ -42,6 +45,7 @@ const NewsPage = async ({searchParams}: NewsPageProps) => {
     return (
         <div className="space-y-4">
             <PageTitle title="News" subtitle={<span id="news-feed-summary">{describeNewsFeed(prefs)}</span>} />
+            <NewsSeenMarker />
 
             <NewsFeedEditor initial={prefs} startOpen={edit === '1'} />
 
@@ -71,7 +75,11 @@ const NewsPage = async ({searchParams}: NewsPageProps) => {
                                     <Link href={`/topics/${topic.slug}`} className="font-heading text-base font-semibold text-fg transition-colors hover:text-brand">
                                         {topic.name}
                                     </Link>
-                                    {topic.unseenCount > 0 && <Badge tone="brand" shape="pill" aria-label={`${topic.unseenCount} unseen`}>{topic.unseenCount}</Badge>}
+                                    {topic.unseenCount > 0 && (
+                                        <Badge tone="brand" shape="pill" aria-label={`${formatCapped(topic.unseenCount, UNSEEN_COUNT_CAP)} unseen`}>
+                                            {formatCapped(topic.unseenCount, UNSEEN_COUNT_CAP)}
+                                        </Badge>
+                                    )}
                                 </div>
                                 {/* The brief is model output: plain text, with the caveat every brief carries. */}
                                 {topic.brief && (

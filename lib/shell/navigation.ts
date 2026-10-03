@@ -9,7 +9,9 @@
 //
 // Pure module: no React, no DB, no next/navigation. Tested in lib/shell/__tests__/navigation.test.ts.
 
-type NavBadgeKey = 'watchlist' | 'friendRequests' | 'topicsUnseen' | 'unpriced';
+// A count the caller supplies. Above zero it is a dot on a rail icon (newsNew, unpriced) or a number
+// beside a label (watchlist on its tab, friendRequests in the account menu).
+export type NavBadgeKey = 'watchlist' | 'friendRequests' | 'newsNew' | 'unpriced';
 
 export type NavPage = {
     href: string;
@@ -29,10 +31,13 @@ export type NavSection = {
     pages: readonly NavPage[];
     /** Route prefixes that light this section without being a tab. */
     match?: readonly string[];
-    /** A count that puts a dot on the rail icon when it is above zero. */
+    /**
+     * A count that puts a dot on the rail icon when it is above zero — for News, how many followed
+     * topics have an article newer than the reader's last look (lib/shell/sidebar.ts).
+     */
     badge?: NavBadgeKey;
     /** The summary the rail shows on hover, where the sidebar's cards used to sit. */
-    flyout?: 'topics' | 'portfolio';
+    flyout?: 'news' | 'portfolio';
 };
 
 export const NAV_SECTIONS: readonly NavSection[] = [
@@ -44,7 +49,7 @@ export const NAV_SECTIONS: readonly NavSection[] = [
         ],
     },
     {
-        id: 'news', label: 'News', icon: 'feed', badge: 'topicsUnseen', flyout: 'topics',
+        id: 'news', label: 'News', icon: 'feed', badge: 'newsNew', flyout: 'news',
         pages: [
             {href: '/news', label: 'Headlines', icon: 'feed'},
             {href: '/topics', label: 'Topics', icon: 'interests'},
