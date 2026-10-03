@@ -4,8 +4,10 @@
 
 import {connectToDatabase} from "@/database/mongoose";
 import PuzzleSolve from "@/database/models/puzzle-solve.model";
+import GameRound from "@/database/models/game-round.model";
 import {getEasternDateString} from "@/lib/dates";
 import {streakFrom, type Streak} from "@/lib/games/streak";
+import {HIGHER_IS_RECORD, type GameId} from "@/lib/games/rounds";
 import {
     archiveRows,
     contextFor,
@@ -99,4 +101,19 @@ export const getDailyPuzzleCard = async (userId: string): Promise<DailyPuzzleCar
     if (!view) return {puzzle: null, status: null, streak: await readStreak(userId)};
     const {id, number, title, category, difficulty} = view.puzzle;
     return {puzzle: {id, number, title, category, difficulty}, status: view.progress.status, streak: view.streak};
+};
+
+// A scored game's record and its last rounds for one settings key: one sorted point read for the
+// record (either end, by the game), one bounded read for the sparkline.
+export const RECENT_ROUNDS = 20;
+
+export type GameSummary = {record: number | null; recent: number[]};
+
+export const readGameSummary = async (userId: string, game: GameId, key: string): Promise<GameSummary> => {
+    await connectToDatabase();
+    const [top, recent] = await Promise.all([
+        GameRound.findOne({userId, game, key}).sort({score: HIGHER_IS_RECORD[game] ? -1 : 1}).select({_id: 0, score: 1}).lean<{score: number} | null>(),
+        GameRound.find({userId, game, key}).sort({finishedAt: -1}).limit(RECENT_ROUNDS).select({_id: 0, score: 1}).lean<{score: number}[]>(),
+    ]);
+    return {record: top?.score ?? null, recent: recent.map((round) => round.score).reverse()};
 };

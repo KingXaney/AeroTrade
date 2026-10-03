@@ -219,8 +219,104 @@ try {
     check('the hub fits a phone too', await pageD.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth + 1));
     await pageD.screenshot({path: `${OUT}05-hub-phone.png`, fullPage: true});
 
+    // --- user E: the arithmetic sprint, its custom mode and interview mode -------------------
+    // A round runs on the page's own clock; Playwright's fake clock, installed after the page has
+    // loaded, ends a two-minute round at once. The suite works each problem out from its text.
+    const solveText = (text) => {
+        const fractions = /^(\d+)\/(\d+) \+ (\d+)\/(\d+)$/.exec(text);
+        if (fractions) return Number(fractions[1]) / Number(fractions[2]) + Number(fractions[3]) / Number(fractions[4]);
+        const percent = /^([\d.]+)% of (\d+)$/.exec(text);
+        if (percent) return (Number(percent[1]) * Number(percent[2])) / 100;
+        if (/²$/.test(text)) return Number(text.slice(0, -1)) ** 2;
+        if (text.startsWith('√')) return Math.sqrt(Number(text.slice(1)));
+        const [a, op, b] = text.split(' ');
+        return {'+': Number(a) + Number(b), '−': Number(a) - Number(b), '×': Number(a) * Number(b), '÷': Number(a) / Number(b)}[op];
+    };
+    const optionValue = (option) => (option.includes('/') ? Number(option.split('/')[0]) / Number(option.split('/')[1]) : Number(option));
+    const rounds = db.collection('gamerounds');
+    const pageE = await browser.newPage({viewport: {width: 1440, height: 900}});
+    pageE.on('pageerror', (error) => errors.push(String(error)));
+    // Installed once, before any page loads; it runs at real speed until fastForward jumps it.
+    await pageE.clock.install();
+    const userE = await userIdFor(await signUp(pageE, 'gamesE', {stay: true}));
+    await pageE.goto(`${BASE}/games`, {waitUntil: 'load'});
+    check('the hub has the arithmetic sprint, no record yet', /no round yet/i.test(await pageE.locator('[data-game-card="arithmetic"]').innerText()));
+    await pageE.goto(`${BASE}/games/arithmetic`, {waitUntil: 'networkidle'});
+    await pageE.locator('[data-arithmetic-lobby="sprint"]').waitFor({timeout: 30000});
+    check('the sprint opens on Zetamac\'s defaults', /2–100/.test(await pageE.locator('[data-arithmetic-lobby]').innerText()));
+    const playSprint = async (answers) => {
+        await pageE.locator('[data-round-start], [data-round-again]').first().click();
+        await pageE.locator('[data-problem-text]').waitFor({timeout: 15000});
+        for (let i = 0; i < answers; i++) {
+            const text = await pageE.locator('[data-problem-text]').innerText();
+            await pageE.locator('[data-arithmetic-answer]').fill(String(solveText(text)));
+            await pageE.locator(`[data-round-score="${i + 1}"]`).waitFor({timeout: 15000});
+        }
+        await pageE.clock.fastForward(121_000);
+        await pageE.locator('[data-arithmetic-done]').waitFor({timeout: 15000});
+        await pageE.locator('[data-round-record]').waitFor({timeout: 15000});
+    };
+    await playSprint(12);
+    check('a right answer moves on at once, and the round ends on the clock', await pageE.locator('[data-round-final="12"]').count() === 1);
+    check('…its first round is a new record', await pageE.locator('[data-round-record="true"]').count() === 1);
+    const sprintRow = await rounds.findOne({userId: userE, game: 'arithmetic'});
+    check('…kept under the defaults with its counts', sprintRow?.key === 'zetamac' && sprintRow.score === 12
+        && Object.values(sprintRow.detail).reduce((a, b) => a + b, 0) === 12 && sprintRow.durationMs <= 120_000, JSON.stringify(sprintRow?.detail));
+    await pageE.screenshot({path: `${OUT}06-sprint-done.png`, fullPage: true});
+    await playSprint(5);
+    check('a lower round keeps the record', await pageE.locator('[data-round-record="false"]').count() === 1
+        && /record: 12/i.test(await pageE.locator('[data-arithmetic-done]').innerText()));
+    check('…and the last rounds draw a line', await pageE.locator('[data-arithmetic-done] [data-sparkline="2"]').count() === 1);
+
+    await pageE.goto(`${BASE}/games/arithmetic?mode=custom`, {waitUntil: 'networkidle'});
+    await pageE.locator('[data-custom-settings]').waitFor({timeout: 30000});
+    await pageE.locator('[data-range="addLeft-min"]').fill('90');
+    await pageE.locator('[data-range="addLeft-max"]').fill('10');
+    await pageE.locator('[data-round-start]').click();
+    check('settings that cannot make a round say so', /cannot make a round/i.test(await pageE.locator('[data-custom-invalid]').innerText()));
+    await pageE.locator('[data-range="addLeft-min"]').fill('2');
+    await pageE.locator('[data-range="addLeft-max"]').fill('100');
+    for (const op of ['add', 'subtract', 'divide']) await pageE.locator(`[data-operation="${op}"]`).uncheck();
+    await pageE.locator('[data-duration]').selectOption('30');
+    await pageE.locator('[data-round-start]').click();
+    await pageE.locator('[data-problem-text]').waitFor({timeout: 15000});
+    check('a custom round asks only what was chosen', /×/.test(await pageE.locator('[data-problem-text]').innerText()));
+    await pageE.locator('[data-arithmetic-answer]').fill(String(solveText(await pageE.locator('[data-problem-text]').innerText())));
+    await pageE.clock.fastForward(31_000);
+    await pageE.locator('[data-round-record]').waitFor({timeout: 15000});
+    const customRow = await rounds.findOne({userId: userE, game: 'arithmetic', key: {$ne: 'zetamac'}});
+    check('…and keeps its record under its own settings', customRow?.key === 'ops=m;add=2-100x2-100;mul=2-12x2-100;t=30' && customRow.score === 1, customRow?.key);
+
+    await pageE.goto(`${BASE}/games/arithmetic?mode=interview`, {waitUntil: 'networkidle'});
+    await pageE.locator('[data-arithmetic-lobby="interview"]').waitFor({timeout: 30000});
+    await pageE.locator('[data-round-start]').click();
+    let rightPicked = 0;
+    for (let i = 0; i < 5; i++) {
+        await pageE.locator(`[data-interview-question="${i}"]`).waitFor({timeout: 15000});
+        const truth = solveText(await pageE.locator('[data-question-text]').innerText());
+        const options = await pageE.locator('[data-option]').allInnerTexts();
+        const rightIndex = options.findIndex((text) => Math.abs(optionValue(text.replace(/^\d\s*/, '').trim()) - truth) < 1e-6);
+        // Three right by keyboard, two wrong.
+        const pick = i < 3 ? rightIndex : (rightIndex + 1) % 5;
+        if (i < 3 && rightIndex >= 0) rightPicked++;
+        await pageE.keyboard.press(String(pick + 1));
+    }
+    await pageE.locator('[data-interview-question="5"]').waitFor({timeout: 15000});
+    await pageE.keyboard.press('Meta+k');
+    await pageE.waitForSelector('[cmdk-input]', {timeout: 15000});
+    check('⌘K still opens search mid-round, and is not an answer', await pageE.locator('[data-interview-question="5"]').count() === 1);
+    await pageE.keyboard.press('Escape');
+    await pageE.locator('[data-round-stop]').click();
+    await pageE.locator('[data-round-record]').waitFor({timeout: 15000});
+    const interviewRow = await rounds.findOne({userId: userE, game: 'interview'});
+    check('the interview mode counts keys 1–5, right and wrong', rightPicked === 3 && interviewRow?.score === 3 && interviewRow.wrong === 2
+        && /2 wrong/.test(await pageE.locator('[data-arithmetic-done]').innerText()), JSON.stringify({rightPicked, score: interviewRow?.score, wrong: interviewRow?.wrong}));
+    await pageE.goto(`${BASE}/games`, {waitUntil: 'load'});
+    const card = await pageE.locator('[data-game-card="arithmetic"]').innerText();
+    check('the hub shows both records', /Sprint record\s*12/i.test(card) && /Interview record\s*3/i.test(card), card.replace(/\s+/g, ' '));
+
     // --- every page in plain words ---------------------------------------------------------
-    for (const path of ['/games', '/games/puzzle', '/games/puzzles']) {
+    for (const path of ['/games', '/games/puzzle', '/games/puzzles', '/games/arithmetic', '/games/arithmetic?mode=interview']) {
         await page.goto(`${BASE}${path}`, {waitUntil: 'load'});
         const banned = findBanned(await page.locator('main').innerText().catch(() => page.locator('body').innerText()), 'copy');
         check(`${path} reads as description, never advice`, banned.length === 0, banned.join(', '));

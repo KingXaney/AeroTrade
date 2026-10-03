@@ -4,15 +4,17 @@ import {revalidatePath} from "next/cache";
 import {z} from "zod";
 import {connectToDatabase} from "@/database/mongoose";
 import PuzzleSolve from "@/database/models/puzzle-solve.model";
+import GameRound from "@/database/models/game-round.model";
 import {getCurrentUserId} from "@/lib/auth/session";
 import {takeRateLimit} from "@/lib/rate-limit";
 import {getEasternDateString} from "@/lib/dates";
 import {ANSWER_MAX_CHARS, checkAnswer, type AnswerCheck} from "@/lib/games/answer";
 import {contextFor, progressFor, type PuzzleContext} from "@/lib/games/puzzles";
-import {readSolveRow, readSolvedDays} from "@/lib/games/store";
+import {readGameSummary, readSolveRow, readSolvedDays} from "@/lib/games/store";
+import {isNewRecord, keptRound} from "@/lib/games/rounds";
 import {streakFrom, type Streak} from "@/lib/games/streak";
 import type {PuzzleProgress} from "@/lib/games/types";
-import {PUZZLE_COPY} from "@/lib/learn/copy/games";
+import {ARITHMETIC_COPY, PUZZLE_COPY} from "@/lib/learn/copy/games";
 
 // The daily puzzle's writes. Every answer is checked here, on the server: the answer key never
 // reaches the page until the puzzle is solved or revealed. Each write is one atomic update
@@ -141,5 +143,32 @@ export const revealPuzzleSolution = async (input: unknown): Promise<PuzzleAction
     } catch (error) {
         console.error('Error revealing a puzzle solution:', error);
         return {success: false, message: PUZZLE_COPY.notSaved};
+    }
+};
+
+// A finished round of a scored game, reported by the page that counted it. Kept only when a
+// person could have played it (lib/games/rounds.keptRound); the record is read back from the rows.
+const ROUNDS_PER_MINUTE = 20;
+
+export type RoundActionResult =
+    | {success: true; record: number | null; isRecord: boolean; recent: number[]}
+    | {success: false; message: string};
+
+export const recordGameRound = async (input: unknown): Promise<RoundActionResult> => {
+    const userId = await getCurrentUserId();
+    if (!userId) return {success: false, message: PUZZLE_COPY.notSignedIn};
+    const round = keptRound(input);
+    if (!round) return {success: false, message: ARITHMETIC_COPY.notKept};
+    try {
+        if (!(await takeRateLimit(`games:round:${userId}`, ROUNDS_PER_MINUTE, 60_000))) return {success: false, message: ARITHMETIC_COPY.tooFast};
+        await connectToDatabase();
+        const before = await readGameSummary(userId, round.game, round.key);
+        await GameRound.create({...round, userId, day: getEasternDateString(), finishedAt: new Date()});
+        const after = await readGameSummary(userId, round.game, round.key);
+        revalidatePath('/games', 'layout');
+        return {success: true, record: after.record, isRecord: isNewRecord(round.game, round.score, before.record), recent: after.recent};
+    } catch (error) {
+        console.error('Error recording a game round:', error);
+        return {success: false, message: ARITHMETIC_COPY.notSaved};
     }
 };

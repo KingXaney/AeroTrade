@@ -1,9 +1,10 @@
 import type {Metadata} from "next";
 import Link from "next/link";
 import {requireUserId} from "@/lib/auth/session";
-import {getDailyPuzzleCard, getPuzzleArchive} from "@/lib/games/store";
-import {ARCHIVE_COPY, GAMES_COPY} from "@/lib/learn/copy/games";
+import {getDailyPuzzleCard, getPuzzleArchive, readGameSummary} from "@/lib/games/store";
+import {ARCHIVE_COPY, ARITHMETIC_COPY, GAMES_COPY} from "@/lib/learn/copy/games";
 import DailyPuzzleCard from "@/components/games/DailyPuzzleCard";
+import GameCard from "@/components/games/GameCard";
 import StreakPanel from "@/components/games/StreakPanel";
 import PageTitle from "@/components/primitives/PageTitle";
 import Panel from "@/components/primitives/Panel";
@@ -17,7 +18,13 @@ export const metadata: Metadata = {title: "Games"};
 // with the way in. The one place the app keeps a score (lib/learn/copy/games.ts says why).
 const GamesPage = async () => {
     const userId = await requireUserId();
-    const [card, archive] = await Promise.all([getDailyPuzzleCard(userId), getPuzzleArchive(userId)]);
+    const [card, archive, sprint, interview] = await Promise.all([
+        getDailyPuzzleCard(userId),
+        getPuzzleArchive(userId),
+        readGameSummary(userId, 'arithmetic', 'zetamac'),
+        readGameSummary(userId, 'interview', 'interview'),
+    ]);
+    const recordStat = (label: string, record: number | null) => ({label, value: record === null ? '—' : record.toLocaleString('en-US'), hint: record === null ? ARITHMETIC_COPY.cardNone : undefined});
     const solved = archive.filter((row) => row.status === 'solved').length;
 
     return (
@@ -37,6 +44,14 @@ const GamesPage = async () => {
                         <Link href="/games/puzzles" className={actionButton({variant: 'secondary', size: 'md'})}>{GAMES_COPY.archiveLink}</Link>
                     </div>
                 </Panel>
+                <GameCard
+                    id="arithmetic"
+                    title={ARITHMETIC_COPY.cardTitle}
+                    body={ARITHMETIC_COPY.cardBody}
+                    stats={[recordStat(ARITHMETIC_COPY.cardSprint, sprint.record), recordStat(ARITHMETIC_COPY.cardInterview, interview.record)]}
+                    href="/games/arithmetic"
+                    cta={ARITHMETIC_COPY.play}
+                />
             </div>
         </div>
     );

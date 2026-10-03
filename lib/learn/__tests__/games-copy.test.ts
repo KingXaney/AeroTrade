@@ -3,7 +3,7 @@
 
 import {describe, expect, it} from 'vitest';
 import {findBanned} from '@/lib/learn/banned';
-import {ARCHIVE_COPY, GAMES_COPY, PUZZLE_CATEGORY_LABEL, PUZZLE_COPY, PUZZLE_DIFFICULTY_LABEL, STREAK_COPY} from '@/lib/learn/copy/games';
+import {ARCHIVE_COPY, ARITHMETIC_COPY, GAMES_COPY, PUZZLE_CATEGORY_LABEL, PUZZLE_COPY, PUZZLE_DIFFICULTY_LABEL, STREAK_COPY} from '@/lib/learn/copy/games';
 
 const clean = (text: string) => {
     expect(text, text).not.toMatch(/undefined|NaN|null|\[object|Infinity/);
@@ -15,7 +15,7 @@ const strings = (table: object): string[] =>
 
 describe('the games copy', () => {
     it('says every fixed line in plain words', () => {
-        for (const table of [GAMES_COPY, STREAK_COPY, PUZZLE_COPY, ARCHIVE_COPY, PUZZLE_CATEGORY_LABEL, PUZZLE_DIFFICULTY_LABEL]) {
+        for (const table of [GAMES_COPY, STREAK_COPY, PUZZLE_COPY, ARCHIVE_COPY, ARITHMETIC_COPY, PUZZLE_CATEGORY_LABEL, PUZZLE_DIFFICULTY_LABEL]) {
             for (const text of strings(table)) clean(text);
         }
     });
@@ -28,6 +28,9 @@ describe('the games copy', () => {
         }
         for (const [attempts, hints] of [[1, 0], [2, 1], [5, 3]]) clean(PUZZLE_COPY.solvedLine('Oct 3, 9:14 PM ET', attempts, hints));
         clean(STREAK_COPY.dayLabel('2026-10-03', true));
+        for (const n of [0, 1, 48, 1200]) [ARITHMETIC_COPY.correct(n), ARITHMETIC_COPY.wrong(n), ARITHMETIC_COPY.record(n), ARITHMETIC_COPY.questionOf(n, 80)].forEach(clean);
+        for (const seconds of [0, 0.4, 59.5, 120, 600]) [ARITHMETIC_COPY.timeLeft(seconds), ARITHMETIC_COPY.perProblem(seconds)].forEach(clean);
+        for (const d of [30, 60, 120, 300, 600]) clean(ARITHMETIC_COPY.duration(d));
         clean(ARCHIVE_COPY.posted('2026-09-28'));
     });
 
@@ -40,5 +43,10 @@ describe('the games copy', () => {
         expect(PUZZLE_COPY.solvedLine('Oct 3, 9:14 PM ET', 1, 0)).toBe('Solved Oct 3, 9:14 PM ET · 1 try');
         expect(STREAK_COPY.chipAria(0, false)).toBe("Today's puzzle, not solved yet");
         expect(STREAK_COPY.weekdays).toHaveLength(7);
+        expect(ARITHMETIC_COPY.timeLeft(119.2)).toBe('2:00 left');
+        expect(ARITHMETIC_COPY.timeLeft(9)).toBe('0:09 left');
+        expect(ARITHMETIC_COPY.timeLeft(-3)).toBe('0:00 left');
+        expect(ARITHMETIC_COPY.duration(30)).toBe('30 s');
+        expect(ARITHMETIC_COPY.duration(120)).toBe('2 min');
     });
 });

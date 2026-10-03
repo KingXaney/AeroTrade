@@ -50,6 +50,7 @@ const SIGNED_IN = [
     ['games', '/games'],
     ['games-puzzle', '/games/puzzle'],
     ['games-archive', '/games/puzzles'],
+    ['games-arithmetic', '/games/arithmetic'],
     ['strategies', '/strategies'],
     ['strategy-rsi2', '/strategies/rsi2-mean-reversion'],
     ['strategy-buy-and-hold', '/strategies/buy-and-hold-spy'],
