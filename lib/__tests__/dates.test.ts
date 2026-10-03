@@ -1,5 +1,5 @@
 import {describe, expect, it} from 'vitest';
-import {addCalendarDays, eachCalendarDay, getEasternDateString, getEasternWeekKey} from '@/lib/dates';
+import {addCalendarDays, calendarDaysBetween, eachCalendarDay, getEasternDateString, getEasternWeekKey} from '@/lib/dates';
 
 describe('addCalendarDays', () => {
     it('moves a date label by whole days across month and year ends', () => {
@@ -12,6 +12,22 @@ describe('addCalendarDays', () => {
     it('is not moved by a DST change', () => {
         expect(addCalendarDays('2026-03-07', 1)).toBe('2026-03-08');
         expect(addCalendarDays('2026-11-01', 1)).toBe('2026-11-02');
+    });
+});
+
+describe('calendarDaysBetween', () => {
+    it('counts whole days either way, across year ends, leap days and DST', () => {
+        expect(calendarDaysBetween('2026-09-28', '2026-10-03')).toBe(5);
+        expect(calendarDaysBetween('2026-10-03', '2026-09-28')).toBe(-5);
+        expect(calendarDaysBetween('2026-12-31', '2027-01-01')).toBe(1);
+        expect(calendarDaysBetween('2024-02-28', '2024-03-01')).toBe(2);
+        expect(calendarDaysBetween('2026-03-07', '2026-03-09')).toBe(2);
+        expect(calendarDaysBetween('2026-10-31', '2026-11-02')).toBe(2);
+        expect(calendarDaysBetween('2026-10-03', '2026-10-03')).toBe(0);
+    });
+
+    it('undoes addCalendarDays', () => {
+        for (const n of [-400, -1, 0, 1, 59, 365, 1000]) expect(calendarDaysBetween('2026-01-15', addCalendarDays('2026-01-15', n))).toBe(n);
     });
 });
 

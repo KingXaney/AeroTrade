@@ -12,6 +12,7 @@ import {COURSE_COPY} from "@/lib/learn/copy/learn";
 import {getCourseProgress} from "@/lib/learn/course-store";
 import {NEWS_COPY} from "@/lib/learn/copy/news";
 import MarketStatus from "@/components/stocks/MarketStatus";
+import StreakChip from "@/components/games/StreakChip";
 import HomeAccounts from "@/components/home/HomeAccounts";
 import TopicsOverview from "@/components/dashboard/widgets/topics/TopicsOverview";
 import TopicBriefsList from "@/components/dashboard/widgets/topics/TopicBriefsList";
@@ -65,7 +66,12 @@ const Home = async ({searchParams}: HomeProps) => {
             <PageTitle
                 title={HOME_COPY.greeting(user.name)}
                 subtitle={HOME_COPY.subtitle}
-                actions={<MarketStatus status={view.market}/>}
+                actions={(
+                    <div className="flex flex-wrap items-center gap-3">
+                        <StreakChip {...view.streak}/>
+                        <MarketStatus status={view.market}/>
+                    </div>
+                )}
             />
 
             <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
