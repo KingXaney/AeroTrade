@@ -8,7 +8,7 @@
 import {describe, expect, it} from 'vitest';
 import {ADVISOR_SYSTEM_PROMPT} from '@/lib/chat/system-prompt';
 import {TOOL_DESCRIPTIONS} from '@/lib/chat/tool-copy';
-import {CHAT_SUGGESTIONS, CHAT_WELCOME_MESSAGE} from '@/lib/learn/copy/chat';
+import {CHAT_SUGGESTIONS, CHAT_USAGE_COPY, CHAT_WELCOME_MESSAGE} from '@/lib/learn/copy/chat';
 import {NEWS_SUMMARY_EMAIL_PROMPT, PERSONALIZED_WELCOME_EMAIL_PROMPT} from '@/lib/email/prompts';
 import {RATIONALE_PROMPT} from '@/lib/navigator/prompts';
 import {MARKET_BRIEFING_PROMPT} from '@/lib/news/prompts';
@@ -51,6 +51,23 @@ describe('advice voice', () => {
             expect(findBanned(chip, 'copy'), chip).toEqual([]);
         }
         expect(CHAT_SUGGESTIONS).toContain("What's new in my topics?");
+    });
+
+    it('keeps the usage caption descriptive and unlike the error copy', () => {
+        const samples = [
+            CHAT_USAGE_COPY.day(42, 60), CHAT_USAGE_COPY.day(0, 60), CHAT_USAGE_COPY.shared(180, 200), CHAT_USAGE_COPY.shared(0, 200),
+            CHAT_USAGE_COPY.hour(0), CHAT_USAGE_COPY.hour(12), CHAT_USAGE_COPY.resets('2h 10m'),
+        ];
+        for (const text of samples) {
+            expect(findBanned(text, 'copy'), text).toEqual([]);
+            expect(text, text).not.toMatch(/undefined|NaN|null|Infinity/);
+            // qa-chat and qa-chat-tutor find the error box by this copy; the caption must never read like it.
+            expect(text, text).not.toMatch(/connection|couldn.t finish|unavailable|a lot of messages|shared budget/i);
+        }
+        expect(CHAT_USAGE_COPY.day(42, 60)).toBe('42 of 60 messages left today');
+        expect(CHAT_USAGE_COPY.shared(180, 200)).toBe('180 of 200 shared');
+        expect(CHAT_USAGE_COPY.hour(5)).toBe('5 left this hour');
+        expect(CHAT_USAGE_COPY.resets('2h 10m')).toBe('resets in 2h 10m');
     });
 
     it('names every tool in the advisor prompt', () => {

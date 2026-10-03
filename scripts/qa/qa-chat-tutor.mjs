@@ -1,5 +1,6 @@
 // The chat as tutor, keyless (lib/chat, the chat's rate limits): the three rate-limit windows
-// refuse in order with honest copy and no retry, an "Ask in chat" link prefills the composer
+// refuse in order with honest copy and no retry, the panel's caption says what is left of them
+// from the same rows without spending one, an "Ask in chat" link prefills the composer
 // without sending, and the explainTerm and getQuantStrategies chips render from stubbed
 // UI-message streams. The tutor's actual answers need a Gemini key and are checked by hand.
 // Run: npm run qa -- chat-tutor   (the harness: README.md)
@@ -42,15 +43,35 @@ try {
         await composer().press('Enter');
     };
     const errorBox = () => dialog.locator('p').filter({hasText: /assistant|messages|budget|connection|finish/i}).last();
+    // The usage caption is a <div>, so the <p> locators above never see it.
+    const USAGE = () => dialog.locator('[data-chat-usage]');
+    const WINDOW_KEYS = {key: {$in: [`chat:${userId}`, `chat:${userId}:day`, 'chat:global']}};
+
+    // --- the caption: read, never spent ---------------------------------------------------
+    await limits.deleteMany(WINDOW_KEYS);
+    await openChat();
+    // The first read also compiles the route under next dev.
+    await USAGE().filter({hasText: /^60 of 60 messages left today · 200 of 200 shared$/i}).waitFor({timeout: 30000});
+    check('a fresh account sees its whole day allowance and the shared budget, with no reset to report', true);
+    check('reading the caption opened no window', await limits.countDocuments(WINDOW_KEYS) === 0);
 
     // --- the user's hour --------------------------------------------------------------------
-    await limits.deleteMany({key: {$in: [`chat:${userId}`, `chat:${userId}:day`, 'chat:global']}});
     await limits.insertOne(windowRow(`chat:${userId}`, 30, 3_600_000));
+    // The panel re-reads on open.
+    await dialog.locator('button[title="Close"]').click();
+    await dialog.waitFor({state: 'detached', timeout: 5000});
+    await openChat();
+    // Anchored and with the separator: "60 of 60" contains "0 of 60", "200 of 200" contains "0 of 200".
+    await USAGE().filter({hasText: /^60 of 60 messages left today · 200 of 200 shared · 0 left this hour · resets in/i}).waitFor({timeout: 15000});
+    check('opening the chat on a spent hour says so before anything is sent', await USAGE().getAttribute('data-chat-usage') === 'hour');
+    check('the peek left the seeded count alone', (await limits.findOne({key: `chat:${userId}`}))?.count === 30);
     await send('hello');
     await dialog.locator('p').filter({hasText: LIMITED}).waitFor({timeout: 30000});
     check('the 31st message in an hour is refused with the hour copy', true);
     check('no retry is offered for a refused request', await dialog.getByRole('button', {name: /try again/i}).count() === 0);
     check('the refused request still counted', (await limits.findOne({key: `chat:${userId}`}))?.count === 31);
+    await USAGE().filter({hasText: /^60 of 60 messages left today · 200 of 200 shared · 0 left this hour/i}).waitFor({timeout: 15000});
+    check('a refused message leaves the day allowance whole and the hour at zero', true);
     await shot('01-hour-limit');
 
     // --- the user's day, then everyone's --------------------------------------------------
@@ -60,6 +81,8 @@ try {
     await send('hello again');
     await dialog.locator('p').filter({hasText: LIMITED}).waitFor({timeout: 30000});
     check('the daily window refuses too, before the shared budget is touched', (await limits.findOne({key: 'chat:global'})) === null);
+    await USAGE().filter({hasText: /^0 of 60 messages left today · 200 of 200 shared · resets in/i}).waitFor({timeout: 15000});
+    check('the caption shows the spent day window', await USAGE().getAttribute('data-chat-usage') === 'day');
 
     await limits.deleteMany({key: `chat:${userId}:day`});
     await limits.insertOne(windowRow('chat:global', 200, 86_400_000));
@@ -67,15 +90,19 @@ try {
     await send('and again');
     await dialog.locator('p').filter({hasText: CAPACITY}).waitFor({timeout: 30000});
     check('the shared budget refuses with its own copy', true);
+    await USAGE().filter({hasText: /^59 of 60 messages left today · 0 of 200 shared · resets in/i}).waitFor({timeout: 15000});
+    check('the caption shows the spent shared budget as the wall', await USAGE().getAttribute('data-chat-usage') === 'global');
 
     // --- with no window in the way, the request reaches the (keyless) provider ------------
-    await limits.deleteMany({key: {$in: [`chat:${userId}`, `chat:${userId}:day`, 'chat:global']}});
+    await limits.deleteMany(WINDOW_KEYS);
     await dialog.getByRole('button', {name: 'Dismiss'}).click().catch(() => {});
     await send('last one');
     await errorBox().waitFor({timeout: 30000});
     const finalCopy = await errorBox().innerText();
     check('an unlimited request falls through to the provider (no key here), not the limiter', !LIMITED.test(finalCopy) && !CAPACITY.test(finalCopy), finalCopy);
     check('every window counted the request once', (await limits.findOne({key: `chat:${userId}`}))?.count === 1 && (await limits.findOne({key: 'chat:global'}))?.count === 1);
+    await USAGE().filter({hasText: /^59 of 60 messages left today · 199 of 200 shared · resets in/i}).waitFor({timeout: 15000});
+    check('after one real message the caption decrements and names no low window', !/this hour/i.test(await USAGE().innerText()), await USAGE().innerText());
     await shot('02-fallthrough');
 
     // --- Ask in chat prefills and never sends ----------------------------------------------

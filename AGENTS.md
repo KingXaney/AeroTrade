@@ -112,6 +112,8 @@ and friends keep none beyond Shared and the invariants).
   `getCurrentUserId` (actions and routes), `requireUserId` (pages — signed out redirects to /sign-in).
 - The server actions keep their own rate limits — better-auth's `rateLimit` never runs on this
   app's `auth.api.*` path — all counted by `lib/rate-limit.takeRateLimit`, the one Mongo counter.
+  `lib/rate-limit.peekRateLimit` is its read-only pair — one `findOne`, never a write, null once
+  the window has passed — for anything that shows a window without spending it.
 - `lib/auth/limits` is import-free: the password-reset and sign-in limits and their counter keys.
   `clientIpFrom` reads `x-vercel-forwarded-for`, then `x-forwarded-for`, then `x-real-ip`, which
   name the client only behind a proxy that overwrites them, such as Vercel.
@@ -320,6 +322,17 @@ and friends keep none beyond Shared and the invariants).
   through `getStrategyLeaderboard`, or one strategy's latest run from
   `lib/strategies/page-store.getLatestRun`, with each reason decoded with its def and the board cut
   to its top rows.
+- The panel's usage caption is `lib/chat/usage` (pure: the three windows as {used, limit, left,
+  resetsAt}, the window that refuses next, and the caption's clauses) over
+  `lib/chat/usage-store.readChatUsage`, served by `app/api/chat/usage/route.ts` and read by
+  `components/chat/useChatUsage` on open and after each reply or refusal. It peeks through
+  `peekRateLimit` and never spends: a refused request and an opened panel leave every count
+  exactly where `app/api/chat/route.ts`'s `takeRateLimit` calls put it. The caption is a `<div>`
+  carrying `data-chat-usage`, never a `<p>`: `scripts/qa/qa-chat-tutor.mjs` reads the panel's
+  error copy from its `<p>` elements. Its sentences are `CHAT_USAGE_COPY` in `lib/learn/copy/chat`
+  — the day and shared clauses always, the hour clause only while the hour is the wall and low,
+  one "resets in" for the warned window else the day's, and none before a window has opened
+  (invariant 8). "Messages", not model calls: one message may spend up to five model steps.
 
 ### email
 

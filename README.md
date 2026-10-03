@@ -166,7 +166,7 @@ lib/            one folder per feature, named as in components/:
   topics/       keyword normalisation, matcher, search query builder, refresh, briefs, the starter set
   learn/        the glossary, the no-advice word list, every learner-facing sentence (copy/), the reason decoder,
                 missions, today's lesson, the daily quiz
-  chat/         the chat assistant: system prompt, tools and what they hand the model, rate limits
+  chat/         the chat assistant: system prompt, tools and what they hand the model, rate limits and the caption that shows what is left of them
   email/        transport, templates, the daily digest with its topics + lesson sections, the welcome email
   jobs/         the Inngest client, the job registry, one file of thin job wrappers per feature, the status read
   prices/       daily bars (Yahoo first, Stooq fallback), dividends + the T-bill rate, signals, NYSE hours, Finnhub
