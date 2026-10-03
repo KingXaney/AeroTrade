@@ -19,11 +19,14 @@ export const useTopicsUi = (): TopicsUi => {
 type Props = {
     overview: TopicsOverview;
     activeSlug?: string;
+    // The manage view: a saved topic re-renders this page instead of opening the topic's own.
+    stayOnSave?: boolean;
     children: ReactNode;    // the server-rendered feed column
 };
 
-// One composer instance for the whole page; the rail, headers and empty feeds open it.
-const TopicsShell = ({overview, activeSlug, children}: Props) => {
+// One composer instance for the whole page; the rail, headers, empty feeds and the manage view's
+// rows open it.
+const TopicsShell = ({overview, activeSlug, stayOnSave, children}: Props) => {
     const [composer, setComposer] = useState<{open: boolean; mode: ComposerMode; initial: TopicView | null}>({open: false, mode: 'create', initial: null});
     const ui = useMemo<TopicsUi>(() => ({
         openComposer: (mode, initial = null) => setComposer({open: true, mode, initial}),
@@ -40,7 +43,7 @@ const TopicsShell = ({overview, activeSlug, children}: Props) => {
                     </div>
                     <div className="lg:col-span-9 space-y-4">{children}</div>
                 </div>
-                <TopicComposer open={composer.open} mode={composer.mode} initial={composer.initial}
+                <TopicComposer open={composer.open} mode={composer.mode} initial={composer.initial} stayOnSave={stayOnSave}
                                onOpenChange={(open) => setComposer((c) => ({...c, open}))} />
             </div>
         </TopicsUiContext.Provider>

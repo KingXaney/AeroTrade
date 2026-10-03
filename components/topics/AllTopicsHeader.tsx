@@ -1,9 +1,11 @@
 'use client';
 
-import {Plus} from "lucide-react";
+import Link from "next/link";
+import {Plus, Settings2} from "lucide-react";
 import {useTopicsUi} from "@/components/topics/TopicsShell";
 import Panel from "@/components/primitives/Panel";
-import ActionButton from "@/components/primitives/ActionButton";
+import ActionButton, {actionButton} from "@/components/primitives/ActionButton";
+import {TOPICS_MANAGE_COPY} from "@/lib/learn/copy/topics";
 
 const AllTopicsHeader = ({count, unseenTotal, preinstalled}: {count: number; unseenTotal: number; preinstalled: boolean}) => {
     const {openComposer} = useTopicsUi();
@@ -17,15 +19,20 @@ const AllTopicsHeader = ({count, unseenTotal, preinstalled}: {count: number; uns
                 {/* Self-extinguishing: it disappears the moment the set stops being ours,
                     so there is no dismissal flag to store and nothing to keep in sync. */}
                 {preinstalled && (
-                    <p className="text-[11px] text-fg-soft mt-2 max-w-md">
-                        These came preinstalled to get you started — edit or remove any of them, or add your own.
-                    </p>
+                    <p className="text-[11px] text-fg-soft mt-2 max-w-md">{TOPICS_MANAGE_COPY.preinstalled}</p>
                 )}
             </div>
-            <ActionButton className="inline-flex items-center gap-2" onClick={() => openComposer('create')}>
-                <Plus className="size-4" />
-                New topic
-            </ActionButton>
+            <div className="flex items-center gap-2 shrink-0">
+                {/* The manage view, for bulk changes; "New topic" stays the one-click path. */}
+                <Link href="/topics?edit=1" className={actionButton({variant: 'secondary', className: 'inline-flex items-center gap-2'})} data-topics-edit>
+                    <Settings2 className="size-4" />
+                    {TOPICS_MANAGE_COPY.editTopics}
+                </Link>
+                <ActionButton className="inline-flex items-center gap-2" onClick={() => openComposer('create')}>
+                    <Plus className="size-4" />
+                    New topic
+                </ActionButton>
+            </div>
         </Panel>
     );
 };

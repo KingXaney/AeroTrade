@@ -5,48 +5,33 @@ import {useRouter} from "next/navigation";
 import {toast} from "sonner";
 import {Loader2} from "lucide-react";
 import TopicComposer from "@/components/topics/TopicComposer";
+import TopicChips from "@/components/topics/TopicChips";
 import Panel from "@/components/primitives/Panel";
 import PageTitle from "@/components/primitives/PageTitle";
 import MicroLabel from "@/components/primitives/MicroLabel";
-import {cn} from "@/lib/utils";
 import {followStarterTopics, restoreDefaultTopics} from "@/lib/actions/topics.actions";
-import {STARTER_TOPICS, type StarterGroup} from "@/lib/topics/starters";
+import {OFFER_GROUPS, offeredTopics, slotsLeft, toFollowInputs, toggleSelection} from "@/lib/topics/manage";
+import {TOPIC_PICKER_COPY, TOPICS_MANAGE_COPY} from "@/lib/learn/copy/topics";
 import type {SuggestedTopic} from "@/lib/topics/types";
 import ActionButton from "@/components/primitives/ActionButton";
-
-const GROUP_LABEL: Record<StarterGroup, string> = {finance: 'Markets & macro', world: 'World news'};
-const GROUPS: StarterGroup[] = ['finance', 'world'];
-
-const Chips = ({items, selected, onToggle}: {items: SuggestedTopic[]; selected: Set<string>; onToggle: (name: string) => void}) => (
-    <div className="flex flex-wrap gap-2">
-        {items.map((s) => {
-            const on = selected.has(s.name);
-            return (
-                <button key={s.name} type="button" aria-pressed={on} onClick={() => onToggle(s.name)}
-                        className={cn('font-mono rounded-full border px-3 py-1.5 text-xs transition-colors',
-                            on ? 'border-brand bg-brand/10 text-brand' : 'border-line-strong/30 bg-surface-2/40 text-fg-soft hover:text-fg hover:border-brand/40')}>
-                    {on ? '✓ ' : ''}{s.name}
-                </button>
-            );
-        })}
-    </div>
-);
 
 // Reached two ways now. For a new account this is dead code — topics are seeded at
 // sign-up — so getting here means the user unfollowed everything on purpose, and
 // `canRestoreDefaults` offers the way back. It is no longer a wall in front of the app.
 const TopicsEmptyState = ({brainSuggestions, canRestoreDefaults = false}: {brainSuggestions: SuggestedTopic[]; canRestoreDefaults?: boolean}) => {
     const router = useRouter();
-    const [selected, setSelected] = useState<Set<string>>(new Set());
+    const [selected, setSelected] = useState<ReadonlySet<string>>(new Set());
     const [composerOpen, setComposerOpen] = useState(false);
     const [pending, startTransition] = useTransition();
 
-    const all = [...STARTER_TOPICS, ...brainSuggestions.filter((b) => !STARTER_TOPICS.some((s) => s.name === b.name))];
-    const toggle = (name: string) => setSelected((prev) => {
-        const next = new Set(prev);
-        if (next.has(name)) next.delete(name); else next.add(name);
-        return next;
-    });
+    // Nothing is followed, so every starter and brain suggestion is on offer, keyed by slug.
+    const offers = offeredTopics([], brainSuggestions);
+    const slots = slotsLeft(0);
+    const toggle = (slug: string) => {
+        const {next, blocked} = toggleSelection(selected, slug, slots);
+        if (blocked) toast.error(TOPICS_MANAGE_COPY.roomFor(slots));
+        else setSelected(next);
+    };
 
     // Land on the first new topic: its page does a bounded live fetch, so the first thing
     // seen is articles rather than a merged feed waiting on a job. push() alone — a
@@ -58,9 +43,8 @@ const TopicsEmptyState = ({brainSuggestions, canRestoreDefaults = false}: {brain
     };
 
     const followSelected = () => startTransition(async () => {
-        const picks = all.filter((s) => selected.has(s.name)).map((s) => ({name: s.name, keywords: s.keywords, exclude: s.exclude ?? []}));
-        const result = await followStarterTopics(picks);
-        if (result.created > 0) toast.success(result.created === 1 ? 'Following 1 topic' : `Following ${result.created} topics`);
+        const result = await followStarterTopics(toFollowInputs(offers, selected));
+        if (result.created > 0) toast.success(TOPIC_PICKER_COPY.following(result.created));
         if (result.message) toast.error(result.message);
         land(result.firstSlug);
     });
@@ -88,24 +72,22 @@ const TopicsEmptyState = ({brainSuggestions, canRestoreDefaults = false}: {brain
                 </div>
 
                 <div className="mt-6 space-y-5">
-                    {GROUPS.map((group) => (
-                        <div key={group}>
-                            <MicroLabel as="div" className="mb-2">{GROUP_LABEL[group]}</MicroLabel>
-                            <Chips items={STARTER_TOPICS.filter((s) => s.group === group)} selected={selected} onToggle={toggle} />
-                        </div>
-                    ))}
-                    {brainSuggestions.length > 0 && (
-                        <div>
-                            <MicroLabel as="div" className="mb-2">What the News Brain is tracking</MicroLabel>
-                            <Chips items={brainSuggestions} selected={selected} onToggle={toggle} />
-                        </div>
-                    )}
+                    {OFFER_GROUPS.map((group) => {
+                        const items = offers.filter((offer) => offer.group === group);
+                        if (items.length === 0) return null;
+                        return (
+                            <div key={group}>
+                                <MicroLabel as="div" className="mb-2">{TOPIC_PICKER_COPY.groups[group]}</MicroLabel>
+                                <TopicChips label={TOPIC_PICKER_COPY.groups[group]} items={items} selected={selected} onToggle={toggle} />
+                            </div>
+                        );
+                    })}
                 </div>
 
                 <div className="font-mono mt-6 flex flex-wrap items-center gap-2">
                     <ActionButton size="md" className="inline-flex items-center gap-2" onClick={followSelected} disabled={pending || selected.size === 0}>
                         {pending && <Loader2 className="size-3.5 animate-spin" />}
-                        Follow {selected.size > 0 ? `${selected.size} selected` : 'selected'}
+                        {TOPIC_PICKER_COPY.followSelected(selected.size)}
                     </ActionButton>
                     {canRestoreDefaults && (
                         <ActionButton variant="secondary" size="md" onClick={restoreDefaults} disabled={pending}>

@@ -46,7 +46,7 @@ Shared pieces that belong to no single feature:
 | **navigator** | `/brain` (Navigator panels) | `navigator/` | `lib/navigator/` — `config` (the rails), `scoring`, `allocator`, `universe`, `run` (weekly job + bootstrap), `store`, `prompts` | `navigator.actions` | `navigator` | `copy/navigator` | `qa-learn`, `qa-chat` |
 | **brain** | `/brain` | `brain/` | `lib/brain/` — `config` (half-lives, thresholds), `decay`, `extraction`, `ingest`, `update`, `store`, `opinion`, `legend`, `event-types`, `since-thesis` | `opinion.actions` | `brain` | `copy/brain` | `qa-learn`, `qa-trading` |
 | **news** | `/news` | `news/` | `lib/news/` — `config` (`RSS_FEEDS`, kill switch), `adapters/`, `feed`, `feed-store`, `article`, `sanitize`, `briefing`, `briefing-store`, `prompts`, `page`, `page-store` | `news-feed.actions` | `news` (the morning briefing) | `copy/news` | `qa-news-feed` |
-| **topics** | `/topics`, `/topics/[slug]` | `topics/` | `lib/topics/` — `starters` (curated set), `seed`, `insert`, `refresh`, `brief`, `match`, `store`, `page-store` | `topics.actions` | `topics` | `copy/topics` | `qa-topics`, `qa-topics-refresh` |
+| **topics** | `/topics` (`?edit=1` is the manage view), `/topics/[slug]` | `topics/` | `lib/topics/` — `starters` (curated set), `seed`, `insert`, `manage` (the manage view's offers and cap), `refresh`, `brief`, `match`, `store`, `page-store` | `topics.actions` | `topics` | `copy/topics` | `qa-topics`, `qa-topics-refresh` |
 | **learn** | `/learn`, `/learn/course/[lesson]` | `learn/`, `dashboard/widgets/learn/` | `lib/learn/` — `glossary`, `banned`, `reasons`, `course(-store)`, `missions`, `moments`, `lesson(-store)`, `quiz(-store)`, `facts(-store)`, `copy/` | `learn.actions` | — | `copy/*` | `qa-learn`, `qa-learn-account` |
 | **chat** | `api/chat` | `chat/` | `lib/chat/` — `system-prompt`, `tools`, `tool-copy`, `limits`, `errors`, `explain`, `learner-hooks`, `ask` | — | — | `copy/chat` | `qa-chat`, `qa-chat-tutor` |
 | **email** | — | — | `lib/email/` — `send` (transport), `templates`, `prompts`, `digest`, `welcome`, `recipients`, `sections/` | — | `email` | lesson section reuses `copy/lesson` | — (unit tests: the sections are pure) |
@@ -82,7 +82,7 @@ Shared pieces that belong to no single feature:
 | The stock page | `app/(root)/stocks/[symbol]/page.tsx`, `components/stocks/`, the embeds in `lib/stocks/tradingview.ts` |
 | Sign-in / sign-up rules | `lib/auth/validation.ts` (email/password rules), `lib/auth/limits.ts` (rate limits), `lib/auth/server.ts` (better-auth), `lib/actions/auth.actions.ts` |
 | A stored field | `database/models/<model>.model.ts`, its type in `lib/<feature>/types.ts`, the store named in `database/models/README.md` |
-| The default followed topics | `lib/topics/starters.ts` (`STARTER_TOPICS`, `DEFAULT_TOPIC_NAMES`) |
+| The default followed topics, and what the manage view offers | `lib/topics/starters.ts` (`STARTER_TOPICS`, `DEFAULT_TOPIC_NAMES`); `lib/topics/manage.ts` (`offeredTopics`) |
 | The brain's decay / half-lives | `lib/brain/config.ts` (`HALF_LIFE_*`), maths in `lib/brain/decay.ts` |
 | Any formatting of money, % or dates | `lib/format.ts` (display), `lib/dates.ts` (ET calendar) |
 | Run the browser QA | `npm run qa` (all, ~5 min) or `npm run qa -- <suite>` — the suites and what each seeds are in `scripts/qa/README.md` |

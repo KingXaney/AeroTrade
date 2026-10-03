@@ -36,6 +36,7 @@ const SIGNED_IN = [
     ['home', '/'],
     ['dashboard', '/dashboard'],
     ['topics', '/topics'],
+    ['topics-edit', '/topics?edit=1'],
     ['news', '/news'],
     ['brain', '/brain'],
     ['portfolio', '/portfolio'],

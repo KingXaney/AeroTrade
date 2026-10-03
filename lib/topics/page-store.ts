@@ -1,5 +1,6 @@
-// The topics pages' reads (app/(root)/topics/page.tsx and topics/[slug]/page.tsx): each returns
-// the page's whole view, so the pages only compose it. Server only.
+// The topics pages' reads (app/(root)/topics/page.tsx — the feed and, under ?edit=1, the manage
+// view — and topics/[slug]/page.tsx): each returns the page's whole view, so the pages only
+// compose it. Server only.
 
 import {getTopEntities} from "@/lib/brain/store";
 import {pickFirstRunTopic} from "@/lib/topics/first-run";
@@ -27,6 +28,8 @@ const readBrainSuggestions = async (): Promise<SuggestedTopic[]> => {
 export type TopicsPageView =
     // Nothing followed, on purpose: the deliberate empty state, never the setup wall.
     | {kind: 'empty'; brainSuggestions: SuggestedTopic[]}
+    // /topics?edit=1: the rows to edit or remove and what the picker may add; no feed.
+    | {kind: 'manage'; overview: TopicsOverview; preinstalled: boolean; brainSuggestions: SuggestedTopic[]}
     | {
         kind: 'topics';
         overview: TopicsOverview;
@@ -37,7 +40,7 @@ export type TopicsPageView =
         preinstalled: boolean;
     };
 
-export const getTopicsPageView = async (userId: string): Promise<TopicsPageView> => {
+export const getTopicsPageView = async (userId: string, {manage = false}: {manage?: boolean} = {}): Promise<TopicsPageView> => {
     // The layout's sidebar card already read this for the request; the re-reads after
     // seeding and the inline fetch below must see those writes, so they skip the cache.
     let overview = await getCachedTopicsOverview(userId);
@@ -56,6 +59,17 @@ export const getTopicsPageView = async (userId: string): Promise<TopicsPageView>
     // Reaching here with nothing means the user removed it all on purpose, so this is a
     // deliberate empty state rather than the setup wall it used to be.
     if (overview.topics.length === 0) return {kind: 'empty', brainSuggestions: await readBrainSuggestions()};
+
+    // The manage view re-renders after every remove, Undo and follow, so it stops here — before
+    // the merged feed and the inline first-run fetch — and a round of editing never runs a search.
+    if (manage) {
+        return {
+            kind: 'manage',
+            overview,
+            preinstalled: isUntouchedDefaultSet(overview.topics.map((t) => t.slug)),
+            brainSuggestions: await readBrainSuggestions(),
+        };
+    }
 
     let articles = await getMergedTopicFeed(userId, {limit: MERGED_FEED_SIZE});
     if (articles.length === 0) {
