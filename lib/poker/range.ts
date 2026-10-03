@@ -186,9 +186,11 @@ const weightSuffix = (w: number): string => {
     return `:${Number(w.toFixed(3))}`;
 };
 
-// The canonical text of a range: whole classes as runs (TT+, 99-66, A2s+, K9o-K6o), grouped by
-// weight, then any class whose combos differ, combo by combo.
+// The canonical text of a range: "random" for every combo at one weight; else whole classes as runs
+// (TT+, 99-66, A2s+, K9o-K6o), grouped by weight, then any class whose combos differ, combo by combo.
 export const formatRange = (range: Range): string => {
+    // Every combo at one weight is a random hand, at that weight.
+    if (range[0] > 0 && range.every((w) => w === range[0])) return `random${weightSuffix(range[0])}`;
     const tokens: string[] = [];
     const classW = classWeights(range);
     const uniform = CLASS_COMBOS.map((combos) => combos.every((combo) => range[combo] === range[combos[0]]));

@@ -4,6 +4,7 @@
 import {describe, expect, it} from 'vitest';
 import {CLASSES, classFromLabel, classLabel} from '@/lib/poker/cards';
 import {decodePreflop, pairCounts, rankingOf, type PreflopFile} from '@/lib/poker/preflop';
+import {PREFLOP_RANKING} from '@/lib/poker/ranking';
 import file from '@/lib/poker/data/preflop-equity.json';
 
 const table = decodePreflop(file as PreflopFile);
@@ -52,5 +53,9 @@ describe('the preflop table', () => {
         expect(new Set(ranking).size).toBe(CLASSES);
         expect(ranking.slice(0, 8).map(classLabel)).toEqual(['AA', 'KK', 'QQ', 'JJ', 'TT', '99', '88', 'AKs']);
         expect(ranking.at(-1)).toBe(id('32o'));
+    });
+
+    it('ships the same ranking for the range editor, so its Top x% needs no table', () => {
+        expect(PREFLOP_RANKING).toEqual(rankingOf(table));
     });
 });

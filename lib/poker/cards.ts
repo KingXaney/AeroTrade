@@ -24,6 +24,31 @@ export const parseCard = (text: string): Card | null => {
     return rank < 0 || suit < 0 ? null : rank * 4 + suit;
 };
 
+// A list of cards as typed: "Ah 7c 2d", "Ah,7c,2d" or "Ah7c2d", a 10 read as a T. Returns the cards
+// in order, the tokens that are not cards, and the cards named more than once.
+export const parseCardList = (text: string): {cards: Card[]; unknown: string[]; repeated: Card[]} => {
+    const cards: Card[] = [];
+    const unknown: string[] = [];
+    const repeated: Card[] = [];
+    for (const raw of text.split(/[\s,]+/).filter(Boolean)) {
+        const token = raw.split('10').join('T');
+        const pieces = token.length > 2 && token.length % 2 === 0 ? token.match(/../g) ?? [] : [token];
+        const parsed = pieces.map(parseCard);
+        if (parsed.some((card) => card === null)) {
+            unknown.push(raw);
+            continue;
+        }
+        for (const card of parsed as Card[]) {
+            if (cards.includes(card)) {
+                if (!repeated.includes(card)) repeated.push(card);
+            } else {
+                cards.push(card);
+            }
+        }
+    }
+    return {cards, unknown, repeated};
+};
+
 // The combo index of two different cards, order ignored: hi·(hi − 1)/2 + lo.
 export const comboIndex = (a: Card, b: Card): number => {
     const hi = a > b ? a : b;

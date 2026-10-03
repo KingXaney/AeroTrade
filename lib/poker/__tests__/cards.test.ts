@@ -17,6 +17,7 @@ import {
     comboIndex,
     comboLabel,
     parseCard,
+    parseCardList,
 } from '@/lib/poker/cards';
 
 describe('cards and combos', () => {
@@ -38,6 +39,27 @@ describe('cards and combos', () => {
         expect(seen.size).toBe(COMBOS);
         expect(Math.max(...seen)).toBe(COMBOS - 1);
         expect(comboLabel(comboIndex(parseCard('As')!, parseCard('Kh')!))).toBe('AsKh');
+    });
+});
+
+describe('parseCardList', () => {
+    const labels = (text: string) => {
+        const out = parseCardList(text);
+        return {cards: out.cards.map(cardLabel), unknown: out.unknown, repeated: out.repeated.map(cardLabel)};
+    };
+
+    it('reads cards with or without separators, a 10 as a T', () => {
+        expect(labels('Ah 7c 2d').cards).toEqual(['Ah', '7c', '2d']);
+        expect(labels('Ah,7c,2d').cards).toEqual(['Ah', '7c', '2d']);
+        expect(labels('Ah7c2d').cards).toEqual(['Ah', '7c', '2d']);
+        expect(labels('10h 10s').cards).toEqual(['Th', 'Ts']);
+        expect(labels('  ').cards).toEqual([]);
+    });
+
+    it('names what is not a card and what is named twice', () => {
+        expect(labels('Ah Xx 7c')).toEqual({cards: ['Ah', '7c'], unknown: ['Xx'], repeated: []});
+        expect(labels('Ah7c7c Ah')).toEqual({cards: ['Ah', '7c'], unknown: [], repeated: ['7c', 'Ah']});
+        expect(labels('Ah7')).toEqual({cards: [], unknown: ['Ah7'], repeated: []});
     });
 });
 

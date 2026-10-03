@@ -8,8 +8,12 @@
 // exact. About 1.6×10¹¹ hand evaluations, spread over every core with node:worker_threads (a few
 // minutes). Needs Node ≥ 22.18, which loads the import-free lib/poker/cards.ts and evaluator.ts.
 //
-//   node scripts/poker-preflop-equity.mjs           write the table
-//   node scripts/poker-preflop-equity.mjs --check   recompute 40 random entries against the file
+// It also writes lib/poker/data/preflop-ranking.json: the 169 classes from the highest equity against
+// a random hand to the lowest, which the range editor's "Top x%" reads without loading the table.
+//
+//   node scripts/poker-preflop-equity.mjs             write the table and the ranking
+//   node scripts/poker-preflop-equity.mjs --check     recompute 40 random entries against the file
+//   node scripts/poker-preflop-equity.mjs --ranking   rewrite the ranking from the table on disk
 
 import {Worker, isMainThread, parentPort} from 'node:worker_threads';
 import {readFileSync, writeFileSync, mkdirSync} from 'node:fs';
@@ -18,6 +22,7 @@ import {fileURLToPath} from 'node:url';
 
 const ROOT = fileURLToPath(new URL('../', import.meta.url));
 const OUT = `${ROOT}lib/poker/data/preflop-equity.json`;
+const RANKING_OUT = `${ROOT}lib/poker/data/preflop-ranking.json`;
 const SCALE = 100_000;
 const {CLASS_COMBOS, COMBO_HI, COMBO_LO, CLASSES} = await import(`${ROOT}lib/poker/cards.ts`);
 
@@ -54,6 +59,36 @@ const casesFor = (i, j) => {
     }
     return [...patterns.values()];
 };
+
+// The ranking: each class's equity against a random hand, weighed by the combo pairs that share no
+// card — the same sum lib/poker/preflop.ts decodePreflop makes — highest first, ties by class id.
+const writeRanking = (upper, scale) => {
+    const upperIndex = (i, j) => i * CLASSES - (i * (i + 1)) / 2 + (j - i - 1);
+    const equity = (i, j) => (i === j ? 0.5 : i < j ? upper[upperIndex(i, j)] / scale : 1 - upper[upperIndex(j, i)] / scale);
+    const vsRandom = [];
+    for (let i = 0; i < CLASSES; i++) {
+        let num = 0;
+        let den = 0;
+        for (let j = 0; j < CLASSES; j++) {
+            let n = 0;
+            for (const a of CLASS_COMBOS[i]) for (const b of CLASS_COMBOS[j]) {
+                if (COMBO_HI[a] !== COMBO_HI[b] && COMBO_HI[a] !== COMBO_LO[b] && COMBO_LO[a] !== COMBO_HI[b] && COMBO_LO[a] !== COMBO_LO[b]) n++;
+            }
+            num += n * equity(i, j);
+            den += n;
+        }
+        vsRandom.push(num / den);
+    }
+    const ranking = Array.from({length: CLASSES}, (_, id) => id).sort((x, y) => vsRandom[y] - vsRandom[x] || x - y);
+    writeFileSync(RANKING_OUT, `${JSON.stringify({format: 1, ranking})}\n`);
+    console.log('wrote lib/poker/data/preflop-ranking.json');
+};
+
+if (isMainThread && process.argv.includes('--ranking')) {
+    const file = JSON.parse(readFileSync(OUT, 'utf8'));
+    writeRanking(file.upper, file.scale);
+    process.exit(0);
+}
 
 if (!isMainThread) {
     const {evaluateMasks} = await import(`${ROOT}lib/poker/evaluator.ts`);
@@ -167,4 +202,5 @@ if (!isMainThread) {
     mkdirSync(`${ROOT}lib/poker/data`, {recursive: true});
     writeFileSync(OUT, `${JSON.stringify({format: 1, scale: SCALE, classes: CLASSES, upper})}\n`);
     console.log(`wrote ${upper.length} entries to lib/poker/data/preflop-equity.json in ${Math.round((Date.now() - started) / 1000)} s`);
+    writeRanking(upper, SCALE);
 }

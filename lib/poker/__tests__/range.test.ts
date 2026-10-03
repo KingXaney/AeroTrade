@@ -79,6 +79,9 @@ describe('formatRange', () => {
         expect(formatRange(parseRange('KQo, JJ:0.5').range)).toBe('KQo, JJ:0.5');
         expect(formatRange(parseRange('76s').range)).toBe('76s');
         expect(formatRange(parseRange('AhKh').range)).toBe('AhKh');
+        expect(formatRange(parseRange('random').range)).toBe('random');
+        expect(formatRange(parseRange('any:0.5').range)).toBe('random:0.5');
+        expect(formatRange(parseRange('').range)).toBe('');
     });
 
     it('reads back exactly what it writes, for random whole-class ranges', () => {

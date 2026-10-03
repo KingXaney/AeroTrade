@@ -21,6 +21,8 @@ export const EXACT_BUDGET = 40_000_000;
 export const MC_BLOCK = 65_536;
 export const MC_MAX_SAMPLES = 20_000_000;
 export const MC_TARGET_SE = 0.0005;
+// The most hand values an enumeration works through between two yields.
+const YIELD_WORK = 50_000;
 
 export type EquityMethod = 'table' | 'exact' | 'monte-carlo';
 
@@ -113,12 +115,13 @@ const sidesOf = (input: EquityInput): Sides => {
 
 export type EquityPlan = {method: EquityMethod; boards: number; live: [number, number]; work: number};
 
-export const planEquity = (input: EquityInput, table: PreflopTable | null): EquityPlan => {
+// `tableLoaded`: whether the preflop table can answer — the page plans without loading it.
+export const planEquity = (input: EquityInput, tableLoaded: boolean): EquityPlan => {
     const {a, b, deck} = sidesOf(input);
     const boards = choose(deck.length, 5 - input.board.length);
     const live: [number, number] = [a.length, b.length];
     const work = boards * (a.length + b.length);
-    const tableFits = table !== null && input.board.length === 0 && input.dead.length === 0 && isClassUniform(input.ranges[0]) && isClassUniform(input.ranges[1]);
+    const tableFits = tableLoaded && input.board.length === 0 && input.dead.length === 0 && isClassUniform(input.ranges[0]) && isClassUniform(input.ranges[1]);
     const method: EquityMethod = input.method !== 'auto' ? input.method : tableFits ? 'table' : work <= EXACT_BUDGET ? 'exact' : 'monte-carlo';
     return {method, boards, live, work};
 };
@@ -211,7 +214,9 @@ function* exactJob(input: EquityInput): Generator<EquityProgress, EquityResult> 
     const onBoard = new Uint8Array(CARDS);
     const need = 5 - input.board.length;
     const totalBoards = choose(deck.length, need);
-    const every = Math.max(1, Math.floor(totalBoards / 200));
+    // A step is at most a 200th of the boards and at most YIELD_WORK hand values, so even two
+    // full ranges preflop hand control back within a few milliseconds.
+    const every = Math.max(1, Math.min(Math.floor(totalBoards / 200), Math.floor(YIELD_WORK / (a.count + b.count))));
     let winSum = 0;
     let tieSum = 0;
     let weightSum = 0;
@@ -364,7 +369,7 @@ function* monteCarloJob(input: EquityInput): Generator<EquityProgress, EquityRes
 export function* equityJob(input: EquityInput, table: PreflopTable | null): Generator<EquityProgress, EquityResult> {
     const issues = validateEquity(input);
     if (issues.length > 0) throw new Error(`equity: ${issues.join(', ')}`);
-    const plan = planEquity(input, table);
+    const plan = planEquity(input, table !== null);
     if (plan.method === 'table' && table) return yield* tableJob(input, table);
     if (plan.method === 'exact') return yield* exactJob(input);
     return yield* monteCarloJob(input);

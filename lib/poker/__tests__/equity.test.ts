@@ -58,14 +58,14 @@ const bruteForce = (spot: EquityInput) => {
 
 describe('planEquity', () => {
     it('takes the table preflop for whole classes, and counts the boards and the work', () => {
-        expect(planEquity(input('AsAh', 'KsKh'), table)).toEqual({method: 'exact', boards: 1_712_304, live: [1, 1], work: 1_712_304 * 2});
-        expect(planEquity(input('random', 'random'), table).method).toBe('table');
-        expect(planEquity(input('random', 'random'), null).method).toBe('monte-carlo');
-        expect(planEquity(input('random', 'random', 'Ah7c2d'), table)).toMatchObject({method: 'exact', boards: 1176, live: [1176, 1176]});
-        expect(planEquity(input('AA', 'KK', '', {method: 'monte-carlo'}), table).method).toBe('monte-carlo');
+        expect(planEquity(input('AsAh', 'KsKh'), true)).toEqual({method: 'exact', boards: 1_712_304, live: [1, 1], work: 1_712_304 * 2});
+        expect(planEquity(input('random', 'random'), true).method).toBe('table');
+        expect(planEquity(input('random', 'random'), false).method).toBe('monte-carlo');
+        expect(planEquity(input('random', 'random', 'Ah7c2d'), true)).toMatchObject({method: 'exact', boards: 1176, live: [1176, 1176]});
+        expect(planEquity(input('AA', 'KK', '', {method: 'monte-carlo'}), true).method).toBe('monte-carlo');
         // A dead card rules the table out; 10 hands over 2,349,060 boards fit the exact budget, 34 do not.
-        expect(planEquity(input('QQ', 'AKs', '', {dead: cards('2c')}), table).method).toBe('exact');
-        expect(planEquity(input('QQ+', 'AK', '', {dead: cards('2c')}), table).method).toBe('monte-carlo');
+        expect(planEquity(input('QQ', 'AKs', '', {dead: cards('2c')}), true).method).toBe('exact');
+        expect(planEquity(input('QQ+', 'AK', '', {dead: cards('2c')}), true).method).toBe('monte-carlo');
     });
 });
 
@@ -104,6 +104,16 @@ describe('exact enumeration', () => {
             expect(result.tie).toBeCloseTo(expected.tie, 12);
         }
     }, 60_000);
+
+    it('hands control back within a bounded amount of work, however large the ranges', () => {
+        // Two full ranges preflop: 2,652 hands a board, so at most 18 boards before a yield.
+        const big = equityJob(input('random', 'random', '', {method: 'exact'}), table).next();
+        expect(big.done).toBe(false);
+        expect((big.value as EquityProgress).done).toBeLessThanOrEqual(Math.floor(50_000 / 2652));
+        // Two fixed hands: a 200th of the boards.
+        const small = equityJob(input('AsAh', 'KsKh'), table).next();
+        expect((small.value as EquityProgress).done).toBe(Math.floor(1_712_304 / 200));
+    });
 
     it('reports each class of side A on its own, and progress without a running figure', () => {
         const job = equityJob(input('AA, KK', 'QQ', 'Kh7c2d'), table);
