@@ -66,9 +66,10 @@ export const usePokerJob = (key: string, choice: EngineChoice) => {
         try {
             const outcome = await job.promise;
             if (current.current !== job) return;
+            // A stopped job that finishes on stop (the river solver) brings its own result.
             commit((previous) => (outcome.status === 'done'
                 ? {status: 'done', progress: null, result: outcome.result, message: null}
-                : {...previous, status: 'stopped', progress: outcome.progress}));
+                : {...previous, status: 'stopped', progress: outcome.progress, result: outcome.result ?? previous.result}));
         } catch (error) {
             if (current.current === job) commit((previous) => ({...previous, status: 'failed', message: error instanceof Error ? error.message : String(error)}));
         } finally {
