@@ -23,6 +23,16 @@ export const addCalendarDays = (date: string, days: number): string => {
     return new Date(Date.UTC(y, m - 1, d + days)).toISOString().slice(0, 10);
 };
 
+// Whole calendar days from `from` to `to`: negative when `to` is earlier. In UTC, like
+// addCalendarDays, so a DST change never makes a day 23 or 25 hours long.
+export const calendarDaysBetween = (from: string, to: string): number => {
+    const utc = (date: string) => {
+        const [y, m, d] = date.split('-').map(Number);
+        return Date.UTC(y, m - 1, d);
+    };
+    return Math.round((utc(to) - utc(from)) / 86_400_000);
+};
+
 // Every calendar day from `from` to `to`, inclusive; empty when `from` is after `to`.
 export const eachCalendarDay = (from: string, to: string): string[] => {
     const days: string[] = [];
