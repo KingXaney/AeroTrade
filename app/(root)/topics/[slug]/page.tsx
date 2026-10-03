@@ -30,7 +30,7 @@ const TopicPage = async ({params}: TopicPageProps) => {
     return (
         <TopicsShell overview={overview} activeSlug={slug}>
             <TopicHeader topic={topic} now={now} />
-            <TopicSeenMarker topicId={topic.id} unseenCount={topic.unseenCount} />
+            <TopicSeenMarker topicId={topic.id} />
             {topic.brief
                 ? <TopicBrief brief={topic.brief} />
                 : articles.length > 0 && (

@@ -1,5 +1,6 @@
 import Link from "next/link";
-import {formatTimeAgoSeconds} from "@/lib/format";
+import {formatCapped, formatTimeAgoSeconds} from "@/lib/format";
+import {UNSEEN_COUNT_CAP} from "@/lib/topics/config";
 import {sortTopicsForRail} from "@/lib/topics/rail";
 import type {TopicsOverview as TopicsOverviewData} from "@/lib/topics/types";
 
@@ -28,8 +29,9 @@ const TopicsOverview = ({overview, span}: {overview: TopicsOverviewData; span: n
                                 )}
                             </span>
                             {t.unseenCount > 0 && (
-                                <span className="rounded-full bg-brand px-1.5 py-0.5 text-[10px] font-bold text-on-brand font-mono" aria-label={`${t.unseenCount} unseen`}>
-                                    {t.unseenCount}
+                                <span className="rounded-full bg-brand px-1.5 py-0.5 text-[10px] font-bold text-on-brand font-mono"
+                                      aria-label={`${formatCapped(t.unseenCount, UNSEEN_COUNT_CAP)} unseen`}>
+                                    {formatCapped(t.unseenCount, UNSEEN_COUNT_CAP)}
                                 </span>
                             )}
                         </Link>
@@ -37,7 +39,7 @@ const TopicsOverview = ({overview, span}: {overview: TopicsOverviewData; span: n
                 ))}
             </ul>
             <Link href="/topics" className="label-type mt-auto pt-3 text-xs text-brand hover:underline">
-                {overview.unseenTotal > 0 ? `${overview.unseenTotal} new` : 'All topics'}{hidden > 0 ? ` · +${hidden} more` : ''} →
+                {overview.unseenTotal > 0 ? `${formatCapped(overview.unseenTotal, UNSEEN_COUNT_CAP)} new` : 'All topics'}{hidden > 0 ? ` · +${hidden} more` : ''} →
             </Link>
         </div>
     );

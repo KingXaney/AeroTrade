@@ -3,6 +3,7 @@
 // endpoints; the writes are in lib/actions/news-feed.actions.ts. The maths — which
 // requests to make, how to filter and merge — is pure and tested in lib/news/feed.ts.
 
+import {cache} from "react";
 import {connectToDatabase} from "@/database/mongoose";
 import UserPreferencesModel from "@/database/models/user-preferences.model";
 import {getNews} from "@/lib/prices/finnhub";
@@ -33,17 +34,28 @@ type NewsFeedResult = {
     requested: number;
 };
 
-// Any failure reads as the default feed: a page never breaks on a preference.
-export const getNewsFeedPrefs = async (userId: string): Promise<NewsFeedPrefs> => {
+// The reader's outlet filter and when they last opened News, read together: one UserPreferences
+// findOne per request, shared by Home, /news, /settings and the shell through React's cache (a
+// pass-through outside a render, where the digest job calls getNewsFeedPrefs). Any failure reads
+// as the default feed and never looked: a page never breaks on a preference.
+export type NewsReaderPrefs = {feed: NewsFeedPrefs; newsSeenAt: number | null};
+
+export const getNewsReaderPrefs = cache(async (userId: string): Promise<NewsReaderPrefs> => {
     try {
         await connectToDatabase();
-        const prefs = await UserPreferencesModel.findOne({userId}).select('newsFeed').lean();
-        return normalizeNewsFeed(prefs?.newsFeed);
+        const prefs = await UserPreferencesModel.findOne({userId}).select('newsFeed newsSeenAt')
+            .lean<{newsFeed?: unknown; newsSeenAt?: Date} | null>();
+        return {
+            feed: normalizeNewsFeed(prefs?.newsFeed),
+            newsSeenAt: prefs?.newsSeenAt ? new Date(prefs.newsSeenAt).getTime() : null,
+        };
     } catch (error) {
-        console.error('Error reading news feed preference:', error);
-        return defaultNewsFeed();
+        console.error('Error reading news preferences:', error);
+        return {feed: defaultNewsFeed(), newsSeenAt: null};
     }
-};
+});
+
+export const getNewsFeedPrefs = async (userId: string): Promise<NewsFeedPrefs> => (await getNewsReaderPrefs(userId)).feed;
 
 // What stands in for Google News when it is switched off or empty: the same wires the
 // digest runs on, plus Finnhub (watchlist company news when there is one, its market wire

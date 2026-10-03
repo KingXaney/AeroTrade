@@ -3,7 +3,8 @@
 import Link from "next/link";
 import {Plus} from "lucide-react";
 import {cn} from "@/lib/utils";
-import {formatTimeAgoSeconds} from "@/lib/format";
+import {formatCapped, formatTimeAgoSeconds} from "@/lib/format";
+import {UNSEEN_COUNT_CAP} from "@/lib/topics/config";
 import {sortTopicsForRail} from "@/lib/topics/rail";
 import type {TopicOverviewItem} from '@/lib/topics/types';
 import Panel from '@/components/primitives/Panel';
@@ -15,9 +16,11 @@ type Props = {
     onNewTopic: () => void;
 };
 
+// The store counts to the cap plus one at most, so past the cap the pill reads "99+".
 const UnseenPill = ({count}: {count: number}) => (
     count > 0
-        ? <span className="ml-auto rounded-full bg-brand px-1.5 py-0.5 text-[10px] font-bold text-on-brand font-mono" aria-label={`${count} unseen`}>{count}</span>
+        ? <span className="ml-auto rounded-full bg-brand px-1.5 py-0.5 text-[10px] font-bold text-on-brand font-mono"
+                aria-label={`${formatCapped(count, UNSEEN_COUNT_CAP)} unseen`}>{formatCapped(count, UNSEEN_COUNT_CAP)}</span>
         : null
 );
 

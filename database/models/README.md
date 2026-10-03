@@ -26,7 +26,7 @@ reads and writes live. Change a field here, then in the store module named besid
 | `topic-article` | topics | `lib/topics/store`, `refresh` |
 | `watchlist` | stocks | `lib/stocks/watchlist-store`; `lib/actions/watchlist.actions` adds and removes |
 | `friendship` | friends | `lib/friends/store`; `lib/actions/friends.actions` writes |
-| `user-preferences` | settings | `lib/settings/preferences-store`, plus each feature's own sub-document: `lib/dashboard/layout-store` (layout), `lib/theme/store` (appearance), `lib/news/feed-store` (feed), `lib/strategies/follows`, `lib/learn` stores (`learn`) |
+| `user-preferences` | settings | `lib/settings/preferences-store`, plus each feature's own sub-document: `lib/dashboard/layout-store` (layout), `lib/theme/store` (appearance), `lib/news/feed-store` (feed, the `newsSeenAt` stamp), `lib/strategies/follows`, `lib/learn` stores (`learn`) |
 | `job-run` | jobs | `lib/jobs/job-runs` (each run's stamp), `lib/jobs/health` (the status strip) |
 | `rate-limit` | auth | `lib/rate-limit` — the one counter sign-in, sign-up, password reset and the chat spend |
 

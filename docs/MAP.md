@@ -55,7 +55,7 @@ Shared pieces that belong to no single feature:
 | **stocks** | `/stocks/[symbol]`, `/watchlist`, `/markets` | `stocks/` | `lib/stocks/` — `watchlist-store`, `watchlist`, `watchlist-page-store`, `key-numbers`, `rules-see`, `tradingview`, `popular` | `stocks.actions`, `watchlist.actions` | — | `copy/key-numbers`, `rules-see`, `watchlist` | `qa-strategies`, `qa-styles` |
 | **friends** | `/friends`, `/friends/[id]` | `friends/` | `lib/friends/` — `store` | `friends.actions` | — | — | `qa-shell` |
 | **settings** | `/settings` | `settings/`, `theme/` | `lib/settings/preferences-store`, `lib/theme/` — `palettes`, `styles`, `presets`, `resolve`, `store` | `preferences.actions`, `appearance.actions` | — | — | `qa-topics`, `qa-chat` |
-| **shell** | `app/(root)/layout.tsx` | `shell/` | `lib/shell/` — `navigation` (every nav link), `sidebar`, `shell-store` | — | — | — | `qa-shell`, `qa-styles` |
+| **shell** | `app/(root)/layout.tsx` | `shell/` | `lib/shell/` — `navigation` (every nav link), `sidebar` (the rail's two cards), `shell-store`, `news-seen` (the News dot clears in place) | — | — | `copy/shell` | `qa-shell`, `qa-styles`, `qa-topics` (the News card and its dot) |
 
 ## To change…, edit…
 
@@ -83,6 +83,7 @@ Shared pieces that belong to no single feature:
 | Sign-in / sign-up rules | `lib/auth/validation.ts` (email/password rules), `lib/auth/limits.ts` (rate limits), `lib/auth/server.ts` (better-auth), `lib/actions/auth.actions.ts` |
 | A stored field | `database/models/<model>.model.ts`, its type in `lib/<feature>/types.ts`, the store named in `database/models/README.md` |
 | The default followed topics | `lib/topics/starters.ts` (`STARTER_TOPICS`, `DEFAULT_TOPIC_NAMES`) |
+| What "new" means on a topic badge or the rail's News dot | `lib/topics/config.ts` (`UNSEEN_WINDOW_HOURS`, `UNSEEN_COUNT_CAP`, `unseenFloor`); the dot's stamp is `newsSeenAt` in `database/models/user-preferences.model.ts`, written by `lib/actions/news-feed.actions.markNewsSeen`, and the card's sentences are `lib/learn/copy/shell.ts` |
 | The brain's decay / half-lives | `lib/brain/config.ts` (`HALF_LIFE_*`), maths in `lib/brain/decay.ts` |
 | Any formatting of money, % or dates | `lib/format.ts` (display), `lib/dates.ts` (ET calendar) |
 | Run the browser QA | `npm run qa` (all, ~5 min) or `npm run qa -- <suite>` — the suites and what each seeds are in `scripts/qa/README.md` |

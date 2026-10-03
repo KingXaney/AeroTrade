@@ -1,5 +1,5 @@
 // The app shell (components/shell, lib/shell): the icon rail lists the eight sections and names
-// each on hover, Portfolio opens its summary card, a section's other pages are tabs on the page,
+// each on hover, Portfolio and News open their cards, a section's other pages are tabs on the page,
 // ⌘K works by keyboard alone and finds a page by name, the mobile drawer stands in for the rail
 // and closes after navigating, and the drawer's Logout signs out and lands on /sign-in. Also
 // friends: a sent request is listed with its age, and the recipient sees a dot on the avatar and
@@ -40,6 +40,13 @@ try {
     const flyout = page.locator('[data-rail-flyout="portfolio"]');
     await flyout.waitFor({timeout: 5000}).catch(() => {});
     check('…and Portfolio opens its summary beside the rail', /total return/.test(await flyout.innerText().catch(() => '')));
+    await page.locator('aside.rail a[data-rail="news"]').hover();
+    const newsFly = page.locator('[data-rail-flyout="news"]');
+    await newsFly.waitFor({timeout: 5000}).catch(() => {});
+    const newsText = (await newsFly.innerText().catch(() => '')).replace(/\n/g, ' ');
+    // `/i`: the card's eyebrow and footer are label-type, which a style may uppercase.
+    check('…and News opens its card, which leads to the news',
+        /News/i.test(newsText) && /Open the news/i.test(newsText) && await newsFly.locator('a[href="/news"]').count() === 1, newsText);
     await page.mouse.move(700, 500);
 
     // --- a section's other pages are tabs on the page ---

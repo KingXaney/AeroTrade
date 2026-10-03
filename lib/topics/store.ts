@@ -7,6 +7,7 @@ import {connectToDatabase} from "@/database/mongoose";
 import Topic, {type TopicDoc} from "@/database/models/topic.model";
 import TopicArticle, {type TopicArticleDoc} from "@/database/models/topic-article.model";
 import {refreshKeywordGroup} from "@/lib/topics/refresh";
+import {UNSEEN_COUNT_CAP, unseenFloor} from "@/lib/topics/config";
 import type {TopicDigestInput} from "@/lib/email/sections/topics";
 import type {MergedTopicArticle, TopicArticleView, TopicOverviewItem, TopicView, TopicsOverview} from '@/lib/topics/types';
 
@@ -77,14 +78,18 @@ const getTopicBySlug = async (userId: string, slug: string): Promise<TopicView |
     return doc ? toTopicView(doc) : null;
 };
 
-const unseenCountFor = async (topic: TopicView): Promise<number> => {
-    const filter: Record<string, unknown> = {keywordSetHash: topic.keywordSetHash};
-    if (topic.lastSeenAt) filter.datetime = {$gt: Math.floor(topic.lastSeenAt / 1000)};
-    return TopicArticle.countDocuments(filter);
-};
+// Articles since the reader opened the topic, inside the window (lib/topics/config.ts): the
+// driver stops counting at the cap plus one — its `limit` is a $limit stage before the $group —
+// and every consumer prints past the cap as "99+" (formatCapped). The {keywordSetHash,
+// datetime} index serves the range.
+const unseenCountFor = async (topic: TopicView, nowSeconds: number): Promise<number> =>
+    TopicArticle.countDocuments(
+        {keywordSetHash: topic.keywordSetHash, datetime: {$gt: unseenFloor(topic.lastSeenAt, nowSeconds)}},
+        {limit: UNSEEN_COUNT_CAP + 1},
+    );
 
-// Counts and the latest article per keyword set in one aggregation; unseen counts
-// depend on each user's lastSeenAt, so they are one small count per topic (≤12).
+// Counts and the latest article per keyword set in one aggregation; unseen counts depend on each
+// user's lastSeenAt, so they are one small, capped count per topic (MAX_TOPICS_PER_USER at most).
 export const getTopicsOverview = async (userId: string): Promise<TopicsOverview> => {
     const topics = await getTopicsForUser(userId);
     if (topics.length === 0) return {topics: [], unseenTotal: 0};
@@ -96,7 +101,8 @@ export const getTopicsOverview = async (userId: string): Promise<TopicsOverview>
         {$group: {_id: '$keywordSetHash', count: {$sum: 1}, latest: {$first: '$$ROOT'}}},
     ]);
     const byHash = new Map(rows.map((r) => [r._id, r]));
-    const unseen = await Promise.all(topics.map(unseenCountFor));
+    const now = Math.floor(Date.now() / 1000);
+    const unseen = await Promise.all(topics.map((t) => unseenCountFor(t, now)));
 
     const items: TopicOverviewItem[] = topics.map((t, i) => {
         const row = byHash.get(t.keywordSetHash);

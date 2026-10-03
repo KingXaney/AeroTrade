@@ -5,9 +5,11 @@ import {usePathname} from "next/navigation";
 import {HoverCard, Tooltip} from "radix-ui";
 import {cn} from "@/lib/utils";
 import {NAV_SECTIONS, sectionFor, type NavBadges, type NavSection} from "@/lib/shell/navigation";
+import {dotLabel} from "@/lib/learn/copy/shell";
 import PortfolioSidebarCard from "@/components/shell/PortfolioSidebarCard";
-import TopicsSidebarCard from "@/components/shell/TopicsSidebarCard";
-import type {SidebarPortfolio, SidebarTopics} from "@/lib/shell/sidebar";
+import NewsSidebarCard from "@/components/shell/NewsSidebarCard";
+import {useNewsSeen} from "@/components/shell/useNewsSeen";
+import type {SidebarNews, SidebarPortfolio} from "@/lib/shell/sidebar";
 
 // The desktop navigation: one icon per section, 64px wide, on every page. It replaced a header
 // of eight tabs repeated inside a sidebar of thirteen links and two summary cards.
@@ -15,33 +17,40 @@ import type {SidebarPortfolio, SidebarTopics} from "@/lib/shell/sidebar";
 // The rail never widens. A name is a tooltip and a summary is a hover card, both portaled: a
 // rail that grew on hover would clip its own flyouts (overflow) or strip their blur (a
 // backdrop-filter ancestor), and would push a summary over the page each time the pointer
-// crossed it. What the old cards showed all the time — unread articles, an unpriced holding —
-// is a dot on the icon, so it is never hover-only (invariant 8).
+// crossed it. What the old cards showed all the time — something new in a followed topic since
+// the reader last opened News, an unpriced holding — is a dot on the icon, so it is never
+// hover-only (invariant 8).
+//
+// The News dot is cleared locally the moment a News page stamps the look (useNewsSeen): the
+// layout does not re-render on a soft navigation, so the server's count would otherwise stay
+// lit all session. Server truth returns on the next full load.
 
 type Props = {
     portfolio: SidebarPortfolio | null;
-    topics: SidebarTopics;
+    news: SidebarNews;
     badges: NavBadges;
 };
 
-const dotLabel = (section: NavSection, count: number): string =>
-    section.badge === 'topicsUnseen'
-        ? `${count} unread ${count === 1 ? 'article' : 'articles'}`
-        : `${count} ${count === 1 ? 'holding' : 'holdings'} valued at cost`;
-
 const POPUP = 'chrome-surface z-[70] rounded-lg data-[state=closed]:hidden';
 
-const Rail = ({portfolio, topics, badges}: Props) => {
+const Rail = ({portfolio, news, badges}: Props) => {
     const pathname = usePathname();
     const current = sectionFor(pathname);
+    const clearedAt = useNewsSeen();
+
+    const countFor = (section: NavSection): number => {
+        if (!section.badge) return 0;
+        if (section.badge === 'newsNew' && clearedAt !== null) return 0;
+        return badges[section.badge] ?? 0;
+    };
 
     const item = (section: NavSection) => {
         const active = current?.id === section.id;
-        const count = section.badge ? (badges[section.badge] ?? 0) : 0;
+        const count = countFor(section);
         return (
             <Link
                 href={section.pages[0].href}
-                aria-label={count > 0 ? `${section.label}, ${dotLabel(section, count)}` : section.label}
+                aria-label={count > 0 && section.badge ? `${section.label}, ${dotLabel(section.badge, count)}` : section.label}
                 aria-current={active ? 'page' : undefined}
                 data-rail={section.id}
                 className={cn(
@@ -60,7 +69,8 @@ const Rail = ({portfolio, topics, badges}: Props) => {
     };
 
     const flyout = (section: NavSection) => {
-        if (section.flyout === 'topics') return <TopicsSidebarCard topics={topics}/>;
+        // Straight after the stamp the card says "Since you last looked · just now".
+        if (section.flyout === 'news') return <NewsSidebarCard news={news} seenAt={clearedAt ?? news.seenAt}/>;
         if (section.flyout === 'portfolio' && portfolio) return <PortfolioSidebarCard portfolio={portfolio}/>;
         return null;
     };

@@ -38,6 +38,7 @@ export interface UserPreferencesDoc extends Document {
     newsFeed?: NewsFeedPrefs;          // absent = the default feed (lib/news/feed-prefs.ts)
     followedStrategies?: string[];     // quant-strategy slugs pinned on the dashboard; absent = none
     topicsSeededAt?: Date;             // default topics installed once; absent = never seeded
+    newsSeenAt?: Date;                 // the reader last opened News (/news or the /topics index); absent = never — the rail dot's and the News card's stamp
     learn?: LearnPrefs;                // learn-surface stamps (checklist hidden, lessons seen, quiz days); absent = none
     updatedAt: Date;
 }
@@ -103,6 +104,9 @@ const UserPreferencesSchema = new Schema<UserPreferencesDoc>({
     // what makes "I deleted them all on purpose" stick: without it, every page view would
     // resurrect the defaults the user just removed.
     topicsSeededAt: {type: Date, required: false},
+    // Written on every visit to News by lib/actions/news-feed.actions.markNewsSeen; read with the
+    // feed by lib/news/feed-store.getNewsReaderPrefs. No default: absent means never looked.
+    newsSeenAt: {type: Date, required: false},
     learn: {type: LearnSchema, required: false},
     updatedAt: {type: Date, default: Date.now},
 });

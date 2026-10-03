@@ -2,8 +2,8 @@ import {readdirSync, readFileSync} from 'node:fs';
 import {fileURLToPath} from 'node:url';
 import {afterEach, describe, expect, it, vi} from 'vitest';
 import {
-    formatChangePercent, formatDrawdown, formatEasternTimestamp, formatMarketCapValue, formatPct, formatPrice, formatSigned,
-    formatSignedPrice, formatTimeAgoMs, formatTimeAgoSeconds, getChangeColorClass, roundPct, signedForColor,
+    formatCapped, formatChangePercent, formatDrawdown, formatEasternTimestamp, formatMarketCapValue, formatPct, formatPrice,
+    formatSigned, formatSignedPrice, formatTimeAgoMs, formatTimeAgoSeconds, getChangeColorClass, roundPct, signedForColor,
 } from '@/lib/format';
 
 describe('formatChangePercent', () => {
@@ -172,6 +172,18 @@ describe('formatTimeAgoMs', () => {
         vi.setSystemTime(new Date('2026-09-05T12:00:00Z'));
         const then = Date.now() - 26 * 3_600_000;
         expect(formatTimeAgoMs(then)).toBe(formatTimeAgoSeconds(then / 1000));
+    });
+});
+
+describe('formatCapped', () => {
+    // The topics store counts unseen articles to the cap plus one at most, so a count past the cap
+    // is only "at least this many" and prints as such.
+    it('prints a count up to the cap and "99+" past it', () => {
+        expect(formatCapped(0, 99)).toBe('0');
+        expect(formatCapped(3, 99)).toBe('3');
+        expect(formatCapped(99, 99)).toBe('99');
+        expect(formatCapped(100, 99)).toBe('99+');
+        expect(formatCapped(1600, 99)).toBe('99+');
     });
 });
 
