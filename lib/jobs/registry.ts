@@ -129,5 +129,14 @@ export const JOB_LIST: readonly JobDefinition[] = Object.values(JOBS);
 
 // A function's triggers: its event, then its crons, as Inngest is handed them. Generic so the
 // event name stays a literal type: Inngest types `event.data` from it.
-export const triggersOf = <J extends JobDefinition>(job: J): [{event: J['event']}, ...{cron: J['crons'][number]}[]] =>
-    [{event: job.event}, ...job.crons.map((cron) => ({cron}))];
+//
+// A preview build registers its events only. The Inngest Vercel integration syncs every preview
+// into a branch environment of its own, and a preview shares production's database and mailer,
+// so its crons would run every job again against production (2026-10-05: eight copies of the
+// noon digest, all of them rate-limited). Production and a local dev server keep their crons;
+// lib/site.isPreviewBuild is the same test, for code that may import.
+export const triggersOf = <J extends JobDefinition>(
+    job: J,
+    env: Readonly<Record<string, string | undefined>> = process.env,
+): [{event: J['event']}, ...{cron: J['crons'][number]}[]] =>
+    [{event: job.event}, ...(env.VERCEL_ENV === 'preview' ? [] : job.crons.map((cron) => ({cron})))];
