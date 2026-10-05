@@ -24,7 +24,7 @@ before the rename keep the name "Main Strategy" (new ones are "Main account", `D
 - `npm run test:db` — connect to `MONGODB_URI` (from `.env`) and print the database and host it reached
 - `npm run migrate:accounts` — the idempotent multi-account migration: builds the indexes in `scripts/migration-indexes.mjs` and drops the ones they replaced (run it on every database, again whenever that list changes)
 - `npm run opinion:local` — the brain's Second Opinion from your Claude subscription through the Claude Code CLI, written straight to the database (`.env.example` lists the other ways)
-- `npm run email:preview` — render every email from the fixtures into `scripts/qa/output/email/` and check it at desktop and phone widths, light and dark (`qa-email` without the harness)
+- `npm run email:preview` — render every email from the fixtures into the QA output folder (output/email under scripts/qa) and check it at desktop and phone widths, light and dark (`qa-email` without the harness)
 - `npm run qa` — browser QA (`scripts/qa/run.sh`): an in-memory MongoDB, `next dev` and the Inngest dev server, then every suite or the named ones (`npm run qa -- learn`); one suite per feature, listed in `scripts/qa/README.md`
 - `node scripts/poker-preflop-equity.mjs` — regenerate the poker solver's exact preflop table and its ranking (about seven minutes on every core; `--check` recomputes 40 entries, `--ranking` rewrites only the ranking)
 

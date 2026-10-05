@@ -132,7 +132,7 @@ const until = async (page, fn, ms) => {
     check('topic page heading', headings.some((t) => /AI chips/i.test(t)), headings.join(' | '));
     check('keyword chips rendered', await page.locator('[role="group"][aria-label*="eyword" i] span').count() > 0);
     check('Refresh now present', await page.getByRole('button', {name: /Refresh now|Refreshing/}).count() === 1);
-    note('article cards on first visit (needs Google News reachability)', String(await page.locator('.news-item').count()));
+    note('article cards on first visit (needs Google News reachability)', String(await page.locator('.news-item, [data-article-row]').count()));
     await shot('02-topic-ai-chips');
 
     // --- the rail's News card + the section's tabs ---
@@ -312,7 +312,7 @@ const until = async (page, fn, ms) => {
     check('the palette topic is stored', !!climate);
     const OLD_HEADLINE = 'QA feed: the story already on screen';
     const NEW_HEADLINE = 'QA feed: a story that landed after the page loaded';
-    const headlineShown = (h) => page.locator('.news-title', {hasText: h}).first()
+    const headlineShown = (h) => page.locator('.news-title, [data-article-title]', {hasText: h}).first()
         .waitFor({state: 'visible', timeout: 15000}).then(() => true, () => false);
     if (climate) {
         await seedInto(climate.keywordSetHash, OLD_HEADLINE, 120, 'climate policy');
@@ -340,7 +340,7 @@ const until = async (page, fn, ms) => {
     check('edited keyword appears on the topic page', /carbon tax/i.test(await page.locator('body').innerText()));
     // The seeded rows belong to the old keyword set. Whether or not Google answered for the
     // new one, none of them may stay on screen above "Load more" pages from the new set.
-    const oldSet = page.locator('.news-title', {hasText: /^QA feed: /});
+    const oldSet = page.locator('.news-title, [data-article-title]', {hasText: /^QA feed: /});
     await oldSet.first().waitFor({state: 'detached', timeout: 20000}).catch(() => {});
     const oldSetShown = await oldSet.count();
     check('after a keyword edit, no article from the old set stays on screen', oldSetShown === 0, `${oldSetShown} left`);
