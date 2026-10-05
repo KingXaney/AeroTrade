@@ -12,7 +12,7 @@ import {mailerReady, sendNewsSummaryEmail, sendPasswordResetEmail, sendWelcomeEm
 const senders = {
     'password reset': () => sendPasswordResetEmail({email: 'a@b.co', name: 'Ada', token: 'secret-token'}),
     welcome: () => sendWelcomeEmail({email: 'a@b.co', name: 'Ada', intro: '<p>Hi</p>'}),
-    digest: () => sendNewsSummaryEmail({email: 'a@b.co', date: 'Thursday, October 1, 2026', newsContent: '<p>News</p>'}),
+    digest: () => sendNewsSummaryEmail({email: 'a@b.co', subject: 'AeroTrade daily brief · Oct 1', html: '<p>News</p>', text: 'News'}),
 };
 
 describe('the mailer guard', () => {
@@ -58,6 +58,32 @@ describe('the mailer guard', () => {
             expect(error).not.toHaveBeenCalled();
         });
     }
+
+    // A preview build shares production's mailer and every reader's address: it never sends.
+    for (const [name, send] of Object.entries(senders)) {
+        it(`never sends the ${name} email from a preview build, even with the mailer configured`, async () => {
+            vi.stubEnv('NODEMAILER_EMAIL', 'news@example.com');
+            vi.stubEnv('NODEMAILER_PASSWORD', 'app-password');
+            vi.stubEnv('VERCEL_ENV', 'preview');
+            await send();
+            expect(sendMail).not.toHaveBeenCalled();
+            expect(warn).toHaveBeenCalledTimes(1);
+            expect(String(warn.mock.calls[0][0])).toContain('preview build');
+        });
+    }
+
+    it('sends as AeroTrade, with production links in production', async () => {
+        vi.stubEnv('NODEMAILER_EMAIL', 'news@example.com');
+        vi.stubEnv('NODEMAILER_PASSWORD', 'app-password');
+        vi.stubEnv('VERCEL_ENV', 'production');
+        vi.stubEnv('BETTER_AUTH_URL', 'https://retired.example.app');
+        await senders['password reset']();
+        const mail = sendMail.mock.calls[0][0];
+        expect(mail.from).toBe('"AeroTrade" <news@example.com>');
+        expect(mail.html).toContain('https://aerotrading.vercel.app/reset-password?token=secret-token');
+        expect(mail.html).not.toContain('retired.example.app');
+        expect(mail.text).toContain('https://aerotrading.vercel.app/reset-password?token=secret-token');
+    });
 
     it('keeps the reset link in the warning outside production, so the flow stays testable locally', async () => {
         await senders['password reset']();

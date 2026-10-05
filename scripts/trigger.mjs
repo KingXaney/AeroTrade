@@ -4,6 +4,7 @@
 //   npm run trigger -- brain                       daily news-brain update
 //   npm run trigger -- navigator                   weekly AI Navigator run
 //   npm run trigger -- news                        today's digest emails
+//   npm run trigger -- news <email>                a test brief to that one opted-in reader
 //   npm run trigger -- snapshots                   daily account + benchmark snapshots
 //   npm run trigger -- income                      credit interest + dividends through yesterday (back-credits new accounts)
 //   npm run trigger -- topics                      refresh every followed keyword set
@@ -36,13 +37,15 @@ const STRATEGY_DATA = {
     'strategies-resimulate': { resimulate: true },
 };
 
-const [job, userId, hash] = process.argv.slice(2);
+const [job, first, second] = process.argv.slice(2);
 const name = EVENTS[job];
-if (!name || (job === 'topic' && (!userId || !Number.isFinite(Number(hash))))) {
-    console.error(`Usage: npm run trigger -- <${Object.keys(EVENTS).join('|')}> [userId keywordSetHash]`);
+if (!name || (job === 'topic' && (!first || !Number.isFinite(Number(second))))) {
+    console.error(`Usage: npm run trigger -- <${Object.keys(EVENTS).join('|')}> [userId keywordSetHash | email]`);
     process.exit(1);
 }
-const data = job === 'topic' ? { userId, keywordSetHash: Number(hash) } : (STRATEGY_DATA[job] ?? {});
+const data = job === 'topic'
+    ? { userId: first, keywordSetHash: Number(second) }
+    : job === 'news' && first ? { email: first } : (STRATEGY_DATA[job] ?? {});
 
 // The id must match lib/jobs/client.ts so the event lands in the same app.
 const inngest = new Inngest({ id: 'aerotrade' });

@@ -1,5 +1,5 @@
 import {describe, expect, it} from 'vitest';
-import {buildTopicsSectionHtml} from '@/lib/email/sections/topics';
+import {buildTopicsSectionHtml, topicsSectionLinks} from '@/lib/email/sections/topics';
 
 describe('buildTopicsSectionHtml', () => {
     it('returns an empty string when there are no topics', () => {
@@ -37,5 +37,20 @@ describe('buildTopicsSectionHtml', () => {
         expect((html.match(/<h3/g) ?? []).length).toBe(6);
         expect((html.match(/<li>/g) ?? []).length).toBe(6 * 4);
         expect((html.match(/https:\/\/x\.test\/\d/g) ?? []).length).toBe(6 * 3);
+    });
+
+    it("links each topic's name to its own page, and lists exactly the links it builds", () => {
+        const topics = [
+            {name: 'AI chips', slug: 'ai chips', newCount: 1, brief: null, articles: [
+                {headline: 'One', url: 'https://news.example.com/1', source: 'W'},
+                {headline: 'Bad', url: 'javascript:alert(1)', source: 'W'},
+            ]},
+            {name: 'No slug', slug: '', newCount: 0, brief: null, articles: []},
+        ];
+        const html = buildTopicsSectionHtml(topics, 'https://app.example.com/topics/');
+        const hrefs = [...html.matchAll(/href="([^"]*)"/g)].map((m) => m[1]);
+        expect(hrefs).toEqual(['https://app.example.com/topics/ai%20chips', 'https://news.example.com/1', 'https://app.example.com/topics/']);
+        expect(new Set(topicsSectionLinks(topics, 'https://app.example.com/topics/'))).toEqual(new Set(hrefs));
+        expect(topicsSectionLinks([], 'https://app.example.com/topics')).toEqual([]);
     });
 });

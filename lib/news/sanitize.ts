@@ -30,19 +30,18 @@ export const sanitizeDigestHtml = (html: string, allowedUrls: string[]): string 
 };
 
 // The welcome-email intro is model output written from user-supplied signup fields
-// (goals, industry, country) and injected into the template at {{intro}}. It needs
-// the same distrust as the digest, but the shape is far narrower: the prompt asks
-// for one styled <p> with <strong> emphasis. So rather than filter what the model
-// sent, keep only the emphasis and rebuild the wrapper ourselves — an attribute the
-// model invented then has nowhere to live.
+// (goals, industry, country) and placed into the welcome email. It needs the same
+// distrust as the digest, but the shape is far narrower: the prompt asks for two
+// sentences with <strong> emphasis. So rather than filter what the model sent, keep
+// only the emphasis and drop every other tag — an attribute the model invented then
+// has nowhere to live. The result is inline HTML; the email's own paragraph block
+// (lib/email/layout.paragraphHtml) wraps it.
 const ANY_TAG_PATTERN = /<\/?([a-zA-Z][a-zA-Z0-9-]*)\b[^>]*>/g;
 const INLINE_TAG_ALIASES: Record<string, string> = {strong: 'strong', b: 'strong', em: 'em', i: 'em'};
 // Sentinels stand in for approved tags while every other angle bracket is escaped,
 // so restoring them cannot reintroduce markup from the original text.
 const OPEN_SENTINEL = '\u0001';
 const CLOSE_SENTINEL = '\u0002';
-const WELCOME_PARAGRAPH_ATTRS =
-    'class="mobile-text" style="margin: 0 0 30px 0; font-size: 16px; line-height: 1.6; color: #CCDADC;"';
 
 // The sentinels below are real characters, so text already containing them could
 // survive escaping and be restored as a tag — U+0001script U+0001 would become
@@ -67,8 +66,7 @@ export const sanitizeWelcomeIntroHtml = (html: string): string => {
         .replace(/\s+/g, ' ')
         .trim();
 
-    if (!escaped) return '';
-    return `<p ${WELCOME_PARAGRAPH_ATTRS}>${escaped}</p>`;
+    return escaped;
 };
 
 // Shared by the email templates and the topics digest section. Replacer function

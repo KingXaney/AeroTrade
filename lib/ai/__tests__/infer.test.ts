@@ -11,7 +11,7 @@ import {
 } from "@/lib/ai/infer";
 import {MODEL_MATRIX} from "@/lib/ai/models";
 
-const GEMINI_SPEC = MODEL_MATRIX.free.digest;
+const GEMINI_SPEC = MODEL_MATRIX.free.rationale;
 const GEMINI_JSON_SPEC = MODEL_MATRIX.free.extraction;
 const OPUS_SPEC = MODEL_MATRIX.pro.extraction;
 const HAIKU_SPEC = MODEL_MATRIX.basic.rationale;

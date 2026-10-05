@@ -78,6 +78,14 @@ describe("the matrix", () => {
             expect(MODEL_MATRIX[tier].marketBriefing.jsonMode, tier).toBe(true);
         }
     });
+
+    // The daily brief is read the same way (lib/email/digest-summary.ts); prose would send the
+    // fallback every day.
+    it("keeps JSON mode on the daily brief in every tier", () => {
+        for (const tier of AI_TIERS) {
+            expect(MODEL_MATRIX[tier].digest.jsonMode, tier).toBe(true);
+        }
+    });
 });
 
 describe("resolveTier", () => {

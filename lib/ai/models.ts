@@ -28,7 +28,7 @@ export const GEMINI_FLASH_LITE = 'gemini-2.5-flash-lite';
 
 const FREE: Record<AiTask, ModelSpec> = {
     extraction: {provider: 'gemini', model: GEMINI_FLASH_LITE, maxTokens: 8192, jsonMode: true},
-    digest: {provider: 'gemini', model: GEMINI_FLASH_LITE, maxTokens: 8192},
+    digest: {provider: 'gemini', model: GEMINI_FLASH_LITE, maxTokens: 8192, jsonMode: true},
     rationale: {provider: 'gemini', model: GEMINI_FLASH_LITE, maxTokens: 2048},
     welcome: {provider: 'gemini', model: GEMINI_FLASH_LITE, maxTokens: 1024},
     topicBrief: {provider: 'gemini', model: GEMINI_FLASH_LITE, maxTokens: 1024, jsonMode: true},
@@ -39,7 +39,7 @@ const FREE: Record<AiTask, ModelSpec> = {
 // controls and its cost is entirely predictable.
 const BASIC: Record<AiTask, ModelSpec> = {
     extraction: {provider: 'anthropic', model: 'claude-haiku-4-5', maxTokens: 8192, jsonMode: true},
-    digest: {provider: 'anthropic', model: 'claude-haiku-4-5', maxTokens: 8192},
+    digest: {provider: 'anthropic', model: 'claude-haiku-4-5', maxTokens: 8192, jsonMode: true},
     rationale: {provider: 'anthropic', model: 'claude-haiku-4-5', maxTokens: 2048},
     welcome: {provider: 'anthropic', model: 'claude-haiku-4-5', maxTokens: 1024},
     topicBrief: {provider: 'anthropic', model: 'claude-haiku-4-5', maxTokens: 1024, jsonMode: true},
@@ -54,7 +54,7 @@ const PRO: Record<AiTask, ModelSpec> = {
     // <thinking> into the visible answer, which here means JSON.parse throws and a
     // whole 20-article batch is dropped.
     extraction: {provider: 'anthropic', model: 'claude-opus-5', maxTokens: 12288, effort: 'low', jsonMode: true},
-    digest: {provider: 'anthropic', model: 'claude-sonnet-5', maxTokens: 8192, effort: 'medium'},
+    digest: {provider: 'anthropic', model: 'claude-sonnet-5', maxTokens: 8192, effort: 'medium', jsonMode: true},
     rationale: {provider: 'anthropic', model: 'claude-haiku-4-5', maxTokens: 2048},
     welcome: {provider: 'anthropic', model: 'claude-haiku-4-5', maxTokens: 1024},
     // A topic brief never reaches a trading decision; the cheap model is the right one.
