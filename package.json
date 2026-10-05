@@ -22,7 +22,8 @@
     "build:check": "next build --experimental-build-mode compile",
     "trigger": "node scripts/trigger.mjs",
     "opinion:local": "node scripts/second-opinion-local.mjs",
-    "qa": "bash scripts/qa/run.sh"
+    "qa": "bash scripts/qa/run.sh",
+    "email:preview": "cd scripts/qa && node qa-email.mjs"
   },
   "dependencies": {
     "@ai-sdk/google": "^3.0.130",
