@@ -40,7 +40,7 @@ const TopicPage = async ({params}: TopicPageProps) => {
                 )}
             {articles.length > 0
                 ? <TopicFeed key={view.feedKey} topicId={topic.id} initial={articles}
-                             unseenCount={topic.unseenCount} pageSize={TOPIC_PAGE_SIZE} />
+                             unseenCount={topic.unseenCount} pageSize={TOPIC_PAGE_SIZE} layout="row" />
                 : <TopicFeedEmpty scope="topic" topic={topic} now={now} />}
         </TopicsShell>
     );

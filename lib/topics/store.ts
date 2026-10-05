@@ -7,13 +7,11 @@ import {connectToDatabase} from "@/database/mongoose";
 import Topic, {type TopicDoc} from "@/database/models/topic.model";
 import TopicArticle, {type TopicArticleDoc} from "@/database/models/topic-article.model";
 import {refreshKeywordGroup} from "@/lib/topics/refresh";
-import {UNSEEN_COUNT_CAP, unseenFloor} from "@/lib/topics/config";
+import {DIGEST_ARTICLES_PER_TOPIC, DIGEST_TOPIC_CAP, UNSEEN_COUNT_CAP, unseenFloor} from "@/lib/topics/config";
 import type {TopicDigestInput} from "@/lib/email/sections/topics";
 import type {MergedTopicArticle, TopicArticleView, TopicOverviewItem, TopicView, TopicsOverview} from '@/lib/topics/types';
 
 const DAY_SECONDS = 24 * 60 * 60;
-const DIGEST_TOPIC_CAP = 6;
-const DIGEST_ARTICLES_PER_TOPIC = 3;
 
 type LeanTopic = Omit<TopicDoc, keyof Document> & {_id: unknown; createdAt?: Date};
 

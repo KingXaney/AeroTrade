@@ -8,6 +8,7 @@
 // articles' own. The text is rendered as text nodes, never as HTML or markdown.
 
 import {z} from 'zod';
+import {citedIndices, cleanText as clean, stripFences} from '@/lib/ai/cited';
 
 export const BRIEFING_MAX_BULLETS = 5;
 export const BRIEFING_MAX_STORIES = 8;
@@ -50,25 +51,9 @@ const answerSchema = z.object({
     stories: z.array(itemSchema).optional(),
 });
 
-const stripFences = (text: string): string =>
-    text.replace(/^\s*```(?:json)?\s*/i, '').replace(/\s*```\s*$/, '').trim();
-
-const clean = (value: unknown, max: number): string =>
-    typeof value === 'string' ? value.replace(/\s+/g, ' ').trim().slice(0, max) : '';
-
 // The cited articles, in the order cited, each once: 1-based numbers into `articles`.
-const cited = (numbers: unknown, articles: readonly BriefingArticle[]): BriefingArticle[] => {
-    if (!Array.isArray(numbers)) return [];
-    const seen = new Set<number>();
-    const out: BriefingArticle[] = [];
-    for (const raw of numbers) {
-        if (typeof raw !== 'number' || !Number.isInteger(raw) || raw < 1 || raw > articles.length || seen.has(raw)) continue;
-        seen.add(raw);
-        out.push(articles[raw - 1]);
-        if (out.length >= SOURCES_PER_ITEM) break;
-    }
-    return out;
-};
+const cited = (numbers: unknown, articles: readonly BriefingArticle[]): BriefingArticle[] =>
+    citedIndices(numbers, articles.length, SOURCES_PER_ITEM).map((i) => articles[i]);
 
 const toSource = (a: BriefingArticle): BriefingSource => ({headline: a.headline, source: a.source, url: a.url, datetime: a.datetime});
 

@@ -46,12 +46,12 @@ const NewsBriefing = ({briefing}: {briefing: Briefing}) => {
 
             {briefing.headline && <p className="mb-3 font-heading text-lg font-semibold leading-snug text-fg" data-briefing-headline>{briefing.headline}</p>}
 
-            <ul className="space-y-2">
+            <ul className="divide-y divide-line-strong/20 border-y border-line-strong/20">
                 {briefing.bullets.map((bullet) => (
-                    <RowCard as="li" key={bullet.text} tone="brand">
+                    <li className="py-3" key={bullet.text}>
                         <span className="block text-sm leading-relaxed text-fg" data-briefing-bullet>{bullet.text}</span>
                         <Sources sources={bullet.sources}/>
-                    </RowCard>
+                    </li>
                 ))}
             </ul>
 

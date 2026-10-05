@@ -59,11 +59,12 @@ describe("sanitizeWelcomeIntroHtml", () => {
         expect(out).toContain("<strong>energy</strong>");
     });
 
-    it("rebuilds the wrapper instead of trusting the model's attributes", () => {
+    it("drops the model's wrapper and its attributes, keeping the text", () => {
         const out = sanitizeWelcomeIntroHtml('<p onclick="steal()" class="evil">Hello</p>');
         expect(out).not.toContain("onclick");
         expect(out).not.toContain("evil");
-        expect(out).toContain('class="mobile-text"');
+        expect(out).not.toContain("<p");
+        expect(out).toBe("Hello");
     });
 
     it("drops script tags and any tag outside the inline allowlist", () => {
@@ -95,11 +96,9 @@ describe("sanitizeWelcomeIntroHtml", () => {
         expect(out).toContain("<em>italic</em>");
     });
 
-    it("wraps plain text so the fallback copy renders identically", () => {
-        const out = sanitizeWelcomeIntroHtml("Thanks for joining AeroTrade.");
-        expect(out).toBe(
-            '<p class="mobile-text" style="margin: 0 0 30px 0; font-size: 16px; line-height: 1.6; color: #CCDADC;">Thanks for joining AeroTrade.</p>',
-        );
+    it("passes plain text through, so the fallback copy renders identically", () => {
+        expect(sanitizeWelcomeIntroHtml("Thanks for joining AeroTrade.")).toBe("Thanks for joining AeroTrade.");
+        expect(sanitizeWelcomeIntroHtml("   ")).toBe("");
     });
 
     // The restore step turns internal sentinels back into tags, so text that already

@@ -15,11 +15,12 @@ type Props = {
     unseenCount?: number;         // the first N initial items are marked "New"
     pageSize?: number;
     showTopicTag?: boolean;
+    layout?: 'card' | 'row';
 };
 
 const isMerged = (a: MergedOrPlain): a is MergedTopicArticle => 'topicSlug' in a;
 
-const TopicFeed = ({topicId, initial, unseenCount = 0, pageSize = 20, showTopicTag = false}: Props) => {
+const TopicFeed = ({topicId, initial, unseenCount = 0, pageSize = 20, showTopicTag = false, layout = 'card'}: Props) => {
     // Seeded once. The pages key this component with topicFeedKey, so a refresh that
     // hands it a different first page remounts it rather than being ignored here.
     const [articles, setArticles] = useState<MergedOrPlain[]>(initial);
@@ -46,12 +47,13 @@ const TopicFeed = ({topicId, initial, unseenCount = 0, pageSize = 20, showTopicT
 
     return (
         <div>
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div className={layout === 'row' ? 'space-y-2' : 'grid grid-cols-1 gap-4 md:grid-cols-2'}>
                 {articles.map((a, i) => (
                     <TopicArticleCard
                         key={`${a.contentHash}-${isMerged(a) ? a.topicSlug : ''}`}
                         article={a}
                         isNew={i < unseenCount}
+                        layout={layout}
                         topic={showTopicTag && isMerged(a) ? {name: a.topicName, slug: a.topicSlug, color: a.topicColor} : undefined}
                     />
                 ))}

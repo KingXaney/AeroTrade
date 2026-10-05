@@ -9,7 +9,7 @@ import {describe, expect, it} from 'vitest';
 import {ADVISOR_SYSTEM_PROMPT} from '@/lib/chat/system-prompt';
 import {TOOL_DESCRIPTIONS} from '@/lib/chat/tool-copy';
 import {CHAT_SUGGESTIONS, CHAT_USAGE_COPY, CHAT_WELCOME_MESSAGE} from '@/lib/learn/copy/chat';
-import {NEWS_SUMMARY_EMAIL_PROMPT, PERSONALIZED_WELCOME_EMAIL_PROMPT} from '@/lib/email/prompts';
+import {DAILY_DIGEST_PROMPT, PERSONALIZED_WELCOME_EMAIL_PROMPT} from '@/lib/email/prompts';
 import {RATIONALE_PROMPT} from '@/lib/navigator/prompts';
 import {MARKET_BRIEFING_PROMPT} from '@/lib/news/prompts';
 import {findBanned} from '@/lib/learn/banned';
@@ -27,7 +27,7 @@ const corpus: [string, string][] = [
     ...CHAT_SUGGESTIONS.map((chip, i): [string, string] => [`chip ${i}`, chip]),
     ...Object.entries(TOOL_DESCRIPTIONS).map(([name, text]): [string, string] => [`tool ${name}`, text]),
     ['PERSONALIZED_WELCOME_EMAIL_PROMPT', PERSONALIZED_WELCOME_EMAIL_PROMPT],
-    ['NEWS_SUMMARY_EMAIL_PROMPT', NEWS_SUMMARY_EMAIL_PROMPT],
+    ['DAILY_DIGEST_PROMPT', DAILY_DIGEST_PROMPT],
     ['RATIONALE_PROMPT', RATIONALE_PROMPT],
     ['MARKET_BRIEFING_PROMPT', MARKET_BRIEFING_PROMPT],
 ];

@@ -13,6 +13,11 @@ export const NAME_MAX = 60;
 export const MAX_MATCH_TEXT_CHARS = 2000;
 export const MATCH_CAP_PER_FETCH = 40;
 export const MAX_ARTICLES_PER_TOPIC_PER_DAY = 60;
+// The daily digest's dedicated topics section is deliberately small. The same limits
+// shape its query, renderer, and the explanation shown while managing topics.
+export const DIGEST_TOPIC_CAP = 6;
+export const DIGEST_ARTICLES_PER_TOPIC = 3;
+export const DIGEST_BRIEF_BULLET_CAP = 4;
 
 // What "new" means on every topic badge: articles published after the reader last opened the
 // topic, counting back at most this long. A topic never opened used to count every stored

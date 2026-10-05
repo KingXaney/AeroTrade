@@ -1,6 +1,7 @@
 import nodemailer from 'nodemailer';
-import {escapeHtml} from "@/lib/news/sanitize";
-import {WELCOME_EMAIL_TEMPLATE, PASSWORD_RESET_EMAIL_TEMPLATE, renderNewsSummaryEmail} from "@/lib/email/templates";
+import {renderPasswordResetEmail, renderWelcomeEmail} from "@/lib/email/templates";
+import {RESET_EMAIL_COPY, WELCOME_EMAIL_COPY} from "@/lib/learn/copy/email";
+import {isPreviewBuild, SITE_NAME, siteUrl} from "@/lib/site";
 
 type WelcomeEmailData = {
     email: string;
@@ -16,8 +17,12 @@ const transporter = nodemailer.createTransport({
     }
 })
 
-// Absolute links in email need the deployment's public URL (the same one better-auth uses).
-export const appUrl = (): string => (process.env.BETTER_AUTH_URL ?? '').replace(/\/$/, '') || 'http://localhost:3000';
+// Absolute links in email: the production domain in production, the app's own address
+// elsewhere (lib/site.ts).
+export const appUrl = (): string => siteUrl();
+
+// The sender: the product's name before whatever address the mailer is configured with.
+const from = (): string => `"${SITE_NAME}" <${process.env.NODEMAILER_EMAIL}>`;
 
 const mailerConfigured = (): boolean => Boolean(process.env.NODEMAILER_EMAIL && process.env.NODEMAILER_PASSWORD);
 
@@ -26,7 +31,15 @@ const mailerConfigured = (): boolean => Boolean(process.env.NODEMAILER_EMAIL && 
 // pays for a model call to write the email — asks here first, and an unconfigured mailer costs
 // one log line: an error in production, a warning elsewhere. `devDetail` (the reset link) is
 // printed only outside production, which keeps the flow testable locally without leaking it.
+//
+// A preview build never sends: it shares production's mailer and database, and the Inngest
+// integration runs its jobs in a branch environment of its own, so its mail would reach every
+// real reader a second time.
 export const mailerReady = (what: string, devDetail?: string): boolean => {
+    if (isPreviewBuild()) {
+        console.warn(`[mailer] preview build — ${what} not sent`);
+        return false;
+    }
     if (mailerConfigured()) return true;
     if (process.env.NODE_ENV === 'production') console.error(`[mailer] NODEMAILER_EMAIL/PASSWORD unset — ${what} not sent`);
     else console.warn(`[mailer] NODEMAILER_EMAIL/PASSWORD unset — ${what} not sent${devDetail ? `: ${devDetail}` : ''}`);
@@ -35,73 +48,39 @@ export const mailerReady = (what: string, devDetail?: string): boolean => {
 
 const PASSWORD_RESET_TTL_MINUTES = 30;
 
-// Everything the senders below interpolate into their templates becomes HTML in an email sent
-// from this product's own address. `name` comes straight from an unverified signup form and the
-// recipient is whatever address that form was given, so without escaping a signup is enough to
-// mail arbitrary markup — a phishing link, say — to anyone. Replacer functions rather than
-// replacement strings: '$&' in a name would otherwise be expanded by String.replace.
-
-// The token lands in an href: URL-encode it first, then HTML-escape the whole URL.
+// Everything the senders below put into an email becomes HTML sent from this product's own
+// address. `name` comes straight from an unverified signup form and the recipient is whatever
+// address that form was given, so without escaping a signup is enough to mail arbitrary markup —
+// a phishing link, say — to anyone. The renderers (lib/email/templates.ts) escape every text
+// argument; the reset token is URL-encoded into its link first.
 export const sendPasswordResetEmail = async ({ email, name, token }: { email: string; name?: string | null; token: string }): Promise<void> => {
     const resetUrl = `${appUrl()}/reset-password?token=${encodeURIComponent(token)}`;
     if (!mailerReady('the password reset email', `link for ${email}: ${resetUrl}`)) return;
-    const htmlTemplate = PASSWORD_RESET_EMAIL_TEMPLATE
-        .replaceAll('{{appUrl}}', () => appUrl())
-        .replace('{{name}}', () => escapeHtml(name?.trim() || 'there'))
-        .replaceAll('{{resetUrl}}', () => escapeHtml(resetUrl))
-        .replaceAll('{{ttl}}', () => String(PASSWORD_RESET_TTL_MINUTES));
-
     await transporter.sendMail({
-        from: `"AeroTrade" <${process.env.NODEMAILER_EMAIL}>`,
+        from: from(),
         to: email,
-        subject: 'Reset your AeroTrade password',
-        text: `Reset your AeroTrade password: ${resetUrl}\n\nThe link expires in ${PASSWORD_RESET_TTL_MINUTES} minutes. If you didn't ask for this, ignore this email — your password stays as it is.`,
-        html: htmlTemplate,
+        subject: RESET_EMAIL_COPY.subject,
+        text: RESET_EMAIL_COPY.text(resetUrl, PASSWORD_RESET_TTL_MINUTES),
+        html: renderPasswordResetEmail({appUrl: appUrl(), name: name?.trim() || 'there', resetUrl, minutes: PASSWORD_RESET_TTL_MINUTES}),
     });
 };
 
+// `intro` is inline HTML that sanitizeWelcomeIntroHtml has already reduced to text and emphasis.
 export const sendWelcomeEmail = async ({ email, name, intro }: WelcomeEmailData): Promise<void> => {
     if (!mailerReady('the welcome email')) return;
-    const htmlTemplate = WELCOME_EMAIL_TEMPLATE
-        .replaceAll('{{appUrl}}', () => appUrl())
-        .replace('{{name}}', () => escapeHtml(name))
-        // intro is deliberately HTML — sanitizeWelcomeIntroHtml has already rebuilt it.
-        .replace('{{intro}}', () => intro);
-
-    const mailOptions = {
-        from: `"AeroTrade" <${process.env.NODEMAILER_EMAIL}>`,
+    await transporter.sendMail({
+        from: from(),
         to: email,
-        subject: `Welcome to AeroTrade — your trading terminal is ready`,
-        text: 'Thanks for joining AeroTrade',
-        html: htmlTemplate,
-    }
-
-    await transporter.sendMail(mailOptions);
+        subject: WELCOME_EMAIL_COPY.subject,
+        text: WELCOME_EMAIL_COPY.text(`${appUrl()}/`),
+        html: renderWelcomeEmail({appUrl: appUrl(), name, introHtml: intro}),
+    });
 }
 
-// The daily digest's date line and subject date, e.g. "Thursday, October 1, 2026" — the ET day,
-// like every other date the app prints.
-export const getFormattedTodayDate = () => new Date().toLocaleDateString('en-US', {
-    weekday: 'long',
-    year: 'numeric',
-    month: 'long',
-    day: 'numeric',
-    timeZone: 'America/New_York',
-});
-
+// The daily brief, already composed (lib/email/digest.ts): its subject, HTML and plain text.
 export const sendNewsSummaryEmail = async (
-    { email, date, newsContent, topicsSection = '', lessonSection = '' }: { email: string; date: string; newsContent: string; topicsSection?: string; lessonSection?: string }
+    {email, subject, html, text}: {email: string; subject: string; html: string; text: string}
 ): Promise<void> => {
     if (!mailerReady('the daily news summary')) return;
-    const htmlTemplate = renderNewsSummaryEmail({appUrl: appUrl(), date, newsContent, topicsSection, lessonSection});
-
-    const mailOptions = {
-        from: `"AeroTrade News" <${process.env.NODEMAILER_EMAIL}>`,
-        to: email,
-        subject: `📈 Market News Summary Today - ${date}`,
-        text: `Today's market news summary from AeroTrade`,
-        html: htmlTemplate,
-    };
-
-    await transporter.sendMail(mailOptions);
+    await transporter.sendMail({from: from(), to: email, subject, text, html});
 };

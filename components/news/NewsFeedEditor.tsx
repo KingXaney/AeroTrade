@@ -29,10 +29,10 @@ import {
 import {KEYWORD_MAX} from "@/lib/news/keywords";
 import {cn} from "@/lib/utils";
 import {NEWS_COPY} from "@/lib/learn/copy/news";
-import Panel from "@/components/primitives/Panel";
+import {UNREACHABLE_MESSAGE} from "@/lib/action-toast";
 import RowCard from "@/components/primitives/RowCard";
 import ActionButton from "@/components/primitives/ActionButton";
-import SectionHeading from "@/components/primitives/SectionHeading";
+import {Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle} from "@/components/ui/dialog";
 
 // Imports lib/news/feed-prefs, never lib/news/feed: the latter reaches the XML parser
 // through the search adapter and has no business in the client bundle.
@@ -52,9 +52,7 @@ const Group = ({label, hint, children}: {label: string; hint?: string; children:
 
 type Props = {initial: NewsFeedPrefs; startOpen?: boolean};
 
-// Closed, it is one button beside the page's title: the feed's summary is the title's subtitle,
-// and a panel that only repeated it sat above the news on every visit. Open, it is
-// the whole preference in one panel, saved explicitly. The draft is normalised on every
+// The title action opens a focused editor. The draft is normalised on every
 // render so the summary line, the fetch-budget hint and the Save button all describe what
 // will actually be stored, not what was typed.
 const NewsFeedEditor = ({initial, startOpen = false}: Props) => {
@@ -86,15 +84,19 @@ const NewsFeedEditor = ({initial, startOpen = false}: Props) => {
     };
 
     const save = () => startTransition(async () => {
-        const result = await saveNewsFeed(normalized);
-        if (!result.success || !result.feed) {
-            toast.error(result.message ?? 'Could not save your news feed');
-            return;
+        try {
+            const result = await saveNewsFeed(normalized);
+            if (!result.success || !result.feed) {
+                toast.error(result.message ?? 'Could not save your news feed');
+                return;
+            }
+            setSaved(result.feed);
+            setDraft(result.feed);
+            toast.success('News feed saved');
+            router.refresh();
+        } catch {
+            toast.error(UNREACHABLE_MESSAGE);
         }
-        setSaved(result.feed);
-        setDraft(result.feed);
-        toast.success('News feed saved');
-        router.refresh();
     });
 
     const {askReset, resetDialog} = useResetNewsFeed((feed) => {
@@ -108,97 +110,94 @@ const NewsFeedEditor = ({initial, startOpen = false}: Props) => {
         </ActionButton>
     );
 
-    if (!open) return <div className="flex justify-end md:-mt-14 md:mb-6">{toggle}{resetDialog}</div>;
-
     return (
-        <Panel>
-            <div className="flex items-center justify-between gap-3 flex-wrap">
-                <div className="min-w-0">
-                    <SectionHeading spacing="none">Your feed</SectionHeading>
-                    <p className="text-xs text-fg-muted mt-1 font-mono">{describeNewsFeed(normalized)}{dirty ? ' · unsaved' : ''}</p>
-                </div>
-                {toggle}
-            </div>
+        <>
+            {toggle}
+            <Dialog open={open} onOpenChange={setOpen}>
+                <DialogContent className="max-h-[85vh] overflow-y-auto sm:max-w-3xl">
+                    <DialogHeader>
+                        <DialogTitle className="font-heading">{NEWS_COPY.customize}</DialogTitle>
+                        <DialogDescription>{NEWS_COPY.editorDescription}</DialogDescription>
+                    </DialogHeader>
+                    <fieldset disabled={pending} className="min-w-0 space-y-5 border-0 p-0">
+                        <p className="text-xs text-fg-muted">{describeNewsFeed(normalized)}{dirty ? ' · unsaved' : ''}</p>
+                        <Group label="Categories" hint={`Up to ${MAX_FEED_CATEGORIES}. Top stories is Google's front page; Markets is the CNBC, MarketWatch and Yahoo Finance wires.`}>
+                            <div className="flex flex-wrap gap-2" role="group" aria-label="Categories">
+                                {NEWS_CATEGORIES.map((c) => (
+                                    <button key={c.id} id={`news-cat-${c.id}`} type="button" aria-pressed={draft.categories.includes(c.id)}
+                                            title={c.hint} onClick={() => toggleCategory(c.id)} className={chipClass(draft.categories.includes(c.id))}>
+                                        {c.label}
+                                    </button>
+                                ))}
+                            </div>
+                        </Group>
 
-            {open && (
-                <div className="mt-5 space-y-5">
-                    <Group label="Categories" hint={`Up to ${MAX_FEED_CATEGORIES}. Top stories is Google's front page; Markets is the CNBC, MarketWatch and Yahoo Finance wires.`}>
-                        <div className="flex flex-wrap gap-2" role="group" aria-label="Categories">
-                            {NEWS_CATEGORIES.map((c) => (
-                                <button key={c.id} id={`news-cat-${c.id}`} type="button" aria-pressed={draft.categories.includes(c.id)}
-                                        title={c.hint} onClick={() => toggleCategory(c.id)} className={chipClass(draft.categories.includes(c.id))}>
-                                    {c.label}
-                                </button>
-                            ))}
+                        <Group label="Regions" hint={`Google News editions, up to ${MAX_FEED_REGIONS}. Each category is fetched for each region.`}>
+                            <div className="flex flex-wrap gap-2" role="group" aria-label="Regions">
+                                {NEWS_REGIONS.map((r) => (
+                                    <button key={r.id} id={`news-region-${r.id}`} type="button" aria-pressed={draft.regions.includes(r.id)}
+                                            onClick={() => toggleRegion(r.id)} className={chipClass(draft.regions.includes(r.id))}>
+                                        {r.label}
+                                    </button>
+                                ))}
+                            </div>
+                        </Group>
+
+                        <Group label="Preferred outlets" hint="Only these outlets are shown when the list is not empty — it narrows every feed. Use Hide for a lighter touch.">
+                            <div className="mb-2 flex flex-wrap gap-2" role="group" aria-label="Suggested outlets">
+                                {SUGGESTED_OUTLETS.map((name) => (
+                                    <button key={name} type="button" aria-pressed={hasOutlet(name)} onClick={() => toggleSuggested(name)} className={chipClass(hasOutlet(name))}>
+                                        {name}
+                                    </button>
+                                ))}
+                            </div>
+                            <KeywordChips values={draft.includeSources} editable variant="include" max={MAX_FEED_OUTLETS} maxLength={OUTLET_MAX_CHARS}
+                                          placeholder="Add an outlet…" ariaLabel="Preferred outlets"
+                                          onChange={(next) => setDraft({...draft, includeSources: next})} />
+                        </Group>
+
+                        <Group label="Hide outlets" hint="Never show these, whatever else the feed carries.">
+                            <KeywordChips values={draft.excludeSources} editable variant="exclude" max={MAX_FEED_OUTLETS} maxLength={OUTLET_MAX_CHARS}
+                                          placeholder="Hide an outlet…" ariaLabel="Hidden outlets"
+                                          onChange={(next) => setDraft({...draft, excludeSources: next})} />
+                        </Group>
+
+                        <Group label="Keywords" hint={`Up to ${MAX_FEED_KEYWORDS} terms, fetched as one Google News search alongside your categories.`}>
+                            <KeywordChips values={draft.keywords} editable max={MAX_FEED_KEYWORDS} maxLength={KEYWORD_MAX}
+                                          placeholder="Add a keyword…" ariaLabel="Keywords"
+                                          onChange={(next) => setDraft({...draft, keywords: next})} />
+                        </Group>
+
+                        <RowCard as="label" htmlFor="news-watchlist-toggle" className="flex cursor-pointer items-center justify-between gap-4">
+                            <div>
+                                <div className="text-sm font-medium text-fg">Include my watchlist companies</div>
+                                <div className="text-[11px] text-fg-muted">Company headlines for the symbols you watch, mixed into the feed.</div>
+                            </div>
+                            <Switch id="news-watchlist-toggle" checked={draft.includeWatchlist}
+                                    onCheckedChange={(checked) => setDraft({...draft, includeWatchlist: checked})} />
+                        </RowCard>
+
+                        {dropped > 0 && (
+                            <p role="status" className="text-[11px] text-warning font-mono">
+                                {slots.length} of {slots.length + dropped} feeds will be fetched — remove a region or category to cover everything.
+                            </p>
+                        )}
+
+                        <div className="flex items-center justify-between gap-2 border-t border-line-strong/20 pt-3 font-mono">
+                            <button id="news-feed-reset" type="button" onClick={askReset}
+                                    className="label-type text-xs text-fg-muted transition-colors hover:text-negative">
+                                Reset to top stories
+                            </button>
+                            <ActionButton id="news-feed-save" size="md" className="inline-flex items-center gap-2" onClick={save} disabled={!dirty}>
+                                {pending && <Loader2 className="size-3.5 animate-spin" />}
+                                Save feed
+                            </ActionButton>
                         </div>
-                    </Group>
-
-                    <Group label="Regions" hint={`Google News editions, up to ${MAX_FEED_REGIONS}. Each category is fetched for each region.`}>
-                        <div className="flex flex-wrap gap-2" role="group" aria-label="Regions">
-                            {NEWS_REGIONS.map((r) => (
-                                <button key={r.id} id={`news-region-${r.id}`} type="button" aria-pressed={draft.regions.includes(r.id)}
-                                        onClick={() => toggleRegion(r.id)} className={chipClass(draft.regions.includes(r.id))}>
-                                    {r.label}
-                                </button>
-                            ))}
-                        </div>
-                    </Group>
-
-                    <Group label="Preferred outlets" hint="Only these outlets are shown when the list is not empty — it narrows every feed. Use Hide for a lighter touch.">
-                        <div className="flex flex-wrap gap-2 mb-2" role="group" aria-label="Suggested outlets">
-                            {SUGGESTED_OUTLETS.map((name) => (
-                                <button key={name} type="button" aria-pressed={hasOutlet(name)} onClick={() => toggleSuggested(name)} className={chipClass(hasOutlet(name))}>
-                                    {name}
-                                </button>
-                            ))}
-                        </div>
-                        <KeywordChips values={draft.includeSources} editable variant="include" max={MAX_FEED_OUTLETS} maxLength={OUTLET_MAX_CHARS}
-                                      placeholder="Add an outlet…" ariaLabel="Preferred outlets"
-                                      onChange={(next) => setDraft({...draft, includeSources: next})} />
-                    </Group>
-
-                    <Group label="Hide outlets" hint="Never show these, whatever else the feed carries.">
-                        <KeywordChips values={draft.excludeSources} editable variant="exclude" max={MAX_FEED_OUTLETS} maxLength={OUTLET_MAX_CHARS}
-                                      placeholder="Hide an outlet…" ariaLabel="Hidden outlets"
-                                      onChange={(next) => setDraft({...draft, excludeSources: next})} />
-                    </Group>
-
-                    <Group label="Keywords" hint={`Up to ${MAX_FEED_KEYWORDS} terms, fetched as one Google News search alongside your categories.`}>
-                        <KeywordChips values={draft.keywords} editable max={MAX_FEED_KEYWORDS} maxLength={KEYWORD_MAX}
-                                      placeholder="Add a keyword…" ariaLabel="Keywords"
-                                      onChange={(next) => setDraft({...draft, keywords: next})} />
-                    </Group>
-
-                    <RowCard as="label" htmlFor="news-watchlist-toggle" className="flex items-center justify-between gap-4 cursor-pointer">
-                        <div>
-                            <div className="text-sm font-medium text-fg">Include my watchlist companies</div>
-                            <div className="text-[11px] text-fg-muted">Company headlines for the symbols you watch, mixed into the feed.</div>
-                        </div>
-                        <Switch id="news-watchlist-toggle" checked={draft.includeWatchlist}
-                                onCheckedChange={(checked) => setDraft({...draft, includeWatchlist: checked})} />
-                    </RowCard>
-
-                    {dropped > 0 && (
-                        <p role="status" className="text-[11px] text-warning font-mono">
-                            {slots.length} of {slots.length + dropped} feeds will be fetched — remove a region or category to cover everything.
-                        </p>
-                    )}
-
-                    <div className="flex items-center justify-between gap-2 pt-3 border-t border-line-strong/20 font-mono">
-                        <button id="news-feed-reset" type="button" onClick={askReset}
-                                className="label-type text-xs text-fg-muted hover:text-negative transition-colors">
-                            Reset to top stories
-                        </button>
-                        <ActionButton id="news-feed-save" size="md" className="inline-flex items-center gap-2" onClick={save} disabled={pending || !dirty}>
-                            {pending && <Loader2 className="size-3.5 animate-spin" />}
-                            Save feed
-                        </ActionButton>
-                    </div>
-                </div>
-            )}
-
+                    </fieldset>
+                </DialogContent>
+            </Dialog>
             {resetDialog}
-        </Panel>
+        </>
     );
 };
 

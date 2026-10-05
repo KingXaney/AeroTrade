@@ -4,6 +4,7 @@
 // (invariant 4); these frame it. The test holds every string to the 'copy' tier of lib/learn/banned.ts.
 
 import type {TopicOfferGroup} from '@/lib/topics/manage';
+import {DIGEST_ARTICLES_PER_TOPIC, DIGEST_TOPIC_CAP} from '@/lib/topics/config';
 
 const CAVEAT = 'AI summary · may contain errors';
 
@@ -62,4 +63,6 @@ export const TOPICS_MANAGE_COPY = {
     roomFor: (count: number): string => count === 1 ? 'Room for 1 more topic.' : `Room for ${count} more topics.`,
     atCap: (max: number): string => `You follow ${max} of ${max} topics. Remove one to add another.`,
     nothingToAdd: 'You already follow every suggested topic.',
+    digestNote: `The noon ET digest has a separate “Your topics” section when enabled: up to ${DIGEST_TOPIC_CAP} followed topics, their latest brief, and up to ${DIGEST_ARTICLES_PER_TOPIC} recent headlines each.`,
+    digestSettings: 'Email settings',
 } as const;

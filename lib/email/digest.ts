@@ -4,11 +4,13 @@
 
 import {connectToDatabase} from "@/database/mongoose";
 import SuggestionSet from "@/database/models/suggestion-set.model";
-import {appUrl, getFormattedTodayDate, sendNewsSummaryEmail} from "@/lib/email/send";
-import {NEWS_SUMMARY_EMAIL_PROMPT} from "@/lib/email/prompts";
-import {buildTopicsSectionHtml} from "@/lib/email/sections/topics";
+import {appUrl, sendNewsSummaryEmail} from "@/lib/email/send";
+import {buildTopicsSectionHtml, topicsSectionLinks} from "@/lib/email/sections/topics";
 import {lessonSectionFor} from "@/lib/email/sections/lesson";
-import {injectJson} from "@/lib/ai/prompt-utils";
+import {claimDigestDay, releaseDigestDay} from "@/lib/email/digest-store";
+import {fallbackDigestSummary, parseDigestSummary} from "@/lib/email/digest-summary";
+import {buildDigestView, type NavigatorDigest} from "@/lib/email/digest-view";
+import {renderDigestHtml, renderDigestText} from "@/lib/email/digest-render";
 import {getWatchlistSymbolsByEmail} from "@/lib/stocks/watchlist-store";
 import {getHeldSymbolsByUserId} from "@/lib/trading/accounts";
 import {getAggregatedNews} from "@/lib/news/aggregate";
@@ -35,7 +37,10 @@ type DigestUser = {
     topicsInDigest: boolean;
 };
 
-export const fetchDigestNews = async (user: DigestUser): Promise<MarketNewsArticle[]> => {
+// The reader's articles, and the symbols they hold or watch (the brief's "Your stocks").
+export type DigestNews = {articles: MarketNewsArticle[]; symbols: string[]};
+
+export const fetchDigestNews = async (user: DigestUser): Promise<DigestNews> => {
     // Holdings-aware: union of the watchlist and every symbol held across the
     // user's paper accounts. Read in both digest modes now — the user's own
     // feed may ask for watchlist company news whatever the mode.
@@ -60,14 +65,7 @@ export const fetchDigestNews = async (user: DigestUser): Promise<MarketNewsArtic
             return [] as MarketNewsArticle[];
         });
     const [aggregated, feedArticles] = await Promise.all([marketPool, feed]);
-    return pickDigestArticles(aggregated, feedArticles);
-};
-
-type NavigatorDigest = {
-    date: string;
-    items: {action: string; symbol: string; targetWeightPct: number; executed: boolean; reasons: string[]}[];
-    rationale: string | null;
-    activeTheses: string[];
+    return {articles: pickDigestArticles(aggregated, feedArticles), symbols};
 };
 
 // Latest weekly AI Navigator decisions (if enrolled) + active theses for the
@@ -86,7 +84,6 @@ export const fetchNavigatorDigest = async (userId: string): Promise<NavigatorDig
                 symbol: i.symbol,
                 targetWeightPct: Math.round(i.targetWeight * 100),
                 executed: i.executed,
-                reasons: i.reasons,
             })),
             rationale: set.rationaleMd ?? null,
             activeTheses: theses.slice(0, 5).map((t) => t.displayName),
@@ -113,9 +110,7 @@ export const fetchDigestSections = async (user: DigestUser, runId: string): Prom
             const data = await getTopicsDigestData(user.id);
             if (data.length === 0) return '';
             const manageUrl = `${appUrl()}/topics`;
-            const section = buildTopicsSectionHtml(data, manageUrl);
-            const allowed = [manageUrl, ...data.flatMap((t) => t.articles.map((a) => a.url))];
-            return sanitizeDigestHtml(section, allowed);
+            return sanitizeDigestHtml(buildTopicsSectionHtml(data, manageUrl), topicsSectionLinks(data, manageUrl));
         } catch (error) {
             console.error('Topics email section failed:', error);
             return '';
@@ -133,29 +128,39 @@ export const fetchDigestSections = async (user: DigestUser, runId: string): Prom
     return {topicsSection: topicsHtml, lessonSection: lessonHtml};
 };
 
-export const buildDigestPrompt = (news: readonly MarketNewsArticle[], navigatorData: NavigatorDigest | null): string => {
-    // fullSummary is for the news brain — JSON.stringify drops undefined values,
-    // keeping the email prompt lean.
-    const promptNews = news.map((article) => ({...article, fullSummary: undefined}));
-    return injectJson(
-        injectJson(NEWS_SUMMARY_EMAIL_PROMPT, '{{newsData}}', promptNews, 2),
-        '{{navigatorData}}', navigatorData, 2,
-    );
+export type DigestSendInput = {
+    user: Pick<DigestUser, 'id' | 'email'>;
+    day: string;                         // the ET day, 'YYYY-MM-DD'
+    test: boolean;                       // a test send to one reader takes no claim
+    news: DigestNews;
+    navigator: NavigatorDigest | null;
+    sections: DigestSections;
+    modelText: string;                   // '' when the model call failed
 };
 
-export const sendDigest = async (
-    email: string,
-    news: readonly MarketNewsArticle[],
-    newsContent: string,
-    {topicsSection, lessonSection}: DigestSections,
-): Promise<void> => {
-    await sendNewsSummaryEmail({
-        email,
-        date: getFormattedTodayDate(),
-        // LLM output built from untrusted news text — links are only allowed
-        // to point at URLs from the actual article set.
-        newsContent: sanitizeDigestHtml(newsContent, news.map((n) => n.url)),
-        topicsSection,
-        lessonSection,
+export type DigestSendResult = 'sent' | 'sent-fallback' | 'already-sent';
+
+// The brief as mailed: what the model wrote, or the articles in their outlets' own words.
+export const composeDigest = ({day, news, navigator, sections, modelText}: Omit<DigestSendInput, 'user' | 'test'>) => {
+    const summary = parseDigestSummary(modelText, news.articles, news.symbols) ?? fallbackDigestSummary(news.articles, news.symbols);
+    const view = buildDigestView({
+        day, appUrl: appUrl(), summary, readerSymbols: news.symbols, navigator,
+        topicsHtml: sections.topicsSection, lessonHtml: sections.lessonSection,
     });
+    return {subject: view.subject, html: renderDigestHtml(view), text: renderDigestText(view), fallback: summary.fallback};
+};
+
+// One reader's send step: claim the day (a second run that day finds it taken), compose, send;
+// a send that throws gives the day back so the step's retry can mail it.
+export const sendUserDigest = async (input: DigestSendInput): Promise<DigestSendResult> => {
+    const {user, day, test} = input;
+    if (!test && !(await claimDigestDay(user.id, day))) return 'already-sent';
+    try {
+        const composed = composeDigest(input);
+        await sendNewsSummaryEmail({email: user.email, subject: composed.subject, html: composed.html, text: composed.text});
+        return composed.fallback ? 'sent-fallback' : 'sent';
+    } catch (error) {
+        if (!test) await releaseDigestDay(user.id, day);
+        throw error;
+    }
 };

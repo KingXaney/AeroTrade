@@ -39,7 +39,7 @@ Follow the topics you care about, test trading strategies with virtual money, an
 
 **Solve a poker spot.** The poker solver, also under Learn, works everything out in your browser in a Web Worker. Equity between two hands or ranges — typed as `QQ+, AKs, 76s-T9s` or painted on the 13×13 grid — comes from an exact preflop table, an enumeration of every board, or seeded Monte Carlo with its standard error. Heads-up push or fold is solved to equilibrium by discounted CFR as the stack slider moves; the river solver takes two ranges, a board and a betting tree of your sizes and shows the equilibrium strategy of every hand at every decision; and pot odds give the break-even equity and the minimum defense. Nothing is stored, and AsAh against KsKh reproduces the textbook 1,410,336 wins and 9,308 ties over 1,712,304 boards.
 
-**A second opinion, a chat advisor, and a digest.** Claude can critique the brain's current picture; a tool-using chat assistant (17 tools) — behind the robot in the bottom-right corner, which offers tips about the app on the topics pages — answers "what's new in my topics?", "what does max drawdown mean?" or "why did RSI-2 buy?"; a daily email summarises the market for each user, personalised to their holdings, then adds their topics and the day's lesson, with links allow-listed to the actual articles and the app's own pages.
+**A second opinion, a chat advisor, and a digest.** Claude can critique the brain's current picture; a tool-using chat assistant (17 tools) — behind the robot in the bottom-right corner, which offers tips about the app on the topics pages — answers "what's new in my topics?", "what does max drawdown mean?" or "why did RSI-2 buy?"; a daily brief by email opens with the day in 30 seconds, then the stories about the reader's own stocks, the markets, their news feed, filings and what people are posting — each written from the articles it cites, with links to those articles and to the stock's page in the app — followed by the AI Navigator's week, their topics and the day's lesson.
 
 **Make it yours.** 12 colour palettes × 5 visual styles (minimal, futuristic, liquid glass, brutalist, soft), saved per account and rendered without a flash. A 35-widget dashboard you can drag, resize and extend.
 
@@ -88,7 +88,7 @@ flowchart LR
 |---|---|
 | App | Next.js 16 (App Router, Server Actions, Turbopack), React 19, TypeScript strict |
 | UI | Tailwind v4 with semantic theme tokens, shadcn/radix primitives, dnd-kit, TradingView embeds |
-| Data | MongoDB + Mongoose 9 (23 models), better-auth for email/password sessions, sign-up, sign-in and password reset rate-limited on a Mongo counter |
+| Data | MongoDB + Mongoose 9 (26 models), better-auth for email/password sessions, sign-up, sign-in and password reset rate-limited on a Mongo counter |
 | Jobs | Inngest (9 scheduled jobs + on-demand events), idempotent steps, per-user rate limits |
 | AI | Vercel AI SDK; Gemini 2.5 Flash-Lite on the free tier for every scheduled job, optional Claude tiers, Claude for the second opinion |
 | Market data | Yahoo Finance daily bars and dividends (Stooq as the fallback), the 13-week T-bill rate, Finnhub (quotes, profiles, financials, search, news), Google News RSS, SEC EDGAR, Reddit |
@@ -116,7 +116,7 @@ npm run trigger -- briefing     # write this morning's market briefing
 npm run trigger -- navigator    # run the weekly AI Navigator
 npm run trigger -- strategies   # run the quant strategies (-preview decides without filling)
 npm run trigger -- income       # credit interest + dividends through yesterday
-npm run trigger -- news         # send today's digest emails
+npm run trigger -- news         # send today's digest emails (news <email>: a test to one reader)
 ```
 
 | Job | Schedule (ET) | What it does |
@@ -126,7 +126,7 @@ npm run trigger -- news         # send today's digest emails
 | `generate-market-briefing` | 07:50 daily | one briefing for everyone from the brain's most important articles of the day, each point citing its articles |
 | `generate-topic-briefs` | 08:00 daily | one "what changed today" brief per topic with fresh news |
 | `ai-navigator-weekly` | Mondays 10:00 | score the universe and rebalance the Navigator account |
-| `daily-news-summary` | 12:00 daily | per-user digest email with a topics section |
+| `daily-news-summary` | 12:00 daily | per-user daily brief, at most one per reader per day |
 | `strategies-daily` | weekdays 09:35 (10:30 retry) | decide and fill every quant strategy's orders from the previous close; opens the system accounts and rebuilds backtests when a rule changes |
 | `daily-account-snapshots` | weekdays 16:10 | value every account and the SPY benchmark |
 | `daily-account-income` | 00:05 daily | credit every account's interest on idle cash (13-week T-bill rate) and dividends on holdings through yesterday; replays a never-credited account from inception |
@@ -142,7 +142,7 @@ npm run build:check   # compile-only build: proves the app builds without any ke
 npm run qa            # browser QA: all 15 suites in scripts/qa against a throwaway harness (~5 min)
 ```
 
-Unit tests (175 files / 2018 tests) cover every pure module, next to the code in `lib/<feature>/__tests__/`: fills, lots and account analytics, the interest and dividend accrual clock (with a parity test holding the strategy simulator to the live credit), the quant strategies' rules, engine, simulator and what-if grid, the AI Navigator's scoring and rails, the news brain's decay and extraction parsing, news aggregation and sanitising, the topic matcher and briefs, every learner-facing sentence (held to one no-advice word list) and the reason decoder's round trips, the chat tools' shaping, the email sections, dashboard layouts and theme tokens. Database-bound modules (Mongoose reads, server actions, the pages) are exercised through the browser QA in [`scripts/qa/`](scripts/qa/README.md) instead: `npm run qa` starts an in-memory MongoDB, the dev server with inline env vars and the Inngest dev server, then runs 15 Playwright suites, one per feature (`qa-auth`, `qa-home`, `qa-trading`, `qa-income`, `qa-strategies`, `qa-learn`, `qa-topics`, …), each signing up its own user and walking its surfaces — no keys needed. `docs/specs/` holds the design documents for the larger features.
+Unit tests (192 files / 2149 tests) cover every pure module, next to the code in `lib/<feature>/__tests__/`: fills, lots and account analytics, the interest and dividend accrual clock (with a parity test holding the strategy simulator to the live credit), the quant strategies' rules, engine, simulator and what-if grid, the AI Navigator's scoring and rails, the news brain's decay and extraction parsing, news aggregation and sanitising, the topic matcher and briefs, every learner-facing sentence (held to one no-advice word list) and the reason decoder's round trips, the chat tools' shaping, the email sections, dashboard layouts and theme tokens. Database-bound modules (Mongoose reads, server actions, the pages) are exercised through the browser QA in [`scripts/qa/`](scripts/qa/README.md) instead: `npm run qa` starts an in-memory MongoDB, the dev server with inline env vars and the Inngest dev server, then runs 17 Playwright suites, one per feature (`qa-auth`, `qa-home`, `qa-trading`, `qa-income`, `qa-strategies`, `qa-learn`, `qa-topics`, …), each signing up its own user and walking its surfaces — no keys needed. `docs/specs/` holds the design documents for the larger features.
 
 ## Project structure
 
@@ -173,7 +173,7 @@ lib/            one folder per feature, named as in components/:
   games/        the daily quant puzzle: its schedule, the answer reader, the streak
   poker/        the hand evaluator, ranges, exact and Monte Carlo equity, the preflop table, push/fold by CFR, pot odds, the river solver
   chat/         the chat assistant: system prompt, tools and what they hand the model, rate limits and the caption that shows what is left of them
-  email/        transport, templates, the daily digest with its topics + lesson sections, the welcome email
+  email/        transport, the email frame, the daily brief (cited summary, view, render) with its topics + lesson sections, welcome and reset
   jobs/         the Inngest client, the job registry, one file of thin job wrappers per feature, the status read
   prices/       daily bars (Yahoo first, Stooq fallback), dividends + the T-bill rate, signals, NYSE hours, Finnhub
   stocks/       the watchlist, the stock page's key numbers and "what the rules see", TradingView embeds

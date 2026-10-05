@@ -152,8 +152,8 @@ describe('the lesson section with one helper swapped out', () => {
         // A builder that one day emitted a link off its list: the section as mailed keeps its
         // text and drops the anchor, because lessonSectionFor sanitises against lessonSectionLinks.
         vi.resetModules();
-        vi.doMock('@/lib/email/sections/topics', async (importOriginal) => {
-            const original = await importOriginal<typeof import('@/lib/email/sections/topics')>();
+        vi.doMock('@/lib/email/layout', async (importOriginal) => {
+            const original = await importOriginal<typeof import('@/lib/email/layout')>();
             return {...original, linkOrText: (url: string, label: string) => `${original.linkOrText(url, label)}<a href="https://stray.example.com/">stray</a>`};
         });
         const mocked = await import('@/lib/email/sections/lesson');

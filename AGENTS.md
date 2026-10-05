@@ -20,10 +20,11 @@ before the rename keep the name "Main Strategy" (new ones are "Main account", `D
 - `npm run build:check` — compile-only Next build; needs no database or keys
 - `npm run build` / `npm start` — the production build and its server
 - `npm run dev` + `npx inngest-cli@latest dev -u http://localhost:3000/api/inngest` — app + jobs
-- `npm run trigger -- <brain|navigator|news|snapshots|income|topics|briefs|briefing|strategies|strategies-preview|strategies-resimulate>` — fire a job locally
+- `npm run trigger -- <brain|navigator|news|snapshots|income|topics|briefs|briefing|strategies|strategies-preview|strategies-resimulate>` — fire a job locally (`news <email>`: a test brief to that one opted-in reader)
 - `npm run test:db` — connect to `MONGODB_URI` (from `.env`) and print the database and host it reached
 - `npm run migrate:accounts` — the idempotent multi-account migration: builds the indexes in `scripts/migration-indexes.mjs` and drops the ones they replaced (run it on every database, again whenever that list changes)
 - `npm run opinion:local` — the brain's Second Opinion from your Claude subscription through the Claude Code CLI, written straight to the database (`.env.example` lists the other ways)
+- `npm run email:preview` — render every email from the fixtures into the QA output folder (output/email under scripts/qa) and check it at desktop and phone widths, light and dark (`qa-email` without the harness)
 - `npm run qa` — browser QA (`scripts/qa/run.sh`): an in-memory MongoDB, `next dev` and the Inngest dev server, then every suite or the named ones (`npm run qa -- learn`); one suite per feature, listed in `scripts/qa/README.md`
 - `node scripts/poker-preflop-equity.mjs` — regenerate the poker solver's exact preflop table and its ranking (about seven minutes on every core; `--check` recomputes 40 entries, `--ranking` rewrites only the ranking)
 
@@ -460,10 +461,38 @@ and friends keep none beyond Shared and the invariants).
 
 ### email
 
+- `lib/site` is the product's name and its one public address: email links are `PRODUCTION_URL` in
+  production and the app's own `BETTER_AUTH_URL` elsewhere (`siteUrl`). The sender is
+  `"AeroTrade" <NODEMAILER_EMAIL>`; `lib/__tests__/brand-name.test.ts` fails if an old product
+  name comes back anywhere in the repo.
+- Every email is one light frame, `lib/email/layout` (pure): nested tables, inline styles, no
+  images, a hidden preheader, a dark-mode block for Apple Mail. Its blocks escape every text
+  argument, and `lib/email/layout.linkOrText` is the only way an email makes an anchor — http(s)
+  only. Every fixed sentence is `lib/learn/copy/email`; the welcome and reset emails are
+  `lib/email/templates`.
+- The daily brief takes the morning briefing's pattern. `lib/email/prompts.buildDigestPrompt` shows
+  the model numbered articles — headline, the outlet's own summary, the outlet, the kind of source,
+  which of the reader's symbols it is about — and no URLs; `lib/email/digest-summary` keeps only
+  the bullets and stories that cite an article it was shown, and when the model wrote nothing
+  usable (a refusal, a 429 that outlasted Inngest's retries) `fallbackDigestSummary` mails the
+  leading articles in their outlets' own words instead of skipping the reader.
+- `lib/email/digest-view` decides everything the brief shows: a story's section comes from its
+  cited articles (the reader's own symbols first, then wire/RSS, their news feed, SEC filings and
+  Reddit, the last two with a caveat); ticker chips name only the reader's symbols and link to
+  their stock pages; the AI Navigator's decisions are a table built from the stored set, never
+  shown to the model. `allowedUrls` is every link it holds — `lib/email/digest-render` sanitises
+  the HTML it builds against it, then adds the topics and lesson sections, each already sanitised
+  against its own (`topicsSectionLinks`, `lessonSectionLinks`). The plain-text part spells out
+  every link.
+- One brief per reader per ET day: the send step claims the day in `DigestSend`
+  (`lib/email/digest-store`, unique on user and day) before it sends and releases it if the send
+  throws, so a retry, a manual trigger or a duplicate environment cannot mail anyone twice. A test
+  send (`event.data.email`) names one opted-in reader and takes no claim.
+- A preview build never sends mail (`lib/email/send.mailerReady`): it shares production's mailer
+  and readers.
 - Today's lesson in the daily email, `lib/email/sections/lesson`: a moment dated exactly
   yesterday — the noon run must not mail a morning fill twice — else the day's concept, in the
-  widget's own copy. Every string is escaped and links go through
-  `lib/email/sections/topics.linkOrText`; `lessonSectionFor` sanitises it with
+  widget's own copy. Every string is escaped; `lessonSectionFor` sanitises it with
   `lessonSectionLinks`, exactly the links it builds.
 - The daily-news step reads the facts through `lib/learn/facts-store.readLearnFacts` (accounts and
   preferences once) and the concept once per keyword set per run
@@ -477,6 +506,11 @@ and friends keep none beyond Shared and the invariants).
   `lib/email/welcome`, `lib/topics/refresh`, `lib/strategies/job`.
 - `lib/jobs/registry` is the one list of jobs (id, event, crons, status row); `lib/jobs/health` the
   status strip's read of their stamps; `lib/jobs/steps` holds `stepId` and `chunk`.
+- Crons run in production (and a local dev server) only: `triggersOf` drops them on a Vercel
+  preview build. The Inngest Vercel integration syncs every preview into a branch environment of
+  its own, and a preview carries production's database, mailer and model keys — on 2026-10-05
+  eight copies of every job were running against production, and the noon digest failed on the
+  shared quotas. Events still reach a preview, so a branch can be tested by hand.
 
 ### prices
 

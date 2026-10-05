@@ -122,11 +122,11 @@ try {
         });
 
         await page.goto(`${BASE}/news`, {waitUntil: 'load'});
-        const topicCards = page.locator('.news-item [data-topic]');
+        const topicCards = page.locator(':is(.news-item, [data-article-row]) [data-topic]');
         check('a followed topic reaches /news', await topicCards.count() > 0, `${await topicCards.count()} tagged cards`);
         check('the card names the topic that brought it in',
-            /AI chips/.test(await page.locator('.news-item [data-topic="ai-chips"]').first().innerText().catch(() => '')));
-        const hrefs = await page.$$eval('.news-item', (as) => as.map((a) => a.getAttribute('href')));
+            /AI chips/.test(await page.locator(':is(.news-item, [data-article-row]) [data-topic="ai-chips"]').first().innerText().catch(() => '')));
+        const hrefs = await page.$$eval('.news-item, [data-article-row]', (as) => as.map((a) => a.getAttribute('href')));
         check('no article is printed twice', new Set(hrefs).size === hrefs.length, `${hrefs.length} cards, ${new Set(hrefs).size} unique`);
         check('topics do not swamp the feed', hrefs.length === 0 || (await topicCards.count()) < hrefs.length,
             `${await topicCards.count()}/${hrefs.length}`);
@@ -188,7 +188,7 @@ try {
     await page.locator('#news-briefing').waitFor({timeout: 30000});
     const briefing = page.locator('#news-briefing');
     check('the briefing leads the page, above every headline card',
-        ((await briefing.boundingBox())?.y ?? 9999) < ((await page.locator('.news-item').first().boundingBox().catch(() => null))?.y ?? 99999));
+        ((await briefing.boundingBox())?.y ?? 9999) < ((await page.locator('.news-item, [data-article-row]').first().boundingBox().catch(() => null))?.y ?? 99999));
     check('…with its headline, its points and the AI caveat dated today',
         (await briefing.locator('[data-briefing-headline]').innerText()) === 'QA briefing headline'
         && await briefing.locator('[data-briefing-bullet]').count() === 2

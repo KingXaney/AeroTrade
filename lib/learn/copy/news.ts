@@ -10,6 +10,7 @@ const plural = (count: number, one: string, many: string): string => `${count} $
 export const NEWS_COPY = {
     customize: 'Customize feed',
     closeEditor: 'Close',
+    editorDescription: 'Choose categories, regions, outlets and keywords for your News feed. These preferences also contribute headlines to the daily email.',
 
     briefingHeading: "Today's briefing",
     // "2026-10-02 · AI summary · may contain errors" — the same caveat a topic brief carries.
@@ -22,6 +23,7 @@ export const NEWS_COPY = {
     moreSources: (count: number): string => `+${count} more`,
 
     topicsHeading: 'Your topics',
+    topicsNote: 'Stories grouped by the interests you follow.',
     topicsLink: 'All topics',
     // "+3 more topics"
     moreTopics: (count: number): string => `+${plural(count, 'more topic', 'more topics')}`,

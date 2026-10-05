@@ -18,6 +18,7 @@ import {formatCapped} from "@/lib/format";
 import {MAX_TOPICS_PER_USER, UNSEEN_COUNT_CAP} from "@/lib/topics/config";
 import {OFFER_GROUPS, offeredTopics, slotsLeft, toFollowInputs, toggleSelection, topicToInput} from "@/lib/topics/manage";
 import {TOPIC_PICKER_COPY, TOPICS_MANAGE_COPY} from "@/lib/learn/copy/topics";
+import TopicDigestNote from "@/components/topics/TopicDigestNote";
 import type {SuggestedTopic, TopicOverviewItem, TopicView} from "@/lib/topics/types";
 
 type Props = {
@@ -111,6 +112,7 @@ const TopicsManager = ({topics, preinstalled, brainSuggestions}: Props) => {
                         {TOPICS_MANAGE_COPY.done}
                     </Link>
                 </div>
+                <div className="mt-4"><TopicDigestNote /></div>
                 <ul className="mt-4 space-y-2">
                     {visible.map((t) => (
                         <li key={t.id} className={rowCard({className: 'flex items-center gap-3 px-3 py-2'})} data-manage-row={t.slug}>

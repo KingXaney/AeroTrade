@@ -48,7 +48,7 @@ const TopicsPage = async ({searchParams}: TopicsPageProps) => {
         <TopicsShell overview={overview}>
             <AllTopicsHeader count={overview.topics.length} unseenTotal={overview.unseenTotal} preinstalled={view.preinstalled} />
             {articles.length > 0
-                ? <TopicFeed key={view.feedKey} initial={articles} showTopicTag pageSize={MERGED_FEED_SIZE} />
+                ? <TopicFeed key={view.feedKey} initial={articles} showTopicTag pageSize={MERGED_FEED_SIZE} layout="row" />
                 : <TopicFeedEmpty scope="all" topics={overview.topics} now={now} />}
         </TopicsShell>
     );

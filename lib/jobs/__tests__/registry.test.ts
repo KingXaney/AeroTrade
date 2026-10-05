@@ -46,6 +46,19 @@ describe('job registry', () => {
         expect(triggersOf(JOBS.signUpEmail)).toEqual([{event: 'app/user.created'}]);
     });
 
+    // Every pushed branch gets a preview build that shares production's database and mailer, and
+    // Inngest syncs it into a branch environment of its own: its crons would run every job again.
+    it('schedules nothing on a preview build, and keeps every event', () => {
+        for (const job of JOB_LIST) {
+            expect(triggersOf(job, {VERCEL_ENV: 'preview'}), job.id).toEqual([{event: job.event}]);
+        }
+        expect(triggersOf(JOBS.newsDigest, {VERCEL_ENV: 'production'})).toEqual([
+            {event: 'app/send.daily.news'},
+            {cron: 'TZ=America/New_York 0 12 * * *'},
+        ]);
+        expect(triggersOf(JOBS.newsDigest, {})).toHaveLength(2);
+    });
+
     it('gives every job but the welcome email a status-strip row', () => {
         expect(JOB_LIST.filter((job) => job.health === null).map((job) => job.id)).toEqual(['sign-up-email']);
         for (const job of JOB_LIST) {

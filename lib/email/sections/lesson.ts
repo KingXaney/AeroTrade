@@ -1,4 +1,5 @@
-// Deterministic "Today's lesson" block for the daily digest email, under the topics block.
+// Deterministic "Today's lesson" block for the daily digest email, under the topics block, built
+// from the shared email blocks (lib/email/layout.ts).
 // Nothing here comes from a model and nothing is new prose: a moment is told in Today's lesson's
 // own copy (momentCopy), a concept in the glossary's own lines, so the email and the dashboard
 // widget cannot drift apart. Headlines and sources are scraped text, so every string is escaped,
@@ -10,7 +11,7 @@
 // mailed. Nothing is stamped: "Got it" stays on the widget.
 
 import {escapeHtml, sanitizeDigestHtml} from "@/lib/news/sanitize";
-import {ARTICLE_STYLE, FOOTER_STYLE, HEADING_STYLE, META_STYLE, TEXT_STYLE, TOPIC_NAME_STYLE, linkOrText} from "@/lib/email/sections/topics";
+import {card, cardTitle, EMAIL_COLORS, linkOrText, paragraph, paragraphHtml, sectionLabel} from "@/lib/email/layout";
 import {GLOSSARY} from "@/lib/learn/glossary";
 import type {LearnFacts} from "@/lib/learn/facts";
 import {safeArticleUrl, type Lesson, type LessonHeadline} from "@/lib/learn/lesson";
@@ -23,8 +24,6 @@ export const DIGEST_MAX_SENTENCES = 3;
 export const DIGEST_MAX_HEADLINES = 3;
 // Scraped headlines can run on; the email shows the start of one.
 export const DIGEST_MAX_HEADLINE_CHARS = 200;
-
-const FIGURE_STYLE = 'margin: 0 0 10px 0; font-size: 16px; font-weight: 600; line-height: 1.5; color: #f8f9fa;';
 
 type LessonSectionInput = {moment: Moment | null; term: Lesson | null};
 
@@ -60,21 +59,19 @@ export const lessonSectionLinks = ({moment, term}: LessonSectionInput, appUrl: s
     return [termHref(term, appUrl), ...articles];
 };
 
-const paragraph = (style: string, text: string): string =>
-    `<p class="mobile-text dark-text-secondary" style="${style}">${escapeHtml(text)}</p>`;
+// The moment's own numbers, in bold.
+const figure = (text: string): string =>
+    paragraphHtml(`<strong class="em-ink" style="color: ${EMAIL_COLORS.ink};">${escapeHtml(text)}</strong>`);
 
-const title = (text: string): string =>
-    `<h3 class="mobile-news-title dark-text" style="${TOPIC_NAME_STYLE}">${escapeHtml(text)}</h3>`;
-
-const footer = (url: string, label: string): string => `<p style="${FOOTER_STYLE}">${linkOrText(url, label)}</p>`;
+const footer = (url: string, label: string): string => paragraphHtml(linkOrText(url, label), 'small');
 
 const renderMoment = (moment: Moment, appUrl: string): string => {
     const copy = momentCopy(moment);
     return [
-        paragraph(META_STYLE, copy.label),
-        title(copy.title),
-        paragraph(FIGURE_STYLE, copy.figure),
-        ...copy.body.slice(0, DIGEST_MAX_SENTENCES).map((sentence) => paragraph(TEXT_STYLE, sentence)),
+        paragraph(copy.label, 'small'),
+        cardTitle(copy.title),
+        figure(copy.figure),
+        ...copy.body.slice(0, DIGEST_MAX_SENTENCES).map((sentence) => paragraph(sentence)),
         footer(momentHref(moment, appUrl), copy.linkLabel),
     ].join('');
 };
@@ -83,18 +80,18 @@ const renderHeadline = (item: LessonHeadline): string => {
     const headline = clip(String(item.headline).trim(), DIGEST_MAX_HEADLINE_CHARS);
     const source = String(item.source ?? '').trim();
     const suffix = source ? ` &middot; ${escapeHtml(source)}` : '';
-    return `<p style="${ARTICLE_STYLE}">${linkOrText(String(item.url ?? ''), headline)}${suffix}</p>`;
+    return paragraphHtml(`${linkOrText(String(item.url ?? ''), headline)}${suffix}`, 'small');
 };
 
 const renderTerm = (term: Lesson, appUrl: string): string => {
     const entry = GLOSSARY[term.key];
     const headlines = shownHeadlines(term);
     return [
-        paragraph(META_STYLE, term.mode === 'feed' ? LESSON_COPY.feedLabel : LESSON_COPY.dayLabel),
-        title(entry.term),
-        paragraph(TEXT_STYLE, entry.short),
-        paragraph(TEXT_STYLE, entry.long),
-        term.mode === 'feed' ? paragraph(META_STYLE, lessonCountLine(term.count)) : '',
+        paragraph(term.mode === 'feed' ? LESSON_COPY.feedLabel : LESSON_COPY.dayLabel, 'small'),
+        cardTitle(entry.term),
+        paragraph(entry.short),
+        paragraph(entry.long),
+        term.mode === 'feed' ? paragraph(lessonCountLine(term.count), 'small') : '',
         ...headlines.map(renderHeadline),
         footer(termHref(term, appUrl), LESSON_COPY.learnLink),
     ].join('');
@@ -104,8 +101,7 @@ const renderTerm = (term: Lesson, appUrl: string): string => {
 export const buildLessonSectionHtml = ({moment, term}: LessonSectionInput, appUrl: string): string => {
     const body = moment ? renderMoment(moment, appUrl) : knownTerm(term) ? renderTerm(term, appUrl) : '';
     if (!body) return '';
-    const heading = `<h2 class="mobile-news-title dark-text" style="${HEADING_STYLE}">&#128218; ${escapeHtml(LESSON_COPY.emailHeading)}</h2>`;
-    return `${heading}<div style="margin: 0 0 24px 0;">${body}</div>`;
+    return sectionLabel(LESSON_COPY.emailHeading) + card(body);
 };
 
 // The whole section for one learner, as the daily-news job mails it: yesterday's moment when
