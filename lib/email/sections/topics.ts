@@ -3,6 +3,7 @@
 // every string is escaped and only http(s) URLs become anchors.
 
 import {escapeHtml} from "@/lib/news/sanitize";
+import {DIGEST_ARTICLES_PER_TOPIC, DIGEST_BRIEF_BULLET_CAP, DIGEST_TOPIC_CAP} from "@/lib/topics/config";
 
 export type TopicDigestInput = {
     name: string;
@@ -13,10 +14,6 @@ export type TopicDigestInput = {
 };
 
 // Caps keep the digest inside the free-tier token budget of the summary step.
-const MAX_TOPICS = 6;
-const MAX_ARTICLES = 3;
-const MAX_BULLETS = 4;
-
 // Shared with the lesson section (lib/email/sections/lesson.ts), so the two blocks read as one email.
 export const HEADING_STYLE = 'margin: 30px 0 15px 0; font-size: 20px; font-weight: 600; color: #f8f9fa; line-height: 1.3;';
 export const TOPIC_NAME_STYLE = 'margin: 0 0 4px 0; font-size: 18px; font-weight: 600; color: #f8f9fa; line-height: 1.3;';
@@ -54,7 +51,7 @@ const renderBrief = (brief: TopicDigestInput['brief']): string => {
     const bullets = (brief.bullets ?? [])
         .map((bullet) => String(bullet ?? '').trim())
         .filter(Boolean)
-        .slice(0, MAX_BULLETS);
+        .slice(0, DIGEST_BRIEF_BULLET_CAP);
 
     const parts: string[] = [];
     if (summary) {
@@ -70,7 +67,7 @@ const renderBrief = (brief: TopicDigestInput['brief']): string => {
 const renderArticles = (articles: TopicDigestInput['articles']): string =>
     (articles ?? [])
         .filter((article) => String(article?.headline ?? '').trim())
-        .slice(0, MAX_ARTICLES)
+        .slice(0, DIGEST_ARTICLES_PER_TOPIC)
         .map((article) => {
             const headline = String(article.headline).trim();
             const source = String(article.source ?? '').trim();
@@ -89,7 +86,7 @@ const renderTopic = (topic: TopicDigestInput): string =>
     `</div>`;
 
 export const buildTopicsSectionHtml = (topics: TopicDigestInput[], manageUrl: string): string => {
-    const shown = (topics ?? []).filter((topic) => String(topic?.name ?? '').trim()).slice(0, MAX_TOPICS);
+    const shown = (topics ?? []).filter((topic) => String(topic?.name ?? '').trim()).slice(0, DIGEST_TOPIC_CAP);
     if (shown.length === 0) return '';
 
     const header = `<h2 class="mobile-news-title dark-text" style="${HEADING_STYLE}">&#128204; Your topics</h2>`;
