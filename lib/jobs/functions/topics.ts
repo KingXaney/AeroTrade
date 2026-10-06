@@ -1,6 +1,7 @@
+import {NonRetriableError} from "inngest";
 import {inngest} from "@/lib/jobs/client";
 import {newsSearchEnabled} from "@/lib/news/config";
-import {inferText} from "@/lib/ai/infer";
+import {inferText, isDailyQuotaExhausted} from "@/lib/ai/infer";
 import {recordJobRun} from "@/lib/jobs/job-runs";
 import {JOBS, triggersOf} from "@/lib/jobs/registry";
 import {loadBriefCandidates, loadKeywordGroup, loadStaleKeywordGroups, refreshKeywordGroup, saveBriefFromText} from "@/lib/topics/refresh";
@@ -117,24 +118,44 @@ export const fillFirstRunTopics = inngest.createFunction(
 
 // Daily "what changed today" per keyword set, after the morning refresh and before the
 // noon digest. Bounded calls on the free tier; one brief serves every user on that set.
+//
+// One keyword set's failure — the model after Inngest's own retries, a write — never costs the
+// other sets their brief: it is counted and the run goes on, as the feed refresh does. The one
+// exception is the model's daily quota: once it is used up every further call fails the same way
+// until it resets, so the run stops there and says how many sets wait for tomorrow. A run in
+// which every set failed is still reported as failed (without re-running: each step has already
+// had its retries), so the dashboard says so and the error is read there, not hidden in a success.
 export const generateTopicBriefs = inngest.createFunction(
     { id: JOBS.topicBriefs.id, triggers: triggersOf(JOBS.topicBriefs) },
     async ({ step }) => {
         const candidates = await step.run('load-candidates', async () => loadBriefCandidates(MAX_BRIEF_CALLS_PER_RUN));
 
         let written = 0;
+        let failed = 0;
+        let left = 0;
         for (let i = 0; i < candidates.length; i++) {
             const candidate = candidates[i];
             if (i > 0) await step.sleep(`brief-throttle-${i}`, BRIEF_THROTTLE_DELAY);
 
-            const prompt = buildTopicBriefPrompt(candidate.name, candidate.articles);
-            const response = await inferText(step, {task: 'topicBrief', stepId: `brief-${candidate.keywordSetHash}`, prompt});
-
-            written += await step.run(`save-brief-${candidate.keywordSetHash}`, async () => saveBriefFromText(candidate, response.text, response.model));
+            try {
+                const prompt = buildTopicBriefPrompt(candidate.name, candidate.articles);
+                const response = await inferText(step, {task: 'topicBrief', stepId: `brief-${candidate.keywordSetHash}`, prompt});
+                written += await step.run(`save-brief-${candidate.keywordSetHash}`, async () => saveBriefFromText(candidate, response.text, response.model));
+            } catch (error) {
+                failed += 1;
+                console.error(`Topic brief for keyword set ${candidate.keywordSetHash} (${candidate.name}) failed:`, error);
+                if (isDailyQuotaExhausted(error)) {
+                    left = candidates.length - i - 1;
+                    break;
+                }
+            }
         }
 
-        const summary = `Wrote ${written} topic briefs from ${candidates.length} keyword sets`;
+        const summary = `Wrote ${written} topic briefs from ${candidates.length} keyword sets`
+            + (failed ? `, ${failed} failed` : '')
+            + (left ? `, ${left} left for tomorrow: the model's daily quota is used up` : '');
         await step.run('record-job-run', async () => recordJobRun(JOBS.topicBriefs.id, summary));
+        if (failed > 0 && written === 0) throw new NonRetriableError(summary);
         return {success: true, message: summary};
     },
 );
