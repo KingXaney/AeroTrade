@@ -1,6 +1,7 @@
 #!/usr/bin/env bash
-# Browser QA in one command. Starts a throwaway harness — an in-memory MongoDB on :27117, the app
-# (`next dev`) on :3000 with inline environment variables, the Inngest dev server on :8288 — runs
+# Browser QA in one command. Starts a throwaway harness — an in-memory MongoDB on :27117, a
+# stand-in for Tiingo on :8787, the app (`next dev`) on :3000 with inline environment variables,
+# the Inngest dev server on :8288 — runs
 # the named suites one after another (every suite when none is named), stops everything it
 # started, and prints a summary. Nothing here needs a .env, an API key or a real database.
 #
@@ -9,8 +10,8 @@
 #   npm run qa -- visual-sweep        any other script in scripts/qa, inside the same harness
 #   npm run qa -- --up [name ...]     run the names (if any), then keep the harness up until Ctrl-C
 #
-# Logs: scripts/qa/output/logs/<name>.log, the harness's own in _mongo.log, _dev.log and
-# _inngest.log. The summary is scripts/qa/output/logs/SUMMARY; its last line starts with "DONE".
+# Logs: scripts/qa/output/logs/<name>.log, the harness's own in _mongo.log, _tiingo.log, _dev.log
+# and _inngest.log. The summary is scripts/qa/output/logs/SUMMARY; its last line starts with "DONE".
 # The ports must be free: the script refuses to start rather than stop someone else's server.
 set -u
 
@@ -20,12 +21,13 @@ LOGS=$QA_DIR/output/logs
 APP_PORT=3000
 MONGO_PORT=27117
 INNGEST_PORT=8288
+TIINGO_PORT=8787
 APP_URL=http://localhost:$APP_PORT
 
 # Every suite, in the order a full run takes. The order is load-bearing: qa-auth removes the
 # sign-in and sign-up counters it fills before anyone else signs in, and qa-learn wipes and
 # reseeds strategyruns, so it runs after qa-strategies. A suite missing here runs last.
-ALL=(auth styles shell home chat topics-refresh trading topics news-feed strategies income learn learn-account games poker chat-tutor email)
+ALL=(auth styles shell landing home chat topics-refresh trading topics news-feed strategies income learn learn-account games poker chat-tutor email)
 
 KEEP_UP=0
 NAMES=()
@@ -71,7 +73,7 @@ port_busy() {
     else (exec 3<>"/dev/tcp/127.0.0.1/$1") 2>/dev/null
     fi
 }
-for port in $APP_PORT $MONGO_PORT $INNGEST_PORT; do
+for port in $APP_PORT $MONGO_PORT $INNGEST_PORT $TIINGO_PORT; do
     if port_busy "$port"; then
         echo "port $port is already in use — stop whatever listens there first (lsof -nP -iTCP:$port -sTCP:LISTEN)"
         exit 2
@@ -101,7 +103,7 @@ tree() {
 on_windows() { case "$(uname -s)" in MINGW*|MSYS*|CYGWIN*) return 0 ;; *) return 1 ;; esac; }
 stop_windows_listeners() {
     local port pid
-    for port in $APP_PORT $MONGO_PORT $INNGEST_PORT; do
+    for port in $APP_PORT $MONGO_PORT $INNGEST_PORT $TIINGO_PORT; do
         for pid in $(netstat -ano -p TCP 2>/dev/null | awk -v p=":$port" '$2 ~ p"$" && $4 == "LISTENING" {print $5}' | sort -u); do
             taskkill //F //T //PID "$pid" >/dev/null 2>&1
         done
@@ -137,6 +139,13 @@ PIDS+=($!)
 for _ in $(seq 1 60); do grep -q 'READY\|FAILED' "$LOGS/_mongo.log" 2>/dev/null && break; sleep 1; done
 grep -q READY "$LOGS/_mongo.log" || harness_failed "MongoDB did not start" "$LOGS/_mongo.log"
 
+# 1b. A stand-in for Tiingo (start-tiingo-stub.mjs). The app gets a token and this address, so the
+# landing terrain's Tiingo path runs here too; it serves nothing until qa-landing switches it on.
+(cd "$QA_DIR" && exec node start-tiingo-stub.mjs) >"$LOGS/_tiingo.log" 2>&1 &
+PIDS+=($!)
+for _ in $(seq 1 30); do grep -q 'READY\|FAILED' "$LOGS/_tiingo.log" 2>/dev/null && break; sleep 1; done
+grep -q READY "$LOGS/_tiingo.log" || harness_failed "the Tiingo stand-in did not start" "$LOGS/_tiingo.log"
+
 # 2. The app. A .next left by `next build` breaks Turbopack's next/font in dev, so start clean.
 # The empty keys keep a local .env's Finnhub and mail settings out: no quotes, no mail sent.
 rm -rf "$ROOT/.next"
@@ -146,6 +155,7 @@ rm -rf "$ROOT/.next"
     BETTER_AUTH_SECRET='local-qa-secret-at-least-32-characters-long' \
     BETTER_AUTH_URL="$APP_URL" \
     SIGN_UP_CLIENT_LIMIT=1000 \
+    TIINGO_TOKEN=qa-tiingo-token TIINGO_API_URL="http://localhost:$TIINGO_PORT" \
     INNGEST_DEV=1 \
     FINNHUB_API_KEY= NEXT_PUBLIC_FINNHUB_API_KEY= NODEMAILER_EMAIL= NODEMAILER_PASSWORD= \
     npm run dev) >"$LOGS/_dev.log" 2>&1 &

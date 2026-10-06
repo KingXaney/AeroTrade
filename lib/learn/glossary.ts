@@ -614,6 +614,16 @@ const ENTRIES = [
         long: 'A bluff of B into a pot of P risks B to win P, so it gains when the other player folds more than B ÷ (P + B) of the time. At equilibrium a range bluffs just often enough that calling and folding are worth the same to the hands that catch bluffs.',
         seeAlso: ['value-bet', 'bluff-catcher', 'minimum-defense-frequency']},
 
+    // ---- the front door's terrain (components/landing/MomentumTerrain) ----------------------
+    {key: 'normalized-momentum', kind: 'metric', term: 'Normalised momentum', aliases: ['normalised momentum', 'normalized momentum', 'momentum', 'momentum score', 'risk-adjusted momentum'],
+        short: 'The log return over a lookback, divided by the swing that many days of recent volatility would produce: σ × √n.',
+        long: 'A raw return grows with the span it covers, so a 5-day and a 250-day figure cannot share a scale. Dividing each by the swing its own span would see by chance — the trailing 60-day daily σ times the square root of the days — counts the move in units of noise: +2 on any row is a move about twice the size chance alone tends to give.',
+        formula: 'ln(P[t] / P[t−n]) ÷ (σ[t] × √n), σ = stdev of the last 60 daily log returns', computedIn: 'lib/landing/momentum-surface.ts normalizedMomentum', seeAlso: ['lookback', 'volatility', 'momentum-12-1']},
+    {key: 'lookback', kind: 'metric', term: 'Lookback', aliases: ['lookback', 'lookback period', 'lookback window', 'look-back'],
+        short: 'How many sessions back a figure reaches: a 20-day lookback sets today against the close 20 sessions earlier.',
+        long: 'Every rolling figure fixes one. A short lookback answers to the last few sessions and flips often; a long one moves slowly and carries the year\'s trend. The strategies\' moving averages, the 12-1 return and each row of the terrain are lookbacks of different lengths.',
+        seeAlso: ['normalized-momentum', 'sma200', 'momentum-12-1']},
+
     // ---- rails --------------------------------------------------------------------------
     {key: 'position-cap', kind: 'rail', term: 'Position cap', aliases: ['position cap', 'max position weight'],
         short: `The largest share of the account the AI Navigator allows in one name: ${pct(MAX_POSITION_WEIGHT)}.`,

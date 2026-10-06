@@ -39,6 +39,15 @@
   --rank-2: #c0c8d0;
   --rank-3: #cd7f32;
 
+  /* The landing terrain's diverging scale (lib/landing/terrain-view.ts TERRAIN_STOPS): teal below
+     zero through magenta at zero to gold above. A material scale for data, like the medals, so
+     the surface reads the same in every palette; the components read these at runtime. */
+  --terrain-neg: #4fb3c8;
+  --terrain-low: #5a3f8f;
+  --terrain-zero: #b23a74;
+  --terrain-high: #ee6a4d;
+  --terrain-pos: #f2c14e;
+
   color-scheme: dark;
   --shade-1: rgb(0 0 0 / 0.25);
   --shade-2: rgb(0 0 0 / 0.5);
@@ -454,6 +463,11 @@ details[open] > :not(summary) { animation: disclosure-in var(--motion-base) var(
   background: var(--chrome-float-bg);
   border-right: var(--chrome-border);
   border-bottom: var(--chrome-border);
+}
+
+/* The landing terrain's legend bar: the same five stops, at the positions TERRAIN_STOPS gives them. */
+.terrain-scale {
+  background: linear-gradient(90deg, var(--terrain-neg) 0%, var(--terrain-low) 30%, var(--terrain-zero) 50%, var(--terrain-high) 75%, var(--terrain-pos) 100%);
 }
 
 /* Particle Background Canvas */
