@@ -65,6 +65,26 @@ export const normalizeAnthropicResponse = (response: unknown): {text: string; st
     return {text, stopReason: message?.stop_reason ?? null};
 };
 
+// A provider's "no more requests today", as a failed step's error carries it: Gemini answers
+// 429 RESOURCE_EXHAUSTED with a quota id naming the window — a per-day one
+// (GenerateRequestsPerDayPerProjectPerModel-FreeTier) is a wall until the quota resets, a
+// per-minute one is not. A job that meets the wall stops asking for the day rather than spending
+// Inngest's retries on calls that cannot succeed; anything else keeps the ordinary path.
+export const isDailyQuotaExhausted = (error: unknown): boolean => {
+    const text = error instanceof Error
+        ? `${error.message} ${typeof error.cause === 'string' ? error.cause : safeJson(error.cause)}`
+        : typeof error === 'string' ? error : safeJson(error);
+    return /RESOURCE_EXHAUSTED|\b429\b/.test(text) && /PerDay|per day|daily/i.test(text);
+};
+
+const safeJson = (value: unknown): string => {
+    try {
+        return value === undefined ? '' : JSON.stringify(value) ?? '';
+    } catch {
+        return '';
+    }
+};
+
 // Inngest's own step type: step.ai.infer is generic over its adapter and correlates
 // model with body, which a hand-rolled structural type cannot express.
 type InferStep = Pick<GetStepTools<Inngest.Any>, 'ai'>;
