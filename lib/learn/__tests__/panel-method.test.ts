@@ -10,6 +10,7 @@ import {GLOSSARY, type GlossaryKey} from '@/lib/learn/glossary';
 import {HABITS_COPY, HABITS_TERMS} from '@/lib/learn/copy/habits';
 import {LUCK_COPY, LUCK_TERMS} from '@/lib/learn/copy/luck';
 import {TIM_COPY, TIM_TERMS} from '@/lib/learn/copy/time-in-market';
+import {TERRAIN_COPY, TERRAIN_TERMS} from '@/lib/learn/copy/terrain';
 
 const RUN = 5;
 
@@ -46,5 +47,9 @@ describe('a panel lead says only what its definitions do not', () => {
 
     it('Time in the market: why the start date matters', () => {
         expect(restatements(TIM_COPY.why, TIM_TERMS)).toEqual([]);
+    });
+
+    it('The momentum terrain: how it is laid out', () => {
+        expect(restatements([TERRAIN_COPY.method], TERRAIN_TERMS)).toEqual([]);
     });
 });

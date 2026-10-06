@@ -1,8 +1,10 @@
 # Browser QA
 
 End-to-end checks against a throwaway database. Nothing here needs a `.env`, an API key or a
-real MongoDB: the harness starts an in-memory MongoDB, runs the dev server with inline
-environment variables beside the Inngest dev server, and drives Google Chrome with Playwright.
+real MongoDB: the harness starts an in-memory MongoDB and a stand-in for Tiingo
+(`start-tiingo-stub.mjs`, which the app is pointed at with a made-up token), runs the dev server
+with inline environment variables beside the Inngest dev server, and drives Google Chrome with
+Playwright.
 
 Unit tests (`npm test`) cover the pure modules. This is how the database-bound parts — server
 actions, Mongoose reads, the pages themselves — get exercised.
@@ -28,10 +30,10 @@ npm run qa -- --up                 # start the harness and keep it up until Ctrl
 npm run qa -- --up topics          # run a suite, then keep the harness up to poke at what it left
 ```
 
-`run.sh` starts the harness — MongoDB on :27117, `next dev` on :3000 (with
-`SIGN_UP_CLIENT_LIMIT=1000`, since every suite signs up its own users from localhost), the
-Inngest dev server on :8288 — runs the suites one after another, stops everything it started and
-prints one line per suite. Each suite prints one `PASS`/`FAIL` line per check and exits non-zero
+`run.sh` starts the harness — MongoDB on :27117, the Tiingo stand-in on :8787, `next dev` on
+:3000 (with `SIGN_UP_CLIENT_LIMIT=1000`, since every suite signs up its own users from localhost,
+and `TIINGO_TOKEN`/`TIINGO_API_URL` pointing at the stand-in), the Inngest dev server on :8288 —
+runs the suites one after another, stops everything it started and prints one line per suite. Each suite prints one `PASS`/`FAIL` line per check and exits non-zero
 when any fails. Logs land in `output/logs/` (`<suite>.log`, the harness's `_dev.log`,
 `_mongo.log`, `_inngest.log`, and `SUMMARY`); screenshots in one folder per suite
 (`output/topics/` for `qa-topics`).
@@ -50,6 +52,7 @@ setup (where the harness is, `check`/`summary`, `signUp`) is `lib.mjs`. A full r
 | `qa-auth` | Sign-up, sign-in and password reset: the reset link opens logged out, the token is single-use and revokes old sessions, the per-address and per-client sign-in limits, the per-client sign-up limit, no session token handed to the page. Also the market-status badge on /trade and /watchlist, the /markets tab in the URL, /history's headings | `ratelimits` counters past their limits; removes every `signin:*`/`signup:*` row at the end | reads the reset token out of Mongo (no SMTP); runs first, so no later sign-in starts inside its window |
 | `qa-styles` | Styles and the page frame: the warning token and its utility, no phantom scroll on six pages, a focus ring on the order ticket, TradingView embeds under a dark palette. Also the global and in-app 404s and a keyless symbol no strategy watches | a theme cookie | the TradingView embed script (network) |
 | `qa-shell` | The app shell: the icon rail (eight sections, tooltips, the Portfolio and News hover cards), a section's tabs, ⌘K by keyboard and by page name, the mobile drawer and its Logout, and the signed-out landing page at `/` (its sign-up button, its theme preview). Also friends: "sent 3 days ago", the friend-request dot on the avatar | a second user; a friend request backdated three days | — |
+| `qa-landing` | The front door's momentum terrain. With the Tiingo stand-in down and no SPY history the route is a 404 and the hero says why; on 560 seeded SPY sessions the route draws from the stored bars (the plan's shape, the close as price, four cells recomputed in the script, the symmetric scale, its five-minute Cache-Control, `source: stored`); with the stand-in up the route prefers it — the surface equals the one the app's own modules build from its rows through jiti, the token travels in the Authorization header and never in the URL, a second request asks it nothing. Then the page: the 3D canvas named for a screen reader, the camera presets and the flatten toggle, the tooltip and the 20-day slice following a hover, the one "What these mean" with its three terms and no Ask links, the Tiingo credit, a theme repaint, reduced motion stopping the rotation, and a phone (no sideways scroll, the tap hint, `touch-action: pan-y`). A browser without WebGL gets the flat heatmap and a NOTE instead of the 3D checks | 560 SPY bars without dividends (the stored SPY bars are saved first and put back after); the stand-in switched on, then off again | `jiti`, for the Tiingo parser and the surface's maths in Node |
 | `qa-home` | Home: a new account's greeting, account total, topics and first-week step; the step moving on as rows appear and following the market once the list is hidden; My dashboard as a tab; the old `/?customize=1` link; a phone width | one user trade; the checklist's dismissal stamp | — |
 | `qa-chat` | The chat panel: error recovery, a conversation that survives closing, the read-only portfolio tool, model markdown rendered safely (on /brain's rationale). Also the confirm dialogs of Reset Account and Reset to default. Also the robot launcher: bottom-right at 1440 with its SVG mascot, no tip in the first seconds, then — in a browser context of its own under Playwright's fake clock — a tip on /topics whose Try it prefills the composer without sending, a different second tip, dismiss, no repeat across a reload, a tip under the pointer outliving its time and leaving once the pointer has, and silence off the topics pages | today's global Navigator rationale as markdown (`suggestionsets`, upserted) | no Gemini key: a failure is forced by aborting `/api/chat`; installs Playwright's clock in a second context (so the chat checks above run on real time) |
 | `qa-topics-refresh` | When topics fetch: the six defaults seeded once and unfollowing sticking, /topics fetching at most once per view, Refresh now and its cooldown. Also unpriced holdings labelled on /portfolio, /trade, the sidebar and the dashboard | holdings with no quote | the Inngest dev server for the queued path; without it, the dead-queue path |

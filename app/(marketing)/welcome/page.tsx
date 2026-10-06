@@ -3,7 +3,10 @@ import Link from "next/link";
 import {LANDING_BALANCE, LANDING_COPY} from "@/lib/learn/copy/landing";
 import {DEFAULT_TOPIC_NAMES} from "@/lib/topics/starters";
 import {TOPIC_BRIEF_COPY} from "@/lib/learn/copy/topics";
+import MomentumTerrain from "@/components/landing/MomentumTerrain";
 import ThemeDemo from "@/components/landing/ThemeDemo";
+import WhatTheseMean from "@/components/learn/WhatTheseMean";
+import {TERRAIN_COPY, TERRAIN_TERMS} from "@/lib/learn/copy/terrain";
 import MicroLabel from "@/components/primitives/MicroLabel";
 import Panel from "@/components/primitives/Panel";
 import SectionHeading from "@/components/primitives/SectionHeading";
@@ -13,10 +16,14 @@ import {rowCard} from "@/components/primitives/RowCard";
 // The front door. proxy.ts shows this page at "/" to a visitor with no session (a rewrite, so
 // the address stays "/"); a signed-in reader gets Home there instead. It reads nothing — no
 // session, no database — so it renders the same for everyone and cannot fail on a missing key.
+// The hero's momentum terrain (components/landing/MomentumTerrain) is the one thing on the page
+// with data behind it, and it fetches app/api/landing/surface itself after the page has painted;
+// the page is the same page without it.
 //
-// Every sentence is lib/learn/copy/landing.ts. The preview is drawn with the app's own
-// primitives, so it follows the theme, and it is labelled as an example: it shows the shape of
-// a screen, never a claim about a market or an account.
+// Every sentence is lib/learn/copy/landing.ts (the terrain's, lib/learn/copy/terrain.ts). The
+// example screen is drawn with the app's own primitives, so it follows the theme, and it is
+// labelled as an example: it shows the shape of a screen, never a claim about a market or an
+// account.
 
 export const metadata: Metadata = {
     // Absolute: it already names the app, so the layout's template must not add it again.
@@ -45,8 +52,8 @@ const Welcome = () => (
 
         <main className="mx-auto max-w-6xl space-y-16 px-6 pb-20 pt-28">
             {/* Hero */}
-            <section className="grid items-center gap-10 lg:grid-cols-2" aria-labelledby="landing-title">
-                <div>
+            <section className="grid items-start gap-10 lg:grid-cols-5" aria-labelledby="landing-title">
+                <div className="lg:col-span-2 lg:pt-8">
                     <MicroLabel tone="brand">{LANDING_COPY.eyebrow}</MicroLabel>
                     <h1 id="landing-title" className="mt-3 font-heading text-4xl font-semibold leading-tight tracking-tight text-fg md:text-5xl">
                         {LANDING_COPY.title}
@@ -62,8 +69,54 @@ const Welcome = () => (
                     </div>
                 </div>
 
-                {/* The example screen: the app's own boxes, with nothing in them that is a claim. */}
-                <div aria-hidden="true" className="space-y-3" data-landing-preview>
+                {/* The terrain: SPY's momentum over the last year, from the app's own stored closes. Its
+                    definitions are the page's, so the client component bundles no glossary. */}
+                <div className="lg:col-span-3" data-landing-terrain>
+                    <MomentumTerrain>
+                        <WhatTheseMean keys={TERRAIN_TERMS} ask={false}>
+                            <p className="text-xs leading-relaxed text-fg-muted" data-terrain-method>{TERRAIN_COPY.method}</p>
+                        </WhatTheseMean>
+                    </MomentumTerrain>
+                </div>
+            </section>
+
+            {/* Pillars */}
+            <section aria-labelledby="landing-pillars">
+                <h2 id="landing-pillars" className="sr-only">{LANDING_COPY.pillarsHeading}</h2>
+                <div className="grid gap-4 lg:grid-cols-3">
+                    {LANDING_COPY.pillars.map((pillar) => (
+                        <Panel key={pillar.id} as="article" pad={6} id={`landing-${pillar.id}`}>
+                            <span className="material-symbols-outlined text-3xl text-brand" aria-hidden="true">{pillar.icon}</span>
+                            <h3 className="mt-3 font-heading text-xl font-semibold text-fg">{pillar.title}</h3>
+                            <p className="mt-2 text-sm leading-relaxed text-fg-soft">{pillar.body}</p>
+                            <ul className="mt-4 space-y-2">
+                                {pillar.points.map((point) => (
+                                    <li key={point} className="flex gap-2 text-sm text-fg-muted">
+                                        <span className="material-symbols-outlined shrink-0 text-base text-brand" aria-hidden="true">check</span>
+                                        <span>{point}</span>
+                                    </li>
+                                ))}
+                            </ul>
+                        </Panel>
+                    ))}
+                </div>
+            </section>
+
+            {/* How it starts, beside the example screen: the app's own boxes, with nothing in them that is a claim. */}
+            <section aria-labelledby="landing-steps" className="grid gap-8 lg:grid-cols-5 lg:items-start">
+                <div className="lg:col-span-3">
+                    <h2 id="landing-steps" className="font-heading text-2xl font-semibold text-fg">{LANDING_COPY.stepsHeading}</h2>
+                    <ol className="mt-5 grid gap-4 md:grid-cols-3 lg:grid-cols-1">
+                        {LANDING_COPY.steps.map((step, i) => (
+                            <Panel key={step.title} as="li">
+                                <MicroLabel tone="brand">{`0${i + 1}`}</MicroLabel>
+                                <h3 className="mt-2 font-heading text-base font-semibold text-fg">{step.title}</h3>
+                                <p className="mt-1 text-sm leading-relaxed text-fg-muted">{step.body}</p>
+                            </Panel>
+                        ))}
+                    </ol>
+                </div>
+                <div aria-hidden="true" className="space-y-3 lg:col-span-2" data-landing-preview>
                     <MicroLabel>{LANDING_COPY.previewLabel}</MicroLabel>
                     <div className="grid gap-3 sm:grid-cols-2">
                         <Panel as="div">
@@ -91,42 +144,6 @@ const Welcome = () => (
                         <MicroLabel as="p" className="mt-3">{TOPIC_BRIEF_COPY.caveat}</MicroLabel>
                     </Panel>
                 </div>
-            </section>
-
-            {/* Pillars */}
-            <section aria-labelledby="landing-pillars">
-                <h2 id="landing-pillars" className="sr-only">{LANDING_COPY.pillarsHeading}</h2>
-                <div className="grid gap-4 lg:grid-cols-3">
-                    {LANDING_COPY.pillars.map((pillar) => (
-                        <Panel key={pillar.id} as="article" pad={6} id={`landing-${pillar.id}`}>
-                            <span className="material-symbols-outlined text-3xl text-brand" aria-hidden="true">{pillar.icon}</span>
-                            <h3 className="mt-3 font-heading text-xl font-semibold text-fg">{pillar.title}</h3>
-                            <p className="mt-2 text-sm leading-relaxed text-fg-soft">{pillar.body}</p>
-                            <ul className="mt-4 space-y-2">
-                                {pillar.points.map((point) => (
-                                    <li key={point} className="flex gap-2 text-sm text-fg-muted">
-                                        <span className="material-symbols-outlined shrink-0 text-base text-brand" aria-hidden="true">check</span>
-                                        <span>{point}</span>
-                                    </li>
-                                ))}
-                            </ul>
-                        </Panel>
-                    ))}
-                </div>
-            </section>
-
-            {/* How it starts */}
-            <section aria-labelledby="landing-steps">
-                <h2 id="landing-steps" className="font-heading text-2xl font-semibold text-fg">{LANDING_COPY.stepsHeading}</h2>
-                <ol className="mt-5 grid gap-4 md:grid-cols-3">
-                    {LANDING_COPY.steps.map((step, i) => (
-                        <Panel key={step.title} as="li">
-                            <MicroLabel tone="brand">{`0${i + 1}`}</MicroLabel>
-                            <h3 className="mt-2 font-heading text-base font-semibold text-fg">{step.title}</h3>
-                            <p className="mt-1 text-sm leading-relaxed text-fg-muted">{step.body}</p>
-                        </Panel>
-                    ))}
-                </ol>
             </section>
 
             {/* The course */}

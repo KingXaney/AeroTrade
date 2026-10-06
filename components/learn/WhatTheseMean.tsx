@@ -24,10 +24,13 @@ type Props = {
     id?: string;
     label?: string;
     className?: string;
+    // False on a page where the chat widget is not mounted (the signed-out landing page), where
+    // an "Ask in chat" link would do nothing.
+    ask?: boolean;
     children?: ReactNode;
 };
 
-const WhatTheseMean = ({keys, id, label = DEFINITIONS_COPY.label, className, children}: Props) => {
+const WhatTheseMean = ({keys, id, label = DEFINITIONS_COPY.label, className, ask = true, children}: Props) => {
     const entries = Array.from(new Set(keys.filter(isGlossaryKey))).map((key) => GLOSSARY[key]);
     if (entries.length === 0 && !children) return null;
     return (
@@ -40,7 +43,7 @@ const WhatTheseMean = ({keys, id, label = DEFINITIONS_COPY.label, className, chi
                         <div key={entry.key} id={id ? `${id}-${entry.key}` : undefined}>
                             <dt className="font-heading text-xs font-semibold text-fg flex items-baseline gap-2">
                                 {entry.term}
-                                <AskLink input={{kind: 'term', term: entry.term}} />
+                                {ask && <AskLink input={{kind: 'term', term: entry.term}} />}
                             </dt>
                             <dd className="text-xs text-fg-muted leading-relaxed">
                                 {entry.long}

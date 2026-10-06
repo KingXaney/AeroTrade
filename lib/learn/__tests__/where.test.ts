@@ -34,7 +34,7 @@ describe('where each term lives', () => {
             expect(groupOf(GLOSSARY[key]), key).toBe('brain');
             expect(homeOf(key), key).toBe('/brain');
         }
-        expect(GLOSSARY_GROUPS.map((group) => group.id)).toEqual(['board', 'portfolio', 'market', 'concepts', 'brain', 'rails', 'games', 'poker']);
+        expect(GLOSSARY_GROUPS.map((group) => group.id)).toEqual(['board', 'portfolio', 'market', 'concepts', 'brain', 'rails', 'games', 'poker', 'landing']);
     });
 
     it('homes the games\' terms on /games', () => {
@@ -42,6 +42,14 @@ describe('where each term lives', () => {
             expect(groupOf(GLOSSARY[key]), key).toBe('games');
             expect(homeOf(key), key).toBe('/games');
         }
+    });
+
+    it('homes the terrain\'s terms on the front door', () => {
+        for (const key of ['normalized-momentum', 'lookback'] as const) {
+            expect(groupOf(GLOSSARY[key]), key).toBe('landing');
+            expect(homeOf(key), key).toBe('/welcome');
+        }
+        expect(homeOf('volatility')).toBe('/portfolio');
     });
 
     it('homes the poker solver\'s terms on /poker', () => {
