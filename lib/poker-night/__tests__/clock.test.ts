@@ -1,11 +1,12 @@
 // The lazy clock: what comes due in each phase and when, advance firing one event and stopping
 // (every new deadline counts from now, so a table left alone for an hour resumes with one timeout,
 // not a string of ghost hands), a new hand taking exactly one deck and one draw, one run-out street
-// per due step, the grace on a turn's deadline, and a move that arrived in time winning against a
-// timeout that fell due while it was being processed.
+// per due step, the grace on a turn's deadline, the slack any writer but the actor waits before
+// timing a turn out (and the mirror the leader's tick is armed by), and a move that arrived in time
+// winning against a timeout that fell due while it was being processed.
 
 import {describe, expect, it} from 'vitest';
-import {advance, nextDue, nextDueAt} from '@/lib/poker-night/clock';
+import {advance, dueFor, nextDue, nextDueAt} from '@/lib/poker-night/clock';
 import {TIMING} from '@/lib/poker-night/config';
 import {FULL_DECK} from '@/lib/poker-night/deck';
 import {reduce} from '@/lib/poker-night/engine';
@@ -36,7 +37,29 @@ describe('nextDue', () => {
     it('is the actor\'s deadline plus the grace while betting', () => {
         const s = deal(three());
         expect(nextDue(s)).toEqual({kind: 'timeout', at: s.hand!.deadline! + GRACE, turn: s.turn});
-        expect(nextDueAt(s)).toBe(s.hand!.deadline! + GRACE);
+        // A tick times the turn out only once the slack is past too: that is the mirror's time.
+        expect(nextDueAt(s)).toBe(s.hand!.deadline! + GRACE + TIMING.TIMEOUT_SLACK_MS);
+    });
+
+    it('waits the slack longer for any writer but the actor, and only for a turn\'s timeout', () => {
+        const s = deal(three());
+        const actor = s.seats[s.hand!.actor!]!.pid;
+        const other = s.seats.find((seat) => seat && seat.pid !== actor)!.pid;
+        const at = s.hand!.deadline! + GRACE;
+        expect(dueFor(s, null)?.at).toBe(at);
+        expect(dueFor(s, {pid: actor})?.at).toBe(at);
+        expect(dueFor(s, {pid: other})?.at).toBe(at + TIMING.TIMEOUT_SLACK_MS);
+        expect(dueFor(s, {pid: null})?.at).toBe(at + TIMING.TIMEOUT_SLACK_MS);
+        // At the turn\'s own time the actor\'s request times them out; anyone else\'s leaves it.
+        expect(advance(s, at, counting().source, {pid: actor}).steps).toBe(1);
+        expect(advance(s, at + TIMING.TIMEOUT_SLACK_MS - 1, counting().source, {pid: other}).state).toBe(s);
+        expect(advance(s, at + TIMING.TIMEOUT_SLACK_MS, counting().source, {pid: other}).steps).toBe(1);
+        // A run-out street and a deal are due at their own times for every writer.
+        const runout = moves(deal(three()), A, A, A);
+        expect(dueFor(runout, {pid: null})).toEqual(nextDue(runout));
+        const between = moves(deal(three()), F, F);
+        expect(dueFor(between, {pid: null})).toEqual(nextDue(between));
+        expect(nextDueAt(between)).toBe(between.nextHandAt);
     });
 
     it('is the next street during a run-out', () => {

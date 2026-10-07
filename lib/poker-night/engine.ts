@@ -14,7 +14,7 @@ import {
     applyMove, commit, foldOutOfTurn, legalFor, owed, pushLog, recheck, settleTurn, snapshotFromState, type Flow,
 } from '@/lib/poker-night/betting';
 import {checkConfig, DEFAULT_CONFIG, DEFAULT_SETTINGS, ENTRY_FLAGS, mergeConfig, RoomSettingsSchema, TIMING} from '@/lib/poker-night/config';
-import {cashOut, ledgerRow, recordBuy} from '@/lib/poker-night/ledger';
+import {cashOut, isSettled, ledgerRow, recordBuy} from '@/lib/poker-night/ledger';
 import {eligibleSeats, isLive, liveSeatOf, positions, seatOf} from '@/lib/poker-night/seats';
 import {closeBetting, closeTable, dealStreet, shownHand, summarize} from '@/lib/poker-night/showdown';
 import type {
@@ -490,4 +490,17 @@ export const forceClose = (state: TableState, at: number): TableState => {
     if (isLive(w.state.hand)) voidHand(w);
     closeTable(w);
     return w.state;
+};
+
+// Lets the ledger rows of players the room has forgotten go: among `pids`, the settled rows
+// (ledger.isSettled: no hand dealt, every chip bought cashed out) of players with no seat, no
+// request and no place in the current hand. Conservation holds, since such a row's bought and
+// cashed out are equal. Hands back the same state when no row goes. The room's join calls it when it
+// lets a departed guest's row go to make room (lib/poker-night/room.joinStep).
+export const forgetSettled = (state: TableState, pids: readonly string[]): TableState => {
+    const gone = new Set(pids.filter((pid) => seatOf(state, pid) === null && !state.requests.some((r) => r.pid === pid)
+        && !(state.hand?.seats.some((p) => p.pid === pid) ?? false)));
+    if (gone.size === 0) return state;
+    const ledger = state.ledger.filter((row) => !(gone.has(row.pid) && isSettled(row)));
+    return ledger.length === state.ledger.length ? state : {...state, ledger};
 };

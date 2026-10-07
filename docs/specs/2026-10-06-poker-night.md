@@ -1,9 +1,9 @@
 # Poker night: a hold'em table you share by link
 
-**Status:** In progress on branch `feat/poker-night`. The pure engine, phase 1 of 8, is written
-and tested. The room server and its API, the playable table and lobby, live updates over Ably,
-looks and avatars, emotes and the tracker's polish follow, each merged once its checks and browser
-QA pass.
+**Status:** In progress on branch `feat/poker-night`. Phase 1 (the pure engine) and phase 2 (the
+room server and its API) of 8 are written and tested. The playable table and lobby, live updates
+over Ably, looks and avatars, emotes and the tracker's polish follow, each merged once its checks
+and browser QA pass.
 
 ## Why
 
@@ -62,8 +62,90 @@ Where the design left a choice, these are the defaults, and the owner can change
   - `engine.ts` and `clock.ts`: the reducer and the lazy clock;
   - `migrate.ts`: reading a stored state back;
   - `views.ts` and `view-types.ts`: what a browser is sent.
-- **The copy** is `lib/learn/copy/poker-night.ts`: so far, the hand names, the log's lines and the
-  refusals.
+- **The room (phase 2)**, pure and in `lib/poker-night/` too:
+  - `room.ts`: the table plus who is at it — one row per account or guest, each with a random
+    11-character pid, the only handle a browser sees — and its steps: joining, the room's own
+    actions (a new name or look, "Let back in", handing over or claiming the host role), the engine's
+    actions with the removal's ban, the clock, the idle close; and the views of a room;
+  - `mutation.ts`: what one attempt of the store's write loop does with a room it has read;
+  - `room-doc.ts`: the room document both ways, and the cheap head every request reads first;
+  - `input.ts`, `http.ts`, `limits.ts`, `bucket.ts`, `env.ts`, `code.ts`, `names.ts`, `avatar.ts`,
+    `links.ts` and `results.ts`: the request bodies, the error codes and request checks, every limit,
+    the in-memory rate limit, the deployment and the kill switch, the share code, display names,
+    avatars, the share link and what an account's result row holds.
+- **The server (phase 2)**, server-only: `store.ts` (every room read and write, and `mutateRoom`,
+  the one way a table moves), `hands-store.ts` (history), `results-store.ts` (accounts' nights),
+  `identity.ts` (who is asking), `guest-token.ts` (the guest cookie), `pass.ts` (the seat pass) and
+  `route-kit.ts` (the checks every route runs). The models are `database/models/poker-room.model.ts`,
+  `poker-hand.model.ts` and `poker-result.model.ts`. The routes are `state`, `detail`, `join`,
+  `action` and `tick` under `app/api/poker-night/[code]/`, and `proxy.ts` leaves `/play/CODE` open
+  to guests (the slash keeps `/play` and `/players` gated).
+- **The copy** is `lib/learn/copy/poker-night.ts`: the hand names, the log's lines, the refusals,
+  every error code and the join card's words so far.
+
+## The room server
+
+**Who is asking.** An account, when the request carries a session; otherwise a guest, by the app's
+own signed cookie (`aero-pn-guest`, `__Host-` over HTTPS, httpOnly, SameSite=Lax so a tap on the
+link in a chat app still carries it, 180 days, re-signed after 30). Guests are never accounts: an
+anonymous better-auth user would open every page of the app and the daily email to them. Only a
+join mints the cookie. A session read that fails is a 503, never a quiet guest. A ten-minute seat
+pass, signed by the server and sent back in `X-PN-Pass`, lets the polls, the ticks and the detail
+reads skip the session's database read (past half its life it is answered with a fresh one); a
+join or a move always reads the identity in full. A join carries an id the client makes once and
+reuses on a retry, and a browser with no identity is given the guest that id names (an HMAC of it),
+so a double tap or a retry after a lost answer is one guest and one row.
+
+**Every request**, cheapest refusal first: the kill switch (`POKER_NIGHT_ENABLED=false`); the
+`X-PN-Protocol` header (a custom header, so a cross-site page's request fails its preflight, and a
+mismatch tells an old page to reload); for a POST, the same origin, JSON and at most 2 KiB, read
+from the stream and given up past the cap; an in-memory token bucket per player (the one a valid
+seat pass names, on every route, so nobody sharing the address can spend a seated player's budget;
+else per address) ahead of any database call; the code; the pass or the identity; the room's head,
+one projected read; the player's row. Mongo counters are spent only on a join (per address, per
+room) and on unknown codes, on every route, so no route checks codes faster than the miss counter
+allows.
+
+**One way a table moves.** `mutateRoom` reads the room, plans one attempt and writes it behind a
+compare-and-set on `seq`, five attempts with a jittered backoff before answering busy. A request
+names its action with an id the client reuses on a retry; the room keeps the last 64 it applied,
+so a double tap or a retried request is one action. The clock runs to the moment the request
+arrived, then the step, then the clock to now, so a move made in time is never beaten by a timeout
+that fell due while it waited in the loop. Only the actor's own request times their turn out at the
+turn's own time; any other request (the leader's tick, another player's move, a join) waits a
+second's slack longer, so it cannot reach the compare-and-set first and time out a move that
+arrived in time and is still on its way. A refused step still lets the clock's own changes commit.
+A room idle twelve hours closes on its next write. A stored state this deploy cannot read closes
+the room — unless a newer deploy wrote it, when every route, a read included, tells the page to
+reload instead. Presence
+beats and, later, emotes and realtime failures are written beside the game, never through it, so
+they never cost a move its race. After the response, the completed hands go to history and the
+accounts' totals to their result rows.
+
+**Nothing on a read writes.** The clock moves only on a POST: a move, a join, or the tick the clock
+leader's page sends when something falls due. A poll, a detail read and the page's render never
+write, so a link preview, a prefetch or a loop of polls cannot deal a hand.
+
+**Removal.** The host's removal is the engine's `kick` and the room's ban: the removed identity
+(an account, or a guest cookie — and an account still carrying that guest's cookie) is refused on
+every join and request — a move is checked against the room it is applied to, so a removal that
+lands while the move is on its way still stops it — and its row is kept and marked removed. "Let
+back in" lifts both, and the player returns as the row they were.
+
+**People who are gone never fill a room.** A room keeps at most 30 rows. A join first prunes
+watchers not heard from in two minutes and, at the bound, lets go of departed guests' rows that hold
+nothing: no seat, no request, no place in the hand, not heard from in two minutes, and a ledger row
+that is settled (never dealt a hand, every chip bought cashed out again), which goes with it. A
+removed guest's row may go too; its key stays on the room's list (the newest 32 removals are kept),
+so the removal holds. Account rows, and guests who played, stay for the night.
+
+**Every query carries the deployment.** A Vercel preview shares production's database, so every
+room, hand and result query and index, every rate-limit key and, later, every realtime channel
+names the env; a preview can never open a production table.
+
+**Names and looks travel apart.** The people part — every row's name and look, and who was removed —
+rides beside the table in responses, versioned by `peopleV`, which moves only when one of them
+does; the realtime message leaves it out and stays within its budget.
 
 ## Engine rules
 
@@ -76,7 +158,8 @@ a step that changes nothing. A refusal names its reason (`stale`, `not-your-turn
 `below-min-raise`, `rebuys-off` and sixteen more).
 
 **The clock.** Nothing on the server wakes on a timer. Three things fall due: the actor's time
-running out (two seconds of grace after the deadline the player sees), the next street of an
+running out (two seconds of grace after the deadline the player sees, and a second's slack more for any
+request but the actor's own), the next street of an
 all-in run-out (every 1.5 seconds), and the next deal. Every request runs the clock up to the
 moment it arrived, and the client chosen as clock leader posts a tick when something falls due.
 Each event is applied at the moment it runs, so a table nobody watched picks up in real time
@@ -157,7 +240,9 @@ number tuples, and the log keeps its latest 200 lines. The wire view is slimmer 
 seat's number is its place in the list, the bank sends what each player bought and cashed out and
 the client derives the rest, and a paid pot carries its amount, winners and shares but not who
 could have won it. Measured on the
-heaviest table the engine can build, the state takes at most 16,000 bytes and the wire view 4,500.
+heaviest table the engine can build, the state takes at most 16,000 bytes and the wire view 4,500;
+the room document around it, with thirty rows of the longest names, at most 27,000 bytes for what
+each write reads and 30,000 with the emotes.
 A stored field never changes meaning without bumping `STATE_VERSION` and adding a step to
 `migrate.ts`.
 
@@ -185,6 +270,20 @@ Every engine module is unit-tested in `lib/poker-night/__tests__/`:
   hand the pots match the chip-by-chip reference and go to the strongest hands, and the state
   survives JSON. The big blind never lands on one player twice running, and each night replays to
   the same state. `PN_SIM_SEEDS=1000` runs a thousand nights (about three minutes).
-- **server guard:** no client file, and nothing under `components/`, reaches `shuffle.ts` or the
-  poker-night server modules still to come by any chain of imports.
+- **room, mutation, room-doc:** joining (new, returning, moved on, watching, locked, full, removed),
+  the caps with stale watchers pruned, names deduped, removal and letting back in, renames between
+  hands, the host role, `peopleV` moving exactly when the people do; every branch of one write
+  attempt with a stacked deck (a repeat, the idle close, a move in time against a timeout, a refusal
+  whose clock still moves, nothing to write); the document read back as the room it was made from,
+  and a commit writing nothing out of band.
+- **input, http, limits, bucket, env, code, names, avatar, links, results, guest-token, pass:** strict
+  bodies; every error code with its status and sentence; the same-origin matrix and the capped body
+  read; the buckets on an injected clock; the guest cookie and the seat pass refusing every
+  tampered, expired or foreign token.
+- **server guard and route guard:** no client file, and nothing under `components/`, reaches
+  `shuffle.ts` or the poker-night server modules by any chain of imports; every route runs
+  `playerRequest` on Node within ten seconds; no GET, page or the shared checks reaches
+  `mutateRoom`; no route grants a cross-origin request; and no server module logs a room, a state
+  or a document. The proxy matcher test pins `/play/CODE` open and `/play`, `/players`,
+  `/playground`, `/poker-night` and `/poker` gated.
 - **copy:** every hand name, log line and refusal held to the no-advice list and a currency ban.

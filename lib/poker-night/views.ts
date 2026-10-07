@@ -8,12 +8,13 @@ import {evaluateCards} from '@/lib/poker/evaluator';
 import {readEntry, type BettingSnapshot} from '@/lib/poker-night/betting';
 import {ENTRY_KINDS, KEEP} from '@/lib/poker-night/config';
 import {bestFive} from '@/lib/poker-night/hand-name';
+import {ledgerEvents} from '@/lib/poker-night/ledger';
 import {buildPots} from '@/lib/poker-night/pots';
 import {handSeatAt, isLive, seatOf} from '@/lib/poker-night/seats';
 import type {Hand, HandResult, HandSeat, HandSummary, LedgerRow, Seat, SettledPot, ShownHand, TableState} from '@/lib/poker-night/types';
 import type {
-    BankRowView, CardsView, EmoteView, HandEntryView, HandResultView, HandSummaryView, HandView, LedgerView, PaidPotView, PlayerMeta, PlayerView, PotView, Presence,
-    SeatState, SeatView, SettledPotView, ShownCardsView, ShownHandView, TableView, ViewMeta, WireEntry, WireView,
+    BankDetailRowView, BankRowView, CardsView, EmoteView, HandEntryView, HandResultView, HandSummaryView, HandView, LedgerView, PaidPotView, People, PeopleView, PlayerMeta, PlayerView,
+    PotView, Presence, SeatState, SeatView, SettledPotView, ShownCardsView, ShownHandView, TableView, ViewMeta, WireEntry, WireView,
 } from '@/lib/poker-night/view-types';
 
 // A WireEntry's kind indexes this list.
@@ -97,8 +98,13 @@ export const publicView = (state: TableState, presence: Readonly<Record<string, 
 export const wireView = (state: TableState, meta: ViewMeta): WireView => ({
     ...publicView(state, meta.presence),
     seq: meta.seq, serverNow: meta.serverNow, nextDueAt: meta.nextDueAt, code: meta.code, clockLeader: meta.clockLeader,
-    people: Object.fromEntries(Object.entries(meta.people).map(([pid, p]) => [pid, {name: p.name, avatar: p.avatar}])),
-    watchers: meta.watchers, realtimeOk: meta.realtimeOk,
+    peopleV: meta.peopleV, watchers: meta.watchers, realtimeOk: meta.realtimeOk,
+});
+
+// The people part, copied name by name: what rides beside the wire view in every response.
+export const peopleView = (people: Readonly<People>, removed: readonly string[]): PeopleView => ({
+    people: Object.fromEntries(Object.entries(people).map(([pid, p]) => [pid, {name: p.name, avatar: p.avatar}])),
+    removed: [...removed],
 });
 
 const emoteView = (e: EmoteView): EmoteView =>
@@ -113,6 +119,7 @@ export const playerView = (state: TableState, pid: string, meta: PlayerMeta): Pl
     const own = i === null ? null : handSeatAt(state, i);
     return {
         ...wireView(state, meta),
+        ...peopleView(meta.people, meta.removed),
         config: {...state.config},
         me: {
             pid, seat: i, role: i === null ? 'watching' : 'seated', isHost: state.hostPid === pid, hasAccount: meta.hasAccount,
@@ -149,6 +156,13 @@ export const bankOf = (view: Pick<TableView, 'seats' | 'ledger'>): BankRowView[]
     const chips = seat ? seat.chips + seat.inPot : 0;
     return {...row, chips, inPot: seat ? seat.inPot : 0, net: chips + row.cashedOut - row.bought, seated: seat !== null};
 });
+
+// The bank in full (GET detail?part=bank): bankOf's figures for every row, with its kept events.
+export const bankDetailView = (state: TableState): BankDetailRowView[] =>
+    bankOf(publicView(state)).map((row, i) => ({
+        ...row,
+        events: ledgerEvents(state, state.ledger[i]).map((e) => ({at: e.at, kind: e.kind, amount: e.amount})),
+    }));
 
 // A shown hand's value and the five cards that play, as the server works them out at the showdown.
 export const readShownHand = (board: readonly number[], shown: ShownCardsView): ShownHandView => {

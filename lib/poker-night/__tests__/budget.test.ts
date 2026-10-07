@@ -1,14 +1,19 @@
 // The room document's size budget, on the heaviest table the engine can build: nine seats, six
 // players who left (fifteen ledger rows, each with its full twelve events), a hand whose log is at
 // its 200-entry cap from a min-raise war, four side pots and six hands shown, and a rebuy request from
-// every non-host player. The engine's state is held to 16,000 bytes of the room's 24,000-byte hot
-// document (lib/poker-night/config KEEP sets the caps), and the public wire view — what every
-// response and Ably message carries — to 4,500 bytes before the room adds names and looks.
+// every non-host player. The engine's state is held to 16,000 bytes (lib/poker-night/config KEEP
+// sets the caps); the room document around it — every row the room keeps with the longest names, the
+// applied ring, the beats and the emotes — to 27,000 bytes for what each write reads and 30,000 in
+// all; and the public wire view — what every response and Ably message carries — to 4,500 bytes.
+// Names and looks are not part of the wire view: they ride beside it in responses only, versioned by
+// peopleV (lib/poker-night/room.roomView).
 
 import {describe, expect, it} from 'vitest';
 import {nextDueAt} from '@/lib/poker-night/clock';
 import {DEFAULT_CONFIG, KEEP} from '@/lib/poker-night/config';
 import {createTable} from '@/lib/poker-night/engine';
+import {LIMITS} from '@/lib/poker-night/limits';
+import {appliedKey} from '@/lib/poker-night/room';
 import {isLive} from '@/lib/poker-night/seats';
 import type {TableAction, TableState} from '@/lib/poker-night/types';
 import {clockLeaderOf, wireView} from '@/lib/poker-night/views';
@@ -91,8 +96,38 @@ describe('the hot document budget', () => {
         const presence = Object.fromEntries(s.seats.map((seat) => [seat!.pid, 'here' as const]));
         const view = wireView(s, {
             code: 'K7QXM4', seq: 3100, serverNow: T0 + 12 * 3_600_000, nextDueAt: nextDueAt(s), clockLeader: clockLeaderOf(s, presence),
-            people: {}, presence, watchers: 12, realtimeOk: true,
+            presence, watchers: 12, realtimeOk: true, peopleV: 40,
         });
         expect(bytes(view)).toBeLessThanOrEqual(4_500);
+    });
+});
+
+describe('the room document budget', () => {
+    const s = heaviest();
+    // The room's other hot fields at their heaviest: every row the room keeps (LIMITS.players), each
+    // with an account id and a 48-unit name of skin-toned emoji (four units, eight bytes a grapheme),
+    // the longest look and a removal flag here and there; the removals the room remembers; the
+    // applied ring full; a beat from every row; the emote ring full of throws.
+    const name = String.fromCodePoint(0x1f44d, 0x1f3fd).repeat(12);
+    const players = Array.from({length: LIMITS.players}, (_, i) => ({
+        pid: pid(i), userId: `6650a1b2c3d4e5f6012345${String(i).padStart(2, '0')}`, guestId: null, name, avatar: 'v1:butterfly:tangerine:double:cherries',
+        joinedAt: T0 + i, banned: i % 7 === 0,
+    }));
+    const applied = Array.from({length: KEEP.APPLIED}, (_, i) => appliedKey(pid(i % 30), `0b7c1e2a-9f3d-4c5b-8a6e-${String(i).padStart(12, '0')}`));
+    const seen = Object.fromEntries(players.map((p) => [p.pid, {at: T0 + 12 * 3_600_000, hidden: true}]));
+    const emotes = Array.from({length: KEEP.EMOTES}, (_, i) => ({kind: 'throw', item: 'tennis-ball', to: pid(1), id: `e${i}`.padEnd(16, 'x'), seq: 1000 + i, from: pid(2), at: T0}));
+    // Every removal the room remembers (LIMITS.bannedKeys), each an account's key, the longest kind.
+    const bannedKeys = Array.from({length: LIMITS.bannedKeys}, (_, i) => `u:6650a1b2c3d4e5f6012345${String(i).padStart(2, '0')}`);
+    const casRead = {state: s, players, bannedKeys, applied, seen, peopleV: 999};
+
+    // The design's first figure was 24,000 bytes; thirty rows of 48-unit names (8 KB) on top of the
+    // heaviest state (14.5 KB) do not fit it, so these hold what the limits really allow.
+    it('keeps what every write reads and rewrites within 27,000 bytes', () => {
+        expect(name.length).toBe(48);
+        expect(bytes(casRead)).toBeLessThanOrEqual(27_000);
+    });
+
+    it('keeps the whole hot document, emotes included, within 30,000 bytes', () => {
+        expect(bytes({...casRead, emotes})).toBeLessThanOrEqual(30_000);
     });
 });

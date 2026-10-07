@@ -11,9 +11,16 @@
 // Organised by export, one section per part of the table, each naming the module whose data it
 // words.
 
+import type {FaceId} from "@/lib/poker-night/avatar";
 import type {HandDescription} from "@/lib/poker-night/hand-name";
+import type {PokerNightErrorCode} from "@/lib/poker-night/http";
+import {LIMITS} from "@/lib/poker-night/limits";
 import type {EntryKind, Refusal} from "@/lib/poker-night/types";
-import {capitalize} from "@/lib/text";
+import {capitalize, numberWord} from "@/lib/text";
+
+// A player's name inside a sentence, set apart from the words around it (U+2068 … U+2069), so a
+// name written right to left cannot reorder the sentence it sits in.
+export const isolate = (name: string): string => `\u2068${name}\u2069`;
 
 // ---- cards (lib/poker/cards.ts) -------------------------------------------------------------
 
@@ -113,3 +120,78 @@ export const REFUSAL_COPY: Record<Refusal, string> = {
     'bad-deck': 'The deal did not go through, so nothing changed.',
     'not-due': 'That is not due yet.',
 };
+
+// ---- errors (lib/poker-night/http.ts, PokerNightErrorCode) -----------------------------------
+
+// What the table says when a request comes back refused. Keyed on every code a route answers with,
+// so a new code does not compile without its sentence; a code named after a refusal says what the
+// refusal does.
+export const POKER_NIGHT_ERRORS: Record<PokerNightErrorCode, string> = {
+    bad_request: 'That request could not be read, so nothing changed.',
+    no_identity: 'Join the table first: this browser has not taken a seat or a place to watch.',
+    cross_origin: 'That request came from another site, so it was turned down.',
+    not_player: 'This browser has not joined the table yet.',
+    banned: 'The host removed you from this table.',
+    locked: 'The host closed this table to new players.',
+    forbidden: 'That is not open at this table.',
+    not_host: REFUSAL_COPY['not-host'],
+    needs_account: 'That needs a signed-in account.',
+    not_found: 'No table has this code. The link may be missing a letter.',
+    watchers_full: 'Every place to watch is taken. One opens when a watcher leaves.',
+    room_full: 'This table has as many players as it can keep tonight.',
+    host_cap: `You have ${numberWord(LIMITS.hostOpenTables)} open tables already. Close one to start another.`,
+    stale: REFUSAL_COPY.stale,
+    not_your_turn: REFUSAL_COPY['not-your-turn'],
+    not_now: REFUSAL_COPY['not-now'],
+    not_seated: REFUSAL_COPY['not-seated'],
+    already_seated: REFUSAL_COPY['already-seated'],
+    seat_taken: REFUSAL_COPY['seat-taken'],
+    no_request: REFUSAL_COPY['no-request'],
+    rebuys_off: REFUSAL_COPY['rebuys-off'],
+    rebuy_cap: REFUSAL_COPY['rebuy-cap'],
+    closed: REFUSAL_COPY.closed,
+    invalid_action: REFUSAL_COPY.illegal,
+    bad_seat: REFUSAL_COPY['bad-seat'],
+    bad_amount: REFUSAL_COPY['bad-amount'],
+    below_buy_in: REFUSAL_COPY['below-buy-in'],
+    over_cap: REFUSAL_COPY['over-cap'],
+    below_min_raise: REFUSAL_COPY['below-min-raise'],
+    bad_config: REFUSAL_COPY['bad-config'],
+    reload: 'This table was updated. Reload to keep playing.',
+    rate_limited: 'One moment: actions are coming in fast.',
+    busy: 'The table was busy, so that did not go through. Try again.',
+    unavailable: 'The table cannot be reached right now. Try again in a moment.',
+};
+
+// ---- joining (lib/poker-night/room.ts joinStep, JoinOutcome) --------------------------------
+
+export const JOIN_COPY = {
+    heading: 'Pull up a chair',
+    // The face is the avatar's name (AVATAR_COPY.faces), which a blank name sits as.
+    blankName: (face: string): string => `Leave it blank to sit as ${face}.`,
+    // How a join went (JoinOutcome): 'returning' says nothing.
+    seated: 'Seated. You are dealt in from the next hand.',
+    seatTaken: 'That seat was just taken, so you have the next free one.',
+    full: 'The table is full. You can watch, and a seat opens when someone leaves.',
+    watching: 'Watching. Take any open seat to join the game.',
+    // Someone here goes by that name, or it is one the table keeps for itself.
+    renamed: (name: string): string => `That name is taken here, so you sit as ${isolate(name)}.`,
+    posting: 'You post one big blind when you are dealt in.',
+    locked: 'The host closed this table to new players.',
+    banned: 'The host removed you from this table.',
+} as const;
+
+// ---- avatars (lib/poker-night/avatar.ts) -----------------------------------------------------
+
+export const AVATAR_COPY = {
+    // Each face's name: what the face is called in the builder, and the name a player who leaves
+    // theirs blank sits under.
+    faces: {
+        fox: 'Fox', cat: 'Cat', dog: 'Dog', panda: 'Panda', koala: 'Koala', tiger: 'Tiger', lion: 'Lion', frog: 'Frog',
+        monkey: 'Monkey', penguin: 'Penguin', owl: 'Owl', octopus: 'Octopus', unicorn: 'Unicorn', dragon: 'Dragon', turtle: 'Turtle',
+        rabbit: 'Rabbit', bear: 'Bear', pig: 'Pig', cow: 'Cow', shark: 'Shark', dinosaur: 'Dinosaur', bee: 'Bee',
+        butterfly: 'Butterfly', whale: 'Whale', robot: 'Robot', alien: 'Alien', ghost: 'Ghost', pumpkin: 'Pumpkin', cowboy: 'Cowboy',
+        wizard: 'Wizard', vampire: 'Vampire', superhero: 'Superhero', clown: 'Clown', cactus: 'Cactus', mushroom: 'Mushroom',
+        sunflower: 'Sunflower', doughnut: 'Doughnut', pizza: 'Pizza', die: 'Dice', rocket: 'Rocket',
+    } satisfies Record<FaceId, string>,
+} as const;

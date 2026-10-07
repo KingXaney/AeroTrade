@@ -45,6 +45,7 @@ const HOUR = 3_600_000;
 
 export const TIMING = {
     TURN_GRACE_MS: 2000, // a move may arrive this long after the deadline the UI counts down to
+    TIMEOUT_SLACK_MS: 1000, // and any request but the actor's waits this much longer to time the turn out (clock.dueFor)
     RUNOUT_STEP_MS: 1500, // between the streets of an all-in run-out
     START_DELAY_MS: 3000, // from Deal (or resume, or a second player) to the cards
     MAX_CLOCK_STEPS: 8,

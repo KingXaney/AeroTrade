@@ -32,6 +32,11 @@ const pushEvent = (w: Work, row: LedgerRow, kind: LedgerKind, amount: number) =>
     if (row.events.length > KEEP.LEDGER_EVENTS) row.events.splice(0, row.events.length - KEEP.LEDGER_EVENTS);
 };
 
+// A row the night no longer needs once its player is gone: never dealt a hand, and every chip
+// bought cashed out again (a sit-down and a leave, a removal before the first deal). Its bought and
+// cashed out are equal, so dropping it moves no sum in conservation (engine.forgetSettled).
+export const isSettled = (row: LedgerRow): boolean => row.hands === 0 && row.bought === row.cashedOut;
+
 // A row's kept events, read back with their times.
 export const ledgerEvents = (state: Pick<TableState, 'createdAt'>, row: LedgerRow): {at: number; kind: LedgerKind; amount: number}[] =>
     row.events.map(([at, kind, amount]) => ({at: state.createdAt + at, kind: LEDGER_KINDS[kind], amount}));

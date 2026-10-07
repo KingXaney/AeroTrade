@@ -28,6 +28,12 @@ describe('the proxy matcher', () => {
             expect(gated(url), url).toBe(true);
         }
     });
+
+    it('leaves a poker night table open to guests, and only the table', () => {
+        for (const url of ['/play/K7QXM4', '/play/K7QXM4?x=1', '/play/k7qxm4']) expect(gated(url), url).toBe(false);
+        // The slash in play/ keeps every look-alike gated, the lobby and the solver included.
+        for (const url of ['/play', '/players', '/playground', '/poker-night', '/poker']) expect(gated(url), url).toBe(true);
+    });
 });
 
 describe('the proxy, for a visitor with no session', () => {

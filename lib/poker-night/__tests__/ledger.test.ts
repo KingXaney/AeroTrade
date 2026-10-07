@@ -6,8 +6,8 @@
 
 import {describe, expect, it} from 'vitest';
 import {DEFAULT_CONFIG, KEEP} from '@/lib/poker-night/config';
-import {createTable, reduce} from '@/lib/poker-night/engine';
-import {buyRange, chipsOf, conservation, inPotOf, ledgerDigest, ledgerEvents, ledgerRow, netOf} from '@/lib/poker-night/ledger';
+import {createTable, forgetSettled, reduce} from '@/lib/poker-night/engine';
+import {buyRange, chipsOf, conservation, inPotOf, isSettled, ledgerDigest, ledgerEvents, ledgerRow, netOf} from '@/lib/poker-night/ledger';
 import type {GameConfig, TableAction, TableState} from '@/lib/poker-night/types';
 import {A, C, R, X, deal, host, moves, nowOf, ok, play, runOut, T0, table} from './fixtures';
 
@@ -143,5 +143,41 @@ describe('conservation', () => {
         expect(conservation(s)).toMatchObject({inPot: 0, ok: true});
         s = ok(host(s, {op: 'end'}));
         expect(conservation(s)).toEqual({bought: 4500, stacks: 0, inPot: 0, cashedOut: 4500, ok: true});
+    });
+});
+
+describe('forgetting settled rows', () => {
+    it('lets go only the rows of players who are gone, were never dealt in and took out what they bought', () => {
+        // p3 sat and left before a hand; p4 is still seated; p5 asked the host for chips; p1 played.
+        let s = seated([2000, 1500, 1000], {rebuys: 'approve'});
+        s = play(s, sit(s, 'p3', 3, 1000), {type: 'leave', by: 'p3', at: nowOf(s)}, sit(s, 'p4', 4, 1000));
+        s = deal(s, {holes: {0: 'AhAd', 1: 'KhKd', 2: '7c2d', 4: '3c3d'}, board: 'QsJs9d5h4c'});
+        s = runOut(moves(s, A, C, C, C));
+        s = play(s, {type: 'leave', by: 'p1', at: nowOf(s)});
+        expect(isSettled(ledgerRow(s, 'p3')!)).toBe(true);
+        expect(isSettled(ledgerRow(s, 'p1')!)).toBe(false);
+        const before = conservation(s);
+        const after = forgetSettled(s, ['p1', 'p3', 'p4', 'nobody']);
+        expect(after.ledger.map((row) => row.pid)).toEqual(s.ledger.map((row) => row.pid).filter((pid) => pid !== 'p3'));
+        expect(conservation(after)).toEqual({...before, bought: before.bought - 1000, cashedOut: before.cashedOut - 1000});
+        expect(conservation(after).ok).toBe(true);
+        // Nothing to let go: the same state.
+        expect(forgetSettled(after, ['p1', 'p4'])).toBe(after);
+        expect(forgetSettled(s, [])).toBe(s);
+    });
+
+    it('never lets go a player who is seated, asking for chips or in the current hand, whatever their row says', () => {
+        let s = seated([2000, 2000]);
+        // p1's row made to read as settled while they still sit, then while they ask for chips with no seat.
+        const settled = (t: TableState): TableState => ({...t, ledger: t.ledger.map((row) => (row.pid === 'p1' ? {...row, cashedOut: row.bought, hands: 0} : row))});
+        const sitting = settled(s);
+        expect(isSettled(ledgerRow(sitting, 'p1')!)).toBe(true);
+        expect(forgetSettled(sitting, ['p1'])).toBe(sitting);
+        const asking = {...sitting, seats: sitting.seats.map((seat) => (seat?.pid === 'p1' ? null : seat)), requests: [{pid: 'p1', amount: 100, at: T0}]};
+        expect(forgetSettled(asking, ['p1'])).toBe(asking);
+        // Dealt into the hand on the table, with no seat left (as the hand completes for a leaver).
+        s = deal(s, {holes: {0: 'AhAd', 1: 'KhKd'}, board: 'QsJs9d5h4c'});
+        const inHand = {...settled(s), seats: s.seats.map((seat) => (seat?.pid === 'p1' ? null : seat))};
+        expect(forgetSettled(inHand, ['p1'])).toBe(inHand);
     });
 });

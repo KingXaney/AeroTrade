@@ -12,11 +12,11 @@ import {legalFor, snapshotFromState} from '@/lib/poker-night/betting';
 import {nextDueAt} from '@/lib/poker-night/clock';
 import {KEEP} from '@/lib/poker-night/config';
 import {reduce} from '@/lib/poker-night/engine';
-import {chipsOf, inPotOf, netOf} from '@/lib/poker-night/ledger';
+import {chipsOf, inPotOf, ledgerEvents, netOf} from '@/lib/poker-night/ledger';
 import {seatOf} from '@/lib/poker-night/seats';
 import type {PreAction, TableState} from '@/lib/poker-night/types';
 import {
-    bankOf, clockLeaderOf, historyView, livePots, peopleIds, playerView, publicView, readShownHand, snapshotFromView, WIRE_KINDS, wireView,
+    bankDetailView, bankOf, clockLeaderOf, historyView, livePots, peopleIds, playerView, publicView, readShownHand, snapshotFromView, WIRE_KINDS, wireView,
 } from '@/lib/poker-night/views';
 import type {PlayerMeta, Presence, ViewMeta} from '@/lib/poker-night/view-types';
 import {mulberry32} from '@/lib/random';
@@ -24,10 +24,13 @@ import {A, C, F, R, X, cards, deal, moves, nowOf, ok, play, randomNight, runOut,
 
 const meta = (s: TableState, presence: Record<string, Presence> = {}): ViewMeta => ({
     code: 'K7QXM4', seq: 12, serverNow: T0, nextDueAt: nextDueAt(s), clockLeader: clockLeaderOf(s, presence),
-    people: Object.fromEntries(peopleIds(s).map((pid) => [pid, {name: pid.toUpperCase(), avatar: 'v1:fox:tangerine:ring:crown'}])),
-    presence, watchers: 2, realtimeOk: true,
+    presence, watchers: 2, realtimeOk: true, peopleV: 3,
 });
-const playerMeta = (s: TableState): PlayerMeta => ({...meta(s), hasAccount: false, emotes: [], emoteSeq: 0, pass: null});
+const playerMeta = (s: TableState): PlayerMeta => ({
+    ...meta(s),
+    people: Object.fromEntries(peopleIds(s).map((pid) => [pid, {name: pid.toUpperCase(), avatar: 'v1:fox:tangerine:ring:crown'}])),
+    removed: [], hasAccount: false, emotes: [], emoteSeq: 0, pass: null,
+});
 
 // Every hole card a viewer may not see: dealt, not shown, not their own.
 const hiddenHoles = (s: TableState, viewer: string | null): number[][] =>
@@ -196,6 +199,16 @@ describe('what the client works out from the wire view', () => {
         }
     });
 
+    it('the bank in full: the same figures with each row\'s kept events, and nothing private', () => {
+        for (const s of STATES) {
+            const detail = bankDetailView(s);
+            // toEqual reads an undefined key as absent: the figures alone.
+            expect(detail.map((row) => ({...row, events: undefined}))).toEqual(bankOf(wireView(s, meta(s))));
+            expect(detail.map((row) => row.events)).toEqual(s.ledger.map((row) => ledgerEvents(s, row)));
+            expectNoLeak(detail, s, null);
+        }
+    });
+
     it('a shown hand: the server\'s value and the five cards that play', () => {
         let shown = 0;
         for (const s of STATES) {
@@ -262,9 +275,13 @@ describe('the room\'s helpers', () => {
         s = play(s, {type: 'leave', by: 'p1', at: T0}, {type: 'sit', by: 'p4', seat: 4, buyIn: 500, at: T0}, {type: 'buy', by: 'p4', amount: 100, at: T0});
         const ids = peopleIds(s);
         expect([...ids].sort()).toEqual(['h', 'p0', 'p1', 'p4']);
-        const view = wireView(s, meta(s));
+        const view = playerView(s, 'p0', playerMeta(s));
         const named = new Set<string>([view.hostPid, ...view.ledger.map((r) => r.pid), ...view.requests.map((r) => r.pid)]);
         for (const seat of view.seats) if (seat) named.add(seat.pid);
         for (const pid of named) expect(view.people[pid], pid).toBeDefined();
+        // The wire view carries no names: they ride beside it in responses, versioned by peopleV.
+        const wire = wireView(s, meta(s));
+        expect(Object.keys(wire)).not.toContain('people');
+        expect([wire.peopleV, view.peopleV]).toEqual([3, 3]);
     });
 });

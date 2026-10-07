@@ -1,10 +1,15 @@
 // Poker night's sentences (lib/learn/copy/poker-night.ts), each rendered over the inputs it meets and
 // held to the 'copy' tier of the no-advice list and to a currency ban (play chips have no cash
-// value), with the strings the table shows pinned word for word. One describe block per copy table.
+// value), with the strings the table shows pinned word for word. One describe block per copy table;
+// the error codes are covered both ways against lib/poker-night/http.ts.
 
 import {describe, expect, it} from 'vitest';
 import {findBanned, stripProhibitions} from '@/lib/learn/banned';
-import {ACTION_COPY, HAND_COPY, REFUSAL_COPY, SUIT_GLYPHS, SUIT_NAMES} from '@/lib/learn/copy/poker-night';
+import {
+    ACTION_COPY, AVATAR_COPY, HAND_COPY, isolate, JOIN_COPY, POKER_NIGHT_ERRORS, REFUSAL_COPY, SUIT_GLYPHS, SUIT_NAMES,
+} from '@/lib/learn/copy/poker-night';
+import {FACE_IDS} from '@/lib/poker-night/avatar';
+import {ERROR_CODES, refusalToCode} from '@/lib/poker-night/http';
 import {ENTRY_KINDS} from '@/lib/poker-night/config';
 import {describeHand, isRoyal, type HandDescription} from '@/lib/poker-night/hand-name';
 import {parseCard} from '@/lib/poker/cards';
@@ -162,5 +167,73 @@ describe('the refusals', () => {
         expect(REFUSAL_COPY['below-min-raise']).toBe('That raise is under the minimum.');
         expect(REFUSAL_COPY['rebuys-off']).toBe('Rebuys are off at this table.');
         expect(REFUSAL_COPY['over-cap']).toBe("That is over the table's chip cap.");
+    });
+});
+
+describe('the errors', () => {
+    it('give every code the routes answer with one sentence, and no other', () => {
+        expect(Object.keys(POKER_NIGHT_ERRORS).sort()).toEqual([...ERROR_CODES].sort());
+        for (const code of ERROR_CODES) {
+            const text = POKER_NIGHT_ERRORS[code];
+            clean(text);
+            expect(text, code).toMatch(/^[A-Z].*\.$/);
+        }
+    });
+
+    it('say what the refusal says when a code is named after one', () => {
+        for (const [reason, text] of Object.entries(REFUSAL_COPY) as [keyof typeof REFUSAL_COPY, string][]) {
+            const code = refusalToCode(reason);
+            if (code === 'invalid_action') continue;
+            expect(POKER_NIGHT_ERRORS[code], reason).toBe(text);
+        }
+        expect(POKER_NIGHT_ERRORS.invalid_action).toBe(REFUSAL_COPY.illegal);
+    });
+
+    it('read as the table says them', () => {
+        expect(POKER_NIGHT_ERRORS.stale).toBe('The table moved on before that arrived.');
+        expect(POKER_NIGHT_ERRORS.rate_limited).toBe('One moment: actions are coming in fast.');
+        expect(POKER_NIGHT_ERRORS.reload).toBe('This table was updated. Reload to keep playing.');
+        expect(POKER_NIGHT_ERRORS.banned).toBe(JOIN_COPY.banned);
+        expect(POKER_NIGHT_ERRORS.locked).toBe(JOIN_COPY.locked);
+        expect(POKER_NIGHT_ERRORS.host_cap).toBe('You have three open tables already. Close one to start another.');
+    });
+});
+
+describe('joining', () => {
+    it('says every fixed line and every name it is handed in plain words', () => {
+        for (const text of strings(JOIN_COPY)) clean(text);
+        for (const face of Object.values(AVATAR_COPY.faces)) {
+            clean(JOIN_COPY.blankName(face));
+            clean(JOIN_COPY.renamed(`${face} 2`));
+        }
+    });
+
+    it('reads as the join card prints it', () => {
+        expect(JOIN_COPY.heading).toBe('Pull up a chair');
+        expect(JOIN_COPY.blankName('Fox')).toBe('Leave it blank to sit as Fox.');
+        expect(JOIN_COPY.seatTaken).toBe('That seat was just taken, so you have the next free one.');
+        expect(JOIN_COPY.full).toBe('The table is full. You can watch, and a seat opens when someone leaves.');
+        expect(JOIN_COPY.locked).toBe('The host closed this table to new players.');
+        expect(JOIN_COPY.banned).toBe('The host removed you from this table.');
+        expect(JOIN_COPY.seated).toBe('Seated. You are dealt in from the next hand.');
+        expect(JOIN_COPY.posting).toBe('You post one big blind when you are dealt in.');
+    });
+
+    it("sets a player's name apart from the sentence around it", () => {
+        const fsi = String.fromCodePoint(0x2068);
+        const pdi = String.fromCodePoint(0x2069);
+        expect(isolate('Ana')).toBe(`${fsi}Ana${pdi}`);
+        expect(JOIN_COPY.renamed('Ana 2')).toBe(`That name is taken here, so you sit as ${fsi}Ana 2${pdi}.`);
+    });
+});
+
+describe('the avatars', () => {
+    it('name every face the builder offers, and only those', () => {
+        expect(Object.keys(AVATAR_COPY.faces)).toEqual(FACE_IDS);
+        for (const name of Object.values(AVATAR_COPY.faces)) {
+            clean(name);
+            expect(name, name).toMatch(/^[A-Z][a-z]+$/);
+        }
+        expect(new Set(Object.values(AVATAR_COPY.faces)).size).toBe(FACE_IDS.length);
     });
 });

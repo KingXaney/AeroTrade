@@ -428,8 +428,9 @@ and friends keep none beyond Shared and the invariants).
 ### poker night
 
 - A Texas hold'em table friends share by link, a feature apart from poker (the solver); it reuses
-  `lib/poker/cards` and `lib/poker/evaluator` and changes neither. So far it is the pure engine in
-  `lib/poker-night/`; the design and the phases still to come are
+  `lib/poker/cards` and `lib/poker/evaluator` and changes neither. So far it is the pure engine and
+  room layer in `lib/poker-night/`, the three models, the stores and the table's API under
+  `app/api/poker-night/[code]/`; the design and the phases still to come are
   `docs/specs/2026-10-06-poker-night.md`.
 - `lib/poker-night/engine.reduce` is the one way a table's state (`lib/poker-night/types`) changes:
   a pure reducer that clones once, never mutates its input and hands back the same reference for a
@@ -441,9 +442,10 @@ and friends keep none beyond Shared and the invariants).
   `node:crypto` (`SECURE_SOURCE`). The clock takes any `DeckSource` (`lib/poker-night/deck`), so
   tests deal from a stacked or seeded one. `lib/poker-night/__tests__/server-guard.test.ts` follows
   imports transitively: no 'use client' file (in `app/`, `components/`, `hooks/` or `lib/`) and
-  nothing under `components/` may reach `shuffle` or the later poker-night stores, identity, pass
-  or realtime modules, and no 'use client' file, nor any of poker night's components (a folder still
-  to come), may reach crypto, mongoose, `database/` or the session. A server page is not held to it.
+  nothing under `components/` may reach `shuffle`, the poker-night stores, identity, guest-token,
+  pass, route-kit or (later) realtime modules, and no 'use client' file, nor any of poker night's
+  components (a folder still to come), may reach crypto, mongoose, `database/` or the session. A
+  server page is not held to it.
 - `lib/poker-night/views` is the only way state leaves the server: `publicView`, `wireView`,
   `playerView` and `historyView` copy field by field from a whitelist. `lib/poker-night/view-types`
   is the client contract, declared on its own, never an `Omit<>` of a server type, and it has no
@@ -458,7 +460,8 @@ and friends keep none beyond Shared and the invariants).
   (`lib/poker-night/config`) and adding a step to `lib/poker-night/migrate`. A hand's log and a
   ledger row's events are stored as number tuples whose kinds index `ENTRY_KINDS` and
   `LEDGER_KINDS`, append-only lists; `lib/poker-night/__tests__/budget.test.ts` holds the state to
-  16,000 bytes and the wire view to 4,500 on the heaviest table the engine builds.
+  16,000 bytes, the room document to 27,000 for what each write reads (30,000 with the emotes) and
+  the wire view to 4,500 on the heaviest table the engine builds.
 - The rules a change most often meets (the spec has the rest): the big blind always moves one
   eligible seat on (`lib/poker-night/seats.positions`); a short all-in reopens nobody who has acted
   unless the short all-ins since add up to a full raise, but a checker facing an opening all-in
@@ -471,6 +474,65 @@ and friends keep none beyond Shared and the invariants).
   "the five cards that play"; no sentence or label opens on "Hold", "Hold'em" or "Buy" ("Press and
   hold", "Texas hold'em", "Chips in", "Rebuy"). `ACTION_COPY.does` is keyed on every `EntryKind`
   and `REFUSAL_COPY` on every `Refusal`, so a new kind or refusal does not compile without words.
+- The room (`lib/poker-night/room`, pure) is the engine's state plus `players` — one row per
+  account or guest, whose `pid` (11 random characters) is the only handle that leaves the server;
+  `userId` and `guestId` never do — `bannedKeys` and `peopleV`. Its steps (`joinStep`, `actionStep`,
+  `clockStep`, …) hand back the same core for a no-op. Removal is the engine's host op `kick` plus
+  the room's ban: the removed pid's identity key (`u:<userId>` or `g:<guestId>`) joins `bannedKeys`
+  and the row is marked banned, so that identity — or a signed-in browser still carrying the removed
+  guest's cookie — is refused `banned` on join and on every request; `unbanStep` (the host only,
+  "Let back in") lifts both, and the player returns as the row they were. `actionStep` checks the
+  player's row on the core the compare-and-set read, so a removal that commits while a move is on its
+  way still refuses it. The room keeps at most `LIMITS.players` rows: a join prunes stale watchers
+  and, at the bound, lets go of departed guests' rows that hold nothing (no seat, request or place in
+  the hand, unheard from in the active window, a settled ledger row, which `engine.forgetSettled`
+  drops with it) — removed ones last, their keys kept in `bannedKeys` (bounded by
+  `LIMITS.bannedKeys`) so the removal holds; account rows stay. `peopleV` moves exactly when a
+  name, a look, a join, a pruned or let-go row, a removal or a let-back-in does, so the realtime
+  message can leave the people out and a client refetches them when it moves.
+- Identity (`lib/poker-night/identity`): the better-auth session wins, read only when a session
+  cookie is present; else the app's own HMAC guest cookie (`lib/poker-night/guest-token`:
+  `aero-pn-guest`, `__Host-` over HTTPS, httpOnly, Lax, 180 days, re-signed after 30 or after a
+  rotation through `POKER_NIGHT_GUEST_SECRET_PREVIOUS`), minted only by POST join — for a browser
+  with no identity, the guest its body's `joinId` names (`guestIdForJoin`), so a double tap or a
+  retried join is one row; else nobody. A session read that throws is a 503, never a guest, and a
+  guest is never a better-auth user. The seat pass (`lib/poker-night/pass`, `X-PN-Pass`, ten
+  minutes, renewed past half its life) stands in for the identity on GET state, GET detail and tick
+  only; join and action always read it in full.
+- Every table request goes through `lib/poker-night/route-kit.playerRequest`, cheapest refusal
+  first: the kill switch (`POKER_NIGHT_ENABLED`), `X-PN-Protocol` (426 reload), a POST's same
+  origin, JSON and 2 KiB (read capped, `lib/poker-night/http.readCappedText`), the in-memory bucket
+  (`lib/poker-night/bucket`; by the player a valid pass names on every route, else the address)
+  before any database call, the code, the pass or the identity, the room's head (one projected
+  read), the player. Mongo counters only on join (per address, per room) and on an unknown code, on
+  every route. Its `json()` takes only `ResponseBody` (`lib/poker-night/view-types`), so a server
+  room or a state does not compile into a response.
+- `lib/poker-night/store.mutateRoom` is the one way the game moves: read, plan with the pure
+  `lib/poker-night/mutation.planMutation`, write behind a compare-and-set on `seq` (five attempts,
+  jittered backoff, then 503 busy). The plan: an action id already in the `applied` ring (64) is
+  answered as a duplicate; a room idle 12 hours closes; the clock runs to the request's
+  `receivedAt`, then the step, then the clock to now — a turn's timeout at the turn's own time for
+  the actor's own request, `TIMING.TIMEOUT_SLACK_MS` later for any other writer (`clock.dueFor`;
+  the `nextDueAt` mirror the leader's tick is armed by includes it), so an in-time move still on its
+  way is not beaten to the compare-and-set; a refused step still commits the clock's own changes,
+  without its action id; nothing changed, no write. A stored state `migrateState` refuses closes the
+  room out of band, or answers reload when a newer deploy wrote it — on the reads too
+  (`store.getRoomById` tells them apart, `room-doc.unreadRefusal`). The out-of-band fields
+  (`seen`, emotes, `rt`, `lastError`) are never part of the write. `afterCommit`, in the route's
+  `after()`, writes the completed hands (`lib/poker-night/hands-store`) and the accounts' results
+  (`lib/poker-night/results-store`); the realtime publish joins it in P4. The document mapping is
+  `lib/poker-night/room-doc` (pure). Logs carry codes, seqs and messages, never a room, a state or
+  a document.
+- A GET or a page render never writes: only POST action, join and tick move a room, so a link
+  preview, a prefetch or a loop of polls cannot deal a hand.
+  `lib/poker-night/__tests__/route-guard.test.ts` holds every `app/api/poker-night/[code]/` route
+  to `playerRequest`, Node and ten seconds, and no GET, (play) page or route-kit to `mutateRoom`.
+- Every room, hand and result query and index, every rate-limit key (`lib/poker-night/limits`) and,
+  later, every realtime channel carries the env (`lib/poker-night/env.envOf`: `VERCEL_ENV`, else
+  development): a preview shares production's database and must never open a production table.
+- The exits: every payload is one of `lib/poker-night/views`' projections or the room's views built
+  on them (`room.playerViewFor`, `roomView`, `playPageView`, `room-doc.playerViewOf`,
+  `views.bankDetailView`); the people (names and looks) are their own part beside the wire view.
 
 ### chat
 
