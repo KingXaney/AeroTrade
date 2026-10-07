@@ -15,9 +15,11 @@ type Props = {
     confirmLabel: string;
     destructive?: boolean;
     onConfirm: () => Promise<void> | void;
+    // Where the focus goes as it closes (Radix's onCloseAutoFocus): by default back to the trigger.
+    onCloseAutoFocus?: (event: Event) => void;
 };
 
-const ConfirmDialog = ({open, onOpenChange, title, description, confirmLabel, destructive = false, onConfirm}: Props) => {
+const ConfirmDialog = ({open, onOpenChange, title, description, confirmLabel, destructive = false, onConfirm, onCloseAutoFocus}: Props) => {
     const [busy, setBusy] = useState(false);
     const confirm = async () => {
         setBusy(true);
@@ -37,7 +39,7 @@ const ConfirmDialog = ({open, onOpenChange, title, description, confirmLabel, de
     return (
         // Don't let a click-away or Escape dismiss it mid-flight.
         <Dialog open={open} onOpenChange={(next) => { if (!next && busy) return; onOpenChange(next); }}>
-            <DialogContent className="sm:max-w-md">
+            <DialogContent className="sm:max-w-md" onCloseAutoFocus={onCloseAutoFocus}>
                 <DialogHeader>
                     <DialogTitle className="font-heading">{title}</DialogTitle>
                     <DialogDescription>{description}</DialogDescription>

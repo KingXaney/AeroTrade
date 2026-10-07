@@ -456,6 +456,523 @@ details[open] > :not(summary) { animation: disclosure-in var(--motion-base) var(
   border-bottom: var(--chrome-border);
 }
 
+/* ═══════════════════════════════════════
+   POKER NIGHT — the table at /play/CODE (components/poker-night, TableScreen and what it draws)
+   The colours are lib/poker-night/looks' LOOKS_CSS, injected by app/(play)/layout.tsx: the --pn-*
+   properties below (--pn-sky, --pn-felt, --pn-suit-h, --pn-chip-face, --pn-av-bg …) come from
+   data-attribute blocks there, never from a .tsx file. The felt reads them, a documented exception
+   to invariant 7 (a game surface, not a framed panel); every readable label floats on palette
+   chrome (.chrome-surface): seat plates, pot pills, tags, the banner, the action bar.
+   Structural rules sit in the components layer, so a utility at the call site still wins. The
+   geometry (where each plate, bet line and card sits) arrives as inline custom properties worked
+   out by lib/poker-night/stage; a centred element uses the `translate` property, which leaves
+   `transform` free for the animations.
+   Motion is CSS keyframes only — no SMIL, no Web Animations — on the timeline
+   lib/poker-night/choreography lays out: --pn-at (when) and --pn-dur (how long) are in units of
+   --motion-base, so brutalist and both motion guards (they zero the token) play every step at once.
+   Each keyframe leaves its end to the element's static style, which is the final state, so a guard's
+   `animation: none` shows the table as it now is: flights that end invisible (opacity 0) are not
+   seen at all, a stack shows its new count, a dimmed card stays dimmed. Element lifetimes are JS
+   timers, never animationend. Loops (.pn-pulse, .pn-win-glow) run in literal seconds and brutalist
+   stops them by name; every class is in both guard lists at the foot of this file, pinned by
+   lib/theme/__tests__/motion-guards.test.ts. The one thing that moves without a keyframe is a
+   winner's stack counting up: formatted text a timer steps (components/poker-night/CountUp), on the
+   same --motion-base, so a zeroed token shows the new count at once.
+   ═══════════════════════════════════════ */
+@layer components {
+  /* The room: the whole viewport, never scrolled; zoom stays on, the double-tap delay goes. */
+  .pn-room {
+    position: fixed;
+    inset: 0;
+    height: 100dvh;
+    overflow: hidden;
+    overscroll-behavior: none;
+    touch-action: manipulation;
+    isolation: isolate;
+    background: var(--bg);
+    color: var(--fg);
+    --pn-top: calc(3rem + env(safe-area-inset-top));
+    --pn-av: 28px;
+    --pn-mini-w: 17px;
+    --pn-show-w: 28px;
+    --pn-name: 11px;
+    --pn-stack: 11px;
+    --pn-chip: 12px;
+    --pn-hole-w: 50px;
+  }
+  .pn-room[data-pn-fit="tight"] { --pn-av: 22px; --pn-mini-w: 14px; --pn-show-w: 24px; --pn-name: 10px; --pn-stack: 10px; --pn-chip: 10px; --pn-hole-w: 44px; }
+  .pn-room[data-pn-fit="comfortable"] { --pn-av: 42px; --pn-mini-w: 24px; --pn-show-w: 40px; --pn-name: 13px; --pn-stack: 14px; --pn-chip: 18px; --pn-hole-w: 68px; --pn-amount: 13px; }
+  .pn-scene { position: absolute; inset: 0; z-index: 0; background: var(--pn-sky, var(--bg)); }
+
+  /* Top bar (the overlays' own, fixed), the table, the dock. A phone on its side puts the dock in a
+     column at the right. */
+  .pn-stage {
+    position: relative;
+    z-index: 1;
+    display: grid;
+    height: 100%;
+    grid-template-rows: var(--pn-top) minmax(0, 1fr) auto;
+    grid-template-columns: minmax(0, 1fr);
+  }
+  /* The margins leave room for what overhangs a plate: a top seat's shown cards, a bottom seat's word. */
+  .pn-table { position: relative; grid-row: 2; min-height: 0; margin: calc(var(--pn-show-w) * 0.75) max(6px, env(safe-area-inset-right)) 10px max(6px, env(safe-area-inset-left)); }
+  .pn-table[data-pn-ready="false"] { visibility: hidden; }
+  @media (orientation: landscape) and (max-height: 500px) {
+    .pn-stage { grid-template-columns: minmax(0, 1fr) minmax(12rem, 32%); grid-template-rows: var(--pn-top) minmax(0, 1fr); }
+    .pn-table { grid-column: 1; grid-row: 2; margin-bottom: 30px; }
+    .pn-dock { grid-column: 2; grid-row: 2; align-self: end; }
+  }
+
+  /* The felt: a stadium (rounded-full, which brutalist's square-corner rule leaves alone) in the
+     felt's two tones inside its rail, the betting line printed on it. */
+  .pn-felt {
+    position: absolute;
+    background: radial-gradient(ellipse at 50% 42%, var(--pn-felt-light), var(--pn-felt) 70%);
+    border: clamp(6px, 1.4vmin, 14px) solid var(--pn-rail);
+    box-shadow: inset 0 0 0 2px var(--pn-rail-light), inset 0 12px 40px rgb(0 0 0 / 0.35), 0 18px 48px rgb(0 0 0 / 0.45);
+  }
+  .pn-felt::before {
+    content: "";
+    position: absolute;
+    inset: max(10px, 9%);
+    border: 2px solid var(--pn-felt-line);
+    border-radius: inherit;
+  }
+  .pn-on-felt { color: var(--pn-on-felt); text-shadow: 0 1px 2px rgb(0 0 0 / 0.55); }
+  .pn-felt-name {
+    position: absolute;
+    translate: -50% -50%;
+    max-width: 70%;
+    overflow: hidden;
+    white-space: nowrap;
+    text-overflow: ellipsis;
+    font-family: var(--type-display);
+    font-weight: 600;
+    font-size: 12px;
+    letter-spacing: 0.28em;
+    text-transform: uppercase;
+    color: var(--pn-on-felt-soft);
+    opacity: 0.55;
+    pointer-events: none;
+  }
+  .pn-centre-note { position: absolute; translate: -50% -50%; text-align: center; font-size: 13px; line-height: 1.35; }
+
+  /* Seats: a plate centred on its spot (lib/poker-night/stage), the cards and tags around it. */
+  .pn-seats { position: absolute; inset: 0; margin: 0; padding: 0; list-style: none; }
+  .pn-seat { position: absolute; translate: -50% -50%; width: var(--pn-plate-w); height: var(--pn-plate-h); z-index: 2; }
+  .pn-plate {
+    position: relative;
+    display: flex;
+    align-items: center;
+    gap: 5px;
+    width: 100%;
+    height: 100%;
+    padding: 3px 5px;
+    border-radius: var(--control-radius);
+    color: var(--fg);
+    transition: opacity var(--motion-base) var(--motion-ease);
+  }
+  .pn-plate-text { display: flex; min-width: 0; flex: 1; flex-direction: column; gap: 1px; line-height: 1.15; }
+  .pn-plate-name { font-size: var(--pn-name); font-weight: 600; }
+  .pn-plate-stack { font-family: var(--type-mono); font-size: var(--pn-stack); font-weight: 700; font-variant-numeric: tabular-nums; }
+  /* A compact or tight plate is too narrow for the name beside the avatar: the avatar and the stack
+     share the top row, the name has the plate's whole width under them. */
+  :is([data-pn-fit="compact"], [data-pn-fit="tight"]) .pn-plate {
+    display: grid;
+    grid-template-columns: auto minmax(0, 1fr);
+    grid-template-areas: "avatar stack" "name name";
+    align-content: center;
+    align-items: center;
+    column-gap: 4px;
+    row-gap: 1px;
+  }
+  :is([data-pn-fit="compact"], [data-pn-fit="tight"]) .pn-plate-text { display: contents; }
+  :is([data-pn-fit="compact"], [data-pn-fit="tight"]) .pn-plate-avatar { grid-area: avatar; }
+  :is([data-pn-fit="compact"], [data-pn-fit="tight"]) .pn-plate-stack { grid-area: stack; min-width: 0; text-align: center; white-space: nowrap; }
+  :is([data-pn-fit="compact"], [data-pn-fit="tight"]) .pn-plate-name { grid-area: name; min-width: 0; text-align: center; }
+  .pn-seat[data-state="folded"] .pn-plate,
+  .pn-seat[data-state="sitting-out"] .pn-plate,
+  .pn-seat[data-state="away"] .pn-plate,
+  .pn-seat[data-state="busted"] .pn-plate,
+  .pn-seat[data-state="leaving"] .pn-plate { opacity: 0.55; }
+  .pn-seat[data-presence="offline"] .pn-avatar { filter: grayscale(0.8); }
+  .pn-seat[data-acting] .pn-plate { outline: 2px solid var(--brand); outline-offset: 1px; }
+  .pn-seat[data-my-turn] .pn-plate { outline-color: var(--warning); }
+  .pn-seat[data-acting] .pn-avatar { box-shadow: none; outline: none; }
+  .pn-plate-avatar { position: relative; display: grid; flex: none; place-items: center; }
+  .pn-plate-flag {
+    position: absolute;
+    left: 50%;
+    bottom: 0;
+    translate: -50% 55%;
+    z-index: 3;
+    max-width: calc(var(--pn-plate-w) + 28px);
+    padding: 0 6px;
+    border-radius: 9999px;
+    font-size: 11px;
+    font-weight: 700;
+    line-height: 15px;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+  .pn-blind {
+    position: absolute;
+    left: 0;
+    top: 0;
+    translate: -30% -45%;
+    z-index: 3;
+    padding: 0 4px;
+    border-radius: 9999px;
+    font-family: var(--type-mono);
+    font-size: 11px;
+    font-weight: 700;
+    line-height: 14px;
+  }
+  [data-pn-fit="tight"] :is(.pn-plate-flag, .pn-blind, .pn-open-seat) { font-size: 10px; }
+  .pn-tag {
+    position: absolute;
+    left: 50%;
+    top: 0;
+    translate: -50% -85%;
+    z-index: 4;
+    padding: 1px 7px;
+    border-radius: 9999px;
+    font-size: 11px;
+    font-weight: 700;
+    white-space: nowrap;
+    pointer-events: none;
+  }
+  /* A plate whose bet line sits over it (a bottom seat) carries its tag under it instead, below the
+     flag, so the name and the stack stay in sight. */
+  .pn-tag[data-over] { top: calc(100% + 10px); translate: -50% 0; }
+  .pn-tag[data-kind="fold"] { color: var(--fg-muted); }
+  .pn-tag[data-all-in] { color: var(--warning); }
+  .pn-seat-cards { position: absolute; top: calc(var(--pn-mini-w) * -0.45); right: 3px; z-index: 1; display: flex; pointer-events: none; }
+  .pn-seat-cards > * + * { margin-left: calc(var(--pn-mini-w) * -0.45); }
+  .pn-seat-cards > :first-child { rotate: -7deg; }
+  .pn-seat-cards > :last-child { rotate: 7deg; }
+  /* Cards turned up sit outside the plate, toward the felt's middle — above a bottom or side seat,
+     below a top one — so the name, the stack and the count stay in sight; a winner's "+N" rises
+     above them. */
+  .pn-seat-shown { position: absolute; left: 50%; bottom: calc(100% + 3px); translate: -50% 0; z-index: 3; display: flex; gap: 2px; pointer-events: none; }
+  .pn-seat[data-side="top"] .pn-seat-shown { bottom: auto; top: calc(100% + 10px); }
+  .pn-seat[data-shown]:not([data-side="top"]) .pn-win-pop-text { top: calc(var(--pn-show-w) * -1.4 - 3px); }
+  .pn-open-seat {
+    position: absolute;
+    left: 50%;
+    top: 50%;
+    translate: -50% -50%;
+    display: grid;
+    place-items: center;
+    width: max(44px, calc(var(--pn-plate-h) * 0.95));
+    height: max(44px, calc(var(--pn-plate-h) * 0.95));
+    border: 2px dashed var(--pn-on-felt-soft);
+    color: var(--pn-on-felt);
+    font-size: 11px;
+    font-weight: 700;
+    line-height: 1.1;
+    text-align: center;
+    background: rgb(0 0 0 / 0.25);
+  }
+  button.pn-open-seat:hover, button.pn-open-seat:focus-visible { border-color: var(--pn-on-felt); background: rgb(0 0 0 / 0.4); }
+
+  /* An avatar: the face on its colour, a frame, a badge. */
+  .pn-avatar {
+    position: relative;
+    display: inline-grid;
+    flex: none;
+    place-items: center;
+    width: var(--pn-av-size, var(--pn-av));
+    height: var(--pn-av-size, var(--pn-av));
+    background: var(--pn-av-bg, var(--surface-3));
+    font-size: calc(var(--pn-av-size, var(--pn-av)) * 0.6);
+    line-height: 1;
+    user-select: none;
+  }
+  .pn-avatar[data-frame="ring"] { box-shadow: 0 0 0 2px var(--pn-av-ring); }
+  .pn-avatar[data-frame="double"] { box-shadow: 0 0 0 2px var(--pn-av-ring), 0 0 0 4px var(--pn-av-bg), 0 0 0 5px var(--pn-av-ring); }
+  .pn-avatar[data-frame="dashed"] { outline: 2px dashed var(--pn-av-ring); outline-offset: 1px; }
+  .pn-avatar[data-frame="gold"] { box-shadow: 0 0 0 2px var(--rank-1), 0 0 8px var(--rank-1); }
+  .pn-avatar[data-frame="neon"] { box-shadow: 0 0 0 2px var(--brand), 0 0 10px var(--brand); }
+  .pn-avatar-badge { position: absolute; right: -18%; bottom: -14%; font-size: 0.6em; line-height: 1; }
+  .pn-turn-ring-svg { position: absolute; inset: -4px; width: calc(100% + 8px); height: calc(100% + 8px); rotate: -90deg; overflow: visible; pointer-events: none; }
+
+  /* Cards: paper, the rank and suit in the suit's colour; the back in the viewer's card back. Three
+     layers, one motion each: the card moves (dealt, turned, folded), its inner layer lifts or dims
+     at a showdown, its face glows. */
+  .pn-card {
+    position: relative;
+    flex: none;
+    width: var(--pn-card-w);
+    height: var(--pn-card-h, calc(var(--pn-card-w) * 1.4));
+    border-radius: calc(var(--pn-card-w) * 0.12);
+    container-type: inline-size;
+    transform-style: preserve-3d;
+    user-select: none;
+  }
+  .pn-card-inner { position: absolute; inset: 0; border-radius: inherit; transform-style: preserve-3d; }
+  .pn-card-face {
+    position: absolute;
+    inset: 0;
+    overflow: hidden;
+    border-radius: inherit;
+    background: var(--pn-card-paper);
+    color: var(--pn-suit-s);
+    box-shadow: 0 1px 3px rgb(0 0 0 / 0.4), inset 0 0 0 1px rgb(0 0 0 / 0.12);
+    backface-visibility: hidden;
+  }
+  .pn-card[data-suit="c"] .pn-card-face { color: var(--pn-suit-c); }
+  .pn-card[data-suit="d"] .pn-card-face { color: var(--pn-suit-d); }
+  .pn-card[data-suit="h"] .pn-card-face { color: var(--pn-suit-h); }
+  .pn-card[data-suit="s"] .pn-card-face { color: var(--pn-suit-s); }
+  .pn-card-rank { position: absolute; top: 3%; left: 7%; font-family: var(--type-display); font-weight: 700; font-size: 40cqw; line-height: 1; letter-spacing: -0.04em; }
+  .pn-card-corner { position: absolute; top: 37%; left: 9%; width: 26cqw; height: 26cqw; }
+  .pn-card-pip { position: absolute; right: 7%; bottom: 6%; width: 50cqw; height: 50cqw; }
+  [data-pn-face="classic"] .pn-card-rank { font-size: 30cqw; }
+  [data-pn-face="classic"] .pn-card-pip { right: 25%; bottom: 22%; }
+  .pn-card-back {
+    background: var(--pn-back-pattern), var(--pn-back-base);
+    box-shadow: 0 1px 3px rgb(0 0 0 / 0.4), inset 0 0 0 max(1.5px, 5cqw) var(--pn-back-edge);
+  }
+  .pn-card-face.pn-card-back { color: transparent; }
+  .pn-card[data-sides="two"] .pn-card-back { transform: rotateY(180deg); }
+  .pn-card[data-state="dim"] > .pn-card-inner { opacity: 0.42; filter: saturate(0.4); }
+  .pn-card[data-state="win"] > .pn-card-inner { transform: translateY(-6px); box-shadow: 0 0 0 2px var(--rank-1); }
+  .pn-slot { flex: none; width: var(--pn-card-w); height: var(--pn-card-h); border-radius: calc(var(--pn-card-w) * 0.12); border: 1.5px dashed var(--pn-felt-line); }
+  .pn-board { position: absolute; display: flex; justify-content: center; translate: -50% -50%; }
+
+  /* Chips: coloured discs from the chip set, a few short columns; the amount always beside them. */
+  .pn-chips { display: inline-flex; align-items: flex-end; gap: 1px; }
+  .pn-chip-col { display: flex; flex-direction: column-reverse; }
+  .pn-chip {
+    display: block;
+    width: var(--pn-chip);
+    height: calc(var(--pn-chip) * 0.42);
+    background: var(--pn-chip-face);
+    border: 1.5px dashed var(--pn-chip-edge);
+    box-shadow: 0 1px 0 rgb(0 0 0 / 0.45);
+  }
+  .pn-chip-col > .pn-chip + .pn-chip { margin-bottom: calc(var(--pn-chip) * -0.18); }
+  .pn-chip-amount { font-family: var(--type-mono); font-weight: 700; font-size: var(--pn-amount, 11px); font-variant-numeric: tabular-nums; white-space: nowrap; }
+  .pn-bet { position: absolute; translate: -50% -50%; z-index: 1; display: inline-flex; align-items: center; gap: 3px; pointer-events: none; }
+  .pn-pot { position: absolute; translate: -50% -50%; z-index: 1; display: flex; flex-wrap: wrap; justify-content: center; gap: 4px; }
+  .pn-pot-pill { display: inline-flex; align-items: center; gap: 5px; padding: 2px 9px; border-radius: 9999px; font-size: 11px; font-weight: 700; white-space: nowrap; }
+  .pn-dealer {
+    position: absolute;
+    translate: -50% -50%;
+    z-index: 2;
+    display: grid;
+    place-items: center;
+    width: var(--pn-button);
+    height: var(--pn-button);
+    background: var(--pn-card-paper);
+    color: var(--pn-suit-s);
+    box-shadow: 0 1px 3px rgb(0 0 0 / 0.5), inset 0 0 0 1.5px rgb(0 0 0 / 0.2);
+    font-family: var(--type-display);
+    font-weight: 800;
+    font-size: calc(var(--pn-button) * 0.55);
+    line-height: 1;
+  }
+
+  /* What flies: chips and cards on their way, drawn where they land. */
+  .pn-flights { position: absolute; inset: 0; z-index: 5; pointer-events: none; }
+  .pn-fly { position: absolute; translate: -50% -50%; }
+
+  /* The winner's banner and the night's confetti. */
+  /* The banner grows away from the board: up from the pot's foot when the pot sits over the
+     board, down from its head when under it. */
+  .pn-banner-wrap {
+    position: absolute;
+    translate: -50% -100%;
+    z-index: 6;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 6px;
+    max-width: min(92%, 22rem);
+    pointer-events: none;
+  }
+  .pn-banner-wrap[data-grow="down"] { translate: -50% 0; }
+  .pn-banner {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+    max-width: 100%;
+    padding: 6px 12px;
+    border-radius: var(--control-radius);
+  }
+  .pn-banner .pn-avatar { --pn-av-size: 26px; }
+  [data-pn-fit="tight"] .pn-banner { gap: 2px; padding: 3px 8px; }
+  [data-pn-fit="tight"] .pn-banner .pn-avatar { --pn-av-size: 20px; }
+  .pn-banner-row { display: flex; align-items: center; gap: 8px; min-width: 0; }
+  .pn-confetti-field { position: absolute; z-index: 7; width: 0; height: 0; pointer-events: none; }
+  .pn-confetti-bit { position: absolute; left: 0; top: 0; width: 7px; height: 11px; border-radius: 1px; opacity: 0; }
+  .pn-win-pop-text {
+    position: absolute;
+    left: 50%;
+    top: 0;
+    translate: -50% -100%;
+    z-index: 5;
+    color: var(--positive);
+    font-family: var(--type-mono);
+    font-weight: 800;
+    font-size: 13px;
+    text-shadow: 0 1px 3px rgb(0 0 0 / 0.7);
+    white-space: nowrap;
+    pointer-events: none;
+  }
+
+  /* The dock: the viewer's cards and what they make, then one row of controls. Both rows keep their
+     height whatever they hold, so the table above never moves when a turn starts or ends. */
+  /* Above everything on the felt (a chip in flight never covers the raise panel), and a container
+     its narrow layouts read. */
+  .pn-dock {
+    position: relative;
+    grid-row: 3;
+    z-index: 8;
+    container: pn-dock / inline-size;
+    padding: 4px max(10px, env(safe-area-inset-right)) calc(8px + env(safe-area-inset-bottom)) max(10px, env(safe-area-inset-left));
+  }
+  .pn-dock-row { display: flex; flex-wrap: wrap; align-items: flex-end; gap: 6px 10px; max-width: 64rem; margin-inline: auto; }
+  .pn-dock-hand { display: flex; flex: 0 1 auto; align-items: flex-end; gap: 8px; min-width: 0; min-height: calc(var(--pn-hole-w) * 1.4); }
+  .pn-dock-actions { position: relative; display: flex; flex: 1 1 17rem; flex-direction: column; justify-content: center; gap: 6px; min-width: 0; min-height: 60px; }
+  .pn-hole { display: flex; gap: 4px; --pn-card-w: var(--pn-hole-w); --pn-card-h: calc(var(--pn-hole-w) * 1.4); }
+  .pn-raise { position: absolute; left: 0; right: 0; bottom: calc(100% + 8px); z-index: 6; padding: 10px; border-radius: var(--control-radius); }
+  .pn-fold-free { position: absolute; left: 0; bottom: calc(100% + 6px); z-index: 6; }
+  /* A narrow dock (a phone upright, or the column of one on its side) wraps its controls under the
+     cards: the raise panel and the fold note then rise from the whole dock, over the felt, never
+     over the viewer's cards and the seconds they have left. */
+  @container pn-dock (max-width: 40rem) {
+    .pn-dock-actions { position: static; }
+    .pn-raise {
+      left: max(10px, env(safe-area-inset-left));
+      right: max(10px, env(safe-area-inset-right));
+      bottom: calc(100% + 6px);
+      max-height: calc(100dvh - var(--pn-top) - 12rem);
+      overflow-y: auto;
+      overscroll-behavior: contain;
+    }
+    .pn-fold-free { left: max(10px, env(safe-area-inset-left)); }
+  }
+}
+
+/* Compact plates draw no glass: nine blurred plates over the scene stutter on a small phone.
+   Unlayered, because .chrome-surface (unlayered too) sets the blur. */
+[data-pn-fit="compact"] .pn-plate, [data-pn-fit="tight"] .pn-plate { backdrop-filter: none; -webkit-backdrop-filter: none; }
+
+/* ── poker night motion. Mechanics on --motion-base (--pn-at, --pn-dur in its units). ── */
+.pn-deal { animation: pn-deal calc(var(--motion-base) * var(--pn-dur, 1.6)) var(--motion-ease) calc(var(--motion-base) * var(--pn-at, 0)) both; }
+@keyframes pn-deal {
+  from { transform: translate(var(--pn-dx, 0px), var(--pn-dy, -40px)) rotate(-18deg) scale(0.55); opacity: 0; }
+}
+.pn-flip { animation: pn-flip calc(var(--motion-base) * var(--pn-dur, 2)) var(--motion-ease) calc(var(--motion-base) * var(--pn-at, 0)) both; }
+@keyframes pn-flip {
+  from { transform: perspective(600px) rotateY(90deg) scale(0.92); }
+}
+/* Chips out: a stack from the plate (--pn-dx/--pn-dy back to it) to the bet line, where the line's
+   own chips take over (.pn-chip-land); an all-in pushes harder. Ends invisible. */
+.pn-chip-slide { opacity: 0; animation: pn-chip-slide calc(var(--motion-base) * var(--pn-dur, 2)) cubic-bezier(0.2, 0.7, 0.3, 1) calc(var(--motion-base) * var(--pn-at, 0)) both; }
+@keyframes pn-chip-slide {
+  0% { transform: translate(var(--pn-dx, 0px), var(--pn-dy, 0px)) scale(var(--pn-push, 0.8)); opacity: 0; }
+  15% { opacity: 1; }
+  82% { transform: translate(0, 0) scale(1); opacity: 1; }
+}
+.pn-chip-land { animation: pn-chip-land calc(var(--motion-base) * 0.8) var(--motion-ease) calc(var(--motion-base) * var(--pn-at, 0)) both; }
+@keyframes pn-chip-land {
+  from { opacity: 0; transform: scale(0.7); }
+}
+/* A street's bets into the pot (and an uncalled bet back to its owner): from the bet line. */
+.pn-sweep { opacity: 0; animation: pn-sweep calc(var(--motion-base) * var(--pn-dur, 2.5)) cubic-bezier(0.5, 0, 0.3, 1) calc(var(--motion-base) * var(--pn-at, 0)) both; }
+@keyframes pn-sweep {
+  0% { transform: translate(var(--pn-dx, 0px), var(--pn-dy, 0px)); opacity: 1; }
+  80% { transform: translate(0, 0); opacity: 1; }
+}
+/* A fold: the cards turn face down, slide toward the middle (--pn-dx/--pn-dy, where they end) and
+   fade. Two layers: the card slides and fades (.pn-fold), its inner layer turns (.pn-fold-turn) in a
+   3D context of its own. Opacity below 1 flattens the element it sits on, so it never sits on the
+   turning one — there the face would show through, mirrored, instead of the back. */
+.pn-fold {
+  transform: translate(var(--pn-dx, 0px), var(--pn-dy, 0px)) scale(0.5);
+  opacity: 0;
+  animation: pn-fold calc(var(--motion-base) * var(--pn-dur, 2.5)) var(--motion-ease) calc(var(--motion-base) * var(--pn-at, 0)) both;
+}
+@keyframes pn-fold {
+  0%, 35% { transform: translate(0, 0) scale(1); opacity: 1; }
+}
+.pn-fold-turn {
+  transform: perspective(500px) rotateY(180deg);
+  animation: pn-fold-turn calc(var(--motion-base) * var(--pn-dur, 2.5)) var(--motion-ease) calc(var(--motion-base) * var(--pn-at, 0)) both;
+}
+@keyframes pn-fold-turn {
+  0% { transform: perspective(500px) rotateY(0deg); }
+  35% { transform: perspective(500px) rotateY(180deg); }
+}
+/* The showdown: the cards that play lift and glow, the rest dim, once the hands have turned. */
+.pn-dim { animation: pn-dim calc(var(--motion-base) * 2) var(--motion-ease) calc(var(--motion-base) * var(--pn-at, 0)) both; }
+@keyframes pn-dim {
+  from { opacity: 1; filter: none; }
+}
+.pn-win-lift { animation: pn-win-lift calc(var(--motion-base) * 2) var(--motion-ease) calc(var(--motion-base) * var(--pn-at, 0)) both; }
+@keyframes pn-win-lift {
+  from { transform: translateY(0); box-shadow: 0 0 0 0 transparent; }
+}
+.pn-banner-drop { animation: pn-banner-drop calc(var(--motion-base) * var(--pn-dur, 2)) cubic-bezier(0.2, 1.2, 0.4, 1) calc(var(--motion-base) * var(--pn-at, 0)) both; }
+@keyframes pn-banner-drop {
+  from { transform: translateY(-28px) scale(0.9); opacity: 0; }
+}
+/* The pot to a winner: each chip on an arc from the pot (--pn-dx/--pn-dy back to it), drawn where
+   it lands and gone once there; the pot's pill empties as its stream leaves. */
+.pn-chip-stream { opacity: 0; animation: pn-chip-stream calc(var(--motion-base) * var(--pn-dur, 3)) cubic-bezier(0.3, 0, 0.3, 1) calc(var(--motion-base) * var(--pn-at, 0)) both; }
+@keyframes pn-chip-stream {
+  0% { transform: translate(var(--pn-dx, 0px), var(--pn-dy, 0px)) scale(0.9); opacity: 0; }
+  10% { opacity: 1; }
+  50% { transform: translate(calc(var(--pn-dx, 0px) * 0.5), calc(var(--pn-dy, 0px) * 0.5 - 30px)) scale(1.15); }
+  85% { transform: translate(0, 0) scale(1); opacity: 1; }
+}
+.pn-pot-out { opacity: 0; transform: scale(0.85); animation: pn-pot-out calc(var(--motion-base) * 1.5) var(--motion-ease) calc(var(--motion-base) * var(--pn-at, 0)) both; }
+@keyframes pn-pot-out {
+  from { opacity: 1; transform: scale(1); }
+}
+.pn-seat-in { animation: pn-seat-in calc(var(--motion-base) * var(--pn-dur, 2)) cubic-bezier(0.2, 1.3, 0.4, 1) calc(var(--motion-base) * var(--pn-at, 0)) both; }
+@keyframes pn-seat-in {
+  from { transform: scale(0.6); opacity: 0; }
+}
+.pn-tag-pop { animation: pn-tag-pop calc(var(--motion-base) * 1.2) var(--motion-ease) calc(var(--motion-base) * var(--pn-at, 0)) both; }
+@keyframes pn-tag-pop {
+  from { transform: translateY(5px) scale(0.85); opacity: 0; }
+}
+/* One-shots in literal time: the winner's "+2,400" and the big win's confetti. */
+.pn-win-pop { opacity: 0; transform: translateY(-18px); animation: pn-win-pop 1.6s ease-out calc(var(--motion-base) * var(--pn-at, 0)) both; }
+@keyframes pn-win-pop {
+  0% { transform: translateY(6px); opacity: 0; }
+  15% { opacity: 1; }
+  80% { transform: translateY(-18px); opacity: 1; }
+}
+.pn-confetti { animation: pn-confetti 1.8s cubic-bezier(0.2, 0.6, 0.4, 1) calc(var(--motion-base) * var(--pn-at, 0) + var(--pn-wait, 0ms)) both; }
+@keyframes pn-confetti {
+  0% { transform: translate(0, 0) rotate(0deg); opacity: 0; }
+  4% { opacity: 1; }
+  70% { opacity: 1; }
+  100% { transform: translate(var(--pn-x, 0px), var(--pn-y, 0px)) rotate(var(--pn-rot, 0deg)); opacity: 0; }
+}
+/* Loops in literal time: the plate on the clock breathes, an all-in bet line too; the cards that
+   play glow. Brutalist stops both by name — its zeroed tokens do not reach a loop timed in seconds. */
+.pn-pulse { animation: pn-pulse 1.6s ease-in-out infinite; }
+@keyframes pn-pulse {
+  0%, 100% { outline-offset: 1px; }
+  50% { outline-offset: 5px; }
+}
+.pn-bet.pn-pulse { outline: 2px solid var(--warning); border-radius: 9999px; padding-inline: 4px; }
+.pn-win-glow { animation: pn-win-glow 1.8s ease-in-out calc(var(--motion-base) * var(--pn-at, 0)) infinite; }
+@keyframes pn-win-glow {
+  0%, 100% { filter: drop-shadow(0 0 2px var(--rank-1)); }
+  50% { filter: drop-shadow(0 0 9px var(--rank-1)); }
+}
+.pn-turn-ring { transition: stroke-dashoffset 1s linear, color var(--motion-base) var(--motion-ease); }
+[data-style="brutalist"] :is(.pn-pulse, .pn-win-glow, .pn-ambient) { animation: none; }
+[data-style="brutalist"] .pn-turn-ring { transition: none; }
+
 /* Particle Background Canvas */
 #bg-canvas {
   position: fixed;
@@ -1121,13 +1638,14 @@ details[open] > :not(summary) { animation: disclosure-in var(--motion-base) var(
   :root { --motion-fast: 0ms; --motion-base: 0ms; }
   .glass-panel, details[open] > :not(summary) { animation: none !important; }
   .theme-blob, .robot-bob, .robot-eyes, .robot-antenna, .robot-mascot, .robot-tip-in,
+  .pn-deal, .pn-flip, .pn-chip-slide, .pn-chip-land, .pn-sweep, .pn-fold, .pn-fold-turn, .pn-dim, .pn-win-lift, .pn-win-glow, .pn-banner-drop, .pn-chip-stream, .pn-pot-out, .pn-seat-in, .pn-tag-pop, .pn-win-pop, .pn-pulse, .pn-confetti, .pn-turn-ring, .pn-ambient,
   [data-style] :is(.glass-panel, .news-item, .yellow-btn, .search-btn) {
     animation: none !important;
     transition: none !important;
   }
   [data-style="futuristic"] .shimmer::after { content: none; }
 }
-html[data-motion="reduced"] :is(.animate-glow, .typing-dot, .theme-blob, .robot-bob, .robot-eyes, .robot-antenna, .robot-mascot, .robot-tip-in, .glass-panel, .news-item, .yellow-btn, .search-btn) {
+html[data-motion="reduced"] :is(.animate-glow, .typing-dot, .theme-blob, .robot-bob, .robot-eyes, .robot-antenna, .robot-mascot, .robot-tip-in, .glass-panel, .news-item, .yellow-btn, .search-btn, .pn-deal, .pn-flip, .pn-chip-slide, .pn-chip-land, .pn-sweep, .pn-fold, .pn-fold-turn, .pn-dim, .pn-win-lift, .pn-win-glow, .pn-banner-drop, .pn-chip-stream, .pn-pot-out, .pn-seat-in, .pn-tag-pop, .pn-win-pop, .pn-pulse, .pn-confetti, .pn-turn-ring, .pn-ambient) {
   animation: none !important;
   transition: none !important;
 }

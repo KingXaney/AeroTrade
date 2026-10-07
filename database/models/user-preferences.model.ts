@@ -25,6 +25,18 @@ export interface LearnPrefs {
     courseDone?: string[];
 }
 
+// Poker night (/poker-night, /play/CODE): the name and look an account sits down with, saved from
+// the lobby's My look panel (lib/actions/poker-night.actions.savePokerNightProfile) and read by
+// lib/poker-night/prefs-store. No defaults anywhere: absent means the account's first name and its
+// stable rolled avatar (lib/poker-night/avatar.avatarForUser). `look` (card back, suits, chips,
+// sound) and `table` (the scene and felt a new table opens with) arrive with the looks (P5).
+export interface PokerNightPrefs {
+    name?: string;            // cleaned (lib/poker-night/names.cleanName)
+    avatar?: string;          // 'v1:fox:tangerine:ring:crown' (lib/poker-night/avatar)
+    look?: Record<string, unknown>;
+    table?: {scene?: string; felt?: string};
+}
+
 export interface UserPreferencesDoc extends Document {
     userId: string;
     emailNotifications: boolean;
@@ -37,6 +49,7 @@ export interface UserPreferencesDoc extends Document {
     topicsSeededAt?: Date;             // default topics installed once; absent = never seeded
     newsSeenAt?: Date;                 // the reader last opened News (/news or the /topics index); absent = never — the rail dot's and the News card's stamp
     learn?: LearnPrefs;                // learn-surface stamps (checklist hidden, lessons seen, course lessons done); absent = none
+    pokerNight?: PokerNightPrefs;      // poker night's name and look; absent = the account's defaults
     updatedAt: Date;
 }
 
@@ -85,6 +98,25 @@ const LearnSchema = new Schema<LearnPrefs>(
     {_id: false},
 );
 
+const PokerNightTableSchema = new Schema<NonNullable<PokerNightPrefs['table']>>(
+    {
+        scene: {type: String, required: false},
+        felt: {type: String, required: false},
+    },
+    {_id: false},
+);
+
+const PokerNightSchema = new Schema<PokerNightPrefs>(
+    {
+        name: {type: String, required: false},
+        avatar: {type: String, required: false},
+        // Mixed with no default: the personal look's fields are P5's (lib/poker-night/personal).
+        look: {type: Schema.Types.Mixed, default: undefined},
+        table: {type: PokerNightTableSchema, required: false},
+    },
+    {_id: false},
+);
+
 const UserPreferencesSchema = new Schema<UserPreferencesDoc>({
     userId: {type: String, required: true, unique: true},
     emailNotifications: {type: Boolean, default: true},
@@ -103,6 +135,7 @@ const UserPreferencesSchema = new Schema<UserPreferencesDoc>({
     // feed by lib/news/feed-store.getNewsReaderPrefs. No default: absent means never looked.
     newsSeenAt: {type: Date, required: false},
     learn: {type: LearnSchema, required: false},
+    pokerNight: {type: PokerNightSchema, required: false},
     updatedAt: {type: Date, default: Date.now},
 });
 

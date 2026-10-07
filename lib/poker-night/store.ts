@@ -23,6 +23,7 @@ import {LIMITS} from "@/lib/poker-night/limits";
 import {migrateState} from "@/lib/poker-night/migrate";
 import {backoffMs, planMutation} from "@/lib/poker-night/mutation";
 import {PID} from "@/lib/poker-night/input";
+import {LOBBY_PROJECTION, lobbyRoomFromDoc, openRoomsFilter, type LobbyDoc, type LobbyRoom} from "@/lib/poker-night/lobby";
 import {isDuplicateKey} from "@/lib/poker-night/results";
 import {appliedKey, newPid, newRoom, type JoinResult, type NewRoom, type Step} from "@/lib/poker-night/room";
 import {
@@ -233,4 +234,31 @@ export const stampSeen = async (ref: RoomRef, pid: string, hidden: boolean, now:
         },
         {$set: {[`seen.${pid}`]: {at: now, hidden}}},
     );
+};
+
+// ── the lobby (P3) ──
+
+// How many tables `userId` hosts that still hold a place under LIMITS.hostOpenTables: not closed
+// and written within LIMITS.hostActiveWindowMs (lobby.openRoomsFilter), so a table left to go idle
+// stops counting without anyone closing it. Two creates at once may both pass: one table over.
+export const countActiveHosted = async (env: Env, userId: string, now: number): Promise<number> => {
+    await connectToDatabase();
+    return PokerRoom.countDocuments({...openRoomsFilter(env, now), hostUserId: userId});
+};
+
+// The open tables the given accounts host, newest first, as the lobby lists them (lobby.LobbyRoom):
+// the reader's own, or (friendsOnly) the ones friends chose to show. Projected: never the state,
+// a guest or a card (lobby.LOBBY_PROJECTION). lobby.shapeLobby drops the idle ones.
+export const listOpenRooms = async (
+    env: Env, hostUserIds: readonly string[], opts: {friendsOnly: boolean; limit: number; now: number},
+): Promise<LobbyRoom[]> => {
+    if (hostUserIds.length === 0) return [];
+    await connectToDatabase();
+    const filter = {
+        ...openRoomsFilter(env, opts.now),
+        hostUserId: {$in: [...hostUserIds]},
+        ...(opts.friendsOnly ? {showToFriends: true} : {}),
+    };
+    const docs = await PokerRoom.find(filter, LOBBY_PROJECTION).sort({lastActivityAt: -1}).limit(opts.limit).lean<LobbyDoc[]>();
+    return docs.map(lobbyRoomFromDoc);
 };

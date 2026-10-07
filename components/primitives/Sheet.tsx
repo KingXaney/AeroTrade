@@ -25,12 +25,23 @@ function SheetClose({
   return <DialogPrimitive.Close data-slot="sheet-close" {...props} />
 }
 
+// The edge a sheet slides from. 'left' is the app's navigation drawer (the default, unchanged);
+// the poker night table opens its drawers from the right, and from the bottom on a phone.
+export type SheetSide = "left" | "right" | "bottom"
+
+const SIDE: Record<SheetSide, string> = {
+  left: "inset-y-0 left-0 h-full w-72 max-w-[85vw] data-open:slide-in-from-left data-closed:slide-out-to-left",
+  right: "inset-y-0 right-0 h-full w-72 max-w-[85vw] data-open:slide-in-from-right data-closed:slide-out-to-right",
+  bottom: "inset-x-0 bottom-0 max-h-[85dvh] w-full rounded-t-xl pb-[env(safe-area-inset-bottom)] data-open:slide-in-from-bottom data-closed:slide-out-to-bottom",
+}
+
 function SheetContent({
   className,
   children,
   title,
+  side = "left",
   ...props
-}: React.ComponentProps<typeof DialogPrimitive.Content> & { title: string }) {
+}: React.ComponentProps<typeof DialogPrimitive.Content> & { title: string; side?: SheetSide }) {
   return (
     <DialogPrimitive.Portal>
       <DialogPrimitive.Overlay
@@ -39,11 +50,13 @@ function SheetContent({
       />
       <DialogPrimitive.Content
         data-slot="sheet-content"
+        data-side={side}
         className={cn(
           // z-[60] so it clears .header, which is z-50 — portal DOM order happens to win
           // today, but that is not something to rely on.
-          "fixed inset-y-0 left-0 z-[60] flex h-full w-72 max-w-[85vw] flex-col duration-150 outline-none chrome-surface",
-          "data-open:animate-in data-open:slide-in-from-left data-closed:animate-out data-closed:slide-out-to-left",
+          "fixed z-[60] flex flex-col duration-150 outline-none chrome-surface",
+          "data-open:animate-in data-closed:animate-out",
+          SIDE[side],
           className
         )}
         {...props}

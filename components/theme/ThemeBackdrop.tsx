@@ -1,12 +1,17 @@
 'use client';
 
+import {usePathname} from "next/navigation";
 import ParticleBackground from "@/components/theme/ParticleBackground";
 import {useTheme} from "@/components/theme/ThemeProvider";
 
 // Ambient layer behind the app for styles that have one. Mounted once in the
 // root layout; the CSS for the blobs and the futuristic grid lives in globals.css.
+// A poker night table (/play/CODE) draws its own scene, so the backdrop stays out of it.
 const ThemeBackdrop = () => {
     const {theme, tokens} = useTheme();
+    const pathname = usePathname();
+
+    if (pathname?.startsWith('/play/')) return null;
 
     if (theme.style === 'futuristic') {
         return <ParticleBackground color={tokens.brand} reduced={theme.reduceMotion} />;

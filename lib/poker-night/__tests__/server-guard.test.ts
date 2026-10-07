@@ -119,6 +119,22 @@ describe('poker night keeps its server side off the browser', () => {
         expect(reach(browser, SERVER_MACHINERY)).toEqual([]);
     });
 
+    // The table talks to its route handlers only (components/poker-night/table-api): a server action
+    // queues behind every other action from the tab and changes its id on each deploy. The lobby
+    // (components/poker-night/lobby/) is the one place that calls one; no (play) file and no other
+    // poker night component reaches @/lib/actions, through any chain.
+    it('keeps the table off server actions: only the lobby reaches @/lib/actions', () => {
+        const table = files.filter((file) => {
+            const path = repoPath(file);
+            return path.startsWith('app/(play)/') || (path.startsWith(POKER_NIGHT_COMPONENTS) && !path.startsWith(`${POKER_NIGHT_COMPONENTS}lobby/`));
+        });
+        expect(table.map(repoPath)).toContain('components/poker-night/TableScreen.tsx');
+        expect(table.map(repoPath)).toContain('app/(play)/play/[code]/page.tsx');
+        expect(reach(table, ['@/lib/actions/'])).toEqual([]);
+        // …while the lobby does, so the walk is known to see one.
+        expect(reach([join(root, 'components/poker-night/lobby/QuickStart.tsx')], ['@/lib/actions/']).length).toBeGreaterThan(0);
+    });
+
     it('reads the imports a bundler follows, and skips the ones it erases', () => {
         expect(runtimeImports([
             "import {a} from '@/lib/one';",

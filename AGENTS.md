@@ -429,9 +429,9 @@ and friends keep none beyond Shared and the invariants).
 
 - A Texas hold'em table friends share by link, a feature apart from poker (the solver); it reuses
   `lib/poker/cards` and `lib/poker/evaluator` and changes neither. So far it is the pure engine and
-  room layer in `lib/poker-night/`, the three models, the stores and the table's API under
-  `app/api/poker-night/[code]/`; the design and the phases still to come are
-  `docs/specs/2026-10-06-poker-night.md`.
+  room layer in `lib/poker-night/`, the three models, the stores, the table's API under
+  `app/api/poker-night/[code]/`, the lobby and the playable table on polling (`/play/CODE`); the
+  design and the phases still to come are `docs/specs/2026-10-06-poker-night.md`.
 - `lib/poker-night/engine.reduce` is the one way a table's state (`lib/poker-night/types`) changes:
   a pure reducer that clones once, never mutates its input and hands back the same reference for a
   no-op. Time, the deck and the first big blind's draw arrive inside the action, so a step replays
@@ -526,13 +526,57 @@ and friends keep none beyond Shared and the invariants).
 - A GET or a page render never writes: only POST action, join and tick move a room, so a link
   preview, a prefetch or a loop of polls cannot deal a hand.
   `lib/poker-night/__tests__/route-guard.test.ts` holds every `app/api/poker-night/[code]/` route
-  to `playerRequest`, Node and ten seconds, and no GET, (play) page or route-kit to `mutateRoom`.
+  to `playerRequest`, Node and ten seconds, and no GET, file of the (play) group or route-kit to
+  `mutateRoom`.
 - Every room, hand and result query and index, every rate-limit key (`lib/poker-night/limits`) and,
   later, every realtime channel carries the env (`lib/poker-night/env.envOf`: `VERCEL_ENV`, else
   development): a preview shares production's database and must never open a production table.
 - The exits: every payload is one of `lib/poker-night/views`' projections or the room's views built
   on them (`room.playerViewFor`, `roomView`, `playPageView`, `room-doc.playerViewOf`,
   `views.bankDetailView`); the people (names and looks) are their own part beside the wire view.
+- The lobby, `/poker-night` (a page of the Learn section, `app/(root)/poker-night/page.tsx`), composes
+  `lib/poker-night/lobby-store.getLobbyView`, shaped by the pure `lib/poker-night/lobby.shapeLobby`:
+  a section with nothing in it comes back null and is not drawn. A table counts as open while it is
+  not closed and not idle past `TIMING.IDLE_CLOSE_MS` (its next write closes it), by one filter,
+  `lobby.openRoomsFilter`, for the lists (`store.listOpenRooms`, the mirrors only) and the open-table
+  cap (`store.countActiveHosted`, `LIMITS.hostOpenTables`). Friends' tables are only those whose host
+  turned `showToFriends` on (off by default), hosted by `lib/friends/store.getAcceptedFriendIds`; a
+  recent night (`results-store.readRecentResults`) is finished once its table closed or went idle.
+- `lib/actions/poker-night.actions` is the lobby's only: `createPokerNight` (the create counter, the
+  cap, `store.insertRoom` seating the host at seat 0 with the chip cap, under `lobby.profileOf` — the
+  saved name and look, `lib/poker-night/prefs-store.getPokerNightPrefs` over
+  `user-preferences.pokerNight`, else the first name and `avatar.avatarForUser(userId)`), then the page
+  opens `/play/CODE?invite=1`; `closePokerNight` (the host's `end` through `mutateRoom`);
+  `savePokerNightProfile`. The table never calls a server action, and nothing under
+  `components/poker-night/` but `lobby/` imports one. My look offers the name and look a browser kept
+  as a guest (`lobby.ME_STORAGE_KEY`, read with `readStoredMe` through `useSyncExternalStore`) to the
+  account.
+- The table, `/play/CODE` (`app/(play)/play/[code]`, a route group with none of the app's shell):
+  its layout settles the address before anything streams — a 307 to the canonical code, a real 404
+  for one that names no table (`app/(play)/play/not-found.tsx`) — and the page renders
+  `components/poker-night/PokerNightRoom` (the viewer's view, or a visitor's table behind the join
+  card) or, once closed, `NightSummary`. It talks to the route handlers only, through
+  `components/poker-night/table-api`, the seat pass on every request that may carry it (on a move it
+  only names the player's own rate bucket).
+- `components/poker-night/useTableFeed` runs `lib/poker-night/feed` (pure): `feedReducer` applies a
+  view only when it is newer; `nextPollDelay` paces the polls; `createTicker` (over `tickerStep`)
+  decides when the clock's tick goes — one out at a time, at most `TICK_RETRIES` more per due time on
+  a doubling backoff, armed again only by a new due time or role or once the poll gets through after
+  failures, never by an answer that lands meanwhile. A visitor polls nothing; the join card reads the
+  page again every `VISITOR_REFRESH_MS`, so a removed, locked or full card learns it opened.
+- The animations are `lib/poker-night/events.diffViews` (ids keyed by the hand number and the log's
+  length, so each fires once) on `lib/poker-night/choreography`'s timeline, drawn by CSS keyframes
+  from custom properties (`--pn-at`, `--pn-dur` in `--motion-base` units; a flight's `--pn-dx` /
+  `--pn-dy` from `lib/poker-night/stage`) and exposed as `data-anim`: no SMIL, no Web Animations,
+  every class in both reduced-motion guards and brutalist's loops stopped by name
+  (`lib/theme/__tests__/motion-guards.test.ts`). Opacity never sits on a turning card (a fold turns
+  the inner `.pn-fold-turn`). The one thing a timer moves is a winner's stack counting up, formatted
+  text on the same token (`components/poker-night/CountUp`).
+- The table's single-key shortcuts (`lib/poker-night/keys`) act only with the focus on the table,
+  and only while the player keeps them on (My look, `PersonalLook.shortcuts` in this browser); Enter
+  on a focused button is that button's. A host removes a player only by a press held for two seconds
+  (`components/poker-night/HoldToConfirm`), never a typed name, and lets them back in from the host
+  drawer.
 
 ### chat
 

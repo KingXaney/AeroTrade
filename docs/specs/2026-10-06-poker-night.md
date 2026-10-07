@@ -147,6 +147,44 @@ names the env; a preview can never open a production table.
 rides beside the table in responses, versioned by `peopleV`, which moves only when one of them
 does; the realtime message leaves it out and stays within its budget.
 
+## The lobby (phase 3)
+
+**Where.** /poker-night is a page of the Learn section (`app/(root)/poker-night/page.tsx`), for
+signed-in readers only: only an account starts a table. It makes one read,
+`lib/poker-night/lobby-store.getLobbyView`, shaped by the pure `lib/poker-night/lobby.ts`, and a
+section with nothing in it is not drawn. The /games hub carries a card for it, with no records:
+poker night keeps no score.
+
+**What it shows**, phone first, in this order:
+- **Host a table.** "Start a table" opens one with the defaults in one tap and takes the host to
+  /play/CODE?invite=1, where the invite is open. "Set it up first" holds a form: the table's name
+  ("Ana's poker night" to start), the blinds, the starting chips (both ends of the range; the host
+  can widen it at the table), the seats (fixed once the table opens), the rebuy policy, the turn
+  timer and whether friends see the table, off by default. Every choice the form offers is within
+  the config's limits, and the config is checked before it is sent and again by the action. At
+  three open tables the button gives way to the sentence that says so.
+- **Join with a code**, typed in any case, with spaces or dashes, opened as /play/CODE.
+- **Your open tables**, with the way back in, Copy link and "End the night" after a confirmation.
+- **Friends' tables**: open tables an accepted friend chose to show.
+- **Recent nights**: the account's results, hands and net chips, a night still running marked so,
+  and a link to the table while the room is kept (a closed table shows its summary there).
+- **My look**: the name and the rolled look the account sits down with from now on. A browser
+  that played as a guest keeps its name and look; when they differ from the account's, "Save to my
+  account" takes them over.
+
+**Open, idle, closed.** A table counts as open while it is not closed and something was written in
+the last twelve hours. One that went idle closes on its next write, so the lobby already counts it
+as closed: it is neither listed nor counted under the three-table cap, which reads by the same
+filter. Two creates at the same moment may both pass the cap: one table over, accepted. A night is
+finished once its table closed or went idle (a room the week's expiry deletes before it closes
+never writes "closed").
+
+**The lobby's writes** are server actions, used by the lobby only (the table talks to its routes):
+`createPokerNight` (a rate limit of ten an hour, the cap, then the room with the host at seat 0
+with the chip cap, under their saved name and look, else their first name and the look their
+account id rolls), `closePokerNight` (the host's "end", through the same compare-and-set as every
+move) and `savePokerNightProfile` (`user-preferences.pokerNight`, a sub-document with no defaults).
+
 ## Engine rules
 
 No-limit Texas hold'em at 2 to 9 seats, fixed when the table is made, for integer play chips.
@@ -280,6 +318,11 @@ Every engine module is unit-tested in `lib/poker-night/__tests__/`:
   bodies; every error code with its status and sentence; the same-origin matrix and the capped body
   read; the buckets on an injected clock; the guest cookie and the seat pass refusing every
   tampered, expired or foreign token.
+- **lobby:** empty sections hidden; closed and idle tables never listed and never under the cap;
+  friends' tables without the reader's own; a night finished once closed or idle, and linked while
+  its room is kept; no account id in what the page gets; every choice of the start form a config
+  `checkConfig` accepts; the name and look an account starts from, and what is read of the look a
+  browser kept. The navigation test keeps /poker-night under Learn and /play/CODE in no section.
 - **server guard and route guard:** no client file, and nothing under `components/`, reaches
   `shuffle.ts` or the poker-night server modules by any chain of imports; every route runs
   `playerRequest` on Node within ten seconds; no GET, page or the shared checks reaches

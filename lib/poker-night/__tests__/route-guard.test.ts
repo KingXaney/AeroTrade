@@ -1,8 +1,9 @@
 // Poker night's route handlers keep to the rules nothing else enforces. Every route under
 // app/api/poker-night/ runs playerRequest (lib/poker-night/route-kit) — the protocol header, the
 // same-origin and body checks, the in-memory bucket, the identity and the player — and declares
-// the Node runtime and its ten-second budget. A GET never writes: no GET handler, no (play) page and
-// not the shared request path imports or calls mutateRoom, so a link preview, a prefetch or a loop
+// the Node runtime and its ten-second budget. A GET never writes: no GET handler, no file of the
+// (play) route group (a page, a layout, a boundary) and not the shared request path imports or
+// calls mutateRoom, so a link preview, a prefetch or a loop
 // of polls cannot deal a hand. Every (play) page lives under app/(play)/play/, and no (root) page
 // takes /play. No route sends an Access-Control-Allow-* header. And the server modules never hand
 // a room, a state or a document to console.* — the logs carry codes, seqs and messages only.
@@ -31,6 +32,9 @@ const withoutStrings = (text: string) => text.replace(/'(?:[^'\\\n]|\\.)*'|"(?:[
 
 const ROUTES = filesUnder('app/api/poker-night', /^route\.ts$/);
 const PLAY_PAGES = filesUnder('app/(play)', /^page\.tsx$/);
+// Every file a (play) render runs: a page, a layout (it runs for a link preview and a prefetch too),
+// a loading or error boundary, a not-found page.
+const PLAY_FILES = filesUnder('app/(play)', /\.(ts|tsx)$/);
 const SERVER_MODULES = ['store', 'hands-store', 'results-store', 'identity', 'route-kit'].map((name) => `lib/poker-night/${name}.ts`);
 
 const exportsMethod = (code: string, method: string) => new RegExp(`export\\s+(async\\s+)?function\\s+${method}\\b|export\\s+const\\s+${method}\\b`).test(code);
@@ -71,8 +75,9 @@ describe('the poker night routes', () => {
     });
 
     it('never write from a GET, a (play) page or the request checks they share', () => {
-        const readers = [...ROUTES.filter((file) => exportsMethod(read(file), 'GET')), ...PLAY_PAGES];
+        const readers = [...ROUTES.filter((file) => exportsMethod(read(file), 'GET')), ...PLAY_FILES];
         expect(readers.length).toBeGreaterThanOrEqual(2);
+        expect(PLAY_FILES).toEqual(expect.arrayContaining(['app/(play)/layout.tsx', 'app/(play)/play/[code]/layout.tsx', 'app/(play)/play/[code]/page.tsx']));
         for (const file of readers) expect(reachesMutate(withoutComments(read(file))), file).toBe(false);
         expect(reachesMutate(withoutComments(read('lib/poker-night/route-kit.ts')))).toBe(false);
         // A route file answers one method: a GET beside a POST would share the POST's imports.
