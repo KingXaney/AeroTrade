@@ -55,7 +55,7 @@ const LessonAsync = async ({userId}: {userId: string}) => {
 // widget grid this page used to be is /dashboard.
 //
 // The terrain is the landing page's (components/landing/MomentumTerrain), read here on the server
-// through the same store, so the panel exists only when there is a surface to draw and the client
+// through the same store, so its section exists only when there is a surface to draw and the client
 // draws it at once; the definitions beneath it keep their Ask links, since the chat is mounted.
 const Home = async ({searchParams}: HomeProps) => {
     const user = await getSessionUser();
@@ -82,15 +82,17 @@ const Home = async ({searchParams}: HomeProps) => {
                 )}
             />
 
+            {/* Frameless, like the landing hero: the canvas is transparent, so the surface sits on
+                the page's own background rather than in a panel's lighter box. */}
             {terrain && (
-                <Panel id="home-terrain" aria-labelledby="home-terrain-heading" data-home-terrain>
+                <section id="home-terrain" aria-labelledby="home-terrain-heading" className="py-2" data-home-terrain>
                     <SectionHeading id="home-terrain-heading">{TERRAIN_COPY.eyebrow}</SectionHeading>
                     <MomentumTerrain initial={terrain} eyebrow={false} size="panel">
                         <WhatTheseMean keys={TERRAIN_TERMS}>
                             <p className="text-xs leading-relaxed text-fg-muted" data-terrain-method>{TERRAIN_COPY.method}</p>
                         </WhatTheseMean>
                     </MomentumTerrain>
-                </Panel>
+                </section>
             )}
 
             <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">

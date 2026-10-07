@@ -73,10 +73,12 @@ adjusted series is only inside `z`.
 
 ## Home
 
-The owner asked for it on Home too. Home's first panel is the same component: the page reads
+The owner asked for it on Home too. Home opens on the same component: the page reads
 `getMomentumSurface` on the server beside its own view and hands the surface in as `initial`, so
-the panel exists only when there is a surface (a box with nothing to say is not drawn) and the
-client draws it at once with no loading state. The panel's heading replaces the eyebrow, the
+the section exists only when there is a surface (a box with nothing to say is not drawn) and the
+client draws it at once with no loading state. It is frameless, like the landing hero — the first
+cut put it in a `Panel`, and the surface floated on the panel's lighter box instead of the page;
+the owner asked for it to match the background. The section's heading replaces the eyebrow, the
 canvas is 16:9 under `lg` and 400px tall above it, and the definitions keep their Ask links, since
 the chat widget is mounted on the signed-in pages.
 
