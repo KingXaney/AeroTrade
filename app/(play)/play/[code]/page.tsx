@@ -5,6 +5,7 @@ import NightSummary from "@/components/poker-night/NightSummary";
 import PokerNightRoom from "@/components/poker-night/PokerNightRoom";
 import {INVITE_COPY, TABLE_COPY} from "@/lib/learn/copy/poker-night";
 import {avatarForUser, encodeAvatar, rollAvatar} from "@/lib/poker-night/avatar";
+import {realtimeEnabled} from "@/lib/poker-night/channel";
 import {normalizeCode} from "@/lib/poker-night/code";
 import {envOf} from "@/lib/poker-night/env";
 import {readIdentity, type PlayerIdentity} from "@/lib/poker-night/identity";
@@ -25,7 +26,9 @@ import type {PlayPageView} from "@/lib/poker-night/view-types";
 // have joined, else the public table behind the join card. Never writes: a link preview or a
 // prefetch cannot move the table
 // (lib/poker-night/__tests__/route-guard.test.ts). Every time comes from the store's read, never
-// the render's clock.
+// the render's clock. Whether the table goes live over Ably is the deployment's
+// (lib/poker-night/channel.realtimeEnabled): the room's client then asks GET token for its channel,
+// and polls without it.
 
 type Props = {
     params: Promise<{code: string}>;
@@ -122,6 +125,7 @@ const PlayPage = async ({params, searchParams}: Props) => {
             signedIn={signedIn}
             invite={query.invite === '1'}
             pollScale={pollFloor(process.env.POKER_NIGHT_POLL_MS)}
+            realtime={realtimeEnabled()}
         />
     );
 };

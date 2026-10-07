@@ -33,6 +33,18 @@
 // the button's; a dialog the turn closes hands the focus to the action bar; an unknown code is a
 // real 404; the host ends the night and every context sees the summary. The no-advice list runs over every screen, and screenshots at 1440 and 390 px land in
 // scripts/qa/output/poker-night/ui-*.png.
+//
+// Realtime over a fake relay (P4). The harness has no Ably key, so GET token answers
+// {realtime: false} and every page polls — but one more guest's page defines window.__PN_RT_FAKE__
+// (the seam run.sh opens with NEXT_PUBLIC_PN_RT_FAKE=1), and this script is its channel: it reads
+// the room's seq from Mongo, builds the message the server publishes (room-doc.wireOfRoom and
+// channel.stateMessage, through jiti) and hands it to the page held back, out of order and twice.
+// Over two hands that page is Live (data-pn-mode="realtime", the top bar's "Live"), the seq it
+// draws only ever moves up, at each new hand it reads its own view once and its cards appear, it
+// reads the table only that and every 20 s, and no message carries a hole that was not shown, an
+// identity, the people or the viewer's own part, or passes the size budget. The relay then stops
+// mid-hand: the watchdog brings the polls back within its 3 s and the page keeps up. No page in any
+// context opens a request or a socket to an Ably host.
 // Run: npm run qa -- poker-night   (the harness: README.md)
 import {chromium} from 'playwright';
 import {PNG} from 'pngjs';
@@ -62,6 +74,10 @@ const {bestFive, describeHand} = await lib('lib/poker-night/hand-name.ts');
 const {isAvatar} = await lib('lib/poker-night/avatar.ts');
 const {POKER_NIGHT_ERRORS, JOIN_COPY, BANK_COPY, HAND_COPY, HOST_COPY, TABLE_COPY} = await lib('lib/learn/copy/poker-night.ts');
 const {findBanned} = await lib('lib/learn/banned.ts');
+const {migrateState} = await lib('lib/poker-night/migrate.ts');
+const {coreFromDoc, serverRoomFromDoc, wireOfRoom} = await lib('lib/poker-night/room-doc.ts');
+const {stateMessage, STATE_MESSAGE, WIRE_BUDGET_BYTES} = await lib('lib/poker-night/channel.ts');
+const {AHEAD_GRACE_MS} = await lib('lib/poker-night/feed.ts');
 const models = await Promise.all(['poker-room', 'poker-hand', 'poker-result'].map(async (m) => (await lib(`database/models/${m}.model.ts`)).default));
 
 const ENV = 'development'; // the harness sets no VERCEL_ENV
@@ -75,6 +91,26 @@ const sameCards = (a, b) => Array.isArray(a) && Array.isArray(b) && a.length ===
 
 const browser = await chromium.launch({channel: 'chrome'});
 const mongo = new MongoClient(MONGO);
+
+// Every host any page in any context asked anything of — a request or a socket — and the ones that
+// were Ably's: this harness has no key, and the one realtime page takes its messages from the relay.
+const hostsSeen = new Set();
+const ablyContacts = [];
+const noteUrl = (url) => {
+    try {
+        const host = new URL(url).hostname;
+        hostsSeen.add(host);
+        if (/ably/i.test(host)) ablyContacts.push(url);
+    } catch {
+        // data: and the like have no host.
+    }
+};
+const newContext = async (options) => {
+    const context = await browser.newContext(options);
+    context.on('request', (r) => noteUrl(r.url()));
+    context.on('page', (page) => page.on('websocket', (ws) => noteUrl(ws.url())));
+    return context;
+};
 
 // ── what every response is held to ──────────────────────────────────────────────────────────
 // Keys no response may carry: the deck, who a player is outside the room, the room's bookkeeping.
@@ -193,7 +229,7 @@ const paced = async () => {
 
 const players = [];
 const newPlayer = async (name, viewport = {width: 1440, height: 900}) => {
-    const context = await browser.newContext({viewport});
+    const context = await newContext({viewport});
     const p = {name, context, pass: null, pid: null, seat: null, view: null};
     players.push(p);
     return p;
@@ -397,6 +433,22 @@ try {
     check('…and with the pass, answers with none', r.status === 200 && r.body?.pass === null && r.body.me.pid === A.pid);
     r = await getState(A, {query: `?since=${r.body.seq}&esince=${r.body.emoteSeq}`});
     check('…and nothing new since its seq: unchanged, from the head alone', r.status === 200 && r.body?.unchanged === true && r.body.seq === afterReturn.seq);
+    {
+        // A failed publish stamps rt out of band (no seq moves), and an Unchanged answer — a poll's or a
+        // tick's, from the head alone — says so as a view does, so a page that sees only those still
+        // learns when the five minutes are over.
+        const since = `?since=${r.body.seq}&esince=${r.body.emoteSeq}`;
+        await rooms.updateOne({env: ENV, code}, {$set: {'rt.failAt': new Date()}});
+        const failing = await getState(A, {query: since});
+        const ticked = await tick(A);
+        await rooms.updateOne({env: ENV, code}, {$set: {'rt.failAt': new Date(Date.now() - 6 * 60_000)}});
+        const over = await getState(A, {query: since});
+        await rooms.updateOne({env: ENV, code}, {$unset: {rt: ''}});
+        check('an Unchanged answer carries realtimeOk: false while a failed publish is under five minutes old (a poll\'s and a tick\'s), true once it is older',
+            failing.body?.unchanged === true && failing.body.realtimeOk === false && ticked.body?.unchanged === true && ticked.body.realtimeOk === false
+            && over.body?.unchanged === true && over.body.realtimeOk === true,
+            `${failing.text.slice(0, 120)} | ${ticked.text.slice(0, 120)} | ${over.text.slice(0, 120)}`);
+    }
     r = await getState(A, {at: code.toLowerCase()});
     check('the code in lower case reaches the same table', r.status === 200 && r.body?.code === code);
 
@@ -830,6 +882,49 @@ const ANIM_PROBE = () => {
     }).observe(document, {subtree: true, childList: true, attributes: true, attributeFilter: ['data-anim']});
 };
 
+// The realtime page's channel: window.__PN_RT_FAKE__ as components/poker-night/realtime-client takes
+// it ({subscribe({onState, onConnection}) → stop}), connected a moment after the link subscribes, as
+// Ably's attach would be. window.__pnRelay is the script's side: deliver(data) hands a message to the
+// link, and the table root's data-pn-seq, -transport and -mode are recorded at every change.
+const RELAY_PROBE = () => {
+    const relay = {handlers: null, subscribes: 0, stops: 0, delivered: 0, seqs: [], transports: [], modes: []};
+    window.__pnRelay = relay;
+    relay.deliver = (data) => {
+        if (!relay.handlers) return false;
+        relay.delivered++;
+        relay.handlers.onState(data);
+        return true;
+    };
+    window.__PN_RT_FAKE__ = {
+        subscribe: (handlers) => {
+            relay.handlers = handlers;
+            relay.subscribes++;
+            setTimeout(() => {
+                if (relay.handlers !== handlers) return;
+                handlers.onConnection('connecting');
+                handlers.onConnection('connected');
+            }, 50);
+            return () => {
+                relay.stops++;
+                if (relay.handlers === handlers) relay.handlers = null;
+            };
+        },
+    };
+    const look = () => {
+        const root = document.querySelector('[data-pn-seq]');
+        if (!root) return;
+        const seq = Number(root.getAttribute('data-pn-seq'));
+        if (relay.seqs[relay.seqs.length - 1] !== seq) relay.seqs.push(seq);
+        const transport = root.getAttribute('data-pn-transport');
+        if (relay.transports[relay.transports.length - 1]?.[1] !== transport) relay.transports.push([Date.now(), transport]);
+        const mode = root.getAttribute('data-pn-mode');
+        if (relay.modes[relay.modes.length - 1]?.[1] !== mode) relay.modes.push([Date.now(), mode]);
+    };
+    new MutationObserver(look).observe(document, {
+        subtree: true, childList: true, attributes: true, attributeFilter: ['data-pn-seq', 'data-pn-transport', 'data-pn-mode'],
+    });
+};
+
 // The page's visible words, players' and tables' names left out (they are [data-user-text]).
 const visibleWords = (page) => page.evaluate(() => {
     const style = document.createElement('style');
@@ -1022,6 +1117,8 @@ const pairsIn = (text) => [...text.matchAll(/(?:"(\w+)":)?\[(\d{1,2}),(\d{1,2})\
     .map((m) => [Number(m[2]), Number(m[3])]);
 
 let handWatcher = null;
+// The fake relay's state while it runs (the realtime pass), so the end of the run can stop its loop.
+let relay = null;
 
 const tableInBrowser = async () => {
     const limits = db.collection('ratelimits');
@@ -1067,9 +1164,10 @@ const tableInBrowser = async () => {
             }
         });
     };
-    const uiPlayer = async (name, options = {}) => {
-        const context = await browser.newContext({viewport: {width: 1440, height: 900}, ...options});
+    const uiPlayer = async (name, options = {}, inits = []) => {
+        const context = await newContext({viewport: {width: 1440, height: 900}, ...options});
         await context.addInitScript(ANIM_PROBE);
+        for (const init of inits) await context.addInitScript(init);
         const page = await context.newPage();
         const p = {name, context, page, pid: null, seat: null, pass: null, view: null};
         watchPage(p, page);
@@ -1241,7 +1339,7 @@ const tableInBrowser = async () => {
     if (host?.context) {
         H = {name: 'uiHost', context: host.context, pid: null, seat: null, pass: null, view: null};
     } else {
-        const context = await browser.newContext({viewport: {width: 1440, height: 900}});
+        const context = await newContext({viewport: {width: 1440, height: 900}});
         H = {name: 'uiHost', context, pid: null, seat: null, pass: null, view: null};
         const page = await context.newPage();
         await signUp(page, 'pnuihost', {stay: true});
@@ -1787,14 +1885,376 @@ const tableInBrowser = async () => {
     check('"Let back in" restores C: unbanned, back at the table watching, and seated again from "Sit here"', watchingAgain && back
         && !doc.players.find((p) => p.pid === C.pid)?.banned && (doc.bannedKeys ?? []).length === 0 && (await roomDoc()).state.seats.some((s) => s?.pid === C.pid));
 
+    // ── realtime over the relay (P4) ──
+    // One more guest, R, whose page has the relay (RELAY_PROBE): two hands with R at the table on the
+    // relay alone, then the relay stops mid-hand and the polls must come back.
+    const R = await uiPlayer('uiR', {}, [RELAY_PROBE]);
+    const isStateRead = (req) => req.method() === 'GET' && req.url().includes(`/api/poker-night/${code}/state`);
+    const readAt = new Map();
+    const rReads = []; // when each of R's GET state requests left
+    const rViews = []; // R's GET state answers: when asked, the hand, whether R's own cards came
+    R.page.on('request', (req) => {
+        if (!isStateRead(req)) return;
+        const at = Date.now();
+        readAt.set(req, at);
+        rReads.push(at);
+    });
+    R.page.on('response', async (res) => {
+        if (!isStateRead(res.request())) return;
+        try {
+            const body = await res.json();
+            rViews.push({sentAt: readAt.get(res.request()) ?? 0, at: Date.now(), seq: body?.seq ?? null, hand: body?.hand?.no ?? null,
+                hole: Array.isArray(body?.me?.hole), unchanged: body?.unchanged === true});
+        } catch {
+            // A refusal or an aborted read: no view.
+        }
+    });
+    await R.page.goto(`${BASE}/play/${code}`, {waitUntil: 'load', timeout: 120000});
+    await R.page.waitForSelector('[data-join-card="visitor"]', {timeout: 60000});
+    await R.page.fill('[data-join-name]', 'Rae');
+    await R.page.click('[data-join-sit]');
+    const meR = await R.page.waitForSelector('[data-me]', {timeout: 30000});
+    R.pid = await meR.getAttribute('data-pid');
+    R.seat = Number(await meR.getAttribute('data-seat'));
+    {
+        const token = await call(R, 'GET', 'token');
+        const spent = await limits.countDocuments({key: /:token:/});
+        check('with no Ably key, GET token answers {realtime: false} — no channel, no token — and spends no counter',
+            token.status === 200 && JSON.stringify(token.body) === '{"realtime":false}' && spent === 0, `${token.status} ${token.text.slice(0, 160)}, counters ${spent}`);
+        const anon = await call(V, 'GET', 'token');
+        check('…and a browser that never joined gets none: 401', anon.status === 401 && anon.body?.error === 'no_identity', `${anon.status} ${anon.text.slice(0, 80)}`);
+    }
+    const rootOf = (page) => page.evaluate(() => {
+        const root = document.querySelector('[data-pn-seq]');
+        return {mode: root?.getAttribute('data-pn-mode'), transport: root?.getAttribute('data-pn-transport'), seq: Number(root?.getAttribute('data-pn-seq') ?? -1)};
+    });
+    const barText = (page) => page.evaluate(() => document.querySelector('[data-pn-topbar] [role="status"]')?.textContent?.trim() ?? '');
+    const wentLive = await R.page.waitForFunction(() => document.querySelector('[data-pn-mode]')?.getAttribute('data-pn-mode') === 'realtime', null, {timeout: 20000})
+        .then(() => true, () => false);
+    {
+        const now = await rootOf(R.page);
+        const bar = await barText(R.page);
+        const link = await R.page.evaluate(() => ({subscribes: window.__pnRelay.subscribes, stops: window.__pnRelay.stops}));
+        check(`R's page, its link on the relay: Live — data-pn-mode "realtime", the channel alone, the top bar "${TABLE_COPY.connection.live}"`,
+            wentLive && now.transport === 'realtime' && bar === TABLE_COPY.connection.live && link.subscribes - link.stops === 1,
+            `${JSON.stringify(now)} "${bar}" ${JSON.stringify(link)}${wentLive ? '' : ' (is the dev server run.sh\'s, with NEXT_PUBLIC_PN_RT_FAKE=1?)'}`);
+        const others = await Promise.all([H, A, B, C].map(async (p) => ({name: p.name, ...(await rootOf(p.page)), bar: await barText(p.page)})));
+        check(`…while every page without the relay polls: "polling", polls alone, "${TABLE_COPY.connection.polling}"`,
+            others.every((o) => o.mode === 'polling' && o.transport === 'poll' && o.bar === TABLE_COPY.connection.polling), JSON.stringify(others));
+    }
+    await uiWording(R.page, 'the table on the relay');
+    await uiShot(R.page, '10-live-1440');
+
+    // The relay: every 100 ms it reads the room's seq; a new one is built into the message the server
+    // publishes after a commit and handed to R's page — every fourth held back until the next one
+    // has gone (or half a second has passed), every fourth sent twice, and the rest followed by one
+    // from a few back. Every message is scanned before it goes.
+    const NOT_ON_WIRE = ['people', 'removed', 'me', 'config', 'emotes', 'emoteSeq', 'pass', 'hole', 'deck'];
+    const RELAY_HOLD_MS = 500;
+    relay = {
+        running: true, loop: null, stoppedAt: null, lastSeq: -1, built: 0, held: null, heldAt: 0, history: [], deliveries: [],
+        late: 0, twice: 0, stale: 0, scanned: 0, shownSeen: 0, maxBytes: 0, problems: [], over: [], errors: [],
+    };
+    const relayScan = (message, hand) => {
+        const seq = message.data.seq;
+        relay.scanned++;
+        const bytes = Buffer.byteLength(JSON.stringify(message));
+        relay.maxBytes = Math.max(relay.maxBytes, bytes);
+        if (bytes > WIRE_BUDGET_BYTES) relay.over.push(`seq ${seq}: ${bytes} B`);
+        if (message.name !== STATE_MESSAGE || message.id !== `${roomId}:${seq}`) relay.problems.push(`seq ${seq}: sent as ${message.name} ${message.id}`);
+        const keys = keysIn(message.data);
+        for (const k of [...PRIVATE_KEYS, ...NOT_ON_WIRE]) if (keys.has(k)) relay.problems.push(`seq ${seq}: "${k}"`);
+        if (!hand) return;
+        // Only the hand the message carries: the board, the pots and a shown hand are its own.
+        const pairs = cardPairsIn(message.data);
+        for (const p of hand.seats) {
+            const found = pairs.some((pair) => sameCards(pair, p.hole));
+            if (found && p.shown) relay.shownSeen++;
+            else if (found) relay.problems.push(`seq ${seq}: seat ${p.seat}'s hole, not shown`);
+        }
+    };
+    const relayDeliver = async (messages) => {
+        const at = Date.now();
+        const seen = await R.page.evaluate((list) => ({
+            before: {
+                seq: Number(document.querySelector('[data-pn-seq]')?.getAttribute('data-pn-seq') ?? -1),
+                hand: Number(document.querySelector('[data-pn-hand]')?.getAttribute('data-pn-hand') ?? 0),
+            },
+            taken: list.map((data) => window.__pnRelay.deliver(data)),
+        }), messages.map((m) => m.data));
+        messages.forEach((m, i) => relay.deliveries.push({seq: m.data.seq, hand: m.data.hand?.no ?? null, at, before: seen.before, taken: seen.taken[i]}));
+    };
+    const relayStep = async () => {
+        const stored = await rooms.findOne({env: ENV, code}, {projection: {emoteAt: 0, awards: 0, applied: 0}});
+        if (!stored) return;
+        if (stored.seq <= relay.lastSeq) {
+            if (relay.held && Date.now() - relay.heldAt > RELAY_HOLD_MS) {
+                const held = relay.held;
+                relay.held = null;
+                await relayDeliver([held]);
+            }
+            return;
+        }
+        relay.lastSeq = stored.seq;
+        rememberHand(stored.state?.hand);
+        const state = migrateState(stored.state);
+        if (state === null) {
+            relay.errors.push(`seq ${stored.seq}: a state this code cannot read`);
+            return;
+        }
+        const message = stateMessage(roomId, wireOfRoom(serverRoomFromDoc(stored, coreFromDoc(stored, state), Date.now())));
+        relayScan(message, stored.state?.hand ?? null);
+        relay.built++;
+        const older = relay.history[relay.history.length - 3] ?? null;
+        relay.history = [...relay.history, message].slice(-8);
+        if (relay.held) {
+            // The one held back goes after its successor: late, and stale by then.
+            const held = relay.held;
+            relay.held = null;
+            relay.late++;
+            await relayDeliver([message, held]);
+        } else if (relay.built % 4 === 1) {
+            relay.held = message;
+            relay.heldAt = Date.now();
+        } else if (relay.built % 4 === 3) {
+            relay.twice++;
+            await relayDeliver([message, message]);
+        } else if (older) {
+            relay.stale++;
+            await relayDeliver([message, older]);
+        } else {
+            await relayDeliver([message]);
+        }
+    };
+    relay.loop = (async () => {
+        while (relay.running) {
+            try {
+                await relayStep();
+            } catch (error) {
+                if (relay.running) relay.errors.push(error.message);
+            }
+            await sleep(100);
+        }
+    })();
+    const stopRelay = async () => {
+        relay.running = false;
+        await relay.loop;
+        relay.stoppedAt = Date.now();
+    };
+
+    // R's own two cards on R's screen, as Mongo dealt them.
+    const ownCards = async (handNo) => {
+        const hand = (await roomDoc()).state.hand;
+        const mine = hand?.no === handNo ? hand.seats.find((p) => p.pid === R.pid) : null;
+        if (!mine) return {dealt: false, ok: false};
+        const want = mine.hole.map((c) => cardLabel(c)).sort().join(' ');
+        const t0 = Date.now();
+        const shown = await R.page.waitForFunction((w) => {
+            const cards = [...document.querySelectorAll('[data-pn-hole] [data-card]')].map((c) => c.getAttribute('data-card')).sort().join(' ');
+            return cards === w ? cards : null;
+        }, want, {timeout: 10000}).then((h) => h.jsonValue(), () => null);
+        return {dealt: true, ok: shown !== null, ms: Date.now() - t0};
+    };
+    const relayHands = new Map();
+    const firstStreet = async (d) => {
+        const no = d.state.hand.no;
+        if (!relayHands.has(no)) relayHands.set(no, {cards: await ownCards(no), endedAt: null});
+    };
+    const pauseFromDrawer = async () => {
+        await hp.click('[data-open="host"]');
+        await hp.waitForSelector('[data-pn-drawer="host"]', {timeout: 10000});
+        await hp.click('[data-host-tab="table"]');
+        await hp.click('[data-host-pause]');
+        await hp.waitForSelector('[data-host-resume]', {timeout: 15000});
+        await hp.keyboard.press('Escape');
+        await hp.waitForSelector('[data-pn-drawer="host"]', {state: 'detached', timeout: 10000}).catch(() => {});
+    };
+    const handEnds = async (handNo) => {
+        const t0 = Date.now();
+        const ended = await R.page.waitForSelector(`[data-pn-hand="${handNo}"] [data-pn-banner]`, {timeout: 15000}).then(() => true, () => false);
+        return {ended, ms: Date.now() - t0};
+    };
+
+    // The host deals again: two hands, R in both.
+    const relayHand1 = (await roomDoc()).state.handNo + 1;
+    const relayHand2 = relayHand1 + 1;
+
+    // A new hand's own read overtaken by the next message: the first read of R's own view at one of
+    // these hands is held until R's page has drawn a later seq — a commit that changes nothing (a seq
+    // bumped in Mongo, which the relay carries like any other) — and only then let through, older
+    // than the table R's page holds. R's cards must still come with it, not wait for a poll.
+    const race = {hand: null, seq: null, bumped: false, drawn: false, releasedAt: null, cardsAt: null, error: null};
+    const isRaceRead = (url) => url.pathname === `/api/poker-night/${code}/state`;
+    const raceRoute = async (route) => {
+        if (route.request().method() !== 'GET') return route.continue();
+        let response;
+        try {
+            response = await route.fetch();
+        } catch {
+            return route.abort().catch(() => {});
+        }
+        try {
+            if (race.hand === null && relay?.running) {
+                const body = await response.json().catch(() => null);
+                if (body && body.unchanged !== true && Array.isArray(body.me?.hole) && [relayHand1, relayHand2].includes(body.hand?.no)) {
+                    race.hand = body.hand.no;
+                    race.seq = body.seq;
+                    const bump = await rooms.updateOne({env: ENV, code, seq: body.seq}, {$inc: {seq: 1}});
+                    race.bumped = bump.modifiedCount === 1;
+                    race.drawn = await R.page.waitForFunction((s) => Number(document.querySelector('[data-pn-seq]')?.getAttribute('data-pn-seq')) > s, body.seq, {timeout: 8000})
+                        .then(() => true, () => false);
+                    race.releasedAt = Date.now();
+                }
+            }
+        } catch (error) {
+            race.error = error.message;
+        }
+        await route.fulfill({response}).catch(() => {});
+        if (race.releasedAt !== null && race.cardsAt === null) {
+            race.cardsAt = 0;
+            R.page.waitForFunction(() => document.querySelectorAll('[data-pn-hole=""] [data-card]').length === 2, null, {timeout: 15000})
+                .then(() => {
+                    race.cardsAt = Date.now();
+                }, () => {});
+        }
+    };
+    await R.page.route(isRaceRead, raceRoute);
+    if (await hp.locator('[data-pn-drawer="host"]').count() === 0) await hp.click('[data-open="host"]');
+    await hp.click('[data-host-tab="table"]');
+    await hp.click('[data-host-resume]');
+    await hp.waitForSelector('[data-host-pause]', {timeout: 15000});
+    await hp.keyboard.press('Escape');
+    await hp.waitForSelector('[data-pn-drawer="host"]', {state: 'detached', timeout: 10000}).catch(() => {});
+    doc = await playByClicks(relayHand1, {choose: (p) => (p === H ? 'fold' : 'call'), onStreet: firstStreet});
+    relayHands.get(relayHand1).endedAt = Date.now();
+    const end1 = await handEnds(relayHand1);
+    check(`hand ${relayHand1}, R's page on the relay alone: the showdown arrives over the channel`, end1.ended && doc.state.hand.result?.showdown === true, `${end1.ms} ms`);
+
+    // The second: the host pauses it (nothing is dealt after it), and on R's first turn past the
+    // preflop, once R's screen has it, the relay stops for good, the channel still "connected": R's
+    // own move is answered with a seq the channel never brings.
+    let paused = false;
+    let stop = null;
+    const lags = [];
+    doc = await playByClicks(relayHand2, {
+        choose: (p) => (p === H ? 'fold' : 'call'),
+        onStreet: firstStreet,
+        before: async (p, d) => {
+            if (p !== R || stop || d.state.hand.street === 'preflop') return;
+            // Once the relay has brought R the turn (its action bar is up), so the move goes at once.
+            await R.page.waitForSelector('[data-pn-actions]:not([aria-busy="true"])', {timeout: 20000});
+            await stopRelay();
+            stop = {
+                street: d.state.hand.street,
+                answered: R.page.waitForResponse((res) => res.url().endsWith('/action') && res.request().method() === 'POST', {timeout: 30000})
+                    .then(() => Date.now(), () => null),
+            };
+        },
+        after: async (p) => {
+            if (p === H && !paused) {
+                paused = true;
+                await pauseFromDrawer();
+            }
+            if (!stop) return;
+            if (p === R && stop.bothAt === undefined) {
+                stop.answeredAt = await stop.answered;
+                stop.bothAt = await R.page.waitForFunction(() => document.querySelector('[data-pn-transport]')?.getAttribute('data-pn-transport') === 'both',
+                    null, {timeout: AHEAD_GRACE_MS + 15000}).then(() => Date.now(), () => null);
+                await sleep(300);
+                stop.root = await rootOf(R.page);
+                stop.bar = await barText(R.page);
+                return;
+            }
+            // Every move after it: on R's screen within a poll or two.
+            const want = (await roomDoc()).seq;
+            const t0 = Date.now();
+            const ok = await R.page.waitForFunction((s) => Number(document.querySelector('[data-pn-seq]')?.getAttribute('data-pn-seq')) >= s, want, {timeout: 10000})
+                .then(() => true, () => false);
+            lags.push({by: p.name, ms: Date.now() - t0, ok});
+        },
+    });
+    relayHands.get(relayHand2).endedAt = Date.now();
+    const end2 = await handEnds(relayHand2);
+    const finalSeq = (await roomDoc()).seq;
+    const caughtUp = await R.page.waitForFunction((s) => Number(document.querySelector('[data-pn-seq]')?.getAttribute('data-pn-seq')) >= s, finalSeq, {timeout: 10000})
+        .then(() => true, () => false);
+    if (stop === null) await stopRelay();
+
+    // ── what the relay showed ──
+    const probe = await R.page.evaluate(() => ({seqs: window.__pnRelay.seqs, transports: window.__pnRelay.transports, modes: window.__pnRelay.modes, delivered: window.__pnRelay.delivered}));
+    {
+        const drops = probe.seqs.flatMap((s, i) => (i > 0 && s < probe.seqs[i - 1] ? [`${probe.seqs[i - 1]} → ${s}`] : []));
+        const taken = relay.deliveries.filter((d) => d.taken).length;
+        check(`R's page was handed ${taken} relayed messages for ${relay.scanned} seqs — ${relay.late} held back and sent after their successor, ${relay.twice} sent twice, ${relay.stale} followed by an older one — and the seq it drew only ever moved up`,
+            drops.length === 0 && probe.seqs.length > 10 && relay.late > 0 && relay.twice > 0 && relay.stale > 0 && taken === probe.delivered,
+            `${probe.seqs.length} seqs drawn, ${probe.seqs[0]} to ${probe.seqs[probe.seqs.length - 1]}${drops.length ? `; went back: ${drops.slice(0, 3).join(', ')}` : ''}`);
+    }
+    {
+        const rows = [relayHand1, relayHand2].map((n) => {
+            const first = relay.deliveries.find((d) => d.hand === n) ?? null;
+            const relayFirst = first !== null && first.before.hand < n;
+            const own = first === null ? null : rViews.find((v) => v.hand === n && v.hole && !v.unchanged && v.sentAt >= first.at - 20) ?? null;
+            const cards = relayHands.get(n)?.cards ?? {dealt: false, ok: false};
+            return {n, relayFirst, readMs: own && first ? own.sentAt - first.at : null, cards};
+        });
+        // A hand the page saw first in an answer of its own (a beat that landed first) needs no read.
+        const ok = rows.every((r) => r.cards.dealt && r.cards.ok && (!r.relayFirst || (r.readMs !== null && r.readMs <= 2000))) && rows.some((r) => r.relayFirst);
+        check('at each new hand the relay brings, R\'s page reads its own view once (GET state) and its own cards appear, as Mongo dealt them',
+            ok, rows.map((r) => `hand ${r.n}: ${r.relayFirst ? `read ${r.readMs} ms after the message` : 'seen first in its own answer'}, cards ${r.cards.ok ? `in ${r.cards.ms} ms` : 'missing'}`).join('; '));
+    }
+    await R.page.unroute(isRaceRead, raceRoute);
+    {
+        const cardsIn = race.releasedAt !== null && race.cardsAt > 0 ? race.cardsAt - race.releasedAt : null;
+        check('a new hand\'s read that lands after the next message (held until R\'s page drew a later seq) still brings R\'s own cards at once — the older whole view\'s own part is kept, not dropped as older',
+            race.hand !== null && race.drawn && race.error === null && cardsIn !== null && cardsIn <= 2500 && relayHands.get(race.hand)?.cards.ok === true,
+            `hand ${race.hand}, read at seq ${race.seq}, bumped ${race.bumped}, later seq drawn ${race.drawn}, cards ${cardsIn === null ? 'never' : `${cardsIn} ms`} after the release${race.error ? `; ${race.error}` : ''}`);
+    }
+    {
+        const first = relay.deliveries.find((d) => d.hand === relayHand1);
+        const until = relayHands.get(relayHand1).endedAt;
+        const seconds = first ? (until - first.at) / 1000 : 0;
+        const reads = first ? rReads.filter((t) => t >= first.at && t <= until).length : -1;
+        check(`over hand ${relayHand1} (${seconds.toFixed(0)} s) R's page read the table ${reads === 1 ? 'once' : `${reads} times`} — the new hand's read and the 20 s safety poll, not the polls' few seconds`,
+            first !== undefined && reads >= 1 && reads <= 3 + Math.ceil(seconds / 20), `polling would have read it about ${Math.round(seconds / 3)} times`);
+    }
+    {
+        const before = (list) => list.filter(([t]) => t < relay.stoppedAt).map(([, v]) => v);
+        const steady = (values) => values.slice(values.indexOf('realtime'));
+        const transports = steady(before(probe.transports));
+        const modes = steady(before(probe.modes));
+        check('while the relay ran, R\'s page stayed Live: the channel alone, never polls beside it',
+            transports.length > 0 && transports.every((v) => v === 'realtime') && modes.length > 0 && modes.every((v) => v === 'realtime'),
+            `transports ${before(probe.transports).join(' → ')}; modes ${before(probe.modes).join(' → ')}`);
+    }
+    check(`no relayed message carried a hole that was not shown, an identity, the people or the viewer's own part (${relay.scanned} scanned)`,
+        relay.problems.length === 0 && relay.scanned > 10, relay.problems.slice(0, 4).join(' | '));
+    check('…and the scan does see a hole once it is shown, at the showdown', relay.shownSeen > 0, `${relay.shownSeen} shown pairs seen`);
+    check(`every message, envelope and all, within the ${WIRE_BUDGET_BYTES}-byte budget (the largest ${relay.maxBytes} B)`, relay.over.length === 0, relay.over.slice(0, 3).join(', '));
+    check('the relay itself ran clean', relay.errors.length === 0, relay.errors.slice(0, 3).join(' | '));
+    {
+        const answeredIn = stop?.answeredAt && stop?.bothAt ? stop.bothAt - stop.answeredAt : null;
+        check(`the relay stopped mid-hand (${stop?.street ?? 'never'}): within ${AHEAD_GRACE_MS / 1000} s of R's move being answered ahead of the channel, polls run beside it — data-pn-transport "both", the mode "polling", the top bar "${TABLE_COPY.connection.polling}"`,
+            answeredIn !== null && answeredIn <= AHEAD_GRACE_MS + 2500 && stop.bothAt - relay.stoppedAt <= AHEAD_GRACE_MS + 6000 && stop.root?.transport === 'both' && stop.root?.mode === 'polling' && stop.bar === TABLE_COPY.connection.polling,
+            `${answeredIn} ms after the answer, ${stop?.bothAt && relay.stoppedAt ? stop.bothAt - relay.stoppedAt : '?'} ms after the stop: ${JSON.stringify(stop?.root)} "${stop?.bar}"`);
+    }
+    {
+        const slow = lags.filter((l) => !l.ok);
+        const worst = lags.reduce((top, l) => Math.max(top, l.ms), 0);
+        check(`…and R's page keeps up by polling: every move after it on R's screen within a poll (${lags.length} moves, the slowest ${worst} ms), the hand's end and the last seq too`,
+            lags.length > 0 && slow.length === 0 && worst <= 6000 && end2.ended && caughtUp, `${slow.map((l) => l.by).join(', ')} end ${end2.ended} caught up ${caughtUp}`);
+    }
+    await uiShot(R.page, '10-polling-again-1440');
+    await hp.click('[data-open="host"]');
+    await hp.waitForSelector('[data-pn-drawer="host"]', {timeout: 10000});
+
     // ── the night ends ──
     await hp.click('[data-host-tab="table"]');
     await hp.click('[data-host-end]');
     await hp.getByRole('button', {name: HOST_COPY.end}).last().click();
-    const summaries = await Promise.all([H, A, B, C].map((p) => p.page.waitForSelector('[data-night-summary]', {timeout: 45000}).then(() => true, () => false)));
+    const summaries = await Promise.all([H, A, B, C, R].map((p) => p.page.waitForSelector('[data-night-summary]', {timeout: 45000}).then(() => true, () => false)));
     await V.page.goto(`${BASE}/play/${code}`, {waitUntil: 'load', timeout: 120000});
     const fresh = await V.page.waitForSelector('[data-night-summary]', {timeout: 30000}).then(() => true, () => false);
-    check('the host ends the night: every context — host, A, B, C and a fresh one — sees the summary', summaries.every(Boolean) && fresh,
+    check('the host ends the night: every context — host, A, B, C, R and a fresh one — sees the summary', summaries.every(Boolean) && fresh,
         `${summaries.join(',')} fresh ${fresh}`);
     doc = await roomDoc();
     check('…the table closed, every chip cashed out', doc.status === 'closed' && conservation(doc.state).ok);
@@ -1809,6 +2269,8 @@ const tableInBrowser = async () => {
     check(`no answer a page got, no page HTML and no RSC payload carried the deck or another seat's unshown hole (${responsesChecked - checkedBefore} checked)`,
         fresh_leaks.length === 0 && responsesChecked - checkedBefore > 40, fresh_leaks.slice(0, 5).join(' | '));
     check('no page asked anything of Ably', requested.every((u) => !/ably/i.test(u)), requested.filter((u) => /ably/i.test(u)).slice(0, 2).join(' '));
+    check('no page in any context — the API part\'s or the table\'s, the relay\'s included — opened a request or a socket to an Ably host',
+        ablyContacts.length === 0 && hostsSeen.size > 0, ablyContacts.length > 0 ? ablyContacts.slice(0, 3).join(' ') : `hosts: ${[...hostsSeen].join(', ')}`);
     // Left out: the browser's own ResizeObserver note, and React's dev-only Server Components
     // performance track, which measures a server render that began before the page's time origin
     // (after a redirect) and throws on the negative time stamp — neither is in a production build.
@@ -1823,6 +2285,10 @@ try {
     check(`the table in a browser threw: ${err.message}`, false, err.stack?.split('\n').slice(1, 4).join(' '));
 } finally {
     clearInterval(handWatcher);
+    if (relay) {
+        relay.running = false;
+        await relay.loop?.catch(() => {});
+    }
     if (db) await db.collection('ratelimits').deleteMany({key: /^poker-night:/}).catch(() => {});
     await mongo.close().catch(() => {});
     await browser.close().catch(() => {});

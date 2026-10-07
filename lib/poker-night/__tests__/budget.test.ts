@@ -4,11 +4,13 @@
 // every non-host player. The engine's state is held to 16,000 bytes (lib/poker-night/config KEEP
 // sets the caps); the room document around it — every row the room keeps with the longest names, the
 // applied ring, the beats and the emotes — to 27,000 bytes for what each write reads and 30,000 in
-// all; and the public wire view — what every response and Ably message carries — to 4,500 bytes.
+// all; and the public wire view — what every response and Ably message carries — to 4,500 bytes,
+// as is the Ably state message around it (lib/poker-night/channel.WIRE_BUDGET_BYTES).
 // Names and looks are not part of the wire view: they ride beside it in responses only, versioned by
 // peopleV (lib/poker-night/room.roomView).
 
 import {describe, expect, it} from 'vitest';
+import {stateMessage, WIRE_BUDGET_BYTES} from '@/lib/poker-night/channel';
 import {nextDueAt} from '@/lib/poker-night/clock';
 import {DEFAULT_CONFIG, KEEP} from '@/lib/poker-night/config';
 import {createTable} from '@/lib/poker-night/engine';
@@ -99,6 +101,19 @@ describe('the hot document budget', () => {
             presence, watchers: 12, realtimeOk: true, peopleV: 40,
         });
         expect(bytes(view)).toBeLessThanOrEqual(4_500);
+    });
+
+    // What Ably carries: the wire view inside its message, the name and the id (the room's ObjectId
+    // and the seq) included, measured as UTF-8 the way Ably counts it.
+    it('keeps the realtime state message, envelope and all, within WIRE_BUDGET_BYTES', () => {
+        const presence = Object.fromEntries(s.seats.map((seat) => [seat!.pid, 'here' as const]));
+        const view = wireView(s, {
+            code: 'K7QXM4', seq: 999_999, serverNow: T0 + 12 * 3_600_000, nextDueAt: nextDueAt(s), clockLeader: clockLeaderOf(s, presence),
+            presence, watchers: 12, realtimeOk: false, peopleV: 99_999,
+        });
+        const message = stateMessage('6650a1b2c3d4e5f601234567', view);
+        expect(WIRE_BUDGET_BYTES).toBe(4_500);
+        expect(bytes(message)).toBeLessThanOrEqual(WIRE_BUDGET_BYTES);
     });
 });
 

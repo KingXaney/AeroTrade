@@ -13,7 +13,8 @@
 // pause) goes inside the winner's banner's column when the banner grows down over it (a phone
 // upright, where the pot sits under the board). The room's root carries the looks' ids for LOOKS_CSS (the host's scene and felt,
 // the viewer's card back and suit colours) and the hooks a test reads: data-pn-mode (polling,
-// realtime, reconnecting), data-pn-ready once the stage is measured.
+// realtime, reconnecting), data-pn-transport (realtime, poll, both), data-pn-seq (the seq of the
+// view drawn, which only ever moves up), data-pn-ready once the stage is measured.
 
 import {useCallback, useEffect, useMemo, useRef, useState, useSyncExternalStore, type CSSProperties} from "react";
 import {AnimContext, createAnimStore, EMPTY_ANIMS} from "@/components/poker-night/anim";
@@ -124,6 +125,8 @@ const TableScreen = () => {
             className="pn-room"
             aria-label={TABLE_COPY.region(name)}
             data-pn-mode={room.mode}
+            data-pn-transport={room.transport}
+            data-pn-seq={table.seq}
             data-pn-scene={tableLook.scene}
             data-pn-felt={tableLook.felt}
             data-pn-back={cardBackFor(room.personal.cardBack)}

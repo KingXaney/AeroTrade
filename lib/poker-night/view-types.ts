@@ -178,7 +178,10 @@ export type PlayPageView = {view: PlayerView} | {preview: RoomView; join: JoinVi
 // emotes newer than its emoteSeq, and a fresh seat pass when the request had to read the identity
 // in full (null when it came with a pass). A seq or emoteSeq above the client's says a GET state is due
 // (a tick answers without reading the emotes).
-export type Unchanged = {unchanged: true; seq: number; emoteSeq: number; serverNow: number; nextDueAt: number | null; emotes: EmoteView[]; pass: string | null};
+export type Unchanged = {
+    unchanged: true; seq: number; emoteSeq: number; serverNow: number; nextDueAt: number | null; emotes: EmoteView[]; pass: string | null;
+    realtimeOk: boolean; // as a view says it: whether a realtime publish failed within the window (read from the head)
+};
 
 export type HandEntryView = {seat: number; street: Street; kind: EntryKind; amount: number; to: number; allIn: boolean; timeout: boolean; auto: boolean; at: number};
 
@@ -211,6 +214,14 @@ export type DetailView =
     | {part: 'history'; hands: HandSummaryView[]}
     | {part: 'bank'; bank: BankDetailRowView[]};
 
+// A realtime token as GET token hands it over: Ably's TokenDetails, copied field by field. Its
+// capability is subscribe on the room's channel alone; its clientId is the viewer's pid.
+export type RealtimeTokenView = {token: string; expires: number; issued: number; capability: string; clientId: string};
+
+// GET token: whether this table goes live over Ably and, when it does, the channel (poker-night:
+// <env>:<room id>, lib/poker-night/channel) and a token for it. Off: the table polls.
+export type TokenReply = {realtime: false} | {realtime: true; channel: string; token: RealtimeTokenView};
+
 // Everything a poker night route answers with — lib/poker-night/route-kit's json() takes nothing
 // else, so a server object (a room, a state) cannot be sent by mistake.
-export type ResponseBody = PlayerView | JoinReply | Unchanged | DetailView | ErrorBody;
+export type ResponseBody = PlayerView | JoinReply | Unchanged | DetailView | TokenReply | ErrorBody;

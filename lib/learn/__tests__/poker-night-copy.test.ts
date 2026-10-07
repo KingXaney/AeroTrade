@@ -416,7 +416,15 @@ describe('the table', () => {
         expect(TABLE_COPY.leaveBody(2000)).toBe('Your 2,000 chips are counted in the bank as you leave.');
         expect(TABLE_COPY.leaveBody(1)).toBe('Your 1 chip is counted in the bank as you leave.');
         expect(TABLE_COPY.sitOut).toBe('Sit out next hand');
+        expect(TABLE_COPY.connection.live).toBe('Live');
         expect(TABLE_COPY.connection.polling).toBe('Updating every few seconds');
+        expect(TABLE_COPY.connectionNote).toEqual({
+            live: 'Every move shows here the moment it is made.',
+            polling: 'This table asks for new moves every few seconds.',
+            reconnecting: 'The connection dropped. Trying again.',
+        });
+        // One note for every word the top bar can show.
+        expect(Object.keys(TABLE_COPY.connectionNote).sort()).toEqual(['live', 'polling', 'reconnecting']);
         expect(TABLE_COPY.connection.reconnecting).toBe('Reconnecting…');
         expect(TABLE_COPY.paused).toBe('Paused by the host.');
         expect(TABLE_COPY.resumed).toBe('The game is back on.');

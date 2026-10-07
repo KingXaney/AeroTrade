@@ -430,8 +430,9 @@ and friends keep none beyond Shared and the invariants).
 - A Texas hold'em table friends share by link, a feature apart from poker (the solver); it reuses
   `lib/poker/cards` and `lib/poker/evaluator` and changes neither. So far it is the pure engine and
   room layer in `lib/poker-night/`, the three models, the stores, the table's API under
-  `app/api/poker-night/[code]/`, the lobby and the playable table on polling (`/play/CODE`); the
-  design and the phases still to come are `docs/specs/2026-10-06-poker-night.md`.
+  `app/api/poker-night/[code]/`, the lobby and the playable table (`/play/CODE`), live over Ably
+  where a key is set and polling everywhere else; the design and the phases still to come are
+  `docs/specs/2026-10-06-poker-night.md`.
 - `lib/poker-night/engine.reduce` is the one way a table's state (`lib/poker-night/types`) changes:
   a pure reducer that clones once, never mutates its input and hands back the same reference for a
   no-op. Time, the deck and the first big blind's draw arrive inside the action, so a step replays
@@ -443,9 +444,10 @@ and friends keep none beyond Shared and the invariants).
   tests deal from a stacked or seeded one. `lib/poker-night/__tests__/server-guard.test.ts` follows
   imports transitively: no 'use client' file (in `app/`, `components/`, `hooks/` or `lib/`) and
   nothing under `components/` may reach `shuffle`, the poker-night stores, identity, guest-token,
-  pass, route-kit or (later) realtime modules, and no 'use client' file, nor any of poker night's
-  components (a folder still to come), may reach crypto, mongoose, `database/` or the session. A
-  server page is not held to it.
+  pass, route-kit or realtime, and no 'use client' file, nor any of poker night's components, may
+  reach crypto, mongoose, `database/` or the session. Ably is split the same way: the browser reaches
+  only `ably/modular`, through a dynamic `import()`, and no server module does. A server page is
+  not held to it.
 - `lib/poker-night/views` is the only way state leaves the server: `publicView`, `wireView`,
   `playerView` and `historyView` copy field by field from a whitelist. `lib/poker-night/view-types`
   is the client contract, declared on its own, never an `Omit<>` of a server type, and it has no
@@ -497,8 +499,8 @@ and friends keep none beyond Shared and the invariants).
   with no identity, the guest its body's `joinId` names (`guestIdForJoin`), so a double tap or a
   retried join is one row; else nobody. A session read that throws is a 503, never a guest, and a
   guest is never a better-auth user. The seat pass (`lib/poker-night/pass`, `X-PN-Pass`, ten
-  minutes, renewed past half its life) stands in for the identity on GET state, GET detail and tick
-  only; join and action always read it in full.
+  minutes, renewed past half its life) stands in for the identity on GET state, GET detail, GET token
+  and tick only; join and action always read it in full.
 - Every table request goes through `lib/poker-night/route-kit.playerRequest`, cheapest refusal
   first: the kill switch (`POKER_NIGHT_ENABLED`), `X-PN-Protocol` (426 reload), a POST's same
   origin, JSON and 2 KiB (read capped, `lib/poker-night/http.readCappedText`), the in-memory bucket
@@ -520,16 +522,16 @@ and friends keep none beyond Shared and the invariants).
   (`store.getRoomById` tells them apart, `room-doc.unreadRefusal`). The out-of-band fields
   (`seen`, emotes, `rt`, `lastError`) are never part of the write. `afterCommit`, in the route's
   `after()`, writes the completed hands (`lib/poker-night/hands-store`) and the accounts' results
-  (`lib/poker-night/results-store`); the realtime publish joins it in P4. The document mapping is
-  `lib/poker-night/room-doc` (pure). Logs carry codes, seqs and messages, never a room, a state or
-  a document.
+  (`lib/poker-night/results-store`) and publishes the commit's wire view (realtime, below). The
+  document mapping is `lib/poker-night/room-doc` (pure). Logs carry codes, seqs and messages, never
+  a room, a state or a document.
 - A GET or a page render never writes: only POST action, join and tick move a room, so a link
   preview, a prefetch or a loop of polls cannot deal a hand.
   `lib/poker-night/__tests__/route-guard.test.ts` holds every `app/api/poker-night/[code]/` route
   to `playerRequest`, Node and ten seconds, and no GET, file of the (play) group or route-kit to
   `mutateRoom`.
-- Every room, hand and result query and index, every rate-limit key (`lib/poker-night/limits`) and,
-  later, every realtime channel carries the env (`lib/poker-night/env.envOf`: `VERCEL_ENV`, else
+- Every room, hand and result query and index, every rate-limit key (`lib/poker-night/limits`) and
+  every realtime channel carries the env (`lib/poker-night/env.envOf`: `VERCEL_ENV`, else
   development): a preview shares production's database and must never open a production table.
 - The exits: every payload is one of `lib/poker-night/views`' projections or the room's views built
   on them (`room.playerViewFor`, `roomView`, `playPageView`, `room-doc.playerViewOf`,
@@ -564,6 +566,40 @@ and friends keep none beyond Shared and the invariants).
   a doubling backoff, armed again only by a new due time or role or once the poll gets through after
   failures, never by an answer that lands meanwhile. A visitor polls nothing; the join card reads the
   page again every `VISITOR_REFRESH_MS`, so a removed, locked or full card learns it opened.
+- Realtime (Ably) is on only where `lib/poker-night/channel.realtimeEnabled` says so: an
+  `ABLY_API_KEY` shaped like one (Production only in Vercel, the key restricted to channels
+  `poker-night:*` with publish and subscribe) and `POKER_NIGHT_REALTIME` not `off`; everywhere
+  else — previews, local servers, the QA harness (run.sh blanks the key), CI — the table polls. The
+  channel is `poker-night:<env>:<room id>`, never the code; the server publishes, in `afterCommit`,
+  `{name: 'state', id: <room>:<seq>, data: WireView}` — the public wire view without the people, so
+  no hole card, deck, viewer's part or config — through `lib/poker-night/realtime` (`Ably.Rest`,
+  built on first use, `serverExternalPackages` in `next.config.ts`); `budget.test.ts` holds the
+  message, envelope and all, to `WIRE_BUDGET_BYTES` (4,500). A failed publish stamps the room's
+  `rt` out of band (`store.markRealtimeFailure`, at most once a minute) and every answer says
+  `realtimeOk: false` for five minutes — a view, a message, and an Unchanged too (the head reads
+  `rt.failAt`). GET token (`app/api/poker-night/[code]/token/route.ts`)
+  answers `{realtime: false}`, or the channel and an Ably `TokenDetails` — subscribe only, 15 minutes,
+  the pid as clientId, a Mongo counter of 20 per 10 minutes per player — so no browser publishes or
+  enters presence. `components/poker-night/realtime-client` loads `ably/modular` (`BaseRealtime`,
+  `WebSocketTransport`, `FetchRequest`) by `import()` only when a table goes live, and never gives up
+  on a first token (`feed.tokenRetryDelay`: 5, 15 and 45 s, then every five minutes); `useTableFeed`
+  feeds each wire into the same reducer by seq, reads the whole view once after every (re)attach and
+  whenever `feed.needsPrivate` says the viewer's own part went stale (a GET state's `since` is how
+  far that part is known fresh, `FeedState.privateSeq`, which a wire carries on only while no move of
+  the viewer's own is out), and lets the connection go after five minutes hidden. A whole view that
+  comes back older than a message keeps its own part under the newer table when nothing between could
+  have changed it (`feed.graftPrivate`: the same hand, seat, config and people), else is read again
+  (`feed.readAgain`); while the part is stale the poll keeps the table's own pace (`feed.pollPace`),
+  and a change to the table never puts off a poll already due. `feed.monitorStep`/`transportOf`
+  choose the transport — the channel alone with a 20 s safety poll, both for `BOTH_FOR_MS` once it
+  stalls (`transportPolicy`, `watchdogTripped`; `realtimeOk` taken from every answer and message, and
+  from the page's own view at the start), polls
+  alone without realtime — shown as `data-pn-mode` (Live only over a connected channel trusted alone)
+  and `data-pn-transport`, beside `data-pn-seq` (the seq drawn). What goes on the channel is
+  `lib/poker-night/room-doc.wireOfRoom` of the committed room. The QA seam: a dev server with
+  `NEXT_PUBLIC_PN_RT_FAKE=1` (run.sh only) lets a page that defines `window.__PN_RT_FAKE__` take its
+  messages from it — `qa-poker-night`'s relay builds them with `wireOfRoom` from Mongo and delivers
+  them held back, out of order and twice; a production build compiles the seam out.
 - The animations are `lib/poker-night/events.diffViews` (ids keyed by the hand number and the log's
   length, so each fires once) on `lib/poker-night/choreography`'s timeline, drawn by CSS keyframes
   from custom properties (`--pn-at`, `--pn-dur` in `--motion-base` units; a flight's `--pn-dx` /

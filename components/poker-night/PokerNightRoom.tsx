@@ -119,10 +119,11 @@ export type PokerNightRoomProps = {
     signedIn: boolean;
     invite: boolean;
     pollScale: number; // POKER_NIGHT_POLL_MS: a floor on every poll's wait
+    realtime: boolean; // this deployment has realtime (lib/poker-night/channel.realtimeEnabled): the table goes live over Ably
 };
 
-const PokerNightRoom = ({code, shareUrl, initial, config, suggested, signedIn, invite, pollScale}: PokerNightRoomProps) => {
-    const feed = useTableFeed({code, initial, pollScale});
+const PokerNightRoom = ({code, shareUrl, initial, config, suggested, signedIn, invite, pollScale, realtime}: PokerNightRoomProps) => {
+    const feed = useTableFeed({code, initial, pollScale, realtime});
     const stored = useSyncExternalStore(subscribeMe, getMe, getServerMe);
     const [edits, setEdits] = useState<Partial<Profile>>({});
 
@@ -162,7 +163,7 @@ const PokerNightRoom = ({code, shareUrl, initial, config, suggested, signedIn, i
         return result;
     }, [feedJoin]);
 
-    const {state, mode, problem, send, detail, serverNow} = feed;
+    const {state, mode, transport, problem, send, detail, serverNow} = feed;
     const joinView = 'join' in initial ? initial.join : null;
     const controller = useMemo<RoomController>(() => {
         // The feed always holds one of the two: the viewer's own view, or the page's preview.
@@ -173,7 +174,7 @@ const PokerNightRoom = ({code, shareUrl, initial, config, suggested, signedIn, i
             me: state.view?.me ?? null,
             config: state.view?.config ?? config,
             hasAccount: state.view?.me.hasAccount ?? joinView?.hasAccount ?? signedIn,
-            serverOffset: state.offset, serverNow, mode,
+            serverOffset: state.offset, serverNow, mode, transport,
             problem: problem ? {code: problem, message: POKER_NIGHT_ERRORS[problem]} : null,
             events: state.events,
             send, join, detail,
@@ -181,7 +182,7 @@ const PokerNightRoom = ({code, shareUrl, initial, config, suggested, signedIn, i
             profile, setProfile,
             shareUrl, code, invite,
         };
-    }, [state, joinView, config, signedIn, serverNow, mode, problem, send, join, detail, stored.look, setPersonal, profile, setProfile, shareUrl, code, invite]);
+    }, [state, joinView, config, signedIn, serverNow, mode, transport, problem, send, join, detail, stored.look, setPersonal, profile, setProfile, shareUrl, code, invite]);
 
     return (
         <RoomControllerContext.Provider value={controller}>

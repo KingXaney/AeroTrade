@@ -446,6 +446,13 @@ export const TABLE_COPY = {
     handNo: (n: number): string => `Hand ${count(n)}`,
     watchers: (n: number): string => plural(n, 'watcher', 'watchers'),
     connection: {live: 'Live', polling: 'Updating every few seconds', reconnecting: 'Reconnecting…', back: 'Back online.'},
+    // What each state means, on hover over the top bar's word: Live is the realtime channel alone;
+    // polling is the table asking the server (no realtime here, or the channel stalled).
+    connectionNote: {
+        live: 'Every move shows here the moment it is made.',
+        polling: 'This table asks for new moves every few seconds.',
+        reconnecting: 'The connection dropped. Trying again.',
+    },
 
     // The seats (a list labelled "Seats"). A seat is its index, printed from 1.
     seatsLabel: 'Seats',

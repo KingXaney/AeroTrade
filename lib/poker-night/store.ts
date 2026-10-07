@@ -7,7 +7,9 @@
 // mutateRoom is the one way the game moves: read the room, plan, write behind a compare-and-set on
 // `seq`, up to TIMING.CAS_ATTEMPTS times with a jittered backoff. The out-of-band fields (seen,
 // emotes, rt, lastError) are written beside it, never through it, so a heartbeat never costs a bet
-// its race. Every query names the env, and every read wants `expiresAt > now`: the TTL monitor runs
+// its race. afterCommit, in the route's after(), sets off what a commit means beyond its answer:
+// history, the accounts' results and the realtime publish (lib/poker-night/realtime), whose failure
+// stamps the room's rt so every answer says realtimeOk: false for a while. Every query names the env, and every read wants `expiresAt > now`: the TTL monitor runs
 // late. Nothing here logs a room, a state or a document — only codes, seqs and messages (the logs
 // outlive nothing on Hobby; lastError keeps the last failure on the room itself).
 
@@ -27,12 +29,13 @@ import {LOBBY_PROJECTION, lobbyRoomFromDoc, openRoomsFilter, type LobbyDoc, type
 import {isDuplicateKey} from "@/lib/poker-night/results";
 import {appliedKey, newPid, newRoom, type JoinResult, type NewRoom, type Step} from "@/lib/poker-night/room";
 import {
-    casUpdate, coreFromDoc, headFromDoc, HEAD_PROJECTION, ms, newRoomDoc, serverRoom, serverRoomFromDoc, unreadableCloseUpdate, unreadableKind,
+    casUpdate, coreFromDoc, headFromDoc, HEAD_PROJECTION, ms, newRoomDoc, serverRoom, serverRoomFromDoc, unreadableCloseUpdate, unreadableKind, wireOfRoom,
     type Commit, type RoomDocLean, type RoomHead, type RoomRef, type ServerRoom, type Unread,
 } from "@/lib/poker-night/room-doc";
 import {SECURE_SOURCE} from "@/lib/poker-night/shuffle";
 import {writeHands} from "@/lib/poker-night/hands-store";
 import {writeResults} from "@/lib/poker-night/results-store";
+import {publishWire} from "@/lib/poker-night/realtime";
 
 export type {Commit, RoomHead, RoomRef, ServerRoom, Unread};
 
@@ -41,8 +44,9 @@ export type {Commit, RoomHead, RoomRef, ServerRoom, Unread};
 const READ_PROJECTION = {emoteAt: 0, awards: 0, applied: 0} as const;
 const MUTATE_PROJECTION = {emoteAt: 0, awards: 0} as const;
 const CODE_ATTEMPTS = 5;
-// At most one lastError write a minute per room.
+// At most one lastError write a minute per room, and at most one realtime failure stamp.
 const ERROR_THROTTLE_MS = 60_000;
+const REALTIME_FAIL_THROTTLE_MS = 60_000;
 
 type LogFields = {code?: string | null; env: Env; seq?: number | null; actionType?: string; message: string};
 
@@ -206,16 +210,43 @@ export const mutateRoom = async (ref: RoomRef, step: Step | null, opts: MutateOp
     }
 };
 
+// A realtime publish failed: stamped on the room out of band (rt.failAt, rt.fails), at most once a
+// minute, so every answer for the next LIMITS.realtimeFailWindowMs says realtimeOk: false and the
+// browsers poll beside the channel (lib/poker-night/feed's watchdog). Never throws.
+export const markRealtimeFailure = async (ref: RoomRef, now: number): Promise<void> => {
+    try {
+        await connectToDatabase();
+        await PokerRoom.updateOne(
+            {_id: ref.id, env: ref.env, 'rt.failAt': {$not: {$gte: new Date(now - REALTIME_FAIL_THROTTLE_MS)}}},
+            {$set: {'rt.failAt': new Date(now)}, $inc: {'rt.fails': 1}},
+        );
+    } catch (error) {
+        logFailure('recording a realtime failure failed', {env: ref.env, message: messageOf(error)});
+    }
+};
+
+// The commit's public wire view on the room's channel; a no-op without realtime. A failure is
+// logged with the code and the seq, and stamped on the room.
+const publishCommit = async (commit: Commit): Promise<void> => {
+    const {ref, room} = commit;
+    const sent = await publishWire(ref.env, ref.id, wireOfRoom(room));
+    if (sent.ok) return;
+    logFailure('a realtime publish failed', {code: room.core.code, env: ref.env, seq: room.seq, message: sent.message});
+    await markRealtimeFailure(ref, Date.now());
+};
+
 // Everything a commit sets off once the response is on its way, run in the route's after(): the
-// hands it completed into history, the accounts' results when a figure they carry moved. P4 adds
-// the realtime publish here. Each part catches and logs its own failure; the next commit heals it
-// (results carry totals, hands are upserted whole).
+// hands it completed into history, the accounts' results when a figure they carry moved, and the
+// commit's wire view on the realtime channel. Each part catches and logs its own failure; the next
+// commit heals it (results carry totals, hands are upserted whole, and every message carries the
+// whole public table, applied by seq).
 export const afterCommit = async (result: MutateResult): Promise<void> => {
     const commit = result.commit;
     if (!commit) return;
     await Promise.all([
         commit.hands.length > 0 ? writeHands(commit) : undefined,
         commit.ledgerDirty ? writeResults(commit) : undefined,
+        publishCommit(commit),
     ]);
 };
 

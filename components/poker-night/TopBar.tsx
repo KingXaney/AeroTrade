@@ -35,6 +35,7 @@ const TopBar = ({onOpen, onSeatChoice, onTakeSeat, onLeave}: Props) => {
     const own = room.view ? ownSeat(room.view) : null;
     const waiting = waitingRequests(table, room.me);
     const connection = TABLE_COPY.connection[room.mode === 'realtime' ? 'live' : room.mode];
+    const connectionNote = TABLE_COPY.connectionNote[room.mode === 'realtime' ? 'live' : room.mode];
     // While a hand plays on, a pause or the night's end waits for it: the bar says "after this hand".
     const live = handLive(table);
     const status = table.status === 'closed' ? null
@@ -53,7 +54,7 @@ const TopBar = ({onOpen, onSeatChoice, onTakeSeat, onLeave}: Props) => {
                         {joined && (
                             <>
                                 <span aria-hidden="true">·</span>
-                                <span className="inline-flex items-center gap-1" role="status" title={connection}>
+                                <span className="inline-flex items-center gap-1" role="status" title={connectionNote}>
                                     <span aria-hidden="true"
                                           className={cn('size-1.5 rounded-full', room.mode === 'reconnecting' ? 'bg-warning' : 'bg-positive')}/>
                                     <span className="sr-only sm:not-sr-only">{connection}</span>

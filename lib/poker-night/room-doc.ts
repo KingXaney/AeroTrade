@@ -9,9 +9,9 @@ import {STATE_VERSION} from '@/lib/poker-night/config';
 import type {Env} from '@/lib/poker-night/env';
 import type {PokerNightErrorCode} from '@/lib/poker-night/http';
 import {LIMITS} from '@/lib/poker-night/limits';
-import {expiryOf, mirrorsOf, playerViewFor, type JoinResult, type PlayerKeys, type RoomCore, type RoomPlayer, type Seen} from '@/lib/poker-night/room';
+import {expiryOf, mirrorsOf, playerViewFor, wireOf, type JoinResult, type PlayerKeys, type RoomCore, type RoomPlayer, type Seen} from '@/lib/poker-night/room';
 import type {HandSummary, TableState, TableStatus} from '@/lib/poker-night/types';
-import type {EmoteView, PlayerView, Unchanged} from '@/lib/poker-night/view-types';
+import type {EmoteView, PlayerView, Unchanged, WireView} from '@/lib/poker-night/view-types';
 
 // A time as the driver hands it back (a Date) or as a number of milliseconds.
 type Time = Date | number | string;
@@ -152,10 +152,15 @@ export const playerViewOf = (room: ServerRoom, pid: string, opts: {pass: string 
         realtimeOk: room.realtimeOk, emotes: room.emotes, emoteSeq: room.emoteSeq, pass: opts.pass, duplicate: opts.duplicate,
     });
 
+// The public wire view of a room the store read or committed: what the realtime channel carries
+// (store.afterCommit publishes it after every commit; the browser QA's relay builds it the same way).
+export const wireOfRoom = (room: ServerRoom): WireView => wireOf(room.core, room.seq, room.readAt, {realtimeOk: room.realtimeOk});
+
 // ── the head: the cheap read every request starts with ──
 
 // What playerRequest and the polling fast path read before anything else: the version, the clock,
-// and who may ask — one projected findOne, no state.
+// who may ask, and the last failed realtime publish (so an Unchanged says realtimeOk as a view does)
+// — one projected findOne, no state.
 export type RoomHead = {
     id: string;
     seq: number;
@@ -164,10 +169,11 @@ export type RoomHead = {
     status: TableStatus;
     players: PlayerKeys[];
     bannedKeys: string[];
+    realtimeFailAt: number | null;
 };
 
 export const HEAD_PROJECTION = {
-    seq: 1, emoteSeq: 1, nextDueAt: 1, status: 1, bannedKeys: 1,
+    seq: 1, emoteSeq: 1, nextDueAt: 1, status: 1, bannedKeys: 1, 'rt.failAt': 1,
     'players.pid': 1, 'players.userId': 1, 'players.guestId': 1, 'players.banned': 1,
 } as const;
 
@@ -179,20 +185,25 @@ export const headFromDoc = (doc: RoomDocLean): RoomHead => ({
     status: doc.status,
     players: (doc.players ?? []).map((p) => ({pid: p.pid, userId: p.userId ?? null, guestId: p.guestId ?? null, banned: p.banned === true})),
     bannedKeys: [...(doc.bannedKeys ?? [])],
+    realtimeFailAt: msOrNull(doc.rt?.failAt),
 });
 
 // The emotes a client has not seen: those after its emoteSeq.
 export const emotesSince = (emotes: readonly EmoteView[], esince: number | null): EmoteView[] =>
     emotes.filter((e) => esince === null || e.seq > esince);
 
-// A poll or a tick when nothing moved.
+const unchangedBody = (
+    head: Pick<RoomHead, 'seq' | 'emoteSeq' | 'nextDueAt'>, serverNow: number, emotes: EmoteView[], pass: string | null, realtimeOk: boolean,
+): Unchanged => ({unchanged: true, seq: head.seq, emoteSeq: head.emoteSeq, serverNow, nextDueAt: head.nextDueAt, emotes, pass, realtimeOk});
+
+// A poll or a tick when nothing moved, from the head: realtimeOk as a view would say it then.
 export const unchangedOf = (
-    head: Pick<RoomHead, 'seq' | 'emoteSeq' | 'nextDueAt'>, serverNow: number, emotes: EmoteView[], pass: string | null,
-): Unchanged => ({unchanged: true, seq: head.seq, emoteSeq: head.emoteSeq, serverNow, nextDueAt: head.nextDueAt, emotes, pass});
+    head: Pick<RoomHead, 'seq' | 'emoteSeq' | 'nextDueAt' | 'realtimeFailAt'>, serverNow: number, emotes: EmoteView[], pass: string | null,
+): Unchanged => unchangedBody(head, serverNow, emotes, pass, realtimeOkAt(head.realtimeFailAt, serverNow));
 
 // The same from a full read: the emotes after the client's emoteSeq, the room's own clock.
 export const unchangedOfRoom = (room: ServerRoom, esince: number | null, pass: string | null): Unchanged =>
-    unchangedOf({seq: room.seq, emoteSeq: room.emoteSeq, nextDueAt: nextDueAt(room.core.state)}, room.readAt, emotesSince(room.emotes, esince), pass);
+    unchangedBody({seq: room.seq, emoteSeq: room.emoteSeq, nextDueAt: nextDueAt(room.core.state)}, room.readAt, emotesSince(room.emotes, esince), pass, room.realtimeOk);
 
 // ── writing ──
 

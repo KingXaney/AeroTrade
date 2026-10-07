@@ -12,7 +12,7 @@ import {createContext, useContext, useSyncExternalStore} from "react";
 import type {JoinOutcome} from "@/lib/poker-night/view-types";
 import type {PokerNightErrorCode} from "@/lib/poker-night/http";
 import type {ActionInput, JoinBody as JoinInputBody} from "@/lib/poker-night/input";
-import type {FeedMode, RoomEvent} from "@/lib/poker-night/feed";
+import type {FeedMode, RoomEvent, Transport} from "@/lib/poker-night/feed";
 import type {GameConfig} from "@/lib/poker-night/types";
 import type {DetailView, JoinView, MeView, PlayerView, RoomView} from "@/lib/poker-night/view-types";
 
@@ -67,6 +67,7 @@ export type RoomController = {
     serverOffset: number; // server minus browser, ms
     serverNow: () => number; // the server's time now; call it in a handler or an effect, never in render
     mode: FeedMode;
+    transport: Transport; // what carries the table now: the realtime channel, polls, or both
     // Something the table cannot carry on through ('reload' after a deploy); null otherwise.
     problem: {code: PokerNightErrorCode; message: string} | null;
     events: RoomEvent[]; // animation events, newest last, each with a stable id

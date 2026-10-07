@@ -15,6 +15,10 @@ const nextConfig: NextConfig = {
   turbopack: {
     root: __dirname,
   },
+  // Ably's Node build (poker night's realtime publish and tokens, lib/poker-night/realtime.ts) loads
+  // ws and got with optional native add-ons: required as is at run time, never bundled. The browser
+  // takes 'ably/modular' through the client bundle as usual.
+  serverExternalPackages: ["ably"],
   async headers() {
     return [{ source: "/(.*)", headers: SECURITY_HEADERS }];
   },

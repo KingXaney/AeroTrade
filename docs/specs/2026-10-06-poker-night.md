@@ -1,9 +1,9 @@
 # Poker night: a hold'em table you share by link
 
-**Status:** In progress on branch `feat/poker-night`. Phase 1 (the pure engine) and phase 2 (the
-room server and its API) of 8 are written and tested. The playable table and lobby, live updates
-over Ably, looks and avatars, emotes and the tracker's polish follow, each merged once its checks
-and browser QA pass.
+**Status:** In progress on branch `feat/poker-night`. Phases 1 to 4 of 8 are written and tested:
+the pure engine, the room server and its API, the playable table and lobby on polling, and live
+updates over Ably. Looks and avatars, emotes and the tracker's polish follow, each merged once its
+checks and browser QA pass.
 
 ## Why
 
@@ -118,9 +118,9 @@ arrived in time and is still on its way. A refused step still lets the clock's o
 A room idle twelve hours closes on its next write. A stored state this deploy cannot read closes
 the room — unless a newer deploy wrote it, when every route, a read included, tells the page to
 reload instead. Presence
-beats and, later, emotes and realtime failures are written beside the game, never through it, so
-they never cost a move its race. After the response, the completed hands go to history and the
-accounts' totals to their result rows.
+beats, realtime failures and, later, emotes are written beside the game, never through it, so
+they never cost a move its race. After the response, the completed hands go to history, the
+accounts' totals to their result rows and the public table to the realtime channel.
 
 **Nothing on a read writes.** The clock moves only on a POST: a move, a join, or the tick the clock
 leader's page sends when something falls due. A poll, a detail read and the page's render never
@@ -140,8 +140,8 @@ removed guest's row may go too; its key stays on the room's list (the newest 32 
 so the removal holds. Account rows, and guests who played, stay for the night.
 
 **Every query carries the deployment.** A Vercel preview shares production's database, so every
-room, hand and result query and index, every rate-limit key and, later, every realtime channel
-names the env; a preview can never open a production table.
+room, hand and result query and index, every rate-limit key and every realtime channel names the
+env; a preview can never open a production table.
 
 **Names and looks travel apart.** The people part — every row's name and look, and who was removed —
 rides beside the table in responses, versioned by `peopleV`, which moves only when one of them
@@ -184,6 +184,70 @@ never writes "closed").
 with the chip cap, under their saved name and look, else their first name and the look their
 account id rolls), `closePokerNight` (the host's "end", through the same compare-and-set as every
 move) and `savePokerNightProfile` (`user-preferences.pokerNight`, a sub-document with no defaults).
+
+## Live updates (phase 4)
+
+**When.** Only where the deployment has realtime (`lib/poker-night/channel.realtimeEnabled`): an
+`ABLY_API_KEY` shaped like an Ably key, set in Vercel for Production only and restricted in the
+Ably dashboard to channels `poker-night:*` with publish and subscribe, and `POKER_NIGHT_REALTIME`
+not `off` (the kill switch that leaves the key in place). Previews, local servers, CI and the QA
+harness have no key, so their tables poll exactly as before.
+
+**The channel.** One per room, `poker-night:<env>:<room id>` — the env because a preview shares
+production's database, the room's id because a code is what a stranger guesses. After every commit
+the server publishes, from the route's `after()` (`store.afterCommit` through
+`lib/poker-night/realtime`, `Ably.Rest` loaded on first use), one message:
+`{name: 'state', id: '<room id>:<seq>', data: WireView}`. The explicit id makes a retried publish
+one message. The wire view is the public table without the people (they move with `peopleV`), so
+no hole card, no deck, no viewer's own part and no config ever rides on Ably, and the message,
+envelope and all, stays under 4,500 bytes on the heaviest table the engine builds
+(`budget.test.ts`). A publish that fails stamps the room's `rt` out of band, at most once a
+minute, and for five minutes every answer the server sends says `realtimeOk: false` — a view, a
+message, and an Unchanged answered from the room's head alone.
+
+**Tokens.** `GET token` answers `{realtime: false}` without realtime, else the channel and an Ably
+`TokenDetails` the server requested for the player: subscribe on that one channel only, fifteen
+minutes, the player's pid as its clientId, at most twenty per player in ten minutes. No browser can
+publish, enter presence or read another table. A removed player is refused like on every route and
+keeps only what the channel shows everyone until their token runs out.
+
+**The browser.** `components/poker-night/realtime-client` loads `ably/modular` — `BaseRealtime`
+with the WebSocket transport and fetch, nothing else — by a dynamic `import()` when a table with
+realtime connects, so it is in no other page's bundle and in /play's only as a chunk fetched then
+(about 52 KB gzipped). Every message goes through the same reducer as an answer, applied only when
+its seq is newer, so a message out of order or twice changes nothing. One GET state follows every
+attach and re-attach, and every message after which the viewer's own part is stale
+(`feed.needsPrivate`: a hand they are dealt into, their seat or role, the config, the people); a
+message that shows the last hand over drops its cards at once, and one that shows a pre-action
+played or cleared drops it. That read can come back older than the next message (the first actor
+moved while it was out): its own part is then kept under the newer table when nothing between the
+two could have changed it — the same hand, seat, config and people — and read again at once when
+something could. While a move of the viewer's own is out, a message does not count their own part
+as fresh (the move may have set a pre-action no message shows); the move's answer brings it. While
+that part is stale the poll keeps the table's own pace rather than the 20-second safety poll, and a
+message never puts off a poll already due. A first token that does not come is asked for again
+after 5, 15 and 45 seconds and then every five minutes for as long as the page is open, so a table
+that missed its first token goes live once the route answers again. A page hidden five minutes
+lets its connection go and opens it again when it shows.
+
+**Which transport.** `lib/poker-night/feed`'s monitor, checked every second: the channel alone,
+with a safety poll every 20 seconds, while it is connected and keeping up; polls beside it for five
+minutes from the last time anything looked wrong — not connected within 8 seconds, disconnected
+over 10, suspended or failed, a view saying `realtimeOk: false`, or during a live hand an answer
+ahead of the channel for over 3 seconds or nothing on it 5 seconds past a due time. The monitor
+hears `realtimeOk` from every answer and every message and starts from the view the page holds, so
+a page opened inside a failure window runs both, and an idle table's safety polls end it on time.
+The top bar says "Live" only over a channel trusted alone, else "Updating every few seconds".
+
+**Testing it without Ably.** The QA dev server (`scripts/qa/run.sh`) blanks the key and sets
+`NEXT_PUBLIC_PN_RT_FAKE=1`: a page that defines `window.__PN_RT_FAKE__` takes its messages from that
+object instead of Ably. A production build compiles the seam out. The poker night suite's relay is
+that object for one guest's page: it reads the room from Mongo, builds the message the server
+publishes (`room-doc.wireOfRoom`, the same function) and delivers it held back, out of order and
+twice. Over two hands it holds the page Live, its drawn seq (`data-pn-seq`) only ever rising, one
+read of its own view at each new hand and its cards there — one of those reads held until a later
+message has landed, and the cards must still come with it — no unshown hole in any message; then it
+stops mid-hand and the watchdog must bring the polls back within its 3 seconds.
 
 ## Engine rules
 
@@ -323,8 +387,19 @@ Every engine module is unit-tested in `lib/poker-night/__tests__/`:
   its room is kept; no account id in what the page gets; every choice of the start form a config
   `checkConfig` accepts; the name and look an account starts from, and what is read of the look a
   browser kept. The navigation test keeps /poker-night under Learn and /play/CODE in no section.
+- **channel, realtime, feed:** the channel names the env and the room's id, never the code; the
+  token's capability is subscribe alone; realtime is on only for a key shaped like one and off by
+  the kill switch; against a stand-in SDK, nothing is loaded or sent without realtime, a token is
+  requested for the pid on the room's channel and handed over field by field, a commit goes out as
+  the state message under its room and seq, and a failed publish is answered, never thrown; the
+  monitor's every threshold, its five minutes of both, the baseline after an attach, and
+  `realtimeOk` heard from messages and Unchanged answers; a message drops a finished hand's cards
+  and a cleared pre-action, the whole view a message already showed still lands once for the
+  viewer's own part, and one a later message overtook keeps it when nothing between could have
+  changed it; the poll's pace while that part is stale; the first token's retries never end.
 - **server guard and route guard:** no client file, and nothing under `components/`, reaches
-  `shuffle.ts` or the poker-night server modules by any chain of imports; every route runs
+  `shuffle.ts` or the poker-night server modules by any chain of imports, nor any of Ably but
+  `ably/modular` (and that only by `import()`), which no server module reaches; every route runs
   `playerRequest` on Node within ten seconds; no GET, page or the shared checks reaches
   `mutateRoom`; no route grants a cross-origin request; and no server module logs a room, a state
   or a document. The proxy matcher test pins `/play/CODE` open and `/play`, `/players`,

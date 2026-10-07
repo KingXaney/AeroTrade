@@ -35,7 +35,7 @@ const PLAY_PAGES = filesUnder('app/(play)', /^page\.tsx$/);
 // Every file a (play) render runs: a page, a layout (it runs for a link preview and a prefetch too),
 // a loading or error boundary, a not-found page.
 const PLAY_FILES = filesUnder('app/(play)', /\.(ts|tsx)$/);
-const SERVER_MODULES = ['store', 'hands-store', 'results-store', 'identity', 'route-kit'].map((name) => `lib/poker-night/${name}.ts`);
+const SERVER_MODULES = ['store', 'hands-store', 'results-store', 'identity', 'route-kit', 'realtime'].map((name) => `lib/poker-night/${name}.ts`);
 
 const exportsMethod = (code: string, method: string) => new RegExp(`export\\s+(async\\s+)?function\\s+${method}\\b|export\\s+const\\s+${method}\\b`).test(code);
 
@@ -62,7 +62,7 @@ const PRIVATE_ARGUMENT = /\b(state|room|doc)\b/;
 
 describe('the poker night routes', () => {
     it('are where the design puts them', () => {
-        expect(ROUTES.sort()).toEqual(['action', 'detail', 'join', 'state', 'tick'].map((name) => `app/api/poker-night/[code]/${name}/route.ts`));
+        expect(ROUTES.sort()).toEqual(['action', 'detail', 'join', 'state', 'tick', 'token'].map((name) => `app/api/poker-night/[code]/${name}/route.ts`));
     });
 
     it('all run playerRequest, on Node, within ten seconds', () => {

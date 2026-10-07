@@ -10,7 +10,7 @@
 
 import {nextOffset, offsetSample} from '@/lib/poker-night/client-clock';
 import {diffViews, type TableEvent} from '@/lib/poker-night/events';
-import type {EmoteView, PlayerView, RoomView, TableView, Unchanged, WireView} from '@/lib/poker-night/view-types';
+import type {EmoteView, MeView, PlayerView, RoomView, TableView, Unchanged, WireView} from '@/lib/poker-night/view-types';
 
 // An event with the moment (this browser's clock) the table saw it.
 export type RoomEvent = TableEvent & {seenAt: number};
@@ -21,6 +21,12 @@ export type FeedState = {
     view: PlayerView | null; // the viewer's own view, once they have joined
     preview: RoomView | null; // the page's public view, for a visitor who has not
     seq: number; // of the view held (the preview's until the first view)
+    // How far the viewer's own part — their cards, the config, the people — is known fresh: the last
+    // whole view's seq (a GET state, a move's answer, or an older one kept by graftPrivate), carried
+    // on by each realtime message that leaves it as it was (needsPrivate) while no move of the
+    // viewer's own is out. Below seq, the next GET state asks for the whole view again
+    // (since=privateSeq) instead of Unchanged, at the table's own pace (pollPace).
+    privateSeq: number;
     emoteSeq: number;
     knownSeq: number; // the highest seq any answer has named: above seq, a GET state is due
     knownEmoteSeq: number;
@@ -40,8 +46,10 @@ export type FeedInput =
     // A player view from any request (GET state, POST action, join or tick). at: when the answer
     // arrived; sentAt: when its request left (a clock sample); animate false snaps (a hidden tab).
     | {type: 'view'; view: PlayerView; at: number; sentAt?: number; animate?: boolean}
-    // The public part alone, from the realtime channel (P4).
-    | {type: 'wire'; wire: WireView; at: number; animate?: boolean}
+    // The public part alone, from the realtime channel (P4). moving: a move of the viewer's own is
+    // out, whose commit may change their own part where no message shows it (a pre-action), so the
+    // message does not count that part fresh — the move's answer brings it.
+    | {type: 'wire'; wire: WireView; at: number; animate?: boolean; moving?: boolean}
     | {type: 'unchanged'; body: Unchanged; at: number; sentAt?: number}
     | {type: 'failed'}
     // A visitor's page, rendered again (router.refresh): the public table as it is now.
@@ -63,7 +71,7 @@ export const initialFeed = (page: {view: PlayerView} | {preview: RoomView}): Fee
     const view = 'view' in page ? page.view : null;
     return {
         view, preview: 'preview' in page ? page.preview : null,
-        seq: base.seq, emoteSeq: view?.emoteSeq ?? 0, knownSeq: base.seq, knownEmoteSeq: view?.emoteSeq ?? 0,
+        seq: base.seq, privateSeq: base.seq, emoteSeq: view?.emoteSeq ?? 0, knownSeq: base.seq, knownEmoteSeq: view?.emoteSeq ?? 0,
         serverNow: base.serverNow, nextDueAt: base.nextDueAt, pass: view?.pass ?? null,
         offset: 0, samples: [],
         // The page's own emotes are history: only what arrives after it shows.
@@ -100,14 +108,49 @@ const diffOptions = (view: PlayerView) => ({mySeat: view.me.seat, bigBlind: view
 
 // The wire view laid over the viewer's own: the public table replaced, what only they may see —
 // their cards and pre-action, the config, the people, the emotes, the pass — kept until a GET
-// state brings it fresh (needsPrivate says when).
+// state brings it fresh (needsPrivate says when). What the message itself shows to be over is
+// dropped at once: a new hand's message leaves the last hand's cards out, and a pre-action goes
+// once the server has cleared it (ownPart).
 export const mergeWire = (view: PlayerView, wire: WireView): PlayerView => ({
     ...view,
+    me: ownPart(view, wire),
     v: wire.v, status: wire.status, closing: wire.closing, settings: wire.settings, configV: wire.configV, hostPid: wire.hostPid,
     handNo: wire.handNo, turn: wire.turn, nextHandAt: wire.nextHandAt, seats: wire.seats, hand: wire.hand, ledger: wire.ledger,
     requests: wire.requests, seq: wire.seq, serverNow: wire.serverNow, nextDueAt: wire.nextDueAt, code: wire.code,
     clockLeader: wire.clockLeader, peopleV: wire.peopleV, watchers: wire.watchers, realtimeOk: wire.realtimeOk,
 });
+
+// Whether the viewer's pre-action still stands after this message. Only its owner sets one (and
+// the move's own answer brings it), and the engine clears it when its owner acts, folds or leaves,
+// when the turn reaches them, when the street moves on and when the hand ends — every one of
+// which the public table shows.
+const preStands = (view: PlayerView, wire: WireView): boolean => {
+    const seat = view.me.seat;
+    const was = view.hand;
+    const now = wire.hand;
+    if (seat === null || !was || !now || now.no !== was.no || now.street !== was.street || now.phase !== 'betting' || now.actor === seat) return false;
+    const before = view.seats[seat];
+    const after = wire.seats[seat];
+    return !!before && !!after && after.pid === before.pid && after.state === before.state && after.acted === before.acted && after.bet === before.bet;
+};
+
+// The viewer's own part under a realtime message: the cards of the hand they were dealt, a
+// pre-action the server has not cleared, and whether they host (the message names the host).
+const ownPart = (view: PlayerView, wire: WireView): MeView => {
+    const sameHand = (wire.hand?.no ?? null) === (view.hand?.no ?? null);
+    const hole = sameHand ? view.me.hole : null;
+    const pre = view.me.pre !== null && preStands(view, wire) ? view.me.pre : null;
+    const isHost = wire.hostPid === view.me.pid;
+    return hole === view.me.hole && pre === view.me.pre && isHost === view.me.isHost ? view.me : {...view.me, hole, pre, isHost};
+};
+
+// A whole view older than the table held — the read a message asked for, overtaken by the next
+// message — still brings the viewer's own part when nothing between the two could have changed it:
+// the same hand, seat, config and people (needsPrivate, read from the older view to the held one).
+// Its own part is then laid under the held table as a message would be (mergeWire: the cards of the
+// same hand, a pre-action only while the seat is as it was); null when something could have.
+export const graftPrivate = (held: PlayerView, whole: PlayerView): PlayerView | null =>
+    whole.me.pid === held.me.pid && whole.seq < held.seq && !needsPrivate(whole, held) ? mergeWire(whole, held) : null;
 
 export const feedReducer = (state: FeedState, input: FeedInput): FeedState => {
     switch (input.type) {
@@ -129,16 +172,29 @@ export const feedReducer = (state: FeedState, input: FeedInput): FeedState => {
             const {view, at} = input;
             const clock = withSample(state, input.sentAt, at, view.serverNow);
             const pass = view.pass ?? state.pass;
-            // An answer no newer than the view held: only its clock sample and pass count.
-            if (state.view !== null && view.seq <= state.seq) {
-                return {...state, ...clock, pass, failures: 0, knownSeq: Math.max(state.knownSeq, view.seq)};
+            // An answer no newer than the view held: only its clock sample and pass count — unless it
+            // is the whole view of the table a realtime message already showed, whose private part
+            // (a new hand's cards, a seat, the config, the people) is what it was fetched for.
+            const freshens = view.seq === state.seq && state.privateSeq < view.seq;
+            if (state.view !== null && view.seq <= state.seq && !freshens) {
+                const kept = {...state, ...clock, pass, failures: 0, knownSeq: Math.max(state.knownSeq, view.seq)};
+                // Older still, yet newer than the own part held: that part, kept under the table held
+                // when nothing since could have changed it (graftPrivate) — else a read again.
+                const grafted = view.seq > state.privateSeq ? graftPrivate(state.view, view) : null;
+                if (grafted === null) return kept;
+                const events = input.animate === false ? [] : diffViews(state.view, grafted, diffOptions(grafted));
+                return {
+                    ...kept, ...withEvents(state, events, at), view: grafted, privateSeq: state.seq,
+                    emotes: mergeEmotes(state.emotes, view.emotes, state.emoteFloor),
+                    emoteSeq: Math.max(state.emoteSeq, view.emoteSeq), knownEmoteSeq: Math.max(state.knownEmoteSeq, view.emoteSeq),
+                };
             }
             const prev: (TableView & {seq: number; serverNow: number}) | null = state.view ?? state.preview;
             const events = input.animate === false ? [] : diffViews(prev, view, diffOptions(view));
             const emotes = mergeEmotes(state.emotes, view.emotes, state.emoteFloor);
             return {
                 ...state, ...clock, ...withEvents(state, events, at),
-                view, preview: null, seq: view.seq, emoteSeq: Math.max(state.emoteSeq, view.emoteSeq),
+                view, preview: null, seq: view.seq, privateSeq: view.seq, emoteSeq: Math.max(state.emoteSeq, view.emoteSeq),
                 knownSeq: Math.max(state.knownSeq, view.seq), knownEmoteSeq: Math.max(state.knownEmoteSeq, view.emoteSeq),
                 serverNow: view.serverNow, nextDueAt: view.nextDueAt, pass, emotes, failures: 0,
             };
@@ -165,7 +221,14 @@ export const feedReducer = (state: FeedState, input: FeedInput): FeedState => {
             if (state.view === null || wire.seq <= state.seq) return knownSeq === state.knownSeq ? state : {...state, knownSeq};
             const view = mergeWire(state.view, wire);
             const events = input.animate === false ? [] : diffViews(state.view, view, diffOptions(view));
-            return {...state, ...withEvents(state, events, at), view, seq: wire.seq, knownSeq, serverNow: wire.serverNow, nextDueAt: wire.nextDueAt};
+            // The viewer's own part stays as fresh as the message when nothing in it says otherwise
+            // (what moved, mergeWire worked out) and no move of theirs is out; else it waits for the
+            // whole view.
+            const carried = input.moving !== true && state.privateSeq === state.seq && !needsPrivate(state.view, wire);
+            const privateSeq = carried ? wire.seq : state.privateSeq;
+            return {
+                ...state, ...withEvents(state, events, at), view, seq: wire.seq, privateSeq, knownSeq, serverNow: wire.serverNow, nextDueAt: wire.nextDueAt,
+            };
         }
     }
 };
@@ -230,6 +293,22 @@ export const nextPollDelay = ({mode, hidden, inHand, nearTurn: near, failures, s
     else delay = 4000;
     return Math.max(delay, Number.isFinite(scale) ? scale : 0);
 };
+
+// The pace the poll keeps under a transport: over a healthy channel only the safety poll, unless the
+// viewer's own part is stale (its read failed, or came back older than a message and could not be
+// kept), which the table's own pace reads again; else the table's own pace.
+export const pollPace = (transport: Transport, state: Pick<FeedState, 'seq' | 'privateSeq'>): FeedMode =>
+    transport === 'realtime' && state.privateSeq >= state.seq ? 'realtime' : 'polling';
+
+// Whether a GET state's answer calls for another at once: one was asked for while it was out, an
+// answer named a newer seq or emote seq, or a whole view came back older than the messages with its
+// own part not kept (graftPrivate) — the next read is the whole view at the head. An Unchanged says
+// the server had nothing past what was asked, so the pace reads again, not a loop.
+export const readAgain = ({again, whole, state}: {
+    again: boolean;
+    whole: boolean;
+    state: Pick<FeedState, 'seq' | 'privateSeq' | 'emoteSeq' | 'knownSeq' | 'knownEmoteSeq'>;
+}): boolean => again || isBehind(state) || (whole && state.privateSeq < state.seq);
 
 // ── the clock ──
 
@@ -432,7 +511,7 @@ export const createTicker = (io: TickerIo): Ticker => {
     };
 };
 
-// ── the transport (P4 runs the realtime side; polling never needs it) ──
+// ── the transport (realtime where the deployment has it; polling never needs it) ──
 
 export type AblyState = 'initialized' | 'connecting' | 'connected' | 'disconnected' | 'suspended' | 'failed' | 'closing' | 'closed';
 export type Transport = 'realtime' | 'poll' | 'both';
@@ -441,6 +520,19 @@ export type Transport = 'realtime' | 'poll' | 'both';
 export const BOTH_FOR_MS = 5 * 60_000;
 export const CONNECT_GRACE_MS = 8000;
 export const DISCONNECT_GRACE_MS = 10_000;
+
+// A first token that does not come is asked for again (components/poker-night/realtime-client):
+// after TOKEN_RETRY_MS while the refusal is one that passes (a dropped connection, a busy room, the
+// token counter), then every TOKEN_RETRY_LATER_MS for as long as the page is open — never given up,
+// so a table that missed its first token goes live once the route answers again. From the first
+// long wait (tokenRetryLate) the link reports 'failed', and both transports run until it connects.
+export const TOKEN_RETRY_MS = [5000, 15_000, 45_000] as const;
+export const TOKEN_RETRY_LATER_MS = BOTH_FOR_MS;
+
+export const tokenRetryLate = (attempt: number, transient: boolean): boolean => !transient || attempt >= TOKEN_RETRY_MS.length;
+
+export const tokenRetryDelay = (attempt: number, transient: boolean): number =>
+    tokenRetryLate(attempt, transient) ? TOKEN_RETRY_LATER_MS : TOKEN_RETRY_MS[attempt] ?? TOKEN_RETRY_LATER_MS;
 
 // Which transport to trust now. Without realtime, polling. With it, realtime while it is connected
 // or still within its grace; both (polls as a safety net) once it has not connected within 8 s, has
@@ -453,6 +545,11 @@ export const transportPolicy = ({realtime, ablyState, msInState, watchdog}: {rea
     return 'realtime';
 };
 
+// The watchdog's limits: an answer ahead of the channel this long, or nothing on it this long past a
+// due time, during a live hand.
+export const AHEAD_GRACE_MS = 3000;
+export const SILENCE_GRACE_MS = 5000;
+
 export type WatchdogInput = {
     now: number; // server time
     realtimeOk: boolean; // the latest answer's: a publish failed on the server lately
@@ -460,16 +557,117 @@ export type WatchdogInput = {
     responseAheadSince: number | null; // since when a response's seq has been above the last realtime one
     lastMessageAt: number | null; // the last realtime message (server time)
     nextDueAt: number | null;
+    // Since when (server time) the channel has been connected; the silence counts only for a due
+    // time it was connected for. Left out: connected all along.
+    connectedAt?: number | null;
 };
 
 // Whether realtime looks stalled: the server says its publishes fail, or during a live hand an
 // answer has been ahead of the channel for over 3 s, or nothing came 5 s past a due time.
-export const watchdogTripped = ({now, realtimeOk, liveHand, responseAheadSince, lastMessageAt, nextDueAt}: WatchdogInput): boolean => {
+export const watchdogTripped = ({now, realtimeOk, liveHand, responseAheadSince, lastMessageAt, nextDueAt, connectedAt}: WatchdogInput): boolean => {
     if (!realtimeOk) return true;
     if (!liveHand) return false;
-    if (responseAheadSince !== null && now - responseAheadSince > 3000) return true;
-    return nextDueAt !== null && now > nextDueAt + 5000 && (lastMessageAt === null || lastMessageAt < nextDueAt);
+    if (responseAheadSince !== null && now - responseAheadSince > AHEAD_GRACE_MS) return true;
+    if (nextDueAt === null || (connectedAt !== undefined && (connectedAt === null || connectedAt > nextDueAt))) return false;
+    return now > nextDueAt + SILENCE_GRACE_MS && (lastMessageAt === null || lastMessageAt < nextDueAt);
 };
+
+// ── the realtime monitor ──
+//
+// What the browser knows about its channel, as a pure step (monitorStep) the hook feeds — the
+// connection's states, each message, each answer to a request, the read after an attach, and a
+// check once a second — and what it says (transportOf): realtime alone while the channel is
+// healthy; both (polls beside it) for BOTH_FOR_MS once anything in transportPolicy or the watchdog
+// says otherwise, counted again from the last time it did; polling alone without realtime.
+//
+// "Ahead" compares the answers with the channel: an answer whose seq the channel has not delivered
+// yet is normal for a moment (a player's own move is answered before the publish that follows it),
+// stalled after AHEAD_GRACE_MS. Only what the channel could have carried counts: the read that
+// follows each attach sets the baseline (the channel need not repeat what came before it), and an
+// answer counts only while connected.
+
+export type RealtimeMonitor = {
+    on: boolean; // this table goes live (the page said so, or the QA's relay is there)
+    ablyState: AblyState;
+    since: number; // browser time ablyState began
+    connectedAt: number | null; // server time the channel connected, null while it is not
+    bothUntil: number; // browser time: polls run beside the channel until then
+    wireSeq: number; // the newest seq the channel delivered, or the baseline
+    answerSeq: number; // the newest seq an answer named
+    aheadSince: number | null; // server time since an answer has been ahead of the channel
+    lastMessageAt: number | null; // server time of the last message
+    realtimeOk: boolean; // the latest answer's or message's word on the server's publishes
+};
+
+// realtimeOk: the word of the view the page holds when the monitor starts, so a page opened inside a
+// failure window runs both from the start.
+export const initialMonitor = (on: boolean, at: number, realtimeOk = true): RealtimeMonitor => ({
+    on, ablyState: 'initialized', since: at, connectedAt: null, bothUntil: on && !realtimeOk ? at + BOTH_FOR_MS : 0, wireSeq: 0, answerSeq: 0,
+    aheadSince: null, lastMessageAt: null, realtimeOk,
+});
+
+export type MonitorInput =
+    // The server says this table has no realtime (GET token): poll.
+    | {type: 'off'}
+    | {type: 'connection'; state: AblyState; at: number; serverNow: number}
+    // The read after an attach: what it held (seq) the channel need not deliver.
+    | {type: 'baseline'; seq: number}
+    // A message, with its word on the publishes (the wire view's realtimeOk, as of its commit).
+    | {type: 'message'; seq: number; realtimeOk: boolean; at: number; serverNow: number}
+    // An answer to a request: a view's realtimeOk or an Unchanged's (read from the head); null from
+    // an answer that does not carry one (an older server's Unchanged, during a rollout).
+    | {type: 'answer'; seq: number; realtimeOk: boolean | null; at: number; serverNow: number}
+    | {type: 'check'; at: number; serverNow: number; liveHand: boolean; nextDueAt: number | null};
+
+const caughtUp = (m: RealtimeMonitor): RealtimeMonitor => (m.aheadSince !== null && m.wireSeq >= m.answerSeq ? {...m, aheadSince: null} : m);
+
+export const monitorStep = (m: RealtimeMonitor, input: MonitorInput): RealtimeMonitor => {
+    switch (input.type) {
+        case 'off':
+            return m.on ? {...m, on: false} : m;
+        case 'connection': {
+            if (input.state === m.ablyState) return m;
+            const connected = input.state === 'connected';
+            // A new connection counts afresh: what was ahead before it is the next read's to settle.
+            return {...m, ablyState: input.state, since: input.at, connectedAt: connected ? input.serverNow : null, aheadSince: null};
+        }
+        case 'baseline':
+            return caughtUp({...m, wireSeq: Math.max(m.wireSeq, input.seq)});
+        case 'message': {
+            // Only the newest message's word counts (a late one says what was); one saying the
+            // publishes fail trips at once, as an answer does.
+            const newest = input.seq >= m.wireSeq;
+            const next = caughtUp({
+                ...m, wireSeq: Math.max(m.wireSeq, input.seq), lastMessageAt: input.serverNow, realtimeOk: newest ? input.realtimeOk : m.realtimeOk,
+            });
+            return m.on && newest && !input.realtimeOk ? {...next, bothUntil: input.at + BOTH_FOR_MS} : next;
+        }
+        case 'answer': {
+            const answerSeq = Math.max(m.answerSeq, input.seq);
+            const realtimeOk = input.realtimeOk ?? m.realtimeOk;
+            const ahead = m.on && m.ablyState === 'connected' && answerSeq > m.wireSeq;
+            const next = {...m, answerSeq, realtimeOk, aheadSince: ahead ? (m.aheadSince ?? input.serverNow) : m.aheadSince};
+            // The server says its publishes fail: both at once, without waiting for a check.
+            return m.on && input.realtimeOk === false ? {...next, bothUntil: input.at + BOTH_FOR_MS} : caughtUp(next);
+        }
+        case 'check': {
+            if (!m.on) return m;
+            const raw = transportPolicy({realtime: true, ablyState: m.ablyState, msInState: input.at - m.since, watchdog: false});
+            const stalled = !m.realtimeOk || (m.ablyState === 'connected' && watchdogTripped({
+                now: input.serverNow, realtimeOk: m.realtimeOk, liveHand: input.liveHand, responseAheadSince: m.aheadSince,
+                lastMessageAt: m.lastMessageAt, nextDueAt: input.nextDueAt, connectedAt: m.connectedAt,
+            }));
+            return raw === 'both' || stalled ? {...m, bothUntil: input.at + BOTH_FOR_MS} : m;
+        }
+    }
+};
+
+// The transport the monitor says to run now (browser time).
+export const transportOf = (m: RealtimeMonitor, at: number): Transport =>
+    m.on ? transportPolicy({realtime: true, ablyState: m.ablyState, msInState: at - m.since, watchdog: at < m.bothUntil}) : 'poll';
+
+// Whether the table is live: realtime alone, over a connected channel.
+export const monitorLive = (m: RealtimeMonitor, at: number): boolean => m.ablyState === 'connected' && transportOf(m, at) === 'realtime';
 
 // ── the seat pass ──
 

@@ -3,16 +3,17 @@
 // commit writes exactly the fields mutateRoom owns — never seen, the emotes or the other
 // out-of-band fields — and drops only the presence stamps of rows a join pruned; the head carries
 // who may ask and nothing else; a state from a newer deploy is told apart from a broken one; the
-// player's view of a read room leaks nothing; and a server room is not something a route can send.
+// player's view of a read room leaks nothing, nor does the wire view the channel carries; and a
+// server room is not something a route can send.
 
 import {describe, expect, expectTypeOf, it} from 'vitest';
 import {STATE_VERSION, TIMING} from '@/lib/poker-night/config';
 import type {JoinInput} from '@/lib/poker-night/input';
 import {LIMITS} from '@/lib/poker-night/limits';
-import {clockStep, joinStep, newRoom, tableStep, type KnownIdentity, type RoomCore, type StepResult} from '@/lib/poker-night/room';
+import {clockStep, joinStep, newRoom, tableStep, wireOf, type KnownIdentity, type RoomCore, type StepResult} from '@/lib/poker-night/room';
 import {
-    casUpdate, commitFields, coreFromDoc, emotesSince, headFromDoc, ms, newRoomDoc, playerViewOf, realtimeOkAt, seenFrom, serverRoomFromDoc,
-    unchangedOf, unchangedOfRoom, unreadableCloseUpdate, unreadableKind, unreadRefusal, type RoomDocLean, type ServerRoom,
+    casUpdate, commitFields, coreFromDoc, emotesSince, HEAD_PROJECTION, headFromDoc, ms, newRoomDoc, playerViewOf, realtimeOkAt, seenFrom, serverRoomFromDoc,
+    unchangedOf, unchangedOfRoom, unreadableCloseUpdate, unreadableKind, unreadRefusal, wireOfRoom, type RoomDocLean, type ServerRoom,
 } from '@/lib/poker-night/room-doc';
 import {FULL_DECK} from '@/lib/poker-night/deck';
 import type {DeckSource} from '@/lib/poker-night/types';
@@ -134,12 +135,15 @@ describe('the head', () => {
         const core = room();
         const doc = asRead(newRoomDoc(core, T0), {seq: 4, emoteSeq: 2, nextDueAt: new Date(T0 + 3000), bannedKeys: ['g:x']});
         expect(headFromDoc(doc)).toEqual({
-            id: ROOM_ID, seq: 4, emoteSeq: 2, nextDueAt: T0 + 3000, status: 'open', bannedKeys: ['g:x'],
+            id: ROOM_ID, seq: 4, emoteSeq: 2, nextDueAt: T0 + 3000, status: 'open', bannedKeys: ['g:x'], realtimeFailAt: null,
             players: [
                 {pid: HOST, userId: 'u-host', guestId: null, banned: false},
                 {pid: ANA, userId: null, guestId: 'ana'.padEnd(22, 'x'), banned: false},
             ],
         });
+        // The last failed publish too, so an Unchanged answered from the head alone says realtimeOk.
+        expect(headFromDoc(asRead(newRoomDoc(core, T0), {seq: 4, rt: {failAt: new Date(T0 - 1000), fails: 1}})).realtimeFailAt).toBe(T0 - 1000);
+        expect(HEAD_PROJECTION).toHaveProperty(['rt.failAt'], 1);
     });
 });
 
@@ -160,14 +164,19 @@ describe('a room the server read', () => {
     it('answers a poll with nothing new from the head or the room, emotes after the client\'s only', () => {
         expect(emotesSince([emote(1), emote(2), emote(3)], 1)).toEqual([emote(2), emote(3)]);
         expect(emotesSince([emote(1)], null)).toEqual([emote(1)]);
-        expect(unchangedOf({seq: 3, emoteSeq: 1, nextDueAt: null}, T0, [], 'pass')).toEqual({
-            unchanged: true, seq: 3, emoteSeq: 1, serverNow: T0, nextDueAt: null, emotes: [], pass: 'pass',
+        expect(unchangedOf({seq: 3, emoteSeq: 1, nextDueAt: null, realtimeFailAt: null}, T0, [], 'pass')).toEqual({
+            unchanged: true, seq: 3, emoteSeq: 1, serverNow: T0, nextDueAt: null, emotes: [], pass: 'pass', realtimeOk: true,
         });
+        // Like a view, an Unchanged says whether a publish failed within the window (rt moves no seq).
+        expect(unchangedOf({seq: 3, emoteSeq: 1, nextDueAt: null, realtimeFailAt: T0 - 1000}, T0, [], null).realtimeOk).toBe(false);
+        expect(unchangedOf({seq: 3, emoteSeq: 1, nextDueAt: null, realtimeFailAt: T0 - LIMITS.realtimeFailWindowMs}, T0, [], null).realtimeOk).toBe(true);
         const core = okStep(tableStep({type: 'host', by: HOST, op: {op: 'start'}})(room(), T0)).core;
         const read = serverRoomFromDoc(asRead(newRoomDoc(core, T0), {seq: 5, emotes: [emote(1), emote(2)], emoteSeq: 2}), core, T0 + 50);
         expect(unchangedOfRoom(read, 1, null)).toEqual({
-            unchanged: true, seq: 5, emoteSeq: 2, serverNow: T0 + 50, nextDueAt: core.state.nextHandAt, emotes: [emote(2)], pass: null,
+            unchanged: true, seq: 5, emoteSeq: 2, serverNow: T0 + 50, nextDueAt: core.state.nextHandAt, emotes: [emote(2)], pass: null, realtimeOk: true,
         });
+        const failing = serverRoomFromDoc(asRead(newRoomDoc(core, T0), {seq: 5, rt: {failAt: new Date(T0), fails: 1}}), core, T0 + 50);
+        expect(unchangedOfRoom(failing, 1, null).realtimeOk).toBe(false);
     });
 
     it('gives a player their own view, with nothing private in it', () => {
@@ -181,6 +190,19 @@ describe('a room the server read', () => {
         const hostHole = core.state.hand!.seats.find((p) => p.pid === HOST)!.hole;
         expect(view.seats.find((s) => s?.pid === HOST)!.cards).toBe('hidden');
         expect(view.me.hole).not.toEqual(hostHole);
+    });
+
+    it('publishes the public table at the read\'s seq and time: no people, no viewer, no hole', () => {
+        let core = okStep(tableStep({type: 'host', by: HOST, op: {op: 'start'}})(room(), T0)).core;
+        core = okStep(clockStep(SOURCE)(core, core.state.nextHandAt!)).core;
+        const read = serverRoomFromDoc(asRead(newRoomDoc(core, T0), {seq: 7, rt: {failAt: new Date(T0), fails: 1}}), core, T0 + 30);
+        const wire = wireOfRoom(read);
+        expect(wire).toEqual(wireOf(core, 7, T0 + 30, {realtimeOk: false}));
+        expect(wire).toMatchObject({seq: 7, serverNow: T0 + 30, realtimeOk: false, code: 'K7QXM4'});
+        for (const key of ['people', 'removed', 'me', 'config', 'emotes', 'pass']) expect(wire, key).not.toHaveProperty(key);
+        const json = JSON.stringify(wire);
+        for (const word of ['deck', 'userId', 'guestId', ROOM_ID]) expect(json).not.toContain(word);
+        for (const p of core.state.hand!.seats) expect(json).not.toContain(JSON.stringify(p.hole));
     });
 
     it('is not something a route can send', () => {

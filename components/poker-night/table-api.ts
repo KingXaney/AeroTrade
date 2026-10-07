@@ -8,7 +8,7 @@
 
 import {isErrorCode, PASS_HEADER, PN_PROTOCOL, PROTOCOL_HEADER, type PokerNightErrorCode} from "@/lib/poker-night/http";
 import type {ActionInput, JoinBody as JoinInputBody, TickInput} from "@/lib/poker-night/input";
-import type {DetailView, JoinReply, PlayerView, Unchanged} from "@/lib/poker-night/view-types";
+import type {DetailView, JoinReply, PlayerView, TokenReply, Unchanged} from "@/lib/poker-night/view-types";
 
 export type ApiResult<T> =
     | {ok: true; body: T; status: number; sentAt: number; receivedAt: number}
@@ -65,6 +65,10 @@ export const getDetail = (code: string, q: DetailQuery, opts: Options = {}) => {
     if (q.part === 'history' && q.before !== undefined && q.before !== null) params.set('before', String(q.before));
     return request<DetailView>(`${base(code)}/detail?${params.toString()}`, {method: 'GET', ...opts});
 };
+
+// GET token: the room's realtime channel and a subscribe-only Ably token for it, or {realtime:
+// false} when this deployment polls.
+export const getToken = (code: string, opts: Options = {}) => request<TokenReply>(`${base(code)}/token`, {method: 'GET', ...opts});
 
 // POST join: the identity is always read in full (no pass).
 export const postJoin = (code: string, body: JoinInputBody, opts: Pick<Options, 'signal'> = {}) =>

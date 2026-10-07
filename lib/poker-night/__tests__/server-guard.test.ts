@@ -7,7 +7,8 @@
 // follows the imports: every '@/…' and relative import, re-export and import() through the .ts and
 // .tsx files they name. A type-only import is erased and is not followed; a 'use server' module is
 // a boundary the browser only calls across, so the walk stops there. A module named here that does
-// not exist yet simply never matches.
+// not exist yet simply never matches. Ably is split the same way: the browser reaches only
+// 'ably/modular', by a dynamic import, and no server module does.
 
 import {describe, expect, it} from 'vitest';
 import {existsSync, readdirSync, readFileSync, statSync} from 'node:fs';
@@ -133,6 +134,24 @@ describe('poker night keeps its server side off the browser', () => {
         expect(reach(table, ['@/lib/actions/'])).toEqual([]);
         // …while the lobby does, so the walk is known to see one.
         expect(reach([join(root, 'components/poker-night/lobby/QuickStart.tsx')], ['@/lib/actions/']).length).toBeGreaterThan(0);
+    });
+
+    // Ably: the browser takes only the modular build (BaseRealtime and the two plugins it uses), and
+    // only through a dynamic import, so the full SDK — and the server's key path — never reach a page;
+    // the server takes only the full package (Ably.Rest in lib/poker-night/realtime).
+    it('keeps the browser on ably/modular and the server off it', () => {
+        const ablyFromBrowser = reach(roots, ['ably', 'ably/']);
+        expect(ablyFromBrowser.filter((chain) => !chain.endsWith('→ ably/modular'))).toEqual([]);
+        // The walk sees the one place the browser takes it.
+        expect(ablyFromBrowser.some((chain) => chain.startsWith('components/poker-night/realtime-client.ts'))).toBe(true);
+        const server = files.filter((file) => !isClient(file) && !repoPath(file).startsWith('components/'));
+        const modularOnServer = server.filter((file) => runtimeImports(readFileSync(file, 'utf8')).some((spec) => spec === 'ably/modular'));
+        expect(modularOnServer.map(repoPath)).toEqual([]);
+        expect(runtimeImports(readFileSync(join(root, 'lib/poker-night/realtime.ts'), 'utf8'))).toContain('ably');
+        // In the browser, only as a chunk loaded on demand: never a static import.
+        const client = readFileSync(join(root, 'components/poker-night/realtime-client.ts'), 'utf8');
+        expect(withoutComments(client)).not.toMatch(/\bimport\s+(?!type\s)[^;]*\bfrom\s*['"]ably/);
+        expect(withoutComments(client)).toMatch(/\bimport\(\s*['"]ably\/modular['"]\s*\)/);
     });
 
     it('reads the imports a bundler follows, and skips the ones it erases', () => {
