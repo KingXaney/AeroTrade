@@ -55,7 +55,7 @@ try {
     check('Portfolio shows Overview and Activity, Overview current', tabs.join(',') === '/portfolio*,/history', tabs.join(','));
     await page.goto(`${BASE}/learn`, {waitUntil: 'load'});
     const learnTabs = await page.$$eval('[data-section-tabs="learn"] a', (as) => as.map((a) => `${a.getAttribute('href')}${a.getAttribute('aria-current') === 'page' ? '*' : ''}`));
-    check('Learn shows Learn, Games and the Poker solver, Learn current', learnTabs.join(',') === '/learn*,/games,/poker', learnTabs.join(','));
+    check('Learn shows Learn, Games, the Poker solver and Poker night, Learn current', learnTabs.join(',') === '/learn*,/games,/poker,/poker-night', learnTabs.join(','));
     await page.goto(`${BASE}/trade`, {waitUntil: 'load'});
     check('a section of one page shows no tabs', await page.locator('[data-section-tabs]').count() === 0);
     await page.goto(`${BASE}/stocks/SPY`, {waitUntil: 'load'});

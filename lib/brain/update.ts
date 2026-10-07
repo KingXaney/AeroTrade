@@ -15,11 +15,14 @@ import {
     type Mention,
 } from "@/lib/brain/decay";
 import {buildDisplayName} from "@/lib/brain/extraction";
-import {ENTITY_EPSILON} from "@/lib/brain/config";
+import {ENTITY_EPSILON, SENTIMENT_SHARE_BY_NATURE, type Nature} from "@/lib/brain/config";
 import {getEasternDateString} from "@/lib/dates";
 
 export type ArticleFold = {
     importance: number;
+    // How the piece is written (config NATURES); absent on a fold from before the label, which
+    // reads as reported.
+    nature?: Nature;
     entities: {key: string; type: 'ticker' | 'sector' | 'theme'; sentiment: number; relevance: number}[];
 };
 
@@ -60,7 +63,7 @@ export const foldExtractionsIntoBrain = async (
     for (const article of articles) {
         for (const entity of article.entities) {
             const entry = mentionsByKey.get(entity.key) ?? {type: entity.type, mentions: [], coMentions: new Map<string, number>()};
-            entry.mentions.push({sentiment: entity.sentiment, importance: article.importance, relevance: entity.relevance});
+            entry.mentions.push({sentiment: entity.sentiment, importance: article.importance, relevance: entity.relevance, sentimentShare: SENTIMENT_SHARE_BY_NATURE[article.nature ?? 'reported']});
             for (const other of article.entities) {
                 if (other.key === entity.key) continue;
                 // Symmetric link mass: min importance is shared, relevance product scales it.

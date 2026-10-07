@@ -5,7 +5,7 @@
 import {connectToDatabase} from "@/database/mongoose";
 import UserPreferencesModel from "@/database/models/user-preferences.model";
 
-type UnsettablePreference = 'appearance' | 'dashboardLayout' | 'newsFeed' | 'followedStrategies' | 'learn';
+type UnsettablePreference = 'appearance' | 'dashboardLayout' | 'newsFeed' | 'followedStrategies' | 'learn' | 'pokerNight';
 
 // Two first-time upserts (theme + layout saved together) can race on the unique userId
 // index; the second attempt finds the document and updates it.

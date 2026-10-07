@@ -31,6 +31,9 @@ const eslintConfig = defineConfig([
   globalIgnores([
     // Default ignores of eslint-config-next:
     ".next/**",
+    // Claude Code's git worktrees live under .claude/worktrees, each with a build output of its
+    // own; a sibling session's tree is never this tree's lint target.
+    ".claude/**",
     "out/**",
     "build/**",
     "next-env.d.ts",

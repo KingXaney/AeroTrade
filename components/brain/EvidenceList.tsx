@@ -5,7 +5,7 @@ import TradeLink from "@/components/trading/TradeLink";
 import Badge from "@/components/primitives/Badge";
 import Term from "@/components/primitives/Term";
 import WhatTheseMean from "@/components/learn/WhatTheseMean";
-import {eventBadge, eventTermsShown} from "@/lib/brain/event-types";
+import {eventBadge, eventTermsShown, natureBadge, natureTermsShown} from "@/lib/brain/event-types";
 import {BRAIN_COPY} from "@/lib/learn/copy/brain";
 import {rowCard} from "@/components/primitives/RowCard";
 
@@ -23,6 +23,9 @@ type EvidenceItem = {
     relevance: number;
     // The extractor's label for the kind of event the article covers; 'other' shows no badge.
     eventType: string | null;
+    // How the piece is written: a company statement, an opinion piece or a rumour gets a badge;
+    // 'reported', and a row tagged before the label, none.
+    nature: string | null;
 };
 
 // The row's event badge, its definition as the title (the panel's disclosure below is the
@@ -33,6 +36,16 @@ const EventBadge = ({eventType}: {eventType: string | null}) => {
     return (
         <Term k={badge.term} className="no-underline">
             <Badge>{badge.label}</Badge>
+        </Term>
+    );
+};
+
+const NatureBadge = ({nature}: {nature: string | null}) => {
+    const badge = natureBadge(nature);
+    if (!badge) return null;
+    return (
+        <Term k={badge.term} className="no-underline">
+            <Badge variant="outline">{badge.label}</Badge>
         </Term>
     );
 };
@@ -68,6 +81,7 @@ const EvidenceList = ({entityKey, items}: {entityKey: string; items: EvidenceIte
                         </div>
                         <div className="flex flex-wrap items-center gap-2 text-[11px] text-fg-muted mt-1 font-mono">
                             <EventBadge eventType={item.eventType} />
+                            <NatureBadge nature={item.nature} />
                             <span>{item.source} · {formatTimeAgoSeconds(item.datetime)}</span>
                             {item.sourceType === 'reddit' && <span className="text-negative">community sentiment</span>}
                         </div>
@@ -76,7 +90,7 @@ const EvidenceList = ({entityKey, items}: {entityKey: string; items: EvidenceIte
             </div>
         )}
         {/* One disclosure per panel, listing only the labels on screen. */}
-        <WhatTheseMean keys={eventTermsShown(items.map((item) => item.eventType))} label={BRAIN_COPY.labelsSummary} />
+        <WhatTheseMean keys={[...eventTermsShown(items.map((item) => item.eventType)), ...natureTermsShown(items.map((item) => item.nature))]} label={BRAIN_COPY.labelsSummary} />
     </div>
 );
 

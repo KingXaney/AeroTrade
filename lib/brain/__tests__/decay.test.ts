@@ -114,6 +114,22 @@ describe("foldMentions", () => {
         const e = baseEntity();
         expect(foldMentions(e, [])).toEqual(e);
     });
+
+    it("lets a mention's sentimentShare scale its tone only: attention still counts in full", () => {
+        const e = baseEntity();
+        const mentions: Mention[] = [
+            {sentiment: 1, importance: 0.5, relevance: 0.8, sentimentShare: 0.5},
+            {sentiment: -1, importance: 0.3, relevance: 1, sentimentShare: 0},
+            {sentiment: 0.5, importance: 0.2, relevance: 1},
+        ];
+        const weightAdd = 0.5 * 0.8 + 0.3 * 1 + 0.2 * 1;
+        const sentimentAdd = 1 * (0.5 * 0.8) * 0.5 + 0 + 0.5 * (0.2 * 1);
+        const folded = foldMentions(e, mentions);
+        expect(folded.weightSlow).toBeCloseTo(e.weightSlow + weightAdd, FLOAT_PRECISION);
+        expect(folded.weightFast).toBeCloseTo(e.weightFast + weightAdd, FLOAT_PRECISION);
+        expect(folded.sentimentSumSlow).toBeCloseTo(e.sentimentSumSlow + sentimentAdd, FLOAT_PRECISION);
+        expect(folded.sentimentSumFast).toBeCloseTo(e.sentimentSumFast + sentimentAdd, FLOAT_PRECISION);
+    });
 });
 
 describe("foldLink", () => {

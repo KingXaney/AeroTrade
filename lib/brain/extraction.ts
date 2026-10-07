@@ -4,12 +4,16 @@
 // whitelist, theme key convergence, bounded scores).
 
 import {z} from "zod";
-import {EXTRACTION_BATCH_SIZE, REDDIT_IMPORTANCE_CAP, SECTOR_KEY_PREFIX, SECTOR_SLUGS} from "@/lib/brain/config";
+import {EXTRACTION_BATCH_SIZE, NATURES, REDDIT_IMPORTANCE_CAP, SECTOR_KEY_PREFIX, SECTOR_SLUGS, TAKE_IMPORTANCE_CAP, type Nature} from "@/lib/brain/config";
+import {sourceTrust} from "@/lib/brain/trust";
 
 export const ExtractionBatchSchema = z.object({
     articles: z.array(z.object({
         id: z.string(),
         eventType: z.enum(["earnings", "guidance", "mna", "product", "macro", "regulatory", "analyst", "legal", "other"]),
+        // How the piece is written (lib/brain/config NATURES). Left out by an older model answer,
+        // it reads as reported, which changes nothing.
+        nature: z.enum(NATURES).default("reported"),
         importance: z.number().min(0).max(1),
         entities: z.array(z.object({
             key: z.string().max(60),
@@ -22,7 +26,9 @@ export const ExtractionBatchSchema = z.object({
 
 export type ExtractionBatch = z.infer<typeof ExtractionBatchSchema>;
 export type ExtractedEntity = {key: string; type: "ticker" | "sector" | "theme"; sentiment: number; relevance: number};
-type SanitizedExtraction = {id: string; eventType: ExtractionBatch["articles"][number]["eventType"]; importance: number; entities: ExtractedEntity[]};
+type SanitizedExtraction = {id: string; eventType: ExtractionBatch["articles"][number]["eventType"]; nature: Nature; importance: number; entities: ExtractedEntity[]};
+// Where a piece came from, for lib/brain/trust: the stored outlet name and the article's URL.
+export type ArticleOutlet = {source: string; url?: string};
 
 const TICKER_KEY_PATTERN = /^[A-Z.]{1,5}$/;
 const THEME_MAX_WORDS = 3;
@@ -100,6 +106,7 @@ export const sanitizeExtraction = (
     article: ExtractionBatch["articles"][number],
     sourceType: string,
     activeThemes: string[],
+    outlet: ArticleOutlet = {source: ""},
 ): SanitizedExtraction => {
     const seenKeys = new Set<string>();
     const entities: ExtractedEntity[] = [];
@@ -116,11 +123,16 @@ export const sanitizeExtraction = (
             relevance: clamp(entity.relevance, RELEVANCE_MIN, RELEVANCE_MAX),
         });
     }
-    // Reddit chatter systematically overstates importance, so it is capped post-parse.
-    const importance = sourceType === REDDIT_SOURCE_TYPE
-        ? Math.min(article.importance, REDDIT_IMPORTANCE_CAP)
-        : article.importance;
-    return {id: article.id, eventType: article.eventType, importance, entities};
+    // The outlet speaks first: a press-release wire settles the nature, a commentary outlet
+    // weighs a share of the importance. Then the clamps — Reddit chatter systematically
+    // overstates importance, and a take (an opinion piece or a rumour) counts at most
+    // TAKE_IMPORTANCE_CAP, however the model rated it. A clamp only ever lowers a weight.
+    const trust = sourceTrust(outlet.source, outlet.url);
+    const nature = trust.nature ?? article.nature;
+    let importance = article.importance * trust.importanceShare;
+    if (sourceType === REDDIT_SOURCE_TYPE) importance = Math.min(importance, REDDIT_IMPORTANCE_CAP);
+    if (nature === "opinion" || nature === "rumour") importance = Math.min(importance, TAKE_IMPORTANCE_CAP);
+    return {id: article.id, eventType: article.eventType, nature, importance, entities};
 };
 
 export const buildDisplayName = (finalKey: string, type: "ticker" | "sector" | "theme"): string => {

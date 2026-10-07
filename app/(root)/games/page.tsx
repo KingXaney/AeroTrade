@@ -3,6 +3,7 @@ import Link from "next/link";
 import {requireUserId} from "@/lib/auth/session";
 import {getDailyPuzzleCard, getPuzzleArchive, readGameSummary} from "@/lib/games/store";
 import {ARCHIVE_COPY, ARITHMETIC_COPY, CORRELATION_COPY, GAMES_COPY, KELLY_COPY, MARKET_COPY} from "@/lib/learn/copy/games";
+import {POKER_NIGHT_COPY} from "@/lib/learn/copy/poker-night";
 import DailyPuzzleCard from "@/components/games/DailyPuzzleCard";
 import GameCard from "@/components/games/GameCard";
 import StreakPanel from "@/components/games/StreakPanel";
@@ -62,6 +63,9 @@ const GamesPage = async () => {
                           stats={[recordStat(MARKET_COPY.recordLabel, market.record, MARKET_COPY.signed)]} href="/games/market-making" cta={ARITHMETIC_COPY.play}/>
                 <GameCard id="correlation" title={CORRELATION_COPY.cardTitle} body={CORRELATION_COPY.cardBody}
                           stats={[recordStat(CORRELATION_COPY.recordLabel, correlation.record, (n) => (n / 1000).toFixed(3))]} href="/games/correlation" cta={ARITHMETIC_COPY.play}/>
+                {/* A table for friends, not a score: no records. */}
+                <GameCard id="poker-night" title={POKER_NIGHT_COPY.cardTitle} body={POKER_NIGHT_COPY.cardBody} stats={[]} href="/poker-night"
+                          cta={POKER_NIGHT_COPY.cardCta}/>
             </div>
         </div>
     );

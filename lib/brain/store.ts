@@ -47,12 +47,12 @@ export const getActiveTheses = async (): Promise<BrainEntitySummary[]> => {
 // article's importance is deliberately left out: nothing on the page prints it.
 const EVIDENCE_PROJECTION = {
     headline: 1, source: 1, sourceType: 1, url: 1, datetime: 1, publishedDate: 1,
-    'extraction.entities': 1, 'extraction.eventType': 1,
+    'extraction.entities': 1, 'extraction.eventType': 1, 'extraction.nature': 1,
 } as const;
 
 type EvidenceDoc = {
     headline: string; source: string; sourceType: string; url: string; datetime: number; publishedDate: string;
-    extraction?: {entities?: {key: string; sentiment: number; relevance: number}[]; eventType?: string};
+    extraction?: {entities?: {key: string; sentiment: number; relevance: number}[]; eventType?: string; nature?: string};
 };
 
 // Recent articles mentioning an entity — the evidence drill-down.
@@ -76,6 +76,8 @@ export const getEntityEvidence = async (entityKey: string, lookbackDays = 21, li
             sentiment: mention?.sentiment ?? 0,
             relevance: mention?.relevance ?? 0,
             eventType: item.extraction?.eventType ?? null,
+            // How the piece is written; null on a row tagged before the label (reads as reported).
+            nature: item.extraction?.nature ?? null,
         };
     });
 };

@@ -90,6 +90,8 @@ export const NAV_SECTIONS: readonly NavSection[] = [
             {href: '/learn', label: 'Learn', icon: 'school'},
             {href: '/games', label: 'Games', icon: 'sports_esports'},
             {href: '/poker', label: 'Poker solver', icon: 'playing_cards'},
+            // The lobby; a table itself (/play/CODE) is full screen, outside the shell and every section.
+            {href: '/poker-night', label: 'Poker night', icon: 'celebration'},
         ],
     },
 ] as const;

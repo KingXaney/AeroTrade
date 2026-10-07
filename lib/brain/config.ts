@@ -25,6 +25,22 @@ export const NEW_TICKER_VERIFY_BUDGET = 10;    // Finnhub verifications per run
 export const THEME_REUSE_LIST_SIZE = 30;       // active themes injected into the prompt
 export const REDDIT_IMPORTANCE_CAP = 0.4;      // clamped deterministically post-parse
 
+// How a piece is written, apart from what it covers (the event type): a newsroom reporting,
+// the company speaking for itself, a columnist's take, or an unconfirmed claim. The extractor
+// labels it, lib/brain/trust.ts may settle it from the outlet, and sanitizeExtraction clamps on
+// it — the label is untrusted and only ever lowers a weight.
+export const NATURES = ['reported', 'company', 'opinion', 'rumour'] as const;
+export type Nature = (typeof NATURES)[number];
+// An opinion piece or a rumour counts at most this much importance, however the model rated it.
+export const TAKE_IMPORTANCE_CAP = 0.3;
+// The share of a piece's tone that joins a name's sentiment average, by nature. Attention
+// (importance × relevance) always counts in full: a loud take still shows that people are
+// talking, it just does not steer the sentiment.
+export const SENTIMENT_SHARE_BY_NATURE: Readonly<Record<Nature, number>> = {reported: 1, company: 0.5, opinion: 0.5, rumour: 0};
+// A piece from an outlet that is mostly commentary (lib/brain/trust.ts) weighs this share of
+// its importance.
+export const COMMENTARY_IMPORTANCE_SHARE = 0.6;
+
 // Thesis detection on the slow layer: sustained narrative mass becomes a thesis;
 // the thesis dies when slow weight falls below this fraction of its peak.
 export const THESIS_WEIGHT_THRESHOLD = 5;
