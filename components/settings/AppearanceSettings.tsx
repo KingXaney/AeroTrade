@@ -54,7 +54,9 @@ const AppearanceSettings = () => {
 
     // Buttons only ever *start* a preview. The restore lives on the group, so the
     // gutter between two cards is inside the hover region and moving A → B never
-    // passes through the committed theme.
+    // passes through the committed theme. A hover previews the palette only (ThemeProvider):
+    // a style moves the page, and a card that moves away from the pointer would cancel its own
+    // preview and loop. The click applies the whole theme.
     const previewProps = (next: Theme) => ({
         onMouseEnter: () => preview(next),
         onFocus: () => preview(next),
@@ -76,7 +78,7 @@ const AppearanceSettings = () => {
             {/* Presets */}
             <div>
                 <div className="flex items-center justify-between mb-3">
-                    <p className="text-sm text-fg-muted">Pick a look. Hover to preview, click to apply — it follows your account on every device.</p>
+                    <p className="text-sm text-fg-muted">Pick a look. Hover to preview its colours, click to apply it — layout included — on every device your account signs into.</p>
                     <button type="button"
                             onClick={() => apply({...DEFAULT_THEME, reduceMotion: theme.reduceMotion})}
                             disabled={pending || (theme.palette === DEFAULT_THEME.palette && theme.style === DEFAULT_THEME.style)}

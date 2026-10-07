@@ -6,8 +6,9 @@ import {useTheme} from "@/components/theme/ThemeProvider";
 import {PRESETS} from "@/lib/theme/presets";
 
 // The landing page's theme switcher: each preset repaints the page it is on. A visitor has no
-// account to save a theme to, so this only previews (ThemeProvider.preview) — nothing is
-// written, and a reload brings the default back.
+// account to save a theme to, so this only previews (ThemeProvider.preview, the whole theme —
+// it is a click, so the layout may move) — nothing is written, and a reload brings the default
+// back.
 const SHOWN = ['quiet-cyber', 'neon-terminal', 'paper', 'gruvbox-brutal', 'mocha-soft', 'dracula-glass'];
 
 const ThemeDemo = () => {
@@ -27,7 +28,7 @@ const ThemeDemo = () => {
                         data-theme-demo={preset.id}
                         onClick={() => {
                             setActive(preset.id);
-                            preview({palette: preset.palette, style: preset.style, reduceMotion: theme.reduceMotion});
+                            preview({palette: preset.palette, style: preset.style, reduceMotion: theme.reduceMotion}, {full: true});
                         }}
                         className={cn(
                             'control-type rounded-lg border px-3 py-2 text-xs transition-colors',
