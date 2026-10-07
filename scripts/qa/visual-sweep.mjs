@@ -72,6 +72,13 @@ const STILL = `
 
 const shoot = async (page, width, name, path) => {
     await page.goto(`${BASE}${path}`, {waitUntil: 'load'});
+    // A page with the momentum terrain draws it a moment after load; wait for its first frame so
+    // the layout below it has settled. (Chromium's full-page capture still paints a WebGL canvas
+    // black; qa-landing's viewport-sized captures are where the drawing itself is checked.)
+    if (await page.locator('[data-terrain]').count() > 0) {
+        await page.locator('[data-terrain-state="ready"], [data-terrain-state="flat"], [data-terrain-state="unavailable"]').first().waitFor({timeout: 20000}).catch(() => {});
+        await page.waitForTimeout(1500);
+    }
     await page.waitForLoadState('networkidle', {timeout: 15000}).catch(() => {});
     await page.addStyleTag({content: STILL}).catch(() => {});
     await page.evaluate(() => document.fonts.ready).catch(() => {});

@@ -27,9 +27,21 @@ which also absorbs the notification toggles that used to sit in the user dropdow
   emits one `html[data-palette="id"]{…}` block per palette; the root layout injects it as
   `<style id="aero-palettes">`. Unit tests enforce contrast floors (fg/surface ≥ 4.5,
   muted ≥ 3, on-brand/brand ≥ 4.5) and byte-parity of the default palette with the old CSS.
-- **Styles** are hand-written `[data-style="…"]` blocks (minimal = `:root` defaults,
-  futuristic, liquid-glass, brutalist, soft) that only set style tokens plus their own
-  effects (shimmer/glow/particles, glass specular + drifting blobs, hard shadows, …).
+- **Styles** are hand-written `[data-style="…"]` blocks (minimal, futuristic, liquid-glass,
+  brutalist, soft) that only set style tokens plus their own effects (shimmer/glow/particles,
+  glass specular + drifting blobs, hard shadows, …). The `:root` values are the neutral baseline
+  a block falls back to. Until 2026-10-06 minimal *was* that baseline and so changed almost
+  nothing when chosen; the owner asked for a real difference, and it is now "no boxes": panels
+  are open sections under hairline rules, flush left, with wider column gaps; rows and headlines
+  are ruled lists; the header and rail sit flat on the page; one typeface (Inter) with
+  medium-weight, fg-soft headings; ink buttons (fg on bg) with the accent kept for links and
+  active states; floating chrome gets a hairline instead of a shadow. The chrome nearly
+  disappears: a 3rem bar with no rule, a small logo, search as an icon, the account as an
+  avatar, a 3rem rail of plain icons with the current one in the foreground colour; section
+  tabs are words with the current one underlined; the page title is smaller; the chat launcher
+  is ink without a halo; the terrain drops its axis caption. The shell hooks this hangs on are
+  `data-app-content` (the content wrapper), `data-page-subtitle`, `data-user-name`,
+  `data-streak-chip` and `data-terrain-caption`.
   Reduced motion is honoured from the OS and from `html[data-motion="reduced"]`.
 - **Persistence**: `UserPreferences.appearance` (Mongo) is the source of truth; the
   `aero-theme` cookie (`v1:<palette>:<style>:<0|1>`, httpOnly, 1 year) mirrors it so

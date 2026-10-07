@@ -59,6 +59,7 @@ const SHAPE = {
 
 const Badge = ({tone = 'neutral', variant = 'soft', shape = 'tag', className, children, ...rest}: Props) => (
     <span
+        data-badge
         className={cn(
             'inline-flex items-center gap-1 shrink-0 whitespace-nowrap',
             SHAPE[shape],

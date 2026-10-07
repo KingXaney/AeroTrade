@@ -24,6 +24,7 @@ const TopicsSettings = ({overview}: {overview: TopicsOverview}) => {
                     {overview.topics.map((t) => (
                         <li key={t.id}>
                             <Link href={`/topics/${t.slug}`}
+                                  data-topic-chip
                                   className="inline-flex items-center gap-2 rounded-full border border-line-strong/20 bg-surface-2/40 px-3 py-1.5 text-xs text-fg transition-colors hover:border-brand/40 hover:text-brand">
                                 <span className="h-2 w-2 rounded-full" style={{background: t.color ?? 'var(--brand)'}} aria-hidden="true" />
                                 <span className="font-heading">{t.name}</span>
