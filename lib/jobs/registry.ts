@@ -132,6 +132,16 @@ export const JOBS = {
         trigger: 'culture',
         health: {label: 'Culture brain', schedule: 'daily 06:40 ET', staleAfterHours: 30},
     },
+    // 10:45 ET: after the Navigator (10:00) and the strategies' 10:30 retry, inside the session
+    // so fills are live quotes, clear of the noon digest. The Tuesday cron is the holiday-Monday
+    // retry: the weekly claim makes it a no-op in an ordinary week.
+    cultureWeekly: {
+        id: 'culture-brain-weekly',
+        event: 'app/run.culture.brain',
+        crons: ['TZ=America/New_York 45 10 * * 1', 'TZ=America/New_York 45 10 * * 2'],
+        trigger: 'culture-weekly',
+        health: {label: 'Culture pickers (weekly)', schedule: 'Mondays 10:45 ET', staleAfterHours: 8 * 24},
+    },
     cultureBackfill: {
         id: 'culture-wikipedia-backfill',
         event: 'app/backfill.culture.wikipedia',

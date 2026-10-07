@@ -2,6 +2,7 @@ import {describe, expect, it} from 'vitest';
 import {GLOSSARY, GLOSSARY_KEYS} from '@/lib/learn/glossary';
 import {GLOSSARY_GROUPS, groupOf} from '@/lib/learn/where';
 import {EVENT_BADGES} from '@/lib/brain/event-types';
+import {SIGNAL_BADGES} from '@/lib/culture/signal-types';
 
 // The in-app home of a term: its group's, as the glossary page links it.
 const homeOf = (key: string): string | undefined => GLOSSARY_GROUPS.find((group) => group.keys.includes(key as never))?.home.href;
@@ -34,7 +35,17 @@ describe('where each term lives', () => {
             expect(groupOf(GLOSSARY[key]), key).toBe('brain');
             expect(homeOf(key), key).toBe('/brain');
         }
-        expect(GLOSSARY_GROUPS.map((group) => group.id)).toEqual(['board', 'portfolio', 'market', 'concepts', 'brain', 'rails', 'games', 'poker', 'landing']);
+        expect(GLOSSARY_GROUPS.map((group) => group.id)).toEqual(['board', 'portfolio', 'market', 'concepts', 'brain', 'rails', 'culture', 'games', 'poker', 'landing']);
+    });
+
+    it('homes the culture brain\'s numbers, its pickers and its labels on /culture', () => {
+        const signalTerms = Object.values(SIGNAL_BADGES).map((badge) => badge.term);
+        expect(signalTerms).toHaveLength(7);
+        for (const key of ['attention', 'attention-anomaly', 'quiet-attention', 'category-share', 'brand-thesis', 'brand-owner', 'picker-profile', ...signalTerms] as const) {
+            expect(groupOf(GLOSSARY[key]), key).toBe('culture');
+            expect(homeOf(key), key).toBe('/culture');
+        }
+        expect(homeOf('thesis')).toBe('/brain');
     });
 
     it('homes the games\' terms on /games', () => {

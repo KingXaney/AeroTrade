@@ -81,5 +81,6 @@ describe('describeCultureRun', () => {
         expect(line).toContain('news off');
         expect(line).toContain('provider 4 new');
         expect(line).not.toContain('quota');
+        expect(describeCultureRun({...parts, quotaHit: false, modelOff: true})).toContain('no model key: alias folds only');
     });
 });

@@ -55,19 +55,22 @@ type NavigatorRail =
     | 'SCORE_WEIGHTS' | 'MOMENTUM_MIX' | 'VOLATILITY_HAIRCUT' | 'MIN_ARTICLES_FOR_ELIGIBILITY'
     | 'EXIT_SCORE_THRESHOLD' | 'HARD_STOP_DRAWDOWN' | 'REBALANCE_BAND' | 'MAX_POSITION_WEIGHT' | 'ENTRY_SCORE_THRESHOLD';
 
+// The lib/culture/config.ts constant a culture picker's clause turns on (lib/learn/culture-reasons.ts).
+type CultureRail = 'CULTURE_PROFILES' | 'CULTURE_MOMENTUM_MIX' | 'CULTURE_VOLATILITY_HAIRCUT' | 'CULTURE_RAILS' | 'MIN_PRICE_BARS';
+
 export type ReasonClause = {
     // A verbatim slice of the reason.
     text: string;
     gloss: string;
     term?: GlossaryKey;
-    rail?: EngineRail | NavigatorRail;
+    rail?: EngineRail | NavigatorRail | CultureRail;
 };
 
 export type DecodedReason = {clauses: ReasonClause[]; unknown: string[]};
 
-type Decode = (match: RegExpExecArray, def: StrategyDefinition | undefined) => ReasonClause[] | null;
+export type Decode = (match: RegExpExecArray, def: StrategyDefinition | undefined) => ReasonClause[] | null;
 
-type ReasonTemplate = {
+export type ReasonTemplate = {
     id: string;
     // The rule that writes this shape; its catalog definition supplies the parameters when
     // the caller passed none, or passed another strategy's.
@@ -81,18 +84,18 @@ export const MAX_REASON_CHARS = 500;
 
 const SYMBOL = '[A-Z][A-Z0-9.\\-]*';
 const PRICE = '\\d+\\.\\d{2}';
-const SIGNED_PCT = '[+-]\\d+\\.\\d%';
-const PCT = '\\d+\\.\\d%';
+export const SIGNED_PCT = '[+-]\\d+\\.\\d%';
+export const PCT = '\\d+\\.\\d%';
 const DATE = '\\d{4}-\\d{2}-\\d{2}';
 
-const anchored = (source: string): RegExp => new RegExp(`^${source}$`);
+export const anchored = (source: string): RegExp => new RegExp(`^${source}$`);
 
 const INVESTED = shareText(1 - CASH_FLOOR);
 const FLOOR = shareText(CASH_FLOOR);
 
 const bandOf = (def: StrategyDefinition | undefined): string => shareText(def?.driftBand ?? DEFAULT_DRIFT_BAND);
 const slotsOf = (def: StrategyDefinition | undefined): number | null => (def ? def.slots : null);
-const unsigned = (pct: string): string => (pct.startsWith('+') || pct.startsWith('-') ? pct.slice(1) : pct);
+export const unsigned = (pct: string): string => (pct.startsWith('+') || pct.startsWith('-') ? pct.slice(1) : pct);
 
 // The indicator a "needs N bars" note is waiting on, per rule.
 const HISTORY_TERM: Partial<Record<StrategyId, GlossaryKey>> = {
@@ -132,7 +135,7 @@ const NOTE_GRAMMAR: readonly ReasonTemplate[] = [
     },
 ];
 
-const decodeWith = (
+export const decodeWith = (
     templates: readonly ReasonTemplate[],
     text: string,
     def: StrategyDefinition | undefined,
@@ -630,7 +633,7 @@ export const NAVIGATOR_GRAMMAR: readonly ReasonTemplate[] = [
 
 // ---- Entry points ------------------------------------------------------------------------
 
-const decodeGuarded = (reason: string, decode: (text: string) => ReasonClause[] | null): DecodedReason => {
+export const decodeGuarded = (reason: string, decode: (text: string) => ReasonClause[] | null): DecodedReason => {
     const text = typeof reason === 'string' ? reason.trim() : '';
     if (!text) return {clauses: [], unknown: []};
     if (text.length > MAX_REASON_CHARS) return {clauses: [], unknown: [text]};

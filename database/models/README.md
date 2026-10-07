@@ -24,6 +24,10 @@ reads and writes live. Change a field here, then in the store module named besid
 | `culture-entity` | culture | `lib/culture/update` (the daily fold), `store` (every read); keyed by the catalog id in `lib/culture/catalog` |
 | `culture-attention` | culture | `lib/culture/store` — a brand's daily attention per source, one document per month (no TTL: the backtest reads the history) |
 | `culture-item` | culture | `lib/culture/ingest` (the daily sources, the model's labels), `store` (evidence reads) |
+| `culture-state` | culture | `lib/culture/picker-store` — one row per picker profile: its shared account, its launch, the week it last claimed |
+| `culture-decision` | culture | `lib/culture/picker-store` — a picker's orders and kept positions for a day, the brands behind each, the universe audit, its rationale |
+| `culture-universe` | culture | `lib/culture/picker-store` — the week's quote check per owner, read before Finnhub is asked |
+| `culture-earnings` | culture | `lib/culture/picker-store` — each owner's last and next report dates from the earnings calendar |
 | `culture-suggestion` | culture | `lib/culture/store` — brand names the model met that the catalog lacks; a person adds one in code |
 | `market-briefing` | news | `lib/news/briefing-store` (the morning job's write, the page's read) |
 | `topic` | topics | `lib/topics/store`, `insert` (the one write path), `seed`, `refresh` |

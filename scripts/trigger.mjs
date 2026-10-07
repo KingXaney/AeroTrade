@@ -15,6 +15,9 @@
 //   npm run trigger -- topic <userId> <keywordSetHash>   one on-demand topic refresh
 //   npm run trigger -- culture                     daily culture-brain update (attention, items, the fold)
 //   npm run trigger -- culture-backfill [brandId ...]   every brand's Wikipedia views back to the backtest horizon (or the named brands)
+//   npm run trigger -- culture-weekly              the two culture pickers (fills only during the session)
+//   npm run trigger -- culture-preview             decide and record without filling anything
+//   npm run trigger -- culture-resimulate          rebuild the culture backtest from the stored history
 import { Inngest } from "inngest";
 
 // Each job's event as lib/jobs/registry.ts names it; lib/jobs/__tests__/registry.test.ts holds
@@ -34,11 +37,16 @@ const EVENTS = {
     'strategies-resimulate': 'app/run.strategies',
     culture: 'app/update.culture.brain',
     'culture-backfill': 'app/backfill.culture.wikipedia',
+    'culture-weekly': 'app/run.culture.brain',
+    'culture-preview': 'app/run.culture.brain',
+    'culture-resimulate': 'app/run.culture.brain',
 };
 
 const STRATEGY_DATA = {
     'strategies-preview': { dryRun: true },
     'strategies-resimulate': { resimulate: true },
+    'culture-preview': { dryRun: true },
+    'culture-resimulate': { resimulate: true },
 };
 
 const [job, first, second, ...rest] = process.argv.slice(2);

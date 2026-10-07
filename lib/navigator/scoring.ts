@@ -53,11 +53,8 @@ const HORIZON_LABELS: Record<MomentumHorizon, string> = {
     r252: "12-month momentum",
 };
 
-// The momentum reason quotes the heaviest-weighted horizon the symbol actually has,
-// so the narrative tracks whatever drives most of the component.
-const REASON_HORIZON_ORDER: MomentumHorizon[] = (Object.keys(MOMENTUM_MIX) as MomentumHorizon[])
-    .sort((a, b) => MOMENTUM_MIX[b] - MOMENTUM_MIX[a]);
-
+// The momentum reason quotes the heaviest-weighted horizon the symbol actually has (the mix's
+// order, computed per call), so the narrative tracks whatever drives most of the component.
 const INSUFFICIENT_MOMENTUM_REASON = "insufficient price history for momentum";
 
 // A single name's sector is the heaviest 'sector:*' co-mention link the brain has
@@ -137,16 +134,22 @@ const computeNewsComponents = (inputs: ScoringInput[]): number[] => {
     return components;
 };
 
-const computeMomentumByIndex = (inputs: ScoringInput[]): MomentumResult[] => {
-    const horizons = Object.keys(MOMENTUM_MIX) as MomentumHorizon[];
+export type MomentumMix = Record<MomentumHorizon, number>;
 
-    // Each horizon is rank-normalized over the symbols that actually have it, so
-    // a sparse universe never drags present values toward an artificial middle.
+// The momentum component and its reason for every symbol of a universe, from each one's
+// signals: each horizon rank-normalized over the symbols that actually have it (so a sparse
+// universe never drags present values toward an artificial middle), the mix renormalized over
+// the horizons a symbol has. Exported for the culture brain's pickers, which rank momentum the
+// same way under their own mix.
+export const computeMomentumComponents = (signalsList: readonly Signals[], mix: MomentumMix = MOMENTUM_MIX): MomentumResult[] => {
+    const horizons = Object.keys(mix) as MomentumHorizon[];
+    const reasonOrder = [...horizons].sort((a, b) => mix[b] - mix[a]);
+
     const normalizedByHorizon = new Map<MomentumHorizon, Map<number, number>>();
     for (const horizon of horizons) {
         const present: {index: number; value: number}[] = [];
-        inputs.forEach((input, index) => {
-            const value = input.signals[horizon];
+        signalsList.forEach((signals, index) => {
+            const value = signals[horizon];
             if (value !== null) {
                 present.push({index, value});
             }
@@ -157,7 +160,7 @@ const computeMomentumByIndex = (inputs: ScoringInput[]): MomentumResult[] => {
         normalizedByHorizon.set(horizon, byIndex);
     }
 
-    return inputs.map((input, index) => {
+    return signalsList.map((signals, index) => {
         let mixWeight = 0;
         let weighted = 0;
         for (const horizon of horizons) {
@@ -165,8 +168,8 @@ const computeMomentumByIndex = (inputs: ScoringInput[]): MomentumResult[] => {
             if (normalized !== undefined) {
                 // Renormalize the mix over the horizons this symbol actually has,
                 // so a missing 12-month return doesn't shrink the whole component.
-                mixWeight += MOMENTUM_MIX[horizon];
-                weighted += MOMENTUM_MIX[horizon] * normalized;
+                mixWeight += mix[horizon];
+                weighted += mix[horizon] * normalized;
             }
         }
 
@@ -174,26 +177,30 @@ const computeMomentumByIndex = (inputs: ScoringInput[]): MomentumResult[] => {
             return {component: 0, reason: INSUFFICIENT_MOMENTUM_REASON};
         }
 
-        const reasonHorizon = REASON_HORIZON_ORDER.find((horizon) => input.signals[horizon] !== null);
+        const reasonHorizon = reasonOrder.find((horizon) => signals[horizon] !== null);
         // find() cannot miss when mixWeight > 0, but fall back safely rather than assert.
         const reason = reasonHorizon !== undefined
-            ? `${HORIZON_LABELS[reasonHorizon]} ${formatSignedPercent(input.signals[reasonHorizon] ?? 0)}`
+            ? `${HORIZON_LABELS[reasonHorizon]} ${formatSignedPercent(signals[reasonHorizon] ?? 0)}`
             : INSUFFICIENT_MOMENTUM_REASON;
 
         return {component: weighted / mixWeight, reason};
     });
 };
 
-const topQuintileVolCutoff = (inputs: ScoringInput[]): number | null => {
-    const vols = inputs
-        .map((input) => input.signals.vol63)
+const computeMomentumByIndex = (inputs: ScoringInput[]): MomentumResult[] =>
+    computeMomentumComponents(inputs.map((input) => input.signals), MOMENTUM_MIX);
+
+// The 63-day volatility at and above which a symbol takes the haircut: the top `fraction` of
+// the volatilities given (null when none). Exported for the culture brain's pickers.
+export const topQuintileVolCutoff = (volatilities: readonly (number | null)[], fraction: number = TOP_QUINTILE_FRACTION): number | null => {
+    const vols = volatilities
         .filter((vol): vol is number => vol !== null)
         .sort((a, b) => b - a);
     if (vols.length === 0) {
         return null;
     }
     // Ceil keeps at least one symbol in the quintile; ties at the cutoff all take the haircut.
-    const haircutCount = Math.ceil(vols.length * TOP_QUINTILE_FRACTION);
+    const haircutCount = Math.ceil(vols.length * fraction);
     return vols[haircutCount - 1];
 };
 
@@ -203,7 +210,7 @@ export const scoreUniverse = (inputs: ScoringInput[]): ScoredSymbol[] => {
         .map((input) => input.newsWeightSlow)
         .filter((weight): weight is number => weight !== null);
     const momentumByIndex = computeMomentumByIndex(inputs);
-    const volCutoff = topQuintileVolCutoff(inputs);
+    const volCutoff = topQuintileVolCutoff(inputs.map((input) => input.signals.vol63), TOP_QUINTILE_FRACTION);
 
     return inputs.map((input, index) => {
         const reasons: string[] = [newsReason(input.newsWeightSlow, coveredWeights)];

@@ -10,7 +10,7 @@
 // Run: npm run qa -- culture   (the harness: README.md)
 import {MongoClient} from 'mongodb';
 import {createJiti} from 'jiti';
-import {MONGO, REPO_ROOT, check, note, summary} from './lib.mjs';
+import {INNGEST, MONGO, REPO_ROOT, check, note, summary} from './lib.mjs';
 
 const COLLECTIONS = ['cultureentities', 'cultureattentions', 'cultureitems', 'culturesuggestions'];
 const mongo = new MongoClient(MONGO);
@@ -153,6 +153,121 @@ try {
     check('the drift alarm names every brand without recent views, not the one with them', !quiet.includes('celsius') && quiet.length === CULTURE_BRANDS.length - 1, `${quiet.length} brands`);
 
     note('the daily job is not fired here', 'its sources are the real Wikipedia, App Store and Google News; run `npm run trigger -- culture` against a dev server with a .env to see a full run');
+
+    // ---- the weekly pickers, through the Inngest dev server ----
+    // The week's quote check is pre-seeded (two owners quoted, the rest not), the bars are
+    // stored through the previous session (so no provider is asked), and the harness has no
+    // Finnhub key: every fill answers "no live price", which is the outcome under test.
+    const inngestUp = await fetch(`${INNGEST}/`).then((r) => r.ok).catch(() => false);
+    if (!inngestUp) {
+        note('no Inngest dev server', 'the weekly picker checks are skipped');
+    } else {
+        const OWNER = 'system:culture';
+        const pickerAccountIds = (await db.collection('paperaccounts').find({userId: OWNER}).project({_id: 1}).toArray()).map((a) => String(a._id));
+        await db.collection('paperaccounts').deleteMany({userId: OWNER});
+        await db.collection('papertrades').deleteMany({userId: OWNER});
+        await db.collection('accountsnapshots').deleteMany({$or: [{userId: OWNER}, {accountId: {$in: pickerAccountIds}}]});
+        for (const name of ['culturestates', 'culturedecisions', 'cultureuniverses', 'cultureearnings']) await db.collection(name).deleteMany({});
+        await db.collection('jobruns').deleteMany({jobId: 'culture-brain-weekly'});
+
+        const {catalogTickers} = await jiti.import(`${REPO_ROOT}lib/culture/catalog.ts`);
+        const {previousTradingDay} = await jiti.import(`${REPO_ROOT}lib/prices/market-hours.ts`);
+        const {getEasternWeekKey} = await jiti.import(`${REPO_ROOT}lib/dates.ts`);
+        const {glossCultureReasons} = await jiti.import(`${REPO_ROOT}lib/learn/culture-reasons.ts`);
+        const weekKey = getEasternWeekKey(today);
+        const prices = {CELH: 40, PEP: 150};
+        await db.collection('cultureuniverses').insertMany(catalogTickers().map((t) => ({
+            weekKey, symbol: t.ticker, quoted: t.ticker in prices, price: prices[t.ticker] ?? null, reason: t.ticker in prices ? 'ok' : 'no quote', checkedAt: new Date(),
+        })));
+
+        // Sessions through the previous one, deep enough that the bars step reads them as a
+        // current ten-year history and asks no provider (a shallower fixture is backfilled from
+        // the real Yahoo, whose real prices decide the picks), with highs for the OHLC check.
+        const lastSession = previousTradingDay(today);
+        const sessions = [];
+        for (let d = lastSession, n = 0; n < 1650; d = addDays(d, -1)) {
+            const dow = new Date(`${d}T12:00:00Z`).getUTCDay();
+            if (dow === 0 || dow === 6) continue;
+            sessions.unshift(d);
+            n++;
+        }
+        const bars = [];
+        for (const [symbol, base] of [['CELH', 30], ['PEP', 140], ['SPY', 500], ['^IRX', 4]]) {
+            sessions.forEach((date, i) => {
+                const close = symbol === '^IRX' ? base : base * (1 + i / 600);
+                bars.push({symbol, date, close, open: close * 0.995, high: close * 1.01, low: close * 0.99, volume: 1000, source: 'yahoo'});
+            });
+        }
+        const storedBars = await db.collection('pricebars').find({symbol: {$in: ['CELH', 'PEP', 'SPY', '^IRX']}}).toArray();
+        await db.collection('pricebars').deleteMany({symbol: {$in: ['CELH', 'PEP', 'SPY', '^IRX']}});
+        await db.collection('pricebars').insertMany(bars);
+
+        // Four hundred days of pageviews, so the picker features can be measured: Celsius
+        // surging, Pepsi and Poppi flat.
+        const views = [];
+        for (let i = 419; i >= 0; i--) {
+            const date = addDays(asOf, -i);
+            views.push({brand: 'celsius', source: 'wikipedia', date, value: i < 28 ? 299 : 99});
+            views.push({brand: 'pepsi', source: 'wikipedia', date, value: 500});
+            views.push({brand: 'poppi', source: 'wikipedia', date, value: 50});
+        }
+        await store.writeAttentionRows(views);
+
+        const fire = (data) => fetch(`${INNGEST}/e/qa`, {method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify({name: 'app/run.culture.brain', data})});
+        const pollUntil = async (predicate, timeoutMs) => {
+            const until = Date.now() + timeoutMs;
+            while (Date.now() < until) {
+                const value = await predicate();
+                if (value) return value;
+                await new Promise((resolve) => setTimeout(resolve, 2000));
+            }
+            return null;
+        };
+        const jobMessage = async () => (await db.collection('jobruns').findOne({jobId: 'culture-brain-weekly'}))?.lastMessage ?? '';
+
+        const first = await fire({force: true});
+        check('the weekly event is accepted by the dev server', first.ok, `status ${first.status}`);
+        const decisions = await pollUntil(async () => {
+            const rows = await db.collection('culturedecisions').find({date: today}).toArray();
+            return rows.length === 2 && (await jobMessage()).includes('Culture pickers') ? rows : null;
+        }, 240_000);
+        check('the run saves a decision for each picker and stamps the job', decisions !== null, await jobMessage());
+        if (decisions) {
+            const accounts = await db.collection('paperaccounts').find({userId: OWNER}).toArray();
+            check('two shared accounts exist, one per picker, at the starting balance', accounts.length === 2 && accounts.every((a) => a.startingBalance === 100000) && accounts.map((a) => a.name).sort().join('|') === 'Culture Brain · Quiet|Culture Brain · Spike', accounts.map((a) => a.name).join(', '));
+            const snapshots = await db.collection('accountsnapshots').countDocuments({userId: OWNER});
+            check('each account has its day-zero snapshot', snapshots === 2, `${snapshots} snapshots`);
+            const states = await db.collection('culturestates').find({}).toArray();
+            check('both pickers claimed the week', states.length === 2 && states.every((s) => s.lastRunWeek === weekKey), JSON.stringify(states.map((s) => [s.key, s.lastRunWeek])));
+            for (const decision of decisions) {
+                const orders = decision.items.filter((i) => i.action !== 'hold');
+                check(`${decision.profile}: the decision is executed, planned an order, and every fill failed for want of a price`, decision.kind === 'executed' && orders.length > 0 && orders.every((i) => i.executed === false && /live price/.test(i.error ?? '')), `${orders.length} orders: ${orders.map((i) => i.error).join('; ')}`);
+                check(`${decision.profile}: every item names the picker and carries its brands and a readable reason`, decision.items.every((i) => i.reasons.some((r) => r === `picker ${decision.profile === 'spike' ? 'Spike' : 'Quiet'}`) && i.brands.length > 0 && glossCultureReasons(i.reasons).length > 0), JSON.stringify(decision.items.map((i) => i.reasons)));
+                check(`${decision.profile}: the universe audit counts the quoted owners`, decision.universe.quoted === 2 && decision.universe.tickers > 50 && decision.feeds.includes('wikipedia'), JSON.stringify({...decision.universe, unquoted: decision.universe.unquoted.length, feeds: decision.feeds}));
+            }
+            check('cash is untouched when nothing filled', accounts.every((a) => a.cash === 100000 && a.positions.length === 0));
+            const trades = await db.collection('papertrades').countDocuments({userId: OWNER});
+            check('no trade row was written', trades === 0, `${trades} trades`);
+
+            await fire({force: true});
+            const again = await pollUntil(async () => ((await jobMessage()).includes('already ran') ? await jobMessage() : null), 60_000);
+            check('a second run in the same week claims nothing and says so', again !== null, again ?? await jobMessage());
+
+            await fire({dryRun: true});
+            const preview = await pollUntil(async () => ((await jobMessage()).includes('preview') ? await jobMessage() : null), 120_000);
+            check('a preview run plans without claiming', preview !== null, preview ?? await jobMessage());
+            const kinds = (await db.collection('culturedecisions').find({date: today}).toArray()).map((d) => d.kind);
+            check('a preview never overwrites the executed decisions', kinds.every((k) => k === 'executed'), kinds.join(','));
+        }
+
+        await db.collection('pricebars').deleteMany({symbol: {$in: ['CELH', 'PEP', 'SPY', '^IRX']}});
+        if (storedBars.length > 0) await db.collection('pricebars').insertMany(storedBars);
+        const cleanupIds = (await db.collection('paperaccounts').find({userId: OWNER}).project({_id: 1}).toArray()).map((a) => String(a._id));
+        await db.collection('paperaccounts').deleteMany({userId: OWNER});
+        await db.collection('papertrades').deleteMany({userId: OWNER});
+        await db.collection('accountsnapshots').deleteMany({$or: [{userId: OWNER}, {accountId: {$in: cleanupIds}}]});
+        for (const name of ['culturestates', 'culturedecisions', 'cultureuniverses', 'cultureearnings']) await db.collection(name).deleteMany({});
+    }
 } catch (err) {
     check(`threw: ${err.message}`, false, err.stack);
 } finally {

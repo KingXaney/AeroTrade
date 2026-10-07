@@ -27,6 +27,11 @@ const BRAIN: readonly GlossaryKey[] = [
     'news-weight', 'news-sentiment', 'thesis', 'since-thesis',
     'event-earnings', 'event-guidance', 'event-mna', 'event-product', 'event-macro', 'event-regulatory', 'event-analyst', 'event-legal',
 ];
+const CULTURE: readonly GlossaryKey[] = [
+    'attention', 'attention-anomaly', 'attention-trend', 'attention-persistence', 'quiet-attention', 'category-share',
+    'attention-since-report', 'app-rank', 'brand-sentiment', 'brand-thesis', 'brand-owner', 'picker-profile',
+    'signal-adoption', 'signal-hype', 'signal-backlash', 'signal-substitution', 'signal-drop', 'signal-price', 'signal-fading',
+];
 
 const HOMES = {
     board: {href: '/strategies', label: 'Strategy boards'},
@@ -35,6 +40,7 @@ const HOMES = {
     concepts: {href: '/topics', label: 'Your topics'},
     brain: {href: '/brain', label: 'The News Brain'},
     rails: {href: '/brain', label: 'The News Brain'},
+    culture: {href: '/culture', label: 'The Culture Brain'},
     games: {href: '/games', label: 'The games'},
     poker: {href: '/poker', label: 'The poker solver'},
     landing: {href: '/welcome', label: 'The front door'},
@@ -48,6 +54,7 @@ export const groupOf = (entry: GlossaryEntry): GroupId => {
     if ((BOARD as readonly string[]).includes(entry.key)) return 'board';
     if ((MARKET as readonly string[]).includes(entry.key)) return 'market';
     if ((BRAIN as readonly string[]).includes(entry.key)) return 'brain';
+    if ((CULTURE as readonly string[]).includes(entry.key)) return 'culture';
     if ((GAMES as readonly string[]).includes(entry.key)) return 'games';
     if ((POKER as readonly string[]).includes(entry.key)) return 'poker';
     if ((LANDING as readonly string[]).includes(entry.key)) return 'landing';
@@ -63,13 +70,14 @@ const GROUP_LABELS: Record<GroupId, string> = {
     concepts: 'Terms in the news',
     brain: 'On the News Brain',
     rails: "The Navigator's rails",
+    culture: 'On the Culture Brain',
     games: 'In the games',
     poker: 'In the poker solver',
     landing: 'On the front door',
 };
 
 // Registry order within each group, groups in reading order.
-export const GLOSSARY_GROUPS: readonly GlossaryGroup[] = (['board', 'portfolio', 'market', 'concepts', 'brain', 'rails', 'games', 'poker', 'landing'] as const).map((id) => ({
+export const GLOSSARY_GROUPS: readonly GlossaryGroup[] = (['board', 'portfolio', 'market', 'concepts', 'brain', 'rails', 'culture', 'games', 'poker', 'landing'] as const).map((id) => ({
     id,
     label: GROUP_LABELS[id],
     home: HOMES[id],

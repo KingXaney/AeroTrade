@@ -24,6 +24,34 @@ Rules:
 - importance: 0.9+ a brand-defining moment (a sell-out, a viral run, a boycott), 0.5 notable, 0.2 routine chatter. At most 6 brands per item; a few highly relevant brands say more than many weak ones.
 - newBrands: at most 3 per item, real consumer brands only, exactly as the item writes them; an empty list when there are none.`;
 
+// A picker's one model call: a weekly note that restates the deterministic reasons behind its
+// decisions beside the brands the brain is watching — it never picks positions or sizes.
+export const CULTURE_RATIONALE_PROMPT = `You are the narrator for an automated PAPER-TRADING experiment (no real money). Write a weekly update in ~120 words of plain markdown (no headings, no code fences).
+
+This week's decisions by the {{picker}} picker (deterministic scoring output — your ONLY source of facts):
+{{items}}
+
+The brands the culture brain is watching most closely right now (what younger consumers are paying attention to):
+{{narratives}}
+
+Rules:
+- ONLY restate the provided reasons and brands. Never invent tickers, numbers, predictions, or facts not present above.
+- Explain the week's moves (or why the account is holding still) in plain English, naming the brands behind each symbol.
+- End with exactly this sentence: "This is an automated paper-trading experiment, not financial advice."`;
+
+export type RationaleItem = {action: string; symbol: string; targetWeight: number; reasons: readonly string[]; brands: readonly {name: string}[]};
+
+export const buildCultureRationalePrompt = (picker: string, items: readonly RationaleItem[], narratives: unknown): string => {
+    const summarized = items.map((item) => ({
+        action: item.action,
+        symbol: item.symbol,
+        brands: item.brands.map((b) => b.name),
+        targetWeightPct: Math.round(item.targetWeight * 100),
+        reasons: item.reasons,
+    }));
+    return injectJson(injectJson(injectJson(CULTURE_RATIONALE_PROMPT, '{{picker}}', picker), '{{items}}', summarized), '{{narratives}}', narratives);
+};
+
 export type PromptItem = {n: number; source: string; title: string; body: string};
 export type PromptBrand = {id: string; name: string};
 

@@ -20,7 +20,7 @@ before the rename keep the name "Main Strategy" (new ones are "Main account", `D
 - `npm run build:check` — compile-only Next build; needs no database or keys
 - `npm run build` / `npm start` — the production build and its server
 - `npm run dev` + `npx inngest-cli@latest dev -u http://localhost:3000/api/inngest` — app + jobs
-- `npm run trigger -- <brain|navigator|news|snapshots|income|topics|briefs|briefing|strategies|strategies-preview|strategies-resimulate|culture|culture-backfill>` — fire a job locally (`news <email>`: a test brief to that one opted-in reader; `culture-backfill [brandId ...]`: every brand's Wikipedia views back to the backtest horizon, or the named brands)
+- `npm run trigger -- <brain|navigator|news|snapshots|income|topics|briefs|briefing|strategies|strategies-preview|strategies-resimulate|culture|culture-weekly|culture-preview|culture-resimulate|culture-backfill>` — fire a job locally (`news <email>`: a test brief to that one opted-in reader; `culture-backfill [brandId ...]`: every brand's Wikipedia views back to the backtest horizon, or the named brands)
 - `npm run test:db` — connect to `MONGODB_URI` (from `.env`) and print the database and host it reached
 - `npm run migrate:accounts` — the idempotent multi-account migration: builds the indexes in `scripts/migration-indexes.mjs` and drops the ones they replaced (run it on every database, again whenever that list changes)
 - `npm run opinion:local` — the brain's Second Opinion from your Claude subscription through the Claude Code CLI, written straight to the database (`.env.example` lists the other ways)

@@ -256,6 +256,8 @@ export type CultureRunParts = {
     deleted: number;
     suggestions: {added: number; counted: number};
     quotaHit: boolean;
+    // No model key at all: nothing was labelled, everything folded by alias.
+    modelOff?: boolean;
 };
 
 export const describeCultureRun = (p: CultureRunParts): string => {
@@ -267,6 +269,6 @@ export const describeCultureRun = (p: CultureRunParts): string => {
         `news ${p.news.skipped ? 'off' : p.news.ok ? `${p.news.inserted} new` : `${p.news.inserted} new, a query failed`}`,
         ...(p.social.adapter ? [`${p.social.adapter} ${p.social.inserted} new`] : []),
     ].join('; ');
-    const reading = `${p.items} items today, ${p.matched} naming a brand, ${p.extracted} labelled by the model, ${p.aliasFolded} by alias${p.quotaHit ? " (the model's daily quota ran out)" : ''}`;
+    const reading = `${p.items} items today, ${p.matched} naming a brand, ${p.extracted} labelled by the model, ${p.aliasFolded} by alias${p.modelOff ? ' (no model key: alias folds only)' : p.quotaHit ? " (the model's daily quota ran out)" : ''}`;
     return `Culture brain updated: ${sources}. ${reading}; ${p.attentionFolded} attention surprises; ${p.entitiesTouched} brands touched, ${p.deleted} pruned; suggestions +${p.suggestions.added}/${p.suggestions.counted}`;
 };
