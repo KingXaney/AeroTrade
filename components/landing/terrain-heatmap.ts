@@ -17,13 +17,3 @@ export const paintHeatmap = (canvas: HTMLCanvasElement, surface: MomentumSurface
     context.putImageData(image, 0, 0);
     return true;
 };
-
-// Whether this browser can draw the 3D scene at all.
-export const supportsWebGL = (): boolean => {
-    try {
-        const probe = document.createElement('canvas');
-        return Boolean(probe.getContext('webgl2') ?? probe.getContext('webgl'));
-    } catch {
-        return false;
-    }
-};

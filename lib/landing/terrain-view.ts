@@ -4,7 +4,10 @@
 
 import type {MomentumSurface, SurfaceCell} from "@/lib/landing/momentum-surface";
 
-export type Rgb = readonly [number, number, number];
+// The colour tuple and the token parser are lib/theme/css-color's, shared with the brain's graph;
+// re-exported here so the terrain's callers and tests keep one import.
+export {parseCssColor, type Rgb} from "@/lib/theme/css-color";
+import type {Rgb} from "@/lib/theme/css-color";
 
 // The diverging scale, symmetric about zero: teal below, magenta at zero, gold above. The
 // colours themselves are the --terrain-* tokens in app/globals.css (invariant 5: no hex in a
@@ -19,20 +22,6 @@ export const TERRAIN_STOPS = [
 
 // The five stops' colours, in TERRAIN_STOPS order.
 export type TerrainScale = readonly Rgb[];
-
-// A computed custom property's value: '#rgb', '#rrggbb', 'rgb(r, g, b)' or 'rgba(r, g, b, a)'
-// (the alpha is dropped). Anything else — a color-mix(), an empty string — is null.
-export const parseCssColor = (text: string): Rgb | null => {
-    const value = text.trim();
-    const hex = /^#([0-9a-f]{3}|[0-9a-f]{6})$/i.exec(value);
-    if (hex) {
-        const digits = hex[1].length === 3 ? hex[1].split('').map((c) => c + c).join('') : hex[1];
-        return [parseInt(digits.slice(0, 2), 16), parseInt(digits.slice(2, 4), 16), parseInt(digits.slice(4, 6), 16)];
-    }
-    const rgb = /^rgba?\(\s*(\d{1,3})\s*,\s*(\d{1,3})\s*,\s*(\d{1,3})\s*(?:,\s*[\d.]+\s*)?\)$/i.exec(value);
-    if (rgb) return [Number(rgb[1]), Number(rgb[2]), Number(rgb[3])];
-    return null;
-};
 
 const clamp = (value: number, low: number, high: number): number => Math.min(high, Math.max(low, value));
 

@@ -65,8 +65,13 @@ export const BRAIN_COPY = {
     views: {narratives: 'Narratives', navigator: 'AI Navigator', system: 'System'},
     thesesEmpty: 'No active theses yet. A narrative becomes a thesis once it keeps accumulating attention for several weeks — check back as the brain ingests more news.',
     graphEmpty: 'The brain is empty — it fills up as daily news is ingested.',
+    // The SVG fallback's legend and hint (components/brain/BrainGraph2D) …
     graphLegend: 'rings: themes · sectors · tickers — size = persistent attention, bold ring = active thesis',
     graphHint: 'click a node for evidence',
+    // … and the 3D graph's (components/brain/BrainGraph).
+    graphShells: 'shells: themes inner · sectors · tickers outer — size = persistent attention, halo = active thesis',
+    graphHint3d: 'drag to turn · click a node for evidence',
+    graphAria: 'News brain knowledge graph — themes on the inner shell, sectors in the middle, tickers outer',
     evidenceEmpty: 'No recent articles mention this entity.',
     secondOpinionAbout: 'A stronger model reads the same theses, decisions and headlines — and argues with them: where the narratives look crowded or stale, what contradicts them, and what to watch next. It only critiques; the deterministic rails still make every trade.',
     secondOpinionEmpty: 'No opinion yet — copy the prompt above, or ask Claude Code to fetch one.',

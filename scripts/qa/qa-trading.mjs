@@ -11,7 +11,7 @@
 // Run: npm run qa -- trading   (the harness: README.md)
 import {chromium} from 'playwright';
 import {MongoClient} from 'mongodb';
-import {BASE, MONGO, check, outDir, signUp, summary} from './lib.mjs';
+import {BASE, MONGO, check, outDir, settledClick, signUp, summary} from './lib.mjs';
 
 const OUT = outDir('trading');
 
@@ -261,7 +261,8 @@ try {
     // instance survives, so the ticket has to adopt the new symbol from its props.
     await page.goto(`${BASE}/trade?symbol=AAPL`, {waitUntil: 'domcontentloaded'});
     await symbolInput.waitFor({timeout: 30000});
-    await page.locator('a[aria-label="Trade MSFT"]').first().click();
+    // The strip sits at the fold after hours, when the ticket's queue note is two lines taller.
+    await settledClick(page.locator('a[aria-label="Trade MSFT"]').first());
     await page.waitForURL(/\/trade\?symbol=MSFT/, {timeout: 15000});
     await page.waitForTimeout(500);
     check('a same-route Trade link re-targets the ticket', (await symbolInput.inputValue()) === 'MSFT', await symbolInput.inputValue());
@@ -399,25 +400,37 @@ try {
     check('a ticker thesis links to the stock page and the ticket',
         await page.locator('a[href="/stocks/NVDA"]').count() >= 1 && await page.locator('a[href="/trade?symbol=NVDA"]').count() >= 1);
     check('no button is nested inside a link on /brain', await page.locator('a button').count() === 0);
-    // The knowledge graph's nodes are real links to the same evidence: a keyboard reaches them,
-    // and opening one lands on #evidence rather than on /brain's top.
+    // The knowledge graph's nodes are real links to the same evidence — in 3D they are the labels
+    // the scene floats over its canvas — so a keyboard reaches them, and opening one lands on
+    // #evidence rather than on /brain's top.
     const evidenceInView = () => page.waitForFunction(() => {
         const el = document.getElementById('evidence');
         if (!el) return false;
         const r = el.getBoundingClientRect();
         return r.top < innerHeight && r.bottom > 0;
     }, null, {timeout: 15000}).then(() => true, () => false);
-    const graphNode = page.locator('svg a[href="/brain?entity=NVDA#evidence"]');
+    const graphDrawn = () => page.locator('[data-brain-graph][data-brain-graph-state="ready"], [data-brain-graph][data-brain-graph-state="flat"]').first().waitFor({timeout: 30000}).catch(() => {});
+    await graphDrawn();
+    const graph = page.locator('[data-brain-graph]');
+    const graphKind = await graph.getAttribute('data-brain-graph');
+    check('the knowledge graph is drawn in 3D (the SVG rings stand in without WebGL)', graphKind === '3d' && await graph.locator('canvas').count() === 1, String(graphKind));
+    const graphNode = page.locator('[data-brain-graph] a[href="/brain?entity=NVDA#evidence"]');
+    await graphNode.waitFor({state: 'visible', timeout: 20000}).catch(() => {});
     check('a graph node links to its evidence', await graphNode.count() === 1);
-    check('the graph is not role="img", so its links stay exposed', await page.locator('svg[role="img"]:has(a)').count() === 0);
+    check('the graph is not role="img", so its links stay exposed', await page.locator('[role="img"]:has(a)').count() === 0 && (await graph.locator('[role="group"]').count()) === 1);
+    await shot('brain-graph');
     await graphNode.focus();
     check('a graph node takes keyboard focus', await graphNode.evaluate((el) => el === document.activeElement));
     await page.keyboard.press('Enter');
     check('Enter on a graph node opens its evidence, scrolled into view',
         await page.waitForURL(/\?entity=NVDA#evidence$/, {timeout: 15000}).then(() => true, () => false) && await evidenceInView(), page.url());
     await page.goto(`${BASE}/brain`, {waitUntil: 'domcontentloaded'});
-    await graphNode.scrollIntoViewIfNeeded();
-    await graphNode.click();
+    await graphDrawn();
+    await graphNode.waitFor({state: 'visible', timeout: 20000}).catch(() => {});
+    // The graph turns on its own, so a label is never "stable" for Playwright until a pointer or
+    // focus on it pauses the turn — as a hand arriving over it would.
+    await graphNode.focus();
+    await settledClick(graphNode);
     check('a click on a graph node opens its evidence, scrolled into view',
         await page.waitForURL(/\?entity=NVDA#evidence$/, {timeout: 15000}).then(() => true, () => false) && await evidenceInView(), page.url());
     await page.goto(`${BASE}/brain?entity=NVDA#evidence`, {waitUntil: 'domcontentloaded'});

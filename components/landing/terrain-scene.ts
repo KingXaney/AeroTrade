@@ -100,8 +100,6 @@ const DROP_EVERY = 5;
 const MIN_DISTANCE = 4;
 const MAX_DISTANCE = 30;
 const ZOOM_STEP = 0.1;
-// What the + and − buttons do to the distance.
-const ZOOM_BUTTON_FACTOR = 0.8;
 // A hair above the surface, so a line on it is not cut by its own facets.
 const LIFT = 0.015;
 // How much of the frame the fitted surface may use, in normalised device coordinates.

@@ -1,119 +1,182 @@
 'use client';
 
-import {useMemo, useState} from "react";
+import {useEffect, useMemo, useRef, useState} from "react";
 import Link from "next/link";
+import {useRouter} from "next/navigation";
 import {evidenceHref} from "@/lib/brain/links";
-import {cn} from "@/lib/utils";
-import type {BrainEntitySummary, BrainEntityType} from '@/lib/brain/types';
+import {layoutGraph, type GraphEdge} from "@/lib/brain/graph-layout";
+import type {BrainEntitySummary} from "@/lib/brain/types";
 import {BRAIN_COPY} from "@/lib/learn/copy/brain";
+import {readTokens, useCoarsePointer, useReducedMotion, useThemeStamp, useWebGL} from "@/components/three/scene-env";
+import type {GraphPalette, GraphScene} from "@/components/brain/graph-scene";
+import BrainGraph2D from "@/components/brain/BrainGraph2D";
+import {cn} from "@/lib/utils";
 
-type GraphNode = BrainEntitySummary;
-type GraphEdge = {source: string; target: string; weight: number};
+// The knowledge graph in 3D: the brain's entities on three concentric shells — themes inner,
+// sectors middle, tickers outer (lib/brain/graph-layout) — as spheres sized by persistent
+// attention and coloured by sentiment, an active thesis haloed, the links among them as lines.
+// The three.js scene (components/brain/graph-scene.ts) loads on demand; a browser without WebGL
+// gets the SVG rings (BrainGraph2D) instead, and an empty brain its empty state.
+//
+// Every entity's label is a real link to its evidence (evidenceHref), placed over the canvas by
+// the scene, so Tab reaches it and Enter opens it exactly as the SVG's nodes did; the canvas
+// itself is aria-hidden and the host is role="group", never "img". Hover or focus on a label
+// lights its sphere and links; a click on a sphere opens the same evidence. Colours are the
+// theme's tokens read from the document (invariant 5); motion follows the OS setting and the
+// in-app toggle.
 
-// Hand-rolled SVG knowledge graph (PerformanceChart precedent — no chart deps).
-// Deterministic concentric-ring layout: themes inner, sectors middle, tickers outer;
-// angle by slow-weight rank within the ring. No physics sim — stable between renders.
-// Each node is a link to its evidence (evidenceHref), so Tab reaches it and Enter opens it;
-// focus lights it the way hover does.
+type Props = {nodes: BrainEntitySummary[]; edges: GraphEdge[]};
 
-const WIDTH = 720;
-const HEIGHT = 440;
-const CX = WIDTH / 2;
-const CY = HEIGHT / 2;
-const RING_RADII: Record<BrainEntityType, number> = {theme: 70, sector: 130, ticker: 190};
-const MIN_NODE_R = 6;
-const MAX_NODE_R = 22;
+const TOKENS = {positive: '--positive', negative: '--negative', muted: '--fg-muted', brand: '--brand', line: '--line-strong', fg: '--fg'} as const;
+const readPalette = (): GraphPalette => readTokens(TOKENS);
+const MAX_LABEL = 16;
 
-const sentimentColor = (s: number) => (s > 0.05 ? 'var(--positive)' : s < -0.05 ? 'var(--negative)' : 'var(--fg-muted)');
+const BrainGraph = ({nodes, edges}: Props) => {
+    const webgl = useWebGL();
+    const stamp = useThemeStamp();
+    const osReduced = useReducedMotion();
+    const coarse = useCoarsePointer();
+    const reduced = osReduced || stamp.endsWith('|reduced');
+    const router = useRouter();
 
-const BrainGraph = ({nodes, edges}: {nodes: GraphNode[]; edges: GraphEdge[]}) => {
-    const [hoverKey, setHoverKey] = useState<string | null>(null);
+    const [sceneFailed, setSceneFailed] = useState(false);
+    const [ready, setReady] = useState(false);
+    const [hover, setHover] = useState<string | null>(null);
+    const [rotating, setRotating] = useState(false);
+    const points = useMemo(() => layoutGraph(nodes, edges), [nodes, edges]);
 
-    const layout = useMemo(() => {
-        const byType: Record<BrainEntityType, GraphNode[]> = {theme: [], sector: [], ticker: []};
-        for (const n of nodes) byType[n.type].push(n);
+    const hostRef = useRef<HTMLDivElement>(null);
+    const canvasRef = useRef<HTMLCanvasElement>(null);
+    const sceneRef = useRef<GraphScene | null>(null);
+    const labelRefs = useRef<(HTMLElement | null)[]>([]);
+    const reducedRef = useRef(reduced);
+    const coarseRef = useRef(coarse);
 
-        const maxWeight = Math.max(...nodes.map((n) => n.weightSlow), 0.001);
-        const positions = new Map<string, {x: number; y: number; r: number; node: GraphNode}>();
-        for (const type of ['theme', 'sector', 'ticker'] as const) {
-            const ring = byType[type].sort((a, b) => b.weightSlow - a.weightSlow);
-            ring.forEach((node, i) => {
-                // Evenly spaced by rank, heaviest at 12 o'clock.
-                const angle = (i / Math.max(ring.length, 1)) * 2 * Math.PI - Math.PI / 2;
-                const radius = RING_RADII[type];
-                positions.set(node.key, {
-                    x: CX + radius * Math.cos(angle),
-                    y: CY + radius * Math.sin(angle),
-                    r: MIN_NODE_R + (MAX_NODE_R - MIN_NODE_R) * Math.sqrt(node.weightSlow / maxWeight),
-                    node,
-                });
+    const threeD = webgl === true && !sceneFailed && nodes.length > 0;
+
+    useEffect(() => {
+        reducedRef.current = reduced;
+        sceneRef.current?.setReduceMotion(reduced);
+    }, [reduced]);
+    useEffect(() => {
+        coarseRef.current = coarse;
+    }, [coarse]);
+
+    // The scene, once there is WebGL and a canvas; a failure falls back to the SVG.
+    useEffect(() => {
+        if (!threeD) return;
+        const canvas = canvasRef.current;
+        if (!canvas) return;
+        let cancelled = false;
+        let scene: GraphScene | null = null;
+        import('@/components/brain/graph-scene')
+            .then(({createGraphScene}) => {
+                if (cancelled) return;
+                try {
+                    scene = createGraphScene({
+                        canvas,
+                        points,
+                        edges,
+                        palette: readPalette(),
+                        reduceMotion: reducedRef.current,
+                        coarsePointer: coarseRef.current,
+                        onHover: setHover,
+                        onPick: (key) => router.push(evidenceHref(key)),
+                        onRotating: setRotating,
+                        labels: () => labelRefs.current,
+                    });
+                    sceneRef.current = scene;
+                    setReady(true);
+                } catch (error) {
+                    console.error('Knowledge graph: the scene could not start', error);
+                    setSceneFailed(true);
+                }
+            })
+            .catch(() => {
+                if (!cancelled) setSceneFailed(true);
             });
-        }
-        const maxEdge = Math.max(...edges.map((e) => e.weight), 0.001);
-        return {positions, maxEdge};
-    }, [nodes, edges]);
+        return () => {
+            cancelled = true;
+            scene?.dispose();
+            sceneRef.current = null;
+        };
+    }, [threeD, points, edges, router]);
+
+    // Draw only while the panel is on screen and the tab is visible.
+    useEffect(() => {
+        if (!threeD) return;
+        const host = hostRef.current;
+        if (!host) return;
+        let inView = true;
+        const apply = () => sceneRef.current?.setActive(inView && !document.hidden);
+        const observer = new IntersectionObserver(([entry]) => {
+            inView = entry?.isIntersecting ?? true;
+            apply();
+        });
+        observer.observe(host);
+        document.addEventListener('visibilitychange', apply);
+        return () => {
+            observer.disconnect();
+            document.removeEventListener('visibilitychange', apply);
+        };
+    }, [threeD]);
+
+    // The theme's tokens, on first draw and whenever the page is repainted.
+    useEffect(() => {
+        sceneRef.current?.setPalette(readPalette());
+    }, [stamp, ready]);
 
     if (nodes.length === 0) {
         return (
-            <div className="flex flex-col items-center justify-center py-12 text-center">
+            <div className="flex flex-col items-center justify-center py-12 text-center" data-brain-graph="empty">
                 <span className="material-symbols-outlined text-3xl text-fg-muted mb-2">neurology</span>
                 <p className="text-sm text-fg-muted">{BRAIN_COPY.graphEmpty}</p>
             </div>
         );
     }
+    if (webgl === false || sceneFailed) return <BrainGraph2D nodes={nodes} edges={edges} />;
 
-    const hovered = hoverKey ? layout.positions.get(hoverKey) : null;
+    const hovered = hover === null ? null : points.find((p) => p.key === hover) ?? null;
+    const light = (key: string | null) => sceneRef.current?.setHover(key);
 
     return (
-        <div>
-            {/* role="group", not "img": an img's descendants are presentational, which would hide
-                every node link from assistive technology. */}
-            <svg viewBox={`0 0 ${WIDTH} ${HEIGHT}`} className="w-full h-auto" role="group"
-                 aria-label="News brain knowledge graph — themes inner ring, sectors middle, tickers outer">
-                {/* Ring guides */}
-                {(['theme', 'sector', 'ticker'] as const).map((type) => (
-                    <circle key={type} cx={CX} cy={CY} r={RING_RADII[type]} fill="none"
-                            className="stroke-line-strong/25" strokeDasharray="3 5" strokeWidth="1" />
-                ))}
-
-                {/* Edges */}
-                {edges.map((e) => {
-                    const a = layout.positions.get(e.source);
-                    const b = layout.positions.get(e.target);
-                    if (!a || !b) return null;
-                    const active = hoverKey === e.source || hoverKey === e.target;
-                    return (
-                        <line key={`${e.source}|${e.target}`} x1={a.x} y1={a.y} x2={b.x} y2={b.y}
-                              className={active ? 'stroke-brand' : 'stroke-line-strong'}
-                              strokeOpacity={active ? 0.8 : 0.25 + 0.5 * (e.weight / layout.maxEdge)}
-                              strokeWidth={active ? 1.5 : 1} />
-                    );
-                })}
-
-                {/* Nodes */}
-                {Array.from(layout.positions.values()).map(({x, y, r, node}) => (
-                    <Link key={node.key} href={evidenceHref(node.key)}
-                          aria-label={`${node.displayName} — evidence`}
-                          className="cursor-pointer focus-visible:outline-2 focus-visible:outline-brand"
-                          onMouseEnter={() => setHoverKey(node.key)}
-                          onMouseLeave={() => setHoverKey(null)}
-                          onFocus={() => setHoverKey(node.key)}
-                          onBlur={() => setHoverKey(null)}>
-                        <circle cx={x} cy={y} r={r}
-                                style={{fill: sentimentColor(node.sentimentSlow), stroke: sentimentColor(node.sentimentSlow)}}
-                                fillOpacity={node.thesisSince !== null ? 0.35 : 0.15}
-                                strokeWidth={node.thesisSince !== null ? 2 : 1} />
-                        <text x={x} y={y + r + 11} textAnchor="middle" fontSize="9"
-                              className={cn('font-mono', hoverKey === node.key ? 'fill-fg' : 'fill-fg-muted')}>
-                            {node.displayName.length > 14 ? `${node.displayName.slice(0, 13)}…` : node.displayName}
-                        </text>
+        <div data-brain-graph="3d" data-brain-graph-state={ready ? 'ready' : 'loading'} data-brain-graph-rotating={rotating ? 'true' : 'false'}>
+            <div
+                ref={hostRef}
+                role="group"
+                aria-label={BRAIN_COPY.graphAria}
+                className="relative aspect-[16/10] w-full overflow-hidden rounded-[var(--panel-radius)]"
+                style={{touchAction: 'pan-y'}}
+            >
+                <canvas ref={canvasRef} aria-hidden="true" className="block h-full w-full" />
+                {!ready && <div className="absolute inset-0 animate-pulse bg-surface-2/40" aria-hidden="true" />}
+                {points.map((p, i) => (
+                    <Link
+                        key={p.key}
+                        href={evidenceHref(p.key)}
+                        aria-label={`${p.node.displayName} — evidence`}
+                        data-graph-node={p.key}
+                        ref={(element) => {
+                            labelRefs.current[i] = element;
+                        }}
+                        className={cn(
+                            'absolute left-0 top-0 -translate-x-1/2 -translate-y-full whitespace-nowrap rounded border px-1.5 py-0.5 font-mono text-[10px] transition-colors focus-visible:outline-2 focus-visible:outline-brand',
+                            hover === p.key ? 'border-brand/50 bg-surface-1/95 text-fg' : 'border-line-strong/30 bg-surface-1/80 text-fg-soft hover:text-fg',
+                        )}
+                        style={{visibility: 'hidden'}}
+                        onMouseEnter={() => light(p.key)}
+                        onMouseLeave={() => light(null)}
+                        onFocus={() => light(p.key)}
+                        onBlur={() => light(null)}
+                    >
+                        {p.node.displayName.length > MAX_LABEL ? `${p.node.displayName.slice(0, MAX_LABEL - 1)}…` : p.node.displayName}
                     </Link>
                 ))}
-            </svg>
+            </div>
 
             <div className="flex items-center justify-between mt-2 text-[10px] text-fg-muted font-mono">
-                <span>{BRAIN_COPY.graphLegend}</span>
-                <span>{hovered ? `${hovered.node.displayName} · weight ${hovered.node.weightSlow.toFixed(1)}` : BRAIN_COPY.graphHint}</span>
+                <span>{BRAIN_COPY.graphShells}</span>
+                <span>{hovered ? `${hovered.node.displayName} · weight ${hovered.node.weightSlow.toFixed(1)}` : BRAIN_COPY.graphHint3d}</span>
             </div>
         </div>
     );
