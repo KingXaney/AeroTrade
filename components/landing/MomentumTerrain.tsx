@@ -39,6 +39,9 @@ const SURFACE_URL = '/api/landing/surface';
 const GREY: Rgb = [128, 128, 128];
 const DEFAULT_ROW = Math.max(0, LOOKBACKS.indexOf(20));
 const THEME_ATTRIBUTES = ['data-palette', 'data-style', 'data-mode', 'data-motion'];
+// One press of − or + : the camera's distance, times this.
+const ZOOM_IN = 0.8;
+const ZOOM_OUT = 1.25;
 // The canvas: the landing's hero column, or a full-width panel on Home. 4:3 and 16:9 under lg.
 const SIZE: Record<Size, string> = {
     hero: 'aspect-[4/3] max-h-[520px] lg:aspect-auto lg:h-[500px] lg:max-h-none',
@@ -114,6 +117,8 @@ const MomentumTerrain = ({initial, eyebrow = true, size = 'hero', children}: Pro
     const [preset, setPreset] = useState<CameraPreset>('angle');
     const [flat, setFlat] = useState(false);
     const [rotating, setRotating] = useState(false);
+    // The camera's distance from the surface, for the zoom buttons' state and the QA's eyes.
+    const [distance, setDistance] = useState<number | null>(null);
 
     const webgl = useWebGL();
     const stamp = useThemeStamp();
@@ -183,6 +188,7 @@ const MomentumTerrain = ({initial, eyebrow = true, size = 'hero', children}: Pro
                         coarsePointer: coarseRef.current,
                         onHover: setHover,
                         onRotating: setRotating,
+                        onZoom: setDistance,
                         markers: () => markerRefs.current,
                     });
                     sceneRef.current = scene;
@@ -235,6 +241,7 @@ const MomentumTerrain = ({initial, eyebrow = true, size = 'hero', children}: Pro
         setFlat(!flat);
         sceneRef.current?.setFlat(!flat);
     };
+    const zoom = (factor: number) => sceneRef.current?.zoom(factor);
 
     const drawn = surface !== null && (status === 'ready' || status === 'flat');
     const days = surface?.dates.length ?? 0;
@@ -245,7 +252,14 @@ const MomentumTerrain = ({initial, eyebrow = true, size = 'hero', children}: Pro
     const cell = hover?.cell ?? null;
 
     return (
-        <div data-terrain data-terrain-size={size} data-terrain-state={status} data-terrain-motion={reduced ? 'reduced' : 'auto'} data-terrain-rotating={rotating ? 'true' : 'false'}>
+        <div
+            data-terrain
+            data-terrain-size={size}
+            data-terrain-state={status}
+            data-terrain-motion={reduced ? 'reduced' : 'auto'}
+            data-terrain-rotating={rotating ? 'true' : 'false'}
+            data-terrain-distance={distance === null ? undefined : distance.toFixed(1)}
+        >
             {eyebrow && <MicroLabel tone="brand">{TERRAIN_COPY.eyebrow}</MicroLabel>}
             <div
                 ref={hostRef}
@@ -328,6 +342,10 @@ const MomentumTerrain = ({initial, eyebrow = true, size = 'hero', children}: Pro
                                 >
                                     {flat ? TERRAIN_COPY.raise : TERRAIN_COPY.flatten}
                                 </ActionButton>
+                                <div role="group" aria-label={TERRAIN_COPY.zoomLabel} className="flex gap-1">
+                                    <ActionButton variant="secondary" size="xs" aria-label={TERRAIN_COPY.zoomIn} data-terrain-zoom="in" className="font-mono" onClick={() => zoom(ZOOM_IN)}>+</ActionButton>
+                                    <ActionButton variant="secondary" size="xs" aria-label={TERRAIN_COPY.zoomOut} data-terrain-zoom="out" className="font-mono" onClick={() => zoom(ZOOM_OUT)}>−</ActionButton>
+                                </div>
                             </>
                         )}
                         <p className="ml-auto text-xs text-fg-muted">

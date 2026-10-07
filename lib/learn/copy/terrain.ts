@@ -18,8 +18,11 @@ export const TERRAIN_COPY = {
     // Under the canvas: the three axes. `days` is how many sessions the surface shows.
     caption: (days: number): string =>
         `Left to right, the last ${days} sessions. Front to back, lookbacks from 5 to 250 days. Height and colour, normalised momentum of SPY's total return.`,
-    hint: 'Drag to turn, hover a point for its date; Ctrl and the wheel zoom.',
-    hintTouch: 'Tap a point for its date.',
+    hint: 'Drag to turn, hover a point for its date. Zoom with + and −, a pinch, or the wheel once you have grabbed the surface.',
+    hintTouch: 'Tap a point for its date; + and − zoom.',
+    zoomLabel: 'Zoom',
+    zoomIn: 'Zoom in',
+    zoomOut: 'Zoom out',
     loading: 'Drawing the last year of SPY…',
     unavailable: 'The terrain draws once the nightly price jobs have stored a year of SPY closes.',
     flat: 'Drawn flat: this browser has no WebGL.',

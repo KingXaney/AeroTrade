@@ -60,6 +60,11 @@ adjusted series is only inside `z`.
   aspect — the nearest camera that keeps the cylinder the surface turns inside in frame, from any
   azimuth — and slides the look-at point so the surface sits in the middle of the canvas. A preset
   tweens both the position and the look-at point; a resize re-fits in place.
+- The footprint is 3:2 (12 × 8 world units), not the plan's 3:1: the data is 250 sessions across
+  and 7 lookbacks deep, and the plan drew it wide so a day stays a thin column; 3:2 keeps that and
+  sits better in a wide panel, as the owner asked. Zoom: + and − buttons, a pinch (Ctrl/Meta and
+  the wheel), or the bare wheel once the surface has been grabbed — idle, the wheel scrolls the
+  page, so a visitor is never trapped over the hero.
 - The canvas is `role="img"` with an `aria-label` built from the data; the tooltip is hover-only
   and `aria-hidden`; presets and the flatten toggle are real buttons with `aria-pressed`.
 - Reduced motion (the OS setting or `html[data-motion="reduced"]`): no auto-rotate, no intro rise,

@@ -223,6 +223,18 @@ try {
         await flatten.click();
         await page.waitForTimeout(900);
 
+        // zoom: + brings the camera in, − takes it out; the distance is on the terrain for the eye
+        const distanceOf = async () => Number(await terrain.getAttribute('data-terrain-distance'));
+        const before = await distanceOf();
+        await box.locator('[data-terrain-zoom="in"]').click();
+        await page.waitForTimeout(300);
+        const closer = await distanceOf();
+        await box.locator('[data-terrain-zoom="out"]').click();
+        await box.locator('[data-terrain-zoom="out"]').click();
+        await page.waitForTimeout(300);
+        const farther = await distanceOf();
+        check('…+ brings the camera in and − takes it out', before > 0 && closer < before && farther > closer, `${before} → ${closer} → ${farther}`);
+
         // hover: the tooltip, the marker and the slice follow the pointer. The clicks above
         // scrolled the page; the canvas has to be in the viewport for the pointer to reach it.
         await page.evaluate(() => window.scrollTo(0, 0));
