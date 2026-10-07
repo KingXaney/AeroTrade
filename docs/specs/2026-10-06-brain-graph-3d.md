@@ -11,17 +11,20 @@ demand, on-demand rendering, theme tokens read from the document, a fallback wit
 ## What
 
 - **Layout**, `lib/brain/graph-layout` (pure, unit-tested): the SVG's rings become three concentric
-  shells — themes inner, sectors middle, tickers outer — so the legend keeps its meaning. Each shell
-  starts as a Fibonacci sphere ordered by slow weight, the heaviest at a pole of that shell's own
-  (the tickers' faces the camera's opening position, the themes' is to its upper left, the sectors'
-  to its lower right), so the three heaviest entities never open stacked on one line. A short
-  relaxation then moves every entity's *direction*: linked entities pull together, every pair pushes
-  apart whatever their shells, and the shell only sets the radius — so an edge is short where the
-  news ties two names together and no two names sit on one line from the centre. Deterministic for
-  one input, so the graph is stable between renders, as the rings were.
+  shells — themes inner, sectors middle, tickers outer — so the legend keeps its meaning. The n
+  entities take n directions spread evenly over the sphere (a Fibonacci lattice turned so its first
+  point faces the camera's opening position), seated in weight order: the heaviest faces the camera,
+  an entity with links to seated ones takes the free direction nearest them (weighted by the links),
+  one without takes the free direction farthest from everything seated. The shell only sets the
+  radius. So spacing is guaranteed — twenty entities are never under 30° apart from the centre,
+  however densely the news links them — and a linked pair still sits side by side where a slot
+  allows. A first version relaxed directions with attraction and repulsion; with the real brain's
+  dense links it clumped. Deterministic for one input, so the graph is stable between renders.
 - **Scene**, `components/brain/graph-scene`: spheres sized by the square root of the share of the
   heaviest weight and coloured by sentiment (`--positive`, `--negative`, `--fg-muted`); a thesis gets
-  a brand-coloured halo; the links are lines brightened by weight; the shells are faint rings at
+  a brand-coloured halo; the links at rest are each entity's three heaviest (`restingEdges`, so a
+  densely linked brain is a constellation, not a hairball), lines brightened by weight, and a lit
+  entity shows all of its links in the brand colour; the shells are faint rings at
   their equators. A slow auto-rotation that pauses under a hand and resumes after six seconds; a
   bloom from the centre on first draw; hover or focus lights an entity and its links; a click on a
   sphere opens its evidence. Zoom with Ctrl/Meta and the wheel, or the wheel once the graph is grabbed.

@@ -270,9 +270,12 @@ and friends keep none beyond Shared and the invariants).
 - The Knowledge Graph is 3D: `components/brain/BrainGraph` over `components/brain/graph-scene`
   (three.js, loaded on demand). The entities sit on three concentric shells — themes inner,
   sectors middle, tickers outer — placed by the pure `lib/brain/graph-layout` (deterministic for
-  one input: each shell spread from a pole of its own, then every entity's direction relaxed —
-  linked ones pulled together, every pair pushed apart whatever their shells), as spheres sized by slow
-  weight and coloured by sentiment, a thesis haloed, the links as lines. Each label is a real link
+  one input: every entity takes one of n directions spread evenly over the sphere — the heaviest
+  facing the camera, a linked one beside its links, an unlinked one as far from the rest as it
+  can — and its shell only sets the radius, so no two names are ever close from the centre
+  however densely the news links them), as spheres sized by slow
+  weight and coloured by sentiment, a thesis haloed, each entity's heaviest links as lines
+  (`restingEdges`; all of an entity's links while it is lit). Each label is a real link
   to `evidenceHref`, floated over the canvas by the scene, so Tab and Enter work as the SVG's nodes
   did; the canvas is `aria-hidden`, the host `role="group"`, never `img`. Without WebGL the SVG
   rings draw instead (`components/brain/BrainGraph2D`). Both scenes read the page through

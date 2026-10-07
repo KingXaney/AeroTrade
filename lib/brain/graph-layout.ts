@@ -1,9 +1,10 @@
 // Where the knowledge graph's entities sit in space. Pure, and deterministic for one input, so the
 // 3D graph (components/brain/BrainGraph, graph-scene) is stable between renders, as the SVG's
 // ring layout was. Three concentric shells keep the SVG's meaning — themes inner, sectors middle,
-// tickers outer — and a short relaxation of every entity's *direction* pulls linked entities
-// toward each other and pushes every pair apart, whatever their shells, so an edge is short where
-// the news ties two names together and no two names sit on one line from the centre.
+// tickers outer — and every entity takes one of n directions spread evenly over the sphere, so no
+// two names are ever close from the centre's point of view, however densely the news links them:
+// the heaviest faces the camera, a linked entity sits beside its links, an unlinked one as far
+// from the rest as it can. The shell only sets the radius.
 
 import type {BrainEntitySummary, BrainEntityType} from "@/lib/brain/types";
 
@@ -21,33 +22,24 @@ export type GraphPoint = {
 
 type Vec = {x: number; y: number; z: number};
 
-// World units; the camera stands 12 away (graph-scene's CAMERA_DISTANCE).
-export const SHELL_RADII: Record<BrainEntityType, number> = {theme: 1.1, sector: 2.2, ticker: 3.3};
+// World units; the camera stands CAMERA_DISTANCE away along VIEW_DIRECTION (graph-scene).
+export const SHELL_RADII: Record<BrainEntityType, number> = {theme: 1.6, sector: 2.8, ticker: 4};
 export const MIN_NODE_R = 0.12;
 export const MAX_NODE_R = 0.42;
-export const RELAX_STEPS = 160;
-// How far one step of the relaxation moves a direction, and how the two forces weigh.
-const STEP = 0.04;
-const ATTRACT = 0.5;
-const REPEL = 0.12;
 
 const unit = (v: Vec): Vec => {
     const n = Math.hypot(v.x, v.y, v.z) || 1;
     return {x: v.x / n, y: v.y / n, z: v.z / n};
 };
+const dot = (a: Vec, b: Vec): number => a.x * b.x + a.y * b.y + a.z * b.z;
 const cross = (a: Vec, b: Vec): Vec => ({x: a.y * b.z - a.z * b.y, y: a.z * b.x - a.x * b.z, z: a.x * b.y - a.y * b.x});
+// The angle between two directions, in radians.
+const angle = (a: Vec, b: Vec): number => Math.acos(Math.min(1, Math.max(-1, dot(a, b))));
 
-// Each shell's distribution has a pole of its own, so the heaviest theme, sector and ticker do
-// not open stacked on one line. The tickers' pole faces the camera's opening position
-// (graph-scene), so the heaviest ticker is the first thing read; the themes' is to its upper
-// left and the sectors' to its lower right, each about 70° away.
-export const SHELL_POLES: Record<BrainEntityType, Vec> = {
-    ticker: unit({x: 0.55, y: 0.35, z: 0.76}),
-    theme: unit({x: -0.5, y: 0.65, z: 0.57}),
-    sector: unit({x: 0.8, y: -0.55, z: 0.1}),
-};
+// Where the camera opens, as a direction from the centre; the heaviest entity faces it.
+export const VIEW_DIRECTION: Vec = unit({x: 0.55, y: 0.35, z: 0.76});
 
-// The i-th of n points spread evenly over a unit sphere, the first at the top (0, 1, 0).
+// The i-th of n points spread evenly over the unit sphere (a Fibonacci lattice).
 const fibonacciPoint = (i: number, n: number): Vec => {
     if (n === 1) return {x: 0, y: 1, z: 0};
     const golden = Math.PI * (3 - Math.sqrt(5));
@@ -57,71 +49,102 @@ const fibonacciPoint = (i: number, n: number): Vec => {
     return {x: Math.cos(theta) * ring, y, z: Math.sin(theta) * ring};
 };
 
-// The frame whose +y is `pole`: maps a point of the unit sphere onto a sphere with that pole.
-const frameOf = (pole: Vec) => {
-    const helper = Math.abs(pole.y) < 0.9 ? {x: 0, y: 1, z: 0} : {x: 1, y: 0, z: 0};
-    const e1 = unit(cross(helper, pole));
-    const e2 = cross(pole, e1);
-    return (p: Vec): Vec => ({
-        x: p.x * e1.x + p.y * pole.x + p.z * e2.x,
-        y: p.x * e1.y + p.y * pole.y + p.z * e2.y,
-        z: p.x * e1.z + p.y * pole.z + p.z * e2.z,
-    });
+// The rotation taking unit vector `from` to unit vector `to` (Rodrigues), as a function.
+const rotationTaking = (from: Vec, to: Vec): ((v: Vec) => Vec) => {
+    const axis = cross(from, to);
+    const s = Math.hypot(axis.x, axis.y, axis.z);
+    const c = dot(from, to);
+    if (s < 1e-9) {
+        if (c > 0) return (v) => v;
+        // Opposite directions: a half turn about any axis perpendicular to `from`.
+        const perpendicular = unit(cross(from, Math.abs(from.y) < 0.9 ? {x: 0, y: 1, z: 0} : {x: 1, y: 0, z: 0}));
+        return (v) => {
+            const along = dot(v, perpendicular);
+            return {x: 2 * along * perpendicular.x - v.x, y: 2 * along * perpendicular.y - v.y, z: 2 * along * perpendicular.z - v.z};
+        };
+    }
+    const k = {x: axis.x / s, y: axis.y / s, z: axis.z / s};
+    return (v) => {
+        const kv = cross(k, v);
+        const kd = dot(k, v);
+        return {
+            x: v.x * c + kv.x * s + k.x * kd * (1 - c),
+            y: v.y * c + kv.y * s + k.y * kd * (1 - c),
+            z: v.z * c + kv.z * s + k.z * kd * (1 - c),
+        };
+    };
 };
 
-type LayoutOptions = {steps?: number};
+// n directions spread evenly over the sphere, the first exactly at VIEW_DIRECTION.
+export const spreadDirections = (n: number): Vec[] => {
+    const points = Array.from({length: n}, (_, i) => fibonacciPoint(i, n));
+    const face = rotationTaking(points[0], VIEW_DIRECTION);
+    return points.map((p) => unit(face(p)));
+};
 
-export const layoutGraph = (nodes: readonly BrainEntitySummary[], edges: readonly GraphEdge[], {steps = RELAX_STEPS}: LayoutOptions = {}): GraphPoint[] => {
+// The links drawn while nothing is lit: each entity's heaviest few, so a densely linked brain is a
+// constellation rather than a hairball. A link stays when it is among either end's heaviest, so an
+// entity with one link always shows it; a lit entity shows all of its links (graph-scene).
+export const RESTING_LINKS_PER_ENTITY = 3;
+export const restingEdges = (edges: readonly GraphEdge[], perEntity = RESTING_LINKS_PER_ENTITY): GraphEdge[] => {
+    const byEntity = new Map<string, GraphEdge[]>();
+    for (const edge of edges) {
+        if (edge.source === edge.target) continue;
+        for (const key of [edge.source, edge.target]) {
+            const list = byEntity.get(key) ?? [];
+            list.push(edge);
+            byEntity.set(key, list);
+        }
+    }
+    const kept = new Set<GraphEdge>();
+    for (const list of byEntity.values()) {
+        const heaviest = [...list].sort((a, b) => b.weight - a.weight || `${a.source}|${a.target}`.localeCompare(`${b.source}|${b.target}`));
+        for (const edge of heaviest.slice(0, perEntity)) kept.add(edge);
+    }
+    return edges.filter((edge) => kept.has(edge));
+};
+
+export const layoutGraph = (nodes: readonly BrainEntitySummary[], edges: readonly GraphEdge[]): GraphPoint[] => {
     if (nodes.length === 0) return [];
     const maxWeight = Math.max(...nodes.map((n) => n.weightSlow), 0.001);
-
-    // Start: each type spread over its own sphere, by rank, the heaviest at that shell's pole.
-    const directions = new Map<string, Vec>();
-    const byType: Record<BrainEntityType, BrainEntitySummary[]> = {theme: [], sector: [], ticker: []};
-    for (const node of nodes) byType[node.type].push(node);
-    for (const type of ['theme', 'sector', 'ticker'] as const) {
-        const shell = [...byType[type]].sort((a, b) => b.weightSlow - a.weightSlow || a.key.localeCompare(b.key));
-        const place = frameOf(SHELL_POLES[type]);
-        shell.forEach((node, i) => directions.set(node.key, place(fibonacciPoint(i, shell.length))));
+    const known = edges.filter((e) => e.source !== e.target);
+    const linkWeight = new Map<string, number>();
+    for (const e of known) {
+        const pair = `${e.source}\u0000${e.target}`;
+        const back = `${e.target}\u0000${e.source}`;
+        linkWeight.set(pair, Math.max(linkWeight.get(pair) ?? 0, e.weight));
+        linkWeight.set(back, Math.max(linkWeight.get(back) ?? 0, e.weight));
     }
 
-    // Relax the directions: linked entities pull, every pair pushes, each kept a unit vector.
-    const known = edges.filter((e) => directions.has(e.source) && directions.has(e.target) && e.source !== e.target);
-    const maxEdge = Math.max(...known.map((e) => e.weight), 0.001);
-    const keys = nodes.map((n) => n.key);
-    for (let step = 0; step < steps; step += 1) {
-        const forces = new Map<string, Vec>(keys.map((k) => [k, {x: 0, y: 0, z: 0}]));
-        for (const edge of known) {
-            const a = directions.get(edge.source)!;
-            const b = directions.get(edge.target)!;
-            const pull = ATTRACT * (0.2 + edge.weight / maxEdge);
-            const fa = forces.get(edge.source)!;
-            const fb = forces.get(edge.target)!;
-            fa.x += (b.x - a.x) * pull; fa.y += (b.y - a.y) * pull; fa.z += (b.z - a.z) * pull;
-            fb.x += (a.x - b.x) * pull; fb.y += (a.y - b.y) * pull; fb.z += (a.z - b.z) * pull;
-        }
-        for (let i = 0; i < keys.length; i += 1) {
-            for (let j = i + 1; j < keys.length; j += 1) {
-                const a = directions.get(keys[i])!;
-                const b = directions.get(keys[j])!;
-                const dx = a.x - b.x, dy = a.y - b.y, dz = a.z - b.z;
-                const d2 = Math.max(dx * dx + dy * dy + dz * dz, 0.02);
-                const push = REPEL / d2;
-                const fa = forces.get(keys[i])!;
-                const fb = forces.get(keys[j])!;
-                fa.x += dx * push; fa.y += dy * push; fa.z += dz * push;
-                fb.x -= dx * push; fb.y -= dy * push; fb.z -= dz * push;
+    // Seat the entities in weight order: the heaviest faces the camera; one with links to seated
+    // entities takes the free direction nearest them, weighted by the links; one without takes the
+    // free direction farthest from everything seated. Ties go to the lower slot, which is nearer
+    // the front.
+    const slots = spreadDirections(nodes.length);
+    const free = slots.map((_, i) => i);
+    const seated = new Map<string, Vec>();
+    const order = [...nodes].sort((a, b) => b.weightSlow - a.weightSlow || a.key.localeCompare(b.key));
+    for (const node of order) {
+        let best = free[0];
+        if (seated.size > 0) {
+            const links = [...seated].map(([key, dir]) => [linkWeight.get(`${node.key}\u0000${key}`) ?? 0, dir] as const).filter(([w]) => w > 0);
+            let bestScore = Infinity;
+            for (const slot of free) {
+                const score = links.length > 0
+                    ? links.reduce((sum, [w, dir]) => sum + w * angle(slots[slot], dir), 0)
+                    : -Math.min(...[...seated.values()].map((dir) => angle(slots[slot], dir)));
+                if (score < bestScore - 1e-12) {
+                    bestScore = score;
+                    best = slot;
+                }
             }
         }
-        for (const key of keys) {
-            const u = directions.get(key)!;
-            const f = forces.get(key)!;
-            directions.set(key, unit({x: u.x + f.x * STEP, y: u.y + f.y * STEP, z: u.z + f.z * STEP}));
-        }
+        free.splice(free.indexOf(best), 1);
+        seated.set(node.key, slots[best]);
     }
 
     return nodes.map((node) => {
-        const u = directions.get(node.key)!;
+        const u = seated.get(node.key)!;
         const radius = SHELL_RADII[node.type];
         return {key: node.key, x: u.x * radius, y: u.y * radius, z: u.z * radius, r: MIN_NODE_R + (MAX_NODE_R - MIN_NODE_R) * Math.sqrt(node.weightSlow / maxWeight), node};
     });

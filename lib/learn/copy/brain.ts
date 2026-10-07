@@ -69,8 +69,8 @@ export const BRAIN_COPY = {
     graphLegend: 'rings: themes · sectors · tickers — size = persistent attention, bold ring = active thesis',
     graphHint: 'click a node for evidence',
     // … and the 3D graph's (components/brain/BrainGraph).
-    graphShells: 'shells: themes inner · sectors · tickers outer — size = persistent attention, halo = active thesis',
-    graphHint3d: 'drag to turn · click a node for evidence',
+    graphShells: 'shells: themes inner · sectors · tickers outer — size = persistent attention, halo = active thesis, lines = heaviest links',
+    graphHint3d: 'drag to turn · hover a node for all of its links · click it for evidence',
     graphAria: 'News brain knowledge graph — themes on the inner shell, sectors in the middle, tickers outer',
     evidenceEmpty: 'No recent articles mention this entity.',
     secondOpinionAbout: 'A stronger model reads the same theses, decisions and headlines — and argues with them: where the narratives look crowded or stale, what contradicts them, and what to watch next. It only critiques; the deterministic rails still make every trade.',
