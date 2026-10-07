@@ -23,6 +23,8 @@ import {getLearnFacts, getOnboardingFacts} from "@/lib/learn/facts-store";
 import type {LearnFacts, OnboardingFacts} from "@/lib/learn/facts";
 import {getTodaysLesson} from "@/lib/learn/lesson-store";
 import {getDailyPuzzleCard, type DailyPuzzleCardView} from "@/lib/games/store";
+import {getCulturePicksSummary, getRisingBrands, type CulturePicksSummary} from "@/lib/culture/page-store";
+import type {BrandRow} from "@/lib/culture/page-view";
 import type {Lesson} from "@/lib/learn/lesson";
 import type {BrainEntitySummary} from '@/lib/brain/types';
 import type {LeaderboardEntry} from '@/lib/friends/types';
@@ -45,6 +47,7 @@ const RECENT_TRADES_LIMIT = 8;
 const TOP_ENTITIES_PER_TYPE = 5;
 const GRAPH_NODE_LIMIT = 16;
 const TOPICS_LATEST_LIMIT = 6;
+const BRAND_ATTENTION_LIMIT = 8;
 
 export type DashboardData = Partial<{
     portfolios: AccountWithPortfolio[];
@@ -70,6 +73,8 @@ export type DashboardData = Partial<{
     learnFacts: LearnFacts;
     lesson: Lesson;
     dailyPuzzle: DailyPuzzleCardView;
+    culturePicks: CulturePicksSummary;
+    brandAttention: BrandRow[];
 }>;
 
 type Loader<K extends DataKey> = (ctx: LoaderCtx) => Promise<DashboardData[K]>;
@@ -124,6 +129,9 @@ export const LOADERS: {[K in DataKey]: Loader<K>} = {
     lesson: ({userId}) => getTodaysLesson(userId),
     // Lazy: today's puzzle row and the solved days, two indexed reads.
     dailyPuzzle: ({userId}) => getDailyPuzzleCard(userId),
+    // Global reads: the culture brain and its accounts belong to no reader.
+    culturePicks: () => getCulturePicksSummary(),
+    brandAttention: () => getRisingBrands(BRAND_ATTENTION_LIMIT),
 };
 
 type LoadedDashboard = {data: DashboardData; failed: Set<DataKey>};

@@ -5,6 +5,7 @@ import Panel from "@/components/primitives/Panel";
 import StatTile from "@/components/primitives/StatTile";
 import Term from "@/components/primitives/Term";
 import WhatTheseMean from "@/components/learn/WhatTheseMean";
+import type {GlossaryKey} from "@/lib/learn/glossary";
 
 // A simulated series' own tiles: annualised figures make sense over three years where the
 // live tiles (a few weeks old) would not. The stored backtest renders them as
@@ -20,9 +21,11 @@ const signClass = (value: number | null): string | undefined => {
     return rounded > 0 ? 'text-positive' : rounded < 0 ? 'text-negative' : undefined;
 };
 
-type Props = {stats: SeriesStats; id?: string; neutral?: boolean};
+// `recordTerm`: the glossary entry that says what kind of simulated record the tiles describe —
+// a strategy's backtest by default; the culture brain's attention-and-price variant passes its own.
+type Props = {stats: SeriesStats; id?: string; neutral?: boolean; recordTerm?: GlossaryKey};
 
-const SimulatedStats = ({stats, id = 'simulated-stats', neutral = false}: Props) => {
+const SimulatedStats = ({stats, id = 'simulated-stats', neutral = false, recordTerm = 'simulated-record'}: Props) => {
     const sign = (value: number | null) => (neutral ? undefined : signClass(value));
     const drawdownClass = !neutral && stats.maxDrawdownPct !== null && roundPct(stats.maxDrawdownPct) > 0 ? 'text-negative' : undefined;
     return (
@@ -35,7 +38,7 @@ const SimulatedStats = ({stats, id = 'simulated-stats', neutral = false}: Props)
                 <StatTile label={<Term k="volatility">{COPY.volatility}</Term>} value={stats.annualizedVolPct === null ? '—' : `${stats.annualizedVolPct.toFixed(1)}%`} hint={COPY.volatilityHint} />
                 <StatTile label={<Term k="win-rate">{COPY.winRate}</Term>} value={stats.winRatePct === null ? '—' : `${stats.winRatePct.toFixed(0)}%`} hint={stats.winRatePct === null ? COPY.winRateNone : COPY.winRateHint(stats)} />
             </div>
-            <WhatTheseMean keys={['total-return', 'vs-spy', 'simulated-record', 'cagr', 'max-drawdown', 'volatility', 'win-rate']} />
+            <WhatTheseMean keys={['total-return', 'vs-spy', recordTerm, 'cagr', 'max-drawdown', 'volatility', 'win-rate']} />
         </Panel>
     );
 };

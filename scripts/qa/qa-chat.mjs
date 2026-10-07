@@ -161,8 +161,10 @@ try {
     const launcher = robot.locator('button[aria-label="Open Aero-AI Assistant"]');
     await launcher.waitFor({timeout: 30000});
     const box = await launcher.boundingBox();
+    // At least the 44px touch target: the minimal style, a new account's default, sizes the
+    // launcher at 2.75rem (app/globals.css), where the other styles keep the 56px button.
     check('the launcher is bottom-right at 1440, not in the top bar',
-        box.width >= 48 && box.x + box.width >= 1440 - 60 && box.y + box.height >= 900 - 40 && box.y > 64, JSON.stringify(box));
+        box.width >= 44 && box.x + box.width >= 1440 - 60 && box.y + box.height >= 900 - 40 && box.y > 64, JSON.stringify(box));
     check('the launcher is the robot: the SVG mascot is inside it', await launcher.locator('svg[data-robot-mascot]').count() === 1);
     await robot.waitForTimeout(1500);
     const bubble = robot.locator('[data-robot-tip]');

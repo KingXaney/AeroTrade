@@ -27,6 +27,9 @@ import {STRATEGY_SLUGS} from "@/lib/strategies/catalog";
 import {numberWord} from "@/lib/text";
 import {getLatestRun, getStrategyLeaderboard} from "@/lib/strategies/page-store";
 import {priceLargestHoldings, readLearnerValue} from "@/lib/chat/learner-hooks";
+import {CULTURE_CHAT_LIMITS, shapeCultureBrain} from "@/lib/chat/culture-brain";
+import {getCulturePicksView} from "@/lib/culture/page-store";
+import {getTickerRollup, getTopCultureEntities} from "@/lib/culture/store";
 import type {ChatToolName} from '@/lib/chat/types';
 import type {Stock} from '@/lib/stocks/types';
 import type {TopicView} from '@/lib/topics/types';
@@ -372,6 +375,26 @@ export const buildTools = (userId: string) => ({
             } catch (error) {
                 console.error('getQuantStrategies failed:', error);
                 return {error: 'Could not read the quant strategies right now.'};
+            }
+        },
+    }),
+
+    getCultureBrain: tool({
+        description: TOOL_DESCRIPTIONS.getCultureBrain,
+        inputSchema: z.object({}),
+        execute: async () => {
+            try {
+                // The /culture page's own readers: the heaviest brands, the owners' roll-up, and
+                // the pickers view (decisions, records, the backtest), cached per request.
+                const [brands, owners, picks] = await Promise.all([
+                    getTopCultureEntities(CULTURE_CHAT_LIMITS.brands),
+                    getTickerRollup(CULTURE_CHAT_LIMITS.owners),
+                    getCulturePicksView(),
+                ]);
+                return shapeCultureBrain({brands, owners, pickers: picks.pickers, backtest: picks.backtest});
+            } catch (error) {
+                console.error('getCultureBrain failed:', error);
+                return {error: 'Could not read the culture brain right now.'};
             }
         },
     }),

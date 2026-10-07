@@ -20,7 +20,7 @@ before the rename keep the name "Main Strategy" (new ones are "Main account", `D
 - `npm run build:check` — compile-only Next build; needs no database or keys
 - `npm run build` / `npm start` — the production build and its server
 - `npm run dev` + `npx inngest-cli@latest dev -u http://localhost:3000/api/inngest` — app + jobs
-- `npm run trigger -- <brain|navigator|news|snapshots|income|topics|briefs|briefing|strategies|strategies-preview|strategies-resimulate>` — fire a job locally (`news <email>`: a test brief to that one opted-in reader)
+- `npm run trigger -- <brain|navigator|news|snapshots|income|topics|briefs|briefing|strategies|strategies-preview|strategies-resimulate|culture|culture-weekly|culture-preview|culture-resimulate|culture-backfill>` — fire a job locally (`news <email>`: a test brief to that one opted-in reader; `culture-backfill [brandId ...]`: every brand's Wikipedia views back to the backtest horizon, or the named brands)
 - `npm run test:db` — connect to `MONGODB_URI` (from `.env`) and print the database and host it reached
 - `npm run migrate:accounts` — the idempotent multi-account migration: builds the indexes in `scripts/migration-indexes.mjs` and drops the ones they replaced (run it on every database, again whenever that list changes)
 - `npm run opinion:local` — the brain's Second Opinion from your Claude subscription through the Claude Code CLI, written straight to the database (`.env.example` lists the other ways)
@@ -329,6 +329,79 @@ and friends keep none beyond Shared and the invariants).
   is absent, and every section passes `lib/news/feed.outletAllowed`, the one outlet rule. The
   feed itself (`getNewsFeedForPrefs`: kill switch, outage fallback, the topic batch for the widget
   and /history) is untouched.
+
+### culture
+
+- The culture brain keeps its own collections — the `culture-*` models, read and written only by
+  `lib/culture/store` and `lib/culture/picker-store` — and never writes `BrainEntity` or
+  `NewsItem` (invariant 3, extended; `lib/culture/__tests__/guard.test.ts` holds the import graph).
+  Its decay maths is the pure `lib/brain/decay`, shared.
+- `lib/culture/catalog.ts` is the universe: a brand's id is its entity key and its series key and
+  is never renamed; `owner: null` is a private brand, tracked for context and for the category-share
+  denominator, never traded; `owner.since` dates a change of hands. The model only suggests
+  (`CultureSuggestion`, shown on the system view); a person adds a brand in code.
+- The LLM extracts and explains; deterministic code decides. `lib/culture/extraction` reads the
+  model's labels with zod and clamps them; an item it never read folds through its alias matches
+  at `FALLBACK_IMPORTANCE`; `lib/culture/fold.planCultureFold` is the one planner — once per run
+  id, attention once per day, every fold scaled by `SOURCE_FOLD_WEIGHTS`, news lowest. Attention
+  series are one document per brand, source and month, never a row per day;
+  `lib/culture/store.writeAttentionRows` upserts a day in place.
+- Two pickers over one feature set: `CULTURE_PROFILES` in `lib/culture/config` (Spike, Quiet;
+  `price` is the backtest-only control), scored by `lib/culture/scoring.scoreCultureUniverse` with
+  each term rank-normalised over the owners that have it (null = neutral 0) and the weights
+  renormalised over the feeds a run has (`effectiveWeights`); `lib/culture/engine.decideWeek` is
+  the one place a week is decided, through the Navigator's allocator under `CULTURE_RAILS`. A new
+  picker is a new profile id, never a reweighted old one: its account and decisions carry the id.
+- Each live profile trades its own paper account under `CULTURE_OWNER_ID` (`system:culture`,
+  never `global` nor the strategies' sentinel), opened by
+  `lib/culture/picker-store.ensureCultureAccount` on the first weekly run and traded only by
+  `lib/jobs/functions/culture.runCultureWeekly` (`PaperTrade.source: 'culture-brain'`, idempotency
+  key `culture:<profile>:<week>:<side>:<symbol>`). The weekly claim per profile is atomic; a run
+  outside the session or on `dryRun` previews and claims nothing; without a model key the
+  rationale is skipped, never retried into a 403.
+- Every reason a picker writes is decoded by `lib/learn/culture-reasons` (round-tripped in its
+  test) and glossed on the server (`glossCultureReasons`) before a client panel sees it.
+- The simulated record is `lib/culture/simulator.simulateCulture` (pure): the same `decideWeek`
+  on the first session of each ET week over stored bars and stored Wikipedia pageviews, the
+  pageview surprises replayed through `lib/brain/decay` as the daily fold applies them
+  (`attentionReplayer`), next-open fills, the one income clock stepped as the strategies'
+  simulator steps it (`lib/strategies/simulate.incomeWalker`); three variants — the price-only
+  control, Spike and Quiet — share each week's features and differ only by weights, and the
+  weights renormalise over the feeds present (price, pageviews, the replayed entities), so a
+  variant and a live run score on one scale. One document, `CultureBacktest` under
+  `CULTURE_BACKTEST_KEY`, rebuilt by the weekly job's last phase when `lib/culture/backtest.cultureBacktestDue`
+  says so (a new `CULTURE_ENGINE_VERSION`, a moved `catalogHash`, a resimulate, no build yet),
+  inside `lib/culture/backtest-store.cultureBacktestReady` (dividends vouched for across the
+  window for every simulated owner and SPY, a T-bill rate for every day of it — the bars step
+  refetches whole whatever is lacking while a rebuild is pending); a failure or a wait is a note
+  in the job's stamp, never in the way of trading. OTC owners are never simulated
+  (`BACKTEST_LISTINGS`). The page prints the variants beside the live records as neutral tiles
+  under "Simulated — attention and price only, not live", with the survivorship caveat, and
+  each record's Simulated tab is its own profile's variant with `attention-backtest` as its term.
+- `/culture` composes `lib/culture/page-store` (every read global, cached per request), shaped by
+  the pure `lib/culture/page-view`: three views in the URL (`?view=`), and `?brand=` always the
+  brands view with `#evidence`. The comparison strip prints the pickers in `LIVE_PROFILES` order
+  and SPY, with no sign colour and no sort by return (invariant 12); the board explains its marks
+  (● thesis, ○ private, * unpriced) once, only when some row carries them (invariant 8); a stored
+  item's link becomes an anchor only through `lib/culture/links.outboundHref` (http(s)); the
+  legend `lib/culture/legend` prints every figure from the config at the foot of every view.
+  Every sentence is `lib/learn/copy/culture`.
+- The brands view also draws the brands named together: `lib/culture/store.getCultureGraph`
+  reads the heaviest entities with their co-mention `links`, the pure `lib/culture/graph` keeps
+  each pair once and prunes a brand none of the others was named with, and
+  `components/culture/BrandLinks` lays them on a circle (deterministic, no physics), each name a
+  link to its evidence; the page draws the panel only when there is a line to draw (invariant 8).
+- The chat's `getCultureBrain` tool reads the same page readers (`getTopCultureEntities`,
+  `getTickerRollup`, `getCulturePicksView`) and hands the model `lib/chat/culture-brain`'s shape:
+  rounded brands and owners, each picker's live record beside SPY, its latest decision with
+  every reason decoded through the culture grammar, and its simulated record apart, under one
+  stance line held to the no-advice list.
+- The Brain section of `lib/shell/navigation` carries both brains (`/brain`, `/culture`); the rail
+  stays at eight icons. The two widgets (`culture-picks`, `brand-attention`) are library-only,
+  category `brain` ("Brains & AI").
+- Jobs: `culture-brain-update` daily 06:40 ET (trigger `culture`), `culture-brain-weekly` Mondays
+  10:45 ET with a Tuesday holiday retry (`culture-weekly`, `culture-preview`, `culture-resimulate`),
+  `culture-wikipedia-backfill` on demand (`culture-backfill [brandId…]`). QA: `npm run qa -- culture`.
 
 ### topics
 
@@ -765,7 +838,8 @@ and friends keep none beyond Shared and the invariants).
 - `lib/chat/quant-strategies` shapes what `getQuantStrategies` hands it: the leaderboard rows read
   through `getStrategyLeaderboard`, or one strategy's latest run from
   `lib/strategies/page-store.getLatestRun`, with each reason decoded with its def and the board cut
-  to its top rows.
+  to its top rows. `lib/chat/culture-brain` is the culture brain's twin for `getCultureBrain`
+  (see culture).
 - `components/chat/ChatWidget` mounts the one launcher — the robot, aria-label "Open Aero-AI
   Assistant", the QA's handle — and, on `/topics` pages only while the panel is closed, its speech
   bubble `components/chat/RobotTipBubble`. The tips are `lib/learn/copy/robot` (`ROBOT_TIPS`: the
