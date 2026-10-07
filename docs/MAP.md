@@ -29,6 +29,7 @@ Shared pieces that belong to no single feature:
 | `lib/text.ts` | `escapeRegExp` (the one way user text becomes a regex), hashing, URL normalising |
 | `lib/rate-limit.ts` | The one Mongo-backed rate-limit counter (sign-in, sign-up, password reset, chat) and `peekRateLimit`, its read without a spend |
 | `lib/day-memo.ts` | The per-day memo request-path reads share |
+| `components/three/` | What a three.js scene reads from the page it draws in: WebGL, the theme stamp, reduced motion, a coarse pointer, the colour tokens as RGB (`lib/theme/css-color`) — the landing terrain and the brain's graph share it |
 | `lib/ai/` | Model selection, inference, prompt helpers (chat itself is `lib/chat/`) |
 | `lib/utils.ts` | `cn` only |
 
@@ -44,7 +45,7 @@ Shared pieces that belong to no single feature:
 | **income** | `/portfolio` (Income panel) | `income/` | `lib/income/` — `accrual` (the one accrual clock), `store` (nightly credit), `page-store` | — | `income` | `copy/income` | `qa-income` |
 | **strategies** | `/strategies`, `/strategies/[slug]`, `api/strategies/[slug]/export` | `strategies/` | `lib/strategies/` — `catalog` (`CATALOG_PARAMS`), `rules/`, `engine`, `simulate`, `whatif`, `store`, `page-store`, `detail-view`, `job`, `learn/` | `strategies.actions` | `strategies` | `copy/strategies`, `board`, `cadence`, `decision`, `replay`, `simulated`, `verdict`, `whatif`, `time-in-market` | `qa-strategies`, `qa-learn` |
 | **navigator** | `/brain` (Navigator panels) | `navigator/` | `lib/navigator/` — `config` (the rails), `scoring`, `allocator`, `universe`, `run` (weekly job + bootstrap), `store`, `prompts` | `navigator.actions` | `navigator` | `copy/navigator` | `qa-learn`, `qa-chat` |
-| **brain** | `/brain` | `brain/` | `lib/brain/` — `config` (half-lives, thresholds), `decay`, `extraction`, `ingest`, `update`, `store`, `opinion`, `legend`, `event-types`, `since-thesis` | `opinion.actions` | `brain` | `copy/brain` | `qa-learn`, `qa-trading` |
+| **brain** | `/brain` | `brain/` — `BrainGraph` (3D, over `graph-scene`), `BrainGraph2D` (the SVG rings without WebGL), `ActiveTheses`, `EvidenceList`, `NarrativeLeaderboard`, `BrainLegend`, `SecondOpinionCard` | `lib/brain/` — `config` (half-lives, thresholds), `decay`, `extraction`, `ingest`, `update`, `store`, `opinion`, `legend`, `event-types`, `since-thesis`, `graph-layout` (the graph's shells) | `opinion.actions` | `brain` | `copy/brain` | `qa-learn`, `qa-trading` |
 | **news** | `/news` | `news/` | `lib/news/` — `config` (`RSS_FEEDS`, kill switch), `adapters/`, `feed`, `feed-store`, `article`, `sanitize`, `briefing`, `briefing-store`, `prompts`, `page`, `page-store` | `news-feed.actions` | `news` (the morning briefing) | `copy/news` | `qa-news-feed` |
 | **topics** | `/topics` (`?edit=1` is the manage view), `/topics/[slug]` | `topics/` | `lib/topics/` — `starters` (curated set), `seed`, `insert`, `manage` (the manage view's offers and cap), `refresh`, `brief`, `match`, `store`, `page-store` | `topics.actions` | `topics` | `copy/topics` | `qa-topics`, `qa-topics-refresh` |
 | **learn** | `/learn`, `/learn/course/[lesson]` | `learn/`, `dashboard/widgets/learn/` | `lib/learn/` — `glossary`, `banned`, `reasons`, `course(-store)`, `missions`, `moments`, `lesson(-store)`, `facts(-store)`, `copy/` | `learn.actions` | — | `copy/*` | `qa-learn`, `qa-learn-account` |

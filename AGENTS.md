@@ -267,6 +267,17 @@ and friends keep none beyond Shared and the invariants).
 ### brain
 
 - `lib/brain/ingest` is the daily update's sweep, extraction batches and ticker guard.
+- The Knowledge Graph is 3D: `components/brain/BrainGraph` over `components/brain/graph-scene`
+  (three.js, loaded on demand). The entities sit on three concentric shells — themes inner,
+  sectors middle, tickers outer — placed by the pure `lib/brain/graph-layout` (deterministic for
+  one input: each shell spread from a pole of its own, then every entity's direction relaxed —
+  linked ones pulled together, every pair pushed apart whatever their shells), as spheres sized by slow
+  weight and coloured by sentiment, a thesis haloed, the links as lines. Each label is a real link
+  to `evidenceHref`, floated over the canvas by the scene, so Tab and Enter work as the SVG's nodes
+  did; the canvas is `aria-hidden`, the host `role="group"`, never `img`. Without WebGL the SVG
+  rings draw instead (`components/brain/BrainGraph2D`). Both scenes read the page through
+  `components/three/scene-env` (WebGL, the theme stamp, reduced motion, a coarse pointer, the
+  colour tokens as RGB through `lib/theme/css-color`).
 - `lib/brain/links.evidenceHref` is the one address of an entity's evidence — the graph's nodes,
   Active Theses and the leaderboard all link through it. `lib/brain/store.getEntityEvidence`
   projects the evidence fields and `extraction.eventType`, never importance.

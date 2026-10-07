@@ -1,6 +1,6 @@
 'use client';
 
-import {useEffect, useRef, useState, useSyncExternalStore, type ReactNode} from "react";
+import {useEffect, useRef, useState, type ReactNode} from "react";
 import {LOOKBACKS, type MomentumSurface} from "@/lib/landing/momentum-surface";
 import {
     CAMERA_PRESET_IDS,
@@ -12,7 +12,8 @@ import {
     type Rgb,
 } from "@/lib/landing/terrain-view";
 import {TERRAIN_COPY} from "@/lib/learn/copy/terrain";
-import {paintHeatmap, supportsWebGL} from "@/components/landing/terrain-heatmap";
+import {paintHeatmap} from "@/components/landing/terrain-heatmap";
+import {useCoarsePointer, useReducedMotion, useThemeStamp, useWebGL} from "@/components/three/scene-env";
 import type {TerrainHit, TerrainPalette, TerrainScene} from "@/components/landing/terrain-scene";
 import TerrainSlice from "@/components/landing/TerrainSlice";
 import ActionButton from "@/components/primitives/ActionButton";
@@ -38,7 +39,6 @@ type Size = 'hero' | 'panel';
 const SURFACE_URL = '/api/landing/surface';
 const GREY: Rgb = [128, 128, 128];
 const DEFAULT_ROW = Math.max(0, LOOKBACKS.indexOf(20));
-const THEME_ATTRIBUTES = ['data-palette', 'data-style', 'data-mode', 'data-motion'];
 // One press of − or + : the camera's distance, times this.
 const ZOOM_IN = 0.8;
 const ZOOM_OUT = 1.25;
@@ -62,42 +62,6 @@ const readPalette = (): TerrainPalette => {
     const read = (token: string): Rgb => parseCssColor(style.getPropertyValue(token)) ?? GREY;
     return {scale: TERRAIN_STOPS.map((stop) => read(stop.token)), fg: read('--fg'), zero: read('--terrain-zero')};
 };
-
-// The document's theme attributes as one external store: a change re-reads the tokens.
-const subscribeHtml = (notify: () => void) => {
-    const observer = new MutationObserver(notify);
-    observer.observe(document.documentElement, {attributes: true, attributeFilter: THEME_ATTRIBUTES});
-    return () => observer.disconnect();
-};
-const themeStamp = () => {
-    const data = document.documentElement.dataset;
-    return `${data.palette}|${data.style}|${data.mode}|${data.motion}`;
-};
-const useThemeStamp = (): string => useSyncExternalStore(subscribeHtml, themeStamp, () => '');
-
-const subscribeMedia = (query: string) => (notify: () => void) => {
-    const media = window.matchMedia(query);
-    media.addEventListener('change', notify);
-    return () => media.removeEventListener('change', notify);
-};
-const REDUCED_QUERY = '(prefers-reduced-motion: reduce)';
-const COARSE_QUERY = '(pointer: coarse)';
-const subscribeReduced = subscribeMedia(REDUCED_QUERY);
-const subscribeCoarse = subscribeMedia(COARSE_QUERY);
-const useReducedMotion = (): boolean =>
-    useSyncExternalStore(subscribeReduced, () => window.matchMedia(REDUCED_QUERY).matches, () => false);
-const useCoarsePointer = (): boolean =>
-    useSyncExternalStore(subscribeCoarse, () => window.matchMedia(COARSE_QUERY).matches, () => false);
-
-// Whether this browser draws WebGL, probed once; null on the server and while hydrating, so the
-// first client paint matches the server's and the decision never sets state inside an effect.
-const subscribeNever = () => () => {};
-let webglProbe: boolean | null = null;
-const readWebGL = (): boolean => {
-    if (webglProbe === null) webglProbe = supportsWebGL();
-    return webglProbe;
-};
-const useWebGL = (): boolean | null => useSyncExternalStore(subscribeNever, readWebGL, () => null);
 
 type Props = {
     // A surface the page already read (Home): drawn at once, nothing fetched. Without one the

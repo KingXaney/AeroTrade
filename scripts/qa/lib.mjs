@@ -44,6 +44,17 @@ export const summary = (suite) => {
     process.exit(failures === 0 ? 0 : 1);
 };
 
+// A click on something below the fold. Playwright scrolls the target into view and clicks in the
+// same tick; while the page's main thread is busy (a TradingView embed loading, a WebGL scene
+// drawing) the compositor has not committed the new scroll offset when the mouse events are
+// hit-tested, so they land where the target *was* — inside the chart's iframe, say — and nothing
+// reacts, with no error. Two animation frames after the scroll the frame is committed.
+export const settledClick = async (locator) => {
+    await locator.scrollIntoViewIfNeeded();
+    await locator.page().evaluate(() => new Promise((resolve) => requestAnimationFrame(() => requestAnimationFrame(() => resolve(undefined)))));
+    await locator.click();
+};
+
 // Signs a fresh user up through the form and waits for the dashboard. The tag names the user
 // ("QA <tag>") and its address (qa<tag><ms>@example.com), so a suite's users are easy to find.
 export const signUp = async (page, tag, {name = `QA ${tag}`, stay = false} = {}) => {
