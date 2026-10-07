@@ -42,6 +42,19 @@ which also absorbs the notification toggles that used to sit in the user dropdow
   is ink without a halo; the terrain drops its axis caption. The shell hooks this hangs on are
   `data-app-content` (the content wrapper), `data-page-subtitle`, `data-user-name`,
   `data-streak-chip` and `data-terrain-caption`.
+  The same day the other four styles each got a layout of their own, so the five are real
+  options rather than surface treatments on one shell: **futuristic** is a console — 15px root
+  type, the sections docked along the bottom edge (the page runs full width), panels bracketed
+  at two corners, a `>` prompt before a mono-capitals title, tabs in brackets, rows with an
+  accent edge, tags as framed mono capitals; **liquid-glass** is islands — the bar floats inset
+  from the top, the sections float as a centred capsule at the left, pill controls everywhere;
+  **brutalist** is a ledger — the rail widens into an 11rem sidebar whose rows carry their names
+  (`::after { content: attr(data-rail) }`) with the current one inverted, a stamped inverted
+  title, tabs as one segmented block, inverted tags, a faint diagonal hatch behind the page;
+  **soft** is a reading column — 17px root type, the page centred at 68rem, a 4.5rem bar with a
+  pill search, a column of rounded tiles with the current one lifted, wider gaps, tabs in a pill
+  track, a radial wash of the accent behind. The visual sweep takes `QA_THEME` as a comma list
+  and `QA_SWEEP_PAGES` as a page subset, so a round of style work is reviewed in one harness run.
   Reduced motion is honoured from the OS and from `html[data-motion="reduced"]`.
 - **Persistence**: `UserPreferences.appearance` (Mongo) is the source of truth; the
   `aero-theme` cookie (`v1:<palette>:<style>:<0|1>`, httpOnly, 1 year) mirrors it so

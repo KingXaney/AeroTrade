@@ -4,25 +4,31 @@
 // aside, run it on the change, then compare with `node visual-diff.mjs <before> <after>`.
 // Run it inside the harness: `npm run qa -- visual-sweep` (README.md).
 //
-// QA_THEME=<palette>:<style> (say nord:brutalist) sweeps under that theme instead of the default
-// one, into ./output/sweep-<palette>-<style>/ — a change to a visual style is checked style by style.
+// QA_THEME=<palette>:<style>[,<palette>:<style>…] (say nord:brutalist) sweeps under each theme
+// named instead of the default one, into ./output/sweep-<palette>-<style>/ — a change to the
+// visual styles is checked style by style in one harness run. QA_SWEEP_PAGES=home,portfolio,…
+// limits the sweep to those page names (below), for a quick look at a few screens.
 import {chromium} from 'playwright';
 import {mkdirSync} from 'node:fs';
 import {BASE, outDir, signUp} from './lib.mjs';
 
 // The theme cookie the root layout reads (lib/theme/resolve.ts); a fresh user has no saved theme,
-// so nothing overrides it.
-const THEME = (process.env.QA_THEME || '').trim();
-if (THEME && !/^[a-z-]+:[a-z-]+$/.test(THEME)) {
-    console.error(`QA_THEME must be <palette>:<style>, got "${THEME}"`);
-    process.exit(2);
+// so nothing overrides it. An empty theme is the default look.
+const THEMES = (process.env.QA_THEME || '').split(',').map((t) => t.trim()).filter(Boolean);
+for (const theme of THEMES) {
+    if (!/^[a-z-]+:[a-z-]+$/.test(theme)) {
+        console.error(`QA_THEME must be <palette>:<style>[,…], got "${theme}"`);
+        process.exit(2);
+    }
 }
-const themed = async (page) => {
-    if (THEME) await page.context().addCookies([{name: 'aero-theme', value: `v1:${THEME}:0`, domain: new URL(BASE).hostname, path: '/'}]);
-    return page;
-};
+const ONLY = new Set((process.env.QA_SWEEP_PAGES || '').split(',').map((p) => p.trim()).filter(Boolean));
+const wanted = (name) => ONLY.size === 0 || ONLY.has(name);
 
-const OUT = outDir(THEME ? `sweep-${THEME.replace(':', '-')}` : 'sweep');
+const setTheme = async (page, theme) => {
+    if (theme) await page.context().addCookies([{name: 'aero-theme', value: `v1:${theme}:0`, domain: new URL(BASE).hostname, path: '/'}]);
+};
+const outFor = (theme) => outDir(theme ? `sweep-${theme.replace(':', '-')}` : 'sweep');
+
 const WIDTHS = [{name: 'desktop', width: 1440, height: 900}, {name: 'phone', width: 390, height: 844}];
 
 const SIGNED_OUT = [
@@ -31,7 +37,7 @@ const SIGNED_OUT = [
     ['sign-up', '/sign-up'],
     ['forgot-password', '/forgot-password'],
     ['reset-password-bad-token', '/reset-password?token=not-a-token'],
-];
+].filter(([name]) => wanted(name));
 const SIGNED_IN = [
     ['home', '/'],
     ['dashboard', '/dashboard'],
@@ -62,7 +68,7 @@ const SIGNED_IN = [
     ['strategy-buy-and-hold', '/strategies/buy-and-hold-spy'],
     ['stock-spy', '/stocks/SPY'],
     ['not-found', '/this-page-does-not-exist'],
-];
+].filter(([name]) => wanted(name));
 
 // Animated and time-dependent pieces would make every run differ; hide them so a diff means markup.
 const STILL = `
@@ -70,7 +76,7 @@ const STILL = `
   canvas, iframe, .tradingview-widget-container, [data-testid="market-status"] { visibility: hidden !important; }
 `;
 
-const shoot = async (page, width, name, path) => {
+const shoot = async (page, out, width, name, path) => {
     await page.goto(`${BASE}${path}`, {waitUntil: 'load'});
     // A page with the momentum terrain draws it a moment after load; wait for its first frame so
     // the layout below it has settled. (Chromium's full-page capture still paints a WebGL canvas
@@ -83,26 +89,37 @@ const shoot = async (page, width, name, path) => {
     await page.addStyleTag({content: STILL}).catch(() => {});
     await page.evaluate(() => document.fonts.ready).catch(() => {});
     await page.waitForTimeout(600);
-    await page.screenshot({path: `${OUT}${width.name}/${name}.png`, fullPage: true});
+    await page.screenshot({path: `${out}${width.name}/${name}.png`, fullPage: true});
 };
 
+const runs = THEMES.length > 0 ? THEMES : [''];
 const browser = await chromium.launch({channel: 'chrome'});
 let shots = 0;
 try {
-    for (const width of WIDTHS) {
-        mkdirSync(`${OUT}${width.name}`, {recursive: true});
-        const out = await themed(await browser.newPage({viewport: {width: width.width, height: width.height}}));
-        for (const [name, path] of SIGNED_OUT) { await shoot(out, width, name, path); shots++; }
-        await out.close();
+    for (const theme of runs) {
+        const out = outFor(theme);
+        for (const width of WIDTHS) {
+            mkdirSync(`${out}${width.name}`, {recursive: true});
+            const page = await browser.newPage({viewport: {width: width.width, height: width.height}});
+            await setTheme(page, theme);
+            for (const [name, path] of SIGNED_OUT) { await shoot(page, out, width, name, path); shots++; }
+            await page.close();
+        }
     }
-    const page = await browser.newPage({viewport: {width: 1440, height: 900}});
-    await signUp(page, 'Sweep');
-    await themed(page);
-    for (const width of WIDTHS) {
-        await page.setViewportSize({width: width.width, height: width.height});
-        for (const [name, path] of SIGNED_IN) { await shoot(page, width, name, path); shots++; }
+    if (SIGNED_IN.length > 0) {
+        const page = await browser.newPage({viewport: {width: 1440, height: 900}});
+        await signUp(page, 'Sweep');
+        for (const theme of runs) {
+            const out = outFor(theme);
+            await setTheme(page, theme);
+            for (const width of WIDTHS) {
+                mkdirSync(`${out}${width.name}`, {recursive: true});
+                await page.setViewportSize({width: width.width, height: width.height});
+                for (const [name, path] of SIGNED_IN) { await shoot(page, out, width, name, path); shots++; }
+            }
+        }
     }
 } finally {
     await browser.close();
 }
-console.log(`saved ${shots} screenshots to ${OUT}`);
+console.log(`saved ${shots} screenshots to ${runs.map(outFor).join(', ')}`);
