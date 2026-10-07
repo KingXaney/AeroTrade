@@ -64,6 +64,8 @@ export type SceneOptions = {
     coarsePointer: boolean;
     onHover: (hit: TerrainHit | null) => void;
     onRotating: (rotating: boolean) => void;
+    // The camera's distance from the surface's centre, whenever it changes (a zoom, a preset).
+    onZoom?: (distance: number) => void;
     // The story markers' elements, in surface.notable order; read on every drawn frame.
     markers: () => readonly (HTMLElement | null)[];
 };
@@ -71,15 +73,19 @@ export type SceneOptions = {
 export type TerrainScene = {
     setPreset: (preset: CameraPreset) => void;
     setFlat: (flat: boolean) => void;
+    // Multiplies the camera's distance: under 1 zooms in, over 1 out, within the limits.
+    zoom: (factor: number) => void;
     setPalette: (palette: TerrainPalette) => void;
     setReduceMotion: (reduce: boolean) => void;
     setActive: (active: boolean) => void;
     dispose: () => void;
 };
 
-// World units: x about three times y, as the plan's reference image.
+// World units. The data is 250 sessions across and 7 lookbacks deep; the plan drew it 3:1 so a
+// day stays a thin column and the ridges along time read. 3:2 keeps that and sits better in a
+// wide panel — the owner wanted it squarer.
 const WIDTH = 12;
-const DEPTH = 4;
+const DEPTH = 8;
 // Height per σ.
 const HEIGHT = 0.45;
 // The floor sits this far under the lowest point.
@@ -91,9 +97,11 @@ const IDLE_RESUME_MS = 6000;
 const AUTO_ROTATE_SPEED = 0.4;
 // A drop line from every fifth session of the front row.
 const DROP_EVERY = 5;
-const MIN_DISTANCE = 6;
+const MIN_DISTANCE = 4;
 const MAX_DISTANCE = 30;
 const ZOOM_STEP = 0.1;
+// What the + and − buttons do to the distance.
+const ZOOM_BUTTON_FACTOR = 0.8;
 // A hair above the surface, so a line on it is not cut by its own facets.
 const LIFT = 0.015;
 // How much of the frame the fitted surface may use, in normalised device coordinates.
@@ -276,6 +284,10 @@ export const createTerrainScene = (options: SceneOptions): TerrainScene => {
     let heightTween: Tween | null = reduceMotion ? null : {from: 0, to: 1, start: performance.now(), ms: INTRO_MS};
     let flatTarget = 1;
     let pending: {x: number; y: number} | null = null;
+    // A hand on the surface: from a press until the pointer leaves, the wheel zooms instead of
+    // scrolling the page. Idle, the wheel is the page's, so a visitor scrolls past the hero.
+    let engaged = false;
+    let reportedDistance = -1;
 
     const schedule = () => {
         if (raf === 0 && active && !disposed) raf = requestAnimationFrame(frame);
@@ -327,16 +339,21 @@ export const createTerrainScene = (options: SceneOptions): TerrainScene => {
     controls.addEventListener('end', resumeLater);
     controls.addEventListener('change', onChange);
 
-    const onWheel = (event: WheelEvent) => {
-        if (!(event.ctrlKey || event.metaKey)) return;
-        event.preventDefault();
+    const zoomBy = (factor: number) => {
         pause();
         const offset = camera.position.clone().sub(controls.target);
-        const length = Math.min(MAX_DISTANCE, Math.max(MIN_DISTANCE, offset.length() * (1 + Math.sign(event.deltaY) * ZOOM_STEP)));
+        const length = Math.min(MAX_DISTANCE, Math.max(MIN_DISTANCE, offset.length() * factor));
         camera.position.copy(controls.target).add(offset.setLength(length));
         resumeLater();
         dirty = true;
         schedule();
+    };
+    // Ctrl or Meta and the wheel (a trackpad pinch arrives this way) zoom at any time; the bare
+    // wheel only once the surface has been grabbed.
+    const onWheel = (event: WheelEvent) => {
+        if (!(event.ctrlKey || event.metaKey || engaged)) return;
+        event.preventDefault();
+        zoomBy(1 + Math.sign(event.deltaY) * ZOOM_STEP);
     };
     canvas.addEventListener('wheel', onWheel, {passive: false});
 
@@ -414,10 +431,12 @@ export const createTerrainScene = (options: SceneOptions): TerrainScene => {
         queuePick(event);
     };
     const onPointerDown = (event: PointerEvent) => {
+        engaged = true;
         if (event.pointerType !== 'touch') return;
         queuePick(event);
     };
     const clearHover = () => {
+        engaged = false;
         pending = null;
         if (hovered === null) return;
         hovered = null;
@@ -502,6 +521,11 @@ export const createTerrainScene = (options: SceneOptions): TerrainScene => {
             renderer.render(scene, camera);
             placeMarkers();
             dirty = false;
+            const distance = camera.position.distanceTo(controls.target);
+            if (Math.abs(distance - reportedDistance) > 0.01) {
+                reportedDistance = distance;
+                options.onZoom?.(distance);
+            }
         }
         if (moved || cameraTween || heightTween || controls.autoRotate || pending) schedule();
     };
@@ -546,6 +570,7 @@ export const createTerrainScene = (options: SceneOptions): TerrainScene => {
             resumeLater();
             schedule();
         },
+        zoom: (factor) => zoomBy(factor),
         setFlat: (flat) => {
             flatTarget = flat ? 0 : 1;
             if (reduceMotion) {

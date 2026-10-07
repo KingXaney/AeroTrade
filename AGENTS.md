@@ -101,7 +101,8 @@ and friends keep none beyond Shared and the invariants).
   the page's theme switcher repaints it (never hex in a component); motion follows the OS setting
   and `html[data-motion]` (no auto-rotate, no intro, presets and the flatten toggle jump); on a
   coarse pointer the orbit controls are off and the canvas keeps `touch-action: pan-y`, so a phone
-  scrolls past it; the wheel is the page's, Ctrl (or a pinch) and the wheel zoom; without WebGL the
+  scrolls past it; the wheel is the page's until the surface is grabbed, while + and −, a pinch, or
+  Ctrl and the wheel zoom at any time; without WebGL the
   same grid is the 2D heatmap (`components/landing/terrain-heatmap`); the loop draws only while the
   hero is on screen and something moves. Its sentences are `lib/learn/copy/terrain`; its terms
   (`normalized-momentum`, `lookback`, `volatility`, homed on the front door in `lib/learn/where`)
