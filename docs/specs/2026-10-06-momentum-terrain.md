@@ -71,6 +71,15 @@ adjusted series is only inside `z`.
 - The landing page itself still reads nothing: the terrain's data arrives from the route after the
   page paints, and the page renders the same without it.
 
+## Home
+
+The owner asked for it on Home too. Home's first panel is the same component: the page reads
+`getMomentumSurface` on the server beside its own view and hands the surface in as `initial`, so
+the panel exists only when there is a surface (a box with nothing to say is not drawn) and the
+client draws it at once with no loading state. The panel's heading replaces the eyebrow, the
+canvas is 16:9 under `lg` and 400px tall above it, and the definitions keep their Ask links, since
+the chat widget is mounted on the signed-in pages.
+
 ## Wording
 
 Every sentence is `TERRAIN_COPY` in `lib/learn/copy/landing.ts`, held to the copy tier of the

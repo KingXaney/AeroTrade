@@ -19,23 +19,31 @@ import ActionButton from "@/components/primitives/ActionButton";
 import MicroLabel from "@/components/primitives/MicroLabel";
 import {cn} from "@/lib/utils";
 
-// The landing page's hero: SPY's momentum over the last year as a 3D surface. The page renders
-// nothing for it; this fetches app/api/landing/surface after paint, then loads the three.js scene
-// (components/landing/terrain-scene.ts) with a dynamic import. Without WebGL the same grid is the
-// 2D heatmap; without data the box says so and nothing else is drawn (invariant 8).
+// SPY's momentum over the last year as a 3D surface, on two pages. The landing hero renders
+// nothing for it on the server; this fetches app/api/landing/surface after paint. Home reads the
+// same store on the server and hands the surface in as `initial`, so the panel is drawn only when
+// there is one and never shows a loading box. Either way the three.js scene
+// (components/landing/terrain-scene.ts) loads with a dynamic import; without WebGL the same grid
+// is the 2D heatmap; without data the box says so and nothing else is drawn (invariant 8).
 //
 // Motion follows the OS setting and the in-app toggle (html[data-motion]): no auto-rotate, no
 // intro, presets and the flatten toggle jump. The colours are the --terrain-* and foreground
-// tokens read from the document, re-read when the page's theme switcher repaints it, so no hex
-// lives here (invariant 5). `children` is the page's one "What these mean" for the panel, shown
-// only once there is a surface to explain.
+// tokens read from the document, re-read when the page's theme changes, so no hex lives here
+// (invariant 5). `children` is the page's one "What these mean" for the panel, shown only once
+// there is a surface to explain.
 
 type Status = 'loading' | 'ready' | 'flat' | 'unavailable';
+type Size = 'hero' | 'panel';
 
 const SURFACE_URL = '/api/landing/surface';
 const GREY: Rgb = [128, 128, 128];
 const DEFAULT_ROW = Math.max(0, LOOKBACKS.indexOf(20));
 const THEME_ATTRIBUTES = ['data-palette', 'data-style', 'data-mode', 'data-motion'];
+// The canvas: the landing's hero column, or a full-width panel on Home. 4:3 and 16:9 under lg.
+const SIZE: Record<Size, string> = {
+    hero: 'aspect-[4/3] max-h-[520px] lg:aspect-auto lg:h-[500px] lg:max-h-none',
+    panel: 'aspect-[16/9] max-h-[440px] lg:aspect-auto lg:h-[400px] lg:max-h-none',
+};
 
 const isSurface = (value: unknown): value is MomentumSurface => {
     if (typeof value !== 'object' || value === null) return false;
@@ -78,18 +86,46 @@ const useReducedMotion = (): boolean =>
 const useCoarsePointer = (): boolean =>
     useSyncExternalStore(subscribeCoarse, () => window.matchMedia(COARSE_QUERY).matches, () => false);
 
-const MomentumTerrain = ({children}: {children?: ReactNode}) => {
-    const [status, setStatus] = useState<Status>('loading');
-    const [surface, setSurface] = useState<MomentumSurface | null>(null);
+// Whether this browser draws WebGL, probed once; null on the server and while hydrating, so the
+// first client paint matches the server's and the decision never sets state inside an effect.
+const subscribeNever = () => () => {};
+let webglProbe: boolean | null = null;
+const readWebGL = (): boolean => {
+    if (webglProbe === null) webglProbe = supportsWebGL();
+    return webglProbe;
+};
+const useWebGL = (): boolean | null => useSyncExternalStore(subscribeNever, readWebGL, () => null);
+
+type Props = {
+    // A surface the page already read (Home): drawn at once, nothing fetched. Without one the
+    // component fetches the route itself (the landing page, which reads nothing).
+    initial?: MomentumSurface;
+    // Off when the host gives the panel its own heading.
+    eyebrow?: boolean;
+    size?: Size;
+    children?: ReactNode;
+};
+
+const MomentumTerrain = ({initial, eyebrow = true, size = 'hero', children}: Props) => {
+    // undefined: not read yet; null: nothing to draw.
+    const [fetched, setFetched] = useState<MomentumSurface | null | undefined>(initial);
+    const [sceneFailed, setSceneFailed] = useState(false);
     const [hover, setHover] = useState<TerrainHit | null>(null);
     const [preset, setPreset] = useState<CameraPreset>('angle');
     const [flat, setFlat] = useState(false);
     const [rotating, setRotating] = useState(false);
 
+    const webgl = useWebGL();
     const stamp = useThemeStamp();
     const osReduced = useReducedMotion();
     const coarse = useCoarsePointer();
     const reduced = osReduced || stamp.endsWith('|reduced');
+
+    const surface = fetched ?? null;
+    const status: Status = fetched === undefined ? 'loading'
+        : fetched === null ? 'unavailable'
+        : webgl === null ? 'loading'
+        : webgl && !sceneFailed ? 'ready' : 'flat';
 
     const hostRef = useRef<HTMLDivElement>(null);
     const canvasRef = useRef<HTMLCanvasElement>(null);
@@ -99,29 +135,25 @@ const MomentumTerrain = ({children}: {children?: ReactNode}) => {
     const reducedRef = useRef(reduced);
     const coarseRef = useRef(coarse);
 
-    // The data, then which drawing it gets.
+    // The data, when the page did not hand it in.
     useEffect(() => {
+        if (initial !== undefined) return;
         const controller = new AbortController();
         (async () => {
             try {
                 const response = await fetch(SURFACE_URL, {signal: controller.signal});
                 if (!response.ok) {
-                    setStatus('unavailable');
+                    setFetched(null);
                     return;
                 }
                 const data: unknown = await response.json();
-                if (!isSurface(data)) {
-                    setStatus('unavailable');
-                    return;
-                }
-                setSurface(data);
-                setStatus(supportsWebGL() ? 'ready' : 'flat');
+                setFetched(isSurface(data) ? data : null);
             } catch {
-                if (!controller.signal.aborted) setStatus('unavailable');
+                if (!controller.signal.aborted) setFetched(null);
             }
         })();
         return () => controller.abort();
-    }, []);
+    }, [initial]);
 
     // The latest flags, for a scene created after they were read.
     useEffect(() => {
@@ -156,11 +188,11 @@ const MomentumTerrain = ({children}: {children?: ReactNode}) => {
                     sceneRef.current = scene;
                 } catch (error) {
                     console.error('Momentum terrain: the scene could not start', error);
-                    setStatus('flat');
+                    setSceneFailed(true);
                 }
             })
             .catch(() => {
-                if (!cancelled) setStatus('flat');
+                if (!cancelled) setSceneFailed(true);
             });
         return () => {
             cancelled = true;
@@ -169,7 +201,7 @@ const MomentumTerrain = ({children}: {children?: ReactNode}) => {
         };
     }, [status, surface]);
 
-    // Draw only while the hero is on screen and the tab is visible.
+    // Draw only while the terrain is on screen and the tab is visible.
     useEffect(() => {
         if (status !== 'ready') return;
         const host = hostRef.current;
@@ -213,11 +245,11 @@ const MomentumTerrain = ({children}: {children?: ReactNode}) => {
     const cell = hover?.cell ?? null;
 
     return (
-        <div data-terrain data-terrain-state={status} data-terrain-motion={reduced ? 'reduced' : 'auto'} data-terrain-rotating={rotating ? 'true' : 'false'}>
-            <MicroLabel tone="brand">{TERRAIN_COPY.eyebrow}</MicroLabel>
+        <div data-terrain data-terrain-size={size} data-terrain-state={status} data-terrain-motion={reduced ? 'reduced' : 'auto'} data-terrain-rotating={rotating ? 'true' : 'false'}>
+            {eyebrow && <MicroLabel tone="brand">{TERRAIN_COPY.eyebrow}</MicroLabel>}
             <div
                 ref={hostRef}
-                className="relative mt-3 aspect-[4/3] max-h-[520px] w-full overflow-hidden rounded-[var(--panel-radius)] lg:aspect-auto lg:h-[500px] lg:max-h-none"
+                className={cn('relative w-full overflow-hidden rounded-[var(--panel-radius)]', eyebrow && 'mt-3', SIZE[size])}
                 style={{touchAction: 'pan-y'}}
             >
                 {status === 'ready' && <canvas ref={canvasRef} role="img" aria-label={label} className="block h-full w-full" />}

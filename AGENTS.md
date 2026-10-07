@@ -106,7 +106,7 @@ and friends keep none beyond Shared and the invariants).
   hero is on screen and something moves. Its sentences are `lib/learn/copy/terrain`; its terms
   (`normalized-momentum`, `lookback`, `volatility`, homed on the front door in `lib/learn/where`)
   are the panel's one `WhatTheseMean`, passed in by the page with `ask={false}`, since the chat
-  widget is not mounted there.
+  widget is not mounted there. Home draws the same component from a server read (see home).
 
 ### home
 
@@ -116,6 +116,12 @@ and friends keep none beyond Shared and the invariants).
   the session (the trade desk while the market is open, the news while it is closed); a box with
   nothing to say is not drawn. The widget grid is `/dashboard`; every action that revalidates
   `/` revalidates it too (`lib/__tests__/home-revalidate.test.ts`).
+- Home's first panel is the landing page's momentum terrain (`components/landing/MomentumTerrain`,
+  `size="panel"`, no eyebrow under the panel's own heading): the page reads
+  `lib/landing/surface-store.getMomentumSurface` on the server beside `getHomeView` and hands the
+  surface in as `initial`, so the panel exists only when there is one (never a loading box) and
+  the client draws it at once. Its one `WhatTheseMean` keeps its Ask links, since the chat is
+  mounted here; the landing page's has none.
 
 ### shell
 

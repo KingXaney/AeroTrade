@@ -25,9 +25,11 @@ TIINGO_PORT=8787
 APP_URL=http://localhost:$APP_PORT
 
 # Every suite, in the order a full run takes. The order is load-bearing: qa-auth removes the
-# sign-in and sign-up counters it fills before anyone else signs in, and qa-learn wipes and
-# reseeds strategyruns, so it runs after qa-strategies. A suite missing here runs last.
-ALL=(auth styles shell landing home chat topics-refresh trading topics news-feed strategies income learn learn-account games poker chat-tutor email)
+# sign-in and sign-up counters it fills before anyone else signs in; qa-home checks that Home draws
+# no terrain before any SPY history exists, so it runs before qa-landing seeds one (and the app
+# caches the Tiingo stand-in's answer for an hour); qa-learn wipes and reseeds strategyruns, so it
+# runs after qa-strategies. A suite missing here runs last.
+ALL=(auth styles shell home landing chat topics-refresh trading topics news-feed strategies income learn learn-account games poker chat-tutor email)
 
 KEEP_UP=0
 NAMES=()
