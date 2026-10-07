@@ -121,6 +121,15 @@ describe('sectionFor', () => {
         expect(sectionFor('/this-page-does-not-exist')).toBeUndefined();
         expect(sectionFor('/stocks-archive')).toBeUndefined();
     });
+
+    it('keeps poker night\'s lobby under Learn and its tables outside every section', () => {
+        expect(sectionFor('/poker-night')?.id).toBe('learn');
+        // A table is full screen, with no shell: nothing on the rail lights for it.
+        expect(sectionFor('/play/K7QXM4')).toBeUndefined();
+        // The lobby and the solver share a prefix, not a tab.
+        expect(isActiveNav('/poker-night', '/poker')).toBe(false);
+        expect(isActiveNav('/poker', '/poker-night')).toBe(false);
+    });
 });
 
 describe('searchPages', () => {

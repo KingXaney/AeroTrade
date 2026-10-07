@@ -63,6 +63,7 @@ const SIGNED_IN = [
     ['poker', '/poker'],
     ['poker-push-fold', '/poker?tab=push-fold'],
     ['poker-pot-odds', '/poker?tab=pot-odds'],
+    ['poker-night', '/poker-night'],
     ['strategies', '/strategies'],
     ['strategy-rsi2', '/strategies/rsi2-mean-reversion'],
     ['strategy-buy-and-hold', '/strategies/buy-and-hold-spy'],

@@ -1,0 +1,418 @@
+{
+  "v": 1,
+  "status": "playing",
+  "closing": false,
+  "config": {
+    "seats": 8,
+    "smallBlind": 10,
+    "bigBlind": 20,
+    "ante": 5,
+    "buyInMin": 400,
+    "buyInMax": 2000,
+    "rebuys": "approve",
+    "maxRebuys": 4,
+    "turnSeconds": 30,
+    "pauseSeconds": 5,
+    "sitOutAfter": 2
+  },
+  "configV": 1,
+  "settings": {
+    "name": "Friday night",
+    "scene": "casino-classic",
+    "felt": "emerald",
+    "throwables": true,
+    "locked": false,
+    "showToFriends": false
+  },
+  "hostPid": "p0",
+  "seats": [
+    {
+      "pid": "p0",
+      "stack": 1975,
+      "sittingOut": false,
+      "sitOutNext": false,
+      "away": false,
+      "timeouts": 0,
+      "owesPost": false,
+      "leaving": false,
+      "removed": false,
+      "pendingBuy": 0
+    },
+    {
+      "pid": "p1",
+      "stack": 1375,
+      "sittingOut": false,
+      "sitOutNext": false,
+      "away": false,
+      "timeouts": 0,
+      "owesPost": false,
+      "leaving": false,
+      "removed": false,
+      "pendingBuy": 0
+    },
+    null,
+    {
+      "pid": "p3",
+      "stack": 1775,
+      "sittingOut": false,
+      "sitOutNext": false,
+      "away": false,
+      "timeouts": 0,
+      "owesPost": false,
+      "leaving": false,
+      "removed": false,
+      "pendingBuy": 0
+    },
+    null,
+    {
+      "pid": "p5",
+      "stack": 1975,
+      "sittingOut": false,
+      "sitOutNext": false,
+      "away": true,
+      "timeouts": 0,
+      "owesPost": false,
+      "leaving": true,
+      "removed": false,
+      "pendingBuy": 0
+    },
+    null,
+    {
+      "pid": "p7",
+      "stack": 1200,
+      "sittingOut": false,
+      "sitOutNext": false,
+      "away": false,
+      "timeouts": 0,
+      "owesPost": true,
+      "leaving": false,
+      "removed": false,
+      "pendingBuy": 0
+    }
+  ],
+  "ledger": [
+    {
+      "pid": "p0",
+      "bought": 2000,
+      "cashedOut": 0,
+      "buys": 0,
+      "events": [
+        [
+          0,
+          0,
+          2000
+        ]
+      ],
+      "hands": 1,
+      "wins": 0,
+      "biggestWin": 0,
+      "allIns": 0,
+      "peakChips": 2000
+    },
+    {
+      "pid": "p1",
+      "bought": 1500,
+      "cashedOut": 0,
+      "buys": 0,
+      "events": [
+        [
+          0,
+          0,
+          1500
+        ]
+      ],
+      "hands": 1,
+      "wins": 0,
+      "biggestWin": 0,
+      "allIns": 0,
+      "peakChips": 1500
+    },
+    {
+      "pid": "p3",
+      "bought": 1800,
+      "cashedOut": 0,
+      "buys": 0,
+      "events": [
+        [
+          0,
+          0,
+          1800
+        ]
+      ],
+      "hands": 1,
+      "wins": 0,
+      "biggestWin": 0,
+      "allIns": 0,
+      "peakChips": 1800
+    },
+    {
+      "pid": "p5",
+      "bought": 2000,
+      "cashedOut": 0,
+      "buys": 0,
+      "events": [
+        [
+          0,
+          0,
+          2000
+        ]
+      ],
+      "hands": 1,
+      "wins": 0,
+      "biggestWin": 0,
+      "allIns": 0,
+      "peakChips": 2000
+    },
+    {
+      "pid": "p7",
+      "bought": 1200,
+      "cashedOut": 0,
+      "buys": 0,
+      "events": [
+        [
+          0,
+          0,
+          1200
+        ]
+      ],
+      "hands": 0,
+      "wins": 0,
+      "biggestWin": 0,
+      "allIns": 0,
+      "peakChips": 1200
+    }
+  ],
+  "requests": [
+    {
+      "pid": "p3",
+      "amount": 100,
+      "at": 1790000000000
+    }
+  ],
+  "lastBigBlind": 1,
+  "button": 5,
+  "handNo": 1,
+  "turn": 7,
+  "hand": {
+    "no": 1,
+    "startedAt": 1790000000000,
+    "button": 5,
+    "smallBlindSeat": 0,
+    "bigBlindSeat": 1,
+    "smallBlind": 10,
+    "bigBlind": 20,
+    "ante": 5,
+    "seats": [
+      {
+        "seat": 0,
+        "pid": "p0",
+        "hole": [
+          50,
+          46
+        ],
+        "startStack": 2000,
+        "committed": 25,
+        "streetBet": 0,
+        "actedAtBet": 0,
+        "folded": false,
+        "allIn": false,
+        "shown": false,
+        "pre": {
+          "kind": "call-any",
+          "atBet": 100
+        }
+      },
+      {
+        "seat": 1,
+        "pid": "p1",
+        "hole": [
+          28,
+          29
+        ],
+        "startStack": 1500,
+        "committed": 125,
+        "streetBet": 100,
+        "actedAtBet": 100,
+        "folded": false,
+        "allIn": false,
+        "shown": false,
+        "pre": null
+      },
+      {
+        "seat": 3,
+        "pid": "p3",
+        "hole": [
+          43,
+          39
+        ],
+        "startStack": 1800,
+        "committed": 25,
+        "streetBet": 0,
+        "actedAtBet": null,
+        "folded": false,
+        "allIn": false,
+        "shown": false,
+        "pre": null
+      },
+      {
+        "seat": 5,
+        "pid": "p5",
+        "hole": [
+          22,
+          0
+        ],
+        "startStack": 2000,
+        "committed": 25,
+        "streetBet": 0,
+        "actedAtBet": null,
+        "folded": true,
+        "allIn": false,
+        "shown": false,
+        "pre": null
+      }
+    ],
+    "deck": [
+      35,
+      25,
+      6,
+      8,
+      45
+    ],
+    "board": [
+      35,
+      25,
+      6
+    ],
+    "street": "flop",
+    "phase": "betting",
+    "currentBet": 100,
+    "increment": 100,
+    "lastAggressor": 1,
+    "actor": 3,
+    "deadline": 1790000030000,
+    "nextStreetAt": null,
+    "log": [
+      [
+        0,
+        0,
+        5,
+        0,
+        0,
+        0,
+        0
+      ],
+      [
+        1,
+        0,
+        5,
+        0,
+        0,
+        0,
+        0
+      ],
+      [
+        3,
+        0,
+        5,
+        0,
+        0,
+        0,
+        0
+      ],
+      [
+        5,
+        0,
+        5,
+        0,
+        0,
+        0,
+        0
+      ],
+      [
+        0,
+        1,
+        10,
+        10,
+        0,
+        0,
+        0
+      ],
+      [
+        1,
+        2,
+        20,
+        20,
+        0,
+        0,
+        0
+      ],
+      [
+        3,
+        6,
+        20,
+        20,
+        0,
+        0,
+        0
+      ],
+      [
+        5,
+        6,
+        20,
+        20,
+        0,
+        0,
+        0
+      ],
+      [
+        0,
+        6,
+        10,
+        20,
+        0,
+        0,
+        0
+      ],
+      [
+        1,
+        5,
+        0,
+        20,
+        0,
+        0,
+        0
+      ],
+      [
+        0,
+        5,
+        0,
+        0,
+        0,
+        1,
+        0
+      ],
+      [
+        1,
+        7,
+        100,
+        100,
+        0,
+        1,
+        0
+      ],
+      [
+        5,
+        4,
+        0,
+        0,
+        0,
+        1,
+        0
+      ]
+    ],
+    "logDropped": 0,
+    "result": null
+  },
+  "nextHandAt": null,
+  "createdAt": 1790000000000
+}

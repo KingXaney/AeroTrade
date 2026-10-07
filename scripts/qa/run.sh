@@ -29,7 +29,7 @@ APP_URL=http://localhost:$APP_PORT
 # no terrain before any SPY history exists, so it runs before qa-landing seeds one (and the app
 # caches the Tiingo stand-in's answer for an hour); qa-learn wipes and reseeds strategyruns, so it
 # runs after qa-strategies. A suite missing here runs last.
-ALL=(auth styles shell home landing chat topics-refresh trading topics news-feed strategies income learn learn-account games poker chat-tutor email)
+ALL=(auth styles shell home landing chat topics-refresh trading topics news-feed strategies income learn learn-account games poker poker-night chat-tutor email)
 
 KEEP_UP=0
 NAMES=()
@@ -84,7 +84,7 @@ done
 
 for env_file in .env .env.local .env.development .env.development.local; do
     if [ -f "$ROOT/$env_file" ]; then
-        echo "note: next dev also loads $env_file; the harness overrides the database, auth, Finnhub and mail settings, but any other key in it (GEMINI_API_KEY) reaches the app"
+        echo "note: next dev also loads $env_file; the harness overrides the database, auth, Finnhub, mail and Ably settings, but any other key in it (GEMINI_API_KEY) reaches the app"
     fi
 done
 
@@ -149,7 +149,11 @@ for _ in $(seq 1 30); do grep -q 'READY\|FAILED' "$LOGS/_tiingo.log" 2>/dev/null
 grep -q READY "$LOGS/_tiingo.log" || harness_failed "the Tiingo stand-in did not start" "$LOGS/_tiingo.log"
 
 # 2. The app. A .next left by `next build` breaks Turbopack's next/font in dev, so start clean.
-# The empty keys keep a local .env's Finnhub and mail settings out: no quotes, no mail sent.
+# The empty keys keep a local .env's Finnhub, mail and Ably settings out: no quotes, no mail sent,
+# and every poker night table polls. NEXT_PUBLIC_PN_RT_FAKE=1 opens poker night's realtime seam
+# (components/poker-night/realtime-client, compiled out of a production build): a page that defines
+# window.__PN_RT_FAKE__ takes its realtime messages from that object — the poker night suite's
+# relay — and every other page polls as before.
 rm -rf "$ROOT/.next"
 (cd "$ROOT" && exec env \
     PORT=$APP_PORT \
@@ -160,6 +164,7 @@ rm -rf "$ROOT/.next"
     TIINGO_TOKEN=qa-tiingo-token TIINGO_API_URL="http://localhost:$TIINGO_PORT" \
     INNGEST_DEV=1 \
     FINNHUB_API_KEY= NEXT_PUBLIC_FINNHUB_API_KEY= NODEMAILER_EMAIL= NODEMAILER_PASSWORD= \
+    ABLY_API_KEY= POKER_NIGHT_REALTIME= NEXT_PUBLIC_PN_RT_FAKE=1 \
     npm run dev) >"$LOGS/_dev.log" 2>&1 &
 PIDS+=($!)
 for _ in $(seq 1 120); do curl -sf -o /dev/null "$APP_URL/sign-in" && break; sleep 2; done

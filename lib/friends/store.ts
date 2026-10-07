@@ -65,8 +65,10 @@ const getProfilesByIds = async (db: Db, ids: string[]): Promise<Map<string, Prof
     return map;
 };
 
-// Accepted friend ids for a user (either direction of the friendship).
-const getAcceptedFriendIds = async (userId: string): Promise<string[]> => {
+// Accepted friend ids for a user (either direction of the friendship). Also the poker night lobby's
+// (lib/poker-night/lobby-store: friends' open tables).
+export const getAcceptedFriendIds = async (userId: string): Promise<string[]> => {
+    await connectToDatabase();
     const links = await Friendship.find({
         status: 'accepted',
         $or: [{requesterId: userId}, {addresseeId: userId}],
