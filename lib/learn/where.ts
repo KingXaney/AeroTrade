@@ -26,6 +26,7 @@ const LANDING: readonly GlossaryKey[] = ['normalized-momentum', 'lookback'];
 const BRAIN: readonly GlossaryKey[] = [
     'news-weight', 'news-sentiment', 'thesis', 'since-thesis',
     'event-earnings', 'event-guidance', 'event-mna', 'event-product', 'event-macro', 'event-regulatory', 'event-analyst', 'event-legal',
+    'nature-company', 'nature-opinion', 'nature-rumour',
 ];
 
 const HOMES = {

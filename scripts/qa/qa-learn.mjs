@@ -743,14 +743,15 @@ try {
             decayedTo: todayF, lastSeenAt: new Date(), verified: true,
             thesisSince: new Date(`${thesisDate}T11:30:00Z`), peakSlowWeight: 900, links: [],
         }}, {upsert: true});
-        const article = (n, eventType, sentiment) => ({
+        const article = (n, eventType, sentiment, nature = null) => ({
             contentHash: 700_000_000 + Math.floor(Math.random() * 1_000_000) * 10 + n,
             headline: `QA brain article ${n}`, summary: 'QA', source: 'QA Wire', sourceType: 'finance',
             url: `https://example.com/qa-brain-${Date.now()}-${n}`, datetime: Math.floor(Date.now() / 1000) - n * 3600, publishedDate: todayF,
             category: '', related: '', createdAt: new Date(),
-            extraction: {eventType, importance: 0.73, entities: [{key: THESIS_KEY, type: 'ticker', sentiment, relevance: 0.9}], model: 'qa', extractedAt: new Date()},
+            extraction: {eventType, ...(nature ? {nature} : {}), importance: 0.73, entities: [{key: THESIS_KEY, type: 'ticker', sentiment, relevance: 0.9}], model: 'qa', extractedAt: new Date()},
         });
-        const articlesF = [article(1, 'earnings', 0.4), article(2, 'other', -0.25)];
+        // Article 1 is reported (no nature badge); article 2 is an opinion piece, the one nature badge.
+        const articlesF = [article(1, 'earnings', 0.4), article(2, 'other', -0.25, 'opinion')];
         const insertedNews = await db.collection('newsitems').insertMany(articlesF);
         newsIdsF = Object.values(insertedNews.insertedIds);
         const item = (symbol, action, reasons, extra = {}) => ({symbol, action, targetWeight: 0.1, currentWeight: 0, score: 0.3, reasons, executed: false, ...extra});
@@ -817,13 +818,16 @@ try {
         check('the evidence lists both articles', (await evidence.innerText()).includes('QA brain article 1') && (await evidence.innerText()).includes('QA brain article 2'));
         check('one badge, for the earnings article', await evidence.locator('[data-term^="event-"]').count() === 1
             && await evidence.locator('[data-term="event-earnings"][title*="8-K"]').count() === 1);
+        check('the opinion piece carries its nature badge; the reported article none', await evidence.locator('[data-term^="nature-"]').count() === 1
+            && await evidence.locator('[data-term="nature-opinion"]').count() === 1);
         const labels = evidence.locator('details');
         check('…and one "What these labels mean", listing only that label', await labels.count() === 1
             && (await labels.locator('summary').innerText()).includes('What these labels mean'));
         await labels.evaluate((d) => { d.open = true; });
         const labelText = await labels.innerText();
-        check('…which names the filings', /Earnings news/.test(labelText) && /10-Q/.test(labelText) && /10-K/.test(labelText) && !/Legal news/.test(labelText));
-        check('an article\'s importance is never printed', !/0\.73|importance/i.test(await evidence.innerText()));
+        check('…which names the filings, and defines the opinion label', /Earnings news/.test(labelText) && /10-Q/.test(labelText) && /10-K/.test(labelText) && /Opinion piece/.test(labelText) && !/Legal news/.test(labelText) && !/Rumour/.test(labelText));
+        // The rows, not the label disclosure, whose glossary text may name the extractor's importance.
+        check('an article\'s importance is never printed on a row', !/0\.73|importance/i.test((await evidence.locator('a[target="_blank"]').allInnerTexts()).join(' ')));
         // Each row is its own article's link, printing that article's sentiment for this name.
         const rowFor = (a) => evidence.locator(`a[href="${a.url}"]`);
         const rowTexts = await Promise.all(articlesF.map(async (a) => ((await rowFor(a).count()) === 1 ? (await rowFor(a).innerText()).replace(/\s+/g, ' ') : '')));

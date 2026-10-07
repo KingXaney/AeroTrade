@@ -17,6 +17,8 @@ export const BRAIN_LEGEND_COPY = {
         `Each day the extractor reads up to ${articlesPerDay} new articles. It labels each one with the kind of event it covers and an importance from 0 to 1, and scores every name it mentions for relevance (0 to 1) and tone (−1 to +1).`,
     adding: (): string =>
         'An article adds importance × relevance to each name\'s weight, and its tone joins the name\'s sentiment average with that same share.',
+    nature: (takeCap: string, company: string, opinion: string, rumour: string, commentary: string): string =>
+        `It also labels how a piece is written: reported, a company speaking for itself, an opinion piece or a rumour. An opinion piece or a rumour counts at most ${takeCap} in importance; a company statement adds ${company} of its tone to a name's sentiment, an opinion piece ${opinion}, a rumour ${rumour}; a piece from a commentary outlet weighs ${commentary} of its importance, and one from a press-release wire is read as the company's own statement.`,
 
     fadingHeading: 'How weight fades',
     layers: (fastDays: number, slowDays: number): string =>

@@ -267,6 +267,16 @@ and friends keep none beyond Shared and the invariants).
 ### brain
 
 - `lib/brain/ingest` is the daily update's sweep, extraction batches and ticker guard.
+- A piece's nature — `reported`, `company`, `opinion`, `rumour` (`NATURES` in `lib/brain/config`) — is
+  the extractor's second label, beside the event type. `lib/brain/trust.sourceTrust` reads the
+  outlet first (a press-release wire is `company` whatever the model said; a commentary outlet
+  weighs `COMMENTARY_IMPORTANCE_SHARE` of its importance), then `lib/brain/extraction.sanitizeExtraction`
+  clamps: an opinion or a rumour at most `TAKE_IMPORTANCE_CAP`, and each mention's tone joins the
+  sentiment at `SENTIMENT_SHARE_BY_NATURE` (the `sentimentShare` of `lib/brain/decay.foldMentions`);
+  attention always counts in full, and a clamp only ever lowers a weight. The evidence list badges
+  company, opinion and rumour (`NATURE_BADGES` in `lib/brain/event-types`, glossary `nature-*`); a
+  reported piece carries none, and a row tagged before the label reads as reported. The model never
+  sees a URL; the trust check reads it.
 - The Knowledge Graph is 3D: `components/brain/BrainGraph` over `components/brain/graph-scene`
   (three.js, loaded on demand). The entities sit on three concentric shells — themes inner,
   sectors middle, tickers outer — placed by the pure `lib/brain/graph-layout` (deterministic for

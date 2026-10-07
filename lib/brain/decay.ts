@@ -23,7 +23,9 @@ export type EntityState = {
     peakSlowWeight: number;
 };
 
-export type Mention = {sentiment: number; importance: number; relevance: number};
+// sentimentShare: how much of the mention's tone joins the sentiment sum (1 when absent) —
+// SENTIMENT_SHARE_BY_NATURE in config, so a take adds attention without steering the tone.
+export type Mention = {sentiment: number; importance: number; relevance: number; sentimentShare?: number};
 
 const MS_PER_DAY = 86_400_000;
 
@@ -67,7 +69,7 @@ export const foldMentions = (e: EntityState, mentions: Mention[]): EntityState =
     for (const mention of mentions) {
         const contribution = mention.importance * mention.relevance;
         weightAdd += contribution;
-        sentimentAdd += mention.sentiment * contribution;
+        sentimentAdd += mention.sentiment * contribution * (mention.sentimentShare ?? 1);
     }
     return {
         ...e,
