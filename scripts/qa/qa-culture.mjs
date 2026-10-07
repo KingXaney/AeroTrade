@@ -34,11 +34,16 @@ const addDays = (date, days) => {
 const near = (a, b, eps = 1e-6) => Math.abs(a - b) <= eps;
 
 // Everything the weekly and page sections seed, removed at the end whatever happened.
-const cleanupWeekly = async (db, storedBars) => {
+const cleanupWeekly = async (db, storedBars, storedMetas) => {
     if (storedBars) {
         await db.collection('pricebars').deleteMany({symbol: {$in: BAR_SYMBOLS}});
         if (storedBars.length > 0) await db.collection('pricebars').insertMany(storedBars);
     }
+    if (storedMetas) {
+        await db.collection('priceseriesmetas').deleteMany({symbol: {$in: BAR_SYMBOLS}});
+        if (storedMetas.length > 0) await db.collection('priceseriesmetas').insertMany(storedMetas);
+    }
+    await db.collection('culturebacktests').deleteMany({});
     const ids = (await db.collection('paperaccounts').find({userId: OWNER}).project({_id: 1}).toArray()).map((a) => String(a._id));
     await db.collection('paperaccounts').deleteMany({userId: OWNER});
     await db.collection('papertrades').deleteMany({userId: OWNER});
@@ -47,11 +52,12 @@ const cleanupWeekly = async (db, storedBars) => {
 };
 
 let storedBars = null;
+let storedMetas = null;
 try {
     await mongo.connect();
     const db = mongo.db();
     for (const name of COLLECTIONS) await db.collection(name).deleteMany({});
-    await cleanupWeekly(db, null);
+    await cleanupWeekly(db, null, null);
     await db.collection('jobruns').deleteMany({jobId: 'culture-brain-weekly'});
 
     // The app's modules connect through database/mongoose, which reads MONGODB_URI at load.
@@ -222,6 +228,11 @@ try {
         storedBars = await db.collection('pricebars').find({symbol: {$in: BAR_SYMBOLS}}).toArray();
         await db.collection('pricebars').deleteMany({symbol: {$in: BAR_SYMBOLS}});
         await db.collection('pricebars').insertMany(bars);
+        // The backtest's readiness guard: every simulated owner's dividends vouched for across
+        // the window, and the T-bill series spanning it (the bars above reach six years back).
+        storedMetas = await db.collection('priceseriesmetas').find({symbol: {$in: BAR_SYMBOLS}}).toArray();
+        await db.collection('priceseriesmetas').deleteMany({symbol: {$in: BAR_SYMBOLS}});
+        await db.collection('priceseriesmetas').insertMany(['CELH', 'PEP', 'SPY'].map((symbol) => ({symbol, dividendsFrom: '2015-01-01', dividendsThrough: lastSession, updatedAt: new Date()})));
 
         // Four hundred days of pageviews, so the picker features can be measured: Celsius
         // surging, Pepsi and Poppi flat.
@@ -269,6 +280,15 @@ try {
             check('cash is untouched when nothing filled', accounts.every((a) => a.cash === 100000 && a.positions.length === 0));
             const trades = await db.collection('papertrades').countDocuments({userId: OWNER});
             check('no trade row was written', trades === 0, `${trades} trades`);
+
+            // The simulated record, built in the same run once the data was vouched for.
+            const backtest = await db.collection('culturebacktests').findOne({key: 'culture'});
+            check('the run builds the backtest: three variants over the stored bars and pageviews, ending before launch',
+                backtest !== null && backtest.variants.length === 3 && backtest.variants.map((v) => v.profile).sort().join(',') === 'price,quiet,spike'
+                && backtest.to < today && backtest.variants.every((v) => v.weeks > 200 && v.points.length > 1000) && /Backtest: rebuilt/.test(await jobMessage()),
+                backtest ? `${backtest.from} → ${backtest.to}, ${backtest.variants.map((v) => `${v.profile}:${v.weeks}w/${v.trades.length}t`).join(' ')}; ${await jobMessage()}` : await jobMessage());
+            check('…stamped with the engine version and the catalog, its feeds price, pageviews and the replayed entities',
+                backtest?.version === '1' && typeof backtest?.catalogHash === 'string' && ['price', 'wikipedia', 'mentions'].every((f) => backtest?.feeds.includes(f)), JSON.stringify(backtest?.feeds));
 
             await fire({force: true});
             const againRun = await pollUntil(async () => ((await jobMessage()).includes('already ran') ? await jobMessage() : null), 60_000);
@@ -387,13 +407,29 @@ try {
     const strip = await page.locator('[data-comparison]').evaluateAll((els) => els.map((el) => el.getAttribute('data-comparison')));
     check('the strip prints Spike, Quiet and SPY, never sorted by return', strip.join(',') === 'spike,quiet,spy', strip.join(','));
     check('…and colours no figure', await page.locator('#picker-comparison [data-comparison] .text-positive, #picker-comparison [data-comparison] .text-negative').count() === 0);
-    check('…saying the backtest is not computed yet', await page.locator('[data-backtest-pending]').count() === 1);
+    if (decisions) {
+        const simulatedTiles = await page.locator('[data-simulated]').evaluateAll((els) => els.map((el) => el.getAttribute('data-simulated')));
+        check('the simulated strip prints the three variants and SPY, in the registry\'s order, neutral', simulatedTiles.join(',') === 'spike,quiet,price,spy'
+            && await page.locator('[data-simulated-strip] .text-positive, [data-simulated-strip] .text-negative').count() === 0
+            && /Simulated — attention and price only/.test(await page.locator('[data-simulated-strip]').innerText())
+            && await page.locator('[data-backtest-pending]').count() === 0, simulatedTiles.join(','));
+        check('…its tiles carrying the backtest\'s definition', await page.locator('[data-simulated] [data-term="attention-backtest"][title]').count() === 3);
+    } else {
+        check('…saying the backtest is not computed yet', await page.locator('[data-backtest-pending]').count() === 1);
+    }
     check('the lead says what each picker follows, once', await page.locator('[data-picks-lead]').count() === 1 && await page.locator('[data-picker-lead]').count() === 2);
     const spikeColumn = page.locator('[data-picker="spike"]');
     const quietColumn = page.locator('[data-picker="quiet"]');
     if (decisions) {
         const stripText = await page.locator('#picker-comparison').innerText();
         check('both accounts have a record since today', (stripText.match(new RegExp(`since ${today}`, 'g')) ?? []).length === 3, stripText.replace(/\s+/g, ' ').slice(0, 200));
+        // A record whose live curve has fewer than two points opens on its Simulated tab once a
+        // backtest is stored (the strategies' rule), so switch to Live before reading it.
+        check('a record with a one-point live curve opens on the simulated tab once a backtest exists',
+            await spikeColumn.locator('#record-simulated-spike[aria-pressed="true"]').count() === 1 && await spikeColumn.locator('[data-record-pending]').count() === 0);
+        await page.locator('#record-live-spike').click();
+        await page.locator('#record-live-quiet').click();
+        await page.getByText('Live since').first().waitFor({timeout: 10000});
         check('each record says it is live since today', /Live since/.test(await spikeColumn.locator('[data-culture-record="spike"]').innerText()) && /Live since/.test(await quietColumn.locator('[data-culture-record="quiet"]').innerText()));
         const spikeDecision = spikeColumn.locator('[data-culture-decision="spike"]');
         check('each column shows its own latest decision, with the universe audit and the feeds', await spikeDecision.count() === 1 && /owners quoted/.test(await spikeDecision.innerText()) && /feeds: /.test(await spikeDecision.innerText())
@@ -409,6 +445,18 @@ try {
         check('…and no "Apply" anywhere: a record, not a list to act on', await page.locator('button', {hasText: 'Apply'}).count() === 0);
         check('the brands behind a symbol are chips to their evidence', await spikeDecision.locator('[data-item-brands] a[href^="/culture?brand="]').count() >= 1);
         check('nothing held and no fill, said plainly', (await page.locator('#culture-holdings-spike').innerText()).includes('Nothing held') && (await page.locator('#culture-trades-spike').innerText()).includes('No fill yet'));
+        // Each record's simulated half is its own profile's variant, labelled as such.
+        await page.locator('#record-simulated-spike').click();
+        await page.locator('#simulated-stats-spike').waitFor({timeout: 10000});
+        const simulatedRecord = await spikeColumn.locator('[data-culture-record="spike"]').innerText();
+        check('the Simulated tab shows the variant with its badge, window, feeds note and survivorship caveat', /Simulated — attention and price only, not live/.test(simulatedRecord)
+            && /weekly decisions/.test(simulatedRecord) && /reads stored pageviews and prices only/.test(simulatedRecord) && /chosen in 2026/.test(simulatedRecord)
+            && await page.locator('#simulated-stats-spike [data-term="attention-backtest"]').count() === 0 && await page.locator('#simulated-stats-spike [data-what-these-mean]').count() === 1,
+            simulatedRecord.replace(/\s+/g, ' ').slice(0, 240));
+        await page.locator('#simulated-stats-spike [data-what-these-mean]').evaluate((d) => { d.open = true; });
+        check('…whose definitions name the attention backtest, not a strategy backtest', /Attention backtest/.test(await page.locator('#simulated-stats-spike').innerText())
+            && !/Simulated record/.test(await page.locator('#simulated-stats-spike').innerText()));
+        await page.locator('#record-live-spike').click();
     } else {
         check('before the first run the strip shows dashes and "not started"', (await page.locator('#picker-comparison').innerText()).includes('not started'));
         check('…and each column its empty decision', await page.locator('[data-culture-decision]').count() === 0 && await page.getByText('No decision yet').count() === 2);
@@ -460,7 +508,7 @@ try {
 } finally {
     try {
         const db = mongo.db();
-        await cleanupWeekly(db, storedBars);
+        await cleanupWeekly(db, storedBars, storedMetas);
         for (const name of COLLECTIONS) await db.collection(name).deleteMany({});
     } catch {}
     await mongo.close().catch(() => {});

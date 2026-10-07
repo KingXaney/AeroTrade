@@ -7,7 +7,9 @@ import {modelConfigured} from "@/lib/ai/models";
 import {brandById, CULTURE_BRANDS} from "@/lib/culture/catalog";
 import {
     BACKFILL_CHUNK,
+    BACKTEST_LISTINGS,
     CULTURE_BACKFILL_YEARS,
+    CULTURE_ENGINE_VERSION,
     CULTURE_NEWS_QUERY_CHUNK,
     CULTURE_OWNER_ID,
     CULTURE_PROFILES,
@@ -18,6 +20,8 @@ import {
     WIKIPEDIA_CHUNK,
     WIKIPEDIA_DAILY_LOOKBACK_DAYS,
 } from "@/lib/culture/config";
+import {cultureBacktestDue} from "@/lib/culture/backtest";
+import {cultureBacktestReady, ensureCultureRateBars, getCultureBacktestStamp, lackingDividendCoverage, simulateCultureBacktest} from "@/lib/culture/backtest-store";
 import {buildCultureItems, type OrderOutcome} from "@/lib/culture/decisions";
 import {decideWeek, firstWeekTrades} from "@/lib/culture/engine";
 import {
@@ -57,9 +61,9 @@ import {buildCultureRationalePrompt} from "@/lib/culture/prompts";
 import {getTickerRollup, getTopCultureEntities} from "@/lib/culture/store";
 import {foldCultureIntoBrain} from "@/lib/culture/update";
 import {brandsByTicker} from "@/lib/culture/catalog";
-import {cultureTickers, orderUniverse, selectCultureUniverse, type CultureTicker, type VerifiedSymbol} from "@/lib/culture/universe";
+import {catalogHash, cultureTickers, orderUniverse, selectCultureUniverse, type CultureTicker, type VerifiedSymbol} from "@/lib/culture/universe";
 import {addCalendarDays, calendarDaysBetween} from "@/lib/dates";
-import {PRICE_CHUNK_SIZE} from "@/lib/prices/config";
+import {BENCHMARK_SYMBOL, PRICE_CHUNK_SIZE} from "@/lib/prices/config";
 import {ensureRateBars, quoteMissed} from "@/lib/strategies/job";
 import {executeOrder, FUNDING_SELL_FAILED} from "@/lib/trading/orders";
 import type {CultureFold} from "@/lib/culture/types";
@@ -206,7 +210,7 @@ export const runCultureWeekly = inngest.createFunction(
             for (const profile of LIVE_PROFILES) out[profile] = await cultureWeekClaimed(profile, day.weekKey);
             return out;
         });
-        if (!day.dryRun && LIVE_PROFILES.every((profile) => claimed[profile])) {
+        if (!day.dryRun && !day.resimulate && LIVE_PROFILES.every((profile) => claimed[profile])) {
             const message = `Culture pickers: every picker already ran in the week of ${day.weekKey}`;
             await step.run('record-job-run', async () => recordJobRun(JOBS.cultureWeekly.id, message));
             return {success: true, message};
@@ -238,14 +242,25 @@ export const runCultureWeekly = inngest.createFunction(
         const tickers: CultureTicker[] = universe.symbols.map((symbol) =>
             tickerBySymbol.get(symbol) ?? {symbol, listing: 'us', company: symbol, brands: []});
 
+        // The simulated record: its universe (the week's listed owners with bars, OTC left out)
+        // and whether this run rebuilds it — a new engine version, a changed catalog, a
+        // resimulate, or no build yet — decided before the bars step, which then refetches whole
+        // any symbol whose dividends the window is not yet vouched for.
+        const simSymbols = ordered.filter((t) => BACKTEST_LISTINGS.includes(t.listing) && universe.symbols.includes(t.symbol)).map((t) => t.symbol);
+        const launchDate = states.map((s) => s.launchDate).sort()[0] ?? day.today;
+        const stamp = await step.run('check-backtest', getCultureBacktestStamp);
+        const rebuild = cultureBacktestDue(stamp, {version: CULTURE_ENGINE_VERSION, catalogHash: catalogHash(), resimulate: day.resimulate});
+        const deep = rebuild ? await step.run('dividend-coverage', async () => lackingDividendCoverage(simSymbols, launchDate)) : [];
+
         const earnings = await step.run('earnings-calendar', async () => refreshReportDates(universe.symbols, day.today));
 
-        const barChunks = chunk(universe.symbols, PRICE_CHUNK_SIZE);
+        // SPY joins the bars step while a rebuild is pending: the simulation's calendar and benchmark.
+        const barChunks = chunk([...universe.symbols, ...(rebuild ? [BENCHMARK_SYMBOL] : [])], PRICE_CHUNK_SIZE);
         for (let i = 0; i < barChunks.length; i++) {
             const symbols = barChunks[i];
-            await step.run(`ensure-bars-${i}`, async () => ensureCultureBars(symbols));
+            await step.run(`ensure-bars-${i}`, async () => ensureCultureBars(symbols, {deep}));
         }
-        await step.run('ensure-rate', ensureRateBars);
+        await step.run('ensure-rate', rebuild ? ensureCultureRateBars : ensureRateBars);
 
         const scoring = await step.run('load-inputs', async () => loadScoringInputs(tickers, universe.targetable, day.asOf));
         const narratives = await step.run('load-narratives', async () =>
@@ -346,12 +361,31 @@ export const runCultureWeekly = inngest.createFunction(
             }
         }
 
+        // The simulated record, last and never in the way of trading: a build waits for the data
+        // it needs rather than run on part of it, and a failure is a note in the stamp.
+        let backtest: string | undefined;
+        if (rebuild) {
+            try {
+                const readiness = await step.run('simulate-ready', async () => cultureBacktestReady(simSymbols, launchDate));
+                if (readiness.ready) {
+                    const built = await step.run('simulate', async () => simulateCultureBacktest(simSymbols, launchDate));
+                    backtest = `rebuilt — ${built.weeks} weeks, ${built.variants} variants`;
+                } else {
+                    backtest = `waiting (${readiness.reason})`;
+                }
+            } catch (error) {
+                console.error('Culture backtest failed:', error);
+                backtest = `failed (${(error as Error).message ?? 'unknown'})`;
+            }
+        }
+
         const message = describeWeeklyRun({
             mode: day.mode,
             universe: {tickers: ordered.length, quoted: universe.targetable.length},
             feeds: scoring.feeds,
             earnings,
             profiles: summaries,
+            backtest,
         });
         await step.run('record-job-run', async () => recordJobRun(JOBS.cultureWeekly.id, message));
         return {success: true, message};

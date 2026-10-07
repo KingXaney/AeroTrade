@@ -112,6 +112,7 @@ describe('the /culture page copy', () => {
         const picksSamples = {
             profileLead: ['Spike', PROFILE_COPY.spike], accountLine: ['Culture Brain · Spike', '2026-10-05'], sinceLaunch: ['2026-10-05'],
             decisionLine: ['2026-10-05', 118, 131], feedsLine: [['price', 'wikipedia']],
+            simulatedLine: ['2021-10-04', '2026-10-01', 260], simulatedFills: [12],
         };
         const recordSamples = {
             liveLine: ['2026-10-05', 3, '+1.20%', '+0.40%'], liveStarts: ['2026-10-05'], simulatedLine: ['2021-10-04', '2026-10-01', 2],

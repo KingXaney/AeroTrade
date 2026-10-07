@@ -18,6 +18,7 @@ import {
     CULTURE_PROFILES,
     CULTURE_STARTING_BALANCE,
     LIVE_LOOKBACK_CALENDAR_DAYS,
+    SERIES_LOOKBACK_DAYS,
     type CultureFeed,
     type ProfileId,
 } from "@/lib/culture/config";
@@ -191,21 +192,26 @@ export const getReportDates = async (symbols: readonly string[]): Promise<Map<st
 
 // ---- bars ----
 
-export const ensureCultureBars = async (symbols: readonly string[]): Promise<{updated: number; failed: string[]; fresh: number}> => {
-    const result = await ensureBars([...symbols], {
-        limit: symbols.length,
-        backfillCalendarDays: CULTURE_BACKFILL_CALENDAR_DAYS,
-        backfillRange: '10y',
-        requireOhlc: true,
-        topupRange: '1mo',
-    });
-    return {updated: result.updated, failed: result.failed, fresh: result.fresh};
+// `deep`: symbols whose dividends are not yet vouched for across the backtest window (the
+// simulation's readiness guard), refetched whole so a rebuild never runs on partial data.
+export const ensureCultureBars = async (symbols: readonly string[], {deep = []}: {deep?: readonly string[]} = {}): Promise<{updated: number; failed: string[]; fresh: number}> => {
+    const options = {backfillCalendarDays: CULTURE_BACKFILL_CALENDAR_DAYS, backfillRange: '10y' as const, requireOhlc: true, topupRange: '1mo' as const};
+    const deepSet = new Set(deep.map((s) => s.toUpperCase()));
+    const refetch = symbols.filter((symbol) => deepSet.has(symbol.toUpperCase()));
+    const shallow = symbols.filter((symbol) => !deepSet.has(symbol.toUpperCase()));
+    // One after the other, never in parallel: ensureBars spaces its Yahoo calls.
+    const runs = [
+        refetch.length > 0 ? await ensureBars(refetch, {...options, limit: refetch.length, forceBackfill: true}) : null,
+        shallow.length > 0 ? await ensureBars(shallow, {...options, limit: shallow.length}) : null,
+    ];
+    return {
+        updated: runs.reduce((n, r) => n + (r?.updated ?? 0), 0),
+        failed: runs.flatMap((r) => r?.failed ?? []),
+        fresh: runs.reduce((n, r) => n + (r?.fresh ?? 0), 0),
+    };
 };
 
 // ---- the scoring inputs ----
-
-// The series the picker features reach back over: persistence's block plus its baseline.
-const SERIES_LOOKBACK_DAYS = 400;
 
 export const loadScoringInputs = async (
     tickers: readonly CultureTicker[],

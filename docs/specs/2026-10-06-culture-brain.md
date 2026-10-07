@@ -1,9 +1,9 @@
 # The culture brain
 
-Status: Built in slices (2026-10-06 → 2026-10-07). Slices 0 to C are in: the Reddit OAuth client,
-the daily pipeline, the two weekly pickers, the `/culture` page with its widgets. Slice D, the
-three-variant backtest, follows; Slice E (a paid social provider, a co-mention graph, a chat tool)
-is optional.
+Status: Built in slices (2026-10-06 → 2026-10-07). Slices 0 to D are in: the Reddit OAuth client,
+the daily pipeline, the two weekly pickers, the `/culture` page with its widgets, and the
+three-variant backtest. Slice E (a paid social provider, a co-mention graph, a chat tool) is
+optional.
 
 ## Why
 
@@ -116,12 +116,28 @@ Browser (`npm run qa -- culture`): the data layer through jiti, the weekly job t
 dev server on a seeded week, then the page — the board, the evidence, the two columns, the system
 view, the widgets, a phone width.
 
+## The backtest
+
+`lib/culture/simulator.ts` (pure) runs the same `decideWeek` on the first session of each ET
+week over stored bars and stored Wikipedia pageviews, for the last 260 weeks before the accounts'
+launch after a 260-bar warm-up. Attention is replayed, not read: each brand's pageview surprises
+go through the fold's own decay maths as the daily job applies them (a day's surprise folded the
+morning after, decayed to the reading day), so the simulation has slow attention and theses as
+the live brain would have had them from pageviews alone. Three variants — the price-only control,
+Spike and Quiet — share each week's features and differ only by their weights, which renormalise
+over the feeds present (price, pageviews, the replayed entities). Fills are at the next open (the
+close when a bar has none), a buy keeps the cash floor, a buy the plan funded with a sell that
+did not fill is dropped, and cash earns interest and holdings their dividends through the one
+income clock, stepped exactly as the strategies' simulator steps it (a parity test holds the
+simulator's rows to a live replay of its own fills). The build is one `CultureBacktest` document,
+rebuilt when the engine version or the catalog's owners change or on `culture-resimulate`, only
+once every simulated owner's dividends are vouched for across the window and the T-bill series
+spans it; OTC owners are never simulated. The page prints the three variants and SPY as neutral
+tiles under "Simulated — attention and price only, not live" with the survivorship caveat, and
+each record's Simulated tab is its own variant.
+
 ## What comes next
 
-Slice D: `lib/culture/simulator.ts` replays the Wikipedia folds through the same pure code over
-five years of weekly decisions in three variants (price only, Spike, Quiet), stored as
-`CultureBacktest` and shown as "Simulated — attention and price only, not live" beside the live
-records, with the survivorship caveat (a 2026 catalog applied to earlier years). Slice E, if
-wanted: a YouTube search rotation, a paid TikTok/Instagram provider under the adapter slot, a
-co-mention brand graph, a chat tool over the culture digest, a third profile once the first two
-have a record.
+Slice E, if wanted: a YouTube search rotation, a paid TikTok/Instagram provider under the adapter
+slot, a co-mention brand graph, a chat tool over the culture digest, a third profile once the
+first two have a record.

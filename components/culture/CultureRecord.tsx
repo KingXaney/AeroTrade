@@ -120,7 +120,7 @@ const CultureRecord = ({id, name, live, simulated, initialMode}: Props) => {
             </Panel>
 
             {showingLive && live && <AnalyticsStats analytics={live.stats} definitions />}
-            {!showingLive && simulated && <SimulatedStats stats={simulated.stats} id={`simulated-stats-${id}`} />}
+            {!showingLive && simulated && <SimulatedStats stats={simulated.stats} id={`simulated-stats-${id}`} recordTerm="attention-backtest" />}
         </section>
     );
 };

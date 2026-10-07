@@ -41,7 +41,7 @@ describe('where each term lives', () => {
     it('homes the culture brain\'s numbers, its pickers and its labels on /culture', () => {
         const signalTerms = Object.values(SIGNAL_BADGES).map((badge) => badge.term);
         expect(signalTerms).toHaveLength(7);
-        for (const key of ['attention', 'attention-anomaly', 'quiet-attention', 'category-share', 'brand-thesis', 'brand-owner', 'picker-profile', ...signalTerms] as const) {
+        for (const key of ['attention', 'attention-anomaly', 'quiet-attention', 'category-share', 'brand-thesis', 'brand-owner', 'picker-profile', 'attention-backtest', ...signalTerms] as const) {
             expect(groupOf(GLOSSARY[key]), key).toBe('culture');
             expect(homeOf(key), key).toBe('/culture');
         }

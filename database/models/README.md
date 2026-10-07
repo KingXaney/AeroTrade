@@ -29,6 +29,7 @@ reads and writes live. Change a field here, then in the store module named besid
 | `culture-universe` | culture | `lib/culture/picker-store` — the week's quote check per owner, read before Finnhub is asked |
 | `culture-earnings` | culture | `lib/culture/picker-store` — each owner's last and next report dates from the earnings calendar |
 | `culture-suggestion` | culture | `lib/culture/store` — brand names the model met that the catalog lacks; a person adds one in code |
+| `culture-backtest` | culture | `lib/culture/backtest-store` — the pickers' simulated record under one key: three variants (price only, Spike, Quiet) over the stored pageviews and bars, rebuilt when the engine version or the catalog's owners change |
 | `market-briefing` | news | `lib/news/briefing-store` (the morning job's write, the page's read) |
 | `topic` | topics | `lib/topics/store`, `insert` (the one write path), `seed`, `refresh` |
 | `topic-article` | topics | `lib/topics/store`, `refresh` |

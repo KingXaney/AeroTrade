@@ -351,6 +351,23 @@ and friends keep none beyond Shared and the invariants).
   rationale is skipped, never retried into a 403.
 - Every reason a picker writes is decoded by `lib/learn/culture-reasons` (round-tripped in its
   test) and glossed on the server (`glossCultureReasons`) before a client panel sees it.
+- The simulated record is `lib/culture/simulator.simulateCulture` (pure): the same `decideWeek`
+  on the first session of each ET week over stored bars and stored Wikipedia pageviews, the
+  pageview surprises replayed through `lib/brain/decay` as the daily fold applies them
+  (`attentionReplayer`), next-open fills, the one income clock stepped as the strategies'
+  simulator steps it (`lib/strategies/simulate.incomeWalker`); three variants — the price-only
+  control, Spike and Quiet — share each week's features and differ only by weights, and the
+  weights renormalise over the feeds present (price, pageviews, the replayed entities), so a
+  variant and a live run score on one scale. One document, `CultureBacktest` under
+  `CULTURE_BACKTEST_KEY`, rebuilt by the weekly job's last phase when `lib/culture/backtest.cultureBacktestDue`
+  says so (a new `CULTURE_ENGINE_VERSION`, a moved `catalogHash`, a resimulate, no build yet),
+  inside `lib/culture/backtest-store.cultureBacktestReady` (dividends vouched for across the
+  window for every simulated owner and SPY, a T-bill rate for every day of it — the bars step
+  refetches whole whatever is lacking while a rebuild is pending); a failure or a wait is a note
+  in the job's stamp, never in the way of trading. OTC owners are never simulated
+  (`BACKTEST_LISTINGS`). The page prints the variants beside the live records as neutral tiles
+  under "Simulated — attention and price only, not live", with the survivorship caveat, and
+  each record's Simulated tab is its own profile's variant with `attention-backtest` as its term.
 - `/culture` composes `lib/culture/page-store` (every read global, cached per request), shaped by
   the pure `lib/culture/page-view`: three views in the URL (`?view=`), and `?brand=` always the
   brands view with `#evidence`. The comparison strip prints the pickers in `LIVE_PROFILES` order

@@ -106,6 +106,8 @@ export const CULTURE_QUOTE_CHUNK = 25;
 export const CULTURE_BACKFILL_CALENDAR_DAYS = 2300;
 // Bars older than this never reach a decision, live or simulated.
 export const LIVE_LOOKBACK_CALENDAR_DAYS = 420;
+// The attention series a decision reads back over: persistence's block plus its baseline.
+export const SERIES_LOOKBACK_DAYS = 400;
 export const MIN_PRICE_BARS = 126;
 // Over-the-counter ADRs are verified live but never simulated: a quote check cannot be replayed.
 export const BACKTEST_LISTINGS: readonly Listing[] = ['us', 'adr'];
@@ -227,9 +229,11 @@ export const CULTURE_RAILS: AllocatorRails = {
     hardStopDrawdown: 0.30,
 };
 
-// The backtest: five years of weekly decisions after a warm-up of daily bars.
+// The backtest: five years of weekly decisions after a warm-up of daily bars, stored once under
+// this key and rebuilt when the engine version or the catalog's owners change.
 export const SIM_RESULT_WEEKS = 260;
 export const SIM_WARMUP_BARS = 260;
+export const CULTURE_BACKTEST_KEY = 'culture';
 // The weekly rationale call's narratives, and the reasons a decision item keeps.
 export const RATIONALE_NARRATIVES = 5;
 export const REASONS_PER_ITEM = 6;

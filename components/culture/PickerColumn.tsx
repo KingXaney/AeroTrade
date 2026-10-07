@@ -34,8 +34,14 @@ const PickerColumn = ({picker}: {picker: PickerView}) => {
                 id={picker.id}
                 name={picker.accountName}
                 live={picker.live}
-                simulated={null}
-                initialMode={pickPerfMode(picker.live?.series.length ?? 0, 0)}
+                simulated={picker.simulated ? {
+                    series: picker.simulated.series,
+                    stats: picker.simulated.stats,
+                    from: picker.simulated.from,
+                    to: picker.simulated.to,
+                    closeFills: picker.simulated.closeFills,
+                } : null}
+                initialMode={pickPerfMode(picker.live?.series.length ?? 0, picker.simulated?.series.length ?? 0)}
             />
 
             <Panel id={`culture-decision-${picker.id}`}>

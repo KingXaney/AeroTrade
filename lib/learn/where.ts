@@ -31,6 +31,7 @@ const CULTURE: readonly GlossaryKey[] = [
     'attention', 'attention-anomaly', 'attention-trend', 'attention-persistence', 'quiet-attention', 'category-share',
     'attention-since-report', 'app-rank', 'brand-sentiment', 'brand-thesis', 'brand-owner', 'picker-profile',
     'signal-adoption', 'signal-hype', 'signal-backlash', 'signal-substitution', 'signal-drop', 'signal-price', 'signal-fading',
+    'attention-backtest',
 ];
 
 const HOMES = {

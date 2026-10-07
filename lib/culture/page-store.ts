@@ -7,6 +7,8 @@ import {cache} from "react";
 import AccountSnapshot from "@/database/models/account-snapshot.model";
 import {connectToDatabase} from "@/database/mongoose";
 import {THESIS_WEIGHT_THRESHOLD} from "@/lib/brain/config";
+import type {CultureBacktestView, SimulatedVariantView} from "@/lib/culture/backtest";
+import {getCultureBacktest} from "@/lib/culture/backtest-store";
 import {brandById} from "@/lib/culture/catalog";
 import {CULTURE_OWNER_ID, CULTURE_PROFILES, LIVE_PROFILES, type ProfileId} from "@/lib/culture/config";
 import type {CultureDecisionItem} from "@/lib/culture/decisions";
@@ -129,9 +131,11 @@ export type PickerView = {
     trades: PaperTradeRecord[];
     // By trade id: the decision item that placed each culture fill on the log.
     fillReplays: Record<string, FillReplay>;
+    // This profile's variant of the stored backtest, once one is built.
+    simulated: SimulatedVariantView | null;
 };
 
-export type PicksView = {pickers: PickerView[]; comparison: ComparisonRow[]; started: boolean};
+export type PicksView = {pickers: PickerView[]; comparison: ComparisonRow[]; started: boolean; backtest: CultureBacktestView | null};
 
 // Each decision's reasons decoded here, on the server, so the panel renders clauses without
 // bundling the grammar.
@@ -169,7 +173,7 @@ const replaysFor = async (profile: ProfileId, trades: readonly PaperTradeRecord[
     return replays;
 };
 
-const readPicker = async (id: ProfileId, state: CultureStateView | null): Promise<PickerView> => {
+const readPicker = async (id: ProfileId, state: CultureStateView | null, backtest: CultureBacktestView | null): Promise<PickerView> => {
     const [analytics, decision, trades, snapshotDays] = await Promise.all([
         state ? getAccountAnalytics(CULTURE_OWNER_ID, state.accountId) : Promise.resolve(null),
         getLatestCultureDecision(id),
@@ -187,19 +191,20 @@ const readPicker = async (id: ProfileId, state: CultureStateView | null): Promis
         decision: withGloss(decision),
         trades,
         fillReplays: await replaysFor(id, trades),
+        simulated: backtest?.variants.find((variant) => variant.profile === id) ?? null,
     };
 };
 
 export const getCulturePicksView = cache(async (): Promise<PicksView> => {
-    const states = await cStates();
-    const pickers = await Promise.all(LIVE_PROFILES.map((id) => readPicker(id, states.find((state) => state.profile === id) ?? null)));
+    const [states, backtest] = await Promise.all([cStates(), getCultureBacktest()]);
+    const pickers = await Promise.all(LIVE_PROFILES.map((id) => readPicker(id, states.find((state) => state.profile === id) ?? null, backtest)));
     const records: Partial<Record<ProfileId, ProfileRecord | null>> = {};
     for (const picker of pickers) {
         records[picker.id] = picker.live
             ? {returnPct: picker.live.totalReturnPct, benchmarkReturnPct: picker.live.benchmarkReturnPct, since: picker.live.since}
             : null;
     }
-    return {pickers, comparison: comparisonRows(records), started: pickers.some((picker) => picker.live !== null)};
+    return {pickers, comparison: comparisonRows(records), started: pickers.some((picker) => picker.live !== null), backtest};
 });
 
 // ---- the dashboard tile ----

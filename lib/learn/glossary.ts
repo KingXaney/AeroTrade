@@ -569,6 +569,10 @@ const ENTRIES = [
         computedIn: 'lib/culture/extraction.ts readCultureBatch', seeAlso: ['signal-backlash']},
 
     // ---- the games ----------------------------------------------------------------------
+    {key: 'attention-backtest', kind: 'metric', term: 'Attention backtest', aliases: ['attention backtest', 'culture backtest', 'simulated picker', 'simulated variant'],
+        short: 'A picker run weekly over five years of stored pageviews and prices ending before launch — hypothetical, apart from the live record.',
+        long: 'A simulation replays each brand\'s pageview surprises through the same fold the live brain uses, computes every week\'s features from the stored series, and lets each picker decide on the first session of the week with next-open fills and no fees. It reads pageviews and prices only — no App Store ranks, posts, news mentions or report dates — and the catalog it runs on was chosen in 2026, which flatters it. A price-only picker runs beside the two, so what attention adds is printed, not assumed.',
+        computedIn: 'lib/culture/simulator.ts simulateCulture', seeAlso: ['simulated-record', 'picker-profile']},
     {key: 'kelly-criterion', kind: 'metric', term: 'Kelly criterion', aliases: ['kelly criterion', 'kelly fraction', 'kelly bet'],
         short: 'The share of a bankroll to stake on a favourable bet that gives the highest expected growth of its logarithm.',
         long: 'For an even-money bet that wins with probability p, the Kelly fraction is 2p − 1: a coin that lands heads 60% of the time gives 20% of the bankroll a flip. Staking more than that lowers the expected growth even though every bet has an edge, and staking everything ends at the first loss.',

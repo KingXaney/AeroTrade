@@ -154,6 +154,10 @@ export const CULTURE_PICKS_COPY = {
     sinceLaunch: (date: string): string => `since ${date}`,
     notStarted: 'not started',
     backtestPending: 'Backtest not computed yet — the simulated variants appear once the weekly job has built one.',
+    simulatedLine: (from: string, to: string, weeks: number): string =>
+        `${from} → ${to} · ${plural(weeks, 'weekly decision', 'weekly decisions')} · next-open fills · no fees or slippage · interest and dividends included`,
+    simulatedFills: (fills: number): string => plural(fills, 'fill', 'fills'),
+    simulatedSpyHint: 'total return, same window',
     decisionsHeading: 'Latest decision',
     decisionsEmpty: "No decision yet. The picker decides on Mondays at 10:45 ET, once the week's quotes are checked.",
     decisionLine: (date: string, quoted: number, tickers: number): string => `${date} · ${quoted} of ${tickers} owners quoted`,

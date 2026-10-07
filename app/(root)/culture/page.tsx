@@ -65,7 +65,7 @@ const PicksView = async () => {
     const view = await getCulturePicksView();
     return (
         <>
-            <PickerComparison rows={view.comparison} />
+            <PickerComparison rows={view.comparison} simulated={view.backtest} />
             <p className="text-sm text-fg-soft max-w-3xl" data-picks-lead>{CULTURE_PICKS_COPY.lead}</p>
             <div className="grid grid-cols-1 xl:grid-cols-2 gap-4 items-start">
                 {view.pickers.map((picker) => <PickerColumn key={picker.id} picker={picker} />)}
