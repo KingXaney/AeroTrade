@@ -376,6 +376,16 @@ and friends keep none beyond Shared and the invariants).
   item's link becomes an anchor only through `lib/culture/links.outboundHref` (http(s)); the
   legend `lib/culture/legend` prints every figure from the config at the foot of every view.
   Every sentence is `lib/learn/copy/culture`.
+- The brands view also draws the brands named together: `lib/culture/store.getCultureGraph`
+  reads the heaviest entities with their co-mention `links`, the pure `lib/culture/graph` keeps
+  each pair once and prunes a brand none of the others was named with, and
+  `components/culture/BrandLinks` lays them on a circle (deterministic, no physics), each name a
+  link to its evidence; the page draws the panel only when there is a line to draw (invariant 8).
+- The chat's `getCultureBrain` tool reads the same page readers (`getTopCultureEntities`,
+  `getTickerRollup`, `getCulturePicksView`) and hands the model `lib/chat/culture-brain`'s shape:
+  rounded brands and owners, each picker's live record beside SPY, its latest decision with
+  every reason decoded through the culture grammar, and its simulated record apart, under one
+  stance line held to the no-advice list.
 - The Brain section of `lib/shell/navigation` carries both brains (`/brain`, `/culture`); the rail
   stays at eight icons. The two widgets (`culture-picks`, `brand-attention`) are library-only,
   category `brain` ("Brains & AI").
@@ -542,7 +552,8 @@ and friends keep none beyond Shared and the invariants).
 - `lib/chat/quant-strategies` shapes what `getQuantStrategies` hands it: the leaderboard rows read
   through `getStrategyLeaderboard`, or one strategy's latest run from
   `lib/strategies/page-store.getLatestRun`, with each reason decoded with its def and the board cut
-  to its top rows.
+  to its top rows. `lib/chat/culture-brain` is the culture brain's twin for `getCultureBrain`
+  (see culture).
 - `components/chat/ChatWidget` mounts the one launcher — the robot, aria-label "Open Aero-AI
   Assistant", the QA's handle — and, on `/topics` pages only while the panel is closed, its speech
   bubble `components/chat/RobotTipBubble`. The tips are `lib/learn/copy/robot` (`ROBOT_TIPS`: the

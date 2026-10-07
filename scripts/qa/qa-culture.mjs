@@ -362,6 +362,12 @@ try {
     check('…which says attention is not demand, then defines the four terms it shows', /Attention is not demand/.test(boardTermsText)
         && /Listed owner/.test(boardTermsText) && /Brand thesis/.test(boardTermsText) && /Brand sentiment/.test(boardTermsText) && !/Picker profile/.test(boardTermsText));
 
+    const linksPanel = page.locator('#brand-links');
+    check('the brands named together are drawn: the co-mention of Celsius and Poppi, each name a link to its evidence, nothing unlinked',
+        await linksPanel.count() === 1 && await linksPanel.locator('line[data-edge="celsius|poppi"]').count() === 1
+        && await linksPanel.locator('a[href="/culture?brand=celsius#evidence"]').count() === 1 && await linksPanel.locator('a[href="/culture?brand=poppi#evidence"]').count() === 1
+        && await linksPanel.locator('[data-brand-links] a').count() === 2 && await linksPanel.locator('[data-what-these-mean]').count() === 1);
+
     const rising = page.locator('#rising-brands');
     const risingBrands = await rising.locator('[data-brand]').evaluateAll((els) => els.map((el) => el.getAttribute('data-brand')));
     check('the rising list ranks the fast layer and links each name to its evidence', risingBrands.length >= 4 && risingBrands[0] === 'celsius'

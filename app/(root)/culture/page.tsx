@@ -3,6 +3,7 @@ import {requireUserId} from "@/lib/auth/session";
 import {getCultureBrandsView, getCulturePicksView, getCultureSystemView} from "@/lib/culture/page-store";
 import BrandBoard from "@/components/culture/BrandBoard";
 import BrandEvidence from "@/components/culture/BrandEvidence";
+import BrandLinks from "@/components/culture/BrandLinks";
 import CultureLegend from "@/components/culture/CultureLegend";
 import CultureSystem from "@/components/culture/CultureSystem";
 import PickerColumn from "@/components/culture/PickerColumn";
@@ -49,6 +50,14 @@ const BrandsView = async ({brandId}: {brandId: string | null}) => {
                     <RisingBrands rows={view.rising} />
                 </Panel>
             </div>
+
+            {/* Only with a line to draw: an unlinked dot says nothing the board does not. */}
+            {view.graph.edges.length > 0 && (
+                <Panel id="brand-links">
+                    <SectionHeading>{CULTURE_COPY.linksHeading}</SectionHeading>
+                    <BrandLinks graph={view.graph} />
+                </Panel>
+            )}
 
             {/* Evidence drill-down for ?brand= */}
             {view.evidence && (

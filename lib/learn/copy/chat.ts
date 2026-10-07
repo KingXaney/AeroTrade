@@ -14,6 +14,7 @@ export const CHAT_SUGGESTIONS = [
     "What does max drawdown mean?",
     "Explain what a P/E ratio measures",
     "How does a quant strategy decide?",
+    "What is the culture brain seeing?",
 ];
 
 // The caption's clauses, joined by `separator`. "Messages", not model calls: one message may

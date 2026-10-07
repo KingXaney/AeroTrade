@@ -12,6 +12,7 @@ import {sentimentAvg} from "@/lib/brain/decay";
 import {CULTURE_BRANDS} from "@/lib/culture/catalog";
 import {CULTURE_SUGGESTION_CAP, CULTURE_SUGGESTION_SAMPLES} from "@/lib/culture/config";
 import {isCatalogName} from "@/lib/culture/mentions";
+import {graphFromEntities, type CultureGraph} from "@/lib/culture/graph";
 import {rollupTickers, type TickerRollup} from "@/lib/culture/rollup";
 import {CULTURE_SOURCES, type AttentionPoint, type AttentionRow, type CultureCategory, type CultureEntitySummary, type CultureItemInput, type CultureItemSource, type CultureSource, type Listing} from "@/lib/culture/types";
 import {addCalendarDays, getEasternDateString} from "@/lib/dates";
@@ -399,4 +400,16 @@ export const brandsWithoutRecentViews = async (days: number, today: string = get
     const from = addCalendarDays(today, -days);
     const series = await getAttentionSeries(CULTURE_BRANDS.map((brand) => brand.id), {sources: ['wikipedia'], from, to: today});
     return CULTURE_BRANDS.filter((brand) => (series.get(brand.id)?.get('wikipedia')?.length ?? 0) === 0).map((brand) => brand.id);
+};
+
+// ---- the brands named together ----
+
+type LeanLinked = LeanSummary & {links?: {key: string; weight: number}[]};
+
+// The heaviest brands with the co-mention links among them, for the brands view's graph
+// (lib/culture/graph.ts prunes a brand none of the others was named with).
+export const getCultureGraph = async (limit: number): Promise<CultureGraph> => {
+    await connectToDatabase();
+    const docs = await CultureEntity.find({}).sort({weightSlow: -1}).limit(limit).lean<LeanLinked[]>();
+    return graphFromEntities(docs.map((doc) => ({...toEntitySummary(doc), links: doc.links ?? []})));
 };

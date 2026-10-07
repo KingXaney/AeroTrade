@@ -2,8 +2,10 @@
 
 Status: Built in slices (2026-10-06 → 2026-10-07). Slices 0 to D are in: the Reddit OAuth client,
 the daily pipeline, the two weekly pickers, the `/culture` page with its widgets, and the
-three-variant backtest. Slice E (a paid social provider, a co-mention graph, a chat tool) is
-optional.
+three-variant backtest. Of Slice E, what costs nothing is in: the brands-named-together graph on
+the brands view, the chat's `getCultureBrain` tool, and the YouTube search rotation (off until
+`CULTURE_YOUTUBE_SEARCH_PER_DAY` is set). A paid TikTok or Instagram provider for the adapter
+slot, and a third picker once the first two have a record, remain open.
 
 ## Why
 
@@ -138,6 +140,5 @@ each record's Simulated tab is its own variant.
 
 ## What comes next
 
-Slice E, if wanted: a YouTube search rotation, a paid TikTok/Instagram provider under the adapter
-slot, a co-mention brand graph, a chat tool over the culture digest, a third profile once the
-first two have a record.
+A paid TikTok/Instagram provider under the adapter slot (`CULTURE_SOCIAL_ADAPTER`), and a third
+profile once the first two have a record to compare it with.

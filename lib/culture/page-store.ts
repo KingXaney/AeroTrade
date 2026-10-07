@@ -32,11 +32,13 @@ import {
     type CultureDecisionView,
     type CultureStateView,
 } from "@/lib/culture/picker-store";
+import type {CultureGraph} from "@/lib/culture/graph";
 import {
     brandsWithoutRecentViews,
     getAllCultureEntities,
     getBrandEvidence,
     getCultureCounts,
+    getCultureGraph,
     getSourceFreshness,
     getSuggestions,
     type CultureCounts,
@@ -57,6 +59,7 @@ import type {AccountAnalytics, PaperTradeRecord, PerfPoint} from "@/lib/trading/
 const EVIDENCE_DAYS = 21;
 const EVIDENCE_LIMIT = 30;
 const RISING_LIMIT = 8;
+const GRAPH_LIMIT = 24;
 const TRADES_LIMIT = 50;
 const DRIFT_DAYS = 10;
 const SUGGESTIONS_LIMIT = 20;
@@ -77,14 +80,17 @@ export type BrandsView = {
     // The week whose quote check marked owners unpriced; null before the first check.
     unpricedWeek: string | null;
     thesisThreshold: number;
+    // The brands named together among the heaviest; the page draws it only when it has an edge.
+    graph: CultureGraph;
     evidence: {brand: CultureBrand; items: EvidenceItem[]; days: number} | null;
 };
 
 export const getCultureBrandsView = cache(async (brandId: string | null): Promise<BrandsView> => {
     const brand = brandId ? brandById(brandId) : undefined;
-    const [entities, universe, items] = await Promise.all([
+    const [entities, universe, graph, items] = await Promise.all([
         cEntities(),
         cWeekUniverse(),
+        getCultureGraph(GRAPH_LIMIT),
         brand ? getBrandEvidence(brand.id, EVIDENCE_DAYS, EVIDENCE_LIMIT) : Promise.resolve([] as EvidenceItem[]),
     ]);
     const unquoted = new Set(universe.rows.filter((row) => !row.quoted).map((row) => row.symbol));
@@ -95,6 +101,7 @@ export const getCultureBrandsView = cache(async (brandId: string | null): Promis
         rising: risingBrands(entities, RISING_LIMIT),
         unpricedWeek: universe.rows.length > 0 ? universe.weekKey : null,
         thesisThreshold: THESIS_WEIGHT_THRESHOLD,
+        graph,
         evidence: brand ? {brand, items, days: EVIDENCE_DAYS} : null,
     };
 });
