@@ -9,6 +9,8 @@ export interface NewsEntityMention {
 
 export interface NewsExtraction {
     eventType: 'earnings' | 'guidance' | 'mna' | 'product' | 'macro' | 'regulatory' | 'analyst' | 'legal' | 'other';
+    // How the piece is written (lib/brain/config NATURES); absent on rows tagged before the label.
+    nature?: 'reported' | 'company' | 'opinion' | 'rumour';
     importance: number;           // 0..1
     entities: NewsEntityMention[];
     model: string;
@@ -43,6 +45,7 @@ const NewsEntityMentionSchema = new Schema<NewsEntityMention>(
 const NewsExtractionSchema = new Schema<NewsExtraction>(
     {
         eventType: {type: String, required: true, enum: ['earnings', 'guidance', 'mna', 'product', 'macro', 'regulatory', 'analyst', 'legal', 'other']},
+        nature: {type: String, enum: ['reported', 'company', 'opinion', 'rumour']},
         importance: {type: Number, required: true, min: 0, max: 1},
         entities: {type: [NewsEntityMentionSchema], default: []},
         model: {type: String, required: true},

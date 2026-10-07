@@ -82,6 +82,8 @@ type QueuedArticle = {
     related: string;
     source: string;
     sourceType: string;
+    // For lib/brain/trust (a press-release wire's host); never shown to the model.
+    url: string;
 };
 
 type ExtractionQueue = {articles: QueuedArticle[]; activeThemes: string[]};
@@ -105,6 +107,7 @@ export const loadExtractionQueue = async (): Promise<ExtractionQueue> => {
             related: i.related,
             source: i.source,
             sourceType: i.sourceType,
+            url: i.url,
         })),
         activeThemes,
     };
@@ -119,9 +122,10 @@ export const extractionBatches = <T>(articles: readonly T[]): T[][] => {
     return Array.from({length: batchCount}, (_, b) => articles.slice(b * EXTRACTION_BATCH_SIZE, (b + 1) * EXTRACTION_BATCH_SIZE));
 };
 
+// The model sees the outlet and the kind of source, never the URL (lib/brain/trust reads that).
 export const buildExtractionPrompt = (batch: readonly QueuedArticle[], activeThemes: readonly string[]): string =>
     injectJson(
-        injectJson(EXTRACTION_PROMPT, '{{articles}}', batch),
+        injectJson(EXTRACTION_PROMPT, '{{articles}}', batch.map(({id, headline, summary, related, source, sourceType}) => ({id, headline, summary, related, source, sourceType}))),
         '{{activeThemes}}', activeThemes,
     );
 
@@ -146,20 +150,21 @@ export const applyExtractionBatch = async ({index, batch, text, model, activeThe
     }
 
     await connectToDatabase();
-    const sourceTypeById = new Map(batch.map((a) => [a.id, a.sourceType]));
+    const queuedById = new Map(batch.map((a) => [a.id, a]));
     const batchFolds: ArticleFold[] = [];
     const batchIds: string[] = [];
     for (const article of parsed.articles) {
         // Consume-once: hallucinated ids AND duplicate ids in one response are skipped.
-        const sourceType = sourceTypeById.get(article.id);
-        if (sourceType === undefined) continue;
-        sourceTypeById.delete(article.id);
-        const clean = sanitizeExtraction(article, sourceType, activeThemes);
+        const queued = queuedById.get(article.id);
+        if (queued === undefined) continue;
+        queuedById.delete(article.id);
+        const clean = sanitizeExtraction(article, queued.sourceType, activeThemes, {source: queued.source, url: queued.url});
         if (clean.entities.length === 0) continue;
         await NewsItem.updateOne(
             {_id: clean.id},
             {$set: {extraction: {
                 eventType: clean.eventType,
+                nature: clean.nature,
                 importance: clean.importance,
                 entities: clean.entities,
                 // The model that actually tagged this article, not a
@@ -170,7 +175,7 @@ export const applyExtractionBatch = async ({index, batch, text, model, activeThe
                 extractedAt: new Date(),
             }}},
         );
-        batchFolds.push({importance: clean.importance, entities: clean.entities});
+        batchFolds.push({importance: clean.importance, nature: clean.nature, entities: clean.entities});
         batchIds.push(clean.id);
     }
     return {folds: batchFolds, ids: batchIds};

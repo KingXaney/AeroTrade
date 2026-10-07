@@ -489,6 +489,20 @@ const ENTRIES = [
         short: 'An article about a lawsuit, a settlement, a court ruling or a criminal case involving the company.',
         long: 'Legal articles cover disputes in court, as distinct from regulatory ones, which cover the agencies and their rules.',
         seeAlso: ['event-regulatory']},
+    // How a piece is written (lib/brain/config NATURES), one entry per badge
+    // (lib/brain/event-types.ts NATURE_BADGES); 'reported' has no badge and no entry.
+    {key: 'nature-company', kind: 'metric', term: 'Company statement', aliases: ['company statement', 'press release', 'company statement label'],
+        short: 'A piece in which the company or its executives speak for themselves: a press release, an interview, their own guidance.',
+        long: 'The extractor labels how each piece is written, apart from what it covers. This one marks the company speaking for itself — a press release, an interview, a statement in its own words — and the brain reads anything from a press-release wire as this, whatever the model called it. Its attention counts in full; its tone joins the name\'s sentiment at the share the brain legend states, since a company describes itself.',
+        seeAlso: ['nature-opinion', 'event-guidance']},
+    {key: 'nature-opinion', kind: 'metric', term: 'Opinion piece', aliases: ['opinion piece', 'opinion label', 'commentary', 'analysis piece'],
+        short: 'Analysis, commentary or a prediction: a piece arguing where a name or the market is going, not reporting what happened.',
+        long: 'Outlooks, "why this stock will…" pieces, lists of names to watch and calls on the market\'s direction carry this label. It is attention like any other, so it counts toward a name\'s weight, but the brain caps its importance and lets its tone join the sentiment average at a reduced share (the brain legend states both), so a wave of takes shows that people are talking without steering the picture.',
+        seeAlso: ['nature-rumour', 'news-sentiment']},
+    {key: 'nature-rumour', kind: 'metric', term: 'Rumour', aliases: ['rumour', 'rumor', 'unconfirmed report', 'speculation'],
+        short: 'An unconfirmed report or speculation: "sources say", a leak, social chatter. Its tone never joins a name\'s sentiment.',
+        long: 'A rumour is a claim nobody has confirmed: an unnamed source, a leak, a forum thread. The brain counts it as attention with its importance capped, and gives its tone no share of the sentiment average — a rumour can show that a name is being talked about, never which way the facts point.',
+        seeAlso: ['nature-opinion', 'news-weight']},
 
     // ---- the games ----------------------------------------------------------------------
     {key: 'kelly-criterion', kind: 'metric', term: 'Kelly criterion', aliases: ['kelly criterion', 'kelly fraction', 'kelly bet'],

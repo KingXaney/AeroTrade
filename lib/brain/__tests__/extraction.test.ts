@@ -6,7 +6,7 @@ import {
     sanitizeExtraction,
 } from "@/lib/brain/extraction";
 import type {ExtractedEntity, ExtractionBatch} from "@/lib/brain/extraction";
-import {EXTRACTION_BATCH_SIZE, REDDIT_IMPORTANCE_CAP} from "@/lib/brain/config";
+import {COMMENTARY_IMPORTANCE_SHARE, EXTRACTION_BATCH_SIZE, REDDIT_IMPORTANCE_CAP, TAKE_IMPORTANCE_CAP} from "@/lib/brain/config";
 
 type ExtractionArticle = ExtractionBatch["articles"][number];
 
@@ -21,6 +21,7 @@ const makeEntity = (overrides: Partial<ExtractedEntity> = {}): ExtractedEntity =
 const makeArticle = (overrides: Partial<ExtractionArticle> = {}): ExtractionArticle => ({
     id: "article-1",
     eventType: "earnings",
+    nature: "reported",
     importance: 0.5,
     entities: [],
     ...overrides,
@@ -62,6 +63,17 @@ describe("ExtractionBatchSchema / parseExtractionResponse", () => {
     it("rejects an unknown eventType", () => {
         const batch = {articles: [{...makeArticle(), eventType: "rumor"}]};
         expect(parseExtractionResponse(JSON.stringify(batch))).toBeNull();
+    });
+
+    it("reads a missing nature as reported and rejects an unknown one", () => {
+        const withoutNature: Record<string, unknown> = {...makeArticle()};
+        delete withoutNature.nature;
+        const parsed = parseExtractionResponse(JSON.stringify({articles: [withoutNature]}));
+        expect(parsed?.articles[0]?.nature).toBe("reported");
+        expect(parseExtractionResponse(JSON.stringify({articles: [{...makeArticle(), nature: "editorial"}]}))).toBeNull();
+        for (const nature of ["reported", "company", "opinion", "rumour"]) {
+            expect(parseExtractionResponse(JSON.stringify({articles: [{...makeArticle(), nature}]}))?.articles[0]?.nature).toBe(nature);
+        }
     });
 
     it("rejects importance outside [0, 1]", () => {
@@ -227,6 +239,40 @@ describe("sanitizeExtraction — dedupe and clamps", () => {
     it("does not cap importance for non-reddit sources", () => {
         const result = sanitizeExtraction(makeArticle({importance: 0.9}), "rss", []);
         expect(result.importance).toBe(0.9);
+    });
+
+    it("caps a take — an opinion piece or a rumour — at TAKE_IMPORTANCE_CAP, and nothing else", () => {
+        expect(sanitizeExtraction(makeArticle({importance: 0.9, nature: "opinion"}), "rss", []).importance).toBe(TAKE_IMPORTANCE_CAP);
+        expect(sanitizeExtraction(makeArticle({importance: 0.9, nature: "rumour"}), "finance", []).importance).toBe(TAKE_IMPORTANCE_CAP);
+        expect(sanitizeExtraction(makeArticle({importance: 0.2, nature: "opinion"}), "rss", []).importance).toBe(0.2);
+        expect(sanitizeExtraction(makeArticle({importance: 0.9, nature: "company"}), "rss", []).importance).toBe(0.9);
+        expect(sanitizeExtraction(makeArticle({importance: 0.9, nature: "reported"}), "rss", []).importance).toBe(0.9);
+        expect(TAKE_IMPORTANCE_CAP).toBeLessThan(REDDIT_IMPORTANCE_CAP);
+    });
+
+    it("passes the nature through, and a reddit take takes the lower of the two caps", () => {
+        expect(sanitizeExtraction(makeArticle({nature: "rumour"}), "rss", []).nature).toBe("rumour");
+        expect(sanitizeExtraction(makeArticle({importance: 0.9, nature: "opinion"}), "reddit", []).importance).toBe(Math.min(REDDIT_IMPORTANCE_CAP, TAKE_IMPORTANCE_CAP));
+        expect(sanitizeExtraction(makeArticle({importance: 0.9, nature: "reported"}), "reddit", []).importance).toBe(REDDIT_IMPORTANCE_CAP);
+    });
+
+    it("reads a press-release wire's piece as the company speaking, whatever the model said, with no take cap", () => {
+        const fromWire = sanitizeExtraction(makeArticle({importance: 0.9, nature: "opinion"}), "finance", [], {source: "PRNewswire"});
+        expect(fromWire.nature).toBe("company");
+        expect(fromWire.importance).toBe(0.9);
+        const byHost = sanitizeExtraction(makeArticle({importance: 0.7, nature: "reported"}), "rss", [], {source: "Yahoo Finance", url: "https://www.globenewswire.com/news-release/2026/10/06/acme.html"});
+        expect(byHost.nature).toBe("company");
+        expect(byHost.importance).toBe(0.7);
+    });
+
+    it("weighs a commentary outlet's piece at its share, before the take cap", () => {
+        const reported = sanitizeExtraction(makeArticle({importance: 0.9, nature: "reported"}), "rss", [], {source: "Motley Fool"});
+        expect(reported.nature).toBe("reported");
+        expect(reported.importance).toBeCloseTo(0.9 * COMMENTARY_IMPORTANCE_SHARE, 12);
+        const opinion = sanitizeExtraction(makeArticle({importance: 0.9, nature: "opinion"}), "rss", [], {source: "Seeking Alpha"});
+        expect(opinion.importance).toBe(Math.min(0.9 * COMMENTARY_IMPORTANCE_SHARE, TAKE_IMPORTANCE_CAP));
+        const unknown = sanitizeExtraction(makeArticle({importance: 0.9, nature: "reported"}), "rss", [], {source: "Reuters", url: "https://www.reuters.com/markets/acme"});
+        expect(unknown.importance).toBe(0.9);
     });
 
     it("passes id and eventType through unchanged", () => {

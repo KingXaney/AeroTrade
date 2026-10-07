@@ -25,6 +25,7 @@ describe('brainLegend', () => {
     it('describes the mechanism in the constants\' own figures', () => {
         const text = legendText(brainLegend());
         for (const figure of ['up to 160 new articles', 'halves every 5 days', 'halves every 60 days', 'reaches 5', 'below 40%',
+            'counts at most 0.3 in importance', 'a company statement adds 50% of its tone', 'an opinion piece 50%, a rumour 0%', 'weighs 60% of its importance',
             'news rank 0.20', 'news sentiment 0.15', 'momentum 0.35', 'thesis 0.20', 'sector standing 0.10',
             '6-month (0.50), 12-month (0.30) and 3-month (0.20)', 'most volatile 20%', 'multiplied by 0.8',
             'the 8 highest scores above 0.15', 'at most 20%', 'with at least 10% kept in cash', 'drops below 0 ', '25% under the average cost',
@@ -87,6 +88,9 @@ describe('brainLegend follows the constants', () => {
             DAILY_DECAY_SLOW: 0.5 ** (1 / 45),
             THESIS_WEIGHT_THRESHOLD: 7,
             THESIS_EXIT_FRACTION: 0.35,
+            TAKE_IMPORTANCE_CAP: 0.25,
+            SENTIMENT_SHARE_BY_NATURE: {reported: 1, company: 0.4, opinion: 0.3, rumour: 0},
+            COMMENTARY_IMPORTANCE_SHARE: 0.55,
         }));
         vi.doMock('@/lib/navigator/config', async (importOriginal) => ({
             ...(await importOriginal<typeof import('@/lib/navigator/config')>()),
@@ -119,6 +123,7 @@ describe('brainLegend follows the constants', () => {
             'the fast layer halves every 4 days', 'the slow layer halves every 90 days',
             'a slow weight of 10 is 5.0 after 45 days and 2.5 after 90.',
             'reaches 7,', 'below 35% of the highest',
+            'counts at most 0.25 in importance', 'a company statement adds 40% of its tone', 'an opinion piece 30%, a rumour 0%', 'weighs 55% of its importance',
             'news rank 0.21, news sentiment 0.14, momentum 0.31, thesis 0.22, sector standing 0.12',
             '6-month (0.41), 12-month (0.33) and 3-month (0.26)',
             'the most volatile 15% of symbols have a positive score multiplied by 0.7',
@@ -129,7 +134,7 @@ describe('brainLegend follows the constants', () => {
         ]) {
             expect(text, figure).toContain(figure);
         }
-        for (const stale of ['halves every 5 days', 'halves every 60 days', 'most volatile 20%', 'multiplied by 0.8', '25% under', 'held 21 trading days', '13 always-eligible']) {
+        for (const stale of ['halves every 5 days', 'halves every 60 days', 'most volatile 20%', 'multiplied by 0.8', '25% under', 'held 21 trading days', '13 always-eligible', 'at most 0.3 in', 'weighs 60%']) {
             expect(text, stale).not.toContain(stale);
         }
     });

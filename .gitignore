@@ -48,6 +48,8 @@ next-env.d.ts
 
 # local agent config (per-machine permissions)
 .claude/settings.local.json
+# Claude Code's worktrees (one per isolated session)
+.claude/worktrees/
 .superpowers/
 
 # design exports
