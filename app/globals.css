@@ -1116,6 +1116,72 @@ details[open] > :not(summary) { animation: disclosure-in var(--motion-base) var(
   50% { box-shadow: 0 0 25px color-mix(in srgb, var(--brand-strong) 45%, transparent); }
 }
 
+/* Layout: a console. Denser type; the sections as a dock along the bottom edge, so the page runs
+   full width; panels bracketed at two corners; a prompt before the page title; tabs in brackets;
+   rows with an accent edge; tags as mono capitals in a thin frame. */
+[data-style="futuristic"] { font-size: 15px; }
+[data-style="futuristic"] .header { height: 3.5rem; }
+[data-style="futuristic"] .header-wrapper { padding-block: 0.5rem; }
+[data-style="futuristic"] .rail {
+  top: auto; bottom: 0; left: 0; right: 0;
+  width: auto; height: 3.5rem;
+  flex-direction: row;
+  border-right: 0;
+  border-top: var(--chrome-border);
+}
+[data-style="futuristic"] .rail nav { flex-direction: row; justify-content: center; gap: 0.75rem; padding: 0.375rem 1rem; width: auto; }
+[data-style="futuristic"] .rail nav a { width: 2.75rem; height: 2.75rem; border-radius: var(--control-radius); border: 1px solid transparent; }
+[data-style="futuristic"] .rail nav a[aria-current="page"] { border-color: color-mix(in srgb, var(--brand) 45%, transparent); box-shadow: var(--glow); }
+[data-style="futuristic"] [data-app-content] { padding-top: 4.5rem; padding-bottom: 6rem; }
+@media (min-width: 64rem) {
+  [data-style="futuristic"] [data-app-content] { margin-left: 0; }
+}
+[data-style="futuristic"] .robot-launcher { bottom: 4.75rem; }
+[data-style="futuristic"] [data-chat-window] { bottom: 4.75rem; max-height: calc(100dvh - 6.75rem); }
+[data-style="futuristic"] [data-robot-tip] { bottom: 9rem; }
+[data-style="futuristic"] .glass-panel {
+  background-image:
+    linear-gradient(var(--brand), var(--brand)), linear-gradient(var(--brand), var(--brand)),
+    linear-gradient(var(--brand), var(--brand)), linear-gradient(var(--brand), var(--brand));
+  background-repeat: no-repeat;
+  background-size: 14px 1px, 1px 14px, 14px 1px, 1px 14px;
+  background-position: left top, left top, right bottom, right bottom;
+}
+[data-style="futuristic"] [data-app-content] h1 {
+  font-family: var(--type-mono);
+  font-size: 1.25rem;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: var(--brand);
+}
+[data-style="futuristic"] [data-app-content] h1::before { content: "> "; color: var(--brand-dim); }
+[data-style="futuristic"] [data-page-subtitle] { font-family: var(--type-mono); font-size: 11px; letter-spacing: 0.04em; }
+[data-style="futuristic"] [data-section-tabs] a {
+  background: transparent;
+  border-radius: 0;
+  padding-inline: 0.25rem;
+  font-family: var(--type-mono);
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+}
+[data-style="futuristic"] [data-section-tabs] a::before { content: "["; color: var(--fg-muted); }
+[data-style="futuristic"] [data-section-tabs] a::after { content: "]"; color: var(--fg-muted); }
+[data-style="futuristic"] [data-section-tabs] a[aria-current="page"] { color: var(--brand); text-shadow: 0 0 12px color-mix(in srgb, var(--brand-strong) 40%, transparent); }
+[data-style="futuristic"] [data-section-tabs] a[aria-current="page"]::before,
+[data-style="futuristic"] [data-section-tabs] a[aria-current="page"]::after { color: var(--brand); }
+[data-style="futuristic"] .row-card { border-left: 2px solid color-mix(in srgb, var(--brand) 45%, transparent); }
+[data-style="futuristic"] :is([data-badge], [data-count-pill]) {
+  font-family: var(--type-mono);
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  border-radius: 0;
+  background: color-mix(in srgb, var(--brand) 12%, transparent);
+  color: var(--brand);
+  border: 1px solid color-mix(in srgb, var(--brand) 40%, transparent);
+}
+[data-style="futuristic"] [data-settings-tab] { border-radius: 0; border-left: 2px solid transparent; }
+[data-style="futuristic"] [data-settings-tab][aria-current="page"] { border-left-color: var(--brand); background: color-mix(in srgb, var(--brand) 8%, transparent); }
+
 /* ─── liquid-glass: translucent blurred panels with a specular top edge over drifting blobs ─── */
 [data-style="liquid-glass"] {
   --panel-bg: color-mix(in srgb, var(--surface-1) 55%, transparent);
@@ -1173,6 +1239,61 @@ details[open] > :not(summary) { animation: disclosure-in var(--motion-base) var(
 .theme-blob--1 { width: 55vmax; height: 55vmax; top: -20vmax; left: -15vmax; background: radial-gradient(circle, color-mix(in srgb, var(--brand) 55%, transparent), transparent 70%); }
 .theme-blob--2 { width: 45vmax; height: 45vmax; bottom: -15vmax; right: -10vmax; animation-duration: 34s; animation-delay: -9s; background: radial-gradient(circle, color-mix(in srgb, var(--secondary-tint) 50%, transparent), transparent 70%); }
 .theme-blob--3 { width: 40vmax; height: 40vmax; top: 40%; left: 50%; animation-duration: 40s; animation-delay: -18s; background: radial-gradient(circle, color-mix(in srgb, var(--positive) 40%, transparent), transparent 70%); }
+
+/* Layout: islands. The bar floats inset from the top edge; the sections float as a capsule at the
+   left, centred on the page; the page sits under them with more air; controls are pills. */
+[data-style="liquid-glass"] .header {
+  top: 0.75rem; left: 0.75rem; right: 0.75rem;
+  width: auto; height: 3.5rem;
+  border: var(--chrome-border);
+  border-radius: 1.25rem;
+  box-shadow: var(--chrome-float-shadow);
+}
+[data-style="liquid-glass"] .header-wrapper { padding-block: 0.5rem; }
+[data-style="liquid-glass"] .search-text { border-radius: 9999px; }
+[data-style="liquid-glass"] .rail {
+  top: 50%; bottom: auto; left: 0.75rem;
+  height: auto; width: 3.75rem;
+  transform: translateY(-50%);
+  border: var(--chrome-border);
+  border-radius: 9999px;
+  box-shadow: var(--chrome-float-shadow);
+  background: var(--chrome-float-bg);
+}
+[data-style="liquid-glass"] .rail nav { padding-block: 0.75rem; gap: 0.5rem; }
+[data-style="liquid-glass"] .rail nav a { width: 2.75rem; height: 2.75rem; border-radius: 9999px; }
+[data-style="liquid-glass"] .rail nav a[aria-current="page"] {
+  background: color-mix(in srgb, var(--fg) 14%, transparent);
+  color: var(--fg);
+  box-shadow: inset 0 1px 0 color-mix(in srgb, var(--fg) 20%, transparent);
+}
+[data-style="liquid-glass"] [data-app-content] { padding-top: 6rem; padding-inline: 2rem; }
+@media (min-width: 64rem) {
+  [data-style="liquid-glass"] [data-app-content] { margin-left: 5.5rem; }
+}
+[data-style="liquid-glass"] [data-app-content] h1 { font-size: 1.75rem; letter-spacing: -0.02em; }
+[data-style="liquid-glass"] .control-type { border-radius: 9999px; }
+[data-style="liquid-glass"] [data-section-tabs] { gap: 0.375rem; }
+[data-style="liquid-glass"] [data-section-tabs] a {
+  border-radius: 9999px;
+  padding: 0.375rem 0.875rem;
+  background: color-mix(in srgb, var(--fg) 6%, transparent);
+  border: 1px solid color-mix(in srgb, var(--fg) 10%, transparent);
+}
+[data-style="liquid-glass"] [data-section-tabs] a[aria-current="page"] {
+  background: color-mix(in srgb, var(--brand) 22%, transparent);
+  color: var(--fg);
+  border-color: color-mix(in srgb, var(--brand) 40%, transparent);
+}
+[data-style="liquid-glass"] :is([data-badge], [data-count-pill], [data-settings-tab], [data-topic-chip]) { border-radius: 9999px; }
+[data-style="liquid-glass"] [data-settings-tab][aria-current="page"] { background: color-mix(in srgb, var(--brand) 18%, transparent); }
+[data-style="liquid-glass"] .robot-launcher {
+  background: color-mix(in srgb, var(--brand) 32%, transparent);
+  color: var(--fg);
+  border: 1px solid color-mix(in srgb, var(--brand) 45%, transparent);
+  backdrop-filter: blur(16px);
+  -webkit-backdrop-filter: blur(16px);
+}
 
 /* ─── brutalist: zero radius, heavy borders, hard offset shadows, mono display ─── */
 [data-style="brutalist"] {
@@ -1238,6 +1359,63 @@ details[open] > :not(summary) { animation: disclosure-in var(--motion-base) var(
 [data-style="brutalist"] :is(.form-input, .select-trigger, .country-select-trigger) { border: 2px solid color-mix(in srgb, var(--fg) 60%, transparent); }
 [data-style="brutalist"] :is(.form-input, .select-trigger):focus { border-color: var(--fg) !important; box-shadow: 4px 4px 0 var(--brand); }
 
+/* Layout: a ledger. The rail widens into a sidebar of sections with their names (data-rail), every
+   row a 2px rule, the current one inverted; the content moves right to make room; the title is a
+   stamp; tabs are one segmented block; tags are inverted blocks; a faint hatch behind the page. */
+[data-style="brutalist"] .rail { width: 11rem; align-items: stretch; }
+[data-style="brutalist"] .rail nav { align-items: stretch; gap: 0; padding: 0; }
+[data-style="brutalist"] .rail nav a {
+  width: 100%; height: 3rem;
+  justify-content: flex-start; gap: 0.75rem;
+  padding-inline: 1rem;
+  border-radius: 0;
+  border-bottom: 2px solid color-mix(in srgb, var(--fg) 20%, transparent);
+  color: var(--fg-soft);
+}
+[data-style="brutalist"] .rail nav a::after {
+  content: attr(data-rail);
+  font-family: var(--type-mono);
+  font-size: 11px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.1em;
+}
+[data-style="brutalist"] .rail nav a:hover { background: var(--surface-2); color: var(--fg); }
+[data-style="brutalist"] .rail nav a[aria-current="page"] { background: var(--fg); color: var(--bg); }
+[data-style="brutalist"] .rail .material-symbols-outlined { font-size: 20px; }
+@media (min-width: 64rem) {
+  [data-style="brutalist"] [data-app-content] { margin-left: 11rem; padding-left: 2rem; }
+}
+[data-style="brutalist"] [data-app-content] h1 {
+  display: inline-block;
+  font-size: 1.75rem;
+  background: var(--fg);
+  color: var(--bg);
+  padding: 0.125rem 0.625rem;
+}
+[data-style="brutalist"] [data-section-tabs] { gap: 0; }
+[data-style="brutalist"] [data-section-tabs] a {
+  border: 2px solid color-mix(in srgb, var(--fg) 60%, transparent);
+  margin-right: -2px;
+  border-radius: 0;
+  padding: 0.5rem 1rem;
+  background: var(--surface-1);
+  color: var(--fg-soft);
+}
+[data-style="brutalist"] [data-section-tabs] a[aria-current="page"] { position: relative; z-index: 1; background: var(--fg); color: var(--bg); border-color: var(--fg); }
+[data-style="brutalist"] :is([data-badge], [data-count-pill]) { border-radius: 0; background: var(--fg); color: var(--bg); font-family: var(--type-mono); }
+[data-style="brutalist"] [data-settings-tab] { border: 2px solid transparent; border-radius: 0; }
+[data-style="brutalist"] [data-settings-tab][aria-current="page"] { background: var(--fg); color: var(--bg); }
+[data-style="brutalist"] .robot-launcher { border-radius: 0; border: 2px solid var(--fg); box-shadow: 4px 4px 0 var(--fg); }
+[data-style="brutalist"] body::before {
+  content: "";
+  position: fixed;
+  inset: 0;
+  z-index: -2;
+  pointer-events: none;
+  background-image: repeating-linear-gradient(45deg, color-mix(in srgb, var(--fg) 3%, transparent) 0 1px, transparent 1px 14px);
+}
+
 /* ─── soft: generous radius, quiet borders, layered shadows ─── */
 [data-style="soft"] {
   /* A breath of the palette's accent in the fill and the shadow: on a dark palette a black shadow
@@ -1280,6 +1458,46 @@ details[open] > :not(summary) { animation: disclosure-in var(--motion-base) var(
 [data-style="soft"] :is(.form-input, .select-trigger):focus { border-color: var(--brand) !important; box-shadow: 0 0 0 4px color-mix(in srgb, var(--brand) 18%, transparent); }
 [data-style="soft"] .news-tag { border-radius: 999px; }
 [data-style="soft"] :is(.yellow-btn, .search-btn) { box-shadow: var(--glow); }
+
+/* Layout: a reading column. Larger type; the page centred at a comfortable width; a tall bar with
+   the search as a wide pill; the rail a column of rounded tiles, the current one lifted; wider
+   gaps; tabs in a pill track; a soft wash of the accent behind the page. */
+[data-style="soft"] { font-size: 17px; }
+[data-style="soft"] .header { height: 4.5rem; }
+[data-style="soft"] .header-wrapper { padding-block: 0.875rem; }
+[data-style="soft"] .search-text { border-radius: 9999px; height: 2.75rem; background: color-mix(in srgb, var(--fg) 6%, transparent); border-color: transparent; }
+[data-style="soft"] .rail { width: 5rem; top: 4.5rem; border-right: 0; background: transparent; box-shadow: none; backdrop-filter: none; -webkit-backdrop-filter: none; }
+[data-style="soft"] .rail nav { gap: 0.625rem; padding-block: 1.25rem; }
+[data-style="soft"] .rail nav a { width: 3.25rem; height: 3.25rem; border-radius: 1rem; }
+[data-style="soft"] .rail nav a[aria-current="page"] { background: var(--panel-bg); box-shadow: var(--panel-shadow); color: var(--brand); }
+[data-style="soft"] [data-app-content] { padding-top: 6rem; }
+@media (min-width: 64rem) {
+  [data-style="soft"] [data-app-content] { margin-left: 5rem; }
+}
+[data-style="soft"] [data-app-content] > * { max-width: 68rem; margin-inline: auto; }
+[data-style="soft"] .grid:has(> .glass-panel) { gap: 1.5rem; }
+[data-style="soft"] [data-app-content] h1 { font-size: 1.875rem; font-weight: 600; }
+[data-style="soft"] .row-card { padding: 0.875rem 1.125rem; }
+[data-style="soft"] [data-section-tabs] {
+  gap: 0.25rem;
+  padding: 0.25rem;
+  width: fit-content;
+  border-radius: 9999px;
+  background: color-mix(in srgb, var(--fg) 5%, transparent);
+}
+[data-style="soft"] [data-section-tabs] a { border-radius: 9999px; padding: 0.375rem 0.875rem; }
+[data-style="soft"] [data-section-tabs] a[aria-current="page"] { background: var(--panel-bg); color: var(--fg); box-shadow: 0 1px 2px var(--shade-1), 0 4px 12px var(--shade-1); }
+[data-style="soft"] [data-settings-tab] { border-radius: 0.875rem; }
+[data-style="soft"] [data-settings-tab][aria-current="page"] { background: var(--panel-bg); box-shadow: var(--panel-shadow); }
+[data-style="soft"] .robot-launcher { width: 4rem; height: 4rem; }
+[data-style="soft"] body::before {
+  content: "";
+  position: fixed;
+  inset: 0;
+  z-index: -2;
+  pointer-events: none;
+  background: radial-gradient(ellipse 70% 50% at 50% -10%, color-mix(in srgb, var(--brand) 10%, transparent), transparent 70%);
+}
 
 /* ─── motion guards: OS setting or the in-app toggle (html[data-motion="reduced"]) ─── */
 @media (prefers-reduced-motion: reduce) {

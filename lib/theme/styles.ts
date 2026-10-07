@@ -28,25 +28,25 @@ export const STYLES: Record<StyleId, Style> = {
     futuristic: {
         id: 'futuristic',
         label: 'Futuristic',
-        description: 'Accent-tinted borders, glow, shimmer and a particle backdrop.',
+        description: 'A console: the sections docked along the bottom, bracketed panels, mono capitals, denser type, glow and a particle grid.',
         fonts: {display: 'Space Grotesk', body: 'Hanken Grotesk', mono: 'JetBrains Mono'},
     },
     'liquid-glass': {
         id: 'liquid-glass',
         label: 'Liquid Glass',
-        description: 'Translucent blurred panels over slow-drifting colour blobs.',
+        description: 'Floating islands: an inset glass bar, a capsule of icons at the left, pill controls, blur and drifting colour behind.',
         fonts: {display: 'Sora', body: 'Inter', mono: 'JetBrains Mono'},
     },
     brutalist: {
         id: 'brutalist',
         label: 'Brutalist',
-        description: 'Square corners, thick borders, hard offset shadows, monospace headings.',
+        description: 'A ledger: a labelled sidebar, a stamped title, square everything, thick rules, hard shadows, mono capitals.',
         fonts: {display: 'IBM Plex Mono', body: 'Inter', mono: 'IBM Plex Mono'},
     },
     soft: {
         id: 'soft',
         label: 'Soft',
-        description: 'Rounded panels with layered soft shadows and low-contrast borders.',
+        description: 'A reading column: larger type centred at a comfortable width, rounded tiles and pills, layered shadows, a soft wash behind.',
         fonts: {display: 'Sora', body: 'Inter', mono: 'JetBrains Mono'},
     },
 };
