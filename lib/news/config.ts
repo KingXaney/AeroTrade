@@ -50,7 +50,7 @@ export const BRAIN_TOTAL_CAP = 80;
 
 export const FEED_REVALIDATE_SECONDS = 900;
 
-const contactEmail = (): string => process.env.SEC_CONTACT_EMAIL || "contact@aerotrade.local";
+export const contactEmail = (): string => process.env.SEC_CONTACT_EMAIL || "contact@aerotrade.local";
 
 export const redditUserAgent = (): string => "AeroTrade/1.0 (paper-trading news digest; contact " + contactEmail() + ")";
 

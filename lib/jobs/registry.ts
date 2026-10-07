@@ -122,6 +122,23 @@ export const JOBS = {
         trigger: 'briefing',
         health: {label: 'Market briefing', schedule: 'daily 07:50 ET', staleAfterHours: 30},
     },
+    // The culture brain reads what younger consumers are into. 06:40 ET: Wikipedia's previous
+    // day is complete, Gemini's free daily quota has reset, and the run's three model calls end
+    // before the 07:30 brain update, so no two model jobs run at once.
+    cultureBrain: {
+        id: 'culture-brain-update',
+        event: 'app/update.culture.brain',
+        crons: ['TZ=America/New_York 40 6 * * *'],
+        trigger: 'culture',
+        health: {label: 'Culture brain', schedule: 'daily 06:40 ET', staleAfterHours: 30},
+    },
+    cultureBackfill: {
+        id: 'culture-wikipedia-backfill',
+        event: 'app/backfill.culture.wikipedia',
+        crons: [],
+        trigger: 'culture-backfill',
+        health: {label: 'Culture backfill (manual)', schedule: 'on demand', staleAfterHours: ON_DEMAND},
+    },
 } as const satisfies Record<string, JobDefinition>;
 
 // In declaration order — the status strip's row order.

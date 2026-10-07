@@ -13,6 +13,8 @@
 //   npm run trigger -- strategies-preview          decide and record without filling anything
 //   npm run trigger -- strategies-resimulate       rebuild every strategy's backtest from a fresh backfill
 //   npm run trigger -- topic <userId> <keywordSetHash>   one on-demand topic refresh
+//   npm run trigger -- culture                     daily culture-brain update (attention, items, the fold)
+//   npm run trigger -- culture-backfill [brandId ...]   every brand's Wikipedia views back to the backtest horizon (or the named brands)
 import { Inngest } from "inngest";
 
 // Each job's event as lib/jobs/registry.ts names it; lib/jobs/__tests__/registry.test.ts holds
@@ -30,6 +32,8 @@ const EVENTS = {
     strategies: 'app/run.strategies',
     'strategies-preview': 'app/run.strategies',
     'strategies-resimulate': 'app/run.strategies',
+    culture: 'app/update.culture.brain',
+    'culture-backfill': 'app/backfill.culture.wikipedia',
 };
 
 const STRATEGY_DATA = {
@@ -37,7 +41,7 @@ const STRATEGY_DATA = {
     'strategies-resimulate': { resimulate: true },
 };
 
-const [job, first, second] = process.argv.slice(2);
+const [job, first, second, ...rest] = process.argv.slice(2);
 const name = EVENTS[job];
 if (!name || (job === 'topic' && (!first || !Number.isFinite(Number(second))))) {
     console.error(`Usage: npm run trigger -- <${Object.keys(EVENTS).join('|')}> [userId keywordSetHash | email]`);
@@ -45,7 +49,9 @@ if (!name || (job === 'topic' && (!first || !Number.isFinite(Number(second))))) 
 }
 const data = job === 'topic'
     ? { userId: first, keywordSetHash: Number(second) }
-    : job === 'news' && first ? { email: first } : (STRATEGY_DATA[job] ?? {});
+    : job === 'news' && first ? { email: first }
+    : job === 'culture-backfill' && first ? { brands: [first, second, ...rest].filter(Boolean) }
+    : (STRATEGY_DATA[job] ?? {});
 
 // The id must match lib/jobs/client.ts so the event lands in the same app.
 const inngest = new Inngest({ id: 'aerotrade' });
