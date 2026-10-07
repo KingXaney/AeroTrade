@@ -145,7 +145,7 @@ const BrainGraph = ({nodes, edges}: Props) => {
                 ref={hostRef}
                 role="group"
                 aria-label={BRAIN_COPY.graphAria}
-                className="relative aspect-[16/10] w-full overflow-hidden rounded-[var(--panel-radius)]"
+                className="relative aspect-[16/10] max-h-[32rem] w-full overflow-hidden rounded-[var(--panel-radius)]"
                 style={{touchAction: 'pan-y'}}
             >
                 <canvas ref={canvasRef} aria-hidden="true" className="block h-full w-full" />

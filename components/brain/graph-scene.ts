@@ -33,7 +33,7 @@ import {
     WebGLRenderer,
 } from 'three';
 import {OrbitControls} from 'three/examples/jsm/controls/OrbitControls.js';
-import {SHELL_RADII, type GraphEdge, type GraphPoint} from "@/lib/brain/graph-layout";
+import {restingEdges, SHELL_RADII, VIEW_DIRECTION, type GraphEdge, type GraphPoint} from "@/lib/brain/graph-layout";
 import type {Rgb} from "@/lib/theme/css-color";
 
 export type GraphPalette = {positive: Rgb; negative: Rgb; muted: Rgb; brand: Rgb; line: Rgb; fg: Rgb};
@@ -64,10 +64,10 @@ export type GraphScene = {
 };
 
 // Far enough that the outer shell's topmost label — the sphere's top plus its lift — stays inside
-// a 45° frustum with room to spare, whatever the canvas's width (its aspect is fixed at 16:10).
-const CAMERA_DISTANCE = 12;
-const MIN_DISTANCE = 5;
-const MAX_DISTANCE = 24;
+// a 45° frustum with room to spare, whatever the canvas's width.
+const CAMERA_DISTANCE = 13;
+const MIN_DISTANCE = 6;
+const MAX_DISTANCE = 26;
 const ZOOM_STEP = 0.1;
 const AUTO_ROTATE_SPEED = 0.6;
 const IDLE_RESUME_MS = 6000;
@@ -96,7 +96,7 @@ export const createGraphScene = (options: GraphSceneOptions): GraphScene => {
 
     const scene = new Scene();
     const camera = new PerspectiveCamera(45, 1, 0.1, 100);
-    camera.position.set(CAMERA_DISTANCE * 0.55, CAMERA_DISTANCE * 0.35, CAMERA_DISTANCE * 0.76);
+    camera.position.set(VIEW_DIRECTION.x * CAMERA_DISTANCE, VIEW_DIRECTION.y * CAMERA_DISTANCE, VIEW_DIRECTION.z * CAMERA_DISTANCE);
     camera.lookAt(0, 0, 0);
     scene.add(new HemisphereLight(new Color(1, 1, 1), new Color(0.1, 0.1, 0.14), 0.9));
     const sun = new DirectionalLight(new Color(1, 1, 1), 1.1);
@@ -127,14 +127,15 @@ export const createGraphScene = (options: GraphSceneOptions): GraphScene => {
         return halo;
     });
 
-    // ---- the links, and the hovered entity's links ----------------------------------------
+    // ---- the links at rest, and all of the hovered entity's links ------------------------------
     const drawn = edges.filter((e) => index.has(e.source) && index.has(e.target));
+    const resting = restingEdges(drawn);
     const maxEdge = Math.max(...drawn.map((e) => e.weight), 0.001);
     const edgeGeometry = new BufferGeometry();
-    edgeGeometry.setAttribute('position', new Float32BufferAttribute(new Float32Array(drawn.length * 6), 3));
-    const edgeColors = new Float32BufferAttribute(new Float32Array(drawn.length * 6), 3);
+    edgeGeometry.setAttribute('position', new Float32BufferAttribute(new Float32Array(resting.length * 6), 3));
+    const edgeColors = new Float32BufferAttribute(new Float32Array(resting.length * 6), 3);
     edgeGeometry.setAttribute('color', edgeColors);
-    const edgeMaterial = new LineBasicMaterial({vertexColors: true, transparent: true, opacity: 0.55});
+    const edgeMaterial = new LineBasicMaterial({vertexColors: true, transparent: true, opacity: 0.45});
     scene.add(new LineSegments(edgeGeometry, edgeMaterial));
     const litGeometry = new BufferGeometry();
     litGeometry.setAttribute('position', new Float32BufferAttribute(new Float32Array(drawn.length * 6), 3));
@@ -170,7 +171,7 @@ export const createGraphScene = (options: GraphSceneOptions): GraphScene => {
             }
         });
         const attribute = edgeGeometry.getAttribute('position') as BufferAttribute;
-        drawn.forEach((e, k) => {
+        resting.forEach((e, k) => {
             const a = spheres[index.get(e.source)!].position;
             const b = spheres[index.get(e.target)!].position;
             attribute.setXYZ(2 * k, a.x, a.y, a.z);
@@ -207,7 +208,7 @@ export const createGraphScene = (options: GraphSceneOptions): GraphScene => {
             materials[i].emissiveIntensity = hovered === p.key ? 0.9 : 0.25;
         });
         const line = toColor(palette.line);
-        drawn.forEach((e, k) => {
+        resting.forEach((e, k) => {
             // A heavier link is a brighter line: the line colour lifted toward the foreground.
             const c = line.clone().lerp(toColor(palette.fg), 0.15 + 0.45 * (e.weight / maxEdge));
             edgeColors.setXYZ(2 * k, c.r, c.g, c.b);
