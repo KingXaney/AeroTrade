@@ -1,5 +1,5 @@
 // The "style" axis: surface treatment, radius, effects and fonts. The CSS for each
-// style is hand-written in app/globals.css under [data-style="…"]; this registry
+// style — minimal included — is hand-written in app/globals.css under [data-style="…"]; this registry
 // only owns the ids (whitelist for the cookie and <html> attribute) and the labels
 // the Settings page shows. Palettes never touch these, so any palette × any style
 // is a valid combination.
@@ -22,8 +22,8 @@ export const STYLES: Record<StyleId, Style> = {
     minimal: {
         id: 'minimal',
         label: 'Minimal',
-        description: 'Flat panels, hairline borders, no effects. The original look.',
-        fonts: {display: 'Sora', body: 'Hanken Grotesk', mono: 'JetBrains Mono'},
+        description: 'As little as possible: no boxes, a thin chrome, one typeface, ink buttons, ruled sections.',
+        fonts: {display: 'Inter', body: 'Inter', mono: 'JetBrains Mono'},
     },
     futuristic: {
         id: 'futuristic',

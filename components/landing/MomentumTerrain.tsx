@@ -355,7 +355,7 @@ const MomentumTerrain = ({initial, eyebrow = true, size = 'hero', children}: Pro
                         <TerrainSlice surface={surface} lookback={cell?.lookback ?? DEFAULT_ROW} day={cell?.day ?? null} />
                     </div>
 
-                    <p className="mt-4 text-xs leading-relaxed text-fg-muted">{TERRAIN_COPY.caption(days)}</p>
+                    <p className="mt-4 text-xs leading-relaxed text-fg-muted" data-terrain-caption>{TERRAIN_COPY.caption(days)}</p>
                     <p className="mt-1 text-xs text-fg-muted" data-terrain-updated data-terrain-source={surface.source}>
                         {TERRAIN_COPY.updated(surface.updated)} · {TERRAIN_COPY.source[surface.source]}
                         {surface.source === 'tiingo' && (

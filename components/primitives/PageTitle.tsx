@@ -26,7 +26,7 @@ const PageTitle = ({title, subtitle, note, actions, id, className}: Props) => {
             <h1 className="font-heading text-2xl font-semibold tracking-tight text-fg mb-1" id={id}>
                 {title}
             </h1>
-            {subtitle && <p className="text-sm text-fg-muted">{subtitle}</p>}
+            {subtitle && <p className="text-sm text-fg-muted" data-page-subtitle>{subtitle}</p>}
             {note && <p className="font-mono text-[11px] text-fg-muted mt-1">{note}</p>}
         </div>
     );

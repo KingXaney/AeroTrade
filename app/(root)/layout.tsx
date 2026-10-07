@@ -30,7 +30,7 @@ const Layout = async ({children}: {children: React.ReactNode}) => {
             />
             <Rail portfolio={shell.portfolio} news={shell.news} badges={shell.navBadges} />
             {/* pb-24: the assistant's launcher floats over this corner (components/chat/ChatWidget). */}
-            <div className="pt-20 lg:ml-16 px-6 pb-24">
+            <div className="pt-20 lg:ml-16 px-6 pb-24" data-app-content>
                 <SectionTabs badges={shell.navBadges} />
                 {children}
             </div>

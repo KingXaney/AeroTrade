@@ -20,7 +20,7 @@ export const PRESETS: Preset[] = [
         label: 'Quiet Cyber',
         palette: 'quiet-cyber',
         style: 'minimal',
-        description: 'The original AeroTrade look: flat dark panels, cyan accent.',
+        description: 'Dark and unboxed: hairline rules, one typeface, a cyan accent for links.',
         isDefault: true,
     },
     {
@@ -56,7 +56,7 @@ export const PRESETS: Preset[] = [
         label: 'Paper',
         palette: 'paper',
         style: 'minimal',
-        description: 'Warm light mode with flat panels and teal accents.',
+        description: 'Warm light mode, unboxed, with teal accents.',
     },
     {
         id: 'arctic-glass',
@@ -98,7 +98,7 @@ export const PRESETS: Preset[] = [
         label: 'Solarized Terminal',
         palette: 'solarized-dark',
         style: 'minimal',
-        description: 'Solarized teal with flat, no-nonsense panels.',
+        description: 'Solarized teal, unboxed and quiet.',
     },
 ];
 

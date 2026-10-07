@@ -29,7 +29,7 @@ const TopicsOverview = ({overview, span}: {overview: TopicsOverviewData; span: n
                                 )}
                             </span>
                             {t.unseenCount > 0 && (
-                                <span className="rounded-full bg-brand px-1.5 py-0.5 text-[10px] font-bold text-on-brand font-mono"
+                                <span data-count-pill className="rounded-full bg-brand px-1.5 py-0.5 text-[10px] font-bold text-on-brand font-mono"
                                       aria-label={`${formatCapped(t.unseenCount, UNSEEN_COUNT_CAP)} unseen`}>
                                     {formatCapped(t.unseenCount, UNSEEN_COUNT_CAP)}
                                 </span>

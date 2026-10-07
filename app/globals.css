@@ -53,7 +53,8 @@
   --shade-2: rgb(0 0 0 / 0.5);
   --backdrop-opacity: 0.35;
 
-  /* style tokens — 'minimal' */
+  /* style tokens — the neutral baseline every style starts from. What "Minimal" is lives in its
+     own [data-style="minimal"] block below, like the other four styles. */
   --panel-bg: var(--surface-1);
   --panel-border: 1px solid var(--line);
   --panel-blur: none;
@@ -879,8 +880,158 @@ details[open] > :not(summary) { animation: disclosure-in var(--motion-base) var(
 }
 /* ═══════════════════════════════════════════════════════════════════
    STYLES — orthogonal to palettes. Each block only sets style tokens and
-   its own extra rules; 'minimal' is the :root default above.
+   its own extra rules; the :root values above are the neutral baseline
+   a block falls back to for the tokens it does not set.
    ═══════════════════════════════════════════════════════════════════ */
+
+/* ─── minimal: no boxes. Open sections under hairline rules, one typeface, ink buttons, flat
+   chrome. The page's own background is the only surface; a rule, a weight and a little air do
+   the work a frame did. ─── */
+[data-style="minimal"] {
+  --panel-bg: transparent;
+  --panel-border: 0;
+  --panel-blur: none;
+  --panel-shadow: none;
+  --panel-radius: 0;
+  --control-radius: 0.25rem;
+  --glow: none;
+  --type-display: var(--font-inter);
+  --type-body: var(--font-inter);
+  --type-mono: var(--font-jetbrains);
+  --label-font: var(--type-body);
+  --label-size: 11px;
+  --label-transform: none;
+  --label-tracking: 0.02em;
+  --heading-font: var(--type-body);
+  --heading-weight: 500;
+  --heading-transform: none;
+  --heading-tracking: 0;
+  --heading-color: var(--fg-soft);
+  --control-font: var(--type-body);
+  --control-weight: 500;
+  --control-transform: none;
+  --control-tracking: 0;
+  --card-bg: transparent;
+  --card-border-width: 1px;
+  --card-border-color: transparent;
+  --card-radius: 0;
+  --chrome-bg: var(--bg);
+  --chrome-border: 1px solid var(--line);
+  --chrome-blur: none;
+  --chrome-shadow: none;
+  --chrome-float-bg: var(--surface-1);
+  --chrome-float-shadow: 0 0 0 1px var(--line-strong);
+}
+/* A panel is a section: a hairline above it, its content flush with the page's left edge, the
+   vertical padding it asked for. The horizontal padding utility loses to this unlayered rule,
+   as .glass-panel documents. */
+[data-style="minimal"] .glass-panel {
+  border-top: 1px solid var(--line-strong);
+  padding-inline: 0;
+}
+/* Panels side by side are columns of one ruled page, so they stand further apart than boxes did. */
+[data-style="minimal"] .grid:has(> .glass-panel) { column-gap: 2.5rem; }
+/* A panel that is a link: its rule takes the accent, and the section lifts a shade. */
+[data-style="minimal"] .glass-panel[data-interactive]:hover {
+  border-top-color: var(--brand);
+  background: color-mix(in srgb, var(--fg) 3%, transparent);
+}
+/* Rows and headlines are a ruled list, not tiles: a hairline under each, flush left. */
+[data-style="minimal"] :is(.row-card, .news-item) {
+  border-width: 0 0 1px 0;
+  border-color: var(--line);
+  border-radius: 0;
+  padding-inline: 0;
+}
+[data-style="minimal"] :is(a, button).row-card:hover,
+[data-style="minimal"] .news-item:hover { border-bottom-color: color-mix(in srgb, var(--brand) 60%, transparent); }
+/* Buttons are ink — the page's foreground on its background — so the accent is kept for links
+   and the active state, and one colour carries one meaning. */
+[data-style="minimal"] .control-type:is(.bg-brand, .bg-brand-strong),
+[data-style="minimal"] :is(.yellow-btn, .search-btn) {
+  background-color: var(--fg);
+  color: var(--bg);
+}
+[data-style="minimal"] .control-type:is(.bg-brand, .bg-brand-strong):hover,
+[data-style="minimal"] :is(.yellow-btn, .search-btn):hover {
+  background-color: var(--fg-soft);
+  filter: none;
+}
+/* Titles carry weight by size, not boldness. */
+[data-style="minimal"] :is(h1, h2) { font-weight: 500; }
+/* Fields are outlines on the page, not filled boxes. */
+[data-style="minimal"] :is(.form-input, .select-trigger, .country-select-trigger) {
+  background-color: transparent;
+  border: 1px solid var(--line-strong);
+}
+[data-style="minimal"] :is(.form-input, .select-trigger):focus { border-color: var(--fg) !important; }
+/* The chrome nearly disappears: a 3rem bar on the page background with no rule, the logo small,
+   search an icon, the account an avatar; the rail a narrow strip of plain icons with the current
+   one in the foreground colour, no tile. The content wrapper moves up and in to match. */
+[data-style="minimal"] .header { height: 3rem; border-bottom: 0; }
+[data-style="minimal"] .header-wrapper { padding-block: 0.5rem; justify-content: flex-start; }
+[data-style="minimal"] .header .font-heading { font-size: 1rem; letter-spacing: -0.01em; }
+[data-style="minimal"] .header .material-symbols-outlined { font-size: 20px; }
+[data-style="minimal"] .search-text {
+  margin-left: auto;
+  width: 2.25rem;
+  max-width: none;
+  padding: 0;
+  justify-content: center;
+  border-color: transparent;
+  background: transparent;
+  color: var(--fg-muted);
+}
+[data-style="minimal"] .search-text:hover { color: var(--fg); }
+[data-style="minimal"] .search-text > :not(svg) { display: none; }
+[data-style="minimal"] [data-user-name] { display: none; }
+[data-style="minimal"] .header [data-slot="avatar"] { width: 1.75rem; height: 1.75rem; box-shadow: none; }
+[data-style="minimal"] .rail { width: 3rem; top: 3rem; border-right: 0; }
+[data-style="minimal"] .rail nav { gap: 0.25rem; padding-block: 0.75rem; }
+[data-style="minimal"] .rail nav a { width: 2.25rem; height: 2.25rem; background: transparent; color: var(--fg-muted); }
+[data-style="minimal"] .rail nav a:hover { background: transparent; color: var(--fg); }
+[data-style="minimal"] .rail nav a[aria-current="page"] { color: var(--fg); }
+[data-style="minimal"] .rail .material-symbols-outlined { font-size: 20px; }
+[data-style="minimal"] [data-app-content] { padding-top: 3.5rem; }
+@media (min-width: 64rem) {
+  [data-style="minimal"] [data-app-content] { margin-left: 3rem; }
+}
+/* A section's pages are words, the current one underlined, not chips. */
+[data-style="minimal"] [data-section-tabs] { gap: 1.25rem; }
+[data-style="minimal"] [data-section-tabs] a {
+  padding-inline: 0;
+  border-radius: 0;
+  background: transparent;
+  border-bottom: 1px solid transparent;
+  color: var(--fg-muted);
+}
+[data-style="minimal"] [data-section-tabs] a:hover { color: var(--fg); background: transparent; }
+[data-style="minimal"] [data-section-tabs] a[aria-current="page"] { color: var(--fg); border-bottom-color: var(--fg); }
+/* Less on the page: a smaller title with its subtitle as a caption, chips as words, the chat
+   launcher in ink without a halo, the terrain without its axis caption (the legend and the
+   definitions stay). */
+[data-style="minimal"] [data-app-content] h1 { font-size: 1.375rem; margin-bottom: 0.125rem; }
+[data-style="minimal"] [data-page-subtitle] { font-size: 0.75rem; }
+[data-style="minimal"] [data-streak-chip] { border-color: transparent; background: transparent; padding-inline: 0; }
+[data-style="minimal"] .robot-launcher {
+  width: 2.75rem;
+  height: 2.75rem;
+  background: var(--fg);
+  color: var(--bg);
+  box-shadow: none;
+}
+[data-style="minimal"] .robot-launcher > svg { width: 1.75rem; height: 1.75rem; }
+[data-style="minimal"] [data-terrain-caption] { display: none; }
+/* The landing page's header has no search to push its buttons right; its nav does that itself. */
+[data-style="minimal"] .header-wrapper > nav { margin-left: auto; }
+/* Settings' section list, the news tags and every badge are words, not chips. */
+[data-style="minimal"] [data-settings-tab] { background: transparent; border-radius: 0; padding-inline: 0; color: var(--fg-muted); }
+[data-style="minimal"] [data-settings-tab]:hover { background: transparent; color: var(--fg); }
+[data-style="minimal"] [data-settings-tab][aria-current="page"] { color: var(--fg); }
+[data-style="minimal"] .news-tag { background: transparent; padding-inline: 0; }
+[data-style="minimal"] [data-badge] { background: transparent; padding-inline: 0; color: var(--fg-soft); }
+[data-style="minimal"] [data-count-pill] { background: transparent; padding-inline: 0; color: var(--brand); }
+[data-style="minimal"] [data-topic-chip] { background: transparent; border-color: transparent; padding-inline: 0; }
 
 /* ─── futuristic: the original Cyber-Fin look (shimmer, glow, particles, grid) ─── */
 [data-style="futuristic"] {
