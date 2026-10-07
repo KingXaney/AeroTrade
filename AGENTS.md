@@ -116,10 +116,11 @@ and friends keep none beyond Shared and the invariants).
   the session (the trade desk while the market is open, the news while it is closed); a box with
   nothing to say is not drawn. The widget grid is `/dashboard`; every action that revalidates
   `/` revalidates it too (`lib/__tests__/home-revalidate.test.ts`).
-- Home's first panel is the landing page's momentum terrain (`components/landing/MomentumTerrain`,
-  `size="panel"`, no eyebrow under the panel's own heading): the page reads
+- Home opens on the landing page's momentum terrain (`components/landing/MomentumTerrain`,
+  `size="panel"`, no eyebrow under the section's own heading), frameless like the landing hero so
+  the transparent canvas sits on the page background, not in a panel's box: the page reads
   `lib/landing/surface-store.getMomentumSurface` on the server beside `getHomeView` and hands the
-  surface in as `initial`, so the panel exists only when there is one (never a loading box) and
+  surface in as `initial`, so the section exists only when there is one (never a loading box) and
   the client draws it at once. Its one `WhatTheseMean` keeps its Ask links, since the chat is
   mounted here; the landing page's has none.
 
