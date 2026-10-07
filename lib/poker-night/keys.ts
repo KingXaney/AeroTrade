@@ -83,3 +83,38 @@ export type FocusPlace = 'body' | 'table' | 'elsewhere';
 // Whether a key may act: only with the focus on the table itself; a single character (a letter, 1–4)
 // only while the player keeps the shortcuts on — Enter and Escape in the raise panel always.
 export const keyAllowed = (key: string, place: FocusPlace, enabled: boolean): boolean => place !== 'elsewhere' && (enabled || key.length !== 1);
+
+// ── the room's own keys (P6) ──
+
+// Beside the moves: E opens the emotes, L the hand log, B the bank, M turns the table's sounds on or
+// off, and ? lists every key (components/poker-night/useHotkeys, under the same rules: never with
+// ⌘, Ctrl or Alt, never on a held key or while typing, only with the focus on the table and only
+// while the player keeps the single-key shortcuts on).
+export type RoomIntent = 'emotes' | 'log' | 'bank' | 'mute' | 'shortcuts';
+
+const ROOM_KEYS: Record<string, RoomIntent> = {e: 'emotes', l: 'log', b: 'bank', m: 'mute', '?': 'shortcuts'};
+
+export const roomIntentForKey = (e: KeyInput): RoomIntent | null => {
+    if (e.metaKey || e.ctrlKey || e.altKey || e.repeat || e.editable) return null;
+    if (e.key.length !== 1) return null;
+    return ROOM_KEYS[e.key.toLowerCase()] ?? null;
+};
+
+// The keys as aria-keyshortcuts names them.
+export const ROOM_KEY_SHORTCUTS = {emotes: 'E', log: 'L', bank: 'B', mute: 'M', shortcuts: '?'} as const satisfies Record<RoomIntent, string>;
+
+// Every key the table answers, as the shortcuts list shows them (components/poker-night
+// ShortcutsDialog; lib/learn/copy/poker-night SHORTCUTS_COPY words each id): on the player's turn,
+// then anywhere at the table.
+export const SHORTCUTS = {
+    turn: [
+        {id: 'fold', keys: ['F']}, {id: 'check-call', keys: ['C']}, {id: 'raise', keys: ['R']}, {id: 'all-in', keys: ['A']},
+        {id: 'sizes', keys: ['1', '2', '3', '4']}, {id: 'confirm', keys: ['Enter']}, {id: 'close', keys: ['Esc']},
+    ],
+    table: [
+        {id: 'emotes', keys: ['E']}, {id: 'log', keys: ['L']}, {id: 'bank', keys: ['B']}, {id: 'mute', keys: ['M']}, {id: 'shortcuts', keys: ['?']},
+    ],
+} as const;
+
+export type ShortcutGroup = keyof typeof SHORTCUTS;
+export type ShortcutId = (typeof SHORTCUTS)[ShortcutGroup][number]['id'];

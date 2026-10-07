@@ -97,6 +97,8 @@ export type People = Record<string, Person>;
 // version of its people (peopleV).
 export type ViewMeta = {
     code: string;
+    // The room's public version (lib/poker-night/room-doc.publicSeq): it moves with every write
+    // anyone but its author can see, and never for a pre-action alone.
     seq: number;
     serverNow: number;
     nextDueAt: number | null;
@@ -222,6 +224,10 @@ export type RealtimeTokenView = {token: string; expires: number; issued: number;
 // <env>:<room id>, lib/poker-night/channel) and a token for it. Off: the table polls.
 export type TokenReply = {realtime: false} | {realtime: true; channel: string; token: RealtimeTokenView};
 
+// POST emote's answer: the emote as the room stored it (its seq the room's new emoteSeq), so the
+// sender's own table draws it at once.
+export type EmoteReply = {ok: true; emoteSeq: number; emote: EmoteView};
+
 // Everything a poker night route answers with — lib/poker-night/route-kit's json() takes nothing
 // else, so a server object (a room, a state) cannot be sent by mistake.
-export type ResponseBody = PlayerView | JoinReply | Unchanged | DetailView | TokenReply | ErrorBody;
+export type ResponseBody = PlayerView | JoinReply | Unchanged | DetailView | TokenReply | EmoteReply | ErrorBody;

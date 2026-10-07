@@ -5,8 +5,9 @@ import {TABLE_COPY} from "@/lib/learn/copy/poker-night";
 
 // An unknown, malformed or expired table code: the [code] layout's notFound(), thrown before anything
 // streams so the answer is a real 404, and caught here, by the parent segment (the page's own
-// notFound() lands here too). No Mongo counter is spent on a page miss: only the API routes count
-// unknown codes.
+// notFound() lands here too). A well-formed code that names no table has spent the address's miss
+// counter on its way here (lib/poker-night/page-gate), as on the table routes, and an address past
+// that counter lands here for every code, so this page says nothing about which codes exist.
 const TableNotFound = () => (
     <main className="mx-auto flex min-h-dvh w-full max-w-lg items-center p-4">
         <EmptyState

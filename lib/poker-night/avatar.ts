@@ -1,6 +1,9 @@
 // A player's avatar as the table stores and sends it: one short string, 'v1:fox:tangerine:ring:crown'
 // — a face, a colour, a frame and a badge, each an id from the lists below. This is the encoding,
-// the check and the dice; the builder and the colours' values come later (P5). Pure and client-safe.
+// the check, the dice and the builder's one edit (withPart); the colours' values are
+// lib/poker-night/looks AVATAR_COLOUR_VALUES (LOOKS_CSS), the frames' drawing app/globals.css's
+// .pn-avatar[data-frame] rules, and components/poker-night/AvatarBuilder the builder. Pure and
+// client-safe.
 //
 // Faces and badges are emoji, each a single code point from Emoji 12.0 or earlier with no
 // zero-width joiner, skin tone or variation selector, so every platform draws one glyph. They are
@@ -38,6 +41,13 @@ export const FACE_IDS = Object.keys(AVATAR_FACES) as FaceId[];
 export const BADGE_IDS = Object.keys(AVATAR_BADGES) as BadgeId[];
 
 export type AvatarSpec = {face: FaceId; colour: ColourId; frame: FrameId; badge: BadgeId};
+
+// The builder's four parts, in the order it shows them, each with the ids it offers.
+export const AVATAR_PARTS = ['face', 'colour', 'frame', 'badge'] as const;
+export type AvatarPart = (typeof AVATAR_PARTS)[number];
+export const PART_IDS: {readonly [P in AvatarPart]: readonly AvatarSpec[P][]} = {
+    face: FACE_IDS, colour: AVATAR_COLOURS, frame: AVATAR_FRAMES, badge: BADGE_IDS,
+};
 
 // The longest encoding is well under this; the join and profile inputs accept no more.
 export const AVATAR_MAX_LENGTH = 64;
@@ -92,6 +102,14 @@ export const rollAvatar = (random: () => number): AvatarSpec => {
 
 // An account's look until they choose one: the same every time for the same account.
 export const avatarForUser = (userId: string): AvatarSpec => rollAvatar(mulberry32(fnv1a(userId)));
+
+// The encoded look with one part changed, the builder's one edit: a part or id this version does not
+// know leaves the look as it was (the other parts resolve as resolveAvatar reads them).
+export const withPart = (raw: unknown, part: AvatarPart, id: unknown): string => {
+    const spec = resolveAvatar(raw);
+    if (!(AVATAR_PARTS as readonly string[]).includes(part) || typeof id !== 'string' || !(PART_IDS[part] as readonly string[]).includes(id)) return encodeAvatar(spec);
+    return encodeAvatar({...spec, [part]: id});
+};
 
 export const faceGlyph = (face: FaceId): string => String.fromCodePoint(AVATAR_FACES[face]);
 

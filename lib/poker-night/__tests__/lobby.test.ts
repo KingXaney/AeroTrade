@@ -9,6 +9,7 @@ import {HOST_COPY, LOBBY_COPY} from '@/lib/learn/copy/poker-night';
 import {avatarForUser, encodeAvatar} from '@/lib/poker-night/avatar';
 import {checkConfig, DEFAULT_CONFIG, mergeConfig, TIMING} from '@/lib/poker-night/config';
 import {LIMITS} from '@/lib/poker-night/limits';
+import {DEFAULT_PERSONAL_LOOK} from '@/lib/poker-night/personal';
 import {
     BLIND_PRESETS, CHIP_PRESETS, chipOptions, chipsFor, configFromForm, configIssueText, DEFAULT_FORM, firstNameOf, invitePath, isIdle,
     isOpenRoom, LOBBY_LIMITS, LOBBY_PROJECTION, lobbyRoomFromDoc, nightFinished, openRoomsFilter, profileOf, readStoredMe, REBUY_CHOICES,
@@ -175,12 +176,22 @@ describe('openRoomsFilter', () => {
 describe('the name and look an account starts from', () => {
     it('is what the account saved', () => {
         const avatar = 'v1:owl:sky:ring:star';
-        expect(profileOf({name: 'Ana B', avatar}, 'Someone Else', ME)).toEqual({name: 'Ana B', avatar, saved: {name: 'Ana B', avatar}});
+        expect(profileOf({name: 'Ana B', avatar}, 'Someone Else', ME)).toEqual({
+            name: 'Ana B', avatar, look: DEFAULT_PERSONAL_LOOK, table: {scene: 'casino-classic', felt: 'emerald'}, saved: {name: 'Ana B', avatar},
+        });
+    });
+
+    it('carries the saved personal look and the table look over the defaults, field by field', () => {
+        const saved = {name: null, avatar: null, look: {cardBack: 'tartan' as const, sound: false}, table: {scene: 'deep-space' as const, felt: 'rose' as const}};
+        expect(profileOf(saved, 'Ada', ME)).toMatchObject({look: {...DEFAULT_PERSONAL_LOOK, cardBack: 'tartan', sound: false}, table: {scene: 'deep-space', felt: 'rose'}});
+        // Whatever a stored value holds, each field reads on its own.
+        const odd = {name: null, avatar: null, look: {cardBack: 'plaid', chips: 'neon'} as never, table: {scene: 'moon', felt: 'teal'} as never};
+        expect(profileOf(odd, 'Ada', ME)).toMatchObject({look: {...DEFAULT_PERSONAL_LOOK, chips: 'neon'}, table: {scene: 'casino-classic', felt: 'teal'}});
     });
 
     it('falls back on the first name and the look the account id rolls', () => {
         const rolled = encodeAvatar(avatarForUser(ME));
-        expect(profileOf({name: null, avatar: null}, '  Ada   Lovelace ', ME)).toEqual({name: 'Ada', avatar: rolled, saved: {name: null, avatar: null}});
+        expect(profileOf({name: null, avatar: null}, '  Ada   Lovelace ', ME)).toMatchObject({name: 'Ada', avatar: rolled, saved: {name: null, avatar: null}});
         expect(profileOf({name: null, avatar: null}, 'Ada', ME).avatar).toBe(profileOf({name: null, avatar: null}, 'Other', ME).avatar);
         // A saved value that no longer reads is ignored.
         expect(profileOf({name: '​', avatar: 'v9:nope'}, 'Ada', ME)).toMatchObject({name: 'Ada', avatar: rolled});

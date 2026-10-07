@@ -20,6 +20,9 @@
 // table never puts off a poll already due (a read for the viewer's own part, a retry, the safety
 // poll). A page hidden five minutes lets the connection go and opens it again when it shows.
 //
+// Emotes (P6) come three ways — the channel's 'emote' messages, the polls (by emoteSeq) and the
+// sender's own POST emote answer (sendEmote) — and are merged by id (feed.withEmotes).
+//
 // A visitor who has not joined polls nothing: the routes answer only players. A table that closed,
 // a removal and a lost seat re-render the page (router.refresh, once), which shows the summary or
 // the join card; a newer deploy asks for a reload.
@@ -37,8 +40,9 @@ import type {ActionInput} from "@/lib/poker-night/input";
 import {LIMITS} from "@/lib/poker-night/limits";
 import type {DetailView, PlayerView, PlayPageView, Unchanged} from "@/lib/poker-night/view-types";
 import {connectRealtime, realtimeFake, type RealtimeLink} from "@/components/poker-night/realtime-client";
-import {getDetail, getState, isUnchanged, newActionId, postAction, postJoin, postTick, type ApiResult} from "@/components/poker-night/table-api";
-import type {ActionBody, DetailOptions, DetailPart, JoinBody, JoinResult, SendResult} from "@/components/poker-night/room-controller";
+import {getDetail, getState, isUnchanged, newActionId, postAction, postEmote, postJoin, postTick, type ApiResult} from "@/components/poker-night/table-api";
+import type {ActionBody, DetailOptions, DetailPart, EmoteResult, JoinBody, JoinResult, SendResult} from "@/components/poker-night/room-controller";
+import type {EmoteInput} from "@/lib/poker-night/emotes";
 
 // ── the store ──
 
@@ -85,6 +89,7 @@ export type TableFeed = {
     join: (body: JoinBody) => Promise<JoinResult>;
     detail: (part: DetailPart, opts?: DetailOptions) => Promise<DetailView | null>;
     serverNow: () => number;
+    sendEmote: (input: EmoteInput) => Promise<EmoteResult>;
 };
 
 type Loop = {poll: () => void};
@@ -151,7 +156,8 @@ export const useTableFeed = ({code, initial, pollScale, realtime}: {code: string
     }, [router]);
 
     // An answer from any request, into the store, and to the monitor (is the channel keeping up?).
-    const take = useCallback((r: ApiResult<PlayerView | Unchanged>): void => {
+    // pre: the answer to the viewer's own pre-action, which moves no seq (lib/poker-night/feed).
+    const take = useCallback((r: ApiResult<PlayerView | Unchanged>, pre = false): void => {
         if (!r.ok) return;
         const body = r.body;
         if (isUnchanged(body)) {
@@ -161,7 +167,7 @@ export const useTableFeed = ({code, initial, pollScale, realtime}: {code: string
             store.dispatch({type: 'unchanged', body, at: r.receivedAt, sentAt: r.sentAt});
         } else {
             stepMonitor({type: 'answer', seq: body.seq, realtimeOk: body.realtimeOk, at: r.receivedAt, serverNow: body.serverNow});
-            store.dispatch({type: 'view', view: body, at: r.receivedAt, sentAt: r.sentAt, animate: !hidden()});
+            store.dispatch({type: 'view', view: body, at: r.receivedAt, sentAt: r.sentAt, animate: !hidden(), pre});
         }
     }, [store, stepMonitor]);
 
@@ -381,6 +387,10 @@ export const useTableFeed = ({code, initial, pollScale, realtime}: {code: string
                     link?.close();
                     link = null;
                 },
+                // An emote (P6): merged by id; a gap in the emote seq reads the table once.
+                emote: (emote) => {
+                    if (!stopped) store.dispatch({type: 'emotes', emotes: [emote]});
+                },
             });
             // Once a second while the page is in front: the watchdog, and the grace periods that
             // run out with time alone.
@@ -485,7 +495,7 @@ export const useTableFeed = ({code, initial, pollScale, realtime}: {code: string
             // A busy table lost five compare-and-sets: once more, under the same id.
             if (!r.ok && r.code === 'busy') r = await postAction(code, full, {pass: pass()});
             // Into the store while the move still counts as out: its own part lands with it.
-            if (r.ok) take(r);
+            if (r.ok) take(r, body.type === 'pre');
         } finally {
             movesOut.current--;
         }
@@ -521,6 +531,18 @@ export const useTableFeed = ({code, initial, pollScale, realtime}: {code: string
 
     const serverNow = useCallback((): number => Date.now() + store.get().offset, [store]);
 
+    // An emote (P6): to its route with the seat pass; the answer's emote goes straight into the
+    // store, so the sender sees their own at once (everyone else by the channel or the next poll).
+    const sendEmote = useCallback(async (input: EmoteInput): Promise<EmoteResult> => {
+        const r = await postEmote(code, input, {pass: pass()});
+        if (r.ok) {
+            store.dispatch({type: 'emotes', emotes: [r.body.emote]});
+            return {ok: true};
+        }
+        if (!r.aborted) settle(r.code);
+        return {ok: false, code: r.code, message: POKER_NIGHT_ERRORS[r.code]};
+    }, [code, pass, settle, store]);
+
     // Live only over a connected channel the monitor trusts alone; polls beside it read as polling.
-    return {state, mode: feedMode(state, link.live), transport: link.transport, problem, send, join, detail, serverNow};
+    return {state, mode: feedMode(state, link.live), transport: link.transport, problem, send, join, detail, serverNow, sendEmote};
 };

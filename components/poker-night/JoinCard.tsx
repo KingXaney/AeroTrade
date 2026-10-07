@@ -2,7 +2,8 @@
 
 // The join card: a Panel over the live table for someone who opened the link — the table's terms,
 // a name already filled in (the account's, else the one this browser kept), a look already rolled
-// (on the server for a guest, kept from then on; Roll rolls another in its click handler), the
+// (on the server for a guest, kept from then on; Roll rolls another in its click handler, and
+// "Change my look" opens the avatar builder in the card — optional, one tap away), the
 // chips field only when the table's minimum and cap differ, and one tap: "Sit down" (in the seat
 // they chose with "Sit here", else the first one open) or "Just watch". A removed visitor, a locked
 // table and a full room get the sentence that says so, what would change it, "Check again" and the
@@ -18,15 +19,16 @@ import {useEffect, useId, useRef, useState, useTransition} from "react";
 import Link from "next/link";
 import {useRouter} from "next/navigation";
 import {toast} from "sonner";
-import {Dices} from "lucide-react";
+import {Dices, Palette} from "lucide-react";
 import ActionButton, {actionButton} from "@/components/primitives/ActionButton";
 import MicroLabel from "@/components/primitives/MicroLabel";
 import Panel from "@/components/primitives/Panel";
 import SectionHeading from "@/components/primitives/SectionHeading";
 import TextField from "@/components/primitives/TextField";
+import AvatarBuilder from "@/components/poker-night/AvatarBuilder";
 import {MiniAvatar} from "@/components/poker-night/overlay-kit";
 import {useRoom} from "@/components/poker-night/room-controller";
-import {AVATAR_COPY, HOST_COPY, JOIN_COPY, OVERLAY_COPY, POKER_NIGHT_ERRORS, TABLE_COPY} from "@/lib/learn/copy/poker-night";
+import {AVATAR_COPY, HOST_COPY, JOIN_COPY, LOOKS_COPY, OVERLAY_COPY, POKER_NIGHT_ERRORS, TABLE_COPY} from "@/lib/learn/copy/poker-night";
 import {encodeAvatar, resolveAvatar, rollAvatar} from "@/lib/poker-night/avatar";
 import {VISITOR_REFRESH_MS} from "@/lib/poker-night/feed";
 import {NAME_INPUT_MAX} from "@/lib/poker-night/input";
@@ -48,6 +50,7 @@ const JoinCard = ({seat, onClose}: Props) => {
     const [chips, setChips] = useState<string | null>(null);
     const [busy, setBusy] = useState<'player' | 'watcher' | null>(null);
     const [error, setError] = useState<string | null>(null);
+    const [building, setBuilding] = useState(false);
     const visitor = room.joinView !== null;
     const name = draft ?? room.profile.name;
     const avatar = room.profile.avatar;
@@ -146,14 +149,30 @@ const JoinCard = ({seat, onClose}: Props) => {
                         {visitor ? (
                             <>
                                 <p className="text-sm text-fg-soft">{JOIN_COPY.lead}</p>
-                                <div className="flex items-center gap-3">
-                                    <MiniAvatar avatar={avatar} size="lg"/>
-                                    <ActionButton variant="secondary" size="md" className="inline-flex min-h-11 items-center gap-2" data-roll-look=""
-                                                  onClick={() => room.setProfile({avatar: encodeAvatar(rollAvatar(Math.random))})}>
-                                        <Dices className="size-4" aria-hidden="true"/>
-                                        {JOIN_COPY.roll}
-                                    </ActionButton>
-                                </div>
+                                {building ? (
+                                    <div className="space-y-2" data-pn-join-builder="">
+                                        <AvatarBuilder compact value={avatar} onChange={(next) => room.setProfile({avatar: next})}/>
+                                        <ActionButton variant="secondary" size="md" className="min-h-11" aria-expanded="true" onClick={() => setBuilding(false)}>
+                                            {LOOKS_COPY.customizeDone}
+                                        </ActionButton>
+                                    </div>
+                                ) : (
+                                    <div className="flex items-center gap-3">
+                                        <MiniAvatar avatar={avatar} size="lg" label={JOIN_COPY.lookLabel(AVATAR_COPY.describe(resolveAvatar(avatar)))}/>
+                                        <div className="flex min-w-0 flex-wrap gap-2">
+                                            <ActionButton variant="secondary" size="md" className="inline-flex min-h-11 items-center gap-2" data-roll-look=""
+                                                          onClick={() => room.setProfile({avatar: encodeAvatar(rollAvatar(Math.random))})}>
+                                                <Dices className="size-4" aria-hidden="true"/>
+                                                {JOIN_COPY.roll}
+                                            </ActionButton>
+                                            <ActionButton variant="secondary" size="md" className="inline-flex min-h-11 items-center gap-2" aria-expanded="false"
+                                                          onClick={() => setBuilding(true)} data-pn-customize="">
+                                                <Palette className="size-4" aria-hidden="true"/>
+                                                {LOOKS_COPY.customize}
+                                            </ActionButton>
+                                        </div>
+                                    </div>
+                                )}
                                 <div className="space-y-1.5">
                                     <MicroLabel as="label" htmlFor={`${id}-name`}>{JOIN_COPY.nameLabel}</MicroLabel>
                                     <TextField ref={nameField} id={`${id}-name`} font="body" className="h-11 w-full" value={name} maxLength={NAME_INPUT_MAX}

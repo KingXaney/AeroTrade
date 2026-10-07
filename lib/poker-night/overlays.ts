@@ -34,6 +34,12 @@ export const holdsCards = (table: Pick<TableView, 'hand' | 'seats'>, seat: numbe
 // The chips a seat holds at the table, a live pot included (the bank's "stack").
 export const seatChips = (seat: Pick<SeatView, 'chips' | 'inPot'> | null | undefined): number => (seat ? seat.chips + seat.inPot : 0);
 
+// Whether a new name and look from the viewer must wait for the hand in play to end: they sit in a
+// seat and a hand is being played (the room refuses it then, not_now). My look keeps the draft and,
+// once saved, sends it by itself when this turns false (components/poker-night/PokerNightRoom).
+export const profileWaits = (view: Pick<PlayerView, 'hand' | 'me'> | null): boolean =>
+    view !== null && view.me.seat !== null && handLive(view);
+
 // The turn number while it is the viewer's turn to act, else null. Each new one closes any drawer
 // or dialog the viewer has open, so nothing modal stands over the action bar while the clock runs.
 export const myTurnKey = (view: Pick<PlayerView, 'hand' | 'turn' | 'me'> | null): number | null => {

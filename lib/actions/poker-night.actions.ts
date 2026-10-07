@@ -16,6 +16,7 @@ import {NAME_INPUT_MAX, TABLE_NAME_INPUT_MAX} from "@/lib/poker-night/input";
 import {LIMITS, pnKey, RATE_LIMITS} from "@/lib/poker-night/limits";
 import {configIssueText, profileOf} from "@/lib/poker-night/lobby";
 import {cleanName, cleanTableName} from "@/lib/poker-night/names";
+import {PersonalLookSchema, TableLookSchema} from "@/lib/poker-night/personal";
 import {getPokerNightPrefs} from "@/lib/poker-night/prefs-store";
 import {tableStep} from "@/lib/poker-night/room";
 import {unreadRefusal} from "@/lib/poker-night/room-doc";
@@ -38,9 +39,13 @@ const CreateInput = z.strictObject({
     showToFriends: z.boolean().optional(),
 });
 
+// My look: the name and avatar, and optionally the personal look (any of its fields, each one of
+// ours) and the scene and felt the reader's new tables open with.
 const ProfileInput = z.strictObject({
     name: z.string().max(NAME_INPUT_MAX),
     avatar: z.string().max(AVATAR_MAX_LENGTH).refine(isAvatar, 'not an avatar'),
+    look: PersonalLookSchema.optional(),
+    table: TableLookSchema.optional(),
 });
 
 const failed = (message: string) => ({success: false as const, message});
@@ -48,7 +53,8 @@ const failed = (message: string) => ({success: false as const, message});
 const messageOf = (error: unknown): string => (error instanceof Error ? error.message : String(error));
 
 // A new table with the reader seated at seat 0 as host, with the table's chip cap (room.newRoom),
-// under the name and look they saved, else their first name and the look their id rolls. Counted
+// under the name and look they saved, else their first name and the look their id rolls, in the
+// scene and felt they saved for their tables (else the casino and its emerald felt). Counted
 // by the create rate limit, and refused while they host LIMITS.hostOpenTables open tables (two
 // creates at once may both pass: one table over). The page then opens /play/CODE?invite=1.
 export const createPokerNight = async (input: unknown = {}): Promise<CreateResult> => {
@@ -75,7 +81,7 @@ export const createPokerNight = async (input: unknown = {}): Promise<CreateResul
             env,
             host: {userId: user.id, name: profile.name, avatar: profile.avatar},
             config: checked.config,
-            settings: {name, showToFriends: parsed.data.showToFriends ?? false},
+            settings: {name, showToFriends: parsed.data.showToFriends ?? false, scene: profile.table.scene, felt: profile.table.felt},
             at: now,
         });
         return {success: true, code: room.core.code};
@@ -116,8 +122,10 @@ export const closePokerNight = async (input: unknown): Promise<ActionResult> => 
 };
 
 // The name and look the reader sits down with at every table they join from now on
-// (user-preferences.pokerNight). A blank name is unset: the reader then sits as their first name.
-// A table they are at already keeps the look they sat down with; it changes there, between hands.
+// (user-preferences.pokerNight), and with them, when sent, their personal look (replaced whole: the
+// fields sent are the look) and their new tables' scene and felt. A blank name is unset: the reader
+// then sits as their first name. A table they are at already keeps the look they sat down with; it
+// changes there, between hands.
 export const savePokerNightProfile = async (input: unknown): Promise<ActionResult> => {
     const parsed = ProfileInput.safeParse(input);
     if (!parsed.success) return failed(POKER_NIGHT_ERRORS.bad_request);
@@ -127,8 +135,15 @@ export const savePokerNightProfile = async (input: unknown): Promise<ActionResul
         if (!userId) return failed(LOBBY_COPY.signedOut);
         if (!(await takeRateLimit(pnKey.look(env, userId), RATE_LIMITS.look.limit, RATE_LIMITS.look.windowMs))) return failed(LOBBY_COPY.tooFast);
         const name = cleanName(parsed.data.name);
+        const {look, table} = parsed.data;
         await upsertPreferences(userId, {
-            $set: {'pokerNight.avatar': parsed.data.avatar, ...(name !== null ? {'pokerNight.name': name} : {}), updatedAt: new Date()},
+            $set: {
+                'pokerNight.avatar': parsed.data.avatar,
+                ...(name !== null ? {'pokerNight.name': name} : {}),
+                ...(look !== undefined ? {'pokerNight.look': look} : {}),
+                ...(table !== undefined ? {'pokerNight.table': table} : {}),
+                updatedAt: new Date(),
+            },
             ...(name === null ? {$unset: {'pokerNight.name': 1}} : {}),
         });
         revalidatePath('/poker-night');

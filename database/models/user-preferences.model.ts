@@ -25,15 +25,31 @@ export interface LearnPrefs {
     courseDone?: string[];
 }
 
-// Poker night (/poker-night, /play/CODE): the name and look an account sits down with, saved from
-// the lobby's My look panel (lib/actions/poker-night.actions.savePokerNightProfile) and read by
-// lib/poker-night/prefs-store. No defaults anywhere: absent means the account's first name and its
-// stable rolled avatar (lib/poker-night/avatar.avatarForUser). `look` (card back, suits, chips,
-// sound) and `table` (the scene and felt a new table opens with) arrive with the looks (P5).
+// Poker night (/poker-night, /play/CODE): the name and look an account sits down with, its personal
+// look and its new tables' scene and felt, saved from the lobby's My look panel
+// (lib/actions/poker-night.actions.savePokerNightProfile; the table look also by the action route
+// when the host changes it at a table, lib/poker-night/prefs-store.saveTableLook) and read by
+// lib/poker-night/prefs-store. No defaults anywhere: absent means the account's first name, its
+// stable rolled avatar (lib/poker-night/avatar.avatarForUser), lib/poker-night/personal's
+// DEFAULT_PERSONAL_LOOK and the default scene and felt — each field read on its own.
+export interface PokerNightLookPrefs {
+    cardBack?: string;        // lib/poker-night/looks CARD_BACK_IDS
+    cardFace?: string;        // CARD_FACE_IDS
+    fourColour?: boolean;
+    chips?: string;           // CHIP_SET_IDS
+    sound?: boolean;
+    buzz?: boolean;
+    keepAwake?: boolean;
+    shortcuts?: boolean;
+    handHints?: boolean;
+    peek?: boolean;
+    muteEmotes?: boolean;
+}
+
 export interface PokerNightPrefs {
     name?: string;            // cleaned (lib/poker-night/names.cleanName)
     avatar?: string;          // 'v1:fox:tangerine:ring:crown' (lib/poker-night/avatar)
-    look?: Record<string, unknown>;
+    look?: PokerNightLookPrefs;
     table?: {scene?: string; felt?: string};
 }
 
@@ -106,12 +122,30 @@ const PokerNightTableSchema = new Schema<NonNullable<PokerNightPrefs['table']>>(
     {_id: false},
 );
 
+// The personal look (lib/poker-night/personal PersonalLook): every field optional, none defaulted,
+// so a save of one field never writes the rest.
+const PokerNightLookSchema = new Schema<PokerNightLookPrefs>(
+    {
+        cardBack: {type: String, required: false},
+        cardFace: {type: String, required: false},
+        fourColour: {type: Boolean, required: false},
+        chips: {type: String, required: false},
+        sound: {type: Boolean, required: false},
+        buzz: {type: Boolean, required: false},
+        keepAwake: {type: Boolean, required: false},
+        shortcuts: {type: Boolean, required: false},
+        handHints: {type: Boolean, required: false},
+        peek: {type: Boolean, required: false},
+        muteEmotes: {type: Boolean, required: false},
+    },
+    {_id: false},
+);
+
 const PokerNightSchema = new Schema<PokerNightPrefs>(
     {
         name: {type: String, required: false},
         avatar: {type: String, required: false},
-        // Mixed with no default: the personal look's fields are P5's (lib/poker-night/personal).
-        look: {type: Schema.Types.Mixed, default: undefined},
+        look: {type: PokerNightLookSchema, required: false},
         table: {type: PokerNightTableSchema, required: false},
     },
     {_id: false},

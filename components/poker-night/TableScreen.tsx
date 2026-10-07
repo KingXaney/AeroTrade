@@ -9,9 +9,10 @@
 // The seat layer is measured, and lib/poker-night/stage places everything in it in pixels — the
 // geometry the animations fly along. The animations are the room's events on
 // lib/poker-night/choreography's timeline (components/poker-night/anim), handed down to the pieces
-// that draw them. While a result shows, the line under the board (the next deal's countdown, the
-// pause) goes inside the winner's banner's column when the banner grows down over it (a phone
-// upright, where the pot sits under the board). The room's root carries the looks' ids for LOOKS_CSS (the host's scene and felt,
+// that draw them. While a result shows, the winner's banner and the line under the board (the next
+// deal's countdown, the pause) go where lib/poker-night/stage.bannerPlan finds room for them, clear of
+// every plate, turned-up hand, the dealer button and the board — under the banner when they fit
+// together, else apart. The room's root carries the looks' ids for LOOKS_CSS (the host's scene and felt,
 // the viewer's card back and suit colours) and the hooks a test reads: data-pn-mode (polling,
 // realtime, reconnecting), data-pn-transport (realtime, poll, both), data-pn-seq (the seq of the
 // view drawn, which only ever moves up), data-pn-ready once the stage is measured.
@@ -22,6 +23,8 @@ import Board from "@/components/poker-night/Board";
 import ChipFlight from "@/components/poker-night/ChipFlight";
 import Dock from "@/components/poker-night/Dock";
 import LiveAnnouncer from "@/components/poker-night/LiveAnnouncer";
+import EmoteLayer from "@/components/poker-night/EmoteLayer";
+import TableFeel from "@/components/poker-night/TableFeel";
 import PotDisplay from "@/components/poker-night/PotDisplay";
 import SceneBackdrop from "@/components/poker-night/SceneBackdrop";
 import SeatRing from "@/components/poker-night/SeatRing";
@@ -32,9 +35,9 @@ import {useRoom, useServerNow} from "@/components/poker-night/room-controller";
 import {TABLE_COPY} from "@/lib/learn/copy/poker-night";
 import {secondsUntil} from "@/lib/poker-night/client-clock";
 import type {Box} from "@/lib/poker-night/layout";
-import {cardBackFor, DEFAULT_CARD_FACE, DEFAULT_CHIP_SET, resolveTableLook} from "@/lib/poker-night/looks";
-import {bannerShows, resultLook} from "@/lib/poker-night/reveal";
-import {bannerPlace, stageLayout, type Stage} from "@/lib/poker-night/stage";
+import {cardBackFor, cardFaceFor, chipSetFor, resolveTableLook} from "@/lib/poker-night/looks";
+import {bannerLines, bannerShows, resultLook} from "@/lib/poker-night/reveal";
+import {bannerPlan, stageLayout, type Stage} from "@/lib/poker-night/stage";
 import {cn} from "@/lib/utils";
 import type {RoomView} from "@/lib/poker-night/view-types";
 
@@ -53,14 +56,17 @@ const centreNote = (table: RoomView): string | null => {
 
 const PILL = 'chrome-surface rounded-full px-3 py-0.5 text-xs text-fg-soft';
 
-// The countdown to the next deal: under the board while a result shows, in the middle otherwise, or
-// in the banner's column (no style: it sits where its parent puts it).
-const NextHand = ({at, style}: {at: number; style?: CSSProperties}) => {
+// The countdown to the next deal: in the middle between hands, else under the board, or where the
+// banner's plan puts it while a result shows.
+const NextHand = ({at, className, style}: {at: number; className: string; style?: CSSProperties}) => {
     const now = useServerNow(1000);
     const s = secondsUntil(at, now, 0);
     if (s === null || s <= 0) return null;
-    return <p className={cn(style && 'pn-centre-note', PILL)} style={style} data-pn-next-hand={s}>{TABLE_COPY.nextHandIn(s)}</p>;
+    return <p className={cn(className, PILL)} style={style} data-pn-next-hand={s}>{TABLE_COPY.nextHandIn(s)}</p>;
 };
+
+// The widest the countdown says it, for the banner's plan: the next deal is never 100 s away.
+const NEXT_HAND_WIDEST = 99;
 
 // The seat layer's size, measured as it changes (a rotation, a resize, the dock's own height).
 const useMeasured = (): [(el: HTMLDivElement | null) => (() => void) | undefined, Box | null] => {
@@ -116,8 +122,27 @@ const TableScreen = () => {
     const live = !!hand && hand.phase !== 'complete';
     const note = live ? null : centreNote(table);
     const nextAt = !live && table.status === 'playing' && !table.closing && table.nextHandAt !== null && note === null ? table.nextHandAt : null;
-    // The line under the board, inside the banner's column when the banner grows down over it.
-    const inBanner = stage !== null && bannerShows(hand, look) && !bannerPlace(stage).up;
+    // While a result shows: what the banner says, what the line under the board says at its widest,
+    // and where the two go, clear of the open seats' rings, the turned-up hands and the dealer button.
+    const lines = useMemo(() => {
+        if (!look) return [];
+        const nameOf = (seat: number) => {
+            const pid = table.seats[seat]?.pid;
+            return pid ? table.people[pid]?.name ?? null : null;
+        };
+        return bannerLines(look, nameOf, mySeat);
+    }, [look, table.seats, table.people, mySeat]);
+    const line = note && hand ? note : nextAt !== null ? TABLE_COPY.nextHandIn(NEXT_HAND_WIDEST) : null;
+    const plan = useMemo(() => {
+        if (!stage || !bannerShows(hand, look)) return null;
+        const open: number[] = [];
+        const shown: number[] = [];
+        table.seats.forEach((v, seat) => {
+            if (!v) open.push(seat);
+            else if (seat !== mySeat && Array.isArray(v.cards)) shown.push(seat);
+        });
+        return bannerPlan(stage, {winners: lines, note: line}, {open, shown, button: hand?.button ?? null});
+    }, [stage, hand, look, lines, line, table.seats, mySeat]);
     const tableVars = stage ? ({'--pn-plate-w': `${stage.plateSize.w}px`, '--pn-plate-h': `${stage.plateSize.h}px`, '--pn-button': `${stage.buttonSize}px`} as CSSProperties) : undefined;
 
     return (
@@ -130,9 +155,9 @@ const TableScreen = () => {
             data-pn-scene={tableLook.scene}
             data-pn-felt={tableLook.felt}
             data-pn-back={cardBackFor(room.personal.cardBack)}
-            data-pn-face={DEFAULT_CARD_FACE}
+            data-pn-face={cardFaceFor(room.personal.cardFace)}
             data-pn-colours={room.personal.fourColour ? 'four' : 'two'}
-            data-pn-chips={DEFAULT_CHIP_SET}
+            data-pn-chips={chipSetFor(room.personal.chips)}
             data-pn-fit={stage?.fit ?? 'compact'}
             data-pn-orientation={stage?.orientation ?? 'portrait'}
             data-pn-joined={room.view ? (mySeat !== null ? 'seated' : 'watching') : 'visitor'}
@@ -154,21 +179,25 @@ const TableScreen = () => {
                                 )}
                                 <SeatRing stage={stage} anims={anims} look={look}/>
                                 <ChipFlight stage={stage} anims={anims} handNo={hand?.no ?? null}/>
-                                <WinnerReveal stage={stage} anims={anims} look={look} footer={inBanner ? (
-                                    <>
-                                        {note && hand && <p className={PILL} role="status" data-pn-note="">{note}</p>}
-                                        {nextAt !== null && <NextHand at={nextAt}/>}
-                                    </>
-                                ) : null}/>
-                                {!inBanner && note && hand && (
+                                {plan && hand && <WinnerReveal anims={anims} handNo={hand.no} lines={lines} plan={plan}/>}
+                                {plan?.note && (
+                                    <div className="pn-banner-wrap" style={{left: plan.note.x - plan.note.width / 2, top: plan.note.top, width: plan.note.width}} data-pn-banner-place="note">
+                                        {note && hand
+                                            ? <p className={cn('pn-banner-note', PILL)} role="status" data-pn-note="">{note}</p>
+                                            : nextAt !== null && <NextHand at={nextAt} className="pn-banner-note"/>}
+                                    </div>
+                                )}
+                                {!plan && note && hand && (
                                     <p className={cn('pn-centre-note', PILL)} role="status" data-pn-note=""
                                        style={{left: stage.board.x, top: stage.board.y + stage.board.h / 2 + 14}}>
                                         {note}
                                     </p>
                                 )}
-                                {!inBanner && nextAt !== null && (
-                                    <NextHand at={nextAt} style={hand ? {left: stage.board.x, top: stage.board.y + stage.board.h / 2 + 14} : {left: stage.board.x, top: stage.board.y}}/>
+                                {!plan && nextAt !== null && (
+                                    <NextHand at={nextAt} className="pn-centre-note"
+                                              style={hand ? {left: stage.board.x, top: stage.board.y + stage.board.h / 2 + 14} : {left: stage.board.x, top: stage.board.y}}/>
                                 )}
+                                <EmoteLayer stage={stage}/>
                             </>
                         )}
                     </div>
@@ -176,6 +205,7 @@ const TableScreen = () => {
                 </div>
             </AnimContext.Provider>
             <LiveAnnouncer/>
+            <TableFeel anims={anims}/>
             <TableOverlays/>
         </main>
     );

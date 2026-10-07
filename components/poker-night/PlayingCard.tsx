@@ -1,5 +1,8 @@
 // One playing card: the rank and a suit drawing on the paper, in the suit's colour (two or four
-// colours, the viewer's choice through [data-pn-colours] on the room), or the viewer's card back.
+// colours, the viewer's choice through [data-pn-colours] on the room), laid out as the viewer's card
+// face ([data-pn-face]: a large corner index, or the classic small corners with a pip in the middle),
+// or the viewer's card back ([data-pn-back]) — all lib/poker-night/personal's choices, drawn by
+// app/globals.css from LOOKS_CSS.
 // Its size is the --pn-card-w the place it sits in sets. data-card is the card ("Ah") or "back",
 // the hook a test reads; the accessible name is the card's own ("Ace of hearts").
 //
@@ -55,6 +58,8 @@ const PlayingCard = ({card, state = null, sides = 'one', motion = null, stateMot
                         <span className="pn-card-rank" aria-hidden="true">{HAND_COPY.rankShort[rankOf(card)]}</span>
                         <SuitIcon suit={suit} className="pn-card-corner"/>
                         <SuitIcon suit={suit} className="pn-card-pip"/>
+                        {/* The classic face's second index, upside down in the far corner (hidden on the large face). */}
+                        <span className="pn-card-rank pn-card-rank-b" aria-hidden="true">{HAND_COPY.rankShort[rankOf(card)]}</span>
                     </div>
                 )}
                 {(card === null || sides === 'two') && <div className="pn-card-face pn-card-back" aria-hidden="true"/>}

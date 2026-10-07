@@ -431,8 +431,8 @@ and friends keep none beyond Shared and the invariants).
   `lib/poker/cards` and `lib/poker/evaluator` and changes neither. So far it is the pure engine and
   room layer in `lib/poker-night/`, the three models, the stores, the table's API under
   `app/api/poker-night/[code]/`, the lobby and the playable table (`/play/CODE`), live over Ably
-  where a key is set and polling everywhere else; the design and the phases still to come are
-  `docs/specs/2026-10-06-poker-night.md`.
+  where a key is set and polling everywhere else, with its looks, emotes and the night's awards;
+  the design and the phase still to come are `docs/specs/2026-10-06-poker-night.md`.
 - `lib/poker-night/engine.reduce` is the one way a table's state (`lib/poker-night/types`) changes:
   a pure reducer that clones once, never mutates its input and hands back the same reference for a
   no-op. Time, the deck and the first big blind's draw arrive inside the action, so a step replays
@@ -499,16 +499,17 @@ and friends keep none beyond Shared and the invariants).
   with no identity, the guest its body's `joinId` names (`guestIdForJoin`), so a double tap or a
   retried join is one row; else nobody. A session read that throws is a 503, never a guest, and a
   guest is never a better-auth user. The seat pass (`lib/poker-night/pass`, `X-PN-Pass`, ten
-  minutes, renewed past half its life) stands in for the identity on GET state, GET detail, GET token
-  and tick only; join and action always read it in full.
+  minutes, renewed past half its life) stands in for the identity on GET state, GET detail, GET
+  token, tick and POST emote; join and action always read it in full.
 - Every table request goes through `lib/poker-night/route-kit.playerRequest`, cheapest refusal
   first: the kill switch (`POKER_NIGHT_ENABLED`), `X-PN-Protocol` (426 reload), a POST's same
   origin, JSON and 2 KiB (read capped, `lib/poker-night/http.readCappedText`), the in-memory bucket
   (`lib/poker-night/bucket`; by the player a valid pass names on every route, else the address)
   before any database call, the code, the pass or the identity, the room's head (one projected
-  read), the player. Mongo counters only on join (per address, per room) and on an unknown code, on
-  every route. Its `json()` takes only `ResponseBody` (`lib/poker-night/view-types`), so a server
-  room or a state does not compile into a response.
+  read), the player. Mongo counters only on join (per address for every new identity; per room, read
+  first and spent only for a row the join made, so turned-down joins never use it up) and on an
+  unknown code, on every route and on the table's page. Its `json()` takes only `ResponseBody`
+  (`lib/poker-night/view-types`), so a server room or a state does not compile into a response.
 - `lib/poker-night/store.mutateRoom` is the one way the game moves: read, plan with the pure
   `lib/poker-night/mutation.planMutation`, write behind a compare-and-set on `seq` (five attempts,
   jittered backoff, then 503 busy). The plan: an action id already in the `applied` ring (64) is
@@ -517,12 +518,18 @@ and friends keep none beyond Shared and the invariants).
   the actor's own request, `TIMING.TIMEOUT_SLACK_MS` later for any other writer (`clock.dueFor`;
   the `nextDueAt` mirror the leader's tick is armed by includes it), so an in-time move still on its
   way is not beaten to the compare-and-set; a refused step still commits the clock's own changes,
-  without its action id; nothing changed, no write. A stored state `migrateState` refuses closes the
+  without its action id; nothing changed, no write. Every write moves `seq`; one only its author can
+  see — a pre-action set, changed or cleared (`mutation.seenByOthers`) — moves `hiddenCommits` with
+  it, and everything that leaves the server (views, Unchanged, `since`, the realtime message, the
+  hands' and results' guards) carries `room-doc.publicSeq`, seq less those, so no browser reads a
+  pre-action's timing off a version; the setter's own answer brings it at the seq held (the feed's
+  `pre` input). A stored state `migrateState` refuses closes the
   room out of band, or answers reload when a newer deploy wrote it — on the reads too
   (`store.getRoomById` tells them apart, `room-doc.unreadRefusal`). The out-of-band fields
   (`seen`, emotes, `rt`, `lastError`) are never part of the write. `afterCommit`, in the route's
   `after()`, writes the completed hands (`lib/poker-night/hands-store`) and the accounts' results
-  (`lib/poker-night/results-store`) and publishes the commit's wire view (realtime, below). The
+  (`lib/poker-night/results-store`) and publishes the commit's wire view (realtime, below) when its
+  public seq moved. The
   document mapping is `lib/poker-night/room-doc` (pure). Logs carry codes, seqs and messages, never
   a room, a state or a document.
 - A GET or a page render never writes: only POST action, join and tick move a room, so a link
@@ -557,7 +564,11 @@ and friends keep none beyond Shared and the invariants).
   its layout settles the address before anything streams — a 307 to the canonical code, a real 404
   for one that names no table (`app/(play)/play/not-found.tsx`) — and the page renders
   `components/poker-night/PokerNightRoom` (the viewer's view, or a visitor's table behind the join
-  card) or, once closed, `NightSummary`. It talks to the route handlers only, through
+  card), once closed `NightSummary`, and with the kill switch on the lobby's note. The layout, the
+  page and its metadata read the room only through `lib/poker-night/page-gate.readTablePage` (once
+  per request): a code that names no table spends the address's miss counter, as on the routes, and
+  an address past it reads every code as gone, so no one learns which codes exist faster than the
+  counter allows. It talks to the route handlers only, through
   `components/poker-night/table-api`, the seat pass on every request that may carry it (on a move it
   only names the player's own rate bucket).
 - `components/poker-night/useTableFeed` runs `lib/poker-night/feed` (pure): `feedReducer` applies a
@@ -570,8 +581,9 @@ and friends keep none beyond Shared and the invariants).
   `ABLY_API_KEY` shaped like one (Production only in Vercel, the key restricted to channels
   `poker-night:*` with publish and subscribe) and `POKER_NIGHT_REALTIME` not `off`; everywhere
   else — previews, local servers, the QA harness (run.sh blanks the key), CI — the table polls. The
-  channel is `poker-night:<env>:<room id>`, never the code; the server publishes, in `afterCommit`,
-  `{name: 'state', id: <room>:<seq>, data: WireView}` — the public wire view without the people, so
+  channel is `poker-night:<env>:<room id>`, never the code; the server publishes, in `afterCommit`
+  for every commit whose public seq moved, `{name: 'state', id: <room>:<seq>, data: WireView}` —
+  the public wire view without the people, so
   no hole card, deck, viewer's part or config — through `lib/poker-night/realtime` (`Ably.Rest`,
   built on first use, `serverExternalPackages` in `next.config.ts`); `budget.test.ts` holds the
   message, envelope and all, to `WIRE_BUDGET_BYTES` (4,500). A failed publish stamps the room's
@@ -608,11 +620,86 @@ and friends keep none beyond Shared and the invariants).
   (`lib/theme/__tests__/motion-guards.test.ts`). Opacity never sits on a turning card (a fold turns
   the inner `.pn-fold-turn`). The one thing a timer moves is a winner's stack counting up, formatted
   text on the same token (`components/poker-night/CountUp`).
+- The winner's banner and the line under it (the next deal's countdown, the pause) go where
+  `lib/poker-night/stage.bannerPlan` finds room, clear of every plate and its status flag, open seat,
+  turned-up hand (`stage.shownHandRect`), the dealer button and the board with its lit cards' lift:
+  the full banner with the line under it nearest the board on the pot's side, then its other side,
+  then the felt's empty bands; then the compact banner (a line a winner, no avatar, wrapped when
+  narrow); then each apart from the line; then cut short. A line with no room is not drawn (the top
+  bar says a pause too), and only when no banner fits does it name fewer winners. Both are drawn
+  top-anchored in a wrap exactly the width found, never wider, from `reveal.bannerLines`' words and
+  `stage.BANNER`'s sizes, which `stage.test` holds to the stylesheet and clears at 390, 375 and
+  320 px phones and a 1440 px desktop for every seat count and button; `qa-poker-night` measures it
+  there in a showdown with the side seats' hands up.
 - The table's single-key shortcuts (`lib/poker-night/keys`) act only with the focus on the table,
   and only while the player keeps them on (My look, `PersonalLook.shortcuts` in this browser); Enter
   on a focused button is that button's. A host removes a player only by a press held for two seconds
   (`components/poker-night/HoldToConfirm`), never a typed name, and lets them back in from the host
   drawer.
+- Emotes (`lib/poker-night/emotes`, pure): twelve reactions, sixteen phrases and ten throwables,
+  each glyph one Emoji 12.0 code point kept as a number (never a glyph in a `.tsx`), each id worded
+  by `EMOTE_COPY` — no free text anywhere. Seated players only (`checkEmote`); a throw needs the
+  host's `throwables` and another seated player. `app/api/poker-night/[code]/emote/route.ts` writes
+  out of band, never through `mutateRoom`: one conditional `findOneAndUpdate`
+  (`room-doc.emoteWrite`, through `store.pushEmote`) whose filter is the sender's 1.2 s cooldown
+  (`emoteAt.<pid>`, stamped with the request's arrival, `receivedAt`, so no counter is written and
+  a second emote inside it is 429; the picker's cooldown starts again on the answer), whose pipeline
+  gives the emote the room's next `emoteSeq`, keeps the last `KEEP.EMOTES` and counts a throw in
+  `awards` for the night summary; `after()` publishes it as the channel's `emote` message.
+  Browsers merge emotes by id (`feed.withEmotes`: the emote seq moves only without a gap, so a poll
+  never skips one) and draw them in `components/poker-night/EmoteLayer` — lifetimes on timers
+  (`EMOTE_TIMING`), at most `ON_SCREEN_CAP`, nothing older than 8 s, only the impact under reduced
+  motion, muted all (`PersonalLook.muteEmotes`) or one player for the visit (`SeatMenu`). Where
+  they sit is `emotes.emoteSpot` and `throwPath`'s ceiling, from `stage`'s sizes (`AVATAR_PX`,
+  `SHOWN_CARD_PX`, `TABLE_TOP_ROOM`, held equal to the stylesheet): clear of a seat's turned-up cards
+  and tag, under a plate along the top, never behind the top bar; an impact lands on the target's
+  avatar (`stage.avatarCentre`), one per plate (a new one replaces it), with its own landing sound
+  (`emotes.landingSound`).
+- The table's feel (`components/poker-night/TableFeel`): sounds synthesised by Web Audio from
+  `lib/poker-night/sounds`' recipes (gain ≤ 0.3, 40 Hz–8 kHz, ≤ 1.2 s, held by `sounds.test`), each
+  at its animation's moment on the motion token, one audio context made and resumed inside a
+  gesture a browser counts (`sound-player.stayUnlocked`: click, a touch's pointerup or touchend,
+  mousedown, keydown — never a touch's pointerdown — again whenever it stops running), at most
+  once per 60 ms, silent while hidden but for the turn's chime; a buzz on a
+  phone's turn, the screen kept awake while seated (`useWakeLock`), the room's keys E, L, B, M and ?
+  (`keys.roomIntentForKey`, `useHotkeys`) and their list (`ShortcutsDialog`, also in the top bar's
+  menu) — each honouring the player's own `PersonalLook` switch.
+- Looks (P5): every colour the table draws is a literal in `lib/poker-night/looks` — eight scenes
+  (a gradient sky, an art id and an ambient loop each, `my-theme` the viewer's own palette tokens),
+  eight felts, eight card backs, two faces, two suit schemes, four chip sets, the avatar colours —
+  rendered to `LOOKS_CSS` (data-attribute selectors and `--pn-*` properties only, injected by the
+  (play) layout and the lobby page; `looks.test` holds its CSS safety and its contrast). The DOM
+  carries whitelisted ids (`sceneFor`, `feltFor`, `cardBackFor`, …); `components/poker-night/SceneArt`
+  draws in `.pn-ink`/`.pn-glow` only. The host picks the scene, the felt and throwables for
+  everyone (the room's settings, applied at once from the host drawer's Look section; a signed-in
+  host's pick also becomes their new tables' default, `prefs-store.saveTableLook` after the
+  action route answers); each player picks the rest for their own eyes (`lib/poker-night/personal`):
+  kept in localStorage `aero-poker-night:me` field by field (`nextStoredMe`) the moment it changes
+  at the table, laid over an account's saved look (`effectiveLook`), and saved to the account only
+  from the lobby's My look (`savePokerNightProfile`, which offers what a browser changed; a save
+  clears the browser's own look, `personal.afterAccountSave`, so a later save elsewhere reaches its
+  tables) — /play never calls a server action. `peek` keeps the viewer's cards face down in the dock
+  until pressed. A seated player's new name and look wait for the hand in play
+  (`overlays.profileWaits`): My look's draft is the room's (`profileDraft`), outlasting the drawer,
+  and a save mid-hand is sent by itself when the hand ends. The avatar builder edits one part at a
+  time (`avatar.withPart`) and rolls only in a click handler. Whatever sits over the scene draws its
+  own ground: an open seat is filled with the felt, a card that does not play dims by filter, never
+  opacity.
+- The night's awards (P7, `lib/poker-night/awards`, pure): `nightAwards` gives Biggest pot
+  (`biggestWin`), Most hands won (`wins`), Highest stack (`peakChips`, only for a player dealt a
+  hand, since a buy-in alone sets it) and Most all-ins (`allIns`) from the ledger's counters, and
+  Tomato magnet and Most roses given from the throws the emote route counts in the room's private
+  `awards` (`throwCountsOf` keeps only a pid, a registry throwable and a whole count). An award shows
+  only when its figure is above zero; a tie names everyone, in the standings' order. Only a closed
+  table's page reads them, on the server (`core.state.ledger` and `store.readNightThrows`, one
+  projected findOne), and `summary.summarize` hands the page names, looks and figures — never a
+  counter or an identity. `components/poker-night/NightSummary` draws them under the final counts
+  and opens with a celebration (the table's `.pn-confetti` in a clipping fixed layer, from
+  `awards.celebrationBits` seeded by the code, and `.pn-award-in` cards on the motion token); Copy
+  summary adds a line per award (`SUMMARY_COPY.text`). The table's words — side pot, dealer button,
+  small blind, minimum raise, rebuy, all in — are the glossary's `poker-night` group, homed at
+  `/poker-night` (big blind and ante stay the solver's); the bank's Rebuys header is a `<Term>`, and
+  the table has no `WhatTheseMean`, whose rows offer a chat /play does not mount.
 
 ### chat
 

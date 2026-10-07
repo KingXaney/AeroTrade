@@ -39,6 +39,8 @@ Follow the topics you care about, test trading strategies with virtual money, an
 
 **Solve a poker spot.** The poker solver, also under Learn, works everything out in your browser in a Web Worker. Equity between two hands or ranges — typed as `QQ+, AKs, 76s-T9s` or painted on the 13×13 grid — comes from an exact preflop table, an enumeration of every board, or seeded Monte Carlo with its standard error. Heads-up push or fold is solved to equilibrium by discounted CFR as the stack slider moves; the river solver takes two ranges, a board and a betting tree of your sizes and shows the equilibrium strategy of every hand at every decision; and pot odds give the break-even equity and the minimum defense. Nothing is stored, and AsAh against KsKh reproduces the textbook 1,410,336 wins and 9,308 ties over 1,712,304 boards.
 
+**Poker night with friends.** Start a Texas hold'em table from the lobby under Learn, share its link or six-character code, and friends sit down from it — as guests with a name and a rolled avatar, no account needed. The server holds the deck and every rule (blinds and antes, side pots, the turn timer, pre-actions) and a tracker of every buy-in, rebuy and cash-out in play chips that have no cash value. A table goes live over Ably where a key is set and polls a no-store route everywhere else; the host picks the scene and the felt, each player their own card back and avatar, and anyone seated can send a reaction or throw a tomato. When the night ends, a summary shows every player's net and the night's awards.
+
 **A second opinion, a chat advisor, and a digest.** Claude can critique the brain's current picture; a tool-using chat assistant (17 tools) — behind the robot in the bottom-right corner, which offers tips about the app on the topics pages — answers "what's new in my topics?", "what does max drawdown mean?" or "why did RSI-2 buy?"; a daily brief by email opens with the day in 30 seconds, then the stories about the reader's own stocks, the markets, their news feed, filings and what people are posting — each written from the articles it cites, with links to those articles and to the stock's page in the app — followed by the AI Navigator's week, their topics and the day's lesson.
 
 **Make it yours.** 12 colour palettes × 5 visual styles (minimal, futuristic, liquid glass, brutalist, soft), saved per account and rendered without a flash. A 35-widget dashboard you can drag, resize and extend.
@@ -88,11 +90,12 @@ flowchart LR
 |---|---|
 | App | Next.js 16 (App Router, Server Actions, Turbopack), React 19, TypeScript strict |
 | UI | Tailwind v4 with semantic theme tokens, shadcn/radix primitives, dnd-kit, TradingView embeds |
-| Data | MongoDB + Mongoose 9 (26 models), better-auth for email/password sessions, sign-up, sign-in and password reset rate-limited on a Mongo counter |
+| Data | MongoDB + Mongoose 9 (29 models), better-auth for email/password sessions, sign-up, sign-in and password reset rate-limited on a Mongo counter |
 | Jobs | Inngest (9 scheduled jobs + on-demand events), idempotent steps, per-user rate limits |
 | AI | Vercel AI SDK; Gemini 2.5 Flash-Lite on the free tier for every scheduled job, optional Claude tiers, Claude for the second opinion |
+| Realtime | Ably (optional, on its free tier): poker night's live tables, subscribe-only tokens per player; without a key every table polls |
 | Market data | Yahoo Finance daily bars and dividends (Stooq as the fallback), the 13-week T-bill rate, Finnhub (quotes, profiles, financials, search, news), Google News RSS, SEC EDGAR, Reddit |
-| Quality | Vitest (175 files / 2018 tests), ESLint, `tsc --noEmit`, a compile-only build, GitHub Actions; Playwright browser QA (15 suites, `npm run qa`) against an in-memory Mongo |
+| Quality | Vitest (249 files / 2944 tests), ESLint, `tsc --noEmit`, a compile-only build, GitHub Actions; Playwright browser QA (18 suites, `npm run qa`) against an in-memory Mongo |
 
 ## Getting started
 
@@ -139,10 +142,10 @@ npm test              # vitest, a few seconds
 npm run typecheck
 npm run lint
 npm run build:check   # compile-only build: proves the app builds without any keys
-npm run qa            # browser QA: all 15 suites in scripts/qa against a throwaway harness (~5 min)
+npm run qa            # browser QA: all 18 suites in scripts/qa against a throwaway harness (~5 min)
 ```
 
-Unit tests (192 files / 2149 tests) cover every pure module, next to the code in `lib/<feature>/__tests__/`: fills, lots and account analytics, the interest and dividend accrual clock (with a parity test holding the strategy simulator to the live credit), the quant strategies' rules, engine, simulator and what-if grid, the AI Navigator's scoring and rails, the news brain's decay and extraction parsing, news aggregation and sanitising, the topic matcher and briefs, every learner-facing sentence (held to one no-advice word list) and the reason decoder's round trips, the chat tools' shaping, the email sections, dashboard layouts and theme tokens. Database-bound modules (Mongoose reads, server actions, the pages) are exercised through the browser QA in [`scripts/qa/`](scripts/qa/README.md) instead: `npm run qa` starts an in-memory MongoDB, the dev server with inline env vars and the Inngest dev server, then runs 17 Playwright suites, one per feature (`qa-auth`, `qa-home`, `qa-trading`, `qa-income`, `qa-strategies`, `qa-learn`, `qa-topics`, …), each signing up its own user and walking its surfaces — no keys needed. `docs/specs/` holds the design documents for the larger features.
+Unit tests (249 files / 2944 tests) cover every pure module, next to the code in `lib/<feature>/__tests__/`: fills, lots and account analytics, the interest and dividend accrual clock (with a parity test holding the strategy simulator to the live credit), the quant strategies' rules, engine, simulator and what-if grid, the AI Navigator's scoring and rails, the news brain's decay and extraction parsing, news aggregation and sanitising, the topic matcher and briefs, every learner-facing sentence (held to one no-advice word list) and the reason decoder's round trips, the chat tools' shaping, the email sections, dashboard layouts and theme tokens. Database-bound modules (Mongoose reads, server actions, the pages) are exercised through the browser QA in [`scripts/qa/`](scripts/qa/README.md) instead: `npm run qa` starts an in-memory MongoDB, the dev server with inline env vars and the Inngest dev server, then runs 18 Playwright suites, one per feature (`qa-auth`, `qa-home`, `qa-trading`, `qa-income`, `qa-strategies`, `qa-learn`, `qa-topics`, …), each signing up its own user and walking its surfaces — no keys needed. `docs/specs/` holds the design documents for the larger features.
 
 ## Project structure
 
@@ -153,10 +156,12 @@ app/            routes — (auth) sign-in, sign-up, forgot-password · (reset) r
                 (marketing) welcome — the landing page a signed-out visitor sees at /
                 (root) home (/), dashboard, topics, topics/[slug], brain, strategies, strategies/[slug], stocks/[symbol],
                 trade, portfolio, history, markets, news, watchlist, friends, friends/[id], learn,
-                learn/course/[lesson], settings
-                api/ chat, inngest, accounts/[accountId]/export, strategies/[slug]/export
+                learn/course/[lesson], games, poker, poker-night, settings
+                (play) play/[code] — a poker night table: full screen, no app shell, open to guests
+                api/ chat, inngest, accounts/[accountId]/export, strategies/[slug]/export,
+                poker-night/[code]/{state,detail,join,action,tick,token,emote}
 components/     UI by feature (auth, dashboard, trading, income, strategies, navigator, brain, news, topics, learn,
-                chat, jobs, stocks, friends, settings, theme), plus primitives/ (the shared surface vocabulary),
+                chat, jobs, stocks, friends, settings, theme, games, poker, poker-night), plus primitives/ (the shared surface vocabulary),
                 shell/ (top bar, icon rail, search), forms/ and ui/ (shadcn output)
 lib/            one folder per feature, named as in components/:
   auth/         better-auth server, the one session read, sign-in / sign-up rate limits and validation
@@ -172,6 +177,8 @@ lib/            one folder per feature, named as in components/:
                 missions, today's lesson, the beginner course
   games/        the daily quant puzzle: its schedule, the answer reader, the streak
   poker/        the hand evaluator, ranges, exact and Monte Carlo equity, the preflop table, push/fold by CFR, pot odds, the river solver
+  poker-night/  hold'em with friends: the pure engine and its clock, the room server (rooms, guests, the seat pass, the one
+                compare-and-set write, its routes' checks), the lobby, the table's feed and realtime monitor, looks, emotes, awards
   chat/         the chat assistant: system prompt, tools and what they hand the model, rate limits and the caption that shows what is left of them
   email/        transport, the email frame, the daily brief (cited summary, view, render) with its topics + lesson sections, welcome and reset
   jobs/         the Inngest client, the job registry, one file of thin job wrappers per feature, the status read

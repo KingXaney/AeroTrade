@@ -673,9 +673,15 @@ details[open] > :not(summary) { animation: disclosure-in var(--motion-base) var(
     font-weight: 700;
     line-height: 1.1;
     text-align: center;
-    background: rgb(0 0 0 / 0.25);
+    /* An open seat straddles the rail, partly over the scene's sky: it is filled with the felt itself,
+       so its words and its ring always sit on the colour the felts' contrast is tested against
+       (lib/poker-night/looks), whatever the scene; the rail's colour rings it on a light sky. */
+    background: var(--pn-felt);
+    box-shadow: 0 0 0 1px var(--pn-rail);
   }
-  button.pn-open-seat:hover, button.pn-open-seat:focus-visible { border-color: var(--pn-on-felt); background: rgb(0 0 0 / 0.4); }
+  button.pn-open-seat:hover, button.pn-open-seat:focus-visible { border-color: var(--pn-on-felt); background: var(--pn-felt-light); }
+  /* A seat the viewer cannot take from here (seated already): the same colours, a lighter ring. */
+  .pn-open-seat[data-idle] { border-width: 1.5px; font-weight: 600; }
 
   /* An avatar: the face on its colour, a frame, a badge. */
   .pn-avatar {
@@ -729,15 +735,22 @@ details[open] > :not(summary) { animation: disclosure-in var(--motion-base) var(
   .pn-card-rank { position: absolute; top: 3%; left: 7%; font-family: var(--type-display); font-weight: 700; font-size: 40cqw; line-height: 1; letter-spacing: -0.04em; }
   .pn-card-corner { position: absolute; top: 37%; left: 9%; width: 26cqw; height: 26cqw; }
   .pn-card-pip { position: absolute; right: 7%; bottom: 6%; width: 50cqw; height: 50cqw; }
-  [data-pn-face="classic"] .pn-card-rank { font-size: 30cqw; }
-  [data-pn-face="classic"] .pn-card-pip { right: 25%; bottom: 22%; }
+  /* The classic face (lib/poker-night/looks CARD_FACE_IDS): a small index in two corners, the second
+     upside down, and a big pip in the middle. The large face, the default, hides the second index. */
+  .pn-card-rank-b { display: none; }
+  [data-pn-face="classic"] .pn-card-rank { top: 4%; left: 8%; font-size: 26cqw; }
+  [data-pn-face="classic"] .pn-card-corner { top: 24%; left: 9%; width: 17cqw; height: 17cqw; }
+  [data-pn-face="classic"] .pn-card-pip { right: auto; bottom: auto; left: 50%; top: 52%; translate: -50% -50%; width: 44cqw; height: 44cqw; }
+  [data-pn-face="classic"] .pn-card-rank-b { display: block; top: auto; left: auto; right: 8%; bottom: 4%; rotate: 180deg; }
   .pn-card-back {
     background: var(--pn-back-pattern), var(--pn-back-base);
     box-shadow: 0 1px 3px rgb(0 0 0 / 0.4), inset 0 0 0 max(1.5px, 5cqw) var(--pn-back-edge);
   }
   .pn-card-face.pn-card-back { color: transparent; }
   .pn-card[data-sides="two"] .pn-card-back { transform: rotateY(180deg); }
-  .pn-card[data-state="dim"] > .pn-card-inner { opacity: 0.42; filter: saturate(0.4); }
+  /* A card that does not play dims without turning see-through: the scene art behind the dock must
+     never show through the paper. */
+  .pn-card[data-state="dim"] > .pn-card-inner { filter: brightness(0.55) saturate(0.4); }
   .pn-card[data-state="win"] > .pn-card-inner { transform: translateY(-6px); box-shadow: 0 0 0 2px var(--rank-1); }
   .pn-slot { flex: none; width: var(--pn-card-w); height: var(--pn-card-h); border-radius: calc(var(--pn-card-w) * 0.12); border: 1.5px dashed var(--pn-felt-line); }
   .pn-board { position: absolute; display: flex; justify-content: center; translate: -50% -50%; }
@@ -779,26 +792,23 @@ details[open] > :not(summary) { animation: disclosure-in var(--motion-base) var(
   .pn-flights { position: absolute; inset: 0; z-index: 5; pointer-events: none; }
   .pn-fly { position: absolute; translate: -50% -50%; }
 
-  /* The winner's banner and the night's confetti. */
-  /* The banner grows away from the board: up from the pot's foot when the pot sits over the
-     board, down from its head when under it. */
+  /* The winner's banner, the line under it and the night's confetti. Each of the banner and the line
+     sits in a wrap exactly as wide as the room lib/poker-night/stage.bannerPlan found clear for it,
+     its top at the plan's top, and is never wider than the wrap; the paddings, gaps and line heights
+     here are the ones the plan sizes them by (BANNER, held to these rules by stage.test). */
   .pn-banner-wrap {
     position: absolute;
-    translate: -50% -100%;
     z-index: 6;
     display: flex;
     flex-direction: column;
     align-items: center;
-    gap: 6px;
-    max-width: min(92%, 22rem);
     pointer-events: none;
   }
-  .pn-banner-wrap[data-grow="down"] { translate: -50% 0; }
+  .pn-banner-wrap > * { max-width: 100%; }
   .pn-banner {
     display: flex;
     flex-direction: column;
     gap: 4px;
-    max-width: 100%;
     padding: 6px 12px;
     border-radius: var(--control-radius);
   }
@@ -806,6 +816,13 @@ details[open] > :not(summary) { animation: disclosure-in var(--motion-base) var(
   [data-pn-fit="tight"] .pn-banner { gap: 2px; padding: 3px 8px; }
   [data-pn-fit="tight"] .pn-banner .pn-avatar { --pn-av-size: 20px; }
   .pn-banner-row { display: flex; align-items: center; gap: 8px; min-width: 0; }
+  .pn-banner-head { font-size: 14px; line-height: 20px; font-weight: 600; }
+  .pn-banner-hand { font-size: 12px; line-height: 16px; }
+  /* The compact banner: a line a winner, no avatar, wrapped when narrow; cut short (truncate) only when
+     nothing else has room. */
+  .pn-banner:not([data-variant="full"]) { gap: 2px; padding: 2px 8px; }
+  .pn-banner-line { font-size: 12px; line-height: 16px; overflow-wrap: anywhere; }
+  .pn-banner-note { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
   .pn-confetti-field { position: absolute; z-index: 7; width: 0; height: 0; pointer-events: none; }
   .pn-confetti-bit { position: absolute; left: 0; top: 0; width: 7px; height: 11px; border-radius: 1px; opacity: 0; }
   .pn-win-pop-text {
@@ -911,7 +928,7 @@ details[open] > :not(summary) { animation: disclosure-in var(--motion-base) var(
 /* The showdown: the cards that play lift and glow, the rest dim, once the hands have turned. */
 .pn-dim { animation: pn-dim calc(var(--motion-base) * 2) var(--motion-ease) calc(var(--motion-base) * var(--pn-at, 0)) both; }
 @keyframes pn-dim {
-  from { opacity: 1; filter: none; }
+  from { filter: none; }
 }
 .pn-win-lift { animation: pn-win-lift calc(var(--motion-base) * 2) var(--motion-ease) calc(var(--motion-base) * var(--pn-at, 0)) both; }
 @keyframes pn-win-lift {
@@ -972,6 +989,261 @@ details[open] > :not(summary) { animation: disclosure-in var(--motion-base) var(
 .pn-turn-ring { transition: stroke-dashoffset 1s linear, color var(--motion-base) var(--motion-ease); }
 [data-style="brutalist"] :is(.pn-pulse, .pn-win-glow, .pn-ambient) { animation: none; }
 [data-style="brutalist"] .pn-turn-ring { transition: none; }
+
+/* ── poker night looks (P5: components/poker-night SceneBackdrop, SceneArt, LookPicker,
+   PersonalLookControls, AvatarBuilder; lib/poker-night/looks, personal) ──
+   A scene is its sky (--pn-sky) with its art over it: inline SVG pieces at the edges, filled with the
+   scene's two inks only (.pn-ink, .pn-glow; LOOKS_CSS's --pn-ink, --pn-glow), sized in container
+   units of the layer they sit in (.pn-scene and a picker's .pn-swatch-scene are size containers), so
+   the full-screen table and a small preview draw the same art. A picker's swatch reads its colours
+   from its own data attribute (a drawer is portaled out of the room). The art's ambient loop
+   (.pn-ambient plus .pn-ambient-twinkle, -drift, -flicker or -waves) runs in literal seconds:
+   brutalist stops .pn-ambient by name and both guards stop every class; a scene change fades in on
+   the motion token (.pn-scene-fade). */
+@layer components {
+  .pn-room { --pn-art-top: var(--pn-top); }
+  .pn-scene-stack { position: absolute; inset: 0; z-index: 0; overflow: hidden; }
+  .pn-scene { container-type: size; overflow: hidden; }
+  .pn-art { position: absolute; inset: 0; pointer-events: none; }
+  .pn-art > svg { position: absolute; display: block; overflow: visible; }
+  [data-pn-fit="compact"] .pn-art, [data-pn-fit="tight"] .pn-art { opacity: 0.75; }
+  .pn-ink { fill: var(--pn-ink); }
+  .pn-glow { fill: var(--pn-glow); }
+  .pn-ink-line { fill: none; stroke: var(--pn-ink); }
+  .pn-glow-line { fill: none; stroke: var(--pn-glow); }
+  .pn-art-hang { top: var(--pn-art-top, 0px); left: 50%; translate: -50% 0; width: min(34cqw, 44cqh); height: auto; }
+  .pn-art-band-top { top: var(--pn-art-top, 0px); left: 0; width: 100%; height: 20cqh; }
+  .pn-art-band-bottom { bottom: 0; left: 0; width: 100%; height: 40cqh; }
+  .pn-art-sea { bottom: 0; left: 0; width: 100%; height: 33cqh; }
+  .pn-art-hedge { bottom: 0; left: 0; width: 100%; height: 16cqh; }
+  .pn-art-left { bottom: 0; left: 0; width: auto; height: min(62cqh, 80cqw); max-width: 46cqw; }
+  .pn-art-right { bottom: 0; right: 0; width: auto; height: min(62cqh, 80cqw); max-width: 46cqw; }
+  .pn-art-corner-tl { top: calc(var(--pn-art-top, 0px) + 3cqh); left: 3cqw; width: min(26cqw, 32cqh); height: auto; }
+  .pn-art-corner-br { bottom: 5cqh; right: 2cqw; width: min(34cqw, 40cqh); height: auto; }
+  .pn-art-sky { inset: 0; width: 100%; height: 100%; }
+  .pn-art-haze { top: 14cqh; left: -10%; width: 120%; height: 44cqh; }
+  .pn-ambient { transform-box: fill-box; transform-origin: center; }
+
+  /* Pickers: a scene as a small room with its art and a felt in it; a felt as a disc in its rail; an
+     avatar colour as a dot; samples of the viewer's cards and chips at a size of their own. */
+  .pn-swatch-scene { position: relative; overflow: hidden; container-type: size; background: var(--pn-sky); --pn-art-top: 0px; }
+  .pn-mini-felt {
+    position: absolute;
+    left: 50%;
+    top: 60%;
+    width: 64%;
+    height: 44%;
+    translate: -50% -50%;
+    background: radial-gradient(ellipse at 50% 42%, var(--pn-felt-light), var(--pn-felt) 70%);
+    border: max(2px, 2.6cqw) solid var(--pn-rail);
+    box-shadow: inset 0 0 0 1px var(--pn-rail-light), 0 4px 12px rgb(0 0 0 / 0.45);
+  }
+  .pn-mini-felt::before { content: ""; position: absolute; inset: 14%; border: 1px solid var(--pn-felt-line); border-radius: inherit; }
+  .pn-felt-swatch {
+    background: radial-gradient(circle at 50% 38%, var(--pn-felt-light), var(--pn-felt) 72%);
+    border: 4px solid var(--pn-rail);
+    box-shadow: inset 0 0 0 1px var(--pn-rail-light);
+  }
+  .pn-colour-swatch { background: var(--pn-av-bg); box-shadow: inset 0 0 0 2px var(--pn-av-ring); }
+  .pn-sample { display: inline-flex; align-items: flex-end; gap: 4px; --pn-chip: 18px; }
+  .pn-sample .pn-card { --pn-card-h: calc(var(--pn-card-w) * 1.4); }
+}
+
+/* Ambient loops in literal time, staggered among siblings so a sky never pulses as one. */
+.pn-ambient-twinkle { animation: pn-ambient-twinkle 3.4s ease-in-out infinite; }
+.pn-ambient-twinkle:nth-child(3n+2) { animation-duration: 4.6s; animation-delay: -1.3s; }
+.pn-ambient-twinkle:nth-child(3n) { animation-duration: 2.8s; animation-delay: -2.1s; }
+@keyframes pn-ambient-twinkle {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.3; }
+}
+.pn-ambient-drift { animation: pn-ambient-drift 22s ease-in-out infinite alternate; }
+@keyframes pn-ambient-drift {
+  from { transform: translateX(-4%); }
+  to { transform: translateX(4%); }
+}
+.pn-ambient-flicker { animation: pn-ambient-flicker 3.2s linear infinite; }
+.pn-ambient-flicker:nth-child(2n) { animation-duration: 2.3s; animation-delay: -0.9s; }
+@keyframes pn-ambient-flicker {
+  0%, 100% { opacity: 1; }
+  8% { opacity: 0.72; }
+  12% { opacity: 1; }
+  38% { opacity: 0.86; }
+  41% { opacity: 0.55; }
+  44% { opacity: 1; }
+  70% { opacity: 0.9; }
+}
+.pn-ambient-waves { animation: pn-ambient-waves 6s ease-in-out infinite alternate; }
+@keyframes pn-ambient-waves {
+  from { transform: translateX(-30px); }
+  to { transform: translateX(30px); }
+}
+/* A new scene fades in over the one it replaces: a mechanic on the motion token. */
+.pn-scene-fade { animation: pn-scene-fade calc(var(--motion-base) * 6) var(--motion-ease) both; }
+@keyframes pn-scene-fade {
+  from { opacity: 0; }
+}
+
+/* ── poker night emotes (P6: components/poker-night EmoteLayer, SeatMenu, lib/poker-night/emotes) ──
+   A reaction rises over its sender's plate, a phrase sits in a speech bubble on the floating
+   chrome, a throw flies from plate to plate — an outer layer straight across (.pn-throw-x, --pn-dx),
+   an inner one up and down an arc (.pn-throw-y, --pn-dy, --pn-arc) — then lands as an impact on the
+   target's plate ([data-splat], whose colours are lib/poker-night/emotes' EMOTE_CSS). Fun one-shots
+   in literal time, every one in both guards; the phrase's pop-in is a mechanic on --motion-base.
+   Each element's static style is what shows when a guard stops it: a reaction above the plate, the
+   impact at rest; a flight is never drawn then (EmoteLayer shows the impact alone). Lifetimes are
+   EmoteLayer's timers, never animationend. */
+@layer components {
+  .pn-emotes { position: absolute; inset: 0; z-index: 7; pointer-events: none; }
+  /* A reaction rises --pn-rise from its spot (its bottom edge over a plate); under a plate along the
+     top (data-below, its top edge) it drifts down toward the felt instead, so it never goes behind
+     the top bar. At rest — a guard stopped it — it sits halfway. */
+  .pn-emote {
+    --pn-rise: -60px;
+    position: absolute;
+    translate: -50% -100%;
+    transform: translateY(calc(var(--pn-rise) / 2));
+    font-size: max(26px, calc(var(--pn-av) * 1.1));
+    line-height: 1;
+    filter: drop-shadow(0 2px 3px rgb(0 0 0 / 0.45));
+  }
+  .pn-emote[data-below] { --pn-rise: 24px; translate: -50% 0; }
+  .pn-phrase {
+    position: absolute;
+    translate: -50% -100%;
+    width: max-content;
+    max-width: 11rem;
+    padding: 4px 10px;
+    border-radius: 12px;
+    color: var(--fg);
+    font-size: 12px;
+    font-weight: 600;
+    line-height: 1.3;
+    text-align: center;
+  }
+  .pn-phrase[data-below] { translate: -50% 0; }
+  .pn-phrase-tail { position: absolute; left: 50%; bottom: -5px; width: 9px; height: 9px; translate: -50% 0; rotate: 45deg; }
+  .pn-phrase[data-below] .pn-phrase-tail { top: -5px; bottom: auto; rotate: 225deg; }
+  .pn-throw { position: absolute; z-index: 1; width: 0; height: 0; }
+  .pn-throw-y {
+    position: absolute;
+    left: 0;
+    top: 0;
+    translate: -50% -50%;
+    opacity: 0;
+    font-size: max(24px, var(--pn-av));
+    line-height: 1;
+    filter: drop-shadow(0 3px 3px rgb(0 0 0 / 0.4));
+  }
+  /* An impact lands on the target's avatar (EmoteLayer places it there), sized to it, so the name
+     and the stack beside it stay readable however often a plate is hit. */
+  .pn-impact {
+    position: absolute;
+    z-index: 2;
+    display: grid;
+    place-items: center;
+    width: calc(var(--pn-av) * 1.5);
+    height: calc(var(--pn-av) * 1.5);
+    translate: -50% -50%;
+  }
+  .pn-impact > * { grid-area: 1 / 1; }
+  .pn-impact-glyph { font-size: max(22px, calc(var(--pn-av) * 0.9)); line-height: 1; filter: drop-shadow(0 2px 2px rgb(0 0 0 / 0.4)); }
+  .pn-splat-blob {
+    width: 86%;
+    height: 78%;
+    border-radius: 46% 54% 42% 58% / 55% 42% 58% 45%;
+    background: radial-gradient(circle at 38% 36%, var(--pn-splat-light) 0 14%, var(--pn-splat) 46%, rgb(0 0 0 / 0) 74%);
+    opacity: 0.8;
+  }
+  .pn-splat-drop, .pn-fizz-bubble { width: 8px; height: 8px; border-radius: 9999px; background: var(--pn-splat); }
+  .pn-fizz-bubble { background: none; border: 1.5px solid var(--pn-splat-light); box-shadow: inset 0 0 0 1px var(--pn-splat); }
+  .pn-petal { width: 9px; height: 13px; border-radius: 0 100% 0 100%; background: var(--pn-splat); }
+  .pn-petal[data-alt] { background: var(--pn-splat-light); }
+  .pn-burst-bit { width: 7px; height: 10px; border-radius: 1px; background: var(--pn-splat); font-size: 14px; line-height: 1; }
+  .pn-burst-bit[data-alt] { background: var(--pn-splat-light); }
+  [data-splat="popcorn"] .pn-burst-bit { width: auto; height: auto; background: none; }
+  /* A clear button over each other player's plate (SeatMenu): at least 44 px each way. */
+  .pn-seat-menus { position: absolute; inset: 0; z-index: 3; pointer-events: none; }
+  .pn-seat-hit {
+    position: absolute;
+    translate: -50% -50%;
+    width: max(44px, var(--pn-plate-w));
+    height: max(44px, var(--pn-plate-h));
+    background: none;
+    pointer-events: auto;
+    cursor: pointer;
+  }
+  .pn-seat-hit:focus-visible { outline: 2px solid var(--brand); outline-offset: 2px; }
+}
+
+.pn-emote-rise { animation: pn-emote-rise 1.8s cubic-bezier(0.2, 0.7, 0.3, 1) both; }
+@keyframes pn-emote-rise {
+  0% { transform: translateY(calc(var(--pn-rise, -60px) * -0.13)) scale(0.4); opacity: 0; }
+  12% { transform: translateY(0) scale(1.18); opacity: 1; }
+  22% { transform: translateY(calc(var(--pn-rise, -60px) * 0.1)) scale(1); }
+  75% { opacity: 1; }
+  100% { transform: translateY(var(--pn-rise, -60px)) scale(1); opacity: 0; }
+}
+.pn-phrase-in { animation: pn-phrase-in calc(var(--motion-base) * 1.2) cubic-bezier(0.2, 1.3, 0.4, 1) calc(var(--motion-base) * var(--pn-at, 0)) both; }
+@keyframes pn-phrase-in {
+  from { transform: translateY(6px) scale(0.85); opacity: 0; }
+}
+.pn-throw-x { animation: pn-throw-x 750ms linear both; }
+@keyframes pn-throw-x {
+  from { transform: translateX(var(--pn-dx, 0px)); }
+  to { transform: translateX(0); }
+}
+.pn-throw-y { animation: pn-throw-y 750ms both; }
+@keyframes pn-throw-y {
+  0% { transform: translateY(var(--pn-dy, 0px)) rotate(0deg) scale(0.8); opacity: 1; animation-timing-function: cubic-bezier(0.25, 0.6, 0.5, 1); }
+  45% { transform: translateY(calc(min(var(--pn-dy, 0px), 0px) - var(--pn-arc, 60px))) rotate(200deg) scale(1.15); opacity: 1; animation-timing-function: cubic-bezier(0.5, 0, 0.75, 0.4); }
+  100% { transform: translateY(0) rotate(420deg) scale(1); opacity: 1; }
+}
+.pn-splat { animation: pn-splat 2.4s ease-out both; }
+@keyframes pn-splat {
+  0% { transform: scale(0.2); opacity: 0; }
+  7% { transform: scale(1.25, 0.75); opacity: 1; }
+  14% { transform: scale(0.95, 1.05); }
+  20% { transform: scale(1); }
+  35% { opacity: 1; }
+  100% { transform: scale(1); opacity: 0; }
+}
+.pn-splat-drop.pn-petals { opacity: 0.9; }
+.pn-petals { transform: translate(var(--pn-x, 0px), var(--pn-y, 0px)) rotate(var(--pn-rot, 0deg)); animation: pn-petals var(--pn-life, 1.6s) cubic-bezier(0.2, 0.6, 0.4, 1) var(--pn-wait, 0ms) both; }
+@keyframes pn-petals {
+  0% { transform: translate(0, 0) rotate(0deg) scale(0.5); opacity: 0; }
+  10% { opacity: 1; }
+  70% { opacity: 1; }
+  100% { transform: translate(var(--pn-x, 0px), var(--pn-y, 0px)) rotate(var(--pn-rot, 0deg)) scale(1); opacity: 0; }
+}
+.pn-fizz { transform: translate(var(--pn-x, 0px), var(--pn-y, 0px)); animation: pn-fizz 1.4s ease-out var(--pn-wait, 0ms) both; }
+@keyframes pn-fizz {
+  0% { transform: translate(0, 6px) scale(0.4); opacity: 0; }
+  20% { opacity: 0.95; }
+  100% { transform: translate(var(--pn-x, 0px), var(--pn-y, 0px)) scale(1.1); opacity: 0; }
+}
+.pn-bounce { animation: pn-bounce 1.3s cubic-bezier(0.3, 0.7, 0.4, 1) both; }
+@keyframes pn-bounce {
+  0% { transform: translate(0, 0) rotate(0deg); opacity: 1; }
+  30% { transform: translate(calc(var(--pn-dir, 1) * 16px), -34px) rotate(calc(var(--pn-dir, 1) * 140deg)); }
+  55% { transform: translate(calc(var(--pn-dir, 1) * 28px), 0) rotate(calc(var(--pn-dir, 1) * 250deg)); }
+  75% { transform: translate(calc(var(--pn-dir, 1) * 36px), -12px) rotate(calc(var(--pn-dir, 1) * 320deg)); opacity: 1; }
+  100% { transform: translate(calc(var(--pn-dir, 1) * 42px), 0) rotate(calc(var(--pn-dir, 1) * 380deg)); opacity: 0; }
+}
+
+/* ── poker night summary (P7: components/poker-night NightSummary, lib/poker-night/awards) ──
+   The end of the night celebrates once as it opens: the big win's confetti (.pn-confetti, in a fixed
+   layer that clips it, so no piece widens the page) and the award cards stepping in one after another
+   on the motion token (.pn-award-in, --pn-at in its units), so brutalist and both guards show them in
+   place at once — and a guarded confetti piece rests unseen. */
+@layer components {
+  .pn-celebration { position: fixed; inset: 0; z-index: 30; overflow: hidden; pointer-events: none; }
+  .pn-award-glyph { display: grid; place-items: center; width: 44px; height: 44px; flex-shrink: 0; border-radius: 9999px; font-size: 24px; line-height: 1; }
+}
+.pn-award-in { animation: pn-award-in calc(var(--motion-base) * 2.2) cubic-bezier(0.2, 1.25, 0.4, 1) calc(var(--motion-base) * var(--pn-at, 0)) both; }
+@keyframes pn-award-in {
+  from { transform: translateY(12px) scale(0.92); opacity: 0; }
+}
 
 /* Particle Background Canvas */
 #bg-canvas {
@@ -1639,13 +1911,16 @@ details[open] > :not(summary) { animation: disclosure-in var(--motion-base) var(
   .glass-panel, details[open] > :not(summary) { animation: none !important; }
   .theme-blob, .robot-bob, .robot-eyes, .robot-antenna, .robot-mascot, .robot-tip-in,
   .pn-deal, .pn-flip, .pn-chip-slide, .pn-chip-land, .pn-sweep, .pn-fold, .pn-fold-turn, .pn-dim, .pn-win-lift, .pn-win-glow, .pn-banner-drop, .pn-chip-stream, .pn-pot-out, .pn-seat-in, .pn-tag-pop, .pn-win-pop, .pn-pulse, .pn-confetti, .pn-turn-ring, .pn-ambient,
+  .pn-ambient-twinkle, .pn-ambient-drift, .pn-ambient-flicker, .pn-ambient-waves, .pn-scene-fade,
+  .pn-emote-rise, .pn-phrase-in, .pn-throw-x, .pn-throw-y, .pn-splat, .pn-petals, .pn-fizz, .pn-bounce,
+  .pn-award-in,
   [data-style] :is(.glass-panel, .news-item, .yellow-btn, .search-btn) {
     animation: none !important;
     transition: none !important;
   }
   [data-style="futuristic"] .shimmer::after { content: none; }
 }
-html[data-motion="reduced"] :is(.animate-glow, .typing-dot, .theme-blob, .robot-bob, .robot-eyes, .robot-antenna, .robot-mascot, .robot-tip-in, .glass-panel, .news-item, .yellow-btn, .search-btn, .pn-deal, .pn-flip, .pn-chip-slide, .pn-chip-land, .pn-sweep, .pn-fold, .pn-fold-turn, .pn-dim, .pn-win-lift, .pn-win-glow, .pn-banner-drop, .pn-chip-stream, .pn-pot-out, .pn-seat-in, .pn-tag-pop, .pn-win-pop, .pn-pulse, .pn-confetti, .pn-turn-ring, .pn-ambient) {
+html[data-motion="reduced"] :is(.animate-glow, .typing-dot, .theme-blob, .robot-bob, .robot-eyes, .robot-antenna, .robot-mascot, .robot-tip-in, .glass-panel, .news-item, .yellow-btn, .search-btn, .pn-deal, .pn-flip, .pn-chip-slide, .pn-chip-land, .pn-sweep, .pn-fold, .pn-fold-turn, .pn-dim, .pn-win-lift, .pn-win-glow, .pn-banner-drop, .pn-chip-stream, .pn-pot-out, .pn-seat-in, .pn-tag-pop, .pn-win-pop, .pn-pulse, .pn-confetti, .pn-turn-ring, .pn-ambient, .pn-emote-rise, .pn-phrase-in, .pn-throw-x, .pn-throw-y, .pn-splat, .pn-petals, .pn-fizz, .pn-bounce, .pn-ambient-twinkle, .pn-ambient-drift, .pn-ambient-flicker, .pn-ambient-waves, .pn-scene-fade, .pn-award-in) {
   animation: none !important;
   transition: none !important;
 }

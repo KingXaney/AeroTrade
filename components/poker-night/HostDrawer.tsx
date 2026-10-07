@@ -5,13 +5,15 @@
 // - Rebuys: the policy, the rebuys per player, and the requests waiting for the host;
 // - Players: everyone at the table, each with a More menu (hand over host, remove from table), and
 //   the removed with "Let back in";
-// - Table: its name, deal / pause / resume, lock, show to friends, and end the night.
+// - Table: its name, deal / pause / resume, lock, show to friends, and end the night;
+// - Look (P5): the scene and the felt (LookPicker) and whether throwables fly — the room's settings,
+//   applied at once for everyone (no "from the next hand"), each pick sent as it is made.
 // A settings section says once that changes apply from the next hand, checks the change the way the
 // engine will (lib/poker-night/overlays.checkGameForm) and sends only what changed. Removing, handing
 // over and ending each ask first, in a dialog TableOverlays holds; the drawer steps aside while it
 // is up and comes back after.
 
-import {useId, useState, type ReactNode} from "react";
+import {useId, useRef, useState, type ReactNode} from "react";
 import {toast} from "sonner";
 import {MoreHorizontal} from "lucide-react";
 import {DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger} from "@/components/ui/dropdown-menu";
@@ -25,10 +27,12 @@ import Switch from "@/components/primitives/Switch";
 import TextField, {fieldClass} from "@/components/primitives/TextField";
 import {iconButton} from "@/components/primitives/iconButton";
 import {RequestsPanel} from "@/components/poker-night/BankPanel";
+import LookPicker from "@/components/poker-night/LookPicker";
 import {Drawer, MiniAvatar, PlayerName} from "@/components/poker-night/overlay-kit";
 import {useRoom} from "@/components/poker-night/room-controller";
-import {HOST_COPY, INVITE_COPY, OVERLAY_COPY, TABLE_COPY} from "@/lib/learn/copy/poker-night";
+import {HOST_COPY, INVITE_COPY, LOOKS_COPY, OVERLAY_COPY, TABLE_COPY} from "@/lib/learn/copy/poker-night";
 import {TABLE_NAME_INPUT_MAX} from "@/lib/poker-night/input";
+import {resolveTableLook, scenePatch, type TableLook} from "@/lib/poker-night/looks";
 import {BLIND_PRESETS, REBUY_CHOICES} from "@/lib/poker-night/lobby";
 import {
     checkGameForm, gameFormOf, GAME_FIELDS, hostPeople, hostRowStatus, REBUY_FIELDS, rebuyLimitChoices, seatedCount, tableControl, timerChoices,
@@ -37,8 +41,9 @@ import {
 import type {RebuyPolicy} from "@/lib/poker-night/types";
 import {cn} from "@/lib/utils";
 
-export type HostSection = 'game' | 'rebuys' | 'players' | 'table';
-const SECTIONS: readonly HostSection[] = ['game', 'rebuys', 'players', 'table'];
+export type HostSection = 'game' | 'rebuys' | 'players' | 'table' | 'look';
+const SECTIONS: readonly HostSection[] = ['game', 'rebuys', 'players', 'table', 'look'];
+const sectionName = (s: HostSection): string => (s === 'look' ? LOOKS_COPY.hostTab : HOST_COPY.sections[s]);
 
 type Props = {
     open: boolean;
@@ -363,6 +368,46 @@ const TableSection = ({onEnd}: Pick<Props, 'onEnd'>) => {
     );
 };
 
+// ── the look ──
+
+// The scene, the felt and the throwables: each pick sent at once as the room's settings, shown at
+// once (the pick waits as "pending" until the table's answer), turned back with a toast if refused.
+const LookSection = () => {
+    const room = useRoom();
+    const id = useId();
+    const table = room.table;
+    const [pending, setPending] = useState<Partial<TableLook> & {throwables?: boolean} | null>(null);
+    const current = resolveTableLook(table.settings);
+    const shown: TableLook = {...current, ...(pending?.scene ? {scene: pending.scene} : {}), ...(pending?.felt ? {felt: pending.felt} : {})};
+    const throwables = pending?.throwables ?? table.settings.throwables;
+    const latest = useRef(0);
+
+    const apply = async (patch: Partial<TableLook> & {throwables?: boolean}) => {
+        const mine = ++latest.current;
+        setPending((prev) => ({...prev, ...patch}));
+        const r = await room.send({type: 'host', op: {op: 'settings', patch}});
+        if (latest.current === mine) setPending(null);
+        if (!r.ok) toast.error(r.message);
+    };
+
+    return (
+        <>
+            <Panel pad={4} className="space-y-3" aria-labelledby={`${id}-look`} data-host-look="">
+                <div className="space-y-1">
+                    <SectionHeading as="h3" size="xs" spacing="none" id={`${id}-look`}>{LOOKS_COPY.hostTab}</SectionHeading>
+                    <p className="text-xs leading-relaxed text-fg-muted">{LOOKS_COPY.hostLead}</p>
+                </div>
+                <LookPicker look={shown} onScene={(scene) => void apply(scenePatch(scene))} onFelt={(felt) => void apply({felt})}/>
+                {room.hasAccount && <p className="text-[11px] text-fg-muted">{LOOKS_COPY.hostSaved}</p>}
+            </Panel>
+            <Panel pad={4}>
+                <SwitchRow id={`${id}-throwables`} label={LOOKS_COPY.throwables} hint={LOOKS_COPY.throwablesHint} checked={throwables} disabled={false}
+                           onChange={(on) => void apply({throwables: on})} hook="throwables"/>
+            </Panel>
+        </>
+    );
+};
+
 // ── the drawer ──
 
 const HostDrawer = ({open, onOpenChange, toTable, onRemove, onHandOver, onEnd}: Props) => {
@@ -373,7 +418,7 @@ const HostDrawer = ({open, onOpenChange, toTable, onRemove, onHandOver, onEnd}: 
 
     return (
         <Drawer open={open} onOpenChange={onOpenChange} title={HOST_COPY.heading} toTable={toTable} wide data-pn-drawer="host">
-            <div role="tablist" aria-label={OVERLAY_COPY.sectionsLabel} className="grid grid-cols-4 gap-1 rounded-lg bg-surface-2/60 p-1">
+            <div role="tablist" aria-label={OVERLAY_COPY.sectionsLabel} className="grid grid-cols-5 gap-1 rounded-lg bg-surface-2/60 p-1">
                 {SECTIONS.map((s) => {
                     const on = s === section;
                     return (
@@ -389,7 +434,7 @@ const HostDrawer = ({open, onOpenChange, toTable, onRemove, onHandOver, onEnd}: 
                                     setSection(next);
                                     document.getElementById(`${id}-tab-${next}`)?.focus();
                                 }}>
-                            {HOST_COPY.sections[s]}
+                            {sectionName(s)}
                             {s === 'rebuys' && waiting > 0 && (
                                 <>
                                     <span aria-hidden="true" className="absolute right-1.5 top-1.5 size-2 rounded-full bg-warning"/>
@@ -405,6 +450,7 @@ const HostDrawer = ({open, onOpenChange, toTable, onRemove, onHandOver, onEnd}: 
                 {section === 'rebuys' && <RebuysSection/>}
                 {section === 'players' && <PlayersSection onRemove={onRemove} onHandOver={onHandOver}/>}
                 {section === 'table' && <TableSection onEnd={onEnd}/>}
+                {section === 'look' && <LookSection/>}
             </div>
         </Drawer>
     );

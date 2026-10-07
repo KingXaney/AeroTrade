@@ -66,7 +66,7 @@ const SeatRing = ({stage, anims, look}: Props) => {
                                         {TABLE_COPY.sitHere}
                                     </button>
                                 ) : (
-                                    <span className="pn-open-seat rounded-full opacity-60" role="img" aria-label={TABLE_COPY.openSeatLabel(seat)}>
+                                    <span className="pn-open-seat rounded-full" role="img" aria-label={TABLE_COPY.openSeatLabel(seat)} data-idle="">
                                         <span aria-hidden="true">{TABLE_COPY.openSeat}</span>
                                     </span>
                                 )}

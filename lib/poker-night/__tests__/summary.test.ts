@@ -8,7 +8,7 @@ import {forceClose} from '@/lib/poker-night/engine';
 import {nightDate, summarize, summaryText} from '@/lib/poker-night/summary';
 import type {TableState} from '@/lib/poker-night/types';
 import {peopleIds, peopleView, publicView} from '@/lib/poker-night/views';
-import {C, R, X, deal, moves, pidOf, table, T0} from './fixtures';
+import {A, C, R, X, deal, moves, pidOf, runOut, table, T0} from './fixtures';
 
 const viewOf = (s: TableState, removed: string[] = []) => ({
     ...publicView(s),
@@ -50,6 +50,52 @@ describe('the night summary', () => {
             standings: summary.standings.map((r) => ({name: r.name, net: r.net, removed: r.removed})),
         }));
         expect(text.split('\n')).toHaveLength(2 + 3 + 1);
+    });
+
+    it('gives the night\'s awards from the ledger\'s counters and the room\'s throws', () => {
+        let s = deal(three(), {holes: {0: 'AhKh', 1: '7c2d', 2: 'QsQd'}, board: '2c5d9hJs3c'});
+        s = moves(s, R(100), C, C, X, X, X, X, X, X, X, X, X);
+        const closed = forceClose(s, s.hand!.result!.completedAt + 1000);
+        const throws = new Map([
+            [pidOf(0), {thrown: {tomato: 2, rose: 1}, received: {}}],
+            [pidOf(1), {thrown: {rose: 1}, received: {tomato: 2}}],
+            [pidOf(2), {thrown: {}, received: {rose: 2}}],
+        ]);
+        const summary = summarize({view: viewOf(closed), startedAt: T0, endedAt: T0 + 60_000, me: pidOf(1), counters: closed.ledger, throws});
+        const who = (id: string) => summary.awards.find((a) => a.id === id)?.winners.map((w) => w.pid);
+        // Queens win the one pot of 300: the biggest pot, the most hands and the highest stack; nobody
+        // was all in, so that award is not shown.
+        expect(summary.awards.map((a) => [a.id, a.value])).toEqual([
+            ['biggest-pot', 300], ['most-won', 1], ['highest-stack', 1200], ['tomato-magnet', 2], ['most-roses', 1],
+        ]);
+        expect(who('biggest-pot')).toEqual([pidOf(2)]);
+        expect(who('tomato-magnet')).toEqual([pidOf(1)]);
+        // A tie names everyone, in the standings' order (by net: P2, then P0 and P1).
+        expect(who('most-roses')).toEqual([pidOf(0), pidOf(1)]);
+        expect(summary.awards.find((a) => a.id === 'tomato-magnet')!.winners[0]).toEqual({pid: pidOf(1), name: 'P1', avatar: 'v1:fox:tangerine:none:none', me: true});
+        // Names, looks and figures only: no counter rides along.
+        for (const award of summary.awards) {
+            expect(Object.keys(award).sort()).toEqual(['id', 'value', 'winners']);
+            for (const w of award.winners) expect(Object.keys(w).sort()).toEqual(['avatar', 'me', 'name', 'pid']);
+        }
+        expect(JSON.stringify(summary)).not.toMatch(/peakChips|biggestWin|allIns|"wins"|thrown|received/);
+
+        const text = summaryText(summary, 'Oct 7, 2026');
+        expect(text.split('\n')).toHaveLength(2 + 3 + 5 + 1);
+        expect(text).toContain(SUMMARY_COPY.award('most-roses', ['P0', 'P1'], 1));
+    });
+
+    it('counts an all-in for both players, and a summary with no counters has no awards', () => {
+        let s = deal(table({0: 1000, 1: 1000}, {lastBigBlind: 0}), {holes: {0: 'AhAd', 1: 'KcKd'}, board: '2c5d9hJs3c'});
+        s = runOut(moves(s, A, C));
+        expect(s.hand!.result).not.toBeNull();
+        const summary = summarize({view: viewOf(s), startedAt: T0, endedAt: T0, counters: s.ledger});
+        const allIns = summary.awards.find((a) => a.id === 'most-all-ins')!;
+        expect(allIns.value).toBe(1);
+        expect(allIns.winners.map((w) => w.pid)).toEqual([pidOf(0), pidOf(1)]);
+        expect(summary.awards.find((a) => a.id === 'biggest-pot')).toMatchObject({value: 2000, winners: [{pid: pidOf(0)}]});
+        expect(summary.awards.some((a) => a.id === 'tomato-magnet' || a.id === 'most-roses')).toBe(false);
+        expect(summarize({view: viewOf(s), startedAt: T0, endedAt: T0}).awards).toEqual([]);
     });
 
     it('prints the date in a named time zone', () => {

@@ -21,7 +21,7 @@ const root = fileURLToPath(new URL('../../..', import.meta.url));
 const POKER_NIGHT_SERVER = [
     '@/lib/poker-night/shuffle', '@/lib/poker-night/store', '@/lib/poker-night/hands-store', '@/lib/poker-night/results-store',
     '@/lib/poker-night/lobby-store', '@/lib/poker-night/prefs-store', '@/lib/poker-night/identity', '@/lib/poker-night/route-kit',
-    '@/lib/poker-night/realtime', '@/lib/poker-night/guest-token', '@/lib/poker-night/pass',
+    '@/lib/poker-night/realtime', '@/lib/poker-night/guest-token', '@/lib/poker-night/pass', '@/lib/poker-night/page-gate',
 ];
 // The server's own machinery: crypto, the database, the session. A server component may read the
 // database (the dashboard's widget registry runs the widget loaders; a (play) page reads the room),
@@ -106,7 +106,9 @@ const reach = (roots: readonly string[], entries: readonly string[]): string[] =
     return found;
 };
 
-describe('poker night keeps its server side off the browser', () => {
+// Each walk reads every source file: half a second alone, several under a loaded full run, so the
+// suite's 5-second default would fail a guard that holds.
+describe('poker night keeps its server side off the browser', {timeout: 30_000}, () => {
     const files = SOURCE_DIRS.filter((dir) => existsSync(join(root, dir))).flatMap((dir) => sources(join(root, dir)));
     const isClient = (file: string) => directive(readFileSync(file, 'utf8')) === 'use client';
     const roots = files.filter((file) => repoPath(file).startsWith('components/') || isClient(file));

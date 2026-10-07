@@ -5,7 +5,7 @@
 import {describe, expect, it} from 'vitest';
 import {TABLE_LIMITS, TIMING} from '@/lib/poker-night/config';
 import {ENVS} from '@/lib/poker-night/env';
-import {BUCKETS, bucketKey, LIMITS, pnKey, RATE_LIMITS} from '@/lib/poker-night/limits';
+import {BUCKETS, bucketKey, counterSpent, LIMITS, pnKey, RATE_LIMITS} from '@/lib/poker-night/limits';
 
 const MINUTE = 60_000;
 const HOUR = 60 * MINUTE;
@@ -87,5 +87,14 @@ describe('the keys', () => {
         expect(bucketKey('production', 'post', {pid: 'Pq3x9Zk2L01'})).toBe('poker-night:production:post:pid:Pq3x9Zk2L01');
         expect(bucketKey('preview', 'get', {ip: '1.2.3.4'})).toBe('poker-night:preview:get:ip:1.2.3.4');
         expect(bucketKey('development', 'get', {ip: null})).toBe('poker-night:development:get:ip:unknown');
+    });
+});
+
+describe('a counter read without spending it', () => {
+    it('is used up once its window holds the limit: takeRateLimit lets the limit-th through and no more', () => {
+        expect(counterSpent(null, RATE_LIMITS.miss.limit)).toBe(false);
+        expect(counterSpent({count: RATE_LIMITS.miss.limit - 1}, RATE_LIMITS.miss.limit)).toBe(false);
+        expect(counterSpent({count: RATE_LIMITS.miss.limit}, RATE_LIMITS.miss.limit)).toBe(true);
+        expect(counterSpent({count: RATE_LIMITS.joinRoom.limit + 5}, RATE_LIMITS.joinRoom.limit)).toBe(true);
     });
 });

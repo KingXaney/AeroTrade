@@ -5,7 +5,8 @@
 // emotes, emoteSeq, emoteAt, awards, rt, lastError).
 
 import {nextDueAt} from '@/lib/poker-night/clock';
-import {STATE_VERSION} from '@/lib/poker-night/config';
+import {KEEP, STATE_VERSION} from '@/lib/poker-night/config';
+import {awardPaths, type EmoteDraft} from '@/lib/poker-night/emotes';
 import type {Env} from '@/lib/poker-night/env';
 import type {PokerNightErrorCode} from '@/lib/poker-night/http';
 import {LIMITS} from '@/lib/poker-night/limits';
@@ -37,6 +38,7 @@ export type RoomDocLean = {
     hostUserId: string;
     status: TableStatus;
     seq: number;
+    hiddenCommits?: number;
     peopleV?: number;
     nextDueAt?: Time | null;
     state?: unknown;
@@ -51,6 +53,13 @@ export type RoomDocLean = {
     closedAt?: Time | null;
     expiresAt?: Time;
 };
+
+// The room's public version: every committed write moves seq (the compare-and-set's guard), but a
+// commit nobody but its author can see — a pre-action set, changed or cleared by a player not on the
+// clock (mutation.seenByOthers) — moves hiddenCommits with it, so the seq every view, Unchanged,
+// realtime message and `since` carries is seq less those, and a pre-action's timing never shows
+// in it. A document written before hiddenCommits existed has none.
+export const publicSeq = (doc: Pick<RoomDocLean, 'seq' | 'hiddenCommits'>): number => doc.seq - (doc.hiddenCommits ?? 0);
 
 // Which room, in which env: every store call names both.
 export type RoomRef = {env: Env; id: string};
@@ -117,7 +126,7 @@ declare const SERVER_ONLY: unique symbol;
 export type ServerRoom = {
     readonly [SERVER_ONLY]: true;
     core: RoomCore;
-    seq: number;
+    seq: number; // the public version (publicSeq): what every view and answer built from it carries
     emotes: EmoteView[];
     emoteSeq: number;
     realtimeOk: boolean;
@@ -137,7 +146,7 @@ export const serverRoom = (fields: Omit<ServerRoom, typeof SERVER_ONLY>): Server
 // The room a full read gives: the core plus the out-of-band parts, as of `readAt`.
 export const serverRoomFromDoc = (doc: RoomDocLean, core: RoomCore, readAt: number): ServerRoom => serverRoom({
     core,
-    seq: doc.seq,
+    seq: publicSeq(doc),
     emotes: (doc.emotes ?? []).filter(isEmote),
     emoteSeq: doc.emoteSeq ?? 0,
     realtimeOk: realtimeOkAt(msOrNull(doc.rt?.failAt), readAt),
@@ -163,7 +172,7 @@ export const wireOfRoom = (room: ServerRoom): WireView => wireOf(room.core, room
 // — one projected findOne, no state.
 export type RoomHead = {
     id: string;
-    seq: number;
+    seq: number; // the public version (publicSeq)
     emoteSeq: number;
     nextDueAt: number | null;
     status: TableStatus;
@@ -173,13 +182,13 @@ export type RoomHead = {
 };
 
 export const HEAD_PROJECTION = {
-    seq: 1, emoteSeq: 1, nextDueAt: 1, status: 1, bannedKeys: 1, 'rt.failAt': 1,
+    seq: 1, hiddenCommits: 1, emoteSeq: 1, nextDueAt: 1, status: 1, bannedKeys: 1, 'rt.failAt': 1,
     'players.pid': 1, 'players.userId': 1, 'players.guestId': 1, 'players.banned': 1,
 } as const;
 
 export const headFromDoc = (doc: RoomDocLean): RoomHead => ({
     id: String(doc._id),
-    seq: doc.seq,
+    seq: publicSeq(doc),
     emoteSeq: doc.emoteSeq ?? 0,
     nextDueAt: msOrNull(doc.nextDueAt),
     status: doc.status,
@@ -235,13 +244,17 @@ export const commitFields = (core: RoomCore, {applied, now, closedAt}: {applied:
     };
 };
 
-// A commit's compare-and-set update: the fields above, seq moved on, and the presence stamps of
-// watcher rows a join pruned dropped (seen is out of band, so only those paths are touched).
-export const casUpdate = (core: RoomCore, opts: {applied: readonly string[]; now: number; closedAt: number | null; pruned: readonly string[]}) => {
+// A commit's compare-and-set update: the fields above, seq moved on — with hiddenCommits too when
+// nobody but its author can see it (`visible` false: publicSeq stays put) — and the presence stamps
+// of watcher rows a join pruned dropped (seen is out of band, so only those paths are touched).
+export const casUpdate = (
+    core: RoomCore, opts: {applied: readonly string[]; now: number; closedAt: number | null; pruned: readonly string[]; visible: boolean},
+) => {
     const $set = commitFields(core, opts);
     const unset = opts.pruned.map((pid) => [`seen.${pid}`, ''] as const);
+    const $inc = opts.visible ? {seq: 1} : {seq: 1, hiddenCommits: 1};
     return {
-        update: {$set, $inc: {seq: 1}, ...(unset.length > 0 ? {$unset: Object.fromEntries(unset)} : {})},
+        update: {$set, $inc, ...(unset.length > 0 ? {$unset: Object.fromEntries(unset)} : {})},
         closedAt: $set.closedAt === null ? null : $set.closedAt.getTime(),
     };
 };
@@ -253,6 +266,7 @@ export const newRoomDoc = (core: RoomCore, now: number) => ({
     code: core.code,
     ...commitFields(core, {applied: [], now, closedAt: null}),
     seq: 0,
+    hiddenCommits: 0,
     seen: {},
     emotes: [],
     emoteSeq: 0,
@@ -274,10 +288,54 @@ export const unreadableCloseUpdate = (now: number, seq: number) => ({
 // completed or showed cards in, and whether a figure a result row carries moved.
 export type Commit = {
     ref: RoomRef;
-    room: ServerRoom; // as committed: core, seq and readAt (the commit's time)
+    room: ServerRoom; // as committed: core, the public seq and readAt (the commit's time)
     prevState: TableState;
     hands: HandSummary[];
     ledgerDirty: boolean;
+    visible: boolean; // false: only its author can see it (publicSeq did not move), so nothing is published
 };
 
 export type {JoinResult};
+
+// ── an emote (P6), out of band ──
+
+// One emote's write (store.pushEmote): a single conditional findOneAndUpdate, its update a pipeline
+// so the emote takes the seq the same write gives it. The filter is the sender's cooldown — their
+// last emote (emoteAt.<pid>) at least cooldownMs ago, or none — so a second emote inside it matches
+// nothing (429) and no counter is ever written. The update: emoteSeq + 1; the emote, with that seq,
+// at the end of the ring (the last KEEP.EMOTES); the sender's stamp; and for a throw the night
+// summary's counts, awards.<from>.thrown.<item> and awards.<to>.received.<item>. Every value the
+// client chose is $literal: an id can never be read as a field path.
+export const emoteWrite = (
+    ref: RoomRef, emote: EmoteDraft, opts: {now: number; cooldownMs: number},
+) => {
+    const stamp = `emoteAt.${emote.from}`;
+    const set: Record<string, unknown> = {
+        emotes: {
+            $slice: [{$concatArrays: [{$ifNull: ['$emotes', []]}, [{$mergeObjects: [{$literal: {...emote}}, {seq: '$emoteSeq'}]}]]}, -KEEP.EMOTES],
+        },
+        [stamp]: {$literal: opts.now},
+    };
+    if (emote.kind === 'throw') {
+        const paths = awardPaths(emote.from, emote.to, emote.item);
+        for (const path of [paths.thrown, paths.received]) set[path] = {$add: [{$ifNull: [`$${path}`, 0]}, 1]};
+    }
+    return {
+        filter: {_id: ref.id, env: ref.env, expiresAt: {$gt: new Date(opts.now)}, [stamp]: {$not: {$gt: opts.now - opts.cooldownMs}}},
+        pipeline: [{$set: {emoteSeq: {$add: [{$ifNull: ['$emoteSeq', 0]}, 1]}}}, {$set: set}],
+    };
+};
+
+// What the emote route checks before it writes: who is in a seat and whether the host has
+// throwables on, from one projected read of the state.
+export const EMOTE_TABLE_PROJECTION = {'state.seats.pid': 1, 'state.settings.throwables': 1, status: 1} as const;
+
+export type EmoteTable = {seated: Set<string>; throwables: boolean; closed: boolean};
+
+export const emoteTableFromDoc = (doc: {state?: unknown; status?: unknown}): EmoteTable => {
+    const state = (typeof doc.state === 'object' && doc.state !== null ? doc.state : {}) as {seats?: unknown; settings?: {throwables?: unknown}};
+    const seats = Array.isArray(state.seats) ? state.seats : [];
+    const seated = new Set<string>();
+    for (const s of seats) if (typeof s === 'object' && s !== null && typeof (s as {pid?: unknown}).pid === 'string') seated.add((s as {pid: string}).pid);
+    return {seated, throwables: state.settings?.throwables !== false, closed: doc.status === 'closed'};
+};

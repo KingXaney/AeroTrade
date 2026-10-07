@@ -14,7 +14,9 @@
 // chips is printed with en-US digit groups ("1,250"), a net with its sign ("+1,250", "−300").
 
 import {rankOf, suitOf, type Card} from "@/lib/poker/cards";
-import type {FaceId} from "@/lib/poker-night/avatar";
+import type {AvatarPart, AvatarSpec, BadgeId, ColourId, FaceId, FrameId} from "@/lib/poker-night/avatar";
+import type {CardBackId, CardFaceId, ChipSetId} from "@/lib/poker-night/looks";
+import type {FeltId, SceneId} from "@/lib/poker-night/types";
 import {CODE_LENGTH} from "@/lib/poker-night/code";
 import {KEEP, TABLE_LIMITS} from "@/lib/poker-night/config";
 import type {HandDescription} from "@/lib/poker-night/hand-name";
@@ -24,6 +26,9 @@ import {NAME_MAX_GRAPHEMES} from "@/lib/poker-night/names";
 import type {EntryKind, LedgerKind, PreAction, RebuyPolicy, Refusal, Street} from "@/lib/poker-night/types";
 import type {SeatState} from "@/lib/poker-night/view-types";
 import {capitalize, numberWord} from "@/lib/text";
+import type {PhraseId, ReactionId, ThrowId} from "@/lib/poker-night/emotes";
+import type {ShortcutGroup, ShortcutId} from "@/lib/poker-night/keys";
+import type {AwardId} from "@/lib/poker-night/awards";
 
 // A player's name inside a sentence, set apart from the words around it (U+2068 … U+2069), so a
 // name written right to left cannot reorder the sentence it sits in.
@@ -321,17 +326,52 @@ export const JOIN_COPY = {
 
 // ---- avatars (lib/poker-night/avatar.ts) -----------------------------------------------------
 
+// Each face's name: what the face is called in the builder, and the name a player who leaves
+// theirs blank sits under.
+const AVATAR_FACE_NAMES = {
+    fox: 'Fox', cat: 'Cat', dog: 'Dog', panda: 'Panda', koala: 'Koala', tiger: 'Tiger', lion: 'Lion', frog: 'Frog',
+    monkey: 'Monkey', penguin: 'Penguin', owl: 'Owl', octopus: 'Octopus', unicorn: 'Unicorn', dragon: 'Dragon', turtle: 'Turtle',
+    rabbit: 'Rabbit', bear: 'Bear', pig: 'Pig', cow: 'Cow', shark: 'Shark', dinosaur: 'Dinosaur', bee: 'Bee',
+    butterfly: 'Butterfly', whale: 'Whale', robot: 'Robot', alien: 'Alien', ghost: 'Ghost', pumpkin: 'Pumpkin', cowboy: 'Cowboy',
+    wizard: 'Wizard', vampire: 'Vampire', superhero: 'Superhero', clown: 'Clown', cactus: 'Cactus', mushroom: 'Mushroom',
+    sunflower: 'Sunflower', doughnut: 'Doughnut', pizza: 'Pizza', die: 'Dice', rocket: 'Rocket',
+} as const satisfies Record<FaceId, string>;
+
+// How a frame and a badge read inside a sentence ("with a gold frame and a crown").
+const AVATAR_FRAME_WORDS: Record<Exclude<FrameId, 'none' | 'double'>, string> = {ring: 'ring', dashed: 'dashed', gold: 'gold', neon: 'neon'};
+const AVATAR_BADGE_WORDS: Record<Exclude<BadgeId, 'none' | 'cherries'>, string> = {
+    crown: 'crown', 'top-hat': 'top hat', star: 'star', clover: 'clover', flame: 'flame', gem: 'gem', bow: 'bow', moon: 'moon', target: 'target',
+    heart: 'heart', balloon: 'balloon',
+};
+
 export const AVATAR_COPY = {
-    // Each face's name: what the face is called in the builder, and the name a player who leaves
-    // theirs blank sits under.
-    faces: {
-        fox: 'Fox', cat: 'Cat', dog: 'Dog', panda: 'Panda', koala: 'Koala', tiger: 'Tiger', lion: 'Lion', frog: 'Frog',
-        monkey: 'Monkey', penguin: 'Penguin', owl: 'Owl', octopus: 'Octopus', unicorn: 'Unicorn', dragon: 'Dragon', turtle: 'Turtle',
-        rabbit: 'Rabbit', bear: 'Bear', pig: 'Pig', cow: 'Cow', shark: 'Shark', dinosaur: 'Dinosaur', bee: 'Bee',
-        butterfly: 'Butterfly', whale: 'Whale', robot: 'Robot', alien: 'Alien', ghost: 'Ghost', pumpkin: 'Pumpkin', cowboy: 'Cowboy',
-        wizard: 'Wizard', vampire: 'Vampire', superhero: 'Superhero', clown: 'Clown', cactus: 'Cactus', mushroom: 'Mushroom',
-        sunflower: 'Sunflower', doughnut: 'Doughnut', pizza: 'Pizza', die: 'Dice', rocket: 'Rocket',
-    } satisfies Record<FaceId, string>,
+    faces: AVATAR_FACE_NAMES,
+
+    // ==== P5: the avatar builder (components/poker-night/AvatarBuilder, AvatarDisc) ====
+    // Every colour, frame and badge by name: the builder's swatches and the words a look is read
+    // out in.
+    colours: {
+        tangerine: 'Tangerine', lemon: 'Lemon', lime: 'Lime', mint: 'Mint', sky: 'Sky', ocean: 'Ocean',
+        grape: 'Grape', berry: 'Berry', rose: 'Rose', coral: 'Coral', sand: 'Sand', slate: 'Slate',
+    } satisfies Record<ColourId, string>,
+    frames: {none: 'No frame', ring: 'Ring', double: 'Double ring', dashed: 'Dashed', gold: 'Gold', neon: 'Neon'} satisfies Record<FrameId, string>,
+    badges: {
+        none: 'No badge', crown: 'Crown', 'top-hat': 'Top hat', star: 'Star', clover: 'Clover', flame: 'Flame', gem: 'Gem', bow: 'Bow',
+        moon: 'Moon', target: 'Target', cherries: 'Cherries', heart: 'Heart', balloon: 'Balloon',
+    } satisfies Record<BadgeId, string>,
+    // The builder's four groups, a heading each.
+    parts: {face: 'Face', colour: 'Colour', frame: 'Frame', badge: 'Badge'} satisfies Record<AvatarPart, string>,
+    builder: 'Build your look',
+    roll: 'Roll',
+    rollLabel: 'Roll a random look',
+    // A look read out: "Fox on tangerine", "Owl on sky, with a gold frame and a crown".
+    describe: (spec: AvatarSpec): string => {
+        const extras = [
+            ...(spec.frame === 'none' ? [] : [`${spec.frame === 'double' ? 'a double ring' : `a ${AVATAR_FRAME_WORDS[spec.frame]} frame`}`]),
+            ...(spec.badge === 'none' ? [] : [spec.badge === 'cherries' ? 'cherries' : `a ${AVATAR_BADGE_WORDS[spec.badge]}`]),
+        ];
+        return `${AVATAR_FACE_NAMES[spec.face]} on ${spec.colour}${extras.length > 0 ? `, with ${words(extras)}` : ''}`;
+    },
 } as const;
 
 // ==== P3: the lobby, the table and its overlays ================================================
@@ -735,18 +775,39 @@ export const BANK_COPY = {
 // ---- the end of the night (components/poker-night/NightSummary) --------------------------------
 
 // What "Copy summary" puts on the clipboard: the table and date, the length, one line per player
-// by net, and the footer.
+// by net, one line per award (P7), and the footer.
 export type SummaryTextInput = {
     table: string;
     date: string;
     hands: number;
     minutes: number;
     standings: readonly {name: string; net: number; removed: boolean}[];
+    awards?: readonly {id: AwardId; names: readonly string[]; value: number}[];
 };
 
 const SUMMARY_FOOTER = 'Play chips only. No cash value.';
 const summaryWhen = (table: string, date: string): string => `${isolate(table)} · ${date}`;
 const summaryLength = (hands: number, minutes: number): string => `${plural(hands, 'hand', 'hands')} in ${duration(minutes)}`;
+
+// The night's awards (P7, lib/poker-night/awards AWARD_IDS): each one's name, and the figure it was
+// won with, which starts on its number so it reads alone under the winners or after them.
+const AWARD_LABELS = {
+    'biggest-pot': 'Biggest pot',
+    'most-won': 'Most hands won',
+    'highest-stack': 'Highest stack',
+    'most-all-ins': 'Most all-ins',
+    'tomato-magnet': 'Tomato magnet',
+    'most-roses': 'Most roses given',
+} as const satisfies Record<AwardId, string>;
+const AWARD_FIGURES: Record<AwardId, (n: number) => string> = {
+    'biggest-pot': (n) => `${plural(n, 'chip', 'chips')} in one hand`,
+    'most-won': (n) => plural(n, 'hand', 'hands'),
+    'highest-stack': (n) => plural(n, 'chip', 'chips'),
+    'most-all-ins': (n) => plural(n, 'all-in', 'all-ins'),
+    'tomato-magnet': (n) => plural(n, 'tomato', 'tomatoes'),
+    'most-roses': (n) => plural(n, 'rose', 'roses'),
+};
+const awardLine = (id: AwardId, winners: readonly string[], n: number): string => `${AWARD_LABELS[id]}: ${names(winners)}, ${AWARD_FIGURES[id](n)}`;
 
 export const SUMMARY_COPY = {
     heading: "That's a wrap",
@@ -763,10 +824,16 @@ export const SUMMARY_COPY = {
     guestNudge: 'With an account, the nights you play are kept under Recent nights.',
     guestNudgeLink: 'Create an account',
     footer: SUMMARY_FOOTER,
-    text: ({table, date, hands, minutes, standings}: SummaryTextInput): string => [
+    awardsHeading: 'Awards',
+    awards: AWARD_LABELS,
+    awardFigure: (id: AwardId, n: number): string => AWARD_FIGURES[id](n),
+    // "Biggest pot: Ana, 1,200 chips in one hand"; a tie names everyone: "Most all-ins: Ben and Cy, 3 all-ins".
+    award: awardLine,
+    text: ({table, date, hands, minutes, standings, awards = []}: SummaryTextInput): string => [
         summaryWhen(table, date),
         summaryLength(hands, minutes),
         ...standings.map((row) => `${isolate(row.name)}: ${signed(row.net)}${row.removed ? ` (${REMOVED.toLowerCase()})` : ''}`),
+        ...awards.map((a) => awardLine(a.id, a.names, a.value)),
         SUMMARY_FOOTER,
     ].join('\n'),
 } as const;
@@ -826,11 +893,11 @@ export const LOBBY_COPY = {
 } as const;
 
 // ==== P3: the table's overlays (components/poker-night: TableOverlays, TopBar, JoinCard, ==========
-// InviteSheet, BankPanel, HostDrawer, RemovePlayerDialog, HandLog, MyLookSheet, NightSummary) ======
+// InviteSheet, BankPanel, HostDrawer, RemovePlayerDialog, HandLog, MyLookDrawer, NightSummary) =====
 
 // What the overlays say beyond the tables above, which they quote for everything else: the drawers'
-// shared words, the top bar's own-seat choices, a watcher taking a seat, the look drawer until the
-// builder arrives (P5), the bank's own-chips panel, the host drawer's section list and the
+// shared words, the top bar's own-seat choices, a watcher taking a seat, the look drawer's name
+// panel (the rest is LOOKS_COPY), the bank's own-chips panel, the host drawer's section list and the
 // summary's place column.
 export const OVERLAY_COPY = {
     close: 'Close',
@@ -843,7 +910,7 @@ export const OVERLAY_COPY = {
     watching: 'Watching',
     connection: (state: string): string => `Connection: ${state.toLowerCase()}`,
 
-    // My look, until the builder (P5): the name and the rolled look the table sees.
+    // My look's name panel (MyLookDrawer): the name and the look the table sees.
     lookLead: 'Your name and look, as everyone at this table sees them. They change between hands.',
     lookSave: 'Save',
     lookSaved: 'Saved.',
@@ -870,4 +937,192 @@ export const OVERLAY_COPY = {
 // in one pill ("3 more side pots: 2,340").
 export const FELT_COPY = {
     morePots: (pots: number, chips: number): string => `${plural(pots, 'more side pot', 'more side pots')}: ${count(chips)}`,
+} as const;
+
+// ==== P5: the looks (lib/poker-night/looks, personal; components/poker-night LookPicker, ==========
+// PersonalLookControls, MyLookDrawer, HostDrawer's Look section, lobby/MyLookPanel) ================
+
+// Every id in lib/poker-night/looks' registries has its name here (the copy test holds the keys
+// equal): the host's scenes and felts, each player's card backs, card faces and chip sets. Then the
+// words of the pickers and switches: what each choice does, said once beside it.
+export const LOOKS_COPY = {
+    scenes: {
+        'casino-classic': 'Casino', 'midnight-lounge': 'Midnight lounge', 'neon-city': 'Neon city', 'beach-sunset': 'Beach sunset',
+        'deep-space': 'Deep space', 'log-cabin': 'Log cabin', 'garden-party': 'Garden party', 'my-theme': 'My theme',
+    } satisfies Record<SceneId, string>,
+    // One line under each scene's name in the picker.
+    sceneNotes: {
+        'casino-classic': 'Gold damask under a chandelier.',
+        'midnight-lounge': 'Lamplight and a slow haze.',
+        'neon-city': 'A skyline whose windows flicker.',
+        'beach-sunset': 'Palms, and the waves rolling in.',
+        'deep-space': 'Planets among twinkling stars.',
+        'log-cabin': 'A fire crackling in the hearth.',
+        'garden-party': 'String lights over a lawn, in daylight.',
+        'my-theme': "Each player sees their own app's colours.",
+    } satisfies Record<SceneId, string>,
+    felts: {
+        emerald: 'Emerald', 'royal-blue': 'Royal blue', burgundy: 'Burgundy', charcoal: 'Charcoal', violet: 'Violet', teal: 'Teal',
+        tangerine: 'Tangerine', rose: 'Rose',
+    } satisfies Record<FeltId, string>,
+    backs: {
+        'classic-red': 'Classic red', 'classic-blue': 'Classic blue', aero: 'AeroTrade', checker: 'Checker', starfield: 'Starfield', waves: 'Waves',
+        'neon-grid': 'Neon grid', tartan: 'Tartan',
+    } satisfies Record<CardBackId, string>,
+    faces: {classic: 'Classic', large: 'Large print'} satisfies Record<CardFaceId, string>,
+    faceNotes: {
+        classic: 'Small corners and a big pip in the middle.',
+        large: 'A big rank in the corner, easy to read on a phone.',
+    } satisfies Record<CardFaceId, string>,
+    chips: {classic: 'Classic', pastel: 'Pastel', neon: 'Neon', mono: 'Mono'} satisfies Record<ChipSetId, string>,
+
+    // A preview's name: "Deep space, violet felt".
+    previewOf: (scene: string, felt: string): string => `${scene}, ${felt.toLowerCase()} felt`,
+
+    // The host's Look section (HostDrawer): the room's settings, applied at once for everyone.
+    hostTab: 'Look',
+    hostLead: 'Everyone at the table sees the scene and felt you pick, straight away.',
+    hostSaved: 'Your next tables open with this look too.',
+    scene: 'Scene',
+    felt: 'Felt',
+    sceneFelt: 'A new scene brings its own felt; any felt can go with it after.',
+    throwables: 'Throwables',
+    throwablesHint: "Players can toss a tomato, a rose or confetti onto someone's seat. Off, reactions and phrases still work.",
+
+    // The join card's way into the builder, and back out of it.
+    customize: 'Change my look',
+    customizeDone: 'Done',
+
+    // My look (MyLookDrawer): the player's name and look for everyone, then what only they see.
+    youHeading: 'You at the table',
+    // A seated player's name and look wait for the hand in play to end (MyLookDrawer): the draft is
+    // kept while the drawer is shut, and a save made now goes on the table by itself at the hand's end.
+    betweenHands: 'This hand is still being played. A save now goes on the table when it ends.',
+    queued: 'Saved. It goes on the table when this hand ends.',
+    queuedDone: 'Your new name and look are on the table.',
+    viewHeading: 'Only you see these',
+    viewLead: 'Kept in this browser and used at every table you open here.',
+    cardBack: 'Card back',
+    cardFace: 'Card face',
+    chipSet: 'Chip colours',
+    fourColour: 'Four-colour deck',
+    fourColourHint: 'Clubs green and diamonds blue, so each suit has a colour of its own.',
+    sound: 'Sound',
+    soundHint: 'Cards, chips and a chime on your turn. Your turn always shows on screen too.',
+    buzz: 'Vibrate on my turn',
+    buzzHint: 'On a phone that can.',
+    keepAwake: 'Keep the screen on',
+    keepAwakeHint: 'While this table is open, so the phone does not lock mid-hand.',
+    handHints: 'Name my hand',
+    handHintsHint: 'The name of what your cards make, such as "Pair of queens", under your cards.',
+    muteEmotes: 'Mute emotes',
+    muteEmotesHint: "Hides other players' reactions, phrases and throws.",
+    // Peek (HoleCards): the viewer's own cards face down in the dock until a press, for a screen
+    // others can see. Never a sentence that opens on "Hold".
+    peek: 'Hide my cards until I press them',
+    peekHint: 'Your cards stay face down until you press on them, for a screen others can see.',
+    peekPrompt: 'Press on your cards to peek.',
+    peekLabel: 'Your cards, face down: press to peek',
+    shortcuts: OVERLAY_COPY.shortcuts,
+    shortcutsHint: OVERLAY_COPY.shortcutsHint,
+
+    // The lobby's My look (lobby/MyLookPanel): the same, saved with the account.
+    personalHeading: 'At every table',
+    personalLead: 'Only you see these. Saved with your account, they follow you to any browser.',
+    tablesHeading: 'Your tables',
+    tablesLead: 'The scene and felt each new table of yours opens with. At the table you can change them for everyone.',
+} as const;
+
+// ==== P6: emotes (lib/poker-night/emotes.ts; components/poker-night EmoteLayer, EmotePicker, SeatMenu) ====
+
+// Every id in lib/poker-night/emotes' registries has its words here (the copy test holds the keys
+// equal). The phrases are friendly table talk, said as the player who sends them: never a verdict
+// on a play ("good call"), never a comparison. A throwable's phrase is how a sentence names it.
+const THROW_WORDS: Record<ThrowId, {label: string; phrase: string}> = {
+    tomato: {label: 'Tomato', phrase: 'a tomato'},
+    rose: {label: 'Rose', phrase: 'a rose'},
+    soda: {label: 'Soda', phrase: 'a soda'},
+    confetti: {label: 'Confetti', phrase: 'confetti'},
+    cake: {label: 'Cake', phrase: 'a slice of cake'},
+    egg: {label: 'Egg', phrase: 'an egg'},
+    'tennis-ball': {label: 'Tennis ball', phrase: 'a tennis ball'},
+    popcorn: {label: 'Popcorn', phrase: 'some popcorn'},
+    heart: {label: 'Heart', phrase: 'a heart'},
+    fish: {label: 'Fish', phrase: 'a fish'},
+};
+
+const REACTION_WORDS: Record<ReactionId, string> = {
+    laugh: 'Laughing', wow: 'Surprised', cool: 'Cool', fire: 'On fire', clap: 'Applause', cry: 'Crying',
+    think: 'Thinking', grimace: 'Grimacing', peek: "Can't look", party: 'Party', huff: 'Huffing', sleepy: 'Sleepy',
+};
+
+const PHRASE_WORDS: Record<PhraseId, string> = {
+    hi: 'Hi all', 'good-luck': 'Good luck', 'nice-hand': 'Nice hand', 'well-played': 'Well played', unlucky: 'Unlucky',
+    'so-close': 'So close', wow: 'Wow', think: 'Thinking…', 'your-move': 'Your move', bluff: 'Was that a bluff?',
+    'ship-it': 'Ship it', brb: 'Be right back', 'one-more': 'One more hand', thanks: 'Thanks', gg: 'GG', 'good-night': 'Good night',
+};
+
+// A phrase closed as a sentence: its own "?" or "…" kept, else a full stop.
+const closed = (text: string): string => (/[.?!…]$/.test(text) ? text : `${text}.`);
+
+export const EMOTE_COPY = {
+    // The dock's button and the picker's three tabs.
+    open: 'Emotes',
+    tabsLabel: 'Kinds of emote',
+    tabs: {react: 'React', say: 'Say', throw: 'Throw'},
+    reactions: REACTION_WORDS,
+    phrases: PHRASE_WORDS,
+    throwables: THROW_WORDS,
+    // Throwing from the picker: the thing first, then who gets it.
+    pickTarget: (item: ThrowId): string => `Who gets ${THROW_WORDS[item].phrase}?`,
+    noTargets: 'Nobody else is seated yet.',
+    back: 'Back',
+    // The host's switch is off: the Throw tab is not offered, and the picker says why.
+    off: 'The host turned throwables off.',
+    // A second emote inside the 1.2-second cooldown.
+    cooldown: 'One moment before the next one.',
+    seatedOnly: 'Take a seat to send emotes.',
+    // A plate's menu (another player): one-tap throws and a mute for this visit.
+    seatMenu: (name: string): string => `${isolate(name)}: emotes`,
+    throwAt: (name: string): string => `Throw at ${isolate(name)}`,
+    throwItemAt: (item: ThrowId, name: string): string => `Throw ${THROW_WORDS[item].phrase} at ${isolate(name)}`,
+    mutePlayer: (name: string): string => `Mute ${isolate(name)}'s emotes`,
+    showPlayer: (name: string): string => `Show ${isolate(name)}'s emotes`,
+    muted: (name: string): string => `${isolate(name)}'s emotes are hidden until you leave the table.`,
+    shown: (name: string): string => `${isolate(name)}'s emotes show again.`,
+    // The personal switch (My look): every other player's emotes hidden and silent; your own still show.
+    muteAll: 'Mute emotes',
+    muteAllHint: "Hides every other player's reactions, phrases and throws on this screen. Yours still show.",
+    // What a screen reader hears (the bursts themselves are hidden from it).
+    reacted: (name: string, item: ReactionId): string => `${isolate(name)} reacts: ${REACTION_WORDS[item].toLowerCase()}.`,
+    said: (name: string, item: PhraseId): string => `${isolate(name)} says: ${closed(PHRASE_WORDS[item])}`,
+    threw: (from: string, item: ThrowId, to: string): string => `${isolate(from)} throws ${THROW_WORDS[item].phrase} at ${isolate(to)}.`,
+    threwAtYou: (from: string, item: ThrowId): string => `${isolate(from)} throws ${THROW_WORDS[item].phrase} at you.`,
+} as const;
+
+// ---- keys (lib/poker-night/keys.ts SHORTCUTS; components/poker-night ShortcutsDialog) -----------
+
+export const SHORTCUTS_COPY = {
+    title: 'Keyboard shortcuts',
+    open: 'Keyboard shortcuts',
+    lead: 'With the focus on the table, one key does each of these. The question mark opens this list.',
+    off: 'Single-key shortcuts are off in My look: only Enter and Escape act, in the raise panel.',
+    groups: {turn: 'On your turn', table: 'At the table'} satisfies Record<ShortcutGroup, string>,
+    does: {
+        fold: 'Fold',
+        'check-call': 'Check or call',
+        raise: 'Open a bet or a raise',
+        'all-in': 'Set the raise to all in',
+        sizes: 'A quick size, with the raise panel open',
+        confirm: 'Confirm the raise',
+        close: 'Close the raise panel',
+        emotes: 'Emotes',
+        log: 'Hand log',
+        bank: 'Bank',
+        mute: 'Sounds on or off',
+        shortcuts: 'This list',
+    } satisfies Record<ShortcutId, string>,
+    // The M key's answer.
+    soundOn: 'Sounds on.',
+    soundOff: 'Sounds off.',
 } as const;

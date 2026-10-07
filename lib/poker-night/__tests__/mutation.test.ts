@@ -3,17 +3,18 @@
 // so a move made in time beats a timeout that fell due while it waited, and on to now after it; a
 // turn timed out by any other writer only after the slack, so an in-time move still on its way beats
 // a tick or another player's request to the compare-and-set; a refused step whose clock still moved
-// committing the clock alone, without its action id; no write when nothing changed; and the retry
-// backoff.
+// committing the clock alone, without its action id; no write when nothing changed; a write that
+// only its author can see (a pre-action) told apart, so the public seq never shows its timing; and
+// the retry backoff.
 
 import {describe, expect, it} from 'vitest';
 import {nextDueAt} from '@/lib/poker-night/clock';
 import {TIMING} from '@/lib/poker-night/config';
 import {FULL_DECK} from '@/lib/poker-night/deck';
 import type {JoinInput} from '@/lib/poker-night/input';
-import {backoffMs, planMutation, type MutationInput, type Plan} from '@/lib/poker-night/mutation';
+import {backoffMs, planMutation, seenByOthers, type MutationInput, type Plan} from '@/lib/poker-night/mutation';
 import {
-    appliedKey, clockStep, joinStep, newRoom, tableStep, type KnownIdentity, type RoomCore, type Step, type StepResult,
+    actionStep, appliedKey, clockStep, joinStep, newRoom, playerViewFor, tableStep, wireOf, type KnownIdentity, type RoomCore, type Step, type StepResult,
 } from '@/lib/poker-night/room';
 import type {DeckSource} from '@/lib/poker-night/types';
 import {mulberry32} from '@/lib/random';
@@ -197,6 +198,46 @@ describe('an idle room', () => {
         const now = T0 + 2 * TIMING.IDLE_CLOSE_MS;
         expect(plan({core: closed, step: joinStep(joinInput(), guest('ben'), 'BenPid00001'), lastActivityAt: T0, receivedAt: now, now}))
             .toEqual({kind: 'refused', code: 'closed'});
+    });
+});
+
+describe('who can see a write', () => {
+    const extras = {realtimeOk: true, emotes: [], emoteSeq: 0, pass: null};
+    // The seat not on the clock heads-up, and its pre-action through the action route's step.
+    const waitingOf = (core: RoomCore): string => (actorOf(core) === HOST ? ANA : HOST);
+    const preStep = (pid: string, pre: {kind: 'check-fold'} | null, id: string) => ({
+        step: actionStep({actionId: id, type: 'pre', pre}, pid), key: appliedKey(pid, id), by: pid,
+    });
+
+    it('keeps a pre-action set by a player not on the clock to its owner: a write, invisible to everyone else', () => {
+        const core = dealt();
+        const waiting = waitingOf(core);
+        const p = commitOf(plan({core, ...preStep(waiting, {kind: 'check-fold'}, 'pre-set-0000000001')}));
+        expect(p.visible).toBe(false);
+        expect(p.refusal).toBeNull();
+        expect(p.applied).toEqual([appliedKey(waiting, 'pre-set-0000000001')]);
+        // At one seq and time the public table, and the actor's own view, are what they were.
+        expect(wireOf(p.core, 5, T0, extras)).toEqual(wireOf(core, 5, T0, extras));
+        expect(playerViewFor(p.core, actorOf(core), 5, T0, extras)).toEqual(playerViewFor(core, actorOf(core), 5, T0, extras));
+        // Only the owner's view carries it.
+        expect(playerViewFor(p.core, waiting, 5, T0, extras).me.pre).toEqual({kind: 'check-fold'});
+        // Cleared again: as invisible.
+        const cleared = commitOf(plan({core: p.core, ...preStep(waiting, null, 'pre-clear-00000001')}));
+        expect(cleared.visible).toBe(false);
+        expect(seenByOthers(core, cleared.core)).toBe(false);
+    });
+
+    it('shows every other write: a move, a join, a deal, a pre-action played', () => {
+        const core = dealt();
+        expect(commitOf(plan({core, step: actorFolds(core), by: actorOf(core)})).visible).toBe(true);
+        expect(commitOf(plan({core, step: joinStep(joinInput({as: 'watcher'}), guest('ben'), 'BenPid00001')})).visible).toBe(true);
+        const s = started();
+        expect(commitOf(plan({core: s, now: s.state.nextHandAt!})).visible).toBe(true);
+        // The waiting seat's pre-action is played the moment the actor calls: that write shows.
+        const waiting = waitingOf(core);
+        const set = commitOf(plan({core, ...preStep(waiting, {kind: 'check-fold'}, 'pre-set-0000000002')})).core;
+        expect(commitOf(plan({core: set, step: actorCalls(set), by: actorOf(set)})).visible).toBe(true);
+        expect(seenByOthers(core, core)).toBe(false);
     });
 });
 

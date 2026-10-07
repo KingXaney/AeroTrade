@@ -151,6 +151,10 @@ describe('the other bodies', () => {
         no(EmoteSchema, {kind: 'throw', item: 'tomato'});
         no(EmoteSchema, {kind: 'say', item: 'Free text here'});
         no(EmoteSchema, {kind: 'react', item: 'laugh', to: PLAYER});
+        // Each item from its own registry (lib/poker-night/emotes).
+        no(EmoteSchema, {kind: 'say', item: 'laugh'});
+        no(EmoteSchema, {kind: 'react', item: 'gg'});
+        no(EmoteSchema, {kind: 'throw', item: 'snowball', to: PLAYER});
     });
 });
 

@@ -4,7 +4,8 @@
 // page's bundle, and in /play's only as a chunk fetched on demand. The server's half is
 // lib/poker-night/realtime; what the channel and its messages are is lib/poker-night/channel.
 //
-// The link only reports: each state message's wire view (checked to be one), the connection's
+// The link only reports: each state message's wire view (checked to be one), each emote message
+// (lib/poker-night/emotes.readEmote; useTableFeed merges it by id), the connection's
 // state, each time the channel (re)attaches — the moment a GET state closes any gap — and the server
 // saying this table has no realtime. lib/poker-night/feed decides what they mean (useTableFeed
 // applies a wire by seq, so a message out of order or twice changes nothing). Tokens come from
@@ -19,10 +20,11 @@
 
 import type {BaseRealtime} from "ably/modular";
 import {getToken} from "@/components/poker-night/table-api";
-import {isWire, STATE_MESSAGE} from "@/lib/poker-night/channel";
+import {EMOTE_MESSAGE, isWire, STATE_MESSAGE} from "@/lib/poker-night/channel";
+import {readEmote} from "@/lib/poker-night/emotes";
 import {tokenRetryDelay, tokenRetryLate, type AblyState} from "@/lib/poker-night/feed";
 import type {PokerNightErrorCode} from "@/lib/poker-night/http";
-import type {RealtimeTokenView, WireView} from "@/lib/poker-night/view-types";
+import type {EmoteView, RealtimeTokenView, WireView} from "@/lib/poker-night/view-types";
 
 export type RealtimeEvents = {
     wire: (wire: WireView) => void;
@@ -31,6 +33,8 @@ export type RealtimeEvents = {
     attached: () => void;
     // The server says this table has no realtime (no key, or the kill switch): poll.
     off: () => void;
+    // An emote (P6), checked to be one (lib/poker-night/emotes.readEmote).
+    emote?: (emote: EmoteView) => void;
 };
 
 export type RealtimeLink = {
@@ -45,7 +49,7 @@ export type RealtimeLink = {
 // What the QA's relay defines on the page before it loads: subscribe hands it the link's
 // callbacks and returns how to stop.
 export type RealtimeFake = {
-    subscribe: (handlers: {onState: (data: unknown) => void; onConnection: (state: string) => void}) => (() => void) | void;
+    subscribe: (handlers: {onState: (data: unknown) => void; onConnection: (state: string) => void; onEmote?: (data: unknown) => void}) => (() => void) | void;
 };
 
 declare global {
@@ -80,6 +84,10 @@ const connectFake = (fake: RealtimeFake, on: RealtimeEvents): RealtimeLink => {
                 if (!open || !isAblyState(state)) return;
                 on.connection(state);
                 if (state === 'connected') on.attached();
+            },
+            onEmote: (data) => {
+                const emote = open ? readEmote(data) : null;
+                if (emote) on.emote?.(emote);
             },
         });
     };
@@ -205,6 +213,10 @@ export const connectRealtime = (code: string, pass: () => string | null, on: Rea
         attach = () => void channel.attach().catch(() => undefined);
         void channel.subscribe(STATE_MESSAGE, (message) => {
             if (!closed && isWire(message.data)) on.wire(message.data);
+        }).catch(() => undefined);
+        void channel.subscribe(EMOTE_MESSAGE, (message) => {
+            const emote = closed ? null : readEmote(message.data);
+            if (emote) on.emote?.(emote);
         }).catch(() => undefined);
     };
 

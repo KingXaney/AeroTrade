@@ -169,6 +169,39 @@ describe('emotes', () => {
         expect(f.emotes).toEqual([]);
         expect(f.emoteSeq).toBe(1);
     });
+
+    // P6: emotes that come on their own (a channel's 'emote' message, the sender's own answer).
+    it('merges emotes that come on their own once each, moving the emote seq only without a gap', () => {
+        const s = three();
+        let f = initialFeed({view: pv(s, pidOf(0), 1, {serverNow: T0, emoteSeq: 4})});
+        f = feedReducer(f, {type: 'emotes', emotes: [emote('e5', 5, T0 + 10)]});
+        expect(f.emotes.map((e) => e.id)).toEqual(['e5']);
+        expect(f.emoteSeq).toBe(5);
+        expect(isBehind(f)).toBe(false);
+        // The same again changes nothing.
+        expect(feedReducer(f, {type: 'emotes', emotes: [emote('e5', 5, T0 + 10)]})).toBe(f);
+        // One past a gap: kept and drawn, but the seq waits, and the gap reads the table once.
+        f = feedReducer(f, {type: 'emotes', emotes: [emote('e7', 7, T0 + 30)]});
+        expect(f.emotes.map((e) => e.id)).toEqual(['e5', 'e7']);
+        expect(f.emoteSeq).toBe(5);
+        expect(f.knownEmoteSeq).toBe(7);
+        expect(isBehind(f)).toBe(true);
+        // The missing one closes the gap.
+        f = feedReducer(f, {type: 'emotes', emotes: [emote('e6', 6, T0 + 20)]});
+        expect(f.emotes.map((e) => e.id)).toEqual(['e5', 'e6', 'e7']);
+        expect(f.emoteSeq).toBe(7);
+        expect(isBehind(f)).toBe(false);
+    });
+
+    it('counts an emote too old to show toward the seq, and ignores emotes before a join', () => {
+        const s = three();
+        let f = initialFeed({view: pv(s, pidOf(0), 1, {serverNow: T0, emoteSeq: 1})});
+        f = feedReducer(f, {type: 'emotes', emotes: [emote('old', 2, T0 - EMOTE_GRACE_MS - 1)]});
+        expect(f.emotes).toEqual([]);
+        expect(f.emoteSeq).toBe(2);
+        const visitor = initialFeed({preview: room(s, 1)});
+        expect(feedReducer(visitor, {type: 'emotes', emotes: [emote('x', 1, T0)]})).toBe(visitor);
+    });
 });
 
 describe('realtime messages', () => {
@@ -307,8 +340,8 @@ describe('realtime messages', () => {
     });
 
     it('carry the viewer\'s own part on only while no move of theirs is out', () => {
-        // Seat 1, the big blind, sets a pre-action; its own commit comes over the channel before the
-        // move's answer, and shows nothing of it.
+        // Seat 1, the big blind, sets a pre-action in a write the table sees (the clock moved in it
+        // too); that commit comes over the channel before the move's answer, and shows nothing of it.
         const s1 = deal(three());
         const waiting = play(s1, {type: 'pre', by: pidOf(1), pre: {kind: 'call-any'}, at: nowOf(s1)});
         let f = initialFeed({view: pv(s1, pidOf(1), 3)});
@@ -325,6 +358,29 @@ describe('realtime messages', () => {
         late = feedReducer(late, {type: 'view', view: pv(waiting, pidOf(1), 4), at: T0});
         expect([late.seq, late.privateSeq]).toEqual([5, 5]);
         expect(late.view!.me.pre).toEqual({kind: 'call-any'});
+    });
+
+    it('take the viewer\'s own pre-action from its answer at the seq held, and nothing from another answer there', () => {
+        // A pre-action is a write nobody else can see: it moves no seq (room-doc.publicSeq), and its
+        // answer comes back at the seq the page holds.
+        const s1 = deal(three());
+        const waiting = play(s1, {type: 'pre', by: pidOf(1), pre: {kind: 'call-any'}, at: nowOf(s1)});
+        const f = initialFeed({view: pv(s1, pidOf(1), 3)});
+        const set = feedReducer(f, {type: 'view', view: pv(waiting, pidOf(1), 3), at: T0, pre: true});
+        expect(set.view!.me.pre).toEqual({kind: 'call-any'});
+        expect(set.view!.seats).toBe(f.view!.seats);
+        expect([set.seq, set.privateSeq, set.knownSeq]).toEqual([3, 3, 3]);
+        // Any other answer at that seq brings nothing of the viewer\'s own part, so an answer to another
+        // move of theirs that the server took first never takes the pre-action away.
+        expect(feedReducer(f, {type: 'view', view: pv(waiting, pidOf(1), 3), at: T0}).view).toBe(f.view);
+        expect(feedReducer(set, {type: 'view', view: pv(s1, pidOf(1), 3), at: T0}).view!.me.pre).toEqual({kind: 'call-any'});
+        // The same answer again (a retried request): nothing moves. Cleared: its answer clears it.
+        expect(feedReducer(set, {type: 'view', view: pv(waiting, pidOf(1), 3), at: T0, pre: true}).view).toBe(set.view);
+        expect(feedReducer(set, {type: 'view', view: pv(s1, pidOf(1), 3), at: T0, pre: true}).view!.me.pre).toBeNull();
+        // An answer older than the table held is still read by the usual rules.
+        const raised = moves(waiting, R(60));
+        const ahead = feedReducer(f, {type: 'view', view: pv(raised, pidOf(1), 4), at: T0});
+        expect(feedReducer(ahead, {type: 'view', view: pv(waiting, pidOf(1), 3), at: T0, pre: true}).view).toBe(ahead.view);
     });
 
     it('name the host from the message', () => {

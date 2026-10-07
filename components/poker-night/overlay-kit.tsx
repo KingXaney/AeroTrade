@@ -11,8 +11,8 @@ import {X} from "lucide-react";
 import {Sheet, SheetContent} from "@/components/primitives/Sheet";
 import SectionHeading from "@/components/primitives/SectionHeading";
 import {iconButton} from "@/components/primitives/iconButton";
-import {AVATAR_COPY, JOIN_COPY, OVERLAY_COPY} from "@/lib/learn/copy/poker-night";
-import {badgeGlyph, faceGlyph, resolveAvatar} from "@/lib/poker-night/avatar";
+import AvatarDisc from "@/components/poker-night/AvatarDisc";
+import {OVERLAY_COPY} from "@/lib/learn/copy/poker-night";
 import {cn} from "@/lib/utils";
 
 // ── browser facts ──
@@ -54,19 +54,13 @@ export const PlayerName = ({name, className}: {name: string; className?: string}
     <bdi data-user-text="" className={cn('min-w-0 truncate', className)}>{name}</bdi>
 );
 
-// A player's look, small: the face and its badge (the colours and frames are P5's).
-export const MiniAvatar = ({avatar, size = 'sm'}: {avatar: string | null; size?: 'sm' | 'md' | 'lg'}) => {
-    const spec = resolveAvatar(avatar);
-    const badge = badgeGlyph(spec.badge);
-    return (
-        <span role="img" aria-label={JOIN_COPY.lookLabel(AVATAR_COPY.faces[spec.face])} data-avatar={avatar ?? ''}
-              className={cn('relative inline-flex shrink-0 items-center justify-center rounded-full bg-surface-3 ring-1 ring-line-strong/40',
-                  size === 'lg' ? 'size-16 text-4xl' : size === 'md' ? 'size-10 text-2xl' : 'size-8 text-lg')}>
-            <span aria-hidden="true">{faceGlyph(spec.face)}</span>
-            {badge && <span aria-hidden="true" className={cn('absolute -right-1 -top-1', size === 'lg' ? 'text-lg' : 'text-[10px]')}>{badge}</span>}
-        </span>
-    );
-};
+// A player's look, small: the face on its colour, in its frame, with its badge (AvatarDisc, at a
+// size of its own, since a drawer is portaled out of the room that sets one).
+const MINI_SIZE = {sm: 32, md: 40, lg: 64} as const;
+
+export const MiniAvatar = ({avatar, size = 'sm', label}: {avatar: string | null; size?: keyof typeof MINI_SIZE; label?: string}) => (
+    <AvatarDisc avatar={avatar} size={MINI_SIZE[size]} label={label} className="shrink-0"/>
+);
 
 // ── closing for the viewer's turn ──
 

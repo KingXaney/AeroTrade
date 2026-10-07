@@ -14,7 +14,9 @@ import type {PokerNightErrorCode} from "@/lib/poker-night/http";
 import type {ActionInput, JoinBody as JoinInputBody} from "@/lib/poker-night/input";
 import type {FeedMode, RoomEvent, Transport} from "@/lib/poker-night/feed";
 import type {GameConfig} from "@/lib/poker-night/types";
-import type {DetailView, JoinView, MeView, PlayerView, RoomView} from "@/lib/poker-night/view-types";
+import type {DetailView, EmoteView, JoinView, MeView, PlayerView, RoomView} from "@/lib/poker-night/view-types";
+import type {EmoteInput} from "@/lib/poker-night/emotes";
+import {DEFAULT_PERSONAL_LOOK, type PersonalLook} from "@/lib/poker-night/personal";
 
 // An action as a component asks for it: the room adds the actionId (one per intent, reused on the
 // one retry a busy table gets).
@@ -32,24 +34,26 @@ export type JoinResult =
     | {ok: true; view: PlayerView; outcome: JoinOutcome; renamed: string | null}
     | {ok: false; code: PokerNightErrorCode; message: string};
 
+// How an emote went (P6): sent, or refused with the code and its sentence.
+export type EmoteResult = {ok: true} | {ok: false; code: PokerNightErrorCode; message: string};
+
 export type DetailPart = DetailView['part'];
 export type DetailOptions = {hand?: number | null; before?: number | null};
 
-// What each player picks for their own eyes only, kept in this browser (P3 has the defaults; the
-// look drawer and its registries come in P5).
-export type PersonalLook = {
-    cardBack: string;
-    fourColour: boolean;
-    sound: boolean;
-    muteEmotes: boolean;
-    shortcuts: boolean; // the table's single-key shortcuts (F, C, R, A); a player can turn them off
-};
-
-export const DEFAULT_PERSONAL: Readonly<PersonalLook> = Object.freeze({cardBack: 'classic-red', fourColour: false, sound: true, muteEmotes: false, shortcuts: true});
+// What each player picks for their own eyes only (card back and face, suits, chips, sound, buzz,
+// screen wake, shortcuts, hand hints, muted emotes): lib/poker-night/personal, kept in this browser
+// and laid over an account's saved look. `room.personal` is always whole.
+export type {PersonalLook};
+export const DEFAULT_PERSONAL: Readonly<PersonalLook> = DEFAULT_PERSONAL_LOOK;
 
 // The name and look the join card starts from: the account's saved ones, else what this browser
 // kept, else a look rolled for this visit.
 export type Profile = {name: string; avatar: string};
+
+// A seated player's new name and look while a hand is being played (My look's draft): kept by the
+// room while the drawer is shut, and — once the player pressed Save (queued) — sent with the room's
+// 'profile' action by itself as soon as the hand ends.
+export type ProfileDraft = Profile & {queued: boolean};
 
 export type RoomController = {
     // The viewer's own view once they have joined (to play or to watch); null before.
@@ -71,6 +75,9 @@ export type RoomController = {
     // Something the table cannot carry on through ('reload' after a deploy); null otherwise.
     problem: {code: PokerNightErrorCode; message: string} | null;
     events: RoomEvent[]; // animation events, newest last, each with a stable id
+    // The latest emotes (P6), once each, never from before the page loaded; and the way to send one.
+    emotes: EmoteView[];
+    sendEmote: (input: EmoteInput) => Promise<EmoteResult>;
     send: (body: ActionBody) => Promise<SendResult>;
     join: (body: JoinBody) => Promise<JoinResult>;
     detail: (part: DetailPart, opts?: DetailOptions) => Promise<DetailView | null>;
@@ -78,6 +85,8 @@ export type RoomController = {
     setPersonal: (patch: Partial<PersonalLook>) => void;
     profile: Profile;
     setProfile: (patch: Partial<Profile>) => void;
+    profileDraft: ProfileDraft | null;
+    setProfileDraft: (draft: ProfileDraft | null) => void;
     shareUrl: string;
     code: string;
     invite: boolean; // the host just started the table (?invite=1): the invite sheet opens first

@@ -7,10 +7,12 @@
 // it. Checked: the gates (protocol, identity, origin, body), guests who are never better-auth users,
 // a returning join, a hand played to a showdown whose winners are worked out again here from the
 // stored holes, nothing private in any response on any street, an all-in run-out dealt by ticks
-// alone 1.5 s a street, a timeout that waits out the slack, a repeated action id, a seat race, a
+// alone 1.5 s a street, a pre-action written without moving the public seq (the player on the clock
+// polls Unchanged), a timeout that waits out the slack, a repeated action id, a seat race, a
 // double-tapped and a retried join that make one guest, a rebuy, a removal and its "let back in", a
 // state a newer deploy wrote answered reload on every route, the env on every room, index and
-// counter, an unknown code costing a miss on every route, a seated player's bucket no one on their
+// counter, an unknown code costing a miss on every route, joins a locked table turns down spending
+// their addresses' join counters and never the room's, a seated player's bucket no one on their
 // address can drain, the in-memory limit on a burst of polls, and the copy behind every code the API
 // answered with.
 //
@@ -31,7 +33,8 @@
 // the banner never cover a name, a stack or the line under the board; the top bar says a pause or
 // the night's end waits for the hand in play; keys stay out of the top bar and Enter on a button is
 // the button's; a dialog the turn closes hands the focus to the action bar; an unknown code is a
-// real 404; the host ends the night and every context sees the summary. The no-advice list runs over every screen, and screenshots at 1440 and 390 px land in
+// real 404, spending the address's miss counter, and an address past it gets a 404 for the live
+// table too; the host ends the night and every context sees the summary. The no-advice list runs over every screen, and screenshots at 1440 and 390 px land in
 // scripts/qa/output/poker-night/ui-*.png.
 //
 // Realtime over a fake relay (P4). The harness has no Ably key, so GET token answers
@@ -45,6 +48,41 @@
 // identity, the people or the viewer's own part, or passes the size budget. The relay then stops
 // mid-hand: the watchdog brings the polls back within its 3 s and the page keeps up. No page in any
 // context opens a request or a socket to an Ably host.
+// Emotes (P6). Through the API: a seated player's reaction answered with the emote as stored, a
+// second inside the 1.2 s cooldown 429 with nothing written, a throw counted for the night summary
+// (awards thrown and received) while the game's seq stays put, a poll from before them bringing
+// both, a watcher refused (409), a throw at oneself or a watcher refused (422), free text refused
+// (400), and with the host's throwables off a throw 403 while a phrase still goes. In the browser:
+// a reaction on one screen shows on another within its next poll, with a pop on that screen (its
+// 600 Hz tone started), a tomato lands on its target's plate ([data-splat]) and in the counts,
+// the reduced-motion screen draws the impact and never the flight, and a player muted from a
+// plate's menu stays off that screen while their own shows it, and a third player's does not. Then
+// "?" lists every key; the host's throwables switch takes the picker's Throw tab away and a throw
+// posted from a page's own cookie is 403; two emotes from it inside 1.2 s, 429. One more hand, on
+// a turn that is neither A's nor B's: A's reaction over A's seat (under it for a seat along the
+// top) on three other screens within a hand's poll, never behind the top bar, a phrase in its
+// words, a tomato flying on the host's screen with its arc's peak under the top bar and landing on
+// B's avatar on three screens, B's name and stack left clear (only the impact under reduced
+// motion), "Mute emotes" keeping A's next one off B's screen, A's own card back drawn mid-hand,
+// Peek turning A's cards face down until pressed, and B's new look saved mid-hand waiting for the
+// hand's end (kept while the drawer is shut), then on the table by itself; at the hand's end a club
+// or a diamond in A's four colours; every Web Audio start counted by an init script — A's screen
+// plays tones and noise over the hand, B's, with its sound off, none — every tab of the picker on
+// the no-advice list; and a phone driven by taps alone wakes its audio inside the gesture.
+// The looks (P5): paused after hand 1, A's card back and four-colour deck change A's cards (the
+// colours LOOKS_CSS gives them, read off a drawn back and suit) and never B's, without a request,
+// and survive a reload; A's avatar from the builder reaches every screen's seat within 5 s; the
+// host's Look section sends seven scenes and a felt to three tables within 5 s each, kept for the
+// host's next tables, and every open seat is filled with the felt. At hand 2's first turn a brutalist visitor's felt stays a stadium while its
+// plate pulse and the scene's twinkle stop by name, and A's emulated reduced motion stops the
+// twinkle and keeps the hand's chip flights still. After the night, the lobby's My look saves a
+// name, the builder's avatar, a card back and the tables' scene, mirrored into the browser with
+// none of its own look left over the account's, and the next Quick start opens with them from the
+// account alone.
+// The night's awards (P7): once the host ends the night, the summary's awards are the ones
+// lib/poker-night/awards works out again from the stored ledger and throws (Tomato magnet exactly
+// when a tomato landed), the same on a guest's phone; Copy summary adds a line per award; the
+// celebration plays at 1440 px, stands still under reduced motion and never widens the phone's page.
 // Run: npm run qa -- poker-night   (the harness: README.md)
 import {chromium} from 'playwright';
 import {PNG} from 'pngjs';
@@ -66,13 +104,22 @@ const {snapshotFromView} = await lib('lib/poker-night/views.ts');
 const {conservation} = await lib('lib/poker-night/ledger.ts');
 const {DEFAULT_CONFIG, ENTRY_FLAGS, ENTRY_KINDS, LEDGER_KINDS, STATE_VERSION, TIMING} = await lib('lib/poker-night/config.ts');
 const {PN_PROTOCOL} = await lib('lib/poker-night/http.ts');
+const {RATE_LIMITS} = await lib('lib/poker-night/limits.ts');
+const {CODE_ALPHABET} = await lib('lib/poker-night/code.ts');
 const {guestCookieName} = await lib('lib/poker-night/guest-token.ts');
 const {faceNameOf} = await lib('lib/poker-night/room.ts');
 const {evaluateCards} = await lib('lib/poker/evaluator.ts');
 const {cardLabel} = await lib('lib/poker/cards.ts');
 const {bestFive, describeHand} = await lib('lib/poker-night/hand-name.ts');
 const {isAvatar} = await lib('lib/poker-night/avatar.ts');
-const {POKER_NIGHT_ERRORS, JOIN_COPY, BANK_COPY, HAND_COPY, HOST_COPY, TABLE_COPY} = await lib('lib/learn/copy/poker-night.ts');
+const {
+    POKER_NIGHT_ERRORS, JOIN_COPY, BANK_COPY, HAND_COPY, HOST_COPY, SUMMARY_COPY, TABLE_COPY, EMOTE_COPY, LOBBY_COPY, SHORTCUTS_COPY, LOOKS_COPY,
+} = await lib('lib/learn/copy/poker-night.ts');
+const {nightAwards, throwCountsOf} = await lib('lib/poker-night/awards.ts');
+const {CARD_BACKS, FELTS, SCENES, SUIT_COLOURS} = await lib('lib/poker-night/looks.ts');
+const {SOUNDS} = await lib('lib/poker-night/sounds.ts');
+const {ME_STORAGE_KEY} = await lib('lib/poker-night/personal.ts');
+const {SHORTCUTS} = await lib('lib/poker-night/keys.ts');
 const {findBanned} = await lib('lib/learn/banned.ts');
 const {migrateState} = await lib('lib/poker-night/migrate.ts');
 const {coreFromDoc, serverRoomFromDoc, wireOfRoom} = await lib('lib/poker-night/room-doc.ts');
@@ -151,6 +198,9 @@ let rooms;
 let code;
 let roomId;
 const roomDoc = (filter = {}) => rooms.findOne({env: ENV, code, ...filter});
+// The seq every answer carries (room-doc.publicSeq): the compare-and-set's, less the writes only
+// their author could see (a pre-action).
+const pubSeq = (doc) => doc.seq - (doc.hiddenCommits ?? 0);
 // Every edit moves seq on, as a commit would, so the next write's compare-and-set sees it.
 const editRoom = (set) => rooms.updateOne({env: ENV, code}, {$set: set, $inc: {seq: 1}});
 
@@ -500,6 +550,27 @@ try {
             && after.applied.length === before.applied.length + 1);
         view = again.body;
     }
+    {
+        // A pre-action shows to nobody but its owner: its write moves the compare-and-set's seq and
+        // hiddenCommits together, so the public seq every answer carries stays put — the player on
+        // the clock cannot tell from it that anyone chose one — and their poll from it is Unchanged.
+        const actor = ownerOf(view, view.hand.actor);
+        const quiet = [host, A, B].find((p) => p !== actor && p.seat !== null && view.seats[p.seat]?.state === 'in-hand');
+        const before = await roomDoc();
+        const set = await action(quiet, {type: 'pre', pre: {kind: 'check-fold'}});
+        const mid = await roomDoc();
+        const polled = await getState(actor, {query: `?since=${pubSeq(before)}&esince=${before.emoteSeq ?? 0}`});
+        const cleared = await action(quiet, {type: 'pre', pre: null});
+        const after = await roomDoc();
+        check(`a pre-action ${quiet?.name} sets while ${actor?.name} is on the clock: written (seq ${before.seq} → ${mid.seq}), the public seq unmoved, only the setter's answer carrying it, and ${actor?.name}'s poll Unchanged`,
+            set.status === 200 && set.body?.me?.pre?.kind === 'check-fold' && set.body.seq === pubSeq(before)
+            && mid.seq === before.seq + 1 && pubSeq(mid) === pubSeq(before) && mid.applied.length === before.applied.length + 1
+            && polled.status === 200 && polled.body?.unchanged === true && polled.body.seq === pubSeq(before),
+            `${set.status} pre ${JSON.stringify(set.body?.me?.pre)} seq ${set.body?.seq}/${pubSeq(before)} | doc ${before.seq}→${mid.seq} hidden ${mid.hiddenCommits} | poll ${polled.text.slice(0, 80)}`);
+        check('…and cleared again the same way: a second write, still nothing for anyone else',
+            cleared.status === 200 && cleared.body?.me?.pre === null && cleared.body.seq === pubSeq(before) && after.seq === before.seq + 2 && pubSeq(after) === pubSeq(before),
+            `${cleared.status} ${JSON.stringify(cleared.body?.me?.pre)} seq ${cleared.body?.seq} doc ${after.seq} hidden ${after.hiddenCommits}`);
+    }
     const peopleBefore = (await roomDoc()).peopleV;
     view = await playHand(view, checkOrCall);
     let doc = await roomDoc();
@@ -707,6 +778,46 @@ try {
     check('every guest is still no better-auth user', await db.collection('user').countDocuments() === userCount
         && await db.collection('session').countDocuments() === sessionCount);
 
+    // --- emotes (P6): seated players only, throwables as the host sets them, a 1.2 s cooldown -----------
+    {
+        doc = await roomDoc();
+        const seq0 = doc.seq;
+        const e0 = doc.emoteSeq ?? 0;
+        r = await post(A, 'emote', {kind: 'react', item: 'laugh'});
+        check('a seated guest reacts: answered with the emote as stored, its seq the room\'s next', r.status === 200 && r.body?.ok === true
+            && r.body.emote?.kind === 'react' && r.body.emote.item === 'laugh' && r.body.emote.from === A.pid && r.body.emoteSeq === e0 + 1 && r.body.emote.seq === e0 + 1,
+            `${r.status} ${r.text.slice(0, 160)}`);
+        r = await post(A, 'emote', {kind: 'say', item: 'gg'});
+        check('a second one inside the 1.2 s cooldown: 429 rate_limited, nothing written', r.status === 429 && r.body?.error === 'rate_limited'
+            && (await roomDoc()).emoteSeq === e0 + 1, `${r.status} ${r.text.slice(0, 120)}`);
+        r = await post(B, 'emote', {kind: 'throw', item: 'tomato', to: A.pid});
+        doc = await roomDoc();
+        check('B throws a tomato at A: counted for the night summary, thrown by B and received by A', r.status === 200 && r.body?.emote?.to === A.pid
+            && doc.awards?.[B.pid]?.thrown?.tomato === 1 && doc.awards?.[A.pid]?.received?.tomato === 1 && doc.emoteSeq === e0 + 2,
+            `${r.status} ${JSON.stringify(doc.awards ?? null)}`);
+        check('…out of band: the game\'s seq never moved, the cooldown stamps kept off every answer', doc.seq === seq0 && typeof doc.emoteAt?.[A.pid] === 'number'
+            && !r.text.includes('emoteAt') && !r.text.includes('awards'));
+        r = await getState(B, {query: `?since=${pubSeq(doc)}&esince=${e0}`});
+        check('a poll from before them brings both, in order', r.status === 200 && r.body?.unchanged === true
+            && r.body.emotes.map((e) => `${e.seq}:${e.kind}`).join(',') === `${e0 + 1}:react,${e0 + 2}:throw`, `${r.status} ${r.text.slice(0, 200)}`);
+        r = await post(F, 'emote', {kind: 'react', item: 'clap'});
+        check('a watcher sends none: 409 not_seated', r.status === 409 && r.body?.error === 'not_seated', `${r.status}`);
+        r = await post(C, 'emote', {kind: 'throw', item: 'egg', to: C.pid});
+        check('…nobody throws at themselves: 422', r.status === 422 && r.body?.error === 'invalid_action', `${r.status}`);
+        r = await post(C, 'emote', {kind: 'throw', item: 'egg', to: F.pid});
+        check('…or at a watcher: 422', r.status === 422 && r.body?.error === 'invalid_action', `${r.status}`);
+        r = await post(C, 'emote', {kind: 'say', item: 'Free text here'});
+        check('…and free text is no emote: 400', r.status === 400 && r.body?.error === 'bad_request', `${r.status}`);
+        r = await hostOp(host, {op: 'settings', patch: {throwables: false}});
+        check('the host turns throwables off', r.status === 200 && r.body?.settings?.throwables === false, `${r.status}`);
+        r = await post(C, 'emote', {kind: 'throw', item: 'egg', to: A.pid});
+        check('…and a throw is 403 forbidden', r.status === 403 && r.body?.error === 'forbidden', `${r.status} ${r.text.slice(0, 120)}`);
+        r = await post(C, 'emote', {kind: 'say', item: 'good-luck'});
+        check('…while a phrase still goes', r.status === 200 && r.body?.emote?.kind === 'say' && (await roomDoc()).emoteSeq === e0 + 3, `${r.status}`);
+        r = await hostOp(host, {op: 'settings', patch: {throwables: true}});
+        check('…and back on', r.status === 200 && r.body?.settings?.throwables === true);
+    }
+
     // --- history, the log, the bank ---------------------------------------------------------------------
     r = await call(A, 'GET', 'detail', {query: '?part=history'});
     check('history: the three hands, newest first, a hole only where shown or A\'s own', r.status === 200 && r.body?.hands?.map((h) => h.no).join(',') === '3,2,1',
@@ -774,6 +885,29 @@ try {
             `${mine.status} ${mine.text.slice(0, 80)}`);
         check('…though the address\'s own bucket is still empty', more.some((q) => q.status === 429), more.map((q) => q.status).join(','));
     }
+    {
+        // The room's join counter counts rows joins made, so joins a locked table turns down — from
+        // as many addresses as anyone likes — never use it up to keep friends out; each still spends
+        // its own address's.
+        const roomJoins = async () => (await limits.findOne({key: `poker-night:${ENV}:join:room:${roomId}`}))?.count ?? 0;
+        const ipJoins = async (ip) => (await limits.findOne({key: `poker-night:${ENV}:join:ip:${ip}`}))?.count ?? 0;
+        r = await hostOp(host, {op: 'settings', patch: {locked: true}});
+        const locked = r.status === 200 && r.body?.settings?.locked === true;
+        const counted = await roomJoins();
+        const refused = [];
+        for (const ip of ['10.5.5.1', '10.5.5.2', '10.5.5.3']) {
+            const knocker = await newPlayer(`knocker ${ip}`);
+            refused.push(await join(knocker, {name: '', avatar: AVATARS.F, as: 'watcher'}, {headers: {'x-forwarded-for': ip}}));
+        }
+        await sleep(500);
+        const roomAfter = await roomJoins();
+        const ipsAfter = await Promise.all(['10.5.5.1', '10.5.5.2', '10.5.5.3'].map(ipJoins));
+        r = await hostOp(host, {op: 'settings', patch: {locked: false}});
+        check('joins a locked table turns down spend each address\'s join counter and never the room\'s',
+            locked && refused.every((q) => q.status === 403 && q.body?.error === 'locked') && counted > 0 && roomAfter === counted && ipsAfter.every((n) => n === 1)
+            && r.status === 200 && r.body?.settings?.locked === false,
+            `${locked} ${refused.map((q) => `${q.status} ${q.body?.error}`).join(', ')}; room ${counted} → ${roomAfter}; addresses ${ipsAfter.join(',')}`);
+    }
     const keys = (await limits.find({key: /^poker-night:/}).toArray()).map((k) => k.key);
     check('every poker night counter is keyed by the env: joins per address and room, misses per address',
         keys.length > 0 && keys.every((k) => k.startsWith(`poker-night:${ENV}:`)) && keys.some((k) => k.includes(':join:ip:'))
@@ -785,7 +919,7 @@ try {
 
     // --- a burst of polls: the in-memory bucket, no Mongo writes -------------------------------------------
     {
-        const seq = (await roomDoc()).seq;
+        const seq = pubSeq(await roomDoc());
         await getState(A, {usePass: false}); // a fresh pass: the bucket is the player's own
         // The player's bucket full again (15, refilling 3 a second) whatever the steps before spent: on a
         // fast server they run close enough together to leave it short.
@@ -829,7 +963,7 @@ try {
         }
         const ledger = doc.state.ledger.find((l) => l.pid === host.pid);
         check('the host\'s result row: closed, its net the ledger\'s', hostRow?.closed === true && hostRow.net === ledger.cashedOut - ledger.bought
-            && hostRow.hands === ledger.hands && hostRow.seq === doc.seq, JSON.stringify(hostRow && {net: hostRow.net, hands: hostRow.hands, seq: hostRow.seq}));
+            && hostRow.hands === ledger.hands && hostRow.seq === pubSeq(doc), JSON.stringify(hostRow && {net: hostRow.net, hands: hostRow.hands, seq: hostRow.seq}));
         check('…the only result row: guests have none', await results.countDocuments({roomId}) === 1);
         check('three hands in history, under the env', await db.collection('pokerhands').countDocuments({roomId, env: ENV}) === 3);
     }
@@ -880,6 +1014,85 @@ const ANIM_PROBE = () => {
             else r.addedNodes.forEach(record);
         }
     }).observe(document, {subtree: true, childList: true, attributes: true, attributeFilter: ['data-anim']});
+};
+
+// Every Web Audio source a page starts, by kind (window.__pnAudio): the table's tones are
+// oscillators, its swishes and splats slices of a noise buffer (components/poker-night/sound-player).
+// An init script, so it counts from the page's first sound; the real start runs after the count.
+// OscillatorNode inherits start from AudioScheduledSourceNode, looked up at each call (a later patch
+// of that prototype still sees it); AudioBufferSourceNode has its own.
+const AUDIO_PROBE = () => {
+    const counts = {osc: 0, buffer: 0};
+    window.__pnAudio = counts;
+    if (window.OscillatorNode && window.AudioScheduledSourceNode) {
+        Object.defineProperty(OscillatorNode.prototype, 'start', {
+            configurable: true, writable: true,
+            value(...args) {
+                counts.osc++;
+                return AudioScheduledSourceNode.prototype.start.apply(this, args);
+            },
+        });
+    }
+    if (window.AudioBufferSourceNode) {
+        const start = AudioBufferSourceNode.prototype.start;
+        Object.defineProperty(AudioBufferSourceNode.prototype, 'start', {
+            configurable: true, writable: true,
+            value(...args) {
+                counts.buffer++;
+                return start.apply(this, args);
+            },
+        });
+    }
+};
+
+// Every AudioContext a page makes (window.__pnContexts) and every make or resume of one, with
+// whether the page had a user's activation at that moment (window.__pnAudioLog) — so a test can
+// tell a context woken inside a real gesture from one made on a touch's pointerdown, which is no
+// gesture to a browser (and which iOS never lets start).
+const AUDIO_GESTURE_PROBE = () => {
+    const made = [];
+    const log = [];
+    window.__pnContexts = made;
+    window.__pnAudioLog = log;
+    const Base = window.AudioContext;
+    if (!Base) return;
+    const active = () => (navigator.userActivation ? navigator.userActivation.isActive : null);
+    window.AudioContext = class extends Base {
+        constructor(...args) {
+            super(...args);
+            made.push(this);
+            log.push({op: 'make', active: active(), state: this.state});
+        }
+    };
+    const resume = Base.prototype.resume;
+    Base.prototype.resume = function (...args) {
+        log.push({op: 'resume', active: active(), state: this.state});
+        return resume.apply(this, args);
+    };
+};
+
+// The pitch every oscillator a page starts begins at (window.__pnTones): the table's recipes start
+// each tone with frequency.setValueAtTime (lib/poker-night/sounds), so a pop is a 600 Hz start.
+const TONE_PROBE = () => {
+    window.__pnTones = [];
+    const proto = window.BaseAudioContext?.prototype;
+    if (!proto || proto.__pnTones) return;
+    const make = proto.createOscillator;
+    proto.createOscillator = function (...args) {
+        const osc = make.apply(this, args);
+        const set = osc.frequency.setValueAtTime.bind(osc.frequency);
+        osc.frequency.setValueAtTime = (value, at) => {
+            osc.__pnHz ??= value;
+            return set(value, at);
+        };
+        const start = osc.start.bind(osc);
+        osc.start = (...a) => {
+            window.__pnTones.push(osc.__pnHz ?? null);
+            return start(...a);
+        };
+        return osc;
+    };
+    proto.__pnTones = true;
 };
 
 // The realtime page's channel: window.__PN_RT_FAKE__ as components/poker-night/realtime-client takes
@@ -1037,6 +1250,45 @@ const coverage = (page) => page.evaluate(() => {
     return {shown: shown.length, notes, covered};
 });
 
+// The winner's banner and the line under it (the countdown, the pause) as drawn, against everything
+// they must never cover (lib/poker-night/stage.bannerPlan): every seat's plate or open seat's ring and
+// its status flag, every turned-up hand and each of its cards as lifted, the dealer button and every
+// board card as lifted (the five that play rise). Also how many turned-up hands sit at a side seat,
+// so a run proves the crowded case, and the banner's variant.
+const bannerClear = (page) => page.evaluate(() => {
+    const hit = (a, b) => a.left < b.right - 0.5 && b.left < a.right - 0.5 && a.top < b.bottom - 0.5 && b.top < a.bottom - 0.5;
+    const rect = (el) => el.getBoundingClientRect();
+    const seatOf = (el) => el.closest('[data-seat]')?.getAttribute('data-seat') ?? '?';
+    const avoid = [
+        ...[...document.querySelectorAll('[data-seat] :is(.pn-plate, .pn-open-seat)')].map((el) => ({what: `seat ${seatOf(el)}'s ${el.classList.contains('pn-plate') ? 'plate' : 'open seat'}`, r: rect(el)})),
+        ...[...document.querySelectorAll('[data-seat] .pn-plate-flag')].map((el) => ({what: `seat ${seatOf(el)}'s flag`, r: rect(el)})),
+        ...[...document.querySelectorAll('[data-seat] .pn-seat-shown, [data-seat] .pn-seat-shown .pn-card-inner')].map((el) => ({what: `seat ${seatOf(el)}'s shown hand`, r: rect(el)})),
+        ...[...document.querySelectorAll('[data-pn-dealer]')].map((el) => ({what: 'the dealer button', r: rect(el)})),
+        ...[...document.querySelectorAll('[data-pn-board] .pn-card, [data-pn-board] .pn-card-inner')].map((el) => ({
+            what: `the board's ${el.closest('.pn-card')?.getAttribute('data-card')}${el.closest('.pn-card')?.getAttribute('data-state') === 'win' ? ' (lit)' : ''}`, r: rect(el),
+        })),
+    ].filter((o) => o.r.width > 0 && o.r.height > 0);
+    const pieces = [
+        ...[...document.querySelectorAll('[data-pn-banner]')].map((el) => ({what: 'the banner', r: rect(el)})),
+        ...[...document.querySelectorAll('[data-pn-banner-place="note"] > *')].map((el) => ({what: `the line "${el.textContent}"`, r: rect(el)})),
+    ];
+    const table = document.querySelector('.pn-table')?.getBoundingClientRect();
+    const covered = [];
+    for (const p of pieces) {
+        for (const o of avoid) if (hit(p.r, o.r)) covered.push(`${p.what} over ${o.what}`);
+        if (table && (p.r.left < table.left - 0.5 || p.r.right > table.right + 0.5 || p.r.top < table.top - 0.5 || p.r.bottom > table.bottom + 0.5)) covered.push(`${p.what} off the table`);
+    }
+    return {
+        banner: pieces.filter((p) => p.what === 'the banner').length,
+        lines: pieces.length - pieces.filter((p) => p.what === 'the banner').length,
+        variant: document.querySelector('[data-pn-banner]')?.getAttribute('data-variant') ?? null,
+        sideShown: document.querySelectorAll('[data-seat]:is([data-side="left"], [data-side="right"]) .pn-seat-shown').length,
+        shown: document.querySelectorAll('[data-seat] .pn-seat-shown').length,
+        dealer: document.querySelectorAll('[data-pn-dealer]').length,
+        covered,
+    };
+});
+
 // A fold on the viewer's own cards, caught where the card has turned past its edge: the animations
 // paused the moment the fold's class lands, then sought to 30 % of the way (the turn ends at 35 %,
 // before any fade). Set up before the click; settles to how many animations it caught.
@@ -1115,6 +1367,73 @@ const flightOf = (html) => {
 const pairsIn = (text) => [...text.matchAll(/(?:"(\w+)":)?\[(\d{1,2}),(\d{1,2})\]/g)]
     .filter((m) => !NOT_CARDS.has(m[1]))
     .map((m) => [Number(m[2]), Number(m[3])]);
+
+// ── the looks (P5) ──
+// "#1f4d2b" as getComputedStyle prints a colour.
+const rgbOf = (hex) => {
+    const n = parseInt(hex.slice(1), 16);
+    return `rgb(${(n >> 16) & 255}, ${(n >> 8) & 255}, ${n & 255})`;
+};
+// A page's room as the looks draw it: the ids on the room (the host's scene and felt, the viewer's
+// card back and suit colours), the scene layer and the felt drawn, the custom properties LOOKS_CSS
+// gives the room, and the colours a drawn card back and a club or diamond actually got.
+const roomLook = (page) => page.evaluate(() => {
+    const room = document.querySelector('.pn-room');
+    if (!room) return null;
+    const vars = getComputedStyle(room);
+    const back = room.querySelector('.pn-card-back');
+    const suited = (s) => {
+        const face = room.querySelector(`.pn-card[data-suit="${s}"] .pn-card-face:not(.pn-card-back)`);
+        return face ? getComputedStyle(face).color : null;
+    };
+    return {
+        scene: room.getAttribute('data-pn-scene'), felt: room.getAttribute('data-pn-felt'),
+        back: room.getAttribute('data-pn-back'), colours: room.getAttribute('data-pn-colours'),
+        layer: room.querySelector('[data-pn-scene-layer]')?.getAttribute('data-pn-scene-layer') ?? null,
+        cloth: room.querySelector('[data-pn-felt-layer]')?.getAttribute('data-pn-felt') ?? null,
+        backBase: vars.getPropertyValue('--pn-back-base').trim(), suitC: vars.getPropertyValue('--pn-suit-c').trim(),
+        drawnBack: back ? getComputedStyle(back).backgroundColor : null, club: suited('c'), diamond: suited('d'),
+    };
+});
+// Waits until every page's room passes ok(roomLook); the ms each took, null for one that never did.
+const lookOnAll = (pages, ok, timeout = 5000) => Promise.all(pages.map(async (page) => {
+    const t0 = Date.now();
+    while (Date.now() - t0 < timeout + 2000) {
+        const look = await roomLook(page).catch(() => null);
+        if (look && ok(look)) return Date.now() - t0;
+        await sleep(100);
+    }
+    return null;
+}));
+// What moves on a page: the style, the felt's corner, and the animation each loop runs — the plate
+// on the clock (.pn-pulse) and the scene's ambient parts (.pn-ambient).
+const motionOf = (page) => page.evaluate(() => {
+    const names = (sel) => [...document.querySelectorAll(sel)].map((el) => getComputedStyle(el).animationName);
+    const felt = document.querySelector('.pn-felt');
+    return {
+        style: document.documentElement.dataset.style ?? null,
+        feltRadius: felt ? parseFloat(getComputedStyle(felt).borderTopLeftRadius) : null,
+        pulses: names('.pn-pulse'),
+        ambient: names('.pn-scene .pn-ambient'),
+    };
+});
+// Whether the element `sel` is over seat `seat`'s plate on a page: its centre within the plate's
+// width and above the plate's middle, at most 150 px above its top (a reaction rises 60 px).
+// Whether an emote sits by a seat's plate: over it, or — data-below, a seat along the top or too
+// near it — under it; never behind the top bar.
+const overSeat = (page, sel, seat) => page.evaluate(({s, n}) => {
+    const el = document.querySelector(s);
+    const plate = document.querySelector(`[data-seat="${n}"] .pn-plate`);
+    const bar = document.querySelector('[data-pn-topbar]');
+    if (!el || !plate || !bar) return false;
+    const e = el.getBoundingClientRect();
+    const p = plate.getBoundingClientRect();
+    const cx = e.left + e.width / 2;
+    const cy = e.top + e.height / 2;
+    const beside = cx >= p.left - 8 && cx <= p.right + 8;
+    const near = el.hasAttribute('data-below') ? cy >= p.top + p.height / 2 && cy <= p.bottom + 170 : cy <= p.top + p.height / 2 && cy >= p.top - 170;
+    return beside && near && e.top >= bar.getBoundingClientRect().bottom - 1;
+}, {s: sel, n: seat});
 
 let handWatcher = null;
 // The fake relay's state while it runs (the realtime pass), so the end of the run can stop its loop.
@@ -1401,9 +1720,42 @@ const tableInBrowser = async () => {
     const missingText = await V.page.innerText('body').catch(() => '');
     check('an unknown code shows the not-found copy, answered 404 (not a streamed 200)', missingText.includes(TABLE_COPY.notFound) && missing?.status() === 404,
         `${missing?.status()} ${missingText.slice(0, 120)}`);
+    {
+        // The page pays for a guess as the routes do: every unknown code spends the address's miss
+        // counter, and an address that has used it up finds the live table gone too — a real 404 —
+        // while every other address still opens it.
+        const guesser = '10.6.6.6';
+        const misses = async () => (await db.collection('ratelimits').findOne({key: `poker-night:${ENV}:miss:ip:${guesser}`}))?.count ?? 0;
+        const render = async (c, ip) => {
+            const res = await fetch(`${BASE}/play/${c}`, {headers: {'x-forwarded-for': ip}, redirect: 'manual'});
+            await res.arrayBuffer();
+            return res.status;
+        };
+        const taken = new Set((await rooms.find({env: ENV}, {projection: {code: 1}}).toArray()).map((d) => d.code));
+        const guesses = [];
+        for (let i = 0; guesses.length < RATE_LIMITS.miss.limit; i++) {
+            const guess = `QQQQ${CODE_ALPHABET[i % 32]}${CODE_ALPHABET[Math.floor(i / 32) % 32]}`;
+            if (!taken.has(guess)) guesses.push(guess);
+        }
+        const open = await render(code, guesser);
+        const statuses = [];
+        let afterFirst = null;
+        for (const guess of guesses) {
+            statuses.push(await render(guess, guesser));
+            // One render, one miss: the layout, the page and its metadata share one read.
+            afterFirst ??= await misses();
+        }
+        const spent = await misses();
+        const closedToGuesser = await render(code, guesser);
+        const elsewhere = await render(code, '10.6.6.7');
+        check(`/play/CODE: ${RATE_LIMITS.miss.limit} unknown codes from one address are 404s spending its miss counter, and then the live table is a 404 to that address alone`,
+            open === 200 && statuses.every((s) => s === 404) && afterFirst === 1 && spent === RATE_LIMITS.miss.limit && closedToGuesser === 404 && elsewhere === 200
+            && await misses() === RATE_LIMITS.miss.limit,
+            `open ${open}; guesses ${[...new Set(statuses)].join(',')}; misses ${afterFirst} after one, ${spent}; then ${closedToGuesser}, elsewhere ${elsewhere}`);
+    }
 
     // ── guests sit down ──
-    const A = await uiPlayer('uiA');
+    const A = await uiPlayer('uiA', {}, [AUDIO_PROBE]);
     await A.page.goto(`${BASE}/play/${code}`, {waitUntil: 'load', timeout: 120000});
     await A.page.waitForSelector('[data-join-card="visitor"]', {timeout: 60000});
     const nameA = await A.page.inputValue('[data-join-name]');
@@ -1427,7 +1779,7 @@ const tableInBrowser = async () => {
     check('…her row: a guestId and no userId, the name typed and the look shown', !rowA?.userId && typeof rowA?.guestId === 'string'
         && rowA.name === 'Ana' && rowA.avatar === lookA, JSON.stringify(rowA && {...rowA, guestId: '…'}));
 
-    const B = await uiPlayer('uiB', {viewport: {width: 390, height: 844}, isMobile: true, hasTouch: true});
+    const B = await uiPlayer('uiB', {viewport: {width: 390, height: 844}, isMobile: true, hasTouch: true}, [AUDIO_PROBE]);
     await B.page.goto(`${BASE}/play/${code}`, {waitUntil: 'load', timeout: 120000});
     await B.page.waitForSelector('[data-join-card="visitor"]', {timeout: 60000});
     const lookB = await B.page.getAttribute('[data-join-card] [data-avatar]', 'data-avatar');
@@ -1658,6 +2010,24 @@ const tableInBrowser = async () => {
     await B.page.waitForSelector('[data-pn-hand="1"] [data-pn-banner]', {timeout: 20000}).catch(() => {});
     await sleep(1500);
     await uiShot(B.page, '05-winner-390');
+    // The banner on every screen size, the side seats' hands turned up: clear of every plate, hand,
+    // the dealer button and the board (the bug a 390 px phone showed, the banner over two side hands).
+    {
+        const sizes = [[A.page, null, 1440], [B.page, null, 390], [B.page, {width: 375, height: 667}, 375], [B.page, {width: 320, height: 568}, 320]];
+        for (const [page, size, width] of sizes) {
+            if (size) {
+                await page.setViewportSize(size);
+                await sleep(900);
+            }
+            const seen = await bannerClear(page);
+            check(`at ${width} px the winner's banner (${seen.variant}) and its line (${seen.lines}) cover no plate, turned-up hand, dealer button or board card (${seen.shown} hands shown, ${seen.sideShown} at side seats)`,
+                seen.banner === 1 && seen.dealer === 1 && (width === 1440 || seen.sideShown >= 2) && seen.covered.length === 0,
+                seen.covered.slice(0, 4).join(' | ') || JSON.stringify(seen));
+            if (width === 320) await uiShot(page, '05-winner-320');
+        }
+        await B.page.setViewportSize({width: 390, height: 844});
+        await sleep(600);
+    }
     for (const [p, width] of [[A, 1440], [B, 390]]) {
         const seen = await coverage(p.page);
         check(`at ${width} px the shown hands cover no name or stack, and the banner not the line under the board (${seen.shown} shown, ${seen.notes} line)`,
@@ -1775,8 +2145,151 @@ const tableInBrowser = async () => {
         check('My look turns the single-key shortcuts off and on, kept in this browser', on === 'true' && off.aria === 'false' && off.stored === false && back === 'true',
             JSON.stringify({on, off, back}));
     }
-    await A.page.keyboard.press('Escape');
-    await A.page.waitForSelector('[data-pn-drawer="look"]', {state: 'detached', timeout: 10000}).catch(() => {});
+
+    // ── the looks (P5), paused between hands: A's own card back and suit colours, A's avatar for
+    // everyone, then the host's scene and felt for everyone ──
+    {
+        const drawer = '[data-pn-drawer="look"]';
+        const keptLook = () => A.page.evaluate((key) => {
+            try {
+                return JSON.parse(localStorage.getItem(key) ?? 'null')?.look ?? null;
+            } catch {
+                return null;
+            }
+        }, ME_STORAGE_KEY);
+        // A card back and the four-colour deck: A's cards change at once, B's never.
+        const back = 'tartan';
+        const bBefore = await roomLook(B.page);
+        const posts = [];
+        const notePost = (req) => {
+            if (req.method() === 'POST' && /\/api\/poker-night\/[^/]+\/action$/.test(req.url())) posts.push(req.url());
+        };
+        A.page.on('request', notePost);
+        await A.page.click(`${drawer} [data-pn-choice="card-back"] [data-pn-option="${back}"]`);
+        if (await A.page.getAttribute(`${drawer} [data-pn-personal="fourColour"]`, 'aria-checked') !== 'true') await A.page.click(`${drawer} [data-pn-personal="fourColour"]`);
+        await sleep(400);
+        A.page.off('request', notePost);
+        const a = await roomLook(A.page);
+        const four = SUIT_COLOURS.four;
+        check(`My look's card back (${back}) and four-colour deck change A's own cards at once: the room's ids, LOOKS_CSS's colours for them, and the colours a drawn back${a?.club || a?.diamond ? ' and a club or diamond' : ''} got`,
+            a?.back === back && a.colours === 'four' && a.backBase === CARD_BACKS[back].base && a.suitC === four.c
+            && (a.drawnBack === null || a.drawnBack === rgbOf(CARD_BACKS[back].base))
+            && (a.club === null || a.club === rgbOf(four.c)) && (a.diamond === null || a.diamond === rgbOf(four.d)), JSON.stringify(a));
+        await sleep(4500); // a poll of B's, which nothing of A's personal look may reach
+        const b = await roomLook(B.page);
+        check('…and only A\'s: B\'s cards keep B\'s own look (the default back, two colours)', b?.back === bBefore?.back && b.back === 'classic-red' && b.colours === 'two'
+            && b.drawnBack === bBefore.drawnBack && (b.drawnBack === null || b.drawnBack === rgbOf(CARD_BACKS['classic-red'].base))
+            && (b.club === null || b.club === rgbOf(SUIT_COLOURS.two.c)), JSON.stringify(b));
+        const stored = await keptLook();
+        check('…kept in A\'s browser (localStorage), with no request to the table', stored?.cardBack === back && stored.fourColour === true && posts.length === 0,
+            `${JSON.stringify(stored)} ${posts.join(' ')}`);
+
+        // The avatar builder: another face, colour and badge, saved between hands — every screen
+        // shows A's seat with it.
+        const builder = `${drawer} [data-pn-look-profile] [data-pn-builder]`;
+        const preview = `${builder} .pn-seat-in[data-avatar]`;
+        const [, face0, colour0, frame0, badge0] = (await A.page.getAttribute(preview, 'data-avatar')).split(':');
+        const want = {face: face0 === 'octopus' ? 'unicorn' : 'octopus', colour: colour0 === 'berry' ? 'lime' : 'berry', badge: badge0 === 'crown' ? 'gem' : 'crown'};
+        await A.page.click(`${builder} [data-pn-choice="avatar-face"] [data-pn-option="${want.face}"]`);
+        await A.page.click(`${builder} [data-pn-builder-tab="colour"]`);
+        await A.page.click(`${builder} [data-pn-choice="avatar-colour"] [data-pn-option="${want.colour}"]`);
+        await A.page.click(`${builder} [data-pn-builder-tab="badge"]`);
+        await A.page.click(`${builder} [data-pn-choice="avatar-badge"] [data-pn-option="${want.badge}"]`);
+        const newLook = await A.page.getAttribute(preview, 'data-avatar');
+        check('the avatar builder: a face, a colour and a badge picked, its preview the look they make', newLook === `v1:${want.face}:${want.colour}:${frame0}:${want.badge}` && isAvatar(newLook),
+            newLook);
+        await uiWording(A.page, 'the avatar builder');
+        await A.page.locator(builder).scrollIntoViewIfNeeded();
+        await uiShot(A.page, '12-avatar-builder-1440');
+        await A.page.locator(`${drawer} [data-pn-personal-look]`).scrollIntoViewIfNeeded();
+        await uiShot(A.page, '13-my-look-1440');
+        const savedAt = Date.now();
+        await A.page.click('[data-pn-look-save]');
+        let rowA = null;
+        for (let i = 0; i < 40 && rowA?.avatar !== newLook; i++) {
+            await sleep(150);
+            rowA = (await roomDoc()).players.find((p) => p.pid === A.pid);
+        }
+        const seatAvatar = async (p) => p.page.waitForFunction(({seat, look}) => document.querySelector(`[data-seat="${seat}"] [data-avatar]`)?.getAttribute('data-avatar') === look,
+            {seat: A.seat, look: newLook}, {timeout: 8000}).then(() => Date.now() - savedAt, () => null);
+        const avatarMs = await Promise.all([H, B, C].map(seatAvatar));
+        check(`…saved between hands, A's seat shows it on the host's, B's and C's screens within 5 s (${avatarMs.join(', ')} ms)`, rowA?.avatar === newLook
+            && rowA.name === 'Ana' && avatarMs.every((ms) => ms !== null && ms <= 5000), JSON.stringify(rowA && {name: rowA.name, avatar: rowA.avatar}));
+        await A.page.keyboard.press('Escape');
+        await A.page.waitForSelector(drawer, {state: 'detached', timeout: 10000}).catch(() => {});
+
+        // A reload brings A's own look back from the browser.
+        await A.page.reload({waitUntil: 'load', timeout: 120000});
+        await A.page.waitForSelector('[data-me]', {timeout: 30000});
+        await A.page.waitForSelector('[data-pn-ready="true"]', {timeout: 30000}).catch(() => {});
+        const reloaded = await roomLook(A.page);
+        check('…and after a reload A\'s cards keep the back and the four colours, from this browser', reloaded?.back === back && reloaded.colours === 'four'
+            && (reloaded.drawnBack === null || reloaded.drawnBack === rgbOf(CARD_BACKS[back].base)), JSON.stringify(reloaded));
+
+        // B's My look on the phone: the builder, then the rest.
+        await B.page.click('[data-open="menu"]');
+        await B.page.click('[data-menu="look"]');
+        await B.page.waitForSelector(drawer, {timeout: 10000});
+        await uiWording(B.page, 'My look on the phone');
+        await uiShot(B.page, '12-avatar-builder-390');
+        await B.page.locator(`${drawer} [data-pn-personal-look]`).scrollIntoViewIfNeeded();
+        await uiShot(B.page, '13-my-look-390');
+        await B.page.keyboard.press('Escape');
+        await B.page.waitForSelector(drawer, {state: 'detached', timeout: 10000}).catch(() => {});
+
+        // The host's Look section: a scene, and its felt with it, on every table within 5 s.
+        await hp.click('[data-open="host"]');
+        await hp.waitForSelector('[data-pn-drawer="host"]', {timeout: 10000});
+        await hp.click('[data-host-tab="look"]');
+        await hp.waitForSelector('[data-host-section="look"] [data-pn-look-picker]', {timeout: 5000});
+        await uiWording(hp, 'the host drawer\'s look section');
+        await uiShotBoth(hp, '11-host-look');
+        const pages = [A.page, B.page, C.page];
+        const start = await roomLook(A.page);
+        await uiShot(A.page, `11-scene-${start.scene}-1440`);
+        await uiShot(B.page, `11-scene-${start.scene}-390`);
+        const timings = [];
+        for (const scene of ['garden-party', 'neon-city', 'beach-sunset', 'log-cabin', 'midnight-lounge', 'my-theme', 'deep-space']) {
+            const felt = SCENES[scene].felt;
+            await hp.click(`[data-host-section="look"] [data-pn-choice="scene"] [data-pn-option="${scene}"]`);
+            const ms = await lookOnAll(pages, (l) => l.scene === scene && l.layer === scene && l.felt === felt && l.cloth === felt);
+            timings.push({scene, ms});
+            await sleep(700); // the new sky fades in
+            await uiShot(A.page, `11-scene-${scene}-1440`);
+            await uiShot(B.page, `11-scene-${scene}-390`);
+        }
+        const late = timings.filter((t) => t.ms.some((ms) => ms === null || ms > 5000));
+        check(`the host's Look section: each scene (${timings.length}) reaches A's, B's and C's tables within 5 s with its own felt — the room's ids, the sky layer and the felt drawn`,
+            late.length === 0, timings.map((t) => `${t.scene} ${t.ms.join('/')}`).join('; '));
+        await hp.click('[data-host-section="look"] [data-pn-choice="felt"] [data-pn-option="tangerine"]');
+        const feltMs = await lookOnAll(pages, (l) => l.felt === 'tangerine' && l.cloth === 'tangerine' && l.scene === 'deep-space');
+        // An open seat straddles the rail, partly over the sky: it is filled with the felt and inked
+        // with the felt's own colours on every screen, whatever the scene behind it.
+        const openSeats = await Promise.all(pages.map((page) => page.$$eval('.pn-open-seat', (els) => els.map((el) => {
+            const s = getComputedStyle(el);
+            return {bg: s.backgroundColor, ink: s.color, opacity: s.opacity};
+        })).catch(() => [])));
+        const felt = FELTS.tangerine;
+        check(`an open seat is filled with the felt and inked with its tested colours (${openSeats.map((o) => o.length).join('/')} open seats on A's, B's and C's screens)`,
+            openSeats.some((o) => o.length > 0) && openSeats.flat().every((o) => o.bg === rgbOf(felt.felt) && o.ink === rgbOf(felt.onFelt) && o.opacity === '1'),
+            JSON.stringify(openSeats.map((o) => o[0] ?? null)));
+        doc = await roomDoc();
+        check(`…and a felt on its own, the scene kept: on every table within 5 s (${feltMs.join(', ')} ms), stored as the room's settings`,
+            feltMs.every((ms) => ms !== null && ms <= 5000) && doc.state.settings.scene === 'deep-space' && doc.state.settings.felt === 'tangerine',
+            JSON.stringify(doc.state.settings));
+        const hostUser = doc.players.find((p) => p.pid === doc.state.hostPid)?.userId;
+        let prefs = null;
+        for (let i = 0; i < 20 && prefs?.pokerNight?.table?.felt !== 'tangerine'; i++) {
+            await sleep(200);
+            prefs = await db.collection('userpreferences').findOne({userId: hostUser});
+        }
+        check('…and kept as the host\'s look for their next tables (preferences, after the answer)', prefs?.pokerNight?.table?.scene === 'deep-space'
+            && prefs.pokerNight.table.felt === 'tangerine', JSON.stringify(prefs?.pokerNight?.table ?? null));
+        await uiShot(A.page, '11-felt-tangerine-1440');
+        await uiShot(B.page, '11-felt-tangerine-390');
+        await hp.keyboard.press('Escape');
+        await hp.waitForSelector('[data-pn-drawer="host"]', {state: 'detached', timeout: 10000}).catch(() => {});
+    }
 
     // ── hand 2: the host folds, then removes C mid-hand ──
     await hp.click('[data-open="host"]');
@@ -1825,6 +2338,50 @@ const tableInBrowser = async () => {
         await hp.keyboard.press('Escape');
         await hp.waitForSelector('[data-pn-drawer="host"]', {state: 'detached', timeout: 10000}).catch(() => {});
     };
+    // Hand 2's first turn (P5): the deep-space scene twinkles and the plate on the clock pulses. A
+    // visitor whose theme is brutalist sees the felt's stadium still round and both loops stopped
+    // by name; on A's screen they run until A's browser asks for reduced motion (emulateMedia),
+    // which stops the twinkle there and keeps every chip flight of the hand still from then on.
+    let styled = false;
+    let reducedA = false;
+    const styleChecks = async () => {
+        const VB = await uiPlayer('uiBrutalist');
+        await VB.context.addCookies([{name: 'aero-theme', value: 'v1:nord:brutalist:0', domain: new URL(BASE).hostname, path: '/'}]);
+        await VB.page.goto(`${BASE}/play/${code}`, {waitUntil: 'load', timeout: 120000});
+        await VB.page.waitForSelector('[data-pn-ready="true"]', {timeout: 30000}).catch(() => {});
+        // Every screen with hand 2's first turn drawn (a page polls between hands only every 4 s).
+        await Promise.all([VB, A, B].map((p) => p.page.waitForSelector('[data-pn-hand="2"] .pn-pulse', {state: 'attached', timeout: 15000}).catch(() => {})));
+        const [brut, plain] = await Promise.all([motionOf(VB.page), motionOf(A.page)]);
+        check('a brutalist screen keeps the felt\'s stadium round (rounded-full spared from its square corners)', brut.style === 'brutalist' && brut.feltRadius > 100
+            && plain.feltRadius > 100, JSON.stringify({brutalist: brut.feltRadius, default: plain.feltRadius}));
+        check('…and stops the loops by name: the plate on the clock (.pn-pulse) and the scene\'s twinkle (.pn-ambient) have animation-name none, while they run on a default screen',
+            brut.pulses.length > 0 && brut.pulses.every((n) => n === 'none') && brut.ambient.length > 0 && brut.ambient.every((n) => n === 'none')
+            && plain.pulses.some((n) => n === 'pn-pulse') && plain.ambient.length > 0 && plain.ambient.every((n) => n === 'pn-ambient-twinkle'),
+            JSON.stringify({brutalist: {pulses: brut.pulses, ambient: [...new Set(brut.ambient)]}, default: {pulses: plain.pulses, ambient: [...new Set(plain.ambient)]}}));
+        await uiWording(VB.page, 'the table in brutalist');
+        await uiShot(VB.page, '17-brutalist-1440');
+        await VB.context.close();
+        ui.splice(ui.indexOf(VB), 1);
+        // The other seats' face-down cards, dealt: in A's own back on A's screen, the default on B's.
+        const backsOf = (page) => page.evaluate(() => [...document.querySelectorAll('[data-seat]:not([data-me]) [data-card="back"] .pn-card-back')]
+            .map((el) => getComputedStyle(el).backgroundColor));
+        const [backsA, backsB] = await Promise.all([backsOf(A.page), backsOf(B.page)]);
+        check('mid-hand, the other seats\' face-down cards are drawn in each viewer\'s own back: tartan on A\'s screen, the default red on B\'s',
+            backsA.length > 0 && backsA.every((c) => c === rgbOf(CARD_BACKS.tartan.base)) && backsB.length > 0 && backsB.every((c) => c === rgbOf(CARD_BACKS['classic-red'].base)),
+            JSON.stringify({A: [...new Set(backsA)], B: [...new Set(backsB)]}));
+        await uiShot(A.page, '13-tartan-backs-1440');
+        // Reduced motion, asked for by A's browser mid-session (C's context asks from the start).
+        await A.page.emulateMedia({reducedMotion: 'reduce'});
+        reducedA = true;
+        await sleep(300);
+        await A.page.evaluate(() => {
+            window.__pnSeen.flights = [];
+        });
+        const [still, fromStart] = await Promise.all([motionOf(A.page), motionOf(C.page)]);
+        check('under reduced motion the ambient loops stop: A\'s screen once emulateMedia asks, C\'s from the start (animation-name none)',
+            still.ambient.length > 0 && still.ambient.every((n) => n === 'none') && still.pulses.every((n) => n === 'none')
+            && fromStart.ambient.length > 0 && fromStart.ambient.every((n) => n === 'none'), JSON.stringify({A: [...new Set(still.ambient)], C: [...new Set(fromStart.ambient)]}));
+    };
     let raised = false;
     armKind = 'leave';
     bankArmed = false;
@@ -1832,6 +2389,10 @@ const tableInBrowser = async () => {
     doc = await playByClicks(2, {
         choose: (p) => (p === H ? 'fold' : p === A && !raised ? 'raise-twice' : 'call'),
         before: async (p) => {
+            if (!styled) {
+                styled = true;
+                await styleChecks();
+            }
             if (p === B) await bankOnTurn();
         },
         after: async (p) => {
@@ -1852,6 +2413,18 @@ const tableInBrowser = async () => {
     if (!bankChecked) note('the phone\'s Leave dialog on B\'s turn', 'never open before a turn of B\'s: not checked');
     if (bankArmed) await B.page.keyboard.press('Escape');
     check('hand 2 is played out', doc.state.hand.no === 2 && doc.state.hand.phase === 'complete' && removedC);
+    if (reducedA) {
+        const flights = await A.page.evaluate(() => window.__pnSeen.flights);
+        check(`…and on A's screen, under the emulated reduced motion, every chip flight of it appeared still and invisible (${flights.length})`,
+            flights.length > 0 && flights.every((f) => f.name === 'none' && f.opacity === '0'), JSON.stringify(flights.slice(0, 4)));
+        await A.page.emulateMedia({reducedMotion: 'no-preference'});
+        await sleep(300);
+        const again = await motionOf(A.page);
+        check('…and once A\'s browser no longer asks, the twinkle runs again', again.ambient.length > 0 && again.ambient.every((n) => n === 'pn-ambient-twinkle'),
+            JSON.stringify([...new Set(again.ambient)]));
+    } else {
+        check('hand 2\'s style checks ran', false, 'no turn reached them');
+    }
     check('…and C, removed during it, is off the table once it ends, cashed out as removed', !doc.state.seats.some((s) => s?.pid === C.pid)
         && doc.state.ledger.find((l) => l.pid === C.pid)?.events.some((e) => LEDGER_KINDS[e[1]] === 'removed') && conservation(doc.state).ok);
     const removedCard = await C.page.waitForSelector('[data-join-blocked="removed"]', {timeout: 30000}).then(() => true, () => false);
@@ -1945,7 +2518,7 @@ const tableInBrowser = async () => {
     await uiWording(R.page, 'the table on the relay');
     await uiShot(R.page, '10-live-1440');
 
-    // The relay: every 100 ms it reads the room's seq; a new one is built into the message the server
+    // The relay: every 100 ms it reads the room's public seq; a new one is built into the message the server
     // publishes after a commit and handed to R's page — every fourth held back until the next one
     // has gone (or half a second has passed), every fourth sent twice, and the rest followed by one
     // from a few back. Every message is scanned before it goes.
@@ -1987,7 +2560,9 @@ const tableInBrowser = async () => {
     const relayStep = async () => {
         const stored = await rooms.findOne({env: ENV, code}, {projection: {emoteAt: 0, awards: 0, applied: 0}});
         if (!stored) return;
-        if (stored.seq <= relay.lastSeq) {
+        // The public seq, as the server publishes it: a write only its author can see moves none.
+        const seq = pubSeq(stored);
+        if (seq <= relay.lastSeq) {
             if (relay.held && Date.now() - relay.heldAt > RELAY_HOLD_MS) {
                 const held = relay.held;
                 relay.held = null;
@@ -1995,11 +2570,11 @@ const tableInBrowser = async () => {
             }
             return;
         }
-        relay.lastSeq = stored.seq;
+        relay.lastSeq = seq;
         rememberHand(stored.state?.hand);
         const state = migrateState(stored.state);
         if (state === null) {
-            relay.errors.push(`seq ${stored.seq}: a state this code cannot read`);
+            relay.errors.push(`seq ${seq}: a state this code cannot read`);
             return;
         }
         const message = stateMessage(roomId, wireOfRoom(serverRoomFromDoc(stored, coreFromDoc(stored, state), Date.now())));
@@ -2166,7 +2741,7 @@ const tableInBrowser = async () => {
                 return;
             }
             // Every move after it: on R's screen within a poll or two.
-            const want = (await roomDoc()).seq;
+            const want = pubSeq(await roomDoc());
             const t0 = Date.now();
             const ok = await R.page.waitForFunction((s) => Number(document.querySelector('[data-pn-seq]')?.getAttribute('data-pn-seq')) >= s, want, {timeout: 10000})
                 .then(() => true, () => false);
@@ -2175,7 +2750,7 @@ const tableInBrowser = async () => {
     });
     relayHands.get(relayHand2).endedAt = Date.now();
     const end2 = await handEnds(relayHand2);
-    const finalSeq = (await roomDoc()).seq;
+    const finalSeq = pubSeq(await roomDoc());
     const caughtUp = await R.page.waitForFunction((s) => Number(document.querySelector('[data-pn-seq]')?.getAttribute('data-pn-seq')) >= s, finalSeq, {timeout: 10000})
         .then(() => true, () => false);
     if (stop === null) await stopRelay();
@@ -2244,6 +2819,472 @@ const tableInBrowser = async () => {
             lags.length > 0 && slow.length === 0 && worst <= 6000 && end2.ended && caughtUp, `${slow.map((l) => l.by).join(', ')} end ${end2.ended} caught up ${caughtUp}`);
     }
     await uiShot(R.page, '10-polling-again-1440');
+
+    // ── emotes (P6): a reaction and a throw from one screen to another, a mute for the visit, the
+    // sounds, and only the impact under reduced motion. The pages poll (no Ably here), so another
+    // screen sees an emote within its next poll.
+    {
+        for (const p of [H, A, B, C, R]) await p.page.keyboard.press('Escape').catch(() => {});
+        doc = await roomDoc();
+        const seatOf = (pid) => doc.state.seats.findIndex((s) => s?.pid === pid);
+        const onScreen = [];
+        for (const p of [A, H, R, B, C]) {
+            const pid = await p.page.getAttribute('[data-me]', 'data-pid', {timeout: 2000}).catch(() => null);
+            if (pid && seatOf(pid) !== -1) onScreen.push({p, pid});
+        }
+        if (onScreen.length < 2 || doc.state.status === 'closed' || doc.state.settings.throwables === false) {
+            check('emotes on screen: two seated screens, the table open, throwables on', false,
+                `${onScreen.length} seated screens, status ${doc.state.status}, throwables ${doc.state.settings.throwables}`);
+        } else {
+            const [S, T] = onScreen;
+            const sp = S.p.page;
+            const tp = T.p.page;
+            const emoteOn = (page, sel, timeout) => page.waitForSelector(sel, {timeout, state: 'attached'}).then(() => true, () => false);
+            // The pitch of every tone T's page starts (TONE_PROBE); a key press is the gesture that wakes its audio.
+            await tp.evaluate(TONE_PROBE);
+            await tp.keyboard.press('Shift');
+            // Under reduced motion (C's context) a throw is never drawn in flight, only its impact —
+            // counted as each appears: C polls every 4 s between hands, so the impact (2.4 s) may come
+            // and go while T's screen is still being watched.
+            await C.page.evaluate(() => {
+                window.__pnFlights = 0;
+                window.__pnImpacts = 0;
+                new MutationObserver((records) => {
+                    for (const r of records) r.addedNodes.forEach((n) => {
+                        if (!(n instanceof Element)) return;
+                        if (n.matches('.pn-throw') || n.querySelector('.pn-throw')) window.__pnFlights++;
+                        if (n.matches('[data-splat="tomato"]') || n.querySelector('[data-splat="tomato"]')) window.__pnImpacts++;
+                    });
+                }).observe(document.body, {subtree: true, childList: true});
+            }).catch(() => {});
+
+            await sp.click('[data-pn-emotes-open]');
+            await sp.click('[data-emote-react="party"]');
+            const sentAt = Date.now();
+            const ownReact = await emoteOn(sp, `[data-emote="react"][data-emote-item="party"][data-emote-from="${S.pid}"]`, 2000);
+            const seenReact = await emoteOn(tp, `[data-emote="react"][data-emote-item="party"][data-emote-from="${S.pid}"]`, 6000);
+            const reactMs = Date.now() - sentAt;
+            check(`a reaction rises over the sender's plate at once, and on another screen within its next poll (${reactMs} ms)`, ownReact && seenReact, `${ownReact} ${seenReact}`);
+            await sleep(300);
+            const tones = await tp.evaluate(() => window.__pnTones);
+            check(`…with a pop on that screen: its rising tone (${SOUNDS.pop[0].freq} Hz) started`, tones.includes(SOUNDS.pop[0].freq), JSON.stringify(tones));
+
+            await sleep(1300);
+            await sp.click('[data-pn-emotes-open]');
+            await sp.click('[data-emote-tab="throw"]');
+            await sp.click('[data-emote-throw="tomato"]');
+            await sp.click(`[data-emote-target="${T.pid}"]`);
+            const landed = await emoteOn(tp, '[data-splat="tomato"]', 7000);
+            const splatSeat = landed ? Number(await tp.getAttribute('[data-splat="tomato"]', 'data-splat-seat').catch(() => -1)) : -1;
+            check('a tomato thrown at a player lands on their plate on their screen ([data-splat])', landed && splatSeat === seatOf(T.pid), `${landed} at seat ${splatSeat} vs ${seatOf(T.pid)}`);
+            const awards = (await roomDoc()).awards ?? {};
+            check('…and the night summary\'s counts have it', awards[S.pid]?.thrown?.tomato >= 1 && awards[T.pid]?.received?.tomato >= 1, JSON.stringify(awards));
+            const cJoined = await C.page.locator('[data-me]').count() > 0 || await C.page.locator('[data-pn-joined="watching"]').count() > 0;
+            if (cJoined) {
+                const cImpact = await C.page.waitForFunction(() => window.__pnImpacts > 0, null, {timeout: 7000}).then(() => true, () => false);
+                const cFlights = await C.page.evaluate(() => window.__pnFlights ?? -1);
+                check('…and under reduced motion only the impact shows, never the flight', cImpact && cFlights === 0, `impact ${cImpact}, flights ${cFlights}`);
+            } else {
+                check('a throw under reduced motion: C still at the table to see it', false, 'C has left the table');
+            }
+
+            // T mutes S for the visit: S's next reaction shows on S's screen, never on T's.
+            await tp.click(`[data-seat-menu="${seatOf(S.pid)}"]`);
+            await tp.click('[data-seat-mute="mute"]');
+            await sleep(1300);
+            // The picker opens on the tab it was left on (Throw, just now), so React first.
+            await sp.click('[data-pn-emotes-open]');
+            await sp.click('[data-emote-tab="react"]');
+            await sp.click('[data-emote-react="clap"]');
+            const ownClap = await emoteOn(sp, `[data-emote-item="clap"][data-emote-from="${S.pid}"]`, 2000);
+            const mutedClap = await emoteOn(tp, `[data-emote-item="clap"][data-emote-from="${S.pid}"]`, 6000);
+            check('a player muted for the visit: their reaction shows on their own screen, never on the screen that muted them', ownClap && !mutedClap, `${ownClap} ${mutedClap}`);
+            // …and only them: a third player's reaction still shows on that screen.
+            const U = onScreen.find((o) => o !== S && o !== T);
+            if (U) {
+                const sent = await post(U.p, 'emote', {kind: 'react', item: 'wow'});
+                const otherShows = await emoteOn(tp, `[data-emote="react"][data-emote-item="wow"][data-emote-from="${U.pid}"]`, 6000);
+                check('…and only them: a third player\'s reaction still shows on the screen that muted the first', sent.status === 200 && otherShows, `${sent.status} ${otherShows}`);
+            } else {
+                check('muting one player hides only theirs: a third seated screen', false, `${onScreen.length} seated screens`);
+            }
+            await tp.click(`[data-seat-menu="${seatOf(S.pid)}"]`);
+            await tp.waitForSelector('[data-seat-mute="show"]', {timeout: 5000});
+            await uiWording(tp, 'a plate\'s menu');
+            await tp.click('[data-seat-mute="show"]');
+            await uiWording(sp, 'the emote picker\'s table');
+        }
+    }
+
+    // ── P6, between hands: "?" lists the keys, the host's throwables switch, the cooldown from a
+    // page's own cookie; then one more hand with A's emotes on every screen and the sounds counted.
+    {
+        // A switch in a player's My look (lib/poker-night/personal), set to `on`; whether it is.
+        const drawerSwitch = async (p, which, on) => {
+            const sel = `[data-pn-drawer="look"] [data-pn-personal="${which}"]`;
+            await p.page.click('[data-open="menu"]');
+            await p.page.click('[data-menu="look"]');
+            await p.page.waitForSelector(sel, {timeout: 10000});
+            if (await p.page.getAttribute(sel, 'aria-checked') !== String(on)) await p.page.click(sel);
+            const now = await p.page.getAttribute(sel, 'aria-checked');
+            await p.page.keyboard.press('Escape');
+            await p.page.waitForSelector('[data-pn-drawer="look"]', {state: 'detached', timeout: 10000}).catch(() => {});
+            return now === String(on);
+        };
+        const settingIs = async (key, value) => {
+            for (let i = 0; i < 40; i++) {
+                if ((await roomDoc()).state.settings[key] === value) return true;
+                await sleep(150);
+            }
+            return false;
+        };
+        const openHostLook = async () => {
+            await hp.click('[data-open="host"]');
+            await hp.waitForSelector('[data-pn-drawer="host"]', {timeout: 10000});
+            await hp.click('[data-host-tab="look"]');
+            await hp.waitForSelector('[data-host-section="look"] [data-host-switch="throwables"]', {timeout: 5000});
+        };
+        const closeHostDrawer = async () => {
+            await hp.keyboard.press('Escape');
+            await hp.waitForSelector('[data-pn-drawer="host"]', {state: 'detached', timeout: 10000}).catch(() => {});
+        };
+
+        // "?" with the focus on the table (nothing focused): every key the table answers, listed.
+        await A.page.evaluate(() => {
+            if (document.activeElement instanceof HTMLElement) document.activeElement.blur();
+        });
+        await A.page.keyboard.press('?');
+        const listed = await A.page.waitForSelector('[data-pn-shortcuts-dialog]', {timeout: 5000}).then(() => true, () => false);
+        const rows = await A.page.locator('[data-pn-shortcuts-dialog] [data-shortcut]').count();
+        const keyCount = Object.values(SHORTCUTS).flat().length;
+        const listText = await A.page.innerText('[data-pn-shortcuts-dialog]').catch(() => '');
+        check(`"?" with the focus on the table opens the keyboard shortcuts, every key the table answers listed (${keyCount})`,
+            listed && rows === keyCount && listText.includes(SHORTCUTS_COPY.title), `${listed} ${rows} rows`);
+        await uiWording(A.page, 'the keyboard shortcuts');
+        await uiShot(A.page, '14-shortcuts-1440');
+        await A.page.keyboard.press('Escape');
+        await A.page.waitForSelector('[data-pn-shortcuts-dialog]', {state: 'detached', timeout: 5000}).catch(() => {});
+
+        doc = await roomDoc();
+        const seatOf = (pid) => doc.state.seats.findIndex((s) => s?.pid === pid);
+        if (seatOf(A.pid) === -1 || seatOf(B.pid) === -1 || seatOf(H.pid) === -1 || doc.status === 'closed') {
+            check('emotes in a hand: A, B and the host seated', false, `A at ${seatOf(A.pid)}, B at ${seatOf(B.pid)}, host at ${seatOf(H.pid)}, ${doc.status}`);
+        } else {
+            // The host turns throwables off in the Look section: A's picker loses its Throw tab, and a
+            // throw sent straight from A's browser is refused; a phrase would still go.
+            await openHostLook();
+            await hp.click('[data-host-section="look"] [data-host-switch="throwables"]');
+            const off = await settingIs('throwables', false);
+            await A.page.click('[data-pn-emotes-open]');
+            const saysOff = await A.page.waitForSelector('[data-pn-emote-picker] [data-emote-off]', {timeout: 8000}).then(() => true, () => false);
+            const tabs = await A.page.$$eval('[data-pn-emote-picker] [data-emote-tab]', (els) => els.map((e) => e.getAttribute('data-emote-tab')));
+            const offText = await A.page.innerText('[data-pn-emote-picker] [data-emote-off]').catch(() => '');
+            check('the host turns throwables off in the Look section: A\'s picker offers React and Say, no Throw tab, and says why',
+                off && saysOff && tabs.join() === 'react,say' && offText.trim() === EMOTE_COPY.off, `${off} ${saysOff} ${tabs.join()} "${offText}"`);
+            await A.page.keyboard.press('Escape');
+            await sleep(1300);
+            const refused = await post(A, 'emote', {kind: 'throw', item: 'egg', to: B.pid});
+            check('…and a throw posted straight from A\'s browser is refused 403 forbidden', refused.status === 403 && refused.body?.error === 'forbidden',
+                `${refused.status} ${refused.text.slice(0, 120)}`);
+            await hp.click('[data-host-section="look"] [data-host-switch="throwables"]');
+            check('…and the host turns them back on', await settingIs('throwables', true));
+            await closeHostDrawer();
+
+            // The cooldown, from A's own browser: two emotes inside 1.2 s.
+            await sleep(1300);
+            const first = await post(A, 'emote', {kind: 'react', item: 'cool'});
+            const second = await post(A, 'emote', {kind: 'react', item: 'think'}, {pace: false});
+            check('two emotes from A\'s browser inside 1.2 s: the first goes, the second is refused 429 rate_limited',
+                first.status === 200 && second.status === 429 && second.body?.error === 'rate_limited', `${first.status} ${second.status} ${second.text.slice(0, 100)}`);
+
+            // B turns the sounds off; every Web Audio start on A's and B's screens is counted from
+            // here (AUDIO_PROBE), and the turns wait long enough for the emotes below.
+            const soundOff = await drawerSwitch(B, 'sound', false);
+            await editRoom({'state.config.turnSeconds': 120});
+            await Promise.all([A, B].map((p) => p.page.evaluate(() => {
+                window.__pnAudio.osc = 0;
+                window.__pnAudio.buffer = 0;
+            })));
+            const handNo = (await roomDoc()).state.handNo + 1;
+            if ((await roomDoc()).status === 'paused') {
+                await hp.click('[data-open="host"]');
+                await hp.waitForSelector('[data-pn-drawer="host"]', {timeout: 10000});
+                await hp.click('[data-host-tab="table"]');
+                await hp.click('[data-host-resume]');
+                await hp.waitForSelector('[data-host-pause]', {timeout: 15000});
+                await closeHostDrawer();
+            }
+
+            // Mid-hand, on a turn neither A's nor B's (it waits for its click): A's emotes.
+            const aSeat = seatOf(A.pid);
+            const bSeat = seatOf(B.pid);
+            const attached = (p, sel, timeout) => p.page.waitForSelector(sel, {state: 'attached', timeout}).then(() => true, () => false);
+            const emoteTour = async () => {
+                // B's picker on the phone, closed without sending.
+                await B.page.click('[data-pn-emotes-open]');
+                await B.page.waitForSelector('[data-pn-emote-picker]', {timeout: 5000});
+                await uiShot(B.page, '14-emote-picker-390');
+                await B.page.keyboard.press('Escape');
+                // A's picker: every tab's words (a throw's "who gets it?" step too) on the no-advice list.
+                await A.page.click('[data-pn-emotes-open]');
+                await A.page.waitForSelector('[data-pn-emote-picker]', {timeout: 5000});
+                const pickerWords = () => A.page.$eval('[data-pn-emote-picker]', (el) => [
+                    el.innerText, ...[...el.querySelectorAll('[aria-label], [title]')].flatMap((b) => [b.getAttribute('aria-label') ?? '', b.getAttribute('title') ?? '']),
+                ].join('\n'));
+                const words = [];
+                await A.page.click('[data-pn-emote-picker] [data-emote-tab="say"]');
+                words.push(await pickerWords());
+                await A.page.click('[data-pn-emote-picker] [data-emote-tab="throw"]');
+                words.push(await pickerWords());
+                await A.page.click('[data-emote-throw="rose"]');
+                await A.page.waitForSelector('[data-emote-aim="rose"]', {timeout: 5000});
+                words.push(await pickerWords());
+                await A.page.click('[data-pn-emote-picker] [data-emote-tab="react"]');
+                words.push(await pickerWords());
+                const hits = findBanned(words.join('\n'));
+                check('the no-advice list over the emote picker\'s every tab, its labels and the throw\'s second step', hits.length === 0 && words.every((w) => w.length > 0), hits.join(', '));
+                await uiShot(A.page, '14-emote-picker-1440');
+
+                // A reaction: over A's seat on B's, C's and the host's screens, each within its next poll.
+                const burst = `[data-emote="react"][data-emote-item="party"][data-emote-from="${A.pid}"]`;
+                const sentAt = Date.now();
+                await A.page.click('[data-emote-react="party"]');
+                const own = await attached(A, burst, 1500);
+                const seen = await Promise.all([B, C, H].map(async (p) => {
+                    const ok = await attached(p, burst, 6000);
+                    const ms = Date.now() - sentAt;
+                    const over = ok ? await overSeat(p.page, burst, aSeat).catch(() => false) : false;
+                    // Near the top of its rise (it lasts 1.8 s), still by the plate and under the top bar.
+                    const risen = ok ? await sleep(1100).then(() => overSeat(p.page, burst, aSeat)).catch(() => false) : false;
+                    const below = ok ? await p.page.$eval(burst, (el) => el.hasAttribute('data-below')).catch(() => null) : null;
+                    return {who: p.name, ms: ok ? ms : null, over, risen, below};
+                }));
+                check(`a reaction from A rises over A's seat (under it, drifting down, where A sits along the top) on A's screen at once and on B's, C's and the host's mid-hand, each by its next poll — 3 s apart in a hand, so within 3.5 s with the request (${seen.map((s) => `${s.who} ${s.ms} ms`).join(', ')}) — and never goes behind the top bar`,
+                    own && seen.every((s) => s.ms !== null && s.ms <= 3500 && s.over && s.risen), JSON.stringify(seen));
+
+                // A phrase: in a bubble on B's phone, in its words.
+                await sleep(1400);
+                await A.page.click('[data-pn-emotes-open]');
+                await A.page.click('[data-pn-emote-picker] [data-emote-tab="say"]');
+                await A.page.click('[data-emote-say="nice-hand"]');
+                const bubble = `[data-emote="say"][data-emote-item="nice-hand"][data-emote-from="${A.pid}"]`;
+                const said = await B.page.waitForSelector(bubble, {state: 'attached', timeout: 6000}).then((h) => h.textContent(), () => null);
+                check(`a phrase from A shows in a speech bubble on B's phone, in its words ("${EMOTE_COPY.phrases['nice-hand']}")`, said?.trim() === EMOTE_COPY.phrases['nice-hand'], String(said));
+                await uiShot(B.page, '14-phrase-390');
+
+                // A throw at B: flying on the host's screen, landing on B's plate there, on C's and on B's own.
+                await sleep(1400);
+                // Each screen records every flight (its running animation) and every impact (where it
+                // landed) as it appears: a page polls on its own beat, so one may have drawn the whole
+                // throw before another has it at all.
+                const probe = () => {
+                    window.__pnThrowsSeen = [];
+                    window.__pnSplatsSeen = [];
+                    new MutationObserver((records) => {
+                        for (const r of records) {
+                            r.addedNodes.forEach((n) => {
+                                if (!(n instanceof Element)) return;
+                                for (const el of n.matches('.pn-throw') ? [n] : n.querySelectorAll('.pn-throw')) window.__pnThrowsSeen.push(getComputedStyle(el).animationName);
+                                for (const el of n.matches('[data-splat]') ? [n] : n.querySelectorAll('[data-splat]')) {
+                                    window.__pnSplatsSeen.push(`${el.getAttribute('data-splat')}@${el.getAttribute('data-splat-seat')}`);
+                                }
+                            });
+                        }
+                    }).observe(document.body, {subtree: true, childList: true});
+                };
+                await Promise.all([H, C, B].map((p) => p.page.evaluate(probe)));
+                await A.page.click('[data-pn-emotes-open]');
+                await A.page.click('[data-pn-emote-picker] [data-emote-tab="throw"]');
+                await A.page.click('[data-emote-throw="tomato"]');
+                await A.page.click(`[data-emote-target="${B.pid}"]`);
+                const flying = await attached(H, `.pn-throw[data-emote-to="${B.pid}"]`, 6000);
+                // Where the flight peaks on the host's screen: its arc kept under the top bar (throwPath's ceiling).
+                const peak = flying ? await hp.evaluate((to) => {
+                    const t = document.querySelector(`.pn-throw[data-emote-to="${to}"]`);
+                    const y = t?.querySelector('.pn-throw-y');
+                    const table = document.querySelector('.pn-table');
+                    const bar = document.querySelector('[data-pn-topbar]');
+                    if (!t || !y || !table || !bar) return null;
+                    const dy = parseFloat(y.style.getPropertyValue('--pn-dy'));
+                    const arc = parseFloat(y.style.getPropertyValue('--pn-arc'));
+                    const glyph = parseFloat(getComputedStyle(y).fontSize);
+                    const top = table.getBoundingClientRect().top + parseFloat(t.style.top) + Math.min(dy, 0) - arc - glyph / 2;
+                    return {top: Math.round(top), bar: Math.round(bar.getBoundingClientRect().bottom), arc, dy};
+                }, B.pid).catch(() => null) : null;
+                if (flying) await hp.screenshot({path: `${OUT}ui-15-throw-flight-1440.png`});
+                check('…and the flight\'s arc on the host\'s screen peaks under the top bar', peak !== null && peak.top >= peak.bar - 1, JSON.stringify(peak));
+                // The splat pictured on the host's screen and on B's phone 300 ms after each lands: on
+                // B's avatar, never over B's name or stack.
+                const onAvatar = (seat) => {
+                    const box = (sel) => document.querySelector(sel)?.getBoundingClientRect() ?? null;
+                    const splat = box(`[data-splat="tomato"][data-splat-seat="${seat}"]`);
+                    const avatar = box(`[data-seat="${seat}"] .pn-avatar`);
+                    const name = box(`[data-seat="${seat}"] .pn-plate-name`);
+                    const stack = box(`[data-seat="${seat}"] .pn-plate-stack`);
+                    if (!splat || !avatar || !name || !stack) return null;
+                    const mid = (r) => ({x: r.left + r.width / 2, y: r.top + r.height / 2});
+                    // The blob: 86% × 78% of the impact, its middle on the avatar's.
+                    const blob = {left: mid(splat).x - splat.width * 0.43, right: mid(splat).x + splat.width * 0.43, top: mid(splat).y - splat.height * 0.39, bottom: mid(splat).y + splat.height * 0.39};
+                    const covers = (r) => mid(r).x > blob.left && mid(r).x < blob.right && mid(r).y > blob.top && mid(r).y < blob.bottom;
+                    const off = Math.hypot(mid(splat).x - mid(avatar).x, mid(splat).y - mid(avatar).y);
+                    return {off: Math.round(off), name: covers(name), stack: covers(stack)};
+                };
+                const landed = await Promise.all([[H, 1440], [C, null], [B, 390]].map(async ([p, width]) => {
+                    const ok = await p.page.waitForFunction((at) => window.__pnSplatsSeen.includes(at), `tomato@${bSeat}`, {timeout: 7000}).then(() => true, () => false);
+                    if (!ok || !width) return {ok, at: null};
+                    await sleep(300);
+                    const at = await p.page.evaluate(onAvatar, bSeat).catch(() => null);
+                    await p.page.screenshot({path: `${OUT}ui-15-splat-${width}.png`}).catch(() => {});
+                    return {ok, at};
+                }));
+                check('…the splat lands on B\'s avatar, leaving B\'s name and stack readable, on the host\'s screen and on B\'s phone',
+                    [landed[0], landed[2]].every((l) => l.ok && l.at !== null && l.at.off <= 4 && !l.at.name && !l.at.stack), JSON.stringify([landed[0].at, landed[2].at]));
+                const [hThrows, cThrows] = await Promise.all([H, C].map((p) => p.page.evaluate(() => window.__pnThrowsSeen)));
+                check('a tomato from A at B flies across the host\'s screen (.pn-throw-x running) and lands on B\'s plate there, on C\'s screen and on B\'s own ([data-splat] at B\'s seat)',
+                    flying && hThrows.length > 0 && hThrows.every((n) => n === 'pn-throw-x') && landed.every((l) => l.ok), JSON.stringify({flying, hThrows, landed}));
+                check('…C\'s screen, under reduced motion, draws the impact and never the flight', landed[1].ok && cThrows.length === 0, JSON.stringify(cThrows));
+
+                // "Mute emotes" in B's My look: A's next reaction everywhere but B's screen.
+                await sleep(1400);
+                const muted = await drawerSwitch(B, 'muteEmotes', true);
+                await A.page.click('[data-pn-emotes-open]');
+                await A.page.click('[data-pn-emote-picker] [data-emote-tab="react"]');
+                await A.page.click('[data-emote-react="fire"]');
+                const fire = `[data-emote="react"][data-emote-item="fire"][data-emote-from="${A.pid}"]`;
+                const [onA, onH, onB] = await Promise.all([attached(A, fire, 1500), attached(H, fire, 6000), attached(B, fire, 6000)]);
+                const unmuted = await drawerSwitch(B, 'muteEmotes', false);
+                check('"Mute emotes" in B\'s My look: A\'s next reaction shows on A\'s screen and the host\'s, never on B\'s; and B turns it back off',
+                    muted && onA && onH && !onB && unmuted, JSON.stringify({muted, onA, onH, onB, unmuted}));
+
+                // A's own look mid-hand (P5): another seat's card backs drawn in A's back, in LOOKS_CSS's colour.
+                const mid = await roomLook(A.page);
+                check(`mid-hand, A's screen draws a card back in A's own (${mid?.back}), LOOKS_CSS's colour for it`,
+                    mid?.back === 'tartan' && mid.drawnBack !== null && mid.drawnBack === rgbOf(CARD_BACKS.tartan.base), JSON.stringify(mid));
+
+                // Peek in A's My look: A's own cards face down, the hand's name replaced by how to peek;
+                // turned up only while pressed.
+                const hole = '[data-pn-dock] [data-pn-hole]';
+                const holeState = () => A.page.evaluate((sel) => {
+                    const h = document.querySelector(sel);
+                    if (!h) return null;
+                    return {
+                        peek: h.getAttribute('data-pn-peek'), pressed: h.getAttribute('aria-pressed'),
+                        backs: h.querySelectorAll('.pn-card[data-card="back"]').length, faces: h.querySelectorAll('.pn-card:not([data-card="back"])').length,
+                        prompt: document.querySelector('[data-pn-peek-prompt]')?.textContent ?? null, strength: document.querySelector('[data-pn-strength]') !== null,
+                    };
+                }, hole);
+                const peekOn = await drawerSwitch(A, 'peek', true);
+                const shut = await holeState();
+                const box = await A.page.locator(hole).boundingBox();
+                await A.page.mouse.move(box.x + box.width / 2, box.y + box.height / 2);
+                await A.page.mouse.down();
+                await sleep(150);
+                const pressed = await holeState();
+                await A.page.mouse.up();
+                await sleep(150);
+                const released = await holeState();
+                await uiWording(A.page, 'the dock with Peek on');
+                const peekOff = await drawerSwitch(A, 'peek', false);
+                const plain = await holeState();
+                check(`Peek in A's My look: mid-hand A's cards stay face down with "${LOOKS_COPY.peekPrompt}" in place of the hand's name, turn up while pressed and go face down on letting go; off, they show again`,
+                    peekOn && peekOff && shut?.peek === 'hidden' && shut.backs === 2 && shut.faces === 0 && shut.prompt === LOOKS_COPY.peekPrompt && !shut.strength
+                    && pressed?.peek === 'shown' && pressed.pressed === 'true' && pressed.faces === 2 && pressed.prompt === null
+                    && released?.peek === 'hidden' && released.backs === 2 && plain?.peek === null && plain.faces === 2,
+                    JSON.stringify({shut, pressed, released, plain}));
+
+                // B's new look, saved mid-hand: it waits for the hand's end, kept while the drawer is
+                // shut, then goes on the table by itself.
+                const lookDrawer = '[data-pn-drawer="look"]';
+                const bBuilder = `${lookDrawer} [data-pn-look-profile] [data-pn-builder]`;
+                const bPreview = `${bBuilder} .pn-seat-in[data-avatar]`;
+                const openLook = async () => {
+                    await B.page.click('[data-open="menu"]');
+                    await B.page.click('[data-menu="look"]');
+                    await B.page.waitForSelector(lookDrawer, {timeout: 10000});
+                };
+                const closeLook = async () => {
+                    await B.page.keyboard.press('Escape');
+                    await B.page.waitForSelector(lookDrawer, {state: 'detached', timeout: 10000}).catch(() => {});
+                };
+                await openLook();
+                bLookBefore = await B.page.getAttribute(bPreview, 'data-avatar');
+                const badge = bLookBefore.split(':')[4] === 'balloon' ? 'cherries' : 'balloon';
+                await B.page.click(`${bBuilder} [data-pn-builder-tab="badge"]`);
+                await B.page.click(`${bBuilder} [data-pn-choice="avatar-badge"] [data-pn-option="${badge}"]`);
+                bLookQueued = await B.page.getAttribute(bPreview, 'data-avatar');
+                await B.page.click(`${lookDrawer} [data-pn-look-save]`);
+                const waits = await B.page.waitForSelector(`${lookDrawer} [data-pn-look-wait]`, {timeout: 5000}).then((h) => h.textContent(), () => null);
+                const greyed = await B.page.locator(`${lookDrawer} [data-pn-look-queued]:disabled`).count();
+                await uiShot(B.page, '12-look-queued-390');
+                await closeLook();
+                await openLook();
+                const kept = await B.page.getAttribute(bPreview, 'data-avatar');
+                await closeLook();
+                const rowMid = (await roomDoc()).players.find((p) => p.pid === B.pid);
+                check(`mid-hand, B's new look saved in My look waits for the hand ("${LOOKS_COPY.queued}"), and is still there when the drawer is opened again`,
+                    waits?.trim() === LOOKS_COPY.queued && greyed === 1 && kept === bLookQueued && bLookQueued !== bLookBefore && rowMid?.avatar === bLookBefore,
+                    JSON.stringify({waits, greyed, kept, bLookQueued, row: rowMid?.avatar}));
+                return true;
+            };
+
+            let pausedAfter = false;
+            let toured = false;
+            let bLookBefore = null;
+            let bLookQueued = null;
+            doc = await playByClicks(handNo, {
+                choose: (p) => (p === H ? 'fold' : 'call'),
+                before: async (p) => {
+                    if (!pausedAfter) {
+                        pausedAfter = true;
+                        await pauseFromDrawer(); // nothing is dealt after this hand
+                    }
+                    if (!toured && p !== A && p !== B) toured = await emoteTour();
+                },
+            });
+            check(`hand ${handNo}, the emotes' hand, is played out — the emotes sent on a turn neither A's nor B's`, doc.state.hand.no === handNo && doc.state.hand.phase === 'complete' && toured);
+            // B's queued look, sent by B's own page once the hand is over.
+            let rowB = null;
+            for (let i = 0; i < 40 && rowB?.avatar !== bLookQueued; i++) {
+                await sleep(200);
+                rowB = (await roomDoc()).players.find((p) => p.pid === B.pid);
+            }
+            const bSeatNow = (await roomDoc()).state.seats.findIndex((s) => s?.pid === B.pid);
+            const bDrawn = await A.page.waitForFunction(({seat, look}) => document.querySelector(`[data-seat="${seat}"] [data-avatar]`)?.getAttribute('data-avatar') === look,
+                {seat: bSeatNow, look: bLookQueued}, {timeout: 8000}).then(() => true, () => false);
+            check('…and goes on the table by itself when the hand ends: stored, and on A\'s screen', bLookQueued !== null && rowB?.avatar === bLookQueued && bDrawn,
+                JSON.stringify({queued: bLookQueued, row: rowB?.avatar, bDrawn}));
+            // A's four-colour deck on the cards turned up by the hand's end (P5): a club or a diamond among them, in A's colours.
+            const end = await roomLook(A.page);
+            check('…and at its end A\'s screen draws a club or a diamond in A\'s four colours',
+                end !== null && (end.club !== null || end.diamond !== null) && (end.club === null || end.club === rgbOf(SUIT_COLOURS.four.c))
+                && (end.diamond === null || end.diamond === rgbOf(SUIT_COLOURS.four.d)), JSON.stringify(end));
+            await sleep(1500); // the last sounds of the hand
+            const [audioA, audioB] = await Promise.all([A, B].map((p) => p.page.evaluate(() => ({...window.__pnAudio}))));
+            check(`over hand ${handNo} the table's sounds played on A's screen (${audioA.osc} tones and ${audioA.buffer} noise slices started) and none on B's, whose sound is off`,
+                soundOff && audioA.osc > 0 && audioA.buffer > 0 && audioB.osc === 0 && audioB.buffer === 0, JSON.stringify({A: audioA, B: audioB}));
+            check('…and B turns the sounds back on', await drawerSwitch(B, 'sound', true));
+
+            // A phone driven by touch alone (page.tap: touch events, no mouse): its first tap wakes the
+            // table's sound inside a real gesture — a touch's pointerup or touchend, never its
+            // pointerdown, which is no gesture to a browser (and iOS starts Web Audio only in a
+            // touchend or a click) — and the context runs.
+            const touch = await newContext({viewport: {width: 390, height: 844}, isMobile: true, hasTouch: true});
+            await touch.addInitScript(AUDIO_GESTURE_PROBE);
+            const tapPage = await touch.newPage();
+            await tapPage.goto(`${BASE}/play/${code}`, {waitUntil: 'load', timeout: 120000});
+            await tapPage.waitForSelector('[data-pn-ready="true"]', {timeout: 60000}).catch(() => {});
+            const madeBefore = await tapPage.evaluate(() => window.__pnContexts.length);
+            // A tap on the felt by its place on the screen (the board and the seats sit over it).
+            const feltBox = await tapPage.locator('.pn-felt').boundingBox();
+            await tapPage.touchscreen.tap(feltBox.x + feltBox.width / 2, feltBox.y + feltBox.height / 2);
+            const running = await tapPage.waitForFunction(() => window.__pnContexts.some((c) => c.state === 'running'), null, {timeout: 5000}).then(() => true, () => false);
+            const audioLog = await tapPage.evaluate(() => window.__pnAudioLog);
+            check('a phone driven by taps alone: its first tap makes the table\'s audio context inside the gesture (the page has activation), and it runs',
+                madeBefore === 0 && running && audioLog.length > 0 && audioLog[0].active === true, JSON.stringify(audioLog));
+            await touch.close().catch(() => {});
+        }
+    }
+
     await hp.click('[data-open="host"]');
     await hp.waitForSelector('[data-pn-drawer="host"]', {timeout: 10000});
 
@@ -2260,9 +3301,131 @@ const tableInBrowser = async () => {
     check('…the table closed, every chip cashed out', doc.status === 'closed' && conservation(doc.state).ok);
     const footer = await hp.innerText('[data-summary-check]').catch(() => '');
     check('…and the summary\'s footer: every chip accounted for', /^Every chip is accounted for: [\d,]+ brought in\.$/.test(footer.trim()), footer);
+
+    // ── the night's awards (P7): the room's own, drawn, copied and celebrated ──
+    {
+        const order = await hp.$$eval('[data-standing]', (rows) => rows.map((row) => row.getAttribute('data-standing')));
+        const expected = nightAwards(order, doc.state.ledger, throwCountsOf(doc.awards));
+        const drawnOn = (page) => page.$$eval('[data-award]', (cards) => cards.map((card) => ({
+            id: card.getAttribute('data-award'),
+            pids: [...card.querySelectorAll('[data-award-winner]')].map((w) => w.getAttribute('data-award-winner')),
+            value: Number(card.getAttribute('data-award-value')),
+        })));
+        const drawn = await drawnOn(hp);
+        check('the summary\'s awards are the ledger\'s counters and the room\'s throws worked out again, every winner on a tie, none without its data',
+            JSON.stringify(drawn) === JSON.stringify(expected) && expected.some((a) => a.id === 'most-won'), JSON.stringify({drawn, expected}));
+        const tomatoes = Object.values(doc.awards ?? {}).some((t) => t?.received?.tomato > 0);
+        check(`…Tomato magnet shown exactly when a tomato landed tonight (${tomatoes ? 'one did' : 'none did'})`, drawn.some((a) => a.id === 'tomato-magnet') === tomatoes);
+        {
+            const pot = drawn.find((a) => a.id === 'biggest-pot');
+            const magnet = drawn.find((a) => a.id === 'tomato-magnet');
+            const biggest = Math.max(0, ...doc.state.ledger.filter((l) => order.includes(l.pid)).map((l) => l.biggestWin ?? 0));
+            const caught = Math.max(0, ...order.map((pid) => doc.awards?.[pid]?.received?.tomato ?? 0));
+            check(`…tonight's data shows on them: Biggest pot (${biggest} chips, the ledger's largest win) and Tomato magnet (${caught}, the most tomatoes one player caught)`,
+                pot?.value === biggest && biggest > 0 && magnet?.value === caught && caught > 0, JSON.stringify({pot, magnet}));
+        }
+        check('…the same awards on a guest\'s phone', JSON.stringify(await drawnOn(B.page)) === JSON.stringify(expected));
+        await hp.click('[data-copy-summary]');
+        const copied = await hp.evaluate(() => navigator.clipboard.readText()).catch((e) => `unreadable: ${e.message}`);
+        const lines = copied.split('\n');
+        check('Copy summary puts the standings and one line per award on the clipboard, the footer last',
+            expected.every((a) => lines.some((line) => line.startsWith(`${SUMMARY_COPY.awards[a.id]}: `)))
+                && lines.length === 2 + order.length + expected.length + 1 && lines.at(-1) === SUMMARY_COPY.footer, copied);
+        // The celebration: confetti and the cards stepping in, still under reduced motion (C), and
+        // never a sideways scroll on the phone (B).
+        const motion = (page) => page.evaluate(() => ({
+            confetti: document.querySelectorAll('[data-celebration] .pn-confetti').length,
+            cards: [...document.querySelectorAll('.pn-award-in')].map((el) => getComputedStyle(el).animationName),
+            bits: [...document.querySelectorAll('[data-celebration] .pn-confetti')].map((el) => getComputedStyle(el).animationName),
+            wide: document.documentElement.scrollWidth > window.innerWidth,
+        }));
+        const [hm, bm, cm] = await Promise.all([motion(hp), motion(B.page), motion(C.page)]);
+        check('the summary celebrates as it opens: confetti and the award cards stepping in', hm.confetti > 0 && hm.cards.length === expected.length
+            && hm.cards.every((n) => n === 'pn-award-in') && hm.bits.every((n) => n === 'pn-confetti'), JSON.stringify(hm));
+        check('…held still under reduced motion: no card moves and no piece flies', cm.cards.length === expected.length
+            && cm.cards.every((n) => n === 'none') && cm.bits.every((n) => n === 'none'), JSON.stringify(cm));
+        check('…and the confetti never widens the phone\'s page', !bm.wide && bm.confetti > 0, JSON.stringify(bm));
+    }
+
     await uiWording(hp, 'the night\'s summary');
     await uiShot(hp, '09-summary-1440');
     await uiShot(B.page, '09-summary-390');
+    for (const [p, width] of [[H, 1440], [B, 390]]) {
+        await p.page.locator('[data-award]').first().scrollIntoViewIfNeeded().catch(() => {});
+        await uiShot(p.page, `16-awards-${width}`);
+    }
+
+    // ── the lobby's My look (P5): a name, an avatar, a card back and the tables' scene saved to the
+    // host's account, and the next table opening with them — from the account alone, this
+    // browser's own copy cleared first ──
+    {
+        await hp.goto(`${BASE}/poker-night`, {waitUntil: 'load', timeout: 180000});
+        const panel = '[data-my-look]';
+        await hp.waitForSelector(`${panel} [data-pn-builder]`, {timeout: 60000});
+        const builder = `${panel} [data-pn-builder]`;
+        const preview = `${builder} .pn-seat-in[data-avatar]`;
+        const [, face0, colour0, frame0, badge0] = (await hp.getAttribute(preview, 'data-avatar')).split(':');
+        const want = {
+            face: face0 === 'robot' ? 'rocket' : 'robot', colour: colour0 === 'ocean' ? 'coral' : 'ocean',
+            frame: frame0 === 'gold' ? 'neon' : 'gold', badge: badge0 === 'gem' ? 'star' : 'gem',
+        };
+        await hp.click(`${builder} [data-pn-choice="avatar-face"] [data-pn-option="${want.face}"]`);
+        for (const part of ['colour', 'frame', 'badge']) {
+            await hp.click(`${builder} [data-pn-builder-tab="${part}"]`);
+            await hp.click(`${builder} [data-pn-choice="avatar-${part}"] [data-pn-option="${want[part]}"]`);
+        }
+        const avatar = await hp.getAttribute(preview, 'data-avatar');
+        const name = 'Lobby Lou';
+        await hp.fill(`${panel} [data-field="look-name"]`, name);
+        const scene = 'beach-sunset';
+        await hp.click(`${panel} [data-pn-default-table] [data-pn-choice="scene"] [data-pn-option="${scene}"]`);
+        const back = 'starfield';
+        await hp.click(`${panel} [data-pn-choice="card-back"] [data-pn-option="${back}"]`);
+        await uiWording(hp, 'the lobby with My look filled in');
+        await hp.locator(panel).scrollIntoViewIfNeeded();
+        await uiShotBoth(hp, '18-lobby-my-look');
+        await hp.click(`${panel} [data-save-look]`);
+        const saved = await hp.getByText(LOBBY_COPY.saved).waitFor({timeout: 30000}).then(() => true, () => false);
+        const closed = await roomDoc();
+        const owner = closed.players.find((p) => p.pid === closed.state.hostPid)?.userId;
+        const prefs = (await db.collection('userpreferences').findOne({userId: owner}))?.pokerNight ?? null;
+        check('the lobby\'s My look saves the name, the avatar from the builder, a card back and the tables\' scene (with its felt) to the account',
+            saved && avatar === `v1:${want.face}:${want.colour}:${want.frame}:${want.badge}` && prefs?.name === name && prefs.avatar === avatar
+            && prefs.look?.cardBack === back && prefs.table?.scene === scene && prefs.table.felt === SCENES[scene].felt, JSON.stringify(prefs));
+        // The save is mirrored into this browser: the name and the avatar, and none of the browser's
+        // own look — the account holds it, so a later save from another device reaches the tables here.
+        const mirrored = await hp.evaluate((key) => {
+            try {
+                return JSON.parse(localStorage.getItem(key) ?? 'null');
+            } catch {
+                return null;
+            }
+        }, ME_STORAGE_KEY);
+        check('…mirrored into this browser as the name and the avatar, with none of the browser\'s own look left to stand over the account\'s',
+            mirrored?.name === name && mirrored.avatar === avatar && mirrored.look !== null && typeof mirrored.look === 'object' && Object.keys(mirrored.look).length === 0,
+            JSON.stringify(mirrored));
+        // The next table, from the account alone: this browser's own copy of the look cleared first.
+        await hp.evaluate((key) => localStorage.removeItem(key), ME_STORAGE_KEY);
+        await hp.click('[data-quick-start]');
+        await hp.waitForURL(/\/play\/[A-HJ-NP-Z2-9]{6}(\?.*)?$/, {timeout: 120000});
+        const next = new URL(hp.url()).pathname.split('/').pop();
+        await hp.waitForSelector('[data-pn-drawer="invite"]', {timeout: 60000}).catch(() => {});
+        await hp.keyboard.press('Escape');
+        await hp.waitForSelector('[data-me]', {timeout: 30000});
+        await hp.waitForSelector('[data-pn-ready="true"]', {timeout: 30000}).catch(() => {});
+        const room = await rooms.findOne({env: ENV, code: next});
+        const row = room?.players.find((p) => p.pid === room.state.hostPid);
+        const seen = await hp.evaluate(() => ({
+            avatar: document.querySelector('[data-me] [data-avatar]')?.getAttribute('data-avatar') ?? null,
+            name: document.querySelector('[data-me] .pn-plate-name')?.textContent ?? null,
+        }));
+        const look = await roomLook(hp);
+        check(`…and the next table opens with them: the host seated as "${name}" in that avatar, the beach at sunset with its felt, the starfield backs`,
+            next !== code && row?.name === name && row.avatar === avatar && room.state.settings.scene === scene && room.state.settings.felt === SCENES[scene].felt
+            && seen.avatar === avatar && seen.name?.trim() === name && look?.scene === scene && look.felt === SCENES[scene].felt && look.back === back,
+            JSON.stringify({row: row && {name: row.name, avatar: row.avatar}, settings: room?.state.settings, seen, look}));
+        await uiShotBoth(hp, '19-next-table');
+    }
 
     // ── what every screen was held to ──
     const fresh_leaks = leaks.slice(leaksBefore);

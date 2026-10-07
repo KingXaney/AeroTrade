@@ -5,13 +5,18 @@
 // after the hand in play, which still plays on), then the drawers — Invite, Bank, Host (the host's, with a dot
 // while rebuy requests wait), and the menu with the hand log, My look and the viewer's own seat
 // (sit out next hand, deal me in, I'm back, take a seat, leave the table). Every target is at
-// least 44 px; a phone shows the same buttons with the name cut short.
+// least 44 px; a phone shows the same buttons with the name cut short. My look (P5) also has its own
+// button beside the menu, one tap from the table: the avatar builder and the personal look.
 
-import {Coins, Crown, Hourglass, LogOut, Menu, ScrollText, Smile, UserPlus, Armchair, Pause, Play} from "lucide-react";
+import {Coins, Crown, Hourglass, LogOut, Menu, ScrollText, Smile, UserPlus, Armchair, Pause, Play, Palette} from "lucide-react";
 import {DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuTrigger} from "@/components/ui/dropdown-menu";
 import {iconButton} from "@/components/primitives/iconButton";
 import type {DrawerKind} from "@/components/poker-night/overlay-requests";
 import {useRoom} from "@/components/poker-night/room-controller";
+import {Keyboard} from "lucide-react";
+import {openShortcuts} from "@/components/poker-night/emote-client";
+import {SHORTCUTS_COPY} from "@/lib/learn/copy/poker-night";
+import {ROOM_KEY_SHORTCUTS} from "@/lib/poker-night/keys";
 import {HOST_COPY, INVITE_COPY, OVERLAY_COPY, TABLE_COPY} from "@/lib/learn/copy/poker-night";
 import {handLive, ownSeat, waitingRequests, type SeatChoice} from "@/lib/poker-night/overlays";
 import {cn} from "@/lib/utils";
@@ -90,6 +95,11 @@ const TopBar = ({onOpen, onSeatChoice, onTakeSeat, onLeave}: Props) => {
                     </button>
                 )}
                 {joined && (
+                    <button type="button" className={ICON} aria-label={OVERLAY_COPY.myLook} title={OVERLAY_COPY.myLook} onClick={() => onOpen('look')} data-open="look">
+                        <Palette className="size-5" aria-hidden="true"/>
+                    </button>
+                )}
+                {joined && (
                     <DropdownMenu>
                         <DropdownMenuTrigger asChild>
                             <button type="button" className={ICON} aria-label={TABLE_COPY.menu} title={TABLE_COPY.menu} data-open="menu">
@@ -102,6 +112,10 @@ const TopBar = ({onOpen, onSeatChoice, onTakeSeat, onLeave}: Props) => {
                             </DropdownMenuItem>
                             <DropdownMenuItem className="min-h-11 gap-3 px-3 text-sm" onSelect={() => onOpen('look')} data-menu="look">
                                 <Smile className="size-4" aria-hidden="true"/>{OVERLAY_COPY.myLook}
+                            </DropdownMenuItem>
+                            {/* P6: every key the table answers (ShortcutsDialog; also the ? key). */}
+                            <DropdownMenuItem className="min-h-11 gap-3 px-3 text-sm" onSelect={openShortcuts} data-menu="shortcuts" aria-keyshortcuts={ROOM_KEY_SHORTCUTS.shortcuts}>
+                                <Keyboard className="size-4" aria-hidden="true"/>{SHORTCUTS_COPY.open}
                             </DropdownMenuItem>
                             {own && (own.choice || own.canTakeSeat || own.canLeave) && <DropdownMenuSeparator/>}
                             {own?.choice && (

@@ -12,7 +12,7 @@ import type {JoinInput} from '@/lib/poker-night/input';
 import {LIMITS} from '@/lib/poker-night/limits';
 import {clockStep, joinStep, newRoom, tableStep, wireOf, type KnownIdentity, type RoomCore, type StepResult} from '@/lib/poker-night/room';
 import {
-    casUpdate, commitFields, coreFromDoc, emotesSince, HEAD_PROJECTION, headFromDoc, ms, newRoomDoc, playerViewOf, realtimeOkAt, seenFrom, serverRoomFromDoc,
+    casUpdate, commitFields, coreFromDoc, emotesSince, HEAD_PROJECTION, headFromDoc, ms, newRoomDoc, playerViewOf, publicSeq, realtimeOkAt, seenFrom, serverRoomFromDoc,
     unchangedOf, unchangedOfRoom, unreadableCloseUpdate, unreadableKind, unreadRefusal, wireOfRoom, type RoomDocLean, type ServerRoom,
 } from '@/lib/poker-night/room-doc';
 import {FULL_DECK} from '@/lib/poker-night/deck';
@@ -42,7 +42,7 @@ const asRead = (doc: ReturnType<typeof newRoomDoc>, extra: Partial<RoomDocLean> 
     ...structuredClone(doc), _id: {toString: () => doc._id}, lastActivityAt: doc.lastActivityAt, ...extra,
 } as RoomDocLean);
 
-const OUT_OF_BAND = ['seen', 'emotes', 'emoteSeq', 'emoteAt', 'awards', 'rt', 'lastError', 'seq'];
+const OUT_OF_BAND = ['seen', 'emotes', 'emoteSeq', 'emoteAt', 'awards', 'rt', 'lastError', 'seq', 'hiddenCommits'];
 
 describe('reading a room back', () => {
     it('gives back the room a new document was made from', () => {
@@ -106,21 +106,40 @@ describe('a commit', () => {
 
     it('moves seq on, and drops the presence stamps of pruned rows only', () => {
         const core = room();
-        const plain = casUpdate(core, {applied: [], now: T0, closedAt: null, pruned: []});
+        const plain = casUpdate(core, {applied: [], now: T0, closedAt: null, pruned: [], visible: true});
         expect(plain.update.$inc).toEqual({seq: 1});
         expect(plain.update).not.toHaveProperty('$unset');
-        const pruned = casUpdate(core, {applied: [], now: T0, closedAt: null, pruned: ['Gone0000001', 'Gone0000002']});
+        const pruned = casUpdate(core, {applied: [], now: T0, closedAt: null, pruned: ['Gone0000001', 'Gone0000002'], visible: true});
         expect(pruned.update.$unset).toEqual({'seen.Gone0000001': '', 'seen.Gone0000002': ''});
         expect(Object.keys(pruned.update.$set)).not.toContain('seen');
+    });
+
+    it('moves hiddenCommits with seq for a write only its author can see, so the public seq stays put', () => {
+        const core = room();
+        const quiet = casUpdate(core, {applied: [], now: T0, closedAt: null, pruned: [], visible: false});
+        expect(quiet.update.$inc).toEqual({seq: 1, hiddenCommits: 1});
+        expect(Object.keys(quiet.update.$set)).not.toContain('hiddenCommits');
+        expect(newRoomDoc(core, T0)).toMatchObject({seq: 0, hiddenCommits: 0});
+        // seq 9 after two such writes: every answer says 7, the head and a full read alike.
+        const doc = asRead(newRoomDoc(core, T0), {seq: 9, hiddenCommits: 2});
+        expect(publicSeq(doc)).toBe(7);
+        expect(headFromDoc(doc).seq).toBe(7);
+        expect(serverRoomFromDoc(doc, core, T0).seq).toBe(7);
+        expect(wireOfRoom(serverRoomFromDoc(doc, core, T0)).seq).toBe(7);
+        expect(HEAD_PROJECTION).toHaveProperty('hiddenCommits', 1);
+        // A document from before hiddenCommits: its seq is its public seq.
+        expect(publicSeq({seq: 4})).toBe(4);
+        // Closing an unreadable room is seen by everyone: seq alone.
+        expect(unreadableCloseUpdate(T0, 9).$inc).toEqual({seq: 1});
     });
 
     it('stamps a close once and keeps the room a week past it', () => {
         const core = room();
         const closed = {...core, state: {...core.state, status: 'closed' as const}};
-        const first = casUpdate(closed, {applied: [], now: T0 + 100, closedAt: null, pruned: []});
+        const first = casUpdate(closed, {applied: [], now: T0 + 100, closedAt: null, pruned: [], visible: true});
         expect(first.closedAt).toBe(T0 + 100);
         expect(first.update.$set.expiresAt).toEqual(new Date(T0 + 100 + TIMING.ROOM_TTL_MS));
-        const later = casUpdate(closed, {applied: [], now: T0 + 999, closedAt: T0 + 100, pruned: []});
+        const later = casUpdate(closed, {applied: [], now: T0 + 999, closedAt: T0 + 100, pruned: [], visible: true});
         expect(later.closedAt).toBe(T0 + 100);
         expect(later.update.$set.nextDueAt).toBeNull();
         expect(unreadableCloseUpdate(T0, 7)).toEqual({

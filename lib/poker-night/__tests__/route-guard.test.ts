@@ -35,7 +35,7 @@ const PLAY_PAGES = filesUnder('app/(play)', /^page\.tsx$/);
 // Every file a (play) render runs: a page, a layout (it runs for a link preview and a prefetch too),
 // a loading or error boundary, a not-found page.
 const PLAY_FILES = filesUnder('app/(play)', /\.(ts|tsx)$/);
-const SERVER_MODULES = ['store', 'hands-store', 'results-store', 'identity', 'route-kit', 'realtime'].map((name) => `lib/poker-night/${name}.ts`);
+const SERVER_MODULES = ['store', 'hands-store', 'results-store', 'identity', 'route-kit', 'realtime', 'page-gate'].map((name) => `lib/poker-night/${name}.ts`);
 
 const exportsMethod = (code: string, method: string) => new RegExp(`export\\s+(async\\s+)?function\\s+${method}\\b|export\\s+const\\s+${method}\\b`).test(code);
 
@@ -62,7 +62,7 @@ const PRIVATE_ARGUMENT = /\b(state|room|doc)\b/;
 
 describe('the poker night routes', () => {
     it('are where the design puts them', () => {
-        expect(ROUTES.sort()).toEqual(['action', 'detail', 'join', 'state', 'tick', 'token'].map((name) => `app/api/poker-night/[code]/${name}/route.ts`));
+        expect(ROUTES.sort()).toEqual(['action', 'detail', 'emote', 'join', 'state', 'tick', 'token'].map((name) => `app/api/poker-night/[code]/${name}/route.ts`));
     });
 
     it('all run playerRequest, on Node, within ten seconds', () => {
@@ -72,6 +72,17 @@ describe('the poker night routes', () => {
             expect(code, file).toMatch(/export\s+const\s+runtime\s*=\s*'nodejs'/);
             expect(code, file).toMatch(/export\s+const\s+maxDuration\s*=\s*10\b/);
         }
+    });
+
+    it('let the seat pass stand in for the identity on the reads, the ticks and an emote, never on a join or a move', () => {
+        const takesPass = ROUTES.filter((file) => /allowPass:\s*true/.test(withoutComments(read(file)))).map((file) => file.split('/').at(-2)).sort();
+        expect(takesPass).toEqual(['detail', 'emote', 'state', 'tick', 'token']);
+    });
+
+    it('stamp an emote, and the cooldown its write is filtered on, with the time the request arrived', () => {
+        const code = withoutComments(read('app/api/poker-night/[code]/emote/route.ts'));
+        expect(code).toMatch(/const now = ctx\.receivedAt;/);
+        expect(code).not.toMatch(/Date\.now\(\)/);
     });
 
     it('never write from a GET, a (play) page or the request checks they share', () => {
@@ -96,6 +107,27 @@ describe('the (play) pages', () => {
     it('live under app/(play)/play/, and no (root) page takes /play', () => {
         for (const file of PLAY_PAGES) expect(file).toMatch(/^app\/\(play\)\/play\//);
         expect(existsSync(join(root, 'app/(root)/play'))).toBe(false);
+    });
+
+    it('read a room only through the page gate: a miss spent on an unknown code, every code gone past the counter', () => {
+        // The layout, the page and its metadata, each through readTablePage, never the store's reads.
+        expect(withoutComments(read('app/(play)/play/[code]/layout.tsx'))).toMatch(/\bawait\s+readTablePage\s*\(/);
+        expect(withoutComments(read('app/(play)/play/[code]/page.tsx')).match(/\bawait\s+readTablePage\s*\(/g)).toHaveLength(2);
+        for (const file of PLAY_FILES) expect(withoutComments(read(file)), file).not.toMatch(/\bgetRoomBy(Code|Id)\b/);
+        const gate = withoutComments(read('lib/poker-night/page-gate.ts'));
+        for (const call of [/pnKey\.miss\(/, /\btakeRateLimit\s*\(/, /\bpeekRateLimit\s*\(/, /\bcounterSpent\s*\(/]) expect(gate).toMatch(call);
+        expect(reachesMutate(gate)).toBe(false);
+    });
+
+    it('show an open table with the feature switched off as the lobby\'s note: after a closed table\'s summary, before the room', () => {
+        const page = withoutComments(read('app/(play)/play/[code]/page.tsx'));
+        const summary = page.indexOf('<NightSummary');
+        const off = page.search(/if\s*\(\s*!pokerNightEnabled\(\)\s*\)/);
+        const room = page.indexOf('<PokerNightRoom');
+        expect(summary).toBeGreaterThan(-1);
+        expect(off).toBeGreaterThan(summary);
+        expect(room).toBeGreaterThan(off);
+        expect(page.slice(off, room)).toMatch(/POKER_NIGHT_COPY\.off/);
     });
 });
 

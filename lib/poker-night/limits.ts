@@ -66,15 +66,24 @@ export type BucketKind = keyof typeof BUCKETS;
 // The Mongo counters (lib/rate-limit.takeRateLimit), each a write, so only on low-frequency routes.
 export const RATE_LIMITS = {
     create: {limit: 10, windowMs: HOUR},
+    // A join from a new identity, per address, whether or not the table lets it in.
     joinIp: {limit: 30, windowMs: 10 * MINUTE},
+    // Rows a join made, per room: read before the join and spent only once it made one, so joins the
+    // table turns down (locked, full, removed) never use up the room's and keep friends out.
     joinRoom: {limit: 60, windowMs: 10 * MINUTE},
-    // Unknown codes on every table route (never a page render): a guess at a code costs one.
+    // Unknown codes, per address, on every table route and on the table's page (/play/CODE): a guess
+    // at a code costs one, and an address past it finds every code gone on the page.
     miss: {limit: 20, windowMs: 10 * MINUTE},
     token: {limit: 20, windowMs: 10 * MINUTE},
     look: {limit: 20, windowMs: MINUTE},
 } as const;
 
 export type RateLimitName = keyof typeof RATE_LIMITS;
+
+// Whether a counter read without spending it (lib/rate-limit.peekRateLimit: null once its window has
+// passed) has used up its window: takeRateLimit lets the limit-th spend through and refuses the
+// next, so a window holding `limit` already allows no more.
+export const counterSpent = (peek: {count: number} | null, limit: number): boolean => peek !== null && peek.count >= limit;
 
 const PREFIX = 'poker-night';
 

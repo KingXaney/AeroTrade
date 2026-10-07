@@ -5,7 +5,8 @@
 import {describe, expect, it} from 'vitest';
 import {nextDueAt} from '@/lib/poker-night/clock';
 import {bestFive} from '@/lib/poker-night/hand-name';
-import {bannerShows, cardLook, resultLook} from '@/lib/poker-night/reveal';
+import {HAND_COPY, TABLE_COPY} from '@/lib/learn/copy/poker-night';
+import {bannerLines, bannerShows, cardLook, resultLook} from '@/lib/poker-night/reveal';
 import type {TableState} from '@/lib/poker-night/types';
 import {clockLeaderOf, wireView} from '@/lib/poker-night/views';
 import {A, C, F, X, cards, deal, moves, nowOf, runOut, table} from './fixtures';
@@ -78,5 +79,30 @@ describe('no showdown', () => {
         expect(resultLook(view(deal(three())).hand)).toBeNull();
         expect(resultLook(null)).toBeNull();
         expect(cardLook(null, 0)).toBeNull();
+    });
+});
+
+describe("the banner's words", () => {
+    it('says "You win" to the viewer, names everyone else (their seat before the people arrive) and the hand', () => {
+        let s = deal(three(), {holes: {0: 'AhKh', 1: '7c2d', 2: 'QsQd'}, board: '2c5d9hJs3c'});
+        s = moves(s, C, C, X, X, X, X, X, X, X, X, X, X);
+        const look = resultLook(view(s).hand)!;
+        const pair = HAND_COPY.label({category: 1, ranks: [10, 9, 7, 3]});
+        expect(bannerLines(look, () => 'Ana', 2)).toEqual([{seat: 2, mine: true, head: TABLE_COPY.bannerYou(60), hand: pair}]);
+        expect(bannerLines(look, () => 'Ana', 0)).toEqual([{seat: 2, mine: false, head: TABLE_COPY.banner('Ana', 60), hand: pair}]);
+        expect(bannerLines(look, () => null, null)[0].head).toBe(TABLE_COPY.banner(TABLE_COPY.seat(2), 60));
+    });
+
+    it('says when the board plays, names at most three winners, and no hand for an uncontested pot', () => {
+        let s = deal(three(), {holes: {0: '2h3d', 1: '2c3s', 2: '4h5d'}, board: 'AsKsQsJsTs'});
+        s = moves(s, C, C, X, X, X, X, X, X, X, X, X, X);
+        const lines = bannerLines(resultLook(view(s).hand)!, () => 'Bo', null);
+        expect(lines).toHaveLength(3);
+        for (const line of lines) expect(line.hand).toBe(`${HAND_COPY.label({category: 8, ranks: [12]})} · ${HAND_COPY.playsBoard}`);
+        const many = {handNo: 1, showdown: true, shown: [], playing: [], winners: [0, 1, 2, 3].map((seat) => ({seat, amount: 10, description: null, playsBoard: false}))};
+        expect(bannerLines(many, () => 'Bo', null).map((l) => l.seat)).toEqual([0, 1, 2]);
+        let t = deal(three(), {board: '2c7d9s3s4c'});
+        t = moves(t, F, F);
+        expect(bannerLines(resultLook(view(t).hand)!, () => 'Bo', null)[0].hand).toBeNull();
     });
 });

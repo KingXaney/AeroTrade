@@ -29,8 +29,25 @@ describe('the motion guards in app/globals.css', () => {
     const toggleStart = css.indexOf('html[data-motion="reduced"] :is(');
     const toggleSelector = css.slice(toggleStart, css.indexOf('{', toggleStart));
 
+    // Poker night's emotes (P6, EmoteLayer): every class that moves, each named after its keyframe;
+    // the phrase's pop-in is a mechanic on the motion token, the rest one-shots in literal time.
+    const EMOTES = ['pn-emote-rise', 'pn-phrase-in', 'pn-throw-x', 'pn-throw-y', 'pn-splat', 'pn-petals', 'pn-fizz', 'pn-bounce'];
+    const EMOTE_MECHANICS = ['pn-phrase-in'];
+
+    // Poker night's looks (P5, SceneBackdrop and SceneArt): the scenes' ambient loops, in literal
+    // seconds on elements that also carry .pn-ambient (which brutalist stops by name), and a new
+    // scene's fade-in, a mechanic on the motion token.
+    const LOOKS = ['pn-ambient-twinkle', 'pn-ambient-drift', 'pn-ambient-flicker', 'pn-ambient-waves', 'pn-scene-fade'];
+
+    // Poker night's end of the night (P7, NightSummary): the award cards stepping in, a mechanic on
+    // the motion token (the celebration's confetti is the table's own .pn-confetti).
+    const SUMMARY = ['pn-award-in'];
+
     // Poker night's table (app/globals.css's poker night section): every class that moves.
     const POKER_NIGHT = [
+        ...EMOTES.map((name) => `.${name}`),
+        ...LOOKS.map((name) => `.${name}`),
+        ...SUMMARY.map((name) => `.${name}`),
         '.pn-deal', '.pn-flip', '.pn-chip-slide', '.pn-chip-land', '.pn-sweep', '.pn-fold', '.pn-fold-turn', '.pn-dim', '.pn-win-lift', '.pn-win-glow',
         '.pn-banner-drop', '.pn-chip-stream', '.pn-pot-out', '.pn-seat-in', '.pn-tag-pop', '.pn-win-pop', '.pn-pulse', '.pn-confetti', '.pn-turn-ring', '.pn-ambient',
     ];
@@ -58,6 +75,9 @@ describe('the motion guards in app/globals.css', () => {
     // a transition), and none of the stylesheet's own animations is left out of the guards.
     it('declares every poker night keyframe and stops the loops and the turn ring by name in brutalist', () => {
         const KEYFRAMES = [
+            ...EMOTES,
+            ...LOOKS,
+            ...SUMMARY,
             'pn-deal', 'pn-flip', 'pn-chip-slide', 'pn-chip-land', 'pn-sweep', 'pn-fold', 'pn-fold-turn', 'pn-dim', 'pn-win-lift', 'pn-win-glow',
             'pn-banner-drop', 'pn-chip-stream', 'pn-pot-out', 'pn-seat-in', 'pn-tag-pop', 'pn-win-pop', 'pn-pulse', 'pn-confetti',
         ];
@@ -74,10 +94,28 @@ describe('the motion guards in app/globals.css', () => {
     });
 
     it('times the table\'s mechanics on the motion token, so brutalist and the guards play them at once', () => {
-        for (const name of ['pn-deal', 'pn-flip', 'pn-chip-slide', 'pn-chip-land', 'pn-sweep', 'pn-fold', 'pn-fold-turn', 'pn-dim', 'pn-win-lift', 'pn-banner-drop', 'pn-chip-stream', 'pn-pot-out', 'pn-seat-in', 'pn-tag-pop']) {
+        for (const name of ['pn-deal', 'pn-flip', 'pn-chip-slide', 'pn-chip-land', 'pn-sweep', 'pn-fold', 'pn-fold-turn', 'pn-dim', 'pn-win-lift', 'pn-banner-drop', 'pn-chip-stream', 'pn-pot-out', 'pn-seat-in', 'pn-tag-pop', ...EMOTE_MECHANICS, ...SUMMARY]) {
             const rule = new RegExp(`\\.${name} \\{[^}]*animation: ${name} calc\\(var\\(--motion-base\\)[^;]*calc\\(var\\(--motion-base\\)`);
             expect(css, name).toMatch(rule);
         }
+    });
+});
+
+// Poker night's scenes (P5): the art's loops stop with brutalist by the name every looping element
+// carries, and a scene change is timed on the motion token, so brutalist and both guards show the
+// new scene at once.
+describe('the poker night scenes in app/globals.css', () => {
+    const css = readFileSync(fileURLToPath(new URL('../../../app/globals.css', import.meta.url)), 'utf8').replace(/\r\n/g, '\n');
+
+    it('fades a new scene in on the motion token', () => {
+        expect(css).toMatch(/\.pn-scene-fade \{[^}]*animation: pn-scene-fade calc\(var\(--motion-base\) \* \d+\)/);
+    });
+
+    it('runs the ambient loops forever, each one stopped in brutalist through .pn-ambient', () => {
+        for (const name of ['twinkle', 'drift', 'flicker', 'waves']) {
+            expect(css, name).toMatch(new RegExp(`\\.pn-ambient-${name} \\{[^}]*animation: pn-ambient-${name} [\\d.]+s [^;]*infinite`));
+        }
+        expect(css).toMatch(/\[data-style="brutalist"\] :is\(\.pn-pulse, \.pn-win-glow, \.pn-ambient\)\s*\{\s*animation: none;/);
     });
 });
 

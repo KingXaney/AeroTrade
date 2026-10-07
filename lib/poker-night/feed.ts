@@ -45,13 +45,18 @@ export type FeedState = {
 export type FeedInput =
     // A player view from any request (GET state, POST action, join or tick). at: when the answer
     // arrived; sentAt: when its request left (a clock sample); animate false snaps (a hidden tab).
-    | {type: 'view'; view: PlayerView; at: number; sentAt?: number; animate?: boolean}
+    // pre: the answer to the viewer's own pre-action, set, changed or cleared — a write nobody else
+    // can see, which moves no seq (room-doc.publicSeq), so at the seq held it still brings that
+    // pre-action (pre-actions go out one at a time, components/poker-night/PreActions).
+    | {type: 'view'; view: PlayerView; at: number; sentAt?: number; animate?: boolean; pre?: boolean}
     // The public part alone, from the realtime channel (P4). moving: a move of the viewer's own is
     // out, whose commit may change their own part where no message shows it (a pre-action), so the
     // message does not count that part fresh — the move's answer brings it.
     | {type: 'wire'; wire: WireView; at: number; animate?: boolean; moving?: boolean}
     | {type: 'unchanged'; body: Unchanged; at: number; sentAt?: number}
     | {type: 'failed'}
+    // Emotes that came on their own: the realtime channel's 'emote' messages, the sender's own (P6).
+    | {type: 'emotes'; emotes: EmoteView[]}
     // A visitor's page, rendered again (router.refresh): the public table as it is now.
     | {type: 'preview'; preview: RoomView}
     // The page has mounted: a first guess at the clock until a round trip gives a sample.
@@ -120,6 +125,9 @@ export const mergeWire = (view: PlayerView, wire: WireView): PlayerView => ({
     clockLeader: wire.clockLeader, peopleV: wire.peopleV, watchers: wire.watchers, realtimeOk: wire.realtimeOk,
 });
 
+const samePreView = (a: MeView['pre'], b: MeView['pre']): boolean =>
+    a === b || (a !== null && b !== null && a.kind === b.kind && (a.kind !== 'call' || (b.kind === 'call' && a.amount === b.amount)));
+
 // Whether the viewer's pre-action still stands after this message. Only its owner sets one (and
 // the move's own answer brings it), and the engine clears it when its owner acts, folds or leaves,
 // when the turn reaches them, when the street moves on and when the hand ends — every one of
@@ -152,12 +160,29 @@ const ownPart = (view: PlayerView, wire: WireView): MeView => {
 export const graftPrivate = (held: PlayerView, whole: PlayerView): PlayerView | null =>
     whole.me.pid === held.me.pid && whole.seq < held.seq && !needsPrivate(whole, held) ? mergeWire(whole, held) : null;
 
+// Emotes that came on their own (P6): an 'emote' message off the realtime channel, or the sender's
+// own from POST emote's answer. Merged once each (mergeEmotes); the emote seq moves only while the
+// emotes held run on without a gap from it, so a poll's esince never skips one the channel missed —
+// and an emote past a gap names a newer emote seq (knownEmoteSeq), which reads the table once.
+export const withEmotes = (state: FeedState, incoming: readonly EmoteView[]): FeedState => {
+    if (incoming.length === 0 || state.view === null) return state;
+    const emotes = mergeEmotes(state.emotes, incoming, state.emoteFloor);
+    const seqs = new Set([...emotes, ...incoming].map((e) => e.seq));
+    let emoteSeq = state.emoteSeq;
+    while (seqs.has(emoteSeq + 1)) emoteSeq++;
+    const knownEmoteSeq = Math.max(state.knownEmoteSeq, ...incoming.map((e) => e.seq));
+    if (emoteSeq === state.emoteSeq && knownEmoteSeq === state.knownEmoteSeq && emotes.length === state.emotes.length && emotes.every((e, i) => e === state.emotes[i])) return state;
+    return {...state, emotes, emoteSeq, knownEmoteSeq};
+};
+
 export const feedReducer = (state: FeedState, input: FeedInput): FeedState => {
     switch (input.type) {
         case 'mounted':
             return state.samples.length > 0 ? state : {...state, offset: Math.round(state.serverNow - input.at)};
         case 'failed':
             return {...state, failures: state.failures + 1};
+        case 'emotes':
+            return withEmotes(state, input.emotes);
         case 'preview': {
             // Only before a join, and only a table at least as new as the one held (presence moves
             // without a seq, so the same seq at a later time still counts).
@@ -178,6 +203,11 @@ export const feedReducer = (state: FeedState, input: FeedInput): FeedState => {
             const freshens = view.seq === state.seq && state.privateSeq < view.seq;
             if (state.view !== null && view.seq <= state.seq && !freshens) {
                 const kept = {...state, ...clock, pass, failures: 0, knownSeq: Math.max(state.knownSeq, view.seq)};
+                // The viewer's own pre-action, answered at the seq held: only that, the table as held.
+                if (input.pre === true && view.seq === state.seq && view.me.pid === state.view.me.pid) {
+                    const held = state.view;
+                    return samePreView(held.me.pre, view.me.pre) ? kept : {...kept, view: {...held, me: {...held.me, pre: view.me.pre}}};
+                }
                 // Older still, yet newer than the own part held: that part, kept under the table held
                 // when nothing since could have changed it (graftPrivate) — else a read again.
                 const grafted = view.seq > state.privateSeq ? graftPrivate(state.view, view) : null;

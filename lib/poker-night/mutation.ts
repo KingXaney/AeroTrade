@@ -17,10 +17,14 @@
 // 4. A refused step still lets the clock's own changes up to now commit (the table must not stall
 //    on a refusal), but its action id is not recorded: the same id may try again.
 // 5. Nothing changed at all: no write.
+// 6. A write says whether anyone but its author can see it (seenByOthers): a pre-action set, changed
+//    or cleared by a player not on the clock shows only in that player's own view, so its commit
+//    moves the compare-and-set's seq but not the public one (room-doc.publicSeq), and nothing is
+//    published — no other browser can read a pre-action's timing off a version that moved.
 
 import type {PokerNightErrorCode} from '@/lib/poker-night/http';
 import {clockStep, idleCloseDue, idleCloseStep, withApplied, type JoinResult, type RoomCore, type Step, type StepResult} from '@/lib/poker-night/room';
-import type {DeckSource, HandSummary} from '@/lib/poker-night/types';
+import type {DeckSource, HandSummary, TableState} from '@/lib/poker-night/types';
 
 export type MutationInput = {
     core: RoomCore;
@@ -40,9 +44,30 @@ export type Plan =
     | {kind: 'unchanged'; join: JoinResult | null}
     // A write. refusal set: the clock moved (or the idle room closed) but the request itself was
     // refused, and that is its answer.
-    | {kind: 'commit'; core: RoomCore; applied: string[]; hands: HandSummary[]; ledgerDirty: boolean; join: JoinResult | null; refusal: PokerNightErrorCode | null};
+    // visible: seenByOthers(before, after).
+    | {
+        kind: 'commit'; core: RoomCore; applied: string[]; hands: HandSummary[]; ledgerDirty: boolean; join: JoinResult | null;
+        refusal: PokerNightErrorCode | null; visible: boolean;
+    };
 
 type Done = Extract<StepResult, {ok: true}>;
+
+// The state with every pre-action left out: the only private part a step can change on its own.
+const withoutPre = (state: TableState): TableState => {
+    const hand = state.hand;
+    if (!hand || hand.seats.every((p) => p.pre === null)) return state;
+    return {...state, hand: {...hand, seats: hand.seats.map((p) => (p.pre === null ? p : {...p, pre: null}))}};
+};
+
+// Whether a write changes anything a viewer other than its author could see: anything at all but
+// the pre-actions (the deck and the holes move only with a deal, which everyone sees). The people,
+// the bans and peopleV count; the out-of-band parts never change in a step.
+export const seenByOthers = (before: RoomCore, after: RoomCore): boolean => {
+    if (after === before) return false;
+    if (after.players !== before.players || after.bannedKeys !== before.bannedKeys || after.peopleV !== before.peopleV) return true;
+    if (after.state === before.state) return false;
+    return JSON.stringify(withoutPre(after.state)) !== JSON.stringify(withoutPre(before.state));
+};
 
 // The clock's and the idle close's steps never refuse.
 const done = (r: StepResult): Done => {
@@ -56,7 +81,10 @@ export const planMutation = (m: MutationInput): Plan => {
     if (core.state.status !== 'closed' && idleCloseDue(m.lastActivityAt, now)) {
         const closed = done(idleCloseStep(core, now));
         if (closed.core === core) return {kind: 'refused', code: 'closed'};
-        return {kind: 'commit', core: closed.core, applied: [...m.applied], hands: closed.hands, ledgerDirty: closed.ledgerDirty, join: null, refusal: 'closed'};
+        return {
+            kind: 'commit', core: closed.core, applied: [...m.applied], hands: closed.hands, ledgerDirty: closed.ledgerDirty, join: null, refusal: 'closed',
+            visible: seenByOthers(core, closed.core),
+        };
     }
     const clock = clockStep(source, {pid: m.by});
     const at = Math.min(m.receivedAt, now);
@@ -65,7 +93,10 @@ export const planMutation = (m: MutationInput): Plan => {
     if (!r.ok) {
         const c = done(clock(core, now));
         if (c.core === core) return {kind: 'refused', code: r.code};
-        return {kind: 'commit', core: c.core, applied: [...m.applied], hands: c.hands, ledgerDirty: c.ledgerDirty, join: null, refusal: r.code};
+        return {
+            kind: 'commit', core: c.core, applied: [...m.applied], hands: c.hands, ledgerDirty: c.ledgerDirty, join: null, refusal: r.code,
+            visible: seenByOthers(core, c.core),
+        };
     }
     const b = done(clock(r.core, now));
     if (b.core === core) return {kind: 'unchanged', join: r.join};
@@ -77,6 +108,7 @@ export const planMutation = (m: MutationInput): Plan => {
         ledgerDirty: a.ledgerDirty || r.ledgerDirty || b.ledgerDirty,
         join: r.join,
         refusal: null,
+        visible: seenByOthers(core, b.core),
     };
 };
 

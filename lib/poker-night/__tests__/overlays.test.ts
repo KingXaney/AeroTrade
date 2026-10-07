@@ -12,13 +12,13 @@ import {DEFAULT_CONFIG, checkConfig, mergeConfig} from '@/lib/poker-night/config
 import {reduce} from '@/lib/poker-night/engine';
 import {
     bankTimeline, checkGameForm, chipsInValue, chipsRange, gameFormOf, GAME_FIELDS, holdsCards, hostPeople, hostRowStatus, inviteDeal,
-    joinCardState, joinNotes, myTurnKey, openSeats, ownChips, ownSeat, rebuyLimitChoices, REBUY_FIELDS, requestEnded, seatedCount, tableControl,
+    joinCardState, joinNotes, myTurnKey, openSeats, profileWaits, ownChips, ownSeat, rebuyLimitChoices, REBUY_FIELDS, requestEnded, seatedCount, tableControl,
     timerChoices, waitingRequests,
 } from '@/lib/poker-night/overlays';
 import type {TableState} from '@/lib/poker-night/types';
 import type {JoinView, PlayerView} from '@/lib/poker-night/view-types';
 import {clockLeaderOf, peopleIds, playerView} from '@/lib/poker-night/views';
-import {C, R, deal, moves, nowOf, ok, pidOf, table} from './fixtures';
+import {C, F, R, deal, moves, nowOf, ok, pidOf, table} from './fixtures';
 
 const people = (s: TableState, extra: string[] = []) =>
     Object.fromEntries([...peopleIds(s), ...extra].map((pid) => [pid, {name: pid.toUpperCase(), avatar: 'v1:fox:tangerine:none:none'}]));
@@ -46,6 +46,19 @@ describe('the drawers and the turn', () => {
         const again = next.hand!.actor!;
         expect(myTurnKey(pv(next, pidOf(again)))).toBe(next.turn);
         expect(next.turn).not.toBe(s.turn);
+    });
+
+    it('holds a seated player\'s new name and look only while a hand is being played', () => {
+        const s = three();
+        expect(profileWaits(pv(s, pidOf(0)))).toBe(false);
+        const live = deal(s);
+        for (const seat of [0, 1, 2]) expect(profileWaits(pv(live, pidOf(seat)))).toBe(true);
+        // A watcher never waits, nor does a player whose hand has ended.
+        expect(profileWaits(pv(live, 'w1', {extra: ['w1']}))).toBe(false);
+        expect(profileWaits(null)).toBe(false);
+        const over = moves(live, F, F);
+        expect(over.hand?.phase).toBe('complete');
+        expect(profileWaits(pv(over, pidOf(0)))).toBe(false);
     });
 
     it('has no turn between hands or for a watcher', () => {

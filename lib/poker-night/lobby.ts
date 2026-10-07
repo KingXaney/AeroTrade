@@ -21,7 +21,9 @@ import {DEFAULT_CONFIG, TABLE_LIMITS, TIMING, type ConfigIssue} from '@/lib/poke
 import type {Env} from '@/lib/poker-night/env';
 import {LIMITS} from '@/lib/poker-night/limits';
 import {tablePath} from '@/lib/poker-night/links';
+import {resolveTableLook, type TableLook} from '@/lib/poker-night/looks';
 import {cleanName} from '@/lib/poker-night/names';
+import {DEFAULT_PERSONAL_LOOK, ME_STORAGE_KEY, resolvePersonalLook, type PersonalLook} from '@/lib/poker-night/personal';
 import type {RecentNight} from '@/lib/poker-night/results';
 import type {GameConfig, RebuyPolicy, TableStatus} from '@/lib/poker-night/types';
 
@@ -196,13 +198,17 @@ export const shapeLobby = ({userId, mine, friends, results, now, shareUrl}: Lobb
 
 // ── the name and look an account sits down with ──
 
-// What an account saved (prefs-store.getPokerNightPrefs): either part may be missing.
-export type SavedProfile = {name: string | null; avatar: string | null};
+// What an account saved (prefs-store.getPokerNightPrefs): any part may be missing. look holds the
+// personal look's fields that read (lib/poker-night/personal), table the scene and felt the
+// account's new tables open with.
+export type SavedProfile = {name: string | null; avatar: string | null; look?: Partial<PersonalLook> | null; table?: TableLook | null};
 
 export type LobbyProfile = {
     // What a new table seats the host as, and what My look starts from.
     name: string;
     avatar: string;
+    look: PersonalLook; // the saved personal look over the defaults
+    table: TableLook; // the scene and felt a new table opens with
     saved: SavedProfile;
 };
 
@@ -211,17 +217,21 @@ export const firstNameOf = (accountName: string | null | undefined): string =>
     cleanName((accountName ?? '').trim().split(/\s+/)[0] ?? '') ?? '';
 
 // The account's saved name and look, else its first name and the look its id rolls
-// (avatar.avatarForUser: the same every time). A saved value that no longer reads is ignored.
+// (avatar.avatarForUser: the same every time); its saved personal look and table look over the
+// defaults. A saved value that no longer reads is ignored, field by field.
 export const profileOf = (saved: SavedProfile, accountName: string | null | undefined, userId: string): LobbyProfile => ({
     name: cleanName(saved.name) ?? firstNameOf(accountName),
     avatar: isAvatar(saved.avatar) ? saved.avatar : encodeAvatar(avatarForUser(userId)),
+    look: resolvePersonalLook(saved.look ?? null, DEFAULT_PERSONAL_LOOK),
+    table: resolveTableLook(saved.table ?? null),
     saved,
 });
 
 // ── the look a browser kept ──
 
-// The key the table keeps a browser's name and look under (shared with the table's own code).
-export const ME_STORAGE_KEY = 'aero-poker-night:me';
+// The key the table keeps a browser's name and look under: lib/poker-night/personal's, where the
+// whole stored value is read and written.
+export {ME_STORAGE_KEY};
 
 // What a browser kept under ME_STORAGE_KEY, as far as the lobby reads it: a name and a look, each
 // only when it still reads; null when there is nothing usable (absent, not JSON, neither part).

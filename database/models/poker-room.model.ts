@@ -33,7 +33,9 @@ export interface PokerRoomDoc extends Document {
     seatsTaken: number;
     showToFriends: boolean;
     nextDueAt: Date | null;   // when the clock next has something to do: GET state and tick read it cheaply
-    seq: number;              // +1 per committed write: the public version and the CAS guard
+    seq: number;              // +1 per committed write: the CAS guard
+    hiddenCommits: number;    // +1 with seq on a write only its author can see (a pre-action): seq − hiddenCommits
+                              // is the public version every answer carries (lib/poker-night/room-doc.publicSeq)
     peopleV: number;          // the version of everyone's names and looks (lib/poker-night/room)
     state: TableState;        // Mixed, migrated on every read (lib/poker-night/migrate)
     players: PokerRoomPlayerDoc[];
@@ -79,6 +81,7 @@ const PokerRoomSchema = new Schema<PokerRoomDoc>(
         showToFriends: {type: Boolean, required: true, default: false},
         nextDueAt: {type: Date, default: null},
         seq: {type: Number, required: true, default: 0},
+        hiddenCommits: {type: Number, default: 0},
         peopleV: {type: Number, required: true, default: 1},
         state: {type: Schema.Types.Mixed, required: true},
         players: {type: [PokerRoomPlayerSchema], default: []},

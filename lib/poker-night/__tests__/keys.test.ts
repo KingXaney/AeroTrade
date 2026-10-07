@@ -5,6 +5,7 @@
 
 import {describe, expect, it} from 'vitest';
 import {intentForKey, isControlTarget, isEditableTarget, keyAllowed, KEY_SHORTCUTS} from '@/lib/poker-night/keys';
+import {ROOM_KEY_SHORTCUTS, roomIntentForKey, SHORTCUTS} from '@/lib/poker-night/keys';
 
 describe('the shortcuts', () => {
     it('map F, C, R and A in either case', () => {
@@ -106,5 +107,40 @@ describe('editable targets', () => {
         expect(isEditableTarget({tagName: 'BUTTON'})).toBe(false);
         expect(isEditableTarget(null)).toBe(false);
         expect(isEditableTarget('input')).toBe(false);
+    });
+});
+
+// The room's own keys (P6): E, L, B, M and ?, under the same rules as the moves, none of them a move.
+describe('the room\'s keys', () => {
+    it('map E, L, B, M and ? in either case', () => {
+        expect(roomIntentForKey({key: 'e'})).toBe('emotes');
+        expect(roomIntentForKey({key: 'E'})).toBe('emotes');
+        expect(roomIntentForKey({key: 'l'})).toBe('log');
+        expect(roomIntentForKey({key: 'b'})).toBe('bank');
+        expect(roomIntentForKey({key: 'm'})).toBe('mute');
+        expect(roomIntentForKey({key: '?'})).toBe('shortcuts');
+        expect(roomIntentForKey({key: 'f'})).toBeNull();
+        expect(roomIntentForKey({key: 'Escape'})).toBeNull();
+    });
+
+    it('never fire with a modifier, on a held key or while typing', () => {
+        for (const extra of [{metaKey: true}, {ctrlKey: true}, {altKey: true}, {repeat: true}, {editable: true}]) {
+            expect(roomIntentForKey({key: 'e', ...extra})).toBeNull();
+        }
+    });
+
+    it('never share a key with a move', () => {
+        for (const key of ['e', 'l', 'b', 'm', '?']) expect(intentForKey({key}, {raiseOpen: true})).toBeNull();
+        for (const key of ['f', 'c', 'r', 'a', '1', 'Enter']) expect(roomIntentForKey({key})).toBeNull();
+    });
+
+    it('list every key once, the moves first, each as aria-keyshortcuts names it', () => {
+        const ids = [...SHORTCUTS.turn, ...SHORTCUTS.table].map((s) => s.id);
+        expect(new Set(ids).size).toBe(ids.length);
+        expect(SHORTCUTS.table.map((s) => s.id)).toEqual(Object.keys(ROOM_KEY_SHORTCUTS));
+        for (const s of SHORTCUTS.table) expect(s.keys).toEqual([ROOM_KEY_SHORTCUTS[s.id]]);
+        for (const id of ['fold', 'check-call', 'raise', 'all-in'] as const) {
+            expect(SHORTCUTS.turn.find((s) => s.id === id)?.keys).toEqual([KEY_SHORTCUTS[id]]);
+        }
     });
 });

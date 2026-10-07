@@ -9,6 +9,7 @@
 import {z} from 'zod';
 import {AVATAR_MAX_LENGTH, isAvatar} from '@/lib/poker-night/avatar';
 import {GameConfigSchema, RoomSettingsSchema, TABLE_LIMITS} from '@/lib/poker-night/config';
+import {PHRASE_IDS, REACTION_IDS, THROW_IDS, type ReactionId, type ThrowId} from '@/lib/poker-night/emotes';
 import {cleanTableName} from '@/lib/poker-night/names';
 import type {HostOp, Move, PreAction, TableAction} from '@/lib/poker-night/types';
 
@@ -97,14 +98,15 @@ export const isRoomAction = (input: ActionInput): input is RoomActionInput =>
 export const TickSchema = z.strictObject({beat: z.strictObject({hidden: z.boolean()}).optional()});
 export type TickInput = z.infer<typeof TickSchema>;
 
-// POST emote (P6): the item lists arrive with lib/poker-night/emotes; until then an item is any
-// short lower-case id, and the route is not served.
-const EMOTE_ITEM = /^[a-z][a-z-]{0,23}$/;
+// POST emote: a reaction, a phrase or a throw at another player, each item an id from
+// lib/poker-night/emotes' registries (never free text). emotes.parseEmote reads the same shape by
+// hand for the browser; input.test holds the two to each other.
 export const EmoteSchema = z.discriminatedUnion('kind', [
-    z.strictObject({kind: z.enum(['react', 'say']), item: z.string().regex(EMOTE_ITEM)}),
-    z.strictObject({kind: z.literal('throw'), item: z.string().regex(EMOTE_ITEM), to: pid}),
+    z.strictObject({kind: z.literal('react'), item: z.enum(REACTION_IDS as [ReactionId, ...ReactionId[]])}),
+    z.strictObject({kind: z.literal('say'), item: z.enum(PHRASE_IDS)}),
+    z.strictObject({kind: z.literal('throw'), item: z.enum(THROW_IDS as [ThrowId, ...ThrowId[]]), to: pid}),
 ]);
-export type EmoteInput = z.infer<typeof EmoteSchema>;
+export type {EmoteInput} from '@/lib/poker-night/emotes';
 
 const moveOf = (m: z.infer<typeof MoveSchema>): Move => (m.kind === 'raise' ? {kind: 'raise', to: m.to} : {kind: m.kind});
 

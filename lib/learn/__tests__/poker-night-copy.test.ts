@@ -8,14 +8,20 @@ import {findBanned, stripProhibitions} from '@/lib/learn/banned';
 import {
     ACTION_COPY, ANNOUNCE_COPY, AVATAR_COPY, BANK_COPY, FELT_COPY, HAND_COPY, HOST_COPY, INVITE_COPY, isolate, JOIN_COPY, LOBBY_COPY, LOG_COPY,
     OVERLAY_COPY, POKER_NIGHT_COPY, POKER_NIGHT_ERRORS, REFUSAL_COPY, SUIT_GLYPHS, SUIT_NAMES, SUMMARY_COPY, TABLE_COPY,
+    LOOKS_COPY,
 } from '@/lib/learn/copy/poker-night';
-import {FACE_IDS} from '@/lib/poker-night/avatar';
+import {AVATAR_BADGES, AVATAR_COLOURS, AVATAR_FRAMES, AVATAR_PARTS, FACE_IDS} from '@/lib/poker-night/avatar';
+import {CARD_BACK_IDS, CARD_FACE_IDS, CHIP_SET_IDS, FELTS, SCENES} from '@/lib/poker-night/looks';
 import {ERROR_CODES, refusalToCode} from '@/lib/poker-night/http';
 import {checkConfig, DEFAULT_CONFIG, ENTRY_KINDS, LEDGER_KINDS} from '@/lib/poker-night/config';
 import {describeHand, isRoyal, type HandDescription} from '@/lib/poker-night/hand-name';
 import {parseCard} from '@/lib/poker/cards';
 import {CATEGORY, evaluateCards} from '@/lib/poker/evaluator';
 import {mulberry32} from '@/lib/random';
+import {EMOTE_COPY, SHORTCUTS_COPY} from '@/lib/learn/copy/poker-night';
+import {PHRASE_IDS, REACTION_IDS, THROW_IDS} from '@/lib/poker-night/emotes';
+import {SHORTCUTS} from '@/lib/poker-night/keys';
+import {AWARD_IDS} from '@/lib/poker-night/awards';
 
 const clean = (text: string) => {
     expect(text, text).not.toMatch(/undefined|NaN|null|\[object|Infinity/);
@@ -725,14 +731,53 @@ describe('the night summary', () => {
 
     it('says every line over the inputs it meets', () => {
         for (const text of strings(SUMMARY_COPY)) clean(text);
+        // Every award over every count, with one winner, two and every name at once (a tie).
+        const everyAward = AWARD_IDS.flatMap((id) => [...NS, 3].map((value) => ({id, value})));
         covers(SUMMARY_COPY, {
             when: () => named((table) => SUMMARY_COPY.when(table, 'Oct 7')),
             length: () => NS.flatMap((hands) => [0, 1, 59, 60, 61, 134, 600].map((minutes) => SUMMARY_COPY.length(hands, minutes))),
+            awardFigure: () => everyAward.map(({id, value}) => SUMMARY_COPY.awardFigure(id, value)),
+            award: () => [
+                ...AWARD_IDS.flatMap((id) => named((name) => SUMMARY_COPY.award(id, [name], 3))),
+                ...everyAward.flatMap(({id, value}) => [SUMMARY_COPY.award(id, ['Ana', 'Ben'], value), SUMMARY_COPY.award(id, NAMES, value)]),
+            ],
             text: () => [
                 SUMMARY_COPY.text(night),
                 SUMMARY_COPY.text({...night, standings: NAMES.map((name, i) => ({name, net: signedNs[i], removed: i % 2 === 0}))}),
+                SUMMARY_COPY.text({...night, awards: AWARD_IDS.map((id, i) => ({id, names: NAMES.slice(0, 1 + (i % 3)), value: NS[i % NS.length] + 1}))}),
             ],
         });
+    });
+
+    it('names every award the summary can show, by the registry\'s ids', () => {
+        expect(Object.keys(SUMMARY_COPY.awards).sort()).toEqual([...AWARD_IDS].sort());
+        expect(SUMMARY_COPY.awards).toEqual({
+            'biggest-pot': 'Biggest pot', 'most-won': 'Most hands won', 'highest-stack': 'Highest stack',
+            'most-all-ins': 'Most all-ins', 'tomato-magnet': 'Tomato magnet', 'most-roses': 'Most roses given',
+        });
+        // Every figure starts on its number, so it reads alone under the winners.
+        for (const id of AWARD_IDS) for (const n of [1, 2, 1_250_000]) expect(SUMMARY_COPY.awardFigure(id, n), id).toMatch(/^\d/);
+    });
+
+    it('reads the awards as the summary prints them', () => {
+        expect(SUMMARY_COPY.awardsHeading).toBe('Awards');
+        expect(plain(SUMMARY_COPY.award('biggest-pot', ['Ana'], 1200))).toBe('Biggest pot: Ana, 1,200 chips in one hand');
+        expect(plain(SUMMARY_COPY.award('most-won', ['Ana', 'Ben'], 12))).toBe('Most hands won: Ana and Ben, 12 hands');
+        expect(plain(SUMMARY_COPY.award('highest-stack', ['Ben'], 4200))).toBe('Highest stack: Ben, 4,200 chips');
+        expect(plain(SUMMARY_COPY.award('most-all-ins', ['Ana', 'Ben', 'Cy'], 1))).toBe('Most all-ins: Ana, Ben and Cy, 1 all-in');
+        expect(plain(SUMMARY_COPY.award('tomato-magnet', ['Cy'], 4))).toBe('Tomato magnet: Cy, 4 tomatoes');
+        expect(plain(SUMMARY_COPY.award('most-roses', ['Ana'], 1))).toBe('Most roses given: Ana, 1 rose');
+        expect(SUMMARY_COPY.awardFigure('tomato-magnet', 1)).toBe('1 tomato');
+        expect(plain(SUMMARY_COPY.text({...night, awards: [{id: 'biggest-pot', names: ['Ana'], value: 1200}, {id: 'most-roses', names: ['Ben', 'Cy'], value: 2}]}))).toBe([
+            "Ana's poker night · Oct 7",
+            '42 hands in 2 h 14 min',
+            'Ana: +1,250',
+            'Ben: 0',
+            `Cy: ${MINUS}1,250 (removed by host)`,
+            'Biggest pot: Ana, 1,200 chips in one hand',
+            'Most roses given: Ben and Cy, 2 roses',
+            'Play chips only. No cash value.',
+        ].join('\n'));
     });
 
     it('reads as the summary prints it', () => {
@@ -818,5 +863,164 @@ describe('the felt', () => {
     it('reads as the pot prints it', () => {
         expect(FELT_COPY.morePots(3, 2340)).toBe('3 more side pots: 2,340');
         expect(FELT_COPY.morePots(1, 520)).toBe('1 more side pot: 520');
+    });
+});
+
+// ==== P5: the looks and the avatar builder (LOOKS_COPY, AVATAR_COPY) ===============================
+
+describe('the looks', () => {
+    it('name every id of every registry, and only those', () => {
+        expect(Object.keys(LOOKS_COPY.scenes).sort()).toEqual(Object.keys(SCENES).sort());
+        expect(Object.keys(LOOKS_COPY.sceneNotes).sort()).toEqual(Object.keys(SCENES).sort());
+        expect(Object.keys(LOOKS_COPY.felts).sort()).toEqual(Object.keys(FELTS).sort());
+        expect(Object.keys(LOOKS_COPY.backs)).toEqual(CARD_BACK_IDS);
+        expect(Object.keys(LOOKS_COPY.faces).sort()).toEqual([...CARD_FACE_IDS].sort());
+        expect(Object.keys(LOOKS_COPY.faceNotes).sort()).toEqual([...CARD_FACE_IDS].sort());
+        expect(Object.keys(LOOKS_COPY.chips)).toEqual(CHIP_SET_IDS);
+        for (const table of [LOOKS_COPY.scenes, LOOKS_COPY.felts, LOOKS_COPY.backs, LOOKS_COPY.faces, LOOKS_COPY.chips]) {
+            const names = Object.values(table) as string[];
+            expect(new Set(names).size).toBe(names.length);
+            for (const name of names) expect(name, name).toMatch(/^[A-Z][A-Za-z]*( [a-z]+)?$/);
+        }
+    });
+
+    it('says every line over the inputs it meets', () => {
+        for (const text of strings(LOOKS_COPY)) clean(text);
+        covers(LOOKS_COPY, {
+            previewOf: () => Object.values(LOOKS_COPY.scenes).flatMap((scene) => Object.values(LOOKS_COPY.felts).map((felt) => LOOKS_COPY.previewOf(scene, felt))),
+        });
+        // Every hint and note is a whole sentence.
+        for (const key of ['sceneNotes', 'faceNotes'] as const) for (const text of Object.values(LOOKS_COPY[key])) expect(text, text).toMatch(/^[A-Z].*\.$/);
+        for (const text of [LOOKS_COPY.fourColourHint, LOOKS_COPY.soundHint, LOOKS_COPY.buzzHint, LOOKS_COPY.keepAwakeHint, LOOKS_COPY.handHintsHint,
+            LOOKS_COPY.muteEmotesHint, LOOKS_COPY.throwablesHint, LOOKS_COPY.hostLead, LOOKS_COPY.viewLead, LOOKS_COPY.personalLead, LOOKS_COPY.tablesLead,
+            LOOKS_COPY.peekHint, LOOKS_COPY.peekPrompt, LOOKS_COPY.betweenHands, LOOKS_COPY.queued, LOOKS_COPY.queuedDone]) {
+            expect(text, text).toMatch(/^[A-Z].*\.$/);
+        }
+    });
+
+    it('reads as the pickers print it', () => {
+        expect(LOOKS_COPY.scenes['casino-classic']).toBe('Casino');
+        expect(LOOKS_COPY.scenes['my-theme']).toBe('My theme');
+        expect(LOOKS_COPY.faces.large).toBe('Large print');
+        expect(LOOKS_COPY.previewOf('Deep space', 'Violet')).toBe('Deep space, violet felt');
+        expect(LOOKS_COPY.hostTab).toBe('Look');
+        expect(LOOKS_COPY.shortcuts).toBe(OVERLAY_COPY.shortcuts);
+        expect(LOOKS_COPY.viewHeading).toBe('Only you see these');
+    });
+
+    it('says how a look saved mid-hand waits, and how to peek, without opening on "Hold"', () => {
+        expect(LOOKS_COPY.peekPrompt).toBe('Press on your cards to peek.');
+        expect(LOOKS_COPY.peek).toBe('Hide my cards until I press them');
+        for (const text of [LOOKS_COPY.peek, LOOKS_COPY.peekHint, LOOKS_COPY.peekPrompt, LOOKS_COPY.peekLabel]) {
+            clean(text);
+            expect(text, text).toMatch(/peek|press/i);
+        }
+        expect(LOOKS_COPY.betweenHands).toMatch(/when it ends\.$/);
+        expect(LOOKS_COPY.queued).toMatch(/^Saved\. .*when this hand ends\.$/);
+        expect(LOOKS_COPY.queuedDone).toMatch(/on the table\.$/);
+    });
+});
+
+describe('the avatar builder', () => {
+    it('names every colour, frame and badge, and only those', () => {
+        expect(Object.keys(AVATAR_COPY.colours)).toEqual([...AVATAR_COLOURS]);
+        expect(Object.keys(AVATAR_COPY.frames)).toEqual([...AVATAR_FRAMES]);
+        expect(Object.keys(AVATAR_COPY.badges)).toEqual(Object.keys(AVATAR_BADGES));
+        expect(Object.keys(AVATAR_COPY.parts)).toEqual([...AVATAR_PARTS]);
+        for (const table of [AVATAR_COPY.colours, AVATAR_COPY.frames, AVATAR_COPY.badges, AVATAR_COPY.parts]) {
+            const names = Object.values(table) as string[];
+            expect(new Set(names).size).toBe(names.length);
+            for (const name of names) {
+                clean(name);
+                expect(name, name).toMatch(/^[A-Z][a-z]*( [a-z]+)?$/);
+            }
+        }
+        for (const text of [AVATAR_COPY.builder, AVATAR_COPY.roll, AVATAR_COPY.rollLabel]) clean(text);
+    });
+
+    it('reads out every look the builder can make', () => {
+        const badges = Object.keys(AVATAR_BADGES) as (keyof typeof AVATAR_BADGES)[];
+        let n = 0;
+        for (const face of FACE_IDS) {
+            for (const colour of AVATAR_COLOURS) {
+                for (const frame of AVATAR_FRAMES) {
+                    for (const badge of badges) {
+                        const text = AVATAR_COPY.describe({face, colour, frame, badge});
+                        expect(text.startsWith(`${AVATAR_COPY.faces[face]} on ${colour}`), text).toBe(true);
+                        if (n++ % 97 === 0) clean(text);
+                        expect(text, text).not.toMatch(/undefined|a cherries|a none|none/);
+                    }
+                }
+            }
+        }
+        expect(n).toBe(FACE_IDS.length * AVATAR_COLOURS.length * AVATAR_FRAMES.length * badges.length);
+        expect(AVATAR_COPY.describe({face: 'fox', colour: 'tangerine', frame: 'none', badge: 'none'})).toBe('Fox on tangerine');
+        expect(AVATAR_COPY.describe({face: 'owl', colour: 'sky', frame: 'gold', badge: 'crown'})).toBe('Owl on sky, with a gold frame and a crown');
+        expect(AVATAR_COPY.describe({face: 'die', colour: 'slate', frame: 'double', badge: 'cherries'})).toBe('Dice on slate, with a double ring and cherries');
+        expect(AVATAR_COPY.describe({face: 'cat', colour: 'mint', frame: 'none', badge: 'top-hat'})).toBe('Cat on mint, with a top hat');
+        clean(JOIN_COPY.lookLabel(AVATAR_COPY.describe({face: 'owl', colour: 'sky', frame: 'gold', badge: 'crown'})));
+    });
+});
+
+// P6: the emotes and the keys.
+describe('the emotes', () => {
+    const NAMES = ['Ana', 'Ben', 'Zoë-Grace van der Berg', 'سارا'];
+
+    it('word every reaction, phrase and throwable, keyed exactly as the registries', () => {
+        expect(Object.keys(EMOTE_COPY.reactions).sort()).toEqual([...REACTION_IDS].sort());
+        expect(Object.keys(EMOTE_COPY.phrases).sort()).toEqual([...PHRASE_IDS].sort());
+        expect(Object.keys(EMOTE_COPY.throwables).sort()).toEqual([...THROW_IDS].sort());
+        for (const text of strings(EMOTE_COPY)) clean(text);
+    });
+
+    it('say every function over the inputs it meets', () => {
+        for (const name of NAMES) {
+            for (const item of REACTION_IDS) clean(EMOTE_COPY.reacted(name, item));
+            for (const item of PHRASE_IDS) clean(EMOTE_COPY.said(name, item));
+            for (const item of THROW_IDS) {
+                for (const to of NAMES) clean(EMOTE_COPY.threw(name, item, to));
+                clean(EMOTE_COPY.threwAtYou(name, item));
+                clean(EMOTE_COPY.throwItemAt(item, name));
+                clean(EMOTE_COPY.pickTarget(item));
+            }
+            for (const line of [EMOTE_COPY.seatMenu(name), EMOTE_COPY.throwAt(name), EMOTE_COPY.mutePlayer(name), EMOTE_COPY.showPlayer(name), EMOTE_COPY.muted(name), EMOTE_COPY.shown(name)]) {
+                clean(line);
+                expect(line).toContain(isolate(name));
+            }
+        }
+    });
+
+    it('keep the phrases friendly table talk, never a verdict on a play', () => {
+        for (const text of Object.values(EMOTE_COPY.phrases)) {
+            expect(text, text).not.toMatch(/\b(good|bad|great|nice) (call|fold|bet|beat|move)\b|\bbeat\b|\bshould\b/i);
+        }
+    });
+
+    it('read as the table prints them', () => {
+        expect(Object.values(EMOTE_COPY.phrases)).toEqual([
+            'Hi all', 'Good luck', 'Nice hand', 'Well played', 'Unlucky', 'So close', 'Wow', 'Thinking…', 'Your move', 'Was that a bluff?', 'Ship it',
+            'Be right back', 'One more hand', 'Thanks', 'GG', 'Good night',
+        ]);
+        expect(plain(EMOTE_COPY.said('Ana', 'good-luck'))).toBe('Ana says: Good luck.');
+        expect(plain(EMOTE_COPY.said('Ana', 'bluff'))).toBe('Ana says: Was that a bluff?');
+        expect(plain(EMOTE_COPY.said('Ana', 'think'))).toBe('Ana says: Thinking…');
+        expect(plain(EMOTE_COPY.reacted('Ben', 'peek'))).toBe("Ben reacts: can't look.");
+        expect(plain(EMOTE_COPY.threw('Ana', 'tomato', 'Ben'))).toBe('Ana throws a tomato at Ben.');
+        expect(plain(EMOTE_COPY.threw('Ana', 'tennis-ball', 'Ben'))).toBe('Ana throws a tennis ball at Ben.');
+        expect(plain(EMOTE_COPY.threwAtYou('Ben', 'rose'))).toBe('Ben throws a rose at you.');
+        expect(plain(EMOTE_COPY.mutePlayer('Sam'))).toBe("Mute Sam's emotes");
+        expect(EMOTE_COPY.cooldown).toBe('One moment before the next one.');
+        expect(EMOTE_COPY.off).toBe('The host turned throwables off.');
+    });
+});
+
+describe('the keys', () => {
+    it('word every key the table answers', () => {
+        const ids = [...SHORTCUTS.turn, ...SHORTCUTS.table].map((s) => s.id);
+        expect(Object.keys(SHORTCUTS_COPY.does).sort()).toEqual([...ids].sort());
+        expect(Object.keys(SHORTCUTS_COPY.groups).sort()).toEqual(Object.keys(SHORTCUTS).sort());
+        for (const text of strings(SHORTCUTS_COPY)) clean(text);
+        expect(SHORTCUTS_COPY.does.mute).toBe('Sounds on or off');
+        expect(SHORTCUTS_COPY.soundOff).toBe('Sounds off.');
     });
 });

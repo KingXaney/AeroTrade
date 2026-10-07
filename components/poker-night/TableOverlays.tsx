@@ -22,7 +22,7 @@ import HandLog from "@/components/poker-night/HandLog";
 import HostDrawer from "@/components/poker-night/HostDrawer";
 import InviteSheet from "@/components/poker-night/InviteSheet";
 import JoinCard from "@/components/poker-night/JoinCard";
-import MyLookSheet from "@/components/poker-night/MyLookSheet";
+import MyLookDrawer from "@/components/poker-night/MyLookDrawer";
 import RemovePlayerDialog, {type RemoveTarget} from "@/components/poker-night/RemovePlayerDialog";
 import TopBar from "@/components/poker-night/TopBar";
 import {focusTableOnClose} from "@/components/poker-night/overlay-kit";
@@ -183,7 +183,7 @@ const TableOverlays = () => {
             {joined && (
                 <>
                     <HandLog open={isOpen('log')} onOpenChange={drawerChange('log')} toTable={ui.closedByTurn}/>
-                    <MyLookSheet open={isOpen('look')} onOpenChange={drawerChange('look')} toTable={ui.closedByTurn}/>
+                    <MyLookDrawer open={isOpen('look')} onOpenChange={drawerChange('look')} toTable={ui.closedByTurn}/>
                 </>
             )}
 

@@ -5,8 +5,10 @@
 // HandResultView) with the server's hand-name functions (views.readShownHand), so the page shows
 // exactly what the server decided. The animations (lib/poker-night/choreography) only time it.
 
+import {HAND_COPY, TABLE_COPY} from '@/lib/learn/copy/poker-night';
 import type {Card} from '@/lib/poker/cards';
 import {describeHand, playsBoard, type HandDescription} from '@/lib/poker-night/hand-name';
+import {BANNER} from '@/lib/poker-night/stage';
 import type {HandView} from '@/lib/poker-night/view-types';
 import {readShownHand} from '@/lib/poker-night/views';
 
@@ -53,6 +55,20 @@ export const cardLook = (look: ResultLook | null, card: Card): 'win' | 'dim' | n
 };
 
 // Whether the winner's banner shows for this hand: once it is complete, with this hand's result and
-// someone paid. TableScreen asks too, to put what shows under the board inside the banner's column.
+// someone paid. TableScreen asks too: while it shows, the line under the board (the next deal's
+// countdown, the pause) goes where lib/poker-night/stage.bannerPlan puts it.
 export const bannerShows = (hand: Pick<HandView, 'no' | 'phase'> | null, look: ResultLook | null): boolean =>
     !!hand && hand.phase === 'complete' && !!look && look.handNo === hand.no && look.winners.length > 0;
+
+// The banner's words for each winner it names (the first BANNER.rows, the most chips first): the
+// head — "You win 70" for the viewer, "Ana wins 1,200" for anyone else, under their seat's name when
+// the people have not arrived — and the hand's name ("Full house, threes full of fives", with
+// "Plays the board" when it does), or null when no hand was shown. lib/poker-night/stage.bannerPlan
+// sizes the banner from these, and components/poker-night/WinnerReveal draws them.
+export type BannerLine = {seat: number; mine: boolean; head: string; hand: string | null};
+export const bannerLines = (look: ResultLook, nameOf: (seat: number) => string | null, mySeat: number | null): BannerLine[] =>
+    look.winners.slice(0, BANNER.rows).map((w) => {
+        const mine = w.seat === mySeat;
+        const hand = w.description ? (w.playsBoard ? `${HAND_COPY.label(w.description)} · ${HAND_COPY.playsBoard}` : HAND_COPY.label(w.description)) : null;
+        return {seat: w.seat, mine, head: mine ? TABLE_COPY.bannerYou(w.amount) : TABLE_COPY.banner(nameOf(w.seat) ?? TABLE_COPY.seat(w.seat), w.amount), hand};
+    });

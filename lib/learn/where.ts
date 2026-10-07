@@ -21,6 +21,8 @@ const POKER: readonly GlossaryKey[] = [
     'nash-equilibrium', 'mixed-strategy', 'cfr', 'exploitability',
     'bluff-catcher', 'polarized-range', 'game-tree', 'showdown', 'value-bet', 'bluff',
 ];
+// The table's own words (/play/CODE has no app shell and is open to guests, so they home on its lobby).
+const POKER_NIGHT: readonly GlossaryKey[] = ['side-pot', 'dealer-button', 'small-blind', 'minimum-raise', 'rebuy', 'all-in'];
 const BRAIN: readonly GlossaryKey[] = [
     'news-weight', 'news-sentiment', 'thesis', 'since-thesis',
     'event-earnings', 'event-guidance', 'event-mna', 'event-product', 'event-macro', 'event-regulatory', 'event-analyst', 'event-legal',
@@ -35,6 +37,7 @@ const HOMES = {
     rails: {href: '/brain', label: 'The News Brain'},
     games: {href: '/games', label: 'The games'},
     poker: {href: '/poker', label: 'The poker solver'},
+    'poker-night': {href: '/poker-night', label: 'Poker night'},
 } as const;
 
 type GroupId = keyof typeof HOMES;
@@ -47,6 +50,7 @@ export const groupOf = (entry: GlossaryEntry): GroupId => {
     if ((BRAIN as readonly string[]).includes(entry.key)) return 'brain';
     if ((GAMES as readonly string[]).includes(entry.key)) return 'games';
     if ((POKER as readonly string[]).includes(entry.key)) return 'poker';
+    if ((POKER_NIGHT as readonly string[]).includes(entry.key)) return 'poker-night';
     return 'portfolio';
 };
 
@@ -61,10 +65,11 @@ const GROUP_LABELS: Record<GroupId, string> = {
     rails: "The Navigator's rails",
     games: 'In the games',
     poker: 'In the poker solver',
+    'poker-night': 'At poker night',
 };
 
 // Registry order within each group, groups in reading order.
-export const GLOSSARY_GROUPS: readonly GlossaryGroup[] = (['board', 'portfolio', 'market', 'concepts', 'brain', 'rails', 'games', 'poker'] as const).map((id) => ({
+export const GLOSSARY_GROUPS: readonly GlossaryGroup[] = (['board', 'portfolio', 'market', 'concepts', 'brain', 'rails', 'games', 'poker', 'poker-night'] as const).map((id) => ({
     id,
     label: GROUP_LABELS[id],
     home: HOMES[id],

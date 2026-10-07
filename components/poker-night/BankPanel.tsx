@@ -7,7 +7,9 @@
 // the host's waiting requests with Approve and Decline; then every player who sat tonight — Chips
 // in, Rebuys (only once someone has rebought), Stack (a live pot counted, said once at the foot),
 // Net with its sign — and the footer's check that every chip is accounted for. "Chips in, by time"
-// reads GET detail?part=bank when the drawer opens and again whenever the ledger moves.
+// reads GET detail?part=bank when the drawer opens and again whenever the ledger moves. The Rebuys
+// header carries the glossary's definition (Term, a native tooltip); the table mounts no chat, so
+// the drawer has no "What these mean", whose rows each offer the chat.
 
 import {useEffect, useId, useState} from "react";
 import {toast} from "sonner";
@@ -18,6 +20,7 @@ import MicroLabel from "@/components/primitives/MicroLabel";
 import Panel from "@/components/primitives/Panel";
 import RowCard from "@/components/primitives/RowCard";
 import SectionHeading from "@/components/primitives/SectionHeading";
+import Term from "@/components/primitives/Term";
 import TextField from "@/components/primitives/TextField";
 import {Drawer, MiniAvatar, PlayerName} from "@/components/poker-night/overlay-kit";
 import {useRoom} from "@/components/poker-night/room-controller";
@@ -170,7 +173,7 @@ const BankPanel = ({open, onOpenChange, toTable}: Props) => {
                         <tr className="text-left">
                             <th scope="col" className="w-[38%] pb-2 font-normal"><MicroLabel>{BANK_COPY.columns.player}</MicroLabel></th>
                             <th scope="col" className="pb-2 text-right font-normal"><MicroLabel>{BANK_COPY.columns.chipsIn}</MicroLabel></th>
-                            {bank.showRebuys && <th scope="col" className="pb-2 text-right font-normal"><MicroLabel>{BANK_COPY.columns.rebuys}</MicroLabel></th>}
+                            {bank.showRebuys && <th scope="col" className="pb-2 text-right font-normal"><MicroLabel><Term k="rebuy">{BANK_COPY.columns.rebuys}</Term></MicroLabel></th>}
                             <th scope="col" className="pb-2 text-right font-normal"><MicroLabel>{BANK_COPY.columns.stack}</MicroLabel></th>
                             <th scope="col" className="pb-2 text-right font-normal"><MicroLabel>{BANK_COPY.columns.net}</MicroLabel></th>
                         </tr>

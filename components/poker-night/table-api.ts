@@ -8,7 +8,8 @@
 
 import {isErrorCode, PASS_HEADER, PN_PROTOCOL, PROTOCOL_HEADER, type PokerNightErrorCode} from "@/lib/poker-night/http";
 import type {ActionInput, JoinBody as JoinInputBody, TickInput} from "@/lib/poker-night/input";
-import type {DetailView, JoinReply, PlayerView, TokenReply, Unchanged} from "@/lib/poker-night/view-types";
+import type {EmoteInput} from "@/lib/poker-night/emotes";
+import type {DetailView, EmoteReply, JoinReply, PlayerView, TokenReply, Unchanged} from "@/lib/poker-night/view-types";
 
 export type ApiResult<T> =
     | {ok: true; body: T; status: number; sentAt: number; receivedAt: number}
@@ -82,6 +83,11 @@ export const postAction = (code: string, body: ActionInput, opts: Options = {}) 
 // POST tick: the clock's nudge, with a presence beat while the page is visible.
 export const postTick = (code: string, body: TickInput, opts: Options = {}) =>
     request<PlayerView | Unchanged>(`${base(code)}/tick`, {method: 'POST', body, ...opts});
+
+// POST emote (P6): a reaction, a phrase or a throw; takes the seat pass. The answer is the emote as
+// the room stored it.
+export const postEmote = (code: string, body: EmoteInput, opts: Options = {}) =>
+    request<EmoteReply>(`${base(code)}/emote`, {method: 'POST', body, ...opts});
 
 export const isUnchanged = (body: PlayerView | Unchanged): body is Unchanged => 'unchanged' in body && body.unchanged === true;
 

@@ -154,3 +154,37 @@ describe('the rails the glossary quotes', () => {
         }
     });
 });
+
+// The poker night table's words (P7): homed on its lobby (lib/learn/where.ts), each one the
+// glossary's own, so a label at the table and a chat answer quote the same sentence.
+describe('the poker night terms', () => {
+    const NIGHT = ['side-pot', 'dealer-button', 'small-blind', 'minimum-raise', 'rebuy', 'all-in'] as const;
+
+    it('define the table\'s words with no currency word, play chips having no cash value', () => {
+        for (const key of NIGHT) {
+            const entry = GLOSSARY[key];
+            expect(entry.kind, key).toBe('metric');
+            expect(`${entry.short} ${entry.long}`, key).not.toMatch(/\b(money|cash|cashed|dollars?|paid out)\b|[$€£]/i);
+        }
+        expect(GLOSSARY.rebuy.short).toBe("Chips a player takes after sitting down: a rebuy at zero or a top-up below the table's cap, counted in the bank.");
+    });
+
+    it('resolve their aliases, and leave the solver\'s own where they were', () => {
+        expect(resolveTerm('what is a side pot?')?.key).toBe('side-pot');
+        expect(resolveTerm('main pot')?.key).toBe('side-pot');
+        expect(resolveTerm('dealer chip')?.key).toBe('dealer-button');
+        expect(resolveTerm('SB')?.key).toBe('small-blind');
+        expect(resolveTerm('min-raise')?.key).toBe('minimum-raise');
+        expect(resolveTerm('top-ups')?.key).toBe('rebuy');
+        expect(resolveTerm('shove')?.key).toBe('all-in');
+        expect(resolveTerm('all in')?.key).toBe('all-in');
+        expect(resolveTerm('all-in equity')?.key).toBe('hand-equity');
+        expect(resolveTerm('shove or fold')?.key).toBe('push-fold');
+        expect(resolveTerm('big blind')?.key).toBe('big-blind');
+    });
+
+    it('never take a bare word another page already means differently', () => {
+        const bare = new Set(['range', 'ev', 'ratio', 'stack', 'pot', 'button', 'blind', 'raise']);
+        for (const key of GLOSSARY_KEYS) for (const alias of GLOSSARY[key].aliases) expect(bare.has(alias.toLowerCase()), `${key}: ${alias}`).toBe(false);
+    });
+});

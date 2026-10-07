@@ -5,7 +5,9 @@
 // attempt writes (lib/poker-night/mutation.planMutation); this file is the I/O around them.
 //
 // mutateRoom is the one way the game moves: read the room, plan, write behind a compare-and-set on
-// `seq`, up to TIMING.CAS_ATTEMPTS times with a jittered backoff. The out-of-band fields (seen,
+// `seq`, up to TIMING.CAS_ATTEMPTS times with a jittered backoff. What leaves the server carries the
+// public seq instead (room-doc.publicSeq), which a write only its author can see — a pre-action —
+// does not move. The out-of-band fields (seen,
 // emotes, rt, lastError) are written beside it, never through it, so a heartbeat never costs a bet
 // its race. afterCommit, in the route's after(), sets off what a commit means beyond its answer:
 // history, the accounts' results and the realtime publish (lib/poker-night/realtime), whose failure
@@ -14,7 +16,6 @@
 // outlive nothing on Hobby; lastError keeps the last failure on the room itself).
 
 import {Types} from "mongoose";
-import {cache} from "react";
 import {connectToDatabase} from "@/database/mongoose";
 import PokerRoom from "@/database/models/poker-room.model";
 import {generateCode} from "@/lib/poker-night/code";
@@ -32,10 +33,13 @@ import {
     casUpdate, coreFromDoc, headFromDoc, HEAD_PROJECTION, ms, newRoomDoc, serverRoom, serverRoomFromDoc, unreadableCloseUpdate, unreadableKind, wireOfRoom,
     type Commit, type RoomDocLean, type RoomHead, type RoomRef, type ServerRoom, type Unread,
 } from "@/lib/poker-night/room-doc";
+import {EMOTE_TABLE_PROJECTION, emoteTableFromDoc, emoteWrite, type EmoteTable} from "@/lib/poker-night/room-doc";
+import type {EmoteDraft, EmoteMessage} from "@/lib/poker-night/emotes";
+import {throwCountsOf, type ThrowCounts} from "@/lib/poker-night/awards";
 import {SECURE_SOURCE} from "@/lib/poker-night/shuffle";
 import {writeHands} from "@/lib/poker-night/hands-store";
 import {writeResults} from "@/lib/poker-night/results-store";
-import {publishWire} from "@/lib/poker-night/realtime";
+import {publishEmote, publishWire} from "@/lib/poker-night/realtime";
 
 export type {Commit, RoomHead, RoomRef, ServerRoom, Unread};
 
@@ -77,15 +81,13 @@ const roomOf = (doc: RoomDocLean | null, readAt: number): RoomRead => {
     return {ok: true, room: serverRoomFromDoc(doc, coreFromDoc(doc, state), readAt)};
 };
 
+// The /play page reads it only through lib/poker-night/page-gate.readTablePage, once per render.
 export const getRoomByCode = async (env: Env, code: string): Promise<RoomRead> => {
     await connectToDatabase();
     const readAt = Date.now();
     const doc = await PokerRoom.findOne({env, code, expiresAt: {$gt: new Date(readAt)}}, READ_PROJECTION).lean<RoomDocLean | null>();
     return roomOf(doc, readAt);
 };
-
-// The /play page and its metadata read the same room once per render.
-export const getRoomByCodeCached = cache(getRoomByCode);
 
 export const getRoomById = async (ref: RoomRef): Promise<RoomRead> => {
     await connectToDatabase();
@@ -190,15 +192,16 @@ export const mutateRoom = async (ref: RoomRef, step: Step | null, opts: MutateOp
             if (plan.kind === 'refused') return refused(plan.code);
             if (plan.kind === 'duplicate' || plan.kind === 'unchanged') {
                 const room = serverRoomFromDoc(doc, core, now);
-                return {ok: true, room, seq: doc.seq, changed: false, duplicate: plan.kind === 'duplicate', join: plan.kind === 'unchanged' ? plan.join : null, commit: null};
+                return {ok: true, room, seq: room.seq, changed: false, duplicate: plan.kind === 'duplicate', join: plan.kind === 'unchanged' ? plan.join : null, commit: null};
             }
             const closedAt = doc.closedAt ? ms(doc.closedAt) : null;
-            const write = casUpdate(plan.core, {applied: plan.applied, now, closedAt, pruned: plan.join?.pruned ?? []});
+            const write = casUpdate(plan.core, {applied: plan.applied, now, closedAt, pruned: plan.join?.pruned ?? [], visible: plan.visible});
             const written = await PokerRoom.updateOne({_id: ref.id, env: ref.env, seq: doc.seq}, write.update);
             if (written.matchedCount !== 1) continue;
             const base = serverRoomFromDoc(doc, plan.core, now);
-            const room = serverRoom({...base, seq: doc.seq + 1, lastActivityAt: now, closedAt: write.closedAt});
-            const commit: Commit = {ref, room, prevState: state, hands: plan.hands, ledgerDirty: plan.ledgerDirty};
+            // The public seq moves only with a write someone else can see (room-doc.publicSeq).
+            const room = serverRoom({...base, seq: base.seq + (plan.visible ? 1 : 0), lastActivityAt: now, closedAt: write.closedAt});
+            const commit: Commit = {ref, room, prevState: state, hands: plan.hands, ledgerDirty: plan.ledgerDirty, visible: plan.visible};
             if (plan.refusal !== null) return {ok: false, code: plan.refusal, commit};
             return {ok: true, room, seq: room.seq, changed: true, duplicate: false, join: plan.join, commit};
         }
@@ -237,7 +240,9 @@ const publishCommit = async (commit: Commit): Promise<void> => {
 
 // Everything a commit sets off once the response is on its way, run in the route's after(): the
 // hands it completed into history, the accounts' results when a figure they carry moved, and the
-// commit's wire view on the realtime channel. Each part catches and logs its own failure; the next
+// commit's wire view on the realtime channel — unless nobody but its author can see the commit (a
+// pre-action), whose public seq did not move: its message would be the last one again, and its
+// moment would show when someone set a pre-action. Each part catches and logs its own failure; the next
 // commit heals it (results carry totals, hands are upserted whole, and every message carries the
 // whole public table, applied by seq).
 export const afterCommit = async (result: MutateResult): Promise<void> => {
@@ -246,7 +251,7 @@ export const afterCommit = async (result: MutateResult): Promise<void> => {
     await Promise.all([
         commit.hands.length > 0 ? writeHands(commit) : undefined,
         commit.ledgerDirty ? writeResults(commit) : undefined,
-        publishCommit(commit),
+        commit.visible ? publishCommit(commit) : undefined,
     ]);
 };
 
@@ -265,6 +270,51 @@ export const stampSeen = async (ref: RoomRef, pid: string, hidden: boolean, now:
         },
         {$set: {[`seen.${pid}`]: {at: now, hidden}}},
     );
+};
+
+// ── emotes (P6), out of band ──
+
+// Who is in a seat and whether throwables are on: what the emote route checks, from one projected
+// read. Null when the room is gone.
+export const readEmoteTable = async (ref: RoomRef): Promise<EmoteTable | null> => {
+    await connectToDatabase();
+    const doc = await PokerRoom.findOne({_id: ref.id, env: ref.env, expiresAt: {$gt: new Date()}}, EMOTE_TABLE_PROJECTION).lean<{state?: unknown; status?: unknown} | null>();
+    return doc ? emoteTableFromDoc(doc) : null;
+};
+
+// One emote, in one conditional write (room-doc.emoteWrite): ok with the emote as stored — its seq
+// the room's new emoteSeq — or not ok when the sender's cooldown has not run out (or the room has
+// just gone): the route answers 429, and nothing was written.
+export const pushEmote = async (
+    ref: RoomRef, emote: EmoteDraft, opts: {now: number; cooldownMs: number},
+): Promise<{ok: true; emote: EmoteMessage; emoteSeq: number} | {ok: false}> => {
+    await connectToDatabase();
+    const {filter, pipeline} = emoteWrite(ref, emote, opts);
+    const doc = await PokerRoom.findOneAndUpdate(filter, pipeline, {projection: {emoteSeq: 1}, returnDocument: 'after', updatePipeline: true, timestamps: false})
+        .lean<{emoteSeq?: number} | null>();
+    if (!doc || typeof doc.emoteSeq !== 'number') return {ok: false};
+    return {ok: true, emote: {...emote, seq: doc.emoteSeq} as EmoteMessage, emoteSeq: doc.emoteSeq};
+};
+
+// The emote on the room's channel (a no-op without realtime), run in the route's after(). A failed
+// publish is logged with the code and the emote's seq, and stamped on the room like a commit's, so
+// the browsers poll beside the channel for a while (the polls carry the emotes too).
+export const publishEmoteAfter = async (ref: RoomRef, code: string, emote: EmoteMessage): Promise<void> => {
+    const sent = await publishEmote(ref.env, ref.id, emote);
+    if (sent.ok) return;
+    logFailure('a realtime emote publish failed', {code, env: ref.env, seq: emote.seq, message: sent.message});
+    await markRealtimeFailure(ref, Date.now());
+};
+
+// ── the night summary's awards (P7) ──
+
+// What each player threw and caught tonight (lib/poker-night/awards.throwCountsOf), for a closed
+// table's summary: one findOne projected to the room's `awards`, which no other read carries. An
+// empty count when the room is gone.
+export const readNightThrows = async (ref: RoomRef): Promise<ThrowCounts> => {
+    await connectToDatabase();
+    const doc = await PokerRoom.findOne({_id: ref.id, env: ref.env, expiresAt: {$gt: new Date()}}, {_id: 0, awards: 1}).lean<{awards?: unknown} | null>();
+    return throwCountsOf(doc?.awards);
 };
 
 // ── the lobby (P3) ──
