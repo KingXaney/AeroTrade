@@ -425,6 +425,53 @@ and friends keep none beyond Shared and the invariants).
   `hand-equity` because net worth owns the alias `equity`, and no alias is a bare `range`, `ev`,
   `ratio` or `stack`.
 
+### poker night
+
+- A Texas hold'em table friends share by link, a feature apart from poker (the solver); it reuses
+  `lib/poker/cards` and `lib/poker/evaluator` and changes neither. So far it is the pure engine in
+  `lib/poker-night/`; the design and the phases still to come are
+  `docs/specs/2026-10-06-poker-night.md`.
+- `lib/poker-night/engine.reduce` is the one way a table's state (`lib/poker-night/types`) changes:
+  a pure reducer that clones once, never mutates its input and hands back the same reference for a
+  no-op. Time, the deck and the first big blind's draw arrive inside the action, so a step replays
+  exactly. `lib/poker-night/clock.advance` applies whatever has fallen due — a timeout once
+  `TIMING.TURN_GRACE_MS` is past the deadline, a run-out street, the next deal — each at the moment
+  it runs, so every new deadline counts from then; nothing wakes on a timer.
+- `lib/poker-night/shuffle` is the engine's only server-only file and its only use of
+  `node:crypto` (`SECURE_SOURCE`). The clock takes any `DeckSource` (`lib/poker-night/deck`), so
+  tests deal from a stacked or seeded one. `lib/poker-night/__tests__/server-guard.test.ts` follows
+  imports transitively: no 'use client' file (in `app/`, `components/`, `hooks/` or `lib/`) and
+  nothing under `components/` may reach `shuffle` or the later poker-night stores, identity, pass
+  or realtime modules, and no 'use client' file, nor any of poker night's components (a folder still
+  to come), may reach crypto, mongoose, `database/` or the session. A server page is not held to it.
+- `lib/poker-night/views` is the only way state leaves the server: `publicView`, `wireView`,
+  `playerView` and `historyView` copy field by field from a whitelist. `lib/poker-night/view-types`
+  is the client contract, declared on its own, never an `Omit<>` of a server type, and it has no
+  deck. The client offers moves with `legalFor(snapshotFromView(view), seat)`, the very function
+  the server checks them with (`lib/poker-night/betting.legalFor`).
+- Conservation: Σ stacks + Σ committed to a live hand + Σ cashed out = Σ bought
+  (`lib/poker-night/ledger.conservation`), checked after every step of
+  `lib/poker-night/__tests__/simulate.test.ts` (100 seeded nights; `PN_SIM_SEEDS=1000` runs more).
+  Chips are bought only when they land (`recordBuy`), so a pending buy is not yet bought; net is
+  chips + cashed out − bought, with chips counting what is in a live pot, steady mid-hand.
+- A stored state field never changes meaning without bumping `STATE_VERSION`
+  (`lib/poker-night/config`) and adding a step to `lib/poker-night/migrate`. A hand's log and a
+  ledger row's events are stored as number tuples whose kinds index `ENTRY_KINDS` and
+  `LEDGER_KINDS`, append-only lists; `lib/poker-night/__tests__/budget.test.ts` holds the state to
+  16,000 bytes and the wire view to 4,500 on the heaviest table the engine builds.
+- The rules a change most often meets (the spec has the rest): the big blind always moves one
+  eligible seat on (`lib/poker-night/seats.positions`); a short all-in reopens nobody who has acted
+  unless the short all-ins since add up to a full raise, but a checker facing an opening all-in
+  below the minimum bet may raise; the uncalled bet goes back even to a folded seat; every live hand
+  shows at a showdown; a player who leaves or is removed while facing a bet folds at once, otherwise
+  stays in, away, and is cashed out when the hand completes.
+- Wording (invariant 12 applies): every sentence is in `lib/learn/copy/poker-night.ts`, held by
+  `lib/learn/__tests__/poker-night-copy.test.ts` to the 'copy' tier and to a currency ban (play
+  chips have no cash value). A hand wins against another and is "stronger"; its five cards are
+  "the five cards that play"; no sentence or label opens on "Hold", "Hold'em" or "Buy" ("Press and
+  hold", "Texas hold'em", "Chips in", "Rebuy"). `ACTION_COPY.does` is keyed on every `EntryKind`
+  and `REFUSAL_COPY` on every `Refusal`, so a new kind or refusal does not compile without words.
+
 ### chat
 
 - `lib/chat/explain` shapes what `explainTerm` hands the model, with `lib/chat/learner-hooks` its
