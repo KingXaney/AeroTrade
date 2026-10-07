@@ -1,8 +1,9 @@
 // Home (app/(root)/page.tsx, lib/home): the signed-in front page. A new account is greeted by
 // first name, sees its account's value, its topics and the first first-week step as the one
 // thing to do next; the step moves on as soon as the row behind it exists; the widget dashboard
-// is its own page under the same rail section; and an old /?customize=1 link still opens the
-// dashboard's edit mode.
+// is its own page under the same rail section; an old /?customize=1 link still opens the
+// dashboard's edit mode; and the momentum terrain has no panel until there is a surface to draw
+// (qa-landing checks the panel once there is one).
 // Run: npm run qa -- home   (the harness: README.md)
 import {chromium} from 'playwright';
 import {MongoClient} from 'mongodb';
@@ -28,6 +29,11 @@ try {
     check('the account total is the starting balance', (await page.locator('[data-home-total]').innerText()) === '$100,000.00', await page.locator('[data-home-total]').innerText());
     check('…with one row for the account, linking into /portfolio',
         await page.locator('#home-accounts ul a[href^="/portfolio?account="]').count() === 1);
+    // The momentum terrain is a panel only when there is a surface to draw: no SPY history yet
+    // (and the Tiingo stand-in down), so Home shows no box for it (invariant 8). qa-landing, which
+    // runs after this suite, checks the panel once there is one.
+    check('no terrain panel before there is a surface to draw',
+        await page.locator('[data-home-terrain]').count() === 0 && await page.locator('[data-terrain]').count() === 0);
     const stepText = (await page.locator('#home-next-step').innerText()).replace(/\s+/g, ' ');
     check('the next step is the first first-week step', /Place your first paper trade/.test(stepText) && /0 of 5 first-week steps done/i.test(stepText), stepText.slice(0, 160));
     check('…and it opens the order ticket', await page.locator('[data-home-step]').getAttribute('href') === '/trade?symbol=SPY');

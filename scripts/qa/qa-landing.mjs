@@ -7,13 +7,14 @@
 // from its rows (through jiti), the token travels in a header, and a second request asks it
 // nothing. Then the page: the 3D canvas named for a screen reader, the tooltip on hover, the camera
 // presets and the flatten toggle, the legend and the 20-day slice, one "What these mean" with its
-// three terms and no Ask links, the Tiingo credit, a theme repaint, reduced motion stopping the
-// rotation, and a phone.
+// three terms and no Ask links, the Tiingo credit, a theme repaint; then, signed in, Home drawing
+// the same surface as a panel with its Ask links; then reduced motion stopping the rotation, and a
+// phone.
 // Run: npm run qa -- landing   (the harness: README.md)
 import {chromium} from 'playwright';
 import {MongoClient} from 'mongodb';
 import {createJiti} from 'jiti';
-import {BASE, MONGO, REPO_ROOT, check, note, outDir, summary} from './lib.mjs';
+import {BASE, MONGO, REPO_ROOT, check, note, outDir, signUp, summary} from './lib.mjs';
 import {STUB_PORT, STUB_TOKEN, tiingoRows} from './tiingo-series.mjs';
 
 const STUB = `http://localhost:${STUB_PORT}`;
@@ -41,10 +42,14 @@ const lcg = (seed) => () => {
 };
 const random = lcg(20261006);
 const gaussian = () => Math.sqrt(-2 * Math.log(1 - random())) * Math.cos(2 * Math.PI * random());
+// Weekdays ending the day before today (UTC): the app reads stored bars through the Eastern
+// "today", and after 8 pm Eastern the UTC date is already tomorrow, so a series ending on the
+// UTC date would carry a session the app rightly leaves out (the Tiingo stand-in does the same).
 const weekdaysEnding = (count) => {
     const out = [];
     const d = new Date();
     d.setUTCHours(0, 0, 0, 0);
+    d.setUTCDate(d.getUTCDate() - 1);
     while (out.length < count) {
         const day = d.getUTCDay();
         if (day !== 0 && day !== 6) out.unshift(d.toISOString().slice(0, 10));
@@ -251,6 +256,27 @@ try {
         await page.waitForTimeout(300);
         await shot('05-paper');
     }
+
+    // --- Home: the same surface as a panel, read on the server, with its Ask links ------------
+    await signUp(page, 'terrain', {stay: true});
+    const homePanel = page.locator('[data-home-terrain]');
+    await homePanel.locator('[data-terrain-state="ready"], [data-terrain-state="flat"]').waitFor({timeout: 45000}).catch(() => {});
+    const homeState = await homePanel.locator('[data-terrain]').getAttribute('data-terrain-state').catch(() => null);
+    check('signed in, Home draws the terrain as a panel under its own heading, with no second eyebrow',
+        await homePanel.count() === 1 && (homeState === 'ready' || homeState === 'flat')
+        && (await homePanel.locator('[data-terrain]').getAttribute('data-terrain-size')) === 'panel'
+        && ((await homePanel.innerText()).match(/S&P 500 momentum/g) ?? []).length === 1, String(homeState));
+    check('…the same surface the route serves, drawn at once from the page\'s own read',
+        ((await homePanel.locator('canvas[role="img"]').getAttribute('aria-label')) ?? '').includes(`updated ${shortDate(shown.updated)}`)
+        && (await homePanel.locator('[data-terrain-source]').getAttribute('data-terrain-source')) === 'tiingo');
+    check('…one "What these mean", its three terms with Ask in chat, since the chat is mounted here',
+        await homePanel.locator('[data-what-these-mean]').count() === 1 && await homePanel.locator('[data-what-these-mean] [data-ask]').count() === 3);
+    check('…above the accounts, which keep their place',
+        await page.locator('[data-home] > *').nth(1).getAttribute('data-home-terrain') !== null
+        && await page.locator('#home-accounts [data-home-total]').count() === 1);
+    await page.evaluate(() => window.scrollTo(0, 0));
+    await page.waitForTimeout(300);
+    await shot('07-home');
 
     // --- reduced motion: no rotation, no intro, still drawn ---------------------------------
     const still = await browser.newContext({viewport: {width: 1440, height: 900}, reducedMotion: 'reduce'});

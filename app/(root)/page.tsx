@@ -4,6 +4,7 @@ import Link from "next/link";
 import {redirect} from "next/navigation";
 import {getSessionUser} from "@/lib/auth/session";
 import {getHomeView} from "@/lib/home/page-store";
+import {getMomentumSurface} from "@/lib/landing/surface-store";
 import {getLearnFacts} from "@/lib/learn/facts-store";
 import {getTodaysLesson} from "@/lib/learn/lesson-store";
 import {deriveMoments} from "@/lib/learn/moments";
@@ -11,6 +12,9 @@ import {HOME_COPY} from "@/lib/learn/copy/home";
 import {COURSE_COPY} from "@/lib/learn/copy/learn";
 import {getCourseProgress} from "@/lib/learn/course-store";
 import {NEWS_COPY} from "@/lib/learn/copy/news";
+import {TERRAIN_COPY, TERRAIN_TERMS} from "@/lib/learn/copy/terrain";
+import MomentumTerrain from "@/components/landing/MomentumTerrain";
+import WhatTheseMean from "@/components/learn/WhatTheseMean";
 import MarketStatus from "@/components/stocks/MarketStatus";
 import StreakChip from "@/components/games/StreakChip";
 import HomeAccounts from "@/components/home/HomeAccounts";
@@ -46,16 +50,20 @@ const LessonAsync = async ({userId}: {userId: string}) => {
     return <TodaysLesson lesson={await getTodaysLesson(userId)}/>;
 };
 
-// Home: who you are, where the market is, what you own, what changed in what you follow, and
-// one thing to look at next. Numbers first; nothing here is a setting. The widget grid this
-// page used to be is /dashboard.
+// Home: who you are, where the market is, the year's momentum terrain, what you own, what
+// changed in what you follow, and one thing to look at next. Nothing here is a setting. The
+// widget grid this page used to be is /dashboard.
+//
+// The terrain is the landing page's (components/landing/MomentumTerrain), read here on the server
+// through the same store, so the panel exists only when there is a surface to draw and the client
+// draws it at once; the definitions beneath it keep their Ask links, since the chat is mounted.
 const Home = async ({searchParams}: HomeProps) => {
     const user = await getSessionUser();
     if (!user) redirect('/sign-in');
     // Old links to the dashboard's edit mode (/?customize=1) keep working.
     if ((await searchParams).customize === '1') redirect('/dashboard?customize=1');
 
-    const view = await getHomeView(user.id);
+    const [view, terrain] = await Promise.all([getHomeView(user.id), getMomentumSurface()]);
     const {step} = view;
     // The box beside the topics: the market briefing, else the topics' own briefs, else the
     // course's next lesson (today's lesson once the course is done).
@@ -73,6 +81,17 @@ const Home = async ({searchParams}: HomeProps) => {
                     </div>
                 )}
             />
+
+            {terrain && (
+                <Panel id="home-terrain" aria-labelledby="home-terrain-heading" data-home-terrain>
+                    <SectionHeading id="home-terrain-heading">{TERRAIN_COPY.eyebrow}</SectionHeading>
+                    <MomentumTerrain initial={terrain} eyebrow={false} size="panel">
+                        <WhatTheseMean keys={TERRAIN_TERMS}>
+                            <p className="text-xs leading-relaxed text-fg-muted" data-terrain-method>{TERRAIN_COPY.method}</p>
+                        </WhatTheseMean>
+                    </MomentumTerrain>
+                </Panel>
+            )}
 
             <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
                 <Panel id="home-accounts" aria-labelledby="home-accounts-heading">
