@@ -63,7 +63,10 @@ which also absorbs the notification toggles that used to sit in the user dropdow
   write re-renders the layouts. `ThemeSync` adopts the account's theme on a device whose
   cookie is stale; sign-out clears the cookie.
 - **Client**: `ThemeProvider` (preview → `document.documentElement` only; commit → server
-  action) wraps all of `<body>` so the toaster and `ThemeBackdrop` can read it.
+  action) wraps all of `<body>` so the toaster and `ThemeBackdrop` can read it. Since
+  2026-10-06 a hover previews the palette only: a style moves the page, and a card that moves
+  away from the pointer cancels its own preview and loops (the Futuristic card flickered between
+  two layouts). The landing switcher, a click, previews the whole theme (`preview(theme, {full: true})`).
   `useThemeTokens()` feeds canvas/SVG/TradingView consumers from the committed theme only.
 - **Migration**: `scripts/codemod-theme-tokens.mjs` rewrote 497 hex / 172 rgba / 240
   inline-font literals to tokens (Tailwind arbitrary classes → token utilities, inline

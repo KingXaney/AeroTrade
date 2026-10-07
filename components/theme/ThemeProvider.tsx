@@ -22,12 +22,20 @@ type ThemeTokens = {
     reduceMotion: boolean;
 };
 
+type PreviewOptions = {
+    // The whole theme, layout included — for a click that previews because there is no account to
+    // save to (the landing page's switcher). A hover previews the palette only: a style moves the
+    // page, and a page that moves under the pointer leaves the card, cancels the preview, moves
+    // back, enters the card again, and loops.
+    full?: boolean;
+};
+
 type ThemeContextValue = {
     theme: Theme;              // the committed theme (what the server rendered)
     mode: PaletteMode;
     tokens: ThemeTokens;
     pending: boolean;
-    preview: (theme: Theme) => void;
+    preview: (theme: Theme, options?: PreviewOptions) => void;
     commit: (theme: Theme) => void;
     cancel: (delayMs?: number) => void;   // 0 = restore right now
 };
@@ -109,12 +117,14 @@ const ThemeProvider = ({initial, children}: {initial: Theme; children: ReactNode
         }, delayMs);
     }, [clearTimer]);
 
-    const preview = useCallback((theme: Theme) => {
+    const preview = useCallback((theme: Theme, options?: PreviewOptions) => {
         if (pendingTheme.current) {   // a commit is in flight; never paint a third theme
             clearTimer();
             return;
         }
-        schedule(() => paint(theme), PREVIEW_DELAY_MS);
+        const base = committedRef.current;
+        const painted: Theme = options?.full ? theme : {...base, palette: theme.palette};
+        schedule(() => paint(painted), PREVIEW_DELAY_MS);
     }, [clearTimer, schedule, paint]);
 
     const cancel = useCallback((delayMs: number = CANCEL_DELAY_MS) => schedule(restore, delayMs), [schedule, restore]);
