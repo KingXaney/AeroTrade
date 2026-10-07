@@ -29,6 +29,8 @@ Follow the topics you care about, test trading strategies with virtual money, an
 
 **A news brain that builds market narratives.** Every morning a job ingests finance news, RSS, Reddit and SEC filings, has Gemini extract tickers, sectors and themes with sentiment, and folds them into an entity graph with *fast* (5-day) and *slow* (60-day) attention weights. Narratives whose slow weight stays high become **theses**. The /brain page draws that graph in 3D — themes, sectors and tickers on three shells, sized by attention and coloured by sentiment — with every node a link to its evidence.
 
+**A culture brain that reads what younger consumers are into.** A second brain beside the first: a catalog of ~190 brands in code (drinks, snacks, apparel, apps, games, …) and a daily job that stores each one's Wikipedia pageviews and App Store chart rank, reads youth subreddits, YouTube's popular chart and a fixed set of news searches, has the model label a few dozen items (which brand, how people feel, what kind of moment), and folds it all into a decayed brand graph — behaviour weighed above the press. Every Monday two pickers read that graph with different weights, **Spike** (attention that just jumped) and **Quiet** (attention that has lasted, that the press has not covered, that built since the last earnings report, that is taking share from private rivals), and each trades its own paper account against SPY under the Navigator's rails. The /culture page prints the board by category, a brand's evidence with the model's labels, the two records side by side without a verdict, and a legend of every constant.
+
 **An AI Navigator that trades on those theses — inside hard rails.** Once a week it scores an eligible universe (news mass, sentiment, momentum, thesis, sector) and rebalances a dedicated paper account. Position count, weights, cash floor, trade frequency, holding period and stop-loss are deterministic constants; the LLM only writes the rationale.
 
 **Eight classic quant strategies, paper-traded live and explained.** Buy & hold, 60/40, golden cross, dual momentum, 12-1 momentum, RSI-2 mean reversion, Donchian breakouts and low volatility each run in their own system account every trading morning, decided from the previous close and filled at the open through the same order path you use. A leaderboard ranks them by live return against SPY; each page explains the rule, shows what it is watching, its holdings and every fill with its reason, alongside a clearly labelled three-year simulated record. Deterministic rules, no AI.
@@ -41,7 +43,7 @@ Follow the topics you care about, test trading strategies with virtual money, an
 
 **A second opinion, a chat advisor, and a digest.** Claude can critique the brain's current picture; a tool-using chat assistant (17 tools) — behind the robot in the bottom-right corner, which offers tips about the app on the topics pages — answers "what's new in my topics?", "what does max drawdown mean?" or "why did RSI-2 buy?"; a daily brief by email opens with the day in 30 seconds, then the stories about the reader's own stocks, the markets, their news feed, filings and what people are posting — each written from the articles it cites, with links to those articles and to the stock's page in the app — followed by the AI Navigator's week, their topics and the day's lesson.
 
-**Make it yours.** 12 colour palettes × 5 visual styles (minimal, futuristic, liquid glass, brutalist, soft), saved per account and rendered without a flash. A 35-widget dashboard you can drag, resize and extend.
+**Make it yours.** 12 colour palettes × 5 visual styles (minimal, futuristic, liquid glass, brutalist, soft), saved per account and rendered without a flash. A 37-widget dashboard you can drag, resize and extend.
 
 <div align="center">
 <img src="docs/screenshots/topic-ai-chips.png" alt="A followed topic: keyword chips, refresh, matched articles" width="440"> <img src="docs/screenshots/trade.png" alt="Trade desk: price chart and paper order entry" width="440">
@@ -114,6 +116,8 @@ npm run trigger -- brain        # build the news brain now
 npm run trigger -- topics       # refresh every followed topic (briefs: the AI briefs)
 npm run trigger -- briefing     # write this morning's market briefing
 npm run trigger -- navigator    # run the weekly AI Navigator
+npm run trigger -- culture      # the culture brain's daily sweep (culture-backfill [brandId…]: years of Wikipedia pageviews)
+npm run trigger -- culture-weekly  # run the two culture pickers (-preview decides without filling, -resimulate rebuilds the backtest)
 npm run trigger -- strategies   # run the quant strategies (-preview decides without filling)
 npm run trigger -- income       # credit interest + dividends through yesterday
 npm run trigger -- news         # send today's digest emails (news <email>: a test to one reader)
@@ -126,6 +130,8 @@ npm run trigger -- news         # send today's digest emails (news <email>: a te
 | `generate-market-briefing` | 07:50 daily | one briefing for everyone from the brain's most important articles of the day, each point citing its articles |
 | `generate-topic-briefs` | 08:00 daily | one "what changed today" brief per topic with fresh news |
 | `ai-navigator-weekly` | Mondays 10:00 | score the universe and rebalance the Navigator account |
+| `culture-brain-update` | 06:40 daily | store every catalog brand's pageviews and chart ranks, read the youth sources, label a batch of items, fold into the brand graph |
+| `culture-brain-weekly` | Mondays 10:45 (Tuesday retry) | verify the owners' quotes, score the universe for each culture picker and rebalance its account |
 | `daily-news-summary` | 12:00 daily | per-user daily brief, at most one per reader per day |
 | `strategies-daily` | weekdays 09:35 (10:30 retry) | decide and fill every quant strategy's orders from the previous close; opens the system accounts and rebuilds backtests when a rule changes |
 | `daily-account-snapshots` | weekdays 16:10 | value every account and the SPY benchmark |
@@ -142,7 +148,7 @@ npm run build:check   # compile-only build: proves the app builds without any ke
 npm run qa            # browser QA: all 15 suites in scripts/qa against a throwaway harness (~5 min)
 ```
 
-Unit tests (197 files / 2189 tests) cover every pure module, next to the code in `lib/<feature>/__tests__/`: fills, lots and account analytics, the interest and dividend accrual clock (with a parity test holding the strategy simulator to the live credit), the quant strategies' rules, engine, simulator and what-if grid, the AI Navigator's scoring and rails, the news brain's decay and extraction parsing, news aggregation and sanitising, the topic matcher and briefs, every learner-facing sentence (held to one no-advice word list) and the reason decoder's round trips, the chat tools' shaping, the email sections, dashboard layouts and theme tokens. Database-bound modules (Mongoose reads, server actions, the pages) are exercised through the browser QA in [`scripts/qa/`](scripts/qa/README.md) instead: `npm run qa` starts an in-memory MongoDB, the dev server with inline env vars and the Inngest dev server, then runs 18 Playwright suites, one per feature (`qa-auth`, `qa-home`, `qa-trading`, `qa-income`, `qa-strategies`, `qa-learn`, `qa-topics`, …), each signing up its own user and walking its surfaces — no keys needed. `docs/specs/` holds the design documents for the larger features.
+Unit tests (222 files / 2374 tests) cover every pure module, next to the code in `lib/<feature>/__tests__/`: fills, lots and account analytics, the interest and dividend accrual clock (with a parity test holding the strategy simulator to the live credit), the quant strategies' rules, engine, simulator and what-if grid, the AI Navigator's scoring and rails, the news brain's decay and extraction parsing, news aggregation and sanitising, the topic matcher and briefs, every learner-facing sentence (held to one no-advice word list) and the reason decoder's round trips, the chat tools' shaping, the email sections, dashboard layouts and theme tokens. Database-bound modules (Mongoose reads, server actions, the pages) are exercised through the browser QA in [`scripts/qa/`](scripts/qa/README.md) instead: `npm run qa` starts an in-memory MongoDB, the dev server with inline env vars and the Inngest dev server, then runs 19 Playwright suites, one per feature (`qa-auth`, `qa-home`, `qa-trading`, `qa-income`, `qa-strategies`, `qa-learn`, `qa-topics`, …), each signing up its own user and walking its surfaces — no keys needed. `docs/specs/` holds the design documents for the larger features.
 
 ## Project structure
 
@@ -151,11 +157,11 @@ Every feature has one folder name in every layer — `lib/trading/`, `components
 ```
 app/            routes — (auth) sign-in, sign-up, forgot-password · (reset) reset-password
                 (marketing) welcome — the landing page a signed-out visitor sees at /
-                (root) home (/), dashboard, topics, topics/[slug], brain, strategies, strategies/[slug], stocks/[symbol],
+                (root) home (/), dashboard, topics, topics/[slug], brain, culture, strategies, strategies/[slug], stocks/[symbol],
                 trade, portfolio, history, markets, news, watchlist, friends, friends/[id], learn,
                 learn/course/[lesson], settings
                 api/ chat, inngest, accounts/[accountId]/export, strategies/[slug]/export, landing/surface
-components/     UI by feature (landing, auth, dashboard, trading, income, strategies, navigator, brain, news, topics, learn,
+components/     UI by feature (landing, auth, dashboard, trading, income, strategies, navigator, brain, culture, news, topics, learn,
                 chat, jobs, stocks, friends, settings, theme), plus primitives/ (the shared surface vocabulary),
                 shell/ (top bar, icon rail, search), forms/ and ui/ (shadcn output)
 lib/            one folder per feature, named as in components/:
@@ -166,6 +172,7 @@ lib/            one folder per feature, named as in components/:
   strategies/   the quant strategies: catalog + rules, indicators, engine, simulator, what-if grid, job + page reads
   navigator/    universe eligibility, composite scoring, allocation rails, the weekly run
   brain/        extraction prompts + parsing, entity graph with dual-timescale decay, theses, second opinion, legend
+  culture/      the brand catalog, the attention sources and their fold, the two pickers' features, scoring and engine, the page reads, the legend
   news/         source adapters (Finnhub, RSS, Reddit, SEC, Google News search), dedupe, sanitiser, the per-user feed
   topics/       keyword normalisation, matcher, search query builder, refresh, briefs, the starter set
   learn/        the glossary, the no-advice word list, every learner-facing sentence (copy/), the reason decoder,

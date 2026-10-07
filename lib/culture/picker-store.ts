@@ -374,3 +374,19 @@ export const getLatestCultureDecision = async (profile: ProfileId): Promise<Cult
     const doc = await CultureDecision.findOne({profile}).sort({date: -1});
     return doc ? toDecisionView(doc) : null;
 };
+
+// Owners with a last report date on file — the system view's earnings line.
+export const countReportDates = async (): Promise<number> => {
+    await connectToDatabase();
+    return CultureEarnings.countDocuments({lastReportDate: {$ne: null}});
+};
+
+// A profile's decisions on the given days, for the trade log's "What the picker saw": each
+// fill's row carries the reasons of the decision item that placed it. Bounded by the dates asked.
+export const getCultureDecisionsForDates = async (profile: ProfileId, dates: readonly string[]): Promise<CultureDecisionView[]> => {
+    const distinct = [...new Set(dates)];
+    if (distinct.length === 0) return [];
+    await connectToDatabase();
+    const docs = await CultureDecision.find({profile, date: {$in: distinct}});
+    return docs.map(toDecisionView);
+};

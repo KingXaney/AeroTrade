@@ -320,6 +320,52 @@ and friends keep none beyond Shared and the invariants).
   feed itself (`getNewsFeedForPrefs`: kill switch, outage fallback, the topic batch for the widget
   and /history) is untouched.
 
+### culture
+
+- The culture brain keeps its own collections — the `culture-*` models, read and written only by
+  `lib/culture/store` and `lib/culture/picker-store` — and never writes `BrainEntity` or
+  `NewsItem` (invariant 3, extended; `lib/culture/__tests__/guard.test.ts` holds the import graph).
+  Its decay maths is the pure `lib/brain/decay`, shared.
+- `lib/culture/catalog.ts` is the universe: a brand's id is its entity key and its series key and
+  is never renamed; `owner: null` is a private brand, tracked for context and for the category-share
+  denominator, never traded; `owner.since` dates a change of hands. The model only suggests
+  (`CultureSuggestion`, shown on the system view); a person adds a brand in code.
+- The LLM extracts and explains; deterministic code decides. `lib/culture/extraction` reads the
+  model's labels with zod and clamps them; an item it never read folds through its alias matches
+  at `FALLBACK_IMPORTANCE`; `lib/culture/fold.planCultureFold` is the one planner — once per run
+  id, attention once per day, every fold scaled by `SOURCE_FOLD_WEIGHTS`, news lowest. Attention
+  series are one document per brand, source and month, never a row per day;
+  `lib/culture/store.writeAttentionRows` upserts a day in place.
+- Two pickers over one feature set: `CULTURE_PROFILES` in `lib/culture/config` (Spike, Quiet;
+  `price` is the backtest-only control), scored by `lib/culture/scoring.scoreCultureUniverse` with
+  each term rank-normalised over the owners that have it (null = neutral 0) and the weights
+  renormalised over the feeds a run has (`effectiveWeights`); `lib/culture/engine.decideWeek` is
+  the one place a week is decided, through the Navigator's allocator under `CULTURE_RAILS`. A new
+  picker is a new profile id, never a reweighted old one: its account and decisions carry the id.
+- Each live profile trades its own paper account under `CULTURE_OWNER_ID` (`system:culture`,
+  never `global` nor the strategies' sentinel), opened by
+  `lib/culture/picker-store.ensureCultureAccount` on the first weekly run and traded only by
+  `lib/jobs/functions/culture.runCultureWeekly` (`PaperTrade.source: 'culture-brain'`, idempotency
+  key `culture:<profile>:<week>:<side>:<symbol>`). The weekly claim per profile is atomic; a run
+  outside the session or on `dryRun` previews and claims nothing; without a model key the
+  rationale is skipped, never retried into a 403.
+- Every reason a picker writes is decoded by `lib/learn/culture-reasons` (round-tripped in its
+  test) and glossed on the server (`glossCultureReasons`) before a client panel sees it.
+- `/culture` composes `lib/culture/page-store` (every read global, cached per request), shaped by
+  the pure `lib/culture/page-view`: three views in the URL (`?view=`), and `?brand=` always the
+  brands view with `#evidence`. The comparison strip prints the pickers in `LIVE_PROFILES` order
+  and SPY, with no sign colour and no sort by return (invariant 12); the board explains its marks
+  (● thesis, ○ private, * unpriced) once, only when some row carries them (invariant 8); a stored
+  item's link becomes an anchor only through `lib/culture/links.outboundHref` (http(s)); the
+  legend `lib/culture/legend` prints every figure from the config at the foot of every view.
+  Every sentence is `lib/learn/copy/culture`.
+- The Brain section of `lib/shell/navigation` carries both brains (`/brain`, `/culture`); the rail
+  stays at eight icons. The two widgets (`culture-picks`, `brand-attention`) are library-only,
+  category `brain` ("Brains & AI").
+- Jobs: `culture-brain-update` daily 06:40 ET (trigger `culture`), `culture-brain-weekly` Mondays
+  10:45 ET with a Tuesday holiday retry (`culture-weekly`, `culture-preview`, `culture-resimulate`),
+  `culture-wikipedia-backfill` on demand (`culture-backfill [brandId…]`). QA: `npm run qa -- culture`.
+
 ### topics
 
 - `lib/topics/starters` is the curated set, `lib/topics/seed` what a new account gets (once —

@@ -12,6 +12,8 @@ import PortfolioSnapshot from "@/components/dashboard/widgets/trading/PortfolioS
 import WatchlistMovers from "@/components/dashboard/widgets/stocks/WatchlistMovers";
 import FriendsRank from "@/components/dashboard/widgets/friends/FriendsRank";
 import NewsBrainTile from "@/components/dashboard/widgets/brain/NewsBrainTile";
+import CulturePicksTile from "@/components/dashboard/widgets/culture/CulturePicksTile";
+import BrandAttentionList from "@/components/dashboard/widgets/culture/BrandAttentionList";
 import TradingViewBody from "@/components/dashboard/widgets/stocks/TradingViewBody";
 import TopHoldings from "@/components/dashboard/widgets/trading/TopHoldings";
 import SecondOpinionExcerpt from "@/components/dashboard/widgets/brain/SecondOpinionExcerpt";
@@ -182,6 +184,8 @@ const WIDGET_RENDERERS: Record<WidgetId, Renderer> = {
             <BrainStatusAsync ctx={r.ctx} />
         </Suspense>
     ),
+    'culture-picks': (r) => need(r, 'culturePicks', (summary) => <CulturePicksTile summary={summary} />),
+    'brand-attention': (r) => need(r, 'brandAttention', (rows) => <BrandAttentionList rows={rows} />),
     'quant-strategies': (r) => <Suspense fallback={skeleton('quant-strategies', 5)}><QuantStrategiesAsync ctx={r.ctx} span={r.span} /></Suspense>,
     'market-news': (r) => <Suspense fallback={skeleton('market-news', 4)}><MarketNewsAsync ctx={r.ctx} span={r.span} /></Suspense>,
     'quick-links': () => <QuickLinks />,

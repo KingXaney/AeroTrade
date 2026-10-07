@@ -5,15 +5,26 @@
 // the day's attention surprises and the alias fallback fold into brand entities through the
 // pure planner — once per run id, attention once per day — with co-mention links; owners roll up;
 // a suggested name the catalog already has is dropped and a repeat is counted; evidence reads a
-// brand's items with the other brands they name and never an importance. The daily job itself
-// is not fired here: its sources are the real Wikipedia, App Store and Google News.
+// brand's items with the other brands they name and never an importance. Then the weekly
+// pickers through the Inngest dev server, and the /culture page in a browser: the brand board
+// with its marks explained once, a brand's evidence with its labels (a stored javascript: link
+// never an anchor), the two pickers side by side with every reason read in plain words and a
+// strip that colours nothing, the system view, the legend last and collapsed, the two widgets
+// from the library, and a phone width without a horizontal scroll. The daily job itself is not
+// fired here: its sources are the real Wikipedia, App Store and Google News.
 // Run: npm run qa -- culture   (the harness: README.md)
+import {chromium} from 'playwright';
 import {MongoClient} from 'mongodb';
 import {createJiti} from 'jiti';
-import {INNGEST, MONGO, REPO_ROOT, check, note, summary} from './lib.mjs';
+import {BASE, INNGEST, MONGO, REPO_ROOT, check, note, outDir, signUp, summary} from './lib.mjs';
 
+const OUT = outDir('culture');
 const COLLECTIONS = ['cultureentities', 'cultureattentions', 'cultureitems', 'culturesuggestions'];
+const WEEKLY_COLLECTIONS = ['culturestates', 'culturedecisions', 'cultureuniverses', 'cultureearnings'];
+const OWNER = 'system:culture';
+const BAR_SYMBOLS = ['CELH', 'PEP', 'SPY', '^IRX'];
 const mongo = new MongoClient(MONGO);
+const browser = await chromium.launch({channel: 'chrome'});
 
 const etDate = (date) => date.toLocaleDateString('en-CA', {timeZone: 'America/New_York'});
 const addDays = (date, days) => {
@@ -22,10 +33,26 @@ const addDays = (date, days) => {
 };
 const near = (a, b, eps = 1e-6) => Math.abs(a - b) <= eps;
 
+// Everything the weekly and page sections seed, removed at the end whatever happened.
+const cleanupWeekly = async (db, storedBars) => {
+    if (storedBars) {
+        await db.collection('pricebars').deleteMany({symbol: {$in: BAR_SYMBOLS}});
+        if (storedBars.length > 0) await db.collection('pricebars').insertMany(storedBars);
+    }
+    const ids = (await db.collection('paperaccounts').find({userId: OWNER}).project({_id: 1}).toArray()).map((a) => String(a._id));
+    await db.collection('paperaccounts').deleteMany({userId: OWNER});
+    await db.collection('papertrades').deleteMany({userId: OWNER});
+    await db.collection('accountsnapshots').deleteMany({$or: [{userId: OWNER}, {accountId: {$in: ids}}]});
+    for (const name of WEEKLY_COLLECTIONS) await db.collection(name).deleteMany({});
+};
+
+let storedBars = null;
 try {
     await mongo.connect();
     const db = mongo.db();
     for (const name of COLLECTIONS) await db.collection(name).deleteMany({});
+    await cleanupWeekly(db, null);
+    await db.collection('jobruns').deleteMany({jobId: 'culture-brain-weekly'});
 
     // The app's modules connect through database/mongoose, which reads MONGODB_URI at load.
     process.env.MONGODB_URI = MONGO;
@@ -157,19 +184,13 @@ try {
     // ---- the weekly pickers, through the Inngest dev server ----
     // The week's quote check is pre-seeded (two owners quoted, the rest not), the bars are
     // stored through the previous session (so no provider is asked), and the harness has no
-    // Finnhub key: every fill answers "no live price", which is the outcome under test.
+    // Finnhub key: every fill answers "no live price", which is the outcome under test. What
+    // the run leaves — the accounts, the decisions, the universe rows — the page section reads.
     const inngestUp = await fetch(`${INNGEST}/`).then((r) => r.ok).catch(() => false);
+    let decisions = null;
     if (!inngestUp) {
-        note('no Inngest dev server', 'the weekly picker checks are skipped');
+        note('no Inngest dev server', 'the weekly picker checks are skipped; the page is checked before any run');
     } else {
-        const OWNER = 'system:culture';
-        const pickerAccountIds = (await db.collection('paperaccounts').find({userId: OWNER}).project({_id: 1}).toArray()).map((a) => String(a._id));
-        await db.collection('paperaccounts').deleteMany({userId: OWNER});
-        await db.collection('papertrades').deleteMany({userId: OWNER});
-        await db.collection('accountsnapshots').deleteMany({$or: [{userId: OWNER}, {accountId: {$in: pickerAccountIds}}]});
-        for (const name of ['culturestates', 'culturedecisions', 'cultureuniverses', 'cultureearnings']) await db.collection(name).deleteMany({});
-        await db.collection('jobruns').deleteMany({jobId: 'culture-brain-weekly'});
-
         const {catalogTickers} = await jiti.import(`${REPO_ROOT}lib/culture/catalog.ts`);
         const {previousTradingDay} = await jiti.import(`${REPO_ROOT}lib/prices/market-hours.ts`);
         const {getEasternWeekKey} = await jiti.import(`${REPO_ROOT}lib/dates.ts`);
@@ -198,8 +219,8 @@ try {
                 bars.push({symbol, date, close, open: close * 0.995, high: close * 1.01, low: close * 0.99, volume: 1000, source: 'yahoo'});
             });
         }
-        const storedBars = await db.collection('pricebars').find({symbol: {$in: ['CELH', 'PEP', 'SPY', '^IRX']}}).toArray();
-        await db.collection('pricebars').deleteMany({symbol: {$in: ['CELH', 'PEP', 'SPY', '^IRX']}});
+        storedBars = await db.collection('pricebars').find({symbol: {$in: BAR_SYMBOLS}}).toArray();
+        await db.collection('pricebars').deleteMany({symbol: {$in: BAR_SYMBOLS}});
         await db.collection('pricebars').insertMany(bars);
 
         // Four hundred days of pageviews, so the picker features can be measured: Celsius
@@ -225,11 +246,11 @@ try {
         };
         const jobMessage = async () => (await db.collection('jobruns').findOne({jobId: 'culture-brain-weekly'}))?.lastMessage ?? '';
 
-        const first = await fire({force: true});
-        check('the weekly event is accepted by the dev server', first.ok, `status ${first.status}`);
-        const decisions = await pollUntil(async () => {
-            const rows = await db.collection('culturedecisions').find({date: today}).toArray();
-            return rows.length === 2 && (await jobMessage()).includes('Culture pickers') ? rows : null;
+        const firstRun = await fire({force: true});
+        check('the weekly event is accepted by the dev server', firstRun.ok, `status ${firstRun.status}`);
+        decisions = await pollUntil(async () => {
+            const docs = await db.collection('culturedecisions').find({date: today}).toArray();
+            return docs.length === 2 && (await jobMessage()).includes('Culture pickers') ? docs : null;
         }, 240_000);
         check('the run saves a decision for each picker and stamps the job', decisions !== null, await jobMessage());
         if (decisions) {
@@ -250,8 +271,8 @@ try {
             check('no trade row was written', trades === 0, `${trades} trades`);
 
             await fire({force: true});
-            const again = await pollUntil(async () => ((await jobMessage()).includes('already ran') ? await jobMessage() : null), 60_000);
-            check('a second run in the same week claims nothing and says so', again !== null, again ?? await jobMessage());
+            const againRun = await pollUntil(async () => ((await jobMessage()).includes('already ran') ? await jobMessage() : null), 60_000);
+            check('a second run in the same week claims nothing and says so', againRun !== null, againRun ?? await jobMessage());
 
             await fire({dryRun: true});
             const preview = await pollUntil(async () => ((await jobMessage()).includes('preview') ? await jobMessage() : null), 120_000);
@@ -259,23 +280,191 @@ try {
             const kinds = (await db.collection('culturedecisions').find({date: today}).toArray()).map((d) => d.kind);
             check('a preview never overwrites the executed decisions', kinds.every((k) => k === 'executed'), kinds.join(','));
         }
-
-        await db.collection('pricebars').deleteMany({symbol: {$in: ['CELH', 'PEP', 'SPY', '^IRX']}});
-        if (storedBars.length > 0) await db.collection('pricebars').insertMany(storedBars);
-        const cleanupIds = (await db.collection('paperaccounts').find({userId: OWNER}).project({_id: 1}).toArray()).map((a) => String(a._id));
-        await db.collection('paperaccounts').deleteMany({userId: OWNER});
-        await db.collection('papertrades').deleteMany({userId: OWNER});
-        await db.collection('accountsnapshots').deleteMany({$or: [{userId: OWNER}, {accountId: {$in: cleanupIds}}]});
-        for (const name of ['culturestates', 'culturedecisions', 'cultureuniverses', 'cultureearnings']) await db.collection(name).deleteMany({});
     }
+
+    // ---- the page, in a browser ----
+    // Beside what the sections above left: a thesis on Celsius (the ● mark), a private brand
+    // (the ○ mark), and a news item stored with a javascript: link (never an anchor).
+    await db.collection('cultureentities').updateOne({key: 'celsius'}, {$set: {thesisSince: new Date(nowMs - 21 * 24 * 3600 * 1000), peakSlowWeight: 9}});
+    await db.collection('cultureentities').insertOne({
+        key: 'liquid-death', displayName: 'Liquid Death', category: 'drinks', ticker: null, listing: null,
+        weightFast: 0.3, sentimentSumFast: 0, weightSlow: 0.8, sentimentSumSlow: 0.1, decayedTo: today, lastSeenAt: new Date(nowMs),
+        thesisSince: null, peakSlowWeight: 0.8, links: [], attentionDay: today,
+    });
+    await db.collection('cultureitems').insertOne({
+        contentHash: 900_000_000 + Math.floor(Math.random() * 1_000_000), source: 'news', sourceName: 'QA Wire', title: 'Celsius sponsors a festival (bad link)',
+        body: '', url: 'javascript:alert(1)', datetime: datetime - 7200, publishedDate: today, day: today, mentions: ['celsius'], createdAt: new Date(nowMs),
+    });
+
+    const page = await browser.newPage({viewport: {width: 1440, height: 900}});
+    const shot = (n) => page.screenshot({path: `${OUT}${n}.png`, fullPage: true});
+    const email = await signUp(page, 'culture');
+    const userDoc = await db.collection('user').findOne({email});
+    const userId = String(userDoc?._id ?? userDoc?.id ?? '');
+    check('signed up', userId.length > 0);
+    const mechanismFree = (text) => !/\b(works?|fails?|beat|outperform)\b/i.test(text);
+
+    // --- the brands view: the shell around it, the board, the rising list, the legend ---
+    await page.goto(`${BASE}/culture`, {waitUntil: 'domcontentloaded'});
+    await page.locator('#brand-board').waitFor({timeout: 60000});
+    const viewTabs = await page.locator('[role="tab"]').evaluateAll((tabs) => tabs.map((t) => `${t.getAttribute('data-tab')}${t.getAttribute('aria-selected') === 'true' ? '*' : ''}`));
+    check('/culture opens on its brands, one view of three', viewTabs.join(',') === 'brands*,picks,system', viewTabs.join(','));
+    const sectionTabs = await page.$$eval('[data-section-tabs="brain"] a', (as) => as.map((a) => `${a.getAttribute('href')}${a.getAttribute('aria-current') === 'page' ? '*' : ''}`));
+    check('the Brain section shows both brains as tabs, the culture brain current', sectionTabs.join(',') === '/brain,/culture*', sectionTabs.join(','));
+    check('the rail still has eight icons, Brain lit', await page.locator('aside.rail nav a').count() === 8
+        && await page.locator('aside.rail nav a[aria-current="page"]').getAttribute('data-rail') === 'brain');
+
+    const board = page.locator('#brand-board');
+    const boardBrands = await board.locator('[data-brand-board] [data-brand]').evaluateAll((els) => els.map((el) => el.getAttribute('data-brand')));
+    check('the board lists every brand with attention', boardBrands.length === 5 && ['celsius', 'poppi', 'crocs', 'duolingo', 'liquid-death'].every((id) => boardBrands.includes(id)), boardBrands.join(','));
+    const categories = await board.locator('[data-category]').evaluateAll((els) => els.map((el) => el.getAttribute('data-category')));
+    check('…one column per category in the catalog\'s order, empty ones not drawn', categories.join(',') === 'drinks,footwear,apps', categories.join(','));
+    check('…heaviest brand first within a category', boardBrands[0] === 'celsius');
+    const celsiusRow = board.locator('[data-brand-board] [data-brand="celsius"]');
+    check('a thesis is a dot on the name, an owner a link to its stock page and a ticket', /●/.test(await celsiusRow.innerText())
+        && await celsiusRow.locator('a[href="/stocks/CELH"]').count() === 1 && await celsiusRow.locator('a[href="/trade?symbol=CELH"]').count() === 1
+        && await celsiusRow.locator('a[href="/culture?brand=celsius#evidence"]').count() === 1);
+    check('a private brand carries the ○ and no ticket', /○/.test(await board.locator('[data-brand-board] [data-brand="liquid-death"]').innerText())
+        && await board.locator('[data-brand-board] [data-brand="liquid-death"] a[href^="/trade"]').count() === 0);
+    const marks = await board.locator('[data-board-marks] li').allInnerTexts();
+    check('the marks are explained once under the grid, only those some row carries', marks.length === (decisions ? 3 : 2)
+        && /● thesis: .*reached 5/.test(marks[0]) && /○ private/.test(marks[1]) && (decisions ? /\* no live quote/.test(marks[2]) : true), marks.join(' | '));
+    if (decisions) {
+        check('an owner without a quote this week is starred', /CROX\*/.test(await board.locator('[data-brand-board] [data-brand="crocs"]').innerText()));
+    }
+    check('the board labels attention and sentiment with their definitions', await board.locator('[data-term="attention"][title]').count() >= 1
+        && await board.locator('[data-term="brand-sentiment"][title]').count() >= 1);
+    const boardTerms = board.locator('[data-what-these-mean]');
+    check('…with one "How to read the board" for the panel, led by its own paragraph', await boardTerms.count() === 1
+        && (await boardTerms.locator('summary').innerText()).includes('How to read the board') && !(await boardTerms.evaluate((d) => d.open)));
+    await boardTerms.evaluate((d) => { d.open = true; });
+    const boardTermsText = await boardTerms.innerText();
+    check('…which says attention is not demand, then defines the four terms it shows', /Attention is not demand/.test(boardTermsText)
+        && /Listed owner/.test(boardTermsText) && /Brand thesis/.test(boardTermsText) && /Brand sentiment/.test(boardTermsText) && !/Picker profile/.test(boardTermsText));
+
+    const rising = page.locator('#rising-brands');
+    const risingBrands = await rising.locator('[data-brand]').evaluateAll((els) => els.map((el) => el.getAttribute('data-brand')));
+    check('the rising list ranks the fast layer and links each name to its evidence', risingBrands.length >= 4 && risingBrands[0] === 'celsius'
+        && await rising.locator('a[href="/culture?brand=celsius#evidence"]').count() === 1, risingBrands.join(','));
+    check('…with one "What these mean" of its own', await rising.locator('[data-what-these-mean]').count() === 1);
+
+    const legend = page.locator('#culture-legend');
+    check('the legend sits collapsed at the foot of the view', await legend.count() === 1
+        && await legend.evaluate((el) => el.nextElementSibling === null) && !(await legend.locator('details').evaluate((d) => d.open)));
+    await legend.locator('details').evaluate((d) => { d.open = true; });
+    const legendText = await legend.innerText();
+    check('…and opens to the constants: the 60-day half-life, both pickers, the rails', /halves every 60 days/.test(legendText) && /The Spike picker/.test(legendText)
+        && /The Quiet picker/.test(legendText) && /at most 15% of its account/.test(legendText) && /opened with \$100,000/.test(legendText), legendText.replace(/\s+/g, ' ').slice(0, 160));
+    check('…describing mechanism, never a result', mechanismFree(legendText));
+    await shot('01-brands');
+
+    // --- a brand's evidence: the labels, the links, the caveat once ---
+    await page.goto(`${BASE}/culture?brand=celsius#evidence`, {waitUntil: 'domcontentloaded'});
+    const evidencePanel = page.locator('#evidence');
+    await evidencePanel.waitFor({timeout: 60000});
+    check('an evidence link lands on the brands view with the evidence panel', await page.locator('[role="tab"][data-tab="brands"][aria-selected="true"]').count() === 1);
+    const evidenceText = await evidencePanel.innerText();
+    check('the evidence lists both items, names the owner and offers its ticket', /Switched from Poppi to Celsius/.test(evidenceText) && /bad link/.test(evidenceText)
+        && await evidencePanel.locator('a[href="/stocks/CELH"]').count() === 1 && await evidencePanel.locator('a[href="/trade?symbol=CELH"]').count() === 1);
+    check('one badge, for the labelled item, its definition as the title', await evidencePanel.locator('[data-term^="signal-"]').count() === 1
+        && await evidencePanel.locator('[data-term="signal-substitution"][title]').count() === 1);
+    check('a stored javascript: link is never an anchor', await page.locator('a[href^="javascript"]').count() === 0
+        && await evidencePanel.locator('a[href="https://www.reddit.com/r/energydrinks/comments/qa1/x/"]').count() === 1);
+    check('the item\'s other brand is a chip to its own evidence', await evidencePanel.locator('[data-brand-chips] a[href="/culture?brand=poppi#evidence"]').count() === 1);
+    check('the AI caveat is stated once, and an importance never', await evidencePanel.locator('[data-evidence-caveat]').count() === 1 && !/importance/i.test(evidenceText));
+    const labels = evidencePanel.locator('[data-what-these-mean]');
+    check('…and one "What these labels mean", listing only that label', await labels.count() === 1 && (await labels.locator('summary').innerText()).includes('What these labels mean'));
+    await labels.evaluate((d) => { d.open = true; });
+    const labelText = await labels.innerText();
+    check('…which defines substitution and nothing else', /Substitution/.test(labelText) && !/Backlash/.test(labelText) && !/Hype/.test(labelText));
+    await shot('02-evidence');
+
+    // --- the pickers view: two columns in profile order, a strip that colours nothing ---
+    await page.goto(`${BASE}/culture?view=picks`, {waitUntil: 'domcontentloaded'});
+    await page.locator('#picker-comparison').waitFor({timeout: 60000});
+    const pickers = await page.locator('[data-picker]').evaluateAll((els) => els.map((el) => el.getAttribute('data-picker')));
+    check('the two pickers stand side by side in the registry\'s order', pickers.join(',') === 'spike,quiet', pickers.join(','));
+    const strip = await page.locator('[data-comparison]').evaluateAll((els) => els.map((el) => el.getAttribute('data-comparison')));
+    check('the strip prints Spike, Quiet and SPY, never sorted by return', strip.join(',') === 'spike,quiet,spy', strip.join(','));
+    check('…and colours no figure', await page.locator('#picker-comparison [data-comparison] .text-positive, #picker-comparison [data-comparison] .text-negative').count() === 0);
+    check('…saying the backtest is not computed yet', await page.locator('[data-backtest-pending]').count() === 1);
+    check('the lead says what each picker follows, once', await page.locator('[data-picks-lead]').count() === 1 && await page.locator('[data-picker-lead]').count() === 2);
+    const spikeColumn = page.locator('[data-picker="spike"]');
+    const quietColumn = page.locator('[data-picker="quiet"]');
+    if (decisions) {
+        const stripText = await page.locator('#picker-comparison').innerText();
+        check('both accounts have a record since today', (stripText.match(new RegExp(`since ${today}`, 'g')) ?? []).length === 3, stripText.replace(/\s+/g, ' ').slice(0, 200));
+        check('each record says it is live since today', /Live since/.test(await spikeColumn.locator('[data-culture-record="spike"]').innerText()) && /Live since/.test(await quietColumn.locator('[data-culture-record="quiet"]').innerText()));
+        const spikeDecision = spikeColumn.locator('[data-culture-decision="spike"]');
+        check('each column shows its own latest decision, with the universe audit and the feeds', await spikeDecision.count() === 1 && /owners quoted/.test(await spikeDecision.innerText()) && /feeds: /.test(await spikeDecision.innerText())
+            && await quietColumn.locator('[data-culture-decision="quiet"]').count() === 1);
+        check('…its raw reasons naming the picker', /picker Spike/.test(await spikeDecision.innerText()) && /picker Quiet/.test(await quietColumn.locator('[data-culture-decision="quiet"]').innerText()));
+        const glosses = page.locator('[data-culture-gloss]');
+        const glossCount = await glosses.count();
+        check('each decision item has one closed "What the picker saw"', glossCount === decisions.reduce((sum, d) => sum + d.items.length, 0)
+            && (await glosses.evaluateAll((all) => all.every((d) => !d.open))), String(glossCount));
+        await glosses.first().evaluate((d) => { d.open = true; });
+        const glossText = await glosses.first().innerText();
+        check('…reading the picker and its weights from the config', /The Spike picker scored it/.test(glossText) && /price momentum 0\.40/.test(glossText), glossText.replace(/\s+/g, ' ').slice(0, 200));
+        check('…and no "Apply" anywhere: a record, not a list to act on', await page.locator('button', {hasText: 'Apply'}).count() === 0);
+        check('the brands behind a symbol are chips to their evidence', await spikeDecision.locator('[data-item-brands] a[href^="/culture?brand="]').count() >= 1);
+        check('nothing held and no fill, said plainly', (await page.locator('#culture-holdings-spike').innerText()).includes('Nothing held') && (await page.locator('#culture-trades-spike').innerText()).includes('No fill yet'));
+    } else {
+        check('before the first run the strip shows dashes and "not started"', (await page.locator('#picker-comparison').innerText()).includes('not started'));
+        check('…and each column its empty decision', await page.locator('[data-culture-decision]').count() === 0 && await page.getByText('No decision yet').count() === 2);
+    }
+    check('the legend closes the pickers view too', await page.locator('#culture-legend').count() === 1);
+    await shot('03-picks');
+
+    // --- the system view ---
+    await page.goto(`${BASE}/culture?view=system`, {waitUntil: 'domcontentloaded'});
+    await page.locator('#culture-system').waitFor({timeout: 60000});
+    const system = page.locator('#culture-system');
+    check('the system view holds the counters, the freshness line and the three job stamps', /Brands/i.test(await system.locator('[data-culture-counters]').innerText())
+        && /Wikipedia/.test(await system.locator('[data-culture-lines]').innerText()) && await system.locator('[data-culture-jobs] > *').count() === 3);
+    // Celsius has views from the data-layer section; the weekly section adds Pepsi and Poppi.
+    const brandsWithViews = inngestUp ? 3 : 1;
+    const drift = await system.locator('[data-drift-alarm]').getAttribute('data-drift-alarm');
+    check('the drift alarm names the brands without recent views', Number(drift) === CULTURE_BRANDS.length - brandsWithViews, `${drift} of ${CULTURE_BRANDS.length}`);
+    check('the suggestions queue lists the name the model met', /Cirkul/.test(await page.locator('#suggested-brands').innerText()));
+    check('…and nothing else of the other views', await page.locator('#brand-board').count() === 0 && await page.locator('#picker-comparison').count() === 0);
+    if (decisions) {
+        check('the accounts are listed with their launch', /Spike · live since/.test(await system.locator('[data-culture-accounts]').innerText()));
+    }
+    await shot('04-system');
+
+    // --- the two widgets, from the library ---
+    await db.collection('userpreferences').updateOne({userId}, {$set: {dashboardLayout: {version: 1, widgets: [{id: 'culture-picks', span: 12}, {id: 'brand-attention', span: 6}]}, updatedAt: new Date()}}, {upsert: true});
+    await page.goto(`${BASE}/dashboard`, {waitUntil: 'load'});
+    await page.locator('[data-widget-id="brand-attention"] [data-brand]').first().waitFor({timeout: 60000});
+    const tile = page.locator('[data-widget-id="culture-picks"]');
+    check('the Culture Brain tile links to the pickers and prints the records or the schedule', await tile.locator('a[href="/culture?view=picks"]').count() === 1
+        && (decisions ? /Spike .*Quiet /.test(await tile.innerText()) : /Mondays 10:45 ET/.test(await tile.innerText())), (await tile.innerText()).replace(/\s+/g, ' '));
+    const attentionWidget = page.locator('[data-widget-id="brand-attention"]');
+    check('the Brand attention widget lists the brands with their titles and no disclosure', await attentionWidget.locator('[data-brand="celsius"]').count() === 1
+        && await attentionWidget.locator('[data-term="attention"][title]').count() >= 1 && await page.locator('[data-widget-id] [data-what-these-mean]').count() === 0);
+    await shot('05-widgets');
+
+    // --- a phone width: nothing scrolls sideways ---
+    await page.setViewportSize({width: 375, height: 812});
+    for (const path of ['/culture', '/culture?view=picks', '/culture?view=system']) {
+        await page.goto(`${BASE}${path}`, {waitUntil: 'domcontentloaded'});
+        await page.locator('#culture-legend').waitFor({timeout: 60000});
+        const overflow = await page.evaluate(() => document.documentElement.scrollWidth - window.innerWidth);
+        check(`${path} has no horizontal scroll at 375px`, overflow <= 1, `${overflow}px`);
+    }
+    await shot('06-phone');
+    await page.close();
 } catch (err) {
     check(`threw: ${err.message}`, false, err.stack);
 } finally {
     try {
         const db = mongo.db();
+        await cleanupWeekly(db, storedBars);
         for (const name of COLLECTIONS) await db.collection(name).deleteMany({});
     } catch {}
     await mongo.close().catch(() => {});
+    await browser.close().catch(() => {});
 }
 
 summary('culture');

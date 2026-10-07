@@ -43,7 +43,7 @@ const weightsOf = (term: CultureTerm): string =>
     LIVE_PROFILES.map((id) => `${CULTURE_PROFILES[id].weights[term] === 0 ? '0' : weightText(CULTURE_PROFILES[id].weights[term])} in ${CULTURE_PROFILES[id].label}`).join(', ');
 
 // "price momentum 0.40, attention surprise 0.20, …": a profile's non-zero weights.
-const profileWeights = (id: (typeof PROFILE_IDS)[number]): string =>
+export const profileWeightsText = (id: (typeof PROFILE_IDS)[number]): string =>
     (Object.entries(CULTURE_PROFILES[id].weights) as [CultureTerm, number][])
         .filter(([, weight]) => weight > 0)
         .sort((a, b) => b[1] - a[1])
@@ -55,7 +55,7 @@ const sessionsOf = (horizon: Horizon): number => Number(horizon.slice(1));
 const monthsOf = (sessions: number): number => Math.round(sessions / 21);
 const horizonsByWeight = (): Horizon[] =>
     (Object.keys(CULTURE_MOMENTUM_MIX) as Horizon[]).sort((a, b) => CULTURE_MOMENTUM_MIX[b] - CULTURE_MOMENTUM_MIX[a]);
-const mixText = (): string => horizonsByWeight()
+export const momentumMixText = (): string => horizonsByWeight()
     .map((horizon, i) => `${monthsOf(sessionsOf(horizon))}-month${i === 0 ? ' change' : ''} ${weightText(CULTURE_MOMENTUM_MIX[horizon])}`)
     .join(', ');
 const shortestHorizon = (): number => Math.min(...(Object.keys(CULTURE_MOMENTUM_MIX) as Horizon[]).map(sessionsOf));
@@ -79,7 +79,7 @@ export const CULTURE_GRAMMAR: readonly ReasonTemplate[] = [
         decode: (m) => {
             const id = PROFILE_IDS.find((candidate) => CULTURE_PROFILES[candidate].label === m[1]);
             if (!id) return null;
-            return [{text: m[0], gloss: CULTURE_GLOSS.picker(m[1], PROFILE_COPY[id], profileWeights(id)), term: 'picker-profile', rail: 'CULTURE_PROFILES'}];
+            return [{text: m[0], gloss: CULTURE_GLOSS.picker(m[1], PROFILE_COPY[id], profileWeightsText(id)), term: 'picker-profile', rail: 'CULTURE_PROFILES'}];
         },
     },
     {
@@ -171,7 +171,7 @@ export const CULTURE_GRAMMAR: readonly ReasonTemplate[] = [
             const sessions = sessionsOf(horizon);
             return [{
                 text: m[0],
-                gloss: CULTURE_GLOSS.momentum(m[2], sessions, monthsOf(sessions), weightsOf('momentumLong'), mixText()),
+                gloss: CULTURE_GLOSS.momentum(m[2], sessions, monthsOf(sessions), weightsOf('momentumLong'), momentumMixText()),
                 rail: 'CULTURE_MOMENTUM_MIX',
             }];
         },

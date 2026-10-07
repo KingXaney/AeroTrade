@@ -79,7 +79,10 @@ export const NAV_SECTIONS: readonly NavSection[] = [
     },
     {
         id: 'brain', label: 'Brain', icon: 'neurology',
-        pages: [{href: '/brain', label: 'Brain', icon: 'neurology'}],
+        pages: [
+            {href: '/brain', label: 'News brain', icon: 'neurology'},
+            {href: '/culture', label: 'Culture brain', icon: 'storefront'},
+        ],
     },
     {
         id: 'learn', label: 'Learn', icon: 'school',
