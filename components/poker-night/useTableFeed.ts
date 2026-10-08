@@ -37,7 +37,7 @@ import {useCallback, useEffect, useRef, useState, useSyncExternalStore} from "re
 import {useRouter} from "next/navigation";
 import {POKER_NIGHT_ERRORS} from "@/lib/learn/copy/poker-night";
 import {
-    createTicker, feedMode, feedReducer, handLive, initialFeed, initialMonitor, isBehind, monitorLive, monitorStep, nearTurn, needsPrivate,
+    askWindow, createTicker, feedMode, feedReducer, handLive, initialFeed, initialMonitor, isBehind, monitorLive, monitorStep, nearTurn, needsPrivate,
     nextPollDelay, passFresh, pollPace, readAgain, shouldRetick, tickRole, transportOf,
     type FeedInput, type FeedMode, type FeedState, type MonitorInput, type RealtimeMonitor, type TickOutcome, type Transport,
 } from "@/lib/poker-night/feed";
@@ -241,7 +241,7 @@ export const useTableFeed = ({code, initial, pollScale, realtime}: {code: string
             // otherwise the table's own pace.
             const delay = nextPollDelay({
                 mode: pollPace(current.transport, s), hidden: hidden(), inHand: handLive(s.view),
-                nearTurn: nearTurn(s.view, s.view?.me.seat ?? null), failures: s.failures, scale: pollScale,
+                nearTurn: nearTurn(s.view, s.view?.me.seat ?? null), failures: s.failures, scale: pollScale, asks: askWindow(s.view),
             });
             const dueAt = delay === null ? null : Date.now() + delay;
             if (sooner && pollTimer !== null && pollDueAt !== null && (dueAt === null || pollDueAt <= dueAt)) return;

@@ -534,9 +534,12 @@ and friends keep none beyond Shared and the invariants).
   (`PaidPotView`; the shares are `pots.paidParts`/`seatShares`, the server's own split), a shown
   hand its cards alone (`variants.readShown`), and the ledger rows are tuples (`LedgerView`;
   `views.ledgerRows`/`ledgerRowOf` read them). Only the viewer's own `me` carries their cards, their
-  thrown-away card, their pre-action, `next` (leaving, now or after the hand; sitting out next), the
-  hand's asks they made or were asked, the hands shown to them alone (`shownToMe`), who they may ask
-  (`canAsk`) and their own `allowAsks`; `PlayerView.nudge` is their nudge count (below).
+  thrown-away card, their pre-action, `next` ('leave' once they left now, 'leave-after' while they
+  play out a hand they chose to leave after, 'sit-out' while a sit-out waits), the hand's asks they
+  made or were asked, the hands shown to them alone (`shownToMe`), who they may ask (`canAsk`) and
+  why not the rest they could (`askBlocked`, `asks.askChoices`: asks off, a cooldown, one waiting,
+  the limit — the one thing a view says of another player's asks setting, what the engine's refusal
+  would say), and their own `allowAsks`; `PlayerView.nudge` is their nudge count (below).
 - Conservation: Σ stacks + Σ committed to a live hand + Σ cashed out = Σ bought
   (`lib/poker-night/ledger.conservation`), checked after every step of
   `lib/poker-night/__tests__/simulate.test.ts` (100 seeded nights; `PN_SIM_SEEDS=1000` runs more).
@@ -803,12 +806,20 @@ and friends keep none beyond Shared and the invariants).
   `/` by a full page load (the landing page for a guest through `proxy.ts`), never `/poker-night`,
   which sends a guest to sign in. A seated player's Home and Leave go through `LeaveDialog`, read on
   every render from `lib/poker-night/overlays.leavePlan`, so a deal that lands while it is open makes
-  it the mid-hand one. The dock offers Sit out and Leave whenever the viewer is not playing a hand
-  (`dock.sitOut`/`leave`, the pause after a showdown they reached included) — one tap unless
+  it the mid-hand one, which offers both ways: "Leave now" (`leave`) and "Leave after this hand"
+  (`leave-after`, the primary, which never navigates — from Home too). Every leave that keeps the
+  player on the page — the dock's Leave, the dialog's between-hands Leave — is `leave-after`, sent
+  through `components/poker-night/useLeaveAfter`, which toasts how it landed (a deal that beat it to
+  the table, `overlays.leaveAfterLanded`: "A new hand was dealt first …"); only "Leave now" and Home's
+  "Leave and go" send `leave`. The dock offers Sit out and Leave whenever the viewer is not playing a
+  hand (`dock.sitOut`/`leave`, the pause after a showdown they reached included) — one tap unless
   `leaveTapAsks` — and after leaving a left panel (`leftState`). What the viewer's own seat does when
-  the hand ends is `MeView.next` ('leave', 'sit-out'; private, never on the wire), since a folded or
-  all-in plate keeps reading so: once they left mid-hand the dock says they leave when it ends and
-  offers nothing more, and Home goes straight home (`overlays.homeAsks`); while a "Sit out next hand"
+  the hand ends is `MeView.next` ('leave', 'leave-after', 'sit-out'; private, never on the wire),
+  since a folded or all-in plate keeps reading so: once they left now the dock says they leave when
+  it ends and offers nothing more, and Home goes straight home (`overlays.homeAsks`, `leftNow`);
+  while they leave after the hand the dock says "Leaving after this hand" ("Last hand" in a narrow
+  dock) with Stay in place of who the table waits for (hidden on their own turn), Home carries a dot
+  and the menu offers "Stay at the table" beside "Leave now"; while a "Sit out next hand"
   waits, the dock says so and offers "Deal me in" (`dock.takeBack`, a sit-in). A row that takes
   another's place under the thumb (the action bar, the early choices — keyed by `dock.preRowKey`, the
   hand and its choices — and the seat's controls) drops pointer taps for `keys.TAP_SHIELD_MS`
@@ -824,6 +835,36 @@ and friends keep none beyond Shared and the invariants).
   complete hand's `HandResultView.gone` names the seats whose player went since the deal, read
   through `reveal.playerAt`, so a result never names the wrong player — nor tells someone who took a
   winner's seat in the pause that they won (`reveal.viewerSeatIn`).
+- Leave after this hand, at the table: one tap while the viewer holds cards in the hand in play
+  (`overlays.leaveAfterOf`, `dock.leaveAfter`) — a door beside the early choices (`Dock`'s
+  `LeaveAfterToggle`, its word in a wide dock, shielded with them; `.pn-pre-row` puts it on a row of
+  its own in a dock too narrow for the four, a phone on its side), a button in the seat's row while
+  all in, the menu's toggle — and, once folded, the break's Leave. The seat empties as the hand
+  completes; while its result shows, a seat whose player went keeps a ghost of their plate
+  (`SeatRing`'s `GhostSeat` from `HandResultView.gone`: the name, the look, the cards they showed,
+  "Left"; never a menu or "Sit here"), which the pots and the banner keep clear of (`TableScreen`).
+- The host's yes, at the table: the join card says it once the first hand is dealt
+  (`JoinView.needsApproval`, `JOIN_COPY.approvalNote`); a seat whose chips wait reads "Waiting for
+  chips" on every plate (the public `requests`) and its dock "Waiting for the host to approve your
+  chips" with Cancel (`withdraw`; `dock.waitingChips`), as the bank does. The host hears a short
+  sound (`sounds` 'request') and sees a toast with Approve for each new request
+  (`components/poker-night/AskPrompt`'s `RequestWatch`, `overlays.newRequests`), a dot on Bank and
+  Host, and the bank's rows say what each is for (`overlays.requestKind`: to sit down, a rebuy, a
+  top-up). The rebuy policy is Off / On (host approves) in the start form and the host drawer
+  (`components/poker-night/RebuyChoice`, a radio pair over `ChoiceGroup`).
+- Asks, at the table: another player's seat menu leads with "Ask to see their cards"
+  (`overlays.askOffer` over `canAsk`, `askBlocked` and the viewer's own `asks`): offered, greyed with
+  its reason, or how the viewer's ask of them stands — read at the server's time, so an ask that ran
+  out frees the rest with no write. The player asked sees `AskPrompt` under the top bar, never over
+  the dock (`.pn-ask-wrap`: on a phone on its side it keeps to the table's column), while one waits (`overlays.askToAnswer`): who asks, its seconds, "Show Ana" / "Show
+  everyone" / "No thanks", 44 px behind a tap shield, and a short sound ('ask'). A hand shown to the
+  viewer alone turns up on its plate for them ("Shown to you", `Seat`'s `privateCards`) and in the
+  hand log ("Shown to you: Ana held …", `hand-log`'s `seenLines` from `shownToMe` until the history
+  row has it); `AskWatch` toasts how each of their asks ended (`overlays.askNews`). "Let others ask
+  to see my cards" is a switch of the personal look (`PersonalLook.allowAsks`, saved with an
+  account), which `PokerNightRoom` sends as `allow-asks` whenever the seat lacks it (the room forgets
+  it for a player without a seat). Through a result's pause the polls come every 1.5 s for a player
+  dealt into the hand (`feed.askWindow`), since the next deal ends every ask.
 - The Hands guide: `lib/poker-night/hands-guide` (pure) holds the ten rankings strongest first, each
   a five-card example with the cards that make it (`RANKING_EXAMPLES`), the kicker pair
   (`KICKER_EXAMPLE`) and the games (`GUIDE_GAMES`: Texas hold'em for now, each with its glossary

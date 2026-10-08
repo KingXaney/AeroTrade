@@ -4,7 +4,9 @@
 // clock, the name in a <bdi>, the stack, a word for anything but simply playing), the cards in front
 // of it (face down for everyone else; turned up at a showdown or when shown), the tag of the last
 // move ("Call 40"), the blind's mark, and — when it wins — its stack counting up and a "+2,400" over
-// it. The viewer's own cards are the dock's, not the plate's.
+// it. The viewer's own cards are the dock's, not the plate's. A hand shown to the viewer alone
+// (answering their ask) turns up on its plate for them, flagged "Shown to you"; a seat whose chips
+// wait for the host's yes says "Waiting for chips".
 //
 // What moves is the room's animations for this seat (components/poker-night/anim): sitting down,
 // the deal, a fold (the cards turn over, slide toward the middle and fade; the plate dims), the
@@ -20,7 +22,7 @@ import BlindMarker from "@/components/poker-night/BlindMarker";
 import CountUp from "@/components/poker-night/CountUp";
 import PlayingCard, {type CardMotion, type CardStateMotion} from "@/components/poker-night/PlayingCard";
 import TurnRing from "@/components/poker-night/TurnRing";
-import {ACTION_COPY, BANK_COPY, TABLE_COPY} from "@/lib/learn/copy/poker-night";
+import {ACTION_COPY, ASK_COPY, BANK_COPY, TABLE_COPY} from "@/lib/learn/copy/poker-night";
 import type {Card} from "@/lib/poker/cards";
 import {compactChips} from "@/lib/poker-night/chips";
 import {cardLook, type ResultLook} from "@/lib/poker-night/reveal";
@@ -43,6 +45,8 @@ export type SeatProps = {
     blind: 'small' | 'big' | null;
     look: ResultLook | null;
     anims: readonly LiveAnim[];
+    privateCards?: readonly Card[] | null; // shown to the viewer alone (MeView.shownToMe)
+    awaitingChips?: boolean; // a request for chips waits for the host (the table's requests)
 };
 
 type Tag = {id: string; kind: EntryKind; text: string; allIn: boolean; said: string; at: number; offset: number};
@@ -70,13 +74,14 @@ const lastTag = (anims: readonly LiveAnim[], seat: number): Tag | null => {
 // A word for the seat when it is not simply playing: folded, all in, away, sitting out, out of
 // chips, leaving; "next hand" only while a hand it is not in is being played; else how it is
 // connected, when it is not here.
-const statusOf = (v: SeatView, live: boolean): string | null => {
+const statusOf = (v: SeatView, live: boolean, awaitingChips = false): string | null => {
     if (v.state === 'in-hand') return v.presence === 'here' ? null : TABLE_COPY.presence[v.presence];
+    if (v.state === 'busted' && awaitingChips) return TABLE_COPY.awaitingChips;
     if (v.state === 'waiting') return live ? TABLE_COPY.status.waiting : v.presence === 'here' ? null : TABLE_COPY.presence[v.presence];
     return TABLE_COPY.status[v.state];
 };
 
-const Seat = ({seat, place, stage, view: v, person, mine, live, acting, myTurn, turn, blind, look, anims}: SeatProps) => {
+const Seat = ({seat, place, stage, view: v, person, mine, live, acting, myTurn, turn, blind, look, anims, privateCards = null, awaitingChips = false}: SeatProps) => {
     const name = person?.name ?? '';
     const ours = useMemo(() => anims.filter((a) => {
         const e = a.event;
@@ -98,7 +103,8 @@ const Seat = ({seat, place, stage, view: v, person, mine, live, acting, myTurn, 
     // The viewer is looking at this page: their own seat is here, whatever another tab of theirs
     // last said (a second tab closing reports the player hidden until this one's next beat).
     const presence = mine ? 'here' : v.presence;
-    const status = statusOf({...v, presence}, live);
+    const seenAlone = !mine && !Array.isArray(v.cards) && privateCards !== null && privateCards.length > 0 ? privateCards : null;
+    const status = seenAlone ? ASK_COPY.shownTag : statusOf({...v, presence}, live, awaitingChips);
 
     // Cards in front of the plate (never the viewer's own: the dock draws those).
     const toCentre = offset(stage.centre, place.plate);
@@ -118,6 +124,13 @@ const Seat = ({seat, place, stage, view: v, person, mine, live, acting, myTurn, 
                     const glow = state === 'win' ? animVars(reveal ?? {offset: 0}, reveal?.liftAt ?? 0) : null;
                     return <PlayingCard key={`${card}`} card={card} state={state} motion={motion} stateMotion={stateMotion} glow={glow}/>;
                 })}
+            </div>
+        );
+    } else if (seenAlone) {
+        // Shown to the viewer alone, after the hand: face up where a shown hand sits, never lit.
+        cards = (
+            <div className="pn-seat-shown" style={{'--pn-card-w': 'var(--pn-show-w)'} as CSSProperties} data-pn-shown-to-me="">
+                {seenAlone.map((card) => <PlayingCard key={`${card}`} card={card}/>)}
             </div>
         );
     } else if (!mine && (typeof v.cards === 'number' || (folded && v.cards === 'none' && v.state === 'folded'))) {
@@ -149,7 +162,7 @@ const Seat = ({seat, place, stage, view: v, person, mine, live, acting, myTurn, 
             data-state={v.state}
             data-presence={presence}
             data-side={place.spot.side}
-            data-shown={faceUp ? '' : undefined}
+            data-shown={faceUp || seenAlone ? '' : undefined}
             data-anim={joined ? 'join' : undefined}
             aria-label={label}
         >

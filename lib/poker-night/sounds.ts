@@ -1,6 +1,7 @@
 // The table's sounds: each a short recipe of Web Audio tones and filtered noise — a card's snap, a
 // chip's click, the knock of a check, the swish of a fold, a winner's arpeggio, the chime of the
-// viewer's turn, an emote's pop and a thrown thing's landing (a splat, a fizz, a bounce) —
+// viewer's turn, an emote's pop, a thrown thing's landing (a splat, a fizz, a bounce), the host's
+// note that a player asks for chips and the viewer's that a player asks to see their cards —
 // synthesised in the browser (components/poker-night/sound-player), so there is no file to fetch.
 // Pure and client-safe: the recipes, the moment each sound plays on the animations' own timeline,
 // and the gate that keeps them few.
@@ -12,7 +13,7 @@
 import {UNIT_MS, type CardTiming, type StreamChip} from '@/lib/poker-night/choreography';
 import type {TableEvent} from '@/lib/poker-night/events';
 
-export const SOUND_IDS = ['deal', 'chip', 'check', 'fold', 'win', 'turn', 'pop', 'splat', 'fizz', 'bounce'] as const;
+export const SOUND_IDS = ['deal', 'chip', 'check', 'fold', 'win', 'turn', 'pop', 'splat', 'fizz', 'bounce', 'request', 'ask'] as const;
 export type SoundId = (typeof SOUND_IDS)[number];
 
 // A tone: an oscillator gliding from freq to `to` (Hz); a noise: one second of white noise through
@@ -69,6 +70,17 @@ export const SOUNDS: Record<SoundId, readonly SoundPart[]> = {
     bounce: [
         {kind: 'tone', wave: 'sine', freq: 520, to: 260, at: 0, dur: 0.12, gain: 0.18},
         {kind: 'tone', wave: 'sine', freq: 440, to: 240, at: 0.16, dur: 0.1, gain: 0.1},
+    ],
+    // The host's note: a player asks for chips (a soft knock-knock, then a short bell).
+    request: [
+        {kind: 'tone', wave: 'sine', freq: 220, to: 160, at: 0, dur: 0.06, gain: 0.18},
+        {kind: 'tone', wave: 'sine', freq: 220, to: 160, at: 0.1, dur: 0.06, gain: 0.16},
+        {kind: 'tone', wave: 'triangle', freq: 988, at: 0.2, dur: 0.22, gain: 0.12},
+    ],
+    // The viewer is asked to see their cards: a gentle rising two-note question.
+    ask: [
+        {kind: 'tone', wave: 'triangle', freq: 587, at: 0, dur: 0.12, gain: 0.15},
+        {kind: 'tone', wave: 'triangle', freq: 784, to: 830, at: 0.11, dur: 0.18, gain: 0.15},
     ],
 };
 

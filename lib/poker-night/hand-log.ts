@@ -111,22 +111,31 @@ const resultLines = (no: number, mode: LogMode, hands: readonly ReadHand[], pots
     return lines;
 };
 
+// The hands shown to the viewer alone, answering their ask: "Shown to you: Ana held …".
+const seenLines = (no: number, seen: readonly {seat: number; cards: readonly Card[]}[], nameOf: SeatNamer): LogLine[] =>
+    seen.map((h) => ({key: `${no}:seen:${h.seat}`, kind: 'note', text: LOG_COPY.showedYou(nameOf(h.seat), HAND_COPY.cardsShort(h.cards)), seat: h.seat}));
+
 // The hand in play (or just ended), from its whole log, its game and boards and, once it is
-// complete, its result.
+// complete, its result — and the hands shown to the viewer alone since (MeView.shownToMe).
 export const currentHandLog = (
     no: number, entries: readonly HandEntryView[], mode: LogMode, result: HandResultView | null, nameOf: SeatNamer,
+    shownToMe: readonly ShownCardsView[] = [],
 ): LogHand => {
     const shown = result ? result.hands.map((h) => readHand(mode, h)) : [];
     return {
         no, title: LOG_COPY.hand(no), blinds: null,
-        lines: [...moveLines(no, entries, mode.boards[0] ?? [], nameOf), ...(result ? resultLines(no, mode, shown, result.pots, nameOf) : [])],
+        lines: [
+            ...moveLines(no, entries, mode.boards[0] ?? [], nameOf),
+            ...(result ? [...resultLines(no, mode, shown, result.pots, nameOf), ...seenLines(no, shownToMe, nameOf)] : []),
+        ],
         truncated: false,
     };
 };
 
 // A completed hand from history, the viewer's own cards added when they were never shown, and any
-// hand shown to the viewer alone.
-export const historyHandLog = (summary: HandSummaryView, people: People, mePid: string | null): LogHand => {
+// hand shown to the viewer alone — from the history row, or (the hand just ended, its row written a
+// moment after the answer) from the view's own part, `seenNow`.
+export const historyHandLog = (summary: HandSummaryView, people: People, mePid: string | null, seenNow: readonly ShownCardsView[] = []): LogHand => {
     const pidAt = new Map(summary.players.map((p) => [p.seat, p.pid]));
     const nameOf = seatNamer((seat) => pidAt.get(seat) ?? null, people);
     const mode: LogMode = {variant: summary.variant, boards: summary.boards};
@@ -136,10 +145,10 @@ export const historyHandLog = (summary: HandSummaryView, people: People, mePid: 
     ];
     const mine = summary.players.find((p) => p.pid === mePid);
     if (mine && mine.hole && !mine.shown) lines.push({key: `${summary.no}:mine`, kind: 'note', text: LOG_COPY.youHeld(HAND_COPY.cardsShort(mine.hole)), seat: mine.seat});
-    for (const p of summary.players) {
-        if (p.pid === mePid || p.shown || !p.hole) continue;
-        lines.push({key: `${summary.no}:seen:${p.seat}`, kind: 'note', text: LOG_COPY.showedYou(nameOf(p.seat), HAND_COPY.cardsShort(p.hole)), seat: p.seat});
-    }
+    const seen = summary.players.flatMap((p) => (p.pid === mePid || p.shown || !p.hole ? [] : [{seat: p.seat, cards: p.hole}]));
+    const shownAll = new Set(summary.players.filter((p) => p.shown).map((p) => p.seat));
+    for (const h of seenNow) if (!shownAll.has(h.seat) && !seen.some((s) => s.seat === h.seat)) seen.push({seat: h.seat, cards: [...h.cards]});
+    lines.push(...seenLines(summary.no, seen, nameOf));
     return {
         no: summary.no, title: LOG_COPY.hand(summary.no), blinds: LOG_COPY.blinds(summary.smallBlind, summary.bigBlind, summary.ante),
         lines, truncated: summary.truncated,

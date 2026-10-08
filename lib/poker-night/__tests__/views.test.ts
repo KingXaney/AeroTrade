@@ -172,7 +172,7 @@ describe('the non-leak property', () => {
         const me = playerView(s, 'p2', playerMeta(s)).me;
         expect(me).toEqual({
             pid: 'p2', seat: 2, role: 'seated', isHost: false, hasAccount: false, hole: cards('QhQd'), pre: null, next: null,
-            discard: null, allowAsks: true, asks: [], canAsk: [], shownToMe: [],
+            discard: null, allowAsks: true, asks: [], canAsk: [], askBlocked: [], shownToMe: [],
         });
     });
 });
@@ -184,14 +184,14 @@ describe('what only the viewer sees', () => {
         const p1 = playerView(s, 'p1', {...playerMeta(s), hasAccount: true});
         expect(p1.me).toEqual({
             pid: 'p1', seat: 1, role: 'seated', isHost: false, hasAccount: true, hole: cards('KhKd'), pre: {kind: 'check-fold'} as PreAction, next: null,
-            discard: null, allowAsks: true, asks: [], canAsk: [], shownToMe: [],
+            discard: null, allowAsks: true, asks: [], canAsk: [], askBlocked: [], shownToMe: [],
         });
         const host = playerView(s, 'p0', playerMeta(s));
         expect(host.me).toMatchObject({isHost: true, pre: null, hole: cards('AhAd')});
         const watcher = playerView(s, 'w1', playerMeta(s));
         expect(watcher.me).toEqual({
             pid: 'w1', seat: null, role: 'watching', isHost: false, hasAccount: false, hole: null, pre: null, next: null,
-            discard: null, allowAsks: true, asks: [], canAsk: [], shownToMe: [],
+            discard: null, allowAsks: true, asks: [], canAsk: [], askBlocked: [], shownToMe: [],
         });
         expect(watcher.config).toEqual(s.config);
         expect(watcher.seats[1]!.cards).toBe(2);
@@ -215,11 +215,13 @@ describe('what only the viewer sees', () => {
         expect(keysIn(publicView(s)).has('next')).toBe(false);
     });
 
-    it('says "leave" to the viewer alone while they play out the hand they chose to leave after', () => {
+    it('says "leave-after" to the viewer alone while they play out the hand they chose to leave after, "leave" once they leave now', () => {
         let s = deal(table({0: 1000, 1: 1000, 2: 1000}, {lastBigBlind: 0}));
         const before = wireView(s, meta(s));
         s = ok(reduce(s, {type: 'leave-after', by: 'p2', on: true, at: nowOf(s)}));
-        expect(playerView(s, 'p2', playerMeta(s)).me.next).toBe('leave');
+        expect(playerView(s, 'p2', playerMeta(s)).me.next).toBe('leave-after');
+        // Leaving now overrides it: nothing takes that back.
+        expect(playerView(ok(reduce(s, {type: 'leave', by: 'p2', at: nowOf(s)})), 'p2', playerMeta(s)).me.next).toBe('leave');
         expect(playerView(s, 'p1', playerMeta(s)).me.next).toBeNull();
         expect(publicView(s).seats[2]!.state).toBe('in-hand');
         expect(wireView(s, meta(s))).toEqual(before);
@@ -279,10 +281,19 @@ describe('what only the viewer sees', () => {
         expect(historyView(summary!, 'p2').players.find((p) => p.pid === 'p1')!.hole).toEqual(cards('KhKd'));
         expect(historyView(summary!, 'p0').players.find((p) => p.pid === 'p1')!.hole).toBeNull();
         expect(historyView(summary!, null).players.find((p) => p.pid === 'p1')!.hole).toBeNull();
-        // Asks off: nobody may ask them.
+        // Asks off: nobody may ask them, and those who could are told why — they alone.
         const off = ok(reduce(moves(deal(table({0: 1000, 1: 1000, 2: 1000}, {lastBigBlind: 0})), F, F), {type: 'allow-asks', by: 'p1', on: false, at: at + 10}));
         expect(playerView(off, 'p1', playerMeta(off)).me.allowAsks).toBe(false);
         expect(playerView(off, 'p2', {...playerMeta(off), serverNow: at}).me.canAsk).toEqual(['p0']);
+        expect(playerView(off, 'p2', {...playerMeta(off), serverNow: at}).me.askBlocked).toEqual([['p1', 'asks-off']]);
+        expect(playerView(off, 'p1', {...playerMeta(off), serverNow: at}).me.askBlocked).toEqual([]);
+        expect(playerView(off, 'w1', {...playerMeta(off), serverNow: at}).me.askBlocked).toEqual([]);
+        expect(keysIn(wireView(off, meta(off))).has('askBlocked')).toBe(false);
+        // An ask waiting blocks the rest, for the one who asked alone, until its time is up.
+        const waiting = ok(reduce(off, {type: 'ask', by: 'p2', to: 'p0', at: at + 20}));
+        expect(playerView(waiting, 'p2', {...playerMeta(waiting), serverNow: at + 30}).me.askBlocked).toEqual([['p1', 'asks-off']]);
+        expect(playerView(waiting, 'p0', {...playerMeta(waiting), serverNow: at + 30}).me.askBlocked).toEqual([['p1', 'asks-off']]);
+        expect(playerView(waiting, 'p0', {...playerMeta(waiting), serverNow: at + 30}).me.canAsk).toEqual(['p2']);
     });
 
     it('keeps a history hole only when shown or the viewer\'s own', () => {

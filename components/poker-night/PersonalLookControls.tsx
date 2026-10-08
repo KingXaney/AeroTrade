@@ -2,8 +2,8 @@
 
 // The personal look's controls (lib/poker-night/personal): what a player sees and hears at the
 // table, for their eyes only — the card back, the card face, a four-colour deck, the chip colours,
-// then sound, vibration, the screen kept on, the hand's name, peek, muted emotes and the single-key
-// shortcuts. Each picker draws real samples of the choice (a card back, two cards in each face,
+// then sound, vibration, the screen kept on, the hand's name, peek, muted emotes, the single-key
+// shortcuts and "Let others ask to see my cards" (which the table also tells the room). Each picker draws real samples of the choice (a card back, two cards in each face,
 // the four aces, a row of chip stacks) from LOOKS_CSS through the sample's own data attributes —
 // a drawer is portaled out of the room that carries the viewer's. Controlled: the table's My look
 // drawer keeps every change in this browser at once, the lobby's My look saves them with the account.
@@ -62,10 +62,11 @@ const SWITCH_WORDS: Record<PersonalSwitch, {label: string; hint: string}> = {
     peek: {label: LOOKS_COPY.peek, hint: LOOKS_COPY.peekHint},
     muteEmotes: {label: LOOKS_COPY.muteEmotes, hint: LOOKS_COPY.muteEmotesHint},
     shortcuts: {label: LOOKS_COPY.shortcuts, hint: LOOKS_COPY.shortcutsHint},
+    allowAsks: {label: LOOKS_COPY.allowAsks, hint: LOOKS_COPY.allowAsksHint},
 };
 
 // The switches below the pickers, in this order (the four-colour deck sits with the cards).
-const SWITCHES: readonly PersonalSwitch[] = ['sound', 'buzz', 'keepAwake', 'handHints', 'peek', 'muteEmotes', 'shortcuts'];
+const SWITCHES: readonly PersonalSwitch[] = ['sound', 'buzz', 'keepAwake', 'handHints', 'peek', 'muteEmotes', 'shortcuts', 'allowAsks'];
 
 const SwitchRow = ({id, which, look, onChange, disabled, sample}: {
     id: string; which: PersonalSwitch; look: PersonalLook; onChange: Props['onChange']; disabled: boolean; sample?: ReactNode;

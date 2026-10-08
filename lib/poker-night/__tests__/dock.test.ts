@@ -13,7 +13,7 @@ import {reduce} from '@/lib/poker-night/engine';
 import type {TableState} from '@/lib/poker-night/types';
 import type {PlayerView} from '@/lib/poker-night/view-types';
 import {clockLeaderOf, playerView} from '@/lib/poker-night/views';
-import {A, C, F, R, X, cards, deal, moves, nowOf, ok, pidOf, table} from './fixtures';
+import {A, C, F, R, X, T0, cards, deal, moves, nowOf, ok, pidOf, table} from './fixtures';
 
 const as = (s: TableState, seat: number): PlayerView => playerView(s, pidOf(seat), {
     code: 'K7QXM4', seq: 1, serverNow: nowOf(s), nextDueAt: nextDueAt(s), clockLeader: clockLeaderOf(s, {}), presence: {}, watchers: 0, realtimeOk: true, peopleV: 1,
@@ -270,5 +270,65 @@ describe('the seat\'s own controls', () => {
         expect(dock.sizing).toMatchObject({kind: 'bet', min: 20, pot: 60});
         s = moves(s, R(40));
         expect(dockView(as(s, 1)).sizing).toMatchObject({kind: 'raise', min: 80, toCall: 40, pot: 100});
+    });
+});
+
+describe('leaving after this hand, and chips that wait for the host', () => {
+    it('offers it in one tap while the viewer plays a hand, then says so with Stay, the early choices still theirs', () => {
+        let s = deal(three());
+        const before = dockView(as(s, 0));
+        expect(before).toMatchObject({leaveAfter: 'offer', leavingAfter: false, leaving: false});
+        expect(before.pre).not.toBeNull();
+        s = ok(reduce(s, {type: 'leave-after', by: pidOf(0), on: true, at: nowOf(s)}));
+        const after = dockView(as(s, 0));
+        expect(after).toMatchObject({leaveAfter: 'set', leavingAfter: true, leaving: false, sitOut: false, leave: false});
+        // Play goes on as usual: the early choices, then the action bar on their turn.
+        expect(after.pre).not.toBeNull();
+        s = moves(s, C);
+        expect(dockView(as(s, 0))).toMatchObject({myTurn: true, leavingAfter: true});
+        // Stay takes it back.
+        const back = ok(reduce(s, {type: 'leave-after', by: pidOf(0), on: false, at: nowOf(s)}));
+        expect(dockView(as(back, 0))).toMatchObject({leaveAfter: 'offer', leavingAfter: false});
+        // Leaving now overrides it, for good.
+        const gone = ok(reduce(s, {type: 'leave', by: pidOf(0), at: nowOf(s)}));
+        expect(dockView(as(gone, 0))).toMatchObject({leaveAfter: null, leavingAfter: false, leaving: true});
+    });
+
+    it('lets a folded player leave as the hand ends with the break\'s Leave, and an all-in one with its own button', () => {
+        let s = deal(three());
+        s = moves(s, F);
+        expect(dockView(as(s, 2))).toMatchObject({folded: true, leave: true, leaveAfter: null});
+        s = ok(reduce(s, {type: 'leave-after', by: pidOf(2), on: true, at: nowOf(s)}));
+        expect(dockView(as(s, 2))).toMatchObject({leavingAfter: true, leaveAfter: 'set', leave: false, sitOut: false});
+        let a = deal(three([1000, 1000, 300]));
+        a = moves(a, A);
+        const allIn = dockView(as(a, 2));
+        expect(allIn).toMatchObject({pre: null, myTurn: false, leaveAfter: 'offer'});
+    });
+
+    it('leaves at once between hands (nothing to offer then but the break\'s Leave)', () => {
+        const s = three();
+        expect(dockView(as(s, 1))).toMatchObject({leaveAfter: null, leave: true});
+        const left = ok(reduce(s, {type: 'leave-after', by: pidOf(1), on: true, at: nowOf(s)}));
+        expect(left.seats[1]).toBeNull();
+    });
+
+    it('says chips wait for the host once the game has started, with Cancel in place of a rebuy', () => {
+        let s = deal(three());
+        s = moves(s, F, F);
+        s = ok(reduce(s, {type: 'sit', by: pidOf(5), seat: 5, buyIn: 2000, at: nowOf(s)}));
+        const dock = dockView(as(s, 5));
+        expect(dock).toMatchObject({waitingChips: true, request: 2000, buy: null, sitOut: false, leave: true});
+        // Taken back: the offer comes back in its place — while a hand Dee is not in is played too.
+        const live = ok(reduce(deal(ok(reduce(s, {type: 'sit', by: pidOf(6), seat: 6, buyIn: 2000, at: nowOf(s)}))), {type: 'withdraw', by: pidOf(5), at: T0}));
+        expect(live.hand!.phase).toBe('betting');
+        expect(dockView(as(live, 5)).buy).not.toBeNull();
+        const back = ok(reduce(s, {type: 'withdraw', by: pidOf(5), at: nowOf(s)}));
+        expect(dockView(as(back, 5))).toMatchObject({waitingChips: false, request: null});
+        expect(dockView(as(back, 5)).buy).not.toBeNull();
+        // The host's own chips never wait.
+        const host = ok(reduce(s, {type: 'leave', by: pidOf(0), at: nowOf(s)}));
+        const again = ok(reduce(host, {type: 'sit', by: pidOf(0), seat: 6, buyIn: 2000, at: nowOf(host)}));
+        expect(dockView(as(again, 6))).toMatchObject({waitingChips: false, request: null});
     });
 });

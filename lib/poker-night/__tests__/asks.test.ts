@@ -3,7 +3,7 @@
 // player may ask — exactly the asks the engine takes, over seeded completed hands.
 
 import {describe, expect, it} from 'vitest';
-import {answerAt, askDeadline, askedHand, canAskFrom, coolingDown} from '@/lib/poker-night/asks';
+import {answerAt, askChoices, askDeadline, askedHand, canAskFrom, coolingDown} from '@/lib/poker-night/asks';
 import {ASKS} from '@/lib/poker-night/config';
 import {reduce} from '@/lib/poker-night/engine';
 import type {TableState} from '@/lib/poker-night/types';
@@ -74,5 +74,38 @@ describe('who a player may ask', () => {
         expect(canAskFrom(s, b, at + 100 + ASKS.WAIT_MS)).not.toContain(winner);
         expect(canAskFrom(s, b, at + 100 + ASKS.WAIT_MS).length).toBeGreaterThan(0);
         agrees(s, at + 100 + ASKS.WAIT_MS);
+    });
+});
+
+describe('why a player may not ask', () => {
+    it('names a reason for exactly the choices the engine refuses, "asks off" as the engine says it', () => {
+        let s = walked();
+        const at = s.hand!.result!.completedAt;
+        const folded = s.hand!.seats.filter((p) => p.folded).map((p) => p.pid);
+        const winner = s.hand!.seats.find((p) => !p.folded)!.pid;
+        const [a, b] = folded;
+        s = ok(reduce(s, {type: 'allow-asks', by: b, on: false, at: at + 1}));
+        s = ok(reduce(s, {type: 'ask', by: a, to: winner, at: at + 2}));
+        const holds = (st: TableState, now: number) => {
+            for (const from of st.hand!.seats.map((p) => p.pid)) {
+                for (const choice of askChoices(st, from, now)) {
+                    const r = reduce(st, {type: 'ask', by: from, to: choice.pid, at: now});
+                    const took = r.ok && r.state !== st;
+                    expect(took, `${from} → ${choice.pid}`).toBe(choice.block === null);
+                    if (choice.block === 'asks-off') expect(r.ok ? null : r.reason).toBe('asks-off');
+                }
+            }
+        };
+        holds(s, at + 3);
+        expect(askChoices(s, a, at + 3)).toEqual(expect.arrayContaining([{pid: b, block: 'asks-off'}]));
+        expect(askChoices(s, a, at + 3).filter((c) => c.pid !== b).every((c) => c.block === 'waiting')).toBe(true);
+        // Its time up: the waiting block lifts, the player asked drops off the list (asked already).
+        holds(s, at + 2 + ASKS.WAIT_MS);
+        expect(askChoices(s, a, at + 2 + ASKS.WAIT_MS).some((c) => c.pid === winner)).toBe(false);
+        s = ok(reduce(s, {type: 'ask', by: a, to: folded[2], at: at + 3 + ASKS.WAIT_MS}));
+        s = ok(reduce(s, {type: 'reply', by: folded[2], to: a, show: 'none', at: at + 4 + ASKS.WAIT_MS}));
+        // Two asks made: every other choice reads "limit".
+        expect(askChoices(s, a, at + 5 + ASKS.WAIT_MS).filter((c) => c.pid !== b).every((c) => c.block === 'limit')).toBe(true);
+        holds(s, at + 5 + ASKS.WAIT_MS);
     });
 });

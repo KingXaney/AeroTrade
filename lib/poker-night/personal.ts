@@ -1,8 +1,10 @@
 // What each player picks for their own eyes at a poker night table (the personal look): their card
 // back and card face, a four-colour deck, their chip set, and the table's sound, vibration, screen
 // wake, single-key shortcuts, the hand's name under their cards, their cards kept face down until
-// a press (peek) and other players' emotes on or off. Nobody else sees any of it; the host's scene
-// and felt are the room's (lib/poker-night/looks).
+// a press (peek), other players' emotes on or off, and whether others may ask to see their cards
+// after a hand (allowAsks: the one switch the table also tells the room, which keeps it for the
+// player's seat — components/poker-night/PokerNightRoom sends it whenever the seat lacks it). Nobody
+// else sees any of it; the host's scene and felt are the room's (lib/poker-night/looks).
 //
 // Where it lives: this browser's localStorage under ME_STORAGE_KEY, one JSON value
 // {v: 1, name, avatar, look} the table (components/poker-night/PokerNightRoom) and the lobby's My
@@ -39,18 +41,19 @@ export type PersonalLook = {
     handHints: boolean; // the name of the viewer's hand under their cards
     peek: boolean; // the viewer's own cards face down in the dock until they press on them
     muteEmotes: boolean; // other players' reactions, phrases and throws hidden
+    allowAsks: boolean; // "Let others ask to see my cards" (the room's 'allow-asks', sent for the seat)
 };
 
 // The pickers, then the switches, in the order My look shows them.
 export const PERSONAL_CHOICES = ['cardBack', 'cardFace', 'chips'] as const;
-export const PERSONAL_SWITCHES = ['fourColour', 'sound', 'buzz', 'keepAwake', 'shortcuts', 'handHints', 'peek', 'muteEmotes'] as const;
+export const PERSONAL_SWITCHES = ['fourColour', 'sound', 'buzz', 'keepAwake', 'shortcuts', 'handHints', 'peek', 'muteEmotes', 'allowAsks'] as const;
 export type PersonalChoice = (typeof PERSONAL_CHOICES)[number];
 export type PersonalSwitch = (typeof PERSONAL_SWITCHES)[number];
 export const PERSONAL_KEYS: readonly (keyof PersonalLook)[] = [...PERSONAL_CHOICES, ...PERSONAL_SWITCHES];
 
 export const DEFAULT_PERSONAL_LOOK: Readonly<PersonalLook> = Object.freeze({
     cardBack: DEFAULT_CARD_BACK, cardFace: DEFAULT_CARD_FACE, fourColour: false, chips: DEFAULT_CHIP_SET,
-    sound: true, buzz: true, keepAwake: true, shortcuts: true, handHints: true, peek: false, muteEmotes: false,
+    sound: true, buzz: true, keepAwake: true, shortcuts: true, handHints: true, peek: false, muteEmotes: false, allowAsks: true,
 });
 
 const CHOICE_IDS: {readonly [K in PersonalChoice]: readonly PersonalLook[K][]} = {cardBack: CARD_BACK_IDS, cardFace: CARD_FACE_IDS, chips: CHIP_SET_IDS};
@@ -162,6 +165,7 @@ export const PersonalLookSchema = z.strictObject({
     handHints: z.boolean(),
     peek: z.boolean(),
     muteEmotes: z.boolean(),
+    allowAsks: z.boolean(),
 }).partial();
 
 // The scene and felt a host's new tables open with.

@@ -1,7 +1,9 @@
 // What a browser is sent about a poker night table: the client's contract. Declared here on their
 // own, never derived from the server's state types (no Omit<> of a TableState), so a field added to
 // the server state never reaches a client by accident — and there is no deck, no thrown-away card
-// but the viewer's own and no ask but the viewer's own anywhere in them. Every value of these types
+// but the viewer's own and no ask but the viewer's own anywhere in them (the one thing a view says
+// of another player's asks setting is, to a player who could ask them, that they turned asks off —
+// what the engine's refusal would say). Every value of these types
 // is built field by field in lib/poker-night/views.ts.
 //
 // Version 2 (TableView.v, http.PN_PROTOCOL 2): the boards, the game, face-down cards as a count,
@@ -165,10 +167,11 @@ export type MeView = {
     hole: Card[] | null;
     pre: PreAction | null;
     // What the viewer's own seat does when the hand in play ends: 'leave' once they left it mid-hand
-    // (folded, all in, or still in it, away — the plate may still read Folded) or chose to leave
-    // after it (playing it out as usual), 'sit-out' while a "Sit out next hand" waits for the deal
+    // (folded, all in, or still in it, away — the plate may still read Folded: nothing takes it back),
+    // 'leave-after' while they play it out as usual having chosen to leave after it (a 'leave-after'
+    // action with on: false takes it back), 'sit-out' while a "Sit out next hand" waits for the deal
     // (theirs or the host's: the view never says whose). Private, never on the wire: the table sees
-    // neither until the hand ends.
+    // none of them until the hand ends.
     next: OwnNext;
     // Triple T: the card the viewer threw away this hand (never anyone else's).
     discard: Card | null;
@@ -180,11 +183,20 @@ export type MeView = {
     // the player's cards not shown and their asks on, no ask of the viewer's waiting, under the
     // limits (lib/poker-night/config ASKS).
     canAsk: string[];
+    // The other players the viewer could ask but for a rule (lib/poker-night/asks.askChoices), each
+    // with why not: so the seat menu greys the ask and says why. Only the viewer's own; empty while
+    // they may ask nobody at all.
+    askBlocked: [pid: string, block: AskBlock][];
     // Hands shown to the viewer alone this hand, answering their ask.
     shownToMe: ShownCardsView[];
 };
 
-export type OwnNext = 'sit-out' | 'leave' | null;
+export type OwnNext = 'sit-out' | 'leave' | 'leave-after' | null;
+
+// Why the viewer may not ask a player to see their cards now: the player turned asks off, the viewer
+// is cooling down from them (a no, or no answer, within the last few hands), an ask of the viewer's
+// still waits for its answer, or the viewer made every ask a hand allows.
+export type AskBlock = 'asks-off' | 'cooldown' | 'waiting' | 'limit';
 
 // What the viewer's own requests add to the meta: the people, who the viewer is to the room, its
 // emotes, and the viewer's nudge count.

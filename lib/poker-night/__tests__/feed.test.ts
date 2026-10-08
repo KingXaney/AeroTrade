@@ -9,7 +9,7 @@
 import {afterEach, beforeEach, describe, expect, it, vi} from 'vitest';
 import {nextDueAt} from '@/lib/poker-night/clock';
 import {
-    BOTH_FOR_MS, createTicker, EMOTE_GRACE_MS, FALLBACK_QUIET_MS, feedMode, feedReducer, handLive, initialFeed, initialMonitor, isBehind, mergeEmotes,
+    askWindow, BOTH_FOR_MS, createTicker, EMOTE_GRACE_MS, FALLBACK_QUIET_MS, feedMode, feedReducer, handLive, initialFeed, initialMonitor, isBehind, mergeEmotes,
     mergeWire, monitorLive, monitorStep, nearTurn, needsPrivate, nextPollDelay, nextTickAt, passExpiry, passFresh, pollPace, readAgain, shouldRetick, TICK_BACKOFF_MS,
     TICK_RETRIES, TICK_RETRY_MS, tickRole, TOKEN_RETRY_LATER_MS, tokenRetryDelay, tokenRetryLate, transportOf, transportPolicy, watchdogTripped, type FeedState,
     type RealtimeMonitor, type TickerFeed, type TickOutcome,
@@ -899,5 +899,20 @@ describe('the seat pass', () => {
         expect(passFresh(pass, exp * 1000 - 120_001)).toBe(pass);
         expect(passFresh(pass, exp * 1000 - 120_000)).toBeNull();
         expect(passFresh(null, T0)).toBeNull();
+    });
+});
+
+describe('asks to see a hand, over the feed', () => {
+    it('polls faster in the pause after a hand the viewer was dealt into', () => {
+        const base = {mode: 'polling' as const, hidden: false, inHand: false, nearTurn: false, failures: 0, scale: 0};
+        expect(nextPollDelay({...base, asks: true})).toBe(1500);
+        expect(nextPollDelay({...base, asks: true, mode: 'realtime'})).toBe(20_000);
+        let s = deal(three());
+        expect(askWindow(pv(s, pidOf(0), 1))).toBe(false);
+        s = moves(s, {kind: 'fold'}, {kind: 'fold'});
+        expect(s.hand!.phase).toBe('complete');
+        expect(askWindow(pv(s, pidOf(0), 2))).toBe(true);
+        expect(askWindow(pv(s, 'w1', 2))).toBe(false);
+        expect(askWindow(null)).toBe(false);
     });
 });

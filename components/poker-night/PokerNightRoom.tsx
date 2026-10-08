@@ -24,6 +24,11 @@
 // so ("The host sat you out."). A sit-out they send is also noted in this browser
 // (overlays.SIT_OUT_ASK_KEY), so another tab, or this page after a reload, never takes it for the
 // host's.
+//
+// "Let others ask to see my cards" is the one part of the personal look the room keeps too (for the
+// player's seat, forgotten once they have none): whenever the viewer's seat lacks the choice this
+// browser holds — they sat down, or turned it in My look — it is sent ('allow-asks'), once per seat
+// and choice, so a refusal is not sent again in a loop.
 
 import {useCallback, useEffect, useMemo, useRef, useState, useSyncExternalStore} from "react";
 import {toast} from "sonner";
@@ -213,6 +218,23 @@ const PokerNightRoom = ({code, shareUrl, initial, config, suggested, savedLook =
         }
         return r;
     }, [feedSend, code, myPid]);
+
+    // "Let others ask to see my cards": the seat told whenever it lacks this browser's choice.
+    const allowWanted = personal.allowAsks;
+    const allowHeld = view?.me.allowAsks ?? true;
+    const allowSeat = view?.me.seat ?? null;
+    const allowSent = useRef<string | null>(null);
+    useEffect(() => {
+        if (allowSeat === null) {
+            allowSent.current = null;
+            return;
+        }
+        if (allowWanted === allowHeld) return;
+        const key = `${allowSeat}:${allowWanted}`;
+        if (allowSent.current === key) return;
+        allowSent.current = key;
+        void send({type: 'allow-asks', on: allowWanted});
+    }, [allowSeat, allowWanted, allowHeld, send]);
 
     // My look's draft, and a queued save sent the moment the hand in play ends.
     const [profileDraft, setProfileDraft] = useState<ProfileDraft | null>(null);

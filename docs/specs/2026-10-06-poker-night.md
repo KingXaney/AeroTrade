@@ -464,6 +464,26 @@ read whole when it moved, and with realtime the server says it on the player's o
 (`poker-night:<env>:<room id>:<pid>`, subscribe only, their token alone), as `{nudge}` and nothing
 else.
 
+**At the table.** Leaving after this hand is one tap while the player holds cards — a door beside
+the early choices (its word on a wide screen), a button in the seat's row while all in, the menu's
+toggle — and then the dock says "Leaving after this hand" with Stay, Home carries a dot, and the menu
+offers "Stay at the table" beside "Leave now". The mid-hand leave dialog offers both, "Leave after
+this hand" the primary; Home's never navigates for it, since an absent player would hold the table
+up. Every leave that stays on the page sends `leave-after`; when the answer shows a deal beat it,
+the table says "A new hand was dealt first: you leave the table when it ends." While a result shows,
+a player who went as it completed keeps a ghost of their plate (name, look, the cards they showed,
+"Left"). The host's yes: the join card says it once the game has started; a seat whose chips wait
+reads "Waiting for chips" on every plate, and its own dock "Waiting for the host to approve your
+chips" with Cancel; the host hears a short sound and gets a toast with Approve for each new request,
+a dot on Bank and Host, and bank rows that say what each request is for. The rebuy policy is Off /
+On (host approves), a radio pair. Asks: another player's plate menu leads with "Ask to see their
+cards", greyed with the reason when a rule stands in the way and, once asked, how it stands; the
+player asked gets a prompt under the top bar — never over the dock — with its seconds and three 44 px
+answers behind a tap shield; a hand shown to one player alone turns up on its plate for them, flagged
+"Shown to you", and in their hand log; "Let others ask to see my cards" is a switch in My look, kept
+with the personal look and sent to the room for the seat. In a result's pause the polls come every
+1.5 s for a player dealt into the hand, since the next deal ends every ask.
+
 **The budgets, measured.** On the heaviest table, with every private list at its longest (sixteen
 asks, the cooldowns kept, a "no asks" setting for every seat and player dealt, a nudge count on every
 room row): the state 14,798 bytes (16,000), what a write reads 26,806 (27,000), the whole document

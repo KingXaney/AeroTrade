@@ -40,7 +40,7 @@ const PreActions = ({pre, disabled}: {pre: NonNullable<DockView['pre']>; disable
     };
 
     return (
-        <div role="group" aria-label={ACTION_COPY.preHeading} className="chrome-surface flex items-stretch gap-1.5 rounded-[var(--control-radius)] p-1.5" data-pn-pre=""
+        <div role="group" aria-label={ACTION_COPY.preHeading} className="chrome-surface flex min-w-0 items-stretch gap-1.5 rounded-[var(--control-radius)] p-1.5" data-pn-pre=""
              data-pn-armed={shield.armed ? '' : undefined}>
             {pre.options.map((option) => {
                 const on = samePre(option, pre.selected);
@@ -49,7 +49,7 @@ const PreActions = ({pre, disabled}: {pre: NonNullable<DockView['pre']>; disable
                     <button key={key} type="button" aria-pressed={on} disabled={disabled || pending !== null} aria-busy={pending === key}
                             onClick={(e) => void choose(option, e)} data-pre={key}
                             className={cn(
-                                'control-type min-h-12 flex-1 rounded-[var(--control-radius)] border px-2 text-xs transition-colors disabled:opacity-60',
+                                'control-type min-h-12 min-w-0 flex-1 rounded-[var(--control-radius)] border px-1.5 text-xs leading-tight transition-colors disabled:opacity-60',
                                 on ? 'border-brand bg-brand text-on-brand' : 'border-line-strong/40 text-fg-soft hover:text-fg',
                             )}>
                         {ACTION_COPY.pre(option)}

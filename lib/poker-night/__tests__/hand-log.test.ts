@@ -110,9 +110,9 @@ describe('a hand from history', () => {
         if (!r.ok) throw new Error(r.reason);
         const summary = r.hands[0];
         const mine = historyHandLog(historyView(summary, 'p2'), people(3), 'p2').lines.map((l) => plain(l.text));
-        expect(mine).toContain(`P1 showed you ${HAND_COPY.cardsShort(cards('7c2d'))}.`);
+        expect(mine).toContain(`Shown to you: P1 held ${HAND_COPY.cardsShort(cards('7c2d'))}.`);
         const theirs = historyHandLog(historyView(summary, 'p0'), people(3), 'p0').lines.map((l) => plain(l.text));
-        expect(theirs.some((t) => t.includes('showed you'))).toBe(false);
+        expect(theirs.some((t) => t.includes('Shown to you'))).toBe(false);
         expect(historyView(summary, 'p0').players.find((p) => p.pid === 'p1')!.hole).toBeNull();
     });
 
@@ -127,5 +127,26 @@ describe('a hand from history', () => {
             .filter((l) => l.kind === 'result').map((l) => plain(l.text));
         expect(lines[0]).toMatch(/from the main pot/);
         expect(lines[1]).toMatch(/from side pot 1/);
+    });
+});
+
+describe('a hand shown to the viewer alone', () => {
+    it('is said in the hand just ended from the view, and in its history row before the row has it', () => {
+        let s = moves(deal(three(), {holes: {0: 'AhKh', 1: '7c2d', 2: 'QsQd'}}), F, F);
+        const at = s.hand!.result!.completedAt;
+        s = ok(reduce(s, {type: 'ask', by: 'p2', to: 'p1', at: at + 100}));
+        const r = reduce(s, {type: 'reply', by: 'p1', to: 'p2', show: 'one', at: at + 200});
+        if (!r.ok) throw new Error(r.reason);
+        const view = publicView(r.state);
+        const nameOf = seatNamer((seat) => view.seats[seat]?.pid ?? null, people(3));
+        const seen = [{seat: 1, cards: cards('7c2d')}];
+        const now = currentHandLog(1, handLogView(r.state), view.hand!, view.hand!.result, nameOf, seen).lines.map((l) => plain(l.text));
+        expect(now).toContain(`Shown to you: P1 held ${HAND_COPY.cardsShort(cards('7c2d'))}.`);
+        expect(currentHandLog(1, handLogView(r.state), view.hand!, view.hand!.result, nameOf).lines.some((l) => l.text.includes('Shown to you'))).toBe(false);
+        // The history row written as the hand completed (before the answer) holds no hole: the view brings it.
+        const early = historyHandLog(historyView(r.hands[0], null), people(3), 'p2', seen);
+        expect(early.lines.filter((l) => l.text.includes('Shown to you'))).toHaveLength(1);
+        const twice = historyHandLog(historyView(r.hands[0], 'p2'), people(3), 'p2', seen);
+        expect(twice.lines.filter((l) => l.text.includes('Shown to you'))).toHaveLength(1);
     });
 });

@@ -3,10 +3,12 @@
 // from a whitelist, never by spreading a server object. The decks, other players' hole cards,
 // thrown-away cards and pre-actions, a seat's plan to leave after the hand, the asks to see a hand
 // (but to their two players), who turned asks off and the cooldowns, and unshown history holes are
-// never read into a view but the viewer's own. Pure, so the room layer passes in what only it knows
+// never read into a view but the viewer's own — less, to a player who could ask someone, that this
+// one turned asks off or is cooling down from them (MeView.askBlocked: what the engine's refusal
+// would say). Pure, so the room layer passes in what only it knows
 // (names, presence, the version, the viewer's nudge count) as a meta argument.
 
-import {ASK_SHOWN, answerAt, askDeadline, canAskFrom, placeOf} from '@/lib/poker-night/asks';
+import {ASK_SHOWN, answerAt, askChoices, askDeadline, placeOf} from '@/lib/poker-night/asks';
 import {readEntry, type BettingSnapshot} from '@/lib/poker-night/betting';
 import {ENTRY_KINDS, KEEP} from '@/lib/poker-night/config';
 import {ledgerEvents} from '@/lib/poker-night/ledger';
@@ -14,8 +16,8 @@ import {buildPots} from '@/lib/poker-night/pots';
 import {handSeatAt, isLive, seatOf} from '@/lib/poker-night/seats';
 import type {Hand, HandResult, HandSeat, HandSummary, LedgerRow, Seat, SettledPot, ShownHand, TableState} from '@/lib/poker-night/types';
 import type {
-    AskView, BankDetailRowView, BankRowView, CardsView, EmoteView, HandEntryView, HandResultView, HandSummaryView, HandView, LedgerRowView, LedgerView, PaidPotView, People,
-    PeopleView, PlayerMeta, PlayerView, PotView, Presence, SeatState, SeatView, SettledPotView, ShownCardsView, TableView, ViewMeta, WireEntry, WireView,
+    AskBlock, AskView, BankDetailRowView, BankRowView, CardsView, EmoteView, HandEntryView, HandResultView, HandSummaryView, HandView, LedgerRowView, LedgerView, PaidPotView, People,
+    OwnNext, PeopleView, PlayerMeta, PlayerView, PotView, Presence, SeatState, SeatView, SettledPotView, ShownCardsView, TableView, ViewMeta, WireEntry, WireView,
 } from '@/lib/poker-night/view-types';
 
 // A WireEntry's kind indexes this list.
@@ -152,6 +154,12 @@ const shownTo = (hand: Hand, pid: string): ShownCardsView[] => {
     });
 };
 
+// What a seat does when the hand in play ends, as its own player's view says it: 'leave' once they
+// left mid-hand (nothing takes it back), 'leave-after' while they play it out having chosen to leave
+// after it, 'sit-out' while a sit-out waits for the deal.
+const ownNext = (seat: Seat | null): OwnNext =>
+    !seat ? null : seat.leaving ? 'leave' : seat.leaveAfter ? 'leave-after' : seat.sitOutNext ? 'sit-out' : null;
+
 // The wire view plus what only this viewer may see: the config, their own seat, cards, pre-action,
 // thrown-away card, what their seat does when the hand ends (`next`: leaving, now or after the hand,
 // or sitting out from the next deal), their asks to see a hand and the hands shown to them alone, and
@@ -164,6 +172,7 @@ export const playerView = (state: TableState, pid: string, meta: PlayerMeta): Pl
     const seat = i === null ? null : state.seats[i];
     const hand = state.hand;
     const discard = own && hand ? hand.discards.find(([s]) => s === own.seat)?.[1] ?? null : null;
+    const choices = askChoices(state, pid, meta.serverNow);
     return {
         ...wireView(state, meta),
         ...peopleView(meta.people, meta.removed),
@@ -172,11 +181,12 @@ export const playerView = (state: TableState, pid: string, meta: PlayerMeta): Pl
             pid, seat: i, role: i === null ? 'watching' : 'seated', isHost: state.hostPid === pid, hasAccount: meta.hasAccount,
             hole: own ? [...own.hole] : null,
             pre: own?.pre && isLive(state.hand) ? (own.pre.kind === 'call' ? {kind: 'call', amount: own.pre.amount} : {kind: own.pre.kind}) : null,
-            next: !seat ? null : seat.leaving || seat.leaveAfter ? 'leave' : seat.sitOutNext ? 'sit-out' : null,
+            next: ownNext(seat),
             discard,
             allowAsks: !state.noAsks.includes(pid),
             asks: hand ? asksOf(hand, pid, meta.serverNow) : [],
-            canAsk: canAskFrom(state, pid, meta.serverNow),
+            canAsk: choices.filter((c) => c.block === null).map((c) => c.pid),
+            askBlocked: choices.flatMap((c): [string, AskBlock][] => (c.block === null ? [] : [[c.pid, c.block]])),
             shownToMe: hand ? shownTo(hand, pid) : [],
         },
         emotes: meta.emotes.map(emoteView),
@@ -192,7 +202,7 @@ export const playerView = (state: TableState, pid: string, meta: PlayerMeta): Pl
 export const nudgeKey = (state: TableState, pid: string): string => {
     const i = seatOf(state, pid);
     const seat = i === null ? null : state.seats[i];
-    const next = !seat ? null : seat.leaving || seat.leaveAfter ? 'leave' : seat.sitOutNext ? 'sit-out' : null;
+    const next = ownNext(seat);
     const hand = state.hand;
     const me = hand ? placeOf(hand, pid) : null;
     const asks = hand && me ? hand.asks.filter((e) => e[0] === me.seat || e[1] === me.seat) : [];

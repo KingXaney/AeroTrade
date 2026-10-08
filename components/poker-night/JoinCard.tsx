@@ -6,7 +6,9 @@
 // (on the server for a guest, kept from then on; Roll rolls another in its click handler, and
 // "Change my look" opens the avatar builder in the card — optional, one tap away), the
 // chips field only when the table's minimum and cap differ, and one tap: "Sit down" (in the seat
-// they chose with "Sit here", else the first one open) or "Just watch". A removed visitor, a locked
+// they chose with "Sit here", else the first one open) or "Just watch". Once the first hand is dealt
+// the card says that the host approves the chips before the player is dealt in (they sit with none
+// until then: the dock says "Waiting for the host to approve your chips", with Cancel). A removed visitor, a locked
 // table and a full room get the sentence that says so, what would change it, "Check again", the way
 // home ("/": the landing page for a guest, never the sign-in the lobby would send them to) and, for
 // an account, the lobby. Someone already watching who asks for a seat gets the same card without
@@ -89,6 +91,8 @@ const JoinCard = ({seat, onClose}: Props) => {
     const canSit = state ? state.kind === 'open' && state.canSit : free.length > 0;
     const canWatch = state ? state.kind === 'open' && state.canWatch : false;
     const face = AVATAR_COPY.faces[resolveAvatar(avatar).face];
+    // Once the first hand is dealt, anyone but the host sits with no chips until the host says yes.
+    const needsApproval = room.joinView ? room.joinView.needsApproval : room.table.handNo > 0 && !(room.me?.isHost ?? false);
 
     const join = async (as: 'player' | 'watcher') => {
         if (busy) return;
@@ -209,6 +213,10 @@ const JoinCard = ({seat, onClose}: Props) => {
                                                onChange={(e) => setChips(e.target.value)}/>
                                     <p id={`${id}-chips-rule`} className="text-[11px] text-fg-muted">{JOIN_COPY.chipsInRule(range.min, range.max)}</p>
                                 </div>
+                            )}
+
+                            {canSit && needsApproval && (
+                                <p className="text-xs text-fg-soft" data-join-approval="">{JOIN_COPY.approvalNote}</p>
                             )}
 
                             {!canSit && visitor && (

@@ -307,6 +307,9 @@ export const JOIN_COPY = {
     // Someone here goes by that name, or it is one the table keeps for itself.
     renamed: (name: string): string => `That name is taken here, so you sit as ${isolate(name)}.`,
     posting: 'You post one big blind when you are dealt in.',
+    // Once the first hand is dealt, a new player's chips wait for the host's yes: said on the card
+    // before they sit, and after (TABLE_COPY.waitingApproval).
+    approvalNote: 'The game has started: the host approves your chips before you are dealt in.',
     locked: 'The host closed this table to new players.',
     banned: 'The host removed you from this table.',
 
@@ -600,6 +603,27 @@ export const TABLE_COPY = {
     leaveShort: 'Leave',
     // Beside the cards while the plate still reads Folded: what the seat does when the hand ends.
     leavingAfterHand: 'You leave when this hand ends.',
+    // Leave after this hand: play it out as usual, leave as it ends. The dock's one-tap toggle and
+    // the menu's, the note beside the cards with Stay (lastHand in a narrow dock), the toasts, and
+    // the line the leave dialog adds under its body while it offers it.
+    leaveAfter: 'Leave after this hand',
+    lastHand: 'Last hand',
+    leavingAfter: 'Leaving after this hand',
+    stayAtTable: 'Stay at the table',
+    leaveAfterSet: 'You leave the table when this hand ends.',
+    leaveAfterCleared: 'You stay at the table.',
+    leaveLanded: 'A new hand was dealt first: you leave the table when it ends.',
+    leaveAfterNote: 'Leave after this hand to play it out as usual: your chips are counted in the bank as it ends.',
+    // A seat whose chips wait for the host's yes (a new player once the game has started, or a
+    // rebuy at zero): the dock's line, with Cancel, and the plate's word.
+    waitingApproval: 'Waiting for the host to approve your chips',
+    awaitingChips: 'Waiting for chips',
+    // A plate kept while a result shows for a player who went as the hand completed.
+    leftSeat: 'Left',
+    ghostLabel: (name: string, seat: number): string => `${isolate(name)}, seat ${seatNo(seat)}, left the table`,
+    cancelRequest: 'Cancel',
+    cancelRequestLabel: 'Cancel the request for chips',
+    requestCancelled: 'Request cancelled.',
     sitOutNextNote: 'You sit out from the next hand.',
     // The host sat the viewer out (the bank's "Sit out next hand"); "I'm back" deals them in again.
     hostSatYouOut: 'The host sat you out.',
@@ -661,8 +685,8 @@ export const LOG_COPY = {
             : `${isolate(name)} ${ACTION_COPY.does(kind, amount, allIn)}${timedOut ? ' as time ran out' : ''}.`,
     shows: (name: string, cards: string, phrase: string | null): string => `${isolate(name)} shows ${cards}${phrase ? `: ${phrase}` : ''}.`,
     youHeld: (cards: string): string => `You held ${cards}.`,
-    // A hand shown to the reader alone, answering their ask.
-    showedYou: (name: string, cards: string): string => `${isolate(name)} showed you ${cards}.`,
+    // A hand shown to the reader alone, answering their ask: "Shown to you: Ana's A♠ K♦."
+    showedYou: (name: string, cards: string): string => `Shown to you: ${isolate(name)} held ${cards}.`,
     // "Ana wins 1,200 with two pair, kings and sevens.", "Ben wins 400 from side pot 1."
     wins: (name: string, n: number, phrase: string | null, pot: PotIndex = null): string =>
         `${isolate(name)} wins ${count(n)}${fromPot(pot)}${phrase ? ` with ${phrase}` : ''}.`,
@@ -699,6 +723,53 @@ export const ANNOUNCE_COPY = {
     paused: 'The host paused the game.',
     resumed: TABLE_COPY.resumed,
     closed: 'The host closed the table.',
+} as const;
+
+// ---- asks to see a hand (components/poker-night SeatMenu, AskPrompt; lib/poker-night/asks) -------
+
+// Why an ask is greyed in the seat menu (AskBlock), each one sentence; the refusals' own words where
+// the engine has one.
+const ASK_BLOCKS = {
+    'asks-off': (name: string): string => `${isolate(name)} has turned off asks to see their cards.`,
+    cooldown: (): string => REFUSAL_COPY['ask-cooldown'],
+    waiting: (): string => REFUSAL_COPY['ask-waiting'],
+    limit: (): string => REFUSAL_COPY['ask-limit'],
+} as const;
+
+export const ASK_COPY = {
+    // The seat menu, once a hand the reader folded is complete.
+    ask: 'Ask to see their cards',
+    blocked: ASK_BLOCKS,
+    asked: (name: string): string => `You asked ${isolate(name)} to see their cards.`,
+    // How the reader's ask of this player stands (AskAnswer), in the menu.
+    status: {
+        waiting: (name: string): string => `Waiting for ${isolate(name)} to answer`,
+        shown: (): string => 'Shown to you',
+        everyone: (): string => 'Shown to everyone',
+        no: (name: string): string => `${isolate(name)} said no thanks`,
+        expired: (name: string): string => `No answer from ${isolate(name)}`,
+    },
+    // How it ended, said once in a toast.
+    ended: {
+        shown: (name: string): string => `${isolate(name)} showed you their cards.`,
+        everyone: (name: string): string => `${isolate(name)} showed their cards to everyone.`,
+        no: (name: string): string => `${isolate(name)} said no thanks.`,
+        expired: (name: string): string => `No answer from ${isolate(name)} in time.`,
+    },
+    // The plate of a player who showed the reader alone.
+    shownTag: 'Shown to you',
+    // The prompt the player asked sees, under the top bar, with its seconds left.
+    region: 'An ask to see your cards',
+    prompt: (name: string): string => `${isolate(name)} asks to see your cards`,
+    showOne: (name: string): string => `Show ${isolate(name)}`,
+    showAll: 'Show everyone',
+    noThanks: 'No thanks',
+    secondsLeft: (s: number): string => `${count(s)} s`,
+    timer: 'Time left to answer',
+    shownOne: (name: string): string => `Your cards are shown to ${isolate(name)} alone.`,
+    // My look's switch (PersonalLook.allowAsks): the room keeps it for the reader's seat.
+    allow: 'Let others ask to see my cards',
+    allowHint: 'After a hand, a player who folded can ask to see your cards if nobody saw them, and you choose who sees them. Off, nobody can ask.',
 } as const;
 
 // ---- the host drawer (components/poker-night/HostDrawer, RemovePlayerDialog) -------------------
@@ -751,8 +822,17 @@ export const HOST_COPY = {
     requestsHeading: 'Waiting for you',
     requests: (n: number): string => `${plural(n, 'request', 'requests')} waiting`,
     request: (name: string, n: number): string => `${isolate(name)} asks for ${plural(n, 'chip', 'chips')}.`,
+    // What a request is for (lib/poker-night/overlays.requestKind): a new player's first chips, a
+    // rebuy at zero, or a top-up.
+    requestSeat: (name: string, n: number): string => `${isolate(name)} asks for ${plural(n, 'chip', 'chips')} to sit down.`,
+    requestRebuy: (name: string, n: number): string => `${isolate(name)} asks for a rebuy of ${plural(n, 'chip', 'chips')}.`,
+    requestTopUp: (name: string, n: number): string => `${isolate(name)} asks to top up with ${plural(n, 'chip', 'chips')}.`,
     approve: 'Approve',
     decline: 'Decline',
+    approvedFor: (name: string): string => `Chips approved for ${isolate(name)}.`,
+    // The rebuy policy's two choices, said once under them: on, the host approves every buy but
+    // their own once the first hand is dealt.
+    rebuysHint: "Once the first hand is dealt, every player's chips but yours wait for your yes in the bank. Off: a player who leaves or runs out of chips can watch, not sit down again.",
 
     // Players: each row's More menu.
     you: 'You',
@@ -850,6 +930,9 @@ export const BANK_COPY = {
     amountLabel: 'Chips to add',
     amountRule: (min: number, max: number): string => `From ${count(min)} to ${count(max)}.`,
     requested: (n: number): string => `Asked the host for ${plural(n, 'chip', 'chips')}.`,
+    cancel: TABLE_COPY.cancelRequest,
+    cancelLabel: TABLE_COPY.cancelRequestLabel,
+    cancelled: TABLE_COPY.requestCancelled,
     pending: (n: number): string => `${plural(n, 'chip joins', 'chips join')} your stack when this hand ends.`,
     approved: (n: number): string => `${plural(n, 'chip', 'chips')} added to your stack.`,
     declined: 'The host declined the request.',
@@ -1119,6 +1202,9 @@ export const LOOKS_COPY = {
     peekLabel: 'Your cards, face down: press to peek',
     shortcuts: OVERLAY_COPY.shortcuts,
     shortcutsHint: OVERLAY_COPY.shortcutsHint,
+    // Asks to see a hand (ASK_COPY): the room keeps it for the player's seat.
+    allowAsks: ASK_COPY.allow,
+    allowAsksHint: ASK_COPY.allowHint,
 
     // The lobby's My look (lobby/MyLookPanel): the same, saved with the account.
     personalHeading: 'At every table',

@@ -158,8 +158,15 @@ const TableScreen = () => {
     // but the viewer's turned up, every bet line; the dealer button always. Keyed on what they depend on,
     // so a poll that changes nothing of it places nothing again.
     const button = hand?.button ?? null;
+    // Hands turned up where no seat view says so: a ghost plate's (a player gone as the hand
+    // completed, SeatRing) and those shown to the viewer alone — kept clear of the pots and banner too.
+    const doneResult = hand?.phase === 'complete' ? hand.result : null;
+    const extraShown = new Set([
+        ...(room.me?.shownToMe ?? []).map((h) => h.seat),
+        ...(doneResult?.gone ?? []).filter(([seat]) => table.seats[seat] === null && doneResult!.hands.some((h) => h.seat === seat)).map(([seat]) => seat),
+    ]);
     const seatedKey = table.seats.map((v) => (v ? 1 : 0)).join('');
-    const shownKey = table.seats.map((v, seat) => (v && seat !== mySeat && Array.isArray(v.cards) ? 1 : 0)).join('');
+    const shownKey = table.seats.map((v, seat) => (seat !== mySeat && ((v && Array.isArray(v.cards)) || extraShown.has(seat)) ? 1 : 0)).join('');
     const betsKey = table.seats.map((v) => (v && v.bet > 0 ? `${v.bet}${v.state === 'all-in' ? '!' : ''}` : '')).join(',');
     const potKey = potsOf(hand).map((p) => p.amount).join(',');
     const pots = useMemo(() => {
@@ -181,12 +188,12 @@ const TableScreen = () => {
         const shown: number[] = [];
         table.seats.forEach((v, seat) => {
             if (!v) open.push(seat);
-            else if (seat !== mySeat && Array.isArray(v.cards)) shown.push(seat);
+            if (seat !== mySeat && ((v && Array.isArray(v.cards)) || [...shownKey][seat] === '1')) shown.push(seat);
         });
         // Clear of the result's pots too, which stay on while their chips stream out, and of the
         // winners' "+N".
         return bannerPlan(stage, {winners: lines, note: line}, {open, shown, button: hand?.button ?? null, pots: pots?.pills ?? [], pops: popsOf(popsKey)});
-    }, [stage, hand, look, lines, line, table.seats, mySeat, pots, popsKey]);
+    }, [stage, hand, look, lines, line, table.seats, mySeat, pots, popsKey, shownKey]);
     const tableVars = stage ? ({'--pn-plate-w': `${stage.plateSize.w}px`, '--pn-plate-h': `${stage.plateSize.h}px`, '--pn-button': `${stage.buttonSize}px`} as CSSProperties) : undefined;
 
     return (

@@ -4,17 +4,19 @@
 // page load of "/" — straight there for a visitor or a watcher, through the leave dialog for a
 // seated player), the table's name and code and how the table is reaching this browser (the word
 // shown even on a phone while it is reconnecting), and what the host has set in motion (paused, or
-// pausing or ending after the hand in play, which still plays on), then the drawers — Invite, Bank,
-// Host (the host's, with a dot while rebuy requests wait), and the menu with the hand log, the Hands
-// guide (also the H key), My look and the viewer's own seat (sit out next hand, deal me in, I'm back,
-// take a seat, leave the table). The status line keeps the code on one line and never runs under the
+// pausing or ending after the hand in play, which still plays on), then the drawers — Invite, Bank
+// and Host (each with a dot for the host while requests for chips wait: the bank is where they are
+// answered), and the menu with the hand log, the Hands guide (also the H key), My look and the
+// viewer's own seat (sit out next hand, deal me in, I'm back, take a seat, "Leave after this hand" —
+// or "Stay at the table" once chosen — and Leave: "Leave now" mid-hand). Home carries a dot while the
+// viewer leaves after the hand in play. The status line keeps the code on one line and never runs under the
 // buttons: what it adds is cut short first, and on a phone while reconnecting the code steps aside
 // (the Invite sheet has it) so the warning reads whole.
 // Every target is at least 44 px; a phone shows the same buttons with the name cut short. My look
 // (P5) also has its own button beside the menu from 640 px, one tap from the table: the avatar
 // builder and the personal look (on a phone it is the menu's, which keeps the name room to read).
 
-import {Coins, Crown, Hourglass, House, LogOut, Menu, ScrollText, Smile, UserPlus, Armchair, Pause, Play, Palette} from "lucide-react";
+import {Coins, Crown, DoorOpen, Hourglass, House, LogOut, Menu, ScrollText, Smile, UserPlus, Armchair, Pause, Play, Palette} from "lucide-react";
 import {DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuTrigger} from "@/components/ui/dropdown-menu";
 import {iconButton} from "@/components/primitives/iconButton";
 import {HomeLink} from "@/components/poker-night/HomeLink";
@@ -33,6 +35,7 @@ type Props = {
     onSeatChoice: (choice: SeatChoice) => void;
     onTakeSeat: () => void;
     onLeave: () => void;
+    onLeaveAfter: (on: boolean) => void; // "Leave after this hand", and Stay
     onHome: () => void; // a seated player's Home: the leave dialog, then "/"
 };
 
@@ -40,7 +43,7 @@ const ICON = cn(iconButton, 'relative size-11 shrink-0');
 
 const SEAT_LABEL: Record<SeatChoice, string> = {'sit-out': TABLE_COPY.sitOut, 'deal-me-in': TABLE_COPY.dealMeIn, back: TABLE_COPY.back};
 
-const TopBar = ({onOpen, onSeatChoice, onTakeSeat, onLeave, onHome}: Props) => {
+const TopBar = ({onOpen, onSeatChoice, onTakeSeat, onLeave, onLeaveAfter, onHome}: Props) => {
     const room = useRoom();
     const table = room.table;
     const name = TABLE_COPY.name(table.settings.name, room.code);
@@ -63,8 +66,10 @@ const TopBar = ({onOpen, onSeatChoice, onTakeSeat, onLeave, onHome}: Props) => {
             {/* Home: a full page load of "/" (the app's Home for an account, the landing page for a guest),
                 so the table's connection, wake lock and sounds end with the page; a seated player is asked first. */}
             {homeAsks(room.view) ? (
-                <button type="button" className={cn(ICON, '-ml-2')} aria-label={TABLE_COPY.home} title={TABLE_COPY.home} onClick={onHome} data-open="home">
+                <button type="button" className={cn(ICON, '-ml-2')} aria-label={own?.leaveAfter === 'set' ? `${TABLE_COPY.home}, ${TABLE_COPY.leavingAfter}` : TABLE_COPY.home}
+                        title={TABLE_COPY.home} onClick={onHome} data-open="home">
                     <House className="size-5" aria-hidden="true"/>
+                    {own?.leaveAfter === 'set' && <span aria-hidden="true" className="absolute right-2 top-2 size-2.5 rounded-full bg-warning outline-2 outline-chrome" data-pn-leaving-dot=""/>}
                 </button>
             ) : (
                 <HomeLink className={cn(ICON, '-ml-2')} aria-label={TABLE_COPY.home} title={TABLE_COPY.home} data-open="home">
@@ -107,8 +112,10 @@ const TopBar = ({onOpen, onSeatChoice, onTakeSeat, onLeave, onHome}: Props) => {
                 <button type="button" className={ICON} aria-label={TABLE_COPY.invite} title={TABLE_COPY.invite} onClick={() => onOpen('invite')} data-open="invite">
                     <UserPlus className="size-5" aria-hidden="true"/>
                 </button>
-                <button type="button" className={ICON} aria-label={TABLE_COPY.bank} title={TABLE_COPY.bank} onClick={() => onOpen('bank')} data-open="bank">
+                <button type="button" className={ICON} title={TABLE_COPY.bank} onClick={() => onOpen('bank')} data-open="bank"
+                        aria-label={waiting > 0 ? `${TABLE_COPY.bank}, ${HOST_COPY.requests(waiting)}` : TABLE_COPY.bank}>
                     <Coins className="size-5" aria-hidden="true"/>
+                    {waiting > 0 && <span aria-hidden="true" className="absolute right-2 top-2 size-2.5 rounded-full bg-warning outline-2 outline-chrome" data-bank-requests-dot=""/>}
                 </button>
                 {room.me?.isHost && (
                     <button type="button" className={ICON} title={TABLE_COPY.host} onClick={() => onOpen('host')} data-open="host"
@@ -144,7 +151,7 @@ const TopBar = ({onOpen, onSeatChoice, onTakeSeat, onLeave, onHome}: Props) => {
                             <DropdownMenuItem className="min-h-11 gap-3 px-3 text-sm" onSelect={openShortcuts} data-menu="shortcuts" aria-keyshortcuts={ROOM_KEY_SHORTCUTS.shortcuts}>
                                 <Keyboard className="size-4" aria-hidden="true"/>{SHORTCUTS_COPY.open}
                             </DropdownMenuItem>
-                            {own && (own.choice || own.canTakeSeat || own.canLeave) && <DropdownMenuSeparator/>}
+                            {own && (own.choice || own.canTakeSeat || own.canLeave || own.leaveAfter) && <DropdownMenuSeparator/>}
                             {own?.choice && (
                                 <DropdownMenuItem className="min-h-11 gap-3 px-3 text-sm" onSelect={() => onSeatChoice(own.choice!)} data-menu={own.choice}>
                                     {own.choice === 'sit-out' ? <Pause className="size-4" aria-hidden="true"/> : <Play className="size-4" aria-hidden="true"/>}
@@ -156,9 +163,20 @@ const TopBar = ({onOpen, onSeatChoice, onTakeSeat, onLeave, onHome}: Props) => {
                                     <Armchair className="size-4" aria-hidden="true"/>{OVERLAY_COPY.takeSeat}
                                 </DropdownMenuItem>
                             )}
+                            {/* Leave after this hand: one tap, no dialog (Stay takes it back). */}
+                            {own?.leaveAfter === 'offer' && (
+                                <DropdownMenuItem className="min-h-11 gap-3 px-3 text-sm" onSelect={() => onLeaveAfter(true)} data-menu="leave-after">
+                                    <DoorOpen className="size-4" aria-hidden="true"/>{TABLE_COPY.leaveAfter}
+                                </DropdownMenuItem>
+                            )}
+                            {own?.leaveAfter === 'set' && (
+                                <DropdownMenuItem className="min-h-11 gap-3 px-3 text-sm" onSelect={() => onLeaveAfter(false)} data-menu="stay">
+                                    <Armchair className="size-4" aria-hidden="true"/>{TABLE_COPY.stayAtTable}
+                                </DropdownMenuItem>
+                            )}
                             {own?.canLeave && (
                                 <DropdownMenuItem variant="destructive" className="min-h-11 gap-3 px-3 text-sm" onSelect={onLeave} data-menu="leave">
-                                    <LogOut className="size-4" aria-hidden="true"/>{TABLE_COPY.leaveTable}
+                                    <LogOut className="size-4" aria-hidden="true"/>{own.dealtIn ? TABLE_COPY.leaveNow : TABLE_COPY.leaveTable}
                                 </DropdownMenuItem>
                             )}
                         </DropdownMenuContent>

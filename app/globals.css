@@ -902,6 +902,35 @@ details[open] > :not(summary) { animation: disclosure-in var(--motion-base) var(
     .pn-label-long { display: none; }
     .pn-label-short { display: inline; }
   }
+  /* "Leave after this hand" beside the early choices: a door, with its word in a wide dock. In a
+     dock too narrow for the four (a phone on its side) it takes a row of its own under them, its
+     word back, so the early choices keep their 44 px. */
+  .pn-pre-row { display: flex; flex-wrap: wrap; align-items: stretch; gap: 6px; }
+  .pn-pre-row > [data-pn-pre] { flex: 1 1 0; }
+  .pn-leave-word { display: inline; }
+  @container pn-dock (max-width: 28rem) {
+    .pn-leave-word { display: none; }
+  }
+  /* An ask to see the viewer's cards (AskPrompt): under the top bar, never over the dock — on a phone
+     on its side it keeps to the table's column, clear of the dock's at the right. */
+  .pn-ask-wrap {
+    position: fixed;
+    left: max(12px, env(safe-area-inset-left));
+    right: max(12px, env(safe-area-inset-right));
+    top: calc(env(safe-area-inset-top) + 3.5rem);
+    z-index: 30;
+    display: flex;
+    justify-content: center;
+    pointer-events: none;
+  }
+  @media (orientation: landscape) and (max-height: 500px) {
+    .pn-ask-wrap { right: calc(max(12rem, 32vw) + 8px); }
+  }
+  @container pn-dock (max-width: 15rem) {
+    .pn-pre-row > [data-pn-pre] { flex-basis: 100%; }
+    .pn-pre-row > [data-pn-leave-after] { flex: 1 1 100%; min-height: 44px; }
+    .pn-leave-word { display: inline; }
+  }
 }
 
 /* Compact plates draw no glass: nine blurred plates over the scene stutter on a small phone.

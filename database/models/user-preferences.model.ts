@@ -44,6 +44,7 @@ export interface PokerNightLookPrefs {
     handHints?: boolean;
     peek?: boolean;
     muteEmotes?: boolean;
+    allowAsks?: boolean;
 }
 
 export interface PokerNightPrefs {
@@ -137,6 +138,7 @@ const PokerNightLookSchema = new Schema<PokerNightLookPrefs>(
         handHints: {type: Boolean, required: false},
         peek: {type: Boolean, required: false},
         muteEmotes: {type: Boolean, required: false},
+        allowAsks: {type: Boolean, required: false},
     },
     {_id: false},
 );

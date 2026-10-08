@@ -8,6 +8,7 @@
 
 import {ASK_ANSWERS, ASKS} from '@/lib/poker-night/config';
 import type {AskAnswer, AskEntry, Hand, HandSeat, TableState} from '@/lib/poker-night/types';
+import type {AskBlock} from '@/lib/poker-night/view-types';
 
 export const ASK_WAITING = ASK_ANSWERS.indexOf('waiting');
 export const ASK_SHOWN = ASK_ANSWERS.indexOf('shown');
@@ -35,18 +36,31 @@ export const placeOf = (hand: Pick<Hand, 'seats'>, pid: string): HandSeat | null
 export const coolingDown = (state: Pick<TableState, 'askCooldowns'>, from: string, to: string, no: number): boolean =>
     state.askCooldowns.some(([a, b, until]) => a === from && b === to && until >= no);
 
-// Who `pid` may ask now (pids, in hand order): the hand complete, `pid` dealt into it and folded, no
-// ask of theirs still waiting, fewer than ASKS.PER_HAND asks made; each player whose cards were not
-// shown, whose asks are on, whom `pid` has not asked about this hand and is not cooling down from.
-export const canAskFrom = (state: Pick<TableState, 'hand' | 'noAsks' | 'askCooldowns'>, pid: string, now: number): string[] => {
+// Every player `pid` could ask about the completed hand — dealt into it, cards not shown, not asked by
+// `pid` already this hand — each with what keeps `pid` from asking them now, or null when nothing
+// does: the player turned asks off, `pid` is cooling down from them (a no, or no answer, within the
+// last ASKS.COOLDOWN_HANDS hands), an ask of `pid`'s still waits, or `pid` has made every ask a hand
+// allows (ASKS.PER_HAND). Empty while `pid` may ask nobody at all: no completed hand, or `pid` was not
+// dealt into it or did not fold. The page greys a blocked ask and says why (the viewer's own view,
+// MeView.askBlocked); the engine refuses exactly these.
+export const askChoices = (state: Pick<TableState, 'hand' | 'noAsks' | 'askCooldowns'>, pid: string, now: number): {pid: string; block: AskBlock | null}[] => {
     const hand = askedHand(state);
     if (!hand) return [];
     const me = placeOf(hand, pid);
     if (!me || !me.folded) return [];
     const mine = hand.asks.filter((e) => e[0] === me.seat);
-    if (mine.length >= ASKS.PER_HAND || mine.some((e) => answerAt(hand, e, now) === 'waiting')) return [];
+    const waiting = mine.some((e) => answerAt(hand, e, now) === 'waiting');
+    const spent = mine.length >= ASKS.PER_HAND;
     return hand.seats
-        .filter((p) => p.pid !== pid && !p.shown && !state.noAsks.includes(p.pid) && !mine.some((e) => e[1] === p.seat)
-            && !coolingDown(state, pid, p.pid, hand.no))
-        .map((p) => p.pid);
+        .filter((p) => p.pid !== pid && !p.shown && !mine.some((e) => e[1] === p.seat))
+        .map((p) => ({
+            pid: p.pid,
+            block: state.noAsks.includes(p.pid) ? 'asks-off' : coolingDown(state, pid, p.pid, hand.no) ? 'cooldown' : waiting ? 'waiting' : spent ? 'limit' : null,
+        }));
 };
+
+// Who `pid` may ask now (pids, in hand order): the hand complete, `pid` dealt into it and folded, no
+// ask of theirs still waiting, fewer than ASKS.PER_HAND asks made; each player whose cards were not
+// shown, whose asks are on, whom `pid` has not asked about this hand and is not cooling down from.
+export const canAskFrom = (state: Pick<TableState, 'hand' | 'noAsks' | 'askCooldowns'>, pid: string, now: number): string[] =>
+    askChoices(state, pid, now).filter((c) => c.block === null).map((c) => c.pid);

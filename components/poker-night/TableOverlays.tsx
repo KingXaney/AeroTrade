@@ -5,8 +5,11 @@
 // drawers — Invite (open by itself for the host who just started the table), Bank, Host controls,
 // Hand log, My look, Hands (the rankings and the game, for every viewer); the dialogs that ask first — remove a player, hand over host, end the night,
 // leave the table (LeaveDialog: staying to watch, or going home); the banner when a newer deploy
-// needs a reload; and the toasts that say once what changed on its own — the connection back
-// ("Back online."), the host sitting the viewer out, how a rebuy request ended.
+// needs a reload; an ask to see the viewer's cards (AskPrompt, under the top bar); and the toasts
+// that say once what changed on its own — the connection back ("Back online."), the host sitting the
+// viewer out, how a request for chips ended, how the viewer's own asks to see a hand ended
+// (AskWatch) and, for the host, each new request for chips with Approve (RequestWatch). The menu's
+// "Leave after this hand" and its Stay go through useLeaveAfter, as the dock's do.
 //
 // Which drawer and dialog are open is this component's state, so a dialog opened from the host
 // drawer steps the drawer aside and brings it back when it closes, and nothing stacks one modal on
@@ -19,6 +22,7 @@ import {useEffect, useRef, useState} from "react";
 import {toast} from "sonner";
 import ConfirmDialog from "@/components/primitives/ConfirmDialog";
 import ActionButton from "@/components/primitives/ActionButton";
+import {AskPrompt, AskWatch, RequestWatch} from "@/components/poker-night/AskPrompt";
 import BankPanel from "@/components/poker-night/BankPanel";
 import HandLog from "@/components/poker-night/HandLog";
 import HandsDrawer from "@/components/poker-night/HandsDrawer";
@@ -33,6 +37,7 @@ import {focusTableOnClose} from "@/components/poker-night/overlay-kit";
 import {latestRequestId, useOverlayRequest, type DrawerKind} from "@/components/poker-night/overlay-requests";
 import {useRoom} from "@/components/poker-night/room-controller";
 import type {HostSitOuts} from "@/components/poker-night/useHostSitOut";
+import {useLeaveAfter} from "@/components/poker-night/useLeaveAfter";
 import {ANNOUNCE_COPY, BANK_COPY, HOST_COPY, LOBBY_COPY, TABLE_COPY} from "@/lib/learn/copy/poker-night";
 import {myTurnKey, ownSeat, requestEnded, type HostRow, type LeaveThen, type SeatChoice} from "@/lib/poker-night/overlays";
 import {ledgerRowOf} from "@/lib/poker-night/views";
@@ -131,6 +136,8 @@ const TableOverlays = () => {
     // A drawer steps aside while a dialog is up.
     const isOpen = (drawer: DrawerKind) => ui.drawer === drawer && ui.dialog === null;
 
+    const leaving = useLeaveAfter();
+
     const seatChoice = async (choice: SeatChoice) => {
         const r = await room.send({type: choice === 'sit-out' ? 'sit-out' : 'sit-in'});
         if (!r.ok) toast.error(r.message);
@@ -193,12 +200,21 @@ const TableOverlays = () => {
 
     const own = view ? ownSeat(view) : null;
     const dialog = ui.dialog;
+    // Asks to see a hand: the prompt while one to the viewer waits, the watch while one of theirs
+    // stands (each reads the clock itself, so nothing here re-renders by the second).
+    const myPid = view?.me.pid ?? null;
+    const askedMe = view !== null && view.me.asks.some((a) => a.to === myPid && a.answer === 'waiting');
+    const myAsks = view !== null && view.me.asks.some((a) => a.from === myPid);
     const showSit = joined && me?.seat === null && ui.sit !== null && own?.canTakeSeat === true;
 
     return (
         <>
             <TopBar onOpen={openDrawer} onSeatChoice={(c) => void seatChoice(c)} onTakeSeat={() => setUi((prev) => ({...prev, sit: {seat: null}}))}
-                    onLeave={() => openDialog({kind: 'leave', then: 'stay'})} onHome={() => openDialog({kind: 'leave', then: 'home'})}/>
+                    onLeave={() => openDialog({kind: 'leave', then: 'stay'})} onHome={() => openDialog({kind: 'leave', then: 'home'})}
+                    onLeaveAfter={(on) => void leaving.send(on)}/>
+            {isHost && <RequestWatch/>}
+            {myAsks && <AskWatch/>}
+            {askedMe && <AskPrompt/>}
 
             {room.problem && (
                 <div role="alert" className="chrome-surface fixed inset-x-3 top-[calc(env(safe-area-inset-top)+3.5rem)] z-30 mx-auto flex max-w-md items-center gap-3 rounded-lg px-4 py-3"

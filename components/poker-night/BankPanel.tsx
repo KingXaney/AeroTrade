@@ -2,9 +2,12 @@
 
 // The bank, in its drawer: play chips only, counted. The viewer's own chips first — the same
 // figure as their Stack below (a live pot counted, said beside it) — with a rebuy at zero or a
-// top-up to the cap by the table's rules (a request when the host approves them; while chips are in
-// the pot it says what it adds, since a top-up counts only the chips behind); then
-// the host's waiting requests with Approve and Decline; then every player who sat tonight — Chips
+// top-up to the cap by the table's rules (once the first hand is dealt, a request the host approves
+// for anyone but the host, which the viewer can Cancel while it waits; while chips are in the pot it
+// says what it adds, since a top-up counts only the chips behind); then the host's waiting requests —
+// a new player's first chips, a rebuy, a top-up, each said as what it is — with Approve and Decline
+// (the host hears a short sound and sees a toast with Approve as each comes in: AskPrompt's
+// RequestWatch); then every player who sat tonight — Chips
 // in, Rebuys (only once someone has rebought), Stack (a live pot counted, said once at the foot),
 // Net with its sign, and for the host each other seated player's "Sit out next hand" (useHostSitOut,
 // the engine's host op 'sit-out': from the next deal while they are in the hand in play, at once
@@ -27,11 +30,12 @@ import SectionHeading from "@/components/primitives/SectionHeading";
 import Term from "@/components/primitives/Term";
 import TextField from "@/components/primitives/TextField";
 import {Drawer, MiniAvatar, PlayerName} from "@/components/poker-night/overlay-kit";
+import {requestText} from "@/components/poker-night/AskPrompt";
 import {useRoom} from "@/components/poker-night/room-controller";
 import {useHostSitOut, type HostSitOuts} from "@/components/poker-night/useHostSitOut";
 import {BANK_COPY, HOST_COPY, OVERLAY_COPY, TABLE_COPY} from "@/lib/learn/copy/poker-night";
 import {bankView} from "@/lib/poker-night/bank";
-import {bankTimeline, chipsInValue, hostSitOut, ownChips} from "@/lib/poker-night/overlays";
+import {bankTimeline, chipsInValue, hostSitOut, ownChips, requestKind} from "@/lib/poker-night/overlays";
 import type {BankDetailRowView} from "@/lib/poker-night/view-types";
 import {cn} from "@/lib/utils";
 
@@ -66,6 +70,15 @@ const OwnChipsPanel = () => {
         else toast.success(BANK_COPY.approved(amount));
     };
 
+    const withdraw = async () => {
+        if (busy) return;
+        setBusy(true);
+        const r = await room.send({type: 'withdraw'});
+        setBusy(false);
+        if (r.ok) toast.message(BANK_COPY.cancelled);
+        else toast.error(r.message);
+    };
+
     const typed = offer ? chipsInValue(other, {min: offer.min, max: offer.max}) : null;
     return (
         <Panel pad={4} className="space-y-3" aria-labelledby={`${id}-own`} data-own-chips="">
@@ -75,7 +88,15 @@ const OwnChipsPanel = () => {
             </div>
             {own.inPot > 0 && <p className="text-xs text-fg-soft" data-own-in-pot="">{BANK_COPY.ownInPot(own.inPot)}</p>}
             {own.pendingBuy > 0 && <p className="text-xs text-fg-soft">{BANK_COPY.pending(own.pendingBuy)}</p>}
-            {own.requested !== null && <p role="status" className="text-xs text-fg-soft" data-pn-requested="">{BANK_COPY.requested(own.requested)}</p>}
+            {own.requested !== null && (
+                <div className="flex flex-wrap items-center justify-between gap-2" data-pn-requested={own.requested}>
+                    <p role="status" className="min-w-0 flex-1 text-xs text-fg-soft">{BANK_COPY.requested(own.requested)}</p>
+                    <ActionButton variant="secondary" size="sm" className="min-h-11" disabled={busy} aria-label={BANK_COPY.cancelLabel}
+                                  onClick={() => void withdraw()} data-pn-withdraw="">
+                        {BANK_COPY.cancel}
+                    </ActionButton>
+                </div>
+            )}
             {offer && (
                 <div className="space-y-3">
                     <ActionButton variant="primary" size="md" className="min-h-11 w-full" disabled={busy} aria-busy={busy} data-pn-rebuy=""
@@ -127,7 +148,9 @@ export const RequestsPanel = () => {
             <ul className="space-y-2">
                 {room.table.requests.map((q) => (
                     <RowCard as="li" key={q.pid} className="flex flex-wrap items-center gap-2 px-3 py-2" data-request={q.pid}>
-                        <p className="min-w-0 flex-1 text-sm text-fg-soft">{HOST_COPY.request(people[q.pid]?.name ?? '', q.amount)}</p>
+                        <p className="min-w-0 flex-1 text-sm text-fg-soft" data-request-kind={requestKind(room.table, q.pid)}>
+                            {requestText(requestKind(room.table, q.pid), people[q.pid]?.name ?? '', q.amount)}
+                        </p>
                         <div className="flex gap-2">
                             <ActionButton size="sm" className="min-h-11" disabled={busy !== null} onClick={() => void answer(q.pid, 'approve')} data-approve="">
                                 {HOST_COPY.approve}

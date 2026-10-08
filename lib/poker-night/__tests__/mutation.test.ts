@@ -252,7 +252,7 @@ describe('who can see a write', () => {
         expect(p.visible).toBe(false);
         expect(p.nudge).toEqual([]);
         expect(wireOf(p.core, 5, T0, extras)).toEqual(wireOf(core, 5, T0, extras));
-        expect(playerViewFor(p.core, ANA, 5, T0, extras).me.next).toBe('leave');
+        expect(playerViewFor(p.core, ANA, 5, T0, extras).me.next).toBe('leave-after');
         const back = commitOf(plan({core: p.core, ...act(ANA, 'leave-after-000002', {type: 'leave-after', on: false})}));
         expect(back.visible).toBe(false);
         const out = commitOf(plan({core, ...act(ANA, 'sit-out-mid-00001', {type: 'sit-out'})}));

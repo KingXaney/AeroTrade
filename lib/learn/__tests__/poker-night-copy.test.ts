@@ -22,7 +22,7 @@ import {EMOTE_COPY, SHORTCUTS_COPY} from '@/lib/learn/copy/poker-night';
 import {PHRASE_IDS, REACTION_IDS, THROW_IDS} from '@/lib/poker-night/emotes';
 import {SHORTCUTS} from '@/lib/poker-night/keys';
 import {AWARD_IDS} from '@/lib/poker-night/awards';
-import {HANDS_COPY, HOME_PANEL_COPY} from '@/lib/learn/copy/poker-night';
+import {ASK_COPY, HANDS_COPY, HOME_PANEL_COPY} from '@/lib/learn/copy/poker-night';
 import {GLOSSARY} from '@/lib/learn/glossary';
 import {GUIDE_GAMES, HANDS_TERMS, KICKER_EXAMPLE, RANKING_EXAMPLES, RANKING_SLOTS} from '@/lib/poker-night/hands-guide';
 
@@ -449,6 +449,7 @@ describe('the table', () => {
             leaveBody: () => each(TABLE_COPY.leaveBody),
             leaveBodyInHand: () => each(TABLE_COPY.leaveBodyInHand),
             netTonight: () => signedNs.map(TABLE_COPY.netTonight),
+            ghostLabel: () => named((name) => [0, 8].map((seat) => TABLE_COPY.ghostLabel(name, seat))),
         });
     });
 
@@ -680,6 +681,10 @@ describe('the host drawer', () => {
             rebuyLimit: () => [null, 1, 2, 20].map(HOST_COPY.rebuyLimit),
             requests: () => each(HOST_COPY.requests),
             request: () => named((name) => NS.map((n) => HOST_COPY.request(name, n))),
+            requestSeat: () => named((name) => NS.map((n) => HOST_COPY.requestSeat(name, n))),
+            requestRebuy: () => named((name) => NS.map((n) => HOST_COPY.requestRebuy(name, n))),
+            requestTopUp: () => named((name) => NS.map((n) => HOST_COPY.requestTopUp(name, n))),
+            approvedFor: () => named(HOST_COPY.approvedFor),
             moreFor: () => named(HOST_COPY.moreFor),
             handOverTitle: () => named(HOST_COPY.handOverTitle),
             removeTitle: () => named(HOST_COPY.removeTitle),
@@ -1184,5 +1189,44 @@ describe('the Hands guide', () => {
     it('never restates a definition it quotes', () => {
         expect(restatements(['A card among the five that play decides between hands.'])).not.toEqual([]);
         expect(restatements(strings(HANDS_COPY))).toEqual([]);
+    });
+});
+
+describe('asks to see a hand, leaving after this hand and the host\'s yes', () => {
+    it('says every line over the inputs it meets', () => {
+        for (const text of strings(ASK_COPY)) clean(text);
+        const said = [
+            ...named((name) => [ASK_COPY.asked(name), ASK_COPY.prompt(name), ASK_COPY.showOne(name), ASK_COPY.shownOne(name)]),
+            ...named((name) => ASK_COPY.blocked['asks-off'](name)),
+            ...(['cooldown', 'waiting', 'limit'] as const).map((block) => ASK_COPY.blocked[block]()),
+            ...named((name) => (['waiting', 'no', 'expired'] as const).map((answer) => ASK_COPY.status[answer](name))),
+            ASK_COPY.status.shown(), ASK_COPY.status.everyone(),
+            ...named((name) => (['shown', 'everyone', 'no', 'expired'] as const).map((answer) => ASK_COPY.ended[answer](name))),
+            ...each(ASK_COPY.secondsLeft),
+        ];
+        for (const text of said) clean(text);
+        for (const text of [TABLE_COPY.leaveAfter, TABLE_COPY.lastHand, TABLE_COPY.leavingAfter, TABLE_COPY.stayAtTable, TABLE_COPY.leaveAfterSet,
+            TABLE_COPY.leaveAfterCleared, TABLE_COPY.leaveLanded, TABLE_COPY.leaveAfterNote, TABLE_COPY.waitingApproval, TABLE_COPY.awaitingChips,
+            TABLE_COPY.leftSeat, JOIN_COPY.approvalNote, HOST_COPY.rebuysHint, LOOKS_COPY.allowAsks, LOOKS_COPY.allowAsksHint]) clean(text);
+    });
+
+    it('reads as the table prints it', () => {
+        expect(ASK_COPY.ask).toBe('Ask to see their cards');
+        expect(plain(ASK_COPY.prompt('Ana'))).toBe('Ana asks to see your cards');
+        expect([plain(ASK_COPY.showOne('Ana')), ASK_COPY.showAll, ASK_COPY.noThanks]).toEqual(['Show Ana', 'Show everyone', 'No thanks']);
+        expect(ASK_COPY.status.shown()).toBe('Shown to you');
+        expect(ASK_COPY.shownTag).toBe('Shown to you');
+        expect(plain(ASK_COPY.blocked['asks-off']('Ana'))).toBe('Ana has turned off asks to see their cards.');
+        expect(ASK_COPY.blocked.cooldown()).toBe(REFUSAL_COPY['ask-cooldown']);
+        expect(ASK_COPY.allow).toBe('Let others ask to see my cards');
+        expect(TABLE_COPY.leaveAfter).toBe('Leave after this hand');
+        expect(TABLE_COPY.leavingAfter).toBe('Leaving after this hand');
+        expect(TABLE_COPY.leaveLanded).toBe('A new hand was dealt first: you leave the table when it ends.');
+        expect(TABLE_COPY.waitingApproval).toBe('Waiting for the host to approve your chips');
+        expect(plain(HOST_COPY.requestSeat('Ana', 2000))).toBe('Ana asks for 2,000 chips to sit down.');
+        expect(plain(HOST_COPY.requestRebuy('Ana', 2000))).toBe('Ana asks for a rebuy of 2,000 chips.');
+        expect(plain(HOST_COPY.requestTopUp('Ana', 500))).toBe('Ana asks to top up with 500 chips.');
+        expect(HOST_COPY.rebuysValue).toEqual({off: 'Off', approve: 'On (host approves)'});
+        expect(plain(LOG_COPY.showedYou('Ana', 'A♠ K♦'))).toBe('Shown to you: Ana held A♠ K♦.');
     });
 });

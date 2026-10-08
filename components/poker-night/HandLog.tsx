@@ -3,7 +3,9 @@
 // The hand log, in its drawer: the hand in play line by line (GET detail?part=log, read again as
 // the hand moves while the drawer is open), then the hands before it from history (GET
 // detail?part=history, ten at a time, "Show earlier hands" for more), each in LOG_COPY's words
-// through lib/poker-night/hand-log. A hand history already holds is not printed twice.
+// through lib/poker-night/hand-log. A hand history already holds is not printed twice. A hand shown
+// to the viewer alone ("Shown to you: …") is in both: the hand just ended prints it from the view's
+// own part (MeView.shownToMe), and history is read again when one comes.
 
 import {useEffect, useState} from "react";
 import ActionButton from "@/components/primitives/ActionButton";
@@ -58,6 +60,8 @@ const HandLog = ({open, onOpenChange, toTable}: Props) => {
     const [loadingMore, setLoadingMore] = useState(false);
     const handNo = hand?.no ?? null;
     const logLength = hand?.logLength ?? 0;
+    const shownToMe = room.me?.shownToMe ?? [];
+    const seenKey = shownToMe.map((h) => h.seat).join(',');
 
     // The hand in play: read on open and whenever it moves.
     useEffect(() => {
@@ -91,7 +95,7 @@ const HandLog = ({open, onOpenChange, toTable}: Props) => {
         return () => {
             live = false;
         };
-    }, [open, handNo, detail]);
+    }, [open, handNo, seenKey, detail]);
 
     const more = async () => {
         if (!history || loadingMore) return;
@@ -107,9 +111,9 @@ const HandLog = ({open, onOpenChange, toTable}: Props) => {
     };
 
     const nameOf = seatNamer((seat) => playerAt(table, seat), table.people);
-    const fromHistory = (history?.hands ?? []).map((h) => historyHandLog(h, table.people, room.me?.pid ?? null));
+    const fromHistory = (history?.hands ?? []).map((h) => historyHandLog(h, table.people, room.me?.pid ?? null, h.no === handNo ? shownToMe : []));
     const showCurrent = hand !== null && current !== null && current.hand === hand.no && !fromHistory.some((h) => h.no === hand.no);
-    const now = showCurrent ? currentHandLog(hand.no, current.log, hand, hand.phase === 'complete' ? hand.result : null, nameOf) : null;
+    const now = showCurrent ? currentHandLog(hand.no, current.log, hand, hand.phase === 'complete' ? hand.result : null, nameOf, shownToMe) : null;
     const loading = open && history === null && !failed;
     const oldest = history?.hands[history.hands.length - 1];
 

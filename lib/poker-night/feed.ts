@@ -153,6 +153,7 @@ const preStands = (view: PlayerView, wire: WireView): boolean => {
 const NO_ASKS: MeView['asks'] = [];
 const NO_PIDS: string[] = [];
 const NO_SHOWN: MeView['shownToMe'] = [];
+const NO_BLOCKS: MeView['askBlocked'] = [];
 
 // The viewer's own part under a realtime message: the cards of the hand they were dealt (and the one
 // they threw away), a pre-action the server has not cleared, what their seat does when that hand
@@ -164,7 +165,7 @@ const ownPart = (view: PlayerView, wire: WireView): MeView => {
     const pre = view.me.pre !== null && preStands(view, wire) ? view.me.pre : null;
     const isHost = wire.hostPid === view.me.pid;
     if (sameHand) return pre === view.me.pre && isHost === view.me.isHost ? view.me : {...view.me, pre, isHost};
-    return {...view.me, hole: null, pre, next: null, discard: null, asks: NO_ASKS, canAsk: NO_PIDS, shownToMe: NO_SHOWN, isHost};
+    return {...view.me, hole: null, pre, next: null, discard: null, asks: NO_ASKS, canAsk: NO_PIDS, askBlocked: NO_BLOCKS, shownToMe: NO_SHOWN, isHost};
 };
 
 // A whole view older than the table held — the read a message asked for, overtaken by the next
@@ -342,16 +343,23 @@ export const nearTurn = (view: Pick<TableView, 'hand' | 'seats'> | null, mySeat:
     return false;
 };
 
-export type PollInput = {mode: FeedMode; hidden: boolean; inHand: boolean; nearTurn: boolean; failures: number; scale: number};
+// Whether the viewer may be asked to see their cards, or wait on an answer of their own: the hand
+// they were dealt into is complete (its result shows until the next deal, which ends every ask). The
+// polls come faster then, since an ask has only that pause to be seen and answered in — over a
+// healthy channel the viewer's own channel's nudge says it at once.
+export const askWindow = (view: Pick<PlayerView, 'hand' | 'me'> | null): boolean =>
+    !!view && view.me.hole !== null && view.hand !== null && view.hand.phase === 'complete';
+
+export type PollInput = {mode: FeedMode; hidden: boolean; inHand: boolean; nearTurn: boolean; failures: number; scale: number; asks?: boolean};
 
 // The wait before the next GET state, or null to pause (a hidden page polls nothing; becoming
 // visible fetches at once). Every wait is at least `scale` (POKER_NIGHT_POLL_MS).
-export const nextPollDelay = ({mode, hidden, inHand, nearTurn: near, failures, scale}: PollInput): number | null => {
+export const nextPollDelay = ({mode, hidden, inHand, nearTurn: near, failures, scale, asks = false}: PollInput): number | null => {
     if (hidden) return null;
     let delay: number;
     if (failures > 0) delay = Math.min(1500 * 2 ** failures, 10_000);
     else if (mode === 'realtime') delay = 20_000;
-    else if (inHand && near) delay = 1500;
+    else if ((inHand && near) || asks) delay = 1500;
     else if (inHand) delay = 3000;
     else delay = 4000;
     return Math.max(delay, Number.isFinite(scale) ? scale : 0);

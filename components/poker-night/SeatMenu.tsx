@@ -1,7 +1,11 @@
 'use client';
 
 // Another player's plate, tapped or clicked (P6): a menu with a row of things to throw at them —
-// one tap and it flies — and "Mute Sam's emotes" for this visit (or "Show" to take it back). The
+// one tap and it flies — and "Mute Sam's emotes" for this visit (or "Show" to take it back). Once a
+// hand the viewer was dealt into and folded is complete, it leads with "Ask to see their cards" for a
+// player whose cards nobody saw (lib/poker-night/overlays.askOffer, the same rules the server keeps):
+// greyed with the reason when that player turned asks off or a rule stands in the way (one ask
+// waiting at a time, two a hand, five hands after a no), and once asked, how the ask stands. The
 // plates themselves are drawn by Seat; this lays a clear button the plate's size (at least 44 px
 // each way) over each other player's plate, so the menu needs nothing from the seat it sits on.
 // Throws are offered to a seated viewer while the host keeps throwables on; a watcher, or a table
@@ -9,16 +13,54 @@
 // cooldown (emote-client.sendEmoteNow).
 
 import {useState} from "react";
-import {VolumeX, Volume2} from "lucide-react";
+import {Eye, VolumeX, Volume2} from "lucide-react";
 import {toast} from "sonner";
 import {DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuLabel, DropdownMenuSeparator, DropdownMenuTrigger} from "@/components/ui/dropdown-menu";
 import {sendEmoteNow, toggleMuted, useCoolingDown, useMutedPlayers} from "@/components/poker-night/emote-client";
 import {focusTableOnClose, PlayerName} from "@/components/poker-night/overlay-kit";
-import {useRoom} from "@/components/poker-night/room-controller";
-import {EMOTE_COPY} from "@/lib/learn/copy/poker-night";
+import {useRoom, useServerNow} from "@/components/poker-night/room-controller";
+import {ASK_COPY, EMOTE_COPY} from "@/lib/learn/copy/poker-night";
 import {THROW_IDS, throwGlyph, type ThrowId} from "@/lib/poker-night/emotes";
-import {myTurnKey} from "@/lib/poker-night/overlays";
+import {askOffer, myTurnKey} from "@/lib/poker-night/overlays";
 import type {Stage} from "@/lib/poker-night/stage";
+
+// The ask, while the menu is open: read at the server's time, so an ask of the viewer's that ran out
+// frees the others without a write.
+const AskItem = ({pid, name}: {pid: string; name: string}) => {
+    const room = useRoom();
+    const now = useServerNow(1000);
+    const [busy, setBusy] = useState(false);
+    const me = room.me;
+    const offer = me ? askOffer(me, pid, now) : null;
+    if (!offer) return null;
+    const ask = async () => {
+        if (busy) return;
+        setBusy(true);
+        const r = await room.send({type: 'ask', to: pid});
+        setBusy(false);
+        if (r.ok) toast.message(ASK_COPY.asked(name));
+        else toast.error(r.message);
+    };
+    if (offer.kind === 'asked') {
+        const status = offer.answer === 'waiting' ? ASK_COPY.status.waiting(name) : ASK_COPY.status[offer.answer](name);
+        return (
+            <>
+                <p className="px-2 py-1.5 text-xs text-fg-soft" role="status" data-seat-ask-status={offer.answer}>{status}</p>
+                <DropdownMenuSeparator/>
+            </>
+        );
+    }
+    return (
+        <>
+            <DropdownMenuItem className="min-h-11 gap-3 px-3 text-sm" disabled={offer.kind === 'blocked' || busy} onSelect={() => void ask()}
+                              data-seat-ask={offer.kind === 'blocked' ? offer.block : 'ask'}>
+                <Eye className="size-4" aria-hidden="true"/>{ASK_COPY.ask}
+            </DropdownMenuItem>
+            {offer.kind === 'blocked' && <p className="px-2 pb-1.5 text-[11px] leading-snug text-fg-muted" data-seat-ask-why="">{ASK_COPY.blocked[offer.block](name)}</p>}
+            <DropdownMenuSeparator/>
+        </>
+    );
+};
 
 const SeatMenus = ({stage}: {stage: Stage}) => {
     const room = useRoom();
@@ -57,6 +99,7 @@ const SeatMenus = ({stage}: {stage: Stage}) => {
                             <DropdownMenuLabel className="flex min-w-0 items-center gap-2 text-sm text-fg">
                                 <PlayerName name={name}/>
                             </DropdownMenuLabel>
+                            <AskItem pid={s.pid} name={name}/>
                             {canThrow ? (
                                 <div role="group" aria-label={EMOTE_COPY.throwAt(name)} className="grid grid-cols-5 gap-0.5">
                                     {THROW_IDS.map((item) => (
