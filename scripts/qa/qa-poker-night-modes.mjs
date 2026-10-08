@@ -3040,7 +3040,6 @@ try {
             && d.state.hand.actor === null && d.state.hand.deadline - d.state.hand.startedAt === 20_000, `${started.status} ${JSON.stringify(d?.state.hand.phase)}`);
         const handNo = d.state.hand.no;
         const dealtAt = Date.now() - 5000;
-        const startedAt = d.state.hand.startedAt;
         const holeAt = (doc, p) => handSeat(doc, p)?.hole ?? [];
         const dealt = new Map(all.map((p) => [p, holeAt(d, p)]));
 
