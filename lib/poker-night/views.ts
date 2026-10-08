@@ -67,19 +67,23 @@ const settledPotView = (pot: SettledPot): SettledPotView =>
 const shownCardsView = (h: ShownHand): ShownCardsView => ({seat: h.seat, cards: pair(h.cards)});
 const shownHandView = (h: ShownHand): ShownHandView => ({seat: h.seat, cards: pair(h.cards), value: h.value, best: [...h.best]});
 
-const resultView = (r: HandResult): HandResultView => ({
+// A result's seats whose player has gone since the deal: empty, or now someone else's.
+const goneSeats = (state: TableState, hand: Hand): [number, string][] =>
+    hand.seats.filter((p) => state.seats[p.seat]?.pid !== p.pid).map((p): [number, string] => [p.seat, p.pid]);
+
+const resultView = (state: TableState, hand: Hand, r: HandResult): HandResultView => ({
     completedAt: r.completedAt, showdown: r.showdown, refund: r.refund ? {seat: r.refund.seat, amount: r.refund.amount} : null,
     pots: r.pots.map(paidPotView), hands: r.hands.map(shownCardsView), nets: r.nets.map((n) => ({seat: n.seat, net: n.net})),
-    revealMs: r.revealMs,
+    revealMs: r.revealMs, gone: goneSeats(state, hand),
 });
 
-const handView = (hand: Hand): HandView => ({
+const handView = (state: TableState, hand: Hand): HandView => ({
     no: hand.no, phase: hand.phase, street: hand.street, board: [...hand.board], pots: hand.phase === 'complete' ? [] : livePots(hand),
     currentBet: hand.currentBet, increment: hand.increment, actor: hand.actor, deadline: hand.deadline, nextStreetAt: hand.nextStreetAt,
     button: hand.button, sb: hand.smallBlindSeat, bb: hand.bigBlindSeat,
     logTail: hand.log.slice(-KEEP.LOG_TAIL).map((e): WireEntry => [e[0], e[1], e[2], e[3], e[4], e[5]]),
     logLength: hand.logDropped + hand.log.length,
-    result: hand.result ? resultView(hand.result) : null,
+    result: hand.result ? resultView(state, hand, hand.result) : null,
 });
 
 const ledgerView = (row: LedgerRow): LedgerView => ({pid: row.pid, bought: row.bought, cashedOut: row.cashedOut, buys: row.buys});
@@ -90,7 +94,7 @@ export const publicView = (state: TableState, presence: Readonly<Record<string, 
     settings: {...state.settings},
     configV: state.configV, hostPid: state.hostPid, handNo: state.handNo, turn: state.turn, nextHandAt: state.nextHandAt,
     seats: state.seats.map((seat, i) => (seat ? seatView(state, i, seat, presence[seat.pid] ?? 'offline') : null)),
-    hand: state.hand ? handView(state.hand) : null,
+    hand: state.hand ? handView(state, state.hand) : null,
     ledger: state.ledger.map(ledgerView),
     requests: state.requests.map((r) => ({pid: r.pid, amount: r.amount})),
 });
@@ -112,11 +116,14 @@ const emoteView = (e: EmoteView): EmoteView =>
         ? {kind: 'throw', item: e.item, to: e.to, id: e.id, seq: e.seq, from: e.from, at: e.at}
         : {kind: e.kind, item: e.item, id: e.id, seq: e.seq, from: e.from, at: e.at};
 
-// The wire view plus what only this viewer may see: the config, their own seat, cards and
-// pre-action.
+// The wire view plus what only this viewer may see: the config, their own seat, cards, pre-action
+// and what their seat does when the hand ends (`next`: leaving, or sitting out from the next deal).
+// Their cards stay theirs to see after they fold, through the results pause, until the next deal:
+// nobody else sees a folded hand unless its player shows it.
 export const playerView = (state: TableState, pid: string, meta: PlayerMeta): PlayerView => {
     const i = seatOf(state, pid);
     const own = i === null ? null : handSeatAt(state, i);
+    const seat = i === null ? null : state.seats[i];
     return {
         ...wireView(state, meta),
         ...peopleView(meta.people, meta.removed),
@@ -125,6 +132,7 @@ export const playerView = (state: TableState, pid: string, meta: PlayerMeta): Pl
             pid, seat: i, role: i === null ? 'watching' : 'seated', isHost: state.hostPid === pid, hasAccount: meta.hasAccount,
             hole: own ? pair(own.hole) : null,
             pre: own?.pre && isLive(state.hand) ? (own.pre.kind === 'call' ? {kind: 'call', amount: own.pre.amount} : {kind: own.pre.kind}) : null,
+            next: !seat ? null : seat.leaving ? 'leave' : seat.sitOutNext ? 'sit-out' : null,
         },
         emotes: meta.emotes.map(emoteView),
         emoteSeq: meta.emoteSeq,

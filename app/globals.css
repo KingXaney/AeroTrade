@@ -535,7 +535,9 @@ details[open] > :not(summary) { animation: disclosure-in var(--motion-base) var(
   @media (orientation: landscape) and (max-height: 500px) {
     .pn-stage { grid-template-columns: minmax(0, 1fr) minmax(12rem, 32%); grid-template-rows: var(--pn-top) minmax(0, 1fr); }
     .pn-table { grid-column: 1; grid-row: 2; margin-bottom: 30px; }
-    .pn-dock { grid-column: 2; grid-row: 2; align-self: end; }
+    /* Over the dock's own grid-row: 3 further down this layer — else the dock opens a third row under
+       the table and the felt loses the dock's height. */
+    .pn-stage > .pn-dock { grid-column: 2; grid-row: 2; align-self: end; }
   }
 
   /* The felt: a stadium (rounded-full, which brutalist's square-corner rule leaves alone) in the
@@ -784,8 +786,13 @@ details[open] > :not(summary) { animation: disclosure-in var(--motion-base) var(
   .pn-chip-col > .pn-chip + .pn-chip { margin-bottom: calc(var(--pn-chip) * -0.18); }
   .pn-chip-amount { font-family: var(--type-mono); font-weight: 700; font-size: var(--pn-amount, 11px); font-variant-numeric: tabular-nums; white-space: nowrap; }
   .pn-bet { position: absolute; translate: -50% -50%; z-index: 1; display: inline-flex; align-items: center; gap: 3px; pointer-events: none; }
-  .pn-pot { position: absolute; translate: -50% -50%; z-index: 1; display: flex; flex-wrap: wrap; justify-content: center; gap: 4px; }
-  .pn-pot-pill { display: inline-flex; align-items: center; gap: 5px; padding: 2px 9px; border-radius: 9999px; font-size: 11px; font-weight: 700; white-space: nowrap; }
+  /* The pots: each pill where lib/poker-night/stage.potPlan placed it, at the size it gave it (its
+     padding, line, type and chips are the plan's own, POT_PILL, held by stage.test), so a pill never
+     grows past what the plan kept clear; the chips are 10 px, at most three to a column. */
+  .pn-pot { position: absolute; inset: 0; z-index: 1; pointer-events: none; }
+  .pn-pot-pill { position: absolute; translate: -50% -50%; display: inline-flex; align-items: center; justify-content: center; gap: 5px; padding: 2px 8px; border-radius: 9999px; font-size: 11px; line-height: 15px; font-weight: 700; white-space: nowrap; overflow: hidden; --pn-chip: 10px; }
+  .pn-pot-label { min-width: 0; overflow: hidden; text-overflow: ellipsis; }
+  .pn-pot-pill .pn-chip-col > .pn-chip:nth-child(n + 4) { display: none; }
   .pn-dealer {
     position: absolute;
     translate: -50% -50%;
@@ -887,6 +894,14 @@ details[open] > :not(summary) { animation: disclosure-in var(--motion-base) var(
     }
     .pn-fold-free { left: max(10px, env(safe-area-inset-left)); }
   }
+  /* The seat's own controls (Show cards, Sit out, Leave) say the short word in a narrow dock — a
+     phone upright, or the column of one on its side — so the row keeps to one line; the long one
+     stays the button's accessible name. */
+  .pn-label-short { display: none; }
+  @container pn-dock (max-width: 28rem) {
+    .pn-label-long { display: none; }
+    .pn-label-short { display: inline; }
+  }
 }
 
 /* Compact plates draw no glass: nine blurred plates over the scene stutter on a small phone.
@@ -949,9 +964,11 @@ details[open] > :not(summary) { animation: disclosure-in var(--motion-base) var(
 @keyframes pn-win-lift {
   from { transform: translateY(0); box-shadow: 0 0 0 0 transparent; }
 }
+/* The winner's banner comes in where it lands, growing from its middle, so on its way in it covers
+   nothing its place (lib/poker-night/stage.bannerPlan) does not. */
 .pn-banner-drop { animation: pn-banner-drop calc(var(--motion-base) * var(--pn-dur, 2)) cubic-bezier(0.2, 1.2, 0.4, 1) calc(var(--motion-base) * var(--pn-at, 0)) both; }
 @keyframes pn-banner-drop {
-  from { transform: translateY(-28px) scale(0.9); opacity: 0; }
+  from { transform: scale(0.9); opacity: 0; }
 }
 /* The pot to a winner: each chip on an arc from the pot (--pn-dx/--pn-dy back to it), drawn where
    it lands and gone once there; the pot's pill empties as its stream leaves. */

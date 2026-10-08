@@ -9,8 +9,11 @@
 // lines already placed; its dealer button beside that; and the board and the pot are then fitted
 // into what is left — the widest five cards that clear every plate, bet line and button, as near
 // the middle as they can sit. lib/poker-night/__tests__/stage.test.ts holds them all apart from
-// 320 px phones to wide desktops.
+// 320 px phones to wide desktops. stage.pot is the one pot's own place (and the table's name between
+// hands); the pots of a hand — side pots and all — go where potPlan (at the foot) finds room.
 
+import {BANK_COPY, FELT_COPY, TABLE_COPY} from '@/lib/learn/copy/poker-night';
+import {CHIP_COLUMNS, chipBreakdown, compactChips} from '@/lib/poker-night/chips';
 import {CENTRE, densityFor, orientationFor, PLATE, seatSpots, spotToPx, visualSlot, type Box, type Density, type Orientation, type SeatSpot} from '@/lib/poker-night/layout';
 
 export type Px = {x: number; y: number};
@@ -276,7 +279,8 @@ export const stageLayout = (box: Box, seatCount: number, mySeat: number | null):
 // row is the avatar beside the name's line (14 px on 20) over the hand's (12 on 16); the compact
 // banner's padding and gap, a 12-on-16 line a winner, no avatar; the line's pill; the gap under the
 // banner; the widest chrome border any visual style draws (brutalist's, 2 px a side); and the room
-// kept between the banner and anything it must not cover.
+// kept between the banner and anything it must not cover. It comes in where it lands, growing from
+// 90 % of its size (.pn-banner-drop), so on its way in it covers nothing its place does not.
 export const BANNER = {
     full: {
         pad: {tight: {x: 8, y: 3}, compact: {x: 12, y: 6}, comfortable: {x: 12, y: 6}} as Record<Fit, {x: number; y: number}>,
@@ -324,9 +328,12 @@ export const textWidth = (text: string, px: number, bold = false): number => {
 // What the banner says: a line for each winner it names (at most three) — the head, "You win 70" or
 // "Ana wins 1,200", and the hand's name or null — and the line under it, or null.
 export type BannerText = {winners: readonly {head: string; hand: string | null}[]; note: string | null};
+// A winner's "+N" (the seat and what it won), rising over its seat while the pots pay out.
+export type WinPop = {seat: number; amount: number};
 // What the table shows beside it: the seats nobody sits in (an open seat's ring, no plate), the seats
-// whose cards are turned up on the felt, and the dealer button's seat.
-export type BannerSeen = {open: readonly number[]; shown: readonly number[]; button: number | null};
+// whose cards are turned up on the felt, the dealer button's seat, the pots' pills (potPlan's, which
+// stay on while their chips stream out under the banner) and the winners' "+N".
+export type BannerSeen = {open: readonly number[]; shown: readonly number[]; button: number | null; pots?: readonly Rect[]; pops?: readonly WinPop[]};
 // The full banner (the avatar, the head over the hand's name); the compact one (no avatar, a line a
 // winner — "You win 70 · Full house, threes full of fives" — wrapped when narrow); the compact one cut
 // to a line a winner with an ellipsis, when nothing else has room.
@@ -353,51 +360,83 @@ export const shownHandRect = (place: Pick<SeatPlace, 'plate' | 'spot'>, stage: P
 // An open seat's ring (.pn-open-seat): max(44 px, 95 % of the plate's height) across.
 export const openSeatPx = (stage: Pick<Stage, 'plateSize'>): number => Math.max(44, stage.plateSize.h * 0.95);
 
+// Text in the mono face (JetBrains Mono, IBM Plex Mono): 0.6 em a character, whatever the weight.
+export const MONO_EM = 0.6;
+
+// A winner's "+N" (.pn-win-pop-text): BANK_COPY.net's words in the mono face at 13 px on the page's
+// 1.5 line, rising (.pn-win-pop) from 6 px under its place to 18 px over it; its place's foot on the
+// plate's top, or on the top of the cards a side or bottom seat has turned up (`shown`).
+export const WIN_POP = {px: 13, line: 1.5, from: 6, to: 18} as const;
+export const winPopRect = (place: Pick<SeatPlace, 'plate' | 'spot'>, stage: Pick<Stage, 'plateSize' | 'fit'>, shown: boolean, amount: number): Rect => {
+    const plateTop = place.plate.y - stage.plateSize.h / 2;
+    const foot = shown && place.spot.side !== 'top' ? plateTop - SHOWN_OFF.over - SHOWN_CARD_PX[stage.fit] * CARD_RATIO : plateTop;
+    const top = foot - WIN_POP.to - WIN_POP.px * WIN_POP.line;
+    const bottom = foot + WIN_POP.from;
+    return {x: place.plate.x, y: (top + bottom) / 2, w: Math.ceil(BANK_COPY.net(amount).length * MONO_EM * WIN_POP.px), h: bottom - top};
+};
+
 // Everything the banner must not cover: every seated player's plate and the status flag that may hang
-// under it, every open seat's ring, each turned-up hand, the dealer button, and the board with its lit
-// cards' lift.
-export const bannerObstacles = (stage: Stage, seen: BannerSeen): Rect[] => {
-    const out: Rect[] = [];
+// under it, every open seat's ring, each turned-up hand, the dealer button, the board with its lit
+// cards' lift, the pots' pills and the winners' "+N" as they rise.
+export const bannerObstacles = (stage: Stage, seen: BannerSeen): Rect[] => [
+    ...tableObstacles(stage, seen),
+    ...(seen.pots ?? []),
+    ...(seen.pops ?? []).flatMap((pop) => (stage.seats[pop.seat] ? [winPopRect(stage.seats[pop.seat], stage, seen.shown.includes(pop.seat), pop.amount)] : [])),
+];
+
+// The same less the pots and the "+N": what the banner and the pots both keep clear of — by part:
+// the plates and open seats' rings, the flags under the plates, the hands turned up, and the dealer
+// button with the board and its lit cards' lift.
+const tableParts = (stage: Stage, seen: Pick<BannerSeen, 'open' | 'shown' | 'button'>): {plates: Rect[]; flags: Rect[]; shown: Rect[]; fixed: Rect[]} => {
+    const plates: Rect[] = [];
+    const flags: Rect[] = [];
     const ring = openSeatPx(stage);
     for (const p of stage.seats) {
         if (seen.open.includes(p.seat)) {
-            out.push(rect(p.plate, {w: ring, h: ring}));
+            plates.push(rect(p.plate, {w: ring, h: ring}));
             continue;
         }
-        out.push(rect(p.plate, stage.plateSize));
+        plates.push(rect(p.plate, stage.plateSize));
         const bottom = p.plate.y + stage.plateSize.h / 2;
-        out.push({x: p.plate.x, y: bottom + FLAG.h * FLAG.below - FLAG.h / 2, w: stage.plateSize.w + FLAG.wider, h: FLAG.h});
+        flags.push({x: p.plate.x, y: bottom + FLAG.h * FLAG.below - FLAG.h / 2, w: stage.plateSize.w + FLAG.wider, h: FLAG.h});
     }
-    for (const seat of seen.shown) if (stage.seats[seat]) out.push(shownHandRect(stage.seats[seat], stage));
+    const shown = seen.shown.flatMap((seat) => (stage.seats[seat] ? [shownHandRect(stage.seats[seat], stage)] : []));
+    const fixed: Rect[] = [];
     const button = seen.button === null ? undefined : stage.seats[seen.button];
-    if (button) out.push(rect(button.button, {w: stage.buttonSize, h: stage.buttonSize}));
+    if (button) fixed.push(rect(button.button, {w: stage.buttonSize, h: stage.buttonSize}));
     const lit = LIT.lift + LIT.ring;
-    out.push({x: stage.board.x, y: stage.board.y - lit / 2, w: stage.board.w + 2 * LIT.ring, h: stage.board.h + lit});
-    return out;
+    fixed.push({x: stage.board.x, y: stage.board.y - lit / 2, w: stage.board.w + 2 * LIT.ring, h: stage.board.h + lit});
+    return {plates, flags, shown, fixed};
+};
+const tableObstacles = (stage: Stage, seen: BannerSeen): Rect[] => {
+    const t = tableParts(stage, seen);
+    return [...t.plates, ...t.flags, ...t.shown, ...t.fixed];
 };
 
 // ── finding room ──
 
 type Span = [number, number];
 
-// The free spans across the band [top, top + h]: the box's width less every obstacle reaching into
-// the band, widened on each side by the room kept. A rectangle that band tall clears everything
-// exactly when it lies inside one of them.
-const freeSpans = (top: number, h: number, avoid: readonly Rect[], box: Box): Span[] => {
+// The free spans across the band [top, top + h]: the box's width (or the part of it `within` names)
+// less every obstacle reaching into the band, widened on each side by the room kept (`clear`). A
+// rectangle that band tall clears everything exactly when it lies inside one of them.
+const freeSpans = (top: number, h: number, avoid: readonly Rect[], box: Box, clear: number = BANNER.clear, within: Span = [0, box.w]): Span[] => {
     if (top < 0 || top + h > box.h) return [];
     const blocked: Span[] = [];
     for (const o of avoid) {
-        if (Math.abs(top + h / 2 - o.y) >= (h + o.h) / 2 + BANNER.clear) continue;
-        blocked.push([o.x - o.w / 2 - BANNER.clear, o.x + o.w / 2 + BANNER.clear]);
+        if (Math.abs(top + h / 2 - o.y) >= (h + o.h) / 2 + clear) continue;
+        blocked.push([o.x - o.w / 2 - clear, o.x + o.w / 2 + clear]);
     }
     blocked.sort((a, b) => a[0] - b[0]);
     const spans: Span[] = [];
-    let from = 0;
+    const end = Math.min(box.w, within[1]);
+    let from = Math.max(0, within[0]);
     for (const [a, b] of blocked) {
-        if (a > from) spans.push([from, Math.min(a, box.w)]);
+        if (from >= end) break;
+        if (a > from) spans.push([from, Math.min(a, end)]);
         from = Math.max(from, b);
     }
-    if (from < box.w) spans.push([from, box.w]);
+    if (from < end) spans.push([from, end]);
     return spans.filter(([a, b]) => b > a);
 };
 
@@ -520,7 +559,11 @@ export const bannerPlan = (stage: Stage, text: BannerText, seen: BannerSeen): Ba
     const noteW = text.note === null ? 0 : fits(2 * (n.pad.x + B) + textWidth(text.note, n.px));
     const note = text.note === null ? null : {h: noteH, w: noteW};
     const avoid = bannerObstacles(stage, seen);
-    const prefer: 'up' | 'down' = stage.potOnBoard || stage.pot.y <= board.y ? 'up' : 'down';
+    // The pot's side of the board, where the pot sat; while the pots' pills are still on, the other.
+    const pots = seen.pots ?? [];
+    const prefer: 'up' | 'down' = pots.length > 0
+        ? (pots.reduce((s, r) => s + r.y, 0) / pots.length <= board.y ? 'down' : 'up')
+        : stage.potOnBoard || stage.pot.y <= board.y ? 'up' : 'down';
     const anchor: Anchor = {x: board.x, top: board.y - board.h / 2 - LIT.lift - LIT.ring, bottom: board.y + board.h / 2};
     const piece = (x: number, top: number, h: number, against: readonly Rect[]): BannerPiece =>
         ({x, top, width: Math.min(cap, clearWidth(x, top, h, against, box)), height: h});
@@ -603,23 +646,388 @@ export const bannerPlan = (stage: Stage, text: BannerText, seen: BannerSeen): Ba
 // starts that far away), whole pixels.
 export const offset = (from: Px, to: Px): {dx: number; dy: number} => ({dx: Math.round(from.x - to.x), dy: Math.round(from.y - to.y)});
 
-// ── the pot's pills ──
+// ── the pots ──
+//
+// The pot, or the main pot and each side pot, as pills on the felt that must never cover a card (the
+// board's, its lit cards' lift included; a seat's face-down pair; a hand turned up), a plate, its
+// flag, a blind's mark, a bet line, the dealer button or a winner's "+N" — and on a phone the board's
+// neighbourhood is crowded, so, like the banner's, the pots' place is chosen, not assumed. potPlan's
+// layouts: every pot its own pill in one row, in full ("Main pot 600", "Side pot 1: 1,350"), chips on
+// the first; the same in short ("Main 600", "Side 1: 1,350"), then without the chips; the short pills
+// in two rows, three, … one a row; the side pots past the first few gathered into one pill ("2 more:
+// 5,050"), in a row, then two; and every pot in one pill ("4 pots: 6,250"). Each is placed at its
+// nearest to the board — over it, under it, beside it — on the felt inside its rail, clear of
+// everything by POT_CLEAR, and the plan takes the nearest of them all, the fuller words weighing in
+// their favour (POT_PENALTY): the pots' own words in one row a little further out before three rows
+// on the board's edge, a pill for every pot before one for them all.
+//
+// What it keeps clear of comes in three kinds. What the table draws for every seated player whatever
+// the hand does — plates, flags, face-down pairs, blinds' marks — the dealer button and the board:
+// always. What shows now (PotSeen.now): the hands turned up, the bet lines out at the size they are
+// drawn (betLineSize), and the winners' "+N" while the pots pay out. And what the table may yet show,
+// so the pills hold their place from the first bet to the payout: every seated player's hand but the
+// viewer's turned up (seen.shown) and, while there is a hand, every bet line at the stage's size
+// (seen.bets). On the felt, the plan keeps clear of all of it where that is near enough (POT_NEAR,
+// keeps 'all'); else of what shows now and the hands that may yet turn up ('hands'); else of what
+// shows now ('now'), by POT_CLEAR, then a pixel apart; else of that less the "+N", which rises for a
+// second and a half ('still'). Only then does it leave the felt (felt: false), clear of what shows
+// now, then of that less the "+N"; and where not even that has room — nine seats on the smallest
+// phone on its side — the smallest layout goes where it covers least (COVER_WEIGHT: a card, plate or
+// the board hardly ever, a flag, a mark or a bet line before them; 'least', clear: false). Between two
+// plans of the same pots what shows now only grows (a bet line out, a hand turned up), so the pots
+// move only when something lands where they are (the rows' box, which a plan keeps clear whole): the
+// place they had is still the nearest clear one until then. The winner's banner keeps clear of the
+// pills (bannerPlan's seen.pots). What is drawn is what it measured: each pill at the size the plan
+// gives it (app/globals.css .pn-pot-pill, held by stage.test), its words sized by textWidth, an upper
+// bound.
 
-// A pill's width as the pot draws it: about this much per character at its type size, its padding,
-// and the chips the first one carries.
-export const POT_PILL = {char: 6.6, pad: 22, chips: 30, gap: 4} as const;
+// A pill: 11 px bold on a 15 px line, 2 px over and under and 8 px a side inside the widest chrome
+// border, 4 px from the next; the first pill's chips (at most CHIP_COLUMNS columns of 10 px chips, a
+// pixel apart) 5 px from its words.
+export const POT_PILL = {px: 11, line: 15, pad: {x: 8, y: 2}, gap: 4, chip: 10, chipsGap: 5} as const;
+export const POT_PILL_H = POT_PILL.line + 2 * (POT_PILL.pad.y + BANNER.border);
+const POT_CHIPS_W = CHIP_COLUMNS * POT_PILL.chip + (CHIP_COLUMNS - 1) + POT_PILL.chipsGap;
+// The room kept between a pill and anything it must not cover.
+export const POT_CLEAR = 3;
 
-const pillWidth = (label: string, first: boolean): number => label.length * POT_PILL.char + POT_PILL.pad + (first ? POT_PILL.chips : 0);
+// The felt's rail at its widest (.pn-felt's border, clamp(6px, 1.4vmin, 14px)): a pill lies inside it.
+export const FELT_RAIL = 14;
 
-// How many of the pots get a pill of their own in a row `width` px wide: all of them when they fit,
-// else as many as fit beside one more pill (`more(k)`, the words for the pots from k on) that stands
-// for the rest — at least the main pot's.
-export const potPillsShown = (labels: readonly string[], width: number, more: (from: number) => string): number => {
-    const row = (widths: number[]) => widths.reduce((s, w) => s + w, 0) + POT_PILL.gap * Math.max(0, widths.length - 1);
-    const all = labels.map((label, i) => pillWidth(label, i === 0));
-    if (labels.length <= 1 || row(all) <= width) return labels.length;
-    for (let k = labels.length - 1; k >= 1; k--) {
-        if (row([...all.slice(0, k), pillWidth(more(k), false)]) <= width) return k;
+// The felt inside its rail across the band [top, top + h]: the span a rectangle that tall may take and
+// lie on it — a stadium (rounded-full) is widest at its middle, so the narrower of the band's two
+// edges. Null when the band leaves the felt.
+export const feltSpan = (stage: Pick<Stage, 'felt'>, top: number, h: number): Span | null => {
+    const f = stage.felt;
+    const left = f.left + FELT_RAIL;
+    const right = f.left + f.width - FELT_RAIL;
+    const up = f.top + FELT_RAIL;
+    const down = f.top + f.height - FELT_RAIL;
+    if (right <= left || top < up || top + h > down) return null;
+    const wide = right - left >= down - up;
+    const r = Math.min(right - left, down - up) / 2;
+    const across = (y: number): Span => {
+        const dy = wide ? Math.abs(y - (up + down) / 2) : Math.max(0, up + r - y, y - (down - r));
+        const dx = Math.sqrt(Math.max(0, r * r - dy * dy));
+        return wide ? [left + r - dx, right - r + dx] : [(left + right) / 2 - dx, (left + right) / 2 + dx];
+    };
+    const [a, b] = [across(top), across(top + h)];
+    const span: Span = [Math.max(a[0], b[0]), Math.min(a[1], b[1])];
+    return span[1] > span[0] ? span : null;
+};
+
+// A seat's face-down pair (.pn-seat-cards): two cards --pn-mini-w wide (MINI_CARD_PX) and 1.4 times as
+// tall, overlapping by 0.45 of a width, at the plate's top right 3 px in and 0.45 of a width over its
+// top, each turned 7° (which widens it by 0.09 of a width a side and heightens it by 0.06); a pixel
+// round it.
+export const MINI_CARD_PX: Record<Fit, number> = {tight: 14, compact: 17, comfortable: 24};
+export const seatCardsRect = (place: Pick<SeatPlace, 'plate'>, stage: Pick<Stage, 'plateSize' | 'fit'>): Rect => {
+    const w = MINI_CARD_PX[stage.fit];
+    const right = place.plate.x + stage.plateSize.w / 2 - 3 + 0.09 * w + 1;
+    const left = right - 1.55 * w - 0.18 * w - 2;
+    const top = place.plate.y - stage.plateSize.h / 2 - 0.45 * w - 0.06 * w - 1;
+    const bottom = top + 1.4 * w + 0.12 * w + 2;
+    return {x: (left + right) / 2, y: (top + bottom) / 2, w: right - left, h: bottom - top};
+};
+
+// A blind's mark (.pn-blind): "SB" or "BB" in the mono face on a 14 px line, 4 px a side inside the
+// widest chrome border — at most BLIND_MARK — over the plate's top-left corner by 30 % of its width
+// and 45 % of its height.
+export const BLIND_MARK: Box = {w: 28, h: 18};
+export const blindRect = (place: Pick<SeatPlace, 'plate'>, stage: Pick<Stage, 'plateSize'>): Rect => ({
+    x: place.plate.x - stage.plateSize.w / 2 - 0.3 * BLIND_MARK.w + BLIND_MARK.w / 2,
+    y: place.plate.y - stage.plateSize.h / 2 - 0.45 * BLIND_MARK.h + BLIND_MARK.h / 2,
+    ...BLIND_MARK,
+});
+
+// A bet line as drawn (.pn-bet, components/poker-night/ChipStack) round the stage's place for it: a
+// column of chips for each denomination (chipBreakdown: at most CHIP_COLUMNS, a pixel apart), each
+// chip CHIP_PX wide and a column of n of them 0.42 + 0.24 (n − 1) of a chip tall; 4 px on, the count
+// (compactChips) in the mono face at AMOUNT_PX on the page's 1.5 line; an all-in's (.pn-bet.pn-pulse)
+// 4 px a side more, inside a 2 px outline breathing out to 5 px.
+export const CHIP_PX: Record<Fit, number> = {tight: 10, compact: 12, comfortable: 18};
+export const AMOUNT_PX: Record<Fit, number> = {tight: 11, compact: 11, comfortable: 13};
+export const PULSE = {pad: 4, outline: 2, offset: 5} as const;
+export const betLineSize = (fit: Fit, amount: number, allIn: boolean): Box => {
+    const chip = CHIP_PX[fit];
+    const columns = chipBreakdown(amount);
+    const chips = columns.length === 0 ? 0 : columns.length * chip + (columns.length - 1) + 4;
+    const tallest = Math.max(0, ...columns.map((c) => chip * (0.42 + 0.24 * (c.count - 1))));
+    const ring = allIn ? PULSE.outline + PULSE.offset : 0;
+    return {
+        w: Math.ceil(chips + compactChips(amount).length * MONO_EM * AMOUNT_PX[fit] + 2 * ((allIn ? PULSE.pad : 0) + ring)),
+        h: Math.ceil(Math.max(tallest, 1.5 * AMOUNT_PX[fit]) + 2 * ring),
+    };
+};
+
+// A bet line out now: its seat, its chips and whether its player is all in (the line pulses).
+export type BetOut = {seat: number; amount: number; allIn: boolean};
+// What shows on the table now: the seats whose cards are turned up, the bet lines out and the winners'
+// "+N" while the pots pay out.
+export type PotNow = {shown: readonly number[]; bets: readonly BetOut[]; pops: readonly WinPop[]};
+// What the pots keep clear of: the banner's open seats and dealer button; in `shown` every seat whose
+// hand may yet turn up, and in `bets` every seat whose bet line may yet show (the seats dealt in, while
+// there is a hand); and what shows now.
+export type PotSeen = Omit<BannerSeen, 'pots' | 'pops'> & {bets: readonly number[]; now?: PotNow};
+
+// What the pots keep clear of, by kind (see above). What the table always draws: the cards, plates,
+// open seats' rings, the dealer button and the board (`cards`), and the flags and blinds' marks
+// (`marks`). What shows now: the hands turned up (`turned`), the bet lines out (`out`), the winners'
+// "+N" (`pops`). What may yet show: the hands (`hands`) and the bet lines (`bets`).
+type PotKinds = {cards: Rect[]; marks: Rect[]; turned: Rect[]; out: Rect[]; pops: Rect[]; hands: Rect[]; bets: Rect[]};
+const potKinds = (stage: Stage, seen: PotSeen): PotKinds => {
+    const now: PotNow = seen.now ?? {shown: [], bets: [], pops: []};
+    const table = tableParts(stage, {open: seen.open, shown: now.shown, button: seen.button});
+    const cards = [...table.plates, ...table.fixed];
+    const marks = [...table.flags];
+    const bets: Rect[] = [];
+    for (const p of stage.seats) {
+        if (seen.open.includes(p.seat)) continue;
+        cards.push(seatCardsRect(p, stage));
+        marks.push(blindRect(p, stage));
+        if (seen.bets.includes(p.seat)) bets.push(rect(p.bet, stage.betSize));
     }
-    return 1;
+    const at = (seat: number): SeatPlace | undefined => stage.seats[seat];
+    return {
+        cards, marks, turned: table.shown,
+        out: now.bets.flatMap((b) => {
+            const p = at(b.seat);
+            return p ? [rect(p.bet, betLineSize(stage.fit, b.amount, b.allIn))] : [];
+        }),
+        pops: now.pops.flatMap((pop) => {
+            const p = at(pop.seat);
+            return p ? [winPopRect(p, stage, now.shown.includes(pop.seat), pop.amount)] : [];
+        }),
+        hands: tableParts(stage, {open: seen.open, shown: seen.shown, button: null}).shown,
+        bets,
+    };
+};
+
+// What a plan keeps clear of (see above): everything — what the table always draws, what shows now
+// and what may yet show; that less the bet lines that may yet show; what the table always draws and
+// what shows now; that less the winners' "+N"; or, covering least of that, nothing.
+export type PotKeeps = 'all' | 'hands' | 'now' | 'still' | 'least';
+
+// Everything a plan that keeps `keeps` clear must not cover.
+export const potObstacles = (stage: Stage, seen: PotSeen, keeps: Exclude<PotKeeps, 'least'> = 'all'): Rect[] => {
+    const k = potKinds(stage, seen);
+    return [
+        ...k.cards, ...k.marks, ...k.turned, ...k.out, ...(keeps === 'still' ? [] : k.pops),
+        ...(keeps === 'all' || keeps === 'hands' ? k.hands : []), ...(keeps === 'all' ? k.bets : []),
+    ];
+};
+
+// The pots in the order they were built (pot 0 the main pot), as the hand or its result has them.
+export type PotAmount = {pot: number; amount: number};
+// A pill: its words, the pots it stands for and their chips, whether it carries the chips, and where
+// it is drawn.
+export type PotPill = Rect & {key: string; pots: number[]; amount: number; label: string; chips: boolean};
+export type PotVariant = 'full' | 'short' | 'gathered' | 'total';
+// The plan: which words, in how many rows, each pill's place, the rows' bounding box, what it keeps
+// clear of and whether that is anything (`clear`, false only when it covers least), by how much room
+// (POT_CLEAR, or a pixel where that has no room; none when it covers least), and whether every pill
+// lies on the felt inside its rail.
+export type PotPlan = {variant: PotVariant; rows: number; pills: PotPill[]; box: Rect; keeps: PotKeeps; clear: boolean; room: number; felt: boolean};
+
+export const potPillWidth = (label: string, chips: boolean): number =>
+    Math.ceil(textWidth(label, POT_PILL.px, true)) + 2 * (POT_PILL.pad.x + BANNER.border) + (chips ? POT_CHIPS_W : 0);
+
+type PillWords = Omit<PotPill, keyof Rect>;
+export type PotLayout = {variant: PotVariant; rows: PillWords[][]; w: number; h: number};
+
+// Items in k rows, as even as they go, the first rows the longer.
+const inRows = <T>(items: readonly T[], k: number): T[][] => {
+    const rows: T[][] = [];
+    let at = 0;
+    for (let r = 0; r < k && at < items.length; r++) {
+        const size = Math.ceil((items.length - at) / (k - r));
+        rows.push(items.slice(at, at + size));
+        at += size;
+    }
+    return rows;
+};
+
+const rowWidth = (row: readonly PillWords[]): number =>
+    row.reduce((s, p) => s + potPillWidth(p.label, p.chips), 0) + POT_PILL.gap * Math.max(0, row.length - 1);
+
+const layout = (variant: PotVariant, rows: PillWords[][]): PotLayout => ({
+    variant, rows, w: Math.max(...rows.map(rowWidth)), h: rows.length * POT_PILL_H + (rows.length - 1) * POT_PILL.gap,
+});
+
+// Every layout of these pots, in the order potPlan tries them.
+export const potLayouts = (pots: readonly PotAmount[]): PotLayout[] => {
+    const pill = (p: PotAmount, label: string, chips: boolean): PillWords => ({key: `pot-${p.pot}`, pots: [p.pot], amount: p.amount, label, chips});
+    const gather = (key: string, of: readonly PotAmount[], label: (pots: number, chips: number) => string): PillWords => {
+        const amount = of.reduce((s, p) => s + p.amount, 0);
+        return {key, pots: of.map((p) => p.pot), amount, label: label(of.length, amount), chips: false};
+    };
+    if (pots.length === 1) {
+        const label = TABLE_COPY.pot(pots[0].amount);
+        return [layout('full', [[pill(pots[0], label, true)]]), layout('short', [[pill(pots[0], label, false)]])];
+    }
+    const full = pots.map((p, i) => pill(p, i === 0 ? TABLE_COPY.mainPot(p.amount) : TABLE_COPY.sidePot(i, p.amount), i === 0));
+    const short = (chips: boolean) => pots.map((p, i) => pill(p, i === 0 ? FELT_COPY.mainPot(p.amount) : FELT_COPY.sidePot(i, p.amount), chips && i === 0));
+    const out = [layout('full', [full]), layout('short', [short(true)]), layout('short', [short(false)])];
+    for (let k = 2; k <= pots.length; k++) out.push(layout('short', inRows(short(false), k)));
+    // The first `shown` pots and one pill for the rest, two or more of them.
+    for (let shown = pots.length - 2; shown >= 1; shown--) {
+        const rest = pots.slice(shown);
+        const more = gather('more', rest, FELT_COPY.morePots);
+        const pills = [...short(false).slice(0, shown), more];
+        out.push(layout('gathered', [pills]), layout('gathered', inRows(pills, 2)));
+    }
+    // Last, every pot in one pill: how many, and their chips.
+    const all = gather('all', pots, FELT_COPY.allPots);
+    out.push(layout('total', [[all]]));
+    return out;
+};
+
+// The pills of a layout drawn with the rows' box centred on x, its top at `top`: each row centred.
+const drawPots = (l: PotLayout, x: number, top: number, keeps: PotKeeps, felt: boolean, room: number): PotPlan => {
+    const pills: PotPill[] = [];
+    l.rows.forEach((row, r) => {
+        const y = top + r * (POT_PILL_H + POT_PILL.gap) + POT_PILL_H / 2;
+        let left = x - rowWidth(row) / 2;
+        for (const words of row) {
+            const w = potPillWidth(words.label, words.chips);
+            pills.push({...words, x: left + w / 2, y, w, h: POT_PILL_H});
+            left += w + POT_PILL.gap;
+        }
+    });
+    return {variant: l.variant, rows: l.rows.length, pills, box: {x, y: top + l.h / 2, w: l.w, h: l.h}, keeps, clear: keeps !== 'least', felt, room};
+};
+
+// How near the board a layout sits, as potPlan weighs it: how far its far edge is from the board (the
+// gap over or under it — none beside it — and the layout's height), twice how far its middle is
+// across from the board's, and a pixel under the board rather than over. Beside the board the
+// distance across alone puts it far.
+// What a layout's words cost on top of that: the pots' own words in full nothing, in short a few
+// pixels (two more without the chips), gathered or all in one pill much more — so the fuller words win
+// wherever they sit about as near.
+const POT_PENALTY: Record<PotVariant, number> = {full: 0, short: 6, gathered: 120, total: 240};
+const potPenalty = (l: PotLayout): number => POT_PENALTY[l.variant] + (l.rows[0][0].chips ? 0 : 2);
+// Clear of what may yet show too, as long as that costs no more than this.
+const POT_NEAR = 120;
+
+// The place for a layout costing less than `budget`, the cheapest; null when none does. Every
+// whole-pixel top, outward from the board, until the gap alone costs the budget; `spansAt` the room
+// across a band.
+const placeNear = (l: PotLayout, spansAt: (top: number, h: number) => Span[], box: Box, anchor: Anchor, budget: number): {x: number; top: number; cost: number} | null => {
+    let best = null as {x: number; top: number; cost: number} | null;
+    const at = (top: number, gap: number, under: boolean) => {
+        const x = nearest(centres(spansAt(top, l.h), l.w), anchor.x);
+        if (x === null) return;
+        const cost = gap + l.h + 2 * Math.abs(x - anchor.x) + (under ? 1 : 0);
+        if (cost < (best?.cost ?? budget)) best = {x: Math.round(x), top, cost};
+    };
+    const within = (gap: number) => gap + l.h < (best?.cost ?? budget);
+    const overTop = Math.floor(anchor.top - l.h);
+    const underTop = Math.ceil(anchor.bottom);
+    for (let gap = 0; within(gap); gap++) {
+        if (overTop - gap < 0 && underTop + gap + l.h > box.h) break;
+        if (overTop - gap >= 0) at(overTop - gap, anchor.top - l.h - (overTop - gap), false);
+        if (underTop + gap + l.h <= box.h) at(underTop + gap, underTop + gap - anchor.bottom, true);
+    }
+    // Beside the board: the tops whose band reaches into its span.
+    if (within(0)) for (let top = Math.max(0, overTop + 1); top < underTop && top + l.h <= box.h; top++) at(top, 0, false);
+    return best;
+};
+
+// Covering a square pixel of a card, a plate, the button or the board outweighs this many pixels of
+// distance; of a flag, a blind's mark or a bet line a hundredth of that, of a "+N" a thousandth; and
+// leaving the felt as much as a square pixel of a card.
+const COVER_WEIGHT = {cards: 10_000, marks: 100, pops: 10} as const;
+const OFF_FELT = COVER_WEIGHT.cards;
+
+// Where a layout covers least of what shows (each thing's overlap with the pill and the room kept round
+// it, in square pixels, weighed by COVER_WEIGHT; off the felt weighed as OFF_FELT): at every whole
+// pixel inside the box, the nearest the board among equals.
+const leastCovering = (l: PotLayout, cards: readonly Rect[], marks: readonly Rect[], pops: readonly Rect[], stage: Stage, anchor: Anchor): {x: number; top: number; felt: boolean} => {
+    const {box} = stage;
+    const mid = (anchor.top + anchor.bottom) / 2;
+    const w = l.w + 2 * POT_CLEAR;
+    const h = l.h + 2 * POT_CLEAR;
+    const weighed = [
+        ...cards.map((r) => ({r, k: COVER_WEIGHT.cards})), ...marks.map((r) => ({r, k: COVER_WEIGHT.marks})), ...pops.map((r) => ({r, k: COVER_WEIGHT.pops})),
+    ];
+    let best = {x: Math.round(Math.min(Math.max(anchor.x, l.w / 2), box.w - l.w / 2)), top: Math.max(0, Math.round(mid - l.h / 2)), cost: Infinity, felt: false};
+    for (let top = 0; top + l.h <= box.h; top++) {
+        const felt = feltSpan(stage, top, l.h);
+        const y = top + l.h / 2;
+        const near = weighed.filter(({r}) => Math.abs(r.y - y) < (r.h + h) / 2);
+        for (let x = Math.ceil(l.w / 2); x + l.w / 2 <= box.w; x++) {
+            const onFelt = felt !== null && x - l.w / 2 >= felt[0] && x + l.w / 2 <= felt[1];
+            let cover = onFelt ? 0 : OFF_FELT;
+            for (const {r, k} of near) {
+                const ox = Math.min(x + w / 2, r.x + r.w / 2) - Math.max(x - w / 2, r.x - r.w / 2);
+                if (ox > 0) cover += k * ox * (Math.min(y + h / 2, r.y + r.h / 2) - Math.max(y - h / 2, r.y - r.h / 2));
+            }
+            const cost = cover + Math.abs(x - anchor.x) + Math.abs(y - mid);
+            if (cost < best.cost) best = {x, top, cost, felt: onFelt};
+        }
+    }
+    return best;
+};
+
+// Where the pots go (see above); null with no chips in any pot. On the felt, the cheapest place of
+// every layout clear of everything, when that is near enough (POT_NEAR); else the cheapest clear of
+// what shows now and the hands that may yet turn up; else of what shows now, by the room kept, then a
+// pixel apart; else of that less the "+N"; then anywhere in the box, off the felt if it must (felt:
+// false); else the smallest layout where it covers least.
+export const potPlan = (stage: Stage, pots: readonly PotAmount[], seen: PotSeen): PotPlan | null => {
+    const live = pots.filter((p) => p.amount > 0);
+    if (live.length === 0) return null;
+    const {box, board} = stage;
+    const anchor: Anchor = {x: board.x, top: board.y - board.h / 2 - LIT.lift - LIT.ring, bottom: board.y + board.h / 2};
+    const layouts = potLayouts(live);
+    type Best = {l: PotLayout; x: number; top: number; cost: number};
+    // The cheapest place of every layout clear of `avoid` by `clear`, on the felt or anywhere in the
+    // box, cheaper than `start`.
+    const search = (avoid: readonly Rect[], start: Best | null, onFelt = true, clear: number = POT_CLEAR): Best | null => {
+        // The room across each band it looks at, kept while it looks.
+        const kept = new Map<string, Span[]>();
+        const spansAt = (top: number, h: number): Span[] => {
+            const key = `${top}:${h}`;
+            let spans = kept.get(key);
+            if (!spans) {
+                const within = onFelt ? feltSpan(stage, top, h) : ([0, box.w] as Span);
+                kept.set(key, spans = within ? freeSpans(top, h, avoid, box, clear, within) : []);
+            }
+            return spans;
+        };
+        let best = start;
+        for (const l of layouts) {
+            const penalty = potPenalty(l);
+            const at = placeNear(l, spansAt, box, anchor, (best?.cost ?? Infinity) - penalty);
+            if (at) best = {l, x: at.x, top: at.top, cost: at.cost + penalty};
+        }
+        return best;
+    };
+    const k = potKinds(stage, seen);
+    const still = [...k.cards, ...k.marks, ...k.turned, ...k.out];
+    const now = [...still, ...k.pops];
+    const all = k.bets.length > 0 ? search([...now, ...k.hands, ...k.bets], null) : null;
+    if (all && all.cost <= POT_NEAR) return drawPots(all.l, all.x, all.top, 'all', true, POT_CLEAR);
+    const hands = search([...now, ...k.hands], all);
+    if (hands) return drawPots(hands.l, hands.x, hands.top, hands === all || k.bets.length === 0 ? 'all' : 'hands', true, POT_CLEAR);
+    // Then what shows now: on the felt, by the room kept, then a pixel apart; the same less the "+N";
+    // then off the felt.
+    type Try = [PotKeeps, readonly Rect[], boolean, number];
+    const pops = k.pops.length > 0;
+    const tries: Try[] = [
+        ['now', now, true, POT_CLEAR], ['now', now, true, 1], ...(pops ? [['still', still, true, 1] as Try] : []),
+        ['now', now, false, POT_CLEAR], ...(pops ? [['still', still, false, POT_CLEAR] as Try] : []),
+    ];
+    for (const [keeps, avoid, onFelt, room] of tries) {
+        const at = search(avoid, null, onFelt, room);
+        if (at) return drawPots(at.l, at.x, at.top, keeps, onFelt, room);
+    }
+    const smallest = layouts[layouts.length - 1];
+    const at = leastCovering(smallest, [...k.cards, ...k.turned], [...k.marks, ...k.out], k.pops, stage, anchor);
+    return drawPots(smallest, at.x, at.top, 'least', at.felt, 0);
+};
+
+// Where a pot's chips are: its pill's middle (the pill a gathered pot shares), else the rows' middle.
+export const potCentre = (plan: PotPlan, pot: number): Px => {
+    const pill = plan.pills.find((p) => p.pots.includes(pot));
+    return pill ? {x: pill.x, y: pill.y} : {x: plan.box.x, y: plan.box.y};
 };

@@ -1,7 +1,8 @@
 // Poker night's engine over seeded random nights. Each night is a random table — 2 to 9 seats, with
 // or without an ante, any rebuy policy — played with random legal moves, and between them players
 // sitting down, leaving, being removed, sitting out and in, buying chips, setting pre-actions and
-// showing cards, and the host approving, pausing, resuming and changing the config; the lazy clock
+// showing cards, and the host approving, pausing, resuming, changing the config and sitting players
+// out (and taking that back); the lazy clock
 // runs whatever falls due, dealing from a seeded deck source.
 //
 // After every step: the chips add up, every number is a whole, non-negative count, nobody sits twice
@@ -235,14 +236,15 @@ type Logged = {kind: 'action'; action: TableAction} | {kind: 'clock'; now: numbe
 type Dealt = {no: number; bb: number; n: number; who: Map<number, string>};
 
 const COUNTERS = ['hands', 'showdowns', 'sidePots', 'oddChips', 'runouts', 'timeouts', 'autoMoves', 'leftMidHand', 'removedMidHand',
-    'pendingBuys', 'approved', 'configs', 'pres', 'shows', 'pauses', 'bigBlindChecks', 'legalChecks'] as const;
+    'pendingBuys', 'approved', 'configs', 'pres', 'shows', 'pauses', 'bigBlindChecks', 'legalChecks', 'hostSitOuts', 'hostSitOutsMidHand',
+    'hostSitOutsAlreadyOut'] as const;
 type Counters = Record<(typeof COUNTERS)[number], number>;
 
-const EVENTS = ['sit', 'leave', 'kick', 'sit-out', 'sit-in', 'buy', 'approve', 'pause', 'resume', 'config', 'pre', 'show'] as const;
+const EVENTS = ['sit', 'leave', 'kick', 'sit-out', 'host-sit-out', 'sit-in', 'buy', 'approve', 'pause', 'resume', 'config', 'pre', 'show'] as const;
 // Half the steps are events, so each is about 4% of all steps (sit 6%, resume 7%, pause under 1%):
 // a pause rarer than a resume and a sit likelier than a leave, so the tables keep dealing.
 const EVENT_WEIGHTS: Record<(typeof EVENTS)[number], number> = {
-    sit: 7, leave: 3, kick: 3, 'sit-out': 4, 'sit-in': 6, buy: 6, approve: 5, pause: 1, resume: 8, config: 5, pre: 6, show: 6,
+    sit: 7, leave: 3, kick: 3, 'sit-out': 4, 'host-sit-out': 2, 'sit-in': 6, buy: 6, approve: 5, pause: 1, resume: 8, config: 5, pre: 6, show: 6,
 };
 const WEIGHT_TOTAL = EVENTS.reduce((sum, e) => sum + EVENT_WEIGHTS[e], 0);
 // The share of steps that play the hand on (a move, or the clock when nobody is on it); the rest
@@ -557,6 +559,35 @@ const night = (seed: number, counters: Counters) => {
             case 'sit-out': {
                 const by = among(seated);
                 if (by) send({type: 'sit-out', by, at: now});
+                return;
+            }
+            case 'host-sit-out': {
+                // The host sits someone else out — now and then one already out or waiting to be, by
+                // their own wish or an earlier one of the host's, which it must leave as it is: nothing
+                // the host sends deals a player back in.
+                const target = among(seated.filter((pid) => pid !== 'p0'));
+                if (!target) return;
+                const before = s.seats.find((seat) => seat?.pid === target) ?? null;
+                const already = before !== null && (before.sitOutNext || before.sittingOut);
+                const dealtIn = live && liveSeatOf(s, target) !== null;
+                const prev = s;
+                const refused = send({type: 'host', by: 'p0', op: {op: 'sit-out', pid: target}, at: now});
+                if (refused !== null) return;
+                const after = s.seats.find((seat) => seat?.pid === target) ?? null;
+                if (!before || !after) fail('a host sit-out moved a seat');
+                if (already) {
+                    counters.hostSitOutsAlreadyOut++;
+                    // Still out, or still waiting to be (a deal the clock ran meanwhile turns waiting into out).
+                    if (!after!.sitOutNext && !after!.sittingOut) fail('a host sit-out dealt a player back in');
+                }
+                if (s === prev) return;
+                counters.hostSitOuts++;
+                if (dealtIn) {
+                    counters.hostSitOutsMidHand++;
+                    if (!after!.sitOutNext || after!.sittingOut !== before!.sittingOut) fail('a host sit-out mid-hand did more than wait for the deal');
+                } else if (!after!.sittingOut) {
+                    fail('a host sit-out between hands left the seat in');
+                }
                 return;
             }
             case 'sit-in': {

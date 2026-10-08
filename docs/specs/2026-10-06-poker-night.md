@@ -169,6 +169,12 @@ night is switched off, the table's with the way back to the lobby; a closed tabl
 shows.
 
 **What it shows**, phone first, in this order:
+- **You are seated at …**, only while the reader holds a seat at an open table: the newest such
+  table, its line as the lobby's rows print it, and Rejoin. A seat held means one of the account's
+  player rows sits in the table's seats and is not leaving: a watcher, a player who left and one
+  whose seat empties when the hand ends get no card. The read goes through the account's player
+  rows (`store.listSeatedRooms`, the newest eight open tables it has a row at) and projects only
+  the lobby's fields and the seats' pids, which never leave the server.
 - **Host a table.** "Start a table" opens one with the defaults in one tap and takes the host to
   /play/CODE?invite=1, where the invite is open. "Set it up first" holds a form: the table's name
   ("Ana's poker night" to start), the blinds, the starting chips (both ends of the range; the host
@@ -191,6 +197,16 @@ as closed: it is neither listed nor counted under the three-table cap, which rea
 filter. Two creates at the same moment may both pass the cap: one table over, accepted. A night is
 finished once its table closed or went idle (a room the week's expiry deletes before it closes
 never writes "closed").
+
+**On Home.** A "Poker night" chip beside the puzzle streak links to the lobby whenever poker night
+is on; while the reader holds a seat at an open table it becomes "Rejoin your table", a link
+straight back to it (streamed in over the lobby's chip from the panel's own read), so a friend who
+closed the table's tab is one tap from it at the top of the page. Below Home's other panels, streamed after the page paints, a Poker night panel appears only
+when it has a row: "Your tables" — the tables the reader holds a seat at (Rejoin), then the ones
+they host from outside a seat (Open), two at most — and "Friends' tables" to Join, two at most and
+never one the reader already sits at or hosts, with links to the lobby and to the Hands guide
+("Learn the hands"). With the kill switch on there is neither, and a failed read draws nothing.
+No lobby write revalidates Home: it renders on every request.
 
 **The lobby's writes** are server actions, used by the lobby only (the table talks to its routes):
 `createPokerNight` (a rate limit of ten an hour, the cap, then the room with the host at seat 0
@@ -300,7 +316,7 @@ itself when the hand ends — and the lobby saves it with the account.
 
 ## Emotes and the table's feel (phase 6)
 
-**What a player can send.** From the dock's emote button (or E): twelve reactions that rise over
+**What a player can send.** From the dock's emote button (or E): thirteen reactions that rise over
 the sender's plate, sixteen phrases said in a speech bubble (friendly table talk, never a verdict on
 a play), and ten things to throw at another seated player — a tomato, a rose, a soda, confetti,
 cake, an egg, a tennis ball, popcorn, a heart, a fish — each landing on the target's plate with its
@@ -376,6 +392,32 @@ glossary entries, the `poker-night` group homed at /poker-night (the blinds' uni
 the solver's). The bank's Rebuys header carries its definition as a tooltip; the table mounts no
 chat, so it has no "What these mean", whose rows each offer the chat.
 
+## The Hands guide
+
+**What it shows.** The ten hand rankings, strongest first, each with its name, the name of its
+example ("Full house, eights full of fours", skipped when it is the ranking's own) and five cards,
+the ones that make the hand lifted and outlined; then ties and kickers, with two pairs of aces that
+only the first kicker separates and the ties a kicker does not settle (playing the board, hands
+exactly alike, the ace in a straight); then the games. Every definition is the glossary's own short,
+quoted under its term: Hand rankings, Kicker and Texas hold'em, three more entries of the
+`poker-night` group. The guide's own lines say only what those do not, and a test rejects any of
+them that shares a run of five words with the entries. Every example is held to the evaluator by a
+unit test: its category is its slot's, the list falls strictly, and the lifted cards are exactly
+the ones that make the hand.
+
+**Where.** The lobby has two views, kept in the URL: Play (/poker-night, everything above) and
+Hands (/poker-night?tab=hands), 44 px tabs. The Hands tab reads nothing — no lobby read, so it shows
+with the kill switch on too — and carries the one "What these mean" for its three terms. At the
+table, the menu's Hands and the H key open the same guide in a drawer, "Hands and games", for any
+viewer: the rankings first — what a player opens it for mid-game — then ties and kickers, then the
+table's own game under "At this table" before any other, the cards in the viewer's own face and
+colours. A kicker hand's picture names only its own pair. Only Texas hold'em is dealt today; the list of games is where the other modes join.
+
+**On a phone.** An example's cards sit on a line of their own under the ranking's name, 34 px wide
+in the narrowest list, 40 px from 248 px (a 320 px phone's drawer and lobby column) and 44 px from
+288 px, measured by the list's own width (a container query), so every screen fits five without
+scrolling sideways; the name moves beside the cards only where both fit.
+
 ## Engine rules
 
 No-limit Texas hold'em at 2 to 9 seats, fixed when the table is made, for integer play chips.
@@ -434,7 +476,12 @@ showdown, 1.5 seconds otherwise.
 **Leaving and removal.** A player who leaves, or is removed, while facing a bet folds at once.
 Otherwise they stay in the hand, away, so the clock checks or folds for them, and are cashed out
 when it completes; a buy that was waiting is dropped. Between hands they are cashed out at once.
-Their row in the bank stays for the night.
+Their row in the bank stays for the night. Their own cards stay theirs to see after a fold, until
+the next deal, and reach the table only if they show them in the pause. A player who folds and then
+leaves still reads Folded on their plate until the hand ends; their own view says they are leaving
+(`MeView.next`, private), so their dock says they leave when the hand ends and offers nothing more,
+and Home takes them straight home. The same private part says when a "Sit out next hand" waits, and
+the dock offers to take it back.
 
 **Buy-ins and the bank.** The first seat of the night takes a buy-in between the table's minimum
 and its cap. Sitting down again after leaving is a rebuy, under the table's policy: off refuses it,
@@ -450,8 +497,13 @@ what they have in a live pot, so the net stays steady while they bet.
 
 **The host.** Deal (the first hand), pause (the hand in play finishes, no new one starts), resume,
 end (the table closes after the live hand), config (checked whole, from the next hand), settings
-such as the scene and the lock (at once), approve or decline a rebuy, and remove a player. An idle
-table is closed by force: a live hand is called off and every chip in it goes back.
+such as the scene and the lock (at once), approve or decline a rebuy, remove a player, and sit
+another player out (from the next deal while they are in the hand in play, at once between hands;
+never the host themself). It only ever sits out: the state never says who asked for a sit-out, so a
+take-back could deal in a player who asked to sit out themself — dealing a player back in is theirs
+alone, with "Deal me in" while it waits and "I'm back" once it has begun. The host offers it from
+the bank (a line of its own under the player's row) and from the Players list's More menu. An idle table is closed by force: a live hand is called off and
+every chip in it goes back.
 
 **Limits and defaults.** Small blind at least 1, big blind at most 100,000, an ante up to the big
 blind; buy-ins between one big blind and the lower of 500 big blinds and 10 million; a turn of 15

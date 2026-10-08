@@ -124,6 +124,18 @@ and friends keep none beyond Shared and the invariants).
   surface in as `initial`, so the section exists only when there is one (never a loading box) and
   the client draws it at once. Its one `WhatTheseMean` keeps its Ask links, since the chat is
   mounted here; the landing page's has none.
+- Poker night on Home: `components/home/PokerNightChip`, a link chip to `/poker-night` beside the
+  streak, is the way in that is always there while `pokerNightEnabled()` — and, while the reader
+  holds a seat, the way straight back to it ("Rejoin your table", `lobby.homeChipOf`, streamed in
+  over the lobby's chip from the panel's own read, one per request through React's `cache`); the panel
+  `components/home/HomePokerNight` (props only) is drawn only when it has a row — the tables the
+  reader holds a seat at (Rejoin) or hosts from outside one (Open), then friends' shown open tables
+  (Join), `HOME_LIMITS` of each, and "Learn the hands" (`/poker-night?tab=hands`). Its read,
+  `lib/poker-night/lobby-store.getHomePokerNight` (null with the kill switch on or no row), shaped by
+  the pure `lib/poker-night/lobby.homePokerNight`, is streamed under `<Suspense fallback={null}>` by
+  `PokerNightAsync`, declared in `app/(root)/page.tsx` because poker night's server guard keeps its
+  stores out of `components/`; it is not part of `getHomeView`, and a failed read draws nothing. No
+  poker night action revalidates `/`: Home renders per request.
 
 ### shell
 
@@ -606,6 +618,13 @@ and friends keep none beyond Shared and the invariants).
   cap (`store.countActiveHosted`, `LIMITS.hostOpenTables`). Friends' tables are only those whose host
   turned `showToFriends` on (off by default), hosted by `lib/friends/store.getAcceptedFriendIds`; a
   recent night (`results-store.readRecentResults`) is finished once its table closed or went idle.
+  While the reader holds a seat at an open table, the Play tab opens on
+  `components/poker-night/lobby/ResumeTable` ("You are seated at …", Rejoin): `lobby.resumeOf`, the
+  newest of `store.listSeatedRooms` — the open tables the account has a player row at (the
+  `{env, players.userId, status}` index), projected by `lobby.SEATED_PROJECTION` (the lobby's fields
+  plus the players' and seats' pids and the seats' `leaving`) and kept by `lobby.holdsSeat`, so a
+  watcher, a departed player or a seat on its way out is no seat; the pids never leave the server.
+  Home's panel takes its tables from the same reads (### home).
 - `lib/actions/poker-night.actions` is the lobby's only: `createPokerNight` (the create counter, the
   cap, `store.insertRoom` seating the host at seat 0 with the chip cap, under `lobby.profileOf` — the
   saved name and look, `lib/poker-night/prefs-store.getPokerNightPrefs` over
@@ -685,13 +704,74 @@ and friends keep none beyond Shared and the invariants).
   top-anchored in a wrap exactly the width found, never wider, from `reveal.bannerLines`' words and
   `stage.BANNER`'s sizes, which `stage.test` holds to the stylesheet and clears at 390, 375 and
   320 px phones and a 1440 px desktop for every seat count and button; `qa-poker-night` measures it
-  there in a showdown with the side seats' hands up.
+  there in a showdown with the side seats' hands up. While the pots pay out under it, it also keeps
+  clear of their pills and of the winners' "+N" as it rises (`stage.winPopRect`); it comes in where it
+  lands, growing from its middle (`.pn-banner-drop`), so on its way in it covers nothing its place
+  does not.
+- The pots go where `lib/poker-night/stage.potPlan` finds room on the felt inside its rail
+  (`stage.feltSpan`), never over a card (the board's and its lift, a seat's face-down pair, a turned-up
+  hand), a plate, its flag or blind's mark, an open seat, the dealer button, a bet line out at the size
+  ChipStack draws it (`stage.betLineSize`, an all-in's pulse included) or a winner's "+N": every pot
+  its own pill in full ("Main pot 600", "Side pot 1: 1,350") in a row, then short (`FELT_COPY`: "Main
+  600", "Side 1: 1,350", counts as a plate prints them), then in rows, then the last side pots
+  gathered ("2 more: 5,050"), every pot in one pill last ("4 pots: 6,250") — the nearest to the board
+  over it, under it or beside it, the fuller words weighing in their favour. It keeps clear of what
+  shows now (`PotSeen.now`, which TableScreen reads off the view) and, where that is near enough, of
+  what may yet show — every seated hand but the viewer's turned up, every bet line — so the pills hold
+  their place and move only when something lands where they are. With no room for that on the felt
+  it lets a "+N" rise over a pill, then leaves the felt, and only where nine seats crowd the smallest
+  phone on its side does it cover anything: the least, a flag or a bet line before a card, a plate or
+  the board (the plan's `keeps`, `clear` and `felt`, the page's `data-pn-pot-*`). Each pill is drawn
+  at the plan's size (`.pn-pot-pill`, `stage.POT_PILL`, held by `stage.test` for one pot to four at
+  every seat count on the phones upright and on their side and the desktop); the sweep lands in their
+  middle and each pot's chips stream from its own pill (`stage.potCentre`). `qa-poker-night-modes`
+  builds three pots and measures every pill against every card, plate, bet line, "+N", the dealer
+  button and the banner.
 - The table's single-key shortcuts (`lib/poker-night/keys`) act only with the focus on the table,
   and only while the player keeps them on (My look, `PersonalLook.shortcuts` in this browser); Enter
   on a focused button is that button's. A host removes a player only by a press held for two seconds
   (`components/poker-night/HoldToConfirm`), never a typed name, and lets them back in from the host
   drawer.
-- Emotes (`lib/poker-night/emotes`, pure): twelve reactions, sixteen phrases and ten throwables,
+- The way out: Home in the top bar, and the way back wherever a guest can land (the join card, the
+  summary, `error.tsx`, `not-found.tsx`, the kill switch), is `components/poker-night/HomeLink` —
+  `/` by a full page load (the landing page for a guest through `proxy.ts`), never `/poker-night`,
+  which sends a guest to sign in. A seated player's Home and Leave go through `LeaveDialog`, read on
+  every render from `lib/poker-night/overlays.leavePlan`, so a deal that lands while it is open makes
+  it the mid-hand one. The dock offers Sit out and Leave whenever the viewer is not playing a hand
+  (`dock.sitOut`/`leave`, the pause after a showdown they reached included) — one tap unless
+  `leaveTapAsks` — and after leaving a left panel (`leftState`). What the viewer's own seat does when
+  the hand ends is `MeView.next` ('leave', 'sit-out'; private, never on the wire), since a folded or
+  all-in plate keeps reading so: once they left mid-hand the dock says they leave when it ends and
+  offers nothing more, and Home goes straight home (`overlays.homeAsks`); while a "Sit out next hand"
+  waits, the dock says so and offers "Deal me in" (`dock.takeBack`, a sit-in). A row that takes
+  another's place under the thumb (the action bar, the early choices — keyed by `dock.preRowKey`, the
+  hand and its choices — and the seat's controls) drops pointer taps for `keys.TAP_SHIELD_MS`
+  (`useTapShield`, `data-pn-armed`). A folded hand stays its player's to see, dimmed, until the next
+  deal (`me.hole` is kept; `dock.mucked`), and reaches the table only by "Show my cards" (a
+  secondary button after Sit out). The host sits another player out — from the bank's row (a line of
+  its own under it) or the host drawer's More menu, one hook (`components/poker-night/useHostSitOut`)
+  over the map `TableOverlays` keeps — with the engine's host op `sit-out` (from the next deal in a
+  live hand, at once between hands). It only ever sits out: the state never says who asked, so a
+  take-back could deal in a player who asked to sit out themself; dealing a player back in is theirs
+  alone. The player's page tells the host's from its own (`overlays.rememberSitOut` over the seat's
+  state and `me.next`, with this browser's `SIT_OUT_ASK_KEY` note for another tab or a reload). A
+  complete hand's `HandResultView.gone` names the seats whose player went since the deal, read
+  through `reveal.playerAt`, so a result never names the wrong player — nor tells someone who took a
+  winner's seat in the pause that they won (`reveal.viewerSeatIn`).
+- The Hands guide: `lib/poker-night/hands-guide` (pure) holds the ten rankings strongest first, each
+  a five-card example with the cards that make it (`RANKING_EXAMPLES`), the kicker pair
+  (`KICKER_EXAMPLE`) and the games (`GUIDE_GAMES`: Texas hold'em for now, each with its glossary
+  entry and anchor; `guideGames` puts the table's own first among them — after the rankings and ties
+  in the drawer, which a player opens mid-game for the rankings). `hands-guide.test` holds every example
+  to the evaluator. `components/poker-night/HandsGuide` draws it with no hooks, so the lobby's Hands
+  tab renders it on the server and `components/poker-night/HandsDrawer` at the table (the menu's
+  Hands, the H key, any viewer). Each definition is the glossary's own short, quoted under its
+  `<Term>` (`hand-rankings`, `kicker`, `texas-holdem`, in the `poker-night` group), and
+  `HANDS_COPY` says only what they do not: the copy test rejects a run of five words shared with
+  them. The lobby is two views (`?tab=play|hands`, `components/primitives/Tabs` at `size="md"`); the
+  Hands tab reads nothing and shows with the kill switch on, and `[data-poker-night-lobby]` marks
+  Play only.
+- Emotes (`lib/poker-night/emotes`, pure): thirteen reactions, sixteen phrases and ten throwables,
   each glyph one Emoji 12.0 code point kept as a number (never a glyph in a `.tsx`), each id worded
   by `EMOTE_COPY` — no free text anywhere. Seated players only (`checkEmote`); a throw needs the
   host's `throwables` and another seated player. `app/api/poker-night/[code]/emote/route.ts` writes

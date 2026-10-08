@@ -3,6 +3,7 @@ import {headers} from "next/headers";
 import Link from "next/link";
 import {notFound} from "next/navigation";
 import NightSummary from "@/components/poker-night/NightSummary";
+import {HomeLink} from "@/components/poker-night/HomeLink";
 import PokerNightRoom from "@/components/poker-night/PokerNightRoom";
 import {actionButton} from "@/components/primitives/ActionButton";
 import EmptyState from "@/components/primitives/EmptyState";
@@ -117,7 +118,8 @@ const PlayPage = async ({params, searchParams}: Props) => {
     }
 
     // The kill switch: every table route answers 503, so an open table is not drawn to sit there
-    // unreachable — the lobby's note instead, with the way back to it.
+    // unreachable — the lobby's note instead, with the way home ("/", which a guest can open) and, for
+    // an account, the lobby.
     if (!pokerNightEnabled()) {
         return (
             <main className="mx-auto flex min-h-dvh w-full max-w-lg items-center p-4" data-pn-off="">
@@ -127,9 +129,16 @@ const PlayPage = async ({params, searchParams}: Props) => {
                     className="w-full"
                     title={POKER_NIGHT_COPY.off}
                     action={
-                        <Link href="/poker-night" className={actionButton({size: 'md'})}>
-                            {TABLE_COPY.toLobby}
-                        </Link>
+                        <>
+                            <HomeLink className={actionButton({size: 'md'})} data-pn-home="">
+                                {TABLE_COPY.home}
+                            </HomeLink>
+                            {signedIn && (
+                                <Link href="/poker-night" className={actionButton({variant: 'secondary', size: 'md'})}>
+                                    {TABLE_COPY.toLobby}
+                                </Link>
+                            )}
+                        </>
                     }
                 />
             </main>

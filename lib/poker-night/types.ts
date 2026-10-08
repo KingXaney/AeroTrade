@@ -186,7 +186,11 @@ export type HostOp =
     | {op: 'start' | 'pause' | 'resume' | 'end'}
     | {op: 'config'; patch: Partial<Omit<GameConfig, 'seats'>>}
     | {op: 'settings'; patch: Partial<RoomSettings>}
-    | {op: 'approve' | 'deny' | 'kick'; pid: string};
+    | {op: 'approve' | 'deny' | 'kick'; pid: string}
+    // Sits a seated player other than the host out: from the next deal while they are in the hand in
+    // play, at once between hands. Only ever out: the state never says who asked for a sit-out, so
+    // nothing the host sends takes one back — dealing a player back in is theirs alone.
+    | {op: 'sit-out'; pid: string};
 
 export type TableAction =
     | {type: 'sit'; by: string; seat: number; buyIn: number; at: number}

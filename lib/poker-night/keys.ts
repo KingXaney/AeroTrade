@@ -40,6 +40,18 @@ export const intentForKey = (e: KeyInput, ctx: {raiseOpen?: boolean} = {}): Tabl
     return LETTERS[e.key.toLowerCase()] ?? null;
 };
 
+// ── the tap shield ──
+
+// A row of buttons that takes another's place under the thumb — the action bar as the turn starts,
+// the seat's own controls as a hand ends — drops a pointer tap that lands within TAP_SHIELD_MS of
+// it appearing: that tap was aimed at what was there before (a "Check" early choice that became
+// "Call 80"). The row marks itself armed (data-pn-armed) once the shield is over. Keys and a
+// keyboard's click (event.detail 0) are never shielded.
+export const TAP_SHIELD_MS = 350;
+
+// Whether a pointer tap at `at` (ms, the event's own time) lands, for a row shown at `shownAt`.
+export const tapLands = (shownAt: number, at: number): boolean => at - shownAt >= TAP_SHIELD_MS;
+
 // Input types a player types text into; a range, a checkbox or a button is not one.
 const TEXT_INPUTS = new Set(['text', 'number', 'search', 'email', 'password', 'tel', 'url', '']);
 
@@ -86,13 +98,14 @@ export const keyAllowed = (key: string, place: FocusPlace, enabled: boolean): bo
 
 // ── the room's own keys (P6) ──
 
-// Beside the moves: E opens the emotes, L the hand log, B the bank, M turns the table's sounds on or
-// off, and ? lists every key (components/poker-night/useHotkeys, under the same rules: never with
-// ⌘, Ctrl or Alt, never on a held key or while typing, only with the focus on the table and only
-// while the player keeps the single-key shortcuts on).
-export type RoomIntent = 'emotes' | 'log' | 'bank' | 'mute' | 'shortcuts';
+// Beside the moves: E opens the emotes, L the hand log, B the bank, H the Hands guide (the rankings
+// and the game's rules), M turns the table's sounds on or off, and ? lists every key
+// (components/poker-night/useHotkeys, under the same rules: never with ⌘, Ctrl or Alt, never on a
+// held key or while typing, only with the focus on the table and only while the player keeps the
+// single-key shortcuts on).
+export type RoomIntent = 'emotes' | 'log' | 'bank' | 'hands' | 'mute' | 'shortcuts';
 
-const ROOM_KEYS: Record<string, RoomIntent> = {e: 'emotes', l: 'log', b: 'bank', m: 'mute', '?': 'shortcuts'};
+const ROOM_KEYS: Record<string, RoomIntent> = {e: 'emotes', l: 'log', b: 'bank', h: 'hands', m: 'mute', '?': 'shortcuts'};
 
 export const roomIntentForKey = (e: KeyInput): RoomIntent | null => {
     if (e.metaKey || e.ctrlKey || e.altKey || e.repeat || e.editable) return null;
@@ -101,7 +114,7 @@ export const roomIntentForKey = (e: KeyInput): RoomIntent | null => {
 };
 
 // The keys as aria-keyshortcuts names them.
-export const ROOM_KEY_SHORTCUTS = {emotes: 'E', log: 'L', bank: 'B', mute: 'M', shortcuts: '?'} as const satisfies Record<RoomIntent, string>;
+export const ROOM_KEY_SHORTCUTS = {emotes: 'E', log: 'L', bank: 'B', hands: 'H', mute: 'M', shortcuts: '?'} as const satisfies Record<RoomIntent, string>;
 
 // Every key the table answers, as the shortcuts list shows them (components/poker-night
 // ShortcutsDialog; lib/learn/copy/poker-night SHORTCUTS_COPY words each id): on the player's turn,
@@ -112,7 +125,8 @@ export const SHORTCUTS = {
         {id: 'sizes', keys: ['1', '2', '3', '4']}, {id: 'confirm', keys: ['Enter']}, {id: 'close', keys: ['Esc']},
     ],
     table: [
-        {id: 'emotes', keys: ['E']}, {id: 'log', keys: ['L']}, {id: 'bank', keys: ['B']}, {id: 'mute', keys: ['M']}, {id: 'shortcuts', keys: ['?']},
+        {id: 'emotes', keys: ['E']}, {id: 'log', keys: ['L']}, {id: 'bank', keys: ['B']}, {id: 'hands', keys: ['H']}, {id: 'mute', keys: ['M']},
+        {id: 'shortcuts', keys: ['?']},
     ],
 } as const;
 

@@ -6,12 +6,16 @@
 // the pot it says what it adds, since a top-up counts only the chips behind); then
 // the host's waiting requests with Approve and Decline; then every player who sat tonight — Chips
 // in, Rebuys (only once someone has rebought), Stack (a live pot counted, said once at the foot),
-// Net with its sign — and the footer's check that every chip is accounted for. "Chips in, by time"
+// Net with its sign, and for the host each other seated player's "Sit out next hand" (useHostSitOut,
+// the engine's host op 'sit-out': from the next deal while they are in the hand in play, at once
+// between hands; a note while it waits; the player comes back with their own "I'm back"), on a line
+// of its own under the player's row, so a phone never crushes it into the Player column — and the
+// footer's check that every chip is accounted for. "Chips in, by time"
 // reads GET detail?part=bank when the drawer opens and again whenever the ledger moves. The Rebuys
 // header carries the glossary's definition (Term, a native tooltip); the table mounts no chat, so
 // the drawer has no "What these mean", whose rows each offer the chat.
 
-import {useEffect, useId, useState} from "react";
+import {Fragment, useEffect, useId, useState} from "react";
 import {toast} from "sonner";
 import ActionButton from "@/components/primitives/ActionButton";
 import Badge from "@/components/primitives/Badge";
@@ -24,13 +28,14 @@ import Term from "@/components/primitives/Term";
 import TextField from "@/components/primitives/TextField";
 import {Drawer, MiniAvatar, PlayerName} from "@/components/poker-night/overlay-kit";
 import {useRoom} from "@/components/poker-night/room-controller";
+import {useHostSitOut, type HostSitOuts} from "@/components/poker-night/useHostSitOut";
 import {BANK_COPY, HOST_COPY, OVERLAY_COPY, TABLE_COPY} from "@/lib/learn/copy/poker-night";
 import {bankView} from "@/lib/poker-night/bank";
-import {bankTimeline, chipsInValue, ownChips} from "@/lib/poker-night/overlays";
+import {bankTimeline, chipsInValue, hostSitOut, ownChips} from "@/lib/poker-night/overlays";
 import type {BankDetailRowView} from "@/lib/poker-night/view-types";
 import {cn} from "@/lib/utils";
 
-type Props = {open: boolean; onOpenChange: (open: boolean) => void; toTable: boolean};
+type Props = {open: boolean; onOpenChange: (open: boolean) => void; toTable: boolean; sitOuts: HostSitOuts};
 
 const count = TABLE_COPY.chips;
 
@@ -138,7 +143,29 @@ export const RequestsPanel = () => {
     );
 };
 
-const BankPanel = ({open, onOpenChange, toTable}: Props) => {
+// The host's own control for another player, on its own line under their row: sit them out from the
+// next hand (at once between hands), then a note while it waits on the hand in play.
+const SitOutControl = ({pid, name, sitOuts}: {pid: string; name: string; sitOuts: HostSitOuts}) => {
+    const room = useRoom();
+    const {busy, sitOut} = useHostSitOut(sitOuts);
+    const view = room.view;
+    const offer = view ? hostSitOut(view, pid, sitOuts.waiting[pid] ?? null) : null;
+    if (!view || !offer) return null;
+    return (
+        <div className="pb-2 pl-8" data-host-sit-out={offer}>
+            {offer === 'waiting' ? (
+                <p className="text-[11px] text-fg-muted">{HOST_COPY.sitOutWaiting}</p>
+            ) : (
+                <ActionButton variant="secondary" size="xs" className="min-h-11 px-4" disabled={busy !== null} aria-busy={busy === pid}
+                              aria-label={HOST_COPY.sitOutFor(name)} onClick={() => void sitOut(pid, name)}>
+                    {HOST_COPY.sitOut}
+                </ActionButton>
+            )}
+        </div>
+    );
+};
+
+const BankPanel = ({open, onOpenChange, toTable, sitOuts}: Props) => {
     const room = useRoom();
     const table = room.table;
     const [detail, setDetail] = useState<BankDetailRowView[] | null>(null);
@@ -159,6 +186,7 @@ const BankPanel = ({open, onOpenChange, toTable}: Props) => {
     }, [open, joined, ledgerKey, readDetail]);
 
     const bank = bankView(table, {me: room.me?.pid ?? null, detail});
+    const columns = bank.showRebuys ? 5 : 4;
     const timeline = bankTimeline(bank.rows);
     const people = table.people;
 
@@ -180,7 +208,8 @@ const BankPanel = ({open, onOpenChange, toTable}: Props) => {
                     </thead>
                     <tbody>
                         {bank.rows.map((row) => (
-                            <tr key={row.pid} className={cn('border-t border-line-strong/15 align-top', row.me && 'bg-brand-strong/5')} data-bank-row={row.pid}>
+                            <Fragment key={row.pid}>
+                            <tr className={cn('border-t border-line-strong/15 align-top', row.me && 'bg-brand-strong/5')} data-bank-row={row.pid}>
                                 <th scope="row" className="py-2 pr-2 text-left font-normal">
                                     <span className="flex min-w-0 items-center gap-2">
                                         <MiniAvatar avatar={row.avatar}/>
@@ -200,6 +229,14 @@ const BankPanel = ({open, onOpenChange, toTable}: Props) => {
                                     {BANK_COPY.net(row.net)}
                                 </td>
                             </tr>
+                            {room.me?.isHost && !row.me && room.view && hostSitOut(room.view, row.pid, sitOuts.waiting[row.pid] ?? null) && (
+                                <tr data-bank-sit-out-row={row.pid}>
+                                    <td colSpan={columns} className="p-0">
+                                        <SitOutControl pid={row.pid} name={row.name} sitOuts={sitOuts}/>
+                                    </td>
+                                </tr>
+                            )}
+                            </Fragment>
                         ))}
                     </tbody>
                 </table>
@@ -211,7 +248,8 @@ const BankPanel = ({open, onOpenChange, toTable}: Props) => {
                 </div>
             </Panel>
             {timeline.length > 0 && (
-                <Disclosure summary={BANK_COPY.byTime} data-bank-timeline="">
+                // Its line a full 44 px target below lg: the drawer is a phone's bottom sheet there.
+                <Disclosure summary={BANK_COPY.byTime} className="max-lg:[&>summary]:min-h-11" data-bank-timeline="">
                     <ol className="mt-2 space-y-1 text-xs text-fg-soft">
                         {timeline.map((item) => (
                             <li key={item.key} className="flex min-w-0 gap-2">

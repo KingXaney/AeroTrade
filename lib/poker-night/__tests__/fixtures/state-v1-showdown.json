@@ -1,0 +1,546 @@
+{
+  "v": 1,
+  "status": "playing",
+  "closing": false,
+  "config": {
+    "seats": 6,
+    "smallBlind": 10,
+    "bigBlind": 20,
+    "ante": 0,
+    "buyInMin": 2000,
+    "buyInMax": 2000,
+    "rebuys": "auto",
+    "maxRebuys": null,
+    "turnSeconds": 30,
+    "pauseSeconds": 5,
+    "sitOutAfter": 2
+  },
+  "configV": 1,
+  "settings": {
+    "name": "",
+    "scene": "casino-classic",
+    "felt": "emerald",
+    "throwables": true,
+    "locked": false,
+    "showToFriends": false
+  },
+  "hostPid": "p0",
+  "seats": [
+    {
+      "pid": "p0",
+      "stack": 2000,
+      "sittingOut": false,
+      "sitOutNext": false,
+      "away": false,
+      "timeouts": 0,
+      "owesPost": false,
+      "leaving": false,
+      "removed": false,
+      "pendingBuy": 0
+    },
+    {
+      "pid": "p1",
+      "stack": 4000,
+      "sittingOut": false,
+      "sitOutNext": false,
+      "away": false,
+      "timeouts": 0,
+      "owesPost": false,
+      "leaving": false,
+      "removed": false,
+      "pendingBuy": 0
+    },
+    {
+      "pid": "p2",
+      "stack": 3000,
+      "sittingOut": false,
+      "sitOutNext": false,
+      "away": false,
+      "timeouts": 0,
+      "owesPost": false,
+      "leaving": false,
+      "removed": false,
+      "pendingBuy": 0
+    },
+    {
+      "pid": "p3",
+      "stack": 2000,
+      "sittingOut": false,
+      "sitOutNext": false,
+      "away": false,
+      "timeouts": 0,
+      "owesPost": false,
+      "leaving": false,
+      "removed": false,
+      "pendingBuy": 0
+    },
+    {
+      "pid": "p4",
+      "stack": 2000,
+      "sittingOut": false,
+      "sitOutNext": false,
+      "away": false,
+      "timeouts": 0,
+      "owesPost": false,
+      "leaving": false,
+      "removed": false,
+      "pendingBuy": 0
+    },
+    null
+  ],
+  "ledger": [
+    {
+      "pid": "p0",
+      "bought": 5000,
+      "cashedOut": 0,
+      "buys": 0,
+      "events": [
+        [
+          0,
+          0,
+          5000
+        ]
+      ],
+      "hands": 1,
+      "wins": 0,
+      "biggestWin": 0,
+      "allIns": 1,
+      "peakChips": 5000
+    },
+    {
+      "pid": "p1",
+      "bought": 1000,
+      "cashedOut": 0,
+      "buys": 0,
+      "events": [
+        [
+          0,
+          0,
+          1000
+        ]
+      ],
+      "hands": 1,
+      "wins": 1,
+      "biggestWin": 4000,
+      "allIns": 1,
+      "peakChips": 4000
+    },
+    {
+      "pid": "p2",
+      "bought": 2000,
+      "cashedOut": 0,
+      "buys": 0,
+      "events": [
+        [
+          0,
+          0,
+          2000
+        ]
+      ],
+      "hands": 1,
+      "wins": 1,
+      "biggestWin": 3000,
+      "allIns": 1,
+      "peakChips": 3000
+    },
+    {
+      "pid": "p3",
+      "bought": 3000,
+      "cashedOut": 0,
+      "buys": 0,
+      "events": [
+        [
+          0,
+          0,
+          3000
+        ]
+      ],
+      "hands": 1,
+      "wins": 1,
+      "biggestWin": 2000,
+      "allIns": 1,
+      "peakChips": 3000
+    },
+    {
+      "pid": "p4",
+      "bought": 2000,
+      "cashedOut": 0,
+      "buys": 0,
+      "events": [
+        [
+          0,
+          0,
+          2000
+        ]
+      ],
+      "hands": 1,
+      "wins": 0,
+      "biggestWin": 0,
+      "allIns": 0,
+      "peakChips": 2000
+    }
+  ],
+  "requests": [],
+  "lastBigBlind": 3,
+  "button": 1,
+  "handNo": 1,
+  "turn": 5,
+  "hand": {
+    "no": 1,
+    "startedAt": 1790000000000,
+    "button": 1,
+    "smallBlindSeat": 2,
+    "bigBlindSeat": 3,
+    "smallBlind": 10,
+    "bigBlind": 20,
+    "ante": 0,
+    "seats": [
+      {
+        "seat": 2,
+        "pid": "p2",
+        "hole": [
+          46,
+          45
+        ],
+        "startStack": 2000,
+        "committed": 2000,
+        "streetBet": 0,
+        "actedAtBet": null,
+        "folded": false,
+        "allIn": true,
+        "shown": true,
+        "pre": null
+      },
+      {
+        "seat": 3,
+        "pid": "p3",
+        "hole": [
+          42,
+          41
+        ],
+        "startStack": 3000,
+        "committed": 3000,
+        "streetBet": 0,
+        "actedAtBet": null,
+        "folded": false,
+        "allIn": true,
+        "shown": true,
+        "pre": null
+      },
+      {
+        "seat": 4,
+        "pid": "p4",
+        "hole": [
+          31,
+          27
+        ],
+        "startStack": 2000,
+        "committed": 0,
+        "streetBet": 0,
+        "actedAtBet": null,
+        "folded": true,
+        "allIn": false,
+        "shown": true,
+        "pre": null
+      },
+      {
+        "seat": 0,
+        "pid": "p0",
+        "hole": [
+          8,
+          9
+        ],
+        "startStack": 5000,
+        "committed": 3000,
+        "streetBet": 0,
+        "actedAtBet": null,
+        "folded": false,
+        "allIn": true,
+        "shown": true,
+        "pre": null
+      },
+      {
+        "seat": 1,
+        "pid": "p1",
+        "hole": [
+          50,
+          49
+        ],
+        "startStack": 1000,
+        "committed": 1000,
+        "streetBet": 0,
+        "actedAtBet": null,
+        "folded": false,
+        "allIn": true,
+        "shown": true,
+        "pre": null
+      }
+    ],
+    "deck": [
+      0,
+      21,
+      15,
+      6,
+      36
+    ],
+    "board": [
+      0,
+      21,
+      15,
+      6,
+      36
+    ],
+    "street": "river",
+    "phase": "complete",
+    "currentBet": 0,
+    "increment": 20,
+    "lastAggressor": null,
+    "actor": null,
+    "deadline": null,
+    "nextStreetAt": null,
+    "log": [
+      [
+        2,
+        1,
+        10,
+        10,
+        0,
+        0,
+        0
+      ],
+      [
+        3,
+        2,
+        20,
+        20,
+        0,
+        0,
+        0
+      ],
+      [
+        4,
+        4,
+        0,
+        0,
+        0,
+        0,
+        0
+      ],
+      [
+        0,
+        8,
+        5000,
+        5000,
+        1,
+        0,
+        0
+      ],
+      [
+        1,
+        6,
+        1000,
+        1000,
+        1,
+        0,
+        0
+      ],
+      [
+        2,
+        6,
+        1990,
+        2000,
+        1,
+        0,
+        0
+      ],
+      [
+        3,
+        6,
+        2980,
+        3000,
+        1,
+        0,
+        0
+      ],
+      [
+        0,
+        9,
+        2000,
+        3000,
+        0,
+        0,
+        0
+      ],
+      [
+        4,
+        10,
+        0,
+        0,
+        0,
+        3,
+        10400
+      ]
+    ],
+    "logDropped": 0,
+    "result": {
+      "completedAt": 1790000004500,
+      "showdown": true,
+      "refund": {
+        "seat": 0,
+        "amount": 2000
+      },
+      "pots": [
+        {
+          "amount": 4000,
+          "eligible": [
+            2,
+            3,
+            0,
+            1
+          ],
+          "winners": [
+            1
+          ],
+          "shares": [
+            4000
+          ]
+        },
+        {
+          "amount": 3000,
+          "eligible": [
+            2,
+            3,
+            0
+          ],
+          "winners": [
+            2
+          ],
+          "shares": [
+            3000
+          ]
+        },
+        {
+          "amount": 2000,
+          "eligible": [
+            3,
+            0
+          ],
+          "winners": [
+            3
+          ],
+          "shares": [
+            2000
+          ]
+        }
+      ],
+      "hands": [
+        {
+          "seat": 2,
+          "cards": [
+            46,
+            45
+          ],
+          "value": 67199528,
+          "best": [
+            21,
+            15,
+            36,
+            46,
+            45
+          ]
+        },
+        {
+          "seat": 3,
+          "cards": [
+            42,
+            41
+          ],
+          "value": 67191336,
+          "best": [
+            21,
+            15,
+            36,
+            42,
+            41
+          ]
+        },
+        {
+          "seat": 0,
+          "cards": [
+            8,
+            9
+          ],
+          "value": 67125800,
+          "best": [
+            21,
+            15,
+            36,
+            8,
+            9
+          ]
+        },
+        {
+          "seat": 1,
+          "cards": [
+            50,
+            49
+          ],
+          "value": 67207720,
+          "best": [
+            21,
+            15,
+            36,
+            50,
+            49
+          ]
+        },
+        {
+          "seat": 4,
+          "cards": [
+            31,
+            27
+          ],
+          "value": 744,
+          "best": [
+            21,
+            15,
+            36,
+            31,
+            27
+          ]
+        }
+      ],
+      "showOrder": [
+        2,
+        3,
+        0,
+        1
+      ],
+      "nets": [
+        {
+          "seat": 2,
+          "net": 1000
+        },
+        {
+          "seat": 3,
+          "net": -1000
+        },
+        {
+          "seat": 4,
+          "net": 0
+        },
+        {
+          "seat": 0,
+          "net": -3000
+        },
+        {
+          "seat": 1,
+          "net": 3000
+        }
+      ],
+      "revealMs": 5400
+    }
+  },
+  "nextHandAt": 1790000013400,
+  "createdAt": 1790000000000
+}

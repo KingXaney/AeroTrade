@@ -26,7 +26,9 @@ import {LIMITS} from "@/lib/poker-night/limits";
 import {migrateState} from "@/lib/poker-night/migrate";
 import {backoffMs, planMutation} from "@/lib/poker-night/mutation";
 import {PID} from "@/lib/poker-night/input";
-import {LOBBY_PROJECTION, lobbyRoomFromDoc, openRoomsFilter, type LobbyDoc, type LobbyRoom} from "@/lib/poker-night/lobby";
+import {
+    holdsSeat, LOBBY_PROJECTION, lobbyRoomFromDoc, openRoomsFilter, SEATED_PROJECTION, type LobbyDoc, type LobbyRoom,
+} from "@/lib/poker-night/lobby";
 import {isDuplicateKey} from "@/lib/poker-night/results";
 import {appliedKey, newPid, newRoom, type JoinResult, type NewRoom, type Step} from "@/lib/poker-night/room";
 import {
@@ -342,4 +344,16 @@ export const listOpenRooms = async (
     };
     const docs = await PokerRoom.find(filter, LOBBY_PROJECTION).sort({lastActivityAt: -1}).limit(opts.limit).lean<LobbyDoc[]>();
     return docs.map(lobbyRoomFromDoc);
+};
+
+// The open tables where `userId` holds a seat it is not leaving, newest first: the lobby's resume
+// card and Home's tables. Read through the account's player rows (the {env, players.userId, status}
+// index) — the `limit` newest open tables it has a row at, a watcher's or a departed player's
+// included — then kept by lobby.holdsSeat. Projected (lobby.SEATED_PROJECTION): the lobby's fields
+// and the seats' pids, never a card, a stack or a guest; the pids never leave the server.
+export const listSeatedRooms = async (env: Env, userId: string, opts: {limit: number; now: number}): Promise<LobbyRoom[]> => {
+    await connectToDatabase();
+    const filter = {...openRoomsFilter(env, opts.now), 'players.userId': userId};
+    const docs = await PokerRoom.find(filter, SEATED_PROJECTION).sort({lastActivityAt: -1}).limit(opts.limit).lean<LobbyDoc[]>();
+    return docs.filter((doc) => holdsSeat(doc, userId)).map(lobbyRoomFromDoc);
 };

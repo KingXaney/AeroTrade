@@ -2,10 +2,11 @@
 
 // Chips in flight, drawn where they land and sent there by CSS from where they start (--pn-dx /
 // --pn-dy, worked out from lib/poker-night/stage's positions): a bet, call or raise sliding from the
-// plate to its bet line (an all-in a bigger push), every bet sweeping into the pot when a street
-// ends, an uncalled bet going back, and at the end each pot bursting into a stream of chips to its
-// winners — split between them by share, side pots first and the main pot last. Each element ends
-// invisible, so under reduced motion nothing flies and the table simply shows where the chips are.
+// plate to its bet line (an all-in a bigger push), every bet sweeping into the pots (the middle of
+// their pills, where lib/poker-night/stage.potPlan put them) when a street ends, an uncalled bet going
+// back, and at the end each pot bursting from its own pill into a stream of chips to its winners —
+// split between them by share, side pots first and the main pot last. Each element ends invisible,
+// so under reduced motion nothing flies and the table simply shows where the chips are.
 // data-anim names each flight for a test.
 
 import type {CSSProperties} from "react";
@@ -13,21 +14,23 @@ import {animsOf, animVars, type LiveAnim} from "@/components/poker-night/anim";
 import ChipStack from "@/components/poker-night/ChipStack";
 import {DENOMINATIONS} from "@/lib/poker-night/chips";
 import {BEAT} from "@/lib/poker-night/choreography";
-import {offset, type Px, type Stage} from "@/lib/poker-night/stage";
+import {offset, potCentre, type PotPlan, type Px, type Stage} from "@/lib/poker-night/stage";
 
 // The chip a stream's chips are drawn as: the largest that a sixth of the pot holds.
 const streamDenom = (amount: number): number => [...DENOMINATIONS].reverse().find((d) => d <= Math.max(1, amount / 6)) ?? 1;
 
 const fly = (at: Px, extra: CSSProperties): CSSProperties => ({left: at.x, top: at.y, ...extra});
 
-const ChipFlight = ({stage, anims, handNo}: {stage: Stage; anims: readonly LiveAnim[]; handNo: number | null}) => {
+const ChipFlight = ({stage, pots, anims, handNo}: {stage: Stage; pots: PotPlan | null; anims: readonly LiveAnim[]; handNo: number | null}) => {
     const seatAt = (seat: number) => stage.seats[seat];
     const current = (a: LiveAnim) => a.event.handNo === handNo;
     const out = animsOf(anims, 'chips-out').filter(current);
     const sweeps = animsOf(anims, 'street-sweep').filter(current);
     const refunds = animsOf(anims, 'refund').filter(current);
     const wins = animsOf(anims, 'win').filter((a) => current(a) && !a.still);
-    const pot: Px = {x: stage.pot.x, y: stage.pot.y};
+    // Where the pots are: the middle of their pills (the one pot's own place before there are any).
+    const pot: Px = pots ? {x: pots.box.x, y: pots.box.y} : {x: stage.pot.x, y: stage.pot.y};
+    const potOf = (n: number): Px => (pots ? potCentre(pots, n) : pot);
     return (
         <div className="pn-flights" aria-hidden="true">
             {out.map((a) => {
@@ -64,7 +67,7 @@ const ChipFlight = ({stage, anims, handNo}: {stage: Stage; anims: readonly LiveA
             {wins.flatMap((a) => (a.streams ?? []).map((chip) => {
                 const place = seatAt(chip.seat);
                 if (!place) return null;
-                const from = offset(pot, place.plate);
+                const from = offset(potOf(chip.pot), place.plate);
                 const amount = a.event.pots.find((p) => p.pot === chip.pot)?.amount ?? 1;
                 return (
                     <span key={`${a.id}:${chip.key}`} className="pn-fly pn-chip-stream" data-anim="stream" data-pot={chip.pot} data-to={chip.seat}

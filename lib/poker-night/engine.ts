@@ -416,6 +416,27 @@ const host = (w: Work, by: string, op: HostOp): Refusal | typeof NOOP | void => 
             if (!s.requests.some((r) => r.pid === op.pid)) return 'no-request';
             s.requests = s.requests.filter((r) => r.pid !== op.pid);
             return;
+        case 'sit-out': {
+            // Never the host themself (their own seat has its own sit-out), never someone unseated.
+            if (op.pid === s.hostPid) return 'illegal';
+            const i = seatOf(s, op.pid);
+            if (i === null) return 'not-seated';
+            const seat = s.seats[i]!;
+            if (seat.leaving) return 'not-now';
+            // In the hand in play: from the next deal, like the player's own "Sit out next hand";
+            // between hands, at once. Only ever out: the state never says who asked, so the host
+            // cannot take back a sit-out without overriding one the player asked for — dealing a
+            // player back in is theirs alone ("Deal me in", "I'm back").
+            if (liveSeatOf(s, op.pid)) {
+                if (seat.sitOutNext) return NOOP;
+                seat.sitOutNext = true;
+                return;
+            }
+            if (seat.sittingOut) return NOOP;
+            seat.sittingOut = true;
+            seat.sitOutNext = false;
+            return;
+        }
         case 'kick': {
             if (op.pid === s.hostPid) return 'illegal';
             const i = seatOf(s, op.pid);

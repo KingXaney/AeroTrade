@@ -5,15 +5,16 @@
 // from, and what the lobby reads of the look a browser kept.
 
 import {describe, expect, it} from 'vitest';
-import {HOST_COPY, LOBBY_COPY} from '@/lib/learn/copy/poker-night';
+import {HOST_COPY, LOBBY_COPY, POKER_NIGHT_COPY} from '@/lib/learn/copy/poker-night';
 import {avatarForUser, encodeAvatar} from '@/lib/poker-night/avatar';
 import {checkConfig, DEFAULT_CONFIG, mergeConfig, TIMING} from '@/lib/poker-night/config';
 import {LIMITS} from '@/lib/poker-night/limits';
 import {DEFAULT_PERSONAL_LOOK} from '@/lib/poker-night/personal';
 import {
-    BLIND_PRESETS, CHIP_PRESETS, chipOptions, chipsFor, configFromForm, configIssueText, DEFAULT_FORM, firstNameOf, invitePath, isIdle,
-    isOpenRoom, LOBBY_LIMITS, LOBBY_PROJECTION, lobbyRoomFromDoc, nightFinished, openRoomsFilter, profileOf, readStoredMe, REBUY_CHOICES,
-    SEAT_CHOICES, shapeLobby, storedDiffers, TIMER_PRESETS, type LobbyRoom,
+    BLIND_PRESETS, CHIP_PRESETS, chipOptions, chipsFor, configFromForm, configIssueText, DEFAULT_FORM, firstNameOf, holdsSeat, HOME_LIMITS,
+    homeChipOf, homePokerNight, invitePath, isIdle, isOpenRoom, LOBBY_LIMITS, LOBBY_PROJECTION, lobbyRoomFromDoc, nightFinished, openRoomsFilter, profileOf,
+    readStoredMe, REBUY_CHOICES, resumeOf, SEAT_CHOICES, SEATED_PROJECTION, shapeLobby, storedDiffers, tableLine, TIMER_PRESETS,
+    type LobbyDoc, type LobbyRoom, type TableLink,
 } from '@/lib/poker-night/lobby';
 import type {RecentNight} from '@/lib/poker-night/results';
 
@@ -38,7 +39,7 @@ const shape = (input: Partial<Parameters<typeof shapeLobby>[0]> = {}) =>
 
 describe('shapeLobby', () => {
     it('hides every section with nothing in it', () => {
-        expect(shape()).toEqual({open: null, friends: null, recent: null, canCreate: true});
+        expect(shape()).toEqual({resume: null, open: null, friends: null, recent: null, canCreate: true});
     });
 
     it('lists the reader\'s open tables newest first, with their page and share link', () => {
@@ -126,11 +127,146 @@ describe('shapeLobby', () => {
     });
 
     it('hands the page no account id', () => {
-        const view = shape({mine: [room('MINEAA')], friends: [room('FRNDAA', {hostUserId: FRIEND, hostName: 'Ben'})], results: [night('PASTAA')]});
+        const view = shape({
+            mine: [room('MINEAA')], friends: [room('FRNDAA', {hostUserId: FRIEND, hostName: 'Ben'})], results: [night('PASTAA')],
+            seated: [room('SEATAA', {hostUserId: FRIEND, hostName: 'Ben'})],
+        });
+        expect(view.resume?.code).toBe('SEATAA');
         const text = JSON.stringify(view);
         expect(text).not.toContain(ME);
         expect(text).not.toContain(FRIEND);
         expect(text).not.toContain('room-PASTAA');
+    });
+
+    it('offers the newest open table the reader holds a seat at as the resume card', () => {
+        const view = shape({
+            seated: [
+                room('OLDERA', {lastActivityAt: NOW - 30 * MIN}),
+                room('NEWERA', {hostUserId: FRIEND, hostName: 'Ben', name: 'Friday', seated: 4, hands: 9, lastActivityAt: NOW - MIN}),
+                room('IDLEAA', {lastActivityAt: NOW - TIMING.IDLE_CLOSE_MS - 1}),
+                room('CLOSED', {status: 'closed', lastActivityAt: NOW}),
+            ],
+        });
+        expect(view.resume).toEqual({
+            code: 'NEWERA', name: 'Friday', status: 'open', seats: 8, seated: 4, hands: 9, href: '/play/NEWERA', mine: false, host: 'Ben', sitting: true,
+        });
+        // The reader's own table, a seat held: theirs, and still listed under their open tables.
+        const own = shape({mine: [room('MINEAA')], seated: [room('MINEAA')]});
+        expect(own.resume).toMatchObject({code: 'MINEAA', mine: true, sitting: true});
+        expect(own.open?.map((t) => t.code)).toEqual(['MINEAA']);
+        // No seat at an open table: no card.
+        expect(shape({seated: [room('IDLEAA', {lastActivityAt: NOW - TIMING.IDLE_CLOSE_MS - 1})]}).resume).toBeNull();
+        expect(resumeOf(ME, [], NOW)).toBeNull();
+    });
+});
+
+describe('tableLine', () => {
+    const link = (over: Partial<TableLink> = {}): TableLink => ({
+        code: 'K7QXM4', name: '', status: 'open', seats: 8, seated: 3, hands: 2, href: '/play/K7QXM4', mine: true, host: 'Ana', sitting: false, ...over,
+    });
+
+    it('prints the reader\'s own table as the lobby\'s open rows do, anyone else\'s with its host', () => {
+        expect(tableLine(link())).toBe(POKER_NIGHT_COPY.openRow(3, 8, 2));
+        expect(tableLine(link({mine: false, host: 'Ben'}))).toBe(POKER_NIGHT_COPY.friendsRow('Ben', 3, 8));
+        // A host with no name at the table: the seats and hands, never "Hosted by" nobody.
+        expect(tableLine(link({mine: false, host: ''}))).toBe(POKER_NIGHT_COPY.openRow(3, 8, 2));
+    });
+});
+
+describe('homePokerNight', () => {
+    const home = (input: Partial<Parameters<typeof homePokerNight>[0]> = {}) =>
+        homePokerNight({userId: ME, mine: [], friends: [], seated: [], now: NOW, ...input});
+    const friend = (code: string, over: Partial<LobbyRoom> = {}) => room(code, {hostUserId: FRIEND, hostName: 'Ben', ...over});
+
+    it('is null with no row, so Home draws no box', () => {
+        expect(home()).toBeNull();
+        // Nothing open counts as nothing.
+        expect(home({
+            mine: [room('CLOSED', {status: 'closed'})],
+            friends: [friend('IDLEAA', {lastActivityAt: NOW - TIMING.IDLE_CLOSE_MS - 1})],
+            seated: [room('GONEAA', {status: 'closed'})],
+        })).toBeNull();
+    });
+
+    it('lists the tables the reader holds a seat at first, then the ones they host from outside a seat', () => {
+        const view = home({
+            mine: [room('HOSTAA', {lastActivityAt: NOW}), room('SEATMI', {lastActivityAt: NOW - 2 * MIN})],
+            seated: [room('SEATMI', {lastActivityAt: NOW - 2 * MIN}), friend('SEATFR', {lastActivityAt: NOW - 5 * MIN})],
+        });
+        expect(view?.tables?.map((t) => [t.code, t.mine, t.sitting])).toEqual([['SEATMI', true, true], ['SEATFR', false, true]]);
+        expect(view?.friends).toBeNull();
+        // One seat: the hosted table fills the other place.
+        const one = home({mine: [room('HOSTAA', {lastActivityAt: NOW}), room('HOSTBB', {lastActivityAt: NOW - HOUR})], seated: [friend('SEATFR')]});
+        expect(one?.tables?.map((t) => [t.code, t.sitting])).toEqual([['SEATFR', true], ['HOSTAA', false]]);
+        expect(one?.tables?.[1]).toEqual({
+            code: 'HOSTAA', name: '', status: 'open', seats: 8, seated: 1, hands: 0, href: '/play/HOSTAA', mine: true, host: 'Ana', sitting: false,
+        });
+    });
+
+    it('caps each list and lists every code once', () => {
+        const many = (prefix: string, make: (code: string, over?: Partial<LobbyRoom>) => LobbyRoom) =>
+            Array.from({length: 6}, (_, i) => make(`${prefix}${String(i).padStart(4, '0')}`, {lastActivityAt: NOW - i * MIN}));
+        const view = home({mine: [...many('MI', room), room('MI0000')], friends: many('FR', friend), seated: many('SE', friend)});
+        expect(view?.tables).toHaveLength(HOME_LIMITS.tables);
+        expect(view?.tables?.every((t) => t.sitting)).toBe(true);
+        expect(view?.friends?.map((t) => t.code)).toEqual(['FR0000', 'FR0001']);
+        expect(HOME_LIMITS.friends).toBe(2);
+    });
+
+    it('offers friends\' open tables to join, never one the reader hosts or sits at, even past the cap', () => {
+        const view = home({
+            seated: [friend('SEAT01', {lastActivityAt: NOW}), friend('SEAT02', {lastActivityAt: NOW - MIN}), friend('SEAT03', {lastActivityAt: NOW - 2 * MIN})],
+            friends: [
+                friend('SEAT03'), friend('JOINAA', {seated: 5}), room('SELFAA'), friend('NONAME', {hostName: ''}),
+                friend('CLOSED', {status: 'closed'}),
+            ],
+        });
+        expect(view?.tables?.map((t) => t.code)).toEqual(['SEAT01', 'SEAT02']);
+        expect(view?.friends).toEqual([{
+            code: 'JOINAA', name: '', status: 'open', seats: 8, seated: 5, hands: 0, href: '/play/JOINAA', mine: false, host: 'Ben', sitting: false,
+        }]);
+        // Friends' tables alone are enough for the panel.
+        expect(home({friends: [friend('JOINAA')]})).toEqual({tables: null, friends: [expect.objectContaining({code: 'JOINAA'})]});
+    });
+
+    it('makes the chip at the top of Home the way back to the newest seat, else the lobby\u2019s', () => {
+        const seated = home({
+            mine: [room('HOSTAA', {lastActivityAt: NOW})],
+            seated: [friend('SEATNW', {lastActivityAt: NOW - MIN}), friend('SEATOL', {lastActivityAt: NOW - 9 * MIN})],
+        });
+        expect(homeChipOf(seated)).toMatchObject({code: 'SEATNW', href: '/play/SEATNW', sitting: true});
+        // Hosting without a seat, friends' tables, or nothing: the chip stays the lobby's.
+        expect(homeChipOf(home({mine: [room('HOSTAA')]}))).toBeNull();
+        expect(homeChipOf(home({friends: [friend('JOINAA')]}))).toBeNull();
+        expect(homeChipOf(null)).toBeNull();
+    });
+
+    it('hands Home no account id', () => {
+        const text = JSON.stringify(home({mine: [room('MINEAA')], friends: [friend('FRNDAA')], seated: [friend('SEATAA')]}));
+        expect(text).not.toContain(ME);
+        expect(text).not.toContain(FRIEND);
+    });
+});
+
+describe('holdsSeat', () => {
+    const doc = (seats: unknown, players: LobbyDoc['players']): Pick<LobbyDoc, 'state' | 'players'> => ({state: {handNo: 3, seats}, players});
+    const players = [{userId: ME, pid: 'pid-me'}, {userId: FRIEND, pid: 'pid-friend'}, {userId: null, pid: 'pid-guest'}];
+
+    it('is true while one of the account\'s player rows sits in the seats', () => {
+        expect(holdsSeat(doc([null, {pid: 'pid-friend'}, {pid: 'pid-me', leaving: false}], players), ME)).toBe(true);
+        // As Mongo projects state.seats.pid out of an array with empty seats in it.
+        expect(holdsSeat(doc([{pid: 'pid-friend'}, {pid: 'pid-me'}], players), ME)).toBe(true);
+    });
+
+    it('is false for a watcher, a seat on its way out, another account\'s seat or a malformed read', () => {
+        expect(holdsSeat(doc([{pid: 'pid-friend'}, null], players), ME)).toBe(false);
+        expect(holdsSeat(doc([{pid: 'pid-me', leaving: true}], players), ME)).toBe(false);
+        expect(holdsSeat(doc([{pid: 'pid-guest'}], players), ME)).toBe(false);
+        expect(holdsSeat(doc([{pid: 'pid-me'}], [{userId: ME, pid: null}]), ME)).toBe(false);
+        expect(holdsSeat(doc([{pid: 'pid-me'}], null), ME)).toBe(false);
+        expect(holdsSeat(doc('seats', players), ME)).toBe(false);
+        expect(holdsSeat({state: null, players}, ME)).toBe(false);
+        expect(holdsSeat(doc([{pid: 'pid-me'}], [{userId: FRIEND, pid: 'pid-me'}]), ME)).toBe(false);
     });
 });
 
@@ -153,6 +289,13 @@ describe('lobbyRoomFromDoc', () => {
         expect(Object.keys(LOBBY_PROJECTION).sort()).toEqual(
             ['_id', 'code', 'hostUserId', 'lastActivityAt', 'name', 'players.name', 'players.userId', 'seatCount', 'seatsTaken', 'state.handNo', 'status'],
         );
+    });
+
+    it('reads a seat-holder\'s tables with only the pids and leaving flags besides: no card, stack or guest', () => {
+        expect(Object.keys(SEATED_PROJECTION).sort()).toEqual([
+            ...Object.keys(LOBBY_PROJECTION), 'players.pid', 'state.seats.leaving', 'state.seats.pid',
+        ].sort());
+        expect(Object.values(SEATED_PROJECTION).every((v, i) => (Object.keys(SEATED_PROJECTION)[i] === '_id' ? v === 0 : v === 1))).toBe(true);
     });
 });
 

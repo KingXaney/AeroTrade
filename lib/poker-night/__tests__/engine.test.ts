@@ -13,7 +13,7 @@ import {createTable, forceClose, reduce} from '@/lib/poker-night/engine';
 import {conservation, ledgerEvents, ledgerRow} from '@/lib/poker-night/ledger';
 import type {HandEntry, TableAction, TableState} from '@/lib/poker-night/types';
 import {
-    A, C, F, R, X, actBy, checkInvariants, deal, deepFreeze, host, moves, nowOf, ok, pidOf, play, randomNight, runOut, table, T0,
+    A, C, F, R, X, actBy, cards, checkInvariants, deal, deepFreeze, host, moves, nowOf, ok, pidOf, play, randomNight, runOut, table, T0,
 } from './fixtures';
 
 const entries = (s: TableState): HandEntry[] => s.hand!.log.map((e) => readEntry(s.hand!, e));
@@ -529,6 +529,59 @@ describe('the host', () => {
         expect(host(s, {op: 'kick', pid: 'p0'})).toEqual({ok: false, reason: 'illegal'});
     });
 
+    it('sits a player out: from the next deal while they are in the hand, at once between hands', () => {
+        let s = deal(three());
+        // In the hand in play the seat plays on, and is left out of the next deal.
+        s = ok(host(s, {op: 'sit-out', pid: 'p2'}));
+        expect(s.seats[2]).toMatchObject({sitOutNext: true, sittingOut: false, away: false});
+        const again = host(s, {op: 'sit-out', pid: 'p2'});
+        expect(again.ok && again.state).toBe(s);
+        s = moves(s, C, F, F);
+        expect(s.hand!.phase).toBe('complete');
+        expect(s.seats[2]!.stack).toBe(1030);
+        s = deal(s);
+        expect(s.hand!.seats.map((p) => p.seat)).toEqual([0, 1]);
+        expect(s.seats[2]).toMatchObject({sittingOut: true, sitOutNext: false, away: false});
+        // Back with the player's own "I'm back" (sit-in), and dealt in from the hand after.
+        s = play(s, by(s, 'sit-in', 2));
+        expect(s.seats[2]).toMatchObject({sittingOut: false, sitOutNext: false});
+    });
+
+    it('sits a player out between hands at once, and never deals them in for them', () => {
+        let s = three();
+        s = ok(host(s, {op: 'sit-out', pid: 'p1'}));
+        expect(s.seats[1]).toMatchObject({sittingOut: true, sitOutNext: false});
+        const same = host(s, {op: 'sit-out', pid: 'p1'});
+        expect(same.ok && same.state).toBe(s);
+        s = play(s, by(s, 'sit-in', 1));
+        expect(s.seats[1]!.sittingOut).toBe(false);
+    });
+
+    it('never sits out the host, a player without a seat or one leaving, and only the host may', () => {
+        const s = deal(three());
+        expect(host(s, {op: 'sit-out', pid: 'p0'})).toEqual({ok: false, reason: 'illegal'});
+        expect(host(s, {op: 'sit-out', pid: 'p7'})).toEqual({ok: false, reason: 'not-seated'});
+        expect(reduce(s, {type: 'host', by: 'p1', op: {op: 'sit-out', pid: 'p2'}, at: nowOf(s)})).toEqual({ok: false, reason: 'not-host'});
+        const leaving = play(s, by(s, 'leave', 1));
+        expect(host(leaving, {op: 'sit-out', pid: 'p1'})).toEqual({ok: false, reason: 'not-now'});
+    });
+
+    it("leaves a player's own sit-out as it is: the host's op only ever sits out, never deals in", () => {
+        let s = deal(three());
+        // The player asks mid-hand; the host, seeing nothing of it, asks too: a no-op that changes nothing.
+        s = play(s, by(s, 'sit-out', 2));
+        expect(s.seats[2]!.sitOutNext).toBe(true);
+        const host1 = host(s, {op: 'sit-out', pid: 'p2'});
+        expect(host1.ok && host1.state).toBe(s);
+        // An old take-back's 'on: false' (the action route refuses it now) would be read as one more sit-out.
+        const takeBack = host(s, {op: 'sit-out', pid: 'p2', on: false} as never);
+        expect(takeBack.ok && takeBack.state).toBe(s);
+        s = moves(s, C, F, F);
+        s = deal(s);
+        expect(s.hand!.seats.map((p) => p.seat)).toEqual([0, 1]);
+        expect(s.seats[2]).toMatchObject({sittingOut: true, sitOutNext: false});
+    });
+
     it('closes a table by force, calling off the live hand: every chip in it goes back', () => {
         let s = deal(three());
         s = moves(s, R(100), C);
@@ -556,6 +609,20 @@ describe('showing cards', () => {
         s = play(s, by(s, 'show', 1));
         expect(s.hand!.seats.filter((p) => p.shown).map((p) => p.seat)).toEqual([1, 2]);
         expect(reduce(s, {type: 'show', by: 'p7', at: nowOf(s)})).toEqual({ok: false, reason: 'not-seated'});
+    });
+
+    it('lets a player who folded show after a showdown, read on the whole board', () => {
+        let s = deal(three(), {holes: {0: 'AhAd', 1: 'KhKd', 2: '7c2d'}, board: 'As7d2c9h3s'});
+        s = moves(s, F, C, X);
+        s = moves(s, X, X, X, X, X, X);
+        expect(s.hand!.result!.showdown).toBe(true);
+        expect(s.hand!.result!.hands.map((h) => h.seat)).not.toContain(2);
+        s = play(s, by(s, 'show', 2));
+        const shown = s.hand!.result!.hands.find((h) => h.seat === 2)!;
+        expect(shown.cards).toEqual(cards('7c2d'));
+        expect(shown.value).not.toBeNull();
+        expect(shown.best).toHaveLength(5);
+        expect(s.hand!.seats.find((p) => p.seat === 2)).toMatchObject({folded: true, shown: true});
     });
 });
 

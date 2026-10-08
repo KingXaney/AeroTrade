@@ -15,7 +15,7 @@ import type {CSSProperties} from "react";
 import {animsOf, animVars, type LiveAnim} from "@/components/poker-night/anim";
 import AvatarDisc from "@/components/poker-night/AvatarDisc";
 import {useRoom} from "@/components/poker-night/room-controller";
-import type {BannerLine} from "@/lib/poker-night/reveal";
+import {playerAt, type BannerLine} from "@/lib/poker-night/reveal";
 import type {BannerPlan} from "@/lib/poker-night/stage";
 import {fnv1a, mulberry32} from "@/lib/random";
 import {cn} from "@/lib/utils";
@@ -61,7 +61,7 @@ const WinnerReveal = ({anims, handNo, lines, plan}: Props) => {
                                 </p>
                             );
                         }
-                        const pid = table.seats[line.seat]?.pid ?? null;
+                        const pid = playerAt(table, line.seat);
                         const person = pid ? table.people[pid] : undefined;
                         return (
                             <div key={line.seat} className="pn-banner-row" data-winner={line.seat}>

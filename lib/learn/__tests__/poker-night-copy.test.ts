@@ -22,6 +22,9 @@ import {EMOTE_COPY, SHORTCUTS_COPY} from '@/lib/learn/copy/poker-night';
 import {PHRASE_IDS, REACTION_IDS, THROW_IDS} from '@/lib/poker-night/emotes';
 import {SHORTCUTS} from '@/lib/poker-night/keys';
 import {AWARD_IDS} from '@/lib/poker-night/awards';
+import {HANDS_COPY, HOME_PANEL_COPY} from '@/lib/learn/copy/poker-night';
+import {GLOSSARY} from '@/lib/learn/glossary';
+import {GUIDE_GAMES, HANDS_TERMS, KICKER_EXAMPLE, RANKING_EXAMPLES, RANKING_SLOTS} from '@/lib/poker-night/hands-guide';
 
 const clean = (text: string) => {
     expect(text, text).not.toMatch(/undefined|NaN|null|\[object|Infinity/);
@@ -299,7 +302,14 @@ describe('the lobby and the game card', () => {
             openRow: () => NS.flatMap((hands) => pairs((seated, seats) => POKER_NIGHT_COPY.openRow(seated, seats, hands))),
             friendsRow: () => named((name) => NS.map((n) => POKER_NIGHT_COPY.friendsRow(name, n, 9))),
             recentRow: () => NS.flatMap((hands) => signedNs.map((net) => POKER_NIGHT_COPY.recentRow(hands, net))),
+            resumeTitle: () => named((name) => POKER_NIGHT_COPY.resumeTitle(name)),
         });
+    });
+
+    it('says where the reader is seated, and the way back', () => {
+        expect(plain(POKER_NIGHT_COPY.resumeTitle('Friday'))).toBe('You are seated at Friday');
+        expect(plain(POKER_NIGHT_COPY.resumeTitle(TABLE_COPY.name('', 'K7QXM4')))).toBe('You are seated at Table K7QXM4');
+        expect(POKER_NIGHT_COPY.rejoin).toBe('Rejoin');
     });
 
     it('reads as the lobby prints it', () => {
@@ -321,6 +331,34 @@ describe('the lobby and the game card', () => {
         expect(POKER_NIGHT_COPY.recentRow(1, -300)).toBe(`1 hand · net ${MINUS}300`);
         expect(POKER_NIGHT_COPY.recentRow(7, 0)).toBe('7 hands · net 0');
         expect(POKER_NIGHT_COPY.tableNameDefault('Ana')).toBe("Ana's poker night");
+    });
+});
+
+describe("Home's poker night chip and panel", () => {
+    it('says every line in plain words, with no function to render', () => {
+        for (const text of strings(HOME_PANEL_COPY)) clean(text);
+        expect(functionKeys(HOME_PANEL_COPY)).toEqual([]);
+    });
+
+    it('reads as Home prints it', () => {
+        expect(HOME_PANEL_COPY).toEqual({
+            chip: 'Poker night',
+            chipRejoin: 'Rejoin your table',
+            heading: 'Poker night',
+            lobby: 'Open the lobby',
+            yours: 'Your tables',
+            friends: "Friends' tables",
+            seatedBadge: 'Seated',
+            rejoin: 'Rejoin',
+            open: 'Open',
+            join: 'Join',
+            hands: 'Learn the hands',
+        });
+        // The same words as the lobby's own buttons.
+        expect(HOME_PANEL_COPY.rejoin).toBe(POKER_NIGHT_COPY.rejoin);
+        expect(HOME_PANEL_COPY.open).toBe(POKER_NIGHT_COPY.open);
+        expect(HOME_PANEL_COPY.join).toBe(POKER_NIGHT_COPY.join);
+        expect(HOME_PANEL_COPY.friends).toBe(POKER_NIGHT_COPY.friendsHeading);
     });
 });
 
@@ -407,7 +445,28 @@ describe('the table', () => {
             nextHandIn: () => each(TABLE_COPY.nextHandIn),
             awayNote: () => [1, 2, 3, 4, 5].map(TABLE_COPY.awayNote),
             leaveBody: () => each(TABLE_COPY.leaveBody),
+            leaveBodyInHand: () => each(TABLE_COPY.leaveBodyInHand),
+            netTonight: () => signedNs.map(TABLE_COPY.netTonight),
         });
+    });
+
+    it('reads the way out and the break as the table prints them', () => {
+        expect(TABLE_COPY.home).toBe('Back to AeroTrade');
+        expect([TABLE_COPY.sitOutShort, TABLE_COPY.showShort, TABLE_COPY.leaveShort]).toEqual(['Sit out', 'Show mine', 'Leave']);
+        // Beside the cards while the plate still reads Folded.
+        expect(TABLE_COPY.leavingAfterHand).toBe('You leave when this hand ends.');
+        expect(TABLE_COPY.sitOutNextNote).toBe('You sit out from the next hand.');
+        expect(TABLE_COPY.leaveMidHandTitle).toBe('Leave in the middle of a hand?');
+        expect([TABLE_COPY.leaveNow, TABLE_COPY.leaveAndGo, TABLE_COPY.leaveNowAndGo]).toEqual(['Leave now', 'Leave and go', 'Leave now and go']);
+        expect(TABLE_COPY.rebuysOffNote).toBe('Rebuys are off at this table: once you leave, you can watch but not sit down again.');
+        expect(TABLE_COPY.rebuysAskNote).toBe("Sitting down again needs the host's yes.");
+        expect(TABLE_COPY.leftTitle).toBe('You left the table');
+        expect(TABLE_COPY.netTonight(450)).toBe('Net tonight: +450.');
+        expect(TABLE_COPY.netTonight(-300)).toBe(`Net tonight: ${MINUS}300.`);
+        expect(TABLE_COPY.netTonight(0)).toBe('Net tonight: 0.');
+        expect(TABLE_COPY.sitAgain).toBe('Sit down again');
+        expect(TABLE_COPY.lobby).toBe('Poker night lobby');
+        expect(TABLE_COPY.foldedHand).toBe('Your hand, folded');
     });
 
     it('reads as the table prints it', () => {
@@ -421,6 +480,11 @@ describe('the table', () => {
         expect(TABLE_COPY.awayNote(1)).toBe('Sat out after one timeout. "I\'m back" deals you in again.');
         expect(TABLE_COPY.leaveBody(2000)).toBe('Your 2,000 chips are counted in the bank as you leave.');
         expect(TABLE_COPY.leaveBody(1)).toBe('Your 1 chip is counted in the bank as you leave.');
+        // Mid-hand, one sentence: never "as you leave" beside "once it ends".
+        expect(TABLE_COPY.leaveBodyInHand(1975)).toBe('Your hand folds the next time it faces a bet; your 1,975 chips are counted in the bank once it ends.');
+        expect(TABLE_COPY.leaveBodyInHand(1)).toBe('Your hand folds the next time it faces a bet; your 1 chip is counted in the bank once it ends.');
+        clean(TABLE_COPY.leaveBodyInHand(1975));
+        expect(TABLE_COPY.leaveBodyInHand(500)).not.toMatch(/as you leave/);
         expect(TABLE_COPY.sitOut).toBe('Sit out next hand');
         expect(TABLE_COPY.connection.live).toBe('Live');
         expect(TABLE_COPY.connection.polling).toBe('Updating every few seconds');
@@ -621,7 +685,22 @@ describe('the host drawer', () => {
             removing: () => named(HOST_COPY.removing),
             removedDone: () => named(HOST_COPY.removedDone),
             letBackInDone: () => named(HOST_COPY.letBackInDone),
+            sitOutFor: () => named(HOST_COPY.sitOutFor),
+            satOut: () => named(HOST_COPY.satOut),
+            satOutNow: () => named(HOST_COPY.satOutNow),
         });
+    });
+
+    it('words sitting a player out from the bank as the drawer prints it', () => {
+        expect(HOST_COPY.sitOut).toBe('Sit out next hand');
+        expect(plain(HOST_COPY.sitOutFor('Ana'))).toBe('Sit Ana out from the next hand');
+        expect(HOST_COPY.sitOutWaiting).toBe('Sits out from the next hand.');
+        expect(plain(HOST_COPY.satOut('Ana'))).toBe('Ana sits out from the next hand.');
+        expect(plain(HOST_COPY.satOutNow('Ana'))).toBe('Ana is sitting out.');
+        // The host's side has no take-back: only the player deals themself back in.
+        expect(Object.keys(HOST_COPY)).not.toContain('sitOutCancelFor');
+        expect(Object.keys(HOST_COPY)).not.toContain('sitOutTakenBack');
+        expect(TABLE_COPY.hostSatYouOut).toBe('The host sat you out.');
     });
 
     it('words every reason checkConfig turns a change down', () => {
@@ -735,6 +814,7 @@ describe('the night summary', () => {
         const everyAward = AWARD_IDS.flatMap((id) => [...NS, 3].map((value) => ({id, value})));
         covers(SUMMARY_COPY, {
             when: () => named((table) => SUMMARY_COPY.when(table, 'Oct 7')),
+            shareTitle: () => named(SUMMARY_COPY.shareTitle),
             length: () => NS.flatMap((hands) => [0, 1, 59, 60, 61, 134, 600].map((minutes) => SUMMARY_COPY.length(hands, minutes))),
             awardFigure: () => everyAward.map(({id, value}) => SUMMARY_COPY.awardFigure(id, value)),
             award: () => [
@@ -789,6 +869,9 @@ describe('the night summary', () => {
         expect(SUMMARY_COPY.copy).toBe('Copy summary');
         expect(SUMMARY_COPY.copied).toBe('Summary copied.');
         expect(SUMMARY_COPY.again).toBe('Start another table');
+        expect(SUMMARY_COPY.home).toBe('Back to AeroTrade');
+        expect(SUMMARY_COPY.share).toBe('Share');
+        expect(plain(SUMMARY_COPY.shareTitle("Ana's poker night"))).toBe("Ana's poker night: the final counts");
         expect(plain(SUMMARY_COPY.text(night))).toBe([
             "Ana's poker night · Oct 7",
             '42 hands in 2 h 14 min',
@@ -856,13 +939,25 @@ describe("the table's overlays", () => {
 describe('the felt', () => {
     it('says every line over the inputs it meets', () => {
         covers(FELT_COPY, {
-            morePots: () => [1, 2, 7].flatMap((pots) => [0, 1, 2340, 1_250_000].map((chips) => FELT_COPY.morePots(pots, chips))),
+            mainPot: () => each(FELT_COPY.mainPot),
+            sidePot: () => pairs((i, n) => FELT_COPY.sidePot(i + 1, n)),
+            morePots: () => [2, 3, 7].flatMap((pots) => [0, 1, 2340, 1_250_000].map((chips) => FELT_COPY.morePots(pots, chips))),
+            allPots: () => [2, 3, 8].flatMap((pots) => [0, 1, 2340, 1_250_000].map((chips) => FELT_COPY.allPots(pots, chips))),
         });
     });
 
-    it('reads as the pot prints it', () => {
-        expect(FELT_COPY.morePots(3, 2340)).toBe('3 more side pots: 2,340');
-        expect(FELT_COPY.morePots(1, 520)).toBe('1 more side pot: 520');
+    it('reads as the pot prints it, the short words shorter than the full', () => {
+        expect(FELT_COPY.mainPot(600)).toBe('Main 600');
+        expect(FELT_COPY.sidePot(1, 1350)).toBe('Side 1: 1,350');
+        expect(FELT_COPY.morePots(3, 2340)).toBe('3 more: 2,340');
+        expect(FELT_COPY.allPots(4, 6250)).toBe('4 pots: 6,250');
+        // From 100,000 on, as a plate prints a stack.
+        expect(FELT_COPY.sidePot(3, 1_250_000)).toBe('Side 3: 1.25M');
+        expect(FELT_COPY.mainPot(125_400)).toBe('Main 125.4k');
+        for (const n of NS) {
+            expect(FELT_COPY.mainPot(n).length).toBeLessThan(TABLE_COPY.mainPot(n).length);
+            expect(FELT_COPY.sidePot(2, n).length).toBeLessThan(TABLE_COPY.sidePot(2, n).length);
+        }
     });
 });
 
@@ -1021,6 +1116,66 @@ describe('the keys', () => {
         expect(Object.keys(SHORTCUTS_COPY.groups).sort()).toEqual(Object.keys(SHORTCUTS).sort());
         for (const text of strings(SHORTCUTS_COPY)) clean(text);
         expect(SHORTCUTS_COPY.does.mute).toBe('Sounds on or off');
+        expect(SHORTCUTS_COPY.does.hands).toBe('Hand rankings and the rules');
         expect(SHORTCUTS_COPY.soundOff).toBe('Sounds off.');
+    });
+});
+
+// The Hands guide (P2): its own lines, and never a restatement of the glossary entries it quotes
+// (invariant 12) — no sentence shares a run of five words with any of their sentences.
+describe('the Hands guide', () => {
+    const RUN = 5;
+    const wordsOf = (text: string): string[] => text.toLowerCase().replace(/[^a-z0-9']+/g, ' ').trim().split(' ').filter(Boolean);
+    const sentences = (text: string): string[] => text.split(/(?<=[.;:])\s+/).filter((s) => s.trim().length > 0);
+    const runs = (text: string): Set<string> => {
+        const w = wordsOf(text);
+        const out = new Set<string>();
+        for (let i = 0; i + RUN <= w.length; i++) out.add(w.slice(i, i + RUN).join(' '));
+        return out;
+    };
+    const restatements = (lines: readonly string[]): string[] =>
+        lines.flatMap(sentences).flatMap((sentence) => {
+            const own = runs(sentence);
+            return HANDS_TERMS.flatMap((key) => [GLOSSARY[key].short, GLOSSARY[key].long].flatMap(sentences)
+                .flatMap((definition) => [...runs(definition)].filter((run) => own.has(run)).map((run) => `${key}: "${run}" in "${sentence}"`)));
+        });
+
+    it('says every line in plain words', () => {
+        for (const text of strings(HANDS_COPY)) clean(text);
+        for (const example of [...RANKING_EXAMPLES, {cards: KICKER_EXAMPLE.first, makes: KICKER_EXAMPLE.makes.slice(0, 2)}]) {
+            clean(HANDS_COPY.example(example.cards, example.makes));
+        }
+    });
+
+    it('names every ranking in the guide\'s order and every game it explains', () => {
+        expect(Object.keys(HANDS_COPY.categories)).toEqual([...RANKING_SLOTS]);
+        expect(Object.keys(HANDS_COPY.games)).toEqual(GUIDE_GAMES.map((game) => game.id));
+        // Each example's own name (its caption) starts with its ranking's, but for high card's "Ace high".
+        for (const example of RANKING_EXAMPLES) {
+            const label = HAND_COPY.label(example.description);
+            if (example.slot === 'high-card') expect(label).toBe('Ace high');
+            else expect(label.toLowerCase().startsWith(HANDS_COPY.categories[example.slot].toLowerCase()), label).toBe(true);
+        }
+        expect(HANDS_COPY.games.holdem.name).toBe(GLOSSARY['texas-holdem'].term);
+    });
+
+    it('reads an example aloud, the cards that make it last', () => {
+        const [royal, , quads, , , , , , , high] = RANKING_EXAMPLES;
+        expect(HANDS_COPY.example(royal.cards, royal.makes)).toBe('Ace of spades, king of spades, queen of spades, jack of spades and ten of spades. All five make the hand.');
+        expect(HANDS_COPY.example(quads.cards, quads.makes))
+            .toBe('Queen of clubs, queen of diamonds, queen of hearts, queen of spades and seven of diamonds. The queen of clubs, queen of diamonds, queen of hearts and queen of spades make the hand.');
+        expect(HANDS_COPY.example(high.cards, high.makes)).toBe('Ace of diamonds, jack of clubs, eight of hearts, five of spades and two of diamonds. The ace of diamonds makes the hand.');
+    });
+
+    it('pins the words the page shows', () => {
+        expect(HANDS_COPY.tabs).toEqual({play: 'Play', hands: 'Hands'});
+        expect(HANDS_COPY.sheetTitle).toBe('Hands and games');
+        expect(HANDS_COPY.menu).toBe('Hands');
+        expect(HANDS_COPY.kickerCaption).toBe('Both hands make a pair of aces. The king is higher than the queen, so the first hand wins.');
+    });
+
+    it('never restates a definition it quotes', () => {
+        expect(restatements(['A card among the five that play decides between hands.'])).not.toEqual([]);
+        expect(restatements(strings(HANDS_COPY))).toEqual([]);
     });
 });

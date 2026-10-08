@@ -9,7 +9,7 @@ import {HAND_COPY, TABLE_COPY} from '@/lib/learn/copy/poker-night';
 import type {Card} from '@/lib/poker/cards';
 import {describeHand, playsBoard, type HandDescription} from '@/lib/poker-night/hand-name';
 import {BANNER} from '@/lib/poker-night/stage';
-import type {HandView} from '@/lib/poker-night/view-types';
+import type {HandView, TableView} from '@/lib/poker-night/view-types';
 import {readShownHand} from '@/lib/poker-night/views';
 
 export type ShownLook = {seat: number; cards: [Card, Card]; best: Card[]; description: HandDescription | null; playsBoard: boolean; winner: boolean};
@@ -53,6 +53,20 @@ export const cardLook = (look: ResultLook | null, card: Card): 'win' | 'dim' | n
     if (!look || !look.showdown || look.playing.length === 0) return null;
     return look.playing.includes(card) ? 'win' : 'dim';
 };
+
+// Who played a seat in the view's hand: the result's gone list first (a player cashed out as the
+// hand completed, or a seat taken by someone new in the pause), else whoever sits there now — so a
+// result never names the wrong player. A view from an older server has no gone list.
+export const playerAt = (table: Pick<TableView, 'seats' | 'hand'>, seat: number): string | null => {
+    const gone = (table.hand?.result?.gone ?? []).find(([s]) => s === seat);
+    return gone ? gone[1] : table.seats[seat]?.pid ?? null;
+};
+
+// The seat the viewer played in the view's hand, for the banner's "You win": their seat, only while
+// the result says it was theirs (playerAt) — someone who takes a winner's seat in the pause is not
+// told they won. Null for a watcher.
+export const viewerSeatIn = (table: Pick<TableView, 'seats' | 'hand'>, mySeat: number | null, myPid: string | null): number | null =>
+    mySeat !== null && myPid !== null && playerAt(table, mySeat) === myPid ? mySeat : null;
 
 // Whether the winner's banner shows for this hand: once it is complete, with this hand's result and
 // someone paid. TableScreen asks too: while it shows, the line under the board (the next deal's
