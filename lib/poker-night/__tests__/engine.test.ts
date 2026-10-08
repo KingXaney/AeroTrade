@@ -10,7 +10,7 @@
 import {describe, expect, it} from 'vitest';
 import {legalFor, readEntry, snapshotFromState} from '@/lib/poker-night/betting';
 import {coolingDown} from '@/lib/poker-night/asks';
-import {ASKS, TIMING} from '@/lib/poker-night/config';
+import {ASKS, TABLE_LIMITS, TIMING} from '@/lib/poker-night/config';
 import {createTable, forceClose, reduce} from '@/lib/poker-night/engine';
 import {conservation, ledgerEvents, ledgerRow} from '@/lib/poker-night/ledger';
 import {isLive} from '@/lib/poker-night/seats';
@@ -1016,20 +1016,39 @@ describe('asking to see a hand', () => {
         expect(s.askCooldowns).toEqual([['p2', 'p1', 6], ['p2', 'p0', 6]]);
     });
 
-    it('ends an ask the next deal cuts short with no answer and no cooldown: nobody said no and its seconds were not up', () => {
+    it('takes an ask the next deal cuts short as a no too, so one its player lets go by cannot come back every hand', () => {
         let s = walked();
         s = play(s, ask(s, 2, 1, 2_000));
-        // The results pause is five seconds: the deal comes three seconds into the ask's fifteen.
+        // The results pause is five seconds: the deal comes three seconds into the ask's fifteen —
+        // as at every running table, whose pause is never longer than an ask's seconds.
         expect(s.nextHandAt).toBe(at(s, 5_000));
+        expect(TABLE_LIMITS.pauseSeconds.max * 1000).toBeLessThanOrEqual(ASKS.WAIT_MS);
         s = deal(s);
         expect(s.hand!.asks).toEqual([]);
+        expect(s.askCooldowns).toEqual([['p2', 'p1', 1 + ASKS.COOLDOWN_HANDS]]);
+        // Through the next five hands p2 may not ask p1 again, however each one ends; then may.
+        let asked = 0;
+        for (;;) {
+            // Everyone but seat 1 folds: seat 1 wins unshown, seat 2 folded.
+            while (s.hand!.phase === 'betting') s = moves(s, s.hand!.actor === 1 ? (s.hand!.seats.find((p) => p.seat === 1)!.streetBet < s.hand!.currentBet ? C : X) : F);
+            const r = reduce(s, ask(s, 2, 1));
+            if (s.hand!.no <= 1 + ASKS.COOLDOWN_HANDS) expect(r, `hand ${s.hand!.no}`).toEqual({ok: false, reason: 'ask-cooldown'});
+            else {
+                expect(r.ok, `hand ${s.hand!.no}`).toBe(true);
+                asked++;
+            }
+            if (s.handNo >= 8) break;
+            s = deal(s);
+        }
+        expect(asked).toBe(2);
+    });
+
+    it('leaves no cooldown for an ask answered before the deal', () => {
+        let s = walked();
+        s = play(s, ask(s, 2, 1), reply(s, 1, 2, 'one'), ask(s, 0, 1, 300), reply(s, 1, 0, 'all', 400));
+        s = deal(s);
         expect(s.askCooldowns).toEqual([]);
-        // In the next pause the same player may ask the same player again.
-        s = moves(s, F, F);
-        const asker = s.hand!.seats.find((p) => p.pid === 'p2')!;
-        const winner = s.hand!.seats.find((p) => !p.folded)!;
-        if (asker.folded && winner.pid === 'p1') expect(reduce(s, ask(s, 2, 1)).ok).toBe(true);
-        else expect(coolingDown(s, 'p2', 'p1', s.hand!.no)).toBe(false);
+        expect(coolingDown(s, 'p2', 'p1', s.hand!.no)).toBe(false);
     });
 
     it('never drops a cooldown before its five hands are up, however many no\'s the table makes: past the cap, nobody asks', () => {

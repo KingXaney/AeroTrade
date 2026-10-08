@@ -681,10 +681,18 @@ details[open] > :not(summary) { animation: disclosure-in var(--motion-base) var(
   .pn-seat-cards[data-count="3"] > :nth-child(2) { rotate: 0deg; }
   .pn-seat-cards[data-count="4"] > :nth-child(2) { rotate: -2.5deg; }
   .pn-seat-cards[data-count="4"] > :nth-child(3) { rotate: 2.5deg; }
+  /* …and, with no gap between them over the stack's figures, on a compact or tight plate (the figures
+     in the top row, beside the avatar) they start a whole card's width over the plate's top, ending
+     above the figures (stage.SEAT_CARDS_OVER). */
+  :is([data-pn-fit="compact"], [data-pn-fit="tight"]) .pn-seat-cards:is([data-count="3"], [data-count="4"]) { top: calc(var(--pn-mini-w) * -1); }
+  /* Triple T's "Discarding…" where its flag has no room under the plate (stage.flagRoom): a dashed
+     ring on the plate instead. */
+  .pn-seat[data-pn-mark="discarding"] .pn-plate { outline: 2px dashed var(--pn-on-felt-soft); outline-offset: 1px; }
   /* Cards turned up sit outside the plate, toward the felt's middle — above a bottom or side seat,
      below a top one — so the name, the stack and the count stay in sight; a winner's "+N" rises
-     above them. */
-  .pn-seat-shown { position: absolute; left: 50%; bottom: calc(100% + 3px); translate: -50% 0; z-index: 3; display: flex; gap: 2px; pointer-events: none; }
+     above them. Where another seat's hand would meet them, they sit moved along the row
+     (--pn-shown-dx, lib/poker-night/stage nudgeHands). */
+  .pn-seat-shown { position: absolute; left: 50%; bottom: calc(100% + 3px); translate: calc(-50% + var(--pn-shown-dx, 0px)) 0; z-index: 3; display: flex; gap: 2px; pointer-events: none; }
   .pn-seat[data-side="top"] .pn-seat-shown { bottom: auto; top: calc(100% + 10px); }
   .pn-seat[data-shown]:not([data-side="top"]) .pn-win-pop-text { top: calc(var(--pn-show-w) * -1.4 - 3px); }
   /* A turned-up hand of four (PLO) overlaps, each card 0.56 of a card on from the one before
@@ -799,7 +807,13 @@ details[open] > :not(summary) { animation: disclosure-in var(--motion-base) var(
   .pn-board-label { position: absolute; translate: -50% -50%; display: grid; place-items: center; width: var(--pn-board-label-w); height: var(--pn-board-label-h); border-radius: 9999px; font-size: calc(var(--pn-board-label-h) - 5px); line-height: 1; font-weight: 700; }
   .pn-boards-zoom { position: absolute; pointer-events: auto; border-radius: 6px; background: transparent; cursor: zoom-in; }
   .pn-boards-zoom:focus-visible { outline: 2px solid var(--brand); outline-offset: 3px; }
+  /* A board's numeral beside what the viewer makes on it, in the dock's line (HandStrength): a filled
+     disc in the palette's ink, so it reads as the board's mark on the pill's chrome. */
+  .pn-board-num { display: inline-grid; flex: none; place-items: center; min-width: 16px; height: 16px; padding: 0 3px; border-radius: 9999px; background: var(--fg); color: var(--bg); font-size: 11px; line-height: 1; font-weight: 700; }
   .pn-sheet-board { display: flex; gap: 3px; }
+  /* The sheet is portaled out of the room, onto the chrome surface, where no felt is set: a card not
+     out yet is a place ringed in the palette's muted ink, so a board on the flop shows its two to come. */
+  .pn-sheet-board .pn-slot { border: 1.5px dashed var(--fg-muted); }
 
   /* Chips: coloured discs from the chip set, a few short columns; the amount always beside them. */
   .pn-chips { display: inline-flex; align-items: flex-end; gap: 1px; }
@@ -968,8 +982,11 @@ details[open] > :not(summary) { animation: disclosure-in var(--motion-base) var(
   @container pn-dock (max-width: 28rem) {
     .pn-label-long { display: none; }
     .pn-label-short { display: inline; }
-    /* "Tap the card to throw away": a phone has the confirm's "Pick a card first" instead. */
-    .pn-discard-prompt { display: none; }
+    /* "Tap the card to throw away": a phone has the confirm's "Pick a card first" instead — its row
+       kept, unseen, for what the two kept make once a card is picked, so the dock never grows; and the
+       throw-away's clock says its seconds alone, the line beside the cards staying lower than them. */
+    .pn-discard-prompt { visibility: hidden; }
+    .pn-clock-label { display: none; }
   }
   /* "Leave after this hand" beside the early choices: a door, with its word in a wide dock. In a
      dock too narrow for the four (a phone on its side: every dock of 18rem or less) it takes a row of
@@ -1005,6 +1022,8 @@ details[open] > :not(summary) { animation: disclosure-in var(--motion-base) var(
     .pn-pre-row > [data-pn-pre] { flex-basis: 100%; }
     .pn-pre-row > [data-pn-leave-after] { flex: 1 1 100%; min-height: 44px; }
     .pn-leave-word { display: inline; }
+    /* The line beside the cards has a row of its own here (below), with room for the clock's words. */
+    .pn-clock-label { display: inline; }
     /* The line beside the cards — the seconds left, who the table waits for, leaving after this hand
        with Stay, what the cards make — takes a row of its own under them: beside the cards and the
        emote button it would have a few pixels, and say nothing. */

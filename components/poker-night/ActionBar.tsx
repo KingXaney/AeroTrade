@@ -31,7 +31,10 @@ import {intentForKey, isControlTarget, isEditableTarget, KEY_SHORTCUTS, keyAllow
 import type {Move} from "@/lib/poker-night/types";
 import {cn} from "@/lib/utils";
 
-const BUTTON = 'min-h-12 flex-1 px-2 text-sm';
+// Each move's button takes its share of the row, never narrower than 44 px or its words: a grid whose
+// one column is 30 px at least (44 with the padding and a border), so the flex item's own minimum, its
+// min-content, is the wider of the two ("Bet" alone is narrower than a thumb).
+const BUTTON = 'grid min-h-12 flex-1 grid-cols-[minmax(1.875rem,auto)] place-items-center px-2 text-sm';
 
 // A keydown aimed at a dialog, a menu or a drawer belongs to it.
 const insideOverlay = (target: EventTarget | null): boolean =>

@@ -18,10 +18,10 @@ import {PLATE, SEAT_COUNTS, spotToPx} from '@/lib/poker-night/layout';
 import {
     AMOUNT_PX, AVATAR_PX, avatarCentre, BANNER, bannerObstacles, bannerPlan, BET, betLineSize, BLIND_MARK, blindRect, BOARD_CARD_MAX, BOARD_CARD_MIN, BOARD_GAP, BOARD_LABEL, BOARD_ROW_GAP,
     BOARD_SIDE_GAP, boardAnchor, boardBlock, BOARDS_SHEET_CARD, CARD_RATIO, CASCADE_STEP, CHIP_PX, FELT_RAIL, INDEX_BAND, MULTI_BOARD_MIN,
-    feltSpan, fitFor, insideBox, menuSide, MINI_CARD_PX, MONO_EM, NARROW_STAGE, offset, openSeatPx, overlaps, pieceRect, PLATE_PAD_X, PLATE_SIZE, POT_CLEAR, POT_PILL, POT_PILL_H,
-    potCentre, potLayouts, potObstacles, potPillWidth, potPlan, PULSE, seatCardsRect, SHOWN_CARD_PX, SHOWN_OFF, SHOWN_STEP, shownHandRect, shownHandWidth, stageLayout, stageOrientation,
+    feltSpan, fitFor, FLAG_PX, flagRect, flagRoom, handsMeet, insideBox, menuSide, MINI_CARD_PX, MONO_EM, NARROW_STAGE, offset, openSeatPx, overlaps, pieceRect, PLATE_PAD_X, PLATE_SIZE, POT_CLEAR, POT_PILL, POT_PILL_H,
+    potCentre, potLayouts, potObstacles, potPillWidth, potPlan, PULSE, SEAT_CARDS_OVER, seatCardsRect, SHOWN_CARD_PX, SHOWN_OFF, SHOWN_STEP, shownHandRect, shownHandWidth, stageLayout, stageOrientation,
     TABLE_TOP_ROOM, textWidth, TIGHT_BELOW, WIN_POP, winPopRect, wrappedLines,
-    type BannerPlan, type BannerSeen, type BannerText, type BetOut, type Fit, type PotNow, type PotPlan, type PotSeen, type Rect, type Stage, type WinPop,
+    type BannerPlan, type BannerSeen, type BannerText, type BetOut, type Fit, type PotNow, type PotPlan, type PotSeen, type Rect, type SeatMarks, type Stage, type WinPop,
 } from '@/lib/poker-night/stage';
 
 // Phones held upright (the box left between the top bar and the dock), a phone on its side (the
@@ -113,6 +113,61 @@ describe('the stage', () => {
         const box = {w: 1280, h: 600};
         const s = stageLayout(box, 9, 0);
         for (const p of s.seats) expect(p.plate).toEqual(spotToPx(p.spot, box, s.plateSize));
+    });
+});
+
+describe("a seat's status flag", () => {
+    const css = readFileSync(fileURLToPath(new URL('../../../app/globals.css', import.meta.url)), 'utf8');
+    // Every seat taken, the viewer at seat 0; Triple T's throw-away: three cards face down before every
+    // other plate, the blinds at seats 1 and 2, "Discarding…" under every plate.
+    const throwAway = (s: Stage): SeatMarks[] => s.seats.map((p) => ({seat: p.seat, open: false, backs: p.seat === 0 ? 0 : 3, blind: p.seat === 1 || p.seat === 2, flag: TABLE_COPY.discarding}));
+    const drawn = (s: Stage, m: SeatMarks): Rect[] => [
+        {...s.seats[m.seat].plate, ...s.plateSize},
+        ...(m.backs > 0 ? [seatCardsRect(s.seats[m.seat], s, m.backs)] : []),
+        ...(m.blind ? [blindRect(s.seats[m.seat], s)] : []),
+    ];
+
+    it('hangs where it clears every other plate, the cards face down before it, its blind\'s mark and its flag — else the plate carries the status', () => {
+        for (const box of [...BOXES, ...Object.values(POT_BOXES).flat(), ...Object.values(SIDEWAYS)]) for (const n of SEAT_COUNTS) {
+            const s = stageLayout(box, n, 0);
+            const marks = throwAway(s);
+            const hangs = marks.filter((m) => flagRoom(s, m.seat, TABLE_COPY.discarding, marks));
+            for (const m of hangs) {
+                const flag = flagRect(s.seats[m.seat], s, TABLE_COPY.discarding);
+                for (const o of marks) {
+                    if (o.seat === m.seat) continue;
+                    const theirs = [...drawn(s, o), ...(hangs.includes(o) ? [flagRect(s.seats[o.seat], s, TABLE_COPY.discarding)] : [])];
+                    for (const r of theirs) expect(overlaps(flag, r), `${box.w}×${box.h} ${n} seats: seat ${m.seat}'s flag over seat ${o.seat}`).toBe(false);
+                }
+            }
+            // Where there is room — a phone held upright, the desktop — every flag hangs.
+            if (box.h >= box.w || fitFor(box) === 'comfortable') expect(hangs.length, `${box.w}×${box.h} ${n} seats`).toBe(n);
+        }
+        // The smallest phone on its side at eight seats: the side columns' flags meet the plates under them.
+        const crowded = stageLayout(SIDEWAYS['568 × 320'], 8, 0);
+        expect(throwAway(crowded).filter((m) => !flagRoom(crowded, m.seat, TABLE_COPY.discarding, throwAway(crowded))).length).toBeGreaterThan(0);
+        // An open seat's ring is all that stands there.
+        const four = throwAway(crowded).map((m) => (m.seat % 2 === 1 ? {...m, open: true, backs: 0, blind: false, flag: null} : m));
+        for (const m of four.filter((x) => !x.open)) {
+            if (!flagRoom(crowded, m.seat, TABLE_COPY.discarding, four)) continue;
+            const flag = flagRect(crowded.seats[m.seat], crowded, TABLE_COPY.discarding);
+            for (const o of four.filter((x) => x.open)) {
+                const ring = openSeatPx(crowded);
+                expect(overlaps(flag, {...crowded.seats[o.seat].plate, w: ring, h: ring})).toBe(false);
+            }
+        }
+    });
+
+    it('is as wide as its words, 6 px a side inside the widest border, never more than 28 px wider than the plate', () => {
+        const s = stageLayout({w: 378, h: 617}, 6, 0);
+        const p = s.seats[3];
+        const r = flagRect(p, s, TABLE_COPY.discarding);
+        expect(r.w).toBe(textWidth(TABLE_COPY.discarding, FLAG_PX[s.fit], true) + 2 * (6 + BANNER.border));
+        expect(flagRect(p, s, 'A very long status a plate never says').w).toBe(s.plateSize.w + 28);
+        expect(r.y - r.h / 2).toBeCloseTo(p.plate.y + s.plateSize.h / 2 - 0.45 * 15, 6);
+        expect(css.match(/\.pn-plate-flag \{[^}]*\}/)?.[0]).toMatch(/translate: -50% 55%;[\s\S]*max-width: calc\(var\(--pn-plate-w\) \+ 28px\);[\s\S]*padding: 0 6px;[\s\S]*font-size: 11px;[\s\S]*line-height: 15px;/);
+        expect(css).toContain('[data-pn-fit="tight"] :is(.pn-plate-flag, .pn-blind, .pn-open-seat) { font-size: 10px; }');
+        expect(css).toContain('.pn-seat[data-pn-mark="discarding"] .pn-plate { outline: 2px dashed var(--pn-on-felt-soft); outline-offset: 1px; }');
     });
 });
 
@@ -208,7 +263,7 @@ describe('the pots', () => {
     for (const [size, boxes] of Object.entries(POT_BOXES)) for (const handSize of [2, 4]) {
         it(`clears every card, plate, bet line out, "+N" and the dealer button, on the felt, at ${size}, every seat count, one pot to four, every button, hands of ${handSize}`, () => {
             for (const box of boxes) for (const n of SEAT_COUNTS) for (const mine of [0, null]) {
-                const s = stageLayout(box, n, mine);
+                const s = stageLayout(box, n, mine, 1, {handSize});
                 for (const {name, seen} of potSeens(s, n, mine, handSize)) for (const amounts of POTS) {
                     const label = `${box.w}×${box.h} ${n} seats, viewer ${mine}, ${name}, ${amounts.length} pots`;
                     const plan = expectPotPlan(s, amounts, seen, label);
@@ -226,7 +281,7 @@ describe('the pots', () => {
     for (const [size, box] of Object.entries(SIDEWAYS)) for (const handSize of [2, 4]) {
         it(`stays inside the box and clear where it can at ${size}, every seat count, one pot to four, every button, hands of ${handSize}`, () => {
             for (const n of SEAT_COUNTS) for (const mine of [0, null]) {
-                const s = stageLayout(box, n, mine);
+                const s = stageLayout(box, n, mine, 1, {handSize});
                 const lit = {x: s.board.x, y: s.board.y - 4, w: s.board.w + 4, h: s.board.h + 8};
                 for (const {name, seen} of potSeens(s, n, mine, handSize)) for (const amounts of POTS) {
                     const label = `${box.w}×${box.h} ${n} seats, viewer ${mine}, ${name}, ${amounts.length} pots`;
@@ -508,6 +563,32 @@ describe('the sizes shared with the stylesheet', () => {
         }
     });
 
+    it('lifts three or four cards face down a whole width over a compact or tight plate, above the stack\'s figures; a pair, and any number on a roomy plate, where they were', () => {
+        expect(css).toContain(':is([data-pn-fit="compact"], [data-pn-fit="tight"]) .pn-seat-cards:is([data-count="3"], [data-count="4"]) { top: calc(var(--pn-mini-w) * -1); }');
+        expect([SEAT_CARDS_OVER.pair, SEAT_CARDS_OVER.more]).toEqual([0.45, 1]);
+        for (const box of [{w: 378, h: 617}, {w: 308, h: 340}, {w: 1428, h: 705}]) {
+            const s = stageLayout(box, 6, 0);
+            const w = MINI_CARD_PX[s.fit];
+            for (const p of s.seats) {
+                const pair = seatCardsRect(p, s);
+                expect(seatCardsRect(p, s, 2)).toEqual(pair);
+                for (const count of [3, 4]) {
+                    const more = seatCardsRect(p, s, count);
+                    for (const k of ['x', 'w', 'h'] as const) expect(more[k]).toBeCloseTo(pair[k], 6);
+                    if (s.fit === 'comfortable') expect(more).toEqual(pair);
+                    else {
+                        expect(more.y).toBeCloseTo(pair.y - (SEAT_CARDS_OVER.more - SEAT_CARDS_OVER.pair) * w, 6);
+                        // The foot of the fan 0.4 of a width into the plate (a turned card's corner and the
+                        // pixel round it below that): above the figures, level with the avatar's middle.
+                        const plateTop = p.plate.y - s.plateSize.h / 2;
+                        expect(more.y + more.h / 2).toBeCloseTo(plateTop + 0.46 * w + 1, 6);
+                        expect(more.y + more.h / 2).toBeLessThan(avatarCentre(p, s).y - 11 * 1.15 / 2);
+                    }
+                }
+            }
+        }
+    });
+
     it('draws a bet line, an all-in\'s pulse, a winner\'s "+N" and the felt\'s rail at the sizes the pots\' plan keeps clear of', () => {
         const rule = (selector: string): string => {
             const at = css.indexOf(`${selector} {`);
@@ -580,10 +661,11 @@ const BANNER_BOXES: Record<string, {w: number; h: number}[]> = {
 const threesFull = HAND_COPY.label({category: 6, ranks: [1, 3]});
 const flush = HAND_COPY.label({category: 5, ranks: [12, 10, 8, 4, 2]});
 // One winner, the viewer; one with a long name and a hand that plays the board; a pot split three ways.
+const shortWins = (name: string) => ({lead: '', name: TABLE_COPY.bannerShortNames([name]), tail: TABLE_COPY.bannerShortWins});
 const TEXTS: Record<string, BannerText['winners']> = {
-    you: [{head: TABLE_COPY.bannerYou(70), hand: threesFull}],
-    long: [{head: TABLE_COPY.banner('Bartholomew Q.', 123_456), hand: `${HAND_COPY.label({category: 6, ranks: [5, 1]})} · ${HAND_COPY.playsBoard}`}],
-    split: ['Ana', 'Cleo', 'Dinosaur'].map((name) => ({head: TABLE_COPY.banner(name, 1_200), hand: flush})),
+    you: [{head: TABLE_COPY.bannerYou(70), short: {lead: TABLE_COPY.bannerShortYou, name: '', tail: ''}, hand: threesFull}],
+    long: [{head: TABLE_COPY.banner('Bartholomew Q.', 123_456), short: shortWins('Bartholomew Q.'), hand: `${HAND_COPY.label({category: 6, ranks: [5, 1]})} · ${HAND_COPY.playsBoard}`}],
+    split: ['Ana', 'Cleo', 'Dinosaur'].map((name) => ({head: TABLE_COPY.banner(name, 1_200), short: shortWins(name), hand: flush})),
 };
 const NOTES = [TABLE_COPY.nextHandIn(99), TABLE_COPY.paused, TABLE_COPY.waitingForPlayers, null];
 
@@ -614,7 +696,7 @@ describe("the winner's banner", () => {
     for (const [size, boxes] of Object.entries(BANNER_BOXES)) for (const handSize of [2, 4]) {
         it(`clears every plate, turned-up hand (of ${handSize}), the dealer button and the board at ${size}, every seat count and button`, () => {
             for (const box of boxes) for (const n of SEAT_COUNTS) for (const mine of [0, null]) {
-                const s = stageLayout(box, n, mine);
+                const s = stageLayout(box, n, mine, 1, {handSize});
                 // Every seat taken and every hand but the viewer's turned up on the felt (a watcher's
                 // seat 0 too), the most a showdown shows; and the table half empty. Texas hold'em's
                 // two cards a hand, and PLO's four.
@@ -670,6 +752,47 @@ describe("the winner's banner", () => {
         const plan = bannerPlan(crowded, {winners: TEXTS.you, note: null}, {open: [], shown: [], button: null});
         expect(plan.clear).toBe(false);
         expect(plan.banner.x).toBe(s.board.x);
+    });
+
+    it('never cuts inside a number or a board\'s name: cut short, a head loses its chips, then the banner names fewer boards, and only then a name shrinks to a letter and an ellipsis', () => {
+        const chrome = 2 * (BANNER.compact.pad.x + BANNER.border);
+        const w = (text: string) => textWidth(text, BANNER.compact.px, true);
+        for (const box of [{w: 363, h: 420}, {w: 308, h: 340}, {w: 562, h: 294}, {w: 442, h: 279}, {w: 364, h: 224}, {w: 378, h: 617}]) for (const n of SEAT_COUNTS) for (const boards of [2, 3]) {
+            const s = stageLayout(box, n, 0, boards);
+            const shown = s.seats.filter((p) => p.seat !== 0).map((p) => p.seat);
+            for (const name of ['Hana', 'Dinosaur Q.']) for (const amount of [27, 123_456]) {
+                const text: BannerText = {
+                    winners: Array.from({length: boards}, (_, k) => ({
+                        head: TABLE_COPY.bannerBoard(k, name, amount), short: {lead: TABLE_COPY.bannerShortBoard(k), name: TABLE_COPY.bannerShortNames([name]), tail: ''}, hand: flush,
+                    })),
+                    note: TABLE_COPY.nextHandIn(99),
+                };
+                const plan = bannerPlan(s, text, {open: [], shown, button: 0, handSize: 4});
+                const label = `${box.w}×${box.h} ${n} seats, ${boards} boards, ${name} ${amount}: ${plan.variant}${plan.short ? ' short' : ''}, ${plan.rows} rows`;
+                if (plan.variant !== 'cut' || !plan.clear) continue;
+                const named = text.winners.slice(0, plan.rows);
+                if (!plan.short) expect(plan.banner.width, label).toBeGreaterThanOrEqual(chrome + Math.max(...named.map((l) => w(l.head))) + textWidth(' …', BANNER.compact.px));
+                else {
+                    expect(plan.banner.width, label).toBeGreaterThanOrEqual(chrome + Math.max(...named.map((l) => w(l.short!.lead) + Math.min(w(l.short!.name), w('W…')))));
+                    // A name is cut only where not even one board's whole short head has room.
+                    if (plan.banner.width < chrome + Math.max(...named.map((l) => w(`${l.short!.lead}${l.short!.name}`)))) {
+                        const one = bannerPlan(s, {...text, winners: text.winners.slice(0, 1)}, {open: [], shown, button: 0, handSize: 4});
+                        expect(one.variant === 'cut' && one.short && one.banner.width < chrome + w(`${text.winners[0].short!.lead}${text.winners[0].short!.name}`), label).toBe(true);
+                    }
+                }
+            }
+        }
+        // The finding's phones: a 375 × 667 and a 320 × 568, three boards, every board won by another.
+        for (const box of [{w: 363, h: 420}, {w: 308, h: 340}]) {
+            const s = stageLayout(box, 8, 0, 3);
+            const text: BannerText = {
+                winners: ['Hana', 'Amy', 'Bo'].map((name, k) => ({head: TABLE_COPY.bannerBoard(k, name, 27), short: {lead: TABLE_COPY.bannerShortBoard(k), name: TABLE_COPY.bannerShortNames([name]), tail: ''}, hand: flush})),
+                note: TABLE_COPY.nextHandIn(9),
+            };
+            const plan = bannerPlan(s, text, {open: [1, 2, 3, 4], shown: [5, 6, 7], button: 0, handSize: 4});
+            expect(plan.clear).toBe(true);
+            if (plan.variant === 'cut') expect(plan.banner.width).toBeGreaterThanOrEqual(chrome + w(`${TABLE_COPY.bannerShortBoard(0)}${TABLE_COPY.bannerShortNames(['Hana'])}`));
+        }
     });
 
     it('keeps the line under the banner off the winner\'s "+N" — heads up at a nine-seat table, a phone on its side', () => {
@@ -921,6 +1044,41 @@ describe('two and three boards', () => {
         expect(CASCADE_STEP).toBeGreaterThanOrEqual(INDEX_BAND);
     });
 
+    it('uses the seats nobody sits in: on the smallest phone on its side, eight seats and four players, the boards move into the felt\'s free half rather than shrink to 14 px', () => {
+        const seatings: number[][] = [];
+        for (let a = 1; a < 8; a++) for (let b = a + 1; b < 8; b++) for (let c = b + 1; c < 8; c++) seatings.push([0, a, b, c]);
+        for (const box of [SIDEWAYS['568 × 320'], SIDEWAYS['667 × 375']]) for (const boards of [2, 3]) {
+            const widths: number[] = [];
+            for (const seated of seatings) {
+                const open = Array.from({length: 8}, (_, seat) => seat).filter((seat) => !seated.includes(seat));
+                const s = stageLayout(box, 8, 0, boards, {handSize: 4, open});
+                const label = `${box.w}×${box.h}, ${boards} boards, seated ${seated.join()}`;
+                widths.push(s.board.card.w);
+                // On the felt, clear of every seat taken (its plate, bet line and button) and of every
+                // open seat's ring.
+                const span = feltSpan(s, s.board.y - s.board.h / 2, s.board.h, 0);
+                expect(span, label).not.toBeNull();
+                expect(s.board.x - s.board.w / 2, label).toBeGreaterThanOrEqual(span![0] - 0.5);
+                expect(s.board.x + s.board.w / 2, label).toBeLessThanOrEqual(span![1] + 0.5);
+                const ring = openSeatPx(s);
+                for (const p of s.seats) {
+                    const near = open.includes(p.seat)
+                        ? [{...p.plate, w: ring, h: ring}]
+                        : [{...p.plate, ...s.plateSize}, {...p.bet, ...s.betSize}, {...p.button, w: s.buttonSize, h: s.buttonSize}];
+                    for (const r of near) expect(overlaps(s.board, r), `${label}: seat ${p.seat}`).toBe(false);
+                }
+            }
+            widths.sort((a, b) => a - b);
+            // Half the seatings deal them 18 px or more on the smallest phone; all of them 22 a size up.
+            expect(widths[Math.floor(widths.length / 2)], `${box.w}×${box.h}, ${boards} boards`).toBeGreaterThanOrEqual(box.w === 364 ? BOARD_CARD_MIN : 22);
+        }
+        // QA's seating: the viewer at the foot and three players up the right-hand side.
+        const qa = (boards: number) => stageLayout(SIDEWAYS['568 × 320'], 8, 0, boards, {handSize: 4, open: [1, 2, 3, 4]}).board.card.w;
+        expect([qa(2), qa(3)].every((w) => w >= 20), `${qa(2)}, ${qa(3)}`).toBe(true);
+        // Every seat taken there is still nowhere to put them larger: 14 px, the sheet is where they read.
+        expect(stageLayout(SIDEWAYS['568 × 320'], 8, 0, 3, {handSize: 4}).board.card.w).toBe(MULTI_BOARD_MIN);
+    }, 120_000);
+
     it("sends a board's share of the pots from its numeral, else its left end", () => {
         const s = stageLayout({w: 1428, h: 705}, 6, 0, 3);
         expect(s.board.labels).toBe(true);
@@ -944,7 +1102,7 @@ describe('two and three boards', () => {
                     if (size === '390 × 844') expect(pots.felt, label).toBe(true);
                     // A line a board, "Board 2: Dinosaur wins 123,456" over the hand's name.
                     const text: BannerText = {
-                        winners: Array.from({length: boards}, (_, k) => ({head: TABLE_COPY.bannerBoard(k, 'Dinosaur', 123_456), hand: k === 0 ? flush : threesFull})),
+                        winners: Array.from({length: boards}, (_, k) => ({head: TABLE_COPY.bannerBoard(k, 'Dinosaur', 123_456), short: {lead: TABLE_COPY.bannerShortBoard(k), name: TABLE_COPY.bannerShortNames(['Dinosaur']), tail: ''}, hand: k === 0 ? flush : threesFull})),
                         note: TABLE_COPY.nextHandIn(99),
                     };
                     const seen: BannerSeen = {open: [], shown, button, pots: pots.pills, pops, handSize: 4};
@@ -962,6 +1120,106 @@ describe('two and three boards', () => {
             }
         }, 120_000);
     }
+});
+
+describe('one board as the table moves a pixel, and the hands turned up round it', () => {
+    const css = readFileSync(fileURLToPath(new URL('../../../app/globals.css', import.meta.url)), 'utf8');
+    // A move from one height to the next that comes back within ten pixels of height: the board sent
+    // across the felt and back as the dock's line wraps.
+    const flips = (ys: readonly number[]): number[] => {
+        const out: number[] = [];
+        for (let i = 1; i < ys.length; i++) {
+            if (Math.abs(ys[i] - ys[i - 1]) <= 12) continue;
+            for (let j = i + 1; j < Math.min(ys.length, i + 10); j++) if (Math.abs(ys[j] - ys[i - 1]) < 12) {
+                out.push(i);
+                break;
+            }
+        }
+        return out;
+    };
+
+    it('keeps its place where the bands over and under the middle are as wide: the throw-away\'s line growing the dock two pixels never sends it across', () => {
+        // QA's 390 × 844 phone, eight seats, the Triple T pick's line taking two pixels from the table;
+        // and the other phones the finding measured.
+        for (const [w, from, to] of [[378, 600, 640], [363, 410, 430], [308, 320, 340]] as const) for (const mine of [0, null]) {
+            const ys: number[] = [];
+            for (let h = from; h <= to; h++) ys.push(stageLayout({w, h}, 8, mine).board.y);
+            for (let i = 1; i < ys.length; i++) expect(Math.abs(ys[i] - ys[i - 1]), `${w}×${from + i}, viewer ${mine}`).toBeLessThanOrEqual(3);
+        }
+        // Over the middle where the bands either side are as wide.
+        const s = stageLayout({w: 378, h: 617}, 8, 0);
+        expect(s.board.y).toBeLessThan(s.centre.y);
+    });
+
+    it('stays where the page drew it a moment ago (prefer) at every phone size, seat count and hand, the table growing or shrinking a pixel at a time', () => {
+        const SWEEPS: [number, number, number][] = [[308, 330, 400], [363, 400, 480], [378, 570, 680], [364, 205, 240], [442, 260, 300], [562, 270, 320]];
+        for (const [w, from, to] of SWEEPS) for (const n of SEAT_COUNTS) for (const handSize of [2, 4]) for (const down of [false, true]) {
+            const heights = Array.from({length: to - from + 1}, (_, k) => (down ? to - k : from + k));
+            let share: number | null = null;
+            const ys = heights.map((h) => {
+                const s = stageLayout({w, h}, n, 0, 1, {handSize, prefer: share === null ? null : share * h});
+                share = s.board.y / h;
+                return s.board.y;
+            });
+            expect(flips(ys).map((i) => heights[i]), `${w} wide, ${n} seats, hands of ${handSize}${down ? ', shrinking' : ''}`).toEqual([]);
+            // The place it prefers is the place it keeps: asked again where it is, it stays.
+            const h = heights[heights.length - 1];
+            const last = stageLayout({w, h}, n, 0, 1, {handSize, prefer: ys[ys.length - 1]});
+            expect(last.board.y).toBe(ys[ys.length - 1]);
+        }
+    }, 120_000);
+
+    it('in PLO keeps clear of every hand of four that may turn up, wherever that leaves its cards 18 px or wider — all but the smallest phone on its side', () => {
+        for (const box of [...BOXES, ...Object.values(POT_BOXES).flat(), ...Object.values(SIDEWAYS)]) for (const n of SEAT_COUNTS) for (const mine of [0, null]) {
+            const s = stageLayout(box, n, mine, 1, {handSize: 4});
+            const label = `${box.w}×${box.h} ${n} seats, viewer ${mine}`;
+            expect(s.board.card.w, label).toBeGreaterThanOrEqual(BOARD_CARD_MIN);
+            if (box.w === 364 && box.h === 224) continue;
+            expect(s.board.handsClear, label).toBe(true);
+            for (const p of s.seats) {
+                if (mine !== null && p.slot === 0) continue;
+                expect(overlaps(s.board, shownHandRect(p, s, 4)), `${label}: the board and seat ${p.seat}'s hand`).toBe(false);
+            }
+            // Texas hold'em's board is laid out as it always was: the hands of two do not move it.
+            expect(stageLayout(box, n, mine, 1, {handSize: 2}).board).toEqual(stageLayout(box, n, mine).board);
+        }
+    }, 120_000);
+
+    it('moves a turned-up hand along its row off another: apart on the phones QA drives at every seat count but seven or more on a 320 px phone (eight on its side)', () => {
+        // Where there is no room for every seat's hand at once — seven seats or more on a 320 px phone,
+        // eight on the smallest phone on its side, and Texas hold'em's eight on a 375 px phone held
+        // upright, whose board, laid out first, takes the room a hand would move to — each hand that
+        // meets none stays where it was.
+        const crowded = (box: {w: number; h: number}, n: number, handSize: number): boolean =>
+            (box.w <= 320 && n >= 7) || (box.w === 364 && box.h === 224 && n >= 8) || (handSize === 2 && n === 8 && box.w < 380 && box.h < 480);
+        for (const box of [...Object.values(POT_BOXES).flat(), ...Object.values(SIDEWAYS)]) for (const n of SEAT_COUNTS) for (const mine of [0, null]) for (const handSize of [2, 4]) {
+            const s = stageLayout(box, n, mine, 1, {handSize});
+            const label = `${box.w}×${box.h} ${n} seats, viewer ${mine}, hands of ${handSize}`;
+            const hands = s.seats.filter((p) => mine === null || p.slot !== 0).map((p) => ({p, r: shownHandRect(p, s, handSize)}));
+            for (const {p, r} of hands) {
+                expect(insideBox(r, s.box), `${label}: seat ${p.seat}'s hand inside`).toBe(true);
+                // A hand moved along its row never covers another seat's plate (or, two cards, the board).
+                if (p.shownDx === 0) continue;
+                for (const q of s.seats) if (q.seat !== p.seat) expect(overlaps(r, {...q.plate, ...s.plateSize}), `${label}: seat ${p.seat}'s hand over plate ${q.seat}`).toBe(false);
+                if (handSize === 2) expect(overlaps(r, {x: s.board.x, y: s.board.y - 4, w: s.board.w + 4, h: s.board.h + 8}), `${label}: seat ${p.seat}'s hand over the board`).toBe(false);
+            }
+            if (crowded(box, n, handSize)) continue;
+            for (let i = 0; i < hands.length; i++) for (let j = i + 1; j < hands.length; j++) {
+                expect(handsMeet(hands[i].r, hands[j].r), `${label}: seats ${hands[i].p.seat} and ${hands[j].p.seat}`).toBe(false);
+            }
+        }
+        // QA's PLO table at 320 × 568: the top corner's hand and the side seat's under it, apart.
+        const s = stageLayout({w: 308, h: 340}, 8, 0, 1, {handSize: 4});
+        const [corner, side] = [s.seats.find((p) => p.slot === 5)!, s.seats.find((p) => p.slot === 6)!];
+        expect(handsMeet(shownHandRect(corner, s, 4), shownHandRect(side, s, 4))).toBe(false);
+        expect(corner.shownDx).toBeLessThan(0);
+    }, 120_000);
+
+    it('draws a hand moved along its row where the stage put it', () => {
+        expect(css).toContain('translate: calc(-50% + var(--pn-shown-dx, 0px)) 0;');
+        const seat = readFileSync(fileURLToPath(new URL('../../../components/poker-night/Seat.tsx', import.meta.url)), 'utf8');
+        expect(seat).toContain("'--pn-shown-dx': `${place.shownDx}px`");
+    });
 });
 
 describe("the boards' sizes in the stylesheet", () => {

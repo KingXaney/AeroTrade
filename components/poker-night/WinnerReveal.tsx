@@ -7,7 +7,7 @@
 // seats' and the dock's own (lib/poker-night/reveal); the chips' flight is ChipFlight's. A result
 // the table had already shown when this page saw it is drawn in place, with no show. Where it goes,
 // how many winners it names and which banner it is — the full one; the compact one, a line a winner
-// with no avatar, wrapped when narrow; or that cut short — is TableScreen's plan
+// with no avatar, wrapped when narrow; or that cut short, never inside a name or a number — is TableScreen's plan
 // (lib/poker-night/stage.bannerPlan), clear of every plate, turned-up hand, the dealer button and the
 // board: drawn top-anchored at the plan's place, never wider than the room it found there.
 
@@ -53,6 +53,17 @@ const WinnerReveal = ({anims, handNo, lines, plan}: Props) => {
                      style={win ? animVars(win, win.bannerAt ?? 0, 2) : undefined}
                      role="status" data-pn-banner={shown.map((w) => w.seat).join(',')} data-variant={plan.variant} data-anim={win ? 'banner' : undefined}>
                     {shown.map((line) => {
+                        if (plan.short) {
+                            // Cut short where the heads have no room whole: without the chips, and only the
+                            // name ever cut, to an ellipsis — never a number or a board's name.
+                            return (
+                                <p key={line.key} className="pn-banner-line flex whitespace-nowrap font-semibold" data-winner={line.seat} data-board={line.board ?? undefined} data-short="">
+                                    {line.short.lead && <span className="flex-none whitespace-pre">{line.short.lead}</span>}
+                                    {line.short.name && <span className="min-w-0 truncate" {...userText(line)}>{line.short.name}</span>}
+                                    {line.short.tail && <span className="flex-none whitespace-pre">{line.short.tail}</span>}
+                                </p>
+                            );
+                        }
                         if (plan.variant !== 'full') {
                             return (
                                 <p key={line.key} className={cn('pn-banner-line', plan.variant === 'cut' && 'truncate')} data-winner={line.seat} data-board={line.board ?? undefined}>

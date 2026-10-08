@@ -15,16 +15,15 @@ import AvatarDisc from "@/components/poker-night/AvatarDisc";
 import ChipStack from "@/components/poker-night/ChipStack";
 import DealerButton from "@/components/poker-night/DealerButton";
 import PlayingCard from "@/components/poker-night/PlayingCard";
-import Seat from "@/components/poker-night/Seat";
+import Seat, {shownStyle} from "@/components/poker-night/Seat";
 import {chooseSeat} from "@/components/poker-night/overlay-requests";
 import {useRoom} from "@/components/poker-night/room-controller";
 import {TABLE_COPY} from "@/lib/learn/copy/poker-night";
 import {HOLE_CARDS, PLAYING_CARDS} from "@/lib/poker-night/config";
 import type {Card} from "@/lib/poker/cards";
 import {cardLook, playerAt, type ResultLook} from "@/lib/poker-night/reveal";
-import type {SeatPlace, Stage} from "@/lib/poker-night/stage";
+import {flagRoom, type SeatMarks, type SeatPlace, type Stage} from "@/lib/poker-night/stage";
 import type {Person} from "@/lib/poker-night/view-types";
-import type {CSSProperties} from "react";
 import {cn} from "@/lib/utils";
 
 type Props = {stage: Stage; anims: readonly LiveAnim[]; look: ResultLook | null};
@@ -37,7 +36,7 @@ const GhostSeat = ({seat, place, pid, person, cards, look}: {
         <li className="pn-seat" style={{left: place.plate.x, top: place.plate.y}} data-seat={seat} data-pid={pid} data-ghost="" data-state="leaving"
             data-side={place.spot.side} data-shown={cards ? '' : undefined} aria-label={TABLE_COPY.ghostLabel(name, seat)}>
             {cards && (
-                <div className="pn-seat-shown" style={{'--pn-card-w': 'var(--pn-show-w)'} as CSSProperties} data-count={cards.length}>
+                <div className="pn-seat-shown" style={shownStyle(place)} data-count={cards.length}>
                     {cards.map((card) => <PlayingCard key={`${card}`} card={card} state={cardLook(look, card)}/>)}
                 </div>
             )}
@@ -64,6 +63,15 @@ const SeatRing = ({stage, anims, look}: Props) => {
     // The cards a hand of this game holds once the betting starts (in Triple T's throw-away, the three
     // dealt): what a seat's fold sends in.
     const held = hand ? (hand.phase === 'discard' ? HOLE_CARDS : PLAYING_CARDS)[hand.variant] : 2;
+    // Where a plate's "Discarding…" flag has no room under it (a crowded side column on a phone on its
+    // side), the plate carries a dashed ring instead (stage.flagRoom); the felt's count and the backs
+    // going three to two say who is still to throw, and the plate's name says it to a screen reader.
+    const blinds = live && hand ? [hand.sb, hand.bb] : [];
+    const marks: SeatMarks[] = table.seats.map((v, seat) => ({
+        seat, open: !v, backs: v && seat !== mySeat && typeof v.cards === 'number' ? v.cards : 0, blind: !!v && blinds.includes(seat),
+        flag: toDiscard.has(seat) ? TABLE_COPY.discarding : null,
+    }));
+    const discardMark = (seat: number): boolean => toDiscard.has(seat) && !flagRoom(stage, seat, TABLE_COPY.discarding, marks);
     const turnMs = room.config.turnSeconds * 1000;
     // An open seat takes a visitor who may join, or a watcher; a seated player sees it as open.
     const canChoose = table.status !== 'closed' && (
@@ -131,7 +139,7 @@ const SeatRing = ({stage, anims, look}: Props) => {
                               blind={live && hand ? (hand.sb === seat && hand.bb !== seat ? 'small' : hand.bb === seat ? 'big' : null) : null}
                               look={look} anims={anims} awaitingChips={requested.has(v.pid)}
                               privateCards={playerAt(table, seat) === v.pid ? seenAlone.find((h) => h.seat === seat)?.cards ?? null : null} held={held}
-                              discarding={toDiscard.has(seat)}/>
+                              discarding={toDiscard.has(seat)} discardMark={discardMark(seat)}/>
                     );
                 })}
             </ul>

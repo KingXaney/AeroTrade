@@ -112,10 +112,10 @@ export const HAND_COPY = {
     playsBoard: 'Plays the board',
     fiveCards: 'The five cards that play',
     // A hand's kind alone ("Flush", "Two pair", "Royal flush"); with two or three boards the dock
-    // says what the viewer's cards make on each in one line ("1 Flush · 2 Pair · 3 Straight"), the
-    // names in full for a screen reader ("Board 1: Flush, ace high; board 2: Pair of kings").
+    // says what the viewer's cards make on each, each kind behind its board's numeral badge
+    // (components/poker-night/HandStrength), the names in full for a screen reader ("Board 1: Flush,
+    // ace high; board 2: Pair of kings").
     kind: (d: HandDescription): string => capitalize(KIND_WORDS[d.category === 8 && d.ranks[0] === 12 ? 9 : d.category]),
-    onBoardsShort: (kinds: readonly string[]): string => kinds.map((k, i) => `${count(i + 1)} ${k}`).join(' · '),
     onBoardsSpoken: (labels: readonly string[]): string => capitalize(labels.map((l, i) => `board ${count(i + 1)}: ${l}`).join('; ')),
     // A card as a picture's name (role="img"): "Ace of spades"; inside a sentence, "ace of spades";
     // as its corner, "A♠︎".
@@ -640,8 +640,19 @@ export const TABLE_COPY = {
     bannerBoardYou: (k: number, n: number): string => `Board ${count(k + 1)}: you win ${count(n)}`,
     bannerBoardSplit: (k: number, parts: readonly {name: string | null; amount: number}[]): string =>
         `Board ${count(k + 1)}: ${words(parts.map((p) => `${p.name === null ? 'you' : isolate(p.name)} ${count(p.amount)}`))}`,
+
     bannerScoop: (name: string, n: number): string => `${isolate(name)} wins every board: ${count(n)}`,
     bannerScoopYou: (n: number): string => `You win every board: ${count(n)}`,
+    // A banner line cut short where the banner has no room for its chips (each seat's "+N" says them),
+    // in three parts so that only a name is ever cut, to an ellipsis, on the narrowest screens: the
+    // words before it, the name (or names), the words after — "Board 2: " "Ana" "", "" "Ana" " wins",
+    // "You win every board" "" "".
+    bannerShortBoard: (k: number): string => `Board ${count(k + 1)}: `,
+    bannerShortNames: (parts: readonly (string | null)[]): string => words(parts.map((name) => (name === null ? 'you' : isolate(name)))),
+    bannerShortWins: ' wins',
+    bannerShortEvery: ' wins every board',
+    bannerShortYou: 'You win',
+    bannerShortEveryYou: 'You win every board',
 
     // The turn and its countdown (role="timer"; the server's two seconds of grace are never shown).
     yourTurn: 'Your turn',
@@ -884,7 +895,7 @@ export const ASK_COPY = {
         everyone: (name: string): string => `${isolate(name)} showed their cards to everyone.`,
         no: (name: string): string => `${isolate(name)} said no thanks.`,
         expired: (name: string): string => `No answer from ${isolate(name)} in time.`,
-        // The next deal ended it while it still had time: no answer, and no wait before asking again.
+        // The next deal ended it while it still had time: no answer, which counts as a no.
         dealt: (name: string): string => `The next hand was dealt before ${isolate(name)} answered.`,
     },
     // The plate of a player who showed the reader alone.

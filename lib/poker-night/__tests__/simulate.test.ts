@@ -636,22 +636,17 @@ const night = (seed: number, counters: Counters) => {
         if (next.handNo - prev.handNo > 1) fail('two hands dealt in one step');
         if (next.handNo !== prev.handNo) {
             checkDeal(prev, next, steps);
-            // The last hand's asks end with it: one whose seconds were up by the deal is a no, with its
-            // cooldown; one still waiting with time left just ends, with none.
+            // The last hand's asks end with it, and every one still waiting is a no, with its cooldown:
+            // one whose seconds were up by the deal, and one the deal cut short.
             for (const [from, to, askedAt, answer] of prev.hand?.asks ?? []) {
                 if (answer !== WAITING) continue;
                 const a = prev.hand!.seats.find((p) => p.seat === from)!.pid;
                 const b = prev.hand!.seats.find((p) => p.seat === to)!.pid;
                 const cooled = next.askCooldowns.some(([x, y, until]) => x === a && y === b && until === prev.hand!.no + ASKS.COOLDOWN_HANDS);
-                const before = prev.askCooldowns.some(([x, y]) => x === a && y === b);
-                if (next.hand!.startedAt >= prev.hand!.startedAt + askedAt + ASKS.WAIT_MS) {
-                    counters.asksExpired++;
-                    noted(a, b, prev.hand!.no);
-                    if (!cooled) fail(`an ask ${a} → ${b} ran out unanswered with no cooldown`);
-                } else {
-                    counters.asksDealt++;
-                    if (cooled && !before) fail(`an ask ${a} → ${b} the deal cut short left a cooldown`);
-                }
+                if (next.hand!.startedAt >= prev.hand!.startedAt + askedAt + ASKS.WAIT_MS) counters.asksExpired++;
+                else counters.asksDealt++;
+                noted(a, b, prev.hand!.no);
+                if (!cooled) fail(`an ask ${a} → ${b} the deal ended unanswered left no cooldown`);
             }
         }
         if (next.handNo === prev.handNo && next.hand && prev.hand) {

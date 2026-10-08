@@ -288,9 +288,10 @@ const sitIn = (w: Work, by: string): Refusal | typeof NOOP | void => {
 // everyone ('all': a show), or no. Kept from spam on the server: one ask waiting per player at a
 // time, ASKS.PER_HAND a hand; an ask unanswered for ASKS.WAIT_MS counts as a no; after a no the same
 // player may not ask the same player again for ASKS.COOLDOWN_HANDS hands; a player who turned asks
-// off cannot be asked. Asks live in the hand, so the next deal ends every one — one still waiting
-// with time left ends unanswered and leaves no cooldown, since nobody said no and its seconds had not
-// run out. The table keeps at most ASKS.COOLDOWNS_KEPT cooldowns and waiting asks together and never
+// off cannot be asked. Asks live in the hand, so the next deal ends every one, and one still waiting
+// then ends unanswered — a no, with its cooldown, even with seconds left: the results pause is never
+// longer than ASKS.WAIT_MS, so otherwise an ask its player lets go by would leave no cooldown and
+// could come back every hand. The table keeps at most ASKS.COOLDOWNS_KEPT cooldowns and waiting asks together and never
 // drops a cooldown before its hands are up: at that cap a new ask is refused ('asks-full') until some
 // run out. A card thrown away in Triple T is never shown.
 
@@ -306,12 +307,13 @@ const coolDown = (s: TableState, hand: Hand, ask: AskEntry): void => {
     s.askCooldowns = [...kept, [from, to, hand.no + ASKS.COOLDOWN_HANDS]];
 };
 
-// Every waiting ask whose seconds have run out by `at` is a no.
-const expireAsks = (s: TableState, at: number): void => {
+// Every waiting ask whose seconds have run out by `at` is a no; at the next deal (`dealt`), every
+// waiting ask.
+const expireAsks = (s: TableState, at: number, dealt = false): void => {
     const hand = s.hand;
     if (!hand) return;
     for (const ask of hand.asks) {
-        if (ask[3] !== ASK_WAITING || at < askDeadline(hand, ask)) continue;
+        if (ask[3] !== ASK_WAITING || (!dealt && at < askDeadline(hand, ask))) continue;
         ask[3] = ASK_EXPIRED;
         coolDown(s, hand, ask);
     }
@@ -521,10 +523,10 @@ const startHand = (w: Work, deck: Card[], draw: number): void => {
         s.nextHandAt = null;
         return;
     }
-    // The last hand's asks end with it: one whose seconds had run out is a no, with its cooldown; one
-    // still waiting with time left just ends, since nobody said no. Cooldowns past their hands go, and
-    // so does the "no asks" setting of anyone no longer seated.
-    expireAsks(s, w.at);
+    // The last hand's asks end with it: one still waiting is a no, with its cooldown, whether its
+    // seconds had run out or the deal cut them short (nobody answered it). Cooldowns past their hands
+    // go, and so does the "no asks" setting of anyone no longer seated.
+    expireAsks(s, w.at, true);
     const no = s.handNo + 1;
     s.askCooldowns = s.askCooldowns.filter(([, , until]) => until >= no);
     s.noAsks = s.noAsks.filter((pid) => seatOf(s, pid) !== null);

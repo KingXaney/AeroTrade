@@ -40,7 +40,7 @@ import TableOverlays from "@/components/poker-night/TableOverlays";
 import WinnerReveal from "@/components/poker-night/WinnerReveal";
 import {useRoom, useServerNow} from "@/components/poker-night/room-controller";
 import {DISCARD_COPY, MODE_COPY, TABLE_COPY} from "@/lib/learn/copy/poker-night";
-import {PLAYING_CARDS} from "@/lib/poker-night/config";
+import {HOLE_CARDS, PLAYING_CARDS} from "@/lib/poker-night/config";
 import {throwAwayCount} from "@/lib/poker-night/dock";
 import {modeChanged, modeOf, nextModeOf} from "@/lib/poker-night/variants";
 import {secondsUntil} from "@/lib/poker-night/client-clock";
@@ -107,8 +107,9 @@ const ThrowAwayNote = ({count, deadline, board}: {count: {done: number; of: numb
 };
 
 // The board widths the felt's throw-away note needs: the sentence with the seconds (two lines at
-// most), and the count alone on one line ("3 of 5 thrown away", at 11 px).
-const THROW_AWAY_PX = {full: 200, count: 130} as const;
+// most), and the count alone on one line ("3 of 5 thrown away" at 11 px: about 95 px in the app's
+// faces, its padding and the widest chrome border, a few pixels to spare).
+const THROW_AWAY_PX = {full: 200, count: 126} as const;
 
 // The widest the countdown says it, for the banner's plan: the next deal is never 100 s away.
 const NEXT_HAND_WIDEST = 99;
@@ -151,7 +152,28 @@ const TableScreen = () => {
     // The stage lays out as many boards as the game has (PLO's two or three): the hand's own while
     // there is one, else what the next deal plays.
     const boardCount = hand ? hand.boards.length : nextModeOf(room.config).boards;
-    const stage: Stage | null = useMemo(() => (box && box.w > 0 && box.h > 0 ? stageLayout(box, seatCount, mySeat, boardCount) : null), [box, seatCount, mySeat, boardCount]);
+    // The game: the hand's own (what its turned-up hands hold), and the next deal's when the host
+    // picked another. The stage keeps the board clear of PLO's hands of four, and moves a turned-up
+    // hand along its row off another.
+    const game = modeOf(hand, room.config);
+    const handSize = PLAYING_CARDS[game.variant];
+    // Where the board sat a moment ago (its middle, as a share of the seat layer's height) for this
+    // table's layout: a box a pixel taller or shorter keeps it there among places as good (the stage's
+    // `prefer`), so the dock's line wrapping never sends the board across the felt and back.
+    const layoutKey = `${seatCount}:${mySeat}:${boardCount}:${handSize}`;
+    const [held, setHeld] = useState<{key: string; share: number} | null>(null);
+    const prefer = box && held?.key === layoutKey ? held.share * box.h : null;
+    // The seats nobody sits in (a ring, no plate, bet line or hand there), which the board may use: a
+    // seat whose player went as the hand completed keeps its ghost plate until the next deal.
+    const goneSeats = new Set(hand?.phase === 'complete' ? (hand.result?.gone ?? []).map(([seat]) => seat) : []);
+    const openKey = table.seats.flatMap((v, seat) => (v === null && !goneSeats.has(seat) ? [seat] : [])).join(',');
+    const stage: Stage | null = useMemo(() => {
+        if (!box || box.w <= 0 || box.h <= 0) return null;
+        const open = openKey ? openKey.split(',').map(Number) : [];
+        return stageLayout(box, seatCount, mySeat, boardCount, {handSize, prefer, open});
+    }, [box, seatCount, mySeat, boardCount, handSize, prefer, openKey]);
+    const share = stage ? stage.board.y / stage.box.h : null;
+    if (share !== null && (held?.key !== layoutKey || held.share !== share)) setHeld({key: layoutKey, share});
     const look = useMemo(() => resultLook(hand), [hand]);
     const tableLook = resolveTableLook(table.settings);
     const name = TABLE_COPY.name(table.settings.name, room.code);
@@ -172,10 +194,8 @@ const TableScreen = () => {
     const note = live ? null : centreNote(table);
     const throwAway = throwAwayCount(table);
     const nextAt = !live && table.status === 'playing' && !table.closing && table.nextHandAt !== null && note === null ? table.nextHandAt : null;
-    // The game: the hand's own (what its turned-up hands hold), and the next deal's when the host
-    // picked another.
-    const game = modeOf(hand, room.config);
-    const handSize = PLAYING_CARDS[game.variant];
+    // The cards face down before a plate: Triple T's three while they throw one away.
+    const backs = hand?.phase === 'discard' ? HOLE_CARDS[game.variant] : handSize;
     const nextGame = nextModeOf(room.config);
     const changedTo = modeChanged(hand, room.config) ? MODE_COPY.label(nextGame.variant, nextGame.boards) : null;
     // While a result shows: what the banner says, what the line under the board says at its widest,
@@ -220,9 +240,9 @@ const TableScreen = () => {
             bets: betsKey.split(',').flatMap((b, seat) => (b ? [{seat, amount: parseInt(b, 10), allIn: b.endsWith('!')}] : [])),
             pops: popsOf(popsKey),
         };
-        const seen: PotSeen = {open, shown: seated.filter((seat) => seat !== mySeat), button, bets: seated, now, handSize};
+        const seen: PotSeen = {open, shown: seated.filter((seat) => seat !== mySeat), button, bets: seated, now, handSize, backs};
         return potPlan(stage, potKey.split(',').map((amount, pot) => ({pot, amount: Number(amount)})), seen);
-    }, [stage, potKey, seatedKey, shownKey, betsKey, popsKey, mySeat, button, handSize]);
+    }, [stage, potKey, seatedKey, shownKey, betsKey, popsKey, mySeat, button, handSize, backs]);
     const plan = useMemo(() => {
         if (!stage || !bannerShows(hand, look)) return null;
         const open: number[] = [];

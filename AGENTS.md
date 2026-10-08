@@ -659,8 +659,9 @@ and friends keep none beyond Shared and the invariants).
   `ASKS.COOLDOWN_HANDS` hands; a player who turned asks off (`TableState.noAsks`, kept while seated
   or dealt into the hand asks are about — `ledger.cashOut` drops anyone else's, so it never names
   more than the seats and the hand's players) cannot be asked. Asks live in the hand, so the next
-  deal ends every one: one whose seconds were up by then is a no, one still waiting with time left
-  just ends, with no cooldown. A cooldown is never dropped before its hands are up: the table holds
+  deal ends every one, and one still waiting is a no, with its cooldown, even with seconds left (the
+  results pause is never longer than `ASKS.WAIT_MS`, so an ask its player lets go by never comes back
+  every hand). A cooldown is never dropped before its hands are up: the table holds
   at most `ASKS.COOLDOWNS_KEPT` cooldowns and waiting asks together, and at that cap a new ask is
   refused `asks-full` until some run out (`asks.asksFull`, in `askChoices` too). A Triple T card
   thrown away is never shown. Refusals `asks-off`, `ask-waiting`, `ask-limit`, `ask-cooldown`,
@@ -843,8 +844,12 @@ and friends keep none beyond Shared and the invariants).
   turned-up hand (`stage.shownHandRect`), the dealer button and the board with its lit cards' lift:
   the full banner with the line under it nearest the board on the pot's side, then its other side,
   then the felt's empty bands; then the compact banner (a line a winner, no avatar, wrapped when
-  narrow); then each apart from the line; then cut short. A line with no room is not drawn (the top
-  bar says a pause too), and only when no banner fits does it name fewer winners. Both are drawn
+  narrow); then each apart from the line; then cut short. Cut short, a line keeps its head whole, or
+  says it without the chips (`BannerLine.short`: "Board 2: Ana", "Ana wins", the seat's "+N" saying the
+  chips; `BannerPlan.short`), never cutting inside a number or a board's name: the plan names fewer
+  winners — fewer boards — before a name is cut, and then only to a letter and an ellipsis. A line
+  with no room is not drawn (the top bar says a pause too), and only when no banner fits does it name
+  fewer winners. Both are drawn
   top-anchored in a wrap exactly the width found, never wider, from `reveal.bannerLines`' words and
   `stage.BANNER`'s sizes, which `stage.test` holds to the stylesheet and clears at 390, 375 and
   320 px phones and a 1440 px desktop for every seat count and button; `qa-poker-night` measures it
@@ -862,19 +867,48 @@ and friends keep none beyond Shared and the invariants).
   costs the cards no more than 8 % (`BOARD_LABEL`, held to the stylesheet; `LABELS_SHARE`) — on the felt and clear of every plate, bet line and
   button, and of every hand of four that may turn up unless that alone deals the cards under 18 px
   (`board.handsClear`); a second layout sending the bet lines along the rails is kept when it deals
-  them larger. One board is laid out exactly as before. The floors the spike measured are pinned in
+  them larger; where the middle deals them under 18 px, anywhere across the felt that deals them
+  larger (`board.x`, the felt's free half). The stage knows the seats nobody sits in
+  (`StageOptions.open`, TableScreen's empty seats but a gone player's ghost): a ring alone, no plate,
+  bet line, button or hand there, so on a 568 × 320 phone with four players at eight seats the boards
+  move into the free half (about 20 px, not 14). The floors the spike measured are pinned in
   `stage.test` (16 px on a 320 px phone, 19 on a wider one, 20 on one on its side); on a 568 × 320
-  phone with seven to nine seats nothing fits, and `fallbackY` puts them at `MULTI_BOARD_MIN` where
-  they cover least, never a plate. The block is one 44 px button to
+  phone with seven to nine seats taken nothing fits, and `fallbackY` puts them at `MULTI_BOARD_MIN`
+  where they cover least, never a plate. The block is one 44 px button to
   `components/poker-night/BoardsSheet` (44 px cards); the seat ring (`.pn-seats`) takes taps on its
   seats alone. A lit card never lifts on two or three boards. The reveal's `BoardLook`,
   `liftBoardOf` and `scoopOf`: cards light board after board; the banner says a line a board, and
   one line only when one player won every board's share of every pot. The choreography turns each
   street board by board, flies each pot's shares to the boards' numerals (`stage.boardAnchor`)
   before each board's stream, and plays a pay-out that would outlast the result's `revealMs`
-  faster, in proportion (`Scheduled.pace` scales the flights). The dock says each board's kind in
-  one line (`dock.boardStrengths`, `HAND_COPY.onBoardsShort`), the hand log and the announcer
-  board by board; the boards' count is picked under PLO by `components/poker-night/BoardsChoice`.
+  faster, in proportion (`Scheduled.pace` scales the flights). The dock says each board's kind
+  behind its numeral's badge (`dock.boardStrengths`, `components/poker-night/HandStrength`,
+  `.pn-board-num`), each board's part whole on its line and the line breaking only between boards;
+  the hand log and the announcer board by board; the boards' count is picked under PLO by
+  `components/poker-night/BoardsChoice`. The boards sheet draws the places still to come in the
+  palette's muted ink (`.pn-sheet-board .pn-slot`: it is portaled out of the room, where no felt is set).
+- One board (`stage.stageLayout`, `placeBoards`): the widest cards in the band round the middle,
+  at every pixel from it, a row counting at the width that fits a pixel over and under it too; among
+  those within `BOARD_TIE` of the widest the nearest the middle, one under it only when
+  `UNDER_BIAS` nearer — and, given `StageOptions.prefer` (where TableScreen drew it a moment ago, kept
+  as a share of the height for the layout it belongs to), the nearest that, so the dock's line wrapping
+  a pixel never sends the board across the felt and back. A dealer button sits beside its bet line on
+  the side away from the middle, half a pixel (`EDGE`) past touching, so a floating hair never moves
+  it. In PLO (`StageOptions.handSize` 4) the board keeps clear of every hand of four that may turn up
+  wherever that leaves its cards 18 px or more (`board.handsClear`); Texas hold'em's and Triple T's
+  board is laid out as before. A hand turned up that meets another's moves along its row
+  (`SeatPlace.shownDx`, `--pn-shown-dx`; `stage.nudgeHands`, `stage.handsMeet` allowing a lit card's
+  lift under the hand over it): side and bottom seats placed first, then the top row, toward the middle
+  first, else the other way, clear of every plate (and, two cards, the board placed first) — or the
+  hand it meets moves instead; seven seats or more on a 320 px phone can leave two meeting.
+- A plate's status flag hangs under it where `stage.flagRoom` finds room clear of every other seat's
+  plate (an open seat's ring), its cards face down, its blind's mark and its flag; where it has none
+  (a phone on its side at seven seats or more), Triple T's "Discarding…" is a dashed ring on the plate
+  instead (`data-pn-mark="discarding"`), the felt's count and the backs saying who is still to throw.
+  Three or four cards face down (Triple T's, PLO's) start a whole card's width over a compact or tight
+  plate (`stage.SEAT_CARDS_OVER`, `seatCardsRect`'s count, `PotSeen.backs`), above the stack's figures
+  that their closed fan would cover; `qa-poker-night-modes`' `tableLayout` counts flags over other
+  seats and figures under their fan.
 - The pots go where `lib/poker-night/stage.potPlan` finds room on the felt inside its rail
   (`stage.feltSpan`), never over a card (the board's and its lift, a seat's face-down pair, a turned-up
   hand), a plate, its flag or blind's mark, an open seat, the dealer button, a bet line out at the size

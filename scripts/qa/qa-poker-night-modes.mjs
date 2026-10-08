@@ -292,15 +292,61 @@ const tableLayout = (page) => page.evaluate(() => {
         return r.width > 0 && r.height > 0 && getComputedStyle(b).visibility !== 'hidden' && !b.closest('[aria-hidden="true"]') && (r.width < 43.5 || r.height < 43.5);
     }).map((b) => `${(b.getAttribute('aria-label') ?? b.textContent ?? '').trim().slice(0, 24)} ${Math.round(rect(b).width)}×${Math.round(rect(b).height)}`);
     const landscape = vw > vh;
+    // A plate's flag over another seat's plate (an open seat's ring), the cards face down before it,
+    // its blind's mark or its flag.
+    const seats = [...document.querySelectorAll('[data-seat]')];
+    const flagHits = [];
+    for (const el of seats) {
+        const flag = el.querySelector(':scope > [data-flag]');
+        if (!flag) continue;
+        const f = rect(flag);
+        for (const other of seats) {
+            if (other === el) continue;
+            const parts = [...other.querySelectorAll(':scope > .pn-plate, :scope > .pn-open-seat, :scope > .pn-seat-cards > *, :scope > .pn-blind, :scope > [data-flag]')];
+            for (const part of parts) if (hit(f, rect(part))) flagHits.push(`${el.getAttribute('data-seat')}>${other.getAttribute('data-seat')} ${part.className.split(' ')[0]}`);
+        }
+    }
+    // A stack's figures under three or four cards face down before its own plate.
+    const stackCovered = seats.flatMap((el) => {
+        const fan = el.querySelector(':scope > .pn-seat-cards');
+        const stack = el.querySelector('.pn-plate-stack');
+        if (!fan || !stack || Number(fan.getAttribute('data-count')) < 3) return [];
+        const range = document.createRange();
+        range.selectNodeContents(stack);
+        const figures = range.getBoundingClientRect();
+        return [...fan.children].some((c) => hit(figures, rect(c))) ? [`${el.getAttribute('data-seat')} "${stack.textContent}"`] : [];
+    });
     return {
         plates: plates.length, outside: plates.filter((r) => !inside(r)).length, overlaps,
         row: row ? inside(rect(row)) : null, small, scroll: document.documentElement.scrollWidth - vw,
         overDock: dock ? plates.filter((p) => hit(p, rect(dock))).length : -1,
         dockRight: landscape ? (dock && table ? rect(dock).left >= rect(table).right - 1 : false) : null,
+        flagHits, stackCovered,
     };
 });
 const tableOk = (m, seats) => m.plates === seats && m.outside === 0 && m.overlaps === 0 && m.row === true && m.small.length === 0 && m.scroll <= 0
     && m.overDock === 0 && m.dockRight !== false;
+
+// No pre-action's label spills out of its button (a word drawn over the next one), no button out
+// of the row, and no word broken across two lines ("Chec" over "k"): a label breaks only at a
+// space or after its slash.
+const preSpill = (page) => page.$$eval('[data-pn-pre]', (rows) => rows.flatMap((row) => [
+    ...(row.scrollWidth > row.clientWidth + 0.5 ? [`the row ${row.scrollWidth}>${row.clientWidth}`] : []),
+    ...[...row.querySelectorAll('button')].flatMap((el) => {
+        const out = el.scrollWidth > el.clientWidth + 0.5 ? [`${el.textContent} ${el.scrollWidth}>${el.clientWidth}`] : [];
+        const walker = document.createTreeWalker(el, NodeFilter.SHOW_TEXT);
+        for (let node = walker.nextNode(); node; node = walker.nextNode()) {
+            for (const m of node.textContent.matchAll(/[^\s/]+/g)) {
+                const range = document.createRange();
+                range.setStart(node, m.index);
+                range.setEnd(node, m.index + m[0].length);
+                const lines = new Set([...range.getClientRects()].map((r) => Math.round(r.top)));
+                if (lines.size > 1) out.push(`"${m[0]}" broken in "${el.textContent}"`);
+            }
+        }
+        return out;
+    }),
+]));
 
 // The Hands guide where it is drawn (the lobby's tab, or the table's drawer): ten rankings and the
 // kicker pair, every example inside its row, nothing sideways.
@@ -376,6 +422,12 @@ const api = async (p, route, body) => {
     return {status: res.status(), body: json};
 };
 const hostOp = (p, op) => api(p, 'action', {actionId: randomUUID(), type: 'host', op});
+// The host ends the table: closing at once between hands, else when the hand in play completes — so
+// a table paused mid-hand is let run again, or it would hold one of the host's open tables for good.
+const endTable = async (p) => {
+    await hostOp(p, {op: 'end'}).catch(() => null);
+    await hostOp(p, {op: 'resume'}).catch(() => null);
+};
 
 // Who acts, by Mongo, and a click on their screen.
 const ownerOfSeat = (doc, seat) => players.find((p) => !p.gone && p.pid && p.pid === doc.state.seats[seat]?.pid) ?? null;
@@ -1436,7 +1488,7 @@ try {
     // mark, open seat, the dealer button, the banner and the line under it: no intersection; each pot's
     // words at 11 px or more, unclipped, on screen; every pot in exactly one pill.
     {
-        await hostOp(H, {op: 'end'}).catch(() => null);
+        await endTable(H);
         await H.page.goto(`${BASE}/poker-night`, {waitUntil: 'load', timeout: 180000});
         await H.page.click('[data-quick-start="holdem"]');
         await H.page.waitForURL(/\/play\/[A-HJ-NP-Z2-9]{6}(\?.*)?$/, {timeout: 120000});
@@ -1667,10 +1719,10 @@ try {
     // host as it plays, so its result stays) Ben and Cy fold; Ana leaves after it, playing it out.
     // In its pause Ben asks Cy (shown to Ben alone) and Cy asks Ben (no thanks); Cy turns asks off.
     // Hand 2 (paused too): everyone folds to the host; the blocked asks and one that runs out. Hand 3
-    // is not paused: Ben asks Dee and the next deal ends it first (no cooldown, Ben told). Last, Eve
+    // is not paused: Ben asks Dee and the next deal ends it first (a no: a cooldown, Ben told). Last, Eve
     // sits down and the host goes quiet for ten minutes: her chips no longer wait for them.
     {
-        await hostOp(H, {op: 'end'}).catch(() => null);
+        await endTable(H);
         const plain = (text) => text.replace(/[⁨⁩]/g, '');
         const rectOf = (page, sel) => page.evaluate((s) => {
             const r = document.querySelector(s)?.getBoundingClientRect();
@@ -1708,9 +1760,6 @@ try {
             return {hits, inView: prompt.left >= -1 && prompt.top >= -1 && prompt.right <= innerWidth + 1 && prompt.bottom <= innerHeight + 1,
                 fromFoot: Math.round(innerHeight - prompt.bottom)};
         }, own);
-        // No pre-action's label spills out of its button (a word drawn over the next one).
-        const preSpill = (page) => page.$$eval('[data-pn-pre] button', (els) => els.filter((el) => el.scrollWidth > el.clientWidth + 0.5)
-            .map((el) => `${el.textContent} ${el.scrollWidth}>${el.clientWidth}`));
 
         // The start form's rebuy policy on a phone: Off / On (host approves), two 44 px radios.
         await Hm.page.goto(`${BASE}/poker-night`, {waitUntil: 'load', timeout: 180000});
@@ -2136,9 +2185,11 @@ try {
         const dealt4 = await waitDoc((x) => x.state.hand?.no === 4, 30000);
         const deePromptGone = await D.page.waitForSelector('[data-pn-ask-prompt]', {state: 'detached', timeout: 10000}).then(() => true, () => false);
         const benDealtToast = await toasted(B.page, plain(ASK_COPY.ended.dealt('Dee')).slice(0, 30), 15000);
-        const noCooldown = dealt4 !== null && !dealt4.state.askCooldowns.some(([a, b]) => a === B.pid && b === D.pid);
-        check('…the deal ends it with no answer: Dee\'s prompt goes, Ben is told ("The next hand was dealt before Dee answered."), and no cooldown keeps Ben from asking Dee again',
-            dealt4 !== null && deePromptGone && benDealtToast && noCooldown, JSON.stringify({dealt: dealt4 !== null, deePromptGone, benDealtToast, cooldowns: dealt4?.state.askCooldowns}));
+        // Unanswered by the deal is a no: Ben may not ask Dee again for five hands, so an ask its
+        // player lets go by never comes back every hand.
+        const dealtCooled = dealt4 !== null && dealt4.state.askCooldowns.some(([a, b, until]) => a === B.pid && b === D.pid && until === 3 + ASKS.COOLDOWN_HANDS);
+        check('…the deal ends it with no answer: Dee\'s prompt goes, Ben is told ("The next hand was dealt before Dee answered."), and, as after a no, Ben may not ask Dee again for five hands',
+            dealt4 !== null && deePromptGone && benDealtToast && dealtCooled, JSON.stringify({dealt: dealt4 !== null, deePromptGone, benDealtToast, cooldowns: dealt4?.state.askCooldowns}));
         await hostOp(H, {op: 'pause'});
 
         // ── the host drawer's Off / On, saved ──
@@ -2198,7 +2249,7 @@ try {
         check('…one tap lands Eve\'s chips without the host (told so), the request gone, every chip accounted for', landedE !== null && await toasted(E.page, BANK_COPY.approved(amountE), 10000)
             && ledgerRow(landedE, E)?.bought === amountE, JSON.stringify({landed: landedE !== null}));
         await H.page.unroute('**/api/poker-night/*/tick', quiet);
-        await hostOp(H, {op: 'end'}).catch(() => null);
+        await endTable(H);
     }
 
     // ═══ PLO (P5): picking it, four cards on every phone, pot limit, the showdown ════════════════
@@ -2215,7 +2266,7 @@ try {
     // switches back to Texas hold'em: the countdown says so, the next deal toasts it and deals two.
     {
         const unisolate = (text) => (text ?? '').replace(/[⁨⁩]/g, '');
-        await hostOp(H, {op: 'end'}).catch(() => null);
+        await endTable(H);
         await H.page.goto(`${BASE}/poker-night`, {waitUntil: 'load', timeout: 180000});
         await H.page.waitForSelector('[data-quick-start="plo"]', {timeout: 60000});
         const quick = await H.page.$$eval('[data-quick-start]', (els) => els.map((el) => [el.getAttribute('data-quick-start'), el.textContent?.trim() ?? '']));
@@ -2316,7 +2367,9 @@ try {
         const dealtAt = Date.now() - 5000;
         const all = [H, ...guests];
         // The table laid out on a phone mid-hand (the early choices are the dock's row then).
-        const layoutOk = (m) => m.plates === 4 && m.outside === 0 && m.overlaps === 0 && m.small.length === 0 && m.scroll <= 0 && m.overDock === 0 && m.dockRight !== false;
+        // …the cards face down (four) above the stack's figures, never over them, and no flag over another seat.
+        const layoutOk = (m) => m.plates === 4 && m.outside === 0 && m.overlaps === 0 && m.small.length === 0 && m.scroll <= 0 && m.overDock === 0 && m.dockRight !== false
+            && m.stackCovered.length === 0 && m.flagHits.length === 0;
         const holeOf = (doc, p) => handSeat(doc, p)?.hole ?? [];
 
         // The docks: four cards in a fan, each at least half in sight; four backs on every other plate.
@@ -2453,15 +2506,22 @@ try {
         await sleep(2500);
         const winnerHoles = expected.map((seat) => live.find((p) => p.seat === seat).hole);
         for (const p of all) {
+            // The banner comes in after the reveal: a page that learns of the showdown by its next poll waits for it.
+            await p.page.waitForSelector('.pn-banner', {timeout: 15000}).catch(() => {});
             const seen = await p.page.evaluate(() => {
                 const rect = (el) => el.getBoundingClientRect();
                 const hit = (a, b) => a.left < b.right - 1 && b.left < a.right - 1 && a.top < b.bottom - 1 && b.top < a.bottom - 1;
                 const banner = [...document.querySelectorAll('.pn-banner')].map(rect).filter((r) => r.width > 0);
                 const hands = [...document.querySelectorAll('.pn-seat-shown')].map((el) => ({count: el.getAttribute('data-count'), r: rect(el)}));
+                const boardEl = document.querySelector('.pn-board');
+                let handsOver = 0;
+                for (let i = 0; i < hands.length; i++) for (let j = i + 1; j < hands.length; j++) if (hit(hands[i].r, hands[j].r)) handsOver++;
                 return {
                     lit: [...new Set([...document.querySelectorAll('main .pn-card[data-state="win"]')].map((el) => el.getAttribute('data-card')))],
                     hands: hands.map((h) => h.count),
                     bannerOver: banner.some((b) => hands.some((h) => hit(b, h.r))), banner: banner.length,
+                    // No hand turned up over a board card or another hand.
+                    boardOver: boardEl ? hands.filter((h) => hit(h.r, rect(boardEl))).length : -1, handsOver,
                     scroll: document.documentElement.scrollWidth - innerWidth,
                 };
             });
@@ -2469,8 +2529,8 @@ try {
             const litBoard = board.filter((c) => seen.lit.includes(cardLabel(c)));
             const fiveOk = expected.length > 1 || (litCards.length === 2 && litBoard.length === 3
                 && evaluateCards([...litCards, ...litBoard]) === topValue);
-            check(`…on ${p.name}'s screen${p.size ? ` (${sizeName(p.size)})` : ''}: the other hands of four turned up overlapping, the banner clear of them, the lit cards two of the winning hand and three of the board`,
-                seen.hands.length === 3 && seen.hands.every((c) => c === '4') && seen.banner === 1 && !seen.bannerOver && fiveOk
+            check(`…on ${p.name}'s screen${p.size ? ` (${sizeName(p.size)})` : ''}: the other hands of four turned up overlapping, clear of the board and of each other, the banner clear of them, the lit cards two of the winning hand and three of the board`,
+                seen.hands.length === 3 && seen.hands.every((c) => c === '4') && seen.banner === 1 && !seen.bannerOver && fiveOk && seen.boardOver === 0 && seen.handsOver === 0
                 && winnerHoles.every((hole) => hole.filter((c) => seen.lit.includes(cardLabel(c))).length === 2) && seen.scroll <= 0,
                 JSON.stringify({...seen, litCards: litCards.map(cardLabel), litBoard: litBoard.map(cardLabel)}));
             await shot(p.page, `35-plo-showdown-${p.size ? sizeFile(p.size) : '1440'}`);
@@ -2532,7 +2592,7 @@ try {
                 scroll: document.documentElement.scrollWidth - innerWidth,
             };
         });
-        const floorAt = (size) => ({'390×844': 33, '375×667': 19, '320×568': 16, '844×390': 26, '667×375': 24, '568×320': 14}[sizeName(size)] ?? 60);
+        const floorAt = (size) => ({'390×844': 33, '375×667': 19, '320×568': 16, '844×390': 26, '667×375': 24, '568×320': 18}[sizeName(size)] ?? 60);
         const boardsOk = (m, size) => m.n === '3' && m.count === 3 && m.cardW >= floorAt(size) && m.inside && m.overPlates === 0 && m.overBets === 0
             && m.zoom !== null && m.zoom[0] >= 44 && m.zoom[1] >= 44 && m.scroll <= 0;
         // The flop out on every screen: three boards of three cards.
@@ -2550,18 +2610,44 @@ try {
         const flopped = (p) => p.page.waitForFunction(() => [...document.querySelectorAll('.pn-board')].filter((el) => el.getAttribute('data-pn-board') === '3').length === 3
             && !document.querySelector('.pn-board [data-anim="board"]'), null, {timeout: 20000}).catch(() => {});
         for (const p of all) await flopped(p);
+        // What the dock says the cards make on each board: each board's badge beside its kind's first
+        // word, inside the pill; a kind on one line wherever it is not wider than the line itself.
+        const strengthsOf = (p) => p.page.evaluate(() => {
+            const pill = document.querySelector('[data-pn-dock] [data-pn-strength][data-pn-boards]');
+            if (!pill) return null;
+            const box = pill.getBoundingClientRect();
+            return [...pill.querySelectorAll('[data-pn-strength-board]')].map((el) => {
+                const r = el.getBoundingClientRect();
+                const badge = el.querySelector('.pn-board-num');
+                const kind = el.querySelector('[data-pn-kind]');
+                const range = document.createRange();
+                if (kind) range.selectNodeContents(kind);
+                const first = kind ? range.getClientRects()[0] : null;
+                const b = badge?.getBoundingClientRect();
+                return {
+                    text: el.textContent, badge: badge?.textContent ?? null, lines: kind ? new Set([...range.getClientRects()].map((q) => Math.round(q.top))).size : 0,
+                    together: !!first && !!b && Math.abs((first.top + first.bottom) / 2 - (b.top + b.bottom) / 2) < 6 && first.left >= b.right - 0.5,
+                    inside: r.left >= box.left - 0.5 && r.right <= box.right + 0.5, wide: Math.round(box.width),
+                };
+            });
+        });
+        const strengthsOk = (list) => list !== null && list.length === 3 && list.every((b, k) => b.badge === String(k + 1) && b.together && b.inside && (b.lines === 1 || b.text.length > 12));
         for (const g of guests) {
             const m = await boardsOn(g);
             const layout = await tableLayout(g.page);
-            check(`three boards at ${sizeName(g.size)}: inside the table, clear of every plate and bet line, cards ${m.cardW} px (at least ${floorAt(g.size)}), the block a 44 px button, the table laid out`,
-                boardsOk(m, g.size) && layoutOk(layout), JSON.stringify({m, layout}));
+            const strengths = await strengthsOf(g);
+            check(`three boards at ${sizeName(g.size)}: inside the table, clear of every plate and bet line, cards ${m.cardW} px (at least ${floorAt(g.size)}), the block a 44 px button, the table laid out; the dock's line a badge and a kind a board, each whole`,
+                boardsOk(m, g.size) && layoutOk(layout) && strengthsOk(strengths), JSON.stringify({m, layout, strengths}));
             await shot(g.page, `ui-20-plo-3boards-${sizeFile(g.size)}`);
             const side = {width: g.size.height, height: g.size.width};
             await resize(g.page, side);
             const ms = await boardsOn(g);
             const ls = await tableLayout(g.page);
-            check(`…and on its side at ${sizeName(side)}: cards ${ms.cardW} px (at least ${floorAt(side)}), inside, clear, the table laid out`,
-                boardsOk(ms, side) && layoutOk(ls), JSON.stringify({ms, ls}));
+            // The early choices with nothing to call ("Check/fold", "Check", "Call any"), whole words.
+            const spill = await preSpill(g.page);
+            const sideStrengths = await strengthsOf(g);
+            check(`…and on its side at ${sizeName(side)}: cards ${ms.cardW} px (at least ${floorAt(side)}), inside, clear, the table laid out; no early choice's word broken or spilling; the dock's line a badge and a kind a board, each whole`,
+                boardsOk(ms, side) && layoutOk(ls) && spill.length === 0 && strengthsOk(sideStrengths), JSON.stringify({ms, ls, spill, sideStrengths}));
             await shot(g.page, `ui-20-plo-3boards-${sizeFile(side)}`);
             await resize(g.page, g.size);
         }
@@ -2582,13 +2668,19 @@ try {
                 widths: [...new Set(rows.flatMap((r) => [...r.children].map((c) => Math.round(c.getBoundingClientRect().width))))],
                 inside: rows.every((r) => r.getBoundingClientRect().right <= innerWidth + 0.5 && r.getBoundingClientRect().left >= -0.5),
                 names: [...document.querySelectorAll('[data-pn-drawer="boards"] [data-pn-sheet-board] h3')].map((h) => h.textContent),
+                // The places of the cards still to come, drawn (the sheet is out of the room, where no
+                // felt is set): a dashed ring, not nothing.
+                slots: rows.flatMap((r) => [...r.querySelectorAll('.pn-slot')]).map((el) => {
+                    const cs = getComputedStyle(el);
+                    return cs.borderTopStyle === 'dashed' && parseFloat(cs.borderTopWidth) > 0 && cs.borderTopColor !== 'rgba(0, 0, 0, 0)';
+                }),
             };
         });
         await shot(small.page, `ui-25-boards-sheet-${sizeFile(small.size)}`);
         await wording(small.page, 'the boards sheet', '[data-pn-drawer="boards"]');
-        check('a tap on the boards opens them larger: three boards under "Board 1", "Board 2", "Board 3", five 44 px places each, the flop\'s three cards, on screen at 320 px',
+        check('a tap on the boards opens them larger: three boards under "Board 1", "Board 2", "Board 3", five 44 px places each, the flop\'s three cards and the two to come drawn as places, on screen at 320 px',
             sheet.rows === 3 && sheet.places.every((n) => n === 5) && sheet.cards.every((n) => n === 3) && JSON.stringify(sheet.widths) === '[44]' && sheet.inside
-            && JSON.stringify(sheet.names) === JSON.stringify([0, 1, 2].map(TABLE_COPY.boardName)), JSON.stringify(sheet));
+            && JSON.stringify(sheet.names) === JSON.stringify([0, 1, 2].map(TABLE_COPY.boardName)) && sheet.slots.length === 6 && sheet.slots.every(Boolean), JSON.stringify(sheet));
         await small.page.keyboard.press('Escape');
         await small.page.waitForSelector('[data-pn-drawer="boards"]', {state: 'detached', timeout: 10000}).catch(() => {});
 
@@ -2627,6 +2719,8 @@ try {
             JSON.stringify(paid));
         const scoop = perBoard.every((b) => b.winners.length === 1 && b.winners[0] === perBoard[0].winners[0]) && result3.pots.length === 1;
         for (const p of all) {
+            // The banner comes in after the reveal: a page that learns of the showdown by its next poll waits for it.
+            await p.page.waitForSelector('.pn-banner', {timeout: 15000}).catch(() => {});
             const seen = await p.page.evaluate(() => {
                 const rect = (el) => el.getBoundingClientRect();
                 const hit = (a, b) => a.left < b.right - 1 && b.left < a.right - 1 && a.top < b.bottom - 1 && b.top < a.bottom - 1;
@@ -2637,6 +2731,14 @@ try {
                     lit: [0, 1, 2].map((k) => [...document.querySelectorAll(`.pn-board[data-pn-board-index="${k}"] .pn-card[data-state="win"]`)].map((el) => el.getAttribute('data-card'))),
                     bannerOver: banner.some((b) => hands.some((h) => hit(b, h))), banner: banner.length, scroll: document.documentElement.scrollWidth - innerWidth,
                     boardsOver: [...document.querySelectorAll('.pn-board')].map(rect).some((b) => hands.some((h) => hit(b, h))),
+                    // Never cut inside a number or a board's name: a line cut short keeps "Board k: " and the
+                    // words after the name whole; a cut line its head whole.
+                    cutInside: [...document.querySelectorAll('.pn-banner [data-winner]')].flatMap((line) => {
+                        const box = rect(line);
+                        const whole = line.hasAttribute('data-short') ? [...line.querySelectorAll('.flex-none')] : line.classList.contains('truncate') ? [line.querySelector('span')] : [];
+                        return whole.filter((el) => el && rect(el).right > box.right + 0.5).map((el) => el.textContent);
+                    }),
+                    short: document.querySelectorAll('.pn-banner [data-short]').length,
                 };
             });
             // Each board's lit cards: three of its own, which with two of a winner's four make the strongest value there.
@@ -2650,7 +2752,7 @@ try {
             // The boards clear of the hands turned up where the stage keeps them clear: every phone but the 320 px one.
             const handsOk = (p.size?.width ?? 1440) <= 320 || !seen.boardsOver;
             check(`…on ${p.name}'s screen${p.size ? ` (${sizeName(p.size)})` : ''}: ${scoop ? 'one line, every board won by one player' : 'a banner line a board'}, the banner${(p.size?.width ?? 1440) > 320 ? ' and the boards' : ''} clear of the hands turned up; each board's lit cards the winner's three`,
-                seen.banner === 1 && rowsOk && !seen.bannerOver && handsOk && litOk && seen.scroll <= 0, JSON.stringify({...seen, perBoard, scoop}));
+                seen.banner === 1 && rowsOk && !seen.bannerOver && handsOk && litOk && seen.scroll <= 0 && seen.cutInside.length === 0, JSON.stringify({...seen, perBoard, scoop}));
             await shot(p.page, `38-plo-3boards-showdown-${p.size ? sizeFile(p.size) : '1440'}`);
         }
         const logLines = await (async () => {
@@ -2688,7 +2790,7 @@ try {
             targetsOk(hostGame) && hostGame.count === 3 && back !== null && /^Next hand: Texas hold'em, in \d+ s$/.test(unisolate(countdown ?? '').trim())
             && dealt2?.state.hand.variant === 'holdem' && toast && twoCards === 2 && barBack === MODE_COPY.short.holdem,
             JSON.stringify({m: brief(hostGame), countdown, dealt: dealt2?.state.hand.variant, toast, twoCards, barBack}));
-        await hostOp(H, {op: 'end'}).catch(() => null);
+        await endTable(H);
         for (const g of guests) g.gone = true;
     }
 
@@ -2706,8 +2808,14 @@ try {
     // The next hand on the phones turned on their sides (844 × 390, 667 × 375, 568 × 320): the picker and
     // the table laid out there too, and under reduced motion the card thrown away is never seen leaving.
     {
-        await hostOp(H, {op: 'end'}).catch(() => null);
+        await endTable(H);
         await H.page.goto(`${BASE}/poker-night`, {waitUntil: 'load', timeout: 180000});
+        // The host's earlier tables close as their last hands run out (an idle table's clock): the lobby
+        // offers a new one once fewer than three are open.
+        for (let tries = 0; tries < 24 && !(await H.page.locator('[data-quick-start="triple-t"]').count()); tries++) {
+            await sleep(10000);
+            await H.page.reload({waitUntil: 'load', timeout: 180000});
+        }
         await H.page.waitForSelector('[data-quick-start="triple-t"]', {timeout: 60000});
         const quick = await H.page.$$eval('[data-quick-start]', (els) => els.map((el) => el.getAttribute('data-quick-start')));
         check('the lobby: "Start a table", then "Start PLO" and "Start Triple T" side by side', JSON.stringify(quick) === JSON.stringify(['holdem', 'plo', 'triple-t'])
@@ -2788,8 +2896,16 @@ try {
                 clock: document.querySelector('[data-pn-dock] [data-pn-clock]')?.textContent ?? null,
                 backs: [...document.querySelectorAll('[data-seat]:not([data-me]) .pn-seat-cards')].map((el) => el.getAttribute('data-count')),
                 flags: [...document.querySelectorAll('[data-seat][data-discarding] [data-flag]')].map((el) => el.textContent),
+                // Where a flag has no room, the plate's dashed ring instead.
+                marks: document.querySelectorAll('[data-seat][data-discarding][data-pn-mark="discarding"]').length,
+                discarding: document.querySelectorAll('[data-seat][data-discarding]').length,
                 felt: document.querySelector('[data-pn-throw-away]')?.getAttribute('data-pn-throw-away') ?? null,
                 feltText: document.querySelector('[data-pn-throw-away]')?.textContent ?? null,
+                // The count's words inside its pill, never spilling past it.
+                feltSpill: (() => {
+                    const note = document.querySelector('[data-pn-throw-away]');
+                    return note ? note.scrollWidth - note.clientWidth : 0;
+                })(),
                 // The felt's count: inside the table, over no plate, bet line or dealer button.
                 noteOver: (() => {
                     const note = document.querySelector('[data-pn-throw-away]');
@@ -2800,9 +2916,18 @@ try {
                     return others.filter((r) => hit(n, r)).length + (n.left < table.left - 1 || n.right > table.right + 1 ? 100 : 0);
                 })(),
                 scroll: document.documentElement.scrollWidth - vw,
+                // Where the board sits and how tall the table is: a pick must move neither.
+                board: (() => {
+                    const b = document.querySelector('.pn-board');
+                    return b ? Math.round(rect(b).top) : null;
+                })(),
+                tableH: Math.round(rect(document.querySelector('.pn-table')).height),
             };
         });
-        const layoutOk = (m) => m.plates === 4 && m.outside === 0 && m.overlaps === 0 && m.small.length === 0 && m.scroll <= 0 && m.overDock === 0 && m.dockRight !== false;
+        // The table laid out: the three cards face down above the stack's figures, and every "Discarding…" flag clear
+        // of the seats round it (a dashed ring on the plate where it has no room, stage.flagRoom).
+        const layoutOk = (m) => m.plates === 4 && m.outside === 0 && m.overlaps === 0 && m.small.length === 0 && m.scroll <= 0 && m.overDock === 0 && m.dockRight !== false
+            && m.stackCovered.length === 0 && m.flagHits.length === 0;
         const pickOk = (m) => m.count === 3 && m.group === DISCARD_COPY.groupLabel && m.small.length === 0 && m.inside && m.overlaps === 0 && m.scroll <= 0
             && m.button !== null && m.button.h >= 44 && m.button.full && m.button.inside && m.noteOver <= 0;
         for (const p of all) await p.page.waitForSelector('[data-pn-dock] [data-pn-pick-card]', {timeout: 20000}).catch(() => {});
@@ -2813,7 +2938,7 @@ try {
             check(`Triple T at ${sizeName(g.size)}: three cards to pick from (each 44 px or more, inside, apart), "${DISCARD_COPY.confirmNone}" full width, the clock; three backs and "${TABLE_COPY.discarding}" on every other plate; the felt's "0 of 4", clear of every plate, bet and the button; the table laid out`,
                 pickOk(m) && m.button.text === DISCARD_COPY.confirmNone && m.button.disabled && (m.clock ?? '').startsWith(DISCARD_COPY.clock)
                 && m.backs.length === 3 && m.backs.every((b) => b === '3') && m.flags.filter((f) => f === TABLE_COPY.discarding).length >= 3
-                && m.felt === '0/4' && [DISCARD_COPY.felt(0, 4), DISCARD_COPY.feltShort(0, 4)].some((t) => (m.feltText ?? '').startsWith(t)) && layoutOk(layout), JSON.stringify({m, layout}));
+                && m.felt === '0/4' && [DISCARD_COPY.felt(0, 4), DISCARD_COPY.feltShort(0, 4)].some((t) => (m.feltText ?? '').startsWith(t)) && m.feltSpill <= 0.5 && layoutOk(layout), JSON.stringify({m, layout}));
             await wording(g.page, `the throw-away at ${sizeName(g.size)}`, '[data-pn-dock]');
         }
         await shot(g390.page, 'ui-21-triple-t-discard-390');
@@ -2821,8 +2946,13 @@ try {
         // The 390 phone taps its second card and confirms.
         const card390 = dealt.get(g390)[1];
         await g390.page.waitForSelector('[data-pn-pick][data-pn-armed]', {timeout: 5000}).catch(() => {});
+        const before390 = await pickerOf(g390);
         await g390.page.click('[data-pn-pick-card="1"]');
+        await sleep(300);
         const picked390 = await pickerOf(g390);
+        check('…the pick grows nothing: the table keeps its height and the board its place (the line beside the cards keeps a row for what the two kept make)',
+            before390.tableH === picked390.tableH && before390.board !== null && Math.abs(before390.board - picked390.board) <= 1,
+            JSON.stringify({before: [before390.tableH, before390.board], after: [picked390.tableH, picked390.board]}));
         await shot(g390.page, 'ui-21-triple-t-picked-390');
         await g390.page.click('[data-pn-throw]');
         d = await waitDoc((x) => holeAt(x, g390).length === 2, 10000);
@@ -2975,8 +3105,8 @@ try {
             const side = {width: g.size.height, height: g.size.width};
             const m = await pickerOf(g);
             const layout = await tableLayout(g.page);
-            check(`…on its side at ${sizeName(side)}: the three cards to pick from (44 px or more, inside, apart) and the confirm in the dock's column, the felt's count clear of every plate, bet and the button, the table laid out`,
-                pickOk(m) && layoutOk(layout), JSON.stringify({m, layout}));
+            check(`…on its side at ${sizeName(side)}: the three cards to pick from (44 px or more, inside, apart) and the confirm in the dock's column, the felt's count clear of every plate, bet and the button; every plate still to throw says so ("${TABLE_COPY.discarding}" where it has room, a dashed ring where not), the table laid out`,
+                pickOk(m) && layoutOk(layout) && m.discarding >= 3 && m.flags.length + m.marks === m.discarding, JSON.stringify({m, layout}));
             await shot(g.page, `ui-21-triple-t-discard-${sizeFile(side)}`);
         }
         // Under reduced motion: the pick is drawn in place (no transition), the card thrown away never seen leaving.
@@ -3000,11 +3130,11 @@ try {
             && throwStyles.every((s) => s.name === 'none' && s.opacity === '0'), JSON.stringify({still, throwStyles: throwStyles.slice(0, 4)}));
         await g390.page.emulateMedia({reducedMotion: 'no-preference'});
         for (const g of guests) await resize(g.page, g.size);
-        await hostOp(H, {op: 'end'}).catch(() => null);
+        await endTable(H);
         for (const g of guests) g.gone = true;
     }
 
-    await hostOp(H, {op: 'end'}).catch(() => null);
+    await endTable(H);
     const errors = pageErrors.filter((e) => !/ResizeObserver loop|Failed to execute 'measure' on 'Performance'.*negative time stamp/.test(e));
     check('no page error on any screen', errors.length === 0, errors.slice(0, 3).join(' | '));
 } catch (error) {

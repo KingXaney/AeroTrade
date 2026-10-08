@@ -54,7 +54,13 @@ export type SeatProps = {
     awaitingChips?: boolean; // a request for chips waits for the host (the table's requests)
     held?: number; // the cards a hand of the game holds (two, four in PLO): what a fold sends to the middle
     discarding?: boolean; // Triple T: still to throw a card away
+    discardMark?: boolean; // …and no room for the flag under the plate: a dashed ring on it instead (stage.flagRoom)
 };
+
+// A seat's turned-up cards: the size they are drawn at, and how far across from the plate they sit
+// (stage.SeatPlace.shownDx: moved along the row off another seat's hand).
+export const shownStyle = (place: Pick<SeatPlace, 'shownDx'>): CSSProperties =>
+    ({'--pn-card-w': 'var(--pn-show-w)', ...(place.shownDx ? {'--pn-shown-dx': `${place.shownDx}px`} : {})} as CSSProperties);
 
 type Tag = {id: string; kind: EntryKind; text: string; allIn: boolean; said: string; at: number; offset: number};
 
@@ -91,7 +97,10 @@ const statusOf = (v: SeatView, live: boolean, awaitingChips = false, discarding 
     return TABLE_COPY.status[v.state];
 };
 
-const Seat = ({seat, place, stage, view: v, person, mine, live, acting, myTurn, turn, blind, look, anims, privateCards = null, awaitingChips = false, held = 2, discarding = false}: SeatProps) => {
+const Seat = ({
+    seat, place, stage, view: v, person, mine, live, acting, myTurn, turn, blind, look, anims, privateCards = null, awaitingChips = false, held = 2, discarding = false,
+    discardMark = false,
+}: SeatProps) => {
     const name = person?.name ?? '';
     const ours = useMemo(() => anims.filter((a) => {
         const e = a.event;
@@ -125,7 +134,7 @@ const Seat = ({seat, place, stage, view: v, person, mine, live, acting, myTurn, 
         const flips = reveal?.cards?.filter((c) => c.seat === seat) ?? shownNow?.cards ?? null;
         const timing = reveal ?? shownNow;
         cards = (
-            <div className="pn-seat-shown" style={{'--pn-card-w': 'var(--pn-show-w)'} as CSSProperties} data-count={v.cards.length}>
+            <div className="pn-seat-shown" style={shownStyle(place)} data-count={v.cards.length}>
                 {v.cards.map((card: Card, index) => {
                     const flip = flips?.find((c) => c.index === index);
                     const state = cardLook(look, card);
@@ -141,7 +150,7 @@ const Seat = ({seat, place, stage, view: v, person, mine, live, acting, myTurn, 
     } else if (seenAlone) {
         // Shown to the viewer alone, after the hand: face up where a shown hand sits, never lit.
         cards = (
-            <div className="pn-seat-shown" style={{'--pn-card-w': 'var(--pn-show-w)'} as CSSProperties} data-count={seenAlone.length} data-pn-shown-to-me="">
+            <div className="pn-seat-shown" style={shownStyle(place)} data-count={seenAlone.length} data-pn-shown-to-me="">
                 {seenAlone.map((card) => <PlayingCard key={`${card}`} card={card}/>)}
             </div>
         );
@@ -178,6 +187,7 @@ const Seat = ({seat, place, stage, view: v, person, mine, live, acting, myTurn, 
             data-acting={acting ? '' : undefined}
             data-state={v.state}
             data-discarding={discarding ? '' : undefined}
+            data-pn-mark={discarding && discardMark ? 'discarding' : undefined}
             data-presence={presence}
             data-side={place.spot.side}
             data-shown={faceUp || seenAlone ? '' : undefined}
@@ -202,7 +212,7 @@ const Seat = ({seat, place, stage, view: v, person, mine, live, acting, myTurn, 
                     </span>
                 </span>
             </div>
-            {status && !acting && <span className="pn-plate-flag chrome-surface text-fg-soft" data-flag="">{status}</span>}
+            {status && !acting && !(discarding && discardMark) && <span className="pn-plate-flag chrome-surface text-fg-soft" data-flag="">{status}</span>}
             {blind && live && <BlindMarker blind={blind}/>}
             {tag && (
                 <span key={tag.id} className="pn-tag chrome-surface pn-tag-pop" style={animVars(tag, tag.at)} data-kind={tag.kind} data-all-in={tag.allIn ? '' : undefined}

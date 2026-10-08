@@ -509,6 +509,12 @@ describe('the table', () => {
             }))),
             bannerScoop: () => named((name) => NS.map((n) => TABLE_COPY.bannerScoop(name, n))),
             bannerScoopYou: () => each(TABLE_COPY.bannerScoopYou),
+            bannerShortBoard: () => [0, 1, 2].map(TABLE_COPY.bannerShortBoard),
+            bannerShortNames: () => [[NAMES[0]], NAMES.slice(0, 2), [NAMES[0], null], [null]].map((parts) => {
+                const text = TABLE_COPY.bannerShortNames(parts);
+                for (const name of parts) if (name !== null) expect(text).toContain(isolate(name));
+                return text;
+            }),
         });
     });
 
@@ -541,6 +547,11 @@ describe('the table', () => {
         expect(plain(TABLE_COPY.bannerBoardSplit(2, [{name: 'Ana', amount: 400}, {name: null, amount: 399}]))).toBe('Board 3: Ana 400 and you 399');
         expect(plain(TABLE_COPY.bannerScoop('Ana', 1800))).toBe('Ana wins every board: 1,800');
         expect(TABLE_COPY.bannerScoopYou(1800)).toBe('You win every board: 1,800');
+        // Cut short, without the chips: the words before a name, the names, the words after.
+        expect(TABLE_COPY.bannerShortBoard(1)).toBe('Board 2: ');
+        expect(plain(TABLE_COPY.bannerShortNames(['Ana', null]))).toBe('Ana and you');
+        expect([TABLE_COPY.bannerShortWins, TABLE_COPY.bannerShortEvery, TABLE_COPY.bannerShortYou, TABLE_COPY.bannerShortEveryYou]).toEqual([' wins', ' wins every board', 'You win', 'You win every board']);
+        expect(plain(`${TABLE_COPY.bannerShortBoard(0)}${TABLE_COPY.bannerShortNames(['Hana'])}`)).toBe('Board 1: Hana');
     });
 
     it('reads as the table prints it', () => {
@@ -648,7 +659,6 @@ describe('the cards', () => {
             cardsSpoken: () => [[], cards('As'), cards('AsKh'), cards('AsKh7c2d9s')].map(HAND_COPY.cardsSpoken),
             cardsShort: () => [cards('As'), cards('AsKh7c2d9s')].map(HAND_COPY.cardsShort),
             kind: () => everyDescription().map(HAND_COPY.kind),
-            onBoardsShort: () => [[hand('AsKsQsJsTs'), hand('Ah9d7c4s2d')], [hand('KhKd7c7s2d'), hand('Ah9h7h4h2h'), hand('2c3d4h5s6c')]].map((ds) => HAND_COPY.onBoardsShort(ds.map(HAND_COPY.kind))),
             onBoardsSpoken: () => [[hand('AsKsQsJsTs'), hand('Ah9d7c4s2d')], [hand('KhKd7c7s2d'), hand('Ah9h7h4h2h'), hand('2c3d4h5s6c')]].map((ds) => HAND_COPY.onBoardsSpoken(ds.map(HAND_COPY.label))),
         });
         expect(new Set(ALL_CARDS.map(HAND_COPY.card)).size).toBe(52);
@@ -666,7 +676,6 @@ describe('the cards', () => {
         expect(HAND_COPY.faceDown).toBe('Face-down card');
         // A hand's kind alone, and the dock's line with two or three boards.
         expect([hand('AsKsQsJsTs'), hand('KsQsJsTs9s'), hand('KhKd7c7s2d'), hand('Ah9d7c4s2d')].map(HAND_COPY.kind)).toEqual(['Royal flush', 'Straight flush', 'Two pair', 'High card']);
-        expect(HAND_COPY.onBoardsShort(['Flush', 'Pair', 'Straight'])).toBe('1 Flush · 2 Pair · 3 Straight');
         expect(HAND_COPY.onBoardsSpoken(['Flush, ace high', 'Pair of kings'])).toBe('Board 1: Flush, ace high; board 2: Pair of kings');
     });
 });

@@ -5,7 +5,7 @@
 import {describe, expect, it} from 'vitest';
 import {nextDueAt} from '@/lib/poker-night/clock';
 import {bestFive} from '@/lib/poker-night/hand-name';
-import {HAND_COPY, TABLE_COPY} from '@/lib/learn/copy/poker-night';
+import {HAND_COPY, isolate, TABLE_COPY} from '@/lib/learn/copy/poker-night';
 import {reduce} from '@/lib/poker-night/engine';
 import {bannerLines, bannerShows, cardLook, liftBoardOf, playerAt, resultLook, scoopOf, viewerSeatIn} from '@/lib/poker-night/reveal';
 import {bestHand} from '@/lib/poker-night/variants';
@@ -106,8 +106,12 @@ describe("the banner's words", () => {
         s = moves(s, C, C, X, X, X, X, X, X, X, X, X, X);
         const look = resultLook(view(s).hand)!;
         const pair = HAND_COPY.label({category: 1, ranks: [10, 9, 7, 3]});
-        expect(bannerLines(look, () => 'Ana', 2)).toEqual([{key: 'seat:2', seat: 2, board: null, mine: true, head: TABLE_COPY.bannerYou(60), hand: pair}]);
-        expect(bannerLines(look, () => 'Ana', 0)).toEqual([{key: 'seat:2', seat: 2, board: null, mine: false, head: TABLE_COPY.banner('Ana', 60), hand: pair}]);
+        expect(bannerLines(look, () => 'Ana', 2)).toEqual([{
+            key: 'seat:2', seat: 2, board: null, mine: true, head: TABLE_COPY.bannerYou(60), short: {lead: TABLE_COPY.bannerShortYou, name: '', tail: ''}, hand: pair,
+        }]);
+        expect(bannerLines(look, () => 'Ana', 0)).toEqual([{
+            key: 'seat:2', seat: 2, board: null, mine: false, head: TABLE_COPY.banner('Ana', 60), short: {lead: '', name: isolate('Ana'), tail: TABLE_COPY.bannerShortWins}, hand: pair,
+        }]);
         expect(bannerLines(look, () => null, null)[0].head).toBe(TABLE_COPY.banner(TABLE_COPY.seat(2), 60));
     });
 
@@ -194,13 +198,22 @@ describe('two and three boards', () => {
             ['board:1', 1, 1, true, TABLE_COPY.bannerBoardYou(1, 20)],
             ['board:2', 1, 2, true, TABLE_COPY.bannerBoardYou(2, 20)],
         ]);
+        // Cut short, without the chips: the board's name whole, then whoever won it.
+        expect(lines.map((l) => l.short)).toEqual([
+            {lead: TABLE_COPY.bannerShortBoard(0), name: isolate('Ana'), tail: ''},
+            {lead: TABLE_COPY.bannerShortBoard(1), name: 'you', tail: ''},
+            {lead: TABLE_COPY.bannerShortBoard(2), name: 'you', tail: ''},
+        ]);
         expect(lines.map((l) => l.hand)).toEqual([
             HAND_COPY.label({category: 8, ranks: [12]}), HAND_COPY.label({category: 7, ranks: [7, 3]}), HAND_COPY.label({category: 6, ranks: [6, 5]}),
         ]);
         const scoop = threeBoards(SCOOP.holes, SCOOP.boards);
         const look = resultLook(view(scoop).hand)!;
         expect(scoopOf(look)).toBe(0);
-        expect(bannerLines(look, () => 'Ana', 0)).toEqual([{key: 'all:0', seat: 0, board: null, mine: true, head: TABLE_COPY.bannerScoopYou(60), hand: null}]);
+        expect(bannerLines(look, () => 'Ana', 0)).toEqual([{
+            key: 'all:0', seat: 0, board: null, mine: true, head: TABLE_COPY.bannerScoopYou(60), short: {lead: TABLE_COPY.bannerShortEveryYou, name: '', tail: ''}, hand: null,
+        }]);
+        expect(bannerLines(look, () => 'Ana', null)[0].short).toEqual({lead: '', name: isolate('Ana'), tail: TABLE_COPY.bannerShortEvery});
         expect(bannerLines(look, () => 'Ana', null)[0].head).toBe(TABLE_COPY.bannerScoop('Ana', 60));
         // Two boards: the same, a line each.
         const two = threeBoards(SPLIT.holes, SPLIT.boards.slice(0, 2));

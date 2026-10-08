@@ -614,8 +614,9 @@ export const askWaiting = (me: Pick<MeView, 'pid' | 'asks'>, now: number): boole
 
 // The viewer's own asks as this page last saw each one (by askKey), with the hand they were about;
 // askNews says which got their answer since — said once each, in a toast. An ask still waiting when
-// the next hand is dealt ends with it ('dealt': no answer, and no wait before asking again), which
-// only the hand moving on can say, since the ask leaves the view with the hand.
+// the next hand is dealt ends with it ('dealt': no answer, which keeps the one who asked from asking
+// that player again for ASKS.COOLDOWN_HANDS hands, as a no does), which only the hand moving on can
+// say, since the ask leaves the view with the hand.
 export type AskSeen = Readonly<{hand: number | null; asks: Readonly<Record<string, {ask: AskView; answer: AskAnswer}>>}>;
 export const NO_ASKS_SEEN: AskSeen = Object.freeze({hand: null, asks: Object.freeze({})});
 export type AskNews = {ask: AskView; answer: AskAnswer | 'dealt'};

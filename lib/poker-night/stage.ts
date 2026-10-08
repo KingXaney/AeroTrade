@@ -8,9 +8,13 @@
 // the ray from its plate to the middle, at the first place clear of every plate and of the bet
 // lines already placed; its dealer button beside that; and the board and the pot are then fitted
 // into what is left — the widest five cards that clear every plate, bet line and button, as near
-// the middle as they can sit. lib/poker-night/__tests__/stage.test.ts holds them all apart from
-// 320 px phones to wide desktops. stage.pot is the one pot's own place (and the table's name between
-// hands); the pots of a hand — side pots and all — go where potPlan (at the foot) finds room.
+// the middle as they can sit, and where the page drew them a moment ago among places as good
+// (options.prefer), so a box a pixel taller or shorter never sends them across the felt. An open seat
+// (options.open) is a ring alone. A hand turned up meeting another's moves along its row
+// (nudgeHands); in PLO the board keeps clear of the hands of four. lib/poker-night/__tests__/stage.test.ts
+// holds them all apart from 320 px phones to wide desktops. stage.pot is the one pot's own place (and
+// the table's name between hands); the pots of a hand — side pots and all — go where potPlan (at the
+// foot) finds room.
 
 import {BANK_COPY, FELT_COPY, TABLE_COPY} from '@/lib/learn/copy/poker-night';
 import {CHIP_COLUMNS, chipBreakdown, compactChips} from '@/lib/poker-night/chips';
@@ -91,6 +95,7 @@ export type SeatPlace = {
     plate: Px; // the plate's centre
     bet: Px; // the bet line's centre
     button: Px; // where the dealer button sits when this seat has it
+    shownDx: number; // how far across from its plate the seat's turned-up hand is drawn (nudgeHands)
 };
 
 // How a hand's boards lie together: one board in its row; two or three (PLO) one over another
@@ -112,8 +117,10 @@ export type Stage = {
     centre: Px;
     // The boards together, as one block (with its numerals): what the pots, the banner, the notes and
     // the emotes keep clear of and anchor to. One board: its own row.
-    // handsClear: several boards placed clear of every hand of four that may turn up (all but the
-    // seated viewer's own), as they are wherever that keeps their cards BOARD_CARD_MIN or wider.
+    // handsClear: several boards, or one in PLO, placed clear of every hand of four that may turn up
+    // (all but the seated viewer's own, an open seat's none), as they are wherever that keeps their
+    // cards BOARD_CARD_MIN or wider. x: the table's middle, unless several boards squeezed under
+    // BOARD_CARD_MIN there deal larger elsewhere across the felt.
     board: Rect & {card: Box; gap: number; arrangement: BoardArrangement; labels: boolean; handsClear: boolean};
     boards: BoardPlace[];
     pot: Rect;
@@ -176,18 +183,27 @@ const placeAlong = (from: Px, dirs: readonly Px[], size: Box, own: Rect, avoid: 
     return {x: from.x + dirs[0].x * t0, y: from.y + dirs[0].y * t0};
 };
 
-// Where a seat's dealer button goes: beside its bet line (either side, across the ray), else at the
-// plate's inner corners, else on along the ray — the first that is clear.
-const placeButton = (plate: Px, bet: Rect, dir: Px, plateSize: Box, size: number, avoid: readonly Rect[], box: Box): Px => {
+// Where a seat's dealer button goes: beside its bet line — on its side away from the table's middle,
+// else the other — else at the plate's inner corners, else on along the ray: the first that is clear.
+// Away from the middle, so the band the board takes stays open. Beside the line and past the plate it
+// sits half a pixel (EDGE) further than touching, so a floating hair never decides the side: set
+// exactly at the clearance, the strict check would take it on one box's height and refuse it on the
+// next, and the board, which keeps clear of every button, would leap across the table.
+const EDGE = 0.5;
+const LEVEL = 4;
+const placeButton = (plate: Px, bet: Rect, dir: Px, plateSize: Box, size: number, avoid: readonly Rect[], box: Box, centre: Px): Px => {
     const r = size / 2;
     const across = {x: -dir.y, y: dir.x};
-    const side = Math.abs(across.x) * (bet.w / 2) + Math.abs(across.y) * (bet.h / 2) + GAP + r;
+    const side = Math.abs(across.x) * (bet.w / 2) + Math.abs(across.y) * (bet.h / 2) + GAP + r + EDGE;
     const corner = Math.abs(across.x) * (plateSize.w / 2) + Math.abs(across.y) * (plateSize.h / 2) - r;
-    const out = Math.abs(dir.x) * (plateSize.w / 2) + Math.abs(dir.y) * (plateSize.h / 2) + GAP + r;
+    const out = Math.abs(dir.x) * (plateSize.w / 2) + Math.abs(dir.y) * (plateSize.h / 2) + GAP + r + EDGE;
     const square = {w: size, h: size};
+    // Which side is away from the middle, by where the plate sits (which moves smoothly with the box,
+    // where its bet line, placed in steps, does not); level with the middle, the first side.
+    const beside: Px[] = [{x: bet.x + across.x * side, y: bet.y + across.y * side}, {x: bet.x - across.x * side, y: bet.y - across.y * side}];
+    if (across.x * (plate.x - centre.x) + across.y * (plate.y - centre.y) < -LEVEL) beside.reverse();
     const candidates: Px[] = [
-        {x: bet.x + across.x * side, y: bet.y + across.y * side},
-        {x: bet.x - across.x * side, y: bet.y - across.y * side},
+        ...beside,
         {x: plate.x + dir.x * out + across.x * corner, y: plate.y + dir.y * out + across.y * corner},
         {x: plate.x + dir.x * out - across.x * corner, y: plate.y + dir.y * out - across.y * corner},
     ];
@@ -301,27 +317,54 @@ const MULTI_ORDER: readonly BoardArrangement[] = ['stack', 'side', 'cascade'];
 // Within this many pixels of the widest card, the earlier arrangement, the numerals and the middle win;
 // the numerals win outright while they keep the cards this share of the widest or more.
 const MULTI_TIE = 1;
+// How far apart the places across the felt are that several boards squeezed under BOARD_CARD_MIN try.
+const ACROSS_STEP = 4;
 export const LABELS_SHARE = 0.92;
+
+// One board: cards within this many pixels of the widest count as wide; a row under the middle is
+// taken over one above it only when it is this much nearer the middle.
+export const BOARD_TIE = 2;
+export const UNDER_BIAS = 24;
 
 // Where the board (or the boards) and the pot go, round the plates, bet lines and buttons.
 type BoardsPlaced = Pick<Stage, 'board' | 'boards' | 'pot' | 'potOnBoard'>;
 const placeBoards = (
     box: Box, fit: Fit, centre: Px, felt: Pick<Stage, 'felt'>, obstacles: readonly Rect[], weights: readonly number[], hands: readonly Rect[], n: number,
+    prefer: number | null = null,
 ): BoardsPlaced => {
     const gap = BOARD_GAP[fit];
     let arrangement: BoardArrangement = 'row';
     let labels = false;
     let handsClear = false;
-    let chosen: {w: number; y: number};
+    let chosen: {w: number; y: number; x?: number};
     if (n <= 1) {
-        // The board: the widest cards anywhere in the band around the middle; among widths within a
-        // pixel of the widest, the row nearest the middle.
-        const rows: {w: number; y: number}[] = [];
-        for (let y = box.h * 0.25; y <= box.h * 0.75; y += 2) rows.push({y, w: widestAt(centre.x, y, box, obstacles, gap, BOARD_CARD_MIN, BOARD_CARD_MAX[fit])});
-        const widest = Math.max(0, ...rows.map((r) => r.w));
-        chosen = widest > 0
-            ? rows.filter((r) => r.w >= widest - 1).sort((a, b) => Math.abs(a.y - centre.y) - Math.abs(b.y - centre.y))[0]
-            : {y: centre.y, w: BOARD_CARD_MIN};
+        // The board: the widest cards anywhere in the band around the middle, at every pixel from the
+        // middle out; among widths within BOARD_TIE of the widest, the row nearest the middle, one
+        // under it only when it is UNDER_BIAS nearer. Where the middle is taken (a side seat's bet line
+        // across it) the rows over it and under it are about as near, so "nearest" alone would send
+        // the board from one to the other as the table's height moves a pixel (the dock's line
+        // wrapping, a phone's bar sliding). In PLO clear of every hand of four that may turn up too
+        // (`hands`), wherever that keeps the cards BOARD_CARD_MIN or wider (`handsClear`). With `prefer`
+        // (where the page drew the board a moment ago), among those rows the one nearest it: the board
+        // then stays put until the band it is in falls BOARD_TIE behind another, and only comes back
+        // once that band is BOARD_TIE ahead again, so no wavering width can send it to and fro.
+        const row = (avoid: readonly Rect[]): {w: number; y: number} | null => {
+            const rows: {w: number; y: number}[] = [];
+            const reach = Math.floor(box.h * 0.25);
+            for (let k = -reach; k <= reach; k++) {
+                const y = centre.y + k;
+                if (y >= box.h * 0.25 && y <= box.h * 0.75) rows.push({y, w: widestAt(centre.x, y, box, avoid, gap, BOARD_CARD_MIN, BOARD_CARD_MAX[fit])});
+            }
+            // A row counts at the width that fits a pixel over and under it too, so a card that fits at one
+            // sub-pixel height alone (squeezed between two hands) never decides the board's place.
+            const steady = rows.map((r, i) => ({y: r.y, w: Math.min(r.w, rows[i - 1]?.w ?? 0, rows[i + 1]?.w ?? 0)}));
+            const widest = Math.max(0, ...steady.map((r) => r.w));
+            const far = (r: {y: number}) => (prefer !== null ? Math.abs(r.y - prefer) : Math.abs(r.y - centre.y) + (r.y > centre.y ? UNDER_BIAS : 0));
+            return widest > 0 ? steady.filter((r) => r.w >= widest - BOARD_TIE).sort((a, b) => far(a) - far(b))[0] : null;
+        };
+        const clear = hands.length > 0 ? row([...obstacles, ...hands]) : null;
+        handsClear = clear !== null;
+        chosen = clear ?? row(obstacles) ?? {y: centre.y, w: BOARD_CARD_MIN};
     } else {
         // Several boards: the widest cards of every arrangement, with and without their numerals, at
         // every height in the band; within MULTI_TIE of the widest, by MULTI_ORDER, the numerals, then
@@ -330,14 +373,14 @@ const placeBoards = (
         // which). Nowhere at all (seven seats or more on the smallest phone on its side, as one board
         // at eight): cascaded at the smallest, where it covers least of the bet lines, the hands and the
         // dealer button, never a plate (fallbackY).
-        type Try = {arrangement: BoardArrangement; labels: boolean; y: number; w: number};
-        const search = (avoid: readonly Rect[]): Try | null => {
+        type Try = {arrangement: BoardArrangement; labels: boolean; x: number; y: number; w: number};
+        const search = (avoid: readonly Rect[], xs: readonly number[] = [centre.x]): Try | null => {
             const tries: Try[] = [];
             for (const a of MULTI_ORDER) for (const l of [true, false]) {
                 const min = l ? labelsFrom(a, fit) : MULTI_BOARD_MIN;
-                for (let y = box.h * 0.25; y <= box.h * 0.75 && min <= BOARD_CARD_MAX[fit]; y += 2) {
-                    const w = widestBlock(centre.x, y, box, felt, avoid, a, n, fit, l, min, BOARD_CARD_MAX[fit]);
-                    if (w > 0) tries.push({arrangement: a, labels: l, y, w});
+                for (const x of xs) for (let y = box.h * 0.25; y <= box.h * 0.75 && min <= BOARD_CARD_MAX[fit]; y += 2) {
+                    const w = widestBlock(x, y, box, felt, avoid, a, n, fit, l, min, BOARD_CARD_MAX[fit]);
+                    if (w > 0) tries.push({arrangement: a, labels: l, x, y, w});
                 }
             }
             const widest = Math.max(0, ...tries.map((t) => t.w));
@@ -346,22 +389,35 @@ const placeBoards = (
             const pool = labelled >= widest * LABELS_SHARE ? tries.filter((t) => t.labels && t.w >= labelled - MULTI_TIE) : tries.filter((t) => t.w >= widest - MULTI_TIE);
             return pool.sort((a, b) =>
                 MULTI_ORDER.indexOf(a.arrangement) - MULTI_ORDER.indexOf(b.arrangement) || Number(b.labels) - Number(a.labels)
-                || Math.abs(a.y - centre.y) - Math.abs(b.y - centre.y) || b.w - a.w)[0] ?? null;
+                || Math.abs(a.x - centre.x) - Math.abs(b.x - centre.x)
+                || Math.abs(a.y - (prefer ?? centre.y)) - Math.abs(b.y - (prefer ?? centre.y)) || b.w - a.w)[0] ?? null;
         };
-        const clear = search([...obstacles, ...hands]);
-        const loose = clear && clear.w >= BOARD_CARD_MIN ? null : search(obstacles);
+        // Centred on the table; where that deals the cards under BOARD_CARD_MIN (a phone on its side,
+        // its seats on one side open), anywhere across the felt that deals them larger — the block in
+        // the felt's free half rather than squeezed between the seats taken.
+        const across = (avoid: readonly Rect[]): Try | null => {
+            const middle = search(avoid);
+            if (middle && middle.w >= BOARD_CARD_MIN) return middle;
+            const xs: number[] = [];
+            for (let x = Math.ceil(felt.felt.left); x <= felt.felt.left + felt.felt.width; x += ACROSS_STEP) xs.push(x);
+            const off = search(avoid, xs);
+            return off && off.w > (middle?.w ?? 0) ? off : middle;
+        };
+        const clear = across([...obstacles, ...hands]);
+        const loose = clear && clear.w >= BOARD_CARD_MIN ? null : across(obstacles);
         const pick = clear && (!loose || clear.w >= BOARD_CARD_MIN || clear.w >= loose.w) ? clear : loose;
         handsClear = pick !== null && pick === clear;
         arrangement = pick?.arrangement ?? 'cascade';
         labels = pick?.labels ?? false;
         chosen = pick ?? {
+            x: centre.x,
             y: fallbackY(box, centre, [...obstacles, ...hands], [...weights, ...hands.map(() => 10)], boardBlock('cascade', n, MULTI_BOARD_MIN, fit, false)),
             w: MULTI_BOARD_MIN,
         };
     }
     const card = {w: chosen.w, h: Math.round(chosen.w * CARD_RATIO)};
     const block = boardBlock(arrangement, n, card.w, fit, labels);
-    const board = {x: centre.x, y: chosen.y, w: block.w, h: block.h, card, gap, arrangement, labels, handsClear};
+    const board = {x: chosen.x ?? centre.x, y: chosen.y, w: block.w, h: block.h, card, gap, arrangement, labels, handsClear};
     const boards: BoardPlace[] = block.places.map((p, index) => ({
         index, x: board.x + p.dx, y: board.y + p.dy, w: 5 * card.w + 4 * gap, h: card.h,
         label: p.label && {x: board.x + p.label.x, y: board.y + p.label.y},
@@ -373,12 +429,12 @@ const placeBoards = (
     const potSize = {w: Math.min(potBase.w, Math.max(board.w, 72)), h: potBase.h};
     const against = [...obstacles, board];
     const candidates: Px[] = [
-        {x: centre.x, y: board.y - board.h / 2 - PAD * 2 - potSize.h / 2},
-        {x: centre.x, y: board.y + board.h / 2 + PAD * 2 + potSize.h / 2},
+        {x: board.x, y: board.y - board.h / 2 - PAD * 2 - potSize.h / 2},
+        {x: board.x, y: board.y + board.h / 2 + PAD * 2 + potSize.h / 2},
     ];
     for (let k = 1; k <= 40; k++) {
-        candidates.push({x: centre.x, y: board.y - board.h / 2 - PAD * 2 - potSize.h / 2 - k * 2});
-        candidates.push({x: centre.x, y: board.y + board.h / 2 + PAD * 2 + potSize.h / 2 + k * 2});
+        candidates.push({x: board.x, y: board.y - board.h / 2 - PAD * 2 - potSize.h / 2 - k * 2});
+        candidates.push({x: board.x, y: board.y + board.h / 2 + PAD * 2 + potSize.h / 2 + k * 2});
     }
     const potAt = candidates.find((p) => {
         const r = rect(p, potSize);
@@ -387,14 +443,19 @@ const placeBoards = (
     return {board, boards, pot: rect(potAt ?? {x: board.x, y: board.y - board.h / 2}, potSize), potOnBoard: potAt === null};
 };
 
+// How many cards a hand turns up (two; PLO's four, which one board keeps clear of too — several boards
+// always do), and where the page drew the board (its middle's y) a moment ago, which the board keeps to
+// among places as good (`prefer`, placeBoards).
+export type StageOptions = {handSize?: number; prefer?: number | null; open?: readonly number[]};
+
 // The plates, bet lines and buttons of a table, its board (or boards: `boards`, PLO's one to three)
 // and pot. With several boards, a second layout sends the side seats' bet lines along their rails
 // (raysOf) and is kept when it deals the boards larger.
-export const stageLayout = (box: Box, seatCount: number, mySeat: number | null, boards = 1): Stage => {
+export const stageLayout = (box: Box, seatCount: number, mySeat: number | null, boards = 1, options: StageOptions = {}): Stage => {
     const n = Math.max(1, Math.min(3, Math.round(boards)));
-    if (n === 1) return layoutStage(box, seatCount, mySeat, 1, false);
-    const straight = layoutStage(box, seatCount, mySeat, n, false);
-    const along = layoutStage(box, seatCount, mySeat, n, true);
+    if (n === 1) return layoutStage(box, seatCount, mySeat, 1, false, options);
+    const straight = layoutStage(box, seatCount, mySeat, n, false, options);
+    const along = layoutStage(box, seatCount, mySeat, n, true, options);
     return along.board.card.w > straight.board.card.w && apart(along) ? along : straight;
 };
 
@@ -405,7 +466,7 @@ const apart = (stage: Stage): boolean => {
     return rects.every((a, i) => rects.every((b, j) => j <= i || !overlaps(a, b)));
 };
 
-const layoutStage = (box: Box, seatCount: number, mySeat: number | null, n: number, along: boolean): Stage => {
+const layoutStage = (box: Box, seatCount: number, mySeat: number | null, n: number, along: boolean, options: StageOptions): Stage => {
     const orientation = stageOrientation(box);
     const fit = fitFor(box);
     const plateSize = PLATE_SIZE[fit];
@@ -435,20 +496,44 @@ const layoutStage = (box: Box, seatCount: number, mySeat: number | null, n: numb
         const avoid = [...plates, ...bets, ...buttons.filter(Boolean)];
         // Along the rail, the button sits across the way the line actually went out.
         const dir = along ? unit(p.plate, bets[p.seat]) : p.dir;
-        buttons[p.seat] = rect(placeButton(p.plate, bets[p.seat], dir, plateSize, buttonSize, avoid, box), {w: buttonSize, h: buttonSize});
+        buttons[p.seat] = rect(placeButton(p.plate, bets[p.seat], dir, plateSize, buttonSize, avoid, box, centre), {w: buttonSize, h: buttonSize});
     }
-    const seats: SeatPlace[] = placed.map((p) => ({
-        seat: p.seat, slot: p.slot, spot: p.spot, plate: p.plate,
-        bet: {x: bets[p.seat].x, y: bets[p.seat].y}, button: {x: buttons[p.seat].x, y: buttons[p.seat].y},
-    }));
-    const obstacles = [...plates, ...bets, ...buttons];
+    // An open seat draws its ring alone: no plate, bet line or button there, and no hand to turn up.
+    const open = new Set(options.open ?? []);
+    const ring = openSeatPx({plateSize});
+    const at = placed.map((p) => (open.has(p.seat) ? rect(p.plate, {w: ring, h: ring}) : plates[p.seat]));
+    const taken = (_: unknown, seat: number) => !open.has(seat);
+    const obstacles = [...at, ...bets.filter(taken), ...buttons.filter(taken)];
     // What covering each weighs, where boards fit nowhere: a plate or a button a hundred bet lines.
-    const weights = [...plates.map(() => 100), ...bets.map(() => 1), ...buttons.map(() => 100)];
-    // Several boards (PLO) keep clear of the hands of four that may turn up too: every seat's but the
-    // seated viewer's own, whose cards are in the dock.
-    const hands = n > 1 ? placed.filter((p) => mySeat === null || p.slot !== 0).map((p) => shownHandRect(p, {plateSize, fit}, 4)) : [];
+    const weights = [...at.map(() => 100), ...bets.filter(taken).map(() => 1), ...buttons.filter(taken).map(() => 100)];
     const felt = {left: plateSize.w / 2, top: plateSize.h / 2, width: Math.max(0, box.w - plateSize.w), height: Math.max(0, box.h - plateSize.h)};
-    return {box, orientation, fit, plateSize, betSize, buttonSize, felt, centre, ...placeBoards(box, fit, centre, {felt}, obstacles, weights, hands, n), seats};
+    // The hands that may turn up — every seat's but the seated viewer's own, whose cards are in the dock
+    // — each moved along its row off another (nudgeHands). Texas hold'em's two (and Triple T's) are
+    // moved round the board, placed first; PLO's four are moved first and the board (one, or several)
+    // keeps clear of them where its cards stay BOARD_CARD_MIN or wider — unless that holds only with the
+    // hands left where they are, which the board then keeps clear of instead.
+    const handSize = n > 1 ? 4 : Math.max(2, options.handSize ?? 2);
+    const showing = placed.filter((p) => (mySeat === null || p.slot !== 0) && !open.has(p.seat));
+    const stageOf = (shownDx: Record<number, number>, boards: BoardsPlaced): Stage => ({
+        box, orientation, fit, plateSize, betSize, buttonSize, felt, centre, ...boards,
+        seats: placed.map((p) => ({
+            seat: p.seat, slot: p.slot, spot: p.spot, plate: p.plate,
+            bet: {x: bets[p.seat].x, y: bets[p.seat].y}, button: {x: buttons[p.seat].x, y: buttons[p.seat].y}, shownDx: shownDx[p.seat] ?? 0,
+        })),
+    });
+    const sized = {plateSize, fit};
+    if (handSize <= 2 && n <= 1) {
+        const boards = placeBoards(box, fit, centre, {felt}, obstacles, weights, [], n, options.prefer ?? null);
+        const lit = LIT.lift + LIT.ring;
+        const board = {x: boards.board.x, y: boards.board.y - lit / 2, w: boards.board.w + 2 * LIT.ring, h: boards.board.h + lit};
+        return stageOf(nudgeHands(showing, sized, box, centre, [...at.map((r, seat) => ({r, seat})), {r: board, seat: -1}], handSize), boards);
+    }
+    const handsAt = (shownDx: Record<number, number>) => showing.map((p) => shownHandRect({...p, shownDx: shownDx[p.seat] ?? 0}, sized, handSize));
+    const moved = nudgeHands(showing, sized, box, centre, at.map((r, seat) => ({r, seat})), handSize);
+    const boards = placeBoards(box, fit, centre, {felt}, obstacles, weights, handsAt(moved), n, options.prefer ?? null);
+    if (boards.board.handsClear || Object.values(moved).every((dx) => dx === 0)) return stageOf(moved, boards);
+    const still = placeBoards(box, fit, centre, {felt}, obstacles, weights, handsAt({}), n, options.prefer ?? null);
+    return still.board.handsClear ? stageOf({}, still) : stageOf(moved, boards);
 };
 
 // ── the winner's banner ──
@@ -461,7 +546,9 @@ const layoutStage = (box: Box, seatCount: number, mySeat: number | null, n: numb
 // board on the pot's side (where the pot sat), then its other side, then out over the felt's empty
 // bands, centred where it can be; then a compact banner (a line a winner, no avatar, wrapped when
 // narrow) the same way; then each apart from the line; then the compact one cut short. The first
-// that clears everything wins. What it clears is what is drawn: the banner and the line are drawn
+// that clears everything wins. The cut one says each head whole, or cut short without its chips (each
+// seat's "+N" says them) — "Board 2: Ana", "Ana wins" — never inside a number or a board's name; it
+// names fewer winners before it cuts a name, and then only to an ellipsis. What it clears is what is drawn: the banner and the line are drawn
 // top-anchored at the place found, never wider than the room found there (their wrap's width), their
 // line heights fixed in the stylesheet, and every text width it sizes them by an upper bound.
 
@@ -527,8 +614,10 @@ export const textWidth = (text: string, px: number, bold = false): number => {
 };
 
 // What the banner says: a line for each winner it names (at most three) — the head, "You win 70" or
-// "Ana wins 1,200", and the hand's name or null — and the line under it, or null.
-export type BannerText = {winners: readonly {head: string; hand: string | null}[]; note: string | null};
+// "Ana wins 1,200"; the head cut short, without its chips, in three parts (`short`: the words before the
+// name, the name, the words after — "Board 2: " "Ana" ""), of which only the name is ever cut; and the
+// hand's name or null — and the line under it, or null.
+export type BannerText = {winners: readonly {head: string; short?: {lead: string; name: string; tail: string}; hand: string | null}[]; note: string | null};
 // A winner's "+N" (the seat and what it won), rising over its seat while the pots pay out.
 export type WinPop = {seat: number; amount: number};
 // What the table shows beside it: the seats nobody sits in (an open seat's ring, no plate), the seats
@@ -546,21 +635,83 @@ export type BannerVariant = 'full' | 'compact' | 'cut';
 // A piece drawn top-anchored: its centre's x, its top, the most it may be wide, its height.
 export type BannerPiece = {x: number; top: number; width: number; height: number};
 // The plan: which banner, how many of the winners it names (the first `rows`), where it and the line
-// under it go (no line when there is none, or no room for it).
-export type BannerPlan = {variant: BannerVariant; rows: number; banner: BannerPiece; note: BannerPiece | null; clear: boolean};
+// under it go (no line when there is none, or no room for it), and whether the cut banner says each
+// head cut short (`short`: where its room is narrower than the heads whole).
+export type BannerPlan = {variant: BannerVariant; rows: number; banner: BannerPiece; note: BannerPiece | null; clear: boolean; short: boolean};
+
+// The least of a name a cut banner keeps: a letter and the ellipsis (an upper bound, in textWidth's terms).
+const NAME_LEAST = 'W…';
 
 export const pieceRect = (p: BannerPiece): Rect => ({x: p.x, y: p.top + p.height / 2, w: p.width, h: p.height});
 
 // A seat's turned-up cards as drawn (.pn-seat-shown), `count` of them, the lift and ring of a card
 // that plays included.
-export const shownHandRect = (place: Pick<SeatPlace, 'plate' | 'spot'>, stage: Pick<Stage, 'plateSize' | 'fit'>, count = 2): Rect => {
+export const shownHandRect = (place: Pick<SeatPlace, 'plate' | 'spot'> & {shownDx?: number}, stage: Pick<Stage, 'plateSize' | 'fit'>, count = 2): Rect => {
     const card = SHOWN_CARD_PX[stage.fit];
     const h = card * CARD_RATIO;
     const top = place.spot.side === 'top'
         ? place.plate.y + stage.plateSize.h / 2 + SHOWN_OFF.under
         : place.plate.y - stage.plateSize.h / 2 - SHOWN_OFF.over - h;
     const lit = LIT.lift + LIT.ring;
-    return {x: place.plate.x, y: top - lit + (h + lit) / 2, w: shownHandWidth(stage.fit, count) + 2 * LIT.ring, h: h + lit};
+    return {x: place.plate.x + (place.shownDx ?? 0), y: top - lit + (h + lit) / 2, w: shownHandWidth(stage.fit, count) + 2 * LIT.ring, h: h + lit};
+};
+
+// Where each hand that may turn up is drawn across from its plate (SeatPlace.shownDx). A side seat's
+// hand over its plate and the top corner's under its own meet on a phone, and two neighbours along
+// the top meet when a row is full: placed side and bottom seats first, then the top row, each by its
+// slot, a hand that meets one placed before it moves along its row — toward the table's middle first,
+// then the other way, two pixels at a time, up to two plates' widths — to the first place inside the
+// box clear of every hand placed, every other plate and (two cards, the board placed first) the board
+// with its lit cards' lift; where none is clear (seven seats or more on the smallest phones, every
+// seat's hand up), it stays. The dealer button it may cover for the seconds a showdown lasts, as a hand
+// at its own place may: every seat has a place for the button, and keeping clear of all of them would
+// leave the hands nowhere to go. Every seat's but the seated viewer's,
+// whose cards are in the dock, so a hand's place never moves while a hand is played.
+const NUDGE_REACH = 2;
+// Whether two hands turned up meet: their cards, a lit card's lift above one allowed under the other
+// (it rises only into the foot of the hand over it, never to its corner's index).
+export const handsMeet = (a: Rect, b: Rect): boolean =>
+    Math.abs(a.x - b.x) < (a.w + b.w) / 2 && Math.abs(a.y - b.y) < (a.h + b.h) / 2 - LIT.lift;
+const nudgeHands = (
+    showing: readonly {seat: number; slot: number; spot: SeatSpot; plate: Px}[], stage: Pick<Stage, 'plateSize' | 'fit'>, box: Box, centre: Px,
+    fixed: readonly {r: Rect; seat: number}[], count: number,
+): Record<number, number> => {
+    const dx: Record<number, number> = {};
+    const placed: {seat: number; r: Rect}[] = [];
+    const bases = new Map(showing.map((p) => [p.seat, shownHandRect(p, stage, count)]));
+    const toMiddle = (p: {plate: Px}) => (centre.x >= p.plate.x ? 1 : -1);
+    // The nearest place along its row for a hand, clear of `others`; null when there is none.
+    const slide = (p: {seat: number; plate: Px}, others: readonly Rect[]): number | null => {
+        const base = bases.get(p.seat)!;
+        for (let d = 2; d <= stage.plateSize.w * NUDGE_REACH; d += 2) for (const sign of [toMiddle(p), -toMiddle(p)]) {
+            const r = {...base, x: base.x + sign * d};
+            if (insideBox(r, box) && others.every((q) => !handsMeet(r, q)) && fixed.every((q) => q.seat === p.seat || !overlaps(r, q.r))) return sign * d;
+        }
+        return null;
+    };
+    const order = [...showing].sort((a, b) => Number(a.spot.side === 'top') - Number(b.spot.side === 'top') || a.slot - b.slot);
+    for (const p of order) {
+        const base = bases.get(p.seat)!;
+        let at = 0;
+        if (placed.some((q) => handsMeet(base, q.r))) {
+            const moved = slide(p, placed.map((q) => q.r));
+            if (moved !== null) at = moved;
+            else {
+                // No room for it along its row: the hand it meets slides instead, where that one has room,
+                // this one staying where it was.
+                for (const q of placed.filter((o) => handsMeet(base, o.r))) {
+                    const them = showing.find((o) => o.seat === q.seat)!;
+                    const theirs = slide(them, [...placed.filter((o) => o !== q).map((o) => o.r), base]);
+                    if (theirs === null) continue;
+                    dx[q.seat] = theirs;
+                    q.r = {...bases.get(q.seat)!, x: bases.get(q.seat)!.x + theirs};
+                }
+            }
+        }
+        dx[p.seat] = at;
+        placed.push({seat: p.seat, r: {...base, x: base.x + at}});
+    }
+    return dx;
 };
 
 // An open seat's ring (.pn-open-seat): max(44 px, 95 % of the plate's height) across.
@@ -617,6 +768,43 @@ const tableParts = (stage: Stage, seen: Pick<BannerSeen, 'open' | 'shown' | 'but
 const tableObstacles = (stage: Stage, seen: BannerSeen): Rect[] => {
     const t = tableParts(stage, seen);
     return [...t.plates, ...t.flags, ...t.shown, ...t.fixed];
+};
+
+// ── a seat's status flag ──
+//
+// A plate's status flag (.pn-plate-flag: 11 px bold, 10 on a tight table, on a 15 px line, 6 px a side
+// inside the widest chrome border, never more than 28 px wider than the plate) hangs 55 % of itself
+// under the plate. In a crowded side column — a phone on its side, seven seats or more — that is where
+// the next plate down draws its blind's mark and the cards face down before it, or the plate itself:
+// flagRoom says whether a flag clears every other seat's plate (an open seat's ring), its cards face
+// down, its blind's mark and its own flag, so a status every plate shows at once (Triple T's
+// "Discarding…", components/poker-night/SeatRing) is drawn on the plate instead where it has none.
+export const FLAG_PX: Record<Fit, number> = {tight: 10, compact: 11, comfortable: 11};
+export const flagRect = (place: Pick<SeatPlace, 'plate'>, stage: Pick<Stage, 'plateSize' | 'fit'>, text: string): Rect => ({
+    x: place.plate.x,
+    y: place.plate.y + stage.plateSize.h / 2 + FLAG.h * FLAG.below - FLAG.h / 2,
+    w: Math.min(stage.plateSize.w + FLAG.wider, textWidth(text, FLAG_PX[stage.fit], true) + 2 * (6 + BANNER.border)),
+    h: FLAG.h,
+});
+// What a seat draws round its spot, as flagRoom weighs it: an open seat's ring, else its plate, the
+// cards face down before it (how many), its blind's mark and its flag's words.
+export type SeatMarks = {seat: number; open: boolean; backs: number; blind: boolean; flag: string | null};
+export const flagRoom = (stage: Stage, seat: number, text: string, seats: readonly SeatMarks[]): boolean => {
+    const place = stage.seats[seat];
+    if (!place) return false;
+    const flag = flagRect(place, stage, text);
+    const ring = openSeatPx(stage);
+    return seats.every((o) => {
+        const p = o.seat === seat ? undefined : stage.seats[o.seat];
+        if (!p) return true;
+        const drawn: Rect[] = o.open ? [rect(p.plate, {w: ring, h: ring})] : [
+            rect(p.plate, stage.plateSize),
+            ...(o.backs > 0 ? [seatCardsRect(p, stage, o.backs)] : []),
+            ...(o.blind ? [blindRect(p, stage)] : []),
+            ...(o.flag ? [flagRect(p, stage, o.flag)] : []),
+        ];
+        return drawn.every((r) => !overlaps(flag, r));
+    });
 };
 
 // ── finding room ──
@@ -773,9 +961,17 @@ export const bannerPlan = (stage: Stage, text: BannerText, seen: BannerSeen): Ba
     const anchor: Anchor = {x: board.x, top: board.y - board.h / 2 - LIT.lift - LIT.ring, bottom: board.y + board.h / 2};
     const piece = (x: number, top: number, h: number, against: readonly Rect[]): BannerPiece =>
         ({x, top, width: Math.min(cap, clearWidth(x, top, h, against, box)), height: h});
+    // Whether a cut banner as wide as `width` says the heads cut short: narrower than every head whole
+    // and an ellipsis.
+    const cutShort = (variant: BannerVariant, rows: number, width: number): boolean => {
+        if (variant !== 'cut') return false;
+        const heads = Math.max(0, ...text.winners.slice(0, rows).map((w) => textWidth(w.head, small.px, true)));
+        return width < 2 * (small.pad.x + B) + heads + textWidth(' …', small.px);
+    };
 
-    // The banner's three shapes naming the first `rows` winners.
-    const shapes = (rows: number): Record<BannerVariant, Omit<Shape, 'note'>> => {
+    // The banner's three shapes naming the first `rows` winners; the cut one, with `names`, cutting a
+    // name to an ellipsis where it has to.
+    const shapes = (rows: number, names = false): Record<BannerVariant, Omit<Shape, 'note'>> => {
         const winners = text.winners.slice(0, rows);
         const k = Math.max(1, winners.length);
         const fullH = 2 * (full.pad[fit].y + B) + (k - 1) * full.rowGap[fit]
@@ -793,23 +989,33 @@ export const bannerPlan = (stage: Stage, text: BannerText, seen: BannerSeen): Ba
         const lineH = 2 * (small.pad.y + B) + (k - 1) * small.rowGap + k * small.line;
         const least = fits(chrome + 4 * small.px);
         const heads = Math.max(0, ...winners.map((w) => textWidth(w.head, small.px, true)));
+        // Cut short: never inside a number or a board's name — at least as wide as the widest head cut
+        // short (with `names`, its name cut as far as a letter and an ellipsis), at most as wide as it whole.
+        const shortOf = (w: BannerText['winners'][number]) => w.short ?? {lead: w.head, name: '', tail: ''};
+        const shorts = Math.max(0, ...winners.map((w) => textWidth(`${shortOf(w).lead}${shortOf(w).name}${shortOf(w).tail}`, small.px, true)));
+        const floors = Math.max(0, ...winners.map((w) => {
+            const {lead, name, tail} = shortOf(w);
+            return textWidth(`${lead}${tail}`, small.px, true) + Math.min(textWidth(name, small.px, true), textWidth(NAME_LEAST, small.px, true));
+        }));
         return {
             full: {height: () => fullH, widest: fullW, least: fullW},
             compact: {
                 height: (w) => lineH + small.line * (words.reduce((s, ws) => s + wrappedLines(ws, space, Math.max(1, w - chrome)), 0) - k),
                 widest: fits(chrome + oneLine), least,
             },
-            // Cut short, a line each: every head whole and an ellipsis at most, four ems at least.
-            cut: {height: () => lineH, widest: Math.max(least, fits(chrome + heads + textWidth(' …', small.px))), least},
+            // Cut short, a line each: every head whole and an ellipsis at most; where that has no room,
+            // every head cut short (with `names`, its name to an ellipsis at the narrowest); four ems at least.
+            cut: {height: () => lineH, widest: Math.max(least, fits(chrome + Math.max(shorts, heads + textWidth(' …', small.px)))), least: Math.max(least, fits(chrome + (names ? floors : shorts)))},
         };
     };
 
-    const attempt = (rows: number): BannerPlan | null => {
-        const shape = shapes(rows);
+    const attempt = (rows: number, names = false): BannerPlan | null => {
+        const shape = shapes(rows, names);
         const together = (variant: BannerVariant): BannerPlan | null => {
             const at = placeShape({...shape[variant], note}, avoid, box, anchor, prefer);
             if (!at) return null;
-            return {variant, rows, banner: piece(at.x, at.top, at.h, avoid), note: note && piece(at.x, at.top + at.h + n.gap, noteH, avoid), clear: true};
+            const banner = piece(at.x, at.top, at.h, avoid);
+            return {variant, rows, banner, note: note && piece(at.x, at.top + at.h + n.gap, noteH, avoid), clear: true, short: cutShort(variant, rows, banner.width)};
         };
         let alone: BannerPlan | null = null;
         const apart = (variant: BannerVariant): BannerPlan | null => {
@@ -819,13 +1025,15 @@ export const bannerPlan = (stage: Stage, text: BannerText, seen: BannerSeen): Ba
             const around = [...avoid, pieceRect(banner)];
             const under = banner.top + at.h + n.gap;
             const line = note && placeShape({height: () => noteH, widest: noteW, least: noteW, note: null}, around, box, {x: banner.x, top: under, bottom: under}, null);
-            if (line) return {variant, rows, banner, note: piece(line.x, line.top, noteH, around), clear: true};
-            alone ??= {variant, rows, banner, note: null, clear: true};
+            if (line) return {variant, rows, banner, note: piece(line.x, line.top, noteH, around), clear: true, short: cutShort(variant, rows, banner.width)};
+            alone ??= {variant, rows, banner, note: null, clear: true, short: cutShort(variant, rows, banner.width)};
             return null;
         };
-        const order: [BannerVariant, 'together' | 'apart'][] = note === null
-            ? [['full', 'together'], ['compact', 'together'], ['cut', 'together']]
-            : [['full', 'together'], ['compact', 'together'], ['full', 'apart'], ['compact', 'apart'], ['cut', 'together'], ['cut', 'apart']];
+        const order: [BannerVariant, 'together' | 'apart'][] = names
+            ? (note === null ? [['cut', 'together']] : [['cut', 'together'], ['cut', 'apart']])
+            : note === null
+                ? [['full', 'together'], ['compact', 'together'], ['cut', 'together']]
+                : [['full', 'together'], ['compact', 'together'], ['full', 'apart'], ['compact', 'apart'], ['cut', 'together'], ['cut', 'apart']];
         for (const [variant, how] of order) {
             const plan = how === 'together' ? together(variant) : apart(variant);
             if (plan) return plan;
@@ -833,9 +1041,10 @@ export const bannerPlan = (stage: Stage, text: BannerText, seen: BannerSeen): Ba
         return alone;
     };
 
+    // Every head whole (cut short at most) naming fewer winners — fewer boards — before a name is cut.
     const most = Math.min(BANNER.rows, Math.max(1, text.winners.length));
-    for (let rows = most; rows >= 1; rows--) {
-        const plan = attempt(rows);
+    for (const names of [false, true]) for (let rows = most; rows >= 1; rows--) {
+        const plan = attempt(rows, names);
         if (plan) return plan;
     }
     // Nowhere clear: where the pot was, full size.
@@ -844,7 +1053,7 @@ export const bannerPlan = (stage: Stage, text: BannerText, seen: BannerSeen): Ba
     const top = prefer === 'up' ? anchor.top - BANNER.clear - column : anchor.bottom + BANNER.clear;
     return {
         variant: 'full', rows: most, banner: {x: board.x, top, width: cap, height: h},
-        note: note && {x: board.x, top: top + h + n.gap, width: cap, height: noteH}, clear: false,
+        note: note && {x: board.x, top: top + h + n.gap, width: cap, height: noteH}, clear: false, short: false,
     };
 };
 
@@ -924,13 +1133,18 @@ export const feltSpan = (stage: Pick<Stage, 'felt'>, top: number, h: number, rai
 // A seat's face-down pair (.pn-seat-cards): two cards --pn-mini-w wide (MINI_CARD_PX) and 1.4 times as
 // tall, overlapping by 0.45 of a width, at the plate's top right 3 px in and 0.45 of a width over its
 // top, each turned 7° (which widens it by 0.09 of a width a side and heightens it by 0.06); a pixel
-// round it.
+// round it. Three or four (Triple T's, PLO's) keep the pair's footprint, the ones between closer, which
+// closes the gap the pair leaves over the stack's figures: on a compact or tight plate, whose figures
+// sit in the top row beside the avatar, they start a whole width over the plate's top
+// (SEAT_CARDS_OVER), ending 0.4 of a width into it, above the figures.
 export const MINI_CARD_PX: Record<Fit, number> = {tight: 14, compact: 17, comfortable: 24};
-export const seatCardsRect = (place: Pick<SeatPlace, 'plate'>, stage: Pick<Stage, 'plateSize' | 'fit'>): Rect => {
+export const SEAT_CARDS_OVER = {pair: 0.45, more: 1} as const;
+export const seatCardsOver = (fit: Fit, count = 2): number => (count > 2 && fit !== 'comfortable' ? SEAT_CARDS_OVER.more : SEAT_CARDS_OVER.pair);
+export const seatCardsRect = (place: Pick<SeatPlace, 'plate'>, stage: Pick<Stage, 'plateSize' | 'fit'>, count = 2): Rect => {
     const w = MINI_CARD_PX[stage.fit];
     const right = place.plate.x + stage.plateSize.w / 2 - 3 + 0.09 * w + 1;
     const left = right - 1.55 * w - 0.18 * w - 2;
-    const top = place.plate.y - stage.plateSize.h / 2 - 0.45 * w - 0.06 * w - 1;
+    const top = place.plate.y - stage.plateSize.h / 2 - seatCardsOver(stage.fit, count) * w - 0.06 * w - 1;
     const bottom = top + 1.4 * w + 0.12 * w + 2;
     return {x: (left + right) / 2, y: (top + bottom) / 2, w: right - left, h: bottom - top};
 };
@@ -972,8 +1186,9 @@ export type BetOut = {seat: number; amount: number; allIn: boolean};
 export type PotNow = {shown: readonly number[]; bets: readonly BetOut[]; pops: readonly WinPop[]};
 // What the pots keep clear of: the banner's open seats and dealer button; in `shown` every seat whose
 // hand may yet turn up, and in `bets` every seat whose bet line may yet show (the seats dealt in, while
-// there is a hand); and what shows now.
-export type PotSeen = Omit<BannerSeen, 'pots' | 'pops'> & {bets: readonly number[]; now?: PotNow};
+// there is a hand); what shows now; and how many cards lie face down before a plate (`backs`: the
+// hand's, Triple T's three while they throw one away; else handSize, else two).
+export type PotSeen = Omit<BannerSeen, 'pots' | 'pops'> & {bets: readonly number[]; now?: PotNow; backs?: number};
 
 // What the pots keep clear of, by kind (see above). What the table always draws: the cards, plates,
 // open seats' rings, the dealer button and the board (`cards`), and the flags and blinds' marks
@@ -988,7 +1203,7 @@ const potKinds = (stage: Stage, seen: PotSeen): PotKinds => {
     const bets: Rect[] = [];
     for (const p of stage.seats) {
         if (seen.open.includes(p.seat)) continue;
-        cards.push(seatCardsRect(p, stage));
+        cards.push(seatCardsRect(p, stage, seen.backs ?? seen.handSize ?? 2));
         marks.push(blindRect(p, stage));
         if (seen.bets.includes(p.seat)) bets.push(rect(p.bet, stage.betSize));
     }

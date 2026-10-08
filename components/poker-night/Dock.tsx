@@ -74,8 +74,10 @@ const LONG_NOTE = 'chrome-surface inline-flex max-w-full items-center rounded-xl
 
 // The seconds left on the viewer's own turn (the ring on the plate shows the share), or in Triple
 // T's throw-away ("Throw away one").
-// A longer label (the throw-away's) may take two lines on a narrow phone: the box rounds less then,
-// and the seconds never break.
+// A longer label (the throw-away's) may take two lines: the box rounds less then, and the seconds
+// never break. Beside the cards of a phone held upright it says the seconds alone (.pn-clock-label),
+// so the line beside the cards stays lower than the cards and what the two kept make never grows the
+// dock (the confirm, the plates and the felt say what the seconds are for).
 const TurnClock = ({deadline, turnMs, label = TABLE_COPY.yourTurn}: {deadline: number; turnMs: number; label?: string}) => {
     const now = useServerNow(1000);
     const left = turnLeft(deadline, turnMs, now, 0);
@@ -83,7 +85,7 @@ const TurnClock = ({deadline, turnMs, label = TABLE_COPY.yourTurn}: {deadline: n
     return (
         <span className={cn(label === TABLE_COPY.yourTurn ? NOTE : LONG_NOTE, 'gap-1.5 font-semibold text-fg')} role="timer" aria-live="off" aria-label={TABLE_COPY.timer}
               data-pn-clock={left.seconds}>
-            <span>{label}</span>
+            <span className={label === TABLE_COPY.yourTurn ? undefined : 'pn-clock-label'}>{label}</span>
             <span className={cn('whitespace-nowrap font-mono', left.fraction <= 0.3 && 'text-warning')}>{TABLE_COPY.secondsLeft(left.seconds)}</span>
         </span>
     );
@@ -332,14 +334,20 @@ const DockHand = ({dock, deadline, waitingFor, anims, look, throwing, disabled}:
                 {dock.leaving && <span className={LONG_NOTE} role="status" data-pn-leaving="">{TABLE_COPY.leavingAfterHand}</span>}
                 {dock.sitOutNext && <span className={LONG_NOTE} role="status" data-pn-sit-out-next="">{TABLE_COPY.sitOutNextNote}</span>}
                 {/* The hand's name, unless the viewer turned it off (My look: "Name my hand") or keeps the cards face down;
-                    while a card is to be thrown away, what the two kept would make, or (in a wide dock) how to pick. */}
+                    while a card is to be thrown away, what the two kept would make, or (in a wide dock) how to pick — the
+                    prompt's row kept, unseen, in a narrow dock and once a card is picked, so the pick never grows the dock
+                    (and the table above it shrinks by nothing). */}
                 {hidden
                     ? <span className={NOTE} data-pn-peek-prompt="">{LOOKS_COPY.peekPrompt}</span>
                     : picking
                         ? kept && room.personal.handHints
                             ? <HandStrength strength={kept}/>
-                            : throwing.picked === null && (
-                                <span className="pn-discard-prompt" data-pn-discard-prompt=""><span className={NOTE}>{DISCARD_COPY.prompt}</span></span>
+                            : (
+                                <span className={cn('pn-discard-prompt flex', throwing.picked !== null && 'invisible')} data-pn-discard-prompt=""
+                                      aria-hidden={throwing.picked !== null ? true : undefined}>
+                                    {/* As tall as the pill that takes its place (HandStrength's, leading-tight). */}
+                                    <span className={cn(NOTE, 'leading-tight')}>{DISCARD_COPY.prompt}</span>
+                                </span>
                             )
                         : <HandStrength strength={room.personal.handHints ? dock.strength : null} strengths={room.personal.handHints ? dock.strengths : null}/>}
             </div>

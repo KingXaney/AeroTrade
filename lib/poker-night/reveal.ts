@@ -136,9 +136,13 @@ export const scoopOf = (look: ResultLook): number | null => {
 // showdown, a line a board — "Board 2: Ana wins 600", or its chips player by player — under the hand
 // of the board's largest winner; or one line, with no hand, when one player won every board
 // ("Ana wins every board: 1,800"). seat: whose look the full banner draws; board: the board a line is
-// about, null for the whole hand. lib/poker-night/stage.bannerPlan sizes the banner from these, and
-// components/poker-night/WinnerReveal draws them.
-export type BannerLine = {key: string; seat: number; board: number | null; mine: boolean; head: string; hand: string | null};
+// about, null for the whole hand; short: the head without its chips, where the banner has no room for
+// it whole ("Board 2: Ana", "Ana wins", "You win every board" — each seat's "+N" says the chips), in
+// three parts so that a cut banner never cuts inside a number or a board's name, and a name only to an
+// ellipsis on the narrowest screens. lib/poker-night/stage.bannerPlan sizes the banner from these,
+// and components/poker-night/WinnerReveal draws them.
+export type ShortHead = {lead: string; name: string; tail: string};
+export type BannerLine = {key: string; seat: number; board: number | null; mine: boolean; head: string; short: ShortHead; hand: string | null};
 export const bannerLines = (look: ResultLook, nameOf: (seat: number) => string | null, mySeat: number | null): BannerLine[] => {
     const name = (seat: number) => nameOf(seat) ?? TABLE_COPY.seat(seat);
     const handOf = (w: WinnerLook) => (w.description ? (w.playsBoard ? `${HAND_COPY.label(w.description)} · ${HAND_COPY.playsBoard}` : HAND_COPY.label(w.description)) : null);
@@ -147,7 +151,9 @@ export const bannerLines = (look: ResultLook, nameOf: (seat: number) => string |
         if (scoop !== null) {
             const w = look.winners[0];
             const mine = scoop === mySeat;
-            return [{key: `all:${scoop}`, seat: scoop, board: null, mine, head: mine ? TABLE_COPY.bannerScoopYou(w.amount) : TABLE_COPY.bannerScoop(name(scoop), w.amount), hand: null}];
+            const head = mine ? TABLE_COPY.bannerScoopYou(w.amount) : TABLE_COPY.bannerScoop(name(scoop), w.amount);
+            const short = mine ? {lead: TABLE_COPY.bannerShortEveryYou, name: '', tail: ''} : {lead: '', name: TABLE_COPY.bannerShortNames([name(scoop)]), tail: TABLE_COPY.bannerShortEvery};
+            return [{key: `all:${scoop}`, seat: scoop, board: null, mine, head, short, hand: null}];
         }
         return look.boards.filter((b) => b.winners.length > 0).slice(0, BANNER.rows).map((b) => {
             const top = b.winners[0];
@@ -155,11 +161,14 @@ export const bannerLines = (look: ResultLook, nameOf: (seat: number) => string |
             const head = b.winners.length === 1
                 ? mine ? TABLE_COPY.bannerBoardYou(b.index, top.amount) : TABLE_COPY.bannerBoard(b.index, name(top.seat), top.amount)
                 : TABLE_COPY.bannerBoardSplit(b.index, b.winners.map((w) => ({name: w.seat === mySeat ? null : name(w.seat), amount: w.amount})));
-            return {key: `board:${b.index}`, seat: top.seat, board: b.index, mine, head, hand: handOf(top)};
+            const short = {lead: TABLE_COPY.bannerShortBoard(b.index), name: TABLE_COPY.bannerShortNames(b.winners.map((w) => (w.seat === mySeat ? null : name(w.seat)))), tail: ''};
+            return {key: `board:${b.index}`, seat: top.seat, board: b.index, mine, head, short, hand: handOf(top)};
         });
     }
     return look.winners.slice(0, BANNER.rows).map((w) => {
         const mine = w.seat === mySeat;
-        return {key: `seat:${w.seat}`, seat: w.seat, board: null, mine, head: mine ? TABLE_COPY.bannerYou(w.amount) : TABLE_COPY.banner(name(w.seat), w.amount), hand: handOf(w)};
+        const head = mine ? TABLE_COPY.bannerYou(w.amount) : TABLE_COPY.banner(name(w.seat), w.amount);
+        const short = mine ? {lead: TABLE_COPY.bannerShortYou, name: '', tail: ''} : {lead: '', name: TABLE_COPY.bannerShortNames([name(w.seat)]), tail: TABLE_COPY.bannerShortWins};
+        return {key: `seat:${w.seat}`, seat: w.seat, board: null, mine, head, short, hand: handOf(w)};
     });
 };

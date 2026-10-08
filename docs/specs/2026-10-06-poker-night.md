@@ -458,8 +458,9 @@ everyone" (a show) or "No thanks". On the server: one ask waiting per player at 
 one unanswered for 15 s is a no; after a no the same player may not ask the same player again for
 five hands; a player who turned off "Let others ask to see my cards" cannot be asked (the setting is
 kept for a seated player and one of the hand asks are about, and dropped as anyone else leaves). The
-next deal ends every ask: one whose 15 s were up by then is a no, one still waiting with time left
-ends with no answer and no cooldown, and the one who asked is told. A cooldown is never dropped
+next deal ends every ask, and one still waiting is a no, with its cooldown, even with time left — the
+results pause is never longer than 15 s, so otherwise an ask its player lets go by could come back
+every hand — and the one who asked is told. A cooldown is never dropped
 before its five hands are up: the table keeps at most twelve cooldowns and waiting asks together,
 and at that cap nobody may ask ('asks-full') until some run out. Nothing ever shows a thrown-away
 Triple T card.
@@ -543,7 +544,13 @@ compact, 123 tight); between hands it holds the night's game's width. It names n
 flop. Another seat's four face-down cards keep the two's footprint; a turned-up four overlap at 0.56
 of a card (75 px compact, 64 tight), the box the banner and the pots keep clear of
 (`stage.shownHandRect` with the count, held at every phone size by `stage.test`). The deal sends
-four cards round in the time two take.
+four cards round in the time two take. Three or four face down sit a whole card's width over a
+compact or tight plate (`stage.SEAT_CARDS_OVER`), so their closed fan never covers the stack's
+figures. The one board keeps clear of every hand of four that may turn up wherever that leaves its
+cards 18 px or more (`board.handsClear`), and a hand that meets another's — a side seat's over its
+plate against the top corner's under its own — moves along its row (`stage.nudgeHands`,
+`SeatPlace.shownDx`), toward the middle first; on a 320 px phone with seven seats or more taken two
+can still meet.
 
 **The Hands guide.** "The games" adds Pot-limit Omaha: the `omaha` and `pot-limit` entries quoted,
 one hand drawn on one board with the five that play lifted (A♥ A♣ 7♠ 3♦ on K♥ 9♥ 6♥ 2♥ J♣: no flush,
@@ -573,8 +580,12 @@ board, 2 boards, 3 boards, each a 44 px choice (`components/poker-night/BoardsCh
 `lobby.boardChoices`), with what more boards do in a line under them. The game's name carries its
 boards wherever it is said ("PLO · 3 boards", "Pot-limit Omaha, 3 boards").
 
-**Where the boards go.** `stage.stageLayout(box, seats, mySeat, boards)` lays one board out exactly as
-before. Two or three are one block: one over another (stack), side by side (side), or cascaded — each
+**Where the boards go.** `stage.stageLayout(box, seats, mySeat, boards, options)` lays one board out
+at the widest cards in the band round the middle (a row counting at the width that fits a pixel over
+and under it too), the nearest the middle among those within `BOARD_TIE` of the widest, one under it
+only when `UNDER_BIAS` nearer, and — given `options.prefer`, where the page drew it a moment ago —
+the nearest that, so the dock growing a pixel never sends it across the felt and back. The seats
+nobody sits in (`options.open`) are rings alone. Two or three are one block: one over another (stack), side by side (side), or cascaded — each
 lower board over the foot of the one above, a card's height × `CASCADE_STEP` (0.62) down, so the
 rank and corner suit (the top `INDEX_BAND`, 0.58, of a card) of every card stay in sight — each
 board's numeral in a column at its left when there is room (`BOARD_LABEL`, per fit, held to the
@@ -586,7 +597,9 @@ plate, bet line and button — and every hand of four that may turn up (every se
 viewer's own, `stage.shownHandRect`), unless that alone deals the cards under 18 px where without
 it they would be larger (`board.handsClear` says which). A second layout sends every seat's bet line
 straight up or down first (a side seat's along its rail, a top seat's under its plate) and is kept
-when it deals the boards larger and keeps its own lines clear.
+when it deals the boards larger and keeps its own lines clear. Where the middle deals them under
+18 px the block may sit anywhere across the felt that deals them larger: on a 568 × 320 phone with
+four players at eight seats, in the free half, at about 20 px rather than 14.
 
 The spike measured every phone's seat layer at every seat count, seated and watching: 19 px or more on
 every upright phone 360 px wide or more (26 up to seven seats), 16 px or more on a 320 px one (20 up
@@ -640,8 +653,9 @@ reader hears the three cards. With Peek on the three stay face down until presse
 card's name nor the confirm says which card it is. Both the cards and the confirm drop a tap that
 lands as they appear. Once thrown, the card flies to the table, the two kept hold three's width for
 the rest of the hand, and the row says how many players the table waits for, with "Leave after this
-hand" beside it. Every other plate shows three backs and "Discarding…" until its player throws, a
-third back then flying to the middle; the felt counts the throws ("Everyone throws away one card · 3
+hand" beside it. Every other plate shows three backs and "Discarding…" until its player throws (where the flag has
+no room under the plate — a phone on its side at seven seats or more — a dashed ring on the plate,
+`stage.flagRoom`), a third back then flying to the middle; the felt counts the throws ("Everyone throws away one card · 3
 of 5 done") with the seconds inside the board's empty place — the count alone ("3 of 5 thrown away")
 where the board is narrow, nothing where it is narrower still (a small phone on its side). Under reduced motion the pick is drawn in place and no card is seen
 leaving.
@@ -675,8 +689,11 @@ runs from there to its winners. A pay-out that would run past the result's showi
 every time in proportion (the flights' own lengths too, `Scheduled.pace`), so it ends with it. The
 hand log prints each street board by board, a shown hand's name on each board and a line for each
 board's share of each pot; the screen reader hears the same. The dock names what the viewer's cards
-make on each board in one line ("1 Flush · 2 Pair · 3 Straight"), the names in full as its
-accessible name, so it keeps its height.
+make on each board, each kind behind its board's numeral badge and kept whole, the line breaking
+only between boards, the names in full as its accessible name. Cut short, a banner line says its head
+without the chips ("Board 2: Ana", "Ana wins": each seat's "+N" says them), never cutting inside a
+number or a board's name; it names fewer boards before it cuts a name, and then only to a letter and
+an ellipsis. The boards sheet draws the places still to come in the palette's muted ink.
 
 **The budgets, measured.** PLO's heaviest table on three boards (every pot split three ways): the
 state 15,048 bytes, the wire view 3,936 and its message 3,999. The room read 27,056 bytes, over its
