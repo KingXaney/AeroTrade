@@ -71,6 +71,7 @@ describe('ActionSchema', () => {
         {actionId: ID, type: 'host', op: {op: 'config', patch: {smallBlind: 25, bigBlind: 50, maxRebuys: null}}},
         {actionId: ID, type: 'host', op: {op: 'settings', patch: {locked: true, name: 'Friday'}}},
         {actionId: ID, type: 'host', op: {op: 'kick', pid: PLAYER}},
+        {actionId: ID, type: 'host', op: {op: 'sit-out', pid: PLAYER}},
         {actionId: ID, type: 'profile', name: 'Ana'},
         {actionId: ID, type: 'profile', avatar: AVATAR},
         {actionId: ID, type: 'unban', pid: PLAYER},
@@ -85,6 +86,12 @@ describe('ActionSchema', () => {
         no(ActionSchema, {actionId: ID, type: 'leave', by: PLAYER});
         no(ActionSchema, {actionId: ID, type: 'act', turn: 3, move: {kind: 'fold', to: 1}});
         no(ActionSchema, {actionId: ID, type: 'host', op: {op: 'start', now: true}});
+        no(ActionSchema, {actionId: ID, type: 'host', op: {op: 'sit-out', pid: PLAYER, seat: 2}});
+        no(ActionSchema, {actionId: ID, type: 'host', op: {op: 'sit-out', pid: PLAYER, on: 'yes'}});
+        // Only ever out: the host cannot take a sit-out back (it may be the player's own).
+        no(ActionSchema, {actionId: ID, type: 'host', op: {op: 'sit-out', pid: PLAYER, on: false}});
+        no(ActionSchema, {actionId: ID, type: 'host', op: {op: 'sit-out', pid: PLAYER, on: true}});
+        no(ActionSchema, {actionId: ID, type: 'host', op: {op: 'sit-out'}});
         no(ActionSchema, {actionId: ID, type: 'host', op: {op: 'config', patch: {seats: 9}}});
         no(ActionSchema, {actionId: ID, type: 'host', op: {op: 'config', patch: {deck: [1, 2]}}});
         no(ActionSchema, {actionId: ID, type: 'host', op: {op: 'settings', patch: {colour: 'red'}}});
@@ -123,6 +130,8 @@ describe('ActionSchema', () => {
         expect(toTableAction(parse({actionId: ID, type: 'sit-out'}), 'p1', 99)).toEqual({type: 'sit-out', by: 'p1', at: 99});
         expect(toTableAction(parse({actionId: ID, type: 'host', op: {op: 'kick', pid: PLAYER}}), 'p1', 99))
             .toEqual({type: 'host', by: 'p1', op: {op: 'kick', pid: PLAYER}, at: 99});
+        expect(toTableAction(parse({actionId: ID, type: 'host', op: {op: 'sit-out', pid: PLAYER}}), 'p1', 99))
+            .toEqual({type: 'host', by: 'p1', op: {op: 'sit-out', pid: PLAYER}, at: 99});
         expect(toTableAction(parse({actionId: ID, type: 'host', op: {op: 'settings', patch: {name: `  Fri${String.fromCodePoint(0x202e)}day  night `, felt: 'teal'}}}), 'p1', 99))
             .toEqual({type: 'host', by: 'p1', op: {op: 'settings', patch: {felt: 'teal', name: 'Friday night'}}, at: 99});
         expect(toTableAction(parse({actionId: ID, type: 'host', op: {op: 'settings', patch: {name: '   '}}}), 'p1', 99))

@@ -2,8 +2,12 @@
 // make so far, and the one row of controls that fits the moment — the action bar on their turn
 // (the moves legalFor offers, the very function the server checks them with), the early choices
 // while the action is elsewhere in a hand they are still in, else the seat's own controls (sit out,
-// deal me in, I'm back, show my cards, a rebuy once the stack is empty, the host's first deal).
-// Pure and client-safe.
+// deal me in, I'm back, show my cards, leave, a rebuy once the stack is empty, the host's first
+// deal) — offered whenever the viewer is not playing a hand, the pause after a showdown they reached
+// included. A folded hand stays the viewer's to see until the next deal. What the seat does when the
+// hand ends is the viewer's own part of the view (MeView.next), since the plate keeps reading Folded:
+// once they have left mid-hand the row says so and offers nothing more; while a "Sit out next hand"
+// waits, it says so and offers to take it back. Pure and client-safe.
 
 import {rankOf} from '@/lib/poker/cards';
 import {evaluateCards} from '@/lib/poker/evaluator';
@@ -22,7 +26,20 @@ export type DockView = {
     seatView: SeatView | null;
     live: boolean; // a hand is being played (betting or running out)
     dealtIn: boolean; // the viewer holds cards in the current (or just finished) hand and has not folded
-    folded: boolean;
+    folded: boolean; // folded in the hand being played
+    // Dealt into the view's hand (live or just finished) and folded: the cards stay the viewer's to
+    // see, dimmed, until the next deal; nobody else sees them unless the viewer shows them.
+    mucked: boolean;
+    // The seat's own "Sit out" and "Leave": whenever the viewer is seated but not playing a hand —
+    // between hands, after a showdown they reached (the results pause), and once folded.
+    sitOut: boolean;
+    leave: boolean;
+    // Left during the hand in play: cashed out when it ends (the plate may still read Folded).
+    leaving: boolean;
+    // A "Sit out next hand" waits for the deal (the viewer's or the host's): the dock says so, and once
+    // the viewer is free to act on it the row offers "Deal me in" (sit-in), which takes it back.
+    sitOutNext: boolean;
+    takeBack: boolean;
     myTurn: boolean;
     legal: Legal | null;
     sizing: Sizing | null;
@@ -48,6 +65,15 @@ export const handStrength = (hole: readonly Card[] | null, board: readonly Card[
 export const preOptions = (due: number): PreAction[] =>
     due > 0 ? [{kind: 'check-fold'}, {kind: 'call', amount: due}, {kind: 'call-any'}] : [{kind: 'check-fold'}, {kind: 'check'}, {kind: 'call-any'}];
 
+// A pre-action's key: its kind, and a call's amount.
+export const preKeyOf = (p: PreAction): string => (p.kind === 'call' ? `call-${p.amount}` : p.kind);
+
+// What the Dock keys the early-choices row by: the hand and the choices on offer, so a new deal or a
+// choice that changed under the thumb ("Check" becoming "Call 40") mounts it afresh, behind its tap
+// shield (components/poker-night/PreActions).
+export const preRowKey = (handNo: number | null, options: readonly PreAction[]): string =>
+    `${handNo ?? 0}:${options.map(preKeyOf).join(',')}`;
+
 export const samePre = (a: PreAction | null, b: PreAction | null): boolean =>
     a !== null && b !== null && a.kind === b.kind && (a.kind !== 'call' || (b.kind === 'call' && a.amount === b.amount));
 
@@ -66,7 +92,9 @@ export const dockView = (view: PlayerView): DockView => {
     // Early choices: a hand being bet, someone else to act, the viewer still in it with chips.
     const canPre = !myTurn && hand?.phase === 'betting' && seat !== null && seatView?.state === 'in-hand' && dealtIn;
     const pre = canPre ? {options: preOptions(owed(snapshot, seat)), selected: view.me.pre} : null;
-    const control: SeatControl | null = seatView === null || seatView.state === 'leaving' ? null
+    // Left mid-hand: the plate reads Folded or All in until the hand ends, the viewer's own part says so.
+    const leaving = seatView !== null && (seatView.state === 'leaving' || view.me.next === 'leave');
+    const control: SeatControl | null = seatView === null || leaving ? null
         : seatView.state === 'away' ? 'back'
             : seatView.state === 'sitting-out' ? 'sit-in'
                 : 'sit-out';
@@ -76,12 +104,24 @@ export const dockView = (view: PlayerView): DockView => {
     const buys = view.ledger.find((row) => row.pid === view.me.pid)?.buys ?? 0;
     const buy = empty && !live ? buyOptions(view.config, seatView, buys) : null;
     const seated = view.seats.filter((s) => s !== null).length;
+    const deal = view.status === 'open' && view.me.isHost && seated >= 2;
+    // Still playing the hand in play: its cards in front of them, not folded.
+    const playing = live && dealtIn && !folded;
+    // Dealt into the view's hand, folded (live or complete): a dealt hand's cards read 'none' then.
+    const mucked = !!hand && view.me.hole !== null && seatView !== null && seatView.cards === 'none';
+    const free = seatView !== null && !leaving && view.status !== 'closed' && !playing && !deal;
+    // Already asked (by the viewer or the host) for the hand in play: nothing more to ask.
+    const sitOutNext = live && !leaving && view.me.next === 'sit-out';
     return {
-        seat, seatView, live, dealtIn: dealtIn && !folded, folded, myTurn, legal, sizing,
+        seat, seatView, live, dealtIn: dealtIn && !folded, folded, mucked, myTurn, legal, sizing,
         hole: view.me.hole,
         strength: dealtIn && !folded ? handStrength(view.me.hole, hand?.board ?? []) : null,
         pre: pre && {options: pre.options, selected: pre.options.find((o) => samePre(o, pre.selected)) ?? null},
-        control, canShow, buy,
-        deal: view.status === 'open' && view.me.isHost && seated >= 2,
+        control, canShow, buy, deal,
+        sitOut: free && control === 'sit-out' && !sitOutNext,
+        leave: free,
+        leaving,
+        sitOutNext,
+        takeBack: free && control === 'sit-out' && sitOutNext,
     };
 };

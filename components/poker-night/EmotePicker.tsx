@@ -1,7 +1,8 @@
 'use client';
 
-// The dock's emote button (key E) and what it opens (P6): three tabs — React (twelve faces that
-// rise over the viewer's plate), Say (sixteen phrases in a bubble) and Throw (ten things, then who
+// The dock's emote button (key E) and what it opens (P6): three tabs — React (thirteen faces that
+// rise over the viewer's plate: five a row on the narrowest phones, seven from 380 px, so no face is
+// left alone on a row and no 44 px cell spills out of the picker), Say (sixteen phrases in a bubble) and Throw (ten things, then who
 // gets it: the other seated players). The Throw tab is not offered while the host keeps throwables
 // off, and the picker says so. A pick sends at once and closes the picker; the buttons grey out for
 // the 1.2-second cooldown the room keeps (emote-client.sendEmoteNow). Seated players only: a watcher
@@ -62,7 +63,7 @@ const EmotePicker = () => {
                     <SmilePlus className="size-5" aria-hidden="true"/>
                 </button>
             </PopoverTrigger>
-            <PopoverContent side="top" align="start" className="w-[min(20rem,calc(100vw-1.5rem))] gap-2 p-2 text-fg" data-pn-emote-picker=""
+            <PopoverContent side="top" align="start" collisionPadding={12} className="w-[min(22rem,calc(100vw-1.5rem))] gap-2 p-2 text-fg" data-pn-emote-picker=""
                             onCloseAutoFocus={focusTableOnClose(ui.closedByTurn)}>
                 <div role="tablist" aria-label={EMOTE_COPY.tabsLabel} className={cn('grid gap-1 rounded-lg bg-surface-2/60 p-1', throwables ? 'grid-cols-3' : 'grid-cols-2')}>
                     {tabs.map((t) => {
@@ -87,9 +88,9 @@ const EmotePicker = () => {
 
                 <div role="tabpanel" id={`${id}-panel`} aria-labelledby={`${id}-tab-${tab}`} className="max-h-[min(22rem,50dvh)] overflow-y-auto overscroll-contain">
                     {tab === 'react' && (
-                        <div className="grid grid-cols-6 gap-1">
+                        <div className="grid grid-cols-5 gap-1 min-[380px]:grid-cols-7" data-emote-reactions="">
                             {REACTION_IDS.map((item) => (
-                                <button key={item} type="button" className={cn(CELL, 'size-11 text-2xl leading-none')} disabled={cooling}
+                                <button key={item} type="button" className={cn(CELL, 'h-11 w-full text-2xl leading-none')} disabled={cooling}
                                         aria-label={EMOTE_COPY.reactions[item]} title={EMOTE_COPY.reactions[item]}
                                         onClick={() => send({kind: 'react', item})} data-emote-react={item}>
                                     <span aria-hidden="true">{reactionGlyph(item)}</span>

@@ -47,6 +47,11 @@ export type HandResultView = {
     hands: ShownCardsView[]; // shown only, in show order
     nets: {seat: number; net: number}[];
     revealMs: number;
+    // The dealt seats whose player has gone since the deal — cashed out as the hand completed, or
+    // the seat taken by someone new in the pause — each with the pid that played it, so the result
+    // names who won (views.resultView; reveal.playerAt). Usually empty. A view from a server older
+    // than this field has none: read it with `?? []`.
+    gone: [seat: number, pid: string][];
 };
 
 export type HandView = {
@@ -142,7 +147,14 @@ export type MeView = {
     hasAccount: boolean;
     hole: [Card, Card] | null;
     pre: PreAction | null;
+    // What the viewer's own seat does when the hand in play ends: 'leave' once they left it mid-hand
+    // (folded, all in, or still in it, away — the plate may still read Folded), 'sit-out' while a
+    // "Sit out next hand" waits for the deal (theirs or the host's: the view never says whose).
+    // Private, never on the wire: the table sees neither until the hand ends.
+    next: OwnNext;
 };
+
+export type OwnNext = 'sit-out' | 'leave' | null;
 
 // What the viewer's own requests add to the meta: the people, who the viewer is to the room, and
 // its emotes.

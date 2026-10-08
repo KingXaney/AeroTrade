@@ -143,13 +143,16 @@ const preStands = (view: PlayerView, wire: WireView): boolean => {
 };
 
 // The viewer's own part under a realtime message: the cards of the hand they were dealt, a
-// pre-action the server has not cleared, and whether they host (the message names the host).
+// pre-action the server has not cleared, what their seat does when that hand ends (a new deal has
+// done it: a sit-out has begun, a leave has cashed the seat out), and whether they host (the
+// message names the host).
 const ownPart = (view: PlayerView, wire: WireView): MeView => {
     const sameHand = (wire.hand?.no ?? null) === (view.hand?.no ?? null);
     const hole = sameHand ? view.me.hole : null;
     const pre = view.me.pre !== null && preStands(view, wire) ? view.me.pre : null;
+    const next = sameHand ? view.me.next : null;
     const isHost = wire.hostPid === view.me.pid;
-    return hole === view.me.hole && pre === view.me.pre && isHost === view.me.isHost ? view.me : {...view.me, hole, pre, isHost};
+    return hole === view.me.hole && pre === view.me.pre && next === view.me.next && isHost === view.me.isHost ? view.me : {...view.me, hole, pre, next, isHost};
 };
 
 // A whole view older than the table held — the read a message asked for, overtaken by the next

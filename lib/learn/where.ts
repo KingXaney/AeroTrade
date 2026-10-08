@@ -23,8 +23,12 @@ const POKER: readonly GlossaryKey[] = [
 ];
 // The landing page's terrain: seen signed out at "/", and at /welcome once signed in.
 const LANDING: readonly GlossaryKey[] = ['normalized-momentum', 'lookback'];
-// The table's own words (/play/CODE has no app shell and is open to guests, so they home on its lobby).
-const POKER_NIGHT: readonly GlossaryKey[] = ['side-pot', 'dealer-button', 'small-blind', 'minimum-raise', 'rebuy', 'all-in'];
+// The table's own words (/play/CODE has no app shell and is open to guests, so they home on its lobby),
+// then the Hands guide's (the lobby's Hands tab and the table's Hands drawer).
+const POKER_NIGHT: readonly GlossaryKey[] = [
+    'side-pot', 'dealer-button', 'small-blind', 'minimum-raise', 'rebuy', 'all-in',
+    'hand-rankings', 'kicker', 'texas-holdem',
+];
 const BRAIN: readonly GlossaryKey[] = [
     'news-weight', 'news-sentiment', 'thesis', 'since-thesis',
     'event-earnings', 'event-guidance', 'event-mna', 'event-product', 'event-macro', 'event-regulatory', 'event-analyst', 'event-legal',

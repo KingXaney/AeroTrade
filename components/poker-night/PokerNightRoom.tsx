@@ -17,16 +17,25 @@
 // (the viewer's turn closes it): a seated player who saves while a hand is being played queues it,
 // and it is sent with the room's 'profile' action by itself the moment the hand ends (said in a
 // toast either way).
+//
+// It also follows the viewer's own seat from view to view — its state and the viewer's own `next` —
+// beside the sit-outs and sit-ins they send (lib/poker-night/overlays.rememberSitOut), so a sit-out
+// that turns up without one of theirs is the host's doing, and once the seat sits out the dock says
+// so ("The host sat you out."). A sit-out they send is also noted in this browser
+// (overlays.SIT_OUT_ASK_KEY), so another tab, or this page after a reload, never takes it for the
+// host's.
 
 import {useCallback, useEffect, useMemo, useRef, useState, useSyncExternalStore} from "react";
 import {toast} from "sonner";
 import TableScreen from "@/components/poker-night/TableScreen";
 import {
-    RoomControllerContext, type JoinBody, type JoinResult, type PersonalLook, type Profile, type ProfileDraft, type RoomController,
+    RoomControllerContext, type ActionBody, type JoinBody, type JoinResult, type PersonalLook, type Profile, type ProfileDraft, type RoomController,
 } from "@/components/poker-night/room-controller";
 import {useTableFeed} from "@/components/poker-night/useTableFeed";
 import {LOOKS_COPY, POKER_NIGHT_ERRORS} from "@/lib/learn/copy/poker-night";
-import {profileWaits} from "@/lib/poker-night/overlays";
+import {
+    profileWaits, rememberSitOut, SIT_OUT_ASK_KEY, SIT_OUT_MEMORY, sitOutAskRecord, sitOutAsked, type SitOutMemory,
+} from "@/lib/poker-night/overlays";
 import {cleanName} from "@/lib/poker-night/names";
 import {
     DEFAULT_PERSONAL_LOOK, effectiveLook, EMPTY_ME, ME_STORAGE_KEY, nextStoredMe, parseStoredMe, resolvePersonalLook, type MePatch, type StoredMe,
@@ -80,6 +89,43 @@ const writeMe = (patch: MePatch): void => {
         unsaved = next;
     }
     for (const listener of [...meListeners]) listener();
+};
+
+// This browser's note of a sit-out the viewer sent (lib/poker-night/overlays.SIT_OUT_ASK_KEY), read
+// by every tab of the table: another tab, or the page after a reload, then never takes that sit-out
+// for the host's.
+const askListeners = new Set<() => void>();
+
+const readSitOutAsk = (): string | null => {
+    try {
+        return window.localStorage.getItem(SIT_OUT_ASK_KEY);
+    } catch {
+        return null;
+    }
+};
+
+const getServerSitOutAsk = (): string | null => null;
+
+const subscribeSitOutAsk = (listener: () => void) => {
+    askListeners.add(listener);
+    const onStorage = (e: StorageEvent) => {
+        if (e.key === null || e.key === SIT_OUT_ASK_KEY) listener();
+    };
+    window.addEventListener('storage', onStorage);
+    return () => {
+        askListeners.delete(listener);
+        window.removeEventListener('storage', onStorage);
+    };
+};
+
+const writeSitOutAsk = (value: string | null): void => {
+    try {
+        if (value === null) window.localStorage.removeItem(SIT_OUT_ASK_KEY);
+        else window.localStorage.setItem(SIT_OUT_ASK_KEY, value);
+    } catch {
+        // A browser that keeps nothing: this page's own memory still knows.
+    }
+    for (const listener of [...askListeners]) listener();
 };
 
 // ── the room ──
@@ -141,12 +187,36 @@ const PokerNightRoom = ({code, shareUrl, initial, config, suggested, savedLook =
         return result;
     }, [feedJoin]);
 
-    const {state, mode, transport, problem, send, detail, serverNow, sendEmote} = feed;
+    const {state, mode, transport, problem, send: feedSend, detail, serverNow, sendEmote} = feed;
+    const view = state.view;
+
+    // Whether the host sat the viewer out: their seat followed from view to view, beside the
+    // sit-outs and sit-ins they send themselves (the view never says who asked).
+    const [sitOut, setSitOut] = useState<SitOutMemory>(SIT_OUT_MEMORY);
+    const seatState = view && view.me.seat !== null ? view.seats[view.me.seat]?.state ?? null : null;
+    const ownNext = view && view.me.seat !== null ? view.me.next : null;
+    const myPid = view?.me.pid ?? null;
+    // A sit-out this browser sent from another tab, or before a reload, is the viewer's own.
+    const askRaw = useSyncExternalStore(subscribeSitOutAsk, readSitOutAsk, getServerSitOutAsk);
+    const askedHere = myPid !== null && view !== null && sitOutAsked(askRaw, code, myPid, view.serverNow);
+    if (seatState !== sitOut.state || ownNext !== sitOut.next) setSitOut(rememberSitOut(sitOut, {state: seatState, next: ownNext, askedHere}));
+    const send = useCallback(async (body: ActionBody) => {
+        if (body.type === 'sit-out' || body.type === 'sit-in') {
+            const sent = body.type;
+            setSitOut((m) => rememberSitOut(m, {sent}));
+            if (myPid !== null) writeSitOutAsk(sent === 'sit-out' ? sitOutAskRecord(code, myPid, Date.now()) : null);
+        }
+        const r = await feedSend(body);
+        if (!r.ok && body.type === 'sit-out') {
+            setSitOut((m) => rememberSitOut(m, {refused: 'sit-out'}));
+            writeSitOutAsk(null);
+        }
+        return r;
+    }, [feedSend, code, myPid]);
 
     // My look's draft, and a queued save sent the moment the hand in play ends.
     const [profileDraft, setProfileDraft] = useState<ProfileDraft | null>(null);
     const sendingDraft = useRef(false);
-    const view = state.view;
     const draftDue = profileDraft?.queued === true && view !== null && !profileWaits(view);
     useEffect(() => {
         if (!draftDue || !profileDraft || sendingDraft.current) return;
@@ -187,10 +257,12 @@ const PokerNightRoom = ({code, shareUrl, initial, config, suggested, savedLook =
             personal, setPersonal,
             profile, setProfile,
             profileDraft, setProfileDraft,
+            // Said once the seat sits out, not while it waits on the hand in play.
+            satOutByHost: sitOut.byHost && sitOut.state === 'sitting-out',
             shareUrl, code, invite,
         };
     }, [state, joinView, config, signedIn, serverNow, mode, transport, problem, send, sendEmote, join, detail, personal, setPersonal, profile, setProfile,
-        profileDraft, shareUrl, code, invite]);
+        profileDraft, sitOut.byHost, sitOut.state, shareUrl, code, invite]);
 
     return (
         <RoomControllerContext.Provider value={controller}>

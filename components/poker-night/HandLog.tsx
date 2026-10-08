@@ -14,6 +14,7 @@ import {Drawer} from "@/components/poker-night/overlay-kit";
 import {useRoom} from "@/components/poker-night/room-controller";
 import {LOG_COPY, OVERLAY_COPY, POKER_NIGHT_ERRORS} from "@/lib/learn/copy/poker-night";
 import {currentHandLog, historyHandLog, seatNamer, type LogHand} from "@/lib/poker-night/hand-log";
+import {playerAt} from "@/lib/poker-night/reveal";
 import type {HandEntryView, HandSummaryView} from "@/lib/poker-night/view-types";
 import {cn} from "@/lib/utils";
 
@@ -105,7 +106,7 @@ const HandLog = ({open, onOpenChange, toTable}: Props) => {
         }
     };
 
-    const nameOf = seatNamer((seat) => table.seats[seat]?.pid ?? null, table.people);
+    const nameOf = seatNamer((seat) => playerAt(table, seat), table.people);
     const fromHistory = (history?.hands ?? []).map((h) => historyHandLog(h, table.people, room.me?.pid ?? null));
     const showCurrent = hand !== null && current !== null && current.hand === hand.no && !fromHistory.some((h) => h.no === hand.no);
     const now = showCurrent ? currentHandLog(hand.no, current.log, hand.board, hand.phase === 'complete' ? hand.result : null, nameOf) : null;

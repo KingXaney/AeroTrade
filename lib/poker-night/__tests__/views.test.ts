@@ -18,6 +18,7 @@ import type {PreAction, TableState} from '@/lib/poker-night/types';
 import {
     bankDetailView, bankOf, clockLeaderOf, historyView, livePots, peopleIds, playerView, publicView, readShownHand, snapshotFromView, WIRE_KINDS, wireView,
 } from '@/lib/poker-night/views';
+import {playerAt} from '@/lib/poker-night/reveal';
 import type {PlayerMeta, Presence, ViewMeta} from '@/lib/poker-night/view-types';
 import {mulberry32} from '@/lib/random';
 import {A, C, F, R, X, cards, deal, moves, nowOf, ok, play, randomNight, runOut, T0, table} from './fixtures';
@@ -147,7 +148,7 @@ describe('the non-leak property', () => {
         expect(publicView(s).seats[0]!.cards).toEqual(cards('AhAd'));
         expect(publicView(s).seats[1]).toMatchObject({state: 'all-in', cards: cards('KhKd')});
         const me = playerView(s, 'p2', playerMeta(s)).me;
-        expect(me).toEqual({pid: 'p2', seat: 2, role: 'seated', isHost: false, hasAccount: false, hole: cards('QhQd'), pre: null});
+        expect(me).toEqual({pid: 'p2', seat: 2, role: 'seated', isHost: false, hasAccount: false, hole: cards('QhQd'), pre: null, next: null});
     });
 });
 
@@ -156,13 +157,54 @@ describe('what only the viewer sees', () => {
         let s = deal(table({0: 1000, 1: 1000, 2: 1000}, {lastBigBlind: 0}), {holes: {0: 'AhAd', 1: 'KhKd', 2: 'QhQd'}});
         s = ok(reduce(s, {type: 'pre', by: 'p1', pre: {kind: 'check-fold'}, at: nowOf(s)}));
         const p1 = playerView(s, 'p1', {...playerMeta(s), hasAccount: true});
-        expect(p1.me).toEqual({pid: 'p1', seat: 1, role: 'seated', isHost: false, hasAccount: true, hole: cards('KhKd'), pre: {kind: 'check-fold'} as PreAction});
+        expect(p1.me).toEqual({pid: 'p1', seat: 1, role: 'seated', isHost: false, hasAccount: true, hole: cards('KhKd'), pre: {kind: 'check-fold'} as PreAction, next: null});
         const host = playerView(s, 'p0', playerMeta(s));
         expect(host.me).toMatchObject({isHost: true, pre: null, hole: cards('AhAd')});
         const watcher = playerView(s, 'w1', playerMeta(s));
-        expect(watcher.me).toEqual({pid: 'w1', seat: null, role: 'watching', isHost: false, hasAccount: false, hole: null, pre: null});
+        expect(watcher.me).toEqual({pid: 'w1', seat: null, role: 'watching', isHost: false, hasAccount: false, hole: null, pre: null, next: null});
         expect(watcher.config).toEqual(s.config);
         expect(watcher.seats[1]!.cards).toBe('hidden');
+    });
+
+    it('says what the viewer\'s own seat does when the hand ends, to them alone: leaving, or sitting out from the next deal', () => {
+        let s = deal(table({0: 1000, 1: 1000, 2: 1000}, {lastBigBlind: 0}));
+        // Seat 2 folds, then leaves: the plate still reads Folded for everyone, the viewer's own part says leave.
+        s = moves(s, F);
+        s = ok(reduce(s, {type: 'leave', by: 'p2', at: nowOf(s)}));
+        expect(publicView(s).seats[2]!.state).toBe('folded');
+        expect(playerView(s, 'p2', playerMeta(s)).me.next).toBe('leave');
+        // Seat 0 asks to sit out from the next hand while still in this one.
+        s = ok(reduce(s, {type: 'sit-out', by: 'p0', at: nowOf(s)}));
+        expect(publicView(s).seats[0]!.state).toBe('in-hand');
+        expect(playerView(s, 'p0', playerMeta(s)).me.next).toBe('sit-out');
+        expect(playerView(s, 'p1', playerMeta(s)).me.next).toBeNull();
+        expect(playerView(s, 'w1', playerMeta(s)).me.next).toBeNull();
+        // Never on the wire, nor in the public table.
+        expect(keysIn(wireView(s, meta(s))).has('next')).toBe(false);
+        expect(keysIn(publicView(s)).has('next')).toBe(false);
+    });
+
+    it('keeps a folded player\'s cards theirs to see through the hand and its pause, and in nobody else\'s view', () => {
+        let s = deal(table({0: 1000, 1: 1000, 2: 1000}, {lastBigBlind: 0}), {holes: {0: 'AhAd', 1: 'KhKd', 2: 'QhQd'}, board: '2c7d9s3s4c'});
+        s = moves(s, F);
+        const others = (st: TableState) => [
+            ...['p0', 'p1', 'w1'].map((pid) => ({viewer: pid as string | null, view: playerView(st, pid, playerMeta(st)) as unknown})),
+            {viewer: null, view: wireView(st, meta(st)) as unknown},
+        ];
+        const folded = playerView(s, 'p2', playerMeta(s));
+        expect(folded.me.hole).toEqual(cards('QhQd'));
+        expect(folded.seats[2]!.cards).toBe('none');
+        for (const {viewer, view} of others(s)) expectNoLeak(view, s, viewer);
+        // To the end of the hand and into the pause.
+        s = moves(s, C, X, X, X, X, X, X, X);
+        expect(s.hand!.phase).toBe('complete');
+        expect(playerView(s, 'p2', playerMeta(s)).me.hole).toEqual(cards('QhQd'));
+        for (const {viewer, view} of others(s)) expectNoLeak(view, s, viewer);
+        // Shown, everyone sees them; the next deal, they are gone.
+        s = ok(reduce(s, {type: 'show', by: 'p2', at: nowOf(s)}));
+        expect(wireView(s, meta(s)).seats[2]!.cards).toEqual(cards('QhQd'));
+        s = deal(s, {holes: {2: 'JhJd'}});
+        expect(playerView(s, 'p2', playerMeta(s)).me.hole).toEqual(cards('JhJd'));
     });
 
     it('keeps a history hole only when shown or the viewer\'s own', () => {
@@ -259,6 +301,33 @@ describe('the hand view', () => {
         expect(v.hand!.result!.hands.map((h) => h.seat)).toEqual([0, 1]);
         expect(v.nextHandAt).toBe(s.nextHandAt);
         expect(v.nextDueAt).toBe(s.nextHandAt);
+        expect(v.hand!.result!.gone).toEqual([]);
+    });
+
+    it('names the players gone from a result\'s seats since the deal, so a winner who left or was replaced keeps their name', () => {
+        let s = deal(table({0: 1000, 1: 1000, 2: 1000}, {lastBigBlind: 0}));
+        // The big blind leaves owing nothing: in the hand, away, and cashed out as it completes.
+        s = ok(reduce(s, {type: 'leave', by: 'p1', at: nowOf(s)}));
+        s = moves(s, F, F);
+        expect(s.hand!.phase).toBe('complete');
+        expect(s.seats[1]).toBeNull();
+        let v = wireView(s, meta(s));
+        expect(v.hand!.result!.gone).toEqual([[1, 'p1']]);
+        expect(playerAt(v, 1)).toBe('p1');
+        expect(playerAt(v, 0)).toBe('p0');
+        // Someone new takes the seat in the pause: the result still names the player who won.
+        s = ok(reduce(s, {type: 'sit', by: 'p7', seat: 1, buyIn: s.config.buyInMax, at: nowOf(s)}));
+        v = wireView(s, meta(s));
+        expect(v.seats[1]!.pid).toBe('p7');
+        expect(v.hand!.result!.gone).toEqual([[1, 'p1']]);
+        expect(playerAt(v, 1)).toBe('p1');
+        // A view from an older server, with no gone list, reads the seats.
+        const old = structuredClone(v) as unknown as {hand: {result: {gone?: unknown}}};
+        delete old.hand.result.gone;
+        expect(playerAt(old as unknown as typeof v, 1)).toBe('p7');
+        // The next deal has no result: the seats.
+        s = deal(s);
+        expect(playerAt(wireView(s, meta(s)), 1)).toBe('p7');
     });
 });
 

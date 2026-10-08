@@ -13,7 +13,8 @@ import {reduce} from '@/lib/poker-night/engine';
 import {
     bankTimeline, checkGameForm, chipsInValue, chipsRange, gameFormOf, GAME_FIELDS, holdsCards, hostPeople, hostRowStatus, inviteDeal,
     joinCardState, joinNotes, myTurnKey, openSeats, profileWaits, ownChips, ownSeat, rebuyLimitChoices, REBUY_FIELDS, requestEnded, seatedCount, tableControl,
-    timerChoices, waitingRequests,
+    timerChoices, waitingRequests, leaveAsks, leavePlan, leaveTapAsks, homeAsks, leftState, hostSitOut, rememberSitOut, SIT_OUT_MEMORY,
+    SIT_OUT_ASK_KEY, SIT_OUT_ASK_MS, sitOutAskRecord, sitOutAsked, type SitOutMemory,
 } from '@/lib/poker-night/overlays';
 import type {TableState} from '@/lib/poker-night/types';
 import type {JoinView, PlayerView} from '@/lib/poker-night/view-types';
@@ -305,5 +306,206 @@ describe('the bank\'s own chips', () => {
         expect(items.map((i) => [i.name, i.kind, i.at])).toEqual([['Ana', 'rebuy', 9000], ['Ben', 'buy-in', 5000], ['Ana', 'buy-in', 0]]);
         expect(new Set(items.map((i) => i.key)).size).toBe(3);
         expect(bankTimeline([{pid: 'a', name: 'A', events: Array.from({length: 50}, (_, i) => ({at: i, kind: 'top-up' as const, amount: 1}))}], 10)).toHaveLength(10);
+    });
+});
+
+describe('leaving, and the way home', () => {
+    it('says what sitting down again takes: nothing, the host\'s yes, or no way back', () => {
+        expect(leaveAsks({rebuys: 'auto', maxRebuys: null}, 5, false)).toBeNull();
+        expect(leaveAsks({rebuys: 'approve', maxRebuys: null}, 0, false)).toBe('rebuys-ask');
+        expect(leaveAsks({rebuys: 'approve', maxRebuys: null}, 0, true)).toBeNull();
+        expect(leaveAsks({rebuys: 'off', maxRebuys: null}, 0, true)).toBe('rebuys-off');
+        expect(leaveAsks({rebuys: 'auto', maxRebuys: 2}, 1, false)).toBeNull();
+        expect(leaveAsks({rebuys: 'auto', maxRebuys: 2}, 2, false)).toBe('rebuy-cap');
+        expect(leaveTapAsks(pv(three(), pidOf(1)))).toBe(false);
+        expect(leaveTapAsks(pv(three({rebuys: 'off'}), pidOf(1)))).toBe(true);
+    });
+
+    it('reads the leave dialog between hands: the chips counted, one Leave, and the way home', () => {
+        const s = three({rebuys: 'off'});
+        const stay = leavePlan(pv(s, pidOf(1)), 'stay')!;
+        expect(stay).toMatchObject({midHand: false, title: TABLE_COPY.leaveTitle, body: TABLE_COPY.leaveBody(1000), note: TABLE_COPY.rebuysOffNote});
+        expect(stay.actions).toEqual([{send: 'leave', label: TABLE_COPY.leave, destructive: true, navigates: false}]);
+        const home = leavePlan(pv(three(), pidOf(1)), 'home')!;
+        expect(home.note).toBeNull();
+        expect(home.actions).toEqual([{send: 'leave', label: TABLE_COPY.leaveAndGo, destructive: true, navigates: true}]);
+        expect(leavePlan(pv(s, 'w1', {extra: ['w1']}), 'stay')).toBeNull();
+    });
+
+    it('turns into the mid-hand dialog the moment a hand is dealt to the viewer, and back once they fold', () => {
+        let s = deal(three());
+        const mid = leavePlan(pv(s, pidOf(0)), 'stay')!;
+        expect(mid).toMatchObject({midHand: true, title: TABLE_COPY.leaveMidHandTitle});
+        expect(mid.body).toBe(TABLE_COPY.leaveBodyInHand(990));
+        expect(mid.actions.map((a) => a.label)).toEqual([TABLE_COPY.leaveNow]);
+        expect(leavePlan(pv(s, pidOf(0)), 'home')!.actions).toEqual([{send: 'leave', label: TABLE_COPY.leaveNowAndGo, destructive: true, navigates: true}]);
+        s = moves(s, F);
+        expect(leavePlan(pv(s, pidOf(2)), 'stay')!.midHand).toBe(false);
+    });
+
+    it('goes home at once for a visitor, a watcher, a player already leaving and a closed table; asks anyone seated', () => {
+        const s = deal(three());
+        expect(homeAsks(null)).toBe(false);
+        expect(homeAsks(pv(s, 'w1', {extra: ['w1']}))).toBe(false);
+        expect(homeAsks(pv(s, pidOf(0)))).toBe(true);
+        expect(homeAsks(pv(three(), pidOf(0)))).toBe(true);
+        const leaving = ok(reduce(s, {type: 'leave', by: pidOf(1), at: nowOf(s)}));
+        expect(homeAsks(pv(leaving, pidOf(1)))).toBe(false);
+        const closed = structuredClone(three());
+        closed.status = 'closed';
+        expect(homeAsks(pv(closed, pidOf(0)))).toBe(false);
+    });
+
+    it('knows a player who folded and then left is leaving, though the plate still reads Folded', () => {
+        let s = deal(three());
+        const folder = s.hand!.actor!;
+        s = moves(s, F);
+        s = ok(reduce(s, {type: 'leave', by: pidOf(folder), at: nowOf(s)}));
+        expect(s.seats[folder]!.leaving).toBe(true);
+        const view = pv(s, pidOf(folder));
+        expect(view.seats[folder]!.state).toBe('folded');
+        expect(view.me.next).toBe('leave');
+        // Home goes straight home, the menu offers neither a seat choice nor Leave, and the dialog has nothing to ask.
+        expect(homeAsks(view)).toBe(false);
+        expect(ownSeat(view)).toMatchObject({choice: null, canLeave: false});
+        expect(leavePlan(view, 'stay')).toBeNull();
+        expect(leavePlan(view, 'home')).toBeNull();
+        // Nobody else learns of it before the hand ends.
+        expect(pv(s, pidOf((folder + 1) % 3)).me.next).toBeNull();
+    });
+
+    it('greets a player who left with their net, and the way back to a seat or why there is none', () => {
+        const s = three();
+        const left = ok(reduce(s, {type: 'leave', by: pidOf(1), at: nowOf(s)}));
+        expect(leftState(pv(left, pidOf(1)))).toEqual({net: 0, sitAgain: true, note: null});
+        // Still seated, a watcher who never played, removed, closed: nothing.
+        expect(leftState(pv(s, pidOf(1)))).toBeNull();
+        expect(leftState(pv(left, 'w1', {extra: ['w1']}))).toBeNull();
+        expect(leftState(pv(left, pidOf(1), {removed: [pidOf(1)]}))).toBeNull();
+        const closed = structuredClone(left);
+        closed.status = 'closed';
+        expect(leftState(pv(closed, pidOf(1)))).toBeNull();
+        // The figure is what they left with against what they brought.
+        const won = structuredClone(s);
+        won.seats[1]!.stack = 1450;
+        won.ledger[1].bought = 1000;
+        expect(leftState(pv(ok(reduce(won, {type: 'leave', by: pidOf(1), at: nowOf(won)})), pidOf(1)))!.net).toBe(450);
+        const off = ok(reduce(three({rebuys: 'off'}), {type: 'leave', by: pidOf(1), at: nowOf(s)}));
+        expect(leftState(pv(off, pidOf(1)))).toMatchObject({sitAgain: false, note: REFUSAL_COPY['rebuys-off']});
+        const ask = ok(reduce(three({rebuys: 'approve'}), {type: 'leave', by: pidOf(1), at: nowOf(s)}));
+        expect(leftState(pv(ask, pidOf(1)))).toMatchObject({sitAgain: true, note: TABLE_COPY.rebuysAskNote});
+        const full = table({0: 1000, 1: 1000, 2: 1000}, {config: {seats: 3}});
+        const gone = ok(reduce(full, {type: 'leave', by: pidOf(1), at: nowOf(full)}));
+        const taken = ok(reduce(gone, {type: 'sit', by: 'p9', seat: 1, buyIn: gone.config.buyInMax, at: nowOf(gone)}));
+        expect(leftState(pv(taken, pidOf(1)))).toMatchObject({sitAgain: false, note: JOIN_COPY.full});
+    });
+});
+
+describe('sitting out', () => {
+    it('offers the host "Sit out next hand" for each other player in the game, and a note while theirs waits on the hand', () => {
+        const s = deal(three());
+        const host = pv(s, pidOf(0));
+        expect(hostSitOut(host, pidOf(1), null)).toBe('offer');
+        expect(hostSitOut(host, pidOf(1), s.hand!.no)).toBe('waiting');
+        // Asked during an earlier hand: that one is long applied.
+        expect(hostSitOut(host, pidOf(1), s.hand!.no - 1)).toBe('offer');
+        // Never for the host themself, from anyone else, or for a stranger.
+        expect(hostSitOut(host, pidOf(0), null)).toBeNull();
+        expect(hostSitOut(pv(s, pidOf(1)), pidOf(2), null)).toBeNull();
+        expect(hostSitOut(host, 'p9', null)).toBeNull();
+        // Between hands it applies at once: nothing waits.
+        expect(hostSitOut(pv(three(), pidOf(0)), pidOf(1), 1)).toBe('offer');
+    });
+
+    it('offers nothing for a player already sitting out, away, leaving or out of chips, or at a closed table', () => {
+        const s = three();
+        const out = ok(reduce(s, {type: 'host', by: pidOf(0), op: {op: 'sit-out', pid: pidOf(1)}, at: nowOf(s)}));
+        expect(hostSitOut(pv(out, pidOf(0)), pidOf(1), null)).toBeNull();
+        const away = structuredClone(s);
+        away.seats[2]!.away = true;
+        expect(hostSitOut(pv(away, pidOf(0)), pidOf(2), null)).toBeNull();
+        const broke = structuredClone(s);
+        broke.seats[2]!.stack = 0;
+        expect(hostSitOut(pv(broke, pidOf(0)), pidOf(2), null)).toBeNull();
+        const closed = structuredClone(s);
+        closed.status = 'closed';
+        expect(hostSitOut(pv(closed, pidOf(0)), pidOf(1), null)).toBeNull();
+        const dealt = deal(s);
+        const leaving = ok(reduce(dealt, {type: 'leave', by: pidOf(1), at: nowOf(dealt)}));
+        expect(hostSitOut(pv(leaving, pidOf(0)), pidOf(1), null)).toBeNull();
+    });
+
+    it('tells the host\'s sit-out from the viewer\'s own, from the views alone', () => {
+        const step = (m: SitOutMemory, ...events: Parameters<typeof rememberSitOut>[1][]) => events.reduce(rememberSitOut, m);
+        // The host, between hands.
+        expect(step(SIT_OUT_MEMORY, {state: 'waiting'}, {state: 'sitting-out'}).byHost).toBe(true);
+        // The host, during a hand: the seat sits out once it ends.
+        expect(step(SIT_OUT_MEMORY, {state: 'in-hand'}, {state: 'folded'}, {state: 'sitting-out'}).byHost).toBe(true);
+        // The viewer's own, between hands and during one.
+        expect(step(SIT_OUT_MEMORY, {state: 'waiting'}, {sent: 'sit-out'}, {state: 'sitting-out'}).byHost).toBe(false);
+        expect(step(SIT_OUT_MEMORY, {state: 'in-hand'}, {sent: 'sit-out'}, {state: 'all-in'}, {state: 'sitting-out'}).byHost).toBe(false);
+        // A page opened on a seat already sitting out says nothing of the host.
+        expect(step(SIT_OUT_MEMORY, {state: 'sitting-out'}).byHost).toBe(false);
+        // "I'm back" clears it, and so does the seat coming back into the game.
+        const host = step(SIT_OUT_MEMORY, {state: 'waiting'}, {state: 'sitting-out'});
+        expect(step(host, {sent: 'sit-in'}).byHost).toBe(false);
+        expect(step(host, {state: 'waiting'}).byHost).toBe(false);
+        // A sit-out the viewer asked for is spent once it lands: the next one is the host's.
+        const spent = step(SIT_OUT_MEMORY, {state: 'waiting'}, {sent: 'sit-out'}, {state: 'sitting-out'}, {state: 'waiting'}, {state: 'sitting-out'});
+        expect(spent.byHost).toBe(true);
+        // Nothing changed, the same memory.
+        expect(rememberSitOut(host, {state: 'sitting-out'})).toBe(host);
+    });
+
+    it('reads the viewer\'s own `next`: a reload or another tab never blames the host for the viewer\'s own sit-out', () => {
+        const step = (m: SitOutMemory, ...events: Parameters<typeof rememberSitOut>[1][]) => events.reduce(rememberSitOut, m);
+        // A page opened mid-hand on a sit-out already waiting (the viewer asked, then reloaded): nothing of the host.
+        expect(step(SIT_OUT_MEMORY, {state: 'in-hand', next: 'sit-out'}, {state: 'folded', next: 'sit-out'}, {state: 'sitting-out', next: 'sit-out'}).byHost).toBe(false);
+        expect(step(SIT_OUT_MEMORY, {state: 'in-hand', next: 'sit-out'}, {state: 'sitting-out', next: null}).byHost).toBe(false);
+        // The viewer's other tab sent it: this tab sees it turn up, and this browser's note says whose it is.
+        expect(step(SIT_OUT_MEMORY, {state: 'in-hand'}, {state: 'sitting-out', askedHere: true}).byHost).toBe(false);
+        expect(step(SIT_OUT_MEMORY, {state: 'in-hand'}, {state: 'in-hand', next: 'sit-out', askedHere: true}, {state: 'sitting-out'}).byHost).toBe(false);
+        // The host's, seen mid-hand through the viewer's own part: blamed, and still once the seat sits out.
+        const mid = step(SIT_OUT_MEMORY, {state: 'in-hand'}, {state: 'in-hand', next: 'sit-out'});
+        expect(mid.byHost).toBe(true);
+        expect(step(mid, {state: 'sitting-out', next: null}).byHost).toBe(true);
+        // Taken back mid-hand: nothing pending, nothing blamed.
+        expect(step(mid, {sent: 'sit-in'}, {state: 'in-hand', next: null}).byHost).toBe(false);
+        // A sit-out on its way is not spent by a view from before it landed.
+        expect(step(SIT_OUT_MEMORY, {state: 'waiting'}, {sent: 'sit-out'}, {state: 'waiting'}, {state: 'sitting-out'}).byHost).toBe(false);
+        // A refused one is no ask: a later sit-out is the host's.
+        expect(step(SIT_OUT_MEMORY, {state: 'waiting'}, {sent: 'sit-out'}, {refused: 'sit-out'}, {state: 'sitting-out'}).byHost).toBe(true);
+        // Unseated: forgotten.
+        expect(step(mid, {state: null})).toBe(SIT_OUT_MEMORY);
+    });
+
+    it('keeps this browser\'s note of a sit-out for one table, one player and half an hour', () => {
+        const at = 1_000_000;
+        const raw = sitOutAskRecord('ABC123', 'p1', at);
+        expect(sitOutAsked(raw, 'ABC123', 'p1', at + 60_000)).toBe(true);
+        // Read against the server's clock, either side of this browser's.
+        expect(sitOutAsked(raw, 'ABC123', 'p1', at - 5_000)).toBe(true);
+        expect(sitOutAsked(raw, 'ABC123', 'p1', at + SIT_OUT_ASK_MS)).toBe(false);
+        expect(sitOutAsked(raw, 'XYZ789', 'p1', at)).toBe(false);
+        expect(sitOutAsked(raw, 'ABC123', 'p2', at)).toBe(false);
+        expect(sitOutAsked(null, 'ABC123', 'p1', at)).toBe(false);
+        expect(sitOutAsked('not json', 'ABC123', 'p1', at)).toBe(false);
+        expect(sitOutAsked(JSON.stringify({code: 'ABC123', pid: 'p1', at: 'soon'}), 'ABC123', 'p1', at)).toBe(false);
+        expect(SIT_OUT_ASK_KEY.startsWith('aero-poker-night:')).toBe(true);
+    });
+
+    it('offers "Deal me in" from the menu while a sit-out waits on the hand in play', () => {
+        let s = deal(three());
+        s = ok(reduce(s, {type: 'sit-out', by: pidOf(1), at: nowOf(s)}));
+        const view = pv(s, pidOf(1));
+        expect(view.me.next).toBe('sit-out');
+        expect(ownSeat(view).choice).toBe('deal-me-in');
+        // The host's, the same: the view never says whose, and the player's sit-in takes it back.
+        let h = deal(three());
+        h = ok(reduce(h, {type: 'host', by: pidOf(0), op: {op: 'sit-out', pid: pidOf(2)}, at: nowOf(h)}));
+        expect(ownSeat(pv(h, pidOf(2))).choice).toBe('deal-me-in');
+        const back = ok(reduce(h, {type: 'sit-in', by: pidOf(2), at: nowOf(h)}));
+        expect(pv(back, pidOf(2)).me.next).toBeNull();
+        expect(ownSeat(pv(back, pidOf(2))).choice).toBe('sit-out');
     });
 });

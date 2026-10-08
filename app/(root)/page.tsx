@@ -1,5 +1,5 @@
 import type {Metadata} from "next";
-import {Suspense} from "react";
+import {cache, Suspense} from "react";
 import Link from "next/link";
 import {redirect} from "next/navigation";
 import {getSessionUser} from "@/lib/auth/session";
@@ -13,11 +13,16 @@ import {COURSE_COPY} from "@/lib/learn/copy/learn";
 import {getCourseProgress} from "@/lib/learn/course-store";
 import {NEWS_COPY} from "@/lib/learn/copy/news";
 import {TERRAIN_COPY, TERRAIN_TERMS} from "@/lib/learn/copy/terrain";
+import {pokerNightEnabled} from "@/lib/poker-night/env";
+import {homeChipOf} from "@/lib/poker-night/lobby";
+import {getHomePokerNight} from "@/lib/poker-night/lobby-store";
 import MomentumTerrain from "@/components/landing/MomentumTerrain";
 import WhatTheseMean from "@/components/learn/WhatTheseMean";
 import MarketStatus from "@/components/stocks/MarketStatus";
 import StreakChip from "@/components/games/StreakChip";
 import HomeAccounts from "@/components/home/HomeAccounts";
+import HomePokerNight from "@/components/home/HomePokerNight";
+import PokerNightChip from "@/components/home/PokerNightChip";
 import TopicsOverview from "@/components/dashboard/widgets/topics/TopicsOverview";
 import TopicBriefsList from "@/components/dashboard/widgets/topics/TopicBriefsList";
 import TopicsWidgetEmpty from "@/components/dashboard/widgets/topics/TopicsWidgetEmpty";
@@ -50,9 +55,33 @@ const LessonAsync = async ({userId}: {userId: string}) => {
     return <TodaysLesson lesson={await getTodaysLesson(userId)}/>;
 };
 
+// Poker night's tables, streamed after the page paints: the ones the reader holds a seat at or
+// hosts, then friends' open ones (lib/poker-night/lobby-store.getHomePokerNight), drawn only when
+// there is a row — a box with nothing to say is not drawn, and the chip in the title is the way in
+// that is always there. Declared here, not under components/: poker night's server guard keeps its
+// stores out of every component. One read per request (React's cache) for the chip and the panel; a
+// failed read draws nothing — the chip stays the lobby's — and never takes Home down.
+const readHomePokerNight = cache((userId: string) => getHomePokerNight(userId).catch((error: unknown) => {
+    console.error('Home poker night failed:', error instanceof Error ? error.message : String(error));
+    return null;
+}));
+
+const PokerNightAsync = async ({userId}: {userId: string}) => {
+    const view = await readHomePokerNight(userId);
+    return view ? <HomePokerNight view={view}/> : null;
+};
+
+// The chip at the top: the lobby's until the read lands, then — while the reader holds a seat — the
+// way straight back to that table (lib/poker-night/lobby.homeChipOf), so a reader who closed the
+// table's tab is one tap from it, not two screens.
+const PokerNightChipAsync = async ({userId}: {userId: string}) => (
+    <PokerNightChip rejoin={homeChipOf(await readHomePokerNight(userId))}/>
+);
+
 // Home: who you are, where the market is, the year's momentum terrain, what you own, what
-// changed in what you follow, and one thing to look at next. Nothing here is a setting. The
-// widget grid this page used to be is /dashboard.
+// changed in what you follow, one thing to look at next and, when there is one, a poker night
+// table to go back to. Nothing here is a setting. The widget grid this page used to be is
+// /dashboard.
 //
 // The terrain is the landing page's (components/landing/MomentumTerrain), read here on the server
 // through the same store, so its section exists only when there is a surface to draw and the client
@@ -68,6 +97,8 @@ const Home = async ({searchParams}: HomeProps) => {
     // The box beside the topics: the market briefing, else the topics' own briefs, else the
     // course's next lesson (today's lesson once the course is done).
     const hasBriefing = view.briefing !== null || view.hasBriefs;
+    // With the kill switch on, poker night is neither a chip nor a panel.
+    const pokerNight = pokerNightEnabled();
 
     return (
         <div className="space-y-4" data-home>
@@ -77,6 +108,11 @@ const Home = async ({searchParams}: HomeProps) => {
                 actions={(
                     <div className="flex flex-wrap items-center gap-3">
                         <StreakChip {...view.streak}/>
+                        {pokerNight && (
+                            <Suspense fallback={<PokerNightChip/>}>
+                                <PokerNightChipAsync userId={user.id}/>
+                            </Suspense>
+                        )}
                         <MarketStatus status={view.market}/>
                     </div>
                 )}
@@ -171,6 +207,12 @@ const Home = async ({searchParams}: HomeProps) => {
                 <Panel id="home-learn" aria-labelledby="home-learn-heading">
                     <LearnBox userId={user.id}/>
                 </Panel>
+            )}
+
+            {pokerNight && (
+                <Suspense fallback={null}>
+                    <PokerNightAsync userId={user.id}/>
+                </Suspense>
             )}
         </div>
     );

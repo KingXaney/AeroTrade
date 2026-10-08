@@ -36,7 +36,7 @@ import {TABLE_COPY} from "@/lib/learn/copy/poker-night";
 import {secondsUntil} from "@/lib/poker-night/client-clock";
 import type {Box} from "@/lib/poker-night/layout";
 import {cardBackFor, cardFaceFor, chipSetFor, resolveTableLook} from "@/lib/poker-night/looks";
-import {bannerLines, bannerShows, resultLook} from "@/lib/poker-night/reveal";
+import {bannerLines, bannerShows, playerAt, resultLook, viewerSeatIn} from "@/lib/poker-night/reveal";
 import {bannerPlan, stageLayout, type Stage} from "@/lib/poker-night/stage";
 import {cn} from "@/lib/utils";
 import type {RoomView} from "@/lib/poker-night/view-types";
@@ -90,6 +90,7 @@ const TableScreen = () => {
     const table = room.table;
     const hand = table.hand;
     const mySeat = room.me?.seat ?? null;
+    const myPid = room.me?.pid ?? null;
 
     // The animations: the room's events, scheduled as they arrive.
     const [store] = useState(createAnimStore);
@@ -126,12 +127,15 @@ const TableScreen = () => {
     // and where the two go, clear of the open seats' rings, the turned-up hands and the dealer button.
     const lines = useMemo(() => {
         if (!look) return [];
+        // Through the result's gone list: a winner cashed out as the hand completed, or whose seat
+        // was taken in the pause, is still named.
         const nameOf = (seat: number) => {
-            const pid = table.seats[seat]?.pid;
+            const pid = playerAt(table, seat);
             return pid ? table.people[pid]?.name ?? null : null;
         };
-        return bannerLines(look, nameOf, mySeat);
-    }, [look, table.seats, table.people, mySeat]);
+        // "You win" only for the seat the viewer played, not one they took in the pause.
+        return bannerLines(look, nameOf, viewerSeatIn(table, mySeat, myPid));
+    }, [look, table, mySeat, myPid]);
     const line = note && hand ? note : nextAt !== null ? TABLE_COPY.nextHandIn(NEXT_HAND_WIDEST) : null;
     const plan = useMemo(() => {
         if (!stage || !bannerShows(hand, look)) return null;

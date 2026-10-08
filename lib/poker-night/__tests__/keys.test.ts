@@ -5,7 +5,7 @@
 
 import {describe, expect, it} from 'vitest';
 import {intentForKey, isControlTarget, isEditableTarget, keyAllowed, KEY_SHORTCUTS} from '@/lib/poker-night/keys';
-import {ROOM_KEY_SHORTCUTS, roomIntentForKey, SHORTCUTS} from '@/lib/poker-night/keys';
+import {ROOM_KEY_SHORTCUTS, roomIntentForKey, SHORTCUTS, TAP_SHIELD_MS, tapLands} from '@/lib/poker-night/keys';
 
 describe('the shortcuts', () => {
     it('map F, C, R and A in either case', () => {
@@ -110,13 +110,15 @@ describe('editable targets', () => {
     });
 });
 
-// The room's own keys (P6): E, L, B, M and ?, under the same rules as the moves, none of them a move.
+// The room's own keys (P6): E, L, B, H, M and ?, under the same rules as the moves, none of them a move.
 describe('the room\'s keys', () => {
-    it('map E, L, B, M and ? in either case', () => {
+    it('map E, L, B, H, M and ? in either case', () => {
         expect(roomIntentForKey({key: 'e'})).toBe('emotes');
         expect(roomIntentForKey({key: 'E'})).toBe('emotes');
         expect(roomIntentForKey({key: 'l'})).toBe('log');
         expect(roomIntentForKey({key: 'b'})).toBe('bank');
+        expect(roomIntentForKey({key: 'h'})).toBe('hands');
+        expect(roomIntentForKey({key: 'H'})).toBe('hands');
         expect(roomIntentForKey({key: 'm'})).toBe('mute');
         expect(roomIntentForKey({key: '?'})).toBe('shortcuts');
         expect(roomIntentForKey({key: 'f'})).toBeNull();
@@ -130,7 +132,7 @@ describe('the room\'s keys', () => {
     });
 
     it('never share a key with a move', () => {
-        for (const key of ['e', 'l', 'b', 'm', '?']) expect(intentForKey({key}, {raiseOpen: true})).toBeNull();
+        for (const key of ['e', 'l', 'b', 'h', 'm', '?']) expect(intentForKey({key}, {raiseOpen: true})).toBeNull();
         for (const key of ['f', 'c', 'r', 'a', '1', 'Enter']) expect(roomIntentForKey({key})).toBeNull();
     });
 
@@ -142,5 +144,18 @@ describe('the room\'s keys', () => {
         for (const id of ['fold', 'check-call', 'raise', 'all-in'] as const) {
             expect(SHORTCUTS.turn.find((s) => s.id === id)?.keys).toEqual([KEY_SHORTCUTS[id]]);
         }
+    });
+});
+
+// The tap shield: a row of buttons that takes another's place drops a pointer tap landing within
+// TAP_SHIELD_MS of it appearing.
+describe('the tap shield', () => {
+    it('drops a tap that lands before the shield is over, and lets one through from then on', () => {
+        expect(TAP_SHIELD_MS).toBe(350);
+        expect(tapLands(1000, 1000)).toBe(false);
+        expect(tapLands(1000, 1100)).toBe(false);
+        expect(tapLands(1000, 1349.9)).toBe(false);
+        expect(tapLands(1000, 1350)).toBe(true);
+        expect(tapLands(1000, 5000)).toBe(true);
     });
 });

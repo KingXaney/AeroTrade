@@ -1,4 +1,4 @@
-// Emotes: the registries (twelve reactions, sixteen phrases, ten throwables, each glyph one plain
+// Emotes: the registries (thirteen reactions, sixteen phrases, ten throwables, each glyph one plain
 // emoji code point from Emoji 12.0 or earlier), a request read only with exactly its keys and ids
 // from the registries (and the route's zod schema agreeing with the hand-written reader), a message
 // off the channel read the same way, who may send what, the room's one conditional write (the
@@ -33,8 +33,8 @@ const msg = (over: Partial<EmoteMessage> & Pick<EmoteMessage, 'kind'>): EmoteMes
     ({item: 'laugh', id: 'e1', seq: 1, from: A, at: T0, ...over} as EmoteMessage);
 
 describe('the registries', () => {
-    it('list 12 reactions, 16 phrases and 10 throwables, each with an impact', () => {
-        expect(REACTION_IDS).toEqual(['laugh', 'wow', 'cool', 'fire', 'clap', 'cry', 'think', 'grimace', 'peek', 'party', 'huff', 'sleepy']);
+    it('list 13 reactions, 16 phrases and 10 throwables, each with an impact', () => {
+        expect(REACTION_IDS).toEqual(['laugh', 'wow', 'cool', 'fire', 'clap', 'cry', 'think', 'grimace', 'peek', 'party', 'huff', 'mad', 'sleepy']);
         expect(PHRASE_IDS).toHaveLength(16);
         expect(new Set(PHRASE_IDS).size).toBe(16);
         expect(THROW_IDS).toEqual(['tomato', 'rose', 'soda', 'confetti', 'cake', 'egg', 'tennis-ball', 'popcorn', 'heart', 'fish']);
@@ -48,7 +48,7 @@ describe('the registries', () => {
     it('pin the code points the design lists', () => {
         expect(REACTIONS).toEqual({
             laugh: 0x1f602, wow: 0x1f62e, cool: 0x1f60e, fire: 0x1f525, clap: 0x1f44f, cry: 0x1f62d,
-            think: 0x1f914, grimace: 0x1f62c, peek: 0x1f648, party: 0x1f973, huff: 0x1f624, sleepy: 0x1f634,
+            think: 0x1f914, grimace: 0x1f62c, peek: 0x1f648, party: 0x1f973, huff: 0x1f624, mad: 0x1f621, sleepy: 0x1f634,
         });
         expect(Object.fromEntries(THROW_IDS.map((id) => [id, THROWABLES[id].point]))).toEqual({
             tomato: 0x1f345, rose: 0x1f339, soda: 0x1f964, confetti: 0x1f389, cake: 0x1f370, egg: 0x1f95a,

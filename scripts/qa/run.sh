@@ -29,7 +29,7 @@ APP_URL=http://localhost:$APP_PORT
 # no terrain before any SPY history exists, so it runs before qa-landing seeds one (and the app
 # caches the Tiingo stand-in's answer for an hour); qa-learn wipes and reseeds strategyruns, so it
 # runs after qa-strategies. A suite missing here runs last.
-ALL=(auth styles shell home landing chat topics-refresh trading topics news-feed strategies income learn learn-account games poker poker-night chat-tutor email)
+ALL=(auth styles shell home landing chat topics-refresh trading topics news-feed strategies income learn learn-account games poker poker-night poker-night-modes chat-tutor email)
 
 KEEP_UP=0
 NAMES=()

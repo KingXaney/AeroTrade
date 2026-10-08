@@ -4,8 +4,9 @@
 // table, the date (in the reader's own time zone, so it is read in the browser), how many hands and
 // how long; the final counts, everyone who sat by net — Chips in, Finished with, Net with its sign;
 // the night's awards (P7), each card with every winner on a tie and the figure it was won with;
-// Copy summary (the box to copy from by hand when the clipboard is blocked); "Start another table"
-// for an account, the account nudge for a guest; and the footer: play chips only, and the check
+// Copy summary (the box to copy from by hand when the clipboard is blocked) and, on a phone, Share;
+// "Start another table" for an account, the account nudge for a guest, and Home ("Back to
+// AeroTrade", "/") for everyone — never a link a guest is bounced to sign in from; and the footer: play chips only, and the check
 // that every chip is accounted for. An unframed scroll of Panels. A night with awards opens with a
 // little celebration — confetti and the award cards stepping in — that both motion guards show
 // in place (the confetti unseen), drawn the same on every screen from the table's code.
@@ -13,7 +14,7 @@
 import type {CSSProperties} from "react";
 import {useState, useSyncExternalStore} from "react";
 import Link from "next/link";
-import {Copy} from "lucide-react";
+import {Copy, Share2} from "lucide-react";
 import ActionButton, {actionButton} from "@/components/primitives/ActionButton";
 import Badge from "@/components/primitives/Badge";
 import MicroLabel from "@/components/primitives/MicroLabel";
@@ -21,7 +22,8 @@ import Panel from "@/components/primitives/Panel";
 import RowCard from "@/components/primitives/RowCard";
 import SectionHeading from "@/components/primitives/SectionHeading";
 import {TextArea} from "@/components/primitives/TextField";
-import {copyText, MiniAvatar, PlayerName} from "@/components/poker-night/overlay-kit";
+import {copyText, MiniAvatar, PlayerName, useCanShare} from "@/components/poker-night/overlay-kit";
+import {HomeLink} from "@/components/poker-night/HomeLink";
 import {BANK_COPY, OVERLAY_COPY, SUMMARY_COPY, TABLE_COPY} from "@/lib/learn/copy/poker-night";
 import {awardGlyph, celebrationBits} from "@/lib/poker-night/awards";
 import {nightDate, summaryText, type AwardView, type NightSummaryView} from "@/lib/poker-night/summary";
@@ -79,6 +81,15 @@ const NightSummary = ({summary, signedIn}: NightSummaryProps) => {
     const counted = summary.standings.reduce((sum, s) => sum + s.finished, 0);
 
     const copy = async () => setNote(await copyText(text));
+    // navigator.share, on phones: the same text as the copy. A closed share sheet is no error.
+    const canShare = useCanShare();
+    const share = async () => {
+        try {
+            await navigator.share({title: SUMMARY_COPY.shareTitle(summary.table), text});
+        } catch {
+            // Cancelled, or the browser refused: the copy is still there.
+        }
+    };
 
     return (
         <main className="mx-auto w-full max-w-2xl space-y-4 px-4 pb-[calc(env(safe-area-inset-bottom)+2rem)] pt-[calc(env(safe-area-inset-top)+1.5rem)]"
@@ -144,12 +155,22 @@ const NightSummary = ({summary, signedIn}: NightSummaryProps) => {
                         <Copy className="size-4" aria-hidden="true"/>
                         {SUMMARY_COPY.copy}
                     </ActionButton>
+                    {canShare && (
+                        <ActionButton variant="secondary" size="md" className="inline-flex min-h-11 items-center gap-2" onClick={() => void share()} data-share-summary="">
+                            <Share2 className="size-4" aria-hidden="true"/>
+                            {SUMMARY_COPY.share}
+                        </ActionButton>
+                    )}
                     {signedIn && (
                         <Link href="/poker-night" className={actionButton({variant: 'secondary', size: 'md', className: 'inline-flex min-h-11 items-center'})}
                               data-start-another="">
                             {SUMMARY_COPY.again}
                         </Link>
                     )}
+                    {/* Home for everyone: "/" is the landing page for a guest, never the sign-in. */}
+                    <HomeLink className={actionButton({variant: 'secondary', size: 'md', className: 'inline-flex min-h-11 items-center'})} data-summary-home="">
+                        {SUMMARY_COPY.home}
+                    </HomeLink>
                 </div>
                 {note && (
                     <p role="status" className={note === 'copied' ? 'text-xs text-positive' : 'text-xs text-warning'}>

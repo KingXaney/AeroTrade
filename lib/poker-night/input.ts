@@ -70,6 +70,8 @@ const HostOpSchema = z.discriminatedUnion('op', [
     z.strictObject({op: z.literal('config'), patch: ConfigPatchSchema}),
     z.strictObject({op: z.literal('settings'), patch: SettingsPatchSchema}),
     z.strictObject({op: z.enum(['approve', 'deny', 'kick']), pid}),
+    // Sit a player out; nothing takes one back but the player's own sit-in.
+    z.strictObject({op: z.literal('sit-out'), pid}),
 ]);
 
 // POST action. The table's moves go to the engine; profile, unban, hand-over and claim-host are the
@@ -123,6 +125,8 @@ const hostOpOf = (op: z.infer<typeof HostOpSchema>): HostOp => {
         }
         case 'approve': case 'deny': case 'kick':
             return {op: op.op, pid: op.pid};
+        case 'sit-out':
+            return {op: 'sit-out', pid: op.pid};
         default:
             return {op: op.op};
     }

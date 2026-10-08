@@ -10,6 +10,7 @@ import {potTotal} from '@/lib/poker-night/bet-sizing';
 import {legalFor} from '@/lib/poker-night/betting';
 import type {TableEvent} from '@/lib/poker-night/events';
 import {describeHand} from '@/lib/poker-night/hand-name';
+import {playerAt} from '@/lib/poker-night/reveal';
 import type {EntryKind} from '@/lib/poker-night/types';
 import type {People, TableView} from '@/lib/poker-night/view-types';
 import {snapshotFromView} from '@/lib/poker-night/views';
@@ -24,7 +25,7 @@ export type AnnounceContext = {
 };
 
 const nameAt = (ctx: AnnounceContext, seat: number, pid?: string): string => {
-    const id = pid ?? ctx.view.seats[seat]?.pid;
+    const id = pid ?? playerAt(ctx.view, seat);
     return (id && ctx.people[id]?.name) || TABLE_COPY.seat(seat);
 };
 

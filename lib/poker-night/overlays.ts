@@ -11,7 +11,7 @@ import {parseChips} from '@/lib/poker-night/bet-sizing';
 import {checkConfig, mergeConfig} from '@/lib/poker-night/config';
 import {configIssueText, TIMER_PRESETS} from '@/lib/poker-night/lobby';
 import type {GameConfig, LedgerKind, RebuyPolicy} from '@/lib/poker-night/types';
-import type {JoinOutcome, JoinView, MeView, People, PlayerView, Presence, SeatView, TableView} from '@/lib/poker-night/view-types';
+import type {JoinOutcome, JoinView, MeView, OwnNext, People, PlayerView, Presence, SeatView, TableView} from '@/lib/poker-night/view-types';
 
 // How long "Press and hold to remove" must stay pressed.
 export const HOLD_TO_CONFIRM_MS = 2000;
@@ -50,7 +50,9 @@ export const myTurnKey = (view: Pick<PlayerView, 'hand' | 'turn' | 'me'> | null)
 // ── the viewer's own seat (the top bar's menu) ──
 
 // Between hands the seat can sit out, come back after sitting out, or come back from away; during
-// a hand only "sit out next hand" (the engine keeps that for the next deal).
+// a hand "sit out next hand" (the engine keeps that for the next deal), and once that waits, "deal me
+// in", which takes it back. Nothing once the viewer has left the hand in play (MeView.next 'leave'):
+// the seat is cashed out when it ends.
 export type SeatChoice = 'sit-out' | 'deal-me-in' | 'back';
 
 export type OwnSeat = {
@@ -68,9 +70,171 @@ export const ownSeat = (view: Pick<PlayerView, 'seats' | 'hand' | 'status' | 'me
     const s = seat === null ? null : view.seats[seat] ?? null;
     const closed = view.status === 'closed';
     if (!s) return {seat: null, chips: 0, stack: 0, dealtIn: false, choice: null, canLeave: false, canTakeSeat: !closed && openSeats(view).length > 0};
-    const leaving = s.state === 'leaving';
-    const choice: SeatChoice | null = closed || leaving ? null : s.state === 'away' ? 'back' : s.state === 'sitting-out' ? 'deal-me-in' : 'sit-out';
+    const leaving = s.state === 'leaving' || view.me.next === 'leave';
+    const waits = view.me.next === 'sit-out' && handLive(view);
+    const choice: SeatChoice | null = closed || leaving ? null
+        : s.state === 'away' ? 'back'
+            : s.state === 'sitting-out' || waits ? 'deal-me-in'
+                : 'sit-out';
     return {seat, chips: seatChips(s), stack: s.chips, dealtIn: holdsCards(view, seat), choice, canLeave: !closed && !leaving, canTakeSeat: false};
+};
+
+// ── leaving, and the way home ──
+
+// What sitting down again would take, said before a player leaves: rebuys are off, they need the
+// host's yes, or this player has had every rebuy the table allows (sitting again is a rebuy:
+// engine.sit). Null when sitting down again simply works.
+export type LeaveAsk = 'rebuys-off' | 'rebuys-ask' | 'rebuy-cap';
+
+export const leaveAsks = (config: Pick<GameConfig, 'rebuys' | 'maxRebuys'>, buys: number, isHost: boolean): LeaveAsk | null => {
+    if (config.rebuys === 'off') return 'rebuys-off';
+    if (config.maxRebuys !== null && buys >= config.maxRebuys) return 'rebuy-cap';
+    if (config.rebuys === 'approve' && !isHost) return 'rebuys-ask';
+    return null;
+};
+
+const LEAVE_NOTES: Record<LeaveAsk, string> = {
+    'rebuys-off': TABLE_COPY.rebuysOffNote, 'rebuys-ask': TABLE_COPY.rebuysAskNote, 'rebuy-cap': TABLE_COPY.rebuyCapNote,
+};
+
+// Where a leave started: the table's own Leave (the player stays on the page, watching) or the top
+// bar's Home (the page goes to "/" once the leave lands).
+export type LeaveThen = 'stay' | 'home';
+
+// One button of the leave dialog after Stay, the primary last. `send` is the action it sends:
+// 'leave' — at once between hands; mid-hand the hand folds the next time it faces a bet. The
+// engine's "leave after this hand" (a later phase) joins here as a second kind, the mid-hand
+// primary that never navigates.
+export type LeaveAction = {send: 'leave'; label: string; destructive: boolean; navigates: boolean};
+
+export type LeavePlan = {midHand: boolean; title: string; body: string; note: string | null; actions: LeaveAction[]};
+
+// The leave dialog as it reads now — worked out on every render, so a deal that lands while it is
+// open turns it into the mid-hand one before the player confirms. Null without a seat, and once the
+// viewer has left (mid-hand the seat stays theirs until the hand ends): there is nothing to confirm.
+export const leavePlan = (view: Pick<PlayerView, 'seats' | 'hand' | 'status' | 'me' | 'config' | 'ledger'>, then: LeaveThen): LeavePlan | null => {
+    const own = ownSeat(view);
+    if (own.seat === null || !own.canLeave) return null;
+    const buys = view.ledger.find((row) => row.pid === view.me.pid)?.buys ?? 0;
+    const ask = leaveAsks(view.config, buys, view.me.isHost);
+    const midHand = own.dealtIn;
+    // The chips they leave with: those behind (a live pot's are the hand's).
+    const body = midHand ? TABLE_COPY.leaveBodyInHand(own.stack) : TABLE_COPY.leaveBody(own.stack);
+    const home = then === 'home';
+    const label = home ? (midHand ? TABLE_COPY.leaveNowAndGo : TABLE_COPY.leaveAndGo) : midHand ? TABLE_COPY.leaveNow : TABLE_COPY.leave;
+    return {
+        midHand, title: midHand ? TABLE_COPY.leaveMidHandTitle : TABLE_COPY.leaveTitle, body, note: ask ? LEAVE_NOTES[ask] : null,
+        actions: [{send: 'leave', label, destructive: true, navigates: home}],
+    };
+};
+
+// Whether the break's one-tap Leave asks first: only when sitting down again is not assured.
+export const leaveTapAsks = (view: Pick<PlayerView, 'config' | 'ledger' | 'me'>): boolean =>
+    leaveAsks(view.config, view.ledger.find((row) => row.pid === view.me.pid)?.buys ?? 0, view.me.isHost) !== null;
+
+// The top bar's Home: straight to "/" for a visitor, a watcher or a player already leaving (folded
+// or all in, their plate still says so: MeView.next is what knows); through the leave dialog for
+// anyone in a seat, whose table would otherwise wait on a player who is gone.
+export const homeAsks = (view: Pick<PlayerView, 'seats' | 'status' | 'me'> | null): boolean => {
+    if (!view || view.me.seat === null || view.status === 'closed' || view.me.next === 'leave') return false;
+    const seat = view.seats[view.me.seat];
+    return seat !== null && seat !== undefined && seat.state !== 'leaving';
+};
+
+// After leaving: a player who played tonight and now watches sees their net, the way home and the
+// way back to a seat — or why there is none.
+export type LeftState = {net: number; sitAgain: boolean; note: string | null};
+
+export const leftState = (view: Pick<PlayerView, 'seats' | 'ledger' | 'status' | 'me' | 'config' | 'removed'>): LeftState | null => {
+    if (view.me.seat !== null || view.status === 'closed' || view.removed.includes(view.me.pid)) return null;
+    const row = view.ledger.find((r) => r.pid === view.me.pid);
+    if (!row || row.bought === 0) return null;
+    const ask = leaveAsks(view.config, row.buys, view.me.isHost);
+    const open = openSeats(view).length > 0;
+    const blocked = ask === 'rebuys-off' || ask === 'rebuy-cap';
+    const note = ask === 'rebuys-off' ? REFUSAL_COPY['rebuys-off']
+        : ask === 'rebuy-cap' ? REFUSAL_COPY['rebuy-cap']
+            : !open ? JOIN_COPY.full
+                : ask === 'rebuys-ask' ? TABLE_COPY.rebuysAskNote : null;
+    // Out of the seat, the net is what they left with against what they brought.
+    return {net: row.cashedOut - row.bought, sitAgain: open && !blocked, note};
+};
+
+// ── sitting out: the host's, and how the viewer learns of it ──
+
+// The host's control for each other player (the bank's row and the host drawer's More menu): "Sit
+// out next hand" while the player is in the game; once the host asked during the hand in play, a
+// note that it waits for the deal (`waiting` is the hand number the host's browser asked during,
+// kept by TableOverlays for both places); none for the host, a player already sitting out, away,
+// leaving or out of chips, or at a closed table. Nothing takes one back: the view never says who
+// asked, so a take-back could deal in a player who asked to sit out themself — dealing a player back
+// in is theirs alone ("Deal me in", "I'm back"), and the host's tap on a sit-out the player already
+// asked for changes nothing.
+export type HostSitOut = 'offer' | 'waiting';
+
+export const hostSitOut = (view: Pick<PlayerView, 'seats' | 'hand' | 'status' | 'me'>, pid: string, waiting: number | null): HostSitOut | null => {
+    if (!view.me.isHost || pid === view.me.pid || view.status === 'closed') return null;
+    const seat = view.seats.find((s) => s !== null && s.pid === pid);
+    if (!seat || seat.state === 'leaving' || seat.state === 'sitting-out' || seat.state === 'away' || seat.state === 'busted') return null;
+    const inHand = handLive(view) && (seat.state === 'in-hand' || seat.state === 'all-in' || seat.state === 'folded');
+    return inHand && waiting !== null && waiting === view.hand!.no ? 'waiting' : 'offer';
+};
+
+// The viewer's own seat, followed from view to view — its state and the viewer's own `next` — to
+// tell a sit-out the host made from one of their own. A sit-out is pending once the seat sits out or
+// `next` says it will. `asked` from the moment the viewer sends one until it is spent (they are dealt
+// in again) or taken back; `byHost` once a sit-out turns up on a seat this page saw with none while
+// the viewer had asked for none — here, or (askedHere) from this browser's other tab or before a
+// reload (SIT_OUT_ASK_KEY). The view never says who asked, so a page opened on a seat already
+// sitting out, or with one already waiting, says nothing of the host.
+export type SitOutMemory = {state: SeatView['state'] | null; next: OwnNext; asked: boolean; byHost: boolean};
+
+export const SIT_OUT_MEMORY: SitOutMemory = {state: null, next: null, asked: false, byHost: false};
+
+export type SitOutEvent =
+    | {sent: 'sit-out' | 'sit-in'}
+    | {refused: 'sit-out'}
+    | {state: SeatView['state'] | null; next?: OwnNext; askedHere?: boolean};
+
+const pending = (state: SeatView['state'] | null, next: OwnNext): boolean => state === 'sitting-out' || next === 'sit-out';
+
+export const rememberSitOut = (m: SitOutMemory, e: SitOutEvent): SitOutMemory => {
+    if ('sent' in e) {
+        const asked = e.sent === 'sit-out';
+        return m.asked === asked && !m.byHost ? m : {...m, asked, byHost: false};
+    }
+    if ('refused' in e) return m.asked ? {...m, asked: false} : m;
+    const next = e.next ?? null;
+    if (e.state === m.state && next === m.next) return m;
+    if (e.state === null) return SIT_OUT_MEMORY;
+    const was = pending(m.state, m.next);
+    if (!pending(e.state, next)) {
+        // Dealt in again: a sit-out the viewer asked for is spent (one still on its way stays asked).
+        return {state: e.state, next, asked: was ? false : m.asked, byHost: false};
+    }
+    if (was) return {...m, state: e.state, next};
+    // A sit-out turned up: the host's when this page saw the seat with none and the viewer asked for none.
+    const seen = m.state !== null;
+    return {state: e.state, next, asked: m.asked, byHost: seen && !m.asked && e.askedHere !== true};
+};
+
+// This browser's note of a sit-out the viewer sent, so another tab, or the page after a reload, does
+// not take it for the host's: the table's code, the player and when (this browser's clock, read
+// against the view's server time — hence either side of it). A sit-out turns up within the hand it
+// was asked during, so the note counts for SIT_OUT_ASK_MS only; a sit-in or a refusal clears it.
+export const SIT_OUT_ASK_KEY = 'aero-poker-night:sit-out-ask';
+export const SIT_OUT_ASK_MS = 30 * 60 * 1000;
+
+export const sitOutAskRecord = (code: string, pid: string, at: number): string => JSON.stringify({code, pid, at});
+
+export const sitOutAsked = (raw: string | null, code: string, pid: string, now: number): boolean => {
+    if (!raw) return false;
+    try {
+        const r = JSON.parse(raw) as {code?: unknown; pid?: unknown; at?: unknown};
+        return r.code === code && r.pid === pid && typeof r.at === 'number' && Math.abs(now - r.at) < SIT_OUT_ASK_MS;
+    } catch {
+        return false;
+    }
 };
 
 // ── the join card ──

@@ -887,6 +887,14 @@ details[open] > :not(summary) { animation: disclosure-in var(--motion-base) var(
     }
     .pn-fold-free { left: max(10px, env(safe-area-inset-left)); }
   }
+  /* The seat's own controls (Show cards, Sit out, Leave) say the short word in a narrow dock — a
+     phone upright, or the column of one on its side — so the row keeps to one line; the long one
+     stays the button's accessible name. */
+  .pn-label-short { display: none; }
+  @container pn-dock (max-width: 28rem) {
+    .pn-label-long { display: none; }
+    .pn-label-short { display: inline; }
+  }
 }
 
 /* Compact plates draw no glass: nine blurred plates over the scene stutter on a small phone.

@@ -6,10 +6,11 @@ import {describe, expect, it} from 'vitest';
 import {nextDueAt} from '@/lib/poker-night/clock';
 import {bestFive} from '@/lib/poker-night/hand-name';
 import {HAND_COPY, TABLE_COPY} from '@/lib/learn/copy/poker-night';
-import {bannerLines, bannerShows, cardLook, resultLook} from '@/lib/poker-night/reveal';
+import {reduce} from '@/lib/poker-night/engine';
+import {bannerLines, bannerShows, cardLook, playerAt, resultLook, viewerSeatIn} from '@/lib/poker-night/reveal';
 import type {TableState} from '@/lib/poker-night/types';
 import {clockLeaderOf, wireView} from '@/lib/poker-night/views';
-import {A, C, F, X, cards, deal, moves, nowOf, runOut, table} from './fixtures';
+import {A, C, F, X, cards, deal, moves, nowOf, ok, runOut, table} from './fixtures';
 
 const view = (s: TableState) => wireView(s, {
     code: 'K7QXM4', seq: 1, serverNow: nowOf(s), nextDueAt: nextDueAt(s), clockLeader: clockLeaderOf(s, {}), presence: {}, watchers: 0, realtimeOk: true, peopleV: 1,
@@ -91,6 +92,30 @@ describe("the banner's words", () => {
         expect(bannerLines(look, () => 'Ana', 2)).toEqual([{seat: 2, mine: true, head: TABLE_COPY.bannerYou(60), hand: pair}]);
         expect(bannerLines(look, () => 'Ana', 0)).toEqual([{seat: 2, mine: false, head: TABLE_COPY.banner('Ana', 60), hand: pair}]);
         expect(bannerLines(look, () => null, null)[0].head).toBe(TABLE_COPY.banner(TABLE_COPY.seat(2), 60));
+    });
+
+    it('never tells someone who took the winner\u2019s seat in the pause that they won', () => {
+        let s = deal(three());
+        // The big blind leaves owing nothing, stays in the hand away, and wins it uncontested.
+        s = ok(reduce(s, {type: 'leave', by: 'p1', at: nowOf(s)}));
+        s = moves(s, F, F);
+        expect(s.hand!.phase).toBe('complete');
+        s = ok(reduce(s, {type: 'sit', by: 'p7', seat: 1, buyIn: s.config.buyInMax, at: nowOf(s)}));
+        const v = view(s);
+        const look = resultLook(v.hand)!;
+        expect(look.winners.map((w) => w.seat)).toEqual([1]);
+        const nameOf = (seat: number) => (playerAt(v, seat) === 'p1' ? 'Ana' : 'Bo');
+        // The newcomer at seat 1 played nothing: the banner names the player who won.
+        expect(viewerSeatIn(v, 1, 'p7')).toBeNull();
+        expect(bannerLines(look, nameOf, viewerSeatIn(v, 1, 'p7'))[0]).toMatchObject({mine: false, head: TABLE_COPY.banner('Ana', look.winners[0].amount)});
+        // A player still in the seat they played keeps it; a watcher has none.
+        expect(viewerSeatIn(v, 0, 'p0')).toBe(0);
+        expect(viewerSeatIn(v, null, 'w1')).toBeNull();
+        // Before anyone moved, the winner reading their own banner is told they won.
+        let w = deal(three());
+        w = moves(w, F, F);
+        const wv = view(w);
+        expect(bannerLines(resultLook(wv.hand)!, () => 'Bo', viewerSeatIn(wv, 1, 'p1'))[0].mine).toBe(true);
     });
 
     it('says when the board plays, names at most three winners, and no hand for an uncontested pot', () => {

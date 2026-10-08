@@ -662,6 +662,20 @@ const ENTRIES = [
         short: 'Betting every chip a player has left: they stay in the hand without acting again and can win only what they matched.',
         long: 'A player all in for less than the bet calls only what they have, and the chips bet above it form a side pot they cannot win. When two or more players are all in with cards to come, every live hand is turned face up and the board runs out a street at a time.',
         seeAlso: ['side-pot', 'push-fold']},
+    // The Hands guide's words (/poker-night?tab=hands, and the table's Hands drawer): no bare "pair",
+    // "straight" or "flush" as an alias, since resolveTerm reads every word of a chat question.
+    {key: 'hand-rankings', kind: 'metric', term: 'Hand rankings', aliases: ['hand rankings', 'hand ranking', 'poker hand rankings', 'ranking of hands', 'poker hands'],
+        short: 'The order hands win in, from a royal flush down to high card: only the five cards that play count, and suits never rank.',
+        long: 'Strongest first: a royal flush is the ace, king, queen, jack and ten of one suit; a straight flush, five cards in a row of one suit; four of a kind, four cards of one rank; a full house, three cards of one rank with two of another; a flush, five cards of one suit; a straight, five cards in a row in mixed suits; three of a kind, three cards of one rank; two pair, two cards of one rank and two of another; a pair, two cards of one rank; and high card, none of these, named by its highest card. Two hands of the same kind compare their ranks from the top, then their kickers.',
+        computedIn: 'lib/poker/evaluator.ts evaluateCards', seeAlso: ['kicker', 'showdown']},
+    {key: 'kicker', kind: 'metric', term: 'Kicker', aliases: ['kicker', 'kickers', 'side card', 'side cards'],
+        short: 'A card among the five that play outside the pair, two pair, three or four of a kind; it decides between hands of the same kind.',
+        long: 'Two pair, kings and fives, with a queen as its kicker wins against the same two pair with a jack. Kickers compare from the highest down, and the first that differs decides. A straight, a flush, a full house and a straight flush have no kicker: all five of their cards make the hand.',
+        seeAlso: ['hand-rankings']},
+    {key: 'texas-holdem', kind: 'metric', term: "Texas hold'em", aliases: ["texas hold'em", 'texas holdem', "hold'em", 'holdem', "no-limit hold'em", 'no limit holdem'],
+        short: 'Two cards each and five shared on the board: a hand is the strongest five of those seven. At poker night it plays no limit.',
+        long: "Each player is dealt two cards face down. Betting goes round before the flop, then after it (the first three board cards), after the turn (the fourth) and after the river (the fifth), and a hand may use both, one or none of its player's two cards. No limit means a bet or a raise can be any size from the minimum raise up to all of a player's chips.",
+        seeAlso: ['hand-rankings', 'minimum-raise', 'all-in']},
 
     // ---- rails --------------------------------------------------------------------------
     {key: 'position-cap', kind: 'rail', term: 'Position cap', aliases: ['position cap', 'max position weight'],

@@ -29,6 +29,7 @@ import {capitalize, numberWord} from "@/lib/text";
 import type {PhraseId, ReactionId, ThrowId} from "@/lib/poker-night/emotes";
 import type {ShortcutGroup, ShortcutId} from "@/lib/poker-night/keys";
 import type {AwardId} from "@/lib/poker-night/awards";
+import type {GuideGame, RankingSlot} from "@/lib/poker-night/hands-guide";
 
 // A player's name inside a sentence, set apart from the words around it (U+2068 … U+2069), so a
 // name written right to left cannot reorder the sentence it sits in.
@@ -427,6 +428,32 @@ export const POKER_NIGHT_COPY = {
     recentEmpty: 'A night shows here once its table closes.',
     recentRow: (hands: number, net: number): string => `${plural(hands, 'hand', 'hands')} · net ${signed(net)}`,
     recentOpen: 'Still open',
+
+    // The card above everything else while the reader holds a seat at an open table (lobby.resumeOf),
+    // with the table's name as the lobby prints it (TABLE_COPY.name).
+    resumeTitle: (table: string): string => `You are seated at ${isolate(table)}`,
+    rejoin: 'Rejoin',
+} as const;
+
+// ---- Home (app/(root)/page.tsx: components/home/PokerNightChip, components/home/HomePokerNight) --
+
+// The chip beside the streak is always there while poker night is on; the panel only when one of
+// its lists has a row (lib/poker-night/lobby.homePokerNight). A row's line is the lobby's own
+// (lobby.tableLine), its button Rejoin where the reader holds a seat, Open at a table they host
+// from outside a seat, Join at a friend's.
+export const HOME_PANEL_COPY = {
+    chip: 'Poker night',
+    // The chip while the reader holds a seat: straight back to that table.
+    chipRejoin: 'Rejoin your table',
+    heading: 'Poker night',
+    lobby: 'Open the lobby',
+    yours: 'Your tables',
+    friends: "Friends' tables",
+    seatedBadge: 'Seated',
+    rejoin: 'Rejoin',
+    open: 'Open',
+    join: 'Join',
+    hands: 'Learn the hands',
 } as const;
 
 // ---- the invite (components/poker-night/InviteSheet) -------------------------------------------
@@ -476,8 +503,10 @@ export const TABLE_COPY = {
     documentTitle: (table: string, yourTurn: boolean): string => (yourTurn ? `Your turn · ${isolate(table)}` : isolate(table)),
     loading: 'Setting up the table…',
 
-    // The top bar and its menu.
+    // The top bar and its menu. Home is a full page load of "/": the app's Home for an account, the
+    // landing page for a guest.
     menu: 'Table menu',
+    home: 'Back to AeroTrade',
     invite: INVITE_COPY.open,
     bank: 'Bank',
     log: 'Hand log',
@@ -552,13 +581,41 @@ export const TABLE_COPY = {
     awayNote: (n: number): string => `Sat out after ${numberWord(n)} ${n === 1 ? 'timeout' : 'timeouts'}. "I'm back" deals you in again.`,
     outOfChips: 'Out of chips.',
     showCards: 'Show my cards',
+    // The break's buttons in a narrow dock (a phone upright); the long words above stay their
+    // accessible names.
+    sitOutShort: 'Sit out',
+    showShort: 'Show mine',
+    leaveShort: 'Leave',
+    // Beside the cards while the plate still reads Folded: what the seat does when the hand ends.
+    leavingAfterHand: 'You leave when this hand ends.',
+    sitOutNextNote: 'You sit out from the next hand.',
+    // The host sat the viewer out (the bank's "Sit out next hand"); "I'm back" deals them in again.
+    hostSatYouOut: 'The host sat you out.',
+    // The viewer's own cards after a fold: still theirs to see, dimmed, until the next deal.
+    foldedHand: 'Your hand, folded',
 
-    // Leaving.
+    // Leaving. Mid-hand, leaving now folds the hand the next time it faces a bet, and the chips are
+    // counted once it ends (leaveBodyInHand, one sentence in place of leaveBody).
     leaveTitle: 'Leave the table?',
     leaveBody: (n: number): string => `Your ${plural(n, 'chip is', 'chips are')} counted in the bank as you leave.`,
-    leaveInHand: 'Your hand folds the next time it faces a bet, and your chips are counted once it ends.',
+    leaveBodyInHand: (n: number): string =>
+        `Your hand folds the next time it faces a bet; your ${plural(n, 'chip is', 'chips are')} counted in the bank once it ends.`,
     leave: 'Leave',
     stay: 'Stay',
+    leaveMidHandTitle: 'Leave in the middle of a hand?',
+    leaveNow: 'Leave now',
+    leaveAndGo: 'Leave and go',
+    leaveNowAndGo: 'Leave now and go',
+    // What sitting down again takes, said before leaving (lib/poker-night/overlays.leaveAsks).
+    rebuysOffNote: 'Rebuys are off at this table: once you leave, you can watch but not sit down again.',
+    rebuysAskNote: "Sitting down again needs the host's yes.",
+    rebuyCapNote: 'You have used every rebuy this table allows: once you leave, you can watch but not sit down again.',
+    // After leaving: the dock's watching side, with the way home, the way back to a seat and, for an
+    // account, the lobby.
+    leftTitle: 'You left the table',
+    netTonight: (n: number): string => `Net tonight: ${signed(n)}.`,
+    sitAgain: 'Sit down again',
+    lobby: 'Poker night lobby',
 
     // The error page (app/(play)/error.tsx), an unknown code (not-found.tsx) and a newer deploy.
     errorTitle: 'The table could not load',
@@ -712,6 +769,15 @@ export const HOST_COPY = {
     letBackIn: 'Let back in',
     letBackInDone: (name: string): string => `${isolate(name)} can join again.`,
 
+    // Sitting a player out from the bank or the Players list: from the next deal while they are in the
+    // hand in play, at once between hands. Only the player deals themself back in ("Deal me in",
+    // "I'm back"): the host's side has no take-back.
+    sitOut: TABLE_COPY.sitOut,
+    sitOutFor: (name: string): string => `Sit ${isolate(name)} out from the next hand`,
+    sitOutWaiting: 'Sits out from the next hand.',
+    satOut: (name: string): string => `${isolate(name)} sits out from the next hand.`,
+    satOutNow: (name: string): string => `${isolate(name)} is sitting out.`,
+
     // Table.
     tableName: 'Table name',
     deal: INVITE_COPY.deal,
@@ -821,6 +887,10 @@ export const SUMMARY_COPY = {
     blocked: 'The clipboard is blocked: copy the summary from the box.',
     again: 'Start another table',
     lobby: 'Back to poker night',
+    home: TABLE_COPY.home,
+    // navigator.share, on phones: the summary's own text under this title.
+    share: 'Share',
+    shareTitle: (table: string): string => `${isolate(table)}: the final counts`,
     guestNudge: 'With an account, the nights you play are kept under Recent nights.',
     guestNudgeLink: 'Create an account',
     footer: SUMMARY_FOOTER,
@@ -1053,7 +1123,7 @@ const THROW_WORDS: Record<ThrowId, {label: string; phrase: string}> = {
 
 const REACTION_WORDS: Record<ReactionId, string> = {
     laugh: 'Laughing', wow: 'Surprised', cool: 'Cool', fire: 'On fire', clap: 'Applause', cry: 'Crying',
-    think: 'Thinking', grimace: 'Grimacing', peek: "Can't look", party: 'Party', huff: 'Huffing', sleepy: 'Sleepy',
+    think: 'Thinking', grimace: 'Grimacing', peek: "Can't look", party: 'Party', huff: 'Huffing', mad: 'Mad', sleepy: 'Sleepy',
 };
 
 const PHRASE_WORDS: Record<PhraseId, string> = {
@@ -1119,10 +1189,68 @@ export const SHORTCUTS_COPY = {
         emotes: 'Emotes',
         log: 'Hand log',
         bank: 'Bank',
+        hands: 'Hand rankings and the rules',
         mute: 'Sounds on or off',
         shortcuts: 'This list',
     } satisfies Record<ShortcutId, string>,
     // The M key's answer.
     soundOn: 'Sounds on.',
     soundOff: 'Sounds off.',
+} as const;
+
+// ==== The Hands guide (lib/poker-night/hands-guide; components/poker-night HandsGuide, HandsDrawer; ====
+// the lobby's Hands tab, app/(root)/poker-night ?tab=hands) ========================================
+
+// What the guide says beyond the glossary entries it quotes word for word wherever it says what a
+// term means (hand-rankings, kicker, texas-holdem in lib/learn/glossary.ts): the lobby's two views,
+// the rankings' names in the guide's order (hands-guide RANKING_SLOTS), what the lifted cards are,
+// the ties a kicker does not settle, and what each game is like at this table. An example's own
+// hand is named by HAND_COPY.label. lib/learn/__tests__/poker-night-copy.test.ts holds these lines
+// to say only what the quoted entries do not: no run of five words shared with any of them.
+export const HANDS_COPY = {
+    // The lobby's two views (?tab=), the table's menu item and its drawer.
+    tabs: {play: 'Play', hands: 'Hands'},
+    tabsLabel: 'Poker night views',
+    menu: 'Hands',
+    sheetTitle: 'Hands and games',
+
+    // The rankings.
+    heading: 'Hand rankings',
+    lead: 'Strongest first. In each example, the cards that make the hand are lifted and outlined.',
+    categories: {
+        'royal-flush': 'Royal flush', 'straight-flush': 'Straight flush', 'four-of-a-kind': 'Four of a kind', 'full-house': 'Full house',
+        flush: 'Flush', straight: 'Straight', 'three-of-a-kind': 'Three of a kind', 'two-pair': 'Two pair', pair: 'Pair', 'high-card': 'High card',
+    } satisfies Record<RankingSlot, string>,
+    // An example's five cards read aloud, then the ones that make the hand: "Queen of clubs, …, queen
+    // of spades and seven of diamonds. The four queens make the hand." is said as the cards' names.
+    example: (cards: readonly Card[], makes: readonly Card[]): string => {
+        const all = capitalize(words(cards.map(cardWords)));
+        if (makes.length === cards.length) return `${all}. All five make the hand.`;
+        return `${all}. The ${words(makes.map(cardWords))} ${makes.length === 1 ? 'makes' : 'make'} the hand.`;
+    },
+
+    // Ties and kickers: the kicker's entry, an example of two hands it separates, then the ties.
+    tiesHeading: 'Ties and kickers',
+    firstHand: 'First hand',
+    secondHand: 'Second hand',
+    kickerCaption: 'Both hands make a pair of aces. The king is higher than the queen, so the first hand wins.',
+    ties: [
+        'When the board makes the strongest five for both players, they split the pot: a sixth or a seventh card never breaks a tie.',
+        'Two hands exactly alike split the pot, whatever their suits.',
+        'An ace counts high or low in a straight, but a straight never wraps round it: queen, king, ace, two, three is not one.',
+    ],
+
+    // The games: the one the table deals first, "At this table", then the others.
+    gamesHeading: 'The games',
+    atThisTable: 'At this table',
+    games: {
+        holdem: {
+            name: "Texas hold'em",
+            facts: [
+                'The host sets the blinds, any ante and the turn timer; a change starts with the next hand.',
+                'At a showdown every hand still in is shown, and the cards that play light up.',
+                'A player who folded may still show their cards while the result is on screen.',
+            ],
+        },
+    } satisfies Record<GuideGame, {name: string; facts: readonly string[]}>,
 } as const;

@@ -11,14 +11,17 @@
 // (aria-keyshortcuts). When the turn starts, focus moves to the bar itself — unless the viewer is
 // typing somewhere or a dialog holds the focus; when the raise panel closes, to the Raise button. A
 // move goes to the action route with the turn it answers, and the buttons wait while it is on its
-// way; a refusal is said in a toast.
+// way; a refusal is said in a toast. A tap that lands within lib/poker-night/keys.TAP_SHIELD_MS of
+// the bar appearing is dropped (useTapShield) — it was aimed at the early choice the bar replaced —
+// and the bar carries data-pn-armed once taps land; keys are never held back.
 //
 // The dock mounts it fresh for each turn (keyed by the turn number), so nothing carries over.
 
-import {useEffect, useEffectEvent, useRef, useState} from "react";
+import {useEffect, useEffectEvent, useRef, useState, type MouseEvent} from "react";
 import {toast} from "sonner";
 import ActionButton from "@/components/primitives/ActionButton";
 import RaisePanel from "@/components/poker-night/RaisePanel";
+import {useTapShield} from "@/components/poker-night/useTapShield";
 import {useRoom} from "@/components/poker-night/room-controller";
 import {ACTION_COPY} from "@/lib/learn/copy/poker-night";
 import {quickSizes} from "@/lib/poker-night/bet-sizing";
@@ -49,6 +52,11 @@ const ActionBar = ({dock, turn, disabled}: {dock: DockView; turn: number; disabl
     const [raiseOpen, setRaiseOpen] = useState(false);
     const [raiseTo, setRaiseTo] = useState(() => sizing?.min ?? 0);
     const [askFold, setAskFold] = useState(false);
+    // A tap that lands as the bar appears was meant for the early choices it replaced.
+    const shield = useTapShield();
+    const tap = (act: () => void) => (e: MouseEvent<HTMLButtonElement>) => {
+        if (shield.lands(e)) act();
+    };
 
     const act = async (move: Move) => {
         if (pending || disabled) return;
@@ -145,29 +153,29 @@ const ActionBar = ({dock, turn, disabled}: {dock: DockView; turn: number; disabl
             )}
             <div ref={bar} role="toolbar" aria-label={ACTION_COPY.toolbar} tabIndex={-1} aria-busy={pending}
                  className="chrome-surface flex items-stretch gap-1.5 rounded-[var(--control-radius)] p-1.5 outline-none focus-visible:outline-2 focus-visible:outline-brand"
-                 data-pn-actions="">
+                 data-pn-actions="" data-pn-armed={shield.armed ? '' : undefined}>
                 {askFold ? (
                     <>
-                        <ActionButton variant="danger" className={BUTTON} disabled={off} onClick={() => void act({kind: 'fold'})} aria-keyshortcuts={KEY_SHORTCUTS.fold}
+                        <ActionButton variant="danger" className={BUTTON} disabled={off} onClick={tap(() => void act({kind: 'fold'}))} aria-keyshortcuts={KEY_SHORTCUTS.fold}
                                       data-pn-action="fold-anyway">
                             {ACTION_COPY.foldConfirm}
                         </ActionButton>
-                        <ActionButton variant="primary" className={BUTTON} disabled={off} onClick={() => void act({kind: 'check'})} aria-keyshortcuts={KEY_SHORTCUTS['check-call']}
+                        <ActionButton variant="primary" className={BUTTON} disabled={off} onClick={tap(() => void act({kind: 'check'}))} aria-keyshortcuts={KEY_SHORTCUTS['check-call']}
                                       data-pn-action="check-instead">
                             {ACTION_COPY.checkInstead}
                         </ActionButton>
                     </>
                 ) : (
                     <>
-                        <ActionButton variant="danger" className={BUTTON} disabled={off} onClick={fold} aria-keyshortcuts={KEY_SHORTCUTS.fold} data-pn-action="fold">
+                        <ActionButton variant="danger" className={BUTTON} disabled={off} onClick={tap(fold)} aria-keyshortcuts={KEY_SHORTCUTS.fold} data-pn-action="fold">
                             {ACTION_COPY.fold}
                         </ActionButton>
-                        <ActionButton variant={sizing ? 'secondary' : 'primary'} className={BUTTON} disabled={off} onClick={checkOrCall}
+                        <ActionButton variant={sizing ? 'secondary' : 'primary'} className={BUTTON} disabled={off} onClick={tap(checkOrCall)}
                                       aria-keyshortcuts={KEY_SHORTCUTS['check-call']} data-pn-action={legal.check ? 'check' : 'call'}>
                             {legal.check ? ACTION_COPY.check : legal.callAllIn ? ACTION_COPY.callAllIn(legal.call) : ACTION_COPY.call(legal.call)}
                         </ActionButton>
                         {sizing && (
-                            <ActionButton ref={raiseButton} variant="strong" className={cn(BUTTON, raiseOpen && 'ring-2 ring-brand')} disabled={off} onClick={() => setRaiseOpen((open) => !open)}
+                            <ActionButton ref={raiseButton} variant="strong" className={cn(BUTTON, raiseOpen && 'ring-2 ring-brand')} disabled={off} onClick={tap(() => setRaiseOpen((open) => !open))}
                                           aria-expanded={raiseOpen} aria-keyshortcuts={KEY_SHORTCUTS.raise} data-pn-action="raise">
                                 {sizing.kind === 'bet' ? ACTION_COPY.openBet : ACTION_COPY.openRaise}
                             </ActionButton>

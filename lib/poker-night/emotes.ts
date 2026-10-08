@@ -1,4 +1,4 @@
-// Emotes at a poker night table: twelve reactions that rise over the sender's plate, sixteen
+// Emotes at a poker night table: thirteen reactions that rise over the sender's plate, sixteen
 // phrases said in a bubble, and ten things to throw at another player, each landing with its own
 // impact (a splat, petals, fizz, a burst, a bounce). The registries, the request a client sends and
 // the message every client receives, the checks the route runs, and the rules the table draws them
@@ -25,7 +25,7 @@ import {AVATAR_PX, CARD_RATIO, SHOWN_CARD_PX, TABLE_TOP_ROOM, type Fit, type Sea
 
 export const REACTIONS = {
     laugh: 0x1f602, wow: 0x1f62e, cool: 0x1f60e, fire: 0x1f525, clap: 0x1f44f, cry: 0x1f62d,
-    think: 0x1f914, grimace: 0x1f62c, peek: 0x1f648, party: 0x1f973, huff: 0x1f624, sleepy: 0x1f634,
+    think: 0x1f914, grimace: 0x1f62c, peek: 0x1f648, party: 0x1f973, huff: 0x1f624, mad: 0x1f621, sleepy: 0x1f634,
 } as const;
 
 export type ReactionId = keyof typeof REACTIONS;
