@@ -6,7 +6,8 @@ import {describe, expect, it} from 'vitest';
 import {rankOf, type Card} from '@/lib/poker/cards';
 import {categoryOf, evaluateCards} from '@/lib/poker/evaluator';
 import {describeHand, isRoyal} from '@/lib/poker-night/hand-name';
-import {cardsThatMake, GUIDE_GAMES, guideGames, HANDS_TERMS, KICKER_EXAMPLE, RANKING_EXAMPLES, RANKING_SLOTS, SLOT_CATEGORY} from '@/lib/poker-night/hands-guide';
+import {cardsThatMake, GUIDE_GAMES, guideGameOf, guideGames, HANDS_TERMS, KICKER_EXAMPLE, PLO_EXAMPLE, RANKING_EXAMPLES, RANKING_SLOTS, SLOT_CATEGORY} from '@/lib/poker-night/hands-guide';
+import {handValue} from '@/lib/poker-night/variants';
 import {HANDS_COPY} from '@/lib/learn/copy/poker-night';
 import {isGlossaryKey} from '@/lib/learn/glossary';
 
@@ -93,12 +94,27 @@ describe('the kicker example', () => {
 describe('the games', () => {
     it('put the table\'s own game first and list the rest under The games', () => {
         expect(guideGames(null)).toEqual({here: null, others: [...GUIDE_GAMES]});
-        expect(guideGames('holdem')).toEqual({here: GUIDE_GAMES[0], others: []});
-        expect(GUIDE_GAMES.map((game) => game.anchor)).toEqual(['texas-holdem']);
+        expect(guideGames('holdem')).toEqual({here: GUIDE_GAMES[0], others: [GUIDE_GAMES[1]]});
+        expect(guideGames('plo')).toEqual({here: GUIDE_GAMES[1], others: [GUIDE_GAMES[0]]});
+        expect(GUIDE_GAMES.map((game) => game.anchor)).toEqual(['texas-holdem', 'plo']);
+        expect([guideGameOf('holdem'), guideGameOf('plo'), guideGameOf('triple-t')]).toEqual(['holdem', 'plo', null]);
+    });
+
+    it('show PLO\'s rule on one hand: four hearts on the board, one in hand, a pair of aces — a flush in Texas hold\'em', () => {
+        const {hole, board, plays, description} = PLO_EXAMPLE;
+        expect([hole.length, board.length, new Set([...hole, ...board]).size]).toEqual([4, 5, 9]);
+        expect(description).toEqual(describeHand(handValue('plo', hole, board)));
+        expect(description.category).toBe(1);
+        expect(description.ranks[0]).toBe(12);
+        expect(describeHand(handValue('holdem', hole.slice(0, 2), board)).category).toBe(5);
+        // Exactly two from the hand, three from the board, and those five are what the value is.
+        expect(plays.filter((c) => hole.includes(c))).toHaveLength(2);
+        expect(plays.filter((c) => board.includes(c))).toHaveLength(3);
+        expect(value(plays)).toBe(handValue('plo', hole, board));
     });
 
     it('quote glossary entries only, each once', () => {
-        expect([...HANDS_TERMS]).toEqual(['hand-rankings', 'kicker', 'texas-holdem']);
+        expect([...HANDS_TERMS]).toEqual(['hand-rankings', 'kicker', 'texas-holdem', 'omaha', 'pot-limit']);
         for (const key of HANDS_TERMS) expect(isGlossaryKey(key), key).toBe(true);
         expect(new Set(HANDS_TERMS).size).toBe(HANDS_TERMS.length);
     });

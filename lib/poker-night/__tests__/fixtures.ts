@@ -4,14 +4,14 @@
 // random play over the legal moves.
 
 import {parseCardList, type Card} from '@/lib/poker/cards';
-import {legalFor, snapshotFromState} from '@/lib/poker-night/betting';
+import {allInOpen, legalFor, snapshotFromState} from '@/lib/poker-night/betting';
 import {advance, nextDue} from '@/lib/poker-night/clock';
 import {DEFAULT_CONFIG, HOLE_CARDS} from '@/lib/poker-night/config';
 import {FULL_DECK, shuffleWith} from '@/lib/poker-night/deck';
 import {createTable, reduce} from '@/lib/poker-night/engine';
 import {conservation} from '@/lib/poker-night/ledger';
 import {eligibleSeats, isLive, positions} from '@/lib/poker-night/seats';
-import type {GameConfig, Move, PreAction, Reduced, Seat, TableAction, TableState} from '@/lib/poker-night/types';
+import type {GameConfig, Move, PreAction, Reduced, Seat, TableAction, TableState, Variant} from '@/lib/poker-night/types';
 import {mulberry32} from '@/lib/random';
 
 export const T0 = 1_790_000_000_000;
@@ -183,8 +183,8 @@ export const checkInvariants = (s: TableState): void => {
 // down, leaving, being removed, sitting out and in, buying chips, setting pre-actions and showing
 // cards, the host approving, pausing and changing the config, and the clock running whatever falls
 // due. Yields every state with the action (or clock step) that made it; refusals are part of the
-// night too and leave the state as it was.
-export function* randomNight(seed: number, steps: number): Generator<{state: TableState; action: TableAction | 'clock'; refused: string | null}> {
+// night too and leave the state as it was. The game is Texas hold'em unless named.
+export function* randomNight(seed: number, steps: number, variant: Variant = 'holdem'): Generator<{state: TableState; action: TableAction | 'clock'; refused: string | null}> {
     const random = mulberry32(seed);
     const pick = <T>(list: readonly T[]): T => list[Math.floor(random() * list.length)];
     const seats = 2 + Math.floor(random() * 8);
@@ -193,7 +193,7 @@ export function* randomNight(seed: number, steps: number): Generator<{state: Tab
     const config: GameConfig = {
         ...DEFAULT_CONFIG, seats, smallBlind: Math.max(1, bigBlind / 2), bigBlind, ante: random() < 0.3 ? Math.max(1, Math.floor(bigBlind / 4)) : 0,
         buyInMin: Math.max(bigBlind, Math.floor(buyInMax / 4)), buyInMax, rebuys: pick(['approve', 'approve', 'off'] as const),
-        maxRebuys: random() < 0.3 ? 3 : null, sitOutAfter: 1 + Math.floor(random() * 2),
+        maxRebuys: random() < 0.3 ? 3 : null, sitOutAfter: 1 + Math.floor(random() * 2), variant,
     };
     let s = createTable({hostPid: 'p0', config, at: T0});
     let now = T0;
@@ -279,11 +279,13 @@ export function* randomNight(seed: number, steps: number): Generator<{state: Tab
 
 const nextDueOf = (s: TableState): number | null => nextDue(s)?.at ?? null;
 
-// A seeded pick among the actor's legal moves: mostly checks and calls, some raises and folds.
+// A seeded pick among the actor's legal moves: mostly checks and calls, some raises and folds; all in
+// only where it is open (in PLO, within the pot limit), else a raise to the most allowed.
 export const randomMove = (state: TableState, random: () => number): Move => {
-    const legal = legalFor(snapshotFromState(state), state.hand!.actor!)!;
+    const snapshot = snapshotFromState(state);
+    const legal = legalFor(snapshot, state.hand!.actor!)!;
     const roll = random();
-    if (legal.raise && roll < 0.08) return {kind: 'all-in'};
+    if (legal.raise && roll < 0.08) return allInOpen(legal, snapshot, state.hand!.actor!) ? {kind: 'all-in'} : {kind: 'raise', to: legal.raise.max};
     if (legal.raise && roll < 0.25) {
         const {min, max} = legal.raise;
         const to = roll < 0.18 ? min : min + Math.floor(random() * (max - min + 1));

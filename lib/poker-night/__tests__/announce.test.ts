@@ -36,6 +36,25 @@ describe('the viewer\'s turn and cards', () => {
         expect(said.assertive).toEqual(['Your turn: 20 to call, pot 30.']);
     });
 
+    it('says a new game from its first deal, then the four cards of a PLO hand', () => {
+        let s = deal(three());
+        s = moves(s, F, F);
+        s = ok(reduce(s, {type: 'host', by: pidOf(0), op: {op: 'config', patch: {variant: 'plo'}}, at: nowOf(s)}));
+        const before = view(s);
+        s = deal(s, {holes: {2: 'AhKdQcJs'}});
+        const after = view(s);
+        const said = announcementsFor(diffViews(before, after, {mySeat: 2}), ctx(after, 2, cards('AhKdQcJs')));
+        expect(said.polite).toEqual([
+            'New game from this hand: Pot-limit Omaha.',
+            'You have the ace of hearts, the king of diamonds, the queen of clubs and the jack of spades.',
+        ]);
+        // The next PLO hand is no news.
+        s = moves(s, F, F);
+        const again = view(s);
+        s = deal(s);
+        expect(announcementsFor(diffViews(again, view(s), {mySeat: 2}), ctx(view(s), 2, null)).polite).toEqual([]);
+    });
+
     it('says nothing of the viewer\'s own move, and checking is free when it is', () => {
         let s = deal(three());
         s = moves(s, C, C);

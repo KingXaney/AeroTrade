@@ -6,7 +6,8 @@
 // Hand log, My look, Hands (the rankings and the game, for every viewer); the dialogs that ask first — remove a player, hand over host, end the night,
 // leave the table (LeaveDialog: staying to watch, or going home); the banner when a newer deploy
 // needs a reload; an ask to see the viewer's cards (AskPrompt, at the foot of the screen); and the
-// toasts that say once what changed on its own — the connection back ("Back online."), the host
+// toasts that say once what changed on its own — a new game from this hand ("New game from this hand:
+// Pot-limit Omaha.", at the first deal of it this page sees), the connection back ("Back online."), the host
 // sitting the viewer out, how a request for chips ended (approved or declined: one the viewer took
 // back, by Cancel or by leaving, says nothing more), how the viewer's own asks to see a hand ended
 // (AskWatch, for every joined viewer, so an ask the next deal ended is said too) and, for the host,
@@ -40,7 +41,7 @@ import {latestRequestId, takeOwnWithdraw, useOverlayRequest, type DrawerKind} fr
 import {useRoom} from "@/components/poker-night/room-controller";
 import type {HostSitOuts} from "@/components/poker-night/useHostSitOut";
 import {useLeaveAfter} from "@/components/poker-night/useLeaveAfter";
-import {ANNOUNCE_COPY, BANK_COPY, HOST_COPY, LOBBY_COPY, TABLE_COPY} from "@/lib/learn/copy/poker-night";
+import {ANNOUNCE_COPY, BANK_COPY, HOST_COPY, LOBBY_COPY, MODE_COPY, TABLE_COPY} from "@/lib/learn/copy/poker-night";
 import {myTurnKey, ownSeat, requestEnded, type HostRow, type LeaveThen, type SeatChoice} from "@/lib/poker-night/overlays";
 import {ledgerRowOf} from "@/lib/poker-night/views";
 
@@ -196,6 +197,17 @@ const TableOverlays = () => {
         wasReconnecting.current = false;
         toast.success(TABLE_COPY.connection.back);
     }, [reconnecting]);
+
+    // A hand of another game than the one before it on this page: said once, at its deal.
+    const dealt = room.table.hand;
+    const lastGame = useRef<{no: number; label: string} | null>(null);
+    useEffect(() => {
+        if (!dealt) return;
+        const label = MODE_COPY.spokenLabel(dealt.variant, dealt.boards.length);
+        const last = lastGame.current;
+        lastGame.current = {no: dealt.no, label};
+        if (last && dealt.no > last.no && label !== last.label) toast.message(MODE_COPY.changed(label));
+    }, [dealt]);
 
     // The host sat the viewer out: said once as it happens (the dock keeps saying it).
     const satOut = room.satOutByHost;

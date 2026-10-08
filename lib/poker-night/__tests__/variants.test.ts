@@ -8,7 +8,7 @@ import {describe, expect, it} from 'vitest';
 import {rankOf, type Card} from '@/lib/poker/cards';
 import {evaluateCards} from '@/lib/poker/evaluator';
 import {bestOmaha, describeHand} from '@/lib/poker-night/hand-name';
-import {autoDiscard, bestHand, handValue, limitOf, modeOf, playsBoardFor, readShown} from '@/lib/poker-night/variants';
+import {autoDiscard, bestHand, handValue, limitOf, modeChanged, modeOf, nextModeOf, playsBoardFor, readShown} from '@/lib/poker-night/variants';
 import {mulberry32} from '@/lib/random';
 import {cards} from './fixtures';
 
@@ -92,6 +92,17 @@ describe('a shown hand, read', () => {
     it('names the game in play: the hand\'s own, else what the config deals next', () => {
         expect(modeOf(null, {variant: 'plo', boards: 2})).toEqual({variant: 'plo', boards: 2});
         expect(modeOf({variant: 'holdem', boards: [[]]}, {variant: 'plo', boards: 2})).toEqual({variant: 'holdem', boards: 1});
+        // More than one board is PLO's alone, whatever a config holds.
+        expect(nextModeOf({variant: 'holdem', boards: 2})).toEqual({variant: 'holdem', boards: 1});
+    });
+
+    it('says the next deal changes the game only between hands, when the host picked another', () => {
+        const done = {variant: 'holdem' as const, boards: [[]], phase: 'complete'};
+        expect(modeChanged(done, {variant: 'plo', boards: 1})).toBe(true);
+        expect(modeChanged(done, {variant: 'holdem', boards: 1})).toBe(false);
+        expect(modeChanged({...done, phase: 'betting'}, {variant: 'plo', boards: 1})).toBe(false);
+        expect(modeChanged(null, {variant: 'plo', boards: 1})).toBe(false);
+        expect(modeChanged({variant: 'plo', boards: [[]], phase: 'complete'}, {variant: 'plo', boards: 2})).toBe(true);
     });
 });
 

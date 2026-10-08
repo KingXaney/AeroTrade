@@ -14,13 +14,13 @@
 // client-safe.
 
 import {rankOf} from '@/lib/poker/cards';
-import {evaluateCards} from '@/lib/poker/evaluator';
 import {buyOptions} from '@/lib/poker-night/bank';
 import {legalFor, owed} from '@/lib/poker-night/betting';
 import {leaveAfterOf, leftNow, type LeaveAfter} from '@/lib/poker-night/overlays';
 import {sizingFor, type Sizing} from '@/lib/poker-night/bet-sizing';
 import {describeHand, type HandDescription} from '@/lib/poker-night/hand-name';
-import type {Card, Legal, PreAction} from '@/lib/poker-night/types';
+import type {Card, Legal, PreAction, Variant} from '@/lib/poker-night/types';
+import {handValue} from '@/lib/poker-night/variants';
 import type {PlayerView, SeatView} from '@/lib/poker-night/view-types';
 import {ledgerRowOf, snapshotFromView} from '@/lib/poker-night/views';
 
@@ -66,10 +66,15 @@ export type DockView = {
     deal: boolean; // the host may deal the first hand
 };
 
-// What the viewer's cards make with the board so far: before the flop a pair or the high card.
-export const handStrength = (hole: readonly Card[] | null, board: readonly Card[]): HandDescription | null => {
-    if (!hole || hole.length !== 2) return null;
-    if (board.length >= 3) return describeHand(evaluateCards([...hole, ...board]));
+// What the viewer's cards make with the board so far, by the hand's game (variants.handValue, the
+// server's own): in Texas hold'em (and Triple T once it holds two) before the flop a pair or the high
+// card; in PLO nothing before the flop — four cards make no hand of their own — then exactly two of
+// them with three from the board. Nothing for cards the game does not play (a Triple T hand of three).
+export const handStrength = (variant: Variant, hole: readonly Card[] | null, board: readonly Card[]): HandDescription | null => {
+    if (!hole) return null;
+    if (variant === 'plo') return hole.length === 4 && board.length >= 3 ? describeHand(handValue('plo', hole, board)) : null;
+    if (hole.length !== 2) return null;
+    if (board.length >= 3) return describeHand(handValue(variant, hole, board));
     const [a, b] = [rankOf(hole[0]), rankOf(hole[1])];
     return a === b ? {category: 1, ranks: [a]} : {category: 0, ranks: [Math.max(a, b), Math.min(a, b)]};
 };
@@ -134,7 +139,7 @@ export const dockView = (view: PlayerView): DockView => {
     return {
         seat, seatView, live, dealtIn: dealtIn && !folded, folded, mucked, myTurn, legal, sizing,
         hole: view.me.hole,
-        strength: dealtIn && !folded ? handStrength(view.me.hole, hand?.boards[0] ?? []) : null,
+        strength: dealtIn && !folded && hand ? handStrength(hand.variant, view.me.hole, hand.boards[0] ?? []) : null,
         pre: pre && {options: pre.options, selected: pre.options.find((o) => samePre(o, pre.selected)) ?? null},
         control, canShow, buy, deal,
         sitOut: free && control === 'sit-out' && !sitOutNext && !waitingChips,

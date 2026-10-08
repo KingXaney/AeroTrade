@@ -212,7 +212,7 @@ describe('the settings form', () => {
 
     it('starts from the table\'s config and sends nothing when nothing changed', () => {
         const form = gameFormOf(config);
-        expect(form).toMatchObject({smallBlind: '10', bigBlind: '20', ante: '0', buyInMin: '2000', buyInMax: '2000', turnSeconds: 30, rebuys: 'approve', maxRebuys: null});
+        expect(form).toMatchObject({smallBlind: '10', bigBlind: '20', ante: '0', buyInMin: '2000', buyInMax: '2000', turnSeconds: 30, rebuys: 'approve', maxRebuys: null, variant: 'holdem', boards: 1});
         expect(checkGameForm(config, form, GAME_FIELDS)).toEqual({ok: true, patch: {}});
         expect(checkGameForm(config, form, REBUY_FIELDS)).toEqual({ok: true, patch: {}});
     });
@@ -224,6 +224,16 @@ describe('the settings form', () => {
             .toEqual({ok: true, patch: {rebuys: 'off', maxRebuys: 3}});
         // A section sends its own fields only.
         expect(checkGameForm(config, {...form, rebuys: 'off'}, REBUY_FIELDS)).toEqual({ok: true, patch: {rebuys: 'off'}});
+    });
+
+    it('switches the game from the next hand, one board for any game but PLO, and turns down one not open here', () => {
+        expect(checkGameForm(config, {...gameFormOf(config), variant: 'plo'}, GAME_FIELDS)).toEqual({ok: true, patch: {variant: 'plo'}});
+        const plo = {...config, variant: 'plo' as const};
+        expect(checkGameForm(plo, {...gameFormOf(plo), variant: 'holdem'}, GAME_FIELDS)).toEqual({ok: true, patch: {variant: 'holdem'}});
+        // A form left on two boards sends one when the game is not PLO.
+        expect(checkGameForm(plo, {...gameFormOf(plo), variant: 'holdem', boards: 2}, GAME_FIELDS)).toEqual({ok: true, patch: {variant: 'holdem'}});
+        expect(checkGameForm(config, {...gameFormOf(config), variant: 'triple-t'}, GAME_FIELDS)).toEqual({ok: false, message: 'That game is not open at this table yet.'});
+        expect(checkGameForm(plo, {...gameFormOf(plo), boards: 2}, GAME_FIELDS)).toEqual({ok: false, message: 'That game is not open at this table yet.'});
     });
 
     it('turns down what the engine would, in the drawer\'s words', () => {

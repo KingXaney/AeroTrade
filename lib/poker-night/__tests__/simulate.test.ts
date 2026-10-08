@@ -1,16 +1,18 @@
-// Poker night's engine over seeded random nights. Each night is a random table — 2 to 9 seats, with
-// or without an ante, either rebuy policy — played with random legal moves, and between them players
+// Poker night's engine over seeded random nights. Each night is a random table — Texas hold'em or PLO
+// (pot limit), 2 to 9 seats, with or without an ante, either rebuy policy — played with random legal
+// moves, and between them players
 // sitting down, leaving (now, or after the hand in play — and taking that back), being removed,
 // sitting out and in, buying chips (once the first hand is dealt, a request the host approves,
 // declines or the player withdraws), setting pre-actions, showing cards, asking to see a folded or
 // uncontested hand and answering, turning asks off, and the host approving, pausing, resuming,
-// changing the config and sitting players out; the lazy clock runs whatever falls due, dealing from a
+// changing the config (the game too, from the next hand) and sitting players out; the lazy clock runs whatever falls due, dealing from a
 // seeded deck source. A leave after the hand sent just as a deal falls due — the race every page's
 // leave meets — is played out, never folded.
 //
 // After every step: the chips add up, every number is a whole, non-negative count, nobody sits twice
 // and no card is dealt twice, the player on the clock is live, holds chips and has to act, and the
-// moves they are offered are exactly the ones a replay of the street's log allows; a plan to leave
+// moves they are offered are exactly the ones a replay of the street's log allows (in PLO, capped at the
+// pot as the log adds it up; an all-in above the cap refused); a plan to leave
 // after the hand only on a seat dealt into the live hand, never with a sit-out; requests only from
 // seated players not leaving; asks only after a hand completes, from players who folded it, within
 // their limits, never past a no's five hands (held to a record of every no and expiry kept apart
@@ -18,7 +20,8 @@
 // within the cap and "no asks" naming only seated players and the hand's; buys the room marks as made
 // with the host away landing at once; and the reducer never touched its frozen input. At every completed hand: the pots
 // match a chip-by-chip reference, add up to what was left in after the uncalled bet came back, and
-// each goes to the strongest eligible hands, every seat leaving after it is empty, and the state
+// each goes to the strongest eligible hands — in PLO by a brute force over every two hole cards with
+// every three from the board — every seat leaving after it is empty, and the state
 // survives a JSON round trip into the stored shape. Across hands the
 // big blind moves one eligible seat on, so nobody pays it twice running and nobody twice in one
 // orbit of another player. A night replays to the same final state from its recorded actions.
@@ -28,16 +31,16 @@
 
 import {describe, expect, it} from 'vitest';
 import {evaluateCards} from '@/lib/poker/evaluator';
-import {legalFor, needsToAct, owed, snapshotFromState} from '@/lib/poker-night/betting';
+import {allInOpen, legalFor, needsToAct, owed, snapshotFromState} from '@/lib/poker-night/betting';
 import {advance, nextDue} from '@/lib/poker-night/clock';
-import {ASK_ANSWERS, ASKS, DEFAULT_CONFIG, ENTRY_FLAGS, ENTRY_KINDS, STREETS, TABLE_LIMITS} from '@/lib/poker-night/config';
+import {ASK_ANSWERS, ASKS, DEFAULT_CONFIG, ENTRY_FLAGS, ENTRY_KINDS, HOLE_CARDS, STREETS, TABLE_LIMITS} from '@/lib/poker-night/config';
 import {FULL_DECK, shuffleWith, type DeckSource} from '@/lib/poker-night/deck';
 import {createTable, forceClose, reduce} from '@/lib/poker-night/engine';
 import {buyRange, conservation, ledgerRow} from '@/lib/poker-night/ledger';
 import {migrateState} from '@/lib/poker-night/migrate';
 import {eligibleSeats, isLive, liveSeatOf} from '@/lib/poker-night/seats';
 import {paidParts} from '@/lib/poker-night/pots';
-import type {GameConfig, HostOp, Legal, Move, PreAction, TableAction, TableState} from '@/lib/poker-night/types';
+import type {Card, GameConfig, HostOp, Legal, Move, PreAction, TableAction, TableState, Variant} from '@/lib/poker-night/types';
 import {readShown} from '@/lib/poker-night/variants';
 import {mulberry32} from '@/lib/random';
 import {deepFreeze, pidOf, T0} from './fixtures';
@@ -82,12 +85,15 @@ const randomConfig = (r: Random): GameConfig => {
         turnSeconds: TABLE_LIMITS.turnSeconds.min + r.int(TABLE_LIMITS.turnSeconds.max - TABLE_LIMITS.turnSeconds.min + 1),
         pauseSeconds: TABLE_LIMITS.pauseSeconds.min + r.int(TABLE_LIMITS.pauseSeconds.max - TABLE_LIMITS.pauseSeconds.min + 1),
         sitOutAfter: 1 + r.int(TABLE_LIMITS.sitOutAfter.max),
+        variant: r.pick(['holdem', 'holdem', 'plo'] as const),
     };
 };
 
 // A config change the host might make; now and then one out of limits, which is refused.
 const randomPatch = (c: GameConfig, r: Random): Extract<HostOp, {op: 'config'}>['patch'] => {
-    switch (r.int(8)) {
+    switch (r.int(9)) {
+        // The game, from the next hand: now and then one this deploy does not deal, or a second board, refused.
+        case 8: return r.chance(0.1) ? r.pick([{variant: 'triple-t' as const}, {variant: 'plo' as const, boards: 2 as const}, {boards: 3 as const}]) : {variant: r.pick(['holdem', 'plo'] as const)};
         case 0: return {turnSeconds: r.chance(0.9) ? 15 + r.int(106) : 5};
         case 1: return {pauseSeconds: 3 + r.int(13)};
         case 2: return {sitOutAfter: 1 + r.int(5)};
@@ -107,10 +113,11 @@ const randomPatch = (c: GameConfig, r: Random): Extract<HostOp, {op: 'config'}>[
 };
 
 // Mostly checks and calls, some folds and raises (at the minimum, a little above, or anything up to
-// all in), and the odd all-in.
-const randomMove = (legal: Legal, r: Random): Move => {
+// the most allowed), and the odd all-in — in PLO, where the stack is past the pot limit, a raise to
+// the cap instead.
+const randomMove = (legal: Legal, r: Random, allIn: boolean): Move => {
     const roll = r.next();
-    if ((legal.raise || legal.callAllIn) && roll < 0.05) return {kind: 'all-in'};
+    if ((legal.raise || legal.callAllIn) && roll < 0.05) return allIn || !legal.raise ? {kind: 'all-in'} : {kind: 'raise', to: legal.raise.max};
     if (legal.raise && roll < 0.2) {
         const {min, max} = legal.raise;
         const span = max - min;
@@ -157,10 +164,21 @@ const naiveUncalled = (contribs: readonly Contrib[]): {seat: number; amount: num
     return lead > 0 ? {seat: sorted[0].seat, amount: lead} : null;
 };
 
+// A hand's value on a board, written apart from the engine: the seven cards in Texas hold'em; in PLO
+// the highest over every two of the four hole cards with every three of the board.
+const naiveValue = (variant: Variant, hole: readonly Card[], board: readonly Card[]): number => {
+    if (variant !== 'plo') return evaluateCards([...board, ...hole]);
+    let top = -1;
+    for (let a = 0; a < hole.length; a++) for (let b = a + 1; b < hole.length; b++)
+        for (let c = 0; c < board.length; c++) for (let d = c + 1; d < board.length; d++) for (let e = d + 1; e < board.length; e++)
+            top = Math.max(top, evaluateCards([hole[a], hole[b], board[c], board[d], board[e]]));
+    return top;
+};
+
 const naiveShares = (amount: number, winners: number): number[] =>
     Array.from({length: winners}, (_, i) => Math.floor(amount / winners) + (i < amount % winners ? 1 : 0));
 
-type Row = {stack: number; streetBet: number; actedAtBet: number | null; folded: boolean};
+type Row = {stack: number; committed: number; streetBet: number; actedAtBet: number | null; folded: boolean};
 
 // The betting round rebuilt from the hand's log alone: stacks from the start stacks and every chip
 // paid, the street's bets, who acted at which bet, the current bet and the last full raise. Each
@@ -168,7 +186,7 @@ type Row = {stack: number; streetBet: number; actedAtBet: number | null; folded:
 const rebuildFromLog = (s: TableState) => {
     const hand = s.hand!;
     const street = STREETS.indexOf(hand.street);
-    const rows = new Map<number, Row>(hand.seats.map((p) => [p.seat, {stack: p.startStack, streetBet: 0, actedAtBet: null, folded: false}]));
+    const rows = new Map<number, Row>(hand.seats.map((p) => [p.seat, {stack: p.startStack, committed: 0, streetBet: 0, actedAtBet: null, folded: false}]));
     let tracking = 0;
     let currentBet = hand.bigBlind;
     let increment = hand.bigBlind;
@@ -190,9 +208,11 @@ const rebuildFromLog = (s: TableState) => {
         switch (kind) {
             case 'ante':
                 row.stack -= amount;
+                row.committed += amount;
                 break;
             case 'small-blind': case 'big-blind': case 'post':
                 row.stack -= amount;
+                row.committed += amount;
                 row.streetBet += amount;
                 break;
             case 'fold':
@@ -204,11 +224,13 @@ const rebuildFromLog = (s: TableState) => {
                 break;
             case 'call':
                 row.stack -= amount;
+                row.committed += amount;
                 row.streetBet += amount;
                 row.actedAtBet = currentBet;
                 break;
             case 'bet': case 'raise': {
                 row.stack -= amount;
+                row.committed += amount;
                 row.streetBet += amount;
                 if (row.streetBet - currentBet >= increment) increment = row.streetBet - currentBet;
                 currentBet = row.streetBet;
@@ -217,6 +239,7 @@ const rebuildFromLog = (s: TableState) => {
             }
             case 'refund':
                 row.stack += amount;
+                row.committed -= amount;
                 break;
         }
         if (row.streetBet !== to) problems.push(`seat ${seat} ${kind}: logged to ${to}, rebuilt ${row.streetBet}`);
@@ -225,8 +248,9 @@ const rebuildFromLog = (s: TableState) => {
     return {rows, currentBet, increment, problems};
 };
 
-// The moves the rules open to the actor over a rebuilt round (the spec's betting rules, written out).
-const referenceLegal = (rows: Map<number, Row>, actor: number, currentBet: number, increment: number): Legal => {
+// The moves the rules open to the actor over a rebuilt round (the spec's betting rules, written out):
+// in PLO a bet or a raise at most to the current bet plus every chip the log put in plus the call.
+const referenceLegal = (rows: Map<number, Row>, actor: number, currentBet: number, increment: number, potLimit: boolean): Legal => {
     const me = rows.get(actor)!;
     const others = [...rows].filter(([seat]) => seat !== actor).map(([, row]) => row);
     const othersCanAct = others.some((q) => !q.folded && q.stack > 0);
@@ -236,8 +260,11 @@ const referenceLegal = (rows: Map<number, Row>, actor: number, currentBet: numbe
         || (me.actedAtBet === 0 && currentBet > 0 && currentBet < increment)
         || currentBet - me.actedAtBet >= increment;
     const allInTo = me.streetBet + me.stack;
+    const min = Math.min(currentBet + increment, allInTo);
+    const pot = [...rows.values()].reduce((sum, row) => sum + row.committed, 0);
+    const max = potLimit ? Math.min(allInTo, Math.max(min, currentBet + pot + due)) : allInTo;
     const raise = me.stack > due && reopened && othersCanAct
-        ? {kind: currentBet === 0 ? 'bet' as const : 'raise' as const, min: Math.min(currentBet + increment, allInTo), max: allInTo}
+        ? {kind: currentBet === 0 ? 'bet' as const : 'raise' as const, min, max}
         : null;
     return {fold: true, check: due === 0, call: Math.min(due, me.stack), callAllIn: due > 0 && me.stack <= due, raise};
 };
@@ -251,7 +278,7 @@ const COUNTERS = ['hands', 'showdowns', 'sidePots', 'oddChips', 'runouts', 'time
     'pendingBuys', 'approved', 'configs', 'pres', 'shows', 'pauses', 'bigBlindChecks', 'legalChecks', 'hostSitOuts', 'hostSitOutsMidHand',
     'hostSitOutsAlreadyOut', 'leaveAfter', 'leaveAfterCancelled', 'leaveAfterCashOuts', 'leaveAfterRace', 'leaveAfterNow', 'buyRequests',
     'firstBuyIns', 'hostBuysAfterStart', 'withdrawn', 'declined', 'asks', 'asksShown', 'asksShownAll', 'asksNo', 'asksExpired', 'askCooldowns',
-    'asksOff', 'askLimits', 'asksFull', 'asksDealt', 'hostAwayBuys'] as const;
+    'asksOff', 'askLimits', 'asksFull', 'asksDealt', 'hostAwayBuys', 'ploHands', 'ploShowdowns', 'potLimitCaps', 'potLimitAllInRefused'] as const;
 type Counters = Record<(typeof COUNTERS)[number], number>;
 
 const EVENTS = [
@@ -367,7 +394,9 @@ const night = (seed: number, counters: Counters) => {
             if (seat === -1 ? ENTRY_KINDS[kind] !== 'void' : !hand.seats.some((p) => p.seat === seat)) fail(`log entry for seat ${seat}`);
         }
         const cards = [...hand.deck.flat(), ...hand.seats.flatMap((p) => p.hole), ...hand.discards.map(([, card]) => card)];
-        if (hand.variant !== 'holdem' || hand.deck.length !== 1 || hand.deck[0].length !== 5 || hand.seats.some((p) => p.hole.length !== 2)) fail('not a Texas hold\'em deal');
+        if (!['holdem', 'plo'].includes(hand.variant) || hand.deck.length !== 1 || hand.deck[0].length !== 5 || hand.seats.some((p) => p.hole.length !== HOLE_CARDS[hand.variant])) {
+            fail(`not a one-board deal of ${hand.variant}`);
+        }
         if (cards.some((card) => !Number.isInteger(card) || card < 0 || card > 51) || new Set(cards).size !== cards.length) fail('cards dealt twice or out of the deck');
         const boardSize = [0, 3, 4, 5][STREETS.indexOf(hand.street)];
         if (hand.boards.length !== hand.deck.length || hand.boards.some((b, k) => b.length !== boardSize || b.some((card, i) => card !== hand.deck[k][i]))) {
@@ -421,7 +450,7 @@ const night = (seed: number, counters: Counters) => {
                 fail(`seat ${q.seat}: ${JSON.stringify({stack, streetBet: q.streetBet, actedAtBet: q.actedAtBet, folded: q.folded})}, the log says ${JSON.stringify(row)}`);
             }
         }
-        const expected = referenceLegal(rebuilt.rows, actor!, rebuilt.currentBet, rebuilt.increment);
+        const expected = referenceLegal(rebuilt.rows, actor!, rebuilt.currentBet, rebuilt.increment, hand.variant === 'plo');
         if (JSON.stringify(expected) !== JSON.stringify(legal)) fail(`legal ${JSON.stringify(legal)}, the log allows ${JSON.stringify(expected)}`);
         counters.legalChecks++;
     };
@@ -431,6 +460,7 @@ const night = (seed: number, counters: Counters) => {
         const hand = st.hand!;
         const result = hand.result!;
         counters.hands++;
+        if (hand.variant === 'plo') counters.ploHands++;
         const contribs = hand.seats.map((p) => ({seat: p.seat, amount: p.committed, folded: p.folded}));
         const live = hand.seats.filter((p) => !p.folded);
         const total = contribs.reduce((sum, c) => sum + c.amount, 0);
@@ -464,12 +494,13 @@ const night = (seed: number, counters: Counters) => {
         counters.showdowns++;
         const board = hand.boards[0];
         if (board.length !== 5 || live.length < 2) fail('a showdown short of a board or a second player');
+        if (hand.variant === 'plo') counters.ploShowdowns++;
         const reference = naivePots(contribs);
         if (JSON.stringify(reference) !== JSON.stringify(result.pots.map(({amount, eligible}) => ({amount, eligible})))) {
             fail(`pots ${JSON.stringify(result.pots)}, chip by chip ${JSON.stringify(reference)}`);
         }
         if (result.pots.length > 1) counters.sidePots++;
-        const value = new Map(live.map((p) => [p.seat, evaluateCards([...board, ...p.hole])]));
+        const value = new Map(live.map((p) => [p.seat, naiveValue(hand.variant, p.hole, board)]));
         for (const pot of result.pots) {
             if (pot.eligible.length === 0) fail('a pot nobody can win');
             const top = Math.max(...pot.eligible.map((seat) => value.get(seat)!));
@@ -485,6 +516,8 @@ const night = (seed: number, counters: Counters) => {
             const read = readShown(hand.variant, hand.boards, shown).reads[0];
             if (JSON.stringify(shown.cards) !== JSON.stringify(p.hole) || read.value !== value.get(shown.seat) || read.best.length !== 5 || new Set(read.best).size !== 5
                 || read.best.some((card) => !all.includes(card)) || evaluateCards(read.best) !== read.value) fail(`shown hand ${JSON.stringify(shown)}`);
+            // PLO: exactly two of the hole cards play.
+            if (hand.variant === 'plo' && read.best.filter((card) => p.hole.includes(card)).length !== 2) fail(`PLO hand ${JSON.stringify(shown)} plays other than two hole cards`);
         }
     };
 
@@ -945,10 +978,19 @@ const night = (seed: number, counters: Counters) => {
         if (onClock !== null && roll < 0.03) {
             clockTo(nextDue(s)!.at + r.int(300));
         } else if (roll < PLAY && onClock !== null) {
-            const legal = legalFor(snapshotFromState(s), onClock);
+            const snapshot = snapshotFromState(s);
+            const legal = legalFor(snapshot, onClock);
             if (!legal) fail('the actor has no moves');
-            const move = randomMove(legal!, r);
-            const refused = send({type: 'act', by: s.seats[onClock]!.pid, turn: s.turn, move, at: now});
+            const allIn = allInOpen(legal!, snapshot, onClock);
+            const move = randomMove(legal!, r, allIn);
+            const by = s.seats[onClock]!.pid;
+            // Over the pot limit, all in is refused and changes nothing; the cap is a raise.
+            if (!allIn && legal!.raise && move.kind === 'raise' && move.to === legal!.raise.max) {
+                if (send({type: 'act', by, turn: s.turn, move: {kind: 'all-in'}, at: now}) !== 'illegal') fail('an all-in over the pot limit was taken');
+                counters.potLimitAllInRefused++;
+            }
+            if (move.kind === 'raise' && legal!.raise && move.to === legal!.raise.max && !allIn) counters.potLimitCaps++;
+            const refused = send({type: 'act', by, turn: s.turn, move, at: now});
             if (refused) fail(`a legal move ${JSON.stringify(move)} was refused: ${refused}`);
         } else if (roll < PLAY && nextDue(s)) {
             clockTo(nextDue(s)!.at + r.int(300));

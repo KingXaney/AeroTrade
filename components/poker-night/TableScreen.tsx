@@ -13,8 +13,10 @@
 // every card, plate, bet line out, a winner's "+N" and the dealer button, and their chips fly to and
 // from there. While a result shows, the winner's banner and the line under the board (the next
 // deal's countdown, the pause) go where lib/poker-night/stage.bannerPlan finds room for them, clear of
-// every plate, turned-up hand, the dealer button, the board, the pots paying out and the winners'
-// "+N" — under the banner when they fit together, else apart. The room's root carries the looks' ids
+// every plate, turned-up hand (as many cards as the game's hands hold: four in PLO), the dealer
+// button, the board, the pots paying out and the winners' "+N" — under the banner when they fit
+// together, else apart. Between hands, when the host picked another game, the countdown says it ("Next
+// hand: PLO, in 4 s"); before the first hand the felt prints the game under the table's name. The room's root carries the looks' ids
 // for LOOKS_CSS (the host's scene and felt, the viewer's card back and suit colours) and the hooks a
 // test reads: data-pn-mode (polling, realtime, reconnecting), data-pn-transport (realtime, poll,
 // both), data-pn-seq (the seq of the view drawn, which only ever moves up), data-pn-ready once the
@@ -35,7 +37,9 @@ import TableFelt from "@/components/poker-night/TableFelt";
 import TableOverlays from "@/components/poker-night/TableOverlays";
 import WinnerReveal from "@/components/poker-night/WinnerReveal";
 import {useRoom, useServerNow} from "@/components/poker-night/room-controller";
-import {TABLE_COPY} from "@/lib/learn/copy/poker-night";
+import {MODE_COPY, TABLE_COPY} from "@/lib/learn/copy/poker-night";
+import {PLAYING_CARDS} from "@/lib/poker-night/config";
+import {modeChanged, modeOf, nextModeOf} from "@/lib/poker-night/variants";
 import {secondsUntil} from "@/lib/poker-night/client-clock";
 import type {Box} from "@/lib/poker-night/layout";
 import {cardBackFor, cardFaceFor, chipSetFor, resolveTableLook} from "@/lib/poker-night/looks";
@@ -71,12 +75,13 @@ const centreNote = (table: RoomView): string | null => {
 const PILL = 'chrome-surface rounded-full px-3 py-0.5 text-xs text-fg-soft';
 
 // The countdown to the next deal: in the middle between hands, else under the board, or where the
-// banner's plan puts it while a result shows.
-const NextHand = ({at, className, style}: {at: number; className: string; style?: CSSProperties}) => {
+// banner's plan puts it while a result shows — naming the game when the next deal changes it.
+const nextHandText = (game: string | null, s: number): string => (game ? MODE_COPY.nextHandIn(game, s) : TABLE_COPY.nextHandIn(s));
+const NextHand = ({at, game, className, style}: {at: number; game: string | null; className: string; style?: CSSProperties}) => {
     const now = useServerNow(1000);
     const s = secondsUntil(at, now, 0);
     if (s === null || s <= 0) return null;
-    return <p className={cn(className, PILL)} style={style} data-pn-next-hand={s}>{TABLE_COPY.nextHandIn(s)}</p>;
+    return <p className={cn(className, PILL)} style={style} data-pn-next-hand={s} data-pn-next-game={game ?? undefined}>{nextHandText(game, s)}</p>;
 };
 
 // The widest the countdown says it, for the banner's plan: the next deal is never 100 s away.
@@ -137,6 +142,12 @@ const TableScreen = () => {
     const live = !!hand && hand.phase !== 'complete';
     const note = live ? null : centreNote(table);
     const nextAt = !live && table.status === 'playing' && !table.closing && table.nextHandAt !== null && note === null ? table.nextHandAt : null;
+    // The game: the hand's own (what its turned-up hands hold), and the next deal's when the host
+    // picked another.
+    const game = modeOf(hand, room.config);
+    const handSize = PLAYING_CARDS[game.variant];
+    const nextGame = nextModeOf(room.config);
+    const changedTo = modeChanged(hand, room.config) ? MODE_COPY.label(nextGame.variant, nextGame.boards) : null;
     // While a result shows: what the banner says, what the line under the board says at its widest,
     // and where the two go, clear of the open seats' rings, the turned-up hands and the dealer button.
     const lines = useMemo(() => {
@@ -150,7 +161,7 @@ const TableScreen = () => {
         // "You win" only for the seat the viewer played, not one they took in the pause.
         return bannerLines(look, nameOf, viewerSeatIn(table, mySeat, myPid));
     }, [look, table, mySeat, myPid]);
-    const line = note && hand ? note : nextAt !== null ? TABLE_COPY.nextHandIn(NEXT_HAND_WIDEST) : null;
+    const line = note && hand ? note : nextAt !== null ? nextHandText(changedTo, NEXT_HAND_WIDEST) : null;
     // The winners' "+N" while the result pays out, which the pots and the banner keep clear of.
     const popsKey = hand?.phase === 'complete' && look ? look.winners.map((w) => `${w.seat}:${w.amount}`).join(',') : '';
     // The pots' pills, clear of what shows now — the hands turned up, the bet lines out as drawn, the
@@ -179,9 +190,9 @@ const TableScreen = () => {
             bets: betsKey.split(',').flatMap((b, seat) => (b ? [{seat, amount: parseInt(b, 10), allIn: b.endsWith('!')}] : [])),
             pops: popsOf(popsKey),
         };
-        const seen: PotSeen = {open, shown: seated.filter((seat) => seat !== mySeat), button, bets: seated, now};
+        const seen: PotSeen = {open, shown: seated.filter((seat) => seat !== mySeat), button, bets: seated, now, handSize};
         return potPlan(stage, potKey.split(',').map((amount, pot) => ({pot, amount: Number(amount)})), seen);
-    }, [stage, potKey, seatedKey, shownKey, betsKey, popsKey, mySeat, button]);
+    }, [stage, potKey, seatedKey, shownKey, betsKey, popsKey, mySeat, button, handSize]);
     const plan = useMemo(() => {
         if (!stage || !bannerShows(hand, look)) return null;
         const open: number[] = [];
@@ -192,8 +203,8 @@ const TableScreen = () => {
         });
         // Clear of the result's pots too, which stay on while their chips stream out, and of the
         // winners' "+N".
-        return bannerPlan(stage, {winners: lines, note: line}, {open, shown, button: hand?.button ?? null, pots: pots?.pills ?? [], pops: popsOf(popsKey)});
-    }, [stage, hand, look, lines, line, table.seats, mySeat, pots, popsKey, shownKey]);
+        return bannerPlan(stage, {winners: lines, note: line}, {open, shown, button: hand?.button ?? null, pots: pots?.pills ?? [], pops: popsOf(popsKey), handSize});
+    }, [stage, hand, look, lines, line, table.seats, mySeat, pots, popsKey, shownKey, handSize]);
     const tableVars = stage ? ({'--pn-plate-w': `${stage.plateSize.w}px`, '--pn-plate-h': `${stage.plateSize.h}px`, '--pn-button': `${stage.buttonSize}px`} as CSSProperties) : undefined;
 
     return (
@@ -220,7 +231,7 @@ const TableScreen = () => {
                     <div ref={measure} className="pn-table" style={tableVars} data-pn-ready={stage ? 'true' : 'false'} data-pn-hand={hand?.no ?? 0}>
                         {stage && (
                             <>
-                                <TableFelt stage={stage} name={name} showName={!hand}/>
+                                <TableFelt stage={stage} name={name} showName={!hand} game={MODE_COPY.label(game.variant, game.boards)}/>
                                 <Board stage={stage} anims={anims} look={look}/>
                                 <PotDisplay plan={pots} anims={anims}/>
                                 {note && !hand && (
@@ -235,7 +246,7 @@ const TableScreen = () => {
                                     <div className="pn-banner-wrap" style={{left: plan.note.x - plan.note.width / 2, top: plan.note.top, width: plan.note.width}} data-pn-banner-place="note">
                                         {note && hand
                                             ? <p className={cn('pn-banner-note', PILL)} role="status" data-pn-note="">{note}</p>
-                                            : nextAt !== null && <NextHand at={nextAt} className="pn-banner-note"/>}
+                                            : nextAt !== null && <NextHand at={nextAt} game={changedTo} className="pn-banner-note"/>}
                                     </div>
                                 )}
                                 {!plan && note && hand && (
@@ -245,7 +256,7 @@ const TableScreen = () => {
                                     </p>
                                 )}
                                 {!plan && nextAt !== null && (
-                                    <NextHand at={nextAt} className="pn-centre-note"
+                                    <NextHand at={nextAt} game={changedTo} className="pn-centre-note"
                                               style={hand ? {left: stage.board.x, top: stage.board.y + stage.board.h / 2 + 14} : {left: stage.board.x, top: stage.board.y}}/>
                                 )}
                                 <EmoteLayer stage={stage}/>

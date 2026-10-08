@@ -1,7 +1,8 @@
 'use client';
 
 // The host's controls, in their drawer, one section at a time:
-// - Game: the blinds, the ante, the starting chips and the chip cap, the turn timer;
+// - Game: the game itself (Texas hold'em or PLO, GameChoice), the blinds, the ante, the starting
+//   chips and the chip cap, the turn timer;
 // - Rebuys: the policy (Off / On, the host approving: RebuyChoice), the rebuys per player, and the
 //   requests for chips waiting for the host (the bank's own rows);
 // - Players: everyone at the table, each with a More menu (sit out next hand — the bank's own, through
@@ -30,11 +31,12 @@ import TextField, {fieldClass} from "@/components/primitives/TextField";
 import {iconButton} from "@/components/primitives/iconButton";
 import {RequestsPanel} from "@/components/poker-night/BankPanel";
 import LookPicker from "@/components/poker-night/LookPicker";
+import GameChoice from "@/components/poker-night/GameChoice";
 import RebuyChoice from "@/components/poker-night/RebuyChoice";
 import {Drawer, MiniAvatar, PlayerName} from "@/components/poker-night/overlay-kit";
 import {useRoom} from "@/components/poker-night/room-controller";
 import {useHostSitOut, type HostSitOuts} from "@/components/poker-night/useHostSitOut";
-import {HOST_COPY, INVITE_COPY, LOOKS_COPY, OVERLAY_COPY, TABLE_COPY} from "@/lib/learn/copy/poker-night";
+import {HOST_COPY, INVITE_COPY, LOOKS_COPY, MODE_COPY, OVERLAY_COPY, TABLE_COPY} from "@/lib/learn/copy/poker-night";
 import {TABLE_NAME_INPUT_MAX} from "@/lib/poker-night/input";
 import {resolveTableLook, scenePatch, type TableLook} from "@/lib/poker-night/looks";
 import {BLIND_PRESETS} from "@/lib/poker-night/lobby";
@@ -123,6 +125,10 @@ const GameSection = () => {
                    e.preventDefault();
                    void save();
                }}>
+            <div className="space-y-2" data-host-field="variant">
+                <MicroLabel as="p">{MODE_COPY.gameLabel}</MicroLabel>
+                <GameChoice value={form.variant} onChange={(variant) => set('variant', variant)} hook="host-game"/>
+            </div>
             <div className="space-y-2">
                 <MicroLabel as="p">{HOST_COPY.blinds}</MicroLabel>
                 <div className="flex flex-wrap gap-1.5">

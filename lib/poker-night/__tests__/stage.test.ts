@@ -18,7 +18,7 @@ import {PLATE, SEAT_COUNTS, spotToPx} from '@/lib/poker-night/layout';
 import {
     AMOUNT_PX, AVATAR_PX, avatarCentre, BANNER, bannerObstacles, bannerPlan, BET, betLineSize, BLIND_MARK, blindRect, BOARD_CARD_MAX, CARD_RATIO, CHIP_PX, FELT_RAIL,
     feltSpan, fitFor, insideBox, menuSide, MINI_CARD_PX, MONO_EM, NARROW_STAGE, offset, openSeatPx, overlaps, pieceRect, PLATE_PAD_X, PLATE_SIZE, POT_CLEAR, POT_PILL, POT_PILL_H,
-    potCentre, potLayouts, potObstacles, potPillWidth, potPlan, PULSE, seatCardsRect, SHOWN_CARD_PX, SHOWN_OFF, shownHandRect, stageLayout, stageOrientation,
+    potCentre, potLayouts, potObstacles, potPillWidth, potPlan, PULSE, seatCardsRect, SHOWN_CARD_PX, SHOWN_OFF, SHOWN_STEP, shownHandRect, shownHandWidth, stageLayout, stageOrientation,
     TABLE_TOP_ROOM, textWidth, TIGHT_BELOW, WIN_POP, winPopRect, wrappedLines,
     type BannerPlan, type BannerSeen, type BannerText, type BetOut, type Fit, type PotNow, type PotPlan, type PotSeen, type Rect, type Stage, type WinPop,
 } from '@/lib/poker-night/stage';
@@ -159,17 +159,18 @@ const nowOf = (s: Stage, mine: number | null, kind: (typeof NOWS)[number]): PotN
 
 // Every seat taken and every hand but the viewer's reserved, as the table reserves them, the bet lines
 // while there is a hand and none once there is not, with each of NOWS; and the table half empty.
-const potSeens = (s: Stage, n: number, mine: number | null): {name: string; seen: PotSeen}[] => {
+// `handSize`: the cards a turned-up hand shows — two, or PLO's four.
+const potSeens = (s: Stage, n: number, mine: number | null, handSize = 2): {name: string; seen: PotSeen}[] => {
     const seated = s.seats.map((p) => p.seat);
     const half = seated.filter((seat) => seat % 2 === 0);
     const out: {name: string; seen: PotSeen}[] = [];
     for (let button = 0; button < n; button++) {
         for (const kind of NOWS) {
-            out.push({name: `full, button ${button}, ${kind}`, seen: {open: [], shown: seated.filter((seat) => seat !== mine), button, bets: seated, now: nowOf(s, mine, kind)}});
+            out.push({name: `full, button ${button}, ${kind}`, seen: {open: [], shown: seated.filter((seat) => seat !== mine), button, bets: seated, now: nowOf(s, mine, kind), handSize}});
         }
-        out.push({name: `full, button ${button}, no hand`, seen: {open: [], shown: seated.filter((seat) => seat !== mine), button, bets: []}});
+        out.push({name: `full, button ${button}, no hand`, seen: {open: [], shown: seated.filter((seat) => seat !== mine), button, bets: [], handSize}});
     }
-    out.push({name: 'half', seen: {open: seated.filter((seat) => seat % 2 === 1), shown: half.filter((seat) => seat !== mine), button: 0, bets: half}});
+    out.push({name: 'half', seen: {open: seated.filter((seat) => seat % 2 === 1), shown: half.filter((seat) => seat !== mine), button: 0, bets: half, handSize}});
     return out;
 };
 
@@ -203,11 +204,11 @@ const expectPotPlan = (s: Stage, amounts: readonly number[], seen: PotSeen, labe
 };
 
 describe('the pots', () => {
-    for (const [size, boxes] of Object.entries(POT_BOXES)) {
-        it(`clears every card, plate, bet line out, "+N" and the dealer button, on the felt, at ${size}, every seat count, one pot to four, every button`, () => {
+    for (const [size, boxes] of Object.entries(POT_BOXES)) for (const handSize of [2, 4]) {
+        it(`clears every card, plate, bet line out, "+N" and the dealer button, on the felt, at ${size}, every seat count, one pot to four, every button, hands of ${handSize}`, () => {
             for (const box of boxes) for (const n of SEAT_COUNTS) for (const mine of [0, null]) {
                 const s = stageLayout(box, n, mine);
-                for (const {name, seen} of potSeens(s, n, mine)) for (const amounts of POTS) {
+                for (const {name, seen} of potSeens(s, n, mine, handSize)) for (const amounts of POTS) {
                     const label = `${box.w}×${box.h} ${n} seats, viewer ${mine}, ${name}, ${amounts.length} pots`;
                     const plan = expectPotPlan(s, amounts, seen, label);
                     // Never over what shows now — but for a winner's "+N" rising for a second and a half
@@ -221,12 +222,12 @@ describe('the pots', () => {
         }, 60_000);
     }
 
-    for (const [size, box] of Object.entries(SIDEWAYS)) {
-        it(`stays inside the box and clear where it can at ${size}, every seat count, one pot to four, every button`, () => {
+    for (const [size, box] of Object.entries(SIDEWAYS)) for (const handSize of [2, 4]) {
+        it(`stays inside the box and clear where it can at ${size}, every seat count, one pot to four, every button, hands of ${handSize}`, () => {
             for (const n of SEAT_COUNTS) for (const mine of [0, null]) {
                 const s = stageLayout(box, n, mine);
                 const lit = {x: s.board.x, y: s.board.y - 4, w: s.board.w + 4, h: s.board.h + 8};
-                for (const {name, seen} of potSeens(s, n, mine)) for (const amounts of POTS) {
+                for (const {name, seen} of potSeens(s, n, mine, handSize)) for (const amounts of POTS) {
                     const label = `${box.w}×${box.h} ${n} seats, viewer ${mine}, ${name}, ${amounts.length} pots`;
                     const plan = expectPotPlan(s, amounts, seen, label);
                     if (size !== '568 × 320') expect(plan.clear, label).toBe(true);
@@ -609,16 +610,17 @@ const expectClear = (s: Stage, text: BannerText, seen: BannerSeen, label: string
 };
 
 describe("the winner's banner", () => {
-    for (const [size, boxes] of Object.entries(BANNER_BOXES)) {
-        it(`clears every plate, turned-up hand, the dealer button and the board at ${size}, every seat count and button`, () => {
+    for (const [size, boxes] of Object.entries(BANNER_BOXES)) for (const handSize of [2, 4]) {
+        it(`clears every plate, turned-up hand (of ${handSize}), the dealer button and the board at ${size}, every seat count and button`, () => {
             for (const box of boxes) for (const n of SEAT_COUNTS) for (const mine of [0, null]) {
                 const s = stageLayout(box, n, mine);
                 // Every seat taken and every hand but the viewer's turned up on the felt (a watcher's
-                // seat 0 too), the most a showdown shows; and the table half empty.
-                const full: BannerSeen = {open: [], shown: s.seats.filter((p) => p.seat !== mine).map((p) => p.seat), button: 0};
+                // seat 0 too), the most a showdown shows; and the table half empty. Texas hold'em's
+                // two cards a hand, and PLO's four.
+                const full: BannerSeen = {open: [], shown: s.seats.filter((p) => p.seat !== mine).map((p) => p.seat), button: 0, handSize};
                 const half: BannerSeen = {
                     open: s.seats.filter((p) => p.seat % 2 === 1).map((p) => p.seat),
-                    shown: s.seats.filter((p) => p.seat % 2 === 0 && p.seat !== mine).map((p) => p.seat), button: 0,
+                    shown: s.seats.filter((p) => p.seat % 2 === 0 && p.seat !== mine).map((p) => p.seat), button: 0, handSize,
                 };
                 for (const [name, winners] of Object.entries(TEXTS)) {
                     // Each winner's "+N" rising over their seat: the viewer's own (or seat 0's), the
@@ -680,12 +682,17 @@ describe("the winner's banner", () => {
     });
 
     it('gives the turned-up hands and the open seats their drawn sizes', () => {
+        // PLO's four overlap: 75 px on a compact table, 64 tight, 107 comfortable.
+        expect([shownHandWidth('compact', 4), shownHandWidth('tight', 4), shownHandWidth('comfortable', 4)].map(Math.round)).toEqual([75, 64, 107]);
         for (const box of BOXES) {
             const s = stageLayout(box, 9, 0);
             for (const p of s.seats) {
                 const r = shownHandRect(p, s);
                 const card = SHOWN_CARD_PX[s.fit];
                 expect(r.w).toBe(2 * card + SHOWN_OFF.gap + 4);
+                const four = shownHandRect(p, s, 4);
+                expect(four.w).toBeCloseTo(card * (1 + 3 * SHOWN_STEP) + 4, 6);
+                expect([four.x, four.y, four.h]).toEqual([r.x, r.y, r.h]);
                 expect(r.h).toBeCloseTo(card * CARD_RATIO + 8, 6);
                 const plateTop = p.plate.y - s.plateSize.h / 2;
                 const plateBottom = p.plate.y + s.plateSize.h / 2;
@@ -755,6 +762,9 @@ describe("the banner's sizes in the stylesheet", () => {
     });
 
     it('turns cards up and lifts the five that play where the plan expects them', () => {
+        // A hand of four overlaps by what SHOWN_STEP leaves of a card.
+        expect(css).toContain(`.pn-seat-shown[data-count="3"] > * + *, .pn-seat-shown[data-count="4"] > * + * { margin-left: calc(var(--pn-card-w) * -${Number((1 - SHOWN_STEP).toFixed(2))}); }`);
+        expect(css).toContain('.pn-seat-shown[data-count="3"], .pn-seat-shown[data-count="4"] { gap: 0; }');
         expect(rule('.pn-seat-shown')).toContain(`bottom: calc(100% + ${SHOWN_OFF.over}px)`);
         expect(rule('.pn-seat-shown')).toContain(`gap: ${SHOWN_OFF.gap}px`);
         expect(rule('.pn-seat[data-side="top"] .pn-seat-shown')).toContain(`top: calc(100% + ${SHOWN_OFF.under}px)`);

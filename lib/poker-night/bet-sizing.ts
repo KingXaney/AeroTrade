@@ -5,9 +5,13 @@
 //
 // A pot-sized raise is the current bet plus the pot after calling: every pot, every bet in front of
 // the players, and the call. With nothing to call it is a share of the pot, a bet. Sizes are rounded
-// to the table's unit (its small blind), and one at or past the stack is the all-in. The ids are
-// ACTION_COPY.sizes' keys in lib/learn/copy/poker-night.
+// to the table's unit (its small blind), and one at or past the top of the range is the top. Under
+// pot limit (PLO) the top is the pot itself whenever the stack goes past it (cap 'pot'): the last
+// quick size is then Pot, the confirm reads "Raise to 340 (pot)", and the move sent is a raise to it —
+// never the all-in, which the server takes only within the cap. The ids are ACTION_COPY.sizes' keys
+// in lib/learn/copy/poker-night.
 
+import {ACTION_COPY} from '@/lib/learn/copy/poker-night';
 import type {Legal} from '@/lib/poker-night/types';
 import type {TableView} from '@/lib/poker-night/view-types';
 
@@ -25,7 +29,8 @@ export const SLIDER_MAX = 1000;
 export type Sizing = {
     kind: 'bet' | 'raise';
     min: number; // the smallest "raise to"
-    max: number; // the largest: the all-in
+    max: number; // the largest: the all-in, or under pot limit the pot when the stack goes past it
+    cap: 'all-in' | 'pot'; // what the largest is
     currentBet: number;
     myBet: number; // the seat's own bet on this street
     toCall: number;
@@ -44,15 +49,17 @@ export const potTotal = (view: Pick<TableView, 'hand' | 'seats'>): number => {
 // The sizing for `seat` from its legal moves, or null when it may not bet or raise.
 export const sizingFor = (view: Pick<TableView, 'hand' | 'seats'>, legal: Legal | null, seat: number | null, unit: number): Sizing | null => {
     if (!legal?.raise || seat === null || !view.hand) return null;
+    const own = view.seats[seat];
+    const allInTo = (own?.chips ?? 0) + (own?.bet ?? 0);
     return {
-        kind: legal.raise.kind, min: legal.raise.min, max: legal.raise.max,
-        currentBet: view.hand.currentBet, myBet: view.seats[seat]?.bet ?? 0, toCall: legal.call,
+        kind: legal.raise.kind, min: legal.raise.min, max: legal.raise.max, cap: legal.raise.max < allInTo ? 'pot' : 'all-in',
+        currentBet: view.hand.currentBet, myBet: own?.bet ?? 0, toCall: legal.call,
         pot: potTotal(view), unit: Math.max(1, Math.floor(unit)),
     };
 };
 
-// A "raise to" held to the legal range, rounded to the unit inside it; the top of the range is the
-// all-in and is never rounded away.
+// A "raise to" held to the legal range, rounded to the unit inside it; the top of the range (the
+// all-in, or the pot) is never rounded away.
 export const clampTo = (to: number, s: Pick<Sizing, 'min' | 'max' | 'unit'>): number => {
     if (!Number.isFinite(to) || to >= s.max) return s.max;
     if (to <= s.min) return s.min;
@@ -61,20 +68,36 @@ export const clampTo = (to: number, s: Pick<Sizing, 'min' | 'max' | 'unit'>): nu
 };
 
 // The raise to `share` of the pot after the call.
-export const potRaise = (s: Sizing, share: number): number => clampTo(s.currentBet + share * (s.pot + s.toCall), s);
+export const potRaise = (s: Pick<Sizing, 'min' | 'max' | 'unit' | 'currentBet' | 'pot' | 'toCall'>, share: number): number => clampTo(s.currentBet + share * (s.pot + s.toCall), s);
 
-// The quick sizes on offer, smallest first, none twice: the minimum, the pot shares, the all-in.
-// A size that reaches the stack is the all-in; when the minimum is the all-in it is the only one.
+// The quick sizes on offer, smallest first, none twice: the minimum, the pot shares, then the top —
+// the all-in, or under pot limit the pot. A size that reaches the top is the top; when the minimum is
+// the top it is the only one.
 export const quickSizes = (s: Sizing): QuickSize[] => {
-    if (s.min >= s.max) return [{id: 'all-in', to: s.max}];
+    const top: QuickSize = {id: s.cap === 'pot' ? 'pot' : 'all-in', to: s.max};
+    if (s.min >= s.max) return [top];
     const out: QuickSize[] = [{id: 'min', to: s.min}];
     for (const id of ['half', 'three-quarters', 'pot'] as const) {
         const to = potRaise(s, POT_SHARE[id]);
         if (to >= s.max) break;
         if (to > out[out.length - 1].to) out.push({id, to});
     }
-    out.push({id: 'all-in', to: s.max});
+    out.push(top);
     return out;
+};
+
+// The move a confirmed "raise to" sends: the all-in at the top of a no-limit range (or of a pot-limit
+// one the stack fits under), else a raise to it — the pot's cap included.
+export const moveFor = (s: Pick<Sizing, 'max' | 'cap'>, to: number): {kind: 'all-in'} | {kind: 'raise'; to: number} =>
+    to >= s.max && s.cap === 'all-in' ? {kind: 'all-in'} : {kind: 'raise', to: Math.min(to, s.max)};
+
+// The confirm button's words for a "raise to": the top of the range says what it is — all in, or the pot.
+export const confirmLabel = (sizing: Pick<Sizing, 'kind' | 'max' | 'cap'>, to: number): string => {
+    if (to >= sizing.max) {
+        if (sizing.cap === 'all-in') return ACTION_COPY.allIn(sizing.max);
+        return sizing.kind === 'bet' ? ACTION_COPY.potBet(sizing.max) : ACTION_COPY.potRaise(sizing.max);
+    }
+    return sizing.kind === 'bet' ? ACTION_COPY.bet(to) : ACTION_COPY.raiseTo(to);
 };
 
 // A slider position (0..SLIDER_MAX) as a "raise to", and back.

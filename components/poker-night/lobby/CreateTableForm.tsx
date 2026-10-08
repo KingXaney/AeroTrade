@@ -3,19 +3,21 @@
 import {useId, useState, useTransition, type FormEvent} from "react";
 import {useRouter} from "next/navigation";
 import {createPokerNight} from "@/lib/actions/poker-night.actions";
-import {HOST_COPY, LOBBY_COPY, POKER_NIGHT_COPY, TABLE_COPY} from "@/lib/learn/copy/poker-night";
+import {HOST_COPY, LOBBY_COPY, MODE_COPY, POKER_NIGHT_COPY, TABLE_COPY} from "@/lib/learn/copy/poker-night";
 import {checkConfig, DEFAULT_CONFIG, mergeConfig, TABLE_LIMITS} from "@/lib/poker-night/config";
 import {
     BLIND_PRESETS, chipOptions, chipsFor, configFromForm, configIssueText, DEFAULT_FORM, invitePath, SEAT_CHOICES, TIMER_PRESETS,
     type TableForm,
 } from "@/lib/poker-night/lobby";
 import ActionButton from "@/components/primitives/ActionButton";
+import GameChoice from "@/components/poker-night/GameChoice";
 import RebuyChoice from "@/components/poker-night/RebuyChoice";
 import MicroLabel from "@/components/primitives/MicroLabel";
 import Switch from "@/components/primitives/Switch";
 import TextField, {fieldClass} from "@/components/primitives/TextField";
 
-// A table set up before anyone sits down (the lobby's "Set it up first"): its name, the blinds,
+// A table set up before anyone sits down (the lobby's "Set it up first"): its game (GameChoice:
+// Texas hold'em or PLO), its name, the blinds,
 // the starting chips, the seats, the rebuy policy (Off / On, RebuyChoice), the turn timer and whether friends see it in
 // their lobby. Every choice is one lib/poker-night/lobby offers within the config's limits; the
 // config is checked here with lib/poker-night/config before it is sent, and again by the action.
@@ -61,9 +63,13 @@ const CreateTableForm = ({hostName}: {hostName: string}) => {
 
     return (
         <form onSubmit={submit} className="mt-3 space-y-4" data-create-table="" aria-describedby={error ? field('error') : undefined}>
+            <div className="space-y-1.5" data-field="variant">
+                <MicroLabel as="p">{MODE_COPY.gameLabel}</MicroLabel>
+                <GameChoice value={form.variant} onChange={(variant) => set('variant', variant)} hook="game"/>
+            </div>
             <div className="space-y-1.5">
                 <MicroLabel as="label" htmlFor={field('name')}>{POKER_NIGHT_COPY.tableName}</MicroLabel>
-                <TextField id={field('name')} font="body" className="w-full" value={name} maxLength={TABLE_LIMITS.tableName}
+                <TextField id={field('name')} font="body" className="h-11 w-full" value={name} maxLength={TABLE_LIMITS.tableName}
                            autoComplete="off" onChange={(e) => setName(e.target.value)} data-field="name"/>
             </div>
             <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
@@ -111,7 +117,7 @@ const CreateTableForm = ({hostName}: {hostName: string}) => {
                         data-field="show-to-friends"/>
             </div>
             {error && <p id={field('error')} role="alert" className="text-xs text-negative" data-create-error="">{error}</p>}
-            <ActionButton type="submit" variant="primary" size="md" disabled={pending} aria-busy={pending} className="w-full sm:w-auto">
+            <ActionButton type="submit" variant="primary" size="md" disabled={pending} aria-busy={pending} className="min-h-11 w-full sm:w-auto">
                 {pending ? POKER_NIGHT_COPY.starting : POKER_NIGHT_COPY.create}
             </ActionButton>
         </form>

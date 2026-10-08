@@ -18,7 +18,7 @@ export const UNIT_MS = 200;
 
 // Every step's length and spacing, in units.
 export const BEAT = {
-    DEAL_STAGGER: 0.35, // between two cards going round
+    DEAL_STAGGER: 0.35, // between two cards going round (a hand of two; more cards each go round faster, in the same time)
     DEAL: 1.6, // one card's flight from the dealer
     CHIP: 2, // chips from a stack to the bet line
     ALL_IN: 2.6, // the all-in's bigger push
@@ -42,8 +42,8 @@ export const BEAT = {
     MAX_BATCH: 40, // a batch longer than this is played faster, to fit
 } as const;
 
-// A card's own moment: a dealt card (the seat, 0 or 1), a board card (seat −1, its index on the
-// board), a shown hand's card.
+// A card's own moment: a dealt card (the seat, its index in the hand: 0 to 3), a board card (seat
+// −1, its index on the board), a shown hand's card.
 export type CardTiming = {seat: number; index: number; at: number};
 // One chip of a pot's stream to one of its winners (pot 0 is the main pot).
 export type StreamChip = {key: string; pot: number; seat: number; at: number};
@@ -81,7 +81,10 @@ export const scheduleBatch = (events: readonly TableEvent[]): Batch => {
             case 'deal': {
                 const n = event.seats.length;
                 const cards: CardTiming[] = [];
-                for (let index = 0; index < 2; index++) event.seats.forEach((seat, k) => cards.push({seat, index, at: t + (index * n + k) * BEAT.DEAL_STAGGER}));
+                // Round by round, a card to each seat; four cards each go round twice as fast as two.
+                const each = Math.max(1, event.cards);
+                const stagger = (BEAT.DEAL_STAGGER * 2) / Math.max(2, each);
+                for (let index = 0; index < each; index++) event.seats.forEach((seat, k) => cards.push({seat, index, at: t + (index * n + k) * stagger}));
                 const last = cards.length > 0 ? cards[cards.length - 1].at : t;
                 items.push({...timed(event, t, last - t + BEAT.DEAL), cards});
                 t = last + BEAT.DEAL * 0.5;
@@ -113,7 +116,7 @@ export const scheduleBatch = (events: readonly TableEvent[]): Batch => {
                 break;
             }
             case 'show':
-                items.push({...timed(event, t, BEAT.FLIP), cards: [0, 1].map((index) => ({seat: event.seat, index, at: t + index * 0.3}))});
+                items.push({...timed(event, t, BEAT.FLIP), cards: Array.from({length: event.cards}, (_, index) => ({seat: event.seat, index, at: t + index * (0.6 / Math.max(2, event.cards))}))});
                 t += BEAT.CHECK_GAP;
                 break;
             case 'street-sweep': {
@@ -132,7 +135,9 @@ export const scheduleBatch = (events: readonly TableEvent[]): Batch => {
             }
             case 'reveal': {
                 const at = Math.max(t, chipsLand);
-                const cards = event.hands.flatMap((h, k) => [0, 1].map((index) => ({seat: h.seat, index, at: at + k * BEAT.REVEAL_STAGGER + index * 0.25})));
+                // A hand's cards turn within a quarter of a unit, however many it shows.
+                const step = (count: number) => 0.25 / Math.max(1, count - 1);
+                const cards = event.hands.flatMap((h, k) => h.cards.map((_, index) => ({seat: h.seat, index, at: at + k * BEAT.REVEAL_STAGGER + index * step(h.cards.length)})));
                 const liftAt = at + Math.max(0, event.hands.length - 1) * BEAT.REVEAL_STAGGER + 0.25 + BEAT.FLIP;
                 items.push({...timed(event, at, liftAt + BEAT.LIFT - at), cards, liftAt});
                 t = liftAt + BEAT.LIFT * 0.5;

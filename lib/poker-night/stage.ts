@@ -303,10 +303,20 @@ export const BANNER = {
 
 // A card that plays rises 6 px (.pn-card[data-state="win"]) inside a 2 px ring; a seat's status flag
 // (.pn-plate-flag, 15 px, at most 28 px wider than the plate) hangs 55 % of itself under the plate;
-// a seat's turned-up cards sit 3 px over a bottom or side plate, 10 px under a top one, 2 px apart.
+// a seat's turned-up cards sit 3 px over a bottom or side plate, 10 px under a top one, 2 px apart —
+// a hand of more than two (PLO's four) overlapping instead, each card SHOWN_STEP of a card on from the
+// one before (.pn-seat-shown[data-count]), so every card's index stays in sight.
 const LIT = {lift: 6, ring: 2} as const;
 const FLAG = {h: 15, below: 0.55, wider: 28} as const;
 export const SHOWN_OFF = {over: 3, under: 10, gap: 2} as const;
+export const SHOWN_STEP = 0.56;
+
+// How wide a seat's turned-up hand of `count` cards is drawn, the cards alone: two side by side, more
+// overlapping by SHOWN_STEP — PLO's four at 75 px on a compact table, 64 tight, 107 comfortable.
+export const shownHandWidth = (fit: Fit, count = 2): number => {
+    const card = SHOWN_CARD_PX[fit];
+    return count <= 2 ? 2 * card + SHOWN_OFF.gap : card * (1 + (count - 1) * SHOWN_STEP);
+};
 
 // A line's width at `px` (semibold when `bold`), from each character's advance in em — an upper bound
 // for the app's text faces (Hanken Grotesk, Inter): the narrow marks and letters, the slim ones, the
@@ -331,9 +341,13 @@ export type BannerText = {winners: readonly {head: string; hand: string | null}[
 // A winner's "+N" (the seat and what it won), rising over its seat while the pots pay out.
 export type WinPop = {seat: number; amount: number};
 // What the table shows beside it: the seats nobody sits in (an open seat's ring, no plate), the seats
-// whose cards are turned up on the felt, the dealer button's seat, the pots' pills (potPlan's, which
-// stay on while their chips stream out under the banner) and the winners' "+N".
-export type BannerSeen = {open: readonly number[]; shown: readonly number[]; button: number | null; pots?: readonly Rect[]; pops?: readonly WinPop[]};
+// whose cards are turned up on the felt and how many cards a hand there shows (the game's: two, four
+// in PLO), the dealer button's seat, the pots' pills (potPlan's, which stay on while their chips stream
+// out under the banner) and the winners' "+N".
+export type BannerSeen = {
+    open: readonly number[]; shown: readonly number[]; button: number | null; pots?: readonly Rect[]; pops?: readonly WinPop[];
+    handSize?: number;
+};
 // The full banner (the avatar, the head over the hand's name); the compact one (no avatar, a line a
 // winner — "You win 70 · Full house, threes full of fives" — wrapped when narrow); the compact one cut
 // to a line a winner with an ellipsis, when nothing else has room.
@@ -346,15 +360,16 @@ export type BannerPlan = {variant: BannerVariant; rows: number; banner: BannerPi
 
 export const pieceRect = (p: BannerPiece): Rect => ({x: p.x, y: p.top + p.height / 2, w: p.width, h: p.height});
 
-// A seat's turned-up cards as drawn (.pn-seat-shown), the lift and ring of a card that plays included.
-export const shownHandRect = (place: Pick<SeatPlace, 'plate' | 'spot'>, stage: Pick<Stage, 'plateSize' | 'fit'>): Rect => {
+// A seat's turned-up cards as drawn (.pn-seat-shown), `count` of them, the lift and ring of a card
+// that plays included.
+export const shownHandRect = (place: Pick<SeatPlace, 'plate' | 'spot'>, stage: Pick<Stage, 'plateSize' | 'fit'>, count = 2): Rect => {
     const card = SHOWN_CARD_PX[stage.fit];
     const h = card * CARD_RATIO;
     const top = place.spot.side === 'top'
         ? place.plate.y + stage.plateSize.h / 2 + SHOWN_OFF.under
         : place.plate.y - stage.plateSize.h / 2 - SHOWN_OFF.over - h;
     const lit = LIT.lift + LIT.ring;
-    return {x: place.plate.x, y: top - lit + (h + lit) / 2, w: 2 * card + SHOWN_OFF.gap + 2 * LIT.ring, h: h + lit};
+    return {x: place.plate.x, y: top - lit + (h + lit) / 2, w: shownHandWidth(stage.fit, count) + 2 * LIT.ring, h: h + lit};
 };
 
 // An open seat's ring (.pn-open-seat): max(44 px, 95 % of the plate's height) across.
@@ -387,7 +402,7 @@ export const bannerObstacles = (stage: Stage, seen: BannerSeen): Rect[] => [
 // The same less the pots and the "+N": what the banner and the pots both keep clear of — by part:
 // the plates and open seats' rings, the flags under the plates, the hands turned up, and the dealer
 // button with the board and its lit cards' lift.
-const tableParts = (stage: Stage, seen: Pick<BannerSeen, 'open' | 'shown' | 'button'>): {plates: Rect[]; flags: Rect[]; shown: Rect[]; fixed: Rect[]} => {
+const tableParts = (stage: Stage, seen: Pick<BannerSeen, 'open' | 'shown' | 'button' | 'handSize'>): {plates: Rect[]; flags: Rect[]; shown: Rect[]; fixed: Rect[]} => {
     const plates: Rect[] = [];
     const flags: Rect[] = [];
     const ring = openSeatPx(stage);
@@ -400,7 +415,7 @@ const tableParts = (stage: Stage, seen: Pick<BannerSeen, 'open' | 'shown' | 'but
         const bottom = p.plate.y + stage.plateSize.h / 2;
         flags.push({x: p.plate.x, y: bottom + FLAG.h * FLAG.below - FLAG.h / 2, w: stage.plateSize.w + FLAG.wider, h: FLAG.h});
     }
-    const shown = seen.shown.flatMap((seat) => (stage.seats[seat] ? [shownHandRect(stage.seats[seat], stage)] : []));
+    const shown = seen.shown.flatMap((seat) => (stage.seats[seat] ? [shownHandRect(stage.seats[seat], stage, seen.handSize)] : []));
     const fixed: Rect[] = [];
     const button = seen.button === null ? undefined : stage.seats[seen.button];
     if (button) fixed.push(rect(button.button, {w: stage.buttonSize, h: stage.buttonSize}));
@@ -776,7 +791,7 @@ export type PotSeen = Omit<BannerSeen, 'pots' | 'pops'> & {bets: readonly number
 type PotKinds = {cards: Rect[]; marks: Rect[]; turned: Rect[]; out: Rect[]; pops: Rect[]; hands: Rect[]; bets: Rect[]};
 const potKinds = (stage: Stage, seen: PotSeen): PotKinds => {
     const now: PotNow = seen.now ?? {shown: [], bets: [], pops: []};
-    const table = tableParts(stage, {open: seen.open, shown: now.shown, button: seen.button});
+    const table = tableParts(stage, {open: seen.open, shown: now.shown, button: seen.button, handSize: seen.handSize});
     const cards = [...table.plates, ...table.fixed];
     const marks = [...table.flags];
     const bets: Rect[] = [];
@@ -797,7 +812,7 @@ const potKinds = (stage: Stage, seen: PotSeen): PotKinds => {
             const p = at(pop.seat);
             return p ? [winPopRect(p, stage, now.shown.includes(pop.seat), pop.amount)] : [];
         }),
-        hands: tableParts(stage, {open: seen.open, shown: seen.shown, button: null}).shown,
+        hands: tableParts(stage, {open: seen.open, shown: seen.shown, button: null, handSize: seen.handSize}).shown,
         bets,
     };
 };

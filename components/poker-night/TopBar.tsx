@@ -9,9 +9,12 @@
 // answered), and the menu with the hand log, the Hands guide (also the H key), My look and the
 // viewer's own seat (sit out next hand, deal me in, I'm back, take a seat, "Leave after this hand" —
 // or "Stay at the table" once chosen — and Leave: "Leave now" mid-hand). Home carries a dot while the
-// viewer leaves after the hand in play. The status line keeps the code on one line and never runs under the
-// buttons: what it adds is cut short first, and on a phone while reconnecting the code steps aside
-// (the Invite sheet has it) so the warning reads whole.
+// viewer leaves after the hand in play. The status line under the name: how the table is reaching
+// this browser, the game in play (MODE_COPY.label: "Texas hold'em", "PLO"; the hand's own while one
+// is dealt, else what the next deals — data-pn-mode-label), then the code from 400 px (the Invite
+// sheet has it on a narrower phone), and what the host has set in motion. It keeps to one line and
+// never runs under the buttons: the game is cut short first, and on a phone while reconnecting the
+// code steps aside so the warning reads whole.
 // Every target is at least 44 px; a phone shows the same buttons with the name cut short. My look
 // (P5) also has its own button beside the menu from 640 px, one tap from the table: the avatar
 // builder and the personal look (on a phone it is the menu's, which keeps the name room to read).
@@ -26,7 +29,8 @@ import {BookOpen, Keyboard} from "lucide-react";
 import {openShortcuts} from "@/components/poker-night/emote-client";
 import {HANDS_COPY, SHORTCUTS_COPY} from "@/lib/learn/copy/poker-night";
 import {ROOM_KEY_SHORTCUTS} from "@/lib/poker-night/keys";
-import {HOST_COPY, INVITE_COPY, OVERLAY_COPY, TABLE_COPY} from "@/lib/learn/copy/poker-night";
+import {HOST_COPY, INVITE_COPY, MODE_COPY, OVERLAY_COPY, TABLE_COPY} from "@/lib/learn/copy/poker-night";
+import {modeOf} from "@/lib/poker-night/variants";
 import {handLive, homeAsks, ownSeat, waitingRequests, type SeatChoice} from "@/lib/poker-night/overlays";
 import {cn} from "@/lib/utils";
 
@@ -55,6 +59,7 @@ const TopBar = ({onOpen, onSeatChoice, onTakeSeat, onLeave, onLeaveAfter, onHome
     // While a hand plays on, a pause or the night's end waits for it: the bar says "after this hand".
     const live = handLive(table);
     const reconnecting = room.mode === 'reconnecting';
+    const game = modeOf(table.hand, room.config);
     const status = table.status === 'closed' ? null
         : table.closing ? 'closing'
             : table.status === 'paused' ? (live ? 'pausing' : 'paused') : null;
@@ -80,20 +85,24 @@ const TopBar = ({onOpen, onSeatChoice, onTakeSeat, onLeave, onLeaveAfter, onHome
                 <div className="min-w-0">
                     <p className="truncate font-heading text-sm leading-tight text-fg" data-user-text="">{name}</p>
                     <p className="flex min-w-0 items-center gap-1.5 overflow-hidden whitespace-nowrap text-[11px] leading-tight text-fg-muted" data-pn-status-line="">
-                        <span className={cn('shrink-0 whitespace-nowrap font-mono tracking-wider', reconnecting && 'max-sm:hidden')} aria-label={OVERLAY_COPY.code(room.code)}
-                              data-pn-code="">
+                        {joined && (
+                            <span className="inline-flex shrink-0 items-center gap-1" role="status" title={connectionNote}>
+                                <span aria-hidden="true"
+                                      className={cn('size-1.5 rounded-full', room.mode === 'reconnecting' ? 'bg-warning' : 'bg-positive')}/>
+                                <span className={room.mode === 'reconnecting' ? 'text-warning' : 'sr-only sm:not-sr-only'} data-pn-connection-word="">{connection}</span>
+                            </span>
+                        )}
+                        {/* Between the word and the game where both read: from 640 px, and never while reconnecting on a phone. */}
+                        {joined && <span aria-hidden="true" className={cn('hidden sm:inline')}>·</span>}
+                        <span className={cn('min-w-0 truncate', reconnecting && 'max-sm:hidden')} title={MODE_COPY.spokenLabel(game.variant, game.boards)}
+                              data-pn-mode-label={game.variant}>
+                            {MODE_COPY.label(game.variant, game.boards)}
+                        </span>
+                        <span aria-hidden="true" className={cn('hidden min-[400px]:inline', reconnecting && 'max-sm:hidden')}>·</span>
+                        <span className={cn('hidden shrink-0 whitespace-nowrap font-mono tracking-wider min-[400px]:inline', reconnecting && 'max-sm:hidden')}
+                              aria-label={OVERLAY_COPY.code(room.code)} data-pn-code="">
                             {INVITE_COPY.codeGrouped(room.code)}
                         </span>
-                        {joined && (
-                            <>
-                                <span aria-hidden="true" className={cn(reconnecting && 'max-sm:hidden')}>·</span>
-                                <span className="inline-flex shrink-0 items-center gap-1" role="status" title={connectionNote}>
-                                    <span aria-hidden="true"
-                                          className={cn('size-1.5 rounded-full', room.mode === 'reconnecting' ? 'bg-warning' : 'bg-positive')}/>
-                                    <span className={room.mode === 'reconnecting' ? 'text-warning' : 'sr-only sm:not-sr-only'} data-pn-connection-word="">{connection}</span>
-                                </span>
-                            </>
-                        )}
                         {status && (
                             <>
                                 <span aria-hidden="true">·</span>

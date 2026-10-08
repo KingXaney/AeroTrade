@@ -14,8 +14,8 @@
 // where it is. A result is `fresh` while the table is still showing it (inside its revealMs).
 
 import type {Card} from '@/lib/poker/cards';
-import {ENTRY_FLAGS, STREETS} from '@/lib/poker-night/config';
-import type {EntryKind, Street} from '@/lib/poker-night/types';
+import {ENTRY_FLAGS, HOLE_CARDS, PLAYING_CARDS, STREETS} from '@/lib/poker-night/config';
+import type {EntryKind, Street, Variant} from '@/lib/poker-night/types';
 import type {HandView, SeatView, TableView, WireEntry} from '@/lib/poker-night/view-types';
 import {seatShares} from '@/lib/poker-night/pots';
 import {readShown} from '@/lib/poker-night/variants';
@@ -42,8 +42,10 @@ export const BIG_WIN_BIG_BLINDS = 40;
 type Base = {id: string; handNo: number};
 
 export type TableEvent =
-    // A new hand dealt to these seats, in the order the cards go round (from the seat after the button).
-    | (Base & {kind: 'deal'; seats: number[]})
+    // A new hand dealt to these seats, in the order the cards go round (from the seat after the button):
+    // `cards` each (two, four in PLO), of the hand's game — `changed` when the hand before it was
+    // another game (or board count), which the table says.
+    | (Base & {kind: 'deal'; seats: number[]; cards: number; variant: Variant; boards: number; changed: boolean})
     // Chips from a stack: an ante or a blind, a call, a bet, a raise. amount is what moved, to the
     // seat's bet line after it (a raise's "raise to").
     | (Base & {kind: 'chips-out'; seat: number; move: ChipMove; amount: number; to: number; allIn: boolean})
@@ -53,8 +55,8 @@ export type TableEvent =
     | (Base & {kind: 'timeout'; seat: number; move: 'check' | 'fold'})
     // The uncalled part of a bet going back to its owner.
     | (Base & {kind: 'refund'; seat: number; amount: number})
-    // A player showing their cards when nothing obliged them to.
-    | (Base & {kind: 'show'; seat: number})
+    // A player showing their cards when nothing obliged them to: `cards` of them.
+    | (Base & {kind: 'show'; seat: number; cards: number})
     // The street's bets sweeping into the pot.
     | (Base & {kind: 'street-sweep'; street: Street; bets: BetLine[]; total: number})
     // Board cards turned: the flop's three, the turn's or the river's one; from is the first card's
@@ -153,7 +155,14 @@ const handEvents = (prevView: DiffableView, prevHand: HandView | null, next: Dif
         }
     };
 
-    if (!prevHand) out.push({kind: 'deal', id: id('deal'), handNo: no, seats: dealtSeats(next.seats, hand.button)});
+    if (!prevHand) {
+        const last = prevView.hand;
+        const changed = last !== null && last.no !== no && (last.variant !== hand.variant || last.boards.length !== hand.boards.length);
+        out.push({
+            kind: 'deal', id: id('deal'), handNo: no, seats: dealtSeats(next.seats, hand.button), cards: HOLE_CARDS[hand.variant],
+            variant: hand.variant, boards: hand.boards.length, changed,
+        });
+    }
 
     for (const {index, entry} of entriesFrom(hand, prevHand ? prevHand.logLength : 0)) {
         const [seat, kindIndex, amount, to, flags, entryStreet] = entry;
@@ -170,7 +179,10 @@ const handEvents = (prevView: DiffableView, prevHand: HandView | null, next: Dif
         else if (kind === 'check') out.push({kind: 'check', id: at, handNo: no, seat});
         else if (kind === 'fold') out.push({kind: 'fold', id: at, handNo: no, seat});
         else if (kind === 'refund') out.push({kind: 'refund', id: at, handNo: no, seat, amount});
-        else if (kind === 'show') out.push({kind: 'show', id: at, handNo: no, seat});
+        else if (kind === 'show') {
+            const shown = next.seats[seat]?.cards;
+            out.push({kind: 'show', id: at, handNo: no, seat, cards: Array.isArray(shown) ? shown.length : PLAYING_CARDS[hand.variant]});
+        }
         bets.set(seat, to);
     }
 

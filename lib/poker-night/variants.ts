@@ -60,6 +60,20 @@ export const autoDiscard = (hole: readonly Card[]): Card => {
     return hole[low];
 };
 
+export type Mode = {variant: Variant; boards: number};
+
 // The game a table is playing: the hand's own while there is one, else what the config deals next.
-export const modeOf = (hand: Pick<Hand, 'variant' | 'boards'> | null, config: Pick<GameConfig, 'variant' | 'boards'>): {variant: Variant; boards: number} =>
-    hand ? {variant: hand.variant, boards: hand.boards.length} : {variant: config.variant, boards: config.boards};
+export const modeOf = (hand: Pick<Hand, 'variant' | 'boards'> | null, config: Pick<GameConfig, 'variant' | 'boards'>): Mode =>
+    hand ? {variant: hand.variant, boards: hand.boards.length} : nextModeOf(config);
+
+// What the config deals from the next hand: more than one board only in PLO.
+export const nextModeOf = (config: Pick<GameConfig, 'variant' | 'boards'>): Mode =>
+    ({variant: config.variant, boards: config.variant === 'plo' ? config.boards : 1});
+
+// Between hands: the host picked another game (or board count) than the hand on the table played,
+// so the next deal changes it. Never while a hand is being played, which keeps its own.
+export const modeChanged = (hand: (Pick<Hand, 'variant' | 'boards'> & {phase: string}) | null, config: Pick<GameConfig, 'variant' | 'boards'>): boolean => {
+    if (!hand || hand.phase !== 'complete') return false;
+    const next = nextModeOf(config);
+    return hand.variant !== next.variant || hand.boards.length !== next.boards;
+};

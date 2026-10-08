@@ -7,7 +7,8 @@
 // F, C, R, A, and 1–4 / Enter / Escape in the raise panel (lib/poker-night/keys; never with ⌘, Ctrl
 // or Alt, never while typing, never over a dialog, only with the focus on the table — not the top
 // bar — and the single characters only while the player keeps them on in My look; Enter on a
-// focused button is that button's). Every button is at least 48 px tall and says its key
+// focused button is that button's; A sets the top of the range: all in, or the pot in PLO). Every
+// button is at least 48 px tall and says its key
 // (aria-keyshortcuts). When the turn starts, focus moves to the bar itself — unless the viewer is
 // typing somewhere or a dialog holds the focus; when the raise panel closes, to the Raise button. A
 // move goes to the action route with the turn it answers, and the buttons wait while it is on its
@@ -24,7 +25,7 @@ import RaisePanel from "@/components/poker-night/RaisePanel";
 import {useTapShield} from "@/components/poker-night/useTapShield";
 import {useRoom} from "@/components/poker-night/room-controller";
 import {ACTION_COPY} from "@/lib/learn/copy/poker-night";
-import {quickSizes} from "@/lib/poker-night/bet-sizing";
+import {moveFor, quickSizes} from "@/lib/poker-night/bet-sizing";
 import type {DockView} from "@/lib/poker-night/dock";
 import {intentForKey, isControlTarget, isEditableTarget, KEY_SHORTCUTS, keyAllowed, type FocusPlace} from "@/lib/poker-night/keys";
 import type {Move} from "@/lib/poker-night/types";
@@ -73,8 +74,10 @@ const ActionBar = ({dock, turn, disabled}: {dock: DockView; turn: number; disabl
         void act({kind: 'fold'});
     };
     const checkOrCall = () => void act(legal?.check ? {kind: 'check'} : {kind: 'call'});
+    // The top of the range: all in when the stack is the limit; under pot limit, when the pot is, a
+    // raise to it (the server takes all in only within the cap).
     const confirmRaise = () => {
-        if (sizing) void act(raiseTo >= sizing.max ? {kind: 'all-in'} : {kind: 'raise', to: raiseTo});
+        if (sizing) void act(moveFor(sizing, raiseTo));
     };
     // Closed with Back or Escape: the focus goes back to the button that opened it, not to the page.
     const closeRaise = () => {

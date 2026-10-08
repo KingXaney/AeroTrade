@@ -35,6 +35,20 @@ describe('on the viewer\'s turn', () => {
         expect(dock.hole).toEqual(cards('AhAd'));
     });
 
+    it('in PLO: four cards, the server\'s pot-limit moves, the pot as the top size, no hand named before the flop', () => {
+        const s = deal(three([1000, 1000, 1000], {variant: 'plo'}), {holes: {2: 'AhAdKcQs'}});
+        const dock = dockView(as(s, 2));
+        expect(dock.hole).toEqual(cards('AhAdKcQs'));
+        expect(dock.legal).toEqual(legalFor(snapshotFromState(s), 2));
+        expect(dock.legal!.raise).toEqual({kind: 'raise', min: 40, max: 70});
+        expect(dock.sizing).toMatchObject({min: 40, max: 70, cap: 'pot'});
+        expect(dock.strength).toBeNull();
+        let flop = deal(three([1000, 1000, 1000], {variant: 'plo'}), {holes: {0: 'AhAdKcQs'}, board: 'As7c2dKd3s'});
+        flop = moves(flop, C, C, X);
+        // Two aces in hand with the flop's three: three aces, the seven and the two — never the king in hand.
+        expect(dockView(as(flop, 0)).strength).toEqual({category: 3, ranks: [12, 5, 0]});
+    });
+
     it('is nobody\'s turn but theirs: the others see no moves', () => {
         const s = deal(three());
         expect(dockView(as(s, 0)).myTurn).toBe(false);
@@ -192,11 +206,22 @@ describe('the break', () => {
 });
 
 describe('what the cards make', () => {
-    it('names a pair or the high card before the flop, the best hand after', () => {
-        expect(handStrength(cards('9c9d'), [])).toEqual({category: 1, ranks: [7]});
-        expect(handStrength(cards('Kc4d'), [])).toEqual({category: 0, ranks: [11, 2]});
-        expect(handStrength(cards('AhKh'), cards('QhJhTh'))).toEqual({category: 8, ranks: [12]});
-        expect(handStrength(null, [])).toBeNull();
+    it('names a pair or the high card before the flop, the hand the cards make after', () => {
+        expect(handStrength('holdem', cards('9c9d'), [])).toEqual({category: 1, ranks: [7]});
+        expect(handStrength('holdem', cards('Kc4d'), [])).toEqual({category: 0, ranks: [11, 2]});
+        expect(handStrength('holdem', cards('AhKh'), cards('QhJhTh'))).toEqual({category: 8, ranks: [12]});
+        expect(handStrength('holdem', null, [])).toBeNull();
+        // Triple T reads only once it holds two.
+        expect(handStrength('triple-t', cards('9c9dKs'), [])).toBeNull();
+        expect(handStrength('triple-t', cards('9c9d'), [])).toEqual({category: 1, ranks: [7]});
+    });
+
+    it('in PLO, names nothing before the flop, then exactly two of the four with three from the board', () => {
+        expect(handStrength('plo', cards('AhAc7s3d'), [])).toBeNull();
+        // One heart in hand on four on the board: no flush, a pair of aces.
+        expect(handStrength('plo', cards('AhAc7s3d'), cards('Kh9h6h2h'))).toEqual({category: 1, ranks: [12, 11, 7, 4]});
+        expect(handStrength('holdem', cards('AhAc'), cards('Kh9h6h2h'))).toMatchObject({category: 5});
+        expect(handStrength('plo', cards('AhAc'), cards('Kh9h6h'))).toBeNull();
     });
 
     it('follows the board as it comes', () => {

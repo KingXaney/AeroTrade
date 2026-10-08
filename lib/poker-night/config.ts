@@ -26,11 +26,12 @@ export const VARIANTS = ['holdem', 'plo', 'triple-t'] as const;
 export const HOLE_CARDS = {holdem: 2, plo: 4, 'triple-t': 3} as const;
 export const PLAYING_CARDS = {holdem: 2, plo: 4, 'triple-t': 2} as const;
 
-// What this deploy deals. The stored shape accepts every variant and board count (lib/poker-night/
-// migrate), so a rollback never closes a live table; only the input paths (checkConfig) and the
-// deal (dealable) are held to this. Later phases open 'plo', two and three boards, 'triple-t'.
+// What this deploy deals: Texas hold'em and PLO, on one board. The stored shape accepts every
+// variant and board count (lib/poker-night/migrate), so a rollback never closes a live table; only
+// the input paths (checkConfig) and the deal (dealable) are held to this. Later phases open two and
+// three boards, then 'triple-t'.
 export const ENABLED: {readonly variants: readonly Variant[]; readonly boards: number} = Object.freeze({
-    variants: Object.freeze(['holdem'] as Variant[]),
+    variants: Object.freeze(['holdem', 'plo'] as Variant[]),
     boards: 1,
 });
 

@@ -24,7 +24,7 @@ import type {HandDescription} from "@/lib/poker-night/hand-name";
 import type {PokerNightErrorCode} from "@/lib/poker-night/http";
 import {LIMITS} from "@/lib/poker-night/limits";
 import {NAME_MAX_GRAPHEMES} from "@/lib/poker-night/names";
-import type {EntryKind, LedgerKind, PreAction, RebuyPolicy, Refusal, Street} from "@/lib/poker-night/types";
+import type {EntryKind, LedgerKind, PreAction, RebuyPolicy, Refusal, Street, Variant} from "@/lib/poker-night/types";
 import type {SeatState} from "@/lib/poker-night/view-types";
 import {capitalize, numberWord} from "@/lib/text";
 import type {PhraseId, ReactionId, ThrowId} from "@/lib/poker-night/emotes";
@@ -191,6 +191,9 @@ export const ACTION_COPY = {
     bet: (n: number): string => `Bet ${count(n)}`,
     raiseTo: (n: number): string => `Raise to ${count(n)}`,
     allIn: (n: number): string => `All in for ${count(n)}`,
+    // Pot limit (PLO): the top of the range when the stack goes past the pot.
+    potBet: (n: number): string => `Bet ${count(n)} (pot)`,
+    potRaise: (n: number): string => `Raise to ${count(n)} (pot)`,
     back: 'Back',
     toCall: (n: number): string => `${count(n)} to call`,
     sending: 'Sending…',
@@ -319,7 +322,10 @@ export const JOIN_COPY = {
     // The join card (a Panel over the live table): the table's terms, a name prefilled from the
     // account or this browser, a pre-rolled look, and one tap to sit.
     lead: 'Pick a name and a look, then take a seat.',
-    terms: (smallBlind: number, bigBlind: number, chips: number): string => `Blinds ${count(smallBlind)}/${count(bigBlind)} · ${count(chips)} chips to start`,
+    terms: (mode: string, smallBlind: number, bigBlind: number, chips: number): string =>
+        `${mode} · Blinds ${count(smallBlind)}/${count(bigBlind)} · ${count(chips)} chips to start`,
+    // Opens the Hands guide on the table's game, before sitting down.
+    howItPlays: 'How it plays',
     nameLabel: 'Your name',
     namePlaceholder: 'Name at the table',
     nameRule: `Up to ${numberWord(NAME_MAX_GRAPHEMES)} characters.`,
@@ -395,24 +401,57 @@ export const AVATAR_COPY = {
 
 // ==== P3: the lobby, the table and its overlays ================================================
 
+// ---- the games (lib/poker-night/config VARIANTS) ------------------------------------------------
+
+// Each game by name: short where a line has little room (the top bar, a lobby row, the felt), spoken
+// where a sentence or a screen reader says it. "Texas hold'em" always whole, so no label opens on
+// "Hold'em". What a game is, is the glossary's (texas-holdem, omaha); a picker card says only what
+// is dealt and the limit.
+const MODE_SHORT: Record<Variant, string> = {holdem: "Texas hold'em", plo: 'PLO', 'triple-t': 'Triple T'};
+const MODE_SPOKEN: Record<Variant, string> = {holdem: "Texas hold'em", plo: 'Pot-limit Omaha', 'triple-t': 'Triple T poker'};
+
+export const MODE_COPY = {
+    short: MODE_SHORT,
+    spoken: MODE_SPOKEN,
+    // With its boards when there is more than one: "PLO · 2 boards", "Pot-limit Omaha, 2 boards".
+    label: (variant: Variant, boards: number): string => (boards > 1 ? `${MODE_SHORT[variant]} · ${count(boards)} boards` : MODE_SHORT[variant]),
+    spokenLabel: (variant: Variant, boards: number): string => (boards > 1 ? `${MODE_SPOKEN[variant]}, ${count(boards)} boards` : MODE_SPOKEN[variant]),
+    // The picker (the lobby's form, the host drawer): its group's name and each card's line.
+    gameLabel: 'Game',
+    pick: {
+        holdem: 'Two cards each. No limit.',
+        plo: 'Four cards each. Pot limit.',
+        'triple-t': 'Three cards each, one thrown away before the betting.',
+    } satisfies Record<Variant, string>,
+    // Between hands, when the host picked another game: under the board. At the deal, a toast and the
+    // screen reader.
+    nextHand: (label: string): string => `Next hand: ${label}`,
+    // The countdown to that deal, in the place of TABLE_COPY.nextHandIn.
+    nextHandIn: (label: string, s: number): string => `Next hand: ${label}, in ${count(s)} s`,
+    changed: (spoken: string): string => `New game from this hand: ${spoken}.`,
+} as const;
+
 // ---- the lobby and the /games card (app/(root)/poker-night, components/poker-night/lobby) ------
 
 export const POKER_NIGHT_COPY = {
     title: 'Poker night',
-    subtitle: "Texas hold'em with friends: start a table, share the link, and play for chips.",
+    subtitle: "Texas hold'em and PLO with friends: start a table, share the link, and play for chips.",
     note: 'Play chips only. No cash value, and nothing is paid out.',
     // POKER_NIGHT_ENABLED=false.
     off: 'Poker night is switched off for now.',
 
     // The card on /games.
     cardTitle: 'Poker night',
-    cardBody: "Texas hold'em for play chips at a table you share by link: friends join from a phone, with no account needed.",
+    cardBody: "Texas hold'em and PLO for play chips at a table you share by link: friends join from a phone, with no account needed.",
     cardCta: 'Open poker night',
 
-    // Starting a table: one tap with the defaults, or the form first.
+    // Starting a table: one tap with the defaults (Texas hold'em), one tap for another game, or the
+    // form first. The hint opens with the game the first button deals.
     quickStart: 'Start a table',
-    quickStartHint: (smallBlind: number, bigBlind: number, chips: number, seats: number): string =>
-        `Blinds ${count(smallBlind)}/${count(bigBlind)}, ${count(chips)} chips each, up to ${numberWord(seats)} seats. Everything can be changed at the table.`,
+    quickPlo: 'Start PLO',
+    quickTripleT: 'Start Triple T',
+    quickStartHint: (mode: string, smallBlind: number, bigBlind: number, chips: number, seats: number): string =>
+        `${mode}, blinds ${count(smallBlind)}/${count(bigBlind)}, ${count(chips)} chips each, up to ${numberWord(seats)} seats. Everything can be changed at the table.`,
     starting: 'Setting the table…',
     setUp: 'Set it up first',
     create: 'Open the table',
@@ -429,17 +468,17 @@ export const POKER_NIGHT_COPY = {
     join: 'Join',
     codeInvalid: `A table code is ${numberWord(CODE_LENGTH)} letters and digits, with no 0, O, 1 or I.`,
 
-    // The host's own open tables.
+    // The host's own open tables; a row opens with the table's game (MODE_COPY.label).
     openHeading: 'Your open tables',
     openEmpty: 'No table is open. Start one and share the link.',
-    openRow: (seated: number, seats: number, hands: number): string =>
-        `${count(seated)} of ${count(seats)} seats taken · ${hands === 0 ? 'no hand dealt yet' : `${plural(hands, 'hand', 'hands')} played`}`,
+    openRow: (mode: string, seated: number, seats: number, hands: number): string =>
+        `${mode} · ${count(seated)} of ${count(seats)} seats taken · ${hands === 0 ? 'no hand dealt yet' : `${plural(hands, 'hand', 'hands')} played`}`,
     open: 'Open',
 
     // Open tables friends chose to show to friends (the panel is hidden when there are none).
     friendsHeading: "Friends' tables",
     friendsLead: 'Open tables your friends chose to show you.',
-    friendsRow: (host: string, seated: number, seats: number): string => `Hosted by ${isolate(host)} · ${count(seated)} of ${count(seats)} seats taken`,
+    friendsRow: (mode: string, host: string, seated: number, seats: number): string => `${mode} · Hosted by ${isolate(host)} · ${count(seated)} of ${count(seats)} seats taken`,
 
     // The reader's own nights (PokerResult rows), as hands played and net chips.
     recentHeading: 'Recent nights',
@@ -487,7 +526,9 @@ export const INVITE_COPY = {
     // navigator.share, on phones. The table is its shown name (TABLE_COPY.name).
     share: 'Share',
     shareTitle: (table: string): string => `Join ${isolate(table)}`,
-    shareText: (table: string): string => `Pull up a chair at ${isolate(table)}. Play chips only.`,
+    // With the game the table deals (MODE_COPY.spokenLabel), so a link preview says it.
+    mode: (mode: string): string => `Game: ${mode}`,
+    shareText: (table: string, mode: string): string => `Pull up a chair at ${isolate(table)}: ${mode}, play chips only.`,
     qrLabel: 'QR code of the table link',
     qrCaption: 'Point a phone camera here to open the table.',
     qrShow: 'Show QR code',
@@ -497,7 +538,7 @@ export const INVITE_COPY = {
     codeGrouped: (code: string): string => `${code.slice(0, 3)} ${code.slice(3)}`,
     deal: 'Deal the first hand',
     needTwo: 'The first hand is dealt once two players are seated.',
-    ogDescription: "Texas hold'em for play chips. Open the link to take a seat.",
+    ogDescription: (mode: string): string => `${mode} for play chips. Open the link to take a seat.`,
 } as const;
 
 // ---- the table (components/poker-night: TopBar, SeatRing, Seat, PotDisplay, Board, Dock) -------
@@ -720,6 +761,7 @@ export const ANNOUNCE_COPY = {
         toCall > 0 ? `Your turn: ${count(toCall)} to call, pot ${count(pot)}.` : `Your turn: checking is free, pot ${count(pot)}.`,
     timeLow: (s: number): string => `${plural(s, 'second', 'seconds')} left.`,
     dealt: (cards: readonly Card[]): string => `You have ${words(cards.map((c) => `the ${cardWords(c)}`))}.`,
+    newGame: MODE_COPY.changed,
     street: (street: Exclude<Street, 'preflop'>, cards: readonly Card[]): string => `${capitalize(street)}: ${words(cards.map(cardWords))}.`,
     // Another player's move and a pot's winners read as the log does.
     move: LOG_COPY.line,
@@ -1108,7 +1150,7 @@ export const OVERLAY_COPY = {
     // My look's keyboard switch (WCAG 2.1.4: single-key shortcuts can be turned off), kept in this
     // browser only.
     shortcuts: 'Single-key shortcuts',
-    shortcutsHint: 'F folds, C checks or calls, R opens a bet or a raise, A sets all in, and 1 to 4 pick a size. Off, only the buttons act; Enter and Escape still work in the raise panel.',
+    shortcutsHint: 'F folds, C checks or calls, R opens a bet or a raise, A sets all in (the pot in PLO), and 1 to 4 pick a size. Off, only the buttons act; Enter and Escape still work in the raise panel.',
 
     // The bank's own-chips panel.
     yourChips: 'Your chips',
@@ -1311,7 +1353,7 @@ export const SHORTCUTS_COPY = {
         fold: 'Fold',
         'check-call': 'Check or call',
         raise: 'Open a bet or a raise',
-        'all-in': 'Set the raise to all in',
+        'all-in': 'Set the raise to all in, or to the pot in PLO',
         sizes: 'A quick size, with the raise panel open',
         confirm: 'Confirm the raise',
         close: 'Close the raise panel',
@@ -1331,7 +1373,7 @@ export const SHORTCUTS_COPY = {
 // the lobby's Hands tab, app/(root)/poker-night ?tab=hands) ========================================
 
 // What the guide says beyond the glossary entries it quotes word for word wherever it says what a
-// term means (hand-rankings, kicker, texas-holdem in lib/learn/glossary.ts): the lobby's two views,
+// term means (hand-rankings, kicker, texas-holdem, omaha, pot-limit in lib/learn/glossary.ts): the lobby's two views,
 // the rankings' names in the guide's order (hands-guide RANKING_SLOTS), what the lifted cards are,
 // the ties a kicker does not settle, and what each game is like at this table. An example's own
 // hand is named by HAND_COPY.label. lib/learn/__tests__/poker-night-copy.test.ts holds these lines
@@ -1381,5 +1423,19 @@ export const HANDS_COPY = {
                 'A player who folded may still show their cards while the result is on screen.',
             ],
         },
+        plo: {
+            name: 'Pot-limit Omaha',
+            facts: [
+                'A flush needs two cards of the suit in your hand: one is not enough, however many the board shows.',
+                'The strongest hand wins the pot; there is no low half.',
+                'In the raise panel, Pot sets the largest bet or raise the limit allows, and A on a keyboard does the same.',
+                'The host can switch the table between Texas hold\'em and PLO; the change starts with the next hand.',
+            ],
+        },
     } satisfies Record<GuideGame, {name: string; facts: readonly string[]}>,
+    // PLO's example (hands-guide PLO_EXAMPLE): four cards in hand, five on the board, the five that play
+    // lifted.
+    ploHand: 'In hand',
+    ploBoard: 'On the board',
+    ploExample: 'Four hearts on the board and one in this hand: no flush. This hand plays as a pair of aces.',
 } as const;

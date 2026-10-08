@@ -44,6 +44,22 @@ describe('a showdown', () => {
         expect(cardLook(look, cards('Qh')[0])).toBe('dim');
     });
 
+    it('in PLO, lights exactly two of the winner\'s four with three from the board, and never says the board plays', () => {
+        // A royal flush on the board: in Texas hold'em everyone plays it; in PLO each hand plays two of its own.
+        let s = deal(three([1000, 1000, 1000], {variant: 'plo'}), {holes: {0: 'AhAc7s3d', 1: 'KcQd8s4c', 2: 'Th8h5d5c'}, board: 'Kh9h6h2hJc'});
+        s = moves(s, C, C, X, X, X, X, X, X, X, X, X, X);
+        const look = resultLook(view(s).hand)!;
+        expect(look.winners).toEqual([{seat: 2, amount: 60, description: expect.objectContaining({category: 5}), playsBoard: false}]);
+        expect(look.playing.filter((c) => cards('Th8h5d5c').includes(c)).sort()).toEqual(cards('Th8h').sort());
+        expect(look.playing.filter((c) => cards('Kh9h6h2hJc').includes(c))).toHaveLength(3);
+        for (const card of cards('5d5c')) expect(cardLook(look, card)).toBe('dim');
+        // The ace of hearts alone makes no flush: a pair of aces.
+        expect(look.shown.find((h) => h.seat === 0)!.description).toMatchObject({category: 1, ranks: [12, 11, 9, 7]});
+        let board = deal(three([1000, 1000, 1000], {variant: 'plo'}), {holes: {0: '2h3d4c5s', 1: '2c3s4d5h', 2: '6c7d8h9s'}, board: 'AsKsQsJsTs'});
+        board = moves(board, C, C, X, X, X, X, X, X, X, X, X, X);
+        expect(resultLook(view(board).hand)!.shown.every((h) => !h.playsBoard)).toBe(true);
+    });
+
     it('says when the board plays', () => {
         let s = deal(three(), {holes: {0: '2h3d', 1: '2c3s', 2: '4h5d'}, board: 'AsKsQsJsTs'});
         s = moves(s, C, C, X, X, X, X, X, X, X, X, X, X);

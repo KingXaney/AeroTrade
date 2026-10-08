@@ -20,9 +20,9 @@
 //
 // The rows a store reads carry the host's account id; the view the page gets never does.
 
-import {HOST_COPY, LOBBY_COPY, POKER_NIGHT_COPY} from '@/lib/learn/copy/poker-night';
+import {HOST_COPY, LOBBY_COPY, MODE_COPY, POKER_NIGHT_COPY} from '@/lib/learn/copy/poker-night';
 import {avatarForUser, encodeAvatar, isAvatar} from '@/lib/poker-night/avatar';
-import {DEFAULT_CONFIG, TABLE_LIMITS, TIMING, type ConfigIssue} from '@/lib/poker-night/config';
+import {DEFAULT_CONFIG, ENABLED, TABLE_LIMITS, TIMING, VARIANTS, type ConfigIssue} from '@/lib/poker-night/config';
 import type {Env} from '@/lib/poker-night/env';
 import {LIMITS} from '@/lib/poker-night/limits';
 import {tablePath} from '@/lib/poker-night/links';
@@ -30,7 +30,7 @@ import {resolveTableLook, type TableLook} from '@/lib/poker-night/looks';
 import {cleanName} from '@/lib/poker-night/names';
 import {DEFAULT_PERSONAL_LOOK, ME_STORAGE_KEY, resolvePersonalLook, type PersonalLook} from '@/lib/poker-night/personal';
 import type {RecentNight} from '@/lib/poker-night/results';
-import type {GameConfig, RebuyPolicy, TableStatus} from '@/lib/poker-night/types';
+import type {BoardCount, GameConfig, RebuyPolicy, TableStatus, Variant} from '@/lib/poker-night/types';
 
 // How many rows each section lists at most. `seated`: how many of the newest open tables the
 // reader has a player row at are read to find the ones where they hold a seat (watching, or having
@@ -42,8 +42,9 @@ export const HOME_LIMITS = {tables: 2, friends: 2} as const;
 
 // ── what the store reads ──
 
-// A table as the store lists it: the room document's mirrors, the hands dealt so far and the
-// host's name at the table. Server-side only: it carries the host's account id.
+// A table as the store lists it: the room document's mirrors, the hands dealt so far, the game the
+// host set (what the next hand deals) and the host's name at the table. Server-side only: it carries
+// the host's account id.
 export type LobbyRoom = {
     code: string;
     name: string;
@@ -53,14 +54,17 @@ export type LobbyRoom = {
     seats: number;
     seated: number;
     hands: number;
+    variant: Variant;
+    boards: BoardCount;
     lastActivityAt: number;
 };
 
-// The fields of a room document the lobby reads, and nothing private: no state but its hand
-// count, no guest, and of each player only the account and the name (to find the host's).
+// The fields of a room document the lobby reads, and nothing private: of the state only its hand
+// count and its config's game and boards, no guest, and of each player only the account and the name
+// (to find the host's).
 export const LOBBY_PROJECTION = {
     _id: 0, code: 1, name: 1, hostUserId: 1, status: 1, seatCount: 1, seatsTaken: 1, lastActivityAt: 1,
-    'state.handNo': 1, 'players.userId': 1, 'players.name': 1,
+    'state.handNo': 1, 'state.config.variant': 1, 'state.config.boards': 1, 'players.userId': 1, 'players.name': 1,
 } as const;
 
 // The tables an account plays at (store.listSeatedRooms): the lobby's fields, plus each player's
@@ -77,7 +81,7 @@ export type LobbyDoc = {
     seatCount?: number | null;
     seatsTaken?: number | null;
     lastActivityAt?: Date | number | string | null;
-    state?: {handNo?: unknown; seats?: unknown} | null;
+    state?: {handNo?: unknown; seats?: unknown; config?: {variant?: unknown; boards?: unknown} | null} | null;
     players?: {userId?: string | null; name?: string | null; pid?: string | null}[] | null;
 };
 
@@ -98,6 +102,11 @@ export const holdsSeat = (doc: Pick<LobbyDoc, 'state' | 'players'>, userId: stri
 };
 
 const whole = (value: unknown): number => (typeof value === 'number' && Number.isSafeInteger(value) && value >= 0 ? value : 0);
+
+// A stored game as the lobby reads it: one of VARIANTS, else Texas hold'em (a version 1 document
+// has none); its boards 1 to 3, else one.
+const variantOf = (value: unknown): Variant => ((VARIANTS as readonly unknown[]).includes(value) ? value as Variant : 'holdem');
+const boardsOf = (value: unknown): BoardCount => (value === 2 || value === 3 ? value : 1);
 
 const timeOf = (value: LobbyDoc['lastActivityAt']): number => {
     if (value instanceof Date) return value.getTime();
@@ -120,6 +129,8 @@ export const lobbyRoomFromDoc = (doc: LobbyDoc): LobbyRoom => ({
     seats: whole(doc.seatCount),
     seated: whole(doc.seatsTaken),
     hands: whole(doc.state?.handNo),
+    variant: variantOf(doc.state?.config?.variant),
+    boards: boardsOf(doc.state?.config?.boards),
     lastActivityAt: timeOf(doc.lastActivityAt),
 });
 
@@ -141,6 +152,8 @@ export type LobbyTable = {
     seats: number;
     seated: number;
     hands: number;
+    variant: Variant;
+    boards: BoardCount;
     href: string;
     shareUrl: string;
 };
@@ -168,6 +181,8 @@ export type TableLink = {
     seats: number;
     seated: number;
     hands: number;
+    variant: Variant;
+    boards: BoardCount;
     href: string;
     mine: boolean;
     host: string;
@@ -212,20 +227,23 @@ const openOnly = (rooms: readonly LobbyRoom[], now: number, limit: number, skip:
 
 const tableOf = (room: LobbyRoom, shareUrl: (code: string) => string): LobbyTable => ({
     code: room.code, name: room.name, status: room.status, seats: room.seats, seated: room.seated, hands: room.hands,
-    href: tablePath(room.code), shareUrl: shareUrl(room.code),
+    variant: room.variant, boards: room.boards, href: tablePath(room.code), shareUrl: shareUrl(room.code),
 });
 
 const linkOf = (room: LobbyRoom, userId: string, sitting: boolean): TableLink => ({
     code: room.code, name: room.name, status: room.status, seats: room.seats, seated: room.seated, hands: room.hands,
-    href: tablePath(room.code), mine: room.hostUserId === userId, host: room.hostName, sitting,
+    variant: room.variant, boards: room.boards, href: tablePath(room.code), mine: room.hostUserId === userId, host: room.hostName, sitting,
 });
 
-// The line under a table's name: its seats and hands when the reader hosts it (or its host has no
-// name), else who hosts it and its seats — the lobby's own rows' words.
-export const tableLine = (table: Pick<TableLink, 'mine' | 'host' | 'seated' | 'seats' | 'hands'>): string =>
+// A table's game as its row opens with it: "Texas hold'em", "PLO", "PLO · 2 boards".
+export const modeLine = (table: Pick<LobbyTable, 'variant' | 'boards'>): string => MODE_COPY.label(table.variant, table.boards);
+
+// The line under a table's name: its game, then its seats and hands when the reader hosts it (or its
+// host has no name), else who hosts it and its seats — the lobby's own rows' words.
+export const tableLine = (table: Pick<TableLink, 'mine' | 'host' | 'seated' | 'seats' | 'hands' | 'variant' | 'boards'>): string =>
     table.mine || table.host === ''
-        ? POKER_NIGHT_COPY.openRow(table.seated, table.seats, table.hands)
-        : POKER_NIGHT_COPY.friendsRow(table.host, table.seated, table.seats);
+        ? POKER_NIGHT_COPY.openRow(modeLine(table), table.seated, table.seats, table.hands)
+        : POKER_NIGHT_COPY.friendsRow(modeLine(table), table.host, table.seated, table.seats);
 
 // The table the lobby's resume card offers: the newest open one of the rooms where the reader holds
 // a seat (store.listSeatedRooms has already matched holdsSeat), or null — no card.
@@ -370,7 +388,7 @@ export const SEAT_CHOICES: readonly number[] = Array.from({length: TABLE_LIMITS.
 export const TIMER_PRESETS: readonly number[] = [15, 20, 30, 45, 60, 90, 120];
 export const REBUY_CHOICES: readonly RebuyPolicy[] = ['approve', 'off'];
 
-export type TableForm = {blinds: number; chips: number; seats: number; rebuys: RebuyPolicy; turnSeconds: number};
+export type TableForm = {blinds: number; chips: number; seats: number; rebuys: RebuyPolicy; turnSeconds: number; variant: Variant; boards: BoardCount};
 
 export const DEFAULT_FORM: Readonly<TableForm> = Object.freeze({
     blinds: BLIND_PRESETS.findIndex(([sb, bb]) => sb === DEFAULT_CONFIG.smallBlind && bb === DEFAULT_CONFIG.bigBlind),
@@ -378,7 +396,16 @@ export const DEFAULT_FORM: Readonly<TableForm> = Object.freeze({
     seats: DEFAULT_CONFIG.seats,
     rebuys: DEFAULT_CONFIG.rebuys,
     turnSeconds: DEFAULT_CONFIG.turnSeconds,
+    variant: DEFAULT_CONFIG.variant,
+    boards: DEFAULT_CONFIG.boards,
 });
+
+// The games the form and the host drawer offer: those this deploy deals (config.ENABLED), Texas
+// hold'em first; and the board counts a game may run (more than one for PLO alone, as far as ENABLED
+// opens them).
+export const GAME_CHOICES: readonly Variant[] = VARIANTS.filter((variant) => ENABLED.variants.includes(variant));
+export const boardChoices = (variant: Variant): BoardCount[] =>
+    ([1, 2, 3] as const).filter((boards) => boards === 1 || (variant === 'plo' && boards <= ENABLED.boards));
 
 const blindsAt = (index: number): readonly [number, number] => BLIND_PRESETS[index] ?? BLIND_PRESETS[DEFAULT_FORM.blinds];
 
@@ -395,11 +422,15 @@ export const chipsFor = (form: Pick<TableForm, 'blinds' | 'chips'>): number => {
 };
 
 // The config the form asks for: the blinds, starting chips as both ends of the range (the host can
-// widen it at the table), the seats, the rebuy policy and the turn timer.
+// widen it at the table), the seats, the rebuy policy, the turn timer and the game — one board unless
+// it is PLO.
 export const configFromForm = (form: TableForm): Partial<GameConfig> => {
     const [smallBlind, bigBlind] = blindsAt(form.blinds);
     const chips = chipsFor(form);
-    return {seats: form.seats, smallBlind, bigBlind, buyInMin: chips, buyInMax: chips, rebuys: form.rebuys, turnSeconds: form.turnSeconds};
+    return {
+        seats: form.seats, smallBlind, bigBlind, buyInMin: chips, buyInMax: chips, rebuys: form.rebuys, turnSeconds: form.turnSeconds,
+        variant: form.variant, boards: form.variant === 'plo' ? form.boards : 1,
+    };
 };
 
 // Where a new table opens for its host: its page with the invite sheet open.

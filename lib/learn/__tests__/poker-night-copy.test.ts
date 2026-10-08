@@ -6,14 +6,14 @@
 import {describe, expect, it} from 'vitest';
 import {findBanned, stripProhibitions} from '@/lib/learn/banned';
 import {
-    ACTION_COPY, ANNOUNCE_COPY, AVATAR_COPY, BANK_COPY, FELT_COPY, HAND_COPY, HOST_COPY, INVITE_COPY, isolate, JOIN_COPY, LOBBY_COPY, LOG_COPY,
+    ACTION_COPY, ANNOUNCE_COPY, AVATAR_COPY, BANK_COPY, FELT_COPY, HAND_COPY, HOST_COPY, INVITE_COPY, isolate, JOIN_COPY, LOBBY_COPY, LOG_COPY, MODE_COPY,
     OVERLAY_COPY, POKER_NIGHT_COPY, POKER_NIGHT_ERRORS, REFUSAL_COPY, SUIT_GLYPHS, SUIT_NAMES, SUMMARY_COPY, TABLE_COPY,
     LOOKS_COPY,
 } from '@/lib/learn/copy/poker-night';
 import {AVATAR_BADGES, AVATAR_COLOURS, AVATAR_FRAMES, AVATAR_PARTS, FACE_IDS} from '@/lib/poker-night/avatar';
 import {CARD_BACK_IDS, CARD_FACE_IDS, CHIP_SET_IDS, FELTS, SCENES} from '@/lib/poker-night/looks';
 import {ERROR_CODES, refusalToCode} from '@/lib/poker-night/http';
-import {checkConfig, DEFAULT_CONFIG, ENTRY_KINDS, LEDGER_KINDS, refineConfig} from '@/lib/poker-night/config';
+import {checkConfig, DEFAULT_CONFIG, ENTRY_KINDS, LEDGER_KINDS, refineConfig, VARIANTS} from '@/lib/poker-night/config';
 import {describeHand, isRoyal, type HandDescription} from '@/lib/poker-night/hand-name';
 import {parseCard} from '@/lib/poker/cards';
 import {CATEGORY, evaluateCards} from '@/lib/poker/evaluator';
@@ -24,7 +24,7 @@ import {SHORTCUTS} from '@/lib/poker-night/keys';
 import {AWARD_IDS} from '@/lib/poker-night/awards';
 import {ASK_COPY, HANDS_COPY, HOME_PANEL_COPY} from '@/lib/learn/copy/poker-night';
 import {GLOSSARY} from '@/lib/learn/glossary';
-import {GUIDE_GAMES, HANDS_TERMS, KICKER_EXAMPLE, RANKING_EXAMPLES, RANKING_SLOTS} from '@/lib/poker-night/hands-guide';
+import {GUIDE_GAMES, HANDS_TERMS, KICKER_EXAMPLE, PLO_EXAMPLE, RANKING_EXAMPLES, RANKING_SLOTS} from '@/lib/poker-night/hands-guide';
 
 const clean = (text: string) => {
     expect(text, text).not.toMatch(/undefined|NaN|null|\[object|Infinity/);
@@ -290,19 +290,55 @@ const each = (render: (n: number) => string): string[] => NS.map(render);
 const pairs = (render: (a: number, b: number) => string): string[] => NS.flatMap((a) => NS.map((b) => render(a, b)));
 const signedNs = [...NS, -1, -300, -1_250_000];
 
+// Every game's name as a line opens with it, short and spoken, with its boards.
+const MODES = VARIANTS.flatMap((v) => [1, 2, 3].map((b) => MODE_COPY.label(v, b)));
+const SPOKEN = VARIANTS.flatMap((v) => [1, 2, 3].map((b) => MODE_COPY.spokenLabel(v, b)));
+
+describe('the games', () => {
+    it('name every game, short and spoken, alone and with its boards, and say every line in plain words', () => {
+        for (const text of strings(MODE_COPY)) clean(text);
+        expect(Object.keys(MODE_COPY.short).sort()).toEqual([...VARIANTS].sort());
+        expect(Object.keys(MODE_COPY.spoken).sort()).toEqual([...VARIANTS].sort());
+        expect(Object.keys(MODE_COPY.pick).sort()).toEqual([...VARIANTS].sort());
+        covers(MODE_COPY, {
+            label: () => MODES,
+            spokenLabel: () => SPOKEN,
+            nextHand: () => MODES.map(MODE_COPY.nextHand),
+            nextHandIn: () => MODES.flatMap((mode) => [1, 5, 99].map((s) => MODE_COPY.nextHandIn(mode, s))),
+            changed: () => SPOKEN.map(MODE_COPY.changed),
+        });
+    });
+
+    it('reads as the table prints it', () => {
+        expect(MODE_COPY.short).toEqual({holdem: "Texas hold'em", plo: 'PLO', 'triple-t': 'Triple T'});
+        expect(MODE_COPY.spoken).toEqual({holdem: "Texas hold'em", plo: 'Pot-limit Omaha', 'triple-t': 'Triple T poker'});
+        expect(MODE_COPY.label('plo', 1)).toBe('PLO');
+        expect(MODE_COPY.label('plo', 2)).toBe('PLO · 2 boards');
+        expect(MODE_COPY.spokenLabel('plo', 3)).toBe('Pot-limit Omaha, 3 boards');
+        expect(MODE_COPY.nextHand('PLO')).toBe('Next hand: PLO');
+        expect(MODE_COPY.nextHandIn('PLO', 4)).toBe('Next hand: PLO, in 4 s');
+        expect(MODE_COPY.nextHand(MODE_COPY.short.holdem)).toBe("Next hand: Texas hold'em");
+        expect(MODE_COPY.changed('Pot-limit Omaha')).toBe('New game from this hand: Pot-limit Omaha.');
+        // The names are the glossary's.
+        expect(MODE_COPY.spoken.holdem).toBe(GLOSSARY['texas-holdem'].term);
+        expect(MODE_COPY.spoken.plo).toBe(GLOSSARY.omaha.term);
+        expect(MODE_COPY.pick).toEqual({holdem: 'Two cards each. No limit.', plo: 'Four cards each. Pot limit.', 'triple-t': 'Three cards each, one thrown away before the betting.'});
+    });
+});
+
 describe('the lobby and the game card', () => {
     it('says every line over the inputs it meets', () => {
         for (const text of strings(POKER_NIGHT_COPY)) clean(text);
         covers(POKER_NIGHT_COPY, {
-            quickStartHint: () => [2, 8, 9].flatMap((seats) => NS.map((n) => POKER_NIGHT_COPY.quickStartHint(n, n * 2, n * 100, seats))),
+            quickStartHint: () => MODES.flatMap((mode) => [2, 8, 9].flatMap((seats) => NS.map((n) => POKER_NIGHT_COPY.quickStartHint(mode, n, n * 2, n * 100, seats)))),
             // A field's default value, not a sentence: the name goes in as typed.
             tableNameDefault: () => NAMES.map((name) => {
                 const text = POKER_NIGHT_COPY.tableNameDefault(name);
                 expect(text).not.toContain(FSI);
                 return text;
             }),
-            openRow: () => NS.flatMap((hands) => pairs((seated, seats) => POKER_NIGHT_COPY.openRow(seated, seats, hands))),
-            friendsRow: () => named((name) => NS.map((n) => POKER_NIGHT_COPY.friendsRow(name, n, 9))),
+            openRow: () => MODES.flatMap((mode) => NS.flatMap((hands) => pairs((seated, seats) => POKER_NIGHT_COPY.openRow(mode, seated, seats, hands)))),
+            friendsRow: () => named((name) => MODES.flatMap((mode) => NS.map((n) => POKER_NIGHT_COPY.friendsRow(mode, name, n, 9)))),
             recentRow: () => NS.flatMap((hands) => signedNs.map((net) => POKER_NIGHT_COPY.recentRow(hands, net))),
             resumeTitle: () => named((name) => POKER_NIGHT_COPY.resumeTitle(name)),
         });
@@ -315,20 +351,21 @@ describe('the lobby and the game card', () => {
     });
 
     it('reads as the lobby prints it', () => {
-        const hint = 'Blinds 10/20, 2,000 chips each, up to eight seats. Everything can be changed at the table.';
+        const hint = "Texas hold'em, blinds 10/20, 2,000 chips each, up to eight seats. Everything can be changed at the table.";
         expect(POKER_NIGHT_COPY.title).toBe('Poker night');
-        expect(POKER_NIGHT_COPY.subtitle).toBe("Texas hold'em with friends: start a table, share the link, and play for chips.");
+        expect(POKER_NIGHT_COPY.subtitle).toBe("Texas hold'em and PLO with friends: start a table, share the link, and play for chips.");
+        expect([POKER_NIGHT_COPY.quickPlo, POKER_NIGHT_COPY.quickTripleT]).toEqual(['Start PLO', 'Start Triple T']);
         expect(POKER_NIGHT_COPY.note).toBe('Play chips only. No cash value, and nothing is paid out.');
         expect(POKER_NIGHT_COPY.quickStart).toBe('Start a table');
-        expect(POKER_NIGHT_COPY.quickStartHint(10, 20, 2000, 8)).toBe(hint);
-        expect(POKER_NIGHT_COPY.quickStartHint(DEFAULT_CONFIG.smallBlind, DEFAULT_CONFIG.bigBlind, DEFAULT_CONFIG.buyInMax, DEFAULT_CONFIG.seats)).toBe(hint);
+        expect(POKER_NIGHT_COPY.quickStartHint(MODE_COPY.short.holdem, 10, 20, 2000, 8)).toBe(hint);
+        expect(POKER_NIGHT_COPY.quickStartHint(MODE_COPY.short[DEFAULT_CONFIG.variant], DEFAULT_CONFIG.smallBlind, DEFAULT_CONFIG.bigBlind, DEFAULT_CONFIG.buyInMax, DEFAULT_CONFIG.seats)).toBe(hint);
         expect(POKER_NIGHT_COPY.joinHeading).toBe('Join with a code');
         expect(POKER_NIGHT_COPY.codePlaceholder).toBe('Six characters');
         expect(POKER_NIGHT_COPY.codeInvalid).toBe('A table code is six letters and digits, with no 0, O, 1 or I.');
         expect(POKER_NIGHT_COPY.openEmpty).toBe('No table is open. Start one and share the link.');
-        expect(POKER_NIGHT_COPY.openRow(3, 8, 0)).toBe('3 of 8 seats taken · no hand dealt yet');
-        expect(POKER_NIGHT_COPY.openRow(3, 8, 1)).toBe('3 of 8 seats taken · 1 hand played');
-        expect(plain(POKER_NIGHT_COPY.friendsRow('Ana', 3, 8))).toBe('Hosted by Ana · 3 of 8 seats taken');
+        expect(POKER_NIGHT_COPY.openRow("Texas hold'em", 3, 8, 0)).toBe("Texas hold'em · 3 of 8 seats taken · no hand dealt yet");
+        expect(POKER_NIGHT_COPY.openRow('PLO', 3, 8, 1)).toBe('PLO · 3 of 8 seats taken · 1 hand played');
+        expect(plain(POKER_NIGHT_COPY.friendsRow('PLO', 'Ana', 3, 8))).toBe('PLO · Hosted by Ana · 3 of 8 seats taken');
         expect(POKER_NIGHT_COPY.recentRow(42, 1250)).toBe('42 hands · net +1,250');
         expect(POKER_NIGHT_COPY.recentRow(1, -300)).toBe(`1 hand · net ${MINUS}300`);
         expect(POKER_NIGHT_COPY.recentRow(7, 0)).toBe('7 hands · net 0');
@@ -369,7 +406,9 @@ describe('the invite', () => {
         for (const text of strings(INVITE_COPY)) clean(text);
         covers(INVITE_COPY, {
             shareTitle: () => named(INVITE_COPY.shareTitle),
-            shareText: () => named(INVITE_COPY.shareText),
+            shareText: () => named((name) => SPOKEN.map((mode) => INVITE_COPY.shareText(name, mode))),
+            mode: () => SPOKEN.map(INVITE_COPY.mode),
+            ogDescription: () => SPOKEN.map(INVITE_COPY.ogDescription),
             codeGrouped: () => ['K7QXM4', 'ABCDEF'].map(INVITE_COPY.codeGrouped),
         });
     });
@@ -382,8 +421,10 @@ describe('the invite', () => {
         expect(INVITE_COPY.deal).toBe('Deal the first hand');
         expect(INVITE_COPY.needTwo).toBe('The first hand is dealt once two players are seated.');
         expect(INVITE_COPY.codeGrouped('K7QXM4')).toBe('K7Q XM4');
-        expect(plain(INVITE_COPY.shareText("Ana's poker night"))).toBe("Pull up a chair at Ana's poker night. Play chips only.");
-        expect(INVITE_COPY.ogDescription).toBe("Texas hold'em for play chips. Open the link to take a seat.");
+        expect(plain(INVITE_COPY.shareText("Ana's poker night", 'Pot-limit Omaha'))).toBe("Pull up a chair at Ana's poker night: Pot-limit Omaha, play chips only.");
+        expect(INVITE_COPY.mode('PLO')).toBe('Game: PLO');
+        expect(INVITE_COPY.ogDescription("Texas hold'em")).toBe("Texas hold'em for play chips. Open the link to take a seat.");
+        expect(INVITE_COPY.ogDescription('Pot-limit Omaha')).toBe('Pot-limit Omaha for play chips. Open the link to take a seat.');
     });
 });
 
@@ -393,7 +434,7 @@ describe('the join card', () => {
         covers(JOIN_COPY, {
             blankName: () => faces.map(JOIN_COPY.blankName),
             renamed: () => named(JOIN_COPY.renamed),
-            terms: () => pairs((a, b) => JOIN_COPY.terms(a, a * 2, b)),
+            terms: () => MODES.flatMap((mode) => pairs((a, b) => JOIN_COPY.terms(mode, a, a * 2, b))),
             lookLabel: () => faces.map(JOIN_COPY.lookLabel),
             sitIn: () => Array.from({length: 9}, (_, seat) => JOIN_COPY.sitIn(seat)),
             chipsInRule: () => pairs(JOIN_COPY.chipsInRule),
@@ -407,7 +448,9 @@ describe('the join card', () => {
         expect(JOIN_COPY.sit).toBe('Sit down');
         expect(JOIN_COPY.watch).toBe('Just watch');
         expect(JOIN_COPY.chipsInLabel).toBe('Chips in');
-        expect(JOIN_COPY.terms(10, 20, 2000)).toBe('Blinds 10/20 · 2,000 chips to start');
+        expect(JOIN_COPY.terms("Texas hold'em", 10, 20, 2000)).toBe("Texas hold'em · Blinds 10/20 · 2,000 chips to start");
+        expect(JOIN_COPY.terms('PLO', 10, 20, 2000)).toBe('PLO · Blinds 10/20 · 2,000 chips to start');
+        expect(JOIN_COPY.howItPlays).toBe('How it plays');
         expect(JOIN_COPY.sitIn(0)).toBe('Sit in seat 1');
         expect(JOIN_COPY.sitIn(8)).toBe('Sit in seat 9');
         expect(JOIN_COPY.chipsInRule(1000, 5000)).toBe('From 1,000 to 5,000 chips.');
@@ -529,6 +572,8 @@ describe('the action bar', () => {
             bet: () => each(ACTION_COPY.bet),
             raiseTo: () => each(ACTION_COPY.raiseTo),
             allIn: () => each(ACTION_COPY.allIn),
+            potBet: () => each(ACTION_COPY.potBet),
+            potRaise: () => each(ACTION_COPY.potRaise),
             toCall: () => each(ACTION_COPY.toCall),
             amountRule: () => pairs(ACTION_COPY.amountRule),
             pre: () => [
@@ -539,6 +584,7 @@ describe('the action bar', () => {
     });
 
     it('reads as the action bar prints it', () => {
+        expect([ACTION_COPY.potRaise(340), ACTION_COPY.potBet(120)]).toEqual(['Raise to 340 (pot)', 'Bet 120 (pot)']);
         expect(ACTION_COPY.fold).toBe('Fold');
         expect(ACTION_COPY.check).toBe('Check');
         expect(ACTION_COPY.call(40)).toBe('Call 40');
@@ -646,7 +692,8 @@ describe('the announcements', () => {
         covers(ANNOUNCE_COPY, {
             yourTurn: () => pairs(ANNOUNCE_COPY.yourTurn),
             timeLow: () => [1, 5, 10].map(ANNOUNCE_COPY.timeLow),
-            dealt: () => [ANNOUNCE_COPY.dealt([parseCard('As')!, parseCard('Kh')!]), ANNOUNCE_COPY.dealt([parseCard('2c')!, parseCard('2d')!])],
+            dealt: () => [ANNOUNCE_COPY.dealt([parseCard('As')!, parseCard('Kh')!]), ANNOUNCE_COPY.dealt([parseCard('2c')!, parseCard('2d')!]), ANNOUNCE_COPY.dealt(cards('AhAcKsQd'))],
+            newGame: () => VARIANTS.flatMap((v) => [1, 2, 3].map((b) => ANNOUNCE_COPY.newGame(MODE_COPY.spokenLabel(v, b)))),
             street: () => [ANNOUNCE_COPY.street('flop', cards('AsKh7c')), ANNOUNCE_COPY.street('river', cards('2d'))],
             move: () => named((name) => ENTRY_KINDS.filter((kind) => kind !== 'void').map((kind) => ANNOUNCE_COPY.move(name, kind, 40, false))),
             wins: () => named((name) => [ANNOUNCE_COPY.wins(name, 1200, null)]),
@@ -720,7 +767,7 @@ describe('the host drawer', () => {
             {...base, buyInMin: 2000, buyInMax: 1000},
             {...base, buyInMax: 20 * 501},
             {...base, boards: 2 as const},
-            {...base, variant: 'plo' as const},
+            {...base, variant: 'triple-t' as const},
         ];
         const messages = new Set<string>();
         for (const config of refused) {
@@ -1171,6 +1218,14 @@ describe('the Hands guide', () => {
             else expect(label.toLowerCase().startsWith(HANDS_COPY.categories[example.slot].toLowerCase()), label).toBe(true);
         }
         expect(HANDS_COPY.games.holdem.name).toBe(GLOSSARY['texas-holdem'].term);
+        expect(HANDS_COPY.games.plo.name).toBe(GLOSSARY.omaha.term);
+        expect(HANDS_TERMS).toEqual(['hand-rankings', 'kicker', 'texas-holdem', 'omaha', 'pot-limit']);
+    });
+
+    it('shows PLO\'s rule on a hand: one heart in hand, four on the board, a pair of aces', () => {
+        expect(HAND_COPY.label(PLO_EXAMPLE.description)).toBe('Pair of aces');
+        expect(HANDS_COPY.ploExample).toBe('Four hearts on the board and one in this hand: no flush. This hand plays as a pair of aces.');
+        clean(HANDS_COPY.example([...PLO_EXAMPLE.board], [...PLO_EXAMPLE.plays.filter((c) => PLO_EXAMPLE.board.includes(c))]));
     });
 
     it('reads an example aloud, the cards that make it last', () => {

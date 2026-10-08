@@ -50,6 +50,16 @@
 // them or the ask, "No thanks" and its five-hand wait, "Let others ask to see my cards" off in My
 // look, an ask nobody answers running out as a no. A page on an older protocol is asked to reload.
 //
+// Batch B (P5): PLO on one board — the lobby's "Start PLO" beside the one-tap Texas hold'em and the
+// start form's Game choice; a PLO table named on the top bar, the invite sheet and the join card
+// ("How it plays": the Hands guide on PLO, for a visitor); three phones (390, 375 and 320 wide, and on
+// their sides) each fanning four cards, every card at least half in sight, four backs on every other
+// plate; no other context's answer or page carrying two cards of a hand of four; the raise panel's
+// Pot ("Raise to … (pot)") landing a raise to the server's cap, never an all-in; a check-down to a
+// showdown whose winner is QA's own Omaha brute force's, its hands of four turned up on every screen,
+// the banner clear of them and the lit cards two of the winner's and three of the board's; and the
+// host drawer's Game back to Texas hold'em, said by the countdown and a toast at the deal.
+//
 // Every surface at 390×844, 375×667, 320×568 and on its side at 844×390: nothing scrolls sideways,
 // every target is at least 44 px, nothing overlaps. The no-advice list (and the poker night copy's
 // own rules: no sentence opening on Hold, Buy or Sell, no currency word) over every new surface.
@@ -68,7 +78,8 @@ const {PN_PROTOCOL} = await lib('lib/poker-night/http.ts');
 const {TAP_SHIELD_MS} = await lib('lib/poker-night/keys.ts');
 const {cardLabel} = await lib('lib/poker/cards.ts');
 const {findBanned, stripProhibitions} = await lib('lib/learn/banned.ts');
-const {TABLE_COPY, HOST_COPY, HANDS_COPY, HOME_PANEL_COPY, POKER_NIGHT_COPY, FELT_COPY, JOIN_COPY, BANK_COPY, ASK_COPY} = await lib('lib/learn/copy/poker-night.ts');
+const {TABLE_COPY, HOST_COPY, HANDS_COPY, HOME_PANEL_COPY, POKER_NIGHT_COPY, FELT_COPY, JOIN_COPY, BANK_COPY, ASK_COPY, MODE_COPY, ACTION_COPY, INVITE_COPY} = await lib('lib/learn/copy/poker-night.ts');
+const {evaluateCards} = await lib('lib/poker/evaluator.ts');
 const {ASK_ANSWERS, ASKS, LEDGER_KINDS} = await lib('lib/poker-night/config.ts');
 const {legalFor, snapshotFromState} = await lib('lib/poker-night/betting.ts');
 const {livePots} = await lib('lib/poker-night/views.ts');
@@ -295,7 +306,8 @@ const guideOf = (page, scope) => page.evaluate((sel) => {
         firstRank: Math.round(guide.querySelector('[data-ranking]')?.getBoundingClientRect().bottom ?? Infinity), vh: innerHeight,
     };
 }, scope);
-const guideOk = (m) => m !== null && m.cards === 60 && m.rankings === 10 && m.outside === 0 && m.sideways <= 0;
+// Ten rankings (50 cards), the kicker pair (10) and PLO's hand (9).
+const guideOk = (m) => m !== null && m.cards === 69 && m.rankings === 10 && m.outside === 0 && m.sideways <= 0;
 
 // The leave dialog as drawn: its kind, where it started, its words and buttons — every button at
 // least 44 px, inside the screen, none over another, full width on a phone.
@@ -481,7 +493,7 @@ try {
         const scope = '[data-poker-night-page]';
         const wide = await guideOf(H.page, '[data-poker-night-hands]');
         const tab = await H.page.getAttribute(`${scope} [role="tab"][aria-selected="true"]`, 'data-tab').catch(() => null);
-        check('the lobby\'s Hands tab (?tab=hands): the Hands view selected, ten rankings and the kicker pair (60 cards), no lobby read',
+        check('the lobby\'s Hands tab (?tab=hands): the Hands view selected, ten rankings, the kicker pair and PLO\'s hand (69 cards), no lobby read',
             guideOk(wide) && tab === 'hands' && await H.page.locator('[data-quick-start]').count() === 0, JSON.stringify({wide, tab}));
         await wording(H.page, 'the Hands tab', scope);
         await shot(H.page, '01-hands-tab-1440');
@@ -502,7 +514,7 @@ try {
 
     // ═══ a table: Quick start, then Home's panel and its Rejoin ════════════════════════════════
     await H.page.goto(`${BASE}/poker-night`, {waitUntil: 'load', timeout: 180000});
-    await H.page.click('[data-quick-start]');
+    await H.page.click('[data-quick-start="holdem"]');
     await H.page.waitForURL(/\/play\/[A-HJ-NP-Z2-9]{6}(\?.*)?$/, {timeout: 120000});
     code = new URL(H.page.url()).pathname.split('/').pop();
     await H.page.waitForSelector('[data-pn-drawer="invite"]', {timeout: 60000}).catch(() => {});
@@ -898,13 +910,18 @@ try {
         await resize(P.page, {width: 320, height: 568}, 500);
         const bar320 = await P.page.evaluate(() => {
             const codeR = document.querySelector('[data-pn-code]')?.getBoundingClientRect();
+            const modeEl = document.querySelector('[data-pn-mode-label]');
+            const modeR = modeEl?.getBoundingClientRect();
             const line = document.querySelector('[data-pn-status-line]')?.getBoundingClientRect();
             const nav = document.querySelector('[data-pn-topbar] nav')?.getBoundingClientRect();
-            return {code: codeR ? Math.round(codeR.height) : null, shown: !!codeR && codeR.width > 0, clear: !!line && !!nav && line.right <= nav.left + 1,
-                paused: document.querySelector('[data-pn-table-status]')?.getAttribute('data-pn-table-status') ?? null};
+            return {
+                mode: modeEl?.textContent ?? null, modeH: modeR ? Math.round(modeR.height) : null, modeShown: !!modeR && modeR.width > 0,
+                code: codeR && codeR.width > 0 ? Math.round(codeR.height) : 0, clear: !!line && !!nav && line.right <= nav.left + 1,
+                paused: document.querySelector('[data-pn-table-status]')?.getAttribute('data-pn-table-status') ?? null,
+            };
         });
-        check('…and at 320 px, back online with the game paused, the table code reads on one line beside the paused mark, clear of the buttons',
-            bar320.shown && bar320.code !== null && bar320.code <= 16 && bar320.clear, JSON.stringify(bar320));
+        check('…and at 320 px, back online with the game paused, the game ("Texas hold\'em") reads on one line beside the paused mark, clear of the buttons; the code steps aside below 400 px (the Invite sheet has it)',
+            bar320.modeShown && bar320.mode === "Texas hold'em" && bar320.modeH !== null && bar320.modeH <= 16 && bar320.code === 0 && bar320.clear, JSON.stringify(bar320));
         await shot(P.page, '08-topbar-paused-320x568');
         await resize(P.page, {width: 390, height: 844}, 300);
 
@@ -914,8 +931,8 @@ try {
         const byKey = await H.page.waitForSelector('[data-pn-drawer="hands"]', {timeout: 10000}).then(() => true, () => false);
         await sleep(400);
         const onH = await guideOf(H.page, '[data-pn-drawer="hands"]');
-        check('H at the table opens the Hands guide: the ten rankings first, then the kicker pair, then Texas hold\'em under "At this table"',
-            byKey && guideOk(onH) && onH.first === 'holdem' && onH.order === 'rankings,ties,here', JSON.stringify(onH));
+        check('H at the table opens the Hands guide: the ten rankings first, then the kicker pair, then Texas hold\'em under "At this table", then PLO',
+            byKey && guideOk(onH) && onH.first === 'holdem' && onH.order === 'rankings,ties,here,games', JSON.stringify(onH));
         await wording(H.page, 'the Hands drawer', '[data-pn-drawer="hands"]');
         await shot(H.page, '09-hands-drawer-1440');
         await H.page.keyboard.press('Escape');
@@ -928,7 +945,7 @@ try {
             const g = await guideOf(P.page, '[data-pn-drawer="hands"]');
             const m = await targets(P.page, '[data-pn-drawer="hands"]');
             check(`the Hands drawer from P's menu at ${sizeName(size)}: the rankings first, the first one whole on the first screen, every example inside its row, nothing sideways, its targets 44 px${size.width === 320 ? ', 40 px cards' : ''}`,
-                byMenu && guideOk(g) && targetsOk(m) && g.order === 'rankings,ties,here' && g.firstRank <= g.vh && (size.width !== 320 || g.card === 40), `${JSON.stringify(g)} ${brief(m)}`);
+                byMenu && guideOk(g) && targetsOk(m) && g.order === 'rankings,ties,here,games' && g.firstRank <= g.vh && (size.width !== 320 || g.card === 40), `${JSON.stringify(g)} ${brief(m)}`);
             await shot(P.page, `09-hands-drawer-${sizeFile(size)}`);
         }
         await resize(P.page, {width: 390, height: 844});
@@ -1404,7 +1421,7 @@ try {
     {
         await hostOp(H, {op: 'end'}).catch(() => null);
         await H.page.goto(`${BASE}/poker-night`, {waitUntil: 'load', timeout: 180000});
-        await H.page.click('[data-quick-start]');
+        await H.page.click('[data-quick-start="holdem"]');
         await H.page.waitForURL(/\/play\/[A-HJ-NP-Z2-9]{6}(\?.*)?$/, {timeout: 120000});
         code = new URL(H.page.url()).pathname.split('/').pop();
         await H.page.waitForSelector('[data-pn-drawer="invite"]', {timeout: 60000}).catch(() => {});
@@ -1701,7 +1718,7 @@ try {
         await wording(Hm.page, 'the start form\'s rebuys', '[data-create-table] [data-field="rebuys"]');
 
         await H.page.goto(`${BASE}/poker-night`, {waitUntil: 'load', timeout: 180000});
-        await H.page.click('[data-quick-start]');
+        await H.page.click('[data-quick-start="holdem"]');
         await H.page.waitForURL(/\/play\/[A-HJ-NP-Z2-9]{6}(\?.*)?$/, {timeout: 120000});
         code = new URL(H.page.url()).pathname.split('/').pop();
         await H.page.waitForSelector('[data-pn-drawer="invite"]', {timeout: 60000}).catch(() => {});
@@ -2165,6 +2182,306 @@ try {
             && ledgerRow(landedE, E)?.bought === amountE, JSON.stringify({landed: landedE !== null}));
         await H.page.unroute('**/api/poker-night/*/tick', quiet);
         await hostOp(H, {op: 'end'}).catch(() => null);
+    }
+
+    // ═══ PLO (P5): picking it, four cards on every phone, pot limit, the showdown ════════════════
+    // The lobby's buttons (Texas hold'em one tap, PLO beside it, each 44 px at every phone size) and
+    // the start form's Game choice; "Start PLO" opens a PLO table whose top bar, invite sheet and join
+    // card name the game, "How it plays" opening the Hands guide on PLO. Three guests on 390 × 844,
+    // 375 × 667 and 320 × 568 phones: each dock fans four cards, every card at least half in sight,
+    // every other seat four backs, nothing sideways, every target 44 px — and on their sides at
+    // 844 × 390, 667 × 375 and 568 × 320. No other context's answer, page HTML or RSC payload carries a
+    // hole (two cards of one or more). The first actor's raise panel tops out at Pot, says "(pot)", and
+    // its confirm lands a raise to the server's own cap. The hand checked down to a showdown: every hand
+    // of four turned up overlapping on every phone, the banner clear of them, the winner the one QA's
+    // own Omaha brute force finds, the lit cards two of that hand and three of the board. The host
+    // switches back to Texas hold'em: the countdown says so, the next deal toasts it and deals two.
+    {
+        const unisolate = (text) => (text ?? '').replace(/[⁨⁩]/g, '');
+        await hostOp(H, {op: 'end'}).catch(() => null);
+        await H.page.goto(`${BASE}/poker-night`, {waitUntil: 'load', timeout: 180000});
+        await H.page.waitForSelector('[data-quick-start="plo"]', {timeout: 60000});
+        const quick = await H.page.$$eval('[data-quick-start]', (els) => els.map((el) => [el.getAttribute('data-quick-start'), el.textContent?.trim() ?? '']));
+        check('the lobby: "Start a table" (Texas hold\'em, one tap) and "Start PLO" under it',
+            JSON.stringify(quick) === JSON.stringify([['holdem', POKER_NIGHT_COPY.quickStart], ['plo', POKER_NIGHT_COPY.quickPlo]]), JSON.stringify(quick));
+        await H.page.click('[data-poker-night-setup] summary');
+        await H.page.waitForSelector('[data-pn-choice="game"]', {timeout: 10000});
+        const formGame = await H.page.$$eval('[data-pn-choice="game"] [role="radio"]', (els) => els.map((el) => [el.getAttribute('data-pn-option'), el.getAttribute('aria-checked')]));
+        await H.page.click('[data-pn-choice="game"] [data-pn-option="plo"]');
+        const ploChecked = await H.page.getAttribute('[data-pn-choice="game"] [data-pn-option="plo"]', 'aria-checked');
+        check('…"Set it up first" opens with the Game choice: Texas hold\'em (chosen) and PLO, a tap choosing PLO',
+            JSON.stringify(formGame) === JSON.stringify([['holdem', 'true'], ['plo', 'false']]) && ploChecked === 'true', JSON.stringify({formGame, ploChecked}));
+        await wording(H.page, 'the lobby with the games', '[data-poker-night-start]');
+        {
+            const strings = (value) => (typeof value === 'string' ? [value] : value && typeof value === 'object' ? Object.values(value).flatMap(strings) : []);
+            const fixed = [
+                ...strings(MODE_COPY.short), ...strings(MODE_COPY.spoken), ...strings(MODE_COPY.pick), MODE_COPY.gameLabel, MODE_COPY.nextHand('PLO'),
+                MODE_COPY.nextHandIn('PLO', 4), MODE_COPY.changed('Pot-limit Omaha'), ACTION_COPY.potRaise(340), ACTION_COPY.potBet(120), JOIN_COPY.howItPlays,
+                JOIN_COPY.terms('PLO', 10, 20, 2000), INVITE_COPY.mode('PLO'), INVITE_COPY.shareText("Ana's table", 'Pot-limit Omaha'),
+                INVITE_COPY.ogDescription('Pot-limit Omaha'), POKER_NIGHT_COPY.quickPlo, POKER_NIGHT_COPY.subtitle, ...strings(HANDS_COPY.games.plo),
+                HANDS_COPY.ploExample, HANDS_COPY.ploHand, HANDS_COPY.ploBoard,
+            ];
+            const hits = fixed.flatMap((text) => wordingOf(text).map((hit) => `"${text.slice(0, 40)}": ${hit}`));
+            check(`the no-advice list (and no Hold/Buy/Sell opener, no currency word) over PLO's strings as written (${fixed.length})`, hits.length === 0, hits.slice(0, 4).join(' | '));
+        }
+        // The quick starts and the Game cards on a phone: each 44 px or more, inside the screen, none over another.
+        const startTargets = (page) => page.evaluate(() => {
+            const vw = innerWidth;
+            const els = [...document.querySelectorAll('[data-quick-start], [data-pn-choice="game"] [role="radio"]')];
+            const rects = els.map((el) => el.getBoundingClientRect());
+            const hit = (a, b) => a.left < b.right - 1 && b.left < a.right - 1 && a.top < b.bottom - 1 && b.top < a.bottom - 1;
+            let overlaps = 0;
+            for (let i = 0; i < rects.length; i++) for (let j = i + 1; j < rects.length; j++) if (hit(rects[i], rects[j])) overlaps++;
+            return {
+                count: els.length, small: rects.filter((r) => r.width < 43.5 || r.height < 43.5).map((r) => `${Math.round(r.width)}×${Math.round(r.height)}`),
+                outside: rects.filter((r) => r.left < -1 || r.right > vw + 1).length, overlaps, scroll: document.documentElement.scrollWidth - vw,
+            };
+        });
+        for (const size of SIZES.slice(0, 3)) {
+            await Hm.page.goto(`${BASE}/poker-night`, {waitUntil: 'load', timeout: 180000});
+            await resize(Hm.page, size);
+            await Hm.page.waitForSelector('[data-quick-start="plo"]', {timeout: 60000});
+            await Hm.page.click('[data-poker-night-setup] summary').catch(() => {});
+            await Hm.page.waitForSelector('[data-pn-choice="game"]', {timeout: 10000}).catch(() => {});
+            await sleep(300);
+            const m = await startTargets(Hm.page);
+            check(`the lobby's start at ${sizeName(size)}: both quick starts and the two Game cards 44 px or more, inside the screen, none over another, nothing sideways`,
+                m.count === 4 && m.small.length === 0 && m.outside === 0 && m.overlaps === 0 && m.scroll <= 0, JSON.stringify(m));
+            await shot(Hm.page, `30-plo-start-${sizeFile(size)}`);
+        }
+
+        await H.page.click('[data-quick-start="plo"]');
+        await H.page.waitForURL(/\/play\/[A-HJ-NP-Z2-9]{6}(\?.*)?$/, {timeout: 120000});
+        code = new URL(H.page.url()).pathname.split('/').pop();
+        const inviteMode = await H.page.waitForSelector('[data-invite-mode]', {timeout: 60000}).then((el) => el.textContent(), () => null);
+        await shot(H.page, '31-plo-invite-1440');
+        await H.page.keyboard.press('Escape');
+        H.pid = (await roomDoc()).state.hostPid;
+        let d = await roomDoc();
+        const barMode = await H.page.textContent('[data-pn-mode-label]').catch(() => null);
+        check('"Start PLO" opens a PLO table on one board: the top bar says "PLO", the invite sheet "Game: PLO"',
+            d.state.config.variant === 'plo' && d.state.config.boards === 1 && barMode === MODE_COPY.short.plo && inviteMode === INVITE_COPY.mode('PLO'),
+            JSON.stringify({config: [d.state.config.variant, d.state.config.boards], barMode, inviteMode}));
+
+        const ploPlayers = [[390, 844, 'Amy'], [375, 667, 'Bo'], [320, 568, 'Cal']];
+        const guests = [];
+        for (const [width, height, name] of ploPlayers) {
+            const g = await newPlayer(`plo-${name}`, PHONE(width, height));
+            g.size = {width, height};
+            guests.push(g);
+        }
+        // The first guest reads the join card and opens "How it plays" before sitting.
+        {
+            const g = guests[0];
+            await g.page.goto(`${BASE}/play/${code}`, {waitUntil: 'load', timeout: 120000});
+            await g.page.waitForSelector('[data-join-card="visitor"]', {timeout: 60000});
+            const terms = await g.page.textContent('[data-join-terms]');
+            await g.page.click('[data-join-how]');
+            const drawer = await g.page.waitForSelector('[data-pn-drawer="hands"]', {timeout: 10000}).then(() => true, () => false);
+            await sleep(400);
+            const here = await g.page.getAttribute('[data-pn-drawer="hands"] [data-guide-here]', 'data-guide-game').catch(() => null);
+            const ploCards = await g.page.locator('[data-pn-drawer="hands"] [data-guide-plo] .pn-card').count();
+            const lifted = await g.page.locator('[data-pn-drawer="hands"] [data-guide-plo] .pn-card[data-state="win"]').count();
+            await shot(g.page, '32-plo-how-it-plays-390x844');
+            await wording(g.page, 'the Hands drawer on PLO', '[data-pn-drawer="hands"]');
+            check('the join card names the game first ("PLO · Blinds 10/20 · 2,000 chips to start") and "How it plays" opens the Hands guide on PLO for a visitor: its hand of four on one board, the five that play lifted',
+                (terms ?? '').trim() === JOIN_COPY.terms('PLO', 10, 20, 2000) && drawer && here === 'plo' && ploCards === 9 && lifted === 5, JSON.stringify({terms, drawer, here, ploCards, lifted}));
+            await g.page.keyboard.press('Escape');
+            await g.page.waitForSelector('[data-pn-drawer="hands"]', {state: 'detached', timeout: 10000}).catch(() => {});
+        }
+        for (const [i, g] of guests.entries()) await sitDown(g, ploPlayers[i][2]);
+        await hostOp(H, {op: 'config', patch: {turnSeconds: 120}});
+        const started = await hostOp(H, {op: 'start'});
+        d = await waitDoc((x) => x.state.hand?.phase === 'betting', 30000);
+        check('…three guests sit down beside the host and the first PLO hand is dealt: four cards each', started.status === 200 && d !== null
+            && d.state.hand.variant === 'plo' && d.state.hand.seats.length === 4 && d.state.hand.seats.every((p) => p.hole.length === 4), `${started.status}`);
+        const handNo = d.state.hand.no;
+        const dealtAt = Date.now() - 5000;
+        const all = [H, ...guests];
+        // The table laid out on a phone mid-hand (the early choices are the dock's row then).
+        const layoutOk = (m) => m.plates === 4 && m.outside === 0 && m.overlaps === 0 && m.small.length === 0 && m.scroll <= 0 && m.overDock === 0 && m.dockRight !== false;
+        const holeOf = (doc, p) => handSeat(doc, p)?.hole ?? [];
+
+        // The docks: four cards in a fan, each at least half in sight; four backs on every other plate.
+        const dockFan = (p) => p.page.evaluate(() => {
+            const cards = [...document.querySelectorAll('[data-pn-dock] .pn-hole .pn-card')].map((el) => el.getBoundingClientRect());
+            const vw = innerWidth;
+            const shownShare = cards.map((r, i) => {
+                const next = cards[i + 1];
+                const visible = next ? Math.min(r.right, next.left) - r.left : r.width;
+                return visible / r.width;
+            });
+            const bar = document.querySelector('[data-pn-topbar]')?.getBoundingClientRect().bottom ?? 0;
+            const emote = document.querySelector('[data-pn-dock] [data-pn-emotes-open]')?.getBoundingClientRect();
+            return {
+                count: cards.length, minShown: Math.min(...shownShare), inside: cards.every((r) => r.left >= -1 && r.right <= vw + 1),
+                // Under the top bar, and on one row with the emote button.
+                clear: cards.every((r) => r.top >= bar - 0.5), row: !!emote && cards.length > 0 && emote.top < Math.max(...cards.map((r) => r.bottom)),
+                backs: [...document.querySelectorAll('[data-seat]:not([data-me]) .pn-seat-cards')].map((el) => el.getAttribute('data-count')),
+            };
+        });
+        // Each screen has the deal and has played it: four cards in the dock, none still flying in.
+        await sleep(1500);
+        const dealtIn = (p) => p.page.waitForFunction(() => document.querySelectorAll('[data-pn-dock] .pn-hole[data-count="4"] .pn-card').length === 4
+            && !document.querySelector('[data-pn-dock] [data-anim="deal"], .pn-seat-cards [data-anim="deal"]'), null, {timeout: 20000}).catch(() => {});
+        for (const p of all) await dealtIn(p);
+        for (const g of guests) {
+            await dealtIn(g);
+            const fan = await dockFan(g);
+            const m = await tableLayout(g.page);
+            check(`PLO at ${sizeName(g.size)}: the dock fans four cards, each at least half in sight, on screen; three other plates show four backs; the table laid out (plates apart, nothing sideways, every target 44 px)`,
+                fan.count === 4 && fan.minShown >= 0.5 && fan.inside && fan.clear && fan.row && fan.backs.length === 3 && fan.backs.every((b) => b === '4') && layoutOk(m),
+                JSON.stringify({fan, m}));
+            await shot(g.page, `33-plo-dock-${sizeFile(g.size)}`);
+        }
+        // On its side: each phone turned.
+        for (const g of guests) {
+            const side = {width: g.size.height, height: g.size.width};
+            await resize(g.page, side);
+            const fan = await dockFan(g);
+            const m = await tableLayout(g.page);
+            check(`…and on its side at ${sizeName(side)}: the fan whole, in the dock's column, under the top bar and on one row with the emote button, the table laid out`,
+                fan.count === 4 && fan.minShown >= 0.5 && fan.inside && fan.clear && fan.row && layoutOk(m), JSON.stringify({fan, m}));
+            await shot(g.page, `33-plo-dock-${sizeFile(side)}`);
+            await resize(g.page, g.size);
+        }
+        await shot(H.page, '33-plo-table-1440');
+
+        // No hole leaves its own context: two cards of a hidden hand in any array of two to four.
+        const leaks = (doc, label) => {
+            const out = [];
+            for (const p of all) {
+                const hidden = all.filter((q) => q !== p).map((q) => holeOf(doc, q)).filter((h) => h.length === 4);
+                for (const {body} of p.bodies.filter((b) => b.at >= dealtAt && b.url.includes(`/api/poker-night/${code}/`))) {
+                    walk(body, null, (node, key) => {
+                        if (!Array.isArray(node) || node.length < 2 || node.length > 4 || NOT_CARDS.has(key)) return;
+                        if (!node.every((n) => Number.isInteger(n) && n >= 0 && n < 52)) return;
+                        for (const h of hidden) if (node.filter((c) => h.includes(c)).length >= 2) out.push(`${label}: ${p.name} ${key} ${JSON.stringify(node)}`);
+                    });
+                }
+            }
+            return out;
+        };
+        d = await roomDoc();
+        const preflopLeaks = leaks(d, 'preflop');
+        const pageLeaks = [];
+        // A hand of four as a page carries it: any array of four numbers, and any pair, in the HTML's flight data and the RSC payload.
+        const quadsIn = (text) => [...text.matchAll(/[(d{1,2}),(d{1,2}),(d{1,2}),(d{1,2})]/g)].map((m) => m.slice(1, 5).map(Number));
+        for (const p of guests) {
+            const html = flightOf(await (await p.context.request.get(`${BASE}/play/${code}`, {timeout: 90000})).text());
+            const rsc = await (await p.context.request.get(`${BASE}/play/${code}`, {headers: {RSC: '1'}, timeout: 90000})).text();
+            for (const q of all.filter((x) => x !== p)) {
+                const hole = holeOf(d, q);
+                const inText = (text) => quadsIn(text).some((quad) => sameCards(quad, hole))
+                    || pairsInText(text).some((pair) => pair.every((c) => hole.includes(c)));
+                if (inText(html) || inText(rsc)) pageLeaks.push(`${p.name} carries ${q.name}'s`);
+            }
+        }
+        check('no other context\'s answers, page HTML or RSC payload carry two cards of a hand of four', preflopLeaks.length === 0 && pageLeaks.length === 0,
+            [...preflopLeaks, ...pageLeaks].slice(0, 3).join(' | '));
+
+        // The first actor's raise panel: Pot is the top, it says so, and its confirm lands the cap.
+        const {doc: turnDoc, actor} = await nextTurn(handNo);
+        const legal = legalFor(snapshotFromState(turnDoc.state), turnDoc.state.hand.actor);
+        const cap = legal.raise.max;
+        const stackTo = turnDoc.state.seats[turnDoc.state.hand.actor].stack + handSeat(turnDoc, actor).streetBet;
+        await actor.page.waitForSelector('[data-pn-actions][data-pn-armed]', {timeout: 20000});
+        await actor.page.click('[data-pn-action="raise"]');
+        await actor.page.waitForSelector('[data-pn-raise]', {timeout: 10000});
+        const sizes = await actor.page.$$eval('[data-pn-raise] [data-size]', (els) => els.map((el) => el.getAttribute('data-size')));
+        await actor.page.click('[data-pn-raise] [data-size="pot"]');
+        const confirmText = (await actor.page.textContent('[data-pn-action="confirm"]'))?.trim() ?? '';
+        const raiseM = await targets(actor.page, '[data-pn-raise]');
+        await shot(actor.page, `34-plo-pot-raise-${actor.size ? sizeFile(actor.size) : '1440'}`);
+        const turn = turnDoc.state.turn;
+        await actor.page.click('[data-pn-action="confirm"]');
+        await waitMoved(turn, handNo);
+        d = await roomDoc();
+        const last = d.state.hand.log.at(-1);
+        check(`pot limit: ${actor.name}'s raise panel tops out at Pot (no all-in, the stack of ${stackTo} past the cap of ${cap}), its confirm reads "${ACTION_COPY.potRaise(cap)}", and lands a raise to exactly the cap`,
+            cap < stackTo && sizes.at(-1) === 'pot' && !sizes.includes('all-in') && confirmText === ACTION_COPY.potRaise(cap) && targetsOk(raiseM)
+            && handSeat(d, actor)?.streetBet === cap && last?.[3] === cap && (last?.[4] & 1) === 0,
+            JSON.stringify({cap, stackTo, sizes, confirmText, bet: handSeat(d, actor)?.streetBet, last, m: brief(raiseM)}));
+
+        // Everyone calls and checks it down: the flop's answers carry no hole either.
+        let flopChecked = false;
+        const done = await playByClicks(handNo, {
+            choose: () => 'call',
+            onStreet: async (doc) => {
+                if (doc.state.hand.street !== 'flop' || flopChecked) return;
+                flopChecked = true;
+                await sleep(800);
+                const flopLeaks = leaks(await roomDoc(), 'flop');
+                check('…on the flop too, no other context\'s answer carries two cards of a hand of four', flopLeaks.length === 0, flopLeaks.slice(0, 3).join(' | '));
+            },
+        });
+        await hostOp(H, {op: 'pause'});
+        const result = done.state.hand.result;
+        const board = done.state.hand.boards[0];
+        // QA's own Omaha: every two of the four with every three of the board.
+        const omaha = (hole) => {
+            let top = -1;
+            for (let a = 0; a < 4; a++) for (let b = a + 1; b < 4; b++) for (let c = 0; c < 5; c++) for (let e = c + 1; e < 5; e++) for (let f = e + 1; f < 5; f++) {
+                top = Math.max(top, evaluateCards([hole[a], hole[b], board[c], board[e], board[f]]));
+            }
+            return top;
+        };
+        const live = done.state.hand.seats.filter((p) => !p.folded);
+        const values = new Map(live.map((p) => [p.seat, omaha(p.hole)]));
+        const topValue = Math.max(...values.values());
+        const expected = live.filter((p) => values.get(p.seat) === topValue).map((p) => p.seat).sort((a, b) => a - b);
+        check('the showdown: every hand of four turned up, the pot to the hand QA\'s own Omaha finds strongest (exactly two of four with three of the board)',
+            result.showdown && result.hands.length === live.length && result.hands.every((h) => h.cards.length === 4)
+            && JSON.stringify([...result.pots[0].winners[0]].sort((a, b) => a - b)) === JSON.stringify(expected), JSON.stringify({pots: result.pots, expected, values: [...values]}));
+        await sleep(2500);
+        const winnerHoles = expected.map((seat) => live.find((p) => p.seat === seat).hole);
+        for (const p of all) {
+            const seen = await p.page.evaluate(() => {
+                const rect = (el) => el.getBoundingClientRect();
+                const hit = (a, b) => a.left < b.right - 1 && b.left < a.right - 1 && a.top < b.bottom - 1 && b.top < a.bottom - 1;
+                const banner = [...document.querySelectorAll('.pn-banner')].map(rect).filter((r) => r.width > 0);
+                const hands = [...document.querySelectorAll('.pn-seat-shown')].map((el) => ({count: el.getAttribute('data-count'), r: rect(el)}));
+                return {
+                    lit: [...new Set([...document.querySelectorAll('main .pn-card[data-state="win"]')].map((el) => el.getAttribute('data-card')))],
+                    hands: hands.map((h) => h.count),
+                    bannerOver: banner.some((b) => hands.some((h) => hit(b, h.r))), banner: banner.length,
+                    scroll: document.documentElement.scrollWidth - innerWidth,
+                };
+            });
+            const litCards = winnerHoles.flatMap((hole) => hole.filter((c) => seen.lit.includes(cardLabel(c))));
+            const litBoard = board.filter((c) => seen.lit.includes(cardLabel(c)));
+            const fiveOk = expected.length > 1 || (litCards.length === 2 && litBoard.length === 3
+                && evaluateCards([...litCards, ...litBoard]) === topValue);
+            check(`…on ${p.name}'s screen${p.size ? ` (${sizeName(p.size)})` : ''}: the other hands of four turned up overlapping, the banner clear of them, the lit cards two of the winning hand and three of the board`,
+                seen.hands.length === 3 && seen.hands.every((c) => c === '4') && seen.banner === 1 && !seen.bannerOver && fiveOk
+                && winnerHoles.every((hole) => hole.filter((c) => seen.lit.includes(cardLabel(c))).length === 2) && seen.scroll <= 0,
+                JSON.stringify({...seen, litCards: litCards.map(cardLabel), litBoard: litBoard.map(cardLabel)}));
+            await shot(p.page, `35-plo-showdown-${p.size ? sizeFile(p.size) : '1440'}`);
+        }
+
+        // Back to Texas hold'em from the host drawer, from the next hand.
+        await H.page.click('[data-open="host"]');
+        await H.page.click('[data-host-tab="game"]');
+        await H.page.waitForSelector('[data-pn-choice="host-game"]', {timeout: 10000});
+        const hostGame = await targets(H.page, '[data-pn-choice="host-game"]');
+        await H.page.click('[data-pn-choice="host-game"] [data-pn-option="holdem"]');
+        await H.page.click('[data-host-section="game"] [data-host-save]');
+        const back = await waitDoc((x) => x.state.config.variant === 'holdem', 10000);
+        await shot(H.page, '36-plo-host-game-1440');
+        await H.page.keyboard.press('Escape');
+        await hostOp(H, {op: 'resume'});
+        const countdown = await guests[0].page.waitForSelector('[data-pn-next-game]', {timeout: 30000}).then((el) => el.textContent(), () => null);
+        const dealt2 = await waitDoc((x) => x.state.hand?.no === handNo + 1, 30000);
+        const toast = await toasted(guests[0].page, MODE_COPY.changed("Texas hold'em"), 15000);
+        await guests[0].page.waitForFunction(() => document.querySelectorAll('[data-pn-dock] .pn-hole .pn-card').length === 2, null, {timeout: 20000}).catch(() => {});
+        const twoCards = await guests[0].page.locator('[data-pn-dock] .pn-hole[data-count="2"] .pn-card').count();
+        const barBack = await guests[0].page.textContent('[data-pn-mode-label]').catch(() => null);
+        check('the host drawer\'s Game switches the table back to Texas hold\'em (two 44 px cards), saved from the next hand: the countdown says "Next hand: Texas hold\'em, in …", the deal toasts "New game from this hand: Texas hold\'em." and deals two cards',
+            targetsOk(hostGame) && hostGame.count === 2 && back !== null && /^Next hand: Texas hold'em, in \d+ s$/.test(unisolate(countdown ?? '').trim())
+            && dealt2?.state.hand.variant === 'holdem' && toast && twoCards === 2 && barBack === MODE_COPY.short.holdem,
+            JSON.stringify({m: brief(hostGame), countdown, dealt: dealt2?.state.hand.variant, toast, twoCards, barBack}));
+        await hostOp(H, {op: 'end'}).catch(() => null);
+        for (const g of guests) g.gone = true;
     }
 
     await hostOp(H, {op: 'end'}).catch(() => null);

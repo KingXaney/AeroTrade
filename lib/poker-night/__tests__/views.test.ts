@@ -15,11 +15,11 @@ import {legalFor, snapshotFromState} from '@/lib/poker-night/betting';
 import {nextDueAt} from '@/lib/poker-night/clock';
 import {ASKS, KEEP} from '@/lib/poker-night/config';
 import {paidParts} from '@/lib/poker-night/pots';
-import {readShown} from '@/lib/poker-night/variants';
+import {handValue, readShown} from '@/lib/poker-night/variants';
 import {reduce} from '@/lib/poker-night/engine';
 import {chipsOf, inPotOf, ledgerEvents, netOf} from '@/lib/poker-night/ledger';
 import {seatOf} from '@/lib/poker-night/seats';
-import type {PreAction, TableState} from '@/lib/poker-night/types';
+import type {PreAction, TableState, Variant} from '@/lib/poker-night/types';
 import {
     bankDetailView, bankOf, clockLeaderOf, historyView, livePots, nudgeKey, peopleIds, playerView, publicView, snapshotFromView, WIRE_KINDS, wireView,
 } from '@/lib/poker-night/views';
@@ -102,7 +102,8 @@ const stringsIn = (value: unknown): string[] => JSON.stringify(value).match(/"(?
 
 const SEAT_LISTS = new Set(['eligible', 'winners', 'shares', 'showOrder']);
 
-// What a view shows that it should not: a private key, another player's hidden hole pair, an id.
+// What a view shows that it should not: a private key, another player's hidden hole (two cards, or a
+// PLO hand's four), an id.
 const leaksIn = (view: unknown, s: TableState, viewer: string | null): string[] => {
     const problems: string[] = [];
     const keys = keysIn(view);
@@ -111,9 +112,9 @@ const leaksIn = (view: unknown, s: TableState, viewer: string | null): string[] 
     }
     const hidden = new Set(hiddenHoles(s, viewer).map((h) => [...h].sort((x, y) => x - y).join(',')));
     for (const {key, array} of arraysIn(view)) {
-        if (array.length !== 2 || SEAT_LISTS.has(key)) continue;
-        const pair = [...array as number[]].sort((x, y) => x - y).join(',');
-        if (hidden.has(pair)) problems.push(`hole ${pair} under ${key}`);
+        if (array.length < 2 || array.length > 4 || SEAT_LISTS.has(key)) continue;
+        const hole = [...array as number[]].sort((x, y) => x - y).join(',');
+        if (hidden.has(hole)) problems.push(`hole ${hole} under ${key}`);
     }
     for (const text of stringsIn(view)) if (/^[0-9a-f]{24}$/.test(text)) problems.push(`id ${text}`);
     return problems;
@@ -121,15 +122,16 @@ const leaksIn = (view: unknown, s: TableState, viewer: string | null): string[] 
 const expectNoLeak = (view: unknown, s: TableState, viewer: string | null) => expect(leaksIn(view, s, viewer)).toEqual([]);
 
 // States from seeded nights, every few steps.
-const nightStates = (seeds: number, steps: number): TableState[] => {
+const nightStates = (seeds: number, steps: number, variant: Variant = 'holdem'): TableState[] => {
     const out: TableState[] = [];
     for (let seed = 1; seed <= seeds; seed++) {
         let k = 0;
-        for (const {state} of randomNight(seed, steps)) if (k++ % 3 === 0) out.push(state);
+        for (const {state} of randomNight(seed, steps, variant)) if (k++ % 3 === 0) out.push(state);
     }
     return out;
 };
-const STATES = nightStates(12, 500);
+// Texas hold'em and PLO (four cards each, pot limit).
+const STATES = [...nightStates(12, 500), ...nightStates(6, 500, 'plo')];
 
 describe('the non-leak property', () => {
     it('gives equal views of states that differ only in what is private', () => {
@@ -354,7 +356,7 @@ describe('what the client works out from the wire view', () => {
                     continue;
                 }
                 const all = [...hand.boards[0], ...h.cards];
-                expect(read.reads[0].value).toBe(evaluateCards(all));
+                expect(read.reads[0].value).toBe(hand.variant === 'plo' ? handValue('plo', h.cards, hand.boards[0]) : evaluateCards(all));
                 expect(evaluateCards(read.reads[0].best)).toBe(read.reads[0].value);
                 expect(read.reads[0].best.every((c) => all.includes(c))).toBe(true);
             }
@@ -367,17 +369,21 @@ describe('what the client works out from the wire view', () => {
 });
 
 describe('the client\'s legal moves', () => {
-    it('rebuilt from the wire view, equal the server\'s for every seat of every state', () => {
+    it('rebuilt from the wire view, equal the server\'s for every seat of every state, the pot limit\'s cap included', () => {
         let compared = 0;
+        let capped = 0;
         for (const s of STATES) {
             const view = wireView(s, meta(s));
+            if (s.hand?.phase === 'betting') expect(snapshotFromView(view).pot).toBe(snapshotFromState(s).pot);
             for (let seat = 0; seat < s.seats.length; seat++) {
                 const server = legalFor(snapshotFromState(s), seat);
                 expect(legalFor(snapshotFromView(view), seat)).toEqual(server);
                 if (server) compared++;
+                if (server?.raise && server.raise.max < s.hand!.seats.find((p) => p.seat === seat)!.streetBet + s.seats[seat]!.stack) capped++;
             }
         }
         expect(compared).toBeGreaterThan(150);
+        expect(capped).toBeGreaterThan(20);
     });
 });
 

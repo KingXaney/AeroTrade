@@ -130,7 +130,8 @@ and friends keep none beyond Shared and the invariants).
   over the lobby's chip from the panel's own read, one per request through React's `cache`); the panel
   `components/home/HomePokerNight` (props only) is drawn only when it has a row — the tables the
   reader holds a seat at (Rejoin) or hosts from outside one (Open), then friends' shown open tables
-  (Join), `HOME_LIMITS` of each, and "Learn the hands" (`/poker-night?tab=hands`). Its read,
+  (Join), `HOME_LIMITS` of each, each row's line opening with its table's game (`lobby.tableLine`: "PLO · …"),
+  and "Learn the hands" (`/poker-night?tab=hands`). Its read,
   `lib/poker-night/lobby-store.getHomePokerNight` (null with the kill switch on or no row), shaped by
   the pure `lib/poker-night/lobby.homePokerNight`, is streamed under `<Suspense fallback={null}>` by
   `PokerNightAsync`, declared in `app/(root)/page.tsx` because poker night's server guard keeps its
@@ -501,7 +502,7 @@ and friends keep none beyond Shared and the invariants).
   where a key is set and polling everywhere else, with its looks, emotes and the night's awards;
   the design and the phase still to come are `docs/specs/2026-10-06-poker-night.md`. State version 2
   (the modes work's P4) holds every stored field PLO, multi-board and Triple T need, so a later phase
-  only switches them on: `lib/poker-night/config.ENABLED` (Texas hold'em on one board for now) gates
+  only switches them on: `lib/poker-night/config.ENABLED` (Texas hold'em and PLO, one board, for now) gates
   the input paths (`checkConfig`: 'not-open') and the deal (`dealable`: a table set to a game this
   deploy does not deal waits between hands, its config intact), never the stored shape;
   `lib/poker-night/variants` (pure) is each game's evaluation (`handValue`, `bestHand`, Omaha's
@@ -509,6 +510,30 @@ and friends keep none beyond Shared and the invariants).
   `limitOf`, `autoDiscard`; a hand keeps its own `variant`, one five-card run per board in `deck`
   and what is out of each in `boards`, and a pot pays board by board (`winners`/`shares` are
   `number[][]`, split by `pots.splitBoards`, the odd chips to the first boards).
+- PLO (P5, one board): four cards each (`config.HOLE_CARDS`), a hand exactly two of them with exactly
+  three from the board (`variants.handValue`/`bestHand` over `hand-name.bestOmaha`; never "plays the
+  board", `playsBoardFor`), high only. Pot limit is `betting.legalFor`'s, on `BettingSnapshot.limit`
+  and `pot` (the server's Σ committed; the client's Σ `SeatView.inPot`): at most to the current bet
+  plus the pot after the call, never below the minimum, never past all in; the all-in move is a raise
+  only within the cap (`betting.allInOpen`), the call facing the whole stack, else 'illegal' — so the
+  raise panel's top is Pot (`bet-sizing.Sizing.cap`, `quickSizes`, `confirmLabel`) and its confirm
+  sends a raise to it (`bet-sizing.moveFor`), never an all-in over the cap. The game is the host's,
+  from the next hand: the lobby's one-tap buttons (`QuickStart`, `data-quick-start="holdem|plo"`,
+  Texas hold'em still the one tap) and `components/poker-night/GameChoice` in the start form and the
+  host drawer (`lobby.GAME_CHOICES`/`boardChoices`, `overlays.GameForm.variant`); `variants.modeOf`,
+  `nextModeOf` and `modeChanged` name the game in play and the next — the top bar's second line
+  (`data-pn-mode-label`, the code from 400 px), the felt before the first hand, the countdown when it
+  changes, a toast and an announcement at its first deal (the deal event's `changed`), the join
+  card's terms with "How it plays" (the Hands drawer on that game, for a visitor too), the invite
+  sheet, the link preview and every lobby and Home row (`LOBBY_PROJECTION` reads
+  `state.config.variant`/`boards`; `lobby.modeLine`); every name is `MODE_COPY`. The dock fans four
+  cards (`.pn-hole[data-count="4"]`, the night's width held by `data-slots`, at 0.8 of the card in the
+  column of a phone on its side so the emote button keeps its row) and names nothing
+  before the flop (`dock.handStrength(variant, …)`); a seat's four backs keep the two's footprint and
+  a turned-up four overlap by `stage.SHOWN_STEP` (`shownHandRect(…, count)` via
+  `BannerSeen.handSize`, which the banner and the pots keep clear of); the deal event carries its
+  card count, which the choreography deals round in the time two take. `budget.test` holds PLO's
+  heaviest table (pot raises to all in) to every budget too.
 - `lib/poker-night/engine.reduce` is the one way a table's state (`lib/poker-night/types`) changes:
   a pure reducer that clones once, never mutates its input and hands back the same reference for a
   no-op. Time, the deck and the first big blind's draw arrive inside the action, so a step replays
@@ -892,13 +917,15 @@ and friends keep none beyond Shared and the invariants).
   next deal ends every ask.
 - The Hands guide: `lib/poker-night/hands-guide` (pure) holds the ten rankings strongest first, each
   a five-card example with the cards that make it (`RANKING_EXAMPLES`), the kicker pair
-  (`KICKER_EXAMPLE`) and the games (`GUIDE_GAMES`: Texas hold'em for now, each with its glossary
-  entry and anchor; `guideGames` puts the table's own first among them — after the rankings and ties
-  in the drawer, which a player opens mid-game for the rankings). `hands-guide.test` holds every example
-  to the evaluator. `components/poker-night/HandsGuide` draws it with no hooks, so the lobby's Hands
+  (`KICKER_EXAMPLE`) and the games (`GUIDE_GAMES`: Texas hold'em and PLO for now, each with its
+  glossary entry, the limit's entry when it is not no limit (PLO's `pot-limit`) and its anchor;
+  `guideGames` puts the table's own first among them — `guideGameOf` of `variants.modeOf` at the
+  table — after the rankings and ties in the drawer, which a player opens mid-game for the rankings;
+  PLO's section draws `PLO_EXAMPLE`, one hand on one board, the five that play lifted).
+  `hands-guide.test` holds every example to the evaluator. `components/poker-night/HandsGuide` draws it with no hooks, so the lobby's Hands
   tab renders it on the server and `components/poker-night/HandsDrawer` at the table (the menu's
   Hands, the H key, any viewer). Each definition is the glossary's own short, quoted under its
-  `<Term>` (`hand-rankings`, `kicker`, `texas-holdem`, in the `poker-night` group), and
+  `<Term>` (`hand-rankings`, `kicker`, `texas-holdem`, `omaha`, `pot-limit`, in the `poker-night` group), and
   `HANDS_COPY` says only what they do not: the copy test rejects a run of five words shared with
   them. The lobby is two views (`?tab=play|hands`, `components/primitives/Tabs` at `size="md"`); the
   Hands tab reads nothing and shows with the kill switch on, and `[data-poker-night-lobby]` marks

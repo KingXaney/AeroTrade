@@ -166,7 +166,7 @@ describe('a game this deploy does not deal', () => {
         let s = moves(deal(table({0: 1000, 1: 1000, 2: 1000}, {lastBigBlind: 0})), F, F);
         expect(nextDue(s)?.kind).toBe('start');
         // As a state written by a later deploy (a rollback) may hold it.
-        s = {...s, config: {...s.config, variant: 'plo'}};
+        s = {...s, config: {...s.config, variant: 'triple-t'}};
         expect(nextDue(s)).toBeNull();
         expect(reduce(s, {type: 'start-hand', deck: [...FULL_DECK], draw: 0, at: s.nextHandAt!}).ok).toBe(true);
         const r = reduce(s, {type: 'start-hand', deck: [...FULL_DECK], draw: 0, at: s.nextHandAt!});

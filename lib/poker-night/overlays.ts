@@ -11,7 +11,7 @@ import {buyOptions, type BankRow} from '@/lib/poker-night/bank';
 import {parseChips} from '@/lib/poker-night/bet-sizing';
 import {ASKS, checkConfig, mergeConfig} from '@/lib/poker-night/config';
 import {configIssueText, TIMER_PRESETS} from '@/lib/poker-night/lobby';
-import type {AskAnswer, GameConfig, LedgerKind, RebuyPolicy} from '@/lib/poker-night/types';
+import type {AskAnswer, BoardCount, GameConfig, LedgerKind, RebuyPolicy, Variant} from '@/lib/poker-night/types';
 import type {AskBlock, AskView, JoinOutcome, JoinView, MeView, OwnNext, People, PlayerView, Presence, SeatView, TableView} from '@/lib/poker-night/view-types';
 import {ledgerRowOf, ledgerRows} from '@/lib/poker-night/views';
 
@@ -408,7 +408,7 @@ export const hostRowStatus = (row: HostRow): string => {
     return row.presence && row.presence !== 'here' ? `${where} · ${TABLE_COPY.presence[row.presence]}` : where;
 };
 
-// The settings form: the chip figures as typed, the rest as chosen.
+// The settings form: the chip figures as typed, the rest as chosen — the game and its boards too.
 export type GameForm = {
     smallBlind: string;
     bigBlind: string;
@@ -418,10 +418,12 @@ export type GameForm = {
     turnSeconds: number;
     rebuys: RebuyPolicy;
     maxRebuys: number | null;
+    variant: Variant;
+    boards: BoardCount;
 };
 
 export type GameField = keyof GameForm;
-export const GAME_FIELDS: readonly GameField[] = ['smallBlind', 'bigBlind', 'ante', 'buyInMin', 'buyInMax', 'turnSeconds'];
+export const GAME_FIELDS: readonly GameField[] = ['variant', 'boards', 'smallBlind', 'bigBlind', 'ante', 'buyInMin', 'buyInMax', 'turnSeconds'];
 export const REBUY_FIELDS: readonly GameField[] = ['rebuys', 'maxRebuys'];
 
 const plain = (n: number): string => String(n);
@@ -429,6 +431,7 @@ const plain = (n: number): string => String(n);
 export const gameFormOf = (c: GameConfig): GameForm => ({
     smallBlind: plain(c.smallBlind), bigBlind: plain(c.bigBlind), ante: plain(c.ante),
     buyInMin: plain(c.buyInMin), buyInMax: plain(c.buyInMax), turnSeconds: c.turnSeconds, rebuys: c.rebuys, maxRebuys: c.maxRebuys,
+    variant: c.variant, boards: c.boards,
 });
 
 // The turn timer's choices: the presets, and the table's own figure when it is not one of them.
@@ -462,6 +465,9 @@ export const checkGameForm = (config: GameConfig, form: GameForm, fields: readon
             case 'turnSeconds': values.turnSeconds = form.turnSeconds; break;
             case 'rebuys': values.rebuys = form.rebuys; break;
             case 'maxRebuys': values.maxRebuys = form.maxRebuys; break;
+            case 'variant': values.variant = form.variant; break;
+            // More than one board is PLO's alone: any other game is one.
+            case 'boards': values.boards = form.variant === 'plo' ? form.boards : 1; break;
         }
     }
     const checked = checkConfig(mergeConfig(config, values));

@@ -11,6 +11,7 @@ import {nextDueAt} from '@/lib/poker-night/clock';
 import {TIMING} from '@/lib/poker-night/config';
 import {reduce} from '@/lib/poker-night/engine';
 import {bestFive} from '@/lib/poker-night/hand-name';
+import {scheduleBatch} from '@/lib/poker-night/choreography';
 import {diffViews, EVENT_KINDS, type DiffableView, type TableEvent} from '@/lib/poker-night/events';
 import type {TableState} from '@/lib/poker-night/types';
 import {clockLeaderOf, wireView} from '@/lib/poker-night/views';
@@ -30,6 +31,36 @@ const only = <K extends TableEvent['kind']>(events: TableEvent[], kind: K) => ev
 const three = (stacks: [number, number, number] = [1000, 1000, 1000], config = {}) =>
     table({0: stacks[0], 1: stacks[1], 2: stacks[2]}, {config, lastBigBlind: 0});
 
+describe('the game a hand deals', () => {
+    it('deals four cards each in PLO, says when the game changed from the hand before, and turns a shown hand of four', () => {
+        let s = deal(three(), {board: '2c7d9s3s4c'});
+        s = moves(s, F, F);
+        s = ok(reduce(s, {type: 'host', by: pidOf(0), op: {op: 'config', patch: {variant: 'plo'}}, at: nowOf(s)}));
+        const before = view(s);
+        s = deal(s, {holes: {0: 'AhAcKsQd', 1: '7h7c2s3d', 2: 'JhTh9c8c'}, board: '2c7d9s3s4c'});
+        const [first] = only(diffViews(before, view(s)), 'deal');
+        expect(first).toMatchObject({cards: 4, variant: 'plo', boards: 1, changed: true});
+        // The next PLO hand is no change.
+        s = moves(s, F, F);
+        const again = view(s);
+        s = deal(s);
+        expect(only(diffViews(again, view(s)), 'deal')[0]).toMatchObject({cards: 4, changed: false});
+        // The showdown turns every card of a four-card hand, and the timeline has a moment for each.
+        s = moves(s, C, C, X);
+        for (let street = 0; street < 2; street++) s = moves(s, X, X, X);
+        s = moves(s, X, X);
+        const river = view(s);
+        s = moves(s, X);
+        const events = diffViews(river, view(s));
+        const [reveal] = only(events, 'reveal');
+        expect(reveal.hands.map((h) => h.cards.length)).toEqual([4, 4, 4]);
+        const scheduled = scheduleBatch(events).items.find((item) => item.event.kind === 'reveal')!;
+        expect(scheduled.cards).toHaveLength(12);
+        expect(new Set(scheduled.cards!.map((c) => `${c.seat}:${c.index}`)).size).toBe(12);
+        expect(Math.max(...scheduled.cards!.map((c) => c.at))).toBeLessThan(scheduled.liftAt!);
+    });
+});
+
 describe('a hand, step by step', () => {
     it('deals, posts the blinds and puts the first player on the clock', () => {
         const s0 = three();
@@ -37,7 +68,7 @@ describe('a hand, step by step', () => {
         const s1 = deal(s0);
         const events = diffViews(v0, view(s1), {mySeat: 2, bigBlind: 20});
         expect(kinds(events)).toEqual(['deal', 'chips-out', 'chips-out', 'turn']);
-        expect(events[0]).toMatchObject({kind: 'deal', handNo: 1, seats: [0, 1, 2], id: '1:deal'});
+        expect(events[0]).toMatchObject({kind: 'deal', handNo: 1, seats: [0, 1, 2], id: '1:deal', cards: 2, variant: 'holdem', boards: 1, changed: false});
         expect(events[1]).toMatchObject({kind: 'chips-out', seat: 0, move: 'small-blind', amount: 10, to: 10, allIn: false, id: '1:0'});
         expect(events[2]).toMatchObject({kind: 'chips-out', seat: 1, move: 'big-blind', amount: 20, to: 20, id: '1:1'});
         expect(events[3]).toMatchObject({kind: 'turn', seat: 2, mine: true, turn: s1.turn});

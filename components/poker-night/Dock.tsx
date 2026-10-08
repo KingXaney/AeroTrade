@@ -53,9 +53,11 @@ import {useLeaveAfter} from "@/components/poker-night/useLeaveAfter";
 import {useTapShield} from "@/components/poker-night/useTapShield";
 import {BANK_COPY, HAND_COPY, INVITE_COPY, JOIN_COPY, LOOKS_COPY, TABLE_COPY} from "@/lib/learn/copy/poker-night";
 import {turnLeft} from "@/lib/poker-night/client-clock";
+import {HOLE_CARDS} from "@/lib/poker-night/config";
 import {dockView, preRowKey, type DockView} from "@/lib/poker-night/dock";
 import {hostAwayNow, leaveTapAsks, leftState, type LeftState} from "@/lib/poker-night/overlays";
 import type {ResultLook} from "@/lib/poker-night/reveal";
+import {modeOf} from "@/lib/poker-night/variants";
 import {cn} from "@/lib/utils";
 
 const NOTE = 'chrome-surface inline-flex items-center rounded-full px-3 py-1 text-xs text-fg-soft';
@@ -292,7 +294,8 @@ const DockHand = ({dock, deadline, waitingFor, anims, look}: {
     const hidden = peekOn && !peeking;
     return (
         <>
-            <HoleCards seat={dock.seat!} hole={dock.hole} holding={dock.dealtIn} folded={dock.mucked} handNo={hand?.no ?? null} anims={anims} look={look}
+            <HoleCards seat={dock.seat!} hole={dock.hole} slots={HOLE_CARDS[modeOf(hand, room.config).variant]} holding={dock.dealtIn} folded={dock.mucked}
+                       handNo={hand?.no ?? null} anims={anims} look={look}
                        peek={room.personal.peek ? {peeking, onPeek: setPeeking} : null}/>
             <div className="pn-dock-line flex min-w-0 flex-col items-start gap-1">
                 {room.mode === 'reconnecting' && <Reconnecting/>}

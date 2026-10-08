@@ -74,7 +74,7 @@ describe('the cues', () => {
     });
 
     it('snap a card for every card dealt or turned, and play the win as its banner drops', () => {
-        const deal = scheduleBatch([{...base, id: '7:deal', kind: 'deal', seats: [0, 1, 2]}]).items.map((s) => ({...s, offset: 0}));
+        const deal = scheduleBatch([{...base, id: '7:deal', kind: 'deal', seats: [0, 1, 2], cards: 2, variant: 'holdem', boards: 1, changed: false}]).items.map((s) => ({...s, offset: 0}));
         const cues = soundCues(deal);
         expect(cues).toHaveLength(6);
         expect(cues.every((c) => c.sound === 'deal')).toBe(true);

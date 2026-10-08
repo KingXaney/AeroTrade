@@ -9,11 +9,12 @@
 // (names, presence, the version, the viewer's nudge count) as a meta argument.
 
 import {ASK_SHOWN, answerAt, askChoices, askDeadline, placeOf} from '@/lib/poker-night/asks';
-import {readEntry, type BettingSnapshot} from '@/lib/poker-night/betting';
+import {NO_HAND_SNAPSHOT, readEntry, type BettingSnapshot} from '@/lib/poker-night/betting';
 import {ENTRY_KINDS, KEEP} from '@/lib/poker-night/config';
 import {ledgerEvents} from '@/lib/poker-night/ledger';
 import {buildPots} from '@/lib/poker-night/pots';
 import {handSeatAt, isLive, seatOf} from '@/lib/poker-night/seats';
+import {limitOf} from '@/lib/poker-night/variants';
 import type {Hand, HandResult, HandSeat, HandSummary, LedgerRow, Seat, SettledPot, ShownHand, TableState} from '@/lib/poker-night/types';
 import type {
     AskBlock, AskView, BankDetailRowView, BankRowView, CardsView, EmoteView, HandEntryView, HandResultView, HandSummaryView, HandView, LedgerRowView, LedgerView, PaidPotView, People,
@@ -252,15 +253,18 @@ export const bankDetailView = (state: TableState): BankDetailRowView[] =>
 // server would (views.test.ts holds the two equal).
 export const snapshotFromView = (view: Pick<TableView, 'hand' | 'seats'>): BettingSnapshot => {
     const hand = view.hand;
-    if (!hand) return {phase: null, actor: null, currentBet: 0, increment: 0, seats: []};
+    if (!hand) return {...NO_HAND_SNAPSHOT, seats: []};
     const seats: BettingSnapshot['seats'] = [];
+    let pot = 0;
     view.seats.forEach((v, seat) => {
+        // Every chip in the live hand: a seat not dealt in has none (SeatView.inPot).
+        pot += v?.inPot ?? 0;
         // Dealt in: folded, or holding cards (face down or shown).
         if (v && (v.state === 'folded' || v.cards !== 'none')) {
             seats.push({seat, streetBet: v.bet, actedAtBet: v.acted, folded: v.state === 'folded', allIn: v.state === 'all-in', stack: v.chips});
         }
     });
-    return {phase: hand.phase, actor: hand.actor, currentBet: hand.currentBet, increment: hand.increment, seats};
+    return {phase: hand.phase, actor: hand.actor, currentBet: hand.currentBet, increment: hand.increment, limit: limitOf(hand.variant), pot, seats};
 };
 
 // Everyone a view names — the seats, the ledger (players who left included), the requests and the

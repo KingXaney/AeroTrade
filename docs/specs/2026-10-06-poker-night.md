@@ -506,6 +506,53 @@ room row): the state 14,798 bytes (16,000), what a write reads 26,806 (27,000), 
 26,883, 29,534, 4,331 and 4,400: ledger times in seconds and the wire's ledger as tuples pay for the
 new fields, and the room remembers its last 40 action ids, from 64.
 
+## PLO, one board (modes P5)
+
+**The game.** `config.ENABLED` opens PLO on one board (two and three boards, then Triple T, are
+later phases). Four cards each; a hand is exactly two of them with exactly three from the board
+(`hand-name.bestOmaha`, through `variants.handValue` and `bestHand` — the engine picks winners and
+the page reads shown hands with the same functions), so one card of a suit in hand never makes a
+flush and a board never "plays". High only: the strongest hand takes the pot. A hand keeps its own
+game: the host's pick (the host drawer's Game, from the next hand) never touches a hand in play.
+
+**Pot limit.** A bet or a raise goes at most to the current bet plus the pot after the call: every
+chip committed this hand — antes, earlier streets, every bet in front of the players, the player's
+own — plus what the player owes; never below the minimum raise, never past all in. At blinds 1/2
+the first player in may raise to 7; facing 7, to 24; the small blind facing 7 alone, to 23; a flop
+bet into 10 is at most 10 and the raise over it 40; nine antes of 1 open to 16; a short big blind (1
+of 2) to 6. The minimum raise and the reopening rules (the TDA rule, the friendlier reading) are no
+limit's. The all-in move is a raise only when all in is within the cap, the call when the bet faced
+is the whole stack, else 'illegal'; the client offers the same moves (`snapshotFromView` sums
+`SeatView.inPot` as the pot), its raise panel tops out at Pot ("Raise to 340 (pot)", key A) and
+sends a raise to it — never the all-in over the cap.
+
+**Picking and showing the game.** The lobby: "Start a table" stays one tap for Texas hold'em, and
+"Start PLO" sits under it; the form under "Set it up first" and the host drawer's Game section open
+with a Game choice (a card a game: its name, the cards dealt and the limit). The game is named
+wherever a table is: the top bar's second line ("PLO", the code beside it from 400 px), the felt
+before the first hand, the countdown between hands when the host picked another ("Next hand: PLO, in
+4 s"), a toast and a screen-reader line at its first deal ("New game from this hand: Pot-limit
+Omaha."), the join card's terms with "How it plays" (the Hands guide on the table's game, for a
+visitor too), the invite sheet ("Game: PLO"), its share text and the link preview, and every lobby
+and Home row. The lobby reads the game from the stored config (`LOBBY_PROJECTION` adds
+`state.config.variant` and `boards`), a document with none reading as Texas hold'em.
+
+**At the table, on a phone.** The dock fans four cards, each 0.6 of a card on from the one before
+and turned −6°, −2°, 2°, 6° from the bottom centre, so every card's rank and suit show (140 px wide
+compact, 123 tight); between hands it holds the night's game's width. It names nothing before the
+flop. Another seat's four face-down cards keep the two's footprint; a turned-up four overlap at 0.56
+of a card (75 px compact, 64 tight), the box the banner and the pots keep clear of
+(`stage.shownHandRect` with the count, held at every phone size by `stage.test`). The deal sends
+four cards round in the time two take.
+
+**The Hands guide.** "The games" adds Pot-limit Omaha: the `omaha` and `pot-limit` entries quoted,
+one hand drawn on one board with the five that play lifted (A♥ A♣ 7♠ 3♦ on K♥ 9♥ 6♥ 2♥ J♣: no flush,
+a pair of aces), and what the table does that the entries do not say.
+
+**The budgets, measured.** PLO's heaviest table (the same table with four-card hands, its short
+stacks in by pot raises): the state 14,878 bytes, the wire view 3,862 and its message 3,925; on it
+the room reads 26,886 per write and 29,537 in all — every figure within its budget.
+
 ## Engine rules
 
 No-limit Texas hold'em at 2 to 9 seats, fixed when the table is made, for integer play chips.

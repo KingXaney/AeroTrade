@@ -1,11 +1,12 @@
 'use client';
 
 // The raise panel, opened from the action bar's Bet or Raise: the quick sizes (min, ½ pot, ¾ pot,
-// pot, all in — lib/poker-night/bet-sizing, within the very limits the server checks), a slider that
-// gives the small end most of its travel, the amount as a number ("1,250", "1.5k"), and the confirm
-// button that names the total ("Raise to 340", "All in for 2,000"). Keys from the action bar: 1–4
-// pick a quick size, A the all-in, Enter confirms, Escape closes — Enter and Escape in the amount
-// field too. It floats over the table above the action bar, so opening it moves nothing; on a narrow
+// pot, all in — lib/poker-night/bet-sizing, within the very limits the server checks; in PLO the pot
+// is the top whenever the stack goes past it), a slider that gives the small end most of its travel,
+// the amount as a number ("1,250", "1.5k"), and the confirm button that names the total ("Raise to
+// 340", "All in for 2,000", "Raise to 340 (pot)"). Keys from the action bar: 1–4 pick a quick size,
+// A the top (all in, or the pot in PLO), Enter confirms, Escape closes — Enter and Escape in the
+// amount field too. It floats over the table above the action bar, so opening it moves nothing; on a narrow
 // dock (a phone), where the controls wrap under the cards, it rises from the whole dock instead, so
 // the viewer's cards and seconds stay in sight (app/globals.css, @container pn-dock).
 
@@ -13,7 +14,7 @@ import {useId, useState} from "react";
 import ActionButton from "@/components/primitives/ActionButton";
 import TextField from "@/components/primitives/TextField";
 import {ACTION_COPY, TABLE_COPY} from "@/lib/learn/copy/poker-night";
-import {amountToSlider, clampTo, parseChips, quickSizes, SLIDER_MAX, sliderToAmount, type Sizing} from "@/lib/poker-night/bet-sizing";
+import {amountToSlider, clampTo, confirmLabel, parseChips, quickSizes, SLIDER_MAX, sliderToAmount, type Sizing} from "@/lib/poker-night/bet-sizing";
 import {KEY_SHORTCUTS} from "@/lib/poker-night/keys";
 import {cn} from "@/lib/utils";
 
@@ -27,10 +28,6 @@ type Props = {
     disabled: boolean;
 };
 
-// The confirm button's words for a "raise to".
-export const confirmLabel = (sizing: Sizing, to: number): string =>
-    to >= sizing.max ? ACTION_COPY.allIn(sizing.max) : sizing.kind === 'bet' ? ACTION_COPY.bet(to) : ACTION_COPY.raiseTo(to);
-
 const RaisePanel = ({sizing, value, onValue, onConfirm, onClose, pending, disabled}: Props) => {
     const id = useId();
     // The field's text while it is being typed; otherwise it shows the value.
@@ -41,7 +38,7 @@ const RaisePanel = ({sizing, value, onValue, onConfirm, onClose, pending, disabl
             <div className="flex gap-1.5" role="group" aria-label={ACTION_COPY.sizesLabel}>
                 {sizes.map((size, i) => (
                     <ActionButton key={size.id} variant={size.to === value ? 'primary' : 'secondary'} size="xs" className="min-h-11 flex-1 px-1"
-                                  aria-pressed={size.to === value} aria-keyshortcuts={size.id === 'all-in' ? KEY_SHORTCUTS['all-in'] : i < 4 ? String(i + 1) : undefined}
+                                  aria-pressed={size.to === value} aria-keyshortcuts={size.to === sizing.max ? KEY_SHORTCUTS['all-in'] : i < 4 ? String(i + 1) : undefined}
                                   onClick={() => {
                                       setText(null);
                                       onValue(size.to);

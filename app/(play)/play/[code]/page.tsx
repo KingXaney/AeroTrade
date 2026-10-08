@@ -7,7 +7,7 @@ import {HomeLink} from "@/components/poker-night/HomeLink";
 import PokerNightRoom from "@/components/poker-night/PokerNightRoom";
 import {actionButton} from "@/components/primitives/ActionButton";
 import EmptyState from "@/components/primitives/EmptyState";
-import {INVITE_COPY, POKER_NIGHT_COPY, TABLE_COPY} from "@/lib/learn/copy/poker-night";
+import {INVITE_COPY, MODE_COPY, POKER_NIGHT_COPY, TABLE_COPY} from "@/lib/learn/copy/poker-night";
 import {avatarForUser, encodeAvatar, rollAvatar} from "@/lib/poker-night/avatar";
 import {realtimeEnabled} from "@/lib/poker-night/channel";
 import {normalizeCode} from "@/lib/poker-night/code";
@@ -22,6 +22,7 @@ import {playerFor, playPageView, roomView} from "@/lib/poker-night/room";
 import {readNightThrows, type ServerRoom} from "@/lib/poker-night/store";
 import {summarize} from "@/lib/poker-night/summary";
 import type {PlayPageView} from "@/lib/poker-night/view-types";
+import {nextModeOf} from "@/lib/poker-night/variants";
 
 // A poker night table, /play/CODE: open to anyone with the link. The code arrives canonical, and the
 // room known to exist (the segment's layout redirects a lower-case or spaced code and answers 404 for
@@ -86,7 +87,9 @@ export const generateMetadata = async ({params}: Props): Promise<Metadata> => {
     try {
         const read = await readTablePage(envOf(), code);
         if (!read.ok) return {title: TABLE_COPY.notFoundTitle};
-        return {title: TABLE_COPY.name(read.room.core.state.settings.name, code), description: INVITE_COPY.ogDescription};
+        // A link preview names the game the table deals next.
+        const game = nextModeOf(read.room.core.state.config);
+        return {title: TABLE_COPY.name(read.room.core.state.settings.name, code), description: INVITE_COPY.ogDescription(MODE_COPY.spokenLabel(game.variant, game.boards))};
     } catch {
         return {title: TABLE_COPY.name('', code)};
     }

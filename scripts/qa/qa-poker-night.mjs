@@ -1692,9 +1692,9 @@ const tableInBrowser = async () => {
         });
         const learnTabs = await hp.$$eval('[data-section-tabs="learn"] a', (as) => as.map((a) => `${a.getAttribute('href')}${a.getAttribute('aria-current') === 'page' ? '*' : ''}`));
         const wide = await handsTab();
-        check('the lobby\'s Hands tab: ten rankings and the kicker pair (60 cards, 39 lifted), Texas hold\'em, three definitions, no lobby read, Learn\'s "Poker night" still lit',
-            wide !== null && wide.cards === 60 && wide.rankings === 10 && wide.lifted === 39 && wide.games === 'holdem' && wide.lobby === 0 && wide.tab === 'hands'
-            && wide.defs === 3 && learnTabs.includes('/poker-night*'), JSON.stringify({...wide, learnTabs}));
+        check('the lobby\'s Hands tab: ten rankings and the kicker pair (60 cards, 39 lifted) and PLO\'s hand (9 more), Texas hold\'em and PLO, five definitions, no lobby read, Learn\'s "Poker night" still lit',
+            wide !== null && wide.cards === 69 && wide.rankings === 10 && wide.lifted === 39 && wide.games === 'holdem,plo' && wide.lobby === 0 && wide.tab === 'hands'
+            && wide.defs === 5 && learnTabs.includes('/poker-night*'), JSON.stringify({...wide, learnTabs}));
         await uiWording(hp, 'the Hands tab');
         await uiShotBoth(hp, '23-hands-tab');
         for (const [width, height] of [[390, 844], [375, 667], [320, 568], [844, 390]]) {
@@ -1712,11 +1712,11 @@ const tableInBrowser = async () => {
         await hp.waitForSelector('[data-poker-night-lobby]', {timeout: 30000}).catch(() => {});
         const back = new URL(hp.url());
         check('…and its Play tab is the lobby again, at /poker-night', back.pathname === '/poker-night' && back.search === ''
-            && await hp.locator('[data-quick-start]').count() === 1, hp.url());
+            && await hp.locator('[data-quick-start="holdem"]').count() === 1, hp.url());
     }
 
     await hp.goto(`${BASE}/poker-night`, {waitUntil: 'load', timeout: 180000});
-    await hp.click('[data-quick-start]');
+    await hp.click('[data-quick-start="holdem"]');
     await hp.waitForURL(/\/play\/[A-HJ-NP-Z2-9]{6}(\?.*)?$/, {timeout: 120000});
     code = new URL(hp.url()).pathname.split('/').pop();
     const created = await roomDoc();
@@ -2282,8 +2282,8 @@ const tableInBrowser = async () => {
                 firstRank: Math.round(guide.querySelector('[data-ranking]').getBoundingClientRect().bottom), vh: innerHeight,
             };
         });
-        // The rankings first (what a player opens Hands for mid-game), then ties, then the table's own game.
-        const handsOk = (m) => m !== null && m.cards === 60 && m.rankings === 10 && m.first === 'holdem' && m.order === 'rankings,ties,here' && m.outside === 0 && m.sideways <= 0;
+        // The rankings first (what a player opens Hands for mid-game), then ties, then the table's own game, then the others (PLO).
+        const handsOk = (m) => m !== null && m.cards === 69 && m.rankings === 10 && m.first === 'holdem' && m.order === 'rankings,ties,here,games' && m.outside === 0 && m.sideways <= 0;
         await A.page.evaluate(() => {
             if (document.activeElement instanceof HTMLElement) document.activeElement.blur();
         });
@@ -3679,7 +3679,7 @@ const tableInBrowser = async () => {
             JSON.stringify(mirrored));
         // The next table, from the account alone: this browser's own copy of the look cleared first.
         await hp.evaluate((key) => localStorage.removeItem(key), ME_STORAGE_KEY);
-        await hp.click('[data-quick-start]');
+        await hp.click('[data-quick-start="holdem"]');
         await hp.waitForURL(/\/play\/[A-HJ-NP-Z2-9]{6}(\?.*)?$/, {timeout: 120000});
         const next = new URL(hp.url()).pathname.split('/').pop();
         await hp.waitForSelector('[data-pn-drawer="invite"]', {timeout: 60000}).catch(() => {});

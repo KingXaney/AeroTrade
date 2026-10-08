@@ -11,9 +11,12 @@
 // What moves is the room's animations for this seat (components/poker-night/anim): sitting down,
 // the deal, a fold (the cards turn over, slide toward the middle and fade; the plate dims), the
 // showdown's flip, the cards that play lifting while the rest dim, the count-up (CountUp, stepped
-// text). Cards turned up sit outside the plate toward the middle (data-side, data-shown), and a
-// bottom seat's tag hangs under its plate, so the name and the stack stay in sight. The hooks a test
-// reads: data-seat, data-me, data-my-turn, data-state, data-acting, data-side, data-card, data-anim.
+// text). Cards turned up sit outside the plate toward the middle (data-side, data-shown) — a PLO
+// hand's four overlapping, each card's index in sight (data-count) — and a bottom seat's tag hangs
+// under its plate, so the name and the stack stay in sight. Face-down cards sit in the same place
+// whatever their number: two, or a PLO hand's four drawn closer together inside the two's footprint.
+// The hooks a test reads: data-seat, data-me, data-my-turn, data-state, data-acting, data-side,
+// data-card, data-anim, data-count.
 
 import {useMemo, type CSSProperties, type ReactNode} from "react";
 import {animsOf, animVars, type LiveAnim} from "@/components/poker-night/anim";
@@ -47,6 +50,7 @@ export type SeatProps = {
     anims: readonly LiveAnim[];
     privateCards?: readonly Card[] | null; // shown to the viewer alone (MeView.shownToMe)
     awaitingChips?: boolean; // a request for chips waits for the host (the table's requests)
+    held?: number; // the cards a hand of the game holds (two, four in PLO): what a fold sends to the middle
 };
 
 type Tag = {id: string; kind: EntryKind; text: string; allIn: boolean; said: string; at: number; offset: number};
@@ -81,7 +85,7 @@ const statusOf = (v: SeatView, live: boolean, awaitingChips = false): string | n
     return TABLE_COPY.status[v.state];
 };
 
-const Seat = ({seat, place, stage, view: v, person, mine, live, acting, myTurn, turn, blind, look, anims, privateCards = null, awaitingChips = false}: SeatProps) => {
+const Seat = ({seat, place, stage, view: v, person, mine, live, acting, myTurn, turn, blind, look, anims, privateCards = null, awaitingChips = false, held = 2}: SeatProps) => {
     const name = person?.name ?? '';
     const ours = useMemo(() => anims.filter((a) => {
         const e = a.event;
@@ -114,7 +118,7 @@ const Seat = ({seat, place, stage, view: v, person, mine, live, acting, myTurn, 
         const flips = reveal?.cards?.filter((c) => c.seat === seat) ?? shownNow?.cards ?? null;
         const timing = reveal ?? shownNow;
         cards = (
-            <div className="pn-seat-shown" style={{'--pn-card-w': 'var(--pn-show-w)'} as CSSProperties}>
+            <div className="pn-seat-shown" style={{'--pn-card-w': 'var(--pn-show-w)'} as CSSProperties} data-count={v.cards.length}>
                 {v.cards.map((card: Card, index) => {
                     const flip = flips?.find((c) => c.index === index);
                     const state = cardLook(look, card);
@@ -129,15 +133,16 @@ const Seat = ({seat, place, stage, view: v, person, mine, live, acting, myTurn, 
     } else if (seenAlone) {
         // Shown to the viewer alone, after the hand: face up where a shown hand sits, never lit.
         cards = (
-            <div className="pn-seat-shown" style={{'--pn-card-w': 'var(--pn-show-w)'} as CSSProperties} data-pn-shown-to-me="">
+            <div className="pn-seat-shown" style={{'--pn-card-w': 'var(--pn-show-w)'} as CSSProperties} data-count={seenAlone.length} data-pn-shown-to-me="">
                 {seenAlone.map((card) => <PlayingCard key={`${card}`} card={card}/>)}
             </div>
         );
     } else if (!mine && (typeof v.cards === 'number' || (folded && v.cards === 'none' && v.state === 'folded'))) {
         const folding = v.cards === 'none' && folded !== null;
+        const backs = typeof v.cards === 'number' ? v.cards : held;
         cards = (
-            <div className="pn-seat-cards" style={{'--pn-card-w': 'var(--pn-mini-w)'} as CSSProperties} data-anim={folding ? 'fold' : undefined}>
-                {[0, 1].map((index) => {
+            <div className="pn-seat-cards" style={{'--pn-card-w': 'var(--pn-mini-w)'} as CSSProperties} data-anim={folding ? 'fold' : undefined} data-count={backs}>
+                {Array.from({length: backs}, (_, index) => {
                     const deal = dealt?.cards?.find((c) => c.seat === seat && c.index === index);
                     const motion: CardMotion | null = folding
                         ? {cls: 'pn-fold', style: animVars(folded, folded.at, folded.dur, {dx: Math.round(toCentre.dx * 0.7), dy: Math.round(toCentre.dy * 0.7)}), anim: 'fold'}

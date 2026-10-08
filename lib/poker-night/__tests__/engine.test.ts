@@ -8,11 +8,12 @@
 // and seeded random nights that keep every invariant without ever mutating their input.
 
 import {describe, expect, it} from 'vitest';
-import {readEntry} from '@/lib/poker-night/betting';
+import {legalFor, readEntry, snapshotFromState} from '@/lib/poker-night/betting';
 import {coolingDown} from '@/lib/poker-night/asks';
 import {ASKS, TIMING} from '@/lib/poker-night/config';
 import {createTable, forceClose, reduce} from '@/lib/poker-night/engine';
 import {conservation, ledgerEvents, ledgerRow} from '@/lib/poker-night/ledger';
+import {isLive} from '@/lib/poker-night/seats';
 import type {HandEntry, TableAction, TableState} from '@/lib/poker-night/types';
 import {readShown} from '@/lib/poker-night/variants';
 import {
@@ -681,6 +682,32 @@ describe('seeded nights', () => {
         }
         expect(hands).toBeGreaterThan(300);
     });
+
+    it('do the same in PLO: four cards each, pot limit, no legal move refused', () => {
+        let hands = 0;
+        let capped = 0;
+        for (let seed = 1; seed <= 20; seed++) {
+            let last: TableState | null = null;
+            for (const {state, action, refused} of randomNight(seed, 800, 'plo')) {
+                if (action !== 'clock' && action.type === 'act') expect(refused, `seed ${seed}`).toBeNull();
+                checkInvariants(state);
+                if (state.hand) {
+                    expect(state.hand.variant).toBe('plo');
+                    expect(state.hand.seats.every((p) => p.hole.length === 4)).toBe(true);
+                }
+                if (isLive(state.hand) && state.hand.phase === 'betting') {
+                    const legal = legalFor(snapshotFromState(state), state.hand.actor!)!;
+                    const p = state.hand.seats.find((q) => q.seat === state.hand!.actor)!;
+                    if (legal.raise && legal.raise.max < p.streetBet + state.seats[p.seat]!.stack) capped++;
+                }
+                last = state;
+            }
+            hands += last!.handNo;
+            expect([...randomNight(seed, 800, 'plo')].pop()!.state).toEqual(last);
+        }
+        expect(hands).toBeGreaterThan(150);
+        expect(capped).toBeGreaterThan(100);
+    });
 });
 
 describe('leaving after this hand', () => {
@@ -1086,5 +1113,44 @@ describe('asking to see a hand', () => {
         t = play(t, ask(t, 2, 1), {type: 'show', by: 'p1', at: at(t, 150)});
         expect(t.hand!.asks[0][3]).toBe(2);
         expect(reduce(t, reply(t, 1, 2, 'one'))).toEqual({ok: false, reason: 'no-request'});
+    });
+});
+
+describe('PLO', () => {
+    const plo = (stacks3: [number, number, number] = [1000, 1000, 1000]) => three(stacks3, {variant: 'plo'});
+
+    it('deals four cards each and one five-card run, and copies the game into the hand', () => {
+        const s = deal(plo());
+        expect(s.hand!.variant).toBe('plo');
+        expect(s.hand!.seats.map((p) => p.hole.length)).toEqual([4, 4, 4]);
+        expect(s.hand!.deck.map((run) => run.length)).toEqual([5]);
+        expect(s.hand!.boards).toEqual([[]]);
+        checkInvariants(s);
+    });
+
+    it('plays exactly two hole cards with three from the board: one heart in hand makes no flush on four', () => {
+        let s = deal(plo(), {holes: {0: 'AhAc7s3d', 1: 'KcQd8s4c', 2: 'Th8h5d5c'}, board: 'Kh9h6h2hJc'});
+        s = moves(s, C, C, X);
+        for (let street = 0; street < 3; street++) s = moves(s, X, X, X);
+        const result = s.hand!.result!;
+        expect(result.showdown).toBe(true);
+        // Two hearts in hand make the flush; the ace of hearts alone makes none, only a pair of aces.
+        expect(result.pots[0].winners).toEqual([[2]]);
+        expect(readOf(s, 2).value >>> 26).toBe(5);
+        expect(readOf(s, 0).value >>> 26).toBe(1);
+        // The pair of aces plays with the board's three highest: three board cards in board order, then the two in hand.
+        expect(readOf(s, 0).best).toEqual(cards('Kh9hJcAhAc'));
+        checkInvariants(s);
+    });
+
+    it('goes back to Texas hold\'em from the next hand when the host picks it, mid-hand', () => {
+        let s = deal(plo());
+        s = ok(host(s, {op: 'config', patch: {variant: 'holdem'}}));
+        expect(s.hand!.variant).toBe('plo');
+        expect(s.config).toMatchObject({variant: 'holdem', boards: 1});
+        s = moves(s, F, F);
+        s = deal(s);
+        expect(s.hand!.variant).toBe('holdem');
+        expect(s.hand!.seats.every((p) => p.hole.length === 2)).toBe(true);
     });
 });

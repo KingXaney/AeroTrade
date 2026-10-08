@@ -11,7 +11,9 @@
 // container query, so the lobby's column and a drawer size them by their own width), and the name
 // moves beside them only where both fit. With `focus` (at the table) the rankings come first — what a
 // player opens Hands mid-game to check — then ties and kickers, then the table's own game under "At
-// this table", before any other. The cards are drawn in the viewer's card face and colours, from
+// this table", before any other. PLO's section quotes the pot limit's entry too, and draws one hand
+// on one board with the five cards that play lifted: one heart in hand on four hearts makes no flush.
+// The cards are drawn in the viewer's card face and colours, from
 // LOOKS_CSS through the sample's own data attributes — the drawer is portaled out of the room that
 // carries the viewer's.
 
@@ -24,7 +26,7 @@ import PlayingCard from "@/components/poker-night/PlayingCard";
 import {GLOSSARY} from "@/lib/learn/glossary";
 import {HAND_COPY, HANDS_COPY} from "@/lib/learn/copy/poker-night";
 import type {Card} from "@/lib/poker/cards";
-import {cardsThatMake, guideGames, KICKER_EXAMPLE, RANKING_EXAMPLES, type GuideGame, type GuideGameEntry} from "@/lib/poker-night/hands-guide";
+import {cardsThatMake, guideGames, KICKER_EXAMPLE, PLO_EXAMPLE, RANKING_EXAMPLES, type GuideGame, type GuideGameEntry} from "@/lib/poker-night/hands-guide";
 import type {CardFaceId} from "@/lib/poker-night/looks";
 import {DEFAULT_PERSONAL_LOOK} from "@/lib/poker-night/personal";
 import {cn} from "@/lib/utils";
@@ -108,8 +110,23 @@ const Ties = ({level, look}: {level: Level; look: Look}) => (
     </section>
 );
 
-// One game: its name as its glossary entry, the entry's short, then what it is like at this table.
-const Game = ({game, heading, here}: {game: GuideGameEntry; heading: (id: string, children: ReactNode) => ReactNode; here: boolean}) => {
+// PLO's hand: its four cards and the board's five, each row a picture, the five that play lifted
+// (two from the hand, three from the board), and what they make.
+const PloExample = ({look}: {look: Look}) => (
+    <div className="@container space-y-2" data-guide-plo="">
+        {([[HANDS_COPY.ploHand, PLO_EXAMPLE.hole], [HANDS_COPY.ploBoard, PLO_EXAMPLE.board]] as const).map(([label, cards]) => (
+            <RowCard key={label} className="flex flex-col gap-1 px-3 py-2.5 @md:flex-row @md:items-center @md:justify-between @md:gap-4">
+                <MicroLabel as="p">{label}</MicroLabel>
+                <Cards cards={cards} makes={PLO_EXAMPLE.plays} look={look}/>
+            </RowCard>
+        ))}
+        <p className="text-xs leading-relaxed text-fg-muted">{HANDS_COPY.ploExample}</p>
+    </div>
+);
+
+// One game: its name as its glossary entry, the entry's short, the limit it plays by (its entry and
+// short) when that is not no limit, PLO's hand, then what it is like at this table.
+const Game = ({game, heading, here, look}: {game: GuideGameEntry; heading: (id: string, children: ReactNode) => ReactNode; here: boolean; look: Look}) => {
     const copy = HANDS_COPY.games[game.id];
     return (
         <article id={game.anchor} aria-labelledby={`${game.anchor}-name`} className="scroll-mt-24 space-y-2" data-guide-game={game.id}
@@ -117,6 +134,8 @@ const Game = ({game, heading, here}: {game: GuideGameEntry; heading: (id: string
             {here && <MicroLabel as="p" tone="brand">{HANDS_COPY.atThisTable}</MicroLabel>}
             {heading(`${game.anchor}-name`, <Term k={game.term}>{copy.name}</Term>)}
             <p className="text-sm leading-relaxed text-fg-soft">{GLOSSARY[game.term].short}</p>
+            {game.limit !== null && <p className="text-sm leading-relaxed text-fg-soft"><Term k={game.limit}/>: {GLOSSARY[game.limit].short}</p>}
+            {game.id === 'plo' && <PloExample look={look}/>}
             <ul className="list-disc space-y-1.5 pl-5 text-sm leading-relaxed text-fg-soft marker:text-fg-muted">
                 {copy.facts.map((line) => <li key={line}>{line}</li>)}
             </ul>
@@ -135,14 +154,14 @@ const HandsGuide = ({focus = null, face = DEFAULT_PERSONAL_LOOK.cardFace, four =
                 at the sections' own level. */}
             {here && (
                 <div className="mb-6 break-inside-avoid" data-guide-section="here">
-                    <Game game={here} here heading={(id, children) => <SectionHeading as={level} id={id} spacing="none">{children}</SectionHeading>}/>
+                    <Game game={here} here look={look} heading={(id, children) => <SectionHeading as={level} id={id} spacing="none">{children}</SectionHeading>}/>
                 </div>
             )}
             {others.length > 0 && (
                 <section aria-labelledby="hands-games" className="mb-6 break-inside-avoid space-y-4" data-guide-section="games">
                     <SectionHeading as={level} id="hands-games" spacing="none">{HANDS_COPY.gamesHeading}</SectionHeading>
                     {others.map((game) => (
-                        <Game key={game.id} game={game} here={false} heading={(id, children) => <SubHeading level={level} id={id}>{children}</SubHeading>}/>
+                        <Game key={game.id} game={game} here={false} look={look} heading={(id, children) => <SubHeading level={level} id={id}>{children}</SubHeading>}/>
                     ))}
                 </section>
             )}

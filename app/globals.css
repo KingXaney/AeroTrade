@@ -572,6 +572,8 @@ details[open] > :not(summary) { animation: disclosure-in var(--motion-base) var(
     opacity: 0.55;
     pointer-events: none;
   }
+  /* The game the table deals, under its name. */
+  .pn-felt-game { display: block; margin-top: 3px; font-size: 10px; letter-spacing: 0.18em; }
   .pn-centre-note { position: absolute; translate: -50% -50%; text-align: center; font-size: 13px; line-height: 1.35; }
 
   /* Seats: a plate centred on its spot (lib/poker-night/stage), the cards and tags around it. */
@@ -669,12 +671,24 @@ details[open] > :not(summary) { animation: disclosure-in var(--motion-base) var(
   .pn-seat-cards > * + * { margin-left: calc(var(--pn-mini-w) * -0.45); }
   .pn-seat-cards > :first-child { rotate: -7deg; }
   .pn-seat-cards > :last-child { rotate: 7deg; }
+  /* More than two face down (PLO's four) keep the two's footprint: the same first and last card, the
+     ones between closer, so nothing new reaches past the plate's corner (stage.seatCardsRect). */
+  .pn-seat-cards[data-count="3"] > * + * { margin-left: calc(var(--pn-mini-w) * -0.725); }
+  .pn-seat-cards[data-count="4"] > * + * { margin-left: calc(var(--pn-mini-w) * -0.8167); }
+  .pn-seat-cards[data-count="3"] > :nth-child(2) { rotate: 0deg; }
+  .pn-seat-cards[data-count="4"] > :nth-child(2) { rotate: -2.5deg; }
+  .pn-seat-cards[data-count="4"] > :nth-child(3) { rotate: 2.5deg; }
   /* Cards turned up sit outside the plate, toward the felt's middle — above a bottom or side seat,
      below a top one — so the name, the stack and the count stay in sight; a winner's "+N" rises
      above them. */
   .pn-seat-shown { position: absolute; left: 50%; bottom: calc(100% + 3px); translate: -50% 0; z-index: 3; display: flex; gap: 2px; pointer-events: none; }
   .pn-seat[data-side="top"] .pn-seat-shown { bottom: auto; top: calc(100% + 10px); }
   .pn-seat[data-shown]:not([data-side="top"]) .pn-win-pop-text { top: calc(var(--pn-show-w) * -1.4 - 3px); }
+  /* A turned-up hand of four (PLO) overlaps, each card 0.56 of a card on from the one before
+     (stage.SHOWN_STEP), so every rank and suit in the top-left corner stays in sight; unturned, so the
+     box the banner keeps clear of (stage.shownHandRect) is exact. */
+  .pn-seat-shown[data-count="3"], .pn-seat-shown[data-count="4"] { gap: 0; }
+  .pn-seat-shown[data-count="3"] > * + *, .pn-seat-shown[data-count="4"] > * + * { margin-left: calc(var(--pn-card-w) * -0.44); }
   .pn-open-seat {
     position: absolute;
     left: 50%;
@@ -877,6 +891,20 @@ details[open] > :not(summary) { animation: disclosure-in var(--motion-base) var(
   .pn-dock-hand { display: flex; flex: 0 1 auto; align-items: flex-end; gap: 8px; min-width: 0; min-height: calc(var(--pn-hole-w) * 1.4); }
   .pn-dock-actions { position: relative; display: flex; flex: 1 1 17rem; flex-direction: column; justify-content: center; gap: 6px; min-width: 0; min-height: 60px; }
   .pn-hole { display: flex; gap: 4px; --pn-card-w: var(--pn-hole-w); --pn-card-h: calc(var(--pn-hole-w) * 1.4); }
+  /* The width the night's game takes (data-slots), held between hands so the line beside never moves:
+     two side by side, or PLO's four in a fan. */
+  .pn-hole[data-slots="2"] { min-width: calc(var(--pn-hole-w) * 2 + 4px); }
+  .pn-hole[data-slots="4"] { min-width: calc(var(--pn-hole-w) * 2.8); }
+  /* PLO's four: a fan, each card 0.6 of a card on from the one before, so the left of every card —
+     the large face's rank and suit — stays in sight; turned by the rotate property from the bottom
+     centre, so transform stays free for the deal, the fold and the lift. */
+  .pn-hole[data-count="4"] { gap: 0; }
+  .pn-hole[data-count="4"] > .pn-card { transform-origin: 50% 100%; }
+  .pn-hole[data-count="4"] > .pn-card + .pn-card { margin-left: calc(var(--pn-card-w) * -0.4); }
+  .pn-hole[data-count="4"] > .pn-card:nth-of-type(1) { rotate: -6deg; }
+  .pn-hole[data-count="4"] > .pn-card:nth-of-type(2) { rotate: -2deg; }
+  .pn-hole[data-count="4"] > .pn-card:nth-of-type(3) { rotate: 2deg; }
+  .pn-hole[data-count="4"] > .pn-card:nth-of-type(4) { rotate: 6deg; }
   .pn-raise { position: absolute; left: 0; right: 0; bottom: calc(100% + 8px); z-index: 6; padding: 10px; border-radius: var(--control-radius); }
   .pn-fold-free { position: absolute; left: 0; bottom: calc(100% + 6px); z-index: 6; }
   /* A narrow dock (a phone upright, or the column of one on its side) wraps its controls under the
@@ -941,6 +969,9 @@ details[open] > :not(summary) { animation: disclosure-in var(--motion-base) var(
        emote button it would have a few pixels, and say nothing. */
     .pn-dock-hand { flex: 1 1 100%; flex-wrap: wrap; }
     .pn-dock-line { order: 3; flex: 1 1 100%; }
+    /* PLO's fan at 0.8 of the card, so it and the emote button share a row in the column of a phone on
+       its side (the dock keeps its height, the cards clear of the top bar). */
+    .pn-hole[data-slots="4"] { --pn-card-w: calc(var(--pn-hole-w) * 0.8); --pn-card-h: calc(var(--pn-hole-w) * 1.12); min-width: calc(var(--pn-hole-w) * 2.24); }
   }
 }
 

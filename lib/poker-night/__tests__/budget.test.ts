@@ -9,11 +9,15 @@
 // 30,000 in all; and the public wire view — what every response and Ably message carries — to 4,500
 // bytes, as is the Ably state message around it (lib/poker-night/channel.WIRE_BUDGET_BYTES).
 // Names and looks are not part of the wire view: they ride beside it in responses only, versioned by
-// peopleV (lib/poker-night/room.roomView).
+// peopleV (lib/poker-night/room.roomView). Every figure is held on the same table in PLO too (P5:
+// four cards a hand, six of them shown; its short stacks go all in by pot-sized raises, the all-in
+// over the cap being refused), and the room document on whichever state is larger.
 //
 // Measured (PN_BUDGET_PRINT=1 prints them): version 1's heaviest table made a 14,512-byte state, a
 // 4,331-byte wire view (4,400 as a message), 26,883 bytes read per write and 29,534 in all; version
 // 2 stores ledger times in seconds and sends the ledger as tuples, which pays for its new fields.
+// With PLO open (P5): Texas hold'em 14,798 / 3,787 / 3,856 bytes (state, wire, message); PLO 14,878 /
+// 3,862 / 3,925; on PLO's state the room reads 26,886 per write and 29,537 in all.
 
 import {describe, expect, it} from 'vitest';
 import {stateMessage, WIRE_BUDGET_BYTES} from '@/lib/poker-night/channel';
@@ -25,7 +29,10 @@ import {appliedKey} from '@/lib/poker-night/room';
 import {isLive} from '@/lib/poker-night/seats';
 import type {TableAction, TableState} from '@/lib/poker-night/types';
 import {clockLeaderOf, wireView} from '@/lib/poker-night/views';
-import {A, C, F, R, X, actorPid, checkInvariants, deal, host, moves, ok, play, T0} from './fixtures';
+import {legalFor, snapshotFromState} from '@/lib/poker-night/betting';
+import {reduce} from '@/lib/poker-night/engine';
+import type {Move, Variant} from '@/lib/poker-night/types';
+import {A, C, F, R, X, actBy, actorPid, checkInvariants, deal, host, moves, ok, play, T0} from './fixtures';
 
 const bytes = (value: unknown): number => new TextEncoder().encode(JSON.stringify(value)).length;
 
@@ -36,10 +43,39 @@ type Unstamped = TableAction extends infer T ? (T extends TableAction ? Omit<T, 
 // Player ids as the room makes them: 11 characters of base64url.
 const pid = (i: number): string => `Pq3x9Zk2L${String(i).padStart(2, '0')}`;
 
-const heaviest = (): TableState => {
+// Each pot has its own winner in either game: in Texas hold'em aces take the main pot, kings, queens
+// and jacks the side pots, tens the two deep stacks' war; in PLO the same pairs in four-card hands,
+// none of which makes a straight or a flush on this board (two of a suit at most, and no 4 with a 6,
+// no 6 with a 9, no ace with a 4 in one hand).
+const HOLES: Record<'holdem' | 'plo', Record<number, string>> = {
+    holdem: {0: '4c4d', 1: 'AhAd', 2: 'KhKd', 3: 'QhQd', 4: 'JhJd', 5: '4h4s', 6: '9c9d', 7: 'TcTd', 8: '6s6h'},
+    plo: {
+        0: '4c4d2h2s', 1: 'AhAdKhQh', 2: 'KsKdJh9d', 3: 'QsQdJd9c', 4: 'JsJcTd9s', 5: '4h4s3c3d', 6: '6c6d8d8h', 7: 'TcThKcQc', 8: '6s6hAs7c',
+    },
+};
+
+// A short stack's way all in: in Texas hold'em the all-in; in PLO a raise to the most the pot limit
+// allows, again until the cap reaches the stack (the all-in over it is refused).
+const shove = (s: TableState, variant: Variant, capped: {n: number}): Move => {
+    if (variant !== 'plo') return A;
+    const actor = s.hand!.actor!;
+    const legal = legalFor(snapshotFromState(s), actor)!;
+    if (!legal.raise) return C;
+    const stack = s.seats[actor]!.stack + s.hand!.seats.find((p) => p.seat === actor)!.streetBet;
+    if (legal.raise.max < stack) {
+        expect(reduce(s, actBy(s, actorPid(s), A))).toEqual({ok: false, reason: 'illegal'});
+        capped.n++;
+    }
+    return R(legal.raise.max);
+};
+
+const heaviest = (variant: 'holdem' | 'plo' = 'holdem', capped = {n: 0}): TableState => {
     let at = T0;
     const tick = () => (at += 7 * MINUTE);
-    const config = {...DEFAULT_CONFIG, seats: 9, smallBlind: 10, bigBlind: 25, ante: 25, buyInMin: 100, buyInMax: 12_500, maxRebuys: 20, turnSeconds: 120, pauseSeconds: 15, sitOutAfter: 5};
+    const config = {
+        ...DEFAULT_CONFIG, seats: 9, smallBlind: 10, bigBlind: 25, ante: 25, buyInMin: 100, buyInMax: 12_500, maxRebuys: 20, turnSeconds: 120, pauseSeconds: 15, sitOutAfter: 5,
+        variant,
+    };
     let s = createTable({hostPid: pid(0), config, at});
     s = ok(host(s, {op: 'settings', patch: {name: '🃏'.repeat(20), scene: 'midnight-lounge', felt: 'royal-blue'}}, at));
     const act = (action: Unstamped) => {
@@ -59,14 +95,9 @@ const heaviest = (): TableState => {
         for (let k = 0; k < 11; k++) act({type: 'buy', by: pid(i), amount: 100});
     });
     s = ok(host(s, {op: 'start'}, tick()));
-    // Each pot has its own winner: aces take the main pot, kings, queens and jacks the side pots,
-    // tens the two deep stacks' war.
-    s = deal(s, {
-        holes: {0: '4c4d', 1: 'AhAd', 2: 'KhKd', 3: 'QhQd', 4: 'JhJd', 5: '4h4s', 6: '9c9d', 7: 'TcTd', 8: '6s6h'},
-        board: '2c7d5s3h8c', at: s.nextHandAt!,
-    });
+    s = deal(s, {holes: HOLES[variant], board: '2c7d5s3h8c', at: s.nextHandAt!});
     // The four short stacks are all in before the flop; the five deep stacks call.
-    while (s.hand!.street === 'preflop') s = moves(s, [1, 2, 3, 4].map(pid).includes(actorPid(s)) ? A : C);
+    while (s.hand!.street === 'preflop') s = moves(s, [1, 2, 3, 4].map(pid).includes(actorPid(s)) ? shove(s, variant, capped) : C);
     // On the flop three deep stacks fold and two min-raise each other past the log's cap.
     while (s.hand!.street === 'flop') {
         const hand = s.hand!;
@@ -93,6 +124,39 @@ const report = (label: string, n: number): number => {
     if (PRINT) process.stderr.write(`PN_BYTES ${label} ${n}\n`);
     return n;
 };
+
+const plo = {capped: {n: 0}, state: null as TableState | null};
+const heaviestPlo = (): TableState => (plo.state ??= heaviest('plo', plo.capped));
+// The larger state, for the room document.
+const largest = (): TableState => [heaviest(), heaviestPlo()].sort((a, b) => bytes(b) - bytes(a))[0];
+
+describe('PLO\'s heaviest table', () => {
+    it('is built as Texas hold\'em\'s is, four cards a hand, the short stacks in by pot raises that hit the cap', () => {
+        const s = heaviestPlo();
+        checkInvariants(s);
+        const hand = s.hand!;
+        expect(hand.variant).toBe('plo');
+        expect(hand.seats.every((p) => p.hole.length === 4)).toBe(true);
+        expect(plo.capped.n).toBeGreaterThan(0);
+        expect(hand.log.length).toBe(KEEP.LOG_SUMMARY);
+        expect(hand.result!.pots.length).toBe(5);
+        expect(hand.result!.pots.map((p) => p.winners[0])).toEqual([[1], [2], [3], [4], [7]]);
+        expect(hand.result!.hands.length).toBe(6);
+        expect(hand.result!.hands.every((h) => h.cards.length === 4)).toBe(true);
+    });
+
+    it('keeps the state, the wire view and the realtime message within their budgets', () => {
+        const s = heaviestPlo();
+        expect(report('plo state', bytes(s))).toBeLessThanOrEqual(16_000);
+        const presence = Object.fromEntries(s.seats.map((seat) => [seat!.pid, 'here' as const]));
+        const view = wireView(s, {
+            code: 'K7QXM4', seq: 999_999, serverNow: T0 + 12 * 3_600_000, nextDueAt: nextDueAt(s), clockLeader: clockLeaderOf(s, presence),
+            presence, watchers: 12, realtimeOk: false, peopleV: 99_999,
+        });
+        expect(report('plo wire', bytes(view))).toBeLessThanOrEqual(4_500);
+        expect(report('plo message', bytes(stateMessage('6650a1b2c3d4e5f601234567', view)))).toBeLessThanOrEqual(WIRE_BUDGET_BYTES);
+    });
+});
 
 describe('the hot document budget', () => {
     const s = heaviest();
@@ -139,7 +203,7 @@ describe('the hot document budget', () => {
 });
 
 describe('the room document budget', () => {
-    const s = heaviest();
+    const s = largest();
     // The room's other hot fields at their heaviest: every row the room keeps (LIMITS.players), each
     // with an account id and a 48-unit name of skin-toned emoji (four units, eight bytes a grapheme),
     // the longest look and a removal flag here and there; the removals the room remembers; the

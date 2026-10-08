@@ -1,7 +1,8 @@
 'use client';
 
 // The join card: a Panel over the live table, behind a scrim that keeps the felt's words from
-// reading through it, for someone who opened the link — the table's terms,
+// reading through it, for someone who opened the link — the table's terms, its game first ("PLO · Blinds
+// 10/20 · 2,000 chips to start"), and "How it plays", which opens the Hands guide on that game —
 // a name already filled in (the account's, else the one this browser kept), a look already rolled
 // (on the server for a guest, kept from then on; Roll rolls another in its click handler, and
 // "Change my look" opens the avatar builder in the card — optional, one tap away), the
@@ -32,11 +33,13 @@ import AvatarBuilder from "@/components/poker-night/AvatarBuilder";
 import {HomeLink} from "@/components/poker-night/HomeLink";
 import {MiniAvatar} from "@/components/poker-night/overlay-kit";
 import {useRoom} from "@/components/poker-night/room-controller";
-import {AVATAR_COPY, HOST_COPY, JOIN_COPY, LOOKS_COPY, OVERLAY_COPY, POKER_NIGHT_ERRORS, TABLE_COPY} from "@/lib/learn/copy/poker-night";
+import {openOverlay} from "@/components/poker-night/overlay-requests";
+import {AVATAR_COPY, HOST_COPY, JOIN_COPY, LOOKS_COPY, MODE_COPY, OVERLAY_COPY, POKER_NIGHT_ERRORS, TABLE_COPY} from "@/lib/learn/copy/poker-night";
 import {encodeAvatar, resolveAvatar, rollAvatar} from "@/lib/poker-night/avatar";
 import {VISITOR_REFRESH_MS} from "@/lib/poker-night/feed";
 import {NAME_INPUT_MAX} from "@/lib/poker-night/input";
 import {chipsInValue, chipsRange, joinCardState, joinNotes, openSeats} from "@/lib/poker-night/overlays";
+import {modeOf} from "@/lib/poker-night/variants";
 
 type Props = {
     seat: number | null; // the seat chosen with "Sit here", else the first one open
@@ -59,6 +62,8 @@ const JoinCard = ({seat, onClose}: Props) => {
     const name = draft ?? room.profile.name;
     const avatar = room.profile.avatar;
     const config = room.config;
+    // The game the table deals: the hand's own while one is on the table, else the next.
+    const game = modeOf(room.table.hand, config);
 
     // A wide screen starts in the name field; a phone keeps its keyboard down until asked.
     useEffect(() => {
@@ -135,7 +140,14 @@ const JoinCard = ({seat, onClose}: Props) => {
                        aria-labelledby={`${id}-heading`} data-join-card={visitor ? 'visitor' : 'watcher'}>
                     <div className="space-y-1">
                         <SectionHeading as="h2" spacing="none" id={`${id}-heading`}>{visitor ? JOIN_COPY.heading : OVERLAY_COPY.takeSeat}</SectionHeading>
-                        <p className="text-xs text-fg-muted" data-join-terms="">{JOIN_COPY.terms(config.smallBlind, config.bigBlind, config.buyInMax)}</p>
+                        <p className="text-xs text-fg-muted" data-join-terms="">
+                            {JOIN_COPY.terms(MODE_COPY.label(game.variant, game.boards), config.smallBlind, config.bigBlind, config.buyInMax)}
+                        </p>
+                        {/* The Hands guide on the table's game, before sitting down: a drawer over the card. */}
+                        <button type="button" className="control-type -ml-1 inline-flex min-h-11 items-center px-1 text-xs text-brand hover:underline"
+                                onClick={() => openOverlay('hands')} data-join-how="">
+                            {JOIN_COPY.howItPlays}
+                        </button>
                     </div>
 
                     {blocked ? (

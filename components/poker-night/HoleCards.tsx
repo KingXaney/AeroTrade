@@ -1,11 +1,13 @@
 'use client';
 
-// The viewer's own two cards, large, in the dock: dealt in from the table, and — when the viewer
+// The viewer's own cards, large, in the dock — two, or PLO's four in a fan, each card's index in
+// sight (data-count) — dealt in from the table, and — when the viewer
 // folds — kept in front of them, dimmed, with a "Folded" tag, until the next deal: the viewer can
 // still see what they folded, and nobody else can unless they show it in the pause (the table sees
 // a folded hand go to the muck on the plate). At a showdown they lift and glow when they are among
 // the cards that play, and dim when they are not. The place keeps its size when there are no cards,
-// so the dock never changes height.
+// and its width for the night's game (data-slots: the cards its hands hold), so the dock never changes
+// height and the line beside it never moves.
 //
 // With Peek on (the personal look's `peek`, for a screen others can see) the cards are a button
 // drawn face down, turned up only while the viewer presses on it — a pointer held down on it, or
@@ -23,6 +25,7 @@ import {cn} from "@/lib/utils";
 type Props = {
     seat: number;
     hole: Card[] | null;
+    slots?: number; // the cards a hand of the table's game holds: the width kept
     holding: boolean; // dealt in and not folded
     folded?: boolean; // dealt into the view's hand and folded: drawn dimmed, tagged "Folded"
     handNo: number | null;
@@ -45,7 +48,7 @@ const FoldedTag = () => (
     </span>
 );
 
-const HoleCards = ({seat, hole, holding, folded = false, handNo, anims, look, peek = null}: Props) => {
+const HoleCards = ({seat, hole, slots = 2, holding, folded = false, handNo, anims, look, peek = null}: Props) => {
     const fold = animsOf(anims, 'fold').find((a) => a.event.seat === seat && a.event.handNo === handNo) ?? null;
     const deal = animsOf(anims, 'deal').find((a) => a.event.handNo === handNo && a.event.seats.includes(seat)) ?? null;
     const reveal = animsOf(anims, 'reveal').find((a) => a.event.handNo === handNo && a.event.hands.some((h) => h.seat === seat)) ?? null;
@@ -68,7 +71,8 @@ const HoleCards = ({seat, hole, holding, folded = false, handNo, anims, look, pe
 
     if (!show || peek === null) {
         return (
-            <div className={cn('pn-hole', mucked && 'relative')} role="group" aria-label={label} data-pn-hole={show ? (mucked ? 'folded' : '') : 'empty'}>
+            <div className={cn('pn-hole', mucked && 'relative')} role="group" aria-label={label} data-pn-hole={show ? (mucked ? 'folded' : '') : 'empty'}
+                 data-count={show ? hole.length : undefined} data-slots={slots}>
                 {cards}
                 {mucked && <FoldedTag/>}
             </div>
@@ -90,6 +94,8 @@ const HoleCards = ({seat, hole, holding, folded = false, handNo, anims, look, pe
             aria-label={hidden ? LOOKS_COPY.peekLabel : label}
             aria-pressed={!hidden}
             data-pn-hole={mucked ? 'folded' : ''}
+            data-count={hole.length}
+            data-slots={slots}
             data-pn-peek={hidden ? 'hidden' : 'shown'}
             onPointerDown={(event) => {
                 event.currentTarget.setPointerCapture?.(event.pointerId);

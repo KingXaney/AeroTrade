@@ -1,5 +1,5 @@
-// A betting round of no-limit hold'em: what a player owes, whether they still have to act, the moves
-// open to them, and the walk from one actor to the next. Pure.
+// A betting round of a poker night hand — no limit, or pot limit in PLO: what a player owes, whether
+// they still have to act, the moves open to them, and the walk from one actor to the next. Pure.
 //
 // The rules, in the order a table meets them:
 // - A player owes the current bet less their street bet, capped at what a live opponent can still
@@ -10,6 +10,12 @@
 //   nobody who has acted, unless the short all-ins since their move add up to a full raise (the TDA
 //   rule). One exception, the friendlier reading: a player who checked and then faces an opening
 //   all-in below the minimum bet may raise. No raise is open when every opponent is all in.
+// - No limit: a bet or a raise may go up to every chip the player has. Pot limit (PLO): at most to the
+//   current bet plus the pot after the call — every chip committed this hand (antes, earlier streets,
+//   every bet in front of the players, the player's own) plus what the player owes — never below the
+//   minimum, never past all in. The all-in move is a raise only when all in is within that; facing a
+//   bet as large as the stack it is the call; else it is refused, and the table's Pot sends the raise
+//   to the cap.
 // - Pre-actions are kept on the server and resolved when the turn reaches their owner; an away
 //   player checks when that is free and folds otherwise.
 //
@@ -20,6 +26,7 @@
 
 import {ENTRY_FLAGS, ENTRY_KINDS, KEEP, STREETS} from '@/lib/poker-night/config';
 import type {EntryKind, Hand, HandEntry, LogEntry, Legal, Move, PreAction, Refusal, TableState, Work} from '@/lib/poker-night/types';
+import {limitOf, type BettingLimit} from '@/lib/poker-night/variants';
 
 export type BetSeat = {seat: number; streetBet: number; actedAtBet: number | null; folded: boolean; allIn: boolean};
 type Round = {currentBet: number; seats: readonly BetSeat[]};
@@ -29,16 +36,21 @@ export type BettingSnapshot = {
     actor: number | null;
     currentBet: number;
     increment: number;
+    limit: BettingLimit; // the hand's game's: pot limit in PLO
+    pot: number; // every chip committed this hand: antes, earlier streets and every bet in front
     seats: (BetSeat & {stack: number})[];
 };
 
 export type Flow = 'waiting' | 'close';
 
+export const NO_HAND_SNAPSHOT: Readonly<BettingSnapshot> = Object.freeze({phase: null, actor: null, currentBet: 0, increment: 0, limit: 'no-limit', pot: 0, seats: []});
+
 export const snapshotFromState = (state: Pick<TableState, 'hand' | 'seats'>): BettingSnapshot => {
     const hand = state.hand;
-    if (!hand) return {phase: null, actor: null, currentBet: 0, increment: 0, seats: []};
+    if (!hand) return {...NO_HAND_SNAPSHOT, seats: []};
     return {
         phase: hand.phase, actor: hand.actor, currentBet: hand.currentBet, increment: hand.increment,
+        limit: limitOf(hand.variant), pot: hand.seats.reduce((sum, p) => sum + p.committed, 0),
         seats: hand.seats.map((p) => ({seat: p.seat, streetBet: p.streetBet, actedAtBet: p.actedAtBet, folded: p.folded, allIn: p.allIn, stack: state.seats[p.seat]?.stack ?? 0})),
     };
 };
@@ -76,10 +88,20 @@ export const legalFor = (snap: BettingSnapshot, seat: number): Legal | null => {
         || (p.actedAtBet === 0 && snap.currentBet > 0 && snap.currentBet < snap.increment)
         || snap.currentBet - p.actedAtBet >= snap.increment;
     const allInTo = p.streetBet + p.stack;
+    const min = Math.min(snap.currentBet + snap.increment, allInTo);
+    // Pot limit: the current bet plus the pot after the call. A raise is open only while someone else
+    // can act, so `due` here is the whole of the current bet less the player's street bet.
+    const capTo = snap.limit === 'pot-limit' ? snap.currentBet + snap.pot + due : Infinity;
     const raise = p.stack > due && reopened && othersCanAct(snap, seat)
-        ? {kind: snap.currentBet === 0 ? 'bet' as const : 'raise' as const, min: Math.min(snap.currentBet + snap.increment, allInTo), max: allInTo}
+        ? {kind: snap.currentBet === 0 ? 'bet' as const : 'raise' as const, min, max: Math.min(allInTo, Math.max(min, capTo))}
         : null;
     return {fold: true, check: due === 0, call: Math.min(due, p.stack), callAllIn: due > 0 && p.stack <= due, raise};
+};
+
+// Whether the all-in move is open: a raise to all in within the limit, or a call of everything left.
+export const allInOpen = (legal: Legal, snap: Pick<BettingSnapshot, 'seats'>, seat: number): boolean => {
+    const p = seatIn(snap, seat);
+    return legal.callAllIn || (legal.raise !== null && p !== undefined && legal.raise.max === p.streetBet + p.stack);
 };
 
 // ── the hand's log ──
@@ -159,7 +181,9 @@ export const applyMove = (w: Work, seat: number, move: Move, how: How): Refusal 
             break;
         }
         case 'all-in':
-            if (legal.raise) raiseTo(legal.raise.max, legal.raise.kind);
+            // Under pot limit all in is a raise only when it is within the cap; the cap itself is a
+            // raise to legal.raise.max.
+            if (legal.raise && legal.raise.max === p.streetBet + table.stack) raiseTo(legal.raise.max, legal.raise.kind);
             else if (legal.callAllIn) pay('call', legal.call);
             else return 'illegal';
             break;
