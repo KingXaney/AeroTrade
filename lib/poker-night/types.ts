@@ -217,7 +217,7 @@ export type TableState = {
     nextHandAt: number | null;
     createdAt: number;
     noAsks: string[]; // PRIVATE: players who turned off "Let others ask to see my cards"
-    askCooldowns: AskCooldown[]; // PRIVATE: the latest ASKS.COOLDOWNS_KEPT
+    askCooldowns: AskCooldown[]; // PRIVATE: with the waiting asks, at most ASKS.COOLDOWNS_KEPT (asks.asksFull)
 };
 
 export type Move = {kind: 'fold'} | {kind: 'check'} | {kind: 'call'} | {kind: 'raise'; to: number} | {kind: 'all-in'};
@@ -236,9 +236,11 @@ export type HostOp =
 export type AskReply = 'one' | 'all' | 'none';
 
 export type TableAction =
-    | {type: 'sit'; by: string; seat: number; buyIn: number; at: number}
+    // hostAway: set by the room alone (never parsed from a request) when the host has been away
+    // LIMITS.hostTakeoverMs: the chips land without the host's yes.
+    | {type: 'sit'; by: string; seat: number; buyIn: number; at: number; hostAway?: boolean}
     | {type: 'leave' | 'sit-out' | 'sit-in' | 'show' | 'withdraw'; by: string; at: number}
-    | {type: 'buy'; by: string; amount: number; at: number}
+    | {type: 'buy'; by: string; amount: number; at: number; hostAway?: boolean}
     | {type: 'act'; by: string; turn: number; move: Move; at: number}
     | {type: 'pre'; by: string; pre: PreAction | null; at: number}
     | {type: 'host'; by: string; op: HostOp; at: number}
@@ -258,7 +260,7 @@ export type Refusal =
     | 'closed' | 'not-now' | 'not-host' | 'not-seated' | 'already-seated' | 'seat-taken' | 'bad-seat' | 'bad-amount'
     | 'below-buy-in' | 'over-cap' | 'rebuys-off' | 'rebuy-cap' | 'no-request' | 'not-your-turn' | 'stale' | 'illegal'
     | 'below-min-raise' | 'bad-config' | 'bad-deck' | 'not-due'
-    | 'asks-off' | 'ask-waiting' | 'ask-limit' | 'ask-cooldown';
+    | 'asks-off' | 'ask-waiting' | 'ask-limit' | 'ask-cooldown' | 'asks-full';
 
 // hands: every hand this step completed (or showed cards in, or answered an ask about), for
 // PokerHand. ledgerDirty: a figure a PokerResult row carries moved. kicked: the pid the host just

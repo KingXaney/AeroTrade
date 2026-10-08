@@ -1632,7 +1632,9 @@ try {
     // (844 × 390) once the game has started, whose chips wait for the host. In hand 1 (paused by the
     // host as it plays, so its result stays) Ben and Cy fold; Ana leaves after it, playing it out.
     // In its pause Ben asks Cy (shown to Ben alone) and Cy asks Ben (no thanks); Cy turns asks off.
-    // Hand 2 (paused too): everyone folds to the host; the blocked asks and one that runs out.
+    // Hand 2 (paused too): everyone folds to the host; the blocked asks and one that runs out. Hand 3
+    // is not paused: Ben asks Dee and the next deal ends it first (no cooldown, Ben told). Last, Eve
+    // sits down and the host goes quiet for ten minutes: her chips no longer wait for them.
     {
         await hostOp(H, {op: 'end'}).catch(() => null);
         const plain = (text) => text.replace(/[⁨⁩]/g, '');
@@ -1643,6 +1645,38 @@ try {
         const overlap = (a, b) => !!a && !!b && a.left < b.right - 1 && b.left < a.right - 1 && a.top < b.bottom - 1 && b.top < a.bottom - 1;
         const inView = (page, r) => page.evaluate((x) => !!x && x.left >= -1 && x.top >= -1 && x.right <= innerWidth + 1 && x.bottom <= innerHeight + 1, r);
         const PHONES = [...SIZES, {width: 667, height: 375}, {width: 568, height: 320}];
+        // What the ask prompt covers of the table: every plate and its flag but the viewer's own, a
+        // turned-up hand, the board, the pots, an open seat, the result banner and the line under it,
+        // the top bar. It may cover only the viewer's own corner (the dock, their own plate).
+        const askCovers = (page, own) => page.evaluate((mine) => {
+            const prompt = document.querySelector('[data-pn-ask-prompt]')?.getBoundingClientRect();
+            if (!prompt) return null;
+            const vis = (el) => {
+                const r = el.getBoundingClientRect();
+                const cs = getComputedStyle(el);
+                return r.width > 0 && r.height > 0 && cs.visibility !== 'hidden' && cs.display !== 'none' && parseFloat(cs.opacity) > 0.05;
+            };
+            const hit = (a, b) => a.left < b.right - 0.5 && b.left < a.right - 0.5 && a.top < b.bottom - 0.5 && b.top < a.bottom - 0.5;
+            const seatOf = (el) => el.closest('[data-seat]')?.getAttribute('data-seat') ?? '?';
+            const hits = [];
+            const add = (sel, name, keep = () => true) => document.querySelectorAll(sel).forEach((el) => {
+                if (vis(el) && keep(el) && hit(prompt, el.getBoundingClientRect())) hits.push(name(el));
+            });
+            const others = (el) => seatOf(el) !== String(mine);
+            add('[data-seat] .pn-plate', (el) => `plate ${seatOf(el)}`, others);
+            add('[data-seat] .pn-plate-flag', (el) => `flag ${seatOf(el)}`, others);
+            add('[data-seat] .pn-seat-shown', (el) => `shown hand ${seatOf(el)}`, others);
+            add('.pn-open-seat', (el) => `open seat ${seatOf(el)}`);
+            add('.pn-board', () => 'board');
+            add('[data-pn-pot] [data-pot]', () => 'pot');
+            add('.pn-banner, .pn-banner-note, [data-pn-next-hand]', () => 'banner');
+            add('[data-pn-topbar]', () => 'top bar');
+            return {hits, inView: prompt.left >= -1 && prompt.top >= -1 && prompt.right <= innerWidth + 1 && prompt.bottom <= innerHeight + 1,
+                fromFoot: Math.round(innerHeight - prompt.bottom)};
+        }, own);
+        // No pre-action's label spills out of its button (a word drawn over the next one).
+        const preSpill = (page) => page.$$eval('[data-pn-pre] button', (els) => els.filter((el) => el.scrollWidth > el.clientWidth + 0.5)
+            .map((el) => `${el.textContent} ${el.scrollWidth}>${el.clientWidth}`));
 
         // The start form's rebuy policy on a phone: Off / On (host approves), two 44 px radios.
         await Hm.page.goto(`${BASE}/poker-night`, {waitUntil: 'load', timeout: 180000});
@@ -1727,20 +1761,27 @@ try {
         await D.page.waitForSelector('[data-pn-seat-controls][data-pn-armed] [data-pn-control="withdraw"]', {timeout: 10000});
         await D.page.click('[data-pn-control="withdraw"]');
         const withdrawn = await waitDoc((x) => !x.state.requests.some((r) => r.pid === D.pid), 10000);
-        const rebuyOffered = await D.page.waitForSelector('[data-pn-control="rebuy"]', {timeout: 10000}).then(() => true, () => false);
+        const firstChips = await D.page.waitForSelector('[data-pn-control="first-chips"]', {timeout: 10000}).then((el) => el.innerText(), () => null);
+        const noChips = await D.page.$eval('[data-pn-no-chips]', (el) => el.textContent).catch(() => null);
+        const outOfChips = await D.page.locator('[data-pn-control="rebuy"]').count();
         const cancelToast = await toasted(D.page, TABLE_COPY.requestCancelled, 5000);
         const toastGone = await H.page.waitForFunction((t) => ![...document.querySelectorAll('[data-sonner-toast]')].some((el) => el.textContent.includes(t)),
             HOST_COPY.requestSeat('Dee', amountD), {timeout: 10000}).then(() => true, () => false);
-        check('…Cancel takes the request back (toasted), the host\'s toast for it goes, and the dock offers the chips again (a hand Dee is not in being played)',
-            withdrawn !== null && rebuyOffered && cancelToast && toastGone, JSON.stringify({withdrawn: withdrawn !== null, rebuyOffered, cancelToast, toastGone}));
-        await D.page.click('[data-pn-control="rebuy"]');
-        await D.page.waitForSelector('[data-pn-drawer="bank"] [data-pn-rebuy]', {timeout: 10000});
+        await sleep(1500);
+        const declinedSaid = await D.page.evaluate((t) => window.__pnToasts.some((x) => x.text.includes(t)), BANK_COPY.declined);
+        await shot(D.page, '23-no-chips-yet-844x390');
+        check('…Cancel takes the request back (toasted, and never as "The host declined the request."), the host\'s toast for it goes, and the dock says "No chips yet." with "Ask for … chips" — never "Out of chips" or a top-up',
+            withdrawn !== null && plain(firstChips ?? '').trim() === BANK_COPY.askFor(amountD) && noChips === TABLE_COPY.noChipsYet && outOfChips === 0
+            && cancelToast && toastGone && !declinedSaid, JSON.stringify({withdrawn: withdrawn !== null, firstChips, noChips, outOfChips, cancelToast, toastGone, declinedSaid}));
+        await D.page.click('[data-open="bank"]');
+        const bankOffer = await D.page.waitForSelector('[data-pn-drawer="bank"] [data-pn-rebuy]', {timeout: 10000}).then((el) => el.innerText(), () => null);
         await D.page.click('[data-pn-drawer="bank"] [data-pn-rebuy]');
         d = await waitDoc((x) => x.state.requests.some((r) => r.pid === D.pid), 10000);
         const ownRow = await D.page.waitForSelector('[data-pn-requested] [data-pn-withdraw]', {timeout: 10000}).then(() => true, () => false);
         const ownM = await targets(D.page, '[data-own-chips]');
         await D.page.keyboard.press('Escape');
-        check('…asked again from the bank: the bank says it waits, with Cancel (44 px)', d !== null && ownRow && targetsOk(ownM), brief(ownM));
+        check('…asked again from the bank, whose button says so too ("Ask for … chips"): the bank says it waits, with Cancel (44 px)',
+            d !== null && ownRow && targetsOk(ownM) && plain(bankOffer ?? '').trim() === BANK_COPY.askFor(amountD), `${brief(ownM)} ${bankOffer}`);
         const toastText = HOST_COPY.requestSeat('Dee', amountD);
         const toastAgain = await H.page.waitForFunction((t) => [...document.querySelectorAll('[data-sonner-toast]')]
             .some((el) => el.textContent.includes(t) && el.querySelector('[data-button][data-action]')), toastText, {timeout: 15000}).then(() => true, () => false);
@@ -1755,6 +1796,9 @@ try {
         await H.page.waitForSelector('[data-pn-drawer="bank"]', {state: 'detached', timeout: 10000}).catch(() => {});
         check('…the host\'s bank: the row says what it is for ("to sit down") with Approve and Decline, 44 px', row?.kind === 'seat' && row.approve && row.decline
             && plain(row.text).includes(plain(toastText)) && targetsOk(rowM), `${JSON.stringify(row)} ${brief(rowM)}`);
+        const approveH = await H.page.evaluate((t) => [...document.querySelectorAll('[data-sonner-toast]')].find((x) => x.textContent.includes(t))
+            ?.querySelector('[data-button][data-action]')?.getBoundingClientRect().height ?? 0, toastText);
+        check('…the host\'s toast\'s Approve is a full 44 px target', approveH >= 43.5, String(approveH));
         const clicked = await H.page.evaluate((t) => {
             const el = [...document.querySelectorAll('[data-sonner-toast]')].find((x) => x.textContent.includes(t) && x.querySelector('[data-button][data-action]'));
             el?.querySelector('[data-button][data-action]')?.click();
@@ -1788,8 +1832,11 @@ try {
                 const m = await targets(A.page, '[data-pn-dock]');
                 const t = await rectOf(A.page, '[data-pn-leave-after]');
                 const pre = await rectOf(A.page, '[data-pn-pre]');
-                check(`"Leave after this hand" beside the early choices at ${sizeName(size)}: one 44 px tap on screen, clear of them; every dock target 44 px, nothing sideways`,
-                    targetsOk(m) && t !== null && t.w >= 43.5 && t.h >= 43.5 && await inView(A.page, t) && !overlap(t, pre), `${brief(m)} ${JSON.stringify(t)}`);
+                const spill = await preSpill(A.page);
+                const word = await A.page.$eval('[data-pn-leave-after] .pn-leave-word', (el) => (getComputedStyle(el).display === 'none' ? null : el.textContent.trim())).catch(() => 'missing');
+                check(`"Leave after this hand" beside the early choices at ${sizeName(size)}: one 44 px tap on screen, clear of them, its word (where shown) "${TABLE_COPY.leaveAfterShort}"; no early choice's label spills out of its button; every dock target 44 px, nothing sideways`,
+                    targetsOk(m) && t !== null && t.w >= 43.5 && t.h >= 43.5 && await inView(A.page, t) && !overlap(t, pre) && spill.length === 0
+                    && (word === null || word === TABLE_COPY.leaveAfterShort), `${brief(m)} ${JSON.stringify({t, spill, word})}`);
                 if ([390, 320, 844, 568].includes(size.width)) await shot(A.page, `21-leave-after-door-${sizeFile(size)}`);
             }
             await resize(A.page, {width: 390, height: 844});
@@ -1798,6 +1845,8 @@ try {
             const set = await waitDoc((x) => x.state.seats[seatA]?.leaveAfter === true, 10000);
             const note = await A.page.waitForSelector('[data-pn-leaving-after] [data-pn-stay]', {timeout: 10000}).then(() => A.page.innerText('[data-pn-leaving-after]'), () => null);
             const toastSet = await toasted(A.page, TABLE_COPY.leaveAfterSet, 5000);
+            const stayToastH = await A.page.evaluate((t) => [...document.querySelectorAll('[data-sonner-toast]')].find((x) => x.textContent.includes(t))
+                ?.querySelector('[data-button]')?.getBoundingClientRect().height ?? 0, TABLE_COPY.leaveAfterSet);
             const pre = await A.page.locator('[data-pn-pre]').count();
             const dot = await A.page.locator('[data-pn-leaving-dot]').count();
             const onHost = await H.page.getAttribute(`[data-seat="${seatA}"]`, 'data-state');
@@ -1806,6 +1855,25 @@ try {
             check('one tap on the door: Ana plays on (the early choices still there), the dock says "Last hand" with Stay (44 px), a toast, a dot on Home — and the host\'s table still shows Ana in the hand',
                 set !== null && note?.includes(TABLE_COPY.lastHand) && toastSet && pre > 0 && dot === 1 && onHost === 'in-hand' && targetsOk(stayM),
                 JSON.stringify({set: set !== null, note, toastSet, pre, dot, onHost, stay: brief(stayM)}));
+            check('…the toast\'s Stay is a full 44 px target', stayToastH >= 43.5, String(stayToastH));
+            // On a phone on its side the note has a row of its own under the cards: its words read whole, Stay inside it.
+            for (const size of [{width: 844, height: 390}, {width: 667, height: 375}, {width: 568, height: 320}]) {
+                await resize(A.page, size, 500);
+                const n = await A.page.evaluate(() => {
+                    const pill = document.querySelector('[data-pn-leaving-after]');
+                    const label = pill?.querySelector('[role="status"]');
+                    const stay = pill?.querySelector('[data-pn-stay]');
+                    if (!pill || !label || !stay) return null;
+                    const p = pill.getBoundingClientRect();
+                    const s = stay.getBoundingClientRect();
+                    return {text: label.textContent.trim(), w: label.clientWidth, sw: label.scrollWidth, inside: s.left >= p.left - 0.5 && s.right <= p.right + 0.5};
+                });
+                const m = await targets(A.page, '[data-pn-dock]');
+                check(`…at ${sizeName(size)} the note beside the cards reads whole ("${TABLE_COPY.lastHand}", never cut short) with Stay inside it; every dock target 44 px`,
+                    n !== null && n.w > 20 && n.sw <= n.w + 0.5 && n.inside && n.text.includes(TABLE_COPY.lastHand) && targetsOk(m), `${JSON.stringify(n)} ${brief(m)}`);
+                await shot(A.page, `21-leaving-after-${sizeFile(size)}`);
+            }
+            await resize(A.page, {width: 390, height: 844}, 500);
             await A.page.click('[data-pn-stay]');
             const back = await waitDoc((x) => x.state.seats[seatA]?.leaveAfter === false, 10000);
             const toggleBack = await A.page.waitForSelector('[data-pn-leave-after]', {timeout: 10000}).then(() => true, () => false);
@@ -1873,14 +1941,12 @@ try {
         for (const size of [{width: 320, height: 568}, {width: 568, height: 320}]) {
             await resize(C.page, size, 400);
             const m = await targets(C.page, '[data-pn-ask-prompt]');
-            const box = await rectOf(C.page, '[data-pn-ask-prompt]');
-            const bar = await rectOf(C.page, '[data-pn-topbar]');
-            const dock = await rectOf(C.page, '[data-pn-dock]');
+            const covers = await askCovers(C.page, seats.cy);
             const text = await C.page.innerText('[data-pn-ask-prompt]').catch(() => '');
             const left = Number(await C.page.getAttribute('[data-pn-ask-left]', 'data-pn-ask-left').catch(() => -1));
-            check(`Cy's prompt at ${sizeName(size)}: "Ben asks to see your cards", its seconds (15 or fewer), three 44 px answers; under the top bar, never over the dock, nothing sideways`,
-                prompt && targetsOk(m) && m.count === 3 && box !== null && bar !== null && box.top >= bar.bottom - 1 && !overlap(box, dock) && await inView(C.page, box)
-                && plain(text).includes(plain(ASK_COPY.prompt('Ben'))) && left > 0 && left <= ASKS.WAIT_MS / 1000, `${brief(m)} ${JSON.stringify({box, bar, dock, left, text})}`);
+            check(`Cy's prompt at ${sizeName(size)}: "Ben asks to see your cards", its seconds (15 or fewer), three 44 px answers at the foot of the screen, over the dock and nothing of the table — no other plate, turned-up hand, the board, a pot or the banner; nothing sideways`,
+                prompt && targetsOk(m) && m.count === 3 && covers !== null && covers.inView && covers.hits.length === 0 && covers.fromFoot <= 24
+                && plain(text).includes(plain(ASK_COPY.prompt('Ben'))) && left > 0 && left <= ASKS.WAIT_MS / 1000, `${brief(m)} ${JSON.stringify({covers, left, text})}`);
             await shot(C.page, `22-ask-prompt-${sizeFile(size)}`);
         }
         await resize(C.page, {width: 320, height: 568}, 300);
@@ -1936,10 +2002,9 @@ try {
         for (const size of [{width: 375, height: 667}, {width: 667, height: 375}]) {
             await resize(B.page, size, 400);
             const m = await targets(B.page, '[data-pn-ask-prompt]');
-            const box = await rectOf(B.page, '[data-pn-ask-prompt]');
-            const dock = await rectOf(B.page, '[data-pn-dock]');
-            check(`Ben's prompt at ${sizeName(size)}: three 44 px answers on screen, never over the dock`, targetsOk(m) && m.count === 3 && !overlap(box, dock) && await inView(B.page, box),
-                `${brief(m)} ${JSON.stringify({box, dock})}`);
+            const covers = await askCovers(B.page, seats.ben);
+            check(`Ben's prompt at ${sizeName(size)}: three 44 px answers on screen, at the foot, over nothing of the table`,
+                targetsOk(m) && m.count === 3 && covers !== null && covers.inView && covers.hits.length === 0 && covers.fromFoot <= 24, `${brief(m)} ${JSON.stringify(covers)}`);
             await shot(B.page, `22-ask-prompt-${sizeFile(size)}`);
         }
         await resize(B.page, {width: 375, height: 667}, 300);
@@ -1969,14 +2034,29 @@ try {
         check('hand 2: the host, Ben, Cy and Dee dealt in (not Ana); all but the host fold', done2.state.hand.no === 2 && handSeat(done2, A) === null
             && [B, C, D].every((p) => handSeat(done2, p)?.folded) && !done2.state.hand.result.showdown, JSON.stringify(done2.state.hand.seats.map((s) => [s.pid, s.folded])));
         await B.page.click(`[data-seat-menu="${seats.cy}"]`);
-        const offSaid = await B.page.waitForSelector(`[data-pn-seat-menu="${seats.cy}"] [data-seat-ask="asks-off"]`, {timeout: 10000}).then(() => B.page.evaluate((s) => ({
-            disabled: document.querySelector(`[data-pn-seat-menu="${s}"] [data-seat-ask]`)?.hasAttribute('data-disabled') ?? false,
-            why: document.querySelector(`[data-pn-seat-menu="${s}"] [data-seat-ask-why]`)?.textContent ?? null,
-        }), seats.cy), () => null);
+        const offSaid = await B.page.waitForSelector(`[data-pn-seat-menu="${seats.cy}"] [data-seat-ask="asks-off"]`, {timeout: 10000}).then(async () => {
+            await sleep(300);
+            return B.page.evaluate((s) => {
+                const menu = document.querySelector(`[data-pn-seat-menu="${s}"]`);
+                const last = menu?.querySelector('[data-seat-mute]')?.getBoundingClientRect();
+                const plate = document.querySelector(`[data-seat="${s}"] .pn-plate`)?.getBoundingClientRect();
+                const m = menu?.getBoundingClientRect();
+                return {
+                    disabled: document.querySelector(`[data-pn-seat-menu="${s}"] [data-seat-ask]`)?.hasAttribute('data-disabled') ?? false,
+                    why: document.querySelector(`[data-pn-seat-menu="${s}"] [data-seat-ask-why]`)?.textContent ?? null,
+                    side: menu?.getAttribute('data-side') ?? null,
+                    lastInView: !!last && last.top >= -0.5 && last.bottom <= innerHeight + 0.5,
+                    scrolls: !!menu && menu.scrollHeight > menu.clientHeight + 1,
+                    towardMiddle: !!m && !!plate && (plate.top + plate.height / 2 > innerHeight / 2 ? m.bottom <= plate.top + 1 : m.top >= plate.bottom - 1),
+                };
+            }, seats.cy);
+        }, () => null);
         await shot(B.page, '22-ask-blocked-375x667');
         await B.page.keyboard.press('Escape');
         check('in the next hand\'s pause, Ben\'s ask of Cy is greyed: "Cy has turned off asks to see their cards."', offSaid?.disabled === true && offSaid.why === ASK_COPY.blocked['asks-off']('Cy'),
             JSON.stringify(offSaid));
+        check('…and Cy\'s menu opens toward the middle of the table, whole on screen: its last row in view, nothing to scroll inside it',
+            offSaid?.lastInView === true && offSaid.scrolls === false && offSaid.towardMiddle === true, JSON.stringify(offSaid));
         await C.page.click(`[data-seat-menu="${seats.ben}"]`);
         const coolSaid = await C.page.waitForSelector(`[data-pn-seat-menu="${seats.ben}"] [data-seat-ask="cooldown"]`, {timeout: 10000})
             .then(() => C.page.$eval(`[data-pn-seat-menu="${seats.ben}"] [data-seat-ask-why]`, (el) => el.textContent), () => null);
@@ -1997,6 +2077,35 @@ try {
         await D.page.keyboard.press('Escape');
         check('an ask nobody answers runs out as a no: the host\'s prompt goes by itself, Dee is told "No answer from …", and her menu says so',
             hostPrompt && hostPromptGone && expiredToast && expiredStatus === 'expired', JSON.stringify({hostPrompt, hostPromptGone, expiredToast, expiredStatus}));
+
+        // ── hand 3, not paused: Ben asks Dee and the next deal ends it first ──
+        // An eight-second pause, so the ask is made with its fifteen seconds outlasting it.
+        await hostOp(H, {op: 'config', patch: {pauseSeconds: 8}});
+        await hostOp(H, {op: 'resume'});
+        await waitDoc((x) => x.state.hand?.no === 3 && x.state.hand.phase === 'betting', 30000);
+        const done3 = await playByClicks(3, {choose: (p) => (p === H ? 'call' : 'fold')});
+        const seatDee = seatIndex(done3, D);
+        await B.page.click(`[data-seat-menu="${seatDee}"]`);
+        await B.page.waitForSelector(`[data-pn-seat-menu="${seatDee}"] [data-seat-ask="ask"]`, {timeout: 10000});
+        await B.page.click(`[data-pn-seat-menu="${seatDee}"] [data-seat-ask="ask"]`);
+        const askedDee = await waitDoc((x) => x.state.hand.no === 3 && x.state.hand.asks.some((e) => e[0] === seats.ben && e[1] === seatDee), 10000);
+        const deePrompt = await D.page.waitForSelector('[data-pn-ask-prompt]', {timeout: 10000}).then(() => true, () => false);
+        const deeLeft = Number(await D.page.getAttribute('[data-pn-ask-left]', 'data-pn-ask-left').catch(() => -1));
+        const deeNow = Date.now();
+        const deeCovers = await askCovers(D.page, seatDee);
+        const deeM = await targets(D.page, '[data-pn-ask-prompt]');
+        await shot(D.page, '22-ask-prompt-dealing-844x390');
+        const toDeal = Math.ceil(((askedDee?.state.nextHandAt ?? 0) - deeNow) / 1000) + 1;
+        check('an ask made in a running pause: Dee\'s prompt (a phone on its side: in the dock\'s column, over nothing of the table) counts down to the next deal, not to the ask\'s fifteen seconds',
+            askedDee !== null && deePrompt && deeLeft > 0 && deeLeft <= Math.max(1, toDeal) && deeLeft < ASKS.WAIT_MS / 1000 - 3 && deeCovers !== null && deeCovers.inView
+            && deeCovers.hits.length === 0 && targetsOk(deeM), JSON.stringify({deeLeft, toDeal, deeCovers, m: brief(deeM)}));
+        const dealt4 = await waitDoc((x) => x.state.hand?.no === 4, 30000);
+        const deePromptGone = await D.page.waitForSelector('[data-pn-ask-prompt]', {state: 'detached', timeout: 10000}).then(() => true, () => false);
+        const benDealtToast = await toasted(B.page, plain(ASK_COPY.ended.dealt('Dee')).slice(0, 30), 15000);
+        const noCooldown = dealt4 !== null && !dealt4.state.askCooldowns.some(([a, b]) => a === B.pid && b === D.pid);
+        check('…the deal ends it with no answer: Dee\'s prompt goes, Ben is told ("The next hand was dealt before Dee answered."), and no cooldown keeps Ben from asking Dee again',
+            dealt4 !== null && deePromptGone && benDealtToast && noCooldown, JSON.stringify({dealt: dealt4 !== null, deePromptGone, benDealtToast, cooldowns: dealt4?.state.askCooldowns}));
+        await hostOp(H, {op: 'pause'});
 
         // ── the host drawer's Off / On, saved ──
         await H.page.click('[data-open="host"]');
@@ -2027,6 +2136,34 @@ try {
         const problemAfter = await B.page.locator('[data-pn-problem]').count();
         check('a page on an older protocol (its requests sent as protocol ' + (PN_PROTOCOL - 1) + ') is asked to reload, and the reload brings the table back',
             reloadAsked && back && problemAfter === 0, JSON.stringify({reloadAsked, back, problemAfter}));
+
+        // ── the host away ten minutes: a guest's chips no longer wait for them ──
+        // Eve, a guest, sits once the game has started: her chips wait. Then the host's page goes
+        // quiet (its beats held back) and the room's record of them is set eleven minutes back, as
+        // ten minutes away would leave it: Eve's page says the chips no longer wait, and one tap lands them.
+        const E = await newPlayer('eve', PHONE(390, 844));
+        await sitDown(E, 'Eve');
+        const eveAsked = await waitDoc((x) => x.state.requests.some((r) => r.pid === E.pid), 10000);
+        const amountE = eveAsked?.state.requests.find((r) => r.pid === E.pid)?.amount ?? 0;
+        const eveWaits = await E.page.waitForSelector('[data-pn-waiting-approval]', {timeout: 15000}).then(() => true, () => false);
+        const takeBefore = await E.page.locator('[data-pn-control="take-chips"]').count();
+        const quiet = (route) => route.abort().catch(() => {});
+        await H.page.route('**/api/poker-night/*/tick', quiet);
+        const longAgo = Date.now() - 11 * 60_000;
+        await rooms.updateOne({env: ENV, code}, {$set: {[`seen.${H.pid}.at`]: longAgo, 'players.$[h].joinedAt': new Date(longAgo)}}, {arrayFilters: [{'h.pid': H.pid}]});
+        await E.page.reload({waitUntil: 'load'});
+        const takeSaid = await E.page.waitForSelector('[data-pn-waiting-approval][data-pn-host-away]', {timeout: 20000}).then((el) => el.innerText(), () => null);
+        const takeLabel = await E.page.waitForSelector('[data-pn-seat-controls][data-pn-armed] [data-pn-control="take-chips"]', {timeout: 15000}).then((el) => el.innerText(), () => null);
+        const takeM = await targets(E.page, '[data-pn-dock]');
+        await shot(E.page, '23-host-away-390x844');
+        check('a guest whose chips wait sees no way round the host while they are here; once the host has been away ten minutes the dock says the chips no longer wait for them, with "Take … chips" (44 px)',
+            eveAsked !== null && eveWaits && takeBefore === 0 && takeSaid?.trim() === TABLE_COPY.hostAwayNote && plain(takeLabel ?? '').trim() === BANK_COPY.takeChips(amountE) && targetsOk(takeM),
+            JSON.stringify({eveWaits, takeBefore, takeSaid, takeLabel, m: brief(takeM)}));
+        await E.page.click('[data-pn-control="take-chips"]');
+        const landedE = await waitDoc((x) => (x.state.seats[seatIndex(x, E)]?.stack ?? 0) === amountE && !x.state.requests.some((r) => r.pid === E.pid), 10000);
+        check('…one tap lands Eve\'s chips without the host (told so), the request gone, every chip accounted for', landedE !== null && await toasted(E.page, BANK_COPY.approved(amountE), 10000)
+            && ledgerRow(landedE, E)?.bought === amountE, JSON.stringify({landed: landedE !== null}));
+        await H.page.unroute('**/api/poker-night/*/tick', quiet);
         await hostOp(H, {op: 'end'}).catch(() => null);
     }
 

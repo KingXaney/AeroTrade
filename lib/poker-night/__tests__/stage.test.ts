@@ -6,7 +6,8 @@
 // the dealer button, moving only when something lands where they are, and inside the box with
 // nothing on the board, a plate or a card where nine seats leave no room; and the winner's banner and
 // the line under it clear of every plate, turned-up hand, the dealer button, the board, the pots and
-// the "+N", on the phones (upright and on their side) and the desktop the QA drives.
+// the "+N", on the phones (upright and on their side) and the desktop the QA drives; and a plate's
+// menu opening toward the middle of the table.
 
 import {readFileSync} from 'node:fs';
 import {fileURLToPath} from 'node:url';
@@ -16,7 +17,7 @@ import {CHIP_COLUMNS} from '@/lib/poker-night/chips';
 import {PLATE, SEAT_COUNTS, spotToPx} from '@/lib/poker-night/layout';
 import {
     AMOUNT_PX, AVATAR_PX, avatarCentre, BANNER, bannerObstacles, bannerPlan, BET, betLineSize, BLIND_MARK, blindRect, BOARD_CARD_MAX, CARD_RATIO, CHIP_PX, FELT_RAIL,
-    feltSpan, fitFor, insideBox, MINI_CARD_PX, MONO_EM, NARROW_STAGE, offset, openSeatPx, overlaps, pieceRect, PLATE_PAD_X, PLATE_SIZE, POT_CLEAR, POT_PILL, POT_PILL_H,
+    feltSpan, fitFor, insideBox, menuSide, MINI_CARD_PX, MONO_EM, NARROW_STAGE, offset, openSeatPx, overlaps, pieceRect, PLATE_PAD_X, PLATE_SIZE, POT_CLEAR, POT_PILL, POT_PILL_H,
     potCentre, potLayouts, potObstacles, potPillWidth, potPlan, PULSE, seatCardsRect, SHOWN_CARD_PX, SHOWN_OFF, shownHandRect, stageLayout, stageOrientation,
     TABLE_TOP_ROOM, textWidth, TIGHT_BELOW, WIN_POP, winPopRect, wrappedLines,
     type BannerPlan, type BannerSeen, type BannerText, type BetOut, type Fit, type PotNow, type PotPlan, type PotSeen, type Rect, type Stage, type WinPop,
@@ -759,5 +760,21 @@ describe("the banner's sizes in the stylesheet", () => {
         expect(rule('.pn-seat[data-side="top"] .pn-seat-shown')).toContain(`top: calc(100% + ${SHOWN_OFF.under}px)`);
         expect(rule('.pn-card[data-state="win"] > .pn-card-inner')).toContain('translateY(-6px)');
         expect(rule('.pn-card[data-state="win"] > .pn-card-inner')).toContain('0 0 0 2px');
+    });
+});
+
+describe("a plate's menu", () => {
+    it('opens toward the middle of the table: up from every plate below the centre, down from every other', () => {
+        for (const box of BOXES) {
+            for (const n of SEAT_COUNTS) {
+                const s = stageLayout(box, n, 0);
+                for (const p of s.seats) expect(menuSide(p, s), `${box.w}x${box.h}, ${n} seats, seat ${p.seat}`).toBe(p.plate.y > s.centre.y ? 'top' : 'bottom');
+                // The viewer's own plate sits at the foot: a menu from it (or a neighbour there) opens upward.
+                expect(menuSide(s.seats[0], s)).toBe('top');
+                // A plate along the top opens downward.
+                const top = s.seats.reduce((a, b) => (b.plate.y < a.plate.y ? b : a));
+                expect(menuSide(top, s)).toBe('bottom');
+            }
+        }
     });
 });

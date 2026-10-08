@@ -903,33 +903,44 @@ details[open] > :not(summary) { animation: disclosure-in var(--motion-base) var(
     .pn-label-short { display: inline; }
   }
   /* "Leave after this hand" beside the early choices: a door, with its word in a wide dock. In a
-     dock too narrow for the four (a phone on its side) it takes a row of its own under them, its
-     word back, so the early choices keep their 44 px. */
+     dock too narrow for the four (a phone on its side: every dock of 18rem or less) it takes a row of
+     its own under them, its word back, so the early choices keep their width. */
   .pn-pre-row { display: flex; flex-wrap: wrap; align-items: stretch; gap: 6px; }
   .pn-pre-row > [data-pn-pre] { flex: 1 1 0; }
   .pn-leave-word { display: inline; }
   @container pn-dock (max-width: 28rem) {
     .pn-leave-word { display: none; }
   }
-  /* An ask to see the viewer's cards (AskPrompt): under the top bar, never over the dock — on a phone
-     on its side it keeps to the table's column, clear of the dock's at the right. */
+  /* An ask to see the viewer's cards (AskPrompt): it rises from the foot of the screen over the
+     viewer's own corner — the dock, under the thumb — and covers nothing of the table: no plate,
+     turned-up hand, board or result banner. An ask comes only in the pause after a hand, when the
+     dock holds nothing that cannot wait a few seconds. On a phone on its side it fills the dock's
+     column at the right, its answers one above the other, the table left in full view. */
   .pn-ask-wrap {
     position: fixed;
-    left: max(12px, env(safe-area-inset-left));
-    right: max(12px, env(safe-area-inset-right));
-    top: calc(env(safe-area-inset-top) + 3.5rem);
+    left: max(8px, env(safe-area-inset-left));
+    right: max(8px, env(safe-area-inset-right));
+    bottom: max(8px, env(safe-area-inset-bottom));
     z-index: 30;
     display: flex;
     justify-content: center;
     pointer-events: none;
   }
+  .pn-ask { max-width: 28rem; }
+  .pn-ask-answers { grid-template-columns: repeat(3, minmax(0, 1fr)); }
   @media (orientation: landscape) and (max-height: 500px) {
-    .pn-ask-wrap { right: calc(max(12rem, 32vw) + 8px); }
+    .pn-ask-wrap { left: auto; width: calc(max(12rem, 32vw) - max(8px, env(safe-area-inset-right)) - 8px); }
+    .pn-ask-answers { grid-template-columns: minmax(0, 1fr); }
   }
-  @container pn-dock (max-width: 15rem) {
+  @container pn-dock (max-width: 18rem) {
     .pn-pre-row > [data-pn-pre] { flex-basis: 100%; }
     .pn-pre-row > [data-pn-leave-after] { flex: 1 1 100%; min-height: 44px; }
     .pn-leave-word { display: inline; }
+    /* The line beside the cards — the seconds left, who the table waits for, leaving after this hand
+       with Stay, what the cards make — takes a row of its own under them: beside the cards and the
+       emote button it would have a few pixels, and say nothing. */
+    .pn-dock-hand { flex: 1 1 100%; flex-wrap: wrap; }
+    .pn-dock-line { order: 3; flex: 1 1 100%; }
   }
 }
 

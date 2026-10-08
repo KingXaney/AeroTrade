@@ -44,6 +44,7 @@ const ERROR_STATUS = {
     ask_waiting: 409,
     ask_limit: 409,
     ask_cooldown: 409,
+    asks_full: 409,
     closed: 410,
     invalid_action: 422,
     bad_seat: 422,
@@ -98,6 +99,7 @@ const REFUSAL_CODES: Record<Refusal, PokerNightErrorCode> = {
     'ask-waiting': 'ask_waiting',
     'ask-limit': 'ask_limit',
     'ask-cooldown': 'ask_cooldown',
+    'asks-full': 'asks_full',
 };
 
 export const refusalToCode = (reason: Refusal): PokerNightErrorCode => REFUSAL_CODES[reason];

@@ -233,7 +233,7 @@ describe('the seat\'s own controls', () => {
         const s = three([1000, 1000, 1000], {buyInMin: 1000, buyInMax: 2000});
         const broke = structuredClone(s);
         broke.seats[0]!.stack = 0;
-        expect(dockView(as(broke, 0)).buy).toEqual({min: 1000, max: 2000, topUp: 2000, rebuy: true});
+        expect(dockView(as(broke, 0)).buy).toEqual({min: 1000, max: 2000, topUp: 2000, rebuy: true, first: false});
         expect(dockView(as(s, 0)).buy).toBeNull();
         const off = structuredClone(broke);
         off.config.rebuys = 'off';

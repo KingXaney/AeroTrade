@@ -578,18 +578,28 @@ and friends keep none beyond Shared and the invariants).
   with `withdraw`, or the player leaves). A newcomer waiting sits with nothing, is dealt nothing and
   has no ledger row until the chips land (as a buy-in: `ledger.hasBought`); the rebuy policy is off
   or on (`REBUY_POLICIES`: 'off' | 'approve'), and off stops rebuys and re-sits, never a first
-  buy-in, nor cashes out a newcomer still waiting. The break's one-tap Leave asks first only when
-  there is no way back (`overlays.leaveTapAsks`).
+  buy-in, nor cashes out a newcomer still waiting. A host unheard from for `LIMITS.hostTakeoverMs`
+  (`room.hostAwayAt`) holds no buy back: from then a sit or a buy lands as before the first deal —
+  the room alone marks the action `hostAway` (`room.withHostAway`; a request never carries it), a
+  buy that lands takes the place of the player's request, and the same request again changes
+  nothing. Claim-host stays an account holder's (a guest cannot hold the role), so this is what keeps
+  a table of guests going. The break's one-tap Leave asks first only when there is no way back
+  (`overlays.leaveTapAsks`).
 - Asks to see a hand (`lib/poker-night/asks`, pure, read by the engine and the views alike; the
   engine's `ask`, `reply`, `allow-asks`): once a hand completes, a player dealt into it who folded
   may ask a player whose cards were not shown; the player asked answers with their cards to the one
   who asked alone ('one': in that player's `shownToMe` and history, `HandSummary.players[].seenBy`),
   to everyone ('all': a show), or no. Kept from spam on the server: one ask waiting per player,
-  `ASKS.PER_HAND` a hand; one unanswered for `ASKS.WAIT_MS` or still waiting at the next deal is a
-  no; after a no the same pair waits `ASKS.COOLDOWN_HANDS` hands (the latest `ASKS.COOLDOWNS_KEPT`
-  kept); a player who turned asks off (`TableState.noAsks`, kept while seated) cannot be asked. Asks
-  live in the hand, so the next deal ends every one; a Triple T card thrown away is never shown.
-  Refusals `asks-off`, `ask-waiting`, `ask-limit`, `ask-cooldown`, each with its sentence.
+  `ASKS.PER_HAND` a hand; one unanswered for `ASKS.WAIT_MS` is a no; after a no the same pair waits
+  `ASKS.COOLDOWN_HANDS` hands; a player who turned asks off (`TableState.noAsks`, kept while seated
+  or dealt into the hand asks are about — `ledger.cashOut` drops anyone else's, so it never names
+  more than the seats and the hand's players) cannot be asked. Asks live in the hand, so the next
+  deal ends every one: one whose seconds were up by then is a no, one still waiting with time left
+  just ends, with no cooldown. A cooldown is never dropped before its hands are up: the table holds
+  at most `ASKS.COOLDOWNS_KEPT` cooldowns and waiting asks together, and at that cap a new ask is
+  refused `asks-full` until some run out (`asks.asksFull`, in `askChoices` too). A Triple T card
+  thrown away is never shown. Refusals `asks-off`, `ask-waiting`, `ask-limit`, `ask-cooldown`,
+  `asks-full`, each with its sentence.
 - Wording (invariant 12 applies): every sentence is in `lib/learn/copy/poker-night.ts`, held by
   `lib/learn/__tests__/poker-night-copy.test.ts` to the 'copy' tier and to a currency ban (play
   chips have no cash value). A hand wins against another and is "stronger"; its five cards are
@@ -837,34 +847,49 @@ and friends keep none beyond Shared and the invariants).
   winner's seat in the pause that they won (`reveal.viewerSeatIn`).
 - Leave after this hand, at the table: one tap while the viewer holds cards in the hand in play
   (`overlays.leaveAfterOf`, `dock.leaveAfter`) — a door beside the early choices (`Dock`'s
-  `LeaveAfterToggle`, its word in a wide dock, shielded with them; `.pn-pre-row` puts it on a row of
-  its own in a dock too narrow for the four, a phone on its side), a button in the seat's row while
-  all in, the menu's toggle — and, once folded, the break's Leave. The seat empties as the hand
-  completes; while its result shows, a seat whose player went keeps a ghost of their plate
+  `LeaveAfterToggle`, its word "Leave after hand", `TABLE_COPY.leaveAfterShort`, in a wide dock,
+  shielded with them; `.pn-pre-row` puts it on a row of its own in a dock of 18rem or less, a phone
+  on its side), a button in the seat's row while all in (the same short word), the menu's toggle —
+  and, once folded, the break's Leave. "Last hand" is only the state's word, beside the cards with
+  Stay; in a dock of 18rem or less that line (`.pn-dock-line`: the seconds, who the table waits
+  for, the note, the hand's name) takes a row of its own under the cards. An early choice's label
+  breaks after its slash (`PreActions`), never spilling over the next button. The seat empties as
+  the hand completes; while its result shows, a seat whose player went keeps a ghost of their plate
   (`SeatRing`'s `GhostSeat` from `HandResultView.gone`: the name, the look, the cards they showed,
   "Left"; never a menu or "Sit here"), which the pots and the banner keep clear of (`TableScreen`).
 - The host's yes, at the table: the join card says it once the first hand is dealt
   (`JoinView.needsApproval`, `JOIN_COPY.approvalNote`); a seat whose chips wait reads "Waiting for
   chips" on every plate (the public `requests`) and its dock "Waiting for the host to approve your
-  chips" with Cancel (`withdraw`; `dock.waitingChips`), as the bank does. The host hears a short
-  sound (`sounds` 'request') and sees a toast with Approve for each new request
-  (`components/poker-night/AskPrompt`'s `RequestWatch`, `overlays.newRequests`), a dot on Bank and
-  Host, and the bank's rows say what each is for (`overlays.requestKind`: to sit down, a rebuy, a
-  top-up). The rebuy policy is Off / On (host approves) in the start form and the host drawer
+  chips" with Cancel (`withdraw`; `dock.waitingChips`), as the bank does — and once the host counts
+  as away (`MeView.hostAwayAt`, a time, so a view read before then still says it), that the chips no
+  longer wait for them, with "Take 2,000 chips". A Cancel (marked as it is sent,
+  `overlay-requests.markOwnWithdraw`) or a leave is never said as the host's no
+  (`overlays.requestEnded`: 'withdrawn'). A seat that never had chips here reads "No chips yet."
+  with one tap, "Ask for 2,000 chips" (`bank.buyOptions`' `first`), never "Out of chips" or a
+  top-up. The host hears a short sound (`sounds` 'request') and sees a toast with Approve for each
+  new request (`components/poker-night/AskPrompt`'s `RequestWatch`, `overlays.newRequests`), a dot on
+  Bank and Host, and the bank's rows say what each is for (`overlays.requestKind`: to sit down, a
+  rebuy, a top-up). A table toast's action is a 44 px target (`overlay-kit.TOAST_ACTION`). The
+  rebuy policy is Off / On (host approves) in the start form and the host drawer
   (`components/poker-night/RebuyChoice`, a radio pair over `ChoiceGroup`).
 - Asks, at the table: another player's seat menu leads with "Ask to see their cards"
   (`overlays.askOffer` over `canAsk`, `askBlocked` and the viewer's own `asks`): offered, greyed with
   its reason, or how the viewer's ask of them stands — read at the server's time, so an ask that ran
-  out frees the rest with no write. The player asked sees `AskPrompt` under the top bar, never over
-  the dock (`.pn-ask-wrap`: on a phone on its side it keeps to the table's column), while one waits (`overlays.askToAnswer`): who asks, its seconds, "Show Ana" / "Show
-  everyone" / "No thanks", 44 px behind a tap shield, and a short sound ('ask'). A hand shown to the
-  viewer alone turns up on its plate for them ("Shown to you", `Seat`'s `privateCards`) and in the
-  hand log ("Shown to you: Ana held …", `hand-log`'s `seenLines` from `shownToMe` until the history
-  row has it); `AskWatch` toasts how each of their asks ended (`overlays.askNews`). "Let others ask
-  to see my cards" is a switch of the personal look (`PersonalLook.allowAsks`, saved with an
-  account), which `PokerNightRoom` sends as `allow-asks` whenever the seat lacks it (the room forgets
-  it for a player without a seat). Through a result's pause the polls come every 1.5 s for a player
-  dealt into the hand (`feed.askWindow`), since the next deal ends every ask.
+  out frees the rest with no write; the menu opens toward the table's middle (`stage.menuSide`), whole
+  on screen. The player asked sees `AskPrompt` at the foot of the screen, over their own corner and
+  nothing of the table — no other plate, turned-up hand, board, pot or banner (`.pn-ask-wrap`: over
+  the dock, under the thumb; on a phone on its side, in the dock's column) — while one waits
+  (`overlays.askToAnswer`): who asks, its seconds, which run to the next deal when that comes first
+  (`overlays.askEndsAt`), "Show Ana" / "Show everyone" / "No thanks", 44 px behind a tap shield, and a
+  short sound ('ask'). A hand shown to the viewer alone turns up on its plate for them ("Shown to
+  you", `Seat`'s `privateCards`) and in the hand log ("Shown to you: Ana held …", `hand-log`'s
+  `seenLines` from `shownToMe` until the history row has it); `AskWatch`, mounted for every joined
+  viewer, toasts how each of their asks ended (`overlays.askNews`), the next deal ending one first
+  included ('dealt'). "Let others ask to see my cards" is a switch of the personal look
+  (`PersonalLook.allowAsks`, saved with an account), which `PokerNightRoom` sends as `allow-asks`
+  whenever the seat lacks it (the room forgets it for a player without a seat). Through a result's
+  pause the polls come every 1.5 s for a player dealt into the hand (`feed.askWindow`), since the
+  next deal ends every ask.
 - The Hands guide: `lib/poker-night/hands-guide` (pure) holds the ten rankings strongest first, each
   a five-card example with the cards that make it (`RANKING_EXAMPLES`), the kicker pair
   (`KICKER_EXAMPLE`) and the games (`GUIDE_GAMES`: Texas hold'em for now, each with its glossary

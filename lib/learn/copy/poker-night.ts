@@ -245,6 +245,8 @@ export const REFUSAL_COPY: Record<Refusal, string> = {
     'ask-waiting': 'Your last ask is still waiting for an answer.',
     'ask-limit': 'That is every ask this hand allows.',
     'ask-cooldown': `They did not show you their cards when you last asked, so asking them again waits ${numberWord(ASKS.COOLDOWN_HANDS)} hands.`,
+    // The table holds as many cooldowns and waiting asks as it keeps (lib/poker-night/asks.asksFull).
+    'asks-full': `Asks to see cards are resting at this table: they open again within ${numberWord(ASKS.COOLDOWN_HANDS)} hands.`,
 };
 
 // ---- errors (lib/poker-night/http.ts, PokerNightErrorCode) -----------------------------------
@@ -279,6 +281,7 @@ export const POKER_NIGHT_ERRORS: Record<PokerNightErrorCode, string> = {
     ask_waiting: REFUSAL_COPY['ask-waiting'],
     ask_limit: REFUSAL_COPY['ask-limit'],
     ask_cooldown: REFUSAL_COPY['ask-cooldown'],
+    asks_full: REFUSAL_COPY['asks-full'],
     closed: REFUSAL_COPY.closed,
     invalid_action: REFUSAL_COPY.illegal,
     bad_seat: REFUSAL_COPY['bad-seat'],
@@ -595,6 +598,8 @@ export const TABLE_COPY = {
     // n is the table's sitOutAfter: the timeouts in a row that sit a player out.
     awayNote: (n: number): string => `Sat out after ${numberWord(n)} ${n === 1 ? 'timeout' : 'timeouts'}. "I'm back" deals you in again.`,
     outOfChips: 'Out of chips.',
+    // A seat that never had chips here (a newcomer whose request was taken back or declined).
+    noChipsYet: 'No chips yet.',
     showCards: 'Show my cards',
     // The break's buttons in a narrow dock (a phone upright); the long words above stay their
     // accessible names.
@@ -607,6 +612,9 @@ export const TABLE_COPY = {
     // the menu's, the note beside the cards with Stay (lastHand in a narrow dock), the toasts, and
     // the line the leave dialog adds under its body while it offers it.
     leaveAfter: 'Leave after this hand',
+    // The action's word where the long one does not fit (the door beside the early choices, the all-in
+    // button in a narrow dock); lastHand is the state's, beside the cards with Stay.
+    leaveAfterShort: 'Leave after hand',
     lastHand: 'Last hand',
     leavingAfter: 'Leaving after this hand',
     stayAtTable: 'Stay at the table',
@@ -624,6 +632,10 @@ export const TABLE_COPY = {
     cancelRequest: 'Cancel',
     cancelRequestLabel: 'Cancel the request for chips',
     requestCancelled: 'Request cancelled.',
+    // The host unheard from for LIMITS.hostTakeoverMs: a waiting request may land without their yes
+    // (BANK_COPY.takeChips); a host back by then keeps it waiting.
+    hostAwayNote: `The host has been away for over ${numberWord(Math.round(LIMITS.hostTakeoverMs / 60_000))} minutes, so your chips no longer wait for them.`,
+    hostBack: 'The host is back: your request waits for them.',
     sitOutNextNote: 'You sit out from the next hand.',
     // The host sat the viewer out (the bank's "Sit out next hand"); "I'm back" deals them in again.
     hostSatYouOut: 'The host sat you out.',
@@ -734,6 +746,7 @@ const ASK_BLOCKS = {
     cooldown: (): string => REFUSAL_COPY['ask-cooldown'],
     waiting: (): string => REFUSAL_COPY['ask-waiting'],
     limit: (): string => REFUSAL_COPY['ask-limit'],
+    full: (): string => REFUSAL_COPY['asks-full'],
 } as const;
 
 export const ASK_COPY = {
@@ -755,6 +768,8 @@ export const ASK_COPY = {
         everyone: (name: string): string => `${isolate(name)} showed their cards to everyone.`,
         no: (name: string): string => `${isolate(name)} said no thanks.`,
         expired: (name: string): string => `No answer from ${isolate(name)} in time.`,
+        // The next deal ended it while it still had time: no answer, and no wait before asking again.
+        dealt: (name: string): string => `The next hand was dealt before ${isolate(name)} answered.`,
     },
     // The plate of a player who showed the reader alone.
     shownTag: 'Shown to you',
@@ -924,6 +939,10 @@ export const BANK_COPY = {
     // while some are in the pot it says what it adds rather than a total.
     rebuy: 'Rebuy',
     topUp: (to: number): string => `Top up to ${count(to)}`,
+    // A seat's first chips here once the game has started: a request the host approves (askFor), or,
+    // with the host away long enough, chips that land at once (takeChips).
+    askFor: (n: number): string => `Ask for ${plural(n, 'chip', 'chips')}`,
+    takeChips: (n: number): string => `Take ${plural(n, 'chip', 'chips')}`,
     ownInPot: (n: number): string => `Counting ${count(n)} in this pot.`,
     addChips: (n: number): string => `Add ${plural(n, 'chip', 'chips')}`,
     otherAmount: 'Other amount',

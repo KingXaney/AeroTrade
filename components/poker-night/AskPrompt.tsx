@@ -3,15 +3,20 @@
 // Asks to see a hand, and the host's requests for chips, as the table says them as they come.
 //
 // - AskPrompt: a player who folded the hand just completed asks the viewer to see their cards. A card
-//   under the top bar says who asks and how many seconds are left, with three answers — "Show Ana"
-//   (to Ana alone: their view and their history of the hand), "Show everyone" (the table's show) and
-//   "No thanks" — each a 44 px target behind a tap shield, so a tap meant for the plate's menu that
-//   lands as the card appears does nothing. It sits under the top bar, never over the dock: the
-//   viewer's own controls stay where they are. It goes when the ask is answered, runs out (the
-//   server reads an unanswered ask as a no once its seconds are up) or the next hand is dealt, which
-//   ends every ask. A short sound says it came (the viewer's sound on).
-// - AskWatch: the viewer's own asks — how each ended, said once in a toast as the answer comes (or
-//   the seconds run out with none).
+//   says who asks and how many seconds are left, with three answers — "Show Ana" (to Ana alone: their
+//   view and their history of the hand), "Show everyone" (the table's show) and "No thanks" — each a
+//   44 px target behind a tap shield, so a tap meant for the plate's menu that lands as the card
+//   appears does nothing. It rises from the foot of the screen over the viewer's own corner (on a
+//   phone on its side, over the dock's column), under the thumb, and covers nothing of the table — no
+//   plate, turned-up hand, board or result banner (app/globals.css .pn-ask-wrap). An ask only comes
+//   in the pause after a hand, when nothing in the dock needs the viewer within seconds. Its seconds
+//   run to whichever comes first, the ask's own or the next deal, which ends every ask
+//   (overlays.askEndsAt), and it goes then, or once answered. A short sound says it came (the
+//   viewer's sound on).
+// - AskWatch: the viewer's own asks — how each ended, said once in a toast as the answer comes, the
+//   seconds run out with none, or the next deal ends it first (no answer, and no wait to ask again).
+//   Mounted for every joined viewer: the deal takes the ask out of the view, so only a watch that was
+//   there before it can say so.
 // - RequestWatch: the host's — each new request for chips once the first hand is dealt (a new player's
 //   first chips, a rebuy, a top-up), a short sound and a toast with Approve; the bank's rows hold
 //   them all, Decline included, and a dot on the Bank and Host icons says they wait.
@@ -19,12 +24,12 @@
 import {useEffect, useId, useRef, useState, type MouseEvent} from "react";
 import {toast} from "sonner";
 import ActionButton from "@/components/primitives/ActionButton";
-import {MiniAvatar} from "@/components/poker-night/overlay-kit";
+import {MiniAvatar, TOAST_ACTION} from "@/components/poker-night/overlay-kit";
 import {useRoom, useServerNow} from "@/components/poker-night/room-controller";
 import {playSound} from "@/components/poker-night/sound-player";
 import {useTapShield} from "@/components/poker-night/useTapShield";
 import {ASK_COPY, HOST_COPY} from "@/lib/learn/copy/poker-night";
-import {askKey, askNews, askToAnswer, newRequests, requestKind, type AskSeen, type RequestKind} from "@/lib/poker-night/overlays";
+import {askEndsAt, askKey, askNews, askToAnswer, newRequests, NO_ASKS_SEEN, requestKind, type AskSeen, type RequestKind} from "@/lib/poker-night/overlays";
 import type {AskReply} from "@/lib/poker-night/types";
 import type {AskView} from "@/lib/poker-night/view-types";
 
@@ -38,7 +43,7 @@ const AskCard = ({ask}: {ask: AskView}) => {
     const [busy, setBusy] = useState<AskReply | null>(null);
     const person = room.table.people[ask.from];
     const name = person?.name ?? '';
-    const left = Math.max(0, Math.ceil((ask.until - now) / 1000));
+    const left = Math.max(0, Math.ceil((askEndsAt(ask, room.table) - now) / 1000));
 
     // Said once as it comes, by sound too while the viewer keeps sounds on.
     const sound = room.personal.sound;
@@ -60,7 +65,7 @@ const AskCard = ({ask}: {ask: AskView}) => {
 
     const button = 'min-h-11 w-full whitespace-normal px-2 leading-tight';
     return (
-        <section aria-labelledby={`${id}-ask`} className="chrome-surface pointer-events-auto w-full max-w-md space-y-2 rounded-lg p-3 shadow-lg"
+        <section aria-labelledby={`${id}-ask`} className="pn-ask chrome-surface pointer-events-auto w-full space-y-2 rounded-lg p-3 shadow-lg"
                  data-pn-ask-prompt={ask.from} data-pn-armed={shield.armed ? '' : undefined}>
             <div className="flex items-center gap-2.5">
                 <MiniAvatar avatar={person?.avatar ?? null}/>
@@ -70,7 +75,7 @@ const AskCard = ({ask}: {ask: AskView}) => {
                     {ASK_COPY.secondsLeft(left)}
                 </span>
             </div>
-            <div className="grid grid-cols-3 gap-1.5" role="group" aria-label={ASK_COPY.region}>
+            <div className="pn-ask-answers grid gap-1.5" role="group" aria-label={ASK_COPY.region}>
                 <ActionButton variant="primary" size="md" className={button} disabled={busy !== null} aria-busy={busy === 'one'}
                               onClick={(e) => void answer('one', e)} data-pn-reply="one">
                     <span className="line-clamp-2 break-words" data-user-text="">{ASK_COPY.showOne(name)}</span>
@@ -89,12 +94,12 @@ const AskCard = ({ask}: {ask: AskView}) => {
 };
 
 // Mounted while an ask to the viewer waits (TableOverlays checks without the clock); the card reads
-// the clock and goes once the seconds are up.
+// the clock and goes once the ask's seconds are up or the next deal is due.
 export const AskPrompt = () => {
     const room = useRoom();
     const now = useServerNow(500);
     const me = room.me;
-    const ask = me ? askToAnswer(me, now) : null;
+    const ask = me ? askToAnswer(me, now, room.table) : null;
     if (!ask) return null;
     return (
         <div className="pn-ask-wrap">
@@ -108,12 +113,13 @@ export const AskPrompt = () => {
 export const AskWatch = () => {
     const room = useRoom();
     const now = useServerNow(1000);
-    const seen = useRef<AskSeen>({});
+    const seen = useRef<AskSeen>(NO_ASKS_SEEN);
     const me = room.me;
+    const hand = room.view?.hand?.no ?? null;
     const people = room.table.people;
     useEffect(() => {
         if (!me) return;
-        const {news, seen: next} = askNews(seen.current, me, now);
+        const {news, seen: next} = askNews(seen.current, me, now, hand);
         seen.current = next;
         for (const {ask, answer} of news) {
             if (answer === 'waiting') continue;
@@ -121,7 +127,7 @@ export const AskWatch = () => {
             if (answer === 'shown') toast.success(ASK_COPY.ended.shown(name));
             else toast.message(ASK_COPY.ended[answer](name));
         }
-    }, [me, now, people]);
+    }, [me, now, hand, people]);
     return null;
 };
 
@@ -160,6 +166,7 @@ export const RequestWatch = () => {
             toast.message(requestText(requestKind(view, r.pid), name, r.amount), {
                 id: `pn-request-${r.pid}`,
                 duration: 15_000,
+                classNames: TOAST_ACTION,
                 action: {
                     label: HOST_COPY.approve,
                     onClick: () => {

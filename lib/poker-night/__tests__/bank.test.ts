@@ -92,13 +92,16 @@ describe('what the rebuy buttons offer', () => {
     it('offers a rebuy at zero and a top-up to the cap above it, and a newcomer their first chips whatever the policy', () => {
         const config = {buyInMin: 1000, buyInMax: 2000, rebuys: 'approve' as const, maxRebuys: null};
         const row = {buys: 0, bought: 1000};
-        expect(buyOptions(config, {chips: 0, pendingBuy: 0, state: 'busted'}, row)).toEqual({min: 1000, max: 2000, topUp: 2000, rebuy: true});
-        expect(buyOptions(config, {chips: 1500, pendingBuy: 0, state: 'waiting'}, row)).toEqual({min: 1, max: 500, topUp: 500, rebuy: false});
+        expect(buyOptions(config, {chips: 0, pendingBuy: 0, state: 'busted'}, row)).toEqual({min: 1000, max: 2000, topUp: 2000, rebuy: true, first: false});
+        expect(buyOptions(config, {chips: 1500, pendingBuy: 0, state: 'waiting'}, row)).toEqual({min: 1, max: 500, topUp: 500, rebuy: false, first: false});
+        // A seat that never had chips here: a first buy, never a rebuy or a top-up.
+        expect(buyOptions(config, {chips: 0, pendingBuy: 0, state: 'busted'}, null)).toEqual({min: 1000, max: 2000, topUp: 2000, rebuy: false, first: true});
+        expect(buyOptions(config, {chips: 0, pendingBuy: 0, state: 'busted'}, {buys: 0, bought: 0})).toMatchObject({first: true, rebuy: false});
         expect(buyOptions(config, {chips: 2000, pendingBuy: 0, state: 'waiting'}, row)).toBeNull();
         expect(buyOptions({...config, rebuys: 'off'}, {chips: 0, pendingBuy: 0, state: 'busted'}, row)).toBeNull();
         expect(buyOptions({...config, maxRebuys: 2}, {chips: 0, pendingBuy: 0, state: 'busted'}, {buys: 2, bought: 1000})).toBeNull();
         expect(buyOptions(config, null, row)).toBeNull();
-        expect(buyOptions({...config, rebuys: 'off', maxRebuys: 1}, {chips: 0, pendingBuy: 0, state: 'busted'}, null)).toEqual({min: 1000, max: 2000, topUp: 2000, rebuy: false});
+        expect(buyOptions({...config, rebuys: 'off', maxRebuys: 1}, {chips: 0, pendingBuy: 0, state: 'busted'}, null)).toEqual({min: 1000, max: 2000, topUp: 2000, rebuy: false, first: true});
         expect(buyOptions(config, {chips: 500, pendingBuy: 0, state: 'waiting'}, row, true)).toBeNull();
     });
 });

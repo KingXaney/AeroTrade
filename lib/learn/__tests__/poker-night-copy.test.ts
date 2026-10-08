@@ -165,7 +165,7 @@ describe('the refusals', () => {
             'already-seated', 'bad-amount', 'bad-config', 'bad-deck', 'bad-seat', 'below-buy-in', 'below-min-raise', 'closed',
             'illegal', 'no-request', 'not-due', 'not-host', 'not-now', 'not-seated', 'not-your-turn', 'over-cap', 'rebuy-cap',
             'rebuys-off', 'seat-taken', 'stale',
-            'ask-cooldown', 'ask-limit', 'ask-waiting', 'asks-off',
+            'ask-cooldown', 'ask-limit', 'ask-waiting', 'asks-off', 'asks-full',
         ].sort());
         for (const text of Object.values(REFUSAL_COPY)) {
             clean(text);
@@ -778,6 +778,8 @@ describe('the bank', () => {
             rebuysUsed: () => pairs(BANK_COPY.rebuysUsed),
             ownInPot: () => each(BANK_COPY.ownInPot),
             addChips: () => each(BANK_COPY.addChips),
+            askFor: () => each(BANK_COPY.askFor),
+            takeChips: () => each(BANK_COPY.takeChips),
         });
     });
 
@@ -1198,14 +1200,15 @@ describe('asks to see a hand, leaving after this hand and the host\'s yes', () =
         const said = [
             ...named((name) => [ASK_COPY.asked(name), ASK_COPY.prompt(name), ASK_COPY.showOne(name), ASK_COPY.shownOne(name)]),
             ...named((name) => ASK_COPY.blocked['asks-off'](name)),
-            ...(['cooldown', 'waiting', 'limit'] as const).map((block) => ASK_COPY.blocked[block]()),
+            ...(['cooldown', 'waiting', 'limit', 'full'] as const).map((block) => ASK_COPY.blocked[block]()),
             ...named((name) => (['waiting', 'no', 'expired'] as const).map((answer) => ASK_COPY.status[answer](name))),
             ASK_COPY.status.shown(), ASK_COPY.status.everyone(),
-            ...named((name) => (['shown', 'everyone', 'no', 'expired'] as const).map((answer) => ASK_COPY.ended[answer](name))),
+            ...named((name) => (['shown', 'everyone', 'no', 'expired', 'dealt'] as const).map((answer) => ASK_COPY.ended[answer](name))),
             ...each(ASK_COPY.secondsLeft),
         ];
         for (const text of said) clean(text);
-        for (const text of [TABLE_COPY.leaveAfter, TABLE_COPY.lastHand, TABLE_COPY.leavingAfter, TABLE_COPY.stayAtTable, TABLE_COPY.leaveAfterSet,
+        for (const text of [TABLE_COPY.leaveAfter, TABLE_COPY.leaveAfterShort, TABLE_COPY.lastHand, TABLE_COPY.leavingAfter, TABLE_COPY.stayAtTable, TABLE_COPY.leaveAfterSet,
+            TABLE_COPY.noChipsYet, TABLE_COPY.hostAwayNote, TABLE_COPY.hostBack,
             TABLE_COPY.leaveAfterCleared, TABLE_COPY.leaveLanded, TABLE_COPY.leaveAfterNote, TABLE_COPY.waitingApproval, TABLE_COPY.awaitingChips,
             TABLE_COPY.leftSeat, JOIN_COPY.approvalNote, HOST_COPY.rebuysHint, LOOKS_COPY.allowAsks, LOOKS_COPY.allowAsksHint]) clean(text);
     });
@@ -1220,7 +1223,16 @@ describe('asks to see a hand, leaving after this hand and the host\'s yes', () =
         expect(ASK_COPY.blocked.cooldown()).toBe(REFUSAL_COPY['ask-cooldown']);
         expect(ASK_COPY.allow).toBe('Let others ask to see my cards');
         expect(TABLE_COPY.leaveAfter).toBe('Leave after this hand');
+        // The action's short word says leave; "Last hand" is only the state's, beside the cards.
+        expect(TABLE_COPY.leaveAfterShort).toBe('Leave after hand');
+        expect(TABLE_COPY.lastHand).toBe('Last hand');
         expect(TABLE_COPY.leavingAfter).toBe('Leaving after this hand');
+        expect(plain(ASK_COPY.ended.dealt('Ana'))).toBe('The next hand was dealt before Ana answered.');
+        expect(ASK_COPY.blocked.full()).toBe(REFUSAL_COPY['asks-full']);
+        expect(REFUSAL_COPY['asks-full']).toBe('Asks to see cards are resting at this table: they open again within five hands.');
+        expect(TABLE_COPY.noChipsYet).toBe('No chips yet.');
+        expect([BANK_COPY.askFor(2000), BANK_COPY.takeChips(2000)]).toEqual(['Ask for 2,000 chips', 'Take 2,000 chips']);
+        expect(TABLE_COPY.hostAwayNote).toBe('The host has been away for over ten minutes, so your chips no longer wait for them.');
         expect(TABLE_COPY.leaveLanded).toBe('A new hand was dealt first: you leave the table when it ends.');
         expect(TABLE_COPY.waitingApproval).toBe('Waiting for the host to approve your chips');
         expect(plain(HOST_COPY.requestSeat('Ana', 2000))).toBe('Ana asks for 2,000 chips to sit down.');

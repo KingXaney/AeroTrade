@@ -13,7 +13,10 @@
 // moves they are offered are exactly the ones a replay of the street's log allows; a plan to leave
 // after the hand only on a seat dealt into the live hand, never with a sit-out; requests only from
 // seated players not leaving; asks only after a hand completes, from players who folded it, within
-// their limits; and the reducer never touched its frozen input. At every completed hand: the pots
+// their limits, never past a no's five hands (held to a record of every no and expiry kept apart
+// from the state, so a cooldown the state lost is caught), the table's cooldowns and waiting asks
+// within the cap and "no asks" naming only seated players and the hand's; buys the room marks as made
+// with the host away landing at once; and the reducer never touched its frozen input. At every completed hand: the pots
 // match a chip-by-chip reference, add up to what was left in after the uncalled bet came back, and
 // each goes to the strongest eligible hands, every seat leaving after it is empty, and the state
 // survives a JSON round trip into the stored shape. Across hands the
@@ -248,19 +251,19 @@ const COUNTERS = ['hands', 'showdowns', 'sidePots', 'oddChips', 'runouts', 'time
     'pendingBuys', 'approved', 'configs', 'pres', 'shows', 'pauses', 'bigBlindChecks', 'legalChecks', 'hostSitOuts', 'hostSitOutsMidHand',
     'hostSitOutsAlreadyOut', 'leaveAfter', 'leaveAfterCancelled', 'leaveAfterCashOuts', 'leaveAfterRace', 'leaveAfterNow', 'buyRequests',
     'firstBuyIns', 'hostBuysAfterStart', 'withdrawn', 'declined', 'asks', 'asksShown', 'asksShownAll', 'asksNo', 'asksExpired', 'askCooldowns',
-    'asksOff', 'askLimits'] as const;
+    'asksOff', 'askLimits', 'asksFull', 'asksDealt', 'hostAwayBuys'] as const;
 type Counters = Record<(typeof COUNTERS)[number], number>;
 
 const EVENTS = [
     'sit', 'leave', 'leave-after', 'kick', 'sit-out', 'host-sit-out', 'sit-in', 'buy', 'approve', 'withdraw', 'pause', 'resume', 'config', 'pre', 'show',
-    'ask', 'reply', 'allow-asks',
+    'ask', 'ask-storm', 'reply', 'allow-asks',
 ] as const;
 // Half the steps are events, so each is about 3% of all steps (sit 5%, approve 7%, pause under 1%):
 // a pause rarer than a resume, a sit likelier than a leave and an approval likelier than a buy, so
 // the tables keep dealing.
 const EVENT_WEIGHTS: Record<(typeof EVENTS)[number], number> = {
     sit: 7, leave: 2, 'leave-after': 3, kick: 2, 'sit-out': 4, 'host-sit-out': 2, 'sit-in': 6, buy: 6, approve: 10, withdraw: 1, pause: 1, resume: 8,
-    config: 5, pre: 6, show: 4, ask: 8, reply: 8, 'allow-asks': 1,
+    config: 5, pre: 6, show: 4, ask: 8, 'ask-storm': 1, reply: 8, 'allow-asks': 1,
 };
 const WAITING = ASK_ANSWERS.indexOf('waiting');
 const WEIGHT_TOTAL = EVENTS.reduce((sum, e) => sum + EVENT_WEIGHTS[e], 0);
@@ -283,6 +286,12 @@ const night = (seed: number, counters: Counters) => {
     const fail = (what: string): never => {
         throw new Error(`seed ${seed}, step ${step}: ${what}`);
     };
+
+    // Every no and every ask that ran out, by who asked whom, with the last hand it holds for: kept
+    // apart from the state, so a cooldown the state lost still keeps the ask it should have refused.
+    const noes = new Map<string, number>();
+    const noted = (from: string, to: string, no: number) => noes.set(`${from}>${to}`, no + ASKS.COOLDOWN_HANDS);
+    const heldBack = (from: string, to: string, no: number) => (noes.get(`${from}>${to}`) ?? -1) >= no;
 
     // Every number a safe integer, non-negative but a hand's net; nothing undefined, NaN or exotic.
     const walk = (value: unknown, key: string): void => {
@@ -323,7 +332,11 @@ const night = (seed: number, counters: Counters) => {
             if (seat.leaveAfter && seat.sitOutNext) fail(`${seat.pid} both leaves after the hand and sits out from the next`);
             if (seat.leaveAfter && (seat.leaving || !liveSeatOf(st, seat.pid))) fail(`${seat.pid} leaves after a hand it is not playing`);
         }
-        if (st.askCooldowns.length > ASKS.COOLDOWNS_KEPT) fail('too long a list of cooldowns kept');
+        const waitingAsks = st.hand?.asks.filter((e) => e[3] === WAITING).length ?? 0;
+        if (st.askCooldowns.length + waitingAsks > ASKS.COOLDOWNS_KEPT) fail('more cooldowns and waiting asks than the table keeps');
+        for (const pid of st.noAsks) {
+            if (!st.seats.some((x) => x?.pid === pid) && !(st.hand?.seats.some((p) => p.pid === pid) ?? false)) fail(`"no asks" kept for ${pid}, who is neither seated nor in the hand`);
+        }
         for (const [from, to, until] of st.askCooldowns) if (from === to || until < st.handNo) fail(`a cooldown ${from} → ${to} past its hands`);
         if (st.status === 'closed' && (seated.length > 0 || st.requests.length > 0)) fail('a closed table with players');
         // The table never stalls: playing, two eligible seats and no live hand means a deal is timed.
@@ -520,16 +533,29 @@ const night = (seed: number, counters: Counters) => {
         if (next.handNo - prev.handNo > 1) fail('two hands dealt in one step');
         if (next.handNo !== prev.handNo) {
             checkDeal(prev, next, steps);
-            // The last hand's asks end with it: one still waiting is a no, with its cooldown.
-            for (const [from, to, , answer] of prev.hand?.asks ?? []) {
+            // The last hand's asks end with it: one whose seconds were up by the deal is a no, with its
+            // cooldown; one still waiting with time left just ends, with none.
+            for (const [from, to, askedAt, answer] of prev.hand?.asks ?? []) {
                 if (answer !== WAITING) continue;
-                counters.asksExpired++;
                 const a = prev.hand!.seats.find((p) => p.seat === from)!.pid;
                 const b = prev.hand!.seats.find((p) => p.seat === to)!.pid;
-                if (next.askCooldowns.length < ASKS.COOLDOWNS_KEPT && !next.askCooldowns.some(([x, y, until]) => x === a && y === b && until === prev.hand!.no + ASKS.COOLDOWN_HANDS)) {
-                    fail(`an ask ${a} → ${b} ended unanswered with no cooldown`);
+                const cooled = next.askCooldowns.some(([x, y, until]) => x === a && y === b && until === prev.hand!.no + ASKS.COOLDOWN_HANDS);
+                const before = prev.askCooldowns.some(([x, y]) => x === a && y === b);
+                if (next.hand!.startedAt >= prev.hand!.startedAt + askedAt + ASKS.WAIT_MS) {
+                    counters.asksExpired++;
+                    noted(a, b, prev.hand!.no);
+                    if (!cooled) fail(`an ask ${a} → ${b} ran out unanswered with no cooldown`);
+                } else {
+                    counters.asksDealt++;
+                    if (cooled && !before) fail(`an ask ${a} → ${b} the deal cut short left a cooldown`);
                 }
             }
+        }
+        if (next.handNo === prev.handNo && next.hand && prev.hand) {
+            next.hand.asks.forEach(([from, to, , answer], k) => {
+                if (prev.hand!.asks[k]?.[3] !== WAITING || (answer !== ASK_ANSWERS.indexOf('expired') && answer !== ASK_ANSWERS.indexOf('no'))) return;
+                noted(next.hand!.seats.find((p) => p.seat === from)!.pid, next.hand!.seats.find((p) => p.seat === to)!.pid, next.hand!.no);
+            });
         }
         const hand = next.hand;
         if (hand?.phase === 'runout' && prev.hand?.phase !== 'runout') counters.runouts++;
@@ -592,12 +618,75 @@ const night = (seed: number, counters: Counters) => {
         return buyInMin + r.int(buyInMax - buyInMin + 1);
     };
 
+    // An ask by `from` of `to` in the pause, its refusal checked against the reason given: null when
+    // it was taken (or changed nothing), else the refusal.
+    const tryAsk = (from: string, to: string): string | null => {
+        const hand = s.hand!;
+        const before = hand.asks.length;
+        const refused = send({type: 'ask', by: from, to, at: now});
+        if (refused === null) {
+            if (s.hand!.asks.length > before) {
+                if (s.hand!.asks.at(-1)![3] !== WAITING) fail('a new ask is not waiting');
+                if (heldBack(from, to, hand.no)) fail(`${from} asked ${to} within five hands of a no`);
+                counters.asks++;
+            }
+        } else if (refused === 'ask-cooldown') {
+            if (!s.askCooldowns.some(([a, b, until]) => a === from && b === to && until >= hand.no)
+                && !hand.asks.some((e) => hand.seats.find((p) => p.seat === e[0])!.pid === from && hand.seats.find((p) => p.seat === e[1])!.pid === to)) fail('a cooldown refused with none kept');
+            counters.askCooldowns++;
+        } else if (refused === 'asks-off') {
+            if (!s.noAsks.includes(to)) fail('asks off refused for a player who takes them');
+            counters.asksOff++;
+        } else if (refused === 'ask-limit') {
+            counters.askLimits++;
+        } else if (refused === 'asks-full') {
+            const live = s.askCooldowns.filter(([, , until]) => until >= hand.no).length;
+            if (live + s.hand!.asks.filter((e) => e[3] === WAITING).length < ASKS.COOLDOWNS_KEPT) fail('asks refused as full below the cap');
+            counters.asksFull++;
+        }
+        return refused;
+    };
+
+    // The player asked says no: a cooldown on the one who asked, kept — never dropped for room.
+    const answerNo = (e: readonly number[]) => {
+        const hand = s.hand!;
+        const by = hand.seats.find((p) => p.seat === e[1])!.pid;
+        const to = hand.seats.find((p) => p.seat === e[0])!.pid;
+        const out = sendFull({type: 'reply', by, to, show: 'none', at: now});
+        if (!out.ok) {
+            if (out.reason === 'no-request' && now >= hand.startedAt + e[2] + ASKS.WAIT_MS) counters.asksExpired++;
+            return;
+        }
+        if (!s.askCooldowns.some(([a, b]) => a === to && b === by)) fail('a no left no cooldown');
+        counters.asksNo++;
+    };
+
+    // A busy pause: every folded player asks everyone they may, and each ask is turned down at once —
+    // over a few hands the cooldowns pile up to the table's cap, where asks stop until some run out.
+    let stormUntil = -1;
+    const stormed = new Set<number>();
+    const storm = () => {
+        const hand = s.hand!;
+        stormed.add(hand.no);
+        for (const from of hand.seats.filter((p) => p.folded).map((p) => p.pid)) {
+            for (const to of hand.seats.map((p) => p.pid).filter((pid) => pid !== from)) {
+                if (tryAsk(from, to) !== null) continue;
+                const waiting = s.hand!.asks.find((e) => e[3] === WAITING && s.hand!.seats.find((p) => p.seat === e[0])!.pid === from);
+                if (waiting) answerNo(waiting);
+            }
+        }
+    };
+
     // One event, aimed at someone it can apply to; about one in eight goes where it is refused (a
     // stranger, the wrong moment), since a refusal must leave the frozen state untouched too. With no
     // one it applies to, it is sent anyway now and then and otherwise skipped.
     const event = () => {
         let roll = r.int(WEIGHT_TOTAL);
         const kind = EVENTS.find((e) => (roll -= EVENT_WEIGHTS[e]) < 0)!;
+        if (s.hand?.phase === 'complete' && s.hand.result && s.handNo <= stormUntil && !stormed.has(s.handNo)) {
+            storm();
+            return;
+        }
         const astray = r.chance(0.12);
         const seated = seatedPids();
         const someone = seated.length > 0 && !astray ? r.pick(seated) : r.pick(pool);
@@ -717,8 +806,14 @@ const night = (seed: number, counters: Counters) => {
                 const amount = !range || astray ? 1 + r.int(s.config.buyInMax) : r.chance(0.5) ? range.max : range.min + r.int(range.max - range.min + 1);
                 const dealtIn = live && liveSeatOf(s, by) !== null;
                 const before = {bought: ledgerRow(s, by)?.bought ?? 0, pending: seatOfPid(by)?.pendingBuy ?? 0};
-                if (send({type: 'buy', by, amount, at: now}) !== null) return;
-                if (s.handNo > 0 && by !== s.hostPid) {
+                // Now and then the host has been away long enough: the room marks the buy, and it lands.
+                const hostAway = s.handNo > 0 && by !== s.hostPid && r.chance(0.08);
+                if (send({type: 'buy', by, amount, at: now, ...(hostAway ? {hostAway} : {})}) !== null) return;
+                if (hostAway) {
+                    if (s.requests.some((q) => q.pid === by)) fail(`${by}'s buy with the host away left a request`);
+                    if ((ledgerRow(s, by)?.bought ?? 0) === before.bought && (seatOfPid(by)?.pendingBuy ?? 0) === before.pending) fail(`${by}'s buy with the host away did not land`);
+                    counters.hostAwayBuys++;
+                } else if (s.handNo > 0 && by !== s.hostPid) {
                     // Once the first hand is dealt, every buy but the host's waits for the host.
                     if ((ledgerRow(s, by)?.bought ?? 0) !== before.bought || (seatOfPid(by)?.pendingBuy ?? 0) !== before.pending) fail(`${by}'s buy landed with nobody's yes`);
                     if (!s.requests.some((q) => q.pid === by && q.amount === amount)) fail(`${by}'s buy left no request`);
@@ -782,24 +877,14 @@ const night = (seed: number, counters: Counters) => {
                 const from = among(hand.seats.filter((p) => p.folded).map((p) => p.pid));
                 if (!from) return;
                 const others = hand.seats.filter((p) => p.pid !== from).map((p) => p.pid);
-                const to = others.length > 0 && r.chance(0.92) ? r.pick(others) : r.pick(pool);
-                const before = hand.asks.length;
-                const refused = send({type: 'ask', by: from, to, at: now});
-                if (refused === null) {
-                    if (s.hand!.asks.length > before) {
-                        if (s.hand!.asks.at(-1)![3] !== WAITING) fail('a new ask is not waiting');
-                        counters.asks++;
-                    }
-                } else if (refused === 'ask-cooldown') {
-                    if (!s.askCooldowns.some(([a, b, until]) => a === from && b === to && until >= hand.no)
-                        && !hand.asks.some((e) => hand.seats.find((p) => p.seat === e[0])!.pid === from && hand.seats.find((p) => p.seat === e[1])!.pid === to)) fail('a cooldown refused with none kept');
-                    counters.askCooldowns++;
-                } else if (refused === 'asks-off') {
-                    if (!s.noAsks.includes(to)) fail('asks off refused for a player who takes them');
-                    counters.asksOff++;
-                } else if (refused === 'ask-limit') {
-                    counters.askLimits++;
-                }
+                tryAsk(from, others.length > 0 && r.chance(0.92) ? r.pick(others) : r.pick(pool));
+                return;
+            }
+            case 'ask-storm': {
+                // A run of busy pauses: for the next few hands every pause is a storm (storm, above).
+                if (hand?.phase !== 'complete' || !hand.result) return;
+                stormUntil = s.handNo + ASKS.COOLDOWN_HANDS;
+                storm();
                 return;
             }
             case 'reply': {
@@ -810,6 +895,10 @@ const night = (seed: number, counters: Counters) => {
                 const by = hand.seats.find((p) => p.seat === e[1])!.pid;
                 const to = hand.seats.find((p) => p.seat === e[0])!.pid;
                 const show = r.pick(['one', 'one', 'none', 'all'] as const);
+                if (show === 'none') {
+                    answerNo(e);
+                    return;
+                }
                 const out = sendFull({type: 'reply', by, to, show, at: now});
                 if (!out.ok) {
                     // Its time ran out before the answer: a no, and no answer lands.
@@ -824,9 +913,6 @@ const night = (seed: number, counters: Counters) => {
                 } else if (show === 'all') {
                     if (!s.hand!.seats.find((p) => p.pid === by)!.shown) fail('a hand shown to everyone is not');
                     counters.asksShownAll++;
-                } else {
-                    if (!s.askCooldowns.some(([a, b]) => a === to && b === by) && s.askCooldowns.length < ASKS.COOLDOWNS_KEPT) fail('a no left no cooldown');
-                    counters.asksNo++;
                 }
                 return;
             }

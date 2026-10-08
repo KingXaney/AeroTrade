@@ -189,18 +189,26 @@ export type MeView = {
     askBlocked: [pid: string, block: AskBlock][];
     // Hands shown to the viewer alone this hand, answering their ask.
     shownToMe: ShownCardsView[];
+    // For a seated player whose chips wait for the host (the first hand dealt, not the host): the
+    // moment the host counts as away (unheard from for ten minutes), from which a buy lands without
+    // their yes. A time rather than a flag, so a view read before then says it once the moment
+    // passes; a host heard from since moves it later, which the next view says. Null otherwise.
+    hostAwayAt: number | null;
 };
 
 export type OwnNext = 'sit-out' | 'leave' | 'leave-after' | null;
 
 // Why the viewer may not ask a player to see their cards now: the player turned asks off, the viewer
 // is cooling down from them (a no, or no answer, within the last few hands), an ask of the viewer's
-// still waits for its answer, or the viewer made every ask a hand allows.
-export type AskBlock = 'asks-off' | 'cooldown' | 'waiting' | 'limit';
+// still waits for its answer, the viewer made every ask a hand allows, or the table holds as many
+// cooldowns and waiting asks as it keeps (lib/poker-night/asks.asksFull) — said of no one in particular.
+export type AskBlock = 'asks-off' | 'cooldown' | 'waiting' | 'limit' | 'full';
 
 // What the viewer's own requests add to the meta: the people, who the viewer is to the room, its
 // emotes, and the viewer's nudge count.
-export type PlayerMeta = ViewMeta & PeopleView & {hasAccount: boolean; emotes: EmoteView[]; emoteSeq: number; pass: string | null; nudge: number};
+export type PlayerMeta = ViewMeta & PeopleView & {
+    hasAccount: boolean; emotes: EmoteView[]; emoteSeq: number; pass: string | null; nudge: number; hostAwayAt?: number | null;
+};
 
 // nudge: how many times a write by someone else changed what only this viewer sees (an ask to see
 // their cards, its answer, a sit-out the host set) — the room counts it per player

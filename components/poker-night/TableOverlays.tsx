@@ -5,11 +5,13 @@
 // drawers — Invite (open by itself for the host who just started the table), Bank, Host controls,
 // Hand log, My look, Hands (the rankings and the game, for every viewer); the dialogs that ask first — remove a player, hand over host, end the night,
 // leave the table (LeaveDialog: staying to watch, or going home); the banner when a newer deploy
-// needs a reload; an ask to see the viewer's cards (AskPrompt, under the top bar); and the toasts
-// that say once what changed on its own — the connection back ("Back online."), the host sitting the
-// viewer out, how a request for chips ended, how the viewer's own asks to see a hand ended
-// (AskWatch) and, for the host, each new request for chips with Approve (RequestWatch). The menu's
-// "Leave after this hand" and its Stay go through useLeaveAfter, as the dock's do.
+// needs a reload; an ask to see the viewer's cards (AskPrompt, at the foot of the screen); and the
+// toasts that say once what changed on its own — the connection back ("Back online."), the host
+// sitting the viewer out, how a request for chips ended (approved or declined: one the viewer took
+// back, by Cancel or by leaving, says nothing more), how the viewer's own asks to see a hand ended
+// (AskWatch, for every joined viewer, so an ask the next deal ended is said too) and, for the host,
+// each new request for chips with Approve (RequestWatch). The menu's "Leave after this hand" and its
+// Stay go through useLeaveAfter, as the dock's do.
 //
 // Which drawer and dialog are open is this component's state, so a dialog opened from the host
 // drawer steps the drawer aside and brings it back when it closes, and nothing stacks one modal on
@@ -34,7 +36,7 @@ import MyLookDrawer from "@/components/poker-night/MyLookDrawer";
 import RemovePlayerDialog, {type RemoveTarget} from "@/components/poker-night/RemovePlayerDialog";
 import TopBar from "@/components/poker-night/TopBar";
 import {focusTableOnClose} from "@/components/poker-night/overlay-kit";
-import {latestRequestId, useOverlayRequest, type DrawerKind} from "@/components/poker-night/overlay-requests";
+import {latestRequestId, takeOwnWithdraw, useOverlayRequest, type DrawerKind} from "@/components/poker-night/overlay-requests";
 import {useRoom} from "@/components/poker-night/room-controller";
 import type {HostSitOuts} from "@/components/poker-night/useHostSitOut";
 import {useLeaveAfter} from "@/components/poker-night/useLeaveAfter";
@@ -98,10 +100,14 @@ const TableOverlays = () => {
     if (next.dialog?.kind === 'leave' && (me?.seat ?? null) === null) next = {...next, dialog: null};
     if (next !== ui) setUi(next);
 
-    // How a rebuy the viewer asked the host for ended: said once, whichever drawer is open.
+    // How a request for chips the viewer asked the host for ended: said once, whichever drawer is
+    // open — approved or declined. One the viewer took back (Cancel, which marks it as it is sent, or
+    // a leave, now or after the hand, which takes it with it) was said where it was done.
     const asked = view ? view.requests.find((r) => r.pid === view.me.pid)?.amount ?? null : null;
     const bought = view ? ledgerRowOf(view, view.me.pid)?.bought ?? 0 : 0;
     const pendingBuy = view && view.me.seat !== null ? view.seats[view.me.seat]?.pendingBuy ?? 0 : 0;
+    const seated = (view?.me.seat ?? null) !== null;
+    const leavingSoon = view?.me.next === 'leave' || view?.me.next === 'leave-after';
     const waiting = useRef<{amount: number; bought: number} | null>(null);
     useEffect(() => {
         const before = waiting.current;
@@ -111,9 +117,10 @@ const TableOverlays = () => {
         }
         if (!before) return;
         waiting.current = null;
-        if (requestEnded(before, {bought, pendingBuy}) === 'declined') toast.message(BANK_COPY.declined);
-        else toast.success(pendingBuy > 0 ? BANK_COPY.pending(pendingBuy) : BANK_COPY.approved(before.amount));
-    }, [asked, bought, pendingBuy]);
+        const outcome = requestEnded(before, {bought, pendingBuy, seated, leaving: leavingSoon, withdrawn: takeOwnWithdraw()});
+        if (outcome === 'declined') toast.message(BANK_COPY.declined);
+        else if (outcome === 'approved') toast.success(pendingBuy > 0 ? BANK_COPY.pending(pendingBuy) : BANK_COPY.approved(before.amount));
+    }, [asked, bought, pendingBuy, seated, leavingSoon]);
 
     // The host's sit-outs still waiting on a hand, by player (the hand they were asked during): kept
     // here, so the bank's rows and the host drawer's More menu agree, whichever drawer is open.
@@ -200,11 +207,10 @@ const TableOverlays = () => {
 
     const own = view ? ownSeat(view) : null;
     const dialog = ui.dialog;
-    // Asks to see a hand: the prompt while one to the viewer waits, the watch while one of theirs
-    // stands (each reads the clock itself, so nothing here re-renders by the second).
+    // Asks to see a hand: the prompt while one to the viewer waits, the watch for every joined viewer
+    // (each reads the clock itself, so nothing here re-renders by the second).
     const myPid = view?.me.pid ?? null;
     const askedMe = view !== null && view.me.asks.some((a) => a.to === myPid && a.answer === 'waiting');
-    const myAsks = view !== null && view.me.asks.some((a) => a.from === myPid);
     const showSit = joined && me?.seat === null && ui.sit !== null && own?.canTakeSeat === true;
 
     return (
@@ -213,7 +219,7 @@ const TableOverlays = () => {
                     onLeave={() => openDialog({kind: 'leave', then: 'stay'})} onHome={() => openDialog({kind: 'leave', then: 'home'})}
                     onLeaveAfter={(on) => void leaving.send(on)}/>
             {isHost && <RequestWatch/>}
-            {myAsks && <AskWatch/>}
+            {joined && <AskWatch/>}
             {askedMe && <AskPrompt/>}
 
             {room.problem && (

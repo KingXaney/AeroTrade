@@ -9,7 +9,8 @@
 
 import {describe, expect, it} from 'vitest';
 import {readEntry} from '@/lib/poker-night/betting';
-import {TIMING} from '@/lib/poker-night/config';
+import {coolingDown} from '@/lib/poker-night/asks';
+import {ASKS, TIMING} from '@/lib/poker-night/config';
 import {createTable, forceClose, reduce} from '@/lib/poker-night/engine';
 import {conservation, ledgerEvents, ledgerRow} from '@/lib/poker-night/ledger';
 import type {HandEntry, TableAction, TableState} from '@/lib/poker-night/types';
@@ -858,6 +859,26 @@ describe('buys once the first hand is dealt', () => {
         expect(reduce(s, sitAt(s, 'p2', 2))).toEqual({ok: false, reason: 'rebuys-off'});
     });
 
+    it('with the host away long enough (the room\'s hostAway), a sit or a buy lands at once and takes the place of a request', () => {
+        let s = moves(deal(three([1000, 1000, 1000], RANGE)), F, F);
+        // A newcomer sits while the host is away: chips at once, a first buy-in.
+        s = play(s, {type: 'sit', by: 'p5', seat: 5, buyIn: 1500, at: nowOf(s), hostAway: true});
+        expect(s.seats[5]).toMatchObject({stack: 1500});
+        expect(s.requests).toEqual([]);
+        expect(events(s, 5)).toEqual([['buy-in', 1500]]);
+        // A request made while the host was here, then taken at once once they are away.
+        s = play(s, sitAt(s, 'p6', 6));
+        expect(s.requests).toEqual([{pid: 'p6', amount: 1500}]);
+        // The same request again changes nothing (no write), so a host back by then keeps it waiting.
+        const again = reduce(s, {type: 'buy', by: 'p6', amount: 1500, at: nowOf(s)});
+        expect(again.ok && again.state).toBe(s);
+        s = play(s, {type: 'buy', by: 'p6', amount: 1500, at: nowOf(s), hostAway: true});
+        expect(s.seats[6]).toMatchObject({stack: 1500});
+        expect(s.requests).toEqual([]);
+        expect(events(s, 6)).toEqual([['buy-in', 1500]]);
+        checkInvariants(s);
+    });
+
     it('a player takes back their own request; with nothing waiting, no-request', () => {
         let s = moves(deal(three([1000, 1000, 1000], {buyInMin: 100, buyInMax: 2000})), F, F);
         s = play(s, buy(s, 2, 300));
@@ -922,6 +943,25 @@ describe('asking to see a hand', () => {
         expect(reduce(s, ask(s, 2, 1))).toEqual({ok: false, reason: 'not-now'});
     });
 
+    it('forgets the "no asks" setting of a player who leaves with no place in the hand, so the list never outgrows the seats and the hand', () => {
+        let s = moves(deal(table({0: 1000, 1: 1000}, {lastBigBlind: 0})), F);
+        s = play(s, {type: 'leave', by: 'p1', at: nowOf(s)});
+        for (let k = 0; k < 40; k++) {
+            const pid = `guest${k}`;
+            // A newcomer sits (their chips wait for the host), turns asks off and leaves.
+            s = play(s, {type: 'sit', by: pid, seat: 3, buyIn: 2000, at: nowOf(s)}, {type: 'allow-asks', by: pid, on: false, at: nowOf(s)});
+            expect(s.noAsks).toContain(pid);
+            s = play(s, {type: 'leave', by: pid, at: nowOf(s)});
+        }
+        expect(s.noAsks).toEqual([]);
+        expect(s.nextHandAt).toBeNull();
+        // A player of the hand asks are about keeps it through the pause, though they left.
+        let t = walked();
+        t = play(t, {type: 'allow-asks', by: 'p1', on: false, at: at(t, 10)}, {type: 'leave', by: 'p1', at: at(t, 20)});
+        expect(t.noAsks).toEqual(['p1']);
+        expect(reduce(t, ask(t, 2, 1, 30))).toEqual({ok: false, reason: 'asks-off'});
+    });
+
     it('cannot ask a player who turned asks off', () => {
         let s = walked();
         s = play(s, {type: 'allow-asks', by: 'p1', on: false, at: at(s, 10)});
@@ -935,7 +975,7 @@ describe('asking to see a hand', () => {
         expect(reduce(s, {type: 'allow-asks', by: 'p9', on: false, at: at(s, 40)})).toEqual({ok: false, reason: 'not-seated'});
     });
 
-    it('takes an ask left unanswered for fifteen seconds as a no, and one still waiting at the next deal too', () => {
+    it('takes an ask left unanswered for fifteen seconds as a no — at the next deal too, once its seconds are up', () => {
         let s = walked();
         s = play(s, ask(s, 2, 1));
         expect(reduce(s, reply(s, 1, 2, 'one', 100 + 15_000))).toEqual({ok: false, reason: 'no-request'});
@@ -943,9 +983,74 @@ describe('asking to see a hand', () => {
         s = play(s, ask(s, 2, 0, 100 + 15_000));
         expect(s.hand!.asks.map((e) => e[3])).toEqual([4, 0]);
         expect(s.askCooldowns).toEqual([['p2', 'p1', 6]]);
-        s = deal(s);
+        // Dealt once the second ask's seconds are up as well: a no, with its cooldown.
+        s = deal(s, {at: at(s, 100 + 30_000)});
         expect(s.hand!.asks).toEqual([]);
         expect(s.askCooldowns).toEqual([['p2', 'p1', 6], ['p2', 'p0', 6]]);
+    });
+
+    it('ends an ask the next deal cuts short with no answer and no cooldown: nobody said no and its seconds were not up', () => {
+        let s = walked();
+        s = play(s, ask(s, 2, 1, 2_000));
+        // The results pause is five seconds: the deal comes three seconds into the ask's fifteen.
+        expect(s.nextHandAt).toBe(at(s, 5_000));
+        s = deal(s);
+        expect(s.hand!.asks).toEqual([]);
+        expect(s.askCooldowns).toEqual([]);
+        // In the next pause the same player may ask the same player again.
+        s = moves(s, F, F);
+        const asker = s.hand!.seats.find((p) => p.pid === 'p2')!;
+        const winner = s.hand!.seats.find((p) => !p.folded)!;
+        if (asker.folded && winner.pid === 'p1') expect(reduce(s, ask(s, 2, 1)).ok).toBe(true);
+        else expect(coolingDown(s, 'p2', 'p1', s.hand!.no)).toBe(false);
+    });
+
+    it('never drops a cooldown before its five hands are up, however many no\'s the table makes: past the cap, nobody asks', () => {
+        // Nine seats; everyone folds to the big blind each hand, so eight players may ask each pause.
+        const nine = table(Object.fromEntries(Array.from({length: 9}, (_, i) => [i, 10_000])), {lastBigBlind: 0});
+        const folded = (st: TableState) => {
+            let t = deal(st);
+            while (t.hand!.phase === 'betting') t = moves(t, F);
+            return t;
+        };
+        const pauseAt = (st: TableState, ms: number) => st.hand!.result!.completedAt + ms;
+        let s = folded(nine);
+        const winner1 = s.hand!.seats.find((p) => !p.folded)!.pid;
+        const askers = s.hand!.seats.filter((p) => p.folded).map((p) => p.pid);
+        const [a, b] = askers;
+        s = play(s, {type: 'ask', by: a, to: b, at: pauseAt(s, 100)}, {type: 'reply', by: b, to: a, show: 'none', at: pauseAt(s, 200)});
+        expect(s.askCooldowns).toEqual([[a, b, s.hand!.no + ASKS.COOLDOWN_HANDS]]);
+        // The others say no to each other until the table holds every cooldown it keeps.
+        let t = 300;
+        let refusedFull = false;
+        for (const from of askers.slice(1)) {
+            for (const to of [winner1, ...askers].filter((x) => x !== from && x !== a).slice(0, ASKS.PER_HAND)) {
+                const r = reduce(s, {type: 'ask', by: from, to, at: pauseAt(s, t++)});
+                if (!r.ok) {
+                    expect(r.reason).toBe(s.askCooldowns.length >= ASKS.COOLDOWNS_KEPT ? 'asks-full' : r.reason);
+                    if (r.reason === 'asks-full') refusedFull = true;
+                    continue;
+                }
+                s = play(r.state, {type: 'reply', by: to, to: from, show: 'none', at: pauseAt(r.state, t++)});
+            }
+        }
+        expect(refusedFull).toBe(true);
+        expect(s.askCooldowns).toHaveLength(ASKS.COOLDOWNS_KEPT);
+        // a's cooldown on b is still there, and a's second ask of b this pause is refused for it.
+        expect(s.askCooldowns.some(([x, y]) => x === a && y === b)).toBe(true);
+        expect(reduce(s, {type: 'ask', by: a, to: b, at: pauseAt(s, t++)})).toEqual({ok: false, reason: 'ask-cooldown'});
+        // Through the five hands after, a may never ask b; the table's other asks wait for room.
+        for (let k = 0; k < ASKS.COOLDOWN_HANDS; k++) {
+            s = folded(s);
+            const me = s.hand!.seats.find((p) => p.pid === a)!;
+            const them = s.hand!.seats.find((p) => p.pid === b)!;
+            if (me.folded && !them.shown) expect(reduce(s, {type: 'ask', by: a, to: b, at: pauseAt(s, 100)}), `hand ${s.hand!.no}`).toEqual({ok: false, reason: 'ask-cooldown'});
+            expect(s.askCooldowns.length).toBeLessThanOrEqual(ASKS.COOLDOWNS_KEPT);
+            checkInvariants(s);
+        }
+        // Then it runs out with the rest.
+        s = folded(s);
+        expect(s.askCooldowns).toEqual([]);
     });
 
     it('keeps a player from asking the same player again for five hands after a no', () => {

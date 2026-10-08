@@ -9,9 +9,12 @@
 // host's first deal, "I'm back", "Deal me in", "Sit out next hand", "Show my cards" and Leave
 // whenever they are not playing a hand — the pause after a showdown they reached and a folded hand
 // included —, "Leave after this hand" while all in, and once the stack is empty a rebuy, which opens
-// the bank, or, while chips wait for the host's yes, "Waiting for the host to approve your chips"
-// with Cancel). Every leave from here is the room's 'leave-after' (useLeaveAfter): between hands it
-// leaves at once, and should a deal land first the player plays that hand out and leaves as it ends —
+// the bank — or, for a seat that never had chips here, "No chips yet." with one tap that asks the
+// host for them ("Ask for 2,000 chips") — or, while chips wait for the host's yes, "Waiting for the
+// host to approve your chips" with Cancel; once the host has been away ten minutes, that the chips no
+// longer wait for them, with "Take 2,000 chips"). Every leave from here is the room's 'leave-after'
+// (useLeaveAfter): between hands it leaves at once, and should a deal land first the player plays
+// that hand out and leaves as it ends —
 // the race never costs a blind. What the seat does when the hand ends is said beside the cards (the
 // plate keeps reading Folded): once they left mid-hand, that they leave when it ends, and the row
 // offers nothing more; while they leave after the hand, "Leaving after this hand" with Stay (hidden on
@@ -43,7 +46,7 @@ import EmotePicker from "@/components/poker-night/EmotePicker";
 import HandStrength from "@/components/poker-night/HandStrength";
 import HoleCards from "@/components/poker-night/HoleCards";
 import {HomeLink} from "@/components/poker-night/HomeLink";
-import {askLeave, chooseSeat, openOverlay} from "@/components/poker-night/overlay-requests";
+import {askLeave, chooseSeat, clearOwnWithdraw, markOwnWithdraw, openOverlay} from "@/components/poker-night/overlay-requests";
 import PreActions from "@/components/poker-night/PreActions";
 import {useRoom, useServerNow, type ActionBody} from "@/components/poker-night/room-controller";
 import {useLeaveAfter} from "@/components/poker-night/useLeaveAfter";
@@ -51,7 +54,7 @@ import {useTapShield} from "@/components/poker-night/useTapShield";
 import {BANK_COPY, HAND_COPY, INVITE_COPY, JOIN_COPY, LOOKS_COPY, TABLE_COPY} from "@/lib/learn/copy/poker-night";
 import {turnLeft} from "@/lib/poker-night/client-clock";
 import {dockView, preRowKey, type DockView} from "@/lib/poker-night/dock";
-import {leaveTapAsks, leftState, type LeftState} from "@/lib/poker-night/overlays";
+import {hostAwayNow, leaveTapAsks, leftState, type LeftState} from "@/lib/poker-night/overlays";
 import type {ResultLook} from "@/lib/poker-night/reveal";
 import {cn} from "@/lib/utils";
 
@@ -86,7 +89,8 @@ const Label = ({long, short}: {long: string; short: string}) => (
 );
 
 // "Leave after this hand" beside the early choices: one tap (a door, with its word in a wide dock;
-// on a row of its own under them in a dock too narrow for the four, app/globals.css .pn-pre-row),
+// on a row of its own under them in a dock too narrow for the four, app/globals.css .pn-pre-row; its
+// word the action's short one, "Leave after hand", where "Last hand" is the state's, by the cards),
 // the action bar's place on the viewer's own turn. Shielded like the row it sits beside: it appears
 // at the deal, under a thumb that was on its way to something else.
 const LeaveAfterToggle = ({disabled}: {disabled: boolean}) => {
@@ -100,8 +104,68 @@ const LeaveAfterToggle = ({disabled}: {disabled: boolean}) => {
                 className="chrome-surface control-type inline-flex min-w-12 shrink-0 items-center justify-center gap-1.5 rounded-[var(--control-radius)] px-2 text-xs text-fg-soft transition-colors hover:text-fg disabled:opacity-60"
                 data-pn-leave-after="" data-pn-armed={shield.armed ? '' : undefined}>
             <DoorOpen className="size-4 shrink-0" aria-hidden="true"/>
-            <span className="pn-leave-word">{TABLE_COPY.lastHand}</span>
+            <span className="pn-leave-word">{TABLE_COPY.leaveAfterShort}</span>
         </button>
+    );
+};
+
+type Tap = (act: () => void) => (e: {detail: number; timeStamp: number}) => void;
+
+// Chips that wait for the host's yes: said, with Cancel (the bank says it too). Once the host has
+// been away ten minutes (MeView.hostAwayAt, read on the server's clock) the chips no longer wait for
+// them: said, with "Take 2,000 chips", which lands them; should the host be back by then, the
+// request keeps waiting and the table says so.
+const WaitingChips = ({amount, disabled, tap, withdraw}: {amount: number; disabled: boolean; tap: Tap; withdraw: () => void}) => {
+    const room = useRoom();
+    const now = useServerNow(5000);
+    const away = room.me !== null && hostAwayNow(room.me, now);
+    // Landed, the request's going in chips is said once, by TableOverlays.
+    const take = async () => {
+        const r = await room.send({type: 'buy', amount});
+        if (!r.ok) toast.error(r.message);
+        else if (r.view.requests.some((q) => q.pid === r.view.me.pid)) toast.message(TABLE_COPY.hostBack);
+    };
+    return (
+        <>
+            <span className={LONG_NOTE} role="status" data-pn-waiting-approval={amount} data-pn-host-away={away ? '' : undefined}>
+                {away ? TABLE_COPY.hostAwayNote : TABLE_COPY.waitingApproval}
+            </span>
+            {away && (
+                <ActionButton variant="primary" size="md" className="min-h-12" disabled={disabled} onClick={tap(() => void take())} data-pn-control="take-chips">
+                    {BANK_COPY.takeChips(amount)}
+                </ActionButton>
+            )}
+            <ActionButton variant="secondary" size="md" className="min-h-12" disabled={disabled} onClick={tap(withdraw)}
+                          aria-label={TABLE_COPY.cancelRequestLabel} data-pn-control="withdraw">
+                {TABLE_COPY.cancelRequest}
+            </ActionButton>
+        </>
+    );
+};
+
+// A seat that never had chips here (a newcomer whose request was taken back or declined): "No chips
+// yet." and one tap that says what it does — "Ask for 2,000 chips" sends the request the host
+// approves, or, with the host away ten minutes, "Take 2,000 chips" lands them; never "Out of chips"
+// or a top-up.
+const FirstChips = ({amount, disabled, tap}: {amount: number; disabled: boolean; tap: Tap}) => {
+    const room = useRoom();
+    const now = useServerNow(5000);
+    const me = room.me;
+    const asks = me !== null && !me.isHost && (room.view?.handNo ?? 0) > 0 && !hostAwayNow(me, now);
+    const ask = async () => {
+        const r = await room.send({type: 'buy', amount});
+        if (!r.ok) toast.error(r.message);
+        else if (r.view.requests.some((q) => q.pid === r.view.me.pid)) toast.message(BANK_COPY.requested(amount));
+        else toast.success(BANK_COPY.approved(amount));
+    };
+    return (
+        <>
+            <span className={NOTE} data-pn-no-chips="">{TABLE_COPY.noChipsYet}</span>
+            <ActionButton variant="primary" size="md" className="min-h-12" disabled={disabled} onClick={tap(() => void ask())}
+                          data-pn-control="first-chips" data-pn-asks={asks ? '' : undefined}>
+                {asks ? BANK_COPY.askFor(amount) : BANK_COPY.takeChips(amount)}
+            </ActionButton>
+        </>
     );
 };
 
@@ -113,6 +177,12 @@ const SeatControls = ({dock, disabled}: {dock: DockView; disabled: boolean}) => 
         const r = await room.send(body);
         if (!r.ok) toast.error(r.message);
         return r.ok;
+    };
+    // The viewer's own Cancel: marked as it is sent, so its going is never said as the host's no.
+    const withdraw = async () => {
+        markOwnWithdraw();
+        if (await send({type: 'withdraw'})) toast.message(TABLE_COPY.requestCancelled);
+        else clearOwnWithdraw();
     };
     // A tap that lands as the row appears was meant for what was there before.
     const tap = (act: () => void) => (e: {detail: number; timeStamp: number}) => {
@@ -127,9 +197,6 @@ const SeatControls = ({dock, disabled}: {dock: DockView; disabled: boolean}) => 
         if (room.view && leaveTapAsks(room.view)) askLeave('stay');
         else void leaving.send(true, {between: !dock.live});
     };
-    const withdraw = async () => {
-        if (await send({type: 'withdraw'})) toast.message(TABLE_COPY.requestCancelled);
-    };
     return (
         <div className="flex min-h-12 flex-wrap items-center gap-1.5" data-pn-seat-controls="" data-pn-armed={shield.armed ? '' : undefined}>
             {dock.deal && (
@@ -138,17 +205,11 @@ const SeatControls = ({dock, disabled}: {dock: DockView; disabled: boolean}) => 
                     {INVITE_COPY.deal}
                 </ActionButton>
             )}
-            {/* Chips that wait for the host's yes: said, with Cancel (the bank says it too). */}
             {dock.waitingChips && dock.request !== null && (
-                <>
-                    <span className={LONG_NOTE} role="status" data-pn-waiting-approval={dock.request}>{TABLE_COPY.waitingApproval}</span>
-                    <ActionButton variant="secondary" size="md" className="min-h-12" disabled={disabled} onClick={tap(() => void withdraw())}
-                                  aria-label={TABLE_COPY.cancelRequestLabel} data-pn-control="withdraw">
-                        {TABLE_COPY.cancelRequest}
-                    </ActionButton>
-                </>
+                <WaitingChips amount={dock.request} disabled={disabled} tap={tap} withdraw={() => void withdraw()}/>
             )}
-            {dock.buy && (
+            {dock.buy?.first && <FirstChips amount={dock.buy.topUp} disabled={disabled} tap={tap}/>}
+            {dock.buy && !dock.buy.first && (
                 <>
                     <span className={NOTE}>{TABLE_COPY.outOfChips}</span>
                     <ActionButton variant="primary" size="md" className="min-h-12" onClick={tap(() => openOverlay('bank'))} data-pn-control="rebuy">
@@ -193,7 +254,7 @@ const SeatControls = ({dock, disabled}: {dock: DockView; disabled: boolean}) => 
             {dock.leaveAfter === 'offer' && (
                 <ActionButton variant="secondary" size="md" className="min-h-12" disabled={disabled || leaving.busy} onClick={tap(() => void leaving.send(true))}
                               aria-label={TABLE_COPY.leaveAfter} data-pn-control="leave-after">
-                    <Label long={TABLE_COPY.leaveAfter} short={TABLE_COPY.lastHand}/>
+                    <Label long={TABLE_COPY.leaveAfter} short={TABLE_COPY.leaveAfterShort}/>
                 </ActionButton>
             )}
         </div>
@@ -233,7 +294,7 @@ const DockHand = ({dock, deadline, waitingFor, anims, look}: {
         <>
             <HoleCards seat={dock.seat!} hole={dock.hole} holding={dock.dealtIn} folded={dock.mucked} handNo={hand?.no ?? null} anims={anims} look={look}
                        peek={room.personal.peek ? {peeking, onPeek: setPeeking} : null}/>
-            <div className="flex min-w-0 flex-col items-start gap-1">
+            <div className="pn-dock-line flex min-w-0 flex-col items-start gap-1">
                 {room.mode === 'reconnecting' && <Reconnecting/>}
                 {deadline !== null && <TurnClock deadline={deadline} turnMs={room.config.turnSeconds * 1000}/>}
                 {/* A long name is cut short with an ellipsis: on the inner span, since a flex box draws none. */}

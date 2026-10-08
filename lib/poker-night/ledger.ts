@@ -61,8 +61,11 @@ export const recordBuy = (w: Work, pid: string, amount: number, kind: BuyKind): 
     w.ledgerDirty = true;
 };
 
-// The player in seat i takes their stack away and the seat empties; their requests go with them. A
-// player who never had chips here (their first buy-in still waiting for the host) leaves no row.
+// The player in seat i takes their stack away and the seat empties; their requests go with them, and
+// so does their "no asks" setting unless they played the hand asks are about (it matters only to a
+// seated player or one of that hand, so the list never names more than the seats and the hand's
+// players; the next deal forgets the rest). A player who never had chips here (their first buy-in
+// still waiting for the host) leaves no row.
 export const cashOut = (w: Work, i: number, kind: 'cash-out' | 'removed'): void => {
     const seat = w.state.seats[i];
     if (!seat) return;
@@ -74,6 +77,9 @@ export const cashOut = (w: Work, i: number, kind: 'cash-out' | 'removed'): void 
     }
     w.state.seats[i] = null;
     w.state.requests = w.state.requests.filter((r) => r.pid !== seat.pid);
+    if (w.state.noAsks.includes(seat.pid) && !(w.state.hand?.seats.some((p) => p.pid === seat.pid) ?? false)) {
+        w.state.noAsks = w.state.noAsks.filter((pid) => pid !== seat.pid);
+    }
 };
 
 export const inPotOf = (state: Pick<TableState, 'hand'>, pid: string): number => liveSeatOf(state, pid)?.committed ?? 0;

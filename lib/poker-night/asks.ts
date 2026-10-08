@@ -36,13 +36,20 @@ export const placeOf = (hand: Pick<Hand, 'seats'>, pid: string): HandSeat | null
 export const coolingDown = (state: Pick<TableState, 'askCooldowns'>, from: string, to: string, no: number): boolean =>
     state.askCooldowns.some(([a, b, until]) => a === from && b === to && until >= no);
 
+// Whether the table holds as many cooldowns and waiting asks (each of which may yet become one) as it
+// keeps, ASKS.COOLDOWNS_KEPT: then nobody may ask until some run out. A cooldown is never dropped
+// before its hands are up, so this is what keeps the list to its cap.
+export const asksFull = (state: Pick<TableState, 'askCooldowns'>, hand: Pick<Hand, 'asks' | 'no'>): boolean =>
+    state.askCooldowns.filter(([, , until]) => until >= hand.no).length + hand.asks.filter((e) => e[3] === ASK_WAITING).length >= ASKS.COOLDOWNS_KEPT;
+
 // Every player `pid` could ask about the completed hand — dealt into it, cards not shown, not asked by
 // `pid` already this hand — each with what keeps `pid` from asking them now, or null when nothing
 // does: the player turned asks off, `pid` is cooling down from them (a no, or no answer, within the
-// last ASKS.COOLDOWN_HANDS hands), an ask of `pid`'s still waits, or `pid` has made every ask a hand
-// allows (ASKS.PER_HAND). Empty while `pid` may ask nobody at all: no completed hand, or `pid` was not
-// dealt into it or did not fold. The page greys a blocked ask and says why (the viewer's own view,
-// MeView.askBlocked); the engine refuses exactly these.
+// last ASKS.COOLDOWN_HANDS hands), an ask of `pid`'s still waits, `pid` has made every ask a hand
+// allows (ASKS.PER_HAND), or the table holds as many cooldowns and waiting asks as it keeps
+// (asksFull: said without a word of whose). Empty while `pid` may ask nobody at all: no completed
+// hand, or `pid` was not dealt into it or did not fold. The page greys a blocked ask and says why
+// (the viewer's own view, MeView.askBlocked); the engine refuses exactly these.
 export const askChoices = (state: Pick<TableState, 'hand' | 'noAsks' | 'askCooldowns'>, pid: string, now: number): {pid: string; block: AskBlock | null}[] => {
     const hand = askedHand(state);
     if (!hand) return [];
@@ -51,11 +58,13 @@ export const askChoices = (state: Pick<TableState, 'hand' | 'noAsks' | 'askCoold
     const mine = hand.asks.filter((e) => e[0] === me.seat);
     const waiting = mine.some((e) => answerAt(hand, e, now) === 'waiting');
     const spent = mine.length >= ASKS.PER_HAND;
+    const full = asksFull(state, hand);
     return hand.seats
         .filter((p) => p.pid !== pid && !p.shown && !mine.some((e) => e[1] === p.seat))
         .map((p) => ({
             pid: p.pid,
-            block: state.noAsks.includes(p.pid) ? 'asks-off' : coolingDown(state, pid, p.pid, hand.no) ? 'cooldown' : waiting ? 'waiting' : spent ? 'limit' : null,
+            block: state.noAsks.includes(p.pid) ? 'asks-off' : coolingDown(state, pid, p.pid, hand.no) ? 'cooldown' : waiting ? 'waiting' : spent ? 'limit'
+                : full ? 'full' : null,
         }));
 };
 

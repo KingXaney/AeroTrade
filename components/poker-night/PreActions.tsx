@@ -13,8 +13,13 @@
 // (useTapShield) — it was aimed at what was there before, and a choice made here plays a move by
 // itself when the turn comes. The row carries data-pn-armed once taps land; a keyboard's click
 // always does.
+//
+// A label never spills into its neighbour: in the narrow docks of a phone on its side a button is
+// narrower than "Check/fold": each button takes its share by its label (flex-auto, so the longest gets
+// the most, and none less than 44 px), the label breaks after the slash (a <wbr>) and, failing that, anywhere — a word drawn
+// over the next button would make a tap on it choose that one.
 
-import {useState, type MouseEvent} from "react";
+import {Fragment, useState, type MouseEvent} from "react";
 import {toast} from "sonner";
 import {useRoom} from "@/components/poker-night/room-controller";
 import {useTapShield} from "@/components/poker-night/useTapShield";
@@ -23,6 +28,11 @@ import {preKeyOf, samePre, type DockView} from "@/lib/poker-night/dock";
 import type {PreAction} from "@/lib/poker-night/types";
 import {cn} from "@/lib/utils";
 
+
+// A label with a line break offered after each slash ("Check/" "fold").
+const breakable = (text: string) => text.split('/').map((part, i, all) => (
+    <Fragment key={i}>{part}{i < all.length - 1 && <>/<wbr/></>}</Fragment>
+));
 
 const PreActions = ({pre, disabled}: {pre: NonNullable<DockView['pre']>; disabled: boolean}) => {
     const room = useRoom();
@@ -49,10 +59,10 @@ const PreActions = ({pre, disabled}: {pre: NonNullable<DockView['pre']>; disable
                     <button key={key} type="button" aria-pressed={on} disabled={disabled || pending !== null} aria-busy={pending === key}
                             onClick={(e) => void choose(option, e)} data-pre={key}
                             className={cn(
-                                'control-type min-h-12 min-w-0 flex-1 rounded-[var(--control-radius)] border px-1.5 text-xs leading-tight transition-colors disabled:opacity-60',
+                                'control-type min-h-12 min-w-11 flex-auto whitespace-normal rounded-[var(--control-radius)] border px-1.5 text-xs leading-tight [overflow-wrap:anywhere] transition-colors disabled:opacity-60',
                                 on ? 'border-brand bg-brand text-on-brand' : 'border-line-strong/40 text-fg-soft hover:text-fg',
                             )}>
-                        {ACTION_COPY.pre(option)}
+                        {breakable(ACTION_COPY.pre(option))}
                     </button>
                 );
             })}

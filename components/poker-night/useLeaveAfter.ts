@@ -2,13 +2,14 @@
 
 // "Leave after this hand", sent and said: the dock's one-tap toggle, the note's Stay, the menu's
 // toggle, the break's Leave and the leave dialog all send the room's 'leave-after' through this, so
-// each says the same once it lands — "You leave the table when this hand ends." (with Stay, which
-// takes it back), "You stay at the table.", or, for a leave sent between hands that a deal beat to
+// each says the same once it lands — "You leave the table when this hand ends." (with Stay, a 44 px
+// action that takes it back), "You stay at the table.", or, for a leave sent between hands that a deal beat to
 // the table, "A new hand was dealt first: you leave the table when it ends." A leave that left at
 // once says nothing here: the dock's left panel shows. A refusal is said as the table words it.
 
 import {useCallback, useState} from "react";
 import {toast} from "sonner";
+import {TOAST_ACTION} from "@/components/poker-night/overlay-kit";
 import {useRoom} from "@/components/poker-night/room-controller";
 import {TABLE_COPY} from "@/lib/learn/copy/poker-night";
 import {leaveAfterLanded} from "@/lib/poker-night/overlays";
@@ -36,6 +37,7 @@ export const useLeaveAfter = (): {busy: boolean; send: LeaveAfterSend} => {
         const text = opts.between ? TABLE_COPY.leaveLanded : TABLE_COPY.leaveAfterSet;
         toast.message(text, {
             id: 'pn-leave-after',
+            classNames: TOAST_ACTION,
             action: {
                 label: TABLE_COPY.stay,
                 onClick: () => {

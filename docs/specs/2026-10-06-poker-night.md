@@ -444,16 +444,25 @@ player a blind — they play that hand out instead. Private: a hidden commit, ne
 it, every buy but the host's own — a newcomer's first chips, a re-sit, a rebuy, a top-up — is a
 request the host approves or declines in the bank; a newcomer waiting sits with nothing, is dealt
 nothing and has no ledger row until the chips land, as a buy-in. A request waits until decided,
-withdrawn (`withdraw`) or its player leaves; a host gone ten minutes is replaced by claim-host. The
-rebuy policy is off or on ('approve'): off stops rebuys and re-sits, never a first buy-in.
+withdrawn (`withdraw`) or its player leaves. A host gone ten minutes (unheard from for
+`LIMITS.hostTakeoverMs`) may be replaced by claim-host, which only an account holder can take; at
+any table, from that moment chips no longer wait for them: a sit or a buy lands as it would before
+the first deal (the room marks the action `hostAway`; no request can), and the waiting player's
+dock and bank offer "Take 2,000 chips". The rebuy policy is off or on ('approve'): off stops rebuys
+and re-sits, never a first buy-in.
 
 **Asks to see a hand.** Once a hand completes, a player dealt into it who folded may ask a player
 whose cards were not shown (folded, or won uncontested) to see them. The player asked answers "Show
 <name>" (to the one who asked alone: in their view and in their history of the hand), "Show
 everyone" (a show) or "No thanks". On the server: one ask waiting per player at a time, two a hand;
-one unanswered for 15 s, or still waiting at the next deal, is a no; after a no the same player may
-not ask the same player again for five hands; a player who turned off "Let others ask to see my
-cards" cannot be asked. The next deal ends every ask. Nothing ever shows a thrown-away Triple T card.
+one unanswered for 15 s is a no; after a no the same player may not ask the same player again for
+five hands; a player who turned off "Let others ask to see my cards" cannot be asked (the setting is
+kept for a seated player and one of the hand asks are about, and dropped as anyone else leaves). The
+next deal ends every ask: one whose 15 s were up by then is a no, one still waiting with time left
+ends with no answer and no cooldown, and the one who asked is told. A cooldown is never dropped
+before its five hands are up: the table keeps at most twelve cooldowns and waiting asks together,
+and at that cap nobody may ask ('asks-full') until some run out. Nothing ever shows a thrown-away
+Triple T card.
 
 **Who sees it, and who is told.** A pre-action, a leave after the hand, a sit-out asked for while
 the hand is live, an ask, its answer and the asks setting are hidden commits: the public seq does not
@@ -466,7 +475,9 @@ else.
 
 **At the table.** Leaving after this hand is one tap while the player holds cards — a door beside
 the early choices (its word on a wide screen), a button in the seat's row while all in, the menu's
-toggle — and then the dock says "Leaving after this hand" with Stay, Home carries a dot, and the menu
+toggle; its short word "Leave after hand" — and then the dock says "Leaving after this hand" ("Last
+hand" where narrow, on a row of its own under the cards on a phone on its side) with Stay, Home
+carries a dot, and the menu
 offers "Stay at the table" beside "Leave now". The mid-hand leave dialog offers both, "Leave after
 this hand" the primary; Home's never navigates for it, since an absent player would hold the table
 up. Every leave that stays on the page sends `leave-after`; when the answer shows a deal beat it,
@@ -474,12 +485,16 @@ the table says "A new hand was dealt first: you leave the table when it ends." W
 a player who went as it completed keeps a ghost of their plate (name, look, the cards they showed,
 "Left"). The host's yes: the join card says it once the game has started; a seat whose chips wait
 reads "Waiting for chips" on every plate, and its own dock "Waiting for the host to approve your
-chips" with Cancel; the host hears a short sound and gets a toast with Approve for each new request,
-a dot on Bank and Host, and bank rows that say what each request is for. The rebuy policy is Off /
+chips" with Cancel (taking it back is never said as the host's no); a seat that never had chips
+here reads "No chips yet." with "Ask for 2,000 chips"; the host hears a short sound and gets a toast
+with Approve (a 44 px action) for each new request, a dot on Bank and Host, and bank rows that say
+what each request is for. The rebuy policy is Off /
 On (host approves), a radio pair. Asks: another player's plate menu leads with "Ask to see their
-cards", greyed with the reason when a rule stands in the way and, once asked, how it stands; the
-player asked gets a prompt under the top bar — never over the dock — with its seconds and three 44 px
-answers behind a tap shield; a hand shown to one player alone turns up on its plate for them, flagged
+cards", greyed with the reason when a rule stands in the way and, once asked, how it stands (the menu
+opens toward the table's middle, whole on screen); the player asked gets a prompt at the foot of the
+screen, over their own corner and nothing of the table (on a phone on its side, in the dock's
+column), with its seconds — to the next deal when that comes first — and three 44 px answers behind
+a tap shield; a hand shown to one player alone turns up on its plate for them, flagged
 "Shown to you", and in their hand log; "Let others ask to see my cards" is a switch in My look, kept
 with the personal look and sent to the room for the seat. In a result's pause the polls come every
 1.5 s for a player dealt into the hand, since the next deal ends every ask.

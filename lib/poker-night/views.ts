@@ -188,6 +188,7 @@ export const playerView = (state: TableState, pid: string, meta: PlayerMeta): Pl
             canAsk: choices.filter((c) => c.block === null).map((c) => c.pid),
             askBlocked: choices.flatMap((c): [string, AskBlock][] => (c.block === null ? [] : [[c.pid, c.block]])),
             shownToMe: hand ? shownTo(hand, pid) : [],
+            hostAwayAt: meta.hostAwayAt ?? null,
         },
         emotes: meta.emotes.map(emoteView),
         emoteSeq: meta.emoteSeq,

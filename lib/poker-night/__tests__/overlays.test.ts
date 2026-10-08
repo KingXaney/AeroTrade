@@ -15,7 +15,7 @@ import {
     joinCardState, joinNotes, myTurnKey, openSeats, profileWaits, ownChips, ownSeat, rebuyLimitChoices, REBUY_FIELDS, requestEnded, seatedCount, tableControl,
     timerChoices, waitingRequests, leaveAsks, leavePlan, leaveTapAsks, homeAsks, leftState, hostSitOut, rememberSitOut, SIT_OUT_MEMORY,
     SIT_OUT_ASK_KEY, SIT_OUT_ASK_MS, sitOutAskRecord, sitOutAsked, type SitOutMemory,
-    answerNow, askKey, askNews, askOffer, askToAnswer, askWaiting, leaveAfterLanded, leaveAfterOf, newRequests, requestKind,
+    answerNow, askEndsAt, askKey, askNews, askOffer, askToAnswer, askWaiting, hostAwayNow, leaveAfterLanded, leaveAfterOf, newRequests, NO_ASKS_SEEN, requestKind,
 } from '@/lib/poker-night/overlays';
 import {ASKS} from '@/lib/poker-night/config';
 import type {AskView, MeView} from '@/lib/poker-night/view-types';
@@ -295,9 +295,34 @@ describe('the bank\'s own chips', () => {
         const approved = ok(reduce(asked, {type: 'host', by: pidOf(0), op: {op: 'approve', pid: pidOf(1)}, at: nowOf(asked)}));
         const before = {bought: asked.ledger.find((r) => r.pid === pidOf(1))!.bought};
         const row = approved.ledger.find((r) => r.pid === pidOf(1))!;
-        expect(requestEnded(before, {bought: row.bought, pendingBuy: 0})).toBe('approved');
+        const still = {seated: true, leaving: false, withdrawn: false};
+        expect(requestEnded(before, {bought: row.bought, pendingBuy: 0, ...still})).toBe('approved');
         const denied = ok(reduce(asked, {type: 'host', by: pidOf(0), op: {op: 'deny', pid: pidOf(1)}, at: nowOf(asked)}));
-        expect(requestEnded(before, {bought: denied.ledger.find((r) => r.pid === pidOf(1))!.bought, pendingBuy: 0})).toBe('declined');
+        expect(requestEnded(before, {bought: denied.ledger.find((r) => r.pid === pidOf(1))!.bought, pendingBuy: 0, ...still})).toBe('declined');
+    });
+
+    it('never reads a request the viewer took back as the host\'s no: a Cancel, a leave now or after the hand', () => {
+        const before = {bought: 0};
+        const gone = {bought: 0, pendingBuy: 0};
+        expect(requestEnded(before, {...gone, seated: true, leaving: false, withdrawn: true})).toBe('withdrawn');
+        expect(requestEnded(before, {...gone, seated: false, leaving: false, withdrawn: false})).toBe('withdrawn');
+        expect(requestEnded(before, {...gone, seated: true, leaving: true, withdrawn: false})).toBe('withdrawn');
+        expect(requestEnded(before, {...gone, seated: true, leaving: false, withdrawn: false})).toBe('declined');
+        // Chips that came are an approval whatever else happened.
+        expect(requestEnded(before, {bought: 0, pendingBuy: 500, seated: true, leaving: true, withdrawn: true})).toBe('approved');
+    });
+
+    it('says when the host counts as away: a seat\'s chips then land without the host, and the bank says so', () => {
+        const s = {...table({0: 1000, 1: 0}, {config: {rebuys: 'approve', buyInMin: 1000, buyInMax: 2000}}), handNo: 1};
+        const view = pv(s, pidOf(1));
+        const away = {...view, me: {...view.me, hostAwayAt: 5000}};
+        expect(hostAwayNow(away.me, 5000)).toBe(false);
+        expect(hostAwayNow(away.me, 5001)).toBe(true);
+        expect(hostAwayNow(view.me, 1e12)).toBe(false);
+        expect(ownChips(away, 4000)).toMatchObject({asksHost: true, hostAway: false});
+        expect(ownChips(away, 6000)).toMatchObject({asksHost: false, hostAway: true});
+        // A seat that never had chips here: its offer is a first buy, never a rebuy.
+        expect(ownChips(away, 4000)!.offer).toMatchObject({first: true, rebuy: false, topUp: 2000});
     });
 
     it('offers nothing with rebuys off or used up, or while leaving after the hand', () => {
@@ -623,20 +648,41 @@ describe('asks to see a hand, as the page reads them', () => {
         const toMe = ask({from: 'ana', to: 'me', fromSeat: 1, toSeat: 0});
         expect(askToAnswer({pid: 'me', asks: [toMe]}, 2000)).toEqual(toMe);
         expect(askToAnswer({pid: 'me', asks: [toMe]}, 1000 + ASKS.WAIT_MS)).toBeNull();
+        // The next deal ends every ask: the prompt runs to it when it comes first, and goes then.
+        const dealing = {status: 'playing' as const, nextHandAt: 6000};
+        expect(askEndsAt(toMe, dealing)).toBe(6000);
+        expect(askEndsAt(toMe, {status: 'paused', nextHandAt: 6000})).toBe(toMe.until);
+        expect(askEndsAt(toMe, {status: 'playing', nextHandAt: null})).toBe(toMe.until);
+        expect(askEndsAt(toMe, {status: 'playing', nextHandAt: 1e12})).toBe(toMe.until);
+        expect(askToAnswer({pid: 'me', asks: [toMe]}, 5999, dealing)).toEqual(toMe);
+        expect(askToAnswer({pid: 'me', asks: [toMe]}, 6000, dealing)).toBeNull();
         expect(askToAnswer({pid: 'me', asks: [ask({})]}, 2000)).toBeNull();
         expect(askWaiting({pid: 'me', asks: [toMe]}, 2000)).toBe(true);
         expect(askWaiting({pid: 'me', asks: [toMe]}, 1000 + ASKS.WAIT_MS)).toBe(false);
-        const first = askNews({}, {pid: 'me', asks: [ask({})]}, 2000);
+        const first = askNews(NO_ASKS_SEEN, {pid: 'me', asks: [ask({})]}, 2000, 4);
         expect(first.news).toEqual([]);
-        expect(first.seen).toEqual({[askKey(ask({}))]: 'waiting'});
-        const answered = askNews(first.seen, {pid: 'me', asks: [ask({answer: 'shown'})]}, 3000);
+        expect(first.seen).toEqual({hand: 4, asks: {[askKey(ask({}))]: {ask: ask({}), answer: 'waiting'}}});
+        const answered = askNews(first.seen, {pid: 'me', asks: [ask({answer: 'shown'})]}, 3000, 4);
         expect(answered.news.map((n) => n.answer)).toEqual(['shown']);
-        expect(askNews(answered.seen, {pid: 'me', asks: [ask({answer: 'shown'})]}, 4000).news).toEqual([]);
+        expect(askNews(answered.seen, {pid: 'me', asks: [ask({answer: 'shown'})]}, 4000, 4).news).toEqual([]);
         // Unanswered past its time: said once, as expired.
-        const expired = askNews(first.seen, {pid: 'me', asks: [ask({})]}, 1000 + ASKS.WAIT_MS);
+        const expired = askNews(first.seen, {pid: 'me', asks: [ask({})]}, 1000 + ASKS.WAIT_MS, 4);
         expect(expired.news.map((n) => n.answer)).toEqual(['expired']);
-        expect(askNews(expired.seen, {pid: 'me', asks: [ask({})]}, 1000 + ASKS.WAIT_MS + 1000).news).toEqual([]);
+        expect(askNews(expired.seen, {pid: 'me', asks: [ask({})]}, 1000 + ASKS.WAIT_MS + 1000, 4).news).toEqual([]);
         // Unchanged, the record is the same object (no re-render).
-        expect(askNews(first.seen, {pid: 'me', asks: [ask({})]}, 2500).seen).toBe(first.seen);
+        expect(askNews(first.seen, {pid: 'me', asks: [ask({})]}, 2500, 4).seen).toBe(first.seen);
+    });
+
+    it('says an ask of the viewer\'s that the next deal ended while it waited, once; one already over says nothing more', () => {
+        const first = askNews(NO_ASKS_SEEN, {pid: 'me', asks: [ask({}), ask({from: 'ana', to: 'me', fromSeat: 1, toSeat: 0})]}, 2000, 4);
+        // Hand 5 is dealt: the asks leave the view with hand 4.
+        const dealt = askNews(first.seen, {pid: 'me', asks: []}, 3000, 5);
+        expect(dealt.news).toEqual([{ask: ask({}), answer: 'dealt'}]);
+        expect(askNews(dealt.seen, {pid: 'me', asks: []}, 4000, 5).news).toEqual([]);
+        // Answered before the deal: said as answered, and not again at the deal.
+        const answered = askNews(first.seen, {pid: 'me', asks: [ask({answer: 'no'})]}, 2500, 4);
+        expect(askNews(answered.seen, {pid: 'me', asks: []}, 3000, 5).news).toEqual([]);
+        // Nothing seen yet when the page opens on a hand: nothing to say.
+        expect(askNews(NO_ASKS_SEEN, {pid: 'me', asks: []}, 3000, 5).news).toEqual([]);
     });
 });

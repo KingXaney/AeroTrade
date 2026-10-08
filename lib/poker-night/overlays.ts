@@ -484,15 +484,19 @@ export type OwnChips = {
     inPot: number;
     pendingBuy: number; // lands when the hand ends
     requested: number | null; // waiting for the host
-    offer: {min: number; max: number; topUp: number; rebuy: boolean} | null;
+    offer: {min: number; max: number; topUp: number; rebuy: boolean; first: boolean} | null;
     asksHost: boolean; // a buy here waits for the host's yes
+    hostAway: boolean; // it would, but the host has been away long enough: chips land at once
     used: number; // rebuys so far
     maxRebuys: number | null;
 };
 
+// Whether the host counts as away at `now` (MeView.hostAwayAt): a buy then lands without their yes.
+export const hostAwayNow = (me: Pick<MeView, 'hostAwayAt'>, now: number): boolean => me.hostAwayAt !== null && now > me.hostAwayAt;
+
 // The viewer's own chips and what they may add, by the table's rules (bank.buyOptions, the client's
-// copy of the server's own check); null without a seat.
-export const ownChips = (view: Pick<PlayerView, 'seats' | 'ledger' | 'requests' | 'config' | 'me' | 'handNo'>): OwnChips | null => {
+// copy of the server's own check); null without a seat. Read at `now` for whether the host is away.
+export const ownChips = (view: Pick<PlayerView, 'seats' | 'ledger' | 'requests' | 'config' | 'me' | 'handNo'>, now = 0): OwnChips | null => {
     const seat = view.me.seat;
     const s = seat === null ? null : view.seats[seat] ?? null;
     if (seat === null || !s) return null;
@@ -502,8 +506,10 @@ export const ownChips = (view: Pick<PlayerView, 'seats' | 'ledger' | 'requests' 
     return {
         seat, stack: seatChips(s), behind: s.chips, inPot: s.inPot, pendingBuy: s.pendingBuy, requested,
         offer: requested === null ? buyOptions(view.config, s, row, view.me.next === 'leave' || view.me.next === 'leave-after') : null,
-        // Once the first hand is dealt every buy but the host's waits for the host (ledger.needsHost).
-        asksHost: !view.me.isHost && view.handNo > 0,
+        // Once the first hand is dealt every buy but the host's waits for the host (ledger.needsHost),
+        // unless the host has been away long enough.
+        asksHost: !view.me.isHost && view.handNo > 0 && !hostAwayNow(view.me, now),
+        hostAway: !view.me.isHost && view.handNo > 0 && hostAwayNow(view.me, now),
         used, maxRebuys: view.config.maxRebuys,
     };
 };
@@ -516,10 +522,19 @@ export const bankTimeline = (rows: readonly Pick<BankRow, 'pid' | 'name' | 'even
         .sort((a, b) => b.at - a.at || a.key.localeCompare(b.key))
         .slice(0, limit);
 
-// How a rebuy request the viewer was waiting on ended: their chips went up (approved), or it went
-// away without them (declined).
-export const requestEnded = (before: {bought: number}, after: {bought: number; pendingBuy: number}): 'approved' | 'declined' =>
-    after.bought > before.bought || after.pendingBuy > 0 ? 'approved' : 'declined';
+// How a request for chips the viewer was waiting on ended: their chips went up (approved); it went
+// with the viewer's own doing (withdrawn) — their Cancel (`withdrawn`, which the page marks as it
+// sends one), or a leave, now or after the hand, which takes a request with it (no seat, or
+// `leaving`); else the host's no (declined). Only a decline is said as the host's.
+export type RequestOutcome = 'approved' | 'declined' | 'withdrawn';
+
+export const requestEnded = (
+    before: {bought: number},
+    after: {bought: number; pendingBuy: number; seated: boolean; leaving: boolean; withdrawn: boolean},
+): RequestOutcome => {
+    if (after.bought > before.bought || after.pendingBuy > 0) return 'approved';
+    return after.withdrawn || !after.seated || after.leaving ? 'withdrawn' : 'declined';
+};
 
 // ── the host's waiting requests (a dot on the menu icon) ──
 
@@ -569,31 +584,48 @@ export const askOffer = (me: Pick<MeView, 'pid' | 'asks' | 'canAsk' | 'askBlocke
     return {kind: 'blocked', block};
 };
 
-// The ask the viewer is to answer now: the oldest one to them still waiting with time left, else null.
-export const askToAnswer = (me: Pick<MeView, 'pid' | 'asks'>, now: number): AskView | null =>
-    me.asks.find((a) => a.to === me.pid && answerNow(a, now) === 'waiting') ?? null;
+// When an ask really ends for the player asked: its own seconds, or the next deal if that comes
+// first — every ask ends at the deal (with no cooldown when its seconds were not up), so the
+// prompt's countdown runs to whichever is sooner. A paused table deals nothing.
+export const askEndsAt = (ask: Pick<AskView, 'until'>, table: Pick<TableView, 'status' | 'nextHandAt'>): number =>
+    table.status === 'playing' && table.nextHandAt !== null ? Math.min(ask.until, table.nextHandAt) : ask.until;
+
+// The ask the viewer is to answer now: the oldest one to them still waiting with time left before it
+// runs out or the next deal ends it (askEndsAt), else null.
+export const askToAnswer = (me: Pick<MeView, 'pid' | 'asks'>, now: number, table: Pick<TableView, 'status' | 'nextHandAt'> | null = null): AskView | null =>
+    me.asks.find((a) => a.to === me.pid && answerNow(a, now) === 'waiting' && (table === null || now < askEndsAt(a, table))) ?? null;
+
 
 // Whether an ask of the viewer's own still waits for its answer at `now` (the page then reads the
 // clock each second, to say when it runs out).
 export const askWaiting = (me: Pick<MeView, 'pid' | 'asks'>, now: number): boolean =>
     me.asks.some((a) => (a.from === me.pid || a.to === me.pid) && answerNow(a, now) === 'waiting');
 
-// The viewer's own asks as this page last saw each one (by askKey); askNews says which got their
-// answer since — said once each, in a toast.
-export type AskSeen = Readonly<Record<string, AskAnswer>>;
+// The viewer's own asks as this page last saw each one (by askKey), with the hand they were about;
+// askNews says which got their answer since — said once each, in a toast. An ask still waiting when
+// the next hand is dealt ends with it ('dealt': no answer, and no wait before asking again), which
+// only the hand moving on can say, since the ask leaves the view with the hand.
+export type AskSeen = Readonly<{hand: number | null; asks: Readonly<Record<string, {ask: AskView; answer: AskAnswer}>>}>;
+export const NO_ASKS_SEEN: AskSeen = Object.freeze({hand: null, asks: Object.freeze({})});
+export type AskNews = {ask: AskView; answer: AskAnswer | 'dealt'};
 
 export const askKey = (ask: Pick<AskView, 'from' | 'to' | 'at'>): string => `${ask.from}>${ask.to}@${ask.at}`;
 
-export const askNews = (seen: AskSeen, me: Pick<MeView, 'pid' | 'asks'>, now: number): {news: {ask: AskView; answer: AskAnswer}[]; seen: AskSeen} => {
-    const next: Record<string, AskAnswer> = {};
-    const news: {ask: AskView; answer: AskAnswer}[] = [];
+export const askNews = (seen: AskSeen, me: Pick<MeView, 'pid' | 'asks'>, now: number, hand: number | null): {news: AskNews[]; seen: AskSeen} => {
+    const news: AskNews[] = [];
+    const before = seen.hand === hand ? seen.asks : {};
+    if (seen.hand !== null && seen.hand !== hand) {
+        for (const {ask, answer} of Object.values(seen.asks)) if (answer === 'waiting') news.push({ask, answer: 'dealt'});
+    }
+    const next: Record<string, {ask: AskView; answer: AskAnswer}> = {};
     for (const ask of me.asks) {
         if (ask.from !== me.pid) continue;
         const key = askKey(ask);
         const answer = answerNow(ask, now);
-        next[key] = answer;
-        if (seen[key] === 'waiting' && answer !== 'waiting') news.push({ask, answer});
+        next[key] = {ask, answer};
+        if (before[key]?.answer === 'waiting' && answer !== 'waiting') news.push({ask, answer});
     }
-    const same = Object.keys(next).length === Object.keys(seen).length && Object.entries(next).every(([k, a]) => seen[k] === a);
-    return {news, seen: same ? seen : next};
+    const same = seen.hand === hand && Object.keys(next).length === Object.keys(seen.asks).length
+        && Object.entries(next).every(([k, a]) => seen.asks[k]?.answer === a.answer);
+    return {news, seen: same ? seen : {hand, asks: next}};
 };

@@ -43,8 +43,10 @@ export const cardsNeeded = (c: Pick<GameConfig, 'variant' | 'boards' | 'seats'>)
 
 // Asking to see a hand once it completes (engine.ask): one ask waiting per player at a time, at most
 // PER_HAND a hand, each answered within WAIT_MS or taken as a no; after a no the same player may not
-// ask the same player again for COOLDOWN_HANDS hands. The state keeps the latest COOLDOWNS_KEPT of
-// those, and every ask ends at the next deal.
+// ask the same player again for COOLDOWN_HANDS hands. Every ask ends at the next deal (one still
+// waiting with time left without a cooldown). The table holds at most COOLDOWNS_KEPT cooldowns and
+// waiting asks together, and never drops a cooldown early: at that cap nobody may ask until some run
+// out (asks.asksFull, the 'asks-full' refusal).
 export const ASKS = {WAIT_MS: 15_000, PER_HAND: 2, COOLDOWN_HANDS: 5, COOLDOWNS_KEPT: 12} as const;
 
 // The looks the host picks for everyone; their colours live in lib/poker-night/looks.ts.

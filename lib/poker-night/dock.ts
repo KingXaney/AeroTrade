@@ -62,7 +62,7 @@ export type DockView = {
     pre: {options: PreAction[]; selected: PreAction | null} | null;
     control: SeatControl | null;
     canShow: boolean;
-    buy: {min: number; max: number; topUp: number; rebuy: boolean} | null; // offered once the stack is empty and no request waits
+    buy: {min: number; max: number; topUp: number; rebuy: boolean; first: boolean} | null; // offered once the stack is empty and no request waits
     deal: boolean; // the host may deal the first hand
 };
 

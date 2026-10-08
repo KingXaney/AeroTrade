@@ -86,18 +86,19 @@ export const bankView = (view: BankInput, opts: {me?: string | null; detail?: re
 // (their ledger row has bought chips) nothing while rebuys are off or once they are used up; else at
 // least what brings the stack (behind, plus any chips already waiting) to the table's minimum and at
 // most what brings it to the cap. topUp is the "Top up to the cap" amount; rebuy says the stack is
-// empty after chips were bought, so the button reads "Rebuy".
+// empty after chips were bought, so the button reads "Rebuy"; first says no chips were bought here
+// tonight (a newcomer whose request was taken back or declined), so nothing reads as a rebuy.
 export const buyOptions = (
     config: Pick<GameConfig, 'buyInMin' | 'buyInMax' | 'rebuys' | 'maxRebuys'>,
     seat: Pick<SeatView, 'chips' | 'pendingBuy' | 'state'> | null,
     row: {buys: number; bought: number} | null,
     leavingAfter = false,
-): {min: number; max: number; topUp: number; rebuy: boolean} | null => {
+): {min: number; max: number; topUp: number; rebuy: boolean; first: boolean} | null => {
     if (!seat || seat.state === 'leaving' || leavingAfter) return null;
     const bought = row !== null && row.bought > 0;
     if (bought && (config.rebuys === 'off' || (config.maxRebuys !== null && row!.buys >= config.maxRebuys))) return null;
     const held = seat.chips + seat.pendingBuy;
     const min = Math.max(1, config.buyInMin - held);
     const max = config.buyInMax - held;
-    return max >= min ? {min, max, topUp: max, rebuy: held === 0 && bought} : null;
+    return max >= min ? {min, max, topUp: max, rebuy: held === 0 && bought, first: !bought} : null;
 };

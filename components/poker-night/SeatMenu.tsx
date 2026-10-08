@@ -7,7 +7,8 @@
 // greyed with the reason when that player turned asks off or a rule stands in the way (one ask
 // waiting at a time, two a hand, five hands after a no), and once asked, how the ask stands. The
 // plates themselves are drawn by Seat; this lays a clear button the plate's size (at least 44 px
-// each way) over each other player's plate, so the menu needs nothing from the seat it sits on.
+// each way) over each other player's plate, so the menu needs nothing from the seat it sits on. The
+// menu opens toward the table's middle (stage.menuSide), where it fits whole.
 // Throws are offered to a seated viewer while the host keeps throwables on; a watcher, or a table
 // with throwables off, gets a line saying why and the mute alone. Sending shares the picker's
 // cooldown (emote-client.sendEmoteNow).
@@ -22,7 +23,7 @@ import {useRoom, useServerNow} from "@/components/poker-night/room-controller";
 import {ASK_COPY, EMOTE_COPY} from "@/lib/learn/copy/poker-night";
 import {THROW_IDS, throwGlyph, type ThrowId} from "@/lib/poker-night/emotes";
 import {askOffer, myTurnKey} from "@/lib/poker-night/overlays";
-import type {Stage} from "@/lib/poker-night/stage";
+import {menuSide, type Stage} from "@/lib/poker-night/stage";
 
 // The ask, while the menu is open: read at the server's time, so an ask of the viewer's that ran out
 // frees the others without a write.
@@ -95,7 +96,8 @@ const SeatMenus = ({stage}: {stage: Stage}) => {
                             <button type="button" className="pn-seat-hit rounded-full" style={{left: place.plate.x, top: place.plate.y}}
                                     aria-label={EMOTE_COPY.seatMenu(name)} data-seat-menu={seat} data-muted={isMuted ? '' : undefined}/>
                         </DropdownMenuTrigger>
-                        <DropdownMenuContent align="center" className="w-64 text-fg" data-pn-seat-menu={seat} onCloseAutoFocus={focusTableOnClose(ui.closedByTurn)}>
+                        <DropdownMenuContent align="center" side={menuSide(place, stage)} collisionPadding={8} className="w-64 text-fg" data-pn-seat-menu={seat}
+                                                 data-pn-menu-side={menuSide(place, stage)} onCloseAutoFocus={focusTableOnClose(ui.closedByTurn)}>
                             <DropdownMenuLabel className="flex min-w-0 items-center gap-2 text-sm text-fg">
                                 <PlayerName name={name}/>
                             </DropdownMenuLabel>

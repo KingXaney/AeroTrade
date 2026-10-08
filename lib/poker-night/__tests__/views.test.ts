@@ -172,7 +172,7 @@ describe('the non-leak property', () => {
         const me = playerView(s, 'p2', playerMeta(s)).me;
         expect(me).toEqual({
             pid: 'p2', seat: 2, role: 'seated', isHost: false, hasAccount: false, hole: cards('QhQd'), pre: null, next: null,
-            discard: null, allowAsks: true, asks: [], canAsk: [], askBlocked: [], shownToMe: [],
+            discard: null, allowAsks: true, asks: [], canAsk: [], askBlocked: [], shownToMe: [], hostAwayAt: null,
         });
     });
 });
@@ -184,14 +184,14 @@ describe('what only the viewer sees', () => {
         const p1 = playerView(s, 'p1', {...playerMeta(s), hasAccount: true});
         expect(p1.me).toEqual({
             pid: 'p1', seat: 1, role: 'seated', isHost: false, hasAccount: true, hole: cards('KhKd'), pre: {kind: 'check-fold'} as PreAction, next: null,
-            discard: null, allowAsks: true, asks: [], canAsk: [], askBlocked: [], shownToMe: [],
+            discard: null, allowAsks: true, asks: [], canAsk: [], askBlocked: [], shownToMe: [], hostAwayAt: null,
         });
         const host = playerView(s, 'p0', playerMeta(s));
         expect(host.me).toMatchObject({isHost: true, pre: null, hole: cards('AhAd')});
         const watcher = playerView(s, 'w1', playerMeta(s));
         expect(watcher.me).toEqual({
             pid: 'w1', seat: null, role: 'watching', isHost: false, hasAccount: false, hole: null, pre: null, next: null,
-            discard: null, allowAsks: true, asks: [], canAsk: [], askBlocked: [], shownToMe: [],
+            discard: null, allowAsks: true, asks: [], canAsk: [], askBlocked: [], shownToMe: [], hostAwayAt: null,
         });
         expect(watcher.config).toEqual(s.config);
         expect(watcher.seats[1]!.cards).toBe(2);

@@ -1031,3 +1031,9 @@ export const potCentre = (plan: PotPlan, pot: number): Px => {
     const pill = plan.pills.find((p) => p.pots.includes(pot));
     return pill ? {x: pill.x, y: pill.y} : {x: plan.box.x, y: plan.box.y};
 };
+
+// The side a plate's menu opens on (components/poker-night/SeatMenu): toward the table's middle — up
+// from a plate in the lower half, down from one in the upper — where there is room for it. The menu
+// keeps to the space it is given (it scrolls inside itself rather than overflow), so it never flips by
+// itself: opened down from a lower plate it would sit over the dock, its last rows cut off.
+export const menuSide = (place: Pick<SeatPlace, 'plate'>, stage: Pick<Stage, 'centre'>): 'top' | 'bottom' => (place.plate.y > stage.centre.y ? 'top' : 'bottom');

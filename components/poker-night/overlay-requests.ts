@@ -39,6 +39,22 @@ export const chooseSeat = (seat: number | null): void => emit({kind: 'seat', sea
 // home once the leave lands.
 export const askLeave = (then: LeaveThen): void => emit({kind: 'leave', then});
 
+// The viewer's own Cancel of their request for chips (the dock's or the bank's), marked as it is
+// sent and cleared if it is refused: TableOverlays reads it once when the request goes, so a request
+// the viewer took back is never said as the host's no (lib/poker-night/overlays.requestEnded).
+let ownWithdraw = false;
+export const markOwnWithdraw = (): void => {
+    ownWithdraw = true;
+};
+export const clearOwnWithdraw = (): void => {
+    ownWithdraw = false;
+};
+export const takeOwnWithdraw = (): boolean => {
+    const was = ownWithdraw;
+    ownWithdraw = false;
+    return was;
+};
+
 // The id of the request made last, 0 before any: what a reader mounting now has already seen.
 export const latestRequestId = (): number => latest?.id ?? 0;
 
