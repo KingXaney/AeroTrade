@@ -27,6 +27,15 @@
 // reconnecting pill and "Back online.", the top bar's code on one line. Home's chip, "Rejoin your
 // table" while seated. The emote picker's thirteen faces at 390 and 320.
 //
+// Side pots: a table of four whose stacks (seeded in Mongo) make a main pot and two side pots — on the
+// flop and the turn, a seated phone and a watching one at every size below and on the smaller phones
+// on their side (667×375, 568×320), and through the run-out and the payout six screens at once — every
+// pot's pill (lib/poker-night/stage.potPlan) measured against every card (the board's and its lit
+// cards' lift, the dock's, a seat's pair or turned-up hand), plate, flag, blind's mark, open seat, bet
+// line, the dealer button, a winner's "+N" while it shows, the banner and the line under it: none
+// touches; on the felt at every size below; each pot's words at 11 px or more, unclipped, on screen;
+// and the banner and the line under it clear of the "+N" (sidepot-*.png).
+//
 // Every surface at 390×844, 375×667, 320×568 and on its side at 844×390: nothing scrolls sideways,
 // every target is at least 44 px, nothing overlaps. The no-advice list (and the poker night copy's
 // own rules: no sentence opening on Hold, Buy or Sell, no currency word) over every new surface.
@@ -45,7 +54,9 @@ const {PN_PROTOCOL} = await lib('lib/poker-night/http.ts');
 const {TAP_SHIELD_MS} = await lib('lib/poker-night/keys.ts');
 const {cardLabel} = await lib('lib/poker/cards.ts');
 const {findBanned, stripProhibitions} = await lib('lib/learn/banned.ts');
-const {TABLE_COPY, HOST_COPY, HANDS_COPY, HOME_PANEL_COPY, POKER_NIGHT_COPY} = await lib('lib/learn/copy/poker-night.ts');
+const {TABLE_COPY, HOST_COPY, HANDS_COPY, HOME_PANEL_COPY, POKER_NIGHT_COPY, FELT_COPY} = await lib('lib/learn/copy/poker-night.ts');
+const {legalFor, snapshotFromState} = await lib('lib/poker-night/betting.ts');
+const {livePots} = await lib('lib/poker-night/views.ts');
 
 const ENV = 'development'; // the harness sets no VERCEL_ENV
 const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
@@ -1337,10 +1348,246 @@ try {
             TABLE_COPY.leavingAfterHand, TABLE_COPY.sitOutNextNote, TABLE_COPY.dealMeIn, TABLE_COPY.leaveBodyInHand(1975), TABLE_COPY.leaveBodyInHand(1),
             HOST_COPY.sitOut, HOST_COPY.sitOutFor(sample), HOST_COPY.sitOutWaiting, HOST_COPY.satOut(sample),
             HOST_COPY.satOutNow(sample), POKER_NIGHT_COPY.resumeTitle('Ana\'s table'), POKER_NIGHT_COPY.rejoin,
+            FELT_COPY.mainPot(600), FELT_COPY.sidePot(1, 1_350), FELT_COPY.morePots(2, 5_050), FELT_COPY.allPots(4, 6_250), FELT_COPY.sidePot(3, 1_250_000),
         ];
         const hits = fixed.flatMap((text) => wordingOf(text).map((hit) => `"${text.slice(0, 40)}": ${hit}`));
         check(`the no-advice list (and no Hold/Buy/Sell opener, no currency word) over every new string as written (${fixed.length})`,
             hits.length === 0 && fixed.every((t) => typeof t === 'string' && t.length > 0), hits.slice(0, 4).join(' | '));
+    }
+
+    // ═══ side pots on a phone: every pot's pill clear of every card, plate, the button and the banner ═
+    // A new table of four, its stacks seeded in Mongo (150, 600, 2,450 and 4,800, the chips conserved):
+    // the two short stacks all in before the flop make a main pot and a side pot, a bet on the flop a
+    // second side pot, and an all-in on the turn runs the board out to a showdown that pays all three.
+    // On the flop and the turn a seated phone and a watching one, each at 390 × 844, 375 × 667, 320 × 568
+    // and on its side at 844 × 390; through the run-out and the payout six screens at once (those sizes,
+    // seated and watching, and the host's desktop). Every pot pill's rectangle against every card (the
+    // board's, a lit card's lift, the dock's, a seat's pair or turned-up hand), plate, flag, blind's
+    // mark, open seat, the dealer button, the banner and the line under it: no intersection; each pot's
+    // words at 11 px or more, unclipped, on screen; every pot in exactly one pill.
+    {
+        await hostOp(H, {op: 'end'}).catch(() => null);
+        await H.page.goto(`${BASE}/poker-night`, {waitUntil: 'load', timeout: 180000});
+        await H.page.click('[data-quick-start]');
+        await H.page.waitForURL(/\/play\/[A-HJ-NP-Z2-9]{6}(\?.*)?$/, {timeout: 120000});
+        code = new URL(H.page.url()).pathname.split('/').pop();
+        await H.page.waitForSelector('[data-pn-drawer="invite"]', {timeout: 60000}).catch(() => {});
+        await H.page.keyboard.press('Escape');
+        H.pid = (await roomDoc()).state.hostPid;
+        const X = await newPlayer('sideSeated', PHONE(390, 844));
+        const Y = await newPlayer('sideY', PHONE(375, 667));
+        const Z = await newPlayer('sideZ', PHONE(320, 568));
+        await sitDown(X, 'Xena');
+        await sitDown(Y, 'Yuri');
+        await sitDown(Z, 'Zed');
+        const watch = async (p) => {
+            await p.page.goto(`${BASE}/play/${code}`, {waitUntil: 'load', timeout: 120000});
+            await p.page.waitForSelector('[data-join-card="visitor"]', {timeout: 60000});
+            await p.page.click('[data-join-watch]');
+            await p.page.waitForSelector('[data-join-card]', {state: 'detached', timeout: 30000}).catch(() => {});
+            await p.page.waitForSelector('[data-pn-ready="true"]', {timeout: 30000}).catch(() => {});
+        };
+        const W = await newPlayer('sideWatcher', PHONE(390, 844));
+        const W2 = await newPlayer('sideWatcher320', PHONE(320, 568));
+        await watch(W);
+        await watch(W2);
+        await hostOp(H, {op: 'config', patch: {turnSeconds: 120}});
+        let d = await roomDoc();
+        const before = d.state.seats.reduce((s, seat) => s + (seat?.stack ?? 0), 0);
+        const stacks = new Map([[Z, 150], [Y, 600], [X, 2_450], [H, before - 150 - 600 - 2_450]]);
+        const set = {};
+        for (const [p, n] of stacks) set[`state.seats.${seatIndex(d, p)}.stack`] = n;
+        await rooms.updateOne({env: ENV, code}, {$set: set, $inc: {seq: 1}});
+        d = await roomDoc();
+        check('side pots: four seated with stacks of 150, 600, 2,450 and the rest, chips conserved, and a watcher on two phones',
+            [H, X, Y, Z].every((p) => d.state.seats[seatIndex(d, p)]?.stack === stacks.get(p)) && d.state.seats.reduce((s, seat) => s + (seat?.stack ?? 0), 0) === before,
+            JSON.stringify(d.state.seats.map((s) => s?.stack ?? null)));
+        const started = await hostOp(H, {op: 'start'});
+        d = await waitDoc((x) => x.state.hand?.phase === 'betting', 30000);
+        check('…the host starts the game: a hand is dealt', started.status === 200 && d !== null, `${started.status}`);
+        const handNo = d.state.hand.no;
+
+        // Each move by the API, the actor's choice from the moves legalFor offers, until `stop`.
+        const actors = [H, X, Y, Z];
+        const playUntil = async (stop, choose, timeout = 60000) => {
+            const t0 = Date.now();
+            while (Date.now() - t0 < timeout) {
+                const doc = await roomDoc();
+                const hand = doc.state.hand;
+                if (hand?.no === handNo && stop(doc)) return doc;
+                if (!hand || hand.no !== handNo || hand.phase !== 'betting' || hand.actor === null) {
+                    await sleep(150);
+                    continue;
+                }
+                const actor = actors.find((p) => p.pid === doc.state.seats[hand.actor]?.pid);
+                const legal = legalFor(snapshotFromState(doc.state), hand.actor);
+                const move = choose(actor, legal);
+                const r = await api(actor, 'action', {actionId: randomUUID(), type: 'act', turn: doc.state.turn, move});
+                if (r.status !== 200) throw new Error(`side pots: ${actor.name}'s ${JSON.stringify(move)} answered ${r.status} ${JSON.stringify(r.body?.error)}`);
+                for (let i = 0; i < 100; i++) {
+                    const next = await roomDoc();
+                    if (next.state.turn !== doc.state.turn || next.state.hand?.phase !== 'betting') break;
+                    await sleep(100);
+                }
+            }
+            throw new Error(`side pots: hand ${handNo} did not reach its stop in ${timeout} ms`);
+        };
+
+        // What a screen shows of the pots, against everything they must not cover.
+        const SIDEPOT_PROBE = () => {
+            const vis = (el) => {
+                const r = el.getBoundingClientRect();
+                const cs = getComputedStyle(el);
+                return r.width > 0.5 && r.height > 0.5 && cs.visibility !== 'hidden' && cs.display !== 'none';
+            };
+            // A winner's "+N" counts only while it shows (it rises from nothing and fades away).
+            const showing = (el) => vis(el) && parseFloat(getComputedStyle(el).opacity) > 0.05;
+            const box = (el) => el.getBoundingClientRect();
+            const hit = (a, b) => a.left < b.right - 0.5 && b.left < a.right - 0.5 && a.top < b.bottom - 0.5 && b.top < a.bottom - 0.5;
+            const pills = [...document.querySelectorAll('[data-pn-pot] [data-pot]')].filter(vis).map((el) => {
+                const label = el.querySelector('.pn-pot-label');
+                return {r: box(el), pots: el.getAttribute('data-pot'), text: label?.textContent ?? '', font: label ? parseFloat(getComputedStyle(label).fontSize) : 0,
+                    clipped: label ? label.scrollWidth > label.clientWidth + 0.5 : true};
+            });
+            const seatOf = (el) => el.closest('[data-seat]')?.getAttribute('data-seat') ?? '?';
+            const where = (el) => (el.closest('.pn-board') ? 'board' : el.closest('[data-pn-dock]') ? 'dock' : `seat ${seatOf(el)}`);
+            const obstacles = [];
+            const add = (sel, name) => document.querySelectorAll(sel).forEach((el) => {
+                if (vis(el) && !el.closest('[data-pn-pot]')) obstacles.push({name: name(el), r: box(el)});
+            });
+            add('main .pn-card', (el) => `${where(el)} card ${el.getAttribute('data-card')}`);
+            add('main .pn-card > .pn-card-inner', (el) => `${where(el)} card ${el.parentElement.getAttribute('data-card')} as lifted`);
+            add('.pn-board .pn-slot', () => 'board slot');
+            add('[data-seat] .pn-plate', (el) => `plate ${seatOf(el)}`);
+            add('[data-seat] .pn-plate-flag', (el) => `flag ${seatOf(el)}`);
+            add('[data-seat] .pn-blind', (el) => `blind's mark ${seatOf(el)}`);
+            add('.pn-open-seat', (el) => `open seat ${seatOf(el)}`);
+            add('[data-pn-dealer]', () => 'dealer button');
+            add('.pn-banner', () => 'banner');
+            add('.pn-banner-note, [data-pn-next-hand]', () => 'line under the banner');
+            add('.pn-bet', (el) => `bet line ${el.getAttribute('data-bet-seat')}`);
+            const pops = [...document.querySelectorAll('.pn-win-pop-text')].filter(showing).map((el) => ({name: `"${el.textContent}" over seat ${seatOf(el)}`, r: box(el)}));
+            obstacles.push(...pops);
+            const hits = [];
+            const apart = [];
+            pills.forEach((p, i) => {
+                for (const o of obstacles) if (hit(p.r, o.r)) hits.push(`"${p.text}" × ${o.name}`);
+                for (const q of pills.slice(i + 1)) if (hit(p.r, q.r)) apart.push(`"${p.text}" × "${q.text}"`);
+            });
+            // The banner and the line under it against a showing "+N".
+            const popHits = [];
+            for (const el of document.querySelectorAll('.pn-banner, .pn-banner-note, [data-pn-next-hand]')) {
+                if (!vis(el)) continue;
+                for (const o of pops) if (hit(box(el), o.r)) popHits.push(`${el.matches('.pn-banner') ? 'banner' : 'line under the banner'} × ${o.name}`);
+            }
+            const table = document.querySelector('.pn-table')?.getBoundingClientRect();
+            const pot = document.querySelector('[data-pn-pot]');
+            return {
+                pills: pills.map((p) => ({text: p.text, pots: p.pots, font: p.font, clipped: p.clipped,
+                    inside: p.r.left >= -0.5 && p.r.right <= innerWidth + 0.5 && p.r.top >= -0.5 && p.r.bottom <= innerHeight + 0.5,
+                    rect: [Math.round(p.r.left), Math.round(p.r.top), Math.round(p.r.width), Math.round(p.r.height)]})),
+                hits, apart, popHits, pops: pops.length, obstacles: obstacles.length, cards: obstacles.filter((o) => / card /.test(o.name)).length,
+                banner: document.querySelector('.pn-banner') !== null, variant: pot?.getAttribute('data-pn-pot-variant') ?? null,
+                keeps: pot?.getAttribute('data-pn-pot-keeps') ?? null, felt: pot?.getAttribute('data-pn-pot-felt') ?? null,
+                table: table ? `${Math.round(table.width)}×${Math.round(table.height)}` : null,
+            };
+        };
+        const pillsBad = (m) => m.pills.filter((p) => p.font < 11 || p.clipped || !p.inside).map((p) => `${p.text} ${p.font}px${p.clipped ? ' clipped' : ''}${p.inside ? '' : ' off screen'}`);
+        const potsIn = (m) => m.pills.flatMap((p) => p.pots.split(',')).sort((a, b) => a - b).join(',');
+        const sideBrief = (m) => JSON.stringify({table: m.table, variant: m.variant, keeps: m.keeps, felt: m.felt, pills: m.pills.map((p) => `${p.text} @${p.rect.join(',')}`),
+            hits: m.hits.slice(0, 4), apart: m.apart.slice(0, 2), bad: pillsBad(m).slice(0, 2), cards: m.cards, obstacles: m.obstacles});
+
+        // A street's pots on the seated phone and the watching one, at every size and on the smaller
+        // phones on their side; on the felt at every size but those.
+        const SIDEWAYS = [{width: 667, height: 375}, {width: 568, height: 320}];
+        const measureStreet = async (label, pots) => {
+            const total = pots.reduce((s, p) => s + p.amount, 0);
+            const want = pots.map((_, i) => i).join(',');
+            for (const [who, p] of [['seated', X], ['watcher', W]]) {
+                const shown = await p.page.waitForFunction((n) => document.querySelector('[data-pn-pot]')?.getAttribute('data-pn-pot') === String(n), total, {timeout: 20000})
+                    .then(() => true, () => false);
+                for (const size of [...SIZES, ...SIDEWAYS]) {
+                    await resize(p.page, size, 900);
+                    const m = await p.page.evaluate(SIDEPOT_PROBE);
+                    const felt = SIDEWAYS.includes(size) || m.felt === 'true';
+                    check(`side pots on the ${label} at ${sizeName(size)} (${who}): every pot's pill clear of every card, plate, flag, blind's mark, open seat, bet line and the dealer button, apart${SIDEWAYS.includes(size) ? '' : ', on the felt'}; 11 px or more, unclipped, on screen; every pot in one pill`,
+                        shown && m.pills.length > 0 && m.hits.length === 0 && m.apart.length === 0 && felt && pillsBad(m).length === 0 && potsIn(m) === want && m.cards > 0, sideBrief(m));
+                    await shot(p.page, `sidepot-${label}-${who}-${sizeFile(size)}`);
+                }
+                await resize(p.page, {width: 390, height: 844}, 500);
+            }
+        };
+
+        // Before the flop: the short stacks all in, the others call.
+        d = await playUntil((x) => x.state.hand.street === 'flop' && x.state.hand.phase === 'betting',
+            (p, legal) => (p === Y || p === Z ? {kind: 'all-in'} : legal.check ? {kind: 'check'} : {kind: 'call'}));
+        const flop = livePots(d.state.hand);
+        check('side pots: all in for 150 and 600 before the flop makes a main pot of 600 and a side pot of 1,350',
+            flop.map((p) => p.amount).join() === '600,1350', JSON.stringify(flop));
+        await measureStreet('flop', flop);
+
+        // The flop: Xena bets 300, the host calls — a second side pot.
+        d = await playUntil((x) => x.state.hand.street === 'turn' && x.state.hand.phase === 'betting',
+            (p, legal) => (legal.call > 0 ? {kind: 'call'} : p === X && legal.raise ? {kind: 'raise', to: Math.max(legal.raise.min, 300)} : {kind: 'check'}));
+        const turn = livePots(d.state.hand);
+        check('side pots: a bet of 300 called on the flop makes a second side pot (600, 1,350, 600)', turn.map((p) => p.amount).join() === '600,1350,600', JSON.stringify(turn));
+        await measureStreet('turn', turn);
+
+        // The turn: Xena all in, the host calls; the river runs out and the showdown pays three pots,
+        // looked at on six screens at once while it plays.
+        await resize(X.page, {width: 844, height: 390}, 900);
+        const screens = [['seated-844x390', X], ['seated-375x667', Y], ['seated-320x568', Z], ['watcher-390x844', W], ['watcher-320x568', W2], ['host-1440x900', H]];
+        const seen = new Map(screens.map(([name]) => [name, {looks: 0, pots: 0, together: 0, pops: 0, hits: [], popHits: [], bad: [], apart: [], want: new Set(), shot: false}]));
+        let sampling = true;
+        const sampler = (async () => {
+            while (sampling) {
+                await Promise.all(screens.map(async ([name, p]) => {
+                    const m = await p.page.evaluate(SIDEPOT_PROBE).catch(() => null);
+                    const s = seen.get(name);
+                    if (!m) return;
+                    s.looks++;
+                    s.pops += m.pops;
+                    s.popHits.push(...m.popHits);
+                    if (m.pills.length === 0) return;
+                    s.pots++;
+                    s.want.add(potsIn(m));
+                    s.hits.push(...m.hits);
+                    s.apart.push(...m.apart);
+                    s.bad.push(...pillsBad(m));
+                    if (!m.banner) return;
+                    s.together++;
+                    if (s.shot) return;
+                    s.shot = true;
+                    await hideDevIndicator(p.page);
+                    await p.page.screenshot({path: `${OUT}sidepot-payout-${name}.png`}).catch(() => {});
+                }));
+                await sleep(100);
+            }
+        })();
+        try {
+            d = await playUntil((x) => x.state.hand.phase === 'complete',
+                (p, legal) => (legal.call > 0 ? {kind: 'call'} : p === X ? {kind: 'all-in'} : {kind: 'check'}));
+            // The payout plays for a few seconds after the hand completes: until every screen's pots are gone.
+            await Promise.all(screens.map(([, p]) => p.page.waitForFunction(() => document.querySelector('.pn-banner') !== null && document.querySelector('[data-pn-pot]') === null,
+                null, {timeout: 20000}).catch(() => {})));
+        } finally {
+            sampling = false;
+            await sampler;
+        }
+        const paid = d.state.hand.result?.pots.map((p) => p.amount) ?? [];
+        check('side pots: Xena all in on the turn and called, the board runs out and the showdown pays three pots (600, 1,350, 3,700)',
+            paid.join() === '600,1350,3700', JSON.stringify(paid));
+        for (const [name] of screens) {
+            const s = seen.get(name);
+            check(`side pots through the run-out and the payout (${name}): no pot's pill over any card, plate, flag, bet line, the dealer button, a winner's "+N", the banner or the line under it, in ${s.pots} looks with the pots on screen (${s.together} beside the banner); 11 px or more, unclipped, every pot in one pill; the banner and its line off the "+N" (${s.pops} looks at one)`,
+                s.pots > 0 && s.hits.length === 0 && s.apart.length === 0 && s.bad.length === 0 && s.popHits.length === 0 && [...s.want].every((w) => w === '0,1,2'),
+                JSON.stringify({looks: s.looks, pots: s.pots, together: s.together, pops: s.pops, hits: [...new Set(s.hits)].slice(0, 4), popHits: [...new Set(s.popHits)].slice(0, 2),
+                    apart: s.apart.slice(0, 2), bad: [...new Set(s.bad)].slice(0, 2), want: [...s.want]}));
+        }
+        const together = [...seen.entries()].filter(([, s]) => s.together > 0).map(([name]) => name);
+        check('…the winner\'s banner seen beside the pots it pays out, clear of them, on the screens the payout played on', together.length > 0, together.join(', '));
+        if (together.length < screens.length) note('the banner beside the pots', `not seen together on ${screens.length - together.length} screen(s) (the payout came in a stale poll there)`);
+        await resize(X.page, {width: 390, height: 844}, 300);
     }
 
     await hostOp(H, {op: 'end'}).catch(() => null);

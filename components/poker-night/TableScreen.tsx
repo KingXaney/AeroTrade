@@ -9,13 +9,16 @@
 // The seat layer is measured, and lib/poker-night/stage places everything in it in pixels — the
 // geometry the animations fly along. The animations are the room's events on
 // lib/poker-night/choreography's timeline (components/poker-night/anim), handed down to the pieces
-// that draw them. While a result shows, the winner's banner and the line under the board (the next
+// that draw them. The pots' pills go where lib/poker-night/stage.potPlan finds room for them, clear of
+// every card, plate, bet line out, a winner's "+N" and the dealer button, and their chips fly to and
+// from there. While a result shows, the winner's banner and the line under the board (the next
 // deal's countdown, the pause) go where lib/poker-night/stage.bannerPlan finds room for them, clear of
-// every plate, turned-up hand, the dealer button and the board — under the banner when they fit
-// together, else apart. The room's root carries the looks' ids for LOOKS_CSS (the host's scene and felt,
-// the viewer's card back and suit colours) and the hooks a test reads: data-pn-mode (polling,
-// realtime, reconnecting), data-pn-transport (realtime, poll, both), data-pn-seq (the seq of the
-// view drawn, which only ever moves up), data-pn-ready once the stage is measured.
+// every plate, turned-up hand, the dealer button, the board, the pots paying out and the winners'
+// "+N" — under the banner when they fit together, else apart. The room's root carries the looks' ids
+// for LOOKS_CSS (the host's scene and felt, the viewer's card back and suit colours) and the hooks a
+// test reads: data-pn-mode (polling, realtime, reconnecting), data-pn-transport (realtime, poll,
+// both), data-pn-seq (the seq of the view drawn, which only ever moves up), data-pn-ready once the
+// stage is measured.
 
 import {useCallback, useEffect, useMemo, useRef, useState, useSyncExternalStore, type CSSProperties} from "react";
 import {AnimContext, createAnimStore, EMPTY_ANIMS} from "@/components/poker-night/anim";
@@ -37,9 +40,20 @@ import {secondsUntil} from "@/lib/poker-night/client-clock";
 import type {Box} from "@/lib/poker-night/layout";
 import {cardBackFor, cardFaceFor, chipSetFor, resolveTableLook} from "@/lib/poker-night/looks";
 import {bannerLines, bannerShows, playerAt, resultLook, viewerSeatIn} from "@/lib/poker-night/reveal";
-import {bannerPlan, stageLayout, type Stage} from "@/lib/poker-night/stage";
+import {bannerPlan, potPlan, stageLayout, type PotAmount, type PotNow, type PotSeen, type Stage, type WinPop} from "@/lib/poker-night/stage";
 import {cn} from "@/lib/utils";
-import type {RoomView} from "@/lib/poker-night/view-types";
+import type {HandView, RoomView} from "@/lib/poker-night/view-types";
+
+// The pots on the felt: as they stand while the hand is played, as its result paid them after.
+const potsOf = (hand: HandView | null): PotAmount[] =>
+    (!hand ? [] : hand.phase === 'complete' ? hand.result?.pots ?? [] : hand.pots).map((p, pot) => ({pot, amount: p.amount}));
+
+// The winners' "+N" from their key ("seat:amount", a comma apart).
+const popsOf = (key: string): WinPop[] =>
+    key ? key.split(',').map((pair) => {
+        const [seat, amount] = pair.split(':').map(Number);
+        return {seat, amount};
+    }) : [];
 
 // A seat that can be dealt into the next hand.
 const ready = (table: RoomView): number =>
@@ -137,6 +151,30 @@ const TableScreen = () => {
         return bannerLines(look, nameOf, viewerSeatIn(table, mySeat, myPid));
     }, [look, table, mySeat, myPid]);
     const line = note && hand ? note : nextAt !== null ? TABLE_COPY.nextHandIn(NEXT_HAND_WIDEST) : null;
+    // The winners' "+N" while the result pays out, which the pots and the banner keep clear of.
+    const popsKey = hand?.phase === 'complete' && look ? look.winners.map((w) => `${w.seat}:${w.amount}`).join(',') : '';
+    // The pots' pills, clear of what shows now — the hands turned up, the bet lines out as drawn, the
+    // winners' "+N" — and, where that is near enough, of what may yet show: every seated player's hand
+    // but the viewer's turned up, every bet line; the dealer button always. Keyed on what they depend on,
+    // so a poll that changes nothing of it places nothing again.
+    const button = hand?.button ?? null;
+    const seatedKey = table.seats.map((v) => (v ? 1 : 0)).join('');
+    const shownKey = table.seats.map((v, seat) => (v && seat !== mySeat && Array.isArray(v.cards) ? 1 : 0)).join('');
+    const betsKey = table.seats.map((v) => (v && v.bet > 0 ? `${v.bet}${v.state === 'all-in' ? '!' : ''}` : '')).join(',');
+    const potKey = potsOf(hand).map((p) => p.amount).join(',');
+    const pots = useMemo(() => {
+        if (!stage || !potKey) return null;
+        const open: number[] = [];
+        const seated: number[] = [];
+        [...seatedKey].forEach((c, seat) => (c === '1' ? seated : open).push(seat));
+        const now: PotNow = {
+            shown: [...shownKey].flatMap((c, seat) => (c === '1' ? [seat] : [])),
+            bets: betsKey.split(',').flatMap((b, seat) => (b ? [{seat, amount: parseInt(b, 10), allIn: b.endsWith('!')}] : [])),
+            pops: popsOf(popsKey),
+        };
+        const seen: PotSeen = {open, shown: seated.filter((seat) => seat !== mySeat), button, bets: seated, now};
+        return potPlan(stage, potKey.split(',').map((amount, pot) => ({pot, amount: Number(amount)})), seen);
+    }, [stage, potKey, seatedKey, shownKey, betsKey, popsKey, mySeat, button]);
     const plan = useMemo(() => {
         if (!stage || !bannerShows(hand, look)) return null;
         const open: number[] = [];
@@ -145,8 +183,10 @@ const TableScreen = () => {
             if (!v) open.push(seat);
             else if (seat !== mySeat && Array.isArray(v.cards)) shown.push(seat);
         });
-        return bannerPlan(stage, {winners: lines, note: line}, {open, shown, button: hand?.button ?? null});
-    }, [stage, hand, look, lines, line, table.seats, mySeat]);
+        // Clear of the result's pots too, which stay on while their chips stream out, and of the
+        // winners' "+N".
+        return bannerPlan(stage, {winners: lines, note: line}, {open, shown, button: hand?.button ?? null, pots: pots?.pills ?? [], pops: popsOf(popsKey)});
+    }, [stage, hand, look, lines, line, table.seats, mySeat, pots, popsKey]);
     const tableVars = stage ? ({'--pn-plate-w': `${stage.plateSize.w}px`, '--pn-plate-h': `${stage.plateSize.h}px`, '--pn-button': `${stage.buttonSize}px`} as CSSProperties) : undefined;
 
     return (
@@ -175,14 +215,14 @@ const TableScreen = () => {
                             <>
                                 <TableFelt stage={stage} name={name} showName={!hand}/>
                                 <Board stage={stage} anims={anims} look={look}/>
-                                <PotDisplay stage={stage} anims={anims}/>
+                                <PotDisplay plan={pots} anims={anims}/>
                                 {note && !hand && (
                                     <p className="pn-centre-note pn-on-felt" style={{left: stage.board.x, top: stage.board.y, maxWidth: Math.max(stage.board.w, 180)}} role="status" data-pn-note="">
                                         {note}
                                     </p>
                                 )}
                                 <SeatRing stage={stage} anims={anims} look={look}/>
-                                <ChipFlight stage={stage} anims={anims} handNo={hand?.no ?? null}/>
+                                <ChipFlight stage={stage} pots={pots} anims={anims} handNo={hand?.no ?? null}/>
                                 {plan && hand && <WinnerReveal anims={anims} handNo={hand.no} lines={lines} plan={plan}/>}
                                 {plan?.note && (
                                     <div className="pn-banner-wrap" style={{left: plan.note.x - plan.note.width / 2, top: plan.note.top, width: plan.note.width}} data-pn-banner-place="note">

@@ -167,8 +167,11 @@ const DockHand = ({dock, deadline, waitingFor, anims, look}: {
             <div className="flex min-w-0 flex-col items-start gap-1">
                 {room.mode === 'reconnecting' && <Reconnecting/>}
                 {deadline !== null && <TurnClock deadline={deadline} turnMs={room.config.turnSeconds * 1000}/>}
+                {/* A long name is cut short with an ellipsis: on the inner span, since a flex box draws none. */}
                 {waitingFor !== null && (
-                    <span className={`${NOTE} max-w-full truncate`} data-user-text="" data-pn-waiting="">{TABLE_COPY.waitingFor(waitingFor)}</span>
+                    <span className={`${NOTE} max-w-full`} data-user-text="" data-pn-waiting="">
+                        <span className="min-w-0 truncate">{TABLE_COPY.waitingFor(waitingFor)}</span>
+                    </span>
                 )}
                 {/* What the seat does when the hand ends, which the plate does not say while it reads Folded. */}
                 {dock.leaving && <span className={LONG_NOTE} role="status" data-pn-leaving="">{TABLE_COPY.leavingAfterHand}</span>}

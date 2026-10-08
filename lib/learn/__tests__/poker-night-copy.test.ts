@@ -939,13 +939,25 @@ describe("the table's overlays", () => {
 describe('the felt', () => {
     it('says every line over the inputs it meets', () => {
         covers(FELT_COPY, {
-            morePots: () => [1, 2, 7].flatMap((pots) => [0, 1, 2340, 1_250_000].map((chips) => FELT_COPY.morePots(pots, chips))),
+            mainPot: () => each(FELT_COPY.mainPot),
+            sidePot: () => pairs((i, n) => FELT_COPY.sidePot(i + 1, n)),
+            morePots: () => [2, 3, 7].flatMap((pots) => [0, 1, 2340, 1_250_000].map((chips) => FELT_COPY.morePots(pots, chips))),
+            allPots: () => [2, 3, 8].flatMap((pots) => [0, 1, 2340, 1_250_000].map((chips) => FELT_COPY.allPots(pots, chips))),
         });
     });
 
-    it('reads as the pot prints it', () => {
-        expect(FELT_COPY.morePots(3, 2340)).toBe('3 more side pots: 2,340');
-        expect(FELT_COPY.morePots(1, 520)).toBe('1 more side pot: 520');
+    it('reads as the pot prints it, the short words shorter than the full', () => {
+        expect(FELT_COPY.mainPot(600)).toBe('Main 600');
+        expect(FELT_COPY.sidePot(1, 1350)).toBe('Side 1: 1,350');
+        expect(FELT_COPY.morePots(3, 2340)).toBe('3 more: 2,340');
+        expect(FELT_COPY.allPots(4, 6250)).toBe('4 pots: 6,250');
+        // From 100,000 on, as a plate prints a stack.
+        expect(FELT_COPY.sidePot(3, 1_250_000)).toBe('Side 3: 1.25M');
+        expect(FELT_COPY.mainPot(125_400)).toBe('Main 125.4k');
+        for (const n of NS) {
+            expect(FELT_COPY.mainPot(n).length).toBeLessThan(TABLE_COPY.mainPot(n).length);
+            expect(FELT_COPY.sidePot(2, n).length).toBeLessThan(TABLE_COPY.sidePot(2, n).length);
+        }
     });
 });
 

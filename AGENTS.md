@@ -704,7 +704,29 @@ and friends keep none beyond Shared and the invariants).
   top-anchored in a wrap exactly the width found, never wider, from `reveal.bannerLines`' words and
   `stage.BANNER`'s sizes, which `stage.test` holds to the stylesheet and clears at 390, 375 and
   320 px phones and a 1440 px desktop for every seat count and button; `qa-poker-night` measures it
-  there in a showdown with the side seats' hands up.
+  there in a showdown with the side seats' hands up. While the pots pay out under it, it also keeps
+  clear of their pills and of the winners' "+N" as it rises (`stage.winPopRect`); it comes in where it
+  lands, growing from its middle (`.pn-banner-drop`), so on its way in it covers nothing its place
+  does not.
+- The pots go where `lib/poker-night/stage.potPlan` finds room on the felt inside its rail
+  (`stage.feltSpan`), never over a card (the board's and its lift, a seat's face-down pair, a turned-up
+  hand), a plate, its flag or blind's mark, an open seat, the dealer button, a bet line out at the size
+  ChipStack draws it (`stage.betLineSize`, an all-in's pulse included) or a winner's "+N": every pot
+  its own pill in full ("Main pot 600", "Side pot 1: 1,350") in a row, then short (`FELT_COPY`: "Main
+  600", "Side 1: 1,350", counts as a plate prints them), then in rows, then the last side pots
+  gathered ("2 more: 5,050"), every pot in one pill last ("4 pots: 6,250") — the nearest to the board
+  over it, under it or beside it, the fuller words weighing in their favour. It keeps clear of what
+  shows now (`PotSeen.now`, which TableScreen reads off the view) and, where that is near enough, of
+  what may yet show — every seated hand but the viewer's turned up, every bet line — so the pills hold
+  their place and move only when something lands where they are. With no room for that on the felt
+  it lets a "+N" rise over a pill, then leaves the felt, and only where nine seats crowd the smallest
+  phone on its side does it cover anything: the least, a flag or a bet line before a card, a plate or
+  the board (the plan's `keeps`, `clear` and `felt`, the page's `data-pn-pot-*`). Each pill is drawn
+  at the plan's size (`.pn-pot-pill`, `stage.POT_PILL`, held by `stage.test` for one pot to four at
+  every seat count on the phones upright and on their side and the desktop); the sweep lands in their
+  middle and each pot's chips stream from its own pill (`stage.potCentre`). `qa-poker-night-modes`
+  builds three pots and measures every pill against every card, plate, bet line, "+N", the dealer
+  button and the banner.
 - The table's single-key shortcuts (`lib/poker-night/keys`) act only with the focus on the table,
   and only while the player keeps them on (My look, `PersonalLook.shortcuts` in this browser); Enter
   on a focused button is that button's. A host removes a player only by a press held for two seconds

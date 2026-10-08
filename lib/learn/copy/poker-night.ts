@@ -17,6 +17,7 @@ import {rankOf, suitOf, type Card} from "@/lib/poker/cards";
 import type {AvatarPart, AvatarSpec, BadgeId, ColourId, FaceId, FrameId} from "@/lib/poker-night/avatar";
 import type {CardBackId, CardFaceId, ChipSetId} from "@/lib/poker-night/looks";
 import type {FeltId, SceneId} from "@/lib/poker-night/types";
+import {compactChips} from "@/lib/poker-night/chips";
 import {CODE_LENGTH} from "@/lib/poker-night/code";
 import {KEEP, TABLE_LIMITS} from "@/lib/poker-night/config";
 import type {HandDescription} from "@/lib/poker-night/hand-name";
@@ -1003,10 +1004,16 @@ export const OVERLAY_COPY = {
 
 // ==== P3: the felt (components/poker-night PotDisplay) ===========================================
 
-// What the felt says beyond TABLE_COPY: the side pots past the few the pot's place has room for,
-// in one pill ("3 more side pots: 2,340").
+// What the felt says beyond TABLE_COPY, where the pots' full words have no room
+// (lib/poker-night/stage.potPlan): the main pot and each side pot in short ("Main 600", "Side 1:
+// 1,350"), the side pots past the few that fit gathered in one pill ("2 more: 5,050"), and, with room
+// for one pill only, every pot in it ("4 pots: 6,250") — each count as a seat's plate prints it
+// (lib/poker-night/chips.compactChips: "125k", "1.25M" from 100,000 on).
 export const FELT_COPY = {
-    morePots: (pots: number, chips: number): string => `${plural(pots, 'more side pot', 'more side pots')}: ${count(chips)}`,
+    mainPot: (n: number): string => `Main ${compactChips(n)}`,
+    sidePot: (i: number, n: number): string => `Side ${count(i)}: ${compactChips(n)}`,
+    morePots: (pots: number, chips: number): string => `${count(pots)} more: ${compactChips(chips)}`,
+    allPots: (pots: number, chips: number): string => `${plural(pots, 'pot', 'pots')}: ${compactChips(chips)}`,
 } as const;
 
 // ==== P5: the looks (lib/poker-night/looks, personal; components/poker-night LookPicker, ==========
