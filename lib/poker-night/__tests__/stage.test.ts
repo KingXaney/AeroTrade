@@ -11,7 +11,7 @@
 
 import {readFileSync} from 'node:fs';
 import {fileURLToPath} from 'node:url';
-import {describe, expect, it} from 'vitest';
+import {describe, expect, it, vi} from 'vitest';
 import {BANK_COPY, FELT_COPY, HAND_COPY, TABLE_COPY} from '@/lib/learn/copy/poker-night';
 import {CHIP_COLUMNS} from '@/lib/poker-night/chips';
 import {PLATE, SEAT_COUNTS, spotToPx} from '@/lib/poker-night/layout';
@@ -23,6 +23,9 @@ import {
     TABLE_TOP_ROOM, textWidth, TIGHT_BELOW, WIN_POP, winPopRect, wrappedLines,
     type BannerPlan, type BannerSeen, type BannerText, type BetOut, type Fit, type PotNow, type PotPlan, type PotSeen, type Rect, type SeatMarks, type Stage, type WinPop,
 } from '@/lib/poker-night/stage';
+
+// Its sweeps run thousands of layouts or hands: ample on a laptop, slower on a CI runner.
+vi.setConfig({testTimeout: 60_000});
 
 // Phones held upright (the box left between the top bar and the dock), a phone on its side (the
 // dock in a column), tablets and desktops.

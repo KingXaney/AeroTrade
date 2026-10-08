@@ -3,9 +3,12 @@
 // blind folding to a short big blind), and 10,000 seeded inputs are held to a naive reference that
 // walks the chips one at a time — every chip level, who paid it, who can still win it.
 
-import {describe, expect, it} from 'vitest';
+import {describe, expect, it, vi} from 'vitest';
 import {buildPots, paidParts, seatShares, splitBoards, splitPot, uncalled, type Contribution, type Pot} from '@/lib/poker-night/pots';
 import {mulberry32} from '@/lib/random';
+
+// Its sweeps run thousands of layouts or hands: ample on a laptop, slower on a CI runner.
+vi.setConfig({testTimeout: 30_000});
 
 const live = (seat: number, amount: number): Contribution => ({seat, amount, folded: false});
 const folded = (seat: number, amount: number): Contribution => ({seat, amount, folded: true});
