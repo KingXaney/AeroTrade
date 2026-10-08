@@ -134,23 +134,13 @@ export const presenceOf = (seen: Seen | null | undefined, now: number): Presence
 // When a row was last heard from: its beat, or its join if it has not beaten since.
 const lastSeen = (core: Pick<RoomCore, 'seen'>, p: RoomPlayer): number => Math.max(seenOf(core, p.pid)?.at ?? 0, p.joinedAt);
 
-// The moment from which the host counts as away (unheard from for LIMITS.hostTakeoverMs): from then a
-// buy no longer waits for their yes (the engine's hostAway), and a seated account holder may claim the
-// role. Null with no host row.
-export const hostAwayAt = (core: Pick<RoomCore, 'seen' | 'players' | 'state'>): number | null => {
+// Whether the host has gone unheard from for LIMITS.hostTakeoverMs by `at`: from then a seated account
+// holder may claim the role. Nothing else changes with it — every buy but the host's still waits for
+// the host's yes once the first hand is dealt, and claim-host is the way on.
+const hostGone = (core: Pick<RoomCore, 'seen' | 'players' | 'state'>, at: number): boolean => {
     const host = rowOf(core, core.state.hostPid);
-    return host ? lastSeen(core, host) + LIMITS.hostTakeoverMs : null;
+    return host !== null && at - lastSeen(core, host) > LIMITS.hostTakeoverMs;
 };
-
-const hostAwayBy = (core: Pick<RoomCore, 'seen' | 'players' | 'state'>, at: number): boolean => {
-    const from = hostAwayAt(core);
-    return from !== null && at > from;
-};
-
-// A sit or a buy carries whether the host is away at its moment, which only the room knows (a request
-// never sets it: input.toTableAction builds neither with it); every other action goes as it is.
-const withHostAway = (core: RoomCore, action: TableAction): TableAction =>
-    (action.type === 'sit' || action.type === 'buy') && hostAwayBy(core, action.at) ? {...action, hostAway: true} : action;
 
 const isWatcher = (core: Pick<RoomCore, 'state'>, p: RoomPlayer): boolean => !p.banned && seatOf(core.state, p.pid) === null;
 
@@ -275,7 +265,7 @@ const banPid = (core: RoomCore, pid: string): Pick<RoomCore, 'players' | 'banned
 };
 
 const applyTable = (core: RoomCore, action: TableAction): StepResult => {
-    const r = reduce(core.state, withHostAway(core, action));
+    const r = reduce(core.state, action);
     if (!r.ok) return fail(refusalToCode(r.reason));
     const ban = r.kicked ? banPid(core, r.kicked) : null;
     if (r.state === core.state && !ban) return done(core, core);
@@ -329,7 +319,7 @@ const sitDown = (core: RoomCore, pid: string, input: JoinInput, at: number, watc
         if (watchersBefore !== null && watchersBefore >= LIMITS.watchers) return {ok: false, code: 'watchers_full'};
         return {ok: true, core, hands: [], ledgerDirty: false, outcome: 'full'};
     }
-    const r = reduce(core.state, withHostAway(core, {type: 'sit', by: pid, seat: choice.seat, buyIn: input.buyIn ?? core.state.config.buyInMax, at}));
+    const r = reduce(core.state, {type: 'sit', by: pid, seat: choice.seat, buyIn: input.buyIn ?? core.state.config.buyInMax, at});
     if (!r.ok) return {ok: false, code: refusalToCode(r.reason)};
     return {ok: true, core: {...core, state: r.state}, hands: r.hands, ledgerDirty: r.ledgerDirty, outcome: choice.moved ? 'moved' : 'seated'};
 };
@@ -426,15 +416,14 @@ export const handOverStep = (by: string, pid: string): Step => open((core) => {
 });
 
 // A seated account holder takes over as host once the host has gone unseen for
-// LIMITS.hostTakeoverMs. (A guest cannot hold the role; from the same moment, at any table, chips
-// stop waiting for the host instead: withHostAway.)
+// LIMITS.hostTakeoverMs (a guest cannot hold the role). Requests for chips wait for whoever holds it.
 export const claimHostStep = (by: string): Step => open((core, at) => {
     const row = rowOf(core, by);
     if (!row || row.banned) return fail('not_player');
     if (by === core.state.hostPid) return done(core, core);
     if (row.userId === null) return fail('needs_account');
     if (seatOf(core.state, by) === null) return fail('not_seated');
-    if (rowOf(core, core.state.hostPid) && !hostAwayBy(core, at)) return fail('not_now');
+    if (rowOf(core, core.state.hostPid) && !hostGone(core, at)) return fail('not_now');
     return makeHost(core, row);
 });
 
@@ -559,22 +548,19 @@ export const roomView = (core: RoomCore, seq: number, now: number, meta: RoomVie
 };
 
 // Player `pid`'s own view: the room view plus their seat, cards and pre-action, the config, the
-// emotes and their own nudge count (their row's) — and, for a seated player whose chips wait for
-// the host, the moment the host counts as away (MeView.hostAwayAt).
+// emotes and their own nudge count (their row's).
 export const playerViewFor = (core: RoomCore, pid: string, seq: number, now: number, extras: PlayerExtras): PlayerView => {
-    const waitsForHost = seatOf(core.state, pid) !== null && needsHost(core.state, pid);
     const view = playerView(core.state, pid, {
         ...viewMeta(core, seq, now, extras), ...peopleOf(core),
         hasAccount: (rowOf(core, pid)?.userId ?? null) !== null, emotes: extras.emotes, emoteSeq: extras.emoteSeq, pass: extras.pass,
         nudge: rowOf(core, pid)?.nudge ?? 0,
-        hostAwayAt: waitsForHost ? hostAwayAt(core) : null,
     });
     return extras.duplicate ? {...view, duplicate: true} : view;
 };
 
 // What the join card needs for a viewer with no row (or a removed one): with it, the game the next
 // hand deals and whether the chips wait for the host (the first hand has been dealt: needsHost for
-// anyone but the host, who always has a row — unless the host has been away long enough).
+// anyone but the host, who always has a row).
 export const joinViewFor = (core: RoomCore, identity: PlayerIdentity, now: number): JoinView => ({
     banned: isKnown(identity) && isBanned(core, identity),
     locked: core.state.settings.locked,
@@ -586,7 +572,7 @@ export const joinViewFor = (core: RoomCore, identity: PlayerIdentity, now: numbe
     hasAccount: identity.kind === 'user',
     variant: core.state.config.variant,
     boards: core.state.config.boards,
-    needsApproval: needsHost(core.state, '') && !hostAwayBy(core, now),
+    needsApproval: needsHost(core.state, ''),
 });
 
 // The /play page's first render: a joined viewer's own view, else the public table behind the join

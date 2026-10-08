@@ -11,7 +11,8 @@
 // container query, so the lobby's column and a drawer size them by their own width), and the name
 // moves beside them only where both fit. With `focus` (at the table) the rankings come first — what a
 // player opens Hands mid-game to check — then ties and kickers, then the table's own game under "At
-// this table", before any other. PLO's section quotes the pot limit's entry too, and draws one hand
+// this table", before any other; with `lead` too (the join card's "How it plays") the table's game
+// comes before the rankings, in the guide's first screen. PLO's section quotes the pot limit's entry too, and draws one hand
 // on one board with the five cards that play lifted: one heart in hand on four hearts makes no flush.
 // The cards are drawn in the viewer's card face and colours, from
 // LOOKS_CSS through the sample's own data attributes — the drawer is portaled out of the room that
@@ -36,6 +37,8 @@ type Level = 'h2' | 'h3';
 type Props = {
     // The game the table deals, put first under "At this table"; none in the lobby.
     focus?: GuideGame | null;
+    // That game before the rankings, not after them: the join card's "How it plays".
+    lead?: boolean;
     face?: CardFaceId;
     four?: boolean; // the four-colour deck
     // The sections' heading level: h2 on the lobby's page, h3 in the table's drawer.
@@ -143,20 +146,22 @@ const Game = ({game, heading, here, look}: {game: GuideGameEntry; heading: (id: 
     );
 };
 
-const HandsGuide = ({focus = null, face = DEFAULT_PERSONAL_LOOK.cardFace, four = DEFAULT_PERSONAL_LOOK.fourColour, level = 'h2', className}: Props) => {
+const HandsGuide = ({focus = null, lead = false, face = DEFAULT_PERSONAL_LOOK.cardFace, four = DEFAULT_PERSONAL_LOOK.fourColour, level = 'h2', className}: Props) => {
     const look: Look = {face, four};
     const {here, others} = guideGames(focus);
+    // At the table: the game it deals, after the rankings (before them with `lead`) and before any
+    // other game, its name at the sections' own level.
+    const atTable = here && (
+        <div className="mb-6 break-inside-avoid" data-guide-section="here" data-guide-lead={lead ? '' : undefined}>
+            <Game game={here} here look={look} heading={(id, children) => <SectionHeading as={level} id={id} spacing="none">{children}</SectionHeading>}/>
+        </div>
+    );
     return (
         <div className={cn('text-fg', className)} data-hands-guide="">
+            {lead && atTable}
             <Rankings level={level} look={look}/>
             <Ties level={level} look={look}/>
-            {/* At the table: the game it deals, after the rankings and before any other game, its name
-                at the sections' own level. */}
-            {here && (
-                <div className="mb-6 break-inside-avoid" data-guide-section="here">
-                    <Game game={here} here look={look} heading={(id, children) => <SectionHeading as={level} id={id} spacing="none">{children}</SectionHeading>}/>
-                </div>
-            )}
+            {!lead && atTable}
             {others.length > 0 && (
                 <section aria-labelledby="hands-games" className="mb-6 break-inside-avoid space-y-4" data-guide-section="games">
                     <SectionHeading as={level} id="hands-games" spacing="none">{HANDS_COPY.gamesHeading}</SectionHeading>

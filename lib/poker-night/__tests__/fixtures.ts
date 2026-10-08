@@ -11,7 +11,7 @@ import {FULL_DECK, shuffleWith} from '@/lib/poker-night/deck';
 import {createTable, reduce} from '@/lib/poker-night/engine';
 import {conservation} from '@/lib/poker-night/ledger';
 import {eligibleSeats, isLive, positions} from '@/lib/poker-night/seats';
-import type {GameConfig, Move, PreAction, Reduced, Seat, TableAction, TableState, Variant} from '@/lib/poker-night/types';
+import type {GameConfig, HostOp, Move, PreAction, Reduced, Seat, TableAction, TableState, Variant} from '@/lib/poker-night/types';
 import {mulberry32} from '@/lib/random';
 
 export const T0 = 1_790_000_000_000;
@@ -129,6 +129,10 @@ export const runOut = (state: TableState): TableState => {
 
 export const host = (state: TableState, op: Extract<TableAction, {type: 'host'}>['op'], at = nowOf(state)): Reduced =>
     reduce(state, {type: 'host', by: state.hostPid, op, at});
+
+// The host's yes to `pid`'s request as it waits now: approve names the amount it says yes to.
+export const approveOf = (state: TableState, pid: string): Extract<HostOp, {op: 'approve'}> =>
+    ({op: 'approve', pid, amount: state.requests.find((r) => r.pid === pid)?.amount ?? 1});
 
 export const deepFreeze = <T>(value: T): T => {
     if (value && typeof value === 'object' && !Object.isFrozen(value)) {
@@ -263,8 +267,15 @@ export function* randomNight(seed: number, steps: number, variant: Variant = 'ho
             case 'buy':
                 action = {type: 'buy', by: someone, amount: 1 + Math.floor(random() * s.config.buyInMax), at: now};
                 break;
-            case 'approve': case 'deny':
-                action = {type: 'host', by: 'p0', op: {op: event, pid: s.requests.length > 0 ? pick(s.requests).pid : anyone}, at: now};
+            case 'approve': {
+                // Now and then an amount the request no longer says (stale).
+                const q = s.requests.length > 0 ? pick(s.requests) : null;
+                const amount = q && random() < 0.97 ? q.amount : (q?.amount ?? 0) + 1;
+                action = {type: 'host', by: 'p0', op: {op: 'approve', pid: q?.pid ?? anyone, amount}, at: now};
+                break;
+            }
+            case 'deny':
+                action = {type: 'host', by: 'p0', op: {op: 'deny', pid: s.requests.length > 0 ? pick(s.requests).pid : anyone}, at: now};
                 break;
             case 'pause': case 'resume':
                 action = {type: 'host', by: random() < 0.9 ? 'p0' : anyone, op: {op: event}, at: now};

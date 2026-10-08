@@ -612,6 +612,13 @@ details[open] > :not(summary) { animation: disclosure-in var(--motion-base) var(
   :is([data-pn-fit="compact"], [data-pn-fit="tight"]) .pn-plate-avatar { grid-area: avatar; }
   :is([data-pn-fit="compact"], [data-pn-fit="tight"]) .pn-plate-stack { grid-area: stack; min-width: 0; text-align: center; white-space: nowrap; }
   :is([data-pn-fit="compact"], [data-pn-fit="tight"]) .pn-plate-name { grid-area: name; min-width: 0; text-align: center; }
+  /* A status with no room under its plate (a crowded column on a phone on its side, stage.flagsOnPlate)
+     takes the stack's place: on a compact or tight plate the name moves up beside the avatar and the
+     word has the plate's whole width under them (the stack is in the plate's accessible name). */
+  .pn-plate-status { min-width: 0; overflow: hidden; color: var(--fg-soft); font-size: 10px; font-weight: 700; line-height: 1.2; text-overflow: ellipsis; white-space: nowrap; }
+  :is([data-pn-fit="compact"], [data-pn-fit="tight"]) .pn-seat[data-status-on="plate"] .pn-plate { grid-template-areas: "avatar name" "stack stack"; }
+  :is([data-pn-fit="compact"], [data-pn-fit="tight"]) .pn-seat[data-status-on="plate"] .pn-plate-name { text-align: left; }
+  :is([data-pn-fit="compact"], [data-pn-fit="tight"]) .pn-plate-status { grid-area: stack; text-align: center; }
   .pn-seat[data-state="folded"] .pn-plate,
   .pn-seat[data-state="sitting-out"] .pn-plate,
   .pn-seat[data-state="away"] .pn-plate,
@@ -1055,6 +1062,27 @@ details[open] > :not(summary) { animation: disclosure-in var(--motion-base) var(
   @media (orientation: landscape) and (max-height: 500px) {
     .pn-ask-wrap { left: auto; width: calc(max(12rem, 32vw) - max(8px, env(safe-area-inset-right)) - 8px); }
     .pn-ask-answers { grid-template-columns: minmax(0, 1fr); }
+  }
+  /* The join card (JoinCard): at the foot of a phone held upright, in the middle of a wider screen, and
+     on a phone on its side from just under the top bar to the foot of the screen — never over the
+     bar — as tall as that leaves it, its form scrolling inside and its buttons at its foot. */
+  .pn-join-wrap {
+    position: fixed;
+    left: 12px;
+    right: 12px;
+    bottom: calc(env(safe-area-inset-bottom) + 0.75rem);
+    z-index: 40;
+    display: flex;
+    justify-content: center;
+    pointer-events: none;
+  }
+  .pn-join-card { max-height: calc(100dvh - 5rem); }
+  @media (min-width: 640px) {
+    .pn-join-wrap { left: 16px; right: 16px; bottom: auto; top: 50%; translate: 0 -50%; }
+  }
+  @media (orientation: landscape) and (max-height: 500px) {
+    .pn-join-wrap { top: calc(var(--pn-top) + 8px); bottom: calc(env(safe-area-inset-bottom) + 8px); translate: none; align-items: flex-start; }
+    .pn-join-card { max-height: 100%; }
   }
   @container pn-dock (max-width: 18rem) {
     .pn-pre-row > [data-pn-pre] { flex-basis: 100%; }

@@ -497,17 +497,17 @@ export type OwnChips = {
     requested: number | null; // waiting for the host
     offer: {min: number; max: number; topUp: number; rebuy: boolean; first: boolean} | null;
     asksHost: boolean; // a buy here waits for the host's yes
-    hostAway: boolean; // it would, but the host has been away long enough: chips land at once
     used: number; // rebuys so far
     maxRebuys: number | null;
 };
 
-// Whether the host counts as away at `now` (MeView.hostAwayAt): a buy then lands without their yes.
-export const hostAwayNow = (me: Pick<MeView, 'hostAwayAt'>, now: number): boolean => me.hostAwayAt !== null && now > me.hostAwayAt;
+// Whether a buy by the viewer waits for the host's yes: once the first hand is dealt, for anyone but
+// the host (ledger.needsHost) — however long the host has been gone (claim-host is the way on).
+export const buyAsksHost = (view: Pick<PlayerView, 'me' | 'handNo'>): boolean => !view.me.isHost && view.handNo > 0;
 
 // The viewer's own chips and what they may add, by the table's rules (bank.buyOptions, the client's
-// copy of the server's own check); null without a seat. Read at `now` for whether the host is away.
-export const ownChips = (view: Pick<PlayerView, 'seats' | 'ledger' | 'requests' | 'config' | 'me' | 'handNo'>, now = 0): OwnChips | null => {
+// copy of the server's own check); null without a seat.
+export const ownChips = (view: Pick<PlayerView, 'seats' | 'ledger' | 'requests' | 'config' | 'me' | 'handNo'>): OwnChips | null => {
     const seat = view.me.seat;
     const s = seat === null ? null : view.seats[seat] ?? null;
     if (seat === null || !s) return null;
@@ -517,10 +517,7 @@ export const ownChips = (view: Pick<PlayerView, 'seats' | 'ledger' | 'requests' 
     return {
         seat, stack: seatChips(s), behind: s.chips, inPot: s.inPot, pendingBuy: s.pendingBuy, requested,
         offer: requested === null ? buyOptions(view.config, s, row, view.me.next === 'leave' || view.me.next === 'leave-after') : null,
-        // Once the first hand is dealt every buy but the host's waits for the host (ledger.needsHost),
-        // unless the host has been away long enough.
-        asksHost: !view.me.isHost && view.handNo > 0 && !hostAwayNow(view.me, now),
-        hostAway: !view.me.isHost && view.handNo > 0 && hostAwayNow(view.me, now),
+        asksHost: buyAsksHost(view),
         used, maxRebuys: view.config.maxRebuys,
     };
 };
@@ -563,11 +560,35 @@ export const requestKind = (view: Pick<TableView, 'seats' | 'ledger'>, pid: stri
     return !seat || seat.chips + seat.pendingBuy + seat.inPot === 0 ? 'rebuy' : 'top-up';
 };
 
-// The requests that came in since `before` (by player and amount): the host hears a short sound and
-// sees a toast with Approve for each, once.
-export const newRequests = (
-    before: readonly {pid: string; amount: number}[], after: readonly {pid: string; amount: number}[],
-): {pid: string; amount: number}[] => after.filter((r) => !before.some((b) => b.pid === r.pid && b.amount === r.amount));
+// The host's alerts as a view of the requests arrives, against the last one seen. Each request new
+// since (its player had none waiting) gets a toast with Approve, and one whose amount changed has its
+// toast said again, in place, with the new amount (`fresh` false) — Approve always names the amount it
+// approves (the engine refuses one changed since: stale). The short sound plays for a new request
+// only, and at most once per player in REQUEST_SOUND_MS (`heard`: when each player's last sounded),
+// so a player who keeps taking a request back and asking again — at most once every
+// REQUESTS.CHANGE_MS, which the server holds — never floods the host with sounds.
+export const REQUEST_SOUND_MS = 20_000;
+
+type RequestFigures = {pid: string; amount: number};
+export type RequestAlerts = {toast: (RequestFigures & {fresh: boolean})[]; sound: boolean; heard: Readonly<Record<string, number>>};
+export const NO_REQUESTS_HEARD: Readonly<Record<string, number>> = Object.freeze({});
+
+export const requestAlerts = (
+    before: readonly RequestFigures[], after: readonly RequestFigures[], heard: Readonly<Record<string, number>>, now: number,
+): RequestAlerts => {
+    const toast: RequestAlerts['toast'] = [];
+    const next: Record<string, number> = Object.fromEntries(Object.entries(heard).filter(([, at]) => now - at < REQUEST_SOUND_MS));
+    let sound = false;
+    for (const r of after) {
+        const was = before.find((b) => b.pid === r.pid);
+        if (was && was.amount === r.amount) continue;
+        toast.push({pid: r.pid, amount: r.amount, fresh: !was});
+        if (was || next[r.pid] !== undefined) continue;
+        sound = true;
+        next[r.pid] = now;
+    }
+    return {toast, sound, heard: next};
+};
 
 // ── asks to see a hand ──
 

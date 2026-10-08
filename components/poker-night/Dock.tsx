@@ -12,8 +12,7 @@
 // ("Rebuy 2,000 chips", or "Ask for 2,000 chips" where the host says yes first; "Other amount" opens
 // the bank) — or, for a seat that never had chips here, "No chips yet." with one tap that asks the
 // host for them ("Ask for 2,000 chips") — or, while chips wait for the host's yes, "Waiting for the
-// host to approve your chips" with Cancel; once the host has been away ten minutes, that the chips no
-// longer wait for them, with "Take 2,000 chips"). Every leave from here is the room's 'leave-after'
+// host to approve your chips" with Cancel). Every leave from here is the room's 'leave-after'
 // (useLeaveAfter): between hands it leaves at once, and should a deal land first the player plays
 // that hand out and leaves as it ends —
 // the race never costs a blind. What the seat does when the hand ends is said beside the cards (the
@@ -64,7 +63,7 @@ import {BANK_COPY, DISCARD_COPY, HAND_COPY, INVITE_COPY, JOIN_COPY, LOOKS_COPY, 
 import {turnLeft} from "@/lib/poker-night/client-clock";
 import {discardMs, HOLE_CARDS} from "@/lib/poker-night/config";
 import {dockView, handStrength, preRowKey, rebuyTap, type DockView} from "@/lib/poker-night/dock";
-import {hostAwayNow, leaveTapAsks, leftState, type LeftState} from "@/lib/poker-night/overlays";
+import {buyAsksHost, leaveTapAsks, leftState, type LeftState} from "@/lib/poker-night/overlays";
 import type {ResultLook} from "@/lib/poker-night/reveal";
 import {modeOf} from "@/lib/poker-night/variants";
 import {cn} from "@/lib/utils";
@@ -130,47 +129,24 @@ const LeaveAfterToggle = ({disabled}: {disabled: boolean}) => {
 
 type Tap = (act: () => void) => (e: {detail: number; timeStamp: number}) => void;
 
-// Chips that wait for the host's yes: said, with Cancel (the bank says it too). Once the host has
-// been away ten minutes (MeView.hostAwayAt, read on the server's clock) the chips no longer wait for
-// them: said, with "Take 2,000 chips", which lands them; should the host be back by then, the
-// request keeps waiting and the table says so.
-const WaitingChips = ({amount, disabled, tap, withdraw}: {amount: number; disabled: boolean; tap: Tap; withdraw: () => void}) => {
-    const room = useRoom();
-    const now = useServerNow(5000);
-    const away = room.me !== null && hostAwayNow(room.me, now);
-    // Landed, the request's going in chips is said once, by TableOverlays.
-    const take = async () => {
-        const r = await room.send({type: 'buy', amount});
-        if (!r.ok) toast.error(r.message);
-        else if (r.view.requests.some((q) => q.pid === r.view.me.pid)) toast.message(TABLE_COPY.hostBack);
-    };
-    return (
-        <>
-            <span className={LONG_NOTE} role="status" data-pn-waiting-approval={amount} data-pn-host-away={away ? '' : undefined}>
-                {away ? TABLE_COPY.hostAwayNote : TABLE_COPY.waitingApproval}
-            </span>
-            {away && (
-                <ActionButton variant="primary" size="md" className="min-h-12" disabled={disabled} onClick={tap(() => void take())} data-pn-control="take-chips">
-                    {BANK_COPY.takeChips(amount)}
-                </ActionButton>
-            )}
-            <ActionButton variant="secondary" size="md" className="min-h-12" disabled={disabled} onClick={tap(withdraw)}
-                          aria-label={TABLE_COPY.cancelRequestLabel} data-pn-control="withdraw">
-                {TABLE_COPY.cancelRequest}
-            </ActionButton>
-        </>
-    );
-};
+// Chips that wait for the host's yes: said, with Cancel (the bank says it too). They wait however long
+// the host is gone: a seated account holder may take the host's place then (claim-host).
+const WaitingChips = ({amount, disabled, tap, withdraw}: {amount: number; disabled: boolean; tap: Tap; withdraw: () => void}) => (
+    <>
+        <span className={LONG_NOTE} role="status" data-pn-waiting-approval={amount}>{TABLE_COPY.waitingApproval}</span>
+        <ActionButton variant="secondary" size="md" className="min-h-12" disabled={disabled} onClick={tap(withdraw)}
+                      aria-label={TABLE_COPY.cancelRequestLabel} data-pn-control="withdraw">
+            {TABLE_COPY.cancelRequest}
+        </ActionButton>
+    </>
+);
 
 // A seat that never had chips here (a newcomer whose request was taken back or declined): "No chips
 // yet." and one tap that says what it does — "Ask for 2,000 chips" sends the request the host
-// approves, or, with the host away ten minutes, "Take 2,000 chips" lands them; never "Out of chips"
-// or a top-up.
+// approves; never "Out of chips" or a top-up.
 const FirstChips = ({amount, disabled, tap}: {amount: number; disabled: boolean; tap: Tap}) => {
     const room = useRoom();
-    const now = useServerNow(5000);
-    const me = room.me;
-    const asks = me !== null && !me.isHost && (room.view?.handNo ?? 0) > 0 && !hostAwayNow(me, now);
+    const asks = room.view !== null && buyAsksHost(room.view);
     const ask = async () => {
         const r = await room.send({type: 'buy', amount});
         if (!r.ok) toast.error(r.message);
@@ -195,9 +171,7 @@ const FirstChips = ({amount, disabled, tap}: {amount: number; disabled: boolean;
 // is said as sent, and the host's answer by TableOverlays.
 const Rebuy = ({buy, disabled, tap}: {buy: NonNullable<DockView['buy']>; disabled: boolean; tap: Tap}) => {
     const room = useRoom();
-    const now = useServerNow(5000);
-    const me = room.me;
-    const offer = rebuyTap(buy, me !== null && !me.isHost && (room.view?.handNo ?? 0) > 0 && !hostAwayNow(me, now));
+    const offer = rebuyTap(buy, room.view !== null && buyAsksHost(room.view));
     if (!offer) return null;
     const go = async () => {
         const r = await room.send({type: 'buy', amount: offer.amount});

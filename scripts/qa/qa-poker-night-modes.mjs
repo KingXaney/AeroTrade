@@ -107,7 +107,7 @@ const {cardLabel} = await lib('lib/poker/cards.ts');
 const {findBanned, stripProhibitions} = await lib('lib/learn/banned.ts');
 const {TABLE_COPY, HOST_COPY, HANDS_COPY, HOME_PANEL_COPY, POKER_NIGHT_COPY, FELT_COPY, JOIN_COPY, BANK_COPY, ASK_COPY, MODE_COPY, ACTION_COPY, INVITE_COPY, DISCARD_COPY, LOG_COPY, HAND_COPY, SHORTCUTS_COPY, LOOKS_COPY} = await lib('lib/learn/copy/poker-night.ts');
 const {evaluateCards} = await lib('lib/poker/evaluator.ts');
-const {ASK_ANSWERS, ASKS, LEDGER_KINDS, ENTRY_KINDS} = await lib('lib/poker-night/config.ts');
+const {ASK_ANSWERS, ASKS, LEDGER_KINDS, ENTRY_KINDS, REQUESTS} = await lib('lib/poker-night/config.ts');
 const {autoDiscard} = await lib('lib/poker-night/variants.ts');
 const {legalFor, snapshotFromState} = await lib('lib/poker-night/betting.ts');
 const {livePots} = await lib('lib/poker-night/views.ts');
@@ -437,6 +437,13 @@ const guideOf = (page, scope) => page.evaluate((sel) => {
 }, scope);
 // Ten rankings (50 cards), the kicker pair (10) and PLO's hand (9).
 const guideOk = (m) => m !== null && m.cards === 69 && m.rankings === 10 && m.outside === 0 && m.sideways <= 0;
+// "How it plays" opens the guide on the table's game: its section first, its heading in sight at once.
+const gameInSight = (page) => page.evaluate(() => {
+    const here = document.querySelector('[data-pn-drawer="hands"] [data-guide-here]');
+    const r = here?.getBoundingClientRect();
+    const guide = document.querySelector('[data-pn-drawer="hands"] [data-hands-guide]');
+    return {inSight: !!r && r.top >= 0 && r.top < innerHeight - 40, first: guide?.firstElementChild?.getAttribute('data-guide-section') ?? null, lead: here?.closest('[data-guide-lead]') !== null};
+});
 
 // The leave dialog as drawn: its kind, where it started, its words and buttons — every button at
 // least 44 px, inside the screen, none over another, full width on a phone.
@@ -487,7 +494,11 @@ const api = async (p, route, body) => {
     }
     return {status: res.status(), body: json};
 };
-const hostOp = (p, op) => api(p, 'action', {actionId: randomUUID(), type: 'host', op});
+// The host's yes names the amount it says yes to (a request changed since is refused, stale): the
+// one waiting in Mongo now, unless the step names one.
+const requestedOf = async (pid) => (await roomDoc()).state.requests.find((q) => q.pid === pid)?.amount ?? 1;
+const hostOp = async (p, op) =>
+    api(p, 'action', {actionId: randomUUID(), type: 'host', op: op.op === 'approve' && op.amount === undefined ? {...op, amount: await requestedOf(op.pid)} : op});
 // The host ends the table: closing at once between hands, else when the hand in play completes — so
 // a table paused mid-hand is let run again, or it would hold one of the host's open tables for good.
 const endTable = async (p) => {
@@ -1297,6 +1308,23 @@ try {
                     }));
                     check(`the Bank with the host's sit-out at ${sizeName(size)}: every target 44 px, none overlapping, nothing sideways; each "${HOST_COPY.sitOut}" on one line`,
                         targetsOk(m) && offers.length > 0 && offers.every((o) => o.h <= 48 && o.w >= 44 && o.text === HOST_COPY.sitOut), `${brief(m)} ${JSON.stringify(offers)}`);
+                    // The bank table's figures: a gap at each one's left (two never read as one); in a
+                    // drawer under 22rem the Rebuys column gives way, each count under its player's name.
+                    const figures = await H.page.evaluate(() => {
+                        const table = document.querySelector('[data-bank] table');
+                        if (!table) return null;
+                        const cells = [...table.querySelectorAll('tr > :not(:first-child)')].filter((el) => getComputedStyle(el).display !== 'none');
+                        const gaps = cells.map((el) => parseFloat(getComputedStyle(el).paddingLeft));
+                        const col = table.querySelector('[data-bank-rebuys-col]');
+                        const panel = document.querySelector('[data-bank]');
+                        const ps = getComputedStyle(panel);
+                        // The container's own width: its content box, as a container query reads it.
+                        const bank = panel.getBoundingClientRect().width - parseFloat(ps.paddingLeft) - parseFloat(ps.paddingRight) - parseFloat(ps.borderLeftWidth) - parseFloat(ps.borderRightWidth);
+                        const lines = [...document.querySelectorAll('[data-bank-rebuys-line]')].filter((el) => getComputedStyle(el).display !== 'none').length;
+                        return {least: Math.min(...gaps), rebuysCol: col ? getComputedStyle(col).display !== 'none' : null, lines, bank: Math.round(bank)};
+                    });
+                    check(`…its figures at ${sizeName(size)} a gap apart (8 px or more); the Rebuys column, where shown, only in a bank 22rem wide or more`,
+                        figures !== null && figures.least >= 8 && (figures.rebuysCol === null || figures.rebuysCol === figures.bank >= 352), JSON.stringify(figures));
                     await shot(H.page, `11-bank-sit-out-${sizeFile(size)}`);
                 }
                 await resize(H.page, DESKTOP.viewport, 400);
@@ -1841,6 +1869,13 @@ try {
             check(`the start form's rebuys at ${sizeName(size)}: "Off" / "On (host approves)", two 44 px radios, On chosen, none overlapping, nothing sideways`,
                 targetsOk(m) && m.count === 2 && radios.map((r) => r.id).join() === 'off,approve' && radios[1].on === 'true'
                 && radios[0].text === HOST_COPY.rebuysValue.off && radios[1].text === HOST_COPY.rebuysValue.approve, `${brief(m)} ${JSON.stringify(radios)}`);
+            // The chosen one's ring drawn inside it, so an option at its panel's edge keeps all four sides.
+            const ring = await Hm.page.$eval('[data-pn-choice="rebuys"] [role="radio"][aria-checked="true"]', (el) => {
+                const cs = getComputedStyle(el);
+                return {offset: parseFloat(cs.outlineOffset), width: parseFloat(cs.outlineWidth), style: cs.outlineStyle};
+            }).catch(() => null);
+            check(`…the chosen option's ring inside it at ${sizeName(size)} (never cut by its panel)`, ring !== null && ring.style !== 'none' && ring.width >= 2 && ring.offset + ring.width <= 0.5,
+                JSON.stringify(ring));
             if (size.width === 390) await shot(Hm.page, '20-rebuys-form-390x844');
         }
         await Hm.page.click('[data-pn-choice="rebuys"] [data-pn-option="off"]');
@@ -1879,7 +1914,26 @@ try {
         await D.page.goto(`${BASE}/play/${code}`, {waitUntil: 'load', timeout: 120000});
         await D.page.waitForSelector('[data-join-card="visitor"]', {timeout: 60000});
         const approvalNote = await D.page.$eval('[data-join-approval]', (el) => el.textContent.trim()).catch(() => null);
-        await shot(D.page, '23-join-approval-844x390');
+        // On a phone on its side the card starts under the top bar and "Sit down" is in sight without
+        // scrolling (the card's buttons sit at its foot, outside its scroll).
+        const joinFits = (page) => page.evaluate(() => {
+            const card = document.querySelector('[data-join-card]')?.getBoundingClientRect();
+            const sit = document.querySelector('[data-join-sit]')?.getBoundingClientRect();
+            const bar = document.querySelector('[data-pn-topbar]')?.getBoundingClientRect();
+            if (!card || !sit || !bar) return null;
+            return {
+                cardTop: Math.round(card.top), barBottom: Math.round(bar.bottom), below: card.top >= bar.bottom - 0.5, inside: card.bottom <= innerHeight + 0.5,
+                sitInView: sit.top >= 0 && sit.bottom <= innerHeight + 0.5 && sit.left >= 0 && sit.right <= innerWidth + 0.5, sitH: Math.round(sit.height),
+            };
+        });
+        for (const size of [{width: 844, height: 390}, {width: 667, height: 375}, {width: 568, height: 320}]) {
+            await resize(D.page, size);
+            const fit = await joinFits(D.page);
+            check(`the join card on a phone on its side (${sizeName(size)}): under the top bar, inside the screen, "Sit down" in sight without scrolling (${fit?.sitH} px)`,
+                fit !== null && fit.below && fit.inside && fit.sitInView && fit.sitH >= 43.5, JSON.stringify(fit));
+            await shot(D.page, `23-join-approval-${sizeFile(size)}`);
+        }
+        await resize(D.page, {width: 844, height: 390});
         await D.page.fill('[data-join-name]', 'Dee');
         await D.page.click('[data-join-sit]');
         D.pid = await (await D.page.waitForSelector('[data-me]', {timeout: 30000})).getAttribute('data-pid');
@@ -1907,6 +1961,15 @@ try {
         check('…Dee\'s dock says so; the host sees a dot on Bank and Host and a toast ("Dee asks for … chips to sit down."); every plate reads "Waiting for chips"',
             waitingSaid?.trim() === TABLE_COPY.waitingApproval && hostDots?.bank === 1 && hostDots.host === 1 && hostToast && plateFlag === TABLE_COPY.awaitingChips,
             JSON.stringify({waitingSaid, hostDots, hostToast, plateFlag}));
+        // The host's yes names the amount it says yes to: one the request does not say is refused (stale), nothing lands.
+        const staleYes = await hostOp(H, {op: 'approve', pid: D.pid, amount: amountD - 1});
+        const stillAsked = await roomDoc();
+        check('…a yes naming another amount than the request\'s is refused (stale): nothing lands, the request waits as it was',
+            staleYes.status === 409 && staleYes.body?.error === 'stale' && stillAsked.state.requests.some((r) => r.pid === D.pid && r.amount === amountD)
+            && stillAsked.state.seats[seatD]?.stack === 0, JSON.stringify({status: staleYes.status, body: staleYes.body}));
+        // A request stands REQUESTS.CHANGE_MS before its player may take it back.
+        const atD = stillAsked.state.requests.find((r) => r.pid === D.pid)?.at ?? 0;
+        await sleep(Math.max(0, atD + REQUESTS.CHANGE_MS + 300 - Date.now()));
         await D.page.waitForSelector('[data-pn-seat-controls][data-pn-armed] [data-pn-control="withdraw"]', {timeout: 10000});
         await D.page.click('[data-pn-control="withdraw"]');
         const withdrawn = await waitDoc((x) => !x.state.requests.some((r) => r.pid === D.pid), 10000);
@@ -1918,14 +1981,27 @@ try {
             HOST_COPY.requestSeat('Dee', amountD), {timeout: 10000}).then(() => true, () => false);
         await sleep(1500);
         const declinedSaid = await D.page.evaluate((t) => window.__pnToasts.some((x) => x.text.includes(t)), BANK_COPY.declined);
+        // Every screen's plate for Dee: "No chips yet", never "Out of chips".
+        const plateOf = (page) => page.waitForFunction(([s, want]) => document.querySelector(`[data-seat="${s}"] [data-flag]`)?.textContent === want ? want : null,
+            [seatD, TABLE_COPY.noChipsFlag], {timeout: 10000}).then((h) => h.jsonValue(), () => page.evaluate((s) => document.querySelector(`[data-seat="${s}"] [data-flag]`)?.textContent ?? null, seatD));
+        const plates = {dee: await plateOf(D.page), host: await plateOf(H.page)};
         await shot(D.page, '23-no-chips-yet-844x390');
-        check('…Cancel takes the request back (toasted, and never as "The host declined the request."), the host\'s toast for it goes, and the dock says "No chips yet." with "Ask for … chips" — never "Out of chips" or a top-up',
+        check('…Cancel takes the request back (toasted, and never as "The host declined the request."), the host\'s toast for it goes, the dock says "No chips yet." with "Ask for … chips" and every plate "No chips yet" — never "Out of chips" or a top-up',
             withdrawn !== null && plain(firstChips ?? '').trim() === BANK_COPY.askFor(amountD) && noChips === TABLE_COPY.noChipsYet && outOfChips === 0
-            && cancelToast && toastGone && !declinedSaid, JSON.stringify({withdrawn: withdrawn !== null, firstChips, noChips, outOfChips, cancelToast, toastGone, declinedSaid}));
+            && cancelToast && toastGone && !declinedSaid && plates.dee === TABLE_COPY.noChipsFlag && plates.host === TABLE_COPY.noChipsFlag,
+            JSON.stringify({withdrawn: withdrawn !== null, firstChips, noChips, outOfChips, cancelToast, toastGone, declinedSaid, plates}));
         await D.page.click('[data-open="bank"]');
         const bankOffer = await D.page.waitForSelector('[data-pn-drawer="bank"] [data-pn-rebuy]', {timeout: 10000}).then((el) => el.innerText(), () => null);
         await D.page.click('[data-pn-drawer="bank"] [data-pn-rebuy]');
         d = await waitDoc((x) => x.state.requests.some((r) => r.pid === D.pid), 10000);
+        // Taken back again at once: refused (request_wait), the request as it was — a request stands
+        // REQUESTS.CHANGE_MS before its player may change it or take it back, so no player can flood
+        // the host with requests.
+        const changed = await api(D, 'action', {actionId: randomUUID(), type: 'withdraw'});
+        const asIt = await roomDoc();
+        check('…a request taken back again within a few seconds is refused (request_wait), the request as it was',
+            changed.status === 409 && changed.body?.error === 'request_wait' && asIt.state.requests.some((r) => r.pid === D.pid && r.amount === amountD),
+            JSON.stringify({status: changed.status, body: changed.body}));
         const ownRow = await D.page.waitForSelector('[data-pn-requested] [data-pn-withdraw]', {timeout: 10000}).then(() => true, () => false);
         const ownM = await targets(D.page, '[data-own-chips]');
         await D.page.keyboard.press('Escape');
@@ -2096,6 +2172,17 @@ try {
             check(`Cy's prompt at ${sizeName(size)}: "Ben asks to see your cards", its seconds (15 or fewer), three 44 px answers at the foot of the screen, over the dock and nothing of the table — no other plate, turned-up hand, the board, a pot or the banner; nothing sideways`,
                 prompt && targetsOk(m) && m.count === 3 && covers !== null && covers.inView && covers.hits.length === 0 && covers.fromFoot <= 24
                 && plain(text).includes(plain(ASK_COPY.prompt('Ben'))) && left > 0 && left <= ASKS.WAIT_MS / 1000, `${brief(m)} ${JSON.stringify({covers, left, text})}`);
+            if (size.width === 568) {
+                // The long pause after the hand (paused by the host), the payout long over: the banner
+                // and the line under it over no plate and no open seat (stage.resultBannerPlan).
+                const bannerHits = await C.page.evaluate(() => {
+                    const hit = (a, b) => a.left < b.right - 1 && b.left < a.right - 1 && a.top < b.bottom - 1 && b.top < a.bottom - 1;
+                    const pieces = [...document.querySelectorAll('.pn-banner, .pn-banner-note')].map((el) => el.getBoundingClientRect());
+                    const seatsDrawn = [...document.querySelectorAll('[data-seat] :is(.pn-plate, .pn-open-seat)')].map((el) => el.getBoundingClientRect());
+                    return {pieces: pieces.length, hits: pieces.flatMap((p, i) => seatsDrawn.filter((q) => hit(p, q)).map(() => i))};
+                });
+                check('…the winner\'s banner there, the payout long over, over no plate and no open seat', bannerHits.pieces > 0 && bannerHits.hits.length === 0, JSON.stringify(bannerHits));
+            }
             await shot(C.page, `22-ask-prompt-${sizeFile(size)}`);
         }
         await resize(C.page, {width: 320, height: 568}, 300);
@@ -2154,6 +2241,19 @@ try {
             const covers = await askCovers(B.page, seats.ben);
             check(`Ben's prompt at ${sizeName(size)}: three 44 px answers on screen, at the foot, over nothing of the table`,
                 targetsOk(m) && m.count === 3 && covers !== null && covers.inView && covers.hits.length === 0 && covers.fromFoot <= 24, `${brief(m)} ${JSON.stringify(covers)}`);
+            if (size.width >= 640) {
+                // The table's status in the top bar from 640 px: one line, cut short rather than wrapped,
+                // the game's name beside it whole.
+                const bar = await B.page.evaluate(() => {
+                    const word = document.querySelector('[data-pn-table-status-word]');
+                    const game = document.querySelector('[data-pn-mode-label]');
+                    if (!word || !game) return null;
+                    const line = parseFloat(getComputedStyle(word).lineHeight) || 13;
+                    return {text: word.textContent, h: Math.round(word.getBoundingClientRect().height), line, game: game.textContent, gameWhole: game.scrollWidth <= game.clientWidth + 1};
+                });
+                check(`…the top bar's "${TABLE_COPY.paused}" on one line at ${sizeName(size)}, the game's name whole beside it`,
+                    bar !== null && bar.h <= bar.line * 1.5 && bar.gameWhole, JSON.stringify(bar));
+            }
             await shot(B.page, `22-ask-prompt-${sizeFile(size)}`);
         }
         await resize(B.page, {width: 375, height: 667}, 300);
@@ -2288,32 +2388,35 @@ try {
         check('a page on an older protocol (its requests sent as protocol ' + (PN_PROTOCOL - 1) + ') is asked to reload, and the reload brings the table back',
             reloadAsked && back && problemAfter === 0, JSON.stringify({reloadAsked, back, problemAfter}));
 
-        // ── the host away ten minutes: a guest's chips no longer wait for them ──
+        // ── the host away an hour: a guest's chips still wait for the host's yes ──
         // Eve, a guest, sits once the game has started: her chips wait. Then the host's page goes
-        // quiet (its beats held back) and the room's record of them is set eleven minutes back, as
-        // ten minutes away would leave it: Eve's page says the chips no longer wait, and one tap lands them.
+        // quiet (its beats held back) and the room's record of them is set an hour back, as a locked
+        // phone would leave it: Eve's chips still wait — no way round the host, whatever she sends —
+        // until the host (or an account holder who takes the host's place) says yes.
         const E = await newPlayer('eve', PHONE(390, 844));
         await sitDown(E, 'Eve');
         const eveAsked = await waitDoc((x) => x.state.requests.some((r) => r.pid === E.pid), 10000);
         const amountE = eveAsked?.state.requests.find((r) => r.pid === E.pid)?.amount ?? 0;
-        const eveWaits = await E.page.waitForSelector('[data-pn-waiting-approval]', {timeout: 15000}).then(() => true, () => false);
-        const takeBefore = await E.page.locator('[data-pn-control="take-chips"]').count();
         const quiet = (route) => route.abort().catch(() => {});
         await H.page.route('**/api/poker-night/*/tick', quiet);
-        const longAgo = Date.now() - 11 * 60_000;
+        const longAgo = Date.now() - 60 * 60_000;
         await rooms.updateOne({env: ENV, code}, {$set: {[`seen.${H.pid}.at`]: longAgo, 'players.$[h].joinedAt': new Date(longAgo)}}, {arrayFilters: [{'h.pid': H.pid}]});
         await E.page.reload({waitUntil: 'load'});
-        const takeSaid = await E.page.waitForSelector('[data-pn-waiting-approval][data-pn-host-away]', {timeout: 20000}).then((el) => el.innerText(), () => null);
-        const takeLabel = await E.page.waitForSelector('[data-pn-seat-controls][data-pn-armed] [data-pn-control="take-chips"]', {timeout: 15000}).then((el) => el.innerText(), () => null);
+        const eveSaid = await E.page.waitForSelector('[data-pn-seat-controls][data-pn-armed] [data-pn-waiting-approval]', {timeout: 20000}).then((el) => el.innerText(), () => null);
+        const eveControls = await E.page.$$eval('[data-pn-seat-controls] [data-pn-control]', (els) => els.map((el) => el.getAttribute('data-pn-control')));
+        // The same buy again from Eve's browser: it changes nothing, and lands nothing.
+        const again = await api(E, 'action', {actionId: randomUUID(), type: 'buy', amount: amountE});
+        const still = await roomDoc();
         const takeM = await targets(E.page, '[data-pn-dock]');
         await shot(E.page, '23-host-away-390x844');
-        check('a guest whose chips wait sees no way round the host while they are here; once the host has been away ten minutes the dock says the chips no longer wait for them, with "Take … chips" (44 px)',
-            eveAsked !== null && eveWaits && takeBefore === 0 && takeSaid?.trim() === TABLE_COPY.hostAwayNote && plain(takeLabel ?? '').trim() === BANK_COPY.takeChips(amountE) && targetsOk(takeM),
-            JSON.stringify({eveWaits, takeBefore, takeSaid, takeLabel, m: brief(takeM)}));
-        await E.page.click('[data-pn-control="take-chips"]');
+        check('the host gone an hour, a guest\'s chips still wait for the host\'s yes: the dock says so, with Cancel and no way round the host, and a buy sent again lands nothing',
+            eveAsked !== null && eveSaid?.trim() === TABLE_COPY.waitingApproval && eveControls.includes('withdraw') && !eveControls.some((c) => c.includes('take'))
+            && again.status === 200 && still.state.requests.some((r) => r.pid === E.pid && r.amount === amountE) && (still.state.seats[seatIndex(still, E)]?.stack ?? -1) === 0
+            && targetsOk(takeM), JSON.stringify({eveSaid, eveControls, again: again.status, m: brief(takeM)}));
+        const yesE = await hostOp(H, {op: 'approve', pid: E.pid});
         const landedE = await waitDoc((x) => (x.state.seats[seatIndex(x, E)]?.stack ?? 0) === amountE && !x.state.requests.some((r) => r.pid === E.pid), 10000);
-        check('…one tap lands Eve\'s chips without the host (told so), the request gone, every chip accounted for', landedE !== null && await toasted(E.page, BANK_COPY.approved(amountE), 10000)
-            && ledgerRow(landedE, E)?.bought === amountE, JSON.stringify({landed: landedE !== null}));
+        check('…the host\'s yes, when it comes, lands them, every chip accounted for', yesE.status === 200 && landedE !== null && ledgerRow(landedE, E)?.bought === amountE,
+            JSON.stringify({yes: yesE.status, landed: landedE !== null}));
         await H.page.unroute('**/api/poker-night/*/tick', quiet);
         await endTable(H);
     }
@@ -2416,10 +2519,12 @@ try {
             const here = await g.page.getAttribute('[data-pn-drawer="hands"] [data-guide-here]', 'data-guide-game').catch(() => null);
             const ploCards = await g.page.locator('[data-pn-drawer="hands"] [data-guide-plo] .pn-card').count();
             const lifted = await g.page.locator('[data-pn-drawer="hands"] [data-guide-plo] .pn-card[data-state="win"]').count();
+            const sight = await gameInSight(g.page);
             await shot(g.page, '32-plo-how-it-plays-390x844');
             await wording(g.page, 'the Hands drawer on PLO', '[data-pn-drawer="hands"]');
-            check('the join card names the game first ("PLO · Blinds 10/20 · 2,000 chips to start") and "How it plays" opens the Hands guide on PLO for a visitor: its hand of four on one board, the five that play lifted',
-                (terms ?? '').trim() === JOIN_COPY.terms('PLO', 10, 20, 2000) && drawer && here === 'plo' && ploCards === 9 && lifted === 5, JSON.stringify({terms, drawer, here, ploCards, lifted}));
+            check('the join card names the game first ("PLO · Blinds 10/20 · 2,000 chips to start") and "How it plays" opens the Hands guide on PLO for a visitor, before the rankings, in sight at once: its hand of four on one board, the five that play lifted',
+                (terms ?? '').trim() === JOIN_COPY.terms('PLO', 10, 20, 2000) && drawer && here === 'plo' && ploCards === 9 && lifted === 5
+                && sight.inSight && sight.first === 'here' && sight.lead, JSON.stringify({terms, drawer, here, ploCards, lifted, sight}));
             await g.page.keyboard.press('Escape');
             await g.page.waitForSelector('[data-pn-drawer="hands"]', {state: 'detached', timeout: 10000}).catch(() => {});
         }
@@ -2916,11 +3021,12 @@ try {
             await sleep(400);
             const here = await g390.page.getAttribute('[data-pn-drawer="hands"] [data-guide-here]', 'data-guide-game').catch(() => null);
             const short = await g390.page.textContent('[data-pn-drawer="hands"] #triple-t').catch(() => '');
+            const sight = await gameInSight(g390.page);
             await shot(g390.page, '40-triple-t-how-it-plays-390x844');
             await wording(g390.page, 'the Hands drawer on Triple T', '[data-pn-drawer="hands"]');
             check('the join card names Triple T first ("Triple T · Blinds 10/20 · …") and "How it plays" opens the guide on Triple T: the glossary\'s own words, then the table\'s facts',
                 (terms ?? '').trim() === JOIN_COPY.terms(MODE_COPY.short['triple-t'], 10, 20, 2000) && here === 'triple-t'
-                && (short ?? '').includes(HANDS_COPY.games['triple-t'].facts[2]), JSON.stringify({terms, here}));
+                && (short ?? '').includes(HANDS_COPY.games['triple-t'].facts[2]) && sight.inSight && sight.first === 'here' && sight.lead, JSON.stringify({terms, here, sight}));
             await g390.page.keyboard.press('Escape');
             await g390.page.waitForSelector('[data-pn-drawer="hands"]', {state: 'detached', timeout: 10000}).catch(() => {});
         }
@@ -3632,6 +3738,17 @@ try {
             await shot(p.page, `p8-dock-name-${name}`);
             check(`the dock's hand name on a phone on its side (${name}): whole ("${m?.text ?? ''}"), and the longest a name gets in its two lines`,
                 m !== null && m.whole && m.inside && m.longestWhole && m.lines <= 2, JSON.stringify(m));
+            if (size.width < 844) {
+                // Nine seats, six guests offline: every word under a plate clears the seats round it; one
+                // with no room there takes its plate's stack line instead (stage.flagsOnPlate).
+                const lay = await tableLayout(p.page);
+                const onPlate = await p.page.$$eval('[data-status-on="plate"] .pn-plate-status', (els) => els.map((el) => el.textContent));
+                // Every guest offline and off the clock says so, under its plate or on it.
+                const said = await p.page.evaluate((offline) => [...document.querySelectorAll('[data-seat][data-presence="offline"]:not([data-acting])')]
+                    .map((el) => el.querySelector('[data-flag]')?.textContent === offline), TABLE_COPY.presence.offline);
+                check(`nine seats on a phone on its side (${name}): no word under a plate over another seat; one with no room there on its own plate (${onPlate.length})`,
+                    lay.flagHits.length === 0 && said.length >= 5 && said.every(Boolean), JSON.stringify({hits: lay.flagHits.slice(0, 4), onPlate, said}));
+            }
         }
         for (const p of [Pia, Quin]) {
             await resize(p.page, p === Pia ? {width: 320, height: 568} : {width: 375, height: 667});

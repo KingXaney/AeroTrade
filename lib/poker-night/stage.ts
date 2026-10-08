@@ -18,7 +18,7 @@
 
 import {BANK_COPY, FELT_COPY, TABLE_COPY} from '@/lib/learn/copy/poker-night';
 import {CHIP_COLUMNS, chipBreakdown, compactChips} from '@/lib/poker-night/chips';
-import {CENTRE, densityFor, orientationFor, PLATE, seatSpots, spotToPx, visualSlot, type Box, type Density, type Orientation, type SeatSpot} from '@/lib/poker-night/layout';
+import {CENTRE, densityFor, isSquat, orientationFor, PLATE, seatSpots, spotToPx, visualSlot, type Box, type Density, type Orientation, type SeatSpot} from '@/lib/poker-night/layout';
 
 export type Px = {x: number; y: number};
 // A rectangle by its centre.
@@ -477,7 +477,8 @@ const layoutStage = (box: Box, seatCount: number, mySeat: number | null, n: numb
     const betSize = BET[fit];
     const buttonSize = BUTTON[fit];
     const centre = spotToPx(CENTRE, box, plateSize);
-    const spots = seatSpots(seatCount, orientation);
+    // A phone on its side, the dock in its column: seven seats or more take the squat slots.
+    const spots = seatSpots(seatCount, orientation, isSquat(box, box.w < NARROW_STAGE));
 
     // Plates first; then each seat's bet line, the viewer's first and on round the table, clear of
     // every plate and the bet lines before it; then the buttons, clear of all of those.
@@ -995,6 +996,13 @@ export const flagRoom = (stage: Stage, seat: number, text: string, seats: readon
     });
 };
 
+// The seats whose status has no room under the plate (flagRoom, every other seat's flag counted as
+// hanging): their plate carries it instead — Triple T's "Discarding…" as a dashed ring, any other
+// word in place of the stack (components/poker-night/Seat) — so no status is ever drawn over a plate,
+// the cards before it, a blind's mark or another flag.
+export const flagsOnPlate = (stage: Stage, seats: readonly SeatMarks[]): Set<number> =>
+    new Set(seats.filter((m) => m.flag !== null && !m.open && !flagRoom(stage, m.seat, m.flag, seats)).map((m) => m.seat));
+
 // ── finding room ──
 
 type Span = [number, number];
@@ -1243,6 +1251,17 @@ export const bannerPlan = (stage: Stage, text: BannerText, seen: BannerSeen): Ba
         variant: 'full', rows: most, banner: {x: board.x, top, width: cap, height: h},
         note: note && {x: board.x, top: top + h + n.gap, width: cap, height: noteH}, clear: false, short: false,
     };
+};
+
+// The banner while a result shows (components/poker-night/TableScreen): clear of the pots paying out
+// and the winners' "+N" as well where that leaves room. Both leave within a second or two of the
+// payout (the pills once their chips have streamed out, a "+N" once it has risen), so where nothing
+// clears them too the banner is placed clear of the table alone — over a pill or a "+N" for that
+// moment at most, never over a plate for the whole pause after the hand.
+export const resultBannerPlan = (stage: Stage, text: BannerText, seen: BannerSeen): BannerPlan => {
+    const busy = bannerPlan(stage, text, seen);
+    if (busy.clear || ((seen.pots?.length ?? 0) === 0 && (seen.pops?.length ?? 0) === 0)) return busy;
+    return bannerPlan(stage, text, {...seen, pots: [], pops: []});
 };
 
 // The offset of `from` as seen from `to`: a flight's --pn-dx / --pn-dy (an element drawn at `to`

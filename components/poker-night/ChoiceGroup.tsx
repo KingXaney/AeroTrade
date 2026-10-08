@@ -54,7 +54,9 @@ const ChoiceGroup = <T extends string>({label, ids, value, onChange, name, rende
                         tabIndex={i === at ? 0 : -1}
                         disabled={disabled}
                         className={cn(
-                            'relative grid min-h-11 min-w-11 place-items-center rounded-lg outline-offset-2 transition-colors',
+                            // The ring inside the option: one at the edge of its panel keeps all four sides
+                            // (.glass-panel clips whatever reaches past it).
+                            'relative grid min-h-11 min-w-11 place-items-center rounded-lg -outline-offset-2 transition-colors',
                             'hover:bg-surface-3/60 focus-visible:outline-2 focus-visible:outline-brand disabled:opacity-50',
                             checked && 'bg-surface-3/70 outline-2 outline-brand',
                             optionClassName,

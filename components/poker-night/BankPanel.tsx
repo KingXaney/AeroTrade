@@ -3,8 +3,7 @@
 // The bank, in its drawer: play chips only, counted. The viewer's own chips first — the same
 // figure as their Stack below (a live pot counted, said beside it) — with a rebuy at zero or a
 // top-up to the cap by the table's rules (once the first hand is dealt, a request the host approves
-// for anyone but the host, which the viewer can Cancel while it waits — and which, once the host has
-// been away ten minutes, they can take at once, "Take 2,000 chips"; a seat that never had chips here
+// for anyone but the host, which the viewer can Cancel while it waits; a seat that never had chips here
 // reads "Ask for 2,000 chips", never a rebuy or a top-up; while chips are in the pot it says what it
 // adds, since a top-up counts only the chips behind); then the host's waiting requests —
 // a new player's first chips, a rebuy, a top-up, each said as what it is — with Approve and Decline
@@ -33,7 +32,7 @@ import Term from "@/components/primitives/Term";
 import TextField from "@/components/primitives/TextField";
 import {Drawer, MiniAvatar, PlayerName} from "@/components/poker-night/overlay-kit";
 import {requestText} from "@/components/poker-night/AskPrompt";
-import {useRoom, useServerNow} from "@/components/poker-night/room-controller";
+import {useRoom} from "@/components/poker-night/room-controller";
 import {clearOwnWithdraw, markOwnWithdraw} from "@/components/poker-night/overlay-requests";
 import {useHostSitOut, type HostSitOuts} from "@/components/poker-night/useHostSitOut";
 import {BANK_COPY, HOST_COPY, OVERLAY_COPY, TABLE_COPY} from "@/lib/learn/copy/poker-night";
@@ -45,14 +44,16 @@ import {cn} from "@/lib/utils";
 type Props = {open: boolean; onOpenChange: (open: boolean) => void; toTable: boolean; sitOuts: HostSitOuts};
 
 const count = TABLE_COPY.chips;
+// The bank table's figures: right-aligned, each with a gap at its left from the one before.
+const NUM_HEAD = 'pb-2 pl-3 text-right font-normal';
+const NUM_CELL = 'py-2 pl-3 text-right font-mono tabular-nums';
 
 // The viewer's own chips: what they hold and what they may add.
 const OwnChipsPanel = () => {
     const room = useRoom();
     const id = useId();
     const view = room.view;
-    const now = useServerNow(5000);
-    const own = view ? ownChips(view, now) : null;
+    const own = view ? ownChips(view) : null;
     const [busy, setBusy] = useState(false);
     const [other, setOther] = useState('');
     if (!view || !own) return null;
@@ -69,7 +70,7 @@ const OwnChipsPanel = () => {
         }
         setOther('');
         const after = r.view.me.seat === null ? null : r.view.seats[r.view.me.seat];
-        if (r.view.requests.some((q) => q.pid === r.view.me.pid)) toast.message(own.hostAway ? TABLE_COPY.hostBack : BANK_COPY.requested(amount));
+        if (r.view.requests.some((q) => q.pid === r.view.me.pid)) toast.message(BANK_COPY.requested(amount));
         // A waiting request that went in chips is said once, by TableOverlays.
         else if (own.requested !== null) return;
         else if (after && after.pendingBuy > 0) toast.message(BANK_COPY.pending(after.pendingBuy));
@@ -101,12 +102,7 @@ const OwnChipsPanel = () => {
             {own.pendingBuy > 0 && <p className="text-xs text-fg-soft">{BANK_COPY.pending(own.pendingBuy)}</p>}
             {own.requested !== null && (
                 <div className="flex flex-wrap items-center justify-between gap-2" data-pn-requested={own.requested}>
-                    <p role="status" className="min-w-0 flex-1 text-xs text-fg-soft">{own.hostAway ? TABLE_COPY.hostAwayNote : BANK_COPY.requested(own.requested)}</p>
-                    {own.hostAway && (
-                        <ActionButton variant="primary" size="sm" className="min-h-11" disabled={busy} onClick={() => void buy(own.requested!)} data-pn-take="">
-                            {BANK_COPY.takeChips(own.requested)}
-                        </ActionButton>
-                    )}
+                    <p role="status" className="min-w-0 flex-1 text-xs text-fg-soft">{BANK_COPY.requested(own.requested)}</p>
                     <ActionButton variant="secondary" size="sm" className="min-h-11" disabled={busy} aria-label={BANK_COPY.cancelLabel}
                                   onClick={() => void withdraw()} data-pn-withdraw="">
                         {BANK_COPY.cancel}
@@ -151,10 +147,12 @@ export const RequestsPanel = () => {
     if (!room.me?.isHost || room.table.requests.length === 0) return null;
     const people = room.table.people;
 
-    const answer = async (pid: string, op: 'approve' | 'deny') => {
+    // Approve names the amount the row shows: one changed since is refused (stale) and the row then
+    // shows the new one.
+    const answer = async (pid: string, op: 'approve' | 'deny', amount: number) => {
         if (busy) return;
         setBusy(pid);
-        const r = await room.send({type: 'host', op: {op, pid}});
+        const r = await room.send({type: 'host', op: op === 'approve' ? {op, pid, amount} : {op, pid}});
         setBusy(null);
         if (!r.ok) toast.error(r.message);
     };
@@ -169,10 +167,10 @@ export const RequestsPanel = () => {
                             {requestText(requestKind(room.table, q.pid), people[q.pid]?.name ?? '', q.amount)}
                         </p>
                         <div className="flex gap-2">
-                            <ActionButton size="sm" className="min-h-11" disabled={busy !== null} onClick={() => void answer(q.pid, 'approve')} data-approve="">
+                            <ActionButton size="sm" className="min-h-11" disabled={busy !== null} onClick={() => void answer(q.pid, 'approve', q.amount)} data-approve="">
                                 {HOST_COPY.approve}
                             </ActionButton>
-                            <ActionButton variant="danger" size="sm" className="min-h-11" disabled={busy !== null} onClick={() => void answer(q.pid, 'deny')} data-decline="">
+                            <ActionButton variant="danger" size="sm" className="min-h-11" disabled={busy !== null} onClick={() => void answer(q.pid, 'deny', q.amount)} data-decline="">
                                 {HOST_COPY.decline}
                             </ActionButton>
                         </div>
@@ -235,15 +233,18 @@ const BankPanel = ({open, onOpenChange, toTable, sitOuts}: Props) => {
             <p className="text-xs leading-relaxed text-fg-muted">{BANK_COPY.lead}</p>
             <OwnChipsPanel/>
             <RequestsPanel/>
-            <Panel pad={4} className="space-y-3" data-bank="">
+            {/* A container: in a drawer narrower than 22rem (a 320 px phone's) the Rebuys column gives its
+                room to the others and each player's count goes under their name. Every figure after the
+                player keeps a gap at its left, so two never read as one. */}
+            <Panel pad={4} className="@container space-y-3" data-bank="">
                 <table className="w-full table-fixed border-collapse text-xs">
                     <thead>
                         <tr className="text-left">
                             <th scope="col" className="w-[38%] pb-2 font-normal"><MicroLabel>{BANK_COPY.columns.player}</MicroLabel></th>
-                            <th scope="col" className="pb-2 text-right font-normal"><MicroLabel>{BANK_COPY.columns.chipsIn}</MicroLabel></th>
-                            {bank.showRebuys && <th scope="col" className="pb-2 text-right font-normal"><MicroLabel><Term k="rebuy">{BANK_COPY.columns.rebuys}</Term></MicroLabel></th>}
-                            <th scope="col" className="pb-2 text-right font-normal"><MicroLabel>{BANK_COPY.columns.stack}</MicroLabel></th>
-                            <th scope="col" className="pb-2 text-right font-normal"><MicroLabel>{BANK_COPY.columns.net}</MicroLabel></th>
+                            <th scope="col" className={NUM_HEAD}><MicroLabel>{BANK_COPY.columns.chipsIn}</MicroLabel></th>
+                            {bank.showRebuys && <th scope="col" className={cn(NUM_HEAD, '@max-[22rem]:hidden')} data-bank-rebuys-col=""><MicroLabel><Term k="rebuy">{BANK_COPY.columns.rebuys}</Term></MicroLabel></th>}
+                            <th scope="col" className={NUM_HEAD}><MicroLabel>{BANK_COPY.columns.stack}</MicroLabel></th>
+                            <th scope="col" className={NUM_HEAD}><MicroLabel>{BANK_COPY.columns.net}</MicroLabel></th>
                         </tr>
                     </thead>
                     <tbody>
@@ -258,13 +259,16 @@ const BankPanel = ({open, onOpenChange, toTable, sitOuts}: Props) => {
                                             {row.me && <Badge tone="brand" className="mt-0.5">{TABLE_COPY.you}</Badge>}
                                             {row.removed && <span className="block text-[11px] text-fg-muted">{BANK_COPY.removed}</span>}
                                             {!row.seated && row.cashedOut > 0 && <span className="block text-[11px] text-fg-muted">{BANK_COPY.leftWith(row.cashedOut)}</span>}
+                                            {bank.showRebuys && row.rebuys > 0 && (
+                                                <span className="block text-[11px] text-fg-muted @min-[22rem]:hidden" data-bank-rebuys-line="">{BANK_COPY.rebuysCount(row.rebuys)}</span>
+                                            )}
                                         </span>
                                     </span>
                                 </th>
-                                <td className="py-2 text-right font-mono tabular-nums text-fg-soft">{count(row.chipsIn)}</td>
-                                {bank.showRebuys && <td className="py-2 text-right font-mono tabular-nums text-fg-soft">{count(row.rebuys)}</td>}
-                                <td className="py-2 text-right font-mono tabular-nums text-fg-soft">{count(row.stack)}</td>
-                                <td className={cn('py-2 text-right font-mono tabular-nums', row.net > 0 ? 'text-positive' : row.net < 0 ? 'text-negative' : 'text-fg-soft')}
+                                <td className={cn(NUM_CELL, 'text-fg-soft')}>{count(row.chipsIn)}</td>
+                                {bank.showRebuys && <td className={cn(NUM_CELL, 'text-fg-soft @max-[22rem]:hidden')}>{count(row.rebuys)}</td>}
+                                <td className={cn(NUM_CELL, 'text-fg-soft')}>{count(row.stack)}</td>
+                                <td className={cn(NUM_CELL, row.net > 0 ? 'text-positive' : row.net < 0 ? 'text-negative' : 'text-fg-soft')}
                                     data-net={row.net}>
                                     {BANK_COPY.net(row.net)}
                                 </td>

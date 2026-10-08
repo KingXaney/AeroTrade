@@ -11,8 +11,10 @@
 
 import {describe, expect, it} from 'vitest';
 import {nextDueAt} from '@/lib/poker-night/clock';
-import {TIMING} from '@/lib/poker-night/config';
+import {ASK_EXPIRED} from '@/lib/poker-night/asks';
+import {ASKS, TIMING} from '@/lib/poker-night/config';
 import {FULL_DECK} from '@/lib/poker-night/deck';
+import {reduce} from '@/lib/poker-night/engine';
 import type {JoinInput} from '@/lib/poker-night/input';
 import {backoffMs, nudgesOf, planMutation, seenByOthers, type MutationInput, type Plan} from '@/lib/poker-night/mutation';
 import {
@@ -20,7 +22,7 @@ import {
 } from '@/lib/poker-night/room';
 import type {DeckSource} from '@/lib/poker-night/types';
 import {mulberry32} from '@/lib/random';
-import {T0} from './fixtures';
+import {F, T0, deal, moves, ok, table} from './fixtures';
 
 const AV = 'v1:fox:tangerine:ring:crown';
 const HOST = 'HostPid0001';
@@ -310,7 +312,25 @@ describe('who can see a write', () => {
         // Turning asks off: nobody told.
         const off = commitOf(plan({core, ...act(winner, 'asks-off-00000001', {type: 'allow-asks', on: false}), receivedAt: at + 50, now: at + 50}));
         expect([off.visible, off.nudge]).toEqual([false, []]);
-        expect(nudgesOf(core.state, core.state, null)).toEqual([]);
+        expect(nudgesOf(core.state, core.state, null, at)).toEqual([]);
+    });
+
+    it('tells nobody but an ask\'s two players of it: another pair\'s ask or answer, which writes down an expiry both views already read, nudges no one else', () => {
+        // Four players fold to the big blind, p1, who wins unshown.
+        let s = deal(table({0: 1000, 1: 1000, 2: 1000, 3: 1000}, {lastBigBlind: 0}));
+        s = moves(s, F, F, F);
+        const at = s.hand!.result!.completedAt;
+        s = ok(reduce(s, {type: 'ask', by: 'p0', to: 'p1', at}));
+        // p1 lets it run out; a moment later p3 asks p2.
+        const late = at + ASKS.WAIT_MS + 1;
+        const asked = ok(reduce(s, {type: 'ask', by: 'p3', to: 'p2', at: late}));
+        expect(asked.hand!.asks[0][3]).toBe(ASK_EXPIRED);
+        expect(nudgesOf(s, asked, 'p3', late)).toEqual(['p2']);
+        // A private answer: the one who asked alone is told.
+        const replied = ok(reduce(asked, {type: 'reply', by: 'p2', to: 'p3', show: 'none', at: late + 10}));
+        expect(nudgesOf(asked, replied, 'p2', late + 10)).toEqual(['p3']);
+        // The expiry itself, read before its time, is news to its two players.
+        expect(nudgesOf(s, asked, 'p3', at + 10)).toEqual(['p0', 'p1', 'p2']);
     });
 });
 

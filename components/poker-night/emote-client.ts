@@ -12,7 +12,7 @@ import {useSyncExternalStore} from "react";
 import {toast} from "sonner";
 import type {EmoteResult} from "@/components/poker-night/room-controller";
 import {EMOTE_COPY} from "@/lib/learn/copy/poker-night";
-import {admit, EMOTE_COOLDOWN_MS, emoteShows, liveFor, nextChange, readEmote, settle, type EmoteInput, type EmoteMessage, type LiveEmote} from "@/lib/poker-night/emotes";
+import {admit, EMOTE_COOLDOWN_MS, emoteShows, landedBetween, liveFor, nextChange, readEmote, settle, type EmoteInput, type EmoteMessage, type LiveEmote} from "@/lib/poker-night/emotes";
 import type {EmoteView} from "@/lib/poker-night/view-types";
 
 const store = <T>(initial: T) => {
@@ -126,7 +126,8 @@ const SEEN_KEPT = 256;
 const NONE: readonly LiveEmote[] = Object.freeze([]);
 
 // The emotes on screen, as lib/poker-night/emotes plans them (admit, settle), each taken away (or
-// landed, a throw in flight) by a timer at its own time, never by animationend.
+// landed, a throw in flight) by a timer at its own time, never by animationend. A landing is told to
+// onLand whichever settles it — the timer, or new emotes arriving first (emotes.landedBetween).
 export const createEmoteStore = (): EmoteStore => {
     let items: readonly LiveEmote[] = NONE;
     const seen = new Set<string>();
@@ -136,6 +137,9 @@ export const createEmoteStore = (): EmoteStore => {
 
     const notify = () => {
         for (const listener of [...listeners]) listener();
+    };
+    const land = (before: readonly LiveEmote[], after: readonly LiveEmote[]) => {
+        for (const i of landedBetween(before, after)) for (const listener of [...landers]) listener(i);
     };
     const arm = () => {
         if (timer !== null) clearTimeout(timer);
@@ -149,7 +153,7 @@ export const createEmoteStore = (): EmoteStore => {
         const before = items;
         const next = settle(before, now);
         if (next !== before) {
-            for (const i of next) if (i.phase === 'impact' && before.some((b) => b.key === i.key && b.phase === 'flight')) for (const land of [...landers]) land(i);
+            land(before, next);
             items = next.length === 0 ? NONE : next;
             notify();
         }
@@ -166,6 +170,8 @@ export const createEmoteStore = (): EmoteStore => {
             const shown: EmoteMessage[] = [];
             const now = Date.now();
             let next = settle(items, now);
+            // A throw whose flight ended before the timer fired lands here: its sound with it.
+            land(items, next);
             for (const raw of emotes) {
                 if (seen.has(raw.id)) continue;
                 seen.add(raw.id);

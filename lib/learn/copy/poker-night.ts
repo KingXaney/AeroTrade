@@ -262,6 +262,8 @@ export const REFUSAL_COPY: Record<Refusal, string> = {
     'ask-cooldown': `They did not show you their cards when you last asked, so asking them again waits ${numberWord(ASKS.COOLDOWN_HANDS)} hands.`,
     // The table holds as many cooldowns and waiting asks as it keeps (lib/poker-night/asks.asksFull).
     'asks-full': `Asks to see cards are resting at this table: they open again within ${numberWord(ASKS.COOLDOWN_HANDS)} hands.`,
+    // A request for chips changed or taken back within REQUESTS.CHANGE_MS of the last change.
+    'request-wait': 'Your request for chips just changed: try again in a moment.',
 };
 
 // ---- errors (lib/poker-night/http.ts, PokerNightErrorCode) -----------------------------------
@@ -297,6 +299,7 @@ export const POKER_NIGHT_ERRORS: Record<PokerNightErrorCode, string> = {
     ask_limit: REFUSAL_COPY['ask-limit'],
     ask_cooldown: REFUSAL_COPY['ask-cooldown'],
     asks_full: REFUSAL_COPY['asks-full'],
+    request_wait: REFUSAL_COPY['request-wait'],
     closed: REFUSAL_COPY.closed,
     invalid_action: REFUSAL_COPY.illegal,
     bad_seat: REFUSAL_COPY['bad-seat'],
@@ -685,8 +688,10 @@ export const TABLE_COPY = {
     // n is the table's sitOutAfter: the timeouts in a row that sit a player out.
     awayNote: (n: number): string => `Sat out after ${numberWord(n)} ${n === 1 ? 'timeout' : 'timeouts'}. "I'm back" deals you in again.`,
     outOfChips: 'Out of chips.',
-    // A seat that never had chips here (a newcomer whose request was taken back or declined).
+    // A seat that never had chips here (a newcomer whose request was taken back or declined): the
+    // dock's line, and the plate's word for everyone (never "Out of chips").
     noChipsYet: 'No chips yet.',
+    noChipsFlag: 'No chips yet',
     showCards: 'Show my cards',
     // The break's buttons in a narrow dock (a phone upright); the long words above stay their
     // accessible names.
@@ -719,10 +724,6 @@ export const TABLE_COPY = {
     cancelRequest: 'Cancel',
     cancelRequestLabel: 'Cancel the request for chips',
     requestCancelled: 'Request cancelled.',
-    // The host unheard from for LIMITS.hostTakeoverMs: a waiting request may land without their yes
-    // (BANK_COPY.takeChips); a host back by then keeps it waiting.
-    hostAwayNote: `The host has been away for over ${numberWord(Math.round(LIMITS.hostTakeoverMs / 60_000))} minutes, so your chips no longer wait for them.`,
-    hostBack: 'The host is back: your request waits for them.',
     sitOutNextNote: 'You sit out from the next hand.',
     // Triple T: a plate's word while its player is still to throw a card away.
     discarding: 'Discarding…',
@@ -1056,6 +1057,8 @@ export const BANK_COPY = {
     heading: 'Bank',
     lead: 'Play chips only. No cash value: the bank counts what each player brought to the table and what they hold now.',
     columns: {player: 'Player', chipsIn: 'Chips in', rebuys: 'Rebuys', stack: 'Stack', net: 'Net'},
+    // A player's rebuys under their name, where the drawer is too narrow for the column.
+    rebuysCount: (n: number): string => plural(n, 'rebuy', 'rebuys'),
     net: signed,
     inPot: (n: number): string => `${count(n)} in the pot`,
     leftWith: (n: number): string => `Left with ${count(n)}`,
@@ -1074,8 +1077,8 @@ export const BANK_COPY = {
     // while some are in the pot it says what it adds rather than a total.
     rebuy: 'Rebuy',
     topUp: (to: number): string => `Top up to ${count(to)}`,
-    // A seat's first chips here once the game has started: a request the host approves (askFor), or,
-    // with the host away long enough, chips that land at once (takeChips).
+    // A seat's first chips here: once the game has started a request the host approves (askFor), before
+    // it (or the host's own) chips that land at once (takeChips).
     askFor: (n: number): string => `Ask for ${plural(n, 'chip', 'chips')}`,
     takeChips: (n: number): string => `Take ${plural(n, 'chip', 'chips')}`,
     // The dock's one-tap rebuy once the stack is empty: the table's whole buy-in in one tap ("Rebuy

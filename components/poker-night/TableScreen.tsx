@@ -47,7 +47,7 @@ import {secondsUntil} from "@/lib/poker-night/client-clock";
 import type {Box} from "@/lib/poker-night/layout";
 import {cardBackFor, cardFaceFor, chipSetFor, resolveTableLook} from "@/lib/poker-night/looks";
 import {bannerLines, bannerShows, playerAt, resultLook, viewerSeatIn} from "@/lib/poker-night/reveal";
-import {bannerPlan, potPlan, stageLayout, type PotAmount, type PotNow, type PotSeen, type Stage, type WinPop} from "@/lib/poker-night/stage";
+import {potPlan, resultBannerPlan, stageLayout, type PotAmount, type PotNow, type PotSeen, type Stage, type WinPop} from "@/lib/poker-night/stage";
 import {cn} from "@/lib/utils";
 import type {HandView, RoomView} from "@/lib/poker-night/view-types";
 
@@ -251,9 +251,12 @@ const TableScreen = () => {
             if (!v) open.push(seat);
             if (seat !== mySeat && ((v && Array.isArray(v.cards)) || [...shownKey][seat] === '1')) shown.push(seat);
         });
+        const text = {winners: lines, note: line};
+        const seen = {open, shown, button: hand?.button ?? null, handSize};
         // Clear of the result's pots too, which stay on while their chips stream out, and of the
-        // winners' "+N".
-        return bannerPlan(stage, {winners: lines, note: line}, {open, shown, button: hand?.button ?? null, pots: pots?.pills ?? [], pops: popsOf(popsKey), handSize});
+        // winners' "+N" — where that leaves room; else clear of the table alone, since both leave
+        // within a second or two (stage.resultBannerPlan), never over a plate for the whole pause.
+        return resultBannerPlan(stage, text, {...seen, pots: pots?.pills ?? [], pops: popsOf(popsKey)});
     }, [stage, hand, look, lines, line, table.seats, mySeat, pots, popsKey, shownKey, handSize]);
     const tableVars = stage ? ({'--pn-plate-w': `${stage.plateSize.w}px`, '--pn-plate-h': `${stage.plateSize.h}px`, '--pn-button': `${stage.buttonSize}px`} as CSSProperties) : undefined;
 

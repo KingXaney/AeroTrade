@@ -12,7 +12,7 @@ import {isHex6} from '@/lib/theme/color';
 import {
     admit, awardPaths, buildEmoteCss, burstJitter, checkEmote, EMOTE_COOLDOWN_MS, EMOTE_CSS, EMOTE_REFUSALS, EMOTE_SIZES, EMOTE_TIMING, emoteCeiling, emoteOut,
     emoteShows, emoteSpot, IMPACT_COLOURS, IMPACT_KINDS, impactBits, impactOf, isPhrase, isReaction, isThrowable, landed, landingSound, liveFor, MIN_ARC,
-    nextChange, ON_SCREEN_CAP, parseEmote, PHRASE_IDS, REACTION_IDS, reactionPx, REACTIONS, reactionGlyph, readEmote, settle, THROW_IDS, THROWABLES,
+    landedBetween, nextChange, ON_SCREEN_CAP, parseEmote, PHRASE_IDS, REACTION_IDS, reactionPx, REACTIONS, reactionGlyph, readEmote, settle, THROW_IDS, THROWABLES,
     throwCeiling, throwGlyph, throwPath, throwPx, type EmoteMessage, type LiveEmote,
 } from '@/lib/poker-night/emotes';
 import {SEAT_COUNTS} from '@/lib/poker-night/layout';
@@ -225,6 +225,23 @@ describe('drawing them', () => {
         expect(settle(at750, 1800).map((i) => i.key)).toEqual(['t']);
         expect(settle(settle(at750, 1800), 750 + 2400)).toEqual([]);
         expect(nextChange([])).toBeNull();
+    });
+
+    it('says which throws landed between two settlements, whichever settles the screen first — so a landing\'s sound never goes missing', () => {
+        const thrown = liveFor(msg({kind: 'throw', item: 'egg', to: B, id: 't'} as Partial<EmoteMessage> & {kind: 'throw'}), 0, false);
+        const burst = liveFor(msg({kind: 'react', id: 'r'}), 0, false);
+        const items = [thrown, burst];
+        // Not yet: nothing landed.
+        expect(landedBetween(items, settle(items, 749))).toEqual([]);
+        // A view arriving a moment after the flight ended settles the screen before the store's timer:
+        // the landing is reported there, once.
+        const atLand = settle(items, 760);
+        expect(landedBetween(items, atLand).map((i) => [i.key, i.phase])).toEqual([['t', 'impact']]);
+        // The timer that follows finds it landed already: nothing twice.
+        expect(landedBetween(atLand, settle(atLand, 775))).toEqual([]);
+        // A throw shown as its impact alone (reduced motion) never lands: its sound is the arrival's.
+        const still = [liveFor(msg({kind: 'throw', item: 'egg', to: B, id: 's'} as Partial<EmoteMessage> & {kind: 'throw'}), 0, true)];
+        expect(landedBetween(still, settle(still, 760))).toEqual([]);
     });
 
     it('keeps at most three per player and 24 in all, the oldest going first; a new phrase replaces the bubble', () => {

@@ -336,7 +336,11 @@ const post = (p, route, data, opts = {}) => call(p, 'POST', route, {...opts, dat
 // Every join carries a fresh joinId unless it names one (a retry reuses its join's).
 const join = (p, input, opts = {}) => post(p, 'join', {joinId: randomUUID(), avatar: AVATARS[p.name], as: 'player', ...input}, opts);
 const action = (p, body, opts = {}) => post(p, 'action', {actionId: randomUUID(), ...body}, opts);
-const hostOp = (p, op, opts = {}) => action(p, {type: 'host', op}, opts);
+// The host's yes names the amount it says yes to (a request changed since is refused, stale): the
+// one waiting in Mongo now, unless the step names one.
+const requestedOf = async (pid) => (await roomDoc()).state.requests.find((q) => q.pid === pid)?.amount ?? 1;
+const hostOp = async (p, op, opts = {}) =>
+    action(p, {type: 'host', op: op.op === 'approve' && op.amount === undefined ? {...op, amount: await requestedOf(op.pid)} : op}, opts);
 const tick = (p, beat = false) => post(p, 'tick', beat ? {beat: {hidden: false}} : {});
 const act = (p, view, move, opts = {}) => action(p, {type: 'act', turn: view.turn, move}, opts);
 

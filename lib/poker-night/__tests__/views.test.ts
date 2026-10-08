@@ -11,6 +11,7 @@
 
 import {describe, expect, it} from 'vitest';
 import {evaluateCards} from '@/lib/poker/evaluator';
+import {ASK_EXPIRED} from '@/lib/poker-night/asks';
 import {legalFor, snapshotFromState} from '@/lib/poker-night/betting';
 import {nextDueAt} from '@/lib/poker-night/clock';
 import {ASKS, KEEP} from '@/lib/poker-night/config';
@@ -190,7 +191,7 @@ describe('the non-leak property', () => {
         const me = playerView(s, 'p2', playerMeta(s)).me;
         expect(me).toEqual({
             pid: 'p2', seat: 2, role: 'seated', isHost: false, hasAccount: false, hole: cards('QhQd'), pre: null, next: null,
-            discard: null, allowAsks: true, asks: [], canAsk: [], askBlocked: [], shownToMe: [], hostAwayAt: null,
+            discard: null, allowAsks: true, asks: [], canAsk: [], askBlocked: [], shownToMe: [],
         });
     });
 });
@@ -202,14 +203,14 @@ describe('what only the viewer sees', () => {
         const p1 = playerView(s, 'p1', {...playerMeta(s), hasAccount: true});
         expect(p1.me).toEqual({
             pid: 'p1', seat: 1, role: 'seated', isHost: false, hasAccount: true, hole: cards('KhKd'), pre: {kind: 'check-fold'} as PreAction, next: null,
-            discard: null, allowAsks: true, asks: [], canAsk: [], askBlocked: [], shownToMe: [], hostAwayAt: null,
+            discard: null, allowAsks: true, asks: [], canAsk: [], askBlocked: [], shownToMe: [],
         });
         const host = playerView(s, 'p0', playerMeta(s));
         expect(host.me).toMatchObject({isHost: true, pre: null, hole: cards('AhAd')});
         const watcher = playerView(s, 'w1', playerMeta(s));
         expect(watcher.me).toEqual({
             pid: 'w1', seat: null, role: 'watching', isHost: false, hasAccount: false, hole: null, pre: null, next: null,
-            discard: null, allowAsks: true, asks: [], canAsk: [], askBlocked: [], shownToMe: [], hostAwayAt: null,
+            discard: null, allowAsks: true, asks: [], canAsk: [], askBlocked: [], shownToMe: [],
         });
         expect(watcher.config).toEqual(s.config);
         expect(watcher.seats[1]!.cards).toBe(2);
@@ -286,7 +287,14 @@ describe('what only the viewer sees', () => {
         // Unanswered past its time: a no for both, though nothing was written.
         expect(viewAt(s, 'p1', at + 100 + ASKS.WAIT_MS).me.asks[0].answer).toBe('expired');
         expect(wireView(s, meta(s))).toEqual(before);
-        expect(nudgeKey(s, 'p1')).not.toBe(nudgeKey(structuredClone({...s, hand: {...s.hand!, asks: []}}), 'p1'));
+        expect(nudgeKey(s, 'p1', at + 200)).not.toBe(nudgeKey(structuredClone({...s, hand: {...s.hand!, asks: []}}), 'p1', at + 200));
+        // Read at a moment: past its time an ask reads expired whether or not a write said so, so writing
+        // its expiry down changes nobody's key — before its time it does.
+        const recorded = structuredClone(s);
+        recorded.hand!.asks[0][3] = ASK_EXPIRED;
+        expect(nudgeKey(recorded, 'p1', at + 100 + ASKS.WAIT_MS)).toBe(nudgeKey(s, 'p1', at + 100 + ASKS.WAIT_MS));
+        expect(nudgeKey(recorded, 'p2', at + 100 + ASKS.WAIT_MS)).toBe(nudgeKey(s, 'p2', at + 100 + ASKS.WAIT_MS));
+        expect(nudgeKey(recorded, 'p1', at + 200)).not.toBe(nudgeKey(s, 'p1', at + 200));
         const r = reduce(s, {type: 'reply', by: 'p1', to: 'p2', show: 'one', at: at + 300});
         s = ok(r);
         expect(viewAt(s, 'p2', at + 400).me.shownToMe).toEqual([{seat: 1, cards: cards('KhKd')}]);

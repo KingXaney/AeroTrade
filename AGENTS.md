@@ -525,7 +525,8 @@ and friends keep none beyond Shared and the invariants).
   `nextModeOf` and `modeChanged` name the game in play and the next — the top bar's second line
   (`data-pn-mode-label`, the code from 400 px), the felt before the first hand, the countdown when it
   changes, a toast and an announcement at its first deal (the deal event's `changed`), the join
-  card's terms with "How it plays" (the Hands drawer on that game, for a visitor too), the invite
+  card's terms with "How it plays" (the Hands drawer opened on that game, before the rankings —
+  `overlay-requests.openOverlay('hands', {lead: true})`, `HandsGuide`'s `lead` — for a visitor too), the invite
   sheet, the link preview and every lobby and Home row (`LOBBY_PROJECTION` reads
   `state.config.variant`/`boards`; `lobby.modeLine`); every name is `MODE_COPY`. The dock fans four
   cards (`.pn-hole[data-count="4"]`, the night's width held by `data-slots`, at 0.8 of the card in the
@@ -614,7 +615,7 @@ and friends keep none beyond Shared and the invariants).
   (`lib/poker-night/config`, now 2) and adding a step to `lib/poker-night/migrate`: `migrateState`
   hands a valid version 2 state back as it is, checks a version 1 one against its own frozen shape
   and steps it (`v1ToV2`: the config's game last, rebuys 'auto' read as 'approve', `leaveAfter` off,
-  ledger times to seconds, a request's unread time dropped, the hand's one board as a run and a
+  ledger times to seconds, a request's time kept, the hand's one board as a run and a
   board, pots paid on that board, shown hands as their cards), and refuses anything else;
   `migrateSummary` reads a PokerHand row written before version 2 as today's
   (`hands-store.readHand`/`readHands`). The version 1 fixtures (`state-v1-corpus.json`,
@@ -622,9 +623,10 @@ and friends keep none beyond Shared and the invariants).
   played on in `fixtures-v1.test.ts`. A hand's log, a ledger row's events and a hand's asks are
   stored as number tuples whose kinds index `ENTRY_KINDS`, `LEDGER_KINDS` and `ASK_ANSWERS`,
   append-only lists; `lib/poker-night/__tests__/budget.test.ts` holds the state to 16,000 bytes,
-  the room document to 27,000 for what each write reads (30,000 with the emotes) and the wire view
+  the room document to 27,200 for what each write reads (30,000 with the emotes) and the wire view
   to 4,500 on the heaviest table the engine builds, every private list at its longest on top
-  (`PN_BUDGET_PRINT=1` prints the bytes: 14,798, 26,806, 29,457 and 3,787 when version 2 landed).
+  (`PN_BUDGET_PRINT=1` prints the bytes: 14,798, 26,806, 29,457 and 3,787 when version 2 landed;
+  each request's time, kept since, took the read past 27,000).
 - The rules a change most often meets (the spec has the rest): the big blind always moves one
   eligible seat on (`lib/poker-night/seats.positions`); a short all-in reopens nobody who has acted
   unless the short all-ins since add up to a full raise, but a checker facing an opening all-in
@@ -643,13 +645,15 @@ and friends keep none beyond Shared and the invariants).
   with `withdraw`, or the player leaves). A newcomer waiting sits with nothing, is dealt nothing and
   has no ledger row until the chips land (as a buy-in: `ledger.hasBought`); the rebuy policy is off
   or on (`REBUY_POLICIES`: 'off' | 'approve'), and off stops rebuys and re-sits, never a first
-  buy-in, nor cashes out a newcomer still waiting. A host unheard from for `LIMITS.hostTakeoverMs`
-  (`room.hostAwayAt`) holds no buy back: from then a sit or a buy lands as before the first deal —
-  the room alone marks the action `hostAway` (`room.withHostAway`; a request never carries it), a
-  buy that lands takes the place of the player's request, and the same request again changes
-  nothing. Claim-host stays an account holder's (a guest cannot hold the role), so this is what keeps
-  a table of guests going. The break's one-tap Leave asks first only when there is no way back
-  (`overlays.leaveTapAsks`).
+  buy-in, nor cashes out a newcomer still waiting. Every buy waits however long the host is gone —
+  nothing lands without their yes; a host unheard from for `LIMITS.hostTakeoverMs` is replaced by
+  claim-host (an account holder at the table), and the requests wait for whoever holds the role. A
+  request keeps its time (`TableState.requests[].at`): the same request again changes nothing, and
+  its player may change its amount or take it back only `REQUESTS.CHANGE_MS` after the last change
+  ('request-wait'), so a request comes and goes at most once every few seconds; a leave is never held.
+  The host's approve names the amount it says yes to (`HostOp` approve's `amount`, sent by the toast
+  and the bank's row): one the request no longer says is refused `stale`, and nothing lands. The
+  break's one-tap Leave asks first only when there is no way back (`overlays.leaveTapAsks`).
 - Asks to see a hand (`lib/poker-night/asks`, pure, read by the engine and the views alike; the
   engine's `ask`, `reply`, `allow-asks`): once a hand completes, a player dealt into it who folded
   may ask a player whose cards were not shown; the player asked answers with their cards to the one
@@ -721,7 +725,9 @@ and friends keep none beyond Shared and the invariants).
   Unchanged, `since`, the realtime message, the results' guard) carries `room-doc.publicSeq`, seq
   less those, so no browser reads their timing off a version; the author's own answer brings it at
   the seq held (the feed's `own` input). A write that changes another player's own view where the
-  public table does not show it (`mutation.nudgesOf` over `views.nudgeKey`: the player asked, the
+  public table does not show it (`mutation.nudgesOf` over `views.nudgeKey`, both sides read at the
+  commit's time — an ask's expiry written down by another pair's ask or answer, which the views
+  already read as expired, nudges no one — : the player asked, the
   one who asked, a player the host sat out mid-hand) moves that player's row's `nudge` count
   (`mutation.withNudges`; private, never peopleV): the head projects it, a GET state sends the count
   it holds (`nsince`; one that names none asks after the table alone) and is read whole when it
@@ -840,7 +846,9 @@ and friends keep none beyond Shared and the invariants).
   the inner `.pn-fold-turn`). The one thing a timer moves is a winner's stack counting up, formatted
   text on the same token (`components/poker-night/CountUp`).
 - The winner's banner and the line under it (the next deal's countdown, the pause) go where
-  `lib/poker-night/stage.bannerPlan` finds room, clear of every plate and its status flag, open seat,
+  `lib/poker-night/stage.bannerPlan` finds room (`stage.resultBannerPlan` at the table: clear of the
+  pots paying out and the winners' "+N" too where that leaves room, else of the table alone, since
+  both leave within a second or two — never over a plate for the long pause after a hand), clear of every plate and its status flag, open seat,
   turned-up hand (`stage.shownHandRect`), the dealer button and the board with its lit cards' lift:
   the full banner with the line under it nearest the board on the pot's side, then its other side,
   then the felt's empty bands; then the compact banner (a line a winner, no avatar, wrapped when
@@ -911,10 +919,18 @@ and friends keep none beyond Shared and the invariants).
   phone or eight on the smallest phone on its side can still leave two meeting (the banner then sits
   where the pot was, flagged); PLO's four keep the row nudge alone. The emotes' spot reads a hand moved
   under its plate (`emotes.emoteSpot`).
-- A plate's status flag hangs under it where `stage.flagRoom` finds room clear of every other seat's
-  plate (an open seat's ring), its cards face down, its blind's mark and its flag; where it has none
-  (a phone on its side at seven seats or more), Triple T's "Discarding…" is a dashed ring on the plate
-  instead (`data-pn-mark="discarding"`), the felt's count and the backs saying who is still to throw.
+- A plate's status word (`lib/poker-night/plate.plateStatus`: "Folded", "All in", "Offline",
+  "Waiting for chips", "No chips yet" for a seat that never had chips here — never "Out of chips" —
+  …) hangs under it where `stage.flagRoom` finds room clear of every other seat's plate (an open
+  seat's ring), its cards face down, its blind's mark and its flag, every seat's word weighed
+  (`SeatRing`); where it has none (`stage.flagsOnPlate`: a crowded column on a phone on its side,
+  the widest word on a 320 px one), the plate carries it — Triple T's "Discarding…" as a dashed ring
+  (`data-pn-mark="discarding"`, the felt's count and the backs saying who is still to throw), any
+  other word in the stack's place, the name beside the avatar (`data-status-on="plate"`,
+  `.pn-plate-status`; the stack stays in the plate's accessible name). A squat box — a phone on its
+  side, the dock in its column (`layout.isSquat`) — seats eight two to a side column
+  (`layout.SQUAT_SLOTS`), so every word hangs there; seven and nine keep the portrait slots, whose
+  hands, pots and banner find room where no squat placement leaves them all.
   Three or four cards face down (Triple T's, PLO's) start a whole card's width over a compact or tight
   plate (`stage.SEAT_CARDS_OVER`, `seatCardsRect`'s count, `PotSeen.backs`), above the stack's figures
   that their closed fan would cover; `qa-poker-night-modes`' `tableLayout` counts flags over other
@@ -992,18 +1008,21 @@ and friends keep none beyond Shared and the invariants).
 - The host's yes, at the table: the join card says it once the first hand is dealt
   (`JoinView.needsApproval`, `JOIN_COPY.approvalNote`); a seat whose chips wait reads "Waiting for
   chips" on every plate (the public `requests`) and its dock "Waiting for the host to approve your
-  chips" with Cancel (`withdraw`; `dock.waitingChips`), as the bank does — and once the host counts
-  as away (`MeView.hostAwayAt`, a time, so a view read before then still says it), that the chips no
-  longer wait for them, with "Take 2,000 chips". A Cancel (marked as it is sent,
+  chips" with Cancel (`withdraw`; `dock.waitingChips`), as the bank does, however long the host is
+  gone (no way round them: `overlays.buyAsksHost`). A Cancel (marked as it is sent,
   `overlay-requests.markOwnWithdraw`) or a leave is never said as the host's no
   (`overlays.requestEnded`: 'withdrawn'). A seat that never had chips here reads "No chips yet."
   with one tap, "Ask for 2,000 chips" (`bank.buyOptions`' `first`), never "Out of chips" or a
-  top-up. The host hears a short sound (`sounds` 'request') and sees a toast with Approve for each
-  new request (`components/poker-night/AskPrompt`'s `RequestWatch`, `overlays.newRequests`), a dot on
-  Bank and Host, and the bank's rows say what each is for (`overlays.requestKind`: to sit down, a
-  rebuy, a top-up). A table toast's action is a 44 px target (`overlay-kit.TOAST_ACTION`). The
-  rebuy policy is Off / On (host approves) in the start form and the host drawer
-  (`components/poker-night/RebuyChoice`, a radio pair over `ChoiceGroup`).
+  top-up. The host sees a toast with Approve for each new request and hears a short sound (`sounds`
+  'request') at most once a player in `REQUEST_SOUND_MS` (`components/poker-night/AskPrompt`'s
+  `RequestWatch`, `overlays.requestAlerts`); a request whose amount changed is said again in its
+  toast's place, silently, its Approve naming the new amount; a dot on Bank and Host, and the bank's
+  rows say what each is for (`overlays.requestKind`: to sit down, a rebuy, a top-up). The bank's
+  figures keep a gap at their left; under 22rem (a 320 px phone's drawer, a container query) the
+  Rebuys column gives way to a count under each name (`BANK_COPY.rebuysCount`). A table toast's
+  action is a 44 px target (`overlay-kit.TOAST_ACTION`). The rebuy policy is Off / On (host
+  approves) in the start form and the host drawer (`components/poker-night/RebuyChoice`, a radio pair
+  over `ChoiceGroup`, whose chosen ring is drawn inside the option, so a panel's edge never cuts it).
 - Asks, at the table: another player's seat menu leads with "Ask to see their cards"
   (`overlays.askOffer` over `canAsk`, `askBlocked` and the viewer's own `asks`): offered, greyed with
   its reason, or how the viewer's ask of them stands — read at the server's time, so an ask that ran
@@ -1055,7 +1074,8 @@ and friends keep none beyond Shared and the invariants).
   `SHOWN_CARD_PX`, `TABLE_TOP_ROOM`, held equal to the stylesheet): clear of a seat's turned-up cards
   and tag, under a plate along the top, never behind the top bar; an impact lands on the target's
   avatar (`stage.avatarCentre`), one per plate (a new one replaces it), with its own landing sound
-  (`emotes.landingSound`).
+  (`emotes.landingSound`), told whichever settles the screen first — the store's timer, or new
+  emotes arriving the moment the throw lands (`emotes.landedBetween`).
 - The table's feel (`components/poker-night/TableFeel`): sounds synthesised by Web Audio from
   `lib/poker-night/sounds`' recipes — layered, physically shaped tones and filtered noise: a card's
   swish and snap, two to four clay chips clacking, a knock, the muck's sweep, and each thing thrown its

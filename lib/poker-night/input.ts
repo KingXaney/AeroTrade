@@ -69,7 +69,9 @@ const HostOpSchema = z.discriminatedUnion('op', [
     z.strictObject({op: z.enum(['start', 'pause', 'resume', 'end'])}),
     z.strictObject({op: z.literal('config'), patch: ConfigPatchSchema}),
     z.strictObject({op: z.literal('settings'), patch: SettingsPatchSchema}),
-    z.strictObject({op: z.enum(['approve', 'deny', 'kick']), pid}),
+    // Approve names the amount the host saw: the engine refuses it (stale) once the request changed.
+    z.strictObject({op: z.literal('approve'), pid, amount: buyIn}),
+    z.strictObject({op: z.enum(['deny', 'kick']), pid}),
     // Sit a player out; nothing takes one back but the player's own sit-in.
     z.strictObject({op: z.literal('sit-out'), pid}),
 ]);
@@ -133,7 +135,9 @@ const hostOpOf = (op: z.infer<typeof HostOpSchema>): HostOp => {
             const {name, ...rest} = op.patch;
             return {op: 'settings', patch: name === undefined ? {...rest} : {...rest, name: cleanTableName(name) ?? ''}};
         }
-        case 'approve': case 'deny': case 'kick':
+        case 'approve':
+            return {op: 'approve', pid: op.pid, amount: op.amount};
+        case 'deny': case 'kick':
             return {op: op.op, pid: op.pid};
         case 'sit-out':
             return {op: 'sit-out', pid: op.pid};

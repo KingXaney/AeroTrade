@@ -165,7 +165,7 @@ describe('the refusals', () => {
             'already-seated', 'bad-amount', 'bad-config', 'bad-deck', 'bad-seat', 'below-buy-in', 'below-min-raise', 'closed',
             'illegal', 'no-request', 'not-due', 'not-host', 'not-now', 'not-seated', 'not-your-turn', 'over-cap', 'rebuy-cap',
             'rebuys-off', 'seat-taken', 'stale',
-            'ask-cooldown', 'ask-limit', 'ask-waiting', 'asks-off', 'asks-full',
+            'ask-cooldown', 'ask-limit', 'ask-waiting', 'asks-off', 'asks-full', 'request-wait',
         ].sort());
         for (const text of Object.values(REFUSAL_COPY)) {
             clean(text);
@@ -934,6 +934,7 @@ describe('the bank', () => {
             rebuyFor: () => each(BANK_COPY.rebuyFor),
             rebuyShort: () => each(BANK_COPY.rebuyShort),
             askShort: () => each(BANK_COPY.askShort),
+            rebuysCount: () => each(BANK_COPY.rebuysCount),
         });
     });
 
@@ -953,6 +954,7 @@ describe('the bank', () => {
         expect(BANK_COPY.net(-300)).toBe(`${MINUS}300`);
         expect(BANK_COPY.net(0)).toBe('0');
         expect(BANK_COPY.inPot(300)).toBe('300 in the pot');
+        expect([BANK_COPY.rebuysCount(1), BANK_COPY.rebuysCount(3)]).toEqual(['1 rebuy', '3 rebuys']);
         expect(BANK_COPY.rebuy).toBe('Rebuy');
         expect(BANK_COPY.topUp(2000)).toBe('Top up to 2,000');
         expect(BANK_COPY.ownInPot(20)).toBe('Counting 20 in this pot.');
@@ -1378,7 +1380,7 @@ describe('asks to see a hand, leaving after this hand and the host\'s yes', () =
         ];
         for (const text of said) clean(text);
         for (const text of [TABLE_COPY.leaveAfter, TABLE_COPY.leaveAfterShort, TABLE_COPY.lastHand, TABLE_COPY.leavingAfter, TABLE_COPY.stayAtTable, TABLE_COPY.leaveAfterSet,
-            TABLE_COPY.noChipsYet, TABLE_COPY.hostAwayNote, TABLE_COPY.hostBack,
+            TABLE_COPY.noChipsYet, TABLE_COPY.noChipsFlag, REFUSAL_COPY['request-wait'],
             TABLE_COPY.leaveAfterCleared, TABLE_COPY.leaveLanded, TABLE_COPY.leaveAfterNote, TABLE_COPY.waitingApproval, TABLE_COPY.awaitingChips,
             TABLE_COPY.leftSeat, JOIN_COPY.approvalNote, HOST_COPY.rebuysHint, LOOKS_COPY.allowAsks, LOOKS_COPY.allowAsksHint]) clean(text);
     });
@@ -1402,7 +1404,8 @@ describe('asks to see a hand, leaving after this hand and the host\'s yes', () =
         expect(REFUSAL_COPY['asks-full']).toBe('Asks to see cards are resting at this table: they open again within five hands.');
         expect(TABLE_COPY.noChipsYet).toBe('No chips yet.');
         expect([BANK_COPY.askFor(2000), BANK_COPY.takeChips(2000)]).toEqual(['Ask for 2,000 chips', 'Take 2,000 chips']);
-        expect(TABLE_COPY.hostAwayNote).toBe('The host has been away for over ten minutes, so your chips no longer wait for them.');
+        expect(TABLE_COPY.noChipsFlag).toBe('No chips yet');
+        expect(REFUSAL_COPY['request-wait']).toBe('Your request for chips just changed: try again in a moment.');
         expect(TABLE_COPY.leaveLanded).toBe('A new hand was dealt first: you leave the table when it ends.');
         expect(TABLE_COPY.waitingApproval).toBe('Waiting for the host to approve your chips');
         expect(plain(HOST_COPY.requestSeat('Ana', 2000))).toBe('Ana asks for 2,000 chips to sit down.');

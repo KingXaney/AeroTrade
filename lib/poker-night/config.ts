@@ -51,6 +51,11 @@ export const cardsNeeded = (c: Pick<GameConfig, 'variant' | 'boards' | 'seats'>)
 // out (asks.asksFull, the 'asks-full' refusal).
 export const ASKS = {WAIT_MS: 15_000, PER_HAND: 2, COOLDOWN_HANDS: 5, COOLDOWNS_KEPT: 12} as const;
 
+// A request for chips once the first hand is dealt (engine.buy, withdraw): kept at least CHANGE_MS
+// before its player may change its amount or take it back ('request-wait'), so a request comes and
+// goes at most once every few seconds and never floods the host with alerts.
+export const REQUESTS = {CHANGE_MS: 3000} as const;
+
 // The looks the host picks for everyone; their colours live in lib/poker-night/looks.ts.
 export const SCENE_IDS = ['casino-classic', 'midnight-lounge', 'neon-city', 'beach-sunset', 'deep-space', 'log-cabin', 'garden-party', 'my-theme'] as const;
 export const FELT_IDS = ['emerald', 'royal-blue', 'burgundy', 'charcoal', 'violet', 'teal', 'tangerine', 'rose'] as const;

@@ -18,8 +18,8 @@ import {PLATE, SEAT_COUNTS, spotToPx} from '@/lib/poker-night/layout';
 import {
     AMOUNT_PX, AVATAR_PX, avatarCentre, BANNER, bannerObstacles, bannerPlan, BET, betLineSize, BLIND_MARK, blindRect, BOARD_CARD_MAX, BOARD_CARD_MIN, BOARD_GAP, BOARD_LABEL, BOARD_ROW_GAP,
     BOARD_SIDE_GAP, boardAnchor, boardBlock, BOARDS_SHEET_CARD, CARD_RATIO, CASCADE_STEP, CHIP_PX, FELT_RAIL, INDEX_BAND, MULTI_BOARD_MIN,
-    feltSpan, fitFor, FLAG_PX, flagRect, flagRoom, handsMeet, insideBox, menuSide, MINI_CARD_PX, MONO_EM, NARROW_STAGE, offset, openSeatPx, overlaps, pieceRect, PLATE_PAD_X, PLATE_SIZE, POT_CLEAR, POT_PILL, POT_PILL_H,
-    potCentre, potLayouts, potObstacles, potPillWidth, potPlan, PULSE, SEAT_CARDS_OVER, seatCardsRect, SHOWN_CARD_PX, SHOWN_OFF, SHOWN_STEP, shownHandRect, shownHandWidth, stageLayout, stageOrientation,
+    feltSpan, fitFor, FLAG_PX, flagRect, flagRoom, flagsOnPlate, handsMeet, insideBox, menuSide, MINI_CARD_PX, MONO_EM, NARROW_STAGE, offset, openSeatPx, overlaps, pieceRect, PLATE_PAD_X, PLATE_SIZE, POT_CLEAR, POT_PILL, POT_PILL_H,
+    potCentre, potLayouts, potObstacles, potPillWidth, potPlan, PULSE, resultBannerPlan, SEAT_CARDS_OVER, seatCardsRect, SHOWN_CARD_PX, SHOWN_OFF, SHOWN_STEP, shownHandRect, shownHandWidth, stageLayout, stageOrientation,
     TABLE_TOP_ROOM, textWidth, TIGHT_BELOW, WIN_POP, winPopRect, wrappedLines,
     type BannerPlan, type BannerSeen, type BannerText, type BetOut, type Fit, type PotNow, type PotPlan, type PotSeen, type Rect, type SeatMarks, type Stage, type WinPop,
 } from '@/lib/poker-night/stage';
@@ -143,8 +143,9 @@ describe("a seat's status flag", () => {
             // Where there is room — a phone held upright, the desktop — every flag hangs.
             if (box.h >= box.w || fitFor(box) === 'comfortable') expect(hangs.length, `${box.w}×${box.h} ${n} seats`).toBe(n);
         }
-        // The smallest phone on its side at eight seats: the side columns' flags meet the plates under them.
-        const crowded = stageLayout(SIDEWAYS['568 × 320'], 8, 0);
+        // The smallest phone on its side at nine seats (the portrait slots, three to a side column): the
+        // side columns' flags meet the plates under them.
+        const crowded = stageLayout(SIDEWAYS['568 × 320'], 9, 0);
         expect(throwAway(crowded).filter((m) => !flagRoom(crowded, m.seat, TABLE_COPY.discarding, throwAway(crowded))).length).toBeGreaterThan(0);
         // An open seat's ring is all that stands there.
         const four = throwAway(crowded).map((m) => (m.seat % 2 === 1 ? {...m, open: true, backs: 0, blind: false, flag: null} : m));
@@ -156,6 +157,70 @@ describe("a seat's status flag", () => {
                 expect(overlaps(flag, {...crowded.seats[o.seat].plate, w: ring, h: ring})).toBe(false);
             }
         }
+    });
+
+    // Every word a plate hangs, the widest first.
+    const WORDS = [TABLE_COPY.awaitingChips, TABLE_COPY.presence.hidden, TABLE_COPY.noChipsFlag, TABLE_COPY.status.busted, TABLE_COPY.status['sitting-out'],
+        TABLE_COPY.presence.offline, TABLE_COPY.status['all-in'], TABLE_COPY.status.folded, TABLE_COPY.status.waiting, TABLE_COPY.status.leaving];
+    // Every seat taken, `backs` face down before every plate but the viewer's, the blinds after button `b`.
+    const marksOf = (s: Stage, mine: number | null, word: string, backs: number, b: number): SeatMarks[] => {
+        const n = s.seats.length;
+        return s.seats.map((p) => ({seat: p.seat, open: false, backs: p.seat === mine ? 0 : backs, blind: p.seat === (b + 1) % n || p.seat === (b + 2) % n, flag: word}));
+    };
+    const SQUAT_BOXES = [...Object.values(SIDEWAYS), {w: 548, h: 280}];
+
+    it('hangs every word under every plate at eight seats on a phone on its side (the squat slots, two to a side column)', () => {
+        for (const box of SQUAT_BOXES) for (const mine of [0, null]) {
+            const s = stageLayout(box, 8, mine);
+            // Two to a side column: the plates apart by a flag's drop and more.
+            const columns = s.seats.filter((p) => p.spot.x === 0);
+            expect(columns, `${box.w}×${box.h}`).toHaveLength(2);
+            for (const word of WORDS) for (const backs of [2, 3, 4]) for (let b = 0; b < 8; b++) {
+                const marks = marksOf(s, mine, word, backs, b);
+                for (const m of marks) expect(flagRoom(s, m.seat, word, marks), `${box.w}×${box.h}, viewer ${mine}, "${word}", ${backs} backs, button ${b}: seat ${m.seat}`).toBe(true);
+                expect(flagsOnPlate(s, marks).size).toBe(0);
+            }
+        }
+        // Not a phone on its side: the portrait and landscape slots as they were.
+        expect(stageLayout({w: 548, h: 600}, 8, 0).seats[1].spot).toMatchObject({x: 8, y: 80});
+        expect(stageLayout({w: 548, h: 280}, 8, 0).seats[1].spot).toMatchObject({x: 8, y: 100});
+        expect(stageLayout({w: 562, h: 294}, 8, 0).seats[1].spot).toMatchObject({x: 20, y: 96});
+    });
+
+    it('goes on the plate where it has no room under it (stage.flagsOnPlate): every word that hangs clears everything round it, at every size, seat count and word', () => {
+        let carried = 0;
+        for (const box of [...BOXES, ...Object.values(POT_BOXES).flat(), ...SQUAT_BOXES]) for (const n of SEAT_COUNTS) for (const mine of [0, null]) {
+            const s = stageLayout(box, n, mine);
+            for (const word of [WORDS[0], TABLE_COPY.presence.offline, TABLE_COPY.status.folded]) for (const backs of [2, 4]) {
+                const marks = marksOf(s, mine, word, backs, 0);
+                const onPlate = flagsOnPlate(s, marks);
+                carried += onPlate.size;
+                const hangs = marks.filter((m) => !onPlate.has(m.seat));
+                for (const m of hangs) {
+                    const flag = flagRect(s.seats[m.seat], s, word);
+                    for (const o of marks) {
+                        if (o.seat === m.seat) continue;
+                        for (const r of [...drawn(s, o), ...(onPlate.has(o.seat) ? [] : [flagRect(s.seats[o.seat], s, word)])]) {
+                            expect(overlaps(flag, r), `${box.w}×${box.h} ${n} seats, viewer ${mine}, "${word}": seat ${m.seat}'s flag over seat ${o.seat}`).toBe(false);
+                        }
+                    }
+                }
+                // Where there is room — a phone held upright, the desktop — every short word hangs (the
+                // widest, "Waiting for chips", may meet a crowded column's next plate on a 320 px phone).
+                if ((box.h >= box.w || fitFor(box) === 'comfortable') && word !== WORDS[0]) expect(onPlate.size, `${box.w}×${box.h} ${n} seats, "${word}"`).toBe(0);
+            }
+        }
+        // Nine seats on the smallest phone on its side: the side columns' plates carry theirs.
+        const nine = stageLayout(SIDEWAYS['568 × 320'], 9, 0);
+        expect(flagsOnPlate(nine, marksOf(nine, 0, TABLE_COPY.presence.offline, 2, 0)).size).toBeGreaterThan(0);
+        expect(carried).toBeGreaterThan(0);
+        // An open seat, or a seat with no word, carries nothing.
+        const open = marksOf(nine, 0, TABLE_COPY.presence.offline, 2, 0).map((m) => (m.seat % 2 ? {...m, open: true, flag: null} : {...m, flag: m.seat === 2 ? null : m.flag}));
+        const carriedOpen = flagsOnPlate(nine, open);
+        for (const m of open) if (m.open || m.flag === null) expect(carriedOpen.has(m.seat)).toBe(false);
+        // The stylesheet: the word in the stack's place, the name beside the avatar.
+        expect(css).toContain('.pn-seat[data-status-on="plate"] .pn-plate { grid-template-areas: "avatar name" "stack stack"; }');
+        expect(css).toMatch(/\.pn-plate-status \{[^}]*text-overflow: ellipsis;[^}]*\}/);
     });
 
     it('is as wide as its words, 6 px a side inside the widest border, never more than 28 px wider than the plate', () => {
@@ -701,6 +766,43 @@ const expectClear = (s: Stage, text: BannerText, seen: BannerSeen, label: string
 };
 
 describe("the winner's banner", () => {
+    it('in the pause after a hand, never stands over a plate for the pots and "+N" that have left: clear of the table alone where nothing clears them too', () => {
+        const text: BannerText = {
+            winners: [{head: TABLE_COPY.banner('Hana', 40), short: {lead: '', name: TABLE_COPY.bannerShortNames(['Hana']), tail: TABLE_COPY.bannerShortWins}, hand: threesFull}],
+            note: TABLE_COPY.paused,
+        };
+        let rescued = 0;
+        for (const [w, from, to] of [[364, 205, 240], [308, 330, 370], [442, 260, 300]] as const) for (let h = from; h <= to; h += 5) for (const n of [6, 7, 8, 9]) {
+            for (let mine = 0; mine < n; mine += 2) for (const button of [mine, (mine + 1) % n]) for (const open of [[], [(mine + 2) % n, (mine + 3) % n, (mine + 4) % n]]) {
+                const s = stageLayout({w, h}, n, mine, 1, {open});
+                const seated = s.seats.map((p) => p.seat).filter((seat) => !open.includes(seat));
+                const pops: WinPop[] = [{seat: seated.find((seat) => seat !== mine) ?? mine, amount: 40}];
+                const pots = potPlan(s, potsOf([40]), {open, shown: [], button, bets: seated, now: {shown: [], bets: [], pops}, handSize: 2});
+                const seen: BannerSeen = {open, shown: [], button, pots: pots?.pills ?? [], pops, handSize: 2};
+                const label = `${w}×${h} ${n} seats, viewer ${mine}, button ${button}, open ${open.join()}`;
+                const plan = resultBannerPlan(s, text, seen);
+                const busy = bannerPlan(s, text, seen);
+                // Clear of the pots and the "+N" where that leaves room: the same plan.
+                if (busy.clear) expect(plan, label).toEqual(busy);
+                // Else clear of the table alone wherever the table leaves room.
+                else if (bannerPlan(s, text, {...seen, pots: [], pops: []}).clear) {
+                    expect(plan.clear, label).toBe(true);
+                    for (const r of [pieceRect(plan.banner), ...(plan.note ? [pieceRect(plan.note)] : [])]) {
+                        for (const o of bannerObstacles(s, {...seen, pots: [], pops: []})) expect(overlaps(r, o, BANNER.clear - 1), label).toBe(false);
+                    }
+                    rescued++;
+                }
+            }
+        }
+        // The smallest phone on its side, eight seats: where the fallback once sat on a plate.
+        expect(rescued).toBeGreaterThan(0);
+        // With nothing paying out, nothing more to drop.
+        const s = stageLayout({w: 364, h: 216}, 8, 3, 1, {open: [5, 6, 7]});
+        const seen: BannerSeen = {open: [5, 6, 7], shown: [], button: 3, handSize: 2};
+        expect(resultBannerPlan(s, text, seen)).toEqual(bannerPlan(s, text, seen));
+        expect(resultBannerPlan(s, text, seen).clear).toBe(true);
+    });
+
     for (const [size, boxes] of Object.entries(BANNER_BOXES)) for (const handSize of [2, 4]) {
         it(`clears every plate, turned-up hand (of ${handSize}), the dealer button and the board at ${size}, every seat count and button`, () => {
             for (const box of boxes) for (const n of SEAT_COUNTS) for (const mine of [0, null]) {
@@ -1084,8 +1186,11 @@ describe('two and three boards', () => {
         // QA's seating: the viewer at the foot and three players up the right-hand side.
         const qa = (boards: number) => stageLayout(SIDEWAYS['568 × 320'], 8, 0, boards, {handSize: 4, open: [1, 2, 3, 4]}).board.card.w;
         expect([qa(2), qa(3)].every((w) => w >= 20), `${qa(2)}, ${qa(3)}`).toBe(true);
-        // Every seat taken there is still nowhere to put them larger: 14 px, the sheet is where they read.
-        expect(stageLayout(SIDEWAYS['568 × 320'], 8, 0, 3, {handSize: 4}).board.card.w).toBe(MULTI_BOARD_MIN);
+        // Every seat taken there, the squat slots (two to a side column) still leave the boards 18 px or
+        // more; nine seats on the portrait slots leave nowhere larger than 14 px, and the sheet is where
+        // they read.
+        expect(stageLayout(SIDEWAYS['568 × 320'], 8, 0, 3, {handSize: 4}).board.card.w).toBeGreaterThanOrEqual(BOARD_CARD_MIN);
+        expect(stageLayout(SIDEWAYS['568 × 320'], 9, 0, 3, {handSize: 4}).board.card.w).toBe(MULTI_BOARD_MIN);
     }, 120_000);
 
     it("sends a board's share of the pots from its numeral, else its left end", () => {

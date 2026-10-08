@@ -274,6 +274,12 @@ export const settle = (items: readonly LiveEmote[], now: number): LiveEmote[] =>
     return changed ? oneImpactEach(out) : (items as LiveEmote[]);
 };
 
+// The throws that landed between two settlements of the screen: in flight before, their impact
+// after. Whichever settles the screen reports them — the store's timer, or a new view's emotes
+// arriving the moment a throw lands, before that timer fires — so a landing never goes unheard.
+export const landedBetween = (before: readonly LiveEmote[], after: readonly LiveEmote[]): LiveEmote[] =>
+    after === before ? [] : after.filter((i) => i.phase === 'impact' && before.some((b) => b.key === i.key && b.phase === 'flight'));
+
 // The soonest moment something on screen changes, or null.
 export const nextChange = (items: readonly LiveEmote[]): number | null =>
     items.length === 0 ? null : Math.min(...items.map((i) => i.until));

@@ -40,7 +40,7 @@ import {describe, expect, it} from 'vitest';
 import {evaluateCards} from '@/lib/poker/evaluator';
 import {allInOpen, legalFor, needsToAct, owed, snapshotFromState} from '@/lib/poker-night/betting';
 import {advance, nextDue} from '@/lib/poker-night/clock';
-import {ASK_ANSWERS, ASKS, DEFAULT_CONFIG, ENTRY_FLAGS, ENTRY_KINDS, HOLE_CARDS, PLAYING_CARDS, STREETS, TABLE_LIMITS} from '@/lib/poker-night/config';
+import {ASK_ANSWERS, ASKS, DEFAULT_CONFIG, ENTRY_FLAGS, ENTRY_KINDS, HOLE_CARDS, PLAYING_CARDS, REQUESTS, STREETS, TABLE_LIMITS} from '@/lib/poker-night/config';
 import {FULL_DECK, shuffleWith, type DeckSource} from '@/lib/poker-night/deck';
 import {createTable, forceClose, reduce} from '@/lib/poker-night/engine';
 import {buyRange, conservation, ledgerRow} from '@/lib/poker-night/ledger';
@@ -288,7 +288,7 @@ const COUNTERS = ['hands', 'showdowns', 'sidePots', 'oddChips', 'runouts', 'time
     'pendingBuys', 'approved', 'configs', 'pres', 'shows', 'pauses', 'bigBlindChecks', 'legalChecks', 'hostSitOuts', 'hostSitOutsMidHand',
     'hostSitOutsAlreadyOut', 'leaveAfter', 'leaveAfterCancelled', 'leaveAfterCashOuts', 'leaveAfterRace', 'leaveAfterNow', 'buyRequests',
     'firstBuyIns', 'hostBuysAfterStart', 'withdrawn', 'declined', 'asks', 'asksShown', 'asksShownAll', 'asksNo', 'asksExpired', 'askCooldowns',
-    'asksOff', 'askLimits', 'asksFull', 'asksDealt', 'hostAwayBuys', 'ploHands', 'ploShowdowns', 'potLimitCaps', 'potLimitAllInRefused',
+    'asksOff', 'askLimits', 'asksFull', 'asksDealt', 'requestWaits', 'staleApprovals', 'ploHands', 'ploShowdowns', 'potLimitCaps', 'potLimitAllInRefused',
     'multiBoardHands', 'multiBoardShowdowns', 'scoops', 'boardSplits', 'tripleTHands', 'tripleTShowdowns', 'discards', 'discardTimeouts',
     'discardsForLeavers', 'discardsRefused', 'tripleTWonInThrowAway'] as const;
 type Counters = Record<(typeof COUNTERS)[number], number>;
@@ -904,14 +904,17 @@ const night = (seed: number, counters: Counters) => {
                 const amount = !range || astray ? 1 + r.int(s.config.buyInMax) : r.chance(0.5) ? range.max : range.min + r.int(range.max - range.min + 1);
                 const dealtIn = live && liveSeatOf(s, by) !== null;
                 const before = {bought: ledgerRow(s, by)?.bought ?? 0, pending: seatOfPid(by)?.pendingBuy ?? 0};
-                // Now and then the host has been away long enough: the room marks the buy, and it lands.
-                const hostAway = s.handNo > 0 && by !== s.hostPid && r.chance(0.08);
-                if (send({type: 'buy', by, amount, at: now, ...(hostAway ? {hostAway} : {})}) !== null) return;
-                if (hostAway) {
-                    if (s.requests.some((q) => q.pid === by)) fail(`${by}'s buy with the host away left a request`);
-                    if ((ledgerRow(s, by)?.bought ?? 0) === before.bought && (seatOfPid(by)?.pendingBuy ?? 0) === before.pending) fail(`${by}'s buy with the host away did not land`);
-                    counters.hostAwayBuys++;
-                } else if (s.handNo > 0 && by !== s.hostPid) {
+                const waiting = s.requests.find((q) => q.pid === by) ?? null;
+                const refused = send({type: 'buy', by, amount, at: now});
+                if (refused === 'request-wait') {
+                    // Another amount within REQUESTS.CHANGE_MS of the request's last change.
+                    if (!waiting || waiting.amount === amount || now >= waiting.at + REQUESTS.CHANGE_MS) fail(`${by}'s buy refused request-wait with nothing to wait for`);
+                    counters.requestWaits++;
+                    return;
+                }
+                if (refused !== null) return;
+                if (waiting && waiting.amount !== amount && now < waiting.at + REQUESTS.CHANGE_MS) fail(`${by}'s request changed within REQUESTS.CHANGE_MS`);
+                if (s.handNo > 0 && by !== s.hostPid) {
                     // Once the first hand is dealt, every buy but the host's waits for the host.
                     if ((ledgerRow(s, by)?.bought ?? 0) !== before.bought || (seatOfPid(by)?.pendingBuy ?? 0) !== before.pending) fail(`${by}'s buy landed with nobody's yes`);
                     if (!s.requests.some((q) => q.pid === by && q.amount === amount)) fail(`${by}'s buy left no request`);
@@ -928,7 +931,16 @@ const night = (seed: number, counters: Counters) => {
                 const op = r.chance(0.85) ? 'approve' as const : 'deny' as const;
                 const first = (ledgerRow(s, by)?.bought ?? 0) === 0;
                 const pending = seatOfPid(by)?.pendingBuy ?? 0;
-                if (send({type: 'host', by: 'p0', op: {op, pid: by}, at: now}) !== null) return;
+                const asked = s.requests.find((q) => q.pid === by)?.amount ?? null;
+                // Now and then the host says yes to an amount the request no longer says: stale, nothing moves.
+                const amount = asked === null ? 1 + r.int(s.config.buyInMax) : r.chance(0.1) ? asked + 1 : asked;
+                const refused = send({type: 'host', by: 'p0', op: op === 'approve' ? {op, pid: by, amount} : {op, pid: by}, at: now});
+                if (op === 'approve' && asked !== null && amount !== asked) {
+                    if (refused !== 'stale') fail(`an approval of ${amount} for a request of ${asked} was not refused stale (${refused})`);
+                    counters.staleApprovals++;
+                    return;
+                }
+                if (refused !== null) return;
                 if (op === 'deny') {
                     counters.declined++;
                     return;
@@ -940,9 +952,16 @@ const night = (seed: number, counters: Counters) => {
             }
             case 'withdraw': {
                 const by = among(s.requests.map((q) => q.pid));
-                if (by && send({type: 'withdraw', by, at: now}) === null) {
+                if (!by) return;
+                const at = s.requests.find((q) => q.pid === by)?.at ?? null;
+                const refused = send({type: 'withdraw', by, at: now});
+                if (refused === null) {
                     if (s.requests.some((q) => q.pid === by)) fail('a withdrawn request still waits');
+                    if (at === null || now < at + REQUESTS.CHANGE_MS) fail('a request taken back within REQUESTS.CHANGE_MS');
                     counters.withdrawn++;
+                } else if (refused === 'request-wait') {
+                    if (at === null || now >= at + REQUESTS.CHANGE_MS) fail('a request held past REQUESTS.CHANGE_MS');
+                    counters.requestWaits++;
                 }
                 return;
             }

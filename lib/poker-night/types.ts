@@ -206,9 +206,10 @@ export type TableState = {
     ledger: LedgerRow[];
     // One per player, waiting for the host: once the first hand is dealt, every buy but the host's
     // (a newcomer's first chips, a re-sit, a rebuy, a top-up) waits here until approved, declined,
-    // withdrawn or its player leaves, in the order asked. (Version 1 stamped each with its time,
-    // which nothing read: version 2 keeps none.)
-    requests: {pid: string; amount: number}[];
+    // withdrawn or its player leaves, in the order asked, each with when it was made or last changed
+    // (PRIVATE: the views copy the player and the amount; engine.buy and withdraw hold a request
+    // REQUESTS.CHANGE_MS before it may change or go).
+    requests: {pid: string; amount: number; at: number}[];
     lastBigBlind: number | null;
     button: number | null;
     handNo: number;
@@ -226,7 +227,9 @@ export type HostOp =
     | {op: 'start' | 'pause' | 'resume' | 'end'}
     | {op: 'config'; patch: Partial<Omit<GameConfig, 'seats'>>}
     | {op: 'settings'; patch: Partial<RoomSettings>}
-    | {op: 'approve' | 'deny' | 'kick'; pid: string}
+    // approve names the amount the host saw: a request changed since is refused (stale).
+    | {op: 'approve'; pid: string; amount: number}
+    | {op: 'deny' | 'kick'; pid: string}
     // Sits a seated player other than the host out: from the next deal while they are in the hand in
     // play, at once between hands. Only ever out: the state never says who asked for a sit-out, so
     // nothing the host sends takes one back — dealing a player back in is theirs alone.
@@ -236,11 +239,9 @@ export type HostOp =
 export type AskReply = 'one' | 'all' | 'none';
 
 export type TableAction =
-    // hostAway: set by the room alone (never parsed from a request) when the host has been away
-    // LIMITS.hostTakeoverMs: the chips land without the host's yes.
-    | {type: 'sit'; by: string; seat: number; buyIn: number; at: number; hostAway?: boolean}
+    | {type: 'sit'; by: string; seat: number; buyIn: number; at: number}
     | {type: 'leave' | 'sit-out' | 'sit-in' | 'show' | 'withdraw'; by: string; at: number}
-    | {type: 'buy'; by: string; amount: number; at: number; hostAway?: boolean}
+    | {type: 'buy'; by: string; amount: number; at: number}
     | {type: 'act'; by: string; turn: number; move: Move; at: number}
     // Triple T: throw away one of the three cards dealt, in the throw-away that opened at `turn`.
     | {type: 'discard'; by: string; turn: number; card: Card; at: number}
@@ -262,7 +263,7 @@ export type Refusal =
     | 'closed' | 'not-now' | 'not-host' | 'not-seated' | 'already-seated' | 'seat-taken' | 'bad-seat' | 'bad-amount'
     | 'below-buy-in' | 'over-cap' | 'rebuys-off' | 'rebuy-cap' | 'no-request' | 'not-your-turn' | 'stale' | 'illegal'
     | 'below-min-raise' | 'bad-config' | 'bad-deck' | 'not-due'
-    | 'asks-off' | 'ask-waiting' | 'ask-limit' | 'ask-cooldown' | 'asks-full';
+    | 'asks-off' | 'ask-waiting' | 'ask-limit' | 'ask-cooldown' | 'asks-full' | 'request-wait';
 
 // hands: every hand this step completed (or showed cards in, or answered an ask about), for
 // PokerHand. ledgerDirty: a figure a PokerResult row carries moved. kicked: the pid the host just

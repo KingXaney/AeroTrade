@@ -15,14 +15,14 @@ import {
     joinCardState, joinNotes, attentionKey, openSeats, profileWaits, ownChips, ownSeat, rebuyLimitChoices, REBUY_FIELDS, requestEnded, seatedCount, tableControl,
     timerChoices, waitingRequests, leaveAsks, leavePlan, leaveTapAsks, homeAsks, leftState, hostSitOut, rememberSitOut, SIT_OUT_MEMORY,
     SIT_OUT_ASK_KEY, SIT_OUT_ASK_MS, sitOutAskRecord, sitOutAsked, type SitOutMemory,
-    answerNow, askEndsAt, askKey, askNews, askOffer, askToAnswer, askWaiting, hostAwayNow, leaveAfterLanded, leaveAfterOf, newRequests, NO_ASKS_SEEN, requestKind,
+    answerNow, askEndsAt, askKey, askNews, askOffer, askToAnswer, askWaiting, buyAsksHost, leaveAfterLanded, leaveAfterOf, NO_ASKS_SEEN, NO_REQUESTS_HEARD, requestAlerts, REQUEST_SOUND_MS, requestKind,
 } from '@/lib/poker-night/overlays';
-import {ASKS} from '@/lib/poker-night/config';
+import {ASKS, REQUESTS} from '@/lib/poker-night/config';
 import type {AskView, MeView} from '@/lib/poker-night/view-types';
 import type {TableState} from '@/lib/poker-night/types';
 import type {JoinView, PlayerView} from '@/lib/poker-night/view-types';
 import {clockLeaderOf, peopleIds, playerView} from '@/lib/poker-night/views';
-import {C, F, R, cards, deal, moves, nowOf, ok, pidOf, table} from './fixtures';
+import {C, F, R, approveOf, cards, deal, moves, nowOf, ok, pidOf, table} from './fixtures';
 
 const people = (s: TableState, extra: string[] = []) =>
     Object.fromEntries([...peopleIds(s), ...extra].map((pid) => [pid, {name: pid.toUpperCase(), avatar: 'v1:fox:tangerine:none:none'}]));
@@ -321,7 +321,7 @@ describe('the bank\'s own chips', () => {
         expect(ownChips(pv(s, pidOf(0)))!.asksHost).toBe(false);
         const asked = ok(reduce(s, {type: 'buy', by: pidOf(1), amount: 1500, at: nowOf(s)}));
         expect(ownChips(pv(asked, pidOf(1)))).toMatchObject({requested: 1500, offer: null});
-        const approved = ok(reduce(asked, {type: 'host', by: pidOf(0), op: {op: 'approve', pid: pidOf(1)}, at: nowOf(asked)}));
+        const approved = ok(reduce(asked, {type: 'host', by: pidOf(0), op: approveOf(asked, pidOf(1)), at: nowOf(asked)}));
         const before = {bought: asked.ledger.find((r) => r.pid === pidOf(1))!.bought};
         const row = approved.ledger.find((r) => r.pid === pidOf(1))!;
         const still = {seated: true, leaving: false, withdrawn: false};
@@ -341,17 +341,17 @@ describe('the bank\'s own chips', () => {
         expect(requestEnded(before, {bought: 0, pendingBuy: 500, seated: true, leaving: true, withdrawn: true})).toBe('approved');
     });
 
-    it('says when the host counts as away: a seat\'s chips then land without the host, and the bank says so', () => {
+    it('keeps every buy waiting for the host once a hand is dealt, however long the host is gone: no way round them', () => {
         const s = {...table({0: 1000, 1: 0}, {config: {rebuys: 'approve', buyInMin: 1000, buyInMax: 2000}}), handNo: 1};
         const view = pv(s, pidOf(1));
-        const away = {...view, me: {...view.me, hostAwayAt: 5000}};
-        expect(hostAwayNow(away.me, 5000)).toBe(false);
-        expect(hostAwayNow(away.me, 5001)).toBe(true);
-        expect(hostAwayNow(view.me, 1e12)).toBe(false);
-        expect(ownChips(away, 4000)).toMatchObject({asksHost: true, hostAway: false});
-        expect(ownChips(away, 6000)).toMatchObject({asksHost: false, hostAway: true});
+        expect(buyAsksHost(view)).toBe(true);
+        expect(buyAsksHost(pv(s, pidOf(0)))).toBe(false);
+        expect(buyAsksHost(pv({...s, handNo: 0}, pidOf(1)))).toBe(false);
+        expect(ownChips(view)).toMatchObject({asksHost: true});
+        expect(Object.keys(ownChips(view)!)).not.toContain('hostAway');
+        expect(Object.keys(view.me)).not.toContain('hostAwayAt');
         // A seat that never had chips here: its offer is a first buy, never a rebuy.
-        expect(ownChips(away, 4000)!.offer).toMatchObject({first: true, rebuy: false, topUp: 2000});
+        expect(ownChips(view)!.offer).toMatchObject({first: true, rebuy: false, topUp: 2000});
     });
 
     it('offers nothing with rebuys off or used up, or while leaving after the hand', () => {
@@ -638,10 +638,30 @@ describe('the host\'s requests for chips', () => {
         broke.seats[1]!.stack = 0;
         expect(requestKind(pv(broke, pidOf(0)), pidOf(1))).toBe('rebuy');
         expect(requestKind(pv(s, pidOf(0)), pidOf(2))).toBe('top-up');
-        expect(newRequests([], [{pid: 'a', amount: 1}])).toEqual([{pid: 'a', amount: 1}]);
-        expect(newRequests([{pid: 'a', amount: 1}], [{pid: 'a', amount: 1}, {pid: 'b', amount: 2}])).toEqual([{pid: 'b', amount: 2}]);
-        // A second request from the same player for another amount is new.
-        expect(newRequests([{pid: 'a', amount: 1}], [{pid: 'a', amount: 3}])).toEqual([{pid: 'a', amount: 3}]);
+        // The host's alerts: a new request toasted with a sound; the same again, nothing.
+        const first = requestAlerts([], [{pid: 'a', amount: 1}], NO_REQUESTS_HEARD, 1000);
+        expect(first).toEqual({toast: [{pid: 'a', amount: 1, fresh: true}], sound: true, heard: {a: 1000}});
+        expect(requestAlerts([{pid: 'a', amount: 1}], [{pid: 'a', amount: 1}, {pid: 'b', amount: 2}], first.heard, 2000))
+            .toEqual({toast: [{pid: 'b', amount: 2, fresh: true}], sound: true, heard: {a: 1000, b: 2000}});
+        // Another amount from the same player: its toast said again with it, silently.
+        expect(requestAlerts([{pid: 'a', amount: 1}], [{pid: 'a', amount: 3}], first.heard, 4000)).toEqual({toast: [{pid: 'a', amount: 3, fresh: false}], sound: false, heard: {a: 1000}});
+        // Taken back and asked again within REQUEST_SOUND_MS: toasted (it needs its Approve), never sounded twice.
+        const gone = requestAlerts([{pid: 'a', amount: 1}], [], first.heard, 4000);
+        expect(gone).toEqual({toast: [], sound: false, heard: {a: 1000}});
+        expect(requestAlerts([], [{pid: 'a', amount: 1}], gone.heard, 1000 + REQUEST_SOUND_MS - 1)).toEqual({toast: [{pid: 'a', amount: 1, fresh: true}], sound: false, heard: {a: 1000}});
+        expect(requestAlerts([], [{pid: 'a', amount: 1}], gone.heard, 1000 + REQUEST_SOUND_MS).sound).toBe(true);
+        // A player flooding the table with requests, one every REQUESTS.CHANGE_MS: one sound in REQUEST_SOUND_MS.
+        let heard = NO_REQUESTS_HEARD;
+        let sounds = 0;
+        let was: {pid: string; amount: number}[] = [];
+        for (let k = 0; k * REQUESTS.CHANGE_MS < REQUEST_SOUND_MS; k++) {
+            const now: {pid: string; amount: number}[] = k % 2 === 0 ? [{pid: 'spam', amount: 100 + k}] : [];
+            const r = requestAlerts(was, now, heard, k * REQUESTS.CHANGE_MS);
+            heard = r.heard;
+            sounds += r.sound ? 1 : 0;
+            was = now;
+        }
+        expect(sounds).toBe(1);
         // The join card's note after sitting: the chips wait.
         expect(joinNotes('seated', null, pv(s, pidOf(5)), 'player')).toEqual([TABLE_COPY.waitingApproval]);
     });

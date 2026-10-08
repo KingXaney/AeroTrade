@@ -10,14 +10,14 @@
 import {describe, expect, it} from 'vitest';
 import {legalFor, readEntry, snapshotFromState} from '@/lib/poker-night/betting';
 import {coolingDown} from '@/lib/poker-night/asks';
-import {ASKS, TABLE_LIMITS, TIMING} from '@/lib/poker-night/config';
+import {ASKS, REQUESTS, TABLE_LIMITS, TIMING} from '@/lib/poker-night/config';
 import {createTable, forceClose, reduce} from '@/lib/poker-night/engine';
 import {conservation, ledgerEvents, ledgerRow} from '@/lib/poker-night/ledger';
 import {isLive} from '@/lib/poker-night/seats';
 import type {HandEntry, TableAction, TableState} from '@/lib/poker-night/types';
 import {readShown} from '@/lib/poker-night/variants';
 import {
-    A, C, F, R, X, actBy, cards, checkInvariants, deal, deepFreeze, host, moves, nowOf, ok, pidOf, play, randomNight, runOut, table, T0,
+    A, C, F, R, X, actBy, approveOf, cards, checkInvariants, deal, deepFreeze, host, moves, nowOf, ok, pidOf, play, randomNight, runOut, table, T0,
 } from './fixtures';
 
 const entries = (s: TableState): HandEntry[] => s.hand!.log.map((e) => readEntry(s.hand!, e));
@@ -28,7 +28,7 @@ const by = (s: TableState, type: 'leave' | 'sit-out' | 'sit-in' | 'show', seat: 
 const buy = (s: TableState, seat: number, amount: number): TableAction => ({type: 'buy', by: pidOf(seat), amount, at: nowOf(s)});
 const timeoutOf = (s: TableState): Extract<TableAction, {type: 'timeout'}> => ({type: 'timeout', turn: s.turn, at: s.hand!.deadline! + TIMING.TURN_GRACE_MS});
 // A buy's request answered by the host at once (every buy but the host's waits once a hand is dealt).
-const approved = (s: TableState, seat: number): TableState => ok(host(s, {op: 'approve', pid: pidOf(seat)}));
+const approved = (s: TableState, seat: number): TableState => ok(host(s, approveOf(s, pidOf(seat))));
 // What a shown hand makes on the hand's first board.
 const readOf = (s: TableState, seat: number) => readShown(s.hand!.variant, s.hand!.boards, s.hand!.result!.hands.find((h) => h.seat === seat)!).reads[0];
 
@@ -269,7 +269,7 @@ describe('leaving and removal mid-hand', () => {
         expect(a.requests).toHaveLength(1);
         a = ok(host(a, {op: 'end'}));
         expect(a.requests).toEqual([]);
-        expect(host(a, {op: 'approve', pid: 'p2'})).toEqual({ok: false, reason: 'not-now'});
+        expect(host(a, approveOf(a, 'p2'))).toEqual({ok: false, reason: 'not-now'});
         a = moves(a, F, F);
         expect(a.status).toBe('closed');
         expect(events(a, 2)).toEqual([['buy-in', 1000], ['cash-out', 1000]]);
@@ -281,7 +281,7 @@ describe('posting to play', () => {
     // A seat taken with 2,000, the host approving the chips once a hand has been dealt.
     const seatFour = (s: TableState, seat: number, pid = pidOf(seat)): TableState => {
         const sat = play(s, {type: 'sit', by: pid, seat, buyIn: 2000, at: nowOf(s)});
-        return sat.requests.some((r) => r.pid === pid) ? ok(host(sat, {op: 'approve', pid})) : sat;
+        return sat.requests.some((r) => r.pid === pid) ? ok(host(sat, approveOf(sat, pid))) : sat;
     };
     const posts = (s: TableState) => said(s).filter((line) => /blind|post|ante/.test(line));
 
@@ -416,7 +416,7 @@ describe('rebuys', () => {
         s = deal(s, {holes: {0: 'AhAd', 1: '7c2d', 2: '8c3d'}, board: 'KsQsJd5h4c'});
         s = play(s, buy(s, 1, 1000));
         expect(s.seats[1]).toMatchObject({stack: 280, pendingBuy: 0});
-        expect(s.requests).toEqual([{pid: 'p1', amount: 1000}]);
+        expect(s.requests).toMatchObject([{pid: 'p1', amount: 1000}]);
         s = approved(s, 1);
         expect(s.seats[1]).toMatchObject({stack: 280, pendingBuy: 1000});
         expect(ledgerRow(s, 'p1')!.bought).toBe(300);
@@ -437,14 +437,15 @@ describe('rebuys', () => {
     it('on: once a hand is dealt, a request the host approves or declines; the host\'s own buys need nobody', () => {
         let s = {...three([1000, 1000, 1000], {rebuys: 'approve', buyInMin: 200, buyInMax: 2000}), handNo: 1};
         s = play(s, buy(s, 1, 300));
-        s = play(s, buy(s, 1, 400));
-        expect(s.requests).toEqual([{pid: 'p1', amount: 400}]);
+        // Another amount takes its place once the request has stood REQUESTS.CHANGE_MS.
+        s = play(s, {type: 'buy', by: 'p1', amount: 400, at: nowOf(s) + REQUESTS.CHANGE_MS});
+        expect(s.requests).toMatchObject([{pid: 'p1', amount: 400}]);
         expect(s.seats[1]!.stack).toBe(1000);
-        expect(reduce(s, {type: 'host', by: 'p2', op: {op: 'approve', pid: 'p1'}, at: nowOf(s)})).toEqual({ok: false, reason: 'not-host'});
-        s = ok(host(s, {op: 'approve', pid: 'p1'}));
+        expect(reduce(s, {type: 'host', by: 'p2', op: approveOf(s, 'p1'), at: nowOf(s)})).toEqual({ok: false, reason: 'not-host'});
+        s = ok(host(s, approveOf(s, 'p1')));
         expect(s.requests).toEqual([]);
         expect(s.seats[1]!.stack).toBe(1400);
-        expect(host(s, {op: 'approve', pid: 'p1'})).toEqual({ok: false, reason: 'no-request'});
+        expect(host(s, approveOf(s, 'p1'))).toEqual({ok: false, reason: 'no-request'});
         s = play(s, buy(s, 2, 100));
         s = ok(host(s, {op: 'deny', pid: 'p2'}));
         expect(s.requests).toEqual([]);
@@ -454,8 +455,8 @@ describe('rebuys', () => {
         s = play(s, by(s, 'leave', 2));
         s = play(s, {type: 'sit', by: 'p2', seat: 5, buyIn: 1500, at: nowOf(s)});
         expect(s.seats[5]).toMatchObject({stack: 0, owesPost: true});
-        expect(s.requests).toEqual([{pid: 'p2', amount: 1500}]);
-        s = ok(host(s, {op: 'approve', pid: 'p2'}));
+        expect(s.requests).toMatchObject([{pid: 'p2', amount: 1500}]);
+        s = ok(host(s, approveOf(s, 'p2')));
         expect(s.seats[5]!.stack).toBe(1500);
         expect(events(s, 2)).toEqual([['buy-in', 1000], ['cash-out', 1000], ['rebuy', 1500]]);
     });
@@ -802,7 +803,7 @@ describe('leaving after this hand', () => {
         let a = deal(three([1000, 1000, 1000], {buyInMin: 100, buyInMax: 2000}));
         a = play(a, buy(a, 1, 100));
         a = {...a, seats: a.seats.map((seat) => (seat?.pid === 'p1' ? {...seat, leaveAfter: true} : seat))};
-        expect(host(a, {op: 'approve', pid: 'p1'})).toEqual({ok: false, reason: 'not-now'});
+        expect(host(a, approveOf(a, 'p1'))).toEqual({ok: false, reason: 'not-now'});
     });
 
     it('is never set with a sit-out: each takes the other\'s place, and the host\'s sit-out leaves it be', () => {
@@ -849,7 +850,7 @@ describe('buys once the first hand is dealt', () => {
         let s = moves(deal(three([1000, 1000, 1000], RANGE)), F, F);
         s = play(s, sitAt(s, 'p5', 5));
         expect(s.seats[5]).toMatchObject({stack: 0, owesPost: true});
-        expect(s.requests).toEqual([{pid: 'p5', amount: 1500}]);
+        expect(s.requests).toMatchObject([{pid: 'p5', amount: 1500}]);
         expect(ledgerRow(s, 'p5')).toBeNull();
         s = deal(s);
         expect(s.hand!.seats.map((p) => p.seat)).not.toContain(5);
@@ -886,23 +887,43 @@ describe('buys once the first hand is dealt', () => {
         expect(reduce(s, sitAt(s, 'p2', 2))).toEqual({ok: false, reason: 'rebuys-off'});
     });
 
-    it('with the host away long enough (the room\'s hostAway), a sit or a buy lands at once and takes the place of a request', () => {
+    it('the host\'s yes names the amount it says yes to: a request changed since is refused (stale), and the one waiting now lands', () => {
         let s = moves(deal(three([1000, 1000, 1000], RANGE)), F, F);
-        // A newcomer sits while the host is away: chips at once, a first buy-in.
-        s = play(s, {type: 'sit', by: 'p5', seat: 5, buyIn: 1500, at: nowOf(s), hostAway: true});
-        expect(s.seats[5]).toMatchObject({stack: 1500});
+        s = play(s, sitAt(s, 'p5', 5));
+        const seen = approveOf(s, 'p5');
+        expect(seen.amount).toBe(1500);
+        // The player changes it once the request has stood REQUESTS.CHANGE_MS.
+        s = play(s, {type: 'buy', by: 'p5', amount: 1200, at: nowOf(s) + REQUESTS.CHANGE_MS});
+        expect(s.requests).toMatchObject([{pid: 'p5', amount: 1200}]);
+        expect(host(s, seen)).toEqual({ok: false, reason: 'stale'});
+        s = ok(host(s, approveOf(s, 'p5')));
+        expect(s.seats[5]).toMatchObject({stack: 1200});
         expect(s.requests).toEqual([]);
-        expect(events(s, 5)).toEqual([['buy-in', 1500]]);
-        // A request made while the host was here, then taken at once once they are away.
-        s = play(s, sitAt(s, 'p6', 6));
-        expect(s.requests).toEqual([{pid: 'p6', amount: 1500}]);
-        // The same request again changes nothing (no write), so a host back by then keeps it waiting.
-        const again = reduce(s, {type: 'buy', by: 'p6', amount: 1500, at: nowOf(s)});
+        expect(events(s, 5)).toEqual([['buy-in', 1200]]);
+        checkInvariants(s);
+    });
+
+    it('holds a request REQUESTS.CHANGE_MS before its player may change it or take it back (request-wait); the same request again changes nothing', () => {
+        let s = moves(deal(three([1000, 1000, 1000], {buyInMin: 100, buyInMax: 2000})), F, F);
+        const t0 = nowOf(s);
+        s = play(s, {type: 'buy', by: 'p2', amount: 300, at: t0});
+        expect(s.requests).toEqual([{pid: 'p2', amount: 300, at: t0}]);
+        const again = reduce(s, {type: 'buy', by: 'p2', amount: 300, at: t0 + 10});
         expect(again.ok && again.state).toBe(s);
-        s = play(s, {type: 'buy', by: 'p6', amount: 1500, at: nowOf(s), hostAway: true});
-        expect(s.seats[6]).toMatchObject({stack: 1500});
+        expect(reduce(s, {type: 'buy', by: 'p2', amount: 400, at: t0 + REQUESTS.CHANGE_MS - 1})).toEqual({ok: false, reason: 'request-wait'});
+        expect(reduce(s, {type: 'withdraw', by: 'p2', at: t0 + REQUESTS.CHANGE_MS - 1})).toEqual({ok: false, reason: 'request-wait'});
+        s = play(s, {type: 'buy', by: 'p2', amount: 400, at: t0 + REQUESTS.CHANGE_MS});
+        expect(s.requests).toEqual([{pid: 'p2', amount: 400, at: t0 + REQUESTS.CHANGE_MS}]);
+        // The change starts the wait again; then Cancel works.
+        expect(reduce(s, {type: 'withdraw', by: 'p2', at: t0 + REQUESTS.CHANGE_MS + 1})).toEqual({ok: false, reason: 'request-wait'});
+        s = play(s, {type: 'withdraw', by: 'p2', at: t0 + 2 * REQUESTS.CHANGE_MS});
         expect(s.requests).toEqual([]);
-        expect(events(s, 6)).toEqual([['buy-in', 1500]]);
+        // Leaving never waits: a request goes with its player at once.
+        s = play(s, {type: 'buy', by: 'p1', amount: 300, at: t0 + 2 * REQUESTS.CHANGE_MS});
+        s = play(s, {type: 'leave', by: 'p1', at: t0 + 2 * REQUESTS.CHANGE_MS + 1});
+        expect(s.requests).toEqual([]);
+        // The host's own buys never wait on anything.
+        s = play(s, {type: 'buy', by: 'p0', amount: 100, at: t0 + 2 * REQUESTS.CHANGE_MS + 2}, {type: 'buy', by: 'p0', amount: 100, at: t0 + 2 * REQUESTS.CHANGE_MS + 3});
         checkInvariants(s);
     });
 
@@ -910,9 +931,9 @@ describe('buys once the first hand is dealt', () => {
         let s = moves(deal(three([1000, 1000, 1000], {buyInMin: 100, buyInMax: 2000})), F, F);
         s = play(s, buy(s, 2, 300));
         expect(s.requests.map((r) => r.pid)).toEqual(['p2']);
-        s = play(s, {type: 'withdraw', by: 'p2', at: nowOf(s)});
+        s = play(s, {type: 'withdraw', by: 'p2', at: nowOf(s) + REQUESTS.CHANGE_MS});
         expect(s.requests).toEqual([]);
-        expect(reduce(s, {type: 'withdraw', by: 'p2', at: nowOf(s)})).toEqual({ok: false, reason: 'no-request'});
+        expect(reduce(s, {type: 'withdraw', by: 'p2', at: nowOf(s) + REQUESTS.CHANGE_MS})).toEqual({ok: false, reason: 'no-request'});
     });
 });
 

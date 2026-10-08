@@ -18,8 +18,11 @@
 //   Mounted for every joined viewer: the deal takes the ask out of the view, so only a watch that was
 //   there before it can say so.
 // - RequestWatch: the host's — each new request for chips once the first hand is dealt (a new player's
-//   first chips, a rebuy, a top-up), a short sound and a toast with Approve; the bank's rows hold
-//   them all, Decline included, and a dot on the Bank and Host icons says they wait.
+//   first chips, a rebuy, a top-up), a toast with Approve and a short sound (at most once a player in
+//   twenty seconds, overlays.requestAlerts); a request whose amount changed is said again in its
+//   toast's place, silently, and its Approve names the new amount (the server refuses an approval of an
+//   amount changed since). The bank's rows hold them all, Decline included, and a dot on the Bank and
+//   Host icons says they wait.
 
 import {useEffect, useId, useRef, useState, type MouseEvent} from "react";
 import {toast} from "sonner";
@@ -29,7 +32,9 @@ import {useRoom, useServerNow} from "@/components/poker-night/room-controller";
 import {playSound} from "@/components/poker-night/sound-player";
 import {useTapShield} from "@/components/poker-night/useTapShield";
 import {ASK_COPY, HOST_COPY} from "@/lib/learn/copy/poker-night";
-import {askEndsAt, askKey, askNews, askToAnswer, newRequests, NO_ASKS_SEEN, requestKind, type AskSeen, type RequestKind} from "@/lib/poker-night/overlays";
+import {
+    askEndsAt, askKey, askNews, askToAnswer, NO_ASKS_SEEN, NO_REQUESTS_HEARD, requestAlerts, requestKind, type AskSeen, type RequestKind,
+} from "@/lib/poker-night/overlays";
 import type {AskReply} from "@/lib/poker-night/types";
 import type {AskView} from "@/lib/poker-night/view-types";
 
@@ -146,6 +151,7 @@ export const RequestWatch = () => {
     const requests = view?.requests ?? null;
     const key = requests ? requests.map((r) => `${r.pid}:${r.amount}`).join(',') : null;
     const before = useRef<{key: string; requests: {pid: string; amount: number}[]} | null>(null);
+    const heard = useRef(NO_REQUESTS_HEARD);
     const sound = room.personal.sound;
     const {send} = room;
     useEffect(() => {
@@ -158,10 +164,11 @@ export const RequestWatch = () => {
         for (const r of was ?? []) if (!requests.some((q) => q.pid === r.pid)) toast.dismiss(`pn-request-${r.pid}`);
         // The first view holds what waited before the page opened: the dot says those.
         if (was === null || !view.me.isHost) return;
-        const fresh = newRequests(was, requests);
-        if (fresh.length === 0) return;
-        if (sound) playSound('request');
-        for (const r of fresh) {
+        const alerts = requestAlerts(was, requests, heard.current, Date.now());
+        heard.current = alerts.heard;
+        if (alerts.toast.length === 0) return;
+        if (sound && alerts.sound) playSound('request');
+        for (const r of alerts.toast) {
             const name = view.people[r.pid]?.name ?? '';
             toast.message(requestText(requestKind(view, r.pid), name, r.amount), {
                 id: `pn-request-${r.pid}`,
@@ -170,7 +177,7 @@ export const RequestWatch = () => {
                 action: {
                     label: HOST_COPY.approve,
                     onClick: () => {
-                        void send({type: 'host', op: {op: 'approve', pid: r.pid}}).then((answer) => {
+                        void send({type: 'host', op: {op: 'approve', pid: r.pid, amount: r.amount}}).then((answer) => {
                             if (answer.ok) toast.success(HOST_COPY.approvedFor(name));
                             else toast.error(answer.message);
                         });

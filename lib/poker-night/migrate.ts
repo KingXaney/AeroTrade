@@ -106,7 +106,7 @@ const hand = z.object({
 }).refine((h) => h.boards.length === h.deck.length && h.boards.every((b) => b.length === h.boards[0].length) && BOARD_LENGTHS.includes(h.boards[0].length));
 
 const TableStateV2 = z.object({
-    ...stateFields, v: z.literal(2), config: GameConfigSchema, requests: z.array(z.strictObject({pid, amount: nat})),
+    ...stateFields, v: z.literal(2), config: GameConfigSchema, requests: z.array(z.strictObject({pid, amount: nat, at: nat})),
     seats: z.array(z.object({...seatFields, leaveAfter: z.boolean()}).nullable()), ledger: z.array(ledgerRow), hand: hand.nullable(),
     noAsks: z.array(pid), askCooldowns: z.array(z.tuple([pid, pid, nat])),
 }).refine((s) => s.seats.length === s.config.seats);
@@ -130,8 +130,8 @@ const handV1ToV2 = (h: HandV1): Hand => ({
 // Version 1 to 2. The config gains its game (Texas hold'em, one board), last, as DEFAULT_CONFIG has
 // it; its rebuy policy 'auto' — rebuys at once — becomes 'approve', which now means every buy but
 // the host's waits for the host once the first hand is dealt. Each seat gains leaveAfter (off); each
-// ledger event's time goes from milliseconds to whole seconds; a request drops its time, which
-// nothing read; the hand gains its game, its one
+// ledger event's time goes from milliseconds to whole seconds; a request keeps its time (engine.buy
+// holds a request REQUESTS.CHANGE_MS before it may change); the hand gains its game, its one
 // board as a run and a board, no throw-aways and no asks, and its result pays each pot on that one
 // board, its shown hands as their cards alone. The table has no asks turned off and no cooldowns.
 export const v1ToV2 = (s: StateV1): TableState => {
@@ -141,7 +141,7 @@ export const v1ToV2 = (s: StateV1): TableState => {
         v: 2,
         config: {...config, rebuys: config.rebuys === 'auto' ? 'approve' : config.rebuys, variant: 'holdem', boards: 1} as GameConfig,
         seats: s.seats.map((seat): Seat | null => (seat ? {...seat, leaveAfter: false} : null)),
-        requests: s.requests.map((r) => ({pid: r.pid, amount: r.amount})),
+        requests: s.requests.map((r) => ({pid: r.pid, amount: r.amount, at: r.at})),
         ledger: s.ledger.map((row): LedgerRow => ({...row, events: row.events.map(([at, kind, amount]): [number, number, number] => [Math.floor(at / 1000), kind, amount])})),
         hand: s.hand ? handV1ToV2(s.hand) : null,
         noAsks: [],

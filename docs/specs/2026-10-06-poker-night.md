@@ -453,12 +453,15 @@ player a blind — they play that hand out instead. Private: a hidden commit, ne
 it, every buy but the host's own — a newcomer's first chips, a re-sit, a rebuy, a top-up — is a
 request the host approves or declines in the bank; a newcomer waiting sits with nothing, is dealt
 nothing and has no ledger row until the chips land, as a buy-in. A request waits until decided,
-withdrawn (`withdraw`) or its player leaves. A host gone ten minutes (unheard from for
-`LIMITS.hostTakeoverMs`) may be replaced by claim-host, which only an account holder can take; at
-any table, from that moment chips no longer wait for them: a sit or a buy lands as it would before
-the first deal (the room marks the action `hostAway`; no request can), and the waiting player's
-dock and bank offer "Take 2,000 chips". The rebuy policy is off or on ('approve'): off stops rebuys
-and re-sits, never a first buy-in.
+withdrawn (`withdraw`) or its player leaves — however long the host is gone: nothing lands without
+the host's yes. A host gone ten minutes (unheard from for `LIMITS.hostTakeoverMs`) may be replaced by
+claim-host, which only an account holder at the table can take, and the requests then wait for the
+new host. A request keeps its time: its player may change its amount or take it back only
+`REQUESTS.CHANGE_MS` (3 s) after the last change ('request-wait'), so a request comes and goes at most
+once every few seconds; the host hears its sound at most once a player in 20 s, and a changed amount
+re-words its toast silently. The host's approve names the amount it approves; one the request no
+longer says is refused (`stale`). The rebuy policy is off or on ('approve'): off stops rebuys and
+re-sits, never a first buy-in.
 
 **Asks to see a hand.** Once a hand completes, a player dealt into it who folded may ask a player
 whose cards were not shown (folded, or won uncontested) to see them. The player asked answers "Show
@@ -481,7 +484,10 @@ not show it — the player asked, the one who asked, a player the host sat out m
 player's nudge count (their room row's `nudge`): a poll sends the count it holds (`nsince`) and is
 read whole when it moved, and with realtime the server says it on the player's own channel
 (`poker-night:<env>:<room id>:<pid>`, subscribe only, their token alone), as `{nudge}` and nothing
-else.
+else. What a write changed is read at the commit's own time (`views.nudgeKey`): an ask past its
+seconds reads expired whether or not a write said so, so writing that expiry down — which another
+pair's ask or answer does — nudges nobody, and no one learns the moment of a private action that is
+not theirs.
 
 **At the table.** Leaving after this hand is one tap while the player holds cards — a door beside
 the early choices (its word on a wide screen), a button in the seat's row while all in, the menu's
@@ -741,6 +747,21 @@ then sits where the pot was, flagged. PLO's hands of four keep the row's nudge a
 
 **The dock's hand name on a phone on its side** sits on a row of its own under the cards and wraps
 to two lines; the longest a name gets ("Full house, threes full of sevens") fits whole at 568 × 320.
+
+**A plate's word with no room under it.** A plate's status ("Folded", "All in", "Offline", "Waiting
+for chips", "No chips yet" for a seat that never had chips — never "Out of chips") hangs under it where
+it clears every other seat's plate, cards, blind's mark and word; where it has none, the plate carries
+it in its stack's place (the stack stays in the plate's name), Triple T's "Discarding…" as a dashed
+ring. A phone on its side, the dock in its column, seats eight two to a side column, the bottom row's
+corners and one at the top, so every word hangs there; seven and nine keep the upright slots.
+
+**After the payout.** The winner's banner keeps clear of the pots paying out and the winners' "+N"
+only where that leaves room; else it is placed clear of the table alone, since both leave within a
+second or two, so the long pause after a hand never leaves it over a plate.
+
+**The join card on a phone on its side** starts under the top bar and is as tall as the screen
+leaves it; its form scrolls inside and "Sit down" and "Just watch" sit at its foot, always in sight.
+"How it plays" opens the Hands guide on the table's game, before the rankings.
 
 ## Engine rules
 

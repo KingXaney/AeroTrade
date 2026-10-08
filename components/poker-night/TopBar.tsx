@@ -91,12 +91,12 @@ const TopBar = ({onOpen, onSeatChoice, onTakeSeat, onLeave, onLeaveAfter, onHome
                             <span className="inline-flex shrink-0 items-center gap-1" role="status" title={connectionNote}>
                                 <span aria-hidden="true"
                                       className={cn('size-1.5 rounded-full', room.mode === 'reconnecting' ? 'bg-warning' : 'bg-positive')}/>
-                                <span className={room.mode === 'reconnecting' ? 'text-warning' : 'sr-only sm:not-sr-only'} data-pn-connection-word="">{connection}</span>
+                                <span className={room.mode === 'reconnecting' ? 'text-warning' : 'max-sm:sr-only'} data-pn-connection-word="">{connection}</span>
                             </span>
                         )}
                         {/* Between the word and the game where both read: from 640 px, and never while reconnecting on a phone. */}
                         {joined && <span aria-hidden="true" className={cn('hidden sm:inline')}>·</span>}
-                        <span className={cn('min-w-0 truncate', reconnecting && 'max-sm:hidden')} title={MODE_COPY.spokenLabel(game.variant, game.boards)}
+                        <span className={cn('min-w-0 truncate sm:shrink-0', reconnecting && 'max-sm:hidden')} title={MODE_COPY.spokenLabel(game.variant, game.boards)}
                               data-pn-mode-label={game.variant}>
                             {MODE_COPY.label(game.variant, game.boards)}
                         </span>
@@ -111,7 +111,9 @@ const TopBar = ({onOpen, onSeatChoice, onTakeSeat, onLeave, onLeaveAfter, onHome
                                 <span className={cn('inline-flex min-w-0 items-center gap-1', status === 'paused' ? 'text-warning' : 'text-fg-soft')}
                                       role="status" title={TABLE_COPY[status]} data-pn-table-status={status}>
                                     {status === 'paused' ? <Pause className="size-3 shrink-0" aria-hidden="true"/> : <Hourglass className="size-3 shrink-0" aria-hidden="true"/>}
-                                    <span className="sr-only truncate sm:not-sr-only">{TABLE_COPY[status]}</span>
+                                    {/* Read aloud only on a phone; from 640 px one line, cut short with an ellipsis (max-sm:sr-only:
+                                        sm:not-sr-only would set white-space back to normal and wrap it). */}
+                                    <span className="truncate max-sm:sr-only" data-pn-table-status-word="">{TABLE_COPY[status]}</span>
                                 </span>
                             </>
                         )}

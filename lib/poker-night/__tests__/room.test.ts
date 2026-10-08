@@ -414,43 +414,38 @@ describe('the host role', () => {
         expect(okStep(claimHostStep(pid(2))(r.core, late)).core).toBe(r.core);
     });
 
-    it('at a table of guests, once the host has been unseen ten minutes, chips stop waiting for them: a request taken, a newcomer\'s seat, the join card', () => {
+    it('keeps every chip waiting for the host\'s yes however long the host is gone — a request, a newcomer\'s seat, the join card — and an account holder at the table may take the host\'s place', () => {
         const actionId = '0b7c1e2a-9f3d-4c5b-8a6e-000000000001';
         let core = joined(room(), guest('ana'), pid(1));
-        core = joined(core, guest('ben'), pid(2));
+        core = joined(core, user('u-ben'), pid(2));
         const dealt = dealHand(core);
         core = dealt.core;
         const soon = dealt.at + MINUTE;
-        // A guest sits while the host is here: a request, 0 chips; the view says when the host counts as away.
+        // A guest sits once the game has started: a request, 0 chips.
         core = joined(core, guest('cy'), pid(3), {}, soon);
         const seat3 = seatOfPid(core, pid(3));
         expect(core.state.seats[seat3]!.stack).toBe(0);
         expect(core.state.requests.map((r) => r.pid)).toEqual([pid(3)]);
-        const view = playerViewFor(core, pid(3), 1, soon, {realtimeOk: true, emotes: [], emoteSeq: 0, pass: null});
-        expect(view.me.hostAwayAt).toBe(T0 + LIMITS.hostTakeoverMs);
-        // Not for the host, nor a watcher or anyone before the first deal.
-        expect(playerViewFor(core, HOST_PID, 1, soon, {realtimeOk: true, emotes: [], emoteSeq: 0, pass: null}).me.hostAwayAt).toBeNull();
-        expect(playerViewFor(room(), HOST_PID, 1, T0, {realtimeOk: true, emotes: [], emoteSeq: 0, pass: null}).me.hostAwayAt).toBeNull();
-        expect(joinViewFor(core, guest('dee'), soon).needsApproval).toBe(true);
-        // Ten minutes unseen: no guest can claim the role, but the same buy now lands.
-        const late = T0 + LIMITS.hostTakeoverMs + 1000;
-        expect(code(claimHostStep(pid(1))(core, late))).toBe('needs_account');
-        expect(joinViewFor(core, guest('dee'), late).needsApproval).toBe(false);
+        const extras = {realtimeOk: true, emotes: [], emoteSeq: 0, pass: null};
+        expect(Object.keys(playerViewFor(core, pid(3), 1, soon, extras).me)).not.toContain('hostAwayAt');
+        // The host unheard from for an hour (a locked phone, a tab in the background): nothing lands.
+        const late = T0 + 6 * LIMITS.hostTakeoverMs;
         const amount = core.state.requests[0].amount;
-        // Still here (a beat a minute ago): the same buy keeps waiting, and changes nothing.
-        const beat = {...core, seen: {[HOST_PID]: {at: late - MINUTE, hidden: false}}};
-        expect(okStep(actionStep({actionId, type: 'buy', amount}, pid(3))(beat, late)).core).toBe(beat);
-        const took = okStep(actionStep({actionId, type: 'buy', amount}, pid(3))(core, late)).core;
-        expect(took.state.seats[seat3]!.stack).toBe(amount);
-        expect(took.state.requests).toEqual([]);
-        expect(conservation(took.state).ok).toBe(true);
-        // A newcomer sits with chips at once.
-        const dee = joined(took, guest('dee'), pid(4), {}, late);
-        expect(dee.state.seats[seatOfPid(dee, pid(4))]!.stack).toBe(DEFAULT_CONFIG.buyInMax);
-        expect(dee.state.requests).toEqual([]);
-        // A request can never say the host is away for itself: the input has no such field.
-        expect(code(actionStep({actionId, type: 'buy', amount, hostAway: true} as never, pid(3))(core, soon))).toBe('ok');
-        expect(okStep(actionStep({actionId, type: 'buy', amount, hostAway: true} as never, pid(3))(core, soon)).core.state.requests).toHaveLength(1);
+        expect(okStep(actionStep({actionId, type: 'buy', amount}, pid(3))(core, late)).core).toBe(core);
+        expect(joinViewFor(core, guest('dee'), late).needsApproval).toBe(true);
+        const dee = joined(core, guest('dee'), pid(4), {}, late);
+        expect(dee.state.seats[seatOfPid(dee, pid(4))]!.stack).toBe(0);
+        expect(dee.state.requests.map((r) => r.pid)).toEqual([pid(3), pid(4)]);
+        // No field of a request lands chips: what the input does not know never reaches the engine.
+        expect(okStep(actionStep({actionId, type: 'buy', amount, hostAway: true} as never, pid(3))(core, late)).core).toBe(core);
+        // The way on: a seated account holder claims the role, and the requests wait for them.
+        expect(code(claimHostStep(pid(1))(dee, late))).toBe('needs_account');
+        const claimed = okStep(claimHostStep(pid(2))(dee, late)).core;
+        expect(claimed.state.hostPid).toBe(pid(2));
+        const yes = okStep(actionStep({actionId, type: 'host', op: {op: 'approve', pid: pid(3), amount}}, pid(2))(claimed, late)).core;
+        expect(yes.state.seats[seat3]!.stack).toBe(amount);
+        expect(yes.state.requests.map((r) => r.pid)).toEqual([pid(4)]);
+        expect(conservation(yes.state).ok).toBe(true);
     });
 });
 

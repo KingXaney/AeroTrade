@@ -9,11 +9,11 @@ import {DEFAULT_CONFIG, KEEP} from '@/lib/poker-night/config';
 import {createTable, forgetSettled, reduce} from '@/lib/poker-night/engine';
 import {buyRange, chipsOf, conservation, hasBought, inPotOf, isSettled, ledgerDigest, ledgerEvents, ledgerRow, needsHost, netOf} from '@/lib/poker-night/ledger';
 import type {GameConfig, TableAction, TableState} from '@/lib/poker-night/types';
-import {A, C, R, X, deal, host, moves, nowOf, ok, play, runOut, T0, table} from './fixtures';
+import {A, C, R, X, approveOf, deal, host, moves, nowOf, ok, play, runOut, T0, table} from './fixtures';
 
 const sit = (s: TableState, pid: string, seat: number, buyIn: number): TableAction => ({type: 'sit', by: pid, seat, buyIn, at: nowOf(s)});
 // Once a hand has been dealt every buy but the host's waits for the host: approved here at once.
-const approve = (s: TableState, pid: string): TableState => ok(host(s, {op: 'approve', pid}));
+const approve = (s: TableState, pid: string): TableState => ok(host(s, approveOf(s, pid)));
 const kinds = (s: TableState, pid: string) => ledgerEvents(s, ledgerRow(s, pid)!).map((e) => `${e.kind} ${e.amount}`);
 
 // A table the players sat down at themselves, each with their own buy-in.
@@ -119,7 +119,7 @@ describe('the figures', () => {
         const r = reduce(s, {type: 'buy', by: 'p2', amount: 1, at: nowOf(s)});
         if (s.seats[2]!.stack < 2000) {
             expect(r.ok && r.ledgerDirty).toBe(false);
-            const yes = host(ok(r), {op: 'approve', pid: 'p2'});
+            const yes = host(ok(r), approveOf(ok(r), 'p2'));
             expect(yes.ok && yes.ledgerDirty).toBe(true);
         }
     });
@@ -196,7 +196,7 @@ describe('forgetting settled rows', () => {
         const sitting = settled(s);
         expect(isSettled(ledgerRow(sitting, 'p1')!)).toBe(true);
         expect(forgetSettled(sitting, ['p1'])).toBe(sitting);
-        const asking = {...sitting, seats: sitting.seats.map((seat) => (seat?.pid === 'p1' ? null : seat)), requests: [{pid: 'p1', amount: 100}]};
+        const asking = {...sitting, seats: sitting.seats.map((seat) => (seat?.pid === 'p1' ? null : seat)), requests: [{pid: 'p1', amount: 100, at: T0}]};
         expect(forgetSettled(asking, ['p1'])).toBe(asking);
         // Dealt into the hand on the table, with no seat left (as the hand completes for a leaver).
         s = deal(s, {holes: {0: 'AhAd', 1: 'KhKd'}, board: 'QsJs9d5h4c'});

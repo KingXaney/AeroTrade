@@ -7,9 +7,13 @@
 // it — the move's tag staying, still, for the rest of the street (reveal.streetTags) once its pop is
 // over. The viewer's own cards are the dock's, not the plate's. A hand shown to the viewer alone
 // (answering their ask) turns up on its plate for them, flagged "Shown to you"; a seat whose chips
-// wait for the host's yes says "Waiting for chips". In Triple T's throw-away a plate still to throw
-// says "Discarding…" over its three backs, and as its player throws, the third back flies to the
-// middle and fades: three, then two.
+// wait for the host's yes says "Waiting for chips", and one that never had chips here "No chips yet"
+// (lib/poker-night/plate.plateStatus). The word hangs under the plate where it clears everything round
+// it; where it has no room (a crowded column on a phone on its side: stage.flagsOnPlate, SeatRing) the
+// plate carries it in place of the stack, its name beside the avatar — the stack is in the plate's
+// accessible name. In Triple T's throw-away a plate still to throw says "Discarding…" over its three
+// backs (where that has no room, a dashed ring), and as its player throws, the third back flies to
+// the middle and fades: three, then two.
 //
 // What moves is the room's animations for this seat (components/poker-night/anim): sitting down,
 // the deal, a fold (the cards turn over, slide toward the middle and fade; the plate dims), the
@@ -28,9 +32,10 @@ import BlindMarker from "@/components/poker-night/BlindMarker";
 import CountUp from "@/components/poker-night/CountUp";
 import PlayingCard, {type CardMotion, type CardStateMotion} from "@/components/poker-night/PlayingCard";
 import TurnRing from "@/components/poker-night/TurnRing";
-import {ACTION_COPY, ASK_COPY, BANK_COPY, TABLE_COPY} from "@/lib/learn/copy/poker-night";
+import {ACTION_COPY, BANK_COPY, TABLE_COPY} from "@/lib/learn/copy/poker-night";
 import type {Card} from "@/lib/poker/cards";
 import {compactChips} from "@/lib/poker-night/chips";
+import {plateStatus} from "@/lib/poker-night/plate";
 import {cardLook, liftBoardOf, type ResultLook, type StillTag} from "@/lib/poker-night/reveal";
 import {offset, type SeatPlace, type Stage} from "@/lib/poker-night/stage";
 import type {EntryKind} from "@/lib/poker-night/types";
@@ -53,6 +58,8 @@ export type SeatProps = {
     anims: readonly LiveAnim[];
     privateCards?: readonly Card[] | null; // shown to the viewer alone (MeView.shownToMe)
     awaitingChips?: boolean; // a request for chips waits for the host (the table's requests)
+    neverBought?: boolean; // no chips bought here yet: "No chips yet", never "Out of chips"
+    statusOnPlate?: boolean; // no room for the status under the plate (stage.flagsOnPlate): it takes the stack's place
     held?: number; // the cards a hand of the game holds (two, four in PLO): what a fold sends to the middle
     discarding?: boolean; // Triple T: still to throw a card away
     discardMark?: boolean; // …and no room for the flag under the plate: a dashed ring on it instead (stage.flagRoom)
@@ -90,22 +97,9 @@ const lastTag = (anims: readonly LiveAnim[], seat: number): Tag | null => {
     return best;
 };
 
-// A word for the seat when it is not simply playing: folded, all in, away, sitting out, out of
-// chips, leaving; "next hand" only while a hand it is not in is being played; else how it is
-// connected, when it is not here.
-const statusOf = (v: SeatView, live: boolean, awaitingChips = false, discarding = false): string | null => {
-    if (v.state === 'in-hand' || (discarding && v.state === 'all-in')) {
-        if (discarding) return TABLE_COPY.discarding;
-        return v.presence === 'here' ? null : TABLE_COPY.presence[v.presence];
-    }
-    if (v.state === 'busted' && awaitingChips) return TABLE_COPY.awaitingChips;
-    if (v.state === 'waiting') return live ? TABLE_COPY.status.waiting : v.presence === 'here' ? null : TABLE_COPY.presence[v.presence];
-    return TABLE_COPY.status[v.state];
-};
-
 const Seat = ({
     seat, place, stage, view: v, person, mine, live, acting, myTurn, turn, blind, look, anims, privateCards = null, awaitingChips = false, held = 2, discarding = false,
-    discardMark = false, still = null,
+    discardMark = false, still = null, neverBought = false, statusOnPlate = false,
 }: SeatProps) => {
     const name = person?.name ?? '';
     const ours = useMemo(() => anims.filter((a) => {
@@ -130,7 +124,10 @@ const Seat = ({
     // last said (a second tab closing reports the player hidden until this one's next beat).
     const presence = mine ? 'here' : v.presence;
     const seenAlone = !mine && !Array.isArray(v.cards) && privateCards !== null && privateCards.length > 0 ? privateCards : null;
-    const status = seenAlone ? ASK_COPY.shownTag : statusOf({...v, presence}, live, awaitingChips, discarding);
+    const status = plateStatus(v, {live, presence, awaitingChips, neverBought, discarding, shownAlone: seenAlone !== null});
+    // The word on the plate in place of the stack (never Triple T's "Discarding…", whose ring says it,
+    // nor while the stack counts up a win).
+    const onPlate = statusOnPlate && status !== null && !acting && !discarding && !(count && win);
 
     // Cards in front of the plate (never the viewer's own: the dock draws those).
     const toCentre = offset(stage.centre, place.plate);
@@ -199,6 +196,7 @@ const Seat = ({
             data-presence={presence}
             data-side={place.spot.side}
             data-shown={faceUp || seenAlone ? '' : undefined}
+            data-status-on={onPlate ? 'plate' : undefined}
             data-anim={joined ? 'join' : undefined}
             aria-label={label}
         >
@@ -210,17 +208,21 @@ const Seat = ({
                 </span>
                 <span className="pn-plate-text">
                     <bdi className="pn-plate-name truncate" data-user-text="">{name}</bdi>
-                    <span className="pn-plate-stack" data-stack={v.chips}>
-                        {count && win ? (
-                            <>
-                                <CountUp from={Math.max(0, v.chips - count.amount)} to={v.chips} at={win.offset + count.at} dur={count.dur}/>
-                                <span className="sr-only">{compactChips(v.chips)}</span>
-                            </>
-                        ) : compactChips(v.chips)}
-                    </span>
+                    {onPlate ? (
+                        <span className="pn-plate-status" data-flag="" data-stack={v.chips} title={status ?? undefined}>{status}</span>
+                    ) : (
+                        <span className="pn-plate-stack" data-stack={v.chips}>
+                            {count && win ? (
+                                <>
+                                    <CountUp from={Math.max(0, v.chips - count.amount)} to={v.chips} at={win.offset + count.at} dur={count.dur}/>
+                                    <span className="sr-only">{compactChips(v.chips)}</span>
+                                </>
+                            ) : compactChips(v.chips)}
+                        </span>
+                    )}
                 </span>
             </div>
-            {status && !acting && !(discarding && discardMark) && <span className="pn-plate-flag chrome-surface text-fg-soft" data-flag="">{status}</span>}
+            {status && !acting && !onPlate && !(discarding && discardMark) && <span className="pn-plate-flag chrome-surface text-fg-soft" data-flag="">{status}</span>}
             {blind && live && <BlindMarker blind={blind}/>}
             {tag && (
                 <span key={tag.id} className="pn-tag chrome-surface pn-tag-pop" style={animVars(tag, tag.at)} data-kind={tag.kind} data-all-in={tag.allIn ? '' : undefined}

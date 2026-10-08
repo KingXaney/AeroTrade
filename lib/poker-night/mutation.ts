@@ -53,7 +53,7 @@ export type Plan =
     | {kind: 'unchanged'; join: JoinResult | null}
     // A write. refusal set: the clock moved (or the idle room closed) but the request itself was
     // refused, and that is its answer.
-    // visible: seenByOthers(before, after). nudge: nudgesOf(before, after, by).
+    // visible: seenByOthers(before, after). nudge: nudgesOf(before, after, by, now).
     | {
         kind: 'commit'; core: RoomCore; applied: string[]; hands: HandSummary[]; ledgerDirty: boolean; join: JoinResult | null;
         refusal: PokerNightErrorCode | null; visible: boolean; nudge: string[];
@@ -88,15 +88,15 @@ export const seenByOthers = (before: RoomCore, after: RoomCore): boolean => {
 };
 
 // The players other than the write's author (`by`) whose own view it changed where the public table
-// does not show it (views.nudgeKey): the ones to nudge.
-export const nudgesOf = (before: TableState, after: TableState, by: string | null): string[] => {
+// does not show it (views.nudgeKey, both sides read at the commit's `now`): the ones to nudge.
+export const nudgesOf = (before: TableState, after: TableState, by: string | null, now: number): string[] => {
     if (after === before) return [];
     const pids = new Set<string>();
     for (const s of [before, after]) {
         for (const seat of s.seats) if (seat) pids.add(seat.pid);
         for (const p of s.hand?.seats ?? []) pids.add(p.pid);
     }
-    return [...pids].filter((pid) => pid !== by && nudgeKey(before, pid) !== nudgeKey(after, pid)).sort();
+    return [...pids].filter((pid) => pid !== by && nudgeKey(before, pid, now) !== nudgeKey(after, pid, now)).sort();
 };
 
 // The clock's and the idle close's steps never refuse.
@@ -111,8 +111,8 @@ export const withNudges = (core: RoomCore, pids: readonly string[]): RoomCore =>
     pids.length === 0 ? core : {...core, players: core.players.map((p) => (pids.includes(p.pid) ? {...p, nudge: p.nudge + 1} : p))};
 
 // A commit's nudges: the players it concerns who have a row, their counts moved on in the core.
-const nudged = (before: RoomCore, after: RoomCore, by: string | null): {core: RoomCore; nudge: string[]} => {
-    const nudge = nudgesOf(before.state, after.state, by).filter((pid) => after.players.some((p) => p.pid === pid));
+const nudged = (before: RoomCore, after: RoomCore, by: string | null, now: number): {core: RoomCore; nudge: string[]} => {
+    const nudge = nudgesOf(before.state, after.state, by, now).filter((pid) => after.players.some((p) => p.pid === pid));
     return {core: withNudges(after, nudge), nudge};
 };
 
@@ -122,7 +122,7 @@ export const planMutation = (m: MutationInput): Plan => {
     if (core.state.status !== 'closed' && idleCloseDue(m.lastActivityAt, now)) {
         const closed = done(idleCloseStep(core, now));
         if (closed.core === core) return {kind: 'refused', code: 'closed'};
-        const n = nudged(core, closed.core, m.by);
+        const n = nudged(core, closed.core, m.by, now);
         return {
             kind: 'commit', core: n.core, applied: [...m.applied], hands: closed.hands, ledgerDirty: closed.ledgerDirty, join: null, refusal: 'closed',
             visible: seenByOthers(core, closed.core), nudge: n.nudge,
@@ -135,7 +135,7 @@ export const planMutation = (m: MutationInput): Plan => {
     if (!r.ok) {
         const c = done(clock(core, now));
         if (c.core === core) return {kind: 'refused', code: r.code};
-        const n = nudged(core, c.core, m.by);
+        const n = nudged(core, c.core, m.by, now);
         return {
             kind: 'commit', core: n.core, applied: [...m.applied], hands: c.hands, ledgerDirty: c.ledgerDirty, join: null, refusal: r.code,
             visible: seenByOthers(core, c.core), nudge: n.nudge,
@@ -143,7 +143,7 @@ export const planMutation = (m: MutationInput): Plan => {
     }
     const b = done(clock(r.core, now));
     if (b.core === core) return {kind: 'unchanged', join: r.join};
-    const n = nudged(core, b.core, m.by);
+    const n = nudged(core, b.core, m.by, now);
     return {
         kind: 'commit',
         core: n.core,

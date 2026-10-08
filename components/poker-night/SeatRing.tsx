@@ -23,7 +23,9 @@ import {TABLE_COPY} from "@/lib/learn/copy/poker-night";
 import {HOLE_CARDS, PLAYING_CARDS} from "@/lib/poker-night/config";
 import type {Card} from "@/lib/poker/cards";
 import {cardLook, playerAt, streetTags, type ResultLook} from "@/lib/poker-night/reveal";
-import {flagRoom, type SeatMarks, type SeatPlace, type Stage} from "@/lib/poker-night/stage";
+import {plateStatus} from "@/lib/poker-night/plate";
+import {flagsOnPlate, type SeatMarks, type SeatPlace, type Stage} from "@/lib/poker-night/stage";
+import {ledgerRowOf} from "@/lib/poker-night/views";
 import type {Person} from "@/lib/poker-night/view-types";
 import {cn} from "@/lib/utils";
 
@@ -64,15 +66,33 @@ const SeatRing = ({stage, anims, look}: Props) => {
     // The cards a hand of this game holds once the betting starts (in Triple T's throw-away, the three
     // dealt): what a seat's fold sends in.
     const held = hand ? (hand.phase === 'discard' ? HOLE_CARDS : PLAYING_CARDS)[hand.variant] : 2;
-    // Where a plate's "Discarding…" flag has no room under it (a crowded side column on a phone on its
-    // side), the plate carries a dashed ring instead (stage.flagRoom); the felt's count and the backs
-    // going three to two say who is still to throw, and the plate's name says it to a screen reader.
     const blinds = live && hand ? [hand.sb, hand.bb] : [];
+    const result = hand && hand.phase === 'complete' ? hand.result : null;
+    const seenAlone = room.me?.shownToMe ?? [];
+    const requested = new Set(table.requests.map((r) => r.pid));
+    // A hand shown to the viewer alone, on the plate of whoever played it.
+    const shownAloneAt = (seat: number, pid: string): Card[] | null =>
+        playerAt(table, seat) === pid ? seenAlone.find((h) => h.seat === seat)?.cards ?? null : null;
+    // Each seat's status word (lib/poker-night/plate), as its plate says it.
+    const statusAt = (seat: number): string | null => {
+        const v = table.seats[seat];
+        if (!v) return null;
+        const mine = seat === mySeat;
+        const alone = shownAloneAt(seat, v.pid);
+        return plateStatus(v, {
+            live, presence: mine ? 'here' : v.presence, awaitingChips: requested.has(v.pid), neverBought: ledgerRowOf(table, v.pid) === null,
+            discarding: toDiscard.has(seat), shownAlone: !mine && !Array.isArray(v.cards) && alone !== null && alone.length > 0,
+        });
+    };
+    // Where a status has no room under its plate (a crowded column on a phone on its side), the plate
+    // carries it (stage.flagsOnPlate): Triple T's "Discarding…" as a dashed ring — the felt's count and
+    // the backs going three to two say who is still to throw — any other word in the stack's place; the
+    // plate's name says it all to a screen reader. A seat on the clock hangs no word.
     const marks: SeatMarks[] = table.seats.map((v, seat) => ({
         seat, open: !v, backs: v && seat !== mySeat && typeof v.cards === 'number' ? v.cards : 0, blind: !!v && blinds.includes(seat),
-        flag: toDiscard.has(seat) ? TABLE_COPY.discarding : null,
+        flag: actor === seat ? null : statusAt(seat),
     }));
-    const discardMark = (seat: number): boolean => toDiscard.has(seat) && !flagRoom(stage, seat, TABLE_COPY.discarding, marks);
+    const onPlate = flagsOnPlate(stage, marks);
     const turnMs = room.config.turnSeconds * 1000;
     // An open seat takes a visitor who may join, or a watcher; a seated player sees it as open.
     const canChoose = table.status !== 'closed' && (
@@ -84,12 +104,9 @@ const SeatRing = ({stage, anims, look}: Props) => {
     const chipsOut = animsOf(anims, 'chips-out');
     // While a result shows: the players gone since the deal whose seat stands empty, and the hands
     // shown to the viewer alone (answering their ask) — each on the plate of whoever played it.
-    const result = hand && hand.phase === 'complete' ? hand.result : null;
     const ghosts = new Map((result?.gone ?? []).filter(([seat]) => table.seats[seat] === null).map(([seat, pid]) => [seat, pid]));
-    const seenAlone = room.me?.shownToMe ?? [];
     const cardsShownAt = (seat: number): Card[] | null =>
         result?.hands.find((h) => h.seat === seat)?.cards ?? seenAlone.find((h) => h.seat === seat)?.cards ?? null;
-    const requested = new Set(table.requests.map((r) => r.pid));
     // Each seat's last move on the street being bet, kept on its plate once the tag's pop is over.
     const stills = streetTags(hand);
 
@@ -147,9 +164,10 @@ const SeatRing = ({stage, anims, look}: Props) => {
                               live={live} acting={acting} myTurn={mine && acting}
                               turn={acting && hand?.deadline != null ? {deadline: hand.deadline, turnMs} : null}
                               blind={live && hand ? (hand.sb === seat && hand.bb !== seat ? 'small' : hand.bb === seat ? 'big' : null) : null}
-                              look={look} anims={anims} awaitingChips={requested.has(v.pid)}
-                              privateCards={playerAt(table, seat) === v.pid ? seenAlone.find((h) => h.seat === seat)?.cards ?? null : null} held={held}
-                              discarding={toDiscard.has(seat)} discardMark={discardMark(seat)} still={stills.get(seat) ?? null}/>
+                              look={look} anims={anims} awaitingChips={requested.has(v.pid)} neverBought={ledgerRowOf(table, v.pid) === null}
+                              privateCards={shownAloneAt(seat, v.pid)} held={held}
+                              discarding={toDiscard.has(seat)} discardMark={toDiscard.has(seat) && onPlate.has(seat)} statusOnPlate={onPlate.has(seat)}
+                              still={stills.get(seat) ?? null}/>
                     );
                 })}
             </ul>

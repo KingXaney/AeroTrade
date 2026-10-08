@@ -61,6 +61,7 @@ type Ui = {
     sit: {seat: number | null} | null; // a watcher taking a seat
     turnSeen: string | null; // what last asked for the viewer (their turn, a card to throw away): the drawers closed for it
     requestSeen: number; // the last overlay request answered
+    handsLead: boolean; // the Hands guide asked for by "How it plays": it opens on the table's game
 };
 
 const TableOverlays = () => {
@@ -73,7 +74,7 @@ const TableOverlays = () => {
     const [ui, setUi] = useState<Ui>(() => ({
         drawer: room.invite && isHost ? 'invite' : null,
         dialog: null, closedByTurn: false, visitorSeat: null, sit: null,
-        turnSeen: attentionKey(room.view), requestSeen: latestRequestId(),
+        turnSeen: attentionKey(room.view), requestSeen: latestRequestId(), handsLead: false,
     }));
 
     // Worked out during render, from what the room and the requests say now (the React pattern for
@@ -84,7 +85,7 @@ const TableOverlays = () => {
         next = {...next, requestSeen: request.id};
         if (request.kind === 'drawer') {
             const allowed = request.drawer === 'host' ? isHost : request.drawer === 'log' || request.drawer === 'look' ? joined : true;
-            if (allowed) next = {...next, drawer: request.drawer, dialog: null, closedByTurn: false};
+            if (allowed) next = {...next, drawer: request.drawer, dialog: null, closedByTurn: false, handsLead: request.lead === true};
         } else if (request.kind === 'leave') {
             if (me?.seat !== null && me?.seat !== undefined) next = {...next, dialog: {kind: 'leave', then: request.then}, closedByTurn: false};
         } else if (!joined) {
@@ -138,7 +139,7 @@ const TableOverlays = () => {
         }),
     };
 
-    const openDrawer = (drawer: DrawerKind) => setUi((prev) => ({...prev, drawer, dialog: null, closedByTurn: false}));
+    const openDrawer = (drawer: DrawerKind) => setUi((prev) => ({...prev, drawer, dialog: null, closedByTurn: false, handsLead: false}));
     const drawerChange = (drawer: DrawerKind) => (open: boolean) =>
         setUi((prev) => ({...prev, drawer: open ? drawer : null, closedByTurn: open ? false : prev.closedByTurn}));
     const openDialog = (dialog: Dialog) => setUi((prev) => ({...prev, dialog, closedByTurn: false}));
@@ -250,7 +251,7 @@ const TableOverlays = () => {
             <InviteSheet open={isOpen('invite')} onOpenChange={drawerChange('invite')} toTable={ui.closedByTurn}
                          onDealt={() => setUi((prev) => ({...prev, drawer: null}))}/>
             <BankPanel open={isOpen('bank')} onOpenChange={drawerChange('bank')} toTable={ui.closedByTurn} sitOuts={sitOuts}/>
-            <HandsDrawer open={isOpen('hands')} onOpenChange={drawerChange('hands')} toTable={ui.closedByTurn}/>
+            <HandsDrawer open={isOpen('hands')} onOpenChange={drawerChange('hands')} toTable={ui.closedByTurn} lead={ui.handsLead}/>
             <BoardsSheet open={isOpen('boards')} onOpenChange={drawerChange('boards')} toTable={ui.closedByTurn}/>
             {isHost && (
                 <HostDrawer open={isOpen('host')} onOpenChange={drawerChange('host')} toTable={ui.closedByTurn}

@@ -11,12 +11,13 @@
 import {useSyncExternalStore} from "react";
 import type {LeaveThen} from "@/lib/poker-night/overlays";
 
-// 'hands': the Hands guide (HandsDrawer), the H key's and the menu's; 'boards': PLO's two or three
-// boards larger (BoardsSheet), a tap on the boards'.
+// 'hands': the Hands guide (HandsDrawer), the H key's and the menu's — and the join card's "How it
+// plays", which asks for it with `lead`: the guide then opens on the table's own game, before the
+// rankings; 'boards': PLO's two or three boards larger (BoardsSheet), a tap on the boards'.
 export type DrawerKind = 'invite' | 'bank' | 'host' | 'log' | 'look' | 'hands' | 'boards';
 
 export type OverlayRequest =
-    | {id: number; kind: 'drawer'; drawer: DrawerKind}
+    | {id: number; kind: 'drawer'; drawer: DrawerKind; lead?: boolean}
     | {id: number; kind: 'seat'; seat: number | null} // null: any open seat
     | {id: number; kind: 'leave'; then: LeaveThen}; // the leave dialog, from the dock's Leave or the top bar's Home
 
@@ -31,7 +32,8 @@ const emit = (request: Unnumbered) => {
     for (const listener of [...listeners]) listener();
 };
 
-export const openOverlay = (drawer: DrawerKind): void => emit({kind: 'drawer', drawer});
+export const openOverlay = (drawer: DrawerKind, options: {lead?: boolean} = {}): void =>
+    emit({kind: 'drawer', drawer, ...(options.lead ? {lead: true} : {})});
 
 // The seat the viewer chose ("Sit here" on an open seat), or any open seat.
 export const chooseSeat = (seat: number | null): void => emit({kind: 'seat', seat});

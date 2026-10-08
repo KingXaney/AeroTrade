@@ -189,7 +189,6 @@ export const playerView = (state: TableState, pid: string, meta: PlayerMeta): Pl
             canAsk: choices.filter((c) => c.block === null).map((c) => c.pid),
             askBlocked: choices.flatMap((c): [string, AskBlock][] => (c.block === null ? [] : [[c.pid, c.block]])),
             shownToMe: hand ? shownTo(hand, pid) : [],
-            hostAwayAt: meta.hostAwayAt ?? null,
         },
         emotes: meta.emotes.map(emoteView),
         emoteSeq: meta.emoteSeq,
@@ -200,14 +199,17 @@ export const playerView = (state: TableState, pid: string, meta: PlayerMeta): Pl
 
 // What of `pid`'s own view another player's write can change without the public table showing it:
 // their seat's plan for the end of the hand (the host's sit-out) and the asks they made or were
-// asked. A write that changes it for anyone but its author nudges them (lib/poker-night/mutation).
-export const nudgeKey = (state: TableState, pid: string): string => {
+// asked, each as the view reads it at `now` (asks.answerAt). A write that changes it for anyone but
+// its author nudges them (lib/poker-night/mutation) — so an ask's expiry written down by someone
+// else's ask or answer, which the two players' views already read as expired, nudges neither of them,
+// and no one learns the moment of a private action that is not theirs.
+export const nudgeKey = (state: TableState, pid: string, now: number): string => {
     const i = seatOf(state, pid);
     const seat = i === null ? null : state.seats[i];
     const next = ownNext(seat);
     const hand = state.hand;
     const me = hand ? placeOf(hand, pid) : null;
-    const asks = hand && me ? hand.asks.filter((e) => e[0] === me.seat || e[1] === me.seat) : [];
+    const asks = hand && me ? hand.asks.filter((e) => e[0] === me.seat || e[1] === me.seat).map((e) => [e[0], e[1], e[2], answerAt(hand, e, now)]) : [];
     return JSON.stringify([next, asks]);
 };
 

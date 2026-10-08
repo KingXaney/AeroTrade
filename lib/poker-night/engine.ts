@@ -8,10 +8,9 @@
 // big blind when next dealt in; a player who leaves (or is removed) while facing a bet folds at once,
 // and otherwise stays in, away, and is cashed out when the hand completes; a player who chose to
 // leave after the hand plays it out as usual and is cashed out when it completes; buys land between
-// hands, and once the first hand is dealt every buy but the host's waits for the host's yes — unless
-// the room says the host has been away LIMITS.hostTakeoverMs (the action's hostAway), when it lands as
-// it would have before the first deal; the host's config applies from the next hand and the room's
-// settings at once. Once a hand completes, a
+// hands, and once the first hand is dealt every buy but the host's waits for the host's yes (a host
+// gone a long while is replaced by claim-host, never bypassed); the host's config applies from the next
+// hand and the room's settings at once. Once a hand completes, a
 // player who folded it may ask one whose cards were not shown to see them, and only those two ever
 // see the ask (asks, below). Triple T deals three cards and, once the blinds are posted, opens a
 // throw-away (the 'discard' phase, below): everyone still in throws one card away at the same time,
@@ -25,7 +24,7 @@ import {
     applyMove, commit, FLAG_OF, foldOutOfTurn, legalFor, owed, pushLog, recheck, settleTurn, snapshotFromState, type Flow, type How,
 } from '@/lib/poker-night/betting';
 import {
-    ASKS, checkConfig, dealable, DEFAULT_CONFIG, DEFAULT_SETTINGS, discardMs, ENTRY_FLAGS, HOLE_CARDS, mergeConfig, RoomSettingsSchema, TIMING,
+    ASKS, checkConfig, dealable, DEFAULT_CONFIG, DEFAULT_SETTINGS, discardMs, ENTRY_FLAGS, HOLE_CARDS, mergeConfig, REQUESTS, RoomSettingsSchema, TIMING,
 } from '@/lib/poker-night/config';
 import {cashOut, hasBought, isSettled, ledgerRow, needsHost, recordBuy} from '@/lib/poker-night/ledger';
 import {eligibleSeats, isLive, liveSeatOf, positions, seatOf} from '@/lib/poker-night/seats';
@@ -91,9 +90,10 @@ const reschedule = (w: Work): void => {
     else if (s.nextHandAt === null || s.nextHandAt < w.at) s.nextHandAt = Math.max(w.at + TIMING.START_DELAY_MS, pauseEnd(s));
 };
 
-// A player's request for chips, newest last; a second one takes the place of the first.
-const putRequest = (s: TableState, pid: string, amount: number): void => {
-    s.requests = [...s.requests.filter((r) => r.pid !== pid), {pid, amount}];
+// A player's request for chips, newest last, stamped with when it was made; a second one takes the
+// place of the first.
+const putRequest = (s: TableState, pid: string, amount: number, at: number): void => {
+    s.requests = [...s.requests.filter((r) => r.pid !== pid), {pid, amount, at}];
 };
 
 const dropRequest = (s: TableState, pid: string): void => {
@@ -104,10 +104,9 @@ const dropRequest = (s: TableState, pid: string): void => {
 
 // A seat taken. Before the first hand is dealt the chips land at once; after it, a player other than
 // the host sits with nothing until the host approves the chips (needsHost): their request waits, and
-// a seat at zero is dealt nothing — unless the host has been away long enough (hostAway, which only
-// the room sets), when the chips land at once as before the first deal. Sitting again after buying
-// chips here is a rebuy, under the policy; a first buy-in never is.
-const sit = (w: Work, by: string, i: number, buyIn: number, hostAway: boolean): Refusal | void => {
+// a seat at zero is dealt nothing. Sitting again after buying chips here is a rebuy, under the
+// policy; a first buy-in never is.
+const sit = (w: Work, by: string, i: number, buyIn: number): Refusal | void => {
     const s = w.state;
     if (s.closing) return 'not-now';
     if (!Number.isInteger(i) || i < 0 || i >= s.seats.length) return 'bad-seat';
@@ -128,8 +127,8 @@ const sit = (w: Work, by: string, i: number, buyIn: number, hostAway: boolean): 
         leaveAfter: false,
     };
     s.seats[i] = seat;
-    if (needsHost(s, by) && !hostAway) {
-        putRequest(s, by, buyIn);
+    if (needsHost(s, by)) {
+        putRequest(s, by, buyIn, w.at);
         return;
     }
     seat.stack = buyIn;
@@ -166,9 +165,9 @@ const landBuy = (w: Work, i: number, amount: number): void => {
 };
 
 // A buy: a request for the host while it needs the host's yes (the same request again changes
-// nothing), else the chips land — taking the place of any request of the player's still waiting
-// (the host away long enough: the waiting player's "Take N chips").
-const buy = (w: Work, by: string, amount: number, hostAway: boolean): Refusal | typeof NOOP | void => {
+// nothing; another amount takes its place, but not within REQUESTS.CHANGE_MS of the last change:
+// 'request-wait'), else the chips land.
+const buy = (w: Work, by: string, amount: number): Refusal | typeof NOOP | void => {
     const s = w.state;
     const i = seatOf(s, by);
     if (i === null) return 'not-seated';
@@ -176,18 +175,24 @@ const buy = (w: Work, by: string, amount: number, hostAway: boolean): Refusal | 
     if (seat.leaving || seat.leaveAfter || s.closing) return 'not-now';
     const refusal = checkBuy(s, seat, amount);
     if (refusal) return refusal;
-    if (needsHost(s, by) && !hostAway) {
-        if (s.requests.some((r) => r.pid === by && r.amount === amount)) return NOOP;
-        putRequest(s, by, amount);
+    if (needsHost(s, by)) {
+        const waiting = s.requests.find((r) => r.pid === by);
+        if (waiting?.amount === amount) return NOOP;
+        if (waiting && w.at < waiting.at + REQUESTS.CHANGE_MS) return 'request-wait';
+        putRequest(s, by, amount, w.at);
         return;
     }
     dropRequest(s, by);
     landBuy(w, i, amount);
 };
 
-// A player takes back their own request before the host answers it.
+// A player takes back their own request before the host answers it — but not within
+// REQUESTS.CHANGE_MS of making or changing it ('request-wait'), so a request comes and goes at most
+// once every few seconds and never floods the host with alerts.
 const withdraw = (w: Work, by: string): Refusal | void => {
-    if (!w.state.requests.some((r) => r.pid === by)) return 'no-request';
+    const waiting = w.state.requests.find((r) => r.pid === by);
+    if (!waiting) return 'no-request';
+    if (w.at < waiting.at + REQUESTS.CHANGE_MS) return 'request-wait';
     dropRequest(w.state, by);
 };
 
@@ -677,6 +682,8 @@ const host = (w: Work, by: string, op: HostOp): Refusal | typeof NOOP | void => 
             if (s.closing) return 'not-now';
             const request = s.requests.find((r) => r.pid === op.pid);
             if (!request) return 'no-request';
+            // The amount the host saw: anything else means the player changed it since.
+            if (request.amount !== op.amount) return 'stale';
             const i = seatOf(s, op.pid);
             if (i === null) return 'not-seated';
             const seat = s.seats[i]!;
@@ -738,7 +745,7 @@ export const reduce = (state: TableState, action: TableAction): Reduced => {
     const at = action.at;
     switch (action.type) {
         case 'sit':
-            return step(state, at, (w) => sit(w, action.by, action.seat, action.buyIn, action.hostAway === true));
+            return step(state, at, (w) => sit(w, action.by, action.seat, action.buyIn));
         case 'leave':
             return step(state, at, (w) => leave(w, action.by));
         case 'leave-after':
@@ -750,7 +757,7 @@ export const reduce = (state: TableState, action: TableAction): Reduced => {
         case 'show':
             return step(state, at, (w) => show(w, action.by));
         case 'buy':
-            return step(state, at, (w) => buy(w, action.by, action.amount, action.hostAway === true));
+            return step(state, at, (w) => buy(w, action.by, action.amount));
         case 'withdraw':
             return step(state, at, (w) => withdraw(w, action.by));
         case 'ask':

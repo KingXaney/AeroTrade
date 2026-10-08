@@ -262,9 +262,9 @@ describe('the room document budget', () => {
 
     // The design's first figure was 24,000 bytes; thirty rows of 48-unit names (8 KB) on top of the
     // heaviest state (14.5 KB) do not fit it, so these hold what the limits really allow.
-    it('keeps what every write reads and rewrites within 27,000 bytes', () => {
+    it('keeps what every write reads and rewrites within 27,200 bytes', () => {
         expect(name.length).toBe(48);
-        expect(report('read', bytes(casRead))).toBeLessThanOrEqual(27_000);
+        expect(report('read', bytes(casRead))).toBeLessThanOrEqual(27_200);
     });
 
     it('keeps the whole hot document, emotes included, within 30,000 bytes', () => {

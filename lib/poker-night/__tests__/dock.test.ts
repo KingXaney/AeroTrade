@@ -7,13 +7,14 @@
 import {describe, expect, it} from 'vitest';
 import {legalFor, snapshotFromState} from '@/lib/poker-night/betting';
 import {nextDueAt} from '@/lib/poker-night/clock';
+import {REQUESTS} from '@/lib/poker-night/config';
 import {boardStrengths, dockView, handStrength, preOptions, preRowKey, rebuyTap, samePre, throwAwayCount} from '@/lib/poker-night/dock';
 import {homeAsks} from '@/lib/poker-night/overlays';
 import {reduce} from '@/lib/poker-night/engine';
 import type {TableState} from '@/lib/poker-night/types';
 import type {PlayerView} from '@/lib/poker-night/view-types';
 import {clockLeaderOf, playerView} from '@/lib/poker-night/views';
-import {A, C, F, R, X, T0, cards, deal, moves, nowOf, ok, pidOf, table} from './fixtures';
+import {A, C, F, R, X, cards, deal, moves, nowOf, ok, pidOf, table} from './fixtures';
 
 const as = (s: TableState, seat: number): PlayerView => playerView(s, pidOf(seat), {
     code: 'K7QXM4', seq: 1, serverNow: nowOf(s), nextDueAt: nextDueAt(s), clockLeader: clockLeaderOf(s, {}), presence: {}, watchers: 0, realtimeOk: true, peopleV: 1,
@@ -361,10 +362,10 @@ describe('leaving after this hand, and chips that wait for the host', () => {
         const dock = dockView(as(s, 5));
         expect(dock).toMatchObject({waitingChips: true, request: 2000, buy: null, sitOut: false, leave: true});
         // Taken back: the offer comes back in its place — while a hand Dee is not in is played too.
-        const live = ok(reduce(deal(ok(reduce(s, {type: 'sit', by: pidOf(6), seat: 6, buyIn: 2000, at: nowOf(s)}))), {type: 'withdraw', by: pidOf(5), at: T0}));
+        const live = ok(reduce(deal(ok(reduce(s, {type: 'sit', by: pidOf(6), seat: 6, buyIn: 2000, at: nowOf(s)}))), {type: 'withdraw', by: pidOf(5), at: nowOf(s) + REQUESTS.CHANGE_MS}));
         expect(live.hand!.phase).toBe('betting');
         expect(dockView(as(live, 5)).buy).not.toBeNull();
-        const back = ok(reduce(s, {type: 'withdraw', by: pidOf(5), at: nowOf(s)}));
+        const back = ok(reduce(s, {type: 'withdraw', by: pidOf(5), at: nowOf(s) + REQUESTS.CHANGE_MS}));
         expect(dockView(as(back, 5))).toMatchObject({waitingChips: false, request: null});
         expect(dockView(as(back, 5)).buy).not.toBeNull();
         // The host's own chips never wait.

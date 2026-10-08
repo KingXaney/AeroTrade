@@ -12,7 +12,7 @@ import {reduce} from '@/lib/poker-night/engine';
 import {buyRange, ledgerRow} from '@/lib/poker-night/ledger';
 import type {TableState} from '@/lib/poker-night/types';
 import {bankDetailView, peopleIds, peopleView, publicView} from '@/lib/poker-night/views';
-import {C, R, deal, moves, nowOf, ok, pidOf, randomNight, table} from './fixtures';
+import {C, R, approveOf, deal, moves, nowOf, ok, pidOf, randomNight, table} from './fixtures';
 
 const viewOf = (s: TableState, removed: string[] = []) => ({
     ...publicView(s),
@@ -50,7 +50,7 @@ describe('the bank', () => {
         s = ok(reduce(s, {type: 'buy', by: pidOf(1), amount: 500, at: nowOf(s)}));
         const waiting = bankView(viewOf(s));
         expect(waiting.requests).toEqual([{pid: pidOf(1), name: 'P1', amount: 500}]);
-        s = ok(reduce(s, {type: 'host', by: pidOf(0), op: {op: 'approve', pid: pidOf(1)}, at: nowOf(s)}));
+        s = ok(reduce(s, {type: 'host', by: pidOf(0), op: approveOf(s, pidOf(1)), at: nowOf(s)}));
         const bank = bankView(viewOf(s));
         expect(bank.showRebuys).toBe(true);
         expect(bank.rows.find((r) => r.pid === pidOf(1))).toMatchObject({rebuys: 1, chipsIn: 1000, stack: 1000, net: 0});
