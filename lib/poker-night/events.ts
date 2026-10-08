@@ -1,6 +1,7 @@
 // What happened at the table between two views, as the animations need it: a deal, chips going out
-// to a bet line, a check, a fold, the street's bets sweeping into the pot, a board card, the
-// winning hands revealed, the pots paid out, a turn starting, a player sitting down or getting up.
+// to a bet line, a check, a fold, a card thrown away (Triple T) and the throw-away over, the street's
+// bets sweeping into the pot, a board card, the winning hands revealed, the pots paid out, a turn
+// starting, a player sitting down or getting up.
 // Pure and client-safe: the table runs it on every view it applies (lib/poker-night/feed) and the
 // components animate the events, never the views.
 //
@@ -55,6 +56,11 @@ export type TableEvent =
     | (Base & {kind: 'fold'; seat: number})
     // The clock made this move for them (a check when free, else a fold).
     | (Base & {kind: 'timeout'; seat: number; move: 'check' | 'fold'})
+    // Triple T: a player threw a card away (never which: the log names none) — by the clock as time ran
+    // out (timeout), or for a player who left (auto).
+    | (Base & {kind: 'discard'; seat: number; timeout: boolean; auto: boolean})
+    // Triple T: the throw-away is over, every card thrown away; the betting starts.
+    | (Base & {kind: 'discarded'})
     // The uncalled part of a bet going back to its owner.
     | (Base & {kind: 'refund'; seat: number; amount: number})
     // A player showing their cards when nothing obliged them to: `cards` of them.
@@ -187,11 +193,20 @@ const handEvents = (prevView: DiffableView, prevHand: HandView | null, next: Dif
         else if (kind === 'check') out.push({kind: 'check', id: at, handNo: no, seat});
         else if (kind === 'fold') out.push({kind: 'fold', id: at, handNo: no, seat});
         else if (kind === 'refund') out.push({kind: 'refund', id: at, handNo: no, seat, amount});
+        else if (kind === 'discard') {
+            out.push({kind: 'discard', id: at, handNo: no, seat, timeout: (flags & ENTRY_FLAGS.timeout) !== 0, auto: (flags & ENTRY_FLAGS.auto) !== 0});
+        }
         else if (kind === 'show') {
             const shown = next.seats[seat]?.cards;
             out.push({kind: 'show', id: at, handNo: no, seat, cards: Array.isArray(shown) ? shown.length : PLAYING_CARDS[hand.variant]});
         }
         bets.set(seat, to);
+    }
+
+    // Triple T's throw-away over: seen once, as the hand goes on from it to the betting (or straight to
+    // a run-out, everyone all in). A hand won in the throw-away (everyone else gone) never had it end.
+    if (prevHand?.phase === 'discard' && (hand.phase === 'betting' || hand.phase === 'runout')) {
+        out.push({kind: 'discarded', id: id('discarded'), handNo: no});
     }
 
     // The streets the hand moved on to without a line in the log (a run-out), and the last street's
@@ -247,5 +262,5 @@ export const diffViews = (prev: DiffableView | null, next: DiffableView, opts: D
 
 // Every event kind, for the components' data-anim hooks and the QA that reads them.
 export const EVENT_KINDS: readonly TableEventKind[] = [
-    'deal', 'chips-out', 'check', 'fold', 'timeout', 'refund', 'show', 'street-sweep', 'board', 'reveal', 'win', 'turn', 'join', 'leave',
+    'deal', 'chips-out', 'check', 'fold', 'timeout', 'discard', 'discarded', 'refund', 'show', 'street-sweep', 'board', 'reveal', 'win', 'turn', 'join', 'leave',
 ];

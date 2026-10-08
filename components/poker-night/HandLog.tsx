@@ -113,7 +113,9 @@ const HandLog = ({open, onOpenChange, toTable}: Props) => {
     const nameOf = seatNamer((seat) => playerAt(table, seat), table.people);
     const fromHistory = (history?.hands ?? []).map((h) => historyHandLog(h, table.people, room.me?.pid ?? null, h.no === handNo ? shownToMe : []));
     const showCurrent = hand !== null && current !== null && current.hand === hand.no && !fromHistory.some((h) => h.no === hand.no);
-    const now = showCurrent ? currentHandLog(hand.no, current.log, hand, hand.phase === 'complete' ? hand.result : null, nameOf, shownToMe) : null;
+    // The card the viewer threw away this hand (Triple T): theirs alone to read.
+    const thrown = room.me?.discard != null && room.me.seat !== null ? {card: room.me.discard, seat: room.me.seat} : null;
+    const now = showCurrent ? currentHandLog(hand.no, current.log, hand, hand.phase === 'complete' ? hand.result : null, nameOf, shownToMe, thrown) : null;
     const loading = open && history === null && !failed;
     const oldest = history?.hands[history.hands.length - 1];
 

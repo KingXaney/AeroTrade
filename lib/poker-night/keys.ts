@@ -1,7 +1,9 @@
 // The table's single-key shortcuts: F folds, C checks or calls, R opens the raise panel, A sets the
-// all-in; with the panel open, 1–4 pick a quick size, Enter confirms and Escape closes it. Pure and
-// client-safe: the action bar reads each keydown through intentForKey and labels every button with
-// its key (aria-keyshortcuts, KEY_SHORTCUTS).
+// all-in; with the panel open, 1–4 pick a quick size, Enter confirms and Escape closes it; in Triple
+// T's throw-away, 1–3 pick the card to throw away, Enter throws it and Escape takes the pick back.
+// Pure and client-safe: the action bar reads each keydown through intentForKey (the throw-away's
+// cards through discardIntentForKey) and labels every button with its key (aria-keyshortcuts,
+// KEY_SHORTCUTS, DISCARD_KEY_SHORTCUTS).
 //
 // Nothing fires with ⌘, Ctrl or Alt held, on a key held down, or while focus is in a field the
 // player is typing into — except Enter and Escape in the raise panel's amount field, which commit
@@ -39,6 +41,28 @@ export const intentForKey = (e: KeyInput, ctx: {raiseOpen?: boolean} = {}): Tabl
     if (e.key.length !== 1) return null;
     return LETTERS[e.key.toLowerCase()] ?? null;
 };
+
+// ── Triple T's throw-away (components/poker-night/DiscardPicker) ──
+
+// 1, 2 and 3 pick the first, second or third card; Enter throws away the card picked; Escape takes
+// the pick back. The same rules as the moves: nothing with ⌘, Ctrl or Alt, on a held key or while
+// typing; Enter on a focused control is that control's (on a card of the picker, the picker's own:
+// it picks that card, and throws it once picked). No clash with the raise panel's 1–4: the betting has
+// not begun while a card is to be thrown away.
+export type DiscardIntent = 'pick-1' | 'pick-2' | 'pick-3' | 'throw' | 'unpick';
+
+const PICKS: Record<string, DiscardIntent> = {'1': 'pick-1', '2': 'pick-2', '3': 'pick-3'};
+
+export const discardIntentForKey = (e: KeyInput, ctx: {picked: boolean}): DiscardIntent | null => {
+    if (e.metaKey || e.ctrlKey || e.altKey || e.repeat) return null;
+    if (e.key === 'Enter') return ctx.picked && !e.control ? 'throw' : null;
+    if (e.key === 'Escape' || e.key === 'Esc') return ctx.picked ? 'unpick' : null;
+    if (e.editable) return null;
+    return PICKS[e.key] ?? null;
+};
+
+// The picker's keys as aria-keyshortcuts names them: each card its number, the throw Enter.
+export const DISCARD_KEY_SHORTCUTS = {pick: ['1', '2', '3'], throw: 'Enter', unpick: 'Escape'} as const;
 
 // ── the tap shield ──
 
@@ -118,11 +142,14 @@ export const ROOM_KEY_SHORTCUTS = {emotes: 'E', log: 'L', bank: 'B', hands: 'H',
 
 // Every key the table answers, as the shortcuts list shows them (components/poker-night
 // ShortcutsDialog; lib/learn/copy/poker-night SHORTCUTS_COPY words each id): on the player's turn,
-// then anywhere at the table.
+// while throwing a card away (Triple T), then anywhere at the table.
 export const SHORTCUTS = {
     turn: [
         {id: 'fold', keys: ['F']}, {id: 'check-call', keys: ['C']}, {id: 'raise', keys: ['R']}, {id: 'all-in', keys: ['A']},
         {id: 'sizes', keys: ['1', '2', '3', '4']}, {id: 'confirm', keys: ['Enter']}, {id: 'close', keys: ['Esc']},
+    ],
+    discard: [
+        {id: 'pick', keys: ['1', '2', '3']}, {id: 'throw', keys: ['Enter']}, {id: 'unpick', keys: ['Esc']},
     ],
     table: [
         {id: 'emotes', keys: ['E']}, {id: 'log', keys: ['L']}, {id: 'bank', keys: ['B']}, {id: 'hands', keys: ['H']}, {id: 'mute', keys: ['M']},

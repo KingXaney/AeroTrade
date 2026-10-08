@@ -242,6 +242,8 @@ export type TableAction =
     | {type: 'leave' | 'sit-out' | 'sit-in' | 'show' | 'withdraw'; by: string; at: number}
     | {type: 'buy'; by: string; amount: number; at: number; hostAway?: boolean}
     | {type: 'act'; by: string; turn: number; move: Move; at: number}
+    // Triple T: throw away one of the three cards dealt, in the throw-away that opened at `turn`.
+    | {type: 'discard'; by: string; turn: number; card: Card; at: number}
     | {type: 'pre'; by: string; pre: PreAction | null; at: number}
     | {type: 'host'; by: string; op: HostOp; at: number}
     // Leave the table when the hand in play completes (on), or stay after all (off).

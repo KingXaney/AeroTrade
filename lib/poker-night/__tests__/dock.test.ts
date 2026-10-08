@@ -7,7 +7,7 @@
 import {describe, expect, it} from 'vitest';
 import {legalFor, snapshotFromState} from '@/lib/poker-night/betting';
 import {nextDueAt} from '@/lib/poker-night/clock';
-import {boardStrengths, dockView, handStrength, preOptions, preRowKey, samePre} from '@/lib/poker-night/dock';
+import {boardStrengths, dockView, handStrength, preOptions, preRowKey, samePre, throwAwayCount} from '@/lib/poker-night/dock';
 import {homeAsks} from '@/lib/poker-night/overlays';
 import {reduce} from '@/lib/poker-night/engine';
 import type {TableState} from '@/lib/poker-night/types';
@@ -371,5 +371,49 @@ describe('leaving after this hand, and chips that wait for the host', () => {
         const host = ok(reduce(s, {type: 'leave', by: pidOf(0), at: nowOf(s)}));
         const again = ok(reduce(host, {type: 'sit', by: pidOf(0), seat: 6, buyIn: 2000, at: nowOf(host)}));
         expect(dockView(as(again, 6))).toMatchObject({waitingChips: false, request: null});
+    });
+});
+
+// Triple T's throw-away (P7): the three cards to pick one from, the clock, the wait for the others,
+// then the two kept as any hand; the felt's count.
+describe('Triple T\'s throw-away', () => {
+    const tt = () => deal(three([1000, 1000, 1000], {variant: 'triple-t'}), {holes: {0: 'AhKd7c', 1: 'QsQd2h', 2: '9c8c3s'}});
+    const throwOf = (s: TableState, seat: number, card: string) => ({type: 'discard' as const, by: pidOf(seat), turn: s.turn, card: cards(card)[0], at: nowOf(s)});
+
+    it('gives every player dealt in the three to pick from and the one clock, no moves, no early choices and no hand named', () => {
+        const s = tt();
+        for (const seat of [0, 1, 2]) {
+            const d = dockView(as(s, seat));
+            expect(d.discard).toMatchObject({pending: true, thrown: null, deadline: s.hand!.deadline, waiting: 2});
+            expect(d.discard!.cards).toHaveLength(3);
+            expect([d.myTurn, d.pre, d.legal, d.strength, d.sitOut, d.leave]).toEqual([false, null, null, null, false, false]);
+            expect(d.leaveAfter).toBe('offer');
+        }
+        expect(throwAwayCount(as(s, 0))).toEqual({done: 0, of: 3});
+    });
+
+    it('once thrown: the two kept and their name, the card thrown away the viewer\'s alone, how many the table waits for', () => {
+        let s = ok(reduce(tt(), throwOf(tt(), 0, '7c')));
+        const mine = dockView(as(s, 0));
+        expect(mine.discard).toMatchObject({pending: false, cards: null, thrown: cards('7c')[0], waiting: 2});
+        expect(mine.hole).toEqual(cards('AhKd'));
+        expect(mine.strength).toEqual({category: 0, ranks: [12, 11]});
+        expect(dockView(as(s, 1)).discard).toMatchObject({pending: true, thrown: null, waiting: 1});
+        expect(throwAwayCount(as(s, 1))).toEqual({done: 1, of: 3});
+        s = ok(reduce(s, throwOf(s, 1, '2h')));
+        s = ok(reduce(s, throwOf(s, 2, '3s')));
+        // The betting: the throw-away gone from the dock, Texas hold'em's moves for the first to act.
+        const first = dockView(as(s, 2));
+        expect(first.discard).toBeNull();
+        expect(first.myTurn).toBe(true);
+        expect(throwAwayCount(as(s, 2))).toBeNull();
+        expect(dockView(as(s, 1)).strength).toEqual({category: 1, ranks: [10]});
+    });
+
+    it('gives nothing to throw to a watcher or a player who left facing the blind', () => {
+        let s = tt();
+        s = ok(reduce(s, {type: 'leave', by: pidOf(2), at: nowOf(s)}));
+        expect(dockView(as(s, 2)).discard).toBeNull();
+        expect(throwAwayCount(as(s, 0))).toEqual({done: 0, of: 2});
     });
 });

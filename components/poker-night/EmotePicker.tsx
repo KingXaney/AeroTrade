@@ -19,14 +19,14 @@ import {useRoom} from "@/components/poker-night/room-controller";
 import {EMOTE_COPY} from "@/lib/learn/copy/poker-night";
 import {PHRASE_IDS, REACTION_IDS, reactionGlyph, THROW_IDS, throwGlyph, type EmoteInput, type ThrowId} from "@/lib/poker-night/emotes";
 import {ROOM_KEY_SHORTCUTS} from "@/lib/poker-night/keys";
-import {myTurnKey} from "@/lib/poker-night/overlays";
+import {attentionKey} from "@/lib/poker-night/overlays";
 import {cn} from "@/lib/utils";
 
 type Tab = 'react' | 'say' | 'throw';
 
 const CELL = 'inline-flex items-center justify-center rounded-[var(--control-radius)] transition-colors hover:bg-surface-3 focus-visible:outline-2 focus-visible:outline-brand disabled:opacity-40';
 
-type Ui = {open: boolean; tab: Tab; aim: ThrowId | null; requestSeen: number; turnSeen: number | null; closedByTurn: boolean};
+type Ui = {open: boolean; tab: Tab; aim: ThrowId | null; requestSeen: number; turnSeen: string | null; closedByTurn: boolean};
 
 const EmotePicker = () => {
     const room = useRoom();
@@ -34,7 +34,7 @@ const EmotePicker = () => {
     const view = room.view;
     const cooling = useCoolingDown();
     const request = useEmotePickerRequest();
-    const turnKey = myTurnKey(view);
+    const turnKey = attentionKey(view);
     const [ui, setUi] = useState<Ui>(() => ({open: false, tab: 'react', aim: null, requestSeen: latestPickerRequest(), turnSeen: turnKey, closedByTurn: false}));
 
     // Worked out during render (as TableOverlays does): the E key opens it, the viewer's turn closes it.

@@ -411,9 +411,10 @@ describe('the form under "Set it up first"', () => {
         }
         expect(SEAT_CHOICES).toEqual([2, 3, 4, 5, 6, 7, 8, 9]);
         // The games this deploy deals, Texas hold'em first; one to three boards in PLO.
-        expect(GAME_CHOICES).toEqual(['holdem', 'plo']);
+        expect(GAME_CHOICES).toEqual(['holdem', 'plo', 'triple-t']);
         expect(boardChoices('plo')).toEqual([1, 2, 3]);
         expect(boardChoices('holdem')).toEqual([1]);
+        expect(boardChoices('triple-t')).toEqual([1]);
         // A board count past one is PLO's alone: the form sends one for any other game.
         expect(configFromForm({...DEFAULT_FORM, variant: 'holdem', boards: 3})).toMatchObject({variant: 'holdem', boards: 1});
         expect(configFromForm({...DEFAULT_FORM, variant: 'plo', boards: 2})).toMatchObject({variant: 'plo', boards: 2});

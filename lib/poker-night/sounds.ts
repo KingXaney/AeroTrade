@@ -125,7 +125,7 @@ export type Cue = {key: string; sound: SoundId; at: number};
 
 // The sounds the table's animations make, each at the moment its animation does: a card for each
 // card dealt, turned or shown, a chip for each bet, sweep and refund, a knock for a check, a swish
-// for a fold, a pop for a player sitting down; a win's arpeggio as its banner drops, a chip for each
+// for a fold and for a card thrown away (Triple T), a pop for a player sitting down; a win's arpeggio as its banner drops, a chip for each
 // pot's share flying to its board (two or three boards), a click for each chip of a stream. A result the table had already shown (still) is silent; the
 // viewer's turn is the room's own (useTableSounds), not an animation.
 export const soundCues = (anims: readonly CueAnim[]): Cue[] => {
@@ -150,6 +150,7 @@ export const soundCues = (anims: readonly CueAnim[]): Cue[] => {
                 out.push({key: a.id, sound: 'check', at: at(a.at)});
                 break;
             case 'fold':
+            case 'discard':
                 out.push({key: a.id, sound: 'fold', at: at(a.at)});
                 break;
             case 'join':

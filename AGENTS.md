@@ -502,7 +502,8 @@ and friends keep none beyond Shared and the invariants).
   where a key is set and polling everywhere else, with its looks, emotes and the night's awards;
   the design and the phase still to come are `docs/specs/2026-10-06-poker-night.md`. State version 2
   (the modes work's P4) holds every stored field PLO, multi-board and Triple T need, so a later phase
-  only switches them on: `lib/poker-night/config.ENABLED` (Texas hold'em and PLO, one board, for now) gates
+  only switches them on: `lib/poker-night/config.ENABLED` (every game now: Texas hold'em, PLO on one
+  to three boards, Triple T; the tests hand `checkConfig`/`dealable` a narrower list) gates
   the input paths (`checkConfig`: 'not-open') and the deal (`dealable`: a table set to a game this
   deploy does not deal waits between hands, its config intact), never the stored shape;
   `lib/poker-night/variants` (pure) is each game's evaluation (`handValue`, `bestHand`, Omaha's
@@ -518,7 +519,7 @@ and friends keep none beyond Shared and the invariants).
   only within the cap (`betting.allInOpen`), the call facing the whole stack, else 'illegal' — so the
   raise panel's top is Pot (`bet-sizing.Sizing.cap`, `quickSizes`, `confirmLabel`) and its confirm
   sends a raise to it (`bet-sizing.moveFor`), never an all-in over the cap. The game is the host's,
-  from the next hand: the lobby's one-tap buttons (`QuickStart`, `data-quick-start="holdem|plo"`,
+  from the next hand: the lobby's one-tap buttons (`QuickStart`, `data-quick-start="holdem|plo|triple-t"`,
   Texas hold'em still the one tap) and `components/poker-night/GameChoice` in the start form and the
   host drawer (`lobby.GAME_CHOICES`/`boardChoices`, `overlays.GameForm.variant`); `variants.modeOf`,
   `nextModeOf` and `modeChanged` name the game in play and the next — the top bar's second line
@@ -534,6 +535,45 @@ and friends keep none beyond Shared and the invariants).
   `BannerSeen.handSize`, which the banner and the pots keep clear of); the deal event carries its
   card count, which the choreography deals round in the time two take. `budget.test` holds PLO's
   heaviest table (pot raises to all in) to every budget too.
+- Triple T (P7): three cards each (`config.HOLE_CARDS`); once the antes and blinds are posted the hand
+  opens its throw-away — `Hand.phase` 'discard', nobody on the clock (`actor` null), `state.turn`
+  moved on once and one deadline for everyone, `config.discardMs` (the turn's seconds, never above
+  `DISCARD_MAX_SECONDS`, 20) — in which every player still in with three, all in from posting
+  included, throws one away at the same time (`engine.discard`, the action `{type: 'discard', turn,
+  card}`: refused 'not-seated', 'stale' for another throw-away's turn or past the deadline's grace,
+  'not-now' out of it or thrown already, 'illegal' for a card not held); the last throw opens the
+  betting as Texas hold'em does (`settleTurn` from the big blind), and from there the hand is Texas
+  hold'em with the two kept (`PLAYING_CARDS`). At the deadline (`clock.nextDue`, every writer giving
+  it the slack, there being no actor) `engine.timeout` throws for everyone still to
+  (`variants.autoDiscard`, data-free: the odd one out when two match, else the lowest; flagged the
+  clock's) and counts no timeout and makes nobody away, so a slow throw never folds a blind. A leaver
+  who owes chips folds; one who owes none (the big blind, all in) has a card thrown for them at once,
+  flagged 'auto'; a hand won in the throw-away ends with its winner's three, never shown. A card
+  thrown away lives in `Hand.discards` (PRIVATE), its log line names no card (`'discard'`, amount 0):
+  the public view says only how many a seat holds face down (`CardsView`, 3 then 2) and who is still
+  to throw (`HandView.toDiscard`); the thrower alone gets it, `MeView.discard` and their history's
+  `players[].discard` (`historyView`), and a show turns up the two kept. A throw is visible (the seat's
+  count moves); `feed.nearTurn` counts everyone dealt in as near through it, and `feed.needsPrivate`
+  reads the whole view when the seat's count no longer matches the cards held (the deadline threw for
+  the viewer). At the table: `components/poker-night/DiscardPicker` in the dock (a radio group of
+  three cards of 44 px or more, the one picked lifted 10 px, dimmed by filter and marked with an ✕;
+  arrows move the pick, Enter on the card picked throws it; 1–3, Enter and Escape with the focus on the
+  table, `keys.discardIntentForKey`, the digits held to the player's switch; Peek keeps them face down
+  until pressed and never names the card; both it and its full-width confirm behind the tap shield),
+  the throw-away's seconds and then what the two kept make beside it (`dock.DockView.discard`), the
+  wait for the others with "Leave after this hand" once thrown, the card thrown flying off
+  (`HoleCards`' `thrown`, `.pn-hole[data-slots="3"]` holding three's width the whole hand); the plates
+  "Discarding…" (`TABLE_COPY.discarding`, `data-discarding`) over three backs, a third back flying to the
+  middle as each throws (the log's `discard` event, `choreography` `BEAT.DISCARD_GAP`, the fold's
+  swish); the felt's count (`dock.throwAwayCount`, "Everyone throws away one card · 3 of 5 done" with
+  the seconds, inside the board's empty place: the count alone where it is narrow, nothing narrower); `overlays.attentionKey` (`turn:n` or `discard:handNo`, in place of the old turn key)
+  closes the drawers, chimes and buzzes for the throw-away as for a turn; the screen reader hears the
+  three cards at once, the viewer's own throw (or the clock's) with its card, the others' without, and
+  the throw-away over (the `discarded` event); the hand log and history say the reader's own card
+  thrown away to them alone (`LOG_COPY.youThrew`). Every sentence is `DISCARD_COPY`; the game's
+  glossary entry is `triple-t`, its Hands section the guide's third game. `simulate.test` plays Triple
+  T nights (throws, refused throws, deadlines, leavers in the throw-away), `views.test` scans them for
+  another player's card thrown away, and `budget.test` holds its heaviest table to every budget.
 - `lib/poker-night/engine.reduce` is the one way a table's state (`lib/poker-night/types`) changes:
   a pure reducer that clones once, never mutates its input and hands back the same reference for a
   no-op. Time, the deck and the first big blind's draw arrive inside the action, so a step replays
@@ -940,7 +980,7 @@ and friends keep none beyond Shared and the invariants).
   next deal ends every ask.
 - The Hands guide: `lib/poker-night/hands-guide` (pure) holds the ten rankings strongest first, each
   a five-card example with the cards that make it (`RANKING_EXAMPLES`), the kicker pair
-  (`KICKER_EXAMPLE`) and the games (`GUIDE_GAMES`: Texas hold'em and PLO for now, each with its
+  (`KICKER_EXAMPLE`) and the games (`GUIDE_GAMES`: Texas hold'em, PLO and Triple T, each with its
   glossary entry, the limit's entry when it is not no limit (PLO's `pot-limit`) and its anchor;
   `guideGames` puts the table's own first among them — `guideGameOf` of `variants.modeOf` at the
   table — after the rankings and ties in the drawer, which a player opens mid-game for the rankings;

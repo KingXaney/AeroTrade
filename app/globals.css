@@ -909,6 +909,7 @@ details[open] > :not(summary) { animation: disclosure-in var(--motion-base) var(
   /* The width the night's game takes (data-slots), held between hands so the line beside never moves:
      two side by side, or PLO's four in a fan. */
   .pn-hole[data-slots="2"] { min-width: calc(var(--pn-hole-w) * 2 + 4px); }
+  .pn-hole[data-slots="3"] { min-width: calc(var(--pn-hole-w) * 3 + 8px); }
   .pn-hole[data-slots="4"] { min-width: calc(var(--pn-hole-w) * 2.8); }
   /* PLO's four: a fan, each card 0.6 of a card on from the one before, so the left of every card —
      the large face's rank and suit — stays in sight; turned by the rotate property from the bottom
@@ -920,6 +921,29 @@ details[open] > :not(summary) { animation: disclosure-in var(--motion-base) var(
   .pn-hole[data-count="4"] > .pn-card:nth-of-type(2) { rotate: -2deg; }
   .pn-hole[data-count="4"] > .pn-card:nth-of-type(3) { rotate: 2deg; }
   .pn-hole[data-count="4"] > .pn-card:nth-of-type(4) { rotate: 6deg; }
+  /* Triple T's throw-away (components/poker-night/DiscardPicker): three cards side by side, never
+     overlapping, each a radio of 44 px or more; the one picked rises 10 px, dims by filter (never
+     opacity: the scene must not show through the paper) and carries an ✕ in a chrome circle. The rise
+     is a transition on the motion token, so a zeroed token (brutalist, both motion guards) shows it at
+     once. */
+  .pn-pick { --pn-card-w: max(44px, var(--pn-hole-w)); --pn-card-h: calc(var(--pn-card-w) * 1.4); }
+  .pn-pick-card {
+    position: relative;
+    display: block;
+    flex: none;
+    min-width: 44px;
+    min-height: 44px;
+    padding: 0;
+    border-radius: calc(var(--pn-card-w) * 0.12);
+    background: transparent;
+    cursor: pointer;
+    touch-action: manipulation;
+    transition: translate calc(var(--motion-base) * 0.75) var(--motion-ease);
+  }
+  .pn-pick-card[aria-checked="true"] { translate: 0 -10px; }
+  .pn-pick-card[aria-checked="true"] > .pn-card > .pn-card-inner { filter: brightness(0.7); }
+  .pn-pick-card:focus-visible { outline: 2px solid var(--brand); outline-offset: 2px; }
+  .pn-pick-x { position: absolute; top: -7px; right: -7px; z-index: 1; display: grid; place-items: center; width: 20px; height: 20px; border-radius: 9999px; color: var(--fg); pointer-events: none; }
   .pn-raise { position: absolute; left: 0; right: 0; bottom: calc(100% + 8px); z-index: 6; padding: 10px; border-radius: var(--control-radius); }
   .pn-fold-free { position: absolute; left: 0; bottom: calc(100% + 6px); z-index: 6; }
   /* A narrow dock (a phone upright, or the column of one on its side) wraps its controls under the
@@ -944,6 +968,8 @@ details[open] > :not(summary) { animation: disclosure-in var(--motion-base) var(
   @container pn-dock (max-width: 28rem) {
     .pn-label-long { display: none; }
     .pn-label-short { display: inline; }
+    /* "Tap the card to throw away": a phone has the confirm's "Pick a card first" instead. */
+    .pn-discard-prompt { display: none; }
   }
   /* "Leave after this hand" beside the early choices: a door, with its word in a wide dock. In a
      dock too narrow for the four (a phone on its side: every dock of 18rem or less) it takes a row of

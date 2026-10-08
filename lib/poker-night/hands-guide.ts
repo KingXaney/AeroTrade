@@ -92,12 +92,13 @@ export const PLO_EXAMPLE: {hole: readonly Card[]; board: readonly Card[]; plays:
 export const cardsThatMake = (hand: readonly Card[], makes: readonly Card[]): Card[] => makes.filter((card) => hand.includes(card));
 
 // The games the guide explains, in the order it lists them, each with the glossary entry its section
-// quotes and the anchor that section carries (/poker-night?tab=hands#texas-holdem, #plo). Triple T
-// (`triple-t`) joins this list in a later phase, as the table learns to deal it. PLO's section quotes
-// the pot limit's entry too (`limit`).
+// quotes and the anchor that section carries (/poker-night?tab=hands#texas-holdem, #plo, #triple-t).
+// PLO's section quotes the pot limit's entry too (`limit`); Triple T plays no limit, as Texas
+// hold'em does once its throw-away is over.
 export const GUIDE_GAMES = [
     {id: 'holdem', term: 'texas-holdem', anchor: 'texas-holdem', limit: null},
     {id: 'plo', term: 'omaha', anchor: 'plo', limit: 'pot-limit'},
+    {id: 'triple-t', term: 'triple-t', anchor: 'triple-t', limit: null},
 ] as const;
 export type GuideGame = (typeof GUIDE_GAMES)[number]['id'];
 export type GuideGameEntry = (typeof GUIDE_GAMES)[number];

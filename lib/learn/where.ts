@@ -27,7 +27,7 @@ const LANDING: readonly GlossaryKey[] = ['normalized-momentum', 'lookback'];
 // then the Hands guide's (the lobby's Hands tab and the table's Hands drawer), its games' included.
 const POKER_NIGHT: readonly GlossaryKey[] = [
     'side-pot', 'dealer-button', 'small-blind', 'minimum-raise', 'rebuy', 'all-in',
-    'hand-rankings', 'kicker', 'texas-holdem', 'omaha', 'pot-limit',
+    'hand-rankings', 'kicker', 'texas-holdem', 'omaha', 'pot-limit', 'triple-t',
 ];
 const BRAIN: readonly GlossaryKey[] = [
     'news-weight', 'news-sentiment', 'thesis', 'since-thesis',

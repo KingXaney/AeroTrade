@@ -6,14 +6,14 @@
 import {describe, expect, it} from 'vitest';
 import {findBanned, stripProhibitions} from '@/lib/learn/banned';
 import {
-    ACTION_COPY, ANNOUNCE_COPY, AVATAR_COPY, BANK_COPY, FELT_COPY, HAND_COPY, HOST_COPY, INVITE_COPY, isolate, JOIN_COPY, LOBBY_COPY, LOG_COPY, MODE_COPY,
+    ACTION_COPY, ANNOUNCE_COPY, AVATAR_COPY, BANK_COPY, DISCARD_COPY, FELT_COPY, HAND_COPY, HOST_COPY, INVITE_COPY, isolate, JOIN_COPY, LOBBY_COPY, LOG_COPY, MODE_COPY,
     OVERLAY_COPY, POKER_NIGHT_COPY, POKER_NIGHT_ERRORS, REFUSAL_COPY, SUIT_GLYPHS, SUIT_NAMES, SUMMARY_COPY, TABLE_COPY,
     LOOKS_COPY,
 } from '@/lib/learn/copy/poker-night';
 import {AVATAR_BADGES, AVATAR_COLOURS, AVATAR_FRAMES, AVATAR_PARTS, FACE_IDS} from '@/lib/poker-night/avatar';
 import {CARD_BACK_IDS, CARD_FACE_IDS, CHIP_SET_IDS, FELTS, SCENES} from '@/lib/poker-night/looks';
 import {ERROR_CODES, refusalToCode} from '@/lib/poker-night/http';
-import {checkConfig, DEFAULT_CONFIG, ENTRY_KINDS, LEDGER_KINDS, refineConfig, VARIANTS} from '@/lib/poker-night/config';
+import {checkConfig, DEFAULT_CONFIG, DISCARD_MAX_SECONDS, ENTRY_KINDS, LEDGER_KINDS, refineConfig, VARIANTS} from '@/lib/poker-night/config';
 import {describeHand, isRoyal, type HandDescription} from '@/lib/poker-night/hand-name';
 import {parseCard} from '@/lib/poker/cards';
 import {CATEGORY, evaluateCards} from '@/lib/poker/evaluator';
@@ -357,7 +357,7 @@ describe('the lobby and the game card', () => {
     it('reads as the lobby prints it', () => {
         const hint = "Texas hold'em, blinds 10/20, 2,000 chips each, up to eight seats. Everything can be changed at the table.";
         expect(POKER_NIGHT_COPY.title).toBe('Poker night');
-        expect(POKER_NIGHT_COPY.subtitle).toBe("Texas hold'em and PLO with friends: start a table, share the link, and play for chips.");
+        expect(POKER_NIGHT_COPY.subtitle).toBe("Texas hold'em, PLO and Triple T with friends: start a table, share the link, and play for chips.");
         expect([POKER_NIGHT_COPY.quickPlo, POKER_NIGHT_COPY.quickTripleT]).toEqual(['Start PLO', 'Start Triple T']);
         expect(POKER_NIGHT_COPY.note).toBe('Play chips only. No cash value, and nothing is paid out.');
         expect(POKER_NIGHT_COPY.quickStart).toBe('Start a table');
@@ -688,6 +688,7 @@ describe('the hand log', () => {
             ],
             shows: () => named((name) => phrases.map((phrase) => LOG_COPY.shows(name, HAND_COPY.cardsShort(cards('AsKs')), phrase))),
             youHeld: () => [LOG_COPY.youHeld(HAND_COPY.cardsShort(cards('AsKs')))],
+            youThrew: () => ALL_CARDS.map((card) => LOG_COPY.youThrew(HAND_COPY.cardShort(card))),
             showedYou: () => named((name) => [LOG_COPY.showedYou(name, HAND_COPY.cardsShort(cards('AsKs')))]),
             wins: () => named((name) => NS.flatMap((n) => phrases.flatMap((phrase) => pots.flatMap((pot) => [null, 0, 2].map((board) => LOG_COPY.wins(name, n, phrase, pot, board)))))),
             split: () => pots.flatMap((pot) => [NAMES.slice(0, 2), NAMES].flatMap((players) => [null, 1].map((board) => {
@@ -725,6 +726,48 @@ describe('the hand log', () => {
         expect(LOG_COPY.onBoards(['a flush, ace high', 'a pair of kings'])).toBe('on board 1 a flush, ace high; on board 2 a pair of kings');
         // Every showdown shows every live hand: there is no line for a hand that is not shown.
         expect(Object.keys(LOG_COPY)).not.toContain('mucks');
+    });
+});
+
+// Triple T's throw-away (P7): the dock's picker, its confirm and clock, the wait, the felt's count and
+// what a screen reader hears — a card named in the viewer's own words alone.
+describe('the throw-away', () => {
+    it('says every line over the inputs it meets', () => {
+        for (const text of strings(DISCARD_COPY)) clean(text);
+        covers(DISCARD_COPY, {
+            hiddenCard: () => [0, 1, 2].map(DISCARD_COPY.hiddenCard),
+            confirm: () => ALL_CARDS.map((card) => DISCARD_COPY.confirm(HAND_COPY.cardShort(card))),
+            waiting: () => [1, 2, 8].map(DISCARD_COPY.waiting),
+            felt: () => [[0, 2], [1, 2], [3, 5], [8, 9]].map(([done, n]) => DISCARD_COPY.felt(done, n)),
+            feltShort: () => [[0, 2], [3, 5]].map(([done, n]) => DISCARD_COPY.feltShort(done, n)),
+            announceStart: () => [DISCARD_COPY.announceStart(cards('AsKh7c')), DISCARD_COPY.announceStart(cards('2c2d2h'))],
+            thrown: () => ALL_CARDS.map(DISCARD_COPY.thrown),
+            timedOut: () => ALL_CARDS.map(DISCARD_COPY.timedOut),
+        });
+        for (const text of [TABLE_COPY.discarding, MODE_COPY.pick['triple-t'], ...HANDS_COPY.games['triple-t'].facts]) clean(text);
+    });
+
+    it('reads as the dock, the plates and the felt print it, and as a screen reader hears it', () => {
+        expect([DISCARD_COPY.prompt, DISCARD_COPY.groupLabel, DISCARD_COPY.confirmNone, DISCARD_COPY.sending, DISCARD_COPY.clock])
+            .toEqual(['Tap the card to throw away', 'Card to throw away', 'Pick a card first', 'Throwing away…', 'Throw away one']);
+        expect(DISCARD_COPY.confirm(HAND_COPY.cardShort(cards('7c')[0]))).toBe(`Throw away 7${glyph(0)}`);
+        expect(DISCARD_COPY.confirmHidden).toBe('Throw away the card picked');
+        expect(DISCARD_COPY.hiddenCard(1)).toBe('Card 2, face down');
+        expect(DISCARD_COPY.waiting(2)).toBe('Waiting for 2 players to throw away a card');
+        expect(DISCARD_COPY.waiting(1)).toBe('Waiting for 1 player to throw away a card');
+        expect(DISCARD_COPY.felt(3, 5)).toBe('Everyone throws away one card · 3 of 5 done');
+        expect(DISCARD_COPY.feltShort(3, 5)).toBe('3 of 5 thrown away');
+        expect(DISCARD_COPY.announceStart(cards('AsKh7c'))).toBe('Throw away one of your three cards: the ace of spades, the king of hearts and the seven of clubs.');
+        expect(DISCARD_COPY.announceDone).toBe('Everyone has thrown away a card.');
+        expect(DISCARD_COPY.thrown(cards('7c')[0])).toBe('You threw away the seven of clubs.');
+        expect(DISCARD_COPY.timedOut(cards('2d')[0])).toBe('Time ran out: the two of diamonds was thrown away for you.');
+        expect(TABLE_COPY.discarding).toBe('Discarding…');
+        // The log names no card but the reader's own.
+        expect(plain(LOG_COPY.line('Ana', 'discard', 0, false))).toBe('Ana throws away a card.');
+        expect(plain(LOG_COPY.line('Ana', 'discard', 0, false, true))).toBe('Ana throws away a card as time ran out.');
+        expect(LOG_COPY.youThrew(HAND_COPY.cardShort(cards('7c')[0]))).toBe(`You threw away 7${glyph(0)}.`);
+        expect(HANDS_COPY.games['triple-t'].facts[1]).toContain(`never above twenty seconds`);
+        expect(DISCARD_MAX_SECONDS).toBe(20);
     });
 });
 
@@ -812,7 +855,6 @@ describe('the host drawer', () => {
             {...base, buyInMin: 2000, buyInMax: 1000},
             {...base, buyInMax: 20 * 501},
             {...base, boards: 2 as const},
-            {...base, variant: 'triple-t' as const},
         ];
         const messages = new Set<string>();
         for (const config of refused) {
@@ -820,6 +862,10 @@ describe('the host drawer', () => {
             expect(checked.ok).toBe(false);
             if (!checked.ok) for (const issue of checked.issues) messages.add(issue.message);
         }
+        // A game this deploy does not deal: every game is open today, so a narrower list stands in.
+        const narrow = checkConfig({...base, variant: 'triple-t' as const}, {variants: ['holdem'], boards: 1});
+        expect(narrow.ok).toBe(false);
+        if (!narrow.ok) for (const issue of narrow.issues) messages.add(issue.message);
         // More cards than a deck: no config inside today's limits asks for it; the rule guards a change of them.
         refineConfig({...base, seats: 12, variant: 'plo', boards: 3}, {addIssue: (issue: {message?: string}) => messages.add(issue.message ?? '')} as never);
         expect([...messages].sort()).toEqual(Object.keys(HOST_COPY.issues).sort());
@@ -1217,7 +1263,7 @@ describe('the emotes', () => {
 
 describe('the keys', () => {
     it('word every key the table answers', () => {
-        const ids = [...SHORTCUTS.turn, ...SHORTCUTS.table].map((s) => s.id);
+        const ids = [...SHORTCUTS.turn, ...SHORTCUTS.discard, ...SHORTCUTS.table].map((s) => s.id);
         expect(Object.keys(SHORTCUTS_COPY.does).sort()).toEqual([...ids].sort());
         expect(Object.keys(SHORTCUTS_COPY.groups).sort()).toEqual(Object.keys(SHORTCUTS).sort());
         for (const text of strings(SHORTCUTS_COPY)) clean(text);
@@ -1264,7 +1310,8 @@ describe('the Hands guide', () => {
         }
         expect(HANDS_COPY.games.holdem.name).toBe(GLOSSARY['texas-holdem'].term);
         expect(HANDS_COPY.games.plo.name).toBe(GLOSSARY.omaha.term);
-        expect(HANDS_TERMS).toEqual(['hand-rankings', 'kicker', 'texas-holdem', 'omaha', 'pot-limit']);
+        expect(HANDS_COPY.games['triple-t'].name).toBe(GLOSSARY['triple-t'].term);
+        expect(HANDS_TERMS).toEqual(['hand-rankings', 'kicker', 'texas-holdem', 'omaha', 'pot-limit', 'triple-t']);
     });
 
     it('shows PLO\'s rule on a hand: one heart in hand, four on the board, a pair of aces', () => {

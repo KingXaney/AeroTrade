@@ -34,6 +34,13 @@
 // The seat's own controls and the early choices shield the first taps after they appear
 // (useTapShield), as the action bar does: a thumb on its way to Call as the hand ends does not land
 // on Leave, nor one on its way to Leave as the next hand is dealt on an early choice.
+//
+// Triple T's throw-away (P7): the three cards to pick one from take the cards' place
+// (components/poker-night/DiscardPicker), the line beside them the throw-away's seconds ("Throw away
+// one · 12 s") and, once a card is picked, what the two kept make; the row its confirm, full width.
+// Once thrown, the two kept are the viewer's cards again (the one thrown away flying off to the
+// table), still as wide as three, and the row says how many the table waits for, with "Leave after
+// this hand" beside it.
 
 import {useState} from "react";
 import {toast} from "sonner";
@@ -42,6 +49,7 @@ import ActionButton, {actionButton} from "@/components/primitives/ActionButton";
 import Panel from "@/components/primitives/Panel";
 import ActionBar from "@/components/poker-night/ActionBar";
 import type {LiveAnim} from "@/components/poker-night/anim";
+import {DiscardPicker, ThrowAwayButton, useThrowAway, type ThrowAway} from "@/components/poker-night/DiscardPicker";
 import EmotePicker from "@/components/poker-night/EmotePicker";
 import HandStrength from "@/components/poker-night/HandStrength";
 import HoleCards from "@/components/poker-night/HoleCards";
@@ -51,10 +59,10 @@ import PreActions from "@/components/poker-night/PreActions";
 import {useRoom, useServerNow, type ActionBody} from "@/components/poker-night/room-controller";
 import {useLeaveAfter} from "@/components/poker-night/useLeaveAfter";
 import {useTapShield} from "@/components/poker-night/useTapShield";
-import {BANK_COPY, HAND_COPY, INVITE_COPY, JOIN_COPY, LOOKS_COPY, TABLE_COPY} from "@/lib/learn/copy/poker-night";
+import {BANK_COPY, DISCARD_COPY, HAND_COPY, INVITE_COPY, JOIN_COPY, LOOKS_COPY, TABLE_COPY} from "@/lib/learn/copy/poker-night";
 import {turnLeft} from "@/lib/poker-night/client-clock";
-import {HOLE_CARDS} from "@/lib/poker-night/config";
-import {dockView, preRowKey, type DockView} from "@/lib/poker-night/dock";
+import {discardMs, HOLE_CARDS} from "@/lib/poker-night/config";
+import {dockView, handStrength, preRowKey, type DockView} from "@/lib/poker-night/dock";
 import {hostAwayNow, leaveTapAsks, leftState, type LeftState} from "@/lib/poker-night/overlays";
 import type {ResultLook} from "@/lib/poker-night/reveal";
 import {modeOf} from "@/lib/poker-night/variants";
@@ -64,15 +72,19 @@ const NOTE = 'chrome-surface inline-flex items-center rounded-full px-3 py-1 tex
 // A sentence that may take two lines beside the cards on a phone.
 const LONG_NOTE = 'chrome-surface inline-flex max-w-full items-center rounded-xl px-3 py-1 text-xs leading-snug text-fg-soft';
 
-// The seconds left on the viewer's own turn (the ring on the plate shows the share).
-const TurnClock = ({deadline, turnMs}: {deadline: number; turnMs: number}) => {
+// The seconds left on the viewer's own turn (the ring on the plate shows the share), or in Triple
+// T's throw-away ("Throw away one").
+// A longer label (the throw-away's) may take two lines on a narrow phone: the box rounds less then,
+// and the seconds never break.
+const TurnClock = ({deadline, turnMs, label = TABLE_COPY.yourTurn}: {deadline: number; turnMs: number; label?: string}) => {
     const now = useServerNow(1000);
     const left = turnLeft(deadline, turnMs, now, 0);
     if (!left) return null;
     return (
-        <span className={`${NOTE} gap-1.5 font-semibold text-fg`} role="timer" aria-live="off" aria-label={TABLE_COPY.timer} data-pn-clock={left.seconds}>
-            <span>{TABLE_COPY.yourTurn}</span>
-            <span className={left.fraction <= 0.3 ? 'font-mono text-warning' : 'font-mono'}>{TABLE_COPY.secondsLeft(left.seconds)}</span>
+        <span className={cn(label === TABLE_COPY.yourTurn ? NOTE : LONG_NOTE, 'gap-1.5 font-semibold text-fg')} role="timer" aria-live="off" aria-label={TABLE_COPY.timer}
+              data-pn-clock={left.seconds}>
+            <span>{label}</span>
+            <span className={cn('whitespace-nowrap font-mono', left.fraction <= 0.3 && 'text-warning')}>{TABLE_COPY.secondsLeft(left.seconds)}</span>
         </span>
     );
 };
@@ -284,22 +296,31 @@ const LeavingAfterNote = () => {
 
 // The viewer's cards and the line beside them: the seconds left, who the table waits for, what the
 // cards make — or, with Peek on and the cards face down, how to turn them up.
-const DockHand = ({dock, deadline, waitingFor, anims, look}: {
+const DockHand = ({dock, deadline, waitingFor, anims, look, throwing, disabled}: {
     dock: DockView; deadline: number | null; waitingFor: string | null; anims: readonly LiveAnim[]; look: ResultLook | null;
+    throwing: ThrowAway; disabled: boolean;
 }) => {
     const room = useRoom();
     const [peeking, setPeeking] = useState(false);
     const hand = room.view?.hand ?? null;
     const peekOn = room.personal.peek && dock.hole !== null && (dock.dealtIn || dock.mucked);
     const hidden = peekOn && !peeking;
+    const peek = room.personal.peek ? {peeking, onPeek: setPeeking} : null;
+    // Triple T's throw-away, still to throw: the three to pick from, and what the two kept make.
+    const picking = dock.discard?.pending && dock.discard.cards ? dock.discard.cards : null;
+    const kept = picking && throwing.picked !== null ? handStrength('triple-t', picking.filter((c) => c !== throwing.picked), []) : null;
     return (
         <>
-            <HoleCards seat={dock.seat!} hole={dock.hole} slots={HOLE_CARDS[modeOf(hand, room.config).variant]} holding={dock.dealtIn} folded={dock.mucked}
-                       handNo={hand?.no ?? null} anims={anims} look={look}
-                       peek={room.personal.peek ? {peeking, onPeek: setPeeking} : null}/>
+            {picking
+                ? <DiscardPicker cards={picking} throwing={throwing} disabled={disabled} peek={peek}/>
+                : <HoleCards seat={dock.seat!} hole={dock.hole} slots={HOLE_CARDS[modeOf(hand, room.config).variant]} holding={dock.dealtIn} folded={dock.mucked}
+                             handNo={hand?.no ?? null} anims={anims} look={look} thrown={room.view?.me.discard ?? null} peek={peek}/>}
             <div className="pn-dock-line flex min-w-0 flex-col items-start gap-1">
                 {room.mode === 'reconnecting' && <Reconnecting/>}
                 {deadline !== null && <TurnClock deadline={deadline} turnMs={room.config.turnSeconds * 1000}/>}
+                {picking && dock.discard?.deadline != null && (
+                    <TurnClock deadline={dock.discard.deadline} turnMs={discardMs(room.config)} label={DISCARD_COPY.clock}/>
+                )}
                 {/* A long name is cut short with an ellipsis: on the inner span, since a flex box draws none. */}
                 {dock.leavingAfter && deadline === null && <LeavingAfterNote/>}
                 {waitingFor !== null && !dock.leavingAfter && (
@@ -310,10 +331,17 @@ const DockHand = ({dock, deadline, waitingFor, anims, look}: {
                 {/* What the seat does when the hand ends, which the plate does not say while it reads Folded. */}
                 {dock.leaving && <span className={LONG_NOTE} role="status" data-pn-leaving="">{TABLE_COPY.leavingAfterHand}</span>}
                 {dock.sitOutNext && <span className={LONG_NOTE} role="status" data-pn-sit-out-next="">{TABLE_COPY.sitOutNextNote}</span>}
-                {/* The hand's name, unless the viewer turned it off (My look: "Name my hand") or keeps the cards face down. */}
+                {/* The hand's name, unless the viewer turned it off (My look: "Name my hand") or keeps the cards face down;
+                    while a card is to be thrown away, what the two kept would make, or (in a wide dock) how to pick. */}
                 {hidden
                     ? <span className={NOTE} data-pn-peek-prompt="">{LOOKS_COPY.peekPrompt}</span>
-                    : <HandStrength strength={room.personal.handHints ? dock.strength : null} strengths={room.personal.handHints ? dock.strengths : null}/>}
+                    : picking
+                        ? kept && room.personal.handHints
+                            ? <HandStrength strength={kept}/>
+                            : throwing.picked === null && (
+                                <span className="pn-discard-prompt" data-pn-discard-prompt=""><span className={NOTE}>{DISCARD_COPY.prompt}</span></span>
+                            )
+                        : <HandStrength strength={room.personal.handHints ? dock.strength : null} strengths={room.personal.handHints ? dock.strengths : null}/>}
             </div>
         </>
     );
@@ -359,9 +387,26 @@ const LeftPanel = ({left}: {left: LeftState}) => {
     );
 };
 
+// Triple T's throw-away in the row: the confirm while the viewer is still to throw; once thrown, how
+// many players the table waits for, with "Leave after this hand" beside it.
+const ThrowAwayRow = ({dock, throwing, disabled, hidden}: {dock: DockView; throwing: ThrowAway; disabled: boolean; hidden: boolean}) => {
+    const discard = dock.discard!;
+    if (discard.pending) return <ThrowAwayButton throwing={throwing} disabled={disabled} hidden={hidden}/>;
+    return (
+        <div className="pn-pre-row" data-pn-discard-wait={discard.waiting}>
+            {discard.waiting > 0 && (
+                <span className={cn(LONG_NOTE, 'min-h-11 flex-1')} role="status" data-pn-waiting="">{DISCARD_COPY.waiting(discard.waiting)}</span>
+            )}
+            {dock.leaveAfter === 'offer' && <LeaveAfterToggle disabled={disabled}/>}
+        </div>
+    );
+};
+
 const Dock = ({anims, look}: {anims: readonly LiveAnim[]; look: ResultLook | null}) => {
     const room = useRoom();
     const view = room.view;
+    // The card picked to throw away (Triple T), shared by the cards and the confirm under them.
+    const throwing = useThrowAway(view?.hand?.no ?? null, view?.turn ?? 0);
     if (!view) return null;
     const disabled = room.problem !== null || room.mode === 'reconnecting';
     if (view.me.seat === null) {
@@ -385,11 +430,15 @@ const Dock = ({anims, look}: {anims: readonly LiveAnim[]; look: ResultLook | nul
         <section className="pn-dock" aria-label={HAND_COPY.yourHand} data-pn-dock="seated">
             <div className="pn-dock-row">
                 <div className="pn-dock-hand">
-                    <DockHand dock={dock} deadline={deadline} waitingFor={waitingFor} anims={anims} look={look}/>
+                    <DockHand dock={dock} deadline={deadline} waitingFor={waitingFor} anims={anims} look={look} throwing={throwing} disabled={disabled}/>
                     <EmotePicker/>
                 </div>
                 <div className="pn-dock-actions">
-                    {dock.myTurn ? (
+                    {dock.discard ? (
+                        // Mounted afresh for each hand and once thrown, behind its tap shield.
+                        <ThrowAwayRow key={`${hand?.no ?? 0}:${dock.discard.pending ? 'pick' : 'wait'}`} dock={dock} throwing={throwing} disabled={disabled}
+                                      hidden={room.personal.peek}/>
+                    ) : dock.myTurn ? (
                         <ActionBar key={view.turn} dock={dock} turn={view.turn} disabled={disabled}/>
                     ) : dock.pre ? (
                         // Mounted afresh for each hand and each set of choices, behind its tap shield;

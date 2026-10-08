@@ -1,10 +1,12 @@
 // What a screen reader hears as the table moves (components/poker-night LiveAnnouncer): the
-// viewer's turn, with what it costs and the pot, said at once (assertive); everything else — a new
-// game from this hand (the host switched to PLO between hands), the cards they are dealt, each street's cards, the other players' moves, who wins what and with
-// which hand, players sitting down and leaving — in turn (polite). Pure and client-safe: the
-// events are lib/poker-night/events', every sentence ANNOUNCE_COPY's.
+// viewer's turn, with what it costs and the pot, and in Triple T the three cards to throw one of away,
+// said at once (assertive); everything else — a new game from this hand (the host switched to PLO
+// between hands), the cards they are dealt, the card they threw away (or the clock threw for them),
+// the throw-away over, each street's cards, the other players' moves, who wins what and with which
+// hand, players sitting down and leaving — in turn (polite). Pure and client-safe: the events are
+// lib/poker-night/events', every sentence ANNOUNCE_COPY's or DISCARD_COPY's.
 
-import {ANNOUNCE_COPY, HAND_COPY, MODE_COPY, TABLE_COPY} from '@/lib/learn/copy/poker-night';
+import {ANNOUNCE_COPY, DISCARD_COPY, HAND_COPY, MODE_COPY, TABLE_COPY} from '@/lib/learn/copy/poker-night';
 import type {Card} from '@/lib/poker/cards';
 import {potTotal} from '@/lib/poker-night/bet-sizing';
 import {legalFor} from '@/lib/poker-night/betting';
@@ -22,6 +24,8 @@ export type AnnounceContext = {
     people: People;
     mySeat: number | null;
     hole: readonly Card[] | null;
+    // Triple T: the card the viewer threw away this hand (MeView.discard).
+    discard?: Card | null;
 };
 
 const nameAt = (ctx: AnnounceContext, seat: number, pid?: string): string => {
@@ -53,7 +57,17 @@ export const announcementsFor = (events: readonly TableEvent[], ctx: AnnounceCon
         switch (e.kind) {
             case 'deal':
                 if (e.changed) polite.push(ANNOUNCE_COPY.newGame(MODE_COPY.spokenLabel(e.variant, e.boards)));
-                if (ctx.mySeat !== null && ctx.hole && e.seats.includes(ctx.mySeat)) polite.push(ANNOUNCE_COPY.dealt(ctx.hole));
+                if (ctx.mySeat === null || !ctx.hole || !e.seats.includes(ctx.mySeat)) break;
+                // Triple T: three cards, one to throw away now — said at once.
+                if (e.variant === 'triple-t' && ctx.hole.length === 3) assertive.push(DISCARD_COPY.announceStart(ctx.hole));
+                else polite.push(ANNOUNCE_COPY.dealt(ctx.hole));
+                break;
+            case 'discard':
+                if (e.seat !== ctx.mySeat) polite.push(ANNOUNCE_COPY.move(nameAt(ctx, e.seat), 'discard', 0, false, e.timeout));
+                else if (ctx.discard != null) polite.push(e.timeout ? DISCARD_COPY.timedOut(ctx.discard) : DISCARD_COPY.thrown(ctx.discard));
+                break;
+            case 'discarded':
+                polite.push(DISCARD_COPY.announceDone);
                 break;
             case 'chips-out':
                 // The blinds and antes are said once, in the log; the moves are said as they happen.

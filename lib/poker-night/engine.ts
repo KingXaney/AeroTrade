@@ -13,23 +13,26 @@
 // it would have before the first deal; the host's config applies from the next hand and the room's
 // settings at once. Once a hand completes, a
 // player who folded it may ask one whose cards were not shown to see them, and only those two ever
-// see the ask (asks, below).
+// see the ask (asks, below). Triple T deals three cards and, once the blinds are posted, opens a
+// throw-away (the 'discard' phase, below): everyone still in throws one card away at the same time,
+// then the hand plays as Texas hold'em.
 
 import {
     ASK_EVERYONE, ASK_EXPIRED, ASK_NO, ASK_SHOWN, ASK_WAITING, askDeadline, askedHand, asksFull, coolingDown, placeOf,
 } from '@/lib/poker-night/asks';
 import {isDeck, dealFrom} from '@/lib/poker-night/deck';
 import {
-    applyMove, commit, foldOutOfTurn, legalFor, owed, pushLog, recheck, settleTurn, snapshotFromState, type Flow,
+    applyMove, commit, FLAG_OF, foldOutOfTurn, legalFor, owed, pushLog, recheck, settleTurn, snapshotFromState, type Flow, type How,
 } from '@/lib/poker-night/betting';
 import {
-    ASKS, checkConfig, dealable, DEFAULT_CONFIG, DEFAULT_SETTINGS, ENTRY_FLAGS, HOLE_CARDS, mergeConfig, RoomSettingsSchema, TIMING,
+    ASKS, checkConfig, dealable, DEFAULT_CONFIG, DEFAULT_SETTINGS, discardMs, ENTRY_FLAGS, HOLE_CARDS, mergeConfig, RoomSettingsSchema, TIMING,
 } from '@/lib/poker-night/config';
 import {cashOut, hasBought, isSettled, ledgerRow, needsHost, recordBuy} from '@/lib/poker-night/ledger';
 import {eligibleSeats, isLive, liveSeatOf, positions, seatOf} from '@/lib/poker-night/seats';
 import {closeBetting, closeTable, dealStreet, shownHand, summarize} from '@/lib/poker-night/showdown';
+import {autoDiscard} from '@/lib/poker-night/variants';
 import type {
-    AskEntry, AskReply, Card, GameConfig, Hand, HostOp, Move, PreAction, Reduced, Refusal, RoomSettings, Seat, TableAction, TableState, Work,
+    AskEntry, AskReply, Card, GameConfig, Hand, HandSeat, HostOp, Move, PreAction, Reduced, Refusal, RoomSettings, Seat, TableAction, TableState, Work,
 } from '@/lib/poker-night/types';
 
 export const createTable = ({hostPid, config = DEFAULT_CONFIG, settings = DEFAULT_SETTINGS, at}: {
@@ -190,8 +193,10 @@ const withdraw = (w: Work, by: string): Refusal | void => {
 
 // A player leaves seat i, or the host removes them. Between hands (or not dealt in) they are cashed
 // out now. In a live hand: facing a bet they fold at once; otherwise they stay in, away — the clock
-// checks or folds for them — and are cashed out when the hand completes. Either way a buy that was
-// waiting is dropped, and so is any request; leaving now overrides leaving after the hand.
+// checks or folds for them — and are cashed out when the hand completes. In Triple T's throw-away a
+// player who stays in (the big blind, all in) has a card thrown away for them at once (flagged
+// 'auto'), so the table never waits on someone gone. Either way a buy that was waiting is dropped, and
+// so is any request; leaving now overrides leaving after the hand.
 const depart = (w: Work, i: number, removed: boolean): void => {
     const s = w.state;
     const seat = s.seats[i]!;
@@ -208,9 +213,10 @@ const depart = (w: Work, i: number, removed: boolean): void => {
     seat.pendingBuy = 0;
     p.pre = null;
     const hand = s.hand!;
-    if (hand.phase !== 'betting') return;
+    if (hand.phase !== 'betting' && hand.phase !== 'discard') return;
     if (!p.folded && !p.allIn && owed(hand, i) > 0) foldOutOfTurn(w, i);
-    follow(w, recheck(w));
+    else if (pendingDiscard(hand, p)) discardFor(w, p, autoDiscard(p.hole), 'auto');
+    follow(w, hand.phase === 'discard' ? discardSettled(w) : recheck(w));
 };
 
 const leave = (w: Work, by: string): Refusal | typeof NOOP | void => {
@@ -436,6 +442,65 @@ const setPre = (w: Work, by: string, pre: PreAction | null): Refusal | typeof NO
     p.pre = next;
 };
 
+// ── Triple T's throw-away ──
+//
+// Right after the deal — the antes and blinds posted — a Triple T hand opens its throw-away: phase
+// 'discard', nobody on the clock (actor null), the turn number moved on once (the one a discard
+// names, so a discard sent for an earlier throw-away is stale) and one deadline for everyone,
+// config.discardMs. Every player still in with three cards throws one away at the same time, all in
+// from posting or not; the last one's throw (or the deadline) opens the betting with the player after
+// the big blind, and from there the hand plays as Texas hold'em. A card thrown away goes to
+// hand.discards (PRIVATE: its owner's view and history alone), and the log says only that one was
+// ('discard', amount 0 — never the card). At the deadline the clock throws for everyone still to
+// (variants.autoDiscard, flagged timeout) without counting a timeout, so a slow throw never sits a
+// player out or folds a blind they posted.
+
+const liveCount = (hand: Hand): number => hand.seats.filter((p) => !p.folded).length;
+
+// A player still to throw a card away: in the throw-away, not folded, holding three.
+const pendingDiscard = (hand: Hand, p: HandSeat): boolean => hand.phase === 'discard' && !p.folded && p.hole.length === HOLE_CARDS['triple-t'];
+
+const pendingDiscards = (hand: Hand): HandSeat[] => hand.seats.filter((p) => pendingDiscard(hand, p));
+
+const discardFor = (w: Work, p: HandSeat, card: Card, how: How): void => {
+    p.hole = p.hole.filter((c) => c !== card);
+    w.state.hand!.discards.push([p.seat, card]);
+    pushLog(w, p.seat, 'discard', 0, FLAG_OF[how]);
+};
+
+// The betting opens as Texas hold'em's does: on the player after the big blind.
+const startBetting = (w: Work): Flow => {
+    const hand = w.state.hand!;
+    hand.phase = 'betting';
+    hand.deadline = null;
+    return settleTurn(w, hand.bigBlindSeat);
+};
+
+// After a throw, a fold or a leave in the throw-away: one player left wins it; nobody still to throw
+// opens the betting; else it waits.
+const discardSettled = (w: Work): Flow => {
+    const hand = w.state.hand!;
+    if (liveCount(hand) <= 1) return 'close';
+    return pendingDiscards(hand).length === 0 ? startBetting(w) : 'waiting';
+};
+
+const discard = (w: Work, by: string, turn: number, card: Card): Refusal | void => {
+    const s = w.state;
+    const i = seatOf(s, by);
+    if (i === null) return 'not-seated';
+    if (turn !== s.turn) return 'stale';
+    const hand = s.hand;
+    const p = liveSeatOf(s, by);
+    if (!isLive(hand) || !p || !pendingDiscard(hand, p)) return 'not-now';
+    if (hand.deadline !== null && w.at >= hand.deadline + TIMING.TURN_GRACE_MS) return 'stale';
+    if (!p.hole.includes(card)) return 'illegal';
+    discardFor(w, p, card, 'player');
+    const seat = s.seats[i]!;
+    seat.timeouts = 0;
+    seat.away = false;
+    follow(w, discardSettled(w));
+};
+
 const startHand = (w: Work, deck: Card[], draw: number): void => {
     const s = w.state;
     if (!dealable(s.config)) {
@@ -470,13 +535,14 @@ const startHand = (w: Work, deck: Card[], draw: number): void => {
     const boards = variant === 'plo' ? s.config.boards : 1;
     const {holes, runs} = dealFrom(deck, order.length, HOLE_CARDS[variant], boards);
     const owes = new Set(order.filter((i) => s.seats[i]!.owesPost));
+    const throwAway = variant === 'triple-t';
     const hand: Hand = {
         no, startedAt: w.at, variant, button, smallBlindSeat: sb, bigBlindSeat: bb, smallBlind, bigBlind, ante,
         seats: order.map((i, k) => ({
             seat: i, pid: s.seats[i]!.pid, hole: holes[k], startStack: s.seats[i]!.stack, committed: 0, streetBet: 0,
             actedAtBet: null, folded: false, allIn: false, shown: false, pre: null,
         })),
-        deck: runs, boards: runs.map(() => []), discards: [], street: 'preflop', phase: 'betting', currentBet: bigBlind, increment: bigBlind,
+        deck: runs, boards: runs.map(() => []), discards: [], street: 'preflop', phase: throwAway ? 'discard' : 'betting', currentBet: bigBlind, increment: bigBlind,
         lastAggressor: null, actor: null, deadline: null, nextStreetAt: null, log: [], logDropped: 0, result: null, asks: [],
     };
     s.hand = hand;
@@ -501,13 +567,28 @@ const startHand = (w: Work, deck: Card[], draw: number): void => {
     else post(sb, smallBlind, 'small-blind');
     post(bb, bigBlind, 'big-blind');
     if (!fresh) for (const i of order) if (owes.has(i) && i !== sb && i !== bb) post(i, bigBlind, 'post');
+    if (throwAway) {
+        // Triple T: the throw-away, everyone at once on one clock, before any betting.
+        s.turn++;
+        hand.deadline = w.at + discardMs(s.config);
+        return;
+    }
     follow(w, settleTurn(w, bb));
 };
 
 // Time ran out on the actor: check if that is free, else fold. Enough in a row and they are away.
+// In Triple T's throw-away, on everyone still to throw: a card thrown away for each, counting no
+// timeout, then the betting.
 const timeout = (w: Work, turn: number): Refusal | void => {
     const s = w.state;
     const hand = s.hand;
+    if (isLive(hand) && hand.phase === 'discard') {
+        if (turn !== s.turn) return 'stale';
+        if (hand.deadline === null || w.at < hand.deadline + TIMING.TURN_GRACE_MS) return 'not-due';
+        for (const p of pendingDiscards(hand)) discardFor(w, p, autoDiscard(p.hole), 'timeout');
+        follow(w, discardSettled(w));
+        return;
+    }
     if (!isLive(hand) || hand.phase !== 'betting' || hand.actor === null) return 'not-now';
     if (turn !== s.turn) return 'stale';
     if (hand.deadline === null || w.at < hand.deadline + TIMING.TURN_GRACE_MS) return 'not-due';
@@ -678,6 +759,8 @@ export const reduce = (state: TableState, action: TableAction): Reduced => {
             return step(state, at, (w) => allowAsks(w, action.by, action.on));
         case 'act':
             return step(state, at, (w) => act(w, action.by, action.turn, action.move));
+        case 'discard':
+            return step(state, at, (w) => discard(w, action.by, action.turn, action.card));
         case 'pre':
             return step(state, at, (w) => setPre(w, action.by, action.pre));
         case 'host': {

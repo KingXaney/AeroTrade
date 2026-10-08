@@ -42,11 +42,16 @@ export const seatChips = (seat: Pick<SeatView, 'chips' | 'inPot'> | null | undef
 export const profileWaits = (view: Pick<PlayerView, 'hand' | 'me'> | null): boolean =>
     view !== null && view.me.seat !== null && handLive(view);
 
-// The turn number while it is the viewer's turn to act, else null. Each new one closes any drawer
-// or dialog the viewer has open, so nothing modal stands over the action bar while the clock runs.
-export const myTurnKey = (view: Pick<PlayerView, 'hand' | 'turn' | 'me'> | null): number | null => {
+// What asks for the viewer now, as a key — their turn to act ("turn:12"), or a card of theirs to
+// throw away in Triple T's throw-away ("discard:7", by the hand) — else null. Each new one closes any
+// drawer or dialog the viewer has open, so nothing modal stands over the action bar or the cards to
+// pick from while the clock runs, and chimes once.
+export const attentionKey = (view: Pick<PlayerView, 'hand' | 'turn' | 'me'> | null): string | null => {
     if (!view || view.me.seat === null || !view.hand) return null;
-    return view.hand.phase === 'betting' && view.hand.actor === view.me.seat ? view.turn : null;
+    const hand = view.hand;
+    if (hand.phase === 'betting' && hand.actor === view.me.seat) return `turn:${view.turn}`;
+    if (hand.phase === 'discard' && hand.toDiscard.includes(view.me.seat) && view.me.hole !== null) return `discard:${hand.no}`;
+    return null;
 };
 
 // ── the viewer's own seat (the top bar's menu) ──

@@ -19,7 +19,7 @@ import Seat from "@/components/poker-night/Seat";
 import {chooseSeat} from "@/components/poker-night/overlay-requests";
 import {useRoom} from "@/components/poker-night/room-controller";
 import {TABLE_COPY} from "@/lib/learn/copy/poker-night";
-import {PLAYING_CARDS} from "@/lib/poker-night/config";
+import {HOLE_CARDS, PLAYING_CARDS} from "@/lib/poker-night/config";
 import type {Card} from "@/lib/poker/cards";
 import {cardLook, playerAt, type ResultLook} from "@/lib/poker-night/reveal";
 import type {SeatPlace, Stage} from "@/lib/poker-night/stage";
@@ -59,8 +59,11 @@ const SeatRing = ({stage, anims, look}: Props) => {
     const live = !!hand && hand.phase !== 'complete';
     const mySeat = room.me?.seat ?? null;
     const actor = hand && hand.phase === 'betting' ? hand.actor : null;
-    // The cards a hand of this game holds once the betting starts: what a seat's fold sends in.
-    const held = hand ? PLAYING_CARDS[hand.variant] : 2;
+    // Triple T's throw-away: the seats still to throw a card away ("Discarding…").
+    const toDiscard = new Set(hand?.phase === 'discard' ? hand.toDiscard : []);
+    // The cards a hand of this game holds once the betting starts (in Triple T's throw-away, the three
+    // dealt): what a seat's fold sends in.
+    const held = hand ? (hand.phase === 'discard' ? HOLE_CARDS : PLAYING_CARDS)[hand.variant] : 2;
     const turnMs = room.config.turnSeconds * 1000;
     // An open seat takes a visitor who may join, or a watcher; a seated player sees it as open.
     const canChoose = table.status !== 'closed' && (
@@ -127,7 +130,8 @@ const SeatRing = ({stage, anims, look}: Props) => {
                               turn={acting && hand?.deadline != null ? {deadline: hand.deadline, turnMs} : null}
                               blind={live && hand ? (hand.sb === seat && hand.bb !== seat ? 'small' : hand.bb === seat ? 'big' : null) : null}
                               look={look} anims={anims} awaitingChips={requested.has(v.pid)}
-                              privateCards={playerAt(table, seat) === v.pid ? seenAlone.find((h) => h.seat === seat)?.cards ?? null : null} held={held}/>
+                              privateCards={playerAt(table, seat) === v.pid ? seenAlone.find((h) => h.seat === seat)?.cards ?? null : null} held={held}
+                              discarding={toDiscard.has(seat)}/>
                     );
                 })}
             </ul>

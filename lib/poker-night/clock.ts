@@ -2,17 +2,18 @@
 // clock to the moment it arrived before its own step and to now after it, and the clock leader's
 // tick (POST tick) advances it alone; a GET or a page render never does. Pure.
 //
-// Three things come due — the actor's time running out (after the deadline's grace), the next
-// street of an all-in run-out, the next deal — and each is applied with at = now, so every new
-// deadline counts from now: a table nobody watched picks up in real time instead of playing out
-// hands no one saw.
+// Three things come due — the actor's time running out (after the deadline's grace; in Triple T's
+// throw-away, everyone's at once), the next street of an all-in run-out, the next deal — and each is
+// applied with at = now, so every new deadline counts from now: a table nobody watched picks up in
+// real time instead of playing out hands no one saw.
 //
 // A turn's timeout is judged by who is running the clock. The actor's own request judges it by the
 // turn's own time (the deadline's grace), so a move that arrived after it is late. Any other writer
 // — the clock leader's tick, another player's step, a join — applies it TIMING.TIMEOUT_SLACK_MS
 // later, so a move that arrived in time and is still on its way to the room's compare-and-set lands
-// before a timeout another request could commit first. With no writer named, the engine's own rule
-// (the grace alone) applies: what the tests and the simulator replay.
+// before a timeout another request could commit first. The throw-away has no actor, so every writer
+// gives it that slack: a throw that arrived in time is never beaten by the deadline. With no writer
+// named, the engine's own rule (the grace alone) applies: what the tests and the simulator replay.
 
 import {dealable, TIMING} from '@/lib/poker-night/config';
 import type {DeckSource} from '@/lib/poker-night/deck';
@@ -26,7 +27,7 @@ export const nextDue = (state: TableState): Due | null => {
     if (state.status === 'closed') return null;
     const hand = state.hand;
     if (isLive(hand)) {
-        if (hand.phase === 'betting' && hand.actor !== null && hand.deadline !== null) {
+        if (((hand.phase === 'betting' && hand.actor !== null) || hand.phase === 'discard') && hand.deadline !== null) {
             return {kind: 'timeout', at: hand.deadline + TIMING.TURN_GRACE_MS, turn: state.turn};
         }
         if (hand.phase === 'runout' && hand.nextStreetAt !== null) return {kind: 'street', at: hand.nextStreetAt};

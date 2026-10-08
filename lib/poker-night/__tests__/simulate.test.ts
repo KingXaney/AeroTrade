@@ -1,6 +1,8 @@
-// Poker night's engine over seeded random nights. Each night is a random table — Texas hold'em or PLO
-// (pot limit, on one to three boards), 2 to 9 seats, with or without an ante, either rebuy policy — played with random legal
-// moves, and between them players
+// Poker night's engine over seeded random nights. Each night is a random table — Texas hold'em, PLO
+// (pot limit, on one to three boards) or Triple T (three cards each, one thrown away by everyone at
+// once before the betting), 2 to 9 seats, with or without an ante, either rebuy policy — played with
+// random legal moves and throws (now and then a card not held, or a throw for an earlier throw-away,
+// refused), the throw-away's deadline throwing for whoever is still to, and between them players
 // sitting down, leaving (now, or after the hand in play — and taking that back), being removed,
 // sitting out and in, buying chips (once the first hand is dealt, a request the host approves,
 // declines or the player withdraws), setting pre-actions, showing cards, asking to see a folded or
@@ -23,7 +25,11 @@
 // splits evenly between the boards (the odd chips to the first), and each board's part goes to the
 // strongest eligible hands on that board — in PLO by a brute force over every two hole cards with
 // every three from the board — every seat leaving after it is empty, and the state
-// survives a JSON round trip into the stored shape. Across hands the
+// survives a JSON round trip into the stored shape. In Triple T: every seat holds three cards until it
+// throws one, two after, and at most one card thrown away a seat; the throw-away has nobody on the
+// clock, one deadline and someone still to throw; the betting opens only once nobody is; a card the
+// deadline throws counts no timeout and makes no one away; and no card is ever in two places among the
+// runs, the holes and the cards thrown away. Across hands the
 // big blind moves one eligible seat on, so nobody pays it twice running and nobody twice in one
 // orbit of another player. A night replays to the same final state from its recorded actions.
 //
@@ -34,7 +40,7 @@ import {describe, expect, it} from 'vitest';
 import {evaluateCards} from '@/lib/poker/evaluator';
 import {allInOpen, legalFor, needsToAct, owed, snapshotFromState} from '@/lib/poker-night/betting';
 import {advance, nextDue} from '@/lib/poker-night/clock';
-import {ASK_ANSWERS, ASKS, DEFAULT_CONFIG, ENTRY_FLAGS, ENTRY_KINDS, HOLE_CARDS, STREETS, TABLE_LIMITS} from '@/lib/poker-night/config';
+import {ASK_ANSWERS, ASKS, DEFAULT_CONFIG, ENTRY_FLAGS, ENTRY_KINDS, HOLE_CARDS, PLAYING_CARDS, STREETS, TABLE_LIMITS} from '@/lib/poker-night/config';
 import {FULL_DECK, shuffleWith, type DeckSource} from '@/lib/poker-night/deck';
 import {createTable, forceClose, reduce} from '@/lib/poker-night/engine';
 import {buyRange, conservation, ledgerRow} from '@/lib/poker-night/ledger';
@@ -86,18 +92,18 @@ const randomConfig = (r: Random): GameConfig => {
         turnSeconds: TABLE_LIMITS.turnSeconds.min + r.int(TABLE_LIMITS.turnSeconds.max - TABLE_LIMITS.turnSeconds.min + 1),
         pauseSeconds: TABLE_LIMITS.pauseSeconds.min + r.int(TABLE_LIMITS.pauseSeconds.max - TABLE_LIMITS.pauseSeconds.min + 1),
         sitOutAfter: 1 + r.int(TABLE_LIMITS.sitOutAfter.max),
-        ...(r.chance(0.35) ? {variant: 'plo' as const, boards: r.pick([1, 2, 3] as const)} : {variant: r.pick(['holdem', 'holdem', 'plo'] as const), boards: 1 as const}),
+        ...(r.chance(0.3) ? {variant: 'plo' as const, boards: r.pick([1, 2, 3] as const)} : {variant: r.pick(['holdem', 'holdem', 'plo', 'triple-t', 'triple-t'] as const), boards: 1 as const}),
     };
 };
 
 // A config change the host might make; now and then one out of limits, which is refused.
 const randomPatch = (c: GameConfig, r: Random): Extract<HostOp, {op: 'config'}>['patch'] => {
     switch (r.int(9)) {
-        // The game, from the next hand — PLO on one to three boards — and now and then one this deploy
-        // does not deal, or a second board for a game other than PLO, refused.
+        // The game, from the next hand — PLO on one to three boards, Triple T — and now and then a
+        // second board for a game other than PLO, refused.
         case 8: return r.chance(0.1)
-            ? r.pick([{variant: 'triple-t' as const}, {variant: 'holdem' as const, boards: 2 as const}, {boards: 3 as const}])
-            : r.chance(0.4) ? {variant: 'plo' as const, boards: r.pick([1, 2, 3] as const)} : {variant: r.pick(['holdem', 'plo'] as const)};
+            ? r.pick([{variant: 'triple-t' as const, boards: 2 as const}, {variant: 'holdem' as const, boards: 2 as const}, {boards: 3 as const}])
+            : r.chance(0.4) ? {variant: 'plo' as const, boards: r.pick([1, 2, 3] as const)} : {variant: r.pick(['holdem', 'plo', 'triple-t'] as const)};
         case 0: return {turnSeconds: r.chance(0.9) ? 15 + r.int(106) : 5};
         case 1: return {pauseSeconds: 3 + r.int(13)};
         case 2: return {sitOutAfter: 1 + r.int(5)};
@@ -283,7 +289,8 @@ const COUNTERS = ['hands', 'showdowns', 'sidePots', 'oddChips', 'runouts', 'time
     'hostSitOutsAlreadyOut', 'leaveAfter', 'leaveAfterCancelled', 'leaveAfterCashOuts', 'leaveAfterRace', 'leaveAfterNow', 'buyRequests',
     'firstBuyIns', 'hostBuysAfterStart', 'withdrawn', 'declined', 'asks', 'asksShown', 'asksShownAll', 'asksNo', 'asksExpired', 'askCooldowns',
     'asksOff', 'askLimits', 'asksFull', 'asksDealt', 'hostAwayBuys', 'ploHands', 'ploShowdowns', 'potLimitCaps', 'potLimitAllInRefused',
-    'multiBoardHands', 'multiBoardShowdowns', 'scoops', 'boardSplits'] as const;
+    'multiBoardHands', 'multiBoardShowdowns', 'scoops', 'boardSplits', 'tripleTHands', 'tripleTShowdowns', 'discards', 'discardTimeouts',
+    'discardsForLeavers', 'discardsRefused', 'tripleTWonInThrowAway'] as const;
 type Counters = Record<(typeof COUNTERS)[number], number>;
 
 const EVENTS = [
@@ -399,11 +406,26 @@ const night = (seed: number, counters: Counters) => {
             if (seat === -1 ? ENTRY_KINDS[kind] !== 'void' : !hand.seats.some((p) => p.seat === seat)) fail(`log entry for seat ${seat}`);
         }
         const cards = [...hand.deck.flat(), ...hand.seats.flatMap((p) => p.hole), ...hand.discards.map(([, card]) => card)];
-        // Texas hold'em on one board, PLO on one to three; five cards a run.
+        // Texas hold'em and Triple T on one board, PLO on one to three; five cards a run. Every seat holds
+        // what its game deals, but in Triple T a seat that threw one away (at most one each) holds two.
         const runs = hand.variant === 'plo' ? [1, 2, 3] : [1];
-        if (!['holdem', 'plo'].includes(hand.variant) || !runs.includes(hand.deck.length) || hand.deck.some((run) => run.length !== 5)
-            || hand.seats.some((p) => p.hole.length !== HOLE_CARDS[hand.variant])) {
+        const thrown = new Map(hand.discards.map(([seat, card]) => [seat, card]));
+        if (!['holdem', 'plo', 'triple-t'].includes(hand.variant) || !runs.includes(hand.deck.length) || hand.deck.some((run) => run.length !== 5)
+            || hand.seats.some((p) => p.hole.length + (thrown.has(p.seat) ? 1 : 0) !== HOLE_CARDS[hand.variant])
+            || thrown.size !== hand.discards.length || hand.discards.some(([seat]) => !hand.seats.some((p) => p.seat === seat))
+            || (hand.variant !== 'triple-t' && hand.discards.length > 0)) {
             fail(`not a deal of ${hand.variant} on ${hand.deck.length} boards`);
+        }
+        // Past the throw-away, everyone still in holds the two they kept; a hand won in it (everyone
+        // else gone) may end with its winner's three.
+        if (hand.variant === 'triple-t' && hand.phase !== 'discard' && (hand.phase !== 'complete' || hand.result?.showdown)) {
+            if (hand.seats.some((p) => !p.folded && p.hole.length !== PLAYING_CARDS['triple-t'])) fail('a player still in past the throw-away without two cards');
+        }
+        if (hand.phase === 'discard') {
+            if (hand.variant !== 'triple-t' || hand.actor !== null || hand.deadline === null || hand.street !== 'preflop') fail('a throw-away with someone on the clock or no deadline');
+            if (!hand.seats.some((p) => !p.folded && p.hole.length === 3)) fail('a throw-away with nobody still to throw');
+            if (hand.seats.filter((p) => !p.folded).length < 2) fail('a throw-away with one player left');
+            if (hand.seats.some((p) => p.pre !== null)) fail('a pre-action in the throw-away');
         }
         if (cards.some((card) => !Number.isInteger(card) || card < 0 || card > 51) || new Set(cards).size !== cards.length) fail('cards dealt twice or out of the deck');
         const boardSize = [0, 3, 4, 5][STREETS.indexOf(hand.street)];
@@ -437,6 +459,7 @@ const night = (seed: number, counters: Counters) => {
             if (live.filter((p) => !p.allIn).length > 1 || live.some((p) => !p.shown || p.streetBet > 0)) fail('a run-out two players could still bet in');
             return;
         }
+        if (hand.phase === 'discard') return;
         // Betting: the actor is live, holds chips, has to act, and is offered what the log allows.
         const actor = hand.actor;
         if (actor === null || hand.deadline === null) fail('betting with nobody on the clock');
@@ -469,6 +492,18 @@ const night = (seed: number, counters: Counters) => {
         const result = hand.result!;
         counters.hands++;
         if (hand.variant === 'plo') counters.ploHands++;
+        if (hand.variant === 'triple-t') {
+            counters.tripleTHands++;
+            if (result.showdown) counters.tripleTShowdowns++;
+            if (hand.discards.length < hand.seats.length && hand.seats.filter((p) => !p.folded).some((p) => p.hole.length === 3)) counters.tripleTWonInThrowAway++;
+            for (const e of hand.log) {
+                if (ENTRY_KINDS[e[1]] !== 'discard') continue;
+                if (e[2] !== 0) fail('a throw-away line with chips');
+                if (e[4] & ENTRY_FLAGS.timeout) counters.discardTimeouts++;
+                else if (e[4] & ENTRY_FLAGS.auto) counters.discardsForLeavers++;
+                else counters.discards++;
+            }
+        }
         if (hand.boards.length > 1) counters.multiBoardHands++;
         const contribs = hand.seats.map((p) => ({seat: p.seat, amount: p.committed, folded: p.folded}));
         const live = hand.seats.filter((p) => !p.folded);
@@ -589,6 +624,15 @@ const night = (seed: number, counters: Counters) => {
     // shape, and the night carries on from the copy.
     const after = (prev: TableState, next: TableState, steps = 1): TableState => {
         checkState(next);
+        // A card the throw-away's deadline threw counts no timeout and makes nobody away.
+        if (prev.hand && next.hand && prev.hand.no === next.hand.no && prev.hand.phase === 'discard') {
+            for (const e of next.hand.log.slice(prev.hand.log.length)) {
+                if (ENTRY_KINDS[e[1]] !== 'discard' || !(e[4] & ENTRY_FLAGS.timeout)) continue;
+                const was = prev.seats[e[0]];
+                const now = next.seats[e[0]];
+                if (was && now && (now.timeouts !== was.timeouts || now.away !== was.away)) fail(`a card thrown away for seat ${e[0]} counted as a timeout`);
+            }
+        }
         if (next.handNo - prev.handNo > 1) fail('two hands dealt in one step');
         if (next.handNo !== prev.handNo) {
             checkDeal(prev, next, steps);
@@ -1000,9 +1044,25 @@ const night = (seed: number, counters: Counters) => {
         clockTo(now);
         const hand = s.hand;
         const onClock = isLive(hand) && hand.phase === 'betting' ? hand.actor : null;
+        const toThrow = isLive(hand) && hand.phase === 'discard' ? hand.seats.filter((p) => !p.folded && p.hole.length === 3) : [];
         const roll = r.next();
-        if (onClock !== null && roll < 0.03) {
+        if ((onClock !== null || toThrow.length > 0) && roll < 0.03) {
             clockTo(nextDue(s)!.at + r.int(300));
+        } else if (roll < PLAY && toThrow.length > 0) {
+            // Triple T: a player still to throw throws a card — now and then one they do not hold, or
+            // for an earlier throw-away, which is refused and changes nothing.
+            const p = r.pick(toThrow);
+            const astray = r.chance(0.06);
+            const stale = !astray && r.chance(0.04);
+            const card = astray ? r.pick(FULL_DECK.filter((c) => !p.hole.includes(c))) : r.pick(p.hole);
+            const refused = send({type: 'discard', by: p.pid, turn: stale ? s.turn - 1 : s.turn, card, at: now});
+            if (astray || stale) {
+                if (refused !== (astray ? 'illegal' : 'stale')) fail(`a throw ${astray ? 'of a card not held' : 'for an earlier throw-away'} came back ${refused}`);
+                counters.discardsRefused++;
+            } else if (refused !== null) {
+                // The clock ran to now first: a player still to throw is inside the deadline's grace.
+                fail(`a throw was refused: ${refused}`);
+            }
         } else if (roll < PLAY && onClock !== null) {
             const snapshot = snapshotFromState(s);
             const legal = legalFor(snapshot, onClock);

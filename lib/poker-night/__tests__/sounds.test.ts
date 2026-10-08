@@ -62,6 +62,16 @@ describe('the cues', () => {
     const base = {id: '7:x', handNo: 7};
     const at = (anims: CueAnim[]) => soundCues(anims).map((c) => [c.sound, c.at]);
 
+    it('swish a card thrown away (Triple T) as a fold, once each, and nothing for the throw-away over', () => {
+        const events: TableEvent[] = [
+            {...base, id: '7:2', kind: 'discard', seat: 0, timeout: false, auto: false},
+            {...base, id: '7:3', kind: 'discard', seat: 1, timeout: true, auto: false},
+            {...base, id: '7:discarded', kind: 'discarded'},
+        ];
+        const batch = scheduleBatch(events).items.map((s) => ({...s, offset: 0}));
+        expect(at(batch)).toEqual([['fold', batch[0].at], ['fold', batch[1].at]]);
+    });
+
     it('sound each move at its moment on the timeline, offset included', () => {
         const events: TableEvent[] = [
             {...base, id: '7:1', kind: 'chips-out', seat: 1, move: 'call', amount: 20, to: 20, allIn: false},

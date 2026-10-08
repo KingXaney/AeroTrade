@@ -685,6 +685,10 @@ const ENTRIES = [
         short: 'A bet or raise can be at most the pot: everything in the middle and in front of the players, plus the call.',
         long: 'A raise counts the call first: with blinds of 1 and 2, the first player in can raise to at most 7, the 2 to call and then 5 more, the size of the pot once that call is in. Facing a raise to 7, the next player can go to at most 24. The minimum raise is the one no limit uses, and a player whose chips fall short of the cap can go all in.',
         computedIn: 'lib/poker-night/betting.ts legalFor', seeAlso: ['omaha', 'minimum-raise', 'all-in']},
+    {key: 'triple-t', kind: 'metric', term: 'Triple T poker', aliases: ['triple t', 'triple-t', 'triple t poker', 'triple-t poker'],
+        short: "Three cards each; everyone throws one away right after the deal, before any betting, and the hand then plays as Texas hold'em.",
+        long: "Each player is dealt three cards face down, and before anyone bets, everyone still in picks one of them to throw away, all at the same moment; nobody sees a card thrown away. From there it is Texas hold'em with the two cards kept: betting before the flop, after it, after the turn and after the river, no limit, and a hand is the strongest five of the two kept and the board's five.",
+        computedIn: 'lib/poker-night/variants.ts autoDiscard', seeAlso: ['texas-holdem', 'hand-rankings']},
 
     // ---- rails --------------------------------------------------------------------------
     {key: 'position-cap', kind: 'rail', term: 'Position cap', aliases: ['position cap', 'max position weight'],

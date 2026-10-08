@@ -16,7 +16,9 @@
 // every plate, turned-up hand (as many cards as the game's hands hold: four in PLO), the dealer
 // button, the board, the pots paying out and the winners' "+N" — under the banner when they fit
 // together, else apart. Between hands, when the host picked another game, the countdown says it ("Next
-// hand: PLO, in 4 s"); before the first hand the felt prints the game under the table's name. The room's root carries the looks' ids
+// hand: PLO, in 4 s"); before the first hand the felt prints the game under the table's name. In
+// Triple T's throw-away the middle of the felt, where the board's cards will come, counts the throws
+// with its seconds ("Everyone throws away one card · 3 of 5 done · 12 s"). The room's root carries the looks' ids
 // for LOOKS_CSS (the host's scene and felt, the viewer's card back and suit colours) and the hooks a
 // test reads: data-pn-mode (polling, realtime, reconnecting), data-pn-transport (realtime, poll,
 // both), data-pn-seq (the seq of the view drawn, which only ever moves up), data-pn-ready once the
@@ -37,8 +39,9 @@ import TableFelt from "@/components/poker-night/TableFelt";
 import TableOverlays from "@/components/poker-night/TableOverlays";
 import WinnerReveal from "@/components/poker-night/WinnerReveal";
 import {useRoom, useServerNow} from "@/components/poker-night/room-controller";
-import {MODE_COPY, TABLE_COPY} from "@/lib/learn/copy/poker-night";
+import {DISCARD_COPY, MODE_COPY, TABLE_COPY} from "@/lib/learn/copy/poker-night";
 import {PLAYING_CARDS} from "@/lib/poker-night/config";
+import {throwAwayCount} from "@/lib/poker-night/dock";
 import {modeChanged, modeOf, nextModeOf} from "@/lib/poker-night/variants";
 import {secondsUntil} from "@/lib/poker-night/client-clock";
 import type {Box} from "@/lib/poker-night/layout";
@@ -83,6 +86,29 @@ const NextHand = ({at, game, className, style}: {at: number; game: string | null
     if (s === null || s <= 0) return null;
     return <p className={cn(className, PILL)} style={style} data-pn-next-hand={s} data-pn-next-game={game ?? undefined}>{nextHandText(game, s)}</p>;
 };
+
+// Triple T's throw-away, in the middle of the felt: how many of the players still in have thrown a
+// card away, and the seconds the throw-away has left — inside the board's own place, which the stage
+// keeps clear of every plate, bet line and the dealer button (the board has no card yet). A narrower
+// board says the count alone on one line; one too narrow for that (a small phone on its side) says
+// nothing there: the plates' "Discarding…" and the dock's clock say it.
+const ThrowAwayNote = ({count, deadline, board}: {count: {done: number; of: number}; deadline: number | null; board: Stage['board']}) => {
+    const now = useServerNow(1000);
+    if (board.w < THROW_AWAY_PX.count) return null;
+    const s = deadline === null ? null : secondsUntil(deadline, now, 0);
+    const full = board.w >= THROW_AWAY_PX.full;
+    return (
+        <p className={cn('pn-centre-note', PILL, 'text-fg', !full && 'whitespace-nowrap text-[11px]')} style={{left: board.x, top: board.y, maxWidth: board.w}} role="status"
+           data-pn-throw-away={`${count.done}/${count.of}`} data-compact={full ? undefined : ''}>
+            <span>{full ? DISCARD_COPY.felt(count.done, count.of) : DISCARD_COPY.feltShort(count.done, count.of)}</span>
+            {full && s !== null && s > 0 && <span className="whitespace-nowrap font-mono"> · {TABLE_COPY.secondsLeft(s)}</span>}
+        </p>
+    );
+};
+
+// The board widths the felt's throw-away note needs: the sentence with the seconds (two lines at
+// most), and the count alone on one line ("3 of 5 thrown away", at 11 px).
+const THROW_AWAY_PX = {full: 200, count: 130} as const;
 
 // The widest the countdown says it, for the banner's plan: the next deal is never 100 s away.
 const NEXT_HAND_WIDEST = 99;
@@ -144,6 +170,7 @@ const TableScreen = () => {
 
     const live = !!hand && hand.phase !== 'complete';
     const note = live ? null : centreNote(table);
+    const throwAway = throwAwayCount(table);
     const nextAt = !live && table.status === 'playing' && !table.closing && table.nextHandAt !== null && note === null ? table.nextHandAt : null;
     // The game: the hand's own (what its turned-up hands hold), and the next deal's when the host
     // picked another.
@@ -242,6 +269,7 @@ const TableScreen = () => {
                                         {note}
                                     </p>
                                 )}
+                                {throwAway && hand && <ThrowAwayNote count={throwAway} deadline={hand.deadline} board={stage.board}/>}
                                 <SeatRing stage={stage} anims={anims} look={look}/>
                                 <ChipFlight stage={stage} pots={pots} anims={anims} handNo={hand?.no ?? null}/>
                                 {plan && hand && <WinnerReveal anims={anims} handNo={hand.no} lines={lines} plan={plan}/>}

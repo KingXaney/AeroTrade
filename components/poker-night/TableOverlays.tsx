@@ -18,7 +18,7 @@
 // Which drawer and dialog are open is this component's state, so a dialog opened from the host
 // drawer steps the drawer aside and brings it back when it closes, and nothing stacks one modal on
 // another. When the viewer's turn comes round, every drawer and dialog closes (worked out during
-// render from the turn number, lib/poker-night/overlays.myTurnKey) and focus goes to the action
+// render from lib/poker-night/overlays.attentionKey: the turn, or Triple T's throw-away) and focus goes to the action
 // bar: nothing modal stands over it while the clock runs. Other table components ask for a drawer,
 // a seat or the leave dialog through components/poker-night/overlay-requests.
 
@@ -44,7 +44,7 @@ import {useRoom} from "@/components/poker-night/room-controller";
 import type {HostSitOuts} from "@/components/poker-night/useHostSitOut";
 import {useLeaveAfter} from "@/components/poker-night/useLeaveAfter";
 import {ANNOUNCE_COPY, BANK_COPY, HOST_COPY, LOBBY_COPY, MODE_COPY, TABLE_COPY} from "@/lib/learn/copy/poker-night";
-import {myTurnKey, ownSeat, requestEnded, type HostRow, type LeaveThen, type SeatChoice} from "@/lib/poker-night/overlays";
+import {attentionKey, ownSeat, requestEnded, type HostRow, type LeaveThen, type SeatChoice} from "@/lib/poker-night/overlays";
 import {ledgerRowOf} from "@/lib/poker-night/views";
 
 type Dialog =
@@ -59,7 +59,7 @@ type Ui = {
     closedByTurn: boolean; // the drawer or dialog last closed because the viewer's turn came round
     visitorSeat: number | null; // the seat a visitor chose with "Sit here"
     sit: {seat: number | null} | null; // a watcher taking a seat
-    turnSeen: number | null; // the viewer's turn the drawers last closed for
+    turnSeen: string | null; // what last asked for the viewer (their turn, a card to throw away): the drawers closed for it
     requestSeen: number; // the last overlay request answered
 };
 
@@ -73,7 +73,7 @@ const TableOverlays = () => {
     const [ui, setUi] = useState<Ui>(() => ({
         drawer: room.invite && isHost ? 'invite' : null,
         dialog: null, closedByTurn: false, visitorSeat: null, sit: null,
-        turnSeen: myTurnKey(room.view), requestSeen: latestRequestId(),
+        turnSeen: attentionKey(room.view), requestSeen: latestRequestId(),
     }));
 
     // Worked out during render, from what the room and the requests say now (the React pattern for
@@ -94,7 +94,7 @@ const TableOverlays = () => {
         }
     }
     // The viewer's turn: whatever is open closes, once per turn.
-    const turnKey = myTurnKey(view);
+    const turnKey = attentionKey(view);
     if (turnKey !== null && turnKey !== next.turnSeen) {
         next = {...next, turnSeen: turnKey, drawer: null, dialog: null, closedByTurn: next.drawer !== null || next.dialog !== null};
     }

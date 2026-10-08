@@ -508,8 +508,8 @@ new fields, and the room remembers its last 40 action ids, from 64.
 
 ## PLO, one board (modes P5)
 
-**The game.** `config.ENABLED` opens PLO on one board (two and three boards came with P6; Triple T
-is a later phase). Four cards each; a hand is exactly two of them with exactly three from the board
+**The game.** `config.ENABLED` opens PLO on one board (two and three boards came with P6, Triple T
+with P7). Four cards each; a hand is exactly two of them with exactly three from the board
 (`hand-name.bestOmaha`, through `variants.handValue` and `bestHand` — the engine picks winners and
 the page reads shown hands with the same functions), so one card of a suit in hand never makes a
 flush and a board never "plays". High only: the strongest hand takes the pot. A hand keeps its own
@@ -597,6 +597,63 @@ smallest phone on its side. There, 568 × 320, seven to nine seats leave the boa
 (as one board has none at eight and nine): they are cascaded at `MULTI_BOARD_MIN` (14 px) where
 they cover least of the bet lines, the hands and the dealer button (`fallbackY`), never a plate.
 Three boards are not capped at any seat count: on a phone the boards sheet carries them at 44 px.
+
+## Triple T (modes P7)
+
+**The game.** `config.ENABLED` opens Triple T: three cards each, one board, no limit. The antes and
+the blinds are posted as in Texas hold'em; then, before any betting, the hand's throw-away
+(`phase` 'discard'): nobody is on the clock, the turn number moves on once (the turn a throw names,
+so a throw sent for an earlier throw-away is stale even when its card is in the new hand) and one
+deadline runs for everyone, the turn's seconds but never above twenty (`config.discardMs`). Every
+player still in with three cards throws one away at the same time — all in from posting or not. The
+last throw opens the betting on the player after the big blind (heads-up, the button), and from there
+it is Texas hold'em with the two kept. A throw out of the throw-away, a second one or a card not held
+is refused; one past the deadline's two seconds of grace is stale.
+
+**The deadline.** The clock throws for everyone still to throw (flagged the clock's): the odd one out
+when two match in rank (three alike: the last dealt), else the lowest — from the cards alone, no
+ranking table. It counts no timeout and makes nobody away, so a slow throw never sits a player out
+or folds a blind they posted. Every writer gives it the timeout slack, since the throw-away has no
+actor. A player who leaves (or is removed) in it folds when they owe chips; one who owes none — the
+big blind, all in — has a card thrown for them at once (flagged 'auto'). A hand everyone else left
+in the throw-away is won uncontested with three cards, never shown (a show turns up all three: none
+was thrown away).
+
+**Private.** A card thrown away is stored in `Hand.discards` and in the history row, and leaves the
+server only to its owner: `MeView.discard` for the hand in play, `players[].discard` in their own
+history. The log line says only that a card went (`discard`, amount 0); the public view says how
+many cards a seat holds face down (three, then two) and which seats are still to throw
+(`HandView.toDiscard`). A throw is a visible write — the seat's count moves. A page whose seat's
+count no longer matches the cards it holds (the deadline threw for it) reads its whole view
+(`feed.needsPrivate`), and everyone dealt in polls at the near pace through the throw-away
+(`feed.nearTurn`). Shown hands, asks answered and shows are the two kept, never the third.
+
+**At the table, on a phone.** The dock's cards become a radio group of three ("Card to throw away"),
+side by side and never overlapping, each a target of 44 px or more (158 px wide compact, 140 tight):
+a tap picks a card, which rises 10 px, dims and carries an ✕; a full-width confirm under them names it
+("Throw away 7♣") or says "Pick a card first"; beside them the throw-away's seconds ("Throw away one ·
+12 s") and, once a card is picked, what the two kept make. Keys with the focus on the table: 1, 2 and
+3 pick, Enter throws, Escape takes the pick back (the digits only while the player keeps single-key
+shortcuts on); arrows move the pick and Enter on the card picked throws it. When the throw-away
+starts the drawers close, the focus moves to the cards, the turn's chime and buzz sound and a screen
+reader hears the three cards. With Peek on the three stay face down until pressed, and neither a
+card's name nor the confirm says which card it is. Both the cards and the confirm drop a tap that
+lands as they appear. Once thrown, the card flies to the table, the two kept hold three's width for
+the rest of the hand, and the row says how many players the table waits for, with "Leave after this
+hand" beside it. Every other plate shows three backs and "Discarding…" until its player throws, a
+third back then flying to the middle; the felt counts the throws ("Everyone throws away one card · 3
+of 5 done") with the seconds inside the board's empty place — the count alone ("3 of 5 thrown away")
+where the board is narrow, nothing where it is narrower still (a small phone on its side). Under reduced motion the pick is drawn in place and no card is seen
+leaving.
+
+**The Hands guide.** "The games" adds Triple T poker: its glossary entry (`triple-t`) quoted, and
+what the table does that the entry does not say — the blinds first, everyone at once and nobody
+seeing the cards thrown away, the timer and the rule a card is thrown by, and that it counts no
+timeout.
+
+**The budgets, measured.** Triple T's heaviest table (Texas hold'em's with nine cards thrown away
+kept): the state 14,833 bytes, the wire view 3,795 and its message 3,858 — below PLO's three boards,
+which the room document is measured on.
 
 **On the felt.** One `.pn-board` a board where the stage put it (`data-pn-board-index`, each read
 aloud as "Board 2: …"), the numerals as pills, empty places as the cloth's dashed outlines (filled

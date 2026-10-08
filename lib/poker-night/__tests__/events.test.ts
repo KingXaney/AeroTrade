@@ -2,7 +2,7 @@
 // deal and the blinds, chips going out, checks and folds, a street's bets sweeping into the pot
 // and the next street's cards, the showdown's revealed hands with the five cards that play, the
 // pots paid side pots first and the main pot last, the run-out's streets, a timeout, a seat taken
-// and given up. Every id is the hand number and the log index (or the street, the turn, the seq),
+// and given up, Triple T's throws and its throw-away over. Every id is the hand number and the log index (or the street, the turn, the seq),
 // so a replay, an older view or the same view twice fires nothing, and a jump past a whole hand
 // snaps instead of animating.
 
@@ -265,5 +265,47 @@ describe('PLO on three boards', () => {
         s = moves(s, F, F);
         const win = only(diffViews(before, view(s)), 'win')[0];
         expect(win).toMatchObject({boards: 1, uncontested: true, pots: [{pot: 0, board: 0, amount: 20, winners: [{seat: 1, share: 20}]}]});
+    });
+});
+
+// Triple T (P7): a throw-away is an event that names its seat and never its card, the clock's said as
+// such; the throw-away over is one event, once, as the betting starts.
+describe('Triple T\'s throw-away', () => {
+    const tt = () => deal(three([1000, 1000, 1000], {variant: 'triple-t'}), {holes: {0: 'AhKd7c', 1: 'QsQd2h', 2: '9c8c3s'}});
+
+    it('deals three each, then a throw a seat, the deadline\'s flagged, and the throw-away over before the first turn', () => {
+        const s0 = three([1000, 1000, 1000], {variant: 'triple-t'});
+        const v0 = view(s0);
+        let s = tt();
+        const v1 = view(s);
+        const dealt = diffViews(v0, v1);
+        expect(only(dealt, 'deal')[0]).toMatchObject({cards: 3, variant: 'triple-t'});
+        expect(kinds(dealt)).not.toContain('turn');
+        s = ok(reduce(s, {type: 'discard', by: pidOf(0), turn: s.turn, card: cards('7c')[0], at: nowOf(s)}));
+        const v2 = view(s);
+        const thrown = diffViews(v1, v2);
+        expect(only(thrown, 'discard')).toEqual([{kind: 'discard', id: `${s.hand!.no}:2`, handNo: s.hand!.no, seat: 0, timeout: false, auto: false}]);
+        expect(JSON.stringify(thrown)).not.toContain(String(cards('7c')[0]) + ',');
+        s = ok(reduce(s, {type: 'timeout', turn: s.turn, at: s.hand!.deadline! + TIMING.TURN_GRACE_MS}));
+        const v3 = view(s);
+        const rest = diffViews(v2, v3);
+        expect(only(rest, 'discard').map((e) => [e.seat, e.timeout])).toEqual([[1, true], [2, true]]);
+        expect(kinds(rest).indexOf('discarded')).toBeGreaterThan(kinds(rest).lastIndexOf('discard'));
+        expect(kinds(rest).indexOf('turn')).toBeGreaterThan(kinds(rest).indexOf('discarded'));
+        // Once: the same views again, or a later one, fire it no more.
+        expect(kinds(diffViews(v2, view(s)))).toContain('discarded');
+        expect(kinds(diffViews(v3, view(moves(s, C))))).not.toContain('discarded');
+    });
+
+    it('schedules a throw as a fold\'s flight, a moment apart, and draws nothing for the throw-away over', () => {
+        let s = tt();
+        const v1 = view(s);
+        s = ok(reduce(s, {type: 'timeout', turn: s.turn, at: s.hand!.deadline! + TIMING.TURN_GRACE_MS}));
+        const batch = scheduleBatch(diffViews(v1, view(s)));
+        const throws = batch.items.filter((i) => i.event.kind === 'discard');
+        expect(throws).toHaveLength(3);
+        expect(throws.map((i) => i.dur)).toEqual([2.5, 2.5, 2.5]);
+        expect(throws[1].at - throws[0].at).toBeCloseTo(0.3);
+        expect(batch.items.some((i) => i.event.kind === 'discarded')).toBe(false);
     });
 });

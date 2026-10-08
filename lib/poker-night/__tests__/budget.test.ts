@@ -21,7 +21,9 @@
 // 3,862 / 3,925; on PLO's state the room reads 26,886 per write and 29,537 in all. On three boards
 // (P6) PLO is 15,048 / 3,936 / 3,999, and the room read 27,056: the applied ring went from 40 keys
 // to 36 (config KEEP.APPLIED), so it reads 26,944 per write and 29,595 in all. The wire keeps 500
-// bytes to spare, so it needed none of the compaction ladder beyond the ledger's tuples.
+// bytes to spare, so it needed none of the compaction ladder beyond the ledger's tuples. Triple T
+// (P7) keeps its nine cards thrown away in the state, beside two-card hands on one board: smaller
+// than PLO's three boards of four-card hands: 14,833 / 3,795 / 3,858 bytes.
 
 import {describe, expect, it} from 'vitest';
 import {stateMessage, WIRE_BUDGET_BYTES} from '@/lib/poker-night/channel';
@@ -51,8 +53,10 @@ const pid = (i: number): string => `Pq3x9Zk2L${String(i).padStart(2, '0')}`;
 // and jacks the side pots, tens the two deep stacks' war; in PLO the same pairs in four-card hands,
 // none of which makes a straight or a flush on this board (two of a suit at most, and no 4 with a 6,
 // no 6 with a 9, no ace with a 4 in one hand).
-const HOLES: Record<'holdem' | 'plo', Record<number, string>> = {
+const HOLES: Record<Variant, Record<number, string>> = {
     holdem: {0: '4c4d', 1: 'AhAd', 2: 'KhKd', 3: 'QhQd', 4: 'JhJd', 5: '4h4s', 6: '9c9d', 7: 'TcTd', 8: '6s6h'},
+    // Texas hold'em's hands with a third card each, the one thrown away.
+    'triple-t': {0: '4c4d2h', 1: 'AhAd3c', 2: 'KhKd2s', 3: 'QhQd3d', 4: 'JhJd2d', 5: '4h4s3s', 6: '9c9d5h', 7: 'TcTd6c', 8: '6s6h5d'},
     plo: {
         0: '4c4d2h2s', 1: 'AhAdKhQh', 2: 'KsKdJh9d', 3: 'QsQdJd9c', 4: 'JsJcTd9s', 5: '4h4s3c3d', 6: '6c6d8d8h', 7: 'TcThKcQc', 8: '6s6hAs7c',
     },
@@ -76,7 +80,7 @@ const shove = (s: TableState, variant: Variant, capped: {n: number}): Move => {
 // PLO's three boards: the first is Texas hold'em's own, the other two from the cards no hand holds.
 const BOARDS = ['2c7d5s3h8c', '5c5d9h2d7h', '3s7s8sTsAc'];
 
-const heaviest = (variant: 'holdem' | 'plo' = 'holdem', capped = {n: 0}, boards: 1 | 2 | 3 = 1): TableState => {
+const heaviest = (variant: Variant = 'holdem', capped = {n: 0}, boards: 1 | 2 | 3 = 1): TableState => {
     let at = T0;
     const tick = () => (at += 7 * MINUTE);
     const config = {
@@ -103,6 +107,10 @@ const heaviest = (variant: 'holdem' | 'plo' = 'holdem', capped = {n: 0}, boards:
     });
     s = ok(host(s, {op: 'start'}, tick()));
     s = deal(s, {holes: HOLES[variant], boards: BOARDS.slice(0, boards), at: s.nextHandAt!});
+    // Triple T: everyone throws the third card away, and the hand is Texas hold'em's.
+    if (variant === 'triple-t') {
+        for (const p of s.hand!.seats) s = play(s, {type: 'discard', by: p.pid, turn: s.turn, card: p.hole[2], at: s.hand!.startedAt});
+    }
     // The four short stacks are all in before the flop; the five deep stacks call.
     while (s.hand!.street === 'preflop') s = moves(s, [1, 2, 3, 4].map(pid).includes(actorPid(s)) ? shove(s, variant, capped) : C);
     // On the flop three deep stacks fold and two min-raise each other past the log's cap.
@@ -134,8 +142,30 @@ const report = (label: string, n: number): number => {
 
 const plo = {capped: {n: 0}, state: null as TableState | null};
 const heaviestPlo = (): TableState => (plo.state ??= heaviest('plo', plo.capped, 3));
-// The larger state, for the room document.
-const largest = (): TableState => [heaviest(), heaviestPlo()].sort((a, b) => bytes(b) - bytes(a))[0];
+const heaviestTripleT = (): TableState => heaviest('triple-t');
+// The largest state, for the room document.
+const largest = (): TableState => [heaviest(), heaviestPlo(), heaviestTripleT()].sort((a, b) => bytes(b) - bytes(a))[0];
+
+describe('Triple T\'s heaviest table', () => {
+    it('is Texas hold\'em\'s, with a card thrown away a seat, and keeps every budget', () => {
+        const s = heaviestTripleT();
+        checkInvariants(s);
+        const hand = s.hand!;
+        expect(hand.variant).toBe('triple-t');
+        expect(hand.discards).toHaveLength(9);
+        expect(hand.seats.every((p) => p.hole.length === 2)).toBe(true);
+        expect(hand.result!.pots.length).toBe(5);
+        expect(report('triple-t state', bytes(s))).toBeLessThanOrEqual(16_000);
+        expect(bytes(s)).toBeLessThan(bytes(heaviestPlo()));
+        const presence = Object.fromEntries(s.seats.map((seat) => [seat!.pid, 'here' as const]));
+        const view = wireView(s, {
+            code: 'K7QXM4', seq: 999_999, serverNow: T0 + 12 * 3_600_000, nextDueAt: nextDueAt(s), clockLeader: clockLeaderOf(s, presence),
+            presence, watchers: 12, realtimeOk: false, peopleV: 99_999,
+        });
+        expect(report('triple-t wire', bytes(view))).toBeLessThanOrEqual(4_500);
+        expect(report('triple-t message', bytes(stateMessage('6650a1b2c3d4e5f601234567', view)))).toBeLessThanOrEqual(WIRE_BUDGET_BYTES);
+    });
+});
 
 describe('PLO\'s heaviest table', () => {
     it('is built as Texas hold\'em\'s is, four cards a hand on three boards, the short stacks in by pot raises that hit the cap', () => {

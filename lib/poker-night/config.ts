@@ -26,16 +26,17 @@ export const VARIANTS = ['holdem', 'plo', 'triple-t'] as const;
 export const HOLE_CARDS = {holdem: 2, plo: 4, 'triple-t': 3} as const;
 export const PLAYING_CARDS = {holdem: 2, plo: 4, 'triple-t': 2} as const;
 
-// What this deploy deals: Texas hold'em, and PLO on one to three boards. The stored shape accepts
-// every variant and board count (lib/poker-night/migrate), so a rollback never closes a live table;
-// only the input paths (checkConfig) and the deal (dealable) are held to this. A later phase opens
-// 'triple-t'.
+// What this deploy deals: Texas hold'em, PLO on one to three boards, and Triple T. The stored shape
+// accepts every variant and board count (lib/poker-night/migrate), so a rollback never closes a live
+// table; only the input paths (checkConfig) and the deal (dealable) are held to this.
 export const ENABLED: {readonly variants: readonly Variant[]; readonly boards: number} = Object.freeze({
-    variants: Object.freeze(['holdem', 'plo'] as Variant[]),
+    variants: Object.freeze(['holdem', 'plo', 'triple-t'] as Variant[]),
     boards: 3,
 });
 
-// Triple T's throw-away: everyone at once, on the turn's clock but never above this.
+// Triple T's throw-away: everyone at once, right after the deal (the blinds and any ante posted), on
+// the turn's clock but never above this. A card the clock throws away for a player counts as no
+// timeout (engine.timeout), so it never sits anyone out.
 export const DISCARD_MAX_SECONDS = 20;
 export const discardMs = (c: Pick<GameConfig, 'turnSeconds'>): number => Math.min(c.turnSeconds, DISCARD_MAX_SECONDS) * 1000;
 
@@ -152,19 +153,24 @@ export const RoomSettingsSchema = z.strictObject({
 
 export type ConfigIssue = {path: string; message: string};
 
+export type Enabled = typeof ENABLED;
+
 // Whether this deploy deals the config's game (ENABLED): a table set to one it does not wait
-// between hands, its config intact, until the host picks one it does (engine.reschedule).
-export const dealable = (c: Pick<GameConfig, 'variant' | 'boards'>): boolean => ENABLED.variants.includes(c.variant) && c.boards <= ENABLED.boards;
+// between hands, its config intact, until the host picks one it does (engine.reschedule). Every game
+// is open here today; the gate stays for the deploy that adds one (and a rollback past it), and the
+// tests hand it a narrower list.
+export const dealable = (c: Pick<GameConfig, 'variant' | 'boards'>, enabled: Enabled = ENABLED): boolean =>
+    enabled.variants.includes(c.variant) && c.boards <= enabled.boards;
 
 // A config a host or the lobby asks for: the stored schema, then the game this deploy deals — a
 // variant or a board count not open yet is 'not-open'.
-export const checkConfig = (input: unknown): {ok: true; config: GameConfig} | {ok: false; issues: ConfigIssue[]} => {
+export const checkConfig = (input: unknown, enabled: Enabled = ENABLED): {ok: true; config: GameConfig} | {ok: false; issues: ConfigIssue[]} => {
     const parsed = GameConfigSchema.safeParse(input);
     if (!parsed.success) return {ok: false, issues: parsed.error.issues.map((i) => ({path: i.path.join('.') || 'config', message: i.message}))};
     const config = parsed.data as GameConfig;
     const issues: ConfigIssue[] = [];
-    if (!ENABLED.variants.includes(config.variant)) issues.push({path: 'variant', message: 'not-open'});
-    if (config.boards > ENABLED.boards) issues.push({path: 'boards', message: 'not-open'});
+    if (!enabled.variants.includes(config.variant)) issues.push({path: 'variant', message: 'not-open'});
+    if (config.boards > enabled.boards) issues.push({path: 'boards', message: 'not-open'});
     return issues.length > 0 ? {ok: false, issues} : {ok: true, config};
 };
 

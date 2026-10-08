@@ -12,7 +12,7 @@ import {DEFAULT_CONFIG, checkConfig, mergeConfig} from '@/lib/poker-night/config
 import {reduce} from '@/lib/poker-night/engine';
 import {
     bankTimeline, checkGameForm, chipsInValue, chipsRange, gameFormOf, GAME_FIELDS, holdsCards, hostPeople, hostRowStatus, inviteDeal,
-    joinCardState, joinNotes, myTurnKey, openSeats, profileWaits, ownChips, ownSeat, rebuyLimitChoices, REBUY_FIELDS, requestEnded, seatedCount, tableControl,
+    joinCardState, joinNotes, attentionKey, openSeats, profileWaits, ownChips, ownSeat, rebuyLimitChoices, REBUY_FIELDS, requestEnded, seatedCount, tableControl,
     timerChoices, waitingRequests, leaveAsks, leavePlan, leaveTapAsks, homeAsks, leftState, hostSitOut, rememberSitOut, SIT_OUT_MEMORY,
     SIT_OUT_ASK_KEY, SIT_OUT_ASK_MS, sitOutAskRecord, sitOutAsked, type SitOutMemory,
     answerNow, askEndsAt, askKey, askNews, askOffer, askToAnswer, askWaiting, hostAwayNow, leaveAfterLanded, leaveAfterOf, newRequests, NO_ASKS_SEEN, requestKind,
@@ -22,7 +22,7 @@ import type {AskView, MeView} from '@/lib/poker-night/view-types';
 import type {TableState} from '@/lib/poker-night/types';
 import type {JoinView, PlayerView} from '@/lib/poker-night/view-types';
 import {clockLeaderOf, peopleIds, playerView} from '@/lib/poker-night/views';
-import {C, F, R, deal, moves, nowOf, ok, pidOf, table} from './fixtures';
+import {C, F, R, cards, deal, moves, nowOf, ok, pidOf, table} from './fixtures';
 
 const people = (s: TableState, extra: string[] = []) =>
     Object.fromEntries([...peopleIds(s), ...extra].map((pid) => [pid, {name: pid.toUpperCase(), avatar: 'v1:fox:tangerine:none:none'}]));
@@ -43,14 +43,30 @@ describe('the drawers and the turn', () => {
     it('names the viewer\'s turn by its number, and nothing on anyone else\'s', () => {
         const s = deal(three());
         const actor = s.hand!.actor!;
-        expect(myTurnKey(pv(s, pidOf(actor)))).toBe(s.turn);
-        for (const seat of [0, 1, 2].filter((i) => i !== actor)) expect(myTurnKey(pv(s, pidOf(seat)))).toBeNull();
-        expect(myTurnKey(null)).toBeNull();
+        expect(attentionKey(pv(s, pidOf(actor)))).toBe(`turn:${s.turn}`);
+        for (const seat of [0, 1, 2].filter((i) => i !== actor)) expect(attentionKey(pv(s, pidOf(seat)))).toBeNull();
+        expect(attentionKey(null)).toBeNull();
         // A new turn for the same player is a new key.
         const next = moves(s, C, C);
         const again = next.hand!.actor!;
-        expect(myTurnKey(pv(next, pidOf(again)))).toBe(next.turn);
+        expect(attentionKey(pv(next, pidOf(again)))).toBe(`turn:${next.turn}`);
         expect(next.turn).not.toBe(s.turn);
+    });
+
+    it('names Triple T\'s throw-away by its hand for every player still to throw, then the first turn after it', () => {
+        let s = deal(three({variant: 'triple-t'}), {holes: {0: 'AhKd7c', 1: 'QsQd2h', 2: '9c8c3s'}});
+        expect(s.hand!.phase).toBe('discard');
+        for (const seat of [0, 1, 2]) expect(attentionKey(pv(s, pidOf(seat)))).toBe(`discard:${s.hand!.no}`);
+        // Thrown: nothing asks for that player until the betting reaches them.
+        s = ok(reduce(s, {type: 'discard', by: pidOf(0), turn: s.turn, card: cards('7c')[0], at: nowOf(s)}));
+        expect(attentionKey(pv(s, pidOf(0)))).toBeNull();
+        expect(attentionKey(pv(s, pidOf(1)))).toBe(`discard:${s.hand!.no}`);
+        s = ok(reduce(s, {type: 'discard', by: pidOf(1), turn: s.turn, card: cards('2h')[0], at: nowOf(s)}));
+        s = ok(reduce(s, {type: 'discard', by: pidOf(2), turn: s.turn, card: cards('3s')[0], at: nowOf(s)}));
+        expect(s.hand!.phase).toBe('betting');
+        const actor = s.hand!.actor!;
+        expect(attentionKey(pv(s, pidOf(actor)))).toBe(`turn:${s.turn}`);
+        expect(attentionKey(pv(s, 'w1', {extra: ['w1']}))).toBeNull();
     });
 
     it('holds a seated player\'s new name and look only while a hand is being played', () => {
@@ -68,10 +84,10 @@ describe('the drawers and the turn', () => {
 
     it('has no turn between hands or for a watcher', () => {
         const s = three();
-        expect(myTurnKey(pv(s, pidOf(0)))).toBeNull();
+        expect(attentionKey(pv(s, pidOf(0)))).toBeNull();
         const watcher = pv(deal(s), 'w1', {extra: ['w1']});
         expect(watcher.me.seat).toBeNull();
-        expect(myTurnKey(watcher)).toBeNull();
+        expect(attentionKey(watcher)).toBeNull();
     });
 });
 
@@ -226,13 +242,14 @@ describe('the settings form', () => {
         expect(checkGameForm(config, {...form, rebuys: 'off'}, REBUY_FIELDS)).toEqual({ok: true, patch: {rebuys: 'off'}});
     });
 
-    it('switches the game from the next hand, one board for any game but PLO, and turns down one not open here', () => {
+    it('switches the game from the next hand, one board for any game but PLO', () => {
         expect(checkGameForm(config, {...gameFormOf(config), variant: 'plo'}, GAME_FIELDS)).toEqual({ok: true, patch: {variant: 'plo'}});
         const plo = {...config, variant: 'plo' as const};
         expect(checkGameForm(plo, {...gameFormOf(plo), variant: 'holdem'}, GAME_FIELDS)).toEqual({ok: true, patch: {variant: 'holdem'}});
         // A form left on two boards sends one when the game is not PLO.
         expect(checkGameForm(plo, {...gameFormOf(plo), variant: 'holdem', boards: 2}, GAME_FIELDS)).toEqual({ok: true, patch: {variant: 'holdem'}});
-        expect(checkGameForm(config, {...gameFormOf(config), variant: 'triple-t'}, GAME_FIELDS)).toEqual({ok: false, message: 'That game is not open at this table yet.'});
+        expect(checkGameForm(config, {...gameFormOf(config), variant: 'triple-t'}, GAME_FIELDS)).toEqual({ok: true, patch: {variant: 'triple-t'}});
+        expect(checkGameForm(plo, {...gameFormOf(plo), variant: 'triple-t', boards: 3}, GAME_FIELDS)).toEqual({ok: true, patch: {variant: 'triple-t'}});
         // Two or three boards, PLO's alone.
         expect(checkGameForm(plo, {...gameFormOf(plo), boards: 2}, GAME_FIELDS)).toEqual({ok: true, patch: {boards: 2}});
         expect(checkGameForm(plo, {...gameFormOf(plo), boards: 3}, GAME_FIELDS)).toEqual({ok: true, patch: {boards: 3}});

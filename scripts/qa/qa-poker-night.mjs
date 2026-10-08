@@ -1692,9 +1692,9 @@ const tableInBrowser = async () => {
         });
         const learnTabs = await hp.$$eval('[data-section-tabs="learn"] a', (as) => as.map((a) => `${a.getAttribute('href')}${a.getAttribute('aria-current') === 'page' ? '*' : ''}`));
         const wide = await handsTab();
-        check('the lobby\'s Hands tab: ten rankings and the kicker pair (60 cards, 39 lifted) and PLO\'s hand (9 more), Texas hold\'em and PLO, five definitions, no lobby read, Learn\'s "Poker night" still lit',
-            wide !== null && wide.cards === 69 && wide.rankings === 10 && wide.lifted === 39 && wide.games === 'holdem,plo' && wide.lobby === 0 && wide.tab === 'hands'
-            && wide.defs === 5 && learnTabs.includes('/poker-night*'), JSON.stringify({...wide, learnTabs}));
+        check('the lobby\'s Hands tab: ten rankings and the kicker pair (60 cards, 39 lifted) and PLO\'s hand (9 more), Texas hold\'em, PLO and Triple T, six definitions, no lobby read, Learn\'s "Poker night" still lit',
+            wide !== null && wide.cards === 69 && wide.rankings === 10 && wide.lifted === 39 && wide.games === 'holdem,plo,triple-t' && wide.lobby === 0 && wide.tab === 'hands'
+            && wide.defs === 6 && learnTabs.includes('/poker-night*'), JSON.stringify({...wide, learnTabs}));
         await uiWording(hp, 'the Hands tab');
         await uiShotBoth(hp, '23-hands-tab');
         for (const [width, height] of [[390, 844], [375, 667], [320, 568], [844, 390]]) {

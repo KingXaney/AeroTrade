@@ -26,7 +26,7 @@ import {
 import {playerAt} from '@/lib/poker-night/reveal';
 import type {PlayerMeta, Presence, ViewMeta} from '@/lib/poker-night/view-types';
 import {mulberry32} from '@/lib/random';
-import {A, C, F, R, X, cards, deal, moves, nowOf, ok, play, randomNight, runOut, T0, table} from './fixtures';
+import {A, C, F, R, X, actBy, actorPid, cards, deal, moves, nowOf, ok, play, randomNight, runOut, T0, table} from './fixtures';
 
 const meta = (s: TableState, presence: Record<string, Presence> = {}): ViewMeta => ({
     code: 'K7QXM4', seq: 12, serverNow: T0, nextDueAt: nextDueAt(s), clockLeader: clockLeaderOf(s, presence),
@@ -43,15 +43,20 @@ const hiddenHoles = (s: TableState, viewer: string | null): number[][] =>
     s.hand ? s.hand.seats.filter((p) => !p.shown && p.pid !== viewer).map((p) => [...p.hole]) : [];
 
 // The same state with everything private redrawn: the boards' unrevealed cards and every hidden
-// hole (but the viewer's own), from the cards nobody can see; every other player's pre-action, plan
-// to leave after the hand and (while the hand is live) sit-out asked for; an ask between two other
-// players of a completed hand, and a cooldown between them.
+// hole (but the viewer's own) and every other player's card thrown away (Triple T), from the cards
+// nobody can see; every other player's pre-action, plan to leave after the hand and (while the hand is
+// live) sit-out asked for; an ask between two other players of a completed hand, and a cooldown
+// between them.
 const perturb = (s: TableState, viewer: string | null, seed: number): TableState => {
     const random = mulberry32(seed);
     const t = structuredClone(s);
     const hand = t.hand;
     if (!hand) return t;
-    const visible = new Set<number>([...hand.boards.flat(), ...hand.seats.filter((p) => p.shown || p.pid === viewer).flatMap((p) => p.hole)]);
+    const own = (seat: number) => hand.seats.find((p) => p.seat === seat)?.pid === viewer;
+    const visible = new Set<number>([
+        ...hand.boards.flat(), ...hand.seats.filter((p) => p.shown || p.pid === viewer).flatMap((p) => p.hole),
+        ...hand.discards.filter(([seat]) => own(seat)).map(([, card]) => card),
+    ]);
     const pool = Array.from({length: 52}, (_, c) => c).filter((c) => !visible.has(c));
     for (let i = pool.length - 1; i > 0; i--) {
         const j = Math.floor(random() * (i + 1));
@@ -61,6 +66,7 @@ const perturb = (s: TableState, viewer: string | null, seed: number): TableState
     hand.deck.forEach((run, b) => {
         for (let i = hand.boards[b].length; i < run.length; i++) run[i] = pool[k++];
     });
+    hand.discards = hand.discards.map(([seat, card]) => [seat, own(seat) ? card : pool[k++]]);
     const live = hand.phase !== 'complete';
     for (const p of hand.seats) {
         if (p.shown || p.pid === viewer) continue;
@@ -103,7 +109,7 @@ const stringsIn = (value: unknown): string[] => JSON.stringify(value).match(/"(?
 const SEAT_LISTS = new Set(['eligible', 'winners', 'shares', 'showOrder']);
 
 // What a view shows that it should not: a private key, another player's hidden hole (two cards, or a
-// PLO hand's four), an id.
+// PLO hand's four, or a Triple T hand's three), another player's card thrown away, an id.
 const leaksIn = (view: unknown, s: TableState, viewer: string | null): string[] => {
     const problems: string[] = [];
     const keys = keysIn(view);
@@ -117,6 +123,16 @@ const leaksIn = (view: unknown, s: TableState, viewer: string | null): string[] 
         if (hidden.has(hole)) problems.push(`hole ${hole} under ${key}`);
     }
     for (const text of stringsIn(view)) if (/^[0-9a-f]{24}$/.test(text)) problems.push(`id ${text}`);
+    // A card thrown away is its owner's alone: never under a card's key, nor in any list of cards.
+    const thrown = new Set((s.hand?.discards ?? []).filter(([seat]) => s.hand!.seats.find((p) => p.seat === seat)?.pid !== viewer).map(([, card]) => card));
+    const look = (value: unknown, key: string): void => {
+        if (typeof value === 'number' && key === 'discard' && thrown.has(value)) problems.push(`another player's card thrown away under ${key}`);
+        if (Array.isArray(value)) {
+            if (['cards', 'hole', 'boards', 'best', 'discards'].includes(key) && value.some((c) => typeof c === 'number' && thrown.has(c))) problems.push(`a card thrown away under ${key}`);
+            value.forEach((v) => look(v, key));
+        } else if (value && typeof value === 'object') for (const [k, v] of Object.entries(value)) look(v, k);
+    };
+    look(view, '');
     return problems;
 };
 const expectNoLeak = (view: unknown, s: TableState, viewer: string | null) => expect(leaksIn(view, s, viewer)).toEqual([]);
@@ -130,8 +146,8 @@ const nightStates = (seeds: number, steps: number, variant: Variant = 'holdem'):
     }
     return out;
 };
-// Texas hold'em and PLO (four cards each, pot limit).
-const STATES = [...nightStates(12, 500), ...nightStates(6, 500, 'plo')];
+// Texas hold'em, PLO (four cards each, pot limit) and Triple T (three, one thrown away).
+const STATES = [...nightStates(12, 500), ...nightStates(6, 500, 'plo'), ...nightStates(6, 500, 'triple-t')];
 
 describe('the non-leak property', () => {
     it('gives equal views of states that differ only in what is private', () => {
@@ -319,6 +335,60 @@ describe('the scan itself', () => {
         expect(leaksIn({...view, extra: {cards: cards('KdKh')}}, s, null)).toHaveLength(1);
         expect(leaksIn({...view, extra: {cards: cards('KdKh')}}, s, 'p1')).toEqual([]);
         expect(leaksIn({...view, by: '64f0c0ffee0000000000beef'}, s, null)).toEqual(['id 64f0c0ffee0000000000beef']);
+    });
+
+    it('catches another player\'s card thrown away (Triple T), and lets its owner see their own', () => {
+        let s = deal(table({0: 1000, 1: 1000, 2: 1000}, {lastBigBlind: 0, config: {variant: 'triple-t'}}), {holes: {0: 'AhAd7c', 1: 'KhKd2s', 2: 'QhQd3d'}});
+        s = play(s, {type: 'discard', by: 'p0', turn: s.turn, card: cards('7c')[0], at: nowOf(s)});
+        const view = wireView(s, meta(s));
+        expect(leaksIn(view, s, null)).toEqual([]);
+        expect(leaksIn({...view, extra: {discard: cards('7c')[0]}}, s, null)).toHaveLength(1);
+        expect(leaksIn({...view, extra: {cards: cards('7c2d')}}, s, 'p1')).toHaveLength(1);
+        expect(leaksIn({...view, extra: {discard: cards('7c')[0]}}, s, 'p0')).toEqual([]);
+    });
+});
+
+// Triple T (P7): a seat's cards face down count three while it is still to throw and two after; the
+// hand lists who is still to throw; a card thrown away reaches its owner's view and history alone.
+describe('Triple T\'s throw-away in the views', () => {
+    const start = () => deal(table({0: 1000, 1: 1000, 2: 1000}, {lastBigBlind: 0, config: {variant: 'triple-t'}}), {holes: {0: 'AhKd7c', 1: 'QsQd2h', 2: '9c8c3s'}});
+
+    it('counts three face down while a seat is still to throw, two after, and names the seats still to throw', () => {
+        let s = start();
+        let v = publicView(s);
+        expect(v.hand!.phase).toBe('discard');
+        expect(v.hand!.actor).toBeNull();
+        expect([...v.hand!.toDiscard].sort()).toEqual([0, 1, 2]);
+        expect(v.seats.slice(0, 3).map((x) => x!.cards)).toEqual([3, 3, 3]);
+        s = play(s, {type: 'discard', by: 'p0', turn: s.turn, card: cards('7c')[0], at: nowOf(s)});
+        v = publicView(s);
+        expect([...v.hand!.toDiscard].sort()).toEqual([1, 2]);
+        expect(v.seats.slice(0, 3).map((x) => x!.cards)).toEqual([2, 3, 3]);
+        // The log says a card went, never which.
+        expect(v.hand!.logTail.at(-1)!.slice(0, 3)).toEqual([0, WIRE_KINDS.indexOf('discard'), 0]);
+        expect(keysIn(v).has('discard') || keysIn(v).has('discards')).toBe(false);
+    });
+
+    it('gives the thrower alone their card thrown away, in their view and their history of the hand', () => {
+        let s = start();
+        const card = cards('7c')[0];
+        s = play(s, {type: 'discard', by: 'p0', turn: s.turn, card, at: nowOf(s)});
+        expect(playerView(s, 'p0', playerMeta(s)).me).toMatchObject({hole: cards('AhKd'), discard: card});
+        for (const pid of ['p1', 'p2', 'w1']) expect(playerView(s, pid, playerMeta(s)).me.discard).toBeNull();
+        s = play(s, {type: 'discard', by: 'p1', turn: s.turn, card: cards('2h')[0], at: nowOf(s)}, {type: 'discard', by: 'p2', turn: s.turn, card: cards('3s')[0], at: nowOf(s)});
+        expect(s.hand!.phase).toBe('betting');
+        // Everyone folds to one player: the hand's history row holds every card thrown away.
+        const r = reduce(moves(s, F), actBy(moves(s, F), actorPid(moves(s, F)), F));
+        expect(r.ok).toBe(true);
+        const summary = r.ok ? r.hands.at(-1)! : null;
+        expect(summary?.players.map((p) => p.discard)).toEqual(expect.arrayContaining([card]));
+        const own = historyView(summary!, 'p0').players.find((p) => p.pid === 'p0')!;
+        expect(own.discard).toBe(card);
+        for (const viewer of ['p1', 'p2', null]) {
+            const seen = historyView(summary!, viewer).players;
+            expect(seen.filter((p) => p.pid !== viewer).every((p) => p.discard === null)).toBe(true);
+            expect(JSON.stringify(seen.filter((p) => p.pid !== viewer))).not.toMatch(new RegExp(`"discard":${card}\\b`));
+        }
     });
 });
 

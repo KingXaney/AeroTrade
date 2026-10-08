@@ -183,3 +183,29 @@ describe('PLO on three boards', () => {
         expect(past.lines.filter((l) => l.kind === 'street')).toHaveLength(9);
     });
 });
+
+// Triple T (P7): a throw-away is a line naming no card; the reader's own card thrown away is said to
+// them alone, in the hand in play and in their history of it.
+describe('Triple T', () => {
+    it('says each throw without its card, and the reader\'s own card thrown away to them alone', () => {
+        let s = deal(table({0: 1000, 1: 1000, 2: 1000}, {lastBigBlind: 0, config: {variant: 'triple-t'}}), {holes: {0: 'AhKd7c', 1: 'QsQd2h', 2: '9c8c3s'}});
+        for (const [seat, card] of [[0, '7c'], [1, '2h'], [2, '3s']] as const) {
+            s = ok(reduce(s, {type: 'discard', by: pidOf(seat), turn: s.turn, card: cards(card)[0], at: s.hand!.startedAt}));
+        }
+        const nameOf = seatNamer((seat) => pidOf(seat), people(3));
+        const mode = {variant: s.hand!.variant, boards: s.hand!.boards};
+        const now = currentHandLog(s.hand!.no, handLogView(s), mode, null, nameOf, [], {card: cards('7c')[0], seat: 0});
+        const text = now.lines.map((l) => plain(l.text));
+        expect(text.filter((t) => t.endsWith('throws away a card.'))).toEqual(['P0 throws away a card.', 'P1 throws away a card.', 'P2 throws away a card.']);
+        expect(text).toContain(LOG_COPY.youThrew(HAND_COPY.cardShort(cards('7c')[0])));
+        expect(text.join(' ')).not.toContain(HAND_COPY.cardShort(cards('2h')[0]));
+        const {summary} = finish(s, F, F);
+        const mine = historyHandLog(historyView(summary, pidOf(0)), people(3), pidOf(0)).lines.map((l) => plain(l.text));
+        expect(mine).toContain(LOG_COPY.youThrew(HAND_COPY.cardShort(cards('7c')[0])));
+        const theirs = historyHandLog(historyView(summary, pidOf(1)), people(3), pidOf(1)).lines.map((l) => plain(l.text));
+        expect(theirs).toContain(LOG_COPY.youThrew(HAND_COPY.cardShort(cards('2h')[0])));
+        expect(theirs.join(' ')).not.toContain(HAND_COPY.cardShort(cards('7c')[0]));
+        const watcher = historyHandLog(historyView(summary, null), people(3), null).lines.map((l) => plain(l.text));
+        expect(watcher.join(' ')).not.toMatch(/threw away/);
+    });
+});

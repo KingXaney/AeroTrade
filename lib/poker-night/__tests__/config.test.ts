@@ -1,5 +1,5 @@
 // The config's rules as version 2 sets them: every game and board count the stored shape takes,
-// what this deploy deals (ENABLED: Texas hold'em, and PLO on one to three boards — the input paths' gate alone),
+// what this deploy deals (ENABLED: Texas hold'em, PLO on one to three boards and Triple T — the input paths' gate alone),
 // more than one board for PLO only, every deal within one deck, a change back to a one-board game
 // that names no board count, the reveal's length, and the rebuy policy's two values.
 
@@ -31,20 +31,27 @@ describe('the games a config names', () => {
     });
 
     it('stores every game and board count, but deals only what is open here', () => {
-        expect(ENABLED.variants).toEqual(['holdem', 'plo']);
+        expect(ENABLED.variants).toEqual(['holdem', 'plo', 'triple-t']);
         expect(ENABLED.boards).toBe(3);
         const plo3: GameConfig = {...DEFAULT_CONFIG, variant: 'plo', boards: 3};
         const tripleT: GameConfig = {...DEFAULT_CONFIG, variant: 'triple-t'};
         // The stored shape takes them (a rollback never closes a table that plays one)...
         expect(GameConfigSchema.safeParse(plo3).success).toBe(true);
         expect(GameConfigSchema.safeParse(tripleT).success).toBe(true);
-        // ...the input paths and the deal only what is open.
+        // ...the input paths and the deal only what is open: everything, here.
         expect(issues(plo3)).toEqual([]);
-        expect(issues(tripleT)).toEqual(['variant not-open']);
+        expect(issues(tripleT)).toEqual([]);
         expect(dealable(plo3)).toBe(true);
         expect(checkConfig(plo3)).toEqual({ok: true, config: plo3});
         expect(dealable({...plo3, boards: 4 as 3})).toBe(false);
-        expect(dealable(tripleT)).toBe(false);
+        expect(dealable(tripleT)).toBe(true);
+        expect(checkConfig(tripleT)).toEqual({ok: true, config: tripleT});
+        // A deploy that deals less (one before a game opened, a rollback) turns the rest down.
+        const narrow = {variants: ['holdem', 'plo'] as const, boards: 1};
+        expect(dealable(tripleT, narrow)).toBe(false);
+        expect(dealable(plo3, narrow)).toBe(false);
+        const refused = checkConfig(tripleT, narrow);
+        expect(refused.ok ? [] : refused.issues.map((i) => `${i.path} ${i.message}`)).toEqual(['variant not-open']);
         expect(dealable(DEFAULT_CONFIG)).toBe(true);
         const plo: GameConfig = {...DEFAULT_CONFIG, variant: 'plo'};
         expect(dealable(plo)).toBe(true);

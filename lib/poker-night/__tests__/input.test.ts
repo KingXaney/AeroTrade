@@ -78,6 +78,8 @@ describe('ActionSchema', () => {
         {actionId: ID, type: 'hand-over', pid: PLAYER},
         {actionId: ID, type: 'leave-after', on: true},
         {actionId: ID, type: 'leave-after', on: false},
+        {actionId: ID, type: 'discard', turn: 4, card: 0},
+        {actionId: ID, type: 'discard', turn: 4, card: 51},
         {actionId: ID, type: 'withdraw'},
         {actionId: ID, type: 'ask', to: PLAYER},
         {actionId: ID, type: 'reply', to: PLAYER, show: 'one'},
@@ -108,6 +110,15 @@ describe('ActionSchema', () => {
         no(ActionSchema, {actionId: ID, type: 'leave-after'});
         no(ActionSchema, {actionId: ID, type: 'leave-after', on: 'yes'});
         no(ActionSchema, {actionId: ID, type: 'leave-after', on: true, at: 5});
+        // Triple T's throw: a card of the deck and the turn the throw-away opened at, nothing else.
+        no(ActionSchema, {actionId: ID, type: 'discard', card: 7});
+        no(ActionSchema, {actionId: ID, type: 'discard', turn: 4});
+        no(ActionSchema, {actionId: ID, type: 'discard', turn: 4, card: 52});
+        no(ActionSchema, {actionId: ID, type: 'discard', turn: 4, card: -1});
+        no(ActionSchema, {actionId: ID, type: 'discard', turn: 4, card: 2.5});
+        no(ActionSchema, {actionId: ID, type: 'discard', turn: -1, card: 7});
+        no(ActionSchema, {actionId: ID, type: 'discard', turn: 4, card: 7, seat: 2});
+        no(ActionSchema, {actionId: ID, type: 'discard', turn: 4, cards: [7]});
         no(ActionSchema, {actionId: ID, type: 'withdraw', amount: 100});
         no(ActionSchema, {actionId: ID, type: 'ask'});
         no(ActionSchema, {actionId: ID, type: 'ask', to: 'nope'});
@@ -160,6 +171,7 @@ describe('ActionSchema', () => {
         expect(toTableAction(parse({actionId: ID, type: 'host', op: {op: 'settings', patch: {name: '   '}}}), 'p1', 99))
             .toEqual({type: 'host', by: 'p1', op: {op: 'settings', patch: {name: ''}}, at: 99});
         expect(toTableAction(parse({actionId: ID, type: 'leave-after', on: true}), 'p1', 99)).toEqual({type: 'leave-after', by: 'p1', on: true, at: 99});
+        expect(toTableAction(parse({actionId: ID, type: 'discard', turn: 4, card: 17}), 'p1', 99)).toEqual({type: 'discard', by: 'p1', turn: 4, card: 17, at: 99});
         expect(toTableAction(parse({actionId: ID, type: 'withdraw'}), 'p1', 99)).toEqual({type: 'withdraw', by: 'p1', at: 99});
         expect(toTableAction(parse({actionId: ID, type: 'ask', to: PLAYER}), 'p1', 99)).toEqual({type: 'ask', by: 'p1', to: PLAYER, at: 99});
         expect(toTableAction(parse({actionId: ID, type: 'reply', to: PLAYER, show: 'one'}), 'p1', 99))

@@ -246,6 +246,24 @@ describe('who can see a write', () => {
         step: actionStep({actionId: id, ...input} as Parameters<typeof actionStep>[0], pid), key: appliedKey(pid, id), by: pid,
     });
 
+    it('shows a card thrown away (Triple T) to the table as a seat holding two, the card to its owner alone', () => {
+        const base = okStep(tableStep({type: 'host', by: HOST, op: {op: 'config', patch: {variant: 'triple-t'}}})(started(), T0)).core;
+        const core = okStep(clockStep(SOURCE)(base, base.state.nextHandAt!)).core;
+        expect(core.state.hand!.phase).toBe('discard');
+        const at = core.state.hand!.startedAt;
+        const card = core.state.hand!.seats.find((p) => p.pid === ANA)!.hole[0];
+        const p = commitOf(plan({core, ...act(ANA, 'discard-000000001', {type: 'discard', turn: core.state.turn, card}), receivedAt: at, now: at}));
+        expect(p.visible).toBe(true);
+        expect(p.refusal).toBeNull();
+        const anaSeat = p.core.state.seats.findIndex((x) => x?.pid === ANA);
+        expect(wireOf(p.core, 5, at, extras).seats[anaSeat]!.cards).toBe(2);
+        expect(playerViewFor(p.core, ANA, 5, at, extras).me.discard).toBe(card);
+        expect(playerViewFor(p.core, HOST, 5, at, extras).me.discard).toBeNull();
+        // The same id again is the same throw, answered.
+        expect(plan({core: p.core, ...act(ANA, 'discard-000000001', {type: 'discard', turn: core.state.turn, card}), applied: p.applied, receivedAt: at, now: at}))
+            .toEqual({kind: 'duplicate'});
+    });
+
     it('keeps leaving after the hand, and a sit-out asked for mid-hand, to the player: nobody else is told', () => {
         const core = dealt();
         const p = commitOf(plan({core, ...act(ANA, 'leave-after-000001', {type: 'leave-after', on: true})}));

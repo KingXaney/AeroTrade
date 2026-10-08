@@ -30,7 +30,8 @@ export const BEAT = {
     MOVE_GAP: 0.8, // from one player's move to the next one's
     CHECK_GAP: 0.5,
     TAG_HOLD: 9, // how long a move's tag stays on its plate
-    FOLD: 2.5, // cards to the middle, fading
+    FOLD: 2.5, // cards to the middle, fading (a card thrown away in Triple T too)
+    DISCARD_GAP: 0.3, // from one card thrown away to the next, when a view brings several
     SWEEP: 2.5, // the bets into the pot
     BOARD_STAGGER: 0.6, // between the flop's three cards
     BOARD_TURN_GAP: 0.4, // from one board's cards to the next board's, on the same street
@@ -128,6 +129,12 @@ export const scheduleBatch = (events: readonly TableEvent[]): Batch => {
                 // The clock's move: its tag shows with the move itself, which comes next.
                 items.push(timed(event, t, 1, BEAT.TAG_HOLD));
                 break;
+            case 'discard':
+                // Triple T: a card thrown away goes to the middle as a fold's do, the throws a moment
+                // apart (everyone throws at once, so a poll may bring several).
+                items.push(timed(event, t, BEAT.FOLD));
+                t += BEAT.DISCARD_GAP;
+                break;
             case 'refund': {
                 const at = Math.max(t, chipsLand);
                 items.push(timed(event, at, BEAT.CHIP, BEAT.TAG_HOLD));
@@ -224,10 +231,11 @@ export const scheduleBatch = (events: readonly TableEvent[]): Batch => {
                 paidOut = Math.max(paidOut, end);
                 break;
             }
-            // A turn starting and a seat given up draw nothing that moves (the turn's ring is the
-            // seat's own); the announcer reads them from the events themselves.
+            // A turn starting, a seat given up and the throw-away over draw nothing that moves (the
+            // turn's ring is the seat's own); the announcer reads them from the events themselves.
             case 'turn':
             case 'leave':
+            case 'discarded':
                 break;
         }
     }

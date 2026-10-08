@@ -75,12 +75,15 @@ const HostOpSchema = z.discriminatedUnion('op', [
 ]);
 
 // POST action. The table's moves go to the engine; profile, unban, hand-over and claim-host are the
-// room's own (lib/poker-night/room.actionStep). leave-after: leave once the hand in play completes
+// room's own (lib/poker-night/room.actionStep). discard: Triple T's throw-away (the card, and the
+// turn the throw-away opened at, as act names its turn). leave-after: leave once the hand in play completes
 // (on), or stay (off). withdraw: take back one's own request for chips. ask: ask a player to see
 // their cards of the hand just completed; reply: answer an ask from `to` — show them alone ('one'),
 // everyone ('all') or no ('none'). allow-asks: "Let others ask to see my cards".
 export const ActionSchema = z.discriminatedUnion('type', [
     z.strictObject({actionId, type: z.literal('act'), turn: count, move: MoveSchema}),
+    // Triple T: the card thrown away, in the throw-away the turn names.
+    z.strictObject({actionId, type: z.literal('discard'), turn: count, card: z.int().min(0).max(51)}),
     z.strictObject({actionId, type: z.literal('pre'), pre: PreSchema.nullable()}),
     z.strictObject({actionId, type: z.literal('sit'), seat, buyIn}),
     z.strictObject({actionId, type: z.enum(['leave', 'sit-out', 'sit-in', 'show', 'withdraw'])}),
@@ -144,6 +147,8 @@ export const toTableAction = (input: TableActionInput, by: string, at: number): 
     switch (input.type) {
         case 'act':
             return {type: 'act', by, turn: input.turn, move: moveOf(input.move), at};
+        case 'discard':
+            return {type: 'discard', by, turn: input.turn, card: input.card, at};
         case 'pre':
             return {type: 'pre', by, pre: preOf(input.pre), at};
         case 'sit':

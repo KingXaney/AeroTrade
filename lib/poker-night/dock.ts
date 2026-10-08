@@ -10,7 +10,9 @@
 // hand (playing it out as usual) the dock says so with Stay, which takes it back; while a "Sit out
 // next hand" waits, it says so and offers to take it back. "Leave after this hand" itself is one tap
 // while they hold cards (dock.leaveAfter), and once folded the break's Leave sends it. Chips that
-// wait for the host's yes (a request) say so, with Cancel, in place of the rebuy. Pure and
+// wait for the host's yes (a request) say so, with Cancel, in place of the rebuy. In Triple T's
+// throw-away the dock's row is the throw-away's (DockView.discard): the three cards to pick one from
+// and the confirm while the viewer is still to throw, then who the table waits for. Pure and
 // client-safe.
 
 import {rankOf} from '@/lib/poker/cards';
@@ -25,6 +27,20 @@ import type {PlayerView, SeatView} from '@/lib/poker-night/view-types';
 import {ledgerRowOf, snapshotFromView} from '@/lib/poker-night/views';
 
 export type SeatControl = 'sit-out' | 'sit-in' | 'back';
+
+// Triple T's throw-away as the viewer meets it, dealt in and not folded: still to throw (pending, the
+// three cards to pick from), or thrown (the card, theirs alone to see); the one clock everyone throws
+// on; and how many players besides the viewer are still to throw.
+export type DockDiscard = {pending: boolean; cards: Card[] | null; thrown: Card | null; deadline: number | null; waiting: number};
+
+// The table's count in the throw-away, for the felt: of the players dealt in and still in, how many
+// have thrown a card away. Null outside it.
+export const throwAwayCount = (view: Pick<PlayerView, 'hand' | 'seats'>): {done: number; of: number} | null => {
+    const hand = view.hand;
+    if (!hand || hand.phase !== 'discard') return null;
+    const of = view.seats.filter((s) => s !== null && s.cards !== 'none').length;
+    return {done: Math.max(0, of - hand.toDiscard.length), of};
+};
 
 export type DockView = {
     seat: number | null;
@@ -63,6 +79,7 @@ export type DockView = {
     strength: HandDescription | null;
     strengths: HandDescription[] | null;
     pre: {options: PreAction[]; selected: PreAction | null} | null;
+    discard: DockDiscard | null; // Triple T's throw-away, dealt in and not folded
     control: SeatControl | null;
     canShow: boolean;
     buy: {min: number; max: number; topUp: number; rebuy: boolean; first: boolean} | null; // offered once the stack is empty and no request waits
@@ -120,6 +137,12 @@ export const dockView = (view: PlayerView): DockView => {
     // Early choices: a hand being bet, someone else to act, the viewer still in it with chips.
     const canPre = !myTurn && hand?.phase === 'betting' && seat !== null && seatView?.state === 'in-hand' && dealtIn;
     const pre = canPre ? {options: preOptions(owed(snapshot, seat)), selected: view.me.pre} : null;
+    // Triple T's throw-away: everyone dealt in and still in throws at once.
+    const pending = !!hand && hand.phase === 'discard' && seat !== null && hand.toDiscard.includes(seat) && view.me.hole?.length === 3;
+    const discard: DockDiscard | null = hand?.phase === 'discard' && seat !== null && dealtIn && !folded ? {
+        pending, cards: pending ? [...view.me.hole!] : null, thrown: view.me.discard, deadline: hand.deadline,
+        waiting: hand.toDiscard.filter((s) => s !== seat).length,
+    } : null;
     // Left mid-hand: the plate reads Folded or All in until the hand ends, the viewer's own part says so.
     const leaving = leftNow(view);
     const leavingAfter = !leaving && seatView !== null && view.me.next === 'leave-after';
@@ -151,6 +174,7 @@ export const dockView = (view: PlayerView): DockView => {
         strength: dealtIn && !folded && hand ? handStrength(hand.variant, view.me.hole, hand.boards[0] ?? []) : null,
         strengths: dealtIn && !folded && hand && hand.boards.length > 1 ? boardStrengths(hand.variant, view.me.hole, hand.boards) : null,
         pre: pre && {options: pre.options, selected: pre.options.find((o) => samePre(o, pre.selected)) ?? null},
+        discard,
         control, canShow, buy, deal,
         sitOut: free && control === 'sit-out' && !sitOutNext && !waitingChips,
         leave: free,

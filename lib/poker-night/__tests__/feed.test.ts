@@ -241,6 +241,23 @@ describe('realtime messages', () => {
         expect(needsPrivate(pv(s1, pidOf(0), 2), wire(moves(s1, R(60)), 3))).toBe(false);
     });
 
+    it('say the viewer\'s own part went stale when the deadline threw a card away for them (Triple T), not when another player threw', () => {
+        const t0 = deal(table({0: 1000, 1: 1000, 2: 1000}, {lastBigBlind: 0, config: {variant: 'triple-t'}}));
+        const mine = pv(t0, pidOf(0), 1);
+        expect(mine.me.hole).toHaveLength(3);
+        // Seat 1 throws: seat 0's own part holds.
+        const card1 = t0.hand!.seats.find((p) => p.seat === 1)!.hole[2];
+        const t1 = play(t0, {type: 'discard', by: pidOf(1), turn: t0.turn, card: card1, at: nowOf(t0)});
+        expect(needsPrivate(mine, wire(t1, 2))).toBe(false);
+        // The deadline throws for seat 0 (and seat 2): seat 0's seat holds two, its own part three.
+        const t2 = play(t1, {type: 'timeout', turn: t1.turn, at: t1.hand!.deadline! + 2000});
+        expect(t2.hand!.phase).toBe('betting');
+        expect(needsPrivate(mine, wire(t2, 3))).toBe(true);
+        // The whole view brings the two kept and the card thrown away, theirs alone.
+        expect(pv(t2, pidOf(0), 3).me.hole).toHaveLength(2);
+        expect(pv(t2, pidOf(0), 3).me.discard).not.toBeNull();
+    });
+
     it('drop at once what the message shows is over: the last hand\'s cards, a pre-action the server cleared', () => {
         // Seat 2 (the button) acts first, then 0, then 1: seat 1, the big blind, waits with call-any.
         const s1 = deal(three());
@@ -482,6 +499,19 @@ describe('the poll', () => {
         expect(nearTurn(pv(s1, pidOf(0), 1), 0, 1)).toBe(true);
         expect(nearTurn(pv(s1, pidOf(1), 1), 1, 1)).toBe(false);
         expect(nearTurn(pv(s1, pidOf(5), 1), null)).toBe(false);
+    });
+
+    it('in Triple T\'s throw-away, counts everyone dealt in as near (thrown already or not), never a watcher or a folded seat', () => {
+        let s = deal(table({0: 1000, 1: 1000, 2: 1000}, {lastBigBlind: 0, config: {variant: 'triple-t'}}));
+        expect(s.hand!.phase).toBe('discard');
+        for (const seat of [0, 1, 2]) expect(nearTurn(pv(s, pidOf(seat), 1), seat)).toBe(true);
+        s = play(s, {type: 'discard', by: pidOf(0), turn: s.turn, card: s.hand!.seats.find((p) => p.seat === 0)!.hole[0], at: nowOf(s)});
+        expect(nearTurn(pv(s, pidOf(0), 2), 0)).toBe(true);
+        expect(nearTurn(pv(s, pidOf(5), 2), null)).toBe(false);
+        // Seat 2 leaves facing the big blind: folded, nothing near for them.
+        s = play(s, {type: 'leave', by: pidOf(2), at: nowOf(s)});
+        expect(s.hand!.phase).toBe('discard');
+        expect(nearTurn(pv(s, pidOf(2), 3), 2)).toBe(false);
     });
 });
 

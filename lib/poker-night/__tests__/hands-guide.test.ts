@@ -94,10 +94,11 @@ describe('the kicker example', () => {
 describe('the games', () => {
     it('put the table\'s own game first and list the rest under The games', () => {
         expect(guideGames(null)).toEqual({here: null, others: [...GUIDE_GAMES]});
-        expect(guideGames('holdem')).toEqual({here: GUIDE_GAMES[0], others: [GUIDE_GAMES[1]]});
-        expect(guideGames('plo')).toEqual({here: GUIDE_GAMES[1], others: [GUIDE_GAMES[0]]});
-        expect(GUIDE_GAMES.map((game) => game.anchor)).toEqual(['texas-holdem', 'plo']);
-        expect([guideGameOf('holdem'), guideGameOf('plo'), guideGameOf('triple-t')]).toEqual(['holdem', 'plo', null]);
+        expect(guideGames('holdem')).toEqual({here: GUIDE_GAMES[0], others: [GUIDE_GAMES[1], GUIDE_GAMES[2]]});
+        expect(guideGames('plo')).toEqual({here: GUIDE_GAMES[1], others: [GUIDE_GAMES[0], GUIDE_GAMES[2]]});
+        expect(guideGames('triple-t')).toEqual({here: GUIDE_GAMES[2], others: [GUIDE_GAMES[0], GUIDE_GAMES[1]]});
+        expect(GUIDE_GAMES.map((game) => game.anchor)).toEqual(['texas-holdem', 'plo', 'triple-t']);
+        expect([guideGameOf('holdem'), guideGameOf('plo'), guideGameOf('triple-t'), guideGameOf('stud')]).toEqual(['holdem', 'plo', 'triple-t', null]);
     });
 
     it('show PLO\'s rule on one hand: four hearts on the board, one in hand, a pair of aces — a flush in Texas hold\'em', () => {
@@ -114,7 +115,7 @@ describe('the games', () => {
     });
 
     it('quote glossary entries only, each once', () => {
-        expect([...HANDS_TERMS]).toEqual(['hand-rankings', 'kicker', 'texas-holdem', 'omaha', 'pot-limit']);
+        expect([...HANDS_TERMS]).toEqual(['hand-rankings', 'kicker', 'texas-holdem', 'omaha', 'pot-limit', 'triple-t']);
         for (const key of HANDS_TERMS) expect(isGlossaryKey(key), key).toBe(true);
         expect(new Set(HANDS_TERMS).size).toBe(HANDS_TERMS.length);
     });

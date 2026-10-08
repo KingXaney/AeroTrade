@@ -1154,3 +1154,161 @@ describe('PLO', () => {
         expect(s.hand!.seats.every((p) => p.hole.length === 2)).toBe(true);
     });
 });
+
+// Triple T (P7): three cards each; once the blinds are posted everyone still in throws one away at
+// the same time, on one clock, before any betting; then the hand plays as Texas hold'em.
+describe('Triple T', () => {
+    const GRACE = TIMING.TURN_GRACE_MS;
+    const tt = (stacks3: [number, number, number] = [1000, 1000, 1000], config = {}) => three(stacks3, {variant: 'triple-t', ...config});
+    const HOLES = {0: 'AhKd7c', 1: 'QsQd2h', 2: '9c8c3s'};
+    const throwOf = (s: TableState, seat: number, card: string, over: {turn?: number; at?: number; by?: string} = {}): TableAction =>
+        ({type: 'discard', by: over.by ?? pidOf(seat), turn: over.turn ?? s.turn, card: cards(card)[0], at: over.at ?? nowOf(s)});
+
+    it('deals three each, posts the blinds, then opens the throw-away: nobody on the clock, one deadline, the turn moved on', () => {
+        const before = tt();
+        const s = deal(before, {holes: HOLES});
+        expect(s.hand!.variant).toBe('triple-t');
+        expect(s.hand!.phase).toBe('discard');
+        expect(s.hand!.seats.map((p) => p.hole.length)).toEqual([3, 3, 3]);
+        expect(s.hand!.actor).toBeNull();
+        // The turn's thirty seconds, but never above twenty.
+        expect(s.hand!.deadline).toBe(s.hand!.startedAt + 20_000);
+        expect(s.turn).toBe(before.turn + 1);
+        expect(said(s)).toEqual(['0:small-blind 10', '1:big-blind 20']);
+        checkInvariants(s);
+    });
+
+    it('takes a throw from each, says only that one went, and opens the betting on the player after the big blind', () => {
+        let s = deal(tt(), {holes: HOLES, board: '2c5d9hJsKc'});
+        const turn = s.turn;
+        s = play(s, throwOf(s, 0, '7c'));
+        expect(s.hand!.phase).toBe('discard');
+        expect(s.hand!.seats[0].hole).toEqual(cards('AhKd'));
+        expect(s.hand!.discards).toEqual([[0, cards('7c')[0]]]);
+        expect(said(s).at(-1)).toBe('0:discard');
+        expect(s.hand!.log.at(-1)![2]).toBe(0);
+        s = play(s, throwOf(s, 1, '2h'), throwOf(s, 2, '3s'));
+        expect(s.hand!.phase).toBe('betting');
+        expect(s.hand!.actor).toBe(2);
+        expect(s.turn).toBe(turn + 1);
+        checkInvariants(s);
+        // From there, Texas hold'em with the two kept: a showdown turns up two cards each, never a third.
+        s = moves(s, C, C, X);
+        for (let street = 0; street < 3; street++) s = moves(s, X, X, X);
+        const result = s.hand!.result!;
+        expect(result.showdown).toBe(true);
+        expect(result.hands.map((h) => h.cards.length)).toEqual([2, 2, 2]);
+        expect(result.hands.flatMap((h) => h.cards)).not.toContain(cards('7c')[0]);
+        // A pair of kings (the board's king with the one kept) against queens and nine high.
+        expect(result.pots[0].winners).toEqual([[0]]);
+        checkInvariants(s);
+    });
+
+    it('opens the betting heads-up on the button, who posted the small blind', () => {
+        let s = deal(table({0: 1000, 1: 1000}, {config: {variant: 'triple-t'}, lastBigBlind: 0}), {holes: {0: 'AhKd7c', 1: 'QsQd2h'}});
+        expect([s.hand!.bigBlindSeat, s.hand!.button]).toEqual([1, 0]);
+        s = play(s, throwOf(s, 1, '2h'), throwOf(s, 0, '7c'));
+        expect(s.hand!.phase).toBe('betting');
+        expect(s.hand!.actor).toBe(0);
+    });
+
+    it('refuses a throw by a stranger, for another throw-away, of a card not held, a second time, out of time and in the betting', () => {
+        let s = deal(tt(), {holes: HOLES});
+        expect(reduce(s, throwOf(s, 0, '7c', {by: 'p9'}))).toEqual({ok: false, reason: 'not-seated'});
+        expect(reduce(s, throwOf(s, 0, '7c', {turn: s.turn - 1}))).toEqual({ok: false, reason: 'stale'});
+        expect(reduce(s, throwOf(s, 0, 'Qs'))).toEqual({ok: false, reason: 'illegal'});
+        expect(reduce(s, throwOf(s, 0, '7c', {at: s.hand!.deadline! + GRACE}))).toEqual({ok: false, reason: 'stale'});
+        expect(reduce(s, throwOf(s, 0, '7c', {at: s.hand!.deadline! + GRACE - 1})).ok).toBe(true);
+        // Nobody acts or sets an early choice in the throw-away.
+        expect(reduce(s, actBy(s, pidOf(2), C)).ok).toBe(false);
+        expect(reduce(s, {type: 'pre', by: pidOf(2), pre: {kind: 'call-any'}, at: nowOf(s)})).toEqual({ok: false, reason: 'not-now'});
+        s = play(s, throwOf(s, 0, '7c'));
+        expect(reduce(s, throwOf(s, 0, 'Ah'))).toEqual({ok: false, reason: 'not-now'});
+        s = play(s, throwOf(s, 1, '2h'), throwOf(s, 2, '3s'));
+        expect(reduce(s, throwOf(s, 2, '9c'))).toEqual({ok: false, reason: 'not-now'});
+        // Between hands, and a throw meant for this hand's throw-away landing in the next one's, its
+        // card in the new hand too: stale, never a card thrown that nobody chose.
+        const first = s.turn - 1;
+        s = moves(s, F, F);
+        expect(reduce(s, throwOf(s, 2, '9c'))).toEqual({ok: false, reason: 'not-now'});
+        s = deal(s, {holes: {1: '7cJdJh', 2: '4s4d5c', 0: '6h6d8s'}});
+        expect(s.hand!.phase).toBe('discard');
+        expect(reduce(s, throwOf(s, 1, '7c', {turn: first}))).toEqual({ok: false, reason: 'stale'});
+    });
+
+    it('throws for everyone still to at the deadline (the odd one out, else the lowest) counting no timeout, and opens the betting', () => {
+        let s = deal(tt([1000, 1000, 1000], {sitOutAfter: 1}), {holes: HOLES});
+        s = play(s, throwOf(s, 0, '7c'));
+        expect(reduce(s, {type: 'timeout', turn: s.turn, at: s.hand!.deadline! + GRACE - 1})).toEqual({ok: false, reason: 'not-due'});
+        expect(reduce(s, {type: 'timeout', turn: s.turn - 1, at: s.hand!.deadline! + GRACE})).toEqual({ok: false, reason: 'stale'});
+        s = play(s, {type: 'timeout', turn: s.turn, at: s.hand!.deadline! + GRACE});
+        expect(s.hand!.phase).toBe('betting');
+        expect(s.hand!.seats[1].hole).toEqual(cards('QsQd'));
+        expect(s.hand!.seats[2].hole).toEqual(cards('9c8c'));
+        expect(said(s).slice(-2)).toEqual(['1:discard (timeout)', '2:discard (timeout)']);
+        // With sitOutAfter at one, a slow throw would otherwise fold the big blind it posted.
+        expect(s.seats.slice(0, 3).map((x) => [x!.timeouts, x!.away])).toEqual([[0, false], [0, false], [0, false]]);
+        expect(s.hand!.seats.every((p) => !p.folded)).toBe(true);
+        checkInvariants(s);
+    });
+
+    it('lets a player all in from posting throw a card away too', () => {
+        let s = deal(tt([1000, 15, 1000]), {holes: HOLES});
+        expect(s.hand!.seats[1]).toMatchObject({allIn: true, committed: 15});
+        expect(s.hand!.phase).toBe('discard');
+        s = play(s, throwOf(s, 1, '2h'), throwOf(s, 0, '7c'));
+        expect(s.hand!.phase).toBe('discard');
+        s = play(s, throwOf(s, 2, '3s'));
+        expect(s.hand!.phase).toBe('betting');
+        checkInvariants(s);
+    });
+
+    it('folds a leaver who owes chips, throws for one who owes none (the big blind), and ends a hand won in the throw-away with its three cards never shown', () => {
+        let s = deal(tt(), {holes: HOLES});
+        s = play(s, by(s, 'leave', 0));
+        expect(s.hand!.seats[0]).toMatchObject({folded: true});
+        expect(s.hand!.seats[0].hole).toHaveLength(3);
+        expect(s.hand!.discards).toEqual([]);
+        s = play(s, by(s, 'leave', 1));
+        expect(s.hand!.seats[1].folded).toBe(false);
+        expect(s.hand!.seats[1].hole).toEqual(cards('QsQd'));
+        expect(said(s).at(-1)).toBe('1:discard (auto)');
+        expect(s.hand!.phase).toBe('discard');
+        // The host removes the last one still to throw: they owe the big blind, fold, and the hand is
+        // the leaver's in the big blind, uncontested.
+        s = ok(host(s, {op: 'kick', pid: pidOf(2)}));
+        expect(s.hand!.phase).toBe('complete');
+        expect(s.hand!.result).toMatchObject({showdown: false, hands: []});
+        expect(s.hand!.result!.pots[0].winners).toEqual([[1]]);
+        checkInvariants(s);
+
+        // Won in the throw-away by a player still holding three: never shown, and a show turns up all
+        // three, there being no card thrown away.
+        let t = deal(tt(), {holes: HOLES});
+        t = play(t, by(t, 'leave', 2), by(t, 'leave', 0));
+        expect(t.hand!.phase).toBe('complete');
+        expect(t.hand!.seats.find((p) => p.seat === 1)!.hole).toHaveLength(3);
+        t = play(t, by(t, 'show', 1));
+        expect(t.hand!.result!.hands).toEqual([{seat: 1, cards: cards('QsQd2h')}]);
+    });
+
+    it('plays the throw-away and the hand on for a player who leaves after it, and cashes them out as it completes', () => {
+        let s = deal(tt(), {holes: HOLES});
+        s = play(s, {type: 'leave-after', by: pidOf(2), on: true, at: nowOf(s)});
+        expect(s.seats[2]!.leaveAfter).toBe(true);
+        expect(s.hand!.seats[2].folded).toBe(false);
+        s = play(s, throwOf(s, 2, '3s'), throwOf(s, 0, '7c'), throwOf(s, 1, '2h'));
+        expect(s.hand!.actor).toBe(2);
+        s = moves(s, F, F);
+        expect(s.seats[2]).toBeNull();
+        expect(events(s, 2).at(-1)?.[0]).toBe('cash-out');
+    });
+
+    it('never touches its input, and changes nothing on a refusal', () => {
+        const s = deepFreeze(deal(tt(), {holes: HOLES}));
+        const r = reduce(s, throwOf(s, 0, '7c'));
+        expect(r.ok && r.state).not.toBe(s);
+        expect(s.hand!.seats[0].hole).toEqual(cards('AhKd7c'));
+        expect(reduce(s, throwOf(s, 0, 'Qs')).ok).toBe(false);
+    });
+});

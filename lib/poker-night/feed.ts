@@ -329,8 +329,15 @@ export const VISITOR_REFRESH_MS = 12_000;
 export const handLive = (view: Pick<TableView, 'hand'> | null): boolean => !!view?.hand && view.hand.phase !== 'complete';
 
 // Whether the action is at most `within` live seats before the viewer's: the polls come faster then.
+// In Triple T's throw-away everyone dealt in is near: they throw at once, the first to act after it
+// is on the clock the moment the last card goes, and a card the deadline threw for the viewer is
+// theirs to see as soon as can be.
 export const nearTurn = (view: Pick<TableView, 'hand' | 'seats'> | null, mySeat: number | null, within = 2): boolean => {
     const hand = view?.hand;
+    if (hand?.phase === 'discard' && mySeat !== null) {
+        const mine = view!.seats[mySeat];
+        return !!mine && mine.cards !== 'none';
+    }
     if (!hand || hand.phase !== 'betting' || hand.actor === null || mySeat === null) return false;
     const n = view.seats.length;
     let steps = 0;

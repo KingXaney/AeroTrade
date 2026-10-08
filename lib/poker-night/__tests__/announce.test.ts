@@ -134,3 +134,29 @@ describe('the others', () => {
         expect(announcementsFor(diffViews(satView, leftView), ctx(leftView, 0)).polite).toEqual(['\u2068Dee\u2069 left the table.']);
     });
 });
+
+// Triple T (P7): the three cards to throw one of away, said at once; the viewer's own throw (or the
+// clock's) with its card, the others' without; the throw-away over.
+describe('Triple T\'s throw-away', () => {
+    it('says the three cards at once, each throw, the clock\'s card for the viewer, and the throw-away over', () => {
+        const s0 = table({0: 1000, 1: 1000, 2: 1000}, {lastBigBlind: 0, config: {variant: 'triple-t'}});
+        const v0 = view(s0);
+        let s = deal(s0, {holes: {0: 'AhKd7c', 1: 'QsQd2h', 2: '9c8c3s'}});
+        const v1 = view(s);
+        const dealt = announcementsFor(diffViews(v0, v1), ctx(v1, 0, cards('AhKd7c')));
+        expect(dealt.assertive).toEqual(['Throw away one of your three cards: the ace of hearts, the king of diamonds and the seven of clubs.']);
+        expect(dealt.polite).toEqual([]);
+        s = ok(reduce(s, {type: 'discard', by: pidOf(1), turn: s.turn, card: cards('2h')[0], at: nowOf(s)}));
+        const v2 = view(s);
+        const other = announcementsFor(diffViews(v1, v2), {...ctx(v2, 0, cards('AhKd7c')), discard: null});
+        expect(other.polite.map((l) => l.replace(/[\u2068\u2069]/g, ''))).toEqual(['Ben throws away a card.']);
+        s = ok(reduce(s, {type: 'timeout', turn: s.turn, at: s.hand!.deadline! + TIMING.TURN_GRACE_MS}));
+        const v3 = view(s);
+        const rest = announcementsFor(diffViews(v2, v3), {...ctx(v3, 0, cards('AhKd')), discard: cards('7c')[0]});
+        const lines = rest.polite.map((l) => l.replace(/[\u2068\u2069]/g, ''));
+        expect(lines).toEqual(['Time ran out: the seven of clubs was thrown away for you.', 'Cy throws away a card as time ran out.', 'Everyone has thrown away a card.']);
+        clean([...dealt.assertive, ...lines]);
+        // Nobody else's card is ever said.
+        expect(lines.join(' ')).not.toMatch(/two of hearts|three of spades/);
+    });
+});

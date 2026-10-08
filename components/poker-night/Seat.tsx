@@ -6,7 +6,9 @@
 // move ("Call 40"), the blind's mark, and — when it wins — its stack counting up and a "+2,400" over
 // it. The viewer's own cards are the dock's, not the plate's. A hand shown to the viewer alone
 // (answering their ask) turns up on its plate for them, flagged "Shown to you"; a seat whose chips
-// wait for the host's yes says "Waiting for chips".
+// wait for the host's yes says "Waiting for chips". In Triple T's throw-away a plate still to throw
+// says "Discarding…" over its three backs, and as its player throws, the third back flies to the
+// middle and fades: three, then two.
 //
 // What moves is the room's animations for this seat (components/poker-night/anim): sitting down,
 // the deal, a fold (the cards turn over, slide toward the middle and fade; the plate dims), the
@@ -51,6 +53,7 @@ export type SeatProps = {
     privateCards?: readonly Card[] | null; // shown to the viewer alone (MeView.shownToMe)
     awaitingChips?: boolean; // a request for chips waits for the host (the table's requests)
     held?: number; // the cards a hand of the game holds (two, four in PLO): what a fold sends to the middle
+    discarding?: boolean; // Triple T: still to throw a card away
 };
 
 type Tag = {id: string; kind: EntryKind; text: string; allIn: boolean; said: string; at: number; offset: number};
@@ -78,14 +81,17 @@ const lastTag = (anims: readonly LiveAnim[], seat: number): Tag | null => {
 // A word for the seat when it is not simply playing: folded, all in, away, sitting out, out of
 // chips, leaving; "next hand" only while a hand it is not in is being played; else how it is
 // connected, when it is not here.
-const statusOf = (v: SeatView, live: boolean, awaitingChips = false): string | null => {
-    if (v.state === 'in-hand') return v.presence === 'here' ? null : TABLE_COPY.presence[v.presence];
+const statusOf = (v: SeatView, live: boolean, awaitingChips = false, discarding = false): string | null => {
+    if (v.state === 'in-hand' || (discarding && v.state === 'all-in')) {
+        if (discarding) return TABLE_COPY.discarding;
+        return v.presence === 'here' ? null : TABLE_COPY.presence[v.presence];
+    }
     if (v.state === 'busted' && awaitingChips) return TABLE_COPY.awaitingChips;
     if (v.state === 'waiting') return live ? TABLE_COPY.status.waiting : v.presence === 'here' ? null : TABLE_COPY.presence[v.presence];
     return TABLE_COPY.status[v.state];
 };
 
-const Seat = ({seat, place, stage, view: v, person, mine, live, acting, myTurn, turn, blind, look, anims, privateCards = null, awaitingChips = false, held = 2}: SeatProps) => {
+const Seat = ({seat, place, stage, view: v, person, mine, live, acting, myTurn, turn, blind, look, anims, privateCards = null, awaitingChips = false, held = 2, discarding = false}: SeatProps) => {
     const name = person?.name ?? '';
     const ours = useMemo(() => anims.filter((a) => {
         const e = a.event;
@@ -101,6 +107,7 @@ const Seat = ({seat, place, stage, view: v, person, mine, live, acting, myTurn, 
     const folded = animsOf(ours, 'fold').at(-1) ?? null;
     const reveal = animsOf(ours, 'reveal').at(-1) ?? null;
     const shownNow = animsOf(ours, 'show').at(-1) ?? null;
+    const thrown = animsOf(ours, 'discard').at(-1) ?? null;
     const win = animsOf(ours, 'win').find((a) => !a.still) ?? null;
     const count = win?.counts?.find((c) => c.seat === seat) ?? null;
     const tag = lastTag(ours, seat);
@@ -108,7 +115,7 @@ const Seat = ({seat, place, stage, view: v, person, mine, live, acting, myTurn, 
     // last said (a second tab closing reports the player hidden until this one's next beat).
     const presence = mine ? 'here' : v.presence;
     const seenAlone = !mine && !Array.isArray(v.cards) && privateCards !== null && privateCards.length > 0 ? privateCards : null;
-    const status = seenAlone ? ASK_COPY.shownTag : statusOf({...v, presence}, live, awaitingChips);
+    const status = seenAlone ? ASK_COPY.shownTag : statusOf({...v, presence}, live, awaitingChips, discarding);
 
     // Cards in front of the plate (never the viewer's own: the dock draws those).
     const toCentre = offset(stage.centre, place.plate);
@@ -140,13 +147,17 @@ const Seat = ({seat, place, stage, view: v, person, mine, live, acting, myTurn, 
         );
     } else if (!mine && (typeof v.cards === 'number' || (folded && v.cards === 'none' && v.state === 'folded'))) {
         const folding = v.cards === 'none' && folded !== null;
-        const backs = typeof v.cards === 'number' ? v.cards : held;
+        // Triple T: the card just thrown away, a third back on its way to the middle.
+        const throwing = !folding && thrown !== null && typeof v.cards === 'number';
+        const backs = (typeof v.cards === 'number' ? v.cards : held) + (throwing ? 1 : 0);
+        const toMiddle = {dx: Math.round(toCentre.dx * 0.7), dy: Math.round(toCentre.dy * 0.7)};
         cards = (
             <div className="pn-seat-cards" style={{'--pn-card-w': 'var(--pn-mini-w)'} as CSSProperties} data-anim={folding ? 'fold' : undefined} data-count={backs}>
                 {Array.from({length: backs}, (_, index) => {
                     const deal = dealt?.cards?.find((c) => c.seat === seat && c.index === index);
                     const motion: CardMotion | null = folding
-                        ? {cls: 'pn-fold', style: animVars(folded, folded.at, folded.dur, {dx: Math.round(toCentre.dx * 0.7), dy: Math.round(toCentre.dy * 0.7)}), anim: 'fold'}
+                        ? {cls: 'pn-fold', style: animVars(folded, folded.at, folded.dur, toMiddle), anim: 'fold'}
+                        : throwing && thrown && index === backs - 1 ? {cls: 'pn-fold', style: animVars(thrown, thrown.at, thrown.dur, toMiddle), anim: 'discard'}
                         : deal && dealt ? {cls: 'pn-deal', style: animVars(dealt, deal.at, 1.6, {dx: toCentre.dx, dy: toCentre.dy}), anim: 'deal'} : null;
                     return <PlayingCard key={index} card={null} motion={motion}/>;
                 })}
@@ -166,6 +177,7 @@ const Seat = ({seat, place, stage, view: v, person, mine, live, acting, myTurn, 
             data-my-turn={myTurn ? '' : undefined}
             data-acting={acting ? '' : undefined}
             data-state={v.state}
+            data-discarding={discarding ? '' : undefined}
             data-presence={presence}
             data-side={place.spot.side}
             data-shown={faceUp || seenAlone ? '' : undefined}

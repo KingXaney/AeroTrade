@@ -82,9 +82,11 @@ export const ok = (r: Reduced, what = 'step'): TableState => {
 export const play = (state: TableState, ...actions: TableAction[]): TableState =>
     actions.reduce((s, action) => ok(reduce(s, action), `${action.type} ${JSON.stringify(action)}`), state);
 
-// The moment the current actor went on the clock, else the next deal's time: tests act "now".
+// The moment the current actor went on the clock (Triple T's throw-away: the deal), else the next
+// deal's time: tests act "now".
 export const nowOf = (state: TableState): number => {
     const hand = state.hand;
+    if (isLive(hand) && hand.phase === 'discard') return hand.startedAt;
     if (isLive(hand) && hand.deadline !== null) return hand.deadline - state.config.turnSeconds * 1000;
     if (isLive(hand) && hand.nextStreetAt !== null) return hand.nextStreetAt;
     return state.nextHandAt ?? hand?.result?.completedAt ?? T0;
@@ -182,8 +184,9 @@ export const checkInvariants = (s: TableState): void => {
 // A seeded night at a random table: moves from the legal set, and between them players sitting
 // down, leaving, being removed, sitting out and in, buying chips, setting pre-actions and showing
 // cards, the host approving, pausing and changing the config, and the clock running whatever falls
-// due. Yields every state with the action (or clock step) that made it; refusals are part of the
-// night too and leave the state as it was. The game is Texas hold'em unless named.
+// due; in Triple T, players throwing a card away. Yields every state with the action (or clock step)
+// that made it; refusals are part of the night too and leave the state as it was. The game is Texas
+// hold'em unless named.
 export function* randomNight(seed: number, steps: number, variant: Variant = 'holdem'): Generator<{state: TableState; action: TableAction | 'clock'; refused: string | null}> {
     const random = mulberry32(seed);
     const pick = <T>(list: readonly T[]): T => list[Math.floor(random() * list.length)];
@@ -217,6 +220,14 @@ export function* randomNight(seed: number, steps: number, variant: Variant = 'ho
         const roll = random();
         if (isLive(hand) && hand.phase === 'betting' && roll < 0.7) {
             const action = actBy(s, actorPid(s), randomMove(s, random), now);
+            const refused = apply(action);
+            yield {state: s, action, refused};
+            continue;
+        }
+        const toThrow = isLive(hand) && hand.phase === 'discard' ? hand.seats.filter((p) => !p.folded && p.hole.length === 3) : [];
+        if (toThrow.length > 0 && roll < 0.6) {
+            const p = pick(toThrow);
+            const action: TableAction = {type: 'discard', by: p.pid, turn: s.turn, card: pick(p.hole), at: now};
             const refused = apply(action);
             yield {state: s, action, refused};
             continue;

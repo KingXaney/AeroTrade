@@ -22,7 +22,7 @@ import {focusTableOnClose, PlayerName} from "@/components/poker-night/overlay-ki
 import {useRoom, useServerNow} from "@/components/poker-night/room-controller";
 import {ASK_COPY, EMOTE_COPY} from "@/lib/learn/copy/poker-night";
 import {THROW_IDS, throwGlyph, type ThrowId} from "@/lib/poker-night/emotes";
-import {askOffer, myTurnKey} from "@/lib/poker-night/overlays";
+import {askOffer, attentionKey} from "@/lib/poker-night/overlays";
 import {menuSide, type Stage} from "@/lib/poker-night/stage";
 
 // The ask, while the menu is open: read at the server's time, so an ask of the viewer's that ran out
@@ -68,8 +68,8 @@ const SeatMenus = ({stage}: {stage: Stage}) => {
     const muted = useMutedPlayers();
     const cooling = useCoolingDown();
     // One menu open at a time; the viewer's turn closes it and hands the focus to the action bar.
-    const turnKey = myTurnKey(room.view);
-    const [ui, setUi] = useState<{open: number | null; turnSeen: number | null; closedByTurn: boolean}>(() => ({open: null, turnSeen: turnKey, closedByTurn: false}));
+    const turnKey = attentionKey(room.view);
+    const [ui, setUi] = useState<{open: number | null; turnSeen: string | null; closedByTurn: boolean}>(() => ({open: null, turnSeen: turnKey, closedByTurn: false}));
     if (turnKey !== ui.turnSeen) setUi({open: turnKey !== null ? null : ui.open, turnSeen: turnKey, closedByTurn: turnKey !== null && ui.open !== null});
     if (!room.view) return null;
     const table = room.table;

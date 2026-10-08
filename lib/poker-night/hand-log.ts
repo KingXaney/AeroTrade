@@ -5,7 +5,9 @@
 // detail?part=history, which carries its own players, boards, shown hands and pots — and the cards
 // shown to the viewer alone, answering their ask, which only their own history holds. With two or
 // three boards (PLO) each street's cards come board by board, a shown hand says what it makes on
-// each, and each pot's share on each board has its own line.
+// each, and each pot's share on each board has its own line. In Triple T a throw-away is a line that
+// names no card ("Ana throws away a card."), but the reader's own: the card they threw away is theirs
+// to read, in this hand's log and their history of it alone.
 //
 // A seat's name is the player's who sat there in that hand; one the room has let go of reads as
 // its seat ("Seat 3"), never as a blank.
@@ -131,17 +133,23 @@ const resultLines = (no: number, mode: LogMode, hands: readonly ReadHand[], pots
 const seenLines = (no: number, seen: readonly {seat: number; cards: readonly Card[]}[], nameOf: SeatNamer): LogLine[] =>
     seen.map((h) => ({key: `${no}:seen:${h.seat}`, kind: 'note', text: LOG_COPY.showedYou(nameOf(h.seat), HAND_COPY.cardsShort(h.cards)), seat: h.seat}));
 
+// The card the reader threw away (Triple T), said to them alone.
+const thrownLine = (no: number, card: Card | null, seat: number | null): LogLine[] =>
+    card === null ? [] : [{key: `${no}:threw`, kind: 'note', text: LOG_COPY.youThrew(HAND_COPY.cardShort(card)), seat}];
+
 // The hand in play (or just ended), from its whole log, its game and boards and, once it is
-// complete, its result — and the hands shown to the viewer alone since (MeView.shownToMe).
+// complete, its result — and the hands shown to the viewer alone since (MeView.shownToMe), and the
+// card the viewer threw away (MeView.discard).
 export const currentHandLog = (
     no: number, entries: readonly HandEntryView[], mode: LogMode, result: HandResultView | null, nameOf: SeatNamer,
-    shownToMe: readonly ShownCardsView[] = [],
+    shownToMe: readonly ShownCardsView[] = [], thrown: {card: Card; seat: number} | null = null,
 ): LogHand => {
     const shown = result ? result.hands.map((h) => readHand(mode, h)) : [];
     return {
         no, title: LOG_COPY.hand(no), blinds: null,
         lines: [
             ...moveLines(no, entries, mode.boards, nameOf),
+            ...thrownLine(no, thrown?.card ?? null, thrown?.seat ?? null),
             ...(result ? [...resultLines(no, mode, shown, result.pots, nameOf), ...seenLines(no, shownToMe, nameOf)] : []),
         ],
         truncated: false,
@@ -161,6 +169,7 @@ export const historyHandLog = (summary: HandSummaryView, people: People, mePid: 
     ];
     const mine = summary.players.find((p) => p.pid === mePid);
     if (mine && mine.hole && !mine.shown) lines.push({key: `${summary.no}:mine`, kind: 'note', text: LOG_COPY.youHeld(HAND_COPY.cardsShort(mine.hole)), seat: mine.seat});
+    if (mine) lines.push(...thrownLine(summary.no, mine.discard ?? null, mine.seat));
     const seen = summary.players.flatMap((p) => (p.pid === mePid || p.shown || !p.hole ? [] : [{seat: p.seat, cards: p.hole}]));
     const shownAll = new Set(summary.players.filter((p) => p.shown).map((p) => p.seat));
     for (const h of seenNow) if (!shownAll.has(h.seat) && !seen.some((s) => s.seat === h.seat)) seen.push({seat: h.seat, cards: [...h.cards]});

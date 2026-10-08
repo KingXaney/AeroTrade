@@ -19,7 +19,7 @@ import type {CardBackId, CardFaceId, ChipSetId} from "@/lib/poker-night/looks";
 import type {FeltId, SceneId} from "@/lib/poker-night/types";
 import {compactChips} from "@/lib/poker-night/chips";
 import {CODE_LENGTH} from "@/lib/poker-night/code";
-import {ASKS, KEEP, TABLE_LIMITS} from "@/lib/poker-night/config";
+import {ASKS, DISCARD_MAX_SECONDS, KEEP, TABLE_LIMITS} from "@/lib/poker-night/config";
 import type {HandDescription} from "@/lib/poker-night/hand-name";
 import type {PokerNightErrorCode} from "@/lib/poker-night/http";
 import {LIMITS} from "@/lib/poker-night/limits";
@@ -448,14 +448,14 @@ export const MODE_COPY = {
 
 export const POKER_NIGHT_COPY = {
     title: 'Poker night',
-    subtitle: "Texas hold'em and PLO with friends: start a table, share the link, and play for chips.",
+    subtitle: "Texas hold'em, PLO and Triple T with friends: start a table, share the link, and play for chips.",
     note: 'Play chips only. No cash value, and nothing is paid out.',
     // POKER_NIGHT_ENABLED=false.
     off: 'Poker night is switched off for now.',
 
     // The card on /games.
     cardTitle: 'Poker night',
-    cardBody: "Texas hold'em and PLO for play chips at a table you share by link: friends join from a phone, with no account needed.",
+    cardBody: "Texas hold'em, PLO and Triple T for play chips at a table you share by link: friends join from a phone, with no account needed.",
     cardCta: 'Open poker night',
 
     // Starting a table: one tap with the defaults (Texas hold'em), one tap for another game, or the
@@ -707,6 +707,8 @@ export const TABLE_COPY = {
     hostAwayNote: `The host has been away for over ${numberWord(Math.round(LIMITS.hostTakeoverMs / 60_000))} minutes, so your chips no longer wait for them.`,
     hostBack: 'The host is back: your request waits for them.',
     sitOutNextNote: 'You sit out from the next hand.',
+    // Triple T: a plate's word while its player is still to throw a card away.
+    discarding: 'Discarding…',
     // The host sat the viewer out (the bank's "Sit out next hand"); "I'm back" deals them in again.
     hostSatYouOut: 'The host sat you out.',
     // The viewer's own cards after a fold: still theirs to see, dimmed, until the next deal.
@@ -745,6 +747,33 @@ export const TABLE_COPY = {
     reload: 'Reload',
 } as const;
 
+// ---- Triple T's throw-away (components/poker-night DiscardPicker, Dock, Seat, the felt) ----------
+
+// Right after the deal everyone still in throws one of three cards away at once: the dock's three
+// cards to pick from (a radio group), its confirm and its clock, the wait for the others, the felt's
+// count, what a screen reader hears. A card is named in the viewer's own words alone: no sentence
+// here ever names another player's.
+export const DISCARD_COPY = {
+    prompt: 'Tap the card to throw away',
+    groupLabel: 'Card to throw away',
+    // A card of the picker while Peek keeps the cards face down: its place, never its name.
+    hiddenCard: (k: number): string => `Card ${count(k + 1)}, face down`,
+    confirm: (card: string): string => `Throw away ${card}`,
+    // With Peek on, the confirm never names the card.
+    confirmHidden: 'Throw away the card picked',
+    confirmNone: 'Pick a card first',
+    sending: 'Throwing away…',
+    clock: 'Throw away one',
+    waiting: (n: number): string => `Waiting for ${plural(n, 'player', 'players')} to throw away a card`,
+    felt: (done: number, n: number): string => `Everyone throws away one card · ${count(done)} of ${count(n)} done`,
+    // The same where the board is narrow (a phone on its side).
+    feltShort: (done: number, n: number): string => `${count(done)} of ${count(n)} thrown away`,
+    announceStart: (cards: readonly Card[]): string => `Throw away one of your three cards: ${words(cards.map((c) => `the ${cardWords(c)}`))}.`,
+    announceDone: 'Everyone has thrown away a card.',
+    thrown: (card: Card): string => `You threw away the ${cardWords(card)}.`,
+    timedOut: (card: Card): string => `Time ran out: the ${cardWords(card)} was thrown away for you.`,
+} as const;
+
 // ---- the hand log (components/poker-night/HandLog) ---------------------------------------------
 
 // Which pot a line is about: null when the hand had one pot, 0 the main pot, 1 the first side pot.
@@ -771,6 +800,8 @@ export const LOG_COPY = {
             : `${isolate(name)} ${ACTION_COPY.does(kind, amount, allIn)}${timedOut ? ' as time ran out' : ''}.`,
     shows: (name: string, cards: string, phrase: string | null): string => `${isolate(name)} shows ${cards}${phrase ? `: ${phrase}` : ''}.`,
     youHeld: (cards: string): string => `You held ${cards}.`,
+    // Triple T: the card the reader threw away, in their own log alone.
+    youThrew: (card: string): string => `You threw away ${card}.`,
     // A hand shown to the reader alone, answering their ask: "Shown to you: Ana's A♠ K♦."
     showedYou: (name: string, cards: string): string => `Shown to you: ${isolate(name)} held ${cards}.`,
     // "Ana wins 1,200 with two pair, kings and sevens.", "Ben wins 400 from side pot 1."; with two or
@@ -1193,7 +1224,7 @@ export const OVERLAY_COPY = {
     // My look's keyboard switch (WCAG 2.1.4: single-key shortcuts can be turned off), kept in this
     // browser only.
     shortcuts: 'Single-key shortcuts',
-    shortcutsHint: 'F folds, C checks or calls, R opens a bet or a raise, A sets all in (the pot in PLO), and 1 to 4 pick a size. Off, only the buttons act; Enter and Escape still work in the raise panel.',
+    shortcutsHint: 'F folds, C checks or calls, R opens a bet or a raise, A sets all in (the pot in PLO), 1 to 4 pick a size, and in Triple T 1 to 3 pick the card to throw away. Off, only the buttons act; Enter and Escape still work.',
 
     // The bank's own-chips panel.
     yourChips: 'Your chips',
@@ -1390,8 +1421,8 @@ export const SHORTCUTS_COPY = {
     title: 'Keyboard shortcuts',
     open: 'Keyboard shortcuts',
     lead: 'With the focus on the table, one key does each of these. The question mark opens this list.',
-    off: 'Single-key shortcuts are off in My look: only Enter and Escape act, in the raise panel.',
-    groups: {turn: 'On your turn', table: 'At the table'} satisfies Record<ShortcutGroup, string>,
+    off: 'Single-key shortcuts are off in My look: only Enter and Escape act, in the raise panel and while throwing a card away.',
+    groups: {turn: 'On your turn', discard: 'While throwing away a card', table: 'At the table'} satisfies Record<ShortcutGroup, string>,
     does: {
         fold: 'Fold',
         'check-call': 'Check or call',
@@ -1400,6 +1431,9 @@ export const SHORTCUTS_COPY = {
         sizes: 'A quick size, with the raise panel open',
         confirm: 'Confirm the raise',
         close: 'Close the raise panel',
+        pick: 'Pick the first, second or third card',
+        throw: 'Throw away the card picked',
+        unpick: 'Pick again',
         emotes: 'Emotes',
         log: 'Hand log',
         bank: 'Bank',
@@ -1474,7 +1508,16 @@ export const HANDS_COPY = {
                 'With two or three boards, each board is played on its own and the pot is split evenly between them: the strongest hand on each board wins that share, so one player can win one board, some or all of them.',
                 'An odd chip goes to the first boards: board 1, then board 2.',
                 'In the raise panel, Pot sets the largest bet or raise the limit allows, and A on a keyboard does the same.',
-                'The host can switch the table between Texas hold\'em and PLO; the change starts with the next hand.',
+                'The host can switch the table to another game; the change starts with the next hand.',
+            ],
+        },
+        'triple-t': {
+            name: 'Triple T poker',
+            facts: [
+                'The blinds and any ante are posted first. Then every player still in throws a card away at the same time, and nobody sees the cards thrown away.',
+                `The throw-away runs on the turn timer, never above ${numberWord(DISCARD_MAX_SECONDS)} seconds. If time runs out, a card is thrown away for you: the odd one out when two match, else the lowest.`,
+                'A card thrown away for you does not count toward sitting you out.',
+                'The betting then starts with the player after the big blind, as in Texas hold\'em.',
             ],
         },
     } satisfies Record<GuideGame, {name: string; facts: readonly string[]}>,
