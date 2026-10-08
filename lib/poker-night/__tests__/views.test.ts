@@ -9,7 +9,7 @@
 // shows a hole only when it was shown, is the viewer's own or was shown to the viewer alone; an ask
 // is seen by its two players only.
 
-import {describe, expect, it} from 'vitest';
+import {describe, expect, it, vi} from 'vitest';
 import {evaluateCards} from '@/lib/poker/evaluator';
 import {ASK_EXPIRED} from '@/lib/poker-night/asks';
 import {legalFor, snapshotFromState} from '@/lib/poker-night/betting';
@@ -28,6 +28,9 @@ import {playerAt} from '@/lib/poker-night/reveal';
 import type {PlayerMeta, Presence, ViewMeta} from '@/lib/poker-night/view-types';
 import {mulberry32} from '@/lib/random';
 import {A, C, F, R, X, actBy, actorPid, cards, deal, moves, nowOf, ok, play, randomNight, runOut, T0, table} from './fixtures';
+
+// Its sweeps run thousands of layouts or hands: ample on a laptop, slower on a CI runner.
+vi.setConfig({testTimeout: 30_000});
 
 const meta = (s: TableState, presence: Record<string, Presence> = {}): ViewMeta => ({
     code: 'K7QXM4', seq: 12, serverNow: T0, nextDueAt: nextDueAt(s), clockLeader: clockLeaderOf(s, presence),

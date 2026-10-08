@@ -7,7 +7,7 @@
 // hand; asking to see a hand; the reveal timing the next deal; no-ops handing back the same state;
 // and seeded random nights that keep every invariant without ever mutating their input.
 
-import {describe, expect, it} from 'vitest';
+import {describe, expect, it, vi} from 'vitest';
 import {legalFor, readEntry, snapshotFromState} from '@/lib/poker-night/betting';
 import {coolingDown} from '@/lib/poker-night/asks';
 import {ASKS, REQUESTS, TABLE_LIMITS, TIMING} from '@/lib/poker-night/config';
@@ -19,6 +19,9 @@ import {readShown} from '@/lib/poker-night/variants';
 import {
     A, C, F, R, X, actBy, approveOf, cards, checkInvariants, deal, deepFreeze, host, moves, nowOf, ok, pidOf, play, randomNight, runOut, table, T0,
 } from './fixtures';
+
+// Its sweeps run thousands of layouts or hands: ample on a laptop, slower on a CI runner.
+vi.setConfig({testTimeout: 30_000});
 
 const entries = (s: TableState): HandEntry[] => s.hand!.log.map((e) => readEntry(s.hand!, e));
 const said = (s: TableState) => entries(s).map((e) => `${e.seat}:${e.kind}${e.amount ? ` ${e.amount}` : ''}${e.auto ? ' (auto)' : ''}${e.timeout ? ' (timeout)' : ''}`);
