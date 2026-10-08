@@ -17,7 +17,7 @@ import {sizingFor, type Sizing} from '@/lib/poker-night/bet-sizing';
 import {describeHand, type HandDescription} from '@/lib/poker-night/hand-name';
 import type {Card, Legal, PreAction} from '@/lib/poker-night/types';
 import type {PlayerView, SeatView} from '@/lib/poker-night/view-types';
-import {snapshotFromView} from '@/lib/poker-night/views';
+import {ledgerRowOf, snapshotFromView} from '@/lib/poker-night/views';
 
 export type SeatControl = 'sit-out' | 'sit-in' | 'back';
 
@@ -43,7 +43,7 @@ export type DockView = {
     myTurn: boolean;
     legal: Legal | null;
     sizing: Sizing | null;
-    hole: [Card, Card] | null;
+    hole: Card[] | null;
     strength: HandDescription | null;
     pre: {options: PreAction[]; selected: PreAction | null} | null;
     control: SeatControl | null;
@@ -101,8 +101,8 @@ export const dockView = (view: PlayerView): DockView => {
     const shownAlready = seatView !== null && Array.isArray(seatView.cards);
     const canShow = !!hand && hand.phase === 'complete' && view.me.hole !== null && seatView !== null && !shownAlready && view.status !== 'closed';
     const empty = seatView !== null && seatView.chips === 0 && seatView.pendingBuy === 0 && seatView.inPot === 0;
-    const buys = view.ledger.find((row) => row.pid === view.me.pid)?.buys ?? 0;
-    const buy = empty && !live ? buyOptions(view.config, seatView, buys) : null;
+    const row = ledgerRowOf(view, view.me.pid);
+    const buy = empty && !live ? buyOptions(view.config, seatView, row) : null;
     const seated = view.seats.filter((s) => s !== null).length;
     const deal = view.status === 'open' && view.me.isHost && seated >= 2;
     // Still playing the hand in play: its cards in front of them, not folded.
@@ -115,7 +115,7 @@ export const dockView = (view: PlayerView): DockView => {
     return {
         seat, seatView, live, dealtIn: dealtIn && !folded, folded, mucked, myTurn, legal, sizing,
         hole: view.me.hole,
-        strength: dealtIn && !folded ? handStrength(view.me.hole, hand?.board ?? []) : null,
+        strength: dealtIn && !folded ? handStrength(view.me.hole, hand?.boards[0] ?? []) : null,
         pre: pre && {options: pre.options, selected: pre.options.find((o) => samePre(o, pre.selected)) ?? null},
         control, canShow, buy, deal,
         sitOut: free && control === 'sit-out' && !sitOutNext,

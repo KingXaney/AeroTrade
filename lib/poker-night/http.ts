@@ -12,7 +12,7 @@
 import {LIMITS} from '@/lib/poker-night/limits';
 import type {Refusal} from '@/lib/poker-night/types';
 
-export const PN_PROTOCOL = 1;
+export const PN_PROTOCOL = 2;
 export const PROTOCOL_HEADER = 'x-pn-protocol';
 export const PASS_HEADER = 'x-pn-pass';
 
@@ -40,6 +40,10 @@ const ERROR_STATUS = {
     no_request: 409,
     rebuys_off: 409,
     rebuy_cap: 409,
+    asks_off: 409,
+    ask_waiting: 409,
+    ask_limit: 409,
+    ask_cooldown: 409,
     closed: 410,
     invalid_action: 422,
     bad_seat: 422,
@@ -90,6 +94,10 @@ const REFUSAL_CODES: Record<Refusal, PokerNightErrorCode> = {
     'bad-config': 'bad_config',
     'bad-deck': 'invalid_action',
     'not-due': 'invalid_action',
+    'asks-off': 'asks_off',
+    'ask-waiting': 'ask_waiting',
+    'ask-limit': 'ask_limit',
+    'ask-cooldown': 'ask_cooldown',
 };
 
 export const refusalToCode = (reason: Refusal): PokerNightErrorCode => REFUSAL_CODES[reason];

@@ -14,7 +14,7 @@
 // before a timeout another request could commit first. With no writer named, the engine's own rule
 // (the grace alone) applies: what the tests and the simulator replay.
 
-import {TIMING} from '@/lib/poker-night/config';
+import {dealable, TIMING} from '@/lib/poker-night/config';
 import type {DeckSource} from '@/lib/poker-night/deck';
 import {reduce} from '@/lib/poker-night/engine';
 import {eligibleSeats, isLive} from '@/lib/poker-night/seats';
@@ -32,7 +32,7 @@ export const nextDue = (state: TableState): Due | null => {
         if (hand.phase === 'runout' && hand.nextStreetAt !== null) return {kind: 'street', at: hand.nextStreetAt};
         return null;
     }
-    if (state.status === 'playing' && !state.closing && state.nextHandAt !== null && eligibleSeats(state).length >= 2) {
+    if (state.status === 'playing' && !state.closing && state.nextHandAt !== null && eligibleSeats(state).length >= 2 && dealable(state.config)) {
         return {kind: 'start', at: state.nextHandAt};
     }
     return null;

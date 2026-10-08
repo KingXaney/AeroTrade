@@ -120,7 +120,7 @@ const Seat = ({seat, place, stage, view: v, person, mine, live, acting, myTurn, 
                 })}
             </div>
         );
-    } else if (!mine && (v.cards === 'hidden' || (folded && v.cards === 'none' && v.state === 'folded'))) {
+    } else if (!mine && (typeof v.cards === 'number' || (folded && v.cards === 'none' && v.state === 'folded'))) {
         const folding = v.cards === 'none' && folded !== null;
         cards = (
             <div className="pn-seat-cards" style={{'--pn-card-w': 'var(--pn-mini-w)'} as CSSProperties} data-anim={folding ? 'fold' : undefined}>

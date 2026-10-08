@@ -12,6 +12,7 @@ import {checkConfig, mergeConfig} from '@/lib/poker-night/config';
 import {configIssueText, TIMER_PRESETS} from '@/lib/poker-night/lobby';
 import type {GameConfig, LedgerKind, RebuyPolicy} from '@/lib/poker-night/types';
 import type {JoinOutcome, JoinView, MeView, OwnNext, People, PlayerView, Presence, SeatView, TableView} from '@/lib/poker-night/view-types';
+import {ledgerRowOf, ledgerRows} from '@/lib/poker-night/views';
 
 // How long "Press and hold to remove" must stay pressed.
 export const HOLD_TO_CONFIRM_MS = 2000;
@@ -82,14 +83,15 @@ export const ownSeat = (view: Pick<PlayerView, 'seats' | 'hand' | 'status' | 'me
 // ── leaving, and the way home ──
 
 // What sitting down again would take, said before a player leaves: rebuys are off, they need the
-// host's yes, or this player has had every rebuy the table allows (sitting again is a rebuy:
-// engine.sit). Null when sitting down again simply works.
+// host's yes (anyone but the host once the first hand is dealt: ledger.needsHost), or this player has
+// had every rebuy the table allows (sitting again is a rebuy: engine.sit). Null when sitting down
+// again simply works.
 export type LeaveAsk = 'rebuys-off' | 'rebuys-ask' | 'rebuy-cap';
 
-export const leaveAsks = (config: Pick<GameConfig, 'rebuys' | 'maxRebuys'>, buys: number, isHost: boolean): LeaveAsk | null => {
+export const leaveAsks = (config: Pick<GameConfig, 'rebuys' | 'maxRebuys'>, buys: number, isHost: boolean, started: boolean): LeaveAsk | null => {
     if (config.rebuys === 'off') return 'rebuys-off';
     if (config.maxRebuys !== null && buys >= config.maxRebuys) return 'rebuy-cap';
-    if (config.rebuys === 'approve' && !isHost) return 'rebuys-ask';
+    if (started && !isHost) return 'rebuys-ask';
     return null;
 };
 
@@ -112,11 +114,11 @@ export type LeavePlan = {midHand: boolean; title: string; body: string; note: st
 // The leave dialog as it reads now — worked out on every render, so a deal that lands while it is
 // open turns it into the mid-hand one before the player confirms. Null without a seat, and once the
 // viewer has left (mid-hand the seat stays theirs until the hand ends): there is nothing to confirm.
-export const leavePlan = (view: Pick<PlayerView, 'seats' | 'hand' | 'status' | 'me' | 'config' | 'ledger'>, then: LeaveThen): LeavePlan | null => {
+export const leavePlan = (view: Pick<PlayerView, 'seats' | 'hand' | 'status' | 'me' | 'config' | 'ledger' | 'handNo'>, then: LeaveThen): LeavePlan | null => {
     const own = ownSeat(view);
     if (own.seat === null || !own.canLeave) return null;
-    const buys = view.ledger.find((row) => row.pid === view.me.pid)?.buys ?? 0;
-    const ask = leaveAsks(view.config, buys, view.me.isHost);
+    const buys = ledgerRowOf(view, view.me.pid)?.buys ?? 0;
+    const ask = leaveAsks(view.config, buys, view.me.isHost, view.handNo > 0);
     const midHand = own.dealtIn;
     // The chips they leave with: those behind (a live pot's are the hand's).
     const body = midHand ? TABLE_COPY.leaveBodyInHand(own.stack) : TABLE_COPY.leaveBody(own.stack);
@@ -128,9 +130,13 @@ export const leavePlan = (view: Pick<PlayerView, 'seats' | 'hand' | 'status' | '
     };
 };
 
-// Whether the break's one-tap Leave asks first: only when sitting down again is not assured.
-export const leaveTapAsks = (view: Pick<PlayerView, 'config' | 'ledger' | 'me'>): boolean =>
-    leaveAsks(view.config, view.ledger.find((row) => row.pid === view.me.pid)?.buys ?? 0, view.me.isHost) !== null;
+// Whether the break's one-tap Leave asks first: only when there is no way back to a seat (rebuys
+// off, or every rebuy used). Once a hand is dealt sitting down again needs the host's yes for anyone
+// but the host — every guest's leave then — which the left panel says after, never a dialog before.
+export const leaveTapAsks = (view: Pick<PlayerView, 'config' | 'ledger' | 'me' | 'handNo'>): boolean => {
+    const ask = leaveAsks(view.config, ledgerRowOf(view, view.me.pid)?.buys ?? 0, view.me.isHost, view.handNo > 0);
+    return ask === 'rebuys-off' || ask === 'rebuy-cap';
+};
 
 // The top bar's Home: straight to "/" for a visitor, a watcher or a player already leaving (folded
 // or all in, their plate still says so: MeView.next is what knows); through the leave dialog for
@@ -145,11 +151,11 @@ export const homeAsks = (view: Pick<PlayerView, 'seats' | 'status' | 'me'> | nul
 // way back to a seat — or why there is none.
 export type LeftState = {net: number; sitAgain: boolean; note: string | null};
 
-export const leftState = (view: Pick<PlayerView, 'seats' | 'ledger' | 'status' | 'me' | 'config' | 'removed'>): LeftState | null => {
+export const leftState = (view: Pick<PlayerView, 'seats' | 'ledger' | 'status' | 'me' | 'config' | 'removed' | 'handNo'>): LeftState | null => {
     if (view.me.seat !== null || view.status === 'closed' || view.removed.includes(view.me.pid)) return null;
-    const row = view.ledger.find((r) => r.pid === view.me.pid);
+    const row = ledgerRowOf(view, view.me.pid);
     if (!row || row.bought === 0) return null;
-    const ask = leaveAsks(view.config, row.buys, view.me.isHost);
+    const ask = leaveAsks(view.config, row.buys, view.me.isHost, view.handNo > 0);
     const open = openSeats(view).length > 0;
     const blocked = ask === 'rebuys-off' || ask === 'rebuy-cap';
     const note = ask === 'rebuys-off' ? REFUSAL_COPY['rebuys-off']
@@ -325,7 +331,7 @@ export const hostPeople = (view: PeopleInput, me: string | null): HostPeople => 
     const removed = new Set(view.removed);
     const seatOf = new Map<string, number>();
     view.seats.forEach((s, i) => s && seatOf.set(s.pid, i));
-    const ledger = new Map(view.ledger.map((row) => [row.pid, row]));
+    const ledger = new Map(ledgerRows(view).map((row) => [row.pid, row]));
     const row = (pid: string): HostRow => {
         const seat = seatOf.get(pid) ?? null;
         const s = seat === null ? null : view.seats[seat];
@@ -440,16 +446,18 @@ export type OwnChips = {
 
 // The viewer's own chips and what they may add, by the table's rules (bank.buyOptions, the client's
 // copy of the server's own check); null without a seat.
-export const ownChips = (view: Pick<PlayerView, 'seats' | 'ledger' | 'requests' | 'config' | 'me'>): OwnChips | null => {
+export const ownChips = (view: Pick<PlayerView, 'seats' | 'ledger' | 'requests' | 'config' | 'me' | 'handNo'>): OwnChips | null => {
     const seat = view.me.seat;
     const s = seat === null ? null : view.seats[seat] ?? null;
     if (seat === null || !s) return null;
-    const used = view.ledger.find((row) => row.pid === view.me.pid)?.buys ?? 0;
+    const row = ledgerRowOf(view, view.me.pid);
+    const used = row?.buys ?? 0;
     const requested = view.requests.find((r) => r.pid === view.me.pid)?.amount ?? null;
     return {
         seat, stack: seatChips(s), behind: s.chips, inPot: s.inPot, pendingBuy: s.pendingBuy, requested,
-        offer: requested === null ? buyOptions(view.config, s, used) : null,
-        asksHost: view.config.rebuys === 'approve' && !view.me.isHost,
+        offer: requested === null ? buyOptions(view.config, s, row, view.me.next === 'leave') : null,
+        // Once the first hand is dealt every buy but the host's waits for the host (ledger.needsHost).
+        asksHost: !view.me.isHost && view.handNo > 0,
         used, maxRebuys: view.config.maxRebuys,
     };
 };

@@ -2,7 +2,8 @@
 // into. Pure — lib/poker-night/store.ts does the I/O and nothing else — so the mapping both ways is
 // unit-tested: times stored as Dates come back as milliseconds, a missing field reads as its empty
 // value, and a commit writes exactly the fields mutateRoom owns (never the out-of-band ones: seen,
-// emotes, emoteSeq, emoteAt, awards, rt, lastError).
+// emotes, emoteSeq, emoteAt, awards, rt, lastError). A player row's nudge count rides with its row,
+// written only when above 0.
 
 import {nextDueAt} from '@/lib/poker-night/clock';
 import {KEEP, STATE_VERSION} from '@/lib/poker-night/config';
@@ -42,7 +43,7 @@ export type RoomDocLean = {
     peopleV?: number;
     nextDueAt?: Time | null;
     state?: unknown;
-    players?: {pid: string; userId?: string | null; guestId?: string | null; name?: string; avatar?: string; joinedAt?: Time; banned?: boolean}[];
+    players?: {pid: string; userId?: string | null; guestId?: string | null; name?: string; avatar?: string; joinedAt?: Time; banned?: boolean; nudge?: unknown}[];
     bannedKeys?: string[] | null;
     applied?: string[] | null;
     seen?: Record<string, {at?: unknown; hidden?: unknown}> | null;
@@ -76,6 +77,9 @@ export const seenFrom = (raw: RoomDocLean['seen']): Record<string, Seen> => {
     return out;
 };
 
+// A row's nudge count as stored: a whole count, else 0 (a row written before nudges has none).
+const countOf = (n: unknown): number => (typeof n === 'number' && Number.isSafeInteger(n) && n >= 0 ? n : 0);
+
 const playerFrom = (p: NonNullable<RoomDocLean['players']>[number]): RoomPlayer => ({
     pid: p.pid,
     userId: p.userId ?? null,
@@ -84,6 +88,7 @@ const playerFrom = (p: NonNullable<RoomDocLean['players']>[number]): RoomPlayer 
     avatar: p.avatar ?? '',
     joinedAt: ms(p.joinedAt),
     banned: p.banned === true,
+    nudge: countOf(p.nudge),
 });
 
 // The core the room's steps run on, from a full read and its migrated state.
@@ -168,8 +173,8 @@ export const wireOfRoom = (room: ServerRoom): WireView => wireOf(room.core, room
 // ── the head: the cheap read every request starts with ──
 
 // What playerRequest and the polling fast path read before anything else: the version, the clock,
-// who may ask, and the last failed realtime publish (so an Unchanged says realtimeOk as a view does)
-// — one projected findOne, no state.
+// who may ask (with each one's nudge count), and the last failed realtime publish (so an Unchanged
+// says realtimeOk as a view does) — one projected findOne, no state.
 export type RoomHead = {
     id: string;
     seq: number; // the public version (publicSeq)
@@ -183,7 +188,7 @@ export type RoomHead = {
 
 export const HEAD_PROJECTION = {
     seq: 1, hiddenCommits: 1, emoteSeq: 1, nextDueAt: 1, status: 1, bannedKeys: 1, 'rt.failAt': 1,
-    'players.pid': 1, 'players.userId': 1, 'players.guestId': 1, 'players.banned': 1,
+    'players.pid': 1, 'players.userId': 1, 'players.guestId': 1, 'players.banned': 1, 'players.nudge': 1,
 } as const;
 
 export const headFromDoc = (doc: RoomDocLean): RoomHead => ({
@@ -192,7 +197,7 @@ export const headFromDoc = (doc: RoomDocLean): RoomHead => ({
     emoteSeq: doc.emoteSeq ?? 0,
     nextDueAt: msOrNull(doc.nextDueAt),
     status: doc.status,
-    players: (doc.players ?? []).map((p) => ({pid: p.pid, userId: p.userId ?? null, guestId: p.guestId ?? null, banned: p.banned === true})),
+    players: (doc.players ?? []).map((p) => ({pid: p.pid, userId: p.userId ?? null, guestId: p.guestId ?? null, banned: p.banned === true, nudge: countOf(p.nudge)})),
     bannedKeys: [...(doc.bannedKeys ?? [])],
     realtimeFailAt: msOrNull(doc.rt?.failAt),
 });
@@ -202,22 +207,31 @@ export const emotesSince = (emotes: readonly EmoteView[], esince: number | null)
     emotes.filter((e) => esince === null || e.seq > esince);
 
 const unchangedBody = (
-    head: Pick<RoomHead, 'seq' | 'emoteSeq' | 'nextDueAt'>, serverNow: number, emotes: EmoteView[], pass: string | null, realtimeOk: boolean,
-): Unchanged => ({unchanged: true, seq: head.seq, emoteSeq: head.emoteSeq, serverNow, nextDueAt: head.nextDueAt, emotes, pass, realtimeOk});
+    head: Pick<RoomHead, 'seq' | 'emoteSeq' | 'nextDueAt'>, serverNow: number, emotes: EmoteView[], pass: string | null, realtimeOk: boolean, nudge: number,
+): Unchanged => ({unchanged: true, seq: head.seq, emoteSeq: head.emoteSeq, serverNow, nextDueAt: head.nextDueAt, emotes, pass, realtimeOk, nudge});
 
-// A poll or a tick when nothing moved, from the head: realtimeOk as a view would say it then.
+// A player's nudge count as the head or a read has it (0 for a pid with no row).
+export const nudgeOf = (players: readonly Pick<PlayerKeys, 'pid' | 'nudge'>[], pid: string): number => players.find((p) => p.pid === pid)?.nudge ?? 0;
+
+// A poll or a tick when nothing moved, from the head, for player `pid`: realtimeOk as a view would
+// say it then, and their nudge count.
 export const unchangedOf = (
-    head: Pick<RoomHead, 'seq' | 'emoteSeq' | 'nextDueAt' | 'realtimeFailAt'>, serverNow: number, emotes: EmoteView[], pass: string | null,
-): Unchanged => unchangedBody(head, serverNow, emotes, pass, realtimeOkAt(head.realtimeFailAt, serverNow));
+    head: Pick<RoomHead, 'seq' | 'emoteSeq' | 'nextDueAt' | 'realtimeFailAt'> & {players: readonly Pick<PlayerKeys, 'pid' | 'nudge'>[]},
+    serverNow: number, emotes: EmoteView[], pass: string | null, pid: string,
+): Unchanged => unchangedBody(head, serverNow, emotes, pass, realtimeOkAt(head.realtimeFailAt, serverNow), nudgeOf(head.players, pid));
 
 // The same from a full read: the emotes after the client's emoteSeq, the room's own clock.
-export const unchangedOfRoom = (room: ServerRoom, esince: number | null, pass: string | null): Unchanged =>
-    unchangedBody({seq: room.seq, emoteSeq: room.emoteSeq, nextDueAt: nextDueAt(room.core.state)}, room.readAt, emotesSince(room.emotes, esince), pass, room.realtimeOk);
+export const unchangedOfRoom = (room: ServerRoom, esince: number | null, pass: string | null, pid: string): Unchanged =>
+    unchangedBody(
+        {seq: room.seq, emoteSeq: room.emoteSeq, nextDueAt: nextDueAt(room.core.state)}, room.readAt, emotesSince(room.emotes, esince), pass, room.realtimeOk,
+        nudgeOf(room.core.players, pid),
+    );
 
 // ── writing ──
 
 const playerDoc = (p: RoomPlayer) => ({
     pid: p.pid, userId: p.userId, guestId: p.guestId, name: p.name, avatar: p.avatar, joinedAt: new Date(p.joinedAt), banned: p.banned,
+    ...(p.nudge > 0 ? {nudge: p.nudge} : {}),
 });
 
 // Every field a commit writes, from the core and the bookkeeping around it: the state, the people,
@@ -289,10 +303,12 @@ export const unreadableCloseUpdate = (now: number, seq: number) => ({
 export type Commit = {
     ref: RoomRef;
     room: ServerRoom; // as committed: core, the public seq and readAt (the commit's time)
+    writeSeq: number; // the document's own seq after the write: every commit moves it (the history's guard)
     prevState: TableState;
     hands: HandSummary[];
     ledgerDirty: boolean;
     visible: boolean; // false: only its author can see it (publicSeq did not move), so nothing is published
+    nudged: {pid: string; nudge: number}[]; // the players it nudged, each with their count after it
 };
 
 export type {JoinResult};

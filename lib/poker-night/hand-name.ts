@@ -84,6 +84,32 @@ export const bestFive = (cards: readonly Card[], prefer: readonly Card[] = []): 
     return {value, cards: chosen.map((i) => cards[i])};
 };
 
+// An Omaha hand's value and the five cards that play: exactly two of the hole cards with exactly
+// three of the board (at least three out). Every pair of hole cards (in index order, outer) with
+// every three board cards (inner) is tried, and the first that reaches the highest value is kept;
+// the cards come back as the three board cards in board order, then the two hole cards.
+export const bestOmaha = (hole: readonly Card[], board: readonly Card[]): {value: HandValue; cards: Card[]} => {
+    if (hole.length < 2 || board.length < 3 || board.length > 5) throw new RangeError(`bestOmaha takes 2+ hole and 3 to 5 board cards, not ${hole.length} and ${board.length}`);
+    const five = [0, 0, 0, 0, 0];
+    let value = -1;
+    let cards: Card[] = [];
+    for (let a = 0; a < hole.length; a++) for (let b = a + 1; b < hole.length; b++) {
+        for (let c = 0; c < board.length; c++) for (let d = c + 1; d < board.length; d++) for (let e = d + 1; e < board.length; e++) {
+            five[0] = board[c];
+            five[1] = board[d];
+            five[2] = board[e];
+            five[3] = hole[a];
+            five[4] = hole[b];
+            const v = evaluateCards(five, 5);
+            if (v > value) {
+                value = v;
+                cards = [...five];
+            }
+        }
+    }
+    return {value, cards};
+};
+
 // "Plays the board": the five board cards alone make the hand's value.
 export const playsBoard = (board: readonly Card[], value: HandValue): boolean =>
     board.length === 5 && evaluateCards(board) === value;

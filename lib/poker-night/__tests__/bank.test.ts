@@ -44,11 +44,12 @@ describe('the bank', () => {
     });
 
     it('shows the Rebuys column only once someone has rebought, and the requests by name', () => {
-        let s = table({0: 1000, 1: 0, 2: 1000}, {lastBigBlind: 0, config: {rebuys: 'approve', buyInMin: 1000, buyInMax: 2000}});
+        // A hand has been dealt: the top-up waits for the host.
+        let s = {...table({0: 1000, 1: 500, 2: 1000}, {lastBigBlind: 0, config: {rebuys: 'approve', buyInMin: 1000, buyInMax: 2000}}), handNo: 1};
         expect(bankView(viewOf(s)).showRebuys).toBe(false);
-        s = ok(reduce(s, {type: 'buy', by: pidOf(1), amount: 1000, at: nowOf(s)}));
+        s = ok(reduce(s, {type: 'buy', by: pidOf(1), amount: 500, at: nowOf(s)}));
         const waiting = bankView(viewOf(s));
-        expect(waiting.requests).toEqual([{pid: pidOf(1), name: 'P1', amount: 1000}]);
+        expect(waiting.requests).toEqual([{pid: pidOf(1), name: 'P1', amount: 500}]);
         s = ok(reduce(s, {type: 'host', by: pidOf(0), op: {op: 'approve', pid: pidOf(1)}, at: nowOf(s)}));
         const bank = bankView(viewOf(s));
         expect(bank.showRebuys).toBe(true);
@@ -80,7 +81,7 @@ describe('what the rebuy buttons offer', () => {
                 const view = publicView(state);
                 state.seats.forEach((seat, i) => {
                     if (!seat) return;
-                    const offer = buyOptions(state.config, view.seats[i], ledgerRow(state, seat.pid)?.buys ?? 0);
+                    const offer = buyOptions(state.config, view.seats[i], ledgerRow(state, seat.pid), seat.leaveAfter);
                     const range = buyRange(state, seat.pid);
                     expect(offer ? {min: offer.min, max: offer.max} : null, `seed ${seed} seat ${i}`).toEqual(range);
                 });
@@ -88,13 +89,16 @@ describe('what the rebuy buttons offer', () => {
         }
     });
 
-    it('offers a rebuy at zero and a top-up to the cap above it', () => {
-        const config = {buyInMin: 1000, buyInMax: 2000, rebuys: 'auto' as const, maxRebuys: null};
-        expect(buyOptions(config, {chips: 0, pendingBuy: 0, state: 'busted'}, 0)).toEqual({min: 1000, max: 2000, topUp: 2000, rebuy: true});
-        expect(buyOptions(config, {chips: 1500, pendingBuy: 0, state: 'waiting'}, 0)).toEqual({min: 1, max: 500, topUp: 500, rebuy: false});
-        expect(buyOptions(config, {chips: 2000, pendingBuy: 0, state: 'waiting'}, 0)).toBeNull();
-        expect(buyOptions({...config, rebuys: 'off'}, {chips: 0, pendingBuy: 0, state: 'busted'}, 0)).toBeNull();
-        expect(buyOptions({...config, maxRebuys: 2}, {chips: 0, pendingBuy: 0, state: 'busted'}, 2)).toBeNull();
-        expect(buyOptions(config, null, 0)).toBeNull();
+    it('offers a rebuy at zero and a top-up to the cap above it, and a newcomer their first chips whatever the policy', () => {
+        const config = {buyInMin: 1000, buyInMax: 2000, rebuys: 'approve' as const, maxRebuys: null};
+        const row = {buys: 0, bought: 1000};
+        expect(buyOptions(config, {chips: 0, pendingBuy: 0, state: 'busted'}, row)).toEqual({min: 1000, max: 2000, topUp: 2000, rebuy: true});
+        expect(buyOptions(config, {chips: 1500, pendingBuy: 0, state: 'waiting'}, row)).toEqual({min: 1, max: 500, topUp: 500, rebuy: false});
+        expect(buyOptions(config, {chips: 2000, pendingBuy: 0, state: 'waiting'}, row)).toBeNull();
+        expect(buyOptions({...config, rebuys: 'off'}, {chips: 0, pendingBuy: 0, state: 'busted'}, row)).toBeNull();
+        expect(buyOptions({...config, maxRebuys: 2}, {chips: 0, pendingBuy: 0, state: 'busted'}, {buys: 2, bought: 1000})).toBeNull();
+        expect(buyOptions(config, null, row)).toBeNull();
+        expect(buyOptions({...config, rebuys: 'off', maxRebuys: 1}, {chips: 0, pendingBuy: 0, state: 'busted'}, null)).toEqual({min: 1000, max: 2000, topUp: 2000, rebuy: false});
+        expect(buyOptions(config, {chips: 500, pendingBuy: 0, state: 'waiting'}, row, true)).toBeNull();
     });
 });

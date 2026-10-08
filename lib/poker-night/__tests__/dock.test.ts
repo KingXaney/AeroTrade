@@ -17,7 +17,7 @@ import {A, C, F, R, X, cards, deal, moves, nowOf, ok, pidOf, table} from './fixt
 
 const as = (s: TableState, seat: number): PlayerView => playerView(s, pidOf(seat), {
     code: 'K7QXM4', seq: 1, serverNow: nowOf(s), nextDueAt: nextDueAt(s), clockLeader: clockLeaderOf(s, {}), presence: {}, watchers: 0, realtimeOk: true, peopleV: 1,
-    people: {}, removed: [], hasAccount: false, emotes: [], emoteSeq: 0, pass: null,
+    people: {}, removed: [], hasAccount: false, emotes: [], emoteSeq: 0, pass: null, nudge: 0,
 });
 // Seat 0 the small blind, 1 the big blind, 2 the button (first to act before the flop).
 const three = (stacks: [number, number, number] = [1000, 1000, 1000], config = {}) => table({0: stacks[0], 1: stacks[1], 2: stacks[2]}, {config, lastBigBlind: 0});

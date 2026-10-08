@@ -1,14 +1,20 @@
 // What a browser is sent about a poker night table: the client's contract. Declared here on their
 // own, never derived from the server's state types (no Omit<> of a TableState), so a field added to
-// the server state never reaches a client by accident — and there is no deck anywhere in them. Every
-// value of these types is built field by field in lib/poker-night/views.ts.
+// the server state never reaches a client by accident — and there is no deck, no thrown-away card
+// but the viewer's own and no ask but the viewer's own anywhere in them. Every value of these types
+// is built field by field in lib/poker-night/views.ts.
+//
+// Version 2 (TableView.v, http.PN_PROTOCOL 2): the boards, the game, face-down cards as a count,
+// paid pots board by board without their shares (pots.paidParts rebuilds them), shown hands as
+// their cards alone, and the viewer's own plan to leave, thrown-away card, asks and nudge.
 
 import type {Card} from '@/lib/poker/cards';
 import type {ErrorBody} from '@/lib/poker-night/http';
-import type {EntryKind, GameConfig, LedgerKind, PreAction, RoomSettings, Street, TableStatus} from '@/lib/poker-night/types';
+import type {AskAnswer, BoardCount, EntryKind, GameConfig, LedgerKind, PreAction, RoomSettings, Street, TableStatus, Variant} from '@/lib/poker-night/types';
 
 export type SeatState = 'waiting' | 'in-hand' | 'folded' | 'all-in' | 'sitting-out' | 'away' | 'busted' | 'leaving';
-export type CardsView = 'hidden' | 'none' | [Card, Card];
+// A seat's cards: none (not dealt in, or folded), that many face down, or face up.
+export type CardsView = 'none' | number | Card[];
 export type Presence = 'here' | 'hidden' | 'offline';
 
 // A seat's number is its index in TableView.seats.
@@ -31,13 +37,15 @@ export type SeatView = {
 export type WireEntry = [seat: number, kind: number, amount: number, to: number, flags: number, street: number];
 
 export type PotView = {amount: number; eligible: number[]};
-export type SettledPotView = PotView & {winners: number[]; shares: number[]};
-// A pot as the result pays it: the shares line up with the winners, the main pot first.
-export type PaidPotView = {amount: number; winners: number[]; shares: number[]};
-// A shown hand on the wire is its cards: the value and the five cards that play follow from them
-// and the board (views.readShownHand runs the server's own hand-name functions).
-export type ShownCardsView = {seat: number; cards: [Card, Card]};
-export type ShownHandView = ShownCardsView & {value: number | null; best: Card[]};
+// winners[k], shares[k]: board k's part of the pot (lib/poker-night/pots.paidParts).
+export type SettledPotView = PotView & {winners: number[][]; shares: number[][]};
+// A pot as the result pays it, the main pot first: each board's winners in hand order. The part
+// each board holds and every winner's share follow from the amount (pots.paidParts, the server's
+// own split), so the wire carries neither.
+export type PaidPotView = {amount: number; winners: number[][]};
+// A shown hand on the wire is its cards: the value and the five cards that play on each board
+// follow from them, the game and the boards (variants.readShown runs the server's own functions).
+export type ShownCardsView = {seat: number; cards: Card[]};
 
 export type HandResultView = {
     completedAt: number;
@@ -56,9 +64,11 @@ export type HandResultView = {
 
 export type HandView = {
     no: number;
-    phase: 'betting' | 'runout' | 'complete';
+    variant: Variant; // the hand's own game
+    phase: 'discard' | 'betting' | 'runout' | 'complete';
     street: Street;
-    board: Card[];
+    boards: Card[][]; // what is out of each board, all the same length
+    toDiscard: number[]; // Triple T: the seats still to throw a card away (the 'discard' phase only)
     pots: PotView[]; // as they stand; none once the hand is complete (the result holds what each paid)
     currentBet: number;
     increment: number;
@@ -73,14 +83,16 @@ export type HandView = {
     result: HandResultView | null;
 };
 
-// The bank's totals per player. Their chips, what is in the pot and the net follow from the seats
+// The bank's totals per player, on the wire as a tuple (the wire's budget: views.ledgerRows reads
+// them back as rows). Their chips, what is in the pot and the net follow from the seats
 // (views.bankOf), so the wire carries each figure once.
-export type LedgerView = {pid: string; bought: number; cashedOut: number; buys: number};
-export type BankRowView = LedgerView & {chips: number; inPot: number; net: number; seated: boolean};
+export type LedgerView = [pid: string, bought: number, cashedOut: number, buys: number];
+export type LedgerRowView = {pid: string; bought: number; cashedOut: number; buys: number};
+export type BankRowView = LedgerRowView & {chips: number; inPot: number; net: number; seated: boolean};
 
 // The table as the engine alone can describe it.
 export type TableView = {
-    v: 1;
+    v: 2;
     status: TableStatus;
     closing: boolean;
     settings: RoomSettings;
@@ -139,28 +151,52 @@ export type RoomView = WireView & PeopleView;
 
 export type EmoteView = ({kind: 'react' | 'say'; item: string} | {kind: 'throw'; item: string; to: string}) & {id: string; seq: number; from: string; at: number};
 
+// An ask to see a hand, as only its two players see it: who asked whom (pids, and the seats they
+// played the hand from), when it was made and when it runs out, and how it stands — 'expired' once
+// it ran out unanswered (taken as a no).
+export type AskView = {from: string; to: string; fromSeat: number; toSeat: number; at: number; until: number; answer: AskAnswer};
+
 export type MeView = {
     pid: string;
     seat: number | null;
     role: 'seated' | 'watching';
     isHost: boolean;
     hasAccount: boolean;
-    hole: [Card, Card] | null;
+    hole: Card[] | null;
     pre: PreAction | null;
     // What the viewer's own seat does when the hand in play ends: 'leave' once they left it mid-hand
-    // (folded, all in, or still in it, away — the plate may still read Folded), 'sit-out' while a
-    // "Sit out next hand" waits for the deal (theirs or the host's: the view never says whose).
-    // Private, never on the wire: the table sees neither until the hand ends.
+    // (folded, all in, or still in it, away — the plate may still read Folded) or chose to leave
+    // after it (playing it out as usual), 'sit-out' while a "Sit out next hand" waits for the deal
+    // (theirs or the host's: the view never says whose). Private, never on the wire: the table sees
+    // neither until the hand ends.
     next: OwnNext;
+    // Triple T: the card the viewer threw away this hand (never anyone else's).
+    discard: Card | null;
+    // "Let others ask to see my cards": on unless the viewer turned it off.
+    allowAsks: boolean;
+    // This hand's asks the viewer made or was asked, oldest first; every one ends at the next deal.
+    asks: AskView[];
+    // Who the viewer may ask to see their cards now (pids): the hand complete, the viewer folded it,
+    // the player's cards not shown and their asks on, no ask of the viewer's waiting, under the
+    // limits (lib/poker-night/config ASKS).
+    canAsk: string[];
+    // Hands shown to the viewer alone this hand, answering their ask.
+    shownToMe: ShownCardsView[];
 };
 
 export type OwnNext = 'sit-out' | 'leave' | null;
 
-// What the viewer's own requests add to the meta: the people, who the viewer is to the room, and
-// its emotes.
-export type PlayerMeta = ViewMeta & PeopleView & {hasAccount: boolean; emotes: EmoteView[]; emoteSeq: number; pass: string | null};
+// What the viewer's own requests add to the meta: the people, who the viewer is to the room, its
+// emotes, and the viewer's nudge count.
+export type PlayerMeta = ViewMeta & PeopleView & {hasAccount: boolean; emotes: EmoteView[]; emoteSeq: number; pass: string | null; nudge: number};
 
-export type PlayerView = RoomView & {config: GameConfig; me: MeView; emotes: EmoteView[]; emoteSeq: number; pass: string | null; duplicate?: boolean};
+// nudge: how many times a write by someone else changed what only this viewer sees (an ask to see
+// their cards, its answer, a sit-out the host set) — the room counts it per player
+// (PokerRoom.nudge), a GET state sends the count it holds (nsince), and a count above it reads the
+// whole view even when the public seq did not move.
+export type PlayerView = RoomView & {
+    config: GameConfig; me: MeView; emotes: EmoteView[]; emoteSeq: number; pass: string | null; nudge: number; duplicate?: boolean;
+};
 
 // How a join went: seated where asked (or in the first free seat), moved to the next free seat
 // because the one asked for was just taken, watching because every seat is taken or by choice, or
@@ -182,6 +218,9 @@ export type JoinView = {
     roomFull: boolean;
     buyIn: {min: number; max: number};
     hasAccount: boolean;
+    variant: Variant; // the game the next hand deals
+    boards: BoardCount;
+    needsApproval: boolean; // the first hand has been dealt: chips wait for the host's yes
 };
 
 // The /play page's first render: the viewer's own view once they have joined, else the public
@@ -195,6 +234,7 @@ export type PlayPageView = {view: PlayerView} | {preview: RoomView; join: JoinVi
 export type Unchanged = {
     unchanged: true; seq: number; emoteSeq: number; serverNow: number; nextDueAt: number | null; emotes: EmoteView[]; pass: string | null;
     realtimeOk: boolean; // as a view says it: whether a realtime publish failed within the window (read from the head)
+    nudge: number; // the viewer's nudge count (PlayerView.nudge): above the one held, a GET state is due
 };
 
 export type HandEntryView = {seat: number; street: Street; kind: EntryKind; amount: number; to: number; allIn: boolean; timeout: boolean; auto: boolean; at: number};
@@ -208,12 +248,15 @@ export type HandSummaryView = {
     smallBlind: number;
     bigBlind: number;
     ante: number;
-    board: Card[];
-    players: {seat: number; pid: string; startStack: number; net: number; hole: [Card, Card] | null; shown: boolean}[];
+    variant: Variant;
+    boards: Card[][];
+    // hole: shown, the viewer's own, or shown to the viewer alone (answering their ask); discard: the
+    // viewer's own thrown-away card, for no one else.
+    players: {seat: number; pid: string; startStack: number; net: number; hole: Card[] | null; shown: boolean; discard: Card | null}[];
     log: HandEntryView[];
     truncated: boolean;
     pots: SettledPotView[];
-    hands: ShownHandView[];
+    hands: ShownCardsView[];
 };
 
 // The bank in full (GET detail?part=bank): each player's figures as bankOf works them out, with
@@ -234,7 +277,9 @@ export type RealtimeTokenView = {token: string; expires: number; issued: number;
 
 // GET token: whether this table goes live over Ably and, when it does, the channel (poker-night:
 // <env>:<room id>, lib/poker-night/channel) and a token for it. Off: the table polls.
-export type TokenReply = {realtime: false} | {realtime: true; channel: string; token: RealtimeTokenView};
+// `private` is the viewer's own channel (poker-night:<env>:<room id>:<pid>), on which the room's
+// nudges for them alone come ('nudge' messages: lib/poker-night/channel).
+export type TokenReply = {realtime: false} | {realtime: true; channel: string; private: string; token: RealtimeTokenView};
 
 // POST emote's answer: the emote as the room stored it (its seq the room's new emoteSeq), so the
 // sender's own table draws it at once.

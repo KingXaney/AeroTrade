@@ -104,8 +104,8 @@ export const readEntry = (hand: Pick<Hand, 'startedAt'>, e: LogEntry): HandEntry
 
 // ── moving chips ──
 
-type How = 'player' | 'timeout' | 'auto';
-const FLAG_OF: Record<How, number> = {player: 0, timeout: ENTRY_FLAGS.timeout, auto: ENTRY_FLAGS.auto};
+export type How = 'player' | 'timeout' | 'auto';
+export const FLAG_OF: Record<How, number> = {player: 0, timeout: ENTRY_FLAGS.timeout, auto: ENTRY_FLAGS.auto};
 
 // Chips from a seat's stack into the hand: committed and, unless dead (an ante), the street bet.
 export const commit = (w: Work, seat: number, amount: number, live = true): void => {
@@ -244,10 +244,11 @@ export const settleTurn = (w: Work, from: number): Flow => {
     throw new Error('the betting round did not settle');
 };
 
-// The next street's cards; the bets of the last one are in the pot.
+// The next street's cards, on every board at once; the bets of the last one are in the pot.
 export const nextStreet = (hand: Hand): void => {
     hand.street = STREETS[STREETS.indexOf(hand.street) + 1];
-    hand.board = hand.deck.slice(0, hand.street === 'flop' ? 3 : hand.street === 'turn' ? 4 : 5);
+    const n = hand.street === 'flop' ? 3 : hand.street === 'turn' ? 4 : 5;
+    hand.boards = hand.deck.map((run) => run.slice(0, n));
     for (const p of hand.seats) {
         p.streetBet = 0;
         p.actedAtBet = null;

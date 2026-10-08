@@ -169,7 +169,7 @@ const BankPanel = ({open, onOpenChange, toTable, sitOuts}: Props) => {
     const room = useRoom();
     const table = room.table;
     const [detail, setDetail] = useState<BankDetailRowView[] | null>(null);
-    const ledgerKey = table.ledger.map((r) => `${r.pid}:${r.bought}:${r.cashedOut}:${r.buys}`).join('|');
+    const ledgerKey = table.ledger.map((r) => r.join(':')).join('|');
     const joined = room.view !== null;
     const {detail: readDetail} = room;
 

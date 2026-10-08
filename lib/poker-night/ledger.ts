@@ -27,8 +27,9 @@ const rowFor = (w: Work, pid: string): LedgerRow => {
     return row;
 };
 
+// An event's time is kept in whole seconds since the table was created (ledgerEvents reads it back).
 const pushEvent = (w: Work, row: LedgerRow, kind: LedgerKind, amount: number) => {
-    row.events.push([w.at - w.state.createdAt, LEDGER_KINDS.indexOf(kind), amount]);
+    row.events.push([Math.floor((w.at - w.state.createdAt) / 1000), LEDGER_KINDS.indexOf(kind), amount]);
     if (row.events.length > KEEP.LEDGER_EVENTS) row.events.splice(0, row.events.length - KEEP.LEDGER_EVENTS);
 };
 
@@ -37,9 +38,17 @@ const pushEvent = (w: Work, row: LedgerRow, kind: LedgerKind, amount: number) =>
 // cashed out are equal, so dropping it moves no sum in conservation (engine.forgetSettled).
 export const isSettled = (row: LedgerRow): boolean => row.hands === 0 && row.bought === row.cashedOut;
 
-// A row's kept events, read back with their times.
+// A row's kept events, read back with their times (to the second).
 export const ledgerEvents = (state: Pick<TableState, 'createdAt'>, row: LedgerRow): {at: number; kind: LedgerKind; amount: number}[] =>
-    row.events.map(([at, kind, amount]) => ({at: state.createdAt + at, kind: LEDGER_KINDS[kind], amount}));
+    row.events.map(([at, kind, amount]) => ({at: state.createdAt + at * 1000, kind: LEDGER_KINDS[kind], amount}));
+
+// Whether a player has bought chips here tonight: their next buy (or sitting down again) is a rebuy
+// or a top-up, under the rebuy policy; before that it is their first buy-in, which no policy stops.
+export const hasBought = (row: LedgerRow | null): boolean => row !== null && row.bought > 0;
+
+// Whether a buy by `pid` waits for the host: every buy but the host's own once the first hand has
+// been dealt (a newcomer's first chips, a re-sit, a rebuy, a top-up). Before that, chips land at once.
+export const needsHost = (state: Pick<TableState, 'hostPid' | 'handNo'>, pid: string): boolean => pid !== state.hostPid && state.handNo > 0;
 
 // Chips that have just landed on the player's seat: called after the stack grew, with the amount
 // that landed and the kind decided as it landed.
@@ -52,16 +61,19 @@ export const recordBuy = (w: Work, pid: string, amount: number, kind: BuyKind): 
     w.ledgerDirty = true;
 };
 
-// The player in seat i takes their stack away and the seat empties; their requests go with them.
+// The player in seat i takes their stack away and the seat empties; their requests go with them. A
+// player who never had chips here (their first buy-in still waiting for the host) leaves no row.
 export const cashOut = (w: Work, i: number, kind: 'cash-out' | 'removed'): void => {
     const seat = w.state.seats[i];
     if (!seat) return;
-    const row = rowFor(w, seat.pid);
-    row.cashedOut += seat.stack;
-    pushEvent(w, row, kind, seat.stack);
+    const row = seat.stack > 0 ? rowFor(w, seat.pid) : ledgerRow(w.state, seat.pid);
+    if (row) {
+        row.cashedOut += seat.stack;
+        pushEvent(w, row, kind, seat.stack);
+        w.ledgerDirty = true;
+    }
     w.state.seats[i] = null;
     w.state.requests = w.state.requests.filter((r) => r.pid !== seat.pid);
-    w.ledgerDirty = true;
 };
 
 export const inPotOf = (state: Pick<TableState, 'hand'>, pid: string): number => liveSeatOf(state, pid)?.committed ?? 0;
@@ -101,16 +113,17 @@ export const ledgerDigest = (state: Pick<TableState, 'hand' | 'seats' | 'ledger'
         buys: row.buys, hands: row.hands, wins: row.wins, biggestWin: row.biggestWin, allIns: row.allIns, peakChips: row.peakChips,
     }));
 
-// The chips a seated player may add now (a rebuy at zero, a top-up above it), or null when they may
-// not: the policy is off, the rebuy limit is reached, they are leaving or already at the cap.
+// The chips a seated player may add now (their first buy-in, a rebuy at zero, a top-up above it),
+// or null when they may not: they are leaving (now or after the hand in play), the policy is off or
+// the rebuy limit reached (for anything after the first buy-in), or they are already at the cap.
 export const buyRange = (state: Pick<TableState, 'seats' | 'ledger' | 'config'>, pid: string): {min: number; max: number} | null => {
     const i = seatOf(state, pid);
     if (i === null) return null;
     const seat = state.seats[i]!;
     const {rebuys, maxRebuys, buyInMin, buyInMax} = state.config;
-    if (seat.leaving || rebuys === 'off') return null;
+    if (seat.leaving || seat.leaveAfter) return null;
     const row = ledgerRow(state, pid);
-    if (row && maxRebuys !== null && row.buys >= maxRebuys) return null;
+    if (hasBought(row) && (rebuys === 'off' || (maxRebuys !== null && row!.buys >= maxRebuys))) return null;
     const held = seat.stack + seat.pendingBuy;
     const min = Math.max(1, buyInMin - held);
     const max = buyInMax - held;

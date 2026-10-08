@@ -22,7 +22,7 @@ import {cn} from "@/lib/utils";
 
 type Props = {
     seat: number;
-    hole: [Card, Card] | null;
+    hole: Card[] | null;
     holding: boolean; // dealt in and not folded
     folded?: boolean; // dealt into the view's hand and folded: drawn dimmed, tagged "Folded"
     handNo: number | null;

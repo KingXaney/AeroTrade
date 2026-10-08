@@ -2,17 +2,19 @@
 // every pot), each shown hand's name, and which cards play — the union of the winners' five cards
 // that play, lifted and glowing, every other card on the board and in the shown hands dimmed.
 // Pure and client-safe: read from the view's own result (lib/poker-night/view-types
-// HandResultView) with the server's hand-name functions (views.readShownHand), so the page shows
-// exactly what the server decided. The animations (lib/poker-night/choreography) only time it.
+// HandResultView) with the server's own functions (variants.readShown, pots.seatShares), so the page
+// shows exactly what the server decided. The animations (lib/poker-night/choreography) only time it.
+// One board for now: the first board's reading.
 
 import {HAND_COPY, TABLE_COPY} from '@/lib/learn/copy/poker-night';
 import type {Card} from '@/lib/poker/cards';
-import {describeHand, playsBoard, type HandDescription} from '@/lib/poker-night/hand-name';
+import {describeHand, type HandDescription} from '@/lib/poker-night/hand-name';
+import {seatShares} from '@/lib/poker-night/pots';
 import {BANNER} from '@/lib/poker-night/stage';
+import {playsBoardFor, readShown} from '@/lib/poker-night/variants';
 import type {HandView, TableView} from '@/lib/poker-night/view-types';
-import {readShownHand} from '@/lib/poker-night/views';
 
-export type ShownLook = {seat: number; cards: [Card, Card]; best: Card[]; description: HandDescription | null; playsBoard: boolean; winner: boolean};
+export type ShownLook = {seat: number; cards: Card[]; best: Card[]; description: HandDescription | null; playsBoard: boolean; winner: boolean};
 export type WinnerLook = {seat: number; amount: number; description: HandDescription | null; playsBoard: boolean};
 
 export type ResultLook = {
@@ -24,17 +26,19 @@ export type ResultLook = {
 };
 
 // The result of the view's hand, or null while there is none.
-export const resultLook = (hand: Pick<HandView, 'no' | 'board' | 'result'> | null): ResultLook | null => {
+export const resultLook = (hand: Pick<HandView, 'no' | 'variant' | 'boards' | 'result'> | null): ResultLook | null => {
     const result = hand?.result;
     if (!hand || !result) return null;
     const totals = new Map<number, number>();
-    for (const pot of result.pots) pot.winners.forEach((seat, k) => totals.set(seat, (totals.get(seat) ?? 0) + (pot.shares[k] ?? 0)));
+    for (const pot of result.pots) for (const {seat, share} of seatShares(pot)) totals.set(seat, (totals.get(seat) ?? 0) + share);
+    const board = hand.boards[0] ?? [];
     const shown = result.hands.map((h): ShownLook => {
-        const read = readShownHand(hand.board, h);
+        const read = readShown(hand.variant, hand.boards, h);
+        const first = read.reads[0] ?? null;
         return {
-            seat: read.seat, cards: read.cards, best: read.best,
-            description: read.value === null ? null : describeHand(read.value),
-            playsBoard: read.value !== null && playsBoard(hand.board, read.value),
+            seat: read.seat, cards: read.cards, best: first?.best ?? [],
+            description: first === null ? null : describeHand(first.value),
+            playsBoard: first !== null && playsBoardFor(hand.variant, board, first.value),
             winner: totals.has(read.seat),
         };
     });

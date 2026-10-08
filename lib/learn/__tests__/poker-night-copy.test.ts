@@ -13,7 +13,7 @@ import {
 import {AVATAR_BADGES, AVATAR_COLOURS, AVATAR_FRAMES, AVATAR_PARTS, FACE_IDS} from '@/lib/poker-night/avatar';
 import {CARD_BACK_IDS, CARD_FACE_IDS, CHIP_SET_IDS, FELTS, SCENES} from '@/lib/poker-night/looks';
 import {ERROR_CODES, refusalToCode} from '@/lib/poker-night/http';
-import {checkConfig, DEFAULT_CONFIG, ENTRY_KINDS, LEDGER_KINDS} from '@/lib/poker-night/config';
+import {checkConfig, DEFAULT_CONFIG, ENTRY_KINDS, LEDGER_KINDS, refineConfig} from '@/lib/poker-night/config';
 import {describeHand, isRoyal, type HandDescription} from '@/lib/poker-night/hand-name';
 import {parseCard} from '@/lib/poker/cards';
 import {CATEGORY, evaluateCards} from '@/lib/poker/evaluator';
@@ -150,6 +150,7 @@ describe('the hand log', () => {
             [['refund', 150, false], 'gets back 150 uncalled'],
             [['show', 0, false], 'shows'],
             [['void', 3000, false], 'the hand is called off'],
+            [['discard', 0, false], 'throws away a card'],
             [['call', 35, true], 'calls 35, all in'],
             [['raise', 1_250_000, true], 'raises to 1,250,000, all in'],
         ];
@@ -164,7 +165,8 @@ describe('the refusals', () => {
             'already-seated', 'bad-amount', 'bad-config', 'bad-deck', 'bad-seat', 'below-buy-in', 'below-min-raise', 'closed',
             'illegal', 'no-request', 'not-due', 'not-host', 'not-now', 'not-seated', 'not-your-turn', 'over-cap', 'rebuy-cap',
             'rebuys-off', 'seat-taken', 'stale',
-        ]);
+            'ask-cooldown', 'ask-limit', 'ask-waiting', 'asks-off',
+        ].sort());
         for (const text of Object.values(REFUSAL_COPY)) {
             clean(text);
             expect(text, text).toMatch(/^[A-Z][^.]*\.$/);
@@ -604,6 +606,7 @@ describe('the hand log', () => {
             ],
             shows: () => named((name) => phrases.map((phrase) => LOG_COPY.shows(name, HAND_COPY.cardsShort(cards('AsKs')), phrase))),
             youHeld: () => [LOG_COPY.youHeld(HAND_COPY.cardsShort(cards('AsKs')))],
+            showedYou: () => named((name) => [LOG_COPY.showedYou(name, HAND_COPY.cardsShort(cards('AsKs')))]),
             wins: () => named((name) => NS.flatMap((n) => phrases.flatMap((phrase) => pots.map((pot) => LOG_COPY.wins(name, n, phrase, pot))))),
             split: () => pots.flatMap((pot) => [NAMES.slice(0, 2), NAMES].map((players) => {
                 const text = LOG_COPY.split(players.map((name, i) => ({name, amount: NS[i % NS.length]})), pot);
@@ -711,6 +714,8 @@ describe('the host drawer', () => {
             {...base, buyInMin: 10, buyInMax: 2000},
             {...base, buyInMin: 2000, buyInMax: 1000},
             {...base, buyInMax: 20 * 501},
+            {...base, boards: 2 as const},
+            {...base, variant: 'plo' as const},
         ];
         const messages = new Set<string>();
         for (const config of refused) {
@@ -718,6 +723,8 @@ describe('the host drawer', () => {
             expect(checked.ok).toBe(false);
             if (!checked.ok) for (const issue of checked.issues) messages.add(issue.message);
         }
+        // More cards than a deck: no config inside today's limits asks for it; the rule guards a change of them.
+        refineConfig({...base, seats: 12, variant: 'plo', boards: 3}, {addIssue: (issue: {message?: string}) => messages.add(issue.message ?? '')} as never);
         expect([...messages].sort()).toEqual(Object.keys(HOST_COPY.issues).sort());
     });
 
@@ -725,7 +732,7 @@ describe('the host drawer', () => {
         expect(HOST_COPY.fromNextHand).toBe('Changes apply from the next hand.');
         expect(HOST_COPY.sections).toEqual({game: 'Game', rebuys: 'Rebuys', players: 'Players', table: 'Table'});
         expect(HOST_COPY.timerValue(30)).toBe('30 s');
-        expect(HOST_COPY.rebuysValue).toEqual({off: 'Off', auto: 'On', approve: 'Host approves'});
+        expect(HOST_COPY.rebuysValue).toEqual({off: 'Off', approve: 'On (host approves)'});
         expect(HOST_COPY.rebuyLimit(3)).toBe('Up to 3 each');
         expect(HOST_COPY.rebuyLimit(null)).toBe('No limit');
         expect(HOST_COPY.startingChips).toBe('Starting chips');

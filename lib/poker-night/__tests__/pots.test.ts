@@ -4,7 +4,7 @@
 // walks the chips one at a time — every chip level, who paid it, who can still win it.
 
 import {describe, expect, it} from 'vitest';
-import {buildPots, splitPot, uncalled, type Contribution, type Pot} from '@/lib/poker-night/pots';
+import {buildPots, paidParts, seatShares, splitBoards, splitPot, uncalled, type Contribution, type Pot} from '@/lib/poker-night/pots';
 import {mulberry32} from '@/lib/random';
 
 const live = (seat: number, amount: number): Contribution => ({seat, amount, folded: false});
@@ -194,5 +194,43 @@ describe('splitPot', () => {
         expect(() => splitPot(10, [])).toThrow(RangeError);
         expect(() => splitPot(-1, [0])).toThrow(RangeError);
         expect(() => splitPot(1.5, [0])).toThrow(RangeError);
+    });
+});
+
+describe('a pot over the boards', () => {
+    it('splits evenly between the boards, the odd chips to the first boards', () => {
+        expect(splitBoards(100, 3)).toEqual([34, 33, 33]);
+        expect(splitBoards(101, 3)).toEqual([34, 34, 33]);
+        expect(splitBoards(2, 3)).toEqual([1, 1, 0]);
+        expect(splitBoards(7, 1)).toEqual([7]);
+        expect(() => splitBoards(10, 0)).toThrow(RangeError);
+        expect(() => splitBoards(-1, 2)).toThrow(RangeError);
+    });
+
+    it('pays each board\'s part to its winners, and a seat its total over the boards', () => {
+        const pot = {amount: 101, winners: [[3], [3, 5], [5]]};
+        expect(paidParts(pot)).toEqual([
+            {board: 0, amount: 34, winners: [3], shares: [34]},
+            {board: 1, amount: 34, winners: [3, 5], shares: [17, 17]},
+            {board: 2, amount: 33, winners: [5], shares: [33]},
+        ]);
+        expect(seatShares(pot)).toEqual([{seat: 3, share: 51}, {seat: 5, share: 50}]);
+        // One board: one part, the pot's own split.
+        expect(paidParts({amount: 7, winners: [[0, 1]]})).toEqual([{board: 0, amount: 7, winners: [0, 1], shares: [4, 3]}]);
+        // A part of nothing: a pot smaller than its boards.
+        expect(paidParts({amount: 1, winners: [[2], [4]]})[1]).toEqual({board: 1, amount: 0, winners: [4], shares: [0]});
+    });
+
+    it('sums to the pot over 10,000 seeded pots of one to three boards', () => {
+        const random = mulberry32(13);
+        for (let t = 0; t < 10_000; t++) {
+            const amount = Math.floor(random() * 1_000_000);
+            const boards = 1 + Math.floor(random() * 3);
+            const winners = Array.from({length: boards}, () => Array.from({length: 1 + Math.floor(random() * 3)}, (_, i) => i * 2));
+            const parts = paidParts({amount, winners});
+            expect(parts.reduce((sum, p) => sum + p.amount, 0)).toBe(amount);
+            expect(parts.flatMap((p) => p.shares).reduce((a, b) => a + b, 0)).toBe(amount);
+            expect(seatShares({amount, winners}).reduce((sum, s) => sum + s.share, 0)).toBe(amount);
+        }
     });
 });

@@ -396,7 +396,7 @@ const playByClicks = async (handNo, {choose = () => 'call', before = async () =>
 
 // ── the scans: a folded hand's cards, outside its own context ────────────────────────────────
 
-const NOT_CARDS = new Set(['eligible', 'winners', 'shares', 'showOrder']);
+const NOT_CARDS = new Set(['eligible', 'winners', 'shares', 'showOrder', 'toDiscard']);
 const walk = (node, key, visit) => {
     visit(node, key);
     if (Array.isArray(node)) node.forEach((child) => walk(child, key, visit));
@@ -1235,6 +1235,11 @@ try {
         await R.page.click('[data-join-sit]');
         const reseated = await waitDoc((d) => seatIndex(d, R) >= 0, 15000);
         check('R\'s "Sit down again" seats R again in one more tap', reseated !== null);
+        // Hands have been dealt: R's chips wait for the host's yes.
+        const asked = reseated?.state.requests.some((q) => q.pid === R.pid) === true && reseated.state.seats[seatIndex(reseated, R)]?.stack === 0;
+        const yes = await hostOp(H, {op: 'approve', pid: R.pid});
+        const landed = await waitDoc((d) => (d.state.seats[seatIndex(d, R)]?.stack ?? 0) > 0, 10000);
+        check('…with nothing until the host approves the chips, which then land', asked && yes.status === 200 && landed !== null, String(yes.status));
     }
 
     // ═══ hand 3 (the host and P), then hand 4 with Q and R back ══════════════════════════════════

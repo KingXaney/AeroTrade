@@ -26,10 +26,13 @@ const metaOf = (s: TableState, seq: number, serverNow: number, extra: {clockLead
     realtimeOk: true, peopleV: extra.peopleV ?? 1,
 });
 
-const pv = (s: TableState, pid: string, seq: number, opts: {serverNow?: number; emotes?: EmoteView[]; emoteSeq?: number; pass?: string | null; clockLeader?: string | null} = {}): PlayerView =>
+const pv = (
+    s: TableState, pid: string, seq: number,
+    opts: {serverNow?: number; emotes?: EmoteView[]; emoteSeq?: number; pass?: string | null; clockLeader?: string | null; nudge?: number} = {},
+): PlayerView =>
     playerView(s, pid, {
         ...metaOf(s, seq, opts.serverNow ?? nowOf(s), {clockLeader: opts.clockLeader}), people: people(s), removed: [], hasAccount: false,
-        emotes: opts.emotes ?? [], emoteSeq: opts.emoteSeq ?? 0, pass: opts.pass ?? null,
+        emotes: opts.emotes ?? [], emoteSeq: opts.emoteSeq ?? 0, pass: opts.pass ?? null, nudge: opts.nudge ?? 0,
     });
 
 const wire = (s: TableState, seq: number, extra: {peopleV?: number} = {}): WireView => wireView(s, metaOf(s, seq, nowOf(s), extra));
@@ -38,7 +41,7 @@ const room = (s: TableState, seq: number): RoomView => ({...wire(s, seq), ...peo
 const emote = (id: string, seq: number, at: number): EmoteView => ({kind: 'react', item: 'laugh', id, seq, from: pidOf(0), at});
 
 const unchanged = (seq: number, extra: Partial<Unchanged> = {}): Unchanged =>
-    ({unchanged: true, seq, emoteSeq: 0, serverNow: T0 + 5000, nextDueAt: null, emotes: [], pass: null, realtimeOk: true, ...extra});
+    ({unchanged: true, seq, emoteSeq: 0, serverNow: T0 + 5000, nextDueAt: null, emotes: [], pass: null, realtimeOk: true, nudge: 0, ...extra});
 
 const three = () => table({0: 1000, 1: 1000, 2: 1000}, {lastBigBlind: 0});
 
@@ -366,7 +369,7 @@ describe('realtime messages', () => {
         const s1 = deal(three());
         const waiting = play(s1, {type: 'pre', by: pidOf(1), pre: {kind: 'call-any'}, at: nowOf(s1)});
         const f = initialFeed({view: pv(s1, pidOf(1), 3)});
-        const set = feedReducer(f, {type: 'view', view: pv(waiting, pidOf(1), 3), at: T0, pre: true});
+        const set = feedReducer(f, {type: 'view', view: pv(waiting, pidOf(1), 3), at: T0, own: true});
         expect(set.view!.me.pre).toEqual({kind: 'call-any'});
         expect(set.view!.seats).toBe(f.view!.seats);
         expect([set.seq, set.privateSeq, set.knownSeq]).toEqual([3, 3, 3]);
@@ -375,12 +378,51 @@ describe('realtime messages', () => {
         expect(feedReducer(f, {type: 'view', view: pv(waiting, pidOf(1), 3), at: T0}).view).toBe(f.view);
         expect(feedReducer(set, {type: 'view', view: pv(s1, pidOf(1), 3), at: T0}).view!.me.pre).toEqual({kind: 'call-any'});
         // The same answer again (a retried request): nothing moves. Cleared: its answer clears it.
-        expect(feedReducer(set, {type: 'view', view: pv(waiting, pidOf(1), 3), at: T0, pre: true}).view).toBe(set.view);
-        expect(feedReducer(set, {type: 'view', view: pv(s1, pidOf(1), 3), at: T0, pre: true}).view!.me.pre).toBeNull();
+        expect(feedReducer(set, {type: 'view', view: pv(waiting, pidOf(1), 3), at: T0, own: true}).view).toBe(set.view);
+        expect(feedReducer(set, {type: 'view', view: pv(s1, pidOf(1), 3), at: T0, own: true}).view!.me.pre).toBeNull();
         // An answer older than the table held is still read by the usual rules.
         const raised = moves(waiting, R(60));
         const ahead = feedReducer(f, {type: 'view', view: pv(raised, pidOf(1), 4), at: T0});
-        expect(feedReducer(ahead, {type: 'view', view: pv(waiting, pidOf(1), 3), at: T0, pre: true}).view).toBe(ahead.view);
+        expect(feedReducer(ahead, {type: 'view', view: pv(waiting, pidOf(1), 3), at: T0, own: true}).view).toBe(ahead.view);
+    });
+
+    it('read the viewer\'s own part again when a nudge says it changed, though the public seq did not move', () => {
+        // Seats 2 and 0 fold to seat 1; seat 2 asks seat 1 to see its cards: only those two see it.
+        const done = moves(deal(three()), {kind: 'fold'}, {kind: 'fold'});
+        const at = done.hand!.result!.completedAt;
+        const asked = play(done, {type: 'ask', by: pidOf(2), to: pidOf(1), at: at + 100});
+        let f = initialFeed({view: pv(done, pidOf(1), 9, {serverNow: at})});
+        expect([f.nudge, f.knownNudge]).toEqual([0, 0]);
+        // A poll's Unchanged names a higher count: behind, a GET state is due.
+        f = feedReducer(f, {type: 'unchanged', body: unchanged(9, {nudge: 1}), at: T0});
+        expect(f.knownNudge).toBe(1);
+        expect(isBehind(f)).toBe(true);
+        // Its answer: the whole view at the same seq, the ask in the viewer's own part.
+        f = feedReducer(f, {type: 'view', view: pv(asked, pidOf(1), 9, {serverNow: at + 200, nudge: 1}), at: T0});
+        expect(f.view!.me.asks).toHaveLength(1);
+        expect([f.seq, f.nudge, isBehind(f)]).toEqual([9, 1, false]);
+        // An older answer (a lower count) never takes it back, even as the viewer's own move's.
+        expect(feedReducer(f, {type: 'view', view: pv(done, pidOf(1), 9, {nudge: 0}), at: T0, own: true}).view).toBe(f.view);
+        // The viewer's own channel names a count: behind until the read lands.
+        const told = feedReducer(f, {type: 'nudge', nudge: 2});
+        expect([told.knownNudge, isBehind(told)]).toEqual([2, true]);
+        expect(feedReducer(told, {type: 'nudge', nudge: 1})).toBe(told);
+        // An older server's Unchanged names none: nothing changes.
+        const old = unchanged(9) as Partial<Unchanged>;
+        delete old.nudge;
+        expect(feedReducer(f, {type: 'unchanged', body: old as Unchanged, at: T0}).knownNudge).toBe(1);
+    });
+
+    it('end the viewer\'s asks and their thrown-away card with the hand, and read the whole view as the hand completes', () => {
+        const live = deal(three());
+        const view = pv(live, pidOf(1), 4);
+        const done = moves(live, {kind: 'fold'}, {kind: 'fold'});
+        // Seat 1 was dealt in and the hand has just completed: who it may ask is in its own part.
+        expect(needsPrivate(view, wire(done, 5))).toBe(true);
+        // The next hand: every ask and card of the last one gone.
+        const next = deal(done);
+        const merged = mergeWire({...view, me: {...view.me, asks: [{from: pidOf(2), to: pidOf(1), fromSeat: 2, toSeat: 1, at: T0, until: T0, answer: 'waiting'}]}}, wire(next, 6));
+        expect(merged.me).toMatchObject({hole: null, asks: [], canAsk: [], shownToMe: [], discard: null});
     });
 
     it('name the host from the message', () => {
@@ -417,7 +459,7 @@ describe('the poll', () => {
     });
 
     it('reads again at once while an answer leaves the table or the viewer\'s own part behind', () => {
-        const held = {seq: 12, privateSeq: 12, emoteSeq: 0, knownSeq: 12, knownEmoteSeq: 0};
+        const held = {seq: 12, privateSeq: 12, emoteSeq: 0, knownSeq: 12, knownEmoteSeq: 0, nudge: 0, knownNudge: 0};
         expect(readAgain({again: false, whole: true, state: held})).toBe(false);
         expect(readAgain({again: true, whole: false, state: held})).toBe(true);
         expect(readAgain({again: false, whole: false, state: {...held, knownSeq: 13}})).toBe(true);
@@ -425,6 +467,8 @@ describe('the poll', () => {
         expect(readAgain({again: false, whole: true, state: {...held, privateSeq: 10}})).toBe(true);
         // An Unchanged says the server has nothing newer than the read asked from: the pace, not a loop.
         expect(readAgain({again: false, whole: false, state: {...held, privateSeq: 10}})).toBe(false);
+        // A nudge count above the one held: once more, now.
+        expect(readAgain({again: false, whole: false, state: {...held, knownNudge: 1}})).toBe(true);
     });
 
     it('knows a live hand and when the action is near', () => {

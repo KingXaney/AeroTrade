@@ -12,7 +12,10 @@
 // afterCommit) logs it with the room's code and seq and marks the room's realtime as failing.
 
 import type * as AblyTypes from "ably";
-import {ablyKeyOf, capabilityFor, channelName, emoteMessage, realtimeEnabled, stateMessage, type EmoteMessage, type StateMessage} from "@/lib/poker-night/channel";
+import {
+    ablyKeyOf, capabilityFor, channelName, emoteMessage, nudgeMessage, privateChannelName, realtimeEnabled, stateMessage,
+    type EmoteMessage, type NudgeMessage, type StateMessage,
+} from "@/lib/poker-night/channel";
 import type {Env} from "@/lib/poker-night/env";
 import {LIMITS} from "@/lib/poker-night/limits";
 import type {EmoteView, TokenReply, WireView} from "@/lib/poker-night/view-types";
@@ -60,11 +63,11 @@ const messageOf = (error: unknown): string => {
     return String(error);
 };
 
-const publish = async (env: Env, roomId: string, message: StateMessage | EmoteMessage, vars: EnvVars): Promise<PublishResult> => {
+const publish = async (channel: string, message: StateMessage | EmoteMessage | NudgeMessage, vars: EnvVars): Promise<PublishResult> => {
     const rest = restOf(vars);
     if (rest === null) return {ok: true, sent: false};
     try {
-        await (await rest).channels.get(channelName(env, roomId)).publish(message);
+        await (await rest).channels.get(channel).publish(message);
         return {ok: true, sent: true};
     } catch (error) {
         return {ok: false, message: messageOf(error)};
@@ -74,23 +77,30 @@ const publish = async (env: Env, roomId: string, message: StateMessage | EmoteMe
 // A commit's public wire view, as the 'state' message on the room's channel. Never the people,
 // a hole card, the deck, a viewer's own part or the config: the wire view has none of them.
 export const publishWire = (env: Env, roomId: string, wire: WireView, vars: EnvVars = process.env): Promise<PublishResult> =>
-    publish(env, roomId, stateMessage(roomId, wire), vars);
+    publish(channelName(env, roomId), stateMessage(roomId, wire), vars);
 
 // An emote, as the 'emote' message (P6's route sends it once the emote is written).
 export const publishEmote = (env: Env, roomId: string, emote: EmoteView, vars: EnvVars = process.env): Promise<PublishResult> =>
-    publish(env, roomId, emoteMessage(roomId, emote), vars);
+    publish(channelName(env, roomId), emoteMessage(roomId, emote), vars);
 
-// A token for player `pid` on room `roomId`'s channel: subscribe only, LIMITS.tokenTtlMs long, the
-// pid as its clientId. Ably's TokenDetails are copied field by field, so nothing else of the
-// library's object reaches a response. Throws when Ably cannot be reached (the route answers 503).
+// A nudge for player `pid` alone, on their own channel: their new count, nothing else.
+export const publishNudge = (env: Env, roomId: string, pid: string, nudge: number, vars: EnvVars = process.env): Promise<PublishResult> =>
+    publish(privateChannelName(env, roomId, pid), nudgeMessage(roomId, pid, nudge), vars);
+
+// A token for player `pid` on room `roomId`'s channel and their own: subscribe only,
+// LIMITS.tokenTtlMs long, the pid as its clientId. Ably's TokenDetails are copied field by field, so
+// nothing else of the library's object reaches a response. Throws when Ably cannot be reached (the
+// route answers 503).
 export const issueToken = async (env: Env, roomId: string, pid: string, vars: EnvVars = process.env): Promise<TokenReply> => {
     const rest = restOf(vars);
     if (rest === null) return {realtime: false};
     const channel = channelName(env, roomId);
-    const details = await (await rest).auth.requestToken({clientId: pid, capability: JSON.stringify(capabilityFor(channel)), ttl: LIMITS.tokenTtlMs});
+    const own = privateChannelName(env, roomId, pid);
+    const details = await (await rest).auth.requestToken({clientId: pid, capability: JSON.stringify(capabilityFor(channel, own)), ttl: LIMITS.tokenTtlMs});
     return {
         realtime: true,
         channel,
+        private: own,
         token: {token: details.token, expires: details.expires, issued: details.issued, capability: details.capability, clientId: details.clientId ?? pid},
     };
 };

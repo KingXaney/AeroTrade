@@ -18,7 +18,7 @@ const Board = ({stage, anims, look}: {stage: Stage; anims: readonly LiveAnim[]; 
     const {table} = useRoom();
     const hand = table.hand;
     if (!hand) return null;
-    const board = hand.board;
+    const board = hand.boards[0] ?? [];
     const turned = animsOf(anims, 'board').filter((a) => a.event.handNo === hand.no);
     const reveal = animsOf(anims, 'reveal').find((a) => a.event.handNo === hand.no) ?? null;
     const style = {

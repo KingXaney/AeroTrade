@@ -21,7 +21,7 @@ export type AnnounceContext = {
     view: Pick<TableView, 'seats' | 'hand'>;
     people: People;
     mySeat: number | null;
-    hole: readonly [Card, Card] | null;
+    hole: readonly Card[] | null;
 };
 
 const nameAt = (ctx: AnnounceContext, seat: number, pid?: string): string => {
@@ -46,7 +46,7 @@ export const announcementsFor = (events: readonly TableEvent[], ctx: AnnounceCon
     for (const e of events) {
         switch (e.kind) {
             case 'deal':
-                if (ctx.mySeat !== null && ctx.hole && e.seats.includes(ctx.mySeat)) polite.push(ANNOUNCE_COPY.dealt([ctx.hole[0], ctx.hole[1]]));
+                if (ctx.mySeat !== null && ctx.hole && e.seats.includes(ctx.mySeat)) polite.push(ANNOUNCE_COPY.dealt(ctx.hole));
                 break;
             case 'chips-out':
                 // The blinds and antes are said once, in the log; the moves are said as they happen.

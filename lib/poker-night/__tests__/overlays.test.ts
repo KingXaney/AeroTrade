@@ -26,13 +26,14 @@ const people = (s: TableState, extra: string[] = []) =>
 
 const pv = (s: TableState, pid: string, opts: {extra?: string[]; removed?: string[]} = {}): PlayerView => playerView(s, pid, {
     code: 'K7QXM4', seq: 1, serverNow: nowOf(s), nextDueAt: nextDueAt(s), clockLeader: clockLeaderOf(s, {}), presence: {}, watchers: 0,
-    realtimeOk: true, peopleV: 1, people: people(s, opts.extra), removed: opts.removed ?? [], hasAccount: true, emotes: [], emoteSeq: 0, pass: null,
+    realtimeOk: true, peopleV: 1, people: people(s, opts.extra), removed: opts.removed ?? [], hasAccount: true, emotes: [], emoteSeq: 0, pass: null, nudge: 0,
 });
 
 const three = (config = {}) => table({0: 1000, 1: 1000, 2: 1000}, {lastBigBlind: 0, config});
 
 const join = (over: Partial<JoinView> = {}): JoinView => ({
-    banned: false, locked: false, seats: 8, seatsFree: 5, watchersFull: false, roomFull: false, buyIn: {min: 2000, max: 2000}, hasAccount: false, ...over,
+    banned: false, locked: false, seats: 8, seatsFree: 5, watchersFull: false, roomFull: false, buyIn: {min: 2000, max: 2000}, hasAccount: false,
+    variant: 'holdem', boards: 1, needsApproval: false, ...over,
 });
 
 describe('the drawers and the turn', () => {
@@ -124,7 +125,7 @@ describe('the join card', () => {
 
     it('says what changed on the way to the seat', () => {
         const live = deal(three({seats: 4}));
-        live.seats[3] = {pid: 'p3', stack: 2000, sittingOut: false, sitOutNext: false, away: false, timeouts: 0, owesPost: true, leaving: false, removed: false, pendingBuy: 0};
+        live.seats[3] = {pid: 'p3', stack: 2000, sittingOut: false, sitOutNext: false, away: false, timeouts: 0, owesPost: true, leaving: false, removed: false, pendingBuy: 0, leaveAfter: false};
         const view = pv(live, 'p3');
         expect(joinNotes('seated', null, view, 'player')).toEqual([JOIN_COPY.seated, JOIN_COPY.posting]);
         expect(joinNotes('moved', 'Ana 2', view, 'player')).toEqual([JOIN_COPY.renamed('Ana 2'), JOIN_COPY.seatTaken, JOIN_COPY.seated, JOIN_COPY.posting]);
@@ -159,7 +160,8 @@ describe('the invite and the host\'s game controls', () => {
     });
 
     it('counts the requests waiting for the host, for the host only', () => {
-        const s = table({0: 1000, 1: 0}, {config: {rebuys: 'approve', buyInMin: 1000, buyInMax: 2000}});
+        // Once a hand has been dealt, a buy waits for the host.
+        const s = {...table({0: 1000, 1: 0}, {config: {rebuys: 'approve', buyInMin: 1000, buyInMax: 2000}}), handNo: 1};
         const asked = ok(reduce(s, {type: 'buy', by: pidOf(1), amount: 1000, at: nowOf(s)}));
         expect(waitingRequests(asked, pv(asked, pidOf(0)).me)).toBe(1);
         expect(waitingRequests(asked, pv(asked, pidOf(1)).me)).toBe(0);
@@ -207,7 +209,7 @@ describe('the settings form', () => {
 
     it('starts from the table\'s config and sends nothing when nothing changed', () => {
         const form = gameFormOf(config);
-        expect(form).toMatchObject({smallBlind: '10', bigBlind: '20', ante: '0', buyInMin: '2000', buyInMax: '2000', turnSeconds: 30, rebuys: 'auto', maxRebuys: null});
+        expect(form).toMatchObject({smallBlind: '10', bigBlind: '20', ante: '0', buyInMin: '2000', buyInMax: '2000', turnSeconds: 30, rebuys: 'approve', maxRebuys: null});
         expect(checkGameForm(config, form, GAME_FIELDS)).toEqual({ok: true, patch: {}});
         expect(checkGameForm(config, form, REBUY_FIELDS)).toEqual({ok: true, patch: {}});
     });
@@ -215,8 +217,8 @@ describe('the settings form', () => {
     it('sends only what changed, read as typed', () => {
         const form = {...gameFormOf(config), smallBlind: '25', bigBlind: '50', buyInMax: '5,000', ante: ''};
         expect(checkGameForm(config, form, GAME_FIELDS)).toEqual({ok: true, patch: {smallBlind: 25, bigBlind: 50, buyInMax: 5000}});
-        expect(checkGameForm(config, {...gameFormOf(config), rebuys: 'approve', maxRebuys: 3}, REBUY_FIELDS))
-            .toEqual({ok: true, patch: {rebuys: 'approve', maxRebuys: 3}});
+        expect(checkGameForm(config, {...gameFormOf(config), rebuys: 'off', maxRebuys: 3}, REBUY_FIELDS))
+            .toEqual({ok: true, patch: {rebuys: 'off', maxRebuys: 3}});
         // A section sends its own fields only.
         expect(checkGameForm(config, {...form, rebuys: 'off'}, REBUY_FIELDS)).toEqual({ok: true, patch: {rebuys: 'off'}});
     });
@@ -259,8 +261,11 @@ describe('the settings form', () => {
 });
 
 describe('the bank\'s own chips', () => {
-    it('offers a rebuy at zero and a top-up to the cap above it', () => {
+    it('offers a rebuy at zero and a top-up to the cap above it, and first chips to a newcomer', () => {
         const s = table({0: 1000, 1: 0}, {config: {buyInMin: 1000, buyInMax: 2000}});
+        // The fixture's p1 has bought nothing: their first chips, not a rebuy.
+        expect(ownChips(pv(s, pidOf(1)))).toMatchObject({stack: 0, offer: {min: 1000, max: 2000, topUp: 2000, rebuy: false}});
+        s.ledger[1].bought = 1000;
         expect(ownChips(pv(s, pidOf(1)))).toMatchObject({stack: 0, requested: null, asksHost: false, offer: {min: 1000, max: 2000, topUp: 2000, rebuy: true}});
         expect(ownChips(pv(s, pidOf(0)))).toMatchObject({stack: 1000, offer: {min: 1, max: 1000, topUp: 1000, rebuy: false}});
         expect(ownChips(pv(s, 'w1', {extra: ['w1']}))).toBeNull();
@@ -276,8 +281,10 @@ describe('the bank\'s own chips', () => {
         expect(own.stack).toBe(1000);
     });
 
-    it('waits on the host under "host approves", but not for the host, and shows the request', () => {
-        const s = table({0: 1000, 1: 0}, {config: {rebuys: 'approve', buyInMin: 1000, buyInMax: 2000}});
+    it('waits on the host once a hand is dealt, but not for the host, and shows the request', () => {
+        const fresh = table({0: 1000, 1: 0}, {config: {rebuys: 'approve', buyInMin: 1000, buyInMax: 2000}});
+        expect(ownChips(pv(fresh, pidOf(1)))!.asksHost).toBe(false);
+        const s = {...fresh, handNo: 1};
         expect(ownChips(pv(s, pidOf(1)))!.asksHost).toBe(true);
         expect(ownChips(pv(s, pidOf(0)))!.asksHost).toBe(false);
         const asked = ok(reduce(s, {type: 'buy', by: pidOf(1), amount: 1500, at: nowOf(s)}));
@@ -290,12 +297,18 @@ describe('the bank\'s own chips', () => {
         expect(requestEnded(before, {bought: denied.ledger.find((r) => r.pid === pidOf(1))!.bought, pendingBuy: 0})).toBe('declined');
     });
 
-    it('offers nothing with rebuys off or used up', () => {
+    it('offers nothing with rebuys off or used up, or while leaving after the hand', () => {
         const off = table({0: 1000, 1: 0}, {config: {rebuys: 'off'}});
+        off.ledger[1].bought = 1000;
         expect(ownChips(pv(off, pidOf(1)))!.offer).toBeNull();
         const capped = table({0: 1000, 1: 0}, {config: {maxRebuys: 1, buyInMin: 1000, buyInMax: 2000}});
+        capped.ledger[1].bought = 1000;
         capped.ledger[1].buys = 1;
         expect(ownChips(pv(capped, pidOf(1)))).toMatchObject({offer: null, used: 1, maxRebuys: 1});
+        const going = deal(table({0: 1000, 1: 1000}, {config: {buyInMin: 1000, buyInMax: 2000}}));
+        const leavingAfter = ok(reduce(going, {type: 'leave-after', by: pidOf(1), on: true, at: nowOf(going)}));
+        expect(ownChips(pv(going, pidOf(1)))!.offer).not.toBeNull();
+        expect(ownChips(pv(leavingAfter, pidOf(1)))!.offer).toBeNull();
     });
 
     it('lists the chips in, by time, newest first', () => {
@@ -311,14 +324,19 @@ describe('the bank\'s own chips', () => {
 
 describe('leaving, and the way home', () => {
     it('says what sitting down again takes: nothing, the host\'s yes, or no way back', () => {
-        expect(leaveAsks({rebuys: 'auto', maxRebuys: null}, 5, false)).toBeNull();
-        expect(leaveAsks({rebuys: 'approve', maxRebuys: null}, 0, false)).toBe('rebuys-ask');
-        expect(leaveAsks({rebuys: 'approve', maxRebuys: null}, 0, true)).toBeNull();
-        expect(leaveAsks({rebuys: 'off', maxRebuys: null}, 0, true)).toBe('rebuys-off');
-        expect(leaveAsks({rebuys: 'auto', maxRebuys: 2}, 1, false)).toBeNull();
-        expect(leaveAsks({rebuys: 'auto', maxRebuys: 2}, 2, false)).toBe('rebuy-cap');
+        // Before the first hand sitting down again simply works; after it, anyone but the host asks.
+        expect(leaveAsks({rebuys: 'approve', maxRebuys: null}, 5, false, false)).toBeNull();
+        expect(leaveAsks({rebuys: 'approve', maxRebuys: null}, 0, false, true)).toBe('rebuys-ask');
+        expect(leaveAsks({rebuys: 'approve', maxRebuys: null}, 0, true, true)).toBeNull();
+        expect(leaveAsks({rebuys: 'off', maxRebuys: null}, 0, true, false)).toBe('rebuys-off');
+        expect(leaveAsks({rebuys: 'approve', maxRebuys: 2}, 1, false, false)).toBeNull();
+        expect(leaveAsks({rebuys: 'approve', maxRebuys: 2}, 2, false, false)).toBe('rebuy-cap');
+        // The break's one tap asks first only with no way back: the host's yes is said after, in the left panel.
         expect(leaveTapAsks(pv(three(), pidOf(1)))).toBe(false);
+        expect(leaveTapAsks(pv({...three(), handNo: 1}, pidOf(1)))).toBe(false);
+        expect(leaveTapAsks(pv({...three(), handNo: 1}, pidOf(0)))).toBe(false);
         expect(leaveTapAsks(pv(three({rebuys: 'off'}), pidOf(1)))).toBe(true);
+        expect(leaveTapAsks(pv(three({maxRebuys: 1}), pidOf(1)))).toBe(false);
     });
 
     it('reads the leave dialog between hands: the chips counted, one Leave, and the way home', () => {
@@ -392,7 +410,7 @@ describe('leaving, and the way home', () => {
         expect(leftState(pv(ok(reduce(won, {type: 'leave', by: pidOf(1), at: nowOf(won)})), pidOf(1)))!.net).toBe(450);
         const off = ok(reduce(three({rebuys: 'off'}), {type: 'leave', by: pidOf(1), at: nowOf(s)}));
         expect(leftState(pv(off, pidOf(1)))).toMatchObject({sitAgain: false, note: REFUSAL_COPY['rebuys-off']});
-        const ask = ok(reduce(three({rebuys: 'approve'}), {type: 'leave', by: pidOf(1), at: nowOf(s)}));
+        const ask = ok(reduce({...three({rebuys: 'approve'}), handNo: 1}, {type: 'leave', by: pidOf(1), at: nowOf(s)}));
         expect(leftState(pv(ask, pidOf(1)))).toMatchObject({sitAgain: true, note: TABLE_COPY.rebuysAskNote});
         const full = table({0: 1000, 1: 1000, 2: 1000}, {config: {seats: 3}});
         const gone = ok(reduce(full, {type: 'leave', by: pidOf(1), at: nowOf(full)}));

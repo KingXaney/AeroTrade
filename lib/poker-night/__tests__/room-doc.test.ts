@@ -12,7 +12,7 @@ import type {JoinInput} from '@/lib/poker-night/input';
 import {LIMITS} from '@/lib/poker-night/limits';
 import {clockStep, joinStep, newRoom, tableStep, wireOf, type KnownIdentity, type RoomCore, type StepResult} from '@/lib/poker-night/room';
 import {
-    casUpdate, commitFields, coreFromDoc, emotesSince, HEAD_PROJECTION, headFromDoc, ms, newRoomDoc, playerViewOf, publicSeq, realtimeOkAt, seenFrom, serverRoomFromDoc,
+    casUpdate, commitFields, coreFromDoc, emotesSince, HEAD_PROJECTION, headFromDoc, ms, newRoomDoc, nudgeOf, playerViewOf, publicSeq, realtimeOkAt, seenFrom, serverRoomFromDoc,
     unchangedOf, unchangedOfRoom, unreadableCloseUpdate, unreadableKind, unreadRefusal, wireOfRoom, type RoomDocLean, type ServerRoom,
 } from '@/lib/poker-night/room-doc';
 import {FULL_DECK} from '@/lib/poker-night/deck';
@@ -64,7 +64,7 @@ describe('reading a room back', () => {
         expect(read.bannedKeys).toEqual([]);
         expect(read.peopleV).toBe(1);
         expect(read.seen).toEqual({});
-        expect(read.players).toEqual([{pid: ANA, userId: null, guestId: null, name: 'Ana', avatar: AV, joinedAt: T0, banned: false}]);
+        expect(read.players).toEqual([{pid: ANA, userId: null, guestId: null, name: 'Ana', avatar: AV, joinedAt: T0, banned: false, nudge: 0}]);
     });
 
     it('keeps only presence stamps with a time', () => {
@@ -114,6 +114,20 @@ describe('a commit', () => {
         expect(Object.keys(pruned.update.$set)).not.toContain('seen');
     });
 
+    it('writes a row\'s nudge count with the row, only when above 0, and reads one back as a whole count', () => {
+        const core = room();
+        const nudged = {...core, players: core.players.map((p) => (p.pid === ANA ? {...p, nudge: 3} : p))};
+        const fields = commitFields(nudged, {applied: [], now: T0, closedAt: null});
+        expect(fields.players.find((p) => p.pid === ANA)).toMatchObject({nudge: 3});
+        expect(fields.players.find((p) => p.pid === HOST)).not.toHaveProperty('nudge');
+        const read = coreFromDoc(asRead(newRoomDoc(nudged, T0)), nudged.state);
+        expect(read.players.map((p) => p.nudge)).toEqual(nudged.players.map((p) => p.nudge));
+        const odd = asRead(newRoomDoc(core, T0), {players: core.players.map((p) => ({...p, joinedAt: new Date(p.joinedAt), nudge: -1}))});
+        expect(coreFromDoc(odd, core.state).players.every((p) => p.nudge === 0)).toBe(true);
+        expect(nudgeOf(nudged.players, ANA)).toBe(3);
+        expect(nudgeOf(nudged.players, 'NobodyPid01')).toBe(0);
+    });
+
     it('moves hiddenCommits with seq for a write only its author can see, so the public seq stays put', () => {
         const core = room();
         const quiet = casUpdate(core, {applied: [], now: T0, closedAt: null, pruned: [], visible: false});
@@ -156,13 +170,17 @@ describe('the head', () => {
         expect(headFromDoc(doc)).toEqual({
             id: ROOM_ID, seq: 4, emoteSeq: 2, nextDueAt: T0 + 3000, status: 'open', bannedKeys: ['g:x'], realtimeFailAt: null,
             players: [
-                {pid: HOST, userId: 'u-host', guestId: null, banned: false},
-                {pid: ANA, userId: null, guestId: 'ana'.padEnd(22, 'x'), banned: false},
+                {pid: HOST, userId: 'u-host', guestId: null, banned: false, nudge: 0},
+                {pid: ANA, userId: null, guestId: 'ana'.padEnd(22, 'x'), banned: false, nudge: 0},
             ],
         });
         // The last failed publish too, so an Unchanged answered from the head alone says realtimeOk.
         expect(headFromDoc(asRead(newRoomDoc(core, T0), {seq: 4, rt: {failAt: new Date(T0 - 1000), fails: 1}})).realtimeFailAt).toBe(T0 - 1000);
         expect(HEAD_PROJECTION).toHaveProperty(['rt.failAt'], 1);
+        // Every player's nudge count, for a poll answered from the head alone.
+        const nudged = {...core, players: core.players.map((p) => (p.pid === ANA ? {...p, nudge: 2} : p))};
+        expect(nudgeOf(headFromDoc(asRead(newRoomDoc(nudged, T0), {seq: 4})).players, ANA)).toBe(2);
+        expect(HEAD_PROJECTION).toHaveProperty(['players.nudge'], 1);
     });
 });
 
@@ -183,31 +201,35 @@ describe('a room the server read', () => {
     it('answers a poll with nothing new from the head or the room, emotes after the client\'s only', () => {
         expect(emotesSince([emote(1), emote(2), emote(3)], 1)).toEqual([emote(2), emote(3)]);
         expect(emotesSince([emote(1)], null)).toEqual([emote(1)]);
-        expect(unchangedOf({seq: 3, emoteSeq: 1, nextDueAt: null, realtimeFailAt: null}, T0, [], 'pass')).toEqual({
-            unchanged: true, seq: 3, emoteSeq: 1, serverNow: T0, nextDueAt: null, emotes: [], pass: 'pass', realtimeOk: true,
+        const head = {seq: 3, emoteSeq: 1, nextDueAt: null, realtimeFailAt: null, players: [{pid: ANA, nudge: 4}, {pid: HOST, nudge: 0}]};
+        expect(unchangedOf(head, T0, [], 'pass', ANA)).toEqual({
+            unchanged: true, seq: 3, emoteSeq: 1, serverNow: T0, nextDueAt: null, emotes: [], pass: 'pass', realtimeOk: true, nudge: 4,
         });
+        expect(unchangedOf(head, T0, [], 'pass', HOST).nudge).toBe(0);
         // Like a view, an Unchanged says whether a publish failed within the window (rt moves no seq).
-        expect(unchangedOf({seq: 3, emoteSeq: 1, nextDueAt: null, realtimeFailAt: T0 - 1000}, T0, [], null).realtimeOk).toBe(false);
-        expect(unchangedOf({seq: 3, emoteSeq: 1, nextDueAt: null, realtimeFailAt: T0 - LIMITS.realtimeFailWindowMs}, T0, [], null).realtimeOk).toBe(true);
+        expect(unchangedOf({...head, realtimeFailAt: T0 - 1000}, T0, [], null, ANA).realtimeOk).toBe(false);
+        expect(unchangedOf({...head, realtimeFailAt: T0 - LIMITS.realtimeFailWindowMs}, T0, [], null, ANA).realtimeOk).toBe(true);
         const core = okStep(tableStep({type: 'host', by: HOST, op: {op: 'start'}})(room(), T0)).core;
-        const read = serverRoomFromDoc(asRead(newRoomDoc(core, T0), {seq: 5, emotes: [emote(1), emote(2)], emoteSeq: 2}), core, T0 + 50);
-        expect(unchangedOfRoom(read, 1, null)).toEqual({
-            unchanged: true, seq: 5, emoteSeq: 2, serverNow: T0 + 50, nextDueAt: core.state.nextHandAt, emotes: [emote(2)], pass: null, realtimeOk: true,
+        const withNudge = {...core, players: core.players.map((p) => (p.pid === ANA ? {...p, nudge: 1} : p))};
+        const read = serverRoomFromDoc(asRead(newRoomDoc(withNudge, T0), {seq: 5, emotes: [emote(1), emote(2)], emoteSeq: 2}), withNudge, T0 + 50);
+        expect(unchangedOfRoom(read, 1, null, ANA)).toEqual({
+            unchanged: true, seq: 5, emoteSeq: 2, serverNow: T0 + 50, nextDueAt: core.state.nextHandAt, emotes: [emote(2)], pass: null, realtimeOk: true, nudge: 1,
         });
         const failing = serverRoomFromDoc(asRead(newRoomDoc(core, T0), {seq: 5, rt: {failAt: new Date(T0), fails: 1}}), core, T0 + 50);
-        expect(unchangedOfRoom(failing, 1, null).realtimeOk).toBe(false);
+        expect(unchangedOfRoom(failing, 1, null, ANA).realtimeOk).toBe(false);
     });
 
     it('gives a player their own view, with nothing private in it', () => {
         let core = okStep(tableStep({type: 'host', by: HOST, op: {op: 'start'}})(room(), T0)).core;
         core = okStep(clockStep(SOURCE)(core, core.state.nextHandAt!)).core;
+        core = {...core, players: core.players.map((p) => ({...p, nudge: p.pid === ANA ? 3 : 9}))};
         const read = serverRoomFromDoc(asRead(newRoomDoc(core, T0), {seq: 12, bannedKeys: ['g:someone'], applied: ['k']}), core, T0 + 9);
         const view = playerViewOf(read, ANA, {pass: 'the-pass', duplicate: true});
-        expect(view).toMatchObject({seq: 12, serverNow: T0 + 9, pass: 'the-pass', duplicate: true, me: {pid: ANA, role: 'seated', hasAccount: false}});
+        expect(view).toMatchObject({seq: 12, serverNow: T0 + 9, pass: 'the-pass', duplicate: true, nudge: 3, me: {pid: ANA, role: 'seated', hasAccount: false}});
         const json = JSON.stringify(view);
         for (const word of ['deck', 'userId', 'guestId', 'bannedKeys', 'applied', 'u-host', 'ana'.padEnd(22, 'x'), ROOM_ID]) expect(json).not.toContain(word);
         const hostHole = core.state.hand!.seats.find((p) => p.pid === HOST)!.hole;
-        expect(view.seats.find((s) => s?.pid === HOST)!.cards).toBe('hidden');
+        expect(view.seats.find((s) => s?.pid === HOST)!.cards).toBe(2);
         expect(view.me.hole).not.toEqual(hostHole);
     });
 

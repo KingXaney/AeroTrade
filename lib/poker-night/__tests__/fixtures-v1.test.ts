@@ -12,20 +12,27 @@
 //   leaving and removed seats, pending buys, requests, a closing night, a voided hand, closed and
 //   paused tables.
 //
-// PN_WRITE_FIXTURES=1 npx vitest run lib/poker-night/__tests__/fixtures-v1.test.ts writes them again
-// from the engine as it is; never do so once the state version has moved on. Otherwise this test
-// reads the files and holds them to what they promise.
+// PN_WRITE_FIXTURES=1 npx vitest run lib/poker-night/__tests__/fixtures-v1.test.ts wrote them from the
+// version 1 engine; the state version has moved on (2), so they are never written again. This test
+// reads the files, holds them to what they promise, and steps every one to version 2
+// (migrate.v1ToV2): each comes out valid, keeps its invariants and plays on — its hand to the end,
+// and the next one dealt and played — with every chip accounted for.
 
 import {readFileSync, writeFileSync} from 'node:fs';
 import {fileURLToPath} from 'node:url';
 import {describe, expect, it} from 'vitest';
 import {legalFor, snapshotFromState} from '@/lib/poker-night/betting';
+import {advance} from '@/lib/poker-night/clock';
 import {STATE_VERSION} from '@/lib/poker-night/config';
+import {FULL_DECK, shuffleWith} from '@/lib/poker-night/deck';
 import {createTable, forceClose, reduce} from '@/lib/poker-night/engine';
-import {migrateState} from '@/lib/poker-night/migrate';
-import {isLive} from '@/lib/poker-night/seats';
+import {conservation} from '@/lib/poker-night/ledger';
+import {migrateState, migrateSummary} from '@/lib/poker-night/migrate';
+import {eligibleSeats, isLive} from '@/lib/poker-night/seats';
 import type {HandSummary, TableState} from '@/lib/poker-night/types';
-import {A, C, F, actorPid, checkInvariants, deal, moves, nowOf, ok, pidOf, randomNight, T0, table} from './fixtures';
+import {readShown} from '@/lib/poker-night/variants';
+import {mulberry32} from '@/lib/random';
+import {A, C, F, X, actBy, actorPid, checkInvariants, deal, moves, nowOf, ok, pidOf, randomNight, T0, table} from './fixtures';
 
 const WRITE = process.env.PN_WRITE_FIXTURES === '1';
 const file = (name: string): string => fileURLToPath(new URL(`./fixtures/${name}`, import.meta.url));
@@ -128,6 +135,37 @@ const corpusJson = (list: readonly {kind: Kind; state: TableState}[]): string =>
 
 const read = <T>(name: string): T => JSON.parse(readFileSync(file(name), 'utf8')) as T;
 
+// A live hand played to its end — checks and calls, the run-out on its clock — then, at a table
+// still dealing, the next hand dealt from a seeded deck and played the same way. Every state on the
+// way keeps its invariants.
+const playOn = (start: TableState, seed: number): TableState => {
+    const random = mulberry32(seed);
+    const source = {deck: () => shuffleWith(FULL_DECK, (max) => Math.floor(random() * max)), draw: () => 0};
+    const finish = (from: TableState): TableState => {
+        let s = from;
+        for (let guard = 0; guard < 400 && isLive(s.hand); guard++) {
+            const hand = s.hand;
+            if (hand.phase === 'betting') {
+                const legal = legalFor(snapshotFromState(s), hand.actor!)!;
+                s = ok(reduce(s, actBy(s, actorPid(s), legal.check ? X : C, nowOf(s))));
+            } else if (hand.phase === 'runout') {
+                s = ok(reduce(s, {type: 'deal-street', at: hand.nextStreetAt!}));
+            } else {
+                throw new Error(`a ${hand.phase} hand cannot be played on here`);
+            }
+            checkInvariants(s);
+        }
+        return s;
+    };
+    let s = finish(start);
+    if (s.status === 'playing' && !s.closing && s.nextHandAt !== null && eligibleSeats(s).length >= 2) {
+        s = advance(s, s.nextHandAt, source).state;
+        expect(isLive(s.hand)).toBe(true);
+        s = finish(s);
+    }
+    return s;
+};
+
 describe('the version 1 baselines', () => {
     it.runIf(WRITE)('are written from today\'s engine', () => {
         expect(STATE_VERSION).toBe(1);
@@ -144,46 +182,68 @@ describe('the version 1 baselines', () => {
         expect(raw.v).toBe(1);
         const s = migrateState(structuredClone(raw));
         expect(s).not.toBeNull();
-        if (STATE_VERSION === 1) expect(s).toEqual(raw);
+        expect(STATE_VERSION).toBe(2);
         checkInvariants(s!);
         const result = s!.hand!.result!;
         expect(s!.hand!.phase).toBe('complete');
         expect(result.showdown).toBe(true);
         expect(result.refund).toEqual({seat: 0, amount: 2000});
         expect(result.pots.map((p) => p.amount)).toEqual([4000, 3000, 2000]);
-        expect(result.pots.map((p) => p.winners)).toEqual([[1], [2], [3]]);
+        // Each pot paid on the one board.
+        expect(result.pots.map((p) => [p.winners, p.shares])).toEqual([[[[1]], [[4000]]], [[[2]], [[3000]]], [[[3]], [[2000]]]]);
         expect(result.hands).toHaveLength(5);
-        for (const h of result.hands) {
-            expect(h.cards).toHaveLength(2);
-            expect(typeof h.value).toBe('number');
-            expect(h.best).toHaveLength(5);
-        }
+        // Shown hands keep their cards; the value and five cards that play the version 1 state
+        // stored are read from them now, and come out the same.
+        const old = (raw as {hand: {result: {hands: {cards: number[]; value: number; best: number[]}[]}}}).hand.result.hands;
+        result.hands.forEach((h, k) => {
+            expect(h).toEqual({seat: h.seat, cards: old[k].cards});
+            const read = readShown(s!.hand!.variant, s!.hand!.boards, h).reads[0];
+            expect(read.value).toBe(old[k].value);
+            expect(read.best).toHaveLength(5);
+        });
         // The folded player's hand, shown in the pause, is the last.
         expect(result.hands[4].seat).toBe(4);
         expect(s!.hand!.seats.find((p) => p.seat === 4)).toMatchObject({folded: true, shown: true});
+        // And the table deals on.
+        const on = playOn(s!, 1);
+        expect(on.handNo).toBe(2);
+        expect(conservation(on).ok).toBe(true);
     });
 
     it('keep that hand as history holds it', () => {
-        const summary = read<HandSummary>('summary-v1.json');
+        // Version 1's shape: one board, flat pots.
+        const summary = read<Omit<HandSummary, 'boards' | 'pots'> & {board: number[]; pots: {winners: number[]; shares: number[]}[]}>('summary-v1.json');
         expect(summary.board).toHaveLength(5);
         expect(summary.players).toHaveLength(5);
         for (const p of summary.players) expect(p.hole).toHaveLength(2);
         expect(summary.pots.map((p) => [p.winners, p.shares])).toEqual([[[1], [4000]], [[2], [3000]], [[3], [2000]]]);
         expect(summary.hands).toHaveLength(5);
         expect(summary.players.find((p) => p.seat === 4)).toMatchObject({shown: true});
+        // Read back through migrateSummary, it is today's shape.
+        const now = migrateSummary(summary)!;
+        expect(now.boards).toEqual([summary.board]);
+        expect(now.pots.map((p) => [p.winners, p.shares])).toEqual([[[[1]], [[4000]]], [[[2]], [[3000]]], [[[3]], [[2000]]]]);
     });
 
     it('keep a corpus with every phase and seat flag a stored room can hold, each one a valid state', () => {
         const {states} = read<{states: {kind: Kind; state: Record<string, unknown>}[]}>('state-v1-corpus.json');
         expect(states.length).toBeGreaterThanOrEqual(30);
         for (const kind of KINDS) expect(states.some((entry) => entry.kind === kind), kind).toBe(true);
-        for (const {kind, state: raw} of states) {
+        let played = 0;
+        states.forEach(({kind, state: raw}, i) => {
             expect(raw.v, kind).toBe(1);
             const s = migrateState(structuredClone(raw));
             expect(s, kind).not.toBeNull();
-            if (STATE_VERSION === 1) expect(s, kind).toEqual(raw);
+            expect(s!.v, kind).toBe(2);
             checkInvariants(s!);
             expect(kindsOf(s!), kind).toContain(kind);
-        }
+            // Version 2 throughout: read again it is the same object, through JSON an equal one.
+            expect(migrateState(s), kind).toBe(s);
+            expect(migrateState(JSON.parse(JSON.stringify(s))), kind).toEqual(s);
+            const on = playOn(s!, i + 1);
+            expect(conservation(on).ok, kind).toBe(true);
+            if (on.handNo > s!.handNo || (isLive(s!.hand) && !isLive(on.hand))) played++;
+        });
+        expect(played).toBeGreaterThanOrEqual(15);
     });
 });

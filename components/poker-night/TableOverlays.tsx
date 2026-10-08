@@ -35,6 +35,7 @@ import {useRoom} from "@/components/poker-night/room-controller";
 import type {HostSitOuts} from "@/components/poker-night/useHostSitOut";
 import {ANNOUNCE_COPY, BANK_COPY, HOST_COPY, LOBBY_COPY, TABLE_COPY} from "@/lib/learn/copy/poker-night";
 import {myTurnKey, ownSeat, requestEnded, type HostRow, type LeaveThen, type SeatChoice} from "@/lib/poker-night/overlays";
+import {ledgerRowOf} from "@/lib/poker-night/views";
 
 type Dialog =
     | {kind: 'remove'; target: RemoveTarget}
@@ -94,7 +95,7 @@ const TableOverlays = () => {
 
     // How a rebuy the viewer asked the host for ended: said once, whichever drawer is open.
     const asked = view ? view.requests.find((r) => r.pid === view.me.pid)?.amount ?? null : null;
-    const bought = view ? view.ledger.find((r) => r.pid === view.me.pid)?.bought ?? 0 : 0;
+    const bought = view ? ledgerRowOf(view, view.me.pid)?.bought ?? 0 : 0;
     const pendingBuy = view && view.me.seat !== null ? view.seats[view.me.seat]?.pendingBuy ?? 0 : 0;
     const waiting = useRef<{amount: number; bought: number} | null>(null);
     useEffect(() => {

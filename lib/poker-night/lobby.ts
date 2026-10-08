@@ -368,7 +368,7 @@ export const BLIND_PRESETS: readonly (readonly [smallBlind: number, bigBlind: nu
 export const CHIP_PRESETS: readonly number[] = [500, 1000, 2000, 5000, 10_000, 20_000, 50_000, 100_000];
 export const SEAT_CHOICES: readonly number[] = Array.from({length: TABLE_LIMITS.seats.max - TABLE_LIMITS.seats.min + 1}, (_, i) => TABLE_LIMITS.seats.min + i);
 export const TIMER_PRESETS: readonly number[] = [15, 20, 30, 45, 60, 90, 120];
-export const REBUY_CHOICES: readonly RebuyPolicy[] = ['auto', 'approve', 'off'];
+export const REBUY_CHOICES: readonly RebuyPolicy[] = ['approve', 'off'];
 
 export type TableForm = {blinds: number; chips: number; seats: number; rebuys: RebuyPolicy; turnSeconds: number};
 

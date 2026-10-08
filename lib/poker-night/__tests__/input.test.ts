@@ -76,6 +76,15 @@ describe('ActionSchema', () => {
         {actionId: ID, type: 'profile', avatar: AVATAR},
         {actionId: ID, type: 'unban', pid: PLAYER},
         {actionId: ID, type: 'hand-over', pid: PLAYER},
+        {actionId: ID, type: 'leave-after', on: true},
+        {actionId: ID, type: 'leave-after', on: false},
+        {actionId: ID, type: 'withdraw'},
+        {actionId: ID, type: 'ask', to: PLAYER},
+        {actionId: ID, type: 'reply', to: PLAYER, show: 'one'},
+        {actionId: ID, type: 'reply', to: PLAYER, show: 'all'},
+        {actionId: ID, type: 'reply', to: PLAYER, show: 'none'},
+        {actionId: ID, type: 'allow-asks', on: false},
+        {actionId: ID, type: 'host', op: {op: 'config', patch: {variant: 'plo', boards: 2, rebuys: 'off'}}},
     ];
 
     it('takes every action the table offers', () => {
@@ -96,6 +105,20 @@ describe('ActionSchema', () => {
         no(ActionSchema, {actionId: ID, type: 'host', op: {op: 'config', patch: {deck: [1, 2]}}});
         no(ActionSchema, {actionId: ID, type: 'host', op: {op: 'settings', patch: {colour: 'red'}}});
         no(ActionSchema, {actionId: ID, type: 'pre', pre: {kind: 'call', amount: 40, atBet: 0}});
+        no(ActionSchema, {actionId: ID, type: 'leave-after'});
+        no(ActionSchema, {actionId: ID, type: 'leave-after', on: 'yes'});
+        no(ActionSchema, {actionId: ID, type: 'leave-after', on: true, at: 5});
+        no(ActionSchema, {actionId: ID, type: 'withdraw', amount: 100});
+        no(ActionSchema, {actionId: ID, type: 'ask'});
+        no(ActionSchema, {actionId: ID, type: 'ask', to: 'nope'});
+        no(ActionSchema, {actionId: ID, type: 'ask', to: PLAYER, hand: 3});
+        no(ActionSchema, {actionId: ID, type: 'reply', to: PLAYER});
+        no(ActionSchema, {actionId: ID, type: 'reply', to: PLAYER, show: 'some'});
+        no(ActionSchema, {actionId: ID, type: 'allow-asks'});
+        // Version 1's third rebuy policy, and a game or board count that is not one.
+        no(ActionSchema, {actionId: ID, type: 'host', op: {op: 'config', patch: {rebuys: 'auto'}}});
+        no(ActionSchema, {actionId: ID, type: 'host', op: {op: 'config', patch: {variant: 'omaha'}}});
+        no(ActionSchema, {actionId: ID, type: 'host', op: {op: 'config', patch: {boards: 4}}});
     });
 
     it('refuses the clock\'s own actions and anything without a good id', () => {
@@ -136,6 +159,12 @@ describe('ActionSchema', () => {
             .toEqual({type: 'host', by: 'p1', op: {op: 'settings', patch: {felt: 'teal', name: 'Friday night'}}, at: 99});
         expect(toTableAction(parse({actionId: ID, type: 'host', op: {op: 'settings', patch: {name: '   '}}}), 'p1', 99))
             .toEqual({type: 'host', by: 'p1', op: {op: 'settings', patch: {name: ''}}, at: 99});
+        expect(toTableAction(parse({actionId: ID, type: 'leave-after', on: true}), 'p1', 99)).toEqual({type: 'leave-after', by: 'p1', on: true, at: 99});
+        expect(toTableAction(parse({actionId: ID, type: 'withdraw'}), 'p1', 99)).toEqual({type: 'withdraw', by: 'p1', at: 99});
+        expect(toTableAction(parse({actionId: ID, type: 'ask', to: PLAYER}), 'p1', 99)).toEqual({type: 'ask', by: 'p1', to: PLAYER, at: 99});
+        expect(toTableAction(parse({actionId: ID, type: 'reply', to: PLAYER, show: 'one'}), 'p1', 99))
+            .toEqual({type: 'reply', by: 'p1', to: PLAYER, show: 'one', at: 99});
+        expect(toTableAction(parse({actionId: ID, type: 'allow-asks', on: false}), 'p1', 99)).toEqual({type: 'allow-asks', by: 'p1', on: false, at: 99});
     });
 
     it('tells the room\'s own actions from the engine\'s', () => {
@@ -172,8 +201,9 @@ describe('the query strings', () => {
         expect(parseSeq('0')).toBe(0);
         expect(parseSeq('3100')).toBe(3100);
         for (const raw of [null, '', 'abc', '-1', '1.5', '01', '1e3', '9'.repeat(16)]) expect(parseSeq(raw), String(raw)).toBeNull();
-        expect(parseStateQuery(new URLSearchParams('since=12&esince=3'))).toEqual({since: 12, esince: 3});
-        expect(parseStateQuery(new URLSearchParams(''))).toEqual({since: null, esince: null});
+        expect(parseStateQuery(new URLSearchParams('since=12&esince=3&nsince=2'))).toEqual({since: 12, esince: 3, nsince: 2});
+        expect(parseStateQuery(new URLSearchParams('since=12&esince=3'))).toEqual({since: 12, esince: 3, nsince: null});
+        expect(parseStateQuery(new URLSearchParams(''))).toEqual({since: null, esince: null, nsince: null});
     });
 
     it('read the detail part asked for', () => {

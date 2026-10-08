@@ -109,7 +109,7 @@ const HandLog = ({open, onOpenChange, toTable}: Props) => {
     const nameOf = seatNamer((seat) => playerAt(table, seat), table.people);
     const fromHistory = (history?.hands ?? []).map((h) => historyHandLog(h, table.people, room.me?.pid ?? null));
     const showCurrent = hand !== null && current !== null && current.hand === hand.no && !fromHistory.some((h) => h.no === hand.no);
-    const now = showCurrent ? currentHandLog(hand.no, current.log, hand.board, hand.phase === 'complete' ? hand.result : null, nameOf) : null;
+    const now = showCurrent ? currentHandLog(hand.no, current.log, hand, hand.phase === 'complete' ? hand.result : null, nameOf) : null;
     const loading = open && history === null && !failed;
     const oldest = history?.hands[history.hands.length - 1];
 

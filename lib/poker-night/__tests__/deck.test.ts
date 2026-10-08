@@ -44,20 +44,37 @@ describe('isDeck', () => {
 });
 
 describe('dealFrom', () => {
-    it('gives player k cards 2k and 2k + 1, then the board', () => {
-        expect(dealFrom(FULL_DECK, 3)).toEqual({holes: [[0, 1], [2, 3], [4, 5]], board: [6, 7, 8, 9, 10]});
+    it('gives player k cards 2k and 2k + 1, then the board — version 1\'s layout', () => {
+        expect(dealFrom(FULL_DECK, 3)).toEqual({holes: [[0, 1], [2, 3], [4, 5]], runs: [[6, 7, 8, 9, 10]]});
         const deck = [...FULL_DECK].reverse();
-        const {holes, board} = dealFrom(deck, 9);
+        const {holes, runs} = dealFrom(deck, 9);
         expect(holes).toHaveLength(9);
         expect(holes[8]).toEqual([deck[16], deck[17]]);
-        expect(board).toEqual(deck.slice(18, 23));
+        expect(runs).toEqual([deck.slice(18, 23)]);
+    });
+
+    it('lays out h cards each, then one run of five per board', () => {
+        for (const h of [2, 3, 4]) {
+            for (const b of [1, 2, 3]) {
+                const n = Math.min(9, Math.floor((52 - 5 * b) / h));
+                const {holes, runs} = dealFrom(FULL_DECK, n, h, b);
+                expect(holes).toEqual(Array.from({length: n}, (_, k) => FULL_DECK.slice(h * k, h * k + h)));
+                expect(runs).toEqual(Array.from({length: b}, (_, j) => FULL_DECK.slice(h * n + 5 * j, h * n + 5 * j + 5)));
+                expect(new Set([...holes.flat(), ...runs.flat()]).size).toBe(h * n + 5 * b);
+            }
+        }
+        // The most a table takes: nine PLO hands over three boards, 51 cards.
+        expect(dealFrom(FULL_DECK, 9, 4, 3).runs[2]).toEqual([46, 47, 48, 49, 50]);
     });
 
     it('refuses a deal the deck cannot cover', () => {
         expect(() => dealFrom(FULL_DECK, 0)).toThrow(RangeError);
         expect(() => dealFrom(FULL_DECK, 1.5)).toThrow(RangeError);
-        expect(dealFrom(FULL_DECK, 23).board).toEqual([46, 47, 48, 49, 50]);
+        expect(dealFrom(FULL_DECK, 23).runs).toEqual([[46, 47, 48, 49, 50]]);
         expect(() => dealFrom(FULL_DECK, 24)).toThrow(RangeError);
+        expect(() => dealFrom(FULL_DECK, 10, 4, 3)).toThrow(RangeError);
+        expect(() => dealFrom(FULL_DECK, 2, 5, 1)).toThrow(RangeError);
+        expect(() => dealFrom(FULL_DECK, 2, 2, 4)).toThrow(RangeError);
     });
 });
 

@@ -1,39 +1,48 @@
 // Poker night's engine over seeded random nights. Each night is a random table — 2 to 9 seats, with
-// or without an ante, any rebuy policy — played with random legal moves, and between them players
-// sitting down, leaving, being removed, sitting out and in, buying chips, setting pre-actions and
-// showing cards, and the host approving, pausing, resuming, changing the config and sitting players
-// out (and taking that back); the lazy clock
-// runs whatever falls due, dealing from a seeded deck source.
+// or without an ante, either rebuy policy — played with random legal moves, and between them players
+// sitting down, leaving (now, or after the hand in play — and taking that back), being removed,
+// sitting out and in, buying chips (once the first hand is dealt, a request the host approves,
+// declines or the player withdraws), setting pre-actions, showing cards, asking to see a folded or
+// uncontested hand and answering, turning asks off, and the host approving, pausing, resuming,
+// changing the config and sitting players out; the lazy clock runs whatever falls due, dealing from a
+// seeded deck source. A leave after the hand sent just as a deal falls due — the race every page's
+// leave meets — is played out, never folded.
 //
 // After every step: the chips add up, every number is a whole, non-negative count, nobody sits twice
 // and no card is dealt twice, the player on the clock is live, holds chips and has to act, and the
-// moves they are offered are exactly the ones a replay of the street's log allows; and the reducer
-// never touched its frozen input. At every completed hand: the pots match a chip-by-chip reference,
-// add up to what was left in after the uncalled bet came back, and each goes to the strongest
-// eligible hands, and the state survives a JSON round trip into the stored shape. Across hands the
+// moves they are offered are exactly the ones a replay of the street's log allows; a plan to leave
+// after the hand only on a seat dealt into the live hand, never with a sit-out; requests only from
+// seated players not leaving; asks only after a hand completes, from players who folded it, within
+// their limits; and the reducer never touched its frozen input. At every completed hand: the pots
+// match a chip-by-chip reference, add up to what was left in after the uncalled bet came back, and
+// each goes to the strongest eligible hands, every seat leaving after it is empty, and the state
+// survives a JSON round trip into the stored shape. Across hands the
 // big blind moves one eligible seat on, so nobody pays it twice running and nobody twice in one
 // orbit of another player. A night replays to the same final state from its recorded actions.
 //
-// 100 nights of up to 60 hands by default; PN_SIM_SEEDS=1000 runs more.
+// 100 nights of up to 60 hands by default; PN_SIM_SEEDS=1000 runs more, PN_SIM_COUNTERS=1 prints how often
+// each situation came up.
 
 import {describe, expect, it} from 'vitest';
 import {evaluateCards} from '@/lib/poker/evaluator';
 import {legalFor, needsToAct, owed, snapshotFromState} from '@/lib/poker-night/betting';
 import {advance, nextDue} from '@/lib/poker-night/clock';
-import {DEFAULT_CONFIG, ENTRY_FLAGS, ENTRY_KINDS, STREETS, TABLE_LIMITS} from '@/lib/poker-night/config';
+import {ASK_ANSWERS, ASKS, DEFAULT_CONFIG, ENTRY_FLAGS, ENTRY_KINDS, STREETS, TABLE_LIMITS} from '@/lib/poker-night/config';
 import {FULL_DECK, shuffleWith, type DeckSource} from '@/lib/poker-night/deck';
 import {createTable, forceClose, reduce} from '@/lib/poker-night/engine';
-import {buyRange, conservation} from '@/lib/poker-night/ledger';
+import {buyRange, conservation, ledgerRow} from '@/lib/poker-night/ledger';
 import {migrateState} from '@/lib/poker-night/migrate';
 import {eligibleSeats, isLive, liveSeatOf} from '@/lib/poker-night/seats';
+import {paidParts} from '@/lib/poker-night/pots';
 import type {GameConfig, HostOp, Legal, Move, PreAction, TableAction, TableState} from '@/lib/poker-night/types';
+import {readShown} from '@/lib/poker-night/variants';
 import {mulberry32} from '@/lib/random';
 import {deepFreeze, pidOf, T0} from './fixtures';
 
 const DEFAULT_SEEDS = 100;
 const SEEDS = Math.max(DEFAULT_SEEDS, Number(process.env.PN_SIM_SEEDS) || 0);
 const HANDS = 60;
-const MAX_STEPS = HANDS * 150;
+const MAX_STEPS = HANDS * 180;
 
 type Random = {next: () => number; int: (n: number) => number; pick: <T>(list: readonly T[]) => T; chance: (p: number) => boolean};
 
@@ -65,7 +74,7 @@ const randomConfig = (r: Random): GameConfig => {
         ante: r.chance(0.4) ? r.pick([1, Math.max(1, Math.floor(bigBlind / 4)), bigBlind]) : 0,
         buyInMin: r.chance(0.3) ? buyInMax : bigBlind * r.pick([1, 10, 20]),
         buyInMax,
-        rebuys: r.pick(['auto', 'auto', 'approve', 'off'] as const),
+        rebuys: r.pick(['approve', 'approve', 'approve', 'off'] as const),
         maxRebuys: r.chance(0.3) ? 1 + r.int(3) : null,
         turnSeconds: TABLE_LIMITS.turnSeconds.min + r.int(TABLE_LIMITS.turnSeconds.max - TABLE_LIMITS.turnSeconds.min + 1),
         pauseSeconds: TABLE_LIMITS.pauseSeconds.min + r.int(TABLE_LIMITS.pauseSeconds.max - TABLE_LIMITS.pauseSeconds.min + 1),
@@ -79,7 +88,7 @@ const randomPatch = (c: GameConfig, r: Random): Extract<HostOp, {op: 'config'}>[
         case 0: return {turnSeconds: r.chance(0.9) ? 15 + r.int(106) : 5};
         case 1: return {pauseSeconds: 3 + r.int(13)};
         case 2: return {sitOutAfter: 1 + r.int(5)};
-        case 3: return {rebuys: r.pick(['off', 'auto', 'approve'] as const)};
+        case 3: return {rebuys: r.pick(['off', 'approve', 'approve'] as const)};
         case 4: return {maxRebuys: r.chance(0.5) ? null : 1 + r.int(4)};
         case 5: return {ante: r.chance(0.5) ? 0 : 1 + r.int(c.bigBlind + 1)};
         case 6: {
@@ -237,15 +246,23 @@ type Dealt = {no: number; bb: number; n: number; who: Map<number, string>};
 
 const COUNTERS = ['hands', 'showdowns', 'sidePots', 'oddChips', 'runouts', 'timeouts', 'autoMoves', 'leftMidHand', 'removedMidHand',
     'pendingBuys', 'approved', 'configs', 'pres', 'shows', 'pauses', 'bigBlindChecks', 'legalChecks', 'hostSitOuts', 'hostSitOutsMidHand',
-    'hostSitOutsAlreadyOut'] as const;
+    'hostSitOutsAlreadyOut', 'leaveAfter', 'leaveAfterCancelled', 'leaveAfterCashOuts', 'leaveAfterRace', 'leaveAfterNow', 'buyRequests',
+    'firstBuyIns', 'hostBuysAfterStart', 'withdrawn', 'declined', 'asks', 'asksShown', 'asksShownAll', 'asksNo', 'asksExpired', 'askCooldowns',
+    'asksOff', 'askLimits'] as const;
 type Counters = Record<(typeof COUNTERS)[number], number>;
 
-const EVENTS = ['sit', 'leave', 'kick', 'sit-out', 'host-sit-out', 'sit-in', 'buy', 'approve', 'pause', 'resume', 'config', 'pre', 'show'] as const;
-// Half the steps are events, so each is about 4% of all steps (sit 6%, resume 7%, pause under 1%):
-// a pause rarer than a resume and a sit likelier than a leave, so the tables keep dealing.
+const EVENTS = [
+    'sit', 'leave', 'leave-after', 'kick', 'sit-out', 'host-sit-out', 'sit-in', 'buy', 'approve', 'withdraw', 'pause', 'resume', 'config', 'pre', 'show',
+    'ask', 'reply', 'allow-asks',
+] as const;
+// Half the steps are events, so each is about 3% of all steps (sit 5%, approve 7%, pause under 1%):
+// a pause rarer than a resume, a sit likelier than a leave and an approval likelier than a buy, so
+// the tables keep dealing.
 const EVENT_WEIGHTS: Record<(typeof EVENTS)[number], number> = {
-    sit: 7, leave: 3, kick: 3, 'sit-out': 4, 'host-sit-out': 2, 'sit-in': 6, buy: 6, approve: 5, pause: 1, resume: 8, config: 5, pre: 6, show: 6,
+    sit: 7, leave: 2, 'leave-after': 3, kick: 2, 'sit-out': 4, 'host-sit-out': 2, 'sit-in': 6, buy: 6, approve: 10, withdraw: 1, pause: 1, resume: 8,
+    config: 5, pre: 6, show: 4, ask: 8, reply: 8, 'allow-asks': 1,
 };
+const WAITING = ASK_ANSWERS.indexOf('waiting');
 const WEIGHT_TOTAL = EVENTS.reduce((sum, e) => sum + EVENT_WEIGHTS[e], 0);
 // The share of steps that play the hand on (a move, or the clock when nobody is on it); the rest
 // are events.
@@ -290,13 +307,24 @@ const night = (seed: number, counters: Counters) => {
         if (new Set(seated).size !== seated.length) fail('a player sits twice');
         const rows = st.ledger.map((row) => row.pid);
         if (new Set(rows).size !== rows.length) fail('two ledger rows for one player');
-        for (const pid of seated) if (!rows.includes(pid)) fail(`${pid} sits with no ledger row`);
+        // A seat holding chips has a ledger row; one with none is a newcomer whose first chips wait.
+        for (const seat of st.seats) {
+            if (seat && !rows.includes(seat.pid) && (seat.stack > 0 || seat.pendingBuy > 0)) fail(`${seat.pid} holds chips with no ledger row`);
+        }
         const asking = st.requests.map((q) => q.pid);
         if (new Set(asking).size !== asking.length) fail('two requests from one player');
         for (const pid of asking) {
             const seat = st.seats.find((x) => x?.pid === pid);
-            if (!seat || seat.leaving) fail(`a request from ${pid}, who is not seated`);
+            if (!seat || seat.leaving || seat.leaveAfter) fail(`a request from ${pid}, who is not seated or is leaving`);
+            if (st.handNo === 0 || pid === st.hostPid) fail(`a request from ${pid} that needed nobody`);
         }
+        for (const seat of st.seats) {
+            if (!seat) continue;
+            if (seat.leaveAfter && seat.sitOutNext) fail(`${seat.pid} both leaves after the hand and sits out from the next`);
+            if (seat.leaveAfter && (seat.leaving || !liveSeatOf(st, seat.pid))) fail(`${seat.pid} leaves after a hand it is not playing`);
+        }
+        if (st.askCooldowns.length > ASKS.COOLDOWNS_KEPT) fail('too long a list of cooldowns kept');
+        for (const [from, to, until] of st.askCooldowns) if (from === to || until < st.handNo) fail(`a cooldown ${from} → ${to} past its hands`);
         if (st.status === 'closed' && (seated.length > 0 || st.requests.length > 0)) fail('a closed table with players');
         // The table never stalls: playing, two eligible seats and no live hand means a deal is timed.
         if (st.status === 'playing' && !st.closing && !isLive(st.hand) && eligibleSeats(st).length >= 2 && st.nextHandAt === null) fail('no deal timed');
@@ -306,6 +334,18 @@ const night = (seed: number, counters: Counters) => {
         }
         if (!hand) return;
 
+        // The asks: only once the hand completed, from a player who folded it, to another dealt
+        // player, at most PER_HAND each and one waiting at a time.
+        if (hand.asks.length > 0 && hand.phase !== 'complete') fail('asks during a live hand');
+        for (const [from, to, at, answer] of hand.asks) {
+            const p = hand.seats.find((q) => q.seat === from);
+            if (!p || !p.folded || from === to || !hand.seats.some((q) => q.seat === to) || at < 0 || answer < 0 || answer >= ASK_ANSWERS.length) fail(`ask ${[from, to, at, answer]}`);
+        }
+        for (const p of hand.seats) {
+            const mine = hand.asks.filter((e) => e[0] === p.seat);
+            if (mine.length > ASKS.PER_HAND || mine.filter((e) => e[3] === WAITING).length > 1) fail(`seat ${p.seat} asked past its limits`);
+        }
+
         // The log, the cards and the positions.
         for (const e of hand.log) {
             const [seat, kind, amount, to, flags, street] = e;
@@ -313,10 +353,13 @@ const night = (seed: number, counters: Counters) => {
             if (kind < 0 || kind >= ENTRY_KINDS.length || street < 0 || street > 3 || flags < 0 || flags > 7 || amount < 0 || to < 0) fail(`log entry ${JSON.stringify(e)}`);
             if (seat === -1 ? ENTRY_KINDS[kind] !== 'void' : !hand.seats.some((p) => p.seat === seat)) fail(`log entry for seat ${seat}`);
         }
-        const cards = [...hand.deck, ...hand.seats.flatMap((p) => p.hole)];
-        if (hand.deck.length !== 5 || cards.some((card) => !Number.isInteger(card) || card < 0 || card > 51) || new Set(cards).size !== cards.length) fail('cards dealt twice or out of the deck');
+        const cards = [...hand.deck.flat(), ...hand.seats.flatMap((p) => p.hole), ...hand.discards.map(([, card]) => card)];
+        if (hand.variant !== 'holdem' || hand.deck.length !== 1 || hand.deck[0].length !== 5 || hand.seats.some((p) => p.hole.length !== 2)) fail('not a Texas hold\'em deal');
+        if (cards.some((card) => !Number.isInteger(card) || card < 0 || card > 51) || new Set(cards).size !== cards.length) fail('cards dealt twice or out of the deck');
         const boardSize = [0, 3, 4, 5][STREETS.indexOf(hand.street)];
-        if (hand.board.length !== boardSize || hand.board.some((card, i) => card !== hand.deck[i])) fail(`board ${hand.board} on the ${hand.street}`);
+        if (hand.boards.length !== hand.deck.length || hand.boards.some((b, k) => b.length !== boardSize || b.some((card, i) => card !== hand.deck[k][i]))) {
+            fail(`boards ${JSON.stringify(hand.boards)} on the ${hand.street}`);
+        }
         const order = hand.seats.map((p) => p.seat);
         const size = st.seats.length;
         const away = order.map((seat) => (seat - hand.button - 1 + size) % size);
@@ -382,14 +425,17 @@ const night = (seed: number, counters: Counters) => {
         if (JSON.stringify(naiveUncalled(before)) !== JSON.stringify(result.refund)) fail(`refund ${JSON.stringify(result.refund)}`);
         if (result.pots.reduce((sum, pot) => sum + pot.amount, 0) !== total) fail(`pots ${JSON.stringify(result.pots)} hold other than the ${total} in`);
         for (const pot of result.pots) {
-            if (pot.winners.length === 0 || pot.winners.length !== pot.shares.length || pot.shares.reduce((a, b) => a + b, 0) !== pot.amount) fail(`pot ${JSON.stringify(pot)}`);
+            // One board: one part, its winners, and the shares the client's own split works out.
+            if (pot.winners.length !== 1 || pot.shares.length !== 1 || pot.winners[0].length === 0 || pot.winners[0].length !== pot.shares[0].length
+                || pot.shares[0].reduce((a, b) => a + b, 0) !== pot.amount) fail(`pot ${JSON.stringify(pot)}`);
+            if (JSON.stringify(paidParts(pot).map((part) => part.shares)) !== JSON.stringify(pot.shares)) fail(`pot ${JSON.stringify(pot)} split otherwise than paidParts`);
         }
         if (total > 0) {
             const top = Math.max(...contribs.map((c) => c.amount));
             if (!contribs.some((c) => c.amount === top && !c.folded)) fail('after the refund the top commitment is a folded seat\'s alone');
         }
         const won = new Map<number, number>();
-        for (const pot of result.pots) pot.winners.forEach((seat, i) => won.set(seat, (won.get(seat) ?? 0) + pot.shares[i]));
+        for (const pot of result.pots) pot.winners[0].forEach((seat, i) => won.set(seat, (won.get(seat) ?? 0) + pot.shares[0][i]));
         const nets = hand.seats.map((p) => ({seat: p.seat, net: (won.get(p.seat) ?? 0) - p.committed}));
         if (JSON.stringify(nets) !== JSON.stringify(result.nets)) fail(`nets ${JSON.stringify(result.nets)}`);
         for (const e of hand.log) {
@@ -398,32 +444,34 @@ const night = (seed: number, counters: Counters) => {
         }
         if (!result.showdown) {
             const winner = live[0]?.seat;
-            const expected = [{amount: total, eligible: [winner], winners: [winner], shares: [total]}];
+            const expected = [{amount: total, eligible: [winner], winners: [[winner]], shares: [[total]]}];
             if (live.length !== 1 || JSON.stringify(result.pots) !== JSON.stringify(expected) || result.hands.length > 0) fail(`uncontested ${JSON.stringify(result)}`);
             return;
         }
         counters.showdowns++;
-        if (hand.board.length !== 5 || live.length < 2) fail('a showdown short of a board or a second player');
+        const board = hand.boards[0];
+        if (board.length !== 5 || live.length < 2) fail('a showdown short of a board or a second player');
         const reference = naivePots(contribs);
         if (JSON.stringify(reference) !== JSON.stringify(result.pots.map(({amount, eligible}) => ({amount, eligible})))) {
             fail(`pots ${JSON.stringify(result.pots)}, chip by chip ${JSON.stringify(reference)}`);
         }
         if (result.pots.length > 1) counters.sidePots++;
-        const value = new Map(live.map((p) => [p.seat, evaluateCards([...hand.board, ...p.hole])]));
+        const value = new Map(live.map((p) => [p.seat, evaluateCards([...board, ...p.hole])]));
         for (const pot of result.pots) {
             if (pot.eligible.length === 0) fail('a pot nobody can win');
             const top = Math.max(...pot.eligible.map((seat) => value.get(seat)!));
             const winners = pot.eligible.filter((seat) => value.get(seat) === top);
-            if (JSON.stringify(winners) !== JSON.stringify(pot.winners)) fail(`pot won by ${pot.winners}, the strongest are ${winners}`);
-            if (JSON.stringify(naiveShares(pot.amount, winners.length)) !== JSON.stringify(pot.shares)) fail(`shares ${pot.shares} of ${pot.amount}`);
-            if (new Set(pot.shares).size > 1) counters.oddChips++;
+            if (JSON.stringify(winners) !== JSON.stringify(pot.winners[0])) fail(`pot won by ${pot.winners}, the strongest are ${winners}`);
+            if (JSON.stringify(naiveShares(pot.amount, winners.length)) !== JSON.stringify(pot.shares[0])) fail(`shares ${pot.shares} of ${pot.amount}`);
+            if (new Set(pot.shares[0]).size > 1) counters.oddChips++;
         }
         if (JSON.stringify(result.hands.map((h) => h.seat).sort()) !== JSON.stringify(live.map((p) => p.seat).sort())) fail('not every live hand shown');
         for (const shown of result.hands) {
             const p = hand.seats.find((q) => q.seat === shown.seat)!;
-            const all = [...hand.board, ...p.hole];
-            if (shown.value !== value.get(shown.seat) || shown.best.length !== 5 || new Set(shown.best).size !== 5
-                || shown.best.some((card) => !all.includes(card)) || evaluateCards(shown.best) !== shown.value) fail(`shown hand ${JSON.stringify(shown)}`);
+            const all = [...board, ...p.hole];
+            const read = readShown(hand.variant, hand.boards, shown).reads[0];
+            if (JSON.stringify(shown.cards) !== JSON.stringify(p.hole) || read.value !== value.get(shown.seat) || read.best.length !== 5 || new Set(read.best).size !== 5
+                || read.best.some((card) => !all.includes(card)) || evaluateCards(read.best) !== read.value) fail(`shown hand ${JSON.stringify(shown)}`);
         }
     };
 
@@ -470,13 +518,32 @@ const night = (seed: number, counters: Counters) => {
     const after = (prev: TableState, next: TableState, steps = 1): TableState => {
         checkState(next);
         if (next.handNo - prev.handNo > 1) fail('two hands dealt in one step');
-        if (next.handNo !== prev.handNo) checkDeal(prev, next, steps);
+        if (next.handNo !== prev.handNo) {
+            checkDeal(prev, next, steps);
+            // The last hand's asks end with it: one still waiting is a no, with its cooldown.
+            for (const [from, to, , answer] of prev.hand?.asks ?? []) {
+                if (answer !== WAITING) continue;
+                counters.asksExpired++;
+                const a = prev.hand!.seats.find((p) => p.seat === from)!.pid;
+                const b = prev.hand!.seats.find((p) => p.seat === to)!.pid;
+                if (next.askCooldowns.length < ASKS.COOLDOWNS_KEPT && !next.askCooldowns.some(([x, y, until]) => x === a && y === b && until === prev.hand!.no + ASKS.COOLDOWN_HANDS)) {
+                    fail(`an ask ${a} → ${b} ended unanswered with no cooldown`);
+                }
+            }
+        }
         const hand = next.hand;
         if (hand?.phase === 'runout' && prev.hand?.phase !== 'runout') counters.runouts++;
         const justCompleted = hand?.phase === 'complete' && (prev.hand?.no !== hand.no || prev.hand.phase !== 'complete');
         if (justCompleted) {
             completed++;
             checkCompletion(next);
+            // Every seat that was to leave after this hand is empty now: cashed out once.
+            for (const p of next.hand!.seats) {
+                const was = prev.seats[p.seat];
+                if (!was || was.pid !== p.pid || !was.leaveAfter) continue;
+                if (next.seats.some((x) => x?.pid === p.pid)) fail(`${p.pid} leaves after the hand but still sits`);
+                counters.leaveAfterCashOuts++;
+            }
         }
         if (justCompleted || step % 20 === 0) {
             const copy = JSON.parse(JSON.stringify(next)) as TableState;
@@ -502,15 +569,19 @@ const night = (seed: number, counters: Counters) => {
 
     // A refused action and a no-op change nothing, so the replay needs only the actions that moved
     // the state.
-    const send = (action: TableAction): string | null => {
+    const sendFull = (action: TableAction): ReturnType<typeof reduce> => {
         const prev = deepFreeze(s);
         const out = reduce(prev, deepFreeze(action));
-        if (!out.ok) return out.reason;
-        if (out.state === prev) return null;
+        if (!out.ok || out.state === prev) return out;
         records.push({kind: 'action', action});
         s = after(prev, out.state);
-        return null;
+        return out;
     };
+    const send = (action: TableAction): string | null => {
+        const out = sendFull(action);
+        return out.ok ? null : out.reason;
+    };
+    const seatOfPid = (pid: string) => s.seats.find((x) => x?.pid === pid) ?? null;
 
     const seatedPids = () => s.seats.flatMap((seat) => (seat ? [seat.pid] : []));
     const freeSeats = () => s.seats.flatMap((seat, i) => (seat ? [] : [i]));
@@ -540,13 +611,57 @@ const night = (seed: number, counters: Counters) => {
                 const fresh = away.filter((pid) => !s.ledger.some((row) => row.pid === pid));
                 const by = among(fresh.length > 0 && r.chance(0.9) ? fresh : away);
                 const free = freeSeats();
-                if (by) send({type: 'sit', by, seat: free.length > 0 && !astray ? r.pick(free) : r.int(s.seats.length), buyIn: randomBuyIn(), at: now});
+                if (!by) return;
+                if (send({type: 'sit', by, seat: free.length > 0 && !astray ? r.pick(free) : r.int(s.seats.length), buyIn: randomBuyIn(), at: now}) !== null) return;
+                // Once the first hand is dealt, anyone but the host sits with nothing until the host approves.
+                if (s.handNo > 0 && by !== s.hostPid) {
+                    if (seatOfPid(by)?.stack !== 0 || !s.requests.some((q) => q.pid === by)) fail(`${by} sat with chips nobody approved`);
+                    counters.buyRequests++;
+                }
                 return;
             }
             case 'leave': {
                 const by = among(seated);
                 const dealtIn = by !== null && live && liveSeatOf(s, by) !== null;
                 if (by && send({type: 'leave', by, at: now}) === null && dealtIn) counters.leftMidHand++;
+                return;
+            }
+            case 'leave-after': {
+                const by = among(seated);
+                if (!by) return;
+                // Mostly a leave; one already waiting for the hand is as often taken back.
+                const on = seatOfPid(by)?.leaveAfter ? r.chance(0.5) : r.chance(0.9);
+                const due = nextDue(s);
+                if (on && !live && due?.kind === 'start' && r.chance(0.5)) {
+                    // The race: the deal falls due as the leave is on its way, and the room runs its
+                    // clock first. Dealt in, the player plays the hand out — no fold, and nothing lost.
+                    clockTo(due.at);
+                    const p = liveSeatOf(s, by);
+                    if (p && !seatOfPid(by)!.leaving) {
+                        const logged = s.hand!.log.length;
+                        if (send({type: 'leave-after', by, on: true, at: now}) !== null) fail('a leave after the hand was refused');
+                        if (!seatOfPid(by)?.leaveAfter) fail('a leave sent as a deal landed did not wait for the hand');
+                        if (s.hand!.log.slice(logged).some((e) => e[0] === p.seat && ENTRY_KINDS[e[1]] === 'fold')) fail('a leave sent as a deal landed folded');
+                        counters.leaveAfterRace++;
+                        return;
+                    }
+                }
+                const before = seatOfPid(by);
+                const dealtIn = isLive(s.hand) && liveSeatOf(s, by) !== null;
+                if (send({type: 'leave-after', by, on, at: now}) !== null) return;
+                const seat = seatOfPid(by);
+                if (on) {
+                    if (dealtIn && before && !before.leaving) {
+                        if (!seat?.leaveAfter) fail(`${by} asked to leave after the hand and does not`);
+                        if (!before.leaveAfter) counters.leaveAfter++;
+                    } else if (!dealtIn) {
+                        if (seat) fail(`${by} left between hands and still sits`);
+                        counters.leaveAfterNow++;
+                    }
+                } else if (before?.leaveAfter) {
+                    if (seat?.leaveAfter) fail(`${by} stays after all and is still leaving`);
+                    counters.leaveAfterCancelled++;
+                }
                 return;
             }
             case 'kick': {
@@ -601,14 +716,41 @@ const night = (seed: number, counters: Counters) => {
                 const range = buyRange(s, by);
                 const amount = !range || astray ? 1 + r.int(s.config.buyInMax) : r.chance(0.5) ? range.max : range.min + r.int(range.max - range.min + 1);
                 const dealtIn = live && liveSeatOf(s, by) !== null;
-                const asked = s.requests.length;
-                if (send({type: 'buy', by, amount, at: now}) === null && dealtIn && s.requests.length === asked) counters.pendingBuys++;
+                const before = {bought: ledgerRow(s, by)?.bought ?? 0, pending: seatOfPid(by)?.pendingBuy ?? 0};
+                if (send({type: 'buy', by, amount, at: now}) !== null) return;
+                if (s.handNo > 0 && by !== s.hostPid) {
+                    // Once the first hand is dealt, every buy but the host's waits for the host.
+                    if ((ledgerRow(s, by)?.bought ?? 0) !== before.bought || (seatOfPid(by)?.pendingBuy ?? 0) !== before.pending) fail(`${by}'s buy landed with nobody's yes`);
+                    if (!s.requests.some((q) => q.pid === by && q.amount === amount)) fail(`${by}'s buy left no request`);
+                    counters.buyRequests++;
+                } else {
+                    if (s.handNo > 0) counters.hostBuysAfterStart++;
+                    if (dealtIn) counters.pendingBuys++;
+                }
                 return;
             }
             case 'approve': {
                 const by = among(s.requests.map((q) => q.pid));
-                const op = r.chance(0.8) ? 'approve' as const : 'deny' as const;
-                if (by && send({type: 'host', by: 'p0', op: {op, pid: by}, at: now}) === null && op === 'approve') counters.approved++;
+                if (!by) return;
+                const op = r.chance(0.85) ? 'approve' as const : 'deny' as const;
+                const first = (ledgerRow(s, by)?.bought ?? 0) === 0;
+                const pending = seatOfPid(by)?.pendingBuy ?? 0;
+                if (send({type: 'host', by: 'p0', op: {op, pid: by}, at: now}) !== null) return;
+                if (op === 'deny') {
+                    counters.declined++;
+                    return;
+                }
+                counters.approved++;
+                if (first) counters.firstBuyIns++;
+                if ((seatOfPid(by)?.pendingBuy ?? 0) > pending) counters.pendingBuys++;
+                return;
+            }
+            case 'withdraw': {
+                const by = among(s.requests.map((q) => q.pid));
+                if (by && send({type: 'withdraw', by, at: now}) === null) {
+                    if (s.requests.some((q) => q.pid === by)) fail('a withdrawn request still waits');
+                    counters.withdrawn++;
+                }
                 return;
             }
             case 'pause': case 'resume': {
@@ -630,6 +772,67 @@ const night = (seed: number, counters: Counters) => {
                 const options: PreAction[] = [{kind: 'check-fold'}, {kind: 'check'}, {kind: 'call-any'}, {kind: 'call', amount: astray ? 1 + r.int(50) : due}];
                 const prev = s;
                 if (send({type: 'pre', by, pre: r.chance(0.1) ? null : r.pick(options), at: now}) === null && s !== prev) counters.pres++;
+                return;
+            }
+            case 'ask': {
+                if (hand?.phase !== 'complete' || !hand.result) {
+                    if (astray && hand) send({type: 'ask', by: r.pick(pool), to: r.pick(pool), at: now});
+                    return;
+                }
+                const from = among(hand.seats.filter((p) => p.folded).map((p) => p.pid));
+                if (!from) return;
+                const others = hand.seats.filter((p) => p.pid !== from).map((p) => p.pid);
+                const to = others.length > 0 && r.chance(0.92) ? r.pick(others) : r.pick(pool);
+                const before = hand.asks.length;
+                const refused = send({type: 'ask', by: from, to, at: now});
+                if (refused === null) {
+                    if (s.hand!.asks.length > before) {
+                        if (s.hand!.asks.at(-1)![3] !== WAITING) fail('a new ask is not waiting');
+                        counters.asks++;
+                    }
+                } else if (refused === 'ask-cooldown') {
+                    if (!s.askCooldowns.some(([a, b, until]) => a === from && b === to && until >= hand.no)
+                        && !hand.asks.some((e) => hand.seats.find((p) => p.seat === e[0])!.pid === from && hand.seats.find((p) => p.seat === e[1])!.pid === to)) fail('a cooldown refused with none kept');
+                    counters.askCooldowns++;
+                } else if (refused === 'asks-off') {
+                    if (!s.noAsks.includes(to)) fail('asks off refused for a player who takes them');
+                    counters.asksOff++;
+                } else if (refused === 'ask-limit') {
+                    counters.askLimits++;
+                }
+                return;
+            }
+            case 'reply': {
+                if (hand?.phase !== 'complete') return;
+                const waiting = hand.asks.filter((e) => e[3] === WAITING);
+                if (waiting.length === 0) return;
+                const e = r.pick(waiting);
+                const by = hand.seats.find((p) => p.seat === e[1])!.pid;
+                const to = hand.seats.find((p) => p.seat === e[0])!.pid;
+                const show = r.pick(['one', 'one', 'none', 'all'] as const);
+                const out = sendFull({type: 'reply', by, to, show, at: now});
+                if (!out.ok) {
+                    // Its time ran out before the answer: a no, and no answer lands.
+                    if (out.reason === 'no-request' && now >= hand.startedAt + e[2] + ASKS.WAIT_MS) counters.asksExpired++;
+                    return;
+                }
+                if (show === 'one') {
+                    const summary = out.hands.find((h) => h.no === hand.no);
+                    if (!summary?.players.find((p) => p.pid === by)!.seenBy.includes(to)) fail('a hand shown alone is not in its history');
+                    if (s.hand!.seats.find((p) => p.pid === by)!.shown) fail('a hand shown alone was shown to everyone');
+                    counters.asksShown++;
+                } else if (show === 'all') {
+                    if (!s.hand!.seats.find((p) => p.pid === by)!.shown) fail('a hand shown to everyone is not');
+                    counters.asksShownAll++;
+                } else {
+                    if (!s.askCooldowns.some(([a, b]) => a === to && b === by) && s.askCooldowns.length < ASKS.COOLDOWNS_KEPT) fail('a no left no cooldown');
+                    counters.asksNo++;
+                }
+                return;
+            }
+            case 'allow-asks': {
+                const by = among(seated);
+                if (by) send({type: 'allow-asks', by, on: r.chance(0.6), at: now});
                 return;
             }
             case 'show': {
@@ -716,6 +919,7 @@ describe('seeded nights at random tables', () => {
             expect(replay(seed, config, records), `seed ${seed} replays`).toEqual(final);
         }
         // The nights reached their hands and met every situation the checks are for.
+        if (process.env.PN_SIM_COUNTERS) console.log(JSON.stringify(counters));
         expect(short, 'nights that stopped short of their hands').toBeLessThanOrEqual(SEEDS / 10);
         expect(counters.hands).toBeGreaterThanOrEqual(SEEDS * HANDS * 0.9);
         for (const key of COUNTERS) expect(counters[key], key).toBeGreaterThan(0);

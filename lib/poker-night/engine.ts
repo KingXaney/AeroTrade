@@ -6,19 +6,28 @@
 //
 // The rules, in short: the big blind always moves on; a seat that sat down or missed hands posts one
 // big blind when next dealt in; a player who leaves (or is removed) while facing a bet folds at once,
-// and otherwise stays in, away, and is cashed out when the hand completes; buys land between hands;
-// the host's config applies from the next hand and the room's settings at once.
+// and otherwise stays in, away, and is cashed out when the hand completes; a player who chose to
+// leave after the hand plays it out as usual and is cashed out when it completes; buys land between
+// hands, and once the first hand is dealt every buy but the host's waits for the host's yes; the
+// host's config applies from the next hand and the room's settings at once. Once a hand completes, a
+// player who folded it may ask one whose cards were not shown to see them, and only those two ever
+// see the ask (asks, below).
 
+import {
+    ASK_EVERYONE, ASK_EXPIRED, ASK_NO, ASK_SHOWN, ASK_WAITING, askDeadline, askedHand, coolingDown, placeOf,
+} from '@/lib/poker-night/asks';
 import {isDeck, dealFrom} from '@/lib/poker-night/deck';
 import {
     applyMove, commit, foldOutOfTurn, legalFor, owed, pushLog, recheck, settleTurn, snapshotFromState, type Flow,
 } from '@/lib/poker-night/betting';
-import {checkConfig, DEFAULT_CONFIG, DEFAULT_SETTINGS, ENTRY_FLAGS, mergeConfig, RoomSettingsSchema, TIMING} from '@/lib/poker-night/config';
-import {cashOut, isSettled, ledgerRow, recordBuy} from '@/lib/poker-night/ledger';
+import {
+    ASKS, checkConfig, dealable, DEFAULT_CONFIG, DEFAULT_SETTINGS, ENTRY_FLAGS, HOLE_CARDS, mergeConfig, RoomSettingsSchema, TIMING,
+} from '@/lib/poker-night/config';
+import {cashOut, hasBought, isSettled, ledgerRow, needsHost, recordBuy} from '@/lib/poker-night/ledger';
 import {eligibleSeats, isLive, liveSeatOf, positions, seatOf} from '@/lib/poker-night/seats';
 import {closeBetting, closeTable, dealStreet, shownHand, summarize} from '@/lib/poker-night/showdown';
 import type {
-    Card, GameConfig, Hand, HostOp, Move, PreAction, Reduced, Refusal, RoomSettings, Seat, TableAction, TableState, Work,
+    AskEntry, AskReply, Card, GameConfig, Hand, HostOp, Move, PreAction, Reduced, Refusal, RoomSettings, Seat, TableAction, TableState, Work,
 } from '@/lib/poker-night/types';
 
 export const createTable = ({hostPid, config = DEFAULT_CONFIG, settings = DEFAULT_SETTINGS, at}: {
@@ -32,9 +41,10 @@ export const createTable = ({hostPid, config = DEFAULT_CONFIG, settings = DEFAUL
     const room = RoomSettingsSchema.safeParse(settings);
     if (!room.success) throw new RangeError('bad room settings');
     return {
-        v: 1, status: 'open', closing: false, config: checked.config, configV: 1, settings: room.data, hostPid,
+        v: 2, status: 'open', closing: false, config: checked.config, configV: 1, settings: room.data, hostPid,
         seats: Array.from({length: checked.config.seats}, () => null), ledger: [], requests: [],
         lastBigBlind: null, button: null, handNo: 0, turn: 0, hand: null, nextHandAt: null, createdAt: at,
+        noAsks: [], askCooldowns: [],
     };
 };
 
@@ -66,22 +76,31 @@ const pauseEnd = (s: TableState): number => {
     return result ? result.completedAt + Math.max(s.config.pauseSeconds * 1000, result.revealMs) : 0;
 };
 
-// Between hands, the next deal is timed while two seats are eligible and cleared otherwise; a time
-// already past (the deal could not start then) moves to a short delay from now, never into the last
-// hand's results pause.
+// Between hands, the next deal is timed while two seats are eligible and this deploy deals the
+// table's game (config.dealable), and cleared otherwise; a time already past (the deal could not
+// start then) moves to a short delay from now, never into the last hand's results pause.
 const reschedule = (w: Work): void => {
     const s = w.state;
     if (s.status !== 'playing' || s.closing || isLive(s.hand)) return;
-    if (eligibleSeats(s).length < 2) s.nextHandAt = null;
+    if (eligibleSeats(s).length < 2 || !dealable(s.config)) s.nextHandAt = null;
     else if (s.nextHandAt === null || s.nextHandAt < w.at) s.nextHandAt = Math.max(w.at + TIMING.START_DELAY_MS, pauseEnd(s));
 };
 
-const putRequest = (s: TableState, pid: string, amount: number, at: number): void => {
-    s.requests = [...s.requests.filter((r) => r.pid !== pid), {pid, amount, at}];
+// A player's request for chips, newest last; a second one takes the place of the first.
+const putRequest = (s: TableState, pid: string, amount: number): void => {
+    s.requests = [...s.requests.filter((r) => r.pid !== pid), {pid, amount}];
+};
+
+const dropRequest = (s: TableState, pid: string): void => {
+    s.requests = s.requests.filter((r) => r.pid !== pid);
 };
 
 // ── seats and chips ──
 
+// A seat taken. Before the first hand is dealt the chips land at once; after it, a player other than
+// the host sits with nothing until the host approves the chips (needsHost): their request waits, and
+// a seat at zero is dealt nothing. Sitting again after buying chips here is a rebuy, under the
+// policy; a first buy-in never is.
 const sit = (w: Work, by: string, i: number, buyIn: number): Refusal | void => {
     const s = w.state;
     if (s.closing) return 'not-now';
@@ -89,31 +108,37 @@ const sit = (w: Work, by: string, i: number, buyIn: number): Refusal | void => {
     if (seatOf(s, by) !== null) return 'already-seated';
     if (s.seats[i]) return 'seat-taken';
     const {buyInMin, buyInMax, rebuys, maxRebuys} = s.config;
-    // A ledger row means they have sat here before: sitting again is a rebuy, under the policy.
     const row = ledgerRow(s, by);
-    if (row) {
+    const again = hasBought(row);
+    if (again) {
         if (rebuys === 'off') return 'rebuys-off';
-        if (maxRebuys !== null && row.buys >= maxRebuys) return 'rebuy-cap';
+        if (maxRebuys !== null && row!.buys >= maxRebuys) return 'rebuy-cap';
     }
     if (!Number.isSafeInteger(buyIn) || buyIn < 1) return 'bad-amount';
     if (buyIn < buyInMin) return 'below-buy-in';
     if (buyIn > buyInMax) return 'over-cap';
-    const seat: Seat = {pid: by, stack: 0, sittingOut: false, sitOutNext: false, away: false, timeouts: 0, owesPost: true, leaving: false, removed: false, pendingBuy: 0};
+    const seat: Seat = {
+        pid: by, stack: 0, sittingOut: false, sitOutNext: false, away: false, timeouts: 0, owesPost: true, leaving: false, removed: false, pendingBuy: 0,
+        leaveAfter: false,
+    };
     s.seats[i] = seat;
-    if (row && rebuys === 'approve' && by !== s.hostPid) {
-        putRequest(s, by, buyIn, w.at);
+    if (needsHost(s, by)) {
+        putRequest(s, by, buyIn);
         return;
     }
     seat.stack = buyIn;
-    recordBuy(w, by, buyIn, row ? 'rebuy' : 'buy-in');
+    recordBuy(w, by, buyIn, again ? 'rebuy' : 'buy-in');
 };
 
+// Whether `amount` more chips may come to the seat: the policy and the rebuy limit for anything after
+// the first buy-in, and the table's range for where the stack (with what waits) would land.
 const checkBuy = (s: TableState, seat: Seat, amount: number): Refusal | null => {
     const {rebuys, maxRebuys, buyInMin, buyInMax} = s.config;
-    if (rebuys === 'off') return 'rebuys-off';
-    if (!Number.isSafeInteger(amount) || amount < 1) return 'bad-amount';
     const row = ledgerRow(s, seat.pid);
-    if (row && maxRebuys !== null && row.buys >= maxRebuys) return 'rebuy-cap';
+    const again = hasBought(row);
+    if (again && rebuys === 'off') return 'rebuys-off';
+    if (!Number.isSafeInteger(amount) || amount < 1) return 'bad-amount';
+    if (again && maxRebuys !== null && row!.buys >= maxRebuys) return 'rebuy-cap';
     const projected = seat.stack + seat.pendingBuy + amount;
     if (projected < buyInMin) return 'below-buy-in';
     if (projected > buyInMax) return 'over-cap';
@@ -121,14 +146,15 @@ const checkBuy = (s: TableState, seat: Seat, amount: number): Refusal | null => 
 };
 
 // Chips for seat i: waiting as a pending buy while the player is in a live hand, landing now
-// otherwise (a rebuy at zero, a top-up above it).
+// otherwise (a first buy-in, a rebuy at zero, a top-up above it).
 const landBuy = (w: Work, i: number, amount: number): void => {
-    const seat = w.state.seats[i]!;
-    if (liveSeatOf(w.state, seat.pid)) {
+    const s = w.state;
+    const seat = s.seats[i]!;
+    if (liveSeatOf(s, seat.pid)) {
         seat.pendingBuy += amount;
         return;
     }
-    const kind = seat.stack === 0 ? 'rebuy' : 'top-up';
+    const kind = !hasBought(ledgerRow(s, seat.pid)) ? 'buy-in' : seat.stack === 0 ? 'rebuy' : 'top-up';
     seat.stack += amount;
     recordBuy(w, seat.pid, amount, kind);
 };
@@ -138,21 +164,28 @@ const buy = (w: Work, by: string, amount: number): Refusal | void => {
     const i = seatOf(s, by);
     if (i === null) return 'not-seated';
     const seat = s.seats[i]!;
-    if (seat.leaving || s.closing) return 'not-now';
+    if (seat.leaving || seat.leaveAfter || s.closing) return 'not-now';
     const refusal = checkBuy(s, seat, amount);
     if (refusal) return refusal;
-    if (s.config.rebuys === 'approve' && by !== s.hostPid) putRequest(s, by, amount, w.at);
+    if (needsHost(s, by)) putRequest(s, by, amount);
     else landBuy(w, i, amount);
+};
+
+// A player takes back their own request before the host answers it.
+const withdraw = (w: Work, by: string): Refusal | void => {
+    if (!w.state.requests.some((r) => r.pid === by)) return 'no-request';
+    dropRequest(w.state, by);
 };
 
 // A player leaves seat i, or the host removes them. Between hands (or not dealt in) they are cashed
 // out now. In a live hand: facing a bet they fold at once; otherwise they stay in, away — the clock
 // checks or folds for them — and are cashed out when the hand completes. Either way a buy that was
-// waiting is dropped, and so is any request.
+// waiting is dropped, and so is any request; leaving now overrides leaving after the hand.
 const depart = (w: Work, i: number, removed: boolean): void => {
     const s = w.state;
     const seat = s.seats[i]!;
-    s.requests = s.requests.filter((r) => r.pid !== seat.pid);
+    seat.leaveAfter = false;
+    dropRequest(s, seat.pid);
     const p = liveSeatOf(s, seat.pid);
     if (!p) {
         cashOut(w, i, removed ? 'removed' : 'cash-out');
@@ -176,6 +209,30 @@ const leave = (w: Work, by: string): Refusal | typeof NOOP | void => {
     depart(w, i, false);
 };
 
+// Leave the table once the hand in play completes (on), or stay after all (off). While dealt into a
+// live hand the player plays it out as usual — not away, nothing forced, pre-actions as ever — and
+// is cashed out as it completes; it takes the place of a sit-out asked for and of a request waiting.
+// Not in a live hand, "leave after this hand" is leaving now: the one leave every page sends while
+// its player stays on it, so a deal that lands first never costs them a blind.
+const leaveAfter = (w: Work, by: string, on: boolean): Refusal | typeof NOOP | void => {
+    const s = w.state;
+    const i = seatOf(s, by);
+    if (i === null) return 'not-seated';
+    const seat = s.seats[i]!;
+    if (seat.leaving) return on ? NOOP : 'not-now';
+    if (!liveSeatOf(s, by)) {
+        if (!on) return NOOP;
+        depart(w, i, false);
+        return;
+    }
+    if (seat.leaveAfter === on) return NOOP;
+    seat.leaveAfter = on;
+    if (on) {
+        seat.sitOutNext = false;
+        dropRequest(s, by);
+    }
+};
+
 const sitOut = (w: Work, by: string): Refusal | typeof NOOP | void => {
     const s = w.state;
     const i = seatOf(s, by);
@@ -183,8 +240,10 @@ const sitOut = (w: Work, by: string): Refusal | typeof NOOP | void => {
     const seat = s.seats[i]!;
     if (seat.leaving) return 'not-now';
     if (liveSeatOf(s, by)) {
-        if (seat.sitOutNext) return NOOP;
+        if (seat.sitOutNext && !seat.leaveAfter) return NOOP;
+        // Sitting out takes the place of leaving after the hand: the two are never both set.
         seat.sitOutNext = true;
+        seat.leaveAfter = false;
     } else {
         if (seat.sittingOut) return NOOP;
         seat.sittingOut = true;
@@ -204,6 +263,109 @@ const sitIn = (w: Work, by: string): Refusal | typeof NOOP | void => {
     seat.timeouts = 0;
 };
 
+// ── asks to see a hand ──
+//
+// Once a hand completes, a player dealt into it who folded may ask a player whose cards were not
+// shown (a folded hand, or one that won uncontested) to see them. The player asked answers: their
+// cards to the one who asked alone ('one': in that player's view and their history of the hand), to
+// everyone ('all': a show), or no. Kept from spam on the server: one ask waiting per player at a
+// time, ASKS.PER_HAND a hand; an ask unanswered for ASKS.WAIT_MS — or still waiting at the next deal
+// — counts as a no; after a no the same player may not ask the same player again for
+// ASKS.COOLDOWN_HANDS hands; a player who turned asks off cannot be asked. Asks live in the hand, so
+// the next deal ends every one; a card thrown away in Triple T is never shown.
+
+const pidAt = (hand: Hand, seat: number): string => hand.seats.find((p) => p.seat === seat)!.pid;
+
+// After a no: `from` may not ask `to` again until a hand numbered above this one's + COOLDOWN_HANDS.
+const coolDown = (s: TableState, hand: Hand, ask: AskEntry): void => {
+    const from = pidAt(hand, ask[0]);
+    const to = pidAt(hand, ask[1]);
+    const kept = s.askCooldowns.filter(([a, b]) => !(a === from && b === to));
+    s.askCooldowns = [...kept, [from, to, hand.no + ASKS.COOLDOWN_HANDS] as [string, string, number]].slice(-ASKS.COOLDOWNS_KEPT);
+};
+
+// Every waiting ask the clock has run out on by `at` (or every one, at the next deal) is a no.
+const expireAsks = (s: TableState, at: number | null): void => {
+    const hand = s.hand;
+    if (!hand) return;
+    for (const ask of hand.asks) {
+        if (ask[3] !== ASK_WAITING || (at !== null && at < askDeadline(hand, ask))) continue;
+        ask[3] = ASK_EXPIRED;
+        coolDown(s, hand, ask);
+    }
+};
+
+const ask = (w: Work, by: string, to: string): Refusal | typeof NOOP | void => {
+    const s = w.state;
+    const hand = askedHand(s);
+    if (!hand) return 'not-now';
+    const me = placeOf(hand, by);
+    if (!me || !me.folded) return 'not-now';
+    const them = placeOf(hand, to);
+    if (!them || them.pid === by) return 'illegal';
+    if (them.shown) return 'not-now';
+    if (s.noAsks.includes(to)) return 'asks-off';
+    expireAsks(s, w.at);
+    const mine = hand.asks.filter((e) => e[0] === me.seat);
+    // Asked them already, and it still stands (waiting, or shown to this player): nothing new.
+    if (mine.some((e) => e[1] === them.seat && (e[3] === ASK_WAITING || e[3] === ASK_SHOWN))) return NOOP;
+    if (mine.some((e) => e[3] === ASK_WAITING)) return 'ask-waiting';
+    if (mine.length >= ASKS.PER_HAND) return 'ask-limit';
+    if (coolingDown(s, by, to, hand.no)) return 'ask-cooldown';
+    hand.asks.push([me.seat, them.seat, w.at - hand.startedAt, ASK_WAITING]);
+};
+
+// The player in `p`'s place turns their cards face up for the table (a show): every ask to see them
+// that was waiting is answered by it.
+const showAll = (w: Work, hand: Hand, seat: number): void => {
+    const p = hand.seats.find((q) => q.seat === seat)!;
+    p.shown = true;
+    hand.result!.hands.push(shownHand(p));
+    for (const e of hand.asks) if (e[1] === seat && e[3] === ASK_WAITING) e[3] = ASK_EVERYONE;
+    pushLog(w, seat, 'show', 0);
+    w.hands.push(summarize(hand));
+};
+
+const reply = (w: Work, by: string, to: string, show: AskReply): Refusal | void => {
+    const s = w.state;
+    const hand = askedHand(s);
+    if (!hand) return 'not-now';
+    const me = placeOf(hand, by);
+    if (!me) return 'not-now';
+    const them = placeOf(hand, to);
+    if (!them) return 'no-request';
+    expireAsks(s, w.at);
+    const entry = hand.asks.find((e) => e[0] === them.seat && e[1] === me.seat && e[3] === ASK_WAITING);
+    if (!entry) return 'no-request';
+    switch (show) {
+        case 'one':
+            entry[3] = ASK_SHOWN;
+            // History keeps who saw it (HandSummary.players[].seenBy).
+            w.hands.push(summarize(hand));
+            return;
+        case 'none':
+            entry[3] = ASK_NO;
+            coolDown(s, hand, entry);
+            return;
+        case 'all':
+            showAll(w, hand, me.seat);
+            return;
+        default:
+            return 'illegal';
+    }
+};
+
+// "Let others ask to see my cards", for a player with a seat or a place in the hand (the table keeps
+// it while they sit, and through the pause of a hand they were dealt; the next deal forgets the
+// setting of anyone without a seat: the page sends it again when they sit down).
+const allowAsks = (w: Work, by: string, on: boolean): Refusal | typeof NOOP | void => {
+    const s = w.state;
+    const known = seatOf(s, by) !== null || (s.hand?.seats.some((p) => p.pid === by) ?? false);
+    if (!known) return 'not-seated';
+    if (on !== s.noAsks.includes(by)) return NOOP;
+    s.noAsks = on ? s.noAsks.filter((pid) => pid !== by) : [...s.noAsks, by];
+};
+
 // During the results pause any dealt player may turn their cards face up, folded or not.
 const show = (w: Work, by: string): Refusal | typeof NOOP | void => {
     const hand = w.state.hand;
@@ -211,10 +373,8 @@ const show = (w: Work, by: string): Refusal | typeof NOOP | void => {
     const p = hand.seats.find((q) => q.pid === by);
     if (!p) return 'not-seated';
     if (p.shown) return NOOP;
-    p.shown = true;
-    hand.result.hands.push(shownHand(hand, p));
-    pushLog(w, p.seat, 'show', 0);
-    w.hands.push(summarize(hand));
+    expireAsks(w.state, w.at);
+    showAll(w, hand, p.seat);
 };
 
 // ── the hand ──
@@ -261,6 +421,10 @@ const setPre = (w: Work, by: string, pre: PreAction | null): Refusal | typeof NO
 
 const startHand = (w: Work, deck: Card[], draw: number): void => {
     const s = w.state;
+    if (!dealable(s.config)) {
+        s.nextHandAt = null;
+        return;
+    }
     for (const seat of s.seats) {
         if (seat && (seat.sitOutNext || seat.away)) {
             seat.sittingOut = true;
@@ -275,20 +439,27 @@ const startHand = (w: Work, deck: Card[], draw: number): void => {
         s.nextHandAt = null;
         return;
     }
+    // The last hand's asks end with it: one still waiting is a no. Cooldowns past their hands go, and
+    // so does the "no asks" setting of anyone no longer seated.
+    expireAsks(s, null);
+    const no = s.handNo + 1;
+    s.askCooldowns = s.askCooldowns.filter(([, , until]) => until >= no);
+    s.noAsks = s.noAsks.filter((pid) => seatOf(s, pid) !== null);
     // A fresh start — fewer than two eligible seats that owe nothing — posts no extra blinds.
     const fresh = eligible.filter((i) => !s.seats[i]!.owesPost).length < 2;
     const {bb, sb, button, order} = positions(s, eligible, draw);
-    const {holes, board} = dealFrom(deck, order.length);
-    const {smallBlind, bigBlind, ante} = s.config;
+    const {smallBlind, bigBlind, ante, variant} = s.config;
+    const boards = variant === 'plo' ? s.config.boards : 1;
+    const {holes, runs} = dealFrom(deck, order.length, HOLE_CARDS[variant], boards);
     const owes = new Set(order.filter((i) => s.seats[i]!.owesPost));
     const hand: Hand = {
-        no: s.handNo + 1, startedAt: w.at, button, smallBlindSeat: sb, bigBlindSeat: bb, smallBlind, bigBlind, ante,
+        no, startedAt: w.at, variant, button, smallBlindSeat: sb, bigBlindSeat: bb, smallBlind, bigBlind, ante,
         seats: order.map((i, k) => ({
             seat: i, pid: s.seats[i]!.pid, hole: holes[k], startStack: s.seats[i]!.stack, committed: 0, streetBet: 0,
             actedAtBet: null, folded: false, allIn: false, shown: false, pre: null,
         })),
-        deck: board, board: [], street: 'preflop', phase: 'betting', currentBet: bigBlind, increment: bigBlind,
-        lastAggressor: null, actor: null, deadline: null, nextStreetAt: null, log: [], logDropped: 0, result: null,
+        deck: runs, boards: runs.map(() => []), discards: [], street: 'preflop', phase: 'betting', currentBet: bigBlind, increment: bigBlind,
+        lastAggressor: null, actor: null, deadline: null, nextStreetAt: null, log: [], logDropped: 0, result: null, asks: [],
     };
     s.hand = hand;
     s.handNo = hand.no;
@@ -370,7 +541,9 @@ const host = (w: Work, by: string, op: HostOp): Refusal | typeof NOOP | void => 
         case 'resume':
             if (s.status !== 'paused') return 'not-now';
             s.status = 'playing';
-            if (!isLive(s.hand) && eligibleSeats(s).length >= 2) s.nextHandAt = Math.max(s.nextHandAt ?? 0, w.at + TIMING.START_DELAY_MS, pauseEnd(s));
+            if (!isLive(s.hand) && eligibleSeats(s).length >= 2 && dealable(s.config)) {
+                s.nextHandAt = Math.max(s.nextHandAt ?? 0, w.at + TIMING.START_DELAY_MS, pauseEnd(s));
+            }
             return;
         case 'end':
             if (s.closing) return NOOP;
@@ -405,16 +578,17 @@ const host = (w: Work, by: string, op: HostOp): Refusal | typeof NOOP | void => 
             if (!request) return 'no-request';
             const i = seatOf(s, op.pid);
             if (i === null) return 'not-seated';
-            if (s.seats[i]!.leaving) return 'not-now';
-            const refusal = checkBuy(s, s.seats[i]!, request.amount);
+            const seat = s.seats[i]!;
+            if (seat.leaving || seat.leaveAfter) return 'not-now';
+            const refusal = checkBuy(s, seat, request.amount);
             if (refusal) return refusal;
-            s.requests = s.requests.filter((r) => r.pid !== op.pid);
+            dropRequest(s, op.pid);
             landBuy(w, i, request.amount);
             return;
         }
         case 'deny':
             if (!s.requests.some((r) => r.pid === op.pid)) return 'no-request';
-            s.requests = s.requests.filter((r) => r.pid !== op.pid);
+            dropRequest(s, op.pid);
             return;
         case 'sit-out': {
             // Never the host themself (their own seat has its own sit-out), never someone unseated.
@@ -423,12 +597,13 @@ const host = (w: Work, by: string, op: HostOp): Refusal | typeof NOOP | void => 
             if (i === null) return 'not-seated';
             const seat = s.seats[i]!;
             if (seat.leaving) return 'not-now';
-            // In the hand in play: from the next deal, like the player's own "Sit out next hand";
-            // between hands, at once. Only ever out: the state never says who asked, so the host
-            // cannot take back a sit-out without overriding one the player asked for — dealing a
-            // player back in is theirs alone ("Deal me in", "I'm back").
+            // In the hand in play: from the next deal, like the player's own "Sit out next hand" —
+            // nothing to do for one leaving after it; between hands, at once. Only ever out: the
+            // state never says who asked, so the host cannot take back a sit-out without overriding
+            // one the player asked for — dealing a player back in is theirs alone ("Deal me in",
+            // "I'm back").
             if (liveSeatOf(s, op.pid)) {
-                if (seat.sitOutNext) return NOOP;
+                if (seat.sitOutNext || seat.leaveAfter) return NOOP;
                 seat.sitOutNext = true;
                 return;
             }
@@ -448,7 +623,7 @@ const host = (w: Work, by: string, op: HostOp): Refusal | typeof NOOP | void => 
             }
             // A watcher: nothing at the table but any request.
             if (!s.requests.some((r) => r.pid === op.pid)) return NOOP;
-            s.requests = s.requests.filter((r) => r.pid !== op.pid);
+            dropRequest(s, op.pid);
             return;
         }
         default:
@@ -465,6 +640,8 @@ export const reduce = (state: TableState, action: TableAction): Reduced => {
             return step(state, at, (w) => sit(w, action.by, action.seat, action.buyIn));
         case 'leave':
             return step(state, at, (w) => leave(w, action.by));
+        case 'leave-after':
+            return step(state, at, (w) => leaveAfter(w, action.by, action.on));
         case 'sit-out':
             return step(state, at, (w) => sitOut(w, action.by));
         case 'sit-in':
@@ -473,6 +650,14 @@ export const reduce = (state: TableState, action: TableAction): Reduced => {
             return step(state, at, (w) => show(w, action.by));
         case 'buy':
             return step(state, at, (w) => buy(w, action.by, action.amount));
+        case 'withdraw':
+            return step(state, at, (w) => withdraw(w, action.by));
+        case 'ask':
+            return step(state, at, (w) => ask(w, action.by, action.to));
+        case 'reply':
+            return step(state, at, (w) => reply(w, action.by, action.to, action.show));
+        case 'allow-asks':
+            return step(state, at, (w) => allowAsks(w, action.by, action.on));
         case 'act':
             return step(state, at, (w) => act(w, action.by, action.turn, action.move));
         case 'pre':
@@ -515,13 +700,16 @@ export const forceClose = (state: TableState, at: number): TableState => {
 
 // Lets the ledger rows of players the room has forgotten go: among `pids`, the settled rows
 // (ledger.isSettled: no hand dealt, every chip bought cashed out) of players with no seat, no
-// request and no place in the current hand. Conservation holds, since such a row's bought and
-// cashed out are equal. Hands back the same state when no row goes. The room's join calls it when it
-// lets a departed guest's row go to make room (lib/poker-night/room.joinStep).
+// request and no place in the current hand — and their "no asks" setting with them. Conservation
+// holds, since such a row's bought and cashed out are equal. Hands back the same state when nothing
+// goes. The room's join calls it when it lets a departed guest's row go to make room
+// (lib/poker-night/room.joinStep).
 export const forgetSettled = (state: TableState, pids: readonly string[]): TableState => {
     const gone = new Set(pids.filter((pid) => seatOf(state, pid) === null && !state.requests.some((r) => r.pid === pid)
         && !(state.hand?.seats.some((p) => p.pid === pid) ?? false)));
     if (gone.size === 0) return state;
     const ledger = state.ledger.filter((row) => !(gone.has(row.pid) && isSettled(row)));
-    return ledger.length === state.ledger.length ? state : {...state, ledger};
+    const noAsks = state.noAsks.filter((pid) => !gone.has(pid));
+    if (ledger.length === state.ledger.length && noAsks.length === state.noAsks.length) return state;
+    return {...state, ledger, noAsks};
 };

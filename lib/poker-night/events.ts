@@ -17,7 +17,9 @@ import type {Card} from '@/lib/poker/cards';
 import {ENTRY_FLAGS, STREETS} from '@/lib/poker-night/config';
 import type {EntryKind, Street} from '@/lib/poker-night/types';
 import type {HandView, SeatView, TableView, WireEntry} from '@/lib/poker-night/view-types';
-import {readShownHand, WIRE_KINDS} from '@/lib/poker-night/views';
+import {seatShares} from '@/lib/poker-night/pots';
+import {readShown} from '@/lib/poker-night/variants';
+import {WIRE_KINDS} from '@/lib/poker-night/views';
 
 // The moves that send chips from a stack to the table.
 export type ChipMove = Extract<EntryKind, 'ante' | 'small-blind' | 'big-blind' | 'post' | 'call' | 'bet' | 'raise'>;
@@ -26,10 +28,10 @@ const CHIP_MOVES: ReadonlySet<string> = new Set<ChipMove>(['ante', 'small-blind'
 // A seat's bet line as a street closes.
 export type BetLine = {seat: number; amount: number};
 
-// A hand shown at the showdown: its cards, the five cards that play (lib/poker-night/hand-name
-// bestFive, through views.readShownHand) and its value (null before the flop); winner when any pot
-// paid it.
-export type RevealedHand = {seat: number; cards: [Card, Card]; best: Card[]; value: number | null; winner: boolean};
+// A hand shown at the showdown: its cards, the five cards that play on the first board
+// (lib/poker-night/variants.readShown) and its value there (null before the flop); winner when any
+// pot paid it.
+export type RevealedHand = {seat: number; cards: Card[]; best: Card[]; value: number | null; winner: boolean};
 
 // One pot as it pays out: pot 0 is the main pot, 1 the first side pot; each winner's share.
 export type PotPayout = {pot: number; amount: number; winners: {seat: number; share: number}[]};
@@ -119,7 +121,8 @@ const handEvents = (prevView: DiffableView, prevHand: HandView | null, next: Dif
     const no = hand.no;
     const id = (rest: string) => `${no}:${rest}`;
     let street = prevHand ? streetIndex(prevHand.street) : 0;
-    let boardShown = prevHand ? prevHand.board.length : 0;
+    let boardShown = prevHand ? prevHand.boards[0]?.length ?? 0 : 0;
+    const board = hand.boards[0] ?? [];
     // Each seat's bet line on the street being played: as the previous view showed it, then as the
     // log moves it (every entry carries the seat's street bet after it).
     const bets = new Map<number, number>();
@@ -137,8 +140,8 @@ const handEvents = (prevView: DiffableView, prevHand: HandView | null, next: Dif
         const name = STREETS[street];
         if (name === 'preflop') return;
         const [from, to] = BOARD_RANGE[name];
-        if (boardShown >= to || hand.board.length < to) return;
-        out.push({kind: 'board', id: id(`board:${name}`), handNo: no, street: name, cards: hand.board.slice(from, to), from});
+        if (boardShown >= to || board.length < to) return;
+        out.push({kind: 'board', id: id(`board:${name}`), handNo: no, street: name, cards: board.slice(from, to), from});
         boardShown = to;
     };
     // Closes every street before `target`: its bets swept, the next street's cards turned.
@@ -178,16 +181,17 @@ const handEvents = (prevView: DiffableView, prevHand: HandView | null, next: Dif
 
     const result = hand.result;
     if (result && !prevHand?.result) {
-        const winners = [...new Set(result.pots.flatMap((p) => p.winners))];
+        const winners = [...new Set(result.pots.flatMap((p) => p.winners.flat()))];
         if (result.showdown && result.hands.length > 0) {
             const hands = result.hands.map((shown): RevealedHand => {
-                const read = readShownHand(hand.board, shown);
-                return {seat: read.seat, cards: read.cards, best: read.best, value: read.value, winner: winners.includes(read.seat)};
+                const read = readShown(hand.variant, hand.boards, shown);
+                const first = read.reads[0] ?? null;
+                return {seat: read.seat, cards: read.cards, best: first?.best ?? [], value: first?.value ?? null, winner: winners.includes(read.seat)};
             });
-            out.push({kind: 'reveal', id: id('reveal'), handNo: no, board: [...hand.board], hands, winners});
+            out.push({kind: 'reveal', id: id('reveal'), handNo: no, board: [...board], hands, winners});
         }
         const pots = result.pots
-            .map((p, pot): PotPayout => ({pot, amount: p.amount, winners: p.winners.map((seat, k) => ({seat, share: p.shares[k] ?? 0}))}))
+            .map((p, pot): PotPayout => ({pot, amount: p.amount, winners: seatShares(p)}))
             .reverse();
         const totals = new Map<number, number>();
         for (const pot of pots) for (const w of pot.winners) totals.set(w.seat, (totals.get(w.seat) ?? 0) + w.share);

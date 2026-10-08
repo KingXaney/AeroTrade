@@ -1,18 +1,24 @@
 // The room document's size budget, on the heaviest table the engine can build: nine seats, six
 // players who left (fifteen ledger rows, each with its full twelve events), a hand whose log is at
 // its 200-entry cap from a min-raise war, four side pots and six hands shown, and a rebuy request from
-// every non-host player. The engine's state is held to 16,000 bytes (lib/poker-night/config KEEP
-// sets the caps); the room document around it — every row the room keeps with the longest names, the
-// applied ring, the beats and the emotes — to 27,000 bytes for what each write reads and 30,000 in
-// all; and the public wire view — what every response and Ably message carries — to 4,500 bytes,
-// as is the Ably state message around it (lib/poker-night/channel.WIRE_BUDGET_BYTES).
+// every non-host player — with every private list of version 2 at its longest on top: sixteen asks
+// to see a hand, the cooldowns the state keeps, a "no asks" setting for every seat and every player
+// dealt. The engine's state is held to 16,000 bytes (lib/poker-night/config KEEP and ASKS set the
+// caps); the room document around it — every row the room keeps with the longest names and a nudge
+// count, the applied ring, the beats and the emotes — to 27,000 bytes for what each write reads and
+// 30,000 in all; and the public wire view — what every response and Ably message carries — to 4,500
+// bytes, as is the Ably state message around it (lib/poker-night/channel.WIRE_BUDGET_BYTES).
 // Names and looks are not part of the wire view: they ride beside it in responses only, versioned by
 // peopleV (lib/poker-night/room.roomView).
+//
+// Measured (PN_BUDGET_PRINT=1 prints them): version 1's heaviest table made a 14,512-byte state, a
+// 4,331-byte wire view (4,400 as a message), 26,883 bytes read per write and 29,534 in all; version
+// 2 stores ledger times in seconds and sends the ledger as tuples, which pays for its new fields.
 
 import {describe, expect, it} from 'vitest';
 import {stateMessage, WIRE_BUDGET_BYTES} from '@/lib/poker-night/channel';
 import {nextDueAt} from '@/lib/poker-night/clock';
-import {DEFAULT_CONFIG, KEEP} from '@/lib/poker-night/config';
+import {ASKS, DEFAULT_CONFIG, KEEP} from '@/lib/poker-night/config';
 import {createTable} from '@/lib/poker-night/engine';
 import {LIMITS} from '@/lib/poker-night/limits';
 import {appliedKey} from '@/lib/poker-night/room';
@@ -68,10 +74,24 @@ const heaviest = (): TableState => {
         s = moves(s, [0, 5, 6].map(pid).includes(actor) ? F : hand.logDropped > 0 ? C : R(hand.currentBet + hand.increment));
     }
     while (isLive(s.hand)) s = moves(s, X);
-    // Everyone but the host asks the host for chips.
-    s = ok(host(s, {op: 'config', patch: {rebuys: 'approve'}}, tick()));
+    // Everyone but the host asks the host for chips (a hand has been dealt: every buy waits).
     for (let i = 1; i < 9; i++) act({type: 'buy', by: pid(i), amount: Math.min(12_500 - s.seats[i]!.stack, 9_000)});
-    return s;
+    // The private lists at their longest: two asks from each of eight folded players (the most a
+    // hand allows), the cooldowns the state keeps, and "no asks" for every seat and every player of
+    // the hand. (Laid on directly: no one hand reaches all of them.)
+    const askedAt = 9_999_999;
+    return {
+        ...s,
+        hand: {...s.hand!, asks: Array.from({length: 16}, (_, k): [number, number, number, number] => [k % 8, 8, askedAt - k, k % 5])},
+        askCooldowns: Array.from({length: ASKS.COOLDOWNS_KEPT}, (_, k): [string, string, number] => [pid(9 + (k % 6)), pid(k % 9), 9_999]),
+        noAsks: Array.from({length: 18}, (_, k) => pid(k)),
+    };
+};
+
+const PRINT = process.env.PN_BUDGET_PRINT === '1';
+const report = (label: string, n: number): number => {
+    if (PRINT) process.stderr.write(`PN_BYTES ${label} ${n}\n`);
+    return n;
 };
 
 describe('the hot document budget', () => {
@@ -88,10 +108,11 @@ describe('the hot document budget', () => {
         expect(hand.result!.pots.length).toBe(5);
         expect(hand.result!.hands.length).toBe(6);
         expect(s.requests.length).toBe(8);
+        expect(s.hand!.asks).toHaveLength(16);
     });
 
     it('keeps the engine state within 16,000 bytes', () => {
-        expect(bytes(s)).toBeLessThanOrEqual(16_000);
+        expect(report('state', bytes(s))).toBeLessThanOrEqual(16_000);
     });
 
     it('keeps the wire view within 4,500 bytes', () => {
@@ -100,7 +121,7 @@ describe('the hot document budget', () => {
             code: 'K7QXM4', seq: 3100, serverNow: T0 + 12 * 3_600_000, nextDueAt: nextDueAt(s), clockLeader: clockLeaderOf(s, presence),
             presence, watchers: 12, realtimeOk: true, peopleV: 40,
         });
-        expect(bytes(view)).toBeLessThanOrEqual(4_500);
+        expect(report('wire', bytes(view))).toBeLessThanOrEqual(4_500);
     });
 
     // What Ably carries: the wire view inside its message, the name and the id (the room's ObjectId
@@ -113,7 +134,7 @@ describe('the hot document budget', () => {
         });
         const message = stateMessage('6650a1b2c3d4e5f601234567', view);
         expect(WIRE_BUDGET_BYTES).toBe(4_500);
-        expect(bytes(message)).toBeLessThanOrEqual(WIRE_BUDGET_BYTES);
+        expect(report('message', bytes(message))).toBeLessThanOrEqual(WIRE_BUDGET_BYTES);
     });
 });
 
@@ -126,7 +147,7 @@ describe('the room document budget', () => {
     const name = String.fromCodePoint(0x1f44d, 0x1f3fd).repeat(12);
     const players = Array.from({length: LIMITS.players}, (_, i) => ({
         pid: pid(i), userId: `6650a1b2c3d4e5f6012345${String(i).padStart(2, '0')}`, guestId: null, name, avatar: 'v1:butterfly:tangerine:double:cherries',
-        joinedAt: T0 + i, banned: i % 7 === 0,
+        joinedAt: T0 + i, banned: i % 7 === 0, nudge: 99,
     }));
     const applied = Array.from({length: KEEP.APPLIED}, (_, i) => appliedKey(pid(i % 30), `0b7c1e2a-9f3d-4c5b-8a6e-${String(i).padStart(12, '0')}`));
     const seen = Object.fromEntries(players.map((p) => [p.pid, {at: T0 + 12 * 3_600_000, hidden: true}]));
@@ -139,10 +160,10 @@ describe('the room document budget', () => {
     // heaviest state (14.5 KB) do not fit it, so these hold what the limits really allow.
     it('keeps what every write reads and rewrites within 27,000 bytes', () => {
         expect(name.length).toBe(48);
-        expect(bytes(casRead)).toBeLessThanOrEqual(27_000);
+        expect(report('read', bytes(casRead))).toBeLessThanOrEqual(27_000);
     });
 
     it('keeps the whole hot document, emotes included, within 30,000 bytes', () => {
-        expect(bytes({...casRead, emotes})).toBeLessThanOrEqual(30_000);
+        expect(report('whole', bytes({...casRead, emotes}))).toBeLessThanOrEqual(30_000);
     });
 });

@@ -9,6 +9,9 @@
 //   with no seat is a watcher.
 // - bannedKeys: 'u:<userId>' or 'g:<guestId>' of everyone the host removed. Private.
 // - seen: when each pid last beat (out of band: read with the room, written only by the tick route).
+// - each row's nudge: how many writes by someone else changed what only that player sees (an ask to
+//   see their cards, its answer, the host's sit-out). Private but for the player's own count;
+//   lib/poker-night/mutation moves it, and it never moves peopleV or the public seq.
 // - peopleV: the version of the people part — every row's name and look and who was removed. A
 //   step bumps it exactly when that part changes, so the realtime message can leave the names out
 //   and a client refetches them only when peopleV moves.
@@ -24,7 +27,7 @@ import {createTable, forceClose, forgetSettled, reduce} from '@/lib/poker-night/
 import type {Env} from '@/lib/poker-night/env';
 import {refusalToCode, type PokerNightErrorCode} from '@/lib/poker-night/http';
 import {isRoomAction, toTableAction, type ActionInput, type JoinInput} from '@/lib/poker-night/input';
-import {isSettled, ledgerRow} from '@/lib/poker-night/ledger';
+import {isSettled, ledgerRow, needsHost} from '@/lib/poker-night/ledger';
 import {LIMITS} from '@/lib/poker-night/limits';
 import {cleanName, cleanTableName, nameKey, uniqueName} from '@/lib/poker-night/names';
 import {isLive, seatOf} from '@/lib/poker-night/seats';
@@ -57,6 +60,7 @@ export type RoomPlayer = {
     avatar: string;
     joinedAt: number;
     banned: boolean;
+    nudge: number; // PRIVATE but to its own player
 };
 
 export type Seen = {at: number; hidden: boolean};
@@ -92,8 +96,9 @@ export const identityKey = (identity: KnownIdentity): string =>
 
 const rowKey = (p: RoomPlayer): string | null => (p.userId !== null ? `u:${p.userId}` : p.guestId !== null ? `g:${p.guestId}` : null);
 
-// What finding a player needs of a row: the store's head projection carries just this much.
-export type PlayerKeys = Pick<RoomPlayer, 'pid' | 'userId' | 'guestId' | 'banned'>;
+// What finding a player needs of a row, and their nudge count: the store's head projection carries
+// just this much.
+export type PlayerKeys = Pick<RoomPlayer, 'pid' | 'userId' | 'guestId' | 'banned' | 'nudge'>;
 
 // The row an identity plays as: an account's by its userId, a guest's by its guestId (and only a
 // guest row — an account never falls back on the guest cookie it also carries).
@@ -339,7 +344,7 @@ export const joinStep = (input: JoinInput, identity: KnownIdentity, newPid: stri
     const {name, renamed} = nameFor(input.name, avatar, kept, null);
     const row: RoomPlayer = {
         pid: newPid, userId: identity.kind === 'user' ? identity.userId : null, guestId: identity.kind === 'guest' ? identity.guestId : null,
-        name, avatar, joinedAt: at, banned: false,
+        name, avatar, joinedAt: at, banned: false, nudge: 0,
     };
     const pruned = kept === core.players ? [] : core.players.filter((p) => !kept.includes(p)).map((p) => p.pid);
     const state = letGo.length === 0 ? core.state : forgetSettled(core.state, letGo.map((p) => p.pid));
@@ -452,7 +457,7 @@ export const newRoom = ({id, code, env, host, config = DEFAULT_CONFIG, settings 
     });
     const avatar = isAvatar(host.avatar) ? host.avatar : encodeAvatar(avatarForUser(host.userId));
     const {name} = nameFor(host.name, avatar, [], null);
-    const row: RoomPlayer = {pid: host.pid, userId: host.userId, guestId: null, name, avatar, joinedAt: at, banned: false};
+    const row: RoomPlayer = {pid: host.pid, userId: host.userId, guestId: null, name, avatar, joinedAt: at, banned: false, nudge: 0};
     const seated = reduce(state, {type: 'sit', by: host.pid, seat: 0, buyIn: state.config.buyInMax, at});
     if (!seated.ok) throw new RangeError(`the host cannot sit: ${seated.reason}`);
     return {id, code, env, hostUserId: host.userId, state: seated.state, players: [row], bannedKeys: [], seen: {}, peopleV: 1};
@@ -535,17 +540,20 @@ export const roomView = (core: RoomCore, seq: number, now: number, meta: RoomVie
     return {...wireOf(core, seq, now, meta), ...peopleView(people, removed)};
 };
 
-// Player `pid`'s own view: the room view plus their seat, cards and pre-action, the config and the
-// emotes.
+// Player `pid`'s own view: the room view plus their seat, cards and pre-action, the config, the
+// emotes and their own nudge count (their row's).
 export const playerViewFor = (core: RoomCore, pid: string, seq: number, now: number, extras: PlayerExtras): PlayerView => {
     const view = playerView(core.state, pid, {
         ...viewMeta(core, seq, now, extras), ...peopleOf(core),
         hasAccount: (rowOf(core, pid)?.userId ?? null) !== null, emotes: extras.emotes, emoteSeq: extras.emoteSeq, pass: extras.pass,
+        nudge: rowOf(core, pid)?.nudge ?? 0,
     });
     return extras.duplicate ? {...view, duplicate: true} : view;
 };
 
-// What the join card needs for a viewer with no row (or a removed one).
+// What the join card needs for a viewer with no row (or a removed one): with it, the game the next
+// hand deals and whether the chips wait for the host (the first hand has been dealt: needsHost for
+// anyone but the host, who always has a row).
 export const joinViewFor = (core: RoomCore, identity: PlayerIdentity, now: number): JoinView => ({
     banned: isKnown(identity) && isBanned(core, identity),
     locked: core.state.settings.locked,
@@ -555,6 +563,9 @@ export const joinViewFor = (core: RoomCore, identity: PlayerIdentity, now: numbe
     roomFull: toLetGo(core, pruneStale(core, now), now) === null,
     buyIn: {min: core.state.config.buyInMin, max: core.state.config.buyInMax},
     hasAccount: identity.kind === 'user',
+    variant: core.state.config.variant,
+    boards: core.state.config.boards,
+    needsApproval: needsHost(core.state, ''),
 });
 
 // The /play page's first render: a joined viewer's own view, else the public table behind the join

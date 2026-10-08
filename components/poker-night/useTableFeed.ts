@@ -23,6 +23,12 @@
 // Emotes (P6) come three ways — the channel's 'emote' messages, the polls (by emoteSeq) and the
 // sender's own POST emote answer (sendEmote) — and are merged by id (feed.withEmotes).
 //
+// A write only the viewer's own view shows — an ask to see their cards, its answer, a sit-out the
+// host set mid-hand — moves no public seq: the room counts a nudge for them instead, which every
+// poll sends (nsince) and reads back, and which their own channel announces ('nudge'); a count above
+// the one held reads the whole view (feed.isBehind). The answer to a move of their own brings their
+// own part at the seq held (the feed's `own` input).
+//
 // A visitor who has not joined polls nothing: the routes answer only players. A table that closed,
 // a removal and a lost seat re-render the page (router.refresh, once), which shows the summary or
 // the join card; a newer deploy asks for a reload.
@@ -156,8 +162,8 @@ export const useTableFeed = ({code, initial, pollScale, realtime}: {code: string
     }, [router]);
 
     // An answer from any request, into the store, and to the monitor (is the channel keeping up?).
-    // pre: the answer to the viewer's own pre-action, which moves no seq (lib/poker-night/feed).
-    const take = useCallback((r: ApiResult<PlayerView | Unchanged>, pre = false): void => {
+    // own: the answer to a move of the viewer's own, which may move no seq (lib/poker-night/feed).
+    const take = useCallback((r: ApiResult<PlayerView | Unchanged>, own = false): void => {
         if (!r.ok) return;
         const body = r.body;
         if (isUnchanged(body)) {
@@ -167,7 +173,7 @@ export const useTableFeed = ({code, initial, pollScale, realtime}: {code: string
             store.dispatch({type: 'unchanged', body, at: r.receivedAt, sentAt: r.sentAt});
         } else {
             stepMonitor({type: 'answer', seq: body.seq, realtimeOk: body.realtimeOk, at: r.receivedAt, serverNow: body.serverNow});
-            store.dispatch({type: 'view', view: body, at: r.receivedAt, sentAt: r.sentAt, animate: !hidden(), pre});
+            store.dispatch({type: 'view', view: body, at: r.receivedAt, sentAt: r.sentAt, animate: !hidden(), own});
         }
     }, [store, stepMonitor]);
 
@@ -263,7 +269,7 @@ export const useTableFeed = ({code, initial, pollScale, realtime}: {code: string
             pollAbort = new AbortController();
             // since: how far the viewer's own part is known fresh (FeedState.privateSeq), so after a
             // realtime message that left it stale the answer is the whole view, not Unchanged.
-            const r = await getState(code, {since: s.privateSeq, esince: s.emoteSeq}, {pass: pass(), signal: pollAbort.signal});
+            const r = await getState(code, {since: s.privateSeq, esince: s.emoteSeq, nsince: s.nudge}, {pass: pass(), signal: pollAbort.signal});
             pollAbort = null;
             polling = false;
             if (stopped) return;
@@ -391,6 +397,10 @@ export const useTableFeed = ({code, initial, pollScale, realtime}: {code: string
                 emote: (emote) => {
                     if (!stopped) store.dispatch({type: 'emotes', emotes: [emote]});
                 },
+                // The viewer's own view changed (a nudge on their own channel): read it.
+                nudge: (count) => {
+                    if (!stopped) store.dispatch({type: 'nudge', nudge: count});
+                },
             });
             // Once a second while the page is in front: the watchdog, and the grace periods that
             // run out with time alone.
@@ -433,7 +443,7 @@ export const useTableFeed = ({code, initial, pollScale, realtime}: {code: string
         // Every change to the store: re-arm the clock, and catch up once each time an answer names a
         // newer seq than any before it (a failed catch-up waits for the poll's own backoff).
         let lastSeq = store.get().seq;
-        let named = {seq: store.get().knownSeq, emoteSeq: store.get().knownEmoteSeq};
+        let named = {seq: store.get().knownSeq, emoteSeq: store.get().knownEmoteSeq, nudge: store.get().knownNudge};
         const unsubscribe = store.subscribe(() => {
             const s = store.get();
             if (s.view?.status === 'closed') {
@@ -447,8 +457,8 @@ export const useTableFeed = ({code, initial, pollScale, realtime}: {code: string
                 // The pace may be quicker now (the action nearer, the own part stale); never later.
                 if (!polling) schedule(true);
             }
-            if (s.knownSeq > named.seq || s.knownEmoteSeq > named.emoteSeq) {
-                named = {seq: s.knownSeq, emoteSeq: s.knownEmoteSeq};
+            if (s.knownSeq > named.seq || s.knownEmoteSeq > named.emoteSeq || s.knownNudge > named.nudge) {
+                named = {seq: s.knownSeq, emoteSeq: s.knownEmoteSeq, nudge: s.knownNudge};
                 if (isBehind(s)) void poll();
             }
         });
@@ -495,7 +505,7 @@ export const useTableFeed = ({code, initial, pollScale, realtime}: {code: string
             // A busy table lost five compare-and-sets: once more, under the same id.
             if (!r.ok && r.code === 'busy') r = await postAction(code, full, {pass: pass()});
             // Into the store while the move still counts as out: its own part lands with it.
-            if (r.ok) take(r, body.type === 'pre');
+            if (r.ok) take(r, true);
         } finally {
             movesOut.current--;
         }

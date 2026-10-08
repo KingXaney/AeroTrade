@@ -418,6 +418,59 @@ in the narrowest list, 40 px from 248 px (a 320 px phone's drawer and lobby colu
 288 px, measured by the list's own width (a container query), so every screen fits five without
 scrolling sideways; the name moves beside the cards only where both fit.
 
+## State version 2 (modes P4): leaving after a hand, the host's yes on buys, asks to see a hand
+
+**One bump for the whole batch.** `STATE_VERSION` is 2, and version 2 holds every stored field
+the modes need at once — a hand's own game (`variant`), one five-card run per board in `deck` and
+what is out of each in `boards`, Triple T's thrown-away cards (`discards`) and its 'discard' phase,
+pots paid board by board (`winners` and `shares` as one list per board), shown hands as their
+cards alone — and the stored shape accepts every game and board count from now on. What this deploy
+deals is `config.ENABLED` (Texas hold'em, one board): the host and the lobby are held to it
+('not-open'), and a table set to a game it does not deal waits between hands until the host picks
+one it does, so a rollback never closes a live table. `migrate.v1ToV2` steps a version 1 state
+(the config's game, last; rebuys 'auto' as 'approve'; `leaveAfter` off; ledger times in seconds;
+a request's unread time dropped; the hand's one board; each pot paid on it; shown hands as cards),
+and `migrateSummary` reads a version 1 history row. `PN_PROTOCOL` is 2 and the wire view's `v` 2,
+so a page left open across the deploy reloads.
+
+**Leave after this hand.** `leave-after {on}`: dealt into a live hand, the player plays it out as
+usual — not away, nothing forced, pre-actions as ever — and is cashed out once as it completes (a
+buy waiting for it dropped); it can be taken back until then. It takes the place of a sit-out asked
+for and of a request, and a buy or the host's approval is refused while it is set. Not in a live hand
+it is leaving now: the leave a page that stays open sends, so a deal that lands first never costs the
+player a blind — they play that hand out instead. Private: a hidden commit, never on the wire.
+
+**The host's yes on buys.** Before the first hand is dealt every seat and buy lands at once. After
+it, every buy but the host's own — a newcomer's first chips, a re-sit, a rebuy, a top-up — is a
+request the host approves or declines in the bank; a newcomer waiting sits with nothing, is dealt
+nothing and has no ledger row until the chips land, as a buy-in. A request waits until decided,
+withdrawn (`withdraw`) or its player leaves; a host gone ten minutes is replaced by claim-host. The
+rebuy policy is off or on ('approve'): off stops rebuys and re-sits, never a first buy-in.
+
+**Asks to see a hand.** Once a hand completes, a player dealt into it who folded may ask a player
+whose cards were not shown (folded, or won uncontested) to see them. The player asked answers "Show
+<name>" (to the one who asked alone: in their view and in their history of the hand), "Show
+everyone" (a show) or "No thanks". On the server: one ask waiting per player at a time, two a hand;
+one unanswered for 15 s, or still waiting at the next deal, is a no; after a no the same player may
+not ask the same player again for five hands; a player who turned off "Let others ask to see my
+cards" cannot be asked. The next deal ends every ask. Nothing ever shows a thrown-away Triple T card.
+
+**Who sees it, and who is told.** A pre-action, a leave after the hand, a sit-out asked for while
+the hand is live, an ask, its answer and the asks setting are hidden commits: the public seq does not
+move and nothing is published. A write that changes another player's own view where the table does
+not show it — the player asked, the one who asked, a player the host sat out mid-hand — moves that
+player's nudge count (their room row's `nudge`): a poll sends the count it holds (`nsince`) and is
+read whole when it moved, and with realtime the server says it on the player's own channel
+(`poker-night:<env>:<room id>:<pid>`, subscribe only, their token alone), as `{nudge}` and nothing
+else.
+
+**The budgets, measured.** On the heaviest table, with every private list at its longest (sixteen
+asks, the cooldowns kept, a "no asks" setting for every seat and player dealt, a nudge count on every
+room row): the state 14,798 bytes (16,000), what a write reads 26,806 (27,000), the whole document
+29,457 (30,000), the wire view 3,787 and its message 3,856 (4,500). Version 1 measured 14,512,
+26,883, 29,534, 4,331 and 4,400: ledger times in seconds and the wire's ledger as tuples pay for the
+new fields, and the room remembers its last 40 action ids, from 64.
+
 ## Engine rules
 
 No-limit Texas hold'em at 2 to 9 seats, fixed when the table is made, for integer play chips.

@@ -19,7 +19,7 @@ import type {CardBackId, CardFaceId, ChipSetId} from "@/lib/poker-night/looks";
 import type {FeltId, SceneId} from "@/lib/poker-night/types";
 import {compactChips} from "@/lib/poker-night/chips";
 import {CODE_LENGTH} from "@/lib/poker-night/code";
-import {KEEP, TABLE_LIMITS} from "@/lib/poker-night/config";
+import {ASKS, KEEP, TABLE_LIMITS} from "@/lib/poker-night/config";
 import type {HandDescription} from "@/lib/poker-night/hand-name";
 import type {PokerNightErrorCode} from "@/lib/poker-night/http";
 import {LIMITS} from "@/lib/poker-night/limits";
@@ -139,6 +139,8 @@ const DOES: Record<EntryKind, (n: string) => string> = {
     refund: (n) => `gets back ${n} uncalled`,
     show: () => 'shows',
     void: () => 'the hand is called off',
+    // Triple T: never the card.
+    discard: () => 'throws away a card',
 };
 
 // The last move a seat made, on the small tag beside its plate: "Call 40", "Raise to 340"; an
@@ -156,6 +158,7 @@ const TAG: Record<EntryKind, (n: string) => string> = {
     refund: (n) => `${n} back`,
     show: () => 'Shows',
     void: () => 'Called off',
+    discard: () => 'Threw one away',
 };
 
 // A pre-action's button (lib/poker-night/types PreAction): "Check/fold", "Check", "Call 40",
@@ -238,6 +241,10 @@ export const REFUSAL_COPY: Record<Refusal, string> = {
     'bad-config': "Those settings are outside the table's limits.",
     'bad-deck': 'The deal did not go through, so nothing changed.',
     'not-due': 'That is not due yet.',
+    'asks-off': 'This player has turned off asks to see their cards.',
+    'ask-waiting': 'Your last ask is still waiting for an answer.',
+    'ask-limit': 'That is every ask this hand allows.',
+    'ask-cooldown': `They did not show you their cards when you last asked, so asking them again waits ${numberWord(ASKS.COOLDOWN_HANDS)} hands.`,
 };
 
 // ---- errors (lib/poker-night/http.ts, PokerNightErrorCode) -----------------------------------
@@ -268,6 +275,10 @@ export const POKER_NIGHT_ERRORS: Record<PokerNightErrorCode, string> = {
     no_request: REFUSAL_COPY['no-request'],
     rebuys_off: REFUSAL_COPY['rebuys-off'],
     rebuy_cap: REFUSAL_COPY['rebuy-cap'],
+    asks_off: REFUSAL_COPY['asks-off'],
+    ask_waiting: REFUSAL_COPY['ask-waiting'],
+    ask_limit: REFUSAL_COPY['ask-limit'],
+    ask_cooldown: REFUSAL_COPY['ask-cooldown'],
     closed: REFUSAL_COPY.closed,
     invalid_action: REFUSAL_COPY.illegal,
     bad_seat: REFUSAL_COPY['bad-seat'],
@@ -650,6 +661,8 @@ export const LOG_COPY = {
             : `${isolate(name)} ${ACTION_COPY.does(kind, amount, allIn)}${timedOut ? ' as time ran out' : ''}.`,
     shows: (name: string, cards: string, phrase: string | null): string => `${isolate(name)} shows ${cards}${phrase ? `: ${phrase}` : ''}.`,
     youHeld: (cards: string): string => `You held ${cards}.`,
+    // A hand shown to the reader alone, answering their ask.
+    showedYou: (name: string, cards: string): string => `${isolate(name)} showed you ${cards}.`,
     // "Ana wins 1,200 with two pair, kings and sevens.", "Ben wins 400 from side pot 1."
     wins: (name: string, n: number, phrase: string | null, pot: PotIndex = null): string =>
         `${isolate(name)} wins ${count(n)}${fromPot(pot)}${phrase ? ` with ${phrase}` : ''}.`,
@@ -670,7 +683,7 @@ export const ANNOUNCE_COPY = {
     yourTurn: (toCall: number, pot: number): string =>
         toCall > 0 ? `Your turn: ${count(toCall)} to call, pot ${count(pot)}.` : `Your turn: checking is free, pot ${count(pot)}.`,
     timeLow: (s: number): string => `${plural(s, 'second', 'seconds')} left.`,
-    dealt: ([a, b]: readonly [Card, Card]): string => `You have the ${cardWords(a)} and the ${cardWords(b)}.`,
+    dealt: (cards: readonly Card[]): string => `You have ${words(cards.map((c) => `the ${cardWords(c)}`))}.`,
     street: (street: Exclude<Street, 'preflop'>, cards: readonly Card[]): string => `${capitalize(street)}: ${words(cards.map(cardWords))}.`,
     // Another player's move and a pot's winners read as the log does.
     move: LOG_COPY.line,
@@ -692,8 +705,9 @@ export const ANNOUNCE_COPY = {
 
 const REMOVED = 'Removed by host';
 
-// The rebuy policy as the drawer's segmented control reads it (GameConfig.rebuys).
-const REBUY_POLICY: Record<RebuyPolicy, string> = {off: 'Off', auto: 'On', approve: 'Host approves'};
+// The rebuy policy as the drawer's control reads it (GameConfig.rebuys): off, or on — once the first
+// hand is dealt the host approves every buy but their own.
+const REBUY_POLICY: Record<RebuyPolicy, string> = {off: 'Off', approve: 'On (host approves)'};
 
 export const HOST_COPY = {
     heading: 'Host controls',
@@ -724,6 +738,9 @@ export const HOST_COPY = {
         'below-big-blind': 'Starting chips are at least one big blind.',
         'below-buy-in-min': 'The chip cap is at least the starting chips.',
         'above-cap': `The chip cap is at most ${count(TABLE_LIMITS.buyIn.bigBlinds)} big blinds.`,
+        'plo-only': 'More than one board is for PLO only.',
+        'not-open': 'That game is not open at this table yet.',
+        'too-many-cards': 'Not enough cards for that many seats and boards.',
     },
 
     // Rebuys, and the requests waiting on the host (a dot on the menu icon, rows in the bank).

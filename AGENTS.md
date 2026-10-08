@@ -499,7 +499,16 @@ and friends keep none beyond Shared and the invariants).
   room layer in `lib/poker-night/`, the three models, the stores, the table's API under
   `app/api/poker-night/[code]/`, the lobby and the playable table (`/play/CODE`), live over Ably
   where a key is set and polling everywhere else, with its looks, emotes and the night's awards;
-  the design and the phase still to come are `docs/specs/2026-10-06-poker-night.md`.
+  the design and the phase still to come are `docs/specs/2026-10-06-poker-night.md`. State version 2
+  (the modes work's P4) holds every stored field PLO, multi-board and Triple T need, so a later phase
+  only switches them on: `lib/poker-night/config.ENABLED` (Texas hold'em on one board for now) gates
+  the input paths (`checkConfig`: 'not-open') and the deal (`dealable`: a table set to a game this
+  deploy does not deal waits between hands, its config intact), never the stored shape;
+  `lib/poker-night/variants` (pure) is each game's evaluation (`handValue`, `bestHand`, Omaha's
+  `hand-name.bestOmaha`), `readShown` (a shown hand read on every board, client and server alike),
+  `limitOf`, `autoDiscard`; a hand keeps its own `variant`, one five-card run per board in `deck`
+  and what is out of each in `boards`, and a pot pays board by board (`winners`/`shares` are
+  `number[][]`, split by `pots.splitBoards`, the odd chips to the first boards).
 - `lib/poker-night/engine.reduce` is the one way a table's state (`lib/poker-night/types`) changes:
   a pure reducer that clones once, never mutates its input and hands back the same reference for a
   no-op. Time, the deck and the first big blind's draw arrive inside the action, so a step replays
@@ -517,26 +526,67 @@ and friends keep none beyond Shared and the invariants).
   not held to it.
 - `lib/poker-night/views` is the only way state leaves the server: `publicView`, `wireView`,
   `playerView` and `historyView` copy field by field from a whitelist. `lib/poker-night/view-types`
-  is the client contract, declared on its own, never an `Omit<>` of a server type, and it has no
-  deck. The client offers moves with `legalFor(snapshotFromView(view), seat)`, the very function
-  the server checks them with (`lib/poker-night/betting.legalFor`).
+  is the client contract (version 2: `TableView.v`), declared on its own, never an `Omit<>` of a
+  server type, and it has no deck. The client offers moves with
+  `legalFor(snapshotFromView(view), seat)`, the very function the server checks them with
+  (`lib/poker-night/betting.legalFor`). To keep the wire to its budget a seat's face-down cards are
+  their count (`CardsView` is `'none' | number | Card[]`), a paid pot carries its winners alone
+  (`PaidPotView`; the shares are `pots.paidParts`/`seatShares`, the server's own split), a shown
+  hand its cards alone (`variants.readShown`), and the ledger rows are tuples (`LedgerView`;
+  `views.ledgerRows`/`ledgerRowOf` read them). Only the viewer's own `me` carries their cards, their
+  thrown-away card, their pre-action, `next` (leaving, now or after the hand; sitting out next), the
+  hand's asks they made or were asked, the hands shown to them alone (`shownToMe`), who they may ask
+  (`canAsk`) and their own `allowAsks`; `PlayerView.nudge` is their nudge count (below).
 - Conservation: Σ stacks + Σ committed to a live hand + Σ cashed out = Σ bought
   (`lib/poker-night/ledger.conservation`), checked after every step of
   `lib/poker-night/__tests__/simulate.test.ts` (100 seeded nights; `PN_SIM_SEEDS=1000` runs more).
   Chips are bought only when they land (`recordBuy`), so a pending buy is not yet bought; net is
   chips + cashed out − bought, with chips counting what is in a live pot, steady mid-hand.
 - A stored state field never changes meaning without bumping `STATE_VERSION`
-  (`lib/poker-night/config`) and adding a step to `lib/poker-night/migrate`. A hand's log and a
-  ledger row's events are stored as number tuples whose kinds index `ENTRY_KINDS` and
-  `LEDGER_KINDS`, append-only lists; `lib/poker-night/__tests__/budget.test.ts` holds the state to
-  16,000 bytes, the room document to 27,000 for what each write reads (30,000 with the emotes) and
-  the wire view to 4,500 on the heaviest table the engine builds.
+  (`lib/poker-night/config`, now 2) and adding a step to `lib/poker-night/migrate`: `migrateState`
+  hands a valid version 2 state back as it is, checks a version 1 one against its own frozen shape
+  and steps it (`v1ToV2`: the config's game last, rebuys 'auto' read as 'approve', `leaveAfter` off,
+  ledger times to seconds, a request's unread time dropped, the hand's one board as a run and a
+  board, pots paid on that board, shown hands as their cards), and refuses anything else;
+  `migrateSummary` reads a PokerHand row written before version 2 as today's
+  (`hands-store.readHand`/`readHands`). The version 1 fixtures (`state-v1-corpus.json`,
+  `state-v1-showdown.json`, `summary-v1.json`) are each stepped, held to their invariants and
+  played on in `fixtures-v1.test.ts`. A hand's log, a ledger row's events and a hand's asks are
+  stored as number tuples whose kinds index `ENTRY_KINDS`, `LEDGER_KINDS` and `ASK_ANSWERS`,
+  append-only lists; `lib/poker-night/__tests__/budget.test.ts` holds the state to 16,000 bytes,
+  the room document to 27,000 for what each write reads (30,000 with the emotes) and the wire view
+  to 4,500 on the heaviest table the engine builds, every private list at its longest on top
+  (`PN_BUDGET_PRINT=1` prints the bytes: 14,798, 26,806, 29,457 and 3,787 when version 2 landed).
 - The rules a change most often meets (the spec has the rest): the big blind always moves one
   eligible seat on (`lib/poker-night/seats.positions`); a short all-in reopens nobody who has acted
   unless the short all-ins since add up to a full raise, but a checker facing an opening all-in
   below the minimum bet may raise; the uncalled bet goes back even to a folded seat; every live hand
   shows at a showdown; a player who leaves or is removed while facing a bet folds at once, otherwise
-  stays in, away, and is cashed out when the hand completes.
+  stays in, away, and is cashed out when the hand completes. "Leave after this hand"
+  (`leave-after`, `Seat.leaveAfter`, private) plays the hand out as usual — not away, moves and
+  pre-actions as ever — and cashes out once as it completes, a buy waiting for it dropped; it can be
+  taken back until then, takes the place of a sit-out asked for (and of a request), a buy or an
+  approval is `not-now` while it is set, and between hands (or not dealt in) it is leaving now — the
+  one leave a page that stays open sends, so a deal that lands first never costs a blind
+  (`seats.isEligible` leaves it out).
+- Buys: before the first hand is dealt every seat and buy lands at once; after it, every buy but the
+  host's — a newcomer's first chips, a re-sit, a rebuy, a top-up — is a request the host approves or
+  declines (`ledger.needsHost`; one per player, the newest in its place, until decided, withdrawn
+  with `withdraw`, or the player leaves). A newcomer waiting sits with nothing, is dealt nothing and
+  has no ledger row until the chips land (as a buy-in: `ledger.hasBought`); the rebuy policy is off
+  or on (`REBUY_POLICIES`: 'off' | 'approve'), and off stops rebuys and re-sits, never a first
+  buy-in, nor cashes out a newcomer still waiting. The break's one-tap Leave asks first only when
+  there is no way back (`overlays.leaveTapAsks`).
+- Asks to see a hand (`lib/poker-night/asks`, pure, read by the engine and the views alike; the
+  engine's `ask`, `reply`, `allow-asks`): once a hand completes, a player dealt into it who folded
+  may ask a player whose cards were not shown; the player asked answers with their cards to the one
+  who asked alone ('one': in that player's `shownToMe` and history, `HandSummary.players[].seenBy`),
+  to everyone ('all': a show), or no. Kept from spam on the server: one ask waiting per player,
+  `ASKS.PER_HAND` a hand; one unanswered for `ASKS.WAIT_MS` or still waiting at the next deal is a
+  no; after a no the same pair waits `ASKS.COOLDOWN_HANDS` hands (the latest `ASKS.COOLDOWNS_KEPT`
+  kept); a player who turned asks off (`TableState.noAsks`, kept while seated) cannot be asked. Asks
+  live in the hand, so the next deal ends every one; a Triple T card thrown away is never shown.
+  Refusals `asks-off`, `ask-waiting`, `ask-limit`, `ask-cooldown`, each with its sentence.
 - Wording (invariant 12 applies): every sentence is in `lib/learn/copy/poker-night.ts`, held by
   `lib/learn/__tests__/poker-night-copy.test.ts` to the 'copy' tier and to a currency ban (play
   chips have no cash value). A hand wins against another and is "stronger"; its five cards are
@@ -579,18 +629,27 @@ and friends keep none beyond Shared and the invariants).
   (`lib/poker-night/view-types`), so a server room or a state does not compile into a response.
 - `lib/poker-night/store.mutateRoom` is the one way the game moves: read, plan with the pure
   `lib/poker-night/mutation.planMutation`, write behind a compare-and-set on `seq` (five attempts,
-  jittered backoff, then 503 busy). The plan: an action id already in the `applied` ring (64) is
+  jittered backoff, then 503 busy). The plan: an action id already in the `applied` ring (40) is
   answered as a duplicate; a room idle 12 hours closes; the clock runs to the request's
   `receivedAt`, then the step, then the clock to now — a turn's timeout at the turn's own time for
   the actor's own request, `TIMING.TIMEOUT_SLACK_MS` later for any other writer (`clock.dueFor`;
   the `nextDueAt` mirror the leader's tick is armed by includes it), so an in-time move still on its
   way is not beaten to the compare-and-set; a refused step still commits the clock's own changes,
   without its action id; nothing changed, no write. Every write moves `seq`; one only its author can
-  see — a pre-action set, changed or cleared (`mutation.seenByOthers`) — moves `hiddenCommits` with
-  it, and everything that leaves the server (views, Unchanged, `since`, the realtime message, the
-  hands' and results' guards) carries `room-doc.publicSeq`, seq less those, so no browser reads a
-  pre-action's timing off a version; the setter's own answer brings it at the seq held (the feed's
-  `pre` input). A stored state `migrateState` refuses closes the
+  see — a pre-action, a plan to leave after the hand or a sit-out asked for while the hand is live,
+  an ask or its answer, the "let others ask" setting (`mutation.seenByOthers`, over its
+  `withoutPrivate`) — moves `hiddenCommits` with it, and everything that leaves the server (views,
+  Unchanged, `since`, the realtime message, the results' guard) carries `room-doc.publicSeq`, seq
+  less those, so no browser reads their timing off a version; the author's own answer brings it at
+  the seq held (the feed's `own` input). A write that changes another player's own view where the
+  public table does not show it (`mutation.nudgesOf` over `views.nudgeKey`: the player asked, the
+  one who asked, a player the host sat out mid-hand) moves that player's row's `nudge` count
+  (`mutation.withNudges`; private, never peopleV): the head projects it, a GET state sends the count
+  it holds (`nsince`; one that names none asks after the table alone) and is read whole when it
+  moved, every Unchanged and view carries the viewer's
+  own, and `afterCommit` says it on their own channel (realtime, below). History rows are guarded by
+  the document's own seq (`Commit.writeSeq`), which every commit moves, so an answer shown to one
+  player alone is kept. A stored state `migrateState` refuses closes the
   room out of band, or answers reload when a newer deploy wrote it — on the reads too
   (`store.getRoomById` tells them apart, `room-doc.unreadRefusal`). The out-of-band fields
   (`seen`, emotes, `rt`, `lastError`) are never part of the write. `afterCommit`, in the route's
@@ -682,7 +741,14 @@ and friends keep none beyond Shared and the invariants).
   from the page's own view at the start), polls
   alone without realtime — shown as `data-pn-mode` (Live only over a connected channel trusted alone)
   and `data-pn-transport`, beside `data-pn-seq` (the seq drawn). What goes on the channel is
-  `lib/poker-night/room-doc.wireOfRoom` of the committed room. The QA seam: a dev server with
+  `lib/poker-night/room-doc.wireOfRoom` of the committed room. Each player also has a channel of
+  their own, `poker-night:<env>:<room id>:<pid>` (`channel.privateChannelName`; the token's
+  capability names both, `TokenReply.private`), on which `afterCommit` publishes only
+  `{name: 'nudge', data: {nudge}}` (`realtime.publishNudge`) when a commit nudged them; the feed
+  (`FeedState.nudge`/`knownNudge`, `isBehind`) reads their view then, and `needsPrivate` also asks
+  for it as the hand they were dealt completes (who they may ask). `isWire` takes version 2 only
+  and `http.PN_PROTOCOL` is 2, so a page left open across the deploy reloads. The QA seam: a dev
+  server with
   `NEXT_PUBLIC_PN_RT_FAKE=1` (run.sh only) lets a page that defines `window.__PN_RT_FAKE__` take its
   messages from it — `qa-poker-night`'s relay builds them with `wireOfRoom` from Mongo and delivers
   them held back, out of order and twice; a production build compiles the seam out.

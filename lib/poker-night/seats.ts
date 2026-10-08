@@ -46,10 +46,11 @@ export const lastBefore = (from: number, seats: readonly number[], size: number)
     return others.length > 0 ? others[others.length - 1] : from;
 };
 
-// Dealt into the next hand: occupied, holding chips, not leaving, not sitting out and not about to
-// be (a sit-out asked for during a hand, or away), which the deal turns into sitting out.
+// Dealt into the next hand: occupied, holding chips, not leaving (now or after the hand in play),
+// not sitting out and not about to be (a sit-out asked for during a hand, or away), which the deal
+// turns into sitting out.
 export const isEligible = (seat: Seat | null): seat is Seat =>
-    seat !== null && seat.stack > 0 && !seat.leaving && !seat.sittingOut && !seat.sitOutNext && !seat.away;
+    seat !== null && seat.stack > 0 && !seat.leaving && !seat.leaveAfter && !seat.sittingOut && !seat.sitOutNext && !seat.away;
 
 export const eligibleSeats = (state: Pick<TableState, 'seats'>): number[] => {
     const out: number[] = [];
