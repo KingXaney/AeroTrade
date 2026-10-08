@@ -2,7 +2,7 @@
 // deal and the blinds, chips going out, checks and folds, a street's bets sweeping into the pot
 // and the next street's cards, the showdown's revealed hands with the five cards that play, the
 // pots paid side pots first and the main pot last, the run-out's streets, a timeout, a seat taken
-// and given up. Every id is the hand number and the log index (or the street, the turn, the seq),
+// and given up, Triple T's throws and its throw-away over. Every id is the hand number and the log index (or the street, the turn, the seq),
 // so a replay, an older view or the same view twice fires nothing, and a jump past a whole hand
 // snaps instead of animating.
 
@@ -11,6 +11,7 @@ import {nextDueAt} from '@/lib/poker-night/clock';
 import {TIMING} from '@/lib/poker-night/config';
 import {reduce} from '@/lib/poker-night/engine';
 import {bestFive} from '@/lib/poker-night/hand-name';
+import {scheduleBatch} from '@/lib/poker-night/choreography';
 import {diffViews, EVENT_KINDS, type DiffableView, type TableEvent} from '@/lib/poker-night/events';
 import type {TableState} from '@/lib/poker-night/types';
 import {clockLeaderOf, wireView} from '@/lib/poker-night/views';
@@ -30,6 +31,36 @@ const only = <K extends TableEvent['kind']>(events: TableEvent[], kind: K) => ev
 const three = (stacks: [number, number, number] = [1000, 1000, 1000], config = {}) =>
     table({0: stacks[0], 1: stacks[1], 2: stacks[2]}, {config, lastBigBlind: 0});
 
+describe('the game a hand deals', () => {
+    it('deals four cards each in PLO, says when the game changed from the hand before, and turns a shown hand of four', () => {
+        let s = deal(three(), {board: '2c7d9s3s4c'});
+        s = moves(s, F, F);
+        s = ok(reduce(s, {type: 'host', by: pidOf(0), op: {op: 'config', patch: {variant: 'plo'}}, at: nowOf(s)}));
+        const before = view(s);
+        s = deal(s, {holes: {0: 'AhAcKsQd', 1: '7h7c2s3d', 2: 'JhTh9c8c'}, board: '2c7d9s3s4c'});
+        const [first] = only(diffViews(before, view(s)), 'deal');
+        expect(first).toMatchObject({cards: 4, variant: 'plo', boards: 1, changed: true});
+        // The next PLO hand is no change.
+        s = moves(s, F, F);
+        const again = view(s);
+        s = deal(s);
+        expect(only(diffViews(again, view(s)), 'deal')[0]).toMatchObject({cards: 4, changed: false});
+        // The showdown turns every card of a four-card hand, and the timeline has a moment for each.
+        s = moves(s, C, C, X);
+        for (let street = 0; street < 2; street++) s = moves(s, X, X, X);
+        s = moves(s, X, X);
+        const river = view(s);
+        s = moves(s, X);
+        const events = diffViews(river, view(s));
+        const [reveal] = only(events, 'reveal');
+        expect(reveal.hands.map((h) => h.cards.length)).toEqual([4, 4, 4]);
+        const scheduled = scheduleBatch(events).items.find((item) => item.event.kind === 'reveal')!;
+        expect(scheduled.cards).toHaveLength(12);
+        expect(new Set(scheduled.cards!.map((c) => `${c.seat}:${c.index}`)).size).toBe(12);
+        expect(Math.max(...scheduled.cards!.map((c) => c.at))).toBeLessThan(scheduled.liftAt!);
+    });
+});
+
 describe('a hand, step by step', () => {
     it('deals, posts the blinds and puts the first player on the clock', () => {
         const s0 = three();
@@ -37,7 +68,7 @@ describe('a hand, step by step', () => {
         const s1 = deal(s0);
         const events = diffViews(v0, view(s1), {mySeat: 2, bigBlind: 20});
         expect(kinds(events)).toEqual(['deal', 'chips-out', 'chips-out', 'turn']);
-        expect(events[0]).toMatchObject({kind: 'deal', handNo: 1, seats: [0, 1, 2], id: '1:deal'});
+        expect(events[0]).toMatchObject({kind: 'deal', handNo: 1, seats: [0, 1, 2], id: '1:deal', cards: 2, variant: 'holdem', boards: 1, changed: false});
         expect(events[1]).toMatchObject({kind: 'chips-out', seat: 0, move: 'small-blind', amount: 10, to: 10, allIn: false, id: '1:0'});
         expect(events[2]).toMatchObject({kind: 'chips-out', seat: 1, move: 'big-blind', amount: 20, to: 20, id: '1:1'});
         expect(events[3]).toMatchObject({kind: 'turn', seat: 2, mine: true, turn: s1.turn});
@@ -75,7 +106,7 @@ describe('a hand, step by step', () => {
         expect(kinds(end)).toEqual(['fold', 'fold', 'refund', 'win']);
         expect(only(end, 'refund')[0]).toMatchObject({seat: 1, amount: 100});
         // The refund took the bet line back to nothing: there is nothing left to sweep.
-        expect(only(end, 'win')[0]).toMatchObject({uncontested: true, big: false, pots: [{pot: 0, amount: 60, winners: [{seat: 1, share: 60}]}], totals: [{seat: 1, amount: 60}]});
+        expect(only(end, 'win')[0]).toMatchObject({uncontested: true, big: false, boards: 1, pots: [{pot: 0, board: 0, amount: 60, winners: [{seat: 1, share: 60}]}], totals: [{seat: 1, amount: 60}]});
     });
 
     it('sweeps a called bet on the river and reveals the showdown with the five cards that play', () => {
@@ -92,8 +123,11 @@ describe('a hand, step by step', () => {
         expect(reveal.hands.map((h) => h.seat).sort()).toEqual([0, 2]);
         const winner = reveal.hands.find((h) => h.winner)!;
         const board = cards('2c5d9hJs3c');
-        expect(winner.best.sort()).toEqual(bestFive([...board, ...cards('QsQd')], cards('QsQd')).cards.sort());
-        expect(only(end, 'win')[0]).toMatchObject({uncontested: false, fresh: true, pots: [{pot: 0, amount: 140}]});
+        expect(winner.best).toHaveLength(1);
+        expect(winner.best[0].sort()).toEqual(bestFive([...board, ...cards('QsQd')], cards('QsQd')).cards.sort());
+        expect(winner.values).toHaveLength(1);
+        expect(reveal.boards).toEqual([board]);
+        expect(only(end, 'win')[0]).toMatchObject({uncontested: false, fresh: true, boards: 1, revealMs: s.hand!.result!.revealMs, pots: [{pot: 0, board: 0, amount: 140}]});
     });
 });
 
@@ -189,5 +223,89 @@ describe('never twice', () => {
         expect(new Set(EVENT_KINDS).size).toBe(EVENT_KINDS.length);
         expect(EVENT_KINDS).toContain('street-sweep');
         expect(EVENT_KINDS).toContain('win');
+    });
+});
+
+describe('PLO on three boards', () => {
+    const HOLES = {0: 'JsTs4h5h', 1: '9c9d8h7h', 2: '6c6d2s3s'};
+    const BOARDS = ['AsKsQs2d3c', '9h9s4c4d5c', '8d8c7d7c2h'];
+
+    it('turns every board\'s cards each street, board by board, and pays each pot a share a board', () => {
+        let s = deal(three([1000, 1000, 1000], {variant: 'plo', boards: 3}), {holes: HOLES, boards: BOARDS});
+        s = moves(s, C, C);
+        const preflop = view(s);
+        s = moves(s, X);
+        const flop = diffViews(preflop, view(s));
+        const turned = only(flop, 'board');
+        expect(turned.map((e) => [e.id, e.board, e.street, e.from])).toEqual([
+            [`${s.hand!.no}:board:flop`, 0, 'flop', 0], [`${s.hand!.no}:board:flop:1`, 1, 'flop', 0], [`${s.hand!.no}:board:flop:2`, 2, 'flop', 0],
+        ]);
+        expect(turned.map((e) => e.cards)).toEqual(BOARDS.map((b) => cards(b).slice(0, 3)));
+        const before = view(s);
+        s = moves(s, X, X, X, X, X, X, X, X, X);
+        const end = diffViews(before, view(s, s.hand!.result!.completedAt));
+        expect(only(end, 'board').map((e) => `${e.street}:${e.board}`)).toEqual(['turn:0', 'turn:1', 'turn:2', 'river:0', 'river:1', 'river:2']);
+        const reveal = only(end, 'reveal')[0];
+        expect(reveal.boards).toEqual(BOARDS.map(cards));
+        expect(reveal.hands.every((h) => h.best.length === 3 && h.values.length === 3)).toBe(true);
+        const win = only(end, 'win')[0];
+        expect(win).toMatchObject({boards: 3, uncontested: false, revealMs: s.hand!.result!.revealMs});
+        expect(win.pots.map((p) => [p.pot, p.board, p.amount, p.winners])).toEqual([
+            [0, 0, 20, [{seat: 0, share: 20}]], [0, 1, 20, [{seat: 1, share: 20}]], [0, 2, 20, [{seat: 1, share: 20}]],
+        ]);
+        expect(win.totals).toEqual([{seat: 0, amount: 20}, {seat: 1, amount: 40}]);
+        // The ids hold whichever views they are read between.
+        const ids = end.map((e) => e.id);
+        expect(new Set(ids).size).toBe(ids.length);
+    });
+
+    it('pays an uncontested pot in one part, whatever the boards, the uncalled half of the big blind back first', () => {
+        let s = deal(three([1000, 1000, 1000], {variant: 'plo', boards: 3}), {holes: HOLES, boards: BOARDS});
+        const before = view(s);
+        s = moves(s, F, F);
+        const win = only(diffViews(before, view(s)), 'win')[0];
+        expect(win).toMatchObject({boards: 1, uncontested: true, pots: [{pot: 0, board: 0, amount: 20, winners: [{seat: 1, share: 20}]}]});
+    });
+});
+
+// Triple T (P7): a throw-away is an event that names its seat and never its card, the clock's said as
+// such; the throw-away over is one event, once, as the betting starts.
+describe('Triple T\'s throw-away', () => {
+    const tt = () => deal(three([1000, 1000, 1000], {variant: 'triple-t'}), {holes: {0: 'AhKd7c', 1: 'QsQd2h', 2: '9c8c3s'}});
+
+    it('deals three each, then a throw a seat, the deadline\'s flagged, and the throw-away over before the first turn', () => {
+        const s0 = three([1000, 1000, 1000], {variant: 'triple-t'});
+        const v0 = view(s0);
+        let s = tt();
+        const v1 = view(s);
+        const dealt = diffViews(v0, v1);
+        expect(only(dealt, 'deal')[0]).toMatchObject({cards: 3, variant: 'triple-t'});
+        expect(kinds(dealt)).not.toContain('turn');
+        s = ok(reduce(s, {type: 'discard', by: pidOf(0), turn: s.turn, card: cards('7c')[0], at: nowOf(s)}));
+        const v2 = view(s);
+        const thrown = diffViews(v1, v2);
+        expect(only(thrown, 'discard')).toEqual([{kind: 'discard', id: `${s.hand!.no}:2`, handNo: s.hand!.no, seat: 0, timeout: false, auto: false}]);
+        expect(JSON.stringify(thrown)).not.toContain(String(cards('7c')[0]) + ',');
+        s = ok(reduce(s, {type: 'timeout', turn: s.turn, at: s.hand!.deadline! + TIMING.TURN_GRACE_MS}));
+        const v3 = view(s);
+        const rest = diffViews(v2, v3);
+        expect(only(rest, 'discard').map((e) => [e.seat, e.timeout])).toEqual([[1, true], [2, true]]);
+        expect(kinds(rest).indexOf('discarded')).toBeGreaterThan(kinds(rest).lastIndexOf('discard'));
+        expect(kinds(rest).indexOf('turn')).toBeGreaterThan(kinds(rest).indexOf('discarded'));
+        // Once: the same views again, or a later one, fire it no more.
+        expect(kinds(diffViews(v2, view(s)))).toContain('discarded');
+        expect(kinds(diffViews(v3, view(moves(s, C))))).not.toContain('discarded');
+    });
+
+    it('schedules a throw as a fold\'s flight, a moment apart, and draws nothing for the throw-away over', () => {
+        let s = tt();
+        const v1 = view(s);
+        s = ok(reduce(s, {type: 'timeout', turn: s.turn, at: s.hand!.deadline! + TIMING.TURN_GRACE_MS}));
+        const batch = scheduleBatch(diffViews(v1, view(s)));
+        const throws = batch.items.filter((i) => i.event.kind === 'discard');
+        expect(throws).toHaveLength(3);
+        expect(throws.map((i) => i.dur)).toEqual([2.5, 2.5, 2.5]);
+        expect(throws[1].at - throws[0].at).toBeCloseTo(0.3);
+        expect(batch.items.some((i) => i.event.kind === 'discarded')).toBe(false);
     });
 });

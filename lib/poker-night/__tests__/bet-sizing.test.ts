@@ -1,14 +1,15 @@
 // The raise panel's sizes, held to the server's own limits: legalFor's smallest and largest "raise
 // to" from the view. A pot-sized raise is the current bet plus the pot after the call; every size is
 // rounded to the small blind, clamped to the legal range, and one that reaches the stack is the
-// all-in. The slider runs from the minimum to the all-in on a square curve and back, and the amount
+// all-in — in PLO, the pot is the top whenever the stack goes past it, and the move it sends is a raise. The slider runs from the minimum to the all-in on a square curve and back, and the amount
 // field reads what people type.
 
 import {describe, expect, it} from 'vitest';
 import {ACTION_COPY} from '@/lib/learn/copy/poker-night';
 import {legalFor} from '@/lib/poker-night/betting';
 import {
-    amountToSlider, clampTo, parseChips, potRaise, potTotal, QUICK_SIZE_IDS, quickSizes, SLIDER_MAX, sizingFor, sliderToAmount, type Sizing,
+    amountToSlider, clampTo, confirmLabel, EMPTY_SIZE_MEMORY, initialRaiseTo, moveFor, parseChips, potRaise, potTotal, QUICK_SIZE_IDS, quickSizes, readSizeMemory, rememberSize,
+    REMEMBERED_SIZES, SIZE_MEMORY_KEY, sizeIdFor, sizeStreet, SLIDER_MAX, sizingFor, sliderToAmount, stepRaise, type Sizing,
 } from '@/lib/poker-night/bet-sizing';
 import type {TableState} from '@/lib/poker-night/types';
 import {publicView, snapshotFromView} from '@/lib/poker-night/views';
@@ -26,7 +27,7 @@ describe('sizing from the view', () => {
     it('reads the pot, the call and the legal range preflop', () => {
         const s = deal(three());
         const sz = sizing(s);
-        expect(sz).toMatchObject({kind: 'raise', min: 40, max: 1000, currentBet: 20, myBet: 0, toCall: 20, pot: 30, unit: 10});
+        expect(sz).toMatchObject({kind: 'raise', min: 40, max: 1000, cap: 'all-in', currentBet: 20, myBet: 0, toCall: 20, pot: 30, unit: 10});
         // A pot-sized raise: 20 to call, then the pot after calling (30 + 20) on top of the bet.
         expect(potRaise(sz, 1)).toBe(70);
         expect(quickSizes(sz)).toEqual([
@@ -52,8 +53,8 @@ describe('sizing from the view', () => {
         const ids = quickSizes(sz).map((q) => q.to);
         expect(new Set(ids).size).toBe(ids.length);
         expect(ids).toEqual([...ids].sort((a, b) => a - b));
-        expect(quickSizes({kind: 'raise', min: 300, max: 300, currentBet: 200, myBet: 0, toCall: 200, pot: 400, unit: 10})).toEqual([{id: 'all-in', to: 300}]);
-        expect(quickSizes({kind: 'raise', min: 40, max: 65, currentBet: 20, myBet: 0, toCall: 20, pot: 30, unit: 10}).map((q) => q.id)).toEqual(['min', 'half', 'three-quarters', 'all-in']);
+        expect(quickSizes({kind: 'raise', min: 300, max: 300, cap: 'all-in', currentBet: 200, myBet: 0, toCall: 200, pot: 400, unit: 10})).toEqual([{id: 'all-in', to: 300}]);
+        expect(quickSizes({kind: 'raise', min: 40, max: 65, cap: 'all-in', currentBet: 20, myBet: 0, toCall: 20, pot: 30, unit: 10}).map((q) => q.id)).toEqual(['min', 'half', 'three-quarters', 'all-in']);
     });
 
     it('has a label for every size', () => {
@@ -66,6 +67,33 @@ describe('sizing from the view', () => {
         expect(sizingFor(view, null, 2, 10)).toBeNull();
         expect(sizingFor(view, {fold: true, check: false, call: 20, callAllIn: false, raise: null}, 2, 10)).toBeNull();
         expect(potTotal({hand: null, seats: []})).toBe(0);
+    });
+});
+
+describe('pot limit (PLO)', () => {
+    const plo = (stacks: [number, number, number] = [1000, 1000, 1000]) => table({0: stacks[0], 1: stacks[1], 2: stacks[2]}, {lastBigBlind: 0, config: {variant: 'plo'}});
+
+    it('tops the range at the pot: Pot is the last size, its words say so, and it sends a raise', () => {
+        const sz = sizing(deal(plo()));
+        // 20 to call, then the pot after calling (30 + 20) on top of the bet: 70, the server's own cap.
+        expect(sz).toMatchObject({kind: 'raise', min: 40, max: 70, cap: 'pot', toCall: 20, pot: 30});
+        expect(quickSizes(sz)).toEqual([{id: 'min', to: 40}, {id: 'half', to: 50}, {id: 'three-quarters', to: 60}, {id: 'pot', to: 70}]);
+        expect(confirmLabel(sz, 70)).toBe('Raise to 70 (pot)');
+        expect(confirmLabel(sz, 50)).toBe('Raise to 50');
+        expect(moveFor(sz, 70)).toEqual({kind: 'raise', to: 70});
+        expect(moveFor(sz, 5000)).toEqual({kind: 'raise', to: 70});
+        expect(confirmLabel({...sz, kind: 'bet'}, 70)).toBe('Bet 70 (pot)');
+    });
+
+    it('is all in, as in no limit, when the stack fits under the pot', () => {
+        const sz = sizing(deal(plo([1000, 1000, 55])));
+        expect(sz).toMatchObject({min: 40, max: 55, cap: 'all-in'});
+        expect(quickSizes(sz).at(-1)).toEqual({id: 'all-in', to: 55});
+        expect(confirmLabel(sz, 55)).toBe(ACTION_COPY.allIn(55));
+        expect(moveFor(sz, 55)).toEqual({kind: 'all-in'});
+        const nl = sizing(deal(three()));
+        expect(moveFor(nl, nl.max)).toEqual({kind: 'all-in'});
+        expect(moveFor(nl, 300)).toEqual({kind: 'raise', to: 300});
     });
 });
 
@@ -110,5 +138,56 @@ describe('the amount field', () => {
 
     it('reads nothing else', () => {
         for (const text of ['', 'abc', '-5', '0', '1.5', '1e3', '12x', '1,2.5k', '.']) expect(parseChips(text), text).toBeNull();
+    });
+});
+
+describe('the panel on a phone', () => {
+    const sz: Sizing = {kind: 'raise', min: 40, max: 1000, cap: 'all-in', currentBet: 20, myBet: 0, toCall: 20, pot: 30, unit: 10};
+
+    it('steps a big blind at a time, held to the range: from the top a big blind under it, from the bottom one over it', () => {
+        expect(stepRaise(sz, 40, 1, 20)).toBe(60);
+        expect(stepRaise(sz, 60, -1, 20)).toBe(40);
+        expect(stepRaise(sz, 40, -1, 20)).toBe(40);
+        expect(stepRaise(sz, 1000, 1, 20)).toBe(1000);
+        expect(stepRaise(sz, 1000, -1, 20)).toBe(980);
+        expect(stepRaise(sz, 990, 1, 20)).toBe(1000);
+        // An amount typed off the unit lands back on it.
+        expect(stepRaise(sz, 55, 1, 20) % sz.unit).toBe(0);
+        // Under pot limit the top is the pot: a step never passes it.
+        const potCap: Sizing = {...sz, max: 120, cap: 'pot'};
+        expect(stepRaise(potCap, 110, 1, 20)).toBe(120);
+    });
+
+    it("remembers the minimum and the pot's shares before and after the flop, never the all-in or the pot", () => {
+        expect(SIZE_MEMORY_KEY).toBe('aero-poker-night:sizes');
+        expect(REMEMBERED_SIZES).toEqual(['min', 'half', 'three-quarters']);
+        expect([sizeStreet('preflop'), sizeStreet('flop'), sizeStreet('turn'), sizeStreet('river')]).toEqual(['pre', 'post', 'post', 'post']);
+        expect(sizeIdFor(sz, 50)).toBe('half');
+        expect(sizeIdFor(sz, 55)).toBeNull();
+        const half = rememberSize(EMPTY_SIZE_MEMORY, 'preflop', sz, 50);
+        expect(half).toEqual({pre: 'half', post: null});
+        // The all-in, the pot and an amount of the player's own leave it as it was.
+        expect(rememberSize(half, 'preflop', sz, 1000)).toBe(half);
+        expect(rememberSize(half, 'preflop', sz, 70)).toBe(half);
+        expect(rememberSize(half, 'preflop', sz, 55)).toBe(half);
+        expect(rememberSize(half, 'river', sz, 60)).toEqual({pre: 'half', post: 'three-quarters'});
+    });
+
+    it('reads only the sizes it may hold back from storage', () => {
+        expect(readSizeMemory(null)).toEqual(EMPTY_SIZE_MEMORY);
+        expect(readSizeMemory('not json')).toEqual(EMPTY_SIZE_MEMORY);
+        expect(readSizeMemory('[1]')).toEqual(EMPTY_SIZE_MEMORY);
+        expect(readSizeMemory(JSON.stringify({pre: 'all-in', post: 'pot'}))).toEqual(EMPTY_SIZE_MEMORY);
+        expect(readSizeMemory(JSON.stringify({pre: 'three-quarters', post: 'min', extra: 1}))).toEqual({pre: 'three-quarters', post: 'min'});
+    });
+
+    it('opens at the size remembered where this turn offers it, else at the minimum', () => {
+        expect(initialRaiseTo(sz, null)).toBe(40);
+        expect(initialRaiseTo(sz, 'half')).toBe(50);
+        expect(initialRaiseTo(sz, 'three-quarters')).toBe(60);
+        // A short stack: no half-pot raise on offer, so the minimum.
+        const short: Sizing = {...sz, max: 45};
+        expect(quickSizes(short).map((q) => q.id)).not.toContain('half');
+        expect(initialRaiseTo(short, 'half')).toBe(40);
     });
 });

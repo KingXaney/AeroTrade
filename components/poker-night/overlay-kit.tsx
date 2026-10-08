@@ -1,8 +1,8 @@
 'use client';
 
 // What the table's overlays share: the drawer frame (a Sheet from the right, from the bottom on a
-// phone, with its heading and Close), a player's small look and name, the clipboard with its
-// fallback, and the two browser facts read without a mismatch between the server's render and
+// phone, with its heading and Close), a player's small look and name, the toasts' 44 px action, the
+// clipboard with its fallback, and the two browser facts read without a mismatch between the server's render and
 // the first one in the browser (a phone-width screen, navigator.share).
 
 import type {ReactNode} from "react";
@@ -33,6 +33,12 @@ const noSubscribe = () => () => {};
 // navigator.share, on phones and a few desktops.
 export const useCanShare = (): boolean =>
     useSyncExternalStore(noSubscribe, () => typeof navigator !== 'undefined' && typeof navigator.share === 'function', () => false);
+
+// ── toasts ──
+
+// A toast's action button at the table (the host's Approve, the leave's Stay): a full 44 px target,
+// where sonner's own is 24 px tall — these are the quick paths a phone uses.
+export const TOAST_ACTION = {actionButton: 'min-h-11 px-3'} as const;
 
 // ── the clipboard ──
 

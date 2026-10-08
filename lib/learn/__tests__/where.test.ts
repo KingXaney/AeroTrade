@@ -66,7 +66,7 @@ describe('where each term lives', () => {
         expect(night?.id).toBe('poker-night');
         expect(night?.label).toBe('At poker night');
         expect(night?.home).toEqual({href: '/poker-night', label: 'Poker night'});
-        expect(night?.keys).toEqual(['side-pot', 'dealer-button', 'small-blind', 'minimum-raise', 'rebuy', 'all-in', 'hand-rankings', 'kicker', 'texas-holdem']);
+        expect(night?.keys).toEqual(['side-pot', 'dealer-button', 'small-blind', 'minimum-raise', 'rebuy', 'all-in', 'hand-rankings', 'kicker', 'texas-holdem', 'omaha', 'pot-limit', 'triple-t']);
         for (const key of night?.keys ?? []) expect(GLOSSARY[key].kind, key).toBe('metric');
         expect(groupOf(GLOSSARY['big-blind'])).toBe('poker');
         expect(groupOf(GLOSSARY.ante)).toBe('poker');

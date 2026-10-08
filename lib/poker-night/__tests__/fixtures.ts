@@ -4,14 +4,14 @@
 // random play over the legal moves.
 
 import {parseCardList, type Card} from '@/lib/poker/cards';
-import {legalFor, snapshotFromState} from '@/lib/poker-night/betting';
+import {allInOpen, legalFor, snapshotFromState} from '@/lib/poker-night/betting';
 import {advance, nextDue} from '@/lib/poker-night/clock';
-import {DEFAULT_CONFIG} from '@/lib/poker-night/config';
+import {DEFAULT_CONFIG, HOLE_CARDS} from '@/lib/poker-night/config';
 import {FULL_DECK, shuffleWith} from '@/lib/poker-night/deck';
 import {createTable, reduce} from '@/lib/poker-night/engine';
 import {conservation} from '@/lib/poker-night/ledger';
 import {eligibleSeats, isLive, positions} from '@/lib/poker-night/seats';
-import type {GameConfig, Move, PreAction, Reduced, Seat, TableAction, TableState} from '@/lib/poker-night/types';
+import type {GameConfig, HostOp, Move, PreAction, Reduced, Seat, TableAction, TableState, Variant} from '@/lib/poker-night/types';
 import {mulberry32} from '@/lib/random';
 
 export const T0 = 1_790_000_000_000;
@@ -24,10 +24,11 @@ export const cards = (text: string): Card[] => {
     return parsed.cards;
 };
 
-// A full 52-card deck in dealFrom's layout for a hand dealt in `order`: the named seats get the named
-// holes, the board is the named cards, and every other place takes the unused cards from the top
-// (aces first, so filler is easy to tell apart from the low cards tests name).
-export const stacked = (order: readonly number[], spec: {holes?: Record<number, string>; board?: string}): Card[] => {
+// A full 52-card deck in dealFrom's layout for a hand dealt in `order` with h hole cards each: the
+// named seats get the named holes, the board (or board k of `boards`) is the named cards, and every
+// other place takes the unused cards from the top (aces first, so filler is easy to tell apart from
+// the low cards tests name).
+export const stacked = (order: readonly number[], spec: {holes?: Record<number, string>; board?: string; boards?: string[]}, h = 2): Card[] => {
     const n = order.length;
     const deck: (Card | null)[] = new Array(52).fill(null);
     const used = new Set<Card>();
@@ -39,11 +40,12 @@ export const stacked = (order: readonly number[], spec: {holes?: Record<number, 
     order.forEach((seat, k) => {
         const hole = spec.holes?.[seat];
         if (!hole) return;
-        const [a, b] = cards(hole);
-        place(2 * k, a);
-        place(2 * k + 1, b);
+        const named = cards(hole);
+        if (named.length !== h) throw new Error(`seat ${seat} named ${named.length} hole cards, not ${h}`);
+        named.forEach((card, j) => place(h * k + j, card));
     });
-    if (spec.board) cards(spec.board).forEach((card, j) => place(2 * n + j, card));
+    const boards = spec.boards ?? (spec.board ? [spec.board] : []);
+    boards.forEach((board, b) => cards(board).forEach((card, j) => place(h * n + 5 * b + j, card)));
     let next = 51;
     for (let i = 0; i < 52; i++) {
         if (deck[i] !== null) continue;
@@ -54,7 +56,7 @@ export const stacked = (order: readonly number[], spec: {holes?: Record<number, 
 };
 
 export const freshSeat = (pid: string, stack: number): Seat =>
-    ({pid, stack, sittingOut: false, sitOutNext: false, away: false, timeouts: 0, owesPost: false, leaving: false, removed: false, pendingBuy: 0});
+    ({pid, stack, sittingOut: false, sitOutNext: false, away: false, timeouts: 0, owesPost: false, leaving: false, removed: false, pendingBuy: 0, leaveAfter: false});
 
 // A playing table with player p<i> in seat i holding stacks[i], as if each had bought in exactly
 // that and played a hand already (nobody owes a post). The host is p0 unless named.
@@ -80,20 +82,22 @@ export const ok = (r: Reduced, what = 'step'): TableState => {
 export const play = (state: TableState, ...actions: TableAction[]): TableState =>
     actions.reduce((s, action) => ok(reduce(s, action), `${action.type} ${JSON.stringify(action)}`), state);
 
-// The moment the current actor went on the clock, else the next deal's time: tests act "now".
+// The moment the current actor went on the clock (Triple T's throw-away: the deal), else the next
+// deal's time: tests act "now".
 export const nowOf = (state: TableState): number => {
     const hand = state.hand;
+    if (isLive(hand) && hand.phase === 'discard') return hand.startedAt;
     if (isLive(hand) && hand.deadline !== null) return hand.deadline - state.config.turnSeconds * 1000;
     if (isLive(hand) && hand.nextStreetAt !== null) return hand.nextStreetAt;
     return state.nextHandAt ?? hand?.result?.completedAt ?? T0;
 };
 
-// Deals the next hand from a deck stacked for its seats.
-export const deal = (state: TableState, spec: {holes?: Record<number, string>; board?: string; draw?: number; at?: number} = {}): TableState => {
+// Deals the next hand from a deck stacked for its seats, in the table's game.
+export const deal = (state: TableState, spec: {holes?: Record<number, string>; board?: string; boards?: string[]; draw?: number; at?: number} = {}): TableState => {
     const draw = spec.draw ?? 0;
     const eligible = eligibleSeats(state);
     const {order} = positions(state, eligible, draw);
-    const deck = stacked(order, spec);
+    const deck = stacked(order, spec, HOLE_CARDS[state.config.variant]);
     return ok(reduce(state, {type: 'start-hand', deck, draw, at: spec.at ?? nowOf(state)}), 'start-hand');
 };
 
@@ -126,6 +130,10 @@ export const runOut = (state: TableState): TableState => {
 export const host = (state: TableState, op: Extract<TableAction, {type: 'host'}>['op'], at = nowOf(state)): Reduced =>
     reduce(state, {type: 'host', by: state.hostPid, op, at});
 
+// The host's yes to `pid`'s request as it waits now: approve names the amount it says yes to.
+export const approveOf = (state: TableState, pid: string): Extract<HostOp, {op: 'approve'}> =>
+    ({op: 'approve', pid, amount: state.requests.find((r) => r.pid === pid)?.amount ?? 1});
+
 export const deepFreeze = <T>(value: T): T => {
     if (value && typeof value === 'object' && !Object.isFrozen(value)) {
         Object.freeze(value);
@@ -151,7 +159,7 @@ export const checkInvariants = (s: TableState): void => {
     const hand = s.hand;
     if (hand) {
         const seen = new Set<number>();
-        for (const card of [...hand.deck, ...hand.seats.flatMap((p) => p.hole)]) {
+        for (const card of [...hand.deck.flat(), ...hand.seats.flatMap((p) => p.hole), ...hand.discards.map(([, c]) => c)]) {
             if (seen.has(card)) throw new Error(`card ${card} dealt twice`);
             seen.add(card);
         }
@@ -180,9 +188,10 @@ export const checkInvariants = (s: TableState): void => {
 // A seeded night at a random table: moves from the legal set, and between them players sitting
 // down, leaving, being removed, sitting out and in, buying chips, setting pre-actions and showing
 // cards, the host approving, pausing and changing the config, and the clock running whatever falls
-// due. Yields every state with the action (or clock step) that made it; refusals are part of the
-// night too and leave the state as it was.
-export function* randomNight(seed: number, steps: number): Generator<{state: TableState; action: TableAction | 'clock'; refused: string | null}> {
+// due; in Triple T, players throwing a card away. Yields every state with the action (or clock step)
+// that made it; refusals are part of the night too and leave the state as it was. The game is Texas
+// hold'em unless named.
+export function* randomNight(seed: number, steps: number, variant: Variant = 'holdem'): Generator<{state: TableState; action: TableAction | 'clock'; refused: string | null}> {
     const random = mulberry32(seed);
     const pick = <T>(list: readonly T[]): T => list[Math.floor(random() * list.length)];
     const seats = 2 + Math.floor(random() * 8);
@@ -190,8 +199,8 @@ export function* randomNight(seed: number, steps: number): Generator<{state: Tab
     const buyInMax = bigBlind * pick([20, 50, 100]);
     const config: GameConfig = {
         ...DEFAULT_CONFIG, seats, smallBlind: Math.max(1, bigBlind / 2), bigBlind, ante: random() < 0.3 ? Math.max(1, Math.floor(bigBlind / 4)) : 0,
-        buyInMin: Math.max(bigBlind, Math.floor(buyInMax / 4)), buyInMax, rebuys: pick(['auto', 'auto', 'approve', 'off'] as const),
-        maxRebuys: random() < 0.3 ? 3 : null, sitOutAfter: 1 + Math.floor(random() * 2),
+        buyInMin: Math.max(bigBlind, Math.floor(buyInMax / 4)), buyInMax, rebuys: pick(['approve', 'approve', 'off'] as const),
+        maxRebuys: random() < 0.3 ? 3 : null, sitOutAfter: 1 + Math.floor(random() * 2), variant,
     };
     let s = createTable({hostPid: 'p0', config, at: T0});
     let now = T0;
@@ -219,6 +228,14 @@ export function* randomNight(seed: number, steps: number): Generator<{state: Tab
             yield {state: s, action, refused};
             continue;
         }
+        const toThrow = isLive(hand) && hand.phase === 'discard' ? hand.seats.filter((p) => !p.folded && p.hole.length === 3) : [];
+        if (toThrow.length > 0 && roll < 0.6) {
+            const p = pick(toThrow);
+            const action: TableAction = {type: 'discard', by: p.pid, turn: s.turn, card: pick(p.hole), at: now};
+            const refused = apply(action);
+            yield {state: s, action, refused};
+            continue;
+        }
         if (roll < 0.85 || !isLive(hand)) {
             const due = nextDueOf(s);
             if (due !== null && roll < 0.95) {
@@ -233,7 +250,7 @@ export function* randomNight(seed: number, steps: number): Generator<{state: Tab
         const anyone = pick(pool);
         const sitting = seated();
         const someone = sitting.length > 0 ? pick(sitting) : anyone;
-        const event = pick(['sit', 'sit', 'leave', 'kick', 'sit-out', 'sit-in', 'buy', 'buy', 'approve', 'deny', 'pause', 'resume', 'config', 'pre', 'show', 'end'] as const);
+        const event = pick(['sit', 'sit', 'leave', 'kick', 'sit-out', 'sit-in', 'buy', 'buy', 'approve', 'approve', 'deny', 'pause', 'resume', 'config', 'pre', 'show', 'end'] as const);
         let action: TableAction;
         switch (event) {
             case 'sit': {
@@ -250,8 +267,15 @@ export function* randomNight(seed: number, steps: number): Generator<{state: Tab
             case 'buy':
                 action = {type: 'buy', by: someone, amount: 1 + Math.floor(random() * s.config.buyInMax), at: now};
                 break;
-            case 'approve': case 'deny':
-                action = {type: 'host', by: 'p0', op: {op: event, pid: s.requests.length > 0 ? pick(s.requests).pid : anyone}, at: now};
+            case 'approve': {
+                // Now and then an amount the request no longer says (stale).
+                const q = s.requests.length > 0 ? pick(s.requests) : null;
+                const amount = q && random() < 0.97 ? q.amount : (q?.amount ?? 0) + 1;
+                action = {type: 'host', by: 'p0', op: {op: 'approve', pid: q?.pid ?? anyone, amount}, at: now};
+                break;
+            }
+            case 'deny':
+                action = {type: 'host', by: 'p0', op: {op: 'deny', pid: s.requests.length > 0 ? pick(s.requests).pid : anyone}, at: now};
                 break;
             case 'pause': case 'resume':
                 action = {type: 'host', by: random() < 0.9 ? 'p0' : anyone, op: {op: event}, at: now};
@@ -261,7 +285,7 @@ export function* randomNight(seed: number, steps: number): Generator<{state: Tab
                 action = {type: 'host', by: 'p0', op: {op: 'end'}, at: now};
                 break;
             case 'config':
-                action = {type: 'host', by: 'p0', op: {op: 'config', patch: random() < 0.5 ? {turnSeconds: 15 + Math.floor(random() * 60)} : {rebuys: pick(['auto', 'approve', 'off'] as const), ante: random() < 0.5 ? 0 : Math.max(1, Math.floor(s.config.bigBlind / 5))}}, at: now};
+                action = {type: 'host', by: 'p0', op: {op: 'config', patch: random() < 0.5 ? {turnSeconds: 15 + Math.floor(random() * 60)} : {rebuys: pick(['approve', 'off'] as const), ante: random() < 0.5 ? 0 : Math.max(1, Math.floor(s.config.bigBlind / 5))}}, at: now};
                 break;
             case 'pre': {
                 const kinds: PreAction[] = [{kind: 'check-fold'}, {kind: 'check'}, {kind: 'call-any'}, {kind: 'call', amount: 1 + Math.floor(random() * bigBlind * 3)}];
@@ -277,11 +301,13 @@ export function* randomNight(seed: number, steps: number): Generator<{state: Tab
 
 const nextDueOf = (s: TableState): number | null => nextDue(s)?.at ?? null;
 
-// A seeded pick among the actor's legal moves: mostly checks and calls, some raises and folds.
+// A seeded pick among the actor's legal moves: mostly checks and calls, some raises and folds; all in
+// only where it is open (in PLO, within the pot limit), else a raise to the most allowed.
 export const randomMove = (state: TableState, random: () => number): Move => {
-    const legal = legalFor(snapshotFromState(state), state.hand!.actor!)!;
+    const snapshot = snapshotFromState(state);
+    const legal = legalFor(snapshot, state.hand!.actor!)!;
     const roll = random();
-    if (legal.raise && roll < 0.08) return {kind: 'all-in'};
+    if (legal.raise && roll < 0.08) return allInOpen(legal, snapshot, state.hand!.actor!) ? {kind: 'all-in'} : {kind: 'raise', to: legal.raise.max};
     if (legal.raise && roll < 0.25) {
         const {min, max} = legal.raise;
         const to = roll < 0.18 ? min : min + Math.floor(random() * (max - min + 1));

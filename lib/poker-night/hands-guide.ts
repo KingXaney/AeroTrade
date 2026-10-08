@@ -1,18 +1,20 @@
 // The Hands guide (P2): the ten hand rankings strongest first, each with one five-card example and
 // the cards in it that make the hand; a pair of hands that only a kicker separates; and the games a
-// poker night table deals, each named by its glossary entry. Pure and client-safe — the lobby's Hands
+// poker night table deals, each named by its glossary entry — PLO (P5) with a hand that shows its
+// two-and-three rule. Pure and client-safe — the lobby's Hands
 // tab (app/(root)/poker-night, ?tab=hands) renders it on the server, the table's Hands drawer in the
 // browser, both through components/poker-night/HandsGuide — and its words are HANDS_COPY in
 // lib/learn/copy/poker-night.ts, never here.
 //
 // lib/poker-night/__tests__/hands-guide.test.ts holds every example to the evaluator: each one's
 // category is its slot's (the royal flush the straight flush to the ace), the list is strictly
-// descending, `makes` is exactly the cards that make the hand, and the kicker pair differs at its
-// first kicker alone.
+// descending, `makes` is exactly the cards that make the hand, the kicker pair differs at its
+// first kicker alone, and the PLO example reads under Omaha's rule as `plays` says (a pair of aces,
+// where the same cards in Texas hold'em make a flush).
 
 import {parseCard, type Card} from "@/lib/poker/cards";
 import {evaluateCards} from "@/lib/poker/evaluator";
-import {describeHand, type HandDescription} from "@/lib/poker-night/hand-name";
+import {bestOmaha, describeHand, type HandDescription} from "@/lib/poker-night/hand-name";
 
 // The ten rankings, strongest first: the order the guide lists them in and HANDS_COPY.categories
 // names them in.
@@ -74,16 +76,29 @@ export const KICKER_EXAMPLE: {
     makes: cards('Ah As Ac Ad'),
 };
 
+// PLO's example: four hearts on the board and one in hand make no flush — exactly two of the four in
+// hand play with exactly three from the board — so this hand plays as a pair of aces. `plays` is the
+// five cards that play (three from the board, then the two in hand: hand-name.bestOmaha's order),
+// lifted on the page; `description` what they make.
+export const PLO_EXAMPLE: {hole: readonly Card[]; board: readonly Card[]; plays: readonly Card[]; description: HandDescription} = (() => {
+    const hole = cards('Ah Ac 7s 3d');
+    const board = cards('Kh 9h 6h 2h Jc');
+    const best = bestOmaha(hole, board);
+    return {hole, board, plays: best.cards, description: describeHand(best.value)};
+})();
+
 // The cards of `makes` that are in this hand: what one example lifts and its picture names. The kicker
 // pair's `makes` covers both hands, and each hand is drawn, and read out, with only its own pair.
 export const cardsThatMake = (hand: readonly Card[], makes: readonly Card[]): Card[] => makes.filter((card) => hand.includes(card));
 
 // The games the guide explains, in the order it lists them, each with the glossary entry its section
-// quotes and the anchor that section carries (/poker-night?tab=hands#texas-holdem). PLO (glossary
-// `omaha`, anchor `plo`) and Triple T (`triple-t`) join this list in later phases, as the table
-// learns to deal them.
+// quotes and the anchor that section carries (/poker-night?tab=hands#texas-holdem, #plo, #triple-t).
+// PLO's section quotes the pot limit's entry too (`limit`); Triple T plays no limit, as Texas
+// hold'em does once its throw-away is over.
 export const GUIDE_GAMES = [
-    {id: 'holdem', term: 'texas-holdem', anchor: 'texas-holdem'},
+    {id: 'holdem', term: 'texas-holdem', anchor: 'texas-holdem', limit: null},
+    {id: 'plo', term: 'omaha', anchor: 'plo', limit: 'pot-limit'},
+    {id: 'triple-t', term: 'triple-t', anchor: 'triple-t', limit: null},
 ] as const;
 export type GuideGame = (typeof GUIDE_GAMES)[number]['id'];
 export type GuideGameEntry = (typeof GUIDE_GAMES)[number];
@@ -96,6 +111,12 @@ export const guideGames = (focus: GuideGame | null): {here: GuideGameEntry | nul
     return {here, others: GUIDE_GAMES.filter((game) => game !== here)};
 };
 
-// The glossary entries the guide quotes, each once: the rankings, the kicker, then every game. The
-// lobby's Hands tab lists exactly these in its one "What these mean".
-export const HANDS_TERMS = ['hand-rankings', 'kicker', ...GUIDE_GAMES.map((game) => game.term)] as const;
+// The guide's game for a table's: the variant's own section (every variant a table deals has one).
+export const guideGameOf = (variant: string): GuideGame | null => GUIDE_GAMES.find((game) => game.id === variant)?.id ?? null;
+
+// The glossary entries the guide quotes, each once: the rankings, the kicker, then every game and
+// the limit it plays. The lobby's Hands tab lists exactly these in its one "What these mean".
+export const HANDS_TERMS = [
+    'hand-rankings', 'kicker',
+    ...GUIDE_GAMES.flatMap((game) => (game.limit === null ? [game.term] : [game.term, game.limit])),
+] as const;

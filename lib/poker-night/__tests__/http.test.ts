@@ -14,6 +14,7 @@ const h = (entries: Record<string, string>) => new Headers(entries);
 const REFUSALS: Refusal[] = [
     'closed', 'not-now', 'not-host', 'not-seated', 'already-seated', 'seat-taken', 'bad-seat', 'bad-amount', 'below-buy-in', 'over-cap',
     'rebuys-off', 'rebuy-cap', 'no-request', 'not-your-turn', 'stale', 'illegal', 'below-min-raise', 'bad-config', 'bad-deck', 'not-due',
+    'asks-off', 'ask-waiting', 'ask-limit', 'ask-cooldown',
 ];
 
 describe('the error codes', () => {
@@ -52,6 +53,7 @@ describe('the error codes', () => {
         expect(refusalToCode('illegal')).toBe('invalid_action');
         expect(refusalToCode('bad-deck')).toBe('invalid_action');
         expect(refusalToCode('not-due')).toBe('invalid_action');
+        expect(refusalToCode('ask-cooldown')).toBe('ask_cooldown');
         // Each refusal but the three that share invalid_action has a code of its own.
         const codes = REFUSALS.map(refusalToCode);
         expect(new Set(codes).size).toBe(REFUSALS.length - 2);
@@ -60,12 +62,12 @@ describe('the error codes', () => {
 
 describe('the request checks', () => {
     it('want the protocol header, and a mismatch means reload', () => {
-        expect(PN_PROTOCOL).toBe(1);
+        expect(PN_PROTOCOL).toBe(2);
         expect(PROTOCOL_HEADER).toBe('x-pn-protocol');
         expect(PASS_HEADER).toBe('x-pn-pass');
-        expect(protocolOk(h({'X-PN-Protocol': '1'}))).toBe(true);
-        expect(protocolOk(h({'x-pn-protocol': ' 1 '}))).toBe(true);
-        expect(protocolOk(h({'x-pn-protocol': '2'}))).toBe(false);
+        expect(protocolOk(h({'X-PN-Protocol': '2'}))).toBe(true);
+        expect(protocolOk(h({'x-pn-protocol': ' 2 '}))).toBe(true);
+        expect(protocolOk(h({'x-pn-protocol': '1'}))).toBe(false);
         expect(protocolOk(h({}))).toBe(false);
     });
 

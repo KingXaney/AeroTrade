@@ -1,11 +1,14 @@
 'use client';
 
-// The viewer's own two cards, large, in the dock: dealt in from the table, and — when the viewer
+// The viewer's own cards, large, in the dock — two, or PLO's four in a fan, each card's index in
+// sight (data-count) — dealt in from the table, and — when the viewer
 // folds — kept in front of them, dimmed, with a "Folded" tag, until the next deal: the viewer can
 // still see what they folded, and nobody else can unless they show it in the pause (the table sees
 // a folded hand go to the muck on the plate). At a showdown they lift and glow when they are among
 // the cards that play, and dim when they are not. The place keeps its size when there are no cards,
-// so the dock never changes height.
+// and its width for the night's game (data-slots: the cards its hands hold — three in Triple T), so the
+// dock never changes height and the line beside it never moves. In Triple T the card the viewer threw
+// away flies off to the table beside the two kept (turning face down as a fold's do), once.
 //
 // With Peek on (the personal look's `peek`, for a screen others can see) the cards are a button
 // drawn face down, turned up only while the viewer presses on it — a pointer held down on it, or
@@ -13,16 +16,17 @@
 // hand too. The same card elements stay mounted either way, so a deal's motion is never played twice.
 
 import type {KeyboardEvent} from "react";
-import {animsOf, animVars, type LiveAnim} from "@/components/poker-night/anim";
+import {animsOf, animVars, liftAtFor, type LiveAnim} from "@/components/poker-night/anim";
 import PlayingCard, {type CardMotion, type CardStateMotion} from "@/components/poker-night/PlayingCard";
 import {HAND_COPY, LOOKS_COPY, TABLE_COPY} from "@/lib/learn/copy/poker-night";
 import type {Card} from "@/lib/poker/cards";
-import {cardLook, type ResultLook} from "@/lib/poker-night/reveal";
+import {cardLook, liftBoardOf, type ResultLook} from "@/lib/poker-night/reveal";
 import {cn} from "@/lib/utils";
 
 type Props = {
     seat: number;
-    hole: [Card, Card] | null;
+    hole: Card[] | null;
+    slots?: number; // the cards a hand of the table's game holds: the width kept
     holding: boolean; // dealt in and not folded
     folded?: boolean; // dealt into the view's hand and folded: drawn dimmed, tagged "Folded"
     handNo: number | null;
@@ -30,6 +34,7 @@ type Props = {
     look: ResultLook | null;
     // Peek: null when it is off; else whether the viewer is pressing now, and how to say so.
     peek?: {peeking: boolean; onPeek: (peeking: boolean) => void} | null;
+    thrown?: Card | null; // Triple T: the card the viewer threw away this hand (MeView.discard)
 };
 
 // Where the cards come from, from the dock: the table above it.
@@ -45,8 +50,12 @@ const FoldedTag = () => (
     </span>
 );
 
-const HoleCards = ({seat, hole, holding, folded = false, handNo, anims, look, peek = null}: Props) => {
+// Where the card thrown away goes, from the dock: up to the table.
+const TO_TABLE = {dx: 0, dy: -140};
+
+const HoleCards = ({seat, hole, slots = 2, holding, folded = false, handNo, anims, look, peek = null, thrown = null}: Props) => {
     const fold = animsOf(anims, 'fold').find((a) => a.event.seat === seat && a.event.handNo === handNo) ?? null;
+    const discard = thrown === null ? null : animsOf(anims, 'discard').find((a) => a.event.seat === seat && a.event.handNo === handNo) ?? null;
     const deal = animsOf(anims, 'deal').find((a) => a.event.handNo === handNo && a.event.seats.includes(seat)) ?? null;
     const reveal = animsOf(anims, 'reveal').find((a) => a.event.handNo === handNo && a.event.hands.some((h) => h.seat === seat)) ?? null;
     const mucked = !holding && folded;
@@ -61,15 +70,22 @@ const HoleCards = ({seat, hole, holding, folded = false, handNo, anims, look, pe
         const state = mucked ? 'dim' : hidden ? null : cardLook(look, card);
         const stateMotion: CardStateMotion | null = mucked
             ? fold ? {cls: 'pn-dim', style: animVars(fold, fold.at)} : null
-            : reveal?.liftAt !== undefined && reveal && state ? {cls: state === 'win' ? 'pn-win-lift' : 'pn-dim', style: animVars(reveal, reveal.liftAt)} : null;
-        const glow = state === 'win' ? animVars(reveal ?? {offset: 0}, reveal?.liftAt ?? 0) : null;
+            : reveal?.liftAt !== undefined && reveal && state ? {cls: state === 'win' ? 'pn-win-lift' : 'pn-dim', style: animVars(reveal, liftAtFor(reveal, state, liftBoardOf(look, card)))} : null;
+        const glow = state === 'win' ? animVars(reveal ?? {offset: 0}, reveal ? liftAtFor(reveal, state, liftBoardOf(look, card)) : 0) : null;
         return <PlayingCard key={`${card}`} card={hidden ? null : card} sides="two" state={state} motion={motion} stateMotion={stateMotion} glow={glow}/>;
     }) : <span className="pn-slot opacity-0" aria-hidden="true"/>;
+    // The card thrown away, on its way to the table while its animation lives (at its end, gone).
+    const flying = show && discard && thrown !== null && !hole.includes(thrown) ? (
+        <PlayingCard key={`thrown-${thrown}`} card={hidden ? null : thrown} sides="two"
+                     motion={{cls: 'pn-fold', style: animVars(discard, discard.at, discard.dur, TO_TABLE), anim: 'discard'}}/>
+    ) : null;
 
     if (!show || peek === null) {
         return (
-            <div className={cn('pn-hole', mucked && 'relative')} role="group" aria-label={label} data-pn-hole={show ? (mucked ? 'folded' : '') : 'empty'}>
+            <div className={cn('pn-hole', mucked && 'relative')} role="group" aria-label={label} data-pn-hole={show ? (mucked ? 'folded' : '') : 'empty'}
+                 data-count={show ? hole.length : undefined} data-slots={slots}>
                 {cards}
+                {flying}
                 {mucked && <FoldedTag/>}
             </div>
         );
@@ -90,6 +106,8 @@ const HoleCards = ({seat, hole, holding, folded = false, handNo, anims, look, pe
             aria-label={hidden ? LOOKS_COPY.peekLabel : label}
             aria-pressed={!hidden}
             data-pn-hole={mucked ? 'folded' : ''}
+            data-count={hole.length}
+            data-slots={slots}
             data-pn-peek={hidden ? 'hidden' : 'shown'}
             onPointerDown={(event) => {
                 event.currentTarget.setPointerCapture?.(event.pointerId);
@@ -104,6 +122,7 @@ const HoleCards = ({seat, hole, holding, folded = false, handNo, anims, look, pe
             onContextMenu={(event) => event.preventDefault()}
         >
             {cards}
+            {flying}
             {mucked && <FoldedTag/>}
         </button>
     );

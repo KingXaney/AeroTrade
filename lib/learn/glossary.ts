@@ -656,7 +656,7 @@ const ENTRIES = [
         computedIn: 'lib/poker-night/betting.ts legalFor', seeAlso: ['big-blind', 'all-in']},
     {key: 'rebuy', kind: 'metric', term: 'Rebuy', aliases: ['rebuy', 'rebuys', 're-buy', 'top-up', 'top-ups'],
         short: 'Chips a player takes after sitting down: a rebuy at zero or a top-up below the table\'s cap, counted in the bank.',
-        long: 'The host sets rebuys to off, automatic or approved one by one, and may limit how many each player takes. Chips that arrive during a hand wait and land when it ends. The bank counts every chip each player brought to the table; play chips have no value outside it.',
+        long: 'The host turns rebuys off or on, and may limit how many each player takes; once the first hand is dealt, the host approves every player\'s chips but their own. Chips that arrive during a hand wait and land when it ends. The bank counts every chip each player brought to the table; play chips have no value outside it.',
         seeAlso: ['all-in']},
     {key: 'all-in', kind: 'metric', term: 'All in', aliases: ['all in', 'all-in', 'all-ins', 'shove'],
         short: 'Betting every chip a player has left: they stay in the hand without acting again and can win only what they matched.',
@@ -676,6 +676,19 @@ const ENTRIES = [
         short: 'Two cards each and five shared on the board: a hand is the strongest five of those seven. At poker night it plays no limit.',
         long: "Each player is dealt two cards face down. Betting goes round before the flop, then after it (the first three board cards), after the turn (the fourth) and after the river (the fifth), and a hand may use both, one or none of its player's two cards. No limit means a bet or a raise can be any size from the minimum raise up to all of a player's chips.",
         seeAlso: ['hand-rankings', 'minimum-raise', 'all-in']},
+    // The games past Texas hold'em (P5 on): no bare "pot" as an alias, which the solver's pages mean otherwise.
+    {key: 'omaha', kind: 'metric', term: 'Pot-limit Omaha', aliases: ['omaha', 'plo', 'pot-limit omaha', 'pot limit omaha', 'omaha poker'],
+        short: 'Four cards each and five on the board: a hand uses exactly two of the four with exactly three from the board. Played pot limit.',
+        long: "Each player is dealt four cards face down, and the betting goes round as in Texas hold'em: before the flop, after it, after the turn and after the river. At a showdown a hand is the strongest five made of two of its player's cards and three of the board's, never more or fewer of either, so a single card of a suit in hand never completes a flush, and four of a kind on the board counts as no more than three. At poker night it is high only: the strongest hand takes the pot.",
+        computedIn: 'lib/poker-night/hand-name.ts bestOmaha', seeAlso: ['pot-limit', 'hand-rankings', 'texas-holdem']},
+    {key: 'pot-limit', kind: 'metric', term: 'Pot limit', aliases: ['pot limit', 'pot-limit', 'pot limit betting', 'pot-limit betting'],
+        short: 'A bet or raise can be at most the pot: everything in the middle and in front of the players, plus the call.',
+        long: 'A raise counts the call first: with blinds of 1 and 2, the first player in can raise to at most 7, the 2 to call and then 5 more, the size of the pot once that call is in. Facing a raise to 7, the next player can go to at most 24. The minimum raise is the one no limit uses, and a player whose chips fall short of the cap can go all in.',
+        computedIn: 'lib/poker-night/betting.ts legalFor', seeAlso: ['omaha', 'minimum-raise', 'all-in']},
+    {key: 'triple-t', kind: 'metric', term: 'Triple T poker', aliases: ['triple t', 'triple-t', 'triple t poker', 'triple-t poker'],
+        short: "Three cards each; everyone throws one away right after the deal, before any betting, and the hand then plays as Texas hold'em.",
+        long: "Each player is dealt three cards face down, and before anyone bets, everyone still in picks one of them to throw away, all at the same moment; nobody sees a card thrown away. From there it is Texas hold'em with the two cards kept: betting before the flop, after it, after the turn and after the river, no limit, and a hand is the strongest five of the two kept and the board's five.",
+        computedIn: 'lib/poker-night/variants.ts autoDiscard', seeAlso: ['texas-holdem', 'hand-rankings']},
 
     // ---- rails --------------------------------------------------------------------------
     {key: 'position-cap', kind: 'rail', term: 'Position cap', aliases: ['position cap', 'max position weight'],

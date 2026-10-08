@@ -17,7 +17,7 @@ import {useRoom} from "@/components/poker-night/room-controller";
 import {playSound, stayUnlocked} from "@/components/poker-night/sound-player";
 import {cssTimeMs} from "@/lib/poker-night/chips";
 import {UNIT_MS} from "@/lib/poker-night/choreography";
-import {myTurnKey} from "@/lib/poker-night/overlays";
+import {attentionKey} from "@/lib/poker-night/overlays";
 import {cueDelayMs, soundCues} from "@/lib/poker-night/sounds";
 
 const KEPT = 512;
@@ -52,7 +52,7 @@ export const useTableSounds = (anims: readonly LiveAnim[]): void => {
         for (const cue of fresh) {
             const timer = setTimeout(() => {
                 timers.current.delete(timer);
-                playSound(cue.sound);
+                playSound(cue.sound, cue.seed);
             }, cueDelayMs(cue, unit));
             timers.current.add(timer);
         }
@@ -73,9 +73,10 @@ export const useTableSounds = (anims: readonly LiveAnim[]): void => {
         };
     }, []);
 
-    // The viewer's turn: a chime, and on a touch screen with buzz on, one short vibration.
-    const turnKey = myTurnKey(room.view);
-    const turnSeen = useRef<number | null>(null);
+    // The viewer's turn (or a card of theirs to throw away, in Triple T): a chime, and on a touch
+    // screen with buzz on, one short vibration.
+    const turnKey = attentionKey(room.view);
+    const turnSeen = useRef<string | null>(null);
     useEffect(() => {
         if (turnKey === null || turnSeen.current === turnKey) return;
         turnSeen.current = turnKey;

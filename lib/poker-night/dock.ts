@@ -6,20 +6,41 @@
 // deal) — offered whenever the viewer is not playing a hand, the pause after a showdown they reached
 // included. A folded hand stays the viewer's to see until the next deal. What the seat does when the
 // hand ends is the viewer's own part of the view (MeView.next), since the plate keeps reading Folded:
-// once they have left mid-hand the row says so and offers nothing more; while a "Sit out next hand"
-// waits, it says so and offers to take it back. Pure and client-safe.
+// once they have left mid-hand the row says so and offers nothing more; while they leave after the
+// hand (playing it out as usual) the dock says so with Stay, which takes it back; while a "Sit out
+// next hand" waits, it says so and offers to take it back. "Leave after this hand" itself is one tap
+// while they hold cards (dock.leaveAfter), and once folded the break's Leave sends it. Chips that
+// wait for the host's yes (a request) say so, with Cancel, in place of the rebuy. In Triple T's
+// throw-away the dock's row is the throw-away's (DockView.discard): the three cards to pick one from
+// and the confirm while the viewer is still to throw, then who the table waits for. Pure and
+// client-safe.
 
 import {rankOf} from '@/lib/poker/cards';
-import {evaluateCards} from '@/lib/poker/evaluator';
 import {buyOptions} from '@/lib/poker-night/bank';
 import {legalFor, owed} from '@/lib/poker-night/betting';
+import {leaveAfterOf, leftNow, type LeaveAfter} from '@/lib/poker-night/overlays';
 import {sizingFor, type Sizing} from '@/lib/poker-night/bet-sizing';
 import {describeHand, type HandDescription} from '@/lib/poker-night/hand-name';
-import type {Card, Legal, PreAction} from '@/lib/poker-night/types';
+import type {Card, Legal, PreAction, Variant} from '@/lib/poker-night/types';
+import {handValue} from '@/lib/poker-night/variants';
 import type {PlayerView, SeatView} from '@/lib/poker-night/view-types';
-import {snapshotFromView} from '@/lib/poker-night/views';
+import {ledgerRowOf, snapshotFromView} from '@/lib/poker-night/views';
 
 export type SeatControl = 'sit-out' | 'sit-in' | 'back';
+
+// Triple T's throw-away as the viewer meets it, dealt in and not folded: still to throw (pending, the
+// three cards to pick from), or thrown (the card, theirs alone to see); the one clock everyone throws
+// on; and how many players besides the viewer are still to throw.
+export type DockDiscard = {pending: boolean; cards: Card[] | null; thrown: Card | null; deadline: number | null; waiting: number};
+
+// The table's count in the throw-away, for the felt: of the players dealt in and still in, how many
+// have thrown a card away. Null outside it.
+export const throwAwayCount = (view: Pick<PlayerView, 'hand' | 'seats'>): {done: number; of: number} | null => {
+    const hand = view.hand;
+    if (!hand || hand.phase !== 'discard') return null;
+    const of = view.seats.filter((s) => s !== null && s.cards !== 'none').length;
+    return {done: Math.max(0, of - hand.toDiscard.length), of};
+};
 
 export type DockView = {
     seat: number | null;
@@ -36,6 +57,15 @@ export type DockView = {
     leave: boolean;
     // Left during the hand in play: cashed out when it ends (the plate may still read Folded).
     leaving: boolean;
+    // Leaving once the hand in play ends, playing it out as usual (MeView.next 'leave-after'): the
+    // dock says so beside the cards, with Stay.
+    leavingAfter: boolean;
+    // "Leave after this hand", one tap, while the viewer holds cards in the hand in play.
+    leaveAfter: LeaveAfter | null;
+    // The viewer's own request for chips, waiting for the host (its amount), and whether it is all
+    // they have: a new seat, or a rebuy at zero, sits with nothing until the host says yes.
+    request: number | null;
+    waitingChips: boolean;
     // A "Sit out next hand" waits for the deal (the viewer's or the host's): the dock says so, and once
     // the viewer is free to act on it the row offers "Deal me in" (sit-in), which takes it back.
     sitOutNext: boolean;
@@ -43,21 +73,36 @@ export type DockView = {
     myTurn: boolean;
     legal: Legal | null;
     sizing: Sizing | null;
-    hole: [Card, Card] | null;
+    hole: Card[] | null;
+    // What the viewer's cards make so far: on the board; with two or three boards (PLO, after the
+    // flop), on each board in turn — then `strength` is the first board's.
     strength: HandDescription | null;
+    strengths: HandDescription[] | null;
     pre: {options: PreAction[]; selected: PreAction | null} | null;
+    discard: DockDiscard | null; // Triple T's throw-away, dealt in and not folded
     control: SeatControl | null;
     canShow: boolean;
-    buy: {min: number; max: number; topUp: number; rebuy: boolean} | null; // offered once the stack is empty
+    buy: {min: number; max: number; topUp: number; rebuy: boolean; first: boolean} | null; // offered once the stack is empty and no request waits
     deal: boolean; // the host may deal the first hand
 };
 
-// What the viewer's cards make with the board so far: before the flop a pair or the high card.
-export const handStrength = (hole: readonly Card[] | null, board: readonly Card[]): HandDescription | null => {
-    if (!hole || hole.length !== 2) return null;
-    if (board.length >= 3) return describeHand(evaluateCards([...hole, ...board]));
+// What the viewer's cards make with the board so far, by the hand's game (variants.handValue, the
+// server's own): in Texas hold'em (and Triple T once it holds two) before the flop a pair or the high
+// card; in PLO nothing before the flop — four cards make no hand of their own — then exactly two of
+// them with three from the board. Nothing for cards the game does not play (a Triple T hand of three).
+export const handStrength = (variant: Variant, hole: readonly Card[] | null, board: readonly Card[]): HandDescription | null => {
+    if (!hole) return null;
+    if (variant === 'plo') return hole.length === 4 && board.length >= 3 ? describeHand(handValue('plo', hole, board)) : null;
+    if (hole.length !== 2) return null;
+    if (board.length >= 3) return describeHand(handValue(variant, hole, board));
     const [a, b] = [rankOf(hole[0]), rankOf(hole[1])];
     return a === b ? {category: 1, ranks: [a]} : {category: 0, ranks: [Math.max(a, b), Math.min(a, b)]};
+};
+
+// With two or three boards: what the cards make on each, once the flop is out (null before).
+export const boardStrengths = (variant: Variant, hole: readonly Card[] | null, boards: readonly (readonly Card[])[]): HandDescription[] | null => {
+    const all = boards.map((board) => handStrength(variant, hole, board));
+    return all.length > 0 && all.every((d) => d !== null) ? (all as HandDescription[]) : null;
 };
 
 // The early choices with `due` chips to call: with nothing to call, check/fold, check or call any;
@@ -77,6 +122,15 @@ export const preRowKey = (handNo: number | null, options: readonly PreAction[]):
 export const samePre = (a: PreAction | null, b: PreAction | null): boolean =>
     a !== null && b !== null && a.kind === b.kind && (a.kind !== 'call' || (b.kind === 'call' && a.amount === b.amount));
 
+// The dock's one-tap rebuy, once the stack is empty and the table allows one: the whole buy-in the
+// table allows (the bank's top-up) in one tap — asked of the host where it says yes first (once the
+// game has started, for anyone but the host, while the host is here: overlays.ownChips' asksHost) —
+// and "Other amount", which opens the bank, only when there is another amount to choose. Null for a
+// seat that never had chips here (its first chips are FirstChips') and when nothing is offered.
+export type RebuyTap = {amount: number; asks: boolean; other: boolean};
+export const rebuyTap = (buy: DockView['buy'], asksHost: boolean): RebuyTap | null =>
+    buy && !buy.first ? {amount: buy.max, asks: asksHost, other: buy.min < buy.max} : null;
+
 export const dockView = (view: PlayerView): DockView => {
     const seat = view.me.seat;
     const seatView = seat === null ? null : view.seats[seat] ?? null;
@@ -92,8 +146,16 @@ export const dockView = (view: PlayerView): DockView => {
     // Early choices: a hand being bet, someone else to act, the viewer still in it with chips.
     const canPre = !myTurn && hand?.phase === 'betting' && seat !== null && seatView?.state === 'in-hand' && dealtIn;
     const pre = canPre ? {options: preOptions(owed(snapshot, seat)), selected: view.me.pre} : null;
+    // Triple T's throw-away: everyone dealt in and still in throws at once.
+    const pending = !!hand && hand.phase === 'discard' && seat !== null && hand.toDiscard.includes(seat) && view.me.hole?.length === 3;
+    const discard: DockDiscard | null = hand?.phase === 'discard' && seat !== null && dealtIn && !folded ? {
+        pending, cards: pending ? [...view.me.hole!] : null, thrown: view.me.discard, deadline: hand.deadline,
+        waiting: hand.toDiscard.filter((s) => s !== seat).length,
+    } : null;
     // Left mid-hand: the plate reads Folded or All in until the hand ends, the viewer's own part says so.
-    const leaving = seatView !== null && (seatView.state === 'leaving' || view.me.next === 'leave');
+    const leaving = leftNow(view);
+    const leavingAfter = !leaving && seatView !== null && view.me.next === 'leave-after';
+    const request = view.requests.find((r) => r.pid === view.me.pid)?.amount ?? null;
     const control: SeatControl | null = seatView === null || leaving ? null
         : seatView.state === 'away' ? 'back'
             : seatView.state === 'sitting-out' ? 'sit-in'
@@ -101,26 +163,35 @@ export const dockView = (view: PlayerView): DockView => {
     const shownAlready = seatView !== null && Array.isArray(seatView.cards);
     const canShow = !!hand && hand.phase === 'complete' && view.me.hole !== null && seatView !== null && !shownAlready && view.status !== 'closed';
     const empty = seatView !== null && seatView.chips === 0 && seatView.pendingBuy === 0 && seatView.inPot === 0;
-    const buys = view.ledger.find((row) => row.pid === view.me.pid)?.buys ?? 0;
-    const buy = empty && !live ? buyOptions(view.config, seatView, buys) : null;
+    const row = ledgerRowOf(view, view.me.pid);
+    const waitingChips = empty && request !== null;
+    // An empty seat has nothing in a live pot, so it is never playing the hand in play: its chips may
+    // be asked for (or land) while one is being played, as between hands.
+    const buy = empty && request === null && !leavingAfter ? buyOptions(view.config, seatView, row) : null;
     const seated = view.seats.filter((s) => s !== null).length;
     const deal = view.status === 'open' && view.me.isHost && seated >= 2;
     // Still playing the hand in play: its cards in front of them, not folded.
     const playing = live && dealtIn && !folded;
     // Dealt into the view's hand, folded (live or complete): a dealt hand's cards read 'none' then.
     const mucked = !!hand && view.me.hole !== null && seatView !== null && seatView.cards === 'none';
-    const free = seatView !== null && !leaving && view.status !== 'closed' && !playing && !deal;
+    const free = seatView !== null && !leaving && !leavingAfter && view.status !== 'closed' && !playing && !deal;
     // Already asked (by the viewer or the host) for the hand in play: nothing more to ask.
     const sitOutNext = live && !leaving && view.me.next === 'sit-out';
     return {
         seat, seatView, live, dealtIn: dealtIn && !folded, folded, mucked, myTurn, legal, sizing,
         hole: view.me.hole,
-        strength: dealtIn && !folded ? handStrength(view.me.hole, hand?.board ?? []) : null,
+        strength: dealtIn && !folded && hand ? handStrength(hand.variant, view.me.hole, hand.boards[0] ?? []) : null,
+        strengths: dealtIn && !folded && hand && hand.boards.length > 1 ? boardStrengths(hand.variant, view.me.hole, hand.boards) : null,
         pre: pre && {options: pre.options, selected: pre.options.find((o) => samePre(o, pre.selected)) ?? null},
+        discard,
         control, canShow, buy, deal,
-        sitOut: free && control === 'sit-out' && !sitOutNext,
+        sitOut: free && control === 'sit-out' && !sitOutNext && !waitingChips,
         leave: free,
         leaving,
+        leavingAfter,
+        leaveAfter: leaveAfterOf(view),
+        request,
+        waitingChips,
         sitOutNext,
         takeBack: free && control === 'sit-out' && sitOutNext,
     };

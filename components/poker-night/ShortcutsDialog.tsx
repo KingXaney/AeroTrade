@@ -15,17 +15,17 @@ import {focusTableOnClose} from "@/components/poker-night/overlay-kit";
 import {useRoom} from "@/components/poker-night/room-controller";
 import {OVERLAY_COPY, SHORTCUTS_COPY} from "@/lib/learn/copy/poker-night";
 import {SHORTCUTS, type ShortcutGroup} from "@/lib/poker-night/keys";
-import {myTurnKey} from "@/lib/poker-night/overlays";
+import {attentionKey} from "@/lib/poker-night/overlays";
 import {cn} from "@/lib/utils";
 
 const GROUPS = Object.keys(SHORTCUTS) as ShortcutGroup[];
 
-type Ui = {open: boolean; requestSeen: number; turnSeen: number | null; closedByTurn: boolean};
+type Ui = {open: boolean; requestSeen: number; turnSeen: string | null; closedByTurn: boolean};
 
 const ShortcutsDialog = () => {
     const room = useRoom();
     const request = useShortcutsRequest();
-    const turnKey = myTurnKey(room.view);
+    const turnKey = attentionKey(room.view);
     const [ui, setUi] = useState<Ui>(() => ({open: false, requestSeen: latestShortcutsRequest(), turnSeen: turnKey, closedByTurn: false}));
 
     let next = ui;

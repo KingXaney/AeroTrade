@@ -1,8 +1,10 @@
 'use client';
 
 // The host's controls, in their drawer, one section at a time:
-// - Game: the blinds, the ante, the starting chips and the chip cap, the turn timer;
-// - Rebuys: the policy, the rebuys per player, and the requests waiting for the host;
+// - Game: the game itself (Texas hold'em or PLO, GameChoice; PLO's one to three boards, BoardsChoice), the blinds, the ante, the starting
+//   chips and the chip cap, the turn timer;
+// - Rebuys: the policy (Off / On, the host approving: RebuyChoice), the rebuys per player, and the
+//   requests for chips waiting for the host (the bank's own rows);
 // - Players: everyone at the table, each with a More menu (sit out next hand — the bank's own, through
 //   useHostSitOut and the map TableOverlays keeps for both — hand over host, remove from table), and
 //   the removed with "Let back in";
@@ -29,18 +31,20 @@ import TextField, {fieldClass} from "@/components/primitives/TextField";
 import {iconButton} from "@/components/primitives/iconButton";
 import {RequestsPanel} from "@/components/poker-night/BankPanel";
 import LookPicker from "@/components/poker-night/LookPicker";
+import BoardsChoice from "@/components/poker-night/BoardsChoice";
+import GameChoice from "@/components/poker-night/GameChoice";
+import RebuyChoice from "@/components/poker-night/RebuyChoice";
 import {Drawer, MiniAvatar, PlayerName} from "@/components/poker-night/overlay-kit";
 import {useRoom} from "@/components/poker-night/room-controller";
 import {useHostSitOut, type HostSitOuts} from "@/components/poker-night/useHostSitOut";
-import {HOST_COPY, INVITE_COPY, LOOKS_COPY, OVERLAY_COPY, TABLE_COPY} from "@/lib/learn/copy/poker-night";
+import {HOST_COPY, INVITE_COPY, LOOKS_COPY, MODE_COPY, OVERLAY_COPY, TABLE_COPY} from "@/lib/learn/copy/poker-night";
 import {TABLE_NAME_INPUT_MAX} from "@/lib/poker-night/input";
 import {resolveTableLook, scenePatch, type TableLook} from "@/lib/poker-night/looks";
-import {BLIND_PRESETS, REBUY_CHOICES} from "@/lib/poker-night/lobby";
+import {BLIND_PRESETS} from "@/lib/poker-night/lobby";
 import {
     checkGameForm, gameFormOf, GAME_FIELDS, hostPeople, hostRowStatus, hostSitOut, REBUY_FIELDS, rebuyLimitChoices, seatedCount, tableControl, timerChoices,
     type GameField, type GameForm, type HostRow,
 } from "@/lib/poker-night/overlays";
-import type {RebuyPolicy} from "@/lib/poker-night/types";
 import {cn} from "@/lib/utils";
 
 export type HostSection = 'game' | 'rebuys' | 'players' | 'table' | 'look';
@@ -122,6 +126,11 @@ const GameSection = () => {
                    e.preventDefault();
                    void save();
                }}>
+            <div className="space-y-2" data-host-field="variant">
+                <MicroLabel as="p">{MODE_COPY.gameLabel}</MicroLabel>
+                <GameChoice value={form.variant} onChange={(variant) => set('variant', variant)} hook="host-game"/>
+            </div>
+            {form.variant === 'plo' && <BoardsChoice variant={form.variant} value={form.boards} onChange={(boards) => set('boards', boards)} hook="host-boards"/>}
             <div className="space-y-2">
                 <MicroLabel as="p">{HOST_COPY.blinds}</MicroLabel>
                 <div className="flex flex-wrap gap-1.5">
@@ -172,12 +181,10 @@ const RebuysSection = () => {
                        e.preventDefault();
                        void save();
                    }}>
-                <Field id={`${id}-policy`} label={HOST_COPY.rebuys}>
-                    <select id={`${id}-policy`} className={fieldClass('h-11 w-full', 'body')} value={form.rebuys}
-                            onChange={(e) => set('rebuys', e.target.value as RebuyPolicy)} data-host-field="rebuys">
-                        {REBUY_CHOICES.map((policy) => <option key={policy} value={policy}>{HOST_COPY.rebuysValue[policy]}</option>)}
-                    </select>
-                </Field>
+                <div className="space-y-1.5" data-host-field="rebuys">
+                    <MicroLabel as="p">{HOST_COPY.rebuys}</MicroLabel>
+                    <RebuyChoice value={form.rebuys} onChange={(policy) => set('rebuys', policy)} hintId={`${id}-policy-hint`} hook="host-rebuys"/>
+                </div>
                 <Field id={`${id}-limit`} label={HOST_COPY.rebuyLimitLabel}>
                     <select id={`${id}-limit`} className={fieldClass('h-11 w-full', 'body')} value={form.maxRebuys ?? ''}
                             onChange={(e) => set('maxRebuys', e.target.value === '' ? null : Number(e.target.value))} data-host-field="maxRebuys">

@@ -4,7 +4,9 @@
 engine, the room server and its API, the playable table and lobby on polling, live updates over Ably,
 looks and avatars, emotes and the table's feel, and the night's awards with the table's glossary
 terms, each with its unit tests and browser QA. Live updates switch on once `ABLY_API_KEY` is set in
-Production; until then every table polls. The extras (phase 8) follow.
+Production; until then every table polls. The modes batch (P1–P8) added the way home, the Hands
+guide, Home's panel, state version 2, PLO on one to three boards, Triple T and the table's small
+conveniences (below).
 
 ## Why
 
@@ -353,18 +355,25 @@ under the top bar. Under reduced motion only the impact shows. A player can mute
 look) or one player for the visit. A screen reader hears each one said in a polite live region.
 
 **Sound, buzz, screen and keys.** The table's sounds are synthesised by Web Audio from short
-recipes — a card's snap, a chip's click, a check's knock, a fold's swish, a winner's arpeggio, the
-turn's chime, an emote's pop and a landing that fits the thing thrown (a splat, a pop for a rose or
-confetti, a fizz, a bounce) — each at most 0.3 gain, between 40 Hz and 8 kHz and over
-within 1.2 s, played at its animation's own moment on the motion token, at most once per 60 ms,
+recipes — a card's swish and snap, two to four clay chips clacking, a check's two knocks, the cards
+swept into the muck, a winner's arpeggio, the turn's gentle chime, an emote's pop and a landing of
+its own for each thing thrown (since P8: a fish's heavy wet slap, a tomato's juicy splat and drips,
+an egg's crack then splat, a cake's muffled thud, a rose's and a heart's whoosh and pop, a soda's
+clink and fizz, confetti's paper pop and rustle, popcorn popping, a tennis ball's thock and bounces)
+— each a few layers of tones and filtered noise with their own attack and fall, played from a seed
+so no two throws, chips or cards sound quite alike (a cue's seed is its key, a landing's the emote's
+id, so every screen hears one throw alike), no part louder than 0.35 gain and the layers together
+never past 0.75, between 40 Hz and 10 kHz and over within 1.2 s, behind a gentle compressor; played
+at its animation's own moment on the motion token, at most once per 60 ms,
 silent while the page is hidden except for the turn, and never the only cue for anything. One audio
 context per page is made, and woken, inside an event a browser counts as a gesture — a click, a
 touch's pointerup or touchend, a mouse press, a key, never a touch's pointerdown (iOS starts Web
 Audio only in a touchend or a click) — and again whenever the browser suspends it. A phone vibrates once when the turn comes
-round; the screen stays awake while the viewer sits (the Screen Wake Lock); each follows the
-player's own switch. Beside the moves' keys, E opens the emotes, L the hand log, B the bank, M
-turns the sounds on or off and ? lists every key (also in the top bar's menu), under the same rules
-as the moves.
+round, and a phone that cannot buzz (an iPhone) sees the dock's edge and "Your turn" breathe
+(still under either motion guard); the screen stays awake while the viewer sits (the Screen Wake
+Lock); each follows the player's own switch. Beside the moves' keys, E opens the emotes, L the hand
+log, B the bank, M turns the sounds on or off (as the top bar's menu does, a check) and ? lists every
+key (also in the top bar's menu), under the same rules as the moves.
 
 ## The end of the night (phase 7)
 
@@ -417,6 +426,342 @@ colours. A kicker hand's picture names only its own pair. Only Texas hold'em is 
 in the narrowest list, 40 px from 248 px (a 320 px phone's drawer and lobby column) and 44 px from
 288 px, measured by the list's own width (a container query), so every screen fits five without
 scrolling sideways; the name moves beside the cards only where both fit.
+
+## State version 2 (modes P4): leaving after a hand, the host's yes on buys, asks to see a hand
+
+**One bump for the whole batch.** `STATE_VERSION` is 2, and version 2 holds every stored field
+the modes need at once — a hand's own game (`variant`), one five-card run per board in `deck` and
+what is out of each in `boards`, Triple T's thrown-away cards (`discards`) and its 'discard' phase,
+pots paid board by board (`winners` and `shares` as one list per board), shown hands as their
+cards alone — and the stored shape accepts every game and board count from now on. What this deploy
+deals is `config.ENABLED` (Texas hold'em, one board): the host and the lobby are held to it
+('not-open'), and a table set to a game it does not deal waits between hands until the host picks
+one it does, so a rollback never closes a live table. `migrate.v1ToV2` steps a version 1 state
+(the config's game, last; rebuys 'auto' as 'approve'; `leaveAfter` off; ledger times in seconds;
+a request's unread time dropped; the hand's one board; each pot paid on it; shown hands as cards),
+and `migrateSummary` reads a version 1 history row. `PN_PROTOCOL` is 2 and the wire view's `v` 2,
+so a page left open across the deploy reloads.
+
+**Leave after this hand.** `leave-after {on}`: dealt into a live hand, the player plays it out as
+usual — not away, nothing forced, pre-actions as ever — and is cashed out once as it completes (a
+buy waiting for it dropped); it can be taken back until then. It takes the place of a sit-out asked
+for and of a request, and a buy or the host's approval is refused while it is set. Not in a live hand
+it is leaving now: the leave a page that stays open sends, so a deal that lands first never costs the
+player a blind — they play that hand out instead. Private: a hidden commit, never on the wire.
+
+**The host's yes on buys.** Before the first hand is dealt every seat and buy lands at once. After
+it, every buy but the host's own — a newcomer's first chips, a re-sit, a rebuy, a top-up — is a
+request the host approves or declines in the bank; a newcomer waiting sits with nothing, is dealt
+nothing and has no ledger row until the chips land, as a buy-in. A request waits until decided,
+withdrawn (`withdraw`) or its player leaves — however long the host is gone: nothing lands without
+the host's yes. A host gone ten minutes (unheard from for `LIMITS.hostTakeoverMs`) may be replaced by
+claim-host, which only an account holder at the table can take, and the requests then wait for the
+new host. A request keeps its time: its player may change its amount or take it back only
+`REQUESTS.CHANGE_MS` (3 s) after the last change ('request-wait'), so a request comes and goes at most
+once every few seconds; the host hears its sound at most once a player in 20 s, and a changed amount
+re-words its toast silently. The host's approve names the amount it approves; one the request no
+longer says is refused (`stale`). The rebuy policy is off or on ('approve'): off stops rebuys and
+re-sits, never a first buy-in.
+
+**Asks to see a hand.** Once a hand completes, a player dealt into it who folded may ask a player
+whose cards were not shown (folded, or won uncontested) to see them. The player asked answers "Show
+<name>" (to the one who asked alone: in their view and in their history of the hand), "Show
+everyone" (a show) or "No thanks". On the server: one ask waiting per player at a time, two a hand;
+one unanswered for 15 s is a no; after a no the same player may not ask the same player again for
+five hands; a player who turned off "Let others ask to see my cards" cannot be asked (the setting is
+kept for a seated player and one of the hand asks are about, and dropped as anyone else leaves). The
+next deal ends every ask, and one still waiting is a no, with its cooldown, even with time left — the
+results pause is never longer than 15 s, so otherwise an ask its player lets go by could come back
+every hand — and the one who asked is told. A cooldown is never dropped
+before its five hands are up: the table keeps at most twelve cooldowns and waiting asks together,
+and at that cap nobody may ask ('asks-full') until some run out. Nothing ever shows a thrown-away
+Triple T card.
+
+**Who sees it, and who is told.** A pre-action, a leave after the hand, a sit-out asked for while
+the hand is live, an ask, its answer and the asks setting are hidden commits: the public seq does not
+move and nothing is published. A write that changes another player's own view where the table does
+not show it — the player asked, the one who asked, a player the host sat out mid-hand — moves that
+player's nudge count (their room row's `nudge`): a poll sends the count it holds (`nsince`) and is
+read whole when it moved, and with realtime the server says it on the player's own channel
+(`poker-night:<env>:<room id>:<pid>`, subscribe only, their token alone), as `{nudge}` and nothing
+else. What a write changed is read at the commit's own time (`views.nudgeKey`): an ask past its
+seconds reads expired whether or not a write said so, so writing that expiry down — which another
+pair's ask or answer does — nudges nobody, and no one learns the moment of a private action that is
+not theirs.
+
+**At the table.** Leaving after this hand is one tap while the player holds cards — a door beside
+the early choices (its word on a wide screen), a button in the seat's row while all in, the menu's
+toggle; its short word "Leave after hand" — and then the dock says "Leaving after this hand" ("Last
+hand" where narrow, on a row of its own under the cards on a phone on its side) with Stay, Home
+carries a dot, and the menu
+offers "Stay at the table" beside "Leave now". The mid-hand leave dialog offers both, "Leave after
+this hand" the primary; Home's never navigates for it, since an absent player would hold the table
+up. Every leave that stays on the page sends `leave-after`; when the answer shows a deal beat it,
+the table says "A new hand was dealt first: you leave the table when it ends." While a result shows,
+a player who went as it completed keeps a ghost of their plate (name, look, the cards they showed,
+"Left"). The host's yes: the join card says it once the game has started; a seat whose chips wait
+reads "Waiting for chips" on every plate, and its own dock "Waiting for the host to approve your
+chips" with Cancel (taking it back is never said as the host's no); a seat that never had chips
+here reads "No chips yet." with "Ask for 2,000 chips"; the host hears a short sound and gets a toast
+with Approve (a 44 px action) for each new request, a dot on Bank and Host, and bank rows that say
+what each request is for. The rebuy policy is Off /
+On (host approves), a radio pair. Asks: another player's plate menu leads with "Ask to see their
+cards", greyed with the reason when a rule stands in the way and, once asked, how it stands (the menu
+opens toward the table's middle, whole on screen); the player asked gets a prompt at the foot of the
+screen, over their own corner and nothing of the table (on a phone on its side, in the dock's
+column), with its seconds — to the next deal when that comes first — and three 44 px answers behind
+a tap shield; a hand shown to one player alone turns up on its plate for them, flagged
+"Shown to you", and in their hand log; "Let others ask to see my cards" is a switch in My look, kept
+with the personal look and sent to the room for the seat. In a result's pause the polls come every
+1.5 s for a player dealt into the hand, since the next deal ends every ask.
+
+**The budgets, measured.** On the heaviest table, with every private list at its longest (sixteen
+asks, the cooldowns kept, a "no asks" setting for every seat and player dealt, a nudge count on every
+room row): the state 14,798 bytes (16,000), what a write reads 26,806 (27,000), the whole document
+29,457 (30,000), the wire view 3,787 and its message 3,856 (4,500). Version 1 measured 14,512,
+26,883, 29,534, 4,331 and 4,400: ledger times in seconds and the wire's ledger as tuples pay for the
+new fields, and the room remembers its last 40 action ids, from 64.
+
+## PLO, one board (modes P5)
+
+**The game.** `config.ENABLED` opens PLO on one board (two and three boards came with P6, Triple T
+with P7). Four cards each; a hand is exactly two of them with exactly three from the board
+(`hand-name.bestOmaha`, through `variants.handValue` and `bestHand` — the engine picks winners and
+the page reads shown hands with the same functions), so one card of a suit in hand never makes a
+flush and a board never "plays". High only: the strongest hand takes the pot. A hand keeps its own
+game: the host's pick (the host drawer's Game, from the next hand) never touches a hand in play.
+
+**Pot limit.** A bet or a raise goes at most to the current bet plus the pot after the call: every
+chip committed this hand — antes, earlier streets, every bet in front of the players, the player's
+own — plus what the player owes; never below the minimum raise, never past all in. At blinds 1/2
+the first player in may raise to 7; facing 7, to 24; the small blind facing 7 alone, to 23; a flop
+bet into 10 is at most 10 and the raise over it 40; nine antes of 1 open to 16; a short big blind (1
+of 2) to 6. The minimum raise and the reopening rules (the TDA rule, the friendlier reading) are no
+limit's. The all-in move is a raise only when all in is within the cap, the call when the bet faced
+is the whole stack, else 'illegal'; the client offers the same moves (`snapshotFromView` sums
+`SeatView.inPot` as the pot), its raise panel tops out at Pot ("Raise to 340 (pot)", key A) and
+sends a raise to it — never the all-in over the cap.
+
+**Picking and showing the game.** The lobby: "Start a table" stays one tap for Texas hold'em, and
+"Start PLO" sits under it; the form under "Set it up first" and the host drawer's Game section open
+with a Game choice (a card a game: its name, the cards dealt and the limit). The game is named
+wherever a table is: the top bar's second line ("PLO", the code beside it from 400 px), the felt
+before the first hand, the countdown between hands when the host picked another ("Next hand: PLO, in
+4 s"), a toast and a screen-reader line at its first deal ("New game from this hand: Pot-limit
+Omaha."), the join card's terms with "How it plays" (the Hands guide on the table's game, for a
+visitor too), the invite sheet ("Game: PLO"), its share text and the link preview, and every lobby
+and Home row. The lobby reads the game from the stored config (`LOBBY_PROJECTION` adds
+`state.config.variant` and `boards`), a document with none reading as Texas hold'em.
+
+**At the table, on a phone.** The dock fans four cards, each 0.6 of a card on from the one before
+and turned −6°, −2°, 2°, 6° from the bottom centre, so every card's rank and suit show (140 px wide
+compact, 123 tight); between hands it holds the night's game's width. It names nothing before the
+flop. Another seat's four face-down cards keep the two's footprint; a turned-up four overlap at 0.56
+of a card (75 px compact, 64 tight), the box the banner and the pots keep clear of
+(`stage.shownHandRect` with the count, held at every phone size by `stage.test`). The deal sends
+four cards round in the time two take. Three or four face down sit a whole card's width over a
+compact or tight plate (`stage.SEAT_CARDS_OVER`), so their closed fan never covers the stack's
+figures. The one board keeps clear of every hand of four that may turn up wherever that leaves its
+cards 18 px or more (`board.handsClear`), and a hand that meets another's — a side seat's over its
+plate against the top corner's under its own — moves along its row (`stage.nudgeHands`,
+`SeatPlace.shownDx`), toward the middle first; on a 320 px phone with seven seats or more taken two
+can still meet.
+
+**The Hands guide.** "The games" adds Pot-limit Omaha: the `omaha` and `pot-limit` entries quoted,
+one hand drawn on one board with the five that play lifted (A♥ A♣ 7♠ 3♦ on K♥ 9♥ 6♥ 2♥ J♣: no flush,
+a pair of aces), and what the table does that the entries do not say.
+
+**The budgets, measured.** PLO's heaviest table (the same table with four-card hands, its short
+stacks in by pot raises): the state 14,878 bytes, the wire view 3,862 and its message 3,925; on it
+the room reads 26,886 per write and 29,537 in all — every figure within its budget.
+
+## PLO, two and three boards (modes P6)
+
+**The game.** `config.ENABLED` opens two and three boards, PLO's alone (`refineConfig`'s `plo-only`;
+a patch that names another game and no board count goes back to one, `mergeConfig`). Each board is
+dealt its own run of five at the deal and every board turns together, street by street, in the
+betting and in an all-in run-out. At a showdown each pot splits evenly between the boards
+(`pots.splitBoards`: the odd chips to board 1, then board 2) and each board's part goes to the
+strongest eligible hand on that board (`showdown`, through `variants.handValue`), an odd chip within a
+board to the first winner left of the button; a part of no chips (a pot of fewer chips than boards)
+names its winners and pays nothing. An uncontested hand pays one part, whatever the boards. A
+player's `wins` counts once a hand and `biggestWin` is the hand's total. The wire carries each paid
+pot's winners board by board (`PaidPotView.winners: number[][]`) and the page rebuilds every share
+with `pots.paidParts`, the server's own split. The result shows for 3 s, 1.2 s more for each side
+pot and a second for each board past the first (`config.revealMs`).
+
+**Picking it.** Under PLO, the start form and the host drawer's Game section show "Boards": One
+board, 2 boards, 3 boards, each a 44 px choice (`components/poker-night/BoardsChoice`, the choices
+`lobby.boardChoices`), with what more boards do in a line under them. The game's name carries its
+boards wherever it is said ("PLO · 3 boards", "Pot-limit Omaha, 3 boards").
+
+**Where the boards go.** `stage.stageLayout(box, seats, mySeat, boards, options)` lays one board out
+at the widest cards in the band round the middle (a row counting at the width that fits a pixel over
+and under it too), the nearest the middle among those within `BOARD_TIE` of the widest, one under it
+only when `UNDER_BIAS` nearer, and — given `options.prefer`, where the page drew it a moment ago —
+the nearest that, so the dock growing a pixel never sends it across the felt and back. The seats
+nobody sits in (`options.open`) are rings alone. Two or three are one block: one over another (stack), side by side (side), or cascaded — each
+lower board over the foot of the one above, a card's height × `CASCADE_STEP` (0.62) down, so the
+rank and corner suit (the top `INDEX_BAND`, 0.58, of a card) of every card stay in sight — each
+board's numeral in a column at its left when there is room (`BOARD_LABEL`, per fit, held to the
+stylesheet). The search tries every arrangement with and without the numerals at every height in the
+band round the middle and keeps the widest cards (within a pixel: stack, then side, then cascade,
+the numerals, nearest the middle; the numerals outright while they keep the cards 92 % of the widest,
+`LABELS_SHARE`, since the banner and the log name the boards); the block lies on the felt, its rail included, and clears every
+plate, bet line and button — and every hand of four that may turn up (every seat's but the seated
+viewer's own, `stage.shownHandRect`), unless that alone deals the cards under 18 px where without
+it they would be larger (`board.handsClear` says which). A second layout sends every seat's bet line
+straight up or down first (a side seat's along its rail, a top seat's under its plate) and is kept
+when it deals the boards larger and keeps its own lines clear. Where the middle deals them under
+18 px the block may sit anywhere across the felt that deals them larger: on a 568 × 320 phone with
+four players at eight seats, in the free half, at about 20 px rather than 14.
+
+The spike measured every phone's seat layer at every seat count, seated and watching: 19 px or more on
+every upright phone 360 px wide or more (26 up to seven seats), 16 px or more on a 320 px one (20 up
+to seven seats; 17 at 320 × 568 with nine), 20 px or more on a phone on its side (26 at 844 × 390 and
+24 at 667 × 375 with eight or nine seats), 60 on a desktop (66 at 1440 × 900) — pinned in
+`stage.test`, the boards clear of the hands everywhere but a few of the 320 px tables and the
+smallest phone on its side. There, 568 × 320, seven to nine seats leave the boards no room at all
+(as one board has none at eight and nine): they are cascaded at `MULTI_BOARD_MIN` (14 px) where
+they cover least of the bet lines, the hands and the dealer button (`fallbackY`), never a plate.
+Three boards are not capped at any seat count: on a phone the boards sheet carries them at 44 px.
+
+## Triple T (modes P7)
+
+**The game.** `config.ENABLED` opens Triple T: three cards each, one board, no limit. The antes and
+the blinds are posted as in Texas hold'em; then, before any betting, the hand's throw-away
+(`phase` 'discard'): nobody is on the clock, the turn number moves on once (the turn a throw names,
+so a throw sent for an earlier throw-away is stale even when its card is in the new hand) and one
+deadline runs for everyone, the turn's seconds but never above twenty (`config.discardMs`). Every
+player still in with three cards throws one away at the same time — all in from posting or not. The
+last throw opens the betting on the player after the big blind (heads-up, the button), and from there
+it is Texas hold'em with the two kept. A throw out of the throw-away, a second one or a card not held
+is refused; one past the deadline's two seconds of grace is stale.
+
+**The deadline.** The clock throws for everyone still to throw (flagged the clock's): the odd one out
+when two match in rank (three alike: the last dealt), else the lowest — from the cards alone, no
+ranking table. It counts no timeout and makes nobody away, so a slow throw never sits a player out
+or folds a blind they posted. Every writer gives it the timeout slack, since the throw-away has no
+actor. A player who leaves (or is removed) in it folds when they owe chips; one who owes none — the
+big blind, all in — has a card thrown for them at once (flagged 'auto'). A hand everyone else left
+in the throw-away is won uncontested with three cards, never shown (a show turns up all three: none
+was thrown away).
+
+**Private.** A card thrown away is stored in `Hand.discards` and in the history row, and leaves the
+server only to its owner: `MeView.discard` for the hand in play, `players[].discard` in their own
+history. The log line says only that a card went (`discard`, amount 0); the public view says how
+many cards a seat holds face down (three, then two) and which seats are still to throw
+(`HandView.toDiscard`). A throw is a visible write — the seat's count moves. A page whose seat's
+count no longer matches the cards it holds (the deadline threw for it) reads its whole view
+(`feed.needsPrivate`), and everyone dealt in polls at the near pace through the throw-away
+(`feed.nearTurn`). Shown hands, asks answered and shows are the two kept, never the third.
+
+**At the table, on a phone.** The dock's cards become a radio group of three ("Card to throw away"),
+side by side and never overlapping, each a target of 44 px or more (158 px wide compact, 140 tight):
+a tap picks a card, which rises 10 px, dims and carries an ✕; a full-width confirm under them names it
+("Throw away 7♣") or says "Pick a card first"; beside them the throw-away's seconds ("Throw away one ·
+12 s") and, once a card is picked, what the two kept make. Keys with the focus on the table: 1, 2 and
+3 pick, Enter throws, Escape takes the pick back (the digits only while the player keeps single-key
+shortcuts on); arrows move the pick and Enter on the card picked throws it. When the throw-away
+starts the drawers close, the focus moves to the cards, the turn's chime and buzz sound and a screen
+reader hears the three cards. With Peek on the three stay face down until pressed, and neither a
+card's name nor the confirm says which card it is. Both the cards and the confirm drop a tap that
+lands as they appear. Once thrown, the card flies to the table, the two kept hold three's width for
+the rest of the hand, and the row says how many players the table waits for, with "Leave after this
+hand" beside it. Every other plate shows three backs and "Discarding…" until its player throws (where the flag has
+no room under the plate — a phone on its side at seven seats or more — a dashed ring on the plate,
+`stage.flagRoom`), a third back then flying to the middle; the felt counts the throws ("Everyone throws away one card · 3
+of 5 done") with the seconds inside the board's empty place — the count alone ("3 of 5 thrown away")
+where the board is narrow, nothing where it is narrower still (a small phone on its side). Under reduced motion the pick is drawn in place and no card is seen
+leaving.
+
+**The Hands guide.** "The games" adds Triple T poker: its glossary entry (`triple-t`) quoted, and
+what the table does that the entry does not say — the blinds first, everyone at once and nobody
+seeing the cards thrown away, the timer and the rule a card is thrown by, and that it counts no
+timeout.
+
+**The budgets, measured.** Triple T's heaviest table (Texas hold'em's with nine cards thrown away
+kept): the state 14,833 bytes, the wire view 3,795 and its message 3,858 — below PLO's three boards,
+which the room document is measured on.
+
+**On the felt.** One `.pn-board` a board where the stage put it (`data-pn-board-index`, each read
+aloud as "Board 2: …"), the numerals as pills, empty places as the cloth's dashed outlines (filled
+with the cloth in a cascade). A card that plays keeps its ring and glow but does not lift on two or
+three boards, which would cover the board over it. The whole block is one button, at least 44 px
+each way, that opens the boards sheet (`components/poker-night/BoardsSheet`): each board under its
+name at 44 px a card, the cards that play lit at a showdown and who won the board with what. The
+pots and the banner keep clear of the whole block. The seat ring takes taps on its seats alone
+(`.pn-seats` passes the rest through), so the block under it keeps its own.
+
+**The reveal.** Each street's cards turn board after board (`BOARD_TURN_GAP`); at a showdown the
+cards that play light board after board (`BOARD_LIFT_STAGGER`), a hole card with the first board it
+plays on (`reveal.liftBoardOf`). The banner says a line a board — "Board 2: Ana wins 600" over the
+board's largest winner's hand, or its chips player by player ("Board 1: Ana 400 and you 200") —
+and one line, with no hand, only when one player won every board's share of every pot ("Ana wins
+every board: 1,800"; a side pot someone else took keeps the lines). Each pot's shares first fly
+from its pill to each board's numeral (the board's left end without one), then each board's stream
+runs from there to its winners. A pay-out that would run past the result's showing plays faster,
+every time in proportion (the flights' own lengths too, `Scheduled.pace`), so it ends with it. The
+hand log prints each street board by board, a shown hand's name on each board and a line for each
+board's share of each pot; the screen reader hears the same. The dock names what the viewer's cards
+make on each board, each kind behind its board's numeral badge and kept whole, the line breaking
+only between boards, the names in full as its accessible name. Cut short, a banner line says its head
+without the chips ("Board 2: Ana", "Ana wins": each seat's "+N" says them), never cutting inside a
+number or a board's name; it names fewer boards before it cuts a name, and then only to a letter and
+an ellipsis. The boards sheet draws the places still to come in the palette's muted ink.
+
+**The budgets, measured.** PLO's heaviest table on three boards (every pot split three ways): the
+state 15,048 bytes, the wire view 3,936 and its message 3,999. The room read 27,056 bytes, over its
+27,000: the room now remembers its last 36 action ids (`KEEP.APPLIED`, from 40), so it reads 26,944
+per write and 29,595 in all. The wire keeps 500 bytes to spare, so the protocol and the wire's shape
+are unchanged (the compaction ladder's first step, the ledger as tuples, came with version 2).
+
+## The table's small conveniences (modes P8)
+
+**A move stays for the street.** Once its tag has popped, each seat's last check, call, bet or raise
+stays on its plate, still, until the street ends (`reveal.streetTags`, from the log's tail; never a
+blind, an ante, a fold — the plate says Folded — or a card thrown away), so a glance mid-street shows
+every seat's move.
+
+**The raise panel on a phone.** A "−" and a "+" (44 px) round the amount step a big blind at a time,
+held to the legal range; the slider takes a row of its own where the dock is narrow. The panel opens
+at the size the player last confirmed before the flop, or after it, when this turn offers it — the
+minimum, ½ or ¾ pot, never the all-in or the pot — kept in this browser alone, never sent.
+
+**One tap back in.** Out of chips with a rebuy allowed, the dock's one tap buys the whole buy-in the
+table allows: "Rebuy 2,000 chips", or "Ask for 2,000 chips" where the host says yes first (once the
+game has started, for anyone but the host, while the host is here); "Other amount" opens the bank,
+only when the table allows another. A narrow dock says the figures alone and leaves "Out of chips"
+to the plate.
+
+**Small doors.** The winner's banner is a button that opens the hand log; for a seated player an
+open seat says "Invite" and opens the invite sheet; the table's menu turns the sounds on or off.
+
+**Hands turned up in a crowded column.** Where a turned-up hand of two would cover another seat's
+plate, the flag under one, another hand or the board — nine seats on a 375 or 320 px phone, seven
+or more on a phone on its side — every hand is placed again, each next to its own plate: along its
+row, under a side seat's plate, or beside it toward the middle, whichever covers least (a plate
+weighing most, then the board, the pots' band by the board, another hand, a flag), keeping one of
+the pots' bands clear. Nine hands up on a 320 px phone can still leave two meeting, and the banner
+then sits where the pot was, flagged. PLO's hands of four keep the row's nudge alone.
+
+**The dock's hand name on a phone on its side** sits on a row of its own under the cards and wraps
+to two lines; the longest a name gets ("Full house, threes full of sevens") fits whole at 568 × 320.
+
+**A plate's word with no room under it.** A plate's status ("Folded", "All in", "Offline", "Waiting
+for chips", "No chips yet" for a seat that never had chips — never "Out of chips") hangs under it where
+it clears every other seat's plate, cards, blind's mark and word; where it has none, the plate carries
+it in its stack's place (the stack stays in the plate's name), Triple T's "Discarding…" as a dashed
+ring. A phone on its side, the dock in its column, seats eight two to a side column, the bottom row's
+corners and one at the top, so every word hangs there; seven and nine keep the upright slots.
+
+**After the payout.** The winner's banner keeps clear of the pots paying out and the winners' "+N"
+only where that leaves room; else it is placed clear of the table alone, since both leave within a
+second or two, so the long pause after a hand never leaves it over a plate.
+
+**The join card on a phone on its side** starts under the top bar and is as tall as the screen
+leaves it; its form scrolls inside and "Sit down" and "Just watch" sit at its foot, always in sight.
+"How it plays" opens the Hands guide on the table's game, before the rankings.
 
 ## Engine rules
 
@@ -583,7 +928,8 @@ Every engine module is unit-tested in `lib/poker-night/__tests__/`:
   verdict of who may send what, the write's filter and pipeline (the cooldown, the seq, the ring,
   the awards), who sees what (muted, stale, their own), the on-screen caps and the timers' phases, a
   throw's path, the impacts' pieces the same on every screen and their CSS safe in a `<style>`;
-  every sound recipe within its gain, frequency and length, the 60 ms gate and the hidden page, each
+  every sound recipe within its gain, its layers' mix, frequency and length over many seeds (one seed
+  one sound, a landing of its own for each thing thrown), the 60 ms gate and the hidden page, each
   animation's sound at its moment; the room's keys, never a move's; the emote seq moving only
   without a gap. The browser QA sends emotes through the API (the cooldown's 429, a watcher's 409,
   throwables off 403, the awards) and between two screens (a reaction, a tomato's `data-splat` on

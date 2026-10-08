@@ -7,11 +7,14 @@
 // order too, and the odd chip of a split goes to the first winner left of the button.
 //
 // Closing a hand runs them in this order: uncalled first (the unique top committer gets back what
-// nobody matched, even a folded one), then buildPots over what is left, then splitPot per pot.
+// nobody matched, even a folded one), then buildPots over what is left, then each pot split between
+// the boards (splitBoards: one part on a single board) and each part between its board's winners
+// (splitPot). paidParts rebuilds the shares from the winners alone, so the wire carries only those.
 
 export type Contribution = {seat: number; amount: number; folded: boolean};
 export type Pot = {amount: number; eligible: number[]};
-export type SettledPot = Pot & {winners: number[]; shares: number[]};
+// winners[k] and shares[k]: board k's part of the pot, its winners in hand order and their shares.
+export type SettledPot = Pot & {winners: number[][]; shares: number[][]};
 
 const checkAmounts = (contribs: readonly Contribution[]) => {
     for (const {seat, amount} of contribs) {
@@ -72,4 +75,31 @@ export const splitPot = (amount: number, winnersInOrder: readonly number[]): num
     const base = Math.floor(amount / k);
     const odd = amount - base * k;
     return winnersInOrder.map((_, i) => base + (i < odd ? 1 : 0));
+};
+
+// A pot split between b boards: an equal part each, rounded down, and the odd chips one each to the
+// first boards (board 1, then board 2). A part may be 0 when the pot holds fewer chips than boards.
+export const splitBoards = (amount: number, boards: number): number[] => {
+    if (!Number.isSafeInteger(amount) || amount < 0) throw new RangeError(`cannot split ${amount}`);
+    if (!Number.isInteger(boards) || boards < 1) throw new RangeError(`a pot splits over at least one board, not ${boards}`);
+    const base = Math.floor(amount / boards);
+    const odd = amount - base * boards;
+    return Array.from({length: boards}, (_, k) => base + (k < odd ? 1 : 0));
+};
+
+export type PaidPart = {board: number; amount: number; winners: number[]; shares: number[]};
+
+// A paid pot board by board, from its amount and each board's winners (one list per board): the
+// part each board holds and the shares of its winners — the server's own split, so a browser that
+// is sent only the winners works out the same chips.
+export const paidParts = (pot: {amount: number; winners: readonly (readonly number[])[]}): PaidPart[] => {
+    const parts = splitBoards(pot.amount, pot.winners.length);
+    return pot.winners.map((winners, board) => ({board, amount: parts[board], winners: [...winners], shares: splitPot(parts[board], winners)}));
+};
+
+// What a paid pot gave each seat over every board, in the order the seats first win a part.
+export const seatShares = (pot: {amount: number; winners: readonly (readonly number[])[]}): {seat: number; share: number}[] => {
+    const out = new Map<number, number>();
+    for (const part of paidParts(pot)) part.winners.forEach((seat, j) => out.set(seat, (out.get(seat) ?? 0) + part.shares[j]));
+    return [...out].map(([seat, share]) => ({seat, share}));
 };

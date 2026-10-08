@@ -1,13 +1,16 @@
 'use client';
 
-// The leave dialog: from the menu's "Leave table", the dock's Leave when sitting down again is not
-// assured, and the top bar's Home for a seated player. What it says and offers is
+// The leave dialog: from the menu's "Leave table" / "Leave now", the dock's Leave when sitting down
+// again is not assured, and the top bar's Home for a seated player. What it says and offers is
 // lib/poker-night/overlays.leavePlan, read on every render — a deal that lands while it is open
-// turns it into the mid-hand dialog before the player confirms ("Leave in the middle of a hand?",
-// the hand folding the next time it faces a bet), and the button keeps its place as its label
-// changes. Home's buttons leave and then load "/" in full ("Leave and go"), so the table's
-// connection, wake lock and sounds end with the page; Stay keeps everything as it is. On a phone the
-// buttons are full width, the one that acts at the bottom.
+// turns it into the mid-hand dialog before the player confirms ("Leave in the middle of a hand?":
+// Leave now, the hand folding the next time it faces a bet, or "Leave after this hand", playing it
+// out), and a button keeps its place as its label changes. A leave that keeps the player on the page
+// is the room's 'leave-after' (useLeaveAfter: between hands it leaves at once, and a deal that lands
+// first is played out, never folded); Home's buttons leave now and then load "/" in full ("Leave and
+// go"), so the table's connection, wake lock and sounds end with the page — but Home's "Leave after
+// this hand" stays on the page, since an absent player would hold the table up. Stay keeps
+// everything as it is. On a phone the buttons are full width, the primary at the bottom.
 
 import {useState} from "react";
 import {toast} from "sonner";
@@ -17,6 +20,7 @@ import ActionButton from "@/components/primitives/ActionButton";
 import {focusTableOnClose} from "@/components/poker-night/overlay-kit";
 import {goHome} from "@/components/poker-night/HomeLink";
 import {useRoom} from "@/components/poker-night/room-controller";
+import {useLeaveAfter} from "@/components/poker-night/useLeaveAfter";
 import {TABLE_COPY} from "@/lib/learn/copy/poker-night";
 import {leavePlan, type LeaveAction, type LeaveThen} from "@/lib/poker-night/overlays";
 
@@ -28,13 +32,22 @@ type Props = {
 
 const LeaveDialog = ({then, toTable, onClose}: Props) => {
     const room = useRoom();
+    const leaving = useLeaveAfter();
     const [busy, setBusy] = useState<LeaveAction['send'] | null>(null);
     const plan = then && room.view ? leavePlan(room.view, then) : null;
     const open = plan !== null;
 
     const act = async (action: LeaveAction) => {
-        if (busy) return;
+        if (busy || !plan) return;
         setBusy(action.send);
+        if (action.send === 'leave-after') {
+            // Read at confirm time: between hands it leaves at once, and should a deal land first the
+            // answer says so (useLeaveAfter's toast).
+            const ok = await leaving.send(true, {between: !plan.midHand});
+            setBusy(null);
+            if (ok) onClose();
+            return;
+        }
         const r = await room.send({type: action.send});
         if (!r.ok) {
             setBusy(null);
@@ -64,17 +77,19 @@ const LeaveDialog = ({then, toTable, onClose}: Props) => {
                             <DialogTitle className="font-heading">{plan.title}</DialogTitle>
                             <DialogDescription>{plan.body}</DialogDescription>
                         </DialogHeader>
+                        {plan.afterNote && <p className="text-xs text-fg-soft" data-pn-leave-after-note="">{plan.afterNote}</p>}
                         {plan.note && <p className="text-xs text-fg-muted" data-pn-leave-note="">{plan.note}</p>}
-                        <div className="mt-2 flex flex-col gap-2 sm:flex-row sm:justify-end">
+                        <div className="mt-2 flex flex-col gap-2 sm:flex-row sm:flex-wrap sm:justify-end">
                             {/* Stay first, so the keyboard lands on the safe choice. */}
                             <ActionButton variant="secondary" size="md" className="min-h-11 w-full sm:w-auto" autoFocus disabled={busy !== null}
                                           onClick={onClose} data-pn-leave="stay">
                                 {TABLE_COPY.stay}
                             </ActionButton>
                             {plan.actions.map((action) => (
-                                <ActionButton key={action.send} variant={action.destructive ? 'destructive' : 'primary'} size="md"
+                                <ActionButton key={`${action.send}-${action.navigates}`} variant={action.destructive ? 'destructive' : 'primary'} size="md"
                                               className="inline-flex min-h-11 w-full items-center justify-center gap-2 sm:w-auto" disabled={busy !== null}
-                                              aria-busy={busy === action.send} onClick={() => void act(action)} data-pn-leave={action.send}>
+                                              aria-busy={busy === action.send} onClick={() => void act(action)} data-pn-leave={action.send}
+                                              data-pn-leave-way={action.destructive ? 'now' : 'after'}>
                                     {busy === action.send && <Loader2 className="size-3.5 animate-spin" aria-hidden="true"/>}
                                     {action.label}
                                 </ActionButton>

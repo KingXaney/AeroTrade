@@ -17,7 +17,7 @@ describe('the personal look', () => {
     it('starts on the defaults: the red back, large faces, two colours, classic chips, everything on but peek and muted emotes', () => {
         expect(DEFAULT_PERSONAL_LOOK).toEqual({
             cardBack: 'classic-red', cardFace: 'large', fourColour: false, chips: 'classic',
-            sound: true, buzz: true, keepAwake: true, shortcuts: true, handHints: true, peek: false, muteEmotes: false,
+            sound: true, buzz: true, keepAwake: true, shortcuts: true, handHints: true, peek: false, muteEmotes: false, allowAsks: true,
         });
         expect(Object.isFrozen(DEFAULT_PERSONAL_LOOK)).toBe(true);
         expect([...PERSONAL_KEYS].sort()).toEqual(Object.keys(DEFAULT_PERSONAL_LOOK).sort());

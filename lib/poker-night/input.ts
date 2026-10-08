@@ -3,12 +3,12 @@
 // client-safe, so the table's fetch helper can type its bodies from the same schemas.
 //
 // Every action carries an actionId the client makes once per intent and reuses on a retry: the room
-// keeps the last 64 it applied, so a double tap or a retried request is one action. Identity never
+// keeps the last 40 it applied, so a double tap or a retried request is one action. Identity never
 // comes from a body — `by` is the pid the room found for the request's own identity.
 
 import {z} from 'zod';
 import {AVATAR_MAX_LENGTH, isAvatar} from '@/lib/poker-night/avatar';
-import {GameConfigSchema, RoomSettingsSchema, TABLE_LIMITS} from '@/lib/poker-night/config';
+import {GAME_CONFIG_SHAPE, RoomSettingsSchema, TABLE_LIMITS} from '@/lib/poker-night/config';
 import {PHRASE_IDS, REACTION_IDS, THROW_IDS, type ReactionId, type ThrowId} from '@/lib/poker-night/emotes';
 import {cleanTableName} from '@/lib/poker-night/names';
 import type {HostOp, Move, PreAction, TableAction} from '@/lib/poker-night/types';
@@ -60,7 +60,7 @@ const PreSchema = z.discriminatedUnion('kind', [
 
 // The host's config changes: any field but the seat count, checked whole by the engine once laid
 // over the current config.
-const ConfigPatchSchema = z.strictObject(GameConfigSchema.shape).omit({seats: true}).partial();
+const ConfigPatchSchema = z.strictObject(GAME_CONFIG_SHAPE).omit({seats: true}).partial();
 
 // The room's settings, at once; a table name is cleaned before the engine sees it.
 const SettingsPatchSchema = RoomSettingsSchema.extend({name: z.string().max(TABLE_NAME_INPUT_MAX)}).partial();
@@ -69,18 +69,30 @@ const HostOpSchema = z.discriminatedUnion('op', [
     z.strictObject({op: z.enum(['start', 'pause', 'resume', 'end'])}),
     z.strictObject({op: z.literal('config'), patch: ConfigPatchSchema}),
     z.strictObject({op: z.literal('settings'), patch: SettingsPatchSchema}),
-    z.strictObject({op: z.enum(['approve', 'deny', 'kick']), pid}),
+    // Approve names the amount the host saw: the engine refuses it (stale) once the request changed.
+    z.strictObject({op: z.literal('approve'), pid, amount: buyIn}),
+    z.strictObject({op: z.enum(['deny', 'kick']), pid}),
     // Sit a player out; nothing takes one back but the player's own sit-in.
     z.strictObject({op: z.literal('sit-out'), pid}),
 ]);
 
 // POST action. The table's moves go to the engine; profile, unban, hand-over and claim-host are the
-// room's own (lib/poker-night/room.actionStep).
+// room's own (lib/poker-night/room.actionStep). discard: Triple T's throw-away (the card, and the
+// turn the throw-away opened at, as act names its turn). leave-after: leave once the hand in play completes
+// (on), or stay (off). withdraw: take back one's own request for chips. ask: ask a player to see
+// their cards of the hand just completed; reply: answer an ask from `to` — show them alone ('one'),
+// everyone ('all') or no ('none'). allow-asks: "Let others ask to see my cards".
 export const ActionSchema = z.discriminatedUnion('type', [
     z.strictObject({actionId, type: z.literal('act'), turn: count, move: MoveSchema}),
+    // Triple T: the card thrown away, in the throw-away the turn names.
+    z.strictObject({actionId, type: z.literal('discard'), turn: count, card: z.int().min(0).max(51)}),
     z.strictObject({actionId, type: z.literal('pre'), pre: PreSchema.nullable()}),
     z.strictObject({actionId, type: z.literal('sit'), seat, buyIn}),
-    z.strictObject({actionId, type: z.enum(['leave', 'sit-out', 'sit-in', 'show'])}),
+    z.strictObject({actionId, type: z.enum(['leave', 'sit-out', 'sit-in', 'show', 'withdraw'])}),
+    z.strictObject({actionId, type: z.literal('leave-after'), on: z.boolean()}),
+    z.strictObject({actionId, type: z.literal('ask'), to: pid}),
+    z.strictObject({actionId, type: z.literal('reply'), to: pid, show: z.enum(['one', 'all', 'none'])}),
+    z.strictObject({actionId, type: z.literal('allow-asks'), on: z.boolean()}),
     z.strictObject({actionId, type: z.literal('claim-host')}),
     z.strictObject({actionId, type: z.literal('buy'), amount: buyIn}),
     z.strictObject({actionId, type: z.literal('host'), op: HostOpSchema}),
@@ -123,7 +135,9 @@ const hostOpOf = (op: z.infer<typeof HostOpSchema>): HostOp => {
             const {name, ...rest} = op.patch;
             return {op: 'settings', patch: name === undefined ? {...rest} : {...rest, name: cleanTableName(name) ?? ''}};
         }
-        case 'approve': case 'deny': case 'kick':
+        case 'approve':
+            return {op: 'approve', pid: op.pid, amount: op.amount};
+        case 'deny': case 'kick':
             return {op: op.op, pid: op.pid};
         case 'sit-out':
             return {op: 'sit-out', pid: op.pid};
@@ -137,6 +151,8 @@ export const toTableAction = (input: TableActionInput, by: string, at: number): 
     switch (input.type) {
         case 'act':
             return {type: 'act', by, turn: input.turn, move: moveOf(input.move), at};
+        case 'discard':
+            return {type: 'discard', by, turn: input.turn, card: input.card, at};
         case 'pre':
             return {type: 'pre', by, pre: preOf(input.pre), at};
         case 'sit':
@@ -145,6 +161,14 @@ export const toTableAction = (input: TableActionInput, by: string, at: number): 
             return {type: 'buy', by, amount: input.amount, at};
         case 'host':
             return {type: 'host', by, op: hostOpOf(input.op), at};
+        case 'leave-after':
+            return {type: 'leave-after', by, on: input.on, at};
+        case 'ask':
+            return {type: 'ask', by, to: input.to, at};
+        case 'reply':
+            return {type: 'reply', by, to: input.to, show: input.show, at};
+        case 'allow-asks':
+            return {type: 'allow-asks', by, on: input.on, at};
         default:
             return {type: input.type, by, at};
     }
@@ -159,9 +183,9 @@ export const parseSeq = (raw: string | null): number | null => (raw !== null && 
 
 type QueryReader = {get(name: string): string | null};
 
-// GET state?since=<seq>&esince=<emoteSeq>: what the client already has.
-export const parseStateQuery = (params: QueryReader): {since: number | null; esince: number | null} =>
-    ({since: parseSeq(params.get('since')), esince: parseSeq(params.get('esince'))});
+// GET state?since=<seq>&esince=<emoteSeq>&nsince=<nudge>: what the client already has.
+export const parseStateQuery = (params: QueryReader): {since: number | null; esince: number | null; nsince: number | null} =>
+    ({since: parseSeq(params.get('since')), esince: parseSeq(params.get('esince')), nsince: parseSeq(params.get('nsince'))});
 
 export type DetailQuery = {part: 'log'; hand: number | null} | {part: 'history'; before: number | null} | {part: 'bank'};
 

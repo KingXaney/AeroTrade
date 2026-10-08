@@ -15,8 +15,8 @@
 // setting) or that player (the plate's menu, for this visit); never one older than 8 s. Lifetimes
 // are timers (lib/poker-night/emotes EMOTE_TIMING), never animationend; at most three per player and
 // 24 in all. Everything drawn here is hidden from a screen reader: the polite region at the end says
-// each one instead. A pop sounds for another player's reaction or phrase, and a landing (a splat, a
-// pop, a fizz or a bounce: emotes.landingSound) as a throw lands, while the viewer keeps the sounds
+// each one instead. A pop sounds for another player's reaction or phrase, and a landing (each thing
+// its own, emotes.landingSound, from the emote's id) as a throw lands, while the viewer keeps the sounds
 // on. Also mounts the plates' menus (SeatMenus).
 
 import {useEffect, useRef, useState, useSyncExternalStore, type CSSProperties} from "react";
@@ -28,6 +28,7 @@ import {EMOTE_COPY, TABLE_COPY} from "@/lib/learn/copy/poker-night";
 import {
     burstJitter, emoteSpot, impactBits, impactOf, landingSound, reactionGlyph, throwCeiling, throwGlyph, throwPath, type EmoteMessage, type LiveEmote,
 } from "@/lib/poker-night/emotes";
+import {soundSeed} from "@/lib/poker-night/sounds";
 import {avatarCentre, type SeatPlace, type Stage} from "@/lib/poker-night/stage";
 import type {People, SeatView} from "@/lib/poker-night/view-types";
 
@@ -100,7 +101,7 @@ const EmoteLayer = ({stage}: {stage: Stage}) => {
     // A throw sounds as it lands, while the viewer keeps the sounds on.
     const soundOn = room.personal.sound;
     useEffect(() => (soundOn ? store.onLand((landed) => {
-        if (landed.emote.kind === 'throw') playSound(landingSound(landed.emote.item));
+        if (landed.emote.kind === 'throw') playSound(landingSound(landed.emote.item), soundSeed(landed.emote.id));
     }) : undefined), [store, soundOn]);
     const live = useSyncExternalStore(store.subscribe, store.get, store.get);
 
@@ -113,7 +114,7 @@ const EmoteLayer = ({stage}: {stage: Stage}) => {
         if (shown.length === 0) return;
         if (personal.sound) {
             if (shown.some((e) => e.kind !== 'throw' && e.from !== me)) playSound('pop');
-            if (motionReduced()) for (const e of shown) if (e.kind === 'throw') playSound(landingSound(e.item));
+            if (motionReduced()) for (const e of shown) if (e.kind === 'throw') playSound(landingSound(e.item), soundSeed(e.id));
         }
         const el = region.current;
         if (!el) return;

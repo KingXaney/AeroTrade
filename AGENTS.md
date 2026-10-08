@@ -130,7 +130,8 @@ and friends keep none beyond Shared and the invariants).
   over the lobby's chip from the panel's own read, one per request through React's `cache`); the panel
   `components/home/HomePokerNight` (props only) is drawn only when it has a row — the tables the
   reader holds a seat at (Rejoin) or hosts from outside one (Open), then friends' shown open tables
-  (Join), `HOME_LIMITS` of each, and "Learn the hands" (`/poker-night?tab=hands`). Its read,
+  (Join), `HOME_LIMITS` of each, each row's line opening with its table's game (`lobby.tableLine`: "PLO · …"),
+  and "Learn the hands" (`/poker-night?tab=hands`). Its read,
   `lib/poker-night/lobby-store.getHomePokerNight` (null with the kill switch on or no row), shaped by
   the pure `lib/poker-night/lobby.homePokerNight`, is streamed under `<Suspense fallback={null}>` by
   `PokerNightAsync`, declared in `app/(root)/page.tsx` because poker night's server guard keeps its
@@ -499,7 +500,81 @@ and friends keep none beyond Shared and the invariants).
   room layer in `lib/poker-night/`, the three models, the stores, the table's API under
   `app/api/poker-night/[code]/`, the lobby and the playable table (`/play/CODE`), live over Ably
   where a key is set and polling everywhere else, with its looks, emotes and the night's awards;
-  the design and the phase still to come are `docs/specs/2026-10-06-poker-night.md`.
+  the design and the phase still to come are `docs/specs/2026-10-06-poker-night.md`. State version 2
+  (the modes work's P4) holds every stored field PLO, multi-board and Triple T need, so a later phase
+  only switches them on: `lib/poker-night/config.ENABLED` (every game now: Texas hold'em, PLO on one
+  to three boards, Triple T; the tests hand `checkConfig`/`dealable` a narrower list) gates
+  the input paths (`checkConfig`: 'not-open') and the deal (`dealable`: a table set to a game this
+  deploy does not deal waits between hands, its config intact), never the stored shape;
+  `lib/poker-night/variants` (pure) is each game's evaluation (`handValue`, `bestHand`, Omaha's
+  `hand-name.bestOmaha`), `readShown` (a shown hand read on every board, client and server alike),
+  `limitOf`, `autoDiscard`; a hand keeps its own `variant`, one five-card run per board in `deck`
+  and what is out of each in `boards`, and a pot pays board by board (`winners`/`shares` are
+  `number[][]`, split by `pots.splitBoards`, the odd chips to the first boards).
+- PLO (P5, one board): four cards each (`config.HOLE_CARDS`), a hand exactly two of them with exactly
+  three from the board (`variants.handValue`/`bestHand` over `hand-name.bestOmaha`; never "plays the
+  board", `playsBoardFor`), high only. Pot limit is `betting.legalFor`'s, on `BettingSnapshot.limit`
+  and `pot` (the server's Σ committed; the client's Σ `SeatView.inPot`): at most to the current bet
+  plus the pot after the call, never below the minimum, never past all in; the all-in move is a raise
+  only within the cap (`betting.allInOpen`), the call facing the whole stack, else 'illegal' — so the
+  raise panel's top is Pot (`bet-sizing.Sizing.cap`, `quickSizes`, `confirmLabel`) and its confirm
+  sends a raise to it (`bet-sizing.moveFor`), never an all-in over the cap. The game is the host's,
+  from the next hand: the lobby's one-tap buttons (`QuickStart`, `data-quick-start="holdem|plo|triple-t"`,
+  Texas hold'em still the one tap) and `components/poker-night/GameChoice` in the start form and the
+  host drawer (`lobby.GAME_CHOICES`/`boardChoices`, `overlays.GameForm.variant`); `variants.modeOf`,
+  `nextModeOf` and `modeChanged` name the game in play and the next — the top bar's second line
+  (`data-pn-mode-label`, the code from 400 px), the felt before the first hand, the countdown when it
+  changes, a toast and an announcement at its first deal (the deal event's `changed`), the join
+  card's terms with "How it plays" (the Hands drawer opened on that game, before the rankings —
+  `overlay-requests.openOverlay('hands', {lead: true})`, `HandsGuide`'s `lead` — for a visitor too), the invite
+  sheet, the link preview and every lobby and Home row (`LOBBY_PROJECTION` reads
+  `state.config.variant`/`boards`; `lobby.modeLine`); every name is `MODE_COPY`. The dock fans four
+  cards (`.pn-hole[data-count="4"]`, the night's width held by `data-slots`, at 0.8 of the card in the
+  column of a phone on its side so the emote button keeps its row) and names nothing
+  before the flop (`dock.handStrength(variant, …)`); a seat's four backs keep the two's footprint and
+  a turned-up four overlap by `stage.SHOWN_STEP` (`shownHandRect(…, count)` via
+  `BannerSeen.handSize`, which the banner and the pots keep clear of); the deal event carries its
+  card count, which the choreography deals round in the time two take. `budget.test` holds PLO's
+  heaviest table (pot raises to all in) to every budget too.
+- Triple T (P7): three cards each (`config.HOLE_CARDS`); once the antes and blinds are posted the hand
+  opens its throw-away — `Hand.phase` 'discard', nobody on the clock (`actor` null), `state.turn`
+  moved on once and one deadline for everyone, `config.discardMs` (the turn's seconds, never above
+  `DISCARD_MAX_SECONDS`, 20) — in which every player still in with three, all in from posting
+  included, throws one away at the same time (`engine.discard`, the action `{type: 'discard', turn,
+  card}`: refused 'not-seated', 'stale' for another throw-away's turn or past the deadline's grace,
+  'not-now' out of it or thrown already, 'illegal' for a card not held); the last throw opens the
+  betting as Texas hold'em does (`settleTurn` from the big blind), and from there the hand is Texas
+  hold'em with the two kept (`PLAYING_CARDS`). At the deadline (`clock.nextDue`, every writer giving
+  it the slack, there being no actor) `engine.timeout` throws for everyone still to
+  (`variants.autoDiscard`, data-free: the odd one out when two match, else the lowest; flagged the
+  clock's) and counts no timeout and makes nobody away, so a slow throw never folds a blind. A leaver
+  who owes chips folds; one who owes none (the big blind, all in) has a card thrown for them at once,
+  flagged 'auto'; a hand won in the throw-away ends with its winner's three, never shown. A card
+  thrown away lives in `Hand.discards` (PRIVATE), its log line names no card (`'discard'`, amount 0):
+  the public view says only how many a seat holds face down (`CardsView`, 3 then 2) and who is still
+  to throw (`HandView.toDiscard`); the thrower alone gets it, `MeView.discard` and their history's
+  `players[].discard` (`historyView`), and a show turns up the two kept. A throw is visible (the seat's
+  count moves); `feed.nearTurn` counts everyone dealt in as near through it, and `feed.needsPrivate`
+  reads the whole view when the seat's count no longer matches the cards held (the deadline threw for
+  the viewer). At the table: `components/poker-night/DiscardPicker` in the dock (a radio group of
+  three cards of 44 px or more, the one picked lifted 10 px, dimmed by filter and marked with an ✕;
+  arrows move the pick, Enter on the card picked throws it; 1–3, Enter and Escape with the focus on the
+  table, `keys.discardIntentForKey`, the digits held to the player's switch; Peek keeps them face down
+  until pressed and never names the card; both it and its full-width confirm behind the tap shield),
+  the throw-away's seconds and then what the two kept make beside it (`dock.DockView.discard`), the
+  wait for the others with "Leave after this hand" once thrown, the card thrown flying off
+  (`HoleCards`' `thrown`, `.pn-hole[data-slots="3"]` holding three's width the whole hand); the plates
+  "Discarding…" (`TABLE_COPY.discarding`, `data-discarding`) over three backs, a third back flying to the
+  middle as each throws (the log's `discard` event, `choreography` `BEAT.DISCARD_GAP`, the fold's
+  swish); the felt's count (`dock.throwAwayCount`, "Everyone throws away one card · 3 of 5 done" with
+  the seconds, inside the board's empty place: the count alone where it is narrow, nothing narrower); `overlays.attentionKey` (`turn:n` or `discard:handNo`, in place of the old turn key)
+  closes the drawers, chimes and buzzes for the throw-away as for a turn; the screen reader hears the
+  three cards at once, the viewer's own throw (or the clock's) with its card, the others' without, and
+  the throw-away over (the `discarded` event); the hand log and history say the reader's own card
+  thrown away to them alone (`LOG_COPY.youThrew`). Every sentence is `DISCARD_COPY`; the game's
+  glossary entry is `triple-t`, its Hands section the guide's third game. `simulate.test` plays Triple
+  T nights (throws, refused throws, deadlines, leavers in the throw-away), `views.test` scans them for
+  another player's card thrown away, and `budget.test` holds its heaviest table to every budget.
 - `lib/poker-night/engine.reduce` is the one way a table's state (`lib/poker-night/types`) changes:
   a pure reducer that clones once, never mutates its input and hands back the same reference for a
   no-op. Time, the deck and the first big blind's draw arrive inside the action, so a step replays
@@ -517,26 +592,84 @@ and friends keep none beyond Shared and the invariants).
   not held to it.
 - `lib/poker-night/views` is the only way state leaves the server: `publicView`, `wireView`,
   `playerView` and `historyView` copy field by field from a whitelist. `lib/poker-night/view-types`
-  is the client contract, declared on its own, never an `Omit<>` of a server type, and it has no
-  deck. The client offers moves with `legalFor(snapshotFromView(view), seat)`, the very function
-  the server checks them with (`lib/poker-night/betting.legalFor`).
+  is the client contract (version 2: `TableView.v`), declared on its own, never an `Omit<>` of a
+  server type, and it has no deck. The client offers moves with
+  `legalFor(snapshotFromView(view), seat)`, the very function the server checks them with
+  (`lib/poker-night/betting.legalFor`). To keep the wire to its budget a seat's face-down cards are
+  their count (`CardsView` is `'none' | number | Card[]`), a paid pot carries its winners alone
+  (`PaidPotView`; the shares are `pots.paidParts`/`seatShares`, the server's own split), a shown
+  hand its cards alone (`variants.readShown`), and the ledger rows are tuples (`LedgerView`;
+  `views.ledgerRows`/`ledgerRowOf` read them). Only the viewer's own `me` carries their cards, their
+  thrown-away card, their pre-action, `next` ('leave' once they left now, 'leave-after' while they
+  play out a hand they chose to leave after, 'sit-out' while a sit-out waits), the hand's asks they
+  made or were asked, the hands shown to them alone (`shownToMe`), who they may ask (`canAsk`) and
+  why not the rest they could (`askBlocked`, `asks.askChoices`: asks off, a cooldown, one waiting,
+  the limit — the one thing a view says of another player's asks setting, what the engine's refusal
+  would say), and their own `allowAsks`; `PlayerView.nudge` is their nudge count (below).
 - Conservation: Σ stacks + Σ committed to a live hand + Σ cashed out = Σ bought
   (`lib/poker-night/ledger.conservation`), checked after every step of
   `lib/poker-night/__tests__/simulate.test.ts` (100 seeded nights; `PN_SIM_SEEDS=1000` runs more).
   Chips are bought only when they land (`recordBuy`), so a pending buy is not yet bought; net is
   chips + cashed out − bought, with chips counting what is in a live pot, steady mid-hand.
 - A stored state field never changes meaning without bumping `STATE_VERSION`
-  (`lib/poker-night/config`) and adding a step to `lib/poker-night/migrate`. A hand's log and a
-  ledger row's events are stored as number tuples whose kinds index `ENTRY_KINDS` and
-  `LEDGER_KINDS`, append-only lists; `lib/poker-night/__tests__/budget.test.ts` holds the state to
-  16,000 bytes, the room document to 27,000 for what each write reads (30,000 with the emotes) and
-  the wire view to 4,500 on the heaviest table the engine builds.
+  (`lib/poker-night/config`, now 2) and adding a step to `lib/poker-night/migrate`: `migrateState`
+  hands a valid version 2 state back as it is, checks a version 1 one against its own frozen shape
+  and steps it (`v1ToV2`: the config's game last, rebuys 'auto' read as 'approve', `leaveAfter` off,
+  ledger times to seconds, a request's time kept, the hand's one board as a run and a
+  board, pots paid on that board, shown hands as their cards), and refuses anything else;
+  `migrateSummary` reads a PokerHand row written before version 2 as today's
+  (`hands-store.readHand`/`readHands`). The version 1 fixtures (`state-v1-corpus.json`,
+  `state-v1-showdown.json`, `summary-v1.json`) are each stepped, held to their invariants and
+  played on in `fixtures-v1.test.ts`. A hand's log, a ledger row's events and a hand's asks are
+  stored as number tuples whose kinds index `ENTRY_KINDS`, `LEDGER_KINDS` and `ASK_ANSWERS`,
+  append-only lists; `lib/poker-night/__tests__/budget.test.ts` holds the state to 16,000 bytes,
+  the room document to 27,200 for what each write reads (30,000 with the emotes) and the wire view
+  to 4,500 on the heaviest table the engine builds, every private list at its longest on top
+  (`PN_BUDGET_PRINT=1` prints the bytes: 14,798, 26,806, 29,457 and 3,787 when version 2 landed;
+  each request's time, kept since, took the read past 27,000).
 - The rules a change most often meets (the spec has the rest): the big blind always moves one
   eligible seat on (`lib/poker-night/seats.positions`); a short all-in reopens nobody who has acted
   unless the short all-ins since add up to a full raise, but a checker facing an opening all-in
   below the minimum bet may raise; the uncalled bet goes back even to a folded seat; every live hand
   shows at a showdown; a player who leaves or is removed while facing a bet folds at once, otherwise
-  stays in, away, and is cashed out when the hand completes.
+  stays in, away, and is cashed out when the hand completes. "Leave after this hand"
+  (`leave-after`, `Seat.leaveAfter`, private) plays the hand out as usual — not away, moves and
+  pre-actions as ever — and cashes out once as it completes, a buy waiting for it dropped; it can be
+  taken back until then, takes the place of a sit-out asked for (and of a request), a buy or an
+  approval is `not-now` while it is set, and between hands (or not dealt in) it is leaving now — the
+  one leave a page that stays open sends, so a deal that lands first never costs a blind
+  (`seats.isEligible` leaves it out).
+- Buys: before the first hand is dealt every seat and buy lands at once; after it, every buy but the
+  host's — a newcomer's first chips, a re-sit, a rebuy, a top-up — is a request the host approves or
+  declines (`ledger.needsHost`; one per player, the newest in its place, until decided, withdrawn
+  with `withdraw`, or the player leaves). A newcomer waiting sits with nothing, is dealt nothing and
+  has no ledger row until the chips land (as a buy-in: `ledger.hasBought`); the rebuy policy is off
+  or on (`REBUY_POLICIES`: 'off' | 'approve'), and off stops rebuys and re-sits, never a first
+  buy-in, nor cashes out a newcomer still waiting. Every buy waits however long the host is gone —
+  nothing lands without their yes; a host unheard from for `LIMITS.hostTakeoverMs` is replaced by
+  claim-host (an account holder at the table), and the requests wait for whoever holds the role. A
+  request keeps its time (`TableState.requests[].at`): the same request again changes nothing, and
+  its player may change its amount or take it back only `REQUESTS.CHANGE_MS` after the last change
+  ('request-wait'), so a request comes and goes at most once every few seconds; a leave is never held.
+  The host's approve names the amount it says yes to (`HostOp` approve's `amount`, sent by the toast
+  and the bank's row): one the request no longer says is refused `stale`, and nothing lands. The
+  break's one-tap Leave asks first only when there is no way back (`overlays.leaveTapAsks`).
+- Asks to see a hand (`lib/poker-night/asks`, pure, read by the engine and the views alike; the
+  engine's `ask`, `reply`, `allow-asks`): once a hand completes, a player dealt into it who folded
+  may ask a player whose cards were not shown; the player asked answers with their cards to the one
+  who asked alone ('one': in that player's `shownToMe` and history, `HandSummary.players[].seenBy`),
+  to everyone ('all': a show), or no. Kept from spam on the server: one ask waiting per player,
+  `ASKS.PER_HAND` a hand; one unanswered for `ASKS.WAIT_MS` is a no; after a no the same pair waits
+  `ASKS.COOLDOWN_HANDS` hands; a player who turned asks off (`TableState.noAsks`, kept while seated
+  or dealt into the hand asks are about — `ledger.cashOut` drops anyone else's, so it never names
+  more than the seats and the hand's players) cannot be asked. Asks live in the hand, so the next
+  deal ends every one, and one still waiting is a no, with its cooldown, even with seconds left (the
+  results pause is never longer than `ASKS.WAIT_MS`, so an ask its player lets go by never comes back
+  every hand). A cooldown is never dropped before its hands are up: the table holds
+  at most `ASKS.COOLDOWNS_KEPT` cooldowns and waiting asks together, and at that cap a new ask is
+  refused `asks-full` until some run out (`asks.asksFull`, in `askChoices` too). A Triple T card
+  thrown away is never shown. Refusals `asks-off`, `ask-waiting`, `ask-limit`, `ask-cooldown`,
+  `asks-full`, each with its sentence.
 - Wording (invariant 12 applies): every sentence is in `lib/learn/copy/poker-night.ts`, held by
   `lib/learn/__tests__/poker-night-copy.test.ts` to the 'copy' tier and to a currency ban (play
   chips have no cash value). A hand wins against another and is "stronger"; its five cards are
@@ -579,18 +712,29 @@ and friends keep none beyond Shared and the invariants).
   (`lib/poker-night/view-types`), so a server room or a state does not compile into a response.
 - `lib/poker-night/store.mutateRoom` is the one way the game moves: read, plan with the pure
   `lib/poker-night/mutation.planMutation`, write behind a compare-and-set on `seq` (five attempts,
-  jittered backoff, then 503 busy). The plan: an action id already in the `applied` ring (64) is
-  answered as a duplicate; a room idle 12 hours closes; the clock runs to the request's
+  jittered backoff, then 503 busy). The plan: an action id already in the `applied` ring (36,
+  `KEEP.APPLIED`) is answered as a duplicate; a room idle 12 hours closes; the clock runs to the request's
   `receivedAt`, then the step, then the clock to now — a turn's timeout at the turn's own time for
   the actor's own request, `TIMING.TIMEOUT_SLACK_MS` later for any other writer (`clock.dueFor`;
   the `nextDueAt` mirror the leader's tick is armed by includes it), so an in-time move still on its
   way is not beaten to the compare-and-set; a refused step still commits the clock's own changes,
   without its action id; nothing changed, no write. Every write moves `seq`; one only its author can
-  see — a pre-action set, changed or cleared (`mutation.seenByOthers`) — moves `hiddenCommits` with
-  it, and everything that leaves the server (views, Unchanged, `since`, the realtime message, the
-  hands' and results' guards) carries `room-doc.publicSeq`, seq less those, so no browser reads a
-  pre-action's timing off a version; the setter's own answer brings it at the seq held (the feed's
-  `pre` input). A stored state `migrateState` refuses closes the
+  see — a pre-action, a plan to leave after the hand or a sit-out asked for while the hand is live,
+  an ask or its answer, the "let others ask" setting (`mutation.seenByOthers`, over its
+  `withoutPrivate`) — moves `hiddenCommits` with it, and everything that leaves the server (views,
+  Unchanged, `since`, the realtime message, the results' guard) carries `room-doc.publicSeq`, seq
+  less those, so no browser reads their timing off a version; the author's own answer brings it at
+  the seq held (the feed's `own` input). A write that changes another player's own view where the
+  public table does not show it (`mutation.nudgesOf` over `views.nudgeKey`, both sides read at the
+  commit's time — an ask's expiry written down by another pair's ask or answer, which the views
+  already read as expired, nudges no one — : the player asked, the
+  one who asked, a player the host sat out mid-hand) moves that player's row's `nudge` count
+  (`mutation.withNudges`; private, never peopleV): the head projects it, a GET state sends the count
+  it holds (`nsince`; one that names none asks after the table alone) and is read whole when it
+  moved, every Unchanged and view carries the viewer's
+  own, and `afterCommit` says it on their own channel (realtime, below). History rows are guarded by
+  the document's own seq (`Commit.writeSeq`), which every commit moves, so an answer shown to one
+  player alone is kept. A stored state `migrateState` refuses closes the
   room out of band, or answers reload when a newer deploy wrote it — on the reads too
   (`store.getRoomById` tells them apart, `room-doc.unreadRefusal`). The out-of-band fields
   (`seen`, emotes, `rt`, `lastError`) are never part of the write. `afterCommit`, in the route's
@@ -682,7 +826,14 @@ and friends keep none beyond Shared and the invariants).
   from the page's own view at the start), polls
   alone without realtime — shown as `data-pn-mode` (Live only over a connected channel trusted alone)
   and `data-pn-transport`, beside `data-pn-seq` (the seq drawn). What goes on the channel is
-  `lib/poker-night/room-doc.wireOfRoom` of the committed room. The QA seam: a dev server with
+  `lib/poker-night/room-doc.wireOfRoom` of the committed room. Each player also has a channel of
+  their own, `poker-night:<env>:<room id>:<pid>` (`channel.privateChannelName`; the token's
+  capability names both, `TokenReply.private`), on which `afterCommit` publishes only
+  `{name: 'nudge', data: {nudge}}` (`realtime.publishNudge`) when a commit nudged them; the feed
+  (`FeedState.nudge`/`knownNudge`, `isBehind`) reads their view then, and `needsPrivate` also asks
+  for it as the hand they were dealt completes (who they may ask). `isWire` takes version 2 only
+  and `http.PN_PROTOCOL` is 2, so a page left open across the deploy reloads. The QA seam: a dev
+  server with
   `NEXT_PUBLIC_PN_RT_FAKE=1` (run.sh only) lets a page that defines `window.__PN_RT_FAKE__` take its
   messages from it — `qa-poker-night`'s relay builds them with `wireOfRoom` from Mongo and delivers
   them held back, out of order and twice; a production build compiles the seam out.
@@ -695,12 +846,18 @@ and friends keep none beyond Shared and the invariants).
   the inner `.pn-fold-turn`). The one thing a timer moves is a winner's stack counting up, formatted
   text on the same token (`components/poker-night/CountUp`).
 - The winner's banner and the line under it (the next deal's countdown, the pause) go where
-  `lib/poker-night/stage.bannerPlan` finds room, clear of every plate and its status flag, open seat,
+  `lib/poker-night/stage.bannerPlan` finds room (`stage.resultBannerPlan` at the table: clear of the
+  pots paying out and the winners' "+N" too where that leaves room, else of the table alone, since
+  both leave within a second or two — never over a plate for the long pause after a hand), clear of every plate and its status flag, open seat,
   turned-up hand (`stage.shownHandRect`), the dealer button and the board with its lit cards' lift:
   the full banner with the line under it nearest the board on the pot's side, then its other side,
   then the felt's empty bands; then the compact banner (a line a winner, no avatar, wrapped when
-  narrow); then each apart from the line; then cut short. A line with no room is not drawn (the top
-  bar says a pause too), and only when no banner fits does it name fewer winners. Both are drawn
+  narrow); then each apart from the line; then cut short. Cut short, a line keeps its head whole, or
+  says it without the chips (`BannerLine.short`: "Board 2: Ana", "Ana wins", the seat's "+N" saying the
+  chips; `BannerPlan.short`), never cutting inside a number or a board's name: the plan names fewer
+  winners — fewer boards — before a name is cut, and then only to a letter and an ellipsis. A line
+  with no room is not drawn (the top bar says a pause too), and only when no banner fits does it name
+  fewer winners. Both are drawn
   top-anchored in a wrap exactly the width found, never wider, from `reveal.bannerLines`' words and
   `stage.BANNER`'s sizes, which `stage.test` holds to the stylesheet and clears at 390, 375 and
   320 px phones and a 1440 px desktop for every seat count and button; `qa-poker-night` measures it
@@ -708,6 +865,76 @@ and friends keep none beyond Shared and the invariants).
   clear of their pills and of the winners' "+N" as it rises (`stage.winPopRect`); it comes in where it
   lands, growing from its middle (`.pn-banner-drop`), so on its way in it covers nothing its place
   does not.
+- PLO's two and three boards (P6; `config.ENABLED.boards` 3, PLO alone): each board its own run,
+  every board turned together; each pot split evenly between the boards (`pots.splitBoards`, the odd
+  chips to board 1, then 2) and each board's part to its strongest eligible hand; the wire sends each
+  paid pot's winners board by board and the page rebuilds the shares with `pots.paidParts`.
+  `stage.stageLayout`'s fourth argument lays them out as one block (`stage.board`, each board in
+  `stage.boards`) — stacked, side by side or cascaded (`CASCADE_STEP` leaves every card's index
+  band, `INDEX_BAND`, in sight), each board's numeral at its left where there is room and it
+  costs the cards no more than 8 % (`BOARD_LABEL`, held to the stylesheet; `LABELS_SHARE`) — on the felt and clear of every plate, bet line and
+  button, and of every hand of four that may turn up unless that alone deals the cards under 18 px
+  (`board.handsClear`); a second layout sending the bet lines along the rails is kept when it deals
+  them larger; where the middle deals them under 18 px, anywhere across the felt that deals them
+  larger (`board.x`, the felt's free half). The stage knows the seats nobody sits in
+  (`StageOptions.open`, TableScreen's empty seats but a gone player's ghost): a ring alone, no plate,
+  bet line, button or hand there, so on a 568 × 320 phone with four players at eight seats the boards
+  move into the free half (about 20 px, not 14). The floors the spike measured are pinned in
+  `stage.test` (16 px on a 320 px phone, 19 on a wider one, 20 on one on its side); on a 568 × 320
+  phone with seven to nine seats taken nothing fits, and `fallbackY` puts them at `MULTI_BOARD_MIN`
+  where they cover least, never a plate. The block is one 44 px button to
+  `components/poker-night/BoardsSheet` (44 px cards); the seat ring (`.pn-seats`) takes taps on its
+  seats alone. A lit card never lifts on two or three boards. The reveal's `BoardLook`,
+  `liftBoardOf` and `scoopOf`: cards light board after board; the banner says a line a board, and
+  one line only when one player won every board's share of every pot. The choreography turns each
+  street board by board, flies each pot's shares to the boards' numerals (`stage.boardAnchor`)
+  before each board's stream, and plays a pay-out that would outlast the result's `revealMs`
+  faster, in proportion (`Scheduled.pace` scales the flights). The dock says each board's kind
+  behind its numeral's badge (`dock.boardStrengths`, `components/poker-night/HandStrength`,
+  `.pn-board-num`), each board's part whole on its line and the line breaking only between boards;
+  the hand log and the announcer board by board; the boards' count is picked under PLO by
+  `components/poker-night/BoardsChoice`. The boards sheet draws the places still to come in the
+  palette's muted ink (`.pn-sheet-board .pn-slot`: it is portaled out of the room, where no felt is set).
+- One board (`stage.stageLayout`, `placeBoards`): the widest cards in the band round the middle,
+  at every pixel from it, a row counting at the width that fits a pixel over and under it too; among
+  those within `BOARD_TIE` of the widest the nearest the middle, one under it only when
+  `UNDER_BIAS` nearer — and, given `StageOptions.prefer` (where TableScreen drew it a moment ago, kept
+  as a share of the height for the layout it belongs to), the nearest that, so the dock's line wrapping
+  a pixel never sends the board across the felt and back. A dealer button sits beside its bet line on
+  the side away from the middle, half a pixel (`EDGE`) past touching, so a floating hair never moves
+  it. In PLO (`StageOptions.handSize` 4) the board keeps clear of every hand of four that may turn up
+  wherever that leaves its cards 18 px or more (`board.handsClear`); Texas hold'em's and Triple T's
+  board is laid out as before. A hand turned up that meets another's moves along its row
+  (`SeatPlace.shownDx`, `--pn-shown-dx`; `stage.nudgeHands`, `stage.handsMeet` allowing a lit card's
+  lift under the hand over it): side and bottom seats placed first, then the top row, toward the middle
+  first, else the other way, clear of every plate (and, two cards, the board placed first) — or the
+  hand it meets moves instead. Where that still leaves a hand of two over another seat's plate, the
+  flag under one (sized as "Out of chips"), another hand or the board — a crowded column of side seats:
+  nine on a 375 or 320 px phone, seven or more on one on its side — `stage.placeHands` places every
+  hand again (`SeatPlace.shownDy`, `--pn-shown-dy`), a seat at a time round again until none moves and
+  then two that still meet together, at the place covering least (`HAND_WEIGHT`: a plate, the board, a
+  pots' band, another hand, a flag): along its row, on its plate's other side (under a side seat's) or
+  beside it toward the middle — always next to its own plate — and keeps one of the pots' bands by the
+  board (`potBands`) clear, so the pots keep a place; never its own plate. Nine hands up on a 320 px
+  phone or eight on the smallest phone on its side can still leave two meeting (the banner then sits
+  where the pot was, flagged); PLO's four keep the row nudge alone. The emotes' spot reads a hand moved
+  under its plate (`emotes.emoteSpot`).
+- A plate's status word (`lib/poker-night/plate.plateStatus`: "Folded", "All in", "Offline",
+  "Waiting for chips", "No chips yet" for a seat that never had chips here — never "Out of chips" —
+  …) hangs under it where `stage.flagRoom` finds room clear of every other seat's plate (an open
+  seat's ring), its cards face down, its blind's mark and its flag, every seat's word weighed
+  (`SeatRing`); where it has none (`stage.flagsOnPlate`: a crowded column on a phone on its side,
+  the widest word on a 320 px one), the plate carries it — Triple T's "Discarding…" as a dashed ring
+  (`data-pn-mark="discarding"`, the felt's count and the backs saying who is still to throw), any
+  other word in the stack's place, the name beside the avatar (`data-status-on="plate"`,
+  `.pn-plate-status`; the stack stays in the plate's accessible name). A squat box — a phone on its
+  side, the dock in its column (`layout.isSquat`) — seats eight two to a side column
+  (`layout.SQUAT_SLOTS`), so every word hangs there; seven and nine keep the portrait slots, whose
+  hands, pots and banner find room where no squat placement leaves them all.
+  Three or four cards face down (Triple T's, PLO's) start a whole card's width over a compact or tight
+  plate (`stage.SEAT_CARDS_OVER`, `seatCardsRect`'s count, `PotSeen.backs`), above the stack's figures
+  that their closed fan would cover; `qa-poker-night-modes`' `tableLayout` counts flags over other
+  seats and figures under their fan.
 - The pots go where `lib/poker-night/stage.potPlan` finds room on the felt inside its rail
   (`stage.feltSpan`), never over a card (the board's and its lift, a seat's face-down pair, a turned-up
   hand), a plate, its flag or blind's mark, an open seat, the dealer button, a bet line out at the size
@@ -737,12 +964,20 @@ and friends keep none beyond Shared and the invariants).
   `/` by a full page load (the landing page for a guest through `proxy.ts`), never `/poker-night`,
   which sends a guest to sign in. A seated player's Home and Leave go through `LeaveDialog`, read on
   every render from `lib/poker-night/overlays.leavePlan`, so a deal that lands while it is open makes
-  it the mid-hand one. The dock offers Sit out and Leave whenever the viewer is not playing a hand
-  (`dock.sitOut`/`leave`, the pause after a showdown they reached included) — one tap unless
+  it the mid-hand one, which offers both ways: "Leave now" (`leave`) and "Leave after this hand"
+  (`leave-after`, the primary, which never navigates — from Home too). Every leave that keeps the
+  player on the page — the dock's Leave, the dialog's between-hands Leave — is `leave-after`, sent
+  through `components/poker-night/useLeaveAfter`, which toasts how it landed (a deal that beat it to
+  the table, `overlays.leaveAfterLanded`: "A new hand was dealt first …"); only "Leave now" and Home's
+  "Leave and go" send `leave`. The dock offers Sit out and Leave whenever the viewer is not playing a
+  hand (`dock.sitOut`/`leave`, the pause after a showdown they reached included) — one tap unless
   `leaveTapAsks` — and after leaving a left panel (`leftState`). What the viewer's own seat does when
-  the hand ends is `MeView.next` ('leave', 'sit-out'; private, never on the wire), since a folded or
-  all-in plate keeps reading so: once they left mid-hand the dock says they leave when it ends and
-  offers nothing more, and Home goes straight home (`overlays.homeAsks`); while a "Sit out next hand"
+  the hand ends is `MeView.next` ('leave', 'leave-after', 'sit-out'; private, never on the wire),
+  since a folded or all-in plate keeps reading so: once they left now the dock says they leave when
+  it ends and offers nothing more, and Home goes straight home (`overlays.homeAsks`, `leftNow`);
+  while they leave after the hand the dock says "Leaving after this hand" ("Last hand" in a narrow
+  dock) with Stay in place of who the table waits for (hidden on their own turn), Home carries a dot
+  and the menu offers "Stay at the table" beside "Leave now"; while a "Sit out next hand"
   waits, the dock says so and offers "Deal me in" (`dock.takeBack`, a sit-in). A row that takes
   another's place under the thumb (the action bar, the early choices — keyed by `dock.preRowKey`, the
   hand and its choices — and the seat's controls) drops pointer taps for `keys.TAP_SHIELD_MS`
@@ -758,15 +993,65 @@ and friends keep none beyond Shared and the invariants).
   complete hand's `HandResultView.gone` names the seats whose player went since the deal, read
   through `reveal.playerAt`, so a result never names the wrong player — nor tells someone who took a
   winner's seat in the pause that they won (`reveal.viewerSeatIn`).
+- Leave after this hand, at the table: one tap while the viewer holds cards in the hand in play
+  (`overlays.leaveAfterOf`, `dock.leaveAfter`) — a door beside the early choices (`Dock`'s
+  `LeaveAfterToggle`, its word "Leave after hand", `TABLE_COPY.leaveAfterShort`, in a wide dock,
+  shielded with them; `.pn-pre-row` puts it on a row of its own in a dock of 18rem or less, a phone
+  on its side), a button in the seat's row while all in (the same short word), the menu's toggle —
+  and, once folded, the break's Leave. "Last hand" is only the state's word, beside the cards with
+  Stay; in a dock of 18rem or less that line (`.pn-dock-line`: the seconds, who the table waits
+  for, the note, the hand's name) takes a row of its own under the cards. An early choice's label
+  breaks after its slash (`PreActions`), never spilling over the next button. The seat empties as
+  the hand completes; while its result shows, a seat whose player went keeps a ghost of their plate
+  (`SeatRing`'s `GhostSeat` from `HandResultView.gone`: the name, the look, the cards they showed,
+  "Left"; never a menu or "Sit here"), which the pots and the banner keep clear of (`TableScreen`).
+- The host's yes, at the table: the join card says it once the first hand is dealt
+  (`JoinView.needsApproval`, `JOIN_COPY.approvalNote`); a seat whose chips wait reads "Waiting for
+  chips" on every plate (the public `requests`) and its dock "Waiting for the host to approve your
+  chips" with Cancel (`withdraw`; `dock.waitingChips`), as the bank does, however long the host is
+  gone (no way round them: `overlays.buyAsksHost`). A Cancel (marked as it is sent,
+  `overlay-requests.markOwnWithdraw`) or a leave is never said as the host's no
+  (`overlays.requestEnded`: 'withdrawn'). A seat that never had chips here reads "No chips yet."
+  with one tap, "Ask for 2,000 chips" (`bank.buyOptions`' `first`), never "Out of chips" or a
+  top-up. The host sees a toast with Approve for each new request and hears a short sound (`sounds`
+  'request') at most once a player in `REQUEST_SOUND_MS` (`components/poker-night/AskPrompt`'s
+  `RequestWatch`, `overlays.requestAlerts`); a request whose amount changed is said again in its
+  toast's place, silently, its Approve naming the new amount; a dot on Bank and Host, and the bank's
+  rows say what each is for (`overlays.requestKind`: to sit down, a rebuy, a top-up). The bank's
+  figures keep a gap at their left; under 22rem (a 320 px phone's drawer, a container query) the
+  Rebuys column gives way to a count under each name (`BANK_COPY.rebuysCount`). A table toast's
+  action is a 44 px target (`overlay-kit.TOAST_ACTION`). The rebuy policy is Off / On (host
+  approves) in the start form and the host drawer (`components/poker-night/RebuyChoice`, a radio pair
+  over `ChoiceGroup`, whose chosen ring is drawn inside the option, so a panel's edge never cuts it).
+- Asks, at the table: another player's seat menu leads with "Ask to see their cards"
+  (`overlays.askOffer` over `canAsk`, `askBlocked` and the viewer's own `asks`): offered, greyed with
+  its reason, or how the viewer's ask of them stands — read at the server's time, so an ask that ran
+  out frees the rest with no write; the menu opens toward the table's middle (`stage.menuSide`), whole
+  on screen. The player asked sees `AskPrompt` at the foot of the screen, over their own corner and
+  nothing of the table — no other plate, turned-up hand, board, pot or banner (`.pn-ask-wrap`: over
+  the dock, under the thumb; on a phone on its side, in the dock's column) — while one waits
+  (`overlays.askToAnswer`): who asks, its seconds, which run to the next deal when that comes first
+  (`overlays.askEndsAt`), "Show Ana" / "Show everyone" / "No thanks", 44 px behind a tap shield, and a
+  short sound ('ask'). A hand shown to the viewer alone turns up on its plate for them ("Shown to
+  you", `Seat`'s `privateCards`) and in the hand log ("Shown to you: Ana held …", `hand-log`'s
+  `seenLines` from `shownToMe` until the history row has it); `AskWatch`, mounted for every joined
+  viewer, toasts how each of their asks ended (`overlays.askNews`), the next deal ending one first
+  included ('dealt'). "Let others ask to see my cards" is a switch of the personal look
+  (`PersonalLook.allowAsks`, saved with an account), which `PokerNightRoom` sends as `allow-asks`
+  whenever the seat lacks it (the room forgets it for a player without a seat). Through a result's
+  pause the polls come every 1.5 s for a player dealt into the hand (`feed.askWindow`), since the
+  next deal ends every ask.
 - The Hands guide: `lib/poker-night/hands-guide` (pure) holds the ten rankings strongest first, each
   a five-card example with the cards that make it (`RANKING_EXAMPLES`), the kicker pair
-  (`KICKER_EXAMPLE`) and the games (`GUIDE_GAMES`: Texas hold'em for now, each with its glossary
-  entry and anchor; `guideGames` puts the table's own first among them — after the rankings and ties
-  in the drawer, which a player opens mid-game for the rankings). `hands-guide.test` holds every example
-  to the evaluator. `components/poker-night/HandsGuide` draws it with no hooks, so the lobby's Hands
+  (`KICKER_EXAMPLE`) and the games (`GUIDE_GAMES`: Texas hold'em, PLO and Triple T, each with its
+  glossary entry, the limit's entry when it is not no limit (PLO's `pot-limit`) and its anchor;
+  `guideGames` puts the table's own first among them — `guideGameOf` of `variants.modeOf` at the
+  table — after the rankings and ties in the drawer, which a player opens mid-game for the rankings;
+  PLO's section draws `PLO_EXAMPLE`, one hand on one board, the five that play lifted).
+  `hands-guide.test` holds every example to the evaluator. `components/poker-night/HandsGuide` draws it with no hooks, so the lobby's Hands
   tab renders it on the server and `components/poker-night/HandsDrawer` at the table (the menu's
   Hands, the H key, any viewer). Each definition is the glossary's own short, quoted under its
-  `<Term>` (`hand-rankings`, `kicker`, `texas-holdem`, in the `poker-night` group), and
+  `<Term>` (`hand-rankings`, `kicker`, `texas-holdem`, `omaha`, `pot-limit`, in the `poker-night` group), and
   `HANDS_COPY` says only what they do not: the copy test rejects a run of five words shared with
   them. The lobby is two views (`?tab=play|hands`, `components/primitives/Tabs` at `size="md"`); the
   Hands tab reads nothing and shows with the kill switch on, and `[data-poker-night-lobby]` marks
@@ -789,16 +1074,39 @@ and friends keep none beyond Shared and the invariants).
   `SHOWN_CARD_PX`, `TABLE_TOP_ROOM`, held equal to the stylesheet): clear of a seat's turned-up cards
   and tag, under a plate along the top, never behind the top bar; an impact lands on the target's
   avatar (`stage.avatarCentre`), one per plate (a new one replaces it), with its own landing sound
-  (`emotes.landingSound`).
+  (`emotes.landingSound`), told whichever settles the screen first — the store's timer, or new
+  emotes arriving the moment the throw lands (`emotes.landedBetween`).
 - The table's feel (`components/poker-night/TableFeel`): sounds synthesised by Web Audio from
-  `lib/poker-night/sounds`' recipes (gain ≤ 0.3, 40 Hz–8 kHz, ≤ 1.2 s, held by `sounds.test`), each
-  at its animation's moment on the motion token, one audio context made and resumed inside a
+  `lib/poker-night/sounds`' recipes — layered, physically shaped tones and filtered noise: a card's
+  swish and snap, two to four clay chips clacking, a knock, the muck's sweep, and each thing thrown its
+  own landing (`HIT_SOUND_IDS`, `emotes.landingSound`: a fish's 60–180 Hz body, wet slap, falling
+  squelch and droplets; a tomato's splat and drips; an egg's crack then splat; …) — each part with its
+  own attack and exponential fall (`partLevel`, the player's envelope), played from a seed
+  (`soundParts(id, seed)`: a cue's key, a landing's emote id through `soundSeed`, else fresh), so one
+  seed is one sound on every screen and no two throws, chips or cards quite alike; the turn's chime,
+  the arpeggio, the pop and the two notes of a request never vary (`FIXED_SOUNDS`). `sounds.test`
+  holds every recipe over many seeds to `SOUND_LIMITS` (a part ≤ 0.35 gain, its layers together ≤ 0.75,
+  40 Hz–10 kHz, ≤ 1.2 s); the parts meet in a master gain behind a gentle compressor. Each sound at its
+  animation's moment on the motion token, one audio context made and resumed inside a
   gesture a browser counts (`sound-player.stayUnlocked`: click, a touch's pointerup or touchend,
   mousedown, keydown — never a touch's pointerdown — again whenever it stops running), at most
   once per 60 ms, silent while hidden but for the turn's chime; a buzz on a
-  phone's turn, the screen kept awake while seated (`useWakeLock`), the room's keys E, L, B, M and ?
+  phone's turn — and, for a phone that cannot buzz, the dock's edge and "Your turn" breathing on
+  `.pn-pulse` (`.pn-turn-edge`, `.pn-turn-cue`, still under either motion guard) — the screen kept
+  awake while seated (`useWakeLock`), the room's keys E, L, B, M and ?
   (`keys.roomIntentForKey`, `useHotkeys`) and their list (`ShortcutsDialog`, also in the top bar's
-  menu) — each honouring the player's own `PersonalLook` switch.
+  menu, which also turns the sounds on or off: a check, said as M says it) — each honouring the
+  player's own `PersonalLook` switch.
+- The table's small conveniences (P8): a move's tag stays on its plate, still, for the rest of the
+  street (`reveal.streetTags` from the log tail: the last check, call, bet or raise, never a blind, a
+  fold or a card thrown away; `data-tag-still`); the raise panel's − and + step a big blind
+  (`bet-sizing.stepRaise`, 44 px) and it opens at the size the player last confirmed before or after the
+  flop where this turn offers it — the minimum, ½ or ¾ pot, never the all-in or the pot — kept in this
+  browser only (`SIZE_MEMORY_KEY`, `readSizeMemory`, `rememberSize`, `initialRaiseTo`); out of chips,
+  the dock's one tap buys the whole buy-in the table allows ("Rebuy 2,000 chips", or "Ask for 2,000
+  chips" where the host says yes first: `dock.rebuyTap`), "Other amount" opening the bank only when
+  there is another to choose; the winner's banner is a button that opens the hand log; and for a seated
+  player an open seat says "Invite" and opens the invite sheet.
 - Looks (P5): every colour the table draws is a literal in `lib/poker-night/looks` — eight scenes
   (a gradient sky, an art id and an ambient loop each, `my-theme` the viewer's own palette tokens),
   eight felts, eight card backs, two faces, two suit schemes, four chip sets, the avatar colours —

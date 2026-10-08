@@ -6,8 +6,8 @@
 
 import {describe, expect, it} from 'vitest';
 import {
-    ablyKeyOf, CAPABILITY, capabilityFor, CHANNEL_NAMESPACE, channelName, emoteMessage, isWire, realtimeEnabled, stateMessage, STATE_MESSAGE,
-    WIRE_BUDGET_BYTES,
+    ablyKeyOf, CAPABILITY, capabilityFor, CHANNEL_NAMESPACE, channelName, emoteMessage, isWire, nudgeMessage, nudgeOf, privateChannelName, realtimeEnabled,
+    stateMessage, STATE_MESSAGE, WIRE_BUDGET_BYTES,
 } from '@/lib/poker-night/channel';
 import {ENVS} from '@/lib/poker-night/env';
 import {newRoom, wireOf} from '@/lib/poker-night/room';
@@ -77,10 +77,19 @@ describe('the messages', () => {
     });
 
     it('know a wire view from anything else', () => {
-        for (const junk of [null, 'state', 3, [], {}, {v: 1, seq: 1}, {v: 2, seq: 1, seats: [], code: 'K7QXM4', serverNow: T0}, {v: 1, seq: 1.5, seats: [], code: 'K', serverNow: T0}]) {
+        // Version 2 only: a version 1 message (an older deploy's) is not one this page reads.
+        for (const junk of [null, 'state', 3, [], {}, {v: 2, seq: 1}, {v: 1, seq: 1, seats: [], code: 'K7QXM4', serverNow: T0}, {v: 3, seq: 1, seats: [], code: 'K7QXM4', serverNow: T0}, {v: 2, seq: 1.5, seats: [], code: 'K', serverNow: T0}]) {
             expect(isWire(junk)).toBe(false);
         }
-        expect(isWire({v: 1, seq: 1, seats: [], code: 'K7QXM4', serverNow: T0})).toBe(true);
+        expect(isWire({v: 2, seq: 1, seats: [], code: 'K7QXM4', serverNow: T0})).toBe(true);
+    });
+
+    it('nudge a player on their own channel with their count alone, and read a count back', () => {
+        expect(privateChannelName('production', ROOM_ID, 'Pq3x9Zk2L00')).toBe(`poker-night:production:${ROOM_ID}:Pq3x9Zk2L00`);
+        expect(nudgeMessage(ROOM_ID, 'Pq3x9Zk2L00', 4)).toEqual({name: 'nudge', id: `${ROOM_ID}:n:Pq3x9Zk2L00:4`, data: {nudge: 4}});
+        expect(nudgeOf({nudge: 4})).toBe(4);
+        for (const junk of [null, 4, {}, {nudge: -1}, {nudge: 1.5}, {nudge: '4'}]) expect(nudgeOf(junk)).toBeNull();
+        expect(capabilityFor('a', 'b')).toEqual({a: ['subscribe'], b: ['subscribe']});
     });
 });
 

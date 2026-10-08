@@ -19,12 +19,12 @@ import type {CardBackId, CardFaceId, ChipSetId} from "@/lib/poker-night/looks";
 import type {FeltId, SceneId} from "@/lib/poker-night/types";
 import {compactChips} from "@/lib/poker-night/chips";
 import {CODE_LENGTH} from "@/lib/poker-night/code";
-import {KEEP, TABLE_LIMITS} from "@/lib/poker-night/config";
+import {ASKS, DISCARD_MAX_SECONDS, KEEP, TABLE_LIMITS} from "@/lib/poker-night/config";
 import type {HandDescription} from "@/lib/poker-night/hand-name";
 import type {PokerNightErrorCode} from "@/lib/poker-night/http";
 import {LIMITS} from "@/lib/poker-night/limits";
 import {NAME_MAX_GRAPHEMES} from "@/lib/poker-night/names";
-import type {EntryKind, LedgerKind, PreAction, RebuyPolicy, Refusal, Street} from "@/lib/poker-night/types";
+import type {EntryKind, LedgerKind, PreAction, RebuyPolicy, Refusal, Street, Variant} from "@/lib/poker-night/types";
 import type {SeatState} from "@/lib/poker-night/view-types";
 import {capitalize, numberWord} from "@/lib/text";
 import type {PhraseId, ReactionId, ThrowId} from "@/lib/poker-night/emotes";
@@ -90,6 +90,9 @@ const handWords = ({category, ranks}: HandDescription): string => {
     }
 };
 
+// Each category's name alone, high card to straight flush, then the royal flush.
+const KIND_WORDS = ['high card', 'pair', 'two pair', 'three of a kind', 'straight', 'flush', 'full house', 'four of a kind', 'straight flush', 'royal flush'] as const;
+
 // The categories a sentence names with "a": a royal flush, a pair; but four of a kind, ace high.
 const TAKES_A = new Set([8, 6, 5, 4, 1]);
 
@@ -108,6 +111,12 @@ export const HAND_COPY = {
     phrase: (d: HandDescription): string => `${TAKES_A.has(d.category) ? 'a ' : ''}${handWords(d)}`,
     playsBoard: 'Plays the board',
     fiveCards: 'The five cards that play',
+    // A hand's kind alone ("Flush", "Two pair", "Royal flush"); with two or three boards the dock
+    // says what the viewer's cards make on each, each kind behind its board's numeral badge
+    // (components/poker-night/HandStrength), the names in full for a screen reader ("Board 1: Flush,
+    // ace high; board 2: Pair of kings").
+    kind: (d: HandDescription): string => capitalize(KIND_WORDS[d.category === 8 && d.ranks[0] === 12 ? 9 : d.category]),
+    onBoardsSpoken: (labels: readonly string[]): string => capitalize(labels.map((l, i) => `board ${count(i + 1)}: ${l}`).join('; ')),
     // A card as a picture's name (role="img"): "Ace of spades"; inside a sentence, "ace of spades";
     // as its corner, "A♠︎".
     card: (card: Card): string => capitalize(cardWords(card)),
@@ -139,6 +148,8 @@ const DOES: Record<EntryKind, (n: string) => string> = {
     refund: (n) => `gets back ${n} uncalled`,
     show: () => 'shows',
     void: () => 'the hand is called off',
+    // Triple T: never the card.
+    discard: () => 'throws away a card',
 };
 
 // The last move a seat made, on the small tag beside its plate: "Call 40", "Raise to 340"; an
@@ -156,6 +167,7 @@ const TAG: Record<EntryKind, (n: string) => string> = {
     refund: (n) => `${n} back`,
     show: () => 'Shows',
     void: () => 'Called off',
+    discard: () => 'Threw one away',
 };
 
 // A pre-action's button (lib/poker-night/types PreAction): "Check/fold", "Check", "Call 40",
@@ -188,6 +200,9 @@ export const ACTION_COPY = {
     bet: (n: number): string => `Bet ${count(n)}`,
     raiseTo: (n: number): string => `Raise to ${count(n)}`,
     allIn: (n: number): string => `All in for ${count(n)}`,
+    // Pot limit (PLO): the top of the range when the stack goes past the pot.
+    potBet: (n: number): string => `Bet ${count(n)} (pot)`,
+    potRaise: (n: number): string => `Raise to ${count(n)} (pot)`,
     back: 'Back',
     toCall: (n: number): string => `${count(n)} to call`,
     sending: 'Sending…',
@@ -199,6 +214,9 @@ export const ACTION_COPY = {
     sliderLabel: 'Size',
     amountLabel: 'Amount',
     amountRule: (min: number, max: number): string => `From ${count(min)} to ${count(max)}.`,
+    // The steppers beside the slider: a big blind less or more ("20 less", "20 more").
+    less: (n: number): string => `${count(n)} less`,
+    more: (n: number): string => `${count(n)} more`,
 
     // Folding when checking is free: the first press asks, the second folds.
     foldFree: 'Checking is free here.',
@@ -238,6 +256,14 @@ export const REFUSAL_COPY: Record<Refusal, string> = {
     'bad-config': "Those settings are outside the table's limits.",
     'bad-deck': 'The deal did not go through, so nothing changed.',
     'not-due': 'That is not due yet.',
+    'asks-off': 'This player has turned off asks to see their cards.',
+    'ask-waiting': 'Your last ask is still waiting for an answer.',
+    'ask-limit': 'That is every ask this hand allows.',
+    'ask-cooldown': `They did not show you their cards when you last asked, so asking them again waits ${numberWord(ASKS.COOLDOWN_HANDS)} hands.`,
+    // The table holds as many cooldowns and waiting asks as it keeps (lib/poker-night/asks.asksFull).
+    'asks-full': `Asks to see cards are resting at this table: they open again within ${numberWord(ASKS.COOLDOWN_HANDS)} hands.`,
+    // A request for chips changed or taken back within REQUESTS.CHANGE_MS of the last change.
+    'request-wait': 'Your request for chips just changed: try again in a moment.',
 };
 
 // ---- errors (lib/poker-night/http.ts, PokerNightErrorCode) -----------------------------------
@@ -268,6 +294,12 @@ export const POKER_NIGHT_ERRORS: Record<PokerNightErrorCode, string> = {
     no_request: REFUSAL_COPY['no-request'],
     rebuys_off: REFUSAL_COPY['rebuys-off'],
     rebuy_cap: REFUSAL_COPY['rebuy-cap'],
+    asks_off: REFUSAL_COPY['asks-off'],
+    ask_waiting: REFUSAL_COPY['ask-waiting'],
+    ask_limit: REFUSAL_COPY['ask-limit'],
+    ask_cooldown: REFUSAL_COPY['ask-cooldown'],
+    asks_full: REFUSAL_COPY['asks-full'],
+    request_wait: REFUSAL_COPY['request-wait'],
     closed: REFUSAL_COPY.closed,
     invalid_action: REFUSAL_COPY.illegal,
     bad_seat: REFUSAL_COPY['bad-seat'],
@@ -296,13 +328,19 @@ export const JOIN_COPY = {
     // Someone here goes by that name, or it is one the table keeps for itself.
     renamed: (name: string): string => `That name is taken here, so you sit as ${isolate(name)}.`,
     posting: 'You post one big blind when you are dealt in.',
+    // Once the first hand is dealt, a new player's chips wait for the host's yes: said on the card
+    // before they sit, and after (TABLE_COPY.waitingApproval).
+    approvalNote: 'The game has started: the host approves your chips before you are dealt in.',
     locked: 'The host closed this table to new players.',
     banned: 'The host removed you from this table.',
 
     // The join card (a Panel over the live table): the table's terms, a name prefilled from the
     // account or this browser, a pre-rolled look, and one tap to sit.
     lead: 'Pick a name and a look, then take a seat.',
-    terms: (smallBlind: number, bigBlind: number, chips: number): string => `Blinds ${count(smallBlind)}/${count(bigBlind)} · ${count(chips)} chips to start`,
+    terms: (mode: string, smallBlind: number, bigBlind: number, chips: number): string =>
+        `${mode} · Blinds ${count(smallBlind)}/${count(bigBlind)} · ${count(chips)} chips to start`,
+    // Opens the Hands guide on the table's game, before sitting down.
+    howItPlays: 'How it plays',
     nameLabel: 'Your name',
     namePlaceholder: 'Name at the table',
     nameRule: `Up to ${numberWord(NAME_MAX_GRAPHEMES)} characters.`,
@@ -378,24 +416,61 @@ export const AVATAR_COPY = {
 
 // ==== P3: the lobby, the table and its overlays ================================================
 
+// ---- the games (lib/poker-night/config VARIANTS) ------------------------------------------------
+
+// Each game by name: short where a line has little room (the top bar, a lobby row, the felt), spoken
+// where a sentence or a screen reader says it. "Texas hold'em" always whole, so no label opens on
+// "Hold'em". What a game is, is the glossary's (texas-holdem, omaha); a picker card says only what
+// is dealt and the limit.
+const MODE_SHORT: Record<Variant, string> = {holdem: "Texas hold'em", plo: 'PLO', 'triple-t': 'Triple T'};
+const MODE_SPOKEN: Record<Variant, string> = {holdem: "Texas hold'em", plo: 'Pot-limit Omaha', 'triple-t': 'Triple T poker'};
+
+export const MODE_COPY = {
+    short: MODE_SHORT,
+    spoken: MODE_SPOKEN,
+    // With its boards when there is more than one: "PLO · 2 boards", "Pot-limit Omaha, 2 boards".
+    label: (variant: Variant, boards: number): string => (boards > 1 ? `${MODE_SHORT[variant]} · ${count(boards)} boards` : MODE_SHORT[variant]),
+    spokenLabel: (variant: Variant, boards: number): string => (boards > 1 ? `${MODE_SPOKEN[variant]}, ${count(boards)} boards` : MODE_SPOKEN[variant]),
+    // The picker (the lobby's form, the host drawer): its group's name and each card's line; under
+    // PLO, the board count (one to three), each choice's accessible name and the hint under them.
+    gameLabel: 'Game',
+    boardsLabel: 'Boards',
+    boardsValue: (n: number): string => (n === 1 ? 'One board' : `${count(n)} boards`),
+    boardsHint: 'Each board is played on its own, and the pot is split evenly between them.',
+    pick: {
+        holdem: 'Two cards each. No limit.',
+        plo: 'Four cards each. Pot limit.',
+        'triple-t': 'Three cards each, one thrown away before the betting.',
+    } satisfies Record<Variant, string>,
+    // Between hands, when the host picked another game: under the board. At the deal, a toast and the
+    // screen reader.
+    nextHand: (label: string): string => `Next hand: ${label}`,
+    // The countdown to that deal, in the place of TABLE_COPY.nextHandIn.
+    nextHandIn: (label: string, s: number): string => `Next hand: ${label}, in ${count(s)} s`,
+    changed: (spoken: string): string => `New game from this hand: ${spoken}.`,
+} as const;
+
 // ---- the lobby and the /games card (app/(root)/poker-night, components/poker-night/lobby) ------
 
 export const POKER_NIGHT_COPY = {
     title: 'Poker night',
-    subtitle: "Texas hold'em with friends: start a table, share the link, and play for chips.",
+    subtitle: "Texas hold'em, PLO and Triple T with friends: start a table, share the link, and play for chips.",
     note: 'Play chips only. No cash value, and nothing is paid out.',
     // POKER_NIGHT_ENABLED=false.
     off: 'Poker night is switched off for now.',
 
     // The card on /games.
     cardTitle: 'Poker night',
-    cardBody: "Texas hold'em for play chips at a table you share by link: friends join from a phone, with no account needed.",
+    cardBody: "Texas hold'em, PLO and Triple T for play chips at a table you share by link: friends join from a phone, with no account needed.",
     cardCta: 'Open poker night',
 
-    // Starting a table: one tap with the defaults, or the form first.
+    // Starting a table: one tap with the defaults (Texas hold'em), one tap for another game, or the
+    // form first. The hint opens with the game the first button deals.
     quickStart: 'Start a table',
-    quickStartHint: (smallBlind: number, bigBlind: number, chips: number, seats: number): string =>
-        `Blinds ${count(smallBlind)}/${count(bigBlind)}, ${count(chips)} chips each, up to ${numberWord(seats)} seats. Everything can be changed at the table.`,
+    quickPlo: 'Start PLO',
+    quickTripleT: 'Start Triple T',
+    quickStartHint: (mode: string, smallBlind: number, bigBlind: number, chips: number, seats: number): string =>
+        `${mode}, blinds ${count(smallBlind)}/${count(bigBlind)}, ${count(chips)} chips each, up to ${numberWord(seats)} seats. Everything can be changed at the table.`,
     starting: 'Setting the table…',
     setUp: 'Set it up first',
     create: 'Open the table',
@@ -412,17 +487,17 @@ export const POKER_NIGHT_COPY = {
     join: 'Join',
     codeInvalid: `A table code is ${numberWord(CODE_LENGTH)} letters and digits, with no 0, O, 1 or I.`,
 
-    // The host's own open tables.
+    // The host's own open tables; a row opens with the table's game (MODE_COPY.label).
     openHeading: 'Your open tables',
     openEmpty: 'No table is open. Start one and share the link.',
-    openRow: (seated: number, seats: number, hands: number): string =>
-        `${count(seated)} of ${count(seats)} seats taken · ${hands === 0 ? 'no hand dealt yet' : `${plural(hands, 'hand', 'hands')} played`}`,
+    openRow: (mode: string, seated: number, seats: number, hands: number): string =>
+        `${mode} · ${count(seated)} of ${count(seats)} seats taken · ${hands === 0 ? 'no hand dealt yet' : `${plural(hands, 'hand', 'hands')} played`}`,
     open: 'Open',
 
     // Open tables friends chose to show to friends (the panel is hidden when there are none).
     friendsHeading: "Friends' tables",
     friendsLead: 'Open tables your friends chose to show you.',
-    friendsRow: (host: string, seated: number, seats: number): string => `Hosted by ${isolate(host)} · ${count(seated)} of ${count(seats)} seats taken`,
+    friendsRow: (mode: string, host: string, seated: number, seats: number): string => `${mode} · Hosted by ${isolate(host)} · ${count(seated)} of ${count(seats)} seats taken`,
 
     // The reader's own nights (PokerResult rows), as hands played and net chips.
     recentHeading: 'Recent nights',
@@ -470,7 +545,9 @@ export const INVITE_COPY = {
     // navigator.share, on phones. The table is its shown name (TABLE_COPY.name).
     share: 'Share',
     shareTitle: (table: string): string => `Join ${isolate(table)}`,
-    shareText: (table: string): string => `Pull up a chair at ${isolate(table)}. Play chips only.`,
+    // With the game the table deals (MODE_COPY.spokenLabel), so a link preview says it.
+    mode: (mode: string): string => `Game: ${mode}`,
+    shareText: (table: string, mode: string): string => `Pull up a chair at ${isolate(table)}: ${mode}, play chips only.`,
     qrLabel: 'QR code of the table link',
     qrCaption: 'Point a phone camera here to open the table.',
     qrShow: 'Show QR code',
@@ -480,7 +557,7 @@ export const INVITE_COPY = {
     codeGrouped: (code: string): string => `${code.slice(0, 3)} ${code.slice(3)}`,
     deal: 'Deal the first hand',
     needTwo: 'The first hand is dealt once two players are seated.',
-    ogDescription: "Texas hold'em for play chips. Open the link to take a seat.",
+    ogDescription: (mode: string): string => `${mode} for play chips. Open the link to take a seat.`,
 } as const;
 
 // ---- the table (components/poker-night: TopBar, SeatRing, Seat, PotDisplay, Board, Dock) -------
@@ -530,6 +607,9 @@ export const TABLE_COPY = {
     openSeat: 'Open seat',
     openSeatLabel: (seat: number): string => `Seat ${seatNo(seat)}, open`,
     sitHere: 'Sit here',
+    // An open seat, for a seated player: a tap opens the invite sheet.
+    inviteSeat: 'Invite',
+    inviteToSeat: (seat: number): string => `Invite a friend to seat ${seatNo(seat)}`,
     you: 'You',
     hostBadge: 'Host',
     status: SEAT_STATUS,
@@ -550,11 +630,38 @@ export const TABLE_COPY = {
     mainPot: (n: number): string => `Main pot ${count(n)}`,
     sidePot: (i: number, n: number): string => `Side pot ${count(i)}: ${count(n)}`,
     board: (spoken: string): string => `Board: ${spoken}`,
+    // PLO on two or three boards: each board's numeral on the felt and its name ("Board 2"), each
+    // board's group read aloud, the boards' block as the button that opens them larger, and the
+    // sheet that does (components/poker-night/BoardsSheet).
+    boardName: (k: number): string => `Board ${count(k + 1)}`,
+    boardOf: (k: number, spoken: string): string => `Board ${count(k + 1)}: ${spoken}`,
+    boardsZoom: 'See the boards larger',
+    boardsSheet: 'The boards',
 
     // The winner's banner; the hand's name sits under it (HAND_COPY.label).
     banner: (name: string, n: number): string => `${isolate(name)} wins ${count(n)}`,
     bannerYou: (n: number): string => `You win ${count(n)}`,
     bannerSplit: (players: readonly string[]): string => `Split pot: ${names(players)}`,
+    // With two or three boards, a line a board: "Board 2: Ana wins 600", "Board 1: you win 300", or
+    // its chips player by player ("Board 1: Ana 400 and Ben 200", the viewer as "you"); one line when
+    // one player wins every board's share of every pot.
+    bannerBoard: (k: number, name: string, n: number): string => `Board ${count(k + 1)}: ${isolate(name)} wins ${count(n)}`,
+    bannerBoardYou: (k: number, n: number): string => `Board ${count(k + 1)}: you win ${count(n)}`,
+    bannerBoardSplit: (k: number, parts: readonly {name: string | null; amount: number}[]): string =>
+        `Board ${count(k + 1)}: ${words(parts.map((p) => `${p.name === null ? 'you' : isolate(p.name)} ${count(p.amount)}`))}`,
+
+    bannerScoop: (name: string, n: number): string => `${isolate(name)} wins every board: ${count(n)}`,
+    bannerScoopYou: (n: number): string => `You win every board: ${count(n)}`,
+    // A banner line cut short where the banner has no room for its chips (each seat's "+N" says them),
+    // in three parts so that only a name is ever cut, to an ellipsis, on the narrowest screens: the
+    // words before it, the name (or names), the words after — "Board 2: " "Ana" "", "" "Ana" " wins",
+    // "You win every board" "" "".
+    bannerShortBoard: (k: number): string => `Board ${count(k + 1)}: `,
+    bannerShortNames: (parts: readonly (string | null)[]): string => words(parts.map((name) => (name === null ? 'you' : isolate(name)))),
+    bannerShortWins: ' wins',
+    bannerShortEvery: ' wins every board',
+    bannerShortYou: 'You win',
+    bannerShortEveryYou: 'You win every board',
 
     // The turn and its countdown (role="timer"; the server's two seconds of grace are never shown).
     yourTurn: 'Your turn',
@@ -581,6 +688,10 @@ export const TABLE_COPY = {
     // n is the table's sitOutAfter: the timeouts in a row that sit a player out.
     awayNote: (n: number): string => `Sat out after ${numberWord(n)} ${n === 1 ? 'timeout' : 'timeouts'}. "I'm back" deals you in again.`,
     outOfChips: 'Out of chips.',
+    // A seat that never had chips here (a newcomer whose request was taken back or declined): the
+    // dock's line, and the plate's word for everyone (never "Out of chips").
+    noChipsYet: 'No chips yet.',
+    noChipsFlag: 'No chips yet',
     showCards: 'Show my cards',
     // The break's buttons in a narrow dock (a phone upright); the long words above stay their
     // accessible names.
@@ -589,7 +700,33 @@ export const TABLE_COPY = {
     leaveShort: 'Leave',
     // Beside the cards while the plate still reads Folded: what the seat does when the hand ends.
     leavingAfterHand: 'You leave when this hand ends.',
+    // Leave after this hand: play it out as usual, leave as it ends. The dock's one-tap toggle and
+    // the menu's, the note beside the cards with Stay (lastHand in a narrow dock), the toasts, and
+    // the line the leave dialog adds under its body while it offers it.
+    leaveAfter: 'Leave after this hand',
+    // The action's word where the long one does not fit (the door beside the early choices, the all-in
+    // button in a narrow dock); lastHand is the state's, beside the cards with Stay.
+    leaveAfterShort: 'Leave after hand',
+    lastHand: 'Last hand',
+    leavingAfter: 'Leaving after this hand',
+    stayAtTable: 'Stay at the table',
+    leaveAfterSet: 'You leave the table when this hand ends.',
+    leaveAfterCleared: 'You stay at the table.',
+    leaveLanded: 'A new hand was dealt first: you leave the table when it ends.',
+    leaveAfterNote: 'Leave after this hand to play it out as usual: your chips are counted in the bank as it ends.',
+    // A seat whose chips wait for the host's yes (a new player once the game has started, or a
+    // rebuy at zero): the dock's line, with Cancel, and the plate's word.
+    waitingApproval: 'Waiting for the host to approve your chips',
+    awaitingChips: 'Waiting for chips',
+    // A plate kept while a result shows for a player who went as the hand completed.
+    leftSeat: 'Left',
+    ghostLabel: (name: string, seat: number): string => `${isolate(name)}, seat ${seatNo(seat)}, left the table`,
+    cancelRequest: 'Cancel',
+    cancelRequestLabel: 'Cancel the request for chips',
+    requestCancelled: 'Request cancelled.',
     sitOutNextNote: 'You sit out from the next hand.',
+    // Triple T: a plate's word while its player is still to throw a card away.
+    discarding: 'Discarding…',
     // The host sat the viewer out (the bank's "Sit out next hand"); "I'm back" deals them in again.
     hostSatYouOut: 'The host sat you out.',
     // The viewer's own cards after a fold: still theirs to see, dimmed, until the next deal.
@@ -628,20 +765,53 @@ export const TABLE_COPY = {
     reload: 'Reload',
 } as const;
 
+// ---- Triple T's throw-away (components/poker-night DiscardPicker, Dock, Seat, the felt) ----------
+
+// Right after the deal everyone still in throws one of three cards away at once: the dock's three
+// cards to pick from (a radio group), its confirm and its clock, the wait for the others, the felt's
+// count, what a screen reader hears. A card is named in the viewer's own words alone: no sentence
+// here ever names another player's.
+export const DISCARD_COPY = {
+    prompt: 'Tap the card to throw away',
+    groupLabel: 'Card to throw away',
+    // A card of the picker while Peek keeps the cards face down: its place, never its name.
+    hiddenCard: (k: number): string => `Card ${count(k + 1)}, face down`,
+    confirm: (card: string): string => `Throw away ${card}`,
+    // With Peek on, the confirm never names the card.
+    confirmHidden: 'Throw away the card picked',
+    confirmNone: 'Pick a card first',
+    sending: 'Throwing away…',
+    clock: 'Throw away one',
+    waiting: (n: number): string => `Waiting for ${plural(n, 'player', 'players')} to throw away a card`,
+    felt: (done: number, n: number): string => `Everyone throws away one card · ${count(done)} of ${count(n)} done`,
+    // The same where the board is narrow (a phone on its side).
+    feltShort: (done: number, n: number): string => `${count(done)} of ${count(n)} thrown away`,
+    announceStart: (cards: readonly Card[]): string => `Throw away one of your three cards: ${words(cards.map((c) => `the ${cardWords(c)}`))}.`,
+    announceDone: 'Everyone has thrown away a card.',
+    thrown: (card: Card): string => `You threw away the ${cardWords(card)}.`,
+    timedOut: (card: Card): string => `Time ran out: the ${cardWords(card)} was thrown away for you.`,
+} as const;
+
 // ---- the hand log (components/poker-night/HandLog) ---------------------------------------------
 
 // Which pot a line is about: null when the hand had one pot, 0 the main pot, 1 the first side pot.
 export type PotIndex = number | null;
 const fromPot = (pot: PotIndex): string => (pot === null ? '' : pot === 0 ? ' from the main pot' : ` from side pot ${count(pot)}`);
 const splitName = (pot: PotIndex): string => (pot === null ? 'Split pot' : pot === 0 ? 'Main pot split' : `Side pot ${count(pot)} split`);
+// A line about one board's share of a pot, with two or three boards: "Board 2: …".
+const onBoard = (board: number | null): string => (board === null ? '' : `Board ${count(board + 1)}: `);
 
 export const LOG_COPY = {
     heading: 'Hand log',
+    // The winner's banner is a button that opens the log: its name says both.
+    fromBanner: (heads: readonly string[]): string => `${heads.join('; ')}. Open the hand log`,
     empty: 'The log fills in once a hand is dealt.',
     hand: (n: number): string => `Hand ${count(n)}`,
     blinds: (smallBlind: number, bigBlind: number, ante: number): string =>
         `Blinds ${count(smallBlind)}/${count(bigBlind)}${ante ? `, ante ${count(ante)}` : ''}`,
-    street: (street: Exclude<Street, 'preflop'>, cards: string): string => `${capitalize(street)}: ${cards}`,
+    // A street's cards, on each board with two or three: "Flop, board 2: A♠︎ K♦︎ 7♣︎".
+    street: (street: Exclude<Street, 'preflop'>, cards: string, board: number | null = null): string =>
+        `${capitalize(street)}${board === null ? '' : `, board ${count(board + 1)}`}: ${cards}`,
     // One line: "Ana calls 40.", "Ana raises to 340, all in.", "Ben folds as time ran out."; a hand
     // called off is the table's own line and takes no name.
     line: (name: string, kind: EntryKind, amount: number, allIn: boolean, timedOut = false): string =>
@@ -650,12 +820,22 @@ export const LOG_COPY = {
             : `${isolate(name)} ${ACTION_COPY.does(kind, amount, allIn)}${timedOut ? ' as time ran out' : ''}.`,
     shows: (name: string, cards: string, phrase: string | null): string => `${isolate(name)} shows ${cards}${phrase ? `: ${phrase}` : ''}.`,
     youHeld: (cards: string): string => `You held ${cards}.`,
-    // "Ana wins 1,200 with two pair, kings and sevens.", "Ben wins 400 from side pot 1."
-    wins: (name: string, n: number, phrase: string | null, pot: PotIndex = null): string =>
-        `${isolate(name)} wins ${count(n)}${fromPot(pot)}${phrase ? ` with ${phrase}` : ''}.`,
+    // Triple T: the card the reader threw away, in their own log alone.
+    youThrew: (card: string): string => `You threw away ${card}.`,
+    // A hand shown to the reader alone, answering their ask: "Shown to you: Ana's A♠ K♦."
+    showedYou: (name: string, cards: string): string => `Shown to you: ${isolate(name)} held ${cards}.`,
+    // "Ana wins 1,200 with two pair, kings and sevens.", "Ben wins 400 from side pot 1."; with two or
+    // three boards, a line for each board's share: "Board 2: Ana wins 600 with a flush, ace high."
+    wins: (name: string, n: number, phrase: string | null, pot: PotIndex = null, board: number | null = null): string =>
+        `${onBoard(board)}${isolate(name)} wins ${count(n)}${fromPot(pot)}${phrase ? ` with ${phrase}` : ''}.`,
     // Share by share, never "each": an odd chip makes the shares differ.
-    split: (shares: readonly {name: string; amount: number}[], pot: PotIndex = null): string =>
-        `${splitName(pot)}: ${shares.map((s) => `${isolate(s.name)} takes ${count(s.amount)}`).join(', ')}.`,
+    // "Board 2, split pot: …" on a board.
+    split: (shares: readonly {name: string; amount: number}[], pot: PotIndex = null, board: number | null = null): string =>
+        `${board === null ? splitName(pot) : `Board ${count(board + 1)}, ${splitName(pot).toLowerCase()}`}: ${shares.map((s) => `${isolate(s.name)} takes ${count(s.amount)}`).join(', ')}.`,
+    // What a shown hand makes on each of two or three boards, for LOG_COPY.shows: "on board 1 a
+    // flush, ace high; on board 2 a pair of kings".
+    onBoards: (phrases: readonly (string | null)[]): string =>
+        phrases.flatMap((p, k) => (p === null ? [] : [`on board ${count(k + 1)} ${p}`])).join('; '),
     uncontested: (name: string, n: number): string => `Everyone else folded: ${isolate(name)} takes ${count(n)}.`,
     refund: (name: string, n: number): string => `${isolate(name)} gets back ${count(n)} uncalled.`,
     playsBoard: (name: string): string => `${isolate(name)} plays the board.`,
@@ -670,8 +850,13 @@ export const ANNOUNCE_COPY = {
     yourTurn: (toCall: number, pot: number): string =>
         toCall > 0 ? `Your turn: ${count(toCall)} to call, pot ${count(pot)}.` : `Your turn: checking is free, pot ${count(pot)}.`,
     timeLow: (s: number): string => `${plural(s, 'second', 'seconds')} left.`,
-    dealt: ([a, b]: readonly [Card, Card]): string => `You have the ${cardWords(a)} and the ${cardWords(b)}.`,
-    street: (street: Exclude<Street, 'preflop'>, cards: readonly Card[]): string => `${capitalize(street)}: ${words(cards.map(cardWords))}.`,
+    dealt: (cards: readonly Card[]): string => `You have ${words(cards.map((c) => `the ${cardWords(c)}`))}.`,
+    newGame: MODE_COPY.changed,
+    street: (street: Exclude<Street, 'preflop'>, cards: readonly Card[], board: number | null = null): string =>
+        `${capitalize(street)}${board === null ? '' : `, board ${count(board + 1)}`}: ${words(cards.map(cardWords))}.`,
+    // With two or three boards, each board's share: "Board 2: you win 600 with a flush, ace high."
+    youWinBoard: (board: number, n: number, phrase: string | null): string =>
+        `Board ${count(board + 1)}: you win ${count(n)}${phrase ? ` with ${phrase}` : ''}.`,
     // Another player's move and a pot's winners read as the log does.
     move: LOG_COPY.line,
     wins: LOG_COPY.wins,
@@ -688,12 +873,63 @@ export const ANNOUNCE_COPY = {
     closed: 'The host closed the table.',
 } as const;
 
+// ---- asks to see a hand (components/poker-night SeatMenu, AskPrompt; lib/poker-night/asks) -------
+
+// Why an ask is greyed in the seat menu (AskBlock), each one sentence; the refusals' own words where
+// the engine has one.
+const ASK_BLOCKS = {
+    'asks-off': (name: string): string => `${isolate(name)} has turned off asks to see their cards.`,
+    cooldown: (): string => REFUSAL_COPY['ask-cooldown'],
+    waiting: (): string => REFUSAL_COPY['ask-waiting'],
+    limit: (): string => REFUSAL_COPY['ask-limit'],
+    full: (): string => REFUSAL_COPY['asks-full'],
+} as const;
+
+export const ASK_COPY = {
+    // The seat menu, once a hand the reader folded is complete.
+    ask: 'Ask to see their cards',
+    blocked: ASK_BLOCKS,
+    asked: (name: string): string => `You asked ${isolate(name)} to see their cards.`,
+    // How the reader's ask of this player stands (AskAnswer), in the menu.
+    status: {
+        waiting: (name: string): string => `Waiting for ${isolate(name)} to answer`,
+        shown: (): string => 'Shown to you',
+        everyone: (): string => 'Shown to everyone',
+        no: (name: string): string => `${isolate(name)} said no thanks`,
+        expired: (name: string): string => `No answer from ${isolate(name)}`,
+    },
+    // How it ended, said once in a toast.
+    ended: {
+        shown: (name: string): string => `${isolate(name)} showed you their cards.`,
+        everyone: (name: string): string => `${isolate(name)} showed their cards to everyone.`,
+        no: (name: string): string => `${isolate(name)} said no thanks.`,
+        expired: (name: string): string => `No answer from ${isolate(name)} in time.`,
+        // The next deal ended it while it still had time: no answer, which counts as a no.
+        dealt: (name: string): string => `The next hand was dealt before ${isolate(name)} answered.`,
+    },
+    // The plate of a player who showed the reader alone.
+    shownTag: 'Shown to you',
+    // The prompt the player asked sees, under the top bar, with its seconds left.
+    region: 'An ask to see your cards',
+    prompt: (name: string): string => `${isolate(name)} asks to see your cards`,
+    showOne: (name: string): string => `Show ${isolate(name)}`,
+    showAll: 'Show everyone',
+    noThanks: 'No thanks',
+    secondsLeft: (s: number): string => `${count(s)} s`,
+    timer: 'Time left to answer',
+    shownOne: (name: string): string => `Your cards are shown to ${isolate(name)} alone.`,
+    // My look's switch (PersonalLook.allowAsks): the room keeps it for the reader's seat.
+    allow: 'Let others ask to see my cards',
+    allowHint: 'After a hand, a player who folded can ask to see your cards if nobody saw them, and you choose who sees them. Off, nobody can ask.',
+} as const;
+
 // ---- the host drawer (components/poker-night/HostDrawer, RemovePlayerDialog) -------------------
 
 const REMOVED = 'Removed by host';
 
-// The rebuy policy as the drawer's segmented control reads it (GameConfig.rebuys).
-const REBUY_POLICY: Record<RebuyPolicy, string> = {off: 'Off', auto: 'On', approve: 'Host approves'};
+// The rebuy policy as the drawer's control reads it (GameConfig.rebuys): off, or on — once the first
+// hand is dealt the host approves every buy but their own.
+const REBUY_POLICY: Record<RebuyPolicy, string> = {off: 'Off', approve: 'On (host approves)'};
 
 export const HOST_COPY = {
     heading: 'Host controls',
@@ -724,6 +960,9 @@ export const HOST_COPY = {
         'below-big-blind': 'Starting chips are at least one big blind.',
         'below-buy-in-min': 'The chip cap is at least the starting chips.',
         'above-cap': `The chip cap is at most ${count(TABLE_LIMITS.buyIn.bigBlinds)} big blinds.`,
+        'plo-only': 'More than one board is for PLO only.',
+        'not-open': 'That game is not open at this table yet.',
+        'too-many-cards': 'Not enough cards for that many seats and boards.',
     },
 
     // Rebuys, and the requests waiting on the host (a dot on the menu icon, rows in the bank).
@@ -734,8 +973,17 @@ export const HOST_COPY = {
     requestsHeading: 'Waiting for you',
     requests: (n: number): string => `${plural(n, 'request', 'requests')} waiting`,
     request: (name: string, n: number): string => `${isolate(name)} asks for ${plural(n, 'chip', 'chips')}.`,
+    // What a request is for (lib/poker-night/overlays.requestKind): a new player's first chips, a
+    // rebuy at zero, or a top-up.
+    requestSeat: (name: string, n: number): string => `${isolate(name)} asks for ${plural(n, 'chip', 'chips')} to sit down.`,
+    requestRebuy: (name: string, n: number): string => `${isolate(name)} asks for a rebuy of ${plural(n, 'chip', 'chips')}.`,
+    requestTopUp: (name: string, n: number): string => `${isolate(name)} asks to top up with ${plural(n, 'chip', 'chips')}.`,
     approve: 'Approve',
     decline: 'Decline',
+    approvedFor: (name: string): string => `Chips approved for ${isolate(name)}.`,
+    // The rebuy policy's two choices, said once under them: on, the host approves every buy but
+    // their own once the first hand is dealt.
+    rebuysHint: "Once the first hand is dealt, every player's chips but yours wait for your yes in the bank. Off: a player who leaves or runs out of chips can watch, not sit down again.",
 
     // Players: each row's More menu.
     you: 'You',
@@ -809,6 +1057,8 @@ export const BANK_COPY = {
     heading: 'Bank',
     lead: 'Play chips only. No cash value: the bank counts what each player brought to the table and what they hold now.',
     columns: {player: 'Player', chipsIn: 'Chips in', rebuys: 'Rebuys', stack: 'Stack', net: 'Net'},
+    // A player's rebuys under their name, where the drawer is too narrow for the column.
+    rebuysCount: (n: number): string => plural(n, 'rebuy', 'rebuys'),
     net: signed,
     inPot: (n: number): string => `${count(n)} in the pot`,
     leftWith: (n: number): string => `Left with ${count(n)}`,
@@ -827,12 +1077,26 @@ export const BANK_COPY = {
     // while some are in the pot it says what it adds rather than a total.
     rebuy: 'Rebuy',
     topUp: (to: number): string => `Top up to ${count(to)}`,
+    // A seat's first chips here: once the game has started a request the host approves (askFor), before
+    // it (or the host's own) chips that land at once (takeChips).
+    askFor: (n: number): string => `Ask for ${plural(n, 'chip', 'chips')}`,
+    takeChips: (n: number): string => `Take ${plural(n, 'chip', 'chips')}`,
+    // The dock's one-tap rebuy once the stack is empty: the table's whole buy-in in one tap ("Rebuy
+    // 2,000 chips", or "Ask for 2,000 chips" where the host says yes first; a narrow dock says the
+    // figure alone), and the bank for any other amount.
+    rebuyFor: (n: number): string => `Rebuy ${plural(n, 'chip', 'chips')}`,
+    rebuyShort: (n: number): string => `Rebuy ${count(n)}`,
+    askShort: (n: number): string => `Ask for ${count(n)}`,
+    otherShort: 'Other',
     ownInPot: (n: number): string => `Counting ${count(n)} in this pot.`,
     addChips: (n: number): string => `Add ${plural(n, 'chip', 'chips')}`,
     otherAmount: 'Other amount',
     amountLabel: 'Chips to add',
     amountRule: (min: number, max: number): string => `From ${count(min)} to ${count(max)}.`,
     requested: (n: number): string => `Asked the host for ${plural(n, 'chip', 'chips')}.`,
+    cancel: TABLE_COPY.cancelRequest,
+    cancelLabel: TABLE_COPY.cancelRequestLabel,
+    cancelled: TABLE_COPY.requestCancelled,
     pending: (n: number): string => `${plural(n, 'chip joins', 'chips join')} your stack when this hand ends.`,
     approved: (n: number): string => `${plural(n, 'chip', 'chips')} added to your stack.`,
     declined: 'The host declined the request.',
@@ -989,7 +1253,7 @@ export const OVERLAY_COPY = {
     // My look's keyboard switch (WCAG 2.1.4: single-key shortcuts can be turned off), kept in this
     // browser only.
     shortcuts: 'Single-key shortcuts',
-    shortcutsHint: 'F folds, C checks or calls, R opens a bet or a raise, A sets all in, and 1 to 4 pick a size. Off, only the buttons act; Enter and Escape still work in the raise panel.',
+    shortcutsHint: 'F folds, C checks or calls, R opens a bet or a raise, A sets all in (the pot in PLO), 1 to 4 pick a size, and in Triple T 1 to 3 pick the card to throw away. Off, only the buttons act; Enter and Escape still work.',
 
     // The bank's own-chips panel.
     yourChips: 'Your chips',
@@ -1102,6 +1366,9 @@ export const LOOKS_COPY = {
     peekLabel: 'Your cards, face down: press to peek',
     shortcuts: OVERLAY_COPY.shortcuts,
     shortcutsHint: OVERLAY_COPY.shortcutsHint,
+    // Asks to see a hand (ASK_COPY): the room keeps it for the player's seat.
+    allowAsks: ASK_COPY.allow,
+    allowAsksHint: ASK_COPY.allowHint,
 
     // The lobby's My look (lobby/MyLookPanel): the same, saved with the account.
     personalHeading: 'At every table',
@@ -1183,16 +1450,19 @@ export const SHORTCUTS_COPY = {
     title: 'Keyboard shortcuts',
     open: 'Keyboard shortcuts',
     lead: 'With the focus on the table, one key does each of these. The question mark opens this list.',
-    off: 'Single-key shortcuts are off in My look: only Enter and Escape act, in the raise panel.',
-    groups: {turn: 'On your turn', table: 'At the table'} satisfies Record<ShortcutGroup, string>,
+    off: 'Single-key shortcuts are off in My look: only Enter and Escape act, in the raise panel and while throwing a card away.',
+    groups: {turn: 'On your turn', discard: 'While throwing away a card', table: 'At the table'} satisfies Record<ShortcutGroup, string>,
     does: {
         fold: 'Fold',
         'check-call': 'Check or call',
         raise: 'Open a bet or a raise',
-        'all-in': 'Set the raise to all in',
+        'all-in': 'Set the raise to all in, or to the pot in PLO',
         sizes: 'A quick size, with the raise panel open',
         confirm: 'Confirm the raise',
         close: 'Close the raise panel',
+        pick: 'Pick the first, second or third card',
+        throw: 'Throw away the card picked',
+        unpick: 'Pick again',
         emotes: 'Emotes',
         log: 'Hand log',
         bank: 'Bank',
@@ -1209,7 +1479,7 @@ export const SHORTCUTS_COPY = {
 // the lobby's Hands tab, app/(root)/poker-night ?tab=hands) ========================================
 
 // What the guide says beyond the glossary entries it quotes word for word wherever it says what a
-// term means (hand-rankings, kicker, texas-holdem in lib/learn/glossary.ts): the lobby's two views,
+// term means (hand-rankings, kicker, texas-holdem, omaha, pot-limit in lib/learn/glossary.ts): the lobby's two views,
 // the rankings' names in the guide's order (hands-guide RANKING_SLOTS), what the lifted cards are,
 // the ties a kicker does not settle, and what each game is like at this table. An example's own
 // hand is named by HAND_COPY.label. lib/learn/__tests__/poker-night-copy.test.ts holds these lines
@@ -1259,5 +1529,30 @@ export const HANDS_COPY = {
                 'A player who folded may still show their cards while the result is on screen.',
             ],
         },
+        plo: {
+            name: 'Pot-limit Omaha',
+            facts: [
+                'A flush needs two cards of the suit in your hand: one is not enough, however many the board shows.',
+                'The strongest hand wins the pot; there is no low half.',
+                'With two or three boards, each board is played on its own and the pot is split evenly between them: the strongest hand on each board wins that share, so one player can win one board, some or all of them.',
+                'An odd chip goes to the first boards: board 1, then board 2.',
+                'In the raise panel, Pot sets the largest bet or raise the limit allows, and A on a keyboard does the same.',
+                'The host can switch the table to another game; the change starts with the next hand.',
+            ],
+        },
+        'triple-t': {
+            name: 'Triple T poker',
+            facts: [
+                'The blinds and any ante are posted first. Then every player still in throws a card away at the same time, and nobody sees the cards thrown away.',
+                `The throw-away runs on the turn timer, never above ${numberWord(DISCARD_MAX_SECONDS)} seconds. If time runs out, a card is thrown away for you: the odd one out when two match, else the lowest.`,
+                'A card thrown away for you does not count toward sitting you out.',
+                'The betting then starts with the player after the big blind, as in Texas hold\'em.',
+            ],
+        },
     } satisfies Record<GuideGame, {name: string; facts: readonly string[]}>,
+    // PLO's example (hands-guide PLO_EXAMPLE): four cards in hand, five on the board, the five that play
+    // lifted.
+    ploHand: 'In hand',
+    ploBoard: 'On the board',
+    ploExample: 'Four hearts on the board and one in this hand: no flush. This hand plays as a pair of aces.',
 } as const;

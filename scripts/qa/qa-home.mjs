@@ -99,12 +99,12 @@ try {
     await page.waitForSelector('#home-learn [data-home-course], #home-learn [data-lesson], #home-first-week', {timeout: 30000}).catch(() => {});
     check('…and with no table to go back to or join, Home draws no poker night box', await page.locator('[data-home-poker-night]').count() === 0);
     await page.goto(`${BASE}/poker-night`, {waitUntil: 'load'});
-    await page.waitForSelector('[data-quick-start]', {timeout: 60000});
+    await page.waitForSelector('[data-quick-start="holdem"]', {timeout: 60000});
     check('…nor does the lobby offer a table to go back to', await page.locator('[data-lobby-resume]').count() === 0);
 
     const TABLE_URL = /\/play\/[A-HJ-NP-Z2-9]{6}(\?.*)?$/;
     const startTable = async (p) => {
-        await p.click('[data-quick-start]');
+        await p.click('[data-quick-start="holdem"]');
         await p.waitForURL(TABLE_URL, {timeout: 120000});
         return new URL(p.url()).pathname.split('/').pop();
     };
@@ -184,7 +184,7 @@ try {
     const emailB = await signUp(bp, 'homefriend', {name: 'Ben Friend', stay: true});
     const idB = String((await db.collection('user').findOne({email: emailB}))?._id ?? '');
     await bp.goto(`${BASE}/poker-night`, {waitUntil: 'load'});
-    await bp.waitForSelector('[data-quick-start]', {timeout: 60000});
+    await bp.waitForSelector('[data-quick-start="holdem"]', {timeout: 60000});
     const codeB = await startTable(bp);
     await other.close();
     await db.collection('pokerrooms').updateOne({code: codeB}, {$set: {showToFriends: true, 'state.settings.showToFriends': true}});
@@ -256,7 +256,7 @@ try {
     const hostedChip = await chipOf();
     check('…and the chip is the lobby\'s again (no seat to go back to)', hostedChip?.kind === 'lobby' && hostedChip.href === '/poker-night', JSON.stringify(hostedChip));
     await page.goto(`${BASE}/poker-night`, {waitUntil: 'load'});
-    await page.waitForSelector('[data-quick-start]', {timeout: 60000});
+    await page.waitForSelector('[data-quick-start="holdem"]', {timeout: 60000});
     check('…and the lobby offers no "You are seated at …" card', await page.locator('[data-lobby-resume]').count() === 0);
 } catch (err) {
     check(`threw: ${err.message}`, false);

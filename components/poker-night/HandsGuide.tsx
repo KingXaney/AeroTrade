@@ -11,7 +11,10 @@
 // container query, so the lobby's column and a drawer size them by their own width), and the name
 // moves beside them only where both fit. With `focus` (at the table) the rankings come first — what a
 // player opens Hands mid-game to check — then ties and kickers, then the table's own game under "At
-// this table", before any other. The cards are drawn in the viewer's card face and colours, from
+// this table", before any other; with `lead` too (the join card's "How it plays") the table's game
+// comes before the rankings, in the guide's first screen. PLO's section quotes the pot limit's entry too, and draws one hand
+// on one board with the five cards that play lifted: one heart in hand on four hearts makes no flush.
+// The cards are drawn in the viewer's card face and colours, from
 // LOOKS_CSS through the sample's own data attributes — the drawer is portaled out of the room that
 // carries the viewer's.
 
@@ -24,7 +27,7 @@ import PlayingCard from "@/components/poker-night/PlayingCard";
 import {GLOSSARY} from "@/lib/learn/glossary";
 import {HAND_COPY, HANDS_COPY} from "@/lib/learn/copy/poker-night";
 import type {Card} from "@/lib/poker/cards";
-import {cardsThatMake, guideGames, KICKER_EXAMPLE, RANKING_EXAMPLES, type GuideGame, type GuideGameEntry} from "@/lib/poker-night/hands-guide";
+import {cardsThatMake, guideGames, KICKER_EXAMPLE, PLO_EXAMPLE, RANKING_EXAMPLES, type GuideGame, type GuideGameEntry} from "@/lib/poker-night/hands-guide";
 import type {CardFaceId} from "@/lib/poker-night/looks";
 import {DEFAULT_PERSONAL_LOOK} from "@/lib/poker-night/personal";
 import {cn} from "@/lib/utils";
@@ -34,6 +37,8 @@ type Level = 'h2' | 'h3';
 type Props = {
     // The game the table deals, put first under "At this table"; none in the lobby.
     focus?: GuideGame | null;
+    // That game before the rankings, not after them: the join card's "How it plays".
+    lead?: boolean;
     face?: CardFaceId;
     four?: boolean; // the four-colour deck
     // The sections' heading level: h2 on the lobby's page, h3 in the table's drawer.
@@ -108,8 +113,23 @@ const Ties = ({level, look}: {level: Level; look: Look}) => (
     </section>
 );
 
-// One game: its name as its glossary entry, the entry's short, then what it is like at this table.
-const Game = ({game, heading, here}: {game: GuideGameEntry; heading: (id: string, children: ReactNode) => ReactNode; here: boolean}) => {
+// PLO's hand: its four cards and the board's five, each row a picture, the five that play lifted
+// (two from the hand, three from the board), and what they make.
+const PloExample = ({look}: {look: Look}) => (
+    <div className="@container space-y-2" data-guide-plo="">
+        {([[HANDS_COPY.ploHand, PLO_EXAMPLE.hole], [HANDS_COPY.ploBoard, PLO_EXAMPLE.board]] as const).map(([label, cards]) => (
+            <RowCard key={label} className="flex flex-col gap-1 px-3 py-2.5 @md:flex-row @md:items-center @md:justify-between @md:gap-4">
+                <MicroLabel as="p">{label}</MicroLabel>
+                <Cards cards={cards} makes={PLO_EXAMPLE.plays} look={look}/>
+            </RowCard>
+        ))}
+        <p className="text-xs leading-relaxed text-fg-muted">{HANDS_COPY.ploExample}</p>
+    </div>
+);
+
+// One game: its name as its glossary entry, the entry's short, the limit it plays by (its entry and
+// short) when that is not no limit, PLO's hand, then what it is like at this table.
+const Game = ({game, heading, here, look}: {game: GuideGameEntry; heading: (id: string, children: ReactNode) => ReactNode; here: boolean; look: Look}) => {
     const copy = HANDS_COPY.games[game.id];
     return (
         <article id={game.anchor} aria-labelledby={`${game.anchor}-name`} className="scroll-mt-24 space-y-2" data-guide-game={game.id}
@@ -117,6 +137,8 @@ const Game = ({game, heading, here}: {game: GuideGameEntry; heading: (id: string
             {here && <MicroLabel as="p" tone="brand">{HANDS_COPY.atThisTable}</MicroLabel>}
             {heading(`${game.anchor}-name`, <Term k={game.term}>{copy.name}</Term>)}
             <p className="text-sm leading-relaxed text-fg-soft">{GLOSSARY[game.term].short}</p>
+            {game.limit !== null && <p className="text-sm leading-relaxed text-fg-soft"><Term k={game.limit}/>: {GLOSSARY[game.limit].short}</p>}
+            {game.id === 'plo' && <PloExample look={look}/>}
             <ul className="list-disc space-y-1.5 pl-5 text-sm leading-relaxed text-fg-soft marker:text-fg-muted">
                 {copy.facts.map((line) => <li key={line}>{line}</li>)}
             </ul>
@@ -124,25 +146,27 @@ const Game = ({game, heading, here}: {game: GuideGameEntry; heading: (id: string
     );
 };
 
-const HandsGuide = ({focus = null, face = DEFAULT_PERSONAL_LOOK.cardFace, four = DEFAULT_PERSONAL_LOOK.fourColour, level = 'h2', className}: Props) => {
+const HandsGuide = ({focus = null, lead = false, face = DEFAULT_PERSONAL_LOOK.cardFace, four = DEFAULT_PERSONAL_LOOK.fourColour, level = 'h2', className}: Props) => {
     const look: Look = {face, four};
     const {here, others} = guideGames(focus);
+    // At the table: the game it deals, after the rankings (before them with `lead`) and before any
+    // other game, its name at the sections' own level.
+    const atTable = here && (
+        <div className="mb-6 break-inside-avoid" data-guide-section="here" data-guide-lead={lead ? '' : undefined}>
+            <Game game={here} here look={look} heading={(id, children) => <SectionHeading as={level} id={id} spacing="none">{children}</SectionHeading>}/>
+        </div>
+    );
     return (
         <div className={cn('text-fg', className)} data-hands-guide="">
+            {lead && atTable}
             <Rankings level={level} look={look}/>
             <Ties level={level} look={look}/>
-            {/* At the table: the game it deals, after the rankings and before any other game, its name
-                at the sections' own level. */}
-            {here && (
-                <div className="mb-6 break-inside-avoid" data-guide-section="here">
-                    <Game game={here} here heading={(id, children) => <SectionHeading as={level} id={id} spacing="none">{children}</SectionHeading>}/>
-                </div>
-            )}
+            {!lead && atTable}
             {others.length > 0 && (
                 <section aria-labelledby="hands-games" className="mb-6 break-inside-avoid space-y-4" data-guide-section="games">
                     <SectionHeading as={level} id="hands-games" spacing="none">{HANDS_COPY.gamesHeading}</SectionHeading>
                     {others.map((game) => (
-                        <Game key={game.id} game={game} here={false} heading={(id, children) => <SubHeading level={level} id={id}>{children}</SubHeading>}/>
+                        <Game key={game.id} game={game} here={false} look={look} heading={(id, children) => <SubHeading level={level} id={id}>{children}</SubHeading>}/>
                     ))}
                 </section>
             )}

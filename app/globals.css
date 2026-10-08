@@ -514,9 +514,11 @@ details[open] > :not(summary) { animation: disclosure-in var(--motion-base) var(
     --pn-stack: 11px;
     --pn-chip: 12px;
     --pn-hole-w: 50px;
+    --pn-board-label-w: 14px;
+    --pn-board-label-h: 16px;
   }
-  .pn-room[data-pn-fit="tight"] { --pn-av: 22px; --pn-mini-w: 14px; --pn-show-w: 24px; --pn-name: 10px; --pn-stack: 10px; --pn-chip: 10px; --pn-hole-w: 44px; }
-  .pn-room[data-pn-fit="comfortable"] { --pn-av: 42px; --pn-mini-w: 24px; --pn-show-w: 40px; --pn-name: 13px; --pn-stack: 14px; --pn-chip: 18px; --pn-hole-w: 68px; --pn-amount: 13px; }
+  .pn-room[data-pn-fit="tight"] { --pn-av: 22px; --pn-mini-w: 14px; --pn-show-w: 24px; --pn-name: 10px; --pn-stack: 10px; --pn-chip: 10px; --pn-hole-w: 44px; --pn-board-label-w: 12px; --pn-board-label-h: 14px; }
+  .pn-room[data-pn-fit="comfortable"] { --pn-av: 42px; --pn-mini-w: 24px; --pn-show-w: 40px; --pn-name: 13px; --pn-stack: 14px; --pn-chip: 18px; --pn-hole-w: 68px; --pn-amount: 13px; --pn-board-label-w: 18px; --pn-board-label-h: 20px; }
   .pn-scene { position: absolute; inset: 0; z-index: 0; background: var(--pn-sky, var(--bg)); }
 
   /* Top bar (the overlays' own, fixed), the table, the dock. A phone on its side puts the dock in a
@@ -572,11 +574,14 @@ details[open] > :not(summary) { animation: disclosure-in var(--motion-base) var(
     opacity: 0.55;
     pointer-events: none;
   }
+  /* The game the table deals, under its name. */
+  .pn-felt-game { display: block; margin-top: 3px; font-size: 10px; letter-spacing: 0.18em; }
   .pn-centre-note { position: absolute; translate: -50% -50%; text-align: center; font-size: 13px; line-height: 1.35; }
 
   /* Seats: a plate centred on its spot (lib/poker-night/stage), the cards and tags around it. */
-  .pn-seats { position: absolute; inset: 0; margin: 0; padding: 0; list-style: none; }
-  .pn-seat { position: absolute; translate: -50% -50%; width: var(--pn-plate-w); height: var(--pn-plate-h); z-index: 2; }
+  /* The ring covers the table: only the seats themselves take a tap, so the boards under it keep theirs. */
+  .pn-seats { position: absolute; inset: 0; margin: 0; padding: 0; list-style: none; pointer-events: none; }
+  .pn-seat { position: absolute; translate: -50% -50%; width: var(--pn-plate-w); height: var(--pn-plate-h); z-index: 2; pointer-events: auto; }
   .pn-plate {
     position: relative;
     display: flex;
@@ -607,6 +612,13 @@ details[open] > :not(summary) { animation: disclosure-in var(--motion-base) var(
   :is([data-pn-fit="compact"], [data-pn-fit="tight"]) .pn-plate-avatar { grid-area: avatar; }
   :is([data-pn-fit="compact"], [data-pn-fit="tight"]) .pn-plate-stack { grid-area: stack; min-width: 0; text-align: center; white-space: nowrap; }
   :is([data-pn-fit="compact"], [data-pn-fit="tight"]) .pn-plate-name { grid-area: name; min-width: 0; text-align: center; }
+  /* A status with no room under its plate (a crowded column on a phone on its side, stage.flagsOnPlate)
+     takes the stack's place: on a compact or tight plate the name moves up beside the avatar and the
+     word has the plate's whole width under them (the stack is in the plate's accessible name). */
+  .pn-plate-status { min-width: 0; overflow: hidden; color: var(--fg-soft); font-size: 10px; font-weight: 700; line-height: 1.2; text-overflow: ellipsis; white-space: nowrap; }
+  :is([data-pn-fit="compact"], [data-pn-fit="tight"]) .pn-seat[data-status-on="plate"] .pn-plate { grid-template-areas: "avatar name" "stack stack"; }
+  :is([data-pn-fit="compact"], [data-pn-fit="tight"]) .pn-seat[data-status-on="plate"] .pn-plate-name { text-align: left; }
+  :is([data-pn-fit="compact"], [data-pn-fit="tight"]) .pn-plate-status { grid-area: stack; text-align: center; }
   .pn-seat[data-state="folded"] .pn-plate,
   .pn-seat[data-state="sitting-out"] .pn-plate,
   .pn-seat[data-state="away"] .pn-plate,
@@ -669,12 +681,34 @@ details[open] > :not(summary) { animation: disclosure-in var(--motion-base) var(
   .pn-seat-cards > * + * { margin-left: calc(var(--pn-mini-w) * -0.45); }
   .pn-seat-cards > :first-child { rotate: -7deg; }
   .pn-seat-cards > :last-child { rotate: 7deg; }
+  /* More than two face down (PLO's four) keep the two's footprint: the same first and last card, the
+     ones between closer, so nothing new reaches past the plate's corner (stage.seatCardsRect). */
+  .pn-seat-cards[data-count="3"] > * + * { margin-left: calc(var(--pn-mini-w) * -0.725); }
+  .pn-seat-cards[data-count="4"] > * + * { margin-left: calc(var(--pn-mini-w) * -0.8167); }
+  .pn-seat-cards[data-count="3"] > :nth-child(2) { rotate: 0deg; }
+  .pn-seat-cards[data-count="4"] > :nth-child(2) { rotate: -2.5deg; }
+  .pn-seat-cards[data-count="4"] > :nth-child(3) { rotate: 2.5deg; }
+  /* …and, with no gap between them over the stack's figures, on a compact or tight plate (the figures
+     in the top row, beside the avatar) they start a whole card's width over the plate's top, ending
+     above the figures (stage.SEAT_CARDS_OVER). */
+  :is([data-pn-fit="compact"], [data-pn-fit="tight"]) .pn-seat-cards:is([data-count="3"], [data-count="4"]) { top: calc(var(--pn-mini-w) * -1); }
+  /* Triple T's "Discarding…" where its flag has no room under the plate (stage.flagRoom): a dashed
+     ring on the plate instead. */
+  .pn-seat[data-pn-mark="discarding"] .pn-plate { outline: 2px dashed var(--pn-on-felt-soft); outline-offset: 1px; }
   /* Cards turned up sit outside the plate, toward the felt's middle — above a bottom or side seat,
      below a top one — so the name, the stack and the count stay in sight; a winner's "+N" rises
-     above them. */
-  .pn-seat-shown { position: absolute; left: 50%; bottom: calc(100% + 3px); translate: -50% 0; z-index: 3; display: flex; gap: 2px; pointer-events: none; }
+     above them. Where another seat's hand would meet them, they sit moved along the row; in a crowded
+     column (nine seats on a small phone, seven or more on its side), where they would cover another
+     plate or the flag under it, beside the plate toward the middle or on its other side (--pn-shown-dx
+     and --pn-shown-dy, lib/poker-night/stage placeHands). */
+  .pn-seat-shown { position: absolute; left: 50%; bottom: calc(100% + 3px); translate: calc(-50% + var(--pn-shown-dx, 0px)) var(--pn-shown-dy, 0px); z-index: 3; display: flex; gap: 2px; pointer-events: none; }
   .pn-seat[data-side="top"] .pn-seat-shown { bottom: auto; top: calc(100% + 10px); }
   .pn-seat[data-shown]:not([data-side="top"]) .pn-win-pop-text { top: calc(var(--pn-show-w) * -1.4 - 3px); }
+  /* A turned-up hand of four (PLO) overlaps, each card 0.56 of a card on from the one before
+     (stage.SHOWN_STEP), so every rank and suit in the top-left corner stays in sight; unturned, so the
+     box the banner keeps clear of (stage.shownHandRect) is exact. */
+  .pn-seat-shown[data-count="3"], .pn-seat-shown[data-count="4"] { gap: 0; }
+  .pn-seat-shown[data-count="3"] > * + *, .pn-seat-shown[data-count="4"] > * + * { margin-left: calc(var(--pn-card-w) * -0.44); }
   .pn-open-seat {
     position: absolute;
     left: 50%;
@@ -771,6 +805,24 @@ details[open] > :not(summary) { animation: disclosure-in var(--motion-base) var(
   .pn-card[data-state="win"] > .pn-card-inner { transform: translateY(-6px); box-shadow: 0 0 0 2px var(--rank-1); }
   .pn-slot { flex: none; width: var(--pn-card-w); height: var(--pn-card-h); border-radius: calc(var(--pn-card-w) * 0.12); border: 1.5px dashed var(--pn-felt-line); }
   .pn-board { position: absolute; display: flex; justify-content: center; translate: -50% -50%; }
+  /* PLO's two or three boards (components/poker-night/Board): each board's row where the stage put it,
+     a numeral at its left when there was room (lib/poker-night/stage BOARD_LABEL, per fit), the whole
+     block one button that opens them larger (BoardsSheet). A card that plays keeps its ring and glow but
+     does not lift, which would cover the board over it; in a cascade an empty place is filled with the
+     cloth, so the places of the board under it hide the foot of its own. */
+  .pn-board-set { position: absolute; inset: 0; pointer-events: none; }
+  .pn-board-set .pn-card[data-state="win"] > .pn-card-inner { transform: none; }
+  .pn-board-set[data-pn-arrangement="cascade"] .pn-slot { background: var(--pn-felt); }
+  .pn-board-label { position: absolute; translate: -50% -50%; display: grid; place-items: center; width: var(--pn-board-label-w); height: var(--pn-board-label-h); border-radius: 9999px; font-size: calc(var(--pn-board-label-h) - 5px); line-height: 1; font-weight: 700; }
+  .pn-boards-zoom { position: absolute; pointer-events: auto; border-radius: 6px; background: transparent; cursor: zoom-in; }
+  .pn-boards-zoom:focus-visible { outline: 2px solid var(--brand); outline-offset: 3px; }
+  /* A board's numeral beside what the viewer makes on it, in the dock's line (HandStrength): a filled
+     disc in the palette's ink, so it reads as the board's mark on the pill's chrome. */
+  .pn-board-num { display: inline-grid; flex: none; place-items: center; min-width: 16px; height: 16px; padding: 0 3px; border-radius: 9999px; background: var(--fg); color: var(--bg); font-size: 11px; line-height: 1; font-weight: 700; }
+  .pn-sheet-board { display: flex; gap: 3px; }
+  /* The sheet is portaled out of the room, onto the chrome surface, where no felt is set: a card not
+     out yet is a place ringed in the palette's muted ink, so a board on the flop shows its two to come. */
+  .pn-sheet-board .pn-slot { border: 1.5px dashed var(--fg-muted); }
 
   /* Chips: coloured discs from the chip set, a few short columns; the amount always beside them. */
   .pn-chips { display: inline-flex; align-items: flex-end; gap: 1px; }
@@ -833,7 +885,12 @@ details[open] > :not(summary) { animation: disclosure-in var(--motion-base) var(
     gap: 4px;
     padding: 6px 12px;
     border-radius: var(--control-radius);
+    /* A button that opens the hand log (components/poker-night/WinnerReveal). */
+    text-align: left;
+    cursor: pointer;
+    pointer-events: auto;
   }
+  .pn-banner:focus-visible { outline: 2px solid var(--brand); outline-offset: 2px; }
   .pn-banner .pn-avatar { --pn-av-size: 26px; }
   [data-pn-fit="tight"] .pn-banner { gap: 2px; padding: 3px 8px; }
   [data-pn-fit="tight"] .pn-banner .pn-avatar { --pn-av-size: 20px; }
@@ -874,9 +931,63 @@ details[open] > :not(summary) { animation: disclosure-in var(--motion-base) var(
     padding: 4px max(10px, env(safe-area-inset-right)) calc(8px + env(safe-area-inset-bottom)) max(10px, env(safe-area-inset-left));
   }
   .pn-dock-row { display: flex; flex-wrap: wrap; align-items: flex-end; gap: 6px 10px; max-width: 64rem; margin-inline: auto; }
+  /* The viewer's turn (or a card of theirs to throw away), for a phone that cannot buzz: the dock's top
+     edge in the warning colour, its ring breathing on .pn-pulse's loop, and the "Your turn" pill ringed
+     the same way — still, and still there, under either motion guard and in brutalist. */
+  .pn-turn-edge {
+    position: absolute;
+    left: max(10px, env(safe-area-inset-left));
+    right: max(10px, env(safe-area-inset-right));
+    top: 0;
+    height: 3px;
+    border-radius: 9999px;
+    background: var(--warning);
+    outline: 2px solid color-mix(in srgb, var(--warning) 40%, transparent);
+    outline-offset: 1px;
+    pointer-events: none;
+  }
+  .pn-turn-cue { outline: 2px solid var(--warning); outline-offset: 1px; }
   .pn-dock-hand { display: flex; flex: 0 1 auto; align-items: flex-end; gap: 8px; min-width: 0; min-height: calc(var(--pn-hole-w) * 1.4); }
   .pn-dock-actions { position: relative; display: flex; flex: 1 1 17rem; flex-direction: column; justify-content: center; gap: 6px; min-width: 0; min-height: 60px; }
   .pn-hole { display: flex; gap: 4px; --pn-card-w: var(--pn-hole-w); --pn-card-h: calc(var(--pn-hole-w) * 1.4); }
+  /* The width the night's game takes (data-slots), held between hands so the line beside never moves:
+     two side by side, or PLO's four in a fan. */
+  .pn-hole[data-slots="2"] { min-width: calc(var(--pn-hole-w) * 2 + 4px); }
+  .pn-hole[data-slots="3"] { min-width: calc(var(--pn-hole-w) * 3 + 8px); }
+  .pn-hole[data-slots="4"] { min-width: calc(var(--pn-hole-w) * 2.8); }
+  /* PLO's four: a fan, each card 0.6 of a card on from the one before, so the left of every card —
+     the large face's rank and suit — stays in sight; turned by the rotate property from the bottom
+     centre, so transform stays free for the deal, the fold and the lift. */
+  .pn-hole[data-count="4"] { gap: 0; }
+  .pn-hole[data-count="4"] > .pn-card { transform-origin: 50% 100%; }
+  .pn-hole[data-count="4"] > .pn-card + .pn-card { margin-left: calc(var(--pn-card-w) * -0.4); }
+  .pn-hole[data-count="4"] > .pn-card:nth-of-type(1) { rotate: -6deg; }
+  .pn-hole[data-count="4"] > .pn-card:nth-of-type(2) { rotate: -2deg; }
+  .pn-hole[data-count="4"] > .pn-card:nth-of-type(3) { rotate: 2deg; }
+  .pn-hole[data-count="4"] > .pn-card:nth-of-type(4) { rotate: 6deg; }
+  /* Triple T's throw-away (components/poker-night/DiscardPicker): three cards side by side, never
+     overlapping, each a radio of 44 px or more; the one picked rises 10 px, dims by filter (never
+     opacity: the scene must not show through the paper) and carries an ✕ in a chrome circle. The rise
+     is a transition on the motion token, so a zeroed token (brutalist, both motion guards) shows it at
+     once. */
+  .pn-pick { --pn-card-w: max(44px, var(--pn-hole-w)); --pn-card-h: calc(var(--pn-card-w) * 1.4); }
+  .pn-pick-card {
+    position: relative;
+    display: block;
+    flex: none;
+    min-width: 44px;
+    min-height: 44px;
+    padding: 0;
+    border-radius: calc(var(--pn-card-w) * 0.12);
+    background: transparent;
+    cursor: pointer;
+    touch-action: manipulation;
+    transition: translate calc(var(--motion-base) * 0.75) var(--motion-ease);
+  }
+  .pn-pick-card[aria-checked="true"] { translate: 0 -10px; }
+  .pn-pick-card[aria-checked="true"] > .pn-card > .pn-card-inner { filter: brightness(0.7); }
+  .pn-pick-card:focus-visible { outline: 2px solid var(--brand); outline-offset: 2px; }
+  .pn-pick-x { position: absolute; top: -7px; right: -7px; z-index: 1; display: grid; place-items: center; width: 20px; height: 20px; border-radius: 9999px; color: var(--fg); pointer-events: none; }
   .pn-raise { position: absolute; left: 0; right: 0; bottom: calc(100% + 8px); z-index: 6; padding: 10px; border-radius: var(--control-radius); }
   .pn-fold-free { position: absolute; left: 0; bottom: calc(100% + 6px); z-index: 6; }
   /* A narrow dock (a phone upright, or the column of one on its side) wraps its controls under the
@@ -894,13 +1005,99 @@ details[open] > :not(summary) { animation: disclosure-in var(--motion-base) var(
     }
     .pn-fold-free { left: max(10px, env(safe-area-inset-left)); }
   }
+  /* A phone on its side: the dock is a column at the right with no room over it, so the raise panel
+     opens beside it, over the felt's right side, its foot on the dock's — wide enough for the quick
+     sizes at 44 px, the − and + and the amount, every row in sight under the top bar — and the
+     viewer's cards and seconds stay where they are. */
+  @media (orientation: landscape) and (max-height: 500px) {
+    .pn-raise {
+      left: auto;
+      right: calc(100% + 6px);
+      bottom: 8px;
+      width: min(19rem, calc(100vw - max(12rem, 32vw) - 16px));
+      max-height: calc(100dvh - var(--pn-top) - 16px);
+    }
+  }
   /* The seat's own controls (Show cards, Sit out, Leave) say the short word in a narrow dock — a
      phone upright, or the column of one on its side — so the row keeps to one line; the long one
      stays the button's accessible name. */
   .pn-label-short { display: none; }
   @container pn-dock (max-width: 28rem) {
+    /* A note the plate says too ("Out of chips"), left to the plate where the row has no room. */
+    .pn-wide-only { display: none !important; }
     .pn-label-long { display: none; }
     .pn-label-short { display: inline; }
+    /* "Tap the card to throw away": a phone has the confirm's "Pick a card first" instead — its row
+       kept, unseen, for what the two kept make once a card is picked, so the dock never grows; and the
+       throw-away's clock says its seconds alone, the line beside the cards staying lower than them. */
+    .pn-discard-prompt { visibility: hidden; }
+    .pn-clock-label { display: none; }
+  }
+  /* "Leave after this hand" beside the early choices: a door, with its word in a wide dock. In a
+     dock too narrow for the four (a phone on its side: every dock of 18rem or less) it takes a row of
+     its own under them, its word back, so the early choices keep their width. */
+  .pn-pre-row { display: flex; flex-wrap: wrap; align-items: stretch; gap: 6px; }
+  .pn-pre-row > [data-pn-pre] { flex: 1 1 0; }
+  .pn-leave-word { display: inline; }
+  @container pn-dock (max-width: 28rem) {
+    .pn-leave-word { display: none; }
+  }
+  /* An ask to see the viewer's cards (AskPrompt): it rises from the foot of the screen over the
+     viewer's own corner — the dock, under the thumb — and covers nothing of the table: no plate,
+     turned-up hand, board or result banner. An ask comes only in the pause after a hand, when the
+     dock holds nothing that cannot wait a few seconds. On a phone on its side it fills the dock's
+     column at the right, its answers one above the other, the table left in full view. */
+  .pn-ask-wrap {
+    position: fixed;
+    left: max(8px, env(safe-area-inset-left));
+    right: max(8px, env(safe-area-inset-right));
+    bottom: max(8px, env(safe-area-inset-bottom));
+    z-index: 30;
+    display: flex;
+    justify-content: center;
+    pointer-events: none;
+  }
+  .pn-ask { max-width: 28rem; }
+  .pn-ask-answers { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+  @media (orientation: landscape) and (max-height: 500px) {
+    .pn-ask-wrap { left: auto; width: calc(max(12rem, 32vw) - max(8px, env(safe-area-inset-right)) - 8px); }
+    .pn-ask-answers { grid-template-columns: minmax(0, 1fr); }
+  }
+  /* The join card (JoinCard): at the foot of a phone held upright, in the middle of a wider screen, and
+     on a phone on its side from just under the top bar to the foot of the screen — never over the
+     bar — as tall as that leaves it, its form scrolling inside and its buttons at its foot. */
+  .pn-join-wrap {
+    position: fixed;
+    left: 12px;
+    right: 12px;
+    bottom: calc(env(safe-area-inset-bottom) + 0.75rem);
+    z-index: 40;
+    display: flex;
+    justify-content: center;
+    pointer-events: none;
+  }
+  .pn-join-card { max-height: calc(100dvh - 5rem); }
+  @media (min-width: 640px) {
+    .pn-join-wrap { left: 16px; right: 16px; bottom: auto; top: 50%; translate: 0 -50%; }
+  }
+  @media (orientation: landscape) and (max-height: 500px) {
+    .pn-join-wrap { top: calc(var(--pn-top) + 8px); bottom: calc(env(safe-area-inset-bottom) + 8px); translate: none; align-items: flex-start; }
+    .pn-join-card { max-height: 100%; }
+  }
+  @container pn-dock (max-width: 18rem) {
+    .pn-pre-row > [data-pn-pre] { flex-basis: 100%; }
+    .pn-pre-row > [data-pn-leave-after] { flex: 1 1 100%; min-height: 44px; }
+    .pn-leave-word { display: inline; }
+    /* The line beside the cards has a row of its own here (below), with room for the clock's words. */
+    .pn-clock-label { display: inline; }
+    /* The line beside the cards — the seconds left, who the table waits for, leaving after this hand
+       with Stay, what the cards make — takes a row of its own under them: beside the cards and the
+       emote button it would have a few pixels, and say nothing. */
+    .pn-dock-hand { flex: 1 1 100%; flex-wrap: wrap; }
+    .pn-dock-line { order: 3; flex: 1 1 100%; }
+    /* PLO's fan at 0.8 of the card, so it and the emote button share a row in the column of a phone on
+       its side (the dock keeps its height, the cards clear of the top bar). */
+    .pn-hole[data-slots="4"] { --pn-card-w: calc(var(--pn-hole-w) * 0.8); --pn-card-h: calc(var(--pn-hole-w) * 1.12); min-width: calc(var(--pn-hole-w) * 2.24); }
   }
 }
 

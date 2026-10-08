@@ -5,9 +5,14 @@
 //
 // A pot-sized raise is the current bet plus the pot after calling: every pot, every bet in front of
 // the players, and the call. With nothing to call it is a share of the pot, a bet. Sizes are rounded
-// to the table's unit (its small blind), and one at or past the stack is the all-in. The ids are
-// ACTION_COPY.sizes' keys in lib/learn/copy/poker-night.
+// to the table's unit (its small blind), and one at or past the top of the range is the top. Under
+// pot limit (PLO) the top is the pot itself whenever the stack goes past it (cap 'pot'): the last
+// quick size is then Pot, the confirm reads "Raise to 340 (pot)", and the move sent is a raise to it —
+// never the all-in, which the server takes only within the cap. The ids are ACTION_COPY.sizes' keys
+// in lib/learn/copy/poker-night. On a phone (P8): the steppers' big blind at a time (stepRaise), and the
+// size the player last confirmed before or after the flop, remembered in the browser (rememberSize).
 
+import {ACTION_COPY} from '@/lib/learn/copy/poker-night';
 import type {Legal} from '@/lib/poker-night/types';
 import type {TableView} from '@/lib/poker-night/view-types';
 
@@ -25,7 +30,8 @@ export const SLIDER_MAX = 1000;
 export type Sizing = {
     kind: 'bet' | 'raise';
     min: number; // the smallest "raise to"
-    max: number; // the largest: the all-in
+    max: number; // the largest: the all-in, or under pot limit the pot when the stack goes past it
+    cap: 'all-in' | 'pot'; // what the largest is
     currentBet: number;
     myBet: number; // the seat's own bet on this street
     toCall: number;
@@ -44,15 +50,17 @@ export const potTotal = (view: Pick<TableView, 'hand' | 'seats'>): number => {
 // The sizing for `seat` from its legal moves, or null when it may not bet or raise.
 export const sizingFor = (view: Pick<TableView, 'hand' | 'seats'>, legal: Legal | null, seat: number | null, unit: number): Sizing | null => {
     if (!legal?.raise || seat === null || !view.hand) return null;
+    const own = view.seats[seat];
+    const allInTo = (own?.chips ?? 0) + (own?.bet ?? 0);
     return {
-        kind: legal.raise.kind, min: legal.raise.min, max: legal.raise.max,
-        currentBet: view.hand.currentBet, myBet: view.seats[seat]?.bet ?? 0, toCall: legal.call,
+        kind: legal.raise.kind, min: legal.raise.min, max: legal.raise.max, cap: legal.raise.max < allInTo ? 'pot' : 'all-in',
+        currentBet: view.hand.currentBet, myBet: own?.bet ?? 0, toCall: legal.call,
         pot: potTotal(view), unit: Math.max(1, Math.floor(unit)),
     };
 };
 
-// A "raise to" held to the legal range, rounded to the unit inside it; the top of the range is the
-// all-in and is never rounded away.
+// A "raise to" held to the legal range, rounded to the unit inside it; the top of the range (the
+// all-in, or the pot) is never rounded away.
 export const clampTo = (to: number, s: Pick<Sizing, 'min' | 'max' | 'unit'>): number => {
     if (!Number.isFinite(to) || to >= s.max) return s.max;
     if (to <= s.min) return s.min;
@@ -61,20 +69,36 @@ export const clampTo = (to: number, s: Pick<Sizing, 'min' | 'max' | 'unit'>): nu
 };
 
 // The raise to `share` of the pot after the call.
-export const potRaise = (s: Sizing, share: number): number => clampTo(s.currentBet + share * (s.pot + s.toCall), s);
+export const potRaise = (s: Pick<Sizing, 'min' | 'max' | 'unit' | 'currentBet' | 'pot' | 'toCall'>, share: number): number => clampTo(s.currentBet + share * (s.pot + s.toCall), s);
 
-// The quick sizes on offer, smallest first, none twice: the minimum, the pot shares, the all-in.
-// A size that reaches the stack is the all-in; when the minimum is the all-in it is the only one.
+// The quick sizes on offer, smallest first, none twice: the minimum, the pot shares, then the top —
+// the all-in, or under pot limit the pot. A size that reaches the top is the top; when the minimum is
+// the top it is the only one.
 export const quickSizes = (s: Sizing): QuickSize[] => {
-    if (s.min >= s.max) return [{id: 'all-in', to: s.max}];
+    const top: QuickSize = {id: s.cap === 'pot' ? 'pot' : 'all-in', to: s.max};
+    if (s.min >= s.max) return [top];
     const out: QuickSize[] = [{id: 'min', to: s.min}];
     for (const id of ['half', 'three-quarters', 'pot'] as const) {
         const to = potRaise(s, POT_SHARE[id]);
         if (to >= s.max) break;
         if (to > out[out.length - 1].to) out.push({id, to});
     }
-    out.push({id: 'all-in', to: s.max});
+    out.push(top);
     return out;
+};
+
+// The move a confirmed "raise to" sends: the all-in at the top of a no-limit range (or of a pot-limit
+// one the stack fits under), else a raise to it — the pot's cap included.
+export const moveFor = (s: Pick<Sizing, 'max' | 'cap'>, to: number): {kind: 'all-in'} | {kind: 'raise'; to: number} =>
+    to >= s.max && s.cap === 'all-in' ? {kind: 'all-in'} : {kind: 'raise', to: Math.min(to, s.max)};
+
+// The confirm button's words for a "raise to": the top of the range says what it is — all in, or the pot.
+export const confirmLabel = (sizing: Pick<Sizing, 'kind' | 'max' | 'cap'>, to: number): string => {
+    if (to >= sizing.max) {
+        if (sizing.cap === 'all-in') return ACTION_COPY.allIn(sizing.max);
+        return sizing.kind === 'bet' ? ACTION_COPY.potBet(sizing.max) : ACTION_COPY.potRaise(sizing.max);
+    }
+    return sizing.kind === 'bet' ? ACTION_COPY.bet(to) : ACTION_COPY.raiseTo(to);
 };
 
 // A slider position (0..SLIDER_MAX) as a "raise to", and back.
@@ -102,3 +126,59 @@ export const parseChips = (text: string): number | null => {
     const whole = Math.round(n);
     return Math.abs(n - whole) < 1e-9 && whole > 0 && Number.isSafeInteger(whole) ? whole : null;
 };
+
+// ── the panel on a phone: a step at a time, and the size the player last chose ──
+
+// The steppers beside the slider: one big blind less or more, held to the range (clampTo) — the
+// slider's thumb is hard to move a chip at a time under a thumb. From the top of the range a step down
+// lands a big blind under it, from the bottom a step up a big blind over it.
+export const stepRaise = (s: Pick<Sizing, 'min' | 'max' | 'unit'>, to: number, dir: 1 | -1, step: number): number => {
+    const by = Math.max(1, Math.round(step));
+    const next = clampTo(to + dir * by, s);
+    // Rounding to the unit may hand back where it started: one more unit the same way.
+    return next === to && to !== (dir > 0 ? s.max : s.min) ? clampTo(to + dir * (by + s.unit), s) : next;
+};
+
+// The quick sizes a player's choice is remembered by, before the flop and after it, in this browser
+// alone (never sent, never part of the look an account saves): the minimum and the pot's shares —
+// never the all-in or the pot, which a careless tap must never repeat.
+export const SIZE_MEMORY_KEY = 'aero-poker-night:sizes';
+export const REMEMBERED_SIZES = ['min', 'half', 'three-quarters'] as const satisfies readonly QuickSizeId[];
+export type RememberedSize = (typeof REMEMBERED_SIZES)[number];
+export type SizeMemory = {pre: RememberedSize | null; post: RememberedSize | null};
+export const EMPTY_SIZE_MEMORY: SizeMemory = {pre: null, post: null};
+
+const remembered = (id: unknown): RememberedSize | null =>
+    typeof id === 'string' && (REMEMBERED_SIZES as readonly string[]).includes(id) ? (id as RememberedSize) : null;
+
+// The memory as stored (localStorage's string, or null): only the sizes it may hold, anything else
+// forgotten.
+export const readSizeMemory = (raw: string | null): SizeMemory => {
+    if (!raw) return EMPTY_SIZE_MEMORY;
+    try {
+        const parsed = JSON.parse(raw) as unknown;
+        if (typeof parsed !== 'object' || parsed === null) return EMPTY_SIZE_MEMORY;
+        const o = parsed as Record<string, unknown>;
+        return {pre: remembered(o.pre), post: remembered(o.post)};
+    } catch {
+        return EMPTY_SIZE_MEMORY;
+    }
+};
+
+// Which half of the hand a street is: before the flop, or after it.
+export const sizeStreet = (street: string): keyof SizeMemory => (street === 'preflop' ? 'pre' : 'post');
+
+// The quick size a "raise to" is, when it is one.
+export const sizeIdFor = (s: Sizing, to: number): QuickSizeId | null => quickSizes(s).find((q) => q.to === to)?.id ?? null;
+
+// The memory after a confirmed raise to `to` on `street`: the size it was, when it may be kept;
+// otherwise as it was (an amount typed or slid, the all-in, the pot).
+export const rememberSize = (memory: SizeMemory, street: string, s: Sizing, to: number): SizeMemory => {
+    const id = remembered(sizeIdFor(s, to));
+    return id === null ? memory : {...memory, [sizeStreet(street)]: id};
+};
+
+// Where the raise panel opens: the size remembered for this street when this sizing offers it, else
+// the minimum.
+export const initialRaiseTo = (s: Sizing, id: RememberedSize | null): number =>
+    (id === null ? null : quickSizes(s).find((q) => q.id === id)?.to) ?? s.min;

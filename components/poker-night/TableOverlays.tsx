@@ -3,15 +3,22 @@
 // Everything that floats over the table, mounted once by TableScreen and reading the room through
 // useRoom(): the top bar; the join card for a visitor (and for a watcher taking a seat); the
 // drawers — Invite (open by itself for the host who just started the table), Bank, Host controls,
-// Hand log, My look, Hands (the rankings and the game, for every viewer); the dialogs that ask first — remove a player, hand over host, end the night,
+// Hand log, My look, Hands (the rankings and the game, for every viewer), the boards larger
+// (BoardsSheet: PLO's two or three boards, a tap on them away, for every viewer); the dialogs that ask first — remove a player, hand over host, end the night,
 // leave the table (LeaveDialog: staying to watch, or going home); the banner when a newer deploy
-// needs a reload; and the toasts that say once what changed on its own — the connection back
-// ("Back online."), the host sitting the viewer out, how a rebuy request ended.
+// needs a reload; an ask to see the viewer's cards (AskPrompt, at the foot of the screen); and the
+// toasts that say once what changed on its own — a new game from this hand ("New game from this hand:
+// Pot-limit Omaha.", at the first deal of it this page sees), the connection back ("Back online."), the host
+// sitting the viewer out, how a request for chips ended (approved or declined: one the viewer took
+// back, by Cancel or by leaving, says nothing more), how the viewer's own asks to see a hand ended
+// (AskWatch, for every joined viewer, so an ask the next deal ended is said too) and, for the host,
+// each new request for chips with Approve (RequestWatch). The menu's "Leave after this hand" and its
+// Stay go through useLeaveAfter, as the dock's do.
 //
 // Which drawer and dialog are open is this component's state, so a dialog opened from the host
 // drawer steps the drawer aside and brings it back when it closes, and nothing stacks one modal on
 // another. When the viewer's turn comes round, every drawer and dialog closes (worked out during
-// render from the turn number, lib/poker-night/overlays.myTurnKey) and focus goes to the action
+// render from lib/poker-night/overlays.attentionKey: the turn, or Triple T's throw-away) and focus goes to the action
 // bar: nothing modal stands over it while the clock runs. Other table components ask for a drawer,
 // a seat or the leave dialog through components/poker-night/overlay-requests.
 
@@ -19,22 +26,26 @@ import {useEffect, useRef, useState} from "react";
 import {toast} from "sonner";
 import ConfirmDialog from "@/components/primitives/ConfirmDialog";
 import ActionButton from "@/components/primitives/ActionButton";
+import {AskPrompt, AskWatch, RequestWatch} from "@/components/poker-night/AskPrompt";
 import BankPanel from "@/components/poker-night/BankPanel";
 import HandLog from "@/components/poker-night/HandLog";
 import HandsDrawer from "@/components/poker-night/HandsDrawer";
 import HostDrawer from "@/components/poker-night/HostDrawer";
 import InviteSheet from "@/components/poker-night/InviteSheet";
+import BoardsSheet from "@/components/poker-night/BoardsSheet";
 import JoinCard from "@/components/poker-night/JoinCard";
 import LeaveDialog from "@/components/poker-night/LeaveDialog";
 import MyLookDrawer from "@/components/poker-night/MyLookDrawer";
 import RemovePlayerDialog, {type RemoveTarget} from "@/components/poker-night/RemovePlayerDialog";
 import TopBar from "@/components/poker-night/TopBar";
 import {focusTableOnClose} from "@/components/poker-night/overlay-kit";
-import {latestRequestId, useOverlayRequest, type DrawerKind} from "@/components/poker-night/overlay-requests";
+import {latestRequestId, takeOwnWithdraw, useOverlayRequest, type DrawerKind} from "@/components/poker-night/overlay-requests";
 import {useRoom} from "@/components/poker-night/room-controller";
 import type {HostSitOuts} from "@/components/poker-night/useHostSitOut";
-import {ANNOUNCE_COPY, BANK_COPY, HOST_COPY, LOBBY_COPY, TABLE_COPY} from "@/lib/learn/copy/poker-night";
-import {myTurnKey, ownSeat, requestEnded, type HostRow, type LeaveThen, type SeatChoice} from "@/lib/poker-night/overlays";
+import {useLeaveAfter} from "@/components/poker-night/useLeaveAfter";
+import {ANNOUNCE_COPY, BANK_COPY, HOST_COPY, LOBBY_COPY, MODE_COPY, TABLE_COPY} from "@/lib/learn/copy/poker-night";
+import {attentionKey, ownSeat, requestEnded, type HostRow, type LeaveThen, type SeatChoice} from "@/lib/poker-night/overlays";
+import {ledgerRowOf} from "@/lib/poker-night/views";
 
 type Dialog =
     | {kind: 'remove'; target: RemoveTarget}
@@ -48,8 +59,9 @@ type Ui = {
     closedByTurn: boolean; // the drawer or dialog last closed because the viewer's turn came round
     visitorSeat: number | null; // the seat a visitor chose with "Sit here"
     sit: {seat: number | null} | null; // a watcher taking a seat
-    turnSeen: number | null; // the viewer's turn the drawers last closed for
+    turnSeen: string | null; // what last asked for the viewer (their turn, a card to throw away): the drawers closed for it
     requestSeen: number; // the last overlay request answered
+    handsLead: boolean; // the Hands guide asked for by "How it plays": it opens on the table's game
 };
 
 const TableOverlays = () => {
@@ -62,7 +74,7 @@ const TableOverlays = () => {
     const [ui, setUi] = useState<Ui>(() => ({
         drawer: room.invite && isHost ? 'invite' : null,
         dialog: null, closedByTurn: false, visitorSeat: null, sit: null,
-        turnSeen: myTurnKey(room.view), requestSeen: latestRequestId(),
+        turnSeen: attentionKey(room.view), requestSeen: latestRequestId(), handsLead: false,
     }));
 
     // Worked out during render, from what the room and the requests say now (the React pattern for
@@ -73,7 +85,7 @@ const TableOverlays = () => {
         next = {...next, requestSeen: request.id};
         if (request.kind === 'drawer') {
             const allowed = request.drawer === 'host' ? isHost : request.drawer === 'log' || request.drawer === 'look' ? joined : true;
-            if (allowed) next = {...next, drawer: request.drawer, dialog: null, closedByTurn: false};
+            if (allowed) next = {...next, drawer: request.drawer, dialog: null, closedByTurn: false, handsLead: request.lead === true};
         } else if (request.kind === 'leave') {
             if (me?.seat !== null && me?.seat !== undefined) next = {...next, dialog: {kind: 'leave', then: request.then}, closedByTurn: false};
         } else if (!joined) {
@@ -83,7 +95,7 @@ const TableOverlays = () => {
         }
     }
     // The viewer's turn: whatever is open closes, once per turn.
-    const turnKey = myTurnKey(view);
+    const turnKey = attentionKey(view);
     if (turnKey !== null && turnKey !== next.turnSeen) {
         next = {...next, turnSeen: turnKey, drawer: null, dialog: null, closedByTurn: next.drawer !== null || next.dialog !== null};
     }
@@ -92,10 +104,14 @@ const TableOverlays = () => {
     if (next.dialog?.kind === 'leave' && (me?.seat ?? null) === null) next = {...next, dialog: null};
     if (next !== ui) setUi(next);
 
-    // How a rebuy the viewer asked the host for ended: said once, whichever drawer is open.
+    // How a request for chips the viewer asked the host for ended: said once, whichever drawer is
+    // open — approved or declined. One the viewer took back (Cancel, which marks it as it is sent, or
+    // a leave, now or after the hand, which takes it with it) was said where it was done.
     const asked = view ? view.requests.find((r) => r.pid === view.me.pid)?.amount ?? null : null;
-    const bought = view ? view.ledger.find((r) => r.pid === view.me.pid)?.bought ?? 0 : 0;
+    const bought = view ? ledgerRowOf(view, view.me.pid)?.bought ?? 0 : 0;
     const pendingBuy = view && view.me.seat !== null ? view.seats[view.me.seat]?.pendingBuy ?? 0 : 0;
+    const seated = (view?.me.seat ?? null) !== null;
+    const leavingSoon = view?.me.next === 'leave' || view?.me.next === 'leave-after';
     const waiting = useRef<{amount: number; bought: number} | null>(null);
     useEffect(() => {
         const before = waiting.current;
@@ -105,9 +121,10 @@ const TableOverlays = () => {
         }
         if (!before) return;
         waiting.current = null;
-        if (requestEnded(before, {bought, pendingBuy}) === 'declined') toast.message(BANK_COPY.declined);
-        else toast.success(pendingBuy > 0 ? BANK_COPY.pending(pendingBuy) : BANK_COPY.approved(before.amount));
-    }, [asked, bought, pendingBuy]);
+        const outcome = requestEnded(before, {bought, pendingBuy, seated, leaving: leavingSoon, withdrawn: takeOwnWithdraw()});
+        if (outcome === 'declined') toast.message(BANK_COPY.declined);
+        else if (outcome === 'approved') toast.success(pendingBuy > 0 ? BANK_COPY.pending(pendingBuy) : BANK_COPY.approved(before.amount));
+    }, [asked, bought, pendingBuy, seated, leavingSoon]);
 
     // The host's sit-outs still waiting on a hand, by player (the hand they were asked during): kept
     // here, so the bank's rows and the host drawer's More menu agree, whichever drawer is open.
@@ -122,13 +139,15 @@ const TableOverlays = () => {
         }),
     };
 
-    const openDrawer = (drawer: DrawerKind) => setUi((prev) => ({...prev, drawer, dialog: null, closedByTurn: false}));
+    const openDrawer = (drawer: DrawerKind) => setUi((prev) => ({...prev, drawer, dialog: null, closedByTurn: false, handsLead: false}));
     const drawerChange = (drawer: DrawerKind) => (open: boolean) =>
         setUi((prev) => ({...prev, drawer: open ? drawer : null, closedByTurn: open ? false : prev.closedByTurn}));
     const openDialog = (dialog: Dialog) => setUi((prev) => ({...prev, dialog, closedByTurn: false}));
     const closeDialog = () => setUi((prev) => ({...prev, dialog: null}));
     // A drawer steps aside while a dialog is up.
     const isOpen = (drawer: DrawerKind) => ui.drawer === drawer && ui.dialog === null;
+
+    const leaving = useLeaveAfter();
 
     const seatChoice = async (choice: SeatChoice) => {
         const r = await room.send({type: choice === 'sit-out' ? 'sit-out' : 'sit-in'});
@@ -182,6 +201,17 @@ const TableOverlays = () => {
         toast.success(TABLE_COPY.connection.back);
     }, [reconnecting]);
 
+    // A hand of another game than the one before it on this page: said once, at its deal.
+    const dealt = room.table.hand;
+    const lastGame = useRef<{no: number; label: string} | null>(null);
+    useEffect(() => {
+        if (!dealt) return;
+        const label = MODE_COPY.spokenLabel(dealt.variant, dealt.boards.length);
+        const last = lastGame.current;
+        lastGame.current = {no: dealt.no, label};
+        if (last && dealt.no > last.no && label !== last.label) toast.message(MODE_COPY.changed(label));
+    }, [dealt]);
+
     // The host sat the viewer out: said once as it happens (the dock keeps saying it).
     const satOut = room.satOutByHost;
     const saidSatOut = useRef(false);
@@ -192,12 +222,20 @@ const TableOverlays = () => {
 
     const own = view ? ownSeat(view) : null;
     const dialog = ui.dialog;
+    // Asks to see a hand: the prompt while one to the viewer waits, the watch for every joined viewer
+    // (each reads the clock itself, so nothing here re-renders by the second).
+    const myPid = view?.me.pid ?? null;
+    const askedMe = view !== null && view.me.asks.some((a) => a.to === myPid && a.answer === 'waiting');
     const showSit = joined && me?.seat === null && ui.sit !== null && own?.canTakeSeat === true;
 
     return (
         <>
             <TopBar onOpen={openDrawer} onSeatChoice={(c) => void seatChoice(c)} onTakeSeat={() => setUi((prev) => ({...prev, sit: {seat: null}}))}
-                    onLeave={() => openDialog({kind: 'leave', then: 'stay'})} onHome={() => openDialog({kind: 'leave', then: 'home'})}/>
+                    onLeave={() => openDialog({kind: 'leave', then: 'stay'})} onHome={() => openDialog({kind: 'leave', then: 'home'})}
+                    onLeaveAfter={(on) => void leaving.send(on)}/>
+            {isHost && <RequestWatch/>}
+            {joined && <AskWatch/>}
+            {askedMe && <AskPrompt/>}
 
             {room.problem && (
                 <div role="alert" className="chrome-surface fixed inset-x-3 top-[calc(env(safe-area-inset-top)+3.5rem)] z-30 mx-auto flex max-w-md items-center gap-3 rounded-lg px-4 py-3"
@@ -213,7 +251,8 @@ const TableOverlays = () => {
             <InviteSheet open={isOpen('invite')} onOpenChange={drawerChange('invite')} toTable={ui.closedByTurn}
                          onDealt={() => setUi((prev) => ({...prev, drawer: null}))}/>
             <BankPanel open={isOpen('bank')} onOpenChange={drawerChange('bank')} toTable={ui.closedByTurn} sitOuts={sitOuts}/>
-            <HandsDrawer open={isOpen('hands')} onOpenChange={drawerChange('hands')} toTable={ui.closedByTurn}/>
+            <HandsDrawer open={isOpen('hands')} onOpenChange={drawerChange('hands')} toTable={ui.closedByTurn} lead={ui.handsLead}/>
+            <BoardsSheet open={isOpen('boards')} onOpenChange={drawerChange('boards')} toTable={ui.closedByTurn}/>
             {isHost && (
                 <HostDrawer open={isOpen('host')} onOpenChange={drawerChange('host')} toTable={ui.closedByTurn}
                             onRemove={(row) => openDialog({kind: 'remove', target: {pid: row.pid, name: row.name, avatar: row.avatar, chips: row.dealtIn ? row.stack : row.chips, dealtIn: row.dealtIn}})}

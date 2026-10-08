@@ -1,17 +1,19 @@
-// What the table's overlays offer, worked out from the view: the top bar's own-seat choices, the join
-// card's state, the invite's deal button, the host drawer's people, controls and settings form, the
-// bank's own-chips buttons and its "chips in, by time" list, and the drawers closing when a turn
-// comes round. Pure and client-safe: components/poker-night/TableOverlays and the pieces it mounts
+// What the table's overlays offer, worked out from the view: the top bar's own-seat choices (leaving
+// after this hand among them), the leave dialog, the join card's state, the invite's deal button,
+// the host drawer's people, controls and settings form, the bank's own-chips buttons, what each
+// request for chips is for and which are new, its "chips in, by time" list, asks to see a hand as the
+// seat menu, the prompt and the toasts read them, and the drawers closing when a turn comes round. Pure and client-safe: components/poker-night/TableOverlays and the pieces it mounts
 // draw what these return and send what the player picks through the table's routes, and the server
 // checks every one of them again.
 
 import {BANK_COPY, JOIN_COPY, OVERLAY_COPY, REFUSAL_COPY, TABLE_COPY} from '@/lib/learn/copy/poker-night';
 import {buyOptions, type BankRow} from '@/lib/poker-night/bank';
 import {parseChips} from '@/lib/poker-night/bet-sizing';
-import {checkConfig, mergeConfig} from '@/lib/poker-night/config';
+import {ASKS, checkConfig, mergeConfig} from '@/lib/poker-night/config';
 import {configIssueText, TIMER_PRESETS} from '@/lib/poker-night/lobby';
-import type {GameConfig, LedgerKind, RebuyPolicy} from '@/lib/poker-night/types';
-import type {JoinOutcome, JoinView, MeView, OwnNext, People, PlayerView, Presence, SeatView, TableView} from '@/lib/poker-night/view-types';
+import type {AskAnswer, BoardCount, GameConfig, LedgerKind, RebuyPolicy, Variant} from '@/lib/poker-night/types';
+import type {AskBlock, AskView, JoinOutcome, JoinView, MeView, OwnNext, People, PlayerView, Presence, SeatView, TableView} from '@/lib/poker-night/view-types';
+import {ledgerRowOf, ledgerRows} from '@/lib/poker-night/views';
 
 // How long "Press and hold to remove" must stay pressed.
 export const HOLD_TO_CONFIRM_MS = 2000;
@@ -40,11 +42,16 @@ export const seatChips = (seat: Pick<SeatView, 'chips' | 'inPot'> | null | undef
 export const profileWaits = (view: Pick<PlayerView, 'hand' | 'me'> | null): boolean =>
     view !== null && view.me.seat !== null && handLive(view);
 
-// The turn number while it is the viewer's turn to act, else null. Each new one closes any drawer
-// or dialog the viewer has open, so nothing modal stands over the action bar while the clock runs.
-export const myTurnKey = (view: Pick<PlayerView, 'hand' | 'turn' | 'me'> | null): number | null => {
+// What asks for the viewer now, as a key — their turn to act ("turn:12"), or a card of theirs to
+// throw away in Triple T's throw-away ("discard:7", by the hand) — else null. Each new one closes any
+// drawer or dialog the viewer has open, so nothing modal stands over the action bar or the cards to
+// pick from while the clock runs, and chimes once.
+export const attentionKey = (view: Pick<PlayerView, 'hand' | 'turn' | 'me'> | null): string | null => {
     if (!view || view.me.seat === null || !view.hand) return null;
-    return view.hand.phase === 'betting' && view.hand.actor === view.me.seat ? view.turn : null;
+    const hand = view.hand;
+    if (hand.phase === 'betting' && hand.actor === view.me.seat) return `turn:${view.turn}`;
+    if (hand.phase === 'discard' && hand.toDiscard.includes(view.me.seat) && view.me.hole !== null) return `discard:${hand.no}`;
+    return null;
 };
 
 // ── the viewer's own seat (the top bar's menu) ──
@@ -52,44 +59,70 @@ export const myTurnKey = (view: Pick<PlayerView, 'hand' | 'turn' | 'me'> | null)
 // Between hands the seat can sit out, come back after sitting out, or come back from away; during
 // a hand "sit out next hand" (the engine keeps that for the next deal), and once that waits, "deal me
 // in", which takes it back. Nothing once the viewer has left the hand in play (MeView.next 'leave'):
-// the seat is cashed out when it ends.
+// the seat is cashed out when it ends; nor while they leave after it ('leave-after'), which "Stay at
+// the table" takes back.
 export type SeatChoice = 'sit-out' | 'deal-me-in' | 'back';
+
+// "Leave after this hand", the menu's toggle and the dock's: offered while the viewer holds cards in
+// the hand in play, 'set' while they leave after it (Stay takes it back).
+export type LeaveAfter = 'offer' | 'set';
 
 export type OwnSeat = {
     seat: number | null;
     chips: number; // a live pot included
     stack: number; // behind
-    dealtIn: boolean; // holds cards in the hand in play: leaving folds them at the next bet
+    dealtIn: boolean; // holds cards in the hand in play: leaving now folds them at the next bet
     choice: SeatChoice | null;
     canLeave: boolean;
+    leaveAfter: LeaveAfter | null;
     canTakeSeat: boolean; // a watcher, with a seat open
+};
+
+// Whether the viewer has left the hand in play for good (now, not after it): the seat reads Leaving,
+// or — folded or all in, the plate still saying so — their own part says 'leave'.
+export const leftNow = (view: Pick<PlayerView, 'seats' | 'me'>): boolean => {
+    const s = view.me.seat === null ? null : view.seats[view.me.seat] ?? null;
+    return s !== null && (s.state === 'leaving' || view.me.next === 'leave');
+};
+
+// "Leave after this hand" as the viewer may use it now: set while they leave after it; offered while
+// they hold cards in the hand in play, have not left it and the table is open. Once they fold, the
+// break's Leave sends it (one tap: there is nothing left to lose in the hand).
+export const leaveAfterOf = (view: Pick<PlayerView, 'seats' | 'hand' | 'status' | 'me'>): LeaveAfter | null => {
+    if (view.me.seat === null || view.status === 'closed' || leftNow(view)) return null;
+    if (view.me.next === 'leave-after') return 'set';
+    return holdsCards(view, view.me.seat) ? 'offer' : null;
 };
 
 export const ownSeat = (view: Pick<PlayerView, 'seats' | 'hand' | 'status' | 'me'>): OwnSeat => {
     const seat = view.me.seat;
     const s = seat === null ? null : view.seats[seat] ?? null;
     const closed = view.status === 'closed';
-    if (!s) return {seat: null, chips: 0, stack: 0, dealtIn: false, choice: null, canLeave: false, canTakeSeat: !closed && openSeats(view).length > 0};
-    const leaving = s.state === 'leaving' || view.me.next === 'leave';
+    if (!s) {
+        return {seat: null, chips: 0, stack: 0, dealtIn: false, choice: null, canLeave: false, leaveAfter: null, canTakeSeat: !closed && openSeats(view).length > 0};
+    }
+    const leaving = leftNow(view);
+    const leaveAfter = leaveAfterOf(view);
     const waits = view.me.next === 'sit-out' && handLive(view);
-    const choice: SeatChoice | null = closed || leaving ? null
+    const choice: SeatChoice | null = closed || leaving || leaveAfter === 'set' ? null
         : s.state === 'away' ? 'back'
             : s.state === 'sitting-out' || waits ? 'deal-me-in'
                 : 'sit-out';
-    return {seat, chips: seatChips(s), stack: s.chips, dealtIn: holdsCards(view, seat), choice, canLeave: !closed && !leaving, canTakeSeat: false};
+    return {seat, chips: seatChips(s), stack: s.chips, dealtIn: holdsCards(view, seat), choice, canLeave: !closed && !leaving, leaveAfter, canTakeSeat: false};
 };
 
 // ── leaving, and the way home ──
 
 // What sitting down again would take, said before a player leaves: rebuys are off, they need the
-// host's yes, or this player has had every rebuy the table allows (sitting again is a rebuy:
-// engine.sit). Null when sitting down again simply works.
+// host's yes (anyone but the host once the first hand is dealt: ledger.needsHost), or this player has
+// had every rebuy the table allows (sitting again is a rebuy: engine.sit). Null when sitting down
+// again simply works.
 export type LeaveAsk = 'rebuys-off' | 'rebuys-ask' | 'rebuy-cap';
 
-export const leaveAsks = (config: Pick<GameConfig, 'rebuys' | 'maxRebuys'>, buys: number, isHost: boolean): LeaveAsk | null => {
+export const leaveAsks = (config: Pick<GameConfig, 'rebuys' | 'maxRebuys'>, buys: number, isHost: boolean, started: boolean): LeaveAsk | null => {
     if (config.rebuys === 'off') return 'rebuys-off';
     if (config.maxRebuys !== null && buys >= config.maxRebuys) return 'rebuy-cap';
-    if (config.rebuys === 'approve' && !isHost) return 'rebuys-ask';
+    if (started && !isHost) return 'rebuys-ask';
     return null;
 };
 
@@ -102,54 +135,73 @@ const LEAVE_NOTES: Record<LeaveAsk, string> = {
 export type LeaveThen = 'stay' | 'home';
 
 // One button of the leave dialog after Stay, the primary last. `send` is the action it sends:
-// 'leave' — at once between hands; mid-hand the hand folds the next time it faces a bet. The
-// engine's "leave after this hand" (a later phase) joins here as a second kind, the mid-hand
-// primary that never navigates.
-export type LeaveAction = {send: 'leave'; label: string; destructive: boolean; navigates: boolean};
+// 'leave-after' — every leave that keeps the player on the page: between hands it leaves at once,
+// and should a deal land first they play that hand out and leave as it ends, so the race never costs
+// them a blind; mid-hand it is "Leave after this hand", which never navigates. 'leave' — "Leave now"
+// mid-hand (the hand folds the next time it faces a bet) and a leave that goes home, whose page is
+// about to go.
+export type LeaveAction = {send: 'leave' | 'leave-after'; label: string; destructive: boolean; navigates: boolean};
 
-export type LeavePlan = {midHand: boolean; title: string; body: string; note: string | null; actions: LeaveAction[]};
+// afterNote: what "Leave after this hand" does, said under the body while the dialog offers it.
+export type LeavePlan = {midHand: boolean; title: string; body: string; note: string | null; afterNote: string | null; actions: LeaveAction[]};
 
 // The leave dialog as it reads now — worked out on every render, so a deal that lands while it is
 // open turns it into the mid-hand one before the player confirms. Null without a seat, and once the
 // viewer has left (mid-hand the seat stays theirs until the hand ends): there is nothing to confirm.
-export const leavePlan = (view: Pick<PlayerView, 'seats' | 'hand' | 'status' | 'me' | 'config' | 'ledger'>, then: LeaveThen): LeavePlan | null => {
+// Mid-hand it offers both ways: now, or after this hand (unless they chose that already).
+export const leavePlan = (view: Pick<PlayerView, 'seats' | 'hand' | 'status' | 'me' | 'config' | 'ledger' | 'handNo'>, then: LeaveThen): LeavePlan | null => {
     const own = ownSeat(view);
     if (own.seat === null || !own.canLeave) return null;
-    const buys = view.ledger.find((row) => row.pid === view.me.pid)?.buys ?? 0;
-    const ask = leaveAsks(view.config, buys, view.me.isHost);
+    const buys = ledgerRowOf(view, view.me.pid)?.buys ?? 0;
+    const ask = leaveAsks(view.config, buys, view.me.isHost, view.handNo > 0);
     const midHand = own.dealtIn;
     // The chips they leave with: those behind (a live pot's are the hand's).
     const body = midHand ? TABLE_COPY.leaveBodyInHand(own.stack) : TABLE_COPY.leaveBody(own.stack);
     const home = then === 'home';
-    const label = home ? (midHand ? TABLE_COPY.leaveNowAndGo : TABLE_COPY.leaveAndGo) : midHand ? TABLE_COPY.leaveNow : TABLE_COPY.leave;
+    const after: LeaveAction | null = midHand && own.leaveAfter === 'offer'
+        ? {send: 'leave-after', label: TABLE_COPY.leaveAfter, destructive: false, navigates: false} : null;
+    const now: LeaveAction = home
+        ? {send: 'leave', label: midHand ? TABLE_COPY.leaveNowAndGo : TABLE_COPY.leaveAndGo, destructive: true, navigates: true}
+        : midHand
+            ? {send: 'leave', label: TABLE_COPY.leaveNow, destructive: true, navigates: false}
+            : {send: 'leave-after', label: TABLE_COPY.leave, destructive: true, navigates: false};
+    // Staying on the page, the gentler way is the primary, last; going home, the way that goes is.
+    const actions = !after ? [now] : home ? [after, now] : [now, after];
     return {
         midHand, title: midHand ? TABLE_COPY.leaveMidHandTitle : TABLE_COPY.leaveTitle, body, note: ask ? LEAVE_NOTES[ask] : null,
-        actions: [{send: 'leave', label, destructive: true, navigates: home}],
+        afterNote: after ? TABLE_COPY.leaveAfterNote : null, actions,
     };
 };
 
-// Whether the break's one-tap Leave asks first: only when sitting down again is not assured.
-export const leaveTapAsks = (view: Pick<PlayerView, 'config' | 'ledger' | 'me'>): boolean =>
-    leaveAsks(view.config, view.ledger.find((row) => row.pid === view.me.pid)?.buys ?? 0, view.me.isHost) !== null;
+// A "leave after this hand" sent between hands, as its answer reads: still seated and leaving after
+// a hand — a deal landed first, which the table says once (TABLE_COPY.leaveLanded); else it left.
+export const leaveAfterLanded = (view: Pick<PlayerView, 'me'>): boolean => view.me.seat !== null && view.me.next === 'leave-after';
+
+// Whether the break's one-tap Leave asks first: only when there is no way back to a seat (rebuys
+// off, or every rebuy used). Once a hand is dealt sitting down again needs the host's yes for anyone
+// but the host — every guest's leave then — which the left panel says after, never a dialog before.
+export const leaveTapAsks = (view: Pick<PlayerView, 'config' | 'ledger' | 'me' | 'handNo'>): boolean => {
+    const ask = leaveAsks(view.config, ledgerRowOf(view, view.me.pid)?.buys ?? 0, view.me.isHost, view.handNo > 0);
+    return ask === 'rebuys-off' || ask === 'rebuy-cap';
+};
 
 // The top bar's Home: straight to "/" for a visitor, a watcher or a player already leaving (folded
 // or all in, their plate still says so: MeView.next is what knows); through the leave dialog for
 // anyone in a seat, whose table would otherwise wait on a player who is gone.
 export const homeAsks = (view: Pick<PlayerView, 'seats' | 'status' | 'me'> | null): boolean => {
-    if (!view || view.me.seat === null || view.status === 'closed' || view.me.next === 'leave') return false;
-    const seat = view.seats[view.me.seat];
-    return seat !== null && seat !== undefined && seat.state !== 'leaving';
+    if (!view || view.me.seat === null || view.status === 'closed' || leftNow(view)) return false;
+    return view.seats[view.me.seat] != null;
 };
 
 // After leaving: a player who played tonight and now watches sees their net, the way home and the
 // way back to a seat — or why there is none.
 export type LeftState = {net: number; sitAgain: boolean; note: string | null};
 
-export const leftState = (view: Pick<PlayerView, 'seats' | 'ledger' | 'status' | 'me' | 'config' | 'removed'>): LeftState | null => {
+export const leftState = (view: Pick<PlayerView, 'seats' | 'ledger' | 'status' | 'me' | 'config' | 'removed' | 'handNo'>): LeftState | null => {
     if (view.me.seat !== null || view.status === 'closed' || view.removed.includes(view.me.pid)) return null;
-    const row = view.ledger.find((r) => r.pid === view.me.pid);
+    const row = ledgerRowOf(view, view.me.pid);
     if (!row || row.bought === 0) return null;
-    const ask = leaveAsks(view.config, row.buys, view.me.isHost);
+    const ask = leaveAsks(view.config, row.buys, view.me.isHost, view.handNo > 0);
     const open = openSeats(view).length > 0;
     const blocked = ask === 'rebuys-off' || ask === 'rebuy-cap';
     const note = ask === 'rebuys-off' ? REFUSAL_COPY['rebuys-off']
@@ -266,7 +318,7 @@ export const chipsInValue = (text: string, range: {min: number; max: number}): n
 
 // What the table says after a join: where the player sat and anything that changed on the way.
 export const joinNotes = (
-    outcome: JoinOutcome, renamed: string | null, view: Pick<PlayerView, 'seats' | 'hand' | 'me'>, asked: 'player' | 'watcher',
+    outcome: JoinOutcome, renamed: string | null, view: Pick<PlayerView, 'seats' | 'hand' | 'me' | 'requests'>, asked: 'player' | 'watcher',
 ): string[] => {
     const notes: string[] = [];
     if (renamed !== null) notes.push(JOIN_COPY.renamed(renamed));
@@ -275,6 +327,11 @@ export const joinNotes = (
     if (outcome === 'watching' && asked === 'watcher') notes.push(JOIN_COPY.watching);
     const seat = view.me.seat === null ? null : view.seats[view.me.seat] ?? null;
     if ((outcome === 'seated' || outcome === 'moved') && seat) {
+        // Chips that wait for the host's yes: said in place of when they are dealt in.
+        if (view.requests.some((r) => r.pid === view.me.pid)) {
+            notes.push(TABLE_COPY.waitingApproval);
+            return notes;
+        }
         if (handLive(view)) notes.push(JOIN_COPY.seated);
         if (seat.owesPost) notes.push(JOIN_COPY.posting);
     }
@@ -325,7 +382,7 @@ export const hostPeople = (view: PeopleInput, me: string | null): HostPeople => 
     const removed = new Set(view.removed);
     const seatOf = new Map<string, number>();
     view.seats.forEach((s, i) => s && seatOf.set(s.pid, i));
-    const ledger = new Map(view.ledger.map((row) => [row.pid, row]));
+    const ledger = new Map(ledgerRows(view).map((row) => [row.pid, row]));
     const row = (pid: string): HostRow => {
         const seat = seatOf.get(pid) ?? null;
         const s = seat === null ? null : view.seats[seat];
@@ -356,7 +413,7 @@ export const hostRowStatus = (row: HostRow): string => {
     return row.presence && row.presence !== 'here' ? `${where} · ${TABLE_COPY.presence[row.presence]}` : where;
 };
 
-// The settings form: the chip figures as typed, the rest as chosen.
+// The settings form: the chip figures as typed, the rest as chosen — the game and its boards too.
 export type GameForm = {
     smallBlind: string;
     bigBlind: string;
@@ -366,10 +423,12 @@ export type GameForm = {
     turnSeconds: number;
     rebuys: RebuyPolicy;
     maxRebuys: number | null;
+    variant: Variant;
+    boards: BoardCount;
 };
 
 export type GameField = keyof GameForm;
-export const GAME_FIELDS: readonly GameField[] = ['smallBlind', 'bigBlind', 'ante', 'buyInMin', 'buyInMax', 'turnSeconds'];
+export const GAME_FIELDS: readonly GameField[] = ['variant', 'boards', 'smallBlind', 'bigBlind', 'ante', 'buyInMin', 'buyInMax', 'turnSeconds'];
 export const REBUY_FIELDS: readonly GameField[] = ['rebuys', 'maxRebuys'];
 
 const plain = (n: number): string => String(n);
@@ -377,6 +436,7 @@ const plain = (n: number): string => String(n);
 export const gameFormOf = (c: GameConfig): GameForm => ({
     smallBlind: plain(c.smallBlind), bigBlind: plain(c.bigBlind), ante: plain(c.ante),
     buyInMin: plain(c.buyInMin), buyInMax: plain(c.buyInMax), turnSeconds: c.turnSeconds, rebuys: c.rebuys, maxRebuys: c.maxRebuys,
+    variant: c.variant, boards: c.boards,
 });
 
 // The turn timer's choices: the presets, and the table's own figure when it is not one of them.
@@ -410,6 +470,9 @@ export const checkGameForm = (config: GameConfig, form: GameForm, fields: readon
             case 'turnSeconds': values.turnSeconds = form.turnSeconds; break;
             case 'rebuys': values.rebuys = form.rebuys; break;
             case 'maxRebuys': values.maxRebuys = form.maxRebuys; break;
+            case 'variant': values.variant = form.variant; break;
+            // More than one board is PLO's alone: any other game is one.
+            case 'boards': values.boards = form.variant === 'plo' ? form.boards : 1; break;
         }
     }
     const checked = checkConfig(mergeConfig(config, values));
@@ -432,24 +495,29 @@ export type OwnChips = {
     inPot: number;
     pendingBuy: number; // lands when the hand ends
     requested: number | null; // waiting for the host
-    offer: {min: number; max: number; topUp: number; rebuy: boolean} | null;
+    offer: {min: number; max: number; topUp: number; rebuy: boolean; first: boolean} | null;
     asksHost: boolean; // a buy here waits for the host's yes
     used: number; // rebuys so far
     maxRebuys: number | null;
 };
 
+// Whether a buy by the viewer waits for the host's yes: once the first hand is dealt, for anyone but
+// the host (ledger.needsHost) — however long the host has been gone (claim-host is the way on).
+export const buyAsksHost = (view: Pick<PlayerView, 'me' | 'handNo'>): boolean => !view.me.isHost && view.handNo > 0;
+
 // The viewer's own chips and what they may add, by the table's rules (bank.buyOptions, the client's
 // copy of the server's own check); null without a seat.
-export const ownChips = (view: Pick<PlayerView, 'seats' | 'ledger' | 'requests' | 'config' | 'me'>): OwnChips | null => {
+export const ownChips = (view: Pick<PlayerView, 'seats' | 'ledger' | 'requests' | 'config' | 'me' | 'handNo'>): OwnChips | null => {
     const seat = view.me.seat;
     const s = seat === null ? null : view.seats[seat] ?? null;
     if (seat === null || !s) return null;
-    const used = view.ledger.find((row) => row.pid === view.me.pid)?.buys ?? 0;
+    const row = ledgerRowOf(view, view.me.pid);
+    const used = row?.buys ?? 0;
     const requested = view.requests.find((r) => r.pid === view.me.pid)?.amount ?? null;
     return {
         seat, stack: seatChips(s), behind: s.chips, inPot: s.inPot, pendingBuy: s.pendingBuy, requested,
-        offer: requested === null ? buyOptions(view.config, s, used) : null,
-        asksHost: view.config.rebuys === 'approve' && !view.me.isHost,
+        offer: requested === null ? buyOptions(view.config, s, row, view.me.next === 'leave' || view.me.next === 'leave-after') : null,
+        asksHost: buyAsksHost(view),
         used, maxRebuys: view.config.maxRebuys,
     };
 };
@@ -462,12 +530,135 @@ export const bankTimeline = (rows: readonly Pick<BankRow, 'pid' | 'name' | 'even
         .sort((a, b) => b.at - a.at || a.key.localeCompare(b.key))
         .slice(0, limit);
 
-// How a rebuy request the viewer was waiting on ended: their chips went up (approved), or it went
-// away without them (declined).
-export const requestEnded = (before: {bought: number}, after: {bought: number; pendingBuy: number}): 'approved' | 'declined' =>
-    after.bought > before.bought || after.pendingBuy > 0 ? 'approved' : 'declined';
+// How a request for chips the viewer was waiting on ended: their chips went up (approved); it went
+// with the viewer's own doing (withdrawn) — their Cancel (`withdrawn`, which the page marks as it
+// sends one), or a leave, now or after the hand, which takes a request with it (no seat, or
+// `leaving`); else the host's no (declined). Only a decline is said as the host's.
+export type RequestOutcome = 'approved' | 'declined' | 'withdrawn';
+
+export const requestEnded = (
+    before: {bought: number},
+    after: {bought: number; pendingBuy: number; seated: boolean; leaving: boolean; withdrawn: boolean},
+): RequestOutcome => {
+    if (after.bought > before.bought || after.pendingBuy > 0) return 'approved';
+    return after.withdrawn || !after.seated || after.leaving ? 'withdrawn' : 'declined';
+};
 
 // ── the host's waiting requests (a dot on the menu icon) ──
 
 export const waitingRequests = (table: Pick<TableView, 'requests'>, me: Pick<MeView, 'isHost'> | null): number =>
     me?.isHost ? table.requests.length : 0;
+
+// What a request for chips is for, as the host's row and toast say it: a new player's first chips
+// (they sit with none until the host says yes), a rebuy at zero, or a top-up.
+export type RequestKind = 'seat' | 'rebuy' | 'top-up';
+
+export const requestKind = (view: Pick<TableView, 'seats' | 'ledger'>, pid: string): RequestKind => {
+    const bought = (ledgerRowOf(view, pid)?.bought ?? 0) > 0;
+    if (!bought) return 'seat';
+    const seat = view.seats.find((s) => s !== null && s.pid === pid) ?? null;
+    return !seat || seat.chips + seat.pendingBuy + seat.inPot === 0 ? 'rebuy' : 'top-up';
+};
+
+// The host's alerts as a view of the requests arrives, against the last one seen. Each request new
+// since (its player had none waiting) gets a toast with Approve, and one whose amount changed has its
+// toast said again, in place, with the new amount (`fresh` false) — Approve always names the amount it
+// approves (the engine refuses one changed since: stale). The short sound plays for a new request
+// only, and at most once per player in REQUEST_SOUND_MS (`heard`: when each player's last sounded),
+// so a player who keeps taking a request back and asking again — at most once every
+// REQUESTS.CHANGE_MS, which the server holds — never floods the host with sounds.
+export const REQUEST_SOUND_MS = 20_000;
+
+type RequestFigures = {pid: string; amount: number};
+export type RequestAlerts = {toast: (RequestFigures & {fresh: boolean})[]; sound: boolean; heard: Readonly<Record<string, number>>};
+export const NO_REQUESTS_HEARD: Readonly<Record<string, number>> = Object.freeze({});
+
+export const requestAlerts = (
+    before: readonly RequestFigures[], after: readonly RequestFigures[], heard: Readonly<Record<string, number>>, now: number,
+): RequestAlerts => {
+    const toast: RequestAlerts['toast'] = [];
+    const next: Record<string, number> = Object.fromEntries(Object.entries(heard).filter(([, at]) => now - at < REQUEST_SOUND_MS));
+    let sound = false;
+    for (const r of after) {
+        const was = before.find((b) => b.pid === r.pid);
+        if (was && was.amount === r.amount) continue;
+        toast.push({pid: r.pid, amount: r.amount, fresh: !was});
+        if (was || next[r.pid] !== undefined) continue;
+        sound = true;
+        next[r.pid] = now;
+    }
+    return {toast, sound, heard: next};
+};
+
+// ── asks to see a hand ──
+
+// How an ask stands at `now`: one still waiting past its time is a no ('expired') before any write
+// says so — as lib/poker-night/asks.answerAt reads the server's own.
+export const answerNow = (ask: Pick<AskView, 'answer' | 'until'>, now: number): AskAnswer =>
+    ask.answer === 'waiting' && now >= ask.until ? 'expired' : ask.answer;
+
+// What another player's seat menu offers about their cards: an ask (the viewer may ask them now),
+// the ask greyed with why not (MeView.askBlocked), how the viewer's ask of them stands, or nothing —
+// the viewer may ask nobody (a hand being played, or they were not dealt into the last one or did not
+// fold it). Read at `now`, so an ask of the viewer's that ran out frees the rest (unless that was
+// every ask a hand allows) and reads as expired, with no write between.
+export type AskOffer = {kind: 'ask'} | {kind: 'blocked'; block: AskBlock} | {kind: 'asked'; answer: AskAnswer} | null;
+
+export const askOffer = (me: Pick<MeView, 'pid' | 'asks' | 'canAsk' | 'askBlocked'>, pid: string, now: number): AskOffer => {
+    const mine = me.asks.filter((a) => a.from === me.pid);
+    const asked = mine.find((a) => a.to === pid);
+    if (asked) return {kind: 'asked', answer: answerNow(asked, now)};
+    const waiting = mine.some((a) => answerNow(a, now) === 'waiting');
+    if (me.canAsk.includes(pid)) return waiting ? {kind: 'blocked', block: 'waiting'} : {kind: 'ask'};
+    const block = me.askBlocked.find(([p]) => p === pid)?.[1] ?? null;
+    if (block === null) return null;
+    if (block === 'waiting' && !waiting) return mine.length >= ASKS.PER_HAND ? {kind: 'blocked', block: 'limit'} : {kind: 'ask'};
+    return {kind: 'blocked', block};
+};
+
+// When an ask really ends for the player asked: its own seconds, or the next deal if that comes
+// first — every ask ends at the deal (with no cooldown when its seconds were not up), so the
+// prompt's countdown runs to whichever is sooner. A paused table deals nothing.
+export const askEndsAt = (ask: Pick<AskView, 'until'>, table: Pick<TableView, 'status' | 'nextHandAt'>): number =>
+    table.status === 'playing' && table.nextHandAt !== null ? Math.min(ask.until, table.nextHandAt) : ask.until;
+
+// The ask the viewer is to answer now: the oldest one to them still waiting with time left before it
+// runs out or the next deal ends it (askEndsAt), else null.
+export const askToAnswer = (me: Pick<MeView, 'pid' | 'asks'>, now: number, table: Pick<TableView, 'status' | 'nextHandAt'> | null = null): AskView | null =>
+    me.asks.find((a) => a.to === me.pid && answerNow(a, now) === 'waiting' && (table === null || now < askEndsAt(a, table))) ?? null;
+
+
+// Whether an ask of the viewer's own still waits for its answer at `now` (the page then reads the
+// clock each second, to say when it runs out).
+export const askWaiting = (me: Pick<MeView, 'pid' | 'asks'>, now: number): boolean =>
+    me.asks.some((a) => (a.from === me.pid || a.to === me.pid) && answerNow(a, now) === 'waiting');
+
+// The viewer's own asks as this page last saw each one (by askKey), with the hand they were about;
+// askNews says which got their answer since — said once each, in a toast. An ask still waiting when
+// the next hand is dealt ends with it ('dealt': no answer, which keeps the one who asked from asking
+// that player again for ASKS.COOLDOWN_HANDS hands, as a no does), which only the hand moving on can
+// say, since the ask leaves the view with the hand.
+export type AskSeen = Readonly<{hand: number | null; asks: Readonly<Record<string, {ask: AskView; answer: AskAnswer}>>}>;
+export const NO_ASKS_SEEN: AskSeen = Object.freeze({hand: null, asks: Object.freeze({})});
+export type AskNews = {ask: AskView; answer: AskAnswer | 'dealt'};
+
+export const askKey = (ask: Pick<AskView, 'from' | 'to' | 'at'>): string => `${ask.from}>${ask.to}@${ask.at}`;
+
+export const askNews = (seen: AskSeen, me: Pick<MeView, 'pid' | 'asks'>, now: number, hand: number | null): {news: AskNews[]; seen: AskSeen} => {
+    const news: AskNews[] = [];
+    const before = seen.hand === hand ? seen.asks : {};
+    if (seen.hand !== null && seen.hand !== hand) {
+        for (const {ask, answer} of Object.values(seen.asks)) if (answer === 'waiting') news.push({ask, answer: 'dealt'});
+    }
+    const next: Record<string, {ask: AskView; answer: AskAnswer}> = {};
+    for (const ask of me.asks) {
+        if (ask.from !== me.pid) continue;
+        const key = askKey(ask);
+        const answer = answerNow(ask, now);
+        next[key] = {ask, answer};
+        if (before[key]?.answer === 'waiting' && answer !== 'waiting') news.push({ask, answer});
+    }
+    const same = seen.hand === hand && Object.keys(next).length === Object.keys(seen.asks).length
+        && Object.entries(next).every(([k, a]) => seen.asks[k]?.answer === a.answer);
+    return {news, seen: same ? seen : {hand, asks: next}};
+};

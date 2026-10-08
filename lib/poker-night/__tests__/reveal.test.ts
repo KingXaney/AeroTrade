@@ -5,12 +5,13 @@
 import {describe, expect, it} from 'vitest';
 import {nextDueAt} from '@/lib/poker-night/clock';
 import {bestFive} from '@/lib/poker-night/hand-name';
-import {HAND_COPY, TABLE_COPY} from '@/lib/learn/copy/poker-night';
+import {ACTION_COPY, HAND_COPY, isolate, TABLE_COPY} from '@/lib/learn/copy/poker-night';
 import {reduce} from '@/lib/poker-night/engine';
-import {bannerLines, bannerShows, cardLook, playerAt, resultLook, viewerSeatIn} from '@/lib/poker-night/reveal';
+import {bannerLines, bannerShows, cardLook, liftBoardOf, playerAt, resultLook, scoopOf, streetTags, viewerSeatIn} from '@/lib/poker-night/reveal';
+import {bestHand} from '@/lib/poker-night/variants';
 import type {TableState} from '@/lib/poker-night/types';
 import {clockLeaderOf, wireView} from '@/lib/poker-night/views';
-import {A, C, F, X, cards, deal, moves, nowOf, ok, runOut, table} from './fixtures';
+import {A, C, F, R, X, cards, deal, moves, nowOf, ok, runOut, table} from './fixtures';
 
 const view = (s: TableState) => wireView(s, {
     code: 'K7QXM4', seq: 1, serverNow: nowOf(s), nextDueAt: nextDueAt(s), clockLeader: clockLeaderOf(s, {}), presence: {}, watchers: 0, realtimeOk: true, peopleV: 1,
@@ -42,6 +43,22 @@ describe('a showdown', () => {
         // Both winners' five cards light up.
         expect(look.playing).toEqual(expect.arrayContaining(cards('AhAd KhKd')));
         expect(cardLook(look, cards('Qh')[0])).toBe('dim');
+    });
+
+    it('in PLO, lights exactly two of the winner\'s four with three from the board, and never says the board plays', () => {
+        // A royal flush on the board: in Texas hold'em everyone plays it; in PLO each hand plays two of its own.
+        let s = deal(three([1000, 1000, 1000], {variant: 'plo'}), {holes: {0: 'AhAc7s3d', 1: 'KcQd8s4c', 2: 'Th8h5d5c'}, board: 'Kh9h6h2hJc'});
+        s = moves(s, C, C, X, X, X, X, X, X, X, X, X, X);
+        const look = resultLook(view(s).hand)!;
+        expect(look.winners).toEqual([{seat: 2, amount: 60, description: expect.objectContaining({category: 5}), playsBoard: false}]);
+        expect(look.playing.filter((c) => cards('Th8h5d5c').includes(c)).sort()).toEqual(cards('Th8h').sort());
+        expect(look.playing.filter((c) => cards('Kh9h6h2hJc').includes(c))).toHaveLength(3);
+        for (const card of cards('5d5c')) expect(cardLook(look, card)).toBe('dim');
+        // The ace of hearts alone makes no flush: a pair of aces.
+        expect(look.shown.find((h) => h.seat === 0)!.description).toMatchObject({category: 1, ranks: [12, 11, 9, 7]});
+        let board = deal(three([1000, 1000, 1000], {variant: 'plo'}), {holes: {0: '2h3d4c5s', 1: '2c3s4d5h', 2: '6c7d8h9s'}, board: 'AsKsQsJsTs'});
+        board = moves(board, C, C, X, X, X, X, X, X, X, X, X, X);
+        expect(resultLook(view(board).hand)!.shown.every((h) => !h.playsBoard)).toBe(true);
     });
 
     it('says when the board plays', () => {
@@ -89,8 +106,12 @@ describe("the banner's words", () => {
         s = moves(s, C, C, X, X, X, X, X, X, X, X, X, X);
         const look = resultLook(view(s).hand)!;
         const pair = HAND_COPY.label({category: 1, ranks: [10, 9, 7, 3]});
-        expect(bannerLines(look, () => 'Ana', 2)).toEqual([{seat: 2, mine: true, head: TABLE_COPY.bannerYou(60), hand: pair}]);
-        expect(bannerLines(look, () => 'Ana', 0)).toEqual([{seat: 2, mine: false, head: TABLE_COPY.banner('Ana', 60), hand: pair}]);
+        expect(bannerLines(look, () => 'Ana', 2)).toEqual([{
+            key: 'seat:2', seat: 2, board: null, mine: true, head: TABLE_COPY.bannerYou(60), short: {lead: TABLE_COPY.bannerShortYou, name: '', tail: ''}, hand: pair,
+        }]);
+        expect(bannerLines(look, () => 'Ana', 0)).toEqual([{
+            key: 'seat:2', seat: 2, board: null, mine: false, head: TABLE_COPY.banner('Ana', 60), short: {lead: '', name: isolate('Ana'), tail: TABLE_COPY.bannerShortWins}, hand: pair,
+        }]);
         expect(bannerLines(look, () => null, null)[0].head).toBe(TABLE_COPY.banner(TABLE_COPY.seat(2), 60));
     });
 
@@ -124,10 +145,154 @@ describe("the banner's words", () => {
         const lines = bannerLines(resultLook(view(s).hand)!, () => 'Bo', null);
         expect(lines).toHaveLength(3);
         for (const line of lines) expect(line.hand).toBe(`${HAND_COPY.label({category: 8, ranks: [12]})} · ${HAND_COPY.playsBoard}`);
-        const many = {handNo: 1, showdown: true, shown: [], playing: [], winners: [0, 1, 2, 3].map((seat) => ({seat, amount: 10, description: null, playsBoard: false}))};
+        const winners = [0, 1, 2, 3].map((seat) => ({seat, amount: 10, description: null, playsBoard: false}));
+        const many = {handNo: 1, showdown: true, shown: [], playing: [], winners, boards: [{index: 0, winners, playing: []}]};
         expect(bannerLines(many, () => 'Bo', null).map((l) => l.seat)).toEqual([0, 1, 2]);
         let t = deal(three(), {board: '2c7d9s3s4c'});
         t = moves(t, F, F);
         expect(bannerLines(resultLook(view(t).hand)!, () => 'Bo', null)[0].hand).toBeNull();
+    });
+});
+
+// ── PLO on two and three boards (P6) ──
+
+// Three players check a three-board PLO hand down: the pot of 60 splits 20 a board.
+const threeBoards = (holes: Record<number, string>, boards: string[]): TableState => {
+    const s = deal(three([1000, 1000, 1000], {variant: 'plo', boards: boards.length as 2 | 3}), {holes, boards});
+    return moves(s, C, C, X, X, X, X, X, X, X, X, X, X);
+};
+// Seat 0 makes a royal flush on board 1, seat 1 four nines on board 2 and a full house on board 3.
+const SPLIT = {holes: {0: 'JsTs4h5h', 1: '9c9d8h7h', 2: '6c6d2s3s'}, boards: ['AsKsQs2d3c', '9h9s4c4d5c', '8d8c7d7c2h']};
+// Seat 0 makes three aces, three kings and three aces: every board.
+const SCOOP = {holes: {0: 'AsAhKsKh', 1: '2c2d7h8h', 2: '3c3s9c9d'}, boards: ['Ad7c8d9s2h', 'Kd6c3h4c9h', 'Ac5d6hTsJc']};
+
+describe('two and three boards', () => {
+    it("names each board's winners and lights each board's cards that play for them, the hole cards with the first board they play on", () => {
+        const s = threeBoards(SPLIT.holes, SPLIT.boards);
+        const look = resultLook(view(s).hand)!;
+        expect(look.boards.map((b) => b.winners.map((w) => [w.seat, w.amount]))).toEqual([[[0, 20]], [[1, 20]], [[1, 20]]]);
+        expect(look.winners.map((w) => [w.seat, w.amount])).toEqual([[1, 40], [0, 20]]);
+        expect(look.boards.map((b) => b.winners[0].description?.category)).toEqual([8, 7, 6]);
+        // Each board's lit cards: its winner's five cards that play there (PLO's two and three).
+        SPLIT.boards.forEach((board, k) => {
+            const seat = [0, 1, 1][k];
+            const best = bestHand('plo', cards(SPLIT.holes[seat as 0 | 1]), cards(board)).cards;
+            expect([...look.boards[k].playing].sort()).toEqual([...best].sort());
+            for (const card of cards(board)) expect(cardLook(look, card), `${board}`).toBe(best.includes(card) ? 'win' : 'dim');
+        });
+        expect(look.playing.sort()).toEqual([...new Set(look.boards.flatMap((b) => b.playing))].sort());
+        // A hole card lights with the first board it plays on; one that plays on none, with the first.
+        expect(cards('JsTs9c9d8h7h').map((c) => liftBoardOf(look, c))).toEqual([0, 0, 1, 1, 2, 2]);
+        expect(liftBoardOf(look, cards('6c')[0])).toBe(0);
+        expect(cardLook(look, cards('6c')[0])).toBe('dim');
+        // Each shown hand read on every board.
+        expect(look.shown.every((h) => h.reads.length === 3)).toBe(true);
+        expect(scoopOf(look)).toBeNull();
+    });
+
+    it('says a board a line in the banner, with the hand on it, and one line when one player wins every board', () => {
+        const s = threeBoards(SPLIT.holes, SPLIT.boards);
+        const lines = bannerLines(resultLook(view(s).hand)!, (seat) => ['Ana', 'Ben', 'Cy'][seat], 1);
+        expect(lines.map((l) => [l.key, l.seat, l.board, l.mine, l.head])).toEqual([
+            ['board:0', 0, 0, false, TABLE_COPY.bannerBoard(0, 'Ana', 20)],
+            ['board:1', 1, 1, true, TABLE_COPY.bannerBoardYou(1, 20)],
+            ['board:2', 1, 2, true, TABLE_COPY.bannerBoardYou(2, 20)],
+        ]);
+        // Cut short, without the chips: the board's name whole, then whoever won it.
+        expect(lines.map((l) => l.short)).toEqual([
+            {lead: TABLE_COPY.bannerShortBoard(0), name: isolate('Ana'), tail: ''},
+            {lead: TABLE_COPY.bannerShortBoard(1), name: 'you', tail: ''},
+            {lead: TABLE_COPY.bannerShortBoard(2), name: 'you', tail: ''},
+        ]);
+        expect(lines.map((l) => l.hand)).toEqual([
+            HAND_COPY.label({category: 8, ranks: [12]}), HAND_COPY.label({category: 7, ranks: [7, 3]}), HAND_COPY.label({category: 6, ranks: [6, 5]}),
+        ]);
+        const scoop = threeBoards(SCOOP.holes, SCOOP.boards);
+        const look = resultLook(view(scoop).hand)!;
+        expect(scoopOf(look)).toBe(0);
+        expect(bannerLines(look, () => 'Ana', 0)).toEqual([{
+            key: 'all:0', seat: 0, board: null, mine: true, head: TABLE_COPY.bannerScoopYou(60), short: {lead: TABLE_COPY.bannerShortEveryYou, name: '', tail: ''}, hand: null,
+        }]);
+        expect(bannerLines(look, () => 'Ana', null)[0].short).toEqual({lead: '', name: isolate('Ana'), tail: TABLE_COPY.bannerShortEvery});
+        expect(bannerLines(look, () => 'Ana', null)[0].head).toBe(TABLE_COPY.bannerScoop('Ana', 60));
+        // Two boards: the same, a line each.
+        const two = threeBoards(SPLIT.holes, SPLIT.boards.slice(0, 2));
+        expect(bannerLines(resultLook(view(two).hand)!, () => 'Bo', null).map((l) => l.board)).toEqual([0, 1]);
+    });
+
+    it("never says one line when someone else won a side pot, and names a board's chips player by player", () => {
+        const board = (seat: number, amount: number) => ({seat, amount});
+        // Ana won the main pot on every board; Ben the side pot on every board.
+        const hand = {
+            no: 4, variant: 'plo' as const, boards: SPLIT.boards.map(cards),
+            result: {
+                completedAt: 0, showdown: true, refund: null, revealMs: 7200, gone: [], nets: [],
+                pots: [{amount: 300, winners: [[0], [0], [0]]}, {amount: 90, winners: [[1], [1], [1]]}],
+                hands: [{seat: 0, cards: cards(SPLIT.holes[0])}, {seat: 1, cards: cards(SPLIT.holes[1])}],
+            },
+        };
+        const look = resultLook(hand)!;
+        expect(look.boards.map((b) => b.winners.map((w) => [w.seat, w.amount]))).toEqual([[board(0, 100), board(1, 30)], [board(0, 100), board(1, 30)], [board(0, 100), board(1, 30)]].map((b) => b.map((w) => [w.seat, w.amount])));
+        expect(scoopOf(look)).toBeNull();
+        const lines = bannerLines(look, (seat) => ['Ana', 'Ben'][seat], 1);
+        expect(lines.map((l) => l.head)).toEqual([0, 1, 2].map((k) => TABLE_COPY.bannerBoardSplit(k, [{name: 'Ana', amount: 100}, {name: null, amount: 30}])));
+        expect(lines.every((l) => !l.mine && l.seat === 0)).toBe(true);
+        // A share of no chips (a pot of one chip over three boards) names nobody on its board.
+        const odd = resultLook({...hand, result: {...hand.result, pots: [{amount: 1, winners: [[0], [1], [1]]}]}})!;
+        expect(odd.boards.map((b) => b.winners.map((w) => w.seat))).toEqual([[0], [], []]);
+        expect(bannerLines(odd, () => 'Ana', null)).toHaveLength(1);
+    });
+});
+
+describe('the moves of the street', () => {
+    const tags = (st: TableState) => Object.fromEntries([...streetTags(view(st).hand)].map(([seat, t]) => [seat, t.text]));
+    const actor = (st: TableState) => st.hand!.actor!;
+
+    it("keeps each seat's last check, call, bet or raise for the street, a raise or an all-in by its total — never a blind, an ante or a fold", () => {
+        let s = deal(three([1000, 1000, 1000], {ante: 5}));
+        // The antes and the blinds carry no tag.
+        expect(tags(s)).toEqual({});
+        const raiser = actor(s);
+        s = moves(s, R(60));
+        const caller = actor(s);
+        s = moves(s, C);
+        const t = tags(s);
+        expect(t[raiser]).toBe(ACTION_COPY.tag('raise', 60, false));
+        expect(t[caller]).toMatch(/^Call /);
+        expect(Object.keys(t)).toHaveLength(2);
+        // The big blind folds: the plate says Folded, and the flop starts with none.
+        const folder = actor(s);
+        const before = moves(s, R(200));
+        expect(tags(before)[folder]).toBe(ACTION_COPY.tag('raise', 200, false));
+        s = moves(s, F);
+        expect(folder in tags(s)).toBe(false);
+    });
+
+    it('starts each street with none, and has none once the hand is complete', () => {
+        let s = deal(three(), {board: '2c7d9s3s4c'});
+        s = moves(s, C, C, X);
+        expect(view(s).hand!.street).toBe('flop');
+        expect(tags(s)).toEqual({});
+        const checker = actor(s);
+        s = moves(s, X);
+        const better = actor(s);
+        s = moves(s, R(40));
+        expect(tags(s)).toEqual({[checker]: ACTION_COPY.tag('check', 0, false), [better]: ACTION_COPY.tag('bet', 40, false)});
+        // The checker calls: the later move is the one kept.
+        s = moves(s, F, C);
+        expect(view(s).hand!.street).toBe('turn');
+        expect(tags(s)).toEqual({});
+        s = moves(s, X, A, C);
+        s = runOut(s);
+        expect(view(s).hand!.phase).toBe('complete');
+        expect(streetTags(view(s).hand).size).toBe(0);
+        expect(streetTags(null).size).toBe(0);
+    });
+
+    it('says an all-in by its total', () => {
+        let s = deal(three([300, 300, 300]));
+        const short = actor(s);
+        s = moves(s, A);
+        expect(streetTags(view(s).hand).get(short)).toMatchObject({allIn: true, amount: 300, text: ACTION_COPY.tag('raise', 300, true)});
     });
 });

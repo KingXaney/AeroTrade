@@ -1,7 +1,7 @@
 'use client';
 
-// The invite: the table link to copy (with the box to copy it from by hand when the clipboard is
-// blocked), Share on a phone, the code in two groups for reading aloud, and a QR code a phone camera
+// The invite: the game the table deals next ("Game: PLO"), the table link to copy (with the box to
+// copy it from by hand when the clipboard is blocked), Share on a phone (its words naming the game), the code in two groups for reading aloud, and a QR code a phone camera
 // opens. It opens by itself for the host who just started the table (?invite=1), and holds the
 // host's "Deal the first hand" until the first deal, ready once two players sit.
 
@@ -14,8 +14,9 @@ import Panel from "@/components/primitives/Panel";
 import TextField from "@/components/primitives/TextField";
 import {copyText, Drawer, useCanShare, useNarrow} from "@/components/poker-night/overlay-kit";
 import {useRoom} from "@/components/poker-night/room-controller";
-import {INVITE_COPY, TABLE_COPY} from "@/lib/learn/copy/poker-night";
+import {INVITE_COPY, MODE_COPY, TABLE_COPY} from "@/lib/learn/copy/poker-night";
 import {inviteDeal} from "@/lib/poker-night/overlays";
+import {nextModeOf} from "@/lib/poker-night/variants";
 
 const QrCode = lazy(() => import("@/components/poker-night/QrCode"));
 
@@ -34,6 +35,8 @@ const InviteSheet = ({open, onOpenChange, toTable, onDealt}: Props) => {
     const table = room.table;
     const name = TABLE_COPY.name(table.settings.name, room.code);
     const deal = inviteDeal(table, room.me);
+    const game = nextModeOf(room.config);
+    const spoken = MODE_COPY.spokenLabel(game.variant, game.boards);
 
     const copy = async () => {
         const result = await copyText(room.shareUrl);
@@ -43,7 +46,7 @@ const InviteSheet = ({open, onOpenChange, toTable, onDealt}: Props) => {
 
     const share = async () => {
         try {
-            await navigator.share({title: INVITE_COPY.shareTitle(name), text: INVITE_COPY.shareText(name), url: room.shareUrl});
+            await navigator.share({title: INVITE_COPY.shareTitle(name), text: INVITE_COPY.shareText(name, spoken), url: room.shareUrl});
         } catch {
             // Closed without sharing, or refused: the link is still in the box.
         }
@@ -60,6 +63,7 @@ const InviteSheet = ({open, onOpenChange, toTable, onDealt}: Props) => {
 
     return (
         <Drawer open={open} onOpenChange={onOpenChange} title={INVITE_COPY.heading} toTable={toTable} data-pn-drawer="invite">
+            <p className="text-sm font-medium text-fg" title={spoken} data-invite-mode={game.variant}>{INVITE_COPY.mode(MODE_COPY.label(game.variant, game.boards))}</p>
             <p className="text-sm leading-relaxed text-fg-soft">{INVITE_COPY.lead}</p>
             <Panel pad={4} className="space-y-3" aria-labelledby={`${id}-link-label`}>
                 <MicroLabel as="label" id={`${id}-link-label`} htmlFor={`${id}-link`}>{INVITE_COPY.linkLabel}</MicroLabel>

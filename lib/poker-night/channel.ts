@@ -11,6 +11,9 @@
 // - A message carries an explicit id (the room and its seq, or the emote's), so a retried publish is
 //   one message; a browser applies a state only when its seq is newer, so order and repeats never
 //   matter.
+// - Each player also has a channel of their own, the room's with their pid after it, on which the
+//   server says only "your own view changed" ('nudge', with their nudge count): an ask to see their
+//   cards, its answer, a sit-out the host set. Their token alone may subscribe to it.
 
 import type {Env} from '@/lib/poker-night/env';
 import type {EmoteView, WireView} from '@/lib/poker-night/view-types';
@@ -20,15 +23,20 @@ export const CHANNEL_NAMESPACE = 'poker-night';
 // The channel of room `roomId` in `env`: poker-night:<env>:<roomId>.
 export const channelName = (env: Env, roomId: string): string => `${CHANNEL_NAMESPACE}:${env}:${roomId}`;
 
-// The one operation a browser's token grants, on its room's channel alone: never publish, never
-// presence.
+// Player `pid`'s own channel at room `roomId`: poker-night:<env>:<roomId>:<pid>.
+export const privateChannelName = (env: Env, roomId: string, pid: string): string => `${channelName(env, roomId)}:${pid}`;
+
+// The one operation a browser's token grants, on its room's channel and its own: never publish,
+// never presence.
 export const CAPABILITY = Object.freeze(['subscribe'] as const);
 
-export const capabilityFor = (channel: string): Record<string, string[]> => ({[channel]: [...CAPABILITY]});
+export const capabilityFor = (...channels: string[]): Record<string, string[]> =>
+    Object.fromEntries(channels.map((channel) => [channel, [...CAPABILITY]]));
 
 // The messages on a channel.
 export const STATE_MESSAGE = 'state';
 export const EMOTE_MESSAGE = 'emote';
+export const NUDGE_MESSAGE = 'nudge';
 
 // A state message, envelope and all, stays under this many bytes (Ably may count messages in 5 KiB
 // chunks): lib/poker-night/__tests__/budget.test.ts measures it on the heaviest table the engine builds.
@@ -36,6 +44,7 @@ export const WIRE_BUDGET_BYTES = 4500;
 
 export type StateMessage = {name: typeof STATE_MESSAGE; id: string; data: WireView};
 export type EmoteMessage = {name: typeof EMOTE_MESSAGE; id: string; data: EmoteView};
+export type NudgeMessage = {name: typeof NUDGE_MESSAGE; id: string; data: {nudge: number}};
 
 // What goes on the channel after a commit: the public wire view, under an id that makes a retried
 // publish idempotent.
@@ -43,6 +52,16 @@ export const stateMessage = (roomId: string, wire: WireView): StateMessage => ({
 
 // An emote (P6), under its own id.
 export const emoteMessage = (roomId: string, emote: EmoteView): EmoteMessage => ({name: EMOTE_MESSAGE, id: `${roomId}:e:${emote.id}`, data: emote});
+
+// A nudge for player `pid`, on their own channel: their count after it, and nothing else.
+export const nudgeMessage = (roomId: string, pid: string, nudge: number): NudgeMessage =>
+    ({name: NUDGE_MESSAGE, id: `${roomId}:n:${pid}:${nudge}`, data: {nudge}});
+
+// A nudge's count, read off a message's data, or null.
+export const nudgeOf = (value: unknown): number | null => {
+    const n = typeof value === 'object' && value !== null ? (value as {nudge?: unknown}).nudge : undefined;
+    return typeof n === 'number' && Number.isSafeInteger(n) && n >= 0 ? n : null;
+};
 
 type EnvVars = Readonly<Record<string, string | undefined>>;
 
@@ -66,5 +85,5 @@ export const realtimeEnabled = (vars: EnvVars = process.env): boolean =>
 export const isWire = (value: unknown): value is WireView => {
     if (typeof value !== 'object' || value === null) return false;
     const wire = value as Partial<WireView>;
-    return wire.v === 1 && Number.isSafeInteger(wire.seq) && Array.isArray(wire.seats) && typeof wire.code === 'string' && typeof wire.serverNow === 'number';
+    return wire.v === 2 && Number.isSafeInteger(wire.seq) && Array.isArray(wire.seats) && typeof wire.code === 'string' && typeof wire.serverNow === 'number';
 };

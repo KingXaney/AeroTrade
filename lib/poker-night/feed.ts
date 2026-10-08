@@ -30,6 +30,11 @@ export type FeedState = {
     emoteSeq: number;
     knownSeq: number; // the highest seq any answer has named: above seq, a GET state is due
     knownEmoteSeq: number;
+    // The viewer's nudge count (PlayerView.nudge) of the view held, and the highest any answer or
+    // the viewer's own channel has named: above it, a GET state is due — their own view changed
+    // where the public seq did not move (an ask to see their cards, its answer).
+    nudge: number;
+    knownNudge: number;
     serverNow: number; // the server's time in the latest answer
     nextDueAt: number | null;
     pass: string | null;
@@ -45,15 +50,17 @@ export type FeedState = {
 export type FeedInput =
     // A player view from any request (GET state, POST action, join or tick). at: when the answer
     // arrived; sentAt: when its request left (a clock sample); animate false snaps (a hidden tab).
-    // pre: the answer to the viewer's own pre-action, set, changed or cleared — a write nobody else
-    // can see, which moves no seq (room-doc.publicSeq), so at the seq held it still brings that
-    // pre-action (pre-actions go out one at a time, components/poker-night/PreActions).
-    | {type: 'view'; view: PlayerView; at: number; sentAt?: number; animate?: boolean; pre?: boolean}
+    // own: the answer to a move of the viewer's own — maybe a write nobody else can see (a
+    // pre-action, leaving after the hand, an ask, its answer), which moves no seq
+    // (room-doc.publicSeq), so at the seq held it still brings the viewer's own part.
+    | {type: 'view'; view: PlayerView; at: number; sentAt?: number; animate?: boolean; own?: boolean}
     // The public part alone, from the realtime channel (P4). moving: a move of the viewer's own is
     // out, whose commit may change their own part where no message shows it (a pre-action), so the
     // message does not count that part fresh — the move's answer brings it.
     | {type: 'wire'; wire: WireView; at: number; animate?: boolean; moving?: boolean}
     | {type: 'unchanged'; body: Unchanged; at: number; sentAt?: number}
+    // The viewer's own channel says their nudge count is now this (a 'nudge' message).
+    | {type: 'nudge'; nudge: number}
     | {type: 'failed'}
     // Emotes that came on their own: the realtime channel's 'emote' messages, the sender's own (P6).
     | {type: 'emotes'; emotes: EmoteView[]}
@@ -77,6 +84,7 @@ export const initialFeed = (page: {view: PlayerView} | {preview: RoomView}): Fee
     return {
         view, preview: 'preview' in page ? page.preview : null,
         seq: base.seq, privateSeq: base.seq, emoteSeq: view?.emoteSeq ?? 0, knownSeq: base.seq, knownEmoteSeq: view?.emoteSeq ?? 0,
+        nudge: view?.nudge ?? 0, knownNudge: view?.nudge ?? 0,
         serverNow: base.serverNow, nextDueAt: base.nextDueAt, pass: view?.pass ?? null,
         offset: 0, samples: [],
         // The page's own emotes are history: only what arrives after it shows.
@@ -125,8 +133,8 @@ export const mergeWire = (view: PlayerView, wire: WireView): PlayerView => ({
     clockLeader: wire.clockLeader, peopleV: wire.peopleV, watchers: wire.watchers, realtimeOk: wire.realtimeOk,
 });
 
-const samePreView = (a: MeView['pre'], b: MeView['pre']): boolean =>
-    a === b || (a !== null && b !== null && a.kind === b.kind && (a.kind !== 'call' || (b.kind === 'call' && a.amount === b.amount)));
+// The viewer's own part, the same in every field.
+const sameMe = (a: MeView, b: MeView): boolean => a === b || JSON.stringify(a) === JSON.stringify(b);
 
 // Whether the viewer's pre-action still stands after this message. Only its owner sets one (and
 // the move's own answer brings it), and the engine clears it when its owner acts, folds or leaves,
@@ -142,17 +150,22 @@ const preStands = (view: PlayerView, wire: WireView): boolean => {
     return !!before && !!after && after.pid === before.pid && after.state === before.state && after.acted === before.acted && after.bet === before.bet;
 };
 
-// The viewer's own part under a realtime message: the cards of the hand they were dealt, a
-// pre-action the server has not cleared, what their seat does when that hand ends (a new deal has
-// done it: a sit-out has begun, a leave has cashed the seat out), and whether they host (the
+const NO_ASKS: MeView['asks'] = [];
+const NO_PIDS: string[] = [];
+const NO_SHOWN: MeView['shownToMe'] = [];
+const NO_BLOCKS: MeView['askBlocked'] = [];
+
+// The viewer's own part under a realtime message: the cards of the hand they were dealt (and the one
+// they threw away), a pre-action the server has not cleared, what their seat does when that hand
+// ends (a new deal has done it: a sit-out has begun, a leave has cashed the seat out), the hand's
+// asks and what was shown to them alone (a new deal ends every one), and whether they host (the
 // message names the host).
 const ownPart = (view: PlayerView, wire: WireView): MeView => {
     const sameHand = (wire.hand?.no ?? null) === (view.hand?.no ?? null);
-    const hole = sameHand ? view.me.hole : null;
     const pre = view.me.pre !== null && preStands(view, wire) ? view.me.pre : null;
-    const next = sameHand ? view.me.next : null;
     const isHost = wire.hostPid === view.me.pid;
-    return hole === view.me.hole && pre === view.me.pre && next === view.me.next && isHost === view.me.isHost ? view.me : {...view.me, hole, pre, next, isHost};
+    if (sameHand) return pre === view.me.pre && isHost === view.me.isHost ? view.me : {...view.me, pre, isHost};
+    return {...view.me, hole: null, pre, next: null, discard: null, asks: NO_ASKS, canAsk: NO_PIDS, askBlocked: NO_BLOCKS, shownToMe: NO_SHOWN, isHost};
 };
 
 // A whole view older than the table held — the read a message asked for, overtaken by the next
@@ -200,16 +213,21 @@ export const feedReducer = (state: FeedState, input: FeedInput): FeedState => {
             const {view, at} = input;
             const clock = withSample(state, input.sentAt, at, view.serverNow);
             const pass = view.pass ?? state.pass;
+            const nudge = view.nudge ?? 0;
+            const knownNudge = Math.max(state.knownNudge, nudge);
             // An answer no newer than the view held: only its clock sample and pass count — unless it
             // is the whole view of the table a realtime message already showed, whose private part
-            // (a new hand's cards, a seat, the config, the people) is what it was fetched for.
-            const freshens = view.seq === state.seq && state.privateSeq < view.seq;
+            // (a new hand's cards, a seat, the config, the people) is what it was fetched for, or the
+            // whole view a nudge asked for (the viewer's own part changed at the seq held).
+            const samePlayer = state.view !== null && view.me.pid === state.view.me.pid;
+            const freshens = view.seq === state.seq && (state.privateSeq < view.seq || (samePlayer && nudge > state.nudge));
             if (state.view !== null && view.seq <= state.seq && !freshens) {
-                const kept = {...state, ...clock, pass, failures: 0, knownSeq: Math.max(state.knownSeq, view.seq)};
-                // The viewer's own pre-action, answered at the seq held: only that, the table as held.
-                if (input.pre === true && view.seq === state.seq && view.me.pid === state.view.me.pid) {
+                const kept = {...state, ...clock, pass, failures: 0, knownSeq: Math.max(state.knownSeq, view.seq), knownNudge};
+                // The viewer's own move, answered at the seq held (a write only they can see): their
+                // own part from it, the table as held — unless a nudge since says it is older.
+                if (input.own === true && view.seq === state.seq && samePlayer && nudge >= state.nudge) {
                     const held = state.view;
-                    return samePreView(held.me.pre, view.me.pre) ? kept : {...kept, view: {...held, me: {...held.me, pre: view.me.pre}}};
+                    return sameMe(held.me, view.me) ? {...kept, nudge} : {...kept, nudge, view: {...held, me: view.me}};
                 }
                 // Older still, yet newer than the own part held: that part, kept under the table held
                 // when nothing since could have changed it (graftPrivate) — else a read again.
@@ -229,9 +247,12 @@ export const feedReducer = (state: FeedState, input: FeedInput): FeedState => {
                 ...state, ...clock, ...withEvents(state, events, at),
                 view, preview: null, seq: view.seq, privateSeq: view.seq, emoteSeq: Math.max(state.emoteSeq, view.emoteSeq),
                 knownSeq: Math.max(state.knownSeq, view.seq), knownEmoteSeq: Math.max(state.knownEmoteSeq, view.emoteSeq),
+                nudge, knownNudge,
                 serverNow: view.serverNow, nextDueAt: view.nextDueAt, pass, emotes, failures: 0,
             };
         }
+        case 'nudge':
+            return input.nudge > state.knownNudge ? {...state, knownNudge: input.nudge} : state;
         case 'unchanged': {
             const {body, at} = input;
             const clock = withSample(state, input.sentAt, at, body.serverNow);
@@ -243,6 +264,8 @@ export const feedReducer = (state: FeedState, input: FeedInput): FeedState => {
             return {
                 ...state, ...clock, emotes, emoteSeq: delivered,
                 knownSeq: Math.max(state.knownSeq, body.seq), knownEmoteSeq: Math.max(state.knownEmoteSeq, body.emoteSeq),
+                // An older server's Unchanged names no nudge count.
+                knownNudge: typeof body.nudge === 'number' ? Math.max(state.knownNudge, body.nudge) : state.knownNudge,
                 serverNow: Math.max(state.serverNow, body.serverNow),
                 nextDueAt: current ? body.nextDueAt : state.nextDueAt,
                 pass: body.pass ?? state.pass, failures: 0,
@@ -266,9 +289,10 @@ export const feedReducer = (state: FeedState, input: FeedInput): FeedState => {
     }
 };
 
-// Whether an answer named a seq or an emote seq beyond what is held: a GET state is due.
-export const isBehind = (state: Pick<FeedState, 'seq' | 'emoteSeq' | 'knownSeq' | 'knownEmoteSeq'>): boolean =>
-    state.knownSeq > state.seq || state.knownEmoteSeq > state.emoteSeq;
+// Whether an answer named a seq, an emote seq or a nudge count beyond what is held: a GET state is
+// due.
+export const isBehind = (state: Pick<FeedState, 'seq' | 'emoteSeq' | 'knownSeq' | 'knownEmoteSeq' | 'nudge' | 'knownNudge'>): boolean =>
+    state.knownSeq > state.seq || state.knownEmoteSeq > state.emoteSeq || state.knownNudge > state.nudge;
 
 // Two failures in a row read as reconnecting.
 export const feedMode = (state: Pick<FeedState, 'failures'>, realtime = false): FeedMode =>
@@ -276,7 +300,9 @@ export const feedMode = (state: Pick<FeedState, 'failures'>, realtime = false): 
 
 // Whether a realtime message (public only) leaves the viewer's own part stale, so one GET state is
 // due: a new hand they are dealt into (their cards), their seat or role changed, the config moved,
-// or the people did (names and looks travel beside the wire, versioned by peopleV).
+// the people did (names and looks travel beside the wire, versioned by peopleV), the hand they were
+// dealt into has just completed (who they may ask to see their cards), or their seat now holds a
+// different count of cards face down than they hold (a card thrown away for them).
 export const needsPrivate = (view: PlayerView | null, wire: WireView): boolean => {
     if (!view) return true;
     if (wire.configV !== view.configV || wire.peopleV !== view.peopleV) return true;
@@ -284,6 +310,11 @@ export const needsPrivate = (view: PlayerView | null, wire: WireView): boolean =
     const mine = seat === -1 ? null : seat;
     if (mine !== view.me.seat) return true;
     if (mine !== null && wire.hand && wire.hand.no !== view.hand?.no) return wire.seats[mine]!.cards !== 'none' || wire.seats[mine]!.state === 'folded';
+    if (wire.hand && view.hand && wire.hand.no === view.hand.no && view.me.hole !== null) {
+        if (wire.hand.phase === 'complete' && view.hand.phase !== 'complete') return true;
+        const cards = mine === null ? null : wire.seats[mine]!.cards;
+        if (typeof cards === 'number' && cards !== view.me.hole.length) return true;
+    }
     return false;
 };
 
@@ -298,8 +329,15 @@ export const VISITOR_REFRESH_MS = 12_000;
 export const handLive = (view: Pick<TableView, 'hand'> | null): boolean => !!view?.hand && view.hand.phase !== 'complete';
 
 // Whether the action is at most `within` live seats before the viewer's: the polls come faster then.
+// In Triple T's throw-away everyone dealt in is near: they throw at once, the first to act after it
+// is on the clock the moment the last card goes, and a card the deadline threw for the viewer is
+// theirs to see as soon as can be.
 export const nearTurn = (view: Pick<TableView, 'hand' | 'seats'> | null, mySeat: number | null, within = 2): boolean => {
     const hand = view?.hand;
+    if (hand?.phase === 'discard' && mySeat !== null) {
+        const mine = view!.seats[mySeat];
+        return !!mine && mine.cards !== 'none';
+    }
     if (!hand || hand.phase !== 'betting' || hand.actor === null || mySeat === null) return false;
     const n = view.seats.length;
     let steps = 0;
@@ -312,16 +350,23 @@ export const nearTurn = (view: Pick<TableView, 'hand' | 'seats'> | null, mySeat:
     return false;
 };
 
-export type PollInput = {mode: FeedMode; hidden: boolean; inHand: boolean; nearTurn: boolean; failures: number; scale: number};
+// Whether the viewer may be asked to see their cards, or wait on an answer of their own: the hand
+// they were dealt into is complete (its result shows until the next deal, which ends every ask). The
+// polls come faster then, since an ask has only that pause to be seen and answered in — over a
+// healthy channel the viewer's own channel's nudge says it at once.
+export const askWindow = (view: Pick<PlayerView, 'hand' | 'me'> | null): boolean =>
+    !!view && view.me.hole !== null && view.hand !== null && view.hand.phase === 'complete';
+
+export type PollInput = {mode: FeedMode; hidden: boolean; inHand: boolean; nearTurn: boolean; failures: number; scale: number; asks?: boolean};
 
 // The wait before the next GET state, or null to pause (a hidden page polls nothing; becoming
 // visible fetches at once). Every wait is at least `scale` (POKER_NIGHT_POLL_MS).
-export const nextPollDelay = ({mode, hidden, inHand, nearTurn: near, failures, scale}: PollInput): number | null => {
+export const nextPollDelay = ({mode, hidden, inHand, nearTurn: near, failures, scale, asks = false}: PollInput): number | null => {
     if (hidden) return null;
     let delay: number;
     if (failures > 0) delay = Math.min(1500 * 2 ** failures, 10_000);
     else if (mode === 'realtime') delay = 20_000;
-    else if (inHand && near) delay = 1500;
+    else if ((inHand && near) || asks) delay = 1500;
     else if (inHand) delay = 3000;
     else delay = 4000;
     return Math.max(delay, Number.isFinite(scale) ? scale : 0);
@@ -340,7 +385,7 @@ export const pollPace = (transport: Transport, state: Pick<FeedState, 'seq' | 'p
 export const readAgain = ({again, whole, state}: {
     again: boolean;
     whole: boolean;
-    state: Pick<FeedState, 'seq' | 'privateSeq' | 'emoteSeq' | 'knownSeq' | 'knownEmoteSeq'>;
+    state: Pick<FeedState, 'seq' | 'privateSeq' | 'emoteSeq' | 'knownSeq' | 'knownEmoteSeq' | 'nudge' | 'knownNudge'>;
 }): boolean => again || isBehind(state) || (whole && state.privateSeq < state.seq);
 
 // ── the clock ──
