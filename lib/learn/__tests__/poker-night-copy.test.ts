@@ -306,6 +306,7 @@ describe('the games', () => {
             nextHand: () => MODES.map(MODE_COPY.nextHand),
             nextHandIn: () => MODES.flatMap((mode) => [1, 5, 99].map((s) => MODE_COPY.nextHandIn(mode, s))),
             changed: () => SPOKEN.map(MODE_COPY.changed),
+            boardsValue: () => [1, 2, 3].map(MODE_COPY.boardsValue),
         });
     });
 
@@ -319,6 +320,9 @@ describe('the games', () => {
         expect(MODE_COPY.nextHandIn('PLO', 4)).toBe('Next hand: PLO, in 4 s');
         expect(MODE_COPY.nextHand(MODE_COPY.short.holdem)).toBe("Next hand: Texas hold'em");
         expect(MODE_COPY.changed('Pot-limit Omaha')).toBe('New game from this hand: Pot-limit Omaha.');
+        expect([1, 2, 3].map(MODE_COPY.boardsValue)).toEqual(['One board', '2 boards', '3 boards']);
+        expect(MODE_COPY.boardsLabel).toBe('Boards');
+        expect(MODE_COPY.boardsHint).toBe('Each board is played on its own, and the pot is split evenly between them.');
         // The names are the glossary's.
         expect(MODE_COPY.spoken.holdem).toBe(GLOSSARY['texas-holdem'].term);
         expect(MODE_COPY.spoken.plo).toBe(GLOSSARY.omaha.term);
@@ -493,6 +497,18 @@ describe('the table', () => {
             leaveBodyInHand: () => each(TABLE_COPY.leaveBodyInHand),
             netTonight: () => signedNs.map(TABLE_COPY.netTonight),
             ghostLabel: () => named((name) => [0, 8].map((seat) => TABLE_COPY.ghostLabel(name, seat))),
+            boardName: () => [0, 1, 2].map(TABLE_COPY.boardName),
+            boardOf: () => [0, 1, 2].flatMap((k) => [HAND_COPY.noBoard, HAND_COPY.cardsSpoken(cards('AsKh7c'))].map((spoken) => TABLE_COPY.boardOf(k, spoken))),
+            bannerBoard: () => named((name) => [0, 1, 2].flatMap((k) => NS.map((n) => TABLE_COPY.bannerBoard(k, name, n)))),
+            bannerBoardYou: () => [0, 1, 2].flatMap((k) => NS.map((n) => TABLE_COPY.bannerBoardYou(k, n))),
+            bannerBoardSplit: () => [0, 1, 2].flatMap((k) => [NAMES.slice(0, 2), NAMES.slice(0, 3)].flatMap((players) => [false, true].map((me) => {
+                const parts = players.map((name, i) => ({name: me && i === 1 ? null : name, amount: NS[i % NS.length]}));
+                const text = TABLE_COPY.bannerBoardSplit(k, parts);
+                for (const p of parts) if (p.name !== null) expect(text).toContain(isolate(p.name));
+                return text;
+            }))),
+            bannerScoop: () => named((name) => NS.map((n) => TABLE_COPY.bannerScoop(name, n))),
+            bannerScoopYou: () => each(TABLE_COPY.bannerScoopYou),
         });
     });
 
@@ -513,6 +529,18 @@ describe('the table', () => {
         expect(TABLE_COPY.sitAgain).toBe('Sit down again');
         expect(TABLE_COPY.lobby).toBe('Poker night lobby');
         expect(TABLE_COPY.foldedHand).toBe('Your hand, folded');
+    });
+
+    it('names the boards and their banner lines as the table prints them', () => {
+        expect(TABLE_COPY.boardName(1)).toBe('Board 2');
+        expect(TABLE_COPY.boardOf(2, 'ace of spades')).toBe('Board 3: ace of spades');
+        expect([TABLE_COPY.boardsZoom, TABLE_COPY.boardsSheet]).toEqual(['See the boards larger', 'The boards']);
+        expect(plain(TABLE_COPY.bannerBoard(1, 'Ana', 600))).toBe('Board 2: Ana wins 600');
+        expect(TABLE_COPY.bannerBoardYou(0, 300)).toBe('Board 1: you win 300');
+        expect(plain(TABLE_COPY.bannerBoardSplit(0, [{name: 'Ana', amount: 400}, {name: 'Ben', amount: 200}]))).toBe('Board 1: Ana 400 and Ben 200');
+        expect(plain(TABLE_COPY.bannerBoardSplit(2, [{name: 'Ana', amount: 400}, {name: null, amount: 399}]))).toBe('Board 3: Ana 400 and you 399');
+        expect(plain(TABLE_COPY.bannerScoop('Ana', 1800))).toBe('Ana wins every board: 1,800');
+        expect(TABLE_COPY.bannerScoopYou(1800)).toBe('You win every board: 1,800');
     });
 
     it('reads as the table prints it', () => {
@@ -619,6 +647,9 @@ describe('the cards', () => {
             cardShort: () => ALL_CARDS.map(HAND_COPY.cardShort),
             cardsSpoken: () => [[], cards('As'), cards('AsKh'), cards('AsKh7c2d9s')].map(HAND_COPY.cardsSpoken),
             cardsShort: () => [cards('As'), cards('AsKh7c2d9s')].map(HAND_COPY.cardsShort),
+            kind: () => everyDescription().map(HAND_COPY.kind),
+            onBoardsShort: () => [[hand('AsKsQsJsTs'), hand('Ah9d7c4s2d')], [hand('KhKd7c7s2d'), hand('Ah9h7h4h2h'), hand('2c3d4h5s6c')]].map((ds) => HAND_COPY.onBoardsShort(ds.map(HAND_COPY.kind))),
+            onBoardsSpoken: () => [[hand('AsKsQsJsTs'), hand('Ah9d7c4s2d')], [hand('KhKd7c7s2d'), hand('Ah9h7h4h2h'), hand('2c3d4h5s6c')]].map((ds) => HAND_COPY.onBoardsSpoken(ds.map(HAND_COPY.label))),
         });
         expect(new Set(ALL_CARDS.map(HAND_COPY.card)).size).toBe(52);
         expect(new Set(ALL_CARDS.map(HAND_COPY.cardShort)).size).toBe(52);
@@ -633,6 +664,10 @@ describe('the cards', () => {
         expect(HAND_COPY.cardsShort(cards('AsKh'))).toBe(`A${glyph(3)} K${glyph(2)}`);
         expect(HAND_COPY.rankShort).toEqual(['2', '3', '4', '5', '6', '7', '8', '9', '10', 'J', 'Q', 'K', 'A']);
         expect(HAND_COPY.faceDown).toBe('Face-down card');
+        // A hand's kind alone, and the dock's line with two or three boards.
+        expect([hand('AsKsQsJsTs'), hand('KsQsJsTs9s'), hand('KhKd7c7s2d'), hand('Ah9d7c4s2d')].map(HAND_COPY.kind)).toEqual(['Royal flush', 'Straight flush', 'Two pair', 'High card']);
+        expect(HAND_COPY.onBoardsShort(['Flush', 'Pair', 'Straight'])).toBe('1 Flush · 2 Pair · 3 Straight');
+        expect(HAND_COPY.onBoardsSpoken(['Flush, ace high', 'Pair of kings'])).toBe('Board 1: Flush, ace high; board 2: Pair of kings');
     });
 });
 
@@ -645,7 +680,7 @@ describe('the hand log', () => {
         covers(LOG_COPY, {
             hand: () => each(LOG_COPY.hand),
             blinds: () => NS.flatMap((ante) => pairs((sb, bb) => LOG_COPY.blinds(sb, bb, ante))),
-            street: () => (['flop', 'turn', 'river'] as const).map((street) => LOG_COPY.street(street, HAND_COPY.cardsShort(cards('AsKh7c')))),
+            street: () => (['flop', 'turn', 'river'] as const).flatMap((street) => [null, 0, 2].map((board) => LOG_COPY.street(street, HAND_COPY.cardsShort(cards('AsKh7c')), board))),
             line: () => [
                 ...named((name) => ENTRY_KINDS.filter((kind) => kind !== 'void').flatMap((kind) =>
                     flags.flatMap((allIn) => flags.flatMap((timedOut) => NS.map((n) => LOG_COPY.line(name, kind, n, allIn, timedOut)))))),
@@ -654,12 +689,13 @@ describe('the hand log', () => {
             shows: () => named((name) => phrases.map((phrase) => LOG_COPY.shows(name, HAND_COPY.cardsShort(cards('AsKs')), phrase))),
             youHeld: () => [LOG_COPY.youHeld(HAND_COPY.cardsShort(cards('AsKs')))],
             showedYou: () => named((name) => [LOG_COPY.showedYou(name, HAND_COPY.cardsShort(cards('AsKs')))]),
-            wins: () => named((name) => NS.flatMap((n) => phrases.flatMap((phrase) => pots.map((pot) => LOG_COPY.wins(name, n, phrase, pot))))),
-            split: () => pots.flatMap((pot) => [NAMES.slice(0, 2), NAMES].map((players) => {
-                const text = LOG_COPY.split(players.map((name, i) => ({name, amount: NS[i % NS.length]})), pot);
+            wins: () => named((name) => NS.flatMap((n) => phrases.flatMap((phrase) => pots.flatMap((pot) => [null, 0, 2].map((board) => LOG_COPY.wins(name, n, phrase, pot, board)))))),
+            split: () => pots.flatMap((pot) => [NAMES.slice(0, 2), NAMES].flatMap((players) => [null, 1].map((board) => {
+                const text = LOG_COPY.split(players.map((name, i) => ({name, amount: NS[i % NS.length]})), pot, board);
                 for (const name of players) expect(text).toContain(isolate(name));
                 return text;
-            })),
+            }))),
+            onBoards: () => [[phrases[1], phrases[2]], [phrases[1], null, phrases[2]]].map(LOG_COPY.onBoards),
             uncontested: () => named((name) => NS.map((n) => LOG_COPY.uncontested(name, n))),
             refund: () => named((name) => NS.map((n) => LOG_COPY.refund(name, n))),
             playsBoard: () => named(LOG_COPY.playsBoard),
@@ -681,6 +717,12 @@ describe('the hand log', () => {
         expect(LOG_COPY.line('Ana', 'void', 3000, false)).toBe('The hand is called off.');
         expect(LOG_COPY.blinds(10, 20, 5)).toBe('Blinds 10/20, ante 5');
         expect(LOG_COPY.street('flop', HAND_COPY.cardsShort(cards('AsKh7c')))).toBe(`Flop: A${glyph(3)} K${glyph(2)} 7${glyph(0)}`);
+        // Two or three boards: a line for each board, a share of each pot on each board.
+        expect(LOG_COPY.street('turn', HAND_COPY.cardsShort(cards('2d')), 1)).toBe(`Turn, board 2: 2${glyph(1)}`);
+        expect(plain(LOG_COPY.wins('Ana', 600, twoPair, null, 1))).toBe('Board 2: Ana wins 600 with two pair, kings and sevens.');
+        expect(plain(LOG_COPY.wins('Ben', 50, null, 1, 0))).toBe('Board 1: Ben wins 50 from side pot 1.');
+        expect(plain(LOG_COPY.split([{name: 'Ana', amount: 51}, {name: 'Ben', amount: 50}], null, 2))).toBe('Board 3, split pot: Ana takes 51, Ben takes 50.');
+        expect(LOG_COPY.onBoards(['a flush, ace high', 'a pair of kings'])).toBe('on board 1 a flush, ace high; on board 2 a pair of kings');
         // Every showdown shows every live hand: there is no line for a hand that is not shown.
         expect(Object.keys(LOG_COPY)).not.toContain('mucks');
     });
@@ -694,9 +736,10 @@ describe('the announcements', () => {
             timeLow: () => [1, 5, 10].map(ANNOUNCE_COPY.timeLow),
             dealt: () => [ANNOUNCE_COPY.dealt([parseCard('As')!, parseCard('Kh')!]), ANNOUNCE_COPY.dealt([parseCard('2c')!, parseCard('2d')!]), ANNOUNCE_COPY.dealt(cards('AhAcKsQd'))],
             newGame: () => VARIANTS.flatMap((v) => [1, 2, 3].map((b) => ANNOUNCE_COPY.newGame(MODE_COPY.spokenLabel(v, b)))),
-            street: () => [ANNOUNCE_COPY.street('flop', cards('AsKh7c')), ANNOUNCE_COPY.street('river', cards('2d'))],
+            street: () => [ANNOUNCE_COPY.street('flop', cards('AsKh7c')), ANNOUNCE_COPY.street('river', cards('2d')), ANNOUNCE_COPY.street('turn', cards('2d'), 2)],
+            youWinBoard: () => [0, 2].flatMap((board) => NS.flatMap((n) => [null, HAND_COPY.phrase(hand('Ah9h7h4h2h'))].map((phrase) => ANNOUNCE_COPY.youWinBoard(board, n, phrase)))),
             move: () => named((name) => ENTRY_KINDS.filter((kind) => kind !== 'void').map((kind) => ANNOUNCE_COPY.move(name, kind, 40, false))),
-            wins: () => named((name) => [ANNOUNCE_COPY.wins(name, 1200, null)]),
+            wins: () => named((name) => [ANNOUNCE_COPY.wins(name, 1200, null), ANNOUNCE_COPY.wins(name, 600, 'a flush, ace high', null, 1)]),
             split: () => [ANNOUNCE_COPY.split(NAMES.map((name) => ({name, amount: 50})))],
             uncontested: () => named((name) => [ANNOUNCE_COPY.uncontested(name, 300)]),
             youWin: () => NS.flatMap((n) => [null, HAND_COPY.phrase(hand('Ah9h7h4h2h'))].map((phrase) => ANNOUNCE_COPY.youWin(n, phrase))),
@@ -715,6 +758,8 @@ describe('the announcements', () => {
         expect(ANNOUNCE_COPY.dealt([parseCard('As')!, parseCard('Kh')!])).toBe('You have the ace of spades and the king of hearts.');
         expect(ANNOUNCE_COPY.street('flop', cards('AsKh7c'))).toBe('Flop: ace of spades, king of hearts and seven of clubs.');
         expect(ANNOUNCE_COPY.youWin(1200, 'a flush, ace high')).toBe('You win 1,200 with a flush, ace high.');
+        expect(ANNOUNCE_COPY.youWinBoard(1, 600, 'a flush, ace high')).toBe('Board 2: you win 600 with a flush, ace high.');
+        expect(ANNOUNCE_COPY.street('flop', cards('AsKh7c'), 2)).toBe('Flop, board 3: ace of spades, king of hearts and seven of clubs.');
         expect(plain(ANNOUNCE_COPY.move('Ana', 'call', 40, false))).toBe('Ana calls 40.');
     });
 });

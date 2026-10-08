@@ -10,7 +10,7 @@
 // 40 Hz and 8 kHz, the whole sound over within 1.2 s (sounds.test holds each one). Sound is never
 // the only cue for anything: everything it marks is drawn, and the live regions say it.
 
-import {UNIT_MS, type CardTiming, type StreamChip} from '@/lib/poker-night/choreography';
+import {UNIT_MS, type CardTiming, type SplitFlight, type StreamChip} from '@/lib/poker-night/choreography';
 import type {TableEvent} from '@/lib/poker-night/events';
 
 export const SOUND_IDS = ['deal', 'chip', 'check', 'fold', 'win', 'turn', 'pop', 'splat', 'fizz', 'bounce', 'request', 'ask'] as const;
@@ -115,6 +115,7 @@ export type CueAnim = {
     still?: boolean;
     cards?: CardTiming[];
     bannerAt?: number;
+    splits?: SplitFlight[];
     streams?: StreamChip[];
 };
 
@@ -124,8 +125,8 @@ export type Cue = {key: string; sound: SoundId; at: number};
 
 // The sounds the table's animations make, each at the moment its animation does: a card for each
 // card dealt, turned or shown, a chip for each bet, sweep and refund, a knock for a check, a swish
-// for a fold, a pop for a player sitting down; a win's arpeggio as its banner drops, a click for
-// each chip of the pot's stream. A result the table had already shown (still) is silent; the
+// for a fold, a pop for a player sitting down; a win's arpeggio as its banner drops, a chip for each
+// pot's share flying to its board (two or three boards), a click for each chip of a stream. A result the table had already shown (still) is silent; the
 // viewer's turn is the room's own (useTableSounds), not an animation.
 export const soundCues = (anims: readonly CueAnim[]): Cue[] => {
     const out: Cue[] = [];
@@ -156,6 +157,7 @@ export const soundCues = (anims: readonly CueAnim[]): Cue[] => {
                 break;
             case 'win':
                 out.push({key: `${a.id}:win`, sound: 'win', at: at(a.bannerAt ?? a.at)});
+                (a.splits ?? []).forEach((s) => out.push({key: `${a.id}:split:${s.key}`, sound: 'chip', at: at(s.at)}));
                 (a.streams ?? []).forEach((s) => out.push({key: `${a.id}:${s.key}`, sound: 'chip', at: at(s.at)}));
                 break;
             default:

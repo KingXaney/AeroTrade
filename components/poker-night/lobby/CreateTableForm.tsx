@@ -10,6 +10,7 @@ import {
     type TableForm,
 } from "@/lib/poker-night/lobby";
 import ActionButton from "@/components/primitives/ActionButton";
+import BoardsChoice from "@/components/poker-night/BoardsChoice";
 import GameChoice from "@/components/poker-night/GameChoice";
 import RebuyChoice from "@/components/poker-night/RebuyChoice";
 import MicroLabel from "@/components/primitives/MicroLabel";
@@ -17,7 +18,7 @@ import Switch from "@/components/primitives/Switch";
 import TextField, {fieldClass} from "@/components/primitives/TextField";
 
 // A table set up before anyone sits down (the lobby's "Set it up first"): its game (GameChoice:
-// Texas hold'em or PLO), its name, the blinds,
+// Texas hold'em or PLO, and PLO's one to three boards, BoardsChoice), its name, the blinds,
 // the starting chips, the seats, the rebuy policy (Off / On, RebuyChoice), the turn timer and whether friends see it in
 // their lobby. Every choice is one lib/poker-night/lobby offers within the config's limits; the
 // config is checked here with lib/poker-night/config before it is sent, and again by the action.
@@ -67,6 +68,7 @@ const CreateTableForm = ({hostName}: {hostName: string}) => {
                 <MicroLabel as="p">{MODE_COPY.gameLabel}</MicroLabel>
                 <GameChoice value={form.variant} onChange={(variant) => set('variant', variant)} hook="game"/>
             </div>
+            {form.variant === 'plo' && <BoardsChoice variant={form.variant} value={form.boards} onChange={(boards) => set('boards', boards)} hook="boards"/>}
             <div className="space-y-1.5">
                 <MicroLabel as="label" htmlFor={field('name')}>{POKER_NIGHT_COPY.tableName}</MicroLabel>
                 <TextField id={field('name')} font="body" className="h-11 w-full" value={name} maxLength={TABLE_LIMITS.tableName}

@@ -80,8 +80,8 @@ describe('the cues', () => {
         expect(cues.every((c) => c.sound === 'deal')).toBe(true);
         expect(new Set(cues.map((c) => c.key)).size).toBe(6);
         const win: TableEvent = {
-            ...base, id: '7:win', kind: 'win', pots: [{pot: 0, amount: 100, winners: [{seat: 1, share: 100}]}], totals: [{seat: 1, amount: 100}],
-            uncontested: false, big: false, fresh: true,
+            ...base, id: '7:win', kind: 'win', pots: [{pot: 0, board: 0, amount: 100, winners: [{seat: 1, share: 100}]}], boards: 1, totals: [{seat: 1, amount: 100}],
+            uncontested: false, big: false, fresh: true, revealMs: 3000,
         };
         const paid = scheduleBatch([win]).items.map((s) => ({...s, offset: 0}));
         const winCues = soundCues(paid);
@@ -91,7 +91,7 @@ describe('the cues', () => {
     });
 
     it('stay silent for a result already shown, a turn and a seat given up', () => {
-        const still: TableEvent = {...base, id: '7:win', kind: 'win', pots: [], totals: [], uncontested: true, big: false, fresh: false};
+        const still: TableEvent = {...base, id: '7:win', kind: 'win', pots: [], boards: 1, totals: [], uncontested: true, big: false, fresh: false, revealMs: 1500};
         const anims = scheduleBatch([still, {...base, id: '7:turn', kind: 'turn', seat: 0, turn: 3, mine: true}, {...base, id: 'l', kind: 'leave', seat: 2, pid: 'p'}])
             .items.map((s) => ({...s, offset: 0}));
         expect(soundCues(anims)).toEqual([]);

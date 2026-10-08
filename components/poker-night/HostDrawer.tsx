@@ -1,7 +1,7 @@
 'use client';
 
 // The host's controls, in their drawer, one section at a time:
-// - Game: the game itself (Texas hold'em or PLO, GameChoice), the blinds, the ante, the starting
+// - Game: the game itself (Texas hold'em or PLO, GameChoice; PLO's one to three boards, BoardsChoice), the blinds, the ante, the starting
 //   chips and the chip cap, the turn timer;
 // - Rebuys: the policy (Off / On, the host approving: RebuyChoice), the rebuys per player, and the
 //   requests for chips waiting for the host (the bank's own rows);
@@ -31,6 +31,7 @@ import TextField, {fieldClass} from "@/components/primitives/TextField";
 import {iconButton} from "@/components/primitives/iconButton";
 import {RequestsPanel} from "@/components/poker-night/BankPanel";
 import LookPicker from "@/components/poker-night/LookPicker";
+import BoardsChoice from "@/components/poker-night/BoardsChoice";
 import GameChoice from "@/components/poker-night/GameChoice";
 import RebuyChoice from "@/components/poker-night/RebuyChoice";
 import {Drawer, MiniAvatar, PlayerName} from "@/components/poker-night/overlay-kit";
@@ -129,6 +130,7 @@ const GameSection = () => {
                 <MicroLabel as="p">{MODE_COPY.gameLabel}</MicroLabel>
                 <GameChoice value={form.variant} onChange={(variant) => set('variant', variant)} hook="host-game"/>
             </div>
+            {form.variant === 'plo' && <BoardsChoice variant={form.variant} value={form.boards} onChange={(boards) => set('boards', boards)} hook="host-boards"/>}
             <div className="space-y-2">
                 <MicroLabel as="p">{HOST_COPY.blinds}</MicroLabel>
                 <div className="flex flex-wrap gap-1.5">

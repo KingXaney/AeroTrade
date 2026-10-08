@@ -47,6 +47,19 @@ export const CARD_RATIO = 1.4;
 export const BOARD_GAP: Record<Fit, number> = {tight: 2, compact: 3, comfortable: 6};
 export const BOARD_CARD_MAX: Record<Fit, number> = {tight: 40, compact: 46, comfortable: 66};
 export const BOARD_CARD_MIN = 18;
+// Two or three boards (PLO): the gap between two boards one over another, and side by side; a
+// board's numeral (.pn-board-label: its width, its height and the gap to its board); how far down a
+// cascade's next board starts, as a share of a card's height — the share of a card above it left in
+// sight, which holds the face's rank and corner suit (INDEX_BAND, app/globals.css .pn-card-rank and
+// .pn-card-corner); and the narrowest card several boards are dealt at (MULTI_BOARD_MIN — the boards
+// sheet, components/poker-night/BoardsSheet, shows them at BOARDS_SHEET_CARD whatever the table).
+export const BOARD_ROW_GAP: Record<Fit, number> = {tight: 3, compact: 4, comfortable: 8};
+export const BOARD_SIDE_GAP: Record<Fit, number> = {tight: 6, compact: 8, comfortable: 16};
+export const BOARD_LABEL: Record<Fit, Box & {gap: number}> = {tight: {w: 12, h: 14, gap: 2}, compact: {w: 14, h: 16, gap: 3}, comfortable: {w: 18, h: 20, gap: 4}};
+export const CASCADE_STEP = 0.62;
+export const INDEX_BAND = 0.58;
+export const MULTI_BOARD_MIN = 14;
+export const BOARDS_SHEET_CARD = 44;
 // The room kept between a plate and what it carries, and around the board and the pot.
 const GAP = 2;
 const PAD = 2;
@@ -80,6 +93,13 @@ export type SeatPlace = {
     button: Px; // where the dealer button sits when this seat has it
 };
 
+// How a hand's boards lie together: one board in its row; two or three (PLO) one over another
+// (stack), side by side (side), or each lower one over the foot of the one above, which keeps every
+// card's index in sight (cascade). labels: each board's numeral in a column at its left.
+export type BoardArrangement = 'row' | 'stack' | 'side' | 'cascade';
+// One board's own row of five (its centre and size) and where its numeral sits, when it has one.
+export type BoardPlace = Rect & {index: number; label: Px | null};
+
 export type Stage = {
     box: Box;
     orientation: Orientation;
@@ -90,7 +110,12 @@ export type Stage = {
     // The felt: the rectangle the plates' centres run round, so every plate straddles its rail.
     felt: {left: number; top: number; width: number; height: number};
     centre: Px;
-    board: Rect & {card: Box; gap: number};
+    // The boards together, as one block (with its numerals): what the pots, the banner, the notes and
+    // the emotes keep clear of and anchor to. One board: its own row.
+    // handsClear: several boards placed clear of every hand of four that may turn up (all but the
+    // seated viewer's own), as they are wherever that keeps their cards BOARD_CARD_MIN or wider.
+    board: Rect & {card: Box; gap: number; arrangement: BoardArrangement; labels: boolean; handsClear: boolean};
+    boards: BoardPlace[];
     pot: Rect;
     // Nowhere clear for the pot (only on the smallest boxes): it sits on the board's top edge.
     potOnBoard: boolean;
@@ -117,12 +142,15 @@ const unit = (from: Px, to: Px): Px => {
 // at the top or the bottom.
 // When that way is blocked, the bet line tries straight toward the middle, then straight up or
 // down toward it.
-const raysOf = (spot: SeatSpot, plate: Px, centre: Px): Px[] => {
+// With several boards on a phone the bet lines that go straight in (or toward the middle from a seat
+// at the top) cut the middle band the boards need, so a second layout (`along`) sends every seat's
+// line straight up or down first: a side seat's along its rail, a top seat's straight under it.
+const raysOf = (spot: SeatSpot, plate: Px, centre: Px, along = false): Px[] => {
     const toMiddle = unit(plate, centre);
     const vertical = {x: 0, y: plate.y <= centre.y ? 1 : -1};
-    if (spot.side === 'left') return [{x: 1, y: 0}, toMiddle, vertical];
-    if (spot.side === 'right') return [{x: -1, y: 0}, toMiddle, vertical];
-    return [toMiddle, vertical];
+    if (spot.side === 'left') return along ? [vertical, {x: 1, y: 0}, toMiddle] : [{x: 1, y: 0}, toMiddle, vertical];
+    if (spot.side === 'right') return along ? [vertical, {x: -1, y: 0}, toMiddle] : [{x: -1, y: 0}, toMiddle, vertical];
+    return along ? [vertical, toMiddle] : [toMiddle, vertical];
 };
 
 // Where a rectangle sent along a ray from `from` first clears `own` (1 px steps).
@@ -186,53 +214,158 @@ const widestAt = (cx: number, y: number, box: Box, obstacles: readonly Rect[], g
     return Math.floor(lo);
 };
 
-export const stageLayout = (box: Box, seatCount: number, mySeat: number | null): Stage => {
-    const orientation = stageOrientation(box);
-    const fit = fitFor(box);
-    const plateSize = PLATE_SIZE[fit];
-    const betSize = BET[fit];
-    const buttonSize = BUTTON[fit];
+// The block of `n` boards in an arrangement, their cards `cw` wide: its size, and each board's centre
+// and numeral as offsets from the block's centre. A board is five cards and four gaps wide and a card
+// tall; its numeral, when the block has them, sits in a column at its left — level with the board,
+// or in a cascade level with the index band the next board leaves in sight.
+type BlockPlace = {dx: number; dy: number; label: Px | null};
+export const boardBlock = (arrangement: BoardArrangement, n: number, cw: number, fit: Fit, labels: boolean): {w: number; h: number; places: BlockPlace[]} => {
     const gap = BOARD_GAP[fit];
-    const centre = spotToPx(CENTRE, box, plateSize);
-    const spots = seatSpots(seatCount, orientation);
-
-    // Plates first; then each seat's bet line, the viewer's first and on round the table, clear of
-    // every plate and the bet lines before it; then the buttons, clear of all of those.
-    const placed = spots.map((_, seat) => {
-        const slot = visualSlot(seat, mySeat, spots.length);
-        const spot = spots[slot];
-        const plate = spotToPx(spot, box, plateSize);
-        const dirs = raysOf(spot, plate, centre);
-        return {seat, slot, spot, plate, dirs, dir: dirs[0]};
-    });
-    const bySlot = [...placed].sort((a, b) => a.slot - b.slot);
-    const plates = placed.map((p) => rect(p.plate, plateSize));
-    const reach = Math.min(box.w, box.h) * 0.2;
-    const bets: Rect[] = new Array(placed.length);
-    for (const p of bySlot) {
-        bets[p.seat] = rect(placeAlong(p.plate, p.dirs, betSize, plates[p.seat], [...plates, ...bets.filter(Boolean)], box, reach), betSize);
+    const ch = Math.round(cw * CARD_RATIO);
+    const bw = 5 * cw + 4 * gap;
+    if (arrangement === 'row' || n <= 1) return {w: bw, h: ch, places: [{dx: 0, dy: 0, label: null}]};
+    const L = BOARD_LABEL[fit];
+    const lab = labels ? L.w + L.gap : 0;
+    const rowW = lab + bw;
+    const places: BlockPlace[] = [];
+    if (arrangement === 'side') {
+        const w = n * rowW + (n - 1) * BOARD_SIDE_GAP[fit];
+        for (let k = 0; k < n; k++) {
+            const left = -w / 2 + k * (rowW + BOARD_SIDE_GAP[fit]);
+            places.push({dx: left + lab + bw / 2, dy: 0, label: labels ? {x: left + L.w / 2, y: 0} : null});
+        }
+        return {w, h: ch, places};
     }
-    const buttons: Rect[] = new Array(placed.length);
-    for (const p of bySlot) {
-        const avoid = [...plates, ...bets, ...buttons.filter(Boolean)];
-        buttons[p.seat] = rect(placeButton(p.plate, bets[p.seat], p.dir, plateSize, buttonSize, avoid, box), {w: buttonSize, h: buttonSize});
+    const step = arrangement === 'stack' ? ch + BOARD_ROW_GAP[fit] : ch * CASCADE_STEP;
+    const h = ch + (n - 1) * step;
+    for (let k = 0; k < n; k++) {
+        const top = -h / 2 + k * step;
+        const labelY = arrangement === 'stack' || k === n - 1 ? top + ch / 2 : top + Math.max(L.h, ch * INDEX_BAND) / 2;
+        places.push({dx: lab / 2, dy: top + ch / 2, label: labels ? {x: -rowW / 2 + L.w / 2, y: labelY} : null});
     }
-    const seats: SeatPlace[] = placed.map((p) => ({
-        seat: p.seat, slot: p.slot, spot: p.spot, plate: p.plate,
-        bet: {x: bets[p.seat].x, y: bets[p.seat].y}, button: {x: buttons[p.seat].x, y: buttons[p.seat].y},
-    }));
-    const obstacles = [...plates, ...bets, ...buttons];
+    return {w: rowW, h, places};
+};
 
-    // The board: the widest cards anywhere in the band around the middle; among widths within a
-    // pixel of the widest, the row nearest the middle.
-    const rows: {w: number; y: number}[] = [];
-    for (let y = box.h * 0.25; y <= box.h * 0.75; y += 2) rows.push({y, w: widestAt(centre.x, y, box, obstacles, gap, BOARD_CARD_MIN, BOARD_CARD_MAX[fit])});
-    const widest = Math.max(0, ...rows.map((r) => r.w));
-    const chosen = widest > 0
-        ? rows.filter((r) => r.w >= widest - 1).sort((a, b) => Math.abs(a.y - centre.y) - Math.abs(b.y - centre.y))[0]
-        : {y: centre.y, w: BOARD_CARD_MIN};
+// The widest whole-pixel card (from min up to max) whose block, centred at (cx, y), sits inside the
+// box, on the felt (its rail included) and clear of every obstacle; 0 when not even the smallest does.
+const widestBlock = (
+    cx: number, y: number, box: Box, felt: Pick<Stage, 'felt'>, obstacles: readonly Rect[],
+    arrangement: BoardArrangement, n: number, fit: Fit, labels: boolean, min: number, max: number,
+): number => {
+    const fits = (cw: number): boolean => {
+        const b = boardBlock(arrangement, n, cw, fit, labels);
+        const r = {x: cx, y, w: b.w, h: b.h};
+        const span = feltSpan(felt, y - b.h / 2, b.h, 0);
+        return insideBox(r, box) && span !== null && cx - b.w / 2 >= span[0] && cx + b.w / 2 <= span[1] && obstacles.every((o) => !overlaps(r, o, PAD));
+    };
+    if (!fits(min)) return 0;
+    if (fits(max)) return max;
+    let lo = min;
+    let hi = max;
+    while (hi - lo > 1) {
+        const mid = Math.floor((lo + hi) / 2);
+        if (fits(mid)) lo = mid;
+        else hi = mid;
+    }
+    return lo;
+};
+
+// The narrowest card a block of boards keeps its numerals at: in a cascade, where the step from one
+// board to the next is a numeral's height or more, so the numerals never touch; else the smallest.
+const labelsFrom = (arrangement: BoardArrangement, fit: Fit): number => {
+    let cw = MULTI_BOARD_MIN;
+    if (arrangement === 'cascade') while (Math.round(cw * CARD_RATIO) * CASCADE_STEP < BOARD_LABEL[fit].h) cw++;
+    return cw;
+};
+
+// Where a block that fits nowhere goes: at the height in the band where it covers least — a plate or
+// a button weighing a hundred times a bet line's square pixel — the nearest the middle among equals.
+const fallbackY = (box: Box, centre: Px, obstacles: readonly Rect[], weights: readonly number[], block: Box): number => {
+    let best = {y: centre.y, cost: Infinity};
+    for (let y = box.h * 0.25; y <= box.h * 0.75; y += 1) {
+        const r = {x: centre.x, y, w: block.w, h: block.h};
+        if (!insideBox(r, box)) continue;
+        let cost = 0;
+        obstacles.forEach((o, i) => {
+            const ox = Math.min(r.x + r.w / 2, o.x + o.w / 2) - Math.max(r.x - r.w / 2, o.x - o.w / 2);
+            const oy = Math.min(r.y + r.h / 2, o.y + o.h / 2) - Math.max(r.y - r.h / 2, o.y - o.h / 2);
+            if (ox > 0 && oy > 0) cost += weights[i] * ox * oy;
+        });
+        if (cost < best.cost || (cost === best.cost && Math.abs(y - centre.y) < Math.abs(best.y - centre.y))) best = {y, cost};
+    }
+    return best.y;
+};
+
+// Several boards' arrangements, in the order a tie goes: one over another, side by side, cascaded.
+const MULTI_ORDER: readonly BoardArrangement[] = ['stack', 'side', 'cascade'];
+// Within this many pixels of the widest card, the earlier arrangement, the numerals and the middle win;
+// the numerals win outright while they keep the cards this share of the widest or more.
+const MULTI_TIE = 1;
+export const LABELS_SHARE = 0.92;
+
+// Where the board (or the boards) and the pot go, round the plates, bet lines and buttons.
+type BoardsPlaced = Pick<Stage, 'board' | 'boards' | 'pot' | 'potOnBoard'>;
+const placeBoards = (
+    box: Box, fit: Fit, centre: Px, felt: Pick<Stage, 'felt'>, obstacles: readonly Rect[], weights: readonly number[], hands: readonly Rect[], n: number,
+): BoardsPlaced => {
+    const gap = BOARD_GAP[fit];
+    let arrangement: BoardArrangement = 'row';
+    let labels = false;
+    let handsClear = false;
+    let chosen: {w: number; y: number};
+    if (n <= 1) {
+        // The board: the widest cards anywhere in the band around the middle; among widths within a
+        // pixel of the widest, the row nearest the middle.
+        const rows: {w: number; y: number}[] = [];
+        for (let y = box.h * 0.25; y <= box.h * 0.75; y += 2) rows.push({y, w: widestAt(centre.x, y, box, obstacles, gap, BOARD_CARD_MIN, BOARD_CARD_MAX[fit])});
+        const widest = Math.max(0, ...rows.map((r) => r.w));
+        chosen = widest > 0
+            ? rows.filter((r) => r.w >= widest - 1).sort((a, b) => Math.abs(a.y - centre.y) - Math.abs(b.y - centre.y))[0]
+            : {y: centre.y, w: BOARD_CARD_MIN};
+    } else {
+        // Several boards: the widest cards of every arrangement, with and without their numerals, at
+        // every height in the band; within MULTI_TIE of the widest, by MULTI_ORDER, the numerals, then
+        // nearest the middle — clear of every hand of four that may turn up too, unless that alone
+        // deals them under BOARD_CARD_MIN where without it they would be larger (`handsClear` says
+        // which). Nowhere at all (seven seats or more on the smallest phone on its side, as one board
+        // at eight): cascaded at the smallest, where it covers least of the bet lines, the hands and the
+        // dealer button, never a plate (fallbackY).
+        type Try = {arrangement: BoardArrangement; labels: boolean; y: number; w: number};
+        const search = (avoid: readonly Rect[]): Try | null => {
+            const tries: Try[] = [];
+            for (const a of MULTI_ORDER) for (const l of [true, false]) {
+                const min = l ? labelsFrom(a, fit) : MULTI_BOARD_MIN;
+                for (let y = box.h * 0.25; y <= box.h * 0.75 && min <= BOARD_CARD_MAX[fit]; y += 2) {
+                    const w = widestBlock(centre.x, y, box, felt, avoid, a, n, fit, l, min, BOARD_CARD_MAX[fit]);
+                    if (w > 0) tries.push({arrangement: a, labels: l, y, w});
+                }
+            }
+            const widest = Math.max(0, ...tries.map((t) => t.w));
+            // The numerals are worth a little of the cards' size: the banner and the log name the boards.
+            const labelled = Math.max(0, ...tries.filter((t) => t.labels).map((t) => t.w));
+            const pool = labelled >= widest * LABELS_SHARE ? tries.filter((t) => t.labels && t.w >= labelled - MULTI_TIE) : tries.filter((t) => t.w >= widest - MULTI_TIE);
+            return pool.sort((a, b) =>
+                MULTI_ORDER.indexOf(a.arrangement) - MULTI_ORDER.indexOf(b.arrangement) || Number(b.labels) - Number(a.labels)
+                || Math.abs(a.y - centre.y) - Math.abs(b.y - centre.y) || b.w - a.w)[0] ?? null;
+        };
+        const clear = search([...obstacles, ...hands]);
+        const loose = clear && clear.w >= BOARD_CARD_MIN ? null : search(obstacles);
+        const pick = clear && (!loose || clear.w >= BOARD_CARD_MIN || clear.w >= loose.w) ? clear : loose;
+        handsClear = pick !== null && pick === clear;
+        arrangement = pick?.arrangement ?? 'cascade';
+        labels = pick?.labels ?? false;
+        chosen = pick ?? {
+            y: fallbackY(box, centre, [...obstacles, ...hands], [...weights, ...hands.map(() => 10)], boardBlock('cascade', n, MULTI_BOARD_MIN, fit, false)),
+            w: MULTI_BOARD_MIN,
+        };
+    }
     const card = {w: chosen.w, h: Math.round(chosen.w * CARD_RATIO)};
-    const board = {x: centre.x, y: chosen.y, w: 5 * card.w + 4 * gap, h: card.h, card, gap};
+    const block = boardBlock(arrangement, n, card.w, fit, labels);
+    const board = {x: centre.x, y: chosen.y, w: block.w, h: block.h, card, gap, arrangement, labels, handsClear};
+    const boards: BoardPlace[] = block.places.map((p, index) => ({
+        index, x: board.x + p.dx, y: board.y + p.dy, w: 5 * card.w + 4 * gap, h: card.h,
+        label: p.label && {x: board.x + p.label.x, y: board.y + p.label.y},
+    }));
 
     // The pot: just over the board where it fits, else just under it, else a little further out;
     // failing all of those, on the board's top edge.
@@ -251,13 +384,71 @@ export const stageLayout = (box: Box, seatCount: number, mySeat: number | null):
         const r = rect(p, potSize);
         return insideBox(r, box) && against.every((o) => !overlaps(r, o, PAD));
     }) ?? null;
-    const potOnBoard = potAt === null;
+    return {board, boards, pot: rect(potAt ?? {x: board.x, y: board.y - board.h / 2}, potSize), potOnBoard: potAt === null};
+};
 
-    return {
-        box, orientation, fit, plateSize, betSize, buttonSize,
-        felt: {left: plateSize.w / 2, top: plateSize.h / 2, width: Math.max(0, box.w - plateSize.w), height: Math.max(0, box.h - plateSize.h)},
-        centre, board, pot: rect(potAt ?? {x: board.x, y: board.y - board.h / 2}, potSize), potOnBoard, seats,
-    };
+// The plates, bet lines and buttons of a table, its board (or boards: `boards`, PLO's one to three)
+// and pot. With several boards, a second layout sends the side seats' bet lines along their rails
+// (raysOf) and is kept when it deals the boards larger.
+export const stageLayout = (box: Box, seatCount: number, mySeat: number | null, boards = 1): Stage => {
+    const n = Math.max(1, Math.min(3, Math.round(boards)));
+    if (n === 1) return layoutStage(box, seatCount, mySeat, 1, false);
+    const straight = layoutStage(box, seatCount, mySeat, n, false);
+    const along = layoutStage(box, seatCount, mySeat, n, true);
+    return along.board.card.w > straight.board.card.w && apart(along) ? along : straight;
+};
+
+// Every plate, bet line and dealer button clear of the others: a layout whose bet lines found their
+// place (along the rail there may be none).
+const apart = (stage: Stage): boolean => {
+    const rects = stage.seats.flatMap((p) => [rect(p.plate, stage.plateSize), rect(p.bet, stage.betSize), rect(p.button, {w: stage.buttonSize, h: stage.buttonSize})]);
+    return rects.every((a, i) => rects.every((b, j) => j <= i || !overlaps(a, b)));
+};
+
+const layoutStage = (box: Box, seatCount: number, mySeat: number | null, n: number, along: boolean): Stage => {
+    const orientation = stageOrientation(box);
+    const fit = fitFor(box);
+    const plateSize = PLATE_SIZE[fit];
+    const betSize = BET[fit];
+    const buttonSize = BUTTON[fit];
+    const centre = spotToPx(CENTRE, box, plateSize);
+    const spots = seatSpots(seatCount, orientation);
+
+    // Plates first; then each seat's bet line, the viewer's first and on round the table, clear of
+    // every plate and the bet lines before it; then the buttons, clear of all of those.
+    const placed = spots.map((_, seat) => {
+        const slot = visualSlot(seat, mySeat, spots.length);
+        const spot = spots[slot];
+        const plate = spotToPx(spot, box, plateSize);
+        const dirs = raysOf(spot, plate, centre, along);
+        return {seat, slot, spot, plate, dirs, dir: dirs[0]};
+    });
+    const bySlot = [...placed].sort((a, b) => a.slot - b.slot);
+    const plates = placed.map((p) => rect(p.plate, plateSize));
+    const reach = Math.min(box.w, box.h) * 0.2;
+    const bets: Rect[] = new Array(placed.length);
+    for (const p of bySlot) {
+        bets[p.seat] = rect(placeAlong(p.plate, p.dirs, betSize, plates[p.seat], [...plates, ...bets.filter(Boolean)], box, reach), betSize);
+    }
+    const buttons: Rect[] = new Array(placed.length);
+    for (const p of bySlot) {
+        const avoid = [...plates, ...bets, ...buttons.filter(Boolean)];
+        // Along the rail, the button sits across the way the line actually went out.
+        const dir = along ? unit(p.plate, bets[p.seat]) : p.dir;
+        buttons[p.seat] = rect(placeButton(p.plate, bets[p.seat], dir, plateSize, buttonSize, avoid, box), {w: buttonSize, h: buttonSize});
+    }
+    const seats: SeatPlace[] = placed.map((p) => ({
+        seat: p.seat, slot: p.slot, spot: p.spot, plate: p.plate,
+        bet: {x: bets[p.seat].x, y: bets[p.seat].y}, button: {x: buttons[p.seat].x, y: buttons[p.seat].y},
+    }));
+    const obstacles = [...plates, ...bets, ...buttons];
+    // What covering each weighs, where boards fit nowhere: a plate or a button a hundred bet lines.
+    const weights = [...plates.map(() => 100), ...bets.map(() => 1), ...buttons.map(() => 100)];
+    // Several boards (PLO) keep clear of the hands of four that may turn up too: every seat's but the
+    // seated viewer's own, whose cards are in the dock.
+    const hands = n > 1 ? placed.filter((p) => mySeat === null || p.slot !== 0).map((p) => shownHandRect(p, {plateSize, fit}, 4)) : [];
+    const felt = {left: plateSize.w / 2, top: plateSize.h / 2, width: Math.max(0, box.w - plateSize.w), height: Math.max(0, box.h - plateSize.h)};
+    return {box, orientation, fit, plateSize, betSize, buttonSize, felt, centre, ...placeBoards(box, fit, centre, {felt}, obstacles, weights, hands, n), seats};
 };
 
 // ── the winner's banner ──
@@ -708,15 +899,15 @@ export const POT_CLEAR = 3;
 // The felt's rail at its widest (.pn-felt's border, clamp(6px, 1.4vmin, 14px)): a pill lies inside it.
 export const FELT_RAIL = 14;
 
-// The felt inside its rail across the band [top, top + h]: the span a rectangle that tall may take and
-// lie on it — a stadium (rounded-full) is widest at its middle, so the narrower of the band's two
+// The felt inside its rail (or `rail` in from its edge) across the band [top, top + h]: the span a
+// rectangle that tall may take and lie on it — a stadium (rounded-full) is widest at its middle, so the narrower of the band's two
 // edges. Null when the band leaves the felt.
-export const feltSpan = (stage: Pick<Stage, 'felt'>, top: number, h: number): Span | null => {
+export const feltSpan = (stage: Pick<Stage, 'felt'>, top: number, h: number, rail: number = FELT_RAIL): Span | null => {
     const f = stage.felt;
-    const left = f.left + FELT_RAIL;
-    const right = f.left + f.width - FELT_RAIL;
-    const up = f.top + FELT_RAIL;
-    const down = f.top + f.height - FELT_RAIL;
+    const left = f.left + rail;
+    const right = f.left + f.width - rail;
+    const up = f.top + rail;
+    const down = f.top + f.height - rail;
     if (right <= left || top < up || top + h > down) return null;
     const wide = right - left >= down - up;
     const r = Math.min(right - left, down - up) / 2;
@@ -1052,3 +1243,11 @@ export const potCentre = (plan: PotPlan, pot: number): Px => {
 // keeps to the space it is given (it scrolls inside itself rather than overflow), so it never flips by
 // itself: opened down from a lower plate it would sit over the dock, its last rows cut off.
 export const menuSide = (place: Pick<SeatPlace, 'plate'>, stage: Pick<Stage, 'centre'>): 'top' | 'bottom' => (place.plate.y > stage.centre.y ? 'top' : 'bottom');
+
+// Where a board's share of the pots gathers on its way to the board's winners (choreography's
+// splits and streams, two or three boards): its numeral, else its left end.
+export const boardAnchor = (stage: Pick<Stage, 'boards' | 'board'>, board: number): Px => {
+    const place = stage.boards[board];
+    if (!place) return {x: stage.board.x, y: stage.board.y};
+    return place.label ?? {x: place.x - place.w / 2, y: place.y};
+};

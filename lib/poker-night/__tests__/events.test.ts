@@ -106,7 +106,7 @@ describe('a hand, step by step', () => {
         expect(kinds(end)).toEqual(['fold', 'fold', 'refund', 'win']);
         expect(only(end, 'refund')[0]).toMatchObject({seat: 1, amount: 100});
         // The refund took the bet line back to nothing: there is nothing left to sweep.
-        expect(only(end, 'win')[0]).toMatchObject({uncontested: true, big: false, pots: [{pot: 0, amount: 60, winners: [{seat: 1, share: 60}]}], totals: [{seat: 1, amount: 60}]});
+        expect(only(end, 'win')[0]).toMatchObject({uncontested: true, big: false, boards: 1, pots: [{pot: 0, board: 0, amount: 60, winners: [{seat: 1, share: 60}]}], totals: [{seat: 1, amount: 60}]});
     });
 
     it('sweeps a called bet on the river and reveals the showdown with the five cards that play', () => {
@@ -123,8 +123,11 @@ describe('a hand, step by step', () => {
         expect(reveal.hands.map((h) => h.seat).sort()).toEqual([0, 2]);
         const winner = reveal.hands.find((h) => h.winner)!;
         const board = cards('2c5d9hJs3c');
-        expect(winner.best.sort()).toEqual(bestFive([...board, ...cards('QsQd')], cards('QsQd')).cards.sort());
-        expect(only(end, 'win')[0]).toMatchObject({uncontested: false, fresh: true, pots: [{pot: 0, amount: 140}]});
+        expect(winner.best).toHaveLength(1);
+        expect(winner.best[0].sort()).toEqual(bestFive([...board, ...cards('QsQd')], cards('QsQd')).cards.sort());
+        expect(winner.values).toHaveLength(1);
+        expect(reveal.boards).toEqual([board]);
+        expect(only(end, 'win')[0]).toMatchObject({uncontested: false, fresh: true, boards: 1, revealMs: s.hand!.result!.revealMs, pots: [{pot: 0, board: 0, amount: 140}]});
     });
 });
 
@@ -220,5 +223,47 @@ describe('never twice', () => {
         expect(new Set(EVENT_KINDS).size).toBe(EVENT_KINDS.length);
         expect(EVENT_KINDS).toContain('street-sweep');
         expect(EVENT_KINDS).toContain('win');
+    });
+});
+
+describe('PLO on three boards', () => {
+    const HOLES = {0: 'JsTs4h5h', 1: '9c9d8h7h', 2: '6c6d2s3s'};
+    const BOARDS = ['AsKsQs2d3c', '9h9s4c4d5c', '8d8c7d7c2h'];
+
+    it('turns every board\'s cards each street, board by board, and pays each pot a share a board', () => {
+        let s = deal(three([1000, 1000, 1000], {variant: 'plo', boards: 3}), {holes: HOLES, boards: BOARDS});
+        s = moves(s, C, C);
+        const preflop = view(s);
+        s = moves(s, X);
+        const flop = diffViews(preflop, view(s));
+        const turned = only(flop, 'board');
+        expect(turned.map((e) => [e.id, e.board, e.street, e.from])).toEqual([
+            [`${s.hand!.no}:board:flop`, 0, 'flop', 0], [`${s.hand!.no}:board:flop:1`, 1, 'flop', 0], [`${s.hand!.no}:board:flop:2`, 2, 'flop', 0],
+        ]);
+        expect(turned.map((e) => e.cards)).toEqual(BOARDS.map((b) => cards(b).slice(0, 3)));
+        const before = view(s);
+        s = moves(s, X, X, X, X, X, X, X, X, X);
+        const end = diffViews(before, view(s, s.hand!.result!.completedAt));
+        expect(only(end, 'board').map((e) => `${e.street}:${e.board}`)).toEqual(['turn:0', 'turn:1', 'turn:2', 'river:0', 'river:1', 'river:2']);
+        const reveal = only(end, 'reveal')[0];
+        expect(reveal.boards).toEqual(BOARDS.map(cards));
+        expect(reveal.hands.every((h) => h.best.length === 3 && h.values.length === 3)).toBe(true);
+        const win = only(end, 'win')[0];
+        expect(win).toMatchObject({boards: 3, uncontested: false, revealMs: s.hand!.result!.revealMs});
+        expect(win.pots.map((p) => [p.pot, p.board, p.amount, p.winners])).toEqual([
+            [0, 0, 20, [{seat: 0, share: 20}]], [0, 1, 20, [{seat: 1, share: 20}]], [0, 2, 20, [{seat: 1, share: 20}]],
+        ]);
+        expect(win.totals).toEqual([{seat: 0, amount: 20}, {seat: 1, amount: 40}]);
+        // The ids hold whichever views they are read between.
+        const ids = end.map((e) => e.id);
+        expect(new Set(ids).size).toBe(ids.length);
+    });
+
+    it('pays an uncontested pot in one part, whatever the boards, the uncalled half of the big blind back first', () => {
+        let s = deal(three([1000, 1000, 1000], {variant: 'plo', boards: 3}), {holes: HOLES, boards: BOARDS});
+        const before = view(s);
+        s = moves(s, F, F);
+        const win = only(diffViews(before, view(s)), 'win')[0];
+        expect(win).toMatchObject({boards: 1, uncontested: true, pots: [{pot: 0, board: 0, amount: 20, winners: [{seat: 1, share: 20}]}]});
     });
 });

@@ -233,7 +233,9 @@ describe('the settings form', () => {
         // A form left on two boards sends one when the game is not PLO.
         expect(checkGameForm(plo, {...gameFormOf(plo), variant: 'holdem', boards: 2}, GAME_FIELDS)).toEqual({ok: true, patch: {variant: 'holdem'}});
         expect(checkGameForm(config, {...gameFormOf(config), variant: 'triple-t'}, GAME_FIELDS)).toEqual({ok: false, message: 'That game is not open at this table yet.'});
-        expect(checkGameForm(plo, {...gameFormOf(plo), boards: 2}, GAME_FIELDS)).toEqual({ok: false, message: 'That game is not open at this table yet.'});
+        // Two or three boards, PLO's alone.
+        expect(checkGameForm(plo, {...gameFormOf(plo), boards: 2}, GAME_FIELDS)).toEqual({ok: true, patch: {boards: 2}});
+        expect(checkGameForm(plo, {...gameFormOf(plo), boards: 3}, GAME_FIELDS)).toEqual({ok: true, patch: {boards: 3}});
     });
 
     it('turns down what the engine would, in the drawer\'s words', () => {

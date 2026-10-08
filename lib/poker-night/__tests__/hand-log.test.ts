@@ -150,3 +150,36 @@ describe('a hand shown to the viewer alone', () => {
         expect(twice.lines.filter((l) => l.text.includes('Shown to you'))).toHaveLength(1);
     });
 });
+
+describe('PLO on three boards', () => {
+    const HOLES = {0: 'JsTs4h5h', 1: '9c9d8h7h', 2: '6c6d2s3s'};
+    const BOARDS = ['AsKsQs2d3c', '9h9s4c4d5c', '8d8c7d7c2h'];
+    const plo = () => table({0: 1000, 1: 1000, 2: 1000}, {lastBigBlind: 0, config: {variant: 'plo', boards: 3}});
+
+    it('prints each street board by board, what each shown hand makes on each, and each board\'s share of the pot', () => {
+        const s = deal(plo(), {holes: HOLES, boards: BOARDS});
+        const {state, summary} = finish(s, C, C, X, X, X, X, X, X, X, X, X, X);
+        const view = publicView(state);
+        const nameOf = seatNamer((seat) => view.seats[seat]?.pid ?? null, people(3));
+        const log = currentHandLog(state.hand!.no, handLogView(state), view.hand!, view.hand!.result, nameOf);
+        const streets = log.lines.filter((l) => l.kind === 'street').map((l) => plain(l.text));
+        expect(streets).toEqual((['flop', 'turn', 'river'] as const).flatMap((street) => BOARDS.map((board, k) => {
+            const [from, to] = {flop: [0, 3], turn: [3, 4], river: [4, 5]}[street];
+            return LOG_COPY.street(street, HAND_COPY.cardsShort(cards(board).slice(from, to)), k);
+        })));
+        const shows = log.lines.filter((l) => l.kind === 'show').map((l) => plain(l.text));
+        expect(shows.find((t) => t.startsWith('P0'))).toBe(`P0 shows ${HAND_COPY.cardsShort(cards(HOLES[0]))}: on board 1 a royal flush; on board 2 a full house, fours full of fives; on board 3 a pair of eights.`);
+        const results = log.lines.filter((l) => l.kind === 'result').map((l) => plain(l.text));
+        expect(results).toEqual([
+            'Board 1: P0 wins 20 with a royal flush.',
+            'Board 2: P1 wins 20 with four of a kind, nines.',
+            'Board 3: P1 wins 20 with a full house, eights full of sevens.',
+        ]);
+        expect(log.lines.some((l) => l.kind === 'note' && plain(l.text).includes('plays the board'))).toBe(false);
+        expect(new Set(log.lines.map((l) => l.key)).size).toBe(log.lines.length);
+        // History reads the same.
+        const past = historyHandLog(historyView(summary, pidOf(0)), people(3), pidOf(0));
+        expect(past.lines.filter((l) => l.kind === 'result').map((l) => plain(l.text))).toEqual(results);
+        expect(past.lines.filter((l) => l.kind === 'street')).toHaveLength(9);
+    });
+});

@@ -514,9 +514,11 @@ details[open] > :not(summary) { animation: disclosure-in var(--motion-base) var(
     --pn-stack: 11px;
     --pn-chip: 12px;
     --pn-hole-w: 50px;
+    --pn-board-label-w: 14px;
+    --pn-board-label-h: 16px;
   }
-  .pn-room[data-pn-fit="tight"] { --pn-av: 22px; --pn-mini-w: 14px; --pn-show-w: 24px; --pn-name: 10px; --pn-stack: 10px; --pn-chip: 10px; --pn-hole-w: 44px; }
-  .pn-room[data-pn-fit="comfortable"] { --pn-av: 42px; --pn-mini-w: 24px; --pn-show-w: 40px; --pn-name: 13px; --pn-stack: 14px; --pn-chip: 18px; --pn-hole-w: 68px; --pn-amount: 13px; }
+  .pn-room[data-pn-fit="tight"] { --pn-av: 22px; --pn-mini-w: 14px; --pn-show-w: 24px; --pn-name: 10px; --pn-stack: 10px; --pn-chip: 10px; --pn-hole-w: 44px; --pn-board-label-w: 12px; --pn-board-label-h: 14px; }
+  .pn-room[data-pn-fit="comfortable"] { --pn-av: 42px; --pn-mini-w: 24px; --pn-show-w: 40px; --pn-name: 13px; --pn-stack: 14px; --pn-chip: 18px; --pn-hole-w: 68px; --pn-amount: 13px; --pn-board-label-w: 18px; --pn-board-label-h: 20px; }
   .pn-scene { position: absolute; inset: 0; z-index: 0; background: var(--pn-sky, var(--bg)); }
 
   /* Top bar (the overlays' own, fixed), the table, the dock. A phone on its side puts the dock in a
@@ -577,8 +579,9 @@ details[open] > :not(summary) { animation: disclosure-in var(--motion-base) var(
   .pn-centre-note { position: absolute; translate: -50% -50%; text-align: center; font-size: 13px; line-height: 1.35; }
 
   /* Seats: a plate centred on its spot (lib/poker-night/stage), the cards and tags around it. */
-  .pn-seats { position: absolute; inset: 0; margin: 0; padding: 0; list-style: none; }
-  .pn-seat { position: absolute; translate: -50% -50%; width: var(--pn-plate-w); height: var(--pn-plate-h); z-index: 2; }
+  /* The ring covers the table: only the seats themselves take a tap, so the boards under it keep theirs. */
+  .pn-seats { position: absolute; inset: 0; margin: 0; padding: 0; list-style: none; pointer-events: none; }
+  .pn-seat { position: absolute; translate: -50% -50%; width: var(--pn-plate-w); height: var(--pn-plate-h); z-index: 2; pointer-events: auto; }
   .pn-plate {
     position: relative;
     display: flex;
@@ -785,6 +788,18 @@ details[open] > :not(summary) { animation: disclosure-in var(--motion-base) var(
   .pn-card[data-state="win"] > .pn-card-inner { transform: translateY(-6px); box-shadow: 0 0 0 2px var(--rank-1); }
   .pn-slot { flex: none; width: var(--pn-card-w); height: var(--pn-card-h); border-radius: calc(var(--pn-card-w) * 0.12); border: 1.5px dashed var(--pn-felt-line); }
   .pn-board { position: absolute; display: flex; justify-content: center; translate: -50% -50%; }
+  /* PLO's two or three boards (components/poker-night/Board): each board's row where the stage put it,
+     a numeral at its left when there was room (lib/poker-night/stage BOARD_LABEL, per fit), the whole
+     block one button that opens them larger (BoardsSheet). A card that plays keeps its ring and glow but
+     does not lift, which would cover the board over it; in a cascade an empty place is filled with the
+     cloth, so the places of the board under it hide the foot of its own. */
+  .pn-board-set { position: absolute; inset: 0; pointer-events: none; }
+  .pn-board-set .pn-card[data-state="win"] > .pn-card-inner { transform: none; }
+  .pn-board-set[data-pn-arrangement="cascade"] .pn-slot { background: var(--pn-felt); }
+  .pn-board-label { position: absolute; translate: -50% -50%; display: grid; place-items: center; width: var(--pn-board-label-w); height: var(--pn-board-label-h); border-radius: 9999px; font-size: calc(var(--pn-board-label-h) - 5px); line-height: 1; font-weight: 700; }
+  .pn-boards-zoom { position: absolute; pointer-events: auto; border-radius: 6px; background: transparent; cursor: zoom-in; }
+  .pn-boards-zoom:focus-visible { outline: 2px solid var(--brand); outline-offset: 3px; }
+  .pn-sheet-board { display: flex; gap: 3px; }
 
   /* Chips: coloured discs from the chip set, a few short columns; the amount always beside them. */
   .pn-chips { display: inline-flex; align-items: flex-end; gap: 1px; }

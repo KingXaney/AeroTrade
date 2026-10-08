@@ -508,8 +508,8 @@ new fields, and the room remembers its last 40 action ids, from 64.
 
 ## PLO, one board (modes P5)
 
-**The game.** `config.ENABLED` opens PLO on one board (two and three boards, then Triple T, are
-later phases). Four cards each; a hand is exactly two of them with exactly three from the board
+**The game.** `config.ENABLED` opens PLO on one board (two and three boards came with P6; Triple T
+is a later phase). Four cards each; a hand is exactly two of them with exactly three from the board
 (`hand-name.bestOmaha`, through `variants.handValue` and `bestHand` — the engine picks winners and
 the page reads shown hands with the same functions), so one card of a suit in hand never makes a
 flush and a board never "plays". High only: the strongest hand takes the pot. A hand keeps its own
@@ -552,6 +552,80 @@ a pair of aces), and what the table does that the entries do not say.
 **The budgets, measured.** PLO's heaviest table (the same table with four-card hands, its short
 stacks in by pot raises): the state 14,878 bytes, the wire view 3,862 and its message 3,925; on it
 the room reads 26,886 per write and 29,537 in all — every figure within its budget.
+
+## PLO, two and three boards (modes P6)
+
+**The game.** `config.ENABLED` opens two and three boards, PLO's alone (`refineConfig`'s `plo-only`;
+a patch that names another game and no board count goes back to one, `mergeConfig`). Each board is
+dealt its own run of five at the deal and every board turns together, street by street, in the
+betting and in an all-in run-out. At a showdown each pot splits evenly between the boards
+(`pots.splitBoards`: the odd chips to board 1, then board 2) and each board's part goes to the
+strongest eligible hand on that board (`showdown`, through `variants.handValue`), an odd chip within a
+board to the first winner left of the button; a part of no chips (a pot of fewer chips than boards)
+names its winners and pays nothing. An uncontested hand pays one part, whatever the boards. A
+player's `wins` counts once a hand and `biggestWin` is the hand's total. The wire carries each paid
+pot's winners board by board (`PaidPotView.winners: number[][]`) and the page rebuilds every share
+with `pots.paidParts`, the server's own split. The result shows for 3 s, 1.2 s more for each side
+pot and a second for each board past the first (`config.revealMs`).
+
+**Picking it.** Under PLO, the start form and the host drawer's Game section show "Boards": One
+board, 2 boards, 3 boards, each a 44 px choice (`components/poker-night/BoardsChoice`, the choices
+`lobby.boardChoices`), with what more boards do in a line under them. The game's name carries its
+boards wherever it is said ("PLO · 3 boards", "Pot-limit Omaha, 3 boards").
+
+**Where the boards go.** `stage.stageLayout(box, seats, mySeat, boards)` lays one board out exactly as
+before. Two or three are one block: one over another (stack), side by side (side), or cascaded — each
+lower board over the foot of the one above, a card's height × `CASCADE_STEP` (0.62) down, so the
+rank and corner suit (the top `INDEX_BAND`, 0.58, of a card) of every card stay in sight — each
+board's numeral in a column at its left when there is room (`BOARD_LABEL`, per fit, held to the
+stylesheet). The search tries every arrangement with and without the numerals at every height in the
+band round the middle and keeps the widest cards (within a pixel: stack, then side, then cascade,
+the numerals, nearest the middle; the numerals outright while they keep the cards 92 % of the widest,
+`LABELS_SHARE`, since the banner and the log name the boards); the block lies on the felt, its rail included, and clears every
+plate, bet line and button — and every hand of four that may turn up (every seat's but the seated
+viewer's own, `stage.shownHandRect`), unless that alone deals the cards under 18 px where without
+it they would be larger (`board.handsClear` says which). A second layout sends every seat's bet line
+straight up or down first (a side seat's along its rail, a top seat's under its plate) and is kept
+when it deals the boards larger and keeps its own lines clear.
+
+The spike measured every phone's seat layer at every seat count, seated and watching: 19 px or more on
+every upright phone 360 px wide or more (26 up to seven seats), 16 px or more on a 320 px one (20 up
+to seven seats; 17 at 320 × 568 with nine), 20 px or more on a phone on its side (26 at 844 × 390 and
+24 at 667 × 375 with eight or nine seats), 60 on a desktop (66 at 1440 × 900) — pinned in
+`stage.test`, the boards clear of the hands everywhere but a few of the 320 px tables and the
+smallest phone on its side. There, 568 × 320, seven to nine seats leave the boards no room at all
+(as one board has none at eight and nine): they are cascaded at `MULTI_BOARD_MIN` (14 px) where
+they cover least of the bet lines, the hands and the dealer button (`fallbackY`), never a plate.
+Three boards are not capped at any seat count: on a phone the boards sheet carries them at 44 px.
+
+**On the felt.** One `.pn-board` a board where the stage put it (`data-pn-board-index`, each read
+aloud as "Board 2: …"), the numerals as pills, empty places as the cloth's dashed outlines (filled
+with the cloth in a cascade). A card that plays keeps its ring and glow but does not lift on two or
+three boards, which would cover the board over it. The whole block is one button, at least 44 px
+each way, that opens the boards sheet (`components/poker-night/BoardsSheet`): each board under its
+name at 44 px a card, the cards that play lit at a showdown and who won the board with what. The
+pots and the banner keep clear of the whole block. The seat ring takes taps on its seats alone
+(`.pn-seats` passes the rest through), so the block under it keeps its own.
+
+**The reveal.** Each street's cards turn board after board (`BOARD_TURN_GAP`); at a showdown the
+cards that play light board after board (`BOARD_LIFT_STAGGER`), a hole card with the first board it
+plays on (`reveal.liftBoardOf`). The banner says a line a board — "Board 2: Ana wins 600" over the
+board's largest winner's hand, or its chips player by player ("Board 1: Ana 400 and you 200") —
+and one line, with no hand, only when one player won every board's share of every pot ("Ana wins
+every board: 1,800"; a side pot someone else took keeps the lines). Each pot's shares first fly
+from its pill to each board's numeral (the board's left end without one), then each board's stream
+runs from there to its winners. A pay-out that would run past the result's showing plays faster,
+every time in proportion (the flights' own lengths too, `Scheduled.pace`), so it ends with it. The
+hand log prints each street board by board, a shown hand's name on each board and a line for each
+board's share of each pot; the screen reader hears the same. The dock names what the viewer's cards
+make on each board in one line ("1 Flush · 2 Pair · 3 Straight"), the names in full as its
+accessible name, so it keeps its height.
+
+**The budgets, measured.** PLO's heaviest table on three boards (every pot split three ways): the
+state 15,048 bytes, the wire view 3,936 and its message 3,999. The room read 27,056 bytes, over its
+27,000: the room now remembers its last 36 action ids (`KEEP.APPLIED`, from 40), so it reads 26,944
+per write and 29,595 in all. The wire keeps 500 bytes to spare, so the protocol and the wire's shape
+are unchanged (the compaction ladder's first step, the ledger as tuples, came with version 2).
 
 ## Engine rules
 

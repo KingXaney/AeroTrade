@@ -11,8 +11,9 @@
 import {useSyncExternalStore} from "react";
 import type {LeaveThen} from "@/lib/poker-night/overlays";
 
-// 'hands': the Hands guide (HandsDrawer), the H key's and the menu's.
-export type DrawerKind = 'invite' | 'bank' | 'host' | 'log' | 'look' | 'hands';
+// 'hands': the Hands guide (HandsDrawer), the H key's and the menu's; 'boards': PLO's two or three
+// boards larger (BoardsSheet), a tap on the boards'.
+export type DrawerKind = 'invite' | 'bank' | 'host' | 'log' | 'look' | 'hands' | 'boards';
 
 export type OverlayRequest =
     | {id: number; kind: 'drawer'; drawer: DrawerKind}

@@ -15,11 +15,11 @@
 // hand too. The same card elements stay mounted either way, so a deal's motion is never played twice.
 
 import type {KeyboardEvent} from "react";
-import {animsOf, animVars, type LiveAnim} from "@/components/poker-night/anim";
+import {animsOf, animVars, liftAtFor, type LiveAnim} from "@/components/poker-night/anim";
 import PlayingCard, {type CardMotion, type CardStateMotion} from "@/components/poker-night/PlayingCard";
 import {HAND_COPY, LOOKS_COPY, TABLE_COPY} from "@/lib/learn/copy/poker-night";
 import type {Card} from "@/lib/poker/cards";
-import {cardLook, type ResultLook} from "@/lib/poker-night/reveal";
+import {cardLook, liftBoardOf, type ResultLook} from "@/lib/poker-night/reveal";
 import {cn} from "@/lib/utils";
 
 type Props = {
@@ -64,8 +64,8 @@ const HoleCards = ({seat, hole, slots = 2, holding, folded = false, handNo, anim
         const state = mucked ? 'dim' : hidden ? null : cardLook(look, card);
         const stateMotion: CardStateMotion | null = mucked
             ? fold ? {cls: 'pn-dim', style: animVars(fold, fold.at)} : null
-            : reveal?.liftAt !== undefined && reveal && state ? {cls: state === 'win' ? 'pn-win-lift' : 'pn-dim', style: animVars(reveal, reveal.liftAt)} : null;
-        const glow = state === 'win' ? animVars(reveal ?? {offset: 0}, reveal?.liftAt ?? 0) : null;
+            : reveal?.liftAt !== undefined && reveal && state ? {cls: state === 'win' ? 'pn-win-lift' : 'pn-dim', style: animVars(reveal, liftAtFor(reveal, state, liftBoardOf(look, card)))} : null;
+        const glow = state === 'win' ? animVars(reveal ?? {offset: 0}, reveal ? liftAtFor(reveal, state, liftBoardOf(look, card)) : 0) : null;
         return <PlayingCard key={`${card}`} card={hidden ? null : card} sides="two" state={state} motion={motion} stateMotion={stateMotion} glow={glow}/>;
     }) : <span className="pn-slot opacity-0" aria-hidden="true"/>;
 

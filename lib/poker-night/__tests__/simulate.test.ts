@@ -1,11 +1,11 @@
 // Poker night's engine over seeded random nights. Each night is a random table — Texas hold'em or PLO
-// (pot limit), 2 to 9 seats, with or without an ante, either rebuy policy — played with random legal
+// (pot limit, on one to three boards), 2 to 9 seats, with or without an ante, either rebuy policy — played with random legal
 // moves, and between them players
 // sitting down, leaving (now, or after the hand in play — and taking that back), being removed,
 // sitting out and in, buying chips (once the first hand is dealt, a request the host approves,
 // declines or the player withdraws), setting pre-actions, showing cards, asking to see a folded or
 // uncontested hand and answering, turning asks off, and the host approving, pausing, resuming,
-// changing the config (the game too, from the next hand) and sitting players out; the lazy clock runs whatever falls due, dealing from a
+// changing the config (the game and PLO's boards too, from the next hand) and sitting players out; the lazy clock runs whatever falls due, dealing from a
 // seeded deck source. A leave after the hand sent just as a deal falls due — the race every page's
 // leave meets — is played out, never folded.
 //
@@ -19,8 +19,9 @@
 // from the state, so a cooldown the state lost is caught), the table's cooldowns and waiting asks
 // within the cap and "no asks" naming only seated players and the hand's; buys the room marks as made
 // with the host away landing at once; and the reducer never touched its frozen input. At every completed hand: the pots
-// match a chip-by-chip reference, add up to what was left in after the uncalled bet came back, and
-// each goes to the strongest eligible hands — in PLO by a brute force over every two hole cards with
+// match a chip-by-chip reference, add up to what was left in after the uncalled bet came back, each
+// splits evenly between the boards (the odd chips to the first), and each board's part goes to the
+// strongest eligible hands on that board — in PLO by a brute force over every two hole cards with
 // every three from the board — every seat leaving after it is empty, and the state
 // survives a JSON round trip into the stored shape. Across hands the
 // big blind moves one eligible seat on, so nobody pays it twice running and nobody twice in one
@@ -85,15 +86,18 @@ const randomConfig = (r: Random): GameConfig => {
         turnSeconds: TABLE_LIMITS.turnSeconds.min + r.int(TABLE_LIMITS.turnSeconds.max - TABLE_LIMITS.turnSeconds.min + 1),
         pauseSeconds: TABLE_LIMITS.pauseSeconds.min + r.int(TABLE_LIMITS.pauseSeconds.max - TABLE_LIMITS.pauseSeconds.min + 1),
         sitOutAfter: 1 + r.int(TABLE_LIMITS.sitOutAfter.max),
-        variant: r.pick(['holdem', 'holdem', 'plo'] as const),
+        ...(r.chance(0.35) ? {variant: 'plo' as const, boards: r.pick([1, 2, 3] as const)} : {variant: r.pick(['holdem', 'holdem', 'plo'] as const), boards: 1 as const}),
     };
 };
 
 // A config change the host might make; now and then one out of limits, which is refused.
 const randomPatch = (c: GameConfig, r: Random): Extract<HostOp, {op: 'config'}>['patch'] => {
     switch (r.int(9)) {
-        // The game, from the next hand: now and then one this deploy does not deal, or a second board, refused.
-        case 8: return r.chance(0.1) ? r.pick([{variant: 'triple-t' as const}, {variant: 'plo' as const, boards: 2 as const}, {boards: 3 as const}]) : {variant: r.pick(['holdem', 'plo'] as const)};
+        // The game, from the next hand — PLO on one to three boards — and now and then one this deploy
+        // does not deal, or a second board for a game other than PLO, refused.
+        case 8: return r.chance(0.1)
+            ? r.pick([{variant: 'triple-t' as const}, {variant: 'holdem' as const, boards: 2 as const}, {boards: 3 as const}])
+            : r.chance(0.4) ? {variant: 'plo' as const, boards: r.pick([1, 2, 3] as const)} : {variant: r.pick(['holdem', 'plo'] as const)};
         case 0: return {turnSeconds: r.chance(0.9) ? 15 + r.int(106) : 5};
         case 1: return {pauseSeconds: 3 + r.int(13)};
         case 2: return {sitOutAfter: 1 + r.int(5)};
@@ -278,7 +282,8 @@ const COUNTERS = ['hands', 'showdowns', 'sidePots', 'oddChips', 'runouts', 'time
     'pendingBuys', 'approved', 'configs', 'pres', 'shows', 'pauses', 'bigBlindChecks', 'legalChecks', 'hostSitOuts', 'hostSitOutsMidHand',
     'hostSitOutsAlreadyOut', 'leaveAfter', 'leaveAfterCancelled', 'leaveAfterCashOuts', 'leaveAfterRace', 'leaveAfterNow', 'buyRequests',
     'firstBuyIns', 'hostBuysAfterStart', 'withdrawn', 'declined', 'asks', 'asksShown', 'asksShownAll', 'asksNo', 'asksExpired', 'askCooldowns',
-    'asksOff', 'askLimits', 'asksFull', 'asksDealt', 'hostAwayBuys', 'ploHands', 'ploShowdowns', 'potLimitCaps', 'potLimitAllInRefused'] as const;
+    'asksOff', 'askLimits', 'asksFull', 'asksDealt', 'hostAwayBuys', 'ploHands', 'ploShowdowns', 'potLimitCaps', 'potLimitAllInRefused',
+    'multiBoardHands', 'multiBoardShowdowns', 'scoops', 'boardSplits'] as const;
 type Counters = Record<(typeof COUNTERS)[number], number>;
 
 const EVENTS = [
@@ -394,8 +399,11 @@ const night = (seed: number, counters: Counters) => {
             if (seat === -1 ? ENTRY_KINDS[kind] !== 'void' : !hand.seats.some((p) => p.seat === seat)) fail(`log entry for seat ${seat}`);
         }
         const cards = [...hand.deck.flat(), ...hand.seats.flatMap((p) => p.hole), ...hand.discards.map(([, card]) => card)];
-        if (!['holdem', 'plo'].includes(hand.variant) || hand.deck.length !== 1 || hand.deck[0].length !== 5 || hand.seats.some((p) => p.hole.length !== HOLE_CARDS[hand.variant])) {
-            fail(`not a one-board deal of ${hand.variant}`);
+        // Texas hold'em on one board, PLO on one to three; five cards a run.
+        const runs = hand.variant === 'plo' ? [1, 2, 3] : [1];
+        if (!['holdem', 'plo'].includes(hand.variant) || !runs.includes(hand.deck.length) || hand.deck.some((run) => run.length !== 5)
+            || hand.seats.some((p) => p.hole.length !== HOLE_CARDS[hand.variant])) {
+            fail(`not a deal of ${hand.variant} on ${hand.deck.length} boards`);
         }
         if (cards.some((card) => !Number.isInteger(card) || card < 0 || card > 51) || new Set(cards).size !== cards.length) fail('cards dealt twice or out of the deck');
         const boardSize = [0, 3, 4, 5][STREETS.indexOf(hand.street)];
@@ -461,16 +469,21 @@ const night = (seed: number, counters: Counters) => {
         const result = hand.result!;
         counters.hands++;
         if (hand.variant === 'plo') counters.ploHands++;
+        if (hand.boards.length > 1) counters.multiBoardHands++;
         const contribs = hand.seats.map((p) => ({seat: p.seat, amount: p.committed, folded: p.folded}));
         const live = hand.seats.filter((p) => !p.folded);
         const total = contribs.reduce((sum, c) => sum + c.amount, 0);
         const before = contribs.map((c) => (result.refund?.seat === c.seat ? {...c, amount: c.amount + result.refund.amount} : c));
         if (JSON.stringify(naiveUncalled(before)) !== JSON.stringify(result.refund)) fail(`refund ${JSON.stringify(result.refund)}`);
         if (result.pots.reduce((sum, pot) => sum + pot.amount, 0) !== total) fail(`pots ${JSON.stringify(result.pots)} hold other than the ${total} in`);
+        // A part a board at a showdown (one when paid uncontested), each with its winners and the shares
+        // the client's own split works out; the parts' chips the pot's, the odd chips to the first boards.
+        const parts = result.showdown ? hand.boards.length : 1;
         for (const pot of result.pots) {
-            // One board: one part, its winners, and the shares the client's own split works out.
-            if (pot.winners.length !== 1 || pot.shares.length !== 1 || pot.winners[0].length === 0 || pot.winners[0].length !== pot.shares[0].length
-                || pot.shares[0].reduce((a, b) => a + b, 0) !== pot.amount) fail(`pot ${JSON.stringify(pot)}`);
+            if (pot.winners.length !== parts || pot.shares.length !== parts || pot.winners.some((w, k) => w.length === 0 || w.length !== pot.shares[k].length)
+                || pot.shares.flat().reduce((a, b) => a + b, 0) !== pot.amount) fail(`pot ${JSON.stringify(pot)}`);
+            const each = pot.shares.map((s) => s.reduce((a, b) => a + b, 0));
+            if (each.some((n, k) => n !== Math.floor(pot.amount / parts) + (k < pot.amount % parts ? 1 : 0))) fail(`pot ${JSON.stringify(pot)} split between the boards unevenly`);
             if (JSON.stringify(paidParts(pot).map((part) => part.shares)) !== JSON.stringify(pot.shares)) fail(`pot ${JSON.stringify(pot)} split otherwise than paidParts`);
         }
         if (total > 0) {
@@ -478,7 +491,7 @@ const night = (seed: number, counters: Counters) => {
             if (!contribs.some((c) => c.amount === top && !c.folded)) fail('after the refund the top commitment is a folded seat\'s alone');
         }
         const won = new Map<number, number>();
-        for (const pot of result.pots) pot.winners[0].forEach((seat, i) => won.set(seat, (won.get(seat) ?? 0) + pot.shares[0][i]));
+        for (const pot of result.pots) pot.winners.forEach((board, k) => board.forEach((seat, i) => won.set(seat, (won.get(seat) ?? 0) + pot.shares[k][i])));
         const nets = hand.seats.map((p) => ({seat: p.seat, net: (won.get(p.seat) ?? 0) - p.committed}));
         if (JSON.stringify(nets) !== JSON.stringify(result.nets)) fail(`nets ${JSON.stringify(result.nets)}`);
         for (const e of hand.log) {
@@ -492,32 +505,45 @@ const night = (seed: number, counters: Counters) => {
             return;
         }
         counters.showdowns++;
-        const board = hand.boards[0];
-        if (board.length !== 5 || live.length < 2) fail('a showdown short of a board or a second player');
+        if (hand.boards.some((b) => b.length !== 5) || live.length < 2) fail('a showdown short of a board or a second player');
         if (hand.variant === 'plo') counters.ploShowdowns++;
+        if (hand.boards.length > 1) counters.multiBoardShowdowns++;
         const reference = naivePots(contribs);
         if (JSON.stringify(reference) !== JSON.stringify(result.pots.map(({amount, eligible}) => ({amount, eligible})))) {
             fail(`pots ${JSON.stringify(result.pots)}, chip by chip ${JSON.stringify(reference)}`);
         }
         if (result.pots.length > 1) counters.sidePots++;
-        const value = new Map(live.map((p) => [p.seat, naiveValue(hand.variant, p.hole, board)]));
+        // Each board on its own: its part of each pot to the strongest eligible hands on that board.
+        const values = hand.boards.map((board) => new Map(live.map((p) => [p.seat, naiveValue(hand.variant, p.hole, board)])));
         for (const pot of result.pots) {
             if (pot.eligible.length === 0) fail('a pot nobody can win');
-            const top = Math.max(...pot.eligible.map((seat) => value.get(seat)!));
-            const winners = pot.eligible.filter((seat) => value.get(seat) === top);
-            if (JSON.stringify(winners) !== JSON.stringify(pot.winners[0])) fail(`pot won by ${pot.winners}, the strongest are ${winners}`);
-            if (JSON.stringify(naiveShares(pot.amount, winners.length)) !== JSON.stringify(pot.shares[0])) fail(`shares ${pot.shares} of ${pot.amount}`);
-            if (new Set(pot.shares[0]).size > 1) counters.oddChips++;
+            const amounts = naiveShares(pot.amount, hand.boards.length);
+            hand.boards.forEach((_, k) => {
+                const value = values[k];
+                const top = Math.max(...pot.eligible.map((seat) => value.get(seat)!));
+                const winners = pot.eligible.filter((seat) => value.get(seat) === top);
+                if (JSON.stringify(winners) !== JSON.stringify(pot.winners[k])) fail(`pot won on board ${k} by ${pot.winners[k]}, the strongest are ${winners}`);
+                if (JSON.stringify(naiveShares(amounts[k], winners.length)) !== JSON.stringify(pot.shares[k])) fail(`shares ${pot.shares[k]} of ${amounts[k]} on board ${k}`);
+                if (new Set(pot.shares[k]).size > 1) counters.oddChips++;
+            });
+            if (hand.boards.length > 1) {
+                if (new Set(pot.winners.map((w) => JSON.stringify(w))).size > 1) counters.boardSplits++;
+                else if (pot.winners[0].length === 1) counters.scoops++;
+            }
         }
         if (JSON.stringify(result.hands.map((h) => h.seat).sort()) !== JSON.stringify(live.map((p) => p.seat).sort())) fail('not every live hand shown');
         for (const shown of result.hands) {
             const p = hand.seats.find((q) => q.seat === shown.seat)!;
-            const all = [...board, ...p.hole];
-            const read = readShown(hand.variant, hand.boards, shown).reads[0];
-            if (JSON.stringify(shown.cards) !== JSON.stringify(p.hole) || read.value !== value.get(shown.seat) || read.best.length !== 5 || new Set(read.best).size !== 5
-                || read.best.some((card) => !all.includes(card)) || evaluateCards(read.best) !== read.value) fail(`shown hand ${JSON.stringify(shown)}`);
-            // PLO: exactly two of the hole cards play.
-            if (hand.variant === 'plo' && read.best.filter((card) => p.hole.includes(card)).length !== 2) fail(`PLO hand ${JSON.stringify(shown)} plays other than two hole cards`);
+            const reads = readShown(hand.variant, hand.boards, shown).reads;
+            if (JSON.stringify(shown.cards) !== JSON.stringify(p.hole) || reads.length !== hand.boards.length) fail(`shown hand ${JSON.stringify(shown)}`);
+            hand.boards.forEach((board, k) => {
+                const read = reads[k];
+                const all = [...board, ...p.hole];
+                if (read.value !== values[k].get(shown.seat) || read.best.length !== 5 || new Set(read.best).size !== 5
+                    || read.best.some((card) => !all.includes(card)) || evaluateCards(read.best) !== read.value) fail(`shown hand ${JSON.stringify(shown)} on board ${k}`);
+                // PLO: exactly two of the hole cards play.
+                if (hand.variant === 'plo' && read.best.filter((card) => p.hole.includes(card)).length !== 2) fail(`PLO hand ${JSON.stringify(shown)} plays other than two hole cards`);
+            });
         }
     };
 

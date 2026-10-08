@@ -57,8 +57,15 @@
 // plate; no other context's answer or page carrying two cards of a hand of four; the raise panel's
 // Pot ("Raise to … (pot)") landing a raise to the server's cap, never an all-in; a check-down to a
 // showdown whose winner is QA's own Omaha brute force's, its hands of four turned up on every screen,
-// the banner clear of them and the lit cards two of the winner's and three of the board's; and the
-// host drawer's Game back to Texas hold'em, said by the countdown and a toast at the deal.
+// the banner clear of them and the lit cards two of the winner's and three of the board's; then
+// (P6) the host drawer's Boards (PLO only) to three boards from the next hand, said by a toast and
+// the top bar: three rows of five on every phone upright and on its side, inside the table, clear of
+// every plate and bet line, at or above the floors stage.test pins, the block a 44 px button that
+// opens the boards sheet (44 px cards under their names); a check-down whose every pot splits three
+// ways, each part to QA's own Omaha on its board, the page's paid pots rebuilt by pots.paidParts to
+// the server's shares, a banner line a board (one for a scoop) clear of the hands up, each board's
+// lit cards its winner's three, the hand log board by board; and the host drawer's Game back to
+// Texas hold'em, said by the countdown and a toast at the deal.
 //
 // Every surface at 390×844, 375×667, 320×568 and on its side at 844×390: nothing scrolls sideways,
 // every target is at least 44 px, nothing overlaps. The no-advice list (and the poker night copy's
@@ -2459,6 +2466,197 @@ try {
             await shot(p.page, `35-plo-showdown-${p.size ? sizeFile(p.size) : '1440'}`);
         }
 
+        // ═══ PLO on three boards (P6) ═══════════════════════════════════════════════════════════
+        // The host drawer's Boards choice, under PLO alone (One board, 2 boards, 3 boards, each 44 px),
+        // three boards from the next hand: three rows of five on every phone, upright and on its side,
+        // inside the table and clear of every plate and bet line, their cards at or above what the
+        // seat layers QA drives measure in stage.test (8 seats: 33 px at 390 × 844, 19 at 375 × 667, 16
+        // at 320 × 568, 26 and 24 on the phones on their side, 14 on the smallest, 60 on the desktop); a
+        // tap on them opens the boards sheet, each board at 44 px under its name. Played down to a
+        // showdown: each board's share of the pot to the hands QA's own Omaha finds strongest on that
+        // board, the page's paid pots the server's own split (pots.paidParts), and the banner a line a
+        // board — or one when a player won every board — clear of the hands turned up (and, but on the
+        // 320 px phone, the boards too), the lit cards on each board the winner's.
+        const {paidParts} = await lib('lib/poker-night/pots.ts');
+        let lastNo = handNo;
+        await H.page.click('[data-open="host"]');
+        await H.page.click('[data-host-tab="game"]');
+        await H.page.waitForSelector('[data-pn-choice="host-boards"]', {timeout: 10000});
+        const boardsM = await targets(H.page, '[data-pn-choice="host-boards"]');
+        const boardsAria = await H.page.$$eval('[data-pn-choice="host-boards"] [role="radio"]', (els) => els.map((el) => [el.getAttribute('aria-label'), el.getAttribute('aria-checked')]));
+        await H.page.click('[data-pn-choice="host-boards"] [data-pn-option="3"]');
+        await H.page.click('[data-host-section="game"] [data-host-save]');
+        const saved3 = await waitDoc((x) => x.state.config.boards === 3, 10000);
+        await shot(H.page, '37-plo-host-boards-1440');
+        await H.page.keyboard.press('Escape');
+        check('the host drawer offers PLO\'s boards under the game: "One board" (chosen), "2 boards", "3 boards", each 44 px; three are saved from the next hand',
+            targetsOk(boardsM) && boardsM.count === 3 && JSON.stringify(boardsAria) === JSON.stringify([[MODE_COPY.boardsValue(1), 'true'], [MODE_COPY.boardsValue(2), 'false'], [MODE_COPY.boardsValue(3), 'false']])
+            && saved3 !== null, JSON.stringify({m: brief(boardsM), boardsAria}));
+        await hostOp(H, {op: 'resume'});
+        d = await waitDoc((x) => x.state.hand?.no === handNo + 1 && x.state.hand.phase === 'betting', 30000);
+        const hand3 = d?.state.hand.no ?? handNo + 1;
+        lastNo = hand3;
+        check('…the next hand deals three runs of five: three boards, four cards each', d !== null && d.state.hand.variant === 'plo' && d.state.hand.deck.length === 3
+            && d.state.hand.deck.every((run) => run.length === 5) && d.state.hand.boards.length === 3 && d.state.hand.seats.every((p) => p.hole.length === 4), JSON.stringify(d?.state.hand.boards));
+        const toast3 = await toasted(guests[0].page, MODE_COPY.changed(MODE_COPY.spokenLabel('plo', 3)), 15000);
+        const bar3 = await guests[0].page.textContent('[data-pn-mode-label]').catch(() => null);
+        check(`…the deal toasts "${MODE_COPY.changed(MODE_COPY.spokenLabel('plo', 3))}" and the top bar says "${MODE_COPY.label('plo', 3)}"`, toast3 && bar3 === MODE_COPY.label('plo', 3), JSON.stringify({toast3, bar3}));
+
+        // The boards where the stage put them, as drawn.
+        const boardsOn = (p) => p.page.evaluate(() => {
+            const rect = (el) => el.getBoundingClientRect();
+            const hit = (a, b) => a.left < b.right - 1 && b.left < a.right - 1 && a.top < b.bottom - 1 && b.top < a.bottom - 1;
+            const table = rect(document.querySelector('.pn-table'));
+            const set = document.querySelector('.pn-board-set');
+            const boards = [...document.querySelectorAll('.pn-board')].map(rect);
+            const card = document.querySelector('.pn-board .pn-card, .pn-board .pn-slot');
+            const plates = [...document.querySelectorAll('[data-seat] .pn-plate')].map(rect);
+            const bets = [...document.querySelectorAll('.pn-bet')].map(rect).filter((r) => r.width > 0);
+            const zoom = document.querySelector('[data-pn-boards-zoom]');
+            return {
+                n: set?.getAttribute('data-pn-boards') ?? null, arrangement: set?.getAttribute('data-pn-arrangement') ?? null, count: boards.length,
+                cardW: card ? Math.round(rect(card).width) : 0,
+                inside: boards.every((r) => r.left >= table.left - 1 && r.right <= table.right + 1 && r.top >= table.top - 1 && r.bottom <= table.bottom + 1),
+                overPlates: boards.filter((r) => plates.some((q) => hit(r, q))).length, overBets: boards.filter((r) => bets.some((b) => hit(r, b))).length,
+                labels: document.querySelectorAll('.pn-board-label').length, zoom: zoom ? [Math.round(rect(zoom).width), Math.round(rect(zoom).height)] : null,
+                scroll: document.documentElement.scrollWidth - innerWidth,
+            };
+        });
+        const floorAt = (size) => ({'390×844': 33, '375×667': 19, '320×568': 16, '844×390': 26, '667×375': 24, '568×320': 14}[sizeName(size)] ?? 60);
+        const boardsOk = (m, size) => m.n === '3' && m.count === 3 && m.cardW >= floorAt(size) && m.inside && m.overPlates === 0 && m.overBets === 0
+            && m.zoom !== null && m.zoom[0] >= 44 && m.zoom[1] >= 44 && m.scroll <= 0;
+        // The flop out on every screen: three boards of three cards.
+        const flopTurn = await (async () => {
+            for (let guard = 0; guard < 12; guard++) {
+                const {doc, actor} = await nextTurn(hand3);
+                if (!actor || doc.state.hand.street !== 'preflop') return doc;
+                const turn = doc.state.turn;
+                await clickMove(actor, 'call');
+                await waitMoved(turn, hand3);
+            }
+            return roomDoc();
+        })();
+        check('…called round to the flop: every board three cards', flopTurn.state.hand.boards.every((b) => b.length === 3), JSON.stringify(flopTurn.state.hand.boards));
+        const flopped = (p) => p.page.waitForFunction(() => [...document.querySelectorAll('.pn-board')].filter((el) => el.getAttribute('data-pn-board') === '3').length === 3
+            && !document.querySelector('.pn-board [data-anim="board"]'), null, {timeout: 20000}).catch(() => {});
+        for (const p of all) await flopped(p);
+        for (const g of guests) {
+            const m = await boardsOn(g);
+            const layout = await tableLayout(g.page);
+            check(`three boards at ${sizeName(g.size)}: inside the table, clear of every plate and bet line, cards ${m.cardW} px (at least ${floorAt(g.size)}), the block a 44 px button, the table laid out`,
+                boardsOk(m, g.size) && layoutOk(layout), JSON.stringify({m, layout}));
+            await shot(g.page, `ui-20-plo-3boards-${sizeFile(g.size)}`);
+            const side = {width: g.size.height, height: g.size.width};
+            await resize(g.page, side);
+            const ms = await boardsOn(g);
+            const ls = await tableLayout(g.page);
+            check(`…and on its side at ${sizeName(side)}: cards ${ms.cardW} px (at least ${floorAt(side)}), inside, clear, the table laid out`,
+                boardsOk(ms, side) && layoutOk(ls), JSON.stringify({ms, ls}));
+            await shot(g.page, `ui-20-plo-3boards-${sizeFile(side)}`);
+            await resize(g.page, g.size);
+        }
+        const desk = await boardsOn(H);
+        check(`…and on the desktop: three boards stacked side by side or cascaded at ${desk.cardW} px (at least 60), each with its numeral`,
+            boardsOk(desk, {width: 1440, height: 900}) && desk.labels === 3, JSON.stringify(desk));
+        await shot(H.page, 'ui-20-plo-3boards-1440');
+
+        // The boards sheet: a tap on the boards on the 320 px phone.
+        const small = guests.find((g) => g.size.width === 320) ?? guests[0];
+        await small.page.click('[data-pn-boards-zoom]');
+        await small.page.waitForSelector('[data-pn-drawer="boards"]', {timeout: 10000});
+        await sleep(500);
+        const sheet = await small.page.evaluate(() => {
+            const rows = [...document.querySelectorAll('[data-pn-drawer="boards"] .pn-sheet-board')];
+            return {
+                rows: rows.length, places: rows.map((r) => r.children.length), cards: rows.map((r) => r.querySelectorAll('.pn-card').length),
+                widths: [...new Set(rows.flatMap((r) => [...r.children].map((c) => Math.round(c.getBoundingClientRect().width))))],
+                inside: rows.every((r) => r.getBoundingClientRect().right <= innerWidth + 0.5 && r.getBoundingClientRect().left >= -0.5),
+                names: [...document.querySelectorAll('[data-pn-drawer="boards"] [data-pn-sheet-board] h3')].map((h) => h.textContent),
+            };
+        });
+        await shot(small.page, `ui-25-boards-sheet-${sizeFile(small.size)}`);
+        await wording(small.page, 'the boards sheet', '[data-pn-drawer="boards"]');
+        check('a tap on the boards opens them larger: three boards under "Board 1", "Board 2", "Board 3", five 44 px places each, the flop\'s three cards, on screen at 320 px',
+            sheet.rows === 3 && sheet.places.every((n) => n === 5) && sheet.cards.every((n) => n === 3) && JSON.stringify(sheet.widths) === '[44]' && sheet.inside
+            && JSON.stringify(sheet.names) === JSON.stringify([0, 1, 2].map(TABLE_COPY.boardName)), JSON.stringify(sheet));
+        await small.page.keyboard.press('Escape');
+        await small.page.waitForSelector('[data-pn-drawer="boards"]', {state: 'detached', timeout: 10000}).catch(() => {});
+
+        // Checked down to a showdown.
+        const done3 = await playByClicks(hand3, {choose: () => 'call'});
+        await hostOp(H, {op: 'pause'});
+        const hand3Doc = done3.state.hand;
+        const result3 = hand3Doc.result;
+        const live3 = hand3Doc.seats.filter((p) => !p.folded);
+        // QA's own Omaha on each board: the strongest value and the five that make it.
+        const omahaOn = (hole, board) => {
+            let top = {value: -1, cards: []};
+            for (let a = 0; a < 4; a++) for (let b = a + 1; b < 4; b++) for (let c = 0; c < 5; c++) for (let e = c + 1; e < 5; e++) for (let f = e + 1; f < 5; f++) {
+                const five = [hole[a], hole[b], board[c], board[e], board[f]];
+                const value = evaluateCards(five);
+                if (value > top.value) top = {value, cards: five};
+            }
+            return top;
+        };
+        const perBoard = hand3Doc.boards.map((board) => {
+            const values = new Map(live3.map((p) => [p.seat, omahaOn(p.hole, board).value]));
+            const top = Math.max(...values.values());
+            return {top, winners: live3.filter((p) => values.get(p.seat) === top).map((p) => p.seat).sort((a, b) => a - b)};
+        });
+        const sorted = (list) => [...list].sort((a, b) => a - b);
+        check('the showdown on three boards: every pot in three parts, each board\'s part to the hands QA\'s own Omaha finds strongest on that board, the odd chips to the first boards',
+            result3.showdown && result3.pots.every((pot) => pot.winners.length === 3 && pot.winners.every((w, k) => JSON.stringify(sorted(w)) === JSON.stringify(perBoard[k].winners))
+                && pot.shares.map((s) => s.reduce((x, y) => x + y, 0)).every((n, k) => n === Math.floor(pot.amount / 3) + (k < pot.amount % 3 ? 1 : 0))),
+            JSON.stringify({pots: result3.pots, perBoard}));
+        await sleep(2500);
+        // The page's paid pots: the winners alone, the shares the server's own split.
+        const paid = [...guests[0].bodies].reverse().map((b) => b.body?.hand).find((h) => h?.no === hand3 && h.result)?.result?.pots ?? null;
+        check('…the page is sent each pot\'s winners board by board, and pots.paidParts rebuilds the server\'s shares from them',
+            paid !== null && paid.length === result3.pots.length && paid.every((pot, i) => JSON.stringify(pot.winners) === JSON.stringify(result3.pots[i].winners)
+                && JSON.stringify(paidParts(pot).map((part) => part.shares)) === JSON.stringify(result3.pots[i].shares) && !('shares' in pot)),
+            JSON.stringify(paid));
+        const scoop = perBoard.every((b) => b.winners.length === 1 && b.winners[0] === perBoard[0].winners[0]) && result3.pots.length === 1;
+        for (const p of all) {
+            const seen = await p.page.evaluate(() => {
+                const rect = (el) => el.getBoundingClientRect();
+                const hit = (a, b) => a.left < b.right - 1 && b.left < a.right - 1 && a.top < b.bottom - 1 && b.top < a.bottom - 1;
+                const banner = [...document.querySelectorAll('.pn-banner')].map(rect).filter((r) => r.width > 0);
+                const hands = [...document.querySelectorAll('.pn-seat-shown')].map(rect);
+                return {
+                    rows: [...document.querySelectorAll('.pn-banner [data-winner]')].map((el) => el.getAttribute('data-board')),
+                    lit: [0, 1, 2].map((k) => [...document.querySelectorAll(`.pn-board[data-pn-board-index="${k}"] .pn-card[data-state="win"]`)].map((el) => el.getAttribute('data-card'))),
+                    bannerOver: banner.some((b) => hands.some((h) => hit(b, h))), banner: banner.length, scroll: document.documentElement.scrollWidth - innerWidth,
+                    boardsOver: [...document.querySelectorAll('.pn-board')].map(rect).some((b) => hands.some((h) => hit(b, h))),
+                };
+            });
+            // Each board's lit cards: three of its own, which with two of a winner's four make the strongest value there.
+            const litOk = hand3Doc.boards.every((board, k) => {
+                const lit = board.filter((c) => seen.lit[k].includes(cardLabel(c)));
+                if (perBoard[k].winners.length > 1) return lit.length >= 3;
+                const hole = live3.find((q) => q.seat === perBoard[k].winners[0]).hole;
+                return lit.length === 3 && hole.some((a, i) => hole.some((b, j) => j > i && evaluateCards([a, b, ...lit]) === perBoard[k].top));
+            });
+            const rowsOk = scoop ? JSON.stringify(seen.rows) === JSON.stringify([null]) : seen.rows.length >= 1 && seen.rows.every((r, i) => r === String(i));
+            // The boards clear of the hands turned up where the stage keeps them clear: every phone but the 320 px one.
+            const handsOk = (p.size?.width ?? 1440) <= 320 || !seen.boardsOver;
+            check(`…on ${p.name}'s screen${p.size ? ` (${sizeName(p.size)})` : ''}: ${scoop ? 'one line, every board won by one player' : 'a banner line a board'}, the banner${(p.size?.width ?? 1440) > 320 ? ' and the boards' : ''} clear of the hands turned up; each board's lit cards the winner's three`,
+                seen.banner === 1 && rowsOk && !seen.bannerOver && handsOk && litOk && seen.scroll <= 0, JSON.stringify({...seen, perBoard, scoop}));
+            await shot(p.page, `38-plo-3boards-showdown-${p.size ? sizeFile(p.size) : '1440'}`);
+        }
+        const logLines = await (async () => {
+            await guests[0].page.click('[data-open="menu"]');
+            await guests[0].page.click('[data-menu="log"]').catch(() => guests[0].page.keyboard.press('Escape'));
+            await guests[0].page.waitForSelector('[data-pn-drawer="log"]', {timeout: 10000}).catch(() => {});
+            await sleep(800);
+            const lines = await guests[0].page.$$eval(`[data-pn-drawer="log"] [data-log-hand="${hand3}"] [data-log-line]`, (els) => els.map((el) => [el.getAttribute('data-log-line'), el.textContent]));
+            await guests[0].page.keyboard.press('Escape');
+            return lines;
+        })();
+        const streets3 = logLines.filter(([kind]) => kind === 'street').length;
+        const results3 = logLines.filter(([kind]) => kind === 'result').map(([, text]) => text ?? '');
+        check('…the hand log prints each street board by board (nine lines) and a result line a board, each "Board k: …"',
+            streets3 === 9 && results3.length >= 3 && results3.every((t) => /^Board [123][:,] /.test(t.replace(/[⁨⁩]/g, ''))), JSON.stringify({streets3, results3}));
+
         // Back to Texas hold'em from the host drawer, from the next hand.
         await H.page.click('[data-open="host"]');
         await H.page.click('[data-host-tab="game"]');
@@ -2471,7 +2669,7 @@ try {
         await H.page.keyboard.press('Escape');
         await hostOp(H, {op: 'resume'});
         const countdown = await guests[0].page.waitForSelector('[data-pn-next-game]', {timeout: 30000}).then((el) => el.textContent(), () => null);
-        const dealt2 = await waitDoc((x) => x.state.hand?.no === handNo + 1, 30000);
+        const dealt2 = await waitDoc((x) => x.state.hand?.no === lastNo + 1, 30000);
         const toast = await toasted(guests[0].page, MODE_COPY.changed("Texas hold'em"), 15000);
         await guests[0].page.waitForFunction(() => document.querySelectorAll('[data-pn-dock] .pn-hole .pn-card').length === 2, null, {timeout: 20000}).catch(() => {});
         const twoCards = await guests[0].page.locator('[data-pn-dock] .pn-hole[data-count="2"] .pn-card').count();

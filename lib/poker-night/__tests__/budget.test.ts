@@ -11,13 +11,17 @@
 // Names and looks are not part of the wire view: they ride beside it in responses only, versioned by
 // peopleV (lib/poker-night/room.roomView). Every figure is held on the same table in PLO too (P5:
 // four cards a hand, six of them shown; its short stacks go all in by pot-sized raises, the all-in
-// over the cap being refused), and the room document on whichever state is larger.
+// over the cap being refused; P6: on three boards, every pot split three ways), and the room
+// document on whichever state is larger.
 //
 // Measured (PN_BUDGET_PRINT=1 prints them): version 1's heaviest table made a 14,512-byte state, a
 // 4,331-byte wire view (4,400 as a message), 26,883 bytes read per write and 29,534 in all; version
 // 2 stores ledger times in seconds and sends the ledger as tuples, which pays for its new fields.
 // With PLO open (P5): Texas hold'em 14,798 / 3,787 / 3,856 bytes (state, wire, message); PLO 14,878 /
-// 3,862 / 3,925; on PLO's state the room reads 26,886 per write and 29,537 in all.
+// 3,862 / 3,925; on PLO's state the room reads 26,886 per write and 29,537 in all. On three boards
+// (P6) PLO is 15,048 / 3,936 / 3,999, and the room read 27,056: the applied ring went from 40 keys
+// to 36 (config KEEP.APPLIED), so it reads 26,944 per write and 29,595 in all. The wire keeps 500
+// bytes to spare, so it needed none of the compaction ladder beyond the ledger's tuples.
 
 import {describe, expect, it} from 'vitest';
 import {stateMessage, WIRE_BUDGET_BYTES} from '@/lib/poker-night/channel';
@@ -69,12 +73,15 @@ const shove = (s: TableState, variant: Variant, capped: {n: number}): Move => {
     return R(legal.raise.max);
 };
 
-const heaviest = (variant: 'holdem' | 'plo' = 'holdem', capped = {n: 0}): TableState => {
+// PLO's three boards: the first is Texas hold'em's own, the other two from the cards no hand holds.
+const BOARDS = ['2c7d5s3h8c', '5c5d9h2d7h', '3s7s8sTsAc'];
+
+const heaviest = (variant: 'holdem' | 'plo' = 'holdem', capped = {n: 0}, boards: 1 | 2 | 3 = 1): TableState => {
     let at = T0;
     const tick = () => (at += 7 * MINUTE);
     const config = {
         ...DEFAULT_CONFIG, seats: 9, smallBlind: 10, bigBlind: 25, ante: 25, buyInMin: 100, buyInMax: 12_500, maxRebuys: 20, turnSeconds: 120, pauseSeconds: 15, sitOutAfter: 5,
-        variant,
+        variant, boards,
     };
     let s = createTable({hostPid: pid(0), config, at});
     s = ok(host(s, {op: 'settings', patch: {name: '🃏'.repeat(20), scene: 'midnight-lounge', felt: 'royal-blue'}}, at));
@@ -95,7 +102,7 @@ const heaviest = (variant: 'holdem' | 'plo' = 'holdem', capped = {n: 0}): TableS
         for (let k = 0; k < 11; k++) act({type: 'buy', by: pid(i), amount: 100});
     });
     s = ok(host(s, {op: 'start'}, tick()));
-    s = deal(s, {holes: HOLES[variant], board: '2c7d5s3h8c', at: s.nextHandAt!});
+    s = deal(s, {holes: HOLES[variant], boards: BOARDS.slice(0, boards), at: s.nextHandAt!});
     // The four short stacks are all in before the flop; the five deep stacks call.
     while (s.hand!.street === 'preflop') s = moves(s, [1, 2, 3, 4].map(pid).includes(actorPid(s)) ? shove(s, variant, capped) : C);
     // On the flop three deep stacks fold and two min-raise each other past the log's cap.
@@ -126,20 +133,23 @@ const report = (label: string, n: number): number => {
 };
 
 const plo = {capped: {n: 0}, state: null as TableState | null};
-const heaviestPlo = (): TableState => (plo.state ??= heaviest('plo', plo.capped));
+const heaviestPlo = (): TableState => (plo.state ??= heaviest('plo', plo.capped, 3));
 // The larger state, for the room document.
 const largest = (): TableState => [heaviest(), heaviestPlo()].sort((a, b) => bytes(b) - bytes(a))[0];
 
 describe('PLO\'s heaviest table', () => {
-    it('is built as Texas hold\'em\'s is, four cards a hand, the short stacks in by pot raises that hit the cap', () => {
+    it('is built as Texas hold\'em\'s is, four cards a hand on three boards, the short stacks in by pot raises that hit the cap', () => {
         const s = heaviestPlo();
         checkInvariants(s);
         const hand = s.hand!;
         expect(hand.variant).toBe('plo');
+        expect(hand.boards).toHaveLength(3);
         expect(hand.seats.every((p) => p.hole.length === 4)).toBe(true);
         expect(plo.capped.n).toBeGreaterThan(0);
         expect(hand.log.length).toBe(KEEP.LOG_SUMMARY);
         expect(hand.result!.pots.length).toBe(5);
+        // Every pot split three ways, the first board's parts to the first board's winners.
+        expect(hand.result!.pots.every((p) => p.winners.length === 3 && p.shares.length === 3)).toBe(true);
         expect(hand.result!.pots.map((p) => p.winners[0])).toEqual([[1], [2], [3], [4], [7]]);
         expect(hand.result!.hands.length).toBe(6);
         expect(hand.result!.hands.every((h) => h.cards.length === 4)).toBe(true);

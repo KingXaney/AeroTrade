@@ -313,7 +313,7 @@ const DockHand = ({dock, deadline, waitingFor, anims, look}: {
                 {/* The hand's name, unless the viewer turned it off (My look: "Name my hand") or keeps the cards face down. */}
                 {hidden
                     ? <span className={NOTE} data-pn-peek-prompt="">{LOOKS_COPY.peekPrompt}</span>
-                    : <HandStrength strength={room.personal.handHints ? dock.strength : null}/>}
+                    : <HandStrength strength={room.personal.handHints ? dock.strength : null} strengths={room.personal.handHints ? dock.strengths : null}/>}
             </div>
         </>
     );

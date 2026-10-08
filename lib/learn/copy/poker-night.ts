@@ -90,6 +90,9 @@ const handWords = ({category, ranks}: HandDescription): string => {
     }
 };
 
+// Each category's name alone, high card to straight flush, then the royal flush.
+const KIND_WORDS = ['high card', 'pair', 'two pair', 'three of a kind', 'straight', 'flush', 'full house', 'four of a kind', 'straight flush', 'royal flush'] as const;
+
 // The categories a sentence names with "a": a royal flush, a pair; but four of a kind, ace high.
 const TAKES_A = new Set([8, 6, 5, 4, 1]);
 
@@ -108,6 +111,12 @@ export const HAND_COPY = {
     phrase: (d: HandDescription): string => `${TAKES_A.has(d.category) ? 'a ' : ''}${handWords(d)}`,
     playsBoard: 'Plays the board',
     fiveCards: 'The five cards that play',
+    // A hand's kind alone ("Flush", "Two pair", "Royal flush"); with two or three boards the dock
+    // says what the viewer's cards make on each in one line ("1 Flush · 2 Pair · 3 Straight"), the
+    // names in full for a screen reader ("Board 1: Flush, ace high; board 2: Pair of kings").
+    kind: (d: HandDescription): string => capitalize(KIND_WORDS[d.category === 8 && d.ranks[0] === 12 ? 9 : d.category]),
+    onBoardsShort: (kinds: readonly string[]): string => kinds.map((k, i) => `${count(i + 1)} ${k}`).join(' · '),
+    onBoardsSpoken: (labels: readonly string[]): string => capitalize(labels.map((l, i) => `board ${count(i + 1)}: ${l}`).join('; ')),
     // A card as a picture's name (role="img"): "Ace of spades"; inside a sentence, "ace of spades";
     // as its corner, "A♠︎".
     card: (card: Card): string => capitalize(cardWords(card)),
@@ -416,8 +425,12 @@ export const MODE_COPY = {
     // With its boards when there is more than one: "PLO · 2 boards", "Pot-limit Omaha, 2 boards".
     label: (variant: Variant, boards: number): string => (boards > 1 ? `${MODE_SHORT[variant]} · ${count(boards)} boards` : MODE_SHORT[variant]),
     spokenLabel: (variant: Variant, boards: number): string => (boards > 1 ? `${MODE_SPOKEN[variant]}, ${count(boards)} boards` : MODE_SPOKEN[variant]),
-    // The picker (the lobby's form, the host drawer): its group's name and each card's line.
+    // The picker (the lobby's form, the host drawer): its group's name and each card's line; under
+    // PLO, the board count (one to three), each choice's accessible name and the hint under them.
     gameLabel: 'Game',
+    boardsLabel: 'Boards',
+    boardsValue: (n: number): string => (n === 1 ? 'One board' : `${count(n)} boards`),
+    boardsHint: 'Each board is played on its own, and the pot is split evenly between them.',
     pick: {
         holdem: 'Two cards each. No limit.',
         plo: 'Four cards each. Pot limit.',
@@ -608,11 +621,27 @@ export const TABLE_COPY = {
     mainPot: (n: number): string => `Main pot ${count(n)}`,
     sidePot: (i: number, n: number): string => `Side pot ${count(i)}: ${count(n)}`,
     board: (spoken: string): string => `Board: ${spoken}`,
+    // PLO on two or three boards: each board's numeral on the felt and its name ("Board 2"), each
+    // board's group read aloud, the boards' block as the button that opens them larger, and the
+    // sheet that does (components/poker-night/BoardsSheet).
+    boardName: (k: number): string => `Board ${count(k + 1)}`,
+    boardOf: (k: number, spoken: string): string => `Board ${count(k + 1)}: ${spoken}`,
+    boardsZoom: 'See the boards larger',
+    boardsSheet: 'The boards',
 
     // The winner's banner; the hand's name sits under it (HAND_COPY.label).
     banner: (name: string, n: number): string => `${isolate(name)} wins ${count(n)}`,
     bannerYou: (n: number): string => `You win ${count(n)}`,
     bannerSplit: (players: readonly string[]): string => `Split pot: ${names(players)}`,
+    // With two or three boards, a line a board: "Board 2: Ana wins 600", "Board 1: you win 300", or
+    // its chips player by player ("Board 1: Ana 400 and Ben 200", the viewer as "you"); one line when
+    // one player wins every board's share of every pot.
+    bannerBoard: (k: number, name: string, n: number): string => `Board ${count(k + 1)}: ${isolate(name)} wins ${count(n)}`,
+    bannerBoardYou: (k: number, n: number): string => `Board ${count(k + 1)}: you win ${count(n)}`,
+    bannerBoardSplit: (k: number, parts: readonly {name: string | null; amount: number}[]): string =>
+        `Board ${count(k + 1)}: ${words(parts.map((p) => `${p.name === null ? 'you' : isolate(p.name)} ${count(p.amount)}`))}`,
+    bannerScoop: (name: string, n: number): string => `${isolate(name)} wins every board: ${count(n)}`,
+    bannerScoopYou: (n: number): string => `You win every board: ${count(n)}`,
 
     // The turn and its countdown (role="timer"; the server's two seconds of grace are never shown).
     yourTurn: 'Your turn',
@@ -722,6 +751,8 @@ export const TABLE_COPY = {
 export type PotIndex = number | null;
 const fromPot = (pot: PotIndex): string => (pot === null ? '' : pot === 0 ? ' from the main pot' : ` from side pot ${count(pot)}`);
 const splitName = (pot: PotIndex): string => (pot === null ? 'Split pot' : pot === 0 ? 'Main pot split' : `Side pot ${count(pot)} split`);
+// A line about one board's share of a pot, with two or three boards: "Board 2: …".
+const onBoard = (board: number | null): string => (board === null ? '' : `Board ${count(board + 1)}: `);
 
 export const LOG_COPY = {
     heading: 'Hand log',
@@ -729,7 +760,9 @@ export const LOG_COPY = {
     hand: (n: number): string => `Hand ${count(n)}`,
     blinds: (smallBlind: number, bigBlind: number, ante: number): string =>
         `Blinds ${count(smallBlind)}/${count(bigBlind)}${ante ? `, ante ${count(ante)}` : ''}`,
-    street: (street: Exclude<Street, 'preflop'>, cards: string): string => `${capitalize(street)}: ${cards}`,
+    // A street's cards, on each board with two or three: "Flop, board 2: A♠︎ K♦︎ 7♣︎".
+    street: (street: Exclude<Street, 'preflop'>, cards: string, board: number | null = null): string =>
+        `${capitalize(street)}${board === null ? '' : `, board ${count(board + 1)}`}: ${cards}`,
     // One line: "Ana calls 40.", "Ana raises to 340, all in.", "Ben folds as time ran out."; a hand
     // called off is the table's own line and takes no name.
     line: (name: string, kind: EntryKind, amount: number, allIn: boolean, timedOut = false): string =>
@@ -740,12 +773,18 @@ export const LOG_COPY = {
     youHeld: (cards: string): string => `You held ${cards}.`,
     // A hand shown to the reader alone, answering their ask: "Shown to you: Ana's A♠ K♦."
     showedYou: (name: string, cards: string): string => `Shown to you: ${isolate(name)} held ${cards}.`,
-    // "Ana wins 1,200 with two pair, kings and sevens.", "Ben wins 400 from side pot 1."
-    wins: (name: string, n: number, phrase: string | null, pot: PotIndex = null): string =>
-        `${isolate(name)} wins ${count(n)}${fromPot(pot)}${phrase ? ` with ${phrase}` : ''}.`,
+    // "Ana wins 1,200 with two pair, kings and sevens.", "Ben wins 400 from side pot 1."; with two or
+    // three boards, a line for each board's share: "Board 2: Ana wins 600 with a flush, ace high."
+    wins: (name: string, n: number, phrase: string | null, pot: PotIndex = null, board: number | null = null): string =>
+        `${onBoard(board)}${isolate(name)} wins ${count(n)}${fromPot(pot)}${phrase ? ` with ${phrase}` : ''}.`,
     // Share by share, never "each": an odd chip makes the shares differ.
-    split: (shares: readonly {name: string; amount: number}[], pot: PotIndex = null): string =>
-        `${splitName(pot)}: ${shares.map((s) => `${isolate(s.name)} takes ${count(s.amount)}`).join(', ')}.`,
+    // "Board 2, split pot: …" on a board.
+    split: (shares: readonly {name: string; amount: number}[], pot: PotIndex = null, board: number | null = null): string =>
+        `${board === null ? splitName(pot) : `Board ${count(board + 1)}, ${splitName(pot).toLowerCase()}`}: ${shares.map((s) => `${isolate(s.name)} takes ${count(s.amount)}`).join(', ')}.`,
+    // What a shown hand makes on each of two or three boards, for LOG_COPY.shows: "on board 1 a
+    // flush, ace high; on board 2 a pair of kings".
+    onBoards: (phrases: readonly (string | null)[]): string =>
+        phrases.flatMap((p, k) => (p === null ? [] : [`on board ${count(k + 1)} ${p}`])).join('; '),
     uncontested: (name: string, n: number): string => `Everyone else folded: ${isolate(name)} takes ${count(n)}.`,
     refund: (name: string, n: number): string => `${isolate(name)} gets back ${count(n)} uncalled.`,
     playsBoard: (name: string): string => `${isolate(name)} plays the board.`,
@@ -762,7 +801,11 @@ export const ANNOUNCE_COPY = {
     timeLow: (s: number): string => `${plural(s, 'second', 'seconds')} left.`,
     dealt: (cards: readonly Card[]): string => `You have ${words(cards.map((c) => `the ${cardWords(c)}`))}.`,
     newGame: MODE_COPY.changed,
-    street: (street: Exclude<Street, 'preflop'>, cards: readonly Card[]): string => `${capitalize(street)}: ${words(cards.map(cardWords))}.`,
+    street: (street: Exclude<Street, 'preflop'>, cards: readonly Card[], board: number | null = null): string =>
+        `${capitalize(street)}${board === null ? '' : `, board ${count(board + 1)}`}: ${words(cards.map(cardWords))}.`,
+    // With two or three boards, each board's share: "Board 2: you win 600 with a flush, ace high."
+    youWinBoard: (board: number, n: number, phrase: string | null): string =>
+        `Board ${count(board + 1)}: you win ${count(n)}${phrase ? ` with ${phrase}` : ''}.`,
     // Another player's move and a pot's winners read as the log does.
     move: LOG_COPY.line,
     wins: LOG_COPY.wins,
@@ -1428,6 +1471,8 @@ export const HANDS_COPY = {
             facts: [
                 'A flush needs two cards of the suit in your hand: one is not enough, however many the board shows.',
                 'The strongest hand wins the pot; there is no low half.',
+                'With two or three boards, each board is played on its own and the pot is split evenly between them: the strongest hand on each board wins that share, so one player can win one board, some or all of them.',
+                'An odd chip goes to the first boards: board 1, then board 2.',
                 'In the raise panel, Pot sets the largest bet or raise the limit allows, and A on a keyboard does the same.',
                 'The host can switch the table between Texas hold\'em and PLO; the change starts with the next hand.',
             ],

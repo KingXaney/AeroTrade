@@ -5,8 +5,10 @@
 // plate to its bet line (an all-in a bigger push), every bet sweeping into the pots (the middle of
 // their pills, where lib/poker-night/stage.potPlan put them) when a street ends, an uncalled bet going
 // back, and at the end each pot bursting from its own pill into a stream of chips to its winners —
-// split between them by share, side pots first and the main pot last. Each element ends invisible,
-// so under reduced motion nothing flies and the table simply shows where the chips are.
+// split between them by share, side pots first and the main pot last — with two or three boards
+// (PLO) a pot's shares first fly as stacks from its pill to each board's numeral, and each board's
+// stream leaves from there. Each element ends invisible, so under reduced motion nothing flies and
+// the table simply shows where the chips are.
 // data-anim names each flight for a test.
 
 import type {CSSProperties} from "react";
@@ -14,7 +16,7 @@ import {animsOf, animVars, type LiveAnim} from "@/components/poker-night/anim";
 import ChipStack from "@/components/poker-night/ChipStack";
 import {DENOMINATIONS} from "@/lib/poker-night/chips";
 import {BEAT} from "@/lib/poker-night/choreography";
-import {offset, potCentre, type PotPlan, type Px, type Stage} from "@/lib/poker-night/stage";
+import {boardAnchor, offset, potCentre, type PotPlan, type Px, type Stage} from "@/lib/poker-night/stage";
 
 // The chip a stream's chips are drawn as: the largest that a sixth of the pot holds.
 const streamDenom = (amount: number): number => [...DENOMINATIONS].reverse().find((d) => d <= Math.max(1, amount / 6)) ?? 1;
@@ -64,14 +66,24 @@ const ChipFlight = ({stage, pots, anims, handNo}: {stage: Stage; pots: PotPlan |
                     </span>
                 );
             })}
+            {wins.flatMap((a) => (a.splits ?? []).map((split) => {
+                const to = boardAnchor(stage, split.board);
+                const from = offset(potOf(split.pot), to);
+                return (
+                    <span key={`${a.id}:split:${split.key}`} className="pn-fly pn-sweep" data-anim="split" data-pot={split.pot} data-board={split.board}
+                          style={fly(to, animVars(a, split.at, BEAT.SPLIT * (a.pace ?? 1), {dx: from.dx, dy: from.dy}))}>
+                        <ChipStack amount={split.amount} label={false}/>
+                    </span>
+                );
+            }))}
             {wins.flatMap((a) => (a.streams ?? []).map((chip) => {
                 const place = seatAt(chip.seat);
                 if (!place) return null;
-                const from = offset(potOf(chip.pot), place.plate);
-                const amount = a.event.pots.find((p) => p.pot === chip.pot)?.amount ?? 1;
+                const from = offset(chip.from === 'board' ? boardAnchor(stage, chip.board) : potOf(chip.pot), place.plate);
+                const amount = a.event.pots.find((p) => p.pot === chip.pot && p.board === chip.board)?.amount ?? 1;
                 return (
-                    <span key={`${a.id}:${chip.key}`} className="pn-fly pn-chip-stream" data-anim="stream" data-pot={chip.pot} data-to={chip.seat}
-                          style={fly(place.plate, animVars(a, chip.at, BEAT.STREAM, {dx: from.dx, dy: from.dy}))}>
+                    <span key={`${a.id}:${chip.key}`} className="pn-fly pn-chip-stream" data-anim="stream" data-pot={chip.pot} data-board={chip.board} data-to={chip.seat}
+                          style={fly(place.plate, animVars(a, chip.at, BEAT.STREAM * (a.pace ?? 1), {dx: from.dx, dy: from.dy}))}>
                         <span className="pn-chips"><span className="pn-chip rounded-full" data-denom={streamDenom(amount)} style={{'--pn-chip': '18px'} as CSSProperties}/></span>
                     </span>
                 );

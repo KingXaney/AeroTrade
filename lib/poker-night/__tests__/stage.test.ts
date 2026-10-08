@@ -16,7 +16,8 @@ import {BANK_COPY, FELT_COPY, HAND_COPY, TABLE_COPY} from '@/lib/learn/copy/poke
 import {CHIP_COLUMNS} from '@/lib/poker-night/chips';
 import {PLATE, SEAT_COUNTS, spotToPx} from '@/lib/poker-night/layout';
 import {
-    AMOUNT_PX, AVATAR_PX, avatarCentre, BANNER, bannerObstacles, bannerPlan, BET, betLineSize, BLIND_MARK, blindRect, BOARD_CARD_MAX, CARD_RATIO, CHIP_PX, FELT_RAIL,
+    AMOUNT_PX, AVATAR_PX, avatarCentre, BANNER, bannerObstacles, bannerPlan, BET, betLineSize, BLIND_MARK, blindRect, BOARD_CARD_MAX, BOARD_CARD_MIN, BOARD_GAP, BOARD_LABEL, BOARD_ROW_GAP,
+    BOARD_SIDE_GAP, boardAnchor, boardBlock, BOARDS_SHEET_CARD, CARD_RATIO, CASCADE_STEP, CHIP_PX, FELT_RAIL, INDEX_BAND, MULTI_BOARD_MIN,
     feltSpan, fitFor, insideBox, menuSide, MINI_CARD_PX, MONO_EM, NARROW_STAGE, offset, openSeatPx, overlaps, pieceRect, PLATE_PAD_X, PLATE_SIZE, POT_CLEAR, POT_PILL, POT_PILL_H,
     potCentre, potLayouts, potObstacles, potPillWidth, potPlan, PULSE, seatCardsRect, SHOWN_CARD_PX, SHOWN_OFF, SHOWN_STEP, shownHandRect, shownHandWidth, stageLayout, stageOrientation,
     TABLE_TOP_ROOM, textWidth, TIGHT_BELOW, WIN_POP, winPopRect, wrappedLines,
@@ -786,5 +787,198 @@ describe("a plate's menu", () => {
                 expect(menuSide(top, s)).toBe('bottom');
             }
         }
+    });
+});
+
+// ── two and three boards (PLO, P6) ──
+//
+// The spike before them measured every phone's seat layer at every seat count, the boards clear of
+// every hand of four that may turn up: the cards (the narrowest of a seated viewer's table and a
+// watcher's) come out at 19 px or more on every upright phone 360 px wide or more (26 up to seven
+// seats), 16 px or more on a 320 px one (20 up to seven seats), 20 px or more on a phone on its side,
+// 60 px or more on a desktop — and on the smallest phone on its side, 568 × 320, at 14 px, where with
+// seven to nine seats nothing fits at all. The boards sheet (components/poker-night/BoardsSheet)
+// shows them at 44 px wherever that is small.
+
+const BOARD_BOXES = [...BOXES, ...Object.values(POT_BOXES).flat(), ...Object.values(SIDEWAYS)];
+
+// Every board's row and numeral as drawn.
+const boardRects = (s: Stage): {name: string; r: Rect}[] => s.boards.flatMap((b) => [
+    {name: `board ${b.index}`, r: b as Rect},
+    ...(b.label ? [{name: `label ${b.index}`, r: {...b.label, w: BOARD_LABEL[s.fit].w, h: BOARD_LABEL[s.fit].h}}] : []),
+]);
+
+describe('two and three boards', () => {
+    it('keeps every board, numeral, plate, bet line, button and the pot inside the box and apart, the boards on the felt, for every table and viewer', () => {
+        for (const box of BOARD_BOXES) for (const n of SEAT_COUNTS) for (const mine of [null, 0, n - 1]) for (const boards of [2, 3]) {
+            const s = stageLayout(box, n, mine, boards);
+            const label = `${box.w}×${box.h} ${n} seats, viewer ${mine}, ${boards} boards`;
+            expect(s.boards.map((b) => b.index), label).toEqual(Array.from({length: boards}, (_, k) => k));
+            const table = rectsOf(s);
+            const own = boardRects(s);
+            for (const {name, r} of [...table, ...own]) expect(insideBox(r, box), `${label}: ${name} inside`).toBe(true);
+            // Nowhere for the boards on the smallest phone on its side with seven seats or more (as for
+            // one board at eight, whose nine seats crowd even the bet lines onto the plates): there they
+            // cover a bet line or a dealer button where that is least, never a plate.
+            const nowhere = box.w === 364 && box.h === 224 && n >= 7;
+            for (let i = 0; i < table.length; i++) for (let j = i + 1; j < table.length; j++) {
+                const board = table[i].name === 'board' || table[j].name === 'board';
+                const plate = table[i].name.startsWith('plate') || table[j].name.startsWith('plate');
+                if (nowhere && !(board && plate)) continue;
+                expect(overlaps(table[i].r, table[j].r), `${label}: ${table[i].name} and ${table[j].name}`).toBe(false);
+            }
+            // Each board and numeral inside the block, which the plates, bets, buttons and pot clear.
+            for (const {name, r} of own) {
+                expect(r.x - r.w / 2, `${label}: ${name}`).toBeGreaterThanOrEqual(s.board.x - s.board.w / 2 - 0.5);
+                expect(r.x + r.w / 2, `${label}: ${name}`).toBeLessThanOrEqual(s.board.x + s.board.w / 2 + 0.5);
+                expect(r.y - r.h / 2, `${label}: ${name}`).toBeGreaterThanOrEqual(s.board.y - s.board.h / 2 - 0.5);
+                expect(r.y + r.h / 2, `${label}: ${name}`).toBeLessThanOrEqual(s.board.y + s.board.h / 2 + 0.5);
+            }
+            // Clear of every hand of four that may turn up (all but the seated viewer's own), wherever
+            // that keeps the cards 18 px or wider — everywhere but a few of the smallest phones' tables.
+            if (s.board.handsClear) {
+                for (const p of s.seats) {
+                    if (mine !== null && p.slot === 0) continue;
+                    expect(overlaps(s.board, shownHandRect(p, s, 4)), `${label}: the boards and seat ${p.seat}'s hand`).toBe(false);
+                }
+            } else expect(nowhere || s.board.card.w < BOARD_CARD_MIN || box.w <= 320 || (box.w === 364 && box.h === 224), `${label}: not clear of the hands`).toBe(true);
+            // On the felt, its rail included.
+            const span = feltSpan(s, s.board.y - s.board.h / 2, s.board.h, 0);
+            expect(span, label).not.toBeNull();
+            expect(s.board.x - s.board.w / 2, label).toBeGreaterThanOrEqual(span![0] - 0.5);
+            expect(s.board.x + s.board.w / 2, label).toBeLessThanOrEqual(span![1] + 0.5);
+            // Boards one over another or side by side never touch; cascaded, each covers the foot of
+            // the one above and leaves its index band in sight.
+            for (let k = 1; k < boards; k++) {
+                const [a, b] = [s.boards[k - 1], s.boards[k]];
+                if (s.board.arrangement === 'cascade') expect(b.y - b.h / 2 - (a.y - a.h / 2), label).toBeCloseTo(a.h * CASCADE_STEP, 6);
+                else expect(overlaps(a, b), `${label}: boards ${k - 1} and ${k}`).toBe(false);
+            }
+        }
+    }, 120_000);
+
+    it('deals the cards as large as the room allows, never under the floors the phones were measured at', () => {
+        const floor = (box: {w: number; h: number}, n: number): number => {
+            if (box.w === 364 && box.h === 224) return MULTI_BOARD_MIN;
+            if (fitFor(box) === 'comfortable') return 60;
+            if (box.h <= box.w) return 20;
+            if (box.w >= 360) return n <= 7 ? 26 : 19;
+            return n <= 7 ? 20 : 16;
+        };
+        for (const box of BOARD_BOXES) for (const n of SEAT_COUNTS) for (const boards of [2, 3]) {
+            const narrowest = Math.min(...[0, null].map((mine) => stageLayout(box, n, mine, boards).board.card.w));
+            const s = stageLayout(box, n, 0, boards);
+            expect(narrowest, `${box.w}×${box.h} ${n} seats, ${boards} boards`).toBeGreaterThanOrEqual(Math.max(MULTI_BOARD_MIN, floor(box, n)));
+            expect(s.board.card.w).toBeLessThanOrEqual(BOARD_CARD_MAX[s.fit]);
+            expect(s.board.card.h).toBe(Math.round(s.board.card.w * CARD_RATIO));
+            for (const b of s.boards) expect([b.w, b.h]).toEqual([5 * s.board.card.w + 4 * s.board.gap, s.board.card.h]);
+        }
+        // The sizes the plan named: a 390 × 630 phone at 28 px or more, a 375 × 469 one at 24.
+        for (const n of SEAT_COUNTS) for (const boards of [2, 3]) {
+            expect(stageLayout({w: 390, h: 630}, n, 0, boards).board.card.w).toBeGreaterThanOrEqual(28);
+            expect(stageLayout({w: 375, h: 469}, n, 0, boards).board.card.w).toBeGreaterThanOrEqual(24);
+        }
+    }, 120_000);
+
+    it('lays one board out exactly as before', () => {
+        for (const box of BOXES) for (const n of SEAT_COUNTS) {
+            const s = stageLayout(box, n, 0, 1);
+            expect(s).toEqual(stageLayout(box, n, 0));
+            expect([s.board.arrangement, s.board.labels, s.boards]).toEqual(['row', false, [{index: 0, x: s.board.x, y: s.board.y, w: s.board.w, h: s.board.h, label: null}]]);
+        }
+    });
+
+    it("builds a block of boards stacked, side by side or cascaded, with a numeral at each board's left", () => {
+        for (const fit of ['tight', 'compact', 'comfortable'] as const) for (const n of [2, 3]) for (const labels of [true, false]) {
+            const cw = 30;
+            const ch = Math.round(cw * CARD_RATIO);
+            const bw = 5 * cw + 4 * BOARD_GAP[fit];
+            const lab = labels ? BOARD_LABEL[fit].w + BOARD_LABEL[fit].gap : 0;
+            const stack = boardBlock('stack', n, cw, fit, labels);
+            expect([stack.w, stack.h]).toEqual([lab + bw, n * ch + (n - 1) * BOARD_ROW_GAP[fit]]);
+            const side = boardBlock('side', n, cw, fit, labels);
+            expect([side.w, side.h]).toEqual([n * (lab + bw) + (n - 1) * BOARD_SIDE_GAP[fit], ch]);
+            const cascade = boardBlock('cascade', n, cw, fit, labels);
+            expect(cascade.w).toBe(lab + bw);
+            expect(cascade.h).toBeCloseTo(ch * (1 + (n - 1) * CASCADE_STEP), 6);
+            for (const block of [stack, side, cascade]) {
+                expect(block.places).toHaveLength(n);
+                for (const p of block.places) {
+                    expect(Math.abs(p.dx) + bw / 2).toBeLessThanOrEqual(block.w / 2 + 1e-9);
+                    expect(Math.abs(p.dy) + ch / 2).toBeLessThanOrEqual(block.h / 2 + 1e-9);
+                    if (!labels) expect(p.label).toBeNull();
+                    else {
+                        // Left of its board, a gap apart, level with it (in a cascade, with its index band).
+                        expect(p.label!.x + BOARD_LABEL[fit].w / 2 + BOARD_LABEL[fit].gap).toBeCloseTo(p.dx - bw / 2, 6);
+                        expect(p.label!.y).toBeGreaterThanOrEqual(p.dy - ch / 2);
+                        expect(p.label!.y).toBeLessThanOrEqual(p.dy - ch / 2 + (block === cascade ? ch * INDEX_BAND : ch));
+                    }
+                }
+            }
+        }
+        expect(boardBlock('row', 3, 30, 'compact', true)).toEqual({w: 5 * 30 + 4 * BOARD_GAP.compact, h: 42, places: [{dx: 0, dy: 0, label: null}]});
+        // A cascade's step leaves the rank and corner suit of the card above in sight.
+        expect(CASCADE_STEP).toBeGreaterThanOrEqual(INDEX_BAND);
+    });
+
+    it("sends a board's share of the pots from its numeral, else its left end", () => {
+        const s = stageLayout({w: 1428, h: 705}, 6, 0, 3);
+        expect(s.board.labels).toBe(true);
+        for (const b of s.boards) expect(boardAnchor(s, b.index)).toEqual(b.label);
+        const bare = {...s, boards: s.boards.map((b) => ({...b, label: null}))};
+        for (const b of bare.boards) expect(boardAnchor(bare, b.index)).toEqual({x: b.x - b.w / 2, y: b.y});
+    });
+
+    for (const [size, boxes] of Object.entries({...POT_BOXES, '667 × 375': [SIDEWAYS['667 × 375']], '568 × 320': [SIDEWAYS['568 × 320']]})) {
+        it(`finds the pots their place and keeps the banner clear at ${size}, two and three boards, four-card hands up`, () => {
+            for (const box of boxes) for (const n of SEAT_COUNTS) for (const mine of [0, null]) for (const boards of [2, 3]) {
+                const s = stageLayout(box, n, mine, boards);
+                const seated = s.seats.map((p) => p.seat);
+                const shown = seated.filter((seat) => seat !== mine);
+                for (const amounts of [POTS[0], POTS[3]]) for (const button of [0, n - 1]) {
+                    const label = `${box.w}×${box.h} ${n} seats, viewer ${mine}, ${boards} boards, ${amounts.length} pots, button ${button}`;
+                    const pops: WinPop[] = [{seat: mine ?? 0, amount: 1_250_000}];
+                    const pots = expectPotPlan(s, amounts, {open: [], shown, button, bets: seated, handSize: 4, now: {shown, bets: [], pops}}, label);
+                    // On the desktop clear of everything that may yet show; on a phone held upright, on the felt.
+                    if (size === '1440 × 900') expect(pots.keeps, label).toBe('all');
+                    if (size === '390 × 844') expect(pots.felt, label).toBe(true);
+                    // A line a board, "Board 2: Dinosaur wins 123,456" over the hand's name.
+                    const text: BannerText = {
+                        winners: Array.from({length: boards}, (_, k) => ({head: TABLE_COPY.bannerBoard(k, 'Dinosaur', 123_456), hand: k === 0 ? flush : threesFull})),
+                        note: TABLE_COPY.nextHandIn(99),
+                    };
+                    const seen: BannerSeen = {open: [], shown, button, pots: pots.pills, pops, handSize: 4};
+                    // Clear everywhere but the smallest phone on its side with eight seats or more,
+                    // where it sits where the pot was; full on a desktop.
+                    if (size === '568 × 320' && n >= 8) {
+                        const plan = bannerPlan(s, text, seen);
+                        if (!plan.clear) expect(plan.banner.x, label).toBe(s.board.x);
+                        continue;
+                    }
+                    const plan = expectClear(s, text, seen, label);
+                    if (size === '1440 × 900' && n <= 7) expect(plan.variant, label).toBe('full');
+                    for (const piece of piecesOf(plan)) for (const pill of pots.pills) expect(overlaps(piece.r, pill), `${label}: ${piece.name} over a pot`).toBe(false);
+                }
+            }
+        }, 120_000);
+    }
+});
+
+describe("the boards' sizes in the stylesheet", () => {
+    const css = readFileSync(fileURLToPath(new URL('../../../app/globals.css', import.meta.url)), 'utf8');
+    const room = (fit: Fit): string =>
+        (fit === 'compact' ? css.match(/\.pn-room \{[^}]*\}/) : css.match(new RegExp(`\\.pn-room\\[data-pn-fit="${fit}"\\] \\{[^}]*\\}`)))?.[0] ?? '';
+    const px = (rule: string, name: string): number => Number(rule.match(new RegExp(`${name}: (\\d+)px`))?.[1]);
+
+    it("draws a board's numeral at the size the stage keeps for it, and never lifts a card that plays on two or three boards", () => {
+        for (const fit of ['tight', 'compact', 'comfortable'] as const) {
+            expect(px(room(fit), '--pn-board-label-w'), fit).toBe(BOARD_LABEL[fit].w);
+            expect(px(room(fit), '--pn-board-label-h'), fit).toBe(BOARD_LABEL[fit].h);
+        }
+        expect(css).toContain('.pn-board-label { position: absolute; translate: -50% -50%;');
+        expect(css).toContain('width: var(--pn-board-label-w); height: var(--pn-board-label-h);');
+        expect(css).toContain('.pn-board-set .pn-card[data-state="win"] > .pn-card-inner { transform: none; }');
+        // The boards sheet's five cards and their gaps fit a 320 px phone's sheet.
+        expect(BOARDS_SHEET_CARD * 5 + 4 * 3).toBeLessThanOrEqual(320 - 2 * 16 - 8);
     });
 });

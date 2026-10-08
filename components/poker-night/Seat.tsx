@@ -19,7 +19,7 @@
 // data-card, data-anim, data-count.
 
 import {useMemo, type CSSProperties, type ReactNode} from "react";
-import {animsOf, animVars, type LiveAnim} from "@/components/poker-night/anim";
+import {animsOf, animVars, liftAtFor, type LiveAnim} from "@/components/poker-night/anim";
 import AvatarDisc from "@/components/poker-night/AvatarDisc";
 import BlindMarker from "@/components/poker-night/BlindMarker";
 import CountUp from "@/components/poker-night/CountUp";
@@ -28,7 +28,7 @@ import TurnRing from "@/components/poker-night/TurnRing";
 import {ACTION_COPY, ASK_COPY, BANK_COPY, TABLE_COPY} from "@/lib/learn/copy/poker-night";
 import type {Card} from "@/lib/poker/cards";
 import {compactChips} from "@/lib/poker-night/chips";
-import {cardLook, type ResultLook} from "@/lib/poker-night/reveal";
+import {cardLook, liftBoardOf, type ResultLook} from "@/lib/poker-night/reveal";
 import {offset, type SeatPlace, type Stage} from "@/lib/poker-night/stage";
 import type {EntryKind} from "@/lib/poker-night/types";
 import type {Person, SeatView} from "@/lib/poker-night/view-types";
@@ -123,9 +123,10 @@ const Seat = ({seat, place, stage, view: v, person, mine, live, acting, myTurn, 
                     const flip = flips?.find((c) => c.index === index);
                     const state = cardLook(look, card);
                     const motion: CardMotion | null = flip && timing ? {cls: 'pn-flip', style: animVars(timing, flip.at, 2), anim: 'flip'} : null;
+                    const liftAt = reveal ? liftAtFor(reveal, state, liftBoardOf(look, card)) : 0;
                     const stateMotion: CardStateMotion | null = reveal && reveal.liftAt !== undefined && state
-                        ? {cls: state === 'win' ? 'pn-win-lift' : 'pn-dim', style: animVars(reveal, reveal.liftAt)} : null;
-                    const glow = state === 'win' ? animVars(reveal ?? {offset: 0}, reveal?.liftAt ?? 0) : null;
+                        ? {cls: state === 'win' ? 'pn-win-lift' : 'pn-dim', style: animVars(reveal, liftAt)} : null;
+                    const glow = state === 'win' ? animVars(reveal ?? {offset: 0}, liftAt) : null;
                     return <PlayingCard key={`${card}`} card={card} state={state} motion={motion} stateMotion={stateMotion} glow={glow}/>;
                 })}
             </div>

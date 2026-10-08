@@ -29,16 +29,22 @@ const nameAt = (ctx: AnnounceContext, seat: number, pid?: string): string => {
     return (id && ctx.people[id]?.name) || TABLE_COPY.seat(seat);
 };
 
+// How many boards the hand's board events turn (one a board each street).
+const boardsOf = (events: readonly TableEvent[], handNo: number): number =>
+    Math.max(1, ...events.flatMap((e) => (e.kind === 'board' && e.handNo === handNo ? [e.board + 1] : [])));
+
 export const announcementsFor = (events: readonly TableEvent[], ctx: AnnounceContext): Announcements => {
     const polite: string[] = [];
     const assertive: string[] = [];
     // The clock's moves, by the id of the move they made.
     const timedOut = new Set(events.filter((e) => e.kind === 'timeout').map((e) => e.id.replace(/:timeout$/, '')));
-    const winHands = new Map<number, string>();
+    // Each shown hand's name on each board, from the reveal.
+    const winHands = new Map<number, (string | null)[]>();
     for (const e of events) {
         if (e.kind !== 'reveal') continue;
-        for (const h of e.hands) if (h.value !== null) winHands.set(h.seat, HAND_COPY.phrase(describeHand(h.value)));
+        for (const h of e.hands) winHands.set(h.seat, h.values.map((v) => (v === null ? null : HAND_COPY.phrase(describeHand(v)))));
     }
+    const phraseOf = (seat: number, board = 0): string | null => winHands.get(seat)?.[board] ?? null;
     const line = (seat: number, kind: EntryKind, amount: number, allIn: boolean, id: string) => {
         if (seat === ctx.mySeat) return;
         polite.push(ANNOUNCE_COPY.move(nameAt(ctx, seat), kind, amount, allIn, timedOut.has(id)));
@@ -59,7 +65,7 @@ export const announcementsFor = (events: readonly TableEvent[], ctx: AnnounceCon
                 line(e.seat, e.kind, 0, false, e.id);
                 break;
             case 'board':
-                polite.push(ANNOUNCE_COPY.street(e.street, e.cards));
+                polite.push(ANNOUNCE_COPY.street(e.street, e.cards, e.board > 0 || boardsOf(events, e.handNo) > 1 ? e.board : null));
                 break;
             case 'win':
                 if (e.uncontested && e.totals.length === 1) {
@@ -67,8 +73,20 @@ export const announcementsFor = (events: readonly TableEvent[], ctx: AnnounceCon
                     polite.push(w.seat === ctx.mySeat ? ANNOUNCE_COPY.youWin(w.amount, null) : ANNOUNCE_COPY.uncontested(nameAt(ctx, w.seat), w.amount));
                     break;
                 }
+                if (e.boards > 1 && !e.uncontested) {
+                    // Two or three boards: what each player took on each board, board by board.
+                    for (let board = 0; board < e.boards; board++) {
+                        const won = new Map<number, number>();
+                        for (const part of e.pots) if (part.board === board) for (const w of part.winners) won.set(w.seat, (won.get(w.seat) ?? 0) + w.share);
+                        for (const [seat, amount] of [...won].filter(([, n]) => n > 0).sort((a, b) => b[1] - a[1] || a[0] - b[0])) {
+                            const phrase = phraseOf(seat, board);
+                            polite.push(seat === ctx.mySeat ? ANNOUNCE_COPY.youWinBoard(board, amount, phrase) : ANNOUNCE_COPY.wins(nameAt(ctx, seat), amount, phrase, null, board));
+                        }
+                    }
+                    break;
+                }
                 for (const w of e.totals) {
-                    const phrase = winHands.get(w.seat) ?? null;
+                    const phrase = phraseOf(w.seat);
                     polite.push(w.seat === ctx.mySeat ? ANNOUNCE_COPY.youWin(w.amount, phrase) : ANNOUNCE_COPY.wins(nameAt(ctx, w.seat), w.amount, phrase));
                 }
                 break;

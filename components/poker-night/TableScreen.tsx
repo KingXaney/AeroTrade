@@ -122,7 +122,10 @@ const TableScreen = () => {
 
     const [measure, box] = useMeasured();
     const seatCount = table.seats.length;
-    const stage: Stage | null = useMemo(() => (box && box.w > 0 && box.h > 0 ? stageLayout(box, seatCount, mySeat) : null), [box, seatCount, mySeat]);
+    // The stage lays out as many boards as the game has (PLO's two or three): the hand's own while
+    // there is one, else what the next deal plays.
+    const boardCount = hand ? hand.boards.length : nextModeOf(room.config).boards;
+    const stage: Stage | null = useMemo(() => (box && box.w > 0 && box.h > 0 ? stageLayout(box, seatCount, mySeat, boardCount) : null), [box, seatCount, mySeat, boardCount]);
     const look = useMemo(() => resultLook(hand), [hand]);
     const tableLook = resolveTableLook(table.settings);
     const name = TABLE_COPY.name(table.settings.name, room.code);

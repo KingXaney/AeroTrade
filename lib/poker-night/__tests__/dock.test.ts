@@ -7,7 +7,7 @@
 import {describe, expect, it} from 'vitest';
 import {legalFor, snapshotFromState} from '@/lib/poker-night/betting';
 import {nextDueAt} from '@/lib/poker-night/clock';
-import {dockView, handStrength, preOptions, preRowKey, samePre} from '@/lib/poker-night/dock';
+import {boardStrengths, dockView, handStrength, preOptions, preRowKey, samePre} from '@/lib/poker-night/dock';
 import {homeAsks} from '@/lib/poker-night/overlays';
 import {reduce} from '@/lib/poker-night/engine';
 import type {TableState} from '@/lib/poker-night/types';
@@ -231,6 +231,22 @@ describe('what the cards make', () => {
         expect(dockView(as(s, 0)).strength).toEqual({category: 1, ranks: [12, 11, 5, 0]});
         s = moves(s, X, X, X);
         expect(dockView(as(s, 0)).strength).toEqual({category: 2, ranks: [12, 11, 5]});
+        expect(dockView(as(s, 0)).strengths).toBeNull();
+    });
+
+    it('says what the cards make on each of two or three boards, once the flop is out', () => {
+        const holes = {0: 'JsTs4h5h', 1: '9c9d8h7h', 2: '6c6d2s3s'};
+        let s = deal(three([1000, 1000, 1000], {variant: 'plo', boards: 3}), {holes, boards: ['AsKsQs2d3c', '9h9s4c4d5c', '8d8c7d7c2h']});
+        expect(dockView(as(s, 0)).strengths).toBeNull();
+        s = moves(s, C, C, X);
+        const flop = dockView(as(s, 0));
+        expect(flop.strengths!.map((d) => d.category)).toEqual([8, 2, 1]);
+        expect(flop.strength).toEqual(flop.strengths![0]);
+        s = moves(s, X, X, X, X, X, X);
+        expect(dockView(as(s, 1)).strengths!.map((d) => d.category)).toEqual([1, 7, 6]);
+        // A watcher, and a folded hand, see nothing.
+        expect(boardStrengths('plo', null, [cards('AsKsQs')])).toBeNull();
+        expect(boardStrengths('plo', cards(holes[0]), [cards('AsKsQs'), []])).toBeNull();
     });
 });
 

@@ -667,8 +667,8 @@ and friends keep none beyond Shared and the invariants).
   (`lib/poker-night/view-types`), so a server room or a state does not compile into a response.
 - `lib/poker-night/store.mutateRoom` is the one way the game moves: read, plan with the pure
   `lib/poker-night/mutation.planMutation`, write behind a compare-and-set on `seq` (five attempts,
-  jittered backoff, then 503 busy). The plan: an action id already in the `applied` ring (40) is
-  answered as a duplicate; a room idle 12 hours closes; the clock runs to the request's
+  jittered backoff, then 503 busy). The plan: an action id already in the `applied` ring (36,
+  `KEEP.APPLIED`) is answered as a duplicate; a room idle 12 hours closes; the clock runs to the request's
   `receivedAt`, then the step, then the clock to now — a turn's timeout at the turn's own time for
   the actor's own request, `TIMING.TIMEOUT_SLACK_MS` later for any other writer (`clock.dueFor`;
   the `nextDueAt` mirror the leader's tick is armed by includes it), so an in-time move still on its
@@ -812,6 +812,29 @@ and friends keep none beyond Shared and the invariants).
   clear of their pills and of the winners' "+N" as it rises (`stage.winPopRect`); it comes in where it
   lands, growing from its middle (`.pn-banner-drop`), so on its way in it covers nothing its place
   does not.
+- PLO's two and three boards (P6; `config.ENABLED.boards` 3, PLO alone): each board its own run,
+  every board turned together; each pot split evenly between the boards (`pots.splitBoards`, the odd
+  chips to board 1, then 2) and each board's part to its strongest eligible hand; the wire sends each
+  paid pot's winners board by board and the page rebuilds the shares with `pots.paidParts`.
+  `stage.stageLayout`'s fourth argument lays them out as one block (`stage.board`, each board in
+  `stage.boards`) — stacked, side by side or cascaded (`CASCADE_STEP` leaves every card's index
+  band, `INDEX_BAND`, in sight), each board's numeral at its left where there is room and it
+  costs the cards no more than 8 % (`BOARD_LABEL`, held to the stylesheet; `LABELS_SHARE`) — on the felt and clear of every plate, bet line and
+  button, and of every hand of four that may turn up unless that alone deals the cards under 18 px
+  (`board.handsClear`); a second layout sending the bet lines along the rails is kept when it deals
+  them larger. One board is laid out exactly as before. The floors the spike measured are pinned in
+  `stage.test` (16 px on a 320 px phone, 19 on a wider one, 20 on one on its side); on a 568 × 320
+  phone with seven to nine seats nothing fits, and `fallbackY` puts them at `MULTI_BOARD_MIN` where
+  they cover least, never a plate. The block is one 44 px button to
+  `components/poker-night/BoardsSheet` (44 px cards); the seat ring (`.pn-seats`) takes taps on its
+  seats alone. A lit card never lifts on two or three boards. The reveal's `BoardLook`,
+  `liftBoardOf` and `scoopOf`: cards light board after board; the banner says a line a board, and
+  one line only when one player won every board's share of every pot. The choreography turns each
+  street board by board, flies each pot's shares to the boards' numerals (`stage.boardAnchor`)
+  before each board's stream, and plays a pay-out that would outlast the result's `revealMs`
+  faster, in proportion (`Scheduled.pace` scales the flights). The dock says each board's kind in
+  one line (`dock.boardStrengths`, `HAND_COPY.onBoardsShort`), the hand log and the announcer
+  board by board; the boards' count is picked under PLO by `components/poker-night/BoardsChoice`.
 - The pots go where `lib/poker-night/stage.potPlan` finds room on the felt inside its rail
   (`stage.feltSpan`), never over a card (the board's and its lift, a seat's face-down pair, a turned-up
   hand), a plate, its flag or blind's mark, an open seat, the dealer button, a bet line out at the size

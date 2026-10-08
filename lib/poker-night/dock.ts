@@ -58,7 +58,10 @@ export type DockView = {
     legal: Legal | null;
     sizing: Sizing | null;
     hole: Card[] | null;
+    // What the viewer's cards make so far: on the board; with two or three boards (PLO, after the
+    // flop), on each board in turn — then `strength` is the first board's.
     strength: HandDescription | null;
+    strengths: HandDescription[] | null;
     pre: {options: PreAction[]; selected: PreAction | null} | null;
     control: SeatControl | null;
     canShow: boolean;
@@ -77,6 +80,12 @@ export const handStrength = (variant: Variant, hole: readonly Card[] | null, boa
     if (board.length >= 3) return describeHand(handValue(variant, hole, board));
     const [a, b] = [rankOf(hole[0]), rankOf(hole[1])];
     return a === b ? {category: 1, ranks: [a]} : {category: 0, ranks: [Math.max(a, b), Math.min(a, b)]};
+};
+
+// With two or three boards: what the cards make on each, once the flop is out (null before).
+export const boardStrengths = (variant: Variant, hole: readonly Card[] | null, boards: readonly (readonly Card[])[]): HandDescription[] | null => {
+    const all = boards.map((board) => handStrength(variant, hole, board));
+    return all.length > 0 && all.every((d) => d !== null) ? (all as HandDescription[]) : null;
 };
 
 // The early choices with `due` chips to call: with nothing to call, check/fold, check or call any;
@@ -140,6 +149,7 @@ export const dockView = (view: PlayerView): DockView => {
         seat, seatView, live, dealtIn: dealtIn && !folded, folded, mucked, myTurn, legal, sizing,
         hole: view.me.hole,
         strength: dealtIn && !folded && hand ? handStrength(hand.variant, view.me.hole, hand.boards[0] ?? []) : null,
+        strengths: dealtIn && !folded && hand && hand.boards.length > 1 ? boardStrengths(hand.variant, view.me.hole, hand.boards) : null,
         pre: pre && {options: pre.options, selected: pre.options.find((o) => samePre(o, pre.selected)) ?? null},
         control, canShow, buy, deal,
         sitOut: free && control === 'sit-out' && !sitOutNext && !waitingChips,

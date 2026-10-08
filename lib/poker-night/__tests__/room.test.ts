@@ -497,13 +497,13 @@ describe('the clock and the room\'s life', () => {
         expect(expiryOf('closed', T0 + 99, T0)).toEqual({expiresAt: T0 + TIMING.ROOM_TTL_MS, closedAt: T0});
     });
 
-    it('keeps the last KEEP.APPLIED (40) applied action ids, each once', () => {
+    it('keeps the last KEEP.APPLIED (36) applied action ids, each once', () => {
         const key = (i: number) => appliedKey(pid(1), `0b7c1e2a-9f3d-4c5b-8a6e-${String(i).padStart(12, '0')}`);
         let applied: string[] = [];
         for (let i = 0; i < 100; i++) applied = withApplied(applied, key(i));
         expect(applied).toHaveLength(KEEP.APPLIED);
-        expect(KEEP.APPLIED).toBe(40);
-        expect(applied[0]).toBe(key(60));
+        expect(KEEP.APPLIED).toBe(36);
+        expect(applied[0]).toBe(key(64));
         applied = withApplied(applied, key(70));
         expect(applied).toHaveLength(KEEP.APPLIED);
         expect(applied.at(-1)).toBe(key(70));

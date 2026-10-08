@@ -55,7 +55,7 @@ const WinnerReveal = ({anims, handNo, lines, plan}: Props) => {
                     {shown.map((line) => {
                         if (plan.variant !== 'full') {
                             return (
-                                <p key={line.seat} className={cn('pn-banner-line', plan.variant === 'cut' && 'truncate')} data-winner={line.seat}>
+                                <p key={line.key} className={cn('pn-banner-line', plan.variant === 'cut' && 'truncate')} data-winner={line.seat} data-board={line.board ?? undefined}>
                                     <span className="font-semibold" {...userText(line)}>{line.head}</span>
                                     {line.hand && <> · <span className="text-fg-soft" data-hand-name="">{line.hand}</span></>}
                                 </p>
@@ -64,7 +64,7 @@ const WinnerReveal = ({anims, handNo, lines, plan}: Props) => {
                         const pid = playerAt(table, line.seat);
                         const person = pid ? table.people[pid] : undefined;
                         return (
-                            <div key={line.seat} className="pn-banner-row" data-winner={line.seat}>
+                            <div key={line.key} className="pn-banner-row" data-winner={line.seat} data-board={line.board ?? undefined}>
                                 <AvatarDisc avatar={person?.avatar} decorative/>
                                 <div className="min-w-0">
                                     <p className="pn-banner-head truncate" {...userText(line)}>{line.head}</p>

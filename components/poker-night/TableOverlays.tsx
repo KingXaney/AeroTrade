@@ -3,7 +3,8 @@
 // Everything that floats over the table, mounted once by TableScreen and reading the room through
 // useRoom(): the top bar; the join card for a visitor (and for a watcher taking a seat); the
 // drawers — Invite (open by itself for the host who just started the table), Bank, Host controls,
-// Hand log, My look, Hands (the rankings and the game, for every viewer); the dialogs that ask first — remove a player, hand over host, end the night,
+// Hand log, My look, Hands (the rankings and the game, for every viewer), the boards larger
+// (BoardsSheet: PLO's two or three boards, a tap on them away, for every viewer); the dialogs that ask first — remove a player, hand over host, end the night,
 // leave the table (LeaveDialog: staying to watch, or going home); the banner when a newer deploy
 // needs a reload; an ask to see the viewer's cards (AskPrompt, at the foot of the screen); and the
 // toasts that say once what changed on its own — a new game from this hand ("New game from this hand:
@@ -31,6 +32,7 @@ import HandLog from "@/components/poker-night/HandLog";
 import HandsDrawer from "@/components/poker-night/HandsDrawer";
 import HostDrawer from "@/components/poker-night/HostDrawer";
 import InviteSheet from "@/components/poker-night/InviteSheet";
+import BoardsSheet from "@/components/poker-night/BoardsSheet";
 import JoinCard from "@/components/poker-night/JoinCard";
 import LeaveDialog from "@/components/poker-night/LeaveDialog";
 import MyLookDrawer from "@/components/poker-night/MyLookDrawer";
@@ -249,6 +251,7 @@ const TableOverlays = () => {
                          onDealt={() => setUi((prev) => ({...prev, drawer: null}))}/>
             <BankPanel open={isOpen('bank')} onOpenChange={drawerChange('bank')} toTable={ui.closedByTurn} sitOuts={sitOuts}/>
             <HandsDrawer open={isOpen('hands')} onOpenChange={drawerChange('hands')} toTable={ui.closedByTurn}/>
+            <BoardsSheet open={isOpen('boards')} onOpenChange={drawerChange('boards')} toTable={ui.closedByTurn}/>
             {isHost && (
                 <HostDrawer open={isOpen('host')} onOpenChange={drawerChange('host')} toTable={ui.closedByTurn}
                             onRemove={(row) => openDialog({kind: 'remove', target: {pid: row.pid, name: row.name, avatar: row.avatar, chips: row.dealtIn ? row.stack : row.chips, dealtIn: row.dealtIn}})}

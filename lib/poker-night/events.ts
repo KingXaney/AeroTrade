@@ -17,7 +17,7 @@ import type {Card} from '@/lib/poker/cards';
 import {ENTRY_FLAGS, HOLE_CARDS, PLAYING_CARDS, STREETS} from '@/lib/poker-night/config';
 import type {EntryKind, Street, Variant} from '@/lib/poker-night/types';
 import type {HandView, SeatView, TableView, WireEntry} from '@/lib/poker-night/view-types';
-import {seatShares} from '@/lib/poker-night/pots';
+import {paidParts} from '@/lib/poker-night/pots';
 import {readShown} from '@/lib/poker-night/variants';
 import {WIRE_KINDS} from '@/lib/poker-night/views';
 
@@ -28,13 +28,15 @@ const CHIP_MOVES: ReadonlySet<string> = new Set<ChipMove>(['ante', 'small-blind'
 // A seat's bet line as a street closes.
 export type BetLine = {seat: number; amount: number};
 
-// A hand shown at the showdown: its cards, the five cards that play on the first board
-// (lib/poker-night/variants.readShown) and its value there (null before the flop); winner when any
+// A hand shown at the showdown: its cards, and on each board its five cards that play
+// (lib/poker-night/variants.readShown) and its value there (none before the flop); winner when any
 // pot paid it.
-export type RevealedHand = {seat: number; cards: Card[]; best: Card[]; value: number | null; winner: boolean};
+export type RevealedHand = {seat: number; cards: Card[]; best: Card[][]; values: (number | null)[]; winner: boolean};
 
-// One pot as it pays out: pot 0 is the main pot, 1 the first side pot; each winner's share.
-export type PotPayout = {pot: number; amount: number; winners: {seat: number; share: number}[]};
+// One board's share of one pot as it pays out (a pot on one board, or paid uncontested, is one
+// part): pot 0 is the main pot, 1 the first side pot; board 0 the first board; the part's chips
+// (pots.paidParts) and each winner's share.
+export type PotPayout = {pot: number; board: number; amount: number; winners: {seat: number; share: number}[]};
 
 // What a pot of this many big blinds or more wins counts as a big win (confetti).
 export const BIG_WIN_BIG_BLINDS = 40;
@@ -60,13 +62,15 @@ export type TableEvent =
     // The street's bets sweeping into the pot.
     | (Base & {kind: 'street-sweep'; street: Street; bets: BetLine[]; total: number})
     // Board cards turned: the flop's three, the turn's or the river's one; from is the first card's
-    // index on the board.
-    | (Base & {kind: 'board'; street: Exclude<Street, 'preflop'>; cards: Card[]; from: number})
-    // The showdown: every shown hand, the winners among them.
-    | (Base & {kind: 'reveal'; board: Card[]; hands: RevealedHand[]; winners: number[]})
-    // The pots paid out in the order the table pays them: side pots first, the main pot last.
-    // totals is what each winner took across them; uncontested when everyone else folded.
-    | (Base & {kind: 'win'; pots: PotPayout[]; totals: {seat: number; amount: number}[]; uncontested: boolean; big: boolean; fresh: boolean})
+    // index on the board; board, which board (every board turns together, one event each).
+    | (Base & {kind: 'board'; street: Exclude<Street, 'preflop'>; board: number; cards: Card[]; from: number})
+    // The showdown: every board, every shown hand, the winners among them.
+    | (Base & {kind: 'reveal'; boards: Card[][]; hands: RevealedHand[]; winners: number[]})
+    // The pots paid out in the order the table pays them: side pots first, the main pot last, each
+    // board's share of a pot in turn (boards: how many shares a pot has). totals is what each winner
+    // took across them; uncontested when everyone else folded; revealMs, how long the result shows
+    // before the next deal may come, which the pay-out keeps within.
+    | (Base & {kind: 'win'; pots: PotPayout[]; boards: number; totals: {seat: number; amount: number}[]; uncontested: boolean; big: boolean; fresh: boolean; revealMs: number})
     // A player on the clock.
     | (Base & {kind: 'turn'; seat: number; turn: number; mine: boolean})
     // A seat taken or given up.
@@ -84,7 +88,7 @@ export type DiffOptions = {
 
 const streetIndex = (street: Street): number => STREETS.indexOf(street);
 
-// Where each street's cards sit on the board.
+// Where each street's cards sit on a board.
 const BOARD_RANGE: Record<Exclude<Street, 'preflop'>, [number, number]> = {flop: [0, 3], turn: [3, 4], river: [4, 5]};
 
 // The seats dealt into a hand, clockwise from the one after the button.
@@ -124,7 +128,8 @@ const handEvents = (prevView: DiffableView, prevHand: HandView | null, next: Dif
     const id = (rest: string) => `${no}:${rest}`;
     let street = prevHand ? streetIndex(prevHand.street) : 0;
     let boardShown = prevHand ? prevHand.boards[0]?.length ?? 0 : 0;
-    const board = hand.boards[0] ?? [];
+    const boards = hand.boards;
+    const board = boards[0] ?? [];
     // Each seat's bet line on the street being played: as the previous view showed it, then as the
     // log moves it (every entry carries the seat's street bet after it).
     const bets = new Map<number, number>();
@@ -143,7 +148,10 @@ const handEvents = (prevView: DiffableView, prevHand: HandView | null, next: Dif
         if (name === 'preflop') return;
         const [from, to] = BOARD_RANGE[name];
         if (boardShown >= to || board.length < to) return;
-        out.push({kind: 'board', id: id(`board:${name}`), handNo: no, street: name, cards: board.slice(from, to), from});
+        // Every board turns together, the first board's id as one board's always was.
+        boards.forEach((cards, k) => out.push({
+            kind: 'board', id: id(k === 0 ? `board:${name}` : `board:${name}:${k}`), handNo: no, street: name, board: k, cards: cards.slice(from, to), from,
+        }));
         boardShown = to;
     };
     // Closes every street before `target`: its bets swept, the next street's cards turned.
@@ -197,22 +205,24 @@ const handEvents = (prevView: DiffableView, prevHand: HandView | null, next: Dif
         if (result.showdown && result.hands.length > 0) {
             const hands = result.hands.map((shown): RevealedHand => {
                 const read = readShown(hand.variant, hand.boards, shown);
-                const first = read.reads[0] ?? null;
-                return {seat: read.seat, cards: read.cards, best: first?.best ?? [], value: first?.value ?? null, winner: winners.includes(read.seat)};
+                return {seat: read.seat, cards: read.cards, best: read.reads.map((r) => r.best), values: read.reads.map((r) => r.value), winner: winners.includes(read.seat)};
             });
-            out.push({kind: 'reveal', id: id('reveal'), handNo: no, board: [...board], hands, winners});
+            out.push({kind: 'reveal', id: id('reveal'), handNo: no, boards: boards.map((b) => [...b]), hands, winners});
         }
+        // Each pot's shares board by board, side pots first and the main pot last.
         const pots = result.pots
-            .map((p, pot): PotPayout => ({pot, amount: p.amount, winners: seatShares(p)}))
-            .reverse();
+            .flatMap((p, pot) => paidParts(p).map((part): PotPayout => ({
+                pot, board: part.board, amount: part.amount, winners: part.winners.map((seat, j) => ({seat, share: part.shares[j]})),
+            })))
+            .sort((a, b) => b.pot - a.pot || a.board - b.board);
         const totals = new Map<number, number>();
         for (const pot of pots) for (const w of pot.winners) totals.set(w.seat, (totals.get(w.seat) ?? 0) + w.share);
         const bigBlind = opts.bigBlind ?? 0;
         const big = [...totals.entries()].some(([seat, amount]) => (bigBlind > 0 && amount >= BIG_WIN_BIG_BLINDS * bigBlind) || allInSeats.has(seat));
         out.push({
-            kind: 'win', id: id('win'), handNo: no, pots,
+            kind: 'win', id: id('win'), handNo: no, pots, boards: Math.max(1, ...result.pots.map((p) => p.winners.length)),
             totals: [...totals.entries()].map(([seat, amount]) => ({seat, amount})).sort((a, b) => a.seat - b.seat),
-            uncontested: !result.showdown, big, fresh: next.serverNow - result.completedAt < result.revealMs,
+            uncontested: !result.showdown, big, fresh: next.serverNow - result.completedAt < result.revealMs, revealMs: result.revealMs,
         });
     }
 

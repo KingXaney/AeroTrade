@@ -8,11 +8,13 @@
 
 import {describe, expect, it} from 'vitest';
 import {nextDueAt} from '@/lib/poker-night/clock';
-import {BEAT, batchStart, MAX_LAG_MS, scheduleBatch, type Scheduled} from '@/lib/poker-night/choreography';
+import {revealMs} from '@/lib/poker-night/config';
+import {BEAT, batchStart, MAX_LAG_MS, scheduleBatch, UNIT_MS, type Scheduled} from '@/lib/poker-night/choreography';
 import {diffViews, type DiffableView, type TableEvent} from '@/lib/poker-night/events';
 import type {TableState} from '@/lib/poker-night/types';
 import {clockLeaderOf, wireView} from '@/lib/poker-night/views';
-import {A, C, F, R, X, deal, moves, nowOf, runOut, table} from './fixtures';
+import {reduce} from '@/lib/poker-night/engine';
+import {A, C, F, R, X, deal, moves, nowOf, ok, runOut, table} from './fixtures';
 
 let seq = 0;
 const view = (s: TableState, serverNow = nowOf(s)): DiffableView => wireView(s, {
@@ -76,8 +78,12 @@ describe('one batch', () => {
     it('pays side pots first and the main pot last, a pot\'s stream after the one before', () => {
         let s = deal(three([100, 200, 300], {smallBlind: 1, bigBlind: 2, buyInMin: 2, buyInMax: 1000}), {holes: {0: 'AhAd', 1: 'KhKd', 2: 'QhQd'}, board: '2c7d9s3s4c'});
         const before = view(s);
-        s = runOut(moves(s, A, A, A));
-        const {items} = scheduleBatch(diffViews(before, view(s, s.hand!.result!.completedAt), {bigBlind: 2}));
+        s = moves(s, A, A, A);
+        // The run-out comes a street at a time: the river's view brings the showdown.
+        while (s.hand!.boards[0].length < 4) s = ok(reduce(s, {type: 'deal-street', at: s.hand!.nextStreetAt!}), 'deal-street');
+        const turn = view(s);
+        s = runOut(s);
+        const {items} = scheduleBatch(diffViews(turn, view(s, s.hand!.result!.completedAt), {bigBlind: 2}));
         const win = byKind(items, 'win')[0];
         expect(win.potsOut!.map((p) => p.pot)).toEqual([1, 0]);
         expect(win.potsOut![1].at - win.potsOut![0].at).toBeCloseTo(BEAT.POT_GAP);
@@ -88,16 +94,21 @@ describe('one batch', () => {
         expect(Math.min(...main.map((c) => c.at))).toBeGreaterThan(Math.max(...side.map((c) => c.at)));
         // A big win (an all-in won): confetti, as the banner lands.
         expect(win.confettiAt).not.toBeNull();
-        // The board's three streets turn before the reveal.
-        const boards = byKind(items, 'board');
+        // The river turns before the reveal; in one batch (a page that saw the hand go all in, then
+        // its end) every street does, faster to end within the result's showing.
+        expect(byKind(items, 'reveal')[0].at).toBeGreaterThan(byKind(items, 'board')[0].at);
+        const whole = scheduleBatch(diffViews(before, view(s, s.hand!.result!.completedAt), {bigBlind: 2})).items;
+        const boards = byKind(whole, 'board');
         expect(boards.map((b) => b.cards!.map((c) => c.index))).toEqual([[0, 1, 2], [3], [4]]);
-        expect(byKind(items, 'reveal')[0].at).toBeGreaterThan(boards[2].at);
+        expect(byKind(whole, 'reveal')[0].at).toBeGreaterThan(boards[2].at);
+        const paid = byKind(whole, 'win')[0];
+        expect(paid.at + paid.dur).toBeCloseTo(s.hand!.result!.revealMs / UNIT_MS);
     });
 
     it('splits a pot\'s stream between its winners by share', () => {
         const event: TableEvent = {
-            kind: 'win', id: '7:win', handNo: 7, uncontested: false, big: false, fresh: true,
-            pots: [{pot: 0, amount: 300, winners: [{seat: 1, share: 150}, {seat: 4, share: 150}]}],
+            kind: 'win', id: '7:win', handNo: 7, uncontested: false, big: false, fresh: true, revealMs: 3000, boards: 1,
+            pots: [{pot: 0, board: 0, amount: 300, winners: [{seat: 1, share: 150}, {seat: 4, share: 150}]}],
             totals: [{seat: 1, amount: 150}, {seat: 4, amount: 150}],
         };
         const win = scheduleBatch([event]).items[0];
@@ -111,8 +122,8 @@ describe('one batch', () => {
 
     it('draws a result the table had already shown in place', () => {
         const event: TableEvent = {
-            kind: 'win', id: '7:win', handNo: 7, uncontested: true, big: true, fresh: false,
-            pots: [{pot: 0, amount: 60, winners: [{seat: 1, share: 60}]}], totals: [{seat: 1, amount: 60}],
+            kind: 'win', id: '7:win', handNo: 7, uncontested: true, big: true, fresh: false, revealMs: 1500, boards: 1,
+            pots: [{pot: 0, board: 0, amount: 60, winners: [{seat: 1, share: 60}]}], totals: [{seat: 1, amount: 60}],
         };
         expect(scheduleBatch([event]).items).toEqual([expect.objectContaining({still: true, at: 0, dur: 0})]);
     });
@@ -136,5 +147,73 @@ describe('batches in a row', () => {
         expect(batchStart(1000, 0)).toBe(1000);
         expect(batchStart(1000, 1500)).toBe(1500);
         expect(batchStart(1000, 1000 + MAX_LAG_MS * 3)).toBe(1000 + MAX_LAG_MS);
+    });
+});
+
+describe('PLO on three boards', () => {
+    const HOLES = {0: 'JsTs4h5h', 1: '9c9d8h7h', 2: '6c6d2s3s'};
+    const BOARDS = ['AsKsQs2d3c', '9h9s4c4d5c', '8d8c7d7c2h'];
+
+    it("turns each street board after board, lifts each board's cards in turn, and splits each pot to the boards before it streams", () => {
+        let s = deal(three([1000, 1000, 1000], {variant: 'plo', boards: 3}), {holes: HOLES, boards: BOARDS});
+        s = moves(s, C, C);
+        const preflop = view(s);
+        s = moves(s, X);
+        const flop = byKind(scheduleBatch(diffViews(preflop, view(s))).items, 'board');
+        expect(flop.map((b) => b.cards!.map((c) => c.board))).toEqual([[0, 0, 0], [1, 1, 1], [2, 2, 2]]);
+        expect(flop[1].at - flop[0].at).toBeCloseTo(BEAT.BOARD_TURN_GAP);
+        expect(flop[2].at - flop[0].at).toBeCloseTo(2 * BEAT.BOARD_TURN_GAP);
+        s = moves(s, X, X, X, X, X, X);
+        const river = view(s);
+        s = moves(s, X, X, X);
+        const {items} = scheduleBatch(diffViews(river, view(s, s.hand!.result!.completedAt), {bigBlind: 20}));
+        const reveal = byKind(items, 'reveal')[0];
+        expect(reveal.lifts).toHaveLength(3);
+        expect(reveal.lifts![0]).toBe(reveal.liftAt);
+        expect(reveal.lifts![2] - reveal.lifts![1]).toBeCloseTo(BEAT.BOARD_LIFT_STAGGER);
+        const win = byKind(items, 'win')[0];
+        expect(win.bannerAt).toBeGreaterThan(reveal.lifts![2]);
+        // One pot, its three shares flying to the boards as it leaves, then each board's stream from there.
+        expect(win.splits!.map((p) => [p.pot, p.board, p.amount])).toEqual([[0, 0, 20], [0, 1, 20], [0, 2, 20]]);
+        const leave = win.potsOut![0].at;
+        expect(win.splits!.every((p) => p.at === leave)).toBe(true);
+        for (const chip of win.streams!) {
+            expect(chip.from).toBe('board');
+            expect(chip.at).toBeGreaterThanOrEqual(leave + BEAT.SPLIT_LEAD + chip.board * BEAT.BOARD_STREAM_GAP - 1e-9);
+        }
+        expect(win.streams!.filter((c) => c.board === 0).every((c) => c.seat === 0)).toBe(true);
+        expect(win.streams!.filter((c) => c.board > 0).every((c) => c.seat === 1)).toBe(true);
+        expect(win.counts!.map((c) => [c.seat, c.amount])).toEqual([[0, 20], [1, 40]]);
+        expect(win.at + win.dur).toBeLessThanOrEqual(s.hand!.result!.revealMs / UNIT_MS + 1e-9);
+    });
+
+    it("keeps a showdown's pay-out within the result's showing, five pots on three boards and nine hands shown included", () => {
+        const showing = revealMs({showdown: true, pots: [1, 2, 3, 4, 5], boards: 3});
+        const winners = (pot: number) => [{seat: pot % 9, share: 100}, {seat: (pot + 4) % 9, share: 100}];
+        const event: TableEvent = {
+            kind: 'win', id: '9:win', handNo: 9, uncontested: false, big: true, fresh: true, revealMs: showing, boards: 3,
+            pots: [4, 3, 2, 1, 0].flatMap((pot) => [0, 1, 2].map((board) => ({pot, board, amount: 200, winners: winners(pot + board)}))),
+            totals: Array.from({length: 9}, (_, seat) => ({seat, amount: 100})),
+        };
+        const hands = Array.from({length: 9}, (_, seat) => ({seat, cards: [0, 1, 2, 3].map((c) => seat * 4 + c), best: [[], [], []], values: [1, 1, 1], winner: true}));
+        const reveal: TableEvent = {kind: 'reveal', id: '9:reveal', handNo: 9, boards: [[36, 37, 38, 39, 40], [41, 42, 43, 44, 45], [46, 47, 48, 49, 50]], hands, winners: []};
+        const within = (batch: Scheduled[], cap: number) => {
+            const win = byKind(batch, 'win')[0];
+            expect(win.at + win.dur).toBeLessThanOrEqual(cap + 1e-9);
+            for (const chip of win.streams!) expect(chip.at + BEAT.STREAM * (win.pace ?? 1)).toBeLessThanOrEqual(cap + 1e-9);
+            for (const split of win.splits!) expect(split.at + BEAT.SPLIT * (win.pace ?? 1)).toBeLessThanOrEqual(cap + 1e-9);
+            return win;
+        };
+        // At its own pace it ends in time: the reveal's figure leaves a second a board past the first.
+        const paced = within(scheduleBatch([reveal, event]).items, showing / UNIT_MS);
+        expect(paced.potsOut![1].at - paced.potsOut![0].at).toBeCloseTo(BEAT.POT_GAP);
+        // A showing shorter than its pace plays it faster, every time in proportion, to end with it:
+        // the pots still leave in order, side pots first, as far apart as each other.
+        const short = within(scheduleBatch([reveal, {...event, revealMs: 3000}]).items, 3000 / UNIT_MS);
+        expect(short.at + short.dur).toBeCloseTo(3000 / UNIT_MS);
+        expect(short.potsOut!.map((p) => p.pot)).toEqual([4, 3, 2, 1, 0]);
+        const gaps = short.potsOut!.slice(1).map((p, i) => p.at - short.potsOut![i].at);
+        for (const gap of gaps) expect(gap).toBeCloseTo(gaps[0]);
+        expect(gaps[0]).toBeLessThan(BEAT.POT_GAP);
     });
 });

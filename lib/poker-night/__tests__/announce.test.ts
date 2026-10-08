@@ -98,6 +98,31 @@ describe('the others', () => {
         expect(folded.polite.at(-1)).toBe('Everyone else folded: \u2068Ben\u2069 takes 20.');
     });
 
+    it('says each board\'s cards and each board\'s winners in turn, on two or three boards', () => {
+        const holes = {0: 'JsTs4h5h', 1: '9c9d8h7h', 2: '6c6d2s3s'};
+        let s = deal(table({0: 1000, 1: 1000, 2: 1000}, {lastBigBlind: 0, config: {variant: 'plo', boards: 3}}), {holes, boards: ['AsKsQs2d3c', '9h9s4c4d5c', '8d8c7d7c2h']});
+        s = moves(s, C, C);
+        const preflop = view(s);
+        s = moves(s, X);
+        const flop = announcementsFor(diffViews(preflop, view(s), {mySeat: 0}), ctx(view(s), 0));
+        expect(flop.polite.slice(-3)).toEqual([
+            'Flop, board 1: ace of spades, king of spades and queen of spades.',
+            'Flop, board 2: nine of hearts, nine of spades and four of clubs.',
+            'Flop, board 3: eight of diamonds, eight of clubs and seven of diamonds.',
+        ]);
+        s = moves(s, X, X, X, X, X, X, X, X);
+        const prev = view(s);
+        s = moves(s, X);
+        const v = view(s, s.hand!.result!.completedAt);
+        const said = announcementsFor(diffViews(prev, v, {mySeat: 1}), ctx(v, 1));
+        clean(said.polite);
+        expect(said.polite.slice(-3)).toEqual([
+            'Board 1: \u2068Ana\u2069 wins 20 with a royal flush.',
+            'Board 2: you win 20 with four of a kind, nines.',
+            'Board 3: you win 20 with a full house, eights full of sevens.',
+        ]);
+    });
+
     it('says who sits down and who leaves', () => {
         const s = three();
         const prev = view(s);
