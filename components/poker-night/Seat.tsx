@@ -4,7 +4,8 @@
 // clock, the name in a <bdi>, the stack, a word for anything but simply playing), the cards in front
 // of it (face down for everyone else; turned up at a showdown or when shown), the tag of the last
 // move ("Call 40"), the blind's mark, and — when it wins — its stack counting up and a "+2,400" over
-// it. The viewer's own cards are the dock's, not the plate's. A hand shown to the viewer alone
+// it — the move's tag staying, still, for the rest of the street (reveal.streetTags) once its pop is
+// over. The viewer's own cards are the dock's, not the plate's. A hand shown to the viewer alone
 // (answering their ask) turns up on its plate for them, flagged "Shown to you"; a seat whose chips
 // wait for the host's yes says "Waiting for chips". In Triple T's throw-away a plate still to throw
 // says "Discarding…" over its three backs, and as its player throws, the third back flies to the
@@ -30,7 +31,7 @@ import TurnRing from "@/components/poker-night/TurnRing";
 import {ACTION_COPY, ASK_COPY, BANK_COPY, TABLE_COPY} from "@/lib/learn/copy/poker-night";
 import type {Card} from "@/lib/poker/cards";
 import {compactChips} from "@/lib/poker-night/chips";
-import {cardLook, liftBoardOf, type ResultLook} from "@/lib/poker-night/reveal";
+import {cardLook, liftBoardOf, type ResultLook, type StillTag} from "@/lib/poker-night/reveal";
 import {offset, type SeatPlace, type Stage} from "@/lib/poker-night/stage";
 import type {EntryKind} from "@/lib/poker-night/types";
 import type {Person, SeatView} from "@/lib/poker-night/view-types";
@@ -55,12 +56,17 @@ export type SeatProps = {
     held?: number; // the cards a hand of the game holds (two, four in PLO): what a fold sends to the middle
     discarding?: boolean; // Triple T: still to throw a card away
     discardMark?: boolean; // …and no room for the flag under the plate: a dashed ring on it instead (stage.flagRoom)
+    still?: StillTag | null; // this seat's last move on the street being bet (reveal.streetTags), drawn once its tag's pop is over
 };
 
 // A seat's turned-up cards: the size they are drawn at, and how far across from the plate they sit
-// (stage.SeatPlace.shownDx: moved along the row off another seat's hand).
-export const shownStyle = (place: Pick<SeatPlace, 'shownDx'>): CSSProperties =>
-    ({'--pn-card-w': 'var(--pn-show-w)', ...(place.shownDx ? {'--pn-shown-dx': `${place.shownDx}px`} : {})} as CSSProperties);
+// (stage.SeatPlace.shownDx, shownDy: moved along its row off another seat's hand — or, in a crowded
+// column, beside the plate or on its other side, off the plates and flags round it).
+export const shownStyle = (place: Pick<SeatPlace, 'shownDx' | 'shownDy'>): CSSProperties => ({
+    '--pn-card-w': 'var(--pn-show-w)',
+    ...(place.shownDx ? {'--pn-shown-dx': `${place.shownDx}px`} : {}),
+    ...(place.shownDy ? {'--pn-shown-dy': `${place.shownDy}px`} : {}),
+} as CSSProperties);
 
 type Tag = {id: string; kind: EntryKind; text: string; allIn: boolean; said: string; at: number; offset: number};
 
@@ -99,7 +105,7 @@ const statusOf = (v: SeatView, live: boolean, awaitingChips = false, discarding 
 
 const Seat = ({
     seat, place, stage, view: v, person, mine, live, acting, myTurn, turn, blind, look, anims, privateCards = null, awaitingChips = false, held = 2, discarding = false,
-    discardMark = false,
+    discardMark = false, still = null,
 }: SeatProps) => {
     const name = person?.name ?? '';
     const ours = useMemo(() => anims.filter((a) => {
@@ -174,6 +180,8 @@ const Seat = ({
         );
     }
 
+    // Once its pop is over, the move stays for the street, still — never while the seat is on the clock again.
+    const stillTag = !tag && !acting && still && v.state !== 'folded' ? still : null;
     const label = TABLE_COPY.seatLabel(name, seat, v.chips + v.inPot, acting ? TABLE_COPY.thinking : status, tag?.said ?? null);
 
     return (
@@ -219,6 +227,12 @@ const Seat = ({
                       data-over={place.bet.y < place.plate.y - stage.plateSize.h / 2 ? '' : undefined}
                       data-anim="tag" aria-hidden="true">
                     {tag.text}
+                </span>
+            )}
+            {stillTag && (
+                <span key={`still-${stillTag.kind}-${stillTag.amount}`} className="pn-tag chrome-surface" data-kind={stillTag.kind} data-all-in={stillTag.allIn ? '' : undefined}
+                      data-over={place.bet.y < place.plate.y - stage.plateSize.h / 2 ? '' : undefined} data-tag-still="" aria-hidden="true">
+                    {stillTag.text}
                 </span>
             )}
             {count && win && (

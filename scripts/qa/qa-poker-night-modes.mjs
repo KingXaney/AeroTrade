@@ -76,6 +76,17 @@
 // a card another player threw away, each player's history and log their own; the next hand on the
 // phones turned on their sides, and under reduced motion a card thrown away is never seen leaving.
 //
+// Batch B (P8): the table's feel. Sounds: on a page that counts every sound it plays (SOUND_PROBE), each
+// of the ten things thrown lands with its own layered recipe — the very parts sounds.soundParts makes
+// of emotes.landingSound from the throw's id — ten recipes, a second tomato unlike the first; the
+// menu's Sound off (a throw then lands silent) and on. On a phone's turn the dock's edge and "Your
+// turn" breathe (still under reduced motion); the raise panel's − and + step a big blind and a ½ pot
+// raise is remembered for the next preflop; a move's tag stays for the street; the banner opens the
+// hand log and an open seat the invite sheet; out of chips, one tap asks for the whole buy-in and
+// "Other" opens the bank. Nine seats on 320 × 568 and 375 × 667 phones (and a watcher): every hand
+// turned up at a showdown clear of every other plate and flag; and on phones on their sides the
+// dock's hand name whole, the longest a name gets in its two lines.
+//
 // Every surface at 390×844, 375×667, 320×568 and on its side at 844×390: nothing scrolls sideways,
 // every target is at least 44 px, nothing overlaps. The no-advice list (and the poker night copy's
 // own rules: no sentence opening on Hold, Buy or Sell, no currency word) over every new surface.
@@ -90,16 +101,18 @@ import {BASE, MONGO, REPO_ROOT, check, note, outDir, signUp, summary} from './li
 const OUT = outDir('poker-night-modes');
 const jiti = createJiti(import.meta.url, {alias: {'@': REPO_ROOT.replace(/\/$/, '')}, fsCache: false});
 const lib = (path) => jiti.import(`${REPO_ROOT}${path}`);
-const {PN_PROTOCOL} = await lib('lib/poker-night/http.ts');
+const {PN_PROTOCOL, PASS_HEADER} = await lib('lib/poker-night/http.ts');
 const {TAP_SHIELD_MS} = await lib('lib/poker-night/keys.ts');
 const {cardLabel} = await lib('lib/poker/cards.ts');
 const {findBanned, stripProhibitions} = await lib('lib/learn/banned.ts');
-const {TABLE_COPY, HOST_COPY, HANDS_COPY, HOME_PANEL_COPY, POKER_NIGHT_COPY, FELT_COPY, JOIN_COPY, BANK_COPY, ASK_COPY, MODE_COPY, ACTION_COPY, INVITE_COPY, DISCARD_COPY, LOG_COPY, HAND_COPY} = await lib('lib/learn/copy/poker-night.ts');
+const {TABLE_COPY, HOST_COPY, HANDS_COPY, HOME_PANEL_COPY, POKER_NIGHT_COPY, FELT_COPY, JOIN_COPY, BANK_COPY, ASK_COPY, MODE_COPY, ACTION_COPY, INVITE_COPY, DISCARD_COPY, LOG_COPY, HAND_COPY, SHORTCUTS_COPY, LOOKS_COPY} = await lib('lib/learn/copy/poker-night.ts');
 const {evaluateCards} = await lib('lib/poker/evaluator.ts');
 const {ASK_ANSWERS, ASKS, LEDGER_KINDS, ENTRY_KINDS} = await lib('lib/poker-night/config.ts');
 const {autoDiscard} = await lib('lib/poker-night/variants.ts');
 const {legalFor, snapshotFromState} = await lib('lib/poker-night/betting.ts');
 const {livePots} = await lib('lib/poker-night/views.ts');
+const {soundParts, soundSeed} = await lib('lib/poker-night/sounds.ts');
+const {landingSound, THROW_IDS} = await lib('lib/poker-night/emotes.ts');
 
 const ENV = 'development'; // the harness sets no VERCEL_ENV
 const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
@@ -168,6 +181,59 @@ const TOAST_PROBE = () => {
     };
     new MutationObserver(look).observe(document, {subtree: true, childList: true, characterData: true});
 };
+// Every sound a page plays, as the recipe it was made from (window.__pnBurstSigs): the table's sounds
+// are oscillators (a tone) and biquad filters over noise (a noise), all made at once when a sound plays
+// (components/poker-night/sound-player), so the nodes one task makes are one sound — each listed as its
+// kind, its wave or filter and the frequency it starts at, the shape lib/poker-night/sounds.soundParts
+// gives in Node. window.__pnAudioState: the page's audio context's state.
+const SOUND_PROBE = () => {
+    const bursts = [];
+    let open = null;
+    let made = null;
+    const proto = window.BaseAudioContext?.prototype;
+    if (!proto) return;
+    const note = (ctx, node, kind) => {
+        made = ctx;
+        if (!open) {
+            open = [];
+            bursts.push(open);
+            queueMicrotask(() => {
+                open = null;
+            });
+        }
+        const rec = {kind, node, hz: null};
+        open.push(rec);
+        const param = node.frequency;
+        const set = param.setValueAtTime.bind(param);
+        param.setValueAtTime = (value, at) => {
+            if (rec.hz === null) rec.hz = value;
+            return set(value, at);
+        };
+    };
+    for (const [name, kind] of [['createOscillator', 'tone'], ['createBiquadFilter', 'noise']]) {
+        const make = proto[name];
+        proto[name] = function (...args) {
+            const node = make.apply(this, args);
+            note(this, node, kind);
+            return node;
+        };
+    }
+    const remember = (ctx) => {
+        made = ctx;
+    };
+    const Base = window.AudioContext;
+    if (Base) {
+        window.AudioContext = class extends Base {
+            constructor(...args) {
+                super(...args);
+                remember(this);
+            }
+        };
+    }
+    window.__pnAudioState = () => made?.state ?? null;
+    window.__pnBurstSigs = () => bursts.map((b) => b.map((r) => `${r.kind}:${r.node.type}:${Math.round(r.hz)}`).sort().join('|'));
+};
+
 const toasted = (page, text, timeout = 10000) => page.waitForFunction((t) => window.__pnToasts.some((x) => x.text.includes(t)), text, {timeout})
     .then(() => true, () => false);
 
@@ -410,7 +476,7 @@ const dialogOk = (m, phone) => m !== null && m.inside && m.small.length === 0 &&
 
 const api = async (p, route, body) => {
     const res = await p.context.request.fetch(`${BASE}/api/poker-night/${code}/${route}`, {
-        method: 'POST', headers: {'x-pn-protocol': String(PN_PROTOCOL), 'content-type': 'application/json', origin: BASE},
+        method: 'POST', headers: {'x-pn-protocol': String(PN_PROTOCOL), 'content-type': 'application/json', origin: BASE, ...(p.pass ? {[PASS_HEADER]: p.pass} : {})},
         data: JSON.stringify(body), failOnStatusCode: false, timeout: 60000,
     });
     let json = null;
@@ -3132,6 +3198,446 @@ try {
         for (const g of guests) await resize(g.page, g.size);
         await endTable(H);
         for (const g of guests) g.gone = true;
+    }
+
+    // ═══ P8: the table's feel — sounds, the menu's Sound, still tags, the raise panel, the one-tap rebuy ═══
+    // A Texas hold'em table of three: the host at 1440 × 900, Tess on a 390 × 844 phone (her page counts
+    // every sound it plays: SOUND_PROBE) and Sam on a 375 × 667 phone. Before the first deal Sam throws
+    // each of the ten things at Tess: on her screen each lands with its own sound, the very recipe
+    // (sounds.soundParts) of its own landing (emotes.landingSound) from the throw's id (sounds.soundSeed),
+    // ten recipes and no two alike; a second tomato sounds unlike the first. The menu's Sound turns the
+    // sounds off (a throw then lands silent) and on again, said as M says it. Then hand 1: on Tess's turn
+    // the dock's edge and "Your turn" breathe (.pn-pulse), still under reduced motion; the raise panel's
+    // − and + step a big blind (44 px each) and a ½ pot raise is remembered for the next hand's preflop;
+    // her raise's tag stays on her plate, still, three seconds on; the winner's banner opens the hand log
+    // and an open seat the invite sheet. Then Sam's chips go to the host (seeded in Mongo, every chip
+    // accounted for): the dock offers "Ask for 2,000" in one tap and "Other" (the bank), the host's yes
+    // lands them.
+    // The host's earlier tables, still open where a hand was left in play: set idle in Mongo, as a table
+    // nobody has touched for thirteen hours is (not counted against the host's three, and its next write
+    // closes it), so the lobby offers a new one.
+    const retireTables = async () => {
+        await endTable(H);
+        await rooms.updateMany({env: ENV, status: {$ne: 'closed'}}, {$set: {lastActivityAt: new Date(Date.now() - 13 * 3600_000)}});
+    };
+    {
+        await retireTables();
+        await db.collection('ratelimits').deleteMany({key: /^poker-night:/});
+        await H.page.goto(`${BASE}/poker-night`, {waitUntil: 'load', timeout: 180000});
+        await H.page.click('[data-quick-start="holdem"]');
+        await H.page.waitForURL(/\/play\/[A-HJ-NP-Z2-9]{6}(\?.*)?$/, {timeout: 120000});
+        code = new URL(H.page.url()).pathname.split('/').pop();
+        await H.page.waitForSelector('[data-pn-drawer="invite"]', {timeout: 60000}).catch(() => {});
+        await H.page.keyboard.press('Escape');
+        H.pid = (await roomDoc()).state.hostPid;
+        const Tess = await newPlayer('p8Tess', PHONE(390, 844));
+        await Tess.context.addInitScript(SOUND_PROBE);
+        const Sam = await newPlayer('p8Sam', PHONE(375, 667));
+        await sitDown(Tess, 'Tess');
+        await sitDown(Sam, 'Sam');
+        await hostOp(H, {op: 'config', patch: {turnSeconds: 120, buyInMin: 1000}});
+        // A key press is the gesture that wakes Tess's audio.
+        await Tess.page.keyboard.press('Shift');
+        const running = await Tess.page.waitForFunction(() => window.__pnAudioState?.() === 'running', null, {timeout: 10000}).then(() => true, () => false);
+        const sigOf = (parts) => parts.map((p) => (p.kind === 'tone' ? `tone:${p.wave}:${p.freq}` : `noise:${p.filter}:${p.freq}`)).sort().join('|');
+        const shapeOf = (sig) => sig.split('|').map((x) => x.split(':').slice(0, 2).join(':')).join('|');
+        // The kinds of layer a sound is made of, whatever their count (a tomato's drips vary in number).
+        const layersOf = (sig) => [...new Set(sig.split('|').map((x) => x.split(':').slice(0, 2).join(':')))].sort().join('|');
+        // A toast at the top of a phone sits over the top bar's buttons for its few seconds.
+        const quiet = (page) => page.waitForFunction(() => !document.querySelector('[data-sonner-toast]'), null, {timeout: 15000}).catch(() => {});
+        const heard = () => Tess.page.evaluate(() => window.__pnBurstSigs());
+        // Sam throws `item` at Tess; the landing's sound on Tess's screen, against its recipe.
+        const throwAt = async (item) => {
+            const before = (await heard()).length;
+            const sent = await api(Sam, 'emote', {kind: 'throw', item, to: Tess.pid});
+            const doc = await roomDoc();
+            const emote = [...(doc.emotes ?? [])].reverse().find((e) => e.kind === 'throw' && e.item === item && e.from === Sam.pid);
+            const expected = emote ? sigOf(soundParts(landingSound(item), soundSeed(emote.id))) : null;
+            const landed = await Tess.page.waitForSelector(`[data-splat="${item}"]`, {timeout: 9000, state: 'attached'}).then(() => true, () => false);
+            await sleep(400);
+            const sigs = (await heard()).slice(before);
+            await sleep(900);
+            return {item, status: sent.status, landed, expected, sigs, played: expected !== null && sigs.includes(expected)};
+        };
+        const landings = [];
+        for (const item of THROW_IDS) landings.push(await throwAt(item));
+        const again = await throwAt('tomato');
+        const distinct = new Set(landings.map((l) => l.expected)).size;
+        const shapes = new Set(landings.map((l) => l.expected && shapeOf(l.expected))).size;
+        check(`sounds: each of the ten things thrown lands on its target's screen with its own recipe, played from the throw's id (${landings.filter((l) => l.played).length} of 10 heard, ${distinct} recipes, ${shapes} layer shapes)`,
+            running && landings.every((l) => l.status === 200 && l.landed && l.played) && distinct === 10 && shapes === 10,
+            JSON.stringify({running, missed: landings.filter((l) => !l.played).map((l) => ({item: l.item, status: l.status, landed: l.landed, heard: l.sigs.length}))}));
+        const fish = landings.find((l) => l.item === 'fish');
+        const fishParts = fish?.expected?.split('|') ?? [];
+        check('…the fish a wet slap: a low body under 180 Hz, a broadband slap, squelches and droplets — more layers than a pop',
+            fishParts.some((x) => /^tone:sine:(\d+)$/.test(x) && Number(x.split(':')[2]) <= 180) && fishParts.some((x) => x.startsWith('noise:highpass'))
+            && fishParts.filter((x) => x.startsWith('noise:bandpass')).length >= 2 && fishParts.length >= 8, fish?.expected ?? 'none');
+        const tomato = landings.find((l) => l.item === 'tomato');
+        check('…and a second tomato never sounds quite like the first: its own recipe from its own id, the same kinds of layer',
+            again.played && again.expected !== tomato?.expected && layersOf(again.expected ?? '') === layersOf(tomato?.expected ?? '-'), JSON.stringify({first: tomato?.expected, second: again.expected}));
+
+        // The menu's Sound: a check, off and on, said as M says it; a throw while off lands silent.
+        const menuSound = async () => {
+            await quiet(Tess.page);
+            await Tess.page.click('[data-open="menu"]');
+            const item = await Tess.page.waitForSelector('[data-menu="sound"]', {timeout: 10000});
+            const checked = await item.getAttribute('aria-checked');
+            const label = (await item.textContent())?.trim() ?? '';
+            const box = await item.boundingBox();
+            return {item, checked, label, h: box?.height ?? 0};
+        };
+        const on = await menuSound();
+        await on.item.click();
+        const offSaid = await toasted(Tess.page, SHORTCUTS_COPY.soundOff, 6000);
+        await Tess.page.waitForSelector('[data-menu="sound"]', {state: 'detached', timeout: 5000}).catch(() => {});
+        const off = await menuSound();
+        await Tess.page.keyboard.press('Escape');
+        const silent = await throwAt('fish');
+        const back = await menuSound();
+        await back.item.click();
+        const onSaid = await toasted(Tess.page, SHORTCUTS_COPY.soundOn, 6000);
+        check(`the table's menu has "${LOOKS_COPY.sound}" as a check (44 px): off ("${SHORTCUTS_COPY.soundOff}"), a throw then lands without a sound, and on again ("${SHORTCUTS_COPY.soundOn}")`,
+            on.checked === 'true' && on.label === LOOKS_COPY.sound && on.h >= 43.5 && offSaid && off.checked === 'false' && silent.landed && silent.sigs.length === 0 && onSaid,
+            JSON.stringify({on: on.checked, label: on.label, h: on.h, offSaid, off: off.checked, silentLanded: silent.landed, silentHeard: silent.sigs.length, onSaid}));
+
+        // ── hand 1 ──
+        await H.page.waitForSelector('[data-pn-seat-controls][data-pn-armed] [data-pn-control="deal"]:not([disabled])', {timeout: 30000});
+        await H.page.click('[data-pn-control="deal"]');
+        let d = await waitDoc((x) => x.state.hand?.phase === 'betting', 30000);
+        const handNo = d.state.hand.no;
+        const seatT = seatIndex(d, Tess);
+        const actors = [H, Tess, Sam];
+        // Everyone but Tess calls (or checks) by the API until it is Tess's turn, or the hand ends.
+        const untilTess = async (timeout = 60000) => {
+            const t0 = Date.now();
+            while (Date.now() - t0 < timeout) {
+                const doc = await roomDoc();
+                const hand = doc.state.hand;
+                if (!hand || hand.no !== handNo || hand.phase === 'complete') return doc;
+                if (hand.phase !== 'betting' || hand.actor === null) {
+                    await sleep(150);
+                    continue;
+                }
+                if (hand.actor === seatT) return doc;
+                const actor = actors.find((p) => p.pid === doc.state.seats[hand.actor]?.pid);
+                const legal = legalFor(snapshotFromState(doc.state), hand.actor);
+                const r = await api(actor, 'action', {actionId: randomUUID(), type: 'act', turn: doc.state.turn, move: legal.check ? {kind: 'check'} : {kind: 'call'}});
+                if (r.status !== 200) throw new Error(`P8: ${actor.name}'s move answered ${r.status}`);
+                for (let i = 0; i < 100 && (await roomDoc()).state.turn === doc.state.turn; i++) await sleep(100);
+            }
+            throw new Error('P8: no turn for Tess');
+        };
+        d = await untilTess();
+        await Tess.page.waitForSelector('[data-pn-actions][data-pn-armed]', {timeout: 20000});
+        const cue = () => Tess.page.evaluate(() => {
+            const edge = document.querySelector('[data-pn-turn-cue]');
+            const pill = document.querySelector('[data-pn-clock].pn-turn-cue');
+            const r = edge?.getBoundingClientRect();
+            return {
+                edge: edge ? getComputedStyle(edge).animationName : null, pill: pill ? getComputedStyle(pill).animationName : null,
+                drawn: r ? r.width > 100 && r.height >= 2 : false, dock: document.querySelector('[data-pn-dock]')?.hasAttribute('data-pn-turn') ?? false,
+            };
+        });
+        const moving = await cue();
+        await Tess.page.emulateMedia({reducedMotion: 'reduce'});
+        await sleep(300);
+        const still = await cue();
+        await Tess.page.emulateMedia({reducedMotion: 'no-preference'});
+        await shot(Tess.page, 'p8-turn-cue-390x844');
+        check('on Tess\'s turn (a phone that cannot buzz) the dock\'s edge and "Your turn" breathe on .pn-pulse; under reduced motion both stay, still',
+            moving.edge === 'pn-pulse' && moving.pill === 'pn-pulse' && moving.drawn && moving.dock && still.edge === 'none' && still.pill === 'none' && still.drawn,
+            JSON.stringify({moving, still}));
+
+        // The raise panel: − and + a big blind at a time, 44 px each; ½ pot confirmed and remembered.
+        await Tess.page.click('[data-pn-action="raise"]');
+        await Tess.page.waitForSelector('[data-pn-raise]', {timeout: 10000});
+        const amount = () => Tess.page.inputValue('[data-pn-amount]').then((t) => Number(t.replace(/[^0-9]/g, '')));
+        const opened = await amount();
+        await Tess.page.click('[data-pn-step="more"]');
+        const up = await amount();
+        await Tess.page.click('[data-pn-step="less"]');
+        const down = await amount();
+        const steppers = await Tess.page.$$eval('[data-pn-step]', (els) => els.map((el) => {
+            const r = el.getBoundingClientRect();
+            return {w: Math.round(r.width), h: Math.round(r.height), label: el.getAttribute('aria-label')};
+        }));
+        const panelM = await targets(Tess.page, '[data-pn-raise]');
+        await shot(Tess.page, 'p8-raise-steppers-390x844');
+        const bb = d.state.config.bigBlind;
+        check(`the raise panel's − and + step a big blind (${ACTION_COPY.less(bb)}, ${ACTION_COPY.more(bb)}), each 44 px, the panel's targets apart and on screen`,
+            opened === d.state.hand.currentBet + d.state.hand.increment && up === opened + bb && down === opened && steppers.length === 2
+            && steppers.every((s) => s.w >= 43.5 && s.h >= 43.5) && steppers.map((s) => s.label).join() === [ACTION_COPY.less(bb), ACTION_COPY.more(bb)].join() && targetsOk(panelM),
+            JSON.stringify({opened, up, down, steppers, m: brief(panelM)}));
+        const half = await Tess.page.locator('[data-size="half"]').count();
+        if (half) await Tess.page.click('[data-size="half"]');
+        const raisedTo = await amount();
+        await Tess.page.click('[data-pn-action="confirm"]');
+        await waitDoc((x) => x.state.turn !== d.state.turn, 10000);
+        const memory = await Tess.page.evaluate(() => localStorage.getItem('aero-poker-night:sizes'));
+        check('…½ pot confirmed: the size is kept in this browser for the next preflop ({"pre":"half"})', half === 1 && JSON.parse(memory ?? '{}').pre === 'half',
+            JSON.stringify({half, memory, raisedTo}));
+        // Three seconds on, Tess's move is still on her plate, on every screen.
+        await sleep(3000);
+        // Each page sees the raise on its next poll: its tag pops, then stays, still.
+        const tagOf = (p) => p.page.waitForSelector(`[data-seat="${seatT}"] [data-tag-still]`, {timeout: 8000}).then((el) => el.textContent(), () => null);
+        const tags = {tess: await tagOf(Tess), sam: await tagOf(Sam), host: await tagOf(H)};
+        check(`a move's tag stays for the street, still, on every screen ("${ACTION_COPY.tag('raise', raisedTo, false)}" three seconds on)`,
+            Object.values(tags).every((t) => t === ACTION_COPY.tag('raise', raisedTo, false)), JSON.stringify(tags));
+        // The rest of the hand checked or called down by the API, Tess checking or calling by the API too;
+        // the table paused first, so the result stays on screen once the hand is over.
+        await hostOp(H, {op: 'pause'});
+        for (let guard = 0; guard < 40; guard++) {
+            const doc = await untilTess();
+            if (doc.state.hand.phase === 'complete' || doc.state.hand.no !== handNo) break;
+            const legal = legalFor(snapshotFromState(doc.state), seatT);
+            await api(Tess, 'action', {actionId: randomUUID(), type: 'act', turn: doc.state.turn, move: legal.check ? {kind: 'check'} : {kind: 'call'}});
+            for (let i = 0; i < 100 && (await roomDoc()).state.turn === doc.state.turn; i++) await sleep(100);
+        }
+        d = await waitDoc((x) => x.state.hand?.no === handNo && x.state.hand.phase === 'complete', 30000);
+        // The banner opens the hand log; an open seat, the invite sheet.
+        await Tess.page.waitForSelector('[data-pn-banner]', {timeout: 20000});
+        const bannerLabel = await Tess.page.getAttribute('[data-pn-banner]', 'aria-label');
+        await Tess.page.click('[data-pn-banner]');
+        const logOpen = await Tess.page.waitForSelector('[data-pn-drawer="log"]', {timeout: 10000}).then(() => true, () => false);
+        await shot(Tess.page, 'p8-banner-log-390x844');
+        await Tess.page.keyboard.press('Escape');
+        await Tess.page.waitForSelector('[data-pn-drawer="log"]', {state: 'detached', timeout: 10000}).catch(() => {});
+        check('the winner\'s banner is a button that opens the hand log ("… Open the hand log")', logOpen && (bannerLabel ?? '').endsWith('Open the hand log'), String(bannerLabel));
+        const inviteSeat = await Tess.page.$eval('[data-invite-seat]', (el) => ({text: el.textContent, label: el.getAttribute('aria-label'), seat: Number(el.getAttribute('data-invite-seat'))})).catch(() => null);
+        await Tess.page.click('[data-invite-seat]');
+        const inviteOpen = await Tess.page.waitForSelector('[data-pn-drawer="invite"]', {timeout: 10000}).then(() => true, () => false);
+        await Tess.page.keyboard.press('Escape');
+        await Tess.page.waitForSelector('[data-pn-drawer="invite"]', {state: 'detached', timeout: 10000}).catch(() => {});
+        check(`for a seated player an open seat says "${TABLE_COPY.inviteSeat}" and opens the invite sheet`,
+            inviteSeat !== null && inviteSeat.text === TABLE_COPY.inviteSeat && inviteSeat.label === TABLE_COPY.inviteToSeat(inviteSeat.seat) && inviteOpen, JSON.stringify({inviteSeat, inviteOpen}));
+
+        // ── hand 2: the remembered size; then Sam out of chips and the one-tap rebuy ──
+        await hostOp(H, {op: 'resume'});
+        d = await waitDoc((x) => x.state.hand?.no === handNo + 1 && x.state.hand.phase === 'betting', 30000);
+        const handNo2 = handNo + 1;
+        {
+            const t0 = Date.now();
+            while (Date.now() - t0 < 60000) {
+                const doc = await roomDoc();
+                const hand = doc.state.hand;
+                if (hand.no !== handNo2 || hand.phase !== 'betting' || hand.actor === null) {
+                    await sleep(150);
+                    continue;
+                }
+                if (hand.actor === seatT) break;
+                const actor = actors.find((p) => p.pid === doc.state.seats[hand.actor]?.pid);
+                const legal = legalFor(snapshotFromState(doc.state), hand.actor);
+                await api(actor, 'action', {actionId: randomUUID(), type: 'act', turn: doc.state.turn, move: legal.check ? {kind: 'check'} : {kind: 'call'}});
+                for (let i = 0; i < 100 && (await roomDoc()).state.turn === doc.state.turn; i++) await sleep(100);
+            }
+        }
+        await Tess.page.waitForSelector('[data-pn-actions][data-pn-armed] [data-pn-action="raise"]', {timeout: 20000});
+        await Tess.page.click('[data-pn-action="raise"]');
+        await Tess.page.waitForSelector('[data-pn-raise]', {timeout: 10000});
+        const pressed = await Tess.page.$eval('[data-pn-raise] [aria-pressed="true"]', (el) => el.getAttribute('data-size')).catch(() => null);
+        check('…the next preflop\'s raise panel opens at ½ pot, the size remembered', pressed === 'half', String(pressed));
+        // The panel with its steppers on a phone on its side, in the dock's column: every target 44 px,
+        // apart and on screen, the amount between − and + still read.
+        for (const side of [{width: 568, height: 320}, {width: 844, height: 390}]) {
+            await resize(Tess.page, side);
+            const m = await targets(Tess.page, '[data-pn-raise]');
+            const field = await Tess.page.$eval('[data-pn-amount]', (el) => ({w: Math.round(el.getBoundingClientRect().width), whole: el.scrollWidth <= el.clientWidth + 1}));
+            await shot(Tess.page, `p8-raise-steppers-${sizeFile(side)}`);
+            check(`…the raise panel on a phone on its side (${sizeName(side)}): its sizes, slider, − and + and confirm 44 px, apart, on screen, the amount whole`,
+                targetsOk(m) && field.w >= 48 && field.whole, JSON.stringify({m: brief(m), field}));
+        }
+        await resize(Tess.page, {width: 390, height: 844});
+        await Tess.page.click('[data-pn-back]');
+        // Hand 2 called down (the table paused for after it); then Sam's chips to the host, between hands
+        // (every chip still counted).
+        await hostOp(H, {op: 'pause'});
+        for (let guard = 0; guard < 40; guard++) {
+            const doc = await roomDoc();
+            const hand = doc.state.hand;
+            if (hand.no !== handNo2 || hand.phase === 'complete') break;
+            if (hand.phase !== 'betting' || hand.actor === null) {
+                await sleep(150);
+                continue;
+            }
+            const actor = actors.find((p) => p.pid === doc.state.seats[hand.actor]?.pid);
+            const legal = legalFor(snapshotFromState(doc.state), hand.actor);
+            await api(actor, 'action', {actionId: randomUUID(), type: 'act', turn: doc.state.turn, move: legal.check ? {kind: 'check'} : {kind: 'call'}});
+            for (let i = 0; i < 100 && (await roomDoc()).state.turn === doc.state.turn; i++) await sleep(100);
+        }
+        d = await waitDoc((x) => x.state.hand?.no === handNo2 && x.state.hand.phase === 'complete', 30000);
+        const seatS = seatIndex(d, Sam);
+        const seatH = seatIndex(d, H);
+        const samChips = d.state.seats[seatS].stack;
+        await rooms.updateOne({env: ENV, code}, {$set: {[`state.seats.${seatS}.stack`]: 0, [`state.seats.${seatH}.stack`]: d.state.seats[seatH].stack + samChips}, $inc: {seq: 1}});
+        await Sam.page.reload({waitUntil: 'load'});
+        const rebuy = await Sam.page.waitForSelector('[data-pn-seat-controls][data-pn-armed] [data-pn-control="rebuy"]', {timeout: 20000})
+            .then(async (el) => ({text: (await el.innerText()).trim(), label: await el.getAttribute('aria-label'), asks: await el.getAttribute('data-pn-asks')}), () => null);
+        const other = await Sam.page.$eval('[data-pn-control="rebuy-other"]', (el) => ({text: el.innerText.trim(), label: el.getAttribute('aria-label')})).catch(() => null);
+        const rowM = await targets(Sam.page, '[data-pn-seat-controls]');
+        await shot(Sam.page, 'p8-one-tap-rebuy-375x667');
+        const buyMax = d.state.config.buyInMax;
+        check(`Sam out of chips: one tap "${BANK_COPY.askShort(buyMax)}" (named "${BANK_COPY.askFor(buyMax)}": the host says yes once the game has started) and "${BANK_COPY.otherShort}" (the bank), each 44 px, the row on screen`,
+            rebuy?.text === BANK_COPY.askShort(buyMax) && rebuy.label === BANK_COPY.askFor(buyMax) && rebuy.asks === '' && other?.text === BANK_COPY.otherShort
+            && other.label === BANK_COPY.otherAmount && targetsOk(rowM), JSON.stringify({rebuy, other, m: brief(rowM)}));
+        await Sam.page.click('[data-pn-control="rebuy-other"]');
+        const bankOpen = await Sam.page.waitForSelector('[data-pn-drawer="bank"]', {timeout: 10000}).then(() => true, () => false);
+        await Sam.page.keyboard.press('Escape');
+        await Sam.page.waitForSelector('[data-pn-drawer="bank"]', {state: 'detached', timeout: 10000}).catch(() => {});
+        await Sam.page.click('[data-pn-control="rebuy"]');
+        const asked = await waitDoc((x) => x.state.requests.some((r) => r.pid === Sam.pid && r.amount === buyMax), 10000);
+        const askedSaid = await toasted(Sam.page, BANK_COPY.requested(buyMax), 8000);
+        const yes = await hostOp(H, {op: 'approve', pid: Sam.pid});
+        const landed = await waitDoc((x) => x.state.seats[seatS]?.stack === buyMax && !x.state.requests.some((r) => r.pid === Sam.pid), 10000);
+        check('…"Other" opens the bank; one tap asks for the whole buy-in (told so), and the host\'s yes lands it, every chip accounted for',
+            bankOpen && asked !== null && askedSaid && yes.status === 200 && landed !== null && ledgerRow(landed, Sam)?.bought === 2 * buyMax,
+            JSON.stringify({bankOpen, asked: asked !== null, askedSaid, yes: yes.status, landed: landed !== null, row: landed && ledgerRow(landed, Sam)}));
+        await wording(Sam.page, 'the one-tap rebuy', '[data-pn-dock]');
+        await endTable(H);
+        for (const p of [Tess, Sam]) p.gone = true;
+    }
+
+    // ═══ P8: nine seats on small phones — every hand turned up, none over another plate or flag ═══
+    // A nine-seat table started from the lobby's form: the host, six guests by the API alone, Pia on a
+    // 320 × 568 phone and Quin on a 375 × 667 one, and a watcher on a 320 × 568 phone. Hand 1 checked down
+    // to a showdown, all nine hands turned up: on each phone every turned-up hand clears every other plate
+    // (stage.placeHands: along its row, beside its plate or on its other side). Hand 2, three fold first:
+    // six hands up, and none covers another plate or the flag under one. Then the two phones on their
+    // sides (568 × 320, 667 × 375) and a third at 844 × 390 during a hand: the dock's hand name whole —
+    // and the longest a hand's name gets ("Full house, threes full of sevens") fits in its two lines.
+    {
+        await retireTables();
+        await db.collection('ratelimits').deleteMany({key: /^poker-night:/});
+        await H.page.goto(`${BASE}/poker-night`, {waitUntil: 'load', timeout: 180000});
+        await H.page.click('[data-poker-night-setup] summary');
+        await H.page.waitForSelector('[data-create-table] [data-field="seats"]', {timeout: 10000});
+        await H.page.selectOption('[data-create-table] [data-field="seats"]', '9');
+        await H.page.click('[data-create-table] button[type="submit"]');
+        await H.page.waitForURL(/\/play\/[A-HJ-NP-Z2-9]{6}(\?.*)?$/, {timeout: 120000});
+        code = new URL(H.page.url()).pathname.split('/').pop();
+        await H.page.waitForSelector('[data-pn-drawer="invite"]', {timeout: 60000}).catch(() => {});
+        await H.page.keyboard.press('Escape');
+        let d = await roomDoc();
+        H.pid = d.state.hostPid;
+        const AV = ['v1:cat:sky:none:none', 'v1:panda:mint:ring:star', 'v1:owl:grape:none:none', 'v1:frog:lime:none:none', 'v1:bee:lemon:dashed:none', 'v1:whale:ocean:none:none'];
+        const bots = [];
+        for (let i = 0; i < 6; i++) {
+            const p = await newPlayer(`p8bot${i}`, {});
+            const r = await api(p, 'join', {joinId: randomUUID(), name: ['Ada', 'Bo', 'Cass', 'Dov', 'Eli', 'Fay'][i], avatar: AV[i], as: 'player'});
+            p.pid = r.body?.me?.pid ?? null;
+            // The seat pass: each player's moves counted in a bucket of their own, not the address's.
+            p.pass = r.body?.pass ?? null;
+            bots.push(p);
+        }
+        const Pia = await newPlayer('p8Pia', PHONE(320, 568));
+        const Quin = await newPlayer('p8Quin', PHONE(375, 667));
+        await sitDown(Pia, 'Pia');
+        await sitDown(Quin, 'Quin');
+        const Wat = await newPlayer('p8Watch', PHONE(320, 568));
+        await Wat.page.goto(`${BASE}/play/${code}`, {waitUntil: 'load', timeout: 120000});
+        await Wat.page.waitForSelector('[data-join-card="visitor"]', {timeout: 60000});
+        await Wat.page.click('[data-join-watch]');
+        await Wat.page.waitForSelector('[data-pn-ready="true"]', {timeout: 30000}).catch(() => {});
+        d = await roomDoc();
+        const nine = [H, ...bots, Pia, Quin];
+        check('nine seated at a nine-seat table: the host, six guests by the API, two phones; and a watcher', d.state.config.seats === 9 && d.state.seats.every((s) => s !== null)
+            && nine.every((p) => seatIndex(d, p) >= 0), JSON.stringify(d.state.seats.map((s) => s?.pid ?? null)));
+        await hostOp(H, {op: 'config', patch: {turnSeconds: 120}});
+        const byPid = (pid) => nine.find((p) => p.pid === pid);
+        const playHand = async (no, fold) => {
+            for (let guard = 0; guard < 120; guard++) {
+                const doc = await roomDoc();
+                const hand = doc.state.hand;
+                if (hand?.no === no && hand.phase === 'complete') return doc;
+                if (!hand || hand.no !== no || hand.phase !== 'betting' || hand.actor === null) {
+                    await sleep(150);
+                    continue;
+                }
+                const actor = byPid(doc.state.seats[hand.actor].pid);
+                const legal = legalFor(snapshotFromState(doc.state), hand.actor);
+                const move = fold(actor, doc) ? {kind: 'fold'} : legal.check ? {kind: 'check'} : {kind: 'call'};
+                const r = await api(actor, 'action', {actionId: randomUUID(), type: 'act', turn: doc.state.turn, move});
+                if (r.status !== 200) throw new Error(`P8 nine: ${actor.name}'s move answered ${r.status} ${JSON.stringify(r.body?.error)}`);
+                for (let i = 0; i < 100 && (await roomDoc()).state.turn === doc.state.turn; i++) await sleep(100);
+            }
+            throw new Error(`P8 nine: hand ${no} did not end`);
+        };
+        // Every turned-up hand on a screen against every other seat's plate and the flag under it.
+        const handsClear = (page) => page.evaluate(() => {
+            const rect = (el) => el.getBoundingClientRect();
+            const hit = (a, b) => a.left < b.right - 1 && b.left < a.right - 1 && a.top < b.bottom - 1 && b.top < a.bottom - 1;
+            const out = [];
+            const hands = [...document.querySelectorAll('.pn-seat-shown')].map((el) => ({seat: el.closest('[data-seat]')?.getAttribute('data-seat'), r: rect(el)}));
+            for (const h of hands) {
+                for (const seat of document.querySelectorAll('[data-seat]')) {
+                    if (seat.getAttribute('data-seat') === h.seat) continue;
+                    const plate = seat.querySelector('.pn-plate');
+                    if (plate && hit(h.r, rect(plate))) out.push(`hand ${h.seat} × plate ${seat.getAttribute('data-seat')}`);
+                    const flag = seat.querySelector('[data-flag]');
+                    if (flag && hit(h.r, rect(flag))) out.push(`hand ${h.seat} × flag ${seat.getAttribute('data-seat')} "${flag.textContent}"`);
+                }
+            }
+            return {hands: hands.length, hits: out};
+        });
+        await H.page.waitForSelector('[data-pn-seat-controls][data-pn-armed] [data-pn-control="deal"]:not([disabled])', {timeout: 30000});
+        await H.page.click('[data-pn-control="deal"]');
+        d = await waitDoc((x) => x.state.hand?.phase === 'betting', 30000);
+        const first = d.state.hand.no;
+        await hostOp(H, {op: 'pause'});
+        await playHand(first, () => false);
+        d = await waitDoc((x) => x.state.hand?.no === first && x.state.hand.phase === 'complete', 30000);
+        const shownAll = d.state.hand.result?.hands?.length ?? 0;
+        await sleep(2500);
+        for (const [p, name, mine] of [[Pia, '320x568', 8], [Quin, '375x667', 8], [Wat, '320x568-watcher', 9]]) {
+            await p.page.waitForSelector('.pn-seat-shown', {timeout: 15000}).catch(() => {});
+            const m = await handsClear(p.page);
+            await shot(p.page, `p8-nine-hands-${name}`);
+            check(`nine hands turned up at a showdown, on the ${name} phone: each of the ${mine} drawn clears every other plate and flag`,
+                shownAll === 9 && m.hands === mine && m.hits.length === 0, JSON.stringify(m));
+        }
+        await hostOp(H, {op: 'resume'});
+        d = await waitDoc((x) => x.state.hand?.no === first + 1 && x.state.hand.phase === 'betting', 30000);
+        const folders = new Set(bots.slice(0, 3).map((p) => p.pid));
+        await hostOp(H, {op: 'pause'});
+        await playHand(first + 1, (actor) => folders.has(actor.pid));
+        d = await waitDoc((x) => x.state.hand?.no === first + 1 && x.state.hand.phase === 'complete', 30000);
+        await sleep(2500);
+        for (const [p, name] of [[Pia, '320x568'], [Quin, '375x667'], [Wat, '320x568-watcher']]) {
+            const m = await handsClear(p.page);
+            const flags = await p.page.$$eval('[data-flag]', (els) => els.map((el) => el.textContent));
+            await shot(p.page, `p8-six-hands-${name}`);
+            check(`three folded, six hands up, on the ${name} phone: no turned-up hand over another plate or a flag under one ("${TABLE_COPY.presence.offline}", the six guests with no page)`,
+                m.hits.length === 0 && flags.length >= 3 && m.hands >= 5, JSON.stringify({m, flags}));
+        }
+        // The dock's hand name on phones on their sides, during a hand.
+        await hostOp(H, {op: 'resume'});
+        d = await waitDoc((x) => x.state.hand?.no === first + 2 && x.state.hand.phase === 'betting', 30000);
+        const LONGEST = 'Full house, threes full of sevens';
+        for (const [p, size] of [[Pia, {width: 568, height: 320}], [Quin, {width: 667, height: 375}], [Quin, {width: 844, height: 390}]]) {
+            const name = sizeFile(size);
+            await resize(p.page, size);
+            await p.page.waitForSelector('[data-pn-strength]', {timeout: 20000}).catch(() => {});
+            const m = await p.page.evaluate((longest) => {
+                const el = document.querySelector('[data-pn-strength]');
+                if (!el) return null;
+                const whole = (e) => e.scrollWidth <= e.clientWidth + 1 && e.scrollHeight <= e.clientHeight + 1;
+                const now = {text: el.textContent, whole: whole(el), inside: el.getBoundingClientRect().right <= innerWidth + 1};
+                const was = el.textContent;
+                el.textContent = longest;
+                const longestWhole = whole(el);
+                const cs = getComputedStyle(el);
+                const lines = Math.round((el.clientHeight - parseFloat(cs.paddingTop) - parseFloat(cs.paddingBottom)) / parseFloat(cs.lineHeight || '15'));
+                el.textContent = was;
+                return {...now, longestWhole, lines};
+            }, LONGEST);
+            await shot(p.page, `p8-dock-name-${name}`);
+            check(`the dock's hand name on a phone on its side (${name}): whole ("${m?.text ?? ''}"), and the longest a name gets in its two lines`,
+                m !== null && m.whole && m.inside && m.longestWhole && m.lines <= 2, JSON.stringify(m));
+        }
+        for (const p of [Pia, Quin]) {
+            await resize(p.page, p === Pia ? {width: 320, height: 568} : {width: 375, height: 667});
+        }
+        await endTable(H);
+        for (const p of [...bots, Pia, Quin, Wat]) p.gone = true;
     }
 
     await endTable(H);

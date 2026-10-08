@@ -69,10 +69,16 @@ export const reactionGlyph = (id: ReactionId): string => String.fromCodePoint(RE
 export const throwGlyph = (id: ThrowId): string => String.fromCodePoint(THROWABLES[id].point);
 export const impactOf = (id: ThrowId): ImpactKind => THROWABLES[id].impact;
 
-// What a landing sounds like (lib/poker-night/sounds): a wet thud only for a splat; a rose or a
-// heart lands with a soft pop, as does confetti or popcorn; a soda fizzes; a ball or a fish bounces.
-const LANDING_SOUNDS: Record<ImpactKind, SoundId> = {splat: 'splat', petals: 'pop', burst: 'pop', fizz: 'fizz', bounce: 'bounce'};
-export const landingSound = (id: ThrowId): SoundId => LANDING_SOUNDS[impactOf(id)];
+// What a landing sounds like (lib/poker-night/sounds): each thing its own — a tomato's juicy splat,
+// an egg's crack and splat, a cake's muffled thud, a rose's and a heart's whoosh and pop, a soda's
+// clink and fizz, confetti's paper pop, popcorn popping, a tennis ball's thock and bounces, a fish's
+// wet slap. Played from the emote's id (sounds.soundSeed), so every screen hears one throw alike and
+// no two throws quite alike.
+const LANDING_SOUNDS = {
+    tomato: 'hit-tomato', rose: 'hit-rose', soda: 'hit-soda', confetti: 'hit-confetti', cake: 'hit-cake', egg: 'hit-egg',
+    'tennis-ball': 'hit-tennis-ball', popcorn: 'hit-popcorn', heart: 'hit-heart', fish: 'hit-fish',
+} as const satisfies Record<ThrowId, SoundId>;
+export const landingSound = (id: ThrowId): SoundId => LANDING_SOUNDS[id];
 
 // ── what a client sends, and what everyone receives ──
 
@@ -322,14 +328,16 @@ export const throwCeiling = (fit: Fit): number => emoteCeiling(fit) + throwPx(fi
 // what the plate carries on top — its turned-up cards, the action tag (which hangs under a plate
 // whose bet line sits over it, data-over) — or, for a seat along the top and any seat whose reaction
 // would rise past emoteCeiling, under the plate (y their top edge), clear of the cards, the tag and
-// the status flag there. `shown`: the seat's cards are turned up beside its plate.
-export const emoteSpot = (place: Pick<SeatPlace, 'plate' | 'bet' | 'spot'>, stage: Pick<Stage, 'plateSize' | 'fit'>, shown: boolean): EmoteSpot => {
+// the status flag there. `shown`: the seat's cards are turned up beside its plate — over it, or (a
+// side seat's moved down off a crowded column's plates: stage.SeatPlace.shownDy) under it.
+export const emoteSpot = (place: Pick<SeatPlace, 'plate' | 'bet' | 'spot'> & {shownDy?: number}, stage: Pick<Stage, 'plateSize' | 'fit'>, shown: boolean): EmoteSpot => {
     const half = stage.plateSize.h / 2;
     const top = place.spot.side === 'top';
     const tagUnder = place.bet.y < place.plate.y - half;
     const cards = shownHeight(stage.fit);
-    const over = Math.max(shown && !top ? SHOWN_OFF.over + cards : 0, tagUnder ? 0 : EMOTE_SIZES.tag);
-    const under = Math.max(EMOTE_SIZES.flag, shown && top ? SHOWN_OFF.under + cards : 0, tagUnder ? SHOWN_OFF.under + EMOTE_SIZES.tag : 0);
+    const cardsUnder = top || (place.shownDy ?? 0) > 0;
+    const over = Math.max(shown && !cardsUnder ? SHOWN_OFF.over + cards : 0, tagUnder ? 0 : EMOTE_SIZES.tag);
+    const under = Math.max(EMOTE_SIZES.flag, shown && cardsUnder ? SHOWN_OFF.under + cards : 0, tagUnder ? SHOWN_OFF.under + EMOTE_SIZES.tag : 0);
     const above = place.plate.y - half - over - EMOTE_SIZES.gap;
     const fits = above - EMOTE_SIZES.rise - reactionPx(stage.fit) >= emoteCeiling(stage.fit);
     if (!top && fits) return {x: place.plate.x, y: Math.round(above), below: false};

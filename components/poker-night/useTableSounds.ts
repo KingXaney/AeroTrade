@@ -52,7 +52,7 @@ export const useTableSounds = (anims: readonly LiveAnim[]): void => {
         for (const cue of fresh) {
             const timer = setTimeout(() => {
                 timers.current.delete(timer);
-                playSound(cue.sound);
+                playSound(cue.sound, cue.seed);
             }, cueDelayMs(cue, unit));
             timers.current.add(timer);
         }

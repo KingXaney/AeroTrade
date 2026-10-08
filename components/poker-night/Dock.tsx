@@ -8,8 +8,9 @@
 // (with "Leave after this hand" beside them, one tap: LeaveAfterToggle), else their seat's own (the
 // host's first deal, "I'm back", "Deal me in", "Sit out next hand", "Show my cards" and Leave
 // whenever they are not playing a hand — the pause after a showdown they reached and a folded hand
-// included —, "Leave after this hand" while all in, and once the stack is empty a rebuy, which opens
-// the bank — or, for a seat that never had chips here, "No chips yet." with one tap that asks the
+// included —, "Leave after this hand" while all in, and once the stack is empty a rebuy in one tap
+// ("Rebuy 2,000 chips", or "Ask for 2,000 chips" where the host says yes first; "Other amount" opens
+// the bank) — or, for a seat that never had chips here, "No chips yet." with one tap that asks the
 // host for them ("Ask for 2,000 chips") — or, while chips wait for the host's yes, "Waiting for the
 // host to approve your chips" with Cancel; once the host has been away ten minutes, that the chips no
 // longer wait for them, with "Take 2,000 chips"). Every leave from here is the room's 'leave-after'
@@ -62,7 +63,7 @@ import {useTapShield} from "@/components/poker-night/useTapShield";
 import {BANK_COPY, DISCARD_COPY, HAND_COPY, INVITE_COPY, JOIN_COPY, LOOKS_COPY, TABLE_COPY} from "@/lib/learn/copy/poker-night";
 import {turnLeft} from "@/lib/poker-night/client-clock";
 import {discardMs, HOLE_CARDS} from "@/lib/poker-night/config";
-import {dockView, handStrength, preRowKey, type DockView} from "@/lib/poker-night/dock";
+import {dockView, handStrength, preRowKey, rebuyTap, type DockView} from "@/lib/poker-night/dock";
 import {hostAwayNow, leaveTapAsks, leftState, type LeftState} from "@/lib/poker-night/overlays";
 import type {ResultLook} from "@/lib/poker-night/reveal";
 import {modeOf} from "@/lib/poker-night/variants";
@@ -73,7 +74,9 @@ const NOTE = 'chrome-surface inline-flex items-center rounded-full px-3 py-1 tex
 const LONG_NOTE = 'chrome-surface inline-flex max-w-full items-center rounded-xl px-3 py-1 text-xs leading-snug text-fg-soft';
 
 // The seconds left on the viewer's own turn (the ring on the plate shows the share), or in Triple
-// T's throw-away ("Throw away one").
+// T's throw-away ("Throw away one"). "Your turn" is ringed in the warning colour and breathes
+// (.pn-pulse, still under either motion guard): with the dock's edge, the cue of a turn on a phone that
+// cannot buzz (an iPhone).
 // A longer label (the throw-away's) may take two lines: the box rounds less then, and the seconds
 // never break. Beside the cards of a phone held upright it says the seconds alone (.pn-clock-label),
 // so the line beside the cards stays lower than the cards and what the two kept make never grows the
@@ -83,7 +86,7 @@ const TurnClock = ({deadline, turnMs, label = TABLE_COPY.yourTurn}: {deadline: n
     const left = turnLeft(deadline, turnMs, now, 0);
     if (!left) return null;
     return (
-        <span className={cn(label === TABLE_COPY.yourTurn ? NOTE : LONG_NOTE, 'gap-1.5 font-semibold text-fg')} role="timer" aria-live="off" aria-label={TABLE_COPY.timer}
+        <span className={cn(label === TABLE_COPY.yourTurn ? cn(NOTE, 'pn-turn-cue pn-pulse') : LONG_NOTE, 'gap-1.5 font-semibold text-fg')} role="timer" aria-live="off" aria-label={TABLE_COPY.timer}
               data-pn-clock={left.seconds}>
             <span className={label === TABLE_COPY.yourTurn ? undefined : 'pn-clock-label'}>{label}</span>
             <span className={cn('whitespace-nowrap font-mono', left.fraction <= 0.3 && 'text-warning')}>{TABLE_COPY.secondsLeft(left.seconds)}</span>
@@ -185,6 +188,41 @@ const FirstChips = ({amount, disabled, tap}: {amount: number; disabled: boolean;
     );
 };
 
+// Out of chips, the table allowing a rebuy: one tap for the whole buy-in — "Rebuy 2,000 chips", or
+// "Ask for 2,000 chips" where the host says yes first (dock.rebuyTap) — and "Other amount", the bank,
+// where there is another to choose. A narrow dock says the figures alone ("Rebuy 2,000", "Other") and
+// leaves "Out of chips" to the plate, so the row keeps to its height. A refusal is a toast; a request
+// is said as sent, and the host's answer by TableOverlays.
+const Rebuy = ({buy, disabled, tap}: {buy: NonNullable<DockView['buy']>; disabled: boolean; tap: Tap}) => {
+    const room = useRoom();
+    const now = useServerNow(5000);
+    const me = room.me;
+    const offer = rebuyTap(buy, me !== null && !me.isHost && (room.view?.handNo ?? 0) > 0 && !hostAwayNow(me, now));
+    if (!offer) return null;
+    const go = async () => {
+        const r = await room.send({type: 'buy', amount: offer.amount});
+        if (!r.ok) toast.error(r.message);
+        else if (r.view.requests.some((q) => q.pid === r.view.me.pid)) toast.message(BANK_COPY.requested(offer.amount));
+        else toast.success(BANK_COPY.approved(offer.amount));
+    };
+    const long = offer.asks ? BANK_COPY.askFor(offer.amount) : BANK_COPY.rebuyFor(offer.amount);
+    return (
+        <>
+            <span className={cn(NOTE, 'pn-wide-only')}>{TABLE_COPY.outOfChips}</span>
+            <ActionButton variant="primary" size="md" className="min-h-12" disabled={disabled} onClick={tap(() => void go())} aria-label={long}
+                          data-pn-control="rebuy" data-pn-asks={offer.asks ? '' : undefined} data-pn-amount={offer.amount}>
+                <Label long={long} short={offer.asks ? BANK_COPY.askShort(offer.amount) : BANK_COPY.rebuyShort(offer.amount)}/>
+            </ActionButton>
+            {offer.other && (
+                <ActionButton variant="secondary" size="md" className="min-h-12" onClick={tap(() => openOverlay('bank'))} aria-label={BANK_COPY.otherAmount}
+                              data-pn-control="rebuy-other">
+                    <Label long={BANK_COPY.otherAmount} short={BANK_COPY.otherShort}/>
+                </ActionButton>
+            )}
+        </>
+    );
+};
+
 const SeatControls = ({dock, disabled}: {dock: DockView; disabled: boolean}) => {
     const room = useRoom();
     const shield = useTapShield();
@@ -225,14 +263,7 @@ const SeatControls = ({dock, disabled}: {dock: DockView; disabled: boolean}) => 
                 <WaitingChips amount={dock.request} disabled={disabled} tap={tap} withdraw={() => void withdraw()}/>
             )}
             {dock.buy?.first && <FirstChips amount={dock.buy.topUp} disabled={disabled} tap={tap}/>}
-            {dock.buy && !dock.buy.first && (
-                <>
-                    <span className={NOTE}>{TABLE_COPY.outOfChips}</span>
-                    <ActionButton variant="primary" size="md" className="min-h-12" onClick={tap(() => openOverlay('bank'))} data-pn-control="rebuy">
-                        {dock.buy.rebuy ? BANK_COPY.rebuy : BANK_COPY.topUp(dock.buy.topUp)}
-                    </ActionButton>
-                </>
-            )}
+            {dock.buy && !dock.buy.first && <Rebuy buy={dock.buy} disabled={disabled} tap={tap}/>}
             {away && <span className={`${NOTE} min-w-0 flex-1`}>{TABLE_COPY.awayNote(room.config.sitOutAfter)}</span>}
             {dock.control === 'sit-in' && <span className={NOTE} data-pn-sat-out={byHost ? 'host' : 'self'}>{byHost ? TABLE_COPY.hostSatYouOut : TABLE_COPY.sittingOut}</span>}
             {(away || dock.control === 'sit-in') && (
@@ -434,8 +465,12 @@ const Dock = ({anims, look}: {anims: readonly LiveAnim[]; look: ResultLook | nul
     // Someone else on the clock in a hand the viewer is in: their name, where the viewer's seconds go.
     const actor = !dock.myTurn && dock.dealtIn && hand?.phase === 'betting' && hand.actor !== null ? view.seats[hand.actor] ?? null : null;
     const waitingFor = actor ? view.people[actor.pid]?.name ?? null : null;
+    // The viewer is wanted: their turn, or a card of theirs to throw away (Triple T).
+    const cue = dock.myTurn || (dock.discard?.pending ?? false);
     return (
-        <section className="pn-dock" aria-label={HAND_COPY.yourHand} data-pn-dock="seated">
+        <section className="pn-dock" aria-label={HAND_COPY.yourHand} data-pn-dock="seated" data-pn-turn={cue ? '' : undefined}>
+            {/* The turn cue a phone that cannot buzz still gets: the dock's edge breathing (motion-guarded). */}
+            {cue && <span className="pn-turn-edge pn-pulse" aria-hidden="true" data-pn-turn-cue=""/>}
             <div className="pn-dock-row">
                 <div className="pn-dock-hand">
                     <DockHand dock={dock} deadline={deadline} waitingFor={waitingFor} anims={anims} look={look} throwing={throwing} disabled={disabled}/>

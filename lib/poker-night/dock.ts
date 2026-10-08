@@ -122,6 +122,15 @@ export const preRowKey = (handNo: number | null, options: readonly PreAction[]):
 export const samePre = (a: PreAction | null, b: PreAction | null): boolean =>
     a !== null && b !== null && a.kind === b.kind && (a.kind !== 'call' || (b.kind === 'call' && a.amount === b.amount));
 
+// The dock's one-tap rebuy, once the stack is empty and the table allows one: the whole buy-in the
+// table allows (the bank's top-up) in one tap — asked of the host where it says yes first (once the
+// game has started, for anyone but the host, while the host is here: overlays.ownChips' asksHost) —
+// and "Other amount", which opens the bank, only when there is another amount to choose. Null for a
+// seat that never had chips here (its first chips are FirstChips') and when nothing is offered.
+export type RebuyTap = {amount: number; asks: boolean; other: boolean};
+export const rebuyTap = (buy: DockView['buy'], asksHost: boolean): RebuyTap | null =>
+    buy && !buy.first ? {amount: buy.max, asks: asksHost, other: buy.min < buy.max} : null;
+
 export const dockView = (view: PlayerView): DockView => {
     const seat = view.me.seat;
     const seatView = seat === null ? null : view.seats[seat] ?? null;

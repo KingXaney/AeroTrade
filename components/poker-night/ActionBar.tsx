@@ -16,6 +16,10 @@
 // the bar appearing is dropped (useTapShield) — it was aimed at the early choice the bar replaced —
 // and the bar carries data-pn-armed once taps land; keys are never held back.
 //
+// The raise panel opens at the size the player last confirmed on this half of the hand (before the
+// flop, or after it) when this turn offers it — the minimum, ½ pot or ¾ pot, never the all-in or the
+// pot — kept in this browser alone (bet-sizing.SIZE_MEMORY_KEY), never sent anywhere.
+//
 // The dock mounts it fresh for each turn (keyed by the turn number), so nothing carries over.
 
 import {useEffect, useEffectEvent, useRef, useState, type MouseEvent} from "react";
@@ -25,7 +29,7 @@ import RaisePanel from "@/components/poker-night/RaisePanel";
 import {useTapShield} from "@/components/poker-night/useTapShield";
 import {useRoom} from "@/components/poker-night/room-controller";
 import {ACTION_COPY} from "@/lib/learn/copy/poker-night";
-import {moveFor, quickSizes} from "@/lib/poker-night/bet-sizing";
+import {initialRaiseTo, moveFor, quickSizes, readSizeMemory, rememberSize, SIZE_MEMORY_KEY, sizeStreet, type SizeMemory} from "@/lib/poker-night/bet-sizing";
 import type {DockView} from "@/lib/poker-night/dock";
 import {intentForKey, isControlTarget, isEditableTarget, KEY_SHORTCUTS, keyAllowed, type FocusPlace} from "@/lib/poker-night/keys";
 import type {Move} from "@/lib/poker-night/types";
@@ -35,6 +39,22 @@ import {cn} from "@/lib/utils";
 // one column is 30 px at least (44 with the padding and a border), so the flex item's own minimum, its
 // min-content, is the wider of the two ("Bet" alone is narrower than a thumb).
 const BUTTON = 'grid min-h-12 flex-1 grid-cols-[minmax(1.875rem,auto)] place-items-center px-2 text-sm';
+
+// The sizes this browser remembers (bet-sizing.readSizeMemory): none where storage is refused.
+const readMemory = (): SizeMemory => {
+    try {
+        return readSizeMemory(window.localStorage.getItem(SIZE_MEMORY_KEY));
+    } catch {
+        return readSizeMemory(null);
+    }
+};
+const keepMemory = (memory: SizeMemory): void => {
+    try {
+        window.localStorage.setItem(SIZE_MEMORY_KEY, JSON.stringify(memory));
+    } catch {
+        // Storage refused (a private window): the panel opens at the minimum next time.
+    }
+};
 
 // A keydown aimed at a dialog, a menu or a drawer belongs to it.
 const insideOverlay = (target: EventTarget | null): boolean =>
@@ -79,8 +99,19 @@ const ActionBar = ({dock, turn, disabled}: {dock: DockView; turn: number; disabl
     const checkOrCall = () => void act(legal?.check ? {kind: 'check'} : {kind: 'call'});
     // The top of the range: all in when the stack is the limit; under pot limit, when the pot is, a
     // raise to it (the server takes all in only within the cap).
+    const street = room.view?.hand?.street ?? 'preflop';
     const confirmRaise = () => {
-        if (sizing) void act(moveFor(sizing, raiseTo));
+        if (!sizing) return;
+        const memory = readMemory();
+        const next = rememberSize(memory, street, sizing, raiseTo);
+        if (next !== memory) keepMemory(next);
+        void act(moveFor(sizing, raiseTo));
+    };
+    // Opened at the size remembered for this half of the hand, where this turn offers it.
+    const openRaise = () => {
+        if (!sizing) return;
+        setRaiseTo(initialRaiseTo(sizing, readMemory()[sizeStreet(street)]));
+        setRaiseOpen(true);
     };
     // Closed with Back or Escape: the focus goes back to the button that opened it, not to the page.
     const closeRaise = () => {
@@ -105,7 +136,7 @@ const ActionBar = ({dock, turn, disabled}: {dock: DockView; turn: number; disabl
                 checkOrCall();
                 break;
             case 'raise':
-                if (sizing) setRaiseOpen(true);
+                if (!raiseOpen) openRaise();
                 break;
             case 'all-in':
                 if (sizing) {
@@ -150,7 +181,7 @@ const ActionBar = ({dock, turn, disabled}: {dock: DockView; turn: number; disabl
     return (
         <>
             {raiseOpen && sizing && (
-                <RaisePanel sizing={sizing} value={raiseTo} onValue={setRaiseTo} onConfirm={confirmRaise} onClose={closeRaise} pending={pending} disabled={disabled}/>
+                <RaisePanel sizing={sizing} step={room.config.bigBlind} value={raiseTo} onValue={setRaiseTo} onConfirm={confirmRaise} onClose={closeRaise} pending={pending} disabled={disabled}/>
             )}
             {askFold && (
                 <p className="pn-fold-free chrome-surface rounded-full px-3 py-1 text-xs font-semibold text-fg" role="status" data-pn-fold-free="">
@@ -181,7 +212,7 @@ const ActionBar = ({dock, turn, disabled}: {dock: DockView; turn: number; disabl
                             {legal.check ? ACTION_COPY.check : legal.callAllIn ? ACTION_COPY.callAllIn(legal.call) : ACTION_COPY.call(legal.call)}
                         </ActionButton>
                         {sizing && (
-                            <ActionButton ref={raiseButton} variant="strong" className={cn(BUTTON, raiseOpen && 'ring-2 ring-brand')} disabled={off} onClick={tap(() => setRaiseOpen((open) => !open))}
+                            <ActionButton ref={raiseButton} variant="strong" className={cn(BUTTON, raiseOpen && 'ring-2 ring-brand')} disabled={off} onClick={tap(() => (raiseOpen ? setRaiseOpen(false) : openRaise()))}
                                           aria-expanded={raiseOpen} aria-keyshortcuts={KEY_SHORTCUTS.raise} data-pn-action="raise">
                                 {sizing.kind === 'bet' ? ACTION_COPY.openBet : ACTION_COPY.openRaise}
                             </ActionButton>

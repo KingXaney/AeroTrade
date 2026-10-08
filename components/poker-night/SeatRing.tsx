@@ -3,7 +3,8 @@
 // The seats round the felt, each where lib/poker-night/stage placed it (the viewer always at the
 // bottom centre), as a list a screen reader can walk: a plate for every player, an open seat for the
 // rest — "Sit here" for a visitor or a watcher, which chooses that seat on the join card
-// (components/poker-night/overlay-requests.chooseSeat). Beside each player who has bet this street,
+// (components/poker-night/overlay-requests.chooseSeat), and "Invite" for a seated player, which opens
+// the invite sheet to fill it. Beside each player who has bet this street,
 // the bet line: their chips and the amount, landing as the chips that flew out to it arrive (the
 // all-in's breathing); and the dealer button. While a result shows, a seat whose player went as the
 // hand completed (they left after it, or were removed: the result's gone list) keeps a ghost of
@@ -16,12 +17,12 @@ import ChipStack from "@/components/poker-night/ChipStack";
 import DealerButton from "@/components/poker-night/DealerButton";
 import PlayingCard from "@/components/poker-night/PlayingCard";
 import Seat, {shownStyle} from "@/components/poker-night/Seat";
-import {chooseSeat} from "@/components/poker-night/overlay-requests";
+import {chooseSeat, openOverlay} from "@/components/poker-night/overlay-requests";
 import {useRoom} from "@/components/poker-night/room-controller";
 import {TABLE_COPY} from "@/lib/learn/copy/poker-night";
 import {HOLE_CARDS, PLAYING_CARDS} from "@/lib/poker-night/config";
 import type {Card} from "@/lib/poker/cards";
-import {cardLook, playerAt, type ResultLook} from "@/lib/poker-night/reveal";
+import {cardLook, playerAt, streetTags, type ResultLook} from "@/lib/poker-night/reveal";
 import {flagRoom, type SeatMarks, type SeatPlace, type Stage} from "@/lib/poker-night/stage";
 import type {Person} from "@/lib/poker-night/view-types";
 import {cn} from "@/lib/utils";
@@ -78,6 +79,8 @@ const SeatRing = ({stage, anims, look}: Props) => {
         (room.joinView !== null && !room.joinView.banned && !room.joinView.locked && room.joinView.seatsFree > 0)
         || (room.me !== null && room.me.seat === null)
     );
+    // A seated player sees an open seat as a way to fill it: a tap opens the invite sheet.
+    const canInvite = table.status !== 'closed' && mySeat !== null;
     const chipsOut = animsOf(anims, 'chips-out');
     // While a result shows: the players gone since the deal whose seat stands empty, and the hands
     // shown to the viewer alone (answering their ask) — each on the plate of whoever played it.
@@ -87,6 +90,8 @@ const SeatRing = ({stage, anims, look}: Props) => {
     const cardsShownAt = (seat: number): Card[] | null =>
         result?.hands.find((h) => h.seat === seat)?.cards ?? seenAlone.find((h) => h.seat === seat)?.cards ?? null;
     const requested = new Set(table.requests.map((r) => r.pid));
+    // Each seat's last move on the street being bet, kept on its plate once the tag's pop is over.
+    const stills = streetTags(hand);
 
     return (
         <>
@@ -122,6 +127,11 @@ const SeatRing = ({stage, anims, look}: Props) => {
                                             aria-label={TABLE_COPY.openSeatLabel(seat)} data-sit-here={seat}>
                                         {TABLE_COPY.sitHere}
                                     </button>
+                                ) : canInvite ? (
+                                    <button type="button" className="pn-open-seat rounded-full" onClick={() => openOverlay('invite')}
+                                            aria-label={TABLE_COPY.inviteToSeat(seat)} data-invite-seat={seat}>
+                                        {TABLE_COPY.inviteSeat}
+                                    </button>
                                 ) : (
                                     <span className="pn-open-seat rounded-full" role="img" aria-label={TABLE_COPY.openSeatLabel(seat)} data-idle="">
                                         <span aria-hidden="true">{TABLE_COPY.openSeat}</span>
@@ -139,7 +149,7 @@ const SeatRing = ({stage, anims, look}: Props) => {
                               blind={live && hand ? (hand.sb === seat && hand.bb !== seat ? 'small' : hand.bb === seat ? 'big' : null) : null}
                               look={look} anims={anims} awaitingChips={requested.has(v.pid)}
                               privateCards={playerAt(table, seat) === v.pid ? seenAlone.find((h) => h.seat === seat)?.cards ?? null : null} held={held}
-                              discarding={toDiscard.has(seat)} discardMark={discardMark(seat)}/>
+                              discarding={toDiscard.has(seat)} discardMark={discardMark(seat)} still={stills.get(seat) ?? null}/>
                     );
                 })}
             </ul>

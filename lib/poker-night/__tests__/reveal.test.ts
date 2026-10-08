@@ -5,13 +5,13 @@
 import {describe, expect, it} from 'vitest';
 import {nextDueAt} from '@/lib/poker-night/clock';
 import {bestFive} from '@/lib/poker-night/hand-name';
-import {HAND_COPY, isolate, TABLE_COPY} from '@/lib/learn/copy/poker-night';
+import {ACTION_COPY, HAND_COPY, isolate, TABLE_COPY} from '@/lib/learn/copy/poker-night';
 import {reduce} from '@/lib/poker-night/engine';
-import {bannerLines, bannerShows, cardLook, liftBoardOf, playerAt, resultLook, scoopOf, viewerSeatIn} from '@/lib/poker-night/reveal';
+import {bannerLines, bannerShows, cardLook, liftBoardOf, playerAt, resultLook, scoopOf, streetTags, viewerSeatIn} from '@/lib/poker-night/reveal';
 import {bestHand} from '@/lib/poker-night/variants';
 import type {TableState} from '@/lib/poker-night/types';
 import {clockLeaderOf, wireView} from '@/lib/poker-night/views';
-import {A, C, F, X, cards, deal, moves, nowOf, ok, runOut, table} from './fixtures';
+import {A, C, F, R, X, cards, deal, moves, nowOf, ok, runOut, table} from './fixtures';
 
 const view = (s: TableState) => wireView(s, {
     code: 'K7QXM4', seq: 1, serverNow: nowOf(s), nextDueAt: nextDueAt(s), clockLeader: clockLeaderOf(s, {}), presence: {}, watchers: 0, realtimeOk: true, peopleV: 1,
@@ -241,5 +241,58 @@ describe('two and three boards', () => {
         const odd = resultLook({...hand, result: {...hand.result, pots: [{amount: 1, winners: [[0], [1], [1]]}]}})!;
         expect(odd.boards.map((b) => b.winners.map((w) => w.seat))).toEqual([[0], [], []]);
         expect(bannerLines(odd, () => 'Ana', null)).toHaveLength(1);
+    });
+});
+
+describe('the moves of the street', () => {
+    const tags = (st: TableState) => Object.fromEntries([...streetTags(view(st).hand)].map(([seat, t]) => [seat, t.text]));
+    const actor = (st: TableState) => st.hand!.actor!;
+
+    it("keeps each seat's last check, call, bet or raise for the street, a raise or an all-in by its total — never a blind, an ante or a fold", () => {
+        let s = deal(three([1000, 1000, 1000], {ante: 5}));
+        // The antes and the blinds carry no tag.
+        expect(tags(s)).toEqual({});
+        const raiser = actor(s);
+        s = moves(s, R(60));
+        const caller = actor(s);
+        s = moves(s, C);
+        const t = tags(s);
+        expect(t[raiser]).toBe(ACTION_COPY.tag('raise', 60, false));
+        expect(t[caller]).toMatch(/^Call /);
+        expect(Object.keys(t)).toHaveLength(2);
+        // The big blind folds: the plate says Folded, and the flop starts with none.
+        const folder = actor(s);
+        const before = moves(s, R(200));
+        expect(tags(before)[folder]).toBe(ACTION_COPY.tag('raise', 200, false));
+        s = moves(s, F);
+        expect(folder in tags(s)).toBe(false);
+    });
+
+    it('starts each street with none, and has none once the hand is complete', () => {
+        let s = deal(three(), {board: '2c7d9s3s4c'});
+        s = moves(s, C, C, X);
+        expect(view(s).hand!.street).toBe('flop');
+        expect(tags(s)).toEqual({});
+        const checker = actor(s);
+        s = moves(s, X);
+        const better = actor(s);
+        s = moves(s, R(40));
+        expect(tags(s)).toEqual({[checker]: ACTION_COPY.tag('check', 0, false), [better]: ACTION_COPY.tag('bet', 40, false)});
+        // The checker calls: the later move is the one kept.
+        s = moves(s, F, C);
+        expect(view(s).hand!.street).toBe('turn');
+        expect(tags(s)).toEqual({});
+        s = moves(s, X, A, C);
+        s = runOut(s);
+        expect(view(s).hand!.phase).toBe('complete');
+        expect(streetTags(view(s).hand).size).toBe(0);
+        expect(streetTags(null).size).toBe(0);
+    });
+
+    it('says an all-in by its total', () => {
+        let s = deal(three([300, 300, 300]));
+        const short = actor(s);
+        s = moves(s, A);
+        expect(streetTags(view(s).hand).get(short)).toMatchObject({allIn: true, amount: 300, text: ACTION_COPY.tag('raise', 300, true)});
     });
 });

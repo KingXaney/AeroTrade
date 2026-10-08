@@ -4,13 +4,16 @@
 // lifted and glowing; every other card on the boards and in the shown hands dimmed. Pure and
 // client-safe: read from the view's own result (lib/poker-night/view-types HandResultView) with the
 // server's own functions (variants.readShown, pots.paidParts), so the page shows exactly what the
-// server decided. The animations (lib/poker-night/choreography) only time it.
+// server decided. The animations (lib/poker-night/choreography) only time it. And, while a street is
+// bet, each seat's last move on it (streetTags), which its plate keeps once the tag's pop is over.
 
-import {HAND_COPY, TABLE_COPY} from '@/lib/learn/copy/poker-night';
+import {ACTION_COPY, HAND_COPY, TABLE_COPY} from '@/lib/learn/copy/poker-night';
 import type {Card} from '@/lib/poker/cards';
+import {ENTRY_FLAGS, ENTRY_KINDS, STREETS} from '@/lib/poker-night/config';
 import {describeHand, type HandDescription} from '@/lib/poker-night/hand-name';
 import {paidParts} from '@/lib/poker-night/pots';
 import {BANNER} from '@/lib/poker-night/stage';
+import type {EntryKind} from '@/lib/poker-night/types';
 import {playsBoardFor, readShown} from '@/lib/poker-night/variants';
 import type {HandView, TableView} from '@/lib/poker-night/view-types';
 
@@ -171,4 +174,35 @@ export const bannerLines = (look: ResultLook, nameOf: (seat: number) => string |
         const short = mine ? {lead: TABLE_COPY.bannerShortYou, name: '', tail: ''} : {lead: '', name: TABLE_COPY.bannerShortNames([name(w.seat)]), tail: TABLE_COPY.bannerShortWins};
         return {key: `seat:${w.seat}`, seat: w.seat, board: null, mine, head, short, hand: handOf(w)};
     });
+};
+
+// ── the moves of the street ──
+//
+// What each seat did last on the street being bet, as its tag says it ("Call 40", "Raise to 340", "All
+// in 1,200") once the tag's pop is over (components/poker-night/Seat draws it still, data-tag-still),
+// so a glance at the table mid-street shows every seat's move: read from the view's log tail, the last
+// check, call, bet or raise per seat on the hand's own street. The blinds, antes and posts carry none
+// (the blinds' marks and the bet lines say them), nor a fold (the plate says Folded), a refund or a
+// card thrown away (Triple T); a raise or an all-in says its total. Nothing between streets' bets
+// (a new street starts with none) or once the hand is complete. The tail is the log's last few
+// entries, so in a long street at a full table the earliest movers may carry none.
+export type StillTag = {kind: EntryKind; amount: number; allIn: boolean; text: string};
+const STILL_KINDS = new Set<EntryKind>(['check', 'call', 'bet', 'raise']);
+export const streetTags = (hand: Pick<HandView, 'phase' | 'street' | 'logTail'> | null): Map<number, StillTag> => {
+    const out = new Map<number, StillTag>();
+    if (!hand || hand.phase === 'complete' || hand.phase === 'discard') return out;
+    const street = STREETS.indexOf(hand.street);
+    for (const [seat, kindIndex, amount, to, flags, entryStreet] of hand.logTail) {
+        const kind = ENTRY_KINDS[kindIndex] as EntryKind | undefined;
+        if (kind === undefined || seat < 0 || entryStreet !== street) continue;
+        if (!STILL_KINDS.has(kind)) {
+            // A fold (or a refund) after a seat's move takes its tag away.
+            if (kind === 'fold') out.delete(seat);
+            continue;
+        }
+        const allIn = (flags & ENTRY_FLAGS.allIn) !== 0;
+        const shown = kind === 'raise' || allIn ? to : amount;
+        out.set(seat, {kind, amount: shown, allIn, text: ACTION_COPY.tag(kind, shown, allIn)});
+    }
+    return out;
 };

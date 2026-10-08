@@ -214,6 +214,9 @@ export const ACTION_COPY = {
     sliderLabel: 'Size',
     amountLabel: 'Amount',
     amountRule: (min: number, max: number): string => `From ${count(min)} to ${count(max)}.`,
+    // The steppers beside the slider: a big blind less or more ("20 less", "20 more").
+    less: (n: number): string => `${count(n)} less`,
+    more: (n: number): string => `${count(n)} more`,
 
     // Folding when checking is free: the first press asks, the second folds.
     foldFree: 'Checking is free here.',
@@ -601,6 +604,9 @@ export const TABLE_COPY = {
     openSeat: 'Open seat',
     openSeatLabel: (seat: number): string => `Seat ${seatNo(seat)}, open`,
     sitHere: 'Sit here',
+    // An open seat, for a seated player: a tap opens the invite sheet.
+    inviteSeat: 'Invite',
+    inviteToSeat: (seat: number): string => `Invite a friend to seat ${seatNo(seat)}`,
     you: 'You',
     hostBadge: 'Host',
     status: SEAT_STATUS,
@@ -796,6 +802,8 @@ const onBoard = (board: number | null): string => (board === null ? '' : `Board 
 
 export const LOG_COPY = {
     heading: 'Hand log',
+    // The winner's banner is a button that opens the log: its name says both.
+    fromBanner: (heads: readonly string[]): string => `${heads.join('; ')}. Open the hand log`,
     empty: 'The log fills in once a hand is dealt.',
     hand: (n: number): string => `Hand ${count(n)}`,
     blinds: (smallBlind: number, bigBlind: number, ante: number): string =>
@@ -1070,6 +1078,13 @@ export const BANK_COPY = {
     // with the host away long enough, chips that land at once (takeChips).
     askFor: (n: number): string => `Ask for ${plural(n, 'chip', 'chips')}`,
     takeChips: (n: number): string => `Take ${plural(n, 'chip', 'chips')}`,
+    // The dock's one-tap rebuy once the stack is empty: the table's whole buy-in in one tap ("Rebuy
+    // 2,000 chips", or "Ask for 2,000 chips" where the host says yes first; a narrow dock says the
+    // figure alone), and the bank for any other amount.
+    rebuyFor: (n: number): string => `Rebuy ${plural(n, 'chip', 'chips')}`,
+    rebuyShort: (n: number): string => `Rebuy ${count(n)}`,
+    askShort: (n: number): string => `Ask for ${count(n)}`,
+    otherShort: 'Other',
     ownInPot: (n: number): string => `Counting ${count(n)} in this pot.`,
     addChips: (n: number): string => `Add ${plural(n, 'chip', 'chips')}`,
     otherAmount: 'Other amount',

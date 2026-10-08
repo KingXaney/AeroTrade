@@ -4,7 +4,9 @@
 engine, the room server and its API, the playable table and lobby on polling, live updates over Ably,
 looks and avatars, emotes and the table's feel, and the night's awards with the table's glossary
 terms, each with its unit tests and browser QA. Live updates switch on once `ABLY_API_KEY` is set in
-Production; until then every table polls. The extras (phase 8) follow.
+Production; until then every table polls. The modes batch (P1–P8) added the way home, the Hands
+guide, Home's panel, state version 2, PLO on one to three boards, Triple T and the table's small
+conveniences (below).
 
 ## Why
 
@@ -353,18 +355,25 @@ under the top bar. Under reduced motion only the impact shows. A player can mute
 look) or one player for the visit. A screen reader hears each one said in a polite live region.
 
 **Sound, buzz, screen and keys.** The table's sounds are synthesised by Web Audio from short
-recipes — a card's snap, a chip's click, a check's knock, a fold's swish, a winner's arpeggio, the
-turn's chime, an emote's pop and a landing that fits the thing thrown (a splat, a pop for a rose or
-confetti, a fizz, a bounce) — each at most 0.3 gain, between 40 Hz and 8 kHz and over
-within 1.2 s, played at its animation's own moment on the motion token, at most once per 60 ms,
+recipes — a card's swish and snap, two to four clay chips clacking, a check's two knocks, the cards
+swept into the muck, a winner's arpeggio, the turn's gentle chime, an emote's pop and a landing of
+its own for each thing thrown (since P8: a fish's heavy wet slap, a tomato's juicy splat and drips,
+an egg's crack then splat, a cake's muffled thud, a rose's and a heart's whoosh and pop, a soda's
+clink and fizz, confetti's paper pop and rustle, popcorn popping, a tennis ball's thock and bounces)
+— each a few layers of tones and filtered noise with their own attack and fall, played from a seed
+so no two throws, chips or cards sound quite alike (a cue's seed is its key, a landing's the emote's
+id, so every screen hears one throw alike), no part louder than 0.35 gain and the layers together
+never past 0.75, between 40 Hz and 10 kHz and over within 1.2 s, behind a gentle compressor; played
+at its animation's own moment on the motion token, at most once per 60 ms,
 silent while the page is hidden except for the turn, and never the only cue for anything. One audio
 context per page is made, and woken, inside an event a browser counts as a gesture — a click, a
 touch's pointerup or touchend, a mouse press, a key, never a touch's pointerdown (iOS starts Web
 Audio only in a touchend or a click) — and again whenever the browser suspends it. A phone vibrates once when the turn comes
-round; the screen stays awake while the viewer sits (the Screen Wake Lock); each follows the
-player's own switch. Beside the moves' keys, E opens the emotes, L the hand log, B the bank, M
-turns the sounds on or off and ? lists every key (also in the top bar's menu), under the same rules
-as the moves.
+round, and a phone that cannot buzz (an iPhone) sees the dock's edge and "Your turn" breathe
+(still under either motion guard); the screen stays awake while the viewer sits (the Screen Wake
+Lock); each follows the player's own switch. Beside the moves' keys, E opens the emotes, L the hand
+log, B the bank, M turns the sounds on or off (as the top bar's menu does, a check) and ? lists every
+key (also in the top bar's menu), under the same rules as the moves.
 
 ## The end of the night (phase 7)
 
@@ -701,6 +710,38 @@ state 15,048 bytes, the wire view 3,936 and its message 3,999. The room read 27,
 per write and 29,595 in all. The wire keeps 500 bytes to spare, so the protocol and the wire's shape
 are unchanged (the compaction ladder's first step, the ledger as tuples, came with version 2).
 
+## The table's small conveniences (modes P8)
+
+**A move stays for the street.** Once its tag has popped, each seat's last check, call, bet or raise
+stays on its plate, still, until the street ends (`reveal.streetTags`, from the log's tail; never a
+blind, an ante, a fold — the plate says Folded — or a card thrown away), so a glance mid-street shows
+every seat's move.
+
+**The raise panel on a phone.** A "−" and a "+" (44 px) round the amount step a big blind at a time,
+held to the legal range; the slider takes a row of its own where the dock is narrow. The panel opens
+at the size the player last confirmed before the flop, or after it, when this turn offers it — the
+minimum, ½ or ¾ pot, never the all-in or the pot — kept in this browser alone, never sent.
+
+**One tap back in.** Out of chips with a rebuy allowed, the dock's one tap buys the whole buy-in the
+table allows: "Rebuy 2,000 chips", or "Ask for 2,000 chips" where the host says yes first (once the
+game has started, for anyone but the host, while the host is here); "Other amount" opens the bank,
+only when the table allows another. A narrow dock says the figures alone and leaves "Out of chips"
+to the plate.
+
+**Small doors.** The winner's banner is a button that opens the hand log; for a seated player an
+open seat says "Invite" and opens the invite sheet; the table's menu turns the sounds on or off.
+
+**Hands turned up in a crowded column.** Where a turned-up hand of two would cover another seat's
+plate, the flag under one, another hand or the board — nine seats on a 375 or 320 px phone, seven
+or more on a phone on its side — every hand is placed again, each next to its own plate: along its
+row, under a side seat's plate, or beside it toward the middle, whichever covers least (a plate
+weighing most, then the board, the pots' band by the board, another hand, a flag), keeping one of
+the pots' bands clear. Nine hands up on a 320 px phone can still leave two meeting, and the banner
+then sits where the pot was, flagged. PLO's hands of four keep the row's nudge alone.
+
+**The dock's hand name on a phone on its side** sits on a row of its own under the cards and wraps
+to two lines; the longest a name gets ("Full house, threes full of sevens") fits whole at 568 × 320.
+
 ## Engine rules
 
 No-limit Texas hold'em at 2 to 9 seats, fixed when the table is made, for integer play chips.
@@ -866,7 +907,8 @@ Every engine module is unit-tested in `lib/poker-night/__tests__/`:
   verdict of who may send what, the write's filter and pipeline (the cooldown, the seq, the ring,
   the awards), who sees what (muted, stale, their own), the on-screen caps and the timers' phases, a
   throw's path, the impacts' pieces the same on every screen and their CSS safe in a `<style>`;
-  every sound recipe within its gain, frequency and length, the 60 ms gate and the hidden page, each
+  every sound recipe within its gain, its layers' mix, frequency and length over many seeds (one seed
+  one sound, a landing of its own for each thing thrown), the 60 ms gate and the hidden page, each
   animation's sound at its moment; the room's keys, never a move's; the emote seq moving only
   without a gap. The browser QA sends emotes through the API (the cooldown's 429, a watcher's 409,
   throwables off 403, the awards) and between two screens (a reaction, a tomato's `data-splat` on

@@ -95,7 +95,11 @@ export type SeatPlace = {
     plate: Px; // the plate's centre
     bet: Px; // the bet line's centre
     button: Px; // where the dealer button sits when this seat has it
-    shownDx: number; // how far across from its plate the seat's turned-up hand is drawn (nudgeHands)
+    // How far across and down from its place over (a top seat's: under) its plate the seat's turned-up
+    // hand is drawn (placeHands): along its row off another hand, or — in a crowded column — beside the
+    // plate toward the middle or on its other side, off the plates and flags round it.
+    shownDx: number;
+    shownDy: number;
 };
 
 // How a hand's boards lie together: one board in its row; two or three (PLO) one over another
@@ -509,29 +513,35 @@ const layoutStage = (box: Box, seatCount: number, mySeat: number | null, n: numb
     const felt = {left: plateSize.w / 2, top: plateSize.h / 2, width: Math.max(0, box.w - plateSize.w), height: Math.max(0, box.h - plateSize.h)};
     // The hands that may turn up — every seat's but the seated viewer's own, whose cards are in the dock
     // — each moved along its row off another (nudgeHands). Texas hold'em's two (and Triple T's) are
-    // moved round the board, placed first; PLO's four are moved first and the board (one, or several)
+    // moved round the board, placed first, and off a crowded column's plates and flags (placeHands); PLO's four are moved first and the board (one, or several)
     // keeps clear of them where its cards stay BOARD_CARD_MIN or wider — unless that holds only with the
     // hands left where they are, which the board then keeps clear of instead.
     const handSize = n > 1 ? 4 : Math.max(2, options.handSize ?? 2);
     const showing = placed.filter((p) => (mySeat === null || p.slot !== 0) && !open.has(p.seat));
-    const stageOf = (shownDx: Record<number, number>, boards: BoardsPlaced): Stage => ({
+    const stageOf = (shown: HandPlaces, boards: BoardsPlaced): Stage => ({
         box, orientation, fit, plateSize, betSize, buttonSize, felt, centre, ...boards,
         seats: placed.map((p) => ({
             seat: p.seat, slot: p.slot, spot: p.spot, plate: p.plate,
-            bet: {x: bets[p.seat].x, y: bets[p.seat].y}, button: {x: buttons[p.seat].x, y: buttons[p.seat].y}, shownDx: shownDx[p.seat] ?? 0,
+            bet: {x: bets[p.seat].x, y: bets[p.seat].y}, button: {x: buttons[p.seat].x, y: buttons[p.seat].y},
+            shownDx: shown[p.seat]?.dx ?? 0, shownDy: shown[p.seat]?.dy ?? 0,
         })),
     });
     const sized = {plateSize, fit};
+    const plateRects = at.map((r, seat) => ({r, seat}));
+    // The flags that may hang under a seated player's plate, the seated viewer's own included.
+    const flagged = placed.filter((p) => !open.has(p.seat)).map((p) => ({seat: p.seat, plate: p.plate}));
+    const litBoard = (b: BoardsPlaced): Rect => {
+        const lit = LIT.lift + LIT.ring;
+        return {x: b.board.x, y: b.board.y - lit / 2, w: b.board.w + 2 * LIT.ring, h: b.board.h + lit};
+    };
     if (handSize <= 2 && n <= 1) {
         const boards = placeBoards(box, fit, centre, {felt}, obstacles, weights, [], n, options.prefer ?? null);
-        const lit = LIT.lift + LIT.ring;
-        const board = {x: boards.board.x, y: boards.board.y - lit / 2, w: boards.board.w + 2 * LIT.ring, h: boards.board.h + lit};
-        return stageOf(nudgeHands(showing, sized, box, centre, [...at.map((r, seat) => ({r, seat})), {r: board, seat: -1}], handSize), boards);
+        return stageOf(placeHands(showing, sized, box, centre, [...plateRects, {r: litBoard(boards), seat: -1}], flagged, handSize, potBands(boards.board, fit)), boards);
     }
-    const handsAt = (shownDx: Record<number, number>) => showing.map((p) => shownHandRect({...p, shownDx: shownDx[p.seat] ?? 0}, sized, handSize));
-    const moved = nudgeHands(showing, sized, box, centre, at.map((r, seat) => ({r, seat})), handSize);
+    const handsAt = (shown: HandPlaces) => showing.map((p) => shownHandRect({...p, shownDx: shown[p.seat]?.dx ?? 0, shownDy: shown[p.seat]?.dy ?? 0}, sized, handSize));
+    const moved = nudged(showing, sized, box, centre, plateRects, handSize);
     const boards = placeBoards(box, fit, centre, {felt}, obstacles, weights, handsAt(moved), n, options.prefer ?? null);
-    if (boards.board.handsClear || Object.values(moved).every((dx) => dx === 0)) return stageOf(moved, boards);
+    if (boards.board.handsClear || Object.values(moved).every((h) => h.dx === 0)) return stageOf(moved, boards);
     const still = placeBoards(box, fit, centre, {felt}, obstacles, weights, handsAt({}), n, options.prefer ?? null);
     return still.board.handsClear ? stageOf({}, still) : stageOf(moved, boards);
 };
@@ -646,14 +656,14 @@ export const pieceRect = (p: BannerPiece): Rect => ({x: p.x, y: p.top + p.height
 
 // A seat's turned-up cards as drawn (.pn-seat-shown), `count` of them, the lift and ring of a card
 // that plays included.
-export const shownHandRect = (place: Pick<SeatPlace, 'plate' | 'spot'> & {shownDx?: number}, stage: Pick<Stage, 'plateSize' | 'fit'>, count = 2): Rect => {
+export const shownHandRect = (place: Pick<SeatPlace, 'plate' | 'spot'> & {shownDx?: number; shownDy?: number}, stage: Pick<Stage, 'plateSize' | 'fit'>, count = 2): Rect => {
     const card = SHOWN_CARD_PX[stage.fit];
     const h = card * CARD_RATIO;
     const top = place.spot.side === 'top'
         ? place.plate.y + stage.plateSize.h / 2 + SHOWN_OFF.under
         : place.plate.y - stage.plateSize.h / 2 - SHOWN_OFF.over - h;
     const lit = LIT.lift + LIT.ring;
-    return {x: place.plate.x + (place.shownDx ?? 0), y: top - lit + (h + lit) / 2, w: shownHandWidth(stage.fit, count) + 2 * LIT.ring, h: h + lit};
+    return {x: place.plate.x + (place.shownDx ?? 0), y: top - lit + (h + lit) / 2 + (place.shownDy ?? 0), w: shownHandWidth(stage.fit, count) + 2 * LIT.ring, h: h + lit};
 };
 
 // Where each hand that may turn up is drawn across from its plate (SeatPlace.shownDx). A side seat's
@@ -712,6 +722,184 @@ const nudgeHands = (
         placed.push({seat: p.seat, r: {...base, x: base.x + at}});
     }
     return dx;
+};
+
+// Where each hand that may turn up is drawn (SeatPlace.shownDx, shownDy). First along its row
+// (nudgeHands); where that still leaves a hand over another seat's plate, under the flag a plate may
+// hang ("Folded", "All in"), over another hand or (two cards) the board — a crowded column of side
+// seats on a small phone, nine seats at 375 × 667, seven or more on a phone on its side — every hand
+// is placed again, a seat at a time and round again until none moves, at the place that covers least:
+// along its row, beside its plate toward the table's middle (anywhere from a little over it to a
+// little under it), or on the plate's other side (under a side or bottom seat's, over a top seat's),
+// each a few pixels at a time; then two hands that still meet are placed together. Covering a plate
+// weighs most, then the board, a pots' band by the board (potBands), another hand, a flag as wide as
+// "Out of chips", and one as wide as any flag is drawn; never its own plate, never outside the box —
+// and one of the pots' bands is kept clear, over a hand meeting another. Where every hand has room,
+// that is where it goes. Texas hold'em's and Triple T's hands of two; PLO's four keep the row's nudge.
+export type HandPlace = {dx: number; dy: number};
+// The hands moved along their rows alone (nudgeHands), as places.
+const nudged = (showing: readonly Showing[], stage: Pick<Stage, 'plateSize' | 'fit'>, box: Box, centre: Px, fixed: readonly {r: Rect; seat: number}[], count: number): HandPlaces => {
+    const slid = nudgeHands(showing, stage, box, centre, fixed, count);
+    return Object.fromEntries(showing.map((p) => [p.seat, {dx: slid[p.seat] ?? 0, dy: 0}]));
+};
+// The bands over and under a board where its pots go (potPlan looks there first): a pill's height and
+// its room, as wide as the board or the pot's default pill. A hand moved off a plate keeps out of them
+// where it can, so the pots keep a place by the board.
+const potBands = (board: Rect, fit: Fit): Rect[] => {
+    const h = POT_PILL_H + 2 * POT_CLEAR;
+    const w = Math.max(board.w, POT[fit].w);
+    return [
+        {x: board.x, y: board.y - board.h / 2 - LIT.lift - LIT.ring - h / 2, w, h},
+        {x: board.x, y: board.y + board.h / 2 + h / 2, w, h},
+    ];
+};
+export type HandPlaces = Record<number, HandPlace>;
+type Showing = {seat: number; slot: number; spot: SeatSpot; plate: Px};
+const HAND_WEIGHT = {plate: 1000, board: 400, reserve: 350, hand: 300, band: 100, flag: 30, wideFlag: 6} as const;
+// The search's steps: 2 px along a row (as nudgeHands), 4 px across the space beside a plate.
+const HAND_STEP = 2;
+const BESIDE_STEP = 4;
+// The words a flag at a showdown is sized by: the longest a seat dealt in may say then.
+const SHOWDOWN_FLAG = 'Out of chips';
+const placeHands = (
+    showing: readonly Showing[], stage: Pick<Stage, 'plateSize' | 'fit'>, box: Box, centre: Px,
+    fixed: readonly {r: Rect; seat: number}[], flagged: readonly {seat: number; plate: Px}[], count: number, reserve: readonly Rect[] = [],
+): HandPlaces => {
+    const start = nudged(showing, stage, box, centre, fixed, count);
+    if (showing.length === 0) return start;
+    const {w: plateW, h: plateH} = stage.plateSize;
+    const bases = new Map(showing.map((p) => [p.seat, shownHandRect(p, stage, count)]));
+    const flags = flagged.map((f) => ({
+        seat: f.seat,
+        r: flagRect({plate: f.plate}, stage, SHOWDOWN_FLAG),
+        wide: {x: f.plate.x, y: f.plate.y + plateH / 2 + FLAG.h * FLAG.below - FLAG.h / 2, w: plateW + FLAG.wider, h: FLAG.h},
+    }));
+    const at = (p: Showing, h: HandPlace): Rect => {
+        const base = bases.get(p.seat)!;
+        return {...base, x: base.x + h.dx, y: base.y + h.dy};
+    };
+    // What covering costs for seat p's hand at r, the other hands where they are now; bands[i] what
+    // covering the pots' band i weighs in this search.
+    const cost = (p: Showing, r: Rect, now: HandPlaces, bands: readonly number[]): number => {
+        if (!insideBox(r, box)) return Infinity;
+        let c = 0;
+        for (const q of fixed) {
+            if (!overlaps(r, q.r)) continue;
+            if (q.seat === p.seat) return Infinity;
+            c += q.seat === -1 ? HAND_WEIGHT.board : HAND_WEIGHT.plate;
+        }
+        // A flag is weighed against the cards alone: a card that plays lifts over one only for a moment.
+        const cards = {...r, y: r.y + LIT.lift / 2, h: r.h - LIT.lift};
+        for (const f of flags) {
+            if (overlaps(cards, f.r)) c += HAND_WEIGHT.flag;
+            else if (overlaps(cards, f.wide)) c += HAND_WEIGHT.wideFlag;
+        }
+        for (const o of showing) if (o.seat !== p.seat && now[o.seat] && handsMeet(r, at(o, now[o.seat]))) c += HAND_WEIGHT.hand;
+        reserve.forEach((band, i) => {
+            if (bands[i] > 0 && overlaps(r, band)) c += bands[i];
+        });
+        return c;
+    };
+    const soft = reserve.map(() => HAND_WEIGHT.band);
+    const clean = showing.every((p) => cost(p, at(p, start[p.seat]), start, soft) < HAND_WEIGHT.wideFlag);
+    if (clean) return start;
+
+    // Every place a seat's hand may go, the nearest first: its row, beside its plate, its other side —
+    // each next to its own plate, so the hand still reads as that seat's: a side seat's moves along its
+    // row at most half a plate's width, and a seat along the top or the bottom as far as two.
+    const handW = bases.values().next().value!.w;
+    const handH = bases.values().next().value!.h;
+    const slides = (p: Showing): number[] => {
+        const reach = p.spot.side === 'left' || p.spot.side === 'right' ? plateW / 2 : plateW * NUDGE_REACH;
+        const out = [0];
+        for (let d = HAND_STEP; d <= reach; d += HAND_STEP) out.push(d, -d);
+        return out;
+    };
+    const places = (p: Showing): (HandPlace & {pref: number})[] => {
+        const base = bases.get(p.seat)!;
+        const out: (HandPlace & {pref: number})[] = slides(p).map((dx) => ({dx, dy: 0, pref: Math.abs(dx) / 40}));
+        const signs = Math.abs(centre.x - p.plate.x) < 1 ? [1, -1] : [centre.x > p.plate.x ? 1 : -1];
+        for (const sign of signs) {
+            for (let k = 0; k <= plateW / 2; k += BESIDE_STEP) {
+                const x = p.plate.x + sign * (plateW / 2 + handW / 2 + k);
+                for (let y = p.plate.y - (plateH + handH) / 2; y <= p.plate.y + (plateH + handH) / 2; y += BESIDE_STEP) {
+                    out.push({dx: Math.round(x - base.x), dy: Math.round(y - base.y), pref: 4 + (k + Math.abs(y - p.plate.y)) / 40});
+                }
+            }
+        }
+        // The plate's other side: under a side or bottom seat's plate, over a top seat's.
+        const top = p.spot.side === 'top';
+        const otherY = top ? p.plate.y - plateH / 2 - SHOWN_OFF.over - handH / 2 : p.plate.y + plateH / 2 + SHOWN_OFF.under + handH / 2 - LIT.lift - LIT.ring;
+        for (const dx of slides(p).filter((d) => Math.abs(d) <= plateW / 2)) out.push({dx, dy: Math.round(otherY - base.y), pref: 2 + Math.abs(dx) / 40});
+        return out;
+    };
+    const choices = new Map(showing.map((p) => [p.seat, places(p)]));
+    const order = [...showing].sort((a, b) => Number(a.spot.side === 'top') - Number(b.spot.side === 'top') || a.slot - b.slot);
+
+    // A seat at a time to its cheapest place, round again until none moves; then two hands that still
+    // meet — where neither alone has a better place (mirror seats both reaching for the same band) —
+    // placed together: each of one's cheapest places, with the other's cheapest beside it.
+    const PAIR_KEEP = 24;
+    const search = (bands: readonly number[]): HandPlaces => {
+        const now: HandPlaces = {...start};
+        const descend = () => {
+            for (let pass = 0; pass < 6; pass++) {
+                let moved = false;
+                for (const p of order) {
+                    const here = now[p.seat];
+                    const hereCost = cost(p, at(p, here), now, bands);
+                    if (hereCost < HAND_WEIGHT.wideFlag) continue;
+                    let best = here;
+                    let bestCost = hereCost;
+                    for (const c of choices.get(p.seat)!) {
+                        const total = cost(p, at(p, c), now, bands) + c.pref;
+                        if (total < bestCost) {
+                            best = {dx: c.dx, dy: c.dy};
+                            bestCost = total;
+                        }
+                    }
+                    if (best !== here) {
+                        now[p.seat] = best;
+                        moved = true;
+                    }
+                }
+                if (!moved) break;
+            }
+        };
+        descend();
+        let repaired = false;
+        for (const p of order) for (const q of order) {
+            if (q.seat <= p.seat || !handsMeet(at(p, now[p.seat]), at(q, now[q.seat]))) continue;
+            const without = (seat: number): HandPlaces => Object.fromEntries(Object.entries(now).filter(([k]) => Number(k) !== seat));
+            const rest = without(q.seat);
+            const cheapest = choices.get(p.seat)!.map((c) => ({c, k: cost(p, at(p, c), rest, bands) + c.pref})).filter((x) => x.k < HAND_WEIGHT.hand)
+                .sort((x, y) => x.k - y.k).slice(0, PAIR_KEEP);
+            const pairNow = cost(p, at(p, now[p.seat]), now, bands) + cost(q, at(q, now[q.seat]), now, bands);
+            let best: {a: HandPlace; b: HandPlace; k: number} | null = null;
+            for (const x of cheapest) {
+                const withP = {...rest, [p.seat]: {dx: x.c.dx, dy: x.c.dy}};
+                for (const c of choices.get(q.seat)!) {
+                    if (handsMeet(at(p, x.c), at(q, c))) continue;
+                    const k = x.k + cost(q, at(q, c), withP, bands) + c.pref;
+                    if (!best || k < best.k) best = {a: {dx: x.c.dx, dy: x.c.dy}, b: {dx: c.dx, dy: c.dy}, k};
+                }
+            }
+            if (best && best.k < pairNow) {
+                now[p.seat] = best.a;
+                now[q.seat] = best.b;
+                repaired = true;
+            }
+        }
+        if (repaired) descend();
+        return now;
+    };
+    // The pots keep at least one of their bands: where the search leaves a hand in both, it is run again
+    // with the band fewer hands took kept firmly clear (over a hand meeting another) and the other free.
+    const placed = search(soft);
+    const taken = reserve.map((band) => showing.filter((p) => overlaps(at(p, placed[p.seat]), band)).length);
+    if (reserve.length === 0 || taken.some((n) => n === 0)) return placed;
+    const keep = taken.indexOf(Math.min(...taken));
+    return search(reserve.map((_, i) => (i === keep ? HAND_WEIGHT.reserve : 0)));
 };
 
 // An open seat's ring (.pn-open-seat): max(44 px, 95 % of the plate's height) across.

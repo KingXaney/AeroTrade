@@ -117,7 +117,8 @@ const {
 } = await lib('lib/learn/copy/poker-night.ts');
 const {nightAwards, throwCountsOf} = await lib('lib/poker-night/awards.ts');
 const {CARD_BACKS, FELTS, SCENES, SUIT_COLOURS} = await lib('lib/poker-night/looks.ts');
-const {SOUNDS} = await lib('lib/poker-night/sounds.ts');
+const {soundParts} = await lib('lib/poker-night/sounds.ts');
+const POP_HZ = soundParts('pop', 0)[0].freq; // the pop never varies (sounds.FIXED_SOUNDS)
 const {ME_STORAGE_KEY} = await lib('lib/poker-night/personal.ts');
 const {SHORTCUTS} = await lib('lib/poker-night/keys.ts');
 const {findBanned} = await lib('lib/learn/banned.ts');
@@ -3065,7 +3066,7 @@ const tableInBrowser = async () => {
             check(`a reaction rises over the sender's plate at once, and on another screen within its next poll (${reactMs} ms)`, ownReact && seenReact, `${ownReact} ${seenReact}`);
             await sleep(300);
             const tones = await tp.evaluate(() => window.__pnTones);
-            check(`…with a pop on that screen: its rising tone (${SOUNDS.pop[0].freq} Hz) started`, tones.includes(SOUNDS.pop[0].freq), JSON.stringify(tones));
+            check(`…with a pop on that screen: its rising tone (${POP_HZ} Hz) started`, tones.includes(POP_HZ), JSON.stringify(tones));
 
             await sleep(1300);
             await sp.click('[data-pn-emotes-open]');

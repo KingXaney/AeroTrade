@@ -6,7 +6,8 @@
 // shown even on a phone while it is reconnecting), and what the host has set in motion (paused, or
 // pausing or ending after the hand in play, which still plays on), then the drawers — Invite, Bank
 // and Host (each with a dot for the host while requests for chips wait: the bank is where they are
-// answered), and the menu with the hand log, the Hands guide (also the H key), My look and the
+// answered), and the menu with the hand log, the Hands guide (also the H key), the table's sounds on or
+// off (a check, as M and My look's switch turn them), My look and the
 // viewer's own seat (sit out next hand, deal me in, I'm back, take a seat, "Leave after this hand" —
 // or "Stay at the table" once chosen — and Leave: "Leave now" mid-hand). Home carries a dot while the
 // viewer leaves after the hand in play. The status line under the name: how the table is reaching
@@ -19,8 +20,9 @@
 // (P5) also has its own button beside the menu from 640 px, one tap from the table: the avatar
 // builder and the personal look (on a phone it is the menu's, which keeps the name room to read).
 
-import {Coins, Crown, DoorOpen, Hourglass, House, LogOut, Menu, ScrollText, Smile, UserPlus, Armchair, Pause, Play, Palette} from "lucide-react";
-import {DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuTrigger} from "@/components/ui/dropdown-menu";
+import {Coins, Crown, DoorOpen, Hourglass, House, LogOut, Menu, ScrollText, Smile, UserPlus, Armchair, Pause, Play, Palette, Volume2} from "lucide-react";
+import {toast} from "sonner";
+import {DropdownMenu, DropdownMenuCheckboxItem, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuTrigger} from "@/components/ui/dropdown-menu";
 import {iconButton} from "@/components/primitives/iconButton";
 import {HomeLink} from "@/components/poker-night/HomeLink";
 import type {DrawerKind} from "@/components/poker-night/overlay-requests";
@@ -29,7 +31,7 @@ import {BookOpen, Keyboard} from "lucide-react";
 import {openShortcuts} from "@/components/poker-night/emote-client";
 import {HANDS_COPY, SHORTCUTS_COPY} from "@/lib/learn/copy/poker-night";
 import {ROOM_KEY_SHORTCUTS} from "@/lib/poker-night/keys";
-import {HOST_COPY, INVITE_COPY, MODE_COPY, OVERLAY_COPY, TABLE_COPY} from "@/lib/learn/copy/poker-night";
+import {HOST_COPY, INVITE_COPY, LOOKS_COPY, MODE_COPY, OVERLAY_COPY, TABLE_COPY} from "@/lib/learn/copy/poker-night";
 import {modeOf} from "@/lib/poker-night/variants";
 import {handLive, homeAsks, ownSeat, waitingRequests, type SeatChoice} from "@/lib/poker-night/overlays";
 import {cn} from "@/lib/utils";
@@ -156,6 +158,14 @@ const TopBar = ({onOpen, onSeatChoice, onTakeSeat, onLeave, onLeaveAfter, onHome
                             <DropdownMenuItem className="min-h-11 gap-3 px-3 text-sm" onSelect={() => onOpen('look')} data-menu="look">
                                 <Smile className="size-4" aria-hidden="true"/>{OVERLAY_COPY.myLook}
                             </DropdownMenuItem>
+                            {/* P8: the table's sounds on or off, one tap (also the M key and My look's switch), said as M says it. */}
+                            <DropdownMenuCheckboxItem className="min-h-11 gap-3 pl-3 pr-8 text-sm" checked={room.personal.sound} aria-keyshortcuts={ROOM_KEY_SHORTCUTS.mute}
+                                                      onCheckedChange={(on) => {
+                                                          room.setPersonal({sound: on});
+                                                          toast.message(on ? SHORTCUTS_COPY.soundOn : SHORTCUTS_COPY.soundOff);
+                                                      }} data-menu="sound">
+                                <Volume2 className="size-4" aria-hidden="true"/>{LOOKS_COPY.sound}
+                            </DropdownMenuCheckboxItem>
                             {/* P6: every key the table answers (ShortcutsDialog; also the ? key). */}
                             <DropdownMenuItem className="min-h-11 gap-3 px-3 text-sm" onSelect={openShortcuts} data-menu="shortcuts" aria-keyshortcuts={ROOM_KEY_SHORTCUTS.shortcuts}>
                                 <Keyboard className="size-4" aria-hidden="true"/>{SHORTCUTS_COPY.open}

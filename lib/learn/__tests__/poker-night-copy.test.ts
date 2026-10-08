@@ -474,6 +474,7 @@ describe('the table', () => {
             watchers: () => each(TABLE_COPY.watchers),
             seat: () => seats.map(TABLE_COPY.seat),
             openSeatLabel: () => seats.map(TABLE_COPY.openSeatLabel),
+            inviteToSeat: () => seats.map(TABLE_COPY.inviteToSeat),
             pendingBuy: () => each(TABLE_COPY.pendingBuy),
             seatLabel: () => named((name) => statuses.flatMap((status) => NS.flatMap((chips) =>
                 [null, ACTION_COPY.does('raise', chips, true)].map((last) => TABLE_COPY.seatLabel(name, 8, chips, status, last))))),
@@ -615,6 +616,8 @@ describe('the action bar', () => {
             potRaise: () => each(ACTION_COPY.potRaise),
             toCall: () => each(ACTION_COPY.toCall),
             amountRule: () => pairs(ACTION_COPY.amountRule),
+            less: () => each(ACTION_COPY.less),
+            more: () => each(ACTION_COPY.more),
             pre: () => [
                 ACTION_COPY.pre({kind: 'check-fold'}), ACTION_COPY.pre({kind: 'check'}), ACTION_COPY.pre({kind: 'call-any'}),
                 ...NS.map((amount) => ACTION_COPY.pre({kind: 'call', amount})),
@@ -687,6 +690,7 @@ describe('the hand log', () => {
         const pots = [null, 0, 1, 2];
         const flags = [false, true];
         covers(LOG_COPY, {
+            fromBanner: () => named((name) => [LOG_COPY.fromBanner([TABLE_COPY.banner(name, 1200)]), LOG_COPY.fromBanner([TABLE_COPY.bannerYou(70), TABLE_COPY.banner(name, 30)])]),
             hand: () => each(LOG_COPY.hand),
             blinds: () => NS.flatMap((ante) => pairs((sb, bb) => LOG_COPY.blinds(sb, bb, ante))),
             street: () => (['flop', 'turn', 'river'] as const).flatMap((street) => [null, 0, 2].map((board) => LOG_COPY.street(street, HAND_COPY.cardsShort(cards('AsKh7c')), board))),
@@ -927,7 +931,17 @@ describe('the bank', () => {
             addChips: () => each(BANK_COPY.addChips),
             askFor: () => each(BANK_COPY.askFor),
             takeChips: () => each(BANK_COPY.takeChips),
+            rebuyFor: () => each(BANK_COPY.rebuyFor),
+            rebuyShort: () => each(BANK_COPY.rebuyShort),
+            askShort: () => each(BANK_COPY.askShort),
         });
+    });
+
+    it('says the one-tap rebuy, the steppers, the open seat and the banner word for word', () => {
+        expect([BANK_COPY.rebuyFor(2000), BANK_COPY.rebuyShort(2000), BANK_COPY.askShort(2000), BANK_COPY.otherShort]).toEqual(['Rebuy 2,000 chips', 'Rebuy 2,000', 'Ask for 2,000', 'Other']);
+        expect([ACTION_COPY.less(20), ACTION_COPY.more(20)]).toEqual(['20 less', '20 more']);
+        expect([TABLE_COPY.inviteSeat, TABLE_COPY.inviteToSeat(4)]).toEqual(['Invite', 'Invite a friend to seat 5']);
+        expect(LOG_COPY.fromBanner(['Ana wins 1,200'])).toBe('Ana wins 1,200. Open the hand log');
     });
 
     it('reads as the bank prints it', () => {

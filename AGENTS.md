@@ -900,7 +900,17 @@ and friends keep none beyond Shared and the invariants).
   (`SeatPlace.shownDx`, `--pn-shown-dx`; `stage.nudgeHands`, `stage.handsMeet` allowing a lit card's
   lift under the hand over it): side and bottom seats placed first, then the top row, toward the middle
   first, else the other way, clear of every plate (and, two cards, the board placed first) — or the
-  hand it meets moves instead; seven seats or more on a 320 px phone can leave two meeting.
+  hand it meets moves instead. Where that still leaves a hand of two over another seat's plate, the
+  flag under one (sized as "Out of chips"), another hand or the board — a crowded column of side seats:
+  nine on a 375 or 320 px phone, seven or more on one on its side — `stage.placeHands` places every
+  hand again (`SeatPlace.shownDy`, `--pn-shown-dy`), a seat at a time round again until none moves and
+  then two that still meet together, at the place covering least (`HAND_WEIGHT`: a plate, the board, a
+  pots' band, another hand, a flag): along its row, on its plate's other side (under a side seat's) or
+  beside it toward the middle — always next to its own plate — and keeps one of the pots' bands by the
+  board (`potBands`) clear, so the pots keep a place; never its own plate. Nine hands up on a 320 px
+  phone or eight on the smallest phone on its side can still leave two meeting (the banner then sits
+  where the pot was, flagged); PLO's four keep the row nudge alone. The emotes' spot reads a hand moved
+  under its plate (`emotes.emoteSpot`).
 - A plate's status flag hangs under it where `stage.flagRoom` finds room clear of every other seat's
   plate (an open seat's ring), its cards face down, its blind's mark and its flag; where it has none
   (a phone on its side at seven seats or more), Triple T's "Discarding…" is a dashed ring on the plate
@@ -1047,14 +1057,36 @@ and friends keep none beyond Shared and the invariants).
   avatar (`stage.avatarCentre`), one per plate (a new one replaces it), with its own landing sound
   (`emotes.landingSound`).
 - The table's feel (`components/poker-night/TableFeel`): sounds synthesised by Web Audio from
-  `lib/poker-night/sounds`' recipes (gain ≤ 0.3, 40 Hz–8 kHz, ≤ 1.2 s, held by `sounds.test`), each
-  at its animation's moment on the motion token, one audio context made and resumed inside a
+  `lib/poker-night/sounds`' recipes — layered, physically shaped tones and filtered noise: a card's
+  swish and snap, two to four clay chips clacking, a knock, the muck's sweep, and each thing thrown its
+  own landing (`HIT_SOUND_IDS`, `emotes.landingSound`: a fish's 60–180 Hz body, wet slap, falling
+  squelch and droplets; a tomato's splat and drips; an egg's crack then splat; …) — each part with its
+  own attack and exponential fall (`partLevel`, the player's envelope), played from a seed
+  (`soundParts(id, seed)`: a cue's key, a landing's emote id through `soundSeed`, else fresh), so one
+  seed is one sound on every screen and no two throws, chips or cards quite alike; the turn's chime,
+  the arpeggio, the pop and the two notes of a request never vary (`FIXED_SOUNDS`). `sounds.test`
+  holds every recipe over many seeds to `SOUND_LIMITS` (a part ≤ 0.35 gain, its layers together ≤ 0.75,
+  40 Hz–10 kHz, ≤ 1.2 s); the parts meet in a master gain behind a gentle compressor. Each sound at its
+  animation's moment on the motion token, one audio context made and resumed inside a
   gesture a browser counts (`sound-player.stayUnlocked`: click, a touch's pointerup or touchend,
   mousedown, keydown — never a touch's pointerdown — again whenever it stops running), at most
   once per 60 ms, silent while hidden but for the turn's chime; a buzz on a
-  phone's turn, the screen kept awake while seated (`useWakeLock`), the room's keys E, L, B, M and ?
+  phone's turn — and, for a phone that cannot buzz, the dock's edge and "Your turn" breathing on
+  `.pn-pulse` (`.pn-turn-edge`, `.pn-turn-cue`, still under either motion guard) — the screen kept
+  awake while seated (`useWakeLock`), the room's keys E, L, B, M and ?
   (`keys.roomIntentForKey`, `useHotkeys`) and their list (`ShortcutsDialog`, also in the top bar's
-  menu) — each honouring the player's own `PersonalLook` switch.
+  menu, which also turns the sounds on or off: a check, said as M says it) — each honouring the
+  player's own `PersonalLook` switch.
+- The table's small conveniences (P8): a move's tag stays on its plate, still, for the rest of the
+  street (`reveal.streetTags` from the log tail: the last check, call, bet or raise, never a blind, a
+  fold or a card thrown away; `data-tag-still`); the raise panel's − and + step a big blind
+  (`bet-sizing.stepRaise`, 44 px) and it opens at the size the player last confirmed before or after the
+  flop where this turn offers it — the minimum, ½ or ¾ pot, never the all-in or the pot — kept in this
+  browser only (`SIZE_MEMORY_KEY`, `readSizeMemory`, `rememberSize`, `initialRaiseTo`); out of chips,
+  the dock's one tap buys the whole buy-in the table allows ("Rebuy 2,000 chips", or "Ask for 2,000
+  chips" where the host says yes first: `dock.rebuyTap`), "Other amount" opening the bank only when
+  there is another to choose; the winner's banner is a button that opens the hand log; and for a seated
+  player an open seat says "Invite" and opens the invite sheet.
 - Looks (P5): every colour the table draws is a literal in `lib/poker-night/looks` — eight scenes
   (a gradient sky, an art id and an ambient loop each, `my-theme` the viewer's own palette tokens),
   eight felts, eight card backs, two faces, two suit schemes, four chip sets, the avatar colours —

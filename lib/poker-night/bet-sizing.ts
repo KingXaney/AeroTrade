@@ -9,7 +9,8 @@
 // pot limit (PLO) the top is the pot itself whenever the stack goes past it (cap 'pot'): the last
 // quick size is then Pot, the confirm reads "Raise to 340 (pot)", and the move sent is a raise to it —
 // never the all-in, which the server takes only within the cap. The ids are ACTION_COPY.sizes' keys
-// in lib/learn/copy/poker-night.
+// in lib/learn/copy/poker-night. On a phone (P8): the steppers' big blind at a time (stepRaise), and the
+// size the player last confirmed before or after the flop, remembered in the browser (rememberSize).
 
 import {ACTION_COPY} from '@/lib/learn/copy/poker-night';
 import type {Legal} from '@/lib/poker-night/types';
@@ -125,3 +126,59 @@ export const parseChips = (text: string): number | null => {
     const whole = Math.round(n);
     return Math.abs(n - whole) < 1e-9 && whole > 0 && Number.isSafeInteger(whole) ? whole : null;
 };
+
+// ── the panel on a phone: a step at a time, and the size the player last chose ──
+
+// The steppers beside the slider: one big blind less or more, held to the range (clampTo) — the
+// slider's thumb is hard to move a chip at a time under a thumb. From the top of the range a step down
+// lands a big blind under it, from the bottom a step up a big blind over it.
+export const stepRaise = (s: Pick<Sizing, 'min' | 'max' | 'unit'>, to: number, dir: 1 | -1, step: number): number => {
+    const by = Math.max(1, Math.round(step));
+    const next = clampTo(to + dir * by, s);
+    // Rounding to the unit may hand back where it started: one more unit the same way.
+    return next === to && to !== (dir > 0 ? s.max : s.min) ? clampTo(to + dir * (by + s.unit), s) : next;
+};
+
+// The quick sizes a player's choice is remembered by, before the flop and after it, in this browser
+// alone (never sent, never part of the look an account saves): the minimum and the pot's shares —
+// never the all-in or the pot, which a careless tap must never repeat.
+export const SIZE_MEMORY_KEY = 'aero-poker-night:sizes';
+export const REMEMBERED_SIZES = ['min', 'half', 'three-quarters'] as const satisfies readonly QuickSizeId[];
+export type RememberedSize = (typeof REMEMBERED_SIZES)[number];
+export type SizeMemory = {pre: RememberedSize | null; post: RememberedSize | null};
+export const EMPTY_SIZE_MEMORY: SizeMemory = {pre: null, post: null};
+
+const remembered = (id: unknown): RememberedSize | null =>
+    typeof id === 'string' && (REMEMBERED_SIZES as readonly string[]).includes(id) ? (id as RememberedSize) : null;
+
+// The memory as stored (localStorage's string, or null): only the sizes it may hold, anything else
+// forgotten.
+export const readSizeMemory = (raw: string | null): SizeMemory => {
+    if (!raw) return EMPTY_SIZE_MEMORY;
+    try {
+        const parsed = JSON.parse(raw) as unknown;
+        if (typeof parsed !== 'object' || parsed === null) return EMPTY_SIZE_MEMORY;
+        const o = parsed as Record<string, unknown>;
+        return {pre: remembered(o.pre), post: remembered(o.post)};
+    } catch {
+        return EMPTY_SIZE_MEMORY;
+    }
+};
+
+// Which half of the hand a street is: before the flop, or after it.
+export const sizeStreet = (street: string): keyof SizeMemory => (street === 'preflop' ? 'pre' : 'post');
+
+// The quick size a "raise to" is, when it is one.
+export const sizeIdFor = (s: Sizing, to: number): QuickSizeId | null => quickSizes(s).find((q) => q.to === to)?.id ?? null;
+
+// The memory after a confirmed raise to `to` on `street`: the size it was, when it may be kept;
+// otherwise as it was (an amount typed or slid, the all-in, the pot).
+export const rememberSize = (memory: SizeMemory, street: string, s: Sizing, to: number): SizeMemory => {
+    const id = remembered(sizeIdFor(s, to));
+    return id === null ? memory : {...memory, [sizeStreet(street)]: id};
+};
+
+// Where the raise panel opens: the size remembered for this street when this sizing offers it, else
+// the minimum.
+export const initialRaiseTo = (s: Sizing, id: RememberedSize | null): number =>
+    (id === null ? null : quickSizes(s).find((q) => q.id === id)?.to) ?? s.min;

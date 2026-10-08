@@ -8,7 +8,8 @@ import {describe, expect, it} from 'vitest';
 import {ACTION_COPY} from '@/lib/learn/copy/poker-night';
 import {legalFor} from '@/lib/poker-night/betting';
 import {
-    amountToSlider, clampTo, confirmLabel, moveFor, parseChips, potRaise, potTotal, QUICK_SIZE_IDS, quickSizes, SLIDER_MAX, sizingFor, sliderToAmount, type Sizing,
+    amountToSlider, clampTo, confirmLabel, EMPTY_SIZE_MEMORY, initialRaiseTo, moveFor, parseChips, potRaise, potTotal, QUICK_SIZE_IDS, quickSizes, readSizeMemory, rememberSize,
+    REMEMBERED_SIZES, SIZE_MEMORY_KEY, sizeIdFor, sizeStreet, SLIDER_MAX, sizingFor, sliderToAmount, stepRaise, type Sizing,
 } from '@/lib/poker-night/bet-sizing';
 import type {TableState} from '@/lib/poker-night/types';
 import {publicView, snapshotFromView} from '@/lib/poker-night/views';
@@ -137,5 +138,56 @@ describe('the amount field', () => {
 
     it('reads nothing else', () => {
         for (const text of ['', 'abc', '-5', '0', '1.5', '1e3', '12x', '1,2.5k', '.']) expect(parseChips(text), text).toBeNull();
+    });
+});
+
+describe('the panel on a phone', () => {
+    const sz: Sizing = {kind: 'raise', min: 40, max: 1000, cap: 'all-in', currentBet: 20, myBet: 0, toCall: 20, pot: 30, unit: 10};
+
+    it('steps a big blind at a time, held to the range: from the top a big blind under it, from the bottom one over it', () => {
+        expect(stepRaise(sz, 40, 1, 20)).toBe(60);
+        expect(stepRaise(sz, 60, -1, 20)).toBe(40);
+        expect(stepRaise(sz, 40, -1, 20)).toBe(40);
+        expect(stepRaise(sz, 1000, 1, 20)).toBe(1000);
+        expect(stepRaise(sz, 1000, -1, 20)).toBe(980);
+        expect(stepRaise(sz, 990, 1, 20)).toBe(1000);
+        // An amount typed off the unit lands back on it.
+        expect(stepRaise(sz, 55, 1, 20) % sz.unit).toBe(0);
+        // Under pot limit the top is the pot: a step never passes it.
+        const potCap: Sizing = {...sz, max: 120, cap: 'pot'};
+        expect(stepRaise(potCap, 110, 1, 20)).toBe(120);
+    });
+
+    it("remembers the minimum and the pot's shares before and after the flop, never the all-in or the pot", () => {
+        expect(SIZE_MEMORY_KEY).toBe('aero-poker-night:sizes');
+        expect(REMEMBERED_SIZES).toEqual(['min', 'half', 'three-quarters']);
+        expect([sizeStreet('preflop'), sizeStreet('flop'), sizeStreet('turn'), sizeStreet('river')]).toEqual(['pre', 'post', 'post', 'post']);
+        expect(sizeIdFor(sz, 50)).toBe('half');
+        expect(sizeIdFor(sz, 55)).toBeNull();
+        const half = rememberSize(EMPTY_SIZE_MEMORY, 'preflop', sz, 50);
+        expect(half).toEqual({pre: 'half', post: null});
+        // The all-in, the pot and an amount of the player's own leave it as it was.
+        expect(rememberSize(half, 'preflop', sz, 1000)).toBe(half);
+        expect(rememberSize(half, 'preflop', sz, 70)).toBe(half);
+        expect(rememberSize(half, 'preflop', sz, 55)).toBe(half);
+        expect(rememberSize(half, 'river', sz, 60)).toEqual({pre: 'half', post: 'three-quarters'});
+    });
+
+    it('reads only the sizes it may hold back from storage', () => {
+        expect(readSizeMemory(null)).toEqual(EMPTY_SIZE_MEMORY);
+        expect(readSizeMemory('not json')).toEqual(EMPTY_SIZE_MEMORY);
+        expect(readSizeMemory('[1]')).toEqual(EMPTY_SIZE_MEMORY);
+        expect(readSizeMemory(JSON.stringify({pre: 'all-in', post: 'pot'}))).toEqual(EMPTY_SIZE_MEMORY);
+        expect(readSizeMemory(JSON.stringify({pre: 'three-quarters', post: 'min', extra: 1}))).toEqual({pre: 'three-quarters', post: 'min'});
+    });
+
+    it('opens at the size remembered where this turn offers it, else at the minimum', () => {
+        expect(initialRaiseTo(sz, null)).toBe(40);
+        expect(initialRaiseTo(sz, 'half')).toBe(50);
+        expect(initialRaiseTo(sz, 'three-quarters')).toBe(60);
+        // A short stack: no half-pot raise on offer, so the minimum.
+        const short: Sizing = {...sz, max: 45};
+        expect(quickSizes(short).map((q) => q.id)).not.toContain('half');
+        expect(initialRaiseTo(short, 'half')).toBe(40);
     });
 });

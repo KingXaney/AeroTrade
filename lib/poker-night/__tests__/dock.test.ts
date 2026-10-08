@@ -7,7 +7,7 @@
 import {describe, expect, it} from 'vitest';
 import {legalFor, snapshotFromState} from '@/lib/poker-night/betting';
 import {nextDueAt} from '@/lib/poker-night/clock';
-import {boardStrengths, dockView, handStrength, preOptions, preRowKey, samePre, throwAwayCount} from '@/lib/poker-night/dock';
+import {boardStrengths, dockView, handStrength, preOptions, preRowKey, rebuyTap, samePre, throwAwayCount} from '@/lib/poker-night/dock';
 import {homeAsks} from '@/lib/poker-night/overlays';
 import {reduce} from '@/lib/poker-night/engine';
 import type {TableState} from '@/lib/poker-night/types';
@@ -415,5 +415,17 @@ describe('Triple T\'s throw-away', () => {
         s = ok(reduce(s, {type: 'leave', by: pidOf(2), at: nowOf(s)}));
         expect(dockView(as(s, 2)).discard).toBeNull();
         expect(throwAwayCount(as(s, 0))).toEqual({done: 0, of: 2});
+    });
+});
+
+describe("the dock's one-tap rebuy", () => {
+    it('offers the whole buy-in the table allows in one tap, asked of the host where it says yes first, and the bank only when there is another amount', () => {
+        const rebuy = {min: 1000, max: 2000, topUp: 2000, rebuy: true, first: false};
+        expect(rebuyTap(rebuy, false)).toEqual({amount: 2000, asks: false, other: true});
+        expect(rebuyTap(rebuy, true)).toEqual({amount: 2000, asks: true, other: true});
+        expect(rebuyTap({...rebuy, min: 2000}, false)).toEqual({amount: 2000, asks: false, other: false});
+        // A seat that never had chips here asks for its first (FirstChips), never a rebuy; nothing offered, nothing.
+        expect(rebuyTap({...rebuy, first: true, rebuy: false}, false)).toBeNull();
+        expect(rebuyTap(null, true)).toBeNull();
     });
 });

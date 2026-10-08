@@ -16,8 +16,8 @@ import {
     throwCeiling, throwGlyph, throwPath, throwPx, type EmoteMessage, type LiveEmote,
 } from '@/lib/poker-night/emotes';
 import {SEAT_COUNTS} from '@/lib/poker-night/layout';
-import {SOUND_IDS} from '@/lib/poker-night/sounds';
-import {avatarCentre, CARD_RATIO, SHOWN_CARD_PX, stageLayout} from '@/lib/poker-night/stage';
+import {HIT_SOUND_IDS, SOUND_IDS} from '@/lib/poker-night/sounds';
+import {avatarCentre, CARD_RATIO, SHOWN_CARD_PX, shownHandRect, stageLayout} from '@/lib/poker-night/stage';
 import {EmoteSchema} from '@/lib/poker-night/input';
 import {LIMITS} from '@/lib/poker-night/limits';
 import {emoteTableFromDoc, emoteWrite} from '@/lib/poker-night/room-doc';
@@ -265,14 +265,10 @@ describe('drawing them', () => {
         expect(throwPath({x: 100, y: 500}, {x: 300, y: 500}, 0).arc).toBe(70);
     });
 
-    it('sounds each landing by its impact: a splat only for a splat', () => {
-        expect(THROW_IDS.filter((id) => landingSound(id) === 'splat').sort()).toEqual(['cake', 'egg', 'tomato']);
-        expect(landingSound('rose')).toBe('pop');
-        expect(landingSound('heart')).toBe('pop');
-        expect(landingSound('confetti')).toBe('pop');
-        expect(landingSound('soda')).toBe('fizz');
-        expect(landingSound('tennis-ball')).toBe('bounce');
-        expect(landingSound('fish')).toBe('bounce');
+    it('sounds each landing as the thing thrown: a landing of its own for each, every one a sound the table makes', () => {
+        expect(THROW_IDS.map(landingSound)).toEqual(THROW_IDS.map((id) => `hit-${id}`));
+        expect(new Set(THROW_IDS.map(landingSound)).size).toBe(THROW_IDS.length);
+        expect([...HIT_SOUND_IDS].sort()).toEqual(THROW_IDS.map(landingSound).sort());
         for (const id of THROW_IDS) expect(SOUND_IDS).toContain(landingSound(id));
     });
 
@@ -326,12 +322,12 @@ describe('drawing them', () => {
                             // The reaction's whole rise, its glyph on top, stays under the top bar.
                             expect(spot.y - EMOTE_SIZES.rise - reactionPx(stage.fit)).toBeGreaterThanOrEqual(emoteCeiling(stage.fit));
                         }
-                        // The turned-up cards: over a bottom or side plate, under a top one — never under the bubble.
-                        if (shown) {
+                        // The turned-up cards: over a bottom or side plate, under a top one (or under a side one
+                        // moved off a crowded column's plates) — never under the bubble; beside the plate, out of its way.
+                        const hand = shownHandRect(place, stage);
+                        if (shown && Math.abs(hand.x - place.plate.x) < (stage.plateSize.w + hand.w) / 2) {
                             const cardH = SHOWN_CARD_PX[stage.fit] * CARD_RATIO;
-                            const cards = place.spot.side === 'top'
-                                ? {top: place.plate.y + half + 10, bottom: place.plate.y + half + 10 + cardH}
-                                : {top: place.plate.y - half - 3 - cardH, bottom: place.plate.y - half - 3};
+                            const cards = {top: hand.y + hand.h / 2 - cardH, bottom: hand.y + hand.h / 2};
                             const bubble = spot.below ? {top: spot.y - 5, bottom: spot.y + BUBBLE} : {top: spot.y - BUBBLE, bottom: spot.y + 5};
                             expect(bubble.bottom <= cards.top || bubble.top >= cards.bottom, JSON.stringify({box: stage.box, seat: place.seat, spot, cards})).toBe(true);
                         }

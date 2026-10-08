@@ -363,6 +363,14 @@ describe('the pots', () => {
                 const pops: WinPop[] = [{seat: mine ?? 0, amount: amounts.reduce((a, b) => a + b, 0)}];
                 const pots = potPlan(s, potsOf(amounts), {open: [], shown, button, bets: seated, now: {shown, bets: [], pops}})!;
                 const label = `${box.w}×${box.h} ${n} seats, viewer ${mine}, ${amounts.length} pots, button ${button}`;
+                // Nine seats on the smallest phone held upright with every hand turned up: the side seats'
+                // hands sit beside their plates (none over another plate), and the banner sits where the pot
+                // was, flagged, as it does where nothing has room.
+                if (box.w <= 308 && box.h <= 352 && n === 9) {
+                    const crowded = bannerPlan(s, text, {open: [], shown, button, pots: pots.pills, pops});
+                    expect(insideBox(pieceRect(crowded.banner), s.box), label).toBe(true);
+                    continue;
+                }
                 const plan = expectClear(s, text, {open: [], shown, button, pots: pots.pills, pops}, label);
                 for (const piece of piecesOf(plan)) for (const pill of pots.pills) {
                     expect(overlaps(piece.r, pill), `${label}: ${piece.name} over "${pill.label}"`).toBe(false);
@@ -820,8 +828,9 @@ describe("the winner's banner", () => {
                 expect(r.h).toBeCloseTo(card * CARD_RATIO + 8, 6);
                 const plateTop = p.plate.y - s.plateSize.h / 2;
                 const plateBottom = p.plate.y + s.plateSize.h / 2;
-                if (p.spot.side === 'top') expect(r.y + r.h / 2).toBeCloseTo(plateBottom + SHOWN_OFF.under + card * CARD_RATIO, 6);
-                else expect(r.y + r.h / 2).toBeCloseTo(plateTop - SHOWN_OFF.over, 6);
+                // Where it is drawn before the stage moves it (shownDy: off a crowded column's plates).
+                if (p.spot.side === 'top') expect(r.y + r.h / 2 - p.shownDy).toBeCloseTo(plateBottom + SHOWN_OFF.under + card * CARD_RATIO, 6);
+                else expect(r.y + r.h / 2 - p.shownDy).toBeCloseTo(plateTop - SHOWN_OFF.over, 6);
             }
             expect(openSeatPx(s)).toBe(Math.max(44, s.plateSize.h * 0.95));
         }
@@ -1185,25 +1194,62 @@ describe('one board as the table moves a pixel, and the hands turned up round it
         }
     }, 120_000);
 
-    it('moves a turned-up hand along its row off another: apart on the phones QA drives at every seat count but seven or more on a 320 px phone (eight on its side)', () => {
-        // Where there is no room for every seat's hand at once — seven seats or more on a 320 px phone,
-        // eight on the smallest phone on its side, and Texas hold'em's eight on a 375 px phone held
-        // upright, whose board, laid out first, takes the room a hand would move to — each hand that
-        // meets none stays where it was.
-        const crowded = (box: {w: number; h: number}, n: number, handSize: number): boolean =>
-            (box.w <= 320 && n >= 7) || (box.w === 364 && box.h === 224 && n >= 8) || (handSize === 2 && n === 8 && box.w < 380 && box.h < 480);
-        for (const box of [...Object.values(POT_BOXES).flat(), ...Object.values(SIDEWAYS)]) for (const n of SEAT_COUNTS) for (const mine of [0, null]) for (const handSize of [2, 4]) {
-            const s = stageLayout(box, n, mine, 1, {handSize});
-            const label = `${box.w}×${box.h} ${n} seats, viewer ${mine}, hands of ${handSize}`;
-            const hands = s.seats.filter((p) => mine === null || p.slot !== 0).map((p) => ({p, r: shownHandRect(p, s, handSize)}));
+    it('keeps a turned-up hand of two off every other plate and the board, on every phone QA drives and every seat count: along its row, beside its plate or on its other side', () => {
+        // Texas hold'em's hands (and Triple T's): never over another seat's plate, nor the board (but on
+        // the smallest phone on its side with eight seats or more, where nine hands up leave the board's
+        // band the last room); apart from one another and off the flags plates hang (as wide as "Out of
+        // chips") but where there is no room for every hand at once — eight seats or more on the smallest
+        // phone on its side, nine on a 320 px phone, where the pots keep a band by the board — there a hand
+        // may meet another, or the end of a long flag under a top seat's plate.
+        const crowdedMeet = (box: {w: number; h: number}, n: number): boolean => (box.w === 364 && box.h === 224 && n >= 8) || (box.w <= 308 && n === 9);
+        const crowdedFlag = (box: {w: number; h: number}, n: number): boolean => crowdedMeet(box, n) || ((box.w <= 308 || (box.w === 363 && box.h === 470)) && n === 9);
+        for (const box of [...Object.values(POT_BOXES).flat(), ...Object.values(SIDEWAYS)]) for (const n of SEAT_COUNTS) for (const mine of [0, null]) {
+            const s = stageLayout(box, n, mine, 1, {handSize: 2});
+            const label = `${box.w}×${box.h} ${n} seats, viewer ${mine}`;
+            const lit = {x: s.board.x, y: s.board.y - 4, w: s.board.w + 4, h: s.board.h + 8};
+            const hands = s.seats.filter((p) => mine === null || p.slot !== 0).map((p) => ({p, r: shownHandRect(p, s, 2)}));
             for (const {p, r} of hands) {
                 expect(insideBox(r, s.box), `${label}: seat ${p.seat}'s hand inside`).toBe(true);
-                // A hand moved along its row never covers another seat's plate (or, two cards, the board).
+                for (const q of s.seats) if (q.seat !== p.seat) expect(overlaps(r, {...q.plate, ...s.plateSize}), `${label}: seat ${p.seat}'s hand over plate ${q.seat}`).toBe(false);
+                // Its own plate, never.
+                expect(overlaps(r, {...p.plate, ...s.plateSize}), `${label}: seat ${p.seat}'s hand over its own plate`).toBe(false);
+                if (!(box.w === 364 && n >= 8)) expect(overlaps(r, lit), `${label}: seat ${p.seat}'s hand over the board`).toBe(false);
+                if (crowdedFlag(box, n)) continue;
+                // The cards (a lit card lifts over a flag only for a moment).
+                const cards = {...r, y: r.y + 3, h: r.h - 6};
+                for (const q of s.seats) if (q.seat !== p.seat) expect(overlaps(cards, flagRect(q, s, 'Out of chips')), `${label}: seat ${p.seat}'s hand over seat ${q.seat}'s flag`).toBe(false);
+            }
+            if (crowdedMeet(box, n)) continue;
+            for (let i = 0; i < hands.length; i++) for (let j = i + 1; j < hands.length; j++) {
+                expect(handsMeet(hands[i].r, hands[j].r), `${label}: seats ${hands[i].p.seat} and ${hands[j].p.seat}`).toBe(false);
+            }
+        }
+        // Nine seats on a 320 × 568 phone: the left column's hands under the lowest plate and beside the
+        // middle one — each still beside its own plate.
+        const s = stageLayout({w: 308, h: 340}, 9, 0);
+        const [low, middle] = [s.seats.find((p) => p.slot === 1)!, s.seats.find((p) => p.slot === 2)!];
+        expect(low.shownDy).toBeGreaterThan(0);
+        expect(middle.shownDx).toBeGreaterThan(0);
+    }, 120_000);
+
+    it('moves a turned-up hand of four along its row off another: apart on the phones QA drives at every seat count but seven or more on a 320 px phone (eight on its side)', () => {
+        // Where there is no room for every seat's hand at once — seven seats or more on a 320 px phone,
+        // eight on the smallest phone on its side, and nine on a 375 px phone held upright — each hand
+        // that meets none stays where it was.
+        const crowded = (box: {w: number; h: number}, n: number): boolean =>
+            (box.w <= 320 && n >= 7) || (box.w === 364 && box.h === 224 && n >= 8) || (box.w < 380 && box.h < 480 && n === 9);
+        for (const box of [...Object.values(POT_BOXES).flat(), ...Object.values(SIDEWAYS)]) for (const n of SEAT_COUNTS) for (const mine of [0, null]) {
+            const s = stageLayout(box, n, mine, 1, {handSize: 4});
+            const label = `${box.w}×${box.h} ${n} seats, viewer ${mine}, hands of 4`;
+            const hands = s.seats.filter((p) => mine === null || p.slot !== 0).map((p) => ({p, r: shownHandRect(p, s, 4)}));
+            for (const {p, r} of hands) {
+                expect(insideBox(r, s.box), `${label}: seat ${p.seat}'s hand inside`).toBe(true);
+                expect(p.shownDy, label).toBe(0);
+                // A hand moved along its row never covers another seat's plate.
                 if (p.shownDx === 0) continue;
                 for (const q of s.seats) if (q.seat !== p.seat) expect(overlaps(r, {...q.plate, ...s.plateSize}), `${label}: seat ${p.seat}'s hand over plate ${q.seat}`).toBe(false);
-                if (handSize === 2) expect(overlaps(r, {x: s.board.x, y: s.board.y - 4, w: s.board.w + 4, h: s.board.h + 8}), `${label}: seat ${p.seat}'s hand over the board`).toBe(false);
             }
-            if (crowded(box, n, handSize)) continue;
+            if (crowded(box, n)) continue;
             for (let i = 0; i < hands.length; i++) for (let j = i + 1; j < hands.length; j++) {
                 expect(handsMeet(hands[i].r, hands[j].r), `${label}: seats ${hands[i].p.seat} and ${hands[j].p.seat}`).toBe(false);
             }
@@ -1216,9 +1262,10 @@ describe('one board as the table moves a pixel, and the hands turned up round it
     }, 120_000);
 
     it('draws a hand moved along its row where the stage put it', () => {
-        expect(css).toContain('translate: calc(-50% + var(--pn-shown-dx, 0px)) 0;');
+        expect(css).toContain('translate: calc(-50% + var(--pn-shown-dx, 0px)) var(--pn-shown-dy, 0px);');
         const seat = readFileSync(fileURLToPath(new URL('../../../components/poker-night/Seat.tsx', import.meta.url)), 'utf8');
         expect(seat).toContain("'--pn-shown-dx': `${place.shownDx}px`");
+        expect(seat).toContain("'--pn-shown-dy': `${place.shownDy}px`");
     });
 });
 

@@ -4,22 +4,29 @@
 // pot, all in — lib/poker-night/bet-sizing, within the very limits the server checks; in PLO the pot
 // is the top whenever the stack goes past it), a slider that gives the small end most of its travel,
 // the amount as a number ("1,250", "1.5k"), and the confirm button that names the total ("Raise to
-// 340", "All in for 2,000", "Raise to 340 (pot)"). Keys from the action bar: 1–4 pick a quick size,
+// 340", "All in for 2,000", "Raise to 340 (pot)"), with a "−" and a "+" (44 px) round the amount that
+// step a big blind at a time (bet-sizing.stepRaise: "20 less", "20 more"), since a slider's thumb is
+// hard to move finely under a thumb — the slider takes a row of its own where the dock is narrow. It
+// opens at the size the player last chose on this half of the hand (before or after the flop), when
+// this turn offers it (the action bar's memory, bet-sizing.initialRaiseTo). Keys from the action bar: 1–4 pick a quick size,
 // A the top (all in, or the pot in PLO), Enter confirms, Escape closes — Enter and Escape in the
 // amount field too. It floats over the table above the action bar, so opening it moves nothing; on a narrow
 // dock (a phone), where the controls wrap under the cards, it rises from the whole dock instead, so
-// the viewer's cards and seconds stay in sight (app/globals.css, @container pn-dock).
+// the viewer's cards and seconds stay in sight (app/globals.css, @container pn-dock); on a phone on its
+// side, beside the dock's column, over the felt's right side.
 
 import {useId, useState} from "react";
+import {Minus, Plus} from "lucide-react";
 import ActionButton from "@/components/primitives/ActionButton";
 import TextField from "@/components/primitives/TextField";
 import {ACTION_COPY, TABLE_COPY} from "@/lib/learn/copy/poker-night";
-import {amountToSlider, clampTo, confirmLabel, parseChips, quickSizes, SLIDER_MAX, sliderToAmount, type Sizing} from "@/lib/poker-night/bet-sizing";
+import {amountToSlider, clampTo, confirmLabel, parseChips, quickSizes, SLIDER_MAX, sliderToAmount, stepRaise, type Sizing} from "@/lib/poker-night/bet-sizing";
 import {KEY_SHORTCUTS} from "@/lib/poker-night/keys";
 import {cn} from "@/lib/utils";
 
 type Props = {
     sizing: Sizing;
+    step: number; // the steppers' step: the big blind
     value: number;
     onValue: (to: number) => void;
     onConfirm: () => void;
@@ -28,7 +35,9 @@ type Props = {
     disabled: boolean;
 };
 
-const RaisePanel = ({sizing, value, onValue, onConfirm, onClose, pending, disabled}: Props) => {
+const STEPPER = 'size-11 shrink-0 p-0';
+
+const RaisePanel = ({sizing, step, value, onValue, onConfirm, onClose, pending, disabled}: Props) => {
     const id = useId();
     // The field's text while it is being typed; otherwise it shows the value.
     const [text, setText] = useState<string | null>(null);
@@ -47,21 +56,37 @@ const RaisePanel = ({sizing, value, onValue, onConfirm, onClose, pending, disabl
                     </ActionButton>
                 ))}
             </div>
-            <div className="flex items-center gap-2">
+            <div className="flex flex-wrap items-center gap-x-2 gap-y-1">
                 <input type="range" min={0} max={SLIDER_MAX} step={1} value={amountToSlider(value, sizing)}
-                       className={cn('h-11 min-w-0 flex-1 accent-brand')} aria-label={ACTION_COPY.sliderLabel} aria-valuetext={TABLE_COPY.chips(value)}
+                       className={cn('h-11 min-w-0 flex-[1_1_8rem] accent-brand')} aria-label={ACTION_COPY.sliderLabel} aria-valuetext={TABLE_COPY.chips(value)}
                        onChange={(e) => {
                            setText(null);
                            onValue(sliderToAmount(Number(e.target.value), sizing));
                        }} data-pn-slider=""/>
-                <TextField inputMode="numeric" autoComplete="off" className="h-11 w-24 text-right" aria-label={ACTION_COPY.amountLabel} aria-describedby={`${id}-rule`}
-                           value={text ?? TABLE_COPY.chips(value)}
-                           onChange={(e) => {
-                               setText(e.target.value);
-                               const n = parseChips(e.target.value);
-                               if (n !== null) onValue(clampTo(n, sizing));
-                           }}
-                           onBlur={() => setText(null)} data-pn-amount=""/>
+                <div className="flex flex-auto items-center justify-end gap-1">
+                    <ActionButton variant="secondary" size="xs" className={STEPPER} aria-label={ACTION_COPY.less(step)} title={ACTION_COPY.less(step)} disabled={value <= sizing.min}
+                                  onClick={() => {
+                                      setText(null);
+                                      onValue(stepRaise(sizing, value, -1, step));
+                                  }} data-pn-step="less">
+                        <Minus className="size-4" aria-hidden="true"/>
+                    </ActionButton>
+                    <TextField inputMode="numeric" autoComplete="off" className="h-11 w-20 min-w-0 text-right" aria-label={ACTION_COPY.amountLabel} aria-describedby={`${id}-rule`}
+                               value={text ?? TABLE_COPY.chips(value)}
+                               onChange={(e) => {
+                                   setText(e.target.value);
+                                   const n = parseChips(e.target.value);
+                                   if (n !== null) onValue(clampTo(n, sizing));
+                               }}
+                               onBlur={() => setText(null)} data-pn-amount=""/>
+                    <ActionButton variant="secondary" size="xs" className={STEPPER} aria-label={ACTION_COPY.more(step)} title={ACTION_COPY.more(step)} disabled={value >= sizing.max}
+                                  onClick={() => {
+                                      setText(null);
+                                      onValue(stepRaise(sizing, value, 1, step));
+                                  }} data-pn-step="more">
+                        <Plus className="size-4" aria-hidden="true"/>
+                    </ActionButton>
+                </div>
             </div>
             <p id={`${id}-rule`} className="text-[11px] text-fg-muted">{ACTION_COPY.amountRule(sizing.min, sizing.max)}</p>
             <div className="flex gap-1.5">
