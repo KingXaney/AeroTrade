@@ -4,9 +4,10 @@
 engine, the room server and its API, the playable table and lobby on polling, live updates over Ably,
 looks and avatars, emotes and the table's feel, and the night's awards with the table's glossary
 terms, each with its unit tests and browser QA. Live updates switch on once `ABLY_API_KEY` is set in
-Production; until then every table polls. The modes batch (P1–P8) added the way home, the Hands
-guide, Home's panel, state version 2, PLO on one to three boards, Triple T and the table's small
-conveniences (below).
+Production (set on 2026-10-08); until then every table polls. The modes batch (P1–P8) shipped on
+2026-10-08 from `feat/poker-night-modes` in two parts: the way home, the Hands guide and Home's panel
+first, then state version 2, PLO on one to three boards, Triple T and the table's small conveniences
+(below).
 
 ## Why
 
