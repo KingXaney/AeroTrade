@@ -158,7 +158,7 @@ describe('the rails the glossary quotes', () => {
 // The poker night table's words (P7): homed on its lobby (lib/learn/where.ts), each one the
 // glossary's own, so a label at the table and a chat answer quote the same sentence.
 describe('the poker night terms', () => {
-    const NIGHT = ['side-pot', 'dealer-button', 'small-blind', 'minimum-raise', 'rebuy', 'all-in'] as const;
+    const NIGHT = ['side-pot', 'dealer-button', 'small-blind', 'minimum-raise', 'rebuy', 'all-in', 'hand-rankings', 'kicker', 'texas-holdem', 'omaha', 'pot-limit', 'triple-t'] as const;
 
     it('define the table\'s words with no currency word, play chips having no cash value', () => {
         for (const key of NIGHT) {
@@ -181,6 +181,40 @@ describe('the poker night terms', () => {
         expect(resolveTerm('all-in equity')?.key).toBe('hand-equity');
         expect(resolveTerm('shove or fold')?.key).toBe('push-fold');
         expect(resolveTerm('big blind')?.key).toBe('big-blind');
+        // The Hands guide's (P2).
+        expect(resolveTerm('what are the hand rankings?')?.key).toBe('hand-rankings');
+        expect(resolveTerm('what is a kicker')?.key).toBe('kicker');
+        expect(resolveTerm('kickers')?.key).toBe('kicker');
+        expect(resolveTerm("how does texas hold'em work")?.key).toBe('texas-holdem');
+        expect(resolveTerm('holdem')?.key).toBe('texas-holdem');
+        // PLO's (P5).
+        expect(resolveTerm('what is PLO?')?.key).toBe('omaha');
+        expect(resolveTerm('how does pot-limit omaha work')?.key).toBe('omaha');
+        expect(resolveTerm('pot limit omaha')?.key).toBe('omaha');
+        expect(resolveTerm('what does pot limit mean')?.key).toBe('pot-limit');
+        expect(resolveTerm('pot odds')?.key).toBe('pot-odds');
+    });
+
+    it('quote PLO\'s two as the guide prints them, each short enough for a tooltip', () => {
+        expect(GLOSSARY.omaha.short).toBe('Four cards each and five on the board: a hand uses exactly two of the four with exactly three from the board. Played pot limit.');
+        expect(GLOSSARY['pot-limit'].short).toBe('A bet or raise can be at most the pot: everything in the middle and in front of the players, plus the call.');
+        for (const key of ['omaha', 'pot-limit'] as const) expect(GLOSSARY[key].short.length, key).toBeLessThanOrEqual(140);
+    });
+
+    it('quote Triple T\'s as the guide prints it, short enough for a tooltip, and find it by name (P7)', () => {
+        expect(GLOSSARY['triple-t'].short).toBe("Three cards each; everyone throws one away right after the deal, before any betting, and the hand then plays as Texas hold'em.");
+        expect(GLOSSARY['triple-t'].short.length).toBeLessThanOrEqual(140);
+        expect(resolveTerm('what is triple t poker?')?.key).toBe('triple-t');
+        expect(resolveTerm('how does Triple-T work')?.key).toBe('triple-t');
+        expect(resolveTerm("how does texas hold'em work")?.key).toBe('texas-holdem');
+    });
+
+    it('quote the Hands guide\'s three as the guide prints them, with no bare ranking as an alias', () => {
+        expect(GLOSSARY['hand-rankings'].short).toBe('The order hands win in, from a royal flush down to high card: only the five cards that play count, and suits never rank.');
+        expect(GLOSSARY.kicker.short).toBe('A card among the five that play outside the pair, two pair, three or four of a kind; it decides between hands of the same kind.');
+        expect(GLOSSARY['texas-holdem'].short).toBe('Two cards each and five shared on the board: a hand is the strongest five of those seven. At poker night it plays no limit.');
+        const rankings = new Set(['pair', 'two pair', 'straight', 'flush', 'full house', 'high card', 'royal flush', 'straight flush', 'four of a kind', 'three of a kind']);
+        for (const key of GLOSSARY_KEYS) for (const alias of GLOSSARY[key].aliases) expect(rankings.has(alias.toLowerCase()), `${key}: ${alias}`).toBe(false);
     });
 
     it('never take a bare word another page already means differently', () => {

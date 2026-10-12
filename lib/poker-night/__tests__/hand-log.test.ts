@@ -2,7 +2,8 @@
 // run-out's streets too), a raise read as its total, the clock's moves said so; then the shown hands
 // with their names, a hand that plays the board, and each pot's winners — one pot plainly, several by
 // number, a split share by share, an uncontested pot as everyone else folding; the viewer's own
-// cards when they were never shown; a seat the room no longer knows by its number.
+// cards when they were never shown, and a hand shown to the viewer alone; a seat the room no longer
+// knows by its number.
 
 import {describe, expect, it} from 'vitest';
 import {HAND_COPY, LOG_COPY, TABLE_COPY} from '@/lib/learn/copy/poker-night';
@@ -11,7 +12,7 @@ import {currentHandLog, historyHandLog, seatNamer} from '@/lib/poker-night/hand-
 import type {HandSummary, TableState} from '@/lib/poker-night/types';
 import type {People} from '@/lib/poker-night/view-types';
 import {handLogView, historyView, publicView} from '@/lib/poker-night/views';
-import {A, C, F, R, X, actBy, actorPid, cards, deal, moves, pidOf, runOut, table} from './fixtures';
+import {A, C, F, R, X, actBy, actorPid, cards, deal, moves, ok, pidOf, runOut, table} from './fixtures';
 
 const FSI = String.fromCodePoint(0x2068);
 const PDI = String.fromCodePoint(0x2069);
@@ -39,7 +40,7 @@ describe('the current hand', () => {
         s = moves(s, R(60), C, C, X, X, X);
         const view = publicView(s);
         const nameOf = seatNamer((seat) => view.seats[seat]?.pid ?? null, people(3));
-        const log = currentHandLog(s.hand!.no, handLogView(s), view.hand!.board, null, nameOf);
+        const log = currentHandLog(s.hand!.no, handLogView(s), view.hand!, null, nameOf);
         const text = log.lines.map((l) => plain(l.text));
         expect(log.title).toBe('Hand 1');
         expect(text.slice(0, 2).every((t) => /posts the (small|big) blind/.test(t))).toBe(true);
@@ -57,7 +58,7 @@ describe('the current hand', () => {
         s = runOut(s);
         const view = publicView(s);
         const nameOf = seatNamer((seat) => view.seats[seat]?.pid ?? null, people(2));
-        const log = currentHandLog(s.hand!.no, handLogView(s), view.hand!.board, view.hand!.result, nameOf);
+        const log = currentHandLog(s.hand!.no, handLogView(s), view.hand!, view.hand!.result, nameOf);
         const streets = log.lines.filter((l) => l.kind === 'street').map((l) => plain(l.text));
         expect(streets).toEqual([
             `Flop: ${HAND_COPY.cardsShort(cards('2c5d9h'))}`, `Turn: ${HAND_COPY.cardsShort(cards('Js'))}`, `River: ${HAND_COPY.cardsShort(cards('3c'))}`,
@@ -100,6 +101,21 @@ describe('a hand from history', () => {
         expect(text.some((t) => t.startsWith('You held'))).toBe(false);
     });
 
+    it('says what was shown to the viewer alone, to them and to nobody else', () => {
+        // Seats 2 and 0 fold to seat 1, which seat 2 asks to see, and is shown alone.
+        let s = moves(deal(three(), {holes: {0: 'AhKh', 1: '7c2d', 2: 'QsQd'}}), F, F);
+        const at = s.hand!.result!.completedAt;
+        s = ok(reduce(s, {type: 'ask', by: 'p2', to: 'p1', at: at + 100}));
+        const r = reduce(s, {type: 'reply', by: 'p1', to: 'p2', show: 'one', at: at + 200});
+        if (!r.ok) throw new Error(r.reason);
+        const summary = r.hands[0];
+        const mine = historyHandLog(historyView(summary, 'p2'), people(3), 'p2').lines.map((l) => plain(l.text));
+        expect(mine).toContain(`Shown to you: P1 held ${HAND_COPY.cardsShort(cards('7c2d'))}.`);
+        const theirs = historyHandLog(historyView(summary, 'p0'), people(3), 'p0').lines.map((l) => plain(l.text));
+        expect(theirs.some((t) => t.includes('Shown to you'))).toBe(false);
+        expect(historyView(summary, 'p0').players.find((p) => p.pid === 'p1')!.hole).toBeNull();
+    });
+
     it('numbers the pots when there are side pots, the main pot first', () => {
         // Everyone all in or calling: a main pot for the short stack and a side pot for the rest.
         const s = moves(deal(table({0: 300, 1: 1000, 2: 1000}, {lastBigBlind: 0}), {holes: {0: 'AhAd', 1: 'KcKd', 2: 'QcQd'}, board: '2c5d9hJs3c'}), A, A, C);
@@ -107,9 +123,89 @@ describe('a hand from history', () => {
         expect(done.hand!.result!.pots.length).toBeGreaterThan(1);
         const view = publicView(done);
         const nameOf = seatNamer((seat) => view.seats[seat]?.pid ?? null, people(3));
-        const lines = currentHandLog(done.hand!.no, handLogView(done), view.hand!.board, view.hand!.result, nameOf).lines
+        const lines = currentHandLog(done.hand!.no, handLogView(done), view.hand!, view.hand!.result, nameOf).lines
             .filter((l) => l.kind === 'result').map((l) => plain(l.text));
         expect(lines[0]).toMatch(/from the main pot/);
         expect(lines[1]).toMatch(/from side pot 1/);
+    });
+});
+
+describe('a hand shown to the viewer alone', () => {
+    it('is said in the hand just ended from the view, and in its history row before the row has it', () => {
+        let s = moves(deal(three(), {holes: {0: 'AhKh', 1: '7c2d', 2: 'QsQd'}}), F, F);
+        const at = s.hand!.result!.completedAt;
+        s = ok(reduce(s, {type: 'ask', by: 'p2', to: 'p1', at: at + 100}));
+        const r = reduce(s, {type: 'reply', by: 'p1', to: 'p2', show: 'one', at: at + 200});
+        if (!r.ok) throw new Error(r.reason);
+        const view = publicView(r.state);
+        const nameOf = seatNamer((seat) => view.seats[seat]?.pid ?? null, people(3));
+        const seen = [{seat: 1, cards: cards('7c2d')}];
+        const now = currentHandLog(1, handLogView(r.state), view.hand!, view.hand!.result, nameOf, seen).lines.map((l) => plain(l.text));
+        expect(now).toContain(`Shown to you: P1 held ${HAND_COPY.cardsShort(cards('7c2d'))}.`);
+        expect(currentHandLog(1, handLogView(r.state), view.hand!, view.hand!.result, nameOf).lines.some((l) => l.text.includes('Shown to you'))).toBe(false);
+        // The history row written as the hand completed (before the answer) holds no hole: the view brings it.
+        const early = historyHandLog(historyView(r.hands[0], null), people(3), 'p2', seen);
+        expect(early.lines.filter((l) => l.text.includes('Shown to you'))).toHaveLength(1);
+        const twice = historyHandLog(historyView(r.hands[0], 'p2'), people(3), 'p2', seen);
+        expect(twice.lines.filter((l) => l.text.includes('Shown to you'))).toHaveLength(1);
+    });
+});
+
+describe('PLO on three boards', () => {
+    const HOLES = {0: 'JsTs4h5h', 1: '9c9d8h7h', 2: '6c6d2s3s'};
+    const BOARDS = ['AsKsQs2d3c', '9h9s4c4d5c', '8d8c7d7c2h'];
+    const plo = () => table({0: 1000, 1: 1000, 2: 1000}, {lastBigBlind: 0, config: {variant: 'plo', boards: 3}});
+
+    it('prints each street board by board, what each shown hand makes on each, and each board\'s share of the pot', () => {
+        const s = deal(plo(), {holes: HOLES, boards: BOARDS});
+        const {state, summary} = finish(s, C, C, X, X, X, X, X, X, X, X, X, X);
+        const view = publicView(state);
+        const nameOf = seatNamer((seat) => view.seats[seat]?.pid ?? null, people(3));
+        const log = currentHandLog(state.hand!.no, handLogView(state), view.hand!, view.hand!.result, nameOf);
+        const streets = log.lines.filter((l) => l.kind === 'street').map((l) => plain(l.text));
+        expect(streets).toEqual((['flop', 'turn', 'river'] as const).flatMap((street) => BOARDS.map((board, k) => {
+            const [from, to] = {flop: [0, 3], turn: [3, 4], river: [4, 5]}[street];
+            return LOG_COPY.street(street, HAND_COPY.cardsShort(cards(board).slice(from, to)), k);
+        })));
+        const shows = log.lines.filter((l) => l.kind === 'show').map((l) => plain(l.text));
+        expect(shows.find((t) => t.startsWith('P0'))).toBe(`P0 shows ${HAND_COPY.cardsShort(cards(HOLES[0]))}: on board 1 a royal flush; on board 2 a full house, fours full of fives; on board 3 a pair of eights.`);
+        const results = log.lines.filter((l) => l.kind === 'result').map((l) => plain(l.text));
+        expect(results).toEqual([
+            'Board 1: P0 wins 20 with a royal flush.',
+            'Board 2: P1 wins 20 with four of a kind, nines.',
+            'Board 3: P1 wins 20 with a full house, eights full of sevens.',
+        ]);
+        expect(log.lines.some((l) => l.kind === 'note' && plain(l.text).includes('plays the board'))).toBe(false);
+        expect(new Set(log.lines.map((l) => l.key)).size).toBe(log.lines.length);
+        // History reads the same.
+        const past = historyHandLog(historyView(summary, pidOf(0)), people(3), pidOf(0));
+        expect(past.lines.filter((l) => l.kind === 'result').map((l) => plain(l.text))).toEqual(results);
+        expect(past.lines.filter((l) => l.kind === 'street')).toHaveLength(9);
+    });
+});
+
+// Triple T (P7): a throw-away is a line naming no card; the reader's own card thrown away is said to
+// them alone, in the hand in play and in their history of it.
+describe('Triple T', () => {
+    it('says each throw without its card, and the reader\'s own card thrown away to them alone', () => {
+        let s = deal(table({0: 1000, 1: 1000, 2: 1000}, {lastBigBlind: 0, config: {variant: 'triple-t'}}), {holes: {0: 'AhKd7c', 1: 'QsQd2h', 2: '9c8c3s'}});
+        for (const [seat, card] of [[0, '7c'], [1, '2h'], [2, '3s']] as const) {
+            s = ok(reduce(s, {type: 'discard', by: pidOf(seat), turn: s.turn, card: cards(card)[0], at: s.hand!.startedAt}));
+        }
+        const nameOf = seatNamer((seat) => pidOf(seat), people(3));
+        const mode = {variant: s.hand!.variant, boards: s.hand!.boards};
+        const now = currentHandLog(s.hand!.no, handLogView(s), mode, null, nameOf, [], {card: cards('7c')[0], seat: 0});
+        const text = now.lines.map((l) => plain(l.text));
+        expect(text.filter((t) => t.endsWith('throws away a card.'))).toEqual(['P0 throws away a card.', 'P1 throws away a card.', 'P2 throws away a card.']);
+        expect(text).toContain(LOG_COPY.youThrew(HAND_COPY.cardShort(cards('7c')[0])));
+        expect(text.join(' ')).not.toContain(HAND_COPY.cardShort(cards('2h')[0]));
+        const {summary} = finish(s, F, F);
+        const mine = historyHandLog(historyView(summary, pidOf(0)), people(3), pidOf(0)).lines.map((l) => plain(l.text));
+        expect(mine).toContain(LOG_COPY.youThrew(HAND_COPY.cardShort(cards('7c')[0])));
+        const theirs = historyHandLog(historyView(summary, pidOf(1)), people(3), pidOf(1)).lines.map((l) => plain(l.text));
+        expect(theirs).toContain(LOG_COPY.youThrew(HAND_COPY.cardShort(cards('2h')[0])));
+        expect(theirs.join(' ')).not.toContain(HAND_COPY.cardShort(cards('7c')[0]));
+        const watcher = historyHandLog(historyView(summary, null), people(3), null).lines.map((l) => plain(l.text));
+        expect(watcher.join(' ')).not.toMatch(/threw away/);
     });
 });

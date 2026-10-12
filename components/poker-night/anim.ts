@@ -121,3 +121,10 @@ export const animVars = (anim: Pick<LiveAnim, 'offset'>, at: number, dur?: numbe
     for (const [name, value] of Object.entries(extra)) vars[`--pn-${name}`] = typeof value === 'number' ? `${value}px` : value;
     return vars as CSSProperties;
 };
+
+// When a card's showdown look starts (a reveal's): a card that plays lights with its board's lift
+// (two or three boards light board after board; `board` is the card's — a board card's own, a hole
+// card's first board it plays on, lib/poker-night/reveal.liftBoardOf), every other card dims with
+// the first.
+export const liftAtFor = (reveal: Pick<LiveAnim, 'liftAt' | 'lifts'>, state: 'win' | 'dim' | null, board: number): number =>
+    (state === 'win' ? reveal.lifts?.[board] : undefined) ?? reveal.liftAt ?? 0;

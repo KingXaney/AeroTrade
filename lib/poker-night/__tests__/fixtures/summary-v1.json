@@ -1,0 +1,296 @@
+{
+  "no": 1,
+  "startedAt": 1790000000000,
+  "completedAt": 1790000004500,
+  "button": 1,
+  "smallBlind": 10,
+  "bigBlind": 20,
+  "ante": 0,
+  "board": [
+    0,
+    21,
+    15,
+    6,
+    36
+  ],
+  "players": [
+    {
+      "seat": 2,
+      "pid": "p2",
+      "startStack": 2000,
+      "net": 1000,
+      "hole": [
+        46,
+        45
+      ],
+      "shown": true
+    },
+    {
+      "seat": 3,
+      "pid": "p3",
+      "startStack": 3000,
+      "net": -1000,
+      "hole": [
+        42,
+        41
+      ],
+      "shown": true
+    },
+    {
+      "seat": 4,
+      "pid": "p4",
+      "startStack": 2000,
+      "net": 0,
+      "hole": [
+        31,
+        27
+      ],
+      "shown": true
+    },
+    {
+      "seat": 0,
+      "pid": "p0",
+      "startStack": 5000,
+      "net": -3000,
+      "hole": [
+        8,
+        9
+      ],
+      "shown": true
+    },
+    {
+      "seat": 1,
+      "pid": "p1",
+      "startStack": 1000,
+      "net": 3000,
+      "hole": [
+        50,
+        49
+      ],
+      "shown": true
+    }
+  ],
+  "log": [
+    {
+      "seat": 2,
+      "street": "preflop",
+      "kind": "small-blind",
+      "amount": 10,
+      "to": 10,
+      "allIn": false,
+      "timeout": false,
+      "auto": false,
+      "at": 1790000000000
+    },
+    {
+      "seat": 3,
+      "street": "preflop",
+      "kind": "big-blind",
+      "amount": 20,
+      "to": 20,
+      "allIn": false,
+      "timeout": false,
+      "auto": false,
+      "at": 1790000000000
+    },
+    {
+      "seat": 4,
+      "street": "preflop",
+      "kind": "fold",
+      "amount": 0,
+      "to": 0,
+      "allIn": false,
+      "timeout": false,
+      "auto": false,
+      "at": 1790000000000
+    },
+    {
+      "seat": 0,
+      "street": "preflop",
+      "kind": "raise",
+      "amount": 5000,
+      "to": 5000,
+      "allIn": true,
+      "timeout": false,
+      "auto": false,
+      "at": 1790000000000
+    },
+    {
+      "seat": 1,
+      "street": "preflop",
+      "kind": "call",
+      "amount": 1000,
+      "to": 1000,
+      "allIn": true,
+      "timeout": false,
+      "auto": false,
+      "at": 1790000000000
+    },
+    {
+      "seat": 2,
+      "street": "preflop",
+      "kind": "call",
+      "amount": 1990,
+      "to": 2000,
+      "allIn": true,
+      "timeout": false,
+      "auto": false,
+      "at": 1790000000000
+    },
+    {
+      "seat": 3,
+      "street": "preflop",
+      "kind": "call",
+      "amount": 2980,
+      "to": 3000,
+      "allIn": true,
+      "timeout": false,
+      "auto": false,
+      "at": 1790000000000
+    },
+    {
+      "seat": 0,
+      "street": "preflop",
+      "kind": "refund",
+      "amount": 2000,
+      "to": 3000,
+      "allIn": false,
+      "timeout": false,
+      "auto": false,
+      "at": 1790000000000
+    },
+    {
+      "seat": 4,
+      "street": "river",
+      "kind": "show",
+      "amount": 0,
+      "to": 0,
+      "allIn": false,
+      "timeout": false,
+      "auto": false,
+      "at": 1790000010400
+    }
+  ],
+  "truncated": false,
+  "pots": [
+    {
+      "amount": 4000,
+      "eligible": [
+        2,
+        3,
+        0,
+        1
+      ],
+      "winners": [
+        1
+      ],
+      "shares": [
+        4000
+      ]
+    },
+    {
+      "amount": 3000,
+      "eligible": [
+        2,
+        3,
+        0
+      ],
+      "winners": [
+        2
+      ],
+      "shares": [
+        3000
+      ]
+    },
+    {
+      "amount": 2000,
+      "eligible": [
+        3,
+        0
+      ],
+      "winners": [
+        3
+      ],
+      "shares": [
+        2000
+      ]
+    }
+  ],
+  "hands": [
+    {
+      "seat": 2,
+      "cards": [
+        46,
+        45
+      ],
+      "value": 67199528,
+      "best": [
+        21,
+        15,
+        36,
+        46,
+        45
+      ]
+    },
+    {
+      "seat": 3,
+      "cards": [
+        42,
+        41
+      ],
+      "value": 67191336,
+      "best": [
+        21,
+        15,
+        36,
+        42,
+        41
+      ]
+    },
+    {
+      "seat": 0,
+      "cards": [
+        8,
+        9
+      ],
+      "value": 67125800,
+      "best": [
+        21,
+        15,
+        36,
+        8,
+        9
+      ]
+    },
+    {
+      "seat": 1,
+      "cards": [
+        50,
+        49
+      ],
+      "value": 67207720,
+      "best": [
+        21,
+        15,
+        36,
+        50,
+        49
+      ]
+    },
+    {
+      "seat": 4,
+      "cards": [
+        31,
+        27
+      ],
+      "value": 744,
+      "best": [
+        21,
+        15,
+        36,
+        31,
+        27
+      ]
+    }
+  ]
+}

@@ -81,19 +81,24 @@ export const bankView = (view: BankInput, opts: {me?: string | null; detail?: re
 };
 
 // What a seated player may add to their stack now, by the table's rules — the client's copy of
-// lib/poker-night/ledger.buyRange, which the server checks with: nothing while leaving, while
-// rebuys are off or once they are used up; else at least what brings the stack (behind, plus any
-// chips already waiting) to the table's minimum and at most what brings it to the cap. topUp is the
-// "Top up to the cap" amount; rebuy says the stack is empty, so the button reads "Rebuy".
+// lib/poker-night/ledger.buyRange, which the server checks with: nothing while leaving (now, or
+// after the hand in play: the viewer's own me.next), and for anything after their first buy-in
+// (their ledger row has bought chips) nothing while rebuys are off or once they are used up; else at
+// least what brings the stack (behind, plus any chips already waiting) to the table's minimum and at
+// most what brings it to the cap. topUp is the "Top up to the cap" amount; rebuy says the stack is
+// empty after chips were bought, so the button reads "Rebuy"; first says no chips were bought here
+// tonight (a newcomer whose request was taken back or declined), so nothing reads as a rebuy.
 export const buyOptions = (
     config: Pick<GameConfig, 'buyInMin' | 'buyInMax' | 'rebuys' | 'maxRebuys'>,
     seat: Pick<SeatView, 'chips' | 'pendingBuy' | 'state'> | null,
-    buys: number,
-): {min: number; max: number; topUp: number; rebuy: boolean} | null => {
-    if (!seat || seat.state === 'leaving' || config.rebuys === 'off') return null;
-    if (config.maxRebuys !== null && buys >= config.maxRebuys) return null;
+    row: {buys: number; bought: number} | null,
+    leavingAfter = false,
+): {min: number; max: number; topUp: number; rebuy: boolean; first: boolean} | null => {
+    if (!seat || seat.state === 'leaving' || leavingAfter) return null;
+    const bought = row !== null && row.bought > 0;
+    if (bought && (config.rebuys === 'off' || (config.maxRebuys !== null && row!.buys >= config.maxRebuys))) return null;
     const held = seat.chips + seat.pendingBuy;
     const min = Math.max(1, config.buyInMin - held);
     const max = config.buyInMax - held;
-    return max >= min ? {min, max, topUp: max, rebuy: held === 0} : null;
+    return max >= min ? {min, max, topUp: max, rebuy: held === 0 && bought, first: !bought} : null;
 };

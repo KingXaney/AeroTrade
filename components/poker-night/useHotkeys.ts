@@ -1,7 +1,7 @@
 'use client';
 
 // The room's own keys (P6), beside the action bar's moves: E opens the emotes (a seated player), L
-// the hand log, B the bank, M turns the sounds on or off, ? lists every key
+// the hand log, B the bank, H the Hands guide, M turns the sounds on or off, ? lists every key
 // (lib/poker-night/keys.roomIntentForKey). The same rules as the moves: never with ⌘, Ctrl or Alt,
 // never on a held key or while typing, never over a dialog, a menu or a drawer, only with the focus
 // on the table itself (not the top bar), and only while the player keeps the single-key shortcuts
@@ -43,6 +43,9 @@ export const useHotkeys = (): void => {
                 break;
             case 'bank':
                 openOverlay('bank');
+                break;
+            case 'hands':
+                openOverlay('hands');
                 break;
             case 'mute': {
                 const sound = !room.personal.sound;

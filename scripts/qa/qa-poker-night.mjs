@@ -85,7 +85,6 @@
 // celebration plays at 1440 px, stands still under reduced motion and never widens the phone's page.
 // Run: npm run qa -- poker-night   (the harness: README.md)
 import {chromium} from 'playwright';
-import {PNG} from 'pngjs';
 import {MongoClient} from 'mongodb';
 import {createJiti} from 'jiti';
 import {randomUUID} from 'node:crypto';
@@ -101,6 +100,7 @@ const lib = (path) => jiti.import(`${REPO_ROOT}${path}`);
 const {insertRoom} = await lib('lib/poker-night/store.ts');
 const {legalFor} = await lib('lib/poker-night/betting.ts');
 const {snapshotFromView} = await lib('lib/poker-night/views.ts');
+const {seatShares} = await lib('lib/poker-night/pots.ts');
 const {conservation} = await lib('lib/poker-night/ledger.ts');
 const {DEFAULT_CONFIG, ENTRY_FLAGS, ENTRY_KINDS, LEDGER_KINDS, STATE_VERSION, TIMING} = await lib('lib/poker-night/config.ts');
 const {PN_PROTOCOL} = await lib('lib/poker-night/http.ts');
@@ -117,7 +117,8 @@ const {
 } = await lib('lib/learn/copy/poker-night.ts');
 const {nightAwards, throwCountsOf} = await lib('lib/poker-night/awards.ts');
 const {CARD_BACKS, FELTS, SCENES, SUIT_COLOURS} = await lib('lib/poker-night/looks.ts');
-const {SOUNDS} = await lib('lib/poker-night/sounds.ts');
+const {soundParts} = await lib('lib/poker-night/sounds.ts');
+const POP_HZ = soundParts('pop', 0)[0].freq; // the pop never varies (sounds.FIXED_SOUNDS)
 const {ME_STORAGE_KEY} = await lib('lib/poker-night/personal.ts');
 const {SHORTCUTS} = await lib('lib/poker-night/keys.ts');
 const {findBanned} = await lib('lib/learn/banned.ts');
@@ -159,11 +160,20 @@ const newContext = async (options) => {
     return context;
 };
 
+// The Next dev indicator (the round "N" button) sits over the dock in every phone picture of a dev
+// server: hidden from every screenshot this suite takes, by a style added once the page has
+// hydrated (none of the suite's checks reads it).
+const hideDevIndicator = (page) => page.addStyleTag({content: 'nextjs-portal{display:none!important}'}).catch(() => {});
+
 // ── what every response is held to ──────────────────────────────────────────────────────────
 // Keys no response may carry: the deck, who a player is outside the room, the room's bookkeeping.
 const PRIVATE_KEYS = new Set(['deck', 'userId', 'guestId', 'bannedKeys', 'applied', 'seen', 'emoteAt', 'awards', 'lastError', 'hostUserId', '_id']);
 // Two-number lists that are seat numbers or chips, never cards.
-const NOT_CARDS = new Set(['eligible', 'winners', 'shares', 'showOrder']);
+const NOT_CARDS = new Set(['eligible', 'winners', 'shares', 'showOrder', 'toDiscard']);
+// Version 2's shapes (state and views alike): a hand's first board, a paid pot's winners over every
+// board, and what each seat took from it (lib/poker-night/pots.seatShares, the client's own split).
+const boardOf = (hand) => hand?.boards?.[0] ?? [];
+const winnersOf = (pot) => [...new Set(pot.winners.flat())];
 const leaks = [];
 const errorCodes = new Map(); // code -> where it was first answered
 const outcomes = new Set();
@@ -208,7 +218,7 @@ const rememberHand = (hand) => {
     if (!hand) return;
     const known = dbHands.get(hand.no);
     dbHands.set(hand.no, {
-        no: hand.no, board: hand.board,
+        no: hand.no, board: boardOf(hand),
         seats: hand.seats.map((p) => ({seat: p.seat, pid: p.pid, hole: p.hole, shown: p.shown || (known?.seats.find((q) => q.seat === p.seat)?.shown ?? false)})),
     });
 };
@@ -239,8 +249,8 @@ const leakCheck = async (p, label, body, {overheard = false} = {}) => {
         const shownAs = body.seats?.[seat.seat]?.cards;
         if (Array.isArray(shownAs)) leaks.push(`${p.name} ${label}: seat ${seat.seat} face up before it was shown`);
     }
-    const board = overheard ? truth.board.slice(0, body.hand.board.length) : truth.board;
-    if (body.hand.board.join() !== board.join()) leaks.push(`${p.name} ${label}: the board is not Mongo's`);
+    const board = overheard ? truth.board.slice(0, boardOf(body.hand).length) : truth.board;
+    if (boardOf(body.hand).join() !== board.join()) leaks.push(`${p.name} ${label}: the board is not Mongo's`);
 };
 
 // A page of history for viewer p: a hole only where it was shown or is p's own, as PokerHand keeps it.
@@ -326,7 +336,11 @@ const post = (p, route, data, opts = {}) => call(p, 'POST', route, {...opts, dat
 // Every join carries a fresh joinId unless it names one (a retry reuses its join's).
 const join = (p, input, opts = {}) => post(p, 'join', {joinId: randomUUID(), avatar: AVATARS[p.name], as: 'player', ...input}, opts);
 const action = (p, body, opts = {}) => post(p, 'action', {actionId: randomUUID(), ...body}, opts);
-const hostOp = (p, op, opts = {}) => action(p, {type: 'host', op}, opts);
+// The host's yes names the amount it says yes to (a request changed since is refused, stale): the
+// one waiting in Mongo now, unless the step names one.
+const requestedOf = async (pid) => (await roomDoc()).state.requests.find((q) => q.pid === pid)?.amount ?? 1;
+const hostOp = async (p, op, opts = {}) =>
+    action(p, {type: 'host', op: op.op === 'approve' && op.amount === undefined ? {...op, amount: await requestedOf(op.pid)} : op}, opts);
 const tick = (p, beat = false) => post(p, 'tick', beat ? {beat: {hidden: false}} : {});
 const act = (p, view, move, opts = {}) => action(p, {type: 'act', turn: view.turn, move}, opts);
 
@@ -360,7 +374,7 @@ const playHand = async (view, choose, {stop = () => false, onActed = async () =>
             for (const p of players.filter((q) => q.name === 'A' || q.name === 'B')) await getState(p);
         }
         if (hand.phase === 'runout') {
-            v = (await tickUntil(players[0], (next) => next.hand?.phase === 'complete' || next.hand?.board.length !== hand.board.length)) ?? v;
+            v = (await tickUntil(players[0], (next) => next.hand?.phase === 'complete' || boardOf(next.hand).length !== boardOf(hand).length)) ?? v;
             continue;
         }
         const owner = ownerOf(v, hand.actor);
@@ -417,14 +431,19 @@ try {
     const joinCard = await strangerPage.waitForSelector('[data-join-card="visitor"]', {timeout: 60000}).then(() => true, () => false);
     check('/play/CODE is open to a browser with no session: 200, no redirect to sign-in, the join card over the table',
         playPage?.status() === 200 && new URL(strangerPage.url()).pathname === `/play/${code}` && joinCard, `${playPage?.status()} ${strangerPage.url()} card ${joinCard}`);
+    await hideDevIndicator(strangerPage);
     await strangerPage.screenshot({path: `${OUT}01-play-visitor.png`});
+    // The way out for a visitor: Home is a plain link to "/" (the landing page for a guest), never
+    // the lobby, which would send them to sign in.
+    const visitorHome = await strangerPage.$eval('[data-open="home"]', (el) => ({tag: el.tagName, href: el.getAttribute('href')})).catch(() => null);
+    check('a visitor\'s Home in the top bar is a plain link to "/"', visitorHome?.tag === 'A' && visitorHome.href === '/', JSON.stringify(visitorHome));
     await strangerPage.goto(`${BASE}/players`, {waitUntil: 'load'});
     check('…while /players, a look-alike, still sends it to sign in', /\/sign-in/.test(strangerPage.url()), strangerPage.url());
 
     let r = await getState(stranger, {headers: {'x-pn-protocol': null}});
     check('GET state without X-PN-Protocol: 426 reload', r.status === 426 && r.body?.error === 'reload', `${r.status} ${r.text}`);
     check('…never cached', /no-store/.test(r.headers['cache-control'] ?? ''), r.headers['cache-control']);
-    r = await getState(stranger, {headers: {'x-pn-protocol': '2'}});
+    r = await getState(stranger, {headers: {'x-pn-protocol': String(PN_PROTOCOL - 1)}});
     check('…and with another protocol: 426', r.status === 426 && r.body?.error === 'reload', `${r.status}`);
     r = await getState(stranger);
     check('GET state with it but no identity: 401 no_identity', r.status === 401 && r.body?.error === 'no_identity', `${r.status} ${r.text}`);
@@ -483,6 +502,15 @@ try {
     check('…and with the pass, answers with none', r.status === 200 && r.body?.pass === null && r.body.me.pid === A.pid);
     r = await getState(A, {query: `?since=${r.body.seq}&esince=${r.body.emoteSeq}`});
     check('…and nothing new since its seq: unchanged, from the head alone', r.status === 200 && r.body?.unchanged === true && r.body.seq === afterReturn.seq);
+    {
+        // The viewer's own nudge count: the same poll naming the one it holds is Unchanged, a count it
+        // does not hold reads the whole view (an ask or an answer meant for it alone moves the count).
+        const held = await getState(A, {query: `?since=${r.body.seq}&esince=${r.body.emoteSeq}&nsince=${r.body.nudge}`});
+        const stale = await getState(A, {query: `?since=${r.body.seq}&esince=${r.body.emoteSeq}&nsince=${r.body.nudge + 1}`});
+        check('…naming its nudge count: Unchanged; naming another: the whole view, its own count on it', r.body.nudge === 0
+            && held.status === 200 && held.body?.unchanged === true && stale.status === 200 && stale.body?.unchanged !== true
+            && stale.body?.me?.pid === A.pid && stale.body.nudge === 0, `${held.text.slice(0, 80)} | ${stale.text.slice(0, 80)}`);
+    }
     {
         // A failed publish stamps rt out of band (no seq moves), and an Unchanged answer — a poll's or a
         // tick's, from the head alone — says so as a view does, so a page that sees only those still
@@ -576,15 +604,15 @@ try {
     let doc = await roomDoc();
     const hand1 = doc.state.hand;
     rememberHand(hand1);
-    check('hand 1 goes to a showdown with every street dealt', hand1.no === 1 && hand1.phase === 'complete' && hand1.result?.showdown === true && hand1.board.length === 5);
+    check('hand 1 goes to a showdown with every street dealt', hand1.no === 1 && hand1.phase === 'complete' && hand1.result?.showdown === true && boardOf(hand1).length === 5);
     {
-        const value = new Map(hand1.seats.filter((p) => !p.folded).map((p) => [p.seat, evaluateCards([...hand1.board, ...p.hole])]));
+        const value = new Map(hand1.seats.filter((p) => !p.folded).map((p) => [p.seat, evaluateCards([...boardOf(hand1), ...p.hole])]));
         const expected = hand1.result.pots.map((pot) => {
             const contenders = pot.eligible.length > 0 ? pot.eligible : [...value.keys()];
             const top = Math.max(...contenders.map((s) => value.get(s)));
             return contenders.filter((s) => value.get(s) === top).sort().join(',');
         });
-        const paid = view.hand.result.pots.map((pot) => [...pot.winners].sort().join(','));
+        const paid = view.hand.result.pots.map((pot) => winnersOf(pot).sort().join(','));
         check('the winners are the hands evaluateCards ranks highest over Mongo\'s holes and board', expected.join('|') === paid.join('|'), `${paid.join('|')} vs ${expected.join('|')}`);
         check('…every hand shown as dealt', view.hand.result.hands.length === value.size
             && view.hand.result.hands.every((h) => sameCards(h.cards, hand1.seats.find((p) => p.seat === h.seat).hole)));
@@ -620,11 +648,11 @@ try {
     }, {stop: (v) => v.hand.phase === 'runout', onActed: async (_p, body) => {
         if (body.hand?.phase === 'runout') closedAt = body.serverNow;
     }});
-    check('A and B are all in and the host folded: the hand runs out', view.hand.phase === 'runout' && view.hand.board.length === 0 && closedAt !== null);
+    check('A and B are all in and the host folded: the hand runs out', view.hand.phase === 'runout' && boardOf(view.hand).length === 0 && closedAt !== null);
     const streets = [];
     let last = view;
     const done = await tickUntil(A, (v) => v.hand.phase === 'complete', {timeout: 12000, seen: (v) => {
-        if (v.hand.no === 2 && v.hand.board.length !== last.hand.board.length) streets.push({cards: v.hand.board.length, at: v.serverNow});
+        if (v.hand.no === 2 && boardOf(v.hand).length !== boardOf(last.hand).length) streets.push({cards: boardOf(v.hand).length, at: v.serverNow});
         last = v;
     }});
     const gaps = streets.map((s, i) => s.at - (i === 0 ? closedAt : streets[i - 1].at));
@@ -676,7 +704,7 @@ try {
     check('hand 3 completes and, paused, nothing more is due', doc.state.hand.phase === 'complete' && doc.status === 'paused' && doc.nextDueAt === null);
     check('chips are conserved after hand 3', conservation(doc.state).ok);
 
-    // --- a rebuy under auto -------------------------------------------------------------------------
+    // --- a rebuy, once a hand is dealt: a request the host approves ------------------------------------
     {
         const seatOf = (p) => doc.state.seats.findIndex((s) => s?.pid === p.pid);
         let buyer = [A, B].find((p) => doc.state.seats[seatOf(p)]?.stack === 0);
@@ -694,10 +722,16 @@ try {
         const bodies = [0, 1].map(() => ({actionId: randomUUID(), type: 'buy', amount: DEFAULT_CONFIG.buyInMax}));
         const [x, y] = await Promise.all(bodies.map((b) => post(buyer, 'action', b, {pace: false})));
         const statuses = [x, y].map((q) => q.status).sort().join(',');
-        check('a double rebuy: one lands, the other would pass the cap (422)', statuses === '200,422' && [x, y].some((q) => q.body?.error === 'over_cap'), statuses);
-        const landed = x.status === 200 ? 0 : 1;
-        const replay = await post(buyer, 'action', bodies[landed]);
+        doc = await roomDoc();
+        check('a double rebuy, a hand dealt: one request waits for the host (the second in the first\'s place), nothing bought yet', statuses === '200,200'
+            && doc.state.requests.length === 1 && doc.state.requests[0].pid === buyer.pid && doc.state.requests[0].amount === DEFAULT_CONFIG.buyInMax
+            && row(doc.state).bought === boughtBefore, `${statuses} ${JSON.stringify(doc.state.requests)}`);
+        const replay = await post(buyer, 'action', bodies[0]);
         check('…and its id again is a duplicate', replay.status === 200 && replay.body?.duplicate === true);
+        r = await hostOp(host, {op: 'approve', pid: buyer.pid});
+        check('…the host approves it: the rebuy lands', r.status === 200 && r.body?.requests?.length === 0, `${r.status} ${r.text.slice(0, 120)}`);
+        r = await hostOp(host, {op: 'approve', pid: buyer.pid});
+        check('…and a second yes finds nothing waiting (409 no_request)', r.status === 409 && r.body?.error === 'no_request', `${r.status}`);
         doc = await roomDoc();
         const events = row(doc.state).events.filter((e) => LEDGER_KINDS[e[1]] === 'rebuy');
         check('exactly one rebuy in the ledger: bought twice the buy-in', events.length === 1 && events[0][2] === DEFAULT_CONFIG.buyInMax
@@ -715,6 +749,18 @@ try {
     r = await join(C, {name: 'Cleo'});
     const pvJoined = r.body?.peopleV;
     check('guest C joins at the paused table', r.status === 200 && r.body?.outcome === 'seated' && pvJoined === (await roomDoc()).peopleV);
+    {
+        // A hand has been dealt: C sits with nothing, the chips waiting for the host's yes.
+        const seatC = r.body?.me?.seat;
+        const waiting = await roomDoc();
+        check('…with nothing until the host approves the chips: a request waits, no ledger row yet', r.body?.seats?.[seatC]?.chips === 0
+            && r.body.requests.some((q) => q.pid === C.pid) && waiting.state.requests.some((q) => q.pid === C.pid)
+            && !waiting.state.ledger.some((l) => l.pid === C.pid), JSON.stringify(r.body?.requests));
+        const yes = await hostOp(host, {op: 'approve', pid: C.pid});
+        const landed = await roomDoc();
+        check('…the host approves: C\'s first chips land as a buy-in', yes.status === 200 && landed.state.seats[seatC]?.stack === DEFAULT_CONFIG.buyInMax
+            && landed.state.ledger.find((l) => l.pid === C.pid)?.events.some((e) => LEDGER_KINDS[e[1]] === 'buy-in'), `${yes.status}`);
+    }
     const passC = C.pass;
     r = await action(A, {type: 'unban', pid: C.pid});
     check('a guest cannot let anyone back in: 403 not_host', r.status === 403 && r.body?.error === 'not_host');
@@ -750,6 +796,7 @@ try {
         && [jd, je].some((q) => q.body?.me?.seat === free), `${jd.body?.outcome}@${jd.body?.me?.seat} ${je.body?.outcome}@${je.body?.me?.seat}`);
     check('a name taken at the table, and a reserved one, are renamed', jd.body?.renamed && jd.body.renamed !== 'Ana' && je.body?.renamed && je.body.renamed !== 'Dealer',
         `${jd.body?.renamed} / ${je.body?.renamed}`);
+    for (const p of [D, E]) await hostOp(host, {op: 'approve', pid: p.pid});
     r = await action(D, {type: 'leave'});
     doc = await roomDoc();
     check('D leaves between hands: cashed out at once', r.status === 200 && r.body.me.seat === null
@@ -1156,6 +1203,7 @@ const uiWording = async (page, where) => {
 // A moment first, so a panel or a drawer that has just opened is in its place, not fading in.
 const uiShot = async (page, name) => {
     await sleep(500);
+    await hideDevIndicator(page);
     await page.screenshot({path: `${OUT}ui-${name}.png`});
 };
 // The screen at 1440 px, then narrowed to 390 for a second picture and widened back.
@@ -1288,68 +1336,6 @@ const bannerClear = (page) => page.evaluate(() => {
         covered,
     };
 });
-
-// A fold on the viewer's own cards, caught where the card has turned past its edge: the animations
-// paused the moment the fold's class lands, then sought to 30 % of the way (the turn ends at 35 %,
-// before any fade). Set up before the click; settles to how many animations it caught.
-const armFoldProbe = (page) => page.evaluate(() => {
-    window.__pnFold = new Promise((resolve) => {
-        const look = () => {
-            const card = document.querySelector('[data-pn-hole] [data-anim="fold"]');
-            if (!card) return false;
-            const anims = document.getAnimations().filter((a) => a.effect?.target instanceof Element && (a.effect.target === card || card.contains(a.effect.target)));
-            for (const a of anims) a.pause();
-            window.__pnFoldAnims = anims;
-            resolve(anims.length);
-            return true;
-        };
-        if (look()) return;
-        const watcher = new MutationObserver(() => {
-            if (look()) watcher.disconnect();
-        });
-        watcher.observe(document, {subtree: true, childList: true, attributes: true, attributeFilter: ['data-anim', 'class']});
-        setTimeout(() => {
-            watcher.disconnect();
-            resolve(-1);
-        }, 15000);
-    });
-});
-// The share of a card's pixels that are its face's paper, at the paused moment.
-const paperShare = async (page) => {
-    const caught = await page.evaluate(() => window.__pnFold);
-    if (!(caught > 0)) return {caught, share: null};
-    try {
-        return {caught, share: await paperAt(page)};
-    } catch (error) {
-        return {caught, share: null, error: error.message};
-    } finally {
-        await page.evaluate(() => {
-            for (const a of window.__pnFoldAnims ?? []) a.play();
-        }).catch(() => {});
-    }
-};
-const paperAt = async (page) => {
-    const box = await page.evaluate(() => {
-        for (const a of window.__pnFoldAnims) {
-            const t = a.effect.getComputedTiming();
-            a.currentTime = (t.delay ?? 0) + Number(t.duration) * 0.3;
-        }
-        const card = document.querySelector('[data-pn-hole] [data-anim="fold"]');
-        if (!card) throw new Error('the folding card was gone before it could be looked at');
-        const face = card.querySelector('.pn-card-face:not(.pn-card-back)');
-        const paper = getComputedStyle(face).backgroundColor.match(/\d+(\.\d+)?/g).slice(0, 3).map(Number);
-        const r = card.getBoundingClientRect();
-        return {x: r.left, y: r.top, width: r.width, height: r.height, paper};
-    });
-    await new Promise((resolve) => setTimeout(resolve, 120));
-    const png = PNG.sync.read(await page.screenshot({clip: {x: box.x + 2, y: box.y + 2, width: box.width - 4, height: box.height - 4}}));
-    let paper = 0;
-    for (let i = 0; i < png.data.length; i += 4) {
-        const d = Math.abs(png.data[i] - box.paper[0]) + Math.abs(png.data[i + 1] - box.paper[1]) + Math.abs(png.data[i + 2] - box.paper[2]);
-        if (d < 45) paper++;
-    }
-    return paper / (png.data.length / 4);
-};
 
 // The RSC flight data a page's HTML carries, decoded from its self.__next_f.push([1, "…"]) strings.
 const flightOf = (html) => {
@@ -1556,7 +1542,7 @@ const tableInBrowser = async () => {
     };
     const clickMove = async (p, move) => {
         const page = p.page;
-        await page.waitForSelector('[data-pn-actions]:not([aria-busy="true"])', {timeout: 20000});
+        await page.waitForSelector('[data-pn-actions][data-pn-armed]:not([aria-busy="true"])', {timeout: 20000});
         if (move === 'fold') {
             const free = await page.locator('[data-pn-action="check"]').count() > 0;
             await page.click('[data-pn-action="fold"]');
@@ -1606,13 +1592,13 @@ const tableInBrowser = async () => {
         const hand = doc.state.hand;
         rememberHand(hand);
         const live = hand.seats.filter((p) => !p.folded);
-        const value = new Map(live.map((p) => [p.seat, evaluateCards([...hand.board, ...p.hole])]));
+        const value = new Map(live.map((p) => [p.seat, evaluateCards([...boardOf(hand), ...p.hole])]));
         const expected = hand.result.pots.map((pot) => {
             const contenders = pot.eligible.length > 0 ? pot.eligible : [...value.keys()];
             const top = Math.max(...contenders.map((s) => value.get(s)));
             return contenders.filter((s) => value.get(s) === top).sort().join(',');
         });
-        const paid = hand.result.pots.map((pot) => [...pot.winners].sort().join(','));
+        const paid = hand.result.pots.map((pot) => winnersOf(pot).sort().join(','));
         check(`${label}: the winners are the hands evaluateCards ranks highest over Mongo's holes and board`, hand.result.showdown === true
             && expected.join('|') === paid.join('|'), `${paid.join('|')} vs ${expected.join('|')}`);
         await viewer.page.waitForSelector(`[data-pn-hand="${hand.no}"] [data-pn-banner]`, {timeout: 30000});
@@ -1638,10 +1624,10 @@ const tableInBrowser = async () => {
             if (p.shown ? [...shownCards].sort().join(' ') !== labels(p.hole) : shownCards.length > 0) wrong.push(`seat ${p.seat}: ${shownCards.join(' ')}`);
         }
         check(`${label}: ${viewer.name}'s screen turns up exactly the shown hands, as Mongo dealt them`, wrong.length === 0, wrong.join(' | '));
-        const winnerSeats = [...new Set(hand.result.pots.flatMap((pot) => pot.winners.filter((_, k) => (pot.shares[k] ?? 0) > 0)))];
+        const winnerSeats = [...new Set(hand.result.pots.flatMap((pot) => seatShares(pot).filter((w) => w.share > 0).map((w) => w.seat)))];
         const best = new Map(winnerSeats.map((seat) => {
             const p = hand.seats.find((q) => q.seat === seat);
-            return [seat, bestFive([...hand.board, ...p.hole], p.hole)];
+            return [seat, bestFive([...boardOf(hand), ...p.hole], p.hole)];
         }));
         const playing = [...new Set([...best.values()].flatMap((b) => b.cards))];
         check(`${label}: the lit cards are the winners' five cards that play`, labels(playing) === [...seen.lit].sort().join(' '),
@@ -1681,8 +1667,61 @@ const tableInBrowser = async () => {
     await hp.goto(`${BASE}/games`, {waitUntil: 'load', timeout: 180000});
     check('/games has the poker night card', await hp.locator('[data-game-card="poker-night"]').count() === 1);
 
+    // ── P2: the lobby's Hands tab (?tab=hands): no lobby read, Learn's tab still lit, the ten
+    // rankings and the kicker pair, every example inside its row and nothing sideways on a phone ──
+    await hp.goto(`${BASE}/poker-night?tab=hands`, {waitUntil: 'load', timeout: 180000});
+    await hp.waitForSelector('[data-poker-night-hands]', {timeout: 60000});
+    {
+        const handsTab = () => hp.evaluate(() => {
+            const guide = document.querySelector('[data-poker-night-hands] [data-hands-guide]');
+            if (!guide) return null;
+            const vw = innerWidth;
+            const outside = [...guide.querySelectorAll('[data-guide-cards]')].filter((el) => {
+                const r = el.getBoundingClientRect();
+                const row = el.parentElement.getBoundingClientRect();
+                return r.left < row.left - 0.5 || r.right > row.right + 0.5 || r.right > vw + 0.5;
+            }).length;
+            const viewTabs = [...document.querySelectorAll('[data-poker-night-page] > [role="tablist"] [role="tab"]')];
+            return {
+                cards: guide.querySelectorAll('.pn-card').length,
+                rankings: guide.querySelectorAll('[data-ranking]').length,
+                lifted: guide.querySelectorAll('[data-hand-rankings] .pn-card[data-state="win"]').length,
+                games: [...guide.querySelectorAll('[data-guide-game]')].map((g) => g.getAttribute('data-guide-game')).join(),
+                lobby: document.querySelectorAll('[data-poker-night-lobby], [data-quick-start]').length,
+                tab: viewTabs.find((t) => t.getAttribute('aria-selected') === 'true')?.getAttribute('data-tab') ?? null,
+                tabHeight: Math.min(...viewTabs.map((t) => t.getBoundingClientRect().height)),
+                defs: document.querySelectorAll('[data-poker-night-hands] [data-what-these-mean] dt').length,
+                outside, scroll: document.documentElement.scrollWidth - vw,
+                card: Math.round(guide.querySelector('.pn-card').getBoundingClientRect().width),
+            };
+        });
+        const learnTabs = await hp.$$eval('[data-section-tabs="learn"] a', (as) => as.map((a) => `${a.getAttribute('href')}${a.getAttribute('aria-current') === 'page' ? '*' : ''}`));
+        const wide = await handsTab();
+        check('the lobby\'s Hands tab: ten rankings and the kicker pair (60 cards, 39 lifted) and PLO\'s hand (9 more), Texas hold\'em, PLO and Triple T, six definitions, no lobby read, Learn\'s "Poker night" still lit',
+            wide !== null && wide.cards === 69 && wide.rankings === 10 && wide.lifted === 39 && wide.games === 'holdem,plo,triple-t' && wide.lobby === 0 && wide.tab === 'hands'
+            && wide.defs === 6 && learnTabs.includes('/poker-night*'), JSON.stringify({...wide, learnTabs}));
+        await uiWording(hp, 'the Hands tab');
+        await uiShotBoth(hp, '23-hands-tab');
+        for (const [width, height] of [[390, 844], [375, 667], [320, 568], [844, 390]]) {
+            await hp.setViewportSize({width, height});
+            await sleep(500);
+            const m = await handsTab();
+            check(`the Hands tab at ${width}×${height}: every example inside its row, nothing sideways, the tabs 44 px tall${width === 320 ? ', 40 px cards (a 248 px list or more)' : ''}`,
+                m !== null && m.outside === 0 && m.scroll <= 0 && m.tabHeight >= 43.5 && (width !== 320 || m.card === 40), JSON.stringify(m));
+            if (width === 320) await uiShot(hp, '23-hands-tab-320');
+        }
+        await hp.setViewportSize({width: 1440, height: 900});
+        await sleep(400);
+        // The Play tab is one tap back: the lobby, at /poker-night.
+        await hp.click('[data-poker-night-page] > [role="tablist"] [data-tab="play"]');
+        await hp.waitForSelector('[data-poker-night-lobby]', {timeout: 30000}).catch(() => {});
+        const back = new URL(hp.url());
+        check('…and its Play tab is the lobby again, at /poker-night', back.pathname === '/poker-night' && back.search === ''
+            && await hp.locator('[data-quick-start="holdem"]').count() === 1, hp.url());
+    }
+
     await hp.goto(`${BASE}/poker-night`, {waitUntil: 'load', timeout: 180000});
-    await hp.click('[data-quick-start]');
+    await hp.click('[data-quick-start="holdem"]');
     await hp.waitForURL(/\/play\/[A-HJ-NP-Z2-9]{6}(\?.*)?$/, {timeout: 120000});
     code = new URL(hp.url()).pathname.split('/').pop();
     const created = await roomDoc();
@@ -1838,7 +1877,7 @@ const tableInBrowser = async () => {
         && await db.collection('session').countDocuments() === sessions0);
 
     // ── hand 1: the host folds, the others check or call to a showdown ──
-    await hp.waitForSelector('[data-pn-control="deal"]:not([disabled])', {timeout: 30000});
+    await hp.waitForSelector('[data-pn-seat-controls][data-pn-armed] [data-pn-control="deal"]:not([disabled])', {timeout: 30000});
     await hp.click('[data-pn-control="deal"]');
     const {doc: dealt} = await nextTurn(1);
     check('the host deals from the dock: hand 1 is dealt', dealt.state.hand?.no === 1);
@@ -1849,7 +1888,7 @@ const tableInBrowser = async () => {
     let armKind = 'bank';
     let bankArmed = false;
     let bankChecked = false;
-    const leaveDialog = () => B.page.getByRole('dialog', {name: TABLE_COPY.leaveTitle});
+    const leaveDialog = () => B.page.locator('[data-pn-leave-dialog]');
     const armBank = async () => {
         if (bankArmed || bankChecked) return;
         const before = (await roomDoc()).state;
@@ -1875,7 +1914,7 @@ const tableInBrowser = async () => {
             : await leaveDialog().waitFor({state: 'detached', timeout: 5000}).then(() => true, () => false);
         await sleep(300);
         const focus = await B.page.evaluate(() => document.activeElement?.getAttribute('role') ?? document.activeElement?.tagName);
-        const what = armKind === 'bank' ? 'the Bank drawer' : 'the "Leave the table?" dialog';
+        const what = armKind === 'bank' ? 'the Bank drawer' : 'the leave dialog';
         check(`${what} open on B's phone closes when B's turn arrives, focus on the action bar`, closed && focus === 'toolbar', `closed ${closed}, focus ${focus}`);
     };
     // B's first turn on the phone: the table and the raise panel as B sees them, and the keys.
@@ -1883,6 +1922,7 @@ const tableInBrowser = async () => {
         await uiShot(B.page, '04-mid-hand-390');
         const turnNow = async () => (await roomDoc()).state.turn;
         const t0 = await turnNow();
+        await B.page.waitForSelector('[data-pn-actions][data-pn-armed]', {timeout: 5000}).catch(() => {});
         const canRaise = await B.page.locator('[data-pn-action="raise"]').count() > 0;
         if (!canRaise) {
             note('the raise panel on the phone', 'B could not raise on this turn: not checked');
@@ -1915,6 +1955,46 @@ const tableInBrowser = async () => {
         check('"F" with the focus in the top bar folds nothing', await turnNow() === t0 && await B.page.locator('[data-pn-actions]').count() === 1);
     };
     await armBank();
+    // The tap shield (lib/poker-night/keys.TAP_SHIELD_MS): a tap that lands as the action bar appears
+    // — dispatched the moment it is there, as a thumb's would be — does nothing; once the bar says
+    // data-pn-armed, taps act (every click of this suite waits for it).
+    let shieldChecked = false;
+    const shieldProbe = async (page) => {
+        await page.waitForSelector('[data-pn-actions]', {timeout: 20000});
+        const t0 = (await roomDoc()).state.turn;
+        const sent = await page.evaluate(() => {
+            const bar = document.querySelector('[data-pn-actions]');
+            if (!bar || bar.hasAttribute('data-pn-armed')) return false;
+            const button = bar.querySelector('[data-pn-action="call"], [data-pn-action="check"]');
+            button?.dispatchEvent(new MouseEvent('click', {bubbles: true, cancelable: true, detail: 1}));
+            return button !== null;
+        });
+        if (!sent) {
+            note('the tap shield', 'the action bar was armed before the probe could tap: not checked');
+            return;
+        }
+        await sleep(700);
+        const t1 = (await roomDoc()).state.turn;
+        const armed = await page.locator('[data-pn-actions][data-pn-armed]').count() === 1;
+        check('a tap that lands as the action bar appears does nothing, and the bar is armed after the shield', t1 === t0 && armed, `turn ${t0} → ${t1}, armed ${armed}`);
+    };
+    // A phone on its side: the dock in the right-hand column, the action bar on screen, no plate over
+    // the dock, nothing scrolling sideways.
+    const landscape = (page) => page.evaluate(() => {
+        const r = (el) => el?.getBoundingClientRect() ?? null;
+        const dock = r(document.querySelector('[data-pn-dock]'));
+        const table = r(document.querySelector('.pn-table'));
+        const bar = r(document.querySelector('[data-pn-actions]'));
+        const plates = [...document.querySelectorAll('[data-seat] .pn-plate')].map(r);
+        const hit = (a, b) => a.left < b.right - 1 && b.left < a.right - 1 && a.top < b.bottom - 1 && b.top < a.bottom - 1;
+        return {
+            right: dock !== null && table !== null && dock.left >= table.right - 1,
+            bar: bar !== null && bar.left >= -1 && bar.right <= innerWidth + 1 && bar.top >= -1 && bar.bottom <= innerHeight + 1,
+            overDock: dock ? plates.filter((p) => hit(p, dock)).length : -1,
+            outside: plates.filter((p) => p.left < -1 || p.right > innerWidth + 1 || p.top < -1 || p.bottom > innerHeight + 1).length,
+            scroll: document.documentElement.scrollWidth - innerWidth,
+        };
+    });
     let phoneChecked = false;
     let midHandShot = false;
     let hostDrawerDone = false;
@@ -1969,9 +2049,12 @@ const tableInBrowser = async () => {
                 await uiWording(A.page, 'the table mid-hand');
             }
         },
-        before: async (p, d) => {
-            if (p === H && !foldProbed && d.state.hand.no === 1) await armFoldProbe(H.page);
+        before: async (p) => {
             if (p !== B) return;
+            if (!shieldChecked) {
+                shieldChecked = true;
+                await shieldProbe(B.page);
+            }
             await bankOnTurn();
             if (phoneChecked) return;
             phoneChecked = true;
@@ -1984,15 +2067,29 @@ const tableInBrowser = async () => {
             await sleep(900);
             const at320 = await tableLayout(B.page);
             check('…and at 320 px', layoutOk(at320, seats), JSON.stringify(at320));
+            for (const size of [{width: 844, height: 390}, {width: 667, height: 375}]) {
+                await B.page.setViewportSize(size);
+                await sleep(900);
+                const side = await landscape(B.page);
+                check(`…and on its side at ${size.width} × ${size.height}: the dock in the right-hand column, the action bar on screen, every plate on screen and none over the dock`,
+                    side.right && side.bar && side.overDock === 0 && side.outside === 0 && side.scroll <= 0, JSON.stringify(side));
+                await uiShot(B.page, `04-landscape-${size.width}x${size.height}`);
+            }
             await B.page.setViewportSize({width: 390, height: 844});
             await sleep(600);
         },
         after: async (p) => {
             if (p === H && !foldProbed) {
                 foldProbed = true;
-                const probe = await paperShare(H.page);
-                check('the host folds: their cards turn face down — at the turn\'s end the card shows its back, not its face mirrored',
-                    probe.caught > 0 && probe.share !== null && probe.share < 0.3, JSON.stringify(probe));
+                // The folded hand stays the host's to see: face up in the dock, dimmed, tagged "Folded" —
+                // while every other screen shows the seat with no cards (backsOnly, each street).
+                const kept = await H.page.waitForFunction(() => {
+                    const hole = document.querySelector('[data-pn-dock] [data-pn-hole="folded"]');
+                    const cards = hole ? [...hole.querySelectorAll('[data-card]')] : [];
+                    return cards.length === 2 && cards.every((c) => c.getAttribute('data-card') !== 'back' && c.getAttribute('data-state') === 'dim')
+                        && hole.querySelector('[data-pn-folded-tag]') !== null;
+                }, null, {timeout: 10000}).then(() => true, () => false);
+                check('the host folds: their own cards stay in their dock, face up, dimmed and tagged "Folded"', kept);
             }
             if (p === H && !hostDrawerDone) {
                 hostDrawerDone = true;
@@ -2027,6 +2124,37 @@ const tableInBrowser = async () => {
         }
         await B.page.setViewportSize({width: 390, height: 844});
         await sleep(600);
+    }
+    // The break (D1): B reached the showdown, and the dock still offers Sit out and Leave — in short
+    // words on a phone, the row one line high at 320 — and Home in the top bar asks first, B being
+    // seated. The host, who folded, still sees the folded hand and may show it.
+    {
+        const breakRow = (page) => page.evaluate(() => {
+            const row = document.querySelector('[data-pn-seat-controls]');
+            const r = row?.getBoundingClientRect();
+            return {
+                height: r ? Math.round(r.height) : null, armed: row?.hasAttribute('data-pn-armed') ?? false,
+                sitOut: row?.querySelector('[data-pn-control="sit-out"]') !== null && row !== null, leave: row?.querySelector('[data-pn-control="leave"]') !== null && row !== null,
+                words: [...(row?.querySelectorAll('button') ?? [])].map((b) => b.innerText.trim()),
+                home: document.querySelector('[data-open="home"]')?.tagName ?? null,
+            };
+        });
+        const at390 = await breakRow(B.page);
+        check('after a showdown B reached, the dock offers Sit out and Leave in short words, and Home asks first',
+            at390.sitOut && at390.leave && at390.words.includes(TABLE_COPY.sitOutShort) && at390.words.includes(TABLE_COPY.leaveShort) && at390.home === 'BUTTON',
+            JSON.stringify(at390));
+        await B.page.setViewportSize({width: 320, height: 568});
+        await sleep(900);
+        const at320 = await breakRow(B.page);
+        check('…the row one line high at 320 px (52 px at most)', at320.sitOut && at320.leave && at320.height !== null && at320.height <= 52, JSON.stringify(at320));
+        await uiShot(B.page, '05-break-320');
+        await B.page.setViewportSize({width: 390, height: 844});
+        await sleep(600);
+        const host = await hp.evaluate(() => ({
+            folded: document.querySelectorAll('[data-pn-dock] [data-pn-hole="folded"] [data-card]:not([data-card="back"])').length,
+            show: document.querySelector('[data-pn-control="show"]') !== null,
+        }));
+        check('…and the host, who folded, still sees the folded hand in the pause, with "Show my cards"', host.folded === 2 && host.show, JSON.stringify(host));
     }
     for (const [p, width] of [[A, 1440], [B, 390]]) {
         const seen = await coverage(p.page);
@@ -2074,6 +2202,16 @@ const tableInBrowser = async () => {
         // Once B's screen has the empty stack (its next poll): "Rebuy", not the top-up it offered before.
         await B.page.waitForFunction((label) => document.querySelector('[data-pn-rebuy]')?.textContent?.trim() === label, BANK_COPY.rebuy, {timeout: 20000});
         await B.page.dblclick('[data-pn-rebuy]');
+        // A hand has been dealt: the double click is one request, which the host approves.
+        let asked = null;
+        for (let i = 0; i < 25 && !asked; i++) {
+            await sleep(200);
+            asked = (await roomDoc()).state.requests.find((q) => q.pid === B.pid) ?? null;
+        }
+        const waitingSaid = await B.page.waitForSelector('[data-pn-requested]', {timeout: 10000}).then(() => true, () => false);
+        check('B double-clicks Rebuy: one request waits for the host, and B\'s bank says so', asked !== null
+            && (await roomDoc()).state.requests.filter((q) => q.pid === B.pid).length === 1 && waitingSaid, JSON.stringify(asked));
+        await hostOp(H, {op: 'approve', pid: B.pid}, {usePass: false});
         let rowB = null;
         for (let i = 0; i < 25; i++) {
             await sleep(200);
@@ -2084,7 +2222,7 @@ const tableInBrowser = async () => {
         doc = await roomDoc();
         rowB = doc.state.ledger.find((l) => l.pid === B.pid);
         const rebuys = rowB.events.filter((e) => LEDGER_KINDS[e[1]] === 'rebuy');
-        check('B double-clicks Rebuy: exactly one rebuy lands, twice the buy-in bought', rebuys.length === 1
+        check('…the host approves: exactly one rebuy lands, twice the buy-in bought', rebuys.length === 1
             && rowB.bought === 2 * doc.state.config.buyInMax && conservation(doc.state).ok, JSON.stringify({bought: rowB.bought, rebuys: rebuys.length}));
         const nets = new Map(doc.state.ledger.map((l) => {
             const seat = doc.state.seats.find((s) => s?.pid === l.pid);
@@ -2125,6 +2263,61 @@ const tableInBrowser = async () => {
     await uiWording(A.page, 'the hand log');
     await A.page.keyboard.press('Escape');
     await A.page.waitForSelector('[data-pn-drawer="log"]', {state: 'detached', timeout: 10000}).catch(() => {});
+    // P2: the Hands guide at the table — H on A's screen (the focus on the table), the menu's Hands on
+    // B's phone at 390 and 320 px: the table's own game first, the ten rankings and the kicker pair,
+    // every example inside its row and nothing sideways in the drawer.
+    {
+        const handsDrawer = (p) => p.page.evaluate(() => {
+            const guide = document.querySelector('[data-pn-drawer="hands"] [data-hands-guide]');
+            if (!guide) return null;
+            const body = guide.parentElement;
+            const vw = innerWidth;
+            const outside = [...guide.querySelectorAll('[data-guide-cards]')].filter((el) => {
+                const r = el.getBoundingClientRect();
+                const row = el.parentElement.getBoundingClientRect();
+                return r.left < row.left - 0.5 || r.right > row.right + 0.5 || r.right > vw + 0.5;
+            }).length;
+            return {
+                cards: guide.querySelectorAll('.pn-card').length,
+                rankings: guide.querySelectorAll('[data-ranking]').length,
+                first: guide.querySelector('[data-guide-here]')?.getAttribute('data-guide-game') ?? null,
+                order: [...guide.children].map((el) => el.getAttribute('data-guide-section')).join(),
+                outside, sideways: body.scrollWidth - body.clientWidth,
+                card: Math.round(guide.querySelector('.pn-card').getBoundingClientRect().width),
+                firstRank: Math.round(guide.querySelector('[data-ranking]').getBoundingClientRect().bottom), vh: innerHeight,
+            };
+        });
+        // The rankings first (what a player opens Hands for mid-game), then ties, then the table's own game, then the others (PLO).
+        const handsOk = (m) => m !== null && m.cards === 69 && m.rankings === 10 && m.first === 'holdem' && m.order === 'rankings,ties,here,games' && m.outside === 0 && m.sideways <= 0;
+        await A.page.evaluate(() => {
+            if (document.activeElement instanceof HTMLElement) document.activeElement.blur();
+        });
+        await A.page.keyboard.press('h');
+        await A.page.waitForSelector('[data-pn-drawer="hands"]', {timeout: 10000}).catch(() => {});
+        await sleep(500);
+        const onA = await handsDrawer(A);
+        check('H with the focus on the table opens the Hands guide: the ten rankings first, then the kicker pair, then Texas hold\'em ("At this table")',
+            handsOk(onA), JSON.stringify(onA));
+        await uiWording(A.page, 'the Hands drawer');
+        await uiShot(A.page, '23-hands-drawer-1440');
+        await A.page.keyboard.press('Escape');
+        await A.page.waitForSelector('[data-pn-drawer="hands"]', {state: 'detached', timeout: 10000}).catch(() => {});
+        for (const [width, height] of [[390, 844], [320, 568]]) {
+            await B.page.setViewportSize({width, height});
+            await sleep(400);
+            await B.page.click('[data-open="menu"]');
+            await B.page.click('[data-menu="hands"]');
+            await B.page.waitForSelector('[data-pn-drawer="hands"]', {timeout: 10000}).catch(() => {});
+            await sleep(600);
+            const onB = await handsDrawer(B);
+            check(`at ${width} px the menu's Hands opens the guide: the first ranking whole on the first screen, ${width === 320 ? '40' : '44'} px cards, every example inside its row, nothing sideways`,
+                handsOk(onB) && onB.firstRank <= onB.vh && onB.card === (width === 320 ? 40 : 44), JSON.stringify(onB));
+            if (width === 390) await uiShot(B.page, '23-hands-drawer-390');
+            await B.page.keyboard.press('Escape');
+            await B.page.waitForSelector('[data-pn-drawer="hands"]', {state: 'detached', timeout: 10000}).catch(() => {});
+        }
+        await B.page.setViewportSize({width: 390, height: 844});
+    }
     await A.page.click('[data-open="menu"]');
     await A.page.click('[data-menu="look"]');
     await A.page.waitForSelector('[data-pn-drawer="look"]', {timeout: 10000});
@@ -2433,9 +2626,10 @@ const tableInBrowser = async () => {
     const cardText = await C.page.innerText('[data-join-card]').catch(() => '');
     await C.page.click('[data-join-check]');
     await sleep(1500);
-    check('…what would change it, "Check again" (which, still removed, changes nothing) and the way to the lobby',
+    check('…what would change it, "Check again" (which, still removed, changes nothing) and the way home — "/", never the lobby a guest is sent to sign in from',
         cardText.includes(JOIN_COPY.bannedNext) && await C.page.locator('[data-join-blocked="removed"]').count() === 1
-        && await C.page.locator('[data-join-card] a[href="/poker-night"]').count() === 1, cardText.replace(/\s+/g, ' ').slice(0, 200));
+        && await C.page.locator('[data-join-card] [data-join-home][href="/"]').count() === 1
+        && await C.page.locator('[data-join-card] a[href="/poker-night"]').count() === 0, cardText.replace(/\s+/g, ' ').slice(0, 200));
 
     await hp.click('[data-open="host"]');
     await hp.click('[data-host-tab="players"]');
@@ -2489,6 +2683,15 @@ const tableInBrowser = async () => {
     const meR = await R.page.waitForSelector('[data-me]', {timeout: 30000});
     R.pid = await meR.getAttribute('data-pid');
     R.seat = Number(await meR.getAttribute('data-seat'));
+    {
+        // Hands have been dealt: R sits with nothing until the host says yes to the chips.
+        const waiting = await roomDoc();
+        const yes = await hostOp(H, {op: 'approve', pid: R.pid}, {usePass: false});
+        const landed = await roomDoc();
+        check('R joins after the first hands: a request for the chips waits until the host approves, then they land', waiting.state.seats[R.seat]?.stack === 0
+            && waiting.state.requests.some((q) => q.pid === R.pid) && yes.status === 200 && (landed.state.seats[R.seat]?.stack ?? 0) > 0
+            && !landed.state.requests.some((q) => q.pid === R.pid), `${yes.status} ${JSON.stringify(waiting.state.requests)}`);
+    }
     {
         const token = await call(R, 'GET', 'token');
         const spent = await limits.countDocuments({key: /:token:/});
@@ -2717,7 +2920,7 @@ const tableInBrowser = async () => {
         before: async (p, d) => {
             if (p !== R || stop || d.state.hand.street === 'preflop') return;
             // Once the relay has brought R the turn (its action bar is up), so the move goes at once.
-            await R.page.waitForSelector('[data-pn-actions]:not([aria-busy="true"])', {timeout: 20000});
+            await R.page.waitForSelector('[data-pn-actions][data-pn-armed]:not([aria-busy="true"])', {timeout: 20000});
             await stopRelay();
             stop = {
                 street: d.state.hand.street,
@@ -2867,7 +3070,7 @@ const tableInBrowser = async () => {
             check(`a reaction rises over the sender's plate at once, and on another screen within its next poll (${reactMs} ms)`, ownReact && seenReact, `${ownReact} ${seenReact}`);
             await sleep(300);
             const tones = await tp.evaluate(() => window.__pnTones);
-            check(`…with a pop on that screen: its rising tone (${SOUNDS.pop[0].freq} Hz) started`, tones.includes(SOUNDS.pop[0].freq), JSON.stringify(tones));
+            check(`…with a pop on that screen: its rising tone (${POP_HZ} Hz) started`, tones.includes(POP_HZ), JSON.stringify(tones));
 
             await sleep(1300);
             await sp.click('[data-pn-emotes-open]');
@@ -3111,7 +3314,10 @@ const tableInBrowser = async () => {
                     const top = table.getBoundingClientRect().top + parseFloat(t.style.top) + Math.min(dy, 0) - arc - glyph / 2;
                     return {top: Math.round(top), bar: Math.round(bar.getBoundingClientRect().bottom), arc, dy};
                 }, B.pid).catch(() => null) : null;
-                if (flying) await hp.screenshot({path: `${OUT}ui-15-throw-flight-1440.png`});
+                if (flying) {
+                    await hideDevIndicator(hp);
+                    await hp.screenshot({path: `${OUT}ui-15-throw-flight-1440.png`});
+                }
                 check('…and the flight\'s arc on the host\'s screen peaks under the top bar', peak !== null && peak.top >= peak.bar - 1, JSON.stringify(peak));
                 // The splat pictured on the host's screen and on B's phone 300 ms after each lands: on
                 // B's avatar, never over B's name or stack.
@@ -3134,6 +3340,7 @@ const tableInBrowser = async () => {
                     if (!ok || !width) return {ok, at: null};
                     await sleep(300);
                     const at = await p.page.evaluate(onAvatar, bSeat).catch(() => null);
+                    await hideDevIndicator(p.page);
                     await p.page.screenshot({path: `${OUT}ui-15-splat-${width}.png`}).catch(() => {});
                     return {ok, at};
                 }));
@@ -3285,6 +3492,70 @@ const tableInBrowser = async () => {
         }
     }
 
+    // ── the way out and the break (modes P1), between hands with the game paused ──
+    const breakDoc = await roomDoc();
+    const leaver = [C, R].find((p) => breakDoc.state.seats.some((x) => x?.pid === p.pid)) ?? null;
+    if (breakDoc.status !== 'paused' || (breakDoc.state.hand !== null && breakDoc.state.hand.phase !== 'complete') || !breakDoc.state.seats.some((x) => x?.pid === A.pid) || !leaver) {
+        note('the way out and the break between hands', 'the game was not paused between hands with A and a guest seated: not checked');
+    } else {
+        // B's state reads fail for a while: the dock and the top bar say "Reconnecting…", then
+        // "Back online." once they answer again.
+        await B.page.route('**/api/poker-night/*/state**', (route) => route.abort());
+        const lost = await B.page.waitForSelector('[data-pn-reconnecting]', {timeout: 30000}).then(() => true, () => false);
+        const word = lost ? await B.page.locator('[data-pn-connection-word]').evaluate((el) => ({text: el.textContent, shown: el.getBoundingClientRect().width > 1})).catch(() => null) : null;
+        if (lost) await uiShot(B.page, '25-reconnecting-390');
+        await B.page.unroute('**/api/poker-night/*/state**');
+        const back = await B.page.waitForFunction((text) => [...document.querySelectorAll('[data-sonner-toast]')].some((t) => t.textContent?.includes(text)),
+            TABLE_COPY.connection.back, {timeout: 30000}).then(() => true, () => false);
+        check('with the table unreachable, B\'s dock says "Reconnecting…" (and the top bar the word, even on a phone); then "Back online."',
+            lost && word?.text === TABLE_COPY.connection.reconnecting && word.shown && back, JSON.stringify({lost, word, back}));
+
+        // The host sits A out from the bank: at once between hands; A's dock says the host did, and
+        // A's own "I'm back" deals A in again.
+        await hp.click('[data-open="bank"]');
+        await hp.waitForSelector('[data-pn-drawer="bank"]', {timeout: 10000});
+        await hp.click(`[data-bank-sit-out-row="${A.pid}"] [data-host-sit-out="offer"] button`);
+        let aSeat = null;
+        for (let i = 0; i < 40 && !aSeat?.sittingOut; i++) {
+            await sleep(200);
+            aSeat = (await roomDoc()).state.seats.find((s) => s?.pid === A.pid) ?? null;
+        }
+        const told = await A.page.waitForSelector('[data-pn-sat-out="host"]', {timeout: 20000}).then(() => true, () => false);
+        const toldText = told ? await A.page.innerText('[data-pn-sat-out="host"]') : '';
+        await hp.keyboard.press('Escape');
+        await hp.waitForSelector('[data-pn-drawer="bank"]', {state: 'detached', timeout: 10000}).catch(() => {});
+        await A.page.waitForSelector('[data-pn-seat-controls][data-pn-armed] [data-pn-control="sit-in"]', {timeout: 10000});
+        const backLabel = (await A.page.innerText('[data-pn-control="sit-in"]')).trim();
+        await A.page.click('[data-pn-control="sit-in"]');
+        let aBack = null;
+        for (let i = 0; i < 40 && aBack?.sittingOut !== false; i++) {
+            await sleep(200);
+            aBack = (await roomDoc()).state.seats.find((s) => s?.pid === A.pid) ?? null;
+        }
+        check('the host sits A out from the bank between hands: at once, A\'s dock says "The host sat you out.", and A\'s "I\'m back" deals A in again',
+            aSeat?.sittingOut === true && told && toldText.trim() === TABLE_COPY.hostSatYouOut && backLabel === TABLE_COPY.back && aBack?.sittingOut === false,
+            JSON.stringify({aSeat: aSeat && {sittingOut: aSeat.sittingOut}, toldText, backLabel, aBack: aBack && {sittingOut: aBack.sittingOut}}));
+
+        // A guest leaves with one tap (sitting down again would need the host's yes, which the left
+        // panel says after): the dock then says what they left with, the way home ("/") and a way back
+        // to a seat — and no lobby, which a guest cannot open.
+        const G = leaver;
+        await G.page.waitForSelector('[data-pn-seat-controls][data-pn-armed] [data-pn-control="leave"]', {timeout: 20000});
+        await G.page.click('[data-pn-control="leave"]');
+        const left = await G.page.waitForSelector('[data-pn-left]', {timeout: 20000}).then(() => true, () => false);
+        const row = (await roomDoc()).state.ledger.find((l) => l.pid === G.pid);
+        const panel = left ? await G.page.evaluate(() => ({
+            net: Number(document.querySelector('[data-pn-left]')?.getAttribute('data-pn-left')),
+            home: document.querySelector('[data-pn-left] [data-pn-home]')?.getAttribute('href') ?? null,
+            again: document.querySelector('[data-pn-left] [data-pn-sit-again]') !== null,
+            lobby: document.querySelector('[data-pn-left] [data-pn-lobby]') !== null,
+        })) : null;
+        check(`${G.name} (a guest) leaves between hands with one tap: the left panel shows their net, Home ("/") and "Sit down again", no lobby for a guest`,
+            left && !(await roomDoc()).state.seats.some((x) => x?.pid === G.pid) && panel?.net === row.cashedOut - row.bought && panel.home === '/' && panel.again && !panel.lobby,
+            JSON.stringify(panel));
+        if (left) await uiShot(G.page, '22-left-panel-1440');
+    }
+
     await hp.click('[data-open="host"]');
     await hp.waitForSelector('[data-pn-drawer="host"]', {timeout: 10000});
 
@@ -3347,6 +3618,13 @@ const tableInBrowser = async () => {
         check('…and the confetti never widens the phone\'s page', !bm.wide && bm.confetti > 0, JSON.stringify(bm));
     }
 
+    {
+        const homeC = await C.page.getAttribute('[data-summary-home]', 'href').catch(() => null);
+        await C.page.click('[data-summary-home]');
+        const landed = await C.page.waitForSelector('[data-landing]', {timeout: 60000}).then(() => true, () => false);
+        const path = new URL(C.page.url()).pathname;
+        check('the summary\'s Home takes a guest to "/", the landing page — never to sign in', homeC === '/' && landed && path === '/', `${homeC} → ${C.page.url()}`);
+    }
     await uiWording(hp, 'the night\'s summary');
     await uiShot(hp, '09-summary-1440');
     await uiShot(B.page, '09-summary-390');
@@ -3406,7 +3684,7 @@ const tableInBrowser = async () => {
             JSON.stringify(mirrored));
         // The next table, from the account alone: this browser's own copy of the look cleared first.
         await hp.evaluate((key) => localStorage.removeItem(key), ME_STORAGE_KEY);
-        await hp.click('[data-quick-start]');
+        await hp.click('[data-quick-start="holdem"]');
         await hp.waitForURL(/\/play\/[A-HJ-NP-Z2-9]{6}(\?.*)?$/, {timeout: 120000});
         const next = new URL(hp.url()).pathname.split('/').pop();
         await hp.waitForSelector('[data-pn-drawer="invite"]', {timeout: 60000}).catch(() => {});

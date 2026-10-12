@@ -9,7 +9,7 @@ import {describe, expect, it} from 'vitest';
 import {legalFor, owed, snapshotFromState} from '@/lib/poker-night/betting';
 import {TIMING} from '@/lib/poker-night/config';
 import {reduce} from '@/lib/poker-night/engine';
-import type {Legal, PreAction, TableState} from '@/lib/poker-night/types';
+import type {GameConfig, Legal, PreAction, TableState} from '@/lib/poker-night/types';
 import {A, C, F, R, X, actBy, actorPid, deal, moves, nowOf, ok, pidOf, table} from './fixtures';
 
 const legal = (s: TableState): Legal => legalFor(snapshotFromState(s), s.hand!.actor!)!;
@@ -247,5 +247,90 @@ describe('refusals', () => {
     it('takes a fold when checking is free (the table asks first)', () => {
         const s = moves(four(), C, C, C);
         expect(reduce(s, actBy(s, actorPid(s), F)).ok).toBe(true);
+    });
+});
+
+// PLO bets pot limit: a bet or a raise goes at most to the current bet plus the pot after the call —
+// every chip committed this hand plus what the player owes — never below the minimum, never past all
+// in. The minimum raise and the reopening rules are the no-limit ones.
+describe('pot limit (PLO)', () => {
+    const plo = (stacks: Record<number, number>, config: Partial<GameConfig> = {}) =>
+        deal(table(stacks, {config: {variant: 'plo', smallBlind: 1, bigBlind: 2, buyInMin: 2, buyInMax: 1000, ...config}, lastBigBlind: 1}));
+    const deep = (n: number) => Object.fromEntries(Array.from({length: n}, (_, i) => [i, 1000]));
+
+    it('opens at blinds 1/2 to at most 7; facing 7, 24; the small blind facing 7 alone, 23', () => {
+        let s = plo(deep(4));
+        expect(s.hand!.variant).toBe('plo');
+        expect(s.hand!.seats.every((p) => p.hole.length === 4)).toBe(true);
+        expect(s.hand!.actor).toBe(3);
+        expect(legal(s).raise).toEqual({kind: 'raise', min: 4, max: 7});
+        expect(reduce(s, actBy(s, actorPid(s), R(8)))).toEqual({ok: false, reason: 'bad-amount'});
+        const facing = moves(s, R(7));
+        expect(legal(facing).raise).toEqual({kind: 'raise', min: 12, max: 24});
+        s = moves(facing, F);
+        expect(s.hand!.actor).toBe(1);
+        expect(legal(s)).toEqual({fold: true, check: false, call: 6, callAllIn: false, raise: {kind: 'raise', min: 12, max: 23}});
+    });
+
+    it('bets the pot on the flop: 10 into 10, and the raise over it to 40', () => {
+        let s = moves(plo(deep(5), {}), C, C, C, C, X);
+        expect(s.hand!.street).toBe('flop');
+        expect(legal(s).raise).toEqual({kind: 'bet', min: 2, max: 10});
+        s = moves(s, R(10));
+        expect(legal(s).raise).toEqual({kind: 'raise', min: 20, max: 40});
+    });
+
+    it('counts the antes: nine antes of 1 open to 16; a short big blind (1 of 2) to 6', () => {
+        const nine = plo(deep(9), {seats: 9, ante: 1});
+        expect(legal(nine).raise!.max).toBe(16);
+        const short = plo({0: 1000, 1: 1000, 2: 1, 3: 1000});
+        expect(short.hand!.seats.find((p) => p.seat === 2)!.allIn).toBe(true);
+        expect(short.hand!.currentBet).toBe(2);
+        expect(legal(short).raise!.max).toBe(6);
+    });
+
+    it('takes all in only within the cap: refused above it, a raise to the cap the way there', () => {
+        const s = plo(deep(4));
+        expect(reduce(s, actBy(s, actorPid(s), A))).toEqual({ok: false, reason: 'illegal'});
+        const capped = moves(s, R(7));
+        expect(capped.hand!.currentBet).toBe(7);
+        // A stack under the cap goes all in as a raise; one at or under the minimum raise has min = max.
+        const short = plo({0: 1000, 1: 1000, 2: 1000, 3: 5});
+        expect(legal(short).raise).toEqual({kind: 'raise', min: 4, max: 5});
+        expect(moves(short, A).hand!.currentBet).toBe(5);
+        const tiny = plo({0: 1000, 1: 1000, 2: 1000, 3: 3});
+        expect(legal(tiny).raise).toEqual({kind: 'raise', min: 3, max: 3});
+        // Facing a bet as large as the stack, all in is the call.
+        const call = plo({0: 2, 1: 1000, 2: 1000, 3: 1000});
+        const facing = moves(call, R(7));
+        expect(legal(facing)).toMatchObject({call: 2, callAllIn: true, raise: null});
+        expect(moves(facing, A).hand!.seats.find((p) => p.seat === 0)!.allIn).toBe(true);
+    });
+
+    it('keeps the short all-in rule: a short all-in over a pot bet reopens nobody who acted', () => {
+        let s = moves(plo({0: 1000, 1: 1000, 2: 1000, 3: 1000, 4: 17}), C, C, C, C, X);
+        // Seat 1 bets the pot (10), seats 2 and 3 call, seat 4 is all in for its last 15: short of a full raise.
+        s = moves(s, R(10), C, C, A);
+        expect(s.hand!.currentBet).toBe(15);
+        expect(s.hand!.actor).toBe(0);
+        expect(legal(s).raise).toEqual({kind: 'raise', min: 25, max: 15 + 55 + 15});
+        s = moves(s, C);
+        expect(s.hand!.actor).toBe(1);
+        expect(legal(s)).toMatchObject({call: 5, raise: null});
+    });
+
+    it('never offers a raise cap below the minimum or above the stack', () => {
+        for (const stacks of [deep(4), {0: 1000, 1: 1000, 2: 1, 3: 1000}, {0: 9, 1: 3, 2: 1000, 3: 4}]) {
+            let s = plo(stacks);
+            for (let k = 0; k < 12 && s.hand!.phase === 'betting'; k++) {
+                const l = legal(s);
+                const p = s.hand!.seats.find((q) => q.seat === s.hand!.actor)!;
+                if (l.raise) {
+                    expect(l.raise.max).toBeGreaterThanOrEqual(l.raise.min);
+                    expect(l.raise.max).toBeLessThanOrEqual(p.streetBet + s.seats[p.seat]!.stack);
+                }
+                s = moves(s, l.raise ? R(l.raise.max) : l.check ? X : C);
+            }
+        }
     });
 });

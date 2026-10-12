@@ -1,6 +1,7 @@
 // What happened at the table between two views, as the animations need it: a deal, chips going out
-// to a bet line, a check, a fold, the street's bets sweeping into the pot, a board card, the
-// winning hands revealed, the pots paid out, a turn starting, a player sitting down or getting up.
+// to a bet line, a check, a fold, a card thrown away (Triple T) and the throw-away over, the street's
+// bets sweeping into the pot, a board card, the winning hands revealed, the pots paid out, a turn
+// starting, a player sitting down or getting up.
 // Pure and client-safe: the table runs it on every view it applies (lib/poker-night/feed) and the
 // components animate the events, never the views.
 //
@@ -14,10 +15,12 @@
 // where it is. A result is `fresh` while the table is still showing it (inside its revealMs).
 
 import type {Card} from '@/lib/poker/cards';
-import {ENTRY_FLAGS, STREETS} from '@/lib/poker-night/config';
-import type {EntryKind, Street} from '@/lib/poker-night/types';
+import {ENTRY_FLAGS, HOLE_CARDS, PLAYING_CARDS, STREETS} from '@/lib/poker-night/config';
+import type {EntryKind, Street, Variant} from '@/lib/poker-night/types';
 import type {HandView, SeatView, TableView, WireEntry} from '@/lib/poker-night/view-types';
-import {readShownHand, WIRE_KINDS} from '@/lib/poker-night/views';
+import {paidParts} from '@/lib/poker-night/pots';
+import {readShown} from '@/lib/poker-night/variants';
+import {WIRE_KINDS} from '@/lib/poker-night/views';
 
 // The moves that send chips from a stack to the table.
 export type ChipMove = Extract<EntryKind, 'ante' | 'small-blind' | 'big-blind' | 'post' | 'call' | 'bet' | 'raise'>;
@@ -26,13 +29,15 @@ const CHIP_MOVES: ReadonlySet<string> = new Set<ChipMove>(['ante', 'small-blind'
 // A seat's bet line as a street closes.
 export type BetLine = {seat: number; amount: number};
 
-// A hand shown at the showdown: its cards, the five cards that play (lib/poker-night/hand-name
-// bestFive, through views.readShownHand) and its value (null before the flop); winner when any pot
-// paid it.
-export type RevealedHand = {seat: number; cards: [Card, Card]; best: Card[]; value: number | null; winner: boolean};
+// A hand shown at the showdown: its cards, and on each board its five cards that play
+// (lib/poker-night/variants.readShown) and its value there (none before the flop); winner when any
+// pot paid it.
+export type RevealedHand = {seat: number; cards: Card[]; best: Card[][]; values: (number | null)[]; winner: boolean};
 
-// One pot as it pays out: pot 0 is the main pot, 1 the first side pot; each winner's share.
-export type PotPayout = {pot: number; amount: number; winners: {seat: number; share: number}[]};
+// One board's share of one pot as it pays out (a pot on one board, or paid uncontested, is one
+// part): pot 0 is the main pot, 1 the first side pot; board 0 the first board; the part's chips
+// (pots.paidParts) and each winner's share.
+export type PotPayout = {pot: number; board: number; amount: number; winners: {seat: number; share: number}[]};
 
 // What a pot of this many big blinds or more wins counts as a big win (confetti).
 export const BIG_WIN_BIG_BLINDS = 40;
@@ -40,8 +45,10 @@ export const BIG_WIN_BIG_BLINDS = 40;
 type Base = {id: string; handNo: number};
 
 export type TableEvent =
-    // A new hand dealt to these seats, in the order the cards go round (from the seat after the button).
-    | (Base & {kind: 'deal'; seats: number[]})
+    // A new hand dealt to these seats, in the order the cards go round (from the seat after the button):
+    // `cards` each (two, four in PLO), of the hand's game — `changed` when the hand before it was
+    // another game (or board count), which the table says.
+    | (Base & {kind: 'deal'; seats: number[]; cards: number; variant: Variant; boards: number; changed: boolean})
     // Chips from a stack: an ante or a blind, a call, a bet, a raise. amount is what moved, to the
     // seat's bet line after it (a raise's "raise to").
     | (Base & {kind: 'chips-out'; seat: number; move: ChipMove; amount: number; to: number; allIn: boolean})
@@ -49,20 +56,27 @@ export type TableEvent =
     | (Base & {kind: 'fold'; seat: number})
     // The clock made this move for them (a check when free, else a fold).
     | (Base & {kind: 'timeout'; seat: number; move: 'check' | 'fold'})
+    // Triple T: a player threw a card away (never which: the log names none) — by the clock as time ran
+    // out (timeout), or for a player who left (auto).
+    | (Base & {kind: 'discard'; seat: number; timeout: boolean; auto: boolean})
+    // Triple T: the throw-away is over, every card thrown away; the betting starts.
+    | (Base & {kind: 'discarded'})
     // The uncalled part of a bet going back to its owner.
     | (Base & {kind: 'refund'; seat: number; amount: number})
-    // A player showing their cards when nothing obliged them to.
-    | (Base & {kind: 'show'; seat: number})
+    // A player showing their cards when nothing obliged them to: `cards` of them.
+    | (Base & {kind: 'show'; seat: number; cards: number})
     // The street's bets sweeping into the pot.
     | (Base & {kind: 'street-sweep'; street: Street; bets: BetLine[]; total: number})
     // Board cards turned: the flop's three, the turn's or the river's one; from is the first card's
-    // index on the board.
-    | (Base & {kind: 'board'; street: Exclude<Street, 'preflop'>; cards: Card[]; from: number})
-    // The showdown: every shown hand, the winners among them.
-    | (Base & {kind: 'reveal'; board: Card[]; hands: RevealedHand[]; winners: number[]})
-    // The pots paid out in the order the table pays them: side pots first, the main pot last.
-    // totals is what each winner took across them; uncontested when everyone else folded.
-    | (Base & {kind: 'win'; pots: PotPayout[]; totals: {seat: number; amount: number}[]; uncontested: boolean; big: boolean; fresh: boolean})
+    // index on the board; board, which board (every board turns together, one event each).
+    | (Base & {kind: 'board'; street: Exclude<Street, 'preflop'>; board: number; cards: Card[]; from: number})
+    // The showdown: every board, every shown hand, the winners among them.
+    | (Base & {kind: 'reveal'; boards: Card[][]; hands: RevealedHand[]; winners: number[]})
+    // The pots paid out in the order the table pays them: side pots first, the main pot last, each
+    // board's share of a pot in turn (boards: how many shares a pot has). totals is what each winner
+    // took across them; uncontested when everyone else folded; revealMs, how long the result shows
+    // before the next deal may come, which the pay-out keeps within.
+    | (Base & {kind: 'win'; pots: PotPayout[]; boards: number; totals: {seat: number; amount: number}[]; uncontested: boolean; big: boolean; fresh: boolean; revealMs: number})
     // A player on the clock.
     | (Base & {kind: 'turn'; seat: number; turn: number; mine: boolean})
     // A seat taken or given up.
@@ -80,7 +94,7 @@ export type DiffOptions = {
 
 const streetIndex = (street: Street): number => STREETS.indexOf(street);
 
-// Where each street's cards sit on the board.
+// Where each street's cards sit on a board.
 const BOARD_RANGE: Record<Exclude<Street, 'preflop'>, [number, number]> = {flop: [0, 3], turn: [3, 4], river: [4, 5]};
 
 // The seats dealt into a hand, clockwise from the one after the button.
@@ -119,7 +133,9 @@ const handEvents = (prevView: DiffableView, prevHand: HandView | null, next: Dif
     const no = hand.no;
     const id = (rest: string) => `${no}:${rest}`;
     let street = prevHand ? streetIndex(prevHand.street) : 0;
-    let boardShown = prevHand ? prevHand.board.length : 0;
+    let boardShown = prevHand ? prevHand.boards[0]?.length ?? 0 : 0;
+    const boards = hand.boards;
+    const board = boards[0] ?? [];
     // Each seat's bet line on the street being played: as the previous view showed it, then as the
     // log moves it (every entry carries the seat's street bet after it).
     const bets = new Map<number, number>();
@@ -137,8 +153,11 @@ const handEvents = (prevView: DiffableView, prevHand: HandView | null, next: Dif
         const name = STREETS[street];
         if (name === 'preflop') return;
         const [from, to] = BOARD_RANGE[name];
-        if (boardShown >= to || hand.board.length < to) return;
-        out.push({kind: 'board', id: id(`board:${name}`), handNo: no, street: name, cards: hand.board.slice(from, to), from});
+        if (boardShown >= to || board.length < to) return;
+        // Every board turns together, the first board's id as one board's always was.
+        boards.forEach((cards, k) => out.push({
+            kind: 'board', id: id(k === 0 ? `board:${name}` : `board:${name}:${k}`), handNo: no, street: name, board: k, cards: cards.slice(from, to), from,
+        }));
         boardShown = to;
     };
     // Closes every street before `target`: its bets swept, the next street's cards turned.
@@ -150,7 +169,14 @@ const handEvents = (prevView: DiffableView, prevHand: HandView | null, next: Dif
         }
     };
 
-    if (!prevHand) out.push({kind: 'deal', id: id('deal'), handNo: no, seats: dealtSeats(next.seats, hand.button)});
+    if (!prevHand) {
+        const last = prevView.hand;
+        const changed = last !== null && last.no !== no && (last.variant !== hand.variant || last.boards.length !== hand.boards.length);
+        out.push({
+            kind: 'deal', id: id('deal'), handNo: no, seats: dealtSeats(next.seats, hand.button), cards: HOLE_CARDS[hand.variant],
+            variant: hand.variant, boards: hand.boards.length, changed,
+        });
+    }
 
     for (const {index, entry} of entriesFrom(hand, prevHand ? prevHand.logLength : 0)) {
         const [seat, kindIndex, amount, to, flags, entryStreet] = entry;
@@ -167,8 +193,20 @@ const handEvents = (prevView: DiffableView, prevHand: HandView | null, next: Dif
         else if (kind === 'check') out.push({kind: 'check', id: at, handNo: no, seat});
         else if (kind === 'fold') out.push({kind: 'fold', id: at, handNo: no, seat});
         else if (kind === 'refund') out.push({kind: 'refund', id: at, handNo: no, seat, amount});
-        else if (kind === 'show') out.push({kind: 'show', id: at, handNo: no, seat});
+        else if (kind === 'discard') {
+            out.push({kind: 'discard', id: at, handNo: no, seat, timeout: (flags & ENTRY_FLAGS.timeout) !== 0, auto: (flags & ENTRY_FLAGS.auto) !== 0});
+        }
+        else if (kind === 'show') {
+            const shown = next.seats[seat]?.cards;
+            out.push({kind: 'show', id: at, handNo: no, seat, cards: Array.isArray(shown) ? shown.length : PLAYING_CARDS[hand.variant]});
+        }
         bets.set(seat, to);
+    }
+
+    // Triple T's throw-away over: seen once, as the hand goes on from it to the betting (or straight to
+    // a run-out, everyone all in). A hand won in the throw-away (everyone else gone) never had it end.
+    if (prevHand?.phase === 'discard' && (hand.phase === 'betting' || hand.phase === 'runout')) {
+        out.push({kind: 'discarded', id: id('discarded'), handNo: no});
     }
 
     // The streets the hand moved on to without a line in the log (a run-out), and the last street's
@@ -178,25 +216,28 @@ const handEvents = (prevView: DiffableView, prevHand: HandView | null, next: Dif
 
     const result = hand.result;
     if (result && !prevHand?.result) {
-        const winners = [...new Set(result.pots.flatMap((p) => p.winners))];
+        const winners = [...new Set(result.pots.flatMap((p) => p.winners.flat()))];
         if (result.showdown && result.hands.length > 0) {
             const hands = result.hands.map((shown): RevealedHand => {
-                const read = readShownHand(hand.board, shown);
-                return {seat: read.seat, cards: read.cards, best: read.best, value: read.value, winner: winners.includes(read.seat)};
+                const read = readShown(hand.variant, hand.boards, shown);
+                return {seat: read.seat, cards: read.cards, best: read.reads.map((r) => r.best), values: read.reads.map((r) => r.value), winner: winners.includes(read.seat)};
             });
-            out.push({kind: 'reveal', id: id('reveal'), handNo: no, board: [...hand.board], hands, winners});
+            out.push({kind: 'reveal', id: id('reveal'), handNo: no, boards: boards.map((b) => [...b]), hands, winners});
         }
+        // Each pot's shares board by board, side pots first and the main pot last.
         const pots = result.pots
-            .map((p, pot): PotPayout => ({pot, amount: p.amount, winners: p.winners.map((seat, k) => ({seat, share: p.shares[k] ?? 0}))}))
-            .reverse();
+            .flatMap((p, pot) => paidParts(p).map((part): PotPayout => ({
+                pot, board: part.board, amount: part.amount, winners: part.winners.map((seat, j) => ({seat, share: part.shares[j]})),
+            })))
+            .sort((a, b) => b.pot - a.pot || a.board - b.board);
         const totals = new Map<number, number>();
         for (const pot of pots) for (const w of pot.winners) totals.set(w.seat, (totals.get(w.seat) ?? 0) + w.share);
         const bigBlind = opts.bigBlind ?? 0;
         const big = [...totals.entries()].some(([seat, amount]) => (bigBlind > 0 && amount >= BIG_WIN_BIG_BLINDS * bigBlind) || allInSeats.has(seat));
         out.push({
-            kind: 'win', id: id('win'), handNo: no, pots,
+            kind: 'win', id: id('win'), handNo: no, pots, boards: Math.max(1, ...result.pots.map((p) => p.winners.length)),
             totals: [...totals.entries()].map(([seat, amount]) => ({seat, amount})).sort((a, b) => a.seat - b.seat),
-            uncontested: !result.showdown, big, fresh: next.serverNow - result.completedAt < result.revealMs,
+            uncontested: !result.showdown, big, fresh: next.serverNow - result.completedAt < result.revealMs, revealMs: result.revealMs,
         });
     }
 
@@ -221,5 +262,5 @@ export const diffViews = (prev: DiffableView | null, next: DiffableView, opts: D
 
 // Every event kind, for the components' data-anim hooks and the QA that reads them.
 export const EVENT_KINDS: readonly TableEventKind[] = [
-    'deal', 'chips-out', 'check', 'fold', 'timeout', 'refund', 'show', 'street-sweep', 'board', 'reveal', 'win', 'turn', 'join', 'leave',
+    'deal', 'chips-out', 'check', 'fold', 'timeout', 'discard', 'discarded', 'refund', 'show', 'street-sweep', 'board', 'reveal', 'win', 'turn', 'join', 'leave',
 ];

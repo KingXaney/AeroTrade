@@ -12,7 +12,7 @@ import {afterCommit, mutateRoom} from "@/lib/poker-night/store";
 // in among them (lib/poker-night/room.actionStep). The identity is read in full, never from the
 // seat pass. The action's time is when the request arrived, so a move made in time is never beaten
 // by a timeout that fell due while it waited. Every body carries an actionId the client reuses on a
-// retry: the room keeps the last 64 it applied, so a double tap or a retried request is one action,
+// retry: the room keeps the last 40 it applied, so a double tap or a retried request is one action,
 // answered with duplicate: true. When a signed-in host changes the scene or the felt, their new
 // tables open with it too (lib/poker-night/prefs-store.saveTableLook, after the answer).
 

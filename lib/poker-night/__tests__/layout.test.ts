@@ -6,7 +6,7 @@
 import {describe, expect, it} from 'vitest';
 import {TABLE_LIMITS} from '@/lib/poker-night/config';
 import {
-    betSpot, buttonSpot, CENTRE, densityFor, flight, orientationFor, PLATE, platesOverlap, SEAT_COUNTS, SEAT_SLOTS, seatSpots, spotForSeat, spotToPx, visualSlot,
+    betSpot, buttonSpot, CENTRE, densityFor, flight, isSquat, orientationFor, PLATE, platesOverlap, SEAT_COUNTS, SEAT_SLOTS, seatSpots, spotForSeat, spotToPx, SQUAT_SLOTS, visualSlot,
     type Orientation,
 } from '@/lib/poker-night/layout';
 
@@ -61,6 +61,32 @@ describe('the slots', () => {
                 }
             }
         }
+    });
+
+    it('gives a squat box (a phone on its side, the dock in its column) eight seats two to a side column, clockwise from the viewer', () => {
+        expect(isSquat({w: 364, h: 224}, true)).toBe(true);
+        expect(isSquat({w: 548, h: 280}, true)).toBe(true);
+        expect(isSquat({w: 364, h: 224}, false)).toBe(false);
+        expect(isSquat({w: 308, h: 340}, true)).toBe(false);
+        expect(isSquat({w: 360, h: 390}, true)).toBe(false);
+        for (const n of SEAT_COUNTS) {
+            const spots = seatSpots(n, 'portrait', true);
+            expect(spots, `${n}`).toHaveLength(n);
+            expect(spots[0]).toMatchObject({x: 50, y: 100, slot: 0, side: 'bottom'});
+            // Only the counts that have squat slots change.
+            if (!SQUAT_SLOTS[n]) expect(spots).toEqual(seatSpots(n, 'portrait'));
+        }
+        const eight = SQUAT_SLOTS[8];
+        expect(eight.filter((p) => p.x === 0)).toHaveLength(2);
+        expect(eight.filter((p) => p.x === 100)).toHaveLength(2);
+        const angle = (p: {x: number; y: number}) => {
+            const a = Math.atan2(-(p.x - 50), p.y - 50);
+            return a < 0 ? a + 2 * Math.PI : a;
+        };
+        for (let k = 1; k < eight.length; k++) expect(angle(eight[k]), `slot ${k}`).toBeGreaterThan(angle(eight[k - 1]));
+        const plate = {w: 72, h: 46};
+        const centres = eight.map((spot) => spotToPx(spot, {w: 364, h: 224}, plate));
+        for (let i = 0; i < 8; i++) for (let j = i + 1; j < 8; j++) expect(platesOverlap(centres[i], centres[j], plate), `${i} and ${j}`).toBe(false);
     });
 
     it('reads a phone held upright as portrait and compact, a laptop as landscape and comfortable', () => {

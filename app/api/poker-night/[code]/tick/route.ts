@@ -21,7 +21,7 @@ export async function POST(request: Request, {params}: {params: Promise<{code: s
     try {
         if (ctx.body.beat) await stampSeen(ctx.ref, pid, ctx.body.beat.hidden, ctx.receivedAt);
         const now = Date.now();
-        if (ctx.head.nextDueAt === null || ctx.head.nextDueAt > now) return json(unchangedOf(ctx.head, now, [], ctx.pass));
+        if (ctx.head.nextDueAt === null || ctx.head.nextDueAt > now) return json(unchangedOf(ctx.head, now, [], ctx.pass, pid));
         const r = await mutateRoom(ctx.ref, null, {receivedAt: ctx.receivedAt, label: 'tick'});
         after(() => afterCommit(r));
         if (!r.ok) return fail(r.code);

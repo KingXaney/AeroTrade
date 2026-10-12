@@ -12,12 +12,17 @@
 //   less any still listed under their open tables. A night is finished once its table closed or
 //   went idle (a room the TTL deletes before it closes never writes `closed`), and keeps a link to
 //   its table while the room is kept (TIMING.ROOM_TTL_MS): a closed table shows its summary there.
+// - The resume card (resumeOf): the open table where the reader holds a seat, newest first
+//   (store.listSeatedRooms, matched by holdsSeat), above everything else.
+//
+// Home's poker night panel is shaped here too (homePokerNight), from the same reads: the tables
+// the reader sits at or hosts, then friends' open tables, a few of each, null when there are none.
 //
 // The rows a store reads carry the host's account id; the view the page gets never does.
 
-import {HOST_COPY, LOBBY_COPY} from '@/lib/learn/copy/poker-night';
+import {HOST_COPY, LOBBY_COPY, MODE_COPY, POKER_NIGHT_COPY} from '@/lib/learn/copy/poker-night';
 import {avatarForUser, encodeAvatar, isAvatar} from '@/lib/poker-night/avatar';
-import {DEFAULT_CONFIG, TABLE_LIMITS, TIMING, type ConfigIssue} from '@/lib/poker-night/config';
+import {DEFAULT_CONFIG, ENABLED, TABLE_LIMITS, TIMING, VARIANTS, type ConfigIssue} from '@/lib/poker-night/config';
 import type {Env} from '@/lib/poker-night/env';
 import {LIMITS} from '@/lib/poker-night/limits';
 import {tablePath} from '@/lib/poker-night/links';
@@ -25,15 +30,21 @@ import {resolveTableLook, type TableLook} from '@/lib/poker-night/looks';
 import {cleanName} from '@/lib/poker-night/names';
 import {DEFAULT_PERSONAL_LOOK, ME_STORAGE_KEY, resolvePersonalLook, type PersonalLook} from '@/lib/poker-night/personal';
 import type {RecentNight} from '@/lib/poker-night/results';
-import type {GameConfig, RebuyPolicy, TableStatus} from '@/lib/poker-night/types';
+import type {BoardCount, GameConfig, RebuyPolicy, TableStatus, Variant} from '@/lib/poker-night/types';
 
-// How many rows each section lists at most.
-export const LOBBY_LIMITS = {open: 10, friends: 12, recent: 20} as const;
+// How many rows each section lists at most. `seated`: how many of the newest open tables the
+// reader has a player row at are read to find the ones where they hold a seat (watching, or having
+// left, keeps the row).
+export const LOBBY_LIMITS = {open: 10, friends: 12, recent: 20, seated: 8} as const;
+
+// How many rows each list of Home's panel shows at most; the lobby has the rest.
+export const HOME_LIMITS = {tables: 2, friends: 2} as const;
 
 // ── what the store reads ──
 
-// A table as the store lists it: the room document's mirrors, the hands dealt so far and the
-// host's name at the table. Server-side only: it carries the host's account id.
+// A table as the store lists it: the room document's mirrors, the hands dealt so far, the game the
+// host set (what the next hand deals) and the host's name at the table. Server-side only: it carries
+// the host's account id.
 export type LobbyRoom = {
     code: string;
     name: string;
@@ -43,15 +54,24 @@ export type LobbyRoom = {
     seats: number;
     seated: number;
     hands: number;
+    variant: Variant;
+    boards: BoardCount;
     lastActivityAt: number;
 };
 
-// The fields of a room document the lobby reads, and nothing private: no state but its hand
-// count, no guest, and of each player only the account and the name (to find the host's).
+// The fields of a room document the lobby reads, and nothing private: of the state only its hand
+// count and its config's game and boards, no guest, and of each player only the account and the name
+// (to find the host's).
 export const LOBBY_PROJECTION = {
     _id: 0, code: 1, name: 1, hostUserId: 1, status: 1, seatCount: 1, seatsTaken: 1, lastActivityAt: 1,
-    'state.handNo': 1, 'players.userId': 1, 'players.name': 1,
+    'state.handNo': 1, 'state.config.variant': 1, 'state.config.boards': 1, 'players.userId': 1, 'players.name': 1,
 } as const;
+
+// The tables an account plays at (store.listSeatedRooms): the lobby's fields, plus each player's
+// pid and each seat's pid and leaving flag — enough for holdsSeat to tell whether the account holds
+// a seat, and never a card, a stack, a guest or a pre-action. Server-side only, like every row a
+// store reads: the pids stay there.
+export const SEATED_PROJECTION = {...LOBBY_PROJECTION, 'players.pid': 1, 'state.seats.pid': 1, 'state.seats.leaving': 1} as const;
 
 export type LobbyDoc = {
     code: string;
@@ -61,11 +81,32 @@ export type LobbyDoc = {
     seatCount?: number | null;
     seatsTaken?: number | null;
     lastActivityAt?: Date | number | string | null;
-    state?: {handNo?: unknown} | null;
-    players?: {userId?: string | null; name?: string | null}[] | null;
+    state?: {handNo?: unknown; seats?: unknown; config?: {variant?: unknown; boards?: unknown} | null} | null;
+    players?: {userId?: string | null; name?: string | null; pid?: string | null}[] | null;
+};
+
+// Whether the account holds a seat at a room read through SEATED_PROJECTION: one of its player rows
+// (an account has one per table) sits in the state's seats, and not on its way out (a seat left or
+// removed during a hand stays until the hand completes). A seat projected away or malformed is no seat.
+export const holdsSeat = (doc: Pick<LobbyDoc, 'state' | 'players'>, userId: string): boolean => {
+    const pids = new Set<string>();
+    for (const p of doc.players ?? []) if (p.userId === userId && typeof p.pid === 'string' && p.pid !== '') pids.add(p.pid);
+    if (pids.size === 0) return false;
+    const seats: unknown = doc.state?.seats;
+    if (!Array.isArray(seats)) return false;
+    return seats.some((seat: unknown) => {
+        if (typeof seat !== 'object' || seat === null) return false;
+        const {pid, leaving} = seat as {pid?: unknown; leaving?: unknown};
+        return typeof pid === 'string' && pids.has(pid) && leaving !== true;
+    });
 };
 
 const whole = (value: unknown): number => (typeof value === 'number' && Number.isSafeInteger(value) && value >= 0 ? value : 0);
+
+// A stored game as the lobby reads it: one of VARIANTS, else Texas hold'em (a version 1 document
+// has none); its boards 1 to 3, else one.
+const variantOf = (value: unknown): Variant => ((VARIANTS as readonly unknown[]).includes(value) ? value as Variant : 'holdem');
+const boardsOf = (value: unknown): BoardCount => (value === 2 || value === 3 ? value : 1);
 
 const timeOf = (value: LobbyDoc['lastActivityAt']): number => {
     if (value instanceof Date) return value.getTime();
@@ -88,6 +129,8 @@ export const lobbyRoomFromDoc = (doc: LobbyDoc): LobbyRoom => ({
     seats: whole(doc.seatCount),
     seated: whole(doc.seatsTaken),
     hands: whole(doc.state?.handNo),
+    variant: variantOf(doc.state?.config?.variant),
+    boards: boardsOf(doc.state?.config?.boards),
     lastActivityAt: timeOf(doc.lastActivityAt),
 });
 
@@ -109,6 +152,8 @@ export type LobbyTable = {
     seats: number;
     seated: number;
     hands: number;
+    variant: Variant;
+    boards: BoardCount;
     href: string;
     shareUrl: string;
 };
@@ -125,7 +170,28 @@ export type LobbyNight = {
     href: string | null;
 };
 
+// A table as a way back to it — the lobby's resume card, Home's rows — with no share link and no
+// account id. `mine`: the reader hosts it; `host`: the host's name at the table ('' when it has
+// none); `sitting`: the reader holds a seat there (Rejoin), else they host it from outside a seat
+// or it is a friend's to join.
+export type TableLink = {
+    code: string;
+    name: string;
+    status: TableStatus;
+    seats: number;
+    seated: number;
+    hands: number;
+    variant: Variant;
+    boards: BoardCount;
+    href: string;
+    mine: boolean;
+    host: string;
+    sitting: boolean;
+};
+
 export type LobbySections = {
+    // The open table where the reader holds a seat, newest first (resumeOf), else null.
+    resume: TableLink | null;
     open: LobbyTable[] | null;
     friends: FriendTable[] | null;
     recent: LobbyNight[] | null;
@@ -161,19 +227,43 @@ const openOnly = (rooms: readonly LobbyRoom[], now: number, limit: number, skip:
 
 const tableOf = (room: LobbyRoom, shareUrl: (code: string) => string): LobbyTable => ({
     code: room.code, name: room.name, status: room.status, seats: room.seats, seated: room.seated, hands: room.hands,
-    href: tablePath(room.code), shareUrl: shareUrl(room.code),
+    variant: room.variant, boards: room.boards, href: tablePath(room.code), shareUrl: shareUrl(room.code),
 });
+
+const linkOf = (room: LobbyRoom, userId: string, sitting: boolean): TableLink => ({
+    code: room.code, name: room.name, status: room.status, seats: room.seats, seated: room.seated, hands: room.hands,
+    variant: room.variant, boards: room.boards, href: tablePath(room.code), mine: room.hostUserId === userId, host: room.hostName, sitting,
+});
+
+// A table's game as its row opens with it: "Texas hold'em", "PLO", "PLO · 2 boards".
+export const modeLine = (table: Pick<LobbyTable, 'variant' | 'boards'>): string => MODE_COPY.label(table.variant, table.boards);
+
+// The line under a table's name: its game, then its seats and hands when the reader hosts it (or its
+// host has no name), else who hosts it and its seats — the lobby's own rows' words.
+export const tableLine = (table: Pick<TableLink, 'mine' | 'host' | 'seated' | 'seats' | 'hands' | 'variant' | 'boards'>): string =>
+    table.mine || table.host === ''
+        ? POKER_NIGHT_COPY.openRow(modeLine(table), table.seated, table.seats, table.hands)
+        : POKER_NIGHT_COPY.friendsRow(modeLine(table), table.host, table.seated, table.seats);
+
+// The table the lobby's resume card offers: the newest open one of the rooms where the reader holds
+// a seat (store.listSeatedRooms has already matched holdsSeat), or null — no card.
+export const resumeOf = (userId: string, seated: readonly LobbyRoom[], now: number): TableLink | null => {
+    const [room] = openOnly(seated, now, 1);
+    return room ? linkOf(room, userId, true) : null;
+};
 
 export type LobbyInput = {
     userId: string;
     mine: readonly LobbyRoom[];
     friends: readonly LobbyRoom[];
     results: readonly RecentNight[];
+    // The rooms where the reader holds a seat (store.listSeatedRooms): the resume card.
+    seated?: readonly LobbyRoom[];
     now: number;
     shareUrl: (code: string) => string;
 };
 
-export const shapeLobby = ({userId, mine, friends, results, now, shareUrl}: LobbyInput): LobbySections => {
+export const shapeLobby = ({userId, mine, friends, results, seated = [], now, shareUrl}: LobbyInput): LobbySections => {
     const own = openOnly(mine.filter((room) => room.hostUserId === userId), now, LOBBY_LIMITS.open);
     const listed = new Set(own.map((room) => room.code));
     const theirs = openOnly(friends.filter((room) => room.hostUserId !== userId && room.hostName !== ''), now, LOBBY_LIMITS.friends, listed);
@@ -189,12 +279,46 @@ export const shapeLobby = ({userId, mine, friends, results, now, shareUrl}: Lobb
             href: now - night.lastAt < TIMING.ROOM_TTL_MS ? tablePath(night.code) : null,
         }));
     return {
+        resume: resumeOf(userId, seated, now),
         open: orNull(own.map((room) => tableOf(room, shareUrl))),
         friends: orNull(theirs.map((room) => ({...tableOf(room, shareUrl), host: room.hostName}))),
         recent: orNull(nights),
         canCreate: own.length < LIMITS.hostOpenTables,
     };
 };
+
+// ── Home's poker night panel ──
+
+// Home's panel (components/home/HomePokerNight), drawn only when one of its lists has a row.
+//   tables  — the tables the reader holds a seat at, newest first, then the open ones they host
+//             without a seat, at most HOME_LIMITS.tables in all;
+//   friends — open tables an accepted friend chose to show, never one the reader hosts or sits at
+//             (even past the cap above), at most HOME_LIMITS.friends.
+export type HomePokerNight = {
+    tables: TableLink[] | null;
+    friends: TableLink[] | null;
+};
+
+export type HomePokerInput = Pick<LobbyInput, 'userId' | 'mine' | 'friends' | 'now'> & {seated: readonly LobbyRoom[]};
+
+export const homePokerNight = ({userId, mine, friends, seated, now}: HomePokerInput): HomePokerNight | null => {
+    const sitting = openOnly(seated, now, HOME_LIMITS.tables);
+    const hosted = openOnly(mine.filter((room) => room.hostUserId === userId), now, HOME_LIMITS.tables, new Set(sitting.map((room) => room.code)));
+    const tables = [...sitting.map((room) => linkOf(room, userId, true)), ...hosted.map((room) => linkOf(room, userId, false))]
+        .slice(0, HOME_LIMITS.tables);
+    // Never offered to join: a table the reader sits at or hosts, whether or not the list above has room for it.
+    const theirsAlready = new Set([...seated, ...mine].map((room) => room.code));
+    const theirs = openOnly(
+        friends.filter((room) => room.hostUserId !== userId && room.hostName !== ''), now, HOME_LIMITS.friends, theirsAlready,
+    );
+    if (tables.length === 0 && theirs.length === 0) return null;
+    return {tables: orNull(tables), friends: orNull(theirs.map((room) => linkOf(room, userId, false)))};
+};
+
+// Home's chip, beside the streak at the top of the page: the table the reader holds a seat at (the
+// panel's first row, newest seat first) — the chip is then the way straight back to it, one tap —
+// else null, and the chip is the lobby's way in.
+export const homeChipOf = (view: HomePokerNight | null): TableLink | null => view?.tables?.find((table) => table.sitting) ?? null;
 
 // ── the name and look an account sits down with ──
 
@@ -262,9 +386,9 @@ export const BLIND_PRESETS: readonly (readonly [smallBlind: number, bigBlind: nu
 export const CHIP_PRESETS: readonly number[] = [500, 1000, 2000, 5000, 10_000, 20_000, 50_000, 100_000];
 export const SEAT_CHOICES: readonly number[] = Array.from({length: TABLE_LIMITS.seats.max - TABLE_LIMITS.seats.min + 1}, (_, i) => TABLE_LIMITS.seats.min + i);
 export const TIMER_PRESETS: readonly number[] = [15, 20, 30, 45, 60, 90, 120];
-export const REBUY_CHOICES: readonly RebuyPolicy[] = ['auto', 'approve', 'off'];
+export const REBUY_CHOICES: readonly RebuyPolicy[] = ['approve', 'off'];
 
-export type TableForm = {blinds: number; chips: number; seats: number; rebuys: RebuyPolicy; turnSeconds: number};
+export type TableForm = {blinds: number; chips: number; seats: number; rebuys: RebuyPolicy; turnSeconds: number; variant: Variant; boards: BoardCount};
 
 export const DEFAULT_FORM: Readonly<TableForm> = Object.freeze({
     blinds: BLIND_PRESETS.findIndex(([sb, bb]) => sb === DEFAULT_CONFIG.smallBlind && bb === DEFAULT_CONFIG.bigBlind),
@@ -272,7 +396,16 @@ export const DEFAULT_FORM: Readonly<TableForm> = Object.freeze({
     seats: DEFAULT_CONFIG.seats,
     rebuys: DEFAULT_CONFIG.rebuys,
     turnSeconds: DEFAULT_CONFIG.turnSeconds,
+    variant: DEFAULT_CONFIG.variant,
+    boards: DEFAULT_CONFIG.boards,
 });
+
+// The games the form and the host drawer offer: those this deploy deals (config.ENABLED), Texas
+// hold'em first; and the board counts a game may run (more than one for PLO alone, as far as ENABLED
+// opens them).
+export const GAME_CHOICES: readonly Variant[] = VARIANTS.filter((variant) => ENABLED.variants.includes(variant));
+export const boardChoices = (variant: Variant): BoardCount[] =>
+    ([1, 2, 3] as const).filter((boards) => boards === 1 || (variant === 'plo' && boards <= ENABLED.boards));
 
 const blindsAt = (index: number): readonly [number, number] => BLIND_PRESETS[index] ?? BLIND_PRESETS[DEFAULT_FORM.blinds];
 
@@ -289,11 +422,15 @@ export const chipsFor = (form: Pick<TableForm, 'blinds' | 'chips'>): number => {
 };
 
 // The config the form asks for: the blinds, starting chips as both ends of the range (the host can
-// widen it at the table), the seats, the rebuy policy and the turn timer.
+// widen it at the table), the seats, the rebuy policy, the turn timer and the game — one board unless
+// it is PLO.
 export const configFromForm = (form: TableForm): Partial<GameConfig> => {
     const [smallBlind, bigBlind] = blindsAt(form.blinds);
     const chips = chipsFor(form);
-    return {seats: form.seats, smallBlind, bigBlind, buyInMin: chips, buyInMax: chips, rebuys: form.rebuys, turnSeconds: form.turnSeconds};
+    return {
+        seats: form.seats, smallBlind, bigBlind, buyInMin: chips, buyInMax: chips, rebuys: form.rebuys, turnSeconds: form.turnSeconds,
+        variant: form.variant, boards: form.variant === 'plo' ? form.boards : 1,
+    };
 };
 
 // Where a new table opens for its host: its page with the invite sheet open.

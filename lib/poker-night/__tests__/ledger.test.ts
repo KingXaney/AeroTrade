@@ -7,11 +7,13 @@
 import {describe, expect, it} from 'vitest';
 import {DEFAULT_CONFIG, KEEP} from '@/lib/poker-night/config';
 import {createTable, forgetSettled, reduce} from '@/lib/poker-night/engine';
-import {buyRange, chipsOf, conservation, inPotOf, isSettled, ledgerDigest, ledgerEvents, ledgerRow, netOf} from '@/lib/poker-night/ledger';
+import {buyRange, chipsOf, conservation, hasBought, inPotOf, isSettled, ledgerDigest, ledgerEvents, ledgerRow, needsHost, netOf} from '@/lib/poker-night/ledger';
 import type {GameConfig, TableAction, TableState} from '@/lib/poker-night/types';
-import {A, C, R, X, deal, host, moves, nowOf, ok, play, runOut, T0, table} from './fixtures';
+import {A, C, R, X, approveOf, deal, host, moves, nowOf, ok, play, runOut, T0, table} from './fixtures';
 
 const sit = (s: TableState, pid: string, seat: number, buyIn: number): TableAction => ({type: 'sit', by: pid, seat, buyIn, at: nowOf(s)});
+// Once a hand has been dealt every buy but the host's waits for the host: approved here at once.
+const approve = (s: TableState, pid: string): TableState => ok(host(s, approveOf(s, pid)));
 const kinds = (s: TableState, pid: string) => ledgerEvents(s, ledgerRow(s, pid)!).map((e) => `${e.kind} ${e.amount}`);
 
 // A table the players sat down at themselves, each with their own buy-in.
@@ -32,10 +34,10 @@ describe('buys', () => {
         s = deal(s, {holes: {0: 'AhAd', 1: 'KhKd', 2: '7c2d'}, board: 'QsJs9d5h4c'});
         s = runOut(moves(s, A, C, C));
         expect(s.seats[2]!.stack).toBe(0);
-        s = play(s, {type: 'buy', by: 'p2', amount: 1500, at: nowOf(s)});
+        s = approve(play(s, {type: 'buy', by: 'p2', amount: 1500, at: nowOf(s)}), 'p2');
         expect(kinds(s, 'p2')).toEqual(['buy-in 1000', 'top-up 500', 'rebuy 1500']);
         expect(ledgerRow(s, 'p2')).toMatchObject({bought: 3000, buys: 2});
-        s = play(s, {type: 'leave', by: 'p2', at: nowOf(s)}, sit(s, 'p2', 4, 1000));
+        s = approve(play(s, {type: 'leave', by: 'p2', at: nowOf(s)}, sit(s, 'p2', 4, 1000)), 'p2');
         expect(kinds(s, 'p2')).toEqual(['buy-in 1000', 'top-up 500', 'rebuy 1500', 'cash-out 1500', 'rebuy 1000']);
         expect(ledgerRow(s, 'p2')).toMatchObject({bought: 4000, cashedOut: 1500, buys: 3});
     });
@@ -85,10 +87,10 @@ describe('the figures', () => {
         expect(ledgerRow(s, 'p1')).toMatchObject({hands: 1, wins: 0, biggestWin: 0, allIns: 1, peakChips: 2000});
         expect(ledgerRow(s, 'p2')).toMatchObject({hands: 1, wins: 0, allIns: 1, peakChips: 1000});
         // A split pays both players: a win each.
-        s = play(s, {type: 'buy', by: 'p1', amount: 2000, at: nowOf(s)});
+        s = approve(play(s, {type: 'buy', by: 'p1', amount: 2000, at: nowOf(s)}), 'p1');
         s = deal(s, {holes: {0: '2c3c', 1: '2d3d'}, board: 'AsKsQsJsTs'});
         s = moves(s, C, X, X, X, X, X, X, X);
-        expect(s.hand!.result!.pots[0].winners.length).toBe(2);
+        expect(s.hand!.result!.pots[0].winners[0]).toHaveLength(2);
         expect(ledgerRow(s, 'p0')).toMatchObject({hands: 2, wins: 2, biggestWin: 5000});
         expect(ledgerRow(s, 'p1')).toMatchObject({hands: 2, wins: 1, biggestWin: 20});
     });
@@ -113,14 +115,20 @@ describe('the figures', () => {
         }
         expect(ledgerDigest(s)).not.toEqual(start);
         expect(flags).toEqual([false, false]);
+        // A request moves no figure; the host's yes does when the chips land.
         const r = reduce(s, {type: 'buy', by: 'p2', amount: 1, at: nowOf(s)});
-        expect(r.ok && r.ledgerDirty).toBe(s.seats[2]!.stack < 2000);
+        if (s.seats[2]!.stack < 2000) {
+            expect(r.ok && r.ledgerDirty).toBe(false);
+            const yes = host(ok(r), approveOf(ok(r), 'p2'));
+            expect(yes.ok && yes.ledgerDirty).toBe(true);
+        }
     });
 });
 
 describe('buyRange', () => {
     it('is what a seated player may add: up to the cap, at least to the minimum, never past the rebuy limit', () => {
-        let s = table({0: 500, 1: 2000, 2: 0}, {config: {buyInMin: 1000, buyInMax: 2000, maxRebuys: 1}});
+        let s = table({0: 500, 1: 2000, 2: 1000}, {config: {buyInMin: 1000, buyInMax: 2000, maxRebuys: 1}});
+        s = {...s, seats: s.seats.map((seat) => (seat?.pid === 'p2' ? {...seat, stack: 0} : seat))};
         expect(buyRange(s, 'p0')).toEqual({min: 500, max: 1500});
         expect(buyRange(s, 'p1')).toBeNull();
         expect(buyRange(s, 'p2')).toEqual({min: 1000, max: 2000});
@@ -128,6 +136,21 @@ describe('buyRange', () => {
         s = play(s, {type: 'buy', by: 'p0', amount: 500, at: T0});
         expect(buyRange(s, 'p0')).toBeNull();
         expect(buyRange({...s, config: {...s.config, rebuys: 'off'}}, 'p2')).toBeNull();
+        // A newcomer who has bought nothing yet: their first chips, whatever the policy and the limit.
+        const newcomer = {...s, config: {...s.config, rebuys: 'off' as const}, seats: s.seats.map((seat, i) => (i === 5 ? {...s.seats[2]!, pid: 'p5'} : seat))};
+        expect(buyRange(newcomer, 'p5')).toEqual({min: 1000, max: 2000});
+        // Leaving now, or after the hand in play: nothing.
+        expect(buyRange({...s, seats: s.seats.map((seat) => (seat?.pid === 'p2' ? {...seat, leaveAfter: true} : seat))}, 'p2')).toBeNull();
+        expect(buyRange({...s, seats: s.seats.map((seat) => (seat?.pid === 'p2' ? {...seat, leaving: true} : seat))}, 'p2')).toBeNull();
+    });
+
+    it('says when a buy waits for the host: anyone but the host, once the first hand is dealt', () => {
+        const s = table({0: 1000, 1: 1000});
+        expect(needsHost(s, 'p1')).toBe(false);
+        expect(needsHost({...s, handNo: 1}, 'p1')).toBe(true);
+        expect(needsHost({...s, handNo: 1}, 'p0')).toBe(false);
+        expect(hasBought(null)).toBe(false);
+        expect(hasBought(ledgerRow(s, 'p1'))).toBe(true);
     });
 });
 

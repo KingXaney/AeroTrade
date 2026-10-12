@@ -41,7 +41,7 @@ vi.mock('ably', () => ({
     },
 }));
 
-const {issueToken, publishEmote, publishWire} = await import('@/lib/poker-night/realtime');
+const {issueToken, publishEmote, publishNudge, publishWire} = await import('@/lib/poker-night/realtime');
 
 const ROOM_ID = '6650a1b2c3d4e5f601234567';
 const KEY = 'appId.keyId:c2VjcmV0';
@@ -67,14 +67,16 @@ describe('without realtime', () => {
 });
 
 describe('with realtime', () => {
-    it('requests a subscribe-only token for the pid on the room\'s channel, and hands it over field by field', async () => {
+    it('requests a subscribe-only token for the pid on the room\'s channel and its own, and hands it over field by field', async () => {
         const reply = await issueToken('production', ROOM_ID, 'Pq3x9Zk2L00', ON);
         const channel = `poker-night:production:${ROOM_ID}`;
-        expect(sdk.tokenParams).toEqual([{clientId: 'Pq3x9Zk2L00', capability: JSON.stringify({[channel]: ['subscribe']}), ttl: LIMITS.tokenTtlMs}]);
+        const own = `${channel}:Pq3x9Zk2L00`;
+        const capability = JSON.stringify({[channel]: ['subscribe'], [own]: ['subscribe']});
+        expect(sdk.tokenParams).toEqual([{clientId: 'Pq3x9Zk2L00', capability, ttl: LIMITS.tokenTtlMs}]);
         expect(LIMITS.tokenTtlMs).toBe(15 * 60_000);
         expect(reply).toEqual({
-            realtime: true, channel,
-            token: {token: 'tok-123', expires: T0 + LIMITS.tokenTtlMs, issued: T0, capability: JSON.stringify({[channel]: ['subscribe']}), clientId: 'Pq3x9Zk2L00'},
+            realtime: true, channel, private: own,
+            token: {token: 'tok-123', expires: T0 + LIMITS.tokenTtlMs, issued: T0, capability, clientId: 'Pq3x9Zk2L00'},
         });
         // Nothing else of the SDK's object (its keyName) reaches the answer.
         expect(JSON.stringify(reply)).not.toContain('keyName');
@@ -87,6 +89,11 @@ describe('with realtime', () => {
         const emote = {kind: 'react' as const, item: 'laugh', id: 'e7', seq: 3, from: 'Pq3x9Zk2L00', at: T0};
         expect(await publishEmote('preview', ROOM_ID, emote, ON)).toEqual({ok: true, sent: true});
         expect(sdk.published[1]).toEqual({channel: `poker-night:preview:${ROOM_ID}`, message: {name: 'emote', id: `${ROOM_ID}:e:e7`, data: emote}});
+        // A nudge goes on the player's own channel, with their count alone.
+        expect(await publishNudge('preview', ROOM_ID, 'Pq3x9Zk2L00', 5, ON)).toEqual({ok: true, sent: true});
+        expect(sdk.published[2]).toEqual({
+            channel: `poker-night:preview:${ROOM_ID}:Pq3x9Zk2L00`, message: {name: 'nudge', id: `${ROOM_ID}:n:Pq3x9Zk2L00:5`, data: {nudge: 5}},
+        });
     });
 
     it('answers a failed publish with its message, never a throw', async () => {

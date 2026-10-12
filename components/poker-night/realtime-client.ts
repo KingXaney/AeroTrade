@@ -5,7 +5,8 @@
 // lib/poker-night/realtime; what the channel and its messages are is lib/poker-night/channel.
 //
 // The link only reports: each state message's wire view (checked to be one), each emote message
-// (lib/poker-night/emotes.readEmote; useTableFeed merges it by id), the connection's
+// (lib/poker-night/emotes.readEmote; useTableFeed merges it by id), each nudge on the viewer's own
+// channel (their nudge count: their own view changed where no state message shows it), the connection's
 // state, each time the channel (re)attaches — the moment a GET state closes any gap — and the server
 // saying this table has no realtime. lib/poker-night/feed decides what they mean (useTableFeed
 // applies a wire by seq, so a message out of order or twice changes nothing). Tokens come from
@@ -20,7 +21,7 @@
 
 import type {BaseRealtime} from "ably/modular";
 import {getToken} from "@/components/poker-night/table-api";
-import {EMOTE_MESSAGE, isWire, STATE_MESSAGE} from "@/lib/poker-night/channel";
+import {EMOTE_MESSAGE, isWire, NUDGE_MESSAGE, nudgeOf, STATE_MESSAGE} from "@/lib/poker-night/channel";
 import {readEmote} from "@/lib/poker-night/emotes";
 import {tokenRetryDelay, tokenRetryLate, type AblyState} from "@/lib/poker-night/feed";
 import type {PokerNightErrorCode} from "@/lib/poker-night/http";
@@ -35,6 +36,8 @@ export type RealtimeEvents = {
     off: () => void;
     // An emote (P6), checked to be one (lib/poker-night/emotes.readEmote).
     emote?: (emote: EmoteView) => void;
+    // A nudge on the viewer's own channel: their nudge count after it.
+    nudge?: (count: number) => void;
 };
 
 export type RealtimeLink = {
@@ -49,7 +52,9 @@ export type RealtimeLink = {
 // What the QA's relay defines on the page before it loads: subscribe hands it the link's
 // callbacks and returns how to stop.
 export type RealtimeFake = {
-    subscribe: (handlers: {onState: (data: unknown) => void; onConnection: (state: string) => void; onEmote?: (data: unknown) => void}) => (() => void) | void;
+    subscribe: (handlers: {
+        onState: (data: unknown) => void; onConnection: (state: string) => void; onEmote?: (data: unknown) => void; onNudge?: (data: unknown) => void;
+    }) => (() => void) | void;
 };
 
 declare global {
@@ -88,6 +93,10 @@ const connectFake = (fake: RealtimeFake, on: RealtimeEvents): RealtimeLink => {
             onEmote: (data) => {
                 const emote = open ? readEmote(data) : null;
                 if (emote) on.emote?.(emote);
+            },
+            onNudge: (data) => {
+                const count = open ? nudgeOf(data) : null;
+                if (count !== null) on.nudge?.(count);
             },
         });
     };
@@ -165,7 +174,7 @@ export const connectRealtime = (code: string, pass: () => string | null, on: Rea
             on.off();
             return;
         }
-        const {channel: channelName, token} = first.body;
+        const {channel: channelName, private: ownName, token} = first.body;
         let ably: typeof import("ably/modular");
         try {
             ably = await import("ably/modular");
@@ -218,6 +227,13 @@ export const connectRealtime = (code: string, pass: () => string | null, on: Rea
             const emote = closed ? null : readEmote(message.data);
             if (emote) on.emote?.(emote);
         }).catch(() => undefined);
+        // The viewer's own channel: nudges for them alone (an older server names none).
+        if (typeof ownName === 'string') {
+            void realtime.channels.get(ownName).subscribe(NUDGE_MESSAGE, (message) => {
+                const count = closed ? null : nudgeOf(message.data);
+                if (count !== null) on.nudge?.(count);
+            }).catch(() => undefined);
+        }
     };
 
     void open();

@@ -48,11 +48,13 @@ const request = async <T>(url: string, init: {method: 'GET' | 'POST'; body?: unk
     }
 };
 
-// GET state?since=&esince=: the viewer's view, or Unchanged when neither version moved.
-export const getState = (code: string, q: {since: number | null; esince: number | null}, opts: Options = {}) => {
+// GET state?since=&esince=&nsince=: the viewer's view, or Unchanged when no version moved — the
+// public seq, the emote seq, the viewer's own nudge count.
+export const getState = (code: string, q: {since: number | null; esince: number | null; nsince: number | null}, opts: Options = {}) => {
     const params = new URLSearchParams();
     if (q.since !== null) params.set('since', String(q.since));
     if (q.esince !== null) params.set('esince', String(q.esince));
+    if (q.nsince !== null) params.set('nsince', String(q.nsince));
     const query = params.toString();
     return request<PlayerView | Unchanged>(`${base(code)}/state${query ? `?${query}` : ''}`, {method: 'GET', ...opts});
 };

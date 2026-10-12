@@ -2,9 +2,10 @@
 // so the engine, the tests and the seeded simulation all deal from the same code, and only
 // lib/poker-night/shuffle.ts (server-only) hands it node:crypto.
 //
-// A card is lib/poker/cards' rank·4 + suit. A deal is a fixed layout over a shuffled deck: player k
-// (in hand order) gets deck[2k] and deck[2k + 1], and the board is the next five cards, deck[2n] to
-// deck[2n + 4]. Nothing else of the deck is ever read.
+// A card is lib/poker/cards' rank·4 + suit. A deal is a fixed layout over a shuffled deck: with h
+// hole cards each, player k (in hand order) gets deck[h·k] to deck[h·k + h − 1], and board j's run
+// of five is deck[h·n + 5j] to deck[h·n + 5j + 4]. Nothing else of the deck is ever read. Two hole
+// cards and one board is exactly version 1's layout.
 
 import {CARDS, type Card} from "@/lib/poker/cards";
 
@@ -41,10 +42,14 @@ export const shuffleWith = (cards: readonly Card[], randomInt: (maxExclusive: nu
     return out;
 };
 
-// The hole cards of n players and the five board cards, in the layout above.
-export const dealFrom = (deck: readonly Card[], n: number): {holes: [Card, Card][]; board: Card[]} => {
-    if (!Number.isInteger(n) || n < 1 || 2 * n + 5 > deck.length) throw new RangeError(`cannot deal ${n} hands from ${deck.length} cards`);
-    const holes: [Card, Card][] = [];
-    for (let k = 0; k < n; k++) holes.push([deck[2 * k], deck[2 * k + 1]]);
-    return {holes, board: deck.slice(2 * n, 2 * n + 5)};
+// The hole cards of n players (h each: 2, 3 or 4) and one run of five board cards per board (1 to
+// 3), in the layout above. Throws unless the deck holds them all.
+export const dealFrom = (deck: readonly Card[], n: number, h = 2, boards = 1): {holes: Card[][]; runs: Card[][]} => {
+    if (![2, 3, 4].includes(h) || ![1, 2, 3].includes(boards)) throw new RangeError(`cannot deal ${h} cards each over ${boards} boards`);
+    if (!Number.isInteger(n) || n < 1 || h * n + 5 * boards > deck.length) throw new RangeError(`cannot deal ${n} hands from ${deck.length} cards`);
+    const holes: Card[][] = [];
+    for (let k = 0; k < n; k++) holes.push(deck.slice(h * k, h * k + h));
+    const runs: Card[][] = [];
+    for (let j = 0; j < boards; j++) runs.push(deck.slice(h * n + 5 * j, h * n + 5 * j + 5));
+    return {holes, runs};
 };

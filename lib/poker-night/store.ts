@@ -26,11 +26,13 @@ import {LIMITS} from "@/lib/poker-night/limits";
 import {migrateState} from "@/lib/poker-night/migrate";
 import {backoffMs, planMutation} from "@/lib/poker-night/mutation";
 import {PID} from "@/lib/poker-night/input";
-import {LOBBY_PROJECTION, lobbyRoomFromDoc, openRoomsFilter, type LobbyDoc, type LobbyRoom} from "@/lib/poker-night/lobby";
+import {
+    holdsSeat, LOBBY_PROJECTION, lobbyRoomFromDoc, openRoomsFilter, SEATED_PROJECTION, type LobbyDoc, type LobbyRoom,
+} from "@/lib/poker-night/lobby";
 import {isDuplicateKey} from "@/lib/poker-night/results";
 import {appliedKey, newPid, newRoom, type JoinResult, type NewRoom, type Step} from "@/lib/poker-night/room";
 import {
-    casUpdate, coreFromDoc, headFromDoc, HEAD_PROJECTION, ms, newRoomDoc, serverRoom, serverRoomFromDoc, unreadableCloseUpdate, unreadableKind, wireOfRoom,
+    casUpdate, coreFromDoc, headFromDoc, HEAD_PROJECTION, ms, newRoomDoc, nudgeOf, serverRoom, serverRoomFromDoc, unreadableCloseUpdate, unreadableKind, wireOfRoom,
     type Commit, type RoomDocLean, type RoomHead, type RoomRef, type ServerRoom, type Unread,
 } from "@/lib/poker-night/room-doc";
 import {EMOTE_TABLE_PROJECTION, emoteTableFromDoc, emoteWrite, type EmoteTable} from "@/lib/poker-night/room-doc";
@@ -39,7 +41,7 @@ import {throwCountsOf, type ThrowCounts} from "@/lib/poker-night/awards";
 import {SECURE_SOURCE} from "@/lib/poker-night/shuffle";
 import {writeHands} from "@/lib/poker-night/hands-store";
 import {writeResults} from "@/lib/poker-night/results-store";
-import {publishEmote, publishWire} from "@/lib/poker-night/realtime";
+import {publishEmote, publishNudge, publishWire} from "@/lib/poker-night/realtime";
 
 export type {Commit, RoomHead, RoomRef, ServerRoom, Unread};
 
@@ -199,9 +201,13 @@ export const mutateRoom = async (ref: RoomRef, step: Step | null, opts: MutateOp
             const written = await PokerRoom.updateOne({_id: ref.id, env: ref.env, seq: doc.seq}, write.update);
             if (written.matchedCount !== 1) continue;
             const base = serverRoomFromDoc(doc, plan.core, now);
+            // Each player it concerns, nudged: their count after it (mutation.withNudges moved it).
+            const nudged = plan.nudge.map((pid) => ({pid, nudge: nudgeOf(plan.core.players, pid)}));
             // The public seq moves only with a write someone else can see (room-doc.publicSeq).
             const room = serverRoom({...base, seq: base.seq + (plan.visible ? 1 : 0), lastActivityAt: now, closedAt: write.closedAt});
-            const commit: Commit = {ref, room, prevState: state, hands: plan.hands, ledgerDirty: plan.ledgerDirty, visible: plan.visible};
+            const commit: Commit = {
+                ref, room, writeSeq: doc.seq + 1, prevState: state, hands: plan.hands, ledgerDirty: plan.ledgerDirty, visible: plan.visible, nudged,
+            };
             if (plan.refusal !== null) return {ok: false, code: plan.refusal, commit};
             return {ok: true, room, seq: room.seq, changed: true, duplicate: false, join: plan.join, commit};
         }
@@ -238,13 +244,25 @@ const publishCommit = async (commit: Commit): Promise<void> => {
     await markRealtimeFailure(ref, Date.now());
 };
 
+// Each nudge the commit set off, on its player's own channel (a no-op without realtime). A failure
+// is logged and stamped like a publish's: that player's poll still finds the count in the head.
+const publishNudges = async (commit: Commit): Promise<void> => {
+    const {ref, room} = commit;
+    const sent = await Promise.all(commit.nudged.map(({pid, nudge}) => publishNudge(ref.env, ref.id, pid, nudge)));
+    const failed = sent.find((r): r is {ok: false; message: string} => !r.ok);
+    if (!failed) return;
+    logFailure('a realtime nudge failed', {code: room.core.code, env: ref.env, seq: room.seq, message: failed.message});
+    await markRealtimeFailure(ref, Date.now());
+};
+
 // Everything a commit sets off once the response is on its way, run in the route's after(): the
-// hands it completed into history, the accounts' results when a figure they carry moved, and the
+// hands it completed into history, the accounts' results when a figure they carry moved, the
 // commit's wire view on the realtime channel — unless nobody but its author can see the commit (a
-// pre-action), whose public seq did not move: its message would be the last one again, and its
-// moment would show when someone set a pre-action. Each part catches and logs its own failure; the next
-// commit heals it (results carry totals, hands are upserted whole, and every message carries the
-// whole public table, applied by seq).
+// pre-action, an ask), whose public seq did not move: its message would be the last one again, and
+// its moment would show when someone did something private — and the nudges for the players it
+// concerns, on their own channels. Each part catches and logs its own failure; the next commit heals
+// it (results carry totals, hands are upserted whole, every message carries the whole public table,
+// applied by seq, and every poll reads the nudge counts).
 export const afterCommit = async (result: MutateResult): Promise<void> => {
     const commit = result.commit;
     if (!commit) return;
@@ -252,6 +270,7 @@ export const afterCommit = async (result: MutateResult): Promise<void> => {
         commit.hands.length > 0 ? writeHands(commit) : undefined,
         commit.ledgerDirty ? writeResults(commit) : undefined,
         commit.visible ? publishCommit(commit) : undefined,
+        commit.nudged.length > 0 ? publishNudges(commit) : undefined,
     ]);
 };
 
@@ -342,4 +361,16 @@ export const listOpenRooms = async (
     };
     const docs = await PokerRoom.find(filter, LOBBY_PROJECTION).sort({lastActivityAt: -1}).limit(opts.limit).lean<LobbyDoc[]>();
     return docs.map(lobbyRoomFromDoc);
+};
+
+// The open tables where `userId` holds a seat it is not leaving, newest first: the lobby's resume
+// card and Home's tables. Read through the account's player rows (the {env, players.userId, status}
+// index) — the `limit` newest open tables it has a row at, a watcher's or a departed player's
+// included — then kept by lobby.holdsSeat. Projected (lobby.SEATED_PROJECTION): the lobby's fields
+// and the seats' pids, never a card, a stack or a guest; the pids never leave the server.
+export const listSeatedRooms = async (env: Env, userId: string, opts: {limit: number; now: number}): Promise<LobbyRoom[]> => {
+    await connectToDatabase();
+    const filter = {...openRoomsFilter(env, opts.now), 'players.userId': userId};
+    const docs = await PokerRoom.find(filter, SEATED_PROJECTION).sort({lastActivityAt: -1}).limit(opts.limit).lean<LobbyDoc[]>();
+    return docs.filter((doc) => holdsSeat(doc, userId)).map(lobbyRoomFromDoc);
 };

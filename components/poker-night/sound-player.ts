@@ -5,16 +5,16 @@
 // mouse press, a key (a touch's pointerdown does not; iOS starts Web Audio only in a touchend or a
 // click). Any state but 'running' is resumed — 'suspended', and WebKit's 'interrupted' after a call
 // or an app switch. A one-second buffer of white noise is made once and every noise part
-// plays a slice of it through its filter; a master gain sits in front of the speakers. The same
-// sound plays at most once per 60 ms, and nothing plays while the page is hidden except the
-// viewer's turn (lib/poker-night/sounds.createSoundGate). No file is fetched, nothing is stored.
+// plays a slice of it through its filter; every part has its own envelope (a linear attack, then an
+// exponential fall), and the parts meet in a master gain behind a gentle compressor, so a fish's
+// layered slap never clips. A sound is played from a seed (sounds.soundParts): the caller's — a
+// cue's key, a landing's emote id — else a fresh one, so no two chips sound quite alike. The same
+// sound plays at most once per 60 ms, and nothing plays while the page is hidden except the viewer's
+// turn (lib/poker-night/sounds.createSoundGate). No file is fetched, nothing is stored.
 
-import {createSoundGate, SOUNDS, type SoundId, type SoundPart} from "@/lib/poker-night/sounds";
+import {createSoundGate, DEFAULT_ATTACK, ENVELOPE_FLOOR, soundParts, type SoundId, type SoundPart} from "@/lib/poker-night/sounds";
 
 const MASTER_GAIN = 0.6;
-// The quietest level an envelope falls to (exponential ramps cannot reach zero).
-const FLOOR = 0.0001;
-const ATTACK_S = 0.005;
 
 type AudioContextClass = typeof AudioContext;
 
@@ -32,6 +32,26 @@ const contextClass = (): AudioContextClass | null => {
 // What listens for the context's state (stayUnlocked): told on every change.
 const stateListeners = new Set<() => void>();
 
+// The master gain, behind a compressor that only touches the loudest moments (a landing's layers
+// at once), in front of the speakers.
+const output = (c: AudioContext): GainNode => {
+    const gain = c.createGain();
+    gain.gain.value = MASTER_GAIN;
+    try {
+        const squeeze = c.createDynamicsCompressor();
+        squeeze.threshold.value = -10;
+        squeeze.knee.value = 6;
+        squeeze.ratio.value = 4;
+        squeeze.attack.value = 0.002;
+        squeeze.release.value = 0.12;
+        gain.connect(squeeze);
+        squeeze.connect(c.destination);
+    } catch {
+        gain.connect(c.destination);
+    }
+    return gain;
+};
+
 // Called from a gesture's handler: makes the page's one context (and its master gain and noise),
 // or resumes it whenever it is not running. Safe to call on every gesture.
 export const unlockSound = (): void => {
@@ -40,9 +60,7 @@ export const unlockSound = (): void => {
             const Ctx = contextClass();
             if (!Ctx) return;
             ctx = new Ctx();
-            master = ctx.createGain();
-            master.gain.value = MASTER_GAIN;
-            master.connect(ctx.destination);
+            master = output(ctx);
             const buffer = ctx.createBuffer(1, ctx.sampleRate, ctx.sampleRate);
             const data = buffer.getChannelData(0);
             for (let i = 0; i < data.length; i++) data[i] = Math.random() * 2 - 1;
@@ -87,11 +105,14 @@ export const stayUnlocked = (): (() => void) => {
     };
 };
 
+// A part's envelope (lib/poker-night/sounds.partLevel): from silence, a linear rise to its gain over
+// its attack, then an exponential fall to silence at its end.
 const envelope = (c: AudioContext, part: SoundPart, start: number): GainNode => {
     const g = c.createGain();
-    g.gain.setValueAtTime(FLOOR, start);
-    g.gain.linearRampToValueAtTime(part.gain, start + ATTACK_S);
-    g.gain.exponentialRampToValueAtTime(FLOOR, start + part.dur);
+    const attack = Math.min(part.attack ?? DEFAULT_ATTACK, part.dur * 0.9);
+    g.gain.setValueAtTime(ENVELOPE_FLOOR, start);
+    g.gain.linearRampToValueAtTime(part.gain, start + attack);
+    g.gain.exponentialRampToValueAtTime(ENVELOPE_FLOOR, start + part.dur);
     return g;
 };
 
@@ -129,8 +150,12 @@ const playPart = (c: AudioContext, out: AudioNode, part: SoundPart, t0: number):
     };
 };
 
-// Plays a sound now, if the page has its context, the gate lets it through and nothing failed.
-export const playSound = (id: SoundId): void => {
+// A seed for a sound nobody gave one.
+const freshSeed = (): number => Math.floor(Math.random() * 0x100000000) >>> 0;
+
+// Plays a sound now, from `seed` (a fresh one unless given), if the page has its context, the gate
+// lets it through and nothing failed.
+export const playSound = (id: SoundId, seed: number = freshSeed()): void => {
     const c = ctx;
     const out = master;
     if (!c || !out) return;
@@ -138,7 +163,7 @@ export const playSound = (id: SoundId): void => {
     try {
         if (c.state !== 'running') void c.resume().catch(() => undefined);
         const t0 = c.currentTime + 0.01;
-        for (const part of SOUNDS[id]) playPart(c, out, part, t0);
+        for (const part of soundParts(id, seed)) playPart(c, out, part, t0);
     } catch {
         // A node the browser would not make: this sound is skipped.
     }

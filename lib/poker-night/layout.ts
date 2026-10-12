@@ -54,13 +54,30 @@ export const SEAT_SLOTS: Record<Orientation, Record<number, readonly Spot[]>> = 
     },
 };
 
+// A squat box: one too narrow for the landscape slots (the stage draws it with the portrait ones) yet
+// clearly wider than it is tall — a phone on its side, the dock in its own column (364 × 224 on a
+// 568 × 320 phone, 442 × 279 on a 667 × 375 one, 548 × 280 on an 844 × 390 one). Eight seats there
+// keep two plates to a side column, the bottom row's corners and one seat at the top, so the status
+// flag hanging under a plate ("Offline", "All in", "Waiting for chips") clears the plate under it, the
+// cards before it and its own flag on every seat (lib/poker-night/stage.flagRoom; stage.test holds
+// it). Seven and nine keep the portrait slots, whose turned-up hands, pots and banner find room
+// where no squat placement leaves them all; where a status has none under its plate there, the
+// plate carries it (stage.flagsOnPlate).
+export const SQUAT_RATIO = 1.3;
+export const isSquat = (box: Box, narrow: boolean): boolean => narrow && box.w >= box.h * SQUAT_RATIO;
+
+export const SQUAT_SLOTS: Record<number, readonly Spot[]> = {
+    8: [s(50, 100), s(8, 100), s(0, 54), s(0, 14), s(50, 0), s(100, 14), s(100, 54), s(92, 100)],
+};
+
 const sideOf = (spot: Spot): Side => (spot.y >= 85 ? 'bottom' : spot.y <= 15 ? 'top' : spot.x < 50 ? 'left' : 'right');
 
 const clampCount = (n: number): number => Math.min(TABLE_LIMITS.seats.max, Math.max(TABLE_LIMITS.seats.min, Math.round(n)));
 
-// Every slot's spot for a table of n seats.
-export const seatSpots = (n: number, orientation: Orientation): SeatSpot[] =>
-    SEAT_SLOTS[orientation][clampCount(n)].map((spot, slot) => ({...spot, slot, side: sideOf(spot)}));
+// Every slot's spot for a table of n seats; on a squat box (isSquat) the squat slots where a count
+// has them.
+export const seatSpots = (n: number, orientation: Orientation, squat = false): SeatSpot[] =>
+    ((squat ? SQUAT_SLOTS[clampCount(n)] : undefined) ?? SEAT_SLOTS[orientation][clampCount(n)]).map((spot, slot) => ({...spot, slot, side: sideOf(spot)}));
 
 // The slot a seat is drawn in: turned so the viewer's own seat is slot 0 (a watcher sees seat 0
 // there). A bijection on 0..n−1 for any viewer.

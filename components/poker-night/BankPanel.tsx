@@ -2,16 +2,24 @@
 
 // The bank, in its drawer: play chips only, counted. The viewer's own chips first — the same
 // figure as their Stack below (a live pot counted, said beside it) — with a rebuy at zero or a
-// top-up to the cap by the table's rules (a request when the host approves them; while chips are in
-// the pot it says what it adds, since a top-up counts only the chips behind); then
-// the host's waiting requests with Approve and Decline; then every player who sat tonight — Chips
+// top-up to the cap by the table's rules (once the first hand is dealt, a request the host approves
+// for anyone but the host, which the viewer can Cancel while it waits; a seat that never had chips here
+// reads "Ask for 2,000 chips", never a rebuy or a top-up; while chips are in the pot it says what it
+// adds, since a top-up counts only the chips behind); then the host's waiting requests —
+// a new player's first chips, a rebuy, a top-up, each said as what it is — with Approve and Decline
+// (the host hears a short sound and sees a toast with Approve as each comes in: AskPrompt's
+// RequestWatch); then every player who sat tonight — Chips
 // in, Rebuys (only once someone has rebought), Stack (a live pot counted, said once at the foot),
-// Net with its sign — and the footer's check that every chip is accounted for. "Chips in, by time"
+// Net with its sign, and for the host each other seated player's "Sit out next hand" (useHostSitOut,
+// the engine's host op 'sit-out': from the next deal while they are in the hand in play, at once
+// between hands; a note while it waits; the player comes back with their own "I'm back"), on a line
+// of its own under the player's row, so a phone never crushes it into the Player column — and the
+// footer's check that every chip is accounted for. "Chips in, by time"
 // reads GET detail?part=bank when the drawer opens and again whenever the ledger moves. The Rebuys
 // header carries the glossary's definition (Term, a native tooltip); the table mounts no chat, so
 // the drawer has no "What these mean", whose rows each offer the chat.
 
-import {useEffect, useId, useState} from "react";
+import {Fragment, useEffect, useId, useState} from "react";
 import {toast} from "sonner";
 import ActionButton from "@/components/primitives/ActionButton";
 import Badge from "@/components/primitives/Badge";
@@ -23,16 +31,22 @@ import SectionHeading from "@/components/primitives/SectionHeading";
 import Term from "@/components/primitives/Term";
 import TextField from "@/components/primitives/TextField";
 import {Drawer, MiniAvatar, PlayerName} from "@/components/poker-night/overlay-kit";
+import {requestText} from "@/components/poker-night/AskPrompt";
 import {useRoom} from "@/components/poker-night/room-controller";
+import {clearOwnWithdraw, markOwnWithdraw} from "@/components/poker-night/overlay-requests";
+import {useHostSitOut, type HostSitOuts} from "@/components/poker-night/useHostSitOut";
 import {BANK_COPY, HOST_COPY, OVERLAY_COPY, TABLE_COPY} from "@/lib/learn/copy/poker-night";
 import {bankView} from "@/lib/poker-night/bank";
-import {bankTimeline, chipsInValue, ownChips} from "@/lib/poker-night/overlays";
+import {bankTimeline, chipsInValue, hostSitOut, ownChips, requestKind} from "@/lib/poker-night/overlays";
 import type {BankDetailRowView} from "@/lib/poker-night/view-types";
 import {cn} from "@/lib/utils";
 
-type Props = {open: boolean; onOpenChange: (open: boolean) => void; toTable: boolean};
+type Props = {open: boolean; onOpenChange: (open: boolean) => void; toTable: boolean; sitOuts: HostSitOuts};
 
 const count = TABLE_COPY.chips;
+// The bank table's figures: right-aligned, each with a gap at its left from the one before.
+const NUM_HEAD = 'pb-2 pl-3 text-right font-normal';
+const NUM_CELL = 'py-2 pl-3 text-right font-mono tabular-nums';
 
 // The viewer's own chips: what they hold and what they may add.
 const OwnChipsPanel = () => {
@@ -57,8 +71,24 @@ const OwnChipsPanel = () => {
         setOther('');
         const after = r.view.me.seat === null ? null : r.view.seats[r.view.me.seat];
         if (r.view.requests.some((q) => q.pid === r.view.me.pid)) toast.message(BANK_COPY.requested(amount));
+        // A waiting request that went in chips is said once, by TableOverlays.
+        else if (own.requested !== null) return;
         else if (after && after.pendingBuy > 0) toast.message(BANK_COPY.pending(after.pendingBuy));
         else toast.success(BANK_COPY.approved(amount));
+    };
+
+    // The viewer's own Cancel: marked as it is sent, so its going is never said as the host's no.
+    const withdraw = async () => {
+        if (busy) return;
+        setBusy(true);
+        markOwnWithdraw();
+        const r = await room.send({type: 'withdraw'});
+        setBusy(false);
+        if (r.ok) toast.message(BANK_COPY.cancelled);
+        else {
+            clearOwnWithdraw();
+            toast.error(r.message);
+        }
     };
 
     const typed = offer ? chipsInValue(other, {min: offer.min, max: offer.max}) : null;
@@ -70,12 +100,21 @@ const OwnChipsPanel = () => {
             </div>
             {own.inPot > 0 && <p className="text-xs text-fg-soft" data-own-in-pot="">{BANK_COPY.ownInPot(own.inPot)}</p>}
             {own.pendingBuy > 0 && <p className="text-xs text-fg-soft">{BANK_COPY.pending(own.pendingBuy)}</p>}
-            {own.requested !== null && <p role="status" className="text-xs text-fg-soft" data-pn-requested="">{BANK_COPY.requested(own.requested)}</p>}
+            {own.requested !== null && (
+                <div className="flex flex-wrap items-center justify-between gap-2" data-pn-requested={own.requested}>
+                    <p role="status" className="min-w-0 flex-1 text-xs text-fg-soft">{BANK_COPY.requested(own.requested)}</p>
+                    <ActionButton variant="secondary" size="sm" className="min-h-11" disabled={busy} aria-label={BANK_COPY.cancelLabel}
+                                  onClick={() => void withdraw()} data-pn-withdraw="">
+                        {BANK_COPY.cancel}
+                    </ActionButton>
+                </div>
+            )}
             {offer && (
                 <div className="space-y-3">
                     <ActionButton variant="primary" size="md" className="min-h-11 w-full" disabled={busy} aria-busy={busy} data-pn-rebuy=""
                                   onClick={() => void buy(offer.topUp)}>
-                        {offer.rebuy ? BANK_COPY.rebuy : own.inPot > 0 ? BANK_COPY.addChips(offer.topUp) : BANK_COPY.topUp(own.behind + own.pendingBuy + offer.topUp)}
+                        {offer.first ? (own.asksHost ? BANK_COPY.askFor(offer.topUp) : BANK_COPY.takeChips(offer.topUp))
+                            : offer.rebuy ? BANK_COPY.rebuy : own.inPot > 0 ? BANK_COPY.addChips(offer.topUp) : BANK_COPY.topUp(own.behind + own.pendingBuy + offer.topUp)}
                     </ActionButton>
                     {offer.min < offer.max && (
                         <form className="space-y-1.5" onSubmit={(e) => {
@@ -108,10 +147,12 @@ export const RequestsPanel = () => {
     if (!room.me?.isHost || room.table.requests.length === 0) return null;
     const people = room.table.people;
 
-    const answer = async (pid: string, op: 'approve' | 'deny') => {
+    // Approve names the amount the row shows: one changed since is refused (stale) and the row then
+    // shows the new one.
+    const answer = async (pid: string, op: 'approve' | 'deny', amount: number) => {
         if (busy) return;
         setBusy(pid);
-        const r = await room.send({type: 'host', op: {op, pid}});
+        const r = await room.send({type: 'host', op: op === 'approve' ? {op, pid, amount} : {op, pid}});
         setBusy(null);
         if (!r.ok) toast.error(r.message);
     };
@@ -122,12 +163,14 @@ export const RequestsPanel = () => {
             <ul className="space-y-2">
                 {room.table.requests.map((q) => (
                     <RowCard as="li" key={q.pid} className="flex flex-wrap items-center gap-2 px-3 py-2" data-request={q.pid}>
-                        <p className="min-w-0 flex-1 text-sm text-fg-soft">{HOST_COPY.request(people[q.pid]?.name ?? '', q.amount)}</p>
+                        <p className="min-w-0 flex-1 text-sm text-fg-soft" data-request-kind={requestKind(room.table, q.pid)}>
+                            {requestText(requestKind(room.table, q.pid), people[q.pid]?.name ?? '', q.amount)}
+                        </p>
                         <div className="flex gap-2">
-                            <ActionButton size="sm" className="min-h-11" disabled={busy !== null} onClick={() => void answer(q.pid, 'approve')} data-approve="">
+                            <ActionButton size="sm" className="min-h-11" disabled={busy !== null} onClick={() => void answer(q.pid, 'approve', q.amount)} data-approve="">
                                 {HOST_COPY.approve}
                             </ActionButton>
-                            <ActionButton variant="danger" size="sm" className="min-h-11" disabled={busy !== null} onClick={() => void answer(q.pid, 'deny')} data-decline="">
+                            <ActionButton variant="danger" size="sm" className="min-h-11" disabled={busy !== null} onClick={() => void answer(q.pid, 'deny', q.amount)} data-decline="">
                                 {HOST_COPY.decline}
                             </ActionButton>
                         </div>
@@ -138,11 +181,33 @@ export const RequestsPanel = () => {
     );
 };
 
-const BankPanel = ({open, onOpenChange, toTable}: Props) => {
+// The host's own control for another player, on its own line under their row: sit them out from the
+// next hand (at once between hands), then a note while it waits on the hand in play.
+const SitOutControl = ({pid, name, sitOuts}: {pid: string; name: string; sitOuts: HostSitOuts}) => {
+    const room = useRoom();
+    const {busy, sitOut} = useHostSitOut(sitOuts);
+    const view = room.view;
+    const offer = view ? hostSitOut(view, pid, sitOuts.waiting[pid] ?? null) : null;
+    if (!view || !offer) return null;
+    return (
+        <div className="pb-2 pl-8" data-host-sit-out={offer}>
+            {offer === 'waiting' ? (
+                <p className="text-[11px] text-fg-muted">{HOST_COPY.sitOutWaiting}</p>
+            ) : (
+                <ActionButton variant="secondary" size="xs" className="min-h-11 px-4" disabled={busy !== null} aria-busy={busy === pid}
+                              aria-label={HOST_COPY.sitOutFor(name)} onClick={() => void sitOut(pid, name)}>
+                    {HOST_COPY.sitOut}
+                </ActionButton>
+            )}
+        </div>
+    );
+};
+
+const BankPanel = ({open, onOpenChange, toTable, sitOuts}: Props) => {
     const room = useRoom();
     const table = room.table;
     const [detail, setDetail] = useState<BankDetailRowView[] | null>(null);
-    const ledgerKey = table.ledger.map((r) => `${r.pid}:${r.bought}:${r.cashedOut}:${r.buys}`).join('|');
+    const ledgerKey = table.ledger.map((r) => r.join(':')).join('|');
     const joined = room.view !== null;
     const {detail: readDetail} = room;
 
@@ -159,6 +224,7 @@ const BankPanel = ({open, onOpenChange, toTable}: Props) => {
     }, [open, joined, ledgerKey, readDetail]);
 
     const bank = bankView(table, {me: room.me?.pid ?? null, detail});
+    const columns = bank.showRebuys ? 5 : 4;
     const timeline = bankTimeline(bank.rows);
     const people = table.people;
 
@@ -167,20 +233,24 @@ const BankPanel = ({open, onOpenChange, toTable}: Props) => {
             <p className="text-xs leading-relaxed text-fg-muted">{BANK_COPY.lead}</p>
             <OwnChipsPanel/>
             <RequestsPanel/>
-            <Panel pad={4} className="space-y-3" data-bank="">
+            {/* A container: in a drawer narrower than 22rem (a 320 px phone's) the Rebuys column gives its
+                room to the others and each player's count goes under their name. Every figure after the
+                player keeps a gap at its left, so two never read as one. */}
+            <Panel pad={4} className="@container space-y-3" data-bank="">
                 <table className="w-full table-fixed border-collapse text-xs">
                     <thead>
                         <tr className="text-left">
                             <th scope="col" className="w-[38%] pb-2 font-normal"><MicroLabel>{BANK_COPY.columns.player}</MicroLabel></th>
-                            <th scope="col" className="pb-2 text-right font-normal"><MicroLabel>{BANK_COPY.columns.chipsIn}</MicroLabel></th>
-                            {bank.showRebuys && <th scope="col" className="pb-2 text-right font-normal"><MicroLabel><Term k="rebuy">{BANK_COPY.columns.rebuys}</Term></MicroLabel></th>}
-                            <th scope="col" className="pb-2 text-right font-normal"><MicroLabel>{BANK_COPY.columns.stack}</MicroLabel></th>
-                            <th scope="col" className="pb-2 text-right font-normal"><MicroLabel>{BANK_COPY.columns.net}</MicroLabel></th>
+                            <th scope="col" className={NUM_HEAD}><MicroLabel>{BANK_COPY.columns.chipsIn}</MicroLabel></th>
+                            {bank.showRebuys && <th scope="col" className={cn(NUM_HEAD, '@max-[22rem]:hidden')} data-bank-rebuys-col=""><MicroLabel><Term k="rebuy">{BANK_COPY.columns.rebuys}</Term></MicroLabel></th>}
+                            <th scope="col" className={NUM_HEAD}><MicroLabel>{BANK_COPY.columns.stack}</MicroLabel></th>
+                            <th scope="col" className={NUM_HEAD}><MicroLabel>{BANK_COPY.columns.net}</MicroLabel></th>
                         </tr>
                     </thead>
                     <tbody>
                         {bank.rows.map((row) => (
-                            <tr key={row.pid} className={cn('border-t border-line-strong/15 align-top', row.me && 'bg-brand-strong/5')} data-bank-row={row.pid}>
+                            <Fragment key={row.pid}>
+                            <tr className={cn('border-t border-line-strong/15 align-top', row.me && 'bg-brand-strong/5')} data-bank-row={row.pid}>
                                 <th scope="row" className="py-2 pr-2 text-left font-normal">
                                     <span className="flex min-w-0 items-center gap-2">
                                         <MiniAvatar avatar={row.avatar}/>
@@ -189,17 +259,28 @@ const BankPanel = ({open, onOpenChange, toTable}: Props) => {
                                             {row.me && <Badge tone="brand" className="mt-0.5">{TABLE_COPY.you}</Badge>}
                                             {row.removed && <span className="block text-[11px] text-fg-muted">{BANK_COPY.removed}</span>}
                                             {!row.seated && row.cashedOut > 0 && <span className="block text-[11px] text-fg-muted">{BANK_COPY.leftWith(row.cashedOut)}</span>}
+                                            {bank.showRebuys && row.rebuys > 0 && (
+                                                <span className="block text-[11px] text-fg-muted @min-[22rem]:hidden" data-bank-rebuys-line="">{BANK_COPY.rebuysCount(row.rebuys)}</span>
+                                            )}
                                         </span>
                                     </span>
                                 </th>
-                                <td className="py-2 text-right font-mono tabular-nums text-fg-soft">{count(row.chipsIn)}</td>
-                                {bank.showRebuys && <td className="py-2 text-right font-mono tabular-nums text-fg-soft">{count(row.rebuys)}</td>}
-                                <td className="py-2 text-right font-mono tabular-nums text-fg-soft">{count(row.stack)}</td>
-                                <td className={cn('py-2 text-right font-mono tabular-nums', row.net > 0 ? 'text-positive' : row.net < 0 ? 'text-negative' : 'text-fg-soft')}
+                                <td className={cn(NUM_CELL, 'text-fg-soft')}>{count(row.chipsIn)}</td>
+                                {bank.showRebuys && <td className={cn(NUM_CELL, 'text-fg-soft @max-[22rem]:hidden')}>{count(row.rebuys)}</td>}
+                                <td className={cn(NUM_CELL, 'text-fg-soft')}>{count(row.stack)}</td>
+                                <td className={cn(NUM_CELL, row.net > 0 ? 'text-positive' : row.net < 0 ? 'text-negative' : 'text-fg-soft')}
                                     data-net={row.net}>
                                     {BANK_COPY.net(row.net)}
                                 </td>
                             </tr>
+                            {room.me?.isHost && !row.me && room.view && hostSitOut(room.view, row.pid, sitOuts.waiting[row.pid] ?? null) && (
+                                <tr data-bank-sit-out-row={row.pid}>
+                                    <td colSpan={columns} className="p-0">
+                                        <SitOutControl pid={row.pid} name={row.name} sitOuts={sitOuts}/>
+                                    </td>
+                                </tr>
+                            )}
+                            </Fragment>
                         ))}
                     </tbody>
                 </table>
@@ -211,7 +292,8 @@ const BankPanel = ({open, onOpenChange, toTable}: Props) => {
                 </div>
             </Panel>
             {timeline.length > 0 && (
-                <Disclosure summary={BANK_COPY.byTime} data-bank-timeline="">
+                // Its line a full 44 px target below lg: the drawer is a phone's bottom sheet there.
+                <Disclosure summary={BANK_COPY.byTime} className="max-lg:[&>summary]:min-h-11" data-bank-timeline="">
                     <ol className="mt-2 space-y-1 text-xs text-fg-soft">
                         {timeline.map((item) => (
                             <li key={item.key} className="flex min-w-0 gap-2">

@@ -71,10 +71,22 @@ describe('ActionSchema', () => {
         {actionId: ID, type: 'host', op: {op: 'config', patch: {smallBlind: 25, bigBlind: 50, maxRebuys: null}}},
         {actionId: ID, type: 'host', op: {op: 'settings', patch: {locked: true, name: 'Friday'}}},
         {actionId: ID, type: 'host', op: {op: 'kick', pid: PLAYER}},
+        {actionId: ID, type: 'host', op: {op: 'sit-out', pid: PLAYER}},
         {actionId: ID, type: 'profile', name: 'Ana'},
         {actionId: ID, type: 'profile', avatar: AVATAR},
         {actionId: ID, type: 'unban', pid: PLAYER},
         {actionId: ID, type: 'hand-over', pid: PLAYER},
+        {actionId: ID, type: 'leave-after', on: true},
+        {actionId: ID, type: 'leave-after', on: false},
+        {actionId: ID, type: 'discard', turn: 4, card: 0},
+        {actionId: ID, type: 'discard', turn: 4, card: 51},
+        {actionId: ID, type: 'withdraw'},
+        {actionId: ID, type: 'ask', to: PLAYER},
+        {actionId: ID, type: 'reply', to: PLAYER, show: 'one'},
+        {actionId: ID, type: 'reply', to: PLAYER, show: 'all'},
+        {actionId: ID, type: 'reply', to: PLAYER, show: 'none'},
+        {actionId: ID, type: 'allow-asks', on: false},
+        {actionId: ID, type: 'host', op: {op: 'config', patch: {variant: 'plo', boards: 2, rebuys: 'off'}}},
     ];
 
     it('takes every action the table offers', () => {
@@ -85,10 +97,39 @@ describe('ActionSchema', () => {
         no(ActionSchema, {actionId: ID, type: 'leave', by: PLAYER});
         no(ActionSchema, {actionId: ID, type: 'act', turn: 3, move: {kind: 'fold', to: 1}});
         no(ActionSchema, {actionId: ID, type: 'host', op: {op: 'start', now: true}});
+        no(ActionSchema, {actionId: ID, type: 'host', op: {op: 'sit-out', pid: PLAYER, seat: 2}});
+        no(ActionSchema, {actionId: ID, type: 'host', op: {op: 'sit-out', pid: PLAYER, on: 'yes'}});
+        // Only ever out: the host cannot take a sit-out back (it may be the player's own).
+        no(ActionSchema, {actionId: ID, type: 'host', op: {op: 'sit-out', pid: PLAYER, on: false}});
+        no(ActionSchema, {actionId: ID, type: 'host', op: {op: 'sit-out', pid: PLAYER, on: true}});
+        no(ActionSchema, {actionId: ID, type: 'host', op: {op: 'sit-out'}});
         no(ActionSchema, {actionId: ID, type: 'host', op: {op: 'config', patch: {seats: 9}}});
         no(ActionSchema, {actionId: ID, type: 'host', op: {op: 'config', patch: {deck: [1, 2]}}});
         no(ActionSchema, {actionId: ID, type: 'host', op: {op: 'settings', patch: {colour: 'red'}}});
         no(ActionSchema, {actionId: ID, type: 'pre', pre: {kind: 'call', amount: 40, atBet: 0}});
+        no(ActionSchema, {actionId: ID, type: 'leave-after'});
+        no(ActionSchema, {actionId: ID, type: 'leave-after', on: 'yes'});
+        no(ActionSchema, {actionId: ID, type: 'leave-after', on: true, at: 5});
+        // Triple T's throw: a card of the deck and the turn the throw-away opened at, nothing else.
+        no(ActionSchema, {actionId: ID, type: 'discard', card: 7});
+        no(ActionSchema, {actionId: ID, type: 'discard', turn: 4});
+        no(ActionSchema, {actionId: ID, type: 'discard', turn: 4, card: 52});
+        no(ActionSchema, {actionId: ID, type: 'discard', turn: 4, card: -1});
+        no(ActionSchema, {actionId: ID, type: 'discard', turn: 4, card: 2.5});
+        no(ActionSchema, {actionId: ID, type: 'discard', turn: -1, card: 7});
+        no(ActionSchema, {actionId: ID, type: 'discard', turn: 4, card: 7, seat: 2});
+        no(ActionSchema, {actionId: ID, type: 'discard', turn: 4, cards: [7]});
+        no(ActionSchema, {actionId: ID, type: 'withdraw', amount: 100});
+        no(ActionSchema, {actionId: ID, type: 'ask'});
+        no(ActionSchema, {actionId: ID, type: 'ask', to: 'nope'});
+        no(ActionSchema, {actionId: ID, type: 'ask', to: PLAYER, hand: 3});
+        no(ActionSchema, {actionId: ID, type: 'reply', to: PLAYER});
+        no(ActionSchema, {actionId: ID, type: 'reply', to: PLAYER, show: 'some'});
+        no(ActionSchema, {actionId: ID, type: 'allow-asks'});
+        // Version 1's third rebuy policy, and a game or board count that is not one.
+        no(ActionSchema, {actionId: ID, type: 'host', op: {op: 'config', patch: {rebuys: 'auto'}}});
+        no(ActionSchema, {actionId: ID, type: 'host', op: {op: 'config', patch: {variant: 'omaha'}}});
+        no(ActionSchema, {actionId: ID, type: 'host', op: {op: 'config', patch: {boards: 4}}});
     });
 
     it('refuses the clock\'s own actions and anything without a good id', () => {
@@ -123,10 +164,19 @@ describe('ActionSchema', () => {
         expect(toTableAction(parse({actionId: ID, type: 'sit-out'}), 'p1', 99)).toEqual({type: 'sit-out', by: 'p1', at: 99});
         expect(toTableAction(parse({actionId: ID, type: 'host', op: {op: 'kick', pid: PLAYER}}), 'p1', 99))
             .toEqual({type: 'host', by: 'p1', op: {op: 'kick', pid: PLAYER}, at: 99});
+        expect(toTableAction(parse({actionId: ID, type: 'host', op: {op: 'sit-out', pid: PLAYER}}), 'p1', 99))
+            .toEqual({type: 'host', by: 'p1', op: {op: 'sit-out', pid: PLAYER}, at: 99});
         expect(toTableAction(parse({actionId: ID, type: 'host', op: {op: 'settings', patch: {name: `  Fri${String.fromCodePoint(0x202e)}day  night `, felt: 'teal'}}}), 'p1', 99))
             .toEqual({type: 'host', by: 'p1', op: {op: 'settings', patch: {felt: 'teal', name: 'Friday night'}}, at: 99});
         expect(toTableAction(parse({actionId: ID, type: 'host', op: {op: 'settings', patch: {name: '   '}}}), 'p1', 99))
             .toEqual({type: 'host', by: 'p1', op: {op: 'settings', patch: {name: ''}}, at: 99});
+        expect(toTableAction(parse({actionId: ID, type: 'leave-after', on: true}), 'p1', 99)).toEqual({type: 'leave-after', by: 'p1', on: true, at: 99});
+        expect(toTableAction(parse({actionId: ID, type: 'discard', turn: 4, card: 17}), 'p1', 99)).toEqual({type: 'discard', by: 'p1', turn: 4, card: 17, at: 99});
+        expect(toTableAction(parse({actionId: ID, type: 'withdraw'}), 'p1', 99)).toEqual({type: 'withdraw', by: 'p1', at: 99});
+        expect(toTableAction(parse({actionId: ID, type: 'ask', to: PLAYER}), 'p1', 99)).toEqual({type: 'ask', by: 'p1', to: PLAYER, at: 99});
+        expect(toTableAction(parse({actionId: ID, type: 'reply', to: PLAYER, show: 'one'}), 'p1', 99))
+            .toEqual({type: 'reply', by: 'p1', to: PLAYER, show: 'one', at: 99});
+        expect(toTableAction(parse({actionId: ID, type: 'allow-asks', on: false}), 'p1', 99)).toEqual({type: 'allow-asks', by: 'p1', on: false, at: 99});
     });
 
     it('tells the room\'s own actions from the engine\'s', () => {
@@ -163,8 +213,9 @@ describe('the query strings', () => {
         expect(parseSeq('0')).toBe(0);
         expect(parseSeq('3100')).toBe(3100);
         for (const raw of [null, '', 'abc', '-1', '1.5', '01', '1e3', '9'.repeat(16)]) expect(parseSeq(raw), String(raw)).toBeNull();
-        expect(parseStateQuery(new URLSearchParams('since=12&esince=3'))).toEqual({since: 12, esince: 3});
-        expect(parseStateQuery(new URLSearchParams(''))).toEqual({since: null, esince: null});
+        expect(parseStateQuery(new URLSearchParams('since=12&esince=3&nsince=2'))).toEqual({since: 12, esince: 3, nsince: 2});
+        expect(parseStateQuery(new URLSearchParams('since=12&esince=3'))).toEqual({since: 12, esince: 3, nsince: null});
+        expect(parseStateQuery(new URLSearchParams(''))).toEqual({since: null, esince: null, nsince: null});
     });
 
     it('read the detail part asked for', () => {

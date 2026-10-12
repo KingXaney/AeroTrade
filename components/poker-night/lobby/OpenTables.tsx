@@ -5,7 +5,7 @@ import Link from "next/link";
 import {toast} from "sonner";
 import {closePokerNight} from "@/lib/actions/poker-night.actions";
 import {LOBBY_COPY, POKER_NIGHT_COPY, TABLE_COPY} from "@/lib/learn/copy/poker-night";
-import type {LobbyTable} from "@/lib/poker-night/lobby";
+import {modeLine, type LobbyTable} from "@/lib/poker-night/lobby";
 import ActionButton, {actionButton} from "@/components/primitives/ActionButton";
 import ConfirmDialog from "@/components/primitives/ConfirmDialog";
 import Panel from "@/components/primitives/Panel";
@@ -57,7 +57,7 @@ const OpenTables = ({tables}: {tables: LobbyTable[]}) => {
                             <div className="flex flex-wrap items-center justify-between gap-x-4 gap-y-2">
                                 <div className="min-w-0">
                                     <p className="truncate text-sm font-medium text-fg"><bdi>{shown}</bdi></p>
-                                    <p className="text-xs text-fg-muted">{POKER_NIGHT_COPY.openRow(table.seated, table.seats, table.hands)}</p>
+                                    <p className="text-xs text-fg-muted">{POKER_NIGHT_COPY.openRow(modeLine(table), table.seated, table.seats, table.hands)}</p>
                                 </div>
                                 <div className="flex flex-wrap gap-2">
                                     <Link href={table.href} className={actionButton({variant: 'primary', size: 'sm'})}>{POKER_NIGHT_COPY.open}</Link>

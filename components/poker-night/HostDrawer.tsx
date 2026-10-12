@@ -1,9 +1,12 @@
 'use client';
 
 // The host's controls, in their drawer, one section at a time:
-// - Game: the blinds, the ante, the starting chips and the chip cap, the turn timer;
-// - Rebuys: the policy, the rebuys per player, and the requests waiting for the host;
-// - Players: everyone at the table, each with a More menu (hand over host, remove from table), and
+// - Game: the game itself (Texas hold'em or PLO, GameChoice; PLO's one to three boards, BoardsChoice), the blinds, the ante, the starting
+//   chips and the chip cap, the turn timer;
+// - Rebuys: the policy (Off / On, the host approving: RebuyChoice), the rebuys per player, and the
+//   requests for chips waiting for the host (the bank's own rows);
+// - Players: everyone at the table, each with a More menu (sit out next hand — the bank's own, through
+//   useHostSitOut and the map TableOverlays keeps for both — hand over host, remove from table), and
 //   the removed with "Let back in";
 // - Table: its name, deal / pause / resume, lock, show to friends, and end the night;
 // - Look (P5): the scene and the felt (LookPicker) and whether throwables fly — the room's settings,
@@ -28,17 +31,20 @@ import TextField, {fieldClass} from "@/components/primitives/TextField";
 import {iconButton} from "@/components/primitives/iconButton";
 import {RequestsPanel} from "@/components/poker-night/BankPanel";
 import LookPicker from "@/components/poker-night/LookPicker";
+import BoardsChoice from "@/components/poker-night/BoardsChoice";
+import GameChoice from "@/components/poker-night/GameChoice";
+import RebuyChoice from "@/components/poker-night/RebuyChoice";
 import {Drawer, MiniAvatar, PlayerName} from "@/components/poker-night/overlay-kit";
 import {useRoom} from "@/components/poker-night/room-controller";
-import {HOST_COPY, INVITE_COPY, LOOKS_COPY, OVERLAY_COPY, TABLE_COPY} from "@/lib/learn/copy/poker-night";
+import {useHostSitOut, type HostSitOuts} from "@/components/poker-night/useHostSitOut";
+import {HOST_COPY, INVITE_COPY, LOOKS_COPY, MODE_COPY, OVERLAY_COPY, TABLE_COPY} from "@/lib/learn/copy/poker-night";
 import {TABLE_NAME_INPUT_MAX} from "@/lib/poker-night/input";
 import {resolveTableLook, scenePatch, type TableLook} from "@/lib/poker-night/looks";
-import {BLIND_PRESETS, REBUY_CHOICES} from "@/lib/poker-night/lobby";
+import {BLIND_PRESETS} from "@/lib/poker-night/lobby";
 import {
-    checkGameForm, gameFormOf, GAME_FIELDS, hostPeople, hostRowStatus, REBUY_FIELDS, rebuyLimitChoices, seatedCount, tableControl, timerChoices,
+    checkGameForm, gameFormOf, GAME_FIELDS, hostPeople, hostRowStatus, hostSitOut, REBUY_FIELDS, rebuyLimitChoices, seatedCount, tableControl, timerChoices,
     type GameField, type GameForm, type HostRow,
 } from "@/lib/poker-night/overlays";
-import type {RebuyPolicy} from "@/lib/poker-night/types";
 import {cn} from "@/lib/utils";
 
 export type HostSection = 'game' | 'rebuys' | 'players' | 'table' | 'look';
@@ -52,6 +58,7 @@ type Props = {
     onRemove: (row: HostRow) => void;
     onHandOver: (row: HostRow) => void;
     onEnd: () => void;
+    sitOuts: HostSitOuts;
 };
 
 // ── the settings sections ──
@@ -119,6 +126,11 @@ const GameSection = () => {
                    e.preventDefault();
                    void save();
                }}>
+            <div className="space-y-2" data-host-field="variant">
+                <MicroLabel as="p">{MODE_COPY.gameLabel}</MicroLabel>
+                <GameChoice value={form.variant} onChange={(variant) => set('variant', variant)} hook="host-game"/>
+            </div>
+            {form.variant === 'plo' && <BoardsChoice variant={form.variant} value={form.boards} onChange={(boards) => set('boards', boards)} hook="host-boards"/>}
             <div className="space-y-2">
                 <MicroLabel as="p">{HOST_COPY.blinds}</MicroLabel>
                 <div className="flex flex-wrap gap-1.5">
@@ -169,12 +181,10 @@ const RebuysSection = () => {
                        e.preventDefault();
                        void save();
                    }}>
-                <Field id={`${id}-policy`} label={HOST_COPY.rebuys}>
-                    <select id={`${id}-policy`} className={fieldClass('h-11 w-full', 'body')} value={form.rebuys}
-                            onChange={(e) => set('rebuys', e.target.value as RebuyPolicy)} data-host-field="rebuys">
-                        {REBUY_CHOICES.map((policy) => <option key={policy} value={policy}>{HOST_COPY.rebuysValue[policy]}</option>)}
-                    </select>
-                </Field>
+                <div className="space-y-1.5" data-host-field="rebuys">
+                    <MicroLabel as="p">{HOST_COPY.rebuys}</MicroLabel>
+                    <RebuyChoice value={form.rebuys} onChange={(policy) => set('rebuys', policy)} hintId={`${id}-policy-hint`} hook="host-rebuys"/>
+                </div>
                 <Field id={`${id}-limit`} label={HOST_COPY.rebuyLimitLabel}>
                     <select id={`${id}-limit`} className={fieldClass('h-11 w-full', 'body')} value={form.maxRebuys ?? ''}
                             onChange={(e) => set('maxRebuys', e.target.value === '' ? null : Number(e.target.value))} data-host-field="maxRebuys">
@@ -189,11 +199,13 @@ const RebuysSection = () => {
 
 // ── players ──
 
-const PlayersSection = ({onRemove, onHandOver}: Pick<Props, 'onRemove' | 'onHandOver'>) => {
+const PlayersSection = ({onRemove, onHandOver, sitOuts}: Pick<Props, 'onRemove' | 'onHandOver' | 'sitOuts'>) => {
     const room = useRoom();
     const id = useId();
     const [busy, setBusy] = useState<string | null>(null);
     const {players, removed} = hostPeople(room.table, room.me?.pid ?? null);
+    const hostSitOuts = useHostSitOut(sitOuts);
+    const sitOutOf = (pid: string) => (room.view ? hostSitOut(room.view, pid, sitOuts.waiting[pid] ?? null) : null);
 
     const letBackIn = async (pid: string, name: string) => {
         if (busy) return;
@@ -219,6 +231,9 @@ const PlayersSection = ({onRemove, onHandOver}: Pick<Props, 'onRemove' | 'onHand
                                     {row.me && <Badge>{HOST_COPY.you}</Badge>}
                                 </div>
                                 <p className="truncate text-[11px] text-fg-muted">{hostRowStatus(row)}</p>
+                                {sitOutOf(row.pid) === 'waiting' && (
+                                    <p className="text-[11px] text-fg-muted" data-host-sit-out-waiting="">{HOST_COPY.sitOutWaiting}</p>
+                                )}
                             </div>
                             {!row.me && (
                                 <DropdownMenu modal={false}>
@@ -228,6 +243,12 @@ const PlayersSection = ({onRemove, onHandOver}: Pick<Props, 'onRemove' | 'onHand
                                         </button>
                                     </DropdownMenuTrigger>
                                     <DropdownMenuContent align="end" className="z-[70] w-56 text-fg">
+                                        {sitOutOf(row.pid) === 'offer' && (
+                                            <DropdownMenuItem className="min-h-11 px-3 text-sm" disabled={hostSitOuts.busy !== null}
+                                                              onSelect={() => void hostSitOuts.sitOut(row.pid, row.name)} data-host-menu-sit-out="">
+                                                {HOST_COPY.sitOut}
+                                            </DropdownMenuItem>
+                                        )}
                                         {!row.host && (
                                             <DropdownMenuItem className="min-h-11 px-3 text-sm" onSelect={() => onHandOver(row)} data-host-handover="">
                                                 {HOST_COPY.handOver}
@@ -410,7 +431,7 @@ const LookSection = () => {
 
 // ── the drawer ──
 
-const HostDrawer = ({open, onOpenChange, toTable, onRemove, onHandOver, onEnd}: Props) => {
+const HostDrawer = ({open, onOpenChange, toTable, onRemove, onHandOver, onEnd, sitOuts}: Props) => {
     const room = useRoom();
     const id = useId();
     const [section, setSection] = useState<HostSection>('game');
@@ -448,7 +469,7 @@ const HostDrawer = ({open, onOpenChange, toTable, onRemove, onHandOver, onEnd}: 
             <div role="tabpanel" id={`${id}-panel`} aria-labelledby={`${id}-tab-${section}`} className="space-y-4" data-host-section={section}>
                 {section === 'game' && <GameSection/>}
                 {section === 'rebuys' && <RebuysSection/>}
-                {section === 'players' && <PlayersSection onRemove={onRemove} onHandOver={onHandOver}/>}
+                {section === 'players' && <PlayersSection onRemove={onRemove} onHandOver={onHandOver} sitOuts={sitOuts}/>}
                 {section === 'table' && <TableSection onEnd={onEnd}/>}
                 {section === 'look' && <LookSection/>}
             </div>

@@ -9,7 +9,7 @@
 import {afterEach, beforeEach, describe, expect, it, vi} from 'vitest';
 import {nextDueAt} from '@/lib/poker-night/clock';
 import {
-    BOTH_FOR_MS, createTicker, EMOTE_GRACE_MS, FALLBACK_QUIET_MS, feedMode, feedReducer, handLive, initialFeed, initialMonitor, isBehind, mergeEmotes,
+    askWindow, BOTH_FOR_MS, createTicker, EMOTE_GRACE_MS, FALLBACK_QUIET_MS, feedMode, feedReducer, handLive, initialFeed, initialMonitor, isBehind, mergeEmotes,
     mergeWire, monitorLive, monitorStep, nearTurn, needsPrivate, nextPollDelay, nextTickAt, passExpiry, passFresh, pollPace, readAgain, shouldRetick, TICK_BACKOFF_MS,
     TICK_RETRIES, TICK_RETRY_MS, tickRole, TOKEN_RETRY_LATER_MS, tokenRetryDelay, tokenRetryLate, transportOf, transportPolicy, watchdogTripped, type FeedState,
     type RealtimeMonitor, type TickerFeed, type TickOutcome,
@@ -26,10 +26,13 @@ const metaOf = (s: TableState, seq: number, serverNow: number, extra: {clockLead
     realtimeOk: true, peopleV: extra.peopleV ?? 1,
 });
 
-const pv = (s: TableState, pid: string, seq: number, opts: {serverNow?: number; emotes?: EmoteView[]; emoteSeq?: number; pass?: string | null; clockLeader?: string | null} = {}): PlayerView =>
+const pv = (
+    s: TableState, pid: string, seq: number,
+    opts: {serverNow?: number; emotes?: EmoteView[]; emoteSeq?: number; pass?: string | null; clockLeader?: string | null; nudge?: number} = {},
+): PlayerView =>
     playerView(s, pid, {
         ...metaOf(s, seq, opts.serverNow ?? nowOf(s), {clockLeader: opts.clockLeader}), people: people(s), removed: [], hasAccount: false,
-        emotes: opts.emotes ?? [], emoteSeq: opts.emoteSeq ?? 0, pass: opts.pass ?? null,
+        emotes: opts.emotes ?? [], emoteSeq: opts.emoteSeq ?? 0, pass: opts.pass ?? null, nudge: opts.nudge ?? 0,
     });
 
 const wire = (s: TableState, seq: number, extra: {peopleV?: number} = {}): WireView => wireView(s, metaOf(s, seq, nowOf(s), extra));
@@ -38,7 +41,7 @@ const room = (s: TableState, seq: number): RoomView => ({...wire(s, seq), ...peo
 const emote = (id: string, seq: number, at: number): EmoteView => ({kind: 'react', item: 'laugh', id, seq, from: pidOf(0), at});
 
 const unchanged = (seq: number, extra: Partial<Unchanged> = {}): Unchanged =>
-    ({unchanged: true, seq, emoteSeq: 0, serverNow: T0 + 5000, nextDueAt: null, emotes: [], pass: null, realtimeOk: true, ...extra});
+    ({unchanged: true, seq, emoteSeq: 0, serverNow: T0 + 5000, nextDueAt: null, emotes: [], pass: null, realtimeOk: true, nudge: 0, ...extra});
 
 const three = () => table({0: 1000, 1: 1000, 2: 1000}, {lastBigBlind: 0});
 
@@ -238,6 +241,23 @@ describe('realtime messages', () => {
         expect(needsPrivate(pv(s1, pidOf(0), 2), wire(moves(s1, R(60)), 3))).toBe(false);
     });
 
+    it('say the viewer\'s own part went stale when the deadline threw a card away for them (Triple T), not when another player threw', () => {
+        const t0 = deal(table({0: 1000, 1: 1000, 2: 1000}, {lastBigBlind: 0, config: {variant: 'triple-t'}}));
+        const mine = pv(t0, pidOf(0), 1);
+        expect(mine.me.hole).toHaveLength(3);
+        // Seat 1 throws: seat 0's own part holds.
+        const card1 = t0.hand!.seats.find((p) => p.seat === 1)!.hole[2];
+        const t1 = play(t0, {type: 'discard', by: pidOf(1), turn: t0.turn, card: card1, at: nowOf(t0)});
+        expect(needsPrivate(mine, wire(t1, 2))).toBe(false);
+        // The deadline throws for seat 0 (and seat 2): seat 0's seat holds two, its own part three.
+        const t2 = play(t1, {type: 'timeout', turn: t1.turn, at: t1.hand!.deadline! + 2000});
+        expect(t2.hand!.phase).toBe('betting');
+        expect(needsPrivate(mine, wire(t2, 3))).toBe(true);
+        // The whole view brings the two kept and the card thrown away, theirs alone.
+        expect(pv(t2, pidOf(0), 3).me.hole).toHaveLength(2);
+        expect(pv(t2, pidOf(0), 3).me.discard).not.toBeNull();
+    });
+
     it('drop at once what the message shows is over: the last hand\'s cards, a pre-action the server cleared', () => {
         // Seat 2 (the button) acts first, then 0, then 1: seat 1, the big blind, waits with call-any.
         const s1 = deal(three());
@@ -366,7 +386,7 @@ describe('realtime messages', () => {
         const s1 = deal(three());
         const waiting = play(s1, {type: 'pre', by: pidOf(1), pre: {kind: 'call-any'}, at: nowOf(s1)});
         const f = initialFeed({view: pv(s1, pidOf(1), 3)});
-        const set = feedReducer(f, {type: 'view', view: pv(waiting, pidOf(1), 3), at: T0, pre: true});
+        const set = feedReducer(f, {type: 'view', view: pv(waiting, pidOf(1), 3), at: T0, own: true});
         expect(set.view!.me.pre).toEqual({kind: 'call-any'});
         expect(set.view!.seats).toBe(f.view!.seats);
         expect([set.seq, set.privateSeq, set.knownSeq]).toEqual([3, 3, 3]);
@@ -375,12 +395,51 @@ describe('realtime messages', () => {
         expect(feedReducer(f, {type: 'view', view: pv(waiting, pidOf(1), 3), at: T0}).view).toBe(f.view);
         expect(feedReducer(set, {type: 'view', view: pv(s1, pidOf(1), 3), at: T0}).view!.me.pre).toEqual({kind: 'call-any'});
         // The same answer again (a retried request): nothing moves. Cleared: its answer clears it.
-        expect(feedReducer(set, {type: 'view', view: pv(waiting, pidOf(1), 3), at: T0, pre: true}).view).toBe(set.view);
-        expect(feedReducer(set, {type: 'view', view: pv(s1, pidOf(1), 3), at: T0, pre: true}).view!.me.pre).toBeNull();
+        expect(feedReducer(set, {type: 'view', view: pv(waiting, pidOf(1), 3), at: T0, own: true}).view).toBe(set.view);
+        expect(feedReducer(set, {type: 'view', view: pv(s1, pidOf(1), 3), at: T0, own: true}).view!.me.pre).toBeNull();
         // An answer older than the table held is still read by the usual rules.
         const raised = moves(waiting, R(60));
         const ahead = feedReducer(f, {type: 'view', view: pv(raised, pidOf(1), 4), at: T0});
-        expect(feedReducer(ahead, {type: 'view', view: pv(waiting, pidOf(1), 3), at: T0, pre: true}).view).toBe(ahead.view);
+        expect(feedReducer(ahead, {type: 'view', view: pv(waiting, pidOf(1), 3), at: T0, own: true}).view).toBe(ahead.view);
+    });
+
+    it('read the viewer\'s own part again when a nudge says it changed, though the public seq did not move', () => {
+        // Seats 2 and 0 fold to seat 1; seat 2 asks seat 1 to see its cards: only those two see it.
+        const done = moves(deal(three()), {kind: 'fold'}, {kind: 'fold'});
+        const at = done.hand!.result!.completedAt;
+        const asked = play(done, {type: 'ask', by: pidOf(2), to: pidOf(1), at: at + 100});
+        let f = initialFeed({view: pv(done, pidOf(1), 9, {serverNow: at})});
+        expect([f.nudge, f.knownNudge]).toEqual([0, 0]);
+        // A poll's Unchanged names a higher count: behind, a GET state is due.
+        f = feedReducer(f, {type: 'unchanged', body: unchanged(9, {nudge: 1}), at: T0});
+        expect(f.knownNudge).toBe(1);
+        expect(isBehind(f)).toBe(true);
+        // Its answer: the whole view at the same seq, the ask in the viewer's own part.
+        f = feedReducer(f, {type: 'view', view: pv(asked, pidOf(1), 9, {serverNow: at + 200, nudge: 1}), at: T0});
+        expect(f.view!.me.asks).toHaveLength(1);
+        expect([f.seq, f.nudge, isBehind(f)]).toEqual([9, 1, false]);
+        // An older answer (a lower count) never takes it back, even as the viewer's own move's.
+        expect(feedReducer(f, {type: 'view', view: pv(done, pidOf(1), 9, {nudge: 0}), at: T0, own: true}).view).toBe(f.view);
+        // The viewer's own channel names a count: behind until the read lands.
+        const told = feedReducer(f, {type: 'nudge', nudge: 2});
+        expect([told.knownNudge, isBehind(told)]).toEqual([2, true]);
+        expect(feedReducer(told, {type: 'nudge', nudge: 1})).toBe(told);
+        // An older server's Unchanged names none: nothing changes.
+        const old = unchanged(9) as Partial<Unchanged>;
+        delete old.nudge;
+        expect(feedReducer(f, {type: 'unchanged', body: old as Unchanged, at: T0}).knownNudge).toBe(1);
+    });
+
+    it('end the viewer\'s asks and their thrown-away card with the hand, and read the whole view as the hand completes', () => {
+        const live = deal(three());
+        const view = pv(live, pidOf(1), 4);
+        const done = moves(live, {kind: 'fold'}, {kind: 'fold'});
+        // Seat 1 was dealt in and the hand has just completed: who it may ask is in its own part.
+        expect(needsPrivate(view, wire(done, 5))).toBe(true);
+        // The next hand: every ask and card of the last one gone.
+        const next = deal(done);
+        const merged = mergeWire({...view, me: {...view.me, asks: [{from: pidOf(2), to: pidOf(1), fromSeat: 2, toSeat: 1, at: T0, until: T0, answer: 'waiting'}]}}, wire(next, 6));
+        expect(merged.me).toMatchObject({hole: null, asks: [], canAsk: [], shownToMe: [], discard: null});
     });
 
     it('name the host from the message', () => {
@@ -417,7 +476,7 @@ describe('the poll', () => {
     });
 
     it('reads again at once while an answer leaves the table or the viewer\'s own part behind', () => {
-        const held = {seq: 12, privateSeq: 12, emoteSeq: 0, knownSeq: 12, knownEmoteSeq: 0};
+        const held = {seq: 12, privateSeq: 12, emoteSeq: 0, knownSeq: 12, knownEmoteSeq: 0, nudge: 0, knownNudge: 0};
         expect(readAgain({again: false, whole: true, state: held})).toBe(false);
         expect(readAgain({again: true, whole: false, state: held})).toBe(true);
         expect(readAgain({again: false, whole: false, state: {...held, knownSeq: 13}})).toBe(true);
@@ -425,6 +484,8 @@ describe('the poll', () => {
         expect(readAgain({again: false, whole: true, state: {...held, privateSeq: 10}})).toBe(true);
         // An Unchanged says the server has nothing newer than the read asked from: the pace, not a loop.
         expect(readAgain({again: false, whole: false, state: {...held, privateSeq: 10}})).toBe(false);
+        // A nudge count above the one held: once more, now.
+        expect(readAgain({again: false, whole: false, state: {...held, knownNudge: 1}})).toBe(true);
     });
 
     it('knows a live hand and when the action is near', () => {
@@ -438,6 +499,19 @@ describe('the poll', () => {
         expect(nearTurn(pv(s1, pidOf(0), 1), 0, 1)).toBe(true);
         expect(nearTurn(pv(s1, pidOf(1), 1), 1, 1)).toBe(false);
         expect(nearTurn(pv(s1, pidOf(5), 1), null)).toBe(false);
+    });
+
+    it('in Triple T\'s throw-away, counts everyone dealt in as near (thrown already or not), never a watcher or a folded seat', () => {
+        let s = deal(table({0: 1000, 1: 1000, 2: 1000}, {lastBigBlind: 0, config: {variant: 'triple-t'}}));
+        expect(s.hand!.phase).toBe('discard');
+        for (const seat of [0, 1, 2]) expect(nearTurn(pv(s, pidOf(seat), 1), seat)).toBe(true);
+        s = play(s, {type: 'discard', by: pidOf(0), turn: s.turn, card: s.hand!.seats.find((p) => p.seat === 0)!.hole[0], at: nowOf(s)});
+        expect(nearTurn(pv(s, pidOf(0), 2), 0)).toBe(true);
+        expect(nearTurn(pv(s, pidOf(5), 2), null)).toBe(false);
+        // Seat 2 leaves facing the big blind: folded, nothing near for them.
+        s = play(s, {type: 'leave', by: pidOf(2), at: nowOf(s)});
+        expect(s.hand!.phase).toBe('discard');
+        expect(nearTurn(pv(s, pidOf(2), 3), 2)).toBe(false);
     });
 });
 
@@ -855,5 +929,20 @@ describe('the seat pass', () => {
         expect(passFresh(pass, exp * 1000 - 120_001)).toBe(pass);
         expect(passFresh(pass, exp * 1000 - 120_000)).toBeNull();
         expect(passFresh(null, T0)).toBeNull();
+    });
+});
+
+describe('asks to see a hand, over the feed', () => {
+    it('polls faster in the pause after a hand the viewer was dealt into', () => {
+        const base = {mode: 'polling' as const, hidden: false, inHand: false, nearTurn: false, failures: 0, scale: 0};
+        expect(nextPollDelay({...base, asks: true})).toBe(1500);
+        expect(nextPollDelay({...base, asks: true, mode: 'realtime'})).toBe(20_000);
+        let s = deal(three());
+        expect(askWindow(pv(s, pidOf(0), 1))).toBe(false);
+        s = moves(s, {kind: 'fold'}, {kind: 'fold'});
+        expect(s.hand!.phase).toBe('complete');
+        expect(askWindow(pv(s, pidOf(0), 2))).toBe(true);
+        expect(askWindow(pv(s, 'w1', 2))).toBe(false);
+        expect(askWindow(null)).toBe(false);
     });
 });

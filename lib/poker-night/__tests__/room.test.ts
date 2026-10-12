@@ -65,7 +65,7 @@ const dealHand = (core: RoomCore): {core: RoomCore; at: number} => {
 describe('a new room', () => {
     it('seats its host at seat 0 with the table\'s cap, by name and look', () => {
         const core = room();
-        expect(core.players).toEqual([{pid: HOST_PID, userId: 'u-host', guestId: null, name: 'Hana', avatar: AV, joinedAt: T0, banned: false}]);
+        expect(core.players).toEqual([{pid: HOST_PID, userId: 'u-host', guestId: null, name: 'Hana', avatar: AV, joinedAt: T0, banned: false, nudge: 0}]);
         expect(core.state.seats[0]).toMatchObject({pid: HOST_PID, stack: DEFAULT_CONFIG.buyInMax});
         expect(core.state.hostPid).toBe(HOST_PID);
         expect(core.hostUserId).toBe('u-host');
@@ -289,7 +289,7 @@ describe('the caps', () => {
         // The rest of the room: watchers on the page now.
         const later = T0 + 6 * 60 * MINUTE;
         const watching = Array.from({length: LIMITS.players - 2}, (_, i) => ({
-            pid: pid(100 + i), userId: null, guestId: `w${i}`.padEnd(22, 'x'), name: `W${i}`, avatar: AV, joinedAt: T0, banned: false,
+            pid: pid(100 + i), userId: null, guestId: `w${i}`.padEnd(22, 'x'), name: `W${i}`, avatar: AV, joinedAt: T0, banned: false, nudge: 0,
         }));
         played = {...played, players: [...played.players, ...watching], seen: Object.fromEntries(watching.map((w) => [w.pid, {at: later - 1000, hidden: false}]))};
         expect(isSettled(played.state.ledger.find((row) => row.pid === pid(1))!)).toBe(false);
@@ -413,6 +413,40 @@ describe('the host role', () => {
         expect([r.core.state.hostPid, r.core.hostUserId]).toEqual([pid(2), 'u-ben']);
         expect(okStep(claimHostStep(pid(2))(r.core, late)).core).toBe(r.core);
     });
+
+    it('keeps every chip waiting for the host\'s yes however long the host is gone — a request, a newcomer\'s seat, the join card — and an account holder at the table may take the host\'s place', () => {
+        const actionId = '0b7c1e2a-9f3d-4c5b-8a6e-000000000001';
+        let core = joined(room(), guest('ana'), pid(1));
+        core = joined(core, user('u-ben'), pid(2));
+        const dealt = dealHand(core);
+        core = dealt.core;
+        const soon = dealt.at + MINUTE;
+        // A guest sits once the game has started: a request, 0 chips.
+        core = joined(core, guest('cy'), pid(3), {}, soon);
+        const seat3 = seatOfPid(core, pid(3));
+        expect(core.state.seats[seat3]!.stack).toBe(0);
+        expect(core.state.requests.map((r) => r.pid)).toEqual([pid(3)]);
+        const extras = {realtimeOk: true, emotes: [], emoteSeq: 0, pass: null};
+        expect(Object.keys(playerViewFor(core, pid(3), 1, soon, extras).me)).not.toContain('hostAwayAt');
+        // The host unheard from for an hour (a locked phone, a tab in the background): nothing lands.
+        const late = T0 + 6 * LIMITS.hostTakeoverMs;
+        const amount = core.state.requests[0].amount;
+        expect(okStep(actionStep({actionId, type: 'buy', amount}, pid(3))(core, late)).core).toBe(core);
+        expect(joinViewFor(core, guest('dee'), late).needsApproval).toBe(true);
+        const dee = joined(core, guest('dee'), pid(4), {}, late);
+        expect(dee.state.seats[seatOfPid(dee, pid(4))]!.stack).toBe(0);
+        expect(dee.state.requests.map((r) => r.pid)).toEqual([pid(3), pid(4)]);
+        // No field of a request lands chips: what the input does not know never reaches the engine.
+        expect(okStep(actionStep({actionId, type: 'buy', amount, hostAway: true} as never, pid(3))(core, late)).core).toBe(core);
+        // The way on: a seated account holder claims the role, and the requests wait for them.
+        expect(code(claimHostStep(pid(1))(dee, late))).toBe('needs_account');
+        const claimed = okStep(claimHostStep(pid(2))(dee, late)).core;
+        expect(claimed.state.hostPid).toBe(pid(2));
+        const yes = okStep(actionStep({actionId, type: 'host', op: {op: 'approve', pid: pid(3), amount}}, pid(2))(claimed, late)).core;
+        expect(yes.state.seats[seat3]!.stack).toBe(amount);
+        expect(yes.state.requests.map((r) => r.pid)).toEqual([pid(4)]);
+        expect(conservation(yes.state).ok).toBe(true);
+    });
 });
 
 describe('peopleV', () => {
@@ -458,15 +492,16 @@ describe('the clock and the room\'s life', () => {
         expect(expiryOf('closed', T0 + 99, T0)).toEqual({expiresAt: T0 + TIMING.ROOM_TTL_MS, closedAt: T0});
     });
 
-    it('keeps the last 64 applied action ids, each once', () => {
+    it('keeps the last KEEP.APPLIED (36) applied action ids, each once', () => {
         const key = (i: number) => appliedKey(pid(1), `0b7c1e2a-9f3d-4c5b-8a6e-${String(i).padStart(12, '0')}`);
         let applied: string[] = [];
         for (let i = 0; i < 100; i++) applied = withApplied(applied, key(i));
         expect(applied).toHaveLength(KEEP.APPLIED);
-        expect(applied[0]).toBe(key(36));
-        applied = withApplied(applied, key(50));
+        expect(KEEP.APPLIED).toBe(36);
+        expect(applied[0]).toBe(key(64));
+        applied = withApplied(applied, key(70));
         expect(applied).toHaveLength(KEEP.APPLIED);
-        expect(applied.at(-1)).toBe(key(50));
+        expect(applied.at(-1)).toBe(key(70));
         expect(new Set(applied).size).toBe(applied.length);
     });
 
@@ -621,12 +656,15 @@ describe('the views', () => {
 
     it('give a player their own cards and account flag, and nothing private to anyone', () => {
         const {core, now} = setUp();
-        const ben = playerViewFor(core, pid(2), 41, now, {realtimeOk: true, emotes: [], emoteSeq: 0, pass: 'p', duplicate: true});
+        const nudged = {...core, players: core.players.map((p) => (p.pid === pid(2) ? {...p, nudge: 2} : p))};
+        const ben = playerViewFor(nudged, pid(2), 41, now, {realtimeOk: true, emotes: [], emoteSeq: 0, pass: 'p', duplicate: true});
         expect(ben.me).toMatchObject({pid: pid(2), seat: 2, role: 'seated', isHost: false, hasAccount: true});
         expect(ben.me.hole).toHaveLength(2);
         expect(ben.duplicate).toBe(true);
         expect(ben.pass).toBe('p');
-        const ana = playerViewFor(core, pid(1), 41, now, {realtimeOk: true, emotes: [], emoteSeq: 0, pass: null});
+        expect(ben.nudge).toBe(2);
+        const ana = playerViewFor(nudged, pid(1), 41, now, {realtimeOk: true, emotes: [], emoteSeq: 0, pass: null});
+        expect(ana.nudge).toBe(0);
         expect(ana.me.hasAccount).toBe(false);
         expect('duplicate' in ana).toBe(false);
         for (const view of [ben, ana, roomView(core, 41, now, {realtimeOk: true})]) {
@@ -638,15 +676,16 @@ describe('the views', () => {
             expect(json).not.toContain('ana'.padEnd(22, 'x'));
         }
         // Another player's cards are never in Ana's view.
-        expect(ana.seats[2]!.cards).toBe('hidden');
+        expect(ana.seats[2]!.cards).toBe(2);
         expect(ana.me.hole).not.toEqual(ben.me.hole);
     });
 
     it('show a joined viewer their own view on the page, and anyone else the table behind the join card', () => {
         const {core, now} = setUp();
         const extras = {realtimeOk: true, emotes: [], emoteSeq: 0, pass: null};
-        const own = playPageView(core, guest('ana'), 41, now, extras);
+        const own = playPageView({...core, players: core.players.map((p) => (p.pid === pid(1) ? {...p, nudge: 5} : p))}, guest('ana'), 41, now, extras);
         expect('view' in own && own.view.me.pid).toBe(pid(1));
+        expect('view' in own && own.view.nudge).toBe(5);
         const watcher = playPageView(core, guest('wes'), 41, now, extras);
         expect('view' in watcher && watcher.view.me.role).toBe('watching');
         const identities: PlayerIdentity[] = [guest('stranger'), {kind: 'none'}, user('u-new'), guest('kim')];
@@ -660,6 +699,7 @@ describe('the views', () => {
             expect(page.join).toEqual({
                 banned: identity.kind === 'guest' && identity.guestId.startsWith('kim'), locked: false, seats: 8, seatsFree: 5,
                 watchersFull: false, roomFull: false, buyIn: {min: DEFAULT_CONFIG.buyInMin, max: DEFAULT_CONFIG.buyInMax}, hasAccount: identity.kind === 'user',
+                variant: 'holdem', boards: 1, needsApproval: core.state.handNo > 0,
             });
         }
     });

@@ -20,6 +20,10 @@ export interface PokerRoomPlayerDoc {
     avatar: string;           // 'v1:fox:tangerine:ring:crown' (lib/poker-night/avatar)
     joinedAt: Date;
     banned: boolean;          // removed by the host until let back in
+    // +1 each time a commit by someone else changed what only this player sees (an ask to see their
+    // cards, its answer, the host's sit-out): GET state's nsince and their own realtime channel read
+    // it (lib/poker-night/mutation.withNudges). PRIVATE but to the player; absent while 0.
+    nudge?: number;
 }
 
 export interface PokerRoomDoc extends Document {
@@ -65,6 +69,7 @@ const PokerRoomPlayerSchema = new Schema<PokerRoomPlayerDoc>(
         avatar: {type: String, required: true},
         joinedAt: {type: Date, required: true},
         banned: {type: Boolean, required: true, default: false},
+        nudge: {type: Number, default: undefined},
     },
     {_id: false},
 );

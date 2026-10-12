@@ -4,21 +4,25 @@
 // turn timed out by any other writer only after the slack, so an in-time move still on its way beats
 // a tick or another player's request to the compare-and-set; a refused step whose clock still moved
 // committing the clock alone, without its action id; no write when nothing changed; a write that
-// only its author can see (a pre-action) told apart, so the public seq never shows its timing; and
-// the retry backoff.
+// only its author can see (a pre-action, leaving after the hand, a sit-out asked for mid-hand, an ask
+// to see a hand and its answer, the "let others ask" setting) told apart, so the public seq never
+// shows its timing, and the players it concerns but its author named, to be nudged; and the retry
+// backoff.
 
 import {describe, expect, it} from 'vitest';
 import {nextDueAt} from '@/lib/poker-night/clock';
-import {TIMING} from '@/lib/poker-night/config';
+import {ASK_EXPIRED} from '@/lib/poker-night/asks';
+import {ASKS, TIMING} from '@/lib/poker-night/config';
 import {FULL_DECK} from '@/lib/poker-night/deck';
+import {reduce} from '@/lib/poker-night/engine';
 import type {JoinInput} from '@/lib/poker-night/input';
-import {backoffMs, planMutation, seenByOthers, type MutationInput, type Plan} from '@/lib/poker-night/mutation';
+import {backoffMs, nudgesOf, planMutation, seenByOthers, type MutationInput, type Plan} from '@/lib/poker-night/mutation';
 import {
     actionStep, appliedKey, clockStep, joinStep, newRoom, playerViewFor, tableStep, wireOf, type KnownIdentity, type RoomCore, type Step, type StepResult,
 } from '@/lib/poker-night/room';
 import type {DeckSource} from '@/lib/poker-night/types';
 import {mulberry32} from '@/lib/random';
-import {T0} from './fixtures';
+import {F, T0, deal, moves, ok, table} from './fixtures';
 
 const AV = 'v1:fox:tangerine:ring:crown';
 const HOST = 'HostPid0001';
@@ -202,7 +206,7 @@ describe('an idle room', () => {
 });
 
 describe('who can see a write', () => {
-    const extras = {realtimeOk: true, emotes: [], emoteSeq: 0, pass: null};
+    const extras = {realtimeOk: true, emotes: [], emoteSeq: 0, pass: null, nudge: 0};
     // The seat not on the clock heads-up, and its pre-action through the action route's step.
     const waitingOf = (core: RoomCore): string => (actorOf(core) === HOST ? ANA : HOST);
     const preStep = (pid: string, pre: {kind: 'check-fold'} | null, id: string) => ({
@@ -238,6 +242,95 @@ describe('who can see a write', () => {
         const set = commitOf(plan({core, ...preStep(waiting, {kind: 'check-fold'}, 'pre-set-0000000002')})).core;
         expect(commitOf(plan({core: set, step: actorCalls(set), by: actorOf(set)})).visible).toBe(true);
         expect(seenByOthers(core, core)).toBe(false);
+    });
+
+    const act = (pid: string, id: string, input: Record<string, unknown>) => ({
+        step: actionStep({actionId: id, ...input} as Parameters<typeof actionStep>[0], pid), key: appliedKey(pid, id), by: pid,
+    });
+
+    it('shows a card thrown away (Triple T) to the table as a seat holding two, the card to its owner alone', () => {
+        const base = okStep(tableStep({type: 'host', by: HOST, op: {op: 'config', patch: {variant: 'triple-t'}}})(started(), T0)).core;
+        const core = okStep(clockStep(SOURCE)(base, base.state.nextHandAt!)).core;
+        expect(core.state.hand!.phase).toBe('discard');
+        const at = core.state.hand!.startedAt;
+        const card = core.state.hand!.seats.find((p) => p.pid === ANA)!.hole[0];
+        const p = commitOf(plan({core, ...act(ANA, 'discard-000000001', {type: 'discard', turn: core.state.turn, card}), receivedAt: at, now: at}));
+        expect(p.visible).toBe(true);
+        expect(p.refusal).toBeNull();
+        const anaSeat = p.core.state.seats.findIndex((x) => x?.pid === ANA);
+        expect(wireOf(p.core, 5, at, extras).seats[anaSeat]!.cards).toBe(2);
+        expect(playerViewFor(p.core, ANA, 5, at, extras).me.discard).toBe(card);
+        expect(playerViewFor(p.core, HOST, 5, at, extras).me.discard).toBeNull();
+        // The same id again is the same throw, answered.
+        expect(plan({core: p.core, ...act(ANA, 'discard-000000001', {type: 'discard', turn: core.state.turn, card}), applied: p.applied, receivedAt: at, now: at}))
+            .toEqual({kind: 'duplicate'});
+    });
+
+    it('keeps leaving after the hand, and a sit-out asked for mid-hand, to the player: nobody else is told', () => {
+        const core = dealt();
+        const p = commitOf(plan({core, ...act(ANA, 'leave-after-000001', {type: 'leave-after', on: true})}));
+        expect(p.visible).toBe(false);
+        expect(p.nudge).toEqual([]);
+        expect(wireOf(p.core, 5, T0, extras)).toEqual(wireOf(core, 5, T0, extras));
+        expect(playerViewFor(p.core, ANA, 5, T0, extras).me.next).toBe('leave-after');
+        const back = commitOf(plan({core: p.core, ...act(ANA, 'leave-after-000002', {type: 'leave-after', on: false})}));
+        expect(back.visible).toBe(false);
+        const out = commitOf(plan({core, ...act(ANA, 'sit-out-mid-00001', {type: 'sit-out'})}));
+        expect(out.visible).toBe(false);
+        // The host's sit-out of Ana: hidden from the table, but Ana is nudged — her own view changed.
+        const hostOut = commitOf(plan({core, ...act(HOST, 'host-sit-out-00001', {type: 'host', op: {op: 'sit-out', pid: ANA}})}));
+        expect(hostOut.visible).toBe(false);
+        expect(hostOut.nudge).toEqual([ANA]);
+        expect(playerViewFor(hostOut.core, ANA, 5, T0, extras).me.next).toBe('sit-out');
+    });
+
+    it('keeps an ask to see a hand and its answer to their two players, nudging the other one', () => {
+        let core = dealt();
+        const folder = actorOf(core);
+        const winner = folder === HOST ? ANA : HOST;
+        core = commitOf(plan({core, step: actorFolds(core), by: folder})).core;
+        const at = core.state.hand!.result!.completedAt;
+        const ask = commitOf(plan({core, ...act(folder, 'ask-to-see-000001', {type: 'ask', to: winner}), receivedAt: at + 100, now: at + 100}));
+        expect(ask.visible).toBe(false);
+        expect(ask.nudge).toEqual([winner]);
+        // The count moves on the row of the player nudged alone, and the people's version stays put.
+        const counts = (c: typeof core) => Object.fromEntries(c.players.map((p) => [p.pid, p.nudge]));
+        expect(counts(ask.core)).toEqual({...counts(core), [winner]: counts(core)[winner] + 1});
+        expect(ask.core.peopleV).toBe(core.peopleV);
+        expect(playerViewFor(ask.core, winner, 5, at + 100, extras).nudge).toBe(counts(core)[winner] + 1);
+        expect(wireOf(ask.core, 5, at, extras)).toEqual(wireOf(core, 5, at, extras));
+        const shown = commitOf(plan({core: ask.core, ...act(winner, 'reply-to-ask-00001', {type: 'reply', to: folder, show: 'one'}), receivedAt: at + 200, now: at + 200}));
+        expect(shown.visible).toBe(false);
+        expect(shown.nudge).toEqual([folder]);
+        expect(counts(shown.core)).toEqual({...counts(ask.core), [folder]: counts(ask.core)[folder] + 1});
+        expect(shown.hands).toHaveLength(1);
+        expect(playerViewFor(shown.core, folder, 5, at + 200, extras).me.shownToMe).toHaveLength(1);
+        // Shown to everyone instead: a show the table sees.
+        const all = commitOf(plan({core: ask.core, ...act(winner, 'reply-to-ask-00002', {type: 'reply', to: folder, show: 'all'}), receivedAt: at + 200, now: at + 200}));
+        expect(all.visible).toBe(true);
+        expect(all.nudge).toEqual([folder]);
+        // Turning asks off: nobody told.
+        const off = commitOf(plan({core, ...act(winner, 'asks-off-00000001', {type: 'allow-asks', on: false}), receivedAt: at + 50, now: at + 50}));
+        expect([off.visible, off.nudge]).toEqual([false, []]);
+        expect(nudgesOf(core.state, core.state, null, at)).toEqual([]);
+    });
+
+    it('tells nobody but an ask\'s two players of it: another pair\'s ask or answer, which writes down an expiry both views already read, nudges no one else', () => {
+        // Four players fold to the big blind, p1, who wins unshown.
+        let s = deal(table({0: 1000, 1: 1000, 2: 1000, 3: 1000}, {lastBigBlind: 0}));
+        s = moves(s, F, F, F);
+        const at = s.hand!.result!.completedAt;
+        s = ok(reduce(s, {type: 'ask', by: 'p0', to: 'p1', at}));
+        // p1 lets it run out; a moment later p3 asks p2.
+        const late = at + ASKS.WAIT_MS + 1;
+        const asked = ok(reduce(s, {type: 'ask', by: 'p3', to: 'p2', at: late}));
+        expect(asked.hand!.asks[0][3]).toBe(ASK_EXPIRED);
+        expect(nudgesOf(s, asked, 'p3', late)).toEqual(['p2']);
+        // A private answer: the one who asked alone is told.
+        const replied = ok(reduce(asked, {type: 'reply', by: 'p2', to: 'p3', show: 'none', at: late + 10}));
+        expect(nudgesOf(asked, replied, 'p2', late + 10)).toEqual(['p3']);
+        // The expiry itself, read before its time, is news to its two players.
+        expect(nudgesOf(s, asked, 'p3', at + 10)).toEqual(['p0', 'p1', 'p2']);
     });
 });
 

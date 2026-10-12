@@ -87,6 +87,9 @@ export type RoomController = {
     setProfile: (patch: Partial<Profile>) => void;
     profileDraft: ProfileDraft | null;
     setProfileDraft: (draft: ProfileDraft | null) => void;
+    // The viewer's seat went to sitting out without a sit-out of their own on its way: the host sat
+    // them out (lib/poker-night/overlays.rememberSitOut, followed from view to view in this page).
+    satOutByHost: boolean;
     shareUrl: string;
     code: string;
     invite: boolean; // the host just started the table (?invite=1): the invite sheet opens first

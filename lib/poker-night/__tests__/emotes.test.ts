@@ -1,4 +1,4 @@
-// Emotes: the registries (twelve reactions, sixteen phrases, ten throwables, each glyph one plain
+// Emotes: the registries (thirteen reactions, sixteen phrases, ten throwables, each glyph one plain
 // emoji code point from Emoji 12.0 or earlier), a request read only with exactly its keys and ids
 // from the registries (and the route's zod schema agreeing with the hand-written reader), a message
 // off the channel read the same way, who may send what, the room's one conditional write (the
@@ -12,12 +12,12 @@ import {isHex6} from '@/lib/theme/color';
 import {
     admit, awardPaths, buildEmoteCss, burstJitter, checkEmote, EMOTE_COOLDOWN_MS, EMOTE_CSS, EMOTE_REFUSALS, EMOTE_SIZES, EMOTE_TIMING, emoteCeiling, emoteOut,
     emoteShows, emoteSpot, IMPACT_COLOURS, IMPACT_KINDS, impactBits, impactOf, isPhrase, isReaction, isThrowable, landed, landingSound, liveFor, MIN_ARC,
-    nextChange, ON_SCREEN_CAP, parseEmote, PHRASE_IDS, REACTION_IDS, reactionPx, REACTIONS, reactionGlyph, readEmote, settle, THROW_IDS, THROWABLES,
+    landedBetween, nextChange, ON_SCREEN_CAP, parseEmote, PHRASE_IDS, REACTION_IDS, reactionPx, REACTIONS, reactionGlyph, readEmote, settle, THROW_IDS, THROWABLES,
     throwCeiling, throwGlyph, throwPath, throwPx, type EmoteMessage, type LiveEmote,
 } from '@/lib/poker-night/emotes';
 import {SEAT_COUNTS} from '@/lib/poker-night/layout';
-import {SOUND_IDS} from '@/lib/poker-night/sounds';
-import {avatarCentre, CARD_RATIO, SHOWN_CARD_PX, stageLayout} from '@/lib/poker-night/stage';
+import {HIT_SOUND_IDS, SOUND_IDS} from '@/lib/poker-night/sounds';
+import {avatarCentre, CARD_RATIO, SHOWN_CARD_PX, shownHandRect, stageLayout} from '@/lib/poker-night/stage';
 import {EmoteSchema} from '@/lib/poker-night/input';
 import {LIMITS} from '@/lib/poker-night/limits';
 import {emoteTableFromDoc, emoteWrite} from '@/lib/poker-night/room-doc';
@@ -33,8 +33,8 @@ const msg = (over: Partial<EmoteMessage> & Pick<EmoteMessage, 'kind'>): EmoteMes
     ({item: 'laugh', id: 'e1', seq: 1, from: A, at: T0, ...over} as EmoteMessage);
 
 describe('the registries', () => {
-    it('list 12 reactions, 16 phrases and 10 throwables, each with an impact', () => {
-        expect(REACTION_IDS).toEqual(['laugh', 'wow', 'cool', 'fire', 'clap', 'cry', 'think', 'grimace', 'peek', 'party', 'huff', 'sleepy']);
+    it('list 13 reactions, 16 phrases and 10 throwables, each with an impact', () => {
+        expect(REACTION_IDS).toEqual(['laugh', 'wow', 'cool', 'fire', 'clap', 'cry', 'think', 'grimace', 'peek', 'party', 'huff', 'mad', 'sleepy']);
         expect(PHRASE_IDS).toHaveLength(16);
         expect(new Set(PHRASE_IDS).size).toBe(16);
         expect(THROW_IDS).toEqual(['tomato', 'rose', 'soda', 'confetti', 'cake', 'egg', 'tennis-ball', 'popcorn', 'heart', 'fish']);
@@ -48,7 +48,7 @@ describe('the registries', () => {
     it('pin the code points the design lists', () => {
         expect(REACTIONS).toEqual({
             laugh: 0x1f602, wow: 0x1f62e, cool: 0x1f60e, fire: 0x1f525, clap: 0x1f44f, cry: 0x1f62d,
-            think: 0x1f914, grimace: 0x1f62c, peek: 0x1f648, party: 0x1f973, huff: 0x1f624, sleepy: 0x1f634,
+            think: 0x1f914, grimace: 0x1f62c, peek: 0x1f648, party: 0x1f973, huff: 0x1f624, mad: 0x1f621, sleepy: 0x1f634,
         });
         expect(Object.fromEntries(THROW_IDS.map((id) => [id, THROWABLES[id].point]))).toEqual({
             tomato: 0x1f345, rose: 0x1f339, soda: 0x1f964, confetti: 0x1f389, cake: 0x1f370, egg: 0x1f95a,
@@ -227,6 +227,23 @@ describe('drawing them', () => {
         expect(nextChange([])).toBeNull();
     });
 
+    it('says which throws landed between two settlements, whichever settles the screen first — so a landing\'s sound never goes missing', () => {
+        const thrown = liveFor(msg({kind: 'throw', item: 'egg', to: B, id: 't'} as Partial<EmoteMessage> & {kind: 'throw'}), 0, false);
+        const burst = liveFor(msg({kind: 'react', id: 'r'}), 0, false);
+        const items = [thrown, burst];
+        // Not yet: nothing landed.
+        expect(landedBetween(items, settle(items, 749))).toEqual([]);
+        // A view arriving a moment after the flight ended settles the screen before the store's timer:
+        // the landing is reported there, once.
+        const atLand = settle(items, 760);
+        expect(landedBetween(items, atLand).map((i) => [i.key, i.phase])).toEqual([['t', 'impact']]);
+        // The timer that follows finds it landed already: nothing twice.
+        expect(landedBetween(atLand, settle(atLand, 775))).toEqual([]);
+        // A throw shown as its impact alone (reduced motion) never lands: its sound is the arrival's.
+        const still = [liveFor(msg({kind: 'throw', item: 'egg', to: B, id: 's'} as Partial<EmoteMessage> & {kind: 'throw'}), 0, true)];
+        expect(landedBetween(still, settle(still, 760))).toEqual([]);
+    });
+
     it('keeps at most three per player and 24 in all, the oldest going first; a new phrase replaces the bubble', () => {
         let items: LiveEmote[] = [];
         for (let i = 0; i < 5; i++) items = admit(items, liveFor(msg({kind: 'react', id: `a${i}`}), i, false));
@@ -265,14 +282,10 @@ describe('drawing them', () => {
         expect(throwPath({x: 100, y: 500}, {x: 300, y: 500}, 0).arc).toBe(70);
     });
 
-    it('sounds each landing by its impact: a splat only for a splat', () => {
-        expect(THROW_IDS.filter((id) => landingSound(id) === 'splat').sort()).toEqual(['cake', 'egg', 'tomato']);
-        expect(landingSound('rose')).toBe('pop');
-        expect(landingSound('heart')).toBe('pop');
-        expect(landingSound('confetti')).toBe('pop');
-        expect(landingSound('soda')).toBe('fizz');
-        expect(landingSound('tennis-ball')).toBe('bounce');
-        expect(landingSound('fish')).toBe('bounce');
+    it('sounds each landing as the thing thrown: a landing of its own for each, every one a sound the table makes', () => {
+        expect(THROW_IDS.map(landingSound)).toEqual(THROW_IDS.map((id) => `hit-${id}`));
+        expect(new Set(THROW_IDS.map(landingSound)).size).toBe(THROW_IDS.length);
+        expect([...HIT_SOUND_IDS].sort()).toEqual(THROW_IDS.map(landingSound).sort());
         for (const id of THROW_IDS) expect(SOUND_IDS).toContain(landingSound(id));
     });
 
@@ -326,12 +339,12 @@ describe('drawing them', () => {
                             // The reaction's whole rise, its glyph on top, stays under the top bar.
                             expect(spot.y - EMOTE_SIZES.rise - reactionPx(stage.fit)).toBeGreaterThanOrEqual(emoteCeiling(stage.fit));
                         }
-                        // The turned-up cards: over a bottom or side plate, under a top one — never under the bubble.
-                        if (shown) {
+                        // The turned-up cards: over a bottom or side plate, under a top one (or under a side one
+                        // moved off a crowded column's plates) — never under the bubble; beside the plate, out of its way.
+                        const hand = shownHandRect(place, stage);
+                        if (shown && Math.abs(hand.x - place.plate.x) < (stage.plateSize.w + hand.w) / 2) {
                             const cardH = SHOWN_CARD_PX[stage.fit] * CARD_RATIO;
-                            const cards = place.spot.side === 'top'
-                                ? {top: place.plate.y + half + 10, bottom: place.plate.y + half + 10 + cardH}
-                                : {top: place.plate.y - half - 3 - cardH, bottom: place.plate.y - half - 3};
+                            const cards = {top: hand.y + hand.h / 2 - cardH, bottom: hand.y + hand.h / 2};
                             const bubble = spot.below ? {top: spot.y - 5, bottom: spot.y + BUBBLE} : {top: spot.y - BUBBLE, bottom: spot.y + 5};
                             expect(bubble.bottom <= cards.top || bubble.top >= cards.bottom, JSON.stringify({box: stage.box, seat: place.seat, spot, cards})).toBe(true);
                         }
