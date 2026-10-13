@@ -17,7 +17,7 @@ Follow the topics you care about, test trading strategies with virtual money, an
 
 ## What it does
 
-**A front door and a home.** A visitor sees what AeroTrade is before making an account — its hero is a 3D terrain of SPY's momentum over the last year, one row per lookback from a week to a year, drawn from Tiingo's end-of-day prices (or, without a key, the app's own stored closes) and refreshed once an hour, that turns, flattens and answers a hover with the session under it; after sign-in, Home opens on the same terrain, then shows your accounts under one total, what changed in your topics, the morning's briefing, the next lesson and one thing to look at next. Navigation is eight icons on a slim rail, with a section's other pages as tabs above the page.
+**A front door and a home.** A visitor sees what AeroTrade is before making an account — its hero is a 3D terrain of SPY's momentum over the last year, one row per lookback from a week to a year, drawn from Tiingo's end-of-day prices (or, without a key, the app's own stored closes) and refreshed once an hour, that turns, flattens and answers a hover with the session under it; after sign-in, Home opens on the same terrain, then shows your accounts under one total, what changed in your topics, the morning's briefing, the next lesson and one thing to look at next. Navigation is seven icons on a slim rail, with a section's other pages as tabs above the page.
 
 **A morning briefing.** Once a day a scheduled job condenses the most important articles the news brain read into a few points, each linked to the articles it draws on, and the news page sets it above your topics, the stories that name what you hold or watch, and a handful of top headlines.
 
@@ -162,7 +162,7 @@ Every feature has one folder name in every layer — `lib/trading/`, `components
 app/            routes — (auth) sign-in, sign-up, forgot-password · (reset) reset-password
                 (marketing) welcome — the landing page a signed-out visitor sees at /
                 (root) home (/), dashboard, topics, topics/[slug], brain, culture, strategies, strategies/[slug], stocks/[symbol],
-                trade, portfolio, history, markets, news, watchlist, friends, friends/[id], learn (the owner's lab),
+                trade (the Markets page), portfolio, history, news, watchlist, friends, friends/[id], learn (the owner's lab),
                 glossary, games, poker, poker-night, settings
                 (play) play/[code] — a poker night table: full screen, no app shell, open to guests
                 api/ chat, inngest, accounts/[accountId]/export, strategies/[slug]/export, landing/surface,

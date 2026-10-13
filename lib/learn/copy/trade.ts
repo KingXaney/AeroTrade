@@ -43,3 +43,17 @@ export const ACCOUNT_COPY = {
 
 export const queueLine = (nextOpenLabel: string): string =>
     `Paper fills now at the last close · a real broker would queue this to ${nextOpenLabel}`;
+
+// The Markets page (/trade), the section's first page since the Markets overview and the Trade
+// Desk became one page (2026-10-13): its header, the open positions panel and the market scan.
+// Held to the 'copy' tier by lib/learn/__tests__/trade-copy.test.ts.
+export const MARKETS_PAGE_COPY = {
+    title: 'Markets',
+    subtitle: 'Paper trading',
+    fullPortfolio: 'View full portfolio →',
+    positionsHeading: 'Open positions',
+    positionsLink: 'Full holdings & history →',
+    scanHeading: 'Scan the market',
+    scanNote: 'Equities, crypto and FX from TradingView — one view at a time, kept in the address.',
+    scanViews: 'Market views',
+} as const;

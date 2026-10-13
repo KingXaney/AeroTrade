@@ -193,8 +193,8 @@ const until = async (page, fn, ms) => {
     await page.goto(`${BASE}/topics/ai-chips`, {waitUntil: 'load'});
     await page.waitForTimeout(800);
     const railNav = await page.$$eval('aside.rail nav a', (as) => as.map((a) => a.getAttribute('aria-label')?.split(',')[0]));
-    // All eight come from lib/shell/navigation.ts; the account pages are in the avatar menu.
-    check('the rail runs Home · News · Markets … Learn', railNav.join(',') === 'Home,News,Markets,Trade,Portfolio,Strategies,Brain,Learn', railNav.join(','));
+    // All seven come from lib/shell/navigation.ts; the account pages are in the avatar menu.
+    check('the rail runs Home · News · Markets … Learn', railNav.join(',') === 'Home,News,Markets,Portfolio,Strategies,Brain,Learn', railNav.join(','));
     const tabHrefs = await page.$$eval('[data-section-tabs="news"] a', (as) => as.map((a) => `${a.getAttribute('href')}${a.getAttribute('aria-current') === 'page' ? '*' : ''}`));
     check('a topic page sits under News, on its Topics tab', tabHrefs.join(',') === '/news,/topics*', tabHrefs.join(','));
     // Search is a palette trigger, not a route — it used to be a fake '/search' NAV_ITEMS entry.

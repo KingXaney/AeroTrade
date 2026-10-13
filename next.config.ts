@@ -22,6 +22,12 @@ const nextConfig: NextConfig = {
   async headers() {
     return [{ source: "/(.*)", headers: SECURITY_HEADERS }];
   },
+  // /markets was the Markets overview until 2026-10-13, when it and the trade desk became one
+  // page. Its views are the same views on /trade, and Next passes the query through, so
+  // /markets?view=heatmap lands on the heatmap.
+  async redirects() {
+    return [{ source: "/markets", destination: "/trade", permanent: true }];
+  },
 };
 
 export default nextConfig;

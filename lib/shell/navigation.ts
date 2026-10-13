@@ -58,15 +58,15 @@ export const NAV_SECTIONS: readonly NavSection[] = [
         ],
     },
     {
-        id: 'markets', label: 'Markets', icon: 'query_stats', match: ['/stocks'],
+        // Markets and Trade were two icons until 2026-10-13: an overview of TradingView screeners
+        // and a thin trade desk, both embeds around a symbol. They are one page now, /trade — the
+        // ticker tape, the desk, the last fill, the open positions and the market scan — and the
+        // old /markets address redirects there (next.config.ts, its ?view= carried over).
+        id: 'markets', label: 'Markets', icon: 'candlestick_chart', match: ['/stocks'],
         pages: [
-            {href: '/markets', label: 'Overview', icon: 'query_stats'},
+            {href: '/trade', label: 'Trade', icon: 'candlestick_chart'},
             {href: '/watchlist', label: 'Watchlist', icon: 'bookmark', badge: 'watchlist'},
         ],
-    },
-    {
-        id: 'trade', label: 'Trade', icon: 'candlestick_chart',
-        pages: [{href: '/trade', label: 'Trade', icon: 'candlestick_chart'}],
     },
     {
         id: 'portfolio', label: 'Portfolio', icon: 'account_balance_wallet', badge: 'unpriced', flyout: 'portfolio',
@@ -109,15 +109,18 @@ export const ACCOUNT_PAGES: readonly NavPage[] = [
 
 // What ⌘K and the Quick Links widget list: a page under a section's own name when it is the
 // section's only page or its first, so "Portfolio" finds /portfolio and "Activity" /history.
-export type NavDestination = NavPage & {section: string};
+// `tab` keeps the page's own name (what its tab reads), so "trade" still finds /trade, whose ⌘K
+// name is Markets.
+export type NavDestination = NavPage & {section: string; tab: string};
 
 const pagesOf = (sections: readonly NavSection[]): NavDestination[] => [
     ...sections.flatMap((section) => section.pages.map((page, i) => ({
         ...page,
         label: i === 0 ? section.label : page.label,
+        tab: page.label,
         section: section.label,
     }))),
-    ...ACCOUNT_PAGES.map((page) => ({...page, section: 'Account'})),
+    ...ACCOUNT_PAGES.map((page) => ({...page, tab: page.label, section: 'Account'})),
 ];
 
 // The full registry: what the tests hold to page files, and what an owner sees.
@@ -147,14 +150,15 @@ export const sectionFor = (pathname: string, sections: readonly NavSection[] = N
         section.pages.some((page) => isActiveNav(pathname, page.href))
         || (section.match ?? []).some((prefix) => isActiveNav(pathname, prefix)));
 
-// ⌘K's "go to page" rows: a destination whose name, or whose section's, starts a word of the
-// query's way — "port" finds Portfolio and its Activity tab, "act" only Activity. Compared as
-// plain lower-case text: the query never becomes a regex (invariant 2).
+// ⌘K's "go to page" rows: a destination whose name, whose tab's, or whose section's starts a
+// word of the query's way — "port" finds Portfolio and its Activity tab, "act" only Activity,
+// "trade" the desk under its Markets name. Compared as plain lower-case text: the query never
+// becomes a regex (invariant 2).
 export const searchPages = (query: string, limit = 5, pages: readonly NavDestination[] = NAV_PAGES): NavDestination[] => {
     const q = query.trim().toLowerCase();
     if (!q) return [];
     const starts = (text: string) => text.toLowerCase().split(/\s+/).some((word) => word.startsWith(q));
-    const byLabel = pages.filter((page) => starts(page.label));
+    const byLabel = pages.filter((page) => starts(page.label) || starts(page.tab));
     const bySection = pages.filter((page) => !byLabel.includes(page) && starts(page.section));
     return [...byLabel, ...bySection].slice(0, limit);
 };
