@@ -113,6 +113,20 @@ try {
         && await page.locator('[data-lab-written="true"] a').count() >= 9 && await page.locator('[data-lab-written="false"]').count() <= 21);
     check('…with the studied unit marked', await page.locator(`[data-lab-row="${unitId}"] [data-badge]`).count() === 1);
     await shot('04-lab-library');
+    // Every written unit's page renders: five sections, the python sketch, every formula (KaTeX
+    // marks one it could not render), and no interpolation left in the text.
+    const unitHrefs = await page.$$eval('[data-lab-written="true"] a[href^="/learn/units/"]', (as) => as.map((a) => a.getAttribute('href')));
+    const broken = [];
+    for (const href of unitHrefs) {
+        await page.goto(`${BASE}${href}`, {waitUntil: 'load'});
+        await page.locator('[data-lab-unit-page]').waitFor({timeout: 30000});
+        const text = await page.locator('main').innerText().catch(() => page.locator('body').innerText());
+        const ok = await page.locator('[data-lab-section]').count() === 5 && await page.locator('#lab-section-code pre code').count() >= 1
+            && await page.locator('.katex-error').count() === 0 && await page.locator('.katex').count() > 3
+            && await page.locator('#lab-sources a[href^="https://"]').count() >= 3 && !/undefined|\$\{|\[object/.test(text);
+        if (!ok) broken.push(href);
+    }
+    check(`every written unit page renders whole (${unitHrefs.length} pages)`, unitHrefs.length >= 18 && broken.length === 0, broken.join(','));
 
     // --- the papers: a seeded day, its digest citing by number, the links built from the ids ----------
     const labDay = {
