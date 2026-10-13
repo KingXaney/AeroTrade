@@ -12,7 +12,7 @@
 // row is removed at the end too. Neither the sign-up nor the sign-in action hands the browser the
 // session token its cookie carries, and the tab icon loads logged out.
 // Also, signed in first: the market-status badge on /trade and /watchlist (no "live prices"), the
-// /markets tab kept in the URL, and /history's Trades section.
+// the scan view kept in /trade's URL (and /markets redirecting there), and /history's Trades section.
 // Run: npm run qa -- auth   (the harness: README.md)
 import {chromium} from 'playwright';
 import {MongoClient} from 'mongodb';
@@ -90,13 +90,20 @@ try {
     check('watchlist states the market status instead of "real-time telemetry"', /Open · closes|Closed ·/i.test(wl) && !/real-time/i.test(wl));
     check('watchlist empty state promises no alerts', !/alerts/i.test(wl));
 
+    // The Markets overview became part of /trade on 2026-10-13; its address redirects with its view.
     await page.goto(`${BASE}/markets?view=heatmap`, {waitUntil: 'domcontentloaded'});
+    await page.waitForURL(/\/trade\?view=heatmap/, {timeout: 15000}).catch(() => {});
+    check('/markets?view=heatmap redirects to /trade with its view', /\/trade\?view=heatmap$/.test(page.url()), page.url());
     const heat = page.getByRole('tab', {name: 'Heatmap'});
     await heat.waitFor({timeout: 30000});
-    check('/markets?view=heatmap opens the Heatmap tab', (await heat.getAttribute('aria-selected')) === 'true');
+    check('…which opens the Heatmap view of the scan', (await heat.getAttribute('aria-selected')) === 'true');
+    // The page now carries the ticket and three embeds; let it finish loading before the click,
+    // which before hydration is a plain anchor's. A slow landing is a FAIL line, not a throw
+    // that ends the suite before the reset checks.
+    await page.waitForLoadState('load', {timeout: 30000}).catch(() => {});
     await page.getByRole('tab', {name: 'Crypto'}).click();
-    await page.waitForURL(/\/markets\?view=crypto/, {timeout: 15000});
-    check('picking a tab updates the URL', /view=crypto/.test(page.url()), page.url());
+    await page.waitForURL(/\/trade\?view=crypto/, {timeout: 30000}).catch(() => {});
+    check('picking a view updates the URL', /view=crypto/.test(page.url()), page.url());
     await page.reload({waitUntil: 'domcontentloaded'});
     check('the tab survives a reload', (await page.getByRole('tab', {name: 'Crypto'}).getAttribute('aria-selected')) === 'true');
 

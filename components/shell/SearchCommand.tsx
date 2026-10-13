@@ -154,9 +154,10 @@ export default function SearchCommand({
                                     <span className="material-symbols-outlined text-base text-brand" aria-hidden="true">{page.icon}</span>
                                     <div className="flex-1">
                                         <div className="search-item-name">{page.label}</div>
-                                        {page.section !== page.label && (
+                                        {/* The section under a tab's name; under a section's own name, the tab it opens on ("Markets" / "Trade"). */}
+                                        {(page.section !== page.label || page.tab !== page.label) && (
                                             <div className="text-sm text-fg-muted font-mono" style={{fontSize: '11px', letterSpacing: '0.02em'}}>
-                                                {page.section}
+                                                {page.section !== page.label ? page.section : page.tab}
                                             </div>
                                         )}
                                     </div>

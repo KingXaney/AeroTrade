@@ -12,27 +12,37 @@ import {openLotNotes} from "@/lib/trading/lots";
 import LastFill from "@/components/trading/desk/LastFill";
 import TradeDesk from "@/components/trading/desk/TradeDesk";
 import MarketStatus from "@/components/stocks/MarketStatus";
+import TradingViewWidget from "@/components/stocks/TradingViewWidget";
+import MarketScan, {isScanViewId} from "@/components/stocks/MarketScan";
+import {MARKET_EMBEDS} from "@/lib/stocks/tradingview";
 import {marketStatus} from "@/lib/prices/market-hours";
 import {describeQueuedFill} from "@/lib/learn/copy/market";
+import {MARKETS_PAGE_COPY} from "@/lib/learn/copy/trade";
 import OpenPositionsStrip from "@/components/trading/desk/OpenPositionsStrip";
 import AccountSwitcher from "@/components/trading/accounts/AccountSwitcher";
 import Panel from "@/components/primitives/Panel";
+import PageTitle from "@/components/primitives/PageTitle";
 import SectionHeading from "@/components/primitives/SectionHeading";
 
 // The browser tab's title; app/layout.tsx appends the app's name.
-export const metadata: Metadata = {title: "Trade"};
+export const metadata: Metadata = {title: MARKETS_PAGE_COPY.title};
 
+// The Markets page: the section's first page, since the Markets overview and the Trade Desk
+// became one on 2026-10-13 (docs/specs/2026-10-13-markets-trade-merge.md). Top to bottom: the
+// ticker tape, the desk (chart and ticket on one symbol), the last fill, the open positions, then
+// the market scan — four TradingView views, one at a time in ?view=. /markets redirects here.
 type TradePageProps = {
-    searchParams: Promise<{symbol?: string; account?: string}>;
+    searchParams: Promise<{symbol?: string; account?: string; view?: string}>;
 };
 
 const TradePage = async ({searchParams}: TradePageProps) => {
     const userId = await requireUserId();
 
-    const {symbol: raw, account: accountParam} = await searchParams;
+    const {symbol: raw, account: accountParam, view} = await searchParams;
     const chartSymbol = (raw || 'NASDAQ:AAPL').toUpperCase();
     // Bare ticker (drop exchange prefix) seeds the order panel.
     const orderSymbol = chartSymbol.includes(':') ? chartSymbol.split(':').pop()! : chartSymbol;
+    const scanView = isScanViewId(view) ? view : 'stocks';
 
     // The active account is resolved from the unpriced accounts, so the ledger read runs beside
     // the pricing instead of after it. Both reads are the render's cache()d ones the (root)
@@ -63,25 +73,33 @@ const TradePage = async ({searchParams}: TradePageProps) => {
 
     return (
         <div className="space-y-4">
-            {/* Header */}
-            <div className="flex flex-col md:flex-row md:items-end md:justify-between gap-4 mb-2">
-                <div>
-                    <h1 className="text-2xl font-semibold text-fg mb-1 font-heading">
-                        Trade Desk
-                    </h1>
-                    {/* Used to read "live prices" at 3 a.m. on a Sunday. */}
-                    <p className="text-sm text-fg-muted flex flex-wrap items-center gap-x-3 gap-y-1">
-                        <span>Paper trading</span>
+            <PageTitle
+                title={MARKETS_PAGE_COPY.title}
+                // Used to read "live prices" at 3 a.m. on a Sunday.
+                subtitle={(
+                    <span className="inline-flex flex-wrap items-center gap-x-3 gap-y-1">
+                        <span>{MARKETS_PAGE_COPY.subtitle}</span>
                         <MarketStatus status={status} />
-                    </p>
-                </div>
-                <div className="flex items-center gap-3">
-                    <AccountSwitcher accounts={switcherAccounts} activeId={activeId} />
-                    <Link href="/portfolio" className="text-xs text-brand hover:underline font-mono">
-                        View full portfolio →
-                    </Link>
-                </div>
-            </div>
+                    </span>
+                )}
+                actions={(
+                    <div className="flex items-center gap-3">
+                        <AccountSwitcher accounts={switcherAccounts} activeId={activeId} />
+                        <Link href="/portfolio" className="text-xs text-brand hover:underline font-mono">
+                            {MARKETS_PAGE_COPY.fullPortfolio}
+                        </Link>
+                    </div>
+                )}
+            />
+
+            {/* The market's pulse, always on: the one embed the overview kept above its views. */}
+            <Panel pad={3}>
+                <TradingViewWidget
+                    scriptUrl={MARKET_EMBEDS.tickerTape.script}
+                    config={MARKET_EMBEDS.tickerTape.config}
+                    height={70}
+                />
+            </Panel>
 
             {/* Chart + order entry — the focus of this page; one symbol drives both */}
             <TradeDesk
@@ -100,14 +118,17 @@ const TradePage = async ({searchParams}: TradePageProps) => {
             <Panel>
                 <div className="flex items-center justify-between mb-4">
                     <SectionHeading spacing="none">
-                        Open Positions
+                        {MARKETS_PAGE_COPY.positionsHeading}
                     </SectionHeading>
                     <Link href="/portfolio" className="text-xs text-fg-muted hover:text-brand font-mono">
-                        Full holdings &amp; history →
+                        {MARKETS_PAGE_COPY.positionsLink}
                     </Link>
                 </div>
                 <OpenPositionsStrip positions={portfolio.positions} accountId={activeId} lotNotes={ledger ? openLotNotes(ledger) : undefined} />
             </Panel>
+
+            {/* The scan: the four views the overview page had, one at a time, keeping the desk's symbol and account in every link. */}
+            <MarketScan active={scanView} params={{symbol: raw, account: accountParam}} />
         </div>
     );
 };

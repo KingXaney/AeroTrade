@@ -1,4 +1,4 @@
-// The app shell (components/shell, lib/shell): the icon rail lists the eight sections and names
+// The app shell (components/shell, lib/shell): the icon rail lists the seven sections and names
 // each on hover, Portfolio and News open their cards, a section's other pages are tabs on the page,
 // ⌘K works by keyboard alone and finds a page by name, the mobile drawer stands in for the rail
 // and closes after navigating, and the drawer's Logout signs out and lands on /sign-in. Also
@@ -24,19 +24,19 @@ try {
     // --- the desktop rail: one icon per section, nothing repeated in the header ---
     const railHrefs = await page.$$eval('aside.rail nav a', (as) => as.map((a) => a.getAttribute('href')));
     // The Learn icon goes to the games: /learn is the owner's lab, and this account is not the owner.
-    check('the rail lists the eight sections',
-        railHrefs.join(',') === '/,/news,/markets,/trade,/portfolio,/strategies,/brain,/games', railHrefs.join(','));
+    check('the rail lists the seven sections',
+        railHrefs.join(',') === '/,/news,/trade,/portfolio,/strategies,/brain,/games', railHrefs.join(','));
     check('…each named for a screen reader, with the dashboard lit',
-        await page.locator('aside.rail nav a[aria-label]').count() === 8
+        await page.locator('aside.rail nav a[aria-label]').count() === 7
         && await page.locator('aside.rail nav a[aria-current="page"]').getAttribute('data-rail') === 'home');
     check('the header carries no section links',
         await page.locator('header nav a').count() === 0 && await page.locator('header a[href="/"]').count() === 1);
     check('hamburger is hidden at desktop width',
         !(await page.locator('button[aria-label="Open navigation"]').isVisible()));
-    await page.locator('aside.rail a[data-rail="trade"]').hover();
-    const tip = page.locator('[data-rail-tip="trade"]');
+    await page.locator('aside.rail a[data-rail="markets"]').hover();
+    const tip = page.locator('[data-rail-tip="markets"]');
     await tip.waitFor({timeout: 5000}).catch(() => {});
-    check('an icon names itself on hover', (await tip.innerText().catch(() => '')).includes('Trade'));
+    check('an icon names itself on hover', (await tip.innerText().catch(() => '')).includes('Markets'));
     await page.locator('aside.rail a[data-rail="portfolio"]').hover();
     const flyout = page.locator('[data-rail-flyout="portfolio"]');
     await flyout.waitFor({timeout: 5000}).catch(() => {});
@@ -57,8 +57,16 @@ try {
     await page.goto(`${BASE}/games`, {waitUntil: 'load'});
     const learnTabs = await page.$$eval('[data-section-tabs="learn"] a', (as) => as.map((a) => `${a.getAttribute('href')}${a.getAttribute('aria-current') === 'page' ? '*' : ''}`));
     check('Learn shows Games, the Poker solver, Poker night and the Glossary, Games current', learnTabs.join(',') === '/games*,/poker,/poker-night,/glossary', learnTabs.join(','));
-    await page.goto(`${BASE}/trade`, {waitUntil: 'load'});
+    await page.goto(`${BASE}/strategies`, {waitUntil: 'load'});
     check('a section of one page shows no tabs', await page.locator('[data-section-tabs]').count() === 0);
+    // Markets and Trade merged on 2026-10-13: the desk is the Markets section's first page.
+    await page.goto(`${BASE}/trade`, {waitUntil: 'load'});
+    const marketTabs = await page.$$eval('[data-section-tabs="markets"] a', (as) => as.map((a) => `${a.getAttribute('href')}${a.getAttribute('aria-current') === 'page' ? '*' : ''}`));
+    check('Markets shows the trade desk and the Watchlist, the desk current', marketTabs.join(',') === '/trade*,/watchlist', marketTabs.join(','));
+    check('…under the Markets heading, with the ticker tape, the ticket and the scan on one page',
+        await page.getByRole('heading', {name: 'Markets', exact: true}).count() === 1
+        && await page.getByText('Order Entry').count() === 1
+        && await page.getByRole('tablist', {name: 'Market views'}).count() === 1);
     await page.goto(`${BASE}/stocks/SPY`, {waitUntil: 'load'});
     check('a stock page lights Markets', await page.locator('aside.rail nav a[aria-current="page"]').getAttribute('data-rail') === 'markets');
     // The palette listens for ⌘K from an effect, so a press before Home has hydrated is lost —
@@ -87,23 +95,23 @@ try {
     check('the rail is gone and search is still one tap away',
         !(await page.locator('aside.rail').isVisible()) && await page.locator('header button.search-text').isVisible());
     check('Activity is a tab on the page, without opening anything', await page.locator('[data-section-tabs] a[href="/history"]:visible').count() === 1);
-    const before = await page.locator('a[href="/markets"]:visible').count();
-    check('markets has no visible link before opening the drawer', before === 0, String(before));
+    const before = await page.locator('a[href="/news"]:visible').count();
+    check('news has no visible link before opening the drawer', before === 0, String(before));
 
     await page.locator('button[aria-label="Open navigation"]').click();
     await page.waitForTimeout(400);
-    for (const href of ['/', '/news', '/markets', '/trade', '/portfolio', '/strategies', '/brain', '/games', '/friends', '/settings']) {
+    for (const href of ['/', '/news', '/trade', '/portfolio', '/strategies', '/brain', '/games', '/friends', '/settings']) {
         check(`drawer reaches ${href}`, await page.locator(`[data-slot="sheet-content"] a[href="${href}"]`).count() === 1);
     }
     await shot('02-mobile-drawer');
 
     // Closing on navigation is manual — Radix does not do it for us.
-    await page.locator('[data-slot="sheet-content"] a[href="/markets"]').click();
-    await page.waitForURL(/\/markets/, {timeout: 15000});
+    await page.locator('[data-slot="sheet-content"] a[href="/trade"]').click();
+    await page.waitForURL(/\/trade/, {timeout: 15000});
     await page.waitForTimeout(600);
     check('drawer closes after navigating', await page.locator('[data-slot="sheet-content"]').count() === 0);
-    check('landed on /markets, where Watchlist is a tab',
-        page.url().endsWith('/markets') && await page.locator('[data-section-tabs="markets"] a[href="/watchlist"]:visible').count() === 1);
+    check('landed on /trade, where Watchlist is a tab',
+        page.url().endsWith('/trade') && await page.locator('[data-section-tabs="markets"] a[href="/watchlist"]:visible').count() === 1);
 
     // --- friend-request badge --------------------------------------------------
     const second = await browser.newPage({viewport: {width: 1440, height: 900}});

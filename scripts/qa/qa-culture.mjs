@@ -331,7 +331,7 @@ try {
     check('/culture opens on its brands, one view of three', viewTabs.join(',') === 'brands*,picks,system', viewTabs.join(','));
     const sectionTabs = await page.$$eval('[data-section-tabs="brain"] a', (as) => as.map((a) => `${a.getAttribute('href')}${a.getAttribute('aria-current') === 'page' ? '*' : ''}`));
     check('the Brain section shows both brains as tabs, the culture brain current', sectionTabs.join(',') === '/brain,/culture*', sectionTabs.join(','));
-    check('the rail still has eight icons, Brain lit', await page.locator('aside.rail nav a').count() === 8
+    check('the rail still has seven icons, Brain lit', await page.locator('aside.rail nav a').count() === 7
         && await page.locator('aside.rail nav a[aria-current="page"]').getAttribute('data-rail') === 'brain');
 
     const board = page.locator('#brand-board');

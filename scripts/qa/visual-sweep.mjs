@@ -49,7 +49,7 @@ const SIGNED_IN = [
     ['culture-picks', '/culture?view=picks'],
     ['portfolio', '/portfolio'],
     ['trade', '/trade'],
-    ['markets', '/markets'],
+    ['trade-heatmap', '/trade?view=heatmap'],
     ['watchlist', '/watchlist'],
     ['friends', '/friends'],
     ['history', '/history'],

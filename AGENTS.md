@@ -198,6 +198,15 @@ and friends keep none beyond Shared and the invariants).
 
 ### trading
 
+- `/trade` is the Markets section's first page (its tab reads Trade, its heading Markets) since
+  the Markets overview and the Trade Desk became one page on 2026-10-13
+  (`docs/specs/2026-10-13-markets-trade-merge.md`): the ticker tape, the desk
+  (`components/trading/desk/TradeDesk`, chart and ticket on one symbol), the last fill, the open
+  positions, then the market scan — `components/stocks/MarketScan`, the four TradingView views as
+  `?view=`, each link keeping `symbol` and `account`, one embed at a time. `/markets` redirects
+  there from `next.config.ts`, its query carried over. The page's sentences are
+  `MARKETS_PAGE_COPY` in `lib/learn/copy/trade`. ⌘K finds the page by its section's name and by
+  its tab's (`NavDestination.tab`), so "trade" and "markets" both land on it.
 - `lib/trading/ledger.getTradeLedger` is the one cached PaperTrade read a page makes. Every
   per-account trade read — the ledger, bounded history, the CSV, the comparison table, `/history`'s
   feed, the chat's sell totals — starts at the account's `inceptionAt` through the ledger's
@@ -420,7 +429,7 @@ and friends keep none beyond Shared and the invariants).
   every reason decoded through the culture grammar, and its simulated record apart, under one
   stance line held to the no-advice list.
 - The Brain section of `lib/shell/navigation` carries both brains (`/brain`, `/culture`); the rail
-  stays at eight icons. The two widgets (`culture-picks`, `brand-attention`) are library-only,
+  stays short (seven icons since Markets and Trade merged). The two widgets (`culture-picks`, `brand-attention`) are library-only,
   category `brain` ("Brains & AI").
 - Jobs: `culture-brain-update` daily 06:40 ET (trigger `culture`), `culture-brain-weekly` Mondays
   10:45 ET with a Tuesday holiday retry (`culture-weekly`, `culture-preview`, `culture-resimulate`),

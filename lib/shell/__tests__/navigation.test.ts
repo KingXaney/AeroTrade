@@ -48,10 +48,31 @@ describe('the navigation registry', () => {
 
     it('still reaches every page the old sidebar listed', () => {
         const hrefs = NAV_PAGES.map((p) => p.href);
-        for (const href of ['/topics', '/', '/brain', '/strategies', '/portfolio', '/trade', '/markets', '/news',
+        for (const href of ['/topics', '/', '/brain', '/strategies', '/portfolio', '/trade', '/news',
             '/watchlist', '/friends', '/history', '/learn', '/settings']) {
             expect(hrefs, href).toContain(href);
         }
+        // The Markets overview and the trade desk became one page on 2026-10-13; the old
+        // address is a redirect in next.config.ts, not a page.
+        expect(hrefs).not.toContain('/markets');
+    });
+
+    it('files the trade desk and the watchlist under the one Markets icon, the desk first', () => {
+        const markets = NAV_SECTIONS.find((s) => s.id === 'markets');
+        expect(markets?.pages.map((p) => p.href)).toEqual(['/trade', '/watchlist']);
+        expect(markets?.match).toEqual(['/stocks']);
+        expect(NAV_SECTIONS.map((s) => s.id)).not.toContain('trade');
+        expect(NAV_SECTIONS).toHaveLength(7);
+        // The desk takes the section's name in ⌘K and keeps its own as the tab, so both words find it.
+        const desk = NAV_PAGES.find((p) => p.href === '/trade');
+        expect(desk?.label).toBe('Markets');
+        expect(desk?.tab).toBe('Trade');
+        expect(NAV_PAGES.find((p) => p.href === '/watchlist')?.label).toBe('Watchlist');
+        expect(searchPages('trade').map((p) => p.href)).toEqual(['/trade']);
+        expect(searchPages('mark').map((p) => p.href)).toEqual(['/trade', '/watchlist']);
+        expect(searchPages('watch').map((p) => p.href)).toEqual(['/watchlist']);
+        expect(sectionFor('/trade')?.id).toBe('markets');
+        expect(sectionFor('/watchlist')?.id).toBe('markets');
     });
 
     it('keeps the lab for its owner: one owner-only page, dropped for everyone else', () => {
@@ -84,8 +105,9 @@ describe('the navigation registry', () => {
     });
 
     it('files both brains under the one Brain icon, the news brain first', () => {
-        // The rail is capped at eight icons and has eight, so the culture brain is the Brain
-        // section's second page: a tab above both pages, a row in the drawer, a ⌘K hit.
+        // The rail is capped at eight icons and had eight when the culture brain arrived (seven
+        // since Markets and Trade merged), so it is the Brain section's second page: a tab above
+        // both pages, a row in the drawer, a ⌘K hit.
         const brain = NAV_SECTIONS.find((s) => s.id === 'brain');
         expect(brain?.pages.map((p) => p.href)).toEqual(['/brain', '/culture']);
         expect(NAV_PAGES.find((p) => p.href === '/brain')?.label).toBe('Brain');
@@ -103,6 +125,8 @@ describe('the navigation registry', () => {
         const label = (href: string) => NAV_PAGES.find((p) => p.href === href)?.label;
         expect(label('/portfolio')).toBe('Portfolio');
         expect(label('/history')).toBe('Activity');
+        expect(label('/trade')).toBe('Markets');
+        expect(label('/watchlist')).toBe('Watchlist');
         expect(label('/news')).toBe('News');
         expect(label('/')).toBe('Home');
         expect(label('/dashboard')).toBe('My dashboard');
@@ -177,6 +201,14 @@ describe('searchPages', () => {
         expect(searchPages('port').map((p) => p.href)).toEqual(['/portfolio', '/history']);
         expect(searchPages('act').map((p) => p.href)).toEqual(['/history']);
         expect(searchPages('SETT').map((p) => p.href)).toEqual(['/settings']);
+    });
+
+    it("finds a section's first page by its own tab name too", () => {
+        // "Today" is Home's first tab, "Headlines" News's: the ⌘K name is the section's, the
+        // tab's own word still finds it.
+        expect(searchPages('today').map((p) => p.href)).toEqual(['/']);
+        expect(searchPages('head').map((p) => p.href)).toEqual(['/news']);
+        expect(searchPages('trade').map((p) => p.href)).toEqual(['/trade']);
     });
 
     it('offers nothing for an empty query or one that starts no word', () => {

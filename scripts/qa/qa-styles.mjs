@@ -37,7 +37,7 @@ try {
     check('text-warning utility is generated', warningUtility === 'rgb(255, 209, 102)', warningUtility);
 
     // --- no phantom scroll on the pages that carried a doubled min-h-screen -----
-    for (const path of ['/', '/dashboard', '/portfolio', '/settings', '/brain', '/strategies', '/markets']) {
+    for (const path of ['/', '/dashboard', '/portfolio', '/settings', '/brain', '/strategies', '/trade']) {
         await page.goto(`${BASE}${path}`, {waitUntil: 'networkidle'}).catch(() => {});
         // The bug was a doubled min-h-screen: scrollable space with nothing in it. So
         // measure the gap between the document's scroll height and the bottom of the
@@ -92,7 +92,7 @@ try {
     // declares one). Under a dark palette <html> is color-scheme: dark, so every
     // isTransparent widget went white and read as a broken light theme.
     await page.context().addCookies([{name: 'aero-theme', value: 'v1:nord:minimal:0', domain: new URL(BASE).hostname, path: '/'}]);
-    await page.goto(`${BASE}/markets`, {waitUntil: 'domcontentloaded'});
+    await page.goto(`${BASE}/trade`, {waitUntil: 'domcontentloaded'});
     await page.waitForSelector('.tradingview-widget-container iframe', {timeout: 30000});
     const schemes = await page.evaluate(() => ({
         html: document.documentElement.style.colorScheme,
