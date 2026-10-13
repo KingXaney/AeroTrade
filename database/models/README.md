@@ -21,6 +21,15 @@ reads and writes live. Change a field here, then in the store module named besid
 | `brain-entity` | brain | `lib/brain/store`, `update`, `ingest` |
 | `news-item` | brain | `lib/brain/ingest` (the daily sweep), `store` (evidence reads) |
 | `second-opinion` | brain | `lib/brain/opinion` |
+| `culture-entity` | culture | `lib/culture/update` (the daily fold), `store` (every read); keyed by the catalog id in `lib/culture/catalog` |
+| `culture-attention` | culture | `lib/culture/store` — a brand's daily attention per source, one document per month (no TTL: the backtest reads the history) |
+| `culture-item` | culture | `lib/culture/ingest` (the daily sources, the model's labels), `store` (evidence reads) |
+| `culture-state` | culture | `lib/culture/picker-store` — one row per picker profile: its shared account, its launch, the week it last claimed |
+| `culture-decision` | culture | `lib/culture/picker-store` — a picker's orders and kept positions for a day, the brands behind each, the universe audit, its rationale |
+| `culture-universe` | culture | `lib/culture/picker-store` — the week's quote check per owner, read before Finnhub is asked |
+| `culture-earnings` | culture | `lib/culture/picker-store` — each owner's last and next report dates from the earnings calendar |
+| `culture-suggestion` | culture | `lib/culture/store` — brand names the model met that the catalog lacks; a person adds one in code |
+| `culture-backtest` | culture | `lib/culture/backtest-store` — the pickers' simulated record under one key: three variants (price only, Spike, Quiet) over the stored pageviews and bars, rebuilt when the engine version or the catalog's owners change |
 | `market-briefing` | news | `lib/news/briefing-store` (the morning job's write, the page's read) |
 | `topic` | topics | `lib/topics/store`, `insert` (the one write path), `seed`, `refresh` |
 | `topic-article` | topics | `lib/topics/store`, `refresh` |
@@ -35,6 +44,9 @@ reads and writes live. Change a field here, then in the store module named besid
 | `poker-hand` | poker night | `lib/poker-night/hands-store` — one row per completed hand, written after the commit; read through `views.historyView` |
 | `poker-result` | poker night | `lib/poker-night/results-store` — an account's totals per table, upserted behind a `seq` guard (`lib/poker-night/results`); no TTL |
 | `rate-limit` | auth | `lib/rate-limit` — the one counter sign-in, sign-up, password reset and the chat spend; `peekRateLimit` reads a window for the chat's caption without spending it |
+
+The culture models are not in that migration list (it covers only the account models); their
+indexes are built by Mongoose's autoIndex, as the brain's and the topics' are.
 
 Indexes the paper account, trade and snapshot models declare are also listed in
 `scripts/migration-indexes.mjs`, which `npm run migrate:accounts` builds and

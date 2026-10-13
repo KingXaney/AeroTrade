@@ -1,25 +1,14 @@
 // Reddit adapter — pulls hot posts from finance subreddits and shapes them into MarketNewsArticle.
+// The listing itself comes through lib/news/reddit-client.ts (OAuth; keyless JSON is gone), so
+// without REDDIT_CLIENT_ID and REDDIT_CLIENT_SECRET this adapter contributes nothing and says so once.
 
 import {formatArticle, validateArticle} from "@/lib/news/article";
-import {FEED_REVALIDATE_SECONDS, REDDIT_POST_LIMIT, redditUserAgent, SUBREDDITS} from "@/lib/news/config";
+import {REDDIT_POST_LIMIT, SUBREDDITS} from "@/lib/news/config";
+import {fetchRedditListing, redditConfigured, type RedditPost} from "@/lib/news/reddit-client";
 import {hashId, escapeRegExp} from "@/lib/text";
 import type {MarketNewsArticle, RawNewsArticle} from '@/lib/news/types';
 
-export type RedditPost = {
-    title: string;
-    selftext?: string;
-    permalink: string;
-    created_utc: number;
-    score: number;
-    stickied?: boolean;
-    subreddit?: string;
-};
-
-type RedditListing = {
-    data?: {
-        children?: {data: RedditPost}[];
-    };
-};
+export type {RedditPost} from "@/lib/news/reddit-client";
 
 const REDDIT_BASE_URL = "https://www.reddit.com";
 
@@ -51,32 +40,22 @@ export const matchTickers = (title: string, symbols: string[]): string[] =>
     });
 
 export const fetchRedditNews = async (symbols?: string[]): Promise<MarketNewsArticle[]> => {
+    if (!redditConfigured()) {
+        console.warn("Reddit skipped: REDDIT_CLIENT_ID and REDDIT_CLIENT_SECRET are not set");
+        return [];
+    }
+
     const rawArticles: RawNewsArticle[] = [];
 
     for (const {name, minScore} of SUBREDDITS) {
-        try {
-            const url = `${REDDIT_BASE_URL}/r/${name}/hot.json?limit=${REDDIT_POST_LIMIT}&raw_json=1`;
-            const response = await fetch(url, {
-                headers: {"User-Agent": redditUserAgent()},
-                next: {revalidate: FEED_REVALIDATE_SECONDS},
-            });
-            if (!response.ok) {
-                throw new Error(`Reddit responded with status ${response.status} for r/${name}`);
+        // Empty on any failure (logged by the client), so one subreddit never costs the others.
+        const posts = await fetchRedditListing(name, {limit: REDDIT_POST_LIMIT});
+        for (const post of posts) {
+            // Stickied posts are subreddit housekeeping; low-score posts are noise per-subreddit thresholds.
+            if (post.stickied || post.score < minScore) {
+                continue;
             }
-
-            const listing = (await response.json()) as RedditListing;
-            const posts = listing.data?.children ?? [];
-
-            for (const child of posts) {
-                const post = child.data;
-                // Stickied posts are subreddit housekeeping; low-score posts are noise per-subreddit thresholds.
-                if (post.stickied || post.score < minScore) {
-                    continue;
-                }
-                rawArticles.push(mapRedditPost(post, name));
-            }
-        } catch (error) {
-            console.error(`Error fetching Reddit posts from r/${name}:`, error);
+            rawArticles.push(mapRedditPost(post, name));
         }
     }
 

@@ -1,39 +1,30 @@
-// Pure target construction + order diffing for the AI Navigator. Deliberately
-// PURE — no DB, no fetch — so vitest can cover the trading rails without a
-// database. Every threshold comes from the navigator config; nothing here is
-// tunable at call sites, so the LLM can never widen its own rails.
+// Pure target construction + order diffing for the AI Navigator, and for the culture brain's
+// pickers. Deliberately PURE — no DB, no fetch — so vitest can cover the trading rails without
+// a database. Every threshold comes from a rails object a config file exports (the Navigator's
+// by default); nothing here is tunable from a call site's data, so the LLM can never widen its
+// own rails.
 
-import {
-    ENTRY_SCORE_THRESHOLD,
-    EXIT_SCORE_THRESHOLD,
-    HARD_STOP_DRAWDOWN,
-    MAX_POSITIONS,
-    MAX_POSITION_WEIGHT,
-    MAX_TRADES_PER_WEEK,
-    MIN_CASH_WEIGHT,
-    MIN_HOLDING_TRADING_DAYS,
-    REBALANCE_BAND,
-} from "@/lib/navigator/config";
+import {NAVIGATOR_RAILS, type AllocatorRails} from "@/lib/navigator/config";
 import type {ScoredSymbol} from "@/lib/navigator/scoring";
 
 export type TargetWeight = {symbol: string; weight: number; score: number; reasons: string[]};
 
 const PERCENT = 100;
 
-// Eligible symbols above the entry threshold, best-first, capped at
-// MAX_POSITIONS. Weights are proportional to score, per-position clamped, then
+// Eligible symbols above the entry threshold, best-first, capped at the rails'
+// maxPositions. Weights are proportional to score, per-position clamped, then
 // rescaled (only downward) so the book never eats into the minimum cash buffer.
-export const buildTargets = (scored: ScoredSymbol[]): TargetWeight[] => {
+export const buildTargets = (scored: ScoredSymbol[], rails: AllocatorRails = NAVIGATOR_RAILS): TargetWeight[] => {
     const picks = scored
-        .filter((item) => item.eligible && item.score > ENTRY_SCORE_THRESHOLD)
+        .filter((item) => item.eligible && item.score > rails.entryScoreThreshold)
         .sort((a, b) => b.score - a.score)
-        .slice(0, MAX_POSITIONS);
+        .slice(0, rails.maxPositions);
     const totalScore = picks.reduce((sum, pick) => sum + pick.score, 0);
     if (totalScore <= 0) {
         return [];
     }
-    const investable = 1 - MIN_CASH_WEIGHT;
-    const clampedWeights = picks.map((pick) => Math.min(pick.score / totalScore, MAX_POSITION_WEIGHT));
+    const investable = 1 - rails.minCashWeight;
+    const clampedWeights = picks.map((pick) => Math.min(pick.score / totalScore, rails.maxPositionWeight));
     const clampedSum = clampedWeights.reduce((sum, weight) => sum + weight, 0);
     // Scaling only shrinks weights, so the per-position clamp still holds after it.
     const scale = clampedSum > investable ? investable / clampedSum : 1;
@@ -75,15 +66,15 @@ type OrderCandidate = {
 };
 
 // Checked in declaration order so multi-trigger positions get a stable reason.
-const exitTriggerReason = (position: HeldPosition): string | null => {
-    if (position.score !== null && position.score < EXIT_SCORE_THRESHOLD) {
-        return `exit: score ${position.score.toFixed(2)} below exit threshold ${EXIT_SCORE_THRESHOLD}`;
+const exitTriggerReason = (position: HeldPosition, rails: AllocatorRails): string | null => {
+    if (position.score !== null && position.score < rails.exitScoreThreshold) {
+        return `exit: score ${position.score.toFixed(2)} below exit threshold ${rails.exitScoreThreshold}`;
     }
     if (position.thesisBroken) {
         return 'exit: thesis broken';
     }
     if (position.price !== null && position.avgCost > 0
-        && position.price / position.avgCost - 1 < -HARD_STOP_DRAWDOWN) {
+        && position.price / position.avgCost - 1 < -rails.hardStopDrawdown) {
         const drawdownPct = Math.round((position.price / position.avgCost - 1) * PERCENT);
         return `exit: hard stop ${drawdownPct}% vs cost`;
     }
@@ -91,8 +82,8 @@ const exitTriggerReason = (position: HeldPosition): string | null => {
 };
 
 // Unknown holding age (null) is treated as satisfying the minimum hold.
-const underMinHold = (position: HeldPosition): boolean =>
-    position.heldTradingDays !== null && position.heldTradingDays < MIN_HOLDING_TRADING_DAYS;
+const underMinHold = (position: HeldPosition, rails: AllocatorRails): boolean =>
+    position.heldTradingDays !== null && position.heldTradingDays < rails.minHoldingTradingDays;
 
 // Weights like 0.14 are inexact in binary, so a drift meant to be 12_000 can
 // arrive as 11_999.999999999996 and floor away a whole share. The epsilon
@@ -108,7 +99,7 @@ const rebalanceReason = (driftValue: number, totalValue: number, targetWeight: n
 };
 
 // Diff current holdings against targets and emit at most maxTrades orders
-// (default MAX_TRADES_PER_WEEK; the one-time enrollment bootstrap raises it to
+// (default the rails' maxTradesPerWeek; the one-time enrollment bootstrap raises it to
 // deploy the full starting portfolio at once). Sells run before buys so exits
 // and trims fund the entries in the same batch; a simulated cash walk trims
 // buys against the cash floor.
@@ -118,13 +109,15 @@ export const diffToOrders = (input: {
     positions: HeldPosition[];
     targets: TargetWeight[];
     maxTrades?: number;
+    rails?: AllocatorRails;
 }): PlannedOrder[] => {
     const {totalValue, positions, targets} = input;
+    const rails = input.rails ?? NAVIGATOR_RAILS;
     if (totalValue <= 0) {
         return [];
     }
 
-    const bandValue = REBALANCE_BAND * totalValue;
+    const bandValue = rails.rebalanceBand * totalValue;
     const targetBySymbol = new Map(targets.map((target) => [target.symbol, target]));
     // Any position row can price a symbol — integration passes quantity-0 rows
     // as quote carriers for not-yet-held targets.
@@ -148,7 +141,7 @@ export const diffToOrders = (input: {
         }
         const price = position.price;
         const currentValue = position.quantity * price;
-        const trigger = exitTriggerReason(position);
+        const trigger = exitTriggerReason(position, rails);
 
         if (trigger !== null) {
             // Triggers override both targeting and the minimum holding period.
@@ -173,7 +166,7 @@ export const diffToOrders = (input: {
         if (Math.abs(driftValue) < bandValue) {
             continue; // churn control
         }
-        if (driftValue < 0 && underMinHold(position)) {
+        if (driftValue < 0 && underMinHold(position, rails)) {
             continue; // trimming is not an exit trigger — min hold blocks it
         }
         candidates.push({
@@ -218,8 +211,8 @@ export const diffToOrders = (input: {
     });
 
     const orders: PlannedOrder[] = [];
-    const cashFloor = MIN_CASH_WEIGHT * totalValue;
-    const tradeCap = input.maxTrades ?? MAX_TRADES_PER_WEEK;
+    const cashFloor = rails.minCashWeight * totalValue;
+    const tradeCap = input.maxTrades ?? rails.maxTradesPerWeek;
     let cash = input.cash;
 
     for (const candidate of candidates) {

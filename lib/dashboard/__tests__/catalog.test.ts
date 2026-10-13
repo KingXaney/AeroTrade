@@ -23,9 +23,9 @@ const spanSet = new Set<number>(WIDGET_SPANS);
 const dataKeySet = new Set<string>(DATA_KEYS);
 
 describe('registry invariants', () => {
-    it('has 35 unique ids whose table keys match their id field', () => {
-        expect(WIDGET_IDS).toHaveLength(35);
-        expect(new Set(WIDGET_IDS).size).toBe(35);
+    it('has 37 unique ids whose table keys match their id field', () => {
+        expect(WIDGET_IDS).toHaveLength(37);
+        expect(new Set(WIDGET_IDS).size).toBe(37);
         expect(Object.keys(WIDGETS).sort()).toEqual([...WIDGET_IDS].sort());
         for (const id of WIDGET_IDS) {
             expect(WIDGETS[id].id).toBe(id);
@@ -113,7 +113,7 @@ describe('registry invariants', () => {
             expect(WIDGETS[id].isNew, id).toBe(true);
         }
         // The quant-strategies panel shipped after the layout system too.
-        expect(defs.filter((d) => d.isNew).map((d) => d.id).sort()).toEqual([...topics, 'quant-strategies', 'getting-started', 'todays-lesson', 'daily-puzzle'].sort());
+        expect(defs.filter((d) => d.isNew).map((d) => d.id).sort()).toEqual([...topics, 'quant-strategies', 'getting-started', 'todays-lesson', 'daily-puzzle', 'culture-picks', 'brand-attention'].sort());
         expect(WIDGETS['topics-latest'].dataKeys).toEqual(['topicsLatest']);
         expect(WIDGETS['topic-briefs'].dataKeys).toEqual(['topicsOverview']);
     });
@@ -174,6 +174,27 @@ describe('registry invariants', () => {
         expect(DEFAULT_LAYOUT.widgets.map((w) => w.id)).not.toContain('daily-puzzle');
     });
 
+    it('the culture widgets are library-only brain panels on two eager global keys', () => {
+        const tile = WIDGETS['culture-picks'];
+        expect(tile.category).toBe('brain');
+        expect(tile.chrome).toBe('link');
+        expect(tile.href).toBe('/culture?view=picks');
+        expect(tile.showTitle).toBe(false);
+        expect(tile.dataKeys).toEqual(['culturePicks']);
+        const list = WIDGETS['brand-attention'];
+        expect(list.category).toBe('brain');
+        expect(list.chrome).toBe('panel');
+        expect(list.isClient).toBe(false);
+        expect(list.dataKeys).toEqual(['brandAttention']);
+        expect(resolveDataKeys(['culture-picks', 'brand-attention'])).toEqual({eager: ['culturePicks', 'brandAttention'], lazy: [], needsActiveAccount: false});
+        for (const id of ['culture-picks', 'brand-attention'] as const) {
+            expect(DEFAULT_LAYOUT.widgets.map((w) => w.id)).not.toContain(id);
+        }
+        // Both brains file under one library group; "News Brain & AI" would hide the second.
+        expect(CATEGORY_LABELS.brain).toBe('Brains & AI');
+        expect(defs.filter((d) => d.category === 'brain').map((d) => d.id).slice(-2)).toEqual(['culture-picks', 'brand-attention']);
+    });
+
     it('default spans follow the plan table', () => {
         const expected: Record<WidgetId, number> = {
             'topics-overview': 4, 'topics-latest': 8, 'topic-briefs': 6,
@@ -186,6 +207,7 @@ describe('registry invariants', () => {
             leaderboard: 6,
             'ai-navigator': 4, 'weekly-decisions': 6, 'active-theses': 6, 'narrative-leaderboard': 12,
             'knowledge-graph': 12, 'second-opinion': 6, 'brain-status': 12, 'quant-strategies': 6,
+            'culture-picks': 12, 'brand-attention': 6,
             'quick-trade': 4, 'market-news': 6, 'quick-links': 4,
         };
         for (const id of WIDGET_IDS) {

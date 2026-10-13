@@ -33,6 +33,33 @@ export const SCORE_WEIGHTS = {newsSlow: 0.20, sentimentSlow: 0.15, momentumLong:
 export const MOMENTUM_MIX = {r126: 0.5, r252: 0.3, r63: 0.2};
 export const VOLATILITY_HAIRCUT = 0.8;         // applied to top-quintile 63d vol
 
+// The allocator's rails as one object, so another picker (the culture brain's) can run the
+// same buildTargets and diffToOrders under its own constants. The Navigator's are the default;
+// the constants above stay exported for the legend, the glossary and the reason grammar.
+export type AllocatorRails = {
+    maxPositions: number;
+    maxPositionWeight: number;
+    minCashWeight: number;
+    maxTradesPerWeek: number;
+    minHoldingTradingDays: number;
+    rebalanceBand: number;
+    entryScoreThreshold: number;
+    exitScoreThreshold: number;
+    hardStopDrawdown: number;
+};
+
+export const NAVIGATOR_RAILS: AllocatorRails = {
+    maxPositions: MAX_POSITIONS,
+    maxPositionWeight: MAX_POSITION_WEIGHT,
+    minCashWeight: MIN_CASH_WEIGHT,
+    maxTradesPerWeek: MAX_TRADES_PER_WEEK,
+    minHoldingTradingDays: MIN_HOLDING_TRADING_DAYS,
+    rebalanceBand: REBALANCE_BAND,
+    entryScoreThreshold: ENTRY_SCORE_THRESHOLD,
+    exitScoreThreshold: EXIT_SCORE_THRESHOLD,
+    hardStopDrawdown: HARD_STOP_DRAWDOWN,
+};
+
 // Sector ETFs are always eligible; SPY is the benchmark, SMH the semis proxy.
 export const ALWAYS_ELIGIBLE_SYMBOLS = [
     'XLE', 'XLK', 'XLF', 'XLV', 'XLI', 'XLP', 'XLY', 'XLU', 'XLB', 'XLRE', 'XLC',

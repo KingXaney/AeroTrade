@@ -31,8 +31,9 @@ type SimulationOptions = {
     rates?: readonly RatePoint[];
 };
 
-// Steps the income clock one calendar day at a time, alongside the trading loop.
-const incomeWalker = (clock: IncomeClock | null) => {
+// Steps the income clock one calendar day at a time, alongside the trading loop. Exported for
+// the culture brain's simulator (lib/culture/simulator.ts), which steps it in the same order.
+export const incomeWalker = (clock: IncomeClock | null) => {
     let due = 0;
     const rows: IncomeRow[] = [];
     return {

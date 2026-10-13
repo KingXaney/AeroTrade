@@ -16,11 +16,13 @@ const SOURCE_LABEL: Partial<Record<TradeSource, string>> = {
     'ai-navigator': 'AI Navigator',
     'ai-suggestion': 'AI suggestion',
     'strategy': 'Strategy',
+    'culture-brain': 'Culture Brain',
 };
 const SOURCE_TITLE: Partial<Record<TradeSource, string>> = {
     'ai-navigator': 'Placed by the AI, not by you',
     'ai-suggestion': 'Placed by the AI, not by you',
     'strategy': 'Placed by a quant strategy\'s rule, not by a person',
+    'culture-brain': 'Placed by the culture brain\'s picker, not by a person',
 };
 
 type Props = {

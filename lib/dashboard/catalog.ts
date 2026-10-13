@@ -34,7 +34,7 @@ export const CATEGORY_LABELS: Record<WidgetCategory, string> = {
     accounts: 'Accounts',
     strategies: 'Quant Strategies',
     social: 'Social',
-    brain: 'News Brain & AI',
+    brain: 'Brains & AI',
     tools: 'Tools',
 };
 
@@ -62,6 +62,8 @@ export const DATA_KEYS = [
     'learnFacts',
     'lesson',
     'dailyPuzzle',
+    'culturePicks',
+    'brandAttention',
 ] as const;
 export type DataKey = (typeof DATA_KEYS)[number];
 
@@ -91,6 +93,8 @@ export const DATA_KEY_DEPS: Record<DataKey, readonly DataKey[]> = {
     learnFacts: [],
     lesson: [],
     dailyPuzzle: [],
+    culturePicks: [],
+    brandAttention: [],
 };
 
 // Streamed under <Suspense> because they are slow or fan out to third parties;
@@ -177,6 +181,8 @@ export const WIDGET_IDS = [
     'knowledge-graph',
     'second-opinion',
     'brain-status',
+    'culture-picks',
+    'brand-attention',
     // tools
     'quick-trade',
     'market-news',
@@ -612,6 +618,39 @@ export const WIDGETS: {readonly [K in WidgetId]: WidgetDefinition & {id: K}} = {
         availability: 'advanced',
         chrome: 'bare',
         showTitle: false,
+    }),
+    // The culture brain's strip: the two pickers' records beside SPY, in the registry's order,
+    // and the newest decision — a link to the pickers view. Library-only, like every widget
+    // shipped after the layout system.
+    'culture-picks': define({
+        id: 'culture-picks',
+        title: 'Culture Brain',
+        description: "The two culture pickers' records beside SPY, and their latest decision.",
+        category: 'brain',
+        icon: 'storefront',
+        spans: [6, 8, 12],
+        defaultSpan: 12,
+        minHeight: 72,
+        dataKeys: ['culturePicks'],
+        chrome: 'link',
+        href: '/culture?view=picks',
+        showTitle: false,
+        isNew: true,
+    }),
+    // The brands with the most attention on the culture brain's slow layer, each a link to its
+    // evidence. Term titles only — no "What these mean" and no "Ask in chat" on a widget
+    // (invariant 12).
+    'brand-attention': define({
+        id: 'brand-attention',
+        title: 'Brand attention',
+        description: "The brands younger consumers are giving the most attention to, by the culture brain's slow layer.",
+        category: 'brain',
+        icon: 'storefront',
+        spans: [4, 6, 8, 12],
+        defaultSpan: 6,
+        minHeight: 240,
+        dataKeys: ['brandAttention'],
+        isNew: true,
     }),
 
     // --- Tools ---

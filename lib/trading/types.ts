@@ -31,7 +31,7 @@ export type PortfolioSummary = {
 // Who placed a paper trade. Absent on rows written before this field existed —
 // nothing recorded which historical fills came from the AI, so absence honestly
 // means "unknown", never "user".
-export type TradeSource = 'user' | 'ai-navigator' | 'ai-suggestion' | 'strategy';
+export type TradeSource = 'user' | 'ai-navigator' | 'ai-suggestion' | 'strategy' | 'culture-brain';
 
 export type PaperTradeRecord = {
     id: string;

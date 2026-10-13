@@ -17,4 +17,5 @@ export type ChatToolName =
     | 'followTopic'
     | 'unfollowTopic'
     | 'explainTerm'
-    | 'getQuantStrategies';
+    | 'getQuantStrategies'
+    | 'getCultureBrain';

@@ -45,6 +45,8 @@ const SIGNED_IN = [
     ['topics-edit', '/topics?edit=1'],
     ['news', '/news'],
     ['brain', '/brain'],
+    ['culture', '/culture'],
+    ['culture-picks', '/culture?view=picks'],
     ['portfolio', '/portfolio'],
     ['trade', '/trade'],
     ['markets', '/markets'],

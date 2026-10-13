@@ -30,6 +30,9 @@ type EnsureBarsOptions = {
     requireOhlc?: boolean;
     topupRange?: YahooRange;
     forceBackfill?: boolean;
+    // What a full backfill asks Yahoo for; "5y" by default, "10y" for the culture brain's
+    // universe, whose backtest needs five result years after a warm-up.
+    backfillRange?: YahooRange;
 };
 
 type EnsureBarsResult = {
@@ -93,9 +96,10 @@ const fetchFromProviders = async (
     window: FetchWindow,
     today: string,
     topupRange: YahooRange,
+    backfillRange: YahooRange = YAHOO_BACKFILL_RANGE,
 ): Promise<FetchOutcome> => {
     const yahooBars = await fetchYahooDaily(symbol, {
-        range: window.mode === "backfill" ? YAHOO_BACKFILL_RANGE : topupRange,
+        range: window.mode === "backfill" ? backfillRange : topupRange,
     });
     await delay(YAHOO_DELAY_MS);
     if (yahooBars.length > 0) {
@@ -120,6 +124,7 @@ export const ensureBars = async (
         requireOhlc = false,
         topupRange = "1mo",
         forceBackfill = false,
+        backfillRange = YAHOO_BACKFILL_RANGE,
     }: EnsureBarsOptions = {},
 ): Promise<EnsureBarsResult> => {
     await connectToDatabase();
@@ -155,7 +160,7 @@ export const ensureBars = async (
                 mode === planned.mode ? planned : decideFetchWindow(null, today, {backfillCalendarDays});
             let window = windowFor(forceBackfill || missingOhlc ? "backfill" : planned.mode);
 
-            let outcome = await fetchFromProviders(symbol, window, today, topupRange);
+            let outcome = await fetchFromProviders(symbol, window, today, topupRange, backfillRange);
             // A yield is not a price: it cannot split, and a 0.5% move on 4% is 2 basis points.
             if (outcome !== null && window.mode === "topup" && latest !== null && symbol !== RATE_SYMBOL) {
                 // The fetched bar for the stored latest date must agree with what
@@ -165,7 +170,7 @@ export const ensureBars = async (
                 if (overlap !== undefined && closesDiffer(overlap.close, latest.close)) {
                     console.warn(`Price bars re-adjusted for ${symbol} on ${latest.date}; backfilling`);
                     window = windowFor("backfill");
-                    outcome = await fetchFromProviders(symbol, window, today, topupRange);
+                    outcome = await fetchFromProviders(symbol, window, today, topupRange, backfillRange);
                 }
             }
             if (outcome === null) {

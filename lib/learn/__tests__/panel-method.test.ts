@@ -11,6 +11,7 @@ import {HABITS_COPY, HABITS_TERMS} from '@/lib/learn/copy/habits';
 import {LUCK_COPY, LUCK_TERMS} from '@/lib/learn/copy/luck';
 import {TIM_COPY, TIM_TERMS} from '@/lib/learn/copy/time-in-market';
 import {TERRAIN_COPY, TERRAIN_TERMS} from '@/lib/learn/copy/terrain';
+import {BRAND_BOARD_TERMS, CULTURE_COPY} from '@/lib/learn/copy/culture';
 
 const RUN = 5;
 
@@ -51,5 +52,9 @@ describe('a panel lead says only what its definitions do not', () => {
 
     it('The momentum terrain: how it is laid out', () => {
         expect(restatements([TERRAIN_COPY.method], TERRAIN_TERMS)).toEqual([]);
+    });
+
+    it('The brand board: how to read it', () => {
+        expect(restatements([CULTURE_COPY.boardLead], BRAND_BOARD_TERMS)).toEqual([]);
     });
 });

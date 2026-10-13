@@ -88,6 +88,13 @@ export const resolveTier = (env: NodeJS.ProcessEnv = process.env): TierResolutio
     return {tier: raw};
 };
 
+// Whether any model can answer at all: the free tier needs GEMINI_API_KEY (the Inngest client
+// hands it to step.ai.infer), a paid tier its Anthropic key. A job that would call a model
+// checks this first: a call with no key is a 403 the Inngest server retries with backoff, which
+// would hold the job's later steps for minutes rather than fail fast.
+export const modelConfigured = (env: NodeJS.ProcessEnv = process.env): boolean =>
+    Boolean(env.GEMINI_API_KEY?.trim()) || resolveTier(env).tier !== 'free';
+
 type ResolvedModel = ModelSpec & {task: AiTask; tier: AiTier; warning?: string};
 
 export const resolveModel = (task: AiTask, env: NodeJS.ProcessEnv = process.env): ResolvedModel => {

@@ -28,7 +28,7 @@ const PaperTradeSchema = new Schema<PaperTradeDoc>({
     price: {type: Number, required: true, min: 0},
     total: {type: Number, required: true},
     realizedPnl: {type: Number},
-    source: {type: String, enum: ['user', 'ai-navigator', 'ai-suggestion', 'strategy']},
+    source: {type: String, enum: ['user', 'ai-navigator', 'ai-suggestion', 'strategy', 'culture-brain']},
     reason: {type: String, maxlength: TRADE_REASON_MAX},
     idempotencyKey: {type: String},
     createdAt: {type: Date, default: Date.now, index: true},

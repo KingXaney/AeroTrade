@@ -30,6 +30,12 @@ const summarizeTool = (toolName: string, part: {input?: unknown; output?: unknow
         return input && typeof input.slug === 'string' && input.slug.trim() ? `"${input.slug.trim()}"` : undefined;
     }
 
+    // How many brands the culture brain handed over.
+    if (toolName === 'getCultureBrain') {
+        const brands = output && typeof output === 'object' ? (output as {brands?: unknown}).brands : undefined;
+        return Array.isArray(brands) ? `${brands.length} ${brands.length === 1 ? 'brand' : 'brands'}` : undefined;
+    }
+
     if (input && typeof input === 'object') {
         if (typeof input.symbol === 'string') return input.symbol;
         if (typeof input.query === 'string') return `"${input.query}"`;

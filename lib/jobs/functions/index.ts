@@ -10,6 +10,7 @@ import {recordDailySnapshots} from "@/lib/jobs/functions/trading";
 import {fillFirstRunTopics, generateTopicBriefs, refreshTopicFeeds, refreshTopicOnDemand} from "@/lib/jobs/functions/topics";
 import {runStrategiesDaily} from "@/lib/jobs/functions/strategies";
 import {generateMarketBriefing} from "@/lib/jobs/functions/news";
+import {backfillCultureWikipedia, runCultureWeekly, updateCultureBrain} from "@/lib/jobs/functions/culture";
 
 export const functions = [
     sendSignUpEmail,
@@ -26,4 +27,7 @@ export const functions = [
     runStrategiesDaily,
     creditDailyIncome,
     generateMarketBriefing,
+    updateCultureBrain,
+    runCultureWeekly,
+    backfillCultureWikipedia,
 ];

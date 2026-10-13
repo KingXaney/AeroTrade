@@ -54,6 +54,17 @@ describe('the navigation registry', () => {
         }
     });
 
+    it('files both brains under the one Brain icon, the news brain first', () => {
+        // The rail is capped at eight icons and has eight, so the culture brain is the Brain
+        // section's second page: a tab above both pages, a row in the drawer, a ⌘K hit.
+        const brain = NAV_SECTIONS.find((s) => s.id === 'brain');
+        expect(brain?.pages.map((p) => p.href)).toEqual(['/brain', '/culture']);
+        expect(NAV_PAGES.find((p) => p.href === '/brain')?.label).toBe('Brain');
+        expect(NAV_PAGES.find((p) => p.href === '/culture')?.label).toBe('Culture brain');
+        expect(sectionFor('/culture')?.id).toBe('brain');
+        expect(searchPages('cult').map((p) => p.href)).toEqual(['/culture']);
+    });
+
     it('keeps the account pages in the account menu, off the rail', () => {
         expect(ACCOUNT_PAGES.map((p) => p.href)).toEqual(['/friends', '/settings']);
         for (const page of ACCOUNT_PAGES) expect(sectionFor(page.href), page.href).toBeUndefined();

@@ -5,7 +5,7 @@
 import {type Bar} from "@/lib/prices/signals";
 import {getEasternDateString} from "@/lib/dates";
 
-export type YahooRange = "1mo" | "2y" | "5y";
+export type YahooRange = "1mo" | "2y" | "5y" | "10y";
 
 type YahooQuote = {
     open?: unknown[];

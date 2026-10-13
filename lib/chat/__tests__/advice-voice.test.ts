@@ -15,7 +15,7 @@ import {MARKET_BRIEFING_PROMPT} from '@/lib/news/prompts';
 import {findBanned} from '@/lib/learn/banned';
 
 // Bumped when a tool is added; the Record type already forces the copy to exist.
-const TOOL_COUNT = 17;
+const TOOL_COUNT = 18;
 
 // A denylist of real symbols, not a bare uppercase regex: "AI chips" is a topic, not a
 // ticker.
