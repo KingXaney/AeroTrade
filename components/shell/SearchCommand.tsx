@@ -11,7 +11,7 @@ import {createTopic} from "@/lib/actions/topics.actions";
 import {NAME_MAX} from "@/lib/topics/config";
 import {useDebounce} from "@/hooks/useDebounce";
 import {searchGlossary} from "@/lib/learn/glossary";
-import {searchPages} from "@/lib/shell/navigation";
+import {NAV_PAGES, searchPages, type NavDestination} from "@/lib/shell/navigation";
 import type {Stock} from '@/lib/stocks/types';
 import type {TopicLink} from '@/lib/topics/types';
 
@@ -20,6 +20,7 @@ type SearchCommandProps = {
     label?: string;
     initialStocks: Stock[];
     initialTopics?: TopicLink[];   // followed topics, so ⌘K opens instead of duplicating
+    pages?: readonly NavDestination[];   // the audience's pages (navPagesFor); the full registry by default
 };
 
 // Anything shorter reads as a ticker prefix, not a topic.
@@ -30,6 +31,7 @@ export default function SearchCommand({
     label = 'Add stock',
     initialStocks,
     initialTopics = [],
+    pages = NAV_PAGES,
 }: SearchCommandProps) {
     const router = useRouter();
     const [open, setOpen] = useState(false);
@@ -50,7 +52,7 @@ export default function SearchCommand({
     const learnHits = searchGlossary(topicQuery, 4);
     // Pages are matched the same way, against the navigation registry: with the rail showing
     // icons only, the palette is also how a page is reached by name.
-    const pageHits = searchPages(topicQuery, 4);
+    const pageHits = searchPages(topicQuery, 4, pages);
 
     useEffect(() => {
         const onKeyDown = (e: KeyboardEvent) => {
@@ -169,7 +171,7 @@ export default function SearchCommand({
                                 <CommandItem
                                     key={entry.key}
                                     value={`learn-${entry.key}`}
-                                    onSelect={() => goTo(`/learn#${entry.key}`)}
+                                    onSelect={() => goTo(`/glossary#${entry.key}`)}
                                     className="search-item-link"
                                     data-learn-hit={entry.key}
                                 >

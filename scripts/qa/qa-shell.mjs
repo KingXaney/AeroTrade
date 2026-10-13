@@ -23,8 +23,9 @@ try {
 
     // --- the desktop rail: one icon per section, nothing repeated in the header ---
     const railHrefs = await page.$$eval('aside.rail nav a', (as) => as.map((a) => a.getAttribute('href')));
+    // The Learn icon goes to the games: /learn is the owner's lab, and this account is not the owner.
     check('the rail lists the eight sections',
-        railHrefs.join(',') === '/,/news,/markets,/trade,/portfolio,/strategies,/brain,/learn', railHrefs.join(','));
+        railHrefs.join(',') === '/,/news,/markets,/trade,/portfolio,/strategies,/brain,/games', railHrefs.join(','));
     check('…each named for a screen reader, with the dashboard lit',
         await page.locator('aside.rail nav a[aria-label]').count() === 8
         && await page.locator('aside.rail nav a[aria-current="page"]').getAttribute('data-rail') === 'home');
@@ -53,9 +54,9 @@ try {
     await page.goto(`${BASE}/portfolio`, {waitUntil: 'load'});
     const tabs = await page.$$eval('[data-section-tabs="portfolio"] a', (as) => as.map((a) => `${a.getAttribute('href')}${a.getAttribute('aria-current') === 'page' ? '*' : ''}`));
     check('Portfolio shows Overview and Activity, Overview current', tabs.join(',') === '/portfolio*,/history', tabs.join(','));
-    await page.goto(`${BASE}/learn`, {waitUntil: 'load'});
+    await page.goto(`${BASE}/games`, {waitUntil: 'load'});
     const learnTabs = await page.$$eval('[data-section-tabs="learn"] a', (as) => as.map((a) => `${a.getAttribute('href')}${a.getAttribute('aria-current') === 'page' ? '*' : ''}`));
-    check('Learn shows Learn, Games, the Poker solver and Poker night, Learn current', learnTabs.join(',') === '/learn*,/games,/poker,/poker-night', learnTabs.join(','));
+    check('Learn shows Games, the Poker solver, Poker night and the Glossary, Games current', learnTabs.join(',') === '/games*,/poker,/poker-night,/glossary', learnTabs.join(','));
     await page.goto(`${BASE}/trade`, {waitUntil: 'load'});
     check('a section of one page shows no tabs', await page.locator('[data-section-tabs]').count() === 0);
     await page.goto(`${BASE}/stocks/SPY`, {waitUntil: 'load'});
@@ -91,7 +92,7 @@ try {
 
     await page.locator('button[aria-label="Open navigation"]').click();
     await page.waitForTimeout(400);
-    for (const href of ['/', '/news', '/markets', '/trade', '/portfolio', '/strategies', '/brain', '/learn', '/friends', '/settings']) {
+    for (const href of ['/', '/news', '/markets', '/trade', '/portfolio', '/strategies', '/brain', '/games', '/friends', '/settings']) {
         check(`drawer reaches ${href}`, await page.locator(`[data-slot="sheet-content"] a[href="${href}"]`).count() === 1);
     }
     await shot('02-mobile-drawer');

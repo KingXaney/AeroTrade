@@ -56,9 +56,10 @@ export const settledClick = async (locator) => {
 };
 
 // Signs a fresh user up through the form and waits for the dashboard. The tag names the user
-// ("QA <tag>") and its address (qa<tag><ms>@example.com), so a suite's users are easy to find.
-export const signUp = async (page, tag, {name = `QA ${tag}`, stay = false} = {}) => {
-    const email = `qa${tag.toLowerCase().replace(/[^a-z0-9]/g, '')}${Date.now()}@example.com`;
+// ("QA <tag>") and its address (qa<tag><ms>@example.com), so a suite's users are easy to find;
+// `email` fixes the address instead (the lab's owner, the one LAB_OWNER_EMAILS names).
+export const signUp = async (page, tag, {name = `QA ${tag}`, stay = false, email: fixed} = {}) => {
+    const email = fixed ?? `qa${tag.toLowerCase().replace(/[^a-z0-9]/g, '')}${Date.now()}@example.com`;
     await page.goto(`${BASE}/sign-up`, {waitUntil: 'load'});
     await page.fill('#fullName', name);
     await page.fill('#email', email);

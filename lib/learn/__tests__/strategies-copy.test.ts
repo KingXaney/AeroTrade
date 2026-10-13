@@ -88,7 +88,6 @@ describe('the counts and rails the copy states', () => {
         const strategies = await import('@/lib/learn/copy/strategies');
         expect(strategies.STRATEGIES_PAGE_COPY.subtitle).toBe('Seven classic rules, paper-traded live against the S&P 500.');
         expect(strategies.STRATEGIES_PAGE_COPY.loadingSubtitle).toBe('Valuing seven strategy accounts…');
-        expect((await import('@/lib/learn/copy/learn')).LEARN_PAGE_COPY.strategiesHeading).toBe('The seven strategies, one line each');
         const followLesson = (await import('@/lib/learn/copy/missions')).MISSION_COPY.find((mission) => mission.id === 'follow-strategy');
         expect(followLesson?.lesson[0]).toMatch(/^Seven rule-based strategies trade/);
         const chat = await import('@/lib/chat/quant-strategies');

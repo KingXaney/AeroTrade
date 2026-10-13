@@ -7,7 +7,7 @@ import {Sheet, SheetContent, SheetTrigger} from "@/components/primitives/Sheet";
 import NavList from "@/components/shell/NavList";
 import {useNewsSeen} from "@/components/shell/useNewsSeen";
 import {useSignOut} from "@/components/shell/useSignOut";
-import type {NavBadges} from "@/lib/shell/navigation";
+import type {NavBadges, NavSection} from "@/lib/shell/navigation";
 
 // Below lg there is no rail, so this drawer stands in for it: the same sections from the same
 // registry, then the account pages and Log out. A section's other pages are the tabs on the
@@ -18,7 +18,7 @@ import type {NavBadges} from "@/lib/shell/navigation";
 // lands while no row exists to hear it. This component sits in the header for the whole session,
 // as the rail does, so a drawer opened after the stamp starts cleared instead of printing the
 // layout's stale count.
-const MobileNav = ({badges}: {badges?: NavBadges}) => {
+const MobileNav = ({badges, sections}: {badges?: NavBadges; sections?: readonly NavSection[]}) => {
     const pathname = usePathname();
     const [open, setOpen] = useState(false);
     const signOut = useSignOut();
@@ -53,7 +53,7 @@ const MobileNav = ({badges}: {badges?: NavBadges}) => {
 
                 <div className="flex-1 overflow-y-auto py-4">
                     <NavList pathname={pathname} badges={clearedAt !== null ? {...badges, newsNew: 0} : badges}
-                             onNavigate={() => setOpen(false)}/>
+                             sections={sections} onNavigate={() => setOpen(false)}/>
                 </div>
 
                 <div className="mt-auto p-4 border-t border-line-strong/15">

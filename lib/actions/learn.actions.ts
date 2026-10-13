@@ -6,8 +6,6 @@ import {getCurrentUserId} from "@/lib/auth/session";
 import {upsertPreferences} from "@/lib/settings/preferences-store";
 import {LESSONS_SEEN_CAP, lessonKey, parseLessonId} from "@/lib/learn/moments";
 import {LESSON_COPY} from "@/lib/learn/copy/lesson";
-import {COURSE_LESSON_IDS} from "@/lib/learn/course";
-import {COURSE_COPY} from "@/lib/learn/copy/learn";
 import type {ActionResult} from '@/lib/actions/types';
 
 // Writes only; the reads live in lib/learn/facts-store.ts (a plain server module).
@@ -50,25 +48,5 @@ export const markLessonSeen = async (input: unknown): Promise<ActionResult> => {
     } catch (error) {
         console.error('Error marking a lesson seen:', error);
         return {success: false, message: LESSON_COPY.notSaved};
-    }
-};
-
-// The beginner course: a lesson's "Mark as done" stamps its id, once ($addToSet). The argument
-// arrives from the client, so it is `unknown` until it is one of the registry's ids; only that
-// id is written.
-export const markCourseLessonDone = async (input: unknown): Promise<ActionResult> => {
-    const userId = await getCurrentUserId();
-    if (!userId) return {success: false, message: COURSE_COPY.notSignedIn};
-    if (typeof input !== 'string' || !COURSE_LESSON_IDS.includes(input)) return {success: false, message: COURSE_COPY.invalid};
-    try {
-        await connectToDatabase();
-        await upsertPreferences(userId, {$addToSet: {'learn.courseDone': input}, $set: {updatedAt: new Date()}});
-        revalidatePath('/');
-        revalidatePath('/dashboard');
-        revalidatePath('/learn');
-        return {success: true};
-    } catch (error) {
-        console.error('Error marking a course lesson done:', error);
-        return {success: false, message: COURSE_COPY.notSaved};
     }
 };

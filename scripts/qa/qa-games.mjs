@@ -56,9 +56,9 @@ try {
         await chip.innerText());
     check('…and links to it', await chip.getAttribute('href') === '/games/puzzle');
 
-    await page.goto(`${BASE}/learn`, {waitUntil: 'load'});
+    await page.goto(`${BASE}/games`, {waitUntil: 'load'});
     const learnTabs = await page.$$eval('[data-section-tabs="learn"] a', (as) => as.map((a) => `${a.getAttribute('href')}${a.getAttribute('aria-current') === 'page' ? '*' : ''}`));
-    check('Learn carries a Games tab, beside the Poker solver and Poker night', learnTabs.join(',') === '/learn*,/games,/poker,/poker-night', learnTabs.join(','));
+    check('Learn carries a Games tab, beside the Poker solver, Poker night and the Glossary', learnTabs.join(',') === '/games*,/poker,/poker-night,/glossary', learnTabs.join(','));
 
     await page.goto(`${BASE}/games`, {waitUntil: 'load'});
     await page.locator('[data-games-hub]').waitFor({timeout: 30000});
@@ -121,13 +121,6 @@ try {
     check('the hub agrees', /1-day streak/.test(await page.locator('#games-streak').innerText())
         && /solved: the streak counts today/i.test(await page.locator('[data-streak-status]').innerText())
         && await page.locator('[data-streak-grid] [data-solved]').count() === 1);
-
-    await page.goto(`${BASE}/learn?tab=today`, {waitUntil: 'load'});
-    await page.locator('#learn-today-puzzle [data-daily-puzzle]').waitFor({timeout: 30000});
-    const todayPanel = page.locator('#learn-today-puzzle');
-    check('Learn › Today shows the puzzle and the streak', await todayPanel.locator('[data-card-streak="1"]').count() === 1
-        && await todayPanel.locator('[data-puzzle-status="solved"]').count() === 1);
-    check('…with no "What these mean" and no "Ask in chat"', await todayPanel.locator('[data-what-these-mean], [data-ask]').count() === 0);
 
     await db.collection('userpreferences').updateOne({userId: userA},
         {$set: {dashboardLayout: {version: 1, widgets: [{id: 'daily-puzzle', span: 6}]}, updatedAt: new Date()}}, {upsert: true});
@@ -386,7 +379,7 @@ try {
     check('the hub shows a record for each game played', !/no round yet/i.test(await pageF.locator('[data-game-card="kelly"]').innerText())
         && !/no round yet/i.test(await pageF.locator('[data-game-card="market-making"]').innerText())
         && !/no round yet/i.test(await pageF.locator('[data-game-card="correlation"]').innerText()));
-    await pageF.goto(`${BASE}/learn?tab=glossary`, {waitUntil: 'load'});
+    await pageF.goto(`${BASE}/glossary`, {waitUntil: 'load'});
     check('the glossary homes the games\' terms on /games', await pageF.locator('#learn-games [data-learn-entry="kelly-criterion"]').count() === 1
         && await pageF.locator('#learn-games a[href="/games"]').count() === 1);
 

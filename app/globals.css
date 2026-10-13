@@ -354,6 +354,30 @@ html[data-mode="light"] {
     border: var(--card-border-width) solid var(--card-border-color);
     border-radius: var(--card-radius);
   }
+
+  /* The lab's unit bodies (components/lab/LabMarkdown): markdown with KaTeX maths and fenced
+     code, read for twenty minutes at a time. Tokens only; KaTeX's own stylesheet sets the maths. */
+  .lab-prose { color: var(--fg-soft); font-size: 0.9375rem; line-height: 1.7; }
+  .lab-prose p { margin-bottom: 0.9rem; }
+  .lab-prose strong { color: var(--fg); font-weight: 600; }
+  .lab-prose em { color: var(--fg); }
+  .lab-prose ul, .lab-prose ol { margin: 0 0 0.9rem 1.25rem; }
+  .lab-prose ul { list-style: disc; }
+  .lab-prose ol { list-style: decimal; }
+  .lab-prose li { margin-bottom: 0.4rem; }
+  .lab-prose li > p { margin-bottom: 0.4rem; }
+  .lab-prose h1, .lab-prose h2, .lab-prose h3 { color: var(--fg); font-family: var(--heading-font); font-weight: 600; margin: 1.3rem 0 0.5rem; }
+  .lab-prose h3 { font-size: 1.05rem; }
+  .lab-prose code { font-family: var(--font-mono, ui-monospace, monospace); font-size: 0.85em; background-color: var(--surface-2); color: var(--fg); padding: 0.1em 0.35em; border-radius: 4px; }
+  .lab-prose pre { background-color: var(--surface-2); border: 1px solid var(--line-strong); border-radius: var(--card-radius, 8px); padding: 0.9rem 1rem; overflow-x: auto; margin: 0 0 1rem; font-size: 0.8rem; line-height: 1.55; }
+  .lab-prose pre code { background: none; padding: 0; font-size: inherit; color: var(--fg-soft); }
+  .lab-prose table { width: 100%; border-collapse: collapse; margin: 0 0 1rem; font-size: 0.875rem; }
+  .lab-prose th, .lab-prose td { border: 1px solid var(--line-strong); padding: 0.35rem 0.6rem; text-align: left; vertical-align: top; }
+  .lab-prose th { color: var(--fg); }
+  .lab-prose blockquote { border-left: 3px solid var(--brand); padding-left: 0.9rem; color: var(--fg-muted); margin: 0 0 0.9rem; }
+  .lab-prose .katex-display { overflow-x: auto; overflow-y: hidden; padding: 0.25rem 0; margin: 0.9rem 0; }
+  .lab-prose .katex { font-size: 1.02em; }
+  .lab-prose > :last-child { margin-bottom: 0; }
 }
 
 /* ═══════════════════════════════════════

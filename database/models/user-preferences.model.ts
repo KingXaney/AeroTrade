@@ -19,10 +19,8 @@ export interface LearnPrefs {
     // Today's lesson "Got it" keys (lib/learn/moments.ts lessonKey), newest last, capped at
     // LESSONS_SEEN_CAP by the $push {$each, $slice} that writes them.
     lessonsSeen?: string[];
-    // Beginner-course lessons marked done (lib/learn/course.ts ids), each once ($addToSet). A
-    // field of its own: lessonsSeen is capped and churns with rebalance keys. (The retired Daily
-    // quiz's quizDaysAnswered / quizLastAnsweredDate may still sit in old documents; nothing reads them.)
-    courseDone?: string[];
+    // (The retired quiz's quizDaysAnswered / quizLastAnsweredDate and the retired beginner course's
+    // courseDone may still sit in old documents; nothing reads them.)
 }
 
 // Poker night (/poker-night, /play/CODE): the name and look an account sits down with, its personal
@@ -65,7 +63,7 @@ export interface UserPreferencesDoc extends Document {
     followedStrategies?: string[];     // quant-strategy slugs pinned on the dashboard; absent = none
     topicsSeededAt?: Date;             // default topics installed once; absent = never seeded
     newsSeenAt?: Date;                 // the reader last opened News (/news or the /topics index); absent = never — the rail dot's and the News card's stamp
-    learn?: LearnPrefs;                // learn-surface stamps (checklist hidden, lessons seen, course lessons done); absent = none
+    learn?: LearnPrefs;                // learn-surface stamps (checklist hidden, lessons seen); absent = none
     pokerNight?: PokerNightPrefs;      // poker night's name and look; absent = the account's defaults
     updatedAt: Date;
 }
@@ -110,7 +108,6 @@ const LearnSchema = new Schema<LearnPrefs>(
     {
         missionsDismissedAt: {type: Date, required: false},
         lessonsSeen: {type: [String], default: undefined},
-        courseDone: {type: [String], default: undefined},
     },
     {_id: false},
 );

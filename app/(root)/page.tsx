@@ -9,8 +9,6 @@ import {getLearnFacts} from "@/lib/learn/facts-store";
 import {getTodaysLesson} from "@/lib/learn/lesson-store";
 import {deriveMoments} from "@/lib/learn/moments";
 import {HOME_COPY} from "@/lib/learn/copy/home";
-import {COURSE_COPY} from "@/lib/learn/copy/learn";
-import {getCourseProgress} from "@/lib/learn/course-store";
 import {NEWS_COPY} from "@/lib/learn/copy/news";
 import {TERRAIN_COPY, TERRAIN_TERMS} from "@/lib/learn/copy/terrain";
 import {pokerNightEnabled} from "@/lib/poker-night/env";
@@ -95,7 +93,7 @@ const Home = async ({searchParams}: HomeProps) => {
     const [view, terrain] = await Promise.all([getHomeView(user.id), getMomentumSurface()]);
     const {step} = view;
     // The box beside the topics: the market briefing, else the topics' own briefs, else the
-    // course's next lesson (today's lesson once the course is done).
+    // Today's lesson, with the glossary a link away.
     const hasBriefing = view.briefing !== null || view.hasBriefs;
     // With the kill switch on, poker night is neither a chip nor a panel.
     const pokerNight = pokerNightEnabled();
@@ -159,7 +157,7 @@ const Home = async ({searchParams}: HomeProps) => {
                     {view.topics.topics.length > 0 ? <TopicsOverview overview={view.topics} span={6}/> : <TopicsWidgetEmpty/>}
                 </Panel>
 
-                {/* A box with nothing to say is not shown: until there is a briefing, the course
+                {/* A box with nothing to say is not shown: until there is a briefing, today's lesson
                     takes this place beside the topics. */}
                 {view.briefing ? (
                     <Panel id="home-briefing" aria-labelledby="home-briefing-heading">
@@ -218,31 +216,14 @@ const Home = async ({searchParams}: HomeProps) => {
     );
 };
 
-// The beginner course's next lesson while there is one; today's lesson once the course is done.
-const LearnBody = async ({userId}: {userId: string}) => {
-    const progress = await getCourseProgress(userId);
-    if (!progress.next) return <LessonAsync userId={userId}/>;
-    return (
-        <div data-home-course={progress.next.id}>
-            <MicroLabel>{progress.next.moduleTitle} · {COURSE_COPY.lessonOf(progress.next.number, progress.total)}</MicroLabel>
-            <h3 className="mt-1 font-heading text-lg font-semibold text-fg">{progress.next.title}</h3>
-            <p className="mt-2 text-sm leading-relaxed text-fg-soft">{progress.next.intro[0]}</p>
-            <div className="mt-4 flex flex-wrap items-center gap-3">
-                <Link href={`/learn/course/${progress.next.id}`} className={actionButton({variant: 'secondary', size: 'md'})}>{COURSE_COPY.continueCta}</Link>
-                <MicroLabel>{COURSE_COPY.progress(progress.done, progress.total)}</MicroLabel>
-            </div>
-        </div>
-    );
-};
-
 const LearnBox = ({userId}: {userId: string}) => (
     <>
         <div className="mb-4 flex items-center justify-between gap-3">
             <SectionHeading id="home-learn-heading" spacing="none">{HOME_COPY.learnHeading}</SectionHeading>
-            <Link href="/learn" className="label-type text-xs text-brand hover:underline">{HOME_COPY.learnLink} →</Link>
+            <Link href="/glossary" className="label-type text-xs text-brand hover:underline">{HOME_COPY.learnLink} →</Link>
         </div>
         <Suspense fallback={<WidgetSkeleton height={160} rows={3}/>}>
-            <LearnBody userId={userId}/>
+            <LessonAsync userId={userId}/>
         </Suspense>
     </>
 );

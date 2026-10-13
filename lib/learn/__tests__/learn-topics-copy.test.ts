@@ -1,10 +1,10 @@
-// The /learn page's frame (lib/learn/copy/learn.ts) and the topics pages' copy (lib/learn/copy/topics.ts):
+// The /glossary page's frame (lib/learn/copy/learn.ts) and the topics pages' copy (lib/learn/copy/topics.ts):
 // a topic brief's caveat and placeholder, the starter chips and the manage view, held to the 'copy'
 // tier of lib/learn/banned.ts.
 
 import {describe, expect, it} from 'vitest';
 import {findBanned} from '@/lib/learn/banned';
-import {LEARN_PAGE_COPY} from '@/lib/learn/copy/learn';
+import {GLOSSARY_PAGE_COPY} from '@/lib/learn/copy/learn';
 import {TOPIC_BRIEF_COPY, TOPIC_PICKER_COPY, TOPICS_MANAGE_COPY} from '@/lib/learn/copy/topics';
 
 const clean = (text: string) => {
@@ -12,13 +12,12 @@ const clean = (text: string) => {
     expect(findBanned(text, 'copy'), text).toEqual([]);
 };
 
-describe('LEARN_PAGE_COPY', () => {
+describe('GLOSSARY_PAGE_COPY', () => {
     it('never advises', () => {
-        clean(LEARN_PAGE_COPY.subtitle);
-        clean(LEARN_PAGE_COPY.strategiesHeading);
-        // The disclaimer's second sentence opens with "No", a prohibition banned.ts drops,
-        // so the note can name the word it disclaims.
-        clean(LEARN_PAGE_COPY.note);
+        for (const text of Object.values(GLOSSARY_PAGE_COPY)) clean(text);
+        // The note's second sentence opens with "No", a prohibition banned.ts drops, so it can
+        // name the word it disclaims.
+        expect(GLOSSARY_PAGE_COPY.note).toMatch(/^Definitions describe\./);
     });
 });
 

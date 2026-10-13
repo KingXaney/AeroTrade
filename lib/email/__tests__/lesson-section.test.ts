@@ -103,7 +103,7 @@ describe('buildLessonSectionHtml', () => {
         expect(text).toContain(GLOSSARY['s&p 500'].short);
         expect(text).toContain('Term of the day');
         expect(text).not.toMatch(/articles in your topics used this term/);
-        expect(hrefsOf(html)).toEqual([`${APP}/learn#s%26p%20500`]);
+        expect(hrefsOf(html)).toEqual([`${APP}/glossary#s%26p%20500`]);
     });
 
     it('teaches a concept from the topics with its count and headlines', () => {
@@ -113,7 +113,7 @@ describe('buildLessonSectionHtml', () => {
         expect(text).toContain('2 of today\'s articles in your topics used this term');
         expect(text).toContain('Headline 1 · Wire');
         // Headlines first, newest first as picked; the Learn link at the foot.
-        expect(hrefsOf(html)).toEqual(['https://news.example.com/story-1', 'https://news.example.com/story-2', `${APP}/learn#tariffs`]);
+        expect(hrefsOf(html)).toEqual(['https://news.example.com/story-1', 'https://news.example.com/story-2', `${APP}/glossary#tariffs`]);
     });
 
     it('caps headlines at three and clips a long one to 200 characters', () => {
@@ -206,8 +206,8 @@ describe('lessonSectionLinks', () => {
     it('lets the sanitizer drop a link that is not on the list', () => {
         const input = {moment: null, term: feedLesson([headline(1)])};
         const html = buildLessonSectionHtml(input, APP);
-        const withoutArticle = sanitizeDigestHtml(html, [`${APP}/learn#tariffs`]);
-        expect(hrefsOf(withoutArticle)).toEqual([`${APP}/learn#tariffs`]);
+        const withoutArticle = sanitizeDigestHtml(html, [`${APP}/glossary#tariffs`]);
+        expect(hrefsOf(withoutArticle)).toEqual([`${APP}/glossary#tariffs`]);
         expect(textOf(withoutArticle)).toContain('Headline 1');
     });
 });

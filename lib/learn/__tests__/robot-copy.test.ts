@@ -7,7 +7,7 @@ import {describe, expect, it} from 'vitest';
 import {findBanned} from '@/lib/learn/banned';
 import {ROBOT_COPY, ROBOT_TIPS} from '@/lib/learn/copy/robot';
 import {ASK_MAX_CHARS} from '@/lib/chat/ask';
-import {COURSE_MODULES} from '@/lib/learn/course';
+import {GLOSSARY_KEYS} from '@/lib/learn/glossary';
 import {JOBS} from '@/lib/jobs/registry';
 import {STRATEGIES} from '@/lib/strategies/catalog';
 import {capitalize, numberWord} from '@/lib/text';
@@ -63,9 +63,7 @@ describe('ROBOT_TIPS', () => {
         expect(text('strategies')).toContain(`${capitalize(numberWord(STRATEGIES.length))} rule-based`);
         expect(text('themes')).toContain(`${numberWord(PALETTE_IDS.length)} palettes`);
         expect(text('themes')).toContain(`${numberWord(STYLE_IDS.length)} visual styles`);
-        expect(text('learn-course')).toContain(
-            `${numberWord(COURSE_MODULES.length)} modules of ${numberWord(COURSE_MODULES[0].lessons.length)} short lessons`);
-        for (const section of COURSE_MODULES) expect(section.lessons.length).toBe(COURSE_MODULES[0].lessons.length);
+        expect(text('learn-glossary')).toContain(`${GLOSSARY_KEYS.length} terms`);
         expect(text('morning-briefing')).toContain(JOBS.marketBriefing.health.schedule.replace('daily ', ''));
     });
 
