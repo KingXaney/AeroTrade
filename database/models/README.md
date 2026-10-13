@@ -40,6 +40,7 @@ reads and writes live. Change a field here, then in the store module named besid
 | `job-run` | jobs | `lib/jobs/job-runs` (each run's stamp), `lib/jobs/health` (the status strip) |
 | `game-round` | games | `lib/games/store` (records and recent rounds); `lib/actions/games.actions.recordGameRound` writes |
 | `puzzle-solve` | games | `lib/games/store` (the streak, today's puzzle, the archive); `lib/actions/games.actions` writes |
+| `arithmetic-skill` | games | `lib/games/store` — one document per reader: a kind of arithmetic problem's answers, total time and slips, `$inc`-ed per kept round (`foldArithmeticSkill`), read whole by the arithmetic page and the hub, deleted by `clearArithmeticSkill`; never a score; no TTL |
 | `poker-room` | poker night | `lib/poker-night/store` only — `mutateRoom`'s compare-and-set on `seq` is the one way a table moves; `stampSeen` writes presence beside it; the lobby's reads (`listOpenRooms`, `countActiveHosted`) project the mirrors only; every query names the env |
 | `poker-hand` | poker night | `lib/poker-night/hands-store` — one row per completed hand, written after the commit; read through `views.historyView` |
 | `poker-result` | poker night | `lib/poker-night/results-store` — an account's totals per table, upserted behind a `seq` guard (`lib/poker-night/results`); no TTL |

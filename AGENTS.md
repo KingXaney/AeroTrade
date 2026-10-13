@@ -582,7 +582,22 @@ and friends keep none beyond Shared and the invariants).
 - The arithmetic round is the pure reducer `lib/games/arithmetic-round`: the seed and the clock
   arrive in its actions, a problem is drawn from the seed and its place
   (`lib/games/arithmetic.problemAt`), and `components/games/ArithmeticGame` owns only the
-  interval, the 1–5 keys (never with ⌘, Ctrl or Alt) and the one report a round sends.
+  interval, the 1–5 keys (never with ⌘, Ctrl or Alt) and the one report a round sends. Every
+  sprint answer is timed by the reducer (`shownAt`, `solved`; a full wrong entry is a slip), and
+  the report carries the seed and one `{ms, slips}` per answer: `keptRound` replays the seed to
+  recover every problem, requires the per-operation counts to agree with the replay, and hands
+  the action what the round says about the reader's kinds of problem (`KeptRound.skill`) — derived,
+  never trusted, never written to the row.
+- The sprint learns: a problem's kind is its cell (`lib/games/arithmetic-cells`: the size of the
+  total and its units carry or borrow, or the times table on the schema's small factor; every
+  cell generates its own problems), and `ArithmeticSkill` (`database/models/arithmetic-skill.model`)
+  is one aggregate per reader of `{n, ms, slips}` per cell, `$inc`-ed by `lib/games/store.foldArithmeticSkill`
+  on every kept round and deleted by "Start over" (`resetArithmeticSkill`, rate-limited). The pure
+  `lib/games/arithmetic-skill.weakCells` names the slow kinds — at least `MIN_ATTEMPTS` answers,
+  at least `WEAK_RATIO` times the reader's own mean, `WEAK_TOP` of them — for
+  `components/games/SkillPanel` (server-rendered, fresh after the action's revalidation) and the
+  hub card; Practice (`?mode=practice&focus=<cells>`, `parseFocus`) is a round drawn from those
+  kinds alone, kept under `practice:<cells>;t=<s>`. Never a score: the records stay on the rounds.
 
 ### poker
 

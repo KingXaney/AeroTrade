@@ -4,6 +4,7 @@
 // sentences describe the games; none says what to do with money. Held to the 'copy' tier of
 // lib/learn/banned.ts by lib/learn/__tests__/games-copy.test.ts.
 
+import type {CellFamily, CellId} from "@/lib/games/arithmetic-cells";
 import type {PuzzleCategory, PuzzleDifficulty, PuzzleStatus} from "@/lib/games/types";
 import {shortDate} from "@/lib/learn/copy/portfolio";
 import {formatSigned} from "@/lib/format";
@@ -31,6 +32,15 @@ export const GAMES_COPY = {
     openPuzzle: "Open today's puzzle",
     seeSolution: 'See the solution',
     noPuzzleYet: 'The first puzzle has not been posted yet.',
+    // Two sites outside the app, each a link and a line: keyed by id so the copy test reads them.
+    outside: {
+        heading: 'Elsewhere',
+        lead: 'Two sites that train in the same spirit, each with its own history of your rounds.',
+        links: {
+            lichess: {title: 'Lichess puzzles', body: 'Chess tactics puzzles, free, rated against your own solving.', href: 'https://lichess.org/training'},
+            monkeytype: {title: 'Monkeytype', body: 'A typing test by words, time or quotes, with a record of your speed.', href: 'https://monkeytype.com'},
+        },
+    },
 } as const;
 
 export const STREAK_COPY = {
@@ -118,7 +128,7 @@ export const ARITHMETIC_COPY = {
     title: 'Arithmetic',
     subtitle: 'Mental arithmetic against the clock: each problem moves on the moment the answer is right.',
     modeLabel: 'Arithmetic modes',
-    modes: {sprint: 'Sprint', custom: 'Custom', interview: 'Interview'},
+    modes: {sprint: 'Sprint', custom: 'Custom', practice: 'Practice', interview: 'Interview'},
     sprintLead: 'Two minutes of addition, subtraction, multiplication and division, Zetamac-style: sums of 2–100 and 2–100, products of 2–12 and 2–100, and both in reverse.',
     customLead: 'Choose the operations, the ranges and the time. A record is kept for each set of settings.',
     interviewLead: 'Eighty multiple-choice problems in eight minutes — large sums, products, decimals, fractions, percentages, squares and roots — in the style of the mental-maths tests trading firms set. Keys 1 to 5 choose an option.',
@@ -159,12 +169,55 @@ export const ARITHMETIC_COPY = {
     notSaved: 'The round could not be saved; its score is only shown here.',
     tooFast: 'That was a lot of rounds in a minute. Wait a moment, then play again.',
     notKept: 'That round could not have been played as reported, so it was not kept.',
+    // Practice: a round of the kinds that take the reader longest (lib/games/arithmetic-cells).
+    practiceLead: 'A round of only the kinds listed, drawn evenly. Its record is kept for that set of kinds and that time.',
+    practiceFocus: 'Kinds in this round',
+    practiceEmpty: 'Nothing to practice yet. After a few sprint rounds this page names the kinds that take you longest.',
+    // Where the reader is slow: the aggregate of every timed answer.
+    skillHeading: 'Where you are slow',
+    skillLead: 'Every answer is timed. These kinds take you longest, against your own average over all of them.',
+    skillRow: (meanSeconds: number, ratio: number, n: number, slips: number): string =>
+        `${meanSeconds.toFixed(1)} s a problem · ${ratio.toFixed(1)}× your average · ${plural(n, 'problem', 'problems')}${slips > 0 ? ` · ${plural(slips, 'slip', 'slips')}` : ''}`,
+    skillFew: 'Fewer than five problems of a kind are not a pattern yet.',
+    skillEven: 'Nothing stands out: every kind is within a tenth of your average.',
+    skillCount: (problems: number, rounds: number): string => `${plural(problems, 'problem', 'problems')} timed over ${plural(rounds, 'round', 'rounds')}`,
+    practiceThese: 'Practice these',
+    startOver: 'Start over',
+    startOverConfirm: 'This clears every timed problem so far. Records stay.',
+    startOverYes: 'Clear it',
+    startOverNo: 'Keep it',
+    roundCellsHeading: 'This round by kind',
+    cellLine: (meanSeconds: number, n: number): string => `${meanSeconds.toFixed(1)} s · ${plural(n, 'problem', 'problems')}`,
+    slips: (n: number): string => `${plural(n, 'slip', 'slips')}: a full wrong entry before the right one`,
+    // A kind's name, from its id: the times table, or the size of the total and its carry.
+    cellLabel: (cell: CellId): string => {
+        if (cell === 'times-13plus') return 'Times 13 and up';
+        if (cell === 'by-13plus') return 'Dividing by 13 and up';
+        if (cell.startsWith('times-')) return `× ${cell.slice('times-'.length)}`;
+        if (cell.startsWith('by-')) return `÷ ${cell.slice('by-'.length)}`;
+        const [op, band, kind] = cell.split('-');
+        const size = band === '2d' ? 'under 100' : band === '3d' ? '100 to 999' : '1,000 or more';
+        const head = op === 'add' ? `Sums ${band === '2d' ? size : `of ${size}`}` : `Taking away from ${size}`;
+        const tail = kind === 'carry' ? ' with a carry' : kind === 'borrow' ? ' with a borrow' : op === 'add' ? ', no carry' : ', no borrow';
+        return head + tail;
+    },
+    // One line a family, in the practice lobby: how the kind is usually worked.
+    methods: {
+        'add-carry': 'Add the tens first, then the units, and carry the one.',
+        'add-plain': 'Add the tens, then the units.',
+        'subtract-borrow': 'Take the tens away first, then the units, borrowing a ten.',
+        'subtract-plain': 'Take the tens away, then the units.',
+        times: 'Split the larger number: 7 × 86 is 7 × 80 and 7 × 6.',
+        by: 'Division is the times table in reverse: how many sevens make 91?',
+    } satisfies Record<CellFamily, string>,
     // The games hub's card.
     cardTitle: 'Arithmetic sprint',
     cardBody: 'Zetamac-style mental arithmetic against the clock, a custom mode, and eighty interview problems in eight minutes.',
     cardSprint: 'Sprint record',
     cardInterview: 'Interview record',
     cardNone: 'No round yet',
+    cardSlowest: 'Slowest kind',
+    cardPractice: 'Practice',
     play: 'Play',
 } as const;
 

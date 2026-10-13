@@ -308,6 +308,86 @@ try {
     const card = await pageE.locator('[data-game-card="arithmetic"]').innerText();
     check('the hub shows both records', /Sprint record\s*12/i.test(card) && /Interview record\s*3/i.test(card), card.replace(/\s+/g, ' '));
 
+    // --- user G: the sprint learns — timed answers, the slow kind named, a practice round on it ---
+    // Additions answered half a second after they appear, multiplications by 7 after three; the
+    // aggregate then names × 7 the slow kind and the practice round is drawn from it alone.
+    const skills = db.collection('arithmeticskills');
+    const pageG = await browser.newPage({viewport: {width: 1440, height: 900}});
+    pageG.on('pageerror', (error) => errors.push(String(error)));
+    await pageG.clock.install();
+    const userG = await userIdFor(await signUp(pageG, 'gamesG', {stay: true}));
+    await pageG.goto(`${BASE}/games`, {waitUntil: 'load'});
+    const lichess = pageG.locator('[data-outside-link="lichess"]');
+    const monkeytype = pageG.locator('[data-outside-link="monkeytype"]');
+    check('the hub links to Lichess puzzles and Monkeytype, outside the app, in a new tab',
+        await lichess.getAttribute('href') === 'https://lichess.org/training' && await monkeytype.getAttribute('href') === 'https://monkeytype.com'
+        && await lichess.getAttribute('target') === '_blank' && /noopener/.test((await monkeytype.getAttribute('rel')) ?? ''));
+    await pageG.goto(`${BASE}/games/arithmetic`, {waitUntil: 'networkidle'});
+    await pageG.locator('[data-arithmetic-skill]').waitFor({timeout: 30000});
+    check('before a round the skill panel says there is no pattern yet', await pageG.locator('[data-skill-empty="few"]').count() === 1);
+    await pageG.goto(`${BASE}/games/arithmetic?mode=custom`, {waitUntil: 'networkidle'});
+    await pageG.locator('[data-custom-settings]').waitFor({timeout: 30000});
+    for (const op of ['subtract', 'divide']) await pageG.locator(`[data-operation="${op}"]`).uncheck();
+    await pageG.locator('[data-range="multiplyLeft-min"]').fill('7');
+    await pageG.locator('[data-range="multiplyLeft-max"]').fill('7');
+    await pageG.locator('[data-round-start]').click();
+    await pageG.locator('[data-problem-text]').waitFor({timeout: 15000});
+    let answered = 0;
+    let slowOnes = 0;
+    while (answered < 30) {
+        const text = await pageG.locator('[data-problem-text]').innerText();
+        const slow = text.includes('×');
+        if (slow) slowOnes += 1;
+        await pageG.clock.fastForward(slow ? 3000 : 500);
+        await pageG.locator('[data-arithmetic-answer]').fill(String(solveText(text)));
+        answered += 1;
+        await pageG.locator(`[data-round-score="${answered}"]`).waitFor({timeout: 15000});
+    }
+    await pageG.clock.fastForward(121_000);
+    await pageG.locator('[data-arithmetic-done]').waitFor({timeout: 15000});
+    await pageG.locator('[data-round-record]').waitFor({timeout: 15000});
+    const roundCells = await pageG.$$eval('[data-round-cells] [data-round-cell]', (lis) => lis.map((li) => li.getAttribute('data-round-cell')));
+    check('the round\'s end lists its kinds, the slowest first', roundCells[0] === 'times-7' && roundCells.every((cell) => cell === 'times-7' || cell.startsWith('add-')), roundCells.join(','));
+    const detailSum = (await pageG.locator('[data-round-detail] li').allInnerTexts()).reduce((sum, line) => sum + Number(line.split(':')[1]), 0);
+    check('…and the per-operation counts still sum to the score', detailSum === 30);
+    const learnRow = await rounds.findOne({userId: userG, game: 'arithmetic'});
+    check('…kept under its settings with no slips', learnRow?.key === 'ops=am;add=2-100x2-100;mul=7-7x2-100;t=120' && learnRow.score === 30 && learnRow.wrong === 0, learnRow?.key);
+    const skillDoc = await skills.findOne({userId: userG});
+    check('the aggregate holds every timed problem by kind', skillDoc?.rounds === 1 && skillDoc.problems === 30 && skillDoc.cells?.['times-7']?.n === slowOnes
+        && skillDoc.cells['times-7'].ms >= slowOnes * 3000 && skillDoc.cells['times-7'].ms < slowOnes * 3000 + 2000 && slowOnes >= 5, JSON.stringify({slowOnes, cells: skillDoc?.cells}));
+    await pageG.locator('[data-skill-row]').waitFor({timeout: 15000});
+    const skillRows = await pageG.$$eval('[data-skill-row]', (lis) => lis.map((li) => `${li.getAttribute('data-skill-row')}|${li.textContent}`));
+    check('the skill panel names × 7 the one slow kind, against the reader\'s own average', skillRows.length === 1 && /^times-7\|/.test(skillRows[0]) && /× 7/.test(skillRows[0]) && /× your average/.test(skillRows[0]), skillRows.join(' / '));
+    const practiceHref = await pageG.locator('[data-skill-practice]').getAttribute('href');
+    check('…and offers a practice round on it', practiceHref === '/games/arithmetic?mode=practice&focus=times-7', String(practiceHref));
+    await pageG.screenshot({path: `${OUT}07-skill-panel.png`, fullPage: true});
+    await pageG.locator('[data-skill-practice]').click();
+    await pageG.locator('[data-arithmetic-lobby="practice"]').waitFor({timeout: 30000});
+    check('the practice lobby lists the kind and its method', await pageG.locator('[data-practice-focus="times-7"]').count() === 1 && await pageG.locator('[data-practice-method="times"]').count() === 1);
+    await pageG.locator('[data-round-start]').click();
+    await pageG.locator('[data-problem-text]').waitFor({timeout: 15000});
+    let allSevens = true;
+    for (let i = 0; i < 10; i++) {
+        const text = await pageG.locator('[data-problem-text]').innerText();
+        if (!/^7 × \d+$/.test(text)) allSevens = false;
+        await pageG.clock.fastForward(1000);
+        await pageG.locator('[data-arithmetic-answer]').fill(String(solveText(text)));
+        await pageG.locator(`[data-round-score="${i + 1}"]`).waitFor({timeout: 15000});
+    }
+    await pageG.clock.fastForward(61_000);
+    await pageG.locator('[data-round-record]').waitFor({timeout: 15000});
+    const practiceRow = await rounds.findOne({userId: userG, game: 'arithmetic', key: /^practice:/});
+    check('a practice round asks only its kind and keeps its own record', allSevens && practiceRow?.key === 'practice:times-7;t=60' && practiceRow.score === 10
+        && await pageG.locator('[data-round-record="true"]').count() === 1, practiceRow?.key);
+    await pageG.goto(`${BASE}/games`, {waitUntil: 'load'});
+    check('the hub card names the slow kind with a way to practise it', await pageG.locator('[data-game-card="arithmetic"] [data-card-slowest="times-7"]').count() === 1
+        && (await pageG.locator('[data-card-practice]').getAttribute('href') ?? '').startsWith('/games/arithmetic?mode=practice'));
+    await pageG.goto(`${BASE}/games/arithmetic`, {waitUntil: 'networkidle'});
+    await pageG.locator('[data-skill-reset]').click();
+    await pageG.locator('[data-skill-reset-yes]').click();
+    await pageG.locator('[data-skill-empty="few"]').waitFor({timeout: 15000});
+    check('Start over clears the aggregate and keeps the rounds', (await skills.countDocuments({userId: userG})) === 0 && (await rounds.countDocuments({userId: userG})) === 2);
+
     // --- user F: Kelly coin, market making, guess the correlation -----------------------------
     // Each game sends its seed and its moves; the server replays them for the score, so the row's
     // score is checked against what the page shows.
@@ -384,7 +464,7 @@ try {
         && await pageF.locator('#learn-games a[href="/games"]').count() === 1);
 
     // --- every page in plain words ---------------------------------------------------------
-    for (const path of ['/games', '/games/puzzle', '/games/puzzles', '/games/arithmetic', '/games/arithmetic?mode=interview', '/games/kelly', '/games/market-making', '/games/correlation']) {
+    for (const path of ['/games', '/games/puzzle', '/games/puzzles', '/games/arithmetic', '/games/arithmetic?mode=custom', '/games/arithmetic?mode=practice&focus=times-7,add-3d-carry', '/games/arithmetic?mode=interview', '/games/kelly', '/games/market-making', '/games/correlation']) {
         await page.goto(`${BASE}${path}`, {waitUntil: 'load'});
         const banned = findBanned(await page.locator('main').innerText().catch(() => page.locator('body').innerText()), 'copy');
         check(`${path} reads as description, never advice`, banned.length === 0, banned.join(', '));

@@ -10,7 +10,7 @@ import {takeRateLimit} from "@/lib/rate-limit";
 import {getEasternDateString} from "@/lib/dates";
 import {ANSWER_MAX_CHARS, checkAnswer, type AnswerCheck} from "@/lib/games/answer";
 import {contextFor, progressFor, type PuzzleContext} from "@/lib/games/puzzles";
-import {readGameSummary, readSolveRow, readSolvedDays} from "@/lib/games/store";
+import {clearArithmeticSkill, foldArithmeticSkill, readGameSummary, readSolveRow, readSolvedDays} from "@/lib/games/store";
 import {isNewRecord, keptRound} from "@/lib/games/rounds";
 import {streakFrom, type Streak} from "@/lib/games/streak";
 import type {PuzzleProgress} from "@/lib/games/types";
@@ -163,12 +163,33 @@ export const recordGameRound = async (input: unknown): Promise<RoundActionResult
         if (!(await takeRateLimit(`games:round:${userId}`, ROUNDS_PER_MINUTE, 60_000))) return {success: false, message: ARITHMETIC_COPY.tooFast};
         await connectToDatabase();
         const before = await readGameSummary(userId, round.game, round.key);
-        await GameRound.create({...round, userId, day: getEasternDateString(), finishedAt: new Date()});
+        // What a sprint says about the reader's kinds of problem goes to the aggregate, never the row.
+        const {skill, ...kept} = round;
+        await GameRound.create({...kept, userId, day: getEasternDateString(), finishedAt: new Date()});
+        if (skill) await foldArithmeticSkill(userId, skill, round.score);
         const after = await readGameSummary(userId, round.game, round.key);
         revalidatePath('/games', 'layout');
         return {success: true, record: after.record, isRecord: isNewRecord(round.game, round.score, before.record), recent: after.recent};
     } catch (error) {
         console.error('Error recording a game round:', error);
+        return {success: false, message: ARITHMETIC_COPY.notSaved};
+    }
+};
+
+const SKILL_RESETS_PER_MINUTE = 5;
+
+// "Start over" on the arithmetic page: the reader's aggregate of timed problems is deleted; the
+// rounds and their records stay.
+export const resetArithmeticSkill = async (): Promise<{success: true} | {success: false; message: string}> => {
+    const userId = await getCurrentUserId();
+    if (!userId) return {success: false, message: PUZZLE_COPY.notSignedIn};
+    try {
+        if (!(await takeRateLimit(`games:skill:${userId}`, SKILL_RESETS_PER_MINUTE, 60_000))) return {success: false, message: ARITHMETIC_COPY.tooFast};
+        await clearArithmeticSkill(userId);
+        revalidatePath('/games', 'layout');
+        return {success: true};
+    } catch (error) {
+        console.error('Error clearing the arithmetic skill:', error);
         return {success: false, message: ARITHMETIC_COPY.notSaved};
     }
 };

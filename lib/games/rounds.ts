@@ -3,12 +3,16 @@
 //
 // A timed round (arithmetic, interview) is counted in the browser and reported when it ends, so the
 // server keeps only what a person could have done: bounded counts, a real duration, known settings.
+// A sprint also reports its seed and each answer's timing; the server replays the seed to recover
+// every problem, so what each round says about the reader's kinds of problem is derived, not
+// trusted, and the per-operation counts must agree with the replay.
 // A game of chance or skill (Kelly, market making, correlation) reports its seed and its moves, and
 // the server replays it to get the score — a reported score is never taken on trust. These are
 // practice records for one reader, not a leaderboard.
 
 import {z} from "zod";
-import {ArithmeticSettingsSchema, settingsKey} from "@/lib/games/arithmetic";
+import {problemStream, settingsKey, SprintSettingsSchema, type Operation} from "@/lib/games/arithmetic";
+import {foldSolved, type SkillCells, type Solved} from "@/lib/games/arithmetic-skill";
 import {CORRELATION_ROUNDS, replayCorrelation} from "@/lib/games/correlation";
 import {INTERVIEW_QUESTIONS, INTERVIEW_SECONDS} from "@/lib/games/interview";
 import {MAX_FLIPS, replayKelly} from "@/lib/games/kelly";
@@ -33,11 +37,14 @@ const Duration = z.number().int().min(0).max(86_400_000);
 export const RoundInputSchema = z.discriminatedUnion('game', [
     z.object({
         game: z.literal('arithmetic'),
-        settings: ArithmeticSettingsSchema,
+        settings: SprintSettingsSchema,
+        seed: Seed,
         score: Count,
         wrong: Count,
         durationMs: z.number().int().min(0),
         detail: z.object({add: Count, subtract: Count, multiply: Count, divide: Count}),
+        // One entry per answered problem, in order: the time it took and its full wrong entries.
+        problems: z.array(z.object({ms: z.number().int().min(0).max(86_400_000), slips: Count})).max(600 * MAX_ANSWERS_PER_SECOND),
     }),
     z.object({
         game: z.literal('interview'),
@@ -68,7 +75,7 @@ export const RoundInputSchema = z.discriminatedUnion('game', [
 
 export type RoundInput = z.infer<typeof RoundInputSchema>;
 
-export type KeptRound = {game: GameId; key: string; score: number; wrong: number; durationMs: number; detail: Record<string, number>};
+export type KeptRound = {game: GameId; key: string; score: number; wrong: number; durationMs: number; detail: Record<string, number>; skill?: SkillCells};
 
 // The round as it is kept, or null when it could not have happened.
 export const keptRound = (input: unknown): KeptRound | null => {
@@ -81,7 +88,20 @@ export const keptRound = (input: unknown): KeptRound | null => {
         if (round.score > round.settings.duration * MAX_ANSWERS_PER_SECOND) return null;
         const perOp = round.detail.add + round.detail.subtract + round.detail.multiply + round.detail.divide;
         if (perOp !== round.score) return null;
-        return {game: 'arithmetic', key: settingsKey(round.settings), score: round.score, wrong: round.wrong, durationMs: round.durationMs, detail: round.detail};
+        if (round.problems.length !== round.score) return null;
+        if (round.problems.reduce((sum, p) => sum + p.ms, 0) > round.durationMs + DURATION_SLACK_MS) return null;
+        if (round.problems.reduce((sum, p) => sum + p.slips, 0) !== round.wrong) return null;
+        // The seed gives back every problem; the per-operation counts must be the replay's own.
+        const next = problemStream(round.seed, round.settings);
+        const derived: Record<Operation, number> = {add: 0, subtract: 0, multiply: 0, divide: 0};
+        const solved: Solved[] = [];
+        for (const timing of round.problems) {
+            const problem = next();
+            derived[problem.op] += 1;
+            solved.push({problem, ms: timing.ms, slips: timing.slips});
+        }
+        for (const op of ['add', 'subtract', 'multiply', 'divide'] as const) if (derived[op] !== round.detail[op]) return null;
+        return {game: 'arithmetic', key: settingsKey(round.settings), score: round.score, wrong: round.wrong, durationMs: round.durationMs, detail: round.detail, skill: foldSolved({}, solved)};
     }
     if (round.game === 'interview') {
         if (round.score + round.wrong > INTERVIEW_QUESTIONS) return null;

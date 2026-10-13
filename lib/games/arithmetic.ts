@@ -9,6 +9,7 @@
 
 import {z} from "zod";
 import {mulberry32} from "@/lib/random";
+import {type CellId, isCellId, MAX_FOCUS, nextCellProblem} from "@/lib/games/arithmetic-cells";
 
 export const OPERATIONS = ['add', 'subtract', 'multiply', 'divide'] as const;
 export type Operation = (typeof OPERATIONS)[number];
@@ -45,6 +46,21 @@ export const ZETAMAC_DEFAULTS: ArithmeticSettings = {
     duration: 120,
 };
 
+// A practice round: problems of the named kinds only (lib/games/arithmetic-cells), drawn evenly.
+export const PracticeSettingsSchema = z.object({
+    cells: z.array(z.string().refine(isCellId, {message: 'not a kind of problem'})).min(1).max(MAX_FOCUS)
+        .transform((cells) => [...new Set(cells)].sort() as CellId[]),
+    duration: z.literal(DURATIONS),
+});
+
+export type PracticeSettings = {cells: CellId[]; duration: Duration};
+
+export const SprintSettingsSchema = z.union([ArithmeticSettingsSchema, PracticeSettingsSchema]);
+
+export type SprintSettings = ArithmeticSettings | PracticeSettings;
+
+export const isPractice = (settings: SprintSettings): settings is PracticeSettings => 'cells' in settings;
+
 export type Problem = {op: Operation; left: number; right: number; answer: number};
 
 export const SYMBOL: Record<Operation, string> = {add: '+', subtract: '−', multiply: '×', divide: '÷'};
@@ -54,7 +70,8 @@ export const problemText = (problem: Problem): string => `${problem.left} ${SYMB
 const between = (random: () => number, range: {min: number; max: number}) =>
     range.min + Math.floor(random() * (range.max - range.min + 1));
 
-export const nextProblem = (random: () => number, settings: ArithmeticSettings): Problem => {
+export const nextProblem = (random: () => number, settings: SprintSettings): Problem => {
+    if (isPractice(settings)) return nextCellProblem(random, settings.cells[Math.floor(random() * settings.cells.length)]);
     const op = settings.operations[Math.floor(random() * settings.operations.length)];
     if (op === 'add' || op === 'subtract') {
         const a = between(random, settings.addLeft);
@@ -69,7 +86,7 @@ export const nextProblem = (random: () => number, settings: ArithmeticSettings):
 // A round's i-th problem, from its seed alone: the same seed, settings and place give the same
 // problem, so a round replays exactly and a reducer can draw it purely. It is never the problem
 // just before it.
-export const problemAt = (seed: number, settings: ArithmeticSettings, index: number, previous: Problem | null): Problem => {
+export const problemAt = (seed: number, settings: SprintSettings, index: number, previous: Problem | null): Problem => {
     const random = mulberry32((seed + Math.imul(index + 1, 0x9e3779b1)) >>> 0);
     for (let tries = 0; ; tries++) {
         const problem = nextProblem(random, settings);
@@ -78,7 +95,7 @@ export const problemAt = (seed: number, settings: ArithmeticSettings, index: num
 };
 
 // The round's problems one after another, for a caller that keeps no index.
-export const problemStream = (seed: number, settings: ArithmeticSettings): (() => Problem) => {
+export const problemStream = (seed: number, settings: SprintSettings): (() => Problem) => {
     let index = 0;
     let previous: Problem | null = null;
     return () => {
@@ -103,7 +120,9 @@ const spell = (settings: ArithmeticSettings): string => [
     `t=${settings.duration}`,
 ].join(';');
 
-export const settingsKey = (settings: ArithmeticSettings): string => {
+// A practice round's key names its kinds, each once in one order, so the same set is one record.
+export const settingsKey = (settings: SprintSettings): string => {
+    if (isPractice(settings)) return `practice:${[...new Set(settings.cells)].sort().join(',')};t=${settings.duration}`;
     const spelled = spell(settings);
     return spelled === spell(ZETAMAC_DEFAULTS) ? 'zetamac' : spelled;
 };
