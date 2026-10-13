@@ -1,10 +1,14 @@
-// The games' server reads, by user id. A plain module, not 'use server': every caller derives
-// the id from the session. The shaping is pure — lib/games/puzzles.ts and lib/games/streak.ts —
-// and each read here is bounded and indexed (database/models/puzzle-solve.model.ts).
+// The games' server reads, by user id, and the arithmetic skill's fold. A plain module, not
+// 'use server': every caller derives the id from the session. The shaping is pure —
+// lib/games/puzzles.ts, lib/games/streak.ts, lib/games/arithmetic-skill.ts — and each read here
+// is bounded and indexed (database/models/puzzle-solve.model.ts, game-round.model.ts,
+// arithmetic-skill.model.ts).
 
 import {connectToDatabase} from "@/database/mongoose";
 import PuzzleSolve from "@/database/models/puzzle-solve.model";
 import GameRound from "@/database/models/game-round.model";
+import ArithmeticSkill from "@/database/models/arithmetic-skill.model";
+import type {SkillCells} from "@/lib/games/arithmetic-skill";
 import {getEasternDateString} from "@/lib/dates";
 import {streakFrom, type Streak} from "@/lib/games/streak";
 import {HIGHER_IS_RECORD, type GameId} from "@/lib/games/rounds";
@@ -116,4 +120,43 @@ export const readGameSummary = async (userId: string, game: GameId, key: string)
         GameRound.find({userId, game, key}).sort({finishedAt: -1}).limit(RECENT_ROUNDS).select({_id: 0, score: 1}).lean<{score: number}[]>(),
     ]);
     return {record: top?.score ?? null, recent: recent.map((round) => round.score).reverse()};
+};
+
+// --- the arithmetic skill: one aggregate per reader --------------------------------------------
+
+export type SkillDoc = {cells: SkillCells; problems: number; rounds: number; since: Date};
+
+export const readArithmeticSkill = async (userId: string): Promise<SkillDoc | null> => {
+    await connectToDatabase();
+    const doc = await ArithmeticSkill.findOne({userId}).select({_id: 0, cells: 1, problems: 1, rounds: 1, since: 1})
+        .lean<{cells?: SkillCells; problems?: number; rounds?: number; since: Date} | null>();
+    return doc ? {cells: doc.cells ?? {}, problems: doc.problems ?? 0, rounds: doc.rounds ?? 0, since: doc.since} : null;
+};
+
+const isDuplicateKey = (error: unknown): boolean => (error as {code?: number} | null)?.code === 11000;
+
+// A kept round added to the reader's aggregate: one update, every kind's counters $inc-ed by
+// dotted path, the document made on the first round. Two rounds landing at once could both try
+// the insert; the loser's duplicate-key error is retried as a plain update.
+export const foldArithmeticSkill = async (userId: string, delta: SkillCells, problems: number): Promise<void> => {
+    await connectToDatabase();
+    const inc: Record<string, number> = {problems, rounds: 1};
+    for (const [cell, stat] of Object.entries(delta)) {
+        if (!stat) continue;
+        inc[`cells.${cell}.n`] = stat.n;
+        inc[`cells.${cell}.ms`] = stat.ms;
+        inc[`cells.${cell}.slips`] = stat.slips;
+    }
+    const now = new Date();
+    try {
+        await ArithmeticSkill.updateOne({userId}, {$inc: inc, $set: {updatedAt: now}, $setOnInsert: {since: now}}, {upsert: true});
+    } catch (error) {
+        if (!isDuplicateKey(error)) throw error;
+        await ArithmeticSkill.updateOne({userId}, {$inc: inc, $set: {updatedAt: now}});
+    }
+};
+
+export const clearArithmeticSkill = async (userId: string): Promise<void> => {
+    await connectToDatabase();
+    await ArithmeticSkill.deleteOne({userId});
 };

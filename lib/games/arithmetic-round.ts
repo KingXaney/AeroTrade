@@ -3,7 +3,8 @@
 // reducer replays exactly and React may call it twice; the page owns only the clock's interval
 // and the report it sends when the round ends.
 
-import {isAnswer, problemAt, type ArithmeticSettings, type Operation, type Problem} from "@/lib/games/arithmetic";
+import {isAnswer, problemAt, type Operation, type Problem, type SprintSettings} from "@/lib/games/arithmetic";
+import type {Solved} from "@/lib/games/arithmetic-skill";
 import {INTERVIEW_SECONDS, interviewRound, type InterviewQuestion} from "@/lib/games/interview";
 
 type Clock = {startedAt: number; endsAt: number; now: number};
@@ -12,11 +13,16 @@ export type SprintRound = Clock & {
     kind: 'sprint';
     phase: 'playing' | 'done';
     seed: number;
-    settings: ArithmeticSettings;
+    settings: SprintSettings;
     index: number;
     problem: Problem;
     typed: string;
     counts: Record<Operation, number>;
+    // When the current problem appeared, and the full wrong entries typed for it so far.
+    shownAt: number;
+    slips: number;
+    // Every problem answered, in order, with how long it took and its slips (lib/games/arithmetic-skill).
+    solved: Solved[];
 };
 
 export type InterviewRound = Clock & {
@@ -33,10 +39,10 @@ export type InterviewRound = Clock & {
 export type RoundState = {kind: 'lobby'} | SprintRound | InterviewRound;
 
 export type RoundAction =
-    | {type: 'start-sprint'; seed: number; settings: ArithmeticSettings; at: number}
+    | {type: 'start-sprint'; seed: number; settings: SprintSettings; at: number}
     | {type: 'start-interview'; seed: number; at: number}
     | {type: 'tick'; at: number}
-    | {type: 'type'; value: string}
+    | {type: 'type'; value: string; at: number}
     | {type: 'choose'; option: number; at: number}
     | {type: 'stop'; at: number}
     | {type: 'reset'};
@@ -57,6 +63,7 @@ export const roundReducer = (state: RoundState, action: RoundAction): RoundState
                 kind: 'sprint', phase: 'playing', seed: action.seed, settings: action.settings,
                 startedAt: action.at, endsAt: action.at + action.settings.duration * 1000, now: action.at,
                 index: 0, problem: problemAt(action.seed, action.settings, 0, null), typed: '', counts: NO_COUNTS,
+                shownAt: action.at, slips: 0, solved: [],
             };
         case 'start-interview':
             return {
@@ -73,7 +80,13 @@ export const roundReducer = (state: RoundState, action: RoundAction): RoundState
             return ended(state, action.at);
         case 'type': {
             if (state.kind !== 'sprint') return state;
-            if (!isAnswer(state.problem, action.value)) return {...state, typed: action.value};
+            if (!isAnswer(state.problem, action.value)) {
+                // A slip is a full wrong entry: the typed text reaching the answer's length without
+                // being the answer. Backspaces and the digits on the way are not slips.
+                const length = String(state.problem.answer).length;
+                const slip = state.typed.trim().length < length && action.value.trim().length >= length;
+                return {...state, typed: action.value, slips: state.slips + (slip ? 1 : 0)};
+            }
             const index = state.index + 1;
             return {
                 ...state,
@@ -81,6 +94,9 @@ export const roundReducer = (state: RoundState, action: RoundAction): RoundState
                 problem: problemAt(state.seed, state.settings, index, state.problem),
                 typed: '',
                 counts: {...state.counts, [state.problem.op]: state.counts[state.problem.op] + 1},
+                solved: [...state.solved, {problem: state.problem, ms: Math.max(0, action.at - state.shownAt), slips: state.slips}],
+                shownAt: action.at,
+                slips: 0,
             };
         }
         case 'choose': {
@@ -109,5 +125,10 @@ export const roundReport = (round: SprintRound | InterviewRound) => {
     const durationMs = Math.round(round.now - round.startedAt);
     return round.kind === 'interview'
         ? {game: 'interview' as const, score: round.right, wrong: round.wrong, durationMs, detail: round.byKind}
-        : {game: 'arithmetic' as const, settings: round.settings, score: roundScore(round), wrong: 0, durationMs, detail: round.counts};
+        : {
+            game: 'arithmetic' as const, settings: round.settings, seed: round.seed, score: roundScore(round),
+            // The server replays the seed to recover each problem; only the timings and slips travel.
+            wrong: round.solved.reduce((sum, s) => sum + s.slips, 0), durationMs, detail: round.counts,
+            problems: round.solved.map(({ms, slips}) => ({ms, slips})),
+        };
 };

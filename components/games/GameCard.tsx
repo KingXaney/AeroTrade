@@ -1,3 +1,4 @@
+import type {ReactNode} from "react";
 import Link from "next/link";
 import Panel from "@/components/primitives/Panel";
 import SectionHeading from "@/components/primitives/SectionHeading";
@@ -6,8 +7,8 @@ import {actionButton} from "@/components/primitives/ActionButton";
 
 type Stat = {label: string; value: string; hint?: string};
 
-// One game on the hub: what it is, the reader's records in it, and the way in.
-const GameCard = ({id, title, body, stats, href, cta}: {id: string; title: string; body: string; stats: Stat[]; href: string; cta: string}) => (
+// One game on the hub: what it is, the reader's records in it, an aside the game may add, and the way in.
+const GameCard = ({id, title, body, stats, href, cta, aside}: {id: string; title: string; body: string; stats: Stat[]; href: string; cta: string; aside?: ReactNode}) => (
     <Panel id={`game-${id}`} aria-labelledby={`game-${id}-heading`} className="flex flex-col" data-game-card={id}>
         <SectionHeading id={`game-${id}-heading`}>{title}</SectionHeading>
         <p className="text-sm leading-relaxed text-fg-soft">{body}</p>
@@ -16,6 +17,7 @@ const GameCard = ({id, title, body, stats, href, cta}: {id: string; title: strin
                 {stats.map((stat) => <StatTile key={stat.label} label={stat.label} value={stat.value} hint={stat.hint}/>)}
             </div>
         )}
+        {aside}
         <div className="mt-auto pt-5">
             <Link href={href} className={actionButton({variant: 'secondary', size: 'md'})}>{cta}</Link>
         </div>

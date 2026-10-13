@@ -1,11 +1,13 @@
 import type {Metadata} from "next";
 import Link from "next/link";
 import {requireUserId} from "@/lib/auth/session";
-import {getDailyPuzzleCard, getPuzzleArchive, readGameSummary} from "@/lib/games/store";
+import {getDailyPuzzleCard, getPuzzleArchive, readArithmeticSkill, readGameSummary} from "@/lib/games/store";
+import {practiceHref, skillView} from "@/lib/games/arithmetic-skill";
 import {ARCHIVE_COPY, ARITHMETIC_COPY, CORRELATION_COPY, GAMES_COPY, KELLY_COPY, MARKET_COPY} from "@/lib/learn/copy/games";
 import {POKER_NIGHT_COPY} from "@/lib/learn/copy/poker-night";
 import DailyPuzzleCard from "@/components/games/DailyPuzzleCard";
 import GameCard from "@/components/games/GameCard";
+import OutsideLinks from "@/components/games/OutsideLinks";
 import StreakPanel from "@/components/games/StreakPanel";
 import PageTitle from "@/components/primitives/PageTitle";
 import Panel from "@/components/primitives/Panel";
@@ -19,9 +21,10 @@ export const metadata: Metadata = {title: "Games"};
 // with the way in. The one place the app keeps a score (lib/learn/copy/games.ts says why).
 const GamesPage = async () => {
     const userId = await requireUserId();
-    const [card, archive, sprint, interview, kelly, market, correlation] = await Promise.all([
+    const [card, archive, skill, sprint, interview, kelly, market, correlation] = await Promise.all([
         getDailyPuzzleCard(userId),
         getPuzzleArchive(userId),
+        readArithmeticSkill(userId),
         readGameSummary(userId, 'arithmetic', 'zetamac'),
         readGameSummary(userId, 'interview', 'interview'),
         readGameSummary(userId, 'kelly', 'kelly'),
@@ -31,6 +34,7 @@ const GamesPage = async () => {
     const recordStat = (label: string, record: number | null, print: (n: number) => string = (n) => n.toLocaleString('en-US')) =>
         ({label, value: record === null ? '—' : print(record), hint: record === null ? ARITHMETIC_COPY.cardNone : undefined});
     const solved = archive.filter((row) => row.status === 'solved').length;
+    const weak = skillView(skill).weak;
 
     return (
         <div className="space-y-4" data-games-hub>
@@ -56,6 +60,13 @@ const GamesPage = async () => {
                     stats={[recordStat(ARITHMETIC_COPY.cardSprint, sprint.record), recordStat(ARITHMETIC_COPY.cardInterview, interview.record)]}
                     href="/games/arithmetic"
                     cta={ARITHMETIC_COPY.play}
+                    aside={weak.length > 0 ? (
+                        <p className="mt-4 text-xs text-fg-muted" data-card-slowest={weak[0].cell}>
+                            {ARITHMETIC_COPY.cardSlowest}: <span className="text-fg-soft">{ARITHMETIC_COPY.cellLabel(weak[0].cell)}</span>
+                            {' · '}
+                            <Link href={practiceHref(weak.map((row) => row.cell))} className="text-brand hover:underline" data-card-practice>{ARITHMETIC_COPY.cardPractice}</Link>
+                        </p>
+                    ) : undefined}
                 />
                 <GameCard id="kelly" title={KELLY_COPY.cardTitle} body={KELLY_COPY.cardBody}
                           stats={[recordStat(KELLY_COPY.recordLabel, kelly.record, KELLY_COPY.money)]} href="/games/kelly" cta={ARITHMETIC_COPY.play}/>
@@ -66,6 +77,7 @@ const GamesPage = async () => {
                 {/* A table for friends, not a score: no records. */}
                 <GameCard id="poker-night" title={POKER_NIGHT_COPY.cardTitle} body={POKER_NIGHT_COPY.cardBody} stats={[]} href="/poker-night"
                           cta={POKER_NIGHT_COPY.cardCta}/>
+                <OutsideLinks/>
             </div>
         </div>
     );

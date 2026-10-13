@@ -4,7 +4,9 @@ import {useEffect, useReducer, useRef, useState, useTransition} from "react";
 import {cn} from "@/lib/utils";
 import {UNREACHABLE_MESSAGE} from "@/lib/action-toast";
 import {recordGameRound, type RoundActionResult} from "@/lib/actions/games.actions";
-import {ArithmeticSettingsSchema, DURATIONS, OPERATIONS, ZETAMAC_DEFAULTS, problemText, type ArithmeticSettings, type Operation} from "@/lib/games/arithmetic";
+import {ArithmeticSettingsSchema, DURATIONS, OPERATIONS, ZETAMAC_DEFAULTS, isPractice, problemText, type ArithmeticSettings, type Duration, type Operation} from "@/lib/games/arithmetic";
+import {familyOf, type CellFamily, type CellId} from "@/lib/games/arithmetic-cells";
+import {foldSolved, type CellStat} from "@/lib/games/arithmetic-skill";
 import {LOBBY, roundReducer, roundReport, roundScore} from "@/lib/games/arithmetic-round";
 import {INTERVIEW_QUESTIONS, OPTION_COUNT} from "@/lib/games/interview";
 import {ARITHMETIC_COPY} from "@/lib/learn/copy/games";
@@ -14,13 +16,16 @@ import StatTile from "@/components/primitives/StatTile";
 import TextField, {fieldClass} from "@/components/primitives/TextField";
 import Sparkline from "@/components/games/Sparkline";
 
-export type ArithmeticMode = 'sprint' | 'custom' | 'interview';
+export type ArithmeticMode = 'sprint' | 'custom' | 'practice' | 'interview';
 type Summary = {record: number | null; recent: number[]};
 
 type Props = {
     mode: ArithmeticMode;
-    // The record and last rounds on this mode's settings; null for custom, which has none until played.
+    // The record and last rounds on this mode's settings; null for custom and practice, which
+    // have none until played.
     summary: Summary | null;
+    // Practice only: the kinds of problem the round is drawn from (lib/games/arithmetic-cells).
+    focus?: readonly CellId[];
 };
 
 type Saved = Extract<RoundActionResult, {success: true}> | {success: false; message: string} | null;
@@ -28,13 +33,19 @@ type Saved = Extract<RoundActionResult, {success: true}> | {success: false; mess
 // A fresh seed per round, taken in the click that starts it (never during render).
 const freshSeed = () => (Date.now() ^ Math.floor(Math.random() * 2 ** 31)) >>> 0;
 
-// Zetamac-style mental arithmetic, its custom mode, and the 80-in-8 interview mode. The round is
-// the pure reducer in lib/games/arithmetic-round.ts; this component owns its clock, its keys and
-// the report it sends when the round ends — the server keeps a round only if a person could have
-// played it (lib/games/rounds.keptRound) and answers with the record.
-const ArithmeticGame = ({mode, summary}: Props) => {
+const PRACTICE_DURATION: Duration = 60;
+
+// Zetamac-style mental arithmetic, its custom mode, a practice mode on the kinds that take the
+// reader longest, and the 80-in-8 interview mode. The round is the pure reducer in
+// lib/games/arithmetic-round.ts; this component owns its clock, its keys and the report it sends
+// when the round ends — the server keeps a round only if a person could have played it
+// (lib/games/rounds.keptRound), replaying its seed, and answers with the record. Every answer
+// is timed by the reducer; the end of a round shows this round's kinds from that, and the page's
+// skill panel shows the reader's aggregate once the server has folded the round in.
+const ArithmeticGame = ({mode, summary, focus = []}: Props) => {
     const [round, dispatch] = useReducer(roundReducer, LOBBY);
     const [settings, setSettings] = useState<ArithmeticSettings>(ZETAMAC_DEFAULTS);
+    const [practiceDuration, setPracticeDuration] = useState<Duration>(PRACTICE_DURATION);
     const [invalid, setInvalid] = useState(false);
     const [saved, setSaved] = useState<Saved>(null);
     const [saving, startSaving] = useTransition();
@@ -48,10 +59,13 @@ const ArithmeticGame = ({mode, summary}: Props) => {
             setInvalid(true);
             return;
         }
+        if (mode === 'practice' && focus.length === 0) return;
         setInvalid(false);
         setSaved(null);
         const at = Date.now();
-        dispatch(interview ? {type: 'start-interview', seed: freshSeed(), at} : {type: 'start-sprint', seed: freshSeed(), settings, at});
+        if (interview) dispatch({type: 'start-interview', seed: freshSeed(), at});
+        else if (mode === 'practice') dispatch({type: 'start-sprint', seed: freshSeed(), settings: {cells: [...focus], duration: practiceDuration}, at});
+        else dispatch({type: 'start-sprint', seed: freshSeed(), settings, at});
     };
 
     // The clock, five ticks a second while a round runs; the reducer ends the round at zero.
@@ -130,7 +144,7 @@ const ArithmeticGame = ({mode, summary}: Props) => {
                             id="arithmetic-answer"
                             ref={input}
                             value={round.typed}
-                            onChange={(event) => dispatch({type: 'type', value: event.target.value})}
+                            onChange={(event) => dispatch({type: 'type', value: event.target.value, at: Date.now()})}
                             inputMode="numeric"
                             autoComplete="off"
                             spellCheck={false}
@@ -150,6 +164,8 @@ const ArithmeticGame = ({mode, summary}: Props) => {
     if (round.kind !== 'lobby') {
         const score = roundScore(round);
         const elapsed = Math.max(1, round.now - round.startedAt) / 1000;
+        const cells = round.kind === 'sprint' ? roundCells(foldSolved({}, round.solved)) : [];
+        const slips = round.kind === 'sprint' ? round.solved.reduce((sum, s) => sum + s.slips, 0) : 0;
         return (
             <div className="space-y-5" data-arithmetic-done={mode} data-round-final={score}>
                 <div className="flex flex-wrap items-end gap-x-10 gap-y-4">
@@ -159,8 +175,20 @@ const ArithmeticGame = ({mode, summary}: Props) => {
                 </div>
                 {round.kind === 'sprint' && (
                     <ul className="flex flex-wrap gap-x-6 gap-y-1 font-mono text-xs text-fg-muted" data-round-detail>
-                        {round.settings.operations.map((op) => <li key={op}>{ARITHMETIC_COPY.operations[op]}: {round.counts[op]}</li>)}
+                        {(isPractice(round.settings) ? OPERATIONS.filter((op) => round.counts[op] > 0) : round.settings.operations)
+                            .map((op) => <li key={op}>{ARITHMETIC_COPY.operations[op]}: {round.counts[op]}</li>)}
                     </ul>
+                )}
+                {cells.length > 0 && (
+                    <div>
+                        <MicroLabel as="p" className="mb-1">{ARITHMETIC_COPY.roundCellsHeading}</MicroLabel>
+                        <ul className="space-y-0.5 font-mono text-xs text-fg-soft" data-round-cells>
+                            {cells.map(({cell, stat}) => (
+                                <li key={cell} data-round-cell={cell}>{ARITHMETIC_COPY.cellLabel(cell)}: {ARITHMETIC_COPY.cellLine(stat.ms / stat.n / 1000, stat.n)}</li>
+                            ))}
+                        </ul>
+                        {slips > 0 && <p className="mt-1 font-mono text-xs text-fg-muted" data-round-slips={slips}>{ARITHMETIC_COPY.slips(slips)}</p>}
+                    </div>
                 )}
                 <p className="text-sm font-semibold" data-round-record={saved?.success ? String(saved.isRecord) : undefined}>
                     {saving || !saved ? <span className="text-fg-muted">{ARITHMETIC_COPY.saving}</span>
@@ -179,21 +207,63 @@ const ArithmeticGame = ({mode, summary}: Props) => {
         );
     }
 
+    const lead = mode === 'sprint' ? ARITHMETIC_COPY.sprintLead
+        : mode === 'custom' ? ARITHMETIC_COPY.customLead
+            : mode === 'practice' ? ARITHMETIC_COPY.practiceLead
+                : ARITHMETIC_COPY.interviewLead;
+    const canStart = mode !== 'practice' || focus.length > 0;
     return (
         <div className="space-y-5" data-arithmetic-lobby={mode}>
-            <p className="text-sm leading-relaxed text-fg-soft">
-                {mode === 'sprint' ? ARITHMETIC_COPY.sprintLead : mode === 'custom' ? ARITHMETIC_COPY.customLead : ARITHMETIC_COPY.interviewLead}
-            </p>
+            <p className="text-sm leading-relaxed text-fg-soft">{lead}</p>
             {mode === 'custom' && <CustomSettings settings={settings} onChange={setSettings}/>}
+            {mode === 'practice' && (
+                focus.length === 0
+                    ? <p className="text-sm text-fg-muted" data-practice-empty>{ARITHMETIC_COPY.practiceEmpty}</p>
+                    : <PracticeFocus focus={focus} duration={practiceDuration} onDuration={setPracticeDuration}/>
+            )}
             {invalid && <p className="text-sm text-warning" role="alert" data-custom-invalid>{ARITHMETIC_COPY.invalid}</p>}
             <div className="flex flex-wrap items-center gap-x-6 gap-y-3">
-                <ActionButton size="md" onClick={start} data-round-start>{ARITHMETIC_COPY.start}</ActionButton>
+                {canStart && <ActionButton size="md" onClick={start} data-round-start>{ARITHMETIC_COPY.start}</ActionButton>}
                 {record !== null && <span className="font-mono text-xs text-fg-muted" data-lobby-record={record}>{ARITHMETIC_COPY.record(record)}</span>}
                 {recent.length > 1 && <Sparkline scores={recent} label={ARITHMETIC_COPY.recentHeading}/>}
             </div>
         </div>
     );
 };
+
+// A round's answered problems by kind, the slowest kind first.
+const roundCells = (folded: Partial<Record<CellId, CellStat>>): {cell: CellId; stat: CellStat}[] =>
+    (Object.entries(folded) as [CellId, CellStat | undefined][])
+        .flatMap(([cell, stat]) => (stat && stat.n > 0 ? [{cell, stat}] : []))
+        .sort((a, b) => b.stat.ms / b.stat.n - a.stat.ms / a.stat.n);
+
+// The practice lobby: the kinds this round is drawn from, one method line a family, the time.
+const PracticeFocus = ({focus, duration, onDuration}: {focus: readonly CellId[]; duration: Duration; onDuration: (d: Duration) => void}) => {
+    const families = [...new Set(focus.map(familyOf))] as CellFamily[];
+    return (
+        <div className="space-y-3">
+            <div>
+                <MicroLabel as="p" className="mb-1">{ARITHMETIC_COPY.practiceFocus}</MicroLabel>
+                <ul className="flex flex-wrap gap-2" data-practice-focus={focus.join(',')}>
+                    {focus.map((cell) => <li key={cell} className="row-card px-2.5 py-1 font-mono text-xs text-fg" data-focus-cell={cell}>{ARITHMETIC_COPY.cellLabel(cell)}</li>)}
+                </ul>
+            </div>
+            <ul className="space-y-1 text-xs text-fg-muted">
+                {families.map((family) => <li key={family} data-practice-method={family}>{ARITHMETIC_COPY.methods[family]}</li>)}
+            </ul>
+            <DurationSelect value={duration} onChange={onDuration}/>
+        </div>
+    );
+};
+
+const DurationSelect = ({value, onChange}: {value: Duration; onChange: (d: Duration) => void}) => (
+    <label className="flex items-center gap-2 text-sm text-fg">
+        {ARITHMETIC_COPY.durationLabel}
+        <select value={value} onChange={(event) => onChange(Number(event.target.value) as Duration)} className={fieldClass('w-28')} data-duration>
+            {DURATIONS.map((d) => <option key={d} value={d}>{ARITHMETIC_COPY.duration(d)}</option>)}
+        </select>
+    </label>
+);
 
 // The custom mode's settings: which operations, the two ranges for each kind, and the time.
 const CustomSettings = ({settings, onChange}: {settings: ArithmeticSettings; onChange: (s: ArithmeticSettings) => void}) => {
@@ -234,13 +304,7 @@ const CustomSettings = ({settings, onChange}: {settings: ArithmeticSettings; onC
                 </div>
                 <p className="text-xs text-fg-muted">{ARITHMETIC_COPY.reverseNote}</p>
             </div>
-            <label className="flex items-center gap-2 text-sm text-fg">
-                {ARITHMETIC_COPY.durationLabel}
-                <select value={settings.duration} onChange={(event) => onChange({...settings, duration: Number(event.target.value) as ArithmeticSettings['duration']})}
-                        className={fieldClass('w-28')} data-duration>
-                    {DURATIONS.map((d) => <option key={d} value={d}>{ARITHMETIC_COPY.duration(d)}</option>)}
-                </select>
-            </label>
+            <DurationSelect value={settings.duration} onChange={(duration) => onChange({...settings, duration})}/>
         </div>
     );
 };

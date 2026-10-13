@@ -3,6 +3,7 @@
 
 import {describe, expect, it} from 'vitest';
 import {findBanned} from '@/lib/learn/banned';
+import {CELL_IDS} from '@/lib/games/arithmetic-cells';
 import {ARCHIVE_COPY, ARITHMETIC_COPY, CORRELATION_COPY, GAMES_COPY, KELLY_COPY, MARKET_COPY, PUZZLE_CATEGORY_LABEL, PUZZLE_COPY, PUZZLE_DIFFICULTY_LABEL, STREAK_COPY} from '@/lib/learn/copy/games';
 
 const clean = (text: string) => {
@@ -31,6 +32,10 @@ describe('the games copy', () => {
         for (const n of [0, 1, 48, 1200]) [ARITHMETIC_COPY.correct(n), ARITHMETIC_COPY.wrong(n), ARITHMETIC_COPY.record(n), ARITHMETIC_COPY.questionOf(n, 80)].forEach(clean);
         for (const seconds of [0, 0.4, 59.5, 120, 600]) [ARITHMETIC_COPY.timeLeft(seconds), ARITHMETIC_COPY.perProblem(seconds)].forEach(clean);
         for (const d of [30, 60, 120, 300, 600]) clean(ARITHMETIC_COPY.duration(d));
+        for (const cell of CELL_IDS) clean(ARITHMETIC_COPY.cellLabel(cell));
+        for (const [mean, ratio, n, slips] of [[3.1, 1.6, 24, 3], [0.9, 1.0, 5, 0], [12.25, 4.333, 1, 1]]) clean(ARITHMETIC_COPY.skillRow(mean, ratio, n, slips));
+        for (const problems of [0, 1, 48]) for (const rounds of [0, 1, 20]) clean(ARITHMETIC_COPY.skillCount(problems, rounds));
+        for (const n of [0, 1, 7]) [ARITHMETIC_COPY.cellLine(2.4, n), ARITHMETIC_COPY.slips(n)].forEach(clean);
         clean(ARCHIVE_COPY.posted('2026-09-28'));
         for (const cents of [0, 1, 2500, 12_345, 25_000]) [KELLY_COPY.money(cents), KELLY_COPY.final(cents), KELLY_COPY.lastFlip(true, true, cents), KELLY_COPY.lastFlip(false, false, cents)].forEach(clean);
         for (const g of [0.0201, 0.0151, -Infinity]) clean(KELLY_COPY.growth(g));
@@ -63,5 +68,14 @@ describe('the games copy', () => {
         expect(MARKET_COPY.signed(0)).toBe('0');
         expect(MARKET_COPY.signed(7)).toBe('+7');
         expect(CORRELATION_COPY.score(41)).toBe('Average miss: 0.041');
+        expect(ARITHMETIC_COPY.cellLabel('times-7')).toBe('× 7');
+        expect(ARITHMETIC_COPY.cellLabel('by-12')).toBe('÷ 12');
+        expect(ARITHMETIC_COPY.cellLabel('add-3d-carry')).toBe('Sums of 100 to 999 with a carry');
+        expect(ARITHMETIC_COPY.cellLabel('add-2d-plain')).toBe('Sums under 100, no carry');
+        expect(ARITHMETIC_COPY.cellLabel('subtract-4d-borrow')).toBe('Taking away from 1,000 or more with a borrow');
+        expect(ARITHMETIC_COPY.skillRow(3.1, 1.6, 24, 3)).toBe('3.1 s a problem · 1.6× your average · 24 problems · 3 slips');
+        expect(ARITHMETIC_COPY.skillRow(0.9, 1.0, 1, 0)).toBe('0.9 s a problem · 1.0× your average · 1 problem');
+        expect(GAMES_COPY.outside.links.lichess.href).toBe('https://lichess.org/training');
+        expect(GAMES_COPY.outside.links.monkeytype.href).toBe('https://monkeytype.com');
     });
 });
