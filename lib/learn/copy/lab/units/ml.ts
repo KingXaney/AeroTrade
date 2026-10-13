@@ -422,4 +422,383 @@ Give the second answer in billions, to two decimal places.
             },
         ],
     },
+    {
+        id: 'ml-long-context-attention',
+        track: 'ml',
+        title: 'Attention variants and long context: FlashAttention, MQA/GQA/MLA, RoPE extension',
+        oneLiner: 'Context length is a memory-bandwidth problem; the KV cache, not FLOPs, is the limit.',
+        readingMinutes: 28,
+        prerequisites: ['ml-transformer-internals'],
+        sections: {
+            idea: md`
+Three separate problems hide under the words "long context", and each has its own fix. The first is **training and prefill compute**: attention materialises an $N \times N$ score matrix per head, so at $N$ in the hundreds of thousands the quadratic term dominates and the matrix does not fit in memory. **FlashAttention** does not change the arithmetic; it changes the order of it. By tiling the query, key and value matrices into blocks that fit in on-chip SRAM, computing the softmax incrementally with a running maximum and running sum (the *online softmax* trick), and never writing the score matrix to high-bandwidth memory, it turns a memory-bound kernel into a compute-bound one. FlashAttention-2 reorders the loops and parallelises across the sequence; FlashAttention-3 overlaps the matrix multiplies with the softmax on Hopper's asynchronous units and uses FP8. Exact attention, two to four times faster, and the memory of the score matrix gone.
+
+The second problem is **decoding memory**. Generating one token requires reading every cached key and value of every previous token in every layer — the **KV cache** — and that read, not the arithmetic, sets the time per token and the number of concurrent sequences a GPU can hold. **Multi-query attention** shares one key and value head across all query heads; **grouped-query attention** shares a key/value head among a group of query heads (8 KV heads for 64 query heads in the Llama family), cutting the cache by the group size at almost no quality cost. DeepSeek's **multi-head latent attention** goes further: it caches a low-rank latent vector per token from which keys and values are reconstructed on the fly, with the up-projection folded into the query and output weights so no extra multiply is paid at decode; the cache shrinks by roughly an order of magnitude against full multi-head attention while keeping per-head expressivity.
+
+The third problem is **position**. Rotary position embedding (RoPE) rotates each pair of channels in a query and key by an angle proportional to the token's position, so the dot product depends on the relative offset; the rotation frequencies form a geometric series, from fast (local order) to slow (long-range). A model trained to 8k positions has never seen the slow frequencies rotate far, and at 32k the attention logits for distant pairs are out of distribution. **Position interpolation** rescales positions into the trained range (losing resolution on short-range frequencies); **NTK-aware** scaling changes the base of the geometric series so slow frequencies stretch and fast ones do not; **YaRN** combines a per-frequency interpolation ramp with a temperature on the attention logits and extends to 128k with a few hundred fine-tuning steps. Beyond that, **ring attention** shards the sequence across devices and passes key/value blocks around a ring so each device computes its queries' attention over the whole sequence with memory proportional to its own shard.
+`,
+            maths: md`
+**Online softmax.** For a query row with scores $s_1, \dots, s_N$ processed in blocks, keep the running maximum $m$ and running denominator $\ell$. On a new block with scores $s_{(b)}$ and values $V_{(b)}$:
+
+$$m' = \max(m, \max s_{(b)}), \qquad \ell' = e^{\,m - m'}\,\ell + \sum_j e^{\,s_{(b),j} - m'}, \qquad o' = e^{\,m - m'}\, o + \sum_j e^{\,s_{(b),j} - m'}\, V_{(b),j},$$
+
+and the output is $o / \ell$ at the end. Each block is a rescale of the running state plus a local softmax; nothing of size $N \times N$ is ever stored. The backward pass recomputes the block scores from $Q$, $K$ and the saved $(m, \ell)$ rather than reading a stored score matrix.
+
+**KV cache size.** Per token, with $L$ layers, $H_{kv}$ key/value heads of dimension $d_h$, two tensors (keys and values) and $b$ bytes per element:
+
+$$\text{bytes per token} = 2\, L\, H_{kv}\, d_h\, b,$$
+
+and a context of $N$ tokens holds $N$ times that. GQA with a group size $g = H_q / H_{kv}$ divides the cache by $g$ relative to MHA. For MLA with latent dimension $d_c$ (plus a small decoupled RoPE key of dimension $d_r$), the cache is $L\,(d_c + d_r)\, b$ per token — one vector per layer, independent of the head count.
+
+**Multi-head latent attention.** The latent $c_t = W_{DKV}\, h_t \in \mathbb{R}^{d_c}$ is cached; keys and values are $k_t = W_{UK}\, c_t$ and $v_t = W_{UV}\, c_t$. Since $q^{\top} k_t = q^{\top} W_{UK}\, c_t = (W_{UK}^{\top} q)^{\top} c_t$, the up-projection is absorbed into the query side, and likewise $W_{UV}$ into the output projection, so decoding attends directly over the cached latents. RoPE does not commute with $W_{UK}$, which is why a separate small rotary key is kept.
+
+**RoPE and its extension.** For channel pair $i$ with base frequency $\theta_i = \beta^{-2i/d}$ (base $\beta = 10{,}000$ originally), a token at position $p$ is rotated by $p\,\theta_i$, and $q_m^{\top} k_n$ depends on $(m - n)\,\theta_i$ only. Position interpolation maps $p \mapsto p / s$ for a scale $s = N_{\text{new}} / N_{\text{train}}$. NTK-aware scaling instead sets $\beta' = \beta\, s^{\,d/(d-2)}$, so the slowest frequency stretches by $s$ and the fastest barely moves. YaRN interpolates per frequency with a ramp $\gamma(r)$ on the wavelength ratio $r$ — full interpolation for long wavelengths, none for short — and scales the logits by $\sqrt{1/t}$ with $t = 0.1 \ln s + 1$ to keep the attention entropy near its trained value.
+`,
+            code: md`
+The two things worth having in your hands: the online-softmax recurrence as a plain loop over key blocks, and the KV-cache arithmetic for a given model shape.
+
+\`\`\`python
+import torch
+
+def attention_blocked(q, K, V, block=256):
+    # q: (d,), K, V: (N, d). Exact softmax attention without an N-vector of scores in memory.
+    m = torch.tensor(float("-inf")); l = torch.tensor(0.0); o = torch.zeros_like(q)
+    scale = q.shape[-1] ** -0.5
+    for start in range(0, K.shape[0], block):
+        s = (K[start:start + block] @ q) * scale          # scores of this block only
+        m_new = torch.maximum(m, s.max())
+        p = torch.exp(s - m_new)
+        l = torch.exp(m - m_new) * l + p.sum()
+        o = torch.exp(m - m_new) * o + p @ V[start:start + block]
+        m = m_new
+    return o / l
+
+def kv_cache_bytes(layers, kv_heads, head_dim, tokens, bytes_per=2):
+    return 2 * layers * kv_heads * head_dim * bytes_per * tokens   # keys and values
+
+# A 70B-class shape: 80 layers, 8 KV heads (GQA over 64 query heads), head dim 128, fp16.
+per_token = kv_cache_bytes(80, 8, 128, 1)                 # 327,680 bytes
+at_128k = kv_cache_bytes(80, 8, 128, 128 * 1024) / 2**30  # about 40 GiB for one sequence
+mha_equiv = kv_cache_bytes(80, 64, 128, 128 * 1024) / 2**30   # 320 GiB without GQA
+\`\`\`
+
+Check it against a direct softmax on a small $N$; the recurrence is exact, and the rescaling factors $e^{m - m'}$ are what make it so.
+`,
+            whyNow: md`
+Context windows went from 4k to 128k as a product default and to a million tokens in the frontier within two years, and every step was one of these three fixes rather than a new attention. Serving economics now turn on the KV cache: it decides how many requests share a GPU, it is what prefix caching and paged attention manage (the inference unit), and the choice between GQA and MLA is a choice about the memory bill of every deployed model. The DeepSeek-V2 and V3 reports made MLA the reference design for cache-efficient attention at scale.
+
+Length extension became a post-training step rather than a pretraining choice: a base model trained at 8k or 32k is extended with YaRN-style scaling and a short continued-pretraining run on long documents, then evaluated on needle-in-a-haystack and on RULER-style tasks whose difficulty grows with length. The honest finding of those evaluations is that an advertised context length and an *effective* one differ, often by a factor of two or more, and that "lost in the middle" degradation persists after extension.
+`,
+            pitfalls: md`
+- **FlashAttention is exact.** Confusing it with sparse or approximate attention leads to wrong expectations; it changes memory traffic, not the function. Its gains are largest at long sequences and small head dimensions.
+- **The cache, not the weights.** At long context a 70B model's single-sequence KV cache can exceed its weights; a serving plan that budgets weights only will OOM at the first long prompt.
+- **Extension without fine-tuning.** NTK and YaRN scaling run zero-shot but degrade perplexity; a few hundred steps on long documents recover most of it. Position interpolation alone hurts short-range resolution.
+- **RoPE and MLA.** The rotary rotation does not commute with the latent up-projection; the decoupled rotary key is not optional, and omitting it silently breaks relative position.
+- **Effective context.** Needle retrieval at 128k says nothing about reasoning over 128k; use multi-hop and aggregation tasks (RULER, LongBench) and expect a cliff well below the advertised length.
+- **Numerics.** FP8 attention (FlashAttention-3) needs block-wise scaling of $Q$ and $K$; naive casting produces softmax overflow at long range where scores are largest.
+`,
+        },
+        sources: [
+            {title: 'FlashAttention: Fast and Memory-Efficient Exact Attention with IO-Awareness', url: 'https://arxiv.org/abs/2205.14135', kind: 'paper', year: 2022},
+            {title: 'FlashAttention-3: Fast and Accurate Attention with Asynchrony and Low-precision', url: 'https://arxiv.org/abs/2407.08608', kind: 'paper', year: 2024},
+            {title: 'Fast Transformer Decoding: One Write-Head is All You Need (MQA)', url: 'https://arxiv.org/abs/1911.02150', kind: 'paper', year: 2019},
+            {title: 'GQA: Training Generalized Multi-Query Transformer Models from Multi-Head Checkpoints', url: 'https://arxiv.org/abs/2305.13245', kind: 'paper', year: 2023},
+            {title: 'DeepSeek-V2: A Strong, Economical, and Efficient Mixture-of-Experts Language Model', url: 'https://arxiv.org/abs/2405.04434', kind: 'paper', year: 2024, note: 'Multi-head latent attention, section 2.1.'},
+            {title: 'RoFormer: Enhanced Transformer with Rotary Position Embedding', url: 'https://arxiv.org/abs/2104.09864', kind: 'paper', year: 2021},
+            {title: 'YaRN: Efficient Context Window Extension of Large Language Models', url: 'https://arxiv.org/abs/2309.00071', kind: 'paper', year: 2023},
+            {title: 'Ring Attention with Blockwise Transformers for Near-Infinite Context', url: 'https://arxiv.org/abs/2310.01889', kind: 'paper', year: 2023},
+        ],
+        cards: [
+            {id: 'ml-long-context-attention/flash', front: 'What does FlashAttention change, and what does it not change?', back: 'The order of computation: tiled blocks in SRAM, an online softmax with running max and sum, no score matrix written to HBM, recomputation in the backward pass. It does not change the function: attention stays exact.', tags: ['flash', 'systems']},
+            {id: 'ml-long-context-attention/online-softmax', front: 'Write the online-softmax update for a new block of scores.', back: '$m\' = \\max(m, \\max s)$; $\\ell\' = e^{m-m\'}\\ell + \\sum_j e^{s_j - m\'}$; $o\' = e^{m-m\'}o + \\sum_j e^{s_j-m\'} V_j$; output $o/\\ell$ at the end. The rescale by $e^{m-m\'}$ keeps earlier blocks consistent with the new maximum.', tags: ['flash', 'maths']},
+            {id: 'ml-long-context-attention/kv-bytes', front: 'Give the KV-cache bytes per token for a model with L layers, H_kv key/value heads of dimension d_h at b bytes per element.', back: '$2 L H_{kv} d_h b$: keys and values, every layer, every KV head. GQA divides it by the group size relative to MHA; MLA replaces $H_{kv} d_h$ by one latent of dimension $d_c + d_r$.', tags: ['kv-cache', 'arithmetic']},
+            {id: 'ml-long-context-attention/mla', front: 'How does multi-head latent attention avoid paying for reconstructing keys at decode time?', back: 'It caches a low-rank latent $c_t$ per token and absorbs the key up-projection into the query ($q^\\top W_{UK} c_t = (W_{UK}^\\top q)^\\top c_t$) and the value up-projection into the output weights, so attention runs directly over the latents. A small separate rotary key carries position, since RoPE does not commute with the up-projection.', tags: ['mla', 'deepseek']},
+            {id: 'ml-long-context-attention/rope', front: 'Why does a RoPE model fail beyond its trained length, and what do interpolation, NTK scaling and YaRN each do?', back: 'Slow frequencies never rotated far in training, so distant-pair logits are out of distribution. Interpolation rescales all positions into range (loses short-range resolution); NTK-aware scaling raises the base so slow frequencies stretch and fast ones barely move; YaRN interpolates per frequency with a ramp and tempers the logits.', tags: ['rope', 'extension']},
+            {id: 'ml-long-context-attention/ring', front: 'What is ring attention?', back: 'The sequence is sharded across devices; key/value blocks are passed around a ring while each device computes its own queries\' attention over every block it receives, so memory per device scales with its shard, not the full sequence.', tags: ['ring', 'distributed']},
+            {id: 'ml-long-context-attention/effective', front: 'What is the difference between advertised and effective context length?', back: 'Advertised is the position range the model accepts; effective is where task accuracy holds. Needle retrieval overstates it; aggregation and multi-hop tasks (RULER, LongBench) show a cliff, often at half the advertised length, and a lost-in-the-middle dip persists.', tags: ['evaluation']},
+        ],
+        problems: [
+            {
+                id: 'ml-long-context-attention/p1',
+                kind: 'quant',
+                title: 'The cache of one long sequence',
+                statement: md`
+A model has 80 layers, 64 query heads and 8 key/value heads of dimension 128, and serves in fp16 (2 bytes per element).
+
+1. How many bytes of KV cache does one token occupy?
+2. How many GiB does a single 131,072-token sequence occupy?
+3. By what factor would the cache grow without grouped-query attention (64 KV heads)?
+
+Give the first answer: bytes per token.
+`,
+                hints: ['Keys and values are two tensors per layer.', 'Multiply 2, the layer count, the KV head count, the head dimension and the bytes per element.'],
+                solution: md`
+1. $2 \times 80 \times 8 \times 128 \times 2 = 327{,}680$ bytes per token (320 KiB).
+2. $131{,}072 \times 327{,}680 = 42{,}949{,}672{,}960$ bytes $= 40$ GiB exactly — more than many single GPUs hold after the weights.
+3. With 64 KV heads the per-token cache is 8 times larger, 2.5 MiB, and the sequence needs 320 GiB. Grouped-query attention is what makes 128k contexts serveable at all; MLA cuts it further by caching one latent per layer.
+`,
+                answer: '327680',
+            },
+        ],
+    },
+    {
+        id: 'ml-state-space-models',
+        track: 'ml',
+        title: 'State-space and linear-attention models: S4, Mamba, hybrids',
+        oneLiner: 'Hybrids give long context at constant memory per token; knowing where they lose (exact recall) matters.',
+        readingMinutes: 26,
+        prerequisites: ['ml-long-context-attention'],
+        sections: {
+            idea: md`
+A **state-space model** is a linear recurrence: a hidden state $h_t$ of fixed size is updated from $h_{t-1}$ and the input $x_t$, and the output is a linear read of the state. Written out it is a convolution of the input with a kernel determined by the recurrence's matrices, so the same model can be run as a recurrence (constant memory per step, one step per token at inference) or as a convolution (parallel over the sequence at training time). **S4** made this work for long sequences by structuring the state matrix — the HiPPO initialisation, which sets the state to remember a compressed history of the input — and by computing the long convolution kernel efficiently with FFTs. Its cost per token is independent of context length, which attention's is not.
+
+The limitation of S4 is that its dynamics are the same for every token: a linear time-invariant system cannot decide, from the content of a token, what to keep and what to forget. **Mamba** makes the step size, the input projection and the output projection *functions of the input* (a *selective* SSM), so the recurrence can gate: a token can reset the state, write to it or pass through. Selection breaks the convolutional form, so Mamba instead computes the recurrence with a hardware-aware parallel scan that keeps the expanded state in SRAM. **Mamba-2** reframes the selective SSM as a form of linear attention with a structured mask — *state space duality* — which lets it use matrix-multiply hardware and larger state dimensions. The linear-attention family (RetNet, GLA, RWKV, DeltaNet) arrives at the same place from the other side: attention without the softmax is a recurrence whose state is a $d \times d$ matrix.
+
+What these models trade is **exact recall**. A transformer's KV cache stores every token; an SSM's state is a fixed-size compression, and a task that requires retrieving an arbitrary earlier token verbatim — copying a long string, looking up a key seen once among many — degrades as the required memory exceeds the state. The "Repeat After Me" line of work shows transformers beating SSMs on copying with far fewer parameters, and associative-recall probes show the state size setting a hard ceiling. The practical answer is the **hybrid**: a stack that is mostly SSM or linear-attention layers with a few full-attention layers (Jamba at a 1 to 7 ratio, later Nemotron-H and others), which keeps the memory cost near the SSM's while the attention layers provide the recall.
+`,
+            maths: md`
+**The continuous and discrete SSM.** With state $h(t) \in \mathbb{R}^{N}$ per channel,
+
+$$h'(t) = A\, h(t) + B\, x(t), \qquad y(t) = C\, h(t),$$
+
+discretised with step $\Delta$ by zero-order hold: $\bar{A} = \exp(\Delta A)$, $\bar{B} = (\Delta A)^{-1}(\exp(\Delta A) - I)\,\Delta B$, giving the recurrence $h_t = \bar{A}\, h_{t-1} + \bar{B}\, x_t$, $y_t = C\, h_t$. Unrolling,
+
+$$y_t = \sum_{k=0}^{t} C\, \bar{A}^{\,k}\, \bar{B}\, x_{t-k} = (\bar{K} * x)_t, \qquad \bar{K} = \big(C\bar{B},\ C\bar{A}\bar{B},\ C\bar{A}^2\bar{B},\ \dots\big),$$
+
+a convolution with a kernel as long as the sequence, computed in $O(L \log L)$ by FFT when $A$ is time-invariant.
+
+**Selection.** Mamba sets $\Delta_t = \operatorname{softplus}(W_\Delta x_t)$, $B_t = W_B x_t$, $C_t = W_C x_t$ per token, with $A$ diagonal and negative. The recurrence becomes
+
+$$h_t = \exp(\Delta_t A)\, h_{t-1} + \Delta_t\, B_t\, x_t, \qquad y_t = C_t\, h_t,$$
+
+so a large $\Delta_t$ forgets ($\exp(\Delta A) \to 0$) and writes, a small one preserves. With $A$ diagonal the scan is elementwise; the per-layer state is $d_{\text{inner}} \times N$ numbers and never grows with the sequence.
+
+**State space duality.** With scalar decay $a_t = \exp(\Delta_t A)$ shared across the state, the output is a masked quadratic form:
+
+$$y_t = \sum_{s \le t} \Big(\prod_{r = s+1}^{t} a_r\Big)\, (C_t^{\top} B_s)\, x_s, \qquad \text{i.e.}\quad Y = \big(L \odot (C B^{\top})\big) X,$$
+
+where $L$ is the lower-triangular matrix of cumulative decays — linear attention with a learned decay mask, computable blockwise with matrix multiplies.
+
+**The recall bound.** An associative-recall task with $k$ key–value pairs of dimension $d$ needs about $k\, d$ numbers of state to answer any query; a model whose per-layer state has fewer cannot solve it exactly, whatever the training. A transformer with a KV cache of $k$ tokens has $2 k d$ by construction.
+`,
+            code: md`
+A selective scan in plain PyTorch — the sequential reference, not the fused kernel — and the recall ceiling made concrete by counting state.
+
+\`\`\`python
+import torch, torch.nn.functional as F
+
+def selective_scan(x, A, W_delta, W_B, W_C):
+    # x: (L, d_inner); A: (d_inner, N) negative; the projections map x_t to delta_t, B_t, C_t.
+    L, d = x.shape
+    N = A.shape[1]
+    h = torch.zeros(d, N)
+    ys = []
+    for t in range(L):
+        delta = F.softplus(x[t] @ W_delta)                 # (d,)  per-channel step
+        B_t = x[t] @ W_B                                   # (N,)
+        C_t = x[t] @ W_C                                   # (N,)
+        a_bar = torch.exp(delta[:, None] * A)              # (d, N) decay, close to 0 forgets
+        h = a_bar * h + (delta[:, None] * B_t[None, :]) * x[t][:, None]
+        ys.append(h @ C_t)                                 # (d,)
+    return torch.stack(ys)                                 # (L, d_inner)
+
+def ssm_state_numbers(layers, d_inner, N):
+    return layers * d_inner * N                            # constant in the sequence length
+
+def kv_cache_numbers(layers, kv_heads, head_dim, tokens):
+    return 2 * layers * kv_heads * head_dim * tokens       # grows with the sequence
+
+# Mamba-2.8B-like: 64 layers, d_inner 5120, N 16  ->  5.2M numbers, whatever the context.
+# A GQA transformer of similar size at 4096 tokens holds about 2 * 32 * 8 * 128 * 4096 = 268M.
+\`\`\`
+
+The loop is the semantics; the fused kernel computes the same thing with a parallel scan and keeps $h$ in SRAM so the $(d, N)$ state is never written out per step.
+`,
+            whyNow: md`
+Hybrids left the research track in 2024–25: Jamba, Nemotron-H, the Granite and Falcon-H lines, and several production models at the 50 to 400 billion parameter scale interleave Mamba-2 or linear-attention layers with a minority of attention layers, and the DeepSeek and Qwen families' work on sparse attention competes with them for the same budget — long context at a fraction of the KV-cache cost. The question is no longer whether an SSM can match a transformer at short context but what the right ratio of attention layers is for a given memory budget and recall requirement, and that ratio is a measurable engineering parameter.
+
+The theory caught up with the practice: state space duality unified the SSM and linear-attention lines, the recall experiments gave a clean account of what the state size buys and what it cannot, and hybrid design now starts from the recall workload (how many exact lookups over how long a context) rather than from architecture preference.
+`,
+            pitfalls: md`
+- **Copying and lookup.** Any workload that needs verbatim recall of arbitrary earlier tokens — long code edits, document question answering with exact quotes — exposes a pure SSM. Measure associative recall at the context lengths you serve, not perplexity.
+- **The convolutional view needs time invariance.** Selection breaks the FFT path; a selective model trains through a scan, and its throughput depends on a fused kernel for the hardware you have.
+- **Initialisation matters.** S4-style $A$ initialisation (negative real parts, HiPPO-like spacing) is what gives long memory at the start of training; a random $A$ forgets within a few tokens.
+- **Benchmarks at short context** (4k) show SSMs and transformers at parity and hide every difference that matters; the differences appear past the trained length and under recall load.
+- **Hybrid ratio.** Too few attention layers and recall collapses; too many and the memory advantage disappears. Published ratios between 1:7 and 1:4 are starting points, not laws.
+- **Numerics of long decays.** Products of many $a_t$ underflow; implementations keep log-decays and use the segmented, chunked formulation of state space duality to stay stable.
+`,
+        },
+        sources: [
+            {title: 'Efficiently Modeling Long Sequences with Structured State Spaces (S4)', url: 'https://arxiv.org/abs/2111.00396', kind: 'paper', year: 2021},
+            {title: 'Mamba: Linear-Time Sequence Modeling with Selective State Spaces', url: 'https://arxiv.org/abs/2312.00752', kind: 'paper', year: 2023},
+            {title: 'Transformers are SSMs: Generalized Models and Efficient Algorithms Through Structured State Space Duality (Mamba-2)', url: 'https://arxiv.org/abs/2405.21060', kind: 'paper', year: 2024},
+            {title: 'Jamba: A Hybrid Transformer-Mamba Language Model', url: 'https://arxiv.org/abs/2403.19887', kind: 'paper', year: 2024},
+            {title: 'Repeat After Me: Transformers are Better than State Space Models at Copying', url: 'https://arxiv.org/abs/2402.01032', kind: 'paper', year: 2024},
+            {title: 'Gated Linear Attention Transformers with Hardware-Efficient Training', url: 'https://arxiv.org/abs/2312.06635', kind: 'paper', year: 2023},
+            {title: 'Simple linear attention language models balance the recall-throughput tradeoff (Based)', url: 'https://arxiv.org/abs/2402.18668', kind: 'paper', year: 2024, note: 'The recall–memory frontier measured across architectures.'},
+        ],
+        cards: [
+            {id: 'ml-state-space-models/two-views', front: 'In what two ways can a time-invariant SSM be computed, and when is each used?', back: 'As a recurrence (constant memory, one step per token: inference) or as a convolution with a kernel built from the recurrence\'s matrices, computed by FFT (parallel over the sequence: training). Selection breaks the convolutional form.', tags: ['ssm', 's4']},
+            {id: 'ml-state-space-models/selection', front: 'What does Mamba make input-dependent, and what does that let the model do?', back: 'The step size, the input projection B and the output projection C per token. A large step forgets and writes, a small one preserves, so the recurrence can gate by content: reset, store or pass through.', tags: ['mamba']},
+            {id: 'ml-state-space-models/state-size', front: 'How much state does a selective SSM layer hold, and how does it scale with context?', back: '$d_{inner} \\times N$ numbers per layer (expansion times state dimension), constant in the sequence length. A transformer\'s KV cache grows linearly with the tokens held.', tags: ['memory']},
+            {id: 'ml-state-space-models/duality', front: 'What is state space duality?', back: 'A selective SSM with scalar decay equals linear attention with a lower-triangular mask of cumulative decays, $Y = (L \\odot CB^\\top)X$, so it can be computed blockwise with matrix multiplies and larger states (Mamba-2).', tags: ['mamba-2', 'linear-attention']},
+            {id: 'ml-state-space-models/recall', front: 'Where do SSMs lose to transformers, and why?', back: 'Exact recall: copying and associative lookup over arbitrary earlier tokens. The state is a fixed-size compression, so once the needed memory exceeds it the task cannot be solved exactly; a KV cache stores every token by construction.', tags: ['recall', 'limits']},
+            {id: 'ml-state-space-models/hybrid', front: 'What is a hybrid, and what does the attention-layer ratio control?', back: 'A stack mostly of SSM or linear-attention layers with a minority of full-attention layers (Jamba at about 1 in 8). The ratio trades recall against KV-cache memory; it is set from the recall workload, not by preference.', tags: ['hybrid']},
+            {id: 'ml-state-space-models/hippo', front: 'What does the HiPPO initialisation of A do?', back: 'Sets the state to maintain a compressed projection of the input\'s history (negative, structured eigenvalues), giving long memory from the start of training; a random A forgets within a few tokens.', tags: ['s4', 'init']},
+        ],
+        problems: [
+            {
+                id: 'ml-state-space-models/p1',
+                kind: 'quant',
+                title: 'Counting the state',
+                statement: md`
+A Mamba-style model has 64 layers, model width 2560 with expansion 2 (so $d_{\text{inner}} = 5120$) and state dimension $N = 16$.
+
+1. How many numbers of SSM state does one layer hold?
+2. How many does the whole model hold, and how many bytes in fp16?
+3. A grouped-query transformer with 32 layers, 8 KV heads of dimension 128 holds a KV cache of $2 \times 32 \times 8 \times 128$ numbers per token. At what context length does its cache equal the Mamba model's whole state?
+
+Give the first answer: numbers of state in one layer.
+`,
+                hints: ['State per layer is the inner width times the state dimension.', 'The transformer\'s per-token cache is 65,536 numbers.'],
+                solution: md`
+1. $5120 \times 16 = 81{,}920$ numbers per layer.
+2. $64 \times 81{,}920 = 5{,}242{,}880$ numbers, $10{,}485{,}760$ bytes (10 MiB) in fp16 — the same at 1k tokens as at 1M.
+3. The transformer holds $65{,}536$ numbers per token, so its cache equals the SSM's state at $5{,}242{,}880 / 65{,}536 = 80$ tokens. Past that the transformer pays more memory per sequence, and it keeps paying linearly; what it buys is exact recall of every one of those tokens.
+`,
+                answer: '81920',
+            },
+        ],
+    },
+    {
+        id: 'ml-post-training',
+        track: 'ml',
+        title: 'Post-training: SFT, reward models, RLHF, DPO and its relatives',
+        oneLiner: 'The alignment stack is what you touch when you fine-tune; DPO\'s closed form explains most of it.',
+        readingMinutes: 28,
+        prerequisites: ['ml-transformer-internals'],
+        sections: {
+            idea: md`
+A pretrained language model predicts the next token of internet text; post-training turns it into a model that answers. The stack that InstructGPT described in 2022 is still the frame. **Supervised fine-tuning (SFT)** continues training on prompt–response pairs written or curated by people, with the loss on the response tokens only; it teaches the format and the basic behaviours and is where most of the capability of a chat model's style comes from. **A reward model** is then trained on comparisons: for a prompt, two responses, and a label saying which a rater preferred, the model learns a scalar score whose differences fit the preferences under the Bradley–Terry model. **Reinforcement learning from human feedback (RLHF)** then optimises the policy to maximise the reward, with a KL penalty toward the SFT model so the policy does not drift into the reward model's blind spots; the optimiser is usually PPO, with the value function, the reference model and the reward model all in memory alongside the policy.
+
+**Direct preference optimisation (DPO)** removed the reward model and the RL loop from that recipe. Its observation is that the RLHF objective — reward minus a KL to the reference — has a closed-form optimal policy, and inverting it expresses the reward as the log-ratio of the policy to the reference, up to a per-prompt constant that cancels in a comparison. Substituting that into the Bradley–Terry likelihood gives a loss on preference pairs that trains the policy directly, with no sampling and no separate reward model: a logistic loss on the difference of the two responses' log-ratios, scaled by the KL coefficient. The relatives — IPO, KTO (which needs only a thumbs-up or thumbs-down per response rather than a pair), SimPO (which drops the reference model and length-normalises), ORPO — change the loss shape or the data requirement while keeping the same idea.
+
+Which to use is an empirical question with a fairly settled answer. DPO is cheap, stable and good when the preference data is on-policy enough; PPO-style RL with a reward model wins when the policy must explore beyond the preference set, on reasoning and agentic tasks where rewards can be computed rather than rated (the next unit), and in the largest labs' pipelines where the reward model is itself a trained artefact worth the cost. Most open models now run SFT, then one or more rounds of DPO-family training on preferences collected from the current policy's own samples (on-policy or *iterative* DPO), then RL on verifiable tasks.
+`,
+            maths: md`
+**Bradley–Terry.** For a prompt $x$ and responses $y_w$ (preferred) and $y_l$, with reward $r$,
+
+$$p(y_w \succ y_l \mid x) = \sigma\big(r(x, y_w) - r(x, y_l)\big) = \frac{e^{r(x,y_w)}}{e^{r(x,y_w)} + e^{r(x,y_l)}},$$
+
+and a reward model $r_\phi$ is trained by maximising the log-likelihood of the rated pairs, $-\log \sigma(r_\phi(x, y_w) - r_\phi(x, y_l))$.
+
+**The RLHF objective and its optimal policy.** With reference policy $\pi_{\text{ref}}$ and coefficient $\beta$,
+
+$$\max_{\pi}\ \mathbb{E}_{x,\, y \sim \pi(\cdot \mid x)}\big[ r(x, y) \big] - \beta\, \mathbb{D}_{\text{KL}}\big(\pi(\cdot \mid x)\, \|\, \pi_{\text{ref}}(\cdot \mid x)\big)$$
+
+has the solution $\pi^{*}(y \mid x) = \frac{1}{Z(x)}\, \pi_{\text{ref}}(y \mid x)\, \exp\!\big(r(x, y) / \beta\big)$. Inverting,
+
+$$r(x, y) = \beta \log \frac{\pi^{*}(y \mid x)}{\pi_{\text{ref}}(y \mid x)} + \beta \log Z(x).$$
+
+**DPO.** Substituting the reward into Bradley–Terry, $Z(x)$ cancels in the difference, and the loss on a pair is
+
+$$\mathcal{L}_{\text{DPO}}(\theta) = -\log \sigma\!\left( \beta \log \frac{\pi_\theta(y_w \mid x)}{\pi_{\text{ref}}(y_w \mid x)} - \beta \log \frac{\pi_\theta(y_l \mid x)}{\pi_{\text{ref}}(y_l \mid x)} \right).$$
+
+Its gradient weights each pair by $\sigma(\hat r_\theta(y_l) - \hat r_\theta(y_w))$ — how wrong the implicit reward currently is — and pushes up the chosen response's log-probability and down the rejected one's. The *implicit reward* $\hat r_\theta = \beta \log(\pi_\theta / \pi_{\text{ref}})$ is what the margin plots in DPO papers show.
+
+**Relatives.** KTO replaces the pair with a single response and a binary label, using a reference point $z_0 = \mathbb{E}[\hat r]$ and a prospect-theory-shaped loss. SimPO uses the length-normalised log-probability $\frac{\beta}{|y|} \log \pi_\theta(y \mid x)$ as the reward, no reference model, and a target margin $\gamma$: $-\log \sigma\big(\frac{\beta}{|y_w|}\log\pi_\theta(y_w|x) - \frac{\beta}{|y_l|}\log\pi_\theta(y_l|x) - \gamma\big)$.
+
+**PPO's clipped objective**, for completeness, with per-token advantage $\hat A_t$ from a value model and ratio $\rho_t = \pi_\theta(a_t \mid s_t) / \pi_{\text{old}}(a_t \mid s_t)$:
+
+$$\mathcal{L}_{\text{PPO}} = -\mathbb{E}_t\big[\min\big(\rho_t \hat A_t,\ \operatorname{clip}(\rho_t, 1-\epsilon, 1+\epsilon)\, \hat A_t\big)\big],$$
+
+with the KL to the reference added to the reward per token in RLHF practice.
+`,
+            code: md`
+The DPO loss from sequence log-probabilities, which is all it needs: two forward passes of the policy and two of the frozen reference per pair.
+
+\`\`\`python
+import torch, torch.nn.functional as F
+
+def sequence_logprob(model, input_ids, response_mask):
+    # Sum of the response tokens' log-probabilities under the model; prompt tokens masked out.
+    logits = model(input_ids).logits[:, :-1]                           # predict token t+1 from t
+    targets = input_ids[:, 1:]
+    logp = torch.log_softmax(logits.float(), dim=-1).gather(-1, targets[..., None]).squeeze(-1)
+    return (logp * response_mask[:, 1:]).sum(-1)                       # (B,)
+
+def dpo_loss(policy, reference, chosen, rejected, beta=0.1):
+    # chosen, rejected: dicts with input_ids and response_mask for the same prompts.
+    pi_w = sequence_logprob(policy, chosen["input_ids"], chosen["response_mask"])
+    pi_l = sequence_logprob(policy, rejected["input_ids"], rejected["response_mask"])
+    with torch.no_grad():
+        ref_w = sequence_logprob(reference, chosen["input_ids"], chosen["response_mask"])
+        ref_l = sequence_logprob(reference, rejected["input_ids"], rejected["response_mask"])
+    r_w = beta * (pi_w - ref_w)                                        # implicit rewards
+    r_l = beta * (pi_l - ref_l)
+    loss = -F.logsigmoid(r_w - r_l).mean()
+    margin = (r_w - r_l).mean().item()                                 # the number to watch
+    return loss, margin
+\`\`\`
+
+The reference log-probabilities can be precomputed once per dataset, which is most of what makes DPO cheap; the policy's two passes per pair are the whole training cost.
+`,
+            whyNow: md`
+Post-training is where the differences between models of the same size now live, and it is the layer anyone fine-tuning a model touches. The 2024–25 open recipes (Llama 3, Tülu 3, the Qwen and DeepSeek reports) converged on the same shape: a large SFT mix, several rounds of on-policy preference training with a DPO-family loss on the model's own samples ranked by a reward model or by rules, and RL with verifiable rewards for maths, code and agent tasks (the next unit). The reward model did not disappear; it moved from the RL loop into the data pipeline, labelling the policy's samples.
+
+The open problems are the ones the maths points at: reward hacking (a policy that exploits the reward model's errors; the KL term is a crude guard), length bias (raters and reward models prefer longer answers; SimPO's normalisation and explicit length penalties are patches), and the distribution shift between the preference data and the policy that produces samples at deployment, which is why iterative, on-policy preference collection replaced static datasets.
+`,
+            pitfalls: md`
+- **Off-policy DPO drifts.** Preference pairs written for another model teach the format of that model; the implicit-reward margin rises while the policy's own samples get worse. Collect preferences on the current policy's outputs and iterate.
+- **Both log-probabilities fall.** A known DPO failure: the chosen response's log-probability drops along with the rejected one's, as long as the gap grows. Watch the chosen log-probability, not only the margin; a small SFT term or a conservative $\beta$ holds it up.
+- **Length.** Raters prefer longer answers; without normalisation the policy learns verbosity. Measure mean response length across training and report win rates length-controlled.
+- **The KL coefficient** $\beta$ sets how far the policy may move: too small and the reward model is exploited, too large and nothing changes. It is the one hyperparameter to sweep.
+- **Reward-model evaluation.** A reward model's accuracy on held-out pairs is not its usefulness; test it on the policy's samples after a round of optimisation, where its errors concentrate.
+- **Catastrophic forgetting of pretraining knowledge** through aggressive SFT: keep a replay of pretraining-like data in the mix and evaluate base-model benchmarks after every stage.
+`,
+        },
+        sources: [
+            {title: 'Training language models to follow instructions with human feedback (InstructGPT)', url: 'https://arxiv.org/abs/2203.02155', kind: 'paper', year: 2022},
+            {title: 'Direct Preference Optimization: Your Language Model is Secretly a Reward Model', url: 'https://arxiv.org/abs/2305.18290', kind: 'paper', year: 2023},
+            {title: 'Proximal Policy Optimization Algorithms', url: 'https://arxiv.org/abs/1707.06347', kind: 'paper', year: 2017},
+            {title: 'Training a Helpful and Harmless Assistant with Reinforcement Learning from Human Feedback', url: 'https://arxiv.org/abs/2204.05862', kind: 'paper', year: 2022},
+            {title: 'KTO: Model Alignment as Prospect Theoretic Optimization', url: 'https://arxiv.org/abs/2402.01306', kind: 'paper', year: 2024},
+            {title: 'SimPO: Simple Preference Optimization with a Reference-Free Reward', url: 'https://arxiv.org/abs/2405.14734', kind: 'paper', year: 2024},
+            {title: 'Is DPO Superior to PPO for LLM Alignment? A Comprehensive Study', url: 'https://arxiv.org/abs/2404.10719', kind: 'paper', year: 2024},
+            {title: 'Rank Analysis of Incomplete Block Designs: The Method of Paired Comparisons (Bradley and Terry)', url: 'https://doi.org/10.2307/2334029', kind: 'paper', year: 1952},
+        ],
+        cards: [
+            {id: 'ml-post-training/stages', front: 'Name the three stages of the InstructGPT recipe and what each needs as data.', back: 'SFT on prompt–response pairs (loss on response tokens); a reward model on pairwise comparisons under Bradley–Terry; RL (PPO) maximising the reward with a KL penalty toward the SFT model, needing only prompts.', tags: ['rlhf', 'pipeline']},
+            {id: 'ml-post-training/optimal-policy', front: 'What is the optimal policy of the KL-regularised reward objective?', back: '$\\pi^*(y|x) = \\pi_{ref}(y|x)\\exp(r(x,y)/\\beta)/Z(x)$: the reference reweighted by the exponentiated reward. Inverting gives $r = \\beta\\log(\\pi^*/\\pi_{ref}) + \\beta\\log Z$.', tags: ['dpo', 'derivation']},
+            {id: 'ml-post-training/dpo-loss', front: 'Write the DPO loss and say why the partition function disappears.', back: '$-\\log\\sigma(\\beta\\log\\frac{\\pi_\\theta(y_w|x)}{\\pi_{ref}(y_w|x)} - \\beta\\log\\frac{\\pi_\\theta(y_l|x)}{\\pi_{ref}(y_l|x)})$. $Z(x)$ depends on the prompt only, so it cancels in the difference of two rewards for the same prompt.', tags: ['dpo']},
+            {id: 'ml-post-training/implicit-reward', front: 'What is DPO\'s implicit reward, and what does the gradient weight each pair by?', back: '$\\hat r_\\theta(x,y) = \\beta\\log(\\pi_\\theta(y|x)/\\pi_{ref}(y|x))$. Each pair is weighted by $\\sigma(\\hat r(y_l) - \\hat r(y_w))$: how wrong the current implicit reward is on it.', tags: ['dpo']},
+            {id: 'ml-post-training/kto-simpo', front: 'How do KTO and SimPO differ from DPO in their data or reference requirement?', back: 'KTO needs only a binary label per single response, not a pair. SimPO needs no reference model: its reward is the length-normalised log-probability, with a target margin.', tags: ['relatives']},
+            {id: 'ml-post-training/when-rl', front: 'When does PPO-style RL beat DPO?', back: 'When the policy must explore beyond the preference set: reasoning and agentic tasks with computable rewards, and pipelines where a strong reward model labels fresh on-policy samples. DPO wins on cost and stability with on-policy preference data.', tags: ['rl', 'choice']},
+            {id: 'ml-post-training/beta', front: 'What does the KL coefficient control, and what goes wrong at each extreme?', back: 'How far the policy may move from the reference. Too small: the reward model (or the preferences) are exploited, reward hacking. Too large: nothing changes. It is the hyperparameter to sweep.', tags: ['hyperparameters']},
+        ],
+        problems: [
+            {
+                id: 'ml-post-training/p1',
+                kind: 'quant',
+                title: 'One DPO pair',
+                statement: md`
+With $\beta = 0.1$, the policy's sequence log-probability of the chosen response is 2 nats above the reference's, and that of the rejected response is 1 nat below the reference's.
+
+1. What are the two implicit rewards?
+2. What is the DPO loss on this pair, $-\log \sigma(\hat r_w - \hat r_l)$?
+3. What is the weight the gradient gives this pair, $\sigma(\hat r_l - \hat r_w)$?
+
+Give the second answer, the loss, to three decimals.
+`,
+                hints: ['The implicit reward is beta times the log-ratio: 0.2 and −0.1.', 'The loss is log(1 + exp(−margin)) with margin 0.3.'],
+                solution: md`
+1. $\hat r_w = 0.1 \times 2 = 0.2$ and $\hat r_l = 0.1 \times (-1) = -0.1$, margin $0.3$.
+2. $-\log \sigma(0.3) = \log(1 + e^{-0.3}) = \log(1.7408) = 0.554$.
+3. $\sigma(-0.3) = 0.426$: the pair is still "wrong enough" to carry most of its gradient. A margin of 3 would give a weight of $0.047$; DPO spends its gradient on pairs the implicit reward has not yet separated.
+`,
+                answer: '0.554',
+                tolerance: 0.002,
+            },
+        ],
+    },
 ];

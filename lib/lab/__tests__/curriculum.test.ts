@@ -94,6 +94,13 @@ describe('every authored unit', () => {
             for (const span of mathOf(text)) {
                 expect(() => katex.renderToString(span, {throwOnError: true, strict: 'ignore'}), `${unit.id}: ${span}`).not.toThrow();
             }
+            // The page's markdown (micromark) reads a $$ at the start of a line as a fence whose
+            // closing $$ must stand on a line of its own; a block over several lines closed at the
+            // end of its last line swallows the paragraphs after it. One line, or the fence form.
+            for (const block of text.matchAll(/\$\$([\s\S]*?)\$\$/g)) {
+                const body = block[1];
+                if (body.includes('\n')) expect(body.startsWith('\n') && body.endsWith('\n'), `${unit.id}: a display block over several lines opens and closes with $$ on lines of their own: ${body.slice(0, 60)}`).toBe(true);
+            }
             expect(findBanned(proseOf(text), 'lab'), `${unit.id}: ${text.slice(0, 80)}`).toEqual([]);
             expect(text, unit.id).not.toMatch(/undefined|NaN|\[object/);
         }
