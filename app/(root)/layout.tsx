@@ -4,6 +4,8 @@ import SectionTabs from "@/components/shell/SectionTabs";
 import {getSessionUser} from "@/lib/auth/session";
 import {redirect} from "next/navigation";
 import {getShellView} from "@/lib/shell/shell-store";
+import {navPagesFor, navSectionsFor} from "@/lib/shell/navigation";
+import {isLabOwner} from "@/lib/lab/owner";
 import ChatWidget from "@/components/chat/ChatWidget";
 import ThemeSync from "@/components/theme/ThemeSync";
 
@@ -19,6 +21,9 @@ const Layout = async ({children}: {children: React.ReactNode}) => {
     if (!user) redirect('/sign-in')
 
     const shell = await getShellView(user.id);
+    // The owner's lab is the one page not every account sees (lib/lab/owner.ts).
+    const audience = {owner: isLabOwner(user.email)};
+    const sections = navSectionsFor(audience);
 
     return (
         <main className="min-h-screen text-fg-soft">
@@ -27,11 +32,13 @@ const Layout = async ({children}: {children: React.ReactNode}) => {
                 initialStocks={shell.initialStocks}
                 initialTopics={shell.initialTopics}
                 navBadges={shell.navBadges}
+                navSections={sections}
+                navPages={navPagesFor(audience)}
             />
-            <Rail portfolio={shell.portfolio} news={shell.news} badges={shell.navBadges} />
+            <Rail portfolio={shell.portfolio} news={shell.news} badges={shell.navBadges} sections={sections} />
             {/* pb-24: the assistant's launcher floats over this corner (components/chat/ChatWidget). */}
             <div className="pt-20 lg:ml-16 px-6 pb-24" data-app-content>
-                <SectionTabs badges={shell.navBadges} />
+                <SectionTabs badges={shell.navBadges} sections={sections} />
                 {children}
             </div>
             <ChatWidget userId={user.id}/>

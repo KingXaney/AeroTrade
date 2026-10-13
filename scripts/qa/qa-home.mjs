@@ -96,7 +96,7 @@ try {
     await page.goto(`${BASE}/`, {waitUntil: 'networkidle'});
     const chipHref = await page.locator('[data-home] [data-poker-night-chip]').getAttribute('href', {timeout: 5000}).catch(() => null);
     check('poker night: a chip beside the streak links to the lobby', chipHref === '/poker-night', String(chipHref));
-    await page.waitForSelector('#home-learn [data-home-course], #home-learn [data-lesson], #home-first-week', {timeout: 30000}).catch(() => {});
+    await page.waitForSelector('#home-learn [data-lesson], #home-first-week', {timeout: 30000}).catch(() => {});
     check('…and with no table to go back to or join, Home draws no poker night box', await page.locator('[data-home-poker-night]').count() === 0);
     await page.goto(`${BASE}/poker-night`, {waitUntil: 'load'});
     await page.waitForSelector('[data-quick-start="holdem"]', {timeout: 60000});

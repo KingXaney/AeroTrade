@@ -20,6 +20,8 @@ export type NavPage = {
     icon: string;
     /** Which count, if any, rides beside this page's label. */
     badge?: NavBadgeKey;
+    /** Shown to the lab's owner only (lib/lab/owner.ts); every other audience's lists drop it. */
+    owner?: true;
 };
 
 export type NavSection = {
@@ -87,11 +89,14 @@ export const NAV_SECTIONS: readonly NavSection[] = [
     {
         id: 'learn', label: 'Learn', icon: 'school',
         pages: [
-            {href: '/learn', label: 'Learn', icon: 'school'},
+            // The owner's lab; any other account's /learn is sent to /games, and their lists
+            // (navSectionsFor) begin at the games.
+            {href: '/learn', label: 'Lab', icon: 'science', owner: true},
             {href: '/games', label: 'Games', icon: 'sports_esports'},
             {href: '/poker', label: 'Poker solver', icon: 'playing_cards'},
             // The lobby; a table itself (/play/CODE) is full screen, outside the shell and every section.
             {href: '/poker-night', label: 'Poker night', icon: 'celebration'},
+            {href: '/glossary', label: 'Glossary', icon: 'menu_book'},
         ],
     },
 ] as const;
@@ -106,14 +111,27 @@ export const ACCOUNT_PAGES: readonly NavPage[] = [
 // section's only page or its first, so "Portfolio" finds /portfolio and "Activity" /history.
 export type NavDestination = NavPage & {section: string};
 
-export const NAV_PAGES: readonly NavDestination[] = [
-    ...NAV_SECTIONS.flatMap((section) => section.pages.map((page, i) => ({
+const pagesOf = (sections: readonly NavSection[]): NavDestination[] => [
+    ...sections.flatMap((section) => section.pages.map((page, i) => ({
         ...page,
         label: i === 0 ? section.label : page.label,
         section: section.label,
     }))),
     ...ACCOUNT_PAGES.map((page) => ({...page, section: 'Account'})),
 ];
+
+// The full registry: what the tests hold to page files, and what an owner sees.
+export const NAV_PAGES: readonly NavDestination[] = pagesOf(NAV_SECTIONS);
+
+// Who is looking: the (root) layout decides from the session (lib/lab/owner.ts) and hands the
+// audience's lists to every nav surface. An owner-only page is dropped for anyone else; a
+// section is never emptied, so its first visible page takes its name and its rail icon.
+export type NavAudience = {owner: boolean};
+
+export const navSectionsFor = ({owner}: NavAudience): readonly NavSection[] =>
+    owner ? NAV_SECTIONS : NAV_SECTIONS.map((section) => ({...section, pages: section.pages.filter((page) => !page.owner)}));
+
+export const navPagesFor = (audience: NavAudience): readonly NavDestination[] => pagesOf(navSectionsFor(audience));
 
 /** Counts supplied by the caller; an absent or zero key renders no badge. */
 export type NavBadges = Partial<Record<NavBadgeKey, number>>;
@@ -124,19 +142,19 @@ export const isActiveNav = (pathname: string, href: string): boolean =>
     href === '/' ? pathname === '/' : pathname === href || pathname.startsWith(`${href}/`);
 
 // The section a route belongs to, or undefined for the account pages and unknown routes.
-export const sectionFor = (pathname: string): NavSection | undefined =>
-    NAV_SECTIONS.find((section) =>
+export const sectionFor = (pathname: string, sections: readonly NavSection[] = NAV_SECTIONS): NavSection | undefined =>
+    sections.find((section) =>
         section.pages.some((page) => isActiveNav(pathname, page.href))
         || (section.match ?? []).some((prefix) => isActiveNav(pathname, prefix)));
 
 // ⌘K's "go to page" rows: a destination whose name, or whose section's, starts a word of the
 // query's way — "port" finds Portfolio and its Activity tab, "act" only Activity. Compared as
 // plain lower-case text: the query never becomes a regex (invariant 2).
-export const searchPages = (query: string, limit = 5): NavDestination[] => {
+export const searchPages = (query: string, limit = 5, pages: readonly NavDestination[] = NAV_PAGES): NavDestination[] => {
     const q = query.trim().toLowerCase();
     if (!q) return [];
     const starts = (text: string) => text.toLowerCase().split(/\s+/).some((word) => word.startsWith(q));
-    const byLabel = NAV_PAGES.filter((page) => starts(page.label));
-    const bySection = NAV_PAGES.filter((page) => !byLabel.includes(page) && starts(page.section));
+    const byLabel = pages.filter((page) => starts(page.label));
+    const bySection = pages.filter((page) => !byLabel.includes(page) && starts(page.section));
     return [...byLabel, ...bySection].slice(0, limit);
 };

@@ -29,13 +29,15 @@ type Props = {
     portfolio: SidebarPortfolio | null;
     news: SidebarNews;
     badges: NavBadges;
+    /** The audience's sections (navSectionsFor); the full registry by default. */
+    sections?: readonly NavSection[];
 };
 
 const POPUP = 'chrome-surface z-[70] rounded-lg data-[state=closed]:hidden';
 
-const Rail = ({portfolio, news, badges}: Props) => {
+const Rail = ({portfolio, news, badges, sections = NAV_SECTIONS}: Props) => {
     const pathname = usePathname();
-    const current = sectionFor(pathname);
+    const current = sectionFor(pathname, sections);
     const clearedAt = useNewsSeen();
 
     const countFor = (section: NavSection): number => {
@@ -79,7 +81,7 @@ const Rail = ({portfolio, news, badges}: Props) => {
         <aside className="rail hidden lg:flex">
             <Tooltip.Provider delayDuration={150} skipDelayDuration={300}>
                 <nav aria-label="Sections" className="flex flex-col items-center gap-1.5 py-4 w-full">
-                    {NAV_SECTIONS.map((section) => {
+                    {sections.map((section) => {
                         const card = flyout(section);
                         return card ? (
                             <HoverCard.Root key={section.id} openDelay={150} closeDelay={120}>

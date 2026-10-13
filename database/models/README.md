@@ -44,6 +44,8 @@ reads and writes live. Change a field here, then in the store module named besid
 | `poker-hand` | poker night | `lib/poker-night/hands-store` — one row per completed hand, written after the commit; read through `views.historyView` |
 | `poker-result` | poker night | `lib/poker-night/results-store` — an account's totals per table, upserted behind a `seq` guard (`lib/poker-night/results`); no TTL |
 | `rate-limit` | auth | `lib/rate-limit` — the one counter sign-in, sign-up, password reset and the chat spend; `peekRateLimit` reads a window for the chat's caption without spending it |
+| `lab-event` | lab | `lib/lab/store` — a unit marked studied, a problem closed (answered or revealed), a session day; unique per owner, kind and key, so a second click is a no-op; the streak is derived from the session rows, never stored |
+| `lab-card-state` | lab | `lib/lab/store` — one row per review card the owner has graded (SM-2 state); absent means new; a grade updates only the state the client saw |
 
 The culture models are not in that migration list (it covers only the account models); their
 indexes are built by Mongoose's autoIndex, as the brain's and the topics' are.

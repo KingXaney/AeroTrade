@@ -105,87 +105,41 @@ try {
     check('a hidden checklist stays hidden', await pageB.locator('[data-widget-id="getting-started"]').count() === 0);
     await contextB.close();
 
-    // --- /learn and the palette ---------------------------------------------------------
-    // The hub opens on the beginner course; the glossary and the strategies are tabs of it.
-    await page.goto(`${BASE}/learn`, {waitUntil: 'load'});
-    await page.getByRole('heading', {name: 'Learn', level: 1}).waitFor({timeout: 30000});
-    await page.locator('#learn-course').waitFor({timeout: 30000});
-    check('/learn opens on the course: four modules of four lessons',
-        await page.locator('#learn-course [data-course-lesson]').count() === 16
-        && await page.locator('#course-market, #course-trade, #course-portfolio, #course-news').count() === 4);
-    check('…with its four tabs, Course selected',
-        (await page.locator('[role="tab"]').allInnerTexts()).join(',').toLowerCase() === 'course,today,glossary,strategies'
-        && await page.locator('[role="tab"][data-tab="course"]').getAttribute('aria-selected') === 'true');
-    const firstLesson = await page.locator('[data-course-next]').getAttribute('data-course-next');
-    // The checklist steps above may already have completed a lesson by doing it.
-    const doneBefore = Number.parseInt((await page.locator('#course-progress').innerText()).trim(), 10);
-    check('…and names the next lesson', firstLesson !== null && /lessons done/i.test(await page.locator('#course-progress').innerText()), String(firstLesson));
-    check('/learn is on the rail', await page.locator('aside.rail nav a[href="/learn"][aria-current="page"]').count() === 1);
-    await shot('02-learn-course');
-
-    // A lesson: framing sentences, the glossary's own definitions, a real screen, "Mark as done".
-    await page.locator('[data-course-next]').click();
-    await page.locator('[data-lesson]').waitFor({timeout: 30000});
-    const lessonId = await page.locator('[data-lesson]').getAttribute('data-lesson');
-    check('the next lesson opens on its own page, still under Learn on the rail',
-        lessonId === firstLesson && await page.locator('aside.rail nav a[href="/learn"][aria-current="page"]').count() === 1);
-    const firstTerm = await page.locator('[data-lesson-term]').first().getAttribute('data-lesson-term');
-    await page.goto(`${BASE}/learn?tab=glossary`, {waitUntil: 'load'});
-    await page.locator('[data-learn-entry]').first().waitFor({timeout: 30000});
-    const glossaryText = (await page.locator(`[data-learn-entry="${firstTerm}"] dd`).innerText()).split('\n')[0].trim();
-    await page.goto(`${BASE}/learn/course/${lessonId}`, {waitUntil: 'load'});
-    await page.locator('[data-lesson]').waitFor({timeout: 30000});
-    check('a lesson quotes the glossary, word for word',
-        glossaryText.length > 20 && (await page.locator(`[data-lesson-term="${firstTerm}"] dd`).innerText()).trim() === glossaryText, glossaryText.slice(0, 60));
-    check('…links to a real screen and is not done yet',
-        (await page.locator('[data-lesson-try]').getAttribute('href') ?? '').startsWith('/') && await page.locator('#lesson-done').count() === 0);
-    check('…and ends on no question', await page.locator('[data-lesson-check], [data-lesson] [data-option]').count() === 0);
-    await page.locator('[data-lesson-mark-done]').click();
-    await page.locator('[data-lesson-marked]').waitFor({timeout: 15000});
-    check('"Mark as done" says so and offers the next lesson',
-        await page.locator('[data-lesson-mark-done]').count() === 0 && await page.locator('[data-lesson-continue]').count() === 1);
-    await page.waitForTimeout(800);
-    await page.reload({waitUntil: 'load'});
-    await page.locator('[data-lesson]').waitFor({timeout: 30000});
-    check('…and marks the lesson done, once',
-        await page.locator('#lesson-done').count() === 1 && await page.locator('[data-lesson-mark-done]').count() === 0
-        && ((await db.collection('userpreferences').findOne({userId: userA}))?.learn?.courseDone ?? []).join(',') === lessonId);
-    await page.goto(`${BASE}/learn`, {waitUntil: 'load'});
-    await page.locator('#learn-course').waitFor({timeout: 30000});
-    check('the course counts it and moves to the next lesson',
-        (await page.locator('#course-progress').innerText()).trim().toLowerCase() === `${doneBefore + 1} of 16 lessons done`
-        && await page.locator(`[data-course-lesson="${lessonId}"]`).getAttribute('data-done') === 'true'
-        && await page.locator('[data-course-next]').getAttribute('data-course-next') !== lessonId);
-    await page.goto(`${BASE}/learn/course/no-such-lesson`, {waitUntil: 'load'});
-    check('an unknown lesson is a 404, not a blank page', /not found/i.test(await page.locator('h1').first().innerText().catch(() => '')));
-
-    await page.goto(`${BASE}/learn?tab=glossary`, {waitUntil: 'load'});
+    // --- /glossary and the palette ------------------------------------------------------
+    // The glossary is a page of its own, for every account; /learn is the owner's lab (qa-lab),
+    // and this user is not the owner, so /learn sends them to the games.
+    await page.goto(`${BASE}/glossary`, {waitUntil: 'load'});
+    await page.getByRole('heading', {name: 'Glossary', level: 1}).waitFor({timeout: 30000});
     await page.locator('[data-learn-entry]').first().waitFor({timeout: 30000});
     const entries = await page.locator('[data-learn-entry]').count();
-    check('the glossary tab lists the whole glossary', entries >= 70, String(entries));
-    check('…and anchors every entry', await page.locator('#max-drawdown').count() === 1 && await page.locator('#fomc').count() === 1);
-    check('/learn states the disclaimer once', ((await page.locator('body').innerText()).match(/not financial advice/gi) ?? []).length === 1);
-    // An address the app has handed out for a long time: ⌘K, Today's lesson, the daily email.
+    check('/glossary lists the whole glossary', entries >= 70, String(entries));
+    check('…anchors every entry', await page.locator('#max-drawdown').count() === 1 && await page.locator('#fomc').count() === 1);
+    check('…states the disclaimer once', ((await page.locator('body').innerText()).match(/not financial advice/gi) ?? []).length === 1);
+    check('…under the Learn icon on the rail, with the Glossary tab current',
+        await page.locator('aside.rail nav a[data-rail="learn"][aria-current="page"]').count() === 1
+        && await page.locator('[data-section-tabs="learn"] a[href="/glossary"][aria-current="page"]').count() === 1);
+    await shot('02-glossary');
+    // An address the app handed out for a long time: ⌘K, Today's lesson, the daily email.
     await page.goto(`${BASE}/learn#max-drawdown`, {waitUntil: 'load'});
-    await page.waitForURL(/\/learn\?tab=glossary#max-drawdown$/, {timeout: 15000}).catch(() => {});
-    check('an old /learn#term link lands on the entry in the glossary tab',
-        /\/learn\?tab=glossary#max-drawdown$/.test(page.url()) && await page.locator('#max-drawdown').isVisible(), page.url());
-    await page.goto(`${BASE}/learn?tab=strategies`, {waitUntil: 'load'});
-    await page.locator('#learn-strategies').waitFor({timeout: 30000});
-    check('the strategies tab lists the eight strategies in one line each', await page.locator('#learn-strategies a[href^="/strategies/"]').count() === 8);
-    await page.goto(`${BASE}/learn?tab=today`, {waitUntil: 'load'});
-    await page.locator('#learn-today').waitFor({timeout: 30000});
-    check('the today tab holds the lesson and no quiz, with no "Ask in chat"',
-        await page.getByRole('heading', {name: /today's lesson/i}).count() === 1 && await page.getByRole('heading', {name: /quiz/i}).count() === 0
-        && await page.locator('#learn-today [data-ask]').count() === 0);
-    await shot('02-learn');
+    await page.waitForURL(/\/glossary#max-drawdown$/, {timeout: 15000}).catch(() => {});
+    await page.locator('#max-drawdown').waitFor({timeout: 15000}).catch(() => {});
+    check('an old /learn#term link lands on the entry in the glossary',
+        /\/glossary#max-drawdown$/.test(page.url()) && await page.locator('#max-drawdown').isVisible(), page.url());
+    await page.goto(`${BASE}/learn?tab=glossary`, {waitUntil: 'load'});
+    await page.waitForURL(/\/glossary$/, {timeout: 15000}).catch(() => {});
+    check('the old glossary tab address lands on /glossary', /\/glossary$/.test(page.url()), page.url());
+    await page.goto(`${BASE}/learn`, {waitUntil: 'load'});
+    await page.waitForURL(/\/games$/, {timeout: 15000}).catch(() => {});
+    check('/learn sends an account the lab is not open to to the games', /\/games$/.test(page.url()), page.url());
     await page.keyboard.press('Meta+k');
     const palette = page.locator('input[placeholder*="term to learn"]');
     await palette.waitFor({timeout: 15000});
     await palette.fill('drawdown');
     await page.locator('[data-learn-hit="max-drawdown"]').waitFor({timeout: 15000});
     check('⌘K offers the glossary entry for a typed term', true);
-    await page.keyboard.press('Escape');
+    await page.locator('[data-learn-hit="max-drawdown"]').click();
+    await page.waitForURL(/\/glossary#max-drawdown$/, {timeout: 15000}).catch(() => {});
+    check('…and opens it on /glossary', /\/glossary#max-drawdown$/.test(page.url()), page.url());
 
     // --- a strategy page: beginner line, definitions and the replay -------------------
     const accountIds = (await db.collection('paperaccounts').find({userId: OWNER}).project({_id: 1}).toArray()).map((a) => String(a._id));
@@ -419,7 +373,7 @@ try {
     check('with no topic articles today it teaches the term of the day',
         await lessonWidget.locator('[data-lesson-mode="day"]').count() === 1
         && /Nothing in your topics used a glossary term today/.test(await lessonWidget.innerText()));
-    check('…with a link to that term on /learn', await lessonWidget.locator('a[href^="/learn#"]').count() === 1);
+    check('…with a link to that term in the glossary', await lessonWidget.locator('a[href^="/glossary#"]').count() === 1);
     const noHandOff = async () => await lessonWidget.locator('[data-what-these-mean], [data-ask], details').count() === 0;
     check('the widget carries no "What these mean" and no "Ask in chat"', await noHandOff());
 

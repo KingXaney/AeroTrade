@@ -50,7 +50,7 @@ export const LESSON_COPY = {
     dayLabel: 'Term of the day',
     noMatches: 'Nothing in your topics used a glossary term today',
     termsLabel: 'Terms here',
-    learnLink: 'More on the Learn page',
+    learnLink: 'More in the glossary',
     gotIt: 'Got it',
     saving: 'Saving…',
     notSaved: 'That could not be saved just now',
@@ -60,7 +60,9 @@ export const LESSON_COPY = {
 
 export const lessonCountLine = (count: number): string => `${count} of today's articles in your topics used this term`;
 
-export const lessonLearnHref = (key: GlossaryKey): string => `/learn#${encodeURIComponent(key)}`;
+// The glossary's own page; a /learn#term address from before it is sent there by
+// components/learn/LearnRedirect.
+export const lessonLearnHref = (key: GlossaryKey): string => `/glossary#${encodeURIComponent(key)}`;
 
 const CADENCE_LINE: Record<Exclude<Cadence, 'daily'>, string> = {
     monthly: 'It re-runs its rule on the first trading day of each month and trades only then; between those days it keeps what it has.',

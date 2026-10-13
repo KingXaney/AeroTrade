@@ -1,9 +1,10 @@
 import Link from "next/link";
-import {NAV_PAGES} from "@/lib/shell/navigation";
+import {navPagesFor} from "@/lib/shell/navigation";
 import {rowCard} from "@/components/primitives/RowCard";
 
-// Every route except the dashboard itself — you are already on it.
-const LINKS = NAV_PAGES.filter((i) => i.href !== '/dashboard');
+// Every route except the dashboard itself — you are already on it. The public lists: a widget
+// is drawn for every account, and the owner's lab is one page away on the rail.
+const LINKS = navPagesFor({owner: false}).filter((i) => i.href !== '/dashboard');
 
 const QuickLinks = () => (
     <div className="grid grid-cols-3 gap-2">

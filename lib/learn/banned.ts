@@ -11,11 +11,18 @@
 //              Learner-facing copy is checked here; a gloss that narrates what a rule did
 //              ("the rule sells when…") is checked at 'advice' only.
 //
+//   'lab'    — the owner's lab (lib/learn/copy/lab): unit bodies, cards and solutions. Advanced
+//              ML and quant prose uses "optimal control", "best-of-n", "cheap to compute" and
+//              "the loss will fall" as terms of art, so this tier keeps only the phrases that aim
+//              an instruction at money or at a security. It is NOT a superset of 'advice'. The
+//              lab's chrome stays at 'copy', and its prose is checked with code and maths
+//              stripped first (lib/lab/prose.ts).
+//
 // A prohibition is not advice: a clause that begins "Never", "No", "Don't" is dropped
 // before matching, so a prompt may say "Never recommend a stock" and a lesson may say
 // "No fee is charged".
 
-type BannedTier = 'advice' | 'copy';
+type BannedTier = 'advice' | 'copy' | 'lab';
 
 export const BANNED_ADVICE: readonly RegExp[] = [
     /\bshould (i|you|we|they|one|anyone|investors?) (buy|sell|add|avoid|hold|own|invest|trim|dump|short)\b/i,
@@ -50,6 +57,21 @@ export const BANNED_COPY: readonly RegExp[] = [
     /\bmistake\b/i,
 ];
 
+export const BANNED_LAB: readonly RegExp[] = [
+    /\b(you|we|one|investors?|traders?|readers?) should (buy|sell|short|hold|own|add|avoid|trim|dump|go long)\b/i,
+    /\bshould i (buy|sell|short|hold)\b/i,
+    /\bprice targets?\b/i,
+    /\b(stocks?|shares?|the market|markets|prices?|this (stock|name|ticker)|the (stock|name|ticker)) (will|is going to|are going to) (go (up|down)|rise|fall|climb|drop|rally|recover|crash|bounce|double)\b/i,
+    /\bguaranteed (returns?|profits?|gains?|income)\b/i,
+    /\b(buy|sell|short) (now|today|the dip|before|immediately)\b/i,
+    /\bstock tips?\b/i,
+    /\b(our|my) (top )?picks?\b/i,
+    /\brecommend(s|ed|ing)? (buying|selling|shorting|holding|owning)\b/i,
+    // An order aimed at a ticker-shaped token. Case-sensitive on purpose: "sell signals" passes,
+    // "sell SPY" and "long NVDA" do not. A false positive forces a reword, nothing more.
+    /\b(buy|sell|short|long|overweight|underweight|accumulate) \$?[A-Z]{2,5}\b/,
+];
+
 // Leading list markers and markdown emphasis are skipped so "- **Never quote…" and
 // "1. Never predict…" still read as prohibitions.
 const PROHIBITION = /^[\s\-*\d.)]*(?:\*\*)?\s*(?:never|no|not|don't|do not|cannot|can't|nothing|nobody|without)\b/i;
@@ -60,7 +82,7 @@ export const stripProhibitions = (text: string): string =>
     text.split(CLAUSE_BREAK).filter((clause) => !PROHIBITION.test(clause)).join(' ');
 
 const patternsFor = (tier: BannedTier): readonly RegExp[] =>
-    tier === 'copy' ? [...BANNED_ADVICE, ...BANNED_COPY] : BANNED_ADVICE;
+    tier === 'copy' ? [...BANNED_ADVICE, ...BANNED_COPY] : tier === 'lab' ? BANNED_LAB : BANNED_ADVICE;
 
 // Every distinct banned phrase found in `text` (empty when it is clean), with
 // prohibitions removed first.

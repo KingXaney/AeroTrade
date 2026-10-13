@@ -2,7 +2,7 @@ import Link from "next/link";
 import SearchCommand from "@/components/shell/SearchCommand";
 import UserDropdown from "@/components/shell/UserDropdown";
 import MobileNav from "@/components/shell/MobileNav";
-import type {NavBadges} from "@/lib/shell/navigation";
+import type {NavBadges, NavDestination, NavSection} from "@/lib/shell/navigation";
 import type {User} from '@/lib/auth/types';
 import type {Stock} from '@/lib/stocks/types';
 import type {TopicLink} from '@/lib/topics/types';
@@ -12,17 +12,20 @@ type HeaderProps = {
     initialStocks: Stock[];
     initialTopics: TopicLink[];
     navBadges: NavBadges;
+    /** The audience's lists (navSectionsFor / navPagesFor): the drawer's rows and ⌘K's pages. */
+    navSections?: readonly NavSection[];
+    navPages?: readonly NavDestination[];
 };
 
 // The top bar: where you are (the logo), how to get anywhere (search) and who you are (the
 // account menu). The sections live on the rail (components/shell/Rail.tsx) at lg and in the
 // drawer below it; the bar repeats none of them.
-function Header({user, initialStocks, initialTopics, navBadges}: HeaderProps) {
+function Header({user, initialStocks, initialTopics, navBadges, navSections, navPages}: HeaderProps) {
     return (
         <header className='header'>
             <div className='header-wrapper gap-3'>
                 <div className="flex items-center gap-3 shrink-0">
-                    <MobileNav badges={navBadges}/>
+                    <MobileNav badges={navBadges} sections={navSections}/>
                     <Link href="/" className="flex items-center gap-2">
                         <span className="material-symbols-outlined text-brand-strong"
                               style={{ fontVariationSettings: "'FILL' 1" }}>
@@ -36,7 +39,7 @@ function Header({user, initialStocks, initialTopics, navBadges}: HeaderProps) {
 
                 {/* The one search trigger, at every width: ⌘K is a keyboard's shortcut, and a
                     phone has none. */}
-                <SearchCommand renderAs="text" label="Search stocks, topics and pages" initialStocks={initialStocks} initialTopics={initialTopics}/>
+                <SearchCommand renderAs="text" label="Search stocks, topics and pages" initialStocks={initialStocks} initialTopics={initialTopics} pages={navPages}/>
 
                 <div className="flex items-center gap-3 shrink-0">
                     <UserDropdown user={user} friendRequests={navBadges.friendRequests ?? 0}/>

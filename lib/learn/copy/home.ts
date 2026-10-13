@@ -32,7 +32,7 @@ export const HOME_COPY = {
 
     learnHeading: 'Keep learning',
     firstWeekHeading: 'First week',
-    learnLink: 'Open Learn',
+    learnLink: 'Open the glossary',
 } as const;
 
 // The step Home offers once the first-week list is done or gone: where the day is, not what to do.

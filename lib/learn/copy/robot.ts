@@ -7,6 +7,8 @@
 // quotes and holds every string to lib/learn/banned.ts at both tiers. Neither control names chat,
 // assistant or advisor: the browser QA finds the launcher by those words.
 
+import {GLOSSARY_KEYS} from "@/lib/learn/glossary";
+
 export type RobotTip = {id: string; text: string; prompt?: string};
 
 export const ROBOT_COPY = {
@@ -52,8 +54,8 @@ export const ROBOT_TIPS: readonly RobotTip[] = [
         text: 'Settings → Appearance has twelve palettes and five visual styles; hovering a card previews it before you choose. Its Reduce motion switch keeps me still.',
     },
     {
-        id: 'learn-course',
-        text: "The Learn page has a beginner course: four modules of four short lessons, each quoting the app's own definitions.",
+        id: 'learn-glossary',
+        text: `The glossary at /glossary defines every number the app shows — ${GLOSSARY_KEYS.length} terms, each in plain words with a link to the screen it is about.`,
     },
     {
         id: 'rail-portfolio',

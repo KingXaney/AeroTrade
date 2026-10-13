@@ -29,7 +29,7 @@ APP_URL=http://localhost:$APP_PORT
 # no terrain before any SPY history exists, so it runs before qa-landing seeds one (and the app
 # caches the Tiingo stand-in's answer for an hour); qa-learn wipes and reseeds strategyruns, so it
 # runs after qa-strategies. A suite missing here runs last.
-ALL=(auth styles shell home landing chat topics-refresh trading topics news-feed strategies income learn learn-account games poker poker-night poker-night-modes chat-tutor email culture)
+ALL=(auth styles shell home landing chat topics-refresh trading topics news-feed strategies income learn lab learn-account games poker poker-night poker-night-modes chat-tutor email culture)
 
 KEEP_UP=0
 NAMES=()
@@ -161,6 +161,7 @@ rm -rf "$ROOT/.next"
     BETTER_AUTH_SECRET='local-qa-secret-at-least-32-characters-long' \
     BETTER_AUTH_URL="$APP_URL" \
     SIGN_UP_CLIENT_LIMIT=1000 \
+    LAB_OWNER_EMAILS=qa-lab-owner@example.com \
     TIINGO_TOKEN=qa-tiingo-token TIINGO_API_URL="http://localhost:$TIINGO_PORT" \
     INNGEST_DEV=1 \
     FINNHUB_API_KEY= NEXT_PUBLIC_FINNHUB_API_KEY= NODEMAILER_EMAIL= NODEMAILER_PASSWORD= \

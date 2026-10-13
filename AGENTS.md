@@ -145,6 +145,11 @@ and friends keep none beyond Shared and the invariants).
   `components/shell/SectionTabs` shows above the page (none for a section of one page), and
   `match` names routes it owns that are not tabs (`/stocks/AAPL` lights Markets). Friends and
   Settings are `ACCOUNT_PAGES`, in the avatar menu. Every `href` is a page file — the test checks.
+  A page flagged `owner: true` (today `/learn`, the owner's lab) is for the accounts
+  `lib/lab/owner.isLabOwner` admits: the `(root)` layout decides the audience from the session and
+  hands `navSectionsFor`/`navPagesFor` to the Rail, SectionTabs, the drawer and ⌘K, so anyone
+  else's Learn section begins at the games; `NAV_SECTIONS` stays the full registry (the Quick
+  Links widget draws the public lists).
 - The rail never widens: a name is a tooltip, a summary (Portfolio, News) a portaled hover card,
   and anything the reader must see without hovering — something new in a followed topic since
   they last opened News, a holding valued at cost, a pending friend request — is a dot on the
@@ -166,7 +171,9 @@ and friends keep none beyond Shared and the invariants).
 ### auth
 
 - `lib/auth/session` is the one session read: `getSessionUser` (the shell's User),
-  `getCurrentUserId` (actions and routes), `requireUserId` (pages — signed out redirects to /sign-in).
+  `getCurrentUserId` (actions and routes), `getCurrentUser` (an action that gates on who the person
+  is — the owner's lab — reads the email through it), `requireUserId` (pages — signed out redirects
+  to /sign-in).
 - The server actions keep their own rate limits — better-auth's `rateLimit` never runs on this
   app's `auth.api.*` path — all counted by `lib/rate-limit.takeRateLimit`, the one Mongo counter.
   `lib/rate-limit.peekRateLimit` is its read-only pair — one `findOne`, never a write, null once
@@ -459,20 +466,13 @@ and friends keep none beyond Shared and the invariants).
   the AI Navigator's own list — the two engines share the rebalance shape under different bands,
   so the caller picks — glossed from `lib/navigator/config.ts` and round-tripped over
   `scoreUniverse`/`diffToOrders`.
-- `/learn` is the hub, one view at a time in the URL (`?tab=`, `components/primitives/Tabs`): the
-  course, Today (the lesson and the first-week list), the glossary, the strategies. A
-  `/learn#term` address — ⌘K, Today's lesson and the daily email hand it out — is sent to the
-  glossary tab by `components/learn/GlossaryHashRedirect`, since the server never sees a hash.
-- The beginner course, `lib/learn/course` (pure): four modules of four lessons in one fixed
-  order, text in `lib/learn/copy/course/<module>`. A lesson is two or three framing sentences,
-  the glossary's own definitions of its terms printed beside them (never a paraphrase — the
-  test rejects a five-word run shared with a listed definition), a link to the real screen and
-  a "Mark as done" button (`components/learn/LessonDone`). It is done when the reader marks it
-  done (`lib/actions/learn.actions.markCourseLessonDone` stamps `learn.courseDone` once, with
-  `$addToSet`, after checking the id against the registry) or when the reader did the thing it is
-  about (`doneFrom`, read off the first-week facts). A lesson id is its address and its stamp and
-  is never renamed. `lib/learn/course-store.getCourseProgress` is the one read; progress is a
-  count, never a bar or a score.
+- `/glossary` is every definition, for every account, grouped by where the number lives
+  (`components/learn/GlossaryGroups`, the frame's sentences `GLOSSARY_PAGE_COPY` in
+  `lib/learn/copy/learn`); each entry's id is its key. A `/learn#term` or `/learn?tab=glossary`
+  address — ⌘K, Today's lesson and the daily email handed it out while the glossary was a tab of
+  `/learn` — is sent to `/glossary#term` by `components/learn/LearnRedirect` on the client, since
+  the server never sees a hash. `/learn` itself is the owner's lab (### lab); any other account is
+  sent to `/games`. The beginner course was removed on 2026-10-12.
 - Today's lesson (`lib/learn/moments`, `lib/learn/lesson`; the
   `components/dashboard/widgets/learn/TodaysLesson` widget): a fresh moment first, from the account
   or a followed strategy's rebalance, stamped seen in `learn.lessonsSeen` by
@@ -480,11 +480,58 @@ and friends keep none beyond Shared and the invariants).
   The server reads are `lib/learn/facts-store` and `lib/learn/lesson-store`; `lib/learn/missions`
   is pure.
 
+### lab
+
+- The owner's lab is `/learn` for the accounts `LAB_OWNER_EMAILS` names (`lib/lab/owner`:
+  `labOwnerEmails`, `isLabOwner`, `labEnabled` — import-free, unset means nobody). The page reads
+  the session through `getSessionUser` and renders `components/learn/LearnRedirect` for anyone
+  else, which keeps a `#term` on its way to `/glossary` and otherwise goes to `/games`; a unit page
+  (`/learn/units/[unit]`) redirects them on the server. One view at a time in the URL (`?view=`):
+  Today and the Library.
+- The bank is `lib/learn/copy/lab/` — `types`, the `md` tag (String.raw, so a formula is written
+  as in a .tex file), `plan` (the thirty syllabus rows, ten a track, never reordered; append past
+  thirty), `units/<track>` (the authored units, in the plan's order) and `bank` (the index). It is
+  server-only: `lib/lab/__tests__/guard.test.ts` fails if a client file, or anything under
+  `components/`, imports the bank, the units, `lib/lab/registry`, `schedule`, `store` or
+  `page-store`. A problem's solution reaches the page only once the owner has closed it (an
+  answer checked on the server, or a reveal). The page's own sentences are `LAB_COPY` in
+  `lib/learn/copy/lab` (client-safe, 'copy' tier).
+- Copy tiers: the units' prose — sections, cards, problems, solutions — is held to the `'lab'`
+  tier of `lib/learn/banned` (trading-directed phrases only, since the fields say "optimal" and
+  "cheap to compute" as terms of art) with code and maths stripped first (`lib/lab/prose`);
+  titles and one-liners to `'copy'`. `lib/lab/__tests__/curriculum.test.ts` also renders every
+  formula with KaTeX, requires one python fence per unit, 5–8 cards and 1–2 problems, https
+  sources, and no five-word run shared with a listed glossary entry (a unit's `glossaryTerms`
+  are quoted beside it in one `WhatTheseMean`, never paraphrased).
+- Pure: `lib/lab/schedule` — `todaysUnit` is owner-paced (the first unstudied unit of the
+  least-advanced track, ties cv → ml → quant; a unit stamped today stays today's; a revisit once
+  every written unit is studied; never a calendar, so a missed day skips no prerequisite),
+  `problemFor`, `dueCards` (overdue, due today, then a studied unit's new cards from the day
+  after), `reviewSummary`; `lib/lab/srs` — the SM-2 variant (`grade`, deterministic, no fuzz);
+  `lib/lab/view.shapeLabView` — what the page shows, fed by `lib/lab/page-store.getLabView`, the
+  one cached read. `lib/lab/registry` indexes the bank for the actions' id checks.
+- Rows, never stamps on the preference: `database/models/lab-event.model.ts` (`labevents`: kind
+  `unit` | `problem` | `session`, unique per owner, kind and key; a `session` row per ET day the
+  owner graded a card, marked a unit or answered a problem — the lab's streak is `streakFrom`
+  over those days, derived, never stored) and `lab-card-state.model.ts` (one row per graded card;
+  a grade is an update filtered on the state the client saw). Writes are `lib/lab/store`; the
+  actions `lib/actions/lab.actions` (`markUnitStudied`, `gradeReviewCard`, `revealProblem`,
+  `answerProblem` through `lib/games/answer.checkAnswer`) gate on the owner through
+  `getCurrentUser`, rate-limit per owner, check every id against the registry, and revalidate
+  `/learn` as a layout — never `/`.
+- `components/lab/LabMarkdown` is the one renderer of the bank's markdown (react-markdown with
+  remark-math, remark-gfm and rehype-katex, on the server; KaTeX's stylesheet imported there;
+  `.lab-prose` in `app/globals.css`). It is never given a model's text — that stays
+  `SafeMarkdown`. `ReviewDeck` and `ProblemCard` take the faces, the statement and the solution
+  as rendered nodes and only flip, grade, hint and answer.
+- The papers feed and its one model call a day are the next slice
+  (`docs/specs/2026-10-12-owner-lab.md`).
+
 ### games
 
 - The games are the one place the app keeps a score: the daily-puzzle streak counts days, and a
   record is a reader's own top score. The learn surfaces stay count-only (a course's progress is a
-  count, never a bar or a score). Every games sentence is still held to the no-advice list
+  count, never a bar or a score; the owner's lab keeps the other streak). Every games sentence is still held to the no-advice list
   (invariant 12): "record" and "highest", never "best"; nothing says what to do with money.
 - The puzzle bank `lib/learn/copy/puzzles` is server-only: an answer reaches the page only once
   the puzzle is solved or revealed, every answer is checked in `lib/actions/games.actions`, and
@@ -1327,7 +1374,7 @@ and friends keep none beyond Shared and the invariants).
 
 - `/settings` shows one section at a time (`?tab=`), each reading only its own data. The daily
   email's `/settings#notifications` is sent to its section by
-  `components/settings/SettingsHashRedirect`, as `/learn#term` is by its own.
+  `components/settings/SettingsHashRedirect`, as `/learn#term` is by `components/learn/LearnRedirect`.
 
 - `lib/theme/store` is the saved theme's read and its cookie mirror.
 
@@ -1383,8 +1430,7 @@ and friends keep none beyond Shared and the invariants).
    shows, an automated fill has exactly one "What the rule saw" disclosure (on its trade-log row; a
    latest-decision order carries one only when it did not fill), and the chat's "Ask in
    chat" link lives only inside those two — never as a per-row icon, never on a dashboard widget.
-   `beginnerLine` renders in the strategy detail header, the wide quant-strategies widget and once per
-   strategy on the `/learn` index, nowhere else — never per row on a board, never in the narrow
+   `beginnerLine` renders in the strategy detail header, the wide quant-strategies widget, nowhere else — never per row on a board, never in the narrow
    widget. Learn surfaces self-limit from rows plus stamp-once fields in the no-default `learn`
    preference sub-schema (no learner flag), and read with bounded queries — no board-carrying
    aggregate on a request path. `#signal-board` keeps exactly one `<details>` of its own; new

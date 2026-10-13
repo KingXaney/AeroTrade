@@ -16,18 +16,20 @@ type Props = {
     badges?: NavBadges;
     /** Fires on any row click — the drawer uses it to close itself. */
     onNavigate?: () => void;
+    /** The audience's sections (navSectionsFor); the full registry by default. */
+    sections?: readonly NavSection[];
 };
 
 const ROW = 'control-type flex items-center gap-4 px-4 py-3 transition-all text-xs';
 const rowTone = (active: boolean) => active ? 'text-brand border-l-4 border-brand' : 'text-fg-soft hover:text-fg hover:bg-surface-3';
 
-const NavList = ({pathname, badges = {}, onNavigate}: Props) => {
-    const current = sectionFor(pathname);
+const NavList = ({pathname, badges = {}, onNavigate, sections = NAV_SECTIONS}: Props) => {
+    const current = sectionFor(pathname, sections);
     const requests = badges.friendRequests ?? 0;
     const countFor = (section: NavSection): number => (section.badge ? badges[section.badge] ?? 0 : 0);
     return (
         <nav aria-label="Sections" className="space-y-1">
-            {NAV_SECTIONS.map((section) => {
+            {sections.map((section) => {
                 const active = current?.id === section.id;
                 const count = countFor(section);
                 return (

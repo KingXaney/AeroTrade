@@ -6,7 +6,7 @@ import {describe, expect, it} from 'vitest';
 import {existsSync} from 'node:fs';
 import {fileURLToPath} from 'node:url';
 
-import {ACCOUNT_PAGES, NAV_PAGES, NAV_SECTIONS, isActiveNav, searchPages, sectionFor} from '@/lib/shell/navigation';
+import {ACCOUNT_PAGES, NAV_PAGES, NAV_SECTIONS, isActiveNav, navPagesFor, navSectionsFor, searchPages, sectionFor} from '@/lib/shell/navigation';
 
 const root = fileURLToPath(new URL('../../..', import.meta.url));
 const pageFile = (href: string) => `${root}app/(root)${href === '/' ? '' : href}/page.tsx`;
@@ -52,6 +52,35 @@ describe('the navigation registry', () => {
             '/watchlist', '/friends', '/history', '/learn', '/settings']) {
             expect(hrefs, href).toContain(href);
         }
+    });
+
+    it('keeps the lab for its owner: one owner-only page, dropped for everyone else', () => {
+        const ownerOnly = NAV_PAGES.filter((page) => page.owner).map((page) => page.href);
+        expect(ownerOnly).toEqual(['/learn']);
+        const everyone = navPagesFor({owner: false});
+        expect(everyone.map((page) => page.href)).not.toContain('/learn');
+        expect(everyone.find((page) => page.href === '/games')?.label).toBe('Learn');
+        expect(everyone.map((page) => page.href)).toContain('/glossary');
+        const owner = navPagesFor({owner: true});
+        expect(owner.find((page) => page.href === '/learn')?.label).toBe('Learn');
+        expect(owner.find((page) => page.href === '/games')?.label).toBe('Games');
+        expect(owner.map((page) => page.href)).toContain('/glossary');
+        // The section is never emptied, and the rail icon goes to the first visible page.
+        const learn = navSectionsFor({owner: false}).find((section) => section.id === 'learn');
+        expect(learn?.pages[0].href).toBe('/games');
+        expect(navSectionsFor({owner: false})).toHaveLength(NAV_SECTIONS.length);
+        expect(navSectionsFor({owner: true})).toBe(NAV_SECTIONS);
+        // Lookups take the audience's lists.
+        // A non-owner on /learn is on their way to the games; their lists own no such page.
+        expect(sectionFor('/learn', navSectionsFor({owner: false}))).toBeUndefined();
+        expect(sectionFor('/learn')?.id).toBe('learn');
+        expect(sectionFor('/glossary')?.id).toBe('learn');
+        // A section's first page takes its name, so "learn" leads with the lab for the owner and
+        // with the games for everyone else; the section's other pages follow by section name.
+        expect(searchPages('learn', 5, owner).map((page) => page.href)).toEqual(['/learn', '/games', '/poker', '/poker-night', '/glossary']);
+        expect(searchPages('learn', 5, everyone).map((page) => page.href)).toEqual(['/games', '/poker', '/poker-night', '/glossary']);
+        expect(searchPages('glossary', 5, everyone).map((page) => page.href)).toEqual(['/glossary']);
+        expect(isActiveNav('/learn/units/cv-vit-dinov2', '/learn')).toBe(true);
     });
 
     it('files both brains under the one Brain icon, the news brain first', () => {

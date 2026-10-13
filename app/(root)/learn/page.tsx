@@ -1,221 +1,163 @@
 import type {Metadata} from "next";
-import {Suspense} from "react";
 import Link from "next/link";
-import {requireUserId} from "@/lib/auth/session";
-import {STRATEGIES, STRATEGIES_DISCLAIMER} from "@/lib/strategies/catalog";
-import {GLOSSARY} from "@/lib/learn/glossary";
-import {GLOSSARY_GROUPS} from "@/lib/learn/where";
-import {COURSE_COPY, LEARN_PAGE_COPY} from "@/lib/learn/copy/learn";
-import {COURSE_MODULES} from "@/lib/learn/course";
-import {getCourseProgress} from "@/lib/learn/course-store";
-import {getLearnFacts, getOnboardingFacts} from "@/lib/learn/facts-store";
-import {getTodaysLesson} from "@/lib/learn/lesson-store";
-import {deriveMissions, onboardingActive} from "@/lib/learn/missions";
-import {deriveMoments} from "@/lib/learn/moments";
-import {getDailyPuzzleCard} from "@/lib/games/store";
-import {GAMES_COPY} from "@/lib/learn/copy/games";
-import DailyPuzzleCard from "@/components/games/DailyPuzzleCard";
-import GlossaryHashRedirect from "@/components/learn/GlossaryHashRedirect";
-import GettingStarted from "@/components/dashboard/widgets/learn/GettingStarted";
-import TodaysLesson from "@/components/dashboard/widgets/learn/TodaysLesson";
+import {redirect} from "next/navigation";
+import {getSessionUser} from "@/lib/auth/session";
+import {isLabOwner} from "@/lib/lab/owner";
+import {getLabView} from "@/lib/lab/page-store";
+import type {LabView} from "@/lib/lab/view";
+import {LAB_COPY, LAB_TRACK_LABELS} from "@/lib/learn/copy/lab";
+import LabMarkdown from "@/components/lab/LabMarkdown";
+import LabProgress from "@/components/lab/LabProgress";
+import ProblemCard from "@/components/lab/ProblemCard";
+import ReviewDeck from "@/components/lab/ReviewDeck";
+import LearnRedirect from "@/components/learn/LearnRedirect";
+import {actionButton} from "@/components/primitives/ActionButton";
+import Badge from "@/components/primitives/Badge";
 import MicroLabel from "@/components/primitives/MicroLabel";
 import PageTitle from "@/components/primitives/PageTitle";
 import Panel from "@/components/primitives/Panel";
-import SectionHeading from "@/components/primitives/SectionHeading";
-import WidgetSkeleton from "@/components/primitives/Skeleton";
-import Tabs from "@/components/primitives/Tabs";
-import {actionButton} from "@/components/primitives/ActionButton";
 import {rowCard} from "@/components/primitives/RowCard";
+import SectionHeading from "@/components/primitives/SectionHeading";
+import Tabs from "@/components/primitives/Tabs";
 import {cn} from "@/lib/utils";
 
 // The browser tab's title; app/layout.tsx appends the app's name.
-export const metadata: Metadata = {title: "Learn"};
+export const metadata: Metadata = {title: "Lab"};
 
-// Everything the app teaches, in one place: the beginner course, today's lesson and puzzle, the
-// glossary every label on every page quotes, and the strategies in a line each. One view at a time, kept
-// in the URL (?tab=), so only the open view's data is read.
+// The owner's lab (lib/lab): a daily study of computer vision, machine learning and
+// quantitative finance, for the accounts LAB_OWNER_EMAILS names. One view at a time in the URL
+// (?view=): Today — the unit, the cards due, the problem, the progress — and the Library, the
+// syllabus. Every other account's /learn goes to the games — on the client, so a /learn#term
+// address from the glossary's days as a tab of this page keeps its hash on the way to /glossary
+// (components/learn/LearnRedirect). One read, getLabView, shaped by the pure lib/lab/view.
 
-const TAB_IDS = ['course', 'today', 'glossary', 'strategies'] as const;
-type TabId = (typeof TAB_IDS)[number];
-const isTab = (value: unknown): value is TabId => typeof value === 'string' && (TAB_IDS as readonly string[]).includes(value);
+const VIEW_IDS = ['today', 'library'] as const;
+type ViewId = (typeof VIEW_IDS)[number];
+const isView = (value: unknown): value is ViewId => typeof value === 'string' && (VIEW_IDS as readonly string[]).includes(value);
+const TABS = VIEW_IDS.map((id) => ({id, label: LAB_COPY.views[id], href: id === 'today' ? '/learn' : `/learn?view=${id}`}));
 
-const TABS = TAB_IDS.map((id) => ({id, label: LEARN_PAGE_COPY.tabs[id], href: id === 'course' ? '/learn' : `/learn?tab=${id}`}));
+type LearnPageProps = {searchParams: Promise<{tab?: string; view?: string}>};
 
-type LearnPageProps = {searchParams: Promise<{tab?: string}>};
-
-const CourseView = async ({userId}: {userId: string}) => {
-    const progress = await getCourseProgress(userId);
-    return (
-        <div className="space-y-4" id="learn-course">
-            <Panel aria-labelledby="course-heading" className="flex flex-wrap items-center justify-between gap-4">
-                <div className="min-w-0 max-w-2xl">
-                    <SectionHeading id="course-heading" spacing="sm">{COURSE_COPY.heading}</SectionHeading>
-                    <p className="text-sm leading-relaxed text-fg-soft">{progress.next ? COURSE_COPY.lead : COURSE_COPY.complete}</p>
-                    <MicroLabel as="p" className="mt-2" id="course-progress">{COURSE_COPY.progress(progress.done, progress.total)}</MicroLabel>
-                </div>
-                {progress.next && (
-                    <Link href={`/learn/course/${progress.next.id}`} className={actionButton({size: 'md'})} data-course-next={progress.next.id}>
-                        {COURSE_COPY.continueCta}: {progress.next.title}
-                    </Link>
-                )}
-            </Panel>
-
-            <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
-                {COURSE_MODULES.map((section, m) => {
-                    const done = section.lessons.filter((lesson) => progress.doneIds.has(lesson.id)).length;
-                    return (
-                        <Panel key={section.id} id={`course-${section.id}`} aria-labelledby={`course-${section.id}-heading`}>
-                            <div className="mb-1 flex items-center justify-between gap-3">
-                                <SectionHeading id={`course-${section.id}-heading`} spacing="none">{`${m + 1}. ${section.title}`}</SectionHeading>
-                                <MicroLabel>{COURSE_COPY.moduleDone(done, section.lessons.length)}</MicroLabel>
-                            </div>
-                            <p className="mb-3 text-xs text-fg-muted">{section.summary}</p>
-                            <ol className="space-y-2">
-                                {section.lessons.map((lesson) => {
-                                    const isDone = progress.doneIds.has(lesson.id);
-                                    return (
-                                        <li key={lesson.id}>
-                                            <Link href={`/learn/course/${lesson.id}`} data-course-lesson={lesson.id} data-done={isDone}
-                                                  className={rowCard({interactive: true, className: 'flex items-center gap-3'})}>
-                                                <span className={cn('material-symbols-outlined text-lg shrink-0', isDone ? 'text-positive' : 'text-fg-muted')} aria-hidden="true">
-                                                    {isDone ? 'check_circle' : 'radio_button_unchecked'}
-                                                </span>
-                                                <span className={cn('min-w-0 flex-1 truncate text-sm', isDone ? 'text-fg-muted' : 'text-fg')}>{lesson.title}</span>
-                                                <span className="sr-only">{isDone ? ' — done' : ' — not yet'}</span>
-                                            </Link>
-                                        </li>
-                                    );
-                                })}
-                            </ol>
-                        </Panel>
-                    );
-                })}
-            </div>
-        </div>
-    );
-};
-
-const LessonAsync = async ({userId}: {userId: string}) => {
-    const facts = await getLearnFacts(userId);
-    const moment = deriveMoments(facts, facts.today)[0];
-    if (moment) return <TodaysLesson moment={moment}/>;
-    return <TodaysLesson lesson={await getTodaysLesson(userId)}/>;
-};
-
-const PuzzleAsync = async ({userId}: {userId: string}) => <DailyPuzzleCard card={await getDailyPuzzleCard(userId)}/>;
-
-const TodayView = async ({userId}: {userId: string}) => {
-    const facts = await getOnboardingFacts(userId);
-    return (
-        <div className="space-y-4" id="learn-today">
-            <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
-                <Panel aria-labelledby="today-lesson-heading">
-                    <SectionHeading id="today-lesson-heading">{LEARN_PAGE_COPY.todayLesson}</SectionHeading>
-                    <Suspense fallback={<WidgetSkeleton height={200} rows={3}/>}><LessonAsync userId={userId}/></Suspense>
-                </Panel>
-                <Panel id="learn-today-puzzle" aria-labelledby="today-puzzle-heading">
-                    <div className="mb-4 flex items-center justify-between gap-3">
-                        <SectionHeading id="today-puzzle-heading" spacing="none">{GAMES_COPY.dailyHeading}</SectionHeading>
-                        <Link href="/games" className="label-type text-xs text-brand hover:underline">{GAMES_COPY.allGames} →</Link>
-                    </div>
-                    <Suspense fallback={<WidgetSkeleton height={200} rows={3}/>}><PuzzleAsync userId={userId}/></Suspense>
-                </Panel>
-            </div>
-            {onboardingActive(facts) && (
-                <Panel aria-labelledby="today-first-week-heading">
-                    <SectionHeading id="today-first-week-heading">{LEARN_PAGE_COPY.todayFirstWeek}</SectionHeading>
-                    <GettingStarted missions={deriveMissions(facts)}/>
-                </Panel>
-            )}
-        </div>
-    );
-};
-
-// The glossary as a page: every definition the app shows inline, grouped by where the number
-// lives, with a link to go and look at the real one. The ⌘K palette deep-links to an entry.
-const GlossaryView = () => (
-    <div className="space-y-4">
-        <p className="max-w-3xl text-sm text-fg-soft">{LEARN_PAGE_COPY.glossaryLead}</p>
-        {GLOSSARY_GROUPS.map((group) => (
-            <Panel key={group.id} id={`learn-${group.id}`}>
-                <div className="flex items-center justify-between gap-3 mb-4">
-                    <SectionHeading spacing="none">{group.label}</SectionHeading>
-                    <Link href={group.home.href} className="font-mono text-[11px] text-brand hover:underline">
-                        {group.home.label} →
+const UnitPanel = ({today}: {today: LabView['today']}) => (
+    <Panel id="lab-unit" aria-labelledby="lab-unit-heading" data-lab-unit={today.kind}>
+        <SectionHeading id="lab-unit-heading" spacing="sm">{LAB_COPY.unitHeading[today.kind]}</SectionHeading>
+        {today.kind === 'nothing-written' ? (
+            <p className="text-sm text-fg-soft">{today.next ? LAB_COPY.nothingWritten(today.next.title) : LAB_COPY.nothingAtAll}</p>
+        ) : (
+            <div data-lab-unit-id={today.unit.id}>
+                <MicroLabel as="p">{LAB_TRACK_LABELS[today.unit.track]} · {LAB_COPY.readingTime(today.unit.readingMinutes)} · {LAB_COPY.cardsCount(today.unit.cards)}</MicroLabel>
+                <h3 className="mt-1 font-heading text-lg font-semibold text-fg">{today.unit.title}</h3>
+                <p className="mt-2 text-sm leading-relaxed text-fg-soft">{today.unit.oneLiner}</p>
+                {today.kind === 'revisit' && <MicroLabel as="p" className="mt-2 normal-case tracking-normal">{LAB_COPY.revisitLine(today.firstDay, today.lastDay)}</MicroLabel>}
+                <div className="mt-4">
+                    <Link href={`/learn/units/${today.unit.id}`} className={actionButton({variant: today.kind === 'study' ? 'primary' : 'secondary', size: 'md'})} data-lab-open-unit={today.unit.id}>
+                        {LAB_COPY.openUnit}
                     </Link>
                 </div>
-                <dl className="grid grid-cols-1 md:grid-cols-2 gap-x-6 gap-y-4">
-                    {group.keys.map((key) => {
-                        const entry = GLOSSARY[key];
-                        return (
-                            <div key={key} id={key} className="scroll-mt-24 min-w-0" data-learn-entry={key}>
-                                <dt className="font-heading text-xs font-semibold text-fg">{entry.term}</dt>
-                                <dd className="text-xs text-fg-muted leading-relaxed">
-                                    {entry.long}
-                                    {entry.formula && (
-                                        <span className="block font-mono text-[10px] text-fg-muted/80 mt-0.5">{entry.formula}</span>
-                                    )}
-                                    {entry.seeAlso && entry.seeAlso.length > 0 && (
-                                        <span className="block mt-0.5 font-mono text-[10px] text-fg-muted">
-                                            See also:{' '}
-                                            {entry.seeAlso.map((other, i) => (
-                                                <span key={other}>
-                                                    {i > 0 ? ', ' : ''}
-                                                    <a href={`#${other}`} className="text-brand hover:underline">{GLOSSARY[other as keyof typeof GLOSSARY]?.term ?? other}</a>
-                                                </span>
-                                            ))}
-                                        </span>
-                                    )}
-                                </dd>
-                            </div>
-                        );
-                    })}
-                </dl>
-            </Panel>
-        ))}
-    </div>
-);
-
-const StrategiesView = () => (
-    <Panel id="learn-strategies">
-        <SectionHeading>{LEARN_PAGE_COPY.strategiesHeading}</SectionHeading>
-        <ul className="grid grid-cols-1 md:grid-cols-2 gap-x-6 gap-y-3">
-            {STRATEGIES.map((def) => (
-                <li key={def.id} className="min-w-0">
-                    <Link href={`/strategies/${def.id}`} className="font-heading text-sm font-semibold text-fg hover:text-brand transition-colors">
-                        {def.name}
-                    </Link>
-                    <p className="text-xs text-fg-soft mt-0.5">{def.explainer.beginnerLine}</p>
-                    <MicroLabel as="p" className="mt-0.5 normal-case tracking-normal">{def.family} · {def.explainer.summary}</MicroLabel>
-                </li>
-            ))}
-        </ul>
+            </div>
+        )}
     </Panel>
 );
 
+const TodayView = ({view}: {view: LabView}) => (
+    <div className="space-y-4" id="lab-today">
+        <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
+            <UnitPanel today={view.today}/>
+            <Panel id="lab-review" aria-labelledby="lab-review-heading">
+                <div className="mb-3 flex items-center justify-between gap-3">
+                    <SectionHeading id="lab-review-heading" spacing="none">{LAB_COPY.reviewHeading}</SectionHeading>
+                    <MicroLabel data-lab-review-due={view.review.summary.due}>{LAB_COPY.reviewDue(view.review.summary.due)}</MicroLabel>
+                </div>
+                <ReviewDeck cards={view.review.queue.map((card) => ({
+                    cardId: card.cardId, unitTitle: card.unitTitle, why: card.why,
+                    front: <LabMarkdown>{card.front}</LabMarkdown>, back: <LabMarkdown>{card.back}</LabMarkdown>,
+                }))}/>
+            </Panel>
+        </div>
+        {view.problem && (
+            <Panel id="lab-problem" aria-labelledby="lab-problem-heading">
+                <div className="mb-3 flex flex-wrap items-center justify-between gap-3">
+                    <SectionHeading id="lab-problem-heading" spacing="none">{LAB_COPY.problemHeading}</SectionHeading>
+                    <MicroLabel>{view.problem.unitTitle} · {LAB_COPY.kinds[view.problem.kind]}</MicroLabel>
+                </div>
+                <h3 className="mb-2 font-heading text-base font-semibold text-fg">{view.problem.title}</h3>
+                <ProblemCard
+                    problemId={view.problem.id}
+                    numeric={view.problem.numeric}
+                    unit={view.problem.unit}
+                    hints={view.problem.hints}
+                    closedLine={view.problem.closed ? LAB_COPY.closedOn(view.problem.closed.day, view.problem.closed.how) : null}
+                    statement={<LabMarkdown>{view.problem.statement}</LabMarkdown>}
+                    solution={view.problem.solution !== null ? <LabMarkdown>{view.problem.solution}</LabMarkdown> : null}
+                />
+            </Panel>
+        )}
+        <Panel id="lab-progress" aria-labelledby="lab-progress-heading">
+            <SectionHeading id="lab-progress-heading" spacing="sm">{LAB_COPY.progressHeading}</SectionHeading>
+            <LabProgress progress={view.progress}/>
+        </Panel>
+    </div>
+);
+
+const LibraryView = ({view}: {view: LabView}) => (
+    <div className="space-y-4" id="lab-library">
+        <p className="max-w-3xl text-sm text-fg-soft">{LAB_COPY.libraryLead}</p>
+        {view.library.map(({track, rows}) => {
+            const progress = view.progress.perTrack.find((t) => t.track === track);
+            return (
+                <Panel key={track} id={`lab-track-${track}`} aria-labelledby={`lab-track-${track}-heading`}>
+                    <div className="mb-3 flex items-center justify-between gap-3">
+                        <SectionHeading id={`lab-track-${track}-heading`} spacing="none">{LAB_TRACK_LABELS[track]}</SectionHeading>
+                        {progress && <MicroLabel>{LAB_COPY.unitsOf(progress.done, progress.planned)} {LAB_COPY.unitsLabel}</MicroLabel>}
+                    </div>
+                    <ol className="space-y-2">
+                        {rows.map((row) => (
+                            <li key={row.id} data-lab-row={row.id} data-lab-written={row.written}>
+                                {row.written ? (
+                                    <Link href={`/learn/units/${row.id}`} className={rowCard({interactive: true, className: 'flex items-start gap-3 px-3 py-2'})}>
+                                        <MicroLabel as="span" className="mt-0.5 w-14 shrink-0">{LAB_COPY.unitNumber(row.number)}</MicroLabel>
+                                        <span className="min-w-0 flex-1">
+                                            <span className="block text-sm text-fg">{row.title}</span>
+                                            <span className="block text-xs text-fg-muted">{row.oneLiner}</span>
+                                        </span>
+                                        {row.studiedOn && <Badge tone="positive" variant="outline">{LAB_COPY.studiedOn(row.studiedOn)}</Badge>}
+                                    </Link>
+                                ) : (
+                                    <div className={cn(rowCard({className: 'flex items-start gap-3 px-3 py-2'}), 'opacity-60')}>
+                                        <MicroLabel as="span" className="mt-0.5 w-14 shrink-0">{LAB_COPY.unitNumber(row.number)}</MicroLabel>
+                                        <span className="min-w-0 flex-1">
+                                            <span className="block text-sm text-fg-soft">{row.title}</span>
+                                            <span className="block text-xs text-fg-muted">{row.oneLiner}</span>
+                                        </span>
+                                        <Badge variant="outline">{LAB_COPY.planned}</Badge>
+                                    </div>
+                                )}
+                            </li>
+                        ))}
+                    </ol>
+                </Panel>
+            );
+        })}
+    </div>
+);
+
 const LearnPage = async ({searchParams}: LearnPageProps) => {
-    const userId = await requireUserId();
-    const {tab: tabParam} = await searchParams;
-    const tab: TabId = isTab(tabParam) ? tabParam : 'course';
+    const user = await getSessionUser();
+    if (!user) redirect('/sign-in');
+    const {tab, view: viewParam} = await searchParams;
+    const legacyGlossaryTab = tab === 'glossary';
+
+    if (!isLabOwner(user.email)) return <LearnRedirect fallback="/games" legacyGlossaryTab={legacyGlossaryTab}/>;
+
+    const view = await getLabView(user.id);
+    const active: ViewId = isView(viewParam) ? viewParam : 'today';
 
     return (
-        <div className="space-y-4">
-            <GlossaryHashRedirect onGlossary={tab === 'glossary'}/>
-            <PageTitle
-                title="Learn"
-                subtitle={LEARN_PAGE_COPY.subtitle}
-                note={LEARN_PAGE_COPY.note}
-            />
-            <Tabs tabs={TABS} active={tab} label="Learn sections"/>
-
-            {tab === 'course' && <CourseView userId={userId}/>}
-            {tab === 'today' && <TodayView userId={userId}/>}
-            {tab === 'glossary' && <GlossaryView/>}
-            {tab === 'strategies' && <StrategiesView/>}
-
-            <MicroLabel as="p" className="text-center">
-                {STRATEGIES_DISCLAIMER}
-            </MicroLabel>
+        <div className="space-y-4" data-lab>
+            <LearnRedirect fallback={null} legacyGlossaryTab={legacyGlossaryTab}/>
+            <PageTitle title={LAB_COPY.title} subtitle={LAB_COPY.subtitle}/>
+            <Tabs tabs={TABS} active={active} label={LAB_COPY.viewsLabel}/>
+            {active === 'today' ? <TodayView view={view}/> : <LibraryView view={view}/>}
         </div>
     );
 };

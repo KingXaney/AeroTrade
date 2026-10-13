@@ -68,9 +68,9 @@ try {
     await signUp(page, 'poker', {stay: true});
 
     // --- the page and its engine ------------------------------------------------------------
-    await page.goto(`${BASE}/learn`, {waitUntil: 'load'});
+    await page.goto(`${BASE}/games`, {waitUntil: 'load'});
     const learnTabs = await page.$$eval('[data-section-tabs="learn"] a', (as) => as.map((a) => a.getAttribute('href')));
-    check('Learn carries Games, the Poker solver and Poker night', learnTabs.join(',') === '/learn,/games,/poker,/poker-night', learnTabs.join(','));
+    check('Learn carries Games, the Poker solver, Poker night and the Glossary', learnTabs.join(',') === '/games,/poker,/poker-night,/glossary', learnTabs.join(','));
 
     await page.goto(`${BASE}/poker`, {waitUntil: 'load'});
     await page.locator('[data-poker-tab="equity"]').waitFor({timeout: 30000});

@@ -26,6 +26,17 @@ export const getCurrentUserId = async (): Promise<string | null> => {
     }
 };
 
+// For actions that gate on who the person is (the owner's lab): the user with their email, or
+// null — a failed read logged and read as signed out, as getCurrentUserId does.
+export const getCurrentUser = async (): Promise<User | null> => {
+    try {
+        return await getSessionUser();
+    } catch (error) {
+        console.error('Error reading session:', error);
+        return null;
+    }
+};
+
 // For pages: the signed-in user's id, or a redirect to /sign-in.
 export const requireUserId = async (): Promise<string> => {
     const userId = await getCurrentUserId();

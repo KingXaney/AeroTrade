@@ -3,16 +3,16 @@
 import Link from "next/link";
 import {usePathname} from "next/navigation";
 import {cn} from "@/lib/utils";
-import {isActiveNav, sectionFor, type NavBadges} from "@/lib/shell/navigation";
+import {NAV_SECTIONS, isActiveNav, sectionFor, type NavBadges, type NavSection} from "@/lib/shell/navigation";
 
 // The pages of the section the reader is in, as links above the page: News has Headlines and
 // Topics, Markets its Overview and the Watchlist, Portfolio its Overview and Activity. A section
 // of one page shows nothing. Links with aria-current, not role="tab" — each is a page of its
 // own with its own URL (the tablist role belongs to a view switched inside one page, as on
 // /markets).
-const SectionTabs = ({badges = {}}: {badges?: NavBadges}) => {
+const SectionTabs = ({badges = {}, sections = NAV_SECTIONS}: {badges?: NavBadges; sections?: readonly NavSection[]}) => {
     const pathname = usePathname();
-    const section = sectionFor(pathname);
+    const section = sectionFor(pathname, sections);
     if (!section || section.pages.length < 2) return null;
 
     return (

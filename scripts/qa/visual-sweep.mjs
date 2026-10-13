@@ -54,7 +54,7 @@ const SIGNED_IN = [
     ['friends', '/friends'],
     ['history', '/history'],
     ['settings', '/settings'],
-    ['learn', '/learn'],
+    ['glossary', '/glossary'],
     ['games', '/games'],
     ['games-puzzle', '/games/puzzle'],
     ['games-archive', '/games/puzzles'],

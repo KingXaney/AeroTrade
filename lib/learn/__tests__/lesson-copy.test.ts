@@ -151,8 +151,8 @@ describe('LESSON_COPY', () => {
         expect(lessonCountLine(4)).toBe('4 of today\'s articles in your topics used this term');
     });
 
-    it('links a concept to its /learn entry', () => {
-        expect(lessonLearnHref('fomc')).toBe('/learn#fomc');
-        expect(lessonLearnHref('s&p 500')).toBe('/learn#s%26p%20500');
+    it('links a concept to its /glossary entry', () => {
+        expect(lessonLearnHref('fomc')).toBe('/glossary#fomc');
+        expect(lessonLearnHref('s&p 500')).toBe('/glossary#s%26p%20500');
     });
 });

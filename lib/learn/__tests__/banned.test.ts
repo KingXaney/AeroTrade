@@ -1,5 +1,5 @@
 import {describe, expect, it} from 'vitest';
-import {BANNED_ADVICE, BANNED_COPY, findBanned, stripProhibitions} from '@/lib/learn/banned';
+import {BANNED_ADVICE, BANNED_COPY, BANNED_LAB, findBanned, stripProhibitions} from '@/lib/learn/banned';
 
 describe('findBanned', () => {
     it('flags a valuation verdict', () => {
@@ -42,6 +42,18 @@ describe('findBanned', () => {
         expect(findBanned('Buy the dip in a strong stock, sell the bounce, repeat.', 'copy').length).toBeGreaterThan(0);
         expect(findBanned('Buys a strong stock on a two-day dip and sells the bounce.', 'copy')).toEqual([]);
         expect(findBanned('what people mean when they call a business diversified', 'copy')).toEqual([]);
+    });
+
+    it('holds the lab\'s prose to trading-directed phrases only', () => {
+        for (const term of ['optimal control', 'best-of-n sampling', 'a cheap-to-compute feature', 'the loss will fall', 'diversify the training mixture', 'the better calibration']) {
+            expect(findBanned(term, 'lab'), term).toEqual([]);
+        }
+        for (const text of ['you should buy the dip', 'a price target of 200', 'stocks will rise next year', 'guaranteed returns', 'buy now', 'our top picks', 'we recommend buying it', 'long NVDA into earnings', 'sell SPY']) {
+            expect(findBanned(text, 'lab').length, text).toBeGreaterThan(0);
+        }
+        expect(findBanned('sell signals fire when the close falls below the band', 'lab')).toEqual([]);
+        expect(findBanned('Never buy now; a model describes.', 'lab')).toEqual([]);
+        expect(BANNED_LAB.length).toBeGreaterThan(5);
     });
 
     it('keeps the two tiers as real lists', () => {
