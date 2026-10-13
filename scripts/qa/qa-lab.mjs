@@ -4,7 +4,8 @@
 // (⌘K, Today's lesson, the daily email) keep their hash on the way to /glossary for both.
 // Then the lab's day: today's unit opened and marked studied (once), its cards due the day
 // after (the unit row is dated back a day), one graded, the problem answered on the server,
-// the streak counting the day, and the library's thirty rows.
+// the streak counting the day, the library's thirty rows, and a seeded day of papers with its
+// digest on the Papers view and on Today.
 // Run: npm run qa -- lab   (the harness: README.md)
 import {chromium} from 'playwright';
 import {MongoClient} from 'mongodb';
@@ -112,6 +113,44 @@ try {
         && await page.locator('[data-lab-written="true"] a').count() >= 9 && await page.locator('[data-lab-written="false"]').count() <= 21);
     check('…with the studied unit marked', await page.locator(`[data-lab-row="${unitId}"] [data-badge]`).count() === 1);
     await shot('04-lab-library');
+
+    // --- the papers: a seeded day, its digest citing by number, the links built from the ids ----------
+    const labDay = {
+        day: today,
+        papers: [
+            {id: '2610.00001', title: 'Patch tokens as geometry', abstract: 'Frozen patch tokens carry depth and correspondence.', authors: ['Ada', 'Bo', 'Cy', 'Di'], categories: ['cs.CV'], primary: 'cs.CV', track: 'cv', published: `${today}T00:00:00Z`, source: 'both', upvotes: 12},
+            {id: '2610.00002', title: 'A routing paper', abstract: 'Experts and their balance.', authors: ['Eve'], categories: ['cs.LG'], primary: 'cs.LG', track: 'ml', published: `${today}T00:00:00Z`, source: 'arxiv', upvotes: null},
+            {id: '2610.00003', title: 'Factor decay measured', abstract: 'Published factors fade.', authors: ['Fay', 'Gus'], categories: ['q-fin.PM'], primary: 'q-fin.PM', track: 'quant', published: `${today}T00:00:00Z`, source: 'arxiv', upvotes: null},
+        ],
+        counts: {listed: 3, hf: 1, novel: 3, kept: 3},
+        digest: {headline: 'Three papers on representation and decay', bullets: [{text: 'Patch tokens carry geometry.', papers: [0]}, {text: 'Routing and factor decay, side by side.', papers: [1, 2]}], model: 'qa', writtenAt: new Date()},
+        fetchedAt: new Date(), createdAt: new Date(),
+    };
+    await db.collection('labdays').insertOne(labDay);
+    await page.goto(`${BASE}/learn?view=papers`, {waitUntil: 'load'});
+    await page.locator('#lab-papers').waitFor({timeout: 30000});
+    const absHrefs = await page.$$eval('[data-paper-abs]', (as) => as.map((a) => `${a.getAttribute('data-paper-abs')}=${a.getAttribute('href')}`));
+    check('the Papers view lists the day\'s papers by field, each linked to its arXiv page by id',
+        await page.locator('[data-lab-paper]').count() === 3 && absHrefs.join(',') === '2610.00001=https://arxiv.org/abs/2610.00001,2610.00002=https://arxiv.org/abs/2610.00002,2610.00003=https://arxiv.org/abs/2610.00003', absHrefs.join(','));
+    check('…the Hugging Face link only where the paper was on its list', await page.locator('[data-paper-hf]').count() === 1 && await page.locator('[data-paper-hf="2610.00001"]').count() === 1);
+    check('…the digest as text with "[n]" links to the rows, and not stale today',
+        /Patch tokens carry geometry\./.test(await page.locator('[data-lab-digest]').innerText()) && await page.locator('[data-digest-bullet]').count() === 2
+        && (await page.locator('[data-digest-ref="2610.00003"]').getAttribute('href')) === '#paper-2610.00003' && await page.locator('[id="paper-2610.00003"]').count() === 1
+        && await page.locator('[data-lab-papers-stale]').count() === 0);
+    check('…and the digest\'s text holds no link of the model\'s', !/http/.test(await page.locator('[data-lab-digest]').innerText()));
+    await shot('05-lab-papers');
+    await page.goto(`${BASE}/learn`, {waitUntil: 'load'});
+    await page.locator('[data-lab]').waitFor({timeout: 30000});
+    check('Today carries the digest with a link to the day\'s papers', await page.locator('#lab-digest').count() === 1 && await page.locator('#lab-digest a[href="/learn?view=papers"]').count() === 1
+        && (await page.locator('#lab-digest [data-digest-ref="2610.00001"]').getAttribute('href')) === '/learn?view=papers#paper-2610.00001');
+    await db.collection('labdays').updateOne({day: today}, {$set: {day: yesterday}});
+    await page.goto(`${BASE}/learn?view=papers`, {waitUntil: 'load'});
+    await page.locator('#lab-papers').waitFor({timeout: 30000});
+    check('a day before today shows as the latest read, marked stale', await page.locator(`[data-lab-papers-stale="${yesterday}"]`).count() === 1 && await page.locator('[data-lab-paper]').count() === 3);
+    await db.collection('labdays').deleteMany({});
+    await page.goto(`${BASE}/learn?view=papers`, {waitUntil: 'load'});
+    await page.locator('#lab-papers').waitFor({timeout: 30000});
+    check('with no day read yet the view says so and Today shows no papers box', await page.locator('#lab-papers-none').count() === 1);
 
     // --- everyone else -------------------------------------------------------------------------------
     await page.goto(`${BASE}/learn#max-drawdown`, {waitUntil: 'load'});

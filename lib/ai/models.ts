@@ -5,7 +5,7 @@
 // Import-free on purpose: resolution is pure and unit-tested, and the "default costs
 // nothing" contract is an assertion in that suite rather than a comment here.
 
-export type AiTask = 'extraction' | 'digest' | 'rationale' | 'welcome' | 'topicBrief' | 'marketBriefing';
+export type AiTask = 'extraction' | 'digest' | 'rationale' | 'welcome' | 'topicBrief' | 'marketBriefing' | 'labDigest';
 export type AiTier = 'free' | 'basic' | 'pro';
 export type AiProvider = 'gemini' | 'anthropic';
 
@@ -33,6 +33,7 @@ const FREE: Record<AiTask, ModelSpec> = {
     welcome: {provider: 'gemini', model: GEMINI_FLASH_LITE, maxTokens: 1024},
     topicBrief: {provider: 'gemini', model: GEMINI_FLASH_LITE, maxTokens: 1024, jsonMode: true},
     marketBriefing: {provider: 'gemini', model: GEMINI_FLASH_LITE, maxTokens: 2048, jsonMode: true},
+    labDigest: {provider: 'gemini', model: GEMINI_FLASH_LITE, maxTokens: 1024, jsonMode: true},
 };
 
 // Haiku has no adaptive thinking and rejects `effort`, so this tier needs no spend
@@ -44,6 +45,7 @@ const BASIC: Record<AiTask, ModelSpec> = {
     welcome: {provider: 'anthropic', model: 'claude-haiku-4-5', maxTokens: 1024},
     topicBrief: {provider: 'anthropic', model: 'claude-haiku-4-5', maxTokens: 1024, jsonMode: true},
     marketBriefing: {provider: 'anthropic', model: 'claude-haiku-4-5', maxTokens: 2048, jsonMode: true},
+    labDigest: {provider: 'anthropic', model: 'claude-haiku-4-5', maxTokens: 1024, jsonMode: true},
 };
 
 // Only the two tasks where model quality reaches a decision or a human get upgraded.
@@ -61,6 +63,8 @@ const PRO: Record<AiTask, ModelSpec> = {
     topicBrief: {provider: 'anthropic', model: 'claude-haiku-4-5', maxTokens: 1024, jsonMode: true},
     // Nor does the morning briefing: one call a day, restating headlines.
     marketBriefing: {provider: 'anthropic', model: 'claude-haiku-4-5', maxTokens: 2048, jsonMode: true},
+    // The lab's digest restates abstracts for one reader; the cheap model is the right one.
+    labDigest: {provider: 'anthropic', model: 'claude-haiku-4-5', maxTokens: 1024, jsonMode: true},
 };
 
 export const MODEL_MATRIX: Record<AiTier, Record<AiTask, ModelSpec>> = {free: FREE, basic: BASIC, pro: PRO};
@@ -88,12 +92,38 @@ export const resolveTier = (env: NodeJS.ProcessEnv = process.env): TierResolutio
     return {tier: raw};
 };
 
-// Whether any model can answer at all: the free tier needs GEMINI_API_KEY (the Inngest client
+// Which Gemini key the free tier runs on. Gemini's free tier is 20 requests a day per model,
+// which the daily jobs already reach; billing is enabled per Google Cloud project, so a key from
+// a billed project is a paid key. Two keys keep a way back: GEMINI_API_KEY (the free project)
+// and GEMINI_API_KEY_PAID (a billed one), and AI_PLAN says which is in use — flip it on the
+// deployment and redeploy, no code change. 'paid' without its key falls back to the free key
+// with a warning, never to an outage, as AI_TIER does with its Anthropic key. The chat route
+// and the Inngest client both read the key through geminiApiKey, so the plan covers every call.
+export type AiPlan = 'free' | 'paid';
+export const AI_PLANS: AiPlan[] = ['free', 'paid'];
+
+type PlanResolution = {plan: AiPlan; warning?: string};
+
+export const resolvePlan = (env: NodeJS.ProcessEnv = process.env): PlanResolution => {
+    const raw = (env.AI_PLAN || '').trim();
+    if (!raw || raw === 'free') return {plan: 'free'};
+    if (raw !== 'paid') return {plan: 'free', warning: `AI_PLAN="${raw}" is not free|paid — using the free key.`};
+    if (!env.GEMINI_API_KEY_PAID?.trim()) return {plan: 'free', warning: 'AI_PLAN="paid" needs GEMINI_API_KEY_PAID — using the free key.'};
+    return {plan: 'paid'};
+};
+
+export const geminiApiKey = (env: NodeJS.ProcessEnv = process.env): string | undefined => {
+    const {plan} = resolvePlan(env);
+    const key = plan === 'paid' ? env.GEMINI_API_KEY_PAID : env.GEMINI_API_KEY;
+    return key?.trim() || undefined;
+};
+
+// Whether any model can answer at all: the free tier needs a Gemini key (the Inngest client
 // hands it to step.ai.infer), a paid tier its Anthropic key. A job that would call a model
 // checks this first: a call with no key is a 403 the Inngest server retries with backoff, which
 // would hold the job's later steps for minutes rather than fail fast.
 export const modelConfigured = (env: NodeJS.ProcessEnv = process.env): boolean =>
-    Boolean(env.GEMINI_API_KEY?.trim()) || resolveTier(env).tier !== 'free';
+    Boolean(geminiApiKey(env)) || resolveTier(env).tier !== 'free';
 
 type ResolvedModel = ModelSpec & {task: AiTask; tier: AiTier; warning?: string};
 

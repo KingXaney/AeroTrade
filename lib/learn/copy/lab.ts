@@ -8,8 +8,8 @@ export const LAB_TRACK_LABELS: Readonly<Record<LabTrack, string>> = {cv: 'Comput
 
 export const LAB_COPY = {
     title: 'Lab',
-    subtitle: 'A daily study of computer vision, machine learning and quantitative finance: one unit, the cards due and a problem.',
-    views: {today: 'Today', library: 'Library'},
+    subtitle: 'A daily study of computer vision, machine learning and quantitative finance: one unit, the cards due, a problem and the day\'s papers.',
+    views: {today: 'Today', papers: 'Papers', library: 'Library'},
     viewsLabel: 'Lab views',
 
     // Today's unit.
@@ -63,6 +63,24 @@ export const LAB_COPY = {
     libraryLead: 'Ten units a track, in reading order. A unit on the syllabus and not yet written is greyed; it is never today\'s unit.',
     planned: 'Not written yet',
     unitNumber: (n: number): string => `Unit ${n}`,
+
+    // The papers.
+    papersHeading: 'Papers',
+    papersLead: 'New on arXiv and in Hugging Face\'s daily papers for the three fields, read each weekday morning: at most twelve a field, none older than a week, none shown on two days. Upvotes are Hugging Face readers\'.',
+    papersNone: 'No papers read yet. The feed runs on weekday mornings.',
+    papersStale: (day: string): string => `The latest day read is ${day}; nothing newer has been fetched.`,
+    papersDay: (day: string): string => `Papers of ${day}`,
+    trackPapers: (n: number): string => `${n} ${n === 1 ? 'paper' : 'papers'}`,
+    moreAuthors: (n: number): string => `and ${n} more`,
+    upvotes: (n: number): string => `${n} ${n === 1 ? 'upvote' : 'upvotes'}`,
+    abstractLabel: 'Abstract',
+    onArxiv: 'arXiv',
+    onHf: 'Hugging Face',
+    allPapers: 'All of the day\'s papers',
+    digestHeading: 'The day in papers',
+    digestCaveat: (day: string): string => `${day} · AI summary written from the abstracts · may contain errors`,
+    digestRefs: 'Papers cited',
+    todayPapersHeading: 'Today\'s papers',
 
     // A unit page.
     sectionHeadings: {idea: 'The idea', maths: 'The maths', code: 'A sketch in code', whyNow: 'Why it matters now', pitfalls: 'Pitfalls'} as const,

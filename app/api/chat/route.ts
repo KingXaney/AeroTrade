@@ -1,5 +1,6 @@
 import {convertToModelMessages, streamText, stepCountIs, type UIMessage} from "ai";
 import {createGoogleGenerativeAI} from "@ai-sdk/google";
+import {geminiApiKey} from "@/lib/ai/models";
 import {z} from "zod";
 import {ADVISOR_SYSTEM_PROMPT} from "@/lib/chat/system-prompt";
 import {buildTools} from "@/lib/chat/tools";
@@ -13,10 +14,11 @@ import {CHAT_GLOBAL_KEY, chatUserDayKey, chatUserHourKey, resolveChatLimits} fro
 const fail = (code: ChatErrorCode) =>
     Response.json(chatErrorBody(code), {status: chatErrorStatus(code)});
 
-// The Google provider defaults to GOOGLE_GENERATIVE_AI_API_KEY; this project keeps the same key
-// under GEMINI_API_KEY (shared with the inngest news pipeline), so we wire it explicitly.
+// The Google provider defaults to GOOGLE_GENERATIVE_AI_API_KEY; this project keeps its keys
+// under GEMINI_API_KEY and GEMINI_API_KEY_PAID (shared with the Inngest jobs), the plan picking
+// one (AI_PLAN, lib/ai/models.geminiApiKey), so we wire it explicitly.
 const google = createGoogleGenerativeAI({
-    apiKey: process.env.GEMINI_API_KEY,
+    apiKey: geminiApiKey(),
 });
 
 export const runtime = 'nodejs'; // mongoose + better-auth need Node, not edge
