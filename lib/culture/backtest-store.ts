@@ -16,6 +16,8 @@ import {
     SERIES_LOOKBACK_DAYS,
 } from "@/lib/culture/config";
 import {toBacktestView, type CultureBacktestStamp, type CultureBacktestView, type StoredCultureBacktest} from "@/lib/culture/backtest";
+import {backtestWindow, coverageWindow} from "@/lib/culture/backtest-window";
+export {backtestWindow};
 import {simulateCulture} from "@/lib/culture/simulator";
 import {getAttentionSeries} from "@/lib/culture/store";
 import {catalogHash, cultureTickers} from "@/lib/culture/universe";
@@ -32,16 +34,11 @@ export const getCultureBacktestStamp = async (): Promise<CultureBacktestStamp | 
     return doc ? {version: doc.version, catalogHash: doc.catalogHash, computedAt: new Date(doc.computedAt).getTime()} : null;
 };
 
-// The window a build pays income over: the backfill's depth before launch, through the day before.
-export const backtestWindow = (launchDate: string): {from: string; through: string} => ({
-    from: addCalendarDays(launchDate, -CULTURE_BACKFILL_CALENDAR_DAYS),
-    through: addCalendarDays(launchDate, -1),
-});
-
-// Symbols whose dividends are not yet vouched for across the window — refetched deep by the
-// bars step while a rebuild is pending, so the guard below can pass.
+// Symbols whose dividends are not yet vouched for across the coverage window (the backfill's
+// depth through the last session before launch — lib/culture/backtest-window) — refetched deep
+// by the bars step while a rebuild is pending, so the guard below can pass.
 export const lackingDividendCoverage = async (symbols: readonly string[], launchDate: string): Promise<string[]> => {
-    const {from, through} = backtestWindow(launchDate);
+    const {from, through} = coverageWindow(launchDate);
     return symbolsLackingDividendCoverage([...symbols, BENCHMARK_SYMBOL], from, through);
 };
 
