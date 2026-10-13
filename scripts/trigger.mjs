@@ -18,6 +18,7 @@
 //   npm run trigger -- culture-weekly              the two culture pickers (fills only during the session)
 //   npm run trigger -- culture-preview             decide and record without filling anything
 //   npm run trigger -- culture-resimulate          rebuild the culture backtest from the stored history
+//   npm run trigger -- lab                         the lab's papers feed: today's new papers and their digest
 import { Inngest } from "inngest";
 
 // Each job's event as lib/jobs/registry.ts names it; lib/jobs/__tests__/registry.test.ts holds
@@ -40,6 +41,7 @@ const EVENTS = {
     'culture-weekly': 'app/run.culture.brain',
     'culture-preview': 'app/run.culture.brain',
     'culture-resimulate': 'app/run.culture.brain',
+    lab: 'app/refresh.lab.papers',
 };
 
 const STRATEGY_DATA = {

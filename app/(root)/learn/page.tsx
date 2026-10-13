@@ -7,7 +7,9 @@ import {getLabView} from "@/lib/lab/page-store";
 import type {LabView} from "@/lib/lab/view";
 import {LAB_COPY, LAB_TRACK_LABELS} from "@/lib/learn/copy/lab";
 import LabMarkdown from "@/components/lab/LabMarkdown";
+import DigestPanel from "@/components/lab/DigestPanel";
 import LabProgress from "@/components/lab/LabProgress";
+import PapersPanel from "@/components/lab/PapersPanel";
 import ProblemCard from "@/components/lab/ProblemCard";
 import ReviewDeck from "@/components/lab/ReviewDeck";
 import LearnRedirect from "@/components/learn/LearnRedirect";
@@ -26,12 +28,12 @@ export const metadata: Metadata = {title: "Lab"};
 
 // The owner's lab (lib/lab): a daily study of computer vision, machine learning and
 // quantitative finance, for the accounts LAB_OWNER_EMAILS names. One view at a time in the URL
-// (?view=): Today — the unit, the cards due, the problem, the progress — and the Library, the
-// syllabus. Every other account's /learn goes to the games — on the client, so a /learn#term
+// (?view=): Today — the unit, the cards due, the problem, the day's digest, the progress — the
+// Papers (the latest day's papers by field with the digest) and the Library, the syllabus. Every other account's /learn goes to the games — on the client, so a /learn#term
 // address from the glossary's days as a tab of this page keeps its hash on the way to /glossary
 // (components/learn/LearnRedirect). One read, getLabView, shaped by the pure lib/lab/view.
 
-const VIEW_IDS = ['today', 'library'] as const;
+const VIEW_IDS = ['today', 'papers', 'library'] as const;
 type ViewId = (typeof VIEW_IDS)[number];
 const isView = (value: unknown): value is ViewId => typeof value === 'string' && (VIEW_IDS as readonly string[]).includes(value);
 const TABS = VIEW_IDS.map((id) => ({id, label: LAB_COPY.views[id], href: id === 'today' ? '/learn' : `/learn?view=${id}`}));
@@ -92,10 +94,44 @@ const TodayView = ({view}: {view: LabView}) => (
                 />
             </Panel>
         )}
+        {view.papers?.digest && (
+            <DigestPanel id="lab-digest" digest={view.papers.digest} day={view.papers.day} hrefPrefix="/learn?view=papers#paper-" more={{href: '/learn?view=papers', label: LAB_COPY.allPapers}}/>
+        )}
+        {view.papers && !view.papers.digest && view.papers.tracks.length > 0 && (
+            <Panel id="lab-papers-today" aria-labelledby="lab-papers-today-heading">
+                <div className="mb-3 flex items-center justify-between gap-3">
+                    <SectionHeading id="lab-papers-today-heading" spacing="none">{LAB_COPY.todayPapersHeading}</SectionHeading>
+                    <Link href="/learn?view=papers" className="label-type text-xs text-brand hover:underline">{LAB_COPY.allPapers}</Link>
+                </div>
+                <ul className="space-y-1">
+                    {view.papers.tracks.flatMap(({track, papers}) => papers.slice(0, 3).map((paper) => (
+                        <li key={paper.id} className="text-sm">
+                            <a href={paper.links.abs} target="_blank" rel="noopener noreferrer" className="text-fg hover:text-brand hover:underline">{paper.title}</a>
+                            <MicroLabel as="span" className="ml-2">{LAB_TRACK_LABELS[track]}</MicroLabel>
+                        </li>
+                    )))}
+                </ul>
+            </Panel>
+        )}
         <Panel id="lab-progress" aria-labelledby="lab-progress-heading">
             <SectionHeading id="lab-progress-heading" spacing="sm">{LAB_COPY.progressHeading}</SectionHeading>
             <LabProgress progress={view.progress}/>
         </Panel>
+    </div>
+);
+
+const PapersView = ({view}: {view: LabView}) => (
+    <div className="space-y-4" id="lab-papers">
+        <p className="max-w-3xl text-sm text-fg-soft">{LAB_COPY.papersLead}</p>
+        {!view.papers ? (
+            <Panel id="lab-papers-none"><p className="text-sm text-fg-muted">{LAB_COPY.papersNone}</p></Panel>
+        ) : (
+            <>
+                {view.papers.stale && <MicroLabel as="p" tone="warning" data-lab-papers-stale={view.papers.day}>{LAB_COPY.papersStale(view.papers.day)}</MicroLabel>}
+                {view.papers.digest && <DigestPanel id="lab-digest" digest={view.papers.digest} day={view.papers.day} hrefPrefix="#paper-"/>}
+                {view.papers.tracks.map(({track, papers}) => <PapersPanel key={track} track={track} papers={papers}/>)}
+            </>
+        )}
     </div>
 );
 
@@ -157,7 +193,7 @@ const LearnPage = async ({searchParams}: LearnPageProps) => {
             <LearnRedirect fallback={null} legacyGlossaryTab={legacyGlossaryTab}/>
             <PageTitle title={LAB_COPY.title} subtitle={LAB_COPY.subtitle}/>
             <Tabs tabs={TABS} active={active} label={LAB_COPY.viewsLabel}/>
-            {active === 'today' ? <TodayView view={view}/> : <LibraryView view={view}/>}
+            {active === 'today' ? <TodayView view={view}/> : active === 'papers' ? <PapersView view={view}/> : <LibraryView view={view}/>}
         </div>
     );
 };

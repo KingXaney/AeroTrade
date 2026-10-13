@@ -20,7 +20,7 @@ before the rename keep the name "Main Strategy" (new ones are "Main account", `D
 - `npm run build:check` — compile-only Next build; needs no database or keys
 - `npm run build` / `npm start` — the production build and its server
 - `npm run dev` + `npx inngest-cli@latest dev -u http://localhost:3000/api/inngest` — app + jobs
-- `npm run trigger -- <brain|navigator|news|snapshots|income|topics|briefs|briefing|strategies|strategies-preview|strategies-resimulate|culture|culture-weekly|culture-preview|culture-resimulate|culture-backfill>` — fire a job locally (`news <email>`: a test brief to that one opted-in reader; `culture-backfill [brandId ...]`: every brand's Wikipedia views back to the backtest horizon, or the named brands)
+- `npm run trigger -- <brain|navigator|news|snapshots|income|topics|briefs|briefing|strategies|strategies-preview|strategies-resimulate|culture|culture-weekly|culture-preview|culture-resimulate|culture-backfill|lab>` — fire a job locally (`news <email>`: a test brief to that one opted-in reader; `culture-backfill [brandId ...]`: every brand's Wikipedia views back to the backtest horizon, or the named brands)
 - `npm run test:db` — connect to `MONGODB_URI` (from `.env`) and print the database and host it reached
 - `npm run migrate:accounts` — the idempotent multi-account migration: builds the indexes in `scripts/migration-indexes.mjs` and drops the ones they replaced (run it on every database, again whenever that list changes)
 - `npm run opinion:local` — the brain's Second Opinion from your Claude subscription through the Claude Code CLI, written straight to the database (`.env.example` lists the other ways)
@@ -63,7 +63,10 @@ and friends keep none beyond Shared and the invariants).
   style block sets only style tokens — a palette block outranks it, so it never writes a
   palette token.
 - `lib/ai/prompt-utils.injectJson` is every prompt's JSON fill; `lib/brain/prompts` keeps an
-  import-free copy.
+  import-free copy. `lib/ai/models` is the one table of which model runs which task (`AI_TIER`:
+  free Gemini, or Anthropic with its key) and which Gemini key is in use (`AI_PLAN`:
+  `GEMINI_API_KEY`, or `GEMINI_API_KEY_PAID` from a billed project — `geminiApiKey`, read by the
+  Inngest client and the chat route alike; a plan without its key falls back to the free key).
 - `lib/action-toast.runWithToast`: a client button's server action with its outcome toasted, a
   thrown call (dropped connection, renamed action) included as `UNREACHABLE_MESSAGE` — the `/brain`
   cards' one copy of that catch.
@@ -524,8 +527,20 @@ and friends keep none beyond Shared and the invariants).
   `.lab-prose` in `app/globals.css`). It is never given a model's text — that stays
   `SafeMarkdown`. `ReviewDeck` and `ProblemCard` take the faces, the statement and the solution
   as rendered nodes and only flip, grade, hint and answer.
-- The papers feed and its one model call a day are the next slice
-  (`docs/specs/2026-10-12-owner-lab.md`).
+- The papers feed, `lib/lab/papers/`: `lib/jobs/functions/lab.refreshLabPapers` runs weekdays
+  at 06:20 ET (`lab-daily-papers`, trigger `lab`) — the previous weekday's and today's Hugging
+  Face daily lists (`hf`), one arXiv listing per track (`config.LISTING_CATEGORIES`, `arxiv`),
+  one id-list lookup for the Hugging Face papers the listings did not carry, three seconds apart
+  — and the pure `day.assembleDay` keeps the new papers (not stored in the last week, published
+  within one) of each track, at most twelve, upvotes first, in one `LabDay` document per ET day
+  (`database/models/lab-day.model.ts`, `store`). A stored day holds no URL: a paper is its
+  arXiv id and `links.paperLinks` builds its addresses at render time. Then one model call
+  (`labDigest`, `prompts.buildLabDigestPrompt`: numbered papers, no ids or links) for a digest
+  `digest.parseLabDigest` keeps only where a bullet cites a paper it was shown and no bullet
+  reads as a trading instruction ('lab' tier); a spent daily quota skips the digest, never the
+  papers. `view.shapePapersView` is the Papers view (`?view=papers`, `components/lab/PapersPanel`
+  and `DigestPanel`, the digest as text nodes with "[n]" links to the rows); Today carries the
+  digest, or three papers a field without one. The job skips when `labEnabled()` is false.
 
 ### games
 
@@ -1343,7 +1358,7 @@ and friends keep none beyond Shared and the invariants).
 - `lib/jobs/functions/` is one file of thin wrappers per feature (`lib/jobs/functions/index` the
   list the route serves); the step bodies live with their feature — `lib/trading/snapshots`,
   `lib/income/store`, `lib/brain/ingest`, `lib/navigator/run`, `lib/email/digest` and
-  `lib/email/welcome`, `lib/topics/refresh`, `lib/strategies/job`.
+  `lib/email/welcome`, `lib/topics/refresh`, `lib/strategies/job`, `lib/lab/papers/job`.
 - `lib/jobs/registry` is the one list of jobs (id, event, crons, status row); `lib/jobs/health` the
   status strip's read of their stamps; `lib/jobs/steps` holds `stepId` and `chunk`.
 - Crons run in production (and a local dev server) only: `triggersOf` drops them on a Vercel

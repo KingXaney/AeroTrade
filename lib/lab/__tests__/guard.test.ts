@@ -10,7 +10,7 @@ import {fileURLToPath} from 'node:url';
 
 const root = fileURLToPath(new URL('../../..', import.meta.url));
 // The chrome's sentences (@/lib/learn/copy/lab) and the syllabus rows (…/lab/plan) hold no solution and may reach a client.
-const SERVER_ONLY = ['@/lib/learn/copy/lab/bank', '@/lib/learn/copy/lab/units', '@/lib/lab/registry', '@/lib/lab/schedule', '@/lib/lab/store', '@/lib/lab/page-store'];
+const SERVER_ONLY = ['@/lib/learn/copy/lab/bank', '@/lib/learn/copy/lab/units', '@/lib/lab/registry', '@/lib/lab/schedule', '@/lib/lab/store', '@/lib/lab/page-store', '@/lib/lab/papers/store', '@/lib/lab/papers/job'];
 
 const sources = (dir: string): string[] => readdirSync(dir).flatMap((name) => {
     const path = join(dir, name);

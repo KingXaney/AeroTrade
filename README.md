@@ -21,7 +21,7 @@ Follow the topics you care about, test trading strategies with virtual money, an
 
 **A morning briefing.** Once a day a scheduled job condenses the most important articles the news brain read into a few points, each linked to the articles it draws on, and the news page sets it above your topics, the stories that name what you hold or watch, and a handful of top headlines.
 
-**A glossary and a daily lesson.** Every number on screen carries its own definition, collected on /glossary; one short lesson a day is drawn from your own account and topics. The owner's /learn is a private lab for current computer vision, machine learning and quantitative finance: a syllabus of thirty units written into the repo (the idea, the maths in KaTeX, a sketch in code, why it matters now, the pitfalls), paced by what the owner has studied rather than the calendar, with each unit's review cards spaced by SM-2, a problem a day checked on the server, and a streak of study days.
+**A glossary and a daily lesson.** Every number on screen carries its own definition, collected on /glossary; one short lesson a day is drawn from your own account and topics. The owner's /learn is a private lab for current computer vision, machine learning and quantitative finance: a syllabus of thirty units written into the repo (the idea, the maths in KaTeX, a sketch in code, why it matters now, the pitfalls), paced by what the owner has studied rather than the calendar, with each unit's review cards spaced by SM-2, a problem a day checked on the server, a streak of study days, and each weekday morning the new papers of the three fields from arXiv and Hugging Face's daily list with a one-call digest that cites them by number.
 
 **Follow the news, not just the tape.** Create a topic for anything — "Fed rate decisions", "AI chips", "NBA trade deadline" — and AeroTrade builds a feed for it from Google News search plus every source the news brain already reads. Each topic gets a daily AI *"what changed today"* brief, a slot in the daily email, and a place in the chat assistant. The topics page's **Edit topics** view adds starters in one click, removes a topic without a dialog (Undo from the toast) and shows how many of the 16 slots are in use.
 
@@ -134,6 +134,7 @@ npm run trigger -- news         # send today's digest emails (news <email>: a te
 | `generate-topic-briefs` | 08:00 daily | one "what changed today" brief per topic with fresh news |
 | `ai-navigator-weekly` | Mondays 10:00 | score the universe and rebalance the Navigator account |
 | `culture-brain-update` | 06:40 daily | store every catalog brand's pageviews and chart ranks, read the youth sources, label a batch of items, fold into the brand graph |
+| `lab-daily-papers` | weekdays 06:20 | the owner's lab: the new papers of each field from arXiv and Hugging Face's daily list, and one cited digest over them |
 | `culture-brain-weekly` | Mondays 10:45 (Tuesday retry) | verify the owners' quotes, score the universe for each culture picker and rebalance its account; rebuilds the three-variant backtest when the engine or the catalog changes |
 | `daily-news-summary` | 12:00 daily | per-user daily brief, at most one per reader per day |
 | `strategies-daily` | weekdays 09:35 (10:30 retry) | decide and fill every quant strategy's orders from the previous close; opens the system accounts and rebuilds backtests when a rule changes |
@@ -182,7 +183,7 @@ lib/            one folder per feature, named as in components/:
   topics/       keyword normalisation, matcher, search query builder, refresh, briefs, the starter set
   learn/        the glossary, the no-advice word list, every learner-facing sentence (copy/), the reason decoder,
                 missions, today's lesson
-  lab/          the owner's learning lab: who sees it, the owner-paced schedule, the SM-2 review, the view and its rows
+  lab/          the owner's learning lab: who sees it, the owner-paced schedule, the SM-2 review, the view and its rows, the papers feed (papers/)
   games/        the daily quant puzzle: its schedule, the answer reader, the streak
   poker/        the hand evaluator, ranges, exact and Monte Carlo equity, the preflop table, push/fold by CFR, pot odds, the river solver
   poker-night/  hold'em with friends: the pure engine and its clock, the room server (rooms, guests, the seat pass, the one

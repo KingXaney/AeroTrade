@@ -11,6 +11,7 @@ import {fillFirstRunTopics, generateTopicBriefs, refreshTopicFeeds, refreshTopic
 import {runStrategiesDaily} from "@/lib/jobs/functions/strategies";
 import {generateMarketBriefing} from "@/lib/jobs/functions/news";
 import {backfillCultureWikipedia, runCultureWeekly, updateCultureBrain} from "@/lib/jobs/functions/culture";
+import {refreshLabPapers} from "@/lib/jobs/functions/lab";
 
 export const functions = [
     sendSignUpEmail,
@@ -30,4 +31,5 @@ export const functions = [
     updateCultureBrain,
     runCultureWeekly,
     backfillCultureWikipedia,
+    refreshLabPapers,
 ];

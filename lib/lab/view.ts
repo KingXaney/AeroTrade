@@ -1,12 +1,14 @@
 // What the lab page shows, shaped from the owner's rows and the bank by pure functions: today's
 // unit, the review queue, the day's problem (its solution only once opened), the progress counts
-// with the streak, and the library. Papers arrive in a later slice (null until then).
+// with the streak, the library, and the latest day of papers (null before the first run).
 
 import type {LabPlanRow, LabTrack, LabUnit} from "@/lib/learn/copy/lab/types";
 import {LAB_TRACKS} from "@/lib/learn/copy/lab/types";
 import {type CardRef, type CardRow, dueCards, problemFor, progressByTrack, reviewSummary, type ReviewSummary, type StudiedRow, todaysUnit, type TrackProgress} from "@/lib/lab/schedule";
 import {streakFrom, type Streak} from "@/lib/games/streak";
 import type {RevealedRow} from "@/lib/lab/store";
+import type {LabDayStored} from "@/lib/lab/papers/day";
+import {shapePapersView, type LabPapersView} from "@/lib/lab/papers/view";
 
 export type LabUnitSummary = {id: string; track: LabTrack; title: string; oneLiner: string; readingMinutes: number; cards: number};
 
@@ -40,6 +42,7 @@ export type LabView = {
     problem: LabProblemView | null;
     progress: {perTrack: TrackProgress[]; learned: number; dueToday: number; streak: Streak};
     library: {track: LabTrack; rows: LabLibraryRow[]}[];
+    papers: LabPapersView | null;
 };
 
 export type LabViewInput = {
@@ -51,6 +54,7 @@ export type LabViewInput = {
     revealed: readonly RevealedRow[];
     sessionDays: readonly string[];
     cardRows: readonly CardRow[];
+    labDay: LabDayStored | null;
 };
 
 const summary = (unit: LabUnit): LabUnitSummary => ({id: unit.id, track: unit.track, title: unit.title, oneLiner: unit.oneLiner, readingMinutes: unit.readingMinutes, cards: unit.cards.length});
@@ -58,7 +62,7 @@ const summary = (unit: LabUnit): LabUnitSummary => ({id: unit.id, track: unit.tr
 const plannedCount = (plan: readonly LabPlanRow[]): Record<LabTrack, number> =>
     Object.fromEntries(LAB_TRACKS.map((track) => [track, plan.filter((row) => row.track === track).length])) as Record<LabTrack, number>;
 
-export const shapeLabView = ({today, units, plan, cards, studied, revealed, sessionDays, cardRows}: LabViewInput): LabView => {
+export const shapeLabView = ({today, units, plan, cards, studied, revealed, sessionDays, cardRows, labDay}: LabViewInput): LabView => {
     const byId = new Map(units.map((unit) => [unit.id, unit]));
     const pick = todaysUnit(units, studied, today);
     const todayView: LabTodayView = pick.kind === 'nothing-written'
@@ -97,5 +101,6 @@ export const shapeLabView = ({today, units, plan, cards, studied, revealed, sess
         problem: problemView,
         progress: {perTrack: progressByTrack(units, plannedCount(plan), studied), learned: review.summary.learned, dueToday: review.summary.due, streak: streakFrom(sessionDays, today)},
         library,
+        papers: labDay ? shapePapersView(labDay, today) : null,
     };
 };

@@ -149,6 +149,16 @@ export const JOBS = {
         trigger: 'culture-backfill',
         health: {label: 'Culture backfill (manual)', schedule: 'on demand', staleAfterHours: ON_DEMAND},
     },
+    // The lab's papers feed. 06:20 ET on weekdays: after Gemini's free quota resets (midnight
+    // Pacific) and before the culture brain's calls at 06:40, so the day's one fixed call is the
+    // first of the quota day; weekdays because arXiv announces Sunday to Thursday evenings.
+    labPapers: {
+        id: 'lab-daily-papers',
+        event: 'app/refresh.lab.papers',
+        crons: ['TZ=America/New_York 20 6 * * 1-5'],
+        trigger: 'lab',
+        health: {label: 'Lab papers', schedule: 'weekdays 06:20 ET', staleAfterHours: 80},
+    },
 } as const satisfies Record<string, JobDefinition>;
 
 // In declaration order — the status strip's row order.

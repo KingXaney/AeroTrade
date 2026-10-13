@@ -46,6 +46,7 @@ reads and writes live. Change a field here, then in the store module named besid
 | `rate-limit` | auth | `lib/rate-limit` — the one counter sign-in, sign-up, password reset and the chat spend; `peekRateLimit` reads a window for the chat's caption without spending it |
 | `lab-event` | lab | `lib/lab/store` — a unit marked studied, a problem closed (answered or revealed), a session day; unique per owner, kind and key, so a second click is a no-op; the streak is derived from the session rows, never stored |
 | `lab-card-state` | lab | `lib/lab/store` — one row per review card the owner has graded (SM-2 state); absent means new; a grade updates only the state the client saw |
+| `lab-day` | lab | `lib/lab/papers/store` — one day of the papers feed (the weekday job's write, the lab page's read): the papers kept per track by arXiv id, never a URL, and the one digest citing them by index; expires after 45 days |
 
 The culture models are not in that migration list (it covers only the account models); their
 indexes are built by Mongoose's autoIndex, as the brain's and the topics' are.

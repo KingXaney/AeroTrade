@@ -10,5 +10,9 @@ describe('modelConfigured', () => {
         expect(modelConfigured(env({AI_TIER: 'basic'}))).toBe(false);
         expect(modelConfigured(env({GEMINI_API_KEY: '  '}))).toBe(false);
         expect(modelConfigured(env({}))).toBe(false);
+        // The paid plan's key counts, and a paid plan without it falls back to the free key.
+        expect(modelConfigured(env({AI_PLAN: 'paid', GEMINI_API_KEY_PAID: 'p'}))).toBe(true);
+        expect(modelConfigured(env({AI_PLAN: 'paid', GEMINI_API_KEY: 'g'}))).toBe(true);
+        expect(modelConfigured(env({AI_PLAN: 'paid'}))).toBe(false);
     });
 });
