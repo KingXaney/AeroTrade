@@ -2,6 +2,7 @@
 // (since the personal news feed) the query-less front page and topic sections too. No key
 // needed; results are opaque redirect links, so headlines (not URLs) carry the identity.
 
+import {reportLimit, responseSignal} from "@/lib/limits/report";
 import {
     FEED_REVALIDATE_SECONDS,
     GOOGLE_NEWS_BASE,
@@ -158,6 +159,7 @@ export const fetchGoogleNewsFeed = async (url: string, {limit = 40, keepFeedOrde
         const response = await fetch(url, init);
         if (!response.ok) {
             console.error(`Google News feed failed: ${response.status} ${response.statusText}`);
+            await reportLimit('google-news', await responseSignal(response, 'rss search'));
             return [];
         }
         const articles = toSearchArticles(parseSearchFeed(await response.text()), {keepFeedOrder});

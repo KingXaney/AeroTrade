@@ -5,6 +5,7 @@
 // brand with a failed title writes no rows this run — the next run's lookback heals the gap.
 
 import {CULTURE_BRANDS} from "@/lib/culture/catalog";
+import {reportLimit, responseSignal} from "@/lib/limits/report";
 import {cultureUserAgent, WIKI_DATA_START, WIKIPEDIA_REQUEST_GAP_MS} from "@/lib/culture/config";
 import {contactEmail} from "@/lib/news/config";
 import type {AttentionPoint, AttentionRow, CultureBrand} from "@/lib/culture/types";
@@ -45,7 +46,10 @@ const fetchTitle = async (title: string, from: string, to: string, fetchImpl: ty
             cache: 'no-store',
         });
         if (response.status === 404) return {status: 'missing'};
-        if (!response.ok) return {status: 'failed'};
+        if (!response.ok) {
+            await reportLimit('wikipedia', await responseSignal(response, `pageviews ${title}`));
+            return {status: 'failed'};
+        }
         return {status: 'ok', points: parseWikipediaResponse(await response.json())};
     } catch {
         return {status: 'failed'};

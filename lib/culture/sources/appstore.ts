@@ -3,6 +3,7 @@
 // best chart score, 101 − rank; an app the catalog does not name is ignored.
 
 import {CULTURE_BRANDS} from "@/lib/culture/catalog";
+import {reportLimit, responseSignal} from "@/lib/limits/report";
 import {APP_STORE_CHART_SIZE, cultureUserAgent} from "@/lib/culture/config";
 import {contactEmail} from "@/lib/news/config";
 import type {AttentionRow, CultureBrand} from "@/lib/culture/types";
@@ -76,6 +77,7 @@ export const fetchAppStoreCharts = async (
             });
             if (!response.ok) {
                 ok = false;
+                await reportLimit('app-store', await responseSignal(response, `chart ${chart}`));
                 continue;
             }
             const ranks = mapAppsToBrands(parseAppStoreFeed(await response.json()), catalog);

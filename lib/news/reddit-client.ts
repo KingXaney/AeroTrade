@@ -11,6 +11,7 @@
 // other sources. The helpers above `fetchRedditListing` are pure and unit-tested.
 
 import {redditUserAgent} from "@/lib/news/config";
+import {reportLimit, responseSignal} from "@/lib/limits/report";
 
 export type RedditPost = {
     title: string;
@@ -94,7 +95,10 @@ const requestToken = async (env: RedditEnv): Promise<string> => {
         body: 'grant_type=client_credentials',
         cache: 'no-store',
     });
-    if (!response.ok) throw new Error(`Reddit token request failed with status ${response.status}`);
+    if (!response.ok) {
+        await reportLimit('reddit', await responseSignal(response, 'token'));
+        throw new Error(`Reddit token request failed with status ${response.status}`);
+    }
     const body = (await response.json()) as {access_token?: unknown; expires_in?: unknown};
     if (typeof body.access_token !== 'string' || !body.access_token) throw new Error('Reddit token response carried no access token');
     const seconds = typeof body.expires_in === 'number' && body.expires_in > 0 ? body.expires_in : DEFAULT_TOKEN_SECONDS;
@@ -126,7 +130,10 @@ export const fetchRedditListing = async (
             tokenCache = null;
             response = await requestListing(subreddit, options, await getToken(env));
         }
-        if (!response.ok) throw new Error(`Reddit responded with status ${response.status} for r/${subreddit}`);
+        if (!response.ok) {
+            await reportLimit('reddit', await responseSignal(response, `r/${subreddit}`));
+            throw new Error(`Reddit responded with status ${response.status} for r/${subreddit}`);
+        }
         return parseListing(await response.json());
     } catch (error) {
         console.error(`Error fetching Reddit posts from r/${subreddit}:`, error);

@@ -17,6 +17,8 @@ import NavigatorCard from "@/components/navigator/NavigatorCard";
 import SecondOpinionCard from "@/components/brain/SecondOpinionCard";
 import SuggestionPanel from "@/components/navigator/SuggestionPanel";
 import SystemStatus from "@/components/jobs/SystemStatus";
+import LimitsPanel from "@/components/limits/LimitsPanel";
+import {getLimitsView} from "@/lib/limits/store";
 import Panel from "@/components/primitives/Panel";
 import PageTitle from "@/components/primitives/PageTitle";
 import SectionHeading from "@/components/primitives/SectionHeading";
@@ -129,7 +131,16 @@ const NavigatorView = async ({userId}: {userId: string}) => {
 };
 
 // Is the machinery actually running?
-const SystemView = async () => <SystemStatus status={await getBrainSystemStatus()} />;
+// Whether the jobs ran, then whether anything they call refused them (the limits tracker).
+const SystemView = async () => {
+    const [status, limits] = await Promise.all([getBrainSystemStatus(), getLimitsView()]);
+    return (
+        <>
+            <SystemStatus status={status} />
+            <LimitsPanel rows={limits} />
+        </>
+    );
+};
 
 const BrainPage = async ({searchParams}: BrainPageProps) => {
     const userId = await requireUserId();

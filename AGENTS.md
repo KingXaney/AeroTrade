@@ -1407,6 +1407,20 @@ and friends keep none beyond Shared and the invariants).
   `lib/email/welcome`, `lib/topics/refresh`, `lib/strategies/job`, `lib/lab/papers/job`.
 - `lib/jobs/registry` is the one list of jobs (id, event, crons, status row); `lib/jobs/health` the
   status strip's read of their stamps; `lib/jobs/steps` holds `stepId` and `chunk`.
+- The limits tracker, `lib/limits/`: `registry` (import-free — every outside service the app
+  meters, its published cap as a dated sentence, its docs link, its planned use and the jobs that
+  call it; `LIMIT_RETENTION_DAYS`), `detect.classifyLimit` (a refusal's kind — quota, rate, auth,
+  outage — per provider, or null for an error that is not a limit), `report.reportLimit` (the one
+  call a provider module makes on a failed response: no-op without `MONGODB_URI`, the recorder
+  loaded on demand so the pure price, news and culture source modules stay light; never throws),
+  `record` (the `LimitEvent` insert), `view.limitsView` (one row per provider, the state says only
+  what was recorded) and `store.getLimitsView` (the last week, bounded). Hits are filed where a
+  failure is caught — `lib/ai/infer.inferText` for every model call, the fetch helpers of
+  `lib/prices/finnhub`, `lib/prices/yahoo`, `lib/prices/tiingo` and `lib/prices/stooq`,
+  `lib/news/reddit-client`, `lib/news/adapters/sec`, `lib/news/adapters/search`, the culture
+  sources, `lib/lab/papers/job`, `lib/email/send` — and `components/limits/LimitsPanel`
+  prints them under the jobs strip on `/brain?view=system` (`LIMITS_COPY`). A service that fails
+  silently records nothing: the panel never says "within limits".
 - Crons run in production (and a local dev server) only: `triggersOf` drops them on a Vercel
   preview build. The Inngest Vercel integration syncs every preview into a branch environment of
   its own, and a preview carries production's database, mailer and model keys — on 2026-10-05

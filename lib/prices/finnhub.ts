@@ -4,6 +4,7 @@
 // fetches client components need are wrapped, one-to-one, in lib/actions/stocks.actions.ts.
 
 import {validateArticle, formatArticle} from "@/lib/news/article";
+import {reportLimit, responseSignal} from "@/lib/limits/report";
 import {formatPrice, formatChangePercent, formatMarketCapValue} from "@/lib/format";
 import {POPULAR_STOCK_SYMBOLS} from "@/lib/stocks/popular";
 import {FINANCIALS_REVALIDATE_SECONDS, PROFILE_REVALIDATE_SECONDS} from "@/lib/prices/config";
@@ -38,6 +39,8 @@ const fetchJSON = async <T>(url: string, revalidateSeconds?: number): Promise<T>
     const response = await fetch(url, options);
 
     if (!response.ok) {
+        // A 429 is the free plan's minute; a 401 or 403 the key (lib/limits).
+        await reportLimit('finnhub', await responseSignal(response, url.replace(/[?&]token=[^&]*/, '')));
         throw new Error(`Finnhub API error: ${response.status} ${response.statusText}`);
     }
 
