@@ -3,7 +3,7 @@
 
 import {describe, expect, it} from 'vitest';
 import {addCalendarDays} from '@/lib/dates';
-import {STREAK_WEEKS, streakFrom} from '@/lib/games/streak';
+import {nextMilestone, STREAK_MILESTONES, STREAK_WEEKS, streakFrom} from '@/lib/games/streak';
 
 const TODAY = '2026-10-07';
 const back = (n: number) => addCalendarDays(TODAY, -n);
@@ -57,5 +57,16 @@ describe('streakFrom', () => {
         expect(last.slice(4).every((d) => d.future && !d.solved)).toBe(true);
         expect(weeks.flat().filter((d) => d.solved).map((d) => d.date)).toEqual(days(10, 0));
         expect(weeks[0][0].date).toBe(addCalendarDays('2026-10-04', -7 * (STREAK_WEEKS - 1)));
+    });
+});
+
+describe('nextMilestone', () => {
+    it('names the first mark above the run and how far it is, or nothing past the last', () => {
+        expect(STREAK_MILESTONES[0]).toBe(3);
+        expect(nextMilestone(0)).toEqual({target: 3, toGo: 3});
+        expect(nextMilestone(3)).toEqual({target: 7, toGo: 4});
+        expect(nextMilestone(29)).toEqual({target: 30, toGo: 1});
+        expect(nextMilestone(365)).toBeNull();
+        expect(nextMilestone(2, [5, 10])).toEqual({target: 5, toGo: 3});
     });
 });

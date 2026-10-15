@@ -4,6 +4,7 @@ import Link from "next/link";
 import {redirect} from "next/navigation";
 import {getSessionUser} from "@/lib/auth/session";
 import {getHomeView} from "@/lib/home/page-store";
+import {isLabOwner} from "@/lib/lab/owner";
 import {getMomentumSurface} from "@/lib/landing/surface-store";
 import {getLearnFacts} from "@/lib/learn/facts-store";
 import {getTodaysLesson} from "@/lib/learn/lesson-store";
@@ -105,7 +106,7 @@ const Home = async ({searchParams}: HomeProps) => {
                 subtitle={HOME_COPY.subtitle}
                 actions={(
                     <div className="flex flex-wrap items-center gap-3">
-                        <StreakChip {...view.streak}/>
+                        <StreakChip {...view.streak} href={isLabOwner(user.email) ? '/learn' : '/games'}/>
                         {pokerNight && (
                             <Suspense fallback={<PokerNightChip/>}>
                                 <PokerNightChipAsync userId={user.id}/>

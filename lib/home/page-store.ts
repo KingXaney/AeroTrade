@@ -12,9 +12,8 @@ import type {MarketBriefingView} from "@/lib/news/briefing";
 import {deriveMissions, onboardingActive, type Mission} from "@/lib/learn/missions";
 import {marketStatus, type MarketStatus} from "@/lib/prices/market-hours";
 import {getCachedTopicsOverview} from "@/lib/topics/store";
-import {readSolvedDays} from "@/lib/games/store";
-import {streakFrom, type Streak} from "@/lib/games/streak";
-import {getEasternDateString} from "@/lib/dates";
+import {readActivityStreak} from "@/lib/learn/activity-store";
+import type {Streak} from "@/lib/games/streak";
 import {getPortfoliosForUser} from "@/lib/trading/valuation";
 import {nextStep, toHomeAccounts, type HomeAccounts, type HomeStep} from "@/lib/home/view";
 import type {TopicsOverview} from "@/lib/topics/types";
@@ -31,12 +30,12 @@ export type HomeView = {
     // The morning's market briefing, through the reader's outlet filter; null before the first
     // one is written. Home prints its first points and leaves the rest to /news.
     briefing: MarketBriefingView | null;
-    // The daily-puzzle streak, for the chip beside the market status.
+    // The one streak (anything done on the Learn list), for the chip beside the market status.
     streak: Pick<Streak, 'current' | 'todayDone' | 'atRisk'>;
 };
 
 export const getHomeView = async (userId: string): Promise<HomeView> => {
-    const [portfolios, topics, facts, briefing, prefs, solvedDays] = await Promise.all([
+    const [portfolios, topics, facts, briefing, prefs, streak] = await Promise.all([
         getPortfoliosForUser(userId),
         // Topics must never take the page down with them, as in the shell.
         getCachedTopicsOverview(userId).catch((error: unknown) => {
@@ -46,13 +45,13 @@ export const getHomeView = async (userId: string): Promise<HomeView> => {
         getOnboardingFacts(userId),
         getLatestMarketBriefing(),
         getNewsFeedPrefs(userId),
-        // A chip must never take the page down: a failed read shows "Today's puzzle".
-        readSolvedDays(userId).catch((error: unknown) => {
+        // A chip must never take the page down: a failed read shows "Start today".
+        readActivityStreak(userId).catch((error: unknown): Pick<Streak, 'current' | 'todayDone' | 'atRisk'> => {
             console.error('Home streak failed:', error);
-            return [] as string[];
+            return {current: 0, todayDone: false, atRisk: false};
         }),
     ]);
-    const {current, todayDone, atRisk} = streakFrom(solvedDays, getEasternDateString());
+    const {current, todayDone, atRisk} = streak;
     const market = marketStatus();
     const missions = deriveMissions(facts);
     const onboarding = onboardingActive(facts);

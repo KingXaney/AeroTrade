@@ -522,6 +522,28 @@ and friends keep none beyond Shared and the invariants).
   else, which keeps a `#term` on its way to `/glossary` and otherwise goes to `/games`; a unit page
   (`/learn/units/[unit]`) redirects them on the server. One view at a time in the URL (`?view=`):
   Today and the Library.
+- Today is a list. `lib/lab/todo.buildTodayList` (pure) turns the day's parts into items with a
+  state read from rows — the unit (done when studied today), the review (the queue graded; `none`
+  with nothing due), the problem (closed), the puzzle (today's row solved), a game (a `GameRound`
+  of that game today), and the manual ones: the papers digest, poker night and the sites outside
+  the app, ticked by the owner's own press (`tickTodo`/`untickTodo`, a `LabEvent` of kind `todo`
+  keyed `${item}:${day}`). `components/lab/TodayList` draws it; the work panels below are where the
+  items are done. The game widgets on Today are `lib/lab/widgets.ts` (import-free ids, the stored
+  preference `learn.labWidgets`; absent = the daily puzzle alone, an empty list = none;
+  `normalizeLabWidgets` keeps the registry's order), picked in `components/lab/WidgetPicker`
+  (`setLabWidgets`) and drawn by `components/lab/LabWidgets` as the games hub's own cards — each a
+  Panel, so the section is a heading over a grid. Every sentence is `LAB_COPY.list` and
+  `LAB_WIDGET_TITLES`.
+- Every written unit carries a quiz (`LabUnit.quiz`: 3–5 questions, four options, one answer, a
+  `why`; the curriculum test holds the shape and varies the answer positions). `lib/lab/quiz` is
+  pure: `quizPublic` strips the answers before the page sees a question, `scoreQuiz` passes at
+  most one wrong (`QUIZ_MAX_WRONG`). `components/lab/QuizCard` collects the choices from prompts
+  and options the unit page rendered (`LabMarkdown`, so the maths renders) and
+  `lib/actions/lab.actions.answerQuiz` scores on the server: a fail says which questions were
+  wrong and nothing else, a pass stamps a `LabEvent` of kind `quiz` (the unit id, the day, the
+  score), counts the day and hands back the explanations. `markUnitStudied` refuses until that row
+  exists (`LAB_COPY.quiz.quizFirst`), so the next unit waits on the quiz; `MarkUnitStudied` is
+  disabled with the same sentence until then.
 - The bank is `lib/learn/copy/lab/` — `types`, the `md` tag (String.raw, so a formula is written
   as in a .tex file), `plan` (the thirty syllabus rows, ten a track, never reordered; append past
   thirty), `units/<track>` (the authored units, in the plan's order) and `bank` (the index). It is
@@ -575,10 +597,22 @@ and friends keep none beyond Shared and the invariants).
 
 ### games
 
-- The games are the one place the app keeps a score: the daily-puzzle streak counts days, and a
-  record is a reader's own top score. The learn surfaces stay count-only (a course's progress is a
-  count, never a bar or a score; the owner's lab keeps the other streak). Every games sentence is still held to the no-advice list
+- The games are the one place the app keeps a score: the streak counts days, and a record is a
+  reader's own top score. The learn surfaces stay count-only (a course's progress is a count,
+  never a bar or a score). Every games sentence is still held to the no-advice list
   (invariant 12): "record" and "highest", never "best"; nothing says what to do with money.
+- There is one streak, and it counts a day when anything on the reader's Learn list was done:
+  the daily puzzle solved on its day, a kept round of any game, a lab session (a card graded, a
+  unit marked, a problem answered, a quiz passed) or a manual tick. `lib/learn/activity.activityDays`
+  (pure) joins the four sources' days and `lib/games/streak.streakFrom` counts them;
+  `lib/learn/activity-store.readActivityStreak` is the one read (the models directly, so
+  `lib/games/store` and `lib/lab/store` may both import it), cached per request, behind
+  `lib/games/store.readStreak`, Home's chip, the hub, the puzzle page, the daily-puzzle widget and
+  the Lab. `nextMilestone` names the mark the hero counts toward (3, 7, 14, 30, 60, 100, 365).
+  `components/learn/StreakHero` draws it everywhere a streak shows (the hub's `StreakPanel` adds
+  the puzzles solved on their day); Home's `StreakChip` says "Start today" at zero and leads the
+  owner to `/learn`, everyone else to `/games`. A write that may move the day's count
+  revalidates `/`, `/dashboard`, `/games` (layout) and `/learn`.
 - The puzzle bank `lib/learn/copy/puzzles` is server-only: an answer reaches the page only once
   the puzzle is solved or revealed, every answer is checked in `lib/actions/games.actions`, and
   `lib/games/__tests__/puzzle-guard.test.ts` fails if a client file — or anything under
@@ -596,8 +630,15 @@ and friends keep none beyond Shared and the invariants).
   `lib/rate-limit.takeRateLimit`. A solve or a reveal revalidates `/`, `/dashboard`, the `/games`
   subtree and `/learn`.
 - The streak shows on Home (`components/games/StreakChip`, beside the market status), on the
-  hub's `components/games/StreakPanel`, and in `components/games/DailyPuzzleCard` on Learn › Today
-  and the library-only `daily-puzzle` widget — all from the reads in `lib/games/store`.
+  hub's `components/games/StreakPanel` and Lab › Today (both `components/learn/StreakHero`), and
+  in `components/games/DailyPuzzleCard` on the library-only `daily-puzzle` widget — all from
+  `lib/learn/activity-store.readActivityStreak`.
+- The arithmetic sprint's custom settings and the practice time are kept in this browser
+  (`components/games/ArithmeticGame`: localStorage `aero-arithmetic:custom` and
+  `aero-arithmetic:practice-duration`, read through `useSyncExternalStore` with the defaults as the
+  server snapshot), so a reload, a tab change or the page's refresh after a round's save never
+  hands the sprint back its defaults; a finished custom or practice round offers "Change settings"
+  back to the lobby with them as they were.
 - A scored game's round is counted in the browser and reported when it ends;
   `lib/games/rounds.keptRound` keeps only what a person could have played (bounded counts, a real
   duration, known settings). These are one reader's practice records, not a leaderboard. A record

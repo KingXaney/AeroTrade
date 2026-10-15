@@ -3,12 +3,15 @@
 // lib/learn/__tests__/lab-copy.test.ts; the units themselves are the bank in ./lab/ (server-only).
 
 import type {LabTrack} from "@/lib/learn/copy/lab/types";
+import type {LabWidgetId} from "@/lib/lab/widgets";
+import {ARITHMETIC_COPY, CORRELATION_COPY, GAMES_COPY, KELLY_COPY, MARKET_COPY} from "@/lib/learn/copy/games";
+import {POKER_NIGHT_COPY} from "@/lib/learn/copy/poker-night";
 
 export const LAB_TRACK_LABELS: Readonly<Record<LabTrack, string>> = {cv: 'Computer vision', ml: 'Machine learning', quant: 'Quantitative finance'};
 
 export const LAB_COPY = {
     title: 'Lab',
-    subtitle: 'A daily study of computer vision, machine learning and quantitative finance: one unit, the cards due, a problem and the day\'s papers.',
+    subtitle: 'A daily study of computer vision, machine learning and quantitative finance, as a list for the day: one unit with its quiz, the cards due, a problem, the day\'s papers and the games you add.',
     views: {today: 'Today', papers: 'Papers', library: 'Library'},
     viewsLabel: 'Lab views',
 
@@ -46,6 +49,59 @@ export const LAB_COPY = {
     closedOn: (day: string, how: 'revealed' | 'solved'): string => (how === 'solved' ? `Answered on ${day}.` : `Solution opened on ${day}.`),
     kinds: {derivation: 'derivation', coding: 'coding', quant: 'calculation'} as const,
 
+    // Today's list (lib/lab/todo.ts builds it; components/lab/TodayList draws it).
+    list: {
+        heading: 'Today\'s list',
+        progress: (done: number, total: number): string => `${done} of ${total} done`,
+        unit: (title: string): string => `Study ${title}`,
+        unitLine: 'Read it, pass its quiz, then mark it studied.',
+        unitQuizPassed: 'Quiz passed. Mark it studied to move on.',
+        unitStudied: 'Studied today.',
+        unitNothing: 'The next unit is not written yet.',
+        review: (n: number): string => `Grade ${n} due ${n === 1 ? 'card' : 'cards'}`,
+        reviewLine: 'The review deck is below.',
+        reviewNone: 'No cards due today',
+        reviewDone: 'Every due card graded.',
+        problem: 'Answer today\'s problem',
+        problemLine: 'A number checked on the server, or the worked solution opened.',
+        problemDone: 'Closed for today.',
+        papers: 'Read the day in papers',
+        papersLine: 'The digest is below; tick it once read.',
+        puzzle: 'Solve today\'s puzzle',
+        puzzleLine: 'The quant puzzle, on its own page.',
+        round: (title: string): string => `Play a round of ${title}`,
+        roundLine: 'A round kept today ticks it.',
+        site: (title: string): string => `A session on ${title}`,
+        siteLine: 'Outside the app: tick it yourself.',
+        table: 'A hand or two at poker night',
+        tableLine: 'Tick it after a table.',
+        tick: 'Done',
+        untick: 'Undo',
+        ticked: (day: string): string => `Ticked ${day}`,
+        open: 'Open',
+        empty: 'Nothing on the list: add a game below.',
+        widgetsHeading: 'Games on Today',
+        pickerSummary: 'Add games to Today',
+        pickerLead: 'Each game added is a card here and an item on the list; a round played counts the day.',
+        noWidgets: 'No games added yet.',
+    },
+
+    // A unit's quiz (components/lab/QuizCard; lib/lab/quiz scores it on the server).
+    quiz: {
+        heading: 'Check your understanding',
+        lead: (n: number): string => `${n} questions, one answer each; at most one wrong passes. A pass is what lets the unit be marked studied.`,
+        check: 'Check answers',
+        checking: 'Checking…',
+        passed: (correct: number, total: number): string => `Passed: ${correct} of ${total}.`,
+        failed: (correct: number, total: number): string => `${correct} of ${total}: not passed yet. The wrong ones are marked; change them and check again.`,
+        tryAgain: 'Try again',
+        passedOn: (day: string): string => `Passed on ${day}.`,
+        whyHeading: 'Why',
+        unanswered: 'Answer every question first.',
+        quizFirst: 'Pass the quiz under the unit before marking it studied.',
+        gateNote: 'The quiz above is passed first; then this button marks the unit studied.',
+    },
+
     // Progress.
     progressHeading: 'Progress',
     unitsOf: (done: number, total: number): string => `${done} of ${total}`,
@@ -53,10 +109,10 @@ export const LAB_COPY = {
     learnedLabel: 'cards learned',
     dueLabel: 'due today',
     streakLabel: 'streak',
-    streakRule: 'A day counts when a card is graded or a unit is marked studied before midnight Eastern. A day with neither starts the count again.',
+    streakRule: 'A day counts when any item on the list is done before midnight Eastern: a unit, a card, a problem, a quiz, the puzzle, a round of a game or a tick. A day with nothing done starts the count again.',
     sessionDoneToday: 'Today counts.',
-    sessionAtRisk: (days: number): string => `Grade a card or mark a unit today to keep the ${days}-day streak.`,
-    sessionStart: 'Grade a card or mark a unit to start a streak.',
+    sessionAtRisk: (days: number): string => `Do one item on the list today to keep the ${days}-day streak.`,
+    sessionStart: 'Do one item on the list to start a streak.',
 
     // The library.
     libraryHeading: 'The syllabus',
@@ -104,3 +160,17 @@ export const LAB_COPY = {
     notSaved: 'That could not be saved just now',
     tooFast: 'Over the minute\'s limit of actions; try again shortly',
 } as const;
+
+// What each widget is called on Today and on the list: the games hub's own titles.
+export const LAB_WIDGET_TITLES: Readonly<Record<LabWidgetId, string>> = {
+    'daily-puzzle': GAMES_COPY.dailyHeading,
+    'arithmetic': ARITHMETIC_COPY.cardTitle,
+    'kelly': KELLY_COPY.cardTitle,
+    'market-making': MARKET_COPY.cardTitle,
+    'correlation': CORRELATION_COPY.cardTitle,
+    'poker-night': POKER_NIGHT_COPY.cardTitle,
+    'lichess': GAMES_COPY.outside.links.lichess.title,
+    'monkeytype': GAMES_COPY.outside.links.monkeytype.title,
+    'codeforces': GAMES_COPY.outside.links.codeforces.title,
+    'leetcode': GAMES_COPY.outside.links.leetcode.title,
+};

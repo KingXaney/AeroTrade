@@ -24,7 +24,7 @@ export const PUZZLE_DIFFICULTY_LABEL: Record<PuzzleDifficulty, string> = {1: 'Wa
 
 export const GAMES_COPY = {
     title: 'Games',
-    subtitle: 'A quant puzzle every day, and a streak for every day you solve it.',
+    subtitle: 'A quant puzzle every day, games to practise on, and a streak for every day something on your Learn list is done.',
     note: 'The games describe how chance and numbers behave. No figure here is a recommendation.',
     dailyHeading: "Today's puzzle",
     archiveLink: 'Past puzzles',
@@ -32,13 +32,16 @@ export const GAMES_COPY = {
     openPuzzle: "Open today's puzzle",
     seeSolution: 'See the solution',
     noPuzzleYet: 'The first puzzle has not been posted yet.',
-    // Two sites outside the app, each a link and a line: keyed by id so the copy test reads them.
+    // Sites outside the app, each a link and a line: keyed by id so the copy test and the Lab's
+    // widgets (lib/lab/widgets.ts) read them.
     outside: {
         heading: 'Elsewhere',
-        lead: 'Two sites that train in the same spirit, each with its own history of your rounds.',
+        lead: 'Sites that train in the same spirit, each with its own history of your rounds.',
         links: {
             lichess: {title: 'Lichess puzzles', body: 'Chess tactics puzzles, free, rated against your own solving.', href: 'https://lichess.org/training'},
             monkeytype: {title: 'Monkeytype', body: 'A typing test by words, time or quotes, with a record of your speed.', href: 'https://monkeytype.com'},
+            codeforces: {title: 'Codeforces', body: 'Competitive programming problems by rating, with rated contests most weeks.', href: 'https://codeforces.com/problemset'},
+            leetcode: {title: 'LeetCode', body: 'Coding problems by topic and difficulty, the usual interview preparation.', href: 'https://leetcode.com/problemset/'},
         },
     },
 } as const;
@@ -49,23 +52,29 @@ export const STREAK_COPY = {
     none: 'No streak yet',
     longest: (days: number): string => `Longest: ${plural(days, 'day', 'days')}`,
     longestLabel: 'Longest streak',
-    solvedLabel: 'Solved on the day',
+    activeLabel: 'Days active',
+    solvedLabel: 'Puzzles solved on the day',
     days: (n: number): string => (n === 1 ? 'day' : 'days'),
     puzzles: (n: number): string => (n === 1 ? 'puzzle' : 'puzzles'),
     solvedOnTheDay: (n: number): string => `${plural(n, 'puzzle', 'puzzles')} solved on the day`,
-    doneToday: "Today's puzzle is solved: the streak counts today.",
-    atRisk: (days: number): string => `Solve today's puzzle by midnight Eastern to keep the ${days}-day streak.`,
-    start: "Solve today's puzzle to start a streak.",
-    rule: 'A day counts when that day\'s puzzle is solved before midnight Eastern. A day with no solve starts the count again.',
+    activeDays: (n: number): string => `${plural(n, 'day', 'days')} with something done`,
+    doneToday: 'Today counts: something on your Learn list is done.',
+    atRisk: (days: number): string => `Do one item on your Learn list by midnight Eastern to keep the ${days}-day streak.`,
+    start: 'Do one item on your Learn list to start a streak.',
+    rule: 'A day counts when any item on your Learn list is done before midnight Eastern: the puzzle, a round of a game, a unit, a card, a problem or a tick. A day with nothing done starts the count again.',
     weekHeading: 'This week',
     gridHeading: 'The last 12 weeks',
+    // The hero's milestone line.
+    milestone: (toGo: number, target: number): string => `${plural(toGo, 'day', 'days')} to ${target}`,
+    pastMilestones: 'Past every milestone',
+    monthShort: ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'] as const,
     // A day's square in the grid.
-    dayLabel: (date: string, solved: boolean): string => `${shortDate(date, true)}: ${solved ? 'solved' : 'not solved'}`,
+    dayLabel: (date: string, solved: boolean): string => `${shortDate(date, true)}: ${solved ? 'done' : 'nothing done'}`,
     weekdays: ['S', 'M', 'T', 'W', 'T', 'F', 'S'] as const,
     // Home's chip, beside the market status.
-    chipTodo: "Today's puzzle",
+    chipTodo: 'Start today',
     chipAria: (days: number, done: boolean): string =>
-        days > 0 ? `${days}-day puzzle streak; today's puzzle ${done ? 'solved' : 'not solved yet'}` : "Today's puzzle, not solved yet",
+        days > 0 ? `${days}-day streak; today ${done ? 'counts' : 'does not count yet'}` : 'No streak yet; nothing done today',
 } as const;
 
 export const PUZZLE_COPY = {
@@ -134,6 +143,8 @@ export const ARITHMETIC_COPY = {
     interviewLead: 'Eighty multiple-choice problems in eight minutes — large sums, products, decimals, fractions, percentages, squares and roots — in the style of the mental-maths tests trading firms set. Keys 1 to 5 choose an option.',
     start: 'Start',
     playAgain: 'Play again',
+    changeSettings: 'Change settings',
+    settingsKept: 'Your settings are kept in this browser.',
     stop: 'End the round',
     answerLabel: 'Answer',
     timeLeft: (seconds: number): string => `${clock(seconds)} left`,

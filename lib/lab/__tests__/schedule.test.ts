@@ -6,7 +6,7 @@ import type {LabUnit} from '@/lib/learn/copy/lab/types';
 const unit = (id: string, track: LabUnit['track'], cards = 2): LabUnit => ({
     id, track, title: id, oneLiner: id, readingMinutes: 10,
     sections: {idea: '', maths: '', code: '', whyNow: '', pitfalls: ''},
-    sources: [], problems: [{id: `${id}/p1`, kind: 'quant', title: 'p1', statement: '', hints: [], solution: ''}, {id: `${id}/p2`, kind: 'quant', title: 'p2', statement: '', hints: [], solution: ''}],
+    sources: [], quiz: [], problems: [{id: `${id}/p1`, kind: 'quant', title: 'p1', statement: '', hints: [], solution: ''}, {id: `${id}/p2`, kind: 'quant', title: 'p2', statement: '', hints: [], solution: ''}],
     cards: Array.from({length: cards}, (_, i) => ({id: `${id}/c${i + 1}`, front: '', back: '', tags: []})),
 });
 const units = [unit('cv-1', 'cv'), unit('cv-2', 'cv'), unit('ml-1', 'ml'), unit('ml-2', 'ml'), unit('quant-1', 'quant')];
