@@ -19,6 +19,7 @@
 //   npm run trigger -- culture-preview             decide and record without filling anything
 //   npm run trigger -- culture-resimulate          rebuild the culture backtest from the stored history
 //   npm run trigger -- lab                         the lab's papers feed: today's new papers and their digest
+//   npm run trigger -- culture-follow <userId> <spike|quiet>   deploy one enrolled account into its picker's latest decision (forces the session)
 import { Inngest } from "inngest";
 
 // Each job's event as lib/jobs/registry.ts names it; lib/jobs/__tests__/registry.test.ts holds
@@ -42,6 +43,7 @@ const EVENTS = {
     'culture-preview': 'app/run.culture.brain',
     'culture-resimulate': 'app/run.culture.brain',
     lab: 'app/refresh.lab.papers',
+    'culture-follow': 'app/bootstrap.culture.follow',
 };
 
 const STRATEGY_DATA = {
@@ -53,7 +55,7 @@ const STRATEGY_DATA = {
 
 const [job, first, second, ...rest] = process.argv.slice(2);
 const name = EVENTS[job];
-if (!name || (job === 'topic' && (!first || !Number.isFinite(Number(second))))) {
+if (!name || (job === 'topic' && (!first || !Number.isFinite(Number(second)))) || (job === 'culture-follow' && (!first || !second))) {
     console.error(`Usage: npm run trigger -- <${Object.keys(EVENTS).join('|')}> [userId keywordSetHash | email]`);
     process.exit(1);
 }
@@ -61,6 +63,7 @@ const data = job === 'topic'
     ? { userId: first, keywordSetHash: Number(second) }
     : job === 'news' && first ? { email: first }
     : job === 'culture-backfill' && first ? { brands: [first, second, ...rest].filter(Boolean) }
+    : job === 'culture-follow' ? { userId: first, profile: second, force: true }
     : (STRATEGY_DATA[job] ?? {});
 
 // The id must match lib/jobs/client.ts so the event lands in the same app.

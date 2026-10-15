@@ -1,6 +1,6 @@
 import type {Metadata} from "next";
 import {requireUserId} from "@/lib/auth/session";
-import {getCultureBrandsView, getCulturePicksView, getCultureSystemView} from "@/lib/culture/page-store";
+import {getCultureBrandsView, getCultureFollowsView, getCulturePicksView, getCultureSystemView} from "@/lib/culture/page-store";
 import BrandBoard from "@/components/culture/BrandBoard";
 import BrandEvidence from "@/components/culture/BrandEvidence";
 import BrandLinks from "@/components/culture/BrandLinks";
@@ -24,8 +24,9 @@ export const metadata: Metadata = {title: "Culture Brain"};
 //            brand's evidence)
 //   picks  — what the two pickers did about it, side by side (records, decisions, holdings)
 //   system — whether the machinery ran (counters, freshness, the jobs' stamps, suggestions)
-// Every read is global: the brain and its accounts belong to no reader, so the session is only
-// the gate. The page composes lib/culture/page-store's reads and nothing else.
+// Every read is global — the brain and its accounts belong to no reader — but one: the reader's
+// own enrolments with the pickers (the accounts of theirs a picker trades), read with the session's
+// user id on the pickers view. The page composes lib/culture/page-store's reads and nothing else.
 const VIEW_IDS = ['brands', 'picks', 'system'] as const;
 type ViewId = (typeof VIEW_IDS)[number];
 const isView = (value: unknown): value is ViewId => typeof value === 'string' && (VIEW_IDS as readonly string[]).includes(value);
@@ -70,14 +71,16 @@ const BrandsView = async ({brandId}: {brandId: string | null}) => {
     );
 };
 
-const PicksView = async () => {
-    const view = await getCulturePicksView();
+const PicksView = async ({userId}: {userId: string}) => {
+    const [view, follows] = await Promise.all([getCulturePicksView(), getCultureFollowsView(userId)]);
     return (
         <>
             <PickerComparison rows={view.comparison} simulated={view.backtest} />
             <p className="text-sm text-fg-soft max-w-3xl" data-picks-lead>{CULTURE_PICKS_COPY.lead}</p>
             <div className="grid grid-cols-1 xl:grid-cols-2 gap-4 items-start">
-                {view.pickers.map((picker) => <PickerColumn key={picker.id} picker={picker} />)}
+                {view.pickers.map((picker) => (
+                    <PickerColumn key={picker.id} picker={picker} follow={follows.find((follow) => follow.profile === picker.id) ?? null} />
+                ))}
             </div>
         </>
     );
@@ -98,7 +101,7 @@ const SystemView = async () => {
 };
 
 const CulturePage = async ({searchParams}: CulturePageProps) => {
-    await requireUserId();
+    const userId = await requireUserId();
 
     const {brand, view: viewParam} = await searchParams;
     // An evidence link (?brand=) always means the brands view, whatever else the URL says.
@@ -110,7 +113,7 @@ const CulturePage = async ({searchParams}: CulturePageProps) => {
             <Tabs tabs={TABS} active={view} label="Culture Brain views" />
 
             {view === 'brands' && <BrandsView brandId={brand ?? null} />}
-            {view === 'picks' && <PicksView />}
+            {view === 'picks' && <PicksView userId={userId} />}
             {view === 'system' && <SystemView />}
 
             {/* How attention is built and scored: reference for every view, collapsed. */}

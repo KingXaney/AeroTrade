@@ -129,8 +129,9 @@ export const LOADERS: {[K in DataKey]: Loader<K>} = {
     lesson: ({userId}) => getTodaysLesson(userId),
     // Lazy: today's puzzle row and the solved days, two indexed reads.
     dailyPuzzle: ({userId}) => getDailyPuzzleCard(userId),
-    // Global reads: the culture brain and its accounts belong to no reader.
-    culturePicks: () => getCulturePicksSummary(),
+    // Global reads — the culture brain and its accounts belong to no reader — plus the reader's
+    // own enrolled accounts on the pickers tile.
+    culturePicks: ({userId}) => getCulturePicksSummary(userId),
     brandAttention: () => getRisingBrands(BRAND_ATTENTION_LIMIT),
 };
 

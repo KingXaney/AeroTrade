@@ -5,7 +5,7 @@
 // sentence passes the no-advice list.
 
 import {describe, expect, it} from 'vitest';
-import {CULTURE_CHAT_LIMITS, CULTURE_NOTES, CULTURE_STANCE, shapeBrand, shapeCultureBrain, shapeOwner, type ChatPickerInput} from '@/lib/chat/culture-brain';
+import {CULTURE_CHAT_LIMITS, CULTURE_NOTES, CULTURE_STANCE, shapeBrand, shapeCultureBrain, shapeOwner, type ChatFollowInput, type ChatPickerInput} from '@/lib/chat/culture-brain';
 import type {CultureBacktestView} from '@/lib/culture/backtest';
 import type {CultureDecisionItem} from '@/lib/culture/decisions';
 import type {TickerRollup} from '@/lib/culture/rollup';
@@ -81,7 +81,34 @@ describe('shapeCultureBrain', () => {
         expect(shaped.reasons[3].decoded.clauses).toEqual([]);
         expect(shaped.reasons[3].decoded.unrecognised).toEqual(['a reason the grammar has never seen']);
         expect(spike.simulated).toEqual({returnPct: 21.56, spyReturnPct: 136.24, from: '2021-10-15', to: '2026-10-06', weeks: 260, fills: 19});
-        expect(result.notes).toEqual([CULTURE_NOTES.unfilled, CULTURE_NOTES.simulatedOnly]);
+        expect(result.yours).toEqual([]);
+        expect(result.notes).toEqual([CULTURE_NOTES.unfilled, CULTURE_NOTES.simulatedOnly, CULTURE_NOTES.noneEnrolled]);
+    });
+
+    it("shapes the reader's own enrolled accounts under \"yours\", enrolled ones only, with their notes", () => {
+        const follow = (profile: 'spike' | 'quiet', over: Partial<ChatFollowInput> = {}): ChatFollowInput => ({
+            profile, label: profile === 'spike' ? 'Spike' : 'Quiet', accountName: `Culture · ${profile === 'spike' ? 'Spike' : 'Quiet'}`,
+            status: {enrolled: true, status: 'active', accountId: 'acc', enrolledAt: 1},
+            record: {returnPct: 1.23456, benchmarkReturnPct: 0.5, since: '2026-10-14'},
+            decision: {date: '2026-10-14', kind: 'executed', items: [item('CELH', {executed: true, error: undefined, executionPrice: 41.2})]},
+            ...over,
+        });
+        const result = shapeCultureBrain({
+            brands: [entity('celsius')], owners: [], pickers: [picker('spike')], backtest,
+            follows: [follow('spike'), follow('quiet', {status: {enrolled: false}})],
+        });
+        expect(result.yours).toHaveLength(1);
+        expect(result.yours[0]).toMatchObject({profile: 'spike', label: 'Spike', status: 'active', accountName: 'Culture · Spike', live: {returnPct: 1.23, spyReturnPct: 0.5, since: '2026-10-14'}});
+        expect(result.yours[0].decision).toMatchObject({date: '2026-10-14', preview: false, itemsTotal: 1});
+        expect(result.yours[0].decision!.items[0]).toMatchObject({symbol: 'CELH', filled: true, price: 41.2});
+        expect(result.notes).toEqual([CULTURE_NOTES.unfilled, CULTURE_NOTES.simulatedOnly, CULTURE_NOTES.enrolled(['Spike'])]);
+
+        const paused = shapeCultureBrain({
+            brands: [], owners: [], pickers: [], backtest: null,
+            follows: [follow('quiet', {status: {enrolled: true, status: 'paused'}, record: null, decision: {date: '2026-10-14', kind: 'preview', items: []}})],
+        });
+        expect(paused.yours[0]).toMatchObject({status: 'paused', live: null, decision: {preview: true, items: [], itemsTotal: 0}});
+        expect(paused.notes).toEqual([CULTURE_NOTES.empty, CULTURE_NOTES.noBacktest, CULTURE_NOTES.enrolled(['Quiet']), CULTURE_NOTES.followPaused('Quiet'), CULTURE_NOTES.followPreview('Quiet')]);
     });
 
     it('says what is missing: no brands, an account not opened, no decision, a preview, no backtest', () => {
@@ -96,6 +123,7 @@ describe('shapeCultureBrain', () => {
             CULTURE_NOTES.noDecision('Spike'),
             CULTURE_NOTES.preview('Quiet'),
             CULTURE_NOTES.noBacktest,
+            CULTURE_NOTES.noneEnrolled,
         ]);
         expect(result.pickers[1].decision?.preview).toBe(true);
         expect(result.pickers[1].simulated).toBeNull();
@@ -113,7 +141,8 @@ describe('shapeCultureBrain', () => {
 
     it('speaks in the descriptive voice', () => {
         const texts = [CULTURE_STANCE, CULTURE_NOTES.empty, CULTURE_NOTES.unfilled, CULTURE_NOTES.noBacktest, CULTURE_NOTES.simulatedOnly,
-            CULTURE_NOTES.notStarted('Spike'), CULTURE_NOTES.noDecision('Quiet'), CULTURE_NOTES.preview('Spike')];
+            CULTURE_NOTES.notStarted('Spike'), CULTURE_NOTES.noDecision('Quiet'), CULTURE_NOTES.preview('Spike'),
+            CULTURE_NOTES.enrolled(['Spike', 'Quiet']), CULTURE_NOTES.noneEnrolled, CULTURE_NOTES.followPaused('Spike'), CULTURE_NOTES.followPreview('Quiet')];
         for (const text of texts) expect(findBanned(text, 'advice'), text).toEqual([]);
     });
 });

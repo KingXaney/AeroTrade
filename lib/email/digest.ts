@@ -9,7 +9,9 @@ import {buildTopicsSectionHtml, topicsSectionLinks} from "@/lib/email/sections/t
 import {lessonSectionFor} from "@/lib/email/sections/lesson";
 import {claimDigestDay, releaseDigestDay} from "@/lib/email/digest-store";
 import {fallbackDigestSummary, parseDigestSummary} from "@/lib/email/digest-summary";
-import {buildDigestView, type NavigatorDigest} from "@/lib/email/digest-view";
+import {buildDigestView, type CultureDigest, type NavigatorDigest} from "@/lib/email/digest-view";
+import {CULTURE_PROFILES} from "@/lib/culture/config";
+import {getLatestFollowDecisions} from "@/lib/culture/follow-store";
 import {renderDigestHtml, renderDigestText} from "@/lib/email/digest-render";
 import {getWatchlistSymbolsByEmail} from "@/lib/stocks/watchlist-store";
 import {getHeldSymbolsByUserId} from "@/lib/trading/accounts";
@@ -94,6 +96,32 @@ export const fetchNavigatorDigest = async (userId: string): Promise<NavigatorDig
     }
 };
 
+// The reader's accounts enrolled with the culture pickers (lib/culture/follow-store.ts): each
+// picker's latest executed decision for their account, for the email's culture section. A
+// preview is analysis only; the email reports what was placed. Failure here never blocks the digest.
+export const fetchCultureDigest = async (userId: string): Promise<CultureDigest | null> => {
+    try {
+        const decisions = await getLatestFollowDecisions(userId);
+        if (decisions.length === 0) return null;
+        return {
+            profiles: decisions.map((decision) => ({
+                profile: decision.profile,
+                label: CULTURE_PROFILES[decision.profile].label,
+                date: decision.date,
+                items: decision.items.map((item) => ({
+                    action: item.action,
+                    symbol: item.symbol,
+                    targetWeightPct: Math.round(item.targetWeight * 100),
+                    executed: item.executed,
+                })),
+            })),
+        };
+    } catch (error) {
+        console.error('Culture email data failed:', error);
+        return null;
+    }
+};
+
 type DigestSections = {topicsSection: string; lessonSection: string};
 
 // Two deterministic sections (no LLM), read together: followed topics (off per user), every
@@ -134,6 +162,7 @@ export type DigestSendInput = {
     test: boolean;                       // a test send to one reader takes no claim
     news: DigestNews;
     navigator: NavigatorDigest | null;
+    culture?: CultureDigest | null;
     sections: DigestSections;
     modelText: string;                   // '' when the model call failed
 };
@@ -141,10 +170,10 @@ export type DigestSendInput = {
 export type DigestSendResult = 'sent' | 'sent-fallback' | 'already-sent';
 
 // The brief as mailed: what the model wrote, or the articles in their outlets' own words.
-export const composeDigest = ({day, news, navigator, sections, modelText}: Omit<DigestSendInput, 'user' | 'test'>) => {
+export const composeDigest = ({day, news, navigator, culture = null, sections, modelText}: Omit<DigestSendInput, 'user' | 'test'>) => {
     const summary = parseDigestSummary(modelText, news.articles, news.symbols) ?? fallbackDigestSummary(news.articles, news.symbols);
     const view = buildDigestView({
-        day, appUrl: appUrl(), summary, readerSymbols: news.symbols, navigator,
+        day, appUrl: appUrl(), summary, readerSymbols: news.symbols, navigator, culture,
         topicsHtml: sections.topicsSection, lessonHtml: sections.lessonSection,
     });
     return {subject: view.subject, html: renderDigestHtml(view), text: renderDigestText(view), fallback: summary.fallback};

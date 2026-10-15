@@ -15,6 +15,8 @@ import type {AccountAnalytics, AccountWithPortfolio, PaperTradeRecord} from "@/l
 import type {IncomeView} from "@/lib/income/accrual";
 import type {HabitsRead} from "@/lib/trading/learn/habits-store";
 import type {LuckRead} from "@/lib/trading/learn/luck-store";
+import type {TradedBy} from "@/lib/trading/traded-by";
+import type {FillReplay} from "@/lib/culture/page-store";
 
 // What the page's reads returned; `ledger` is null when the ledger read failed.
 export type PortfolioPageReads = {
@@ -27,6 +29,10 @@ export type PortfolioPageReads = {
     luck: LuckRead | null;
     habits: HabitsRead | null;
     marketOpen: boolean;
+    // Who trades in this account besides its owner (null: nobody), and, for an account a culture
+    // picker trades, the decision item behind each of its fills on the log.
+    tradedBy?: TradedBy;
+    fillReplays?: Record<string, FillReplay>;
 };
 
 export type PortfolioTradeLog = {
@@ -35,6 +41,8 @@ export type PortfolioTradeLog = {
     receipts: Record<string, FillReceipt>;
     buyNotesBySellId: Record<string, string[]>;
     exportHref: string;
+    // By trade id: the one "What the picker saw" a culture fill carries (invariant 12).
+    replays: Record<string, FillReplay>;
 };
 
 export type PortfolioPageView = {
@@ -42,6 +50,7 @@ export type PortfolioPageView = {
     portfolio: AccountWithPortfolio['summary'];
     // "N holdings · <basis>" under the account name.
     summaryLine: string;
+    tradedBy: TradedBy;
     // More than one account: the comparison table shows and the account can be deleted.
     multiAccount: boolean;
     switcherAccounts: SwitcherAccount[];
@@ -66,6 +75,7 @@ export const toPortfolioPageView = (
     return {
         account,
         portfolio,
+        tradedBy: reads.tradedBy ?? null,
         summaryLine: HOLDINGS_COPY.summary(portfolio.positions.length, countUnpriced(portfolio.positions), reads.marketOpen),
         multiAccount: all.length > 1,
         switcherAccounts: toSwitcherAccounts(all),
@@ -88,6 +98,7 @@ export const toPortfolioPageView = (
             receipts: replayReceipts(ledger),
             buyNotesBySellId: buyNotesBySellId(ledger),
             exportHref: accountExportHref(account.id),
+            replays: reads.fillReplays ?? {},
         } : null,
     };
 };

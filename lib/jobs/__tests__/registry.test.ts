@@ -33,6 +33,7 @@ describe('job registry', () => {
             ['culture-brain-weekly', 'app/run.culture.brain', 'TZ=America/New_York 45 10 * * 1', 'TZ=America/New_York 45 10 * * 2'],
             ['culture-wikipedia-backfill', 'app/backfill.culture.wikipedia'],
             ['lab-daily-papers', 'app/refresh.lab.papers', 'TZ=America/New_York 20 6 * * 1-5'],
+            ['culture-follow-bootstrap', 'app/bootstrap.culture.follow'],
         ]);
     });
 

@@ -3,7 +3,7 @@
 // the real ones.
 
 import type {DigestArticle} from '@/lib/email/digest-summary';
-import type {NavigatorDigest} from '@/lib/email/digest-view';
+import type {CultureDigest, NavigatorDigest} from '@/lib/email/digest-view';
 import type {TopicDigestInput} from '@/lib/email/sections/topics';
 
 export const FIXTURE_DAY = '2026-10-05';
@@ -47,6 +47,20 @@ export const FIXTURE_NAVIGATOR: NavigatorDigest = {
     ],
     rationale: '## This week\n**Chips** led the news brain\'s themes, so the Navigator added to [NVDA](https://evil.example.com) and sold XLE.',
     activeTheses: ['AI data-center spending', 'Rate path', 'Oil supply'],
+};
+
+// Two accounts enrolled with the culture pickers; the second's set is a sale and a hold.
+export const FIXTURE_CULTURE: CultureDigest = {
+    profiles: [
+        {profile: 'spike', label: 'Spike', date: '2026-10-05', items: [
+            {action: 'buy', symbol: 'CELH', targetWeightPct: 15, executed: true},
+            {action: 'buy', symbol: 'DUOL', targetWeightPct: 12, executed: false},
+        ]},
+        {profile: 'quiet', label: 'Quiet', date: '2026-10-05', items: [
+            {action: 'sell', symbol: 'PEP', targetWeightPct: 0, executed: true},
+            {action: 'hold', symbol: 'CROX', targetWeightPct: 10, executed: false},
+        ]},
+    ],
 };
 
 export const FIXTURE_TOPICS: TopicDigestInput[] = [

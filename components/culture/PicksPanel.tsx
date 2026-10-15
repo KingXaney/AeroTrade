@@ -10,13 +10,39 @@ import WhatTheseMean from "@/components/learn/WhatTheseMean";
 import ReasonGloss from "@/components/learn/ReasonGloss";
 import BrandChips from "@/components/culture/BrandChips";
 import type {DecisionAction} from "@/lib/culture/decisions";
-import type {GlossedDecision, GlossedDecisionItem} from "@/lib/culture/page-store";
+import type {GlossedDecisionItem} from "@/lib/culture/page-store";
+import type {ProfileId} from "@/lib/culture/config";
 import {CULTURE_PICKS_COPY, PICKS_TERMS} from "@/lib/learn/copy/culture";
 
 // A picker's latest decision: every order it planned with what happened to it, every position
 // it kept, the brands that put each symbol in its universe, its reasons as written and — one
 // disclosure per item — the same reasons read in plain words (decoded on the server by
 // lib/learn/culture-reasons). A record of what the picker did: no Apply, nothing to act on.
+// The same panel draws an enrolled account's decision (scope 'follow'): the picker's targets
+// sized to that account, with no universe line, no feeds and no rationale of its own — a note
+// from the caller in their place.
+
+// The picker's own decision carries its universe, feeds and rationale; an enrolled account's
+// carries only the items.
+export type PanelDecision = {
+    profile: ProfileId;
+    date: string;
+    kind: 'executed' | 'preview' | 'skipped';
+    items: GlossedDecisionItem[];
+    universe?: {tickers: number; quoted: number};
+    feeds?: readonly string[];
+    rationaleMd?: string | null;
+};
+
+type Props = {
+    decision: PanelDecision | null;
+    scope?: 'picker' | 'follow';
+    emptyText?: string;
+    // Under the items in place of the picker's rationale (the enrolled account's panel).
+    note?: string;
+    // Under the date for a decision that previewed (the enrolled account's panel).
+    previewNote?: string;
+};
 
 const ACTION_STYLES: Record<DecisionAction, string> = {
     buy: 'text-brand bg-brand-strong/8',
@@ -66,18 +92,20 @@ const ItemRow = ({item}: {item: GlossedDecisionItem}) => (
     </RowCard>
 );
 
-const PicksPanel = ({decision}: {decision: GlossedDecision | null}) => {
+const PicksPanel = ({decision, scope = 'picker', emptyText = CULTURE_PICKS_COPY.decisionsEmpty, note, previewNote}: Props) => {
     if (!decision) {
-        return <p className="text-sm text-fg-muted">{CULTURE_PICKS_COPY.decisionsEmpty}</p>;
+        return <p className="text-sm text-fg-muted">{emptyText}</p>;
     }
+    const hook = scope === 'follow' ? {'data-culture-follow-decision': decision.profile} : {'data-culture-decision': decision.profile};
     return (
-        <div className="space-y-3" data-culture-decision={decision.profile}>
+        <div className="space-y-3" {...hook}>
             <p className="text-[11px] text-fg-muted font-mono flex flex-wrap items-center gap-2">
-                <span>{CULTURE_PICKS_COPY.decisionLine(decision.date, decision.universe.quoted, decision.universe.tickers)}</span>
-                <span>· {CULTURE_PICKS_COPY.feedsLine(decision.feeds)}</span>
+                <span>{decision.universe ? CULTURE_PICKS_COPY.decisionLine(decision.date, decision.universe.quoted, decision.universe.tickers) : decision.date}</span>
+                {decision.feeds && <span>· {CULTURE_PICKS_COPY.feedsLine(decision.feeds)}</span>}
                 {decision.kind === 'preview' && <Badge tone="warning">{CULTURE_PICKS_COPY.previewBadge}</Badge>}
                 {decision.kind === 'skipped' && <Badge tone="neutral">{CULTURE_PICKS_COPY.skippedBadge}</Badge>}
             </p>
+            {decision.kind === 'preview' && previewNote && <p className="text-xs text-fg-muted" data-follow-previewed>{previewNote}</p>}
             <div className="space-y-2">
                 {decision.items.map((item) => <ItemRow key={`${item.symbol}-${item.action}`} item={item} />)}
             </div>
@@ -86,6 +114,7 @@ const PicksPanel = ({decision}: {decision: GlossedDecision | null}) => {
                     {decision.rationaleMd}
                 </SafeMarkdown>
             )}
+            {note && <p className="text-xs text-fg-muted">{note}</p>}
             <p className="label-type text-[length:var(--label-size)] text-fg-muted">{CULTURE_PICKS_COPY.footer}</p>
             <WhatTheseMean keys={PICKS_TERMS} />
         </div>

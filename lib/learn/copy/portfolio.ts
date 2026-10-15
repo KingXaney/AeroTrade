@@ -44,6 +44,17 @@ export const pctOneDecimal = (pct: number): string => {
 
 const wholePct = (fraction: number): string => `${Math.round(fraction * 100)}%`;
 
+// ---- who trades in this account --------------------------------------------------------
+
+// The line under an account's name when an automated trader — the AI Navigator, or a culture
+// picker the reader enrolled with — places its fills (components/trading/portfolio/TradedBy).
+export const TRADED_BY_COPY = {
+    navigator: 'Traded by the AI Navigator',
+    culture: (label: string): string => `Traded by the ${label} culture picker`,
+    paused: 'paused',
+    link: 'Its decisions →',
+} as const;
+
 // ---- the dated drawdown ----------------------------------------------------------------
 
 export const DRAWDOWN_COPY = {

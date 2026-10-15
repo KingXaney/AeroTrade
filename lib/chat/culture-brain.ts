@@ -12,7 +12,7 @@ import {echoText, MAX_ECHO_CHARS, shapeReason, type ExplainReason} from '@/lib/c
 import type {CultureBacktestView} from '@/lib/culture/backtest';
 import {CATEGORY_LABELS} from '@/lib/culture/catalog';
 import type {CultureDecisionItem} from '@/lib/culture/decisions';
-import type {LiveRecordView} from '@/lib/culture/page-store';
+import type {FollowView, LiveRecordView} from '@/lib/culture/page-store';
 import type {TickerRollup} from '@/lib/culture/rollup';
 import type {CultureEntitySummary} from '@/lib/culture/types';
 import type {ProfileId} from '@/lib/culture/config';
@@ -29,6 +29,11 @@ export const CULTURE_NOTES = {
     unfilled: 'An order marked unfilled did not trade; its note says why.',
     noBacktest: 'No simulated record yet; the weekly job builds it once the data is vouched for.',
     simulatedOnly: 'The simulated records read pageviews and prices only, over a catalog chosen in 2026.',
+    enrolled: (labels: readonly string[]): string =>
+        `The reader enrolled a paper account of their own with ${labels.join(' and ')}: the picker trades it with its own weekly targets, sized to that account. Its record and latest decision are under "yours"; they are the reader's own accounts, read from their rows.`,
+    noneEnrolled: 'The reader has enrolled no account of their own with a picker; the Culture page offers it.',
+    followPaused: (label: string): string => `The reader's ${label} account is paused: the picker trades nothing in it until resumed.`,
+    followPreview: (label: string): string => `The reader's ${label} account's latest decision was a preview — the market was closed — so its orders were planned, not placed.`,
 } as const;
 
 // How much travels: the heaviest brands and owners, and the first items of a decision.
@@ -79,7 +84,21 @@ export type ChatPickerInput = {
     decision: {date: string; kind: 'executed' | 'preview' | 'skipped'; items: CultureDecisionItem[]} | null;
 };
 
-export type CultureChatResult = {stance: string; brands: ChatBrand[]; owners: ChatOwner[]; pickers: ChatPicker[]; notes: string[]};
+// The reader's own account enrolled with a picker: its record beside SPY and its latest decision.
+export type ChatFollow = {
+    profile: ProfileId;
+    label: string;
+    status: 'active' | 'paused';
+    accountName: string;
+    live: {returnPct: number; spyReturnPct: number | null; since: string} | null;
+    decision: {date: string; preview: boolean; items: ChatDecisionItem[]; itemsTotal: number} | null;
+};
+
+export type ChatFollowInput = Pick<FollowView, 'profile' | 'label' | 'status' | 'accountName' | 'record'> & {
+    decision: {date: string; kind: 'executed' | 'preview'; items: CultureDecisionItem[]} | null;
+};
+
+export type CultureChatResult = {stance: string; brands: ChatBrand[]; owners: ChatOwner[]; pickers: ChatPicker[]; yours: ChatFollow[]; notes: string[]};
 
 export const shapeBrand = (entity: CultureEntitySummary): ChatBrand => ({
     id: entity.key,
@@ -139,13 +158,30 @@ const shapePicker = (picker: ChatPickerInput, backtest: CultureBacktestView | nu
     };
 };
 
-export const shapeCultureBrain = ({brands, owners, pickers, backtest}: {
+const shapeFollow = (follow: ChatFollowInput): ChatFollow => ({
+    profile: follow.profile,
+    label: follow.label,
+    status: follow.status.status ?? 'active',
+    accountName: follow.accountName,
+    live: follow.record ? {returnPct: round2(follow.record.returnPct), spyReturnPct: round2OrNull(follow.record.benchmarkReturnPct), since: follow.record.since} : null,
+    decision: follow.decision ? {
+        date: follow.decision.date,
+        preview: follow.decision.kind !== 'executed',
+        items: follow.decision.items.slice(0, CULTURE_CHAT_LIMITS.items).map(shapeItem),
+        itemsTotal: follow.decision.items.length,
+    } : null,
+});
+
+export const shapeCultureBrain = ({brands, owners, pickers, backtest, follows = []}: {
     brands: readonly CultureEntitySummary[];
     owners: readonly TickerRollup[];
     pickers: readonly ChatPickerInput[];
     backtest: CultureBacktestView | null;
+    // The reader's own enrolments, enrolled or not; only the enrolled ones travel.
+    follows?: readonly ChatFollowInput[];
 }): CultureChatResult => {
     const shaped = pickers.map((picker) => shapePicker(picker, backtest));
+    const yours = follows.filter((follow) => follow.status.enrolled).map(shapeFollow);
     const notes: string[] = [];
     if (brands.length === 0) notes.push(CULTURE_NOTES.empty);
     for (const picker of shaped) {
@@ -153,13 +189,23 @@ export const shapeCultureBrain = ({brands, owners, pickers, backtest}: {
         if (!picker.decision) notes.push(CULTURE_NOTES.noDecision(picker.label));
         else if (picker.decision.preview) notes.push(CULTURE_NOTES.preview(picker.label));
     }
-    if (shaped.some((picker) => picker.decision?.items.some((item) => item.unfilledBecause))) notes.push(CULTURE_NOTES.unfilled);
+    if (shaped.some((picker) => picker.decision?.items.some((item) => item.unfilledBecause)) || yours.some((follow) => follow.decision?.items.some((item) => item.unfilledBecause))) notes.push(CULTURE_NOTES.unfilled);
     notes.push(backtest ? CULTURE_NOTES.simulatedOnly : CULTURE_NOTES.noBacktest);
+    if (yours.length > 0) {
+        notes.push(CULTURE_NOTES.enrolled(yours.map((follow) => follow.label)));
+        for (const follow of yours) {
+            if (follow.status === 'paused') notes.push(CULTURE_NOTES.followPaused(follow.label));
+            if (follow.decision?.preview) notes.push(CULTURE_NOTES.followPreview(follow.label));
+        }
+    } else {
+        notes.push(CULTURE_NOTES.noneEnrolled);
+    }
     return {
         stance: CULTURE_STANCE,
         brands: brands.slice(0, CULTURE_CHAT_LIMITS.brands).map(shapeBrand),
         owners: owners.slice(0, CULTURE_CHAT_LIMITS.owners).filter((owner) => owner.weightSlowSum > 0).map(shapeOwner),
         pickers: shaped,
+        yours,
         notes,
     };
 };

@@ -11,6 +11,20 @@ export type Book = {totalValue: number; cash: number; positions: HeldPosition[]}
 
 export type WeekDecision = {scored: ScoredSymbol[]; targets: TargetWeight[]; orders: PlannedOrder[]};
 
+// One book's orders from a week's scores and targets: the picker's own account, or an enrolled
+// account that takes the same targets sized to its own cash, holdings and holding ages. The
+// week's score reaches every held row, so an exit trigger reads this week's number.
+export const decideForBook = ({scored, targets, book, maxTrades}: {
+    scored: readonly ScoredSymbol[];
+    targets: readonly TargetWeight[];
+    book: Book;
+    maxTrades?: number;
+}): PlannedOrder[] => {
+    const scoreBySymbol = new Map(scored.map((s) => [s.symbol, s]));
+    const positions = book.positions.map((position) => ({...position, score: scoreBySymbol.get(position.symbol)?.score ?? position.score}));
+    return diffToOrders({totalValue: book.totalValue, cash: book.cash, positions, targets: [...targets], maxTrades, rails: CULTURE_RAILS});
+};
+
 export const decideWeek = ({inputs, feeds, profile, book, targetable, maxTrades}: {
     inputs: readonly CultureScoringInput[];
     feeds: readonly CultureFeed[];
@@ -21,11 +35,8 @@ export const decideWeek = ({inputs, feeds, profile, book, targetable, maxTrades}
     maxTrades?: number;
 }): WeekDecision => {
     const scored = scoreCultureUniverse(inputs, {profile, feeds});
-    const scoreBySymbol = new Map(scored.map((s) => [s.symbol, s]));
     const targets = buildTargets(scored.filter((s) => targetable.has(s.symbol)), CULTURE_RAILS);
-    // The week's score reaches every held row, so an exit trigger reads this week's number.
-    const positions = book.positions.map((position) => ({...position, score: scoreBySymbol.get(position.symbol)?.score ?? position.score}));
-    const orders = diffToOrders({totalValue: book.totalValue, cash: book.cash, positions, targets, maxTrades, rails: CULTURE_RAILS});
+    const orders = decideForBook({scored, targets, book, maxTrades});
     return {scored, targets, orders};
 };
 

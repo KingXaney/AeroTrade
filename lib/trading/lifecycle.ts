@@ -8,6 +8,7 @@ import PaperTrade from "@/database/models/paper-trade.model";
 import AccountSnapshot from "@/database/models/account-snapshot.model";
 import AccountIncome from "@/database/models/account-income.model";
 import AiNavigator from "@/database/models/ai-navigator.model";
+import CultureFollow from "@/database/models/culture-follow.model";
 import {getEasternDateString} from "@/lib/dates";
 import {getOwnedAccount} from "@/lib/trading/accounts";
 import type {ActionResult} from '@/lib/actions/types';
@@ -90,6 +91,10 @@ export const deleteOwnedAccount = async (
     const id = String(account._id);
     if (await AiNavigator.exists({userId, accountId: id})) {
         return {success: false, message: 'The AI Navigator trades in this account — unenroll it on the Brain page first'};
+    }
+    // The same for an account a culture picker trades in (lib/culture/follow-store.ts).
+    if (await CultureFollow.exists({userId, accountId: id})) {
+        return {success: false, message: 'A culture picker trades in this account — unenroll it on the Culture page first'};
     }
 
     // Children first, parent last: a crash mid-cascade leaves the account intact and

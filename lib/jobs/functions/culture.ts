@@ -23,7 +23,9 @@ import {
 import {cultureBacktestDue} from "@/lib/culture/backtest";
 import {cultureBacktestReady, ensureCultureRateBars, getCultureBacktestStamp, lackingDividendCoverage, simulateCultureBacktest} from "@/lib/culture/backtest-store";
 import {buildCultureItems, type OrderOutcome} from "@/lib/culture/decisions";
-import {decideWeek, firstWeekTrades} from "@/lib/culture/engine";
+import {decideForBook, decideWeek, firstWeekTrades} from "@/lib/culture/engine";
+import {describeFollowRun, isFollowProfile, scoredFromItems, targetsFromDecisionItems} from "@/lib/culture/follow";
+import {claimFollowWeek, completeFollowRun, getFollow, getHeldSymbolsForAccounts, listActiveFollowers, saveFollowDecision} from "@/lib/culture/follow-store";
 import {
     applyCultureBatch,
     buildCultureBatchPrompt,
@@ -50,6 +52,8 @@ import {
     ensureCultureAccount,
     ensureCultureBars,
     getHeldCultureSymbols,
+    getLatestExecutedCultureDecision,
+    getWeekUniverse,
     loadBook,
     loadScoringInputs,
     refreshReportDates,
@@ -66,6 +70,7 @@ import {addCalendarDays, calendarDaysBetween} from "@/lib/dates";
 import {BENCHMARK_SYMBOL, PRICE_CHUNK_SIZE} from "@/lib/prices/config";
 import {ensureRateBars, quoteMissed} from "@/lib/strategies/job";
 import {executeOrder, FUNDING_SELL_FAILED} from "@/lib/trading/orders";
+import {buildPriceMap} from "@/lib/trading/valuation";
 import type {CultureFold} from "@/lib/culture/types";
 
 // The culture brain's three jobs (lib/culture/ingest.ts, lib/culture/update.ts, lib/culture/job.ts,
@@ -216,8 +221,17 @@ export const runCultureWeekly = inngest.createFunction(
             return {success: true, message};
         }
 
-        // The universe: the catalog's listed owners, bounded, quoted once this week.
+        // The universe: the catalog's listed owners, bounded, quoted once this week. The accounts
+        // enrolled with a picker (lib/culture/follow-store) are read here too: what they hold
+        // joins the sweep, so a holding the catalog does not list is priced and can exit.
         const held = await step.run('held-symbols', getHeldCultureSymbols);
+        const followers = await step.run('load-followers', async () => {
+            const out: Record<string, {userId: string; accountId: string}[]> = {};
+            for (const profile of LIVE_PROFILES) out[profile] = (await listActiveFollowers(profile)).map((f) => ({userId: f.userId, accountId: f.accountId}));
+            return out;
+        });
+        const followerHeld = await step.run('followers-held-symbols', async () =>
+            getHeldSymbolsForAccounts(Object.values(followers).flat().map((f) => f.accountId)));
         const attention = await step.run('order-universe', async () => {
             const rollup = await getTickerRollup();
             return Object.fromEntries(rollup.map((row) => [row.ticker, row.weightSlowSum]));
@@ -225,7 +239,8 @@ export const runCultureWeekly = inngest.createFunction(
         const allTickers = cultureTickers();
         const ordered = orderUniverse(allTickers, new Map(Object.entries(attention)));
         const verified: VerifiedSymbol[] = [];
-        const quoteChunks = chunk(ordered.map((t) => t.symbol), CULTURE_QUOTE_CHUNK);
+        const listed = new Set(ordered.map((t) => t.symbol));
+        const quoteChunks = chunk([...ordered.map((t) => t.symbol), ...followerHeld.filter((s) => !listed.has(s))], CULTURE_QUOTE_CHUNK);
         let fetchedLast = 0;
         for (let i = 0; i < quoteChunks.length; i++) {
             const symbols = quoteChunks[i];
@@ -236,7 +251,7 @@ export const runCultureWeekly = inngest.createFunction(
             verified.push(...out.rows);
             fetchedLast = out.fetched;
         }
-        const universe = selectCultureUniverse(verified, held);
+        const universe = selectCultureUniverse(verified, [...held, ...followerHeld]);
         const tickerBySymbol = new Map(allTickers.map((t) => [t.symbol, t]));
         // A held name the catalog no longer lists is scored on price alone, for its exit.
         const tickers: CultureTicker[] = universe.symbols.map((symbol) =>
@@ -280,7 +295,7 @@ export const runCultureWeekly = inngest.createFunction(
             }
 
             const plan = await step.run(`plan-${profile}`, async () => {
-                const loaded = await loadBook(state.accountId, universe.priceBySymbol, universe.targetable, nowMs);
+                const loaded = await loadBook(CULTURE_OWNER_ID, state.accountId, universe.priceBySymbol, universe.targetable, nowMs);
                 if (!loaded) return null;
                 const decision = decideWeek({inputs: scoring.inputs, feeds: scoring.feeds, profile, book: loaded.book, targetable, maxTrades: firstWeekTrades(loaded.book.positions)});
                 return {book: loaded.book, decision};
@@ -343,7 +358,68 @@ export const runCultureWeekly = inngest.createFunction(
                 }));
             }
 
-            summaries.push({profile, kind, orders: plan.decision.orders.length, filled});
+            // The accounts enrolled with this picker: the same scores and targets, each sized to
+            // its own book, each with its own claim; a picker that previews, its followers preview.
+            const enrolled = {traded: 0, filled: 0, orders: 0, skipped: 0};
+            for (const follower of followers[profile] ?? []) {
+                const uid = stepId(follower.userId);
+                const fplan = await step.run(`follow-plan-${profile}-${uid}`, async () => {
+                    const loaded = await loadBook(follower.userId, follower.accountId, universe.priceBySymbol, universe.targetable, nowMs);
+                    if (!loaded) return null;
+                    const orders = decideForBook({scored: plan.decision.scored, targets: plan.decision.targets, book: loaded.book, maxTrades: firstWeekTrades(loaded.book.positions)});
+                    return {book: loaded.book, orders};
+                });
+                if (!fplan) {
+                    enrolled.skipped += 1;
+                    continue;
+                }
+                const flive = day.dryRun ? false : await step.run(`follow-claim-${profile}-${uid}`, async () => claimFollowWeek(follower.userId, profile, day.weekKey));
+                if (!day.dryRun && !flive) {
+                    enrolled.skipped += 1;
+                    continue;
+                }
+                const foutcomes: OrderOutcome[] = [];
+                let fsellFailed = false;
+                for (const order of fplan.orders) {
+                    if (!flive) {
+                        foutcomes.push({success: false});
+                        continue;
+                    }
+                    if (fsellFailed && order.side === 'buy') {
+                        foutcomes.push({success: false, message: FUNDING_SELL_FAILED});
+                        continue;
+                    }
+                    const request = cultureOrderRequest(profile, follower.accountId, order, day.weekKey, fplan.book.totalValue);
+                    let result = await step.run(stepId(`follow-exec-${profile}-${uid}-${order.side}-${order.symbol}`), async () => executeOrder(follower.userId, request));
+                    if (quoteMissed(result)) {
+                        await step.sleep(stepId(`follow-quote-retry-${profile}-${uid}-${order.symbol}`), QUOTE_RETRY_DELAY);
+                        result = await step.run(stepId(`follow-exec-again-${profile}-${uid}-${order.side}-${order.symbol}`), async () => executeOrder(follower.userId, request));
+                    }
+                    if (order.side === 'sell' && !result.success) fsellFailed = true;
+                    foutcomes.push(result);
+                }
+                const fitems = buildCultureItems({
+                    orders: fplan.orders, outcomes: foutcomes, positions: fplan.book.positions, totalValue: fplan.book.totalValue,
+                    targets: plan.decision.targets, scored: plan.decision.scored, brandsBySymbol,
+                });
+                const ffilled = foutcomes.filter((o) => o.success).length;
+                await step.run(`follow-save-${profile}-${uid}`, async () => saveFollowDecision({
+                    userId: follower.userId, profile, accountId: follower.accountId, date: day.today, weekKey: day.weekKey,
+                    kind: flive ? 'executed' : 'preview', items: fitems,
+                    summary: flive ? `${ffilled}/${fplan.orders.length} order(s) filled` : `${fplan.orders.length} order(s) planned (preview)`,
+                }));
+                if (flive) {
+                    await step.run(`follow-complete-${profile}-${uid}`, async () => completeFollowRun({
+                        userId: follower.userId, profile,
+                        outcomes: fplan.orders.map((order, i) => ({symbol: order.symbol, side: order.side, executed: foutcomes[i]?.success ?? false, message: foutcomes[i]?.message})),
+                    }));
+                }
+                enrolled.traded += 1;
+                enrolled.filled += ffilled;
+                enrolled.orders += fplan.orders.length;
+            }
+
+            summaries.push({profile, kind, orders: plan.decision.orders.length, filled, ...(enrolled.traded + enrolled.skipped > 0 ? {followers: enrolled} : {})});
             decided.push({profile, items});
         }
 
@@ -388,6 +464,105 @@ export const runCultureWeekly = inngest.createFunction(
             backtest,
         });
         await step.run('record-job-run', async () => recordJobRun(JOBS.cultureWeekly.id, message));
+        return {success: true, message};
+    },
+);
+
+// On enrolment, or "Trade now": one enrolled account deployed into its picker's latest executed
+// decision — the targets the picker recorded, sized to the account's own book, at the week's
+// stored quotes (a holding the week did not quote takes a live one). No re-scoring and no quote
+// sweep, so it is cheap; outside the session it previews (the picker's own rule) and the weekly
+// run deploys the account at the next open run. The claim is the enrolment's week, shared with
+// the weekly run, so a deployed account is not traded twice in one week.
+export const bootstrapCultureFollow = inngest.createFunction(
+    { id: JOBS.cultureFollowBootstrap.id, triggers: triggersOf(JOBS.cultureFollowBootstrap), concurrency: [{ limit: 1, key: 'event.data.userId' }] },
+    async ({ event, step }) => {
+        const nowMs = typeof event.ts === 'number' ? event.ts : Date.now();
+        const data = (event.data ?? {}) as {userId?: unknown; profile?: unknown; force?: unknown};
+        const userId = typeof data.userId === 'string' ? data.userId : '';
+        const profile = isFollowProfile(data.profile) ? data.profile : null;
+        const day = cultureDay({force: data.force === true}, new Date(nowMs));
+        const stop = async (message: string) => {
+            await step.run('record-job-run', async () => recordJobRun(JOBS.cultureFollowBootstrap.id, message));
+            return {success: false, message};
+        };
+        if (!userId || !profile) return stop('Culture enrolment — no user or picker named');
+
+        const follow = await step.run('load-follow', async () => {
+            const row = await getFollow(userId, profile);
+            return row && row.status === 'active' ? {accountId: row.accountId} : null;
+        });
+        if (!follow) return stop(describeFollowRun({profile, kind: 'not-enrolled', orders: 0, filled: 0}));
+
+        const decision = await step.run('load-targets', async () => {
+            const latest = await getLatestExecutedCultureDecision(profile);
+            return latest ? {date: latest.date, items: latest.items} : null;
+        });
+        if (!decision) return stop(describeFollowRun({profile, kind: 'no-decision', orders: 0, filled: 0}));
+        const targets = targetsFromDecisionItems(decision.items);
+        const scored = scoredFromItems(decision.items);
+
+        const prices = await step.run('load-prices', async () => {
+            const priceBySymbol: Record<string, number> = {};
+            for (const row of await getWeekUniverse(day.weekKey)) {
+                if (row.quoted && row.price !== null) priceBySymbol[row.symbol] = row.price;
+            }
+            const held = await getHeldSymbolsForAccounts([follow.accountId]);
+            const missing = [...new Set([...targets.map((t) => t.symbol), ...held])].filter((symbol) => !(symbol in priceBySymbol));
+            if (missing.length > 0) {
+                for (const [symbol, info] of await buildPriceMap(missing)) {
+                    if (typeof info.price === 'number' && info.price > 0) priceBySymbol[symbol] = info.price;
+                }
+            }
+            return priceBySymbol;
+        });
+
+        const plan = await step.run('plan', async () => {
+            const loaded = await loadBook(userId, follow.accountId, prices, targets.map((t) => t.symbol), nowMs);
+            if (!loaded) return null;
+            return {book: loaded.book, orders: decideForBook({scored, targets, book: loaded.book, maxTrades: firstWeekTrades(loaded.book.positions)})};
+        });
+        if (!plan) return stop(describeFollowRun({profile, kind: 'skipped', orders: 0, filled: 0, note: 'account missing'}));
+
+        const live = day.dryRun ? false : await step.run('claim', async () => claimFollowWeek(userId, profile, day.weekKey));
+        const outcomes: OrderOutcome[] = [];
+        let sellFailed = false;
+        for (const order of plan.orders) {
+            if (!live) {
+                outcomes.push({success: false});
+                continue;
+            }
+            if (sellFailed && order.side === 'buy') {
+                outcomes.push({success: false, message: FUNDING_SELL_FAILED});
+                continue;
+            }
+            const request = cultureOrderRequest(profile, follow.accountId, order, day.weekKey, plan.book.totalValue);
+            let result = await step.run(stepId(`exec-${order.side}-${order.symbol}`), async () => executeOrder(userId, request));
+            if (quoteMissed(result)) {
+                await step.sleep(stepId(`quote-retry-${order.symbol}`), QUOTE_RETRY_DELAY);
+                result = await step.run(stepId(`exec-again-${order.side}-${order.symbol}`), async () => executeOrder(userId, request));
+            }
+            if (order.side === 'sell' && !result.success) sellFailed = true;
+            outcomes.push(result);
+        }
+
+        const brandsBySymbol = new Map([...brandsByTicker()].map(([ticker, brands]) => [ticker, brands.map((b) => ({id: b.id, name: b.name}))]));
+        const items = buildCultureItems({orders: plan.orders, outcomes, positions: plan.book.positions, totalValue: plan.book.totalValue, targets, scored, brandsBySymbol});
+        const filled = outcomes.filter((o) => o.success).length;
+        const kind = live ? 'executed' as const : 'preview' as const;
+        await step.run('save', async () => saveFollowDecision({
+            userId, profile, accountId: follow.accountId, date: day.today, weekKey: day.weekKey, kind, items,
+            summary: live ? `${filled}/${plan.orders.length} order(s) filled` : `${plan.orders.length} order(s) planned (preview)`,
+        }));
+        if (live) {
+            await step.run('complete', async () => completeFollowRun({
+                userId, profile,
+                outcomes: plan.orders.map((order, i) => ({symbol: order.symbol, side: order.side, executed: outcomes[i]?.success ?? false, message: outcomes[i]?.message})),
+            }));
+        }
+        const note = live ? undefined : day.dryRun ? 'market closed: previewed, the account trades at the next open run' : 'already ran this week';
+        const message = describeFollowRun({profile, kind, orders: plan.orders.length, filled, note});
+        await step.run('record-job-run', async () => recordJobRun(JOBS.cultureFollowBootstrap.id, message));
         return {success: true, message};
     },
 );

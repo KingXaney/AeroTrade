@@ -4,7 +4,8 @@ import {CULTURE_WIDGET_COPY} from "@/lib/learn/copy/culture";
 
 // Full-width strip linking to /culture?view=picks (the shell provides the <Link> chrome): the
 // two pickers' records and SPY since the launch, in the registry's order and without a sign
-// colour — a dashboard tile ranks nothing — and the newest decision's count.
+// colour — a dashboard tile ranks nothing — the newest decision's count, and under them the
+// reader's own enrolled accounts, when there are any (invariant 8).
 const CulturePicksTile = ({summary}: {summary: CulturePicksSummary}) => {
     const started = summary.comparison.filter((row) => row.returnPct !== null && row.since !== null);
     const since = started[0]?.since ?? null;
@@ -21,6 +22,11 @@ const CulturePicksTile = ({summary}: {summary: CulturePicksSummary}) => {
                             ? CULTURE_WIDGET_COPY.picksLine(started.map((row) => ({label: row.label, ret: formatPct(row.returnPct)})), since)
                             : CULTURE_WIDGET_COPY.picksBuilding}
                     </div>
+                    {summary.yours.length > 0 && (
+                        <div className="text-xs text-fg-muted font-mono mt-0.5" data-culture-yours>
+                            {CULTURE_WIDGET_COPY.yours(summary.yours.map((row) => ({label: row.label, ret: row.returnPct === null ? '—' : formatPct(row.returnPct)})))}
+                        </div>
+                    )}
                 </div>
             </div>
             <span className="text-xs text-fg-muted font-mono">

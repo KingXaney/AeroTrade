@@ -60,7 +60,9 @@ try {
         {symbol: 'AAPL', company: 'Apple Inc', quantity: 10, avgCost: 150},
         {symbol: 'MSFT', company: 'Microsoft', quantity: 5, avgCost: 300},
     ]}});
-    await accounts.insertOne({userId, name: 'Value', cash: 100_000, startingBalance: 100_000, inceptionAt: new Date(), positions: [], createdAt: new Date(), updatedAt: new Date()});
+    const valueInsert = await accounts.insertOne({userId, name: 'Value', cash: 100_000, startingBalance: 100_000, inceptionAt: new Date(), positions: [], createdAt: new Date(), updatedAt: new Date()});
+    // The AI Navigator trades the Value account: /portfolio says so under its name.
+    await db.collection('ainavigators').insertOne({userId, accountId: String(valueInsert.insertedId), status: 'active', enrolledAt: new Date()});
     const mainId = String(main._id);
     const trade = (over) => ({userId, accountId: mainId, symbol: 'AAPL', company: 'Apple Inc', side: 'buy', quantity: 5, price: 150, total: 750, createdAt: new Date(), ...over});
     await db.collection('papertrades').insertMany([
@@ -114,6 +116,13 @@ try {
     await page.keyboard.press('Escape');
     await page.waitForTimeout(300);
     await shot('01-portfolio');
+
+    check('an account nobody else trades carries no traded-by line', await page.locator('[data-traded-by]').count() === 0);
+    await page.goto(`${BASE}/portfolio?account=${String(valueInsert.insertedId)}`, {waitUntil: 'load'});
+    await page.getByText('Holdings', {exact: true}).waitFor({timeout: 30000});
+    const navLine = page.locator('[data-traded-by="navigator"]');
+    check('the Navigator\'s account says who trades it, linking to its decisions', await navLine.count() === 1 && /Traded by the AI Navigator/.test(await navLine.innerText())
+        && await navLine.locator('a[href="/brain?view=navigator"]').count() === 1);
 
     await page.setViewportSize({width: 390, height: 844});
     await page.goto(`${BASE}/portfolio`, {waitUntil: 'load'});

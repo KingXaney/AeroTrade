@@ -7,14 +7,14 @@ import {buildDigestView} from '@/lib/email/digest-view';
 import {renderDigestBody, renderDigestHtml, renderDigestText} from '@/lib/email/digest-render';
 import {parseDigestSummary, type DigestArticle} from '@/lib/email/digest-summary';
 import {buildTopicsSectionHtml, topicsSectionLinks} from '@/lib/email/sections/topics';
-import {FIXTURE_APP, FIXTURE_ARTICLES, FIXTURE_DAY, FIXTURE_MODEL_ANSWER, FIXTURE_NAVIGATOR, FIXTURE_SYMBOLS, FIXTURE_TOPICS} from '@/lib/email/__fixtures__/digest';
+import {FIXTURE_APP, FIXTURE_ARTICLES, FIXTURE_CULTURE, FIXTURE_DAY, FIXTURE_MODEL_ANSWER, FIXTURE_NAVIGATOR, FIXTURE_SYMBOLS, FIXTURE_TOPICS} from '@/lib/email/__fixtures__/digest';
 
 const hrefsOf = (html: string): string[] => [...html.matchAll(/href="([^"]*)"/g)].map((m) => m[1].replace(/&amp;/g, '&'));
 
 const topicsHtml = buildTopicsSectionHtml(FIXTURE_TOPICS, `${FIXTURE_APP}/topics`);
 const view = (articles: DigestArticle[] = FIXTURE_ARTICLES, answer = FIXTURE_MODEL_ANSWER) => buildDigestView({
     day: FIXTURE_DAY, appUrl: FIXTURE_APP, summary: parseDigestSummary(answer, articles, FIXTURE_SYMBOLS)!,
-    readerSymbols: FIXTURE_SYMBOLS, navigator: FIXTURE_NAVIGATOR, topicsHtml, lessonHtml: '',
+    readerSymbols: FIXTURE_SYMBOLS, navigator: FIXTURE_NAVIGATOR, culture: FIXTURE_CULTURE, topicsHtml, lessonHtml: '',
 });
 
 describe('renderDigestHtml', () => {
@@ -30,7 +30,7 @@ describe('renderDigestHtml', () => {
     it('lays out every part of the brief, in order', () => {
         const html = renderDigestHtml(view());
         const order = ['Chipmakers rise on strong orders', 'In 30 seconds', 'Your stocks', 'Why it matters:', 'Markets',
-            'From your news feed', 'What people are posting', 'AI Navigator', 'Your topics', 'All of today’s news on AeroTrade', 'Email preferences'];
+            'From your news feed', 'What people are posting', 'AI Navigator', 'Culture pickers', "decisions for your account, dated", 'Your topics', 'All of today’s news on AeroTrade', 'Email preferences'];
         const at = order.map((text) => html.indexOf(text));
         for (const [i, position] of at.entries()) expect(position, order[i]).toBeGreaterThan(-1);
         expect([...at].sort((a, b) => a - b)).toEqual(at);
@@ -79,5 +79,23 @@ describe('renderDigestText', () => {
         expect(text).toContain('Why it matters: When orders outrun supply');
         expect(text).toContain(`AI chips (${FIXTURE_APP}/topics/ai-chips)`);
         expect(text).not.toMatch(/<[a-z/]/i);
+    });
+});
+
+describe('the culture section', () => {
+    it('renders each enrolled account\'s decisions as text and spells out its links in the plain part', () => {
+        const v = view();
+        const html = renderDigestBody(v);
+        expect(html).toContain('Culture pickers');
+        expect(html).toContain('Sold the whole position');
+        expect(html).toContain(`href="${FIXTURE_APP}/culture?view=picks"`);
+        const text = renderDigestText(v);
+        expect(text).toContain('CULTURE PICKERS');
+        expect(text).toContain(`- CELH: Bought, toward 15% of the account (${FIXTURE_APP}/stocks/CELH)`);
+        expect(text).toContain(`Every decision, with its reasons: ${FIXTURE_APP}/culture?view=picks`);
+        // Without an enrolment the section is absent in both parts.
+        const bare = buildDigestView({day: FIXTURE_DAY, appUrl: FIXTURE_APP, summary: parseDigestSummary(FIXTURE_MODEL_ANSWER, FIXTURE_ARTICLES, FIXTURE_SYMBOLS)!, readerSymbols: FIXTURE_SYMBOLS, navigator: null});
+        expect(renderDigestBody(bare)).not.toContain('Culture pickers');
+        expect(renderDigestText(bare)).not.toContain('CULTURE PICKERS');
     });
 });

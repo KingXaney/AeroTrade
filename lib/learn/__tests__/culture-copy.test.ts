@@ -10,6 +10,7 @@ import {
     BRAND_BOARD_TERMS,
     COMPARISON_TERMS,
     CULTURE_COPY,
+    CULTURE_FOLLOW_COPY,
     CULTURE_GLOSS,
     CULTURE_LEGEND_COPY,
     CULTURE_PICKS_COPY,
@@ -121,13 +122,23 @@ describe('the /culture page copy', () => {
             brandsHint: [160, 30], itemsHint: [40], driftAlarm: [['celsius', 'poppi'], 10], driftClear: [10], earnings: [90],
             universe: ['2026-10-05', 118, 131], accountLine: ['Spike', '2026-10-05', '2026-10-12'],
         };
-        const widgetSamples = {picksLine: [[{label: 'Spike', ret: '+1.20%'}, {label: 'Quiet', ret: '-0.30%'}], '2026-10-05'], decisions: [12, '2026-10-05']};
+        const widgetSamples = {
+            picksLine: [[{label: 'Spike', ret: '+1.20%'}, {label: 'Quiet', ret: '-0.30%'}], '2026-10-05'], decisions: [12, '2026-10-05'],
+            yours: [[{label: 'Spike', ret: '+1.20%'}, {label: 'Quiet', ret: '—'}]],
+        };
+        const followSamples = {
+            heading: ['Spike'], about: ['Spike'], balanceLabel: ['Spike'], enroll: ['Spike', '$50,000'], accountLine: ['Culture · Spike', '2026-10-14'],
+            lastError: ['1 of 4 order(s) failed: CELH — no live price'], pickerPaused: ['Spike'], decisionsHeading: ['Spike'], decisionsEmpty: ['Spike'],
+            decisionsNote: ['Spike'], alreadyEnrolled: ['Spike'], hasHoldings: ['Culture · Spike'], enrolledQueued: ['Spike'], enrolledWeekly: ['Spike'],
+            pausedToast: ['Spike'], resumedToast: ['Spike'], unenrolledToast: ['Spike'],
+        };
         for (const text of [
             ...rendered(CULTURE_COPY, pageSamples),
             ...rendered(CULTURE_PICKS_COPY, picksSamples),
             ...rendered(CULTURE_RECORD_COPY, recordSamples),
             ...rendered(CULTURE_SYSTEM_COPY, systemSamples),
             ...rendered(CULTURE_WIDGET_COPY, widgetSamples),
+            ...rendered(CULTURE_FOLLOW_COPY, followSamples),
             ...Object.values(SOURCE_LABELS),
         ]) {
             clean(text);
@@ -143,6 +154,9 @@ describe('the /culture page copy', () => {
         expect(CULTURE_SYSTEM_COPY.earnings(0)).toMatch(/neutral/);
         expect(CULTURE_WIDGET_COPY.picksLine([{label: 'Spike', ret: '+1.20%'}, {label: 'Quiet', ret: '-0.30%'}], '2026-10-05')).toBe('Spike +1.20% · Quiet -0.30% · since 2026-10-05');
         expect(CULTURE_COPY.suggestionRow(1, '2026-10-01')).toBe('1 mention · first seen 2026-10-01');
+        expect(CULTURE_WIDGET_COPY.yours([{label: 'Spike', ret: '+1.20%'}, {label: 'Quiet', ret: '—'}])).toBe('Yours: Spike +1.20% · Quiet —');
+        expect(CULTURE_FOLLOW_COPY.enroll('Quiet', '$50,000')).toBe('Enroll — Quiet trades $50,000');
+        expect(CULTURE_FOLLOW_COPY.decisionsHeading('Spike')).toBe("Your Spike account's decisions");
     });
 
     it('lists only glossary keys in every panel\'s term list', () => {

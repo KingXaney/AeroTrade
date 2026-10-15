@@ -178,6 +178,53 @@ export const CULTURE_PICKS_COPY = {
     fillSummary: 'What the picker saw',
 } as const;
 
+// Enrolling one of the reader's own paper accounts with a picker (lib/culture/follow.ts): the
+// card's words, the follower's decisions panel and the actions' toasts and refusals. The account
+// is the reader's, so these sentences may say "your account"; they still describe and never
+// advise, and the test holds them to the 'copy' tier.
+export const CULTURE_FOLLOW_COPY = {
+    heading: (label: string): string => `Enroll with ${label}`,
+    about: (label: string): string =>
+        `A paper account of yours that the ${label} picker trades: its weekly targets, sized to this account's cash and holdings, on Mondays at 10:45 ET while the market is open, under the same rails as its own account. An experiment, not financial advice.`,
+    balanceLabel: (label: string): string => `${label} starts with ($)`,
+    enroll: (label: string, dollars: string): string => `Enroll — ${label} trades ${dollars}`,
+    enrolling: 'Enrolling…',
+    active: 'Active',
+    paused: 'Paused',
+    tradeNow: 'Trade now',
+    queueing: 'Queueing…',
+    pause: 'Pause trading',
+    resume: 'Resume trading',
+    view: 'View your account vs SPY →',
+    unenroll: 'Unenroll',
+    confirmUnenroll: 'Confirm unenroll',
+    accountLine: (name: string, since: string): string => `${name} · enrolled ${since}`,
+    lastError: (error: string): string => `Last run error: ${error}`,
+    pickerPaused: (label: string): string => `The ${label} picker itself is paused, so this account waits with it.`,
+    decisionsHeading: (label: string): string => `Your ${label} account's decisions`,
+    decisionsEmpty: (label: string): string =>
+        `No decision for this account yet. The first comes with the enrolment run; after that ${label} trades the account on Mondays at 10:45 ET, while the market is open.`,
+    decisionsNote: (label: string): string => `${label}'s targets for the week, sized to this account's cash and holdings; the picker's own decision above has the brands and the scores behind them.`,
+    previewedOutsideSession: 'The market was closed when the run came, so these orders were planned and none was placed; the account trades at the next open run.',
+    // The actions' toasts and refusals.
+    unknownPicker: 'That picker cannot be enrolled with',
+    tooFast: 'Several changes in one minute — wait a moment and try again',
+    alreadyEnrolled: (label: string): string => `You are already enrolled with ${label}`,
+    hasHoldings: (name: string): string => `Your "${name}" account still has holdings. Empty it (or rename it) before enrolling again.`,
+    couldNotCreate: 'Could not create the account',
+    enrolledQueued: (label: string): string => `Enrolled with ${label} — building the account's first positions now, check back in a few minutes`,
+    enrolledWeekly: (label: string): string => `Enrolled with ${label} — the first positions arrive with the next weekly run`,
+    couldNotEnroll: 'Could not enroll with the picker',
+    notEnrolled: 'Not enrolled',
+    pausedToast: (label: string): string => `${label} paused — it trades nothing in this account until resumed`,
+    resumedToast: (label: string): string => `${label} resumed`,
+    couldNotUpdate: 'Could not update the enrolment',
+    pausedFirst: 'This enrolment is paused — resume it first',
+    queueUnreachable: 'Could not queue the run — is the job queue reachable?',
+    runQueued: 'Run queued — the decision appears under your account in a few minutes',
+    unenrolledToast: (label: string): string => `Unenrolled from ${label} — the paper account was kept`,
+} as const;
+
 export const CULTURE_RECORD_COPY = {
     heading: 'Performance vs SPY',
     tabs: {live: 'Live', simulated: 'Simulated'},
@@ -233,6 +280,8 @@ export const CULTURE_WIDGET_COPY = {
         `${parts.map((part) => `${part.label} ${part.ret}`).join(' · ')} · since ${since}`,
     decisions: (count: number, date: string): string => `${plural(count, 'decision', 'decisions')} · ${date}`,
     schedule: 'Mondays 10:45 ET',
+    // The reader's own enrolled accounts, in the registry's order: "Yours: Spike +1.20% · Quiet —".
+    yours: (parts: readonly {label: string; ret: string}[]): string => `Yours: ${parts.map((part) => `${part.label} ${part.ret}`).join(' · ')}`,
     attentionEmpty: 'No brand has attention yet.',
     attentionFooter: 'slow attention · the brand board has the rest',
 } as const;

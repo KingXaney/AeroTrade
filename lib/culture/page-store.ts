@@ -1,7 +1,8 @@
 // Read side for /culture and its two dashboard widgets (NOT a 'use server' module): the brand
 // board and a brand's evidence, the pickers' records and decisions, and the system view. Every
 // read is global — the brain and its accounts belong to no reader — and cached per request;
-// the shaping is lib/culture/page-view.ts (pure).
+// the shaping is lib/culture/page-view.ts (pure). The one exception is the reader's own
+// enrolments (getCultureFollowsView): the accounts a picker trades for them, read per user.
 
 import {cache} from "react";
 import AccountSnapshot from "@/database/models/account-snapshot.model";
@@ -12,6 +13,8 @@ import {getCultureBacktest} from "@/lib/culture/backtest-store";
 import {brandById} from "@/lib/culture/catalog";
 import {CULTURE_OWNER_ID, CULTURE_PROFILES, LIVE_PROFILES, type ProfileId} from "@/lib/culture/config";
 import type {CultureDecisionItem} from "@/lib/culture/decisions";
+import {followAccountName, followStatusView, LIVE_FOLLOW_PROFILES, type FollowProfile, type FollowStatus} from "@/lib/culture/follow";
+import {getFollows, getLatestFollowDecision, type FollowDecisionView} from "@/lib/culture/follow-store";
 import {
     boardMarks,
     comparisonRows,
@@ -166,19 +169,28 @@ const toLiveRecord = (analytics: AccountAnalytics, snapshotDays: number): LiveRe
     totalReturnPct: analytics.summary.totalReturnPct,
 });
 
-// The decision item behind each culture fill: the same profile, the fill's day, its symbol and side.
-const replaysFor = async (profile: ProfileId, trades: readonly PaperTradeRecord[]): Promise<Record<string, FillReplay>> => {
-    const fills = trades.filter((trade) => trade.source === 'culture-brain');
-    const dateOf = (trade: PaperTradeRecord) => getEasternDateString(new Date(trade.createdAt));
-    const decisions = await getCultureDecisionsForDates(profile, fills.map(dateOf));
+export const cultureFillDates = (trades: readonly PaperTradeRecord[]): string[] =>
+    trades.filter((trade) => trade.source === 'culture-brain').map((trade) => getEasternDateString(new Date(trade.createdAt)));
+
+// The decision item behind each culture fill — the fill's day, its symbol and side — among the
+// decisions given (a picker's own, or an enrolled account's), each fill's reasons glossed.
+export const replaysFromDecisions = (
+    trades: readonly PaperTradeRecord[],
+    decisions: readonly {date: string; items: readonly CultureDecisionItem[]}[],
+): Record<string, FillReplay> => {
     const byDate = new Map(decisions.map((decision) => [decision.date, decision]));
     const replays: Record<string, FillReplay> = {};
-    for (const trade of fills) {
-        const item = byDate.get(dateOf(trade))?.items.find((candidate) => candidate.symbol === trade.symbol && candidate.action === trade.side);
+    for (const trade of trades) {
+        if (trade.source !== 'culture-brain') continue;
+        const date = getEasternDateString(new Date(trade.createdAt));
+        const item = byDate.get(date)?.items.find((candidate) => candidate.symbol === trade.symbol && candidate.action === trade.side);
         if (item) replays[trade.id] = {reasons: item.reasons, gloss: glossCultureReasons(item.reasons)};
     }
     return replays;
 };
+
+const replaysFor = async (profile: ProfileId, trades: readonly PaperTradeRecord[]): Promise<Record<string, FillReplay>> =>
+    replaysFromDecisions(trades, await getCultureDecisionsForDates(profile, cultureFillDates(trades)));
 
 const readPicker = async (id: ProfileId, state: CultureStateView | null, backtest: CultureBacktestView | null): Promise<PickerView> => {
     const [analytics, decision, trades, snapshotDays] = await Promise.all([
@@ -214,21 +226,62 @@ export const getCulturePicksView = cache(async (): Promise<PicksView> => {
     return {pickers, comparison: comparisonRows(records), started: pickers.some((picker) => picker.live !== null), backtest};
 });
 
+// ---- the reader's enrolments ----
+
+export type GlossedFollowDecision = Omit<FollowDecisionView, 'items'> & {items: GlossedDecisionItem[]};
+
+// One per live picker, enrolled or not: what the card and the follower's decisions panel show.
+export type FollowView = {
+    profile: FollowProfile;
+    label: string;
+    status: FollowStatus;
+    accountName: string;
+    // The picker itself is paused: the enrolled account waits with it.
+    pickerPaused: boolean;
+    decision: GlossedFollowDecision | null;
+    record: ProfileRecord | null;
+};
+
+export const getCultureFollowsView = cache(async (userId: string): Promise<FollowView[]> => {
+    const [rows, states] = await Promise.all([getFollows(userId), cStates()]);
+    return Promise.all(LIVE_FOLLOW_PROFILES.map(async (profile): Promise<FollowView> => {
+        const row = rows.find((candidate) => candidate.profile === profile) ?? null;
+        const [decision, analytics] = await Promise.all([
+            row ? getLatestFollowDecision(userId, profile) : Promise.resolve(null),
+            row ? getAccountAnalytics(userId, row.accountId) : Promise.resolve(null),
+        ]);
+        return {
+            profile,
+            label: CULTURE_PROFILES[profile].label,
+            status: followStatusView(row),
+            accountName: followAccountName(profile),
+            pickerPaused: states.find((state) => state.profile === profile)?.status === 'paused',
+            decision: decision && {...decision, items: decision.items.map((item) => ({...item, gloss: glossCultureReasons(item.reasons)}))},
+            record: analytics
+                ? {returnPct: analytics.summary.totalReturnPct, benchmarkReturnPct: analytics.series.at(-1)?.benchmarkPct ?? null, since: getEasternDateString(new Date(analytics.account.inceptionAt))}
+                : null,
+        };
+    }));
+});
+
 // ---- the dashboard tile ----
 
 export type CulturePicksSummary = {
     comparison: ComparisonRow[];
     // The newest decision across the live pickers.
     decisions: {count: number; date: string; kind: CultureDecisionView['kind']} | null;
+    // The reader's own enrolled accounts, in the registry's order; empty when none is enrolled.
+    yours: {profile: FollowProfile; label: string; returnPct: number | null}[];
 };
 
-export const getCulturePicksSummary = cache(async (): Promise<CulturePicksSummary> => {
-    const view = await getCulturePicksView();
+export const getCulturePicksSummary = cache(async (userId: string): Promise<CulturePicksSummary> => {
+    const [view, follows] = await Promise.all([getCulturePicksView(), getCultureFollowsView(userId)]);
     const latest = view.pickers.map((picker) => picker.decision).filter((decision): decision is GlossedDecision => decision !== null)
         .sort((a, b) => b.date.localeCompare(a.date))[0];
     return {
         comparison: view.comparison,
         decisions: latest ? {count: view.pickers.reduce((sum, picker) => sum + (picker.decision?.date === latest.date ? picker.decision.items.length : 0), 0), date: latest.date, kind: latest.kind} : null,
+        yours: follows.filter((follow) => follow.status.enrolled).map((follow) => ({profile: follow.profile, label: follow.label, returnPct: follow.record?.returnPct ?? null})),
     };
 });
 

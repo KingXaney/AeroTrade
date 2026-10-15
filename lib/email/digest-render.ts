@@ -23,7 +23,7 @@ import {
     sourceLine,
 } from "@/lib/email/layout";
 import {DIGEST_COPY} from "@/lib/learn/copy/email";
-import type {DigestNavigatorView, DigestStoryView, DigestView} from "@/lib/email/digest-view";
+import type {DigestCultureView, DigestNavigatorView, DigestStoryView, DigestView} from "@/lib/email/digest-view";
 
 const storyCard = (story: DigestStoryView, accent: boolean): string => card(
     chips(story.chips) +
@@ -46,6 +46,17 @@ const navigatorBlock = (nav: DigestNavigatorView): string => sectionLabel(nav.he
     paragraphHtml(`${linkOrText(nav.link.url, nav.link.label)} &rarr;`, 'small'),
 );
 
+const cultureBlock = (culture: DigestCultureView): string => sectionLabel(culture.heading) + card(
+    paragraph(culture.caveat, 'small') +
+    culture.blocks.map((block) =>
+        paragraph(block.decided) +
+        keyValueRows(block.rows.map((row) => ({
+            keyHtml: linkOrText(row.symbol.url, row.symbol.label, `color: ${EMAIL_COLORS.ink}; text-decoration: none;`),
+            valueHtml: escapeHtml(row.action),
+        })))).join('') +
+    paragraphHtml(`${linkOrText(culture.link.url, culture.link.label)} &rarr;`, 'small'),
+);
+
 // The part of the body built from the view (and so from the model's text): sanitized against
 // the view's own links.
 export const renderDigestBody = (view: DigestView): string => {
@@ -60,6 +71,7 @@ export const renderDigestBody = (view: DigestView): string => {
             (section.note ? paragraph(section.note, 'small') : '') +
             section.stories.map((story) => storyCard(story, section.key === 'mine')).join('')),
         view.navigator ? navigatorBlock(view.navigator) : '',
+        view.culture ? cultureBlock(view.culture) : '',
     ].join('');
     return sanitizeDigestHtml(html, view.allowedUrls);
 };
@@ -111,6 +123,12 @@ export const renderDigestText = (view: DigestView): string => {
         if (nav.rationale) lines.push(nav.rationale);
         if (nav.themes.length > 0) lines.push(`${nav.themesLabel}: ${nav.themes.join(', ')}`);
         lines.push(`${nav.link.label}: ${nav.link.url}`);
+    }
+    if (view.culture) {
+        const culture = view.culture;
+        lines.push('', culture.heading.toUpperCase(), culture.caveat);
+        for (const block of culture.blocks) lines.push(block.decided, ...block.rows.map((r) => `- ${r.symbol.label}: ${r.action} (${r.symbol.url})`));
+        lines.push(`${culture.link.label}: ${culture.link.url}`);
     }
     for (const html of [view.topicsHtml, view.lessonHtml]) {
         const text = htmlToText(html);

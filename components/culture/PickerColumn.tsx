@@ -6,16 +6,18 @@ import HoldingsTable from "@/components/trading/portfolio/HoldingsTable";
 import TradeHistory from "@/components/trading/portfolio/TradeHistory";
 import CultureRecord from "@/components/culture/CultureRecord";
 import FillReplay from "@/components/culture/FillReplay";
+import FollowPickerCard from "@/components/culture/FollowPickerCard";
 import PicksPanel from "@/components/culture/PicksPanel";
-import type {PickerView} from "@/lib/culture/page-store";
+import type {FollowView, PickerView} from "@/lib/culture/page-store";
 import {pickPerfMode} from "@/lib/strategies/views";
 import type {PaperTradeRecord} from "@/lib/trading/types";
-import {CULTURE_PICKS_COPY} from "@/lib/learn/copy/culture";
+import {CULTURE_FOLLOW_COPY, CULTURE_PICKS_COPY} from "@/lib/learn/copy/culture";
 
-// One picker, top to bottom: what it follows, its account, its record against SPY, its latest
-// decision, its holdings and its trade log. The pickers view lays two of these side by side so
-// the same panels of each can be read across; nothing here says which is ahead.
-const PickerColumn = ({picker}: {picker: PickerView}) => {
+// One picker, top to bottom: what it follows, the reader's own enrolment with it (the card, and
+// once enrolled the decisions it made for their account), its account, its record against SPY,
+// its latest decision, its holdings and its trade log. The pickers view lays two of these side
+// by side so the same panels of each can be read across; nothing here says which is ahead.
+const PickerColumn = ({picker, follow}: {picker: PickerView; follow: FollowView | null}) => {
     const replayFor = (trade: PaperTradeRecord) => {
         const replay = picker.fillReplays[trade.id];
         return replay ? <FillReplay replay={replay} /> : null;
@@ -27,6 +29,29 @@ const PickerColumn = ({picker}: {picker: PickerView}) => {
                 <p className="text-sm text-fg-soft mt-2" data-picker-lead>{CULTURE_PICKS_COPY.profileLead(picker.label, picker.follows)}</p>
                 <MicroLabel as="p" className="mt-2">{CULTURE_PICKS_COPY.accountLine(picker.accountName, picker.state?.launchDate ?? null)}</MicroLabel>
             </Panel>
+
+            {follow && (
+                <FollowPickerCard
+                    profile={follow.profile}
+                    label={follow.label}
+                    status={follow.status}
+                    accountName={follow.accountName}
+                    pickerPaused={follow.pickerPaused}
+                />
+            )}
+
+            {follow?.status.enrolled && (
+                <Panel id={`culture-follow-${picker.id}`} data-follow-decisions={picker.id}>
+                    <SectionHeading>{CULTURE_FOLLOW_COPY.decisionsHeading(follow.label)}</SectionHeading>
+                    <PicksPanel
+                        decision={follow.decision}
+                        scope="follow"
+                        emptyText={CULTURE_FOLLOW_COPY.decisionsEmpty(follow.label)}
+                        note={CULTURE_FOLLOW_COPY.decisionsNote(follow.label)}
+                        previewNote={CULTURE_FOLLOW_COPY.previewedOutsideSession}
+                    />
+                </Panel>
+            )}
 
             {picker.analytics && <AccountSummary portfolio={picker.analytics.summary} income={picker.analytics.income} definitions />}
 

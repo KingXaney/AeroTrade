@@ -10,8 +10,13 @@
 // with its marks explained once, a brand's evidence with its labels (a stored javascript: link
 // never an anchor), the two pickers side by side with every reason read in plain words and a
 // strip that colours nothing, the system view, the legend last and collapsed, the two widgets
-// from the library, and a phone width without a horizontal scroll. The daily job itself is not
-// fired here: its sources are the real Wikipedia, App Store and Google News.
+// from the library, and a phone width without a horizontal scroll. Then enrolling one of the
+// reader's own accounts with a picker (lib/culture/follow.ts): the card, the account and row the
+// action makes, the enrolment run through the dev server (every fill failing for want of a
+// price, as the pickers' own do), the follower's decisions panel, the weekly run skipping a
+// claimed week and trading an unclaimed one, the portfolio's traded-by line and delete refusal,
+// the widget's line, and unenrolling (the account stays, re-enrolling reuses it). The daily job
+// itself is not fired here: its sources are the real Wikipedia, App Store and Google News.
 // Run: npm run qa -- culture   (the harness: README.md)
 import {chromium} from 'playwright';
 import {MongoClient} from 'mongodb';
@@ -20,7 +25,7 @@ import {BASE, INNGEST, MONGO, REPO_ROOT, check, note, outDir, signUp, summary} f
 
 const OUT = outDir('culture');
 const COLLECTIONS = ['cultureentities', 'cultureattentions', 'cultureitems', 'culturesuggestions'];
-const WEEKLY_COLLECTIONS = ['culturestates', 'culturedecisions', 'cultureuniverses', 'cultureearnings'];
+const WEEKLY_COLLECTIONS = ['culturestates', 'culturedecisions', 'cultureuniverses', 'cultureearnings', 'culturefollows', 'culturefollowdecisions'];
 const OWNER = 'system:culture';
 const BAR_SYMBOLS = ['CELH', 'PEP', 'SPY', '^IRX'];
 const mongo = new MongoClient(MONGO);
@@ -44,6 +49,13 @@ const cleanupWeekly = async (db, storedBars, storedMetas) => {
         if (storedMetas.length > 0) await db.collection('priceseriesmetas').insertMany(storedMetas);
     }
     await db.collection('culturebacktests').deleteMany({});
+    // The reader's own enrolled accounts, by name (the user is signed up afresh each run).
+    const enrolled = (await db.collection('paperaccounts').find({name: {$in: ['Culture · Spike', 'Culture · Quiet']}}).project({_id: 1}).toArray()).map((a) => String(a._id));
+    if (enrolled.length > 0) {
+        await db.collection('paperaccounts').deleteMany({name: {$in: ['Culture · Spike', 'Culture · Quiet']}});
+        await db.collection('papertrades').deleteMany({accountId: {$in: enrolled}});
+        await db.collection('accountsnapshots').deleteMany({accountId: {$in: enrolled}});
+    }
     const ids = (await db.collection('paperaccounts').find({userId: OWNER}).project({_id: 1}).toArray()).map((a) => String(a._id));
     await db.collection('paperaccounts').deleteMany({userId: OWNER});
     await db.collection('papertrades').deleteMany({userId: OWNER});
@@ -58,7 +70,7 @@ try {
     const db = mongo.db();
     for (const name of COLLECTIONS) await db.collection(name).deleteMany({});
     await cleanupWeekly(db, null, null);
-    await db.collection('jobruns').deleteMany({jobId: 'culture-brain-weekly'});
+    await db.collection('jobruns').deleteMany({jobId: {$in: ['culture-brain-weekly', 'culture-follow-bootstrap']}});
 
     // The app's modules connect through database/mongoose, which reads MONGODB_URI at load.
     process.env.MONGODB_URI = MONGO;
@@ -68,6 +80,7 @@ try {
     const update = await jiti.import(`${REPO_ROOT}lib/culture/update.ts`);
     const {SOURCE_FOLD_WEIGHTS, FALLBACK_IMPORTANCE} = await jiti.import(`${REPO_ROOT}lib/culture/config.ts`);
     const {CULTURE_BRANDS} = await jiti.import(`${REPO_ROOT}lib/culture/catalog.ts`);
+    const {getEasternWeekKey: getEasternWeekKeyOf} = await jiti.import(`${REPO_ROOT}lib/dates.ts`);
 
     const today = etDate(new Date());
     const asOf = addDays(today, -1);
@@ -193,6 +206,17 @@ try {
     // Finnhub key: every fill answers "no live price", which is the outcome under test. What
     // the run leaves — the accounts, the decisions, the universe rows — the page section reads.
     const inngestUp = await fetch(`${INNGEST}/`).then((r) => r.ok).catch(() => false);
+    const fireEvent = (name, data) => fetch(`${INNGEST}/e/qa`, {method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify({name, data})});
+    const pollUntil = async (predicate, timeoutMs) => {
+        const until = Date.now() + timeoutMs;
+        while (Date.now() < until) {
+            const value = await predicate();
+            if (value) return value;
+            await new Promise((resolve) => setTimeout(resolve, 2000));
+        }
+        return null;
+    };
+    const jobMessageOf = async (jobId) => (await db.collection('jobruns').findOne({jobId}))?.lastMessage ?? '';
     let decisions = null;
     if (!inngestUp) {
         note('no Inngest dev server', 'the weekly picker checks are skipped; the page is checked before any run');
@@ -245,17 +269,8 @@ try {
         }
         await store.writeAttentionRows(views);
 
-        const fire = (data) => fetch(`${INNGEST}/e/qa`, {method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify({name: 'app/run.culture.brain', data})});
-        const pollUntil = async (predicate, timeoutMs) => {
-            const until = Date.now() + timeoutMs;
-            while (Date.now() < until) {
-                const value = await predicate();
-                if (value) return value;
-                await new Promise((resolve) => setTimeout(resolve, 2000));
-            }
-            return null;
-        };
-        const jobMessage = async () => (await db.collection('jobruns').findOne({jobId: 'culture-brain-weekly'}))?.lastMessage ?? '';
+        const fire = (data) => fireEvent('app/run.culture.brain', data);
+        const jobMessage = () => jobMessageOf('culture-brain-weekly');
 
         const firstRun = await fire({force: true});
         check('the weekly event is accepted by the dev server', firstRun.ok, `status ${firstRun.status}`);
@@ -508,6 +523,125 @@ try {
         check(`${path} has no horizontal scroll at 375px`, overflow <= 1, `${overflow}px`);
     }
     await shot('06-phone');
+    await page.setViewportSize({width: 1440, height: 900});
+
+    // ---- enrolling one of the reader's own accounts with a picker ----
+    // The card offers Enroll; the action makes a "Culture · Spike" account at the typed balance
+    // and an active row, and queues the bootstrap. The harness has no Finnhub key, so a fill
+    // fails for want of a price — the outcome under test, as for the pickers' own accounts.
+    await page.goto(`${BASE}/culture?view=picks`, {waitUntil: 'domcontentloaded'});
+    const spikeCard = page.locator('[data-follow-card="spike"]');
+    await spikeCard.waitFor({timeout: 60000});
+    check('each picker carries an enrolment card offering Enroll, none enrolled', await page.locator('[data-follow-card]').count() === 2
+        && await page.locator('[data-follow-enroll]').count() === 2 && await page.locator('[data-follow-status]').count() === 0 && await page.locator('[data-follow-decisions]').count() === 0);
+    const cardText = await spikeCard.innerText();
+    check('the card says what the picker does with the account and that it is an experiment', /sized to this account/.test(cardText) && /not financial advice/.test(cardText) && mechanismFree(cardText), cardText.replace(/\s+/g, ' ').slice(0, 200));
+    await spikeCard.locator('#follow-balance-spike').fill('50000');
+    check('the button names the picker and the balance typed', /Enroll — Spike trades \$50,000/.test(await spikeCard.locator('[data-follow-enroll]').innerText()));
+    await spikeCard.locator('[data-follow-enroll]').click();
+    await spikeCard.locator('[data-follow-status="active"]').waitFor({timeout: 30000});
+    const followRow = await db.collection('culturefollows').findOne({userId, profile: 'spike'});
+    const followAccount = followRow ? await db.collection('paperaccounts').findOne({_id: new (await import('mongodb')).ObjectId(followRow.accountId)}) : null;
+    check('enrolling makes an active row and a "Culture · Spike" account of the reader\'s at the typed balance', followRow?.status === 'active' && followAccount?.userId === userId
+        && followAccount?.name === 'Culture · Spike' && followAccount?.startingBalance === 50000 && followAccount?.cash === 50000, JSON.stringify({row: followRow?.status, account: followAccount?.name, balance: followAccount?.startingBalance}));
+    check('the card now shows Active, Trade now, Pause, the link to the account and Unenroll', await spikeCard.locator('[data-follow-run]').count() === 1 && await spikeCard.locator('[data-follow-pause]').count() === 1
+        && await spikeCard.locator(`a[href="/portfolio?account=${followRow?.accountId}"]`).count() === 1 && await spikeCard.locator('[data-follow-unenroll]').count() === 1);
+    check('…and the column gains the account\'s decisions panel, empty until the first run', await page.locator('[data-follow-decisions="spike"]').count() === 1
+        && /No decision for this account yet/.test(await page.locator('[data-follow-decisions="spike"]').innerText()));
+    check('the Quiet card still offers Enroll', await page.locator('[data-follow-card="quiet"] [data-follow-enroll]').count() === 1);
+
+    const accountId = followRow?.accountId ?? '';
+    if (inngestUp && decisions) {
+        // The enrolment run (the action queued one too; a forced one here settles the session).
+        const followMessage = () => jobMessageOf('culture-follow-bootstrap');
+        await fireEvent('app/bootstrap.culture.follow', {userId, profile: 'spike', force: true});
+        const followDecision = await pollUntil(async () => {
+            const doc = await db.collection('culturefollowdecisions').findOne({userId, profile: 'spike', kind: 'executed'});
+            return doc && /Culture enrolment/.test(await followMessage()) ? doc : null;
+        }, 240_000);
+        check('the enrolment run writes an executed decision for the account and stamps its job', followDecision !== null, await followMessage());
+        if (followDecision) {
+            const pickerDecision = decisions.find((d) => d.profile === 'spike');
+            const orders = followDecision.items.filter((i) => i.action !== 'hold');
+            check('…its orders are the picker\'s targets, every fill failing for want of a price', orders.length > 0 && orders.every((i) => i.executed === false && /live price/.test(i.error ?? ''))
+                && orders.every((i) => pickerDecision.items.some((p) => p.symbol === i.symbol)), `${orders.length} orders: ${orders.map((i) => `${i.action} ${i.symbol}`).join(', ')}`);
+            check('…the week is claimed on the row and the failures noted', (await db.collection('culturefollows').findOne({userId, profile: 'spike'}))?.lastRunWeek === getEasternWeekKeyOf(today)
+                && /failed/.test((await db.collection('culturefollows').findOne({userId, profile: 'spike'}))?.lastError ?? ''));
+            check('the account itself is untouched when nothing filled', (await db.collection('paperaccounts').findOne({_id: followAccount._id}))?.cash === 50000);
+
+            await page.goto(`${BASE}/culture?view=picks`, {waitUntil: 'domcontentloaded'});
+            const followPanel = page.locator('[data-follow-decisions="spike"]');
+            await followPanel.waitFor({timeout: 60000});
+            const followGlosses = await followPanel.locator('[data-culture-gloss]').count();
+            check('the account\'s decisions panel prints the items, each with one closed "What the picker saw"', await followPanel.locator('[data-culture-follow-decision="spike"]').count() === 1
+                && followGlosses === followDecision.items.length && await followPanel.locator('[data-culture-gloss][open]').count() === 0, `${followGlosses} glosses`);
+            check('…and names the picker\'s targets, not a universe of its own', /sized to this account/.test(await followPanel.innerText()) && !/owners quoted/.test(await followPanel.innerText()));
+            check('the picker\'s own decision panel is unchanged beside it', await page.locator('[data-picker="spike"] [data-culture-decision="spike"]').count() === 1);
+            await shot('07-enrolled');
+
+            // The weekly run, with the pickers' own claims backdated so it runs past its early
+            // return: it passes over the enrolment the bootstrap already claimed this week; with
+            // that claim backdated too, it trades the account.
+            await db.collection('culturestates').updateMany({}, {$set: {lastRunWeek: '2020-W01'}});
+            await fireEvent('app/run.culture.brain', {force: true});
+            const skipped = await pollUntil(async () => (/enrolled accounts: 0 traded, 1 skipped/.test(await jobMessageOf('culture-brain-weekly')) ? await jobMessageOf('culture-brain-weekly') : null), 240_000);
+            check('the weekly run passes over an enrolment that already ran this week', skipped !== null, await jobMessageOf('culture-brain-weekly'));
+            await db.collection('culturefollows').updateOne({userId, profile: 'spike'}, {$set: {lastRunWeek: '2020-W01'}});
+            await db.collection('culturestates').updateMany({}, {$set: {lastRunWeek: '2020-W01'}});
+            await fireEvent('app/run.culture.brain', {force: true});
+            const traded = await pollUntil(async () => (/enrolled accounts: 1 traded/.test(await jobMessageOf('culture-brain-weekly')) ? await jobMessageOf('culture-brain-weekly') : null), 240_000);
+            check('…and trades it once the week is unclaimed, this week\'s decision written again', traded !== null
+                && (await db.collection('culturefollows').findOne({userId, profile: 'spike'}))?.lastRunWeek === getEasternWeekKeyOf(today), await jobMessageOf('culture-brain-weekly'));
+        }
+    } else {
+        note('enrolment run skipped', 'no Inngest dev server or no picker decision; the card, the row, the portfolio line and the delete refusal are still checked');
+    }
+
+    // The portfolio names the picker and refuses the delete.
+    await page.goto(`${BASE}/portfolio?account=${accountId}`, {waitUntil: 'load'});
+    await page.getByText('Holdings', {exact: true}).waitFor({timeout: 30000});
+    const tradedBy = page.locator('[data-traded-by="culture:spike"]');
+    check('/portfolio says the Spike picker trades the account, with the way to its decisions', await tradedBy.count() === 1 && /Traded by the Spike culture picker/.test(await tradedBy.innerText())
+        && await tradedBy.locator('a[href="/culture?view=picks"]').count() === 1);
+    const {deletePaperAccount} = await jiti.import(`${REPO_ROOT}lib/trading/lifecycle.ts`).then(() => ({deletePaperAccount: null}));
+    void deletePaperAccount;
+    const lifecycle = await jiti.import(`${REPO_ROOT}lib/trading/lifecycle.ts`);
+    const refusal = await lifecycle.deleteOwnedAccount(userId, accountId);
+    check('deleting the account is refused while the picker trades in it, and nothing is removed', refusal.success === false && /culture picker/.test(refusal.message) && /unenroll/i.test(refusal.message)
+        && (await db.collection('paperaccounts').countDocuments({_id: followAccount._id})) === 1, refusal.message);
+    await shot('08-portfolio-enrolled');
+
+    // The widget prints the reader's own line.
+    await page.goto(`${BASE}/dashboard`, {waitUntil: 'load'});
+    await page.locator('[data-widget-id="culture-picks"]').waitFor({timeout: 60000});
+    check('the Culture Brain tile prints the reader\'s own enrolled account', /Yours: Spike/.test(await page.locator('[data-widget-id="culture-picks"] [data-culture-yours]').innerText()));
+
+    // Pause, resume, then unenroll: the row goes, the account stays; enrolling again reuses it.
+    await page.goto(`${BASE}/culture?view=picks`, {waitUntil: 'domcontentloaded'});
+    await spikeCard.locator('[data-follow-pause]').waitFor({timeout: 60000});
+    await spikeCard.locator('[data-follow-pause]').click();
+    await spikeCard.locator('[data-follow-status="paused"]').waitFor({timeout: 30000});
+    check('Pause marks the row paused and takes Trade now away', (await db.collection('culturefollows').findOne({userId, profile: 'spike'}))?.status === 'paused' && await spikeCard.locator('[data-follow-run]').count() === 0);
+    await spikeCard.locator('[data-follow-resume]').click();
+    await spikeCard.locator('[data-follow-status="active"]').waitFor({timeout: 30000});
+    await spikeCard.locator('[data-follow-unenroll]').click();
+    check('Unenroll asks once', /Confirm unenroll/.test(await spikeCard.locator('[data-follow-unenroll]').innerText()));
+    await spikeCard.locator('[data-follow-unenroll]').click();
+    await spikeCard.locator('[data-follow-enroll]').waitFor({timeout: 30000});
+    check('unenrolling removes the row and keeps the account', (await db.collection('culturefollows').countDocuments({userId})) === 0
+        && (await db.collection('paperaccounts').countDocuments({_id: followAccount._id})) === 1 && await page.locator('[data-follow-decisions]').count() === 0);
+    await spikeCard.locator('#follow-balance-spike').fill('60000');
+    await spikeCard.locator('[data-follow-enroll]').click();
+    await spikeCard.locator('[data-follow-status="active"]').waitFor({timeout: 30000});
+    const reused = await db.collection('paperaccounts').find({userId, name: 'Culture · Spike'}).toArray();
+    check('enrolling again reuses the empty account at the new balance, never a second one', reused.length === 1 && String(reused[0]._id) === accountId && reused[0].startingBalance === 60000 && reused[0].cash === 60000,
+        JSON.stringify(reused.map((a) => [a.startingBalance, a.cash])));
+    for (const path of ['/culture?view=picks', `/portfolio?account=${accountId}`]) {
+        await page.goto(`${BASE}${path}`, {waitUntil: 'domcontentloaded'});
+        await page.locator('[data-follow-card], [data-traded-by]').first().waitFor({timeout: 60000});
+        const text = await page.locator('main').innerText().catch(() => page.locator('body').innerText());
+        check(`${path} keeps to the descriptive voice`, !/\b(should|recommend|best|optimal)\b/i.test(text), text.match(/.{0,40}\b(should|recommend|best|optimal)\b.{0,40}/i)?.[0] ?? '');
+    }
     await page.close();
 } catch (err) {
     check(`threw: ${err.message}`, false, err.stack);
