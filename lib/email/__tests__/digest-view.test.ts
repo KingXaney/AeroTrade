@@ -6,11 +6,11 @@ import {describe, expect, it} from 'vitest';
 import {buildDigestView, longDate, plainText, sectionOf, shortDate} from '@/lib/email/digest-view';
 import {fallbackDigestSummary, parseDigestSummary, type DigestSource} from '@/lib/email/digest-summary';
 import {DIGEST_COPY} from '@/lib/learn/copy/email';
-import {FIXTURE_APP, FIXTURE_ARTICLES, FIXTURE_DAY, FIXTURE_MODEL_ANSWER, FIXTURE_NAVIGATOR, FIXTURE_SYMBOLS} from '@/lib/email/__fixtures__/digest';
+import {FIXTURE_APP, FIXTURE_ARTICLES, FIXTURE_CULTURE, FIXTURE_DAY, FIXTURE_MODEL_ANSWER, FIXTURE_NAVIGATOR, FIXTURE_SYMBOLS} from '@/lib/email/__fixtures__/digest';
 
 const summary = () => parseDigestSummary(FIXTURE_MODEL_ANSWER, FIXTURE_ARTICLES, FIXTURE_SYMBOLS)!;
 const view = (over: Partial<Parameters<typeof buildDigestView>[0]> = {}) => buildDigestView({
-    day: FIXTURE_DAY, appUrl: `${FIXTURE_APP}/`, summary: summary(), readerSymbols: FIXTURE_SYMBOLS, navigator: FIXTURE_NAVIGATOR, ...over,
+    day: FIXTURE_DAY, appUrl: `${FIXTURE_APP}/`, summary: summary(), readerSymbols: FIXTURE_SYMBOLS, navigator: FIXTURE_NAVIGATOR, culture: FIXTURE_CULTURE, ...over,
 });
 const source = (over: Partial<DigestSource>): DigestSource => ({headline: 'h', source: 'S', url: 'https://x.example.com/1', kind: 'finance', symbols: [], ...over});
 
@@ -73,6 +73,23 @@ describe('buildDigestView', () => {
         expect(view({navigator: {...FIXTURE_NAVIGATOR, items: [{action: 'buy', symbol: '<script>', targetWeightPct: 5, executed: true}]}}).navigator).toBeNull();
     });
 
+    it("builds one block per culture picker the reader enrolled with, from the stored decisions", () => {
+        const culture = view().culture!;
+        expect(culture.heading).toBe('Culture pickers');
+        expect(culture.blocks.map((b) => b.profile)).toEqual(['spike', 'quiet']);
+        expect(culture.blocks[0].decided).toBe("Spike's decisions for your account, dated Monday, October 5, 2026:");
+        expect(culture.blocks[0].rows).toEqual([
+            {symbol: {label: 'CELH', url: `${FIXTURE_APP}/stocks/CELH`}, action: 'Bought, toward 15% of the account'},
+            {symbol: {label: 'DUOL', url: `${FIXTURE_APP}/stocks/DUOL`}, action: 'Planned to buy, toward 12% of the account'},
+        ]);
+        expect(culture.blocks[1].rows.map((r) => r.action)).toEqual(['Sold the whole position', 'Kept, toward 10% of the account']);
+        expect(culture.link.url).toBe(`${FIXTURE_APP}/culture?view=picks`);
+        // Nothing enrolled, or nothing the ticker rule lets through: no section at all.
+        expect(view({culture: null}).culture).toBeNull();
+        expect(view({culture: undefined}).culture).toBeNull();
+        expect(view({culture: {profiles: [{...FIXTURE_CULTURE.profiles[0], items: [{action: 'buy', symbol: 'bad ticker', targetWeightPct: 5, executed: true}]}]}}).culture).toBeNull();
+    });
+
     it('says when it fell back to the outlets’ own words', () => {
         const fallback = view({summary: fallbackDigestSummary(FIXTURE_ARTICLES, FIXTURE_SYMBOLS)});
         expect(fallback.headline).toBe(DIGEST_COPY.fallbackHeadline);
@@ -95,7 +112,9 @@ describe('buildDigestView', () => {
         const held = [
             ...v.bullets.flatMap((b) => b.sources.map((s) => s.url)),
             ...v.sections.flatMap((s) => s.stories.flatMap((story) => [...story.sources, ...story.chips].map((l) => l.url))),
-            ...v.navigator!.rows.map((r) => r.symbol.url), v.navigator!.link.url, v.cta.url, ...v.footerLinks.map((l) => l.url),
+            ...v.navigator!.rows.map((r) => r.symbol.url), v.navigator!.link.url,
+            ...v.culture!.blocks.flatMap((b) => b.rows.map((r) => r.symbol.url)), v.culture!.link.url,
+            v.cta.url, ...v.footerLinks.map((l) => l.url),
         ];
         expect(new Set(v.allowedUrls)).toEqual(new Set(held));
         expect(v.allowedUrls).toContain(`${FIXTURE_APP}/settings#notifications`);

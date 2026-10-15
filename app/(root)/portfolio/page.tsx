@@ -7,6 +7,8 @@ import {getPortfolioPageView} from "@/lib/trading/portfolio-page-store";
 import AccountSummary from "@/components/trading/portfolio/AccountSummary";
 import PositionsTable from "@/components/trading/portfolio/PositionsTable";
 import TradeHistory from "@/components/trading/portfolio/TradeHistory";
+import TradedBy from "@/components/trading/portfolio/TradedBy";
+import FillReplay from "@/components/culture/FillReplay";
 import ResetAccountButton from "@/components/trading/accounts/ResetAccountButton";
 import AccountSwitcher from "@/components/trading/accounts/AccountSwitcher";
 import ManageAccountMenu from "@/components/trading/accounts/ManageAccountMenu";
@@ -50,6 +52,7 @@ const PortfolioPage = async ({searchParams}: PortfolioPageProps) => {
                         {account.name}
                     </h1>
                     <p className="text-sm text-fg-muted">{view.summaryLine}</p>
+                    <TradedBy by={view.tradedBy} />
                 </div>
                 <div className="flex flex-wrap items-center gap-3">
                     <AccountSwitcher accounts={view.switcherAccounts} activeId={account.id} />
@@ -141,7 +144,17 @@ const PortfolioPage = async ({searchParams}: PortfolioPageProps) => {
                     <SectionHeading>
                         Trade History
                     </SectionHeading>
-                    <TradeHistory trades={tradeLog.trades} totalCount={analytics?.tradeCount} exportHref={tradeLog.exportHref} receipts={tradeLog.receipts} buyNotesBySellId={tradeLog.buyNotesBySellId} />
+                    <TradeHistory
+                        trades={tradeLog.trades}
+                        totalCount={analytics?.tradeCount}
+                        exportHref={tradeLog.exportHref}
+                        receipts={tradeLog.receipts}
+                        buyNotesBySellId={tradeLog.buyNotesBySellId}
+                        detail={(trade) => {
+                            const replay = tradeLog.replays[trade.id];
+                            return replay ? <FillReplay replay={replay} /> : null;
+                        }}
+                    />
                 </Panel>
             )}
         </div>

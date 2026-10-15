@@ -26,6 +26,8 @@ reads and writes live. Change a field here, then in the store module named besid
 | `culture-item` | culture | `lib/culture/ingest` (the daily sources, the model's labels), `store` (evidence reads) |
 | `culture-state` | culture | `lib/culture/picker-store` — one row per picker profile: its shared account, its launch, the week it last claimed |
 | `culture-decision` | culture | `lib/culture/picker-store` — a picker's orders and kept positions for a day, the brands behind each, the universe audit, its rationale |
+| `culture-follow` | culture | `lib/culture/follow-store` — a reader's enrolment of one of their accounts with a picker: unique per user and profile, active or paused, `lastRunWeek` the atomic weekly claim |
+| `culture-follow-decision` | culture | `lib/culture/follow-store` — what a picker decided for an enrolled account on a day (its items, executed or preview); unique per user, profile and day |
 | `culture-universe` | culture | `lib/culture/picker-store` — the week's quote check per owner, read before Finnhub is asked |
 | `culture-earnings` | culture | `lib/culture/picker-store` — each owner's last and next report dates from the earnings calendar |
 | `culture-suggestion` | culture | `lib/culture/store` — brand names the model met that the catalog lacks; a person adds one in code |

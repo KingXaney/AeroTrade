@@ -76,6 +76,14 @@ export const DIGEST_COPY = {
         themes: 'Themes the news brain is following',
         link: 'Every decision, with its reasons',
     },
+    // The reader's accounts enrolled with the culture pickers, one block per picker; the rows
+    // borrow the Navigator's verbs.
+    culture: {
+        heading: 'Culture pickers',
+        caveat: 'An automated paper-trading experiment: a culture picker trades this account of yours on its own rules. This is a record of what it did, not advice.',
+        decided: (label: string, date: string): string => `${label}'s decisions for your account, dated ${date}:`,
+        link: 'Every decision, with its reasons',
+    },
     // The plain-text part's own words.
     text: {
         rule: '----------------------------------------',

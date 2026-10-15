@@ -9,7 +9,11 @@ import {countUnpriced} from "@/lib/trading/analytics";
 import {getLuckOrSkill} from "@/lib/trading/learn/luck-store";
 import {getTradingHabits} from "@/lib/trading/learn/habits-store";
 import {pickActiveAccount} from "@/lib/trading/active-account";
+import {TRADE_HISTORY_LIMIT} from "@/lib/trading/config";
 import {marketStatus} from "@/lib/prices/market-hours";
+import {tradedBy as readTradedBy, type TradedBy} from "@/lib/trading/traded-by";
+import {getFollowDecisionsForDates} from "@/lib/culture/follow-store";
+import {cultureFillDates, replaysFromDecisions, type FillReplay} from "@/lib/culture/page-store";
 import {toPortfolioPageView, type PortfolioPageView} from "@/lib/trading/portfolio-page";
 
 // `preferredId` is preferredAccountId's answer: ?account=, else the active-account cookie.
@@ -48,13 +52,30 @@ export const getPortfolioPageView = async (userId: string, preferredId: string |
         // A ledger that could not be read cannot say whose fills these are; the panel reads as before.
         ownFills: ledger === null || ledger.some((trade) => trade.source === 'user'),
     }));
-    const [ledger, analytics, comparisonStats, income, luck, habits] = await Promise.all([
+    // Who else trades here (the line under the name; null when nobody or when the read failed),
+    // and for an account a culture picker trades, the decision behind each culture fill on the
+    // log — read from the enrolment's own decisions, bounded by the fills' dates.
+    const tradedByRead: Promise<TradedBy> = readTradedBy(userId, account.id).catch((error) => {
+        console.error('Portfolio: reading who trades in the account failed:', error);
+        return null;
+    });
+    const replaysRead: Promise<Record<string, FillReplay>> = Promise.all([ledgerRead, tradedByRead]).then(async ([ledger, by]) => {
+        if (!ledger || by?.kind !== 'culture') return {};
+        const tail = ledger.slice(-TRADE_HISTORY_LIMIT);
+        return replaysFromDecisions(tail, await getFollowDecisionsForDates(userId, by.profile, cultureFillDates(tail)));
+    }).catch((error) => {
+        console.error('Portfolio: reading the culture fills\' decisions failed:', error);
+        return {};
+    });
+    const [ledger, analytics, comparisonStats, income, luck, habits, tradedBy, fillReplays] = await Promise.all([
         ledgerRead,
         getAccountAnalytics(userId, account.id),
         getComparisonStats(userId, Object.fromEntries(all.map((x) => [x.account.id, x.summary.totalValue]))),
         getIncomeActivity(userId, account.id),
         luckRead,
         habitsRead,
+        tradedByRead,
+        replaysRead,
     ]);
 
     return toPortfolioPageView({
@@ -67,5 +88,7 @@ export const getPortfolioPageView = async (userId: string, preferredId: string |
         luck,
         habits,
         marketOpen: marketStatus().state === 'open',
+        tradedBy,
+        fillReplays,
     });
 };

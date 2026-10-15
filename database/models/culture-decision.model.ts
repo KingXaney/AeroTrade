@@ -31,7 +31,7 @@ export interface CultureDecisionDoc extends Document {
     createdAt: Date;
 }
 
-const CultureDecisionItemSchema = new Schema<CultureDecisionItemDoc>(
+export const CultureDecisionItemSchema = new Schema<CultureDecisionItemDoc>(
     {
         symbol: {type: String, required: true},
         action: {type: String, required: true, enum: ['buy', 'sell', 'hold']},

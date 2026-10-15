@@ -39,7 +39,7 @@ try {
 
     const input = (over = {}) => ({
         user: {id: `${tag}-b`, email: `${tag}-b@example.com`}, day, test: false,
-        news: {articles: fx.FIXTURE_ARTICLES, symbols: fx.FIXTURE_SYMBOLS}, navigator: fx.FIXTURE_NAVIGATOR,
+        news: {articles: fx.FIXTURE_ARTICLES, symbols: fx.FIXTURE_SYMBOLS}, navigator: fx.FIXTURE_NAVIGATOR, culture: fx.FIXTURE_CULTURE,
         sections: {topicsSection: '', lessonSection: ''}, modelText: fx.FIXTURE_MODEL_ANSWER, ...over,
     });
     check('send: the day\'s brief goes out once', await sendUserDigest(input()) === 'sent');
@@ -71,7 +71,7 @@ const lessonHtml = sanitizeDigestHtml(buildLessonSectionHtml(lessonInput, fx.FIX
 
 const digestView = (summaryValue) => buildDigestView({
     day: fx.FIXTURE_DAY, appUrl: fx.FIXTURE_APP, summary: summaryValue, readerSymbols: fx.FIXTURE_SYMBOLS,
-    navigator: fx.FIXTURE_NAVIGATOR, topicsHtml, lessonHtml,
+    navigator: fx.FIXTURE_NAVIGATOR, culture: fx.FIXTURE_CULTURE, topicsHtml, lessonHtml,
 });
 const written = digestView(parseDigestSummary(fx.FIXTURE_MODEL_ANSWER, fx.FIXTURE_ARTICLES, fx.FIXTURE_SYMBOLS));
 const fallback = digestView(fallbackDigestSummary(fx.FIXTURE_ARTICLES, fx.FIXTURE_SYMBOLS));

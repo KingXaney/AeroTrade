@@ -39,7 +39,7 @@ vi.mock('@/lib/strategies/page-store', () => ({getLatestRun: vi.fn(), getStrateg
 vi.mock('@/lib/navigator/store', () => ({getLatestSuggestions: stubs.getLatestSuggestions}));
 vi.mock('@/lib/chat/learner-hooks', () => ({priceLargestHoldings: vi.fn(), readLearnerValue: vi.fn()}));
 vi.mock('@/lib/culture/store', () => ({getTopCultureEntities: vi.fn(), getTickerRollup: vi.fn()}));
-vi.mock('@/lib/culture/page-store', () => ({getCulturePicksView: vi.fn()}));
+vi.mock('@/lib/culture/page-store', () => ({getCulturePicksView: vi.fn(), getCultureFollowsView: vi.fn(async () => [])}));
 
 import {buildTools} from '@/lib/chat/tools';
 import {FEED_WATCHLIST_SYMBOL_CAP} from '@/lib/news/config';

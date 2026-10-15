@@ -249,12 +249,14 @@ export type LoadedBook = {book: Book; accountName: string; startingBalance: numb
 // (unpriced = null, skipped by the allocator), the holding age from the last buy, and a
 // quantity-0 quote carrier for every targetable symbol not held.
 export const loadBook = async (
+    // The account's owner: CULTURE_OWNER_ID for a picker's own account, a user for an enrolled one.
+    userId: string,
     accountId: string,
     priceBySymbol: Readonly<Record<string, number>>,
     targetable: readonly string[],
     nowMs: number,
 ): Promise<LoadedBook | null> => {
-    const account = await getOwnedAccount(CULTURE_OWNER_ID, accountId);
+    const account = await getOwnedAccount(userId, accountId);
     if (!account) return null;
     const priceMap = new Map(Object.entries(priceBySymbol).map(([symbol, price]) => [symbol.toUpperCase(), {price}]));
     const portfolio = computePortfolio(
@@ -378,6 +380,14 @@ const toDecisionView = (doc: CultureDecisionDoc): CultureDecisionView => ({
 export const getLatestCultureDecision = async (profile: ProfileId): Promise<CultureDecisionView | null> => {
     await connectToDatabase();
     const doc = await CultureDecision.findOne({profile}).sort({date: -1});
+    return doc ? toDecisionView(doc) : null;
+};
+
+// The picker's latest decision that traded: what an account enrolled mid-week is deployed into
+// (lib/culture/follow.targetsFromDecisionItems). A preview is never a portfolio to copy.
+export const getLatestExecutedCultureDecision = async (profile: ProfileId): Promise<CultureDecisionView | null> => {
+    await connectToDatabase();
+    const doc = await CultureDecision.findOne({profile, kind: 'executed'}).sort({date: -1});
     return doc ? toDecisionView(doc) : null;
 };
 

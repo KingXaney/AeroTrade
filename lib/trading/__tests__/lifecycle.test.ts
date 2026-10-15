@@ -1,5 +1,5 @@
 // The strategy-account delete and restart, with the models stubbed. The delete refuses an account
-// the AI Navigator trades in before anything is removed; any other owned account goes, children
+// the AI Navigator or a culture picker trades in before anything is removed; any other owned account goes, children
 // first. The restart sweeps the pre-migration trades only when asked, and only into the user's
 // original (oldest) account — the one those rows belonged to.
 
@@ -8,6 +8,7 @@ import {beforeEach, describe, expect, it, vi} from 'vitest';
 const db = vi.hoisted(() => ({
     accounts: new Map<string, {userId: string; name: string}>(),
     navigators: [] as {userId: string; accountId: string}[],
+    follows: [] as {userId: string; accountId: string}[],
     deletes: [] as string[],
     writes: [] as string[],
 }));
@@ -22,6 +23,10 @@ vi.mock('@/lib/trading/accounts', () => ({
 vi.mock('@/database/models/ai-navigator.model', () => ({
     default: {exists: async ({userId, accountId}: {userId: string; accountId: string}) =>
         db.navigators.some((n) => n.userId === userId && n.accountId === accountId) ? {_id: 'nav'} : null},
+}));
+vi.mock('@/database/models/culture-follow.model', () => ({
+    default: {exists: async ({userId, accountId}: {userId: string; accountId: string}) =>
+        db.follows.some((n) => n.userId === userId && n.accountId === accountId) ? {_id: 'follow'} : null},
 }));
 vi.mock('@/database/models/paper-account.model', () => ({
     default: {
@@ -60,8 +65,10 @@ describe('deleteOwnedAccount', () => {
         db.accounts = new Map([
             ['main', {userId: 'u1', name: 'Main account'}],
             ['nav', {userId: 'u1', name: 'AI Navigator'}],
+            ['culture', {userId: 'u1', name: 'Culture · Spike'}],
         ]);
         db.navigators = [{userId: 'u1', accountId: 'nav'}];
+        db.follows = [{userId: 'u1', accountId: 'culture'}];
         db.deletes = [];
     });
 
@@ -69,6 +76,14 @@ describe('deleteOwnedAccount', () => {
         const result = await deleteOwnedAccount('u1', 'nav');
         expect(result.success).toBe(false);
         expect(result.message).toMatch(/AI Navigator/);
+        expect(result.message).toMatch(/unenroll/i);
+        expect(db.deletes).toEqual([]);
+    });
+
+    it('refuses the account a culture picker trades in, and removes nothing', async () => {
+        const result = await deleteOwnedAccount('u1', 'culture');
+        expect(result.success).toBe(false);
+        expect(result.message).toMatch(/culture picker/);
         expect(result.message).toMatch(/unenroll/i);
         expect(db.deletes).toEqual([]);
     });
@@ -81,7 +96,9 @@ describe('deleteOwnedAccount', () => {
 
     it('keeps the last account and refuses one the user does not own', async () => {
         db.accounts.delete('nav');
+        db.accounts.delete('culture');
         db.navigators = [];
+        db.follows = [];
         expect((await deleteOwnedAccount('u1', 'main')).success).toBe(false);
         expect((await deleteOwnedAccount('u2', 'main')).message).toBe('Account not found');
         expect(db.deletes).toEqual([]);

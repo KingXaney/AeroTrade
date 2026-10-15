@@ -7,7 +7,7 @@ import {buildDigestPrompt, buildWelcomePrompt} from "@/lib/email/prompts";
 import {mailerReady} from "@/lib/email/send";
 import {getAllUsersForNewsEmail} from "@/lib/email/recipients";
 import {sendWelcome} from "@/lib/email/welcome";
-import {fetchDigestNews, fetchDigestSections, fetchNavigatorDigest, sendUserDigest} from "@/lib/email/digest";
+import {fetchCultureDigest, fetchDigestNews, fetchDigestSections, fetchNavigatorDigest, sendUserDigest} from "@/lib/email/digest";
 
 // The welcome email: the model writes a short intro from the user's sign-up answers
 // (lib/email/prompts.ts), lib/email/welcome.ts sanitizes and sends it.
@@ -70,6 +70,8 @@ export const sendDailyNewsSummary = inngest.createFunction(
                 }
 
                 const navigator = await step.run(`fetch-navigator-${safeId}`, async () => fetchNavigatorDigest(user.id));
+                // The accounts enrolled with the culture pickers, their latest executed decisions.
+                const culture = await step.run(`fetch-culture-${safeId}`, async () => fetchCultureDigest(user.id));
 
                 // Both deterministic sections (topics, Today's lesson) in one step.
                 const sections = await step.run(`fetch-sections-${safeId}`, async () => fetchDigestSections(user, runId));
@@ -86,7 +88,7 @@ export const sendDailyNewsSummary = inngest.createFunction(
                 }
 
                 const result = await step.run(`send-news-email-${safeId}`, async () =>
-                    sendUserDigest({user, day, test: only !== null, news, navigator, sections, modelText}));
+                    sendUserDigest({user, day, test: only !== null, news, navigator, culture, sections, modelText}));
 
                 if (result === 'already-sent') counts.already++;
                 else if (result === 'sent-fallback') counts.fallback++;

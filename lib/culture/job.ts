@@ -60,6 +60,9 @@ export type ProfileRunSummary = {
     orders: number;
     filled: number;
     note?: string;
+    // The accounts enrolled with this picker (lib/culture/follow.ts): how many it traded this
+    // run, how many fills, how many it passed over (claimed already, or no account).
+    followers?: {traded: number; filled: number; orders: number; skipped: number};
 };
 
 export type WeeklyRunParts = {
@@ -74,7 +77,11 @@ export type WeeklyRunParts = {
 export const describeWeeklyRun = (p: WeeklyRunParts): string => {
     const profiles = p.profiles.map((s) => {
         const head = `${s.profile}: ${s.kind === 'skipped' ? 'already ran this week' : s.kind === 'preview' ? `${s.orders} order(s) planned (preview)` : `${s.filled}/${s.orders} order(s) filled`}`;
-        return s.note ? `${head} — ${s.note}` : head;
+        const f = s.followers;
+        const enrolled = f && (f.traded > 0 || f.skipped > 0)
+            ? ` (enrolled accounts: ${f.traded} traded${f.traded > 0 ? `, ${f.filled}/${f.orders} filled` : ''}${f.skipped > 0 ? `, ${f.skipped} skipped` : ''})`
+            : '';
+        return (s.note ? `${head} — ${s.note}` : head) + enrolled;
     }).join('; ');
     const earnings = p.earnings.skipped ? 'no earnings calendar (no Finnhub key)' : p.earnings.ok ? `${p.earnings.dated} report dates` : 'earnings calendar failed';
     return `Culture pickers (${p.mode}): ${p.universe.quoted}/${p.universe.tickers} owners quoted; feeds ${p.feeds.join(', ')}; ${earnings}. ${profiles}${p.backtest ? `. Backtest: ${p.backtest}` : ''}`;

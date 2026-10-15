@@ -24,6 +24,21 @@ export type CultureDecisionItem = {
 
 export type OrderOutcome = {success: boolean; message?: string; price?: number};
 
+// A stored item read back as the view's own shape (the optional fields only when set).
+export const copyDecisionItem = (item: CultureDecisionItem): CultureDecisionItem => ({
+    symbol: item.symbol,
+    action: item.action,
+    ...(typeof item.quantity === 'number' ? {quantity: item.quantity} : {}),
+    targetWeight: item.targetWeight,
+    currentWeight: item.currentWeight,
+    score: item.score,
+    reasons: [...item.reasons],
+    brands: item.brands.map((b) => ({id: b.id, name: b.name})),
+    executed: item.executed,
+    ...(typeof item.executionPrice === 'number' ? {executionPrice: item.executionPrice} : {}),
+    ...(item.error ? {error: item.error} : {}),
+});
+
 const weightOf = (position: HeldPosition | undefined, totalValue: number): number =>
     position && position.price !== null && totalValue > 0 ? (position.quantity * position.price) / totalValue : 0;
 

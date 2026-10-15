@@ -217,7 +217,9 @@ and friends keep none beyond Shared and the invariants).
 - `lib/trading/lots` pairs a sell with the learner's buy notes, FIFO; `lib/trading/analytics` also
   dates the drawdown.
 - `lib/trading/lifecycle`: the day-zero snapshot, `restartAccount` (reset and Navigator re-enroll)
-  and the delete cascade, which refuses the last account and the one the AI Navigator trades in.
+  and the delete cascade, which refuses the last account, the one the AI Navigator trades in and
+  one a culture picker trades in (`CultureFollow`). `lib/trading/traded-by.tradedBy` is the one read
+  of who else trades an account, drawn under its name on `/portfolio` (never when nobody does).
 - `lib/trading/csv`: the exports' quoted, formula-safe cells and `tradesCsv`, the one row builder
   both CSV routes (`app/api/accounts/[accountId]/export`, `app/api/strategies/[slug]/export`) share.
 - `/portfolio`'s learn panels (`lib/trading/learn/`, drawn by `components/trading/learn/`):
@@ -431,9 +433,29 @@ and friends keep none beyond Shared and the invariants).
 - The Brain section of `lib/shell/navigation` carries both brains (`/brain`, `/culture`); the rail
   stays short (seven icons since Markets and Trade merged). The two widgets (`culture-picks`, `brand-attention`) are library-only,
   category `brain` ("Brains & AI").
+- Enrolling an account with a picker (the Navigator's shape, per picker): `lib/culture/follow`
+  (pure — `followAccountName` "Culture · Spike", `FollowProfileSchema` over `LIVE_PROFILES`,
+  `targetsFromDecisionItems`, `followStatusView`, `describeFollowRun`), `lib/culture/follow-store`
+  (the `CultureFollow` row per user and profile with its atomic weekly claim `claimFollowWeek`, the
+  account's own `CultureFollowDecision` rows — a preview never overwrites an executed one — and the
+  reads the page, /portfolio, the widget, the email and the chat make), `lib/actions/culture.actions`
+  (`enrollCulturePicker` reuses an empty account named for the picker through `restartAccount`, else
+  `createPaperAccount`, then queues the bootstrap; pause, resume, `runCultureFollowNow`, unenroll
+  keeps the account; zod on `unknown`, one counter `culture:follow:<uid>`). The weekly run trades each
+  active enrolment after its picker's own decision — `engine.decideForBook` lays the picker's `scored`
+  and `targets` over the account's own book under `CULTURE_RAILS`, fills through `executeOrder(userId,
+  …)` with `source: 'culture-brain'` and the same idempotency key shape — and `bootstrapCultureFollow`
+  (`culture-follow-bootstrap`, trigger `culture-follow <userId> <profile>`) deploys a new enrolment
+  from the picker's latest executed decision, without re-scoring or a model call; outside the session
+  both preview and claim nothing (`cultureDay`). `lib/trading/lifecycle.deleteOwnedAccount` refuses the
+  account while the row stands; `/portfolio` says who trades an account (`lib/trading/traded-by`,
+  `components/trading/portfolio/TradedBy`) and its culture fills carry the one "What the picker saw"
+  from the enrolment's own decisions. The card is `components/culture/FollowPickerCard` and the
+  account's decisions reuse `PicksPanel` (scope `follow`); every sentence is `CULTURE_FOLLOW_COPY`.
 - Jobs: `culture-brain-update` daily 06:40 ET (trigger `culture`), `culture-brain-weekly` Mondays
   10:45 ET with a Tuesday holiday retry (`culture-weekly`, `culture-preview`, `culture-resimulate`),
-  `culture-wikipedia-backfill` on demand (`culture-backfill [brandId…]`). QA: `npm run qa -- culture`.
+  `culture-wikipedia-backfill` on demand (`culture-backfill [brandId…]`), `culture-follow-bootstrap`
+  on demand (`culture-follow`). QA: `npm run qa -- culture`.
 
 ### topics
 

@@ -7,7 +7,8 @@
 // Markets, the reader's news feed is its own section, SEC filings and Reddit posts each come
 // with a one-line caveat. Ticker chips name only the reader's own symbols, each a link to that
 // stock's page in the app. The AI Navigator's decisions are a table built from the stored set —
-// the model never sees them, so it cannot restate a number wrongly.
+// the model never sees them, so it cannot restate a number wrongly — and so are the decisions a
+// culture picker made for an account the reader enrolled with it, one block per picker.
 //
 // `allowedUrls` is every link the view holds, the allow-list the rendered HTML is sanitized
 // against (invariant 4).
@@ -17,6 +18,7 @@ import {isHttpUrl, type EmailLink} from "@/lib/email/layout";
 import type {DigestSource, DigestStory, DigestSummary} from "@/lib/email/digest-summary";
 import type {NewsSourceType} from "@/lib/news/types";
 import type {SuggestionAction} from "@/lib/navigator/types";
+import type {ProfileId} from "@/lib/culture/config";
 
 // The reader's latest AI Navigator set, as lib/email/digest.ts reads it.
 export type NavigatorDigest = {
@@ -24,6 +26,11 @@ export type NavigatorDigest = {
     items: {action: SuggestionAction; symbol: string; targetWeightPct: number; executed: boolean}[];
     rationale: string | null;
     activeTheses: string[];
+};
+
+// The latest executed decision of each culture picker the reader enrolled an account with.
+export type CultureDigest = {
+    profiles: {profile: ProfileId; label: string; date: string; items: NavigatorDigest['items']}[];
 };
 
 export type DigestStoryView = {title: string; summary: string; why: string; chips: EmailLink[]; sources: EmailLink[]};
@@ -40,6 +47,9 @@ export type DigestNavigatorView = {
     link: EmailLink;
 };
 
+export type DigestCultureBlock = {profile: ProfileId; decided: string; rows: DigestNavigatorRow[]};
+export type DigestCultureView = {heading: string; caveat: string; blocks: DigestCultureBlock[]; link: EmailLink};
+
 export type DigestView = {
     subject: string;
     preheader: string;
@@ -52,6 +62,7 @@ export type DigestView = {
     bullets: {text: string; sources: EmailLink[]}[];
     sections: DigestSectionView[];
     navigator: DigestNavigatorView | null;
+    culture: DigestCultureView | null;
     // Built and sanitized by their own modules (lib/email/sections/), against their own links.
     topicsHtml: string;
     lessonHtml: string;
@@ -67,6 +78,7 @@ export type DigestViewInput = {
     summary: DigestSummary;
     readerSymbols: readonly string[];
     navigator: NavigatorDigest | null;
+    culture?: CultureDigest | null;
     topicsHtml?: string;
     lessonHtml?: string;
 };
@@ -129,7 +141,7 @@ export const plainText = (markdown: string, max: number): string => {
     return flat.length > max ? `${flat.slice(0, max - 1).trimEnd()}…` : flat;
 };
 
-export const buildDigestView = ({day, appUrl, summary, readerSymbols, navigator, topicsHtml = '', lessonHtml = ''}: DigestViewInput): DigestView => {
+export const buildDigestView = ({day, appUrl, summary, readerSymbols, navigator, culture = null, topicsHtml = '', lessonHtml = ''}: DigestViewInput): DigestView => {
     const base = String(appUrl ?? '').replace(/\/+$/, '');
     const mine = new Set(readerSymbols.map((s) => s.toUpperCase()));
     const stockLink = (symbol: string): EmailLink => ({label: symbol, url: `${base}/stocks/${encodeURIComponent(symbol)}`});
@@ -153,13 +165,15 @@ export const buildDigestView = ({day, appUrl, summary, readerSymbols, navigator,
 
     const bullets = summary.bullets.map((point) => ({text: point.text, sources: point.sources.map(sourceLink)}));
 
-    const rows = (navigator?.items ?? [])
+    // A decision set's rows, the Navigator's and a culture picker's alike: tickers only, capped.
+    const decisionRows = (items: NavigatorDigest['items'] | undefined): DigestNavigatorRow[] => (items ?? [])
         .filter((item) => TICKER.test(String(item.symbol ?? '')))
         .slice(0, MAX_NAVIGATOR_ROWS)
         .map((item): DigestNavigatorRow => ({
             symbol: stockLink(item.symbol),
             action: DIGEST_COPY.navigator.row(item.action, item.executed, Math.round(Number(item.targetWeightPct) || 0)),
         }));
+    const rows = decisionRows(navigator?.items);
     const navigatorView: DigestNavigatorView | null = navigator && rows.length > 0
         ? {
             heading: DIGEST_COPY.navigator.heading,
@@ -173,6 +187,13 @@ export const buildDigestView = ({day, appUrl, summary, readerSymbols, navigator,
         }
         : null;
 
+    const cultureBlocks: DigestCultureBlock[] = (culture?.profiles ?? [])
+        .map((profile) => ({profile: profile.profile, decided: DIGEST_COPY.culture.decided(oneLine(profile.label, 40), longDate(profile.date)), rows: decisionRows(profile.items)}))
+        .filter((block) => block.rows.length > 0);
+    const cultureView: DigestCultureView | null = cultureBlocks.length > 0
+        ? {heading: DIGEST_COPY.culture.heading, caveat: DIGEST_COPY.culture.caveat, blocks: cultureBlocks, link: {label: DIGEST_COPY.culture.link, url: `${base}/culture?view=picks`}}
+        : null;
+
     const headline = summary.headline || DIGEST_COPY.fallbackHeadline;
     const cta: EmailLink = {label: DIGEST_COPY.allNews, url: `${base}/news`};
     const footerLinks: EmailLink[] = [
@@ -184,6 +205,7 @@ export const buildDigestView = ({day, appUrl, summary, readerSymbols, navigator,
         ...bullets.flatMap((b) => b.sources.map((s) => s.url)),
         ...sections.flatMap((section) => section.stories.flatMap((story) => [...story.sources, ...story.chips].map((l) => l.url))),
         ...(navigatorView ? [...navigatorView.rows.map((r) => r.symbol.url), navigatorView.link.url] : []),
+        ...(cultureView ? [...cultureView.blocks.flatMap((b) => b.rows.map((r) => r.symbol.url)), cultureView.link.url] : []),
         cta.url,
         ...footerLinks.map((l) => l.url),
     ].filter(isHttpUrl);
@@ -200,6 +222,7 @@ export const buildDigestView = ({day, appUrl, summary, readerSymbols, navigator,
         bullets,
         sections,
         navigator: navigatorView,
+        culture: cultureView,
         topicsHtml,
         lessonHtml,
         cta,

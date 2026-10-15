@@ -17,6 +17,7 @@ import {
     RISK_COPY,
     shortDate,
     signedMoney,
+    TRADED_BY_COPY,
 } from '@/lib/learn/copy/portfolio';
 import {MAX_POSITION_WEIGHT, MIN_CASH_WEIGHT} from '@/lib/navigator/config';
 import type {DrawdownWindow} from '@/lib/trading/types';
@@ -199,5 +200,13 @@ describe('HOLDINGS_COPY', () => {
 describe('PERFORMANCE_COPY', () => {
     it('never advises', () => {
         for (const text of Object.values(PERFORMANCE_COPY)) clean(text);
+    });
+});
+
+describe('TRADED_BY_COPY', () => {
+    it('names who trades in the account and where its decisions are, without advice', () => {
+        expect(TRADED_BY_COPY.navigator).toBe('Traded by the AI Navigator');
+        expect(TRADED_BY_COPY.culture('Spike')).toBe('Traded by the Spike culture picker');
+        for (const text of [TRADED_BY_COPY.navigator, TRADED_BY_COPY.culture('Quiet'), TRADED_BY_COPY.paused, TRADED_BY_COPY.link]) clean(text);
     });
 });

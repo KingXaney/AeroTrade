@@ -159,6 +159,15 @@ export const JOBS = {
         trigger: 'lab',
         health: {label: 'Lab papers', schedule: 'weekdays 06:20 ET', staleAfterHours: 80},
     },
+    // An account enrolled with a culture picker, deployed on enrolment or "Trade now" (the
+    // Navigator's bootstrap, for the pickers); the weekly run trades it from then on.
+    cultureFollowBootstrap: {
+        id: 'culture-follow-bootstrap',
+        event: 'app/bootstrap.culture.follow',
+        crons: [],
+        trigger: 'culture-follow',
+        health: {label: 'Culture enrolment (manual/enroll)', schedule: 'on demand', staleAfterHours: ON_DEMAND},
+    },
 } as const satisfies Record<string, JobDefinition>;
 
 // In declaration order — the status strip's row order.

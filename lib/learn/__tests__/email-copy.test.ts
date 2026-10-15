@@ -26,6 +26,7 @@ const rendered = (): string[] => [
     DIGEST_COPY.subject('Oct 5', 'Chipmakers rise on strong orders'),
     DIGEST_COPY.subject('Oct 5', ''),
     DIGEST_COPY.navigator.decided('Monday, October 5, 2026'),
+    DIGEST_COPY.culture.decided('Spike', 'Monday, October 5, 2026'),
     ...ACTIONS.flatMap((action) => [true, false].flatMap((executed) => [0, 12].map((pct) => DIGEST_COPY.navigator.row(action, executed, pct)))),
     ...[0, 1, 7].map((n) => DIGEST_COPY.topics.newCount(n)),
     WELCOME_EMAIL_COPY.hero('Ada'),
