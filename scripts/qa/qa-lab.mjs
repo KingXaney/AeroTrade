@@ -2,14 +2,21 @@
 // qa-lab-owner@example.com in LAB_OWNER_EMAILS (run.sh), so this suite signs that address up and
 // sees the lab; a second user does not, and lands on the games. The old /learn#term addresses
 // (⌘K, Today's lesson, the daily email) keep their hash on the way to /glossary for both.
-// Then the lab's day: today's unit opened and marked studied (once), its cards due the day
-// after (the unit row is dated back a day), one graded, the problem answered on the server,
-// the streak counting the day, the library's thirty rows, and a seeded day of papers with its
-// digest on the Papers view and on Today.
+// Then the lab's day: Today's list and the streak hero at zero; today's unit opened, its quiz
+// failed on a wrong set and passed on the right one (the gate on "Mark as studied"), then marked
+// studied (once), its cards due the day after (the unit row is dated back a day), one graded,
+// the problem answered on the server, the streak counting the day, the library's thirty rows, a
+// seeded day of papers with its digest on the Papers view and on Today, the digest ticked by hand
+// and unticked, the game widgets added from the picker (a seeded round ticks the sprint; Codeforces
+// is ticked by hand), the saved preference, and a phone width.
 // Run: npm run qa -- lab   (the harness: README.md)
 import {chromium} from 'playwright';
 import {MongoClient} from 'mongodb';
-import {BASE, MONGO, check, outDir, signUp, summary} from './lib.mjs';
+import {createJiti} from 'jiti';
+import {BASE, MONGO, REPO_ROOT, check, outDir, signUp, summary} from './lib.mjs';
+
+// The bank, for the quiz's answers (the page never holds them).
+const jiti = createJiti(import.meta.url, {alias: {'@': REPO_ROOT.replace(/\/$/, '')}, fsCache: false});
 
 const OUT = outDir('lab');
 const OWNER_EMAIL = 'qa-lab-owner@example.com';
@@ -35,23 +42,51 @@ try {
     const ownerTabs = await page.$$eval('[data-section-tabs="learn"] a', (as) => as.map((a) => `${a.getAttribute('href')}${a.getAttribute('aria-current') === 'page' ? '*' : ''}`));
     check('…and the Lab tab first, before the games and the glossary', ownerTabs.join(',') === '/learn*,/games,/poker,/poker-night,/glossary', ownerTabs.join(','));
 
-    // --- today: the first unit of the first track, nothing due, a problem, no streak ------------
+    // --- today: the streak hero at zero, the list, the first unit of the first track, nothing due, a problem ---
     const unitId = await page.locator('[data-lab-unit-id]').getAttribute('data-lab-unit-id');
     check('Today opens on the first unit of the computer-vision track, to study', await page.locator('[data-lab-unit="study"]').count() === 1 && unitId === 'cv-vit-dinov2', String(unitId));
     check('…nothing due yet, the day\'s problem posed, its solution not in the page',
         await page.locator('[data-lab-review-due="0"]').count() === 1 && await page.locator('[data-review-done]').count() === 1
         && await page.locator('[data-lab-problem]').count() === 1 && await page.locator('[data-lab-solution]').count() === 0
         && !/1369/.test(await page.locator('#lab-problem').innerText()));
-    check('…and no streak', await page.locator('[data-lab-streak="0"]').count() === 1);
+    check('…and no streak: the hero at zero, naming the first milestone', await page.locator('[data-lab-streak="0"]').count() === 1
+        && await page.locator('#lab-streak [data-streak-hero][data-streak-tone="none"]').count() === 1 && /3 days to 3/.test(await page.locator('#lab-streak').innerText()));
+    const listStates = async () => page.locator('[data-lab-todo]').evaluateAll((els) => els.map((el) => `${el.getAttribute('data-lab-todo')}:${el.getAttribute('data-todo-state')}`));
+    check('Today\'s list: the unit to do, no cards due, the problem to do, the puzzle from the default widget',
+        (await listStates()).join(',') === 'unit:todo,review:none,problem:todo,daily-puzzle:todo' && await page.locator('[data-list-progress]').innerText() === '0 of 3 done', (await listStates()).join(','));
+    check('…the unit item opens its page and the puzzle item the puzzle', (await page.locator('[data-todo-open="unit"]').getAttribute('href')) === `/learn/units/${unitId}`
+        && (await page.locator('[data-todo-open="daily-puzzle"]').getAttribute('href')) === '/games/puzzle');
+    check('the default widget is the puzzle card, with the picker under it', await page.locator('[data-lab-widget="daily-puzzle"] [data-daily-puzzle]').count() === 1
+        && await page.locator('[data-widget-picker]').count() === 1 && await page.locator('[data-widget-switch]').count() === 10);
     await shot('01-lab-today');
 
-    // --- the unit page, marked studied once ------------------------------------------------------
+    // --- the unit page: the quiz gates the mark; a wrong set fails, the right set passes and counts the day ---
     await page.locator(`[data-lab-open-unit="${unitId}"]`).click();
     await page.locator(`[data-lab-unit-page="${unitId}"]`).waitFor({timeout: 30000});
     check('the unit opens on its own page with its five sections, sources and maths',
         await page.locator('[data-lab-section]').count() === 5 && await page.locator('#lab-sources a[href^="https://"]').count() >= 3
         && await page.locator('.katex').count() > 5 && await page.locator('#lab-section-code pre code').count() >= 1);
     check('…its glossary terms in one disclosure, or none', await page.locator('[data-what-these-mean]').count() <= 1);
+    const {unitById} = await jiti.import(`${REPO_ROOT}lib/learn/copy/lab/bank.ts`);
+    const quiz = unitById(unitId).quiz;
+    check('the quiz is in the page without its answers, and "Mark as studied" waits for it', await page.locator('[data-quiz-question]').count() === quiz.length
+        && await page.locator('[data-lab-mark]').isDisabled() && await page.locator('[data-lab-mark-gated]').count() === 1
+        && !(await page.content()).includes(quiz[0].why));
+    // The result line stays from one attempt to the next, so each attempt waits for its own outcome.
+    const answer = async (choices, outcome) => {
+        for (const [qi, oi] of choices.entries()) await page.locator(`[data-quiz-option="${qi}:${oi}"]`).check();
+        await page.locator('[data-quiz-check]').click();
+        return page.locator(`[data-quiz-result="${outcome}"]`).waitFor({timeout: 15000}).then(() => true, () => false);
+    };
+    const wrongSet = quiz.map((q) => (q.answer + 1) % 4);
+    check('a wrong set fails, marks the wrong questions and writes nothing', await answer(wrongSet, 'failed')
+        && await page.locator('[data-quiz-wrong]').count() === quiz.length && await db.collection('labevents').countDocuments({userId: owner, kind: 'quiz'}) === 0
+        && await page.locator('[data-lab-mark]').isDisabled());
+    check('the right set passes, shows why, stamps the quiz once and counts the day', await answer(quiz.map((q) => q.answer), 'passed')
+        && await page.locator('[data-quiz-why]').count() === quiz.length
+        && (await db.collection('labevents').findOne({userId: owner, kind: 'quiz'}))?.key === unitId
+        && await db.collection('labevents').countDocuments({userId: owner, kind: 'session'}) === 1);
+    await page.locator('[data-lab-mark]:not([disabled])').waitFor({timeout: 15000});
     await page.locator('[data-lab-mark]').click();
     await page.locator('[data-lab-marked]').waitFor({timeout: 15000});
     const unitRows = () => db.collection('labevents').find({userId: owner, kind: 'unit'}).toArray();
@@ -59,12 +94,14 @@ try {
     await page.locator('[data-lab-mark]').click();
     await page.waitForTimeout(1200);
     check('…and a second click adds no row', (await unitRows()).length === 1);
-    check('…the day counts toward the streak', await db.collection('labevents').countDocuments({userId: owner, kind: 'session'}) === 1);
+    check('…the day counts toward the streak once', await db.collection('labevents').countDocuments({userId: owner, kind: 'session'}) === 1);
     await shot('02-lab-unit');
     await page.goto(`${BASE}/learn`, {waitUntil: 'load'});
     await page.locator('[data-lab]').waitFor({timeout: 30000});
-    check('Today now shows the unit as studied today, and the streak at one',
-        await page.locator('[data-lab-unit="studied-today"]').count() === 1 && await page.locator('[data-lab-streak="1"]').count() === 1);
+    check('Today now shows the unit as studied today, ticked on the list, and the streak at one',
+        await page.locator('[data-lab-unit="studied-today"]').count() === 1 && await page.locator('[data-lab-streak="1"]').count() === 1
+        && await page.locator('[data-lab-todo="unit"][data-todo-state="done"]').count() === 1 && await page.locator('[data-list-progress]').innerText() === '1 of 3 done'
+        && await page.locator('#lab-streak [data-streak-tone="done"]').count() === 1 && await page.locator('#lab-streak [data-week-pills] li[data-today][data-solved]').count() === 1);
 
     // --- the day after: its cards are due; one graded, written as a row ----------------------------
     const today = (await unitRows())[0].day;
@@ -157,6 +194,45 @@ try {
     await page.locator('[data-lab]').waitFor({timeout: 30000});
     check('Today carries the digest with a link to the day\'s papers', await page.locator('#lab-digest').count() === 1 && await page.locator('#lab-digest a[href="/learn?view=papers"]').count() === 1
         && (await page.locator('#lab-digest [data-digest-ref="2610.00001"]').getAttribute('href')) === '/learn?view=papers#paper-2610.00001');
+
+    // --- the list's manual ticks and the game widgets ---------------------------------------------
+    check('the digest is an item of the list, ticked by hand', await page.locator('[data-lab-todo="papers"][data-todo-state="todo"] [data-todo-tick="papers"]').count() === 1);
+    await page.locator('[data-todo-tick="papers"]').click();
+    await page.locator('[data-lab-todo="papers"][data-todo-state="done"]').waitFor({timeout: 15000});
+    const tickRow = await db.collection('labevents').findOne({userId: owner, kind: 'todo'});
+    check('a tick writes the day\'s row, keyed on the item and the day', tickRow?.key === `papers:${today}` && tickRow?.day === today && await page.locator('[data-todo-tick="papers"][aria-pressed="true"]').count() === 1);
+    await page.locator('[data-todo-tick="papers"]').click();
+    await page.locator('[data-lab-todo="papers"][data-todo-state="todo"]').waitFor({timeout: 15000});
+    check('…and Undo removes it', await db.collection('labevents').countDocuments({userId: owner, kind: 'todo'}) === 0);
+
+    await page.locator('[data-widget-picker]').evaluate((d) => { d.open = true; });
+    await page.locator('[data-widget-switch="arithmetic"]').click();
+    await page.locator('[data-lab-widget="arithmetic"]').waitFor({timeout: 15000});
+    check('adding the arithmetic sprint puts its card on Today and a round on the list', await page.locator('[data-lab-todo="arithmetic"][data-todo-state="todo"]').count() === 1
+        && /Play a round of/.test(await page.locator('[data-lab-todo="arithmetic"]').innerText()) && (await page.locator('[data-todo-open="arithmetic"]').getAttribute('href')) === '/games/arithmetic');
+    await db.collection('gamerounds').insertOne({userId: owner, game: 'arithmetic', key: 'zetamac', score: 31, wrong: 2, durationMs: 120000, detail: {}, day: today, finishedAt: new Date()});
+    await page.reload({waitUntil: 'load'});
+    await page.locator('[data-lab-list]').waitFor({timeout: 30000});
+    check('a round kept today ticks it, and the card shows the record', await page.locator('[data-lab-todo="arithmetic"][data-todo-state="done"]').count() === 1
+        && /31/.test(await page.locator('[data-lab-widget="arithmetic"]').innerText()));
+    await page.locator('[data-widget-picker]').evaluate((d) => { d.open = true; });
+    await page.locator('[data-widget-switch="codeforces"]').click();
+    await page.locator('[data-lab-widget="codeforces"]').waitFor({timeout: 15000});
+    check('Codeforces is a card with its link and an item ticked by hand', await page.locator('[data-lab-widget="codeforces"] a[href="https://codeforces.com/problemset"]').count() === 1
+        && await page.locator('[data-lab-todo="codeforces"] [data-todo-tick="codeforces"]').count() === 1 && (await page.locator('[data-todo-open="codeforces"]').getAttribute('target')) === '_blank');
+    const prefs = await db.collection('userpreferences').findOne({userId: owner});
+    check('the picker\'s choice is the saved preference, in the registry\'s order', JSON.stringify(prefs?.learn?.labWidgets) === JSON.stringify(['daily-puzzle', 'arithmetic', 'codeforces']), JSON.stringify(prefs?.learn?.labWidgets));
+    const labText = await page.locator('main').innerText().catch(() => page.locator('body').innerText());
+    check('Today keeps to the descriptive voice', !/\b(should|recommend|best|optimal)\b/i.test(labText), labText.match(/.{0,40}\b(should|recommend|best|optimal)\b.{0,40}/i)?.[0] ?? '');
+    await shot('06-lab-list');
+    await page.setViewportSize({width: 375, height: 812});
+    await page.goto(`${BASE}/learn`, {waitUntil: 'load'});
+    await page.locator('[data-lab-list]').waitFor({timeout: 30000});
+    const overflow = await page.evaluate(() => document.documentElement.scrollWidth - window.innerWidth);
+    check('Today has no horizontal scroll at 375px', overflow <= 1, `${overflow}px`);
+    await shot('07-lab-phone');
+    await page.setViewportSize({width: 1440, height: 900});
+    await db.collection('gamerounds').deleteMany({userId: owner});
     await db.collection('labdays').updateOne({day: today}, {$set: {day: yesterday}});
     await page.goto(`${BASE}/learn?view=papers`, {waitUntil: 'load'});
     await page.locator('#lab-papers').waitFor({timeout: 30000});

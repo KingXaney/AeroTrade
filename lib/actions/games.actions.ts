@@ -168,7 +168,8 @@ export const recordGameRound = async (input: unknown): Promise<RoundActionResult
         await GameRound.create({...kept, userId, day: getEasternDateString(), finishedAt: new Date()});
         if (skill) await foldArithmeticSkill(userId, skill, round.score);
         const after = await readGameSummary(userId, round.game, round.key);
-        revalidatePath('/games', 'layout');
+        // A kept round counts the day: every surface that shows the streak, and Today's list.
+        revalidateGames();
         return {success: true, record: after.record, isRecord: isNewRecord(round.game, round.score, before.record), recent: after.recent};
     } catch (error) {
         console.error('Error recording a game round:', error);

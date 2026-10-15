@@ -1,6 +1,6 @@
 'use client';
 
-import {useEffect, useReducer, useRef, useState, useTransition} from "react";
+import {useEffect, useMemo, useReducer, useRef, useState, useSyncExternalStore, useTransition} from "react";
 import {cn} from "@/lib/utils";
 import {UNREACHABLE_MESSAGE} from "@/lib/action-toast";
 import {recordGameRound, type RoundActionResult} from "@/lib/actions/games.actions";
@@ -35,6 +35,63 @@ const freshSeed = () => (Date.now() ^ Math.floor(Math.random() * 2 ** 31)) >>> 0
 
 const PRACTICE_DURATION: Duration = 60;
 
+// The custom settings and the practice time are kept in this browser (localStorage, read through
+// useSyncExternalStore as the poker-night lobby reads its look), so a reload, a tab change or
+// the page's refresh after a round's save never hands the sprint back its defaults. The server
+// renders the defaults; the browser's value takes over on hydration. A blocked store keeps the
+// session's settings in memory.
+const CUSTOM_KEY = 'aero-arithmetic:custom';
+const PRACTICE_KEY = 'aero-arithmetic:practice-duration';
+
+const listeners = new Set<() => void>();
+const subscribe = (listener: () => void) => {
+    listeners.add(listener);
+    return () => { listeners.delete(listener); };
+};
+const memory = new Map<string, string>();
+const readRaw = (key: string): string | null => {
+    try {
+        return window.localStorage.getItem(key) ?? memory.get(key) ?? null;
+    } catch {
+        return memory.get(key) ?? null;
+    }
+};
+const writeRaw = (key: string, value: unknown): void => {
+    const raw = JSON.stringify(value);
+    memory.set(key, raw);
+    try {
+        window.localStorage.setItem(key, raw);
+    } catch {
+        // Kept in memory for the session.
+    }
+    listeners.forEach((listener) => listener());
+};
+const nothingOnServer = () => null;
+
+const parseJson = (raw: string | null): unknown => {
+    if (raw === null) return null;
+    try {
+        return JSON.parse(raw);
+    } catch {
+        return null;
+    }
+};
+
+const isDuration = (value: unknown): value is Duration => typeof value === 'number' && (DURATIONS as readonly number[]).includes(value);
+
+// The stored settings as typed, invalid ranges included: a range the player is still editing
+// must stay on the form, so the schema is checked only when a round starts (and the stored
+// value is read back as the shape, not validated).
+const isSettingsShape = (value: unknown): value is ArithmeticSettings => {
+    if (typeof value !== 'object' || value === null) return false;
+    const candidate = value as Record<string, unknown>;
+    if (!Array.isArray(candidate.operations)) return false;
+    return (Object.keys(ZETAMAC_DEFAULTS) as (keyof ArithmeticSettings)[]).every((key) => key === 'operations' || key === 'duration' || (
+        typeof candidate[key] === 'object' && candidate[key] !== null
+        && typeof (candidate[key] as {min?: unknown}).min === 'number' && typeof (candidate[key] as {max?: unknown}).max === 'number'
+    )) && typeof candidate.duration === 'number';
+};
+
 // Zetamac-style mental arithmetic, its custom mode, a practice mode on the kinds that take the
 // reader longest, and the 80-in-8 interview mode. The round is the pure reducer in
 // lib/games/arithmetic-round.ts; this component owns its clock, its keys and the report it sends
@@ -44,8 +101,16 @@ const PRACTICE_DURATION: Duration = 60;
 // skill panel shows the reader's aggregate once the server has folded the round in.
 const ArithmeticGame = ({mode, summary, focus = []}: Props) => {
     const [round, dispatch] = useReducer(roundReducer, LOBBY);
-    const [settings, setSettings] = useState<ArithmeticSettings>(ZETAMAC_DEFAULTS);
-    const [practiceDuration, setPracticeDuration] = useState<Duration>(PRACTICE_DURATION);
+    const customRaw = useSyncExternalStore(subscribe, () => readRaw(CUSTOM_KEY), nothingOnServer);
+    const practiceRaw = useSyncExternalStore(subscribe, () => readRaw(PRACTICE_KEY), nothingOnServer);
+    const settings = useMemo((): ArithmeticSettings => {
+        const stored = parseJson(customRaw);
+        return isSettingsShape(stored) ? stored : ZETAMAC_DEFAULTS;
+    }, [customRaw]);
+    const practiceDuration = useMemo((): Duration => {
+        const stored = parseJson(practiceRaw);
+        return isDuration(stored) ? stored : PRACTICE_DURATION;
+    }, [practiceRaw]);
     const [invalid, setInvalid] = useState(false);
     const [saved, setSaved] = useState<Saved>(null);
     const [saving, startSaving] = useTransition();
@@ -53,6 +118,9 @@ const ArithmeticGame = ({mode, summary, focus = []}: Props) => {
     const input = useRef<HTMLInputElement>(null);
     const interview = mode === 'interview';
     const playing = round.kind !== 'lobby' && round.phase === 'playing';
+
+    const changeSettings = (next: ArithmeticSettings) => writeRaw(CUSTOM_KEY, next);
+    const changePracticeDuration = (next: Duration) => writeRaw(PRACTICE_KEY, next);
 
     const start = () => {
         if (mode === 'custom' && !ArithmeticSettingsSchema.safeParse(settings).success) {
@@ -202,7 +270,14 @@ const ArithmeticGame = ({mode, summary, focus = []}: Props) => {
                         <Sparkline scores={recent} label={ARITHMETIC_COPY.recentHeading}/>
                     </div>
                 )}
-                <ActionButton size="md" onClick={start} disabled={saving} data-round-again>{ARITHMETIC_COPY.playAgain}</ActionButton>
+                <div className="flex flex-wrap items-center gap-3">
+                    <ActionButton size="md" onClick={start} disabled={saving} data-round-again>{ARITHMETIC_COPY.playAgain}</ActionButton>
+                    {(mode === 'custom' || mode === 'practice') && (
+                        <ActionButton variant="secondary" size="md" onClick={() => dispatch({type: 'reset'})} disabled={saving} data-round-settings>
+                            {ARITHMETIC_COPY.changeSettings}
+                        </ActionButton>
+                    )}
+                </div>
             </div>
         );
     }
@@ -215,12 +290,13 @@ const ArithmeticGame = ({mode, summary, focus = []}: Props) => {
     return (
         <div className="space-y-5" data-arithmetic-lobby={mode}>
             <p className="text-sm leading-relaxed text-fg-soft">{lead}</p>
-            {mode === 'custom' && <CustomSettings settings={settings} onChange={setSettings}/>}
+            {mode === 'custom' && <CustomSettings settings={settings} onChange={changeSettings}/>}
             {mode === 'practice' && (
                 focus.length === 0
                     ? <p className="text-sm text-fg-muted" data-practice-empty>{ARITHMETIC_COPY.practiceEmpty}</p>
-                    : <PracticeFocus focus={focus} duration={practiceDuration} onDuration={setPracticeDuration}/>
+                    : <PracticeFocus focus={focus} duration={practiceDuration} onDuration={changePracticeDuration}/>
             )}
+            {(mode === 'custom' || mode === 'practice') && <MicroLabel as="p" className="normal-case tracking-normal" data-settings-kept>{ARITHMETIC_COPY.settingsKept}</MicroLabel>}
             {invalid && <p className="text-sm text-warning" role="alert" data-custom-invalid>{ARITHMETIC_COPY.invalid}</p>}
             <div className="flex flex-wrap items-center gap-x-6 gap-y-3">
                 {canStart && <ActionButton size="md" onClick={start} data-round-start>{ARITHMETIC_COPY.start}</ActionButton>}

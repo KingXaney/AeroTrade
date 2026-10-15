@@ -9,10 +9,13 @@ import {LAB_COPY, LAB_TRACK_LABELS} from "@/lib/learn/copy/lab";
 import LabMarkdown from "@/components/lab/LabMarkdown";
 import DigestPanel from "@/components/lab/DigestPanel";
 import LabProgress from "@/components/lab/LabProgress";
+import LabWidgets from "@/components/lab/LabWidgets";
 import PapersPanel from "@/components/lab/PapersPanel";
 import ProblemCard from "@/components/lab/ProblemCard";
 import ReviewDeck from "@/components/lab/ReviewDeck";
+import TodayList from "@/components/lab/TodayList";
 import LearnRedirect from "@/components/learn/LearnRedirect";
+import StreakHero from "@/components/learn/StreakHero";
 import {actionButton} from "@/components/primitives/ActionButton";
 import Badge from "@/components/primitives/Badge";
 import MicroLabel from "@/components/primitives/MicroLabel";
@@ -63,6 +66,11 @@ const UnitPanel = ({today}: {today: LabView['today']}) => (
 
 const TodayView = ({view}: {view: LabView}) => (
     <div className="space-y-4" id="lab-today">
+        {/* The one streak, then the day as a list; the work panels below are where the items are done. */}
+        <Panel id="lab-streak" aria-labelledby="lab-streak-heading" data-lab-streak={view.progress.streak.current}>
+            <StreakHero streak={view.progress.streak} headingId="lab-streak-heading"/>
+        </Panel>
+        <TodayList items={view.list} summary={view.listSummary}/>
         <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
             <UnitPanel today={view.today}/>
             <Panel id="lab-review" aria-labelledby="lab-review-heading">
@@ -113,6 +121,7 @@ const TodayView = ({view}: {view: LabView}) => (
                 </ul>
             </Panel>
         )}
+        <LabWidgets widgets={view.widgets} puzzle={view.puzzle}/>
         <Panel id="lab-progress" aria-labelledby="lab-progress-heading">
             <SectionHeading id="lab-progress-heading" spacing="sm">{LAB_COPY.progressHeading}</SectionHeading>
             <LabProgress progress={view.progress}/>

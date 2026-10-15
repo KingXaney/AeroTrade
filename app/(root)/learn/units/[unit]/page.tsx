@@ -6,8 +6,10 @@ import {isLabOwner} from "@/lib/lab/owner";
 import {getUnitProgress} from "@/lib/lab/page-store";
 import {plannedCountByTrack, unitById, unitsOf} from "@/lib/lab/registry";
 import {LAB_COPY} from "@/lib/learn/copy/lab";
+import {quizPublic} from "@/lib/lab/quiz";
 import LabMarkdown from "@/components/lab/LabMarkdown";
 import MarkUnitStudied from "@/components/lab/MarkUnitStudied";
+import QuizCard from "@/components/lab/QuizCard";
 import WhatTheseMean from "@/components/learn/WhatTheseMean";
 import {actionButton} from "@/components/primitives/ActionButton";
 import MicroLabel from "@/components/primitives/MicroLabel";
@@ -16,8 +18,9 @@ import Panel from "@/components/primitives/Panel";
 import SectionHeading from "@/components/primitives/SectionHeading";
 
 // One unit of the owner's lab (lib/learn/copy/lab/units): its five sections, its sources, the
-// app's own metrics it leans on (the glossary's definitions, in one disclosure), and the one
-// button that marks it studied. Owner only; an unknown id is a 404.
+// app's own metrics it leans on (the glossary's definitions, in one disclosure), its quiz — the
+// questions and options rendered here, the answers kept on the server — and the one button that
+// marks it studied, live once the quiz is passed. Owner only; an unknown id is a 404.
 
 const SECTION_KEYS = ['idea', 'maths', 'code', 'whyNow', 'pitfalls'] as const;
 
@@ -72,10 +75,24 @@ const UnitPage = async ({params}: UnitPageProps) => {
                 {unit.glossaryTerms && unit.glossaryTerms.length > 0 && <WhatTheseMean keys={unit.glossaryTerms}/>}
             </Panel>
 
+            <Panel id="lab-quiz" aria-labelledby="lab-quiz-heading">
+                <SectionHeading id="lab-quiz-heading" spacing="sm">{LAB_COPY.quiz.heading}</SectionHeading>
+                <QuizCard
+                    unitId={unit.id}
+                    passedOn={progress.quizPassedOn}
+                    score={progress.quizScore}
+                    questions={quizPublic(unit).map((question) => ({
+                        id: question.id,
+                        prompt: <LabMarkdown>{question.prompt}</LabMarkdown>,
+                        options: question.options.map((option) => <LabMarkdown key={option}>{option}</LabMarkdown>),
+                    }))}
+                />
+            </Panel>
+
             <Panel id="lab-mark" aria-labelledby="lab-mark-heading">
                 <SectionHeading id="lab-mark-heading" spacing="sm">{LAB_COPY.markHeading}</SectionHeading>
                 <p className="mb-4 text-sm text-fg-soft">{LAB_COPY.markLead}</p>
-                <MarkUnitStudied unitId={unit.id} studiedOn={progress.studiedOn} lastDay={progress.lastDay}/>
+                <MarkUnitStudied unitId={unit.id} studiedOn={progress.studiedOn} lastDay={progress.lastDay} quizPassed={progress.quizPassedOn !== null}/>
             </Panel>
 
             <nav aria-label="Units" className="flex flex-wrap items-center justify-between gap-3">

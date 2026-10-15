@@ -10,8 +10,9 @@ import GameRound from "@/database/models/game-round.model";
 import ArithmeticSkill from "@/database/models/arithmetic-skill.model";
 import type {SkillCells} from "@/lib/games/arithmetic-skill";
 import {getEasternDateString} from "@/lib/dates";
-import {streakFrom, type Streak} from "@/lib/games/streak";
+import type {Streak} from "@/lib/games/streak";
 import {HIGHER_IS_RECORD, type GameId} from "@/lib/games/rounds";
+import {readActivityStreak, readSolvedDays, STREAK_READ_LIMIT} from "@/lib/learn/activity-store";
 import {
     archiveRows,
     contextFor,
@@ -23,25 +24,17 @@ import {
 } from "@/lib/games/puzzles";
 import type {PuzzleProgress, PuzzleView} from "@/lib/games/types";
 
-// More solved days than anyone can have yet; the streak and the 12-week grid need far fewer.
-export const STREAK_READ_LIMIT = 5000;
+// The puzzle's solved days (lib/learn/activity-store reads them; the puzzle action still asks
+// for them by this name).
+export {readSolvedDays, STREAK_READ_LIMIT};
 // A reader has at most two rows per puzzle: its day, and the archive.
 const ROWS_READ_LIMIT = 5000;
 
 const ROW_FIELDS = {_id: 0, puzzleId: 1, day: 1, status: 1, attempts: 1, hintsUsed: 1, solvedAt: 1} as const;
 
-export const readSolvedDays = async (userId: string): Promise<string[]> => {
-    await connectToDatabase();
-    const rows = await PuzzleSolve.find({userId, status: 'solved', day: {$type: 'string'}})
-        .sort({day: -1})
-        .limit(STREAK_READ_LIMIT)
-        .select({_id: 0, day: 1})
-        .lean<{day: string}[]>();
-    return rows.map((row) => row.day);
-};
-
+// The one streak, over everything the reader did on their Learn list (lib/learn/activity-store).
 export const readStreak = async (userId: string, today: string = getEasternDateString()): Promise<Streak> =>
-    streakFrom(await readSolvedDays(userId), today);
+    readActivityStreak(userId, today);
 
 export const readSolveRow = async (userId: string, puzzleId: string, day: string | null): Promise<SolveRow | null> => {
     await connectToDatabase();
@@ -61,8 +54,8 @@ export const getTodaysPuzzle = async (userId: string): Promise<PuzzlePageView | 
     const today = getEasternDateString();
     const daily = dailyPuzzleFor(today);
     if (!daily) return null;
-    const [row, days] = await Promise.all([readSolveRow(userId, daily.puzzle.id, today), readSolvedDays(userId)]);
-    return {puzzle: puzzleView(daily.puzzle, daily.number), day: today, progress: progressFor(daily.puzzle, row), streak: streakFrom(days, today)};
+    const [row, streak] = await Promise.all([readSolveRow(userId, daily.puzzle.id, today), readActivityStreak(userId, today)]);
+    return {puzzle: puzzleView(daily.puzzle, daily.number), day: today, progress: progressFor(daily.puzzle, row), streak};
 };
 
 // An archive puzzle. Its own archive attempt shows; with none yet, a solve or reveal from the
@@ -72,9 +65,9 @@ export const getArchivePuzzle = async (userId: string, puzzleId: string): Promis
     const context = contextFor(puzzleId, today);
     if (!context) return null;
     await connectToDatabase();
-    const [rows, days] = await Promise.all([
+    const [rows, streak] = await Promise.all([
         PuzzleSolve.find({userId, puzzleId: context.puzzle.id}).select(ROW_FIELDS).limit(10).lean<SolveRow[]>(),
-        readSolvedDays(userId),
+        readActivityStreak(userId, today),
     ]);
     const own = rows.find((row) => row.day === context.day) ?? null;
     const closedEarlier = rows.find((row) => row.day !== context.day && row.status !== 'open') ?? null;
@@ -82,7 +75,7 @@ export const getArchivePuzzle = async (userId: string, puzzleId: string): Promis
         puzzle: puzzleView(context.puzzle, context.number),
         day: context.day,
         progress: progressFor(context.puzzle, own ?? closedEarlier),
-        streak: streakFrom(days, today),
+        streak,
     };
 };
 

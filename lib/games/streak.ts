@@ -1,9 +1,10 @@
-// The daily-puzzle streak, Duolingo-style: the count of consecutive ET days on which the day's
-// puzzle was solved on that day. Derived from the solved rows' days alone, never stored, so it
-// cannot drift from them. Pure and client-safe.
+// The streak, Duolingo-style: the count of consecutive ET days on which something on the
+// reader's Learn list was done — a puzzle solved on its day, a round of a game kept, a lab
+// session, a manual tick (lib/learn/activity.ts gathers the days). Derived from those rows'
+// days alone, never stored, so it cannot drift from them. Pure and client-safe.
 //
-// A streak is alive through yesterday until today ends: before today's solve it still counts,
-// and the reader is told it is at risk. A day with no solve resets it. Days are ET labels
+// A streak is alive through yesterday until today ends: before today counts it still stands,
+// and the reader is told it is at risk. A day with nothing done resets it. Days are ET labels
 // ('YYYY-MM-DD', lib/dates.ts), moved in UTC so no timezone or DST can shift one.
 
 import {addCalendarDays} from "@/lib/dates";
@@ -25,6 +26,17 @@ export type Streak = {
 };
 
 export const STREAK_WEEKS = 12;
+
+// The marks the hero counts toward: the first past the current streak is "n to go".
+export const STREAK_MILESTONES: readonly number[] = [3, 7, 14, 30, 60, 100, 365];
+
+export type Milestone = {target: number; toGo: number};
+
+// The next milestone above the current run, or null past the last one.
+export const nextMilestone = (current: number, milestones: readonly number[] = STREAK_MILESTONES): Milestone | null => {
+    const target = milestones.find((mark) => mark > current);
+    return target === undefined ? null : {target, toGo: target - current};
+};
 
 const DATE = /^\d{4}-\d{2}-\d{2}$/;
 

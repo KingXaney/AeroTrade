@@ -51,10 +51,10 @@ try {
 
     await page.locator('[data-streak-chip]').waitFor({timeout: 30000});
     const chip = page.locator('[data-streak-chip]');
-    check('Home names today\'s puzzle beside the market, with no bare zero',
-        await chip.getAttribute('data-streak') === '0' && /today's puzzle/i.test(await chip.innerText()) && !/\b0\b/.test(await chip.innerText()),
+    check('Home offers "Start today" beside the market, with no bare zero',
+        await chip.getAttribute('data-streak') === '0' && /start today/i.test(await chip.innerText()) && !/\b0\b/.test(await chip.innerText()),
         await chip.innerText());
-    check('…and links to it', await chip.getAttribute('href') === '/games/puzzle');
+    check('…and links to the games for an account without the lab', await chip.getAttribute('href') === '/games');
 
     await page.goto(`${BASE}/games`, {waitUntil: 'load'});
     const learnTabs = await page.$$eval('[data-section-tabs="learn"] a', (as) => as.map((a) => `${a.getAttribute('href')}${a.getAttribute('aria-current') === 'page' ? '*' : ''}`));
@@ -62,7 +62,9 @@ try {
 
     await page.goto(`${BASE}/games`, {waitUntil: 'load'});
     await page.locator('[data-games-hub]').waitFor({timeout: 30000});
-    check('the hub opens on the streak, empty so far', /no streak yet/i.test(await page.locator('#games-streak').innerText()));
+    check('the hub opens on the streak hero, empty so far, with the first milestone named', /no streak yet/i.test(await page.locator('#games-streak').innerText())
+        && await page.locator('#games-streak [data-streak-hero][data-streak-tone="none"]').count() === 1 && /3 days to 3/.test(await page.locator('#games-streak').innerText())
+        && await page.locator('#games-streak [data-week-pills] li').count() === 7);
     check('…lights the Games tab under Learn', await page.locator('[data-section-tabs="learn"] a[href="/games"][aria-current="page"]').count() === 1);
     check('…counts the archive', await page.locator('[data-archive-count="0"]').count() === 1
         && new RegExp(`0 of ${archiveFor(today).length} posted`).test(await page.locator('#games-archive').innerText()));
@@ -118,9 +120,11 @@ try {
     await shot('04-home-chip');
 
     await page.goto(`${BASE}/games`, {waitUntil: 'load'});
-    check('the hub agrees', /1-day streak/.test(await page.locator('#games-streak').innerText())
-        && /solved: the streak counts today/i.test(await page.locator('[data-streak-status]').innerText())
-        && await page.locator('[data-streak-grid] [data-solved]').count() === 1);
+    check('the hub agrees: the hero lit, today\'s pill checked, one square in the grid, the puzzle counted on its day',
+        /1-day streak/.test(await page.locator('#games-streak').innerText()) && /today counts/i.test(await page.locator('[data-streak-status]').innerText())
+        && await page.locator('#games-streak [data-streak-tone="done"]').count() === 1 && await page.locator('[data-week-pills] li[data-today][data-solved]').count() === 1
+        && await page.locator('[data-streak-grid] [data-solved]').count() === 1 && /Puzzles solved on the day\s*1\s*puzzle\b/.test(await page.locator('#games-streak').innerText()),
+        (await page.locator('#games-streak').innerText()).replace(/\s+/g, ' ').slice(0, 200));
 
     await db.collection('userpreferences').updateOne({userId: userA},
         {$set: {dashboardLayout: {version: 1, widgets: [{id: 'daily-puzzle', span: 6}]}, updatedAt: new Date()}}, {upsert: true});
@@ -260,6 +264,10 @@ try {
     check('a lower round keeps the record', await pageE.locator('[data-round-record="false"]').count() === 1
         && /record: 12/i.test(await pageE.locator('[data-arithmetic-done]').innerText()));
     check('…and the last rounds draw a line', await pageE.locator('[data-arithmetic-done] [data-sparkline="2"]').count() === 1);
+    await pageE.goto(`${BASE}/`, {waitUntil: 'load'});
+    await pageE.locator('[data-streak-chip]').waitFor({timeout: 30000});
+    check('a kept round counts the day: Home shows a one-day streak with no puzzle solved', await pageE.locator('[data-streak-chip]').getAttribute('data-streak') === '1'
+        && await pageE.locator('[data-streak-chip]').getAttribute('data-today-done') !== null);
 
     await pageE.goto(`${BASE}/games/arithmetic?mode=custom`, {waitUntil: 'networkidle'});
     await pageE.locator('[data-custom-settings]').waitFor({timeout: 30000});
@@ -279,6 +287,15 @@ try {
     await pageE.locator('[data-round-record]').waitFor({timeout: 15000});
     const customRow = await rounds.findOne({userId: userE, game: 'arithmetic', key: {$ne: 'zetamac'}});
     check('…and keeps its record under its own settings', customRow?.key === 'ops=m;add=2-100x2-100;mul=2-12x2-100;t=30' && customRow.score === 1, customRow?.key);
+    // The settings survive the round's end, "Change settings" and a reload: kept in this browser.
+    await pageE.locator('[data-round-settings]').click();
+    await pageE.locator('[data-custom-settings]').waitFor({timeout: 15000});
+    const customOps = async () => pageE.locator('[data-operation]:checked').evaluateAll((els) => els.map((el) => el.getAttribute('data-operation')).join(','));
+    check('"Change settings" returns to the lobby with the custom settings as they were', await customOps() === 'multiply' && await pageE.locator('[data-duration]').inputValue() === '30'
+        && await pageE.locator('[data-settings-kept]').count() === 1);
+    await pageE.reload({waitUntil: 'networkidle'});
+    await pageE.locator('[data-custom-settings]').waitFor({timeout: 30000});
+    check('…and a reload keeps them too', await customOps() === 'multiply' && await pageE.locator('[data-duration]').inputValue() === '30');
 
     await pageE.goto(`${BASE}/games/arithmetic?mode=interview`, {waitUntil: 'networkidle'});
     await pageE.locator('[data-arithmetic-lobby="interview"]').waitFor({timeout: 30000});

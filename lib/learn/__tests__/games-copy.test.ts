@@ -56,7 +56,10 @@ describe('the games copy', () => {
         expect(STREAK_COPY.solvedOnTheDay(1200)).toBe('1,200 puzzles solved on the day');
         expect(PUZZLE_COPY.solvedLine('Oct 3, 9:14 PM ET', 2, 1)).toBe('Solved Oct 3, 9:14 PM ET · 2 tries · 1 hint');
         expect(PUZZLE_COPY.solvedLine('Oct 3, 9:14 PM ET', 1, 0)).toBe('Solved Oct 3, 9:14 PM ET · 1 try');
-        expect(STREAK_COPY.chipAria(0, false)).toBe("Today's puzzle, not solved yet");
+        expect(STREAK_COPY.chipAria(0, false)).toBe('No streak yet; nothing done today');
+        expect(STREAK_COPY.chipAria(4, true)).toBe('4-day streak; today counts');
+        expect(STREAK_COPY.milestone(1, 7)).toBe('1 day to 7');
+        expect(STREAK_COPY.activeDays(12)).toBe('12 days with something done');
         expect(STREAK_COPY.weekdays).toHaveLength(7);
         expect(ARITHMETIC_COPY.timeLeft(119.2)).toBe('2:00 left');
         expect(ARITHMETIC_COPY.timeLeft(9)).toBe('0:09 left');
@@ -77,5 +80,8 @@ describe('the games copy', () => {
         expect(ARITHMETIC_COPY.skillRow(0.9, 1.0, 1, 0)).toBe('0.9 s a problem · 1.0× your average · 1 problem');
         expect(GAMES_COPY.outside.links.lichess.href).toBe('https://lichess.org/training');
         expect(GAMES_COPY.outside.links.monkeytype.href).toBe('https://monkeytype.com');
+        expect(GAMES_COPY.outside.links.codeforces.href).toBe('https://codeforces.com/problemset');
+        expect(GAMES_COPY.outside.links.leetcode.href).toBe('https://leetcode.com/problemset/');
+        for (const link of Object.values(GAMES_COPY.outside.links)) expect(link.href).toMatch(/^https:\/\//);
     });
 });

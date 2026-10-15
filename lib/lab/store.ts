@@ -4,14 +4,18 @@
 
 import LabCardState from "@/database/models/lab-card-state.model";
 import LabEvent from "@/database/models/lab-event.model";
+import UserPreferences from "@/database/models/user-preferences.model";
 import {connectToDatabase} from "@/database/mongoose";
 import {grade, newCardState, type CardState, type Grade} from "@/lib/lab/srs";
 import type {CardRow, StudiedRow} from "@/lib/lab/schedule";
+import {labWidgetsFrom, type LabWidgetId} from "@/lib/lab/widgets";
 
 const SESSION_DAYS_LIMIT = 5000;
+// Manual ticks: at most a handful a day, read newest first for the streak and today's list.
+const TICKS_READ_LIMIT = 5000;
 
-type EventRow = {key: string; day: string; lastDay: string; how?: 'revealed' | 'solved'};
-type CardDoc = {cardId: string; unitId: string; ease: number; intervalDays: number; dueOn: string; reps: number; lapses: number};
+type EventRow = {key: string; day: string; lastDay: string; how?: 'revealed' | 'solved'; score?: number};
+type CardDoc = {cardId: string; unitId: string; ease: number; intervalDays: number; dueOn: string; reps: number; lapses: number; gradedOn?: string};
 
 export const readStudied = async (userId: string): Promise<StudiedRow[]> => {
     await connectToDatabase();
@@ -34,13 +38,73 @@ export const readSessionDays = async (userId: string): Promise<string[]> => {
     return rows.map((row) => row.day);
 };
 
-export const readCardRows = async (userId: string): Promise<(CardRow & {unitId: string})[]> => {
+export const readCardRows = async (userId: string): Promise<(CardRow & {unitId: string; gradedOn: string | null})[]> => {
     await connectToDatabase();
-    const docs = await LabCardState.find({userId}).select('cardId unitId ease intervalDays dueOn reps lapses').lean<CardDoc[]>();
-    return docs.map((doc) => ({cardId: doc.cardId, unitId: doc.unitId, state: {ease: doc.ease, intervalDays: doc.intervalDays, dueOn: doc.dueOn, reps: doc.reps, lapses: doc.lapses}}));
+    const docs = await LabCardState.find({userId}).select('cardId unitId ease intervalDays dueOn reps lapses gradedOn').lean<CardDoc[]>();
+    return docs.map((doc) => ({cardId: doc.cardId, unitId: doc.unitId, gradedOn: doc.gradedOn ?? null, state: {ease: doc.ease, intervalDays: doc.intervalDays, dueOn: doc.dueOn, reps: doc.reps, lapses: doc.lapses}}));
+};
+
+export type QuizRow = {unitId: string; day: string; score: number};
+
+// The quizzes passed, one row per unit.
+export const readQuizzes = async (userId: string): Promise<QuizRow[]> => {
+    await connectToDatabase();
+    const rows = await LabEvent.find({userId, kind: 'quiz'}).select('key day score').lean<EventRow[]>();
+    return rows.map((row) => ({unitId: row.key, day: row.day, score: row.score ?? 0}));
+};
+
+// The manual ticks of Today's list (lib/lab/todo.todoKey), newest first: the keys for today's
+// list and the days for the streak.
+export const readTickedKeys = async (userId: string): Promise<{key: string; day: string}[]> => {
+    await connectToDatabase();
+    const rows = await LabEvent.find({userId, kind: 'todo'}).select('key day').sort({day: -1}).limit(TICKS_READ_LIMIT).lean<EventRow[]>();
+    return rows.map((row) => ({key: row.key, day: row.day}));
+};
+
+// The widgets on Today, as stored; absent means the default set (lib/lab/widgets.ts).
+export const readLabWidgets = async (userId: string): Promise<LabWidgetId[]> => {
+    await connectToDatabase();
+    const prefs = await UserPreferences.findOne({userId}).select('learn.labWidgets').lean<{learn?: {labWidgets?: string[]}} | null>();
+    return labWidgetsFrom(prefs?.learn?.labWidgets);
+};
+
+export const writeLabWidgets = async (userId: string, widgets: readonly LabWidgetId[]): Promise<void> => {
+    await connectToDatabase();
+    await UserPreferences.updateOne({userId}, {$set: {'learn.labWidgets': [...widgets], updatedAt: new Date()}}, {upsert: true});
 };
 
 const isDuplicateKey = (error: unknown): boolean => (error as {code?: number})?.code === 11000;
+
+// A quiz passed: the first pass sets the day and the score; a later pass changes nothing.
+export const recordQuizPass = async (userId: string, unitId: string, today: string, score: number): Promise<{first: boolean}> => {
+    await connectToDatabase();
+    try {
+        const result = await LabEvent.updateOne(
+            {userId, kind: 'quiz', key: unitId},
+            {$setOnInsert: {day: today, lastDay: today, score, at: new Date()}},
+            {upsert: true},
+        );
+        return {first: result.upsertedCount === 1};
+    } catch (error) {
+        if (isDuplicateKey(error)) return {first: false};
+        throw error;
+    }
+};
+
+// A manual tick of Today's list, once per item and day; unticking removes the row.
+export const tickTodo = async (userId: string, key: string, today: string): Promise<void> => {
+    await connectToDatabase();
+    try {
+        await LabEvent.updateOne({userId, kind: 'todo', key}, {$setOnInsert: {day: today, lastDay: today, at: new Date()}}, {upsert: true});
+    } catch (error) {
+        if (!isDuplicateKey(error)) throw error;
+    }
+};
+
+export const untickTodo = async (userId: string, key: string): Promise<void> => {
+    await connectToDatabase();
+    await LabEvent.deleteOne({userId, kind: 'todo', key});
+};
 
 // A unit marked studied: the first mark sets the day; a later one (a revisit) moves lastDay only.
 export const markUnitStudied = async (userId: string, unitId: string, today: string): Promise<{first: boolean}> => {

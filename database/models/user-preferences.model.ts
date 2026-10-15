@@ -19,6 +19,9 @@ export interface LearnPrefs {
     // Today's lesson "Got it" keys (lib/learn/moments.ts lessonKey), newest last, capped at
     // LESSONS_SEEN_CAP by the $push {$each, $slice} that writes them.
     lessonsSeen?: string[];
+    // The game widgets on Lab › Today (lib/lab/widgets.ts ids), saved from the page's picker;
+    // absent = the default set, an empty list = none.
+    labWidgets?: string[];
     // (The retired quiz's quizDaysAnswered / quizLastAnsweredDate and the retired beginner course's
     // courseDone may still sit in old documents; nothing reads them.)
 }
@@ -108,6 +111,7 @@ const LearnSchema = new Schema<LearnPrefs>(
     {
         missionsDismissedAt: {type: Date, required: false},
         lessonsSeen: {type: [String], default: undefined},
+        labWidgets: {type: [String], default: undefined},
     },
     {_id: false},
 );

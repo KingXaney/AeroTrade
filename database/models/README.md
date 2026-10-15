@@ -37,7 +37,7 @@ reads and writes live. Change a field here, then in the store module named besid
 | `topic-article` | topics | `lib/topics/store`, `refresh` |
 | `watchlist` | stocks | `lib/stocks/watchlist-store`; `lib/actions/watchlist.actions` adds and removes |
 | `friendship` | friends | `lib/friends/store`; `lib/actions/friends.actions` writes |
-| `user-preferences` | settings | `lib/settings/preferences-store`, plus each feature's own sub-document: `lib/dashboard/layout-store` (layout), `lib/theme/store` (appearance), `lib/news/feed-store` (feed, the `newsSeenAt` stamp), `lib/strategies/follows`, `lib/learn` stores (`learn`), `lib/poker-night/prefs-store` (`pokerNight`: the name and look an account sits down with) |
+| `user-preferences` | settings | `lib/settings/preferences-store`, plus each feature's own sub-document: `lib/dashboard/layout-store` (layout), `lib/theme/store` (appearance), `lib/news/feed-store` (feed, the `newsSeenAt` stamp), `lib/strategies/follows`, `lib/learn` stores and `lib/lab/store` (`learn`: the lesson stamps, the game widgets on Lab › Today `labWidgets`), `lib/poker-night/prefs-store` (`pokerNight`: the name and look an account sits down with) |
 | `digest-send` | email | `lib/email/digest-store` — the daily brief's one-per-reader-per-day claim |
 | `job-run` | jobs | `lib/jobs/job-runs` (each run's stamp), `lib/jobs/health` (the status strip) |
 | `limit-event` | jobs | `lib/limits/record` (one row per refusal a provider answered a job or a request with), `lib/limits/store` (the panel's week); expires after `LIMIT_RETENTION_DAYS` |
@@ -48,7 +48,7 @@ reads and writes live. Change a field here, then in the store module named besid
 | `poker-hand` | poker night | `lib/poker-night/hands-store` — one row per completed hand, written after the commit; read through `views.historyView` |
 | `poker-result` | poker night | `lib/poker-night/results-store` — an account's totals per table, upserted behind a `seq` guard (`lib/poker-night/results`); no TTL |
 | `rate-limit` | auth | `lib/rate-limit` — the one counter sign-in, sign-up, password reset and the chat spend; `peekRateLimit` reads a window for the chat's caption without spending it |
-| `lab-event` | lab | `lib/lab/store` — a unit marked studied, a problem closed (answered or revealed), a session day; unique per owner, kind and key, so a second click is a no-op; the streak is derived from the session rows, never stored |
+| `lab-event` | lab | `lib/lab/store` — a unit marked studied, a problem closed (answered or revealed), a session day, a quiz passed (the unit id, the score), a manual tick of Today's list (`${item}:${day}`); unique per owner, kind and key, so a second click is a no-op; the streak is derived from the session and tick days with the puzzle's and the games' (`lib/learn/activity-store`), never stored |
 | `lab-card-state` | lab | `lib/lab/store` — one row per review card the owner has graded (SM-2 state); absent means new; a grade updates only the state the client saw |
 | `lab-day` | lab | `lib/lab/papers/store` — one day of the papers feed (the weekday job's write, the lab page's read): the papers kept per track by arXiv id, never a URL, and the one digest citing them by index; expires after 45 days |
 

@@ -42,6 +42,18 @@ export type LabProblem = {
     unit?: string;
 };
 
+// One multiple-choice question of a unit's quiz: four options, one right. The answer index and
+// the explanation stay on the server (lib/lab/quiz.quizPublic strips them); the quiz is scored
+// there (lib/actions/lab.actions.answerQuiz) and a pass is what lets the unit be marked studied.
+export type LabQuizQuestion = {
+    // `${unitId}/q1`, a key for the page; never stored.
+    id: string;
+    prompt: string;
+    options: readonly [string, string, string, string];
+    answer: 0 | 1 | 2 | 3;
+    why: string;
+};
+
 export type LabSections = {
     // What it is, in the field's own words.
     idea: string;
@@ -69,6 +81,8 @@ export type LabUnit = {
     cards: readonly LabCard[];
     // 1–2.
     problems: readonly LabProblem[];
+    // 3–5 questions; passed with at most one wrong (lib/lab/quiz.QUIZ_MAX_WRONG).
+    quiz: readonly LabQuizQuestion[];
     // The app's own metrics the unit leans on: printed beside it from the glossary, never
     // paraphrased in it.
     glossaryTerms?: readonly GlossaryKey[];

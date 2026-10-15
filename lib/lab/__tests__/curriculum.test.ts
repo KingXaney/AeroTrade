@@ -19,6 +19,7 @@ const runsOf = (text: string, n = 5): Set<string> => {
 };
 const prose = (unit: LabUnit): string[] => [
     ...Object.values(unit.sections), ...unit.cards.flatMap((c) => [c.front, c.back]), ...unit.problems.flatMap((p) => [p.statement, ...p.hints, p.solution]),
+    ...unit.quiz.flatMap((q) => [q.prompt, ...q.options, q.why]),
 ];
 
 describe('the syllabus', () => {
@@ -87,6 +88,19 @@ describe('every authored unit', () => {
         });
         for (const key of unit.glossaryTerms ?? []) expect(isGlossaryKey(key), key).toBe(true);
         for (const other of unit.prerequisites ?? []) expect(LAB_PLAN.some((row) => row.id === other), other).toBe(true);
+        // The quiz the unit is passed on: three to five questions, four distinct options each, one
+        // right, a line saying why; the answers vary in position so a pattern is no help.
+        expect(unit.quiz.length).toBeGreaterThanOrEqual(3);
+        expect(unit.quiz.length).toBeLessThanOrEqual(5);
+        unit.quiz.forEach((question, i) => {
+            expect(question.id, question.id).toBe(`${unit.id}/q${i + 1}`);
+            expect(question.prompt.trim().length, question.id).toBeGreaterThan(10);
+            expect(question.options).toHaveLength(4);
+            expect(new Set(question.options.map((o) => o.trim())).size, question.id).toBe(4);
+            expect([0, 1, 2, 3], question.id).toContain(question.answer);
+            expect(question.why.trim().length, question.id).toBeGreaterThan(10);
+        });
+        expect(new Set(unit.quiz.map((question) => question.answer)).size, unit.id).toBeGreaterThan(1);
     });
 
     it.each(LAB_UNITS.map((unit) => [unit.id, unit] as const))('%s renders every formula and says nothing trading-directed', (_id, unit) => {

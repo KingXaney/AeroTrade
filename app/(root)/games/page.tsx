@@ -39,7 +39,7 @@ const GamesPage = async () => {
     return (
         <div className="space-y-4" data-games-hub>
             <PageTitle title={GAMES_COPY.title} subtitle={GAMES_COPY.subtitle} note={GAMES_COPY.note}/>
-            <StreakPanel streak={card.streak}/>
+            <StreakPanel streak={card.streak} puzzlesSolved={solved}/>
             <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
                 <Panel id="games-daily" aria-labelledby="games-daily-heading">
                     <SectionHeading id="games-daily-heading">{GAMES_COPY.dailyHeading}</SectionHeading>
