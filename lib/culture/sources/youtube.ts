@@ -4,6 +4,7 @@
 // Without YOUTUBE_API_KEY the source is skipped and the run says so.
 
 import {CULTURE_BRANDS} from "@/lib/culture/catalog";
+import {reportLimit, responseSignal} from "@/lib/limits/report";
 import {CULTURE_ITEM_BODY_CHARS, YOUTUBE_CHART_SIZE} from "@/lib/culture/config";
 import type {CultureBrand, CultureItemInput} from "@/lib/culture/types";
 
@@ -105,6 +106,8 @@ export const fetchYouTube = async ({
             const response = await fetchImpl(url, {cache: 'no-store'});
             if (!response.ok) {
                 ok = false;
+                // The Data API names its daily quota in the body (quotaExceeded).
+                await reportLimit('youtube', await responseSignal(response, url.includes('/search') ? 'search' : 'chart'));
                 return;
             }
             items.push(...toYouTubeItems(parseYouTubeVideos(await response.json())));

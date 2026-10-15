@@ -3,6 +3,7 @@
 // untrusted and any non-conforming shape yields [] rather than a throw.
 
 import {type Bar} from "@/lib/prices/signals";
+import {reportLimit, responseSignal} from "@/lib/limits/report";
 import {getEasternDateString} from "@/lib/dates";
 
 export type YahooRange = "1mo" | "2y" | "5y" | "10y";
@@ -144,6 +145,7 @@ export const fetchYahooDaily = async (
         });
         if (!response.ok) {
             console.error(`Yahoo fetch failed for ${symbol}: HTTP ${response.status}`);
+            await reportLimit('yahoo', await responseSignal(response, `chart ${symbol}`));
             return [];
         }
         const json: unknown = await response.json();

@@ -1,6 +1,7 @@
 // Stooq daily EOD client. CSV parsing and fetch-window planning are pure so
 // vitest can cover them without any network or database.
 
+import {reportLimit, responseSignal} from "@/lib/limits/report";
 import {
     BACKFILL_CALENDAR_DAYS,
     BACKFILL_TRIGGER_GAP_DAYS,
@@ -128,9 +129,17 @@ export const fetchStooqDaily = async (
         });
         if (!response.ok) {
             console.error(`Stooq fetch failed for ${symbol}: HTTP ${response.status}`);
+            await reportLimit('stooq', await responseSignal(response, `daily ${symbol}`));
             return [];
         }
-        return parseStooqCsv(await response.text());
+        const text = await response.text();
+        // Stooq refuses a burst with a 200 whose body says so (lib/limits).
+        if (/daily hits limit/i.test(text)) {
+            console.error(`Stooq refused ${symbol}: ${text.trim().slice(0, 80)}`);
+            await reportLimit('stooq', {status: 200, message: `daily ${symbol}: ${text.trim().slice(0, 120)}`});
+            return [];
+        }
+        return parseStooqCsv(text);
     } catch (error) {
         console.error(`Stooq fetch threw for ${symbol}`, error);
         return [];

@@ -2,6 +2,7 @@
 // DB-free by design: pure mapping + fetch only, so it stays testable and cache-friendly.
 
 import {XMLParser} from "fast-xml-parser";
+import {reportLimit, responseSignal} from "@/lib/limits/report";
 import {
     FEED_REVALIDATE_SECONDS,
     SEC_FORM_TYPES,
@@ -296,6 +297,7 @@ export const fetchSecFilings = async (symbols: string[]): Promise<MarketNewsArti
                 signal: AbortSignal.timeout(SEC_FETCH_TIMEOUT_MS),
             });
             if (!response.ok) {
+                await reportLimit('sec', await responseSignal(response, `EDGAR ${symbol}`));
                 throw new Error(`EDGAR responded ${response.status} for ${symbol}`);
             }
 

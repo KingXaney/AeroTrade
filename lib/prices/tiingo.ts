@@ -9,6 +9,7 @@
 // the terrain, against a free tier of 50 requests an hour and 1,000 a day (checked 2026-10-06).
 
 import {addCalendarDays} from "@/lib/dates";
+import {reportLimit, responseSignal} from "@/lib/limits/report";
 import {easternParts, isTradingDay} from "@/lib/prices/market-hours";
 import type {Bar} from "@/lib/prices/signals";
 
@@ -107,6 +108,7 @@ export const fetchTiingoDaily = async (
         });
         if (!response.ok) {
             console.error(`Tiingo fetch failed for ${symbol}: HTTP ${response.status}`);
+            await reportLimit('tiingo', await responseSignal(response, `prices ${symbol}`));
             return [];
         }
         const json: unknown = await response.json();

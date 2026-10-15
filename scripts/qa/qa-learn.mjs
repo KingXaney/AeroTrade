@@ -745,12 +745,36 @@ try {
         check('the leaderboard says what the dot means, once', (await pageF.locator('[data-testid="thesis-legend"]').allInnerTexts()).join('|')
             === '● thesis: the news about this name has stayed strong for weeks (its slow weight reached 5)');
 
-        // What the AI did about them is the second view; whether the jobs ran, the third.
+        // What the AI did about them is the second view; whether the jobs ran, the third — with
+        // the limits tracker under the jobs: three seeded hits (two today, one three days ago).
+        const etDay = (ms) => new Date(ms).toLocaleDateString('en-CA', {timeZone: 'America/New_York'});
+        await db.collection('limitevents').deleteMany({});
+        await db.collection('limitevents').insertMany([
+            // Minutes ago, not hours: a run just after midnight ET must still count both as today.
+            {provider: 'gemini', kind: 'quota', jobId: 'generate-topic-briefs', message: '429 RESOURCE_EXHAUSTED: GenerateRequestsPerDayPerProjectPerModel', at: new Date(Date.now() - 120_000), day: etDay(Date.now() - 120_000)},
+            {provider: 'finnhub', kind: 'rate', message: 'Finnhub API error: 429 Too Many Requests', at: new Date(Date.now() - 3 * 86_400_000), day: etDay(Date.now() - 3 * 86_400_000)},
+            {provider: 'youtube', kind: 'quota', message: 'search: HTTP 403 quotaExceeded', at: new Date(Date.now() - 60_000), day: etDay(Date.now() - 60_000)},
+        ]);
         await pageF.goto(`${BASE}/brain?view=system`, {waitUntil: 'domcontentloaded'});
         await pageF.getByText('System Status').first().waitFor({timeout: 60000});
-        check('the system view holds the pipeline and the job stamps, and nothing else',
+        check('the system view holds the pipeline, the job stamps and the limits, and nothing else',
             await pageF.getByText('Active Theses').count() === 0 && await pageF.getByText('Weekly Decisions').count() === 0
-            && await pageF.locator('#brain-legend').count() === 1);
+            && await pageF.locator('#brain-legend').count() === 1 && await pageF.locator('[data-limits]').count() === 1);
+        const limits = pageF.locator('[data-limits]');
+        const limitRows = await limits.locator('[data-limit]').evaluateAll((els) => els.map((el) => `${el.getAttribute('data-limit')}:${el.getAttribute('data-limit-state')}`));
+        check('the limits panel lists every tracked service, the hit ones first and newest first', limitRows.length >= 12
+            && limitRows.slice(0, 3).join(',') === 'youtube:hit-today,gemini:hit-today,finnhub:hit-week' && limitRows.slice(3).every((row) => row.endsWith(':clear')), limitRows.join(','));
+        const geminiRow = limits.locator('[data-limit="gemini"]');
+        check("a hit row says its kind, when, which job and the error's words, with the published cap and the planned use",
+            /quota · .* · Topic briefs/.test(await geminiRow.locator('[data-limit-last]').innerText()) && /RESOURCE_EXHAUSTED/.test(await geminiRow.innerText())
+            && /1 hit today · 1 hit in 7 days/.test(await geminiRow.locator('[data-limit-hits]').innerText()) && /20 requests a day/.test(await geminiRow.innerText()) && /as published 20\d\d-/.test(await geminiRow.innerText()),
+            (await geminiRow.innerText()).replace(/\s+/g, ' ').slice(0, 240));
+        check('a clear row says no hit was recorded, never that the service is within its limits', /no hit recorded/.test(await limits.locator('[data-limit="yahoo"]').innerText())
+            && !/within/.test(await limits.innerText()));
+        check('the summary counts the services hit today and this week', /2 services hit today, 3 this week, of \d+ tracked/.test(await limits.locator('[data-limits-summary]').innerText()), await limits.locator('[data-limits-summary]').innerText());
+        check('…and the panel keeps to the descriptive voice', !/\b(should|recommend|best|optimal)\b/i.test(await limits.innerText()));
+        // Inngest's dashboard is linked from its own row and from the note under the panel.
+        check('the dashboards the app cannot read are linked', await limits.locator('a[href^="https://app.inngest.com"]').count() >= 1 && await limits.locator('a[href^="https://vercel.com"]').count() === 1);
         await pageF.goto(`${BASE}/brain?view=navigator`, {waitUntil: 'domcontentloaded'});
         await pageF.getByText('Weekly Decisions').first().waitFor({timeout: 60000});
         const decisions = panelOf('Weekly Decisions');
@@ -830,6 +854,7 @@ try {
         await db.collection('brainentities').deleteOne({key: THESIS_KEY});
         if (newsIdsF.length > 0) await db.collection('newsitems').deleteMany({_id: {$in: newsIdsF}});
         if (userF) await db.collection('suggestionsets').deleteMany({userId: userF});
+        await db.collection('limitevents').deleteMany({}).catch(() => {});
         await pricebarsF.deleteMany({symbol: {$in: [THESIS_KEY, 'SPY']}});
         if (savedSpyF.length > 0) await pricebarsF.insertMany(savedSpyF);
     }

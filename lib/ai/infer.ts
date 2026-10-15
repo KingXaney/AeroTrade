@@ -3,6 +3,7 @@
 // meant touching all of them.
 
 import type {GetStepTools, Inngest} from "inngest";
+import {reportLimit} from "@/lib/limits/report";
 
 import {resolveModel, type AiProvider, type AiTask, type ModelSpec} from "@/lib/ai/models";
 
@@ -96,22 +97,33 @@ export const inferText = async (
     const spec = resolveModel(task);
     if (spec.warning) console.warn(`AI tier: ${spec.warning}`);
 
+    // A refusal that is a limit — the day's quota, a rate, a key, an outage — is filed against
+    // the provider (lib/limits) before it reaches the job, which decides what to do without it.
+    const reporting = async <T>(call: () => Promise<T>): Promise<T> => {
+        try {
+            return await call();
+        } catch (error) {
+            await reportLimit(spec.provider, `${task} (${spec.model}): ${error instanceof Error ? error.message : String(error)}`);
+            throw error;
+        }
+    };
+
     if (spec.provider === 'anthropic') {
-        const response = await step.ai.infer(stepId, {
+        const response = await reporting(() => step.ai.infer(stepId, {
             // max_tokens goes in defaultParameters, not the body: the Anthropic adapter
             // assigns defaults OVER the body (Gemini's does the reverse), so a body
             // value would be silently clobbered.
             model: step.ai.models.anthropic({model: spec.model, defaultParameters: {max_tokens: spec.maxTokens}}),
             body: buildAnthropicBody(spec, prompt, system),
-        });
+        }));
         const {text, stopReason} = normalizeAnthropicResponse(response);
         return {text, stopReason, provider: spec.provider, model: spec.model};
     }
 
-    const response = await step.ai.infer(stepId, {
+    const response = await reporting(() => step.ai.infer(stepId, {
         model: step.ai.models.gemini({model: spec.model}),
         body: buildGeminiBody(spec, prompt, system),
-    });
+    }));
     const {text, stopReason} = normalizeGeminiResponse(response);
     return {text, stopReason, provider: spec.provider, model: spec.model};
 };

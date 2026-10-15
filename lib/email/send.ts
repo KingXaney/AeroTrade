@@ -1,4 +1,5 @@
 import nodemailer from 'nodemailer';
+import {reportLimit} from "@/lib/limits/report";
 import {renderPasswordResetEmail, renderWelcomeEmail} from "@/lib/email/templates";
 import {RESET_EMAIL_COPY, WELCOME_EMAIL_COPY} from "@/lib/learn/copy/email";
 import {isPreviewBuild, SITE_NAME, siteUrl} from "@/lib/site";
@@ -23,6 +24,17 @@ export const appUrl = (): string => siteUrl();
 
 // The sender: the product's name before whatever address the mailer is configured with.
 const from = (): string => `"${SITE_NAME}" <${process.env.NODEMAILER_EMAIL}>`;
+
+// Every send goes through here: a refusal that is Gmail's daily limit or a rejected login is
+// filed against the mailer (lib/limits) before the caller sees it.
+const sendReporting = async (mail: Parameters<typeof transporter.sendMail>[0]): Promise<void> => {
+    try {
+        await transporter.sendMail(mail);
+    } catch (error) {
+        await reportLimit('mailer', error instanceof Error ? error : String(error));
+        throw error;
+    }
+};
 
 const mailerConfigured = (): boolean => Boolean(process.env.NODEMAILER_EMAIL && process.env.NODEMAILER_PASSWORD);
 
@@ -56,7 +68,7 @@ const PASSWORD_RESET_TTL_MINUTES = 30;
 export const sendPasswordResetEmail = async ({ email, name, token }: { email: string; name?: string | null; token: string }): Promise<void> => {
     const resetUrl = `${appUrl()}/reset-password?token=${encodeURIComponent(token)}`;
     if (!mailerReady('the password reset email', `link for ${email}: ${resetUrl}`)) return;
-    await transporter.sendMail({
+    await sendReporting({
         from: from(),
         to: email,
         subject: RESET_EMAIL_COPY.subject,
@@ -68,7 +80,7 @@ export const sendPasswordResetEmail = async ({ email, name, token }: { email: st
 // `intro` is inline HTML that sanitizeWelcomeIntroHtml has already reduced to text and emphasis.
 export const sendWelcomeEmail = async ({ email, name, intro }: WelcomeEmailData): Promise<void> => {
     if (!mailerReady('the welcome email')) return;
-    await transporter.sendMail({
+    await sendReporting({
         from: from(),
         to: email,
         subject: WELCOME_EMAIL_COPY.subject,
@@ -82,5 +94,5 @@ export const sendNewsSummaryEmail = async (
     {email, subject, html, text}: {email: string; subject: string; html: string; text: string}
 ): Promise<void> => {
     if (!mailerReady('the daily news summary')) return;
-    await transporter.sendMail({from: from(), to: email, subject, text, html});
+    await sendReporting({from: from(), to: email, subject, text, html});
 };

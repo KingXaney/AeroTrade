@@ -4,6 +4,7 @@
 // still leaves a day.
 
 import {LAB_TRACKS, type LabTrack} from "@/lib/learn/copy/lab/types";
+import {reportLimit, responseSignal} from "@/lib/limits/report";
 import {ARXIV_ID_BATCH, ARXIV_LISTING_SIZE, FETCH_TIMEOUT_MS, LISTING_CATEGORIES, PAPERS_USER_AGENT, SEEN_WINDOW_DAYS} from "@/lib/lab/papers/config";
 import {arxivIdListUrl, arxivListingUrl, parseArxivAtom, type ArxivListing} from "@/lib/lab/papers/arxiv";
 import {hfDailyPapersUrl, hfDatesFor, parseHfDailyPapers, type HfPaper} from "@/lib/lab/papers/hf";
@@ -16,7 +17,10 @@ export const loadSeenIds = (today: string): Promise<string[]> => readSeenIds(tod
 const fetchArxiv = async (url: string): Promise<ArxivListing> => {
     try {
         const response = await fetch(url, init());
-        if (!response.ok) return {status: 'error', message: `HTTP ${response.status}`};
+        if (!response.ok) {
+            await reportLimit('arxiv', await responseSignal(response, 'listing'));
+            return {status: 'error', message: `HTTP ${response.status}`};
+        }
         return parseArxivAtom(await response.text());
     } catch (error) {
         return {status: 'error', message: error instanceof Error ? error.message : String(error)};
@@ -38,6 +42,7 @@ export const fetchHfDays = async (today: string): Promise<{papers: HfPaper[]; er
             const response = await fetch(hfDailyPapersUrl(date), init());
             if (!response.ok) {
                 errors.push(`${date}: HTTP ${response.status}`);
+                await reportLimit('huggingface', await responseSignal(response, `daily papers ${date}`));
                 continue;
             }
             for (const paper of parseHfDailyPapers(await response.json())) {
