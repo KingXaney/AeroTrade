@@ -34,6 +34,7 @@ const Layout = async ({children}: {children: React.ReactNode}) => {
                 navBadges={shell.navBadges}
                 navSections={sections}
                 navPages={navPagesFor(audience)}
+                owner={audience.owner}
             />
             <Rail portfolio={shell.portfolio} news={shell.news} badges={shell.navBadges} sections={sections} />
             {/* pb-24: the assistant's launcher floats over this corner (components/chat/ChatWidget). */}

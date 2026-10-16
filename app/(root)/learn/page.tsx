@@ -1,17 +1,24 @@
 import type {Metadata} from "next";
+import type {ReactNode} from "react";
 import Link from "next/link";
 import {redirect} from "next/navigation";
 import {getSessionUser} from "@/lib/auth/session";
 import {isLabOwner} from "@/lib/lab/owner";
 import {getLabView} from "@/lib/lab/page-store";
+import {labLayoutFingerprint} from "@/lib/lab/layout";
 import type {LabView} from "@/lib/lab/view";
+import type {LabWidgetId} from "@/lib/lab/widgets";
 import {LAB_COPY, LAB_TRACK_LABELS} from "@/lib/learn/copy/lab";
+import CheckIn from "@/components/lab/CheckIn";
+import LabArrange from "@/components/lab/LabArrange";
 import LabMarkdown from "@/components/lab/LabMarkdown";
 import DigestPanel from "@/components/lab/DigestPanel";
 import LabProgress from "@/components/lab/LabProgress";
+import LabWidgetBody from "@/components/lab/LabWidgetBody";
 import LabWidgets from "@/components/lab/LabWidgets";
 import PapersPanel from "@/components/lab/PapersPanel";
 import ProblemCard from "@/components/lab/ProblemCard";
+import Reflection from "@/components/lab/Reflection";
 import ReviewDeck from "@/components/lab/ReviewDeck";
 import TodayList from "@/components/lab/TodayList";
 import LearnRedirect from "@/components/learn/LearnRedirect";
@@ -31,8 +38,11 @@ export const metadata: Metadata = {title: "Lab"};
 
 // The owner's lab (lib/lab): a daily study of computer vision, machine learning and
 // quantitative finance, for the accounts LAB_OWNER_EMAILS names. One view at a time in the URL
-// (?view=): Today — the unit, the cards due, the problem, the day's digest, the progress — the
-// Papers (the latest day's papers by field with the digest) and the Library, the syllabus. Every other account's /learn goes to the games — on the client, so a /learn#term
+// (?view=): Today — the check-in, the list, the streak, the unit, the cards due, the problem, the
+// day's digest, the games in their layout, the end of the day, the progress — the Papers (the
+// latest day's papers by field with the digest) and the Library, the syllabus. ?arrange=1 is
+// Today's games being arranged (components/lab/LabArrange), reached from Today's "Arrange" and the
+// account menu. Every other account's /learn goes to the games — on the client, so a /learn#term
 // address from the glossary's days as a tab of this page keeps its hash on the way to /glossary
 // (components/learn/LearnRedirect). One read, getLabView, shaped by the pure lib/lab/view.
 
@@ -41,7 +51,7 @@ type ViewId = (typeof VIEW_IDS)[number];
 const isView = (value: unknown): value is ViewId => typeof value === 'string' && (VIEW_IDS as readonly string[]).includes(value);
 const TABS = VIEW_IDS.map((id) => ({id, label: LAB_COPY.views[id], href: id === 'today' ? '/learn' : `/learn?view=${id}`}));
 
-type LearnPageProps = {searchParams: Promise<{tab?: string; view?: string}>};
+type LearnPageProps = {searchParams: Promise<{tab?: string; view?: string; arrange?: string}>};
 
 const UnitPanel = ({today}: {today: LabView['today']}) => (
     <Panel id="lab-unit" aria-labelledby="lab-unit-heading" data-lab-unit={today.kind}>
@@ -64,13 +74,14 @@ const UnitPanel = ({today}: {today: LabView['today']}) => (
     </Panel>
 );
 
-const TodayView = ({view}: {view: LabView}) => (
+const TodayView = ({view, name}: {view: LabView; name: string | null | undefined}) => (
     <div className="space-y-4" id="lab-today">
-        {/* The one streak, then the day as a list; the work panels below are where the items are done. */}
+        {/* The check-in, then the day as a list, then the one streak; the work panels below are where the items are done. */}
+        <CheckIn view={view.checkIn} name={name}/>
+        <TodayList items={view.list} summary={view.listSummary}/>
         <Panel id="lab-streak" aria-labelledby="lab-streak-heading" data-lab-streak={view.progress.streak.current}>
             <StreakHero streak={view.progress.streak} headingId="lab-streak-heading"/>
         </Panel>
-        <TodayList items={view.list} summary={view.listSummary}/>
         <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
             <UnitPanel today={view.today}/>
             <Panel id="lab-review" aria-labelledby="lab-review-heading">
@@ -122,12 +133,26 @@ const TodayView = ({view}: {view: LabView}) => (
             </Panel>
         )}
         <LabWidgets widgets={view.widgets} puzzle={view.puzzle}/>
+        <Reflection key={`${view.reflection.notes ?? ''}\u0000${view.reflection.next ?? ''}`} view={view.reflection}/>
         <Panel id="lab-progress" aria-labelledby="lab-progress-heading">
             <SectionHeading id="lab-progress-heading" spacing="sm">{LAB_COPY.progressHeading}</SectionHeading>
             <LabProgress progress={view.progress}/>
         </Panel>
     </div>
 );
+
+// Today's games being arranged: the cards' bodies are rendered here, on the server, and handed to
+// the client view with the saved layout; the key remounts it on the layout the page read.
+const ArrangeView = ({view}: {view: LabView}) => {
+    const bodies = Object.fromEntries(
+        view.widgets.map((widget) => [widget.id, <LabWidgetBody key={widget.id} widget={widget} puzzle={view.puzzle}/>]),
+    ) as Partial<Record<LabWidgetId, ReactNode>>;
+    return (
+        <div className="space-y-4" id="lab-arrange">
+            <LabArrange key={labLayoutFingerprint(view.layout)} initialLayout={view.layout} bodies={bodies}/>
+        </div>
+    );
+};
 
 const PapersView = ({view}: {view: LabView}) => (
     <div className="space-y-4" id="lab-papers">
@@ -189,20 +214,21 @@ const LibraryView = ({view}: {view: LabView}) => (
 const LearnPage = async ({searchParams}: LearnPageProps) => {
     const user = await getSessionUser();
     if (!user) redirect('/sign-in');
-    const {tab, view: viewParam} = await searchParams;
+    const {tab, view: viewParam, arrange} = await searchParams;
     const legacyGlossaryTab = tab === 'glossary';
 
     if (!isLabOwner(user.email)) return <LearnRedirect fallback="/games" legacyGlossaryTab={legacyGlossaryTab}/>;
 
     const view = await getLabView(user.id);
-    const active: ViewId = isView(viewParam) ? viewParam : 'today';
+    const arranging = arrange === '1';
+    const active: ViewId = !arranging && isView(viewParam) ? viewParam : 'today';
 
     return (
         <div className="space-y-4" data-lab>
             <LearnRedirect fallback={null} legacyGlossaryTab={legacyGlossaryTab}/>
             <PageTitle title={LAB_COPY.title} subtitle={LAB_COPY.subtitle}/>
             <Tabs tabs={TABS} active={active} label={LAB_COPY.viewsLabel}/>
-            {active === 'today' ? <TodayView view={view}/> : active === 'papers' ? <PapersView view={view}/> : <LibraryView view={view}/>}
+            {arranging ? <ArrangeView view={view}/> : active === 'today' ? <TodayView view={view} name={user.name}/> : active === 'papers' ? <PapersView view={view}/> : <LibraryView view={view}/>}
         </div>
     );
 };

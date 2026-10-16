@@ -12,6 +12,9 @@ export interface DashboardLayoutPrefs {
     widgets: {id: string; span: number}[];
 }
 
+// The same shape for the lab's game widgets (lib/lab/layout.ts LabLayout).
+export type LabLayoutPrefs = DashboardLayoutPrefs;
+
 // Learn-surface stamps: each is written once by the user's own click and read back as
 // derived state. No defaults anywhere in the sub-schema.
 export interface LearnPrefs {
@@ -19,8 +22,12 @@ export interface LearnPrefs {
     // Today's lesson "Got it" keys (lib/learn/moments.ts lessonKey), newest last, capped at
     // LESSONS_SEEN_CAP by the $push {$each, $slice} that writes them.
     lessonsSeen?: string[];
-    // The game widgets on Lab › Today (lib/lab/widgets.ts ids), saved from the page's picker;
-    // absent = the default set, an empty list = none.
+    // The game widgets on Lab › Today with their widths (lib/lab/layout.ts), saved from the
+    // arranging view; absent = the older labWidgets list below, else the puzzle alone.
+    labLayout?: LabLayoutPrefs;
+    // The game widgets on Lab › Today (lib/lab/widgets.ts ids) as the page's picker saved them
+    // before the layout above: read as a layout at the default width, unset by the first layout
+    // save. Absent = the default set, an empty list = none.
     labWidgets?: string[];
     // (The retired quiz's quizDaysAnswered / quizLastAnsweredDate and the retired beginner course's
     // courseDone may still sit in old documents; nothing reads them.)
@@ -107,10 +114,23 @@ const NewsFeedSchema = new Schema<NewsFeedPrefs>(
     {_id: false},
 );
 
+// The lab's layout, shaped as the dashboard's: no default on the array, for the same reason.
+const LabLayoutSchema = new Schema<LabLayoutPrefs>(
+    {
+        version: {type: Number, required: true},
+        widgets: {
+            type: [new Schema({id: {type: String, required: true}, span: {type: Number, required: true}}, {_id: false})],
+            default: undefined,
+        },
+    },
+    {_id: false},
+);
+
 const LearnSchema = new Schema<LearnPrefs>(
     {
         missionsDismissedAt: {type: Date, required: false},
         lessonsSeen: {type: [String], default: undefined},
+        labLayout: {type: LabLayoutSchema, required: false},
         labWidgets: {type: [String], default: undefined},
     },
     {_id: false},

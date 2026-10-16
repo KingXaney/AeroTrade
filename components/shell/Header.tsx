@@ -15,13 +15,15 @@ type HeaderProps = {
     /** The audience's lists (navSectionsFor / navPagesFor): the drawer's rows and ⌘K's pages. */
     navSections?: readonly NavSection[];
     navPages?: readonly NavDestination[];
+    /** The lab's owner (lib/lab/owner.ts): the account menu then offers the lab's layout. */
+    owner?: boolean;
 };
 
 // The top bar: where you are (the logo), how to get anywhere (search) and who you are (the
 // account menu). The sections live on the rail (components/shell/Rail.tsx) at lg and in the
 // drawer below it; the bar repeats none of them. `.header-bar` (app/globals.css) centres the
 // search in the bar from md, whatever the two sides' widths.
-function Header({user, initialStocks, initialTopics, navBadges, navSections, navPages}: HeaderProps) {
+function Header({user, initialStocks, initialTopics, navBadges, navSections, navPages, owner = false}: HeaderProps) {
     return (
         <header className='header'>
             <div className='header-wrapper header-bar gap-3'>
@@ -43,7 +45,7 @@ function Header({user, initialStocks, initialTopics, navBadges, navSections, nav
                 <SearchCommand renderAs="text" label="Search stocks, topics and pages" initialStocks={initialStocks} initialTopics={initialTopics} pages={navPages}/>
 
                 <div className="flex items-center gap-3 shrink-0">
-                    <UserDropdown user={user} friendRequests={navBadges.friendRequests ?? 0}/>
+                    <UserDropdown user={user} friendRequests={navBadges.friendRequests ?? 0} owner={owner}/>
                 </div>
             </div>
         </header>

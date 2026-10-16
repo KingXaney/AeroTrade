@@ -39,3 +39,8 @@ export const eachCalendarDay = (from: string, to: string): string[] => {
     for (let day = from; day <= to; day = addCalendarDays(day, 1)) days.push(day);
     return days;
 };
+
+// The hour of the day in America/New_York, 0–23: what "morning" means on a page dated in ET.
+// hourCycle h23, not hour12 false, which some engines print as "24" at midnight.
+export const getEasternHour = (date: Date = new Date()): number =>
+    Number(new Intl.DateTimeFormat('en-US', {timeZone: 'America/New_York', hour: 'numeric', hourCycle: 'h23'}).format(date)) % 24;

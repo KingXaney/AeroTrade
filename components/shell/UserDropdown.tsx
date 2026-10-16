@@ -11,14 +11,17 @@ import {
     DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 
-import {LogOut, ChevronDown, Settings, Users} from "lucide-react";
+import {LayoutGrid, LogOut, ChevronDown, Settings, Users} from "lucide-react";
 import {useSignOut} from "@/components/shell/useSignOut";
 import type {User} from '@/lib/auth/types';
+import {LAB_COPY} from "@/lib/learn/copy/lab";
 
-// The account menu: the pages about the person (Friends, Settings) and Log out. A pending
-// friend request shows as a dot on the avatar — it used to be a badge on a sidebar row, and an
-// ask nobody can see leaves both sides waiting.
-function UserDropdown({user, friendRequests = 0}: {user: User; friendRequests?: number}) {
+// The account menu: the pages about the person (Friends, Settings), for the lab's owner the way
+// to arrange Today's games (/learn?arrange=1 — a view of the lab, not a page of ACCOUNT_PAGES,
+// whose entries are page files), and Log out. A pending friend request shows as a dot on the
+// avatar — it used to be a badge on a sidebar row, and an ask nobody can see leaves both sides
+// waiting.
+function UserDropdown({user, friendRequests = 0, owner = false}: {user: User; friendRequests?: number; owner?: boolean}) {
     const handleSignOut = useSignOut();
 
     const initial = user.name?.[0]?.toUpperCase() ?? '?';
@@ -95,6 +98,15 @@ function UserDropdown({user, friendRequests = 0}: {user: User; friendRequests?: 
                         )}
                     </Link>
                 </DropdownMenuItem>
+
+                {owner && (
+                    <DropdownMenuItem asChild className="group cursor-pointer rounded-md px-3 py-2 text-sm font-medium text-fg focus:!bg-brand-strong/8 focus:!text-brand transition-colors">
+                        <Link href="/learn?arrange=1" data-menu-lab-layout>
+                            <LayoutGrid className="size-4 text-fg-soft group-focus:text-brand transition-colors"/>
+                            {LAB_COPY.layout.menuItem}
+                        </Link>
+                    </DropdownMenuItem>
+                )}
 
                 {/* Themes, dashboard layout and notification preferences live in Settings */}
                 <DropdownMenuItem asChild className="group cursor-pointer rounded-md px-3 py-2 text-sm font-medium text-fg focus:!bg-brand-strong/8 focus:!text-brand transition-colors">

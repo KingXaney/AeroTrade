@@ -4,16 +4,98 @@
 
 import type {LabTrack} from "@/lib/learn/copy/lab/types";
 import type {LabWidgetId} from "@/lib/lab/widgets";
-import {ARITHMETIC_COPY, CORRELATION_COPY, GAMES_COPY, KELLY_COPY, MARKET_COPY} from "@/lib/learn/copy/games";
+import {ARITHMETIC_COPY, CORRELATION_COPY, GAMES_COPY, KELLY_COPY, MARKET_COPY, PUZZLE_COPY} from "@/lib/learn/copy/games";
 import {POKER_NIGHT_COPY} from "@/lib/learn/copy/poker-night";
 
 export const LAB_TRACK_LABELS: Readonly<Record<LabTrack, string>> = {cv: 'Computer vision', ml: 'Machine learning', quant: 'Quantitative finance'};
+
+// "Good morning, Ada." — the first name only, and the greeting alone when there is no name.
+const greet = (opening: string) => (name: string | null | undefined): string => {
+    const first = (name ?? '').trim().split(/\s+/)[0];
+    return first ? `${opening}, ${first}.` : `${opening}.`;
+};
 
 export const LAB_COPY = {
     title: 'Lab',
     subtitle: 'A daily study of computer vision, machine learning and quantitative finance, as a list for the day: one unit with its quiz, the cards due, a problem, the day\'s papers and the games you add.',
     views: {today: 'Today', papers: 'Papers', library: 'Library'},
     viewsLabel: 'Lab views',
+
+    // The check-in at the top of Today (lib/lab/checkin.ts; components/lab/CheckIn, DayFocus).
+    checkIn: {
+        greeting: {morning: greet('Good morning'), afternoon: greet('Good afternoon'), evening: greet('Good evening')},
+        focusLabel: 'Today\'s focus',
+        question: 'What would you like to accomplish today?',
+        placeholder: 'One line: what the day is for.',
+        save: 'Save',
+        saving: 'Saving…',
+        edit: 'Edit',
+        cancel: 'Cancel',
+        planLabel: 'Yesterday\'s note for today',
+        usePlan: 'Make it today\'s focus',
+        yesterdayHeading: 'Yesterday',
+        yesterdayDone: (n: number): string => `${n} done`,
+        yesterdayLeft: (n: number): string => `${n} left`,
+        yesterdayNothing: 'Nothing counted yesterday.',
+        doneLabel: 'Done',
+        leftLabel: 'Left',
+        unitDone: (title: string): string => `Studied ${title}`,
+        unitLeft: (title: string): string => `Study ${title}`,
+        cards: (n: number): string => `${n} ${n === 1 ? 'card' : 'cards'} graded`,
+        problem: 'The problem',
+        puzzle: 'The puzzle',
+    },
+
+    // The end of the day (components/lab/Reflection; saved to the day's note).
+    reflection: {
+        heading: 'End of day',
+        lead: 'A minute at the close: what the day held, and what tomorrow is for. Tomorrow\'s line comes back as the morning\'s note.',
+        doneLabel: 'Done today',
+        leftLabel: 'Still open',
+        nothingDone: 'Nothing yet.',
+        nothingLeft: 'Nothing.',
+        notesLabel: 'Notes on the day',
+        notesPlaceholder: 'What went well, what got in the way.',
+        nextLabel: 'Tomorrow\'s focus',
+        nextPlaceholder: 'One line for tomorrow morning.',
+        save: 'Save',
+        saving: 'Saving…',
+        saved: 'Saved.',
+    },
+
+    // The game widgets' layout (lib/lab/layout.ts; components/lab/LabWidgets on Today, the
+    // arranging view components/lab/LabArrange at /learn?arrange=1, the account menu's entry).
+    layout: {
+        menuItem: 'Lab layout',
+        arrange: 'Arrange',
+        heading: 'Arrange Today\'s games',
+        lead: 'Drag a card by its handle or use the arrows, pick its width, add or remove games, then save. Below a tablet\'s width every card takes the full row.',
+        add: 'Add a game',
+        reset: 'Reset',
+        resetTitle: 'Back to the puzzle alone (applied on Save)',
+        cancel: 'Cancel',
+        save: 'Save',
+        saved: 'Layout saved.',
+        empty: 'No games on Today. Add one, or reset to the puzzle alone.',
+        saveToLoad: 'Save to load',
+        library: {
+            title: 'Add a game',
+            lead: 'A game added is a card on Today and an item on the list; a round played counts the day.',
+            full: 'Every game is on Today.',
+            none: 'Every game is already on Today.',
+            addRow: 'Add',
+            inApp: 'In the app',
+            elsewhere: GAMES_COPY.outside.heading,
+        },
+        // What a screen reader hears while a card is dragged.
+        announce: {
+            pickedUp: (title: string): string => `Picked up ${title}. Drop it on another card to move it there.`,
+            over: (title: string, target: string): string => `${title} moves to ${target}'s place.`,
+            moved: (title: string, target: string): string => `Moved ${title} to ${target}'s place.`,
+            notMoved: (title: string): string => `${title} was not moved.`,
+            cancelled: (title: string): string => `Cancelled moving ${title}.`,
+        },
+    },
 
     // Today's unit.
     unitHeading: {study: 'Today\'s unit', 'studied-today': 'Studied today', revisit: 'A revisit', 'nothing-written': 'The next unit'} as const,
@@ -53,6 +135,8 @@ export const LAB_COPY = {
     list: {
         heading: 'Today\'s list',
         progress: (done: number, total: number): string => `${done} of ${total} done`,
+        groups: {study: 'Study', play: 'Play', elsewhere: 'Elsewhere'} as const,
+        states: {done: 'Done', todo: 'To do', started: 'Started', overdue: 'Overdue', none: 'Nothing today'} as const,
         unit: (title: string): string => `Study ${title}`,
         unitLine: 'Read it, pass its quiz, then mark it studied.',
         unitQuizPassed: 'Quiz passed. Mark it studied to move on.',
@@ -60,6 +144,8 @@ export const LAB_COPY = {
         unitNothing: 'The next unit is not written yet.',
         review: (n: number): string => `Grade ${n} due ${n === 1 ? 'card' : 'cards'}`,
         reviewLine: 'The review deck is below.',
+        reviewOverdue: (n: number): string => `${n} past ${n === 1 ? 'its' : 'their'} day. The review deck is below.`,
+        reviewStarted: (n: number): string => `${n} to go. The review deck is below.`,
         reviewNone: 'No cards due today',
         reviewDone: 'Every due card graded.',
         problem: 'Answer today\'s problem',
@@ -69,6 +155,8 @@ export const LAB_COPY = {
         papersLine: 'The digest is below; tick it once read.',
         puzzle: 'Solve today\'s puzzle',
         puzzleLine: 'The quant puzzle, on its own page.',
+        puzzleStarted: 'Started; the answer is still open.',
+        puzzleRevealed: PUZZLE_COPY.revealedLine,
         round: (title: string): string => `Play a round of ${title}`,
         roundLine: 'A round kept today ticks it.',
         site: (title: string): string => `A session on ${title}`,
@@ -79,11 +167,9 @@ export const LAB_COPY = {
         untick: 'Undo',
         ticked: (day: string): string => `Ticked ${day}`,
         open: 'Open',
-        empty: 'Nothing on the list: add a game below.',
+        empty: 'Nothing on the list: add a game from the arranging view.',
         widgetsHeading: 'Games on Today',
-        pickerSummary: 'Add games to Today',
-        pickerLead: 'Each game added is a card here and an item on the list; a round played counts the day.',
-        noWidgets: 'No games added yet.',
+        noWidgets: 'No games on Today yet.',
     },
 
     // A unit's quiz (components/lab/QuizCard; lib/lab/quiz scores it on the server).
@@ -173,4 +259,18 @@ export const LAB_WIDGET_TITLES: Readonly<Record<LabWidgetId, string>> = {
     'monkeytype': GAMES_COPY.outside.links.monkeytype.title,
     'codeforces': GAMES_COPY.outside.links.codeforces.title,
     'leetcode': GAMES_COPY.outside.links.leetcode.title,
+};
+
+// One line each, in the arranging view's library: the hub's own card bodies.
+export const LAB_WIDGET_BLURBS: Readonly<Record<LabWidgetId, string>> = {
+    'daily-puzzle': 'Today\'s quant puzzle and the streak, with the way to the puzzle.',
+    'arithmetic': ARITHMETIC_COPY.cardBody,
+    'kelly': KELLY_COPY.cardBody,
+    'market-making': MARKET_COPY.cardBody,
+    'correlation': CORRELATION_COPY.cardBody,
+    'poker-night': POKER_NIGHT_COPY.cardBody,
+    'lichess': GAMES_COPY.outside.links.lichess.body,
+    'monkeytype': GAMES_COPY.outside.links.monkeytype.body,
+    'codeforces': GAMES_COPY.outside.links.codeforces.body,
+    'leetcode': GAMES_COPY.outside.links.leetcode.body,
 };

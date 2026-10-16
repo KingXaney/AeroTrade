@@ -1,15 +1,20 @@
-// What the lab page shows, shaped from the owner's rows and the bank by pure functions: Today's
-// list, today's unit (with its quiz's state), the review queue, the day's problem (its solution
-// only once opened), the game widgets on the page, the progress counts with the one streak, the
+// What the lab page shows, shaped from the owner's rows and the bank by pure functions: the
+// check-in (the day, the greeting's period, today's focus and yesterday's note for it, what
+// yesterday held), Today's list, today's unit (with its quiz's state), the review queue, the
+// day's problem (its solution only once opened), the game widgets on the page in their layout,
+// the end-of-day lines with the day's note, the progress counts with the one streak, the
 // library, and the latest day of papers (null before the first run).
 
+import {addCalendarDays} from "@/lib/dates";
 import type {LabPlanRow, LabTrack, LabUnit} from "@/lib/learn/copy/lab/types";
 import {LAB_TRACKS} from "@/lib/learn/copy/lab/types";
 import {type CardRef, type CardRow, dueCards, problemFor, progressByTrack, reviewSummary, type ReviewSummary, type StudiedRow, todaysUnit, type TrackProgress} from "@/lib/lab/schedule";
 import type {Streak} from "@/lib/games/streak";
 import type {DailyPuzzleCardView, GameSummary} from "@/lib/games/store";
 import type {QuizRow, RevealedRow} from "@/lib/lab/store";
-import {buildTodayList, listSummary, todoKey, type LabTodoItem} from "@/lib/lab/todo";
+import {buildCheckIn, type CheckInView, type LabNote, type YesterdayInput} from "@/lib/lab/checkin";
+import type {LabLayout, LabSpan} from "@/lib/lab/layout";
+import {buildTodayList, listSummary, reflectionLines, todoKey, type LabTodoItem} from "@/lib/lab/todo";
 import {labWidget, type LabWidgetId, type LabWidgetKind, type LabOutsideSite} from "@/lib/lab/widgets";
 import type {LabDayStored} from "@/lib/lab/papers/day";
 import {shapePapersView, type LabPapersView} from "@/lib/lab/papers/view";
@@ -40,25 +45,33 @@ export type LabTodayView =
 
 export type LabLibraryRow = {id: string; track: LabTrack; title: string; oneLiner: string; number: number; written: boolean; studiedOn: string | null; quizPassedOn: string | null};
 
-// One game widget on Today: what the card needs beside the copy's titles.
+// One game widget on Today: where it sits (the layout's order), how wide, and what its card
+// needs beside the copy's titles.
 export type LabWidgetCard = {
     id: LabWidgetId;
     kind: LabWidgetKind;
     href: string;
+    span: LabSpan;
     site?: LabOutsideSite;
     // A scored game's record on its default settings.
     record: number | null;
 };
 
+// The end of the day: the day's note, and the list's done and open items as lines.
+export type LabReflectionView = {notes: string | null; next: string | null; done: string[]; left: string[]};
+
 export type LabView = {
+    checkIn: CheckInView;
     list: LabTodoItem[];
     listSummary: {done: number; total: number};
     today: LabTodayView;
     review: {queue: LabReviewCard[]; summary: ReviewSummary};
     problem: LabProblemView | null;
+    layout: LabLayout;
     widgets: LabWidgetCard[];
     // Today's puzzle, when its widget is on the page.
     puzzle: DailyPuzzleCardView | null;
+    reflection: LabReflectionView;
     progress: {perTrack: TrackProgress[]; learned: number; dueToday: number; streak: Streak};
     library: {track: LabTrack; rows: LabLibraryRow[]}[];
     papers: LabPapersView | null;
@@ -66,6 +79,8 @@ export type LabView = {
 
 export type LabViewInput = {
     today: string;
+    // The Eastern hour, for the greeting.
+    hour: number;
     units: readonly LabUnit[];
     plan: readonly LabPlanRow[];
     cards: readonly CardRef[];
@@ -76,13 +91,18 @@ export type LabViewInput = {
     labDay: LabDayStored | null;
     // The one streak, read by lib/learn/activity-store.
     streak: Streak;
-    widgets: readonly LabWidgetId[];
+    layout: LabLayout;
     puzzle: DailyPuzzleCardView | null;
-    // The games with a kept round today, and each game widget's record.
+    // The games with a kept round today and yesterday, whether yesterday's puzzle was solved on its
+    // day, and each game widget's record.
     playedToday: readonly string[];
+    playedYesterday: readonly string[];
+    puzzleSolvedYesterday: boolean;
     gameSummaries: Readonly<Record<string, GameSummary>>;
     // The manual ticks' keys (lib/lab/todo.todoKey), any day.
     tickedKeys: readonly string[];
+    // The day's notes, today's and yesterday's.
+    notes: {today: LabNote | null; yesterday: LabNote | null};
 };
 
 const summary = (unit: LabUnit, quizPassedOn: string | null): LabUnitSummary =>
@@ -91,8 +111,12 @@ const summary = (unit: LabUnit, quizPassedOn: string | null): LabUnitSummary =>
 const plannedCount = (plan: readonly LabPlanRow[]): Record<LabTrack, number> =>
     Object.fromEntries(LAB_TRACKS.map((track) => [track, plan.filter((row) => row.track === track).length])) as Record<LabTrack, number>;
 
+// The manual items ticked on a day, from the keys.
+const tickedOn = (tickedKeys: readonly string[], day: string): string[] =>
+    tickedKeys.flatMap((key) => (key.endsWith(`:${day}`) ? [key.slice(0, key.length - day.length - 1)] : []));
+
 export const shapeLabView = (input: LabViewInput): LabView => {
-    const {today, units, plan, cards, studied, revealed, quizzes, cardRows, labDay, streak, widgets, puzzle, playedToday, gameSummaries, tickedKeys} = input;
+    const {today, hour, units, plan, cards, studied, revealed, quizzes, cardRows, labDay, streak, layout, puzzle, playedToday, playedYesterday, puzzleSolvedYesterday, gameSummaries, tickedKeys, notes} = input;
     const byId = new Map(units.map((unit) => [unit.id, unit]));
     const quizPassedOn = new Map(quizzes.map((row) => [row.unitId, row.day]));
     const pick = todaysUnit(units, studied, today);
@@ -128,32 +152,53 @@ export const shapeLabView = (input: LabViewInput): LabView => {
     }));
 
     const papers = labDay ? shapePapersView(labDay, today) : null;
-    const tickedToday = tickedKeys.flatMap((key) => (key.endsWith(`:${today}`) ? [key.slice(0, key.length - today.length - 1)] : []));
+    const widgetIds = layout.widgets.map((w) => w.id);
     const list = buildTodayList({
         today,
         unit: pick.kind === 'nothing-written'
             ? {kind: 'nothing-written', id: null, title: null, quizPassed: false, revisitedToday: false}
             : {kind: pick.kind, id: pick.unit.id, title: pick.unit.title, quizPassed: quizPassedOn.has(pick.unit.id), revisitedToday: pick.kind === 'revisit' && pick.lastDay === today},
-        review: {due: review.summary.due, gradedToday: cardRows.some((row) => row.gradedOn === today)},
+        review: {due: review.summary.due, overdue: review.summary.overdue, gradedToday: cardRows.some((row) => row.gradedOn === today)},
         problem: problemView ? {closed: problemView.closed !== null} : null,
         papers: papers !== null && (papers.digest !== null || papers.tracks.length > 0),
-        widgets,
+        widgets: widgetIds,
         puzzle: puzzle ? {status: puzzle.status} : null,
         playedToday,
-        ticked: tickedToday,
+        ticked: tickedOn(tickedKeys, today),
     });
 
+    // Yesterday, read from the rows: the unit marked or revisited that day, the cards whose last
+    // grade was that day, the problem closed that day, the puzzle's solve, the rounds, the ticks.
+    // Drawn only once the owner has a day behind them.
+    const yesterday = addCalendarDays(today, -1);
+    const unitStudiedYesterday = studied.find((row) => row.day === yesterday || row.lastDay === yesterday);
+    const yesterdayInput: YesterdayInput = {
+        widgets: widgetIds,
+        unitStudied: unitStudiedYesterday ? byId.get(unitStudiedYesterday.unitId)?.title ?? null : null,
+        unitPending: unitStudiedYesterday || pick.kind === 'nothing-written' ? null : pick.unit.title,
+        cardsGraded: cardRows.filter((row) => row.gradedOn === yesterday).length,
+        problemClosed: revealed.some((row) => row.day === yesterday),
+        puzzleSolved: puzzleSolvedYesterday,
+        played: playedYesterday,
+        ticked: tickedOn(tickedKeys, yesterday),
+    };
+    const activeBefore = streak.total > (streak.todayDone ? 1 : 0);
+    const checkIn = buildCheckIn({today, hour, notes, yesterday: activeBefore ? yesterdayInput : null});
+
     return {
+        checkIn,
         list,
         listSummary: listSummary(list),
         today: todayView,
         review,
         problem: problemView,
-        widgets: widgets.map((id) => {
+        layout,
+        widgets: layout.widgets.map(({id, span}) => {
             const widget = labWidget(id);
-            return {id, kind: widget.kind, href: widget.href, ...(widget.site ? {site: widget.site} : {}), record: widget.game ? gameSummaries[widget.game]?.record ?? null : null};
+            return {id, kind: widget.kind, href: widget.href, span, ...(widget.site ? {site: widget.site} : {}), record: widget.game ? gameSummaries[widget.game]?.record ?? null : null};
         }),
         puzzle,
+        reflection: {notes: notes.today?.notes ?? null, next: notes.today?.next ?? null, ...reflectionLines(list)},
         progress: {perTrack: progressByTrack(units, plannedCount(plan), studied), learned: review.summary.learned, dueToday: review.summary.due, streak},
         library,
         papers,
