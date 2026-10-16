@@ -5,14 +5,28 @@ import MicroLabel from "@/components/primitives/MicroLabel";
 import SectionHeading from "@/components/primitives/SectionHeading";
 import StatTile from "@/components/primitives/StatTile";
 
-// The one streak, drawn the same on the games hub and on Lab › Today: a flame in a disc (filled
+// The one streak, drawn whole on the games hub: a flame in a disc (filled
 // once today counts, warning-tinted while the run is at risk, muted at zero), the count as the
 // heading with its status line and the next milestone, the longest run and the days active, the
 // week as seven day pills (a check inside a day that counted, today ringed and breathing while
 // it is at risk), and the last twelve weeks as a grid under their month labels. Presentational;
 // the streak is lib/learn/activity-store's. The grid is one picture, so a screen reader gets one
 // sentence for it rather than 84 squares. No keyframe of its own: the ring uses Tailwind's pulse
-// under motion-safe only.
+// under motion-safe only. Lab › Today draws components/learn/StreakMini from the same pieces: the
+// tone, the disc's classes and the day pill are exported here for it.
+
+export type StreakTone = 'done' | 'risk' | 'alive' | 'none';
+
+// Today counted, the run at risk, a run alive, or nothing yet.
+export const toneOf = (streak: Streak): StreakTone => (streak.todayDone ? 'done' : streak.atRisk ? 'risk' : streak.current > 0 ? 'alive' : 'none');
+
+// The flame's disc by tone.
+export const DISC_CLASS: Readonly<Record<StreakTone, string>> = {
+    done: 'border-brand bg-brand/15 text-brand',
+    risk: 'border-warning/60 bg-warning/10 text-warning',
+    alive: 'border-brand/40 bg-brand/5 text-brand',
+    none: 'border-line-strong/40 bg-surface-3 text-fg-muted',
+};
 
 const weekdayOf = (date: string): number => {
     const [y, m, d] = date.split('-').map(Number);
@@ -35,19 +49,21 @@ const monthLabels = (weeks: readonly StreakDay[][]): (string | null)[] => {
     });
 };
 
-const DayPill = ({day, atRisk}: {day: StreakDay; atRisk: boolean}) => (
+// One day of the week: a check inside a day that counted, today ringed. 'sm' is the compact card's.
+export const DayPill = ({day, atRisk, size = 'md'}: {day: StreakDay; atRisk: boolean; size?: 'md' | 'sm'}) => (
     <li className="flex flex-col items-center gap-1.5" data-solved={day.solved || undefined} data-today={day.today || undefined} aria-label={STREAK_COPY.dayLabel(day.date, day.solved)}>
         <span
             aria-hidden="true"
             className={cn(
-                'flex size-9 items-center justify-center rounded-full border text-sm transition-colors',
+                'flex items-center justify-center rounded-full border transition-colors',
+                size === 'sm' ? 'size-8 text-xs' : 'size-9 text-sm',
                 day.solved ? 'border-brand bg-brand text-brand-ink' : 'border-line-strong/50 bg-surface-3 text-fg-muted',
                 day.today && !day.solved && 'outline outline-2 outline-offset-2',
                 day.today && !day.solved && (atRisk ? 'outline-warning/70 motion-safe:animate-pulse' : 'outline-brand/50'),
                 day.today && day.solved && 'outline outline-2 outline-offset-2 outline-brand/40',
             )}
         >
-            {day.solved ? <span className="material-symbols-outlined text-base leading-none">check</span> : null}
+            {day.solved ? <span className={cn('material-symbols-outlined leading-none', size === 'sm' ? 'text-sm' : 'text-base')}>check</span> : null}
         </span>
         <span aria-hidden="true" className={cn('font-mono text-[10px]', day.today ? 'text-fg' : 'text-fg-muted')}>
             {STREAK_COPY.weekdays[weekdayOf(day.date)]}
@@ -67,20 +83,14 @@ const StreakHero = ({streak, extraTiles = [], headingId = 'streak-heading'}: Pro
     const status = streak.todayDone ? STREAK_COPY.doneToday : streak.atRisk ? STREAK_COPY.atRisk(streak.current) : STREAK_COPY.start;
     const milestone = nextMilestone(streak.current);
     const labels = monthLabels(streak.weeks);
-    const tone = streak.todayDone ? 'done' : streak.atRisk ? 'risk' : streak.current > 0 ? 'alive' : 'none';
+    const tone = toneOf(streak);
     return (
         <div className="grid gap-6 lg:grid-cols-[minmax(0,1fr)_auto]" data-streak-hero data-streak-tone={tone} data-streak-current={streak.current}>
             <div className="min-w-0 space-y-5">
                 <div className="flex items-center gap-4">
                     <span
                         aria-hidden="true"
-                        className={cn(
-                            'flex size-16 shrink-0 items-center justify-center rounded-full border-2',
-                            tone === 'done' ? 'border-brand bg-brand/15 text-brand'
-                                : tone === 'risk' ? 'border-warning/60 bg-warning/10 text-warning'
-                                    : tone === 'alive' ? 'border-brand/40 bg-brand/5 text-brand'
-                                        : 'border-line-strong/40 bg-surface-3 text-fg-muted',
-                        )}
+                        className={cn('flex size-16 shrink-0 items-center justify-center rounded-full border-2', DISC_CLASS[tone])}
                     >
                         <span className="material-symbols-outlined text-4xl leading-none" style={streak.todayDone ? {fontVariationSettings: "'FILL' 1"} : undefined}>
                             local_fire_department

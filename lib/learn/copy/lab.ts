@@ -12,16 +12,16 @@ export const LAB_TRACK_LABELS: Readonly<Record<LabTrack, string>> = {cv: 'Comput
 
 export const LAB_COPY = {
     title: 'Lab',
-    subtitle: 'A daily study of computer vision, machine learning and quantitative finance, as a list for the day: one unit with its quiz, the cards due, a problem, the day\'s papers and the games you add.',
+    subtitle: 'A daily study of computer vision, machine learning and quantitative finance: today\'s unit, the cards due, a problem, the day\'s papers and the games you add.',
     views: {today: 'Today', papers: 'Papers', library: 'Library'},
     viewsLabel: 'Lab views',
 
-    // Today as a HUD (lib/lab/layout.ts; components/lab/LabHud arranges it in place at /learn and
-    // from the account menu's entry, /learn?arrange=1).
+    // Today as a HUD (lib/lab/layout.ts; components/lab/LabHud arranges it in place: the title's
+    // Arrange and the account menu's entry both open /learn?arrange=1).
     layout: {
         menuItem: 'Lab layout',
         arrange: 'Arrange',
-        lead: 'Drag a card by its handle or use the arrows, pick its width, add or remove cards, then save. Below a tablet\'s width every card takes the full row.',
+        lead: 'Drag a card by its handle or use the arrows, pick its width, add or remove cards, then save. On a wide screen the list is two rows tall, so two cards a third wide sit beside it. Below a tablet\'s width every card takes the full row.',
         add: 'Add to Today',
         reset: 'Reset',
         resetTitle: 'Back to the day as it comes (applied on Save)',
@@ -86,6 +86,10 @@ export const LAB_COPY = {
 
     // The problem.
     problemHeading: 'Today\'s problem',
+    // The problem card folded to its title on Today, and the badge of one closed today.
+    problemShow: 'Show',
+    problemHide: 'Hide',
+    problemClosed: 'Closed for today',
     hintOf: (n: number, total: number): string => `Hint ${n} of ${total}`,
     nextHint: 'Next hint',
     answerLabel: 'Your answer',
@@ -157,11 +161,6 @@ export const LAB_COPY = {
     unitsLabel: 'units studied',
     learnedLabel: 'cards learned',
     dueLabel: 'due today',
-    streakLabel: 'streak',
-    streakRule: 'A day counts when any item on the list is done before midnight Eastern: a unit, a card, a problem, a quiz, the puzzle, a round of a game or a tick. A day with nothing done starts the count again.',
-    sessionDoneToday: 'Today counts.',
-    sessionAtRisk: (days: number): string => `Do one item on the list today to keep the ${days}-day streak.`,
-    sessionStart: 'Do one item on the list to start a streak.',
 
     // The library.
     libraryHeading: 'The syllabus',
@@ -183,7 +182,7 @@ export const LAB_COPY = {
     onHf: 'Hugging Face',
     allPapers: 'All of the day\'s papers',
     digestHeading: 'The day in papers',
-    digestCaveat: (day: string): string => `${day} · AI summary written from the abstracts · may contain errors`,
+    digestCaveat: (day: string): string => `${day} · AI summary from the abstracts · may contain errors`,
     digestRefs: 'Papers cited',
     todayPapersHeading: 'Today\'s papers',
 
@@ -226,7 +225,7 @@ export const LAB_WIDGET_TITLES: Readonly<Record<LabWidgetId, string>> = {
 
 // One line each, in the arranging view's library: the hub's own card bodies.
 export const LAB_WIDGET_BLURBS: Readonly<Record<LabWidgetId, string>> = {
-    'daily-puzzle': 'Today\'s quant puzzle and the streak, with the way to the puzzle.',
+    'daily-puzzle': 'Today\'s quant puzzle, with the way to it.',
     'arithmetic': ARITHMETIC_COPY.cardBody,
     'kelly': KELLY_COPY.cardBody,
     'market-making': MARKET_COPY.cardBody,
@@ -241,7 +240,7 @@ export const LAB_WIDGET_BLURBS: Readonly<Record<LabWidgetId, string>> = {
 // What each part of the day is called on the arranging handles and in the library, with one line.
 export const LAB_PANEL_WORDS: Readonly<Record<LabPanelId, {title: string; blurb: string}>> = {
     list: {title: LAB_COPY.list.heading, blurb: 'One item per thing the day holds, each with the way in.'},
-    streak: {title: 'Streak', blurb: 'The days in a row something on the list was done: this week and the last twelve.'},
+    streak: {title: 'Streak', blurb: 'The days in a row something on the list was done, with this week as seven pills and the next milestone.'},
     unit: {title: LAB_COPY.unitHeading.study, blurb: 'The unit to read, with the way to its page and its quiz.'},
     review: {title: LAB_COPY.reviewHeading, blurb: 'The cards due, graded one at a time.'},
     problem: {title: LAB_COPY.problemHeading, blurb: 'A problem from the unit, checked on the server.'},

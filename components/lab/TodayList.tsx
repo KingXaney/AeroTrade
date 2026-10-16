@@ -15,8 +15,8 @@ import TodoTick from "@/components/lab/TodoTick";
 // drawn only when more than one group has items), one row per item with its state — a filled
 // check for a done item, a ring for one still to do, a half ring for one started, a clock for a
 // review past its day, a dash for one with nothing to do today — its title and line, and the way
-// in: a link to the unit, an anchor to the review deck, the problem or the digest below, the
-// puzzle's or a game's page, a site in a new tab. A manual item carries its tick. The state's
+// in: a link to the unit, an anchor to the review deck, the problem (which it opens) or the digest
+// below, the puzzle's or a game's page, a site in a new tab. A manual item carries its tick. The state's
 // word is read by a screen reader on every row and seen on a started or overdue one. "Games" in
 // the header switches the games on Today on and off (components/lab/GamesOnToday), so a game
 // joins the list in two taps and its item opens the game.
@@ -34,6 +34,12 @@ const WayIn = ({item}: {item: LabTodoItem}) => {
     if (item.external) {
         return <a href={item.href} target="_blank" rel="noopener noreferrer" className={className} data-todo-open={item.id}>{LAB_COPY.list.open} ↗</a>;
     }
+    // An address on this page (#lab-review, #lab-problem, #lab-digest) is the browser's own fragment
+    // navigation, which fires hashchange and so opens the problem's fold (Disclosure openOnHash); a
+    // Link to a hash goes through the router's pushState and fires nothing.
+    if (item.href.startsWith('#')) {
+        return <a href={item.href} className={className} data-todo-open={item.id}>{LAB_COPY.list.open} →</a>;
+    }
     return <Link href={item.href} className={className} data-todo-open={item.id}>{LAB_COPY.list.open} →</Link>;
 };
 
@@ -41,8 +47,8 @@ const Row = ({item}: {item: LabTodoItem}) => {
     const mark = MARK[item.state];
     const word = LAB_COPY.list.states[item.state];
     return (
-        <RowCard className={cn('flex items-center gap-3 px-3 py-2.5', item.state === 'none' && 'opacity-60')} data-lab-todo={item.id} data-todo-state={item.state}>
-            <span aria-hidden="true" className={cn('material-symbols-outlined shrink-0 text-2xl leading-none', mark.className)} style={mark.fill ? {fontVariationSettings: "'FILL' 1"} : undefined}>
+        <RowCard className={cn('flex items-center gap-3 px-3 py-2', item.state === 'none' && 'opacity-60')} data-lab-todo={item.id} data-todo-state={item.state}>
+            <span aria-hidden="true" className={cn('material-symbols-outlined shrink-0 text-xl leading-none', mark.className)} style={mark.fill ? {fontVariationSettings: "'FILL' 1"} : undefined}>
                 {mark.icon}
             </span>
             <span className="min-w-0 flex-1">
@@ -70,8 +76,8 @@ type Props = {
 const TodayList = ({items, summary, games}: Props) => {
     const groups = groupItems(items);
     return (
-        <Panel id="lab-list" aria-labelledby="lab-list-heading" className="h-full" data-lab-list data-list-done={summary.done} data-list-total={summary.total}>
-            <div className="mb-3 flex flex-wrap items-center justify-between gap-3">
+        <Panel id="lab-list" aria-labelledby="lab-list-heading" pad={4} className="h-full" data-lab-list data-list-done={summary.done} data-list-total={summary.total}>
+            <div className="mb-2 flex flex-wrap items-center justify-between gap-3">
                 <SectionHeading id="lab-list-heading" spacing="none">{LAB_COPY.list.heading}</SectionHeading>
                 <div className="flex items-center gap-3">
                     <MicroLabel data-list-progress>{LAB_COPY.list.progress(summary.done, summary.total)}</MicroLabel>
@@ -85,7 +91,7 @@ const TodayList = ({items, summary, games}: Props) => {
                     {groups.map(({group, items: own}) => (
                         <div key={group} data-todo-group={group}>
                             {groups.length > 1 && <MicroLabel as="p" className="mb-1.5">{LAB_COPY.list.groups[group]}</MicroLabel>}
-                            <ol className="space-y-1.5">
+                            <ol className="space-y-1">
                                 {own.map((item) => <li key={item.id}><Row item={item}/></li>)}
                             </ol>
                         </div>

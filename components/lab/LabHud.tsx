@@ -18,6 +18,7 @@ import {
     type DragStartEvent,
 } from "@dnd-kit/core";
 import {SortableContext, type SortingStrategy} from "@dnd-kit/sortable";
+import {cn} from "@/lib/utils";
 import {saveLabLayout} from "@/lib/actions/lab.actions";
 import {
     LAB_HUD, MAX_LAB_WIDGETS, addLabWidget, isLabHudId, isLabPanelId, labLayoutsEqual, missingLabWidgets, moveLabWidget, removeLabWidget, resetLabLayout, setLabSpan,
@@ -36,8 +37,9 @@ import Panel from "@/components/primitives/Panel";
 // Lab › Today as a HUD: every part of the day and every game card on the dashboard's twelve-column
 // grid, in the saved layout's order and widths (lib/lab/layout), arranged in place. Viewing, each
 // card is its own server-rendered body (a Panel of its own, so the shell's chrome is 'bare').
-// Arranging — Today's Arrange, or /learn?arrange=1 from the account menu — the dashboard's own
-// pieces take over: the shell with its handle, arrow keys, width picker and arrows, the drag ghost,
+// A card the catalog marks tall (the list) is two rows tall from a desktop's width, so two cards a
+// third wide stack beside it. Arranging — the title's Arrange and the account menu's "Lab layout",
+// both /learn?arrange=1 — the dashboard's own pieces take over: the shell with its handle, arrow keys, width picker and arrows, the drag ghost,
 // the library of what is not yet on the page. Every change is local until Save writes the layout
 // through saveLabLayout; Cancel puts the saved one back. A card added here has no server-rendered
 // body until then and shows a stand-in; a part of the day with nothing to show (no problem, no
@@ -162,30 +164,33 @@ const LabHud = ({initialLayout, bodies, availableIds, startInEditMode}: Props) =
 
     return (
         <div className="space-y-4" data-lab-hud={editing ? 'editing' : 'viewing'} data-lab-hud-count={layout.widgets.length} data-lab-hud-dirty={dirty || undefined}>
-            <div className={editing ? 'flex flex-wrap items-start justify-between gap-3' : 'flex justify-end'}>
-                {editing && <p className="max-w-2xl text-sm text-fg-muted" data-lab-hud-lead>{words.lead}</p>}
-                <DashboardToolbar
-                    editing={editing} dirty={dirty} pending={pending} labels={TOOLBAR}
-                    onCustomize={() => setEditing(true)}
-                    onAdd={() => setLibraryOpen(true)}
-                    onReset={() => setLayout(resetLabLayout())}
-                    onSave={save}
-                    onCancel={cancel}
-                />
-            </div>
+            {/* Viewing, the page title carries Arrange; the toolbar is the arranging's own. */}
+            {editing && (
+                <div className="flex flex-wrap items-start justify-between gap-3">
+                    <p className="max-w-2xl text-sm text-fg-muted" data-lab-hud-lead>{words.lead}</p>
+                    <DashboardToolbar
+                        editing={editing} dirty={dirty} pending={pending} labels={TOOLBAR}
+                        onCustomize={() => setEditing(true)}
+                        onAdd={() => setLibraryOpen(true)}
+                        onReset={() => setLayout(resetLabLayout())}
+                        onSave={save}
+                        onCancel={cancel}
+                    />
+                </div>
+            )}
 
             <DndContext id="lab-hud" sensors={sensors} collisionDetection={collisionDetection}
                         onDragStart={onDragStart} onDragEnd={onDragEnd} onDragCancel={() => setActiveId(null)}
                         accessibility={{announcements}}>
                 <SortableContext items={ids} strategy={NO_TRANSFORM}>
-                    <div className="grid grid-cols-1 gap-4 md:grid-cols-12">
+                    <div className="grid grid-cols-1 gap-4 md:grid-cols-12" data-lab-grid>
                         {layout.widgets.map((w, index) => {
                             const body = bodies[w.id];
                             if (!editing && body === undefined) return null;
                             const def = shellDef(w.id);
                             return (
                                 <WidgetShell key={w.id} def={def} span={w.span} editing={editing} index={index} count={layout.widgets.length}
-                                             className={spanClass(w.span, false)}
+                                             className={cn(spanClass(w.span, false), LAB_HUD[w.id].tall && w.span < 12 && 'xl:row-span-2')}
                                              onSpan={(s) => setLayout((l) => setLabSpan(l, w.id, s))}
                                              onRemove={() => setLayout((l) => removeLabWidget(l, w.id))}
                                              onMoveBy={(d) => setLayout((l) => moveLabWidget(l, index, Math.max(0, Math.min(l.widgets.length - 1, index + d))))}

@@ -16,18 +16,20 @@ type Props = {
     // view, the Papers view's own address on Today.
     hrefPrefix: string;
     more?: {href: string; label: string};
+    // Layout only, as Panel's: h-full in a grid cell, scroll-mt under the fixed header.
+    className?: string;
 };
 
-const DigestPanel = ({id, digest, day, hrefPrefix, more}: Props) => (
-    <Panel id={id} aria-labelledby={`${id}-heading`} data-lab-digest={day}>
-        <div className="mb-2 flex flex-wrap items-center justify-between gap-3">
+const DigestPanel = ({id, digest, day, hrefPrefix, more, className}: Props) => (
+    <Panel id={id} aria-labelledby={`${id}-heading`} pad={4} className={className} data-lab-digest={day}>
+        <div className="mb-2 flex flex-wrap items-center justify-between gap-x-3 gap-y-1">
             <SectionHeading id={`${id}-heading`} spacing="none">{LAB_COPY.digestHeading}</SectionHeading>
             <MicroLabel>{LAB_COPY.digestCaveat(day)}</MicroLabel>
         </div>
-        {digest.headline && <p className="mb-3 font-heading text-base font-semibold text-fg" data-digest-headline>{digest.headline}</p>}
-        <ol className="list-decimal space-y-2 pl-5">
+        {digest.headline && <p className="mb-2 font-heading text-base font-semibold text-fg" data-digest-headline>{digest.headline}</p>}
+        <ol className="list-decimal space-y-1.5 pl-5">
             {digest.bullets.map((bullet, i) => (
-                <li key={i} className="text-sm leading-relaxed text-fg-soft" data-digest-bullet>
+                <li key={i} className="text-sm leading-normal text-fg-soft" data-digest-bullet>
                     {bullet.text}
                     {' '}
                     <span className="whitespace-nowrap">
@@ -39,7 +41,7 @@ const DigestPanel = ({id, digest, day, hrefPrefix, more}: Props) => (
             ))}
         </ol>
         {more && (
-            <div className="mt-3">
+            <div className="mt-2">
                 <Link href={more.href} className="label-type text-xs text-brand hover:underline">{more.label}</Link>
             </div>
         )}

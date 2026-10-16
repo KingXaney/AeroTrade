@@ -53,14 +53,14 @@ const ReviewDeck = ({cards}: {cards: ReviewDeckCard[]}) => {
 
     return (
         <div data-review-deck data-review-left={queue.length - index}>
-            <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
+            <div className="mb-2 flex flex-wrap items-center justify-between gap-2">
                 <MicroLabel>{LAB_COPY.fromUnit(card.unitTitle)}</MicroLabel>
                 <span className="flex items-center gap-2">
                     <Badge tone={card.why === 'overdue' ? 'warning' : card.why === 'new' ? 'brand' : 'neutral'} variant="outline">{LAB_COPY.why[card.why]}</Badge>
                     <MicroLabel>{LAB_COPY.reviewLeft(queue.length - index)}</MicroLabel>
                 </span>
             </div>
-            <div className={rowCard({className: 'px-4 py-3'})} data-review-card={card.cardId}>
+            <div className={rowCard({className: 'px-3 py-2.5'})} data-review-card={card.cardId}>
                 <div data-review-front>{card.front}</div>
                 {revealed && (
                     <div className="mt-3 border-t border-line-strong/25 pt-3" data-review-back>{card.back}</div>

@@ -4,7 +4,7 @@
 **Status:** Shipped 2026-10-16, merged from `feat/lab-check-in`; revised the same afternoon as the HUD
 (below, PR #72); the check-in and the end of the day — the greeting, the date, the day's focus, yesterday,
 the notes and the `LabNote` row — were removed that evening at the owner's request, the HUD and the games
-from the list staying. Extends
+from the list staying, and Today was then laid out on one screen (below). Extends
 [Lab › Today as a list](2026-10-15-learn-todo-streak.md).
 
 ## Why
@@ -97,6 +97,29 @@ completing the day. So:
   saved at once (`setGameOnToday`); on puts the card at the end of Today and the item on the
   list, whose Open is the way in, and the round or tick counts the day. The HUD is keyed on the
   mode, not the layout, so the dialog stays open while the page follows each toggle.
+
+## Revised again that evening: the day on one screen
+
+The owner: "display most of everything in the main screen without much scrolling down. Have the
+streaks minimally on the top right with the todos on the left and the rest of the information
+displayed aesthetically between."
+
+- **Layout version 3** (`DEFAULT_LAB_LAYOUT`): the list two-thirds wide and two rows tall from a
+  desktop's width (`LAB_HUD.list.tall`, the `xl:row-span-2` added by the HUD), the streak compact
+  at its top right and the unit under it, the problem a bar folded to its title, the review beside
+  the progress (one strip of tiles), the papers, the games last at a third (`game` default 4). A
+  saved version-1 or version-2 layout keeps only which games were on Today: the owner chose to
+  replace the arrangement rather than keep it behind Reset.
+- **The compact streak** (`components/learn/StreakMini`): the flame, the count, the milestone and
+  the week's pills, from the hero's exported pieces; no tiles, status line, caption or grid. The
+  puzzle card's own strip is off while the streak card is on the page.
+- **The folded problem**: `components/primitives/Disclosure` gained a 'row' variant and
+  `openOnHash` (one client leaf, `OpenOnHash`); the list's in-page links are plain anchors so the
+  fragment navigation fires `hashchange`, and `LearnRedirect` leaves `#lab-*` and `#paper-*` on
+  the page (a reload of `/learn?view=papers#paper-…` used to bounce to the glossary).
+- **The frame**: Arrange is the page title's link; every card at `pad={4}`, the list's rows and
+  the unit, review, digest and game cards tighter; the progress one strip without the streak's
+  rule, which the compact card says in numbers.
 
 ## Not built
 
