@@ -33,6 +33,39 @@ try {
         await page.locator('header nav a').count() === 0 && await page.locator('header a[href="/"]').count() === 1);
     check('hamburger is hidden at desktop width',
         !(await page.locator('button[aria-label="Open navigation"]').isVisible()));
+
+    // --- the bar's search sits in its middle (.header-bar) ---
+    // Every style that draws the search as a box centres it in the bar, wide and narrow, whatever
+    // the logo's and the account button's widths; on a phone, and in Minimal at every width, it is
+    // an icon beside the account menu. The theme cookie is taken away again after.
+    const barPlaces = () => page.evaluate(() => {
+        const bar = document.querySelector('header.header').getBoundingClientRect();
+        const search = document.querySelector('header .search-text').getBoundingClientRect();
+        const account = document.querySelector('header .header-bar > :last-child').getBoundingClientRect();
+        return {off: Math.round(search.left + search.width / 2 - (bar.left + bar.width / 2)), gap: Math.round(account.left - search.right)};
+    });
+    const offCentre = [];
+    for (const style of ['futuristic', 'liquid-glass', 'brutalist', 'soft']) {
+        await page.context().addCookies([{name: 'aero-theme', value: `v1:quiet-cyber:${style}:0`, domain: new URL(BASE).hostname, path: '/'}]);
+        for (const width of [1440, 1024, 768]) {
+            await page.setViewportSize({width, height: 900});
+            await page.goto(`${BASE}/trade`, {waitUntil: 'load'});
+            await page.locator('header .search-text').waitFor({timeout: 30000});
+            const {off} = await barPlaces();
+            if (Math.abs(off) > 1) offCentre.push(`${style} at ${width}px: ${off}px`);
+        }
+    }
+    check('the bar\'s search sits in its middle in every boxed style, wide and narrow', offCentre.length === 0, offCentre.join(', '));
+    await page.setViewportSize({width: 390, height: 844});
+    await page.goto(`${BASE}/trade`, {waitUntil: 'load'});
+    const phoneBar = await barPlaces();
+    check('…and on a phone it is an icon beside the account menu', phoneBar.gap >= 0 && phoneBar.gap <= 16, JSON.stringify(phoneBar));
+    await page.context().clearCookies({name: 'aero-theme'});
+    await page.setViewportSize({width: 1440, height: 900});
+    await page.goto(`${BASE}/`, {waitUntil: 'load'});
+    const minimalBar = await barPlaces();
+    check('…while Minimal keeps it an icon beside the account menu at every width',
+        await page.evaluate(() => document.documentElement.dataset.style) === 'minimal' && minimalBar.gap >= 0 && minimalBar.gap <= 16, JSON.stringify(minimalBar));
     await page.locator('aside.rail a[data-rail="markets"]').hover();
     const tip = page.locator('[data-rail-tip="markets"]');
     await tip.waitFor({timeout: 5000}).catch(() => {});

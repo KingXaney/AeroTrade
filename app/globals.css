@@ -1556,6 +1556,21 @@ details[open] > :not(summary) { animation: disclosure-in var(--motion-base) var(
     @apply flex justify-between items-center px-6 py-3;
     color: var(--fg-soft);
   }
+  /* The app's bar (components/shell/Header.tsx): the logo, the search, the account menu. From md
+     the search sits in the bar's true middle: two equal side columns, so neither the logo nor a
+     name beside the avatar pushes it off centre, and the middle never takes more than leaves
+     each side 12rem (the drawer button and the logo below lg). Below md the search is an icon,
+     set beside the account menu, since a centred icon would meet the logo. Minimal keeps its own
+     row (its block below). The landing page's header has no search and keeps the plain wrapper. */
+  .header-bar > .search-text { margin-left: auto; }
+  @media (min-width: 48rem) {
+    .header-bar {
+      display: grid;
+      grid-template-columns: 1fr minmax(0, min(28rem, calc(100% - 24rem))) 1fr;
+    }
+    .header-bar > .search-text { margin-left: 0; justify-self: center; }
+    .header-bar > :last-child { justify-self: end; }
+  }
 
   /* ─── AUTH ─── */
   .auth-layout {
@@ -1997,6 +2012,8 @@ details[open] > :not(summary) { animation: disclosure-in var(--motion-base) var(
    one in the foreground colour, no tile. The content wrapper moves up and in to match. */
 [data-style="minimal"] .header { height: 3rem; border-bottom: 0; }
 [data-style="minimal"] .header-wrapper { padding-block: 0.5rem; justify-content: flex-start; }
+/* Minimal's search is an icon beside the account menu at every width, so its bar stays a row. */
+[data-style="minimal"] .header-bar { display: flex; }
 [data-style="minimal"] .header .font-heading { font-size: 1rem; letter-spacing: -0.01em; }
 [data-style="minimal"] .header .material-symbols-outlined { font-size: 20px; }
 [data-style="minimal"] .search-text {
