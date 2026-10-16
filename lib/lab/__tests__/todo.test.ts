@@ -4,7 +4,7 @@
 // 'none' and counts neither way. Items carry a group the list draws them under.
 
 import {describe, expect, it} from 'vitest';
-import {buildTodayList, groupItems, isManualTodoId, listSummary, MANUAL_TODO_IDS, OPEN_STATES, reflectionLines, todoKey, TODO_GROUPS, type TodayListInput} from '@/lib/lab/todo';
+import {buildTodayList, groupItems, isManualTodoId, listSummary, MANUAL_TODO_IDS, todoKey, TODO_GROUPS, type TodayListInput} from '@/lib/lab/todo';
 import {findBanned} from '@/lib/learn/banned';
 
 const base = (over: Partial<TodayListInput> = {}): TodayListInput => ({
@@ -91,21 +91,6 @@ describe('buildTodayList', () => {
         const grouped = groupItems(buildTodayList(base()));
         expect(grouped.map((g) => `${g.group}:${g.items.map((i) => i.id).join('+')}`)).toEqual(['study:unit+review+problem+papers', 'play:daily-puzzle+arithmetic+poker-night', 'elsewhere:leetcode']);
         expect(groupItems(buildTodayList(base({widgets: []}))).map((g) => g.group)).toEqual(['study']);
-    });
-
-    it('gives the end of the day its two lines', () => {
-        expect(OPEN_STATES).toEqual(['todo', 'started', 'overdue']);
-        const items = buildTodayList(base({
-            unit: {kind: 'study', id: 'u', title: 'T', quizPassed: true, revisitedToday: false},
-            review: {due: 0, overdue: 0, gradedToday: true},
-            problem: {closed: true},
-            puzzle: {status: 'revealed'},
-            playedToday: ['arithmetic'],
-        }));
-        expect(reflectionLines(items)).toEqual({
-            done: ['No cards due today', 'Answer today\'s problem', 'Play a round of Arithmetic sprint'],
-            left: ['Study T', 'Read the day in papers', 'A session on LeetCode', 'A hand or two at poker night'],
-        });
     });
 
     it('keys a manual tick on the item and the day, and knows which items are manual', () => {

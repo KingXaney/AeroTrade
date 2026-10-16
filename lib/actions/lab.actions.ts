@@ -9,16 +9,15 @@ import {isLabOwner} from "@/lib/lab/owner";
 import {quizExplanations, scoreQuiz} from "@/lib/lab/quiz";
 import {cardById, isLabCardId, isLabProblemId, isLabUnitId, problemById, unitById} from "@/lib/lab/registry";
 import {GRADES} from "@/lib/lab/srs";
-import {FOCUS_MAX, NOTE_MAX} from "@/lib/lab/checkin";
 import {LabLayoutSchema, normalizeLabLayout, setGameOn, type LabLayout} from "@/lib/lab/layout";
-import {closeProblem, gradeCard, markUnitStudied as writeStudied, readLabLayout, readQuizzes, recordQuizPass, recordSession, tickTodo as writeTick, untickTodo as removeTick, writeLabLayout, writeLabNote} from "@/lib/lab/store";
+import {closeProblem, gradeCard, markUnitStudied as writeStudied, readLabLayout, readQuizzes, recordQuizPass, recordSession, tickTodo as writeTick, untickTodo as removeTick, writeLabLayout} from "@/lib/lab/store";
 import {isManualTodoId, todoKey} from "@/lib/lab/todo";
 import {isLabWidgetId} from "@/lib/lab/widgets";
 import {LAB_COPY} from "@/lib/learn/copy/lab";
 import {takeRateLimit} from "@/lib/rate-limit";
 
 // The owner's lab's writes (lib/lab/store does the database work, lib/lab/srs, schedule, quiz,
-// todo, layout and checkin the arithmetic). Every action: the signed-in user with their email,
+// todo and layout the arithmetic). Every action: the signed-in user with their email,
 // the owner gate, one rate limit, a client-sent id checked against the registry, one atomic
 // write, a session row for the streak when something was done, then /learn and its unit pages
 // revalidated — and, since the one streak shows on Home, the dashboard and the games hub, those
@@ -52,15 +51,6 @@ const AnswerInput = z.strictObject({problemId: z.string().min(1).max(120), answe
 const QuizInput = z.strictObject({unitId: z.string().min(1).max(120), answers: z.array(z.number().int().min(0).max(3)).max(8)});
 const TodoInput = z.strictObject({id: z.string().min(1).max(40)});
 const GameOnInput = z.strictObject({id: z.string().max(40), on: z.boolean()});
-const FocusInput = z.strictObject({focus: z.string().max(FOCUS_MAX)});
-const ReflectionInput = z.strictObject({notes: z.string().max(NOTE_MAX), next: z.string().max(FOCUS_MAX)});
-
-// A note's field as stored: trimmed, and an empty one cleared.
-const noteText = (text: string): string | null => {
-    const trimmed = text.trim();
-    return trimmed.length > 0 ? trimmed : null;
-};
-
 // The unit's quiz is passed first: the first row is the gate, a revisit needs no second pass.
 export const markUnitStudied = async (input: unknown): Promise<LabActionResult> => {
     const gate = await begin();
@@ -179,39 +169,6 @@ export const setGameOnToday = async (input: unknown): Promise<LabActionResult> =
         return {success: true};
     } catch (error) {
         console.error('Error switching a game on Today:', error);
-        return {success: false, message: LAB_COPY.notSaved};
-    }
-};
-
-// Today's focus, one line of the owner's own; an empty one clears it. Not a session: a note
-// counts nothing toward the streak. The page re-renders in the action's response.
-export const saveDayFocus = async (input: unknown): Promise<LabActionResult> => {
-    const gate = await begin();
-    if ('refused' in gate) return {success: false, message: gate.refused};
-    const parsed = FocusInput.safeParse(input);
-    if (!parsed.success) return {success: false, message: LAB_COPY.invalid};
-    try {
-        await writeLabNote(gate.userId, gate.today, {focus: noteText(parsed.data.focus)});
-        refresh();
-        return {success: true};
-    } catch (error) {
-        console.error('Error saving the day\'s focus:', error);
-        return {success: false, message: LAB_COPY.notSaved};
-    }
-};
-
-// The end of the day: the notes and tomorrow's focus, which the next morning's check-in offers.
-export const saveReflection = async (input: unknown): Promise<LabActionResult> => {
-    const gate = await begin();
-    if ('refused' in gate) return {success: false, message: gate.refused};
-    const parsed = ReflectionInput.safeParse(input);
-    if (!parsed.success) return {success: false, message: LAB_COPY.invalid};
-    try {
-        await writeLabNote(gate.userId, gate.today, {notes: noteText(parsed.data.notes), next: noteText(parsed.data.next)});
-        refresh();
-        return {success: true, message: LAB_COPY.reflection.saved};
-    } catch (error) {
-        console.error('Error saving the day\'s reflection:', error);
         return {success: false, message: LAB_COPY.notSaved};
     }
 };

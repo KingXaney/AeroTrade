@@ -538,19 +538,6 @@ and friends keep none beyond Shared and the invariants).
   else, which keeps a `#term` on its way to `/glossary` and otherwise goes to `/games`; a unit page
   (`/learn/units/[unit]`) redirects them on the server. One view at a time in the URL (`?view=`):
   Today, the Papers and the Library; `?arrange=1` is Today being arranged (below).
-- Today opens on the check-in (`lib/lab/checkin`, pure; `components/lab/CheckIn`): the date
-  (`dayLabel`), a greeting by the Eastern hour (`periodOf` over `lib/dates.getEasternHour`),
-  today's focus — one line written to "What would you like to accomplish today?"
-  (`components/lab/DayFocus`, `saveDayFocus`) — with yesterday's note for today offered until it
-  is written (one press makes it the focus), and yesterday (`buildYesterday`: the unit studied,
-  the cards graded, the problem, the puzzle, the rounds and ticks that counted, and the widgets
-  left), drawn once the owner has a day behind them. The day's notes are one row per owner and
-  ET day (`database/models/lab-note.model.ts`: `focus`, `notes`, `next`;
-  `lib/lab/store.readLabNotes`, `writeLabNote` — a cleared field is unset), the owner's own text,
-  bounded (`FOCUS_MAX`, `NOTE_MAX`) and rendered as text. At the foot of Today,
-  `components/lab/Reflection` (`saveReflection`) shows the list's done and open items as two
-  lines (`lib/lab/todo.reflectionLines`) over notes on the day and tomorrow's focus, which the
-  next morning's check-in offers. A note counts nothing toward the streak.
 - Today is a list. `lib/lab/todo.buildTodayList` (pure) turns the day's parts into items, each in
   a group — study (the unit, the review, the problem, the papers), play (the puzzle, the games,
   poker night), elsewhere (the outside sites); `groupItems`, drawn as eyebrows only when more
@@ -563,8 +550,8 @@ and friends keep none beyond Shared and the invariants).
   (`tickTodo`/`untickTodo`, a `LabEvent` of kind `todo` keyed `${item}:${day}`).
   `components/lab/TodayList` draws it; the work panels below are where the items are done.
 - Today is a HUD. `lib/lab/layout.ts` (pure, client-safe) is its catalog and layout: every part of
-  the day (`LAB_PANEL_IDS`: the check-in, the list, the streak, the unit, the review, the problem,
-  the papers, the end of the day, the progress) and every game card (`lib/lab/widgets.ts`:
+  the day (`LAB_PANEL_IDS`: the list, the streak, the unit, the review, the problem, the papers,
+  the progress) and every game card (`lib/lab/widgets.ts`:
   import-free ids, never renamed, each with its `icon`) as `{id, span}` rows on the dashboard's
   twelve-column grid, a span one of `LAB_SPANS` (4, 6, 8 or 12 — S to XL on the width picker)
   among those the card allows (`LAB_HUD`, each with its `defaultSpan`); the preference
@@ -593,7 +580,7 @@ and friends keep none beyond Shared and the invariants).
   switch per game — on is a card at the end of Today and an item on the list, off takes both away
   — each saved at once by `setGameOnToday` (`setGameOn` over the stored layout, then `/learn`
   revalidated), so the switch shows the page's own answer. Every sentence is `LAB_COPY`
-  (`checkIn`, `reflection`, `list`, `layout`, `games`), `LAB_PANEL_WORDS`, `LAB_WIDGET_TITLES`
+  (`list`, `layout`, `games`), `LAB_PANEL_WORDS`, `LAB_WIDGET_TITLES`
   and `LAB_WIDGET_BLURBS` (`labHudWords` by id).
 - Every written unit carries a quiz (`LabUnit.quiz`: 3–5 questions, four options, one answer, a
   `why`; the curriculum test holds the shape and varies the answer positions). `lib/lab/quiz` is

@@ -1,20 +1,16 @@
-// What the lab page shows, shaped from the owner's rows and the bank by pure functions: the
-// check-in (the day, the greeting's period, today's focus and yesterday's note for it, what
-// yesterday held), Today's list, today's unit (with its quiz's state), the review queue, the
-// day's problem (its solution only once opened), the game widgets on the page in their layout,
-// the end-of-day lines with the day's note, the progress counts with the one streak, the
-// library, and the latest day of papers (null before the first run).
+// What the lab page shows, shaped from the owner's rows and the bank by pure functions: Today's
+// list, today's unit (with its quiz's state), the review queue, the day's problem (its solution
+// only once opened), the game widgets on the page in their layout, the progress counts with the
+// one streak, the library, and the latest day of papers (null before the first run).
 
-import {addCalendarDays} from "@/lib/dates";
 import type {LabPlanRow, LabTrack, LabUnit} from "@/lib/learn/copy/lab/types";
 import {LAB_TRACKS} from "@/lib/learn/copy/lab/types";
 import {type CardRef, type CardRow, dueCards, problemFor, progressByTrack, reviewSummary, type ReviewSummary, type StudiedRow, todaysUnit, type TrackProgress} from "@/lib/lab/schedule";
 import type {Streak} from "@/lib/games/streak";
 import type {DailyPuzzleCardView, GameSummary} from "@/lib/games/store";
 import type {QuizRow, RevealedRow} from "@/lib/lab/store";
-import {buildCheckIn, type CheckInView, type LabNote, type YesterdayInput} from "@/lib/lab/checkin";
 import {gamesOf, type LabLayout, type LabSpan} from "@/lib/lab/layout";
-import {buildTodayList, listSummary, reflectionLines, todoKey, type LabTodoItem} from "@/lib/lab/todo";
+import {buildTodayList, listSummary, todoKey, type LabTodoItem} from "@/lib/lab/todo";
 import {isLabWidgetId, labWidget, type LabWidgetId, type LabWidgetKind, type LabOutsideSite} from "@/lib/lab/widgets";
 import type {LabDayStored} from "@/lib/lab/papers/day";
 import {shapePapersView, type LabPapersView} from "@/lib/lab/papers/view";
@@ -57,11 +53,7 @@ export type LabWidgetCard = {
     record: number | null;
 };
 
-// The end of the day: the day's note, and the list's done and open items as lines.
-export type LabReflectionView = {notes: string | null; next: string | null; done: string[]; left: string[]};
-
 export type LabView = {
-    checkIn: CheckInView;
     list: LabTodoItem[];
     listSummary: {done: number; total: number};
     today: LabTodayView;
@@ -71,7 +63,6 @@ export type LabView = {
     widgets: LabWidgetCard[];
     // Today's puzzle, when its widget is on the page.
     puzzle: DailyPuzzleCardView | null;
-    reflection: LabReflectionView;
     progress: {perTrack: TrackProgress[]; learned: number; dueToday: number; streak: Streak};
     library: {track: LabTrack; rows: LabLibraryRow[]}[];
     papers: LabPapersView | null;
@@ -79,8 +70,6 @@ export type LabView = {
 
 export type LabViewInput = {
     today: string;
-    // The Eastern hour, for the greeting.
-    hour: number;
     units: readonly LabUnit[];
     plan: readonly LabPlanRow[];
     cards: readonly CardRef[];
@@ -93,16 +82,11 @@ export type LabViewInput = {
     streak: Streak;
     layout: LabLayout;
     puzzle: DailyPuzzleCardView | null;
-    // The games with a kept round today and yesterday, whether yesterday's puzzle was solved on its
-    // day, and each game widget's record.
+    // The games with a kept round today, and each game widget's record.
     playedToday: readonly string[];
-    playedYesterday: readonly string[];
-    puzzleSolvedYesterday: boolean;
     gameSummaries: Readonly<Record<string, GameSummary>>;
     // The manual ticks' keys (lib/lab/todo.todoKey), any day.
     tickedKeys: readonly string[];
-    // The day's notes, today's and yesterday's.
-    notes: {today: LabNote | null; yesterday: LabNote | null};
 };
 
 const summary = (unit: LabUnit, quizPassedOn: string | null): LabUnitSummary =>
@@ -116,7 +100,7 @@ const tickedOn = (tickedKeys: readonly string[], day: string): string[] =>
     tickedKeys.flatMap((key) => (key.endsWith(`:${day}`) ? [key.slice(0, key.length - day.length - 1)] : []));
 
 export const shapeLabView = (input: LabViewInput): LabView => {
-    const {today, hour, units, plan, cards, studied, revealed, quizzes, cardRows, labDay, streak, layout, puzzle, playedToday, playedYesterday, puzzleSolvedYesterday, gameSummaries, tickedKeys, notes} = input;
+    const {today, units, plan, cards, studied, revealed, quizzes, cardRows, labDay, streak, layout, puzzle, playedToday, gameSummaries, tickedKeys} = input;
     const byId = new Map(units.map((unit) => [unit.id, unit]));
     const quizPassedOn = new Map(quizzes.map((row) => [row.unitId, row.day]));
     const pick = todaysUnit(units, studied, today);
@@ -167,26 +151,7 @@ export const shapeLabView = (input: LabViewInput): LabView => {
         ticked: tickedOn(tickedKeys, today),
     });
 
-    // Yesterday, read from the rows: the unit marked or revisited that day, the cards whose last
-    // grade was that day, the problem closed that day, the puzzle's solve, the rounds, the ticks.
-    // Drawn only once the owner has a day behind them.
-    const yesterday = addCalendarDays(today, -1);
-    const unitStudiedYesterday = studied.find((row) => row.day === yesterday || row.lastDay === yesterday);
-    const yesterdayInput: YesterdayInput = {
-        widgets: widgetIds,
-        unitStudied: unitStudiedYesterday ? byId.get(unitStudiedYesterday.unitId)?.title ?? null : null,
-        unitPending: unitStudiedYesterday || pick.kind === 'nothing-written' ? null : pick.unit.title,
-        cardsGraded: cardRows.filter((row) => row.gradedOn === yesterday).length,
-        problemClosed: revealed.some((row) => row.day === yesterday),
-        puzzleSolved: puzzleSolvedYesterday,
-        played: playedYesterday,
-        ticked: tickedOn(tickedKeys, yesterday),
-    };
-    const activeBefore = streak.total > (streak.todayDone ? 1 : 0);
-    const checkIn = buildCheckIn({today, hour, notes, yesterday: activeBefore ? yesterdayInput : null});
-
     return {
-        checkIn,
         list,
         listSummary: listSummary(list),
         today: todayView,
@@ -199,7 +164,6 @@ export const shapeLabView = (input: LabViewInput): LabView => {
             return [{id, kind: widget.kind, href: widget.href, span, ...(widget.site ? {site: widget.site} : {}), record: widget.game ? gameSummaries[widget.game]?.record ?? null : null}];
         }),
         puzzle,
-        reflection: {notes: notes.today?.notes ?? null, next: notes.today?.next ?? null, ...reflectionLines(list)},
         progress: {perTrack: progressByTrack(units, plannedCount(plan), studied), learned: review.summary.learned, dueToday: review.summary.due, streak},
         library,
         papers,

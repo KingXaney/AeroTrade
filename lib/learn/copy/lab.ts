@@ -10,59 +10,11 @@ import {POKER_NIGHT_COPY} from "@/lib/learn/copy/poker-night";
 
 export const LAB_TRACK_LABELS: Readonly<Record<LabTrack, string>> = {cv: 'Computer vision', ml: 'Machine learning', quant: 'Quantitative finance'};
 
-// "Good morning, Ada." — the first name only, and the greeting alone when there is no name.
-const greet = (opening: string) => (name: string | null | undefined): string => {
-    const first = (name ?? '').trim().split(/\s+/)[0];
-    return first ? `${opening}, ${first}.` : `${opening}.`;
-};
-
 export const LAB_COPY = {
     title: 'Lab',
     subtitle: 'A daily study of computer vision, machine learning and quantitative finance, as a list for the day: one unit with its quiz, the cards due, a problem, the day\'s papers and the games you add.',
     views: {today: 'Today', papers: 'Papers', library: 'Library'},
     viewsLabel: 'Lab views',
-
-    // The check-in at the top of Today (lib/lab/checkin.ts; components/lab/CheckIn, DayFocus).
-    checkIn: {
-        greeting: {morning: greet('Good morning'), afternoon: greet('Good afternoon'), evening: greet('Good evening')},
-        focusLabel: 'Today\'s focus',
-        question: 'What would you like to accomplish today?',
-        placeholder: 'One line: what the day is for.',
-        save: 'Save',
-        saving: 'Saving…',
-        edit: 'Edit',
-        cancel: 'Cancel',
-        planLabel: 'Yesterday\'s note for today',
-        usePlan: 'Make it today\'s focus',
-        yesterdayHeading: 'Yesterday',
-        yesterdayDone: (n: number): string => `${n} done`,
-        yesterdayLeft: (n: number): string => `${n} left`,
-        yesterdayNothing: 'Nothing counted yesterday.',
-        doneLabel: 'Done',
-        leftLabel: 'Left',
-        unitDone: (title: string): string => `Studied ${title}`,
-        unitLeft: (title: string): string => `Study ${title}`,
-        cards: (n: number): string => `${n} ${n === 1 ? 'card' : 'cards'} graded`,
-        problem: 'The problem',
-        puzzle: 'The puzzle',
-    },
-
-    // The end of the day (components/lab/Reflection; saved to the day's note).
-    reflection: {
-        heading: 'End of day',
-        lead: 'A minute at the close: what the day held, and what tomorrow is for. Tomorrow\'s line comes back as the morning\'s note.',
-        doneLabel: 'Done today',
-        leftLabel: 'Still open',
-        nothingDone: 'Nothing yet.',
-        nothingLeft: 'Nothing.',
-        notesLabel: 'Notes on the day',
-        notesPlaceholder: 'What went well, what got in the way.',
-        nextLabel: 'Tomorrow\'s focus',
-        nextPlaceholder: 'One line for tomorrow morning.',
-        save: 'Save',
-        saving: 'Saving…',
-        saved: 'Saved.',
-    },
 
     // Today as a HUD (lib/lab/layout.ts; components/lab/LabHud arranges it in place at /learn and
     // from the account menu's entry, /learn?arrange=1).
@@ -288,14 +240,12 @@ export const LAB_WIDGET_BLURBS: Readonly<Record<LabWidgetId, string>> = {
 
 // What each part of the day is called on the arranging handles and in the library, with one line.
 export const LAB_PANEL_WORDS: Readonly<Record<LabPanelId, {title: string; blurb: string}>> = {
-    'check-in': {title: 'Check-in', blurb: 'The date, a greeting, today\'s focus and a look back at yesterday.'},
     list: {title: LAB_COPY.list.heading, blurb: 'One item per thing the day holds, each with the way in.'},
     streak: {title: 'Streak', blurb: 'The days in a row something on the list was done: this week and the last twelve.'},
     unit: {title: LAB_COPY.unitHeading.study, blurb: 'The unit to read, with the way to its page and its quiz.'},
     review: {title: LAB_COPY.reviewHeading, blurb: 'The cards due, graded one at a time.'},
     problem: {title: LAB_COPY.problemHeading, blurb: 'A problem from the unit, checked on the server.'},
     papers: {title: LAB_COPY.digestHeading, blurb: 'The day\'s digest of new papers in the three fields.'},
-    reflection: {title: LAB_COPY.reflection.heading, blurb: 'The done and open items, notes on the day and tomorrow\'s focus.'},
     progress: {title: LAB_COPY.progressHeading, blurb: 'Units studied per track, cards learned, cards due.'},
 };
 
