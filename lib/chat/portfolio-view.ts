@@ -19,6 +19,7 @@ type ChatPosition = {
     unrealizedPnl: number | null;     // null when unpriced — the model must not report "flat"
     unrealizedPnlPct: number | null;
     priceStale: boolean;
+    priceAsOf: string | null;         // the stored close's day when no live quote answered; null when live
 };
 
 type ChatAccount = {
@@ -56,7 +57,7 @@ type ChatPortfolio = {
     };
     accounts: ChatAccount[];
     recentTrades?: ChatTrade[];
-    valuation: {pricedSymbols: number; unpricedSymbols: number};
+    valuation: {pricedSymbols: number; unpricedSymbols: number; atCloseSymbols: number};
 };
 
 export const toChatPosition = (p: EnrichedPosition): ChatPosition => ({
@@ -70,6 +71,7 @@ export const toChatPosition = (p: EnrichedPosition): ChatPosition => ({
     unrealizedPnl: p.priceStale ? null : money(p.unrealizedPnl),
     unrealizedPnlPct: p.priceStale ? null : Math.round(p.unrealizedPnlPct * 100) / 100,
     priceStale: p.priceStale,
+    priceAsOf: p.closeDate ?? null,
 });
 
 const toChatAccount = (entry: AccountWithPortfolio): ChatAccount => ({
@@ -118,6 +120,7 @@ export const toChatPortfolio = (
         valuation: {
             pricedSymbols: positions.filter((p) => !p.priceStale).length,
             unpricedSymbols: positions.filter((p) => p.priceStale).length,
+            atCloseSymbols: positions.filter((p) => !p.priceStale && p.closeDate !== undefined).length,
         },
     };
 };

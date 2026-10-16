@@ -70,14 +70,25 @@ describe('missing prices', () => {
     it('counts priced vs unpriced so the prompt can hedge the total', () => {
         const s = summary({positions: [position(), position({symbol: 'AMD', currentPrice: undefined, priceStale: true})]});
         const view = toChatPortfolio([entry('Main', s)], s);
-        expect(view.valuation).toEqual({pricedSymbols: 1, unpricedSymbols: 1});
+        expect(view.valuation).toEqual({pricedSymbols: 1, unpricedSymbols: 1, atCloseSymbols: 0});
     });
 
     it('counts by the priceStale flag, not by the presence of a price', () => {
         // enrichPosition keeps the two in lockstep; the view must key off the flag so a
         // future producer cannot smuggle a stale position past the hedge with a number.
         const s = summary({positions: [position({currentPrice: 120, priceStale: true})]});
-        expect(toChatPortfolio([entry('Main', s)], s).valuation).toEqual({pricedSymbols: 0, unpricedSymbols: 1});
+        expect(toChatPortfolio([entry('Main', s)], s).valuation).toEqual({pricedSymbols: 0, unpricedSymbols: 1, atCloseSymbols: 0});
+    });
+
+    it('dates a price taken from a stored close and counts those apart', () => {
+        // No live quote answered, so the price is the symbol's newest stored daily close: a real
+        // price with a P&L, which the model must date rather than call live.
+        const p = toChatPosition(position({currentPrice: 118, closeDate: '2026-10-14'}));
+        expect(p.priceAsOf).toBe('2026-10-14');
+        expect(p.unrealizedPnl).not.toBeNull();
+        expect(toChatPosition(position()).priceAsOf).toBeNull();
+        const s = summary({positions: [position(), position({symbol: 'XLF', currentPrice: 52.5, closeDate: '2026-10-14'})]});
+        expect(toChatPortfolio([entry('Main', s)], s).valuation).toEqual({pricedSymbols: 2, unpricedSymbols: 0, atCloseSymbols: 1});
     });
 
     it('reports a fully priced portfolio as having nothing unpriced', () => {

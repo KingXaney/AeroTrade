@@ -108,10 +108,27 @@ describe('HOLDINGS_COPY.summary', () => {
         expect(HOLDINGS_COPY.summary(5, 2, false)).toBe('5 holdings · 2 of 5 valued at cost');
     });
 
+    it('says how many holdings stand at a stored close, and from which day', () => {
+        const oct14 = {count: 3, date: '2026-10-14'};
+        expect(HOLDINGS_COPY.summary(8, 0, false, oct14)).toBe('8 holdings · 3 of 8 at the Oct 14 close');
+        expect(HOLDINGS_COPY.summary(8, 0, true, {count: 8, date: '2026-10-14'})).toBe('8 holdings · valued at the Oct 14 close');
+        expect(HOLDINGS_COPY.summary(8, 1, true, oct14)).toBe('8 holdings · 1 of 8 valued at cost · 3 of 8 at the Oct 14 close');
+        expect(HOLDINGS_COPY.summary(8, 0, true, {count: 2, date: null})).toBe('8 holdings · 2 of 8 at their last close');
+        expect(HOLDINGS_COPY.summary(8, 0, true, {count: 0, date: null})).toBe('8 holdings · live valuation');
+    });
+
+    it('titles a price cell taken from a stored close', () => {
+        expect(HOLDINGS_COPY.closeCellTitle('2026-10-14')).toBe('No live quote — the Oct 14 close');
+    });
+
     it('never advises', () => {
         for (const [h, u] of [[0, 0], [1, 0], [1, 1], [4, 1], [4, 4]]) {
-            for (const open of [true, false]) clean(HOLDINGS_COPY.summary(h, u, open));
+            for (const open of [true, false]) {
+                clean(HOLDINGS_COPY.summary(h, u, open));
+                for (const date of ['2026-10-14', null]) clean(HOLDINGS_COPY.summary(h, u, open, {count: Math.max(1, h - u), date}));
+            }
         }
+        clean(HOLDINGS_COPY.closeCellTitle('2026-10-14'));
     });
 });
 

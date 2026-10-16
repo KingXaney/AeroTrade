@@ -16,3 +16,9 @@ export const TRADE_REASON_MAX = 200;
 // The trade log's page size: getTradeHistory's bounded read, and the tail a page slices from the
 // ledger it already holds (/portfolio).
 export const TRADE_HISTORY_LIMIT = 50;
+
+// How old a stored daily close may be and still stand in for a quote Finnhub did not give
+// (lib/trading/valuation.buildHoldingsPriceMap): a long weekend and a holiday, never an old
+// history. The nightly income job tops up the bars of every held symbol, so a held symbol's
+// newest close is normally the last session's.
+export const CLOSE_FALLBACK_DAYS = 7;

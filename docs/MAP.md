@@ -69,6 +69,7 @@ Shared pieces that belong to no single feature:
 |---|---|
 | A quant strategy's rule or parameter | `lib/strategies/catalog.ts` (`CATALOG_PARAMS` — explainers and column labels are built from it) and the rule in `lib/strategies/rules/<slug>.ts`. The reason decoder `lib/learn/reasons.ts` has a round-trip test that fails if a reason's wording changes |
 | Add a quant strategy | A rule in `lib/strategies/rules/`, its entry in `lib/strategies/catalog.ts`; the compiler then points at every `Record<StrategyId, …>` table (`rules/index.ts`, `whatif.ts`, board narration) |
+| What a holding shows when no live quote answers | `lib/trading/valuation.ts` (`buildHoldingsPriceMap`: the stored-close fallback, request paths only), `lib/trading/analytics.ts` (`withStoredCloses`, `livePrice`, `countAtClose`), `lib/trading/config.ts` (`CLOSE_FALLBACK_DAYS`), the words in `lib/learn/copy/portfolio.ts` (`HOLDINGS_COPY.summary`, `closeCellTitle`) and `lib/learn/copy/unpriced.ts` (at cost) |
 | The AI Navigator's caps, cash floor, thresholds | `lib/navigator/config.ts` — the glossary and the /brain legend read them |
 | When a job runs | `lib/jobs/registry.ts` (`crons`); never rename an id or event there (Inngest keys runs on them) |
 | A service's published limit, or which service a refusal is filed against | `lib/limits/registry.ts` (the cap sentence with its date, the docs link, the planned use, the jobs); `lib/limits/detect.ts` reads the refusal; a new call site calls `reportLimit` from `lib/limits/report.ts` where it catches the failure |

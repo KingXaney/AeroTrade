@@ -8,6 +8,7 @@ import type {EnrichedPosition} from '@/lib/trading/types';
 import RowCard from "@/components/primitives/RowCard";
 import MicroLabel from "@/components/primitives/MicroLabel";
 import {UNPRICED_CELL_TITLE} from "@/lib/learn/copy/unpriced";
+import {HOLDINGS_COPY} from "@/lib/learn/copy/portfolio";
 
 // The one holdings table. Read-only as rendered by the friend profile page, the strategy
 // detail page and the dashboard's Top Holdings widget; /portfolio's PositionsTable passes
@@ -63,7 +64,9 @@ const HoldingsTable = ({positions, emptyText = 'No open positions.', showUnprice
                     <div className="flex justify-between md:block md:text-right text-fg-soft font-mono"><MicroLabel className="md:hidden mr-2">Avg Cost</MicroLabel>{formatPrice(p.avgCost)}</div>
                     <div className="flex justify-between md:block md:text-right text-fg font-mono">
                         <MicroLabel className="md:hidden mr-2">Price</MicroLabel>
-                        {typeof p.currentPrice === 'number' ? formatPrice(p.currentPrice) : '—'}
+                        {typeof p.currentPrice !== 'number' ? '—' : p.closeDate ? (
+                            <span title={HOLDINGS_COPY.closeCellTitle(p.closeDate)} data-price-close={p.closeDate}>{formatPrice(p.currentPrice)}</span>
+                        ) : formatPrice(p.currentPrice)}
                     </div>
                     <div className="flex justify-between md:block md:text-right font-mono">
                         <MicroLabel className="md:hidden mr-2">Value / P&L</MicroLabel>

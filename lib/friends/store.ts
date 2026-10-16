@@ -11,7 +11,7 @@ import PaperAccount from "@/database/models/paper-account.model";
 import {PAPER_STARTING_BALANCE} from "@/lib/trading/starting-balance";
 import {countUnpriced} from "@/lib/trading/analytics";
 import {DEFAULT_ACCOUNT_NAME} from "@/lib/trading/accounts";
-import {buildPriceMap, computePortfolio, getPortfoliosForUser, type AccountLike} from "@/lib/trading/valuation";
+import {buildHoldingsPriceMap, computePortfolio, getPortfoliosForUser, type AccountLike} from "@/lib/trading/valuation";
 import type {FriendRequest, FriendSummary, LeaderboardEntry, SentFriendRequest} from '@/lib/friends/types';
 import type {PaperPosition, PortfolioSummary} from '@/lib/trading/types';
 
@@ -201,7 +201,7 @@ export const getLeaderboard = async (userId: string): Promise<LeaderboardEntry[]
         }
 
         const allSymbols = accounts.flatMap((a) => a.positions.map((p: PaperPosition) => p.symbol));
-        const priceMap = await buildPriceMap(allSymbols);
+        const priceMap = await buildHoldingsPriceMap(allSymbols);
 
         const rows: LeaderboardEntry[] = allIds.map((id) => {
             const stored = accountsByUser.get(id) ?? [];

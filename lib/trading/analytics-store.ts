@@ -18,10 +18,11 @@ import {
     computeRealizedPnl,
     computeWinStats,
     drawdownWindow,
+    livePrice,
     mergeLivePoint,
 } from "@/lib/trading/analytics";
 import {getOwnedAccount, toAccountSummary, toPlainPositions} from "@/lib/trading/accounts";
-import {buildPriceMap, computePortfolio} from "@/lib/trading/valuation";
+import {buildHoldingsPriceMap, computePortfolio} from "@/lib/trading/valuation";
 import {epochTradesOf, getTradeLedger} from "@/lib/trading/ledger";
 import {getIncomeSummary} from "@/lib/income/page-store";
 import type {AccountAnalytics, SnapshotPoint} from '@/lib/trading/types';
@@ -45,8 +46,9 @@ export const getAccountAnalytics = async (userId: string, accountId: string): Pr
         ]);
 
         const positions = toPlainPositions(account);
-        // SPY rides along in the same quote map: the benchmark needs today's point too.
-        const priceMap = await buildPriceMap([...positions.map((p) => p.symbol), BENCHMARK_SYMBOL]);
+        // SPY rides along in the same quote map: the benchmark needs today's point too. A holding
+        // without a quote is valued at its stored close; SPY's point is taken from a live quote only.
+        const priceMap = await buildHoldingsPriceMap([...positions.map((p) => p.symbol), BENCHMARK_SYMBOL]);
         const summary = computePortfolio(
             {cash: account.cash, startingBalance: account.startingBalance, positions},
             priceMap,
@@ -56,7 +58,7 @@ export const getAccountAnalytics = async (userId: string, accountId: string): Pr
         const today = getEasternDateString();
         // SPY total return, with today's point from the live quote so the chart's last point
         // compares like with like instead of today's account against yesterday's SPY.
-        const benchmarkPoints: SnapshotPoint[] = appendLive(benchmark.points, benchmark.lastClose, priceMap.get(BENCHMARK_SYMBOL)?.price, today);
+        const benchmarkPoints: SnapshotPoint[] = appendLive(benchmark.points, benchmark.lastClose, livePrice(priceMap.get(BENCHMARK_SYMBOL)), today);
         const livePoint: SnapshotPoint = {date: today, value: summary.totalValue};
 
         const tradeStats = trades.map((t) => ({side: t.side as string, realizedPnl: t.realizedPnl}));

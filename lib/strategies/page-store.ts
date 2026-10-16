@@ -9,10 +9,10 @@ import StrategyRun from "@/database/models/strategy-run.model";
 import {getJobHealth, type JobHealth} from "@/lib/jobs/health";
 import {JOBS} from "@/lib/jobs/registry";
 import {readAccountsForUser, toAccountSummary} from "@/lib/trading/accounts";
-import {buildPriceMap, computePortfolio} from "@/lib/trading/valuation";
+import {buildHoldingsPriceMap, buildPriceMap, computePortfolio} from "@/lib/trading/valuation";
 import {getTradeHistory, getTradeLedger} from "@/lib/trading/ledger";
 import {getAccountAnalytics, getComparisonStats} from "@/lib/trading/analytics-store";
-import {countUnpriced, mergeLivePoint} from "@/lib/trading/analytics";
+import {countUnpriced, livePrice, mergeLivePoint} from "@/lib/trading/analytics";
 import {getEasternDateString} from "@/lib/dates";
 import {getBenchmarkIndex} from "@/lib/prices/benchmark-store";
 import {getLatestBarDate} from "@/lib/prices/store";
@@ -203,8 +203,8 @@ const buildLeaderboard = async (userId: string | null): Promise<StrategyLeaderbo
     // One shared quote map over held symbols (plus SPY for the benchmark leg), never the
     // 59-symbol universe.
     const heldSymbols = Array.from(new Set([...accounts.flatMap((a) => a.positions.map((p) => p.symbol.toUpperCase())), BENCHMARK_SYMBOL]));
-    const priceMap = await buildPriceMap(heldSymbols);
-    const spyLive = priceMap.get(BENCHMARK_SYMBOL)?.price;
+    const priceMap = await buildHoldingsPriceMap(heldSymbols);
+    const spyLive = livePrice(priceMap.get(BENCHMARK_SYMBOL));
     const portfolios = new Map(accounts.map((a) => [
         String(a._id),
         computePortfolio({cash: a.cash, startingBalance: a.startingBalance, positions: a.positions.map((p) => ({
@@ -330,7 +330,7 @@ export const getStrategyDetail = cache(async (slug: string, userId: string | nul
     const inception = analytics ? getEasternDateString(new Date(analytics.account.inceptionAt)) : null;
     // The same basis as the account's live valuation: SPY's quote if held, else one quote.
     const spyLive = analytics
-        ? (analytics.summary.positions.find((p) => p.symbol === BENCHMARK_SYMBOL)?.currentPrice
+        ? (analytics.summary.positions.find((p) => p.symbol === BENCHMARK_SYMBOL && p.closeDate === undefined)?.currentPrice
             ?? (await buildPriceMap([BENCHMARK_SYMBOL])).get(BENCHMARK_SYMBOL)?.price)
         : undefined;
     const benchmarkReturns = inception ? await benchmarkReturnsSince([inception], spyLive) : new Map<string, number | null>();

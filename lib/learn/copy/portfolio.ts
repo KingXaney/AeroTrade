@@ -117,12 +117,30 @@ export const HOLDINGS_COPY = {
     empty: 'No open positions.',
     toTradeDesk: 'Orders are placed on the Trade Desk.',
     // The /portfolio header's line under the account name: how many holdings, and on what basis
-    // they are valued — live, at the last close, or (some or all) at cost.
-    summary: (holdings: number, unpriced: number, marketOpen: boolean): string => {
+    // they are valued — live, at the last close, some or all at cost, and some or all at a stored
+    // close where no live quote answered (`atClose`, analytics.countAtClose: the day when they
+    // share one).
+    summary: (
+        holdings: number,
+        unpriced: number,
+        marketOpen: boolean,
+        atClose: {count: number; date: string | null} = {count: 0, date: null},
+    ): string => {
         if (holdings === 0) return 'No open positions yet';
-        const basis = unpricedText(unpriced, holdings) ?? (marketOpen ? 'live valuation' : 'valued at last close');
+        const parts = [unpricedText(unpriced, holdings), atCloseText(atClose.count, holdings, atClose.date)]
+            .filter((part): part is string => part !== null);
+        const basis = parts.length > 0 ? parts.join(' · ') : (marketOpen ? 'live valuation' : 'valued at last close');
         return `${holdings} ${holdings === 1 ? 'holding' : 'holdings'} · ${basis}`;
     },
+    // The tooltip on a price cell that shows a stored close because no live quote answered.
+    closeCellTitle: (date: string): string => `No live quote — the ${shortDate(date)} close`,
+};
+
+// How many holdings stand at a stored daily close instead of a live quote, beside a figure.
+const atCloseText = (atClose: number, holdings: number, date: string | null): string | null => {
+    if (atClose <= 0 || holdings <= 0) return null;
+    const close = date ? `the ${shortDate(date)} close` : 'their last close';
+    return atClose >= holdings ? `valued at ${close}` : `${atClose} of ${holdings} at ${close}`;
 };
 
 // ---- where the return came from ------------------------------------------------------------

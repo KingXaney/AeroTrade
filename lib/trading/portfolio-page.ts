@@ -5,7 +5,7 @@
 
 import {drawdownBand, HOLDINGS_COPY} from "@/lib/learn/copy/portfolio";
 import {toComparisonRows, toSwitcherAccounts, type ComparisonRow, type ComparisonStat, type SwitcherAccount} from "@/lib/trading/active-account";
-import {countUnpriced} from "@/lib/trading/analytics";
+import {countAtClose, countUnpriced} from "@/lib/trading/analytics";
 import {TRADE_HISTORY_LIMIT} from "@/lib/trading/config";
 import {accountExportHref} from "@/lib/trading/csv";
 import {buildReturnBridge, type ReturnBridge} from "@/lib/trading/learn/bridge";
@@ -76,7 +76,7 @@ export const toPortfolioPageView = (
         account,
         portfolio,
         tradedBy: reads.tradedBy ?? null,
-        summaryLine: HOLDINGS_COPY.summary(portfolio.positions.length, countUnpriced(portfolio.positions), reads.marketOpen),
+        summaryLine: HOLDINGS_COPY.summary(portfolio.positions.length, countUnpriced(portfolio.positions), reads.marketOpen, countAtClose(portfolio.positions)),
         multiAccount: all.length > 1,
         switcherAccounts: toSwitcherAccounts(all),
         comparisonRows: toComparisonRows(all, reads.comparisonStats),
