@@ -19,11 +19,12 @@ type HeaderProps = {
 
 // The top bar: where you are (the logo), how to get anywhere (search) and who you are (the
 // account menu). The sections live on the rail (components/shell/Rail.tsx) at lg and in the
-// drawer below it; the bar repeats none of them.
+// drawer below it; the bar repeats none of them. `.header-bar` (app/globals.css) centres the
+// search in the bar from md, whatever the two sides' widths.
 function Header({user, initialStocks, initialTopics, navBadges, navSections, navPages}: HeaderProps) {
     return (
         <header className='header'>
-            <div className='header-wrapper gap-3'>
+            <div className='header-wrapper header-bar gap-3'>
                 <div className="flex items-center gap-3 shrink-0">
                     <MobileNav badges={navBadges} sections={navSections}/>
                     <Link href="/" className="flex items-center gap-2">

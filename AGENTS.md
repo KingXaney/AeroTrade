@@ -166,7 +166,10 @@ and friends keep none beyond Shared and the invariants).
   from `lib/shell/news-seen` (the `aero:news-seen` window event, as `lib/chat/ask` opens the chat)
   and settles on the next full load. The shell's own sentences are `lib/learn/copy/shell`.
 - The header repeats no section: logo, the one `components/shell/SearchCommand` trigger (which
-  also finds pages, `searchPages`), the account menu. The assistant's launcher is not in the bar:
+  also finds pages, `searchPages`), the account menu. From md the trigger sits in the bar's true
+  middle (`.header-bar` in `app/globals.css`: two equal side columns, the middle narrowing so each
+  side keeps 12rem); below md, and in Minimal at every width, it is an icon beside the account
+  menu. The landing page's header keeps the plain `.header-wrapper`. The assistant's launcher is not in the bar:
   `components/chat/ChatWidget` floats the robot (`components/chat/RobotMascot`) fixed bottom-right
   at every width, over the page, and the `(root)` layout's content wrapper (`app/(root)/layout.tsx`)
   ends in `pb-24` so it never covers a page's last panel.
