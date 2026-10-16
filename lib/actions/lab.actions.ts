@@ -10,9 +10,10 @@ import {quizExplanations, scoreQuiz} from "@/lib/lab/quiz";
 import {cardById, isLabCardId, isLabProblemId, isLabUnitId, problemById, unitById} from "@/lib/lab/registry";
 import {GRADES} from "@/lib/lab/srs";
 import {FOCUS_MAX, NOTE_MAX} from "@/lib/lab/checkin";
-import {LabLayoutSchema, normalizeLabLayout, type LabLayout} from "@/lib/lab/layout";
-import {closeProblem, gradeCard, markUnitStudied as writeStudied, readQuizzes, recordQuizPass, recordSession, tickTodo as writeTick, untickTodo as removeTick, writeLabLayout, writeLabNote} from "@/lib/lab/store";
+import {LabLayoutSchema, normalizeLabLayout, setGameOn, type LabLayout} from "@/lib/lab/layout";
+import {closeProblem, gradeCard, markUnitStudied as writeStudied, readLabLayout, readQuizzes, recordQuizPass, recordSession, tickTodo as writeTick, untickTodo as removeTick, writeLabLayout, writeLabNote} from "@/lib/lab/store";
 import {isManualTodoId, todoKey} from "@/lib/lab/todo";
+import {isLabWidgetId} from "@/lib/lab/widgets";
 import {LAB_COPY} from "@/lib/learn/copy/lab";
 import {takeRateLimit} from "@/lib/rate-limit";
 
@@ -50,6 +51,7 @@ const ProblemInput = z.strictObject({problemId: z.string().min(1).max(120)});
 const AnswerInput = z.strictObject({problemId: z.string().min(1).max(120), answer: z.string().max(40)});
 const QuizInput = z.strictObject({unitId: z.string().min(1).max(120), answers: z.array(z.number().int().min(0).max(3)).max(8)});
 const TodoInput = z.strictObject({id: z.string().min(1).max(40)});
+const GameOnInput = z.strictObject({id: z.string().max(40), on: z.boolean()});
 const FocusInput = z.strictObject({focus: z.string().max(FOCUS_MAX)});
 const ReflectionInput = z.strictObject({notes: z.string().max(NOTE_MAX), next: z.string().max(FOCUS_MAX)});
 
@@ -143,9 +145,9 @@ export const untickTodo = async (input: unknown): Promise<LabActionResult> => {
 
 export type LayoutActionResult = {success: true; layout: LabLayout} | {success: false; message: string};
 
-// The game widgets' layout from the arranging view, written whole (lib/lab/layout: the strict
-// schema refuses a stray key or a width off the scale, then the lenient reader caps it). No
-// revalidation: the view navigates to Today itself once the save lands, as the dashboard's grid
+// Today's layout from the HUD being arranged, written whole (lib/lab/layout: the strict schema
+// refuses a stray key or a width off the scale, then the lenient reader caps it). No
+// revalidation: the HUD re-renders the page itself once the save lands, as the dashboard's grid
 // does, so the page is never re-rendered under a save still in flight.
 export const saveLabLayout = async (input: unknown): Promise<LayoutActionResult> => {
     const gate = await begin();
@@ -158,6 +160,25 @@ export const saveLabLayout = async (input: unknown): Promise<LayoutActionResult>
         return {success: true, layout};
     } catch (error) {
         console.error('Error saving the lab layout:', error);
+        return {success: false, message: LAB_COPY.notSaved};
+    }
+};
+
+// A game switched on or off from the list: on puts its card at the end of the saved layout and
+// its item on the list, off takes both away. The page re-renders in the action's response.
+export const setGameOnToday = async (input: unknown): Promise<LabActionResult> => {
+    const gate = await begin();
+    if ('refused' in gate) return {success: false, message: gate.refused};
+    const parsed = GameOnInput.safeParse(input);
+    if (!parsed.success || !isLabWidgetId(parsed.data.id)) return {success: false, message: LAB_COPY.invalid};
+    try {
+        const current = await readLabLayout(gate.userId);
+        const next = setGameOn(current, parsed.data.id, parsed.data.on);
+        if (next !== current) await writeLabLayout(gate.userId, next);
+        refresh();
+        return {success: true};
+    } catch (error) {
+        console.error('Error switching a game on Today:', error);
         return {success: false, message: LAB_COPY.notSaved};
     }
 };

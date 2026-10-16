@@ -20,34 +20,44 @@ import {
 import {SortableContext, type SortingStrategy} from "@dnd-kit/sortable";
 import {saveLabLayout} from "@/lib/actions/lab.actions";
 import {
-    LAB_SPANS, MAX_LAB_WIDGETS, addLabWidget, labLayoutsEqual, missingLabWidgets, moveLabWidget, removeLabWidget, resetLabLayout, setLabSpan, type LabLayout,
+    LAB_HUD, MAX_LAB_WIDGETS, addLabWidget, isLabHudId, isLabPanelId, labLayoutsEqual, missingLabWidgets, moveLabWidget, removeLabWidget, resetLabLayout, setLabSpan,
+    type LabHudId, type LabLayout,
 } from "@/lib/lab/layout";
-import {isLabWidgetId, labWidget, type LabWidgetId} from "@/lib/lab/widgets";
-import {LAB_COPY, LAB_WIDGET_BLURBS, LAB_WIDGET_TITLES} from "@/lib/learn/copy/lab";
+import {labWidget} from "@/lib/lab/widgets";
+import {LAB_COPY, labHudWords} from "@/lib/learn/copy/lab";
 import DashboardToolbar, {type ToolbarLabels} from "@/components/dashboard/DashboardToolbar";
 import DragGhost from "@/components/dashboard/DragGhost";
-import WidgetLibrary, {type LibraryCopy, type LibraryGroup} from "@/components/dashboard/WidgetLibrary";
+import WidgetLibrary, {type LibraryCopy, type LibraryGroup, type LibraryRow} from "@/components/dashboard/WidgetLibrary";
 import WidgetPlaceholder from "@/components/dashboard/WidgetPlaceholder";
 import WidgetShell, {type ShellDef} from "@/components/dashboard/WidgetShell";
 import {spanClass} from "@/components/dashboard/spanClass";
 import Panel from "@/components/primitives/Panel";
-import SectionHeading from "@/components/primitives/SectionHeading";
 
-// The arranging view of Today's games (/learn?arrange=1): the dashboard's own editing pieces —
-// the shell with its handle, arrow keys, width picker and arrows, the drag ghost, the library —
-// over the lab's layout (lib/lab/layout). Every change is local until Save writes the layout
-// through saveLabLayout and the view goes back to Today, which reads it fresh; Cancel goes back
-// as it was. A card added here has no server-rendered body until then and shows a stand-in.
+// Lab › Today as a HUD: every part of the day and every game card on the dashboard's twelve-column
+// grid, in the saved layout's order and widths (lib/lab/layout), arranged in place. Viewing, each
+// card is its own server-rendered body (a Panel of its own, so the shell's chrome is 'bare').
+// Arranging — Today's Arrange, or /learn?arrange=1 from the account menu — the dashboard's own
+// pieces take over: the shell with its handle, arrow keys, width picker and arrows, the drag ghost,
+// the library of what is not yet on the page. Every change is local until Save writes the layout
+// through saveLabLayout; Cancel puts the saved one back. A card added here has no server-rendered
+// body until then and shows a stand-in; a part of the day with nothing to show (no problem, no
+// papers) is skipped viewing and a stand-in arranging, so it keeps its place.
+//
+// The page re-renders this component with a new layout when a game is switched on from the list
+// or a save lands: it follows the page unless a draft is open, so the list's own dialog stays open
+// across its toggles — nothing here is keyed on the layout.
 
 type Props = {
     initialLayout: LabLayout;
-    bodies: Partial<Record<LabWidgetId, ReactNode>>;   // the cards' bodies, rendered by the page
+    bodies: Partial<Record<LabHudId, ReactNode>>;   // the cards' bodies, rendered by the page; absent = nothing to show today
+    availableIds: readonly LabHudId[];               // what the library may offer
+    startInEditMode: boolean;
 };
 
-const titleOf = (id: unknown): string => (isLabWidgetId(id) ? LAB_WIDGET_TITLES[id] : String(id));
+const titleOf = (id: unknown): string => (isLabHudId(id) ? labHudWords(id).title : String(id));
 
-// 'bare' with the title off: the shell draws its toolbar over the body, which names nothing twice.
-const shellDef = (id: LabWidgetId): ShellDef => ({id, title: LAB_WIDGET_TITLES[id], icon: labWidget(id).icon, spans: LAB_SPANS, chrome: 'bare', showTitle: false});
+// 'bare' with the title off: the body draws its own panel and heading; the arranging toolbar names it.
+const shellDef = (id: LabHudId): ShellDef => ({id, title: labHudWords(id).title, icon: LAB_HUD[id].icon, spans: LAB_HUD[id].spans, chrome: 'bare', showTitle: false});
 
 // The source node stays in place while dragging, so the pointer position decides the target.
 const collisionDetection: CollisionDetection = (args) => {
@@ -70,43 +80,58 @@ const announcements: Announcements = {
 const TOOLBAR: ToolbarLabels = {customize: words.arrange, add: words.add, reset: words.reset, resetTitle: words.resetTitle, cancel: words.cancel, save: words.save};
 const LIBRARY: LibraryCopy = {title: words.library.title, lead: words.library.lead, fullLead: words.library.full, none: words.library.none, add: words.library.addRow};
 
-const PLACEHOLDER_HEIGHT = 160;
+const PLACEHOLDER_HEIGHT = 120;
 
-const LabArrange = ({initialLayout, bodies}: Props) => {
+const LabHud = ({initialLayout, bodies, availableIds, startInEditMode}: Props) => {
     const router = useRouter();
+    const [saved, setSaved] = useState(initialLayout);
     const [layout, setLayout] = useState(initialLayout);
+    const [editing, setEditing] = useState(startInEditMode);
     const [libraryOpen, setLibraryOpen] = useState(false);
-    const [activeId, setActiveId] = useState<LabWidgetId | null>(null);
+    const [activeId, setActiveId] = useState<LabHudId | null>(null);
     const [activeWidth, setActiveWidth] = useState<number | undefined>(undefined);
     const [pending, startTransition] = useTransition();
     const [mounted, setMounted] = useState(false);
     // eslint-disable-next-line react-hooks/set-state-in-effect -- one-time flag to enable the overlay portal client-side
     useEffect(() => setMounted(true), []);
 
-    const dirty = !labLayoutsEqual(layout, initialLayout);
+    // The page's layout moved under this component and the page re-rendered with it: follow it,
+    // unless a draft is being arranged (React's own pattern for state that tracks a prop).
+    const [seen, setSeen] = useState(initialLayout);
+    if (seen !== initialLayout) {
+        setSeen(initialLayout);
+        if (!labLayoutsEqual(seen, initialLayout)) {
+            setSaved(initialLayout);
+            if (!editing) setLayout(initialLayout);
+        }
+    }
+
+    const dirty = !labLayoutsEqual(layout, saved);
     const ids = useMemo(() => layout.widgets.map((w) => w.id), [layout]);
+    const available = useMemo(() => new Set<LabHudId>(availableIds), [availableIds]);
     const sensors = useSensors(useSensor(PointerSensor, {activationConstraint: {distance: 6}}));
 
-    // The games not yet on the page: those in the app, then the sites outside it.
+    // What is not yet on the page: the parts of the day, then the games in the app, then the sites.
     const groups = useMemo<LibraryGroup[]>(() => {
-        const missing = missingLabWidgets(layout);
-        const row = (id: LabWidgetId) => ({id, title: LAB_WIDGET_TITLES[id], description: LAB_WIDGET_BLURBS[id], icon: labWidget(id).icon});
+        const missing = missingLabWidgets(layout).filter((id) => available.has(id));
+        const row = (id: LabHudId): LibraryRow => ({id, title: labHudWords(id).title, description: labHudWords(id).blurb, icon: LAB_HUD[id].icon});
         return [
-            {label: words.library.inApp, rows: missing.filter((id) => labWidget(id).kind !== 'outside').map(row)},
-            {label: words.library.elsewhere, rows: missing.filter((id) => labWidget(id).kind === 'outside').map(row)},
+            {label: words.library.parts, rows: missing.filter(isLabPanelId).map(row)},
+            {label: words.library.inApp, rows: missing.filter((id) => !isLabPanelId(id) && labWidget(id).kind !== 'outside').map(row)},
+            {label: words.library.elsewhere, rows: missing.filter((id) => !isLabPanelId(id) && labWidget(id).kind === 'outside').map(row)},
         ];
-    }, [layout]);
+    }, [layout, available]);
 
     const onDragStart = (e: DragStartEvent) => {
-        setActiveId(e.active.id as LabWidgetId);
+        setActiveId(e.active.id as LabHudId);
         setActiveWidth(e.active.rect.current.initial?.width);
     };
     const onDragEnd = (e: DragEndEvent) => {
         setActiveId(null);
         const {active, over} = e;
         if (!over || active.id === over.id) return;
-        const from = ids.indexOf(active.id as LabWidgetId);
-        const to = ids.indexOf(over.id as LabWidgetId);
+        const from = ids.indexOf(active.id as LabHudId);
+        const to = ids.indexOf(over.id as LabHudId);
         if (from === -1 || to === -1) return;
         setLayout((l) => moveLabWidget(l, from, to));
     };
@@ -117,24 +142,31 @@ const LabArrange = ({initialLayout, bodies}: Props) => {
             toast.error(result.message);
             return;
         }
+        setSaved(result.layout);
+        setLayout(result.layout);
+        setEditing(false);
         toast.success(words.saved);
-        // Today reads the saved layout fresh; nothing here re-renders under the save.
-        router.replace('/learn');
+        // The action does not revalidate: re-render here, so a card added gets its body. Leaving
+        // ?arrange=1 first keeps a reload from opening the arranging again.
+        if (startInEditMode) router.replace('/learn');
+        else router.refresh();
     });
-    const cancel = () => router.replace('/learn');
+
+    const cancel = () => {
+        setLayout(saved);
+        setEditing(false);
+        if (startInEditMode) router.replace('/learn');
+    };
 
     const active = activeId ? layout.widgets.find((w) => w.id === activeId) : undefined;
 
     return (
-        <section className="space-y-4" aria-labelledby="lab-arrange-heading" data-lab-arrange-view data-lab-arrange-count={layout.widgets.length} data-lab-arrange-dirty={dirty || undefined}>
-            <div className="flex flex-wrap items-start justify-between gap-3">
-                <div className="min-w-0">
-                    <SectionHeading id="lab-arrange-heading" spacing="none">{words.heading}</SectionHeading>
-                    <p className="mt-1 max-w-2xl text-sm text-fg-muted">{words.lead}</p>
-                </div>
+        <div className="space-y-4" data-lab-hud={editing ? 'editing' : 'viewing'} data-lab-hud-count={layout.widgets.length} data-lab-hud-dirty={dirty || undefined}>
+            <div className={editing ? 'flex flex-wrap items-start justify-between gap-3' : 'flex justify-end'}>
+                {editing && <p className="max-w-2xl text-sm text-fg-muted" data-lab-hud-lead>{words.lead}</p>}
                 <DashboardToolbar
-                    editing dirty={dirty} pending={pending} labels={TOOLBAR}
-                    onCustomize={() => undefined}
+                    editing={editing} dirty={dirty} pending={pending} labels={TOOLBAR}
+                    onCustomize={() => setEditing(true)}
                     onAdd={() => setLibraryOpen(true)}
                     onReset={() => setLayout(resetLabLayout())}
                     onSave={save}
@@ -142,22 +174,25 @@ const LabArrange = ({initialLayout, bodies}: Props) => {
                 />
             </div>
 
-            <DndContext id="lab-arrange" sensors={sensors} collisionDetection={collisionDetection}
+            <DndContext id="lab-hud" sensors={sensors} collisionDetection={collisionDetection}
                         onDragStart={onDragStart} onDragEnd={onDragEnd} onDragCancel={() => setActiveId(null)}
                         accessibility={{announcements}}>
                 <SortableContext items={ids} strategy={NO_TRANSFORM}>
                     <div className="grid grid-cols-1 gap-4 md:grid-cols-12">
                         {layout.widgets.map((w, index) => {
+                            const body = bodies[w.id];
+                            if (!editing && body === undefined) return null;
                             const def = shellDef(w.id);
                             return (
-                                <WidgetShell key={w.id} def={def} span={w.span} editing index={index} count={layout.widgets.length}
+                                <WidgetShell key={w.id} def={def} span={w.span} editing={editing} index={index} count={layout.widgets.length}
                                              className={spanClass(w.span, false)}
                                              onSpan={(s) => setLayout((l) => setLabSpan(l, w.id, s))}
                                              onRemove={() => setLayout((l) => removeLabWidget(l, w.id))}
                                              onMoveBy={(d) => setLayout((l) => moveLabWidget(l, index, Math.max(0, Math.min(l.widgets.length - 1, index + d))))}
                                              onMoveTo={(to) => setLayout((l) => moveLabWidget(l, index, to))}>
-                                    {bodies[w.id] ?? (
-                                        <WidgetPlaceholder def={{icon: def.icon, title: def.title, description: LAB_WIDGET_BLURBS[w.id], minHeight: PLACEHOLDER_HEIGHT}} note={words.saveToLoad}/>
+                                    {body ?? (
+                                        <WidgetPlaceholder def={{icon: def.icon, title: def.title, description: labHudWords(w.id).blurb, minHeight: PLACEHOLDER_HEIGHT}}
+                                                           note={available.has(w.id) ? words.saveToLoad : words.nothingToday}/>
                                     )}
                                 </WidgetShell>
                             );
@@ -175,14 +210,14 @@ const LabArrange = ({initialLayout, bodies}: Props) => {
 
             {layout.widgets.length === 0 && (
                 <Panel as="div" pad={8} className="text-center">
-                    <p className="text-sm text-fg-muted" data-lab-arrange-empty>{words.empty}</p>
+                    <p className="text-sm text-fg-muted" data-lab-hud-empty>{words.empty}</p>
                 </Panel>
             )}
 
             <WidgetLibrary open={libraryOpen} onOpenChange={setLibraryOpen} groups={groups} full={layout.widgets.length >= MAX_LAB_WIDGETS} copy={LIBRARY}
-                           onAdd={(id) => { if (isLabWidgetId(id)) setLayout((l) => addLabWidget(l, id)); }}/>
-        </section>
+                           onAdd={(id) => { if (isLabHudId(id)) setLayout((l) => addLabWidget(l, id)); }}/>
+        </div>
     );
 };
 
-export default LabArrange;
+export default LabHud;

@@ -8,6 +8,7 @@ import {getDailyPuzzleCard, readGameSummary, type GameSummary} from "@/lib/games
 import {readActivityStreak, readGamesPlayedOn, readSolvedDays} from "@/lib/learn/activity-store";
 import {cardRefs, LAB_PLAN, LAB_UNITS} from "@/lib/lab/registry";
 import {readCardRows, readLabLayout, readLabNotes, readQuizzes, readRevealed, readStudied, readTickedKeys} from "@/lib/lab/store";
+import {gamesOf} from "@/lib/lab/layout";
 import {labWidget, type LabWidgetGame} from "@/lib/lab/widgets";
 import {getLatestLabDay} from "@/lib/lab/papers/store";
 import {shapeLabView, type LabView} from "@/lib/lab/view";
@@ -17,7 +18,7 @@ const RECORD_KEYS: Readonly<Record<LabWidgetGame, string>> = {arithmetic: 'zetam
 
 export const getLabView = cache(async (userId: string, today: string = getEasternDateString(), hour: number = getEasternHour()): Promise<LabView> => {
     const layout = await readLabLayout(userId);
-    const widgets = layout.widgets.map((w) => w.id);
+    const widgets = gamesOf(layout);
     const games = widgets.map((id) => labWidget(id).game).filter((game): game is LabWidgetGame => game !== undefined);
     const yesterday = addCalendarDays(today, -1);
     const hasPuzzle = widgets.includes('daily-puzzle');

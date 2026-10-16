@@ -404,6 +404,20 @@ html[data-mode="light"] {
 }
 /* A panel arrives rather than appears. One short rise, in the style's own tempo. */
 .glass-panel { animation: panel-in var(--motion-base) var(--motion-ease) both; }
+/* Lab › Today being arranged (components/lab/LabHud): each card's own Panel sits inside the
+   shell's editing frame, so it draws no frame of its own there — one box per card, not two.
+   Unlayered like .glass-panel, and more specific than any style's rule for it. */
+[data-lab-hud="editing"] .glass-panel .glass-panel {
+  background: transparent;
+  border-color: transparent;
+  box-shadow: none;
+  backdrop-filter: none;
+  -webkit-backdrop-filter: none;
+  padding: 0;
+  animation: none;
+}
+[data-lab-hud="editing"] .glass-panel .glass-panel::before,
+[data-lab-hud="editing"] .glass-panel .glass-panel::after { display: none; }
 @keyframes panel-in {
   from { opacity: 0; transform: translateY(6px); }
 }

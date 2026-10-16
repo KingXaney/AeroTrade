@@ -12,7 +12,7 @@ const CheckIn = ({view, name}: {view: CheckInView; name: string | null | undefin
     const copy = LAB_COPY.checkIn;
     const yesterday = view.yesterday;
     return (
-        <Panel id="lab-checkin" aria-labelledby="lab-checkin-heading" data-lab-checkin={view.period}>
+        <Panel id="lab-checkin" aria-labelledby="lab-checkin-heading" className="h-full" data-lab-checkin={view.period}>
             <MicroLabel as="p" data-lab-date>{view.dateLabel}</MicroLabel>
             <SectionHeading id="lab-checkin-heading" spacing="none" className="mt-1 text-xl">{copy.greeting[view.period](name)}</SectionHeading>
             <DayFocus focus={view.focus} plan={view.plan}/>

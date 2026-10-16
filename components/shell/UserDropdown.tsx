@@ -17,7 +17,7 @@ import type {User} from '@/lib/auth/types';
 import {LAB_COPY} from "@/lib/learn/copy/lab";
 
 // The account menu: the pages about the person (Friends, Settings), for the lab's owner the way
-// to arrange Today's games (/learn?arrange=1 — a view of the lab, not a page of ACCOUNT_PAGES,
+// to arrange Today's cards (/learn?arrange=1 — a view of the lab, not a page of ACCOUNT_PAGES,
 // whose entries are page files), and Log out. A pending friend request shows as a dot on the
 // avatar — it used to be a badge on a sidebar row, and an ask nobody can see leaves both sides
 // waiting.

@@ -9,10 +9,11 @@
 // seeded day of papers with its digest on the Papers view and on Today, the digest ticked by hand
 // and unticked, the check-in (the date and the greeting, today's focus written and edited, the end
 // of the day's note saved and read the next morning as yesterday's, the look back at yesterday),
-// the list's groups and the overdue state, the game widgets (the older preference read as a layout,
-// then arranged at /learn?arrange=1 — added from the library, sized, moved, removed, saved as
-// learn.labLayout — a seeded round ticking the sprint, Codeforces ticked by hand), the account
-// menu's "Lab layout" for the owner alone, and a phone width.
+// the list's groups and the overdue state, Today as a HUD (the day's cards on the grid as it comes,
+// the older preference read with its games in the games slot, the list's Games dialog switching
+// games on and off at once, then arranging in place at /learn?arrange=1 — added from the library,
+// sized, moved, removed, saved as learn.labLayout — a seeded round ticking the sprint, Codeforces
+// ticked by hand), the account menu's "Lab layout" for the owner alone, and a phone width.
 // Run: npm run qa -- lab   (the harness: README.md)
 import {chromium} from 'playwright';
 import {MongoClient} from 'mongodb';
@@ -84,8 +85,10 @@ try {
         (await listStates()).join(',') === 'unit:todo,review:none,problem:todo,daily-puzzle:todo' && await page.locator('[data-list-progress]').innerText() === '0 of 3 done', (await listStates()).join(','));
     check('…the unit item opens its page and the puzzle item the puzzle', (await page.locator('[data-todo-open="unit"]').getAttribute('href')) === `/learn/units/${unitId}`
         && (await page.locator('[data-todo-open="daily-puzzle"]').getAttribute('href')) === '/games/puzzle');
-    check('the default widget is the puzzle card at half width, with Arrange leading to the arranging view', await page.locator('[data-lab-widget="daily-puzzle"] [data-daily-puzzle]').count() === 1
-        && await page.locator('[data-lab-widgets="1"] [data-widget-id="daily-puzzle"][data-widget-span="6"]').count() === 1 && (await page.locator('[data-lab-arrange]').getAttribute('href')) === '/learn?arrange=1');
+    const hudOrder = async () => page.locator('[data-lab-hud] [data-widget-id]').evaluateAll((els) => els.map((el) => el.getAttribute('data-widget-id')));
+    check('Today is a HUD of the day as it comes: nine cards (no papers yet), the puzzle at half width, Arrange on the page', (await hudOrder()).join(',') === 'check-in,list,streak,unit,review,problem,daily-puzzle,reflection,progress'
+        && await page.locator('[data-lab-hud="viewing"]').count() === 1 && ((await page.locator('[data-widget-id="daily-puzzle"]').getAttribute('class')) ?? '').includes('md:col-span-6')
+        && await page.locator('[data-lab-widget="daily-puzzle"] [data-daily-puzzle]').count() === 1 && await page.locator('[data-toolbar-customize]').count() === 1, (await hudOrder()).join(','));
     check('…the list under its group eyebrows, study then play, and the end of the day with nothing done', (await page.locator('[data-todo-group]').evaluateAll((els) => els.map((el) => el.getAttribute('data-todo-group')))).join(',') === 'study,play'
         && await page.locator('[data-lab-reflection] [data-reflection-done="0"]').count() === 1 && Number(await page.locator('[data-reflection-left]').getAttribute('data-reflection-left')) >= 2);
     await shot('01-lab-today');
@@ -264,65 +267,75 @@ try {
     check('…and one press makes it today\'s focus', (await db.collection('labnotes').findOne({userId: owner, day: today}))?.focus === 'Open with the problem' && /Open with the problem/.test(await page.locator('[data-focus-text]').innerText())
         && await page.locator('[data-focus-plan]').count() === 0);
 
-    // --- the game widgets: the older preference read as a layout, then arranged, saved and drawn ----
+    // --- Today as a HUD: the older preference, the list's Games dialog, then arranging in place ------
     await db.collection('userpreferences').updateOne({userId: owner}, {$set: {'learn.labWidgets': ['kelly', 'daily-puzzle']}, $unset: {'learn.labLayout': 1}}, {upsert: true});
     await page.reload({waitUntil: 'load'});
     await page.locator('[data-lab-list]').waitFor({timeout: 30000});
-    const drawnOrder = async () => page.locator('[data-lab-widgets] [data-widget-id]').evaluateAll((els) => els.map((el) => `${el.getAttribute('data-widget-id')}@${el.getAttribute('data-widget-span')}`));
-    check('the older labWidgets preference reads as a layout at the default width, in the registry order', (await drawnOrder()).join(',') === 'daily-puzzle@6,kelly@6'
-        && await page.locator('[data-lab-todo="kelly"][data-todo-state="todo"]').count() === 1, (await drawnOrder()).join(','));
+    check('the older labWidgets preference reads with its games in the games slot, after the day\'s papers, in the registry order', (await hudOrder()).join(',') === 'check-in,list,streak,unit,review,problem,papers,daily-puzzle,kelly,reflection,progress'
+        && await page.locator('[data-lab-todo="kelly"][data-todo-state="todo"]').count() === 1, (await hudOrder()).join(','));
+    // The list's Games dialog: each switch saves at once, the dialog stays open and the list follows.
+    await page.locator('[data-games-on-today]').click();
+    await page.locator('[data-games-dialog]').waitFor({timeout: 15000});
+    check('the Games dialog shows every game with the puzzle and Kelly coin on', await page.locator('[data-game-switch]').count() === 10
+        && await page.locator('[data-game-switch="daily-puzzle"][data-game-on]').count() === 1 && await page.locator('[data-game-switch="kelly"][data-game-on]').count() === 1
+        && await page.locator('[data-game-switch="arithmetic"][data-game-on]').count() === 0);
+    await page.locator('[data-game-switch="arithmetic"]').click();
+    await page.locator('[data-game-switch="arithmetic"][data-game-on]').waitFor({timeout: 15000});
+    const afterOn = await db.collection('userpreferences').findOne({userId: owner});
+    check('switching the sprint on writes the layout (version 2, the card at the end) and the list follows, the dialog still open',
+        afterOn?.learn?.labLayout?.version === 2 && JSON.stringify(afterOn?.learn?.labLayout?.widgets?.at(-1)) === JSON.stringify({id: 'arithmetic', span: 6}) && afterOn?.learn?.labWidgets === undefined
+        && await page.locator('[data-lab-todo="arithmetic"][data-todo-state="todo"]').count() === 1 && await page.locator('[data-games-dialog]').isVisible(), JSON.stringify(afterOn?.learn));
+    await page.locator('[data-game-switch="kelly"]').click();
+    await page.locator('[data-game-switch="kelly"]:not([data-game-on])').waitFor({timeout: 15000});
+    await page.locator('[data-lab-todo="kelly"]').waitFor({state: 'detached', timeout: 15000});
+    check('…and off takes Kelly coin off the list and the layout', await page.locator('[data-lab-todo="kelly"]').count() === 0
+        && !((await db.collection('userpreferences').findOne({userId: owner}))?.learn?.labLayout?.widgets ?? []).some((w) => w.id === 'kelly'));
+    await page.keyboard.press('Escape');
+    await page.locator('[data-games-dialog]').waitFor({state: 'hidden', timeout: 15000});
+    check('the sprint is a card on Today after the puzzle, with its round on the list', (await hudOrder()).join(',') === 'check-in,list,streak,unit,review,problem,papers,daily-puzzle,reflection,progress,arithmetic'
+        && /Play a round of/.test(await page.locator('[data-lab-todo="arithmetic"]').innerText()) && (await page.locator('[data-todo-open="arithmetic"]').getAttribute('href')) === '/games/arithmetic', (await hudOrder()).join(','));
+    // Arranging in place, from the account menu's address.
     await page.goto(`${BASE}/learn?arrange=1`, {waitUntil: 'load'});
-    await page.locator('[data-lab-arrange-view]').waitFor({timeout: 30000});
-    check('the arranging view shows the two cards in editing shells with their bodies, Save waiting on a change, the Today tab lit',
-        await page.locator('[data-lab-arrange-view] [data-widget-id]').count() === 2 && await page.locator('[data-lab-arrange-view] [data-widget-id="daily-puzzle"] [data-daily-puzzle]').count() === 1
-        && await page.locator('[data-toolbar-save][disabled]').count() === 1 && await page.locator('[data-tab="today"][aria-selected="true"]').count() === 1);
+    await page.locator('[data-lab-hud="editing"]').waitFor({timeout: 30000});
+    check('arranging turns every card into an editing shell in place, the digest and the list inside theirs, Save waiting on a change, the Today tab lit',
+        (await hudOrder()).join(',') === 'check-in,list,streak,unit,review,problem,papers,daily-puzzle,reflection,progress,arithmetic'
+        && await page.locator('[data-widget-id="papers"] #lab-digest').count() === 1 && await page.locator('[data-widget-id="list"] [data-lab-list]').count() === 1
+        && await page.locator('[data-toolbar-save][disabled]').count() === 1 && await page.locator('[data-tab="today"][aria-selected="true"]').count() === 1, (await hudOrder()).join(','));
     await page.locator('[data-toolbar-add]').click();
     await page.locator('[data-widget-library]').waitFor({timeout: 15000});
     const libraryRows = await page.locator('[data-widget-library] [data-library-row]').evaluateAll((els) => els.map((el) => el.getAttribute('data-library-row')));
-    check('the library offers the eight games not yet on the page, those in the app before elsewhere', libraryRows.join(',') === 'arithmetic,market-making,correlation,poker-night,lichess,monkeytype,codeforces,leetcode', libraryRows.join(','));
+    check('the library offers the eight games not yet on the page, those in the app before elsewhere, and no part of the day already there', libraryRows.join(',') === 'kelly,market-making,correlation,poker-night,lichess,monkeytype,codeforces,leetcode' && !libraryRows.includes('list'), libraryRows.join(','));
     const iconWidths = await page.locator('[data-widget-library] [data-library-row] .material-symbols-outlined').evaluateAll((els) => els.map((el) => Math.round(el.getBoundingClientRect().width)));
-    check('…every icon a glyph, not a word', iconWidths.length === 8 && iconWidths.every((w) => w > 0 && w <= 32), iconWidths.join(','));
-    await page.locator('[data-library-add="arithmetic"]').click();
-    await page.keyboard.press('Escape');
-    await page.locator('[data-widget-library]').waitFor({state: 'hidden', timeout: 15000});
-    check('a game added waits for the save behind a stand-in, and Save is offered', await page.locator('[data-lab-arrange-view] [data-widget-id="arithmetic"]').count() === 1
-        && /save to load/i.test(await page.locator('[data-lab-arrange-view] [data-widget-id="arithmetic"]').innerText()) && await page.locator('[data-toolbar-save]:not([disabled])').count() === 1);
-    await page.locator('[data-widget-id="arithmetic"] [role="group"][aria-label="Widget width"] button[title="8 of 12 columns"]').click();
-    await page.locator('[data-widget-id="arithmetic"] button[aria-label="Move earlier"]').click();
-    await page.locator('[data-widget-id="arithmetic"] button[aria-label="Move earlier"]').click();
-    await page.locator('[data-widget-id="kelly"] button[aria-label="Remove Kelly coin"]').click();
-    const arranged = await page.locator('[data-lab-arrange-view] [data-widget-id]').evaluateAll((els) => els.map((el) => el.getAttribute('data-widget-id')));
-    check('its width set to L, moved to the front, and Kelly coin removed', arranged.join(',') === 'arithmetic,daily-puzzle' && await page.locator('[data-widget-id="arithmetic"] button[title="8 of 12 columns"][aria-pressed="true"]').count() === 1, arranged.join(','));
-    await shot('06a-lab-arrange');
-    await page.locator('[data-toolbar-save]').click();
-    await page.waitForURL(/\/learn$/, {timeout: 20000});
-    await page.locator('[data-lab-widgets]').waitFor({timeout: 30000});
-    const savedPrefs = await db.collection('userpreferences').findOne({userId: owner});
-    check('Save writes the layout with its widths and unsets the older list', savedPrefs?.learn?.labLayout?.version === 1
-        && JSON.stringify(savedPrefs?.learn?.labLayout?.widgets) === JSON.stringify([{id: 'arithmetic', span: 8}, {id: 'daily-puzzle', span: 6}]) && savedPrefs?.learn?.labWidgets === undefined, JSON.stringify(savedPrefs?.learn));
-    check('Today draws the grid as arranged, the sprint first at eight columns, and lists its round', (await drawnOrder()).join(',') === 'arithmetic@8,daily-puzzle@6'
-        && ((await page.locator('[data-widget-id="arithmetic"]').getAttribute('class')) ?? '').includes('xl:col-span-8') && await page.locator('[data-lab-todo="kelly"]').count() === 0
-        && await page.locator('[data-lab-todo="arithmetic"][data-todo-state="todo"]').count() === 1 && /Play a round of/.test(await page.locator('[data-lab-todo="arithmetic"]').innerText())
-        && (await page.locator('[data-todo-open="arithmetic"]').getAttribute('href')) === '/games/arithmetic', (await drawnOrder()).join(','));
-    await db.collection('gamerounds').insertOne({userId: owner, game: 'arithmetic', key: 'zetamac', score: 31, wrong: 2, durationMs: 120000, detail: {}, day: today, finishedAt: new Date()});
-    await page.reload({waitUntil: 'load'});
-    await page.locator('[data-lab-list]').waitFor({timeout: 30000});
-    check('a round kept today ticks it, and the card shows the record', await page.locator('[data-lab-todo="arithmetic"][data-todo-state="done"]').count() === 1
-        && /31/.test(await page.locator('[data-lab-widget="arithmetic"]').innerText()));
-    await page.goto(`${BASE}/learn?arrange=1`, {waitUntil: 'load'});
-    await page.locator('[data-lab-arrange-view]').waitFor({timeout: 30000});
-    await page.locator('[data-toolbar-add]').click();
+    check('…every icon a glyph, not a word', iconWidths.length === libraryRows.length && iconWidths.every((w) => w > 0 && w <= 32), iconWidths.join(','));
     await page.locator('[data-library-add="codeforces"]').click();
     await page.keyboard.press('Escape');
     await page.locator('[data-widget-library]').waitFor({state: 'hidden', timeout: 15000});
+    check('a card added waits for the save behind a stand-in, and Save is offered', await page.locator('[data-lab-hud] [data-widget-id="codeforces"]').count() === 1
+        && /save to load/i.test(await page.locator('[data-lab-hud] [data-widget-id="codeforces"]').innerText()) && await page.locator('[data-toolbar-save]:not([disabled])').count() === 1);
+    await page.locator('[data-widget-id="arithmetic"] [role="group"][aria-label="Widget width"] button[title="8 of 12 columns"]').click();
+    await page.locator('[data-widget-id="arithmetic"] button[aria-label="Move earlier"]').click();
+    await page.locator('[data-widget-id="arithmetic"] button[aria-label="Move earlier"]').click();
+    await page.locator('[data-widget-id="progress"] button[aria-label="Remove Progress"]').click();
+    check('the sprint set to L and moved up two places, Progress removed', (await hudOrder()).join(',') === 'check-in,list,streak,unit,review,problem,papers,daily-puzzle,arithmetic,reflection,codeforces'
+        && await page.locator('[data-widget-id="arithmetic"] button[title="8 of 12 columns"][aria-pressed="true"]').count() === 1, (await hudOrder()).join(','));
+    await shot('06a-lab-arrange');
     await page.locator('[data-toolbar-save]').click();
     await page.waitForURL(/\/learn$/, {timeout: 20000});
+    await page.locator('[data-lab-hud="viewing"]').waitFor({timeout: 30000});
     await page.locator('[data-lab-widget="codeforces"]').waitFor({timeout: 30000});
+    const savedPrefs = await db.collection('userpreferences').findOne({userId: owner});
+    check('Save writes the layout with its widths, the old list unset', savedPrefs?.learn?.labLayout?.version === 2 && savedPrefs?.learn?.labWidgets === undefined
+        && JSON.stringify(savedPrefs?.learn?.labLayout?.widgets) === JSON.stringify([{id: 'check-in', span: 12}, {id: 'list', span: 12}, {id: 'streak', span: 12}, {id: 'unit', span: 6}, {id: 'review', span: 6}, {id: 'problem', span: 12}, {id: 'papers', span: 12}, {id: 'daily-puzzle', span: 6}, {id: 'arithmetic', span: 8}, {id: 'reflection', span: 12}, {id: 'codeforces', span: 6}]), JSON.stringify(savedPrefs?.learn));
+    check('Today draws the HUD as arranged: the sprint at eight columns after the puzzle, Codeforces last, no Progress, the papers in their place', (await hudOrder()).join(',') === 'check-in,list,streak,unit,review,problem,papers,daily-puzzle,arithmetic,reflection,codeforces'
+        && ((await page.locator('[data-widget-id="arithmetic"]').getAttribute('class')) ?? '').includes('xl:col-span-8') && await page.locator('#lab-progress').count() === 0, (await hudOrder()).join(','));
     check('Codeforces is a card with its link and an item ticked by hand, under its own eyebrow', await page.locator('[data-lab-widget="codeforces"] a[href="https://codeforces.com/problemset"]').count() === 1
         && await page.locator('[data-lab-todo="codeforces"] [data-todo-tick="codeforces"]').count() === 1 && (await page.locator('[data-todo-open="codeforces"]').getAttribute('target')) === '_blank'
         && (await page.locator('[data-todo-group]').evaluateAll((els) => els.map((el) => el.getAttribute('data-todo-group')))).join(',') === 'study,play,elsewhere');
-    const prefs = await db.collection('userpreferences').findOne({userId: owner});
-    check('…saved after the sprint and the puzzle at the default width', JSON.stringify(prefs?.learn?.labLayout?.widgets) === JSON.stringify([{id: 'arithmetic', span: 8}, {id: 'daily-puzzle', span: 6}, {id: 'codeforces', span: 6}]), JSON.stringify(prefs?.learn?.labLayout));
+    await db.collection('gamerounds').insertOne({userId: owner, game: 'arithmetic', key: 'zetamac', score: 31, wrong: 2, durationMs: 120000, detail: {}, day: today, finishedAt: new Date()});
+    await page.reload({waitUntil: 'load'});
+    await page.locator('[data-lab-list]').waitFor({timeout: 30000});
+    check('a round kept today ticks the sprint, and its card shows the record', await page.locator('[data-lab-todo="arithmetic"][data-todo-state="done"]').count() === 1
+        && /31/.test(await page.locator('[data-lab-widget="arithmetic"]').innerText()));
     const labText = await page.locator('main').innerText().catch(() => page.locator('body').innerText());
     check('Today keeps to the descriptive voice', !/\b(should|recommend|best|optimal)\b/i.test(labText), labText.match(/.{0,40}\b(should|recommend|best|optimal)\b.{0,40}/i)?.[0] ?? '');
     await shot('06-lab-list');
@@ -333,10 +346,10 @@ try {
     check('Today has no horizontal scroll at 375px', overflow <= 1, `${overflow}px`);
     await shot('07-lab-phone');
     await page.goto(`${BASE}/learn?arrange=1`, {waitUntil: 'load'});
-    await page.locator('[data-lab-arrange-view]').waitFor({timeout: 30000});
+    await page.locator('[data-lab-hud="editing"]').waitFor({timeout: 30000});
     const arrangeOverflow = await page.evaluate(() => document.documentElement.scrollWidth - window.innerWidth);
     const arrangeText = await page.locator('main').innerText().catch(() => page.locator('body').innerText());
-    check('the arranging view has no horizontal scroll at 375px, its toolbar on screen, and keeps to the descriptive voice', arrangeOverflow <= 1 && await page.locator('[data-toolbar-save]').isVisible()
+    check('arranging has no horizontal scroll at 375px, its toolbar on screen, and keeps to the descriptive voice', arrangeOverflow <= 1 && await page.locator('[data-toolbar-save]').isVisible()
         && !/\b(should|recommend|best|optimal)\b/i.test(arrangeText), `${arrangeOverflow}px`);
     await shot('08-lab-arrange-phone');
     await page.setViewportSize({width: 1440, height: 900});
@@ -349,7 +362,15 @@ try {
     await db.collection('labdays').deleteMany({});
     await page.goto(`${BASE}/learn?view=papers`, {waitUntil: 'load'});
     await page.locator('#lab-papers').waitFor({timeout: 30000});
-    check('with no day read yet the view says so and Today shows no papers box', await page.locator('#lab-papers-none').count() === 1);
+    check('with no day read yet the view says so', await page.locator('#lab-papers-none').count() === 1);
+    await page.goto(`${BASE}/learn`, {waitUntil: 'load'});
+    await page.locator('[data-lab-hud="viewing"]').waitFor({timeout: 30000});
+    check('…and Today skips the papers\' card, its place kept in the saved layout', !(await hudOrder()).includes('papers') && await page.locator('#lab-digest').count() === 0
+        && ((await db.collection('userpreferences').findOne({userId: owner}))?.learn?.labLayout?.widgets ?? []).some((w) => w.id === 'papers'), (await hudOrder()).join(','));
+    await page.goto(`${BASE}/learn?arrange=1`, {waitUntil: 'load'});
+    await page.locator('[data-lab-hud="editing"]').waitFor({timeout: 30000});
+    check('…while arranging shows that place as a stand-in with nothing to show today', (await hudOrder()).includes('papers')
+        && /nothing to show today/i.test(await page.locator('[data-widget-id="papers"]').innerText()), (await hudOrder()).join(','));
 
     // --- everyone else -------------------------------------------------------------------------------
     await page.goto(`${BASE}/learn#max-drawdown`, {waitUntil: 'load'});
