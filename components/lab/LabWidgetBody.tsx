@@ -10,9 +10,10 @@ import {actionButton} from "@/components/primitives/ActionButton";
 
 // What a game widget's card says under its title, frameless: the games hub's own card body for
 // a scored game (with its record) and poker night, the daily puzzle's card, and a line with the
-// link for a site outside the app. Today's grid (components/lab/LabWidgets) draws it inside a
-// Panel; the arranging view (components/lab/LabArrange) inside the editing shell. No "What these
-// mean" and no "Ask in chat" on a widget (invariant 12).
+// link for a site outside the app. components/lab/LabGameCard draws it inside a Panel on Today's
+// HUD, viewing and arranging alike. The puzzle card's own streak strip is off while the streak
+// card is on the page (`showStreak`). No "What these mean" and no "Ask in chat" on a widget
+// (invariant 12).
 
 type GameWords = {body: string; recordLabel: string; print: (n: number) => string};
 
@@ -23,17 +24,17 @@ const GAME_WORDS: Partial<Record<LabWidgetId, GameWords>> = {
     correlation: {body: CORRELATION_COPY.cardBody, recordLabel: CORRELATION_COPY.recordLabel, print: (n) => (n / 1000).toFixed(3)},
 };
 
-const LabWidgetBody = ({widget, puzzle}: {widget: LabWidgetCard; puzzle: DailyPuzzleCardView | null}) => {
+const LabWidgetBody = ({widget, puzzle, showStreak = true}: {widget: LabWidgetCard; puzzle: DailyPuzzleCardView | null; showStreak?: boolean}) => {
     if (widget.kind === 'puzzle') {
-        return puzzle ? <DailyPuzzleCard card={puzzle}/> : <p className="text-sm text-fg-muted">{GAMES_COPY.noPuzzleYet}</p>;
+        return puzzle ? <DailyPuzzleCard card={puzzle} showStreak={showStreak}/> : <p className="text-sm text-fg-muted">{GAMES_COPY.noPuzzleYet}</p>;
     }
     if (widget.kind === 'outside' && widget.site) {
         const link = GAMES_COPY.outside.links[widget.site];
         return (
             <>
                 <p className="text-sm leading-relaxed text-fg-soft">{link.body}</p>
-                <div className="mt-auto pt-5">
-                    <a href={widget.href} target="_blank" rel="noopener noreferrer" className={actionButton({variant: 'secondary', size: 'md'})} data-outside-link={widget.site}>{LAB_COPY.list.open} ↗</a>
+                <div className="mt-auto pt-4">
+                    <a href={widget.href} target="_blank" rel="noopener noreferrer" className={actionButton({variant: 'secondary', size: 'sm'})} data-outside-link={widget.site}>{LAB_COPY.list.open} ↗</a>
                 </div>
             </>
         );

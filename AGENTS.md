@@ -48,7 +48,8 @@ and friends keep none beyond Shared and the invariants).
   `lib/email/recipients`.
 - `components/primitives/`: `Panel` is the top-level framed surface and never nests; `RowCard` is a
   flat row *inside* one. `StatTile` is every label / value / hint tile, `Disclosure` every
-  markerless details/summary ('link' or 'panel'), `ActionButton` every labelled button (primary,
+  markerless details/summary ('link', 'panel' or 'row' — a card folded to its title — with
+  `openOnHash` the page hash that opens it), `ActionButton` every labelled button (primary,
   strong, secondary, danger, destructive; `actionButton()` for a Link), `Switch` the themed toggle
   over `components/ui/switch`, `TextField`/`TextArea` the compact form field, `iconButton` the
   square icon affordance's class string.
@@ -554,11 +555,14 @@ and friends keep none beyond Shared and the invariants).
   the progress) and every game card (`lib/lab/widgets.ts`:
   import-free ids, never renamed, each with its `icon`) as `{id, span}` rows on the dashboard's
   twelve-column grid, a span one of `LAB_SPANS` (4, 6, 8 or 12 — S to XL on the width picker)
-  among those the card allows (`LAB_HUD`, each with its `defaultSpan`); the preference
-  `learn.labLayout`, version 2. `readLabLayout` reads a saved layout first (a version-1 layout —
-  the morning's, the games alone — puts its games in the day's games slot, `layoutWithGames`),
-  else the older `learn.labWidgets` list the same way, else `DEFAULT_LAB_LAYOUT`, the day as it
-  comes; a save writes the layout and unsets the list. `moveLabWidget`, `addLabWidget`,
+  among those the card allows (`LAB_HUD`, each with its `defaultSpan`; the list is `tall`, two
+  rows from a desktop's width so two cards a third wide stack beside it); the preference
+  `learn.labLayout`, version 3. `DEFAULT_LAB_LAYOUT` is the day on one screen: the list
+  two-thirds wide, the streak (compact) at its top right and the unit under it, the problem a bar
+  folded to its title, the review beside the progress, the papers, the games last at a third.
+  `readLabLayout` reads a version-3 layout as saved; a version-1 or version-2 layout, or the older
+  `learn.labWidgets` list, keeps only which games were on Today, at the default width, at the end
+  (`layoutWithGames`); else the default. A save writes the layout and unsets the list. `moveLabWidget`, `addLabWidget`,
   `removeLabWidget`, `setLabSpan`, `setGameOn`, `labLayoutsEqual`, `labLayoutFingerprint`,
   `missingLabWidgets` and `gamesOf`, each the same reference for a no-op.
   `components/lab/LabHud` (client) draws it: the page renders every card's body on the server
@@ -569,13 +573,22 @@ and friends keep none beyond Shared and the invariants).
   'bare': each body is its own Panel, un-framed inside the editing shell by one rule in
   `app/globals.css`), `DragGhost`, `WidgetPlaceholder` (a card added, or a part with nothing to
   show today, which viewing is skipped), `DashboardToolbar` and `WidgetLibrary`, which take their
-  words as props. Arrange is on Today (and `/learn?arrange=1`, the account menu's "Lab layout" for
-  the owner — `components/shell/UserDropdown`, `owner` handed down from the `(root)` layout; not
-  an `ACCOUNT_PAGES` entry, since the registry holds page files only): Add to Today (the parts of
+  words as props. Arrange is the page title's link on Today, `/learn?arrange=1` (the account
+  menu's "Lab layout" for the owner too — `components/shell/UserDropdown`, `owner` handed down
+  from the `(root)` layout; not an `ACCOUNT_PAGES` entry, since the registry holds page files
+  only); viewing, the HUD draws no toolbar of its own. Arranging: Add to Today (the parts of
   the day, the games in the app, elsewhere), Reset, Cancel, Save (`saveLabLayout`: the strict
   zod schema, then the lenient reader; no revalidation — the HUD refreshes the page itself, as the
   dashboard grid does). The HUD is keyed on the mode, never the layout: it follows a new layout
   from the page unless a draft is open, so the list's own dialog stays open across its toggles.
+  The problem is folded to its title (`components/primitives/Disclosure` 'row', `#lab-problem-fold`),
+  opened by its title or by the list's Open → — a plain anchor to `#lab-problem`, as every in-page
+  link on the list is, so the browser's fragment navigation fires `hashchange` and the fold's
+  `openOnHash` (`components/primitives/OpenOnHash`) opens it; `components/learn/LearnRedirect`
+  leaves the lab's own anchors (`#lab-*`, `#paper-*`) on the page. The streak card is
+  `components/learn/StreakMini` — the flame, the count, the milestone and the week's pills from the
+  hero's own exported pieces, without its tiles, status line or grid — and the puzzle card's own
+  strip is off while the streak card is on the page.
 - Games join the list from the list: "Games" in its header (`components/lab/GamesOnToday`) is one
   switch per game — on is a card at the end of Today and an item on the list, off takes both away
   — each saved at once by `setGameOnToday` (`setGameOn` over the stored layout, then `/learn`
@@ -657,8 +670,10 @@ and friends keep none beyond Shared and the invariants).
   `lib/games/store` and `lib/lab/store` may both import it), cached per request, behind
   `lib/games/store.readStreak`, Home's chip, the hub, the puzzle page, the daily-puzzle widget and
   the Lab. `nextMilestone` names the mark the hero counts toward (3, 7, 14, 30, 60, 100, 365).
-  `components/learn/StreakHero` draws it everywhere a streak shows (the hub's `StreakPanel` adds
-  the puzzles solved on their day); Home's `StreakChip` says "Start today" at zero and leads the
+  `components/learn/StreakHero` draws it whole on the hub (the hub's `StreakPanel` adds the
+  puzzles solved on their day) and `components/learn/StreakMini` compact on Lab › Today — the
+  flame, the count, the milestone and the week's pills, from the hero's exported pieces (`toneOf`,
+  `DISC_CLASS`, `DayPill`); Home's `StreakChip` says "Start today" at zero and leads the
   owner to `/learn`, everyone else to `/games`. A write that may move the day's count
   revalidates `/`, `/dashboard`, `/games` (layout) and `/learn`.
 - The puzzle bank `lib/learn/copy/puzzles` is server-only: an answer reaches the page only once
@@ -678,8 +693,9 @@ and friends keep none beyond Shared and the invariants).
   `lib/rate-limit.takeRateLimit`. A solve or a reveal revalidates `/`, `/dashboard`, the `/games`
   subtree and `/learn`.
 - The streak shows on Home (`components/games/StreakChip`, beside the market status), on the
-  hub's `components/games/StreakPanel` and Lab › Today (both `components/learn/StreakHero`), and
-  in `components/games/DailyPuzzleCard` on the library-only `daily-puzzle` widget — all from
+  hub's `components/games/StreakPanel` (`components/learn/StreakHero`) and Lab › Today
+  (`components/learn/StreakMini`), and in `components/games/DailyPuzzleCard` on the library-only
+  `daily-puzzle` widget (its strip off on Lab › Today while the streak card is on the page) — all from
   `lib/learn/activity-store.readActivityStreak`.
 - The arithmetic sprint's custom settings and the practice time are kept in this browser
   (`components/games/ArithmeticGame`: localStorage `aero-arithmetic:custom` and

@@ -12,7 +12,8 @@ import TextField from "@/components/primitives/TextField";
 // The day's problem: its statement (rendered on the server), hints one at a time, an answer box
 // when the answer is one number, and the worked solution once it is opened — by a correct answer
 // or by asking. The solution reaches this component only after the server has stamped the
-// problem closed; before that it is not in the page at all.
+// problem closed; before that it is not in the page at all. The page's ProblemPanel folds this
+// card to its title (Disclosure 'row'); nothing here knows about the fold.
 type Props = {
     problemId: string;
     numeric: boolean;
@@ -71,7 +72,7 @@ const ProblemCard = ({problemId, numeric, unit, hints, closedLine, statement, so
                 </div>
             )}
             {solution === null ? (
-                <div className="mt-4 flex flex-wrap items-end gap-2">
+                <div className="mt-3 flex flex-wrap items-end gap-2">
                     {numeric && (
                         <form className="flex flex-wrap items-end gap-2" onSubmit={(e) => { e.preventDefault(); void check(); }}>
                             <label className="flex flex-col gap-1">
@@ -84,7 +85,7 @@ const ProblemCard = ({problemId, numeric, unit, hints, closedLine, statement, so
                     <ActionButton variant="secondary" disabled={busy} onClick={reveal} data-lab-reveal>{LAB_COPY.reveal}</ActionButton>
                 </div>
             ) : (
-                <div className="mt-4 border-t border-line-strong/25 pt-4" data-lab-solution>
+                <div className="mt-3 border-t border-line-strong/25 pt-3" data-lab-solution>
                     <MicroLabel as="p" className="mb-2">{LAB_COPY.solutionHeading}{closedLine ? ` · ${closedLine}` : ''}</MicroLabel>
                     {solution}
                 </div>

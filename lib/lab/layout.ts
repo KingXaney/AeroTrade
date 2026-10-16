@@ -10,10 +10,14 @@ import {z} from 'zod';
 import {LAB_WIDGET_IDS, isLabWidgetId, labWidget, normalizeLabWidgets, type LabWidgetId} from '@/lib/lab/widgets';
 
 // Version 1 (2026-10-16, the morning) held the game cards alone, below the fixed panels; version
-// 2 holds the panels too. A version-1 layout is read with its games in the day's games slot. An
-// id the catalog no longer has (the check-in and the end of the day, removed that evening) is
-// dropped on read, so a saved layout outlives a card.
-export const LAB_LAYOUT_VERSION = 2;
+// 2 (that afternoon) the panels too, each at full width; version 3 (that evening) is the day on
+// one screen — the list two-thirds wide and two rows tall, the streak compact at its top right, the
+// unit under it, the problem a bar, the review beside the progress, the papers, the games last. A
+// version-1 or version-2 layout reads as the day as it comes with the games it had, at the default
+// width, at the end: the arrangement is replaced, which games are on Today is kept. An id the
+// catalog no longer has (the check-in and the end of the day, removed that evening) is dropped on
+// read, so a saved layout outlives a card.
+export const LAB_LAYOUT_VERSION = 3;
 
 // Of the grid's twelve columns: S, M, L and XL on the width picker (SPAN_LABELS in the dashboard
 // catalog); never 3, which a card of the day is too narrow for.
@@ -40,21 +44,28 @@ export type LabHudDef = {
     icon: string;
     spans: readonly LabSpan[];   // ascending
     defaultSpan: LabSpan;
+    // Two rows tall from a desktop's width when narrower than the row (the list), so two cards a
+    // third wide stack beside it. Never stored; components/lab/LabHud adds the class.
+    tall?: true;
 };
 
 const WIDE: readonly LabSpan[] = [6, 8, 12];
 const ANY: readonly LabSpan[] = [4, 6, 8, 12];
-const panel = (id: LabPanelId, icon: string, spans: readonly LabSpan[] = WIDE, defaultSpan: LabSpan = 12): LabHudDef => ({id, kind: 'panel', icon, spans, defaultSpan});
-const game = (id: LabWidgetId): LabHudDef => ({id, kind: 'game', icon: labWidget(id).icon, spans: ANY, defaultSpan: 6});
+const panel = (id: LabPanelId, icon: string, spans: readonly LabSpan[], defaultSpan: LabSpan): LabHudDef => ({id, kind: 'panel', icon, spans, defaultSpan});
+// A game card is a third wide by default, so the games tile three to a row.
+const game = (id: LabWidgetId): LabHudDef => ({id, kind: 'game', icon: labWidget(id).icon, spans: ANY, defaultSpan: 4});
 
+// The list's rows (a mark, two lines, a tick, the way in) want half the row at least; the compact
+// streak, the unit, the review, the digest and a game read at a third; the progress keeps its five
+// tiles on one line from half.
 export const LAB_HUD: Readonly<Record<LabHudId, LabHudDef>> = {
-    list: panel('list', 'checklist'),
-    streak: panel('streak', 'local_fire_department'),
-    unit: panel('unit', 'menu_book', ANY, 6),
-    review: panel('review', 'style', ANY, 6),
-    problem: panel('problem', 'functions'),
-    papers: panel('papers', 'article'),
-    progress: panel('progress', 'insights'),
+    list: {...panel('list', 'checklist', WIDE, 8), tall: true},
+    streak: panel('streak', 'local_fire_department', ANY, 4),
+    unit: panel('unit', 'menu_book', ANY, 4),
+    review: panel('review', 'style', ANY, 4),
+    problem: panel('problem', 'functions', WIDE, 12),
+    papers: panel('papers', 'article', ANY, 12),
+    progress: panel('progress', 'insights', WIDE, 8),
     ...(Object.fromEntries(LAB_WIDGET_IDS.map((id) => [id, game(id)])) as Record<LabWidgetId, LabHudDef>),
 };
 
@@ -86,19 +97,21 @@ export const clampLabSpan = (id: LabHudId, span: number): LabSpan => {
     return best;
 };
 
-// The day as it comes: every panel in the day's order, the unit beside the review, and the puzzle
-// alone among the games, after the papers.
+// The day as it comes, on one screen from a desktop's width: the list two-thirds wide and two rows
+// tall (components/lab/LabHud adds the row span) with the streak and the unit stacked beside it, the
+// problem a bar across (folded to its title), the review beside the progress, the papers, and the
+// games last — the puzzle alone — three to a row.
 export const DEFAULT_LAB_LAYOUT: LabLayout = {
     version: LAB_LAYOUT_VERSION,
     widgets: [
-        {id: 'list', span: 12},
-        {id: 'streak', span: 12},
-        {id: 'unit', span: 6},
-        {id: 'review', span: 6},
+        {id: 'list', span: 8},
+        {id: 'streak', span: 4},
+        {id: 'unit', span: 4},
         {id: 'problem', span: 12},
+        {id: 'review', span: 4},
+        {id: 'progress', span: 8},
         {id: 'papers', span: 12},
-        {id: 'daily-puzzle', span: 6},
-        {id: 'progress', span: 12},
+        {id: 'daily-puzzle', span: 4},
     ],
 };
 
@@ -108,8 +121,9 @@ export const resetLabLayout = (): LabLayout => ({
     widgets: DEFAULT_LAB_LAYOUT.widgets.map((w) => ({...w})),
 });
 
-// The default's panels with these games in the games slot (where the puzzle sits by default):
-// what a version-1 layout and the older learn.labWidgets list read as.
+// The default's panels with these games in the games slot — the end of the day, where the puzzle
+// sits by default and where setGameOn adds a game: what a version-1 or version-2 layout and the
+// older learn.labWidgets list read as.
 export const layoutWithGames = (games: readonly LabLayoutItem[]): LabLayout => {
     const defaults = DEFAULT_LAB_LAYOUT.widgets;
     const slot = defaults.findIndex((w) => isLabWidgetId(w.id));
@@ -137,13 +151,17 @@ const readItems = (raws: readonly unknown[], allowed: (id: string) => id is LabH
     return widgets;
 };
 
-// A stored layout read back: version 2 as it is (unknown ids dropped, repeats folded, widths
-// clamped or filled), version 1's games in the games slot, anything else the default.
+// A stored layout read back: version 3 as it is (unknown ids dropped, repeats folded, widths
+// clamped or filled); version 1's or 2's games — in their order, at the default width — in the
+// games slot of the day as it comes; anything else the default.
 export const normalizeLabLayout = (input: unknown): LabLayout => {
     const parsed = LooseLayoutSchema.safeParse(input);
     if (!parsed.success) return resetLabLayout();
     if (parsed.data.version === LAB_LAYOUT_VERSION) return {version: LAB_LAYOUT_VERSION, widgets: readItems(parsed.data.widgets, isLabHudId)};
-    if (parsed.data.version === 1) return layoutWithGames(readItems(parsed.data.widgets, (id): id is LabWidgetId => isLabWidgetId(id)));
+    if (parsed.data.version === 1 || parsed.data.version === 2) {
+        const games = readItems(parsed.data.widgets, (id): id is LabWidgetId => isLabWidgetId(id));
+        return layoutWithGames(games.map((w) => ({id: w.id, span: LAB_HUD[w.id].defaultSpan})));
+    }
     return resetLabLayout();
 };
 

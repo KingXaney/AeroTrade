@@ -32,5 +32,7 @@ describe('LAB_COPY', () => {
         expect(LAB_COPY.trackOf('quant', 2, 10)).toBe('Quantitative finance · unit 2 of 10');
         expect(labHudWords('list').title).toBe('Today\'s list');
         expect(labHudWords('kelly').title).toBe('Kelly coin');
+        expect(LAB_COPY.digestCaveat('2026-10-12')).toBe('2026-10-12 · AI summary from the abstracts · may contain errors');
+        expect(LAB_COPY.problemClosed).toBe('Closed for today');
     });
 });

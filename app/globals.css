@@ -1994,6 +1994,8 @@ details[open] > :not(summary) { animation: disclosure-in var(--motion-base) var(
 }
 /* Panels side by side are columns of one ruled page, so they stand further apart than boxes did. */
 [data-style="minimal"] .grid:has(> .glass-panel) { column-gap: 2.5rem; }
+/* The lab's HUD grid holds its cards in shell divs, so the rule above never matches it. */
+[data-style="minimal"] [data-lab-grid] { column-gap: 2.5rem; }
 /* A panel that is a link: its rule takes the accent, and the section lifts a shade. */
 [data-style="minimal"] .glass-panel[data-interactive]:hover {
   border-top-color: var(--brand);
@@ -2541,6 +2543,7 @@ details[open] > :not(summary) { animation: disclosure-in var(--motion-base) var(
 }
 [data-style="soft"] [data-app-content] > * { max-width: 68rem; margin-inline: auto; }
 [data-style="soft"] .grid:has(> .glass-panel) { gap: 1.5rem; }
+[data-style="soft"] [data-lab-grid] { gap: 1.5rem; }
 [data-style="soft"] [data-app-content] h1 { font-size: 1.875rem; font-weight: 600; }
 [data-style="soft"] .row-card { padding: 0.875rem 1.125rem; }
 [data-style="soft"] [data-section-tabs] {

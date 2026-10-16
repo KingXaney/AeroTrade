@@ -2,6 +2,7 @@ import type {Metadata} from "next";
 import type {ReactNode} from "react";
 import Link from "next/link";
 import {redirect} from "next/navigation";
+import {Settings2} from "lucide-react";
 import {getSessionUser} from "@/lib/auth/session";
 import {isLabOwner} from "@/lib/lab/owner";
 import {getLabView} from "@/lib/lab/page-store";
@@ -19,9 +20,10 @@ import ProblemCard from "@/components/lab/ProblemCard";
 import ReviewDeck from "@/components/lab/ReviewDeck";
 import TodayList from "@/components/lab/TodayList";
 import LearnRedirect from "@/components/learn/LearnRedirect";
-import StreakHero from "@/components/learn/StreakHero";
+import StreakMini from "@/components/learn/StreakMini";
 import {actionButton} from "@/components/primitives/ActionButton";
 import Badge from "@/components/primitives/Badge";
+import Disclosure from "@/components/primitives/Disclosure";
 import MicroLabel from "@/components/primitives/MicroLabel";
 import PageTitle from "@/components/primitives/PageTitle";
 import Panel from "@/components/primitives/Panel";
@@ -36,10 +38,10 @@ export const metadata: Metadata = {title: "Lab"};
 // The owner's lab (lib/lab): a daily study of computer vision, machine learning and
 // quantitative finance, for the accounts LAB_OWNER_EMAILS names. One view at a time in the URL
 // (?view=): Today — a HUD of the day's parts and the game cards in the owner's layout
-// (components/lab/LabHud): the list, the streak, the unit, the cards due, the problem, the day's
-// digest, the progress — the Papers (the latest day's
-// papers by field with the digest) and the Library, the syllabus. ?arrange=1 opens Today with its
-// arranging on, for the account menu's entry. Every other account's /learn goes to the games — on
+// (components/lab/LabHud): the list, the streak, the unit, the cards due, the problem (folded to
+// its title), the day's digest, the progress — on one screen from a desktop's width — the Papers
+// (the latest day's papers by field with the digest) and the Library, the syllabus. ?arrange=1
+// opens Today with its arranging on: the title's Arrange and the account menu's entry. Every other account's /learn goes to the games — on
 // the client, so a /learn#term address from the glossary's days as a tab of this page keeps its
 // hash on the way to /glossary (components/learn/LearnRedirect). One read, getLabView, shaped by
 // the pure lib/lab/view.
@@ -52,18 +54,18 @@ const TABS = VIEW_IDS.map((id) => ({id, label: LAB_COPY.views[id], href: id === 
 type LearnPageProps = {searchParams: Promise<{tab?: string; view?: string; arrange?: string}>};
 
 const UnitPanel = ({today}: {today: LabView['today']}) => (
-    <Panel id="lab-unit" aria-labelledby="lab-unit-heading" className="h-full" data-lab-unit={today.kind}>
-        <SectionHeading id="lab-unit-heading" spacing="sm">{LAB_COPY.unitHeading[today.kind]}</SectionHeading>
+    <Panel id="lab-unit" aria-labelledby="lab-unit-heading" pad={4} className="flex h-full flex-col" data-lab-unit={today.kind}>
+        <SectionHeading id="lab-unit-heading" spacing="none" className="mb-2">{LAB_COPY.unitHeading[today.kind]}</SectionHeading>
         {today.kind === 'nothing-written' ? (
             <p className="text-sm text-fg-soft">{today.next ? LAB_COPY.nothingWritten(today.next.title) : LAB_COPY.nothingAtAll}</p>
         ) : (
-            <div data-lab-unit-id={today.unit.id}>
+            <div className="flex flex-1 flex-col" data-lab-unit-id={today.unit.id}>
                 <MicroLabel as="p">{LAB_TRACK_LABELS[today.unit.track]} · {LAB_COPY.readingTime(today.unit.readingMinutes)} · {LAB_COPY.cardsCount(today.unit.cards)}</MicroLabel>
-                <h3 className="mt-1 font-heading text-lg font-semibold text-fg">{today.unit.title}</h3>
-                <p className="mt-2 text-sm leading-relaxed text-fg-soft">{today.unit.oneLiner}</p>
-                {today.kind === 'revisit' && <MicroLabel as="p" className="mt-2 normal-case tracking-normal">{LAB_COPY.revisitLine(today.firstDay, today.lastDay)}</MicroLabel>}
-                <div className="mt-4">
-                    <Link href={`/learn/units/${today.unit.id}`} className={actionButton({variant: today.kind === 'study' ? 'primary' : 'secondary', size: 'md'})} data-lab-open-unit={today.unit.id}>
+                <h3 className="mt-1 font-heading text-base font-semibold text-fg">{today.unit.title}</h3>
+                <p className="mt-1.5 text-sm leading-snug text-fg-soft">{today.unit.oneLiner}</p>
+                {today.kind === 'revisit' && <MicroLabel as="p" className="mt-1.5 normal-case tracking-normal">{LAB_COPY.revisitLine(today.firstDay, today.lastDay)}</MicroLabel>}
+                <div className="mt-auto pt-3">
+                    <Link href={`/learn/units/${today.unit.id}`} className={actionButton({variant: today.kind === 'study' ? 'primary' : 'secondary', size: 'sm'})} data-lab-open-unit={today.unit.id}>
                         {LAB_COPY.openUnit}
                     </Link>
                 </div>
@@ -73,8 +75,8 @@ const UnitPanel = ({today}: {today: LabView['today']}) => (
 );
 
 const ReviewPanel = ({view}: {view: LabView}) => (
-    <Panel id="lab-review" aria-labelledby="lab-review-heading" className="h-full">
-        <div className="mb-3 flex items-center justify-between gap-3">
+    <Panel id="lab-review" aria-labelledby="lab-review-heading" pad={4} className="h-full scroll-mt-24">
+        <div className="mb-2 flex items-center justify-between gap-3">
             <SectionHeading id="lab-review-heading" spacing="none">{LAB_COPY.reviewHeading}</SectionHeading>
             <MicroLabel data-lab-review-due={view.review.summary.due}>{LAB_COPY.reviewDue(view.review.summary.due)}</MicroLabel>
         </div>
@@ -85,31 +87,47 @@ const ReviewPanel = ({view}: {view: LabView}) => (
     </Panel>
 );
 
+// The problem, folded to its title: one press opens the statement, the hints and the answer in
+// place, and the list's Open → (#lab-problem) opens it too. A problem closed today stays folded
+// under its badge; the fold outlives the page's refresh after an answer, since `open` is the
+// element's own, never a prop. Not h-full: a folded card is never stretched to a neighbour.
 const ProblemPanel = ({problem}: {problem: NonNullable<LabView['problem']>}) => (
-    <Panel id="lab-problem" aria-labelledby="lab-problem-heading" className="h-full">
-        <div className="mb-3 flex flex-wrap items-center justify-between gap-3">
+    <Panel id="lab-problem" aria-labelledby="lab-problem-heading" pad={4} className="scroll-mt-24">
+        <div className="mb-2 flex flex-wrap items-center justify-between gap-3">
             <SectionHeading id="lab-problem-heading" spacing="none">{LAB_COPY.problemHeading}</SectionHeading>
             <MicroLabel>{problem.unitTitle} · {LAB_COPY.kinds[problem.kind]}</MicroLabel>
         </div>
-        <h3 className="mb-2 font-heading text-base font-semibold text-fg">{problem.title}</h3>
-        <ProblemCard
-            problemId={problem.id}
-            numeric={problem.numeric}
-            unit={problem.unit}
-            hints={problem.hints}
-            closedLine={problem.closed ? LAB_COPY.closedOn(problem.closed.day, problem.closed.how) : null}
-            statement={<LabMarkdown>{problem.statement}</LabMarkdown>}
-            solution={problem.solution !== null ? <LabMarkdown>{problem.solution}</LabMarkdown> : null}
-        />
+        <Disclosure variant="row" id="lab-problem-fold" openOnHash="#lab-problem" data-lab-problem-fold summary={(
+            <>
+                <h3 className="min-w-0 flex-1 font-heading text-base font-semibold text-fg">{problem.title}</h3>
+                {problem.closed && <Badge tone="positive" variant="outline">{LAB_COPY.problemClosed}</Badge>}
+                <span className="label-type shrink-0 text-xs text-brand">
+                    <span className="group-open:hidden">{LAB_COPY.problemShow}</span>
+                    <span className="hidden group-open:inline">{LAB_COPY.problemHide}</span>
+                </span>
+            </>
+        )}>
+            <div className="mt-3">
+                <ProblemCard
+                    problemId={problem.id}
+                    numeric={problem.numeric}
+                    unit={problem.unit}
+                    hints={problem.hints}
+                    closedLine={problem.closed ? LAB_COPY.closedOn(problem.closed.day, problem.closed.how) : null}
+                    statement={<LabMarkdown>{problem.statement}</LabMarkdown>}
+                    solution={problem.solution !== null ? <LabMarkdown>{problem.solution}</LabMarkdown> : null}
+                />
+            </div>
+        </Disclosure>
     </Panel>
 );
 
 // The day's papers on Today: the digest with a link to the Papers view, else three papers a field.
 const PapersToday = ({papers}: {papers: NonNullable<LabView['papers']>}) => papers.digest ? (
-    <DigestPanel id="lab-digest" digest={papers.digest} day={papers.day} hrefPrefix="/learn?view=papers#paper-" more={{href: '/learn?view=papers', label: LAB_COPY.allPapers}}/>
+    <DigestPanel id="lab-digest" digest={papers.digest} day={papers.day} hrefPrefix="/learn?view=papers#paper-" more={{href: '/learn?view=papers', label: LAB_COPY.allPapers}} className="h-full scroll-mt-24"/>
 ) : (
-    <Panel id="lab-papers-today" aria-labelledby="lab-papers-today-heading" className="h-full">
-        <div className="mb-3 flex items-center justify-between gap-3">
+    <Panel id="lab-papers-today" aria-labelledby="lab-papers-today-heading" pad={4} className="h-full scroll-mt-24">
+        <div className="mb-2 flex items-center justify-between gap-3">
             <SectionHeading id="lab-papers-today-heading" spacing="none">{LAB_COPY.todayPapersHeading}</SectionHeading>
             <Link href="/learn?view=papers" className="label-type text-xs text-brand hover:underline">{LAB_COPY.allPapers}</Link>
         </div>
@@ -130,25 +148,39 @@ const PapersToday = ({papers}: {papers: NonNullable<LabView['papers']>}) => pape
 const bodiesOf = (view: LabView): Partial<Record<LabHudId, ReactNode>> => {
     const bodies: Partial<Record<LabHudId, ReactNode>> = {
         list: <TodayList items={view.list} summary={view.listSummary} games={gamesOf(view.layout)}/>,
+        // Content height, not h-full: the small card sits at the top of its cell, the unit under it.
         streak: (
-            <Panel id="lab-streak" aria-labelledby="lab-streak-heading" className="h-full" data-lab-streak={view.progress.streak.current}>
-                <StreakHero streak={view.progress.streak} headingId="lab-streak-heading"/>
+            <Panel id="lab-streak" aria-labelledby="lab-streak-heading" pad={4} data-lab-streak={view.progress.streak.current}>
+                <StreakMini streak={view.progress.streak} headingId="lab-streak-heading"/>
             </Panel>
         ),
         unit: <UnitPanel today={view.today}/>,
         review: <ReviewPanel view={view}/>,
         progress: (
-            <Panel id="lab-progress" aria-labelledby="lab-progress-heading" className="h-full">
-                <SectionHeading id="lab-progress-heading" spacing="sm">{LAB_COPY.progressHeading}</SectionHeading>
-                <LabProgress progress={view.progress}/>
+            <Panel id="lab-progress" aria-labelledby="lab-progress-heading" pad={4} className="h-full">
+                <div className="flex flex-wrap items-center gap-x-8 gap-y-3">
+                    <SectionHeading id="lab-progress-heading" spacing="none" className="shrink-0">{LAB_COPY.progressHeading}</SectionHeading>
+                    <LabProgress progress={view.progress}/>
+                </div>
             </Panel>
         ),
     };
     if (view.problem) bodies.problem = <ProblemPanel problem={view.problem}/>;
     if (view.papers && (view.papers.digest || view.papers.tracks.length > 0)) bodies.papers = <PapersToday papers={view.papers}/>;
-    for (const widget of view.widgets) bodies[widget.id] = <LabGameCard widget={widget} puzzle={view.puzzle}/>;
+    // One streak on the page: the puzzle card's own strip only while the streak card is off it.
+    const streakOnPage = view.layout.widgets.some((w) => w.id === 'streak');
+    for (const widget of view.widgets) bodies[widget.id] = <LabGameCard widget={widget} puzzle={view.puzzle} showStreak={!streakOnPage}/>;
     return bodies;
 };
+
+// Arrange, as the page title's action on Today: the same address as the account menu's "Lab
+// layout", so the HUD opens arranging on a fresh render and Save or Cancel lead back to /learn.
+const ArrangeLink = () => (
+    <Link href="/learn?arrange=1" className={actionButton({variant: 'secondary', className: 'inline-flex shrink-0 items-center gap-2'})} data-toolbar-customize>
+        <Settings2 className="size-4" aria-hidden="true"/>
+        {LAB_COPY.layout.arrange}
+    </Link>
+);
 
 const TodayView = ({view, arranging}: {view: LabView; arranging: boolean}) => {
     const bodies = bodiesOf(view);
@@ -234,7 +266,7 @@ const LearnPage = async ({searchParams}: LearnPageProps) => {
     return (
         <div className="space-y-4" data-lab>
             <LearnRedirect fallback={null} legacyGlossaryTab={legacyGlossaryTab}/>
-            <PageTitle title={LAB_COPY.title} subtitle={LAB_COPY.subtitle}/>
+            <PageTitle title={LAB_COPY.title} subtitle={LAB_COPY.subtitle} actions={active === 'today' && !arranging ? <ArrangeLink/> : undefined}/>
             <Tabs tabs={TABS} active={active} label={LAB_COPY.viewsLabel}/>
             {active === 'today' ? <TodayView view={view} arranging={arranging}/> : active === 'papers' ? <PapersView view={view}/> : <LibraryView view={view}/>}
         </div>
