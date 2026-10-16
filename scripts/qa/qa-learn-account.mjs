@@ -399,6 +399,11 @@ try {
     await db.collection('accountsnapshots').deleteMany({accountId, date: {$gte: END}});
 
     // Case A: unpriced holding, no snapshot on the last session → the marker is withheld.
+    // QALRN's stored close (the income checks' bar) would stand in for its missing quote
+    // (lib/trading/valuation.buildHoldingsPriceMap) and price it; this case needs a holding with
+    // no price at all, so the bar is set aside and put back after.
+    const qalrnBars = await db.collection('pricebars').find({symbol: 'QALRN'}).toArray();
+    await db.collection('pricebars').deleteMany({symbol: 'QALRN'});
     await page.goto(`${BASE}/portfolio`, {waitUntil: 'load'});
     await page.locator('#luck-or-skill').waitFor({timeout: 30000});
     const luckText = async () => text('#luck-or-skill [data-testid=luck-landed]');
@@ -430,6 +435,7 @@ try {
         (await page.locator('#luck-or-skill [data-what-these-mean]').count()) === 1
             && (await page.locator('#luck-or-skill a').count()) === (await page.locator('#luck-or-skill [data-what-these-mean] a').count()));
     await shot('07-luck-withheld');
+    if (qalrnBars.length > 0) await db.collection('pricebars').insertMany(qalrnBars);
 
     // Case B: a snapshot on the last session is a real close — the learner is placed from it,
     // not from today's value (cash plus a holding at cost, about +0.3%).

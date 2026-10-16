@@ -6,14 +6,18 @@ import {
     computeRealizedPnl,
     computeWinStats,
     concentration,
+    countAtClose,
     countUnpriced,
     describeUnpriced,
     drawdownWindow,
     enrichPosition,
+    livePrice,
     mergeLivePoint,
+    symbolsWithoutPrice,
     toReturnPct,
     unpricedLabel,
     winStatsFromCounts,
+    withStoredCloses,
 } from '@/lib/trading/analytics';
 import type {PaperPosition} from '@/lib/trading/types';
 
@@ -351,6 +355,70 @@ describe('enrichPosition', () => {
 
     it('falls back to the symbol when the stored company is blank', () => {
         expect(enrichPosition({...held, company: ''}, {price: 1}).company).toBe('NVDA');
+    });
+
+    it('prices a position from a stored close, priced but dated', () => {
+        const p = enrichPosition(held, {price: 118, closeDate: '2026-10-14'});
+        expect(p).toMatchObject({marketValue: 1180, unrealizedPnl: 180, currentPrice: 118, priceStale: false, closeDate: '2026-10-14'});
+        expect(p.changePercent).toBeUndefined();
+    });
+
+    it('carries no close date on a live quote, or on a row with no price', () => {
+        expect(enrichPosition(held, {price: 120}).closeDate).toBeUndefined();
+        expect(enrichPosition(held, {closeDate: '2026-10-14'})).toMatchObject({priceStale: true, closeDate: undefined});
+    });
+});
+
+describe('the stored-close fallback', () => {
+    const live = new Map([
+        ['NVDA', {price: 120, changePercent: 1.5}],
+        ['XLF', {changePercent: undefined}],
+        ['XLY', {}],
+        ['ZZZZ', {}],
+    ]);
+    const closes = new Map([
+        ['NVDA', {date: '2026-10-14', close: 118}],
+        ['XLF', {date: '2026-10-14', close: 52.5}],
+        ['XLY', {date: '2026-10-13', close: 0}],
+        ['AMZN', {date: '2026-10-14', close: 210}],
+    ]);
+
+    it('names the symbols the quotes left without a price', () => {
+        expect(symbolsWithoutPrice(live)).toEqual(['XLF', 'XLY', 'ZZZZ']);
+        expect(symbolsWithoutPrice(new Map())).toEqual([]);
+    });
+
+    it('fills only those, from a usable close, and marks each with its date', () => {
+        const merged = withStoredCloses(live, closes);
+        expect(merged.get('NVDA')).toEqual({price: 120, changePercent: 1.5});
+        expect(merged.get('XLF')).toEqual({price: 52.5, closeDate: '2026-10-14'});
+        // A zero close is no price; a symbol with no stored bar stays unpriced; a close for a
+        // symbol nobody asked about is not added.
+        expect(merged.get('XLY')).toEqual({});
+        expect(merged.get('ZZZZ')).toEqual({});
+        expect(merged.has('AMZN')).toBe(false);
+        expect(live.get('XLF')).toEqual({changePercent: undefined});
+    });
+
+    it('hands the same map back when there is nothing to fill', () => {
+        const allLive = new Map([['NVDA', {price: 120}]]);
+        expect(withStoredCloses(allLive, closes)).toBe(allLive);
+        expect(withStoredCloses(live, new Map())).toBe(live);
+    });
+
+    it('reads a live price only from a live quote', () => {
+        expect(livePrice({price: 120})).toBe(120);
+        expect(livePrice({price: 118, closeDate: '2026-10-14'})).toBeUndefined();
+        expect(livePrice(undefined)).toBeUndefined();
+        expect(livePrice({})).toBeUndefined();
+    });
+
+    it('counts the holdings standing at a stored close, with their day when they share one', () => {
+        const at = (closeDate?: string) => ({closeDate});
+        expect(countAtClose([])).toEqual({count: 0, date: null});
+        expect(countAtClose([at(), at()])).toEqual({count: 0, date: null});
+        expect(countAtClose([at('2026-10-14'), at(), at('2026-10-14')])).toEqual({count: 2, date: '2026-10-14'});
+        expect(countAtClose([at('2026-10-14'), at('2026-10-13')])).toEqual({count: 2, date: null});
     });
 });
 

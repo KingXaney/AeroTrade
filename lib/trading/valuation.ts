@@ -6,7 +6,10 @@ import {cache} from "react";
 import {connectToDatabase} from "@/database/mongoose";
 import AccountSnapshot from "@/database/models/account-snapshot.model";
 import {getQuote} from "@/lib/prices/finnhub";
-import {enrichPosition, type PriceInfo} from "@/lib/trading/analytics";
+import {getLatestBars} from "@/lib/prices/store";
+import {addCalendarDays, getEasternDateString} from "@/lib/dates";
+import {CLOSE_FALLBACK_DAYS} from "@/lib/trading/config";
+import {enrichPosition, symbolsWithoutPrice, withStoredCloses, type PriceInfo} from "@/lib/trading/analytics";
 import {getAccountsForUser, getCachedAccountsForUser, getOwnedAccount, toAccountSummary, toPlainPositions} from "@/lib/trading/accounts";
 import type {AccountWithPortfolio, EnrichedPosition, PaperPosition, PortfolioSummary} from '@/lib/trading/types';
 
@@ -32,6 +35,24 @@ export const buildPriceMap = async (symbols: string[]): Promise<Map<string, Pric
         });
     });
     return map;
+};
+
+// The quote map a page values holdings with: live quotes first, then, for each symbol Finnhub gave
+// no price (a 429 under a burst of page loads, an outage), its newest stored daily close within
+// CLOSE_FALLBACK_DAYS, dated (PriceInfo.closeDate), so a refusal shows the last close instead of
+// the cost basis. Request paths only: the snapshot job, fills and the Navigator's plan keep
+// buildPriceMap, where a missing quote must stay missing. A failed bars read is no fallback.
+export const buildHoldingsPriceMap = async (symbols: string[]): Promise<Map<string, PriceInfo>> => {
+    const live = await buildPriceMap(symbols);
+    const missing = symbolsWithoutPrice(live);
+    if (missing.length === 0) return live;
+    const today = getEasternDateString();
+    const closes = await getLatestBars(missing, {since: addCalendarDays(today, -CLOSE_FALLBACK_DAYS), onOrBefore: today})
+        .catch((error) => {
+            console.error('Stored closes for unquoted holdings could not be read:', error);
+            return new Map<string, {date: string; close: number}>();
+        });
+    return withStoredCloses(live, closes);
 };
 
 // Pure computation: turn a stored account + price map into a serializable portfolio summary.
@@ -65,7 +86,7 @@ export const getPortfolio = async (userId: string, accountId?: string): Promise<
     const account = (accountId ? await getOwnedAccount(userId, accountId) : null)
         ?? (await getAccountsForUser(userId))[0];
     const positions = toPlainPositions(account);
-    const priceMap = await buildPriceMap(positions.map((p) => p.symbol));
+    const priceMap = await buildHoldingsPriceMap(positions.map((p) => p.symbol));
     return computePortfolio({cash: account.cash, startingBalance: account.startingBalance, positions}, priceMap);
 };
 
@@ -75,7 +96,7 @@ export const getPortfolio = async (userId: string, accountId?: string): Promise<
 export const getPortfoliosForUser = cache(async (userId: string): Promise<AccountWithPortfolio[]> => {
     const accounts = await getCachedAccountsForUser(userId);
     const allSymbols = accounts.flatMap((a) => a.positions.map((p) => p.symbol));
-    const priceMap = await buildPriceMap(allSymbols);
+    const priceMap = await buildHoldingsPriceMap(allSymbols);
     return accounts.map((a) => ({
         account: toAccountSummary(a),
         summary: computePortfolio(

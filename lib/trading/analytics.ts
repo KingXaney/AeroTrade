@@ -8,7 +8,10 @@ import {unpricedText} from "@/lib/learn/copy/unpriced";
 export const toReturnPct = (value: number, base: number): number =>
     base > 0 ? (value / base - 1) * 100 : 0;
 
-export type PriceInfo = {price?: number; changePercent?: number};
+// One symbol's price for a valuation. `closeDate` is set when `price` is not a live quote but the
+// symbol's newest stored daily close, standing in for a quote Finnhub did not give (a refusal, an
+// outage): a real price, dated, with no day change.
+export type PriceInfo = {price?: number; changePercent?: number; closeDate?: string};
 
 // One held position priced against the quote map.
 //
@@ -32,6 +35,7 @@ export const enrichPosition = (p: PaperPosition, info: PriceInfo | undefined): E
         company: p.company || p.symbol,
         currentPrice,
         changePercent: info?.changePercent,
+        closeDate: priceStale ? undefined : info?.closeDate,
         costBasis,
         marketValue,
         unrealizedPnl,
@@ -42,6 +46,40 @@ export const enrichPosition = (p: PaperPosition, info: PriceInfo | undefined): E
 
 export const countUnpriced = (positions: readonly {priceStale: boolean}[]): number =>
     positions.reduce((n, p) => n + (p.priceStale ? 1 : 0), 0);
+
+// The symbols a quote map left without a price, in its order: what a stored close may stand in for.
+export const symbolsWithoutPrice = (prices: ReadonlyMap<string, PriceInfo>): string[] =>
+    Array.from(prices.entries()).filter(([, info]) => typeof info.price !== 'number').map(([symbol]) => symbol);
+
+// The quote map with each symbol it left without a price filled from that symbol's newest stored
+// close, dated — never a live quote replaced, never a symbol added that was not asked about, never
+// a close that is not a positive number. The same map back when nothing is filled.
+export const withStoredCloses = (
+    prices: Map<string, PriceInfo>,
+    closes: ReadonlyMap<string, {date: string; close: number}>,
+): Map<string, PriceInfo> => {
+    const fills = symbolsWithoutPrice(prices)
+        .map((symbol) => [symbol, closes.get(symbol)] as const)
+        .filter((entry): entry is readonly [string, {date: string; close: number}] =>
+            entry[1] !== undefined && Number.isFinite(entry[1].close) && entry[1].close > 0);
+    if (fills.length === 0) return prices;
+    const merged = new Map(prices);
+    for (const [symbol, bar] of fills) merged.set(symbol, {price: bar.close, closeDate: bar.date});
+    return merged;
+};
+
+// A price only when it is a live quote: what a benchmark's live point is built from, which a
+// stored close would date wrong.
+export const livePrice = (info: PriceInfo | undefined): number | undefined =>
+    info && info.closeDate === undefined ? info.price : undefined;
+
+// How many holdings stand at a stored close, and the day when they all share one (null when none
+// do or the days differ) — said once beside the figure, never per row.
+export const countAtClose = (positions: readonly {closeDate?: string}[]): {count: number; date: string | null} => {
+    const dates = positions.flatMap((p) => (p.closeDate ? [p.closeDate] : []));
+    const days = new Set(dates);
+    return {count: dates.length, date: days.size === 1 ? dates[0] : null};
+};
 
 // Compact marker for rows that quote a return (leaderboard, strategy comparison,
 // account switcher): "unpriced" when nothing behind the number is live, "partly

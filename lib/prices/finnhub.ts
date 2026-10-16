@@ -3,6 +3,7 @@
 // endpoint, and lib code (trading, news, dashboard, chat, jobs) calls these directly. The two
 // fetches client components need are wrapped, one-to-one, in lib/actions/stocks.actions.ts.
 
+import {cache} from "react";
 import {validateArticle, formatArticle} from "@/lib/news/article";
 import {reportLimit, responseSignal} from "@/lib/limits/report";
 import {formatPrice, formatChangePercent, formatMarketCapValue} from "@/lib/format";
@@ -196,19 +197,26 @@ export const searchStocks = async (query?: string): Promise<Stock[]> => {
 // --- Quote / profile / financials ---
 // ============================================================================
 
-export const getQuote = async (symbol: string): Promise<QuoteData> => {
+// One quote per symbol per server render. Next already shares one network request between
+// identical fetches in a render, but each caller that awaited a refusal logged it and filed its
+// own limit row, so a page valuing an account twice (the shell's accounts and the page's own
+// analytics) counted every 429 twice. React's cache passes straight through outside a render
+// (jobs, tests), so a job's quotes are as before.
+const quoteOnce = cache(async (symbol: string): Promise<QuoteData> => {
     // Without a key every request is a guaranteed 401: the answer is the same empty quote
     // (the symbol reads as unpriced), so skip the round-trip and the per-call error log —
     // in development that log opens Next's error overlay on every page that values a position.
     if (!FINNHUB_API_KEY) return {};
     try {
-        const url = `${FINNHUB_BASE_URL}/quote?symbol=${encodeURIComponent(symbol.toUpperCase())}&token=${FINNHUB_API_KEY}`;
+        const url = `${FINNHUB_BASE_URL}/quote?symbol=${encodeURIComponent(symbol)}&token=${FINNHUB_API_KEY}`;
         return await fetchJSON<QuoteData>(url, 30);
     } catch (error) {
         console.error(`Error fetching quote for ${symbol}:`, error);
         return {};
     }
-};
+});
+
+export const getQuote = (symbol: string): Promise<QuoteData> => quoteOnce(symbol.toUpperCase());
 
 export const getCompanyProfile = async (symbol: string): Promise<ProfileData> => {
     // Keyless, the answer is the same empty profile getQuote gives: skip the certain 401 and

@@ -10,6 +10,7 @@ import TradeLink from "@/components/trading/TradeLink";
 import type {EnrichedPosition} from '@/lib/trading/types';
 import RowCard from "@/components/primitives/RowCard";
 import {UNPRICED_CELL_TITLE} from "@/lib/learn/copy/unpriced";
+import {HOLDINGS_COPY} from "@/lib/learn/copy/portfolio";
 
 // Compact, horizontally-scrolling open-positions strip for the Trade page and the
 // dashboard's positions widget.
@@ -35,7 +36,11 @@ const OpenPositionsStrip = ({positions, accountId, lotNotes}: {positions: Enrich
                             {p.priceStale ? (
                                 <span className="text-[11px] text-fg-muted font-mono" title={UNPRICED_CELL_TITLE}>—</span>
                             ) : (
-                                <span className={cn('font-mono text-[11px]', getChangeColorClass(p.unrealizedPnlPct))}>
+                                <span
+                                    className={cn('font-mono text-[11px]', getChangeColorClass(p.unrealizedPnlPct))}
+                                    title={p.closeDate ? HOLDINGS_COPY.closeCellTitle(p.closeDate) : undefined}
+                                    data-price-close={p.closeDate}
+                                >
                                     {formatPct(p.unrealizedPnlPct)}
                                 </span>
                             )}

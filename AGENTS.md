@@ -207,6 +207,16 @@ and friends keep none beyond Shared and the invariants).
   there from `next.config.ts`, its query carried over. The page's sentences are
   `MARKETS_PAGE_COPY` in `lib/learn/copy/trade`. ⌘K finds the page by its section's name and by
   its tab's (`NavDestination.tab`), so "trade" and "markets" both land on it.
+- `lib/trading/valuation.buildHoldingsPriceMap` is the quote map a page values holdings with:
+  live Finnhub quotes, then, for a symbol Finnhub gave no price (a 429 under a burst of page
+  loads, an outage), its newest stored daily close within `CLOSE_FALLBACK_DAYS`
+  (`lib/trading/config`) — priced, not stale, and dated (`PriceInfo.closeDate`,
+  `EnrichedPosition.closeDate`, the chat's `priceAsOf`), said once in the holdings line
+  (`HOLDINGS_COPY.summary` over `analytics.countAtClose`) and in the price cell's title, never a
+  per-row flag. A benchmark's live point reads `analytics.livePrice`, never a stored close. The
+  snapshot job, fills and the Navigator's plan keep `buildPriceMap`, where a missing quote stays
+  missing. `lib/prices/finnhub.getQuote` is one call per symbol per server render (React `cache`,
+  a pass-through in jobs), so a refusal is logged and filed once.
 - `lib/trading/ledger.getTradeLedger` is the one cached PaperTrade read a page makes. Every
   per-account trade read — the ledger, bounded history, the CSV, the comparison table, `/history`'s
   feed, the chat's sell totals — starts at the account's `inceptionAt` through the ledger's
