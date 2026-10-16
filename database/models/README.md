@@ -51,7 +51,6 @@ reads and writes live. Change a field here, then in the store module named besid
 | `lab-event` | lab | `lib/lab/store` — a unit marked studied, a problem closed (answered or revealed), a session day, a quiz passed (the unit id, the score), a manual tick of Today's list (`${item}:${day}`); unique per owner, kind and key, so a second click is a no-op; the streak is derived from the session and tick days with the puzzle's and the games' (`lib/learn/activity-store`), never stored |
 | `lab-card-state` | lab | `lib/lab/store` — one row per review card the owner has graded (SM-2 state); absent means new; a grade updates only the state the client saw |
 | `lab-day` | lab | `lib/lab/papers/store` — one day of the papers feed (the weekday job's write, the lab page's read): the papers kept per track by arXiv id, never a URL, and the one digest citing them by index; expires after 45 days |
-| `lab-note` | lab | `lib/lab/store` — the owner's note for one ET day: the morning's focus, the evening's notes and tomorrow's focus (`readLabNotes` for today and yesterday, `writeLabNote` field by field, a cleared field unset); unique per owner and day; the owner's own words, bounded, rendered as text; no TTL |
 
 The culture models are not in that migration list (it covers only the account models); their
 indexes are built by Mongoose's autoIndex, as the brain's and the topics' are.

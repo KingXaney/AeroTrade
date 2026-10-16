@@ -1,5 +1,5 @@
 import {describe, expect, it} from 'vitest';
-import {addCalendarDays, calendarDaysBetween, eachCalendarDay, getEasternDateString, getEasternHour, getEasternWeekKey} from '@/lib/dates';
+import {addCalendarDays, calendarDaysBetween, eachCalendarDay, getEasternDateString, getEasternWeekKey} from '@/lib/dates';
 
 describe('addCalendarDays', () => {
     it('moves a date label by whole days across month and year ends', () => {
@@ -50,14 +50,5 @@ describe('getEasternWeekKey', () => {
         expect(getEasternWeekKey('2026-09-28')).toBe('2026-09-28');
         expect(getEasternWeekKey('2026-10-01')).toBe('2026-09-28');
         expect(getEasternWeekKey('2026-10-04')).toBe('2026-09-28');
-    });
-});
-
-describe('getEasternHour', () => {
-    it('reads the Eastern hour on a 24-hour clock, midnight as 0', () => {
-        expect(getEasternHour(new Date('2026-07-01T03:30:00Z'))).toBe(23);
-        expect(getEasternHour(new Date('2026-07-01T04:30:00Z'))).toBe(0);
-        expect(getEasternHour(new Date('2026-01-15T14:05:00Z'))).toBe(9);
-        expect(getEasternHour(new Date('2026-01-15T22:59:00Z'))).toBe(17);
     });
 });

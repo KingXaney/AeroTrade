@@ -42,7 +42,7 @@ const layout = (widgets: LabLayoutItem[]): LabLayout => {
     return Object.freeze({version: LAB_LAYOUT_VERSION, widgets}) as LabLayout;
 };
 const ids = (l: LabLayout) => l.widgets.map((w) => w.id);
-const DEFAULT_IDS = ['check-in', 'list', 'streak', 'unit', 'review', 'problem', 'papers', 'daily-puzzle', 'reflection', 'progress'];
+const DEFAULT_IDS = ['list', 'streak', 'unit', 'review', 'problem', 'papers', 'daily-puzzle', 'progress'];
 
 describe('the catalog and the default', () => {
     it('lists every panel of the day and every game once, each with an icon and widths it allows', () => {
@@ -85,16 +85,16 @@ describe('the catalog and the default', () => {
 });
 
 describe('reading what was stored', () => {
-    it('keeps a sound layout, drops a stale id, folds a repeat, clamps a width, fills a missing one', () => {
+    it('keeps a sound layout, drops a stale id (a retired card too), folds a repeat, clamps a width, fills a missing one', () => {
         const read = normalizeLabLayout({version: 2, widgets: [
-            {id: 'list', span: 8}, {id: 'nope', span: 4}, {id: 'list', span: 4}, {id: 'lichess', span: 5}, {id: 'unit'}, 'junk', {span: 4}, {id: 'streak', span: 4},
+            {id: 'list', span: 8}, {id: 'nope', span: 4}, {id: 'check-in', span: 12}, {id: 'reflection', span: 12}, {id: 'list', span: 4}, {id: 'lichess', span: 5}, {id: 'unit'}, 'junk', {span: 4}, {id: 'streak', span: 4},
         ]});
         expect(read).toEqual({version: 2, widgets: [{id: 'list', span: 8}, {id: 'lichess', span: 4}, {id: 'unit', span: 6}, {id: 'streak', span: 6}]});
     });
 
     it('reads the morning\'s version 1 — the games alone — into the games slot of the day as it comes', () => {
         const read = normalizeLabLayout({version: 1, widgets: [{id: 'arithmetic', span: 8}, {id: 'daily-puzzle', span: 6}, {id: 'list', span: 12}]});
-        expect(ids(read)).toEqual(['check-in', 'list', 'streak', 'unit', 'review', 'problem', 'papers', 'arithmetic', 'daily-puzzle', 'reflection', 'progress']);
+        expect(ids(read)).toEqual(['list', 'streak', 'unit', 'review', 'problem', 'papers', 'arithmetic', 'daily-puzzle', 'progress']);
         expect(read.widgets.find((w) => w.id === 'arithmetic')?.span).toBe(8);
         expect(ids(normalizeLabLayout({version: 1, widgets: []}))).toEqual(DEFAULT_IDS.filter((id) => id !== 'daily-puzzle'));
     });
@@ -113,7 +113,7 @@ describe('reading what was stored', () => {
 
     it('prefers the layout to the old list, the old list to nothing, and nothing is the default', () => {
         expect(ids(readLabLayout({labLayout: {version: 2, widgets: [{id: 'kelly', span: 12}]}, labWidgets: ['arithmetic']}))).toEqual(['kelly']);
-        expect(ids(readLabLayout({labWidgets: ['monkeytype', 'daily-puzzle']}))).toEqual(['check-in', 'list', 'streak', 'unit', 'review', 'problem', 'papers', 'daily-puzzle', 'monkeytype', 'reflection', 'progress']);
+        expect(ids(readLabLayout({labWidgets: ['monkeytype', 'daily-puzzle']}))).toEqual(['list', 'streak', 'unit', 'review', 'problem', 'papers', 'daily-puzzle', 'monkeytype', 'progress']);
         // An empty old list meant "no games", and still does.
         expect(ids(readLabLayout({labWidgets: []}))).toEqual(DEFAULT_IDS.filter((id) => id !== 'daily-puzzle'));
         expect(readLabLayout({})).toEqual(resetLabLayout());
@@ -188,7 +188,7 @@ describe('editing', () => {
     });
 
     it('lists what is not yet on the page in the registry order, the panels first', () => {
-        expect(missingLabWidgets(base)).toEqual(['check-in', 'streak', 'unit', 'review', 'problem', 'papers', 'reflection', 'progress', 'kelly', 'market-making', 'correlation', 'poker-night', 'monkeytype', 'codeforces', 'leetcode']);
+        expect(missingLabWidgets(base)).toEqual(['streak', 'unit', 'review', 'problem', 'papers', 'progress', 'kelly', 'market-making', 'correlation', 'poker-night', 'monkeytype', 'codeforces', 'leetcode']);
         expect(missingLabWidgets(resetLabLayout())).toEqual(LAB_WIDGET_IDS.filter((id) => id !== 'daily-puzzle'));
     });
 });

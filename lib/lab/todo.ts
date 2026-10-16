@@ -17,9 +17,6 @@ export type LabTodoGroup = 'study' | 'play' | 'elsewhere';
 // The groups in the order the list draws them.
 export const TODO_GROUPS: readonly LabTodoGroup[] = ['study', 'play', 'elsewhere'];
 
-// The states with something still to do, in the list's sense: counted, not done.
-export const OPEN_STATES: readonly LabTodoState[] = ['todo', 'started', 'overdue'];
-
 export type LabTodoItem = {
     id: string;
     kind: LabTodoKind;
@@ -135,11 +132,5 @@ export const groupItems = (items: readonly LabTodoItem[]): {group: LabTodoGroup;
         const own = items.filter((item) => item.group === group);
         return own.length > 0 ? [{group, items: own}] : [];
     });
-
-// The end-of-day lines: what is done, and what is still open (to do, started or overdue).
-export const reflectionLines = (items: readonly LabTodoItem[]): {done: string[]; left: string[]} => ({
-    done: items.filter((item) => item.state === 'done').map((item) => item.title),
-    left: items.filter((item) => OPEN_STATES.includes(item.state)).map((item) => item.title),
-});
 
 export const isManualTodoId = (value: unknown): value is string => typeof value === 'string' && MANUAL_TODO_IDS.includes(value);

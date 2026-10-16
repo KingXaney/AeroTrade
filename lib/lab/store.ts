@@ -4,10 +4,8 @@
 
 import LabCardState from "@/database/models/lab-card-state.model";
 import LabEvent from "@/database/models/lab-event.model";
-import LabNoteModel from "@/database/models/lab-note.model";
 import UserPreferences from "@/database/models/user-preferences.model";
 import {connectToDatabase} from "@/database/mongoose";
-import type {LabNote} from "@/lib/lab/checkin";
 import {readLabLayout as readStoredLabLayout, type LabLayout} from "@/lib/lab/layout";
 import {grade, newCardState, type CardState, type Grade} from "@/lib/lab/srs";
 import type {CardRow, StudiedRow} from "@/lib/lab/schedule";
@@ -85,36 +83,6 @@ export const writeLabLayout = async (userId: string, layout: LabLayout): Promise
 };
 
 const isDuplicateKey = (error: unknown): boolean => (error as {code?: number})?.code === 11000;
-
-type NoteDoc = {day: string; focus?: string; notes?: string; next?: string};
-
-// The day's notes (database/models/lab-note.model.ts) for the days asked: absent fields read as null.
-export const readLabNotes = async (userId: string, days: readonly string[]): Promise<LabNote[]> => {
-    await connectToDatabase();
-    const rows = await LabNoteModel.find({userId, day: {$in: [...days]}}).select('day focus notes next').lean<NoteDoc[]>();
-    return rows.map((row) => ({day: row.day, focus: row.focus ?? null, notes: row.notes ?? null, next: row.next ?? null}));
-};
-
-// One day's note, field by field: a string is set, null unsets it, a field left out is untouched.
-// The row is made on the first write; two first writes at once leave one row.
-export const writeLabNote = async (userId: string, day: string, fields: Partial<Omit<LabNote, 'day'>>): Promise<void> => {
-    await connectToDatabase();
-    const set: Record<string, unknown> = {updatedAt: new Date()};
-    const unset: Record<string, 1> = {};
-    for (const key of ['focus', 'notes', 'next'] as const) {
-        const value = fields[key];
-        if (value === undefined) continue;
-        if (value === null) unset[key] = 1;
-        else set[key] = value;
-    }
-    const update = Object.keys(unset).length > 0 ? {$set: set, $unset: unset} : {$set: set};
-    try {
-        await LabNoteModel.updateOne({userId, day}, update, {upsert: true});
-    } catch (error) {
-        if (!isDuplicateKey(error)) throw error;
-        await LabNoteModel.updateOne({userId, day}, update);
-    }
-};
 
 // A quiz passed: the first pass sets the day and the score; a later pass changes nothing.
 export const recordQuizPass = async (userId: string, unitId: string, today: string, score: number): Promise<{first: boolean}> => {

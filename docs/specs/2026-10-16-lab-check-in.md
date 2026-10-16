@@ -1,7 +1,10 @@
 # Lab › Today as a daily check-in, and the game widgets arranged
 
 **Date:** 2026-10-16
-**Status:** Shipped 2026-10-16, merged from `feat/lab-check-in`. Extends
+**Status:** Shipped 2026-10-16, merged from `feat/lab-check-in`; revised the same afternoon as the HUD
+(below, PR #72); the check-in and the end of the day — the greeting, the date, the day's focus, yesterday,
+the notes and the `LabNote` row — were removed that evening at the owner's request, the HUD and the games
+from the list staying. Extends
 [Lab › Today as a list](2026-10-15-learn-todo-streak.md).
 
 ## Why

@@ -7,9 +7,7 @@
 // studied (once), its cards due the day after (the unit row is dated back a day), one graded,
 // the problem answered on the server, the streak counting the day, the library's thirty rows, a
 // seeded day of papers with its digest on the Papers view and on Today, the digest ticked by hand
-// and unticked, the check-in (the date and the greeting, today's focus written and edited, the end
-// of the day's note saved and read the next morning as yesterday's, the look back at yesterday),
-// the list's groups and the overdue state, Today as a HUD (the day's cards on the grid as it comes,
+// and unticked, the list's groups and the overdue state, Today as a HUD (the day's cards on the grid as it comes,
 // the older preference read with its games in the games slot, the list's Games dialog switching
 // games on and off at once, then arranging in place at /learn?arrange=1 — added from the library,
 // sized, moved, removed, saved as learn.labLayout — a seeded round ticking the sprint, Codeforces
@@ -52,25 +50,6 @@ try {
     check('the account menu offers the owner the lab\'s layout', menuHref === '/learn?arrange=1' && /lab layout/i.test(await page.locator('[data-menu-lab-layout]').innerText()), String(menuHref));
     await page.keyboard.press('Escape');
 
-    // --- the check-in: the date, the greeting by name, today's focus written and edited ----------------
-    const todayEt = new Intl.DateTimeFormat('en-CA', {timeZone: 'America/New_York'}).format(new Date());
-    const dateLabel = new Intl.DateTimeFormat('en-US', {weekday: 'long', month: 'long', day: 'numeric', timeZone: 'UTC'}).format(new Date(`${todayEt}T00:00:00Z`));
-    check('the check-in opens on the date and a greeting by first name, the focus to be written, no look back on a first day',
-        await page.locator('[data-lab-checkin] [data-lab-date]').innerText() === dateLabel && /good (morning|afternoon|evening), qa\./i.test(await page.locator('#lab-checkin-heading').innerText())
-        && await page.locator('[data-focus-form]').count() === 1 && await page.locator('[data-focus-plan]').count() === 0 && await page.locator('[data-lab-yesterday]').count() === 0,
-        `${await page.locator('[data-lab-checkin] [data-lab-date]').innerText()} / ${await page.locator('#lab-checkin-heading').innerText()}`);
-    await page.locator('[data-focus-input]').fill('Finish the DINOv2 unit');
-    await page.locator('[data-focus-save]').click();
-    await page.locator('[data-focus-text]').waitFor({timeout: 15000});
-    const firstNote = await db.collection('labnotes').findOne({userId: owner});
-    check('today\'s focus is saved to the day\'s note and shown as text without a reload', firstNote?.day === todayEt && firstNote?.focus === 'Finish the DINOv2 unit'
-        && /Finish the DINOv2 unit/.test(await page.locator('[data-focus-text]').innerText()));
-    await page.locator('[data-focus-edit]').click();
-    await page.locator('[data-focus-input]').fill('Cards first, then the unit');
-    await page.locator('[data-focus-save]').click();
-    await page.locator('[data-focus-text]:has-text("Cards first")').waitFor({timeout: 15000});
-    check('…and edited in place, one row for the day', (await db.collection('labnotes').findOne({userId: owner}))?.focus === 'Cards first, then the unit' && await db.collection('labnotes').countDocuments({userId: owner}) === 1);
-
     // --- today: the streak hero at zero, the list, the first unit of the first track, nothing due, a problem ---
     const unitId = await page.locator('[data-lab-unit-id]').getAttribute('data-lab-unit-id');
     check('Today opens on the first unit of the computer-vision track, to study', await page.locator('[data-lab-unit="study"]').count() === 1 && unitId === 'cv-vit-dinov2', String(unitId));
@@ -86,11 +65,10 @@ try {
     check('…the unit item opens its page and the puzzle item the puzzle', (await page.locator('[data-todo-open="unit"]').getAttribute('href')) === `/learn/units/${unitId}`
         && (await page.locator('[data-todo-open="daily-puzzle"]').getAttribute('href')) === '/games/puzzle');
     const hudOrder = async () => page.locator('[data-lab-hud] [data-widget-id]').evaluateAll((els) => els.map((el) => el.getAttribute('data-widget-id')));
-    check('Today is a HUD of the day as it comes: nine cards (no papers yet), the puzzle at half width, Arrange on the page', (await hudOrder()).join(',') === 'check-in,list,streak,unit,review,problem,daily-puzzle,reflection,progress'
+    check('Today is a HUD of the day as it comes: seven cards (no papers yet), the puzzle at half width, Arrange on the page', (await hudOrder()).join(',') === 'list,streak,unit,review,problem,daily-puzzle,progress'
         && await page.locator('[data-lab-hud="viewing"]').count() === 1 && ((await page.locator('[data-widget-id="daily-puzzle"]').getAttribute('class')) ?? '').includes('md:col-span-6')
         && await page.locator('[data-lab-widget="daily-puzzle"] [data-daily-puzzle]').count() === 1 && await page.locator('[data-toolbar-customize]').count() === 1, (await hudOrder()).join(','));
-    check('…the list under its group eyebrows, study then play, and the end of the day with nothing done', (await page.locator('[data-todo-group]').evaluateAll((els) => els.map((el) => el.getAttribute('data-todo-group')))).join(',') === 'study,play'
-        && await page.locator('[data-lab-reflection] [data-reflection-done="0"]').count() === 1 && Number(await page.locator('[data-reflection-left]').getAttribute('data-reflection-left')) >= 2);
+    check('…the list under its group eyebrows, study then play', (await page.locator('[data-todo-group]').evaluateAll((els) => els.map((el) => el.getAttribute('data-todo-group')))).join(',') === 'study,play');
     await shot('01-lab-today');
 
     // --- the unit page: the quiz gates the mark; a wrong set fails, the right set passes and counts the day ---
@@ -145,8 +123,6 @@ try {
     const dueText = await page.locator('[data-lab-review-due]').getAttribute('data-lab-review-due');
     check('the unit\'s cards are due the day after it was studied, as new cards', dueText === '7' && await page.locator('[data-review-left="7"]').count() === 1, String(dueText));
     check('…the next unit is the machine-learning track\'s first', await page.locator('[data-lab-unit-id="ml-transformer-internals"]').count() === 1);
-    check('the check-in looks back at yesterday: the unit studied counted, the puzzle left', await page.locator('[data-lab-yesterday][data-yesterday-done="1"][data-yesterday-left="1"]').count() === 1
-        && /Studied ViT/.test(await page.locator('[data-lab-yesterday]').innerText()) && /The puzzle/.test(await page.locator('[data-lab-yesterday]').innerText()), await page.locator('[data-lab-yesterday]').innerText().catch(() => 'none'));
     const cardId = await page.locator('[data-review-card]').getAttribute('data-review-card');
     check('a card shows its front only until asked', await page.locator('[data-review-back]').count() === 0 && cardId !== null);
     await page.locator('[data-review-show]').click();
@@ -248,30 +224,11 @@ try {
     await page.locator('[data-lab-todo="papers"][data-todo-state="todo"]').waitFor({timeout: 15000});
     check('…and Undo removes it', await db.collection('labevents').countDocuments({userId: owner, kind: 'todo'}) === 0);
 
-    // --- the end of the day: the lines from the list, the note saved, and the morning after ---------
-    check('the end of the day lists what is done and what is open, read from the list', Number(await page.locator('[data-reflection-done]').getAttribute('data-reflection-done')) >= 1
-        && Number(await page.locator('[data-reflection-left]').getAttribute('data-reflection-left')) >= 1 && /problem/i.test(await page.locator('[data-reflection-done]').innerText()));
-    await page.locator('[data-reflection-notes]').fill('Slow start; the review deck went well.');
-    await page.locator('[data-reflection-next]').fill('Open with the problem');
-    await page.locator('[data-reflection-save]').click();
-    await page.getByText('Saved.').first().waitFor({timeout: 15000});
-    const dayNote = await db.collection('labnotes').findOne({userId: owner, day: today});
-    check('the notes and tomorrow\'s focus are saved to the day\'s note beside the morning\'s', dayNote?.notes === 'Slow start; the review deck went well.' && dayNote?.next === 'Open with the problem' && dayNote?.focus === 'Cards first, then the unit');
-    // The morning after: the note is yesterday's, and its line for today is offered until a focus is written.
-    await db.collection('labnotes').updateOne({userId: owner, day: today}, {$set: {day: yesterday}, $unset: {focus: 1}});
-    await page.reload({waitUntil: 'load'});
-    await page.locator('[data-lab-list]').waitFor({timeout: 30000});
-    check('the next morning offers yesterday\'s note for today', await page.locator('[data-focus-form]').count() === 1 && /Open with the problem/.test(await page.locator('[data-focus-plan]').innerText()));
-    await page.locator('[data-focus-use-plan]').click();
-    await page.locator('[data-focus-text]').waitFor({timeout: 15000});
-    check('…and one press makes it today\'s focus', (await db.collection('labnotes').findOne({userId: owner, day: today}))?.focus === 'Open with the problem' && /Open with the problem/.test(await page.locator('[data-focus-text]').innerText())
-        && await page.locator('[data-focus-plan]').count() === 0);
-
     // --- Today as a HUD: the older preference, the list's Games dialog, then arranging in place ------
     await db.collection('userpreferences').updateOne({userId: owner}, {$set: {'learn.labWidgets': ['kelly', 'daily-puzzle']}, $unset: {'learn.labLayout': 1}}, {upsert: true});
     await page.reload({waitUntil: 'load'});
     await page.locator('[data-lab-list]').waitFor({timeout: 30000});
-    check('the older labWidgets preference reads with its games in the games slot, after the day\'s papers, in the registry order', (await hudOrder()).join(',') === 'check-in,list,streak,unit,review,problem,papers,daily-puzzle,kelly,reflection,progress'
+    check('the older labWidgets preference reads with its games in the games slot, after the day\'s papers, in the registry order', (await hudOrder()).join(',') === 'list,streak,unit,review,problem,papers,daily-puzzle,kelly,progress'
         && await page.locator('[data-lab-todo="kelly"][data-todo-state="todo"]').count() === 1, (await hudOrder()).join(','));
     // The list's Games dialog: each switch saves at once, the dialog stays open and the list follows.
     await page.locator('[data-games-on-today]').click();
@@ -292,13 +249,13 @@ try {
         && !((await db.collection('userpreferences').findOne({userId: owner}))?.learn?.labLayout?.widgets ?? []).some((w) => w.id === 'kelly'));
     await page.keyboard.press('Escape');
     await page.locator('[data-games-dialog]').waitFor({state: 'hidden', timeout: 15000});
-    check('the sprint is a card on Today after the puzzle, with its round on the list', (await hudOrder()).join(',') === 'check-in,list,streak,unit,review,problem,papers,daily-puzzle,reflection,progress,arithmetic'
+    check('the sprint is a card on Today after the puzzle, with its round on the list', (await hudOrder()).join(',') === 'list,streak,unit,review,problem,papers,daily-puzzle,progress,arithmetic'
         && /Play a round of/.test(await page.locator('[data-lab-todo="arithmetic"]').innerText()) && (await page.locator('[data-todo-open="arithmetic"]').getAttribute('href')) === '/games/arithmetic', (await hudOrder()).join(','));
     // Arranging in place, from the account menu's address.
     await page.goto(`${BASE}/learn?arrange=1`, {waitUntil: 'load'});
     await page.locator('[data-lab-hud="editing"]').waitFor({timeout: 30000});
     check('arranging turns every card into an editing shell in place, the digest and the list inside theirs, Save waiting on a change, the Today tab lit',
-        (await hudOrder()).join(',') === 'check-in,list,streak,unit,review,problem,papers,daily-puzzle,reflection,progress,arithmetic'
+        (await hudOrder()).join(',') === 'list,streak,unit,review,problem,papers,daily-puzzle,progress,arithmetic'
         && await page.locator('[data-widget-id="papers"] #lab-digest').count() === 1 && await page.locator('[data-widget-id="list"] [data-lab-list]').count() === 1
         && await page.locator('[data-toolbar-save][disabled]').count() === 1 && await page.locator('[data-tab="today"][aria-selected="true"]').count() === 1, (await hudOrder()).join(','));
     await page.locator('[data-toolbar-add]').click();
@@ -314,9 +271,8 @@ try {
         && /save to load/i.test(await page.locator('[data-lab-hud] [data-widget-id="codeforces"]').innerText()) && await page.locator('[data-toolbar-save]:not([disabled])').count() === 1);
     await page.locator('[data-widget-id="arithmetic"] [role="group"][aria-label="Widget width"] button[title="8 of 12 columns"]').click();
     await page.locator('[data-widget-id="arithmetic"] button[aria-label="Move earlier"]').click();
-    await page.locator('[data-widget-id="arithmetic"] button[aria-label="Move earlier"]').click();
     await page.locator('[data-widget-id="progress"] button[aria-label="Remove Progress"]').click();
-    check('the sprint set to L and moved up two places, Progress removed', (await hudOrder()).join(',') === 'check-in,list,streak,unit,review,problem,papers,daily-puzzle,arithmetic,reflection,codeforces'
+    check('the sprint set to L and moved up a place, Progress removed', (await hudOrder()).join(',') === 'list,streak,unit,review,problem,papers,daily-puzzle,arithmetic,codeforces'
         && await page.locator('[data-widget-id="arithmetic"] button[title="8 of 12 columns"][aria-pressed="true"]').count() === 1, (await hudOrder()).join(','));
     await shot('06a-lab-arrange');
     await page.locator('[data-toolbar-save]').click();
@@ -325,8 +281,8 @@ try {
     await page.locator('[data-lab-widget="codeforces"]').waitFor({timeout: 30000});
     const savedPrefs = await db.collection('userpreferences').findOne({userId: owner});
     check('Save writes the layout with its widths, the old list unset', savedPrefs?.learn?.labLayout?.version === 2 && savedPrefs?.learn?.labWidgets === undefined
-        && JSON.stringify(savedPrefs?.learn?.labLayout?.widgets) === JSON.stringify([{id: 'check-in', span: 12}, {id: 'list', span: 12}, {id: 'streak', span: 12}, {id: 'unit', span: 6}, {id: 'review', span: 6}, {id: 'problem', span: 12}, {id: 'papers', span: 12}, {id: 'daily-puzzle', span: 6}, {id: 'arithmetic', span: 8}, {id: 'reflection', span: 12}, {id: 'codeforces', span: 6}]), JSON.stringify(savedPrefs?.learn));
-    check('Today draws the HUD as arranged: the sprint at eight columns after the puzzle, Codeforces last, no Progress, the papers in their place', (await hudOrder()).join(',') === 'check-in,list,streak,unit,review,problem,papers,daily-puzzle,arithmetic,reflection,codeforces'
+        && JSON.stringify(savedPrefs?.learn?.labLayout?.widgets) === JSON.stringify([{id: 'list', span: 12}, {id: 'streak', span: 12}, {id: 'unit', span: 6}, {id: 'review', span: 6}, {id: 'problem', span: 12}, {id: 'papers', span: 12}, {id: 'daily-puzzle', span: 6}, {id: 'arithmetic', span: 8}, {id: 'codeforces', span: 6}]), JSON.stringify(savedPrefs?.learn));
+    check('Today draws the HUD as arranged: the sprint at eight columns after the puzzle, Codeforces last, no Progress, the papers in their place', (await hudOrder()).join(',') === 'list,streak,unit,review,problem,papers,daily-puzzle,arithmetic,codeforces'
         && ((await page.locator('[data-widget-id="arithmetic"]').getAttribute('class')) ?? '').includes('xl:col-span-8') && await page.locator('#lab-progress').count() === 0, (await hudOrder()).join(','));
     check('Codeforces is a card with its link and an item ticked by hand, under its own eyebrow', await page.locator('[data-lab-widget="codeforces"] a[href="https://codeforces.com/problemset"]').count() === 1
         && await page.locator('[data-lab-todo="codeforces"] [data-todo-tick="codeforces"]').count() === 1 && (await page.locator('[data-todo-open="codeforces"]').getAttribute('target')) === '_blank'
@@ -354,7 +310,6 @@ try {
     await shot('08-lab-arrange-phone');
     await page.setViewportSize({width: 1440, height: 900});
     await db.collection('gamerounds').deleteMany({userId: owner});
-    await db.collection('labnotes').deleteMany({userId: owner});
     await db.collection('labdays').updateOne({day: today}, {$set: {day: yesterday}});
     await page.goto(`${BASE}/learn?view=papers`, {waitUntil: 'load'});
     await page.locator('#lab-papers').waitFor({timeout: 30000});

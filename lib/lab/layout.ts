@@ -1,7 +1,7 @@
-// Lab › Today as a HUD (the preference learn.labLayout): every part of the day — the check-in,
-// the list, the streak, the unit, the review, the problem, the papers, the end of the day, the
-// progress — and every game card, as {id, span} rows on the dashboard's twelve-column grid, in
-// the owner's order and at the widths they chose. PURE and client-safe, like
+// Lab › Today as a HUD (the preference learn.labLayout): every part of the day — the list, the
+// streak, the unit, the review, the problem, the papers, the progress — and every game card, as
+// {id, span} rows on the dashboard's twelve-column grid, in the owner's order and at the widths
+// they chose. PURE and client-safe, like
 // lib/dashboard/layout.ts, whose shape it keeps: every helper is immutable and hands back the SAME
 // reference when nothing changed, so the arranging state and its dirty check can rely on identity.
 // A game's id is lib/lab/widgets' and a panel's is LAB_PANEL_IDS'; neither is ever renamed.
@@ -10,7 +10,9 @@ import {z} from 'zod';
 import {LAB_WIDGET_IDS, isLabWidgetId, labWidget, normalizeLabWidgets, type LabWidgetId} from '@/lib/lab/widgets';
 
 // Version 1 (2026-10-16, the morning) held the game cards alone, below the fixed panels; version
-// 2 holds the panels too. A version-1 layout is read with its games in the day's games slot.
+// 2 holds the panels too. A version-1 layout is read with its games in the day's games slot. An
+// id the catalog no longer has (the check-in and the end of the day, removed that evening) is
+// dropped on read, so a saved layout outlives a card.
 export const LAB_LAYOUT_VERSION = 2;
 
 // Of the grid's twelve columns: S, M, L and XL on the width picker (SPAN_LABELS in the dashboard
@@ -19,7 +21,7 @@ export const LAB_SPANS = [4, 6, 8, 12] as const;
 export type LabSpan = (typeof LAB_SPANS)[number];
 
 // The parts of the day that are not a game, in the day's order.
-export const LAB_PANEL_IDS = ['check-in', 'list', 'streak', 'unit', 'review', 'problem', 'papers', 'reflection', 'progress'] as const;
+export const LAB_PANEL_IDS = ['list', 'streak', 'unit', 'review', 'problem', 'papers', 'progress'] as const;
 export type LabPanelId = (typeof LAB_PANEL_IDS)[number];
 
 // Everything a card on Today can be: the panels, then the games (the library's order).
@@ -46,14 +48,12 @@ const panel = (id: LabPanelId, icon: string, spans: readonly LabSpan[] = WIDE, d
 const game = (id: LabWidgetId): LabHudDef => ({id, kind: 'game', icon: labWidget(id).icon, spans: ANY, defaultSpan: 6});
 
 export const LAB_HUD: Readonly<Record<LabHudId, LabHudDef>> = {
-    'check-in': panel('check-in', 'wb_sunny'),
     list: panel('list', 'checklist'),
     streak: panel('streak', 'local_fire_department'),
     unit: panel('unit', 'menu_book', ANY, 6),
     review: panel('review', 'style', ANY, 6),
     problem: panel('problem', 'functions'),
     papers: panel('papers', 'article'),
-    reflection: panel('reflection', 'bedtime'),
     progress: panel('progress', 'insights'),
     ...(Object.fromEntries(LAB_WIDGET_IDS.map((id) => [id, game(id)])) as Record<LabWidgetId, LabHudDef>),
 };
@@ -91,7 +91,6 @@ export const clampLabSpan = (id: LabHudId, span: number): LabSpan => {
 export const DEFAULT_LAB_LAYOUT: LabLayout = {
     version: LAB_LAYOUT_VERSION,
     widgets: [
-        {id: 'check-in', span: 12},
         {id: 'list', span: 12},
         {id: 'streak', span: 12},
         {id: 'unit', span: 6},
@@ -99,7 +98,6 @@ export const DEFAULT_LAB_LAYOUT: LabLayout = {
         {id: 'problem', span: 12},
         {id: 'papers', span: 12},
         {id: 'daily-puzzle', span: 6},
-        {id: 'reflection', span: 12},
         {id: 'progress', span: 12},
     ],
 };

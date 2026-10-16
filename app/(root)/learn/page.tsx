@@ -9,7 +9,6 @@ import {gamesOf, type LabHudId} from "@/lib/lab/layout";
 import {LAB_WIDGET_IDS} from "@/lib/lab/widgets";
 import type {LabView} from "@/lib/lab/view";
 import {LAB_COPY, LAB_TRACK_LABELS} from "@/lib/learn/copy/lab";
-import CheckIn from "@/components/lab/CheckIn";
 import LabHud from "@/components/lab/LabHud";
 import LabGameCard from "@/components/lab/LabGameCard";
 import LabMarkdown from "@/components/lab/LabMarkdown";
@@ -17,7 +16,6 @@ import DigestPanel from "@/components/lab/DigestPanel";
 import LabProgress from "@/components/lab/LabProgress";
 import PapersPanel from "@/components/lab/PapersPanel";
 import ProblemCard from "@/components/lab/ProblemCard";
-import Reflection from "@/components/lab/Reflection";
 import ReviewDeck from "@/components/lab/ReviewDeck";
 import TodayList from "@/components/lab/TodayList";
 import LearnRedirect from "@/components/learn/LearnRedirect";
@@ -38,8 +36,8 @@ export const metadata: Metadata = {title: "Lab"};
 // The owner's lab (lib/lab): a daily study of computer vision, machine learning and
 // quantitative finance, for the accounts LAB_OWNER_EMAILS names. One view at a time in the URL
 // (?view=): Today — a HUD of the day's parts and the game cards in the owner's layout
-// (components/lab/LabHud): the check-in, the list, the streak, the unit, the cards due, the
-// problem, the day's digest, the end of the day, the progress — the Papers (the latest day's
+// (components/lab/LabHud): the list, the streak, the unit, the cards due, the problem, the day's
+// digest, the progress — the Papers (the latest day's
 // papers by field with the digest) and the Library, the syllabus. ?arrange=1 opens Today with its
 // arranging on, for the account menu's entry. Every other account's /learn goes to the games — on
 // the client, so a /learn#term address from the glossary's days as a tab of this page keeps its
@@ -129,9 +127,8 @@ const PapersToday = ({papers}: {papers: NonNullable<LabView['papers']>}) => pape
 // Every card's body, rendered here on the server and handed to the HUD by id: the parts of the
 // day that have something to show, and each game card on the layout. A part with nothing to show
 // (no problem, no papers) has no body, so the HUD skips it and the library does not offer it.
-const bodiesOf = (view: LabView, name: string | null | undefined): Partial<Record<LabHudId, ReactNode>> => {
+const bodiesOf = (view: LabView): Partial<Record<LabHudId, ReactNode>> => {
     const bodies: Partial<Record<LabHudId, ReactNode>> = {
-        'check-in': <CheckIn view={view.checkIn} name={name}/>,
         list: <TodayList items={view.list} summary={view.listSummary} games={gamesOf(view.layout)}/>,
         streak: (
             <Panel id="lab-streak" aria-labelledby="lab-streak-heading" className="h-full" data-lab-streak={view.progress.streak.current}>
@@ -140,7 +137,6 @@ const bodiesOf = (view: LabView, name: string | null | undefined): Partial<Recor
         ),
         unit: <UnitPanel today={view.today}/>,
         review: <ReviewPanel view={view}/>,
-        reflection: <Reflection view={view.reflection}/>,
         progress: (
             <Panel id="lab-progress" aria-labelledby="lab-progress-heading" className="h-full">
                 <SectionHeading id="lab-progress-heading" spacing="sm">{LAB_COPY.progressHeading}</SectionHeading>
@@ -154,8 +150,8 @@ const bodiesOf = (view: LabView, name: string | null | undefined): Partial<Recor
     return bodies;
 };
 
-const TodayView = ({view, name, arranging}: {view: LabView; name: string | null | undefined; arranging: boolean}) => {
-    const bodies = bodiesOf(view, name);
+const TodayView = ({view, arranging}: {view: LabView; arranging: boolean}) => {
+    const bodies = bodiesOf(view);
     // The library offers every part of the day with something to show, and every game.
     const availableIds = [...(Object.keys(bodies) as LabHudId[]).filter((id) => !(LAB_WIDGET_IDS as readonly string[]).includes(id)), ...LAB_WIDGET_IDS];
     return (
@@ -240,7 +236,7 @@ const LearnPage = async ({searchParams}: LearnPageProps) => {
             <LearnRedirect fallback={null} legacyGlossaryTab={legacyGlossaryTab}/>
             <PageTitle title={LAB_COPY.title} subtitle={LAB_COPY.subtitle}/>
             <Tabs tabs={TABS} active={active} label={LAB_COPY.viewsLabel}/>
-            {active === 'today' ? <TodayView view={view} name={user.name} arranging={arranging}/> : active === 'papers' ? <PapersView view={view}/> : <LibraryView view={view}/>}
+            {active === 'today' ? <TodayView view={view} arranging={arranging}/> : active === 'papers' ? <PapersView view={view}/> : <LibraryView view={view}/>}
         </div>
     );
 };
