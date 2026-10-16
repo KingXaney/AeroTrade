@@ -1552,8 +1552,12 @@ details[open] > :not(summary) { animation: disclosure-in var(--motion-base) var(
     -webkit-backdrop-filter: var(--chrome-blur);
     box-shadow: var(--chrome-shadow);
   }
+  /* The bar's row fills the bar, so its items centre on the bar's middle line: the account button
+     (a 36px avatar in its padding) is taller than a bar's height less its padding in every style,
+     and a row that only started at the top hung 2-5px low. */
   .header-wrapper {
     @apply flex justify-between items-center px-6 py-3;
+    height: 100%;
     color: var(--fg-soft);
   }
   /* The app's bar (components/shell/Header.tsx): the logo, the search, the account menu. From md
@@ -1567,6 +1571,9 @@ details[open] > :not(summary) { animation: disclosure-in var(--motion-base) var(
     .header-bar {
       display: grid;
       grid-template-columns: 1fr minmax(0, min(28rem, calc(100% - 24rem))) 1fr;
+      /* The row is taller than the bar less its padding; centred, it overhangs both paddings
+         evenly instead of growing down from the top. */
+      align-content: center;
     }
     .header-bar > .search-text { margin-left: 0; justify-self: center; }
     .header-bar > :last-child { justify-self: end; }
