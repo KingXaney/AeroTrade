@@ -537,7 +537,7 @@ and friends keep none beyond Shared and the invariants).
   the session through `getSessionUser` and renders `components/learn/LearnRedirect` for anyone
   else, which keeps a `#term` on its way to `/glossary` and otherwise goes to `/games`; a unit page
   (`/learn/units/[unit]`) redirects them on the server. One view at a time in the URL (`?view=`):
-  Today, the Papers and the Library; `?arrange=1` is Today's games being arranged (below).
+  Today, the Papers and the Library; `?arrange=1` is Today being arranged (below).
 - Today opens on the check-in (`lib/lab/checkin`, pure; `components/lab/CheckIn`): the date
   (`dayLabel`), a greeting by the Eastern hour (`periodOf` over `lib/dates.getEasternHour`),
   today's focus — one line written to "What would you like to accomplish today?"
@@ -562,26 +562,39 @@ and friends keep none beyond Shared and the invariants).
   papers digest, poker night and the sites outside the app — are ticked by the owner's own press
   (`tickTodo`/`untickTodo`, a `LabEvent` of kind `todo` keyed `${item}:${day}`).
   `components/lab/TodayList` draws it; the work panels below are where the items are done.
-- The game widgets on Today are `lib/lab/widgets.ts` (import-free ids, never renamed, each with
-  its `icon`) in the layout `lib/lab/layout.ts` (pure, client-safe: `{id, span}` rows on the
-  dashboard's twelve-column grid, a span one of `LAB_SPANS` — 4, 6, 8 or 12, S to XL on the
-  width picker — and `DEFAULT_LAB_SPAN` 6; the preference `learn.labLayout`, which
-  `readLabLayout` reads first, else the older `learn.labWidgets` list at the default width, else
-  the puzzle alone; a save writes the layout and unsets the list; `moveLabWidget`,
-  `addLabWidget`, `removeLabWidget`, `setLabSpan`, `labLayoutsEqual`, `labLayoutFingerprint` and
-  `missingLabWidgets`, each the same reference for a no-op). `components/lab/LabWidgets` draws
-  them on Today in that order and at those widths (`spanClass`), each a Panel with the widget's
-  title over `components/lab/LabWidgetBody` (the hub's `GameCardBody`, the puzzle card, an
-  outside site's line and link), so the section is a heading over a grid, with "Arrange" leading
-  to `/learn?arrange=1`, where `components/lab/LabArrange` (client) arranges them with the
-  dashboard's own pieces — `WidgetShell` over a structural `ShellDef`, `DragGhost`,
-  `WidgetPlaceholder`, `DashboardToolbar` and `WidgetLibrary`, which take their words as props:
-  Add a game, Reset (the puzzle alone), Cancel (back to Today), Save (`saveLabLayout`: the strict
-  zod schema, then the lenient reader; no revalidation — the view goes to `/learn` itself, as the
-  dashboard grid does). The account menu (`components/shell/UserDropdown`, `owner` handed down
-  from the `(root)` layout) carries "Lab layout" for the owner — not an `ACCOUNT_PAGES` entry,
-  since the registry holds page files only. Every sentence is `LAB_COPY` (`checkIn`,
-  `reflection`, `list`, `layout`), `LAB_WIDGET_TITLES` and `LAB_WIDGET_BLURBS`.
+- Today is a HUD. `lib/lab/layout.ts` (pure, client-safe) is its catalog and layout: every part of
+  the day (`LAB_PANEL_IDS`: the check-in, the list, the streak, the unit, the review, the problem,
+  the papers, the end of the day, the progress) and every game card (`lib/lab/widgets.ts`:
+  import-free ids, never renamed, each with its `icon`) as `{id, span}` rows on the dashboard's
+  twelve-column grid, a span one of `LAB_SPANS` (4, 6, 8 or 12 — S to XL on the width picker)
+  among those the card allows (`LAB_HUD`, each with its `defaultSpan`); the preference
+  `learn.labLayout`, version 2. `readLabLayout` reads a saved layout first (a version-1 layout —
+  the morning's, the games alone — puts its games in the day's games slot, `layoutWithGames`),
+  else the older `learn.labWidgets` list the same way, else `DEFAULT_LAB_LAYOUT`, the day as it
+  comes; a save writes the layout and unsets the list. `moveLabWidget`, `addLabWidget`,
+  `removeLabWidget`, `setLabSpan`, `setGameOn`, `labLayoutsEqual`, `labLayoutFingerprint`,
+  `missingLabWidgets` and `gamesOf`, each the same reference for a no-op.
+  `components/lab/LabHud` (client) draws it: the page renders every card's body on the server
+  (`bodiesOf` in `app/(root)/learn/page.tsx`: each part of the day that has something to show,
+  each game as `components/lab/LabGameCard` over `components/lab/LabWidgetBody`, the hub's
+  `GameCardBody`) and hands them to the HUD by id, which lays them out viewing and arranges them
+  in place with the dashboard's own pieces — `WidgetShell` over a structural `ShellDef` (chrome
+  'bare': each body is its own Panel, un-framed inside the editing shell by one rule in
+  `app/globals.css`), `DragGhost`, `WidgetPlaceholder` (a card added, or a part with nothing to
+  show today, which viewing is skipped), `DashboardToolbar` and `WidgetLibrary`, which take their
+  words as props. Arrange is on Today (and `/learn?arrange=1`, the account menu's "Lab layout" for
+  the owner — `components/shell/UserDropdown`, `owner` handed down from the `(root)` layout; not
+  an `ACCOUNT_PAGES` entry, since the registry holds page files only): Add to Today (the parts of
+  the day, the games in the app, elsewhere), Reset, Cancel, Save (`saveLabLayout`: the strict
+  zod schema, then the lenient reader; no revalidation — the HUD refreshes the page itself, as the
+  dashboard grid does). The HUD is keyed on the mode, never the layout: it follows a new layout
+  from the page unless a draft is open, so the list's own dialog stays open across its toggles.
+- Games join the list from the list: "Games" in its header (`components/lab/GamesOnToday`) is one
+  switch per game — on is a card at the end of Today and an item on the list, off takes both away
+  — each saved at once by `setGameOnToday` (`setGameOn` over the stored layout, then `/learn`
+  revalidated), so the switch shows the page's own answer. Every sentence is `LAB_COPY`
+  (`checkIn`, `reflection`, `list`, `layout`, `games`), `LAB_PANEL_WORDS`, `LAB_WIDGET_TITLES`
+  and `LAB_WIDGET_BLURBS` (`labHudWords` by id).
 - Every written unit carries a quiz (`LabUnit.quiz`: 3–5 questions, four options, one answer, a
   `why`; the curriculum test holds the shape and varies the answer positions). `lib/lab/quiz` is
   pure: `quizPublic` strips the answers before the page sees a question, `scoreQuiz` passes at

@@ -13,9 +13,9 @@ import type {Streak} from "@/lib/games/streak";
 import type {DailyPuzzleCardView, GameSummary} from "@/lib/games/store";
 import type {QuizRow, RevealedRow} from "@/lib/lab/store";
 import {buildCheckIn, type CheckInView, type LabNote, type YesterdayInput} from "@/lib/lab/checkin";
-import type {LabLayout, LabSpan} from "@/lib/lab/layout";
+import {gamesOf, type LabLayout, type LabSpan} from "@/lib/lab/layout";
 import {buildTodayList, listSummary, reflectionLines, todoKey, type LabTodoItem} from "@/lib/lab/todo";
-import {labWidget, type LabWidgetId, type LabWidgetKind, type LabOutsideSite} from "@/lib/lab/widgets";
+import {isLabWidgetId, labWidget, type LabWidgetId, type LabWidgetKind, type LabOutsideSite} from "@/lib/lab/widgets";
 import type {LabDayStored} from "@/lib/lab/papers/day";
 import {shapePapersView, type LabPapersView} from "@/lib/lab/papers/view";
 
@@ -45,8 +45,8 @@ export type LabTodayView =
 
 export type LabLibraryRow = {id: string; track: LabTrack; title: string; oneLiner: string; number: number; written: boolean; studiedOn: string | null; quizPassedOn: string | null};
 
-// One game widget on Today: where it sits (the layout's order), how wide, and what its card
-// needs beside the copy's titles.
+// One game card on Today: where it sits (the layout's order), how wide, and what its card needs
+// beside the copy's titles. The panels of the day are drawn from the view's other parts.
 export type LabWidgetCard = {
     id: LabWidgetId;
     kind: LabWidgetKind;
@@ -152,7 +152,7 @@ export const shapeLabView = (input: LabViewInput): LabView => {
     }));
 
     const papers = labDay ? shapePapersView(labDay, today) : null;
-    const widgetIds = layout.widgets.map((w) => w.id);
+    const widgetIds = gamesOf(layout);
     const list = buildTodayList({
         today,
         unit: pick.kind === 'nothing-written'
@@ -193,9 +193,10 @@ export const shapeLabView = (input: LabViewInput): LabView => {
         review,
         problem: problemView,
         layout,
-        widgets: layout.widgets.map(({id, span}) => {
+        widgets: layout.widgets.flatMap(({id, span}) => {
+            if (!isLabWidgetId(id)) return [];
             const widget = labWidget(id);
-            return {id, kind: widget.kind, href: widget.href, span, ...(widget.site ? {site: widget.site} : {}), record: widget.game ? gameSummaries[widget.game]?.record ?? null : null};
+            return [{id, kind: widget.kind, href: widget.href, span, ...(widget.site ? {site: widget.site} : {}), record: widget.game ? gameSummaries[widget.game]?.record ?? null : null}];
         }),
         puzzle,
         reflection: {notes: notes.today?.notes ?? null, next: notes.today?.next ?? null, ...reflectionLines(list)},

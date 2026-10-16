@@ -3,7 +3,8 @@
 // lib/learn/__tests__/lab-copy.test.ts; the units themselves are the bank in ./lab/ (server-only).
 
 import type {LabTrack} from "@/lib/learn/copy/lab/types";
-import type {LabWidgetId} from "@/lib/lab/widgets";
+import type {LabHudId, LabPanelId} from "@/lib/lab/layout";
+import {isLabWidgetId, type LabWidgetId} from "@/lib/lab/widgets";
 import {ARITHMETIC_COPY, CORRELATION_COPY, GAMES_COPY, KELLY_COPY, MARKET_COPY, PUZZLE_COPY} from "@/lib/learn/copy/games";
 import {POKER_NIGHT_COPY} from "@/lib/learn/copy/poker-night";
 
@@ -63,28 +64,29 @@ export const LAB_COPY = {
         saved: 'Saved.',
     },
 
-    // The game widgets' layout (lib/lab/layout.ts; components/lab/LabWidgets on Today, the
-    // arranging view components/lab/LabArrange at /learn?arrange=1, the account menu's entry).
+    // Today as a HUD (lib/lab/layout.ts; components/lab/LabHud arranges it in place at /learn and
+    // from the account menu's entry, /learn?arrange=1).
     layout: {
         menuItem: 'Lab layout',
         arrange: 'Arrange',
-        heading: 'Arrange Today\'s games',
-        lead: 'Drag a card by its handle or use the arrows, pick its width, add or remove games, then save. Below a tablet\'s width every card takes the full row.',
-        add: 'Add a game',
+        lead: 'Drag a card by its handle or use the arrows, pick its width, add or remove cards, then save. Below a tablet\'s width every card takes the full row.',
+        add: 'Add to Today',
         reset: 'Reset',
-        resetTitle: 'Back to the puzzle alone (applied on Save)',
+        resetTitle: 'Back to the day as it comes (applied on Save)',
         cancel: 'Cancel',
         save: 'Save',
         saved: 'Layout saved.',
-        empty: 'No games on Today. Add one, or reset to the puzzle alone.',
+        empty: 'Nothing on Today. Add a card, or reset to the day as it comes.',
         saveToLoad: 'Save to load',
+        nothingToday: 'Nothing to show today',
         library: {
-            title: 'Add a game',
-            lead: 'A game added is a card on Today and an item on the list; a round played counts the day.',
-            full: 'Every game is on Today.',
-            none: 'Every game is already on Today.',
+            title: 'Add to Today',
+            lead: 'A card added shows once the layout is saved; a game added is an item on the list too.',
+            full: 'Everything is on Today.',
+            none: 'Everything is already on Today.',
             addRow: 'Add',
-            inApp: 'In the app',
+            parts: 'Parts of the day',
+            inApp: 'Games in the app',
             elsewhere: GAMES_COPY.outside.heading,
         },
         // What a screen reader hears while a card is dragged.
@@ -95,6 +97,17 @@ export const LAB_COPY = {
             notMoved: (title: string): string => `${title} was not moved.`,
             cancelled: (title: string): string => `Cancelled moving ${title}.`,
         },
+    },
+
+    // The games on Today, switched on and off from the list (components/lab/GamesOnToday).
+    games: {
+        button: 'Games',
+        title: 'Games on Today',
+        lead: 'A game switched on is a card on Today and an item on the list; a round played counts the day. Elsewhere, a session is ticked by hand.',
+        inApp: 'In the app',
+        elsewhere: GAMES_COPY.outside.heading,
+        on: (title: string): string => `${title} is on Today.`,
+        off: (title: string): string => `${title} is off Today.`,
     },
 
     // Today's unit.
@@ -167,9 +180,7 @@ export const LAB_COPY = {
         untick: 'Undo',
         ticked: (day: string): string => `Ticked ${day}`,
         open: 'Open',
-        empty: 'Nothing on the list: add a game from the arranging view.',
-        widgetsHeading: 'Games on Today',
-        noWidgets: 'No games on Today yet.',
+        empty: 'Nothing on the list.',
     },
 
     // A unit's quiz (components/lab/QuizCard; lib/lab/quiz scores it on the server).
@@ -274,3 +285,20 @@ export const LAB_WIDGET_BLURBS: Readonly<Record<LabWidgetId, string>> = {
     'codeforces': GAMES_COPY.outside.links.codeforces.body,
     'leetcode': GAMES_COPY.outside.links.leetcode.body,
 };
+
+// What each part of the day is called on the arranging handles and in the library, with one line.
+export const LAB_PANEL_WORDS: Readonly<Record<LabPanelId, {title: string; blurb: string}>> = {
+    'check-in': {title: 'Check-in', blurb: 'The date, a greeting, today\'s focus and a look back at yesterday.'},
+    list: {title: LAB_COPY.list.heading, blurb: 'One item per thing the day holds, each with the way in.'},
+    streak: {title: 'Streak', blurb: 'The days in a row something on the list was done: this week and the last twelve.'},
+    unit: {title: LAB_COPY.unitHeading.study, blurb: 'The unit to read, with the way to its page and its quiz.'},
+    review: {title: LAB_COPY.reviewHeading, blurb: 'The cards due, graded one at a time.'},
+    problem: {title: LAB_COPY.problemHeading, blurb: 'A problem from the unit, checked on the server.'},
+    papers: {title: LAB_COPY.digestHeading, blurb: 'The day\'s digest of new papers in the three fields.'},
+    reflection: {title: LAB_COPY.reflection.heading, blurb: 'The done and open items, notes on the day and tomorrow\'s focus.'},
+    progress: {title: LAB_COPY.progressHeading, blurb: 'Units studied per track, cards learned, cards due.'},
+};
+
+// A card's words by its id, panel or game.
+export const labHudWords = (id: LabHudId): {title: string; blurb: string} =>
+    isLabWidgetId(id) ? {title: LAB_WIDGET_TITLES[id], blurb: LAB_WIDGET_BLURBS[id]} : LAB_PANEL_WORDS[id];

@@ -35,7 +35,7 @@ const Reflection = ({view}: {view: LabReflectionView}) => {
     };
 
     return (
-        <Panel as="form" id="lab-reflection" aria-labelledby="lab-reflection-heading" onSubmit={onSubmit} data-lab-reflection>
+        <Panel as="form" id="lab-reflection" aria-labelledby="lab-reflection-heading" className="h-full" onSubmit={onSubmit} data-lab-reflection>
             <SectionHeading id="lab-reflection-heading" spacing="sm">{copy.heading}</SectionHeading>
             <p className="mb-4 max-w-2xl text-sm text-fg-muted">{copy.lead}</p>
             <dl className="mb-4 space-y-1 text-sm">

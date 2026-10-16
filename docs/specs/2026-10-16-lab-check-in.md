@@ -56,7 +56,7 @@ user-authored — the list stays derived — so there is no "add a task", and no
   `addLabWidget`, `removeLabWidget`, `setLabSpan`, `labLayoutsEqual`, `labLayoutFingerprint`,
   `missingLabWidgets`), each handing back the same reference for a no-op. A widget id is still
   the registry's, never renamed; each entry now carries an `icon`.
-- **Today's grid** (`components/lab/LabWidgets`, server): the cards on a twelve-column grid from
+- *(Superseded the same day — see below.)* **Today's grid** (`components/lab/LabWidgets`, server): the cards on a twelve-column grid from
   the tablet width (`spanClass`), one column below it; each card a Panel with the widget's title
   and `components/lab/LabWidgetBody` (the games hub's card body, `GameCardBody`, which the hub's
   `GameCard` now wraps). An "Arrange" link leads to the arranging view.
@@ -71,12 +71,35 @@ user-authored — the list stays derived — so there is no "add a task", and no
   (`components/shell/UserDropdown`) carries "Lab layout" for the owner — the one entry that is
   not a page of `ACCOUNT_PAGES`, since the registry holds page files only.
 
+## Revised the same day: Today as a HUD
+
+The first cut arranged the game cards alone, on a separate view. The owner's answer: the layout
+should be a live, editable HUD — the cards of the current page moved, removed and sized in place
+— and the main want is adding a game to the checklist in a tap, opening it from there and
+completing the day. So:
+
+- **Every part of the day is a card** (`LAB_PANEL_IDS`: the check-in, the list, the streak, the
+  unit, the review, the problem, the papers, the end of the day, the progress) beside the game
+  cards, on one twelve-column grid in the owner's order and widths (`LAB_HUD` names each card's
+  widths and default; `DEFAULT_LAB_LAYOUT` is the day as it comes, the unit beside the review,
+  the puzzle after the papers). The layout is version 2; the morning's version-1 layouts and the
+  older list read with their games in the games slot.
+- **Arranging is in place** (`components/lab/LabHud`): Arrange on Today — or `/learn?arrange=1`
+  from the account menu — turns every card into the dashboard's editing shell (handle, arrow
+  keys, width picker, earlier/later, remove), with Add to Today (parts of the day, games in the
+  app, elsewhere), Reset, Cancel and Save. Each body is its own Panel, un-framed inside the shell
+  by one CSS rule while arranging. A part with nothing to show today is skipped viewing and a
+  stand-in arranging, so it keeps its place.
+- **Games join the list from the list**: "Games" in the list's header is one switch per game,
+  saved at once (`setGameOnToday`); on puts the card at the end of Today and the item on the
+  list, whose Open is the way in, and the round or tick counts the day. The HUD is keyed on the
+  mode, not the layout, so the dialog stays open while the page follows each toggle.
+
 ## Not built
 
 - A snooze, a user-written task, an app-suggestion layer (the list opens the one place each
-  item is done). A Settings section for the lab's layout (the arranging view is one tap from the
-  menu). A ⌘K or drawer entry for the arranging view (the nav registry lists page files only).
-  The fixed panels (the unit, the review, the problem, the digest) are not arrangeable.
+  item is done). A Settings section for the lab's layout (Arrange is on the page and one tap from
+  the menu). A ⌘K or drawer entry for the arranging (the nav registry lists page files only).
 
 ## Rules kept
 
