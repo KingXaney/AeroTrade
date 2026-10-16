@@ -29,10 +29,12 @@ function UserDropdown({user, friendRequests = 0, owner = false}: {user: User; fr
     return (
         <DropdownMenu>
             <DropdownMenuTrigger asChild>
+                {/* -mr-2: the hover pill's padding sits inside the bar's own, so the chevron (the
+                    avatar on a phone) is as far from the right edge as the logo is from the left. */}
                 <button
                     type="button"
                     aria-label={friendRequests > 0 ? `Account menu, ${friendRequests} pending friend ${friendRequests === 1 ? 'request' : 'requests'}` : 'Account menu'}
-                    className="group relative inline-flex items-center gap-3 rounded-full px-2 py-1.5 text-fg-soft hover:bg-surface-3/60 hover:text-fg transition-colors outline-none focus-visible:ring-2 focus-visible:ring-brand-strong"
+                    className="group relative -mr-2 inline-flex items-center gap-3 rounded-full px-2 py-1.5 text-fg-soft hover:bg-surface-3/60 hover:text-fg transition-colors outline-none focus-visible:ring-2 focus-visible:ring-brand-strong"
                 >
                     {friendRequests > 0 && (
                         <span aria-hidden="true" data-friend-requests={friendRequests}

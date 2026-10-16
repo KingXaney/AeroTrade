@@ -38,21 +38,41 @@ try {
     // Every style that draws the search as a box centres it in the bar, wide and narrow, whatever
     // the logo's and the account button's widths; on a phone, and in Minimal at every width, it is
     // an icon beside the account menu. The theme cookie is taken away again after.
+    // The account button's avatar sits on the bar's middle line (the bar's own box, above its
+    // border), and where the logo leads the bar (lg and up, the drawer button hidden) the button's
+    // visible edge (the chevron) is as far from the right as the logo's icon is from the left.
     const barPlaces = () => page.evaluate(() => {
-        const bar = document.querySelector('header.header').getBoundingClientRect();
+        const header = document.querySelector('header.header');
+        const bar = header.getBoundingClientRect();
+        const border = parseFloat(getComputedStyle(header).borderBottomWidth) || 0;
         const search = document.querySelector('header .search-text').getBoundingClientRect();
         const account = document.querySelector('header .header-bar > :last-child').getBoundingClientRect();
-        return {off: Math.round(search.left + search.width / 2 - (bar.left + bar.width / 2)), gap: Math.round(account.left - search.right)};
+        const avatar = document.querySelector('header [data-slot="avatar"]').getBoundingClientRect();
+        const chevron = document.querySelector('header [data-slot="avatar"]').closest('button').querySelector('svg').getBoundingClientRect();
+        const logo = document.querySelector('header a[href="/"] .material-symbols-outlined').getBoundingClientRect();
+        const drawer = document.querySelector('header button[aria-label="Open navigation"]');
+        const logoLeads = !drawer || drawer.getBoundingClientRect().width === 0;
+        return {
+            off: Math.round(search.left + search.width / 2 - (bar.left + bar.width / 2)),
+            gap: Math.round(account.left - search.right),
+            dy: +(avatar.top + avatar.height / 2 - (bar.top + (bar.height - border) / 2)).toFixed(1),
+            edges: logoLeads ? Math.round((bar.right - Math.max(avatar.right, chevron.right)) - (logo.left - bar.left)) : null,
+        };
     });
     const offCentre = [];
+    const offProfile = [];
+    const profileOf = (where, {dy, edges}) => {
+        if (Math.abs(dy) > 1 || (edges !== null && Math.abs(edges) > 1)) offProfile.push(`${where}: ${dy}px low, edges ${edges}px apart`);
+    };
     for (const style of ['futuristic', 'liquid-glass', 'brutalist', 'soft']) {
         await page.context().addCookies([{name: 'aero-theme', value: `v1:quiet-cyber:${style}:0`, domain: new URL(BASE).hostname, path: '/'}]);
         for (const width of [1440, 1024, 768]) {
             await page.setViewportSize({width, height: 900});
             await page.goto(`${BASE}/trade`, {waitUntil: 'load'});
             await page.locator('header .search-text').waitFor({timeout: 30000});
-            const {off} = await barPlaces();
-            if (Math.abs(off) > 1) offCentre.push(`${style} at ${width}px: ${off}px`);
+            const places = await barPlaces();
+            if (Math.abs(places.off) > 1) offCentre.push(`${style} at ${width}px: ${places.off}px`);
+            profileOf(`${style} at ${width}px`, places);
         }
     }
     check('the bar\'s search sits in its middle in every boxed style, wide and narrow', offCentre.length === 0, offCentre.join(', '));
@@ -60,12 +80,16 @@ try {
     await page.goto(`${BASE}/trade`, {waitUntil: 'load'});
     const phoneBar = await barPlaces();
     check('…and on a phone it is an icon beside the account menu', phoneBar.gap >= 0 && phoneBar.gap <= 16, JSON.stringify(phoneBar));
+    profileOf('soft on a phone', phoneBar);
     await page.context().clearCookies({name: 'aero-theme'});
     await page.setViewportSize({width: 1440, height: 900});
     await page.goto(`${BASE}/`, {waitUntil: 'load'});
     const minimalBar = await barPlaces();
     check('…while Minimal keeps it an icon beside the account menu at every width',
         await page.evaluate(() => document.documentElement.dataset.style) === 'minimal' && minimalBar.gap >= 0 && minimalBar.gap <= 16, JSON.stringify(minimalBar));
+    profileOf('minimal at 1440px', minimalBar);
+    check('the account button sits on the bar\'s middle line, its edge as far from the right as the logo from the left',
+        offProfile.length === 0, offProfile.join(', '));
     await page.locator('aside.rail a[data-rail="markets"]').hover();
     const tip = page.locator('[data-rail-tip="markets"]');
     await tip.waitFor({timeout: 5000}).catch(() => {});
