@@ -534,19 +534,51 @@ and friends keep none beyond Shared and the invariants).
   the session through `getSessionUser` and renders `components/learn/LearnRedirect` for anyone
   else, which keeps a `#term` on its way to `/glossary` and otherwise goes to `/games`; a unit page
   (`/learn/units/[unit]`) redirects them on the server. One view at a time in the URL (`?view=`):
-  Today and the Library.
-- Today is a list. `lib/lab/todo.buildTodayList` (pure) turns the day's parts into items with a
-  state read from rows — the unit (done when studied today), the review (the queue graded; `none`
-  with nothing due), the problem (closed), the puzzle (today's row solved), a game (a `GameRound`
-  of that game today), and the manual ones: the papers digest, poker night and the sites outside
-  the app, ticked by the owner's own press (`tickTodo`/`untickTodo`, a `LabEvent` of kind `todo`
-  keyed `${item}:${day}`). `components/lab/TodayList` draws it; the work panels below are where the
-  items are done. The game widgets on Today are `lib/lab/widgets.ts` (import-free ids, the stored
-  preference `learn.labWidgets`; absent = the daily puzzle alone, an empty list = none;
-  `normalizeLabWidgets` keeps the registry's order), picked in `components/lab/WidgetPicker`
-  (`setLabWidgets`) and drawn by `components/lab/LabWidgets` as the games hub's own cards — each a
-  Panel, so the section is a heading over a grid. Every sentence is `LAB_COPY.list` and
-  `LAB_WIDGET_TITLES`.
+  Today, the Papers and the Library; `?arrange=1` is Today's games being arranged (below).
+- Today opens on the check-in (`lib/lab/checkin`, pure; `components/lab/CheckIn`): the date
+  (`dayLabel`), a greeting by the Eastern hour (`periodOf` over `lib/dates.getEasternHour`),
+  today's focus — one line written to "What would you like to accomplish today?"
+  (`components/lab/DayFocus`, `saveDayFocus`) — with yesterday's note for today offered until it
+  is written (one press makes it the focus), and yesterday (`buildYesterday`: the unit studied,
+  the cards graded, the problem, the puzzle, the rounds and ticks that counted, and the widgets
+  left), drawn once the owner has a day behind them. The day's notes are one row per owner and
+  ET day (`database/models/lab-note.model.ts`: `focus`, `notes`, `next`;
+  `lib/lab/store.readLabNotes`, `writeLabNote` — a cleared field is unset), the owner's own text,
+  bounded (`FOCUS_MAX`, `NOTE_MAX`) and rendered as text. At the foot of Today,
+  `components/lab/Reflection` (`saveReflection`) shows the list's done and open items as two
+  lines (`lib/lab/todo.reflectionLines`) over notes on the day and tomorrow's focus, which the
+  next morning's check-in offers. A note counts nothing toward the streak.
+- Today is a list. `lib/lab/todo.buildTodayList` (pure) turns the day's parts into items, each in
+  a group — study (the unit, the review, the problem, the papers), play (the puzzle, the games,
+  poker night), elsewhere (the outside sites); `groupItems`, drawn as eyebrows only when more
+  than one group has items — with a state read from rows: `done` (the unit studied today, the
+  queue graded, the problem closed, the puzzle solved, a `GameRound` of that game today, a manual
+  tick), `started` (the quiz passed but the unit not yet marked, a review partly graded today, a
+  puzzle attempted), `overdue` (a review with cards past their day), `todo`, and `none` (nothing
+  to do today — no cards due, a revealed puzzle — counted neither way). The manual ones — the
+  papers digest, poker night and the sites outside the app — are ticked by the owner's own press
+  (`tickTodo`/`untickTodo`, a `LabEvent` of kind `todo` keyed `${item}:${day}`).
+  `components/lab/TodayList` draws it; the work panels below are where the items are done.
+- The game widgets on Today are `lib/lab/widgets.ts` (import-free ids, never renamed, each with
+  its `icon`) in the layout `lib/lab/layout.ts` (pure, client-safe: `{id, span}` rows on the
+  dashboard's twelve-column grid, a span one of `LAB_SPANS` — 4, 6, 8 or 12, S to XL on the
+  width picker — and `DEFAULT_LAB_SPAN` 6; the preference `learn.labLayout`, which
+  `readLabLayout` reads first, else the older `learn.labWidgets` list at the default width, else
+  the puzzle alone; a save writes the layout and unsets the list; `moveLabWidget`,
+  `addLabWidget`, `removeLabWidget`, `setLabSpan`, `labLayoutsEqual`, `labLayoutFingerprint` and
+  `missingLabWidgets`, each the same reference for a no-op). `components/lab/LabWidgets` draws
+  them on Today in that order and at those widths (`spanClass`), each a Panel with the widget's
+  title over `components/lab/LabWidgetBody` (the hub's `GameCardBody`, the puzzle card, an
+  outside site's line and link), so the section is a heading over a grid, with "Arrange" leading
+  to `/learn?arrange=1`, where `components/lab/LabArrange` (client) arranges them with the
+  dashboard's own pieces — `WidgetShell` over a structural `ShellDef`, `DragGhost`,
+  `WidgetPlaceholder`, `DashboardToolbar` and `WidgetLibrary`, which take their words as props:
+  Add a game, Reset (the puzzle alone), Cancel (back to Today), Save (`saveLabLayout`: the strict
+  zod schema, then the lenient reader; no revalidation — the view goes to `/learn` itself, as the
+  dashboard grid does). The account menu (`components/shell/UserDropdown`, `owner` handed down
+  from the `(root)` layout) carries "Lab layout" for the owner — not an `ACCOUNT_PAGES` entry,
+  since the registry holds page files only. Every sentence is `LAB_COPY` (`checkIn`,
+  `reflection`, `list`, `layout`), `LAB_WIDGET_TITLES` and `LAB_WIDGET_BLURBS`.
 - Every written unit carries a quiz (`LabUnit.quiz`: 3–5 questions, four options, one answer, a
   `why`; the curriculum test holds the shape and varies the answer positions). `lib/lab/quiz` is
   pure: `quizPublic` strips the answers before the page sees a question, `scoreQuiz` passes at

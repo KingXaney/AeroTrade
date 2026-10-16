@@ -12,8 +12,21 @@ import SectionHeading from "@/components/primitives/SectionHeading";
 import {iconButton} from "@/components/primitives/iconButton";
 import SpanPicker from "@/components/dashboard/SpanPicker";
 
+// What the shell needs of a widget: the dashboard catalog's definition, or the lab's
+// (components/lab/LabArrange), which has no catalog of its own — the same handles, keys, width
+// picker and arrows either way.
+export type ShellDef = {
+    id: string;
+    title: string;
+    icon: string;
+    spans: readonly WidgetSpan[];
+    chrome: WidgetDefinition['chrome'];
+    href?: string;
+    showTitle: boolean;
+};
+
 type Props = {
-    def: WidgetDefinition;
+    def: ShellDef;
     span: WidgetSpan;
     editing: boolean;
     index: number;

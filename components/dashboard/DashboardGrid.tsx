@@ -18,9 +18,9 @@ import {
     type DragStartEvent,
 } from "@dnd-kit/core";
 import {SortableContext, type SortingStrategy} from "@dnd-kit/sortable";
-import {WIDGETS, type WidgetId} from "@/lib/dashboard/catalog";
+import {CATEGORY_LABELS, CATEGORY_ORDER, WIDGETS, isWidgetId, type WidgetDefinition, type WidgetId} from "@/lib/dashboard/catalog";
 import {
-    addWidget, layoutsEqual, missingWidgetIds, moveWidget, removeWidget, resetLayout, setSpan, type DashboardLayout,
+    MAX_WIDGETS, addWidget, layoutsEqual, missingWidgetIds, moveWidget, removeWidget, resetLayout, setSpan, type DashboardLayout,
 } from "@/lib/dashboard/layout";
 import {saveDashboardLayout} from "@/lib/actions/dashboard.actions";
 import PageTitle from "@/components/primitives/PageTitle";
@@ -28,7 +28,7 @@ import {spanClass} from "@/components/dashboard/spanClass";
 import WidgetShell from "@/components/dashboard/WidgetShell";
 import WidgetPlaceholder from "@/components/dashboard/WidgetPlaceholder";
 import DashboardToolbar from "@/components/dashboard/DashboardToolbar";
-import WidgetLibrary from "@/components/dashboard/WidgetLibrary";
+import WidgetLibrary, {type LibraryCopy, type LibraryGroup} from "@/components/dashboard/WidgetLibrary";
 import DragGhost from "@/components/dashboard/DragGhost";
 import Panel from "@/components/primitives/Panel";
 
@@ -52,6 +52,21 @@ const collisionDetection: CollisionDetection = (args) => {
 // Transforms are never applied (the DOM only moves on drop); hoisted so the
 // SortableContext value stays referentially stable across renders.
 const NO_TRANSFORM: SortingStrategy = () => null;
+
+// The library's words and badges, as they read before it took them as props.
+const LIBRARY_COPY: LibraryCopy = {
+    title: 'Add widgets',
+    lead: 'Added widgets load once you save the layout.',
+    fullLead: `Your dashboard holds ${MAX_WIDGETS} widgets — remove one to add another.`,
+    none: 'Every widget is already on your dashboard.',
+    add: 'Add',
+};
+const badgesOf = (def: WidgetDefinition): string[] => [
+    def.isNew ? 'New' : null,
+    def.isClient ? 'Live embed' : null,
+    def.heavy ? 'Extra API calls' : null,
+    def.availability === 'advanced' ? 'Advanced' : null,
+].filter((badge): badge is string => badge !== null);
 
 const announcements: Announcements = {
     onDragStart: ({active}) => `Picked up ${titleOf(active.id)}. Drop it on another widget to move it there.`,
@@ -114,6 +129,18 @@ const DashboardGrid = ({initialLayout, bodies, availableIds, headerActions, star
         setEditing(false);
         if (startInEditMode) router.replace('/dashboard');
     }, [saved, startInEditMode, router]);
+
+    // The widgets not yet on the dashboard, by category, for the library.
+    const libraryGroups = useMemo<LibraryGroup[]>(() => {
+        const missing = missingWidgetIds(layout).filter((id) => availability.has(id));
+        return CATEGORY_ORDER.map((category) => ({
+            label: CATEGORY_LABELS[category],
+            rows: missing.filter((id) => WIDGETS[id].category === category).map((id) => {
+                const def = WIDGETS[id];
+                return {id, title: def.title, description: def.description, icon: def.icon, badges: badgesOf(def)};
+            }),
+        }));
+    }, [layout, availability]);
 
     const activeDef = activeId ? WIDGETS[activeId] : null;
     const activeSpan = activeId ? layout.widgets.find((w) => w.id === activeId)?.span : undefined;
@@ -181,9 +208,10 @@ const DashboardGrid = ({initialLayout, bodies, availableIds, headerActions, star
             )}
 
             <WidgetLibrary open={libraryOpen} onOpenChange={setLibraryOpen}
-                           ids={missingWidgetIds(layout).filter((id) => availability.has(id))}
-                           count={layout.widgets.length}
-                           onAdd={(id) => setLayout((l) => addWidget(l, id))} />
+                           groups={libraryGroups}
+                           full={layout.widgets.length >= MAX_WIDGETS}
+                           copy={LIBRARY_COPY}
+                           onAdd={(id) => { if (isWidgetId(id)) setLayout((l) => addWidget(l, id)); }} />
         </div>
     );
 };

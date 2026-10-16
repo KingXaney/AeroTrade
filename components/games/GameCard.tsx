@@ -7,10 +7,13 @@ import {actionButton} from "@/components/primitives/ActionButton";
 
 type Stat = {label: string; value: string; hint?: string};
 
-// One game on the hub: what it is, the reader's records in it, an aside the game may add, and the way in.
-const GameCard = ({id, title, body, stats, href, cta, aside}: {id: string; title: string; body: string; stats: Stat[]; href: string; cta: string; aside?: ReactNode}) => (
-    <Panel id={`game-${id}`} aria-labelledby={`game-${id}-heading`} className="flex flex-col" data-game-card={id}>
-        <SectionHeading id={`game-${id}-heading`}>{title}</SectionHeading>
+type Body = {body: string; stats: Stat[]; href: string; cta: string; aside?: ReactNode};
+
+// What a game's card says under its title: what it is, the reader's records in it, an aside the
+// game may add, and the way in. Frameless, so Lab › Today draws it inside its own card
+// (components/lab/LabWidgetBody) and the hub inside GameCard below.
+export const GameCardBody = ({body, stats, href, cta, aside}: Body) => (
+    <>
         <p className="text-sm leading-relaxed text-fg-soft">{body}</p>
         {stats.length > 0 && (
             <div className="mt-4 flex flex-wrap gap-x-8 gap-y-3">
@@ -21,6 +24,14 @@ const GameCard = ({id, title, body, stats, href, cta, aside}: {id: string; title
         <div className="mt-auto pt-5">
             <Link href={href} className={actionButton({variant: 'secondary', size: 'md'})}>{cta}</Link>
         </div>
+    </>
+);
+
+// One game on the hub: the card body in a Panel under the game's title.
+const GameCard = ({id, title, ...body}: Body & {id: string; title: string}) => (
+    <Panel id={`game-${id}`} aria-labelledby={`game-${id}-heading`} className="flex flex-col" data-game-card={id}>
+        <SectionHeading id={`game-${id}-heading`}>{title}</SectionHeading>
+        <GameCardBody {...body}/>
     </Panel>
 );
 

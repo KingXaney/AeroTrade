@@ -37,7 +37,7 @@ reads and writes live. Change a field here, then in the store module named besid
 | `topic-article` | topics | `lib/topics/store`, `refresh` |
 | `watchlist` | stocks | `lib/stocks/watchlist-store`; `lib/actions/watchlist.actions` adds and removes |
 | `friendship` | friends | `lib/friends/store`; `lib/actions/friends.actions` writes |
-| `user-preferences` | settings | `lib/settings/preferences-store`, plus each feature's own sub-document: `lib/dashboard/layout-store` (layout), `lib/theme/store` (appearance), `lib/news/feed-store` (feed, the `newsSeenAt` stamp), `lib/strategies/follows`, `lib/learn` stores and `lib/lab/store` (`learn`: the lesson stamps, the game widgets on Lab › Today `labWidgets`), `lib/poker-night/prefs-store` (`pokerNight`: the name and look an account sits down with) |
+| `user-preferences` | settings | `lib/settings/preferences-store`, plus each feature's own sub-document: `lib/dashboard/layout-store` (layout), `lib/theme/store` (appearance), `lib/news/feed-store` (feed, the `newsSeenAt` stamp), `lib/strategies/follows`, `lib/learn` stores and `lib/lab/store` (`learn`: the lesson stamps, the game widgets on Lab › Today in their layout `labLayout` — and the older `labWidgets` list, read until a layout is saved), `lib/poker-night/prefs-store` (`pokerNight`: the name and look an account sits down with) |
 | `digest-send` | email | `lib/email/digest-store` — the daily brief's one-per-reader-per-day claim |
 | `job-run` | jobs | `lib/jobs/job-runs` (each run's stamp), `lib/jobs/health` (the status strip) |
 | `limit-event` | jobs | `lib/limits/record` (one row per refusal a provider answered a job or a request with), `lib/limits/store` (the panel's week); expires after `LIMIT_RETENTION_DAYS` |
@@ -51,6 +51,7 @@ reads and writes live. Change a field here, then in the store module named besid
 | `lab-event` | lab | `lib/lab/store` — a unit marked studied, a problem closed (answered or revealed), a session day, a quiz passed (the unit id, the score), a manual tick of Today's list (`${item}:${day}`); unique per owner, kind and key, so a second click is a no-op; the streak is derived from the session and tick days with the puzzle's and the games' (`lib/learn/activity-store`), never stored |
 | `lab-card-state` | lab | `lib/lab/store` — one row per review card the owner has graded (SM-2 state); absent means new; a grade updates only the state the client saw |
 | `lab-day` | lab | `lib/lab/papers/store` — one day of the papers feed (the weekday job's write, the lab page's read): the papers kept per track by arXiv id, never a URL, and the one digest citing them by index; expires after 45 days |
+| `lab-note` | lab | `lib/lab/store` — the owner's note for one ET day: the morning's focus, the evening's notes and tomorrow's focus (`readLabNotes` for today and yesterday, `writeLabNote` field by field, a cleared field unset); unique per owner and day; the owner's own words, bounded, rendered as text; no TTL |
 
 The culture models are not in that migration list (it covers only the account models); their
 indexes are built by Mongoose's autoIndex, as the brain's and the topics' are.
