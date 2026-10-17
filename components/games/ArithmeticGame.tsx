@@ -136,6 +136,13 @@ const ArithmeticGame = ({mode, summary, focus = []}: Props) => {
         else dispatch({type: 'start-sprint', seed: freshSeed(), settings, at});
     };
 
+    // A fresh round on the same settings without ending this one, which is dropped unsaved (the
+    // reducer's restart). The answer box takes the focus back, so Tab then Enter restarts again.
+    const restart = () => {
+        dispatch({type: 'restart', seed: freshSeed(), at: Date.now()});
+        if (!interview) input.current?.focus();
+    };
+
     // The clock, five ticks a second while a round runs; the reducer ends the round at zero.
     useEffect(() => {
         if (!playing) return;
@@ -222,8 +229,13 @@ const ArithmeticGame = ({mode, summary, focus = []}: Props) => {
                         />
                     </div>
                 )}
-                <div className="text-center">
-                    <ActionButton variant="secondary" onClick={() => dispatch({type: 'stop', at: Date.now()})} data-round-stop>{ARITHMETIC_COPY.stop}</ActionButton>
+                {/* Restart first: the next stop after the answer box, so Tab then Enter reaches it. */}
+                <div className="space-y-2">
+                    <div className="flex flex-wrap items-center justify-center gap-3">
+                        <ActionButton variant="secondary" onClick={restart} title={ARITHMETIC_COPY.restartTitle} data-round-restart>{ARITHMETIC_COPY.restart}</ActionButton>
+                        <ActionButton variant="secondary" onClick={() => dispatch({type: 'stop', at: Date.now()})} data-round-stop>{ARITHMETIC_COPY.stop}</ActionButton>
+                    </div>
+                    {round.kind === 'sprint' && <p className="text-center font-mono text-[11px] text-fg-muted" data-restart-keys>{ARITHMETIC_COPY.restartKeys}</p>}
                 </div>
             </div>
         );

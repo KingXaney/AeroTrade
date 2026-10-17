@@ -146,6 +146,10 @@ export const ARITHMETIC_COPY = {
     changeSettings: 'Change settings',
     settingsKept: 'Your settings are kept in this browser.',
     stop: 'End the round',
+    // Restart drops the round in play, unsaved, for a new one on the same settings.
+    restart: 'Restart',
+    restartTitle: 'Drop this round without saving it and start a new one on the same settings',
+    restartKeys: 'From the answer box: Tab, then Enter, restarts',
     answerLabel: 'Answer',
     timeLeft: (seconds: number): string => `${clock(seconds)} left`,
     questionOf: (n: number, total: number): string => `Question ${n} of ${total}`,
