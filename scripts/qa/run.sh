@@ -22,6 +22,7 @@ APP_PORT=3000
 MONGO_PORT=27117
 INNGEST_PORT=8288
 TIINGO_PORT=8787
+ALPACA_PORT=8788
 APP_URL=http://localhost:$APP_PORT
 
 # Every suite, in the order a full run takes. The order is load-bearing: qa-auth removes the
@@ -29,7 +30,7 @@ APP_URL=http://localhost:$APP_PORT
 # no terrain before any SPY history exists, so it runs before qa-landing seeds one (and the app
 # caches the Tiingo stand-in's answer for an hour); qa-learn wipes and reseeds strategyruns, so it
 # runs after qa-strategies. A suite missing here runs last.
-ALL=(auth styles shell home landing chat topics-refresh trading topics news-feed strategies income learn lab learn-account games poker poker-night poker-night-modes chat-tutor email culture)
+ALL=(auth styles shell home landing chat topics-refresh trading topics news-feed strategies income learn lab learn-account games poker poker-night poker-night-modes chat-tutor email culture broker)
 
 KEEP_UP=0
 NAMES=()
@@ -75,7 +76,7 @@ port_busy() {
     else (exec 3<>"/dev/tcp/127.0.0.1/$1") 2>/dev/null
     fi
 }
-for port in $APP_PORT $MONGO_PORT $INNGEST_PORT $TIINGO_PORT; do
+for port in $APP_PORT $MONGO_PORT $INNGEST_PORT $TIINGO_PORT $ALPACA_PORT; do
     if port_busy "$port"; then
         echo "port $port is already in use — stop whatever listens there first (lsof -nP -iTCP:$port -sTCP:LISTEN)"
         exit 2
@@ -105,7 +106,7 @@ tree() {
 on_windows() { case "$(uname -s)" in MINGW*|MSYS*|CYGWIN*) return 0 ;; *) return 1 ;; esac; }
 stop_windows_listeners() {
     local port pid
-    for port in $APP_PORT $MONGO_PORT $INNGEST_PORT $TIINGO_PORT; do
+    for port in $APP_PORT $MONGO_PORT $INNGEST_PORT $TIINGO_PORT $ALPACA_PORT; do
         for pid in $(netstat -ano -p TCP 2>/dev/null | awk -v p=":$port" '$2 ~ p"$" && $4 == "LISTENING" {print $5}' | sort -u); do
             taskkill //F //T //PID "$pid" >/dev/null 2>&1
         done
@@ -148,6 +149,13 @@ PIDS+=($!)
 for _ in $(seq 1 30); do grep -q 'READY\|FAILED' "$LOGS/_tiingo.log" 2>/dev/null && break; sleep 1; done
 grep -q READY "$LOGS/_tiingo.log" || harness_failed "the Tiingo stand-in did not start" "$LOGS/_tiingo.log"
 
+# 1c. A stand-in for Alpaca's trading API (start-alpaca-stub.mjs): the app gets its keys and this
+# address (paper mode only), so the broker link runs end to end; qa-broker opens its market.
+(cd "$QA_DIR" && exec node start-alpaca-stub.mjs) >"$LOGS/_alpaca.log" 2>&1 &
+PIDS+=($!)
+for _ in $(seq 1 30); do grep -q 'READY\|FAILED' "$LOGS/_alpaca.log" 2>/dev/null && break; sleep 1; done
+grep -q READY "$LOGS/_alpaca.log" || harness_failed "the Alpaca stand-in did not start" "$LOGS/_alpaca.log"
+
 # 2. The app. A .next left by `next build` breaks Turbopack's next/font in dev, so start clean.
 # The empty keys keep a local .env's Finnhub, mail and Ably settings out: no quotes, no mail sent,
 # and every poker night table polls. NEXT_PUBLIC_PN_RT_FAKE=1 opens poker night's realtime seam
@@ -163,6 +171,8 @@ rm -rf "$ROOT/.next"
     SIGN_UP_CLIENT_LIMIT=1000 \
     LAB_OWNER_EMAILS=qa-lab-owner@example.com \
     TIINGO_TOKEN=qa-tiingo-token TIINGO_API_URL="http://localhost:$TIINGO_PORT" \
+    ALPACA_API_KEY_ID=qa-alpaca-key ALPACA_API_SECRET_KEY=qa-alpaca-secret ALPACA_BASE_URL="http://localhost:$ALPACA_PORT" \
+    ALPACA_MODE= ALPACA_LIVE_ENABLED= BROKER_OWNER_EMAILS= \
     INNGEST_DEV=1 \
     FINNHUB_API_KEY= NEXT_PUBLIC_FINNHUB_API_KEY= NODEMAILER_EMAIL= NODEMAILER_PASSWORD= \
     ABLY_API_KEY= POKER_NIGHT_REALTIME= NEXT_PUBLIC_PN_RT_FAKE=1 \

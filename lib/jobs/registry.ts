@@ -168,6 +168,15 @@ export const JOBS = {
         trigger: 'culture-follow',
         health: {label: 'Culture enrolment (manual/enroll)', schedule: 'on demand', staleAfterHours: ON_DEMAND},
     },
+    // The Alpaca mirror (lib/broker): after the Navigator (Mondays 10:00) and the culture pickers
+    // (Mondays 10:45), every weekday so a mid-week trade in the source reaches it the same day.
+    brokerSync: {
+        id: 'broker-sync',
+        event: 'app/sync.broker.mirror',
+        crons: ['TZ=America/New_York 15 11 * * 1-5'],
+        trigger: 'broker',
+        health: {label: 'Broker mirror (Alpaca)', schedule: 'weekdays 11:15 ET', staleAfterHours: 80},
+    },
 } as const satisfies Record<string, JobDefinition>;
 
 // In declaration order — the status strip's row order.

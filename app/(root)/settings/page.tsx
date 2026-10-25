@@ -18,9 +18,16 @@ import {getVisibleLayout} from "@/lib/dashboard/availability";
 import Panel from "@/components/primitives/Panel";
 import {cn} from "@/lib/utils";
 import type {User} from "@/lib/auth/types";
+import {isBrokerOwner} from "@/lib/broker/config";
+import {getBrokerView} from "@/lib/broker/page-store";
+import BrokerSettings from "@/components/settings/BrokerSettings";
 
 // The browser tab's title; app/layout.tsx appends the app's name.
 export const metadata: Metadata = {title: "Settings"};
+
+// Broker's Sync now runs one Alpaca sync inside its server action (a clock, an account, the
+// positions, an asset a symbol and up to twenty orders): the default budget could cut it off.
+export const maxDuration = 60;
 
 const SECTIONS = [
     {id: 'topics', label: 'Topics', icon: 'interests'},
@@ -29,11 +36,14 @@ const SECTIONS = [
     {id: 'dashboard', label: 'Dashboard', icon: 'space_dashboard'},
     {id: 'notifications', label: 'Notifications', icon: 'notifications'},
     {id: 'account', label: 'Account', icon: 'person'},
+    // The owner's Alpaca link (lib/broker): shown only to the broker owner.
+    {id: 'broker', label: 'Broker', icon: 'account_balance'},
 ] as const;
 
 type SectionId = (typeof SECTIONS)[number]['id'];
+const OWNER_SECTIONS: readonly SectionId[] = ['broker'];
+const sectionsFor = (user: User) => SECTIONS.filter((s) => !OWNER_SECTIONS.includes(s.id) || isBrokerOwner(user.email));
 const SECTION_IDS: readonly string[] = SECTIONS.map((s) => s.id);
-const isSection = (value: unknown): value is SectionId => typeof value === 'string' && SECTION_IDS.includes(value);
 const hrefOf = (id: SectionId) => (id === SECTIONS[0].id ? '/settings' : `/settings?tab=${id}`);
 
 type SettingsPageProps = {searchParams: Promise<{tab?: string}>};
@@ -58,6 +68,8 @@ const Section = async ({id, user}: {id: SectionId; user: User}) => {
             return <NotificationSettings initial={await getNotificationPreferences(user.id)} />;
         case 'account':
             return <AccountSection user={user} />;
+        case 'broker':
+            return <BrokerSettings view={await getBrokerView(user.id)} />;
     }
 };
 
@@ -66,8 +78,10 @@ const SettingsPage = async ({searchParams}: SettingsPageProps) => {
     if (!user) redirect('/sign-in');
 
     const {tab} = await searchParams;
-    const active: SectionId = isSection(tab) ? tab : SECTIONS[0].id;
-    const section = SECTIONS.find((s) => s.id === active) ?? SECTIONS[0];
+    // An owner-only section is no section at all for anyone else.
+    const visible = sectionsFor(user);
+    const section = visible.find((s) => s.id === tab) ?? visible[0];
+    const active: SectionId = section.id;
 
     return (
         <div className="space-y-4">
@@ -79,7 +93,7 @@ const SettingsPage = async ({searchParams}: SettingsPageProps) => {
                     lost to it and its `top` pushed the nav 96px down the page instead. */}
                 <div className="lg:col-span-3 lg:sticky lg:top-24">
                 <Panel as="nav" pad={2} aria-label="Settings sections">
-                    {SECTIONS.map((s) => (
+                    {visible.map((s) => (
                         <Link key={s.id} href={hrefOf(s.id)} replace scroll={false}
                               aria-current={s.id === active ? 'page' : undefined}
                               data-settings-tab={s.id}

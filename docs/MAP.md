@@ -61,6 +61,7 @@ Shared pieces that belong to no single feature:
 | **stocks** | `/stocks/[symbol]`, `/watchlist` | `stocks/` | `lib/stocks/` — `watchlist-store`, `watchlist`, `watchlist-page-store`, `key-numbers`, `rules-see`, `tradingview`, `popular` | `stocks.actions`, `watchlist.actions` | — | `copy/key-numbers`, `rules-see`, `watchlist` | `qa-strategies`, `qa-styles` |
 | **friends** | `/friends`, `/friends/[id]` | `friends/` | `lib/friends/` — `store` | `friends.actions` | — | — | `qa-shell` |
 | **settings** | `/settings` | `settings/`, `theme/` | `lib/settings/preferences-store`, `lib/theme/` — `palettes`, `styles`, `presets`, `resolve`, `store` | `preferences.actions`, `appearance.actions` | — | — | `qa-topics`, `qa-chat` |
+| **broker** | `/settings?tab=broker` (the owner only) | `settings/BrokerSettings`, `broker/BrokerControls` | `lib/broker/` — `config` (the environment, the live lock, the owner), `alpaca` (the client), `plan` (the mirror, pure), `sync`, `store`, `view`, `page-store`; model `broker-link` | `broker.actions` | `broker` (`broker-sync`, weekdays 11:15 ET) | `copy/broker` | `qa-broker` |
 | **shell** | `app/(root)/layout.tsx` | `shell/` | `lib/shell/` — `navigation` (every nav link), `sidebar` (the rail's two cards), `shell-store`, `news-seen` (the News dot clears in place) | — | — | `copy/shell` | `qa-shell`, `qa-styles`, `qa-topics` (the News card and its dot) |
 
 ## To change…, edit…
@@ -119,6 +120,7 @@ Shared pieces that belong to no single feature:
 | How interest and dividends are credited | `lib/income/accrual.ts` (the only accrual clock — AGENTS.md invariant 11), `lib/income/store.ts` (the nightly job) |
 | Add a brand to the culture catalog, or change its owner | `lib/culture/catalog.ts` — an id is never renamed; `owner: null` for a private brand; `owner.since` dates a change of hands; `lib/culture/__tests__/catalog.test.ts` holds the rules |
 | The culture brain's caps, half-lives, fold weights or model budget | `lib/culture/config.ts` |
+| How the Alpaca mirror sizes its orders, or when it is allowed to trade live | `lib/broker/plan.ts` (the mirror), `lib/broker/config.ts` (`MIRROR_*`, the environment and the live lock) |
 | Who may trade in a reader's account besides them (the AI Navigator, a culture picker) | `lib/trading/traded-by.ts` names them for `/portfolio`; `lib/trading/lifecycle.ts` refuses the delete while they do; an enrolment with a culture picker is `lib/culture/follow.ts` + `follow-store.ts` and its actions `lib/actions/culture.actions.ts`; the Navigator's is `lib/navigator/store.ts` |
 | A culture picker's weights, or the pickers' rails | `lib/culture/config.ts` (`CULTURE_PROFILES`, `CULTURE_RAILS`); a new picker is a new profile id, never a reweighted old one — its account and decisions carry the id. The reason grammar `lib/learn/culture-reasons.ts` prints the figures. A change of meaning bumps `CULTURE_ENGINE_VERSION`, which rebuilds the stored backtest on the next weekly run |
 | A culture source (what a subreddit, a chart or a query reads) | `lib/culture/sources/` |

@@ -34,6 +34,7 @@ describe('job registry', () => {
             ['culture-wikipedia-backfill', 'app/backfill.culture.wikipedia'],
             ['lab-daily-papers', 'app/refresh.lab.papers', 'TZ=America/New_York 20 6 * * 1-5'],
             ['culture-follow-bootstrap', 'app/bootstrap.culture.follow'],
+            ['broker-sync', 'app/sync.broker.mirror', 'TZ=America/New_York 15 11 * * 1-5'],
         ]);
     });
 
