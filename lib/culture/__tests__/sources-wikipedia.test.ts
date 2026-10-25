@@ -87,3 +87,83 @@ describe('fetchWikipediaViews', () => {
         expect(calls[0]).toContain('/daily/20150701/20260901');
     });
 });
+
+describe('fetchWikipediaViews under the rate limit', () => {
+    const okFor = (article: string) => respond(200, payload(article, [['2026-09-01', 5]]));
+    const refused = (retryAfter?: string): Response =>
+        new Response('Too many requests', {status: 429, headers: retryAfter ? {'Retry-After': retryAfter} : {}});
+
+    it('waits what a refusal asks, once, then asks again', async () => {
+        const waits: number[] = [];
+        let first = true;
+        const fetchImpl = (async (url: string | URL | Request) => {
+            if (String(url).includes('/Busy/') && first) {
+                first = false;
+                return refused('2');
+            }
+            return okFor('Busy');
+        }) as unknown as typeof fetch;
+        const result = await fetchWikipediaViews([brand('busy', ['Busy'])], {from: '2026-09-01', to: '2026-09-01'},
+            {fetchImpl, gapMs: 0, sleepImpl: async (ms) => { waits.push(ms); }});
+        expect(waits).toEqual([2000]);
+        expect(result.rows).toEqual([{brand: 'busy', source: 'wikipedia', date: '2026-09-01', value: 5}]);
+        expect(result.failed).toEqual([]);
+    });
+
+    it('waits five seconds when a refusal names no wait, and never longer than the cap', async () => {
+        const waits: number[] = [];
+        const answers = [refused(), okFor('A'), refused('120'), okFor('B')];
+        const fetchImpl = (async () => answers.shift()!) as unknown as typeof fetch;
+        await fetchWikipediaViews([brand('a', ['A']), brand('b', ['B'])], {from: '2026-09-01', to: '2026-09-01'},
+            {fetchImpl, gapMs: 0, sleepImpl: async (ms) => { waits.push(ms); }});
+        expect(waits).toEqual([5000, 10_000]);
+    });
+
+    it('marks a title refused twice as failed', async () => {
+        const fetchImpl = (async (url: string | URL | Request) => (String(url).includes('/Busy/') ? refused('1') : okFor('Ok'))) as unknown as typeof fetch;
+        const result = await fetchWikipediaViews([brand('busy', ['Busy']), brand('fine', ['Ok'])], {from: '2026-09-01', to: '2026-09-01'},
+            {fetchImpl, gapMs: 0, sleepImpl: async () => {}});
+        expect(result.failed).toEqual(['Busy']);
+        expect(result.rows.map((r) => r.brand)).toEqual(['fine']);
+    });
+
+    it('stops asking after three refusals in a row; the rest are left for the next run', async () => {
+        const calls: string[] = [];
+        const fetchImpl = (async (url: string | URL | Request) => {
+            calls.push(String(url));
+            return refused('1');
+        }) as unknown as typeof fetch;
+        const result = await fetchWikipediaViews(['a', 'b', 'c', 'd', 'e'].map((id) => brand(id, [id.toUpperCase()])), {from: '2026-09-01', to: '2026-09-01'},
+            {fetchImpl, gapMs: 0, sleepImpl: async () => {}});
+        // Each of the first three asked twice (the retry), the last two never.
+        expect(calls).toHaveLength(6);
+        expect(result.failed).toEqual(['A', 'B', 'C', 'D', 'E']);
+        expect(result.rows).toEqual([]);
+    });
+
+    it('asks nothing more once its time is spent', async () => {
+        let now = 0;
+        const calls: string[] = [];
+        const fetchImpl = (async (url: string | URL | Request) => {
+            calls.push(String(url));
+            now += 20_000;
+            return okFor('X');
+        }) as unknown as typeof fetch;
+        const result = await fetchWikipediaViews(['a', 'b', 'c', 'd'].map((id) => brand(id, [id.toUpperCase()])), {from: '2026-09-01', to: '2026-09-01'},
+            {fetchImpl, gapMs: 0, sleepImpl: async () => {}, nowImpl: () => now, budgetMs: 45_000});
+        // 0, 20 and 40 seconds in it asks; at 60 the budget is spent.
+        expect(calls).toHaveLength(3);
+        expect(result.rows.map((r) => r.brand)).toEqual(['a', 'b', 'c']);
+        expect(result.failed).toEqual(['D']);
+    });
+
+    it('names the site in the User-Agent, as Wikimedia asks of a bot', async () => {
+        let agent = '';
+        const fetchImpl = (async (_url: string | URL | Request, init?: RequestInit) => {
+            agent = String((init?.headers as Record<string, string>)['User-Agent']);
+            return okFor('Ok');
+        }) as unknown as typeof fetch;
+        await fetchWikipediaViews([brand('ok', ['Ok'])], {from: '2026-09-01', to: '2026-09-01'}, {fetchImpl, gapMs: 0});
+        expect(agent).toMatch(/^AeroTrade\/1\.0 \(https:\/\/aerotrading\.vercel\.app; culture brain; contact .+\)$/);
+    });
+});

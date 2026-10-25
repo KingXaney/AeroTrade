@@ -6,7 +6,7 @@
 // mechanism-only rule (nothing says a picker works, fails or beats anything). Pure: formatted
 // values in, sentences out; the grammar interpolates lib/culture/config.ts.
 
-import type {CultureTerm, ProfileId} from '@/lib/culture/config';
+import {MIN_PRICE_BARS, type CultureTerm, type ProfileId} from '@/lib/culture/config';
 import type {CultureSource} from '@/lib/culture/types';
 
 // What each term is called where a reader meets it.
@@ -164,6 +164,17 @@ export const CULTURE_PICKS_COPY = {
     decisionsHeading: 'Latest decision',
     decisionsEmpty: "No decision yet. The picker decides on Mondays at 10:45 ET, once the week's quotes are checked.",
     decisionLine: (date: string, quoted: number, tickers: number): string => `${date} · ${quoted} of ${tickers} owners quoted`,
+    // The week's eligibility (lib/culture/scoring.eligibilityOf): beside the line above, and
+    // when nothing could be bought, what kept the owners out — once, never per row.
+    eligibleLine: (eligible: number): string => `${eligible} eligible to buy`,
+    noneEligible: (e: {total: number; eligible?: number; noAttention: number; fewBars: number; unquoted: number}): string => {
+        const parts = [
+            ...(e.noAttention > 0 ? [`${e.noAttention} of ${e.total} had no Wikipedia baseline yet (six months of stored views)`] : []),
+            ...(e.fewBars > 0 ? [`${e.fewBars} had under ${MIN_PRICE_BARS} days of prices`] : []),
+            ...(e.unquoted > 0 ? [`${e.unquoted} of ${e.total} had no quote`] : []),
+        ];
+        return `No owner could be bought this week: ${parts.join(', ')}.`;
+    },
     feedsLine: (feeds: readonly string[]): string => `feeds: ${feeds.join(', ')}`,
     previewBadge: 'Preview — nothing traded',
     skippedBadge: 'Skipped — nothing decided',

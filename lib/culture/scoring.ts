@@ -44,6 +44,24 @@ export type CultureScoringInput = {
 
 const DECIMALS = 1;
 
+// Whether a symbol may be bought: enough bars for its momentum, a quote this week, and at least
+// one brand whose attention is measured (a Wikipedia surprise, which needs the six-month
+// baseline). The scorer's one rule, and the week's audit below.
+export const isEligibleInput = (input: CultureScoringInput): boolean =>
+    input.barsCount >= MIN_PRICE_BARS && input.quoted && input.brandsCovered >= 1;
+
+// The week's eligibility, stored on each decision: how many could be bought, and what kept the
+// rest out (an owner may lack several).
+export type CultureEligibility = {total: number; eligible: number; noAttention: number; fewBars: number; unquoted: number};
+
+export const eligibilityOf = (inputs: readonly CultureScoringInput[]): CultureEligibility => ({
+    total: inputs.length,
+    eligible: inputs.filter(isEligibleInput).length,
+    noAttention: inputs.filter((input) => input.brandsCovered < 1).length,
+    fewBars: inputs.filter((input) => input.barsCount < MIN_PRICE_BARS).length,
+    unquoted: inputs.filter((input) => !input.quoted).length,
+});
+
 // The profile's weights over the feeds a run has, divided by their sum: a term whose feed is
 // absent is zeroed, and the rest keep their proportions, so a backtest on attention and price
 // and a live run with everything score on one scale.
@@ -182,7 +200,7 @@ export const scoreCultureUniverse = (
             reasons.push('high volatility haircut');
         }
 
-        const eligible = input.barsCount >= MIN_PRICE_BARS && input.quoted && input.brandsCovered >= 1;
+        const eligible = isEligibleInput(input);
         if (!eligible) {
             reasons.push(`ineligible (${input.barsCount} bars, ${input.quoted ? 'quoted' : 'no quote'}, ${input.brandsCovered >= 1 ? 'attention covered' : 'no attention series'})`);
         }

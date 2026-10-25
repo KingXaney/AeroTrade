@@ -113,6 +113,7 @@ describe('the /culture page copy', () => {
         const picksSamples = {
             profileLead: ['Spike', PROFILE_COPY.spike], accountLine: ['Culture Brain · Spike', '2026-10-05'], sinceLaunch: ['2026-10-05'],
             decisionLine: ['2026-10-05', 118, 131], feedsLine: [['price', 'wikipedia']],
+            eligibleLine: [12], noneEligible: [{total: 130, eligible: 0, noAttention: 128, fewBars: 3, unquoted: 1}],
             simulatedLine: ['2021-10-04', '2026-10-01', 260], simulatedFills: [12],
         };
         const recordSamples = {
@@ -148,6 +149,12 @@ describe('the /culture page copy', () => {
 
     it('composes the lines the page prints', () => {
         expect(CULTURE_PICKS_COPY.decisionLine('2026-10-05', 118, 131)).toBe('2026-10-05 · 118 of 131 owners quoted');
+        expect(CULTURE_PICKS_COPY.eligibleLine(12)).toBe('12 eligible to buy');
+        expect(CULTURE_PICKS_COPY.eligibleLine(1)).toBe('1 eligible to buy');
+        expect(CULTURE_PICKS_COPY.noneEligible({total: 130, eligible: 0, noAttention: 128, fewBars: 3, unquoted: 0}))
+            .toBe('No owner could be bought this week: 128 of 130 had no Wikipedia baseline yet (six months of stored views), 3 had under 126 days of prices.');
+        expect(CULTURE_PICKS_COPY.noneEligible({total: 2, eligible: 0, noAttention: 0, fewBars: 0, unquoted: 1}))
+            .toBe('No owner could be bought this week: 1 of 2 had no quote.');
         expect(CULTURE_RECORD_COPY.liveLine('2026-10-05', 1, '+1.20%', '+0.40%')).toBe('Live since 2026-10-05 · 1 daily snapshot at 16:10 ET · return +1.20% vs SPY +0.40%');
         expect(CULTURE_RECORD_COPY.simulatedLine('2021-10-04', '2026-10-01', 0)).toBe('2021-10-04 → 2026-10-01 · weekly decisions · next-open fills · no fees or slippage · interest and dividends included');
         expect(CULTURE_SYSTEM_COPY.driftAlarm(['celsius'], 10)).toBe('1 brand has no Wikipedia views in the last 10 days — a renamed article or a title the catalog misspells: celsius');

@@ -25,6 +25,9 @@ export interface CultureDecisionDoc extends Document {
     kind: 'executed' | 'preview' | 'skipped';
     items: CultureDecisionItemDoc[];
     universe: {tickers: number; quoted: number; unquoted: {symbol: string; reason: string}[]};
+    // The week's eligibility (lib/culture/scoring.eligibilityOf); absent on decisions made
+    // before it was stored.
+    eligibility?: {total: number; eligible: number; noAttention: number; fewBars: number; unquoted: number};
     feeds: string[];
     rationaleMd?: string;
     summary: string;
@@ -58,6 +61,16 @@ const CultureDecisionSchema = new Schema<CultureDecisionDoc>({
         tickers: {type: Number, default: 0},
         quoted: {type: Number, default: 0},
         unquoted: {type: [new Schema({symbol: {type: String, required: true}, reason: {type: String, default: ''}}, {_id: false})], default: []},
+    },
+    eligibility: {
+        type: new Schema({
+            total: {type: Number, required: true},
+            eligible: {type: Number, required: true},
+            noAttention: {type: Number, required: true},
+            fewBars: {type: Number, required: true},
+            unquoted: {type: Number, required: true},
+        }, {_id: false}),
+        default: undefined,
     },
     feeds: {type: [String], default: []},
     rationaleMd: {type: String},

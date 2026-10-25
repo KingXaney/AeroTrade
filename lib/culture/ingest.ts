@@ -241,7 +241,8 @@ export const recordNewBrands = async (names: readonly {name: string; itemHash: n
 // ---- the summary line the status strip shows ----
 
 export type CultureRunParts = {
-    wikipedia: {written: number; missing: number; failed: number};
+    // `history`: brands asked for their whole backfill window this run (lib/culture/history).
+    wikipedia: {written: number; missing: number; failed: number; history?: number};
     appstore: {mapped: number; ok: boolean};
     youtube: {inserted: number; skipped: boolean; ok: boolean};
     reddit: {inserted: number; skipped: boolean};
@@ -262,7 +263,7 @@ export type CultureRunParts = {
 
 export const describeCultureRun = (p: CultureRunParts): string => {
     const sources = [
-        `wikipedia ${p.wikipedia.written} docs${p.wikipedia.missing ? `, ${p.wikipedia.missing} titles missing` : ''}${p.wikipedia.failed ? `, ${p.wikipedia.failed} failed` : ''}`,
+        `wikipedia ${p.wikipedia.written} docs${p.wikipedia.missing ? `, ${p.wikipedia.missing} titles missing` : ''}${p.wikipedia.failed ? `, ${p.wikipedia.failed} failed` : ''}${p.wikipedia.history ? `, whole history asked for ${p.wikipedia.history} brands` : ''}`,
         `app store ${p.appstore.ok ? `${p.appstore.mapped} brands` : 'failed'}`,
         `youtube ${p.youtube.skipped ? 'skipped (no key)' : p.youtube.ok ? `${p.youtube.inserted} new` : 'failed'}`,
         `reddit ${p.reddit.skipped ? 'skipped (no app)' : `${p.reddit.inserted} new`}`,

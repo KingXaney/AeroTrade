@@ -1,6 +1,6 @@
 import {describe, expect, it} from 'vitest';
 import {CULTURE_PROFILES, CULTURE_TERMS, CULTURE_VOLATILITY_HAIRCUT, MIN_PRICE_BARS, PROFILE_IDS, TERM_FEEDS, type CultureFeed} from '@/lib/culture/config';
-import {effectiveWeights, scoreCultureUniverse, type CultureScoringInput} from '@/lib/culture/scoring';
+import {effectiveWeights, eligibilityOf, isEligibleInput, scoreCultureUniverse, type CultureScoringInput} from '@/lib/culture/scoring';
 
 const ALL_FEEDS: CultureFeed[] = ['price', 'wikipedia', 'mentions', 'press', 'appstore', 'earnings'];
 
@@ -146,3 +146,25 @@ describe('scoreCultureUniverse', () => {
         }
     });
 });
+
+describe('eligibility', () => {
+    it('is the scorer\'s own rule: enough bars, a quote, a brand with attention measured', () => {
+        expect(isEligibleInput(input('OK'))).toBe(true);
+        expect(isEligibleInput(input('FEW', {barsCount: MIN_PRICE_BARS - 1}))).toBe(false);
+        expect(isEligibleInput(input('NOQ', {quoted: false}))).toBe(false);
+        expect(isEligibleInput(input('NOA', {brandsCovered: 0}))).toBe(false);
+        const scored = scoreCultureUniverse([input('OK'), input('NOA', {brandsCovered: 0})], {profile: 'spike', feeds: ['price', 'wikipedia']});
+        expect(scored.map((s) => s.eligible)).toEqual([true, false]);
+    });
+
+    it('counts the week: how many could be bought, and what kept the rest out (one owner may lack several)', () => {
+        expect(eligibilityOf([
+            input('OK'),
+            input('NOA', {brandsCovered: 0}),
+            input('BOTH', {brandsCovered: 0, barsCount: 10}),
+            input('NOQ', {quoted: false}),
+        ])).toEqual({total: 4, eligible: 1, noAttention: 2, fewBars: 1, unquoted: 1});
+        expect(eligibilityOf([])).toEqual({total: 0, eligible: 0, noAttention: 0, fewBars: 0, unquoted: 0});
+    });
+});
+
