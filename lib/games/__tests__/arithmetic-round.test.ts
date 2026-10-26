@@ -122,3 +122,34 @@ describe('the interview mode', () => {
         expect(run(stopped, {type: 'reset'})).toBe(LOBBY);
     });
 });
+
+describe('restarting a round', () => {
+    it('drops a sprint in play for a fresh one on the same settings, its own seed and clock', () => {
+        let round: RoundState = roundReducer(LOBBY, {type: 'start-sprint', seed: 5, settings: {cells: ['add-2d-carry', 'times-7'], duration: 60}, at: T0});
+        round = run(round, {type: 'type', value: String((round as SprintRound).problem.answer), at: T0 + 1500}, {type: 'type', value: '-1', at: T0 + 2000});
+        expect(roundScore(round as SprintRound)).toBe(1);
+        const fresh = roundReducer(round, {type: 'restart', seed: 9, at: T0 + 30_000});
+        expect(fresh).toEqual(roundReducer(LOBBY, {type: 'start-sprint', seed: 9, settings: (round as SprintRound).settings, at: T0 + 30_000}));
+        expect(fresh).toMatchObject({phase: 'playing', index: 0, typed: '', slips: 0, solved: [], startedAt: T0 + 30_000, endsAt: T0 + 90_000});
+        expect(roundScore(fresh as SprintRound)).toBe(0);
+    });
+
+    it('keeps a Zetamac or custom sprint on the settings it was started with', () => {
+        const custom = {...ZETAMAC_DEFAULTS, operations: ['multiply' as const], duration: 30 as const};
+        const round = roundReducer(LOBBY, {type: 'start-sprint', seed: 5, settings: custom, at: T0});
+        expect(roundReducer(round, {type: 'restart', seed: 6, at: T0 + 1000})).toMatchObject({settings: custom, seed: 6, endsAt: T0 + 31_000});
+    });
+
+    it('drops an interview in play for a fresh one', () => {
+        const answered = run(interview(), {type: 'choose', option: 0, at: T0 + 1000});
+        const fresh = roundReducer(answered, {type: 'restart', seed: 7, at: T0 + 2000});
+        expect(fresh).toEqual(roundReducer(LOBBY, {type: 'start-interview', seed: 7, at: T0 + 2000}));
+        expect(fresh).toMatchObject({index: 0, right: 0, wrong: 0});
+    });
+
+    it('does nothing in the lobby or once a round has ended, which keeps its report', () => {
+        expect(roundReducer(LOBBY, {type: 'restart', seed: 7, at: T0})).toBe(LOBBY);
+        const ended = run(sprint(), {type: 'stop', at: T0 + 5000});
+        expect(roundReducer(ended, {type: 'restart', seed: 7, at: T0 + 6000})).toBe(ended);
+    });
+});

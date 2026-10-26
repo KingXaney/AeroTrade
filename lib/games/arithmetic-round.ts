@@ -45,6 +45,10 @@ export type RoundAction =
     | {type: 'type'; value: string; at: number}
     | {type: 'choose'; option: number; at: number}
     | {type: 'stop'; at: number}
+    // A round in play dropped for a fresh one of the same kind on the same settings (a new seed and
+    // clock). The dropped round never reaches 'done', so the page never reports it: no record, no
+    // streak day, nothing folded into the reader's skill.
+    | {type: 'restart'; seed: number; at: number}
     | {type: 'reset'};
 
 export const LOBBY: RoundState = {kind: 'lobby'};
@@ -78,6 +82,10 @@ export const roundReducer = (state: RoundState, action: RoundAction): RoundState
             return action.at >= state.endsAt ? ended(state, action.at) : {...state, now: action.at};
         case 'stop':
             return ended(state, action.at);
+        case 'restart':
+            return state.kind === 'sprint'
+                ? roundReducer(LOBBY, {type: 'start-sprint', seed: action.seed, settings: state.settings, at: action.at})
+                : roundReducer(LOBBY, {type: 'start-interview', seed: action.seed, at: action.at});
         case 'type': {
             if (state.kind !== 'sprint') return state;
             if (!isAnswer(state.problem, action.value)) {

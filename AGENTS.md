@@ -740,7 +740,10 @@ and friends keep none beyond Shared and the invariants).
 - The arithmetic round is the pure reducer `lib/games/arithmetic-round`: the seed and the clock
   arrive in its actions, a problem is drawn from the seed and its place
   (`lib/games/arithmetic.problemAt`), and `components/games/ArithmeticGame` owns only the
-  interval, the 1–5 keys (never with ⌘, Ctrl or Alt) and the one report a round sends. Every
+  interval, the 1–5 keys (never with ⌘, Ctrl or Alt) and the one report a round sends. Restart
+  (the reducer's `restart`, the button after the answer box, so Tab then Enter reaches it) drops
+  the round in play for a fresh one on the same settings; the dropped round never reaches 'done',
+  so it is never reported, kept, counted for the streak or folded into the skill aggregate. Every
   sprint answer is timed by the reducer (`shownAt`, `solved`; a full wrong entry is a slip), and
   the report carries the seed and one `{ms, slips}` per answer: `keptRound` replays the seed to
   recover every problem, requires the per-operation counts to agree with the replay, and hands

@@ -297,6 +297,42 @@ try {
     await pageE.locator('[data-custom-settings]').waitFor({timeout: 30000});
     check('…and a reload keeps them too', await customOps() === 'multiply' && await pageE.locator('[data-duration]').inputValue() === '30');
 
+    // Restart, mid-round: a fresh round on the same settings, the dropped one never saved; Tab then
+    // Enter from the answer box does the same; the round after it is kept as any other.
+    const arithmeticRows = () => rounds.countDocuments({userId: userE, game: 'arithmetic'});
+    const rowsBefore = await arithmeticRows();
+    const answerOne = async (n) => {
+        await pageE.locator('[data-arithmetic-answer]').fill(String(solveText(await pageE.locator('[data-problem-text]').innerText())));
+        await pageE.locator(`[data-round-score="${n}"]`).waitFor({timeout: 15000});
+    };
+    const answerFocused = () => pageE.evaluate(() => document.activeElement?.hasAttribute('data-arithmetic-answer') === true);
+    await pageE.locator('[data-round-start]').click();
+    await pageE.locator('[data-problem-text]').waitFor({timeout: 15000});
+    await answerOne(1);
+    await answerOne(2);
+    await pageE.clock.fastForward(10_000);
+    check('a round in play offers Restart beside End the round, with its keys said once',
+        await pageE.locator('[data-round-restart]').count() === 1 && await pageE.locator('[data-round-stop]').count() === 1
+        && /Tab, then Enter/.test(await pageE.locator('[data-restart-keys]').innerText()));
+    await pageE.locator('[data-round-restart]').click();
+    await pageE.locator('[data-round-score="0"]').waitFor({timeout: 15000});
+    check('Restart starts a fresh round on the same settings and clock, the answer box focused',
+        /^0:(30|29) left$/.test((await pageE.locator('[data-time-left]').innerText()).trim()) && /×/.test(await pageE.locator('[data-problem-text]').innerText())
+        && await answerFocused(), (await pageE.locator('[data-time-left]').innerText()).trim());
+    await answerOne(1);
+    await pageE.keyboard.press('Tab');
+    await pageE.keyboard.press('Enter');
+    await pageE.locator('[data-round-score="0"]').waitFor({timeout: 15000});
+    check('…and Tab then Enter from the answer box restarts too', await answerFocused() && await pageE.locator('[data-arithmetic-playing]').count() === 1);
+    await pageE.screenshot({path: `${OUT}06b-sprint-restart.png`, fullPage: true});
+    check('…a dropped round is never saved', await arithmeticRows() === rowsBefore, `${await arithmeticRows()} vs ${rowsBefore}`);
+    await answerOne(1);
+    await pageE.clock.fastForward(31_000);
+    await pageE.locator('[data-round-record]').waitFor({timeout: 15000});
+    const afterRestart = await rounds.find({userId: userE, game: 'arithmetic'}).sort({finishedAt: -1}).limit(1).next();
+    check('…and the round after a restart is kept with only its own answers', await arithmeticRows() === rowsBefore + 1 && afterRestart?.score === 1
+        && afterRestart.key === 'ops=m;add=2-100x2-100;mul=2-12x2-100;t=30', JSON.stringify({score: afterRestart?.score, key: afterRestart?.key}));
+
     await pageE.goto(`${BASE}/games/arithmetic?mode=interview`, {waitUntil: 'networkidle'});
     await pageE.locator('[data-arithmetic-lobby="interview"]').waitFor({timeout: 30000});
     await pageE.locator('[data-round-start]').click();
