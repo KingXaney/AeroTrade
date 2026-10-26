@@ -25,7 +25,7 @@ import {
 import type {CultureDecisionItem} from "@/lib/culture/decisions";
 import type {Book} from "@/lib/culture/engine";
 import {toScoringInputs, type BrandSeriesInput} from "@/lib/culture/inputs";
-import type {CultureScoringInput} from "@/lib/culture/scoring";
+import type {CultureEligibility, CultureScoringInput} from "@/lib/culture/scoring";
 import {fetchReportDates, type ReportDates} from "@/lib/culture/sources/earnings";
 import {getAttentionSeries, getCultureEntities} from "@/lib/culture/store";
 import {catalogHash, type CultureTicker, type VerifiedSymbol} from "@/lib/culture/universe";
@@ -303,6 +303,7 @@ export type CultureDecisionInput = {
     kind: 'executed' | 'preview' | 'skipped';
     items: CultureDecisionItem[];
     universe: {tickers: number; quoted: number; unquoted: {symbol: string; reason: string}[]};
+    eligibility?: CultureEligibility;
     feeds: readonly CultureFeed[];
     summary: string;
 };
@@ -314,7 +315,7 @@ export const saveCultureDecision = async (input: CultureDecisionInput): Promise<
     if (existing && existing.kind === 'executed' && input.kind !== 'executed') return false;
     await CultureDecision.updateOne(
         {date: input.date, profile: input.profile},
-        {$set: {weekKey: input.weekKey, kind: input.kind, items: input.items, universe: input.universe, feeds: [...input.feeds], summary: input.summary}},
+        {$set: {weekKey: input.weekKey, kind: input.kind, items: input.items, universe: input.universe, ...(input.eligibility ? {eligibility: input.eligibility} : {}), feeds: [...input.feeds], summary: input.summary}},
         {upsert: true},
     );
     return true;
@@ -348,6 +349,7 @@ export type CultureDecisionView = {
     kind: 'executed' | 'preview' | 'skipped';
     items: CultureDecisionItem[];
     universe: {tickers: number; quoted: number; unquoted: {symbol: string; reason: string}[]};
+    eligibility: CultureEligibility | null;
     feeds: string[];
     rationaleMd: string | null;
     summary: string;
@@ -372,6 +374,9 @@ const toDecisionView = (doc: CultureDecisionDoc): CultureDecisionView => ({
         ...(item.error ? {error: item.error} : {}),
     })),
     universe: {tickers: doc.universe?.tickers ?? 0, quoted: doc.universe?.quoted ?? 0, unquoted: (doc.universe?.unquoted ?? []).map((u) => ({symbol: u.symbol, reason: u.reason}))},
+    eligibility: doc.eligibility
+        ? {total: doc.eligibility.total, eligible: doc.eligibility.eligible, noAttention: doc.eligibility.noAttention, fewBars: doc.eligibility.fewBars, unquoted: doc.eligibility.unquoted}
+        : null,
     feeds: [...(doc.feeds ?? [])],
     rationaleMd: doc.rationaleMd ?? null,
     summary: doc.summary,

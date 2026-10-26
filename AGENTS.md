@@ -469,6 +469,20 @@ and friends keep none beyond Shared and the invariants).
   `components/trading/portfolio/TradedBy`) and its culture fills carry the one "What the picker saw"
   from the enrolment's own decisions. The card is `components/culture/FollowPickerCard` and the
   account's decisions reuse `PicksPanel` (scope `follow`); every sentence is `CULTURE_FOLLOW_COPY`.
+- Wikipedia history fills itself: a brand's attention surprise reads its last four weeks against
+  the six months before them, and a brand's owner is eligible only with a brand whose surprise is
+  measured (`lib/culture/scoring.isEligibleInput`). The daily run's `wikipedia-plan` step
+  (`lib/culture/history.planWikipediaFetch` over `lib/culture/store.wikipediaFirstMonths`) asks a
+  brand whose stored series starts after the baseline for its whole backfill window
+  (`historyWindow`, listed owners first), every other brand for the lookback (`recentWindow`): one
+  request a title either way. Without it no brand had a baseline and no owner was eligible — the
+  pickers' first two weeks of empty decisions (2026-10-13, 2026-10-19). The fetches keep under
+  Wikimedia's 200 requests a minute for an identified bot (`WIKIPEDIA_REQUEST_GAP_MS`), wait out a
+  refusal once (`retryWaitMs`), stop after `WIKIPEDIA_REFUSALS_TO_STOP` in a row or a spent
+  `WIKIPEDIA_STEP_BUDGET_MS`, and the job pauses a minute after a refused pass; the User-Agent names
+  the site. Each weekly decision stores its eligibility (`eligibilityOf`: how many owners could be
+  bought, and how many lacked attention, bars or a quote), printed beside the universe line, with
+  one sentence when nothing could be bought (`CULTURE_PICKS_COPY.noneEligible`).
 - Jobs: `culture-brain-update` daily 06:40 ET (trigger `culture`), `culture-brain-weekly` Mondays
   10:45 ET with a Tuesday holiday retry (`culture-weekly`, `culture-preview`, `culture-resimulate`),
   `culture-wikipedia-backfill` on demand (`culture-backfill [brandId…]`), `culture-follow-bootstrap`

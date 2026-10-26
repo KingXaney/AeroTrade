@@ -269,6 +269,19 @@ try {
         }
         await store.writeAttentionRows(views);
 
+        // The daily run's Wikipedia plan reads each brand's first stored month: the three seeded
+        // brands reach back past the baseline and are asked only the lookback; every other brand
+        // (nothing stored) is asked its whole history, listed owners first.
+        const {planWikipediaFetch} = await jiti.import(`${REPO_ROOT}lib/culture/history.ts`);
+        const firstMonths = await store.wikipediaFirstMonths();
+        const wikiPlan = planWikipediaFetch(CULTURE_BRANDS, firstMonths, asOf);
+        check('the daily plan asks the lookback for brands with history, the whole history for the rest',
+            firstMonths.get('pepsi') === addDays(asOf, -419).slice(0, 7)
+            && ['celsius', 'pepsi', 'poppi'].every((id) => wikiPlan.recent.includes(id) && !wikiPlan.history.includes(id))
+            && wikiPlan.history.length + wikiPlan.recent.length === CULTURE_BRANDS.length
+            && CULTURE_BRANDS.find((b) => b.id === wikiPlan.history[0])?.owner !== null,
+            JSON.stringify({first: firstMonths.get('pepsi'), history: wikiPlan.history.length, recent: wikiPlan.recent.length}));
+
         const fire = (data) => fireEvent('app/run.culture.brain', data);
         const jobMessage = () => jobMessageOf('culture-brain-weekly');
 
@@ -291,6 +304,9 @@ try {
                 check(`${decision.profile}: the decision is executed, planned an order, and every fill failed for want of a price`, decision.kind === 'executed' && orders.length > 0 && orders.every((i) => i.executed === false && /live price/.test(i.error ?? '')), `${orders.length} orders: ${orders.map((i) => i.error).join('; ')}`);
                 check(`${decision.profile}: every item names the picker and carries its brands and a readable reason`, decision.items.every((i) => i.reasons.some((r) => r === `picker ${decision.profile === 'spike' ? 'Spike' : 'Quiet'}`) && i.brands.length > 0 && glossCultureReasons(i.reasons).length > 0), JSON.stringify(decision.items.map((i) => i.reasons)));
                 check(`${decision.profile}: the universe audit counts the quoted owners`, decision.universe.quoted === 2 && decision.universe.tickers > 50 && decision.feeds.includes('wikipedia'), JSON.stringify({...decision.universe, unquoted: decision.universe.unquoted.length, feeds: decision.feeds}));
+                // The two quoted owners carry seeded views and bars: both may be bought.
+                check(`${decision.profile}: the decision stores the week's eligibility`, decision.eligibility?.total === 2 && decision.eligibility?.eligible === 2
+                    && decision.eligibility?.noAttention === 0, JSON.stringify(decision.eligibility));
             }
             check('cash is untouched when nothing filled', accounts.every((a) => a.cash === 100000 && a.positions.length === 0));
             const trades = await db.collection('papertrades').countDocuments({userId: OWNER});
@@ -456,6 +472,18 @@ try {
         check('each column shows its own latest decision, with the universe audit and the feeds', await spikeDecision.count() === 1 && /owners quoted/.test(await spikeDecision.innerText()) && /feeds: /.test(await spikeDecision.innerText())
             && await quietColumn.locator('[data-culture-decision="quiet"]').count() === 1);
         check('…its raw reasons naming the picker', /picker Spike/.test(await spikeDecision.innerText()) && /picker Quiet/.test(await quietColumn.locator('[data-culture-decision="quiet"]').innerText()));
+        check('…how many owners were eligible to buy, and no "none eligible" sentence', /\d+ eligible to buy/.test(await spikeDecision.innerText())
+            && await spikeDecision.locator('[data-culture-none-eligible]').count() === 0);
+        // A week in which nothing could be bought says why, once.
+        const storedEligibility = (await db.collection('culturedecisions').findOne({date: today, profile: 'spike'}))?.eligibility;
+        await db.collection('culturedecisions').updateOne({date: today, profile: 'spike'}, {$set: {eligibility: {total: 130, eligible: 0, noAttention: 130, fewBars: 2, unquoted: 0}}});
+        await page.reload({waitUntil: 'domcontentloaded'});
+        await page.locator('[data-culture-decision="spike"]').waitFor({timeout: 30000});
+        const noneLine = await page.locator('[data-culture-decision="spike"] [data-culture-none-eligible]').innerText().catch(() => '');
+        check('a week with no owner eligible says what kept them out', /^No owner could be bought this week: 130 of 130 had no Wikipedia baseline yet/.test(noneLine), noneLine);
+        await db.collection('culturedecisions').updateOne({date: today, profile: 'spike'}, storedEligibility ? {$set: {eligibility: storedEligibility}} : {$unset: {eligibility: ''}});
+        await page.reload({waitUntil: 'domcontentloaded'});
+        await page.locator('[data-culture-decision="spike"]').waitFor({timeout: 30000});
         const glosses = page.locator('[data-culture-gloss]');
         const glossCount = await glosses.count();
         check('each decision item has one closed "What the picker saw"', glossCount === decisions.reduce((sum, d) => sum + d.items.length, 0)

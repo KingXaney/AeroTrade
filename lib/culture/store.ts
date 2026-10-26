@@ -101,6 +101,18 @@ export const getSourceFreshness = async (): Promise<Record<CultureSource, string
     return out;
 };
 
+// Each brand's first stored Wikipedia month ('YYYY-MM'): whether its series reaches back far
+// enough for the attention baseline (lib/culture/history). One aggregate on the
+// {brand, source, month} index; a brand with no series is absent.
+export const wikipediaFirstMonths = async (): Promise<Map<string, string>> => {
+    await connectToDatabase();
+    const rows = await CultureAttention.aggregate<{_id: string; first: string}>([
+        {$match: {source: 'wikipedia'}},
+        {$group: {_id: '$brand', first: {$min: '$month'}}},
+    ]);
+    return new Map(rows.map((row) => [row._id, row.first]));
+};
+
 // ---- items ----
 
 // New items only; a duplicate link (the same post read twice, the same article from two

@@ -79,8 +79,8 @@ export const LIMIT_PROVIDERS: readonly LimitProvider[] = [
     },
     {
         id: 'wikipedia', label: 'Wikipedia', uses: "every catalog brand's daily pageviews (the REST pageviews API)",
-        cap: 'the REST API asks for at most 200 requests a second and a descriptive User-Agent', capAsOf: '2026-10-07',
-        docsUrl: 'https://wikimedia.org/api/rest_v1/', planned: 'one read per brand a day (about 160), and the backfill on demand', jobs: ['culture-brain-update', 'culture-wikipedia-backfill'],
+        cap: 'an identified bot (a User-Agent with a contact) may send 200 requests a minute, an unidentified client 10, at most three at once; a refusal names its wait', capAsOf: '2026-10-24',
+        docsUrl: 'https://www.mediawiki.org/wiki/Wikimedia_APIs/Rate_limits', planned: 'one request per title a day (about 280), one every 350 ms; a brand without its history asks the whole window in that one request; the backfill on demand', jobs: ['culture-brain-update', 'culture-wikipedia-backfill'],
     },
     {
         id: 'app-store', label: 'App Store', uses: "the US free and paid charts (Apple's RSS marketing feed)",

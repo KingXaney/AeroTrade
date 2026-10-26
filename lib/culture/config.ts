@@ -1,15 +1,26 @@
-// Knobs for the culture brain. Import-free and client-safe: the /culture legend prints every
+// Knobs for the culture brain. Import-free (types, and lib/site's address, itself import-free) and client-safe: the /culture legend prints every
 // figure from here, and a moved constant moves the text and the tests with it.
 
 import type {CultureSource, Listing} from "@/lib/culture/types";
+import {PRODUCTION_URL} from "@/lib/site";
 import type {AllocatorRails} from "@/lib/navigator/config";
 import type {MomentumMix} from "@/lib/navigator/scoring";
 
 // --- The daily sweep: what each source costs, whatever the catalog's size ---
 
 // Wikipedia pageview requests per Inngest step (one request per brand), spaced this far apart.
+// Wikimedia allows an identified bot 200 requests a minute (mediawiki.org, Wikimedia APIs/Rate
+// limits); one every 350 ms is about 170. At 100 ms the daily run was refused a third of its
+// requests every day, always the catalog's last brands.
 export const WIKIPEDIA_CHUNK = 25;
-export const WIKIPEDIA_REQUEST_GAP_MS = 100;
+export const WIKIPEDIA_REQUEST_GAP_MS = 350;
+// A refusal (429) is asked again once, after the wait it names, else Wikimedia's five seconds,
+// never more than the cap; three refusals in a row end the step, and a step stops asking once its
+// budget is spent (the route's limit is 60 s). What is left is fetched by the next run.
+export const WIKIPEDIA_RETRY_DEFAULT_MS = 5000;
+export const WIKIPEDIA_RETRY_MAX_MS = 10_000;
+export const WIKIPEDIA_REFUSALS_TO_STOP = 3;
+export const WIKIPEDIA_STEP_BUDGET_MS = 45_000;
 // A daily run asks for this many days back, so a late or failed day heals on the next run.
 export const WIKIPEDIA_DAILY_LOOKBACK_DAYS = 10;
 // The pageviews API's first day.
@@ -86,7 +97,9 @@ export const CULTURE_SUGGESTION_SAMPLES = 3;
 export const CULTURE_SUGGESTION_NAME_CHARS = 40;
 
 // The identity every keyless request carries (Wikimedia asks for a contact).
-export const cultureUserAgent = (contact: string): string => `AeroTrade/1.0 (culture brain; contact ${contact})`;
+// Wikimedia's User-Agent policy: the client's name and a way to reach its operator — the site's
+// address, and the contact mailbox when one is set.
+export const cultureUserAgent = (contact: string): string => `AeroTrade/1.0 (${PRODUCTION_URL}; culture brain; contact ${contact})`;
 
 // --- The pickers: two profiles over one feature set, one shared account each ---
 

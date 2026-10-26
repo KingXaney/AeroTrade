@@ -74,6 +74,12 @@ describe('describeCultureRun', () => {
         expect(findBanned(line, 'copy')).toEqual([]);
     });
 
+    it('says how many brands were asked for their whole history, and nothing when none were', () => {
+        expect(describeCultureRun({...parts, wikipedia: {written: 900, missing: 0, failed: 3, history: 12}}))
+            .toContain('wikipedia 900 docs, 3 failed, whole history asked for 12 brands');
+        expect(describeCultureRun({...parts, wikipedia: {written: 180, missing: 0, failed: 0, history: 0}})).not.toContain('history');
+    });
+
     it('says when a source is off or failed', () => {
         const line = describeCultureRun({...parts, appstore: {mapped: 0, ok: false}, youtube: {inserted: 0, skipped: true, ok: true}, news: {inserted: 0, skipped: true, ok: true}, social: {inserted: 4, adapter: 'provider'}, quotaHit: false});
         expect(line).toContain('app store failed');

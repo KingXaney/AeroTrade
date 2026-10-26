@@ -8,7 +8,6 @@ import {brandById, CULTURE_BRANDS} from "@/lib/culture/catalog";
 import {
     BACKFILL_CHUNK,
     BACKTEST_LISTINGS,
-    CULTURE_BACKFILL_YEARS,
     CULTURE_ENGINE_VERSION,
     CULTURE_NEWS_QUERY_CHUNK,
     CULTURE_OWNER_ID,
@@ -18,8 +17,9 @@ import {
     RATIONALE_NARRATIVES,
     WIKI_DATA_START,
     WIKIPEDIA_CHUNK,
-    WIKIPEDIA_DAILY_LOOKBACK_DAYS,
 } from "@/lib/culture/config";
+import {historyWindow, planWikipediaFetch, recentWindow} from "@/lib/culture/history";
+import {eligibilityOf} from "@/lib/culture/scoring";
 import {cultureBacktestDue} from "@/lib/culture/backtest";
 import {cultureBacktestReady, ensureCultureRateBars, getCultureBacktestStamp, lackingDividendCoverage, simulateCultureBacktest} from "@/lib/culture/backtest-store";
 import {buildCultureItems, type OrderOutcome} from "@/lib/culture/decisions";
@@ -62,7 +62,7 @@ import {
     verifyUniverseChunk,
 } from "@/lib/culture/picker-store";
 import {buildCultureRationalePrompt} from "@/lib/culture/prompts";
-import {getTickerRollup, getTopCultureEntities} from "@/lib/culture/store";
+import {getTickerRollup, getTopCultureEntities, wikipediaFirstMonths} from "@/lib/culture/store";
 import {foldCultureIntoBrain} from "@/lib/culture/update";
 import {brandsByTicker} from "@/lib/culture/catalog";
 import {catalogHash, cultureTickers, orderUniverse, selectCultureUniverse, type CultureTicker, type VerifiedSymbol} from "@/lib/culture/universe";
@@ -84,6 +84,8 @@ const NEWS_QUERY_GAP_MS = 1000;
 // Finnhub's free tier allows about sixty calls a minute: a pause between quote bursts past
 // two chunks, the snapshots job's own pacing.
 const QUOTE_THROTTLE_DELAY = '30s';
+// Wikimedia counts its limit by the minute.
+const WIKIPEDIA_COOLDOWN = '60s';
 const QUOTE_RETRY_DELAY = '15s';
 
 // Daily: every source into the series and the items, the model over a bounded batch, the
@@ -100,17 +102,25 @@ export const updateCultureBrain = inngest.createFunction(
         const asOf = addCalendarDays(today, -1);
         const nowMs = typeof event.ts === 'number' ? event.ts : Date.now();
         const dayIndex = calendarDaysBetween(WIKI_DATA_START, today);
-        const brandIds = CULTURE_BRANDS.map((brand) => brand.id);
 
-        const wikipedia = {written: 0, missing: 0, failed: 0};
-        const wikiChunks = chunk(brandIds, WIKIPEDIA_CHUNK);
-        for (let i = 0; i < wikiChunks.length; i++) {
-            const ids = wikiChunks[i];
-            const out = await step.run(`wikipedia-${i}`, async () =>
-                ingestWikipedia(ids, {from: addCalendarDays(today, -WIKIPEDIA_DAILY_LOOKBACK_DAYS), to: asOf}));
+        // A brand whose stored views do not reach back to the attention baseline is asked for its
+        // whole history (listed owners first), every other brand for the lookback: one request a
+        // title either way (lib/culture/history). Without this the baseline never fills, no brand
+        // has a surprise, and every owner is ineligible — the pickers' first two weeks.
+        const wikiPlan = await step.run('wikipedia-plan', async () => planWikipediaFetch(CULTURE_BRANDS, await wikipediaFirstMonths(), asOf));
+        const wikiPasses = [
+            ...chunk(wikiPlan.history, BACKFILL_CHUNK).map((ids) => ({ids, window: historyWindow(today, asOf)})),
+            ...chunk(wikiPlan.recent, WIKIPEDIA_CHUNK).map((ids) => ({ids, window: recentWindow(today, asOf)})),
+        ];
+        const wikipedia = {written: 0, missing: 0, failed: 0, history: wikiPlan.history.length};
+        for (let i = 0; i < wikiPasses.length; i++) {
+            const {ids, window} = wikiPasses[i];
+            const out = await step.run(`wikipedia-${i}`, async () => ingestWikipedia(ids, window));
             wikipedia.written += out.written;
             wikipedia.missing += out.missing.length;
             wikipedia.failed += out.failed.length;
+            // A refused pass waits out Wikimedia's minute before the next one asks.
+            if (out.failed.length > 0 && i < wikiPasses.length - 1) await step.sleep(`wikipedia-cooldown-${i}`, WIKIPEDIA_COOLDOWN);
         }
 
         const appstore = await step.run('appstore', async () => ingestAppStore(today));
@@ -347,6 +357,7 @@ export const runCultureWeekly = inngest.createFunction(
                 kind,
                 items,
                 universe: {tickers: ordered.length, quoted: universe.targetable.length, unquoted: universe.unquoted.map((u) => ({symbol: u.symbol, reason: u.reason}))},
+                eligibility: eligibilityOf(scoring.inputs),
                 feeds: scoring.feeds,
                 summary,
             }));
@@ -577,8 +588,7 @@ export const backfillCultureWikipedia = inngest.createFunction(
         const requested: unknown = event.data?.brands;
         const ids = (Array.isArray(requested) && requested.length > 0 ? requested.map(String) : CULTURE_BRANDS.map((brand) => brand.id))
             .filter((id) => brandById(id) !== undefined);
-        const horizon = addCalendarDays(today, -Math.round(CULTURE_BACKFILL_YEARS * 365));
-        const window = {from: horizon < WIKI_DATA_START ? WIKI_DATA_START : horizon, to: addCalendarDays(today, -1)};
+        const window = historyWindow(today, addCalendarDays(today, -1));
 
         let written = 0;
         let missing = 0;

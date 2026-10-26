@@ -13,6 +13,7 @@ import type {DecisionAction} from "@/lib/culture/decisions";
 import type {GlossedDecisionItem} from "@/lib/culture/page-store";
 import type {ProfileId} from "@/lib/culture/config";
 import {CULTURE_PICKS_COPY, PICKS_TERMS} from "@/lib/learn/copy/culture";
+import type {CultureEligibility} from "@/lib/culture/scoring";
 
 // A picker's latest decision: every order it planned with what happened to it, every position
 // it kept, the brands that put each symbol in its universe, its reasons as written and — one
@@ -30,6 +31,9 @@ export type PanelDecision = {
     kind: 'executed' | 'preview' | 'skipped';
     items: GlossedDecisionItem[];
     universe?: {tickers: number; quoted: number};
+    // How many owners could be bought that week (lib/culture/scoring.eligibilityOf); null on a
+    // decision made before it was stored.
+    eligibility?: CultureEligibility | null;
     feeds?: readonly string[];
     rationaleMd?: string | null;
 };
@@ -101,11 +105,15 @@ const PicksPanel = ({decision, scope = 'picker', emptyText = CULTURE_PICKS_COPY.
         <div className="space-y-3" {...hook}>
             <p className="text-[11px] text-fg-muted font-mono flex flex-wrap items-center gap-2">
                 <span>{decision.universe ? CULTURE_PICKS_COPY.decisionLine(decision.date, decision.universe.quoted, decision.universe.tickers) : decision.date}</span>
+                {decision.eligibility && <span data-culture-eligible={decision.eligibility.eligible}>· {CULTURE_PICKS_COPY.eligibleLine(decision.eligibility.eligible)}</span>}
                 {decision.feeds && <span>· {CULTURE_PICKS_COPY.feedsLine(decision.feeds)}</span>}
                 {decision.kind === 'preview' && <Badge tone="warning">{CULTURE_PICKS_COPY.previewBadge}</Badge>}
                 {decision.kind === 'skipped' && <Badge tone="neutral">{CULTURE_PICKS_COPY.skippedBadge}</Badge>}
             </p>
             {decision.kind === 'preview' && previewNote && <p className="text-xs text-fg-muted" data-follow-previewed>{previewNote}</p>}
+            {decision.eligibility && decision.eligibility.eligible === 0 && decision.eligibility.total > 0 && (
+                <p className="text-xs text-warning" data-culture-none-eligible>{CULTURE_PICKS_COPY.noneEligible(decision.eligibility)}</p>
+            )}
             <div className="space-y-2">
                 {decision.items.map((item) => <ItemRow key={`${item.symbol}-${item.action}`} item={item} />)}
             </div>
