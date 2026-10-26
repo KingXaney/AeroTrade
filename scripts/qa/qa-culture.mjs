@@ -325,6 +325,26 @@ try {
             const againRun = await pollUntil(async () => ((await jobMessage()).includes('already ran') ? await jobMessage() : null), 60_000);
             check('a second run in the same week claims nothing and says so', againRun !== null, againRun ?? await jobMessage());
 
+            // A week whose decision could buy no owner and traded nothing is no week used: the next
+            // run (Tuesday's retry) lets its claim go and decides it again; a week that stands is left.
+            const quietBefore = await db.collection('culturedecisions').findOne({date: today, profile: 'quiet'});
+            await db.collection('culturedecisions').updateOne({date: today, profile: 'spike'}, {$set: {eligibility: {total: 2, eligible: 0, noAttention: 2, fewBars: 0, unquoted: 0}}});
+            await db.collection('jobruns').updateOne({jobId: 'culture-brain-weekly'}, {$set: {lastMessage: 'qa: before the void-week run'}});
+            await fire({force: true});
+            const redecided = await pollUntil(async () => {
+                const message = await jobMessage();
+                if (!message.startsWith('Culture pickers')) return null;
+                const spike = await db.collection('culturedecisions').findOne({date: today, profile: 'spike'});
+                return spike?.eligibility?.eligible === 2 ? {message, spike} : null;
+            }, 240_000);
+            const statesAfter = await db.collection('culturestates').find({}).toArray();
+            const quietAfter = await db.collection('culturedecisions').findOne({date: today, profile: 'quiet'});
+            check('a void week (no owner eligible, nothing traded) is decided again by the next run, and claimed again',
+                redecided !== null && !redecided.message.includes('every picker already ran') && /spike: \d+\/\d+ order\(s\) filled/.test(redecided.message)
+                && /quiet: already ran this week/.test(redecided.message) && statesAfter.every((s) => s.lastRunWeek === weekKey),
+                redecided ? redecided.message : await jobMessage());
+            check('…while a week that stands is left as it was', JSON.stringify(quietAfter?.items) === JSON.stringify(quietBefore?.items) && quietAfter?.eligibility?.eligible === 2);
+
             await fire({dryRun: true});
             const preview = await pollUntil(async () => ((await jobMessage()).includes('preview') ? await jobMessage() : null), 120_000);
             check('a preview run plans without claiming', preview !== null, preview ?? await jobMessage());

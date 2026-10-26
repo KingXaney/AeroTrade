@@ -76,6 +76,16 @@ export const claimFollowWeek = async (userId: string, profile: ProfileId, weekKe
     return doc !== null;
 };
 
+// An enrolled account's claim on a void week let go with its picker's, when nothing filled in
+// that account that week: the re-decided week reaches it too. A week it traded in stays claimed.
+export const releaseIdleFollowWeek = async (userId: string, profile: ProfileId, weekKey: string): Promise<boolean> => {
+    await connectToDatabase();
+    const traded = await CultureFollowDecision.exists({userId, profile, weekKey, 'items.executed': true});
+    if (traded) return false;
+    const result = await CultureFollow.updateOne({userId, profile, lastRunWeek: weekKey}, {$unset: {lastRunWeek: ''}});
+    return result.modifiedCount === 1;
+};
+
 export const completeFollowRun = async ({userId, profile, outcomes}: {userId: string; profile: ProfileId; outcomes: readonly OutcomeRecord[]}): Promise<void> => {
     await connectToDatabase();
     const failed = outcomes.filter((o) => !o.executed);
