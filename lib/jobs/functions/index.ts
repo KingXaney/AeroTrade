@@ -12,6 +12,7 @@ import {runStrategiesDaily} from "@/lib/jobs/functions/strategies";
 import {generateMarketBriefing} from "@/lib/jobs/functions/news";
 import {backfillCultureWikipedia, bootstrapCultureFollow, runCultureWeekly, updateCultureBrain} from "@/lib/jobs/functions/culture";
 import {refreshLabPapers} from "@/lib/jobs/functions/lab";
+import {syncBrokerMirror} from "@/lib/jobs/functions/broker";
 
 export const functions = [
     sendSignUpEmail,
@@ -33,4 +34,5 @@ export const functions = [
     backfillCultureWikipedia,
     refreshLabPapers,
     bootstrapCultureFollow,
+    syncBrokerMirror,
 ];

@@ -77,6 +77,10 @@ export const classifyLimit = (provider: LimitProviderId, signal: unknown): Limit
             if (/daily hits limit/i.test(text)) return 'quota';
             if (/empty|blocked|no data/i.test(text)) return 'rate';
             return status === null ? null : kindOfStatus(status);
+        case 'alpaca':
+            // Alpaca's 403 is "buying power or shares is not sufficient" — an answer, not a limit.
+            if (status === 403) return null;
+            return status === null ? null : kindOfStatus(status);
         case 'mailer':
             // Gmail's daily sending limit is a 550 or 421 with "limit" in the text.
             if (/\b(421|550)\b.*limit|limit exceeded|quota/i.test(text)) return 'quota';

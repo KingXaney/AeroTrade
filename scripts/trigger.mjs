@@ -20,6 +20,7 @@
 //   npm run trigger -- culture-resimulate          rebuild the culture backtest from the stored history
 //   npm run trigger -- lab                         the lab's papers feed: today's new papers and their digest
 //   npm run trigger -- culture-follow <userId> <spike|quiet>   deploy one enrolled account into its picker's latest decision (forces the session)
+//   npm run trigger -- broker                                 sync every active Alpaca link (previews while Alpaca's market is closed)
 import { Inngest } from "inngest";
 
 // Each job's event as lib/jobs/registry.ts names it; lib/jobs/__tests__/registry.test.ts holds
@@ -44,6 +45,7 @@ const EVENTS = {
     'culture-resimulate': 'app/run.culture.brain',
     lab: 'app/refresh.lab.papers',
     'culture-follow': 'app/bootstrap.culture.follow',
+    broker: 'app/sync.broker.mirror',
 };
 
 const STRATEGY_DATA = {

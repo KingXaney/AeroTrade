@@ -14,7 +14,7 @@ export const LIMIT_RETENTION_DAYS = 45;
 
 export const LIMIT_PROVIDER_IDS = [
     'gemini', 'anthropic', 'finnhub', 'yahoo', 'stooq', 'tiingo', 'wikipedia', 'app-store', 'reddit', 'youtube',
-    'google-news', 'sec', 'arxiv', 'huggingface', 'mailer', 'inngest',
+    'google-news', 'sec', 'arxiv', 'huggingface', 'mailer', 'inngest', 'alpaca',
 ] as const;
 
 export type LimitProviderId = (typeof LIMIT_PROVIDER_IDS)[number];
@@ -127,6 +127,12 @@ export const LIMIT_PROVIDERS: readonly LimitProvider[] = [
         cap: 'free plan: 50,000 step runs a month, 5 concurrent steps, a 7-day event history', capAsOf: '2026-10-12',
         docsUrl: 'https://www.inngest.com/pricing', planned: 'about 10,000–14,000 step runs a month after the culture brain', jobs: [],
         dashboardUrl: 'https://app.inngest.com/',
+    },
+    {
+        id: 'alpaca', label: 'Alpaca', uses: 'the broker link: the mirrored account, its positions and clock, and the orders a sync sends',
+        cap: 'the trading API allows 200 requests a minute per account', capAsOf: '2026-10-24',
+        docsUrl: 'https://docs.alpaca.markets/docs/trading-api', planned: 'one sync a weekday: the clock, the account, the positions, an asset per symbol and at most twenty orders — about 40 requests',
+        jobs: ['broker-sync'],
     },
 ];
 
