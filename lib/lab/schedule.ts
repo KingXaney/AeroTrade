@@ -46,13 +46,34 @@ export const progressByTrack = (units: readonly LabUnit[], plannedCount: Record<
     });
 };
 
-// The day's problem: the unit's first problem the owner has not opened, else the one opened
-// longest ago (a second pass hands out the next).
-export const problemFor = (unit: LabUnit, revealed: readonly {problemId: string; day: string}[]): LabUnit['problems'][number] | null => {
-    if (unit.problems.length === 0) return null;
-    const opened = new Map(revealed.map((row) => [row.problemId, row.day]));
-    return unit.problems.find((problem) => !opened.has(problem.id))
-        ?? [...unit.problems].sort((a, b) => opened.get(a.id)!.localeCompare(opened.get(b.id)!))[0];
+// The day's problem draws from a pool: today's unit first, then every unit already studied, in
+// the registry's order — so a day whose unit has no unopened problem left practises earlier
+// material instead of handing back the same one.
+export const problemPool = (units: readonly LabUnit[], current: LabUnit | null, studied: readonly StudiedRow[]): LabUnit[] => {
+    if (!current) return [];
+    const studiedIds = new Set(studied.map((row) => row.unitId));
+    return [current, ...units.filter((unit) => unit.id !== current.id && studiedIds.has(unit.id))];
+};
+
+// A problem's closures: the first day it was opened, and the last (a re-closure moves it).
+export type ClosedRow = {problemId: string; day: string; lastDay: string};
+
+export type DailyProblem = {unit: LabUnit; problem: LabUnit['problems'][number]; closedToday: ClosedRow | null};
+
+// The day's problem: the one closed today (it stays today's, closed); else the pool's first
+// unopened problem; else the one closed longest ago, open again — a closure from an earlier day
+// never reads as closed today.
+export const dailyProblem = (pool: readonly LabUnit[], closed: readonly ClosedRow[], today: string): DailyProblem | null => {
+    const candidates = pool.flatMap((unit) => unit.problems.map((problem) => ({unit, problem})));
+    if (candidates.length === 0) return null;
+    const rowOf = new Map(closed.map((row) => [row.problemId, row]));
+    const closedToday = candidates.find(({problem}) => rowOf.get(problem.id)?.lastDay === today);
+    if (closedToday) return {...closedToday, closedToday: rowOf.get(closedToday.problem.id)!};
+    const unopened = candidates.find(({problem}) => !rowOf.has(problem.id));
+    if (unopened) return {...unopened, closedToday: null};
+    const oldest = candidates.reduce((best, candidate) =>
+        rowOf.get(candidate.problem.id)!.lastDay < rowOf.get(best.problem.id)!.lastDay ? candidate : best);
+    return {...oldest, closedToday: null};
 };
 
 // ---- the review queue -------------------------------------------------------------------------

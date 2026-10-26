@@ -5,7 +5,7 @@
 
 import type {LabPlanRow, LabTrack, LabUnit} from "@/lib/learn/copy/lab/types";
 import {LAB_TRACKS} from "@/lib/learn/copy/lab/types";
-import {type CardRef, type CardRow, dueCards, problemFor, progressByTrack, reviewSummary, type ReviewSummary, type StudiedRow, todaysUnit, type TrackProgress} from "@/lib/lab/schedule";
+import {type CardRef, type CardRow, dailyProblem, dueCards, problemPool, progressByTrack, reviewSummary, type ReviewSummary, type StudiedRow, todaysUnit, type TrackProgress} from "@/lib/lab/schedule";
 import type {Streak} from "@/lib/games/streak";
 import type {DailyPuzzleCardView, GameSummary} from "@/lib/games/store";
 import type {QuizRow, RevealedRow} from "@/lib/lab/store";
@@ -117,13 +117,15 @@ export const shapeLabView = (input: LabViewInput): LabView => {
     });
     const review = {queue, summary: reviewSummary(cards, cardRows, studied, today)};
 
-    const unitForProblem = pick.kind === 'nothing-written' ? null : pick.unit;
-    const problem = unitForProblem ? problemFor(unitForProblem, revealed) : null;
-    const closed = problem ? revealed.find((row) => row.problemId === problem.id) ?? null : null;
-    const problemView: LabProblemView | null = problem && unitForProblem ? {
-        id: problem.id, unitId: unitForProblem.id, unitTitle: unitForProblem.title, kind: problem.kind, title: problem.title,
-        statement: problem.statement, hints: problem.hints, numeric: problem.answer !== undefined, ...(problem.unit ? {unit: problem.unit} : {}),
-        closed, solution: closed ? problem.solution : null,
+    // Today's unit's problems first, then the studied units'; closed means closed today, its
+    // line dated by that closure (lib/lab/schedule.dailyProblem).
+    const daily = dailyProblem(problemPool(units, pick.kind === 'nothing-written' ? null : pick.unit, studied), revealed, today);
+    const closedRow = daily?.closedToday ? revealed.find((row) => row.problemId === daily.problem.id) ?? null : null;
+    const closed = closedRow ? {...closedRow, day: closedRow.lastDay} : null;
+    const problemView: LabProblemView | null = daily ? {
+        id: daily.problem.id, unitId: daily.unit.id, unitTitle: daily.unit.title, kind: daily.problem.kind, title: daily.problem.title,
+        statement: daily.problem.statement, hints: daily.problem.hints, numeric: daily.problem.answer !== undefined, ...(daily.problem.unit ? {unit: daily.problem.unit} : {}),
+        closed, solution: closed ? daily.problem.solution : null,
     } : null;
 
     const studiedOn = new Map(studied.map((row) => [row.unitId, row.day]));

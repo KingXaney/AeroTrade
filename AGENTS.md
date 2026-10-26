@@ -637,7 +637,11 @@ and friends keep none beyond Shared and the invariants).
 - Pure: `lib/lab/schedule` — `todaysUnit` is owner-paced (the first unstudied unit of the
   least-advanced track, ties cv → ml → quant; a unit stamped today stays today's; a revisit once
   every written unit is studied; never a calendar, so a missed day skips no prerequisite),
-  `problemFor`, `dueCards` (overdue, due today, then a studied unit's new cards from the day
+  `problemPool` and `dailyProblem` (the day's problem: today's unit's problems first, then every
+  studied unit's — the one closed today stays today's, closed; else the first unopened; else the
+  one closed longest ago, open again, so a closure from an earlier day never reads as "closed for
+  today" — `closeProblem` moves a re-closure's `lastDay`, keeping `day`, the first),
+  `dueCards` (overdue, due today, then a studied unit's new cards from the day
   after), `reviewSummary`; `lib/lab/srs` — the SM-2 variant (`grade`, deterministic, no fuzz);
   `lib/lab/view.shapeLabView` — what the page shows, fed by `lib/lab/page-store.getLabView`, the
   one cached read. `lib/lab/registry` indexes the bank for the actions' id checks.

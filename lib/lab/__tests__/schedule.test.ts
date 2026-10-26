@@ -1,5 +1,5 @@
 import {describe, expect, it} from 'vitest';
-import {dueCards, NEW_CARD_DELAY_DAYS, problemFor, progressByTrack, reviewSummary, todaysUnit, type StudiedRow} from '@/lib/lab/schedule';
+import {dailyProblem, dueCards, NEW_CARD_DELAY_DAYS, problemPool, progressByTrack, reviewSummary, todaysUnit, type StudiedRow} from '@/lib/lab/schedule';
 import {newCardState, type CardState} from '@/lib/lab/srs';
 import type {LabUnit} from '@/lib/learn/copy/lab/types';
 
@@ -33,18 +33,51 @@ describe('todaysUnit', () => {
     });
 });
 
-describe('progressByTrack and problemFor', () => {
+describe('progressByTrack', () => {
     it('counts done, written and planned per track', () => {
         expect(progressByTrack(units, {cv: 10, ml: 10, quant: 10}, studied(['cv-1', '2026-10-01']))).toEqual([
             {track: 'cv', done: 1, written: 2, planned: 10}, {track: 'ml', done: 0, written: 2, planned: 10}, {track: 'quant', done: 0, written: 1, planned: 10},
         ]);
     });
+});
 
-    it('hands out the unit\'s unopened problem first, then the one opened longest ago', () => {
-        expect(problemFor(units[0], [])?.id).toBe('cv-1/p1');
-        expect(problemFor(units[0], [{problemId: 'cv-1/p1', day: '2026-10-01'}])?.id).toBe('cv-1/p2');
-        expect(problemFor(units[0], [{problemId: 'cv-1/p1', day: '2026-10-01'}, {problemId: 'cv-1/p2', day: '2026-10-05'}])?.id).toBe('cv-1/p1');
-        expect(problemFor({...units[0], problems: []}, [])).toBeNull();
+describe('the day\'s problem', () => {
+    const TODAY = '2026-10-24';
+    const closed = (problemId: string, lastDay: string, day = lastDay) => ({problemId, day, lastDay});
+    const one = (u: LabUnit): LabUnit => ({...u, problems: u.problems.slice(0, 1)});
+
+    it('draws from today\'s unit first, then the units already studied, in the registry\'s order', () => {
+        expect(problemPool(units, units[2], studied(['cv-2', '2026-10-01'], ['cv-1', '2026-10-02'])).map((u) => u.id)).toEqual(['ml-1', 'cv-1', 'cv-2']);
+        expect(problemPool(units, units[0], studied(['cv-1', TODAY])).map((u) => u.id)).toEqual(['cv-1']);
+        expect(problemPool(units, null, []).map((u) => u.id)).toEqual([]);
+    });
+
+    it('hands out today\'s unit\'s unopened problem first', () => {
+        expect(dailyProblem([units[0]], [], TODAY)).toMatchObject({unit: {id: 'cv-1'}, problem: {id: 'cv-1/p1'}, closedToday: null});
+        expect(dailyProblem([units[0]], [closed('cv-1/p1', '2026-10-01')], TODAY)?.problem.id).toBe('cv-1/p2');
+    });
+
+    it('moves on to a studied unit\'s unopened problem once today\'s unit has none', () => {
+        const pool = [one(units[1]), one(units[0])];
+        expect(dailyProblem(pool, [closed('cv-2/p1', '2026-10-13')], TODAY)).toMatchObject({unit: {id: 'cv-1'}, problem: {id: 'cv-1/p1'}, closedToday: null});
+    });
+
+    it('keeps the problem closed today as today\'s, closed, whatever else is unopened', () => {
+        const pick = dailyProblem([units[0]], [closed('cv-1/p2', TODAY, '2026-10-01')], TODAY);
+        expect(pick).toMatchObject({problem: {id: 'cv-1/p2'}, closedToday: {problemId: 'cv-1/p2', lastDay: TODAY}});
+    });
+
+    it('opens the one closed longest ago again once every problem was opened — never "closed" from an earlier day', () => {
+        const pool = [one(units[1]), one(units[0])];
+        const pick = dailyProblem(pool, [closed('cv-2/p1', '2026-10-13'), closed('cv-1/p1', '2026-10-05')], TODAY);
+        expect(pick).toMatchObject({unit: {id: 'cv-1'}, problem: {id: 'cv-1/p1'}, closedToday: null});
+        // The production case: one unit, one problem, closed eleven days ago — open again today.
+        expect(dailyProblem([one(units[0])], [closed('cv-1/p1', '2026-10-13')], TODAY)).toMatchObject({problem: {id: 'cv-1/p1'}, closedToday: null});
+    });
+
+    it('has nothing when the pool holds no problem', () => {
+        expect(dailyProblem([{...units[0], problems: []}], [], TODAY)).toBeNull();
+        expect(dailyProblem([], [], TODAY)).toBeNull();
     });
 });
 

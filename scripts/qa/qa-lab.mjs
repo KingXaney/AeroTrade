@@ -186,6 +186,47 @@ try {
     await page.locator('[data-lab-problem-fold]:not([open])').waitFor({timeout: 15000});
     check('a press on the title folds it again', await page.locator('[data-lab-problem-fold]:not([open])').count() === 1);
 
+    // A closure from an earlier day is not today's. Backdated, the day's problem is open again:
+    // first a studied unit's unopened problem (the pool's next), then, once every problem in the
+    // pool was opened, the one closed longest ago — whose re-closure moves to today, keeping its
+    // first day.
+    const openProblem = async () => {
+        await page.locator('[data-todo-open="problem"]').click();
+        await page.locator('[data-lab-problem-fold][open]').waitFor({timeout: 15000});
+    };
+    const shownProblem = () => page.locator('[data-lab-problem]').getAttribute('data-lab-problem');
+    const twoDaysAgo = addDays(today, -2);
+    await db.collection('labevents').updateOne({userId: owner, kind: 'problem', key: 'ml-transformer-internals/p1'}, {$set: {day: twoDaysAgo, lastDay: twoDaysAgo}});
+    await page.reload({waitUntil: 'load'});
+    await page.locator('[data-lab-list]').waitFor({timeout: 30000});
+    const fresh = await shownProblem();
+    const problemState = await page.locator('[data-lab-todo="problem"]').getAttribute('data-todo-state');
+    check('a problem closed on an earlier day is not "closed for today": the day hands out a studied unit\'s unopened one, open',
+        fresh !== 'ml-transformer-internals/p1' && await page.locator('[data-lab-problem-closed="false"]').count() === 1 && problemState === 'todo'
+        && await page.locator('[data-lab-solution]').count() === 0 && !/Closed for today/.test(await page.locator('[data-lab-problem-fold] summary').innerText()),
+        `${fresh} ${problemState}`);
+    await openProblem();
+    await page.locator('[data-lab-reveal]').click();
+    await page.locator('[data-lab-solution]').waitFor({timeout: 20000});
+    const freshRow = await db.collection('labevents').findOne({userId: owner, kind: 'problem', key: fresh});
+    check('…revealed, it is closed for today', freshRow?.day === today && freshRow?.lastDay === today && freshRow?.how === 'revealed'
+        && /Closed for today/.test(await page.locator('[data-lab-problem-fold] summary').innerText()), JSON.stringify(freshRow && {day: freshRow.day, lastDay: freshRow.lastDay}));
+    await db.collection('labevents').updateOne({userId: owner, kind: 'problem', key: fresh}, {$set: {day: yesterday, lastDay: yesterday}});
+    await page.reload({waitUntil: 'load'});
+    await page.locator('[data-lab-list]').waitFor({timeout: 30000});
+    check('once every problem was opened, the one closed longest ago comes back open',
+        await shownProblem() === 'ml-transformer-internals/p1' && await page.locator('[data-lab-problem-closed="false"]').count() === 1, await shownProblem());
+    await openProblem();
+    await page.locator('[data-lab-reveal]').click();
+    await page.locator('[data-lab-solution]').waitFor({timeout: 20000});
+    const reclosed = await db.collection('labevents').findOne({userId: owner, kind: 'problem', key: 'ml-transformer-internals/p1'});
+    check('…and closed again, the closure moves to today while its first day is kept',
+        reclosed?.day === twoDaysAgo && reclosed?.lastDay === today && reclosed?.how === 'revealed'
+        && /Solution opened on/.test(await page.locator('[data-lab-solution]').innerText()) && /Closed for today/.test(await page.locator('[data-lab-problem-fold] summary').innerText()),
+        JSON.stringify({day: reclosed?.day, lastDay: reclosed?.lastDay, how: reclosed?.how}));
+    await page.locator('[data-lab-problem-fold] summary').click();
+    await page.locator('[data-lab-problem-fold]:not([open])').waitFor({timeout: 15000});
+
     // --- the library ---------------------------------------------------------------------------------
     await page.goto(`${BASE}/learn?view=library`, {waitUntil: 'load'});
     await page.locator('#lab-library').waitFor({timeout: 30000});

@@ -23,12 +23,14 @@ export const readStudied = async (userId: string): Promise<StudiedRow[]> => {
     return rows.map((row) => ({unitId: row.key, day: row.day, lastDay: row.lastDay}));
 };
 
-export type RevealedRow = {problemId: string; day: string; how: 'revealed' | 'solved'};
+// A problem's closures: the day it was first closed, the last day it was (lib/lab/schedule's
+// dailyProblem reads "closed today" and the rotation from it), and how the last one went.
+export type RevealedRow = {problemId: string; day: string; lastDay: string; how: 'revealed' | 'solved'};
 
 export const readRevealed = async (userId: string): Promise<RevealedRow[]> => {
     await connectToDatabase();
-    const rows = await LabEvent.find({userId, kind: 'problem'}).select('key day how').lean<EventRow[]>();
-    return rows.map((row) => ({problemId: row.key, day: row.day, how: row.how ?? 'revealed'}));
+    const rows = await LabEvent.find({userId, kind: 'problem'}).select('key day lastDay how').lean<EventRow[]>();
+    return rows.map((row) => ({problemId: row.key, day: row.day, lastDay: row.lastDay ?? row.day, how: row.how ?? 'revealed'}));
 };
 
 // Newest first; the streak reads the distinct days.
@@ -126,16 +128,19 @@ export const markUnitStudied = async (userId: string, unitId: string, today: str
     return {first: result.upsertedCount === 1};
 };
 
-// A problem closed: the first reveal or the first correct answer wins; a second is a no-op.
+// A problem closed: the day's first reveal or first correct answer wins, a second that day is a
+// no-op; on a later day (the problem handed out again) it closes anew, moving `lastDay`, so the
+// rotation puts it last. The filter on `lastDay` makes the same day's second close miss, and its
+// upsert then meets the unique key.
 export const closeProblem = async (userId: string, problemId: string, today: string, how: 'revealed' | 'solved'): Promise<{first: boolean}> => {
     await connectToDatabase();
     try {
         const result = await LabEvent.updateOne(
-            {userId, kind: 'problem', key: problemId},
-            {$setOnInsert: {day: today, lastDay: today, how, at: new Date()}},
+            {userId, kind: 'problem', key: problemId, lastDay: {$ne: today}},
+            {$set: {lastDay: today, how}, $setOnInsert: {day: today, at: new Date()}},
             {upsert: true},
         );
-        return {first: result.upsertedCount === 1};
+        return {first: result.upsertedCount === 1 || result.modifiedCount === 1};
     } catch (error) {
         if (isDuplicateKey(error)) return {first: false};
         throw error;
