@@ -482,7 +482,11 @@ and friends keep none beyond Shared and the invariants).
   `WIKIPEDIA_STEP_BUDGET_MS`, and the job pauses a minute after a refused pass; the User-Agent names
   the site. Each weekly decision stores its eligibility (`eligibilityOf`: how many owners could be
   bought, and how many lacked attention, bars or a quote), printed beside the universe line, with
-  one sentence when nothing could be bought (`CULTURE_PICKS_COPY.noneEligible`).
+  one sentence when nothing could be bought (`CULTURE_PICKS_COPY.noneEligible`). Such a week is
+  void (`lib/culture/decisions.isVoidWeek`: eligibility stored, none eligible, nothing executed):
+  the next weekly run — Tuesday's retry — lets the picker's claim go (`releaseCultureWeek`) with
+  its enrolled accounts' where they traded nothing (`releaseIdleFollowWeek`) and decides the week
+  again; nothing traded, so nothing can double.
 - Jobs: `culture-brain-update` daily 06:40 ET (trigger `culture`), `culture-brain-weekly` Mondays
   10:45 ET with a Tuesday holiday retry (`culture-weekly`, `culture-preview`, `culture-resimulate`),
   `culture-wikipedia-backfill` on demand (`culture-backfill [brandId…]`), `culture-follow-bootstrap`

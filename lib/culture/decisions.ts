@@ -89,3 +89,12 @@ export const buildCultureItems = ({orders, outcomes, positions, totalValue, targ
     }
     return items;
 };
+
+// A week the picker could not decide: its decision stored the week's eligibility, found no owner
+// it could buy, and executed nothing. Missing data, not a judgement — so the week is not used up:
+// the next weekly run (Tuesday's retry) releases its claim and decides it again
+// (lib/jobs/functions/culture.runCultureWeekly). Nothing traded, so a second decision can double
+// nothing. A decision made before eligibility was stored is never void.
+export const isVoidWeek = (decision: {eligibility?: {eligible: number} | null; items: readonly {executed: boolean}[]} | null): boolean =>
+    decision !== null && decision.eligibility != null && decision.eligibility.eligible === 0 && decision.items.every((item) => !item.executed);
+

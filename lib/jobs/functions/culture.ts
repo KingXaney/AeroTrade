@@ -22,10 +22,10 @@ import {historyWindow, planWikipediaFetch, recentWindow} from "@/lib/culture/his
 import {eligibilityOf} from "@/lib/culture/scoring";
 import {cultureBacktestDue} from "@/lib/culture/backtest";
 import {cultureBacktestReady, ensureCultureRateBars, getCultureBacktestStamp, lackingDividendCoverage, simulateCultureBacktest} from "@/lib/culture/backtest-store";
-import {buildCultureItems, type OrderOutcome} from "@/lib/culture/decisions";
+import {buildCultureItems, isVoidWeek, type OrderOutcome} from "@/lib/culture/decisions";
 import {decideForBook, decideWeek, firstWeekTrades} from "@/lib/culture/engine";
 import {describeFollowRun, isFollowProfile, scoredFromItems, targetsFromDecisionItems} from "@/lib/culture/follow";
-import {claimFollowWeek, completeFollowRun, getFollow, getHeldSymbolsForAccounts, listActiveFollowers, saveFollowDecision} from "@/lib/culture/follow-store";
+import {claimFollowWeek, completeFollowRun, getFollow, getHeldSymbolsForAccounts, listActiveFollowers, releaseIdleFollowWeek, saveFollowDecision} from "@/lib/culture/follow-store";
 import {
     applyCultureBatch,
     buildCultureBatchPrompt,
@@ -51,12 +51,14 @@ import {
     cultureWeekClaimed,
     ensureCultureAccount,
     ensureCultureBars,
+    getCultureDecisionForWeek,
     getHeldCultureSymbols,
     getLatestExecutedCultureDecision,
     getWeekUniverse,
     loadBook,
     loadScoringInputs,
     refreshReportDates,
+    releaseCultureWeek,
     saveCultureDecision,
     saveCultureRationale,
     verifyUniverseChunk,
@@ -220,9 +222,20 @@ export const runCultureWeekly = inngest.createFunction(
         for (const profile of LIVE_PROFILES) {
             states.push(await step.run(`ensure-account-${profile}`, async () => ensureCultureAccount(profile, day.today)));
         }
+        // A claimed week whose decision could buy no owner and traded nothing (isVoidWeek: missing
+        // data, the pickers' first weeks without Wikipedia history) is let go, with its idle
+        // followers' claims, and decided again — Tuesday's retry is the run that finds it.
         const claimed = await step.run('peek-week', async () => {
             const out: Record<string, boolean> = {};
-            for (const profile of LIVE_PROFILES) out[profile] = await cultureWeekClaimed(profile, day.weekKey);
+            for (const profile of LIVE_PROFILES) {
+                let taken = await cultureWeekClaimed(profile, day.weekKey);
+                if (taken && !day.dryRun && isVoidWeek(await getCultureDecisionForWeek(profile, day.weekKey))) {
+                    await releaseCultureWeek(profile, day.weekKey);
+                    for (const follower of await listActiveFollowers(profile)) await releaseIdleFollowWeek(follower.userId, profile, day.weekKey);
+                    taken = false;
+                }
+                out[profile] = taken;
+            }
             return out;
         });
         if (!day.dryRun && !day.resimulate && LIVE_PROFILES.every((profile) => claimed[profile])) {

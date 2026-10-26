@@ -127,6 +127,22 @@ export const cultureWeekClaimed = async (profile: ProfileId, weekKey: string): P
     return (await CultureState.exists({key: profile, lastRunWeek: weekKey})) !== null;
 };
 
+// The picker's executed decision for a week, newest first: what lib/culture/decisions.isVoidWeek
+// reads before the week's claim is taken as standing.
+export const getCultureDecisionForWeek = async (profile: ProfileId, weekKey: string): Promise<CultureDecisionView | null> => {
+    await connectToDatabase();
+    const doc = await CultureDecision.findOne({profile, weekKey, kind: 'executed'}).sort({date: -1});
+    return doc ? toDecisionView(doc) : null;
+};
+
+// A void week's claim let go, so this run may take it again (only the week named: a claim on
+// another week is never touched).
+export const releaseCultureWeek = async (profile: ProfileId, weekKey: string): Promise<boolean> => {
+    await connectToDatabase();
+    const result = await CultureState.updateOne({key: profile, lastRunWeek: weekKey}, {$unset: {lastRunWeek: ''}});
+    return result.modifiedCount === 1;
+};
+
 export const getHeldCultureSymbols = async (): Promise<string[]> => getHeldSymbolsByUserId(CULTURE_OWNER_ID);
 
 // ---- the week's quote check ----
