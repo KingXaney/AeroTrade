@@ -34,6 +34,9 @@ const eslintConfig = defineConfig([
     // Claude Code's git worktrees live under .claude/worktrees, each with a build output of its
     // own; a sibling session's tree is never this tree's lint target.
     ".claude/**",
+    // The Python services: no app code, and a local virtualenv carries hundreds of megabytes of
+    // vendored JavaScript (plotly, OpenBB's widgets) that would exhaust the linter's heap.
+    "services/**",
     "out/**",
     "build/**",
     "next-env.d.ts",

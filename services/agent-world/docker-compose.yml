@@ -1,0 +1,76 @@
+# The service, Paperclip (built from its tagged source, local_trusted) and Paperclip's Postgres.
+# Unverified: Docker was not installed where this was written (see README, "Containers").
+#
+#   export BETTER_AUTH_SECRET="$(openssl rand -hex 32)"
+#   docker compose up --build
+#
+# AeroTrade itself runs on the host (npm run dev, port 3000); the containers reach it as
+# host.docker.internal.
+
+services:
+  agent-world:
+    build: .
+    env_file:
+      - path: .env
+        required: false
+    environment:
+      AGENT_WORLD_DATA_DIR: /data
+      AEROTRADE_URL: ${AEROTRADE_URL:-http://host.docker.internal:3000}
+      PAPERCLIP_URL: http://paperclip:3100
+    ports:
+      - "8789:8789"
+    volumes:
+      - agent-world-data:/data
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+    restart: unless-stopped
+
+  paperclip:
+    build:
+      context: https://github.com/paperclipai/paperclip.git#v2026.1023.0
+      dockerfile: Dockerfile
+      # The Dockerfile's last stage is a cloud image; the server is the `production` stage.
+      target: production
+    pids_limit: 2048
+    stop_grace_period: 90s
+    environment:
+      DATABASE_URL: postgres://paperclip:paperclip@db:5432/paperclip
+      HOST: "0.0.0.0"
+      PORT: "3100"
+      SERVE_UI: "true"
+      PAPERCLIP_HOME: /paperclip
+      PAPERCLIP_DEPLOYMENT_MODE: local_trusted
+      PAPERCLIP_PUBLIC_URL: ${PAPERCLIP_PUBLIC_URL:-http://localhost:3100}
+      BETTER_AUTH_SECRET: ${BETTER_AUTH_SECRET:?set BETTER_AUTH_SECRET, e.g. openssl rand -hex 32}
+      # The http adapter only posts to private addresses named here, exactly.
+      PAPERCLIP_HTTP_ADAPTER_PRIVATE_ENDPOINT_ALLOWLIST: http://agent-world:8789,http://host.docker.internal:3000
+    ports:
+      - "3100:3100"
+    volumes:
+      - paperclip-data:/paperclip
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+    depends_on:
+      db:
+        condition: service_healthy
+    restart: unless-stopped
+
+  db:
+    image: postgres:17-alpine
+    environment:
+      POSTGRES_USER: paperclip
+      POSTGRES_PASSWORD: paperclip
+      POSTGRES_DB: paperclip
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U paperclip -d paperclip"]
+      interval: 2s
+      timeout: 5s
+      retries: 30
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    restart: unless-stopped
+
+volumes:
+  agent-world-data:
+  paperclip-data:
+  pgdata:
