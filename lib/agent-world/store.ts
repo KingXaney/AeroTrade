@@ -129,6 +129,18 @@ export const getRuns = async (env: AgentWorldEnv, sessionId: string, afterSeq = 
     return docs.map(toRunView).sort((a, b) => a.index - b.index);
 };
 
+// The runs of the sessions named, projected to what the office's career figures read: the stages,
+// the turns' speakers and the fetches' providers — never a report, a turn's text or a tool's args.
+// At most the sessions named times the universe.
+export const getCareerRuns = async (env: AgentWorldEnv, sessionIds: readonly string[]): Promise<{sessionId: string; run: RunView}[]> => {
+    if (sessionIds.length === 0) return [];
+    await connectToDatabase();
+    const docs = await AgentWorldRun.find({env, sessionId: {$in: [...sessionIds]}})
+        .select({sessionId: 1, symbol: 1, index: 1, status: 1, startedAt: 1, finishedAt: 1, rating: 1, stages: 1, cost: 1, 'debate.side': 1, 'risk.role': 1, 'toolResults.role': 1, 'toolResults.vendor': 1, 'toolResults.status': 1})
+        .lean<Loose[]>();
+    return docs.map((doc) => ({sessionId: String(doc.sessionId), run: toRunView(doc)}));
+};
+
 export const latestSession = async (env: AgentWorldEnv): Promise<SessionView | null> => {
     await connectToDatabase();
     const doc = await AgentWorldSession.findOne({env}).sort({createdAt: -1}).lean<Loose | null>();

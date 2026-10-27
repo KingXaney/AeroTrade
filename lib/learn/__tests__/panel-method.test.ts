@@ -13,6 +13,7 @@ import {TIM_COPY, TIM_TERMS} from '@/lib/learn/copy/time-in-market';
 import {TERRAIN_COPY, TERRAIN_TERMS} from '@/lib/learn/copy/terrain';
 import {BRAND_BOARD_TERMS, CULTURE_COPY} from '@/lib/learn/copy/culture';
 import {COMPANY_COPY, COMPANY_TERMS, DATA_COPY, DATA_TERMS, DECISION_TERMS, FLOOR_COPY, RECORD_COPY, RECORD_TERMS} from '@/lib/learn/copy/agent-world';
+import {DOSSIER_COPY, OFFICE_TERMS, SCOREBOARD_COPY} from '@/lib/learn/copy/agent-world-office';
 
 const RUN = 5;
 
@@ -64,5 +65,10 @@ describe('a panel lead says only what its definitions do not', () => {
         expect(restatements([FLOOR_COPY.ordersLead], DECISION_TERMS)).toEqual([]);
         expect(restatements([COMPANY_COPY.lead], COMPANY_TERMS)).toEqual([]);
         expect(restatements([DATA_COPY.lead], DATA_TERMS)).toEqual([]);
+    });
+
+    it('The office: a seat\'s file and the wall', () => {
+        for (const keys of Object.values(OFFICE_TERMS)) expect(restatements([DOSSIER_COPY.lead], keys)).toEqual([]);
+        expect(restatements([SCOREBOARD_COPY.lead], OFFICE_TERMS.board)).toEqual([]);
     });
 });

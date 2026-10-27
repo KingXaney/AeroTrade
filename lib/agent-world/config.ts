@@ -70,6 +70,14 @@ export const PAPERCLIP_DESKS = {'head-trader': 'Head trader', 'execution-desk': 
 export type PaperclipDesk = keyof typeof PAPERCLIP_DESKS;
 export type PaperclipAgentKey = RoleId | PaperclipDesk;
 
+// The office's fourteen seats in the order a session reaches them: the Head trader opens it, the
+// twelve roles run, the Execution desk takes the decision. A seat does one of WORKER_STATUSES at a
+// time (lib/agent-world/office.ts reads which from the stored session).
+export type WorkerId = PaperclipAgentKey;
+export const WORKER_IDS: readonly WorkerId[] = ['head-trader', ...ROLE_IDS, 'execution-desk'];
+export const WORKER_STATUSES = ['idle', 'waiting', 'fetching', 'working', 'talking', 'filed', 'done', 'stopped'] as const;
+export type WorkerStatus = (typeof WORKER_STATUSES)[number];
+
 // The models a session runs on unless the service is told otherwise: the research manager and the
 // portfolio manager use the deep one, every other role the quick one (TradingAgents' tiers).
 export const AGENT_WORLD_MODELS = {provider: 'google', quick: 'gemini-2.5-flash-lite', deep: 'gemini-2.5-flash'} as const;
@@ -205,6 +213,12 @@ export const DATA_TOOLS = [
 ] as const;
 export const DATA_CATEGORIES = ['prices', 'indicators', 'fundamentals', 'news', 'macro'] as const;
 export type DataCategory = (typeof DATA_CATEGORIES)[number];
+export type DataTool = (typeof DATA_TOOLS)[number]['tool'];
+export const DATA_TOOL_NAMES: readonly DataTool[] = DATA_TOOLS.map((tool) => tool.tool);
+
+// The office (/agent-world/office) plays a finished session back over this long; with motion
+// reduced it shows the end at once. The floor keeps its own REPLAY_MS.
+export const OFFICE_REPLAY_MS = 60_000;
 
 // The kill switch's name, for the page's note and the legend.
 export const AGENT_WORLD_ENABLED_ENV = 'AGENT_WORLD_ENABLED';

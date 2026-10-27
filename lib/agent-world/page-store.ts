@@ -52,7 +52,8 @@ export type FloorView = {
     serverNow: number;
 };
 
-const readRecord = async (env: ReturnType<typeof agentWorldEnv>): Promise<DeskRecordView | null> => {
+// The desk's account against SPY since its first session (also read by the office's page).
+export const readDeskRecord = async (env: ReturnType<typeof agentWorldEnv>): Promise<DeskRecordView | null> => {
     const accountId = await findAgentWorldAccountId(env);
     if (!accountId) return null;
     const [analytics, snapshotDays] = await Promise.all([
@@ -73,7 +74,7 @@ const readRecord = async (env: ReturnType<typeof agentWorldEnv>): Promise<DeskRe
 export const getFloorView = cache(async (): Promise<FloorView> => {
     const env = agentWorldEnv();
     const serverNow = Date.now();
-    const [live, record, sessions, totals] = await Promise.all([getFullLiveView(env), readRecord(env), listSessions(env, 12), sessionTotals(env)]);
+    const [live, record, sessions, totals] = await Promise.all([getFullLiveView(env), readDeskRecord(env), listSessions(env, 12), sessionTotals(env)]);
     return {
         off: agentWorldOff(),
         mode: approvalMode(),
