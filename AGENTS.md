@@ -20,7 +20,7 @@ before the rename keep the name "Main Strategy" (new ones are "Main account", `D
 - `npm run build:check` — compile-only Next build; needs no database or keys
 - `npm run build` / `npm start` — the production build and its server
 - `npm run dev` + `npx inngest-cli@latest dev -u http://localhost:3000/api/inngest` — app + jobs
-- `npm run trigger -- <brain|navigator|news|snapshots|income|topics|briefs|briefing|strategies|strategies-preview|strategies-resimulate|culture|culture-weekly|culture-preview|culture-resimulate|culture-backfill|lab>` — fire a job locally (`news <email>`: a test brief to that one opted-in reader; `culture-backfill [brandId ...]`: every brand's Wikipedia views back to the backtest horizon, or the named brands)
+- `npm run trigger -- <brain|navigator|news|snapshots|income|topics|briefs|briefing|strategies|strategies-preview|strategies-resimulate|culture|culture-weekly|culture-preview|culture-resimulate|culture-backfill|lab|agent-world|agent-world-now|agent-world-preview>` — fire a job locally (`news <email>`: a test brief to that one opted-in reader; `culture-backfill [brandId ...]`: every brand's Wikipedia views back to the backtest horizon, or the named brands)
 - `npm run test:db` — connect to `MONGODB_URI` (from `.env`) and print the database and host it reached
 - `npm run migrate:accounts` — the idempotent multi-account migration: builds the indexes in `scripts/migration-indexes.mjs` and drops the ones they replaced (run it on every database, again whenever that list changes)
 - `npm run opinion:local` — the brain's Second Opinion from your Claude subscription through the Claude Code CLI, written straight to the database (`.env.example` lists the other ways)
@@ -447,7 +447,7 @@ and friends keep none beyond Shared and the invariants).
   rounded brands and owners, each picker's live record beside SPY, its latest decision with
   every reason decoded through the culture grammar, and its simulated record apart, under one
   stance line held to the no-advice list.
-- The Brain section of `lib/shell/navigation` carries both brains (`/brain`, `/culture`); the rail
+- The Brain section of `lib/shell/navigation` carries the three brains (`/brain`, `/culture`, `/agent-world`); the rail
   stays short (seven icons since Markets and Trade merged). The two widgets (`culture-picks`, `brand-attention`) are library-only,
   category `brain` ("Brains & AI").
 - Enrolling an account with a picker (the Navigator's shape, per picker): `lib/culture/follow`
@@ -491,6 +491,80 @@ and friends keep none beyond Shared and the invariants).
   10:45 ET with a Tuesday holiday retry (`culture-weekly`, `culture-preview`, `culture-resimulate`),
   `culture-wikipedia-backfill` on demand (`culture-backfill [brandId…]`), `culture-follow-bootstrap`
   on demand (`culture-follow`). QA: `npm run qa -- culture`.
+
+### agent world
+
+- The trading agent world (`/agent-world`, the Brain section's third page; `docs/specs/2026-10-27-trading-agent-world.md`)
+  joins three outside projects: TradingAgents (a LangGraph desk of twelve model roles) and OpenBB
+  (its data vendor) run in a separate Python service, `services/agent-world`, never in this app;
+  Paperclip is the company around the desk. Mongo is this app's truth; Paperclip is told
+  everything best effort (`lib/agent-world/company`) and never stops a session. Everything is read
+  through `lib/agent-world/env` (the only reader of the feature's secrets; never `NEXT_PUBLIC`), and
+  `agentWorldOff` (`disabled`, `unconfigured`, `no-approver`) is what the page and the job say when
+  nothing may run.
+- One session at a time per deployment (`lib/agent-world/store.openSession` refuses while one is
+  queued, running, awaiting a decision or approved), every row and index carrying `env` and the
+  desk's paper account named per deployment (`agentWorldAccountName`), since a preview shares
+  production's database. A weekly session's id is its week (`aw-<Monday>`), so the unique
+  `{env, sessionId}` index is the week's claim; a manual session or a preview is a second session
+  of the week, named by the second it was asked for (`lib/agent-world/job.agentWorldDay`).
+- The job, `lib/jobs/functions/agent-world.runAgentWorldWeekly` (Mondays 08:30 ET, a Tuesday cron for a
+  holiday Monday): open the session, load the book, open the Paperclip issue, a signed POST /runs
+  (the service answers at once and works in the background — Vercel caps a request at 60 s), then
+  wait in `SESSION_WAIT_ROUNDS` rounds of `step.waitForEvent` (`AGENT_WORLD_EVENTS.finished`, matched
+  with an `if` on the session id, since a cron's own event carries none) with a Mongo read between
+  them, so a lost wake-up costs one round. Then the ratings become orders by code
+  (`lib/agent-world/orders`: `RATING_TARGET_WEIGHTS`, capped and scaled under `AGENT_WORLD_RAILS`,
+  sized by the Navigator's `diffToOrders`; a rating the model wrote never names a quantity), the
+  owner decides (`AGENT_WORLD_EVENTS.decided`, timing out at `lapseDeadline`, Mongo read whatever
+  woke it) or `auto` approves, and fills go through `executeOrder` during the session
+  (`step.sleepUntil` the open; a manual run fills at once) with `source: 'agent-world'` and the key
+  `agent-world:<session>:<side>:<symbol>`. Every exit is a sentence on the job's stamp
+  (`describeRun`), a failure included.
+- The service's events (`app/api/agent-world/events/route.ts`): signed both ways with one secret
+  (`lib/agent-world/signing`, HMAC-SHA256 over `timestamp.body`, a five-minute window; the service's
+  test holds the same vector), capped at `EVENT_BODY_BYTES`, read with zod and cut to `CLAMPS`
+  (`lib/agent-world/events`). A batch is applied as one guarded update per run-level event to its
+  run's document (`runUpdateFor`, filtered on the run's seq below the event's) and one
+  compare-and-set of the session's head on its seq (`foldHead`), so a retried batch changes nothing;
+  every head write moves `version`, the live poll's "nothing new" test. A refusal the service met
+  (`limit`) is filed on the limits tracker under the job; `finished` wakes the job after the write.
+- The floor (`components/agent-world/LiveFloor`) polls `GET /api/agent-world/live` through the pure
+  `lib/agent-world/live` (3 s while a session holds the desk, 30 s otherwise, nothing while the tab
+  is hidden), naming the session, version and seq it holds, so an answer is `unchanged` from one
+  head read or carries only the runs that moved. A finished session plays back from its stored times
+  (`lib/agent-world/replay`; none with motion reduced). The stage strip's working dot is
+  `.aw-working`, in both motion guards and stopped by name in brutalist. The ratings' words are data
+  labels (`RATING_LABELS`, `ORDER_SIDE_LABELS` in `lib/agent-world/config`), drawn in neutral badges
+  and table cells, never opening a sentence; every model text goes through `SafeMarkdown` under the
+  caveat. Components reach no store, no Paperclip client, no env reader
+  (`lib/agent-world/__tests__/guard.test.ts`); the glossary arrives as slots from the page.
+- Paperclip (`lib/agent-world/paperclip`, `lib/agent-world/paperclip-view`, every call with a
+  timeout, `PaperclipResult`, never a throw): one agent per role plus the Head trader (the issue's
+  assignee; its address is the service) and the Execution desk (the approval stage's participant;
+  its address is `app/api/agent-world/paperclip/heartbeat/route.ts`, which only logs). The owner's
+  decision is Mongo's first (`lib/actions/agent-world.actions`), then the job is woken, then the issue
+  is told as the Execution desk's (`mirrorDecision`; whether it landed is on the session). A
+  routine fired in Paperclip reaches the service, which relays it signed to
+  `app/api/agent-world/sessions/route.ts` (a manual session, a few an hour at most) and closes the
+  routine's own issue; the session keeps an issue of its own.
+  `scripts/agent-world-setup.mjs` creates the company, its agents, keys and routine idempotently.
+- What a running Paperclip v2026.1023.0 showed (2026-10-27), which both sides follow: an agent key's
+  comment or issue update needs `X-Paperclip-Run-Id` naming one of that agent's own runs on an issue
+  (`paperclip.runFor` finds the desk's; the service invokes the Head trader on the session's issue
+  with a reason beginning `execution_`); nothing is checked out (a checkout strands the issue once its
+  short run ends); the session's issue opens in backlog with `allowDuplicate` and the session id as
+  its idempotency key (in todo Paperclip wakes and checks it out at once; by title it dedupes); cost
+  events need no run; `blocked` names its unblocker; the roles are `general`, `researcher`, `qa` and
+  `pm` (`manager` is refused); an issue's board page sits under its identifier's prefix
+  (`paperclip-view.issueBoardUrl`). Every http wake leaves an unpriced cost event, which pauses the
+  company under Paperclip's default policy, so the setup script allows unpriced usage. Under automatic
+  approval the desk has no run of its own, so its comments land only once it has had one.
+- Its sentences are `lib/learn/copy/agent-world` (and the issue's own, `lib/learn/copy/agent-world-paperclip`);
+  its terms the glossary's `agent-world` group, homed on `/agent-world`; the legend
+  `lib/agent-world/legend` (every figure from config). QA: `npm run qa -- agent-world`, against
+  `scripts/qa/start-agent-world-stub.mjs` (the service's own exported events,
+  `scripts/qa/fixtures/agent-world-events.json`) and `scripts/qa/start-paperclip-stub.mjs`.
 
 ### topics
 

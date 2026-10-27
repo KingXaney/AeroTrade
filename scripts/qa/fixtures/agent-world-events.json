@@ -1,0 +1,1545 @@
+{
+ "sessionId": "aw-fixture",
+ "symbols": [
+  "AAPL",
+  "MSFT"
+ ],
+ "events": [
+  {
+   "seq": 1,
+   "at": "2026-10-26T12:30:00.400Z",
+   "type": "session.started",
+   "sessionId": "aw-fixture",
+   "symbols": [
+    "AAPL",
+    "MSFT"
+   ],
+   "tradeDate": "2026-10-26",
+   "approval": "owner",
+   "dryRun": false,
+   "models": {
+    "provider": "google",
+    "quick": "gemini-2.5-flash-lite",
+    "deep": "gemini-2.5-flash"
+   }
+  },
+  {
+   "seq": 2,
+   "at": "2026-10-26T12:30:01.000Z",
+   "type": "run.started",
+   "sessionId": "aw-fixture",
+   "symbol": "AAPL",
+   "index": 0,
+   "total": 2
+  },
+  {
+   "seq": 3,
+   "at": "2026-10-26T12:30:01.050Z",
+   "type": "role.started",
+   "sessionId": "aw-fixture",
+   "symbol": "AAPL",
+   "role": "market"
+  },
+  {
+   "seq": 4,
+   "at": "2026-10-26T12:30:01.100Z",
+   "type": "role.started",
+   "sessionId": "aw-fixture",
+   "symbol": "AAPL",
+   "role": "sentiment"
+  },
+  {
+   "seq": 5,
+   "at": "2026-10-26T12:30:01.150Z",
+   "type": "role.started",
+   "sessionId": "aw-fixture",
+   "symbol": "AAPL",
+   "role": "news"
+  },
+  {
+   "seq": 6,
+   "at": "2026-10-26T12:30:01.200Z",
+   "type": "role.started",
+   "sessionId": "aw-fixture",
+   "symbol": "AAPL",
+   "role": "fundamentals"
+  },
+  {
+   "seq": 7,
+   "at": "2026-10-26T12:30:08.000Z",
+   "type": "tool.called",
+   "sessionId": "aw-fixture",
+   "symbol": "AAPL",
+   "role": "market",
+   "name": "get_stock_data",
+   "args": "{\"end_date\": \"2026-10-26\", \"start_date\": \"2026-09-25\"}",
+   "callId": "call-aapl-mkt-1"
+  },
+  {
+   "seq": 8,
+   "at": "2026-10-26T12:30:09.000Z",
+   "type": "tool.called",
+   "sessionId": "aw-fixture",
+   "symbol": "AAPL",
+   "role": "news",
+   "name": "get_news",
+   "args": "{\"end_date\": \"2026-10-26\", \"start_date\": \"2026-10-19\"}",
+   "callId": "call-aapl-news-1"
+  },
+  {
+   "seq": 9,
+   "at": "2026-10-26T12:30:09.050Z",
+   "type": "tool.called",
+   "sessionId": "aw-fixture",
+   "symbol": "AAPL",
+   "role": "news",
+   "name": "get_global_news",
+   "args": "{\"curr_date\": \"2026-10-26\", \"look_back_days\": 7}",
+   "callId": "call-aapl-news-2"
+  },
+  {
+   "seq": 10,
+   "at": "2026-10-26T12:30:09.100Z",
+   "type": "tool.called",
+   "sessionId": "aw-fixture",
+   "symbol": "AAPL",
+   "role": "news",
+   "name": "get_macro_indicators",
+   "args": "{\"curr_date\": \"2026-10-26\", \"indicator\": \"10y_treasury\"}",
+   "callId": "call-aapl-news-3"
+  },
+  {
+   "seq": 11,
+   "at": "2026-10-26T12:30:10.000Z",
+   "type": "tool.called",
+   "sessionId": "aw-fixture",
+   "symbol": "AAPL",
+   "role": "fundamentals",
+   "name": "get_fundamentals",
+   "args": "{\"curr_date\": \"2026-10-26\"}",
+   "callId": "call-aapl-fund-1"
+  },
+  {
+   "seq": 12,
+   "at": "2026-10-26T12:30:10.050Z",
+   "type": "tool.called",
+   "sessionId": "aw-fixture",
+   "symbol": "AAPL",
+   "role": "fundamentals",
+   "name": "get_balance_sheet",
+   "args": "{\"curr_date\": \"2026-10-26\", \"freq\": \"quarterly\"}",
+   "callId": "call-aapl-fund-2"
+  },
+  {
+   "seq": 13,
+   "at": "2026-10-26T12:30:10.100Z",
+   "type": "tool.called",
+   "sessionId": "aw-fixture",
+   "symbol": "AAPL",
+   "role": "fundamentals",
+   "name": "get_insider_transactions",
+   "args": "{}",
+   "callId": "call-aapl-fund-3"
+  },
+  {
+   "seq": 14,
+   "at": "2026-10-26T12:30:12.000Z",
+   "type": "tool.result",
+   "sessionId": "aw-fixture",
+   "symbol": "AAPL",
+   "role": "market",
+   "callId": "call-aapl-mkt-1",
+   "name": "get_stock_data",
+   "status": "ok",
+   "chars": 296,
+   "vendor": "yfinance",
+   "ms": 1567,
+   "attempts": [
+    {
+     "vendor": "openbb",
+     "ok": false,
+     "error": "VendorUnavailableError: OpenBB equity.price.historical rate limited (429): YFRateLimitError, Yahoo asked for a pause"
+    },
+    {
+     "vendor": "yfinance",
+     "ok": true,
+     "error": null
+    }
+   ]
+  },
+  {
+   "seq": 15,
+   "at": "2026-10-26T12:30:12.050Z",
+   "type": "limit",
+   "sessionId": "aw-fixture",
+   "symbol": "AAPL",
+   "provider": "openbb-yfinance",
+   "status": 429,
+   "message": "OpenBB equity.price.historical rate limited (429): YFRateLimitError, Yahoo asked for a pause",
+   "fatal": false
+  },
+  {
+   "seq": 16,
+   "at": "2026-10-26T12:30:13.000Z",
+   "type": "tool.result",
+   "sessionId": "aw-fixture",
+   "symbol": "AAPL",
+   "role": "news",
+   "callId": "call-aapl-news-1",
+   "name": "get_news",
+   "status": "ok",
+   "chars": 174,
+   "vendor": "openbb",
+   "ms": 764,
+   "attempts": [
+    {
+     "vendor": "openbb",
+     "ok": true,
+     "error": null
+    }
+   ]
+  },
+  {
+   "seq": 17,
+   "at": "2026-10-26T12:30:13.050Z",
+   "type": "tool.result",
+   "sessionId": "aw-fixture",
+   "symbol": "AAPL",
+   "role": "news",
+   "callId": "call-aapl-news-2",
+   "name": "get_global_news",
+   "status": "ok",
+   "chars": 173,
+   "vendor": "yfinance",
+   "ms": 1511,
+   "attempts": [
+    {
+     "vendor": "yfinance",
+     "ok": true,
+     "error": null
+    }
+   ]
+  },
+  {
+   "seq": 18,
+   "at": "2026-10-26T12:30:13.100Z",
+   "type": "tool.result",
+   "sessionId": "aw-fixture",
+   "symbol": "AAPL",
+   "role": "news",
+   "callId": "call-aapl-news-3",
+   "name": "get_macro_indicators",
+   "status": "ok",
+   "chars": 189,
+   "vendor": "fred",
+   "ms": 402,
+   "attempts": [
+    {
+     "vendor": "fred",
+     "ok": true,
+     "error": null
+    }
+   ]
+  },
+  {
+   "seq": 19,
+   "at": "2026-10-26T12:30:23.000Z",
+   "type": "tool.called",
+   "sessionId": "aw-fixture",
+   "symbol": "AAPL",
+   "role": "market",
+   "name": "get_indicators",
+   "args": "{\"curr_date\": \"2026-10-26\", \"indicator\": \"rsi\", \"look_back_days\": 30}",
+   "callId": "call-aapl-mkt-2"
+  },
+  {
+   "seq": 20,
+   "at": "2026-10-26T12:30:23.050Z",
+   "type": "tool.called",
+   "sessionId": "aw-fixture",
+   "symbol": "AAPL",
+   "role": "market",
+   "name": "get_indicators",
+   "args": "{\"curr_date\": \"2026-10-26\", \"indicator\": \"macd\", \"look_back_days\": 30}",
+   "callId": "call-aapl-mkt-3"
+  },
+  {
+   "seq": 21,
+   "at": "2026-10-26T12:30:25.000Z",
+   "type": "tool.result",
+   "sessionId": "aw-fixture",
+   "symbol": "AAPL",
+   "role": "market",
+   "callId": "call-aapl-mkt-2",
+   "name": "get_indicators",
+   "status": "ok",
+   "chars": 136,
+   "vendor": "openbb",
+   "ms": 1840,
+   "attempts": [
+    {
+     "vendor": "openbb",
+     "ok": true,
+     "error": null
+    }
+   ]
+  },
+  {
+   "seq": 22,
+   "at": "2026-10-26T12:30:25.050Z",
+   "type": "tool.result",
+   "sessionId": "aw-fixture",
+   "symbol": "AAPL",
+   "role": "market",
+   "callId": "call-aapl-mkt-3",
+   "name": "get_indicators",
+   "status": "ok",
+   "chars": 81,
+   "vendor": "openbb",
+   "ms": 118,
+   "attempts": [
+    {
+     "vendor": "openbb",
+     "ok": true,
+     "error": null
+    }
+   ]
+  },
+  {
+   "seq": 23,
+   "at": "2026-10-26T12:30:34.000Z",
+   "type": "tool.result",
+   "sessionId": "aw-fixture",
+   "symbol": "AAPL",
+   "role": "fundamentals",
+   "callId": "call-aapl-fund-1",
+   "name": "get_fundamentals",
+   "status": "ok",
+   "chars": 238,
+   "vendor": "openbb",
+   "ms": 1093,
+   "attempts": [
+    {
+     "vendor": "openbb",
+     "ok": true,
+     "error": null
+    }
+   ]
+  },
+  {
+   "seq": 24,
+   "at": "2026-10-26T12:30:34.050Z",
+   "type": "tool.result",
+   "sessionId": "aw-fixture",
+   "symbol": "AAPL",
+   "role": "fundamentals",
+   "callId": "call-aapl-fund-2",
+   "name": "get_balance_sheet",
+   "status": "unavailable",
+   "chars": 236,
+   "vendor": null,
+   "ms": 22191,
+   "attempts": [
+    {
+     "vendor": "openbb",
+     "ok": false,
+     "error": "VendorUnavailableError: OpenBB equity.fundamental.balance took longer than 20s"
+    },
+    {
+     "vendor": "sec_edgar",
+     "ok": false,
+     "error": "VendorUnavailableError: SEC EDGAR request failed (503)"
+    },
+    {
+     "vendor": "yfinance",
+     "ok": false,
+     "error": "VendorUnavailableError: Yahoo Finance request failed: ConnectError"
+    }
+   ]
+  },
+  {
+   "seq": 25,
+   "at": "2026-10-26T12:30:34.100Z",
+   "type": "tool.result",
+   "sessionId": "aw-fixture",
+   "symbol": "AAPL",
+   "role": "fundamentals",
+   "callId": "call-aapl-fund-3",
+   "name": "get_insider_transactions",
+   "status": "ok",
+   "chars": 258,
+   "vendor": "openbb",
+   "ms": 5212,
+   "attempts": [
+    {
+     "vendor": "openbb",
+     "ok": true,
+     "error": null
+    }
+   ]
+  },
+  {
+   "seq": 26,
+   "at": "2026-10-26T12:30:42.000Z",
+   "type": "cost.tick",
+   "sessionId": "aw-fixture",
+   "symbol": "AAPL",
+   "role": "sentiment",
+   "model": "gemini-2.5-flash-lite",
+   "inputTokens": 4200,
+   "outputTokens": 700,
+   "costCents": 0.07,
+   "llmCalls": 1,
+   "pricing": "known"
+  },
+  {
+   "seq": 27,
+   "at": "2026-10-26T12:30:42.050Z",
+   "type": "role.report",
+   "sessionId": "aw-fixture",
+   "symbol": "AAPL",
+   "role": "sentiment",
+   "text": "**Overall Sentiment:** **Mildly Bullish** (Score: 6.4/10)\n**Confidence:** Medium\n\nStockTwits messages over the past seven days lean positive, with 64% of tagged posts marked Bullish across 30 messages. Reddit threads in r/stocks focus on the iPhone 18 cycle and services margins; r/wallstreetbets posts are fewer and mixed. News framing is steadier than the social feeds: headlines centre on supplier commentary and the quarterly report due on 29 October. The sample is small, so the read carries medium confidence.",
+   "forced": false
+  },
+  {
+   "seq": 28,
+   "at": "2026-10-26T12:30:42.100Z",
+   "type": "role.done",
+   "sessionId": "aw-fixture",
+   "symbol": "AAPL",
+   "role": "sentiment"
+  },
+  {
+   "seq": 29,
+   "at": "2026-10-26T12:31:45.000Z",
+   "type": "cost.tick",
+   "sessionId": "aw-fixture",
+   "symbol": "AAPL",
+   "role": "news",
+   "model": "gemini-2.5-flash-lite",
+   "inputTokens": 7600,
+   "outputTokens": 1400,
+   "costCents": 0.132,
+   "llmCalls": 2,
+   "pricing": "known"
+  },
+  {
+   "seq": 30,
+   "at": "2026-10-26T12:31:45.050Z",
+   "type": "role.report",
+   "sessionId": "aw-fixture",
+   "symbol": "AAPL",
+   "role": "news",
+   "text": "Apple reports fiscal fourth-quarter results on 29 October after the close. Supplier commentary from Taiwan points to steady iPhone 18 builds through December, and two outlets report expanded production of the base model. On the macro side, the Federal Reserve meets on 4 November with futures pricing a 25 bp cut, and ten-year Treasury yields eased to 4.0% over the week. A European Commission decision on App Store fees remains pending; reports describe a fine range but no date. Insider activity was routine, with two Form 4 sales under 10b5-1 plans.\n\n| Item | Date | Relevance |\n|---|---|---|\n| Q4 FY26 results | 29 Oct | Near-term catalyst |\n| FOMC decision | 4 Nov | Rates backdrop |\n| EU App Store ruling | Pending | Regulatory overhang |",
+   "forced": false
+  },
+  {
+   "seq": 31,
+   "at": "2026-10-26T12:31:45.100Z",
+   "type": "role.done",
+   "sessionId": "aw-fixture",
+   "symbol": "AAPL",
+   "role": "news"
+  },
+  {
+   "seq": 32,
+   "at": "2026-10-26T12:32:33.000Z",
+   "type": "cost.tick",
+   "sessionId": "aw-fixture",
+   "symbol": "AAPL",
+   "role": "market",
+   "model": "gemini-2.5-flash-lite",
+   "inputTokens": 9800,
+   "outputTokens": 1900,
+   "costCents": 0.174,
+   "llmCalls": 3,
+   "pricing": "known"
+  },
+  {
+   "seq": 33,
+   "at": "2026-10-26T12:32:33.050Z",
+   "type": "role.report",
+   "sessionId": "aw-fixture",
+   "symbol": "AAPL",
+   "role": "market",
+   "text": "AAPL closed the week at $347.73 on Friday 23 October, up 5.3% across the month after a run of higher lows since early October. The 50-day SMA sits near $336 and the 200-day near $312, so price trades above both averages and the 50-day keeps rising. RSI(14) read 61 at Friday's close, below the 70 line that marks a stretched move. MACD stays above its signal line, though the histogram has narrowed for three sessions, which says momentum is slowing rather than reversing. ATR(14) is about $6.10, roughly 1.8% of price. Volume on the rally days ran near the 30-day average, without a climactic spike.\n\n| Indicator | Reading | What it says |\n|---|---|---|\n| Close vs 50/200 SMA | Above both | Uptrend intact |\n| RSI(14) | 61 | Firm, not stretched |\n| MACD histogram | Narrowing | Momentum slowing |\n| ATR(14) | $6.10 | Daily range near 1.8% |",
+   "forced": false
+  },
+  {
+   "seq": 34,
+   "at": "2026-10-26T12:32:33.100Z",
+   "type": "role.done",
+   "sessionId": "aw-fixture",
+   "symbol": "AAPL",
+   "role": "market"
+  },
+  {
+   "seq": 35,
+   "at": "2026-10-26T12:33:16.000Z",
+   "type": "cost.tick",
+   "sessionId": "aw-fixture",
+   "symbol": "AAPL",
+   "role": "fundamentals",
+   "model": "gemini-2.5-flash-lite",
+   "inputTokens": 8100,
+   "outputTokens": 1300,
+   "costCents": 0.133,
+   "llmCalls": 2,
+   "pricing": "known"
+  },
+  {
+   "seq": 36,
+   "at": "2026-10-26T12:33:16.050Z",
+   "type": "role.report",
+   "sessionId": "aw-fixture",
+   "symbol": "AAPL",
+   "role": "fundamentals",
+   "text": "Apple's trailing revenue stands near $416 billion with a gross margin of 46.9% and an operating margin of 32.6%. Services carry a higher margin than hardware and now contribute roughly a quarter of revenue. The trailing P/E is about 39.8 and the forward P/E about 36.3, both above the five-year median near 29. Return on equity is very high because buybacks keep the equity base small. The quarterly balance sheet was unavailable this run (none of the statement vendors answered), so leverage figures come from the key-metrics feed: debt to equity of 78% and a current ratio of 1.0.\n\n| Metric | Value |\n|---|---|\n| Gross margin | 46.9% |\n| Operating margin | 32.6% |\n| Trailing P/E | 39.8 |\n| Forward P/E | 36.3 |\n| Debt to equity | 78% |",
+   "forced": false
+  },
+  {
+   "seq": 37,
+   "at": "2026-10-26T12:33:16.100Z",
+   "type": "role.done",
+   "sessionId": "aw-fixture",
+   "symbol": "AAPL",
+   "role": "fundamentals"
+  },
+  {
+   "seq": 38,
+   "at": "2026-10-26T12:33:16.150Z",
+   "type": "role.started",
+   "sessionId": "aw-fixture",
+   "symbol": "AAPL",
+   "role": "bull"
+  },
+  {
+   "seq": 39,
+   "at": "2026-10-26T12:33:17.000Z",
+   "type": "memory.note",
+   "sessionId": "aw-fixture",
+   "symbol": "AAPL",
+   "text": "1 past decision(s) could not be settled this run and stay pending."
+  },
+  {
+   "seq": 40,
+   "at": "2026-10-26T12:34:11.000Z",
+   "type": "cost.tick",
+   "sessionId": "aw-fixture",
+   "symbol": "AAPL",
+   "role": "bull",
+   "model": "gemini-2.5-flash-lite",
+   "inputTokens": 6200,
+   "outputTokens": 520,
+   "costCents": 0.0828,
+   "llmCalls": 1,
+   "pricing": "known"
+  },
+  {
+   "seq": 41,
+   "at": "2026-10-26T12:34:11.050Z",
+   "type": "debate.turn",
+   "sessionId": "aw-fixture",
+   "symbol": "AAPL",
+   "side": "bull",
+   "round": 1,
+   "text": "The trend, the services mix and the product cycle all point the same way. Price holds above both moving averages with RSI at 61, so the move has room before it looks stretched. Supplier checks describe steady iPhone 18 builds into December, and services keep lifting the blended margin toward 47%. The bear case leans on the multiple, yet a forward P/E near 36 has persisted through two years of rising earnings, and the report on 29 October gives the desk a fresh read within days."
+  },
+  {
+   "seq": 42,
+   "at": "2026-10-26T12:34:11.100Z",
+   "type": "role.started",
+   "sessionId": "aw-fixture",
+   "symbol": "AAPL",
+   "role": "bear"
+  },
+  {
+   "seq": 43,
+   "at": "2026-10-26T12:35:03.000Z",
+   "type": "cost.tick",
+   "sessionId": "aw-fixture",
+   "symbol": "AAPL",
+   "role": "bear",
+   "model": "gemini-2.5-flash-lite",
+   "inputTokens": 6700,
+   "outputTokens": 510,
+   "costCents": 0.0874,
+   "llmCalls": 1,
+   "pricing": "known"
+  },
+  {
+   "seq": 44,
+   "at": "2026-10-26T12:35:03.050Z",
+   "type": "debate.turn",
+   "sessionId": "aw-fixture",
+   "symbol": "AAPL",
+   "side": "bear",
+   "round": 1,
+   "text": "A forward P/E of 36 leaves little cushion if the 29 October report disappoints on iPhone volumes or guidance. The MACD histogram has narrowed for three sessions, so momentum is fading into the event. The EU App Store ruling is an open liability with no date, and services margins are exactly where regulation bites. The bull reads steady supplier builds as demand; they can just as easily be inventory ahead of a softer holiday quarter."
+  },
+  {
+   "seq": 45,
+   "at": "2026-10-26T12:35:03.100Z",
+   "type": "role.done",
+   "sessionId": "aw-fixture",
+   "symbol": "AAPL",
+   "role": "bull"
+  },
+  {
+   "seq": 46,
+   "at": "2026-10-26T12:35:03.150Z",
+   "type": "role.done",
+   "sessionId": "aw-fixture",
+   "symbol": "AAPL",
+   "role": "bear"
+  },
+  {
+   "seq": 47,
+   "at": "2026-10-26T12:35:03.200Z",
+   "type": "role.started",
+   "sessionId": "aw-fixture",
+   "symbol": "AAPL",
+   "role": "research-manager"
+  },
+  {
+   "seq": 48,
+   "at": "2026-10-26T12:36:02.000Z",
+   "type": "cost.tick",
+   "sessionId": "aw-fixture",
+   "symbol": "AAPL",
+   "role": "research-manager",
+   "model": "gemini-2.5-flash",
+   "inputTokens": 5200,
+   "outputTokens": 640,
+   "costCents": 0.316,
+   "llmCalls": 1,
+   "pricing": "known"
+  },
+  {
+   "seq": 49,
+   "at": "2026-10-26T12:36:02.050Z",
+   "type": "role.report",
+   "sessionId": "aw-fixture",
+   "symbol": "AAPL",
+   "role": "research-manager",
+   "text": "**Decision**: Overweight\n\n**Rationale**: The bull case rests on trend, margin mix and a near-term catalyst; the bear case rests on valuation and event risk. The trend evidence is measurable and current, while the regulatory risk has no date attached, so the bull side carries more weight, sized down for the event on 29 October.\n\n**Strategic Actions**: Build toward a full position in two steps, the first before the report and the second after it, with a stop below the 50-day average near $336.",
+   "forced": false
+  },
+  {
+   "seq": 50,
+   "at": "2026-10-26T12:36:02.100Z",
+   "type": "role.done",
+   "sessionId": "aw-fixture",
+   "symbol": "AAPL",
+   "role": "research-manager"
+  },
+  {
+   "seq": 51,
+   "at": "2026-10-26T12:36:02.150Z",
+   "type": "role.started",
+   "sessionId": "aw-fixture",
+   "symbol": "AAPL",
+   "role": "trader"
+  },
+  {
+   "seq": 52,
+   "at": "2026-10-26T12:36:39.000Z",
+   "type": "cost.tick",
+   "sessionId": "aw-fixture",
+   "symbol": "AAPL",
+   "role": "trader",
+   "model": "gemini-2.5-flash-lite",
+   "inputTokens": 4300,
+   "outputTokens": 420,
+   "costCents": 0.0598,
+   "llmCalls": 1,
+   "pricing": "known"
+  },
+  {
+   "seq": 53,
+   "at": "2026-10-26T12:36:39.050Z",
+   "type": "role.report",
+   "sessionId": "aw-fixture",
+   "symbol": "AAPL",
+   "role": "trader",
+   "text": "The plan maps to adding AAPL in two tranches. The first tranche goes in at the open near $348, sized at half of the target weight; the second follows the 29 October report if price holds above $336. A stop at $333 sits about two ATRs under the entry and below the 50-day average.\n\n**Entry Price**: 348.0\n\n**Stop Loss**: 333.0\n\n**Position Sizing**: half of the target weight now, half after the report\n\nFINAL TRANSACTION PROPOSAL: **BUY**",
+   "forced": false
+  },
+  {
+   "seq": 54,
+   "at": "2026-10-26T12:36:39.100Z",
+   "type": "role.done",
+   "sessionId": "aw-fixture",
+   "symbol": "AAPL",
+   "role": "trader"
+  },
+  {
+   "seq": 55,
+   "at": "2026-10-26T12:36:39.150Z",
+   "type": "role.started",
+   "sessionId": "aw-fixture",
+   "symbol": "AAPL",
+   "role": "risk-aggressive"
+  },
+  {
+   "seq": 56,
+   "at": "2026-10-26T12:37:22.000Z",
+   "type": "cost.tick",
+   "sessionId": "aw-fixture",
+   "symbol": "AAPL",
+   "role": "risk-aggressive",
+   "model": "gemini-2.5-flash-lite",
+   "inputTokens": 7400,
+   "outputTokens": 300,
+   "costCents": 0.086,
+   "llmCalls": 1,
+   "pricing": "known"
+  },
+  {
+   "seq": 57,
+   "at": "2026-10-26T12:37:22.050Z",
+   "type": "risk.turn",
+   "sessionId": "aw-fixture",
+   "symbol": "AAPL",
+   "role": "risk-aggressive",
+   "round": 1,
+   "text": "The half-size entry leaves upside on the table. The trend is intact, the catalyst is days away, and services margins compound regardless of the quarter's unit count. Waiting for the report means paying a gap if guidance lands well, and the stop already caps the loss at about 4%."
+  },
+  {
+   "seq": 58,
+   "at": "2026-10-26T12:37:22.100Z",
+   "type": "role.started",
+   "sessionId": "aw-fixture",
+   "symbol": "AAPL",
+   "role": "risk-conservative"
+  },
+  {
+   "seq": 59,
+   "at": "2026-10-26T12:38:07.000Z",
+   "type": "cost.tick",
+   "sessionId": "aw-fixture",
+   "symbol": "AAPL",
+   "role": "risk-conservative",
+   "model": "gemini-2.5-flash-lite",
+   "inputTokens": 7700,
+   "outputTokens": 310,
+   "costCents": 0.0894,
+   "llmCalls": 1,
+   "pricing": "known"
+  },
+  {
+   "seq": 60,
+   "at": "2026-10-26T12:38:07.050Z",
+   "type": "risk.turn",
+   "sessionId": "aw-fixture",
+   "symbol": "AAPL",
+   "role": "risk-conservative",
+   "round": 1,
+   "text": "Two tranches are the right shape, but the first one belongs after the report, not before it. Options price a 5% move into earnings, larger than the distance to the stop, so the stop can trigger on noise. Keeping the book at its current weight until 29 October costs little and removes the event from the decision."
+  },
+  {
+   "seq": 61,
+   "at": "2026-10-26T12:38:07.100Z",
+   "type": "role.started",
+   "sessionId": "aw-fixture",
+   "symbol": "AAPL",
+   "role": "risk-neutral"
+  },
+  {
+   "seq": 62,
+   "at": "2026-10-26T12:38:49.000Z",
+   "type": "cost.tick",
+   "sessionId": "aw-fixture",
+   "symbol": "AAPL",
+   "role": "risk-neutral",
+   "model": "gemini-2.5-flash-lite",
+   "inputTokens": 7900,
+   "outputTokens": 280,
+   "costCents": 0.0902,
+   "llmCalls": 1,
+   "pricing": "known"
+  },
+  {
+   "seq": 63,
+   "at": "2026-10-26T12:38:49.050Z",
+   "type": "risk.turn",
+   "sessionId": "aw-fixture",
+   "symbol": "AAPL",
+   "role": "risk-neutral",
+   "round": 1,
+   "text": "Both sides agree on direction and differ on timing. A smaller first tranche, a third of the target instead of a half, keeps exposure to the trend while limiting what the event can do to the book. The stop below the 50-day average stays as written."
+  },
+  {
+   "seq": 64,
+   "at": "2026-10-26T12:38:49.100Z",
+   "type": "role.done",
+   "sessionId": "aw-fixture",
+   "symbol": "AAPL",
+   "role": "risk-aggressive"
+  },
+  {
+   "seq": 65,
+   "at": "2026-10-26T12:38:49.150Z",
+   "type": "role.done",
+   "sessionId": "aw-fixture",
+   "symbol": "AAPL",
+   "role": "risk-conservative"
+  },
+  {
+   "seq": 66,
+   "at": "2026-10-26T12:38:49.200Z",
+   "type": "role.done",
+   "sessionId": "aw-fixture",
+   "symbol": "AAPL",
+   "role": "risk-neutral"
+  },
+  {
+   "seq": 67,
+   "at": "2026-10-26T12:38:49.250Z",
+   "type": "role.started",
+   "sessionId": "aw-fixture",
+   "symbol": "AAPL",
+   "role": "portfolio-manager"
+  },
+  {
+   "seq": 68,
+   "at": "2026-10-26T12:39:57.000Z",
+   "type": "cost.tick",
+   "sessionId": "aw-fixture",
+   "symbol": "AAPL",
+   "role": "portfolio-manager",
+   "model": "gemini-2.5-flash",
+   "inputTokens": 6100,
+   "outputTokens": 620,
+   "costCents": 0.338,
+   "llmCalls": 1,
+   "pricing": "known"
+  },
+  {
+   "seq": 69,
+   "at": "2026-10-26T12:39:57.050Z",
+   "type": "role.report",
+   "sessionId": "aw-fixture",
+   "symbol": "AAPL",
+   "role": "portfolio-manager",
+   "text": "Rating: Buy\n\n**Executive Summary**: The desk adds AAPL toward its target weight in two steps, a third now and the rest after the 29 October report, with a stop at $333 below the 50-day average.\n\n**Investment Thesis**: The analysts agree the trend is intact, with price above both moving averages and RSI at 61. Services keep lifting the margin mix, and supplier checks describe steady iPhone builds. Valuation near 36 times forward earnings and the open EU ruling are the main risks; the staged entry and the stop size the position against them.\n\n**Time Horizon**: three to six months",
+   "forced": false
+  },
+  {
+   "seq": 70,
+   "at": "2026-10-26T12:39:59.000Z",
+   "type": "role.done",
+   "sessionId": "aw-fixture",
+   "symbol": "AAPL",
+   "role": "portfolio-manager"
+  },
+  {
+   "seq": 71,
+   "at": "2026-10-26T12:39:59.050Z",
+   "type": "run.completed",
+   "sessionId": "aw-fixture",
+   "symbol": "AAPL",
+   "rating": "Buy",
+   "review": false,
+   "decision": "Rating: Buy\n\n**Executive Summary**: The desk adds AAPL toward its target weight in two steps, a third now and the rest after the 29 October report, with a stop at $333 below the 50-day average.\n\n**Investment Thesis**: The analysts agree the trend is intact, with price above both moving averages and RSI at 61. Services keep lifting the margin mix, and supplier checks describe steady iPhone builds. Valuation near 36 times forward earnings and the open EU ruling are the main risks; the staged entry and the stop size the position against them.\n\n**Time Horizon**: three to six months",
+   "stats": {
+    "llmCalls": 16,
+    "toolCalls": 9,
+    "tokensIn": 81200,
+    "tokensOut": 8900,
+    "costCents": 1.6586
+   }
+  },
+  {
+   "seq": 72,
+   "at": "2026-10-26T12:40:11.000Z",
+   "type": "run.started",
+   "sessionId": "aw-fixture",
+   "symbol": "MSFT",
+   "index": 1,
+   "total": 2
+  },
+  {
+   "seq": 73,
+   "at": "2026-10-26T12:40:11.050Z",
+   "type": "role.started",
+   "sessionId": "aw-fixture",
+   "symbol": "MSFT",
+   "role": "market"
+  },
+  {
+   "seq": 74,
+   "at": "2026-10-26T12:40:11.100Z",
+   "type": "role.started",
+   "sessionId": "aw-fixture",
+   "symbol": "MSFT",
+   "role": "sentiment"
+  },
+  {
+   "seq": 75,
+   "at": "2026-10-26T12:40:11.150Z",
+   "type": "role.started",
+   "sessionId": "aw-fixture",
+   "symbol": "MSFT",
+   "role": "news"
+  },
+  {
+   "seq": 76,
+   "at": "2026-10-26T12:40:11.200Z",
+   "type": "role.started",
+   "sessionId": "aw-fixture",
+   "symbol": "MSFT",
+   "role": "fundamentals"
+  },
+  {
+   "seq": 77,
+   "at": "2026-10-26T12:40:17.000Z",
+   "type": "tool.called",
+   "sessionId": "aw-fixture",
+   "symbol": "MSFT",
+   "role": "market",
+   "name": "get_stock_data",
+   "args": "{\"end_date\": \"2026-10-26\", \"start_date\": \"2026-09-25\"}",
+   "callId": "call-msft-mkt-1"
+  },
+  {
+   "seq": 78,
+   "at": "2026-10-26T12:40:17.050Z",
+   "type": "tool.called",
+   "sessionId": "aw-fixture",
+   "symbol": "MSFT",
+   "role": "market",
+   "name": "get_indicators",
+   "args": "{\"curr_date\": \"2026-10-26\", \"indicator\": \"rsi\", \"look_back_days\": 30}",
+   "callId": "call-msft-mkt-2"
+  },
+  {
+   "seq": 79,
+   "at": "2026-10-26T12:40:18.000Z",
+   "type": "tool.called",
+   "sessionId": "aw-fixture",
+   "symbol": "MSFT",
+   "role": "news",
+   "name": "get_news",
+   "args": "{\"end_date\": \"2026-10-26\", \"start_date\": \"2026-10-19\"}",
+   "callId": "call-msft-news-1"
+  },
+  {
+   "seq": 80,
+   "at": "2026-10-26T12:40:19.000Z",
+   "type": "tool.called",
+   "sessionId": "aw-fixture",
+   "symbol": "MSFT",
+   "role": "fundamentals",
+   "name": "get_fundamentals",
+   "args": "{\"curr_date\": \"2026-10-26\"}",
+   "callId": "call-msft-fund-1"
+  },
+  {
+   "seq": 81,
+   "at": "2026-10-26T12:40:19.050Z",
+   "type": "tool.called",
+   "sessionId": "aw-fixture",
+   "symbol": "MSFT",
+   "role": "fundamentals",
+   "name": "get_income_statement",
+   "args": "{\"curr_date\": \"2026-10-26\", \"freq\": \"annual\"}",
+   "callId": "call-msft-fund-2"
+  },
+  {
+   "seq": 82,
+   "at": "2026-10-26T12:40:21.000Z",
+   "type": "tool.result",
+   "sessionId": "aw-fixture",
+   "symbol": "MSFT",
+   "role": "market",
+   "callId": "call-msft-mkt-1",
+   "name": "get_stock_data",
+   "status": "ok",
+   "chars": 153,
+   "vendor": "openbb",
+   "ms": 584,
+   "attempts": [
+    {
+     "vendor": "openbb",
+     "ok": true,
+     "error": null
+    }
+   ]
+  },
+  {
+   "seq": 83,
+   "at": "2026-10-26T12:40:21.050Z",
+   "type": "tool.result",
+   "sessionId": "aw-fixture",
+   "symbol": "MSFT",
+   "role": "market",
+   "callId": "call-msft-mkt-2",
+   "name": "get_indicators",
+   "status": "ok",
+   "chars": 63,
+   "vendor": "openbb",
+   "ms": 1702,
+   "attempts": [
+    {
+     "vendor": "openbb",
+     "ok": true,
+     "error": null
+    }
+   ]
+  },
+  {
+   "seq": 84,
+   "at": "2026-10-26T12:40:22.000Z",
+   "type": "tool.result",
+   "sessionId": "aw-fixture",
+   "symbol": "MSFT",
+   "role": "news",
+   "callId": "call-msft-news-1",
+   "name": "get_news",
+   "status": "ok",
+   "chars": 168,
+   "vendor": "openbb",
+   "ms": 690,
+   "attempts": [
+    {
+     "vendor": "openbb",
+     "ok": true,
+     "error": null
+    }
+   ]
+  },
+  {
+   "seq": 85,
+   "at": "2026-10-26T12:40:24.000Z",
+   "type": "tool.result",
+   "sessionId": "aw-fixture",
+   "symbol": "MSFT",
+   "role": "fundamentals",
+   "callId": "call-msft-fund-1",
+   "name": "get_fundamentals",
+   "status": "ok",
+   "chars": 123,
+   "vendor": "openbb",
+   "ms": 1015,
+   "attempts": [
+    {
+     "vendor": "openbb",
+     "ok": true,
+     "error": null
+    }
+   ]
+  },
+  {
+   "seq": 86,
+   "at": "2026-10-26T12:40:24.050Z",
+   "type": "tool.result",
+   "sessionId": "aw-fixture",
+   "symbol": "MSFT",
+   "role": "fundamentals",
+   "callId": "call-msft-fund-2",
+   "name": "get_income_statement",
+   "status": "ok",
+   "chars": 235,
+   "vendor": "openbb",
+   "ms": 744,
+   "attempts": [
+    {
+     "vendor": "openbb",
+     "ok": true,
+     "error": null
+    }
+   ]
+  },
+  {
+   "seq": 87,
+   "at": "2026-10-26T12:40:48.000Z",
+   "type": "cost.tick",
+   "sessionId": "aw-fixture",
+   "symbol": "MSFT",
+   "role": "sentiment",
+   "model": "gemini-2.5-flash-lite",
+   "inputTokens": 3800,
+   "outputTokens": 520,
+   "costCents": 0.0588,
+   "llmCalls": 1,
+   "pricing": "known"
+  },
+  {
+   "seq": 88,
+   "at": "2026-10-26T12:40:48.050Z",
+   "type": "role.report",
+   "sessionId": "aw-fixture",
+   "symbol": "MSFT",
+   "role": "sentiment",
+   "text": "**Overall Sentiment:** **Mixed** (Score: 5.1/10)\n**Confidence:** Low\n\nStockTwits tags split close to evenly across 22 messages, and Reddit discussion centres on Azure capacity and AI capital spending. The feeds are thin this week, so the read carries low confidence.",
+   "forced": false
+  },
+  {
+   "seq": 89,
+   "at": "2026-10-26T12:40:48.100Z",
+   "type": "role.done",
+   "sessionId": "aw-fixture",
+   "symbol": "MSFT",
+   "role": "sentiment"
+  },
+  {
+   "seq": 90,
+   "at": "2026-10-26T12:41:47.000Z",
+   "type": "cost.tick",
+   "sessionId": "aw-fixture",
+   "symbol": "MSFT",
+   "role": "news",
+   "model": "gemini-2.5-flash-lite",
+   "inputTokens": 5900,
+   "outputTokens": 900,
+   "costCents": 0.095,
+   "llmCalls": 2,
+   "pricing": "known"
+  },
+  {
+   "seq": 91,
+   "at": "2026-10-26T12:41:47.050Z",
+   "type": "role.report",
+   "sessionId": "aw-fixture",
+   "symbol": "MSFT",
+   "role": "news",
+   "text": "Microsoft reports fiscal first-quarter results on 28 October. Coverage focuses on Azure growth against capacity limits and on capital spending, which reports put above $30 billion for the quarter. A cloud licensing inquiry in the UK continues without a date.",
+   "forced": false
+  },
+  {
+   "seq": 92,
+   "at": "2026-10-26T12:41:47.100Z",
+   "type": "role.done",
+   "sessionId": "aw-fixture",
+   "symbol": "MSFT",
+   "role": "news"
+  },
+  {
+   "seq": 93,
+   "at": "2026-10-26T12:42:19.000Z",
+   "type": "cost.tick",
+   "sessionId": "aw-fixture",
+   "symbol": "MSFT",
+   "role": "market",
+   "model": "gemini-2.5-flash-lite",
+   "inputTokens": 7100,
+   "outputTokens": 1100,
+   "costCents": 0.115,
+   "llmCalls": 2,
+   "pricing": "known"
+  },
+  {
+   "seq": 94,
+   "at": "2026-10-26T12:42:19.050Z",
+   "type": "role.report",
+   "sessionId": "aw-fixture",
+   "symbol": "MSFT",
+   "role": "market",
+   "text": "MSFT closed at $561.40 on 23 October, flat over the month inside a $545 to $575 range. Price sits between the 50-day SMA near $558 and the 200-day near $529. RSI(14) reads 52 and the MACD line is hugging its signal line, a picture of balance rather than trend. ATR(14) is about $8.90, close to 1.6% of price.",
+   "forced": false
+  },
+  {
+   "seq": 95,
+   "at": "2026-10-26T12:42:19.100Z",
+   "type": "role.done",
+   "sessionId": "aw-fixture",
+   "symbol": "MSFT",
+   "role": "market"
+  },
+  {
+   "seq": 96,
+   "at": "2026-10-26T12:43:01.000Z",
+   "type": "cost.tick",
+   "sessionId": "aw-fixture",
+   "symbol": "MSFT",
+   "role": "fundamentals",
+   "model": "gemini-2.5-flash-lite",
+   "inputTokens": 6600,
+   "outputTokens": 950,
+   "costCents": 0.104,
+   "llmCalls": 2,
+   "pricing": "known"
+  },
+  {
+   "seq": 97,
+   "at": "2026-10-26T12:43:01.050Z",
+   "type": "role.report",
+   "sessionId": "aw-fixture",
+   "symbol": "MSFT",
+   "role": "fundamentals",
+   "text": "Microsoft's trailing revenue is near $290 billion with an operating margin of 45%. The trailing P/E is about 37, and free cash flow covers the dividend more than three times. Capital spending has doubled over two years, which compresses free cash flow growth even as revenue grows in the mid-teens.",
+   "forced": false
+  },
+  {
+   "seq": 98,
+   "at": "2026-10-26T12:43:01.100Z",
+   "type": "role.done",
+   "sessionId": "aw-fixture",
+   "symbol": "MSFT",
+   "role": "fundamentals"
+  },
+  {
+   "seq": 99,
+   "at": "2026-10-26T12:43:01.150Z",
+   "type": "role.started",
+   "sessionId": "aw-fixture",
+   "symbol": "MSFT",
+   "role": "bull"
+  },
+  {
+   "seq": 100,
+   "at": "2026-10-26T12:43:53.000Z",
+   "type": "cost.tick",
+   "sessionId": "aw-fixture",
+   "symbol": "MSFT",
+   "role": "bull",
+   "model": "gemini-2.5-flash-lite",
+   "inputTokens": 5100,
+   "outputTokens": 300,
+   "costCents": 0.063,
+   "llmCalls": 1,
+   "pricing": "known"
+  },
+  {
+   "seq": 101,
+   "at": "2026-10-26T12:43:53.050Z",
+   "type": "debate.turn",
+   "sessionId": "aw-fixture",
+   "symbol": "MSFT",
+   "side": "bull",
+   "round": 1,
+   "text": "Azure demand still exceeds capacity, and each quarter of new data centres converts into revenue the following quarter. The range since August has held at $545 on three tests, which reads as accumulation."
+  },
+  {
+   "seq": 102,
+   "at": "2026-10-26T12:43:53.100Z",
+   "type": "role.started",
+   "sessionId": "aw-fixture",
+   "symbol": "MSFT",
+   "role": "bear"
+  },
+  {
+   "seq": 103,
+   "at": "2026-10-26T12:44:39.000Z",
+   "type": "cost.tick",
+   "sessionId": "aw-fixture",
+   "symbol": "MSFT",
+   "role": "bear",
+   "model": "gemini-2.5-flash-lite",
+   "inputTokens": 5400,
+   "outputTokens": 290,
+   "costCents": 0.0656,
+   "llmCalls": 1,
+   "pricing": "known"
+  },
+  {
+   "seq": 104,
+   "at": "2026-10-26T12:44:39.050Z",
+   "type": "debate.turn",
+   "sessionId": "aw-fixture",
+   "symbol": "MSFT",
+   "side": "bear",
+   "round": 1,
+   "text": "Capital spending above $30 billion a quarter has to earn its return, and margins do not show it yet. A flat price over a month of strong headlines says the good news is already known."
+  },
+  {
+   "seq": 105,
+   "at": "2026-10-26T12:44:39.100Z",
+   "type": "role.done",
+   "sessionId": "aw-fixture",
+   "symbol": "MSFT",
+   "role": "bull"
+  },
+  {
+   "seq": 106,
+   "at": "2026-10-26T12:44:39.150Z",
+   "type": "role.done",
+   "sessionId": "aw-fixture",
+   "symbol": "MSFT",
+   "role": "bear"
+  },
+  {
+   "seq": 107,
+   "at": "2026-10-26T12:44:39.200Z",
+   "type": "role.started",
+   "sessionId": "aw-fixture",
+   "symbol": "MSFT",
+   "role": "research-manager"
+  },
+  {
+   "seq": 108,
+   "at": "2026-10-26T12:45:31.000Z",
+   "type": "cost.tick",
+   "sessionId": "aw-fixture",
+   "symbol": "MSFT",
+   "role": "research-manager",
+   "model": "gemini-2.5-flash",
+   "inputTokens": 4300,
+   "outputTokens": 380,
+   "costCents": 0.224,
+   "llmCalls": 1,
+   "pricing": "known"
+  },
+  {
+   "seq": 109,
+   "at": "2026-10-26T12:45:31.050Z",
+   "type": "role.report",
+   "sessionId": "aw-fixture",
+   "symbol": "MSFT",
+   "role": "research-manager",
+   "text": "**Decision**: keep the current weight\n\n**Rationale**: The debate splits evenly between capacity-led growth and the cost of building it, and neither side brings evidence the other cannot answer.\n\n**Strategic Actions**: Leave the position unchanged until the 28 October report adds data.",
+   "forced": false
+  },
+  {
+   "seq": 110,
+   "at": "2026-10-26T12:45:31.100Z",
+   "type": "role.done",
+   "sessionId": "aw-fixture",
+   "symbol": "MSFT",
+   "role": "research-manager"
+  },
+  {
+   "seq": 111,
+   "at": "2026-10-26T12:45:31.150Z",
+   "type": "role.started",
+   "sessionId": "aw-fixture",
+   "symbol": "MSFT",
+   "role": "trader"
+  },
+  {
+   "seq": 112,
+   "at": "2026-10-26T12:46:03.000Z",
+   "type": "cost.tick",
+   "sessionId": "aw-fixture",
+   "symbol": "MSFT",
+   "role": "trader",
+   "model": "gemini-2.5-flash-lite",
+   "inputTokens": 3600,
+   "outputTokens": 250,
+   "costCents": 0.046,
+   "llmCalls": 1,
+   "pricing": "known"
+  },
+  {
+   "seq": 113,
+   "at": "2026-10-26T12:46:03.050Z",
+   "type": "role.report",
+   "sessionId": "aw-fixture",
+   "symbol": "MSFT",
+   "role": "trader",
+   "text": "The plan maps to no change in MSFT ahead of the 28 October report. The position stays at its current size; a close below $545 would reopen the question.\n\nFINAL TRANSACTION PROPOSAL: **HOLD**",
+   "forced": false
+  },
+  {
+   "seq": 114,
+   "at": "2026-10-26T12:46:03.100Z",
+   "type": "role.done",
+   "sessionId": "aw-fixture",
+   "symbol": "MSFT",
+   "role": "trader"
+  },
+  {
+   "seq": 115,
+   "at": "2026-10-26T12:46:03.150Z",
+   "type": "role.started",
+   "sessionId": "aw-fixture",
+   "symbol": "MSFT",
+   "role": "risk-aggressive"
+  },
+  {
+   "seq": 116,
+   "at": "2026-10-26T12:46:42.000Z",
+   "type": "cost.tick",
+   "sessionId": "aw-fixture",
+   "symbol": "MSFT",
+   "role": "risk-aggressive",
+   "model": "gemini-2.5-flash-lite",
+   "inputTokens": 6000,
+   "outputTokens": 210,
+   "costCents": 0.0684,
+   "llmCalls": 1,
+   "pricing": "known"
+  },
+  {
+   "seq": 117,
+   "at": "2026-10-26T12:46:42.050Z",
+   "type": "risk.turn",
+   "sessionId": "aw-fixture",
+   "symbol": "MSFT",
+   "role": "risk-aggressive",
+   "round": 1,
+   "text": "Standing still into a report with this much capacity news leaves the desk reacting instead of positioned. A small add with a stop under $545 keeps the risk defined."
+  },
+  {
+   "seq": 118,
+   "at": "2026-10-26T12:46:42.100Z",
+   "type": "role.started",
+   "sessionId": "aw-fixture",
+   "symbol": "MSFT",
+   "role": "risk-conservative"
+  },
+  {
+   "seq": 119,
+   "at": "2026-10-26T12:47:21.000Z",
+   "type": "cost.tick",
+   "sessionId": "aw-fixture",
+   "symbol": "MSFT",
+   "role": "risk-conservative",
+   "model": "gemini-2.5-flash-lite",
+   "inputTokens": 6200,
+   "outputTokens": 220,
+   "costCents": 0.0708,
+   "llmCalls": 1,
+   "pricing": "known"
+  },
+  {
+   "seq": 120,
+   "at": "2026-10-26T12:47:21.050Z",
+   "type": "risk.turn",
+   "sessionId": "aw-fixture",
+   "symbol": "MSFT",
+   "role": "risk-conservative",
+   "round": 1,
+   "text": "No change fits the event: the range is intact and the report is two days away. Adding now trades a known range for an unknown gap."
+  },
+  {
+   "seq": 121,
+   "at": "2026-10-26T12:47:21.100Z",
+   "type": "role.started",
+   "sessionId": "aw-fixture",
+   "symbol": "MSFT",
+   "role": "risk-neutral"
+  },
+  {
+   "seq": 122,
+   "at": "2026-10-26T12:47:57.000Z",
+   "type": "cost.tick",
+   "sessionId": "aw-fixture",
+   "symbol": "MSFT",
+   "role": "risk-neutral",
+   "model": "gemini-2.5-flash-lite",
+   "inputTokens": 6300,
+   "outputTokens": 200,
+   "costCents": 0.071,
+   "llmCalls": 1,
+   "pricing": "known"
+  },
+  {
+   "seq": 123,
+   "at": "2026-10-26T12:47:57.050Z",
+   "type": "risk.turn",
+   "sessionId": "aw-fixture",
+   "symbol": "MSFT",
+   "role": "risk-neutral",
+   "round": 1,
+   "text": "The two views differ by a small add. Either way the stop at $545 defines the downside, and the report decides the rest."
+  },
+  {
+   "seq": 124,
+   "at": "2026-10-26T12:47:57.100Z",
+   "type": "role.done",
+   "sessionId": "aw-fixture",
+   "symbol": "MSFT",
+   "role": "risk-aggressive"
+  },
+  {
+   "seq": 125,
+   "at": "2026-10-26T12:47:57.150Z",
+   "type": "role.done",
+   "sessionId": "aw-fixture",
+   "symbol": "MSFT",
+   "role": "risk-conservative"
+  },
+  {
+   "seq": 126,
+   "at": "2026-10-26T12:47:57.200Z",
+   "type": "role.done",
+   "sessionId": "aw-fixture",
+   "symbol": "MSFT",
+   "role": "risk-neutral"
+  },
+  {
+   "seq": 127,
+   "at": "2026-10-26T12:47:57.250Z",
+   "type": "role.started",
+   "sessionId": "aw-fixture",
+   "symbol": "MSFT",
+   "role": "portfolio-manager"
+  },
+  {
+   "seq": 128,
+   "at": "2026-10-26T12:48:59.000Z",
+   "type": "cost.tick",
+   "sessionId": "aw-fixture",
+   "symbol": "MSFT",
+   "role": "portfolio-manager",
+   "model": "gemini-2.5-flash",
+   "inputTokens": 5200,
+   "outputTokens": 410,
+   "costCents": 0.2585,
+   "llmCalls": 1,
+   "pricing": "known"
+  },
+  {
+   "seq": 129,
+   "at": "2026-10-26T12:48:59.050Z",
+   "type": "role.report",
+   "sessionId": "aw-fixture",
+   "symbol": "MSFT",
+   "role": "portfolio-manager",
+   "text": "**Executive Summary**: The desk leaves MSFT at its current weight through the 28 October report and revisits it with the new figures.\n\n**Investment Thesis**: Capacity-led growth and the cost of building it balance each other in the evidence presented, and the price range since August reflects the same split. The text names no position change of its own, so the run is filed for review.",
+   "forced": false
+  },
+  {
+   "seq": 130,
+   "at": "2026-10-26T12:49:01.000Z",
+   "type": "role.done",
+   "sessionId": "aw-fixture",
+   "symbol": "MSFT",
+   "role": "portfolio-manager"
+  },
+  {
+   "seq": 131,
+   "at": "2026-10-26T12:49:01.050Z",
+   "type": "run.completed",
+   "sessionId": "aw-fixture",
+   "symbol": "MSFT",
+   "rating": "REVIEW",
+   "review": true,
+   "decision": "**Executive Summary**: The desk leaves MSFT at its current weight through the 28 October report and revisits it with the new figures.\n\n**Investment Thesis**: Capacity-led growth and the cost of building it balance each other in the evidence presented, and the price range since August reflects the same split. The text names no position change of its own, so the run is filed for review.",
+   "stats": {
+    "llmCalls": 15,
+    "toolCalls": 5,
+    "tokensIn": 65500,
+    "tokensOut": 5730,
+    "costCents": 1.2401
+   }
+  },
+  {
+   "seq": 132,
+   "at": "2026-10-26T12:49:02.000Z",
+   "type": "session.completed",
+   "sessionId": "aw-fixture",
+   "runs": [
+    {
+     "symbol": "AAPL",
+     "rating": "Buy",
+     "review": false
+    },
+    {
+     "symbol": "MSFT",
+     "rating": "REVIEW",
+     "review": true
+    }
+   ],
+   "tokensIn": 146700,
+   "tokensOut": 14630,
+   "costCents": 2.8987,
+   "llmCalls": 31,
+   "toolCalls": 14,
+   "dropped": 0
+  }
+ ]
+}

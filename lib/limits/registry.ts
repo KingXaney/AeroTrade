@@ -15,6 +15,7 @@ export const LIMIT_RETENTION_DAYS = 45;
 export const LIMIT_PROVIDER_IDS = [
     'gemini', 'anthropic', 'finnhub', 'yahoo', 'stooq', 'tiingo', 'wikipedia', 'app-store', 'reddit', 'youtube',
     'google-news', 'sec', 'arxiv', 'huggingface', 'mailer', 'inngest', 'alpaca',
+    'agent-world', 'openbb-yfinance', 'fred', 'paperclip',
 ] as const;
 
 export type LimitProviderId = (typeof LIMIT_PROVIDER_IDS)[number];
@@ -44,8 +45,8 @@ export const LIMIT_PROVIDERS: readonly LimitProvider[] = [
         id: 'gemini', label: 'Gemini', uses: 'every model call: extraction, briefs, the digest, rationales, the lab digest, the chat',
         cap: 'free tier: 20 requests a day per model (gemini-2.5-flash-lite), 15 a minute; a billed project lifts the daily cap', capAsOf: '2026-10-12',
         docsUrl: 'https://ai.google.dev/gemini-api/docs/rate-limits',
-        planned: 'about 14–16 calls a weekday before the chat: culture ≤3 (+2 Mon/Tue), brain ≤8, briefing 1, topic briefs ≤20 (stop on quota), digest 1 per reader, lab 1',
-        jobs: ['culture-brain-update', 'culture-brain-weekly', 'daily-brain-update', 'generate-market-briefing', 'generate-topic-briefs', 'daily-news-summary', 'lab-daily-papers', 'ai-navigator-weekly', 'ai-navigator-bootstrap', 'sign-up-email'],
+        planned: 'about 14–16 calls a weekday before the chat: culture ≤3 (+2 Mon/Tue), brain ≤8, briefing 1, topic briefs ≤20 (stop on quota), digest 1 per reader, lab 1; the trading agent world\'s service a few dozen calls per symbol each Monday, on its own key',
+        jobs: ['culture-brain-update', 'culture-brain-weekly', 'daily-brain-update', 'generate-market-briefing', 'generate-topic-briefs', 'daily-news-summary', 'lab-daily-papers', 'ai-navigator-weekly', 'ai-navigator-bootstrap', 'sign-up-email', 'agent-world-weekly'],
         dashboardUrl: 'https://aistudio.google.com/usage',
     },
     {
@@ -133,6 +134,30 @@ export const LIMIT_PROVIDERS: readonly LimitProvider[] = [
         cap: 'the trading API allows 200 requests a minute per account', capAsOf: '2026-10-24',
         docsUrl: 'https://docs.alpaca.markets/docs/trading-api', planned: 'one sync a weekday: the clock, the account, the positions, an asset per symbol and at most twenty orders — about 40 requests',
         jobs: ['broker-sync'],
+    },
+    {
+        id: 'agent-world', label: 'Trading agent world service', uses: "the desk's runs: one TradingAgents run per symbol, the events it streams back, its health",
+        cap: 'self-hosted, one worker: one session at a time, a second one answered 409 until the first ends', capAsOf: '2026-10-27',
+        docsUrl: 'https://github.com/TauricResearch/TradingAgents', planned: 'one weekly session of three symbols, about 15 to 30 minutes and a few hundred event batches',
+        jobs: ['agent-world-weekly'],
+    },
+    {
+        id: 'openbb-yfinance', label: 'OpenBB (yfinance provider)', uses: "the desk's prices, indicators, statements and company news, read through OpenBB",
+        cap: 'no published limit; Yahoo answers 429 to a burst of requests', capAsOf: '2026-10-27',
+        docsUrl: 'https://docs.openbb.co/', planned: 'a few dozen reads per symbol in each session',
+        jobs: ['agent-world-weekly'],
+    },
+    {
+        id: 'fred', label: 'FRED', uses: "the news analyst's macro series (rates, inflation, labour)",
+        cap: 'a free key allows 120 requests a minute', capAsOf: '2026-10-27',
+        docsUrl: 'https://fred.stlouisfed.org/docs/api/fred/', planned: 'a handful of series per symbol in each session',
+        jobs: ['agent-world-weekly'],
+    },
+    {
+        id: 'paperclip', label: 'Paperclip', uses: "the desk's company: the session's issue and its comments, cost events per role, budgets, activity",
+        cap: "self-hosted, so no request limit; each agent's monthly budget pauses it at 100% of its cap", capAsOf: '2026-10-27',
+        docsUrl: 'https://github.com/paperclipai/paperclip', planned: 'one issue, a few comments and a cost event per role per symbol in each session',
+        jobs: ['agent-world-weekly'],
     },
 ];
 

@@ -485,6 +485,17 @@ details[open] > :not(summary) { animation: disclosure-in var(--motion-base) var(
   0%, 100% { transform: translateY(0); }
   50% { transform: translateY(-3px); }
 }
+
+/* The trading agent world's floor (components/agent-world/StageStrip): a working role's dot
+   breathes. A loop in literal seconds, so both motion guards at the foot of this file stop it by
+   name, and brutalist, whose zeroed tokens stop nothing timed in seconds, stops it by name too
+   (lib/theme/__tests__/motion-guards.test.ts pins all three). */
+.aw-working { animation: aw-working 1.6s ease-in-out infinite; }
+@keyframes aw-working {
+  0%, 100% { opacity: 1; transform: scale(1); }
+  50% { opacity: 0.45; transform: scale(1.35); }
+}
+[data-style="brutalist"] .aw-working { animation: none; }
 @keyframes robot-blink {
   0%, 92%, 100% { transform: scaleY(1); }
   95% { transform: scaleY(0.12); }
@@ -2576,13 +2587,14 @@ details[open] > :not(summary) { animation: disclosure-in var(--motion-base) var(
   .pn-ambient-twinkle, .pn-ambient-drift, .pn-ambient-flicker, .pn-ambient-waves, .pn-scene-fade,
   .pn-emote-rise, .pn-phrase-in, .pn-throw-x, .pn-throw-y, .pn-splat, .pn-petals, .pn-fizz, .pn-bounce,
   .pn-award-in,
+  .aw-working,
   [data-style] :is(.glass-panel, .news-item, .yellow-btn, .search-btn) {
     animation: none !important;
     transition: none !important;
   }
   [data-style="futuristic"] .shimmer::after { content: none; }
 }
-html[data-motion="reduced"] :is(.animate-glow, .typing-dot, .theme-blob, .robot-bob, .robot-eyes, .robot-antenna, .robot-mascot, .robot-tip-in, .glass-panel, .news-item, .yellow-btn, .search-btn, .pn-deal, .pn-flip, .pn-chip-slide, .pn-chip-land, .pn-sweep, .pn-fold, .pn-fold-turn, .pn-dim, .pn-win-lift, .pn-win-glow, .pn-banner-drop, .pn-chip-stream, .pn-pot-out, .pn-seat-in, .pn-tag-pop, .pn-win-pop, .pn-pulse, .pn-confetti, .pn-turn-ring, .pn-ambient, .pn-emote-rise, .pn-phrase-in, .pn-throw-x, .pn-throw-y, .pn-splat, .pn-petals, .pn-fizz, .pn-bounce, .pn-ambient-twinkle, .pn-ambient-drift, .pn-ambient-flicker, .pn-ambient-waves, .pn-scene-fade, .pn-award-in) {
+html[data-motion="reduced"] :is(.animate-glow, .typing-dot, .theme-blob, .robot-bob, .robot-eyes, .robot-antenna, .robot-mascot, .robot-tip-in, .glass-panel, .news-item, .yellow-btn, .search-btn, .pn-deal, .pn-flip, .pn-chip-slide, .pn-chip-land, .pn-sweep, .pn-fold, .pn-fold-turn, .pn-dim, .pn-win-lift, .pn-win-glow, .pn-banner-drop, .pn-chip-stream, .pn-pot-out, .pn-seat-in, .pn-tag-pop, .pn-win-pop, .pn-pulse, .pn-confetti, .pn-turn-ring, .pn-ambient, .pn-emote-rise, .pn-phrase-in, .pn-throw-x, .pn-throw-y, .pn-splat, .pn-petals, .pn-fizz, .pn-bounce, .pn-ambient-twinkle, .pn-ambient-drift, .pn-ambient-flicker, .pn-ambient-waves, .pn-scene-fade, .pn-award-in, .aw-working) {
   animation: none !important;
   transition: none !important;
 }

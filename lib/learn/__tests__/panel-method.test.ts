@@ -12,6 +12,7 @@ import {LUCK_COPY, LUCK_TERMS} from '@/lib/learn/copy/luck';
 import {TIM_COPY, TIM_TERMS} from '@/lib/learn/copy/time-in-market';
 import {TERRAIN_COPY, TERRAIN_TERMS} from '@/lib/learn/copy/terrain';
 import {BRAND_BOARD_TERMS, CULTURE_COPY} from '@/lib/learn/copy/culture';
+import {COMPANY_COPY, COMPANY_TERMS, DATA_COPY, DATA_TERMS, DECISION_TERMS, FLOOR_COPY, RECORD_COPY, RECORD_TERMS} from '@/lib/learn/copy/agent-world';
 
 const RUN = 5;
 
@@ -56,5 +57,12 @@ describe('a panel lead says only what its definitions do not', () => {
 
     it('The brand board: how to read it', () => {
         expect(restatements([CULTURE_COPY.boardLead], BRAND_BOARD_TERMS)).toEqual([]);
+    });
+
+    it('The trading agent world: the record, the orders, the company and the data', () => {
+        expect(restatements([RECORD_COPY.lead], RECORD_TERMS)).toEqual([]);
+        expect(restatements([FLOOR_COPY.ordersLead], DECISION_TERMS)).toEqual([]);
+        expect(restatements([COMPANY_COPY.lead], COMPANY_TERMS)).toEqual([]);
+        expect(restatements([DATA_COPY.lead], DATA_TERMS)).toEqual([]);
     });
 });

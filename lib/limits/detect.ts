@@ -81,6 +81,21 @@ export const classifyLimit = (provider: LimitProviderId, signal: unknown): Limit
             // Alpaca's 403 is "buying power or shares is not sufficient" — an answer, not a limit.
             if (status === 403) return null;
             return status === null ? null : kindOfStatus(status);
+        case 'agent-world':
+            // A 409 is the service saying a session is already running: an answer, not a limit.
+            if (status === 409) return null;
+            if (status === null && /unreachable|timed out|ECONNREFUSED|fetch failed/i.test(text)) return 'outage';
+            return status === null ? null : kindOfStatus(status);
+        case 'paperclip':
+            // A 409 (someone else's checkout) or a 422 (not this agent's stage) is an answer.
+            if (status === 409 || status === 422) return null;
+            if (status === null && /unreachable|timed out|ECONNREFUSED|fetch failed/i.test(text)) return 'outage';
+            return status === null ? null : kindOfStatus(status);
+        case 'openbb-yfinance':
+            // Yahoo, behind OpenBB, refuses a burst with a 429 or "Too Many Requests" in the text.
+            if (/too many requests|rate limit/i.test(text)) return 'rate';
+            if (status === null && /unreachable|timed out/i.test(text)) return 'outage';
+            return status === null ? null : kindOfStatus(status);
         case 'mailer':
             // Gmail's daily sending limit is a 550 or 421 with "limit" in the text.
             if (/\b(421|550)\b.*limit|limit exceeded|quota/i.test(text)) return 'quota';

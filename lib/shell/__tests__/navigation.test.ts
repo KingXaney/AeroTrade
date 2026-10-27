@@ -104,16 +104,19 @@ describe('the navigation registry', () => {
         expect(isActiveNav('/learn/units/cv-vit-dinov2', '/learn')).toBe(true);
     });
 
-    it('files both brains under the one Brain icon, the news brain first', () => {
+    it('files the three brains under the one Brain icon, the news brain first', () => {
         // The rail is capped at eight icons and had eight when the culture brain arrived (seven
-        // since Markets and Trade merged), so it is the Brain section's second page: a tab above
-        // both pages, a row in the drawer, a ⌘K hit.
+        // since Markets and Trade merged), so each later brain is a page of the Brain section: a
+        // tab above its pages, a row in the drawer, a ⌘K hit. The trading agent world is the third.
         const brain = NAV_SECTIONS.find((s) => s.id === 'brain');
-        expect(brain?.pages.map((p) => p.href)).toEqual(['/brain', '/culture']);
+        expect(brain?.pages.map((p) => p.href)).toEqual(['/brain', '/culture', '/agent-world']);
         expect(NAV_PAGES.find((p) => p.href === '/brain')?.label).toBe('Brain');
         expect(NAV_PAGES.find((p) => p.href === '/culture')?.label).toBe('Culture brain');
+        expect(NAV_PAGES.find((p) => p.href === '/agent-world')?.label).toBe('Trading agent world');
         expect(sectionFor('/culture')?.id).toBe('brain');
+        expect(sectionFor('/agent-world')?.id).toBe('brain');
         expect(searchPages('cult').map((p) => p.href)).toEqual(['/culture']);
+        expect(searchPages('agent').map((p) => p.href)).toEqual(['/agent-world']);
     });
 
     it('keeps the account pages in the account menu, off the rail', () => {

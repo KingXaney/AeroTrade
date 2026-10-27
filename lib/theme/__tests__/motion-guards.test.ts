@@ -51,7 +51,15 @@ describe('the motion guards in app/globals.css', () => {
         '.pn-deal', '.pn-flip', '.pn-chip-slide', '.pn-chip-land', '.pn-sweep', '.pn-fold', '.pn-fold-turn', '.pn-dim', '.pn-win-lift', '.pn-win-glow',
         '.pn-banner-drop', '.pn-chip-stream', '.pn-pot-out', '.pn-seat-in', '.pn-tag-pop', '.pn-win-pop', '.pn-pulse', '.pn-confetti', '.pn-turn-ring', '.pn-ambient',
     ];
-    const STOPPED = ['.robot-bob', '.robot-eyes', '.robot-antenna', '.robot-mascot', '.robot-tip-in', '.theme-blob', ...POKER_NIGHT];
+    // The trading agent world's floor (components/agent-world/StageStrip): a working role's dot.
+    const AGENT_WORLD = ['.aw-working'];
+    const STOPPED = ['.robot-bob', '.robot-eyes', '.robot-antenna', '.robot-mascot', '.robot-tip-in', '.theme-blob', ...POKER_NIGHT, ...AGENT_WORLD];
+
+    it('declares the agent world\'s working pulse, a loop in literal seconds that brutalist stops by name', () => {
+        expect(css).toContain('@keyframes aw-working {');
+        expect(css).toMatch(/\.aw-working \{[^}]*animation: aw-working [\d.]+s [^;]*infinite/);
+        expect(css).toMatch(/\[data-style="brutalist"\] \.aw-working\s*\{\s*animation: none;/);
+    });
 
     it('finds both guard lists', () => {
         expect(mediaBlock).toContain('animation: none !important');

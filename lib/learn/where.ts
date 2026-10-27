@@ -40,6 +40,11 @@ const CULTURE: readonly GlossaryKey[] = [
     'signal-adoption', 'signal-hype', 'signal-backlash', 'signal-substitution', 'signal-drop', 'signal-price', 'signal-fading',
     'attention-backtest',
 ];
+const AGENT_WORLD: readonly GlossaryKey[] = [
+    'desk-session', 'desk-role', 'analyst-report', 'research-debate', 'desk-rating', 'rating-target', 'desk-rails',
+    'session-approval', 'approval-lapse', 'agent-budget', 'heartbeat', 'approval-stage', 'data-vendor', 'point-in-time',
+    'tool-call', 'model-tokens', 'session-cost',
+];
 
 const HOMES = {
     board: {href: '/strategies', label: 'Strategy boards'},
@@ -49,6 +54,7 @@ const HOMES = {
     brain: {href: '/brain', label: 'The News Brain'},
     rails: {href: '/brain', label: 'The News Brain'},
     culture: {href: '/culture', label: 'The Culture Brain'},
+    'agent-world': {href: '/agent-world', label: 'The trading agent world'},
     games: {href: '/games', label: 'The games'},
     poker: {href: '/poker', label: 'The poker solver'},
     landing: {href: '/welcome', label: 'The front door'},
@@ -64,6 +70,7 @@ export const groupOf = (entry: GlossaryEntry): GroupId => {
     if ((MARKET as readonly string[]).includes(entry.key)) return 'market';
     if ((BRAIN as readonly string[]).includes(entry.key)) return 'brain';
     if ((CULTURE as readonly string[]).includes(entry.key)) return 'culture';
+    if ((AGENT_WORLD as readonly string[]).includes(entry.key)) return 'agent-world';
     if ((GAMES as readonly string[]).includes(entry.key)) return 'games';
     if ((POKER as readonly string[]).includes(entry.key)) return 'poker';
     if ((LANDING as readonly string[]).includes(entry.key)) return 'landing';
@@ -81,6 +88,7 @@ const GROUP_LABELS: Record<GroupId, string> = {
     brain: 'On the News Brain',
     rails: "The Navigator's rails",
     culture: 'On the Culture Brain',
+    'agent-world': 'In the trading agent world',
     games: 'In the games',
     poker: 'In the poker solver',
     landing: 'On the front door',
@@ -88,7 +96,7 @@ const GROUP_LABELS: Record<GroupId, string> = {
 };
 
 // Registry order within each group, groups in reading order.
-export const GLOSSARY_GROUPS: readonly GlossaryGroup[] = (['board', 'portfolio', 'market', 'concepts', 'brain', 'rails', 'culture', 'games', 'poker', 'landing', 'poker-night'] as const).map((id) => ({
+export const GLOSSARY_GROUPS: readonly GlossaryGroup[] = (['board', 'portfolio', 'market', 'concepts', 'brain', 'rails', 'culture', 'agent-world', 'games', 'poker', 'landing', 'poker-night'] as const).map((id) => ({
     id,
     label: GROUP_LABELS[id],
     home: HOMES[id],

@@ -84,6 +84,7 @@ export const NAV_SECTIONS: readonly NavSection[] = [
         pages: [
             {href: '/brain', label: 'News brain', icon: 'neurology'},
             {href: '/culture', label: 'Culture brain', icon: 'storefront'},
+            {href: '/agent-world', label: 'Trading agent world', icon: 'smart_toy'},
         ],
     },
     {

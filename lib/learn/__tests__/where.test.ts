@@ -35,7 +35,24 @@ describe('where each term lives', () => {
             expect(groupOf(GLOSSARY[key]), key).toBe('brain');
             expect(homeOf(key), key).toBe('/brain');
         }
-        expect(GLOSSARY_GROUPS.map((group) => group.id)).toEqual(['board', 'portfolio', 'market', 'concepts', 'brain', 'rails', 'culture', 'games', 'poker', 'landing', 'poker-night']);
+        expect(GLOSSARY_GROUPS.map((group) => group.id)).toEqual(['board', 'portfolio', 'market', 'concepts', 'brain', 'rails', 'culture', 'agent-world', 'games', 'poker', 'landing', 'poker-night']);
+    });
+
+    it('homes the trading agent world\'s terms on /agent-world, after the culture brain, leaving the record\'s tiles where they were', () => {
+        const desk = GLOSSARY_GROUPS.find((group) => group.id === 'agent-world');
+        expect(desk?.home).toEqual({href: '/agent-world', label: 'The trading agent world'});
+        expect(desk?.label).toBe('In the trading agent world');
+        expect(desk?.keys).toEqual([
+            'desk-session', 'desk-role', 'analyst-report', 'research-debate', 'desk-rating', 'rating-target', 'desk-rails',
+            'session-approval', 'approval-lapse', 'agent-budget', 'heartbeat', 'approval-stage', 'data-vendor', 'point-in-time',
+            'tool-call', 'model-tokens', 'session-cost',
+        ]);
+        for (const key of desk?.keys ?? []) {
+            expect(GLOSSARY[key].kind, key).toBe('metric');
+            expect(homeOf(key), key).toBe('/agent-world');
+        }
+        expect(homeOf('total-return')).toBe('/portfolio');
+        expect(homeOf('benchmark')).toBe('/portfolio');
     });
 
     it('homes the culture brain\'s numbers, its pickers and its labels on /culture', () => {

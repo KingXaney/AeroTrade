@@ -177,6 +177,17 @@ export const JOBS = {
         trigger: 'broker',
         health: {label: 'Broker mirror (Alpaca)', schedule: 'weekdays 11:15 ET', staleAfterHours: 80},
     },
+    // The trading agent world (lib/agent-world): Mondays 08:30 ET, before the open, so the desk
+    // reads the week's close and the owner can decide before 09:30; the Tuesday cron is the
+    // holiday-Monday retry (the week's claim makes it a no-op otherwise). The same event also
+    // carries the owner's Run now and a preview ({manual, force, dryRun}).
+    agentWorldWeekly: {
+        id: 'agent-world-weekly',
+        event: 'app/run.agent.world',
+        crons: ['TZ=America/New_York 30 8 * * 1', 'TZ=America/New_York 30 8 * * 2'],
+        trigger: 'agent-world',
+        health: {label: 'Trading agent world', schedule: 'Mondays 08:30 ET', staleAfterHours: 8 * 24},
+    },
 } as const satisfies Record<string, JobDefinition>;
 
 // In declaration order — the status strip's row order.
