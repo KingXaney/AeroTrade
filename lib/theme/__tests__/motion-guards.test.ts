@@ -52,13 +52,23 @@ describe('the motion guards in app/globals.css', () => {
         '.pn-banner-drop', '.pn-chip-stream', '.pn-pot-out', '.pn-seat-in', '.pn-tag-pop', '.pn-win-pop', '.pn-pulse', '.pn-confetti', '.pn-turn-ring', '.pn-ambient',
     ];
     // The trading agent world's floor (components/agent-world/StageStrip): a working role's dot.
-    const AGENT_WORLD = ['.aw-working'];
+    const AGENT_WORLD = ['.aw-working', '.ao-bubble-in', '.ao-lamp', '.ao-confetti', '.ao-stamp-in', '.ao-line-in'];
     const STOPPED = ['.robot-bob', '.robot-eyes', '.robot-antenna', '.robot-mascot', '.robot-tip-in', '.theme-blob', ...POKER_NIGHT, ...AGENT_WORLD];
 
     it('declares the agent world\'s working pulse, a loop in literal seconds that brutalist stops by name', () => {
         expect(css).toContain('@keyframes aw-working {');
         expect(css).toMatch(/\.aw-working \{[^}]*animation: aw-working [\d.]+s [^;]*infinite/);
         expect(css).toMatch(/\[data-style="brutalist"\] \.aw-working\s*\{\s*animation: none;/);
+    });
+
+    it('declares the office\'s loops and one-shots, the two in literal seconds stopped by name in brutalist', () => {
+        for (const name of ['ao-bubble-in', 'ao-lamp', 'ao-confetti', 'ao-stamp-in', 'ao-line-in']) expect(css).toContain(`@keyframes ${name} {`);
+        expect(css).toMatch(/\.ao-lamp \{[^}]*animation: ao-lamp [\d.]+s [^;]*infinite/);
+        expect(css).toMatch(/\[data-style="brutalist"\] \.ao-lamp\s*\{\s*animation: none;/);
+        expect(css).toMatch(/\[data-style="brutalist"\] \.ao-confetti\s*\{\s*animation: none;/);
+        // A confetti piece rests invisible, so a stopped one is never left on the screen.
+        expect(css).toMatch(/\.ao-confetti \{ opacity: 0;/);
+        for (const name of ['ao-bubble-in', 'ao-stamp-in', 'ao-line-in']) expect(css).toMatch(new RegExp(`\\.${name} \\{[^}]*animation: ${name} calc\\(var\\(--motion-base\\)`));
     });
 
     it('finds both guard lists', () => {

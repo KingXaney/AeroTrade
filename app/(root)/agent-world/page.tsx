@@ -10,12 +10,14 @@ import WhatTheseMean from "@/components/learn/WhatTheseMean";
 import PageTitle from "@/components/primitives/PageTitle";
 import Panel from "@/components/primitives/Panel";
 import Tabs from "@/components/primitives/Tabs";
+import {actionButton} from "@/components/primitives/ActionButton";
 import {agentWorldOff, agentWorldUniverse, approvalMode, isAgentWorldOwner} from "@/lib/agent-world/env";
 import {getCompanyView, getDataView, getFloorView} from "@/lib/agent-world/page-store";
 import {getCurrentUser} from "@/lib/auth/session";
 import {formatEasternTimestamp} from "@/lib/format";
 import {GLOSSARY} from "@/lib/learn/glossary";
 import {AGENT_WORLD_COPY, DECISION_TERMS, REPORT_TERMS, STRIP_TERMS} from "@/lib/learn/copy/agent-world";
+import {OFFICE_COPY} from "@/lib/learn/copy/agent-world-office";
 
 // The browser tab's title; app/layout.tsx appends the app's name.
 export const metadata: Metadata = {title: "Trading agent world"};
@@ -73,7 +75,18 @@ const AgentWorldPage = async ({searchParams}: AgentWorldPageProps) => {
 
     return (
         <div className="space-y-4">
-            <PageTitle title={AGENT_WORLD_COPY.title} subtitle={AGENT_WORLD_COPY.pageSubtitle(symbols.length)} />
+            <PageTitle
+                title={AGENT_WORLD_COPY.title}
+                subtitle={AGENT_WORLD_COPY.pageSubtitle(symbols.length)}
+                actions={
+                    // The office: the same session as a 3D floor of fourteen seats, in a tab of its own.
+                    <a href="/agent-world/office" target="_blank" rel="noopener noreferrer" data-aw-office title={OFFICE_COPY.openHint}
+                        className={actionButton({variant: 'secondary', size: 'sm'})}>
+                        <span className="material-symbols-outlined text-base" aria-hidden="true">view_in_ar</span>
+                        {OFFICE_COPY.open}
+                    </a>
+                }
+            />
             <Tabs tabs={TABS} active={view} label="Trading agent world views" />
             {off && (
                 <Panel pad={4}>

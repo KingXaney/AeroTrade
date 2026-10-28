@@ -12,6 +12,7 @@
 
 import {
     DATA_TOOLS,
+    OFFICE_REPLAY_MS,
     RATING_LABELS,
     RISK_ROLES,
     ROLES,
@@ -60,7 +61,7 @@ export type OfficeWorker = {
 };
 export type FetchHop = {vendor: string; ok: boolean; note: string | null};
 export type OfficeFlow =
-    | {kind: 'fetch'; id: string; seq: number; role: RoleId; tool: string; what: string; hops: FetchHop[]; open: boolean; at: number; until: number | null}
+    | {kind: 'fetch'; id: string; seq: number; role: RoleId; tool: string; what: string; hops: FetchHop[]; open: boolean; at: number; landedAt: number | null; until: number | null}
     | {kind: 'handoff'; id: string; from: WorkerId; to: WorkerId[]; at: number; until: number}
     | {kind: 'card'; id: string; symbol: string; rating: Rating | null; at: number; until: number}
     | {kind: 'ticket'; id: string; symbol: string; side: OrderSide; executed: boolean; at: number; until: number};
@@ -165,6 +166,9 @@ export const excerpt = (text: string): string | null => {
 // "8:31:07 AM", New York time.
 export const officeClock = (at: number): string =>
     new Date(at).toLocaleTimeString('en-US', {timeZone: 'America/New_York', hour: 'numeric', minute: '2-digit', second: '2-digit'}).replace(/\s+/g, ' ');
+
+// How long the office plays a finished session back: OFFICE_REPLAY_MS, none with motion reduced.
+export const officeReplayDuration = (motionMs: number): number => (motionMs > 0 ? OFFICE_REPLAY_MS : 0);
 
 // The replay's cut at `progress`, the same formula lib/agent-world/replay.ts replayFrame cuts with.
 export const replayCut = (view: LiveView, progress: number): number | null => {
@@ -504,7 +508,8 @@ const flowsOf = (view: LiveView, run: RunView | null, now: number, anchor: Ancho
             if (tool.at > now) continue;
             const result = results.get(tool.callId) ?? null;
             const at = anchor(`tool:${tool.seq}`, tool.at);
-            const until = result ? anchor(`result:${result.seq}`, result.at) + W.land : null;
+            const landedAt = result ? anchor(`result:${result.seq}`, result.at) : null;
+            const until = landedAt === null ? null : landedAt + W.land;
             if (!live(at, until)) continue;
             const first = chainOf(tool.name)[0];
             flows.push({
@@ -517,6 +522,7 @@ const flowsOf = (view: LiveView, run: RunView | null, now: number, anchor: Ancho
                 hops: result ? hopsOf(result) : first ? [{vendor: first, ok: true, note: null}] : [],
                 open: result === null,
                 at,
+                landedAt,
                 until,
             });
         }

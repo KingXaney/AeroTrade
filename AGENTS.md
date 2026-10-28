@@ -560,9 +560,37 @@ and friends keep none beyond Shared and the invariants).
   (`paperclip-view.issueBoardUrl`). Every http wake leaves an unpriced cost event, which pauses the
   company under Paperclip's default policy, so the setup script allows unpriced usage. Under automatic
   approval the desk has no run of its own, so its comments land only once it has had one.
+- The office (`/agent-world/office`, `docs/specs/2026-10-27-agent-office.md`) is the same session as a
+  3D floor on a page of its own: the route group `app/(office)/agent-world/office` has none of the app's shell
+  (`components/theme/ThemeBackdrop` draws nothing there either), and the floor's title links to it in
+  a new tab. `lib/agent-world/office.officeState` (pure) reads the live view into fourteen workers
+  (`WORKER_IDS`: the Head trader, the twelve roles in the run's order, the Execution desk), each with
+  a status (`WORKER_STATUSES`; "Busy" for working, the legend's mechanism-only rule), a task line, a
+  bubble and this session's figures, plus the flows in flight, the shelves, the tickets, the issue,
+  the approval lamp, the focus, the wall and the ticker. A window (`OFFICE_WINDOWS`) opens when the
+  browser first saw the event while live (`seenAfter`, at the arriving view's own `serverNow`) and on
+  the stored stamp in a replay (`OFFICE_REPLAY_MS`, the windows scaled by `replayWindowScale`), so a
+  replay scrubbed to any point twice gives the same office. `lib/agent-world/office-store.getOfficeView`
+  adds the career (`careerStats` over the last 40 finished sessions, projected, memoised per ET day on
+  the newest) and Paperclip's budgets (best effort).
+- The scene (`components/agent-world/office/office-scene`, three.js loaded on demand, its set built by
+  `components/agent-world/office/office-build`; seats, furniture, paths, camera presets, idle gestures
+  and the sky's mix by the New York clock are the pure `lib/agent-world/office-layout`) takes only
+  `OfficeState` and diffs it, drawing on demand. Everything a reader acts on is HTML placed over the
+  canvas: each seat's plate is a button, stacked in screen space on a stem in the seat's colour when
+  neighbours crowd; a bubble slides aside or climbs rather than cover another; the shelves', issue's,
+  corkboard's, lamp's and chute's chips. The roster (`components/agent-world/office/OfficeSidebar`)
+  is every seat as a button in the run's order whatever the camera shows; a seat's file
+  (`components/agent-world/office/OfficeDossier`, a sheet that leaves the floor live) is the
+  Execution desk's `DecisionPanel` too, so an owner decides from the office; `?engine=2d` or no WebGL
+  draws `components/agent-world/office/OfficeMap2D`. Colours are the `--office-*` tokens in
+  `app/globals.css`; the `.ao-*` motion classes are in both guards and stopped by name in brutalist.
+  Keys: `lib/agent-world/office-keys`. Its sentences are `lib/learn/copy/agent-world-office`, its
+  legend `lib/agent-world/office-legend`.
 - Its sentences are `lib/learn/copy/agent-world` (and the issue's own, `lib/learn/copy/agent-world-paperclip`);
   its terms the glossary's `agent-world` group, homed on `/agent-world`; the legend
-  `lib/agent-world/legend` (every figure from config). QA: `npm run qa -- agent-world`, against
+  `lib/agent-world/legend` (every figure from config). QA: `npm run qa -- agent-world` (and
+  `agent-office` for the office), against
   `scripts/qa/start-agent-world-stub.mjs` (the service's own exported events,
   `scripts/qa/fixtures/agent-world-events.json`) and `scripts/qa/start-paperclip-stub.mjs`.
 

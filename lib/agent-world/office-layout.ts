@@ -5,18 +5,18 @@
 // the New York hour is a function of constants here, so the 3D scene and the 2D floor plan draw the
 // same room and a test can hold it together (lib/agent-world/__tests__/office-layout.test.ts).
 //
-// Axes: x to the right, y up, z toward the camera; the back wall stands at z = −12. A seat's yaw is
+// Axes: x to the right, y up, z toward the camera; the back wall stands at z = −10. A seat's yaw is
 // the way its worker faces: 0 toward the camera (+z), π toward the back wall.
 
 import type {WorkerId} from "@/lib/agent-world/config";
 
 export type Vec3 = readonly [number, number, number];
 
-export const FLOOR = {minX: -20, maxX: 20, minZ: -12, maxZ: 12} as const;
+export const FLOOR = {minX: -20, maxX: 20, minZ: -10, maxZ: 7} as const;
 export const WALL_HEIGHT = 4.4;
 export const PARTITION_HEIGHT = 1.1;
 // The robot's corridor between the back row and the front row.
-export const CORRIDOR_Z = 0.4;
+export const CORRIDOR_Z = 0;
 
 // The data wall's five providers, left to right, in the order the chains ask them most.
 export const OFFICE_SHELF_VENDORS = ['openbb', 'yfinance', 'sec_edgar', 'fred', 'polymarket'] as const;
@@ -49,8 +49,8 @@ export type OfficeSeat = {
     drop: Vec3;
 };
 
-const BACK_SEAT_Z = -6;
-const BACK_DESK_Z = -6.95;
+const BACK_SEAT_Z = -4.6;
+const BACK_DESK_Z = -5.55;
 const DESK: readonly [number, number] = [1.6, 0.8];
 
 const backSeat = (id: WorkerId, desk: number, zone: OfficeZoneId, x: number, prop: OfficeProp, surface = true): OfficeSeat => ({
@@ -63,33 +63,33 @@ const backSeat = (id: WorkerId, desk: number, zone: OfficeZoneId, x: number, pro
     prop,
     surface: surface ? {center: [x, RIG.deskTop, BACK_DESK_Z], size: DESK} : null,
     work: [x, RIG.deskTop + 0.05, BACK_DESK_Z + 0.2],
-    drop: [x, 0, BACK_SEAT_Z + 1.25],
+    drop: [x, 0, BACK_SEAT_Z + 1.2],
 });
 
-const TABLE: Vec3 = [-2.5, RIG.deskTop, -7.2];
+const TABLE: Vec3 = [-2.5, RIG.deskTop, -5.8];
 const TABLE_RADIUS = 1.25;
 
 export const OFFICE_SEATS: readonly OfficeSeat[] = [
-    {id: 'head-trader', desk: 1, zone: 'front', seat: [-15, 0, 5.3], yaw: 0, standing: true, prop: 'bell',
-        surface: {center: [-15, 1.1, 6.35], size: [3.2, 0.9]}, work: [-15, 1.12, 6.2], drop: [-12.9, 0, 5.4]},
+    {id: 'head-trader', desk: 1, zone: 'front', seat: [-15, 0, 3.2], yaw: 0, standing: true, prop: 'bell',
+        surface: {center: [-15, 1.1, 4.25], size: [3.2, 0.9]}, work: [-15, 1.12, 4.1], drop: [-12.9, 0, 3.3]},
     backSeat('market', 2, 'bullpen', -17.5, 'monitors'),
     backSeat('sentiment', 3, 'bullpen', -14.5, 'headset'),
     backSeat('news', 4, 'bullpen', -11.5, 'newspaper'),
     backSeat('fundamentals', 5, 'bullpen', -8.5, 'calculator'),
     {id: 'bull', desk: 6, zone: 'table', seat: [TABLE[0] - 1.85, 0, TABLE[2]], yaw: Math.PI / 2, standing: false, prop: 'bull',
-        surface: null, work: [TABLE[0] - 0.75, RIG.deskTop + 0.05, TABLE[2]], drop: [TABLE[0] - 1.85, 0, TABLE[2] + 1.6]},
+        surface: null, work: [TABLE[0] - 0.75, RIG.deskTop + 0.05, TABLE[2]], drop: [TABLE[0] - 1.85, 0, TABLE[2] + 1.5]},
     {id: 'bear', desk: 7, zone: 'table', seat: [TABLE[0] + 1.85, 0, TABLE[2]], yaw: -Math.PI / 2, standing: false, prop: 'bear',
-        surface: null, work: [TABLE[0] + 0.75, RIG.deskTop + 0.05, TABLE[2]], drop: [TABLE[0] + 1.85, 0, TABLE[2] + 1.6]},
+        surface: null, work: [TABLE[0] + 0.75, RIG.deskTop + 0.05, TABLE[2]], drop: [TABLE[0] + 1.85, 0, TABLE[2] + 1.5]},
     {id: 'research-manager', desk: 8, zone: 'table', seat: [TABLE[0], 0, TABLE[2] - 1.85], yaw: 0, standing: false, prop: 'glasses',
-        surface: null, work: [TABLE[0], RIG.deskTop + 0.05, TABLE[2] - 0.75], drop: [TABLE[0], 0, TABLE[2] + 1.75]},
+        surface: null, work: [TABLE[0], RIG.deskTop + 0.05, TABLE[2] - 0.75], drop: [TABLE[0], 0, TABLE[2] + 1.6]},
     backSeat('trader', 9, 'trading', 3.5, 'visor'),
     backSeat('risk-aggressive', 10, 'risk', 8, 'lamp-tall', false),
     backSeat('risk-conservative', 11, 'risk', 10, 'lamp-banker', false),
     backSeat('risk-neutral', 12, 'risk', 12, 'lamp-disc', false),
-    {id: 'portfolio-manager', desk: 13, zone: 'corner', seat: [17.4, 0, -9.3], yaw: 0, standing: false, prop: 'tie',
-        surface: {center: [17.4, RIG.deskTop, -8.3], size: [2, 0.9]}, work: [17.4, RIG.deskTop + 0.05, -8.5], drop: [15.6, 0, -2.6]},
-    {id: 'execution-desk', desk: 14, zone: 'execution', seat: [7, 0, 5.3], yaw: 0, standing: false, prop: 'stamp',
-        surface: {center: [7, RIG.deskTop, 6.3], size: [2.2, 0.9]}, work: [7, RIG.deskTop + 0.05, 6.1], drop: [5.2, 0, 4.6]},
+    {id: 'portfolio-manager', desk: 13, zone: 'corner', seat: [17.4, 0, -7.4], yaw: 0, standing: false, prop: 'tie',
+        surface: {center: [17.4, RIG.deskTop, -6.4], size: [2, 0.9]}, work: [17.4, RIG.deskTop + 0.05, -6.6], drop: [15.6, 0, -1.4]},
+    {id: 'execution-desk', desk: 14, zone: 'execution', seat: [7, 0, 3.2], yaw: 0, standing: false, prop: 'stamp',
+        surface: {center: [7, RIG.deskTop, 4.2], size: [2.2, 0.9]}, work: [7, RIG.deskTop + 0.05, 4.0], drop: [5.2, 0, 2.5]},
 ];
 
 const SEAT_BY_ID = new Map(OFFICE_SEATS.map((seat) => [seat.id, seat]));
@@ -111,33 +111,33 @@ export const FURNITURE = {
     bench: {center: [10, RIG.deskTop, BACK_DESK_Z] as Vec3, size: [6.2, 0.8] as const},
     shelves: OFFICE_SHELF_VENDORS.map((vendor, i): {vendor: ShelfVendor; center: Vec3; width: number; height: number} => ({
         vendor,
-        center: [-18 + i * 2.5, 0, -11.45],
+        center: [-18 + i * 2.5, 0, -9.45],
         width: 2.1,
         height: 2.6,
     })),
-    bin: [-6.6, 0, -10.9] as Vec3,
-    planBoard: {center: [-2.5, 1.65, -11.82] as Vec3, size: [3.2, 1.25] as const},
-    wallPlate: {center: [5.6, 2.35, -11.82] as Vec3, size: [3.6, 1.3] as const},
-    clock: [1.25, 2.55, -11.8] as Vec3,
-    gauges: [[8, 2.05, -11.8], [10, 2.05, -11.8], [12, 2.05, -11.8]] as readonly Vec3[],
+    bin: [-6.6, 0, -8.9] as Vec3,
+    planBoard: {center: [-2.5, 1.65, -9.82] as Vec3, size: [3.2, 1.25] as const},
+    wallPlate: {center: [5.6, 2.35, -9.82] as Vec3, size: [3.6, 1.3] as const},
+    clock: [1.25, 2.55, -9.8] as Vec3,
+    gauges: [[8, 2.05, -9.8], [10, 2.05, -9.8], [12, 2.05, -9.8]] as readonly Vec3[],
     windowBand: {from: -20, to: 14.2, bottom: 3.15, top: 4.25},
-    cornerWindow: {center: [18.7, 2.2, -11.85] as Vec3, size: [2.2, 2.4] as const},
-    corkboard: {center: [15.8, 1.75, -11.82] as Vec3, size: [2.2, 1.3] as const},
-    plant: [19.2, 0, -10.9] as Vec3,
+    cornerWindow: {center: [18.7, 2.2, -9.85] as Vec3, size: [2.2, 2.4] as const},
+    corkboard: {center: [15.8, 1.75, -9.82] as Vec3, size: [2.2, 1.3] as const},
+    plant: [19.2, 0, -8.9] as Vec3,
     glass: [
-        {from: [14.2, -12] as const, to: [14.2, -3.6] as const},
-        {from: [14.2, -3.6] as const, to: [14.9, -3.6] as const},
-        {from: [16.3, -3.6] as const, to: [20, -3.6] as const},
+        {from: [14.2, -10] as const, to: [14.2, -2.6] as const},
+        {from: [14.2, -2.6] as const, to: [14.9, -2.6] as const},
+        {from: [16.3, -2.6] as const, to: [20, -2.6] as const},
     ],
-    counter: {center: [-15, 0, 6.35] as Vec3, size: [3.2, 0.9, 1.1] as const},
-    bell: [-13.9, 1.1, 6.3] as Vec3,
-    issueBoard: {center: [-15.6, 1.6, 3.7] as Vec3, size: [3.0, 1.3] as const},
-    coffee: {center: [-6.6, 0, 9.6] as Vec3, size: [2.4, 0.7] as const},
-    dock: [-3.8, 0, 9.4] as Vec3,
-    lampPost: [8.15, RIG.deskTop, 6.35] as Vec3,
-    stamp: [5.95, RIG.deskTop, 6.35] as Vec3,
-    trays: {sent: [6.5, RIG.deskTop, 6.65] as Vec3, returned: [7.55, RIG.deskTop, 6.65] as Vec3},
-    chute: {center: [18.3, 0, 5.6] as Vec3, radius: 0.36, mouth: [17.85, 1.25, 5.6] as Vec3},
+    counter: {center: [-15, 0, 4.25] as Vec3, size: [3.2, 0.9, 1.1] as const},
+    bell: [-13.9, 1.1, 4.2] as Vec3,
+    issueBoard: {center: [-18.4, 1.6, 2.6] as Vec3, size: [2.4, 1.3] as const},
+    coffee: {center: [-6.6, 0, 5.6] as Vec3, size: [2.4, 0.7] as const},
+    dock: [-3.8, 0, 5.3] as Vec3,
+    lampPost: [8.15, RIG.deskTop, 4.25] as Vec3,
+    stamp: [5.95, RIG.deskTop, 4.25] as Vec3,
+    trays: {sent: [6.5, RIG.deskTop, 4.55] as Vec3, returned: [7.55, RIG.deskTop, 4.55] as Vec3},
+    chute: {center: [12.8, 0, 3.8] as Vec3, radius: 0.26, mouth: [12.35, 1.25, 3.8] as Vec3},
 } as const;
 
 export const shelfOf = (vendor: string): (typeof FURNITURE.shelves)[number] | null => FURNITURE.shelves.find((shelf) => shelf.vendor === vendor) ?? null;
@@ -160,13 +160,13 @@ export const corkSlot = (i: number): Vec3 => {
 
 // The zones, each with its label's place, its bounds on the floor and its camera preset.
 export const OFFICE_ZONES: readonly {id: OfficeZoneId; label: Vec3; bounds: {minX: number; maxX: number; minZ: number; maxZ: number}}[] = [
-    {id: 'front', label: [-15, 2.6, 4.4], bounds: {minX: -20, maxX: -9, minZ: 2.5, maxZ: 12}},
-    {id: 'bullpen', label: [-13, 3.0, -4.4], bounds: {minX: -20, maxX: -6.2, minZ: -12, maxZ: -2.5}},
-    {id: 'table', label: [-2.5, 2.7, -4.4], bounds: {minX: -6.2, maxX: 1.2, minZ: -12, maxZ: -2.5}},
-    {id: 'trading', label: [3.5, 2.7, -4.4], bounds: {minX: 1.2, maxX: 6.4, minZ: -12, maxZ: -2.5}},
-    {id: 'risk', label: [10, 2.7, -4.4], bounds: {minX: 6.4, maxX: 14.2, minZ: -12, maxZ: -2.5}},
-    {id: 'corner', label: [17.2, 3.0, -4.4], bounds: {minX: 14.2, maxX: 20, minZ: -12, maxZ: -3.6}},
-    {id: 'execution', label: [7, 2.5, 4.3], bounds: {minX: 2, maxX: 20, minZ: 2.5, maxZ: 12}},
+    {id: 'front', label: [-15, 0.05, 6.2], bounds: {minX: -20, maxX: -9, minZ: 1.4, maxZ: 7}},
+    {id: 'bullpen', label: [-13, 0.05, -3.0], bounds: {minX: -20, maxX: -6.2, minZ: -10, maxZ: -2.2}},
+    {id: 'table', label: [-2.5, 0.05, -3.0], bounds: {minX: -6.2, maxX: 1.2, minZ: -10, maxZ: -2.2}},
+    {id: 'trading', label: [3.5, 0.05, -3.0], bounds: {minX: 1.2, maxX: 6.4, minZ: -10, maxZ: -2.2}},
+    {id: 'risk', label: [10, 0.05, -3.0], bounds: {minX: 6.4, maxX: 14.2, minZ: -10, maxZ: -2.2}},
+    {id: 'corner', label: [17.2, 0.05, -3.2], bounds: {minX: 14.2, maxX: 20, minZ: -10, maxZ: -2.6}},
+    {id: 'execution', label: [7, 0.05, 6.2], bounds: {minX: 2, maxX: 20, minZ: 1.4, maxZ: 7}},
 ];
 
 // ---- paths ---------------------------------------------------------------------------------------
@@ -222,7 +222,8 @@ export const pathPoint = (points: readonly Vec3[], distance: number): {at: Vec3;
         const length = Math.hypot(b[0] - a[0], b[2] - a[2]);
         const heading = Math.atan2(b[0] - a[0], b[2] - a[2]);
         if (left <= length || i === points.length - 1) {
-            const t = length === 0 ? 1 : Math.min(1, left / length);
+            if (left >= length - 1e-9) return {at: b, heading};
+            const t = length === 0 ? 1 : left / length;
             return {at: [a[0] + (b[0] - a[0]) * t, 0, a[2] + (b[2] - a[2]) * t], heading};
         }
         left -= length;
@@ -236,14 +237,14 @@ export const OFFICE_PRESET_IDS = ['overview', 'front', 'bullpen', 'table', 'trad
 export type OfficePresetId = (typeof OFFICE_PRESET_IDS)[number];
 
 export const OFFICE_PRESETS: Readonly<Record<OfficePresetId, {target: Vec3; position: Vec3}>> = {
-    overview: {target: [0, 0.6, -2.4], position: [0, 25, 26]},
-    front: {target: [-14.6, 1.3, 5.6], position: [-9.6, 7.6, 15.6]},
-    bullpen: {target: [-13, 1.2, -7.6], position: [-13, 8.6, 2.6]},
-    table: {target: [-2.5, 1, -7.2], position: [-2.5, 7.6, 1.8]},
-    trading: {target: [3.5, 1, -7], position: [1.6, 6.6, 0.8]},
-    risk: {target: [10, 1.3, -7.4], position: [10, 7.6, 2.2]},
-    corner: {target: [17.2, 1.3, -8.6], position: [12.6, 7, -0.6]},
-    execution: {target: [9, 1.1, 6], position: [6.2, 6.6, 14.6]},
+    overview: {target: [0, 0.4, -1.6], position: [0, 19.5, 17.5]},
+    front: {target: [-15.4, 1.2, 3.4], position: [-10.6, 7, 12.4]},
+    bullpen: {target: [-13, 1.1, -6.2], position: [-13, 7.8, 3.4]},
+    table: {target: [-2.5, 0.9, -5.9], position: [-2.5, 7, 2.6]},
+    trading: {target: [3.5, 1, -5.6], position: [1.8, 6.2, 2.2]},
+    risk: {target: [10, 1.2, -6], position: [10, 7, 3.2]},
+    corner: {target: [17.2, 1.2, -6.8], position: [12.8, 6.6, 1.2]},
+    execution: {target: [9.9, 1.1, 4], position: [9.6, 6, 12.8]},
 };
 
 // The preset that shows a seat best.
@@ -253,8 +254,8 @@ export const presetForSeat = (id: WorkerId): OfficePresetId => {
 };
 
 // Orbit limits: the camera stays in front of the room and above the floor.
-export const CAMERA_LIMITS = {minDistance: 5, maxDistance: 48, minPolar: 0.18, maxPolar: Math.PI / 2 - 0.12, maxAzimuth: 1.05, fov: 40} as const;
-export const TARGET_BOUNDS = {minX: -18, maxX: 18, minZ: -10, maxZ: 9, minY: 0.3, maxY: 3} as const;
+export const CAMERA_LIMITS = {minDistance: 5, maxDistance: 62, minPolar: 0.18, maxPolar: Math.PI / 2 - 0.12, maxAzimuth: 1.05, fov: 40} as const;
+export const TARGET_BOUNDS = {minX: -18, maxX: 18, minZ: -8.5, maxZ: 5.5, minY: 0.3, maxY: 3} as const;
 
 // ---- idle gestures and the sky -------------------------------------------------------------------
 
@@ -277,13 +278,13 @@ const smooth = (edge0: number, edge1: number, x: number): number => {
 };
 const bump = (x: number, centre: number, width: number): number => Math.max(0, 1 - Math.abs(x - centre) / width);
 
-// Day, dusk and night by the minute of the New York day, summing to 1: day from about 6:00 to
-// 18:30, a twilight around 6:30 and 18:30, night otherwise.
+// Day, dusk and night by the minute of the New York day, summing to 1: day from about 7:00 to
+// 17:30, a twilight around 6:45 and 18:00, night otherwise.
 export const skyMix = (etMinutes: number): {day: number; dusk: number; night: number} => {
     const m = ((etMinutes % 1440) + 1440) % 1440;
-    const day = smooth(360, 450, m) * (1 - smooth(1050, 1140, m));
-    const dusk = bump(m, 390, 60) + bump(m, 1110, 75);
-    const night = Math.max(0, 1 - smooth(300, 420, m)) + smooth(1110, 1230, m);
+    const day = smooth(390, 465, m) * (1 - smooth(1005, 1095, m));
+    const dusk = bump(m, 405, 60) + bump(m, 1080, 70);
+    const night = Math.max(0, 1 - smooth(330, 405, m)) + smooth(1080, 1155, m);
     const total = day + dusk + night;
     return total <= 0 ? {day: 0, dusk: 0, night: 1} : {day: day / total, dusk: dusk / total, night: night / total};
 };

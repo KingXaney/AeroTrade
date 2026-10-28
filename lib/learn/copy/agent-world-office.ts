@@ -51,6 +51,15 @@ export const ZONE_COPY = {
     sent: 'Sent',
     returned: 'Returned',
     bin: 'Refusals',
+    issue: 'Issue',
+    noAnswer: 'no answer',
+    stampApproved: 'Approved',
+    stampDeclined: 'Declined',
+    lampAwaiting: 'Waiting for a decision',
+    lampLapsed: 'Lapsed, nothing traded',
+    lampPreview: 'Preview, nothing traded',
+    marketOpen: 'Open',
+    marketClosed: 'Closed',
 } as const;
 
 export const OFFICE_PRESET_COPY = {
