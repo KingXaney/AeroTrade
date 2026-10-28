@@ -58,6 +58,8 @@ describe('job registry', () => {
     it('schedules nothing on a preview build, and keeps every event', () => {
         for (const job of JOB_LIST) {
             expect(triggersOf(job, {VERCEL_ENV: 'preview'}), job.id).toEqual([{event: job.event}]);
+            // Nor where the schedules are switched off (the browser QA harness).
+            expect(triggersOf(job, {JOB_CRONS: 'off'}), job.id).toEqual([{event: job.event}]);
         }
         expect(triggersOf(JOBS.newsDigest, {VERCEL_ENV: 'production'})).toEqual([
             {event: 'app/send.daily.news'},

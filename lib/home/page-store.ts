@@ -34,7 +34,8 @@ export type HomeView = {
     streak: Pick<Streak, 'current' | 'todayDone' | 'atRisk'>;
 };
 
-export const getHomeView = async (userId: string): Promise<HomeView> => {
+// `owner` (lib/lab/owner.isLabOwner) from the session: the first-week steps the reader is offered.
+export const getHomeView = async (userId: string, owner: boolean): Promise<HomeView> => {
     const [portfolios, topics, facts, briefing, prefs, streak] = await Promise.all([
         getPortfoliosForUser(userId),
         // Topics must never take the page down with them, as in the shell.
@@ -42,7 +43,7 @@ export const getHomeView = async (userId: string): Promise<HomeView> => {
             console.error('Home topics failed:', error);
             return {topics: [], unseenTotal: 0} as TopicsOverview;
         }),
-        getOnboardingFacts(userId),
+        getOnboardingFacts(userId, owner),
         getLatestMarketBriefing(),
         getNewsFeedPrefs(userId),
         // A chip must never take the page down: a failed read shows "Start today".

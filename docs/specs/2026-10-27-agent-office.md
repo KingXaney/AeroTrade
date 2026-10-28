@@ -15,8 +15,9 @@ keeping track of the stats.
 
 - **The page**: `/agent-world/office`, in the route group `app/(office)/agent-world/office` — no rail,
   no header, no chat, no theme backdrop. "Open the office" in the floor's title opens it in a new
-  tab; its own top bar links back. Every signed-in reader watches; an owner also runs a session,
-  previews one, and approves or declines from inside it.
+  tab; its own top bar links back. Like the whole Brain section it is the app owner's
+  (`LAB_OWNER_EMAILS`; anyone else is sent Home), who also runs a session, previews one, and
+  approves or declines from inside it.
 - **Fourteen workers** in the order a run reaches them: the Head trader at the front desk, the four
   analysts in the bullpen, the bull and bear researchers and their manager at the round table, the
   trader, the three risk analysts on one bench, the portfolio manager in the corner office, the
@@ -72,7 +73,7 @@ keeping track of the stats.
 ## Surfaces
 
 `/agent-world/office` (its own tab) and the "Open the office" link in `/agent-world`'s title. Not in
-the nav registry, on Home, the dashboard or the chat.
+the nav registry, on Home, the dashboard or the chat. The owner's alone, as the Brain section is.
 
 ## Verification
 
@@ -97,7 +98,8 @@ What ran on 2026-10-27, on `feat/agent-world`:
   the focus back; the camera's keys and a drag; Approve from the lamp's chip, the confetti, the
   stamp, the ticket returned for want of a live price, the issue done; the replay from its start and
   Stop; motion reduced (no replay, nothing loops, the scene asleep); the floor plan; brutalist; the
-  voice and the legend; 375 px; a watcher with no decision.
+  voice and the legend; 375 px; a reader who is not the owner, sent Home (the Brain section is the
+  owner's alone since 2026-10-28).
 - By eye, the harness's screenshots (`scripts/qa/output/agent-office/`) and a slow session watched
   seat by seat: the whole floor at 1440 × 900 at dusk and at night, the planes, the 429 and 503
   tags, the bubbles at the table and the risk desk, the robot, the corner office's plant, a 390 px

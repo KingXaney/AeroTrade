@@ -116,7 +116,8 @@ export const deriveMoments = (
     if (facts.firstDrawdown) candidates.push({kind: 'first-drawdown', id: 'first-drawdown', occurredOn: facts.firstDrawdown.date, drawdown: facts.firstDrawdown});
     if (facts.firstSell) candidates.push({kind: 'first-sell', id: 'first-sell', occurredOn: facts.firstSell.date, sell: facts.firstSell});
     if (facts.firstFill) candidates.push({kind: 'first-fill', id: 'first-fill', occurredOn: facts.firstFill.date, fill: facts.firstFill});
-    for (const item of facts.rebalances) {
+    // A followed strategy's rebalance is the owner's alone, as the strategies are (lib/lab/owner.ts).
+    for (const item of facts.owner ? facts.rebalances : []) {
         const moment = rebalanceMoment(item);
         if (moment) candidates.push(moment);
     }

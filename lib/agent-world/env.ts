@@ -47,7 +47,7 @@ const emailsOf = (value: string | undefined): string[] =>
     (value ?? '').split(',').map((email) => email.trim().toLowerCase()).filter((email) => email.length > 0);
 
 // Who may start a session by hand and decide one: AGENT_WORLD_OWNER_EMAILS, else the lab's owners
-// (the app's one owner). Everyone signed in watches.
+// (the app's one owner). Only the owner sees the trading agent world at all (lib/lab/owner.ts).
 export const agentWorldOwnerEmails = (env: Env = process.env): string[] => {
     const own = emailsOf(env.AGENT_WORLD_OWNER_EMAILS);
     return own.length > 0 ? own : emailsOf(env.LAB_OWNER_EMAILS);

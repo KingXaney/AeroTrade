@@ -13,7 +13,7 @@ import MicroLabel from "@/components/primitives/MicroLabel";
 import {describeChatError} from "@/lib/chat/errors";
 import {describeChatUsage} from "@/lib/chat/usage";
 import {subscribeAsk} from "@/lib/chat/ask";
-import {CHAT_WELCOME_MESSAGE, CHAT_SUGGESTIONS} from "@/lib/learn/copy/chat";
+import {CHAT_WELCOME_MESSAGE, chatSuggestionsFor} from "@/lib/learn/copy/chat";
 import {cn} from "@/lib/utils";
 
 // Tools that change what the surrounding pages show; the router refreshes after they run.
@@ -21,6 +21,8 @@ const MUTATING_TOOLS = new Set(['addStockToWatchlist', 'removeStockFromWatchlist
 
 type ChatPanelProps = {
     userId: string;
+    // The app's owner (lib/lab/owner.ts), who alone is offered the chips about the brains and the strategies.
+    owner: boolean;
     onClose: () => void;
     initialMessages: UIMessage[];
     onMessagesChange: (messages: UIMessage[]) => void;
@@ -50,7 +52,7 @@ const loadSize = (userId: string): {width: number; height: number} => {
 
 type ResizeEdge = 'top' | 'left' | 'corner';
 
-const ChatPanel = ({userId, onClose, initialMessages, onMessagesChange, initialInput}: ChatPanelProps) => {
+const ChatPanel = ({userId, owner, onClose, initialMessages, onMessagesChange, initialInput}: ChatPanelProps) => {
     const router = useRouter();
     const [input, setInput] = useState(initialInput ?? '');
     const listRef = useRef<HTMLDivElement>(null);
@@ -259,7 +261,7 @@ const ChatPanel = ({userId, onClose, initialMessages, onMessagesChange, initialI
                             {CHAT_WELCOME_MESSAGE}
                         </div>
                         <div className="flex flex-col gap-2">
-                            {CHAT_SUGGESTIONS.map((s) => (
+                            {chatSuggestionsFor({owner}).map((s) => (
                                 <button
                                     key={s}
                                     type="button"

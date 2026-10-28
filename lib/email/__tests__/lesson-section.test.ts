@@ -160,7 +160,7 @@ describe('the lesson section with one helper swapped out', () => {
         expect(mocked.buildLessonSectionHtml({moment: fill, term: null}, APP)).toContain('stray.example.com');
         const facts: LearnFacts = {
             today: '2026-09-30', accountCreatedOn: '2026-09-20', hasUserTrade: true, followedStrategies: [], topicOpened: false,
-            hasWatchlist: false, navigatorEnrolled: false, missionsDismissedAt: null,
+            hasWatchlist: false, navigatorEnrolled: false, missionsDismissedAt: null, owner: true,
             firstFill: fill.fill, firstSell: null, firstDividend: null, firstDrawdown: null, rebalances: [], lessonsSeen: [],
         };
         const mailed = await mocked.lessonSectionFor({facts, loadTerm: async () => null, appUrl: APP});
@@ -240,7 +240,7 @@ describe('pickDigestMoment', () => {
     const YESTERDAY = '2026-09-29';
     const none: LearnFacts = {
         today: TODAY, accountCreatedOn: '2026-09-20', hasUserTrade: false, followedStrategies: [], topicOpened: false,
-        hasWatchlist: false, navigatorEnrolled: false, missionsDismissedAt: null,
+        hasWatchlist: false, navigatorEnrolled: false, missionsDismissedAt: null, owner: true,
         firstFill: null, firstSell: null, firstDividend: null, firstDrawdown: null, rebalances: [], lessonsSeen: [],
     };
     const fillOn = (date: string) => ({date, symbol: 'SPY', side: 'buy' as const, quantity: 3, price: 500});
@@ -296,7 +296,7 @@ describe('lessonSectionFor', () => {
     const TODAY = '2026-09-30';
     const facts: LearnFacts = {
         today: TODAY, accountCreatedOn: '2026-09-20', hasUserTrade: false, followedStrategies: [], topicOpened: false,
-        hasWatchlist: false, navigatorEnrolled: false, missionsDismissedAt: null,
+        hasWatchlist: false, navigatorEnrolled: false, missionsDismissedAt: null, owner: true,
         firstFill: null, firstSell: null, firstDividend: null, firstDrawdown: null, rebalances: [], lessonsSeen: [],
     };
     const withMoment: LearnFacts = {...facts, hasUserTrade: true, firstFill: {date: '2026-09-29', symbol: 'SPY', side: 'buy', quantity: 3, price: 500}};

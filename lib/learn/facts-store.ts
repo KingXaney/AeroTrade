@@ -43,7 +43,9 @@ const readRowsNow = async (userId: string): Promise<LearnRows> => {
 // read the accounts and the preferences once per request.
 const readRows = cache(readRowsNow);
 
-const onboardingFrom = async (userId: string, {accounts, prefs}: LearnRows): Promise<OnboardingFacts> => {
+// `owner` (lib/lab/owner.isLabOwner) comes from the caller, who read the session's email or, in the
+// digest job, the reader's: the facts never look the owner up themselves.
+const onboardingFrom = async (userId: string, {accounts, prefs}: LearnRows, owner: boolean): Promise<OnboardingFacts> => {
     await connectToDatabase();
     const [trade, topic, watch, navigator] = await Promise.all([
         PaperTrade.exists({userId, source: 'user'}),
@@ -62,10 +64,11 @@ const onboardingFrom = async (userId: string, {accounts, prefs}: LearnRows): Pro
         hasWatchlist: watch !== null,
         navigatorEnrolled: navigator !== null,
         missionsDismissedAt: dismissed ? new Date(dismissed).toISOString() : null,
+        owner,
     };
 };
 
-export const getOnboardingFacts = cache(async (userId: string): Promise<OnboardingFacts> => onboardingFrom(userId, await readRows(userId)));
+export const getOnboardingFacts = cache(async (userId: string, owner: boolean): Promise<OnboardingFacts> => onboardingFrom(userId, await readRows(userId), owner));
 
 type LeanFill = {symbol: string; side: 'buy' | 'sell'; quantity: number; price: number; realizedPnl?: number | null; createdAt: Date};
 type LeanDividend = {symbol: string; date: string; amount: number; perShare?: number; quantity?: number; exDate?: string};
@@ -83,10 +86,11 @@ const isStrategyId = (value: string): value is StrategyId => (STRATEGY_SLUGS as 
 // - the drawdown scan: only accounts younger than ONBOARDING_MAX_DAYS, projected to three
 //   fields and dated on or after the same cutoff, so it can never grow into a history read
 //   (the digest needs it too: a first drawdown crossed yesterday is a moment it mails);
-// - the followed strategies' StrategyState rows (eight at most) for their last check.
+// - the followed strategies' StrategyState rows (eight at most) for their last check — the
+//   owner's alone, as the strategies are (lib/lab/owner.ts).
 // The rows' read has connected; the onboarding promise is joined before anything else awaits.
-const learnFactsFrom = async (userId: string, {accounts, prefs}: LearnRows, onboardingFacts: Promise<OnboardingFacts>): Promise<LearnFacts> => {
-    const followed = (prefs?.followedStrategies ?? []).filter(isStrategyId);
+const learnFactsFrom = async (userId: string, {accounts, prefs}: LearnRows, onboardingFacts: Promise<OnboardingFacts>, owner: boolean): Promise<LearnFacts> => {
+    const followed = owner ? (prefs?.followedStrategies ?? []).filter(isStrategyId) : [];
     const today = getEasternDateString();
     const cutoff = addCalendarDays(today, -ONBOARDING_MAX_DAYS);
     const young = accounts.filter((a) => daysBetween(getEasternDateString(new Date(a.createdAt)), today) <= ONBOARDING_MAX_DAYS);
@@ -124,14 +128,14 @@ const learnFactsFrom = async (userId: string, {accounts, prefs}: LearnRows, onbo
     };
 };
 
-export const getLearnFacts = cache(async (userId: string): Promise<LearnFacts> =>
-    learnFactsFrom(userId, await readRows(userId), getOnboardingFacts(userId)));
+export const getLearnFacts = cache(async (userId: string, owner: boolean): Promise<LearnFacts> =>
+    learnFactsFrom(userId, await readRows(userId), getOnboardingFacts(userId, owner), owner));
 
 // The digest job's reader (no render, so no cache() sharing): the accounts and the preferences
 // are read once and handed to the onboarding and the lesson builders alike.
-export const readLearnFacts = async (userId: string): Promise<LearnFacts> => {
+export const readLearnFacts = async (userId: string, owner: boolean): Promise<LearnFacts> => {
     const rows = await readRowsNow(userId);
-    return learnFactsFrom(userId, rows, onboardingFrom(userId, rows));
+    return learnFactsFrom(userId, rows, onboardingFrom(userId, rows, owner), owner);
 };
 
 const toFill = (t: LeanFill): LearnFill => ({

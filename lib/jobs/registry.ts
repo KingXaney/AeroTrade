@@ -200,9 +200,11 @@ export const JOB_LIST: readonly JobDefinition[] = Object.values(JOBS);
 // into a branch environment of its own, and a preview shares production's database and mailer,
 // so its crons would run every job again against production (2026-10-05: eight copies of the
 // noon digest, all of them rate-limited). Production and a local dev server keep their crons;
-// lib/site.isPreviewBuild is the same test, for code that may import.
+// lib/site.isPreviewBuild is the same test, for code that may import. JOB_CRONS=off drops them too,
+// for a server whose jobs must run only when asked — the browser QA harness, where a schedule that
+// falls mid-run (the 10:30 strategies retry) would fetch real prices into the suites' fixtures.
 export const triggersOf = <J extends JobDefinition>(
     job: J,
     env: Readonly<Record<string, string | undefined>> = process.env,
 ): [{event: J['event']}, ...{cron: J['crons'][number]}[]] =>
-    [{event: job.event}, ...(env.VERCEL_ENV === 'preview' ? [] : job.crons.map((cron) => ({cron})))];
+    [{event: job.event}, ...(env.VERCEL_ENV === 'preview' || env.JOB_CRONS === 'off' ? [] : job.crons.map((cron) => ({cron})))];

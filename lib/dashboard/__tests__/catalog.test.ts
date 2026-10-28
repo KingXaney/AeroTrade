@@ -316,9 +316,20 @@ describe('isWidgetAvailable', () => {
     });
 
     it('advanced needs the advanced flag', () => {
-        expect(isWidgetAvailable(WIDGETS['brain-status'], single)).toBe(false);
-        expect(isWidgetAvailable(WIDGETS['brain-status'], multi)).toBe(false);
-        expect(isWidgetAvailable(WIDGETS['brain-status'], advanced)).toBe(true);
+        expect(isWidgetAvailable(WIDGETS['brain-status'], {...single, owner: true})).toBe(false);
+        expect(isWidgetAvailable(WIDGETS['brain-status'], {...multi, owner: true})).toBe(false);
+        expect(isWidgetAvailable(WIDGETS['brain-status'], {...advanced, owner: true})).toBe(true);
+    });
+
+    it("keeps the owner's widgets for the owner, reading an absent flag as anyone else", () => {
+        for (const id of ['quant-strategies', 'ai-navigator', 'culture-picks', 'news-brain-tile'] as const) {
+            expect(WIDGETS[id].owner, id).toBe(true);
+            expect(isWidgetAvailable(WIDGETS[id], {...advanced, owner: true}), id).toBe(true);
+            expect(isWidgetAvailable(WIDGETS[id], advanced), id).toBe(false);
+            expect(isWidgetAvailable(WIDGETS[id], {...advanced, owner: false}), id).toBe(false);
+        }
+        expect(WIDGETS['portfolio-snapshot'].owner).toBeUndefined();
+        expect(isWidgetAvailable(WIDGETS['portfolio-snapshot'], single)).toBe(true);
     });
 
     it('onboarding follows its own flag and reads an absent flag as false', () => {

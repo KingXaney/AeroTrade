@@ -8,7 +8,7 @@
 import {chromium} from 'playwright';
 import {MongoClient} from 'mongodb';
 import {createJiti} from 'jiti';
-import {BASE, MONGO, REPO_ROOT, check, outDir, signUp, summary} from './lib.mjs';
+import {BASE, MONGO, REPO_ROOT, check, outDir, ownerEmail, signUp, summary} from './lib.mjs';
 
 const OUT = outDir('chat');
 
@@ -21,7 +21,8 @@ try {
     await mongo.connect();
     const db = mongo.db();
 
-    const email = await signUp(page, 'AI');
+    // The owner (lib/lab/owner.ts): the Navigator's panel on /brain is theirs alone.
+    const email = await signUp(page, 'AI', {email: ownerEmail('chat')});
     // Scoped to this user: other harness scripts seed rows for their own users.
     const me = await db.collection('user').findOne({email});
     const userId = String(me._id);

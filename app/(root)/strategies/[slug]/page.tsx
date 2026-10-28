@@ -2,7 +2,7 @@ import type {Metadata} from "next";
 import {strategyBySlug as strategyForTitle} from "@/lib/strategies/catalog";
 import Link from "next/link";
 import {notFound} from "next/navigation";
-import {requireUserId} from "@/lib/auth/session";
+import {requireOwner} from "@/lib/auth/session";
 import {STRATEGIES_DISCLAIMER} from "@/lib/strategies/catalog";
 import {getStrategyPageView} from "@/lib/strategies/page-store";
 import {BOARD_COPY} from "@/lib/learn/copy/board";
@@ -40,7 +40,8 @@ type StrategyPageProps = {
 // What this page shows is worked out in lib/strategies/detail-view.ts and read by
 // getStrategyPageView (lib/strategies/page-store.ts); the page only composes it.
 const StrategyPage = async ({params, searchParams}: StrategyPageProps) => {
-    const userId = await requireUserId();
+    // The owner's alone (lib/lab/owner.ts): anyone else is sent Home.
+    const {id: userId} = await requireOwner();
 
     const {slug} = await params;
     const view = await getStrategyPageView(slug, userId, () => searchParams.then(({from}) => from));

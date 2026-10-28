@@ -3,7 +3,8 @@
 // into the stored bars (a different start price), so a check can tell which source answered.
 // The adjusted close is nine tenths of the close, as after a long-ago distribution: the surface is
 // computed on it, the printed price is the close, and the two must not be confused.
-export const STUB_PORT = 8787;
+// run.sh's TIINGO_PORT (QA_TIINGO_PORT), :8787 unless it was moved.
+export const STUB_PORT = Number(process.env.QA_TIINGO_PORT ?? 8787);
 export const STUB_TOKEN = 'qa-tiingo-token';
 export const SERIES_COUNT = 560;
 

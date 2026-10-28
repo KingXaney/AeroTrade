@@ -94,7 +94,7 @@ describe('the counts and rails the copy states', () => {
         expect(chat.QUANT_STANCE).toContain("the app's seven rule-based paper strategies");
         expect(chat.QUANT_NOTES.unknown).toContain('These are the seven, by slug and name.');
         expect((await import('@/lib/chat/tool-copy')).TOOL_DESCRIPTIONS.getQuantStrategies).toContain("Read the app's seven rule-based quant strategies");
-        expect((await import('@/lib/chat/system-prompt')).ADVISOR_SYSTEM_PROMPT).toContain('the seven rule-based paper strategies');
+        expect((await import('@/lib/chat/system-prompt')).advisorSystemPrompt({owner: true})).toContain('the seven rule-based paper strategies');
         expect((await import('@/lib/dashboard/catalog')).WIDGETS['quant-strategies'].description).toContain('the seven classic strategies');
     });
 

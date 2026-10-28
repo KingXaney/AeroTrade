@@ -11,6 +11,7 @@ import NewsItem from "@/database/models/news-item.model";
 import PaperAccount from "@/database/models/paper-account.model";
 import PaperTrade from "@/database/models/paper-trade.model";
 import {getTopVerifiedTickers} from "@/lib/brain/store";
+import {readOwnerUserIds} from "@/lib/lab/owner-store";
 import {getBarsForSymbols} from "@/lib/prices/store";
 import {computeSignals} from "@/lib/prices/signals";
 import {dominantSectorKey, rankNormalize, scoreUniverse, type ScoredSymbol, type ScoringInput} from "@/lib/navigator/scoring";
@@ -57,10 +58,13 @@ const toView = (set: SuggestionSetDoc | null): SuggestionSetView | null => {
 // ---------------------------------------------------------------------------
 
 // Symbols worth scoring: always-eligible ETFs + the brain's top verified tickers
-// + what each enrolled Navigator account holds (selectNavigatorUniverse).
+// + what each enrolled Navigator account holds (selectNavigatorUniverse). The AI Navigator is the
+// owner's alone (lib/lab/owner.ts), so only the owner's enrolment is read, and so traded: an
+// enrolment anyone else made before then rests.
 export const buildNavigatorUniverse = async (): Promise<NavigatorUniverse & {navigators: {userId: string; accountId: string}[]}> => {
     await connectToDatabase();
-    const navigators = (await AiNavigator.find({status: 'active'}).lean())
+    const owners = [...await readOwnerUserIds()];
+    const navigators = (await AiNavigator.find({status: 'active', userId: {$in: owners}}).lean())
         .map((n) => ({userId: n.userId, accountId: n.accountId}));
     const accountIds = navigators.map((n) => n.accountId).filter((id) => Types.ObjectId.isValid(id));
     const accounts = await PaperAccount.find({_id: {$in: accountIds}}).select('userId positions.symbol')

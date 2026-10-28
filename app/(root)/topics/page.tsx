@@ -1,5 +1,6 @@
 import type {Metadata} from "next";
-import {requireUserId} from "@/lib/auth/session";
+import {requireUser} from "@/lib/auth/session";
+import {isLabOwner} from "@/lib/lab/owner";
 import {getTopicsPageView, MERGED_FEED_SIZE} from "@/lib/topics/page-store";
 import TopicsShell from "@/components/topics/TopicsShell";
 import AllTopicsHeader from "@/components/topics/AllTopicsHeader";
@@ -20,9 +21,9 @@ type TopicsPageProps = {searchParams: Promise<{edit?: string}>};
 // Opening the index, in either view, stamps "last opened News" (TopicsShell carries the marker;
 // the empty state has no shell, so it mounts its own).
 const TopicsPage = async ({searchParams}: TopicsPageProps) => {
-    const userId = await requireUserId();
+    const user = await requireUser();
     const {edit} = await searchParams;
-    const view = await getTopicsPageView(userId, {manage: edit === '1'});
+    const view = await getTopicsPageView(user.id, {manage: edit === '1', owner: isLabOwner(user.email)});
 
     if (view.kind === 'empty') {
         return (

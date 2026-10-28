@@ -40,7 +40,10 @@ export type TopicsPageView =
         preinstalled: boolean;
     };
 
-export const getTopicsPageView = async (userId: string, {manage = false}: {manage?: boolean} = {}): Promise<TopicsPageView> => {
+// `owner` (lib/lab/owner.ts): the news brain's topic suggestions are the owner's alone, as the brain
+// is; anyone else is offered the curated starters.
+export const getTopicsPageView = async (userId: string, {manage = false, owner = false}: {manage?: boolean; owner?: boolean} = {}): Promise<TopicsPageView> => {
+    const brainSuggestions = (): Promise<SuggestedTopic[]> => owner ? readBrainSuggestions() : Promise.resolve([]);
     // The layout's sidebar card already read this for the request; the re-reads after
     // seeding and the inline fetch below must see those writes, so they skip the cache.
     let overview = await getCachedTopicsOverview(userId);
@@ -58,7 +61,7 @@ export const getTopicsPageView = async (userId: string, {manage = false}: {manag
 
     // Reaching here with nothing means the user removed it all on purpose, so this is a
     // deliberate empty state rather than the setup wall it used to be.
-    if (overview.topics.length === 0) return {kind: 'empty', brainSuggestions: await readBrainSuggestions()};
+    if (overview.topics.length === 0) return {kind: 'empty', brainSuggestions: await brainSuggestions()};
 
     // The manage view re-renders after every remove, Undo and follow, so it stops here — before
     // the merged feed and the inline first-run fetch — and a round of editing never runs a search.
@@ -67,7 +70,7 @@ export const getTopicsPageView = async (userId: string, {manage = false}: {manag
             kind: 'manage',
             overview,
             preinstalled: isUntouchedDefaultSet(overview.topics.map((t) => t.slug)),
-            brainSuggestions: await readBrainSuggestions(),
+            brainSuggestions: await brainSuggestions(),
         };
     }
 

@@ -6,6 +6,7 @@ import {inferText} from "@/lib/ai/infer";
 import {buildDigestPrompt, buildWelcomePrompt} from "@/lib/email/prompts";
 import {mailerReady} from "@/lib/email/send";
 import {getAllUsersForNewsEmail} from "@/lib/email/recipients";
+import {isLabOwner} from "@/lib/lab/owner";
 import {sendWelcome} from "@/lib/email/welcome";
 import {fetchCultureDigest, fetchDigestNews, fetchDigestSections, fetchNavigatorDigest, sendUserDigest} from "@/lib/email/digest";
 
@@ -69,9 +70,12 @@ export const sendDailyNewsSummary = inngest.createFunction(
                     continue;
                 }
 
-                const navigator = await step.run(`fetch-navigator-${safeId}`, async () => fetchNavigatorDigest(user.id));
+                // The AI Navigator and the culture pickers are the owner's alone (lib/lab/owner.ts):
+                // anyone else's brief has neither block, and reads neither.
+                const owner = isLabOwner(user.email);
+                const navigator = owner ? await step.run(`fetch-navigator-${safeId}`, async () => fetchNavigatorDigest(user.id)) : null;
                 // The accounts enrolled with the culture pickers, their latest executed decisions.
-                const culture = await step.run(`fetch-culture-${safeId}`, async () => fetchCultureDigest(user.id));
+                const culture = owner ? await step.run(`fetch-culture-${safeId}`, async () => fetchCultureDigest(user.id)) : null;
 
                 // Both deterministic sections (topics, Today's lesson) in one step.
                 const sections = await step.run(`fetch-sections-${safeId}`, async () => fetchDigestSections(user, runId));

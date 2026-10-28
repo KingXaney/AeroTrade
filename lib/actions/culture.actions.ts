@@ -8,7 +8,7 @@
 
 import {revalidatePath} from "next/cache";
 import {z} from "zod";
-import {getCurrentUserId} from "@/lib/auth/session";
+import {getOwnerUserId} from "@/lib/auth/session";
 import {createPaperAccount} from "@/lib/actions/accounts.actions";
 import {getAccountsForUser} from "@/lib/trading/accounts";
 import {STARTING_BALANCE_ERROR, resolveStartingBalance} from "@/lib/trading/starting-balance";
@@ -38,9 +38,10 @@ const revalidateFollowPaths = () => {
     revalidatePath('/dashboard');
 };
 
-// The session, the input and the counter, in that order; every action begins here.
+// The session (the owner's: lib/lab/owner.ts), the input and the counter, in that order; every
+// action begins here.
 const begin = async <T>(schema: z.ZodType<T>, input: unknown): Promise<{userId: string; data: T} | {error: string}> => {
-    const userId = await getCurrentUserId();
+    const userId = await getOwnerUserId();
     if (!userId) return {error: 'Not authenticated'};
     const parsed = schema.safeParse(input);
     if (!parsed.success) return {error: CULTURE_FOLLOW_COPY.unknownPicker};

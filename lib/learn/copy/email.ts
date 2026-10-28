@@ -101,7 +101,7 @@ export const WELCOME_EMAIL_COPY = {
     features: [
         `Paper-trade with ${dollars(PAPER_STARTING_BALANCE)} of practice money, and see each account next to the S&P 500.`,
         'Follow the topics you care about, such as rate decisions, AI chips or oil, and read a short brief on what changed.',
-        'Ask the news brain what the market is paying attention to, and learn what every number on the screen means.',
+        'Ask the assistant about the news you follow, and learn what every number on the screen means.',
     ],
     digestNote: 'Your daily brief arrives around noon ET with the news behind your watchlist and topics.',
     cta: `Open ${SITE_NAME}`,

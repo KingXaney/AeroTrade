@@ -1,7 +1,8 @@
 import type {Metadata} from "next";
 import {cookies} from "next/headers";
 import Link from "next/link";
-import {requireUserId} from "@/lib/auth/session";
+import {requireUser} from "@/lib/auth/session";
+import {isLabOwner} from "@/lib/lab/owner";
 import {preferredAccountId} from "@/lib/trading/active-account";
 import {getPortfolioPageView} from "@/lib/trading/portfolio-page-store";
 import AccountSummary from "@/components/trading/portfolio/AccountSummary";
@@ -37,10 +38,11 @@ type PortfolioPageProps = {
 // The reads and everything worked out from them live in getPortfolioPageView
 // (lib/trading/portfolio-page-store.ts, lib/trading/portfolio-page.ts); the page only composes.
 const PortfolioPage = async ({searchParams}: PortfolioPageProps) => {
-    const userId = await requireUserId();
+    const user = await requireUser();
+    const userId = user.id;
 
     const {account: accountParam} = await searchParams;
-    const view = await getPortfolioPageView(userId, preferredAccountId(accountParam, await cookies()));
+    const view = await getPortfolioPageView(userId, preferredAccountId(accountParam, await cookies()), {owner: isLabOwner(user.email)});
     const {account, portfolio, analytics, bridge, habits, luck, income, tradeLog} = view;
 
     return (

@@ -6,7 +6,7 @@
 // keyless with no stock panels.
 // Run: npm run qa -- styles   (the harness: README.md)
 import {chromium} from 'playwright';
-import {BASE, check, outDir, signUp, summary} from './lib.mjs';
+import {BASE, check, outDir, ownerEmail, signUp, summary} from './lib.mjs';
 
 const OUT = outDir('styles');
 
@@ -16,7 +16,8 @@ const shot = (n) => page.screenshot({path: `${OUT}${n}.png`, fullPage: true});
 
 try {
     // --- sign up ---------------------------------------------------------------
-    await signUp(page, 'Foundations');
+    // The owner (lib/lab/owner.ts), so the sweep reaches /brain and /strategies too.
+    await signUp(page, 'Foundations', {email: ownerEmail('styles')});
     check('sign-up lands in the app', page.url().endsWith('/dashboard'), page.url());
 
     // --- the warning token actually resolves (both globals.css edits landed) ----

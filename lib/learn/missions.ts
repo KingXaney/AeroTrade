@@ -16,13 +16,20 @@ const DONE: Record<MissionId, (facts: OnboardingFacts) => boolean> = {
     'enrol-navigator': (f) => f.navigatorEnrolled,
 };
 
+// The missions that lead to the owner's pages (lib/lab/owner.ts): anyone else's checklist leaves them
+// out, and counts as complete without them.
+export const OWNER_MISSIONS: ReadonlySet<MissionId> = new Set<MissionId>(['follow-strategy', 'enrol-navigator']);
+
+const missionsFor = (facts: OnboardingFacts): readonly MissionCopy[] =>
+    facts.owner ? MISSION_COPY : MISSION_COPY.filter((mission) => !OWNER_MISSIONS.has(mission.id));
+
 export type Mission = MissionCopy & {done: boolean};
 
 export const deriveMissions = (facts: OnboardingFacts): Mission[] =>
-    MISSION_COPY.map((mission) => ({...mission, done: DONE[mission.id](facts)}));
+    missionsFor(facts).map((mission) => ({...mission, done: DONE[mission.id](facts)}));
 
 export const missionsComplete = (facts: OnboardingFacts): boolean =>
-    MISSION_COPY.every((mission) => DONE[mission.id](facts));
+    missionsFor(facts).every((mission) => DONE[mission.id](facts));
 
 // True while the checklist should be on the dashboard at all.
 export const onboardingActive = (facts: OnboardingFacts, today: string = facts.today): boolean => {

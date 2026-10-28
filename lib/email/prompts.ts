@@ -45,7 +45,7 @@ FORMATTING REQUIREMENTS:
 Example personalized outputs (showing obvious customization with TWO sentences):
 Thanks for joining AeroTrade! As someone focused on <strong>technology growth stocks</strong>, follow a topic like AI chips and the daily brief will tell you what changed before the market opens. Paper-trade your ideas with practice money and see how they hold up.
 
-Great to have you aboard! Perfect for your <strong>conservative retirement strategy</strong> — the news brain reads hundreds of articles a day so you can follow the companies you already care about without the noise. Track a practice portfolio against the S&P 500 and let the numbers build your confidence.
+Great to have you aboard! Perfect for your <strong>conservative retirement strategy</strong> — your topics gather the day's articles about the companies you already care about, without the noise. Track a practice portfolio against the S&P 500 and let the numbers build your confidence.
 
 You're all set! Since you're new to investing, start with a paper portfolio and a couple of topics in the <strong>healthcare sector</strong> you're interested in. The daily brief explains what moved in plain language, with none of the jargon.`
 

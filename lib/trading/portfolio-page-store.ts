@@ -17,7 +17,9 @@ import {cultureFillDates, replaysFromDecisions, type FillReplay} from "@/lib/cul
 import {toPortfolioPageView, type PortfolioPageView} from "@/lib/trading/portfolio-page";
 
 // `preferredId` is preferredAccountId's answer: ?account=, else the active-account cookie.
-export const getPortfolioPageView = async (userId: string, preferredId: string | undefined): Promise<PortfolioPageView> => {
+// `owner` (lib/lab/owner.ts): the AI Navigator and the culture pickers are the owner's alone, so only
+// the owner's page reads who trades an account and the decisions behind its culture fills.
+export const getPortfolioPageView = async (userId: string, preferredId: string | undefined, {owner}: {owner: boolean}): Promise<PortfolioPageView> => {
     const all = await getPortfoliosForUser(userId);
     const activeEntry = pickActiveAccount(all, preferredId);
     // getPortfoliosForUser creates the first account, so there always is one.
@@ -55,7 +57,7 @@ export const getPortfolioPageView = async (userId: string, preferredId: string |
     // Who else trades here (the line under the name; null when nobody or when the read failed),
     // and for an account a culture picker trades, the decision behind each culture fill on the
     // log — read from the enrolment's own decisions, bounded by the fills' dates.
-    const tradedByRead: Promise<TradedBy> = readTradedBy(userId, account.id).catch((error) => {
+    const tradedByRead: Promise<TradedBy> = !owner ? Promise.resolve(null) : readTradedBy(userId, account.id).catch((error) => {
         console.error('Portfolio: reading who trades in the account failed:', error);
         return null;
     });

@@ -23,6 +23,7 @@ const none: LearnFacts = {
     hasWatchlist: false,
     navigatorEnrolled: false,
     missionsDismissedAt: null,
+    owner: true,
     firstFill: null,
     firstSell: null,
     firstDividend: null,
@@ -59,6 +60,10 @@ describe('deriveMoments', () => {
     it('dates each moment by the day it happened', () => {
         const byKind = Object.fromEntries(deriveMoments(all, TODAY).map((m) => [m.kind, m.occurredOn]));
         expect(byKind).toMatchObject({'first-dividend': '2026-09-28', 'first-drawdown': '2026-09-26', 'first-sell': '2026-09-25', 'first-fill': '2026-09-22'});
+    });
+
+    it("keeps a followed strategy's rebalance for the owner alone", () => {
+        expect(kinds({...all, owner: false})).toEqual(['first-dividend', 'first-drawdown', 'first-sell', 'first-fill']);
     });
 
     it('keeps a first for seven days and a rebalance for three', () => {

@@ -1,7 +1,8 @@
 import type {Metadata} from "next";
 import {cookies} from "next/headers";
 import type {ReactNode} from "react";
-import {requireUserId} from "@/lib/auth/session";
+import {requireUser} from "@/lib/auth/session";
+import {isLabOwner} from "@/lib/lab/owner";
 import {getPortfoliosForUser} from "@/lib/trading/valuation";
 import {resolveDataKeys, type WidgetId} from "@/lib/dashboard/catalog";
 import {layoutFingerprint} from "@/lib/dashboard/layout";
@@ -24,14 +25,16 @@ type DashboardProps = {
 // stays a Server Component: every widget body is rendered here and handed to
 // the client grid, which only owns order/span/edit state.
 const Dashboard = async ({searchParams}: DashboardProps) => {
-    const userId = await requireUserId();
+    const user = await requireUser();
+    const userId = user.id;
 
     const {customize, account} = await searchParams;
-    const ctx: LoaderCtx = {userId, preferredAccountId: preferredAccountId(account, await cookies())};
+    const owner = isLabOwner(user.email);
+    const ctx: LoaderCtx = {userId, owner, preferredAccountId: preferredAccountId(account, await cookies())};
 
     // Portfolios are cache()-deduped with the (root) layout and the availability read, so this
     // costs nothing extra.
-    const [{layout, availableIds}, portfolios] = await Promise.all([getVisibleLayout(userId), getPortfoliosForUser(userId)]);
+    const [{layout, availableIds}, portfolios] = await Promise.all([getVisibleLayout(userId, owner), getPortfoliosForUser(userId)]);
 
     const {eager, needsActiveAccount} = resolveDataKeys(layout.widgets.map((w) => w.id));
     const {data, failed} = await loadDashboardData(eager, ctx);

@@ -12,7 +12,8 @@ import {
 import KeyNumbers from "@/components/stocks/KeyNumbers";
 import RulesSee from "@/components/stocks/RulesSee";
 import {getCompanyProfile, getFinancials, getQuote} from "@/lib/prices/finnhub";
-import {requireUserId} from "@/lib/auth/session";
+import {requireUser} from "@/lib/auth/session";
+import {isLabOwner} from "@/lib/lab/owner";
 import {isInWatchlist} from "@/lib/stocks/watchlist-store";
 import {getTopicsForUser} from "@/lib/topics/store";
 import {readKeyNumbers} from "@/lib/stocks/key-numbers";
@@ -53,7 +54,8 @@ const readBoardRows = async (symbol: string): Promise<SymbolBoardRead[] | null> 
 };
 
 const StockDetailsPage = async ({params, searchParams}: StockDetailsPageProps) => {
-    const userId = await requireUserId();
+    const user = await requireUser();
+    const userId = user.id;
 
     const {symbol: raw} = await params;
     const symbol = raw.toUpperCase();
@@ -61,7 +63,9 @@ const StockDetailsPage = async ({params, searchParams}: StockDetailsPageProps) =
     const reference = REFERENCE.find((r) => r.id === view) ?? REFERENCE[0];
     const path = `/stocks/${encodeURIComponent(symbol)}`;
 
-    const watching = strategiesWatching(symbol);
+    // The strategies are the owner's alone (lib/lab/owner.ts): for anyone else none watches a symbol,
+    // so the page reads no board and shows no "What the rules see".
+    const watching = isLabOwner(user.email) ? strategiesWatching(symbol) : [];
     const [profile, quote, inWatchlist, topics, financials, boardRows] = await Promise.all([
         getCompanyProfile(symbol),
         getQuote(symbol),

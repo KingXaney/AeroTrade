@@ -149,11 +149,12 @@ and friends keep none beyond Shared and the invariants).
   `components/shell/SectionTabs` shows above the page (none for a section of one page), and
   `match` names routes it owns that are not tabs (`/stocks/AAPL` lights Markets). Friends and
   Settings are `ACCOUNT_PAGES`, in the avatar menu. Every `href` is a page file — the test checks.
-  A page flagged `owner: true` (today `/learn`, the owner's lab) is for the accounts
-  `lib/lab/owner.isLabOwner` admits: the `(root)` layout decides the audience from the session and
-  hands `navSectionsFor`/`navPagesFor` to the Rail, SectionTabs, the drawer and ⌘K, so anyone
-  else's Learn section begins at the games; `NAV_SECTIONS` stays the full registry (the Quick
-  Links widget draws the public lists).
+  A section or a page flagged `owner: true` (the Strategies and Brain sections; `/learn`, the
+  owner's lab) is for the accounts `lib/lab/owner.isLabOwner` admits (### owner): the `(root)`
+  layout decides the audience from the session and hands `navSectionsFor`/`navPagesFor` to the
+  Rail, SectionTabs, the drawer and ⌘K, so anyone else has no Strategies or Brain icon and their
+  Learn section begins at the games (a section left with no page is dropped too); `NAV_SECTIONS`
+  stays the full registry (the Quick Links widget draws the public lists).
 - The rail never widens: a name is a tooltip, a summary (Portfolio, News) a portaled hover card,
   and anything the reader must see without hovering — something new in a followed topic since
   they last opened News, a holding valued at cost, a pending friend request — is a dot on the
@@ -183,7 +184,9 @@ and friends keep none beyond Shared and the invariants).
 - `lib/auth/session` is the one session read: `getSessionUser` (the shell's User),
   `getCurrentUserId` (actions and routes), `getCurrentUser` (an action that gates on who the person
   is — the owner's lab — reads the email through it), `requireUserId` (pages — signed out redirects
-  to /sign-in).
+  to /sign-in), `requireUser` (a page that shows the owner more), `requireOwner` (the owner's own
+  pages — anyone else is sent Home) and `getOwnerUserId` (the owner's actions and routes — anyone
+  else reads as signed out).
 - The server actions keep their own rate limits — better-auth's `rateLimit` never runs on this
   app's `auth.api.*` path — all counted by `lib/rate-limit.takeRateLimit`, the one Mongo counter.
   `lib/rate-limit.peekRateLimit` is its read-only pair — one `findOne`, never a write, null once
@@ -448,7 +451,7 @@ and friends keep none beyond Shared and the invariants).
   every reason decoded through the culture grammar, and its simulated record apart, under one
   stance line held to the no-advice list.
 - The Brain section of `lib/shell/navigation` carries the three brains (`/brain`, `/culture`, `/agent-world`); the rail
-  stays short (seven icons since Markets and Trade merged). The two widgets (`culture-picks`, `brand-attention`) are library-only,
+  stays short (seven icons since Markets and Trade merged; five for anyone but the owner, who alone has Strategies and Brain). The two widgets (`culture-picks`, `brand-attention`) are library-only,
   category `brain` ("Brains & AI").
 - Enrolling an account with a picker (the Navigator's shape, per picker): `lib/culture/follow`
   (pure — `followAccountName` "Culture · Spike", `FollowProfileSchema` over `LIVE_PROFILES`,
@@ -491,6 +494,35 @@ and friends keep none beyond Shared and the invariants).
   10:45 ET with a Tuesday holiday retry (`culture-weekly`, `culture-preview`, `culture-resimulate`),
   `culture-wikipedia-backfill` on demand (`culture-backfill [brandId…]`), `culture-follow-bootstrap`
   on demand (`culture-follow`). QA: `npm run qa -- culture`.
+
+### owner
+
+- The app's owner — its admin — is the accounts `LAB_OWNER_EMAILS` names (`lib/lab/owner.isLabOwner`;
+  `lib/lab/owner-store.readOwnerUserIds` is the same list as user ids, for the reads that have no
+  session). The owner alone has the lab (`/learn`), both brains (`/brain`, `/culture`), the trading
+  agent world (`/agent-world` and its office) and the strategies (`/strategies`); for anyone else
+  none of them exists:
+  - the nav: the Strategies and Brain sections are `owner: true` (### shell);
+  - the pages: `requireOwner` sends anyone else Home; the actions (the Navigator's, the culture
+    follow's, the strategy follow's, the Second Opinion's) and the routes (the strategy CSV, the
+    agent world's live poll) take `getOwnerUserId`;
+  - the widgets: every one in the `strategies` and `brain` categories, and `news-brain-tile`, is
+    `owner` (`lib/dashboard/catalog`), shown only with `AvailabilityContext.owner` — the dashboard
+    and Settings read it from the session (`getVisibleLayout(userId, owner)`);
+  - the chat: `buildTools(userId, {owner})` leaves `OWNER_CHAT_TOOLS` (`lib/chat/types`) out for
+    anyone else and `advisorSystemPrompt({owner})` never names them; the chips about them
+    (`OWNER_CHAT_SUGGESTIONS`, `chatSuggestionsFor`) and the robot's tip (`robotTipsFor`) are the
+    owner's;
+  - the rest: the stock page's "What the rules see" (no strategy watches a symbol for anyone
+    else), the first-week missions in `OWNER_MISSIONS`, a followed strategy's rebalance lesson
+    (`OnboardingFacts.owner`), the Topics page's brain suggestions, `/portfolio`'s "Traded by", the
+    glossary's groups homed on those pages (`glossaryGroupsFor`) and the strategies' disclaimer
+    under them, and the daily brief's Navigator and culture blocks;
+  - the jobs: the AI Navigator and the culture pickers trade the owner's enrolments only
+    (`buildNavigatorUniverse`, `listActiveFollowers`); one anyone else made before rests.
+  News — the briefing, the feed, the topic briefs — is everyone's, as are the accounts, the
+  topics, the games, poker night and the glossary's other groups. The landing page still
+  describes the strategies and the Navigator.
 
 ### agent world
 
@@ -1656,7 +1688,7 @@ and friends keep none beyond Shared and the invariants).
   prints them under the jobs strip on `/brain?view=system` (`LIMITS_COPY`). A service that fails
   silently records nothing: the panel never says "within limits".
 - Crons run in production (and a local dev server) only: `triggersOf` drops them on a Vercel
-  preview build. The Inngest Vercel integration syncs every preview into a branch environment of
+  preview build, and wherever `JOB_CRONS=off` (the browser QA harness, so no schedule lands mid-run). The Inngest Vercel integration syncs every preview into a branch environment of
   its own, and a preview carries production's database, mailer and model keys — on 2026-10-05
   eight copies of every job were running against production, and the noon digest failed on the
   shared quotas. Events still reach a preview, so a branch can be tested by hand.

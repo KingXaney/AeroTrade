@@ -61,7 +61,9 @@ None of the three ships an integration with the others; the glue is this feature
 
 `/agent-world` (`?view=floor|company|data`), the Brain section's third tab; the job and its stamp on
 the system views; four limits providers (`agent-world`, `openbb-yfinance`, `fred`, `paperclip`); the
-trade log's "Agent world" source. Not on Home, the dashboard or the chat yet.
+trade log's "Agent world" source. Not on Home, the dashboard or the chat yet. Like the whole Brain
+section, the owner's alone since 2026-10-28 (`LAB_OWNER_EMAILS`, AGENTS.md ### owner): anyone else
+is sent Home and its live poll answers them 401.
 
 ## To run it for real
 
@@ -94,7 +96,7 @@ What ran on 2026-10-27, on `feat/agent-world`:
   own agent, the Head trader's comments made under a run of its own with nothing checked out; a
   declined session, a preview that trades nothing and opens no issue, a refused run; the replay with
   motion and without; the company and data views, Paperclip down included; the voice; 375 px; a
-  reader who is not the owner; a "Weekly session" routine run relayed through the service to a manual
+  reader who is not the owner (sent Home since the Brain section became the owner's); a "Weekly session" routine run relayed through the service to a manual
   session on an issue of its own, the routine's issue closed.
 - Paperclip v2026.1023.0, run locally (Node 24.22.1, `local_trusted`, embedded Postgres): the
   roles it accepts (`general`, `researcher`, `qa`, `pm`; `manager` is refused), the key's `token`,

@@ -8,7 +8,8 @@
 // /__stats reads the orders and positions.
 import http from 'node:http';
 
-export const ALPACA_STUB_PORT = 8788;
+// run.sh's ALPACA_PORT (QA_ALPACA_PORT), :8788 unless it was moved.
+export const ALPACA_STUB_PORT = Number(process.env.QA_ALPACA_PORT ?? 8788);
 const KEY = 'qa-alpaca-key';
 const SECRET = 'qa-alpaca-secret';
 const PRICES = {NVDA: 200, XLK: 100, 'BRK.B': 500, ADDYY: 120, SPY: 600, AAPL: 150, MSFT: 300};

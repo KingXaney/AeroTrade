@@ -5,7 +5,7 @@
 // shelves, the turns as bubbles, the ratings, the desks), opens a seat's file by keyboard, moves the
 // camera, approves from the Execution desk's file (the confetti, the stamp, the ticket returned for
 // want of a live price), replays the session, and the office holds with motion reduced, as a floor
-// plan, in brutalist, on a phone, in its words, and for a reader who is not the owner.
+// plan, in brutalist, on a phone, in its words, and a reader who is not the owner sent Home.
 // Run: npm run qa -- agent-office   (the harness: README.md)
 import {chromium} from 'playwright';
 import {MongoClient} from 'mongodb';
@@ -13,7 +13,7 @@ import {BASE, HOME_URL, INNGEST, MONGO, PASSWORD, check, note, outDir, signUp, s
 
 const OUT = outDir('agent-office');
 const OWNER_EMAIL = 'qa-lab-owner@example.com';
-const SERVICE = 'http://localhost:8789';
+const SERVICE = `http://localhost:${process.env.QA_AGENT_WORLD_PORT ?? 8789}`;
 const JOB = 'agent-world-weekly';
 const ENV = 'development';
 const OWNER_ID = 'system:agent-world';
@@ -374,17 +374,15 @@ try {
     check('… every seat still on the roster', await tab.locator('[data-office-roster] [data-office-worker]').count() === 14);
     await shot('07-phone');
 
-    // --- a reader who is not the owner watches, and decides nothing ---
+    // --- a reader who is not the owner never reaches the office (lib/lab/owner.ts) ---
     const otherContext = await browser.newContext({viewport: {width: 1440, height: 900}});
     const other = await otherContext.newPage();
-    await signUp(other, 'Office watcher');
+    await signUp(other, 'Office other');
     await other.goto(`${BASE}/agent-world/office`, {waitUntil: 'load'});
-    await ready(other);
-    check('another reader sees the fourteen seats, with no Run now', await other.locator('[data-office-roster] [data-office-worker]').count() === 14 && await other.locator('[data-aw-run-now]').count() === 0);
-    await stopReplay(other);
-    await other.locator('[data-office-roster] [data-office-worker="execution-desk"]').click();
-    await other.locator('[data-office-dossier="execution-desk"]').waitFor({timeout: 10000});
-    check('… and the Execution desk\'s file offers no decision', await other.locator('[data-aw-approve], [data-aw-decline]').count() === 0);
+    await other.waitForURL(HOME_URL, {timeout: 15000}).catch(() => {});
+    const poll = await other.request.get(`${BASE}/api/agent-world/live`);
+    check('another reader is sent Home, and the floor\'s live poll answers them 401',
+        HOME_URL.test(other.url()) && poll.status() === 401, `${other.url()} ${poll.status()}`);
     await otherContext.close();
 } catch (error) {
     check('qa-agent-office threw', false, String(error?.stack ?? error));

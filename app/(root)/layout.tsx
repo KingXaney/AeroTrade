@@ -21,7 +21,8 @@ const Layout = async ({children}: {children: React.ReactNode}) => {
     if (!user) redirect('/sign-in')
 
     const shell = await getShellView(user.id);
-    // The owner's lab is the one page not every account sees (lib/lab/owner.ts).
+    // The owner's lab, both brains, the trading agent world and the strategies are the parts not
+    // every account sees (lib/lab/owner.ts).
     const audience = {owner: isLabOwner(user.email)};
     const sections = navSectionsFor(audience);
 
@@ -42,7 +43,7 @@ const Layout = async ({children}: {children: React.ReactNode}) => {
                 <SectionTabs badges={shell.navBadges} sections={sections} />
                 {children}
             </div>
-            <ChatWidget userId={user.id}/>
+            <ChatWidget userId={user.id} owner={audience.owner}/>
             <ThemeSync dbTheme={shell.savedTheme}/>
         </main>
     )

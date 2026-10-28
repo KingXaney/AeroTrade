@@ -1,6 +1,6 @@
 import Link from "next/link";
 import {GLOSSARY} from "@/lib/learn/glossary";
-import {GLOSSARY_GROUPS} from "@/lib/learn/where";
+import {glossaryGroupsFor} from "@/lib/learn/where";
 import {GLOSSARY_PAGE_COPY} from "@/lib/learn/copy/learn";
 import Panel from "@/components/primitives/Panel";
 import SectionHeading from "@/components/primitives/SectionHeading";
@@ -10,9 +10,11 @@ import SectionHeading from "@/components/primitives/SectionHeading";
 // /glossary#max-drawdown lands on it with no script (⌘K, Today's lesson and the daily email
 // hand that address out). The panel ids (learn-<group>) and the entry attributes are what the
 // browser QA reads.
-const GlossaryGroups = () => (
+// `owner` (lib/lab/owner.ts): the groups about both brains, the trading agent world and the
+// strategies are the owner's alone, as their pages are.
+const GlossaryGroups = ({owner}: {owner: boolean}) => (
     <div className="space-y-4">
-        {GLOSSARY_GROUPS.map((group) => (
+        {glossaryGroupsFor({owner}).map((group) => (
             <Panel key={group.id} id={`learn-${group.id}`}>
                 <div className="flex items-center justify-between gap-3 mb-4">
                     <SectionHeading spacing="none">{group.label}</SectionHeading>

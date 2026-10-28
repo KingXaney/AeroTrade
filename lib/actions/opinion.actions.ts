@@ -3,7 +3,7 @@
 import {revalidatePath} from "next/cache";
 import SecondOpinion from "@/database/models/second-opinion.model";
 import {connectToDatabase} from "@/database/mongoose";
-import {getCurrentUserId} from "@/lib/auth/session";
+import {getOwnerUserId} from "@/lib/auth/session";
 import {inngest} from "@/lib/jobs/client";
 import {JOBS} from "@/lib/jobs/registry";
 import {
@@ -21,13 +21,16 @@ import {
 import {buildStandaloneSecondOpinionPrompt} from "@/lib/brain/prompts";
 import type {ActionResult} from '@/lib/actions/types';
 
+// The brain's Second Opinion is the owner's alone (lib/lab/owner.ts): getOwnerUserId reads anyone
+// else as signed out, so every action below refuses them.
+
 const MIN_PASTED_CHARS = 40;
 
 // Path 1 — API key configured: queue the background Claude call. Paid, so it
 // sits behind a session and a cool-down that stops the button becoming a bill.
 export const requestSecondOpinion = async (): Promise<ActionResult> => {
     try {
-        const userId = await getCurrentUserId();
+        const userId = await getOwnerUserId();
         if (!userId) return {success: false, message: 'Not authenticated'};
         if (!isSecondOpinionConfigured()) {
             return {success: false, message: 'No API key set — use the Max-plan options below instead'};
@@ -77,7 +80,7 @@ export const requestSecondOpinion = async (): Promise<ActionResult> => {
 // stays identical to what the automated paths send.
 export const getSecondOpinionPrompt = async (): Promise<{success: boolean; prompt?: string; message?: string}> => {
     try {
-        const userId = await getCurrentUserId();
+        const userId = await getOwnerUserId();
         if (!userId) return {success: false, message: 'Not authenticated'};
 
         const context = await gatherOpinionContext();
@@ -95,7 +98,7 @@ export const getSecondOpinionPrompt = async (): Promise<{success: boolean; promp
 // pasting user, link-stripped, and rendered as markdown without raw HTML.
 export const saveManualSecondOpinion = async (opinionMd: string): Promise<ActionResult> => {
     try {
-        const userId = await getCurrentUserId();
+        const userId = await getOwnerUserId();
         if (!userId) return {success: false, message: 'Not authenticated'};
 
         const text = (opinionMd || '').trim();

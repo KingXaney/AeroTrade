@@ -26,6 +26,10 @@ type TipStorage = Pick<Storage, 'getItem' | 'setItem'>;
 export const robotTipsOn = (pathname: string | null | undefined): boolean =>
     pathname === '/topics' || (typeof pathname === 'string' && pathname.startsWith('/topics/'));
 
+// The tips this reader may hear: the owner every one; anyone else none about the owner's pages.
+export const robotTipsFor = ({owner}: {owner: boolean}): readonly RobotTip[] =>
+    owner ? ROBOT_TIPS : ROBOT_TIPS.filter((tip) => !tip.owner);
+
 // The day's order: the lead tip first, the rest rotated by the date, so everyone sees the same
 // order on a day and it moves on the next.
 export const robotTipOrder = (date: string, tips: readonly RobotTip[] = ROBOT_TIPS): RobotTip[] => {

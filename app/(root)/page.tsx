@@ -47,8 +47,8 @@ type HomeProps = {
 
 // Read under Suspense, so the page paints before the lesson: a first from the account wins and
 // never reads the day's concept at all (as on the dashboard widget).
-const LessonAsync = async ({userId}: {userId: string}) => {
-    const facts = await getLearnFacts(userId);
+const LessonAsync = async ({userId, owner}: {userId: string; owner: boolean}) => {
+    const facts = await getLearnFacts(userId, owner);
     const moment = deriveMoments(facts, facts.today)[0];
     if (moment) return <TodaysLesson moment={moment}/>;
     return <TodaysLesson lesson={await getTodaysLesson(userId)}/>;
@@ -91,7 +91,8 @@ const Home = async ({searchParams}: HomeProps) => {
     // Old links to the dashboard's edit mode (/?customize=1) keep working.
     if ((await searchParams).customize === '1') redirect('/dashboard?customize=1');
 
-    const [view, terrain] = await Promise.all([getHomeView(user.id), getMomentumSurface()]);
+    const owner = isLabOwner(user.email);
+    const [view, terrain] = await Promise.all([getHomeView(user.id, owner), getMomentumSurface()]);
     const {step} = view;
     // The box beside the topics: the market briefing, else the topics' own briefs, else the
     // Today's lesson, with the glossary a link away.
@@ -106,7 +107,7 @@ const Home = async ({searchParams}: HomeProps) => {
                 subtitle={HOME_COPY.subtitle}
                 actions={(
                     <div className="flex flex-wrap items-center gap-3">
-                        <StreakChip {...view.streak} href={isLabOwner(user.email) ? '/learn' : '/games'}/>
+                        <StreakChip {...view.streak} href={owner ? '/learn' : '/games'}/>
                         {pokerNight && (
                             <Suspense fallback={<PokerNightChip/>}>
                                 <PokerNightChipAsync userId={user.id}/>
@@ -192,7 +193,7 @@ const Home = async ({searchParams}: HomeProps) => {
                     </Panel>
                 ) : (
                     <Panel id="home-learn" aria-labelledby="home-learn-heading">
-                        <LearnBox userId={user.id}/>
+                        <LearnBox userId={user.id} owner={owner}/>
                     </Panel>
                 )}
             </div>
@@ -204,7 +205,7 @@ const Home = async ({searchParams}: HomeProps) => {
                 </Panel>
             ) : hasBriefing && (
                 <Panel id="home-learn" aria-labelledby="home-learn-heading">
-                    <LearnBox userId={user.id}/>
+                    <LearnBox userId={user.id} owner={owner}/>
                 </Panel>
             )}
 
@@ -217,14 +218,14 @@ const Home = async ({searchParams}: HomeProps) => {
     );
 };
 
-const LearnBox = ({userId}: {userId: string}) => (
+const LearnBox = ({userId, owner}: {userId: string; owner: boolean}) => (
     <>
         <div className="mb-4 flex items-center justify-between gap-3">
             <SectionHeading id="home-learn-heading" spacing="none">{HOME_COPY.learnHeading}</SectionHeading>
             <Link href="/glossary" className="label-type text-xs text-brand hover:underline">{HOME_COPY.learnLink} →</Link>
         </div>
         <Suspense fallback={<WidgetSkeleton height={160} rows={3}/>}>
-            <LessonAsync userId={userId}/>
+            <LessonAsync userId={userId} owner={owner}/>
         </Suspense>
     </>
 );

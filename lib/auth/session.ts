@@ -5,6 +5,7 @@
 import {headers} from "next/headers";
 import {redirect} from "next/navigation";
 import {auth} from "@/lib/auth/server";
+import {isLabOwner} from "@/lib/lab/owner";
 import type {User} from '@/lib/auth/types';
 
 // The signed-in user as the (root) layout hands it to the shell, or null when signed out.
@@ -42,4 +43,27 @@ export const requireUserId = async (): Promise<string> => {
     const userId = await getCurrentUserId();
     if (!userId) redirect('/sign-in');
     return userId;
+};
+
+// For pages that show the owner more than anyone else (lib/lab/owner.ts): the signed-in user with
+// their email, or a redirect to /sign-in.
+export const requireUser = async (): Promise<User> => {
+    const user = await getCurrentUser();
+    if (!user) redirect('/sign-in');
+    return user;
+};
+
+// For the owner's own pages — both brains, the trading agent world, the strategies: the owner, a
+// redirect to /sign-in when signed out, or Home for anyone else, where nothing links to them.
+export const requireOwner = async (): Promise<User> => {
+    const user = await requireUser();
+    if (!isLabOwner(user.email)) redirect('/');
+    return user;
+};
+
+// For the owner's actions and routes: the owner's id, or null — signed out and anyone else alike,
+// since no page offers those actions to anyone but the owner.
+export const getOwnerUserId = async (): Promise<string | null> => {
+    const user = await getCurrentUser();
+    return user && isLabOwner(user.email) ? user.id : null;
 };

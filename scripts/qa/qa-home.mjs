@@ -37,10 +37,11 @@ try {
     check('no terrain panel before there is a surface to draw',
         await page.locator('[data-home-terrain]').count() === 0 && await page.locator('[data-terrain]').count() === 0);
     const stepText = (await page.locator('#home-next-step').innerText()).replace(/\s+/g, ' ');
-    check('the next step is the first first-week step', /Place your first paper trade/.test(stepText) && /0 of 5 first-week steps done/i.test(stepText), stepText.slice(0, 160));
+    // This reader is not the owner (lib/lab/owner.ts), so the strategy and Navigator steps are not theirs.
+    check('the next step is the first first-week step', /Place your first paper trade/.test(stepText) && /0 of 3 first-week steps done/i.test(stepText), stepText.slice(0, 160));
     check('…and it opens the order ticket', await page.locator('[data-home-step]').getAttribute('href') === '/trade?symbol=SPY');
     check('the six seeded topics are listed', await page.locator('#home-topics a[href^="/topics/"]').count() === 6);
-    check('the first-week list is on the page', await page.locator('#home-first-week li[data-done]').count() === 5);
+    check('the first-week list is on the page, its three steps', await page.locator('#home-first-week li[data-done]').count() === 3);
     check('a box with nothing to say is not drawn', await page.locator('#home-briefing').count() === 0);
     check('numbers come before prose: the total sits above the fold',
         ((await page.locator('[data-home-total]').boundingBox())?.y ?? 9999) < 400);
@@ -68,7 +69,7 @@ try {
     });
     await page.goto(`${BASE}/`, {waitUntil: 'load'});
     const moved = (await page.locator('#home-next-step').innerText()).replace(/\s+/g, ' ');
-    check('with a trade on the ledger, the step moves to the next one', /Follow a quant strategy/.test(moved) && /1 of 5 first-week steps done/i.test(moved), moved.slice(0, 160));
+    check('with a trade on the ledger, the step moves to the next one', /Open one of your topics/.test(moved) && /1 of 3 first-week steps done/i.test(moved), moved.slice(0, 160));
 
     // Hidden once, the list leaves Home, and the step follows the session instead.
     await db.collection('userpreferences').updateOne({userId}, {$set: {'learn.missionsDismissedAt': new Date()}}, {upsert: true});

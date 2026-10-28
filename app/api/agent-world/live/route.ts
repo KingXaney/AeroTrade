@@ -2,12 +2,12 @@ import {takeToken, type Bucket} from "@/lib/agent-world/bucket";
 import {agentWorldEnv} from "@/lib/agent-world/env";
 import {SESSION_ID} from "@/lib/agent-world/events";
 import {getLiveView} from "@/lib/agent-world/store";
-import {getCurrentUserId} from "@/lib/auth/session";
+import {getOwnerUserId} from "@/lib/auth/session";
 
 // What the floor polls (components/agent-world/useLiveFeed): the newest session, or only what the
 // poll does not already hold — nothing at all when its version matches, the session and the runs
-// past its seq when it names this session. Signed-in readers only (proxy.ts leaves /api alone), and
-// a reader's polls are metered per instance so a runaway tab costs a 429, not database reads.
+// past its seq when it names this session. The owner only (lib/lab/owner.ts; proxy.ts leaves /api
+// alone), and the owner's polls are metered per instance so a runaway tab costs a 429, not database reads.
 
 export const runtime = 'nodejs';
 export const maxDuration = 10;
@@ -23,7 +23,7 @@ const intOrNull = (value: string | null): number | null => {
 };
 
 export async function GET(request: Request) {
-    const userId = await getCurrentUserId();
+    const userId = await getOwnerUserId();
     if (!userId) return Response.json({error: 'unauthorized'}, {status: 401, headers: NO_STORE});
     if (!takeToken(buckets, userId, Date.now(), RATE)) return Response.json({error: 'rate-limited'}, {status: 429, headers: NO_STORE});
 

@@ -193,8 +193,9 @@ const until = async (page, fn, ms) => {
     await page.goto(`${BASE}/topics/ai-chips`, {waitUntil: 'load'});
     await page.waitForTimeout(800);
     const railNav = await page.$$eval('aside.rail nav a', (as) => as.map((a) => a.getAttribute('aria-label')?.split(',')[0]));
-    // All seven come from lib/shell/navigation.ts; the account pages are in the avatar menu.
-    check('the rail runs Home · News · Markets … Learn', railNav.join(',') === 'Home,News,Markets,Portfolio,Strategies,Brain,Learn', railNav.join(','));
+    // From lib/shell/navigation.ts; the account pages are in the avatar menu. This reader is not the
+    // owner (lib/lab/owner.ts), so Strategies and Brain are not among them.
+    check('the rail runs Home · News · Markets … Learn', railNav.join(',') === 'Home,News,Markets,Portfolio,Learn', railNav.join(','));
     const tabHrefs = await page.$$eval('[data-section-tabs="news"] a', (as) => as.map((a) => `${a.getAttribute('href')}${a.getAttribute('aria-current') === 'page' ? '*' : ''}`));
     check('a topic page sits under News, on its Topics tab', tabHrefs.join(',') === '/news,/topics*', tabHrefs.join(','));
     // Search is a palette trigger, not a route — it used to be a fake '/search' NAV_ITEMS entry.
@@ -206,7 +207,8 @@ const until = async (page, fn, ms) => {
     await page.goto(`${BASE}/dashboard`, {waitUntil: 'load'});
     await page.waitForTimeout(2500);
     const order = await widgetOrder();
-    check('default layout is checklist-then-topics', order.join(',') === 'getting-started,topics-overview,portfolio-snapshot,watchlist-movers,topics-latest,friends-rank,news-brain-tile,tv-heatmap,tv-top-stories', order.join(','));
+    // The brain tile is the owner's (lib/lab/owner.ts); this reader is not, so it is not drawn.
+    check('default layout is checklist-then-topics', order.join(',') === 'getting-started,topics-overview,portfolio-snapshot,watchlist-movers,topics-latest,friends-rank,tv-heatmap,tv-top-stories', order.join(','));
     check('topics-overview lists the topic', /AI chips/i.test(await page.locator('[data-widget-id="topics-overview"]').innerText()));
     await shot('03-dashboard');
 

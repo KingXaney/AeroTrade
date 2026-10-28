@@ -5,7 +5,7 @@
 // watches it run live — the desk's stages lighting in order, the reports arriving, the ratings —
 // approves the planned order (it fails on "live price": the harness has no quotes, as qa-culture
 // asserts) and sees the decision on the Paperclip issue; then a declined session, a preview, a
-// refused one, the replay with motion and without, a watcher who is not the owner, the company and
+// refused one, the replay with motion and without, a reader who is not the owner sent Home, the company and
 // data views, the legend, the voice, a phone.
 // Run: npm run qa -- agent-world   (the harness: README.md)
 import {chromium} from 'playwright';
@@ -15,8 +15,8 @@ import {BASE, HOME_URL, INNGEST, MONGO, PASSWORD, check, note, outDir, signUp, s
 
 const OUT = outDir('agent-world');
 const OWNER_EMAIL = 'qa-lab-owner@example.com';
-const SERVICE = 'http://localhost:8789';
-const PAPERCLIP = 'http://localhost:8790';
+const SERVICE = `http://localhost:${process.env.QA_AGENT_WORLD_PORT ?? 8789}`;
+const PAPERCLIP = `http://localhost:${process.env.QA_PAPERCLIP_PORT ?? 8790}`;
 const SECRET = 'qa-agent-world-secret';
 const JOB = 'agent-world-weekly';
 const ENV = 'development';
@@ -332,13 +332,13 @@ try {
     }
     await shot('07-phone');
 
-    // --- a reader who is not the owner watches, and decides nothing ---
+    // --- a reader who is not the owner never reaches the trading agent world (lib/lab/owner.ts) ---
     const other = await browser.newPage({viewport: {width: 1440, height: 900}});
-    await signUp(other, 'Agent world watcher');
+    await signUp(other, 'Agent world other');
     await other.goto(`${BASE}/agent-world`, {waitUntil: 'load'});
-    await other.locator('[data-aw-floor]').waitFor({timeout: 30000});
-    check('another reader sees the floor without Run now, a preview or a decision',
-        await other.locator('[data-aw-run-now]').count() === 0 && await other.locator('[data-aw-preview]').count() === 0 && await other.locator('[data-aw-approve]').count() === 0);
+    await other.waitForURL(HOME_URL, {timeout: 15000}).catch(() => {});
+    check('another reader is sent Home, with no Brain icon to come back by',
+        HOME_URL.test(other.url()) && await other.locator('aside.rail a[href="/brain"]').count() === 0, other.url());
     await other.close();
 
     // --- the company's "Weekly session" routine starts one through the service ---

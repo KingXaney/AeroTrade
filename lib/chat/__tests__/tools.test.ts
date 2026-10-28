@@ -42,11 +42,12 @@ vi.mock('@/lib/culture/store', () => ({getTopCultureEntities: vi.fn(), getTicker
 vi.mock('@/lib/culture/page-store', () => ({getCulturePicksView: vi.fn(), getCultureFollowsView: vi.fn(async () => [])}));
 
 import {buildTools} from '@/lib/chat/tools';
+import {OWNER_CHAT_TOOLS} from '@/lib/chat/types';
 import {FEED_WATCHLIST_SYMBOL_CAP} from '@/lib/news/config';
 import type {SuggestionItem} from '@/lib/navigator/types';
 import type {Stock} from '@/lib/stocks/types';
 
-const tools = buildTools('user-1');
+const tools = buildTools('user-1', {owner: true});
 
 const run = async (name: keyof typeof tools, input: unknown): Promise<unknown> => {
     const execute = tools[name].execute as unknown as (input: unknown, options: ToolExecutionOptions) => Promise<unknown>;
@@ -54,6 +55,15 @@ const run = async (name: keyof typeof tools, input: unknown): Promise<unknown> =
 };
 
 const stock = (symbol: string): Stock => ({symbol, name: `${symbol} Inc`, exchange: 'US', type: 'Common Stock'});
+
+describe("the owner's tools", () => {
+    it('hands anyone else no tool over the brains or the strategies', () => {
+        const everyone = Object.keys(buildTools('user-2', {owner: false}));
+        for (const name of OWNER_CHAT_TOOLS) expect(everyone, name).not.toContain(name);
+        expect(everyone.sort()).toEqual(Object.keys(tools).filter((name) => !(OWNER_CHAT_TOOLS as readonly string[]).includes(name)).sort());
+        for (const name of OWNER_CHAT_TOOLS) expect(Object.keys(tools), name).toContain(name);
+    });
+});
 
 beforeEach(() => {
     vi.clearAllMocks();

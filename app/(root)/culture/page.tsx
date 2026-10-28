@@ -1,5 +1,5 @@
 import type {Metadata} from "next";
-import {requireUserId} from "@/lib/auth/session";
+import {requireOwner} from "@/lib/auth/session";
 import {getCultureBrandsView, getCultureFollowsView, getCulturePicksView, getCultureSystemView} from "@/lib/culture/page-store";
 import BrandBoard from "@/components/culture/BrandBoard";
 import BrandEvidence from "@/components/culture/BrandEvidence";
@@ -101,7 +101,8 @@ const SystemView = async () => {
 };
 
 const CulturePage = async ({searchParams}: CulturePageProps) => {
-    const userId = await requireUserId();
+    // The owner's alone (lib/lab/owner.ts): anyone else is sent Home.
+    const {id: userId} = await requireOwner();
 
     const {brand, view: viewParam} = await searchParams;
     // An evidence link (?brand=) always means the brands view, whatever else the URL says.

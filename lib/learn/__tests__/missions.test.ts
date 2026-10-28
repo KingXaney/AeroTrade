@@ -2,7 +2,7 @@ import {describe, expect, it} from 'vitest';
 import {findBanned} from '@/lib/learn/banned';
 import {daysBetween, type OnboardingFacts} from '@/lib/learn/facts';
 import {MISSION_COPY, MISSIONS_FOOTER, MISSIONS_HIDE_FAILED, MISSIONS_HIDE_LABEL, MISSIONS_HIDING} from '@/lib/learn/copy/missions';
-import {deriveMissions, missionsComplete, onboardingActive, ONBOARDING_MAX_DAYS} from '@/lib/learn/missions';
+import {deriveMissions, missionsComplete, onboardingActive, ONBOARDING_MAX_DAYS, OWNER_MISSIONS} from '@/lib/learn/missions';
 
 const fresh: OnboardingFacts = {
     today: '2026-09-27',
@@ -13,6 +13,7 @@ const fresh: OnboardingFacts = {
     hasWatchlist: false,
     navigatorEnrolled: false,
     missionsDismissedAt: null,
+    owner: true,
 };
 
 const complete: OnboardingFacts = {
@@ -69,6 +70,17 @@ describe('deriveMissions', () => {
         expect(missionsComplete(fresh)).toBe(false);
         expect(missionsComplete({...complete, navigatorEnrolled: false})).toBe(false);
         expect(missionsComplete(complete)).toBe(true);
+    });
+
+    it("offers the strategies' and the Navigator's missions to the owner alone", () => {
+        expect([...OWNER_MISSIONS].sort()).toEqual(['enrol-navigator', 'follow-strategy']);
+        const everyone = {...fresh, owner: false};
+        expect(deriveMissions(everyone).map((m) => m.id)).toEqual(['first-trade', 'open-topic', 'watch-symbol']);
+        for (const mission of deriveMissions(everyone)) expect(mission.href, mission.id).not.toMatch(/^\/(strategies|brain)/);
+        // Their checklist is complete with its three done, whatever the owner's two would say.
+        expect(missionsComplete({...everyone, hasUserTrade: true, topicOpened: true, hasWatchlist: true})).toBe(true);
+        expect(onboardingActive({...everyone, hasUserTrade: true, topicOpened: true, hasWatchlist: true})).toBe(false);
+        expect(missionsComplete({...complete, owner: false, hasWatchlist: false})).toBe(false);
     });
 });
 

@@ -30,7 +30,7 @@ import {priceLargestHoldings, readLearnerValue} from "@/lib/chat/learner-hooks";
 import {CULTURE_CHAT_LIMITS, shapeCultureBrain} from "@/lib/chat/culture-brain";
 import {getCultureFollowsView, getCulturePicksView} from "@/lib/culture/page-store";
 import {getTickerRollup, getTopCultureEntities} from "@/lib/culture/store";
-import type {ChatToolName} from '@/lib/chat/types';
+import {OWNER_CHAT_TOOLS, type ChatToolName} from '@/lib/chat/types';
 import type {Stock} from '@/lib/stocks/types';
 import type {TopicView} from '@/lib/topics/types';
 
@@ -64,7 +64,7 @@ const findTopic = async (userId: string, ref: string): Promise<TopicView | null>
 
 // Tool definitions for the chat assistant. Each one wraps an existing server action.
 // The userId closure keeps auth off the LLM — it never sees or supplies a user id.
-export const buildTools = (userId: string) => ({
+const allTools = (userId: string) => ({
     searchStock: tool({
         description: TOOL_DESCRIPTIONS.searchStock,
         inputSchema: z.object({
@@ -401,3 +401,16 @@ export const buildTools = (userId: string) => ({
         },
     }),
 }) satisfies Record<ChatToolName, unknown>;
+
+type ChatTools = ReturnType<typeof allTools>;
+type OwnerChatTool = (typeof OWNER_CHAT_TOOLS)[number];
+
+// The audience's tools, read from the session by the chat route (lib/lab/owner.ts): the owner gets
+// every one; anyone else's set leaves out the tools over the brains and the strategies
+// (OWNER_CHAT_TOOLS), so the model can never read those for them.
+export const buildTools = <Owner extends boolean>(userId: string, {owner}: {owner: Owner}): Owner extends true ? ChatTools : Omit<ChatTools, OwnerChatTool> => {
+    const tools = allTools(userId);
+    if (owner) return tools as Owner extends true ? ChatTools : Omit<ChatTools, OwnerChatTool>;
+    const ownerOnly = new Set<string>(OWNER_CHAT_TOOLS);
+    return Object.fromEntries(Object.entries(tools).filter(([name]) => !ownerOnly.has(name))) as Owner extends true ? ChatTools : Omit<ChatTools, OwnerChatTool>;
+};

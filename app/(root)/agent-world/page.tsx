@@ -1,5 +1,4 @@
 import type {Metadata} from "next";
-import {redirect} from "next/navigation";
 import AgentWorldLegend from "@/components/agent-world/AgentWorldLegend";
 import CompanyPanel from "@/components/agent-world/CompanyPanel";
 import DataPanels from "@/components/agent-world/DataPanels";
@@ -13,7 +12,7 @@ import Tabs from "@/components/primitives/Tabs";
 import {actionButton} from "@/components/primitives/ActionButton";
 import {agentWorldOff, agentWorldUniverse, approvalMode, isAgentWorldOwner} from "@/lib/agent-world/env";
 import {getCompanyView, getDataView, getFloorView} from "@/lib/agent-world/page-store";
-import {getCurrentUser} from "@/lib/auth/session";
+import {requireOwner} from "@/lib/auth/session";
 import {formatEasternTimestamp} from "@/lib/format";
 import {GLOSSARY} from "@/lib/learn/glossary";
 import {AGENT_WORLD_COPY, DECISION_TERMS, REPORT_TERMS, STRIP_TERMS} from "@/lib/learn/copy/agent-world";
@@ -27,8 +26,9 @@ export const metadata: Metadata = {title: "Trading agent world"};
 //   company — the Paperclip company around the desk: org chart, budgets, this session's issue
 //   data    — where the desk's data comes from (OpenBB first), what the service says of itself,
 //             what the last session fetched, the job's stamp and this desk's limits rows
-// Everyone signed in watches; the owners (AGENT_WORLD_OWNER_EMAILS, else LAB_OWNER_EMAILS) start
-// and decide sessions. The page composes lib/agent-world/page-store's reads and nothing else.
+// The owner's alone (LAB_OWNER_EMAILS, lib/lab/owner.ts); AGENT_WORLD_OWNER_EMAILS (else
+// LAB_OWNER_EMAILS) names who starts and decides sessions. The page composes
+// lib/agent-world/page-store's reads and nothing else.
 const VIEW_IDS = ['floor', 'company', 'data'] as const;
 type ViewId = (typeof VIEW_IDS)[number];
 const isView = (value: unknown): value is ViewId => typeof value === 'string' && (VIEW_IDS as readonly string[]).includes(value);
@@ -66,8 +66,8 @@ const CompanyView = async () => <CompanyPanel view={await getCompanyView()} />;
 const DataView = async () => <DataPanels view={await getDataView()} />;
 
 const AgentWorldPage = async ({searchParams}: AgentWorldPageProps) => {
-    const user = await getCurrentUser();
-    if (!user) redirect('/sign-in');
+    // The owner's alone (lib/lab/owner.ts): anyone else is sent Home.
+    const user = await requireOwner();
     const {view: viewParam} = await searchParams;
     const view: ViewId = isView(viewParam) ? viewParam : 'floor';
     const off = agentWorldOff();

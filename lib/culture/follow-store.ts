@@ -11,6 +11,7 @@ import type {ProfileId} from "@/lib/culture/config";
 import {copyDecisionItem, type CultureDecisionItem} from "@/lib/culture/decisions";
 import type {FollowRow} from "@/lib/culture/follow";
 import type {OutcomeRecord} from "@/lib/culture/picker-store";
+import {readOwnerUserIds} from "@/lib/lab/owner-store";
 
 // More enrolments than one picker will ever have; the weekly loop is bounded by it.
 const FOLLOWERS_READ_LIMIT = 200;
@@ -44,9 +45,12 @@ export const getFollowByAccount = async (userId: string, accountId: string): Pro
     return doc ? toRow(doc) : null;
 };
 
+// The weekly run's enrolments. The culture pickers are the owner's alone (lib/lab/owner.ts), so only
+// the owner's enrolments are read, and so traded: one anyone else made before then rests.
 export const listActiveFollowers = async (profile: ProfileId): Promise<FollowRow[]> => {
     await connectToDatabase();
-    return (await CultureFollow.find({profile, status: 'active'}).sort({enrolledAt: 1}).limit(FOLLOWERS_READ_LIMIT).lean<LeanFollow[]>()).map(toRow);
+    const owners = [...await readOwnerUserIds()];
+    return (await CultureFollow.find({profile, status: 'active', userId: {$in: owners}}).sort({enrolledAt: 1}).limit(FOLLOWERS_READ_LIMIT).lean<LeanFollow[]>()).map(toRow);
 };
 
 export const createFollow = async (userId: string, profile: ProfileId, accountId: string): Promise<FollowRow> => {

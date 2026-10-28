@@ -14,7 +14,7 @@ import {MongoClient, ObjectId} from 'mongodb';
 // A TypeScript loader (declared in scripts/qa/package.json), so the checks below
 // can call the job's store functions as the job does, through Mongoose, on this harness database.
 import {createJiti} from 'jiti';
-import {BASE, MONGO, REPO_ROOT, check, outDir, signUp, summary} from './lib.mjs';
+import {BASE, MONGO, REPO_ROOT, check, outDir, ownerEmail, signUp, summary} from './lib.mjs';
 
 const OUT = outDir('strategies');
 
@@ -45,7 +45,8 @@ const isoDaysAgo = (n) => new Date(Date.now() - n * 24 * 60 * 60 * 1000).toLocal
 try {
     await mongo.connect();
     const db = mongo.db();
-    const email = await signUp(page, 'Strategies');
+    // The strategies are the owner's alone (lib/lab/owner.ts).
+    const email = await signUp(page, 'Strategies', {email: ownerEmail('strategies')});
     const userDoc = await db.collection('user').findOne({email});
     const userId = String(userDoc?._id ?? userDoc?.id ?? '');
     check('signed up', userId.length > 0);
