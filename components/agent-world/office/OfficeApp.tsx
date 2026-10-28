@@ -16,7 +16,7 @@ import {iconButton} from "@/components/primitives/iconButton";
 import {OFFICE_REPLAY_MS, POLL_LIVE_MS, WORKER_IDS, type WorkerId} from "@/lib/agent-world/config";
 import {isSessionLive, liveMode} from "@/lib/agent-world/live";
 import {officeClock, officeReplayDuration, officeState, replayCut, replayWindowScale, seenAfter, type CareerStats, type OfficeExtras} from "@/lib/agent-world/office";
-import {OFFICE_KEY_SHORTCUTS, type OfficeIntent} from "@/lib/agent-world/office-keys";
+import {OFFICE_KEY_SHORTCUTS, ORBIT_STEP, type OfficeIntent} from "@/lib/agent-world/office-keys";
 import {OFFICE_PRESET_IDS, presetForSeat, type OfficePresetId} from "@/lib/agent-world/office-layout";
 import {cuesFor} from "@/lib/agent-world/office-sounds";
 import type {OfficeBudgets} from "@/lib/agent-world/office-store";
@@ -251,6 +251,9 @@ const OfficeApp = (props: Props) => {
             case 'zoom':
                 controls.current?.zoom(intent.factor);
                 break;
+            case 'orbit':
+                controls.current?.rotate(intent.radians);
+                break;
             case 'step': {
                 const current = (document.activeElement as HTMLElement | null)?.dataset?.officeWorker as WorkerId | undefined;
                 const index = current ? WORKER_IDS.indexOf(current) : -1;
@@ -333,6 +336,9 @@ const OfficeApp = (props: Props) => {
                         </button>
                         <button type="button" className={iconButton} aria-label={OFFICE_COPY.zoomIn} aria-keyshortcuts={OFFICE_KEY_SHORTCUTS.zoomIn} onClick={() => controls.current?.zoom(0.8)}>
                             <span className="material-symbols-outlined text-lg" aria-hidden="true">add</span>
+                        </button>
+                        <button type="button" className={iconButton} data-office-orbit aria-label={OFFICE_COPY.orbit} title={OFFICE_COPY.orbit} aria-keyshortcuts={OFFICE_KEY_SHORTCUTS.orbit} onClick={() => controls.current?.rotate(ORBIT_STEP)}>
+                            <span className="material-symbols-outlined text-lg" aria-hidden="true">rotate_right</span>
                         </button>
                         <button type="button" className={iconButton} data-office-sound={sound ? 'on' : 'off'} aria-pressed={sound} aria-label={OFFICE_COPY.sound} title={OFFICE_COPY.soundOn}
                             aria-keyshortcuts={OFFICE_KEY_SHORTCUTS.sound} onClick={toggleSound}>

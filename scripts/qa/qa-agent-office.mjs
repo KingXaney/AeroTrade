@@ -112,6 +112,34 @@ const animated = (target = tab) => target.evaluate(() => [...document.querySelec
         return style.animationName !== 'none' && style.animationDuration.split(',').some((d) => parseFloat(d) > 0);
     })
     .map((el) => [...el.classList].find((c) => c.startsWith('ao-'))));
+// Every plate drawn: faded or whole, its pointer setting, and whether the pointer finds it at its middle.
+const plateHits = (target = tab) => target.evaluate(() => [...document.querySelectorAll('button[data-office-plate]')]
+    .filter((b) => b.parentElement?.style.visibility === 'visible')
+    .map((b) => {
+        const r = b.getBoundingClientRect();
+        const hit = document.elementFromPoint(r.x + r.width / 2, r.y + r.height / 2);
+        return {id: b.getAttribute('data-office-plate'), faded: b.parentElement.style.opacity !== '1', pointer: getComputedStyle(b).pointerEvents, found: Boolean(hit && b.contains(hit))};
+    }));
+// Every plate drawn that the open seat's file meets, and whether the file is what the pointer finds
+// in the middle of where they meet: the plates stack inside the stage's own layer, under the file.
+const platesUnderFile = (target = tab) => target.evaluate(() => {
+    const sheet = document.querySelector('[data-office-dossier]');
+    const r = sheet?.getBoundingClientRect();
+    if (!sheet || !r) return null;
+    const met = [];
+    for (const plate of document.querySelectorAll('button[data-office-plate]')) {
+        if (plate.parentElement?.style.visibility !== 'visible') continue;
+        const p = plate.getBoundingClientRect();
+        const left = Math.max(p.left, r.left);
+        const right = Math.min(p.right, r.right);
+        const top = Math.max(p.top, r.top);
+        const bottom = Math.min(p.bottom, r.bottom);
+        if (right - left < 2 || bottom - top < 2) continue;
+        const hit = document.elementFromPoint((left + right) / 2, (top + bottom) / 2);
+        met.push({plate: plate.getAttribute('data-office-plate'), under: Boolean(hit && sheet.contains(hit))});
+    }
+    return met;
+});
 
 try {
     await mongo.connect();
@@ -260,6 +288,51 @@ try {
         await sleep(300);
         check('a drag on the floor takes the camera back from following', (await office()).follow === 'false');
 
+        // --- the plates hold still ---
+        // Hovering a plate once placed it first: it took the lowest row, slid out from under the
+        // pointer, lost the hover and slid back, over and over. The bullpen's four sit closest.
+        await tab.mouse.move(box.x + box.width / 2, box.y - 20);
+        await tab.selectOption('[data-office-presets]', 'overview');
+        await sleep(1600);
+        const plateBoxes = () => tab.evaluate(() => Object.fromEntries([...document.querySelectorAll('button[data-office-plate]')].map((b) => {
+            const wrap = b.parentElement;
+            const r = b.getBoundingClientRect();
+            return [b.getAttribute('data-office-plate'), {cx: r.x + r.width / 2, cy: r.y + r.height / 2, whole: wrap?.style.visibility === 'visible' && wrap.style.opacity === '1'}];
+        })));
+        const resting = await plateBoxes();
+        const held = [];
+        for (const id of ['market', 'sentiment', 'news', 'fundamentals'].filter((w) => resting[w]?.whole)) {
+            const {cx, cy} = resting[id];
+            await tab.mouse.move(cx, cy);
+            const under = [];
+            for (let i = 0; i < 8; i += 1) {
+                await sleep(100);
+                under.push(await tab.evaluate(([x, y]) => document.elementFromPoint(x, y)?.closest('[data-office-plate]')?.getAttribute('data-office-plate') ?? null, [cx, cy]));
+            }
+            const after = (await plateBoxes())[id];
+            held.push({id, under: [...new Set(under)], moved: Math.round(Math.hypot(after.cx - cx, after.cy - cy))});
+        }
+        await tab.mouse.move(box.x + box.width / 2, box.y - 20);
+        check('a hovered plate holds still under the pointer', held.length > 0 && held.every((h) => h.under.length === 1 && h.under[0] === h.id && h.moved <= 2), JSON.stringify(held));
+
+        // --- turning the camera ---
+        await tab.locator('[data-office-roster] [data-office-worker="head-trader"]').focus();
+        await tab.keyboard.press('f');
+        await sleep(300);
+        const followingBeforeKey = (await office()).follow === 'true';
+        await tab.keyboard.press('o');
+        await sleep(300);
+        const afterKey = await office();
+        check('O turns the camera round the floor, taking it back from following and off its preset', followingBeforeKey && afterKey.follow === 'false' && afterKey.preset === '',
+            `${followingBeforeKey} ${afterKey.follow} ${afterKey.preset}`);
+        await tab.keyboard.press('f');
+        await sleep(300);
+        const followingBeforeButton = (await office()).follow === 'true';
+        const orbit = tab.locator('[data-office-orbit]');
+        await orbit.click();
+        await sleep(300);
+        check('… and so does its button, which names the key', followingBeforeButton && (await office()).follow === 'false' && await orbit.getAttribute('aria-keyshortcuts') === 'O');
+
         // --- approve from the office ---
         await tab.selectOption('[data-office-presets]', 'execution');
         await sleep(1200);
@@ -372,6 +445,26 @@ try {
     const overflow = await tab.evaluate(() => document.documentElement.scrollWidth - window.innerWidth);
     check('no sideways scroll at 375 px', overflow <= 1, String(overflow));
     check('… every seat still on the roster', await tab.locator('[data-office-roster] [data-office-worker]').count() === 14);
+    // A phone crowds the plates: one with no free row fades and lets the pointer through to what it
+    // covers, and a seat's file, nearly the screen's width, covers every plate it meets.
+    await stopReplay();
+    await tab.selectOption('[data-office-presets]', 'overview');
+    await sleep(1600);
+    const crowd = await plateHits();
+    const fadedOnPhone = crowd.filter((p) => p.faded);
+    check('on a phone a faded plate lets the pointer through, a whole one takes it',
+        crowd.length > 0 && fadedOnPhone.every((p) => p.pointer === 'none' && !p.found) && crowd.filter((p) => !p.faded).every((p) => p.pointer === 'auto'),
+        `${crowd.length - fadedOnPhone.length} whole, ${fadedOnPhone.length} faded`);
+    const toOpen = crowd.find((p) => !p.faded)?.id;
+    if (toOpen) {
+        await tab.locator(`button[data-office-plate="${toOpen}"]`).click();
+        await tab.locator(`[data-office-dossier="${toOpen}"]`).waitFor({timeout: 10000});
+        await sleep(1500);
+        const met = await platesUnderFile();
+        check('… and a seat\'s file covers every plate it meets', Array.isArray(met) && met.length > 0 && met.every((m) => m.under), JSON.stringify(met));
+        await tab.keyboard.press('Escape');
+        await sleep(300);
+    } else check('… and a seat\'s file covers every plate it meets', false, 'no whole plate to open');
     await shot('07-phone');
 
     // --- a reader who is not the owner never reaches the office (lib/lab/owner.ts) ---

@@ -672,16 +672,16 @@ export const buildCity = (reg: Registry, m: OfficeMaterials): City => {
     ground.position.y = CITY_GROUND_Y;
     group.add(ground);
 
-    // Towers round the floor, behind it and far to the sides, none in front of the camera: the
-    // nearer ones stay well below floor 12, the far ones rise past it to make a skyline.
+    // Towers all the way round the floor, so every way the camera turns has a skyline: the nearer
+    // ones well below floor 12, the farther ones taller, their roofs still under it.
     const spots: {x: number; z: number; w: number; d: number; top: number}[] = [];
-    for (let i = 0; spots.length < 90 && i < 900; i += 1) {
+    for (let i = 0; spots.length < 110 && i < 1100; i += 1) {
         const h = hashString(`tower:${i}`);
-        const angle = Math.PI + ((h % 3600) / 3600) * Math.PI;
+        const angle = ((h % 3600) / 3600) * Math.PI * 2;
         const radius = 52 + ((h >>> 12) % 140);
         const x = Math.cos(angle) * radius * 1.3;
-        const z = Math.sin(angle) * radius - 10;
-        if (z > -22 && Math.abs(x) < 80) continue;
+        const z = Math.sin(angle) * radius - 4;
+        if (Math.abs(x) < 28 && z > -18 && z < 15) continue;
         const w = 3.5 + ((h >>> 5) % 6);
         const d = 3.5 + ((h >>> 9) % 6);
         const ceiling = -34 + (radius - 50) * 0.22;
@@ -708,7 +708,7 @@ export const buildCity = (reg: Registry, m: OfficeMaterials): City => {
         const theta = ((h % 1000) / 1000) * Math.PI * 2;
         const phi = 0.15 + (((h >>> 10) % 1000) / 1000) * 1.1;
         const r = 260;
-        positions.push(Math.cos(theta) * Math.cos(phi) * r, Math.sin(phi) * r * 0.9 + 20, Math.sin(theta) * Math.cos(phi) * r - 60);
+        positions.push(Math.cos(theta) * Math.cos(phi) * r, Math.sin(phi) * r * 0.9 + 20, Math.sin(theta) * Math.cos(phi) * r);
     }
     const geometry = register(reg, new BufferGeometry());
     geometry.setAttribute('position', new Float32BufferAttribute(positions, 3));

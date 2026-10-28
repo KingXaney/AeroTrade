@@ -8,6 +8,7 @@ export type OfficeIntent =
     | {type: 'preset'; preset: OfficePresetId}
     | {type: 'follow'}
     | {type: 'zoom'; factor: number}
+    | {type: 'orbit'; radians: number}
     | {type: 'step'; by: 1 | -1}
     | {type: 'replay'}
     | {type: 'plan'}
@@ -18,6 +19,8 @@ export type KeyLike = {key: string; metaKey?: boolean; ctrlKey?: boolean; altKey
 
 export const ZOOM_IN = 0.8;
 export const ZOOM_OUT = 1.25;
+// One turn of the camera round the floor: an eighth of the way.
+export const ORBIT_STEP = Math.PI / 4;
 
 export const officeIntentForKey = (event: KeyLike): OfficeIntent | null => {
     if (event.metaKey || event.ctrlKey || event.altKey || event.repeat) return null;
@@ -31,6 +34,7 @@ export const officeIntentForKey = (event: KeyLike): OfficeIntent | null => {
         case '_': return {type: 'zoom', factor: ZOOM_OUT};
         case '[': return {type: 'step', by: -1};
         case ']': return {type: 'step', by: 1};
+        case 'o': return {type: 'orbit', radians: ORBIT_STEP};
         case 'r': return {type: 'replay'};
         case 'p': return {type: 'plan'};
         case 'm': return {type: 'sound'};
@@ -44,6 +48,7 @@ export const OFFICE_KEY_SHORTCUTS = {
     follow: 'F',
     zoomIn: '+',
     zoomOut: '-',
+    orbit: 'O',
     replay: 'R',
     plan: 'P',
     sound: 'M',

@@ -43,8 +43,10 @@ keeping track of the stats.
   Paperclip budget this month when the company is configured, and the terms it uses.
 - **Getting around**: presets 0–7 (the floor, the front desk, the bullpen, the table, the trader,
   the risk desk, the corner office, the Execution desk), Follow the run (the camera glides to the
-  newest seat, paused by a drag), zoom, the floor plan (`?engine=2d`, also drawn without WebGL), the
-  keys (`[`/`]` walk the seats, R replays, F follows, P the plan, M the sound, Esc clears).
+  newest seat, paused by a drag), zoom, a turn round the floor (the camera goes all the way round;
+  the toolbar's button or O turns it an eighth, pausing Follow as a drag does), the floor plan
+  (`?engine=2d`, also drawn without WebGL), the keys (`[`/`]` walk the seats, O turns, R replays,
+  F follows, P the plan, M the sound, Esc clears).
 - **The small delights**: sound, off until the reader turns it on (the speaker in the top bar, or
   M; kept in this browser) — six synthesised cues, quiet and short (`lib/agent-world/office-sounds`,
   every recipe held to its limits by a test): a fetch landing, a filing, a turn, a rating pinned, the
@@ -113,5 +115,5 @@ What ran on 2026-10-27, on `feat/agent-world`:
 - The robot's coffee for the seat busy longest, and a budget rack on the wall (each agent's budget
   is in its file).
 - Decisions inside Paperclip's own UI, a chat tool, Home or dashboard surfaces, a filing-cabinet
-  archive of past sessions, orbiting by touch (a phone uses the presets and zoom).
+  archive of past sessions, orbiting by touch (a phone uses the presets, zoom and the turn button).
 - A second "Open the office" link in the floor's empty state: the one in the title is always there.

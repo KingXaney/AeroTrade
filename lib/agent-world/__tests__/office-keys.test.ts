@@ -1,5 +1,5 @@
 import {describe, expect, it} from 'vitest';
-import {officeIntentForKey, OFFICE_KEY_SHORTCUTS, ZOOM_IN, ZOOM_OUT} from '@/lib/agent-world/office-keys';
+import {officeIntentForKey, OFFICE_KEY_SHORTCUTS, ORBIT_STEP, ZOOM_IN, ZOOM_OUT} from '@/lib/agent-world/office-keys';
 import {OFFICE_PRESET_IDS} from '@/lib/agent-world/office-layout';
 
 describe('the office\'s keys', () => {
@@ -19,6 +19,8 @@ describe('the office\'s keys', () => {
         expect(officeIntentForKey({key: '-'})).toEqual({type: 'zoom', factor: ZOOM_OUT});
         expect(officeIntentForKey({key: ']'})).toEqual({type: 'step', by: 1});
         expect(officeIntentForKey({key: '['})).toEqual({type: 'step', by: -1});
+        expect(officeIntentForKey({key: 'o'})).toEqual({type: 'orbit', radians: ORBIT_STEP});
+        expect(officeIntentForKey({key: 'O'})).toEqual({type: 'orbit', radians: ORBIT_STEP});
         expect(officeIntentForKey({key: 'r'})).toEqual({type: 'replay'});
         expect(officeIntentForKey({key: 'p'})).toEqual({type: 'plan'});
         expect(officeIntentForKey({key: 'm'})).toEqual({type: 'sound'});

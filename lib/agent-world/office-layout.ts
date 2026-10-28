@@ -240,7 +240,7 @@ export const OFFICE_PRESET_IDS = ['overview', 'front', 'bullpen', 'table', 'trad
 export type OfficePresetId = (typeof OFFICE_PRESET_IDS)[number];
 
 export const OFFICE_PRESETS: Readonly<Record<OfficePresetId, {target: Vec3; position: Vec3}>> = {
-    overview: {target: [0, 0.4, -1.6], position: [0, 19.5, 17.5]},
+    overview: {target: [0, 0.4, -1.6], position: [-7.5, 21.0, 20.0]},
     front: {target: [-15.4, 1.2, 3.4], position: [-10.6, 7, 12.4]},
     bullpen: {target: [-13, 1.1, -6.2], position: [-13, 7.8, 3.4]},
     table: {target: [-2.5, 0.9, -5.9], position: [-2.5, 7, 2.6]},
@@ -256,9 +256,9 @@ export const presetForSeat = (id: WorkerId): OfficePresetId => {
     return zone === 'execution' ? 'execution' : zone;
 };
 
-// Orbit limits: the camera stays in front of the room and above the floor.
-export const CAMERA_LIMITS = {minDistance: 5, maxDistance: 62, minPolar: 0.18, maxPolar: Math.PI / 2 - 0.12, maxAzimuth: 1.05, fov: 40} as const;
-export const TARGET_BOUNDS = {minX: -18, maxX: 18, minZ: -8.5, maxZ: 5.5, minY: 0.3, maxY: 3} as const;
+// Orbit limits: the camera goes all the way round the room, and stays above the floor.
+export const CAMERA_LIMITS = {minDistance: 4, maxDistance: 70, minPolar: 0.15, maxPolar: Math.PI / 2 - 0.05, fov: 40} as const;
+export const TARGET_BOUNDS = {minX: -20, maxX: 20, minZ: -10, maxZ: 7, minY: 0.2, maxY: 4} as const;
 
 // ---- idle gestures and the sky -------------------------------------------------------------------
 

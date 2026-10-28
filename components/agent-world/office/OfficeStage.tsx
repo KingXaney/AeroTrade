@@ -23,7 +23,7 @@ import {cn} from "@/lib/utils";
 // the wall's totals, the issue, the stamp. Without WebGL, or with ?engine=2d, the floor plan
 // (OfficeMap2D) draws the same seats and statuses. The canvas is aria-hidden; the host is a group.
 
-export type OfficeStageControls = {setPreset: (preset: OfficePresetId) => void; zoom: (factor: number) => void};
+export type OfficeStageControls = {setPreset: (preset: OfficePresetId) => void; zoom: (factor: number) => void; rotate: (radians: number) => void};
 
 type Props = {
     state: OfficeState;
@@ -205,6 +205,7 @@ const OfficeStage = (props: Props) => {
         controlsRef.current = {
             setPreset: (id) => sceneRef.current?.setPreset(id),
             zoom: (factor) => sceneRef.current?.zoom(factor),
+            rotate: (radians) => sceneRef.current?.rotate(radians),
         };
         return () => {
             controlsRef.current = null;
@@ -255,7 +256,8 @@ const OfficeStage = (props: Props) => {
                     onFocus={() => light(id)}
                     onBlur={() => light(null)}
                     className={cn(
-                        'chrome-surface pointer-events-auto relative block overflow-hidden whitespace-nowrap rounded-lg py-1 pl-2.5 pr-2 text-left focus-visible:outline-2 focus-visible:outline-brand',
+                        'chrome-surface relative block cursor-pointer select-none overflow-hidden whitespace-nowrap rounded-lg py-1 pl-2.5 pr-2 text-left focus-visible:outline-2 focus-visible:outline-brand',
+                        'transition-transform duration-(--motion-fast) hover:scale-[1.03] active:scale-[0.98]',
                         id === selected && 'outline outline-2 outline-brand',
                     )}
                 >
@@ -267,7 +269,7 @@ const OfficeStage = (props: Props) => {
                     </span>
                     {showTask && <span className="mt-0.5 block max-w-52 truncate text-[10px] leading-tight text-fg-soft">{worker.task}</span>}
                 </button>
-                <span aria-hidden="true" className={cn('absolute top-full w-0.5 -translate-x-1/2 rounded-b', seatEdge(id))} style={{height: 'var(--ao-lift, 0px)', left: 'calc(50% + var(--ao-stem-x, 0px))'}} />
+                <span aria-hidden="true" className={cn('pointer-events-none absolute top-full w-0.5 -translate-x-1/2 rounded-b', seatEdge(id))} style={{height: 'var(--ao-lift, 0px)', left: 'calc(50% + var(--ao-stem-x, 0px))'}} />
             </span>
         );
     };
@@ -277,7 +279,9 @@ const OfficeStage = (props: Props) => {
             role="group" aria-label={OFFICE_COPY.stageLabel} className="relative h-full w-full overflow-hidden" style={{touchAction: 'pan-y'}}>
             <canvas ref={canvasRef} aria-hidden="true" className="absolute inset-0 block h-full w-full" />
             {!ready && <div className="absolute inset-0 animate-pulse bg-surface-2/40" aria-hidden="true" />}
-            <div className="pointer-events-none absolute inset-0">
+            {/* isolate: the plates and bubbles stack among themselves (z 5 to 1250), never over the
+                header's menus or a seat's file, which sits in the page's own layer at z 60. */}
+            <div className="pointer-events-none absolute inset-0 isolate">
                 {!near && OFFICE_ZONES.map((zone) => (
                     <span key={zone.id} ref={register(`zone:${zone.id}`)} data-office-zone={zone.id} style={{visibility: 'hidden'}}
                         className="label-type absolute left-0 top-0 -translate-x-1/2 -translate-y-1/2 whitespace-nowrap rounded bg-surface-1/70 px-1.5 py-0.5 text-[10px] text-fg-soft">

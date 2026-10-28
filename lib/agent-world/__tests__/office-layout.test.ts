@@ -141,8 +141,6 @@ describe('the camera', () => {
             const distance = Math.hypot(position[0] - target[0], position[1] - target[1], position[2] - target[2]);
             expect(distance, id).toBeGreaterThanOrEqual(CAMERA_LIMITS.minDistance);
             expect(distance, id).toBeLessThanOrEqual(CAMERA_LIMITS.maxDistance);
-            const azimuth = Math.atan2(position[0] - target[0], position[2] - target[2]);
-            expect(Math.abs(azimuth), id).toBeLessThanOrEqual(CAMERA_LIMITS.maxAzimuth);
         }
         for (const seat of OFFICE_SEATS) expect(OFFICE_PRESET_IDS).toContain(presetForSeat(seat.id));
     });

@@ -106,6 +106,7 @@ export type OfficeScene = {
     setPreset: (preset: OfficePresetId) => void;
     setFollow: (on: boolean) => void;
     zoom: (factor: number) => void;
+    rotate: (radians: number) => void;
     setPalette: (palette: OfficePalette) => void;
     setReduceMotion: (reduce: boolean) => void;
     setActive: (active: boolean) => void;
@@ -121,6 +122,7 @@ const TICKET_MS = 1000;
 const BOUNCE_MS = 700;
 const BLEND_MS = 350;
 const PRESET_MS = 1100;
+const SPIN_MS = 650;
 const FOLLOW_DWELL_MS = 3500;
 const ROBOT_SPEED = 3.4; // m per second of the wall clock
 const ROBOT_PAUSE_MS = 380;
@@ -130,10 +132,10 @@ const PLANE_POOL = 12;
 const CLICK_SLOP_PX = 5;
 const OVERLAP_PAD = 4;
 const clamp = (value: number, low: number, high: number) => (high < low ? (low + high) / 2 : Math.min(high, Math.max(low, value)));
-const PLATE_ROWS = 3;
+const PLATE_ROWS = 6;
 const PLATE_GAP = 6;
 // Where a plate may slide to, as a share of its width, before it climbs a row.
-const PLATE_SHIFTS = [0, 0.3, -0.3];
+const PLATE_SHIFTS = [0, 0.25, -0.25, 0.5, -0.5, 0.75, -0.75];
 const BUBBLE_GAP = 10;
 const EDGE_PAD = 6;
 // The chips drawn centred over their anchor and above it, kept inside the stage.
@@ -272,14 +274,16 @@ export const createOfficeScene = (options: OfficeSceneOptions): OfficeScene => {
     controls.maxDistance = CAMERA_LIMITS.maxDistance;
     controls.minPolarAngle = CAMERA_LIMITS.minPolar;
     controls.maxPolarAngle = CAMERA_LIMITS.maxPolar;
-    controls.minAzimuthAngle = -CAMERA_LIMITS.maxAzimuth;
-    controls.maxAzimuthAngle = CAMERA_LIMITS.maxAzimuth;
+    controls.minAzimuthAngle = -Infinity;
+    controls.maxAzimuthAngle = Infinity;
     controls.enabled = !options.coarsePointer;
     canvas.style.touchAction = 'pan-y';
 
     let preset: OfficePresetId | null = 'overview';
     let cameraTouched = false;
     let tween: {fromPos: Vector3; fromTarget: Vector3; toPos: Vector3; toTarget: Vector3; start: number; ms: number} | null = null;
+    // A turn round the target, from the toolbar or the O key: the azimuth it starts at and how far it goes.
+    let spin: {from: number; by: number; start: number; ms: number} | null = null;
     let follow = options.follow;
     let lastFollowAt = -1e9;
     let followFocus: WorkerId | null = null;
@@ -306,6 +310,7 @@ export const createOfficeScene = (options: OfficeSceneOptions): OfficeScene => {
     const goTo = (id: OfficePresetId, ms = PRESET_MS) => {
         const pose = presetPose(id);
         preset = id;
+        spin = null;
         if (reduceMotion || ms <= 0) {
             camera.position.copy(pose.position);
             controls.target.copy(pose.target);
@@ -333,6 +338,7 @@ export const createOfficeScene = (options: OfficeSceneOptions): OfficeScene => {
 
     const onStart = () => {
         tween = null;
+        spin = null;
         cameraTouched = true;
         if (preset !== null) {
             preset = null;
@@ -349,6 +355,26 @@ export const createOfficeScene = (options: OfficeSceneOptions): OfficeScene => {
     };
     controls.addEventListener('start', onStart);
     controls.addEventListener('change', onChange);
+
+    // Round the target, keeping the camera at its height and its distance across the floor.
+    const azimuth = () => Math.atan2(camera.position.x - controls.target.x, camera.position.z - controls.target.z);
+    const orbitTo = (angle: number) => {
+        const t = controls.target;
+        const radius = Math.hypot(camera.position.x - t.x, camera.position.z - t.z);
+        camera.position.x = t.x + Math.sin(angle) * radius;
+        camera.position.z = t.z + Math.cos(angle) * radius;
+    };
+    // A turn is the reader moving the camera, as a drag is, so the preset and following end. A second
+    // press during a turn carries on from where the first was going.
+    const orbitBy = (radians: number) => {
+        const at = azimuth();
+        const end = (spin ? spin.from + spin.by : at) + radians;
+        onStart();
+        if (reduceMotion) orbitTo(end);
+        else spin = {from: at, by: end - at, start: performance.now(), ms: SPIN_MS};
+        dirty = true;
+        schedule();
+    };
 
     // The wheel, when the page might scroll: Ctrl or ⌘ zooms, or a grabbed floor.
     let engaged = false;
@@ -1106,15 +1132,16 @@ export const createOfficeScene = (options: OfficeSceneOptions): OfficeScene => {
             element.style.zIndex = String(Math.max(1, 900 - Math.round(depth * 8)));
         }
         // A plate that would cover one already placed climbs a row (at most PLATE_ROWS − 1 times) on
-        // a stem in its seat's colour; one with no free row fades. The selected and hovered go
-        // first, then the run's order, so the rows hold still while statuses change.
-        plates.sort((a, b) => b.priority - a.priority || a.order - b.order);
+        // a stem in its seat's colour; one with no free row fades. They are placed in the run's order
+        // alone: a hovered plate placed first took the lowest row, slid out from under the pointer,
+        // lost the hover and slid back, so hovering or selecting never moves a plate.
+        plates.sort((a, b) => a.order - b.order);
         const claimed: Box[] = [];
         const plateTops = new Map<WorkerId, number>();
         const meets = (boxes: readonly Box[], x: number, y: number, w: number, h: number) => boxes.some((c) =>
             Math.abs(c.x - x) * 2 < c.w + w + OVERLAP_PAD && Math.abs(c.y - y) * 2 < c.h + h + OVERLAP_PAD);
         for (const plate of plates) {
-            const {element, x, y, w, h} = plate;
+            const {element, worker, x, y, w, h} = plate;
             // The lowest row clear of the other plates and the chips, sliding a little aside before it
             // climbs; else the lowest clear of the plates alone. Always inside the stage.
             const inside = (cx: number, lift: number) => ({x: clamp(cx, w / 2 + EDGE_PAD, width - w / 2 - EDGE_PAD), bottom: clamp(y - lift, h + EDGE_PAD, height - EDGE_PAD)});
@@ -1131,24 +1158,29 @@ export const createOfficeScene = (options: OfficeSceneOptions): OfficeScene => {
                 }
                 if (spot !== null) break;
             }
-            const shown = spot !== null || plate.priority >= 100;
+            // A plate with no free row stays on its seat, unclaimed, so the plates after it keep their
+            // rows; faded, it lets the pointer through to the plate it covers. The selected or hovered
+            // one is drawn whole where it stands, over its neighbours, moving none of them; only its
+            // own bubble, which the pointer passes through, rises above it.
+            const room = spot !== null;
+            const shown = room || worker === selected || worker === hovered;
             const {x: px, bottom: py} = spot ?? inside(x, 0);
-            if (shown) {
-                claimed.push({x: px, y: py - h / 2, w, h});
-                plateTops.set(plate.worker, py - h);
-            }
+            if (room) claimed.push({x: px, y: py - h / 2, w, h});
+            if (shown) plateTops.set(worker, py - h);
             element.style.visibility = 'visible';
-            element.style.transform = `translate(${px.toFixed(1)}px, ${py.toFixed(1)}px)`;
+            element.style.transform = `translate3d(${px.toFixed(1)}px, ${py.toFixed(1)}px, 0)`;
             // The stem from the plate down to its seat.
             element.style.setProperty('--ao-lift', `${Math.max(0, y - py).toFixed(1)}px`);
             element.style.setProperty('--ao-stem-x', `${clamp(x - px, -(w / 2 - 8), w / 2 - 8).toFixed(1)}px`);
             element.style.opacity = shown ? '1' : '0.18';
-            element.style.zIndex = String(shown ? 950 + Math.min(40, plate.priority) - Math.round(plate.near) : 5);
+            // The wrapper sits in a layer the pointer passes through, and the plate inherits this.
+            element.style.pointerEvents = shown ? 'auto' : 'none';
+            element.style.zIndex = String(!shown ? 5 : worker === selected ? 1200 : worker === hovered ? 1100 : 950 - Math.round(plate.near));
         }
         // A bubble sits over its seat's plate. One that would cover another bubble or a plate slides
         // aside (its tail still pointing at the seat) or climbs a row; the newest words go first, and
         // a bubble with no room waits hidden until there is (the seat's file and the ticker keep it).
-        bubbles.sort((a, b) => b.priority - a.priority || (seats.get(b.worker)?.worker?.since ?? 0) - (seats.get(a.worker)?.worker?.since ?? 0));
+        bubbles.sort((a, b) => (seats.get(b.worker)?.worker?.since ?? 0) - (seats.get(a.worker)?.worker?.since ?? 0) || a.order - b.order);
         const said: Box[] = [];
         for (const bubble of bubbles) {
             const {element, worker, w, h} = bubble;
@@ -1175,7 +1207,7 @@ export const createOfficeScene = (options: OfficeSceneOptions): OfficeScene => {
             element.style.opacity = '1';
             element.style.transform = `translate(${spot.x.toFixed(1)}px, ${spot.bottom.toFixed(1)}px)`;
             element.style.setProperty('--ao-tail', `${Math.max(-reach, Math.min(reach, bubble.x - spot.x)).toFixed(1)}px`);
-            element.style.zIndex = String(1000 + bubble.priority - bubble.order);
+            element.style.zIndex = String(bubble.worker === selected ? 1250 : bubble.worker === hovered ? 1150 : 1000 - bubble.order);
         }
     };
 
@@ -1274,6 +1306,12 @@ export const createOfficeScene = (options: OfficeSceneOptions): OfficeScene => {
             camera.position.lerpVectors(tween.fromPos, tween.toPos, u);
             controls.target.lerpVectors(tween.fromTarget, tween.toTarget, u);
             if (u >= 1) tween = null;
+            busy = true;
+        }
+        if (spin) {
+            const u = smooth((wall - spin.start) / spin.ms);
+            orbitTo(spin.from + spin.by * u);
+            if (u >= 1) spin = null;
             busy = true;
         }
         if (mixStart >= 0) {
@@ -1379,6 +1417,7 @@ export const createOfficeScene = (options: OfficeSceneOptions): OfficeScene => {
             }
         },
         zoom: (factor) => zoomBy(factor),
+        rotate: (radians) => orbitBy(radians),
         setPalette: (next) => {
             palette = next;
             recolor(m, next);
@@ -1390,6 +1429,8 @@ export const createOfficeScene = (options: OfficeSceneOptions): OfficeScene => {
             reduceMotion = reduce;
             if (reduce) {
                 tween = null;
+                if (spin) orbitTo(spin.from + spin.by);
+                spin = null;
                 for (const run of runs.values()) {
                     run.mesh.visible = false;
                     freePlanes.push(run.mesh);
