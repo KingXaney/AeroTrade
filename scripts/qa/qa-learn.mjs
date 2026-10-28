@@ -19,7 +19,7 @@
 // Run: npm run qa -- learn   (the harness: README.md)
 import {chromium} from 'playwright';
 import {MongoClient, ObjectId} from 'mongodb';
-import {BASE, MONGO, check, outDir, signUp, summary} from './lib.mjs';
+import {BASE, MONGO, check, outDir, ownerEmail, signUp, summary} from './lib.mjs';
 
 const OUT = outDir('learn');
 
@@ -42,7 +42,9 @@ try {
     };
 
     // --- user A: the checklist ticks itself from rows and leaves when done ----------------
-    const emailA = await signUp(page, 'learnA');
+    // Every user here is an owner of their own (lib/lab/owner.ts; owners.mjs): the checklist's
+    // strategy and Navigator steps, the strategy pages and /brain are the owner's alone.
+    const emailA = await signUp(page, 'learnA', {email: ownerEmail('learn-a')});
     const userA = await userIdFor(emailA);
     check('signed up', userA.length > 0);
     const checklist = page.locator('[data-widget-id="getting-started"]');
@@ -85,7 +87,7 @@ try {
     // --- user B: age cap and the one-time hide ----------------------------------------
     const contextB = await browser.newContext({viewport: {width: 1440, height: 900}});
     const pageB = await contextB.newPage();
-    const emailB = await signUp(pageB, 'learnB');
+    const emailB = await signUp(pageB, 'learnB', {email: ownerEmail('learn-b')});
     const userB = await userIdFor(emailB);
     await pageB.locator('[data-widget-id="getting-started"]').waitFor({timeout: 30000});
     const accountB = await db.collection('paperaccounts').findOne({userId: userB});
@@ -128,9 +130,17 @@ try {
     await page.goto(`${BASE}/learn?tab=glossary`, {waitUntil: 'load'});
     await page.waitForURL(/\/glossary$/, {timeout: 15000}).catch(() => {});
     check('the old glossary tab address lands on /glossary', /\/glossary$/.test(page.url()), page.url());
-    await page.goto(`${BASE}/learn`, {waitUntil: 'load'});
-    await page.waitForURL(/\/games$/, {timeout: 15000}).catch(() => {});
-    check('/learn sends an account the lab is not open to to the games', /\/games$/.test(page.url()), page.url());
+    // This suite's readers are owners (the strategies and /brain are theirs alone), so /learn is
+    // their lab: the redirect is checked with a reader who is not.
+    const plainContext = await browser.newContext({viewport: {width: 1440, height: 900}});
+    const plain = await plainContext.newPage();
+    await signUp(plain, 'learn plain');
+    await plain.goto(`${BASE}/learn`, {waitUntil: 'load'});
+    await plain.waitForURL(/\/games$/, {timeout: 15000}).catch(() => {});
+    check('/learn sends an account the lab is not open to to the games', /\/games$/.test(plain.url()), plain.url());
+    await plainContext.close();
+    // The palette listens for ⌘K from an effect: wait for the page to settle before pressing it.
+    await page.goto(`${BASE}/games`, {waitUntil: 'networkidle'});
     await page.keyboard.press('Meta+k');
     const palette = page.locator('input[placeholder*="term to learn"]');
     await palette.waitFor({timeout: 15000});
@@ -349,7 +359,7 @@ try {
     // --- Today's lesson: library-only; a fresh first from the account, else today's concept -
     const contextC = await browser.newContext({viewport: {width: 1440, height: 900}});
     const pageC = await contextC.newPage();
-    const emailC = await signUp(pageC, 'learnC');
+    const emailC = await signUp(pageC, 'learnC', {email: ownerEmail('learn-c')});
     const userC = await userIdFor(emailC);
     await pageC.locator('[data-widget-id]').first().waitFor({timeout: 30000});
     check('Today\'s lesson is not on the default dashboard', await pageC.locator('[data-widget-id="todays-lesson"]').count() === 0);
@@ -360,10 +370,8 @@ try {
     const library = pageC.locator('[role="dialog"]');
     await library.waitFor({timeout: 15000});
     check('the library lists it under Learn, badged New', /LEARN[\s\S]*Today's lesson[\s\S]*NEW/i.test(await library.innerText()));
-    await library.locator('div')
-        .filter({has: pageC.getByText('Today\'s lesson', {exact: true})})
-        .filter({has: pageC.getByRole('button', {name: 'Add', exact: true})})
-        .last().getByRole('button', {name: 'Add', exact: true}).click();
+    // By the row's own handle: the owner's library also lists both brains' and the strategies' widgets.
+    await library.locator('[data-library-row="todays-lesson"]').getByRole('button', {name: /^Add/}).click();
     await pageC.keyboard.press('Escape');
     await pageC.getByRole('button', {name: 'Save', exact: true}).click();
     const lessonWidget = pageC.locator('[data-widget-id="todays-lesson"]');
@@ -503,7 +511,7 @@ try {
 
         const contextE = await browser.newContext({viewport: {width: 1440, height: 900}});
         const pageE = await contextE.newPage();
-        const emailE = await signUp(pageE, 'learnE');
+        const emailE = await signUp(pageE, 'learnE', {email: ownerEmail('learn-e')});
         const userE = await userIdFor(emailE);
         await pageE.locator('[data-widget-id]').first().waitFor({timeout: 30000});
         let accountE = null;
@@ -690,7 +698,7 @@ try {
 
         const contextF = await browser.newContext({viewport: {width: 1440, height: 900}});
         const pageF = await contextF.newPage();
-        const emailF = await signUp(pageF, 'learnF');
+        const emailF = await signUp(pageF, 'learnF', {email: ownerEmail('learn-f')});
         userF = await userIdFor(emailF);
         await db.collection('brainentities').updateOne({key: THESIS_KEY}, {$set: {
             key: THESIS_KEY, type: 'ticker', displayName: THESIS_KEY, weightFast: 4, sentimentSumFast: 1, weightSlow: 900, sentimentSumSlow: 270,

@@ -2,19 +2,20 @@
 
 import {connectToDatabase} from "@/database/mongoose";
 import UserPreferencesModel from "@/database/models/user-preferences.model";
-import {getCurrentUserId} from "@/lib/auth/session";
+import {getOwnerUserId} from "@/lib/auth/session";
 import {unsetPreference, upsertPreferences} from "@/lib/settings/preferences-store";
 import {strategyBySlug} from "@/lib/strategies/catalog";
 import {getFollowedStrategies} from "@/lib/strategies/follows";
 import type {ActionResult} from '@/lib/actions/types';
 
-// Writes only: which quant strategies a user pins on the dashboard. Reads live in
-// lib/strategies/follows.ts. Absence is the default, so emptying the list unsets it.
+// Writes only: which quant strategies the owner pins on the dashboard (the strategies are the
+// owner's alone, lib/lab/owner.ts). Reads live in lib/strategies/follows.ts. Absence is the
+// default, so emptying the list unsets it.
 
 type FollowResult = ActionResult & {followed?: string[]};
 
 export const followStrategy = async (slug: unknown): Promise<FollowResult> => {
-    const userId = await getCurrentUserId();
+    const userId = await getOwnerUserId();
     if (!userId) return {success: false, message: 'Not authenticated'};
     const def = typeof slug === 'string' ? strategyBySlug(slug) : undefined;
     if (!def) return {success: false, message: 'Unknown strategy'};
@@ -29,7 +30,7 @@ export const followStrategy = async (slug: unknown): Promise<FollowResult> => {
 };
 
 export const unfollowStrategy = async (slug: unknown): Promise<FollowResult> => {
-    const userId = await getCurrentUserId();
+    const userId = await getOwnerUserId();
     if (!userId) return {success: false, message: 'Not authenticated'};
     const def = typeof slug === 'string' ? strategyBySlug(slug) : undefined;
     if (!def) return {success: false, message: 'Unknown strategy'};

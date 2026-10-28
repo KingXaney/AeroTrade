@@ -3,7 +3,7 @@
 import {revalidatePath} from "next/cache";
 import AiNavigator from "@/database/models/ai-navigator.model";
 import {connectToDatabase} from "@/database/mongoose";
-import {getCurrentUserId} from "@/lib/auth/session";
+import {getOwnerUserId} from "@/lib/auth/session";
 import {createPaperAccount} from "@/lib/actions/accounts.actions";
 import {getAccountsForUser, getOwnedAccount} from "@/lib/trading/accounts";
 import {getPortfolio} from "@/lib/trading/valuation";
@@ -16,6 +16,9 @@ import {inngest} from "@/lib/jobs/client";
 import {JOBS} from "@/lib/jobs/registry";
 import type {ActionResult} from '@/lib/actions/types';
 import type {SuggestionAction} from '@/lib/navigator/types';
+
+// The AI Navigator is the owner's alone (lib/lab/owner.ts): getOwnerUserId reads anyone else as
+// signed out, so every action below refuses them.
 
 const revalidateNavigatorPaths = () => {
     revalidatePath('/brain');
@@ -31,7 +34,7 @@ export const enrollAiNavigator = async (
     {startingBalance}: {startingBalance?: number} = {},
 ): Promise<ActionResult> => {
     try {
-        const userId = await getCurrentUserId();
+        const userId = await getOwnerUserId();
         if (!userId) return {success: false, message: 'Not authenticated'};
 
         await connectToDatabase();
@@ -93,7 +96,7 @@ export const enrollAiNavigator = async (
 
 const setNavigatorStatus = async (status: 'active' | 'paused'): Promise<ActionResult> => {
     try {
-        const userId = await getCurrentUserId();
+        const userId = await getOwnerUserId();
         if (!userId) return {success: false, message: 'Not authenticated'};
 
         await connectToDatabase();
@@ -116,7 +119,7 @@ export const resumeAiNavigator = async (): Promise<ActionResult> => setNavigator
 // always safe to press for a health check or a point-in-time read.
 export const runAiNavigatorNow = async (): Promise<ActionResult> => {
     try {
-        const userId = await getCurrentUserId();
+        const userId = await getOwnerUserId();
         if (!userId) return {success: false, message: 'Not authenticated'};
 
         await connectToDatabase();
@@ -136,7 +139,7 @@ export const runAiNavigatorNow = async (): Promise<ActionResult> => {
 // account management flow if desired.
 export const unenrollAiNavigator = async (): Promise<ActionResult> => {
     try {
-        const userId = await getCurrentUserId();
+        const userId = await getOwnerUserId();
         if (!userId) return {success: false, message: 'Not authenticated'};
 
         await connectToDatabase();
@@ -157,7 +160,7 @@ export const applySuggestion = async (
     {symbol, action, targetWeight, accountId}: {symbol: string; action: SuggestionAction; targetWeight: number; accountId: string},
 ): Promise<ActionResult> => {
     try {
-        const userId = await getCurrentUserId();
+        const userId = await getOwnerUserId();
         if (!userId) return {success: false, message: 'Not authenticated'};
         if (action === 'hold') return {success: false, message: 'Nothing to apply for a hold'};
 

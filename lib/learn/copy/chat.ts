@@ -13,9 +13,17 @@ export const CHAT_SUGGESTIONS = [
     "How is my paper portfolio doing?",
     "What does max drawdown mean?",
     "Explain what a P/E ratio measures",
+];
+
+// The chips about the strategies and the brains, offered to the owner alone (lib/lab/owner.ts):
+// only the owner's chat has the tools that answer them.
+export const OWNER_CHAT_SUGGESTIONS = [
     "How does a quant strategy decide?",
     "What is the culture brain seeing?",
 ];
+
+export const chatSuggestionsFor = ({owner}: {owner: boolean}): readonly string[] =>
+    owner ? [...CHAT_SUGGESTIONS, ...OWNER_CHAT_SUGGESTIONS] : CHAT_SUGGESTIONS;
 
 // The caption's clauses, joined by `separator`. "Messages", not model calls: one message may
 // spend up to five model steps, and the message is what the windows count. "Today" is the

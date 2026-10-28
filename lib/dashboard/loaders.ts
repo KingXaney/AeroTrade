@@ -39,6 +39,7 @@ const STRATEGY_WIDGET_LIMIT = 5;
 
 export type LoaderCtx = {
     userId: string;
+    owner: boolean;                // the app's owner (lib/lab/owner.isLabOwner), from the session
     preferredAccountId?: string;   // ?account= ?? ACTIVE_ACCOUNT_COOKIE
 };
 
@@ -122,9 +123,9 @@ export const LOADERS: {[K in DataKey]: Loader<K>} = {
     topicsOverview: ({userId}) => getCachedTopicsOverview(userId),
     topicsLatest: ({userId}) => getMergedTopicFeed(userId, {limit: TOPICS_LATEST_LIMIT}),
     // cache()-shared with the page, which reads it for widget availability: the checklist costs no read.
-    onboardingFacts: ({userId}) => getOnboardingFacts(userId),
+    onboardingFacts: ({userId, owner}) => getOnboardingFacts(userId, owner),
     // The onboarding half is the same cached read; the lesson reads are Today's lesson's alone.
-    learnFacts: ({userId}) => getLearnFacts(userId),
+    learnFacts: ({userId, owner}) => getLearnFacts(userId, owner),
     // Lazy: awaited under Suspense only when no moment wins (components/dashboard/widgets/registry.tsx).
     lesson: ({userId}) => getTodaysLesson(userId),
     // Lazy: today's puzzle row and the solved days, two indexed reads.

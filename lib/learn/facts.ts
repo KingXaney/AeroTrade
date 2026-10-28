@@ -18,6 +18,9 @@ export type OnboardingFacts = {
     navigatorEnrolled: boolean;
     // ISO timestamp of the one-time "Hide" click, or null.
     missionsDismissedAt: string | null;
+    // The reader is the app's owner (lib/lab/owner.ts): only the owner is offered the missions and
+    // the lessons about the strategies and the AI Navigator, whose pages are theirs alone.
+    owner: boolean;
 };
 
 // The firsts Today's lesson can point at, read from rows (lib/learn/facts-store.ts

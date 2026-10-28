@@ -14,7 +14,7 @@ import {BASE, HOME_URL, INNGEST, MONGO, PASSWORD, check, note, outDir, signUp, s
 
 const OUT = outDir('broker');
 const OWNER_EMAIL = 'qa-lab-owner@example.com';
-const STUB = 'http://localhost:8788';
+const STUB = `http://localhost:${process.env.QA_ALPACA_PORT ?? 8788}`;
 const stub = (path) => fetch(`${STUB}${path}`).then((r) => r.json());
 const etDay = (msAgo = 0) => new Date(Date.now() - msAgo).toLocaleDateString('en-CA', {timeZone: 'America/New_York'});
 const PRICES = {NVDA: 200, XLK: 100, 'BRK.B': 500, ADDYY: 120};

@@ -1,5 +1,5 @@
 import type {Metadata} from "next";
-import {requireUserId} from "@/lib/auth/session";
+import {requireOwner} from "@/lib/auth/session";
 import {getActiveTheses, getBrainGraph, getBrainSystemStatus, getEntityEvidence, getSinceThesis, getTopEntities} from "@/lib/brain/store";
 import {glossNavigatorReasons} from "@/lib/learn/reasons";
 import type {SuggestionSetView} from "@/lib/navigator/store";
@@ -143,7 +143,8 @@ const SystemView = async () => {
 };
 
 const BrainPage = async ({searchParams}: BrainPageProps) => {
-    const userId = await requireUserId();
+    // The owner's alone (lib/lab/owner.ts): anyone else is sent Home.
+    const {id: userId} = await requireOwner();
 
     const {entity, view: viewParam} = await searchParams;
     // An evidence link (?entity=) always means the narratives view, whatever else the URL says.

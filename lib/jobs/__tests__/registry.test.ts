@@ -35,6 +35,7 @@ describe('job registry', () => {
             ['lab-daily-papers', 'app/refresh.lab.papers', 'TZ=America/New_York 20 6 * * 1-5'],
             ['culture-follow-bootstrap', 'app/bootstrap.culture.follow'],
             ['broker-sync', 'app/sync.broker.mirror', 'TZ=America/New_York 15 11 * * 1-5'],
+            ['agent-world-weekly', 'app/run.agent.world', 'TZ=America/New_York 30 8 * * 1', 'TZ=America/New_York 30 8 * * 2'],
         ]);
     });
 
@@ -57,6 +58,8 @@ describe('job registry', () => {
     it('schedules nothing on a preview build, and keeps every event', () => {
         for (const job of JOB_LIST) {
             expect(triggersOf(job, {VERCEL_ENV: 'preview'}), job.id).toEqual([{event: job.event}]);
+            // Nor where the schedules are switched off (the browser QA harness).
+            expect(triggersOf(job, {JOB_CRONS: 'off'}), job.id).toEqual([{event: job.event}]);
         }
         expect(triggersOf(JOBS.newsDigest, {VERCEL_ENV: 'production'})).toEqual([
             {event: 'app/send.daily.news'},

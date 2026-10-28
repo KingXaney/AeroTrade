@@ -4,7 +4,9 @@
 
 import {GLOSSARY, GLOSSARY_KEYS, type GlossaryEntry, type GlossaryKey} from "@/lib/learn/glossary";
 
-export type Home = {href: string; label: string};
+// `owner`: a page that is the owner's alone (lib/lab/owner.ts) — both brains, the trading agent world
+// and the strategies; the glossary page leaves those groups out for anyone else (glossaryGroupsFor).
+export type Home = {href: string; label: string; owner?: true};
 
 const BOARD: readonly GlossaryKey[] = [
     'close', 'since-entry', 'weight', 'target', 'drift', 'sma50', 'sma200', 'sma5', 'spread', 'trend-on',
@@ -40,15 +42,21 @@ const CULTURE: readonly GlossaryKey[] = [
     'signal-adoption', 'signal-hype', 'signal-backlash', 'signal-substitution', 'signal-drop', 'signal-price', 'signal-fading',
     'attention-backtest',
 ];
+const AGENT_WORLD: readonly GlossaryKey[] = [
+    'desk-session', 'desk-role', 'analyst-report', 'research-debate', 'desk-rating', 'rating-target', 'desk-rails',
+    'session-approval', 'approval-lapse', 'agent-budget', 'heartbeat', 'approval-stage', 'data-vendor', 'point-in-time',
+    'tool-call', 'model-tokens', 'session-cost',
+];
 
 const HOMES = {
-    board: {href: '/strategies', label: 'Strategy boards'},
+    board: {href: '/strategies', label: 'Strategy boards', owner: true},
     portfolio: {href: '/portfolio', label: 'Your portfolio'},
     market: {href: '/watchlist', label: 'Watchlist and stock pages'},
     concepts: {href: '/topics', label: 'Your topics'},
-    brain: {href: '/brain', label: 'The News Brain'},
-    rails: {href: '/brain', label: 'The News Brain'},
-    culture: {href: '/culture', label: 'The Culture Brain'},
+    brain: {href: '/brain', label: 'The News Brain', owner: true},
+    rails: {href: '/brain', label: 'The News Brain', owner: true},
+    culture: {href: '/culture', label: 'The Culture Brain', owner: true},
+    'agent-world': {href: '/agent-world', label: 'The trading agent world', owner: true},
     games: {href: '/games', label: 'The games'},
     poker: {href: '/poker', label: 'The poker solver'},
     landing: {href: '/welcome', label: 'The front door'},
@@ -64,6 +72,7 @@ export const groupOf = (entry: GlossaryEntry): GroupId => {
     if ((MARKET as readonly string[]).includes(entry.key)) return 'market';
     if ((BRAIN as readonly string[]).includes(entry.key)) return 'brain';
     if ((CULTURE as readonly string[]).includes(entry.key)) return 'culture';
+    if ((AGENT_WORLD as readonly string[]).includes(entry.key)) return 'agent-world';
     if ((GAMES as readonly string[]).includes(entry.key)) return 'games';
     if ((POKER as readonly string[]).includes(entry.key)) return 'poker';
     if ((LANDING as readonly string[]).includes(entry.key)) return 'landing';
@@ -81,6 +90,7 @@ const GROUP_LABELS: Record<GroupId, string> = {
     brain: 'On the News Brain',
     rails: "The Navigator's rails",
     culture: 'On the Culture Brain',
+    'agent-world': 'In the trading agent world',
     games: 'In the games',
     poker: 'In the poker solver',
     landing: 'On the front door',
@@ -88,9 +98,14 @@ const GROUP_LABELS: Record<GroupId, string> = {
 };
 
 // Registry order within each group, groups in reading order.
-export const GLOSSARY_GROUPS: readonly GlossaryGroup[] = (['board', 'portfolio', 'market', 'concepts', 'brain', 'rails', 'culture', 'games', 'poker', 'landing', 'poker-night'] as const).map((id) => ({
+export const GLOSSARY_GROUPS: readonly GlossaryGroup[] = (['board', 'portfolio', 'market', 'concepts', 'brain', 'rails', 'culture', 'agent-world', 'games', 'poker', 'landing', 'poker-night'] as const).map((id) => ({
     id,
     label: GROUP_LABELS[id],
     home: HOMES[id],
     keys: GLOSSARY_KEYS.filter((key) => groupOf(GLOSSARY[key]) === id),
 }));
+
+// The groups one reader's glossary shows: every group for the owner; anyone else none whose home is
+// the owner's alone.
+export const glossaryGroupsFor = ({owner}: {owner: boolean}): readonly GlossaryGroup[] =>
+    owner ? GLOSSARY_GROUPS : GLOSSARY_GROUPS.filter((group) => !group.home.owner);

@@ -20,7 +20,7 @@ before the rename keep the name "Main Strategy" (new ones are "Main account", `D
 - `npm run build:check` — compile-only Next build; needs no database or keys
 - `npm run build` / `npm start` — the production build and its server
 - `npm run dev` + `npx inngest-cli@latest dev -u http://localhost:3000/api/inngest` — app + jobs
-- `npm run trigger -- <brain|navigator|news|snapshots|income|topics|briefs|briefing|strategies|strategies-preview|strategies-resimulate|culture|culture-weekly|culture-preview|culture-resimulate|culture-backfill|lab>` — fire a job locally (`news <email>`: a test brief to that one opted-in reader; `culture-backfill [brandId ...]`: every brand's Wikipedia views back to the backtest horizon, or the named brands)
+- `npm run trigger -- <brain|navigator|news|snapshots|income|topics|briefs|briefing|strategies|strategies-preview|strategies-resimulate|culture|culture-weekly|culture-preview|culture-resimulate|culture-backfill|lab|agent-world|agent-world-now|agent-world-preview>` — fire a job locally (`news <email>`: a test brief to that one opted-in reader; `culture-backfill [brandId ...]`: every brand's Wikipedia views back to the backtest horizon, or the named brands)
 - `npm run test:db` — connect to `MONGODB_URI` (from `.env`) and print the database and host it reached
 - `npm run migrate:accounts` — the idempotent multi-account migration: builds the indexes in `scripts/migration-indexes.mjs` and drops the ones they replaced (run it on every database, again whenever that list changes)
 - `npm run opinion:local` — the brain's Second Opinion from your Claude subscription through the Claude Code CLI, written straight to the database (`.env.example` lists the other ways)
@@ -149,11 +149,12 @@ and friends keep none beyond Shared and the invariants).
   `components/shell/SectionTabs` shows above the page (none for a section of one page), and
   `match` names routes it owns that are not tabs (`/stocks/AAPL` lights Markets). Friends and
   Settings are `ACCOUNT_PAGES`, in the avatar menu. Every `href` is a page file — the test checks.
-  A page flagged `owner: true` (today `/learn`, the owner's lab) is for the accounts
-  `lib/lab/owner.isLabOwner` admits: the `(root)` layout decides the audience from the session and
-  hands `navSectionsFor`/`navPagesFor` to the Rail, SectionTabs, the drawer and ⌘K, so anyone
-  else's Learn section begins at the games; `NAV_SECTIONS` stays the full registry (the Quick
-  Links widget draws the public lists).
+  A section or a page flagged `owner: true` (the Strategies and Brain sections; `/learn`, the
+  owner's lab) is for the accounts `lib/lab/owner.isLabOwner` admits (### owner): the `(root)`
+  layout decides the audience from the session and hands `navSectionsFor`/`navPagesFor` to the
+  Rail, SectionTabs, the drawer and ⌘K, so anyone else has no Strategies or Brain icon and their
+  Learn section begins at the games (a section left with no page is dropped too); `NAV_SECTIONS`
+  stays the full registry (the Quick Links widget draws the public lists).
 - The rail never widens: a name is a tooltip, a summary (Portfolio, News) a portaled hover card,
   and anything the reader must see without hovering — something new in a followed topic since
   they last opened News, a holding valued at cost, a pending friend request — is a dot on the
@@ -183,7 +184,9 @@ and friends keep none beyond Shared and the invariants).
 - `lib/auth/session` is the one session read: `getSessionUser` (the shell's User),
   `getCurrentUserId` (actions and routes), `getCurrentUser` (an action that gates on who the person
   is — the owner's lab — reads the email through it), `requireUserId` (pages — signed out redirects
-  to /sign-in).
+  to /sign-in), `requireUser` (a page that shows the owner more), `requireOwner` (the owner's own
+  pages — anyone else is sent Home) and `getOwnerUserId` (the owner's actions and routes — anyone
+  else reads as signed out).
 - The server actions keep their own rate limits — better-auth's `rateLimit` never runs on this
   app's `auth.api.*` path — all counted by `lib/rate-limit.takeRateLimit`, the one Mongo counter.
   `lib/rate-limit.peekRateLimit` is its read-only pair — one `findOne`, never a write, null once
@@ -447,8 +450,8 @@ and friends keep none beyond Shared and the invariants).
   rounded brands and owners, each picker's live record beside SPY, its latest decision with
   every reason decoded through the culture grammar, and its simulated record apart, under one
   stance line held to the no-advice list.
-- The Brain section of `lib/shell/navigation` carries both brains (`/brain`, `/culture`); the rail
-  stays short (seven icons since Markets and Trade merged). The two widgets (`culture-picks`, `brand-attention`) are library-only,
+- The Brain section of `lib/shell/navigation` carries the three brains (`/brain`, `/culture`, `/agent-world`); the rail
+  stays short (seven icons since Markets and Trade merged; five for anyone but the owner, who alone has Strategies and Brain). The two widgets (`culture-picks`, `brand-attention`) are library-only,
   category `brain` ("Brains & AI").
 - Enrolling an account with a picker (the Navigator's shape, per picker): `lib/culture/follow`
   (pure — `followAccountName` "Culture · Spike", `FollowProfileSchema` over `LIVE_PROFILES`,
@@ -491,6 +494,139 @@ and friends keep none beyond Shared and the invariants).
   10:45 ET with a Tuesday holiday retry (`culture-weekly`, `culture-preview`, `culture-resimulate`),
   `culture-wikipedia-backfill` on demand (`culture-backfill [brandId…]`), `culture-follow-bootstrap`
   on demand (`culture-follow`). QA: `npm run qa -- culture`.
+
+### owner
+
+- The app's owner — its admin — is the accounts `LAB_OWNER_EMAILS` names (`lib/lab/owner.isLabOwner`;
+  `lib/lab/owner-store.readOwnerUserIds` is the same list as user ids, for the reads that have no
+  session). The owner alone has the lab (`/learn`), both brains (`/brain`, `/culture`), the trading
+  agent world (`/agent-world` and its office) and the strategies (`/strategies`); for anyone else
+  none of them exists:
+  - the nav: the Strategies and Brain sections are `owner: true` (### shell);
+  - the pages: `requireOwner` sends anyone else Home; the actions (the Navigator's, the culture
+    follow's, the strategy follow's, the Second Opinion's) and the routes (the strategy CSV, the
+    agent world's live poll) take `getOwnerUserId`;
+  - the widgets: every one in the `strategies` and `brain` categories, and `news-brain-tile`, is
+    `owner` (`lib/dashboard/catalog`), shown only with `AvailabilityContext.owner` — the dashboard
+    and Settings read it from the session (`getVisibleLayout(userId, owner)`);
+  - the chat: `buildTools(userId, {owner})` leaves `OWNER_CHAT_TOOLS` (`lib/chat/types`) out for
+    anyone else and `advisorSystemPrompt({owner})` never names them; the chips about them
+    (`OWNER_CHAT_SUGGESTIONS`, `chatSuggestionsFor`) and the robot's tip (`robotTipsFor`) are the
+    owner's;
+  - the rest: the stock page's "What the rules see" (no strategy watches a symbol for anyone
+    else), the first-week missions in `OWNER_MISSIONS`, a followed strategy's rebalance lesson
+    (`OnboardingFacts.owner`), the Topics page's brain suggestions, `/portfolio`'s "Traded by", the
+    glossary's groups homed on those pages (`glossaryGroupsFor`) and the strategies' disclaimer
+    under them, and the daily brief's Navigator and culture blocks;
+  - the jobs: the AI Navigator and the culture pickers trade the owner's enrolments only
+    (`buildNavigatorUniverse`, `listActiveFollowers`); one anyone else made before rests.
+  News — the briefing, the feed, the topic briefs — is everyone's, as are the accounts, the
+  topics, the games, poker night and the glossary's other groups. The landing page still
+  describes the strategies and the Navigator.
+
+### agent world
+
+- The trading agent world (`/agent-world`, the Brain section's third page; `docs/specs/2026-10-27-trading-agent-world.md`)
+  joins three outside projects: TradingAgents (a LangGraph desk of twelve model roles) and OpenBB
+  (its data vendor) run in a separate Python service, `services/agent-world`, never in this app;
+  Paperclip is the company around the desk. Mongo is this app's truth; Paperclip is told
+  everything best effort (`lib/agent-world/company`) and never stops a session. Everything is read
+  through `lib/agent-world/env` (the only reader of the feature's secrets; never `NEXT_PUBLIC`), and
+  `agentWorldOff` (`disabled`, `unconfigured`, `no-approver`) is what the page and the job say when
+  nothing may run.
+- One session at a time per deployment (`lib/agent-world/store.openSession` refuses while one is
+  queued, running, awaiting a decision or approved), every row and index carrying `env` and the
+  desk's paper account named per deployment (`agentWorldAccountName`), since a preview shares
+  production's database. A weekly session's id is its week (`aw-<Monday>`), so the unique
+  `{env, sessionId}` index is the week's claim; a manual session or a preview is a second session
+  of the week, named by the second it was asked for (`lib/agent-world/job.agentWorldDay`).
+- The job, `lib/jobs/functions/agent-world.runAgentWorldWeekly` (Mondays 08:30 ET, a Tuesday cron for a
+  holiday Monday): open the session, load the book, open the Paperclip issue, a signed POST /runs
+  (the service answers at once and works in the background — Vercel caps a request at 60 s), then
+  wait in `SESSION_WAIT_ROUNDS` rounds of `step.waitForEvent` (`AGENT_WORLD_EVENTS.finished`, matched
+  with an `if` on the session id, since a cron's own event carries none) with a Mongo read between
+  them, so a lost wake-up costs one round. Then the ratings become orders by code
+  (`lib/agent-world/orders`: `RATING_TARGET_WEIGHTS`, capped and scaled under `AGENT_WORLD_RAILS`,
+  sized by the Navigator's `diffToOrders`; a rating the model wrote never names a quantity), the
+  owner decides (`AGENT_WORLD_EVENTS.decided`, timing out at `lapseDeadline`, Mongo read whatever
+  woke it) or `auto` approves, and fills go through `executeOrder` during the session
+  (`step.sleepUntil` the open; a manual run fills at once) with `source: 'agent-world'` and the key
+  `agent-world:<session>:<side>:<symbol>`. Every exit is a sentence on the job's stamp
+  (`describeRun`), a failure included.
+- The service's events (`app/api/agent-world/events/route.ts`): signed both ways with one secret
+  (`lib/agent-world/signing`, HMAC-SHA256 over `timestamp.body`, a five-minute window; the service's
+  test holds the same vector), capped at `EVENT_BODY_BYTES`, read with zod and cut to `CLAMPS`
+  (`lib/agent-world/events`). A batch is applied as one guarded update per run-level event to its
+  run's document (`runUpdateFor`, filtered on the run's seq below the event's) and one
+  compare-and-set of the session's head on its seq (`foldHead`), so a retried batch changes nothing;
+  every head write moves `version`, the live poll's "nothing new" test. A refusal the service met
+  (`limit`) is filed on the limits tracker under the job; `finished` wakes the job after the write.
+- The floor (`components/agent-world/LiveFloor`) polls `GET /api/agent-world/live` through the pure
+  `lib/agent-world/live` (3 s while a session holds the desk, 30 s otherwise, nothing while the tab
+  is hidden), naming the session, version and seq it holds, so an answer is `unchanged` from one
+  head read or carries only the runs that moved. A finished session plays back from its stored times
+  (`lib/agent-world/replay`; none with motion reduced). The stage strip's working dot is
+  `.aw-working`, in both motion guards and stopped by name in brutalist. The ratings' words are data
+  labels (`RATING_LABELS`, `ORDER_SIDE_LABELS` in `lib/agent-world/config`), drawn in neutral badges
+  and table cells, never opening a sentence; every model text goes through `SafeMarkdown` under the
+  caveat. Components reach no store, no Paperclip client, no env reader
+  (`lib/agent-world/__tests__/guard.test.ts`); the glossary arrives as slots from the page.
+- Paperclip (`lib/agent-world/paperclip`, `lib/agent-world/paperclip-view`, every call with a
+  timeout, `PaperclipResult`, never a throw): one agent per role plus the Head trader (the issue's
+  assignee; its address is the service) and the Execution desk (the approval stage's participant;
+  its address is `app/api/agent-world/paperclip/heartbeat/route.ts`, which only logs). The owner's
+  decision is Mongo's first (`lib/actions/agent-world.actions`), then the job is woken, then the issue
+  is told as the Execution desk's (`mirrorDecision`; whether it landed is on the session). A
+  routine fired in Paperclip reaches the service, which relays it signed to
+  `app/api/agent-world/sessions/route.ts` (a manual session, a few an hour at most) and closes the
+  routine's own issue; the session keeps an issue of its own.
+  `scripts/agent-world-setup.mjs` creates the company, its agents, keys and routine idempotently.
+- What a running Paperclip v2026.1023.0 showed (2026-10-27), which both sides follow: an agent key's
+  comment or issue update needs `X-Paperclip-Run-Id` naming one of that agent's own runs on an issue
+  (`paperclip.runFor` finds the desk's; the service invokes the Head trader on the session's issue
+  with a reason beginning `execution_`); nothing is checked out (a checkout strands the issue once its
+  short run ends); the session's issue opens in backlog with `allowDuplicate` and the session id as
+  its idempotency key (in todo Paperclip wakes and checks it out at once; by title it dedupes); cost
+  events need no run; `blocked` names its unblocker; the roles are `general`, `researcher`, `qa` and
+  `pm` (`manager` is refused); an issue's board page sits under its identifier's prefix
+  (`paperclip-view.issueBoardUrl`). Every http wake leaves an unpriced cost event, which pauses the
+  company under Paperclip's default policy, so the setup script allows unpriced usage. Under automatic
+  approval the desk has no run of its own, so its comments land only once it has had one.
+- The office (`/agent-world/office`, `docs/specs/2026-10-27-agent-office.md`) is the same session as a
+  3D floor on a page of its own: the route group `app/(office)/agent-world/office` has none of the app's shell
+  (`components/theme/ThemeBackdrop` draws nothing there either), and the floor's title links to it in
+  a new tab. `lib/agent-world/office.officeState` (pure) reads the live view into fourteen workers
+  (`WORKER_IDS`: the Head trader, the twelve roles in the run's order, the Execution desk), each with
+  a status (`WORKER_STATUSES`; "Busy" for working, the legend's mechanism-only rule), a task line, a
+  bubble and this session's figures, plus the flows in flight, the shelves, the tickets, the issue,
+  the approval lamp, the focus, the wall and the ticker. A window (`OFFICE_WINDOWS`) opens when the
+  browser first saw the event while live (`seenAfter`, at the arriving view's own `serverNow`) and on
+  the stored stamp in a replay (`OFFICE_REPLAY_MS`, the windows scaled by `replayWindowScale`), so a
+  replay scrubbed to any point twice gives the same office. `lib/agent-world/office-store.getOfficeView`
+  adds the career (`careerStats` over the last 40 finished sessions, projected, memoised per ET day on
+  the newest) and Paperclip's budgets (best effort).
+- The scene (`components/agent-world/office/office-scene`, three.js loaded on demand, its set built by
+  `components/agent-world/office/office-build`; seats, furniture, paths, camera presets, idle gestures
+  and the sky's mix by the New York clock are the pure `lib/agent-world/office-layout`) takes only
+  `OfficeState` and diffs it, drawing on demand. Everything a reader acts on is HTML placed over the
+  canvas: each seat's plate is a button, stacked in screen space on a stem in the seat's colour when
+  neighbours crowd; a bubble slides aside or climbs rather than cover another; the shelves', issue's,
+  corkboard's, lamp's and chute's chips. The roster (`components/agent-world/office/OfficeSidebar`)
+  is every seat as a button in the run's order whatever the camera shows; a seat's file
+  (`components/agent-world/office/OfficeDossier`, a sheet that leaves the floor live) is the
+  Execution desk's `DecisionPanel` too, so an owner decides from the office; `?engine=2d` or no WebGL
+  draws `components/agent-world/office/OfficeMap2D`. Colours are the `--office-*` tokens in
+  `app/globals.css`; the `.ao-*` motion classes are in both guards and stopped by name in brutalist.
+  Keys: `lib/agent-world/office-keys`; sound, off until turned on and kept in this browser, is the
+  pure recipes of `lib/agent-world/office-sounds` (cued by the ticker's new event keys) played by
+  `components/agent-world/office/office-sound`. Its sentences are `lib/learn/copy/agent-world-office`,
+  its legend `lib/agent-world/office-legend`.
+- Its sentences are `lib/learn/copy/agent-world` (and the issue's own, `lib/learn/copy/agent-world-paperclip`);
+  its terms the glossary's `agent-world` group, homed on `/agent-world`; the legend
+  `lib/agent-world/legend` (every figure from config). QA: `npm run qa -- agent-world` (and
+  `agent-office` for the office), against
+  `scripts/qa/start-agent-world-stub.mjs` (the service's own exported events,
+  `scripts/qa/fixtures/agent-world-events.json`) and `scripts/qa/start-paperclip-stub.mjs`.
 
 ### topics
 
@@ -1552,7 +1688,7 @@ and friends keep none beyond Shared and the invariants).
   prints them under the jobs strip on `/brain?view=system` (`LIMITS_COPY`). A service that fails
   silently records nothing: the panel never says "within limits".
 - Crons run in production (and a local dev server) only: `triggersOf` drops them on a Vercel
-  preview build. The Inngest Vercel integration syncs every preview into a branch environment of
+  preview build, and wherever `JOB_CRONS=off` (the browser QA harness, so no schedule lands mid-run). The Inngest Vercel integration syncs every preview into a branch environment of
   its own, and a preview carries production's database, mailer and model keys — on 2026-10-05
   eight copies of every job were running against production, and the noon digest failed on the
   shared quotas. Events still reach a preview, so a branch can be tested by hand.

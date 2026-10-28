@@ -11,7 +11,7 @@
 // Run: npm run qa -- trading   (the harness: README.md)
 import {chromium} from 'playwright';
 import {MongoClient} from 'mongodb';
-import {BASE, MONGO, check, outDir, settledClick, signUp, summary} from './lib.mjs';
+import {BASE, MONGO, check, outDir, ownerEmail, settledClick, signUp, summary} from './lib.mjs';
 
 const OUT = outDir('trading');
 
@@ -51,7 +51,8 @@ try {
     await mongo.connect();
     const db = mongo.db();
 
-    const email = await signUp(page, 'Trade');
+    // The owner (lib/lab/owner.ts): the suite reads /brain and the Navigator's line too.
+    const email = await signUp(page, 'Trade', {email: ownerEmail('trading')});
     const user = await db.collection('user').findOne({email});
     const userId = String(user._id);
     const accounts = db.collection('paperaccounts');

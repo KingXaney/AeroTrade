@@ -20,7 +20,7 @@ export type NavPage = {
     icon: string;
     /** Which count, if any, rides beside this page's label. */
     badge?: NavBadgeKey;
-    /** Shown to the lab's owner only (lib/lab/owner.ts); every other audience's lists drop it. */
+    /** Shown to the owner only (lib/lab/owner.ts); every other audience's lists drop it. */
     owner?: true;
 };
 
@@ -40,6 +40,8 @@ export type NavSection = {
     badge?: NavBadgeKey;
     /** The summary the rail shows on hover, where the sidebar's cards used to sit. */
     flyout?: 'news' | 'portfolio';
+    /** The whole section is the owner's (lib/lab/owner.ts): anyone else has no icon, row or tab for it. */
+    owner?: true;
 };
 
 export const NAV_SECTIONS: readonly NavSection[] = [
@@ -76,14 +78,16 @@ export const NAV_SECTIONS: readonly NavSection[] = [
         ],
     },
     {
-        id: 'strategies', label: 'Strategies', icon: 'auto_graph',
+        id: 'strategies', label: 'Strategies', icon: 'auto_graph', owner: true,
         pages: [{href: '/strategies', label: 'Strategies', icon: 'auto_graph'}],
     },
     {
-        id: 'brain', label: 'Brain', icon: 'neurology',
+        // Both brains and the trading agent world (its office, /agent-world/office, is outside the shell).
+        id: 'brain', label: 'Brain', icon: 'neurology', owner: true,
         pages: [
             {href: '/brain', label: 'News brain', icon: 'neurology'},
             {href: '/culture', label: 'Culture brain', icon: 'storefront'},
+            {href: '/agent-world', label: 'Trading agent world', icon: 'smart_toy'},
         ],
     },
     {
@@ -127,12 +131,16 @@ const pagesOf = (sections: readonly NavSection[]): NavDestination[] => [
 export const NAV_PAGES: readonly NavDestination[] = pagesOf(NAV_SECTIONS);
 
 // Who is looking: the (root) layout decides from the session (lib/lab/owner.ts) and hands the
-// audience's lists to every nav surface. An owner-only page is dropped for anyone else; a
-// section is never emptied, so its first visible page takes its name and its rail icon.
+// audience's lists to every nav surface. For anyone else an owner section is dropped whole and an
+// owner page from its section, whose first visible page then takes its name and its rail icon; a
+// section left with no page goes too, so no icon ever leads nowhere.
 export type NavAudience = {owner: boolean};
 
 export const navSectionsFor = ({owner}: NavAudience): readonly NavSection[] =>
-    owner ? NAV_SECTIONS : NAV_SECTIONS.map((section) => ({...section, pages: section.pages.filter((page) => !page.owner)}));
+    owner ? NAV_SECTIONS : NAV_SECTIONS
+        .filter((section) => !section.owner)
+        .map((section) => ({...section, pages: section.pages.filter((page) => !page.owner)}))
+        .filter((section) => section.pages.length > 0);
 
 export const navPagesFor = (audience: NavAudience): readonly NavDestination[] => pagesOf(navSectionsFor(audience));
 

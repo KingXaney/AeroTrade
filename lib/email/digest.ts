@@ -23,6 +23,7 @@ import {getNewsFeedForPrefs, getNewsFeedPrefs} from "@/lib/news/feed-store";
 import {getActiveTheses} from "@/lib/brain/store";
 import {getTopicsDigestData} from "@/lib/topics/store";
 import {readLearnFacts} from "@/lib/learn/facts-store";
+import {isLabOwner} from "@/lib/lab/owner";
 import {readLessonForDigest} from "@/lib/learn/lesson-store";
 import type {SuggestionItem} from '@/lib/navigator/types';
 import type {MarketNewsArticle} from '@/lib/news/types';
@@ -146,7 +147,7 @@ export const fetchDigestSections = async (user: DigestUser, runId: string): Prom
     };
     const lesson = async (): Promise<string> => {
         try {
-            return await lessonSectionFor({facts: await readLearnFacts(user.id), loadTerm: () => readLessonForDigest(user.id, runId), appUrl: appUrl()});
+            return await lessonSectionFor({facts: await readLearnFacts(user.id, isLabOwner(user.email)), loadTerm: () => readLessonForDigest(user.id, runId), appUrl: appUrl()});
         } catch (error) {
             console.error('Lesson email section failed:', error);
             return '';

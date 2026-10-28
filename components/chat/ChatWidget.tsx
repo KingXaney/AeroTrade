@@ -13,6 +13,7 @@ import {
     ROBOT_TIP_HOLD_MS,
     ROBOT_TIP_VISIBLE_MS,
     nextRobotTip,
+    robotTipsFor,
     readShownTips,
     rememberShownTip,
     robotTipDelay,
@@ -23,6 +24,8 @@ import type {RobotTip} from "@/lib/learn/copy/robot";
 
 type ChatWidgetProps = {
     userId: string;
+    // The app's owner (lib/lab/owner.ts): the chips and the tips about the brains and the strategies.
+    owner: boolean;
 };
 
 const storageKey = (userId: string) => `aero-chat:${userId}`;
@@ -49,7 +52,7 @@ const sessionStorageOrNull = (): Storage | null => {
     }
 };
 
-const ChatWidget = ({userId}: ChatWidgetProps) => {
+const ChatWidget = ({userId, owner}: ChatWidgetProps) => {
     const [open, setOpen] = useState(false);
     // The question an "Ask in chat" link typed before the panel was open; the panel seeds
     // its composer from it on mount and it is cleared on close so it cannot come back.
@@ -107,7 +110,7 @@ const ChatWidget = ({userId}: ChatWidgetProps) => {
             timer = setTimeout(show, ROBOT_TIP_GAP_MS);
         }
         function show() {
-            const next = nextRobotTip(getEasternDateString(), readShownTips(storage));
+            const next = nextRobotTip(getEasternDateString(), readShownTips(storage), robotTipsFor({owner}));
             if (!next) return; // every tip heard this session: the robot keeps quiet
             rememberShownTip(storage, next.id);
             setTip(next);
@@ -120,7 +123,7 @@ const ChatWidget = ({userId}: ChatWidgetProps) => {
             attention.current = {hover: false, focus: false};
             setTip(null);
         };
-    }, [onTopics, open, tipRound]);
+    }, [onTopics, open, tipRound, owner]);
 
     // "Try it" goes through the same door as an Ask link: the subscribeAsk handler above opens the
     // panel with the prompt typed, and nothing is sent until the reader presses Send.
@@ -176,6 +179,7 @@ const ChatWidget = ({userId}: ChatWidgetProps) => {
             {open && (
                 <ChatPanel
                     userId={userId}
+                    owner={owner}
                     initialMessages={initialMessages}
                     onMessagesChange={persist}
                     initialInput={pendingInput}

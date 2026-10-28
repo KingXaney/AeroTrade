@@ -9,7 +9,8 @@
 
 import {GLOSSARY_KEYS} from "@/lib/learn/glossary";
 
-export type RobotTip = {id: string; text: string; prompt?: string};
+// `owner`: a tip about the owner's pages (lib/lab/owner.ts), which no one else is told (lib/chat/robot-tips.robotTipsFor).
+export type RobotTip = {id: string; text: string; prompt?: string; owner?: true};
 
 export const ROBOT_COPY = {
     tryIt: 'Try it',
@@ -44,6 +45,7 @@ export const ROBOT_TIPS: readonly RobotTip[] = [
     {
         id: 'strategies',
         text: "Eight rule-based quant strategies paper-trade on their own; the Strategies page shows each one's live return and the benchmark's over the same days.",
+        owner: true,
     },
     {
         id: 'what-these-mean',

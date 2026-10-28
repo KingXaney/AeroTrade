@@ -1,5 +1,5 @@
 import type {Metadata} from "next";
-import {requireUserId} from "@/lib/auth/session";
+import {requireOwner} from "@/lib/auth/session";
 import {marketStatus} from "@/lib/prices/market-hours";
 import {getStrategiesSystemStatus, getStrategyLeaderboard} from "@/lib/strategies/page-store";
 import {everyLiveRecordYoung, LIVE_YOUNG_DAYS} from "@/lib/strategies/views";
@@ -16,7 +16,8 @@ import {STRATEGIES_PAGE_COPY} from "@/lib/learn/copy/strategies";
 export const metadata: Metadata = {title: "Strategies"};
 
 const StrategiesPage = async () => {
-    const userId = await requireUserId();
+    // The owner's alone (lib/lab/owner.ts): anyone else is sent Home.
+    const {id: userId} = await requireOwner();
 
     const [leaderboard, status] = await Promise.all([
         getStrategyLeaderboard(userId),

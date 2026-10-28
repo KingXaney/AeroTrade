@@ -86,10 +86,9 @@ describe('the navigation registry', () => {
         expect(owner.find((page) => page.href === '/learn')?.label).toBe('Learn');
         expect(owner.find((page) => page.href === '/games')?.label).toBe('Games');
         expect(owner.map((page) => page.href)).toContain('/glossary');
-        // The section is never emptied, and the rail icon goes to the first visible page.
+        // Learn keeps its other pages, and the rail icon goes to the first visible page.
         const learn = navSectionsFor({owner: false}).find((section) => section.id === 'learn');
         expect(learn?.pages[0].href).toBe('/games');
-        expect(navSectionsFor({owner: false})).toHaveLength(NAV_SECTIONS.length);
         expect(navSectionsFor({owner: true})).toBe(NAV_SECTIONS);
         // Lookups take the audience's lists.
         // A non-owner on /learn is on their way to the games; their lists own no such page.
@@ -104,16 +103,38 @@ describe('the navigation registry', () => {
         expect(isActiveNav('/learn/units/cv-vit-dinov2', '/learn')).toBe(true);
     });
 
-    it('files both brains under the one Brain icon, the news brain first', () => {
+    it('keeps both brains, the trading agent world and the strategies for the owner alone', () => {
+        const ownerSections = NAV_SECTIONS.filter((section) => section.owner).map((section) => section.id);
+        expect(ownerSections).toEqual(['strategies', 'brain']);
+        const sections = navSectionsFor({owner: false});
+        expect(sections.map((section) => section.id)).toEqual(NAV_SECTIONS.map((s) => s.id).filter((id) => !ownerSections.includes(id)));
+        // No icon is ever left leading nowhere.
+        for (const section of sections) expect(section.pages.length, section.id).toBeGreaterThan(0);
+        const everyone = navPagesFor({owner: false}).map((page) => page.href);
+        for (const href of ['/strategies', '/brain', '/culture', '/agent-world']) {
+            expect(everyone, href).not.toContain(href);
+            expect(sectionFor(href, sections), href).toBeUndefined();
+            expect(navPagesFor({owner: true}).map((page) => page.href), href).toContain(href);
+        }
+        // ⌘K finds none of them for anyone else.
+        const pages = navPagesFor({owner: false});
+        for (const query of ['strat', 'brain', 'cult', 'agent', 'news brain']) expect(searchPages(query, 5, pages), query).toEqual([]);
+        expect(searchPages('strat', 5, navPagesFor({owner: true})).map((page) => page.href)).toEqual(['/strategies']);
+    });
+
+    it('files the three brains under the one Brain icon, the news brain first', () => {
         // The rail is capped at eight icons and had eight when the culture brain arrived (seven
-        // since Markets and Trade merged), so it is the Brain section's second page: a tab above
-        // both pages, a row in the drawer, a ⌘K hit.
+        // since Markets and Trade merged), so each later brain is a page of the Brain section: a
+        // tab above its pages, a row in the drawer, a ⌘K hit. The trading agent world is the third.
         const brain = NAV_SECTIONS.find((s) => s.id === 'brain');
-        expect(brain?.pages.map((p) => p.href)).toEqual(['/brain', '/culture']);
+        expect(brain?.pages.map((p) => p.href)).toEqual(['/brain', '/culture', '/agent-world']);
         expect(NAV_PAGES.find((p) => p.href === '/brain')?.label).toBe('Brain');
         expect(NAV_PAGES.find((p) => p.href === '/culture')?.label).toBe('Culture brain');
+        expect(NAV_PAGES.find((p) => p.href === '/agent-world')?.label).toBe('Trading agent world');
         expect(sectionFor('/culture')?.id).toBe('brain');
+        expect(sectionFor('/agent-world')?.id).toBe('brain');
         expect(searchPages('cult').map((p) => p.href)).toEqual(['/culture']);
+        expect(searchPages('agent').map((p) => p.href)).toEqual(['/agent-world']);
     });
 
     it('keeps the account pages in the account menu, off the rail', () => {

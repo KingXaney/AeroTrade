@@ -41,6 +41,8 @@ reads and writes live. Change a field here, then in the store module named besid
 | `digest-send` | email | `lib/email/digest-store` — the daily brief's one-per-reader-per-day claim |
 | `job-run` | jobs | `lib/jobs/job-runs` (each run's stamp), `lib/jobs/health` (the status strip) |
 | `broker-link` | broker | `lib/broker/store` — the owner's Alpaca link: the paper account it mirrors, active or paused, and its last syncs (orders as sent, Alpaca's answers), newest first; one per user, the keys never stored |
+| `agent-world-session` | agent world | `lib/agent-world/store` — one trading agent world session (weekly, manual or preview): its small head (status, seq and version, the runs' ratings, cost, limits), its orders, decision and fills, its Paperclip issue; `env` on every row and index, the weekly session's id its week (the claim) |
+| `agent-world-run` | agent world | `lib/agent-world/store` — one symbol's run in a session: each role's stage, the reports, the debate and the risk desk's turns, every fetch and its provider, the rating; written one event at a time under a seq guard |
 | `limit-event` | jobs | `lib/limits/record` (one row per refusal a provider answered a job or a request with), `lib/limits/store` (the panel's week); expires after `LIMIT_RETENTION_DAYS` |
 | `game-round` | games | `lib/games/store` (records and recent rounds); `lib/actions/games.actions.recordGameRound` writes |
 | `puzzle-solve` | games | `lib/games/store` (the streak, today's puzzle, the archive); `lib/actions/games.actions` writes |

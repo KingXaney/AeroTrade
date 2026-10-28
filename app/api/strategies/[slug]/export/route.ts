@@ -1,5 +1,5 @@
 import {NextResponse} from "next/server";
-import {getSessionUser} from "@/lib/auth/session";
+import {getOwnerUserId} from "@/lib/auth/session";
 import {getStrategyLedger} from "@/lib/strategies/page-store";
 import {csvDownloadHeaders, tradesCsv, tradesCsvFilename} from "@/lib/trading/csv";
 import {getEasternDateString} from "@/lib/dates";
@@ -7,10 +7,9 @@ import {getEasternDateString} from "@/lib/dates";
 // One quant strategy's live fills as a CSV download: its system account's current epoch, in
 // the account export's columns (tradesCsv), named for the strategy and the Eastern date. The
 // account belongs to the sentinel owner, so the account export's ownership check can never
-// pass for it; any signed-in user may read these, as every strategy page shows them.
+// pass for it; the app's owner may read these (lib/lab/owner.ts), as only they have the strategy pages.
 export async function GET(_request: Request, {params}: {params: Promise<{slug: string}>}) {
-    const user = await getSessionUser();
-    if (!user?.id) {
+    if (!(await getOwnerUserId())) {
         return NextResponse.json({error: 'Not authenticated'}, {status: 401});
     }
 

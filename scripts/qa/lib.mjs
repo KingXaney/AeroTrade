@@ -13,6 +13,8 @@ export const MONGO = process.env.QA_MONGO_URL || 'mongodb://127.0.0.1:27117/aero
 export const INNGEST = (process.env.QA_INNGEST_URL || 'http://localhost:8288').replace(/\/+$/, '');
 
 export const PASSWORD = 'Passw0rd!Passw0rd!';
+// The app's owners in this harness (owners.mjs, the list run.sh hands LAB_OWNER_EMAILS).
+export {LAB_OWNER_EMAIL, OWNER_EMAILS, ownerEmail} from './owners.mjs';
 // Where sign-up and sign-in land: Home, with or without a query string.
 export const HOME_URL = new RegExp(`^${BASE.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}/(\\?.*)?$`);
 
@@ -57,7 +59,7 @@ export const settledClick = async (locator) => {
 
 // Signs a fresh user up through the form and waits for the dashboard. The tag names the user
 // ("QA <tag>") and its address (qa<tag><ms>@example.com), so a suite's users are easy to find;
-// `email` fixes the address instead (the lab's owner, the one LAB_OWNER_EMAILS names).
+// `email` fixes the address instead — an owner's, from owners.mjs (LAB_OWNER_EMAIL, ownerEmail).
 export const signUp = async (page, tag, {name = `QA ${tag}`, stay = false, email: fixed} = {}) => {
     const email = fixed ?? `qa${tag.toLowerCase().replace(/[^a-z0-9]/g, '')}${Date.now()}@example.com`;
     await page.goto(`${BASE}/sign-up`, {waitUntil: 'load'});

@@ -15,6 +15,7 @@ import NewsFeedSettings from "@/components/settings/NewsFeedSettings";
 import {getNewsFeedPrefs} from "@/lib/news/feed-store";
 import {getCachedTopicsOverview} from "@/lib/topics/store";
 import {getVisibleLayout} from "@/lib/dashboard/availability";
+import {isLabOwner} from "@/lib/lab/owner";
 import Panel from "@/components/primitives/Panel";
 import {cn} from "@/lib/utils";
 import type {User} from "@/lib/auth/types";
@@ -61,7 +62,7 @@ const Section = async ({id, user}: {id: SectionId; user: User}) => {
             return <AppearanceSettings />;
         case 'dashboard': {
             // The same view as the dashboard.
-            const {layout, availableIds} = await getVisibleLayout(user.id);
+            const {layout, availableIds} = await getVisibleLayout(user.id, isLabOwner(user.email));
             return <DashboardSettings initialLayout={layout} availableIds={availableIds} />;
         }
         case 'notifications':

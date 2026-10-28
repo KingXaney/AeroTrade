@@ -55,6 +55,18 @@ describe('classifyLimit', () => {
         expect(classifyLimit('huggingface', new Error('HTTP 502'))).toBe('outage');
     });
 
+    it('reads the trading agent world\'s service, OpenBB and Paperclip, leaving their answers alone', () => {
+        expect(classifyLimit('agent-world', {status: 409, message: 'busy'})).toBeNull();
+        expect(classifyLimit('agent-world', {status: 503})).toBe('outage');
+        expect(classifyLimit('agent-world', {message: 'runs: unreachable (fetch failed)'})).toBe('outage');
+        expect(classifyLimit('openbb-yfinance', {status: 429, message: 'AAPL: Too Many Requests'})).toBe('rate');
+        expect(classifyLimit('openbb-yfinance', {message: 'Too Many Requests. Rate limited. Try after a while.'})).toBe('rate');
+        expect(classifyLimit('paperclip', {status: 409, message: 'checked out by another agent'})).toBeNull();
+        expect(classifyLimit('paperclip', {status: 422, message: 'not the stage participant'})).toBeNull();
+        expect(classifyLimit('paperclip', {status: 502})).toBe('outage');
+        expect(classifyLimit('fred', {status: 429})).toBe('rate');
+    });
+
     it("reads YouTube's quota reasons, Stooq's empty answer and the mailer's limits", () => {
         expect(classifyLimit('youtube', {status: 403, message: '{"error":{"errors":[{"reason":"quotaExceeded"}]}}'})).toBe('quota');
         expect(classifyLimit('youtube', {status: 403, message: 'rateLimitExceeded'})).toBe('rate');

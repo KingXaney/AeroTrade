@@ -13,6 +13,7 @@ import {generateMarketBriefing} from "@/lib/jobs/functions/news";
 import {backfillCultureWikipedia, bootstrapCultureFollow, runCultureWeekly, updateCultureBrain} from "@/lib/jobs/functions/culture";
 import {refreshLabPapers} from "@/lib/jobs/functions/lab";
 import {syncBrokerMirror} from "@/lib/jobs/functions/broker";
+import {runAgentWorldWeekly} from "@/lib/jobs/functions/agent-world";
 
 export const functions = [
     sendSignUpEmail,
@@ -35,4 +36,5 @@ export const functions = [
     refreshLabPapers,
     bootstrapCultureFollow,
     syncBrokerMirror,
+    runAgentWorldWeekly,
 ];

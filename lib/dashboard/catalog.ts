@@ -118,6 +118,9 @@ export type AvailabilityContext = {
     advanced: boolean;
     // Absent reads as false: a caller that has not computed it never shows the checklist.
     onboarding?: boolean;
+    // The reader is the app's owner (lib/lab/owner.ts). Absent reads as false: the owner's
+    // widgets stay off every grid and library a caller has not vouched for.
+    owner?: boolean;
 };
 
 export type WidgetDefinition = {
@@ -138,6 +141,7 @@ export type WidgetDefinition = {
     isClient: boolean;
     heavy?: boolean;                  // extra third-party calls; surfaced as a badge in the library
     isNew?: boolean;                  // shipped after the layout system; badged so customised dashboards find it
+    owner?: true;                     // the owner's alone (lib/lab/owner.ts): on no one else's grid or library
 };
 
 export const WIDGET_IDS = [
@@ -193,6 +197,10 @@ export type WidgetId = (typeof WIDGET_IDS)[number];
 type RequiredFields = 'id' | 'title' | 'description' | 'category' | 'icon' | 'spans' | 'defaultSpan' | 'minHeight';
 type WidgetInput<Id extends WidgetId> = Pick<WidgetDefinition, RequiredFields> & {id: Id} & Partial<Omit<WidgetDefinition, RequiredFields>>;
 
+// Both brains and the strategies are the owner's alone (lib/lab/owner.ts), so every widget in
+// their categories is too; a widget of theirs filed elsewhere says so itself (news-brain-tile).
+const OWNER_CATEGORIES: ReadonlySet<WidgetCategory> = new Set(['strategies', 'brain']);
+
 const define = <Id extends WidgetId>(input: WidgetInput<Id>): WidgetDefinition & {id: Id} => ({
     dataKeys: [],
     availability: 'always',
@@ -200,6 +208,7 @@ const define = <Id extends WidgetId>(input: WidgetInput<Id>): WidgetDefinition &
     showTitle: true,
     wideOnTablet: false,
     isClient: false,
+    ...(OWNER_CATEGORIES.has(input.category) ? {owner: true as const} : {}),
     ...input,
 });
 
@@ -345,6 +354,7 @@ export const WIDGETS: {readonly [K in WidgetId]: WidgetDefinition & {id: K}} = {
         chrome: 'link',
         href: '/brain',
         showTitle: false,
+        owner: true,
     }),
 
     // --- Markets (TradingView embeds, no data of our own) ---
@@ -709,6 +719,7 @@ export const clampSpan = (id: string, span: number): WidgetSpan => {
 };
 
 export const isWidgetAvailable = (def: WidgetDefinition, ctx: AvailabilityContext): boolean => {
+    if (def.owner && !ctx.owner) return false;
     switch (def.availability) {
         case 'always':
             return true;

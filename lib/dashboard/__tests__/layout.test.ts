@@ -296,13 +296,14 @@ describe('filterAvailable', () => {
     it('removes widgets the user cannot use', () => {
         expect(ids(filterAvailable(mixed, {accountCount: 1, advanced: false}))).toEqual(['leaderboard']);
         expect(ids(filterAvailable(mixed, {accountCount: 2, advanced: false}))).toEqual(['leaderboard', 'account-comparison']);
-        expect(ids(filterAvailable(mixed, {accountCount: 1, advanced: true}))).toEqual(['leaderboard', 'brain-status']);
+        expect(ids(filterAvailable(mixed, {accountCount: 1, advanced: true, owner: true}))).toEqual(['leaderboard', 'brain-status']);
     });
 
     it('returns the same reference when nothing is removed', () => {
-        expect(filterAvailable(mixed, {accountCount: 2, advanced: true})).toBe(mixed);
-        // The default holds the checklist, so the identity holds only while onboarding is on.
-        expect(filterAvailable(DEFAULT_LAYOUT, {accountCount: 0, advanced: false, onboarding: true})).toBe(DEFAULT_LAYOUT);
+        expect(filterAvailable(mixed, {accountCount: 2, advanced: true, owner: true})).toBe(mixed);
+        // The default holds the checklist and the brain tile, so the identity holds only for the
+        // owner while onboarding is on.
+        expect(filterAvailable(DEFAULT_LAYOUT, {accountCount: 0, advanced: false, onboarding: true, owner: true})).toBe(DEFAULT_LAYOUT);
         expect(ids(filterAvailable(DEFAULT_LAYOUT, {accountCount: 0, advanced: false}))).not.toContain('getting-started');
     });
 });
@@ -443,6 +444,23 @@ describe('resetLayout', () => {
     });
 });
 
+describe("the owner's widgets", () => {
+    it("are both brains' and the strategies', and the brain tile filed under personal", () => {
+        const owned = WIDGET_IDS.filter((id) => WIDGETS[id].owner);
+        expect(owned).toEqual(WIDGET_IDS.filter((id) => ['strategies', 'brain'].includes(WIDGETS[id].category) || id === 'news-brain-tile'));
+        expect(owned).toEqual(expect.arrayContaining(['quant-strategies', 'ai-navigator', 'culture-picks', 'news-brain-tile']));
+    });
+
+    it("stay off anyone else's grid and library, and on the owner's", () => {
+        const everyone = {accountCount: 2, advanced: true, onboarding: true};
+        expect(ids(filterAvailable(DEFAULT_LAYOUT, everyone))).toEqual(ids(DEFAULT_LAYOUT).filter((id) => id !== 'news-brain-tile'));
+        const library = missingWidgetIds({version: 1, widgets: []}, everyone);
+        for (const id of WIDGET_IDS) expect(library.includes(id), id).toBe(!WIDGETS[id].owner);
+        expect(ids(filterAvailable(DEFAULT_LAYOUT, {...everyone, owner: true}))).toContain('news-brain-tile');
+        expect(missingWidgetIds({version: 1, widgets: []}, {...everyone, owner: true})).toEqual([...WIDGET_IDS]);
+    });
+});
+
 describe('missingWidgetIds', () => {
     it('lists every widget not in the layout', () => {
         const missing = missingWidgetIds(DEFAULT_LAYOUT);
@@ -454,7 +472,7 @@ describe('missingWidgetIds', () => {
     });
 
     it('hides unavailable widgets when a context is given', () => {
-        const missing = missingWidgetIds(DEFAULT_LAYOUT, {accountCount: 1, advanced: false});
+        const missing = missingWidgetIds(DEFAULT_LAYOUT, {accountCount: 1, advanced: false, owner: true});
         expect(missing).not.toContain('account-comparison');
         expect(missing).not.toContain('brain-status');
         expect(missing).toHaveLength(WIDGET_IDS.length - DEFAULT_LAYOUT.widgets.length - 2);

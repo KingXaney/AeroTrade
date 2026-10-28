@@ -21,7 +21,7 @@
 import {chromium} from 'playwright';
 import {MongoClient} from 'mongodb';
 import {createJiti} from 'jiti';
-import {BASE, INNGEST, MONGO, REPO_ROOT, check, note, outDir, signUp, summary} from './lib.mjs';
+import {BASE, INNGEST, MONGO, REPO_ROOT, check, note, outDir, ownerEmail, signUp, summary} from './lib.mjs';
 
 const OUT = outDir('culture');
 const COLLECTIONS = ['cultureentities', 'cultureattentions', 'cultureitems', 'culturesuggestions'];
@@ -369,7 +369,8 @@ try {
 
     const page = await browser.newPage({viewport: {width: 1440, height: 900}});
     const shot = (n) => page.screenshot({path: `${OUT}${n}.png`, fullPage: true});
-    const email = await signUp(page, 'culture');
+    // The culture brain is the owner's alone (lib/lab/owner.ts).
+    const email = await signUp(page, 'culture', {email: ownerEmail('culture')});
     const userDoc = await db.collection('user').findOne({email});
     const userId = String(userDoc?._id ?? userDoc?.id ?? '');
     check('signed up', userId.length > 0);
@@ -381,7 +382,7 @@ try {
     const viewTabs = await page.locator('[role="tab"]').evaluateAll((tabs) => tabs.map((t) => `${t.getAttribute('data-tab')}${t.getAttribute('aria-selected') === 'true' ? '*' : ''}`));
     check('/culture opens on its brands, one view of three', viewTabs.join(',') === 'brands*,picks,system', viewTabs.join(','));
     const sectionTabs = await page.$$eval('[data-section-tabs="brain"] a', (as) => as.map((a) => `${a.getAttribute('href')}${a.getAttribute('aria-current') === 'page' ? '*' : ''}`));
-    check('the Brain section shows both brains as tabs, the culture brain current', sectionTabs.join(',') === '/brain,/culture*', sectionTabs.join(','));
+    check('the Brain section shows the three brains as tabs, the culture brain current', sectionTabs.join(',') === '/brain,/culture*,/agent-world', sectionTabs.join(','));
     check('the rail still has seven icons, Brain lit', await page.locator('aside.rail nav a').count() === 7
         && await page.locator('aside.rail nav a[aria-current="page"]').getAttribute('data-rail') === 'brain');
 

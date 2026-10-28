@@ -10,6 +10,7 @@ import {
     rememberShownTip,
     robotTipDelay,
     robotTipOrder,
+    robotTipsFor,
     robotTipsOn,
 } from '@/lib/chat/robot-tips';
 import {ROBOT_TIPS} from '@/lib/learn/copy/robot';
@@ -127,5 +128,16 @@ describe('the timings and the key', () => {
     it('keeps its storage key out of the chat conversations qa-chat counts', () => {
         expect(ROBOT_SHOWN_KEY.startsWith('aero-robot:')).toBe(true);
         expect(ROBOT_SHOWN_KEY.startsWith('aero-chat:')).toBe(false);
+    });
+
+    it("tells no one but the owner about the owner's pages", () => {
+        expect(robotTipsFor({owner: true})).toBe(ROBOT_TIPS);
+        const everyone = robotTipsFor({owner: false});
+        expect(everyone.map((tip) => tip.id)).not.toContain('strategies');
+        expect(everyone.every((tip) => !tip.owner)).toBe(true);
+        expect(everyone[0]).toBe(ROBOT_TIPS[0]);
+        for (const tip of everyone) expect(tip.text + (tip.prompt ?? ''), tip.id).not.toMatch(/strateg|brain|navigator|culture/i);
+        // Their sessions run out of tips once every one they may hear is heard.
+        expect(nextRobotTip(DATES[0], everyone.map((tip) => tip.id), everyone)).toBeNull();
     });
 });

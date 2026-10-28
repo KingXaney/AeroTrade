@@ -17,6 +17,17 @@
 //             so a matched article term is a glossary key;
 //   rail    — a constant the AI Navigator or the news brain trades under.
 
+import {
+    AGENT_WORLD_RAILS,
+    BUDGET_HARD_PCT,
+    BUDGET_SOFT_PCT,
+    CLAMPS,
+    DEBATE_ROUNDS,
+    LAPSE_HOURS,
+    LAPSE_WEEKDAY,
+    RATING_TARGET_WEIGHTS,
+    SESSION_SCHEDULE,
+} from '@/lib/agent-world/config';
 import {MAX_POSITION_WEIGHT, MIN_CASH_WEIGHT} from '@/lib/navigator/config';
 import {DEFAULT_DRIFT_BAND} from '@/lib/strategies/config';
 
@@ -40,6 +51,9 @@ const pct = (fraction: number): string => `${Math.round(fraction * 100)}%`;
 // A share as a sentence says it — 'a fifth' — or its percentage when it has no plain name.
 const SHARE_NAMES: Readonly<Record<string, string>> = {'0.5': 'half', '0.25': 'a quarter', '0.2': 'a fifth', '0.1': 'a tenth'};
 const shareName = (fraction: number): string => SHARE_NAMES[String(fraction)] ?? pct(fraction);
+// A wall-clock time from its hour and minute ("08:30").
+const clock = (hour: number, minute: number): string => `${String(hour).padStart(2, '0')}:${String(minute).padStart(2, '0')}`;
+const rounds = (n: number): string => `${n} ${n === 1 ? 'round' : 'rounds'}`;
 
 const ENTRIES = [
     // ---- signal board columns -------------------------------------------------------
@@ -771,6 +785,76 @@ const ENTRIES = [
         short: "Three cards each; everyone throws one away right after the deal, before any betting, and the hand then plays as Texas hold'em.",
         long: "Each player is dealt three cards face down, and before anyone bets, everyone still in picks one of them to throw away, all at the same moment; nobody sees a card thrown away. From there it is Texas hold'em with the two cards kept: betting before the flop, after it, after the turn and after the river, no limit, and a hand is the strongest five of the two kept and the board's five.",
         computedIn: 'lib/poker-night/variants.ts autoDiscard', seeAlso: ['texas-holdem', 'hand-rankings']},
+
+    // ---- the trading agent world (/agent-world) -----------------------------------------
+    {key: 'desk-session', kind: 'metric', term: 'Desk session', aliases: ['desk session', 'agent world session', 'weekly session'],
+        short: 'One pass of the twelve-role desk over the week’s symbols: reports, a debate, a rating each, then orders, a decision and fills.',
+        long: `A weekly session starts ${SESSION_SCHEDULE.day}s at ${clock(SESSION_SCHEDULE.hour, SESSION_SCHEDULE.minute)} ET (on ${SESSION_SCHEDULE.retryDay} when ${SESSION_SCHEDULE.day} is a market holiday); the owner can also start a manual session, which trades the same way, or a preview, which plans orders and trades nothing. The service runs the desk once per symbol, one after another, and the floor shows each step as it is filed; a finished session plays back from what was stored.`,
+        computedIn: 'lib/jobs/functions/agent-world.ts runAgentWorldWeekly', seeAlso: ['desk-role', 'session-approval']},
+    {key: 'desk-role', kind: 'metric', term: 'Desk role', aliases: ['desk role', 'agent role', 'research manager', 'risk desk'],
+        short: 'One of the desk’s twelve jobs: four analysts, two researchers and their manager, the trader, three risk analysts and the portfolio manager.',
+        long: 'The four analysts read market data, public sentiment, news and fundamentals at the same time; the bull and bear researchers argue over their reports and the research manager weighs the argument into a plan; the trader turns the plan into a proposal; three risk analysts weigh it from an aggressive, a conservative and a neutral side; the portfolio manager names the rating. Each role is model calls with tools of its own, and an agent of its own in the Paperclip company.',
+        computedIn: 'lib/agent-world/config.ts ROLES', seeAlso: ['analyst-report', 'research-debate', 'desk-rating']},
+    {key: 'analyst-report', kind: 'metric', term: 'Analyst report', aliases: ['analyst report', 'market report', 'fundamentals report', 'news report', 'sentiment report'],
+        short: 'The text an analyst role filed from what its data tools returned for one symbol, shown as the model wrote it.',
+        long: `A report is model text, cut at ${CLAMPS.report.toLocaleString('en-US')} characters, describing what the role’s tools returned; it is not a measurement of the company. Every figure in it came through a fetch the data view lists, so a report with no fetches behind it was written from the prompt alone.`,
+        computedIn: 'services/agent-world role.report events', seeAlso: ['tool-call', 'desk-role']},
+    {key: 'research-debate', kind: 'metric', term: 'Research debate', aliases: ['research debate', 'bull case', 'bear case', 'bull and bear'],
+        short: `The bull and bear researchers’ turns over the four analyst reports, ${rounds(DEBATE_ROUNDS)} each, weighed by the research manager.`,
+        long: 'The bull researcher argues for the symbol and the bear researcher against it, each reading the same reports and the other’s last turn; the number of rounds is a setting of the service. The research manager then writes the plan the trader starts from. The floor shows the turns in the order they were spoken.',
+        computedIn: 'services/agent-world AGENT_WORLD_MAX_DEBATE_ROUNDS', seeAlso: ['desk-role', 'desk-rating']},
+    {key: 'desk-rating', kind: 'metric', term: 'Desk rating', aliases: ['desk rating', 'rating scale', 'overweight', 'underweight', 'five-tier rating'],
+        short: 'The portfolio manager’s word for a symbol, one of five from Buy down to Sell, or REVIEW when its text named none.',
+        long: 'The five words, strongest first, are Buy, Overweight, Hold, Underweight and Sell; the service reads the word off the portfolio manager’s text, and a text with no readable word is REVIEW, which trades nothing. The word is the desk’s own label about its own paper account, not advice to a reader: a fixed table maps it to a target share of the account and code places the orders.',
+        computedIn: 'lib/agent-world/orders.ts targetsFromRatings', seeAlso: ['rating-target', 'desk-rails']},
+    {key: 'rating-target', kind: 'metric', term: 'Rating target', aliases: ['rating target', 'target by rating', 'target share'],
+        short: `The share of the account a rating aims at: ${pct(RATING_TARGET_WEIGHTS.Buy as number)} for Buy, ${pct(RATING_TARGET_WEIGHTS.Overweight as number)} for Overweight, ${pct(RATING_TARGET_WEIGHTS.Underweight as number)} for Underweight, ${pct(RATING_TARGET_WEIGHTS.Sell as number)} for Sell.`,
+        long: `A fixed table in code, not the model’s choice. A Hold or a REVIEW keeps a position as it is, an Underweight trims a holding to ${pct(RATING_TARGET_WEIGHTS.Underweight as number)} and opens nothing, and a Sell closes a holding. The targets are capped at ${pct(AGENT_WORLD_RAILS.maxPositionWeight)} a name and scaled down together when they would reach into the ${pct(AGENT_WORLD_RAILS.minCashWeight)} kept in cash.`,
+        computedIn: 'lib/agent-world/orders.ts targetsFromRatings', seeAlso: ['desk-rating', 'desk-rails']},
+    {key: 'desk-rails', kind: 'metric', term: 'Desk rails', aliases: ['desk rails', 'agent world rails'],
+        short: `The limits the desk trades under, fixed in code: at most ${pct(AGENT_WORLD_RAILS.maxPositionWeight)} of the account in one name and ${pct(AGENT_WORLD_RAILS.minCashWeight)} always in cash.`,
+        long: `Whatever a rating says, the allocator sizes orders in whole shares, leaves a change smaller than ${pct(AGENT_WORLD_RAILS.rebalanceBand)} of the account alone, places at most one order per symbol, side and session, and never trades a REVIEW; a declined or lapsed session trades nothing.`,
+        computedIn: 'lib/agent-world/config.ts AGENT_WORLD_RAILS', seeAlso: ['rating-target', 'position-cap']},
+    {key: 'session-approval', kind: 'metric', term: 'Session approval', aliases: ['session approval', 'owner approval', 'approve the session'],
+        short: 'Under owner approval a session with orders waits for the owner to approve or decline them before any is placed.',
+        long: 'The approval mode is a setting: owner, the default, or automatic. Under owner approval the session waits in review, the owner sees Approve and Decline on the floor and everyone else a waiting line; the decision is recorded on the session’s Paperclip issue as the Execution desk’s, and approved orders are placed while the market is open. Under automatic approval the orders go without a pause.',
+        computedIn: 'lib/actions/agent-world.actions.ts approveSession', seeAlso: ['approval-lapse', 'approval-stage']},
+    {key: 'approval-lapse', kind: 'metric', term: 'Lapse', aliases: ['lapse', 'lapsed session', 'decision deadline'],
+        short: `A session nobody decided in time (by the next ${LAPSE_WEEKDAY.day} ${clock(LAPSE_WEEKDAY.hour, LAPSE_WEEKDAY.minute)} ET or ${LAPSE_HOURS} hours on, whichever is first) trades nothing.`,
+        long: 'A lapse closes the session with its orders unplaced, and the next weekly session starts afresh. The deadline is printed beside Approve and Decline while the session waits, and an approval that comes after the last open before the deadline lapses too.',
+        computedIn: 'lib/agent-world/job.ts lapseDeadline', seeAlso: ['session-approval']},
+    {key: 'agent-budget', kind: 'metric', term: 'Agent budget', aliases: ['agent budget', 'monthly budget', 'budget hard stop'],
+        short: `The monthly cap on one Paperclip agent’s model cost; Paperclip warns at ${BUDGET_SOFT_PCT}% of it and pauses the agent at ${BUDGET_HARD_PCT}%.`,
+        long: 'Every role reports its model cost to Paperclip against its own agent, so each bar on the company view is the month’s spend over that agent’s cap; budgets reset on the first of the month. A paused agent takes no more work, and a session that meets one stops before it runs.',
+        computedIn: 'Paperclip budgetMonthlyCents', seeAlso: ['session-cost', 'heartbeat']},
+    {key: 'heartbeat', kind: 'metric', term: 'Heartbeat', aliases: ['heartbeat', 'agent heartbeat', 'wake-up'],
+        short: 'Paperclip’s wake-up call to an agent: a request to the agent’s address naming the task that woke it and why.',
+        long: 'Paperclip runs nothing itself: it wakes an agent when work is assigned, a comment names it, a routine fires or someone presses Invoke. Here the Head trader’s address is the desk’s service and the Execution desk’s is this app; a routine fired in Paperclip starts a manual session, and the Execution desk’s wake is only logged, since its hand is the owner’s decision on the floor.',
+        computedIn: 'app/api/agent-world/paperclip/heartbeat/route.ts', seeAlso: ['approval-stage', 'agent-budget']},
+    {key: 'approval-stage', kind: 'metric', term: 'Approval stage', aliases: ['approval stage', 'execution policy', 'in review'],
+        short: 'A stage on a Paperclip issue that holds it in review until its participant decides; here the Execution desk is the participant.',
+        long: 'When the Head trader marks the session’s issue done, the issue’s execution policy holds it in review and hands it to the Execution desk. The owner’s Approve closes it as approved and Decline sends it back; every decision is a row in the issue’s decision log, with the owner’s address in its comment.',
+        computedIn: 'lib/agent-world/paperclip-view.ts executionPolicyFor', seeAlso: ['session-approval', 'heartbeat']},
+    {key: 'data-vendor', kind: 'metric', term: 'Data vendor', aliases: ['data vendor', 'vendor chain', 'provider chain'],
+        short: 'Where an analyst’s data tool reads from: a chain of providers asked in order, the first that answers kept.',
+        long: 'The tools read prices, indicators, statements, news, insider filings and macro series. OpenBB comes first in most chains (its keyless yfinance, SEC and FRED providers), with TradingAgents’ own readers after it; a provider not named in a chain is never asked, and a chain with no answer returns a marker the report quotes.',
+        computedIn: 'lib/agent-world/config.ts DATA_TOOLS', seeAlso: ['tool-call', 'point-in-time']},
+    {key: 'point-in-time', kind: 'metric', term: 'Point-in-time data', aliases: ['point-in-time', 'point in time', 'as-of date', 'look-ahead'],
+        short: 'Data as it stood on the session’s trade date, so nothing published later reaches a report.',
+        long: 'Every fetch carries the trade date. Prices are daily bars up to it; news and insider filings are cut at it; a statement counts only once its filing could have been read (a set lag after its period ends), and a live company profile is read only on the day itself.',
+        computedIn: 'services/agent-world/agent_world/vendors', seeAlso: ['data-vendor']},
+    {key: 'tool-call', kind: 'metric', term: 'Data fetch', aliases: ['data fetch', 'tool call', 'tool calls'],
+        short: 'One request an analyst role made through a data tool: the provider that answered, how long it took, and whether it answered.',
+        long: 'An analyst asks for data by calling a tool; the service routes the call down its vendor chain and hands the model the text that came back. The floor badges each role with the providers it read from, and the data view lists every fetch of the last session with its milliseconds; a fetch with no answer is marked, not hidden.',
+        computedIn: 'services/agent-world tool.called and tool.result events', seeAlso: ['data-vendor']},
+    {key: 'model-tokens', kind: 'metric', term: 'Model tokens', aliases: ['model tokens', 'tokens', 'input tokens', 'output tokens'],
+        short: 'What a model call is metered in: tokens in (the prompt) and tokens out (the answer).',
+        long: 'Each role’s tokens are counted from the model’s own usage report and tied to the role by the graph step that made the call; a price table in the service turns them into cents. The floor’s tiles, the session’s cost line and the cost events sent to Paperclip all read the same count.',
+        computedIn: 'services/agent-world/agent_world/stats.py', seeAlso: ['session-cost']},
+    {key: 'session-cost', kind: 'metric', term: 'Session cost', aliases: ['session cost', 'model cost', 'cost of a session'],
+        short: 'The cents a session spent on model calls, every role’s added up; fetches from keyless providers cost nothing.',
+        long: 'Cost is tokens times the service’s price table, counted as the calls happen, so a tile’s figure climbs while its role runs. The table is an estimate dated in the service; Paperclip holds the same figures per agent for the month, against each agent’s budget.',
+        computedIn: 'services/agent-world/agent_world/stats.py PRICES', seeAlso: ['model-tokens', 'agent-budget']},
 
     // ---- rails --------------------------------------------------------------------------
     {key: 'position-cap', kind: 'rail', term: 'Position cap', aliases: ['position cap', 'max position weight'],

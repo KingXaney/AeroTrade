@@ -48,6 +48,46 @@
   --terrain-high: #ee6a4d;
   --terrain-pos: #f2c14e;
 
+  /* The office's materials (/agent-world/office, components/agent-world/office/office-tokens.ts):
+     floor 12 of a tower, its furniture, the seven seats' shirts and the New York sky. A material
+     scale like the terrain's, read by the scene at runtime, so the room reads the same in every
+     palette; the shirts differ in lightness as well as hue, and each seat also has its own prop. */
+  --office-floor: #d3ccbc;
+  --office-floor-alt: #c9c1af;
+  --office-wall: #ebe6dc;
+  --office-wall-trim: #b8b0a2;
+  --office-glass: #a9d8eb;
+  --office-wood: #a47551;
+  --office-wood-top: #c99f73;
+  --office-chair: #3c4452;
+  --office-metal: #8f98a8;
+  --office-brass: #c9a24a;
+  --office-screen-off: #1d2230;
+  --office-screen-glow: #bfe9ff;
+  --office-paper: #fbf7ee;
+  --office-cork: #b8875a;
+  --office-plant: #4f9d5d;
+  --office-shelf: #6b4f3a;
+  --office-robot: #eef2f6;
+  --office-robot-dark: #2a3140;
+  --office-skin: #ead6c1;
+  --office-team-analysts: #3d78d8;
+  --office-team-research: #ea8a3c;
+  --office-team-trading: #22a79c;
+  --office-team-risk: #7a4fc0;
+  --office-team-portfolio: #ede7d8;
+  --office-desk-head: #d8b545;
+  --office-desk-execution: #6f7f99;
+  --office-sky-day: #7ec3ec;
+  --office-sky-day-low: #e3f3fb;
+  --office-sky-dusk: #5b4a8b;
+  --office-sky-dusk-low: #f3a35e;
+  --office-sky-night: #070c20;
+  --office-sky-night-low: #1a2350;
+  --office-city: #2b3140;
+  --office-skyline: #56617c;
+  --office-skyline-window: #ffd58a;
+
   color-scheme: dark;
   --shade-1: rgb(0 0 0 / 0.25);
   --shade-2: rgb(0 0 0 / 0.5);
@@ -484,6 +524,49 @@ details[open] > :not(summary) { animation: disclosure-in var(--motion-base) var(
 @keyframes robot-bob {
   0%, 100% { transform: translateY(0); }
   50% { transform: translateY(-3px); }
+}
+
+/* The trading agent world's floor (components/agent-world/StageStrip): a working role's dot
+   breathes. A loop in literal seconds, so both motion guards at the foot of this file stop it by
+   name, and brutalist, whose zeroed tokens stop nothing timed in seconds, stops it by name too
+   (lib/theme/__tests__/motion-guards.test.ts pins all three). */
+.aw-working { animation: aw-working 1.6s ease-in-out infinite; }
+@keyframes aw-working {
+  0%, 100% { opacity: 1; transform: scale(1); }
+  50% { opacity: 0.45; transform: scale(1.35); }
+}
+[data-style="brutalist"] .aw-working { animation: none; }
+
+/* The office (/agent-world/office): a bubble pops in over a seat that just spoke, a status lamp
+   breathes while its seat is at it, the confetti after the owner's Approve falls once, the stamp's
+   label lands, a new ticker line slides in. The one-shots run on --motion-base; the two in literal
+   seconds (.ao-lamp, .ao-confetti) are stopped by name in brutalist; all five are in both motion
+   guards (lib/theme/__tests__/motion-guards.test.ts). A confetti piece rests invisible, so a stopped
+   one is simply not seen; a bubble and a label rest whole. */
+.ao-bubble-in { animation: ao-bubble-in calc(var(--motion-base) * 1.4) cubic-bezier(.2, .9, .3, 1.2) both; }
+@keyframes ao-bubble-in {
+  from { opacity: 0; transform: translateY(6px) scale(.9); }
+}
+.ao-lamp { animation: ao-lamp 1.6s ease-in-out infinite; }
+@keyframes ao-lamp {
+  0%, 100% { opacity: 1; transform: scale(1); }
+  50% { opacity: .5; transform: scale(1.3); }
+}
+[data-style="brutalist"] .ao-lamp { animation: none; }
+.ao-confetti { opacity: 0; animation: ao-confetti 1.8s cubic-bezier(.15, .7, .35, 1) both; animation-delay: var(--ao-delay, 0ms); }
+@keyframes ao-confetti {
+  0% { opacity: 1; transform: translate(0, 0) rotate(0deg); }
+  80% { opacity: 1; }
+  100% { opacity: 0; transform: translate(var(--ao-dx, 0px), var(--ao-dy, 120px)) rotate(var(--ao-rot, 360deg)); }
+}
+[data-style="brutalist"] .ao-confetti { animation: none; }
+.ao-stamp-in { transform: rotate(-6deg); animation: ao-stamp-in calc(var(--motion-base) * 1.6) cubic-bezier(.2, 1.5, .4, 1) both; }
+@keyframes ao-stamp-in {
+  from { opacity: 0; transform: scale(1.9) rotate(-14deg); }
+}
+.ao-line-in { animation: ao-line-in calc(var(--motion-base) * 1.2) ease-out both; }
+@keyframes ao-line-in {
+  from { opacity: 0; transform: translateX(-8px); }
 }
 @keyframes robot-blink {
   0%, 92%, 100% { transform: scaleY(1); }
@@ -2576,13 +2659,14 @@ details[open] > :not(summary) { animation: disclosure-in var(--motion-base) var(
   .pn-ambient-twinkle, .pn-ambient-drift, .pn-ambient-flicker, .pn-ambient-waves, .pn-scene-fade,
   .pn-emote-rise, .pn-phrase-in, .pn-throw-x, .pn-throw-y, .pn-splat, .pn-petals, .pn-fizz, .pn-bounce,
   .pn-award-in,
+  .aw-working, .ao-bubble-in, .ao-lamp, .ao-confetti, .ao-stamp-in, .ao-line-in,
   [data-style] :is(.glass-panel, .news-item, .yellow-btn, .search-btn) {
     animation: none !important;
     transition: none !important;
   }
   [data-style="futuristic"] .shimmer::after { content: none; }
 }
-html[data-motion="reduced"] :is(.animate-glow, .typing-dot, .theme-blob, .robot-bob, .robot-eyes, .robot-antenna, .robot-mascot, .robot-tip-in, .glass-panel, .news-item, .yellow-btn, .search-btn, .pn-deal, .pn-flip, .pn-chip-slide, .pn-chip-land, .pn-sweep, .pn-fold, .pn-fold-turn, .pn-dim, .pn-win-lift, .pn-win-glow, .pn-banner-drop, .pn-chip-stream, .pn-pot-out, .pn-seat-in, .pn-tag-pop, .pn-win-pop, .pn-pulse, .pn-confetti, .pn-turn-ring, .pn-ambient, .pn-emote-rise, .pn-phrase-in, .pn-throw-x, .pn-throw-y, .pn-splat, .pn-petals, .pn-fizz, .pn-bounce, .pn-ambient-twinkle, .pn-ambient-drift, .pn-ambient-flicker, .pn-ambient-waves, .pn-scene-fade, .pn-award-in) {
+html[data-motion="reduced"] :is(.animate-glow, .typing-dot, .theme-blob, .robot-bob, .robot-eyes, .robot-antenna, .robot-mascot, .robot-tip-in, .glass-panel, .news-item, .yellow-btn, .search-btn, .pn-deal, .pn-flip, .pn-chip-slide, .pn-chip-land, .pn-sweep, .pn-fold, .pn-fold-turn, .pn-dim, .pn-win-lift, .pn-win-glow, .pn-banner-drop, .pn-chip-stream, .pn-pot-out, .pn-seat-in, .pn-tag-pop, .pn-win-pop, .pn-pulse, .pn-confetti, .pn-turn-ring, .pn-ambient, .pn-emote-rise, .pn-phrase-in, .pn-throw-x, .pn-throw-y, .pn-splat, .pn-petals, .pn-fizz, .pn-bounce, .pn-ambient-twinkle, .pn-ambient-drift, .pn-ambient-flicker, .pn-ambient-waves, .pn-scene-fade, .pn-award-in, .aw-working, .ao-bubble-in, .ao-lamp, .ao-confetti, .ao-stamp-in, .ao-line-in) {
   animation: none !important;
   transition: none !important;
 }

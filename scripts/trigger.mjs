@@ -46,6 +46,9 @@ const EVENTS = {
     lab: 'app/refresh.lab.papers',
     'culture-follow': 'app/bootstrap.culture.follow',
     broker: 'app/sync.broker.mirror',
+    'agent-world': 'app/run.agent.world',
+    'agent-world-now': 'app/run.agent.world',
+    'agent-world-preview': 'app/run.agent.world',
 };
 
 const STRATEGY_DATA = {
@@ -53,6 +56,10 @@ const STRATEGY_DATA = {
     'strategies-resimulate': { resimulate: true },
     'culture-preview': { dryRun: true },
     'culture-resimulate': { resimulate: true },
+    // The trading agent world: a manual session (a second one in the week, trading at once when
+    // approved) and a preview (the desk runs and plans; nothing is claimed or traded).
+    'agent-world-now': { manual: true, force: true },
+    'agent-world-preview': { manual: true, dryRun: true },
 };
 
 const [job, first, second, ...rest] = process.argv.slice(2);

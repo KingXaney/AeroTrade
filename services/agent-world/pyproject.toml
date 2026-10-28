@@ -1,0 +1,49 @@
+[build-system]
+requires = ["setuptools>=69"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "agent-world"
+version = "0.1.0"
+description = "AeroTrade's trading agent world: TradingAgents over OpenBB, streaming signed events back to AeroTrade."
+readme = "README.md"
+requires-python = ">=3.11"
+dependencies = [
+    # Not on PyPI: the tagged release from GitHub.
+    "tradingagents @ git+https://github.com/TauricResearch/TradingAgents@v0.7.1",
+    # OpenBB, minimal set. openbb-core ships the `openbb` module itself
+    # (`from openbb import obb`, `openbb.build()`); the `openbb` 5.0.0
+    # distribution is a code-less bundle of ~25 extensions and is not needed.
+    "openbb-core==2.0.1",
+    "openbb-equity==2.0.0",
+    "openbb-news==2.0.0",
+    "openbb-economy==2.0.0",
+    "openbb-technical==2.0.1",
+    "openbb-yfinance==2.0.0",
+    "openbb-sec==2.0.0",
+    "openbb-fred==2.0.0",
+    "fastapi>=0.137",
+    "uvicorn[standard]>=0.48",
+    "httpx>=0.28",
+    "pydantic>=2.12,<3",
+    "python-dotenv>=1.0",
+]
+
+[project.optional-dependencies]
+test = [
+    "pytest>=8",
+    "respx>=0.22",
+]
+
+[tool.setuptools.packages.find]
+include = ["agent_world*"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+addopts = "-ra -m \"not integration\""
+markers = [
+    "integration: needs network or a real TradingAgents graph; run with -m integration",
+]
+filterwarnings = [
+    "ignore::DeprecationWarning",
+]

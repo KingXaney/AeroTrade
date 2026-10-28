@@ -1,13 +1,15 @@
-// The app shell (components/shell, lib/shell): the icon rail lists the seven sections and names
-// each on hover, Portfolio and News open their cards, a section's other pages are tabs on the page,
+// The app shell (components/shell, lib/shell): the icon rail lists the five sections every account
+// has (the owner's seven: Strategies and Brain are theirs alone, lib/lab/owner.ts) and names each
+// on hover, Portfolio and News open their cards, a section's other pages are tabs on the page,
 // ⌘K works by keyboard alone and finds a page by name, the mobile drawer stands in for the rail
 // and closes after navigating, and the drawer's Logout signs out and lands on /sign-in. Also
 // friends: a sent request is listed with its age, and the recipient sees a dot on the avatar and
-// a count in the account menu.
+// a count in the account menu. Anyone but the owner meets none of the owner's pages: each sends
+// them Home, the routes answer 401, and nothing on their own pages leads there.
 // Run: npm run qa -- shell   (the harness: README.md)
 import {chromium} from 'playwright';
 import {MongoClient} from 'mongodb';
-import {BASE, MONGO, check, outDir, signUp, summary} from './lib.mjs';
+import {BASE, HOME_URL, MONGO, check, outDir, ownerEmail, signUp, summary} from './lib.mjs';
 
 const OUT = outDir('shell');
 
@@ -23,11 +25,12 @@ try {
 
     // --- the desktop rail: one icon per section, nothing repeated in the header ---
     const railHrefs = await page.$$eval('aside.rail nav a', (as) => as.map((a) => a.getAttribute('href')));
-    // The Learn icon goes to the games: /learn is the owner's lab, and this account is not the owner.
-    check('the rail lists the seven sections',
-        railHrefs.join(',') === '/,/news,/trade,/portfolio,/strategies,/brain,/games', railHrefs.join(','));
+    // This account is not the owner (lib/lab/owner.ts): no Strategies or Brain icon, and the Learn
+    // icon goes to the games, since /learn is the owner's lab.
+    check('the rail lists the five sections every account has',
+        railHrefs.join(',') === '/,/news,/trade,/portfolio,/games', railHrefs.join(','));
     check('…each named for a screen reader, with the dashboard lit',
-        await page.locator('aside.rail nav a[aria-label]').count() === 7
+        await page.locator('aside.rail nav a[aria-label]').count() === 5
         && await page.locator('aside.rail nav a[aria-current="page"]').getAttribute('data-rail') === 'home');
     check('the header carries no section links',
         await page.locator('header nav a').count() === 0 && await page.locator('header a[href="/"]').count() === 1);
@@ -114,8 +117,6 @@ try {
     await page.goto(`${BASE}/games`, {waitUntil: 'load'});
     const learnTabs = await page.$$eval('[data-section-tabs="learn"] a', (as) => as.map((a) => `${a.getAttribute('href')}${a.getAttribute('aria-current') === 'page' ? '*' : ''}`));
     check('Learn shows Games, the Poker solver, Poker night and the Glossary, Games current', learnTabs.join(',') === '/games*,/poker,/poker-night,/glossary', learnTabs.join(','));
-    await page.goto(`${BASE}/strategies`, {waitUntil: 'load'});
-    check('a section of one page shows no tabs', await page.locator('[data-section-tabs]').count() === 0);
     // Markets and Trade merged on 2026-10-13: the desk is the Markets section's first page.
     await page.goto(`${BASE}/trade`, {waitUntil: 'load'});
     const marketTabs = await page.$$eval('[data-section-tabs="markets"] a', (as) => as.map((a) => `${a.getAttribute('href')}${a.getAttribute('aria-current') === 'page' ? '*' : ''}`));
@@ -124,8 +125,6 @@ try {
         await page.getByRole('heading', {name: 'Markets', exact: true}).count() === 1
         && await page.getByText('Order Entry').count() === 1
         && await page.getByRole('tablist', {name: 'Market views'}).count() === 1);
-    await page.goto(`${BASE}/stocks/SPY`, {waitUntil: 'load'});
-    check('a stock page lights Markets', await page.locator('aside.rail nav a[aria-current="page"]').getAttribute('data-rail') === 'markets');
     // The palette listens for ⌘K from an effect, so a press before Home has hydrated is lost —
     // on a cold dev server that is seconds after 'load'. Wait for the network to settle first.
     await page.goto(`${BASE}/`, {waitUntil: 'networkidle'});
@@ -157,9 +156,11 @@ try {
 
     await page.locator('button[aria-label="Open navigation"]').click();
     await page.waitForTimeout(400);
-    for (const href of ['/', '/news', '/trade', '/portfolio', '/strategies', '/brain', '/games', '/friends', '/settings']) {
+    for (const href of ['/', '/news', '/trade', '/portfolio', '/games', '/friends', '/settings']) {
         check(`drawer reaches ${href}`, await page.locator(`[data-slot="sheet-content"] a[href="${href}"]`).count() === 1);
     }
+    check("…and none of the owner's sections",
+        await page.locator('[data-slot="sheet-content"] a[href^="/strategies"], [data-slot="sheet-content"] a[href="/brain"], [data-slot="sheet-content"] a[href="/culture"], [data-slot="sheet-content"] a[href="/agent-world"]').count() === 0);
     await shot('02-mobile-drawer');
 
     // Closing on navigation is manual — Radix does not do it for us.
@@ -200,6 +201,63 @@ try {
     await page.keyboard.press('Escape');
     await shot('04-friend-badge');
     await second.close();
+
+    // --- the owner (lib/lab/owner.ts): Strategies and Brain, and the lab at Learn ---
+    const ownerPage = await browser.newPage({viewport: {width: 1440, height: 900}});
+    await signUp(ownerPage, 'shell owner', {email: ownerEmail('shell')});
+    const ownerRail = await ownerPage.$$eval('aside.rail nav a', (as) => as.map((a) => a.getAttribute('href')));
+    check("the owner's rail lists the seven sections, Learn leading to the lab",
+        ownerRail.join(',') === '/,/news,/trade,/portfolio,/strategies,/brain,/learn', ownerRail.join(','));
+    await ownerPage.goto(`${BASE}/strategies`, {waitUntil: 'load'});
+    check('a section of one page shows no tabs', ownerPage.url().endsWith('/strategies') && await ownerPage.locator('[data-section-tabs]').count() === 0, ownerPage.url());
+    await ownerPage.goto(`${BASE}/culture`, {waitUntil: 'load'});
+    const brainTabs = await ownerPage.$$eval('[data-section-tabs="brain"] a', (as) => as.map((a) => a.getAttribute('href')));
+    check("…and the Brain section's tabs are both brains and the trading agent world", brainTabs.join(',') === '/brain,/culture,/agent-world', brainTabs.join(','));
+    // A strategy watches SPY, so its page has content of its own with no quote key.
+    await ownerPage.goto(`${BASE}/stocks/SPY`, {waitUntil: 'load'});
+    check('a stock page lights Markets', await ownerPage.locator('aside.rail nav a[aria-current="page"]').getAttribute('data-rail') === 'markets');
+    await ownerPage.close();
+
+    // --- anyone but the owner: none of the owner's pages, routes, widgets or chips ---
+    await page.setViewportSize({width: 1440, height: 900});
+    for (const path of ['/brain', '/culture', '/strategies', '/strategies/golden-cross', '/agent-world', '/agent-world/office']) {
+        await page.goto(`${BASE}${path}`, {waitUntil: 'load'});
+        // A page with a loading state streams first and redirects in the browser.
+        await page.waitForURL(HOME_URL, {timeout: 15000}).catch(() => {});
+        check(`${path} sends anyone but the owner Home`, HOME_URL.test(page.url()), page.url());
+    }
+    const live = await page.request.get(`${BASE}/api/agent-world/live`);
+    const csv = await page.request.get(`${BASE}/api/strategies/golden-cross/export`);
+    check("the agent world's live poll and a strategy's CSV answer anyone else 401", live.status() === 401 && csv.status() === 401, `${live.status()} ${csv.status()}`);
+    await page.goto(`${BASE}/dashboard`, {waitUntil: 'load'});
+    const widgetIds = await page.$$eval('[data-widget-id]', (els) => els.map((el) => el.getAttribute('data-widget-id')));
+    check('the default dashboard carries no brain tile', widgetIds.length > 0 && !widgetIds.includes('news-brain-tile'), widgetIds.join(','));
+    const missions = await page.locator('[data-widget-id="getting-started"] li[data-done]').count();
+    check("…and the first-week checklist leaves out the strategies' and the Navigator's steps", missions === 3, String(missions));
+    await page.goto(`${BASE}/glossary`, {waitUntil: 'load'});
+    const groups = await page.$$eval('[id^="learn-"]', (els) => els.map((el) => el.id));
+    check("the glossary leaves out the groups homed on the owner's pages",
+        groups.includes('learn-portfolio') && !groups.some((id) => ['learn-board', 'learn-brain', 'learn-rails', 'learn-culture', 'learn-agent-world'].includes(id)), groups.join(','));
+    await page.goto(`${BASE}/`, {waitUntil: 'networkidle'});
+    await page.keyboard.press('Meta+k');
+    await page.waitForSelector('[cmdk-input]', {timeout: 15000});
+    await page.keyboard.type('strat');
+    await page.waitForTimeout(300);
+    const stratHits = await page.locator('[data-page-hit]').count();
+    for (let i = 0; i < 5; i++) await page.keyboard.press('Backspace');
+    await page.keyboard.type('brain');
+    await page.waitForTimeout(300);
+    check('⌘K finds neither the strategies nor a brain for anyone else', stratHits === 0 && await page.locator('[data-page-hit]').count() === 0);
+    await page.keyboard.press('Escape');
+    await page.getByRole('button', {name: 'Open Aero-AI Assistant'}).click();
+    const chips = page.getByRole('button', {name: "What's new in my topics?"});
+    await chips.waitFor({timeout: 15000}).catch(() => {});
+    check("the chat offers anyone else no chip about the strategies or the brains",
+        await chips.count() === 1
+        && await page.getByRole('button', {name: 'How does a quant strategy decide?'}).count() === 0
+        && await page.getByRole('button', {name: 'What is the culture brain seeing?'}).count() === 0);
+    await page.keyboard.press('Escape');
+    await shot('05-not-the-owner');
 
     // --- logout from the mobile drawer --------------------------------------------
     // Its Logout used to close the drawer and stay on the page; every logout button now goes

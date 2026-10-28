@@ -12,25 +12,42 @@
 #
 # Logs: scripts/qa/output/logs/<name>.log, the harness's own in _mongo.log, _tiingo.log, _dev.log
 # and _inngest.log. The summary is scripts/qa/output/logs/SUMMARY; its last line starts with "DONE".
-# The ports must be free: the script refuses to start rather than stop someone else's server.
+# The ports must be free: the script refuses to start rather than stop someone else's server. To run
+# beside another harness, move every port with its QA_*_PORT variable below, e.g.
+#   QA_APP_PORT=3100 QA_MONGO_PORT=27127 QA_INNGEST_PORT=8298 QA_INNGEST_GATEWAY_PORT=8299 \
+#   QA_INNGEST_GRPC_PORT=50062 QA_INNGEST_EXECUTOR_PORT=50063 QA_TIINGO_PORT=8797 QA_ALPACA_PORT=8798 \
+#   QA_AGENT_WORLD_PORT=8799 QA_PAPERCLIP_PORT=8800 npm run qa
 set -u
 
 QA_DIR=$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)
 ROOT=$(cd "$QA_DIR/../.." && pwd)
 LOGS=$QA_DIR/output/logs
-APP_PORT=3000
-MONGO_PORT=27117
-INNGEST_PORT=8288
-TIINGO_PORT=8787
-ALPACA_PORT=8788
+APP_PORT=${QA_APP_PORT:-3000}
+MONGO_PORT=${QA_MONGO_PORT:-27117}
+INNGEST_PORT=${QA_INNGEST_PORT:-8288}
+INNGEST_GATEWAY_PORT=${QA_INNGEST_GATEWAY_PORT:-8289}
+INNGEST_GRPC_PORT=${QA_INNGEST_GRPC_PORT:-50052}
+INNGEST_EXECUTOR_PORT=${QA_INNGEST_EXECUTOR_PORT:-50053}
+TIINGO_PORT=${QA_TIINGO_PORT:-8787}
+ALPACA_PORT=${QA_ALPACA_PORT:-8788}
+AGENT_WORLD_PORT=${QA_AGENT_WORLD_PORT:-8789}
+PAPERCLIP_PORT=${QA_PAPERCLIP_PORT:-8790}
 APP_URL=http://localhost:$APP_PORT
+# What the suites and the stand-ins read (lib.mjs, tiingo-series.mjs, start-*.mjs), so they follow
+# the ports wherever they were moved.
+export QA_BASE_URL=$APP_URL QA_MONGO_URL="mongodb://127.0.0.1:$MONGO_PORT/aerotrade" QA_INNGEST_URL="http://localhost:$INNGEST_PORT"
+export QA_MONGO_PORT=$MONGO_PORT QA_TIINGO_PORT=$TIINGO_PORT QA_ALPACA_PORT=$ALPACA_PORT QA_AGENT_WORLD_PORT=$AGENT_WORLD_PORT QA_PAPERCLIP_PORT=$PAPERCLIP_PORT
+PORTS="$APP_PORT $MONGO_PORT $INNGEST_PORT $INNGEST_GATEWAY_PORT $INNGEST_GRPC_PORT $INNGEST_EXECUTOR_PORT $TIINGO_PORT $ALPACA_PORT $AGENT_WORLD_PORT $PAPERCLIP_PORT"
+# The app's owners in this harness: every address scripts/qa/owners.mjs lists (LAB_OWNER_EMAILS).
+OWNER_EMAILS=$(cd "$QA_DIR" && node --input-type=module -e "import {OWNER_EMAILS} from './owners.mjs'; process.stdout.write(OWNER_EMAILS.join(','))")
+[ -n "$OWNER_EMAILS" ] || { echo "could not read the owners from scripts/qa/owners.mjs"; exit 2; }
 
 # Every suite, in the order a full run takes. The order is load-bearing: qa-auth removes the
 # sign-in and sign-up counters it fills before anyone else signs in; qa-home checks that Home draws
 # no terrain before any SPY history exists, so it runs before qa-landing seeds one (and the app
 # caches the Tiingo stand-in's answer for an hour); qa-learn wipes and reseeds strategyruns, so it
 # runs after qa-strategies. A suite missing here runs last.
-ALL=(auth styles shell home landing chat topics-refresh trading topics news-feed strategies income learn lab learn-account games poker poker-night poker-night-modes chat-tutor email culture broker)
+ALL=(auth styles shell home landing chat topics-refresh trading topics news-feed strategies income learn lab learn-account games poker poker-night poker-night-modes chat-tutor email culture broker agent-world agent-office)
 
 KEEP_UP=0
 NAMES=()
@@ -76,7 +93,7 @@ port_busy() {
     else (exec 3<>"/dev/tcp/127.0.0.1/$1") 2>/dev/null
     fi
 }
-for port in $APP_PORT $MONGO_PORT $INNGEST_PORT $TIINGO_PORT $ALPACA_PORT; do
+for port in $PORTS; do
     if port_busy "$port"; then
         echo "port $port is already in use — stop whatever listens there first (lsof -nP -iTCP:$port -sTCP:LISTEN)"
         exit 2
@@ -106,7 +123,7 @@ tree() {
 on_windows() { case "$(uname -s)" in MINGW*|MSYS*|CYGWIN*) return 0 ;; *) return 1 ;; esac; }
 stop_windows_listeners() {
     local port pid
-    for port in $APP_PORT $MONGO_PORT $INNGEST_PORT $TIINGO_PORT $ALPACA_PORT; do
+    for port in $PORTS; do
         for pid in $(netstat -ano -p TCP 2>/dev/null | awk -v p=":$port" '$2 ~ p"$" && $4 == "LISTENING" {print $5}' | sort -u); do
             taskkill //F //T //PID "$pid" >/dev/null 2>&1
         done
@@ -156,6 +173,24 @@ PIDS+=($!)
 for _ in $(seq 1 30); do grep -q 'READY\|FAILED' "$LOGS/_alpaca.log" 2>/dev/null && break; sleep 1; done
 grep -q READY "$LOGS/_alpaca.log" || harness_failed "the Alpaca stand-in did not start" "$LOGS/_alpaca.log"
 
+# 1d. A stand-in for Paperclip (start-paperclip-stub.mjs): the trading agent world's company — its
+# agents and keys, the session's issue with its approval stage, cost events, budgets, activity.
+(cd "$QA_DIR" && exec env PAPERCLIP_STUB_PORT=$PAPERCLIP_PORT PAPERCLIP_STUB_SERVICE_URL="http://localhost:$AGENT_WORLD_PORT" \
+    PAPERCLIP_STUB_APP_URL="$APP_URL" node start-paperclip-stub.mjs) >"$LOGS/_paperclip.log" 2>&1 &
+PIDS+=($!)
+for _ in $(seq 1 30); do grep -q 'READY\|FAILED' "$LOGS/_paperclip.log" 2>/dev/null && break; sleep 1; done
+grep -q READY "$LOGS/_paperclip.log" || harness_failed "the Paperclip stand-in did not start" "$LOGS/_paperclip.log"
+
+# 1e. A stand-in for the trading agent world's service (start-agent-world-stub.mjs): it checks the
+# job's signed POST /runs and plays the service's own exported events back to the app, signed, then
+# does the service's part on the Paperclip stand-in. No Python, no model, no key.
+(cd "$QA_DIR" && exec env AGENT_WORLD_STUB_PORT=$AGENT_WORLD_PORT PAPERCLIP_URL="http://localhost:$PAPERCLIP_PORT" \
+    PAPERCLIP_COMPANY_ID=11111111-1111-4111-8111-111111111111 AEROTRADE_URL="http://localhost:$APP_PORT" \
+    AGENT_WORLD_STUB_HEARTBEAT_SECRET=qa-agent-world-heartbeat node start-agent-world-stub.mjs) >"$LOGS/_agent-world.log" 2>&1 &
+PIDS+=($!)
+for _ in $(seq 1 30); do grep -q 'READY\|FAILED' "$LOGS/_agent-world.log" 2>/dev/null && break; sleep 1; done
+grep -q READY "$LOGS/_agent-world.log" || harness_failed "the agent world stand-in did not start" "$LOGS/_agent-world.log"
+
 # 2. The app. A .next left by `next build` breaks Turbopack's next/font in dev, so start clean.
 # The empty keys keep a local .env's Finnhub, mail and Ably settings out: no quotes, no mail sent,
 # and every poker night table polls. NEXT_PUBLIC_PN_RT_FAKE=1 opens poker night's realtime seam
@@ -169,11 +204,16 @@ rm -rf "$ROOT/.next"
     BETTER_AUTH_SECRET='local-qa-secret-at-least-32-characters-long' \
     BETTER_AUTH_URL="$APP_URL" \
     SIGN_UP_CLIENT_LIMIT=1000 \
-    LAB_OWNER_EMAILS=qa-lab-owner@example.com \
+    LAB_OWNER_EMAILS="$OWNER_EMAILS" \
     TIINGO_TOKEN=qa-tiingo-token TIINGO_API_URL="http://localhost:$TIINGO_PORT" \
     ALPACA_API_KEY_ID=qa-alpaca-key ALPACA_API_SECRET_KEY=qa-alpaca-secret ALPACA_BASE_URL="http://localhost:$ALPACA_PORT" \
     ALPACA_MODE= ALPACA_LIVE_ENABLED= BROKER_OWNER_EMAILS= \
-    INNGEST_DEV=1 \
+    AGENT_WORLD_ENABLED=true AGENT_WORLD_SERVICE_URL="http://localhost:$AGENT_WORLD_PORT" AGENT_WORLD_SERVICE_SECRET=qa-agent-world-secret \
+    AGENT_WORLD_HEARTBEAT_SECRET=qa-agent-world-heartbeat AGENT_WORLD_APPROVAL=owner AGENT_WORLD_OWNER_EMAILS= AGENT_WORLD_UNIVERSE=AAPL,MSFT \
+    AGENT_WORLD_CALLBACK_ORIGIN= AGENT_WORLD_PAPERCLIP_AGENT_IDS= \
+    PAPERCLIP_URL="http://localhost:$PAPERCLIP_PORT" PAPERCLIP_API_KEY=qa-paperclip-key PAPERCLIP_COMPANY_ID=11111111-1111-4111-8111-111111111111 \
+    PAPERCLIP_BOARD_URL="http://localhost:$PAPERCLIP_PORT" \
+    INNGEST_DEV=1 INNGEST_BASE_URL="http://localhost:$INNGEST_PORT" JOB_CRONS=off \
     FINNHUB_API_KEY= NEXT_PUBLIC_FINNHUB_API_KEY= NODEMAILER_EMAIL= NODEMAILER_PASSWORD= \
     ABLY_API_KEY= POKER_NIGHT_REALTIME= NEXT_PUBLIC_PN_RT_FAKE=1 \
     npm run dev) >"$LOGS/_dev.log" 2>&1 &
@@ -183,7 +223,10 @@ curl -sf -o /dev/null "$APP_URL/sign-in" || harness_failed "the app did not answ
 
 # 3. The Inngest dev server, pointed at the app's /api/inngest. Without it qa-income skips its job
 # checks and qa-topics-refresh takes the dead-queue path, so a run says so instead of failing.
-(cd "$ROOT" && exec npx --yes inngest-cli@latest dev -u "$APP_URL/api/inngest") >"$LOGS/_inngest.log" 2>&1 &
+# No discovery: it would sync any other app it finds on the usual ports, another harness's included.
+(cd "$ROOT" && exec npx --yes inngest-cli@latest dev -p "$INNGEST_PORT" --connect-gateway-port "$INNGEST_GATEWAY_PORT" \
+    --connect-gateway-grpc-port "$INNGEST_GRPC_PORT" --connect-executor-grpc-port "$INNGEST_EXECUTOR_PORT" --no-discovery \
+    -u "$APP_URL/api/inngest") >"$LOGS/_inngest.log" 2>&1 &
 PIDS+=($!)
 for _ in $(seq 1 60); do curl -sf -o /dev/null "http://localhost:$INNGEST_PORT/" && break; sleep 2; done
 if curl -sf -o /dev/null "http://localhost:$INNGEST_PORT/"; then

@@ -6,9 +6,10 @@
 // text, and its rules are phrased as prohibitions the shared list already ignores.
 
 import {describe, expect, it} from 'vitest';
-import {ADVISOR_SYSTEM_PROMPT} from '@/lib/chat/system-prompt';
+import {advisorSystemPrompt} from '@/lib/chat/system-prompt';
 import {TOOL_DESCRIPTIONS} from '@/lib/chat/tool-copy';
-import {CHAT_SUGGESTIONS, CHAT_USAGE_COPY, CHAT_WELCOME_MESSAGE} from '@/lib/learn/copy/chat';
+import {OWNER_CHAT_TOOLS} from '@/lib/chat/types';
+import {CHAT_SUGGESTIONS, CHAT_USAGE_COPY, CHAT_WELCOME_MESSAGE, OWNER_CHAT_SUGGESTIONS, chatSuggestionsFor} from '@/lib/learn/copy/chat';
 import {DAILY_DIGEST_PROMPT, PERSONALIZED_WELCOME_EMAIL_PROMPT} from '@/lib/email/prompts';
 import {RATIONALE_PROMPT} from '@/lib/navigator/prompts';
 import {MARKET_BRIEFING_PROMPT} from '@/lib/news/prompts';
@@ -21,10 +22,16 @@ const TOOL_COUNT = 18;
 // ticker.
 const TICKERS = /\b(NVDA|AAPL|TSLA|MSFT|SPY|AMZN|GOOGL|GOOG|META|AMD|NFLX)\b/;
 
+// The owner's prompt names the tools over the brains and the strategies; everyone else's does not.
+const OWNER_PROMPT = advisorSystemPrompt({owner: true});
+const PUBLIC_PROMPT = advisorSystemPrompt({owner: false});
+const PROMPTS: [string, string][] = [['owner prompt', OWNER_PROMPT], ['public prompt', PUBLIC_PROMPT]];
+const ALL_CHIPS = [...CHAT_SUGGESTIONS, ...OWNER_CHAT_SUGGESTIONS];
+
 const corpus: [string, string][] = [
-    ['ADVISOR_SYSTEM_PROMPT', ADVISOR_SYSTEM_PROMPT],
+    ...PROMPTS,
     ['CHAT_WELCOME_MESSAGE', CHAT_WELCOME_MESSAGE],
-    ...CHAT_SUGGESTIONS.map((chip, i): [string, string] => [`chip ${i}`, chip]),
+    ...ALL_CHIPS.map((chip, i): [string, string] => [`chip ${i}`, chip]),
     ...Object.entries(TOOL_DESCRIPTIONS).map(([name, text]): [string, string] => [`tool ${name}`, text]),
     ['PERSONALIZED_WELCOME_EMAIL_PROMPT', PERSONALIZED_WELCOME_EMAIL_PROMPT],
     ['DAILY_DIGEST_PROMPT', DAILY_DIGEST_PROMPT],
@@ -40,17 +47,25 @@ describe('advice voice', () => {
     });
 
     it('keeps the disclaimer and the no-prediction rule in the advisor prompt', () => {
-        expect(ADVISOR_SYSTEM_PROMPT).toContain('This is not licensed financial advice — markets carry real risk.');
-        expect(ADVISOR_SYSTEM_PROMPT).toContain('Never predict future prices');
-        expect(ADVISOR_SYSTEM_PROMPT).not.toMatch(/recommend/i);
+        for (const [name, prompt] of PROMPTS) {
+            expect(prompt, name).toContain('This is not licensed financial advice — markets carry real risk.');
+            expect(prompt, name).toContain('Never predict future prices');
+            expect(prompt, name).not.toMatch(/recommend/i);
+        }
     });
 
     it('offers no ticker and no verdict in a suggestion chip', () => {
-        for (const chip of CHAT_SUGGESTIONS) {
+        for (const chip of ALL_CHIPS) {
             expect(chip, chip).not.toMatch(TICKERS);
             expect(findBanned(chip, 'copy'), chip).toEqual([]);
         }
         expect(CHAT_SUGGESTIONS).toContain("What's new in my topics?");
+    });
+
+    it("offers the brains' and the strategies' chips to the owner alone", () => {
+        expect(chatSuggestionsFor({owner: true})).toEqual(ALL_CHIPS);
+        expect(chatSuggestionsFor({owner: false})).toEqual(CHAT_SUGGESTIONS);
+        for (const chip of CHAT_SUGGESTIONS) expect(chip, chip).not.toMatch(/strateg|brain|navigator|culture/i);
     });
 
     it('keeps the usage caption descriptive and unlike the error copy', () => {
@@ -70,16 +85,26 @@ describe('advice voice', () => {
         expect(CHAT_USAGE_COPY.resets('2h 10m')).toBe('resets in 2h 10m');
     });
 
-    it('names every tool in the advisor prompt', () => {
+    it("names every tool in the owner's prompt, and the brains' and strategies' in no one else's", () => {
+        const ownerOnly = new Set<string>(OWNER_CHAT_TOOLS);
         for (const name of Object.keys(TOOL_DESCRIPTIONS)) {
-            expect(ADVISOR_SYSTEM_PROMPT, name).toContain(`**${name}**`);
+            expect(OWNER_PROMPT, name).toContain(`**${name}**`);
+            if (ownerOnly.has(name)) expect(PUBLIC_PROMPT, name).not.toContain(name);
+            else expect(PUBLIC_PROMPT, name).toContain(`**${name}**`);
         }
+        for (const section of ['# Quant strategies', '# Culture brain']) {
+            expect(OWNER_PROMPT, section).toContain(section);
+            expect(PUBLIC_PROMPT, section).not.toContain(section);
+        }
+        expect(PUBLIC_PROMPT).not.toMatch(/navigator|strateg|culture brain/i);
     });
 
     it('defines terms only through explainTerm, and admits a missing entry', () => {
-        const tutoring = ADVISOR_SYSTEM_PROMPT.slice(ADVISOR_SYSTEM_PROMPT.indexOf('# Tutoring'));
-        expect(tutoring).toContain('explainTerm');
-        expect(tutoring).toMatch(/the app has no entry/i);
+        for (const [name, prompt] of PROMPTS) {
+            const tutoring = prompt.slice(prompt.indexOf('# Tutoring'));
+            expect(tutoring, name).toContain('explainTerm');
+            expect(tutoring, name).toMatch(/the app has no entry/i);
+        }
     });
 
     it('gives every tool a description', () => {

@@ -2,10 +2,11 @@ import {convertToModelMessages, streamText, stepCountIs, type UIMessage} from "a
 import {createGoogleGenerativeAI} from "@ai-sdk/google";
 import {geminiApiKey} from "@/lib/ai/models";
 import {z} from "zod";
-import {ADVISOR_SYSTEM_PROMPT} from "@/lib/chat/system-prompt";
+import {advisorSystemPrompt} from "@/lib/chat/system-prompt";
 import {buildTools} from "@/lib/chat/tools";
 import {chatErrorBody, chatErrorStatus, type ChatErrorCode} from "@/lib/chat/errors";
-import {getCurrentUserId} from "@/lib/auth/session";
+import {getCurrentUser} from "@/lib/auth/session";
+import {isLabOwner} from "@/lib/lab/owner";
 import {takeRateLimit} from "@/lib/rate-limit";
 import {CHAT_GLOBAL_KEY, chatUserDayKey, chatUserHourKey, resolveChatLimits} from "@/lib/chat/limits";
 
@@ -46,10 +47,14 @@ const textLength = (message: UIMessage): number =>
     message.parts.reduce((n, part) => n + (part.type === 'text' ? part.text.length : 0), 0);
 
 export async function POST(req: Request) {
-    const userId = await getCurrentUserId();
-    if (!userId) {
+    const user = await getCurrentUser();
+    if (!user) {
         return fail('unauthorized');
     }
+    const userId = user.id;
+    // The tools over the brains and the strategies, and the prompt's lines about them, are the
+    // owner's alone (lib/lab/owner.ts).
+    const owner = isLabOwner(user.email);
 
     const parsed = bodySchema.safeParse(await req.json().catch(() => null));
     if (!parsed.success) {
@@ -69,9 +74,9 @@ export async function POST(req: Request) {
 
     const result = streamText({
         model: google('gemini-2.5-flash'),
-        system: ADVISOR_SYSTEM_PROMPT,
+        system: advisorSystemPrompt({owner}),
         messages: await convertToModelMessages(messages),
-        tools: buildTools(userId),
+        tools: buildTools(userId, {owner}),
         maxOutputTokens: MAX_OUTPUT_TOKENS,
         stopWhen: stepCountIs(5), // allow tool → model → tool chains, capped
     });
