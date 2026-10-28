@@ -33,6 +33,7 @@ import {activeRun, type LiveMode} from "@/lib/agent-world/live";
 import {OFFICE_SHELF_VENDORS} from "@/lib/agent-world/office-layout";
 import {approvalState, comparisonRows, elapsedText, vendorBadges, type ComparisonRow, type DeskRecord} from "@/lib/agent-world/page-view";
 import {sessionSpan} from "@/lib/agent-world/replay";
+import {formatPrice} from "@/lib/format";
 import type {LiveView, OrderSide, RunView, SessionFill, SessionLimit, SessionRow, SessionView, ToolResult} from "@/lib/agent-world/types";
 import {ROLE_COPY, vendorLabel} from "@/lib/learn/copy/agent-world";
 import {DESK_TASK_COPY, providerLabel, ROLE_OUTPUT_COPY, ROLE_TASK_COPY, TASK_COPY, TICKER_COPY, toolWhat} from "@/lib/learn/copy/agent-world-office";
@@ -604,7 +605,7 @@ const tickerText = (event: OfficeEvent, s: SessionView | null): string | null =>
             const fill = event.fill;
             if (!fill) return null;
             return fill.executed && fill.price !== null
-                ? TICKER_COPY.filled(fill.symbol, fill.side === 'sell', fill.quantity, `$${fill.price.toLocaleString('en-US', {minimumFractionDigits: 2, maximumFractionDigits: 2})}`)
+                ? TICKER_COPY.filled(fill.symbol, fill.side === 'sell', fill.quantity, formatPrice(fill.price))
                 : TICKER_COPY.notFilled(fill.symbol, trimStop(fill.message ?? 'not filled'));
         }
         case 'service-stopped': return TICKER_COPY.serviceStopped(trimStop(s?.service?.message ?? s?.service?.outcome ?? 'stopped'));

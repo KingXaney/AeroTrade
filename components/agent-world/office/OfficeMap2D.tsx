@@ -30,6 +30,15 @@ const CARPET: Record<string, string> = {
 
 type Props = {state: OfficeState; selected: WorkerId | null; onSelect: (id: WorkerId | null) => void; ratingTitle: string; note: string};
 
+// On a row of desks closer than a plate is wide (the bullpen, the risk bench), every other plate
+// sits a little lower, so the row reads as two staggered lines rather than one pile.
+const STAGGER = 1.9;
+const staggered = (id: WorkerId): number => {
+    const seat = seatOf(id);
+    const row = OFFICE_SEATS.filter((other) => other.zone === seat.zone && Math.abs(other.seat[2] - seat.seat[2]) < 0.5).sort((a, b) => a.seat[0] - b.seat[0]);
+    return row.length > 2 && row.findIndex((other) => other.id === id) % 2 === 1 ? STAGGER : 0;
+};
+
 const OfficeMap2D = ({state, selected, onSelect, ratingTitle, note}: Props) => {
     const workers = new Map(state.workers.map((w) => [w.id, w]));
     const fetches = state.flows.filter((flow) => flow.kind === 'fetch');
@@ -46,13 +55,13 @@ const OfficeMap2D = ({state, selected, onSelect, ratingTitle, note}: Props) => {
                             <text x={x(zone.bounds.minX) + 6} y={z(zone.bounds.maxZ) - 6} className="fill-fg-muted font-mono text-[6px] uppercase">{ZONE_COPY[zone.id]}</text>
                         </g>
                     ))}
-                    {FURNITURE.shelves.map((shelf) => {
+                    {FURNITURE.shelves.map((shelf, i) => {
                         const live = state.shelves.find((s) => s.vendor === shelf.vendor);
                         return (
                             <g key={shelf.vendor} data-office-map-shelf={shelf.vendor} data-hot={live?.hot ? 'true' : 'false'}>
                                 <rect x={x(shelf.center[0] - shelf.width / 2)} y={z(shelf.center[2] - 0.3)} width={x(shelf.center[0] + shelf.width / 2) - x(shelf.center[0] - shelf.width / 2)} height={z(shelf.center[2] + 0.3) - z(shelf.center[2] - 0.3)}
                                     className={cn('fill-[color:var(--office-shelf)]', live?.refused ? 'stroke-warning' : live?.hot ? 'stroke-brand' : 'stroke-transparent')} strokeWidth={1.5} />
-                                <text x={x(shelf.center[0])} y={z(shelf.center[2]) + 10} textAnchor="middle" className="fill-fg font-mono text-[5.5px]">{live?.label ?? shelf.vendor}{live?.tag ? ` · ${live.tag.note ?? ZONE_COPY.noAnswer}` : ''}</text>
+                                <text x={x(shelf.center[0])} y={z(shelf.center[2]) + (i % 2 === 0 ? 9 : 15)} textAnchor="middle" className="fill-fg font-mono text-[4.5px]">{live?.label ?? shelf.vendor}{live?.tag ? ` · ${live.tag.note ?? ZONE_COPY.noAnswer}` : ''}</text>
                             </g>
                         );
                     })}
@@ -82,7 +91,7 @@ const OfficeMap2D = ({state, selected, onSelect, ratingTitle, note}: Props) => {
                             title={worker.task}
                             className={cn('chrome-surface absolute w-max max-w-40 -translate-x-1/2 -translate-y-1/2 overflow-hidden rounded-lg py-0.5 pl-2 pr-1.5 text-left focus-visible:outline-2 focus-visible:outline-brand',
                                 selected === seat.id && 'outline outline-2 outline-brand')}
-                            style={{left: pctX(seat.seat[0]), top: pctZ(seat.seat[2])}}>
+                            style={{left: pctX(seat.seat[0]), top: pctZ(seat.seat[2] + staggered(seat.id))}}>
                             <span aria-hidden="true" className={cn('absolute inset-y-0 left-0 w-[3px]', seatEdge(seat.id))} />
                             <span className="flex items-center gap-1 text-[10px] leading-tight">
                                 <span aria-hidden="true" className={cn('size-1.5 shrink-0 rounded-full', seatDot(worker.status), ACTIVE_STATUSES.has(worker.status) && 'ao-lamp')} />

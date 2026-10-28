@@ -43,7 +43,12 @@ keeping track of the stats.
 - **Getting around**: presets 0–7 (the floor, the front desk, the bullpen, the table, the trader,
   the risk desk, the corner office, the Execution desk), Follow the run (the camera glides to the
   newest seat, paused by a drag), zoom, the floor plan (`?engine=2d`, also drawn without WebGL), the
-  keys (`[`/`]` walk the seats, R replays, F follows, Esc clears).
+  keys (`[`/`]` walk the seats, R replays, F follows, P the plan, M the sound, Esc clears).
+- **The small delights**: sound, off until the reader turns it on (the speaker in the top bar, or
+  M; kept in this browser) — six synthesised cues, quiet and short (`lib/agent-world/office-sounds`,
+  every recipe held to its limits by a test): a fetch landing, a filing, a turn, a rating pinned, the
+  stamp, the desk done, a poll's batch spaced out rather than piled. The corner office's plant grows
+  a leaf for each session, up to twelve.
 
 ## Rules kept
 
@@ -57,8 +62,10 @@ keeping track of the stats.
 - Colours are the `--office-*` tokens (invariant 5); `.ao-*` motion classes sit in both reduced-motion
   guards and stop by name in brutalist. With motion reduced nothing loops, flies or walks; statuses,
   bubbles, tags, cards and the stamp still appear at their end states.
-- The scene draws on demand and sleeps when nothing moves; it only reads the state it is handed
-  (components reach no store, client or env — the feature's guard test).
+- The scene draws only while the tab is visible and the stage on screen; with motion on the idle
+  seats keep their gestures at up to 30 frames a second, with motion reduced it draws only when
+  something changes. It reads only the state it is handed (components reach no store, client or env
+  — the feature's guard test).
 - Reads are bounded: the career is the last forty finished sessions, projected, memoised for the
   ET day on the newest; Paperclip's budgets are one best-effort call.
 
@@ -71,21 +78,38 @@ the nav registry, on Home, the dashboard or the chat.
 
 What ran on 2026-10-27, on `feat/agent-world`:
 
-- Unit: `npm run check` — lint and typecheck clean; the office's state (statuses, task lines,
-  bubbles, flows, shelves, desks, focus, wall, ticker, live windows, replay idempotence, career), its
-  layout (seats apart and on the floor, every anchor and path, presets above the floor, the sky's
-  mix), keys, legend and copy, the motion guards.
+- Unit: `npm run check` — lint and typecheck clean, 3,974 tests in 343 files: the office's state
+  (statuses, task lines, bubbles, flows, shelves, desks, focus, wall, ticker, live windows, replay
+  idempotence, career), its layout (seats apart and on the floor, every anchor and path, presets
+  above the floor, the sky's mix), keys, legend, sound recipes and copy, the motion guards.
 - Build: `npm run build:check` lists `/agent-world/office`.
-- By eye in the QA harness (`npm run qa -- --up`, the stand-in service in slow mode): the overview
-  fits the whole floor at 1440 × 900 at dusk and at night; a live session watched seat by seat — the
-  planes, the 429 and 503 tags, the bubbles at the table and the risk desk, the robot, the follow
-  camera; the session waiting for the owner, approved from the Execution desk's file, the stamp, the
-  ticket returned for want of a live price; the replay; a 390 px phone.
+- Browser: `npm run qa -- shell agent-world agent-office` — the shell's 46 checks and the floor's 73
+  passed, and the office's suite found one fault (with motion reduced, an idle office still drew a
+  frame a second, on the page's clock tick); fixed, `npm run qa -- agent-office` ran its 66 checks
+  with none failing. They cover: the floor's link opening a new tab with no rail, header or chat;
+  the canvas, the fourteen seats in the run's order, their plates as buttons; sound off until turned
+  on, M and the switch; a session watched live from Run now (the analysts fetching and saying
+  through whom, the sentiment analyst never, OpenBB refusing with its 429 while yfinance answers, the
+  ticker saying so, filed then done, the bull before the bear, the risk desk talking, a bubble, the
+  Execution desk waiting with its lamp and chip, the Head trader handing the issue in, the ticker's
+  ET times, the wall's counts, the ratings pinned in neutral badges, the camera following three seats
+  or more, the draw budget); a lane showing AAPL's run; a seat's file by keyboard and Escape handing
+  the focus back; the camera's keys and a drag; Approve from the lamp's chip, the confetti, the
+  stamp, the ticket returned for want of a live price, the issue done; the replay from its start and
+  Stop; motion reduced (no replay, nothing loops, the scene asleep); the floor plan; brutalist; the
+  voice and the legend; 375 px; a watcher with no decision.
+- By eye, the harness's screenshots (`scripts/qa/output/agent-office/`) and a slow session watched
+  seat by seat: the whole floor at 1440 × 900 at dusk and at night, the planes, the 429 and 503
+  tags, the bubbles at the table and the risk desk, the robot, the corner office's plant, a 390 px
+  phone.
+- Not verified here: a session of the real service (the stand-in replays its exported events, and
+  stamps each batch a few seconds ahead of the clock), sound through speakers (the cues are checked
+  as recipes; a headless browser plays nothing), a touch device.
 
 ## Not built
 
-- Sound cues, the robot's coffee for the seat busy longest, a plant that grows a leaf a session, a
-  budget rack.
+- The robot's coffee for the seat busy longest, and a budget rack on the wall (each agent's budget
+  is in its file).
 - Decisions inside Paperclip's own UI, a chat tool, Home or dashboard surfaces, a filing-cabinet
   archive of past sessions, orbiting by touch (a phone uses the presets and zoom).
 - A second "Open the office" link in the floor's empty state: the one in the title is always there.

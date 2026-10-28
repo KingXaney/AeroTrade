@@ -1,11 +1,12 @@
 'use client';
 
-import {useCallback, useEffect, useMemo, useRef, useState, type ReactNode} from "react";
+import {useCallback, useEffect, useMemo, useRef, useState, useSyncExternalStore, type ReactNode} from "react";
 import {useRouter} from "next/navigation";
 import RunNowButton from "@/components/agent-world/RunNowButton";
 import OfficeDossier from "@/components/agent-world/office/OfficeDossier";
 import {OfficeRoster, OfficeTicker, OfficeWall} from "@/components/agent-world/office/OfficeSidebar";
 import OfficeStage, {type OfficeStageControls} from "@/components/agent-world/office/OfficeStage";
+import {createOfficeSound, type OfficeSoundPlayer} from "@/components/agent-world/office/office-sound";
 import {useOfficeKeys} from "@/components/agent-world/office/useOfficeKeys";
 import {useClock, useLiveFeed} from "@/components/agent-world/useLiveFeed";
 import ActionButton from "@/components/primitives/ActionButton";
@@ -17,6 +18,7 @@ import {isSessionLive, liveMode} from "@/lib/agent-world/live";
 import {officeClock, officeReplayDuration, officeState, replayCut, replayWindowScale, seenAfter, type CareerStats, type OfficeExtras} from "@/lib/agent-world/office";
 import {OFFICE_KEY_SHORTCUTS, type OfficeIntent} from "@/lib/agent-world/office-keys";
 import {OFFICE_PRESET_IDS, presetForSeat, type OfficePresetId} from "@/lib/agent-world/office-layout";
+import {cuesFor} from "@/lib/agent-world/office-sounds";
 import type {OfficeBudgets} from "@/lib/agent-world/office-store";
 import {motionUnitMs, replayFrame, replayProgress, sessionSpan} from "@/lib/agent-world/replay";
 import type {LiveView} from "@/lib/agent-world/types";
@@ -47,6 +49,33 @@ type Props = {
 };
 
 const motionUnit = (): number => motionUnitMs(getComputedStyle(document.documentElement).getPropertyValue('--motion-base'));
+
+// The sound switch is this browser's: off unless the reader turned it on here (localStorage, read
+// through useSyncExternalStore with off as the server's answer).
+const SOUND_KEY = 'aero-office:sound';
+const readSound = (): boolean => {
+    try {
+        return window.localStorage.getItem(SOUND_KEY) === 'on';
+    } catch {
+        return false;
+    }
+};
+const subscribeSound = (onChange: () => void) => {
+    window.addEventListener('storage', onChange);
+    window.addEventListener(SOUND_KEY, onChange);
+    return () => {
+        window.removeEventListener('storage', onChange);
+        window.removeEventListener(SOUND_KEY, onChange);
+    };
+};
+const writeSound = (on: boolean) => {
+    try {
+        window.localStorage.setItem(SOUND_KEY, on ? 'on' : 'off');
+    } catch {
+        // Storage refused (a private window): the switch still flips for this page.
+    }
+    window.dispatchEvent(new Event(SOUND_KEY));
+};
 
 const OfficeApp = (props: Props) => {
     const {initial, owner, enabled, ratingTitle, extras, career, budgets, terms} = props;
@@ -107,7 +136,9 @@ const OfficeApp = (props: Props) => {
     }, [statusKey, router]);
 
     const shown = live.replay ? replayFrame(live.view, progress) : live.view;
-    const at = live.replay ? (replayCut(live.view, progress) ?? serverNow) : serverNow;
+    // Never earlier than the view itself: the clock ticks once a second, and a poll that lands between
+    // two ticks would otherwise hold back what it carried until the next one.
+    const at = live.replay ? (replayCut(live.view, progress) ?? serverNow) : Math.max(serverNow, live.view.serverNow);
     const scale = live.replay ? replayWindowScale(live.view, live.replay.duration) : 1;
     const symbol = live.pinned || !live.replay ? live.symbol : shown.session?.current?.symbol ?? live.symbol;
     const office = useMemo(
@@ -128,6 +159,47 @@ const OfficeApp = (props: Props) => {
         return undefined;
     }, [office.lamp, mode]);
 
+    // Sound: made at the reader's own gesture (the switch, M), or at their first one when the page
+    // opened with it on; then each new event on the ticker, live or played back, sounds its cue.
+    const storedSound = useSyncExternalStore(subscribeSound, readSound, () => false);
+    const [pageSound, setPageSound] = useState<boolean | null>(null);
+    const sound = pageSound ?? storedSound;
+    const player = useRef<OfficeSoundPlayer | null>(null);
+    const wakeSound = useCallback(() => {
+        player.current ??= createOfficeSound();
+        player.current?.unlock();
+    }, []);
+    const toggleSound = useCallback(() => {
+        const next = !sound;
+        if (next) wakeSound();
+        setPageSound(next);
+        writeSound(next);
+    }, [sound, wakeSound]);
+    useEffect(() => () => player.current?.dispose(), []);
+    useEffect(() => {
+        if (!sound) return;
+        window.addEventListener('pointerdown', wakeSound, {once: true});
+        window.addEventListener('keydown', wakeSound, {once: true});
+        return () => {
+            window.removeEventListener('pointerdown', wakeSound);
+            window.removeEventListener('keydown', wakeSound);
+        };
+    }, [sound, wakeSound]);
+    const heard = useRef<{key: string; ids: Set<string>} | null>(null);
+    useEffect(() => {
+        const ids = office.ticker.map((line) => line.id);
+        const key = `${office.sessionId ?? ''}:${mode}`;
+        const held = heard.current;
+        if (!held || held.key !== key) {
+            heard.current = {key, ids: new Set(ids)};
+            return;
+        }
+        const fresh = ids.filter((id) => !held.ids.has(id)).reverse();
+        for (const id of ids) held.ids.add(id);
+        if (!sound || mode === 'idle' || fresh.length === 0) return;
+        for (const {cue, delay} of cuesFor(fresh)) player.current?.play(cue, delay);
+    }, [office.ticker, office.sessionId, mode, sound]);
+
     // The New York clock: the sky, the wall clock and the market lamp follow it, not the session.
     const minute = Math.floor(serverNow / 60_000);
     const daylight = useMemo(() => {
@@ -137,16 +209,35 @@ const OfficeApp = (props: Props) => {
     const marketLine = useMemo(() => describeMarketStatus(marketStatus(new Date(minute * 60_000))), [minute]);
     const clock = officeClock(serverNow);
 
+    // A session just asked for takes a moment to open: a few quick polls catch it, as on the floor,
+    // after which the feed's own pace takes over.
+    const kicks = useRef<ReturnType<typeof setTimeout>[]>([]);
+    useEffect(() => () => kicks.current.forEach(clearTimeout), []);
+    const kick = useCallback(() => {
+        pollNow();
+        kicks.current.push(...[1500, 4000, 8000, 15_000].map((ms) => setTimeout(pollNow, ms)));
+    }, [pollNow]);
+
     const startReplay = useCallback(() => {
         dispatch({type: 'replay-start', at: Date.now(), duration: officeReplayDuration(motionUnit())});
     }, [dispatch]);
     const canReplay = !isSessionLive(live.view) && sessionSpan(live.view) !== null;
 
+    // A seat's file opens from a plate, the roster or a click on the floor; closing it hands the
+    // focus back to the button that opened it.
+    const returnFocus = useRef<HTMLElement | null>(null);
     const open = useCallback((id: WorkerId) => {
+        returnFocus.current = document.activeElement instanceof HTMLElement && document.activeElement !== document.body ? document.activeElement : null;
         setPicked(id);
         setFollow(false);
         controls.current?.setPreset(presetForSeat(id));
     }, [setPicked, setFollow]);
+    const close = useCallback(() => {
+        setPicked(null);
+        const back = returnFocus.current;
+        returnFocus.current = null;
+        if (back?.isConnected) requestAnimationFrame(() => back.focus());
+    }, [setPicked]);
 
     const onIntent = useCallback((intent: OfficeIntent) => {
         switch (intent.type) {
@@ -175,12 +266,15 @@ const OfficeApp = (props: Props) => {
                 setEngine((e) => (e === '2d' ? 'auto' : '2d'));
                 break;
             case 'clear':
-                setPicked(null);
+                close();
+                break;
+            case 'sound':
+                toggleSound();
                 break;
             default:
                 break;
         }
-    }, [live.replay, canReplay, startReplay, dispatch, setFollow, setEngine, setPicked]);
+    }, [live.replay, canReplay, startReplay, dispatch, setFollow, setEngine, close, toggleSound]);
     useOfficeKeys(rootRef, onIntent);
 
     const session = live.view.session;
@@ -220,7 +314,7 @@ const OfficeApp = (props: Props) => {
                     ) : canReplay && (
                         <ActionButton variant="secondary" size="sm" data-office-replay title={OFFICE_COPY.replayNote(OFFICE_REPLAY_MS / 1000)} aria-keyshortcuts={OFFICE_KEY_SHORTCUTS.replay} onClick={startReplay}>{OFFICE_COPY.replay}</ActionButton>
                     )}
-                    {owner && enabled && !live.replay && <RunNowButton live={isSessionLive(live.view)} onStarted={pollNow} />}
+                    {owner && enabled && !live.replay && <RunNowButton live={isSessionLive(live.view)} onStarted={kick} />}
                     <div className="ml-auto flex flex-wrap items-center gap-2">
                         <label className="flex items-center gap-1.5 text-xs text-fg-soft">
                             <Switch checked={follow} onCheckedChange={setFollow} aria-keyshortcuts={OFFICE_KEY_SHORTCUTS.follow} data-office-follow-switch />
@@ -240,6 +334,10 @@ const OfficeApp = (props: Props) => {
                         <button type="button" className={iconButton} aria-label={OFFICE_COPY.zoomIn} aria-keyshortcuts={OFFICE_KEY_SHORTCUTS.zoomIn} onClick={() => controls.current?.zoom(0.8)}>
                             <span className="material-symbols-outlined text-lg" aria-hidden="true">add</span>
                         </button>
+                        <button type="button" className={iconButton} data-office-sound={sound ? 'on' : 'off'} aria-pressed={sound} aria-label={OFFICE_COPY.sound} title={OFFICE_COPY.soundOn}
+                            aria-keyshortcuts={OFFICE_KEY_SHORTCUTS.sound} onClick={toggleSound}>
+                            <span className="material-symbols-outlined text-lg" aria-hidden="true">{sound ? 'volume_up' : 'volume_off'}</span>
+                        </button>
                         <ActionButton variant="secondary" size="sm" data-office-plan aria-keyshortcuts={OFFICE_KEY_SHORTCUTS.plan} onClick={() => setEngine((e) => (e === '2d' ? 'auto' : '2d'))}>
                             {engine === '2d' ? OFFICE_COPY.view3d : OFFICE_COPY.plan}
                         </ActionButton>
@@ -250,7 +348,7 @@ const OfficeApp = (props: Props) => {
                             {showKeys && (
                                 <div className="chrome-surface absolute right-0 top-full z-30 mt-2 w-72 rounded-lg p-3" data-office-keys>
                                     <dl className="space-y-1 text-xs">
-                                        {OFFICE_KEYS_COPY.filter((row) => row.keys !== 'M').map((row) => (
+                                        {OFFICE_KEYS_COPY.map((row) => (
                                             <div key={row.keys} className="flex gap-3">
                                                 <dt className="w-14 shrink-0 font-mono text-fg">{row.keys}</dt>
                                                 <dd className="text-fg-soft">{row.what}</dd>
@@ -274,7 +372,7 @@ const OfficeApp = (props: Props) => {
                         daylight={daylight}
                         engine={engine}
                         selected={picked}
-                        onSelect={(id) => (id ? open(id) : setPicked(null))}
+                        onSelect={(id) => (id ? open(id) : close())}
                         follow={follow}
                         onFollowChange={setFollow}
                         onCamera={(info) => setPreset(info.preset)}
@@ -292,7 +390,7 @@ const OfficeApp = (props: Props) => {
                                 <p className="font-heading text-sm font-semibold text-fg">{OFFICE_COPY.noSessionTitle}</p>
                                 <p className="mt-1 text-xs text-fg-soft">{OFFICE_COPY.noSessionBody}</p>
                                 {props.nextSessionNote && <p className="mt-1 text-xs text-fg-muted">{props.nextSessionNote}</p>}
-                                {owner && enabled && <div className="mt-3 flex justify-center"><RunNowButton live={false} onStarted={pollNow} /></div>}
+                                {owner && enabled && <div className="mt-3 flex justify-center"><RunNowButton live={false} onStarted={kick} /></div>}
                             </div>
                         </div>
                     )}
@@ -308,7 +406,7 @@ const OfficeApp = (props: Props) => {
             </main>
 
             <OfficeDossier id={picked} office={office} view={shown} career={career} budgets={budgets} owner={owner} enabled={enabled} ratingTitle={ratingTitle} terms={terms}
-                onClose={() => setPicked(null)} onDecided={pollNow} />
+                onClose={close} onDecided={pollNow} />
         </div>
     );
 };

@@ -585,8 +585,10 @@ and friends keep none beyond Shared and the invariants).
   Execution desk's `DecisionPanel` too, so an owner decides from the office; `?engine=2d` or no WebGL
   draws `components/agent-world/office/OfficeMap2D`. Colours are the `--office-*` tokens in
   `app/globals.css`; the `.ao-*` motion classes are in both guards and stopped by name in brutalist.
-  Keys: `lib/agent-world/office-keys`. Its sentences are `lib/learn/copy/agent-world-office`, its
-  legend `lib/agent-world/office-legend`.
+  Keys: `lib/agent-world/office-keys`; sound, off until turned on and kept in this browser, is the
+  pure recipes of `lib/agent-world/office-sounds` (cued by the ticker's new event keys) played by
+  `components/agent-world/office/office-sound`. Its sentences are `lib/learn/copy/agent-world-office`,
+  its legend `lib/agent-world/office-legend`.
 - Its sentences are `lib/learn/copy/agent-world` (and the issue's own, `lib/learn/copy/agent-world-paperclip`);
   its terms the glossary's `agent-world` group, homed on `/agent-world`; the legend
   `lib/agent-world/legend` (every figure from config). QA: `npm run qa -- agent-world` (and

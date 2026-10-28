@@ -406,6 +406,7 @@ export const OFFICE_LEGEND_COPY = {
     lamp: 'The lamp on the execution desk breathes while the orders wait for the owner, and the stamp comes down when a decision is made.',
     tickets: 'A ticket down the chute is one order placed on the paper account; a ticket that comes back was not filled, and its tag says why.',
     board: "The issue board by the front desk shows the session's Paperclip issue: open, in review, done.",
+    plant: (leaves: number): string => `The plant in the corner office has a leaf for each session so far, up to ${leaves}.`,
     clockHeading: 'The clock',
     polling: (live: number, idle: number): string =>
         `The office checks for news every ${live} seconds while a session is in progress and every ${idle} seconds otherwise, and not at all while its tab is hidden.`,
@@ -417,6 +418,7 @@ export const OFFICE_LEGEND_COPY = {
     readingHeading: 'Reading it',
     keyboard: "Tab moves along the seats in the order a run reaches them; Enter opens a seat's file and Escape closes it.",
     fallbackMap: 'Without WebGL, or with ?engine=2d in the address, the office is a floor plan with the same seats and statuses.',
+    sound: 'Sound stays off until it is turned on, by the speaker in the top bar or M: a soft cue marks a fetch landing, a filing, a turn, a rating pinned, the decision and the desk done.',
     caveat: 'Every bubble and every text in a file is model text about the desk\'s own paper account, shown as written.',
     figures: "This session's figures are the stored stage records; the last sessions' add the most recent forty finished sessions; budgets are Paperclip's month to date for each agent.",
     noRank: 'Nothing in the office ranks a seat: the figures say what was spent and read, not who did well.',

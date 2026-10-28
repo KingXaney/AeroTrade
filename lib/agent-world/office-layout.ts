@@ -148,6 +148,9 @@ export const shelfFront = (vendor: string): Vec3 | null => {
     return shelf ? [shelf.center[0], 1.45, shelf.center[2] + 0.42] : null;
 };
 
+// The corner office's plant grows a leaf for each session, up to this many.
+export const OFFICE_PLANT_LEAVES = 12;
+
 // A rating card's place on the corkboard, the i-th of up to ten (two rows of five).
 export const CORK_SLOTS = 10;
 export const corkSlot = (i: number): Vec3 => {

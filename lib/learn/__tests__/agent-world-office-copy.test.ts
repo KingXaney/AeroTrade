@@ -120,7 +120,7 @@ const SENTENCE_GROUPS: {name: string; copy: Copy; samples: Record<string, unknow
     {
         name: 'OFFICE_LEGEND_COPY',
         copy: Object.fromEntries(Object.entries(OFFICE_LEGEND_COPY).filter(([key]) => key !== 'summary' && !key.endsWith('Heading'))),
-        samples: {polling: [[3, 30]], replay: [[60]], windows: [[6]]},
+        samples: {polling: [[3, 30]], replay: [[60]], windows: [[6]], plant: [[12]]},
     },
 ];
 
@@ -139,7 +139,7 @@ describe('the office\'s copy', () => {
     });
 
     it('keeps the legend to mechanism only', () => {
-        const {strings} = renderGroup('OFFICE_LEGEND_COPY', OFFICE_LEGEND_COPY, {polling: [[3, 30]], replay: [[60]], windows: [[6]]});
+        const {strings} = renderGroup('OFFICE_LEGEND_COPY', OFFICE_LEGEND_COPY, {polling: [[3, 30]], replay: [[60]], windows: [[6]], plant: [[12]]});
         for (const text of strings) expect(text, text).not.toMatch(MECHANISM_ONLY);
     });
 

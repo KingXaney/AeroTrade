@@ -46,6 +46,7 @@ import {
     OFFICE_SEATS,
     OFFICE_ZONES,
     pathLength,
+    OFFICE_PLANT_LEAVES,
     pathPoint,
     presetForSeat,
     seatOf,
@@ -836,6 +837,12 @@ export const createOfficeScene = (options: OfficeSceneOptions): OfficeScene => {
                 ticketFlights.set(flow.id, {start: flow.at, executed: flow.executed, slot: ticketFlights.size % tickets.length});
             }
         }
+        // The corner office's plant: a leaf for each session so far.
+        const grown = Math.min(OFFICE_PLANT_LEAVES, next.scoreboard.sessionsToDate);
+        if (room.leaves.count !== grown) {
+            room.leaves.count = grown;
+            dirty = true;
+        }
         if (next.lamp !== lastLamp) {
             const exec = next.workers.find((w) => w.id === 'execution-desk');
             const recent = exec?.since != null && now - exec.since < span(8000);
@@ -1173,6 +1180,19 @@ export const createOfficeScene = (options: OfficeSceneOptions): OfficeScene => {
     };
 
     // ---- state ----
+    // What the floor draws from a state, as one string: the page hands a new state every tick of its
+    // clock, and one that changes none of this needs no frame (with motion reduced, nothing else asks
+    // for one, so an idle office stops drawing).
+    let drawnSignature = '';
+    const signatureOf = (s: OfficeState): string => JSON.stringify([
+        s.mode, s.sessionId, s.focus, s.lamp, s.issue.state,
+        s.workers.map((w) => [w.status, w.task, w.bubbleKey]),
+        s.flows.map((f) => f.id),
+        s.shelves.map((shelf) => [shelf.vendor, shelf.hot, shelf.refused, shelf.fetches, shelf.tag?.at ?? 0]),
+        s.ratings.map((r) => [r.symbol, r.rating]),
+        s.tickets.map((ticket) => [ticket.symbol, ticket.executed]),
+        s.scoreboard.sessionsToDate, s.scoreboard.refusals,
+    ]);
     const applyState = (next: OfficeState, nowMs: number, nextRate: number) => {
         const wall = performance.now();
         if (next.sessionId !== state.sessionId || nowMs < stateNow - 500) {
@@ -1215,7 +1235,9 @@ export const createOfficeScene = (options: OfficeSceneOptions): OfficeScene => {
                 goTo(target);
             }
         }
-        dirty = true;
+        const signature = signatureOf(next);
+        if (signature !== drawnSignature || runs.size > 0) dirty = true;
+        drawnSignature = signature;
         schedule();
     };
 
@@ -1301,7 +1323,7 @@ export const createOfficeScene = (options: OfficeSceneOptions): OfficeScene => {
             dirty = false;
             lastDraw = wall;
             frames += 1;
-            if (frames % 30 === 0) options.onDrawn?.(frames, renderer.info.render.calls);
+            options.onDrawn?.(frames, renderer.info.render.calls);
         }
         if (busy || ambient || runs.size > 0) schedule();
         else if (state.mode === 'live') {

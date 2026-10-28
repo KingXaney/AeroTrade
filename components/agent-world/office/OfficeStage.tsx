@@ -288,7 +288,7 @@ const OfficeStage = (props: Props) => {
                     <span key={shelf.vendor} ref={register(`shelf:${shelf.vendor}`)} data-office-shelf={shelf.vendor} data-hot={shelf.hot ? 'true' : 'false'} data-refused={shelf.refused ? 'true' : 'false'}
                         style={{visibility: 'hidden'}} className="absolute left-0 top-0 flex -translate-x-1/2 -translate-y-full items-center gap-1 whitespace-nowrap">
                         <span className={cn('chrome-surface rounded px-1 py-px font-mono text-[9px] text-fg', shelf.hot && 'outline outline-1 outline-brand')}>{shelf.label}{shelf.fetches > 0 ? ` · ${shelf.fetches}` : ''}</span>
-                        {shelf.tag && <span key={shelf.tag.at} className="ao-stamp-in rounded bg-warning px-1 font-mono text-[10px] font-semibold text-bg">{shelf.tag.note ?? ZONE_COPY.noAnswer}</span>}
+                        {shelf.tag && <span key={shelf.tag.at} data-office-tag className="ao-stamp-in rounded bg-warning px-1 font-mono text-[10px] font-semibold text-bg">{shelf.tag.note ?? ZONE_COPY.noAnswer}</span>}
                     </span>
                 ))}
                 {state.ratings.some((rating) => rating.rating !== null) && (

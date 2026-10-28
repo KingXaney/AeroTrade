@@ -30,6 +30,7 @@ import {
     SphereGeometry,
     SRGBColorSpace,
     TorusGeometry,
+    Vector3,
     type Material,
     type Object3D,
     type Texture,
@@ -42,6 +43,7 @@ import {
     FLOOR,
     FURNITURE,
     hashString,
+    OFFICE_PLANT_LEAVES,
     OFFICE_SEATS,
     RIG,
     type OfficeSeat,
@@ -316,6 +318,7 @@ export type Room = {
     riskLampBulbs: Mesh[];
     brewLight: Mesh;
     ring: Mesh;
+    leaves: InstancedMesh;
 };
 
 const WALL_H = 3.4;
@@ -532,6 +535,19 @@ export const buildRoom = (reg: Registry, m: OfficeMaterials): Room => {
     batch.add(m.plant, new ConeGeometry(0.42, 0.9, 9).translate(px, 0.86, pz));
     batch.add(m.plant, new ConeGeometry(0.32, 0.7, 9).translate(px, 1.2, pz));
     batch.add(m.plant, new ConeGeometry(0.2, 0.5, 9).translate(px, 1.5, pz));
+    // Its leaves, one a session (the scene sets how many show), on a spiral round the stem.
+    const leaves = new InstancedMesh(register(reg, new SphereGeometry(1, 8, 6)), m.plant, OFFICE_PLANT_LEAVES);
+    const leaf = new Matrix4();
+    for (let i = 0; i < OFFICE_PLANT_LEAVES; i += 1) {
+        const angle = i * 2.39996;
+        const r = 0.44 - i * 0.016;
+        leaf.makeRotationY(-angle).multiply(new Matrix4().makeRotationZ(0.5)).scale(new Vector3(0.18, 0.045, 0.1));
+        leaf.setPosition(px + Math.cos(angle) * r, 0.8 + i * 0.07, pz + Math.sin(angle) * r);
+        leaves.setMatrixAt(i, leaf);
+    }
+    leaves.instanceMatrix.needsUpdate = true;
+    leaves.count = 0;
+    group.add(leaves);
     const cork = FURNITURE.corkboard;
     batch.add(m.cork, box(cork.size[0], cork.size[1], 0.04, cork.center));
     batch.add(m.wood, box(cork.size[0] + 0.1, cork.size[1] + 0.1, 0.02, [cork.center[0], cork.center[1], cork.center[2] - 0.02]));
@@ -640,7 +656,7 @@ export const buildRoom = (reg: Registry, m: OfficeMaterials): Room => {
     group.add(pickRing);
 
     batch.build(group);
-    return {group, glows, gaugeNeedles, clockHands, planBars, printerStrip: strip, lampBulb, marketLamp, stamp, issueCard, riskLampBulbs, brewLight, ring: pickRing};
+    return {group, glows, gaugeNeedles, clockHands, planBars, printerStrip: strip, lampBulb, marketLamp, stamp, issueCard, riskLampBulbs, brewLight, ring: pickRing, leaves};
 };
 
 // ---- the city below and the sky ------------------------------------------------------------------

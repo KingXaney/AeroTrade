@@ -4,6 +4,7 @@
 
 import {OFFICE_REPLAY_MS, POLL_IDLE_MS, POLL_LIVE_MS} from "@/lib/agent-world/config";
 import {OFFICE_WINDOWS} from "@/lib/agent-world/office";
+import {OFFICE_PLANT_LEAVES} from "@/lib/agent-world/office-layout";
 import {OFFICE_LEGEND_COPY as L} from "@/lib/learn/copy/agent-world-office";
 
 export type OfficeLegend = {summary: string; sections: {heading: string; lines: string[]}[]};
@@ -14,7 +15,7 @@ export const officeLegend = (): OfficeLegend => ({
     summary: L.summary,
     sections: [
         {heading: L.seatsHeading, lines: [L.idle, L.waiting, L.fetching, L.busy, L.talking, L.filed, L.done, L.stopped]},
-        {heading: L.movesHeading, lines: [L.planes, L.fallback, L.papers, L.cards, L.lamp, L.tickets, L.board]},
+        {heading: L.movesHeading, lines: [L.planes, L.fallback, L.papers, L.cards, L.lamp, L.tickets, L.board, L.plant(OFFICE_PLANT_LEAVES)]},
         {
             heading: L.clockHeading,
             lines: [
@@ -24,6 +25,6 @@ export const officeLegend = (): OfficeLegend => ({
                 L.daylight,
             ],
         },
-        {heading: L.readingHeading, lines: [L.keyboard, L.fallbackMap, L.caveat, L.figures, L.noRank]},
+        {heading: L.readingHeading, lines: [L.keyboard, L.fallbackMap, L.sound, L.caveat, L.figures, L.noRank]},
     ],
 });
