@@ -41,6 +41,8 @@ const CULTURE: readonly GlossaryKey[] = [
     'attention-since-report', 'app-rank', 'brand-sentiment', 'brand-thesis', 'brand-owner', 'picker-profile',
     'signal-adoption', 'signal-hype', 'signal-backlash', 'signal-substitution', 'signal-drop', 'signal-price', 'signal-fading',
     'attention-backtest',
+    // The signal check (research log R1): the culture backtest's, and the Navigator's beside it.
+    'information-coefficient', 'ic-t-statistic',
 ];
 const AGENT_WORLD: readonly GlossaryKey[] = [
     'desk-session', 'desk-role', 'analyst-report', 'research-debate', 'desk-rating', 'rating-target', 'desk-rails',

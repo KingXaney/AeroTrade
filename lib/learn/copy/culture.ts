@@ -115,6 +115,8 @@ export const BRAND_BOARD_TERMS = ['attention', 'brand-sentiment', 'brand-thesis'
 export const RISING_TERMS = ['attention'] as const;
 export const PICKS_TERMS = ['picker-profile', 'brand-owner'] as const;
 export const COMPARISON_TERMS = ['picker-profile', 'total-return'] as const;
+// The signal check (components/culture/SignalCheck): research log R1 and R2, docs/research/log.md.
+export const SIGNAL_CHECK_TERMS = ['information-coefficient', 'ic-t-statistic', 'attention-backtest'] as const;
 
 export const CULTURE_COPY = {
     pageSubtitle: 'What younger consumers look up, install and post about, mapped onto the companies that own the brands — read by two pickers that trade on it inside hard rails',
@@ -146,6 +148,20 @@ export const CULTURE_COPY = {
     suggestionsLead: 'Names the model met that are not in the catalog. A person adds one in code; the brain never adds a brand itself.',
     suggestionsEmpty: 'The model has met no name the catalog lacks.',
     suggestionRow: (count: number, firstSeen: string): string => `${plural(count, 'mention', 'mentions')} · first seen ${firstSeen}`,
+} as const;
+
+// What each signal said, against what followed: the backtest's weeks, measured (lib/culture/signal-check).
+export const SIGNAL_CHECK_COPY = {
+    heading: 'What each signal said, against what followed',
+    lead: "In each simulated week the owners the pickers could buy are put in two orders: by a signal, and by what they returned from that week's open over the weeks after it. A cell is how closely the two orders agreed, averaged over the weeks measured, with its t-statistic beneath; a picker's row reads its whole score. No cell is coloured and no row is sorted by its figure.",
+    signalHeader: 'Signal',
+    horizonHeader: 'Weeks after',
+    pickerRow: (label: string): string => `${label}, whole score`,
+    horizon: (weeks: number): string => (weeks === 1 ? '1 week' : `${weeks} weeks`),
+    tLine: (t: number | null): string => (t === null ? 't —' : `t ${t < 0 ? '−' : '+'}${Math.abs(t).toFixed(1)}`),
+    weeksNote: (weeks: number): string => `Up to ${plural(weeks, 'week', 'weeks')} in a cell; a longer horizon leaves fewer weeks with a return to measure.`,
+    hurdle: (figures: number): string => `${plural(figures, 'figure is', 'figures are')} read here together; among that many, a handful can sit beyond ±2 with no relation behind them.`,
+    simulatedOnly: 'Simulated weeks only, from pageviews and prices: the live feeds — App Store ranks, mentions, the press — have no history here, so their terms have no row.',
 } as const;
 
 export const CULTURE_PICKS_COPY = {

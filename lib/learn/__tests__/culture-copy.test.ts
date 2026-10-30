@@ -20,6 +20,8 @@ import {
     PICKS_TERMS,
     PROFILE_COPY,
     RISING_TERMS,
+    SIGNAL_CHECK_COPY,
+    SIGNAL_CHECK_TERMS,
     SOURCE_LABELS,
     TERM_LABELS,
 } from '@/lib/learn/copy/culture';
@@ -186,5 +188,28 @@ describe('the /culture page copy', () => {
             clean(text);
             expect(text).not.toMatch(MECHANISM_ONLY);
         }
+    });
+});
+
+describe('the signal check', () => {
+    it('says what it measured without advice, and claims nothing for a picker', () => {
+        const lines = [
+            SIGNAL_CHECK_COPY.heading, SIGNAL_CHECK_COPY.lead, SIGNAL_CHECK_COPY.signalHeader, SIGNAL_CHECK_COPY.horizonHeader,
+            SIGNAL_CHECK_COPY.hurdle(70), SIGNAL_CHECK_COPY.hurdle(1), SIGNAL_CHECK_COPY.simulatedOnly,
+            SIGNAL_CHECK_COPY.pickerRow('Spike'), SIGNAL_CHECK_COPY.horizon(1), SIGNAL_CHECK_COPY.horizon(13),
+            SIGNAL_CHECK_COPY.tLine(2.43), SIGNAL_CHECK_COPY.tLine(-0.04), SIGNAL_CHECK_COPY.tLine(null),
+            SIGNAL_CHECK_COPY.weeksNote(259), SIGNAL_CHECK_COPY.weeksNote(1),
+        ];
+        for (const line of lines) {
+            clean(line);
+            expect(line).not.toMatch(MECHANISM_ONLY);
+        }
+        expect(SIGNAL_CHECK_COPY.tLine(-0.04)).toBe('t −0.0');
+        expect(SIGNAL_CHECK_COPY.tLine(2.43)).toBe('t +2.4');
+        expect(SIGNAL_CHECK_COPY.horizon(1)).toBe('1 week');
+    });
+
+    it('lists only glossary entries', () => {
+        for (const key of SIGNAL_CHECK_TERMS) expect(GLOSSARY[key], key).toBeDefined();
     });
 });

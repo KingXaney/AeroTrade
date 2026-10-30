@@ -1,5 +1,6 @@
 import {describe, expect, it} from 'vitest';
-import {cultureBacktestDue, toBacktestView, type StoredCultureBacktest} from '@/lib/culture/backtest';
+import {cultureBacktestDue, toBacktestView, toSignalTable, type StoredCultureBacktest} from '@/lib/culture/backtest';
+import type {SignalIcRow} from '@/lib/culture/signal-check';
 import type {SeriesStats} from '@/lib/strategies/types';
 
 const stats = (totalReturnPct: number, benchmarkReturnPct: number): SeriesStats => ({
@@ -7,17 +8,48 @@ const stats = (totalReturnPct: number, benchmarkReturnPct: number): SeriesStats 
 });
 
 describe('cultureBacktestDue', () => {
-    const stamp = {version: '1', catalogHash: 'abc', computedAt: 1};
+    const stamp = {version: '1', catalogHash: 'abc', computedAt: 1, signalsVersion: '1'};
+    const now = {version: '1', catalogHash: 'abc', resimulate: false, signalsVersion: '1'};
 
     it('rebuilds before any build, on a new version, a changed catalog, or a resimulate', () => {
-        expect(cultureBacktestDue(null, {version: '1', catalogHash: 'abc', resimulate: false})).toBe(true);
-        expect(cultureBacktestDue(stamp, {version: '2', catalogHash: 'abc', resimulate: false})).toBe(true);
-        expect(cultureBacktestDue(stamp, {version: '1', catalogHash: 'def', resimulate: false})).toBe(true);
-        expect(cultureBacktestDue(stamp, {version: '1', catalogHash: 'abc', resimulate: true})).toBe(true);
+        expect(cultureBacktestDue(null, now)).toBe(true);
+        expect(cultureBacktestDue(stamp, {...now, version: '2'})).toBe(true);
+        expect(cultureBacktestDue(stamp, {...now, catalogHash: 'def'})).toBe(true);
+        expect(cultureBacktestDue(stamp, {...now, resimulate: true})).toBe(true);
     });
 
-    it('keeps a build whose version and catalog still hold', () => {
-        expect(cultureBacktestDue(stamp, {version: '1', catalogHash: 'abc', resimulate: false})).toBe(false);
+    it('rebuilds a build whose signals were measured under another version, or not at all', () => {
+        expect(cultureBacktestDue(stamp, {...now, signalsVersion: '2'})).toBe(true);
+        expect(cultureBacktestDue({...stamp, signalsVersion: null}, now)).toBe(true);
+    });
+
+    it('keeps a build whose version, catalog and measurement still hold', () => {
+        expect(cultureBacktestDue(stamp, now)).toBe(false);
+    });
+});
+
+describe('toSignalTable', () => {
+    const row = (signal: SignalIcRow['signal'], horizonWeeks: number, meanIc: number): SignalIcRow =>
+        ({signal, horizonWeeks, meanIc, tStat: meanIc * 40, weeks: 200, positiveShare: 0.5 + meanIc});
+
+    it('puts the pickers first in the registry order, then the terms in theirs, never by figure', () => {
+        const table = toSignalTable([
+            row('attentionTrend', 1, 0.09), row('score:quiet', 1, 0.01), row('attentionAnomaly', 1, -0.04),
+            row('score:spike', 1, 0.02), row('momentumLong', 4, 0.03),
+        ]);
+        expect(table?.rows.map((r) => (r.kind === 'score' ? `score:${r.profile}` : r.term))).toEqual(
+            ['score:spike', 'score:quiet', 'momentumLong', 'attentionAnomaly', 'attentionTrend']);
+    });
+
+    it('keeps only the horizons that have a figure, with a gap where a signal has none', () => {
+        const table = toSignalTable([row('attentionAnomaly', 1, -0.04), row('attentionAnomaly', 13, 0.02), row('momentumLong', 13, 0.03)]);
+        expect(table?.horizons).toEqual([1, 13]);
+        const momentum = table?.rows.find((r) => r.kind === 'term' && r.term === 'momentumLong');
+        expect(momentum?.cells).toEqual([null, {meanIc: 0.03, tStat: expect.closeTo(1.2, 9), weeks: 200, positiveShare: 0.53}]);
+    });
+
+    it('is null without a figure', () => {
+        expect(toSignalTable([])).toBeNull();
     });
 });
 
@@ -26,6 +58,7 @@ describe('toBacktestView', () => {
         version: '1', catalogHash: 'abc', feeds: ['price', 'wikipedia'], from: '2021-10-04', to: '2026-10-03',
         benchmark: [{date: '2021-10-04', value: 400}, {date: '2021-10-05', value: 404}],
         computedAt: 1_700_000_000_000,
+        signals: [],
         variants: [
             {profile: 'quiet', weeks: 260, turnoverPct: 80, closeFills: 0, tradeCount: 40, points: [{date: '2021-10-04', value: 100_000}, {date: '2021-10-05', value: 101_000}], stats: stats(1, 1)},
             {profile: 'price', weeks: 260, turnoverPct: 20, closeFills: 1, tradeCount: 10, points: [{date: '2021-10-04', value: 100_000}, {date: '2021-10-05', value: 102_000}], stats: stats(2, 1)},
