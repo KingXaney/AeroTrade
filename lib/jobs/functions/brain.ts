@@ -64,7 +64,9 @@ export const updateNewsBrain = inngest.createFunction(
         const foldResult = await step.run('fold-brain', async () =>
             foldExtractionsIntoBrain(folds, new Set(verifiedTickers), runId));
 
-        const summary = `Brain updated: ${inserted} articles ingested, ${extractedIds.length} extracted${readEmpty > 0 ? `, ${readEmpty} read with nothing to tag` : ''}, ${foldResult.entitiesTouched} entities touched, ${foldResult.deleted} pruned`;
+        // A replayed fold step from before the repeat check has no count: say nothing then.
+        const repeats = foldResult.repeats ?? 0;
+        const summary = `Brain updated: ${inserted} articles ingested, ${extractedIds.length} extracted${readEmpty > 0 ? `, ${readEmpty} read with nothing to tag` : ''}${repeats > 0 ? `, ${repeats} repeated ${repeats === 1 ? 'mention' : 'mentions'} counted as attention only` : ''}, ${foldResult.entitiesTouched} entities touched, ${foldResult.deleted} pruned`;
         await step.run('record-job-run', async () => recordJobRun(JOBS.newsBrain.id, summary));
         return {success: true, message: summary};
     },

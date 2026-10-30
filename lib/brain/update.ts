@@ -58,7 +58,7 @@ export const foldExtractionsIntoBrain = async (
     articles: ArticleFold[],
     verifiedTickers: Set<string>,
     runId?: string,
-): Promise<{entitiesTouched: number; deleted: number}> => {
+): Promise<{entitiesTouched: number; deleted: number; repeats: number}> => {
     await connectToDatabase();
     const today = getEasternDateString();
     const nowMs = Date.now();
@@ -66,6 +66,7 @@ export const foldExtractionsIntoBrain = async (
     // Group mentions + co-mention links per entity key across the run's articles. A story the run
     // already read under a near-identical headline adds attention but no tone (research log R4).
     const repeats = repeatedMentions(articles);
+    const repeatCount = repeats.reduce((sum, keys) => sum + keys.size, 0);
     const mentionsByKey = new Map<string, {type: 'ticker' | 'sector' | 'theme'; mentions: Mention[]; coMentions: Map<string, number>}>();
     for (const [index, article] of articles.entries()) {
         for (const entity of article.entities) {
@@ -154,5 +155,5 @@ export const foldExtractionsIntoBrain = async (
         }
     }
 
-    return {entitiesTouched, deleted};
+    return {entitiesTouched, deleted, repeats: repeatCount};
 };
