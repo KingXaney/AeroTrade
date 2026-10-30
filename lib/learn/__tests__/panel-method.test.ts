@@ -13,6 +13,7 @@ import {TIM_COPY, TIM_TERMS} from '@/lib/learn/copy/time-in-market';
 import {TERRAIN_COPY, TERRAIN_TERMS} from '@/lib/learn/copy/terrain';
 import {BRAND_BOARD_TERMS, CULTURE_COPY, SIGNAL_CHECK_COPY, SIGNAL_CHECK_TERMS} from '@/lib/learn/copy/culture';
 import {RESEARCH_COPY} from '@/lib/learn/copy/research';
+import {NAVIGATOR_SIGNAL_COPY, NAVIGATOR_SIGNAL_TERMS} from '@/lib/learn/copy/navigator';
 import {COMPANY_COPY, COMPANY_TERMS, DATA_COPY, DATA_TERMS, DECISION_TERMS, FLOOR_COPY, RECORD_COPY, RECORD_TERMS} from '@/lib/learn/copy/agent-world';
 import {DOSSIER_COPY, OFFICE_TERMS, SCOREBOARD_COPY} from '@/lib/learn/copy/agent-world-office';
 
@@ -55,6 +56,10 @@ describe('a panel lead says only what its definitions do not', () => {
 
     it('The momentum terrain: how it is laid out', () => {
         expect(restatements([TERRAIN_COPY.method], TERRAIN_TERMS)).toEqual([]);
+    });
+
+    it("The Navigator's signal check: what it measured", () => {
+        expect(restatements([NAVIGATOR_SIGNAL_COPY.lead, RESEARCH_COPY.hurdle(30), RESEARCH_COPY.weeksNote(51)], NAVIGATOR_SIGNAL_TERMS)).toEqual([]);
     });
 
     it('The signal check: what it measured', () => {

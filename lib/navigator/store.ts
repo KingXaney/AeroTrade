@@ -10,6 +10,8 @@ import BrainEntity from "@/database/models/brain-entity.model";
 import NewsItem from "@/database/models/news-item.model";
 import PaperAccount from "@/database/models/paper-account.model";
 import PaperTrade from "@/database/models/paper-trade.model";
+import NavigatorSignalWeek from "@/database/models/navigator-signal-week.model";
+import {toSignalSymbols} from "@/lib/navigator/signal-check";
 import {getTopVerifiedTickers} from "@/lib/brain/store";
 import {readOwnerUserIds} from "@/lib/lab/owner-store";
 import {getBarsForSymbols} from "@/lib/prices/store";
@@ -94,7 +96,10 @@ const buildSectorStanding = async (): Promise<SectorStanding> => {
     };
 };
 
-export const computeNavigatorScores = async (symbols: string[]): Promise<ScoredSymbol[]> => {
+// `record`: the weekly job's scoring also keeps the week's whole scored universe, one row per ET
+// week (the latest run of the week in place), for the signal check (research log R1); the
+// bootstrap of a new enrolment scores without recording.
+export const computeNavigatorScores = async (symbols: string[], {record}: {record?: {weekKey: string; date: string}} = {}): Promise<ScoredSymbol[]> => {
     await connectToDatabase();
     // Sector entities are fetched alongside the symbols themselves: a sector ETF's
     // narrative lives under 'sector:<slug>', never under its ticker.
@@ -152,7 +157,15 @@ export const computeNavigatorScores = async (symbols: string[]): Promise<ScoredS
             alwaysEligible: ALWAYS_ELIGIBLE_SYMBOLS.includes(symbol),
         };
     });
-    return scoreUniverse(inputs);
+    const scored = scoreUniverse(inputs);
+    if (record) {
+        await NavigatorSignalWeek.updateOne(
+            {weekKey: record.weekKey},
+            {$set: {date: record.date, symbols: toSignalSymbols(inputs, scored)}, $setOnInsert: {weekKey: record.weekKey, createdAt: new Date()}},
+            {upsert: true},
+        );
+    }
+    return scored;
 };
 
 export type AccountPlan = {planned: PlannedOrder[]; positions: HeldPosition[]; totalValue: number};
