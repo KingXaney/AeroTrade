@@ -27,6 +27,7 @@ Shared pieces that belong to no single feature:
 | `lib/format.ts` | Every display formatter: money, signed %, drawdown, time-ago, ET timestamps |
 | `lib/dates.ts` | Eastern-time calendar days and date arithmetic |
 | `lib/text.ts` | `escapeRegExp` (the one way user text becomes a regex), hashing, URL normalising |
+| `lib/research/` | The signal check both brains share: information coefficients and their t-statistics (`ic.ts`), open-to-open forward returns with dividends (`returns.ts`); the ideas behind each brain are `docs/research/log.md` |
 | `lib/rate-limit.ts` | The one Mongo-backed rate-limit counter (sign-in, sign-up, password reset, chat) and `peekRateLimit`, its read without a spend |
 | `lib/day-memo.ts` | The per-day memo request-path reads share |
 | `components/three/` | What a three.js scene reads from the page it draws in: WebGL, the theme stamp, reduced motion, a coarse pointer, the colour tokens as RGB (`lib/theme/css-color`) — the landing terrain and the brain's graph share it |
@@ -73,6 +74,7 @@ Shared pieces that belong to no single feature:
 | Add a quant strategy | A rule in `lib/strategies/rules/`, its entry in `lib/strategies/catalog.ts`; the compiler then points at every `Record<StrategyId, …>` table (`rules/index.ts`, `whatif.ts`, board narration) |
 | What a holding shows when no live quote answers | `lib/trading/valuation.ts` (`buildHoldingsPriceMap`: the stored-close fallback, request paths only), `lib/trading/analytics.ts` (`withStoredCloses`, `livePrice`, `countAtClose`), `lib/trading/config.ts` (`CLOSE_FALLBACK_DAYS`), the words in `lib/learn/copy/portfolio.ts` (`HOLDINGS_COPY.summary`, `closeCellTitle`) and `lib/learn/copy/unpriced.ts` (at cost) |
 | The AI Navigator's caps, cash floor, thresholds | `lib/navigator/config.ts` — the glossary and the /brain legend read them |
+| A brain's scoring, decay, sources or rails on the strength of a paper | Its entry in `docs/research/log.md` first (or a new one), then the constant; say `Research log R<n>` beside it. The signal checks judge it: `lib/research/ic.ts`, `lib/culture/signal-check.ts`, `lib/navigator/signal-check.ts` |
 | When a job runs | `lib/jobs/registry.ts` (`crons`); never rename an id or event there (Inngest keys runs on them) |
 | A service's published limit, or which service a refusal is filed against | `lib/limits/registry.ts` (the cap sentence with its date, the docs link, the planned use, the jobs); `lib/limits/detect.ts` reads the refusal; a new call site calls `reportLimit` from `lib/limits/report.ts` where it catches the failure |
 | The daily email's layout | `lib/email/layout.ts` (the frame and its blocks), `lib/email/digest-view.ts` (sections, links), `lib/email/digest-render.ts` (HTML and text), `lib/email/prompts.ts` (what the model is asked), `lib/email/sections/` (topics, lesson), `lib/learn/copy/email.ts` (every fixed sentence) |

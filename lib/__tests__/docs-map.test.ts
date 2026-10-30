@@ -12,7 +12,9 @@ import {fileURLToPath} from 'node:url';
 // <placeholder> segment (`lib/<feature>/types.ts` — then at least one file must match), or a
 // literal Next segment (`app/(root)/stocks/[symbol]`). Globs (`lib/**/__tests__`) are skipped.
 const root = fileURLToPath(new URL('../..', import.meta.url));
-const DOCS = ['docs/MAP.md', 'AGENTS.md'];
+const DOCS = ['docs/MAP.md', 'AGENTS.md', 'docs/research/log.md'];
+// Fewer paths than this and a doc's paths have stopped being read (a broken matcher, a moved file).
+const MIN_PATHS: Record<string, number> = {'docs/MAP.md': 40, 'AGENTS.md': 40, 'docs/research/log.md': 10};
 const ROOTS = ['app', 'components', 'lib', 'database', 'scripts', 'docs'];
 const EXTENSIONS = ['', '.ts', '.tsx', '.mjs'];
 const PATH = new RegExp(`^(${ROOTS.join('|')})/`);
@@ -60,7 +62,7 @@ const problemWith = (path: string): string | null => {
 describe('the repo map points at files that exist', () => {
     it.each(DOCS)('every path in %s resolves', (doc) => {
         const paths = pathsIn(readFileSync(`${root}${doc}`, 'utf8'));
-        expect(paths.length).toBeGreaterThan(40);
+        expect(paths.length).toBeGreaterThan(MIN_PATHS[doc]);
         const broken = paths.flatMap((path) => {
             const problem = problemWith(path);
             return problem ? [`${path} — ${problem}`] : [];

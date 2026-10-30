@@ -195,6 +195,9 @@ export type PickerProfile = {
 // reader can watch. Quiet follows attention that has lasted, that the press has not caught up
 // with, that built since the last report, and that is taking share inside its category — the
 // terms the market is slowest on. Price only is the backtest's baseline. Each sums to one.
+// Research log R2 (docs/research/log.md): whether Spike's jump in attention keeps paying or
+// reverses is measured by the backtest's signal check, not assumed. Research log R3: the evidence
+// behind Quiet's terms — attention that has lasted and that the press has not covered.
 export const CULTURE_PROFILES: Record<ProfileId, PickerProfile> = {
     spike: {
         id: 'spike',

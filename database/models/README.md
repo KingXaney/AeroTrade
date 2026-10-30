@@ -18,6 +18,7 @@ reads and writes live. Change a field here, then in the store module named besid
 | `strategy-backtest` | strategies | `lib/strategies/store`, `page-store` |
 | `ai-navigator` | navigator | `lib/navigator/store` (enrolment), `run` (the weekly job) |
 | `suggestion-set` | navigator | `lib/navigator/store`, `run`; the digest reads the latest set |
+| `navigator-signal-week` | navigator | `lib/navigator/store` (written by the weekly scoring step), `signal-store` (the signal check, research log R1) |
 | `brain-entity` | brain | `lib/brain/store`, `update`, `ingest` |
 | `news-item` | brain | `lib/brain/ingest` (the daily sweep), `store` (evidence reads) |
 | `second-opinion` | brain | `lib/brain/opinion` |
