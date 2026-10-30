@@ -22,7 +22,7 @@ before the rename keep the name "Main Strategy" (new ones are "Main account", `D
 - `npm run dev` + `npx inngest-cli@latest dev -u http://localhost:3000/api/inngest` — app + jobs
 - `npm run trigger -- <brain|navigator|news|snapshots|income|topics|briefs|briefing|strategies|strategies-preview|strategies-resimulate|culture|culture-weekly|culture-preview|culture-resimulate|culture-backfill|lab|agent-world|agent-world-now|agent-world-preview>` — fire a job locally (`news <email>`: a test brief to that one opted-in reader; `culture-backfill [brandId ...]`: every brand's Wikipedia views back to the backtest horizon, or the named brands)
 - `npm run test:db` — connect to `MONGODB_URI` (from `.env`) and print the database and host it reached
-- `npm run migrate:accounts` — the idempotent multi-account migration: builds the indexes in `scripts/migration-indexes.mjs` and drops the ones they replaced (run it on every database, again whenever that list changes)
+- `npm run migrate:accounts` — the idempotent multi-account migration: repairs income rows written twice (`scripts/income-dedupe.mjs`), builds the indexes in `scripts/migration-indexes.mjs` and drops the ones they replaced (run it on every database, again whenever that list changes; `-- --dry-run` writes nothing and prints what it would change)
 - `npm run opinion:local` — the brain's Second Opinion from your Claude subscription through the Claude Code CLI, written straight to the database (`.env.example` lists the other ways)
 - `npm run email:preview` — render every email from the fixtures into the QA output folder (output/email under scripts/qa) and check it at desktop and phone widths, light and dark (`qa-email` without the harness)
 - `npm run qa` — browser QA (`scripts/qa/run.sh`): an in-memory MongoDB, `next dev` and the Inngest dev server, then every suite or the named ones (`npm run qa -- learn`); one suite per feature, listed in `scripts/qa/README.md`
@@ -74,7 +74,7 @@ and friends keep none beyond Shared and the invariants).
 - `lib/day-memo` is the one in-process memo the request-path reads share: kept for an ET day, keyed
   on the stored data's own stamp (latest closes, run dates), never the clock alone, so a read taken
   before a price job lands is never pinned.
-- `database/models/`: the paper account, trade and snapshot models' indexes are also listed in
+- `database/models/`: the paper account, trade, snapshot and income models' indexes are also listed in
   `scripts/migration-indexes.mjs`, which `migrate:accounts` builds and
   `lib/__tests__/migration-indexes.test.ts` holds equal to the models.
 
@@ -269,6 +269,12 @@ and friends keep none beyond Shared and the invariants).
 - `lib/income/store` is the nightly credit; `lib/income/page-store.getCashApy` is the one cached
   rate read, behind both the Income panel's APY and the order ticket's month of interest
   (`lib/income/accrual.interestOverDays`).
+- An `AccountIncome` row is one credit, keyed by account, epoch, kind, date and symbol, and that key
+  is unique (`scripts/migration-indexes.mjs`). Every sum of stored rows counts a key once
+  (`lib/income/accrual.distinctIncomeRows`): before the index existed in production, two runs at
+  once could each write a day's rows and the winner credited both (August and September 2026),
+  which `migrate:accounts` step 4 repairs. A waiting account names what holds it back
+  (`readinessOf`: the T-bill rate for a day, or a symbol's dividends).
 
 ### strategies
 
@@ -320,7 +326,9 @@ and friends keep none beyond Shared and the invariants).
 
 ### brain
 
-- `lib/brain/ingest` is the daily update's sweep, extraction batches and ticker guard.
+- `lib/brain/ingest` is the daily update's sweep, extraction batches and ticker guard. An article the
+  model has read is never sent again: one it answered with nothing to tag is stamped `readAt`, one it
+  left out of its answer after `MAX_EXTRACTION_TRIES`; the queue and "waiting to be read" skip both.
 - A piece's nature — `reported`, `company`, `opinion`, `rumour` (`NATURES` in `lib/brain/config`) — is
   the extractor's second label, beside the event type. `lib/brain/trust.sourceTrust` reads the
   outlet first (a press-release wire is `company` whatever the model said; a commentary outlet
@@ -1697,7 +1705,10 @@ and friends keep none beyond Shared and the invariants).
 
 - Daily bars come from Yahoo first, Stooq as the fallback (`lib/prices/store`), alongside
   dividends, the T-bill rate, the SPY total-return index, signals and the NYSE calendar
-  (`lib/prices/market-hours`).
+  (`lib/prices/market-hours`). The app writes a share class as Finnhub does (`BRK.B`); the providers
+  are asked for `BRK-B` (`yahooTicker`, `stooqTicker`). `PriceSeriesMeta.listedOn` is the company's
+  first session from Yahoo's chart: a history that starts there is deep enough (`decideFetchWindow`)
+  and its dividends are needed only from there (`lib/prices/coverage.coversWindow`).
 - `lib/prices/finnhub` (quotes, profiles, financials, search, company news) is a plain module;
   client components reach search and quotes through `lib/actions/stocks.actions`.
 
