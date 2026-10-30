@@ -2,7 +2,7 @@
 // exercised against a stubbed global fetch — no network.
 
 import {afterEach, beforeEach, describe, expect, it, vi} from "vitest";
-import {DIVIDEND_NOISE_FLOOR, dividendCoverage, fetchYahooDaily, inferDividends, parseYahooChart, yahooChartUrl} from "@/lib/prices/yahoo";
+import {DIVIDEND_NOISE_FLOOR, dividendCoverage, fetchYahooChart, fetchYahooDaily, inferDividends, parseYahooChart, parseYahooListing, yahooChartUrl, yahooTicker} from "@/lib/prices/yahoo";
 
 // Session opens (09:30 ET) as epoch seconds: EDT is UTC-4, EST is UTC-5.
 const EDT_2026_07_27 = Date.UTC(2026, 6, 27, 13, 30) / 1000;
@@ -54,6 +54,38 @@ describe("yahooChartUrl", () => {
             "https://query1.finance.yahoo.com/v8/finance/chart/SPY?range=5y&interval=1d",
         );
         expect(yahooChartUrl("AAPL", "1mo")).not.toContain("events");
+    });
+});
+
+describe("yahooTicker", () => {
+    // Finnhub, and so the app, writes a share class with a dot; Yahoo answers "No data found"
+    // for BRK.B and serves BRK-B.
+    it("writes a US share class with a hyphen", () => {
+        expect(yahooTicker("BRK.B")).toBe("BRK-B");
+        expect(yahooTicker("bf.a")).toBe("BF-A");
+        expect(yahooChartUrl("BRK.B", "10y")).toBe("https://query1.finance.yahoo.com/v8/finance/chart/BRK-B?range=10y&interval=1d");
+    });
+
+    it("leaves a plain ticker and the T-bill index as they are", () => {
+        expect(yahooTicker("AAPL")).toBe("AAPL");
+        expect(yahooTicker("^IRX")).toBe("^IRX");
+        expect(yahooChartUrl("^IRX", "1mo")).toBe("https://query1.finance.yahoo.com/v8/finance/chart/%5EIRX?range=1mo&interval=1d");
+    });
+});
+
+describe("parseYahooListing", () => {
+    const withMeta = (meta: Record<string, unknown>) => ({chart: {result: [{...HAPPY_CHART.chart.result[0], meta}], error: null}});
+
+    it("is the ET date of the chart's first trade", () => {
+        // DoorDash: firstTradeDate 1607524200 is 09:30 ET on 2020-12-09.
+        expect(parseYahooListing(withMeta({symbol: "DASH", firstTradeDate: 1607524200}))).toBe("2020-12-09");
+    });
+
+    it("is null when the payload does not say", () => {
+        expect(parseYahooListing(HAPPY_CHART)).toBeNull();
+        expect(parseYahooListing(withMeta({firstTradeDate: null}))).toBeNull();
+        expect(parseYahooListing(withMeta({firstTradeDate: "2020-12-09"}))).toBeNull();
+        expect(parseYahooListing({chart: {result: null, error: {code: "Not Found"}}})).toBeNull();
     });
 });
 
@@ -298,6 +330,22 @@ describe("fetchYahooDaily", () => {
         // every 2026-07 bar survives whatever day the suite runs on.
         expect(bars).toHaveLength(3);
         expect(bars[0]).toMatchObject({date: "2026-07-27", close: 102.75, adjClose: 102.75 * 0.98});
+    });
+
+    it("hands back the listing date beside the bars", async () => {
+        const chart = {chart: {result: [{...HAPPY_CHART.chart.result[0], meta: {symbol: "DASH", firstTradeDate: 1607524200}}], error: null}};
+        vi.stubGlobal("fetch", vi.fn().mockResolvedValue(new Response(JSON.stringify(chart), {status: 200})));
+
+        const result = await fetchYahooChart("DASH", {range: "10y"});
+
+        expect(result.listedOn).toBe("2020-12-09");
+        expect(result.bars).toHaveLength(3);
+    });
+
+    it("hands back no bars and no listing date when the request fails", async () => {
+        vi.stubGlobal("fetch", vi.fn().mockResolvedValue(new Response("Not Found", {status: 404})));
+
+        expect(await fetchYahooChart("BRK.B", {range: "10y"})).toEqual({bars: [], listedOn: null});
     });
 
     it("returns [] on a non-ok response", async () => {

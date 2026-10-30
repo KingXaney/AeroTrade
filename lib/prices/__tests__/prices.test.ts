@@ -2,7 +2,7 @@
 // fetchStooqDaily is exercised against a stubbed global fetch — no network.
 
 import {afterEach, beforeEach, describe, expect, it, vi} from "vitest";
-import {decideFetchWindow, fetchStooqDaily, parseStooqCsv} from "@/lib/prices/stooq";
+import {decideFetchWindow, fetchStooqDaily, parseStooqCsv, stooqTicker} from "@/lib/prices/stooq";
 import {computeSignals, type Bar} from "@/lib/prices/signals";
 import {
     BACKFILL_CALENDAR_DAYS,
@@ -166,6 +166,16 @@ describe("decideFetchWindow", () => {
             expect(window.mode).toBe("topup");
         });
 
+        it("tops up a series that already starts at the company's listing", () => {
+            // Listed 2025-06-12: no provider has an older bar, so a backfill would only fetch the same history again.
+            expect(decideFetchWindow("2026-07-29", TODAY, {earliestBarDate: "2025-06-12", listedOn: "2025-06-12"}).mode).toBe("topup");
+            expect(decideFetchWindow("2026-07-29", TODAY, {earliestBarDate: "2025-06-16", listedOn: "2025-06-12"}).mode).toBe("topup");
+            // A series that starts well after the listing is still shallow.
+            expect(decideFetchWindow("2026-07-29", TODAY, {earliestBarDate: "2025-09-02", listedOn: "2025-06-12"}).mode).toBe("backfill");
+            // And a stale series still backfills, listing or not.
+            expect(decideFetchWindow("2026-07-01", TODAY, {earliestBarDate: "2025-06-12", listedOn: "2025-06-12"}).mode).toBe("backfill");
+        });
+
         it("backfills when the earliest stored bar is too recent for the default window", () => {
             const window = decideFetchWindow("2026-07-29", TODAY, {earliestBarDate: "2024-08-30"});
 
@@ -300,6 +310,16 @@ describe("fetchStooqDaily", () => {
     afterEach(() => {
         vi.unstubAllGlobals();
         vi.restoreAllMocks();
+    });
+
+    it("asks for a share class the way Stooq writes it", async () => {
+        const fetchMock = vi.fn().mockResolvedValue(new Response(HAPPY_CSV, {status: 200}));
+        vi.stubGlobal("fetch", fetchMock);
+
+        await fetchStooqDaily("BRK.B", "20260720", "20260730");
+
+        expect(fetchMock.mock.calls[0][0]).toBe("https://stooq.com/q/d/l/?s=brk-b.us&i=d&d1=20260720&d2=20260730");
+        expect(stooqTicker("SPY")).toBe("spy");
     });
 
     it("requests the lowercased .us symbol with d1/d2 and parses the CSV body", async () => {

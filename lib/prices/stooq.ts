@@ -9,6 +9,7 @@ import {
 } from "@/lib/prices/config";
 import {type Bar} from "@/lib/prices/signals";
 import {addCalendarDays} from "@/lib/dates";
+import {LISTING_COVERAGE_SLACK_DAYS} from "@/lib/prices/coverage";
 
 // Both providers now produce the same shape; the alias survives for older imports.
 type StooqBar = Bar;
@@ -90,6 +91,9 @@ type FetchWindowOptions = {
     // triggers a backfill (a caller asking for 3 years must not settle for 2).
     earliestBarDate?: string | null;
     backfillCalendarDays?: number;
+    // The company's first session (lib/prices/yahoo parseYahooListing): a history that already
+    // starts there is as deep as any provider's, however short, so it is never "too shallow".
+    listedOn?: string | null;
 };
 
 export type FetchWindow = {mode: "backfill" | "topup"; fromDate: string; toDate: string};
@@ -97,7 +101,7 @@ export type FetchWindow = {mode: "backfill" | "topup"; fromDate: string; toDate:
 export const decideFetchWindow = (
     latestBarDate: string | null,
     today: string,
-    {earliestBarDate = null, backfillCalendarDays = BACKFILL_CALENDAR_DAYS}: FetchWindowOptions = {},
+    {earliestBarDate = null, backfillCalendarDays = BACKFILL_CALENDAR_DAYS, listedOn = null}: FetchWindowOptions = {},
 ): FetchWindow => {
     const todayUtc = parseUtcDate(today);
     // No history at all is treated as an infinite gap → backfill.
@@ -105,7 +109,8 @@ export const decideFetchWindow = (
         ? Number.POSITIVE_INFINITY
         : Math.round((todayUtc.getTime() - parseUtcDate(latestBarDate).getTime()) / MS_PER_DAY);
     const requiredEarliest = addCalendarDays(today, -(backfillCalendarDays - BACKFILL_DEPTH_TOLERANCE_DAYS));
-    const tooShallow = earliestBarDate !== null && earliestBarDate > requiredEarliest;
+    const fromListing = listedOn !== null && earliestBarDate !== null && earliestBarDate <= addCalendarDays(listedOn, LISTING_COVERAGE_SLACK_DAYS);
+    const tooShallow = earliestBarDate !== null && earliestBarDate > requiredEarliest && !fromListing;
     // A gap of exactly BACKFILL_TRIGGER_GAP_DAYS is still fresh enough to top up.
     const mode: "backfill" | "topup" = gapDays > BACKFILL_TRIGGER_GAP_DAYS || tooShallow ? "backfill" : "topup";
     const windowDays = mode === "backfill" ? backfillCalendarDays : TOPUP_CALENDAR_DAYS;
@@ -116,12 +121,15 @@ export const decideFetchWindow = (
     };
 };
 
+// Stooq writes a US share class as Yahoo does, with a hyphen (brk-b.us), never the app's dot.
+export const stooqTicker = (symbol: string): string => symbol.toLowerCase().replace(/^([a-z]{1,5})\.([a-z])$/, "$1-$2");
+
 export const fetchStooqDaily = async (
     symbol: string,
     fromDate: string,
     toDate: string,
 ): Promise<StooqBar[]> => {
-    const url = `https://stooq.com/q/d/l/?s=${symbol.toLowerCase()}.us&i=d&d1=${fromDate}&d2=${toDate}`;
+    const url = `https://stooq.com/q/d/l/?s=${stooqTicker(symbol)}.us&i=d&d1=${fromDate}&d2=${toDate}`;
     try {
         const response = await fetch(url, {
             cache: "no-store",

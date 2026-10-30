@@ -6,8 +6,8 @@ import {connectToDatabase} from "@/database/mongoose";
 import PriceBar, {type PriceBarSource} from "@/database/models/price-bar.model";
 import PriceSeriesMeta from "@/database/models/price-series-meta.model";
 import {decideFetchWindow, fetchStooqDaily, type FetchWindow} from "@/lib/prices/stooq";
-import {dividendCoverage, fetchYahooDaily, type YahooRange} from "@/lib/prices/yahoo";
-import {mergeCoverage, type CoverageRange} from "@/lib/prices/coverage";
+import {dividendCoverage, fetchYahooChart, type YahooRange} from "@/lib/prices/yahoo";
+import {coversWindow, mergeCoverage, type CoverageRange} from "@/lib/prices/coverage";
 import {type Bar} from "@/lib/prices/signals";
 import {BAR_PROJECTION, toBar, toSetFields, type LeanPriceBar} from "@/lib/prices/bar-fields";
 import type {DividendPoint, RatePoint} from "@/lib/prices/types";
@@ -45,7 +45,7 @@ type EnsureBarsResult = {
 
 type StoredBarEdge = {date: string; close: number} | null;
 type FetchMode = FetchWindow["mode"];
-type FetchOutcome = {bars: Bar[]; source: PriceBarSource} | null;
+type FetchOutcome = {bars: Bar[]; source: PriceBarSource; listedOn: string | null} | null;
 
 // Beyond this, a fetched close on a stored date is a split re-adjustment, not
 // a provider rounding difference — the whole history must be replaced.
@@ -62,15 +62,20 @@ type StoredCoverage = {dividendsFrom?: string; dividendsThrough?: string} | null
 const toRange = (doc: StoredCoverage): CoverageRange | null =>
     doc?.dividendsFrom && doc.dividendsThrough ? {from: doc.dividendsFrom, through: doc.dividendsThrough} : null;
 
-// After a Yahoo write: extend the trusted range with what this payload vouched for, and end
-// any failing streak. Stooq never reaches here — it carries no adjclose, so no dividends.
-const recordCoverage = async (symbol: string, bars: Bar[]): Promise<void> => {
+// After a Yahoo write: extend the trusted range with what this payload vouched for, note the
+// company's first session when the payload names it, and end any failing streak. Stooq never
+// reaches here — it carries no adjclose, so no dividends.
+const recordCoverage = async (symbol: string, bars: Bar[], listedOn: string | null): Promise<void> => {
     const stored = await PriceSeriesMeta.findOne({symbol}).lean<StoredCoverage>();
     const merged = mergeCoverage(toRange(stored), dividendCoverage(bars));
     await PriceSeriesMeta.updateOne(
         {symbol},
         {
-            $set: {updatedAt: new Date(), ...(merged ? {dividendsFrom: merged.from, dividendsThrough: merged.through} : {})},
+            $set: {
+                updatedAt: new Date(),
+                ...(merged ? {dividendsFrom: merged.from, dividendsThrough: merged.through} : {}),
+                ...(listedOn ? {listedOn} : {}),
+            },
             $unset: {failingSince: 1},
         },
         {upsert: true},
@@ -98,12 +103,12 @@ const fetchFromProviders = async (
     topupRange: YahooRange,
     backfillRange: YahooRange = YAHOO_BACKFILL_RANGE,
 ): Promise<FetchOutcome> => {
-    const yahooBars = await fetchYahooDaily(symbol, {
+    const yahoo = await fetchYahooChart(symbol, {
         range: window.mode === "backfill" ? backfillRange : topupRange,
     });
     await delay(YAHOO_DELAY_MS);
-    if (yahooBars.length > 0) {
-        return {bars: yahooBars, source: "yahoo"};
+    if (yahoo.bars.length > 0) {
+        return {bars: yahoo.bars, source: "yahoo", listedOn: yahoo.listedOn};
     }
 
     const stooqBars = (await fetchStooqDaily(symbol, window.fromDate, window.toDate))
@@ -111,7 +116,7 @@ const fetchFromProviders = async (
         // previous close everywhere else, so keep that invariant here too.
         .filter((bar) => bar.date < today);
     await delay(STOOQ_DELAY_MS);
-    return stooqBars.length > 0 ? {bars: stooqBars, source: "stooq"} : null;
+    return stooqBars.length > 0 ? {bars: stooqBars, source: "stooq", listedOn: null} : null;
 };
 
 // Sequential + politely spaced; per-symbol failure isolation — a dead symbol
@@ -136,6 +141,7 @@ export const ensureBars = async (
     const failed: string[] = [];
     const providers: Record<PriceBarSource, number> = {yahoo: 0, stooq: 0};
     const previousSession = previousTradingDay(today);
+    const metas = await getSeriesMeta(unique);
 
     for (const symbol of unique) {
         try {
@@ -144,6 +150,7 @@ export const ensureBars = async (
             const planned = decideFetchWindow(latest?.date ?? null, today, {
                 earliestBarDate: earliest?.date ?? null,
                 backfillCalendarDays,
+                listedOn: metas.get(symbol)?.listedOn ?? null,
             });
             const missingOhlc = requireOhlc && planned.mode === "topup"
                 ? await PriceBar.exists({symbol, date: {$gte: requiredFrom}, high: {$exists: false}}) !== null
@@ -187,7 +194,7 @@ export const ensureBars = async (
                     upsert: true,
                 },
             })), {ordered: false});
-            if (source === "yahoo") await recordCoverage(symbol, bars);
+            if (source === "yahoo") await recordCoverage(symbol, bars, outcome.listedOn);
             else await recordFailure(symbol, today);
             providers[source] += 1;
             updated++;
@@ -258,13 +265,13 @@ export const getBarsFrom = async (requests: readonly {symbol: string; from: stri
 
 // What each symbol's series record says: the dividend range a Yahoo payload vouched for, and
 // the first day of a failing streak. A symbol with no record is absent.
-type SeriesMeta = {dividendsFrom?: string; dividendsThrough?: string; failingSince?: string};
+type SeriesMeta = {dividendsFrom?: string; dividendsThrough?: string; failingSince?: string; listedOn?: string};
 
 export const getSeriesMeta = async (symbols: readonly string[]): Promise<Map<string, SeriesMeta>> => {
     await connectToDatabase();
     const metas = await PriceSeriesMeta.find({symbol: {$in: [...symbols]}})
         .lean<({symbol: string} & SeriesMeta)[]>();
-    return new Map(metas.map(({symbol, dividendsFrom, dividendsThrough, failingSince}) => [symbol, {dividendsFrom, dividendsThrough, failingSince}]));
+    return new Map(metas.map(({symbol, dividendsFrom, dividendsThrough, failingSince, listedOn}) => [symbol, {dividendsFrom, dividendsThrough, failingSince, listedOn}]));
 };
 
 // Symbols whose stored dividends cannot be vouched for over [from, through] — they need a
@@ -273,7 +280,7 @@ export const symbolsLackingDividendCoverage = async (symbols: string[], from: st
     const unique = Array.from(new Set(symbols.map((s) => s.toUpperCase()))).filter(Boolean);
     const metas = await getSeriesMeta(unique);
     const covered = (meta: SeriesMeta | undefined): boolean =>
-        meta?.dividendsFrom !== undefined && meta.dividendsThrough !== undefined && meta.dividendsFrom <= from && meta.dividendsThrough >= through;
+        coversWindow(meta?.dividendsFrom && meta.dividendsThrough ? {from: meta.dividendsFrom, through: meta.dividendsThrough} : null, meta?.listedOn ?? null, from, through);
     return unique.filter((symbol) => !covered(metas.get(symbol)));
 };
 
