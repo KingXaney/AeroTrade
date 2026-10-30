@@ -43,6 +43,11 @@ export const SENTIMENT_SHARE_BY_NATURE: Readonly<Record<Nature, number>> = {repo
 // A piece from an outlet that is mostly commentary (lib/brain/trust.ts) weighs this share of
 // its importance.
 export const COMMENTARY_IMPORTANCE_SHARE = 0.6;
+// A story the same run already read under a near-identical headline (lib/brain/novelty): from
+// this headline similarity (Jaccard over its words) it is a repeat, and joins a name's sentiment
+// at this share — attention in full, no fresh tone. Research log R4 (Tetlock 2011).
+export const REPEAT_SIMILARITY = 0.6;
+export const REPEAT_SENTIMENT_SHARE = 0;
 
 // Thesis detection on the slow layer: sustained narrative mass becomes a thesis;
 // the thesis dies when slow weight falls below this fraction of its peak.

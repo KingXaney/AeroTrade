@@ -79,6 +79,8 @@ export const fetchAndPersistNews = async (): Promise<number> => {
 type QueuedArticle = {
     id: string;
     headline: string;
+    // Unix seconds, for the repeat check's order (lib/brain/novelty); never shown to the model.
+    datetime: number;
     summary: string;
     related: string;
     source: string;
@@ -105,6 +107,7 @@ export const loadExtractionQueue = async (): Promise<ExtractionQueue> => {
         articles: items.map((i) => ({
             id: String(i._id),
             headline: i.headline,
+            datetime: i.datetime,
             summary: i.summary,
             related: i.related,
             source: i.source,
@@ -185,7 +188,7 @@ export const applyExtractionBatch = async ({index, batch, text, model, activeThe
                 extractedAt: new Date(),
             }}},
         );
-        batchFolds.push({importance: clean.importance, nature: clean.nature, entities: clean.entities});
+        batchFolds.push({importance: clean.importance, nature: clean.nature, entities: clean.entities, headline: queued.headline, datetime: queued.datetime});
         batchIds.push(clean.id);
     }
     const readAt = new Date();

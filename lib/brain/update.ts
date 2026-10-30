@@ -15,7 +15,8 @@ import {
     type Mention,
 } from "@/lib/brain/decay";
 import {buildDisplayName} from "@/lib/brain/extraction";
-import {ENTITY_EPSILON, SENTIMENT_SHARE_BY_NATURE, type Nature} from "@/lib/brain/config";
+import {ENTITY_EPSILON, REPEAT_SENTIMENT_SHARE, SENTIMENT_SHARE_BY_NATURE, type Nature} from "@/lib/brain/config";
+import {repeatedMentions} from "@/lib/brain/novelty";
 import {getEasternDateString} from "@/lib/dates";
 
 export type ArticleFold = {
@@ -24,6 +25,10 @@ export type ArticleFold = {
     // reads as reported.
     nature?: Nature;
     entities: {key: string; type: 'ticker' | 'sector' | 'theme'; sentiment: number; relevance: number}[];
+    // For the repeat check (lib/brain/novelty): the headline and when it was published (unix
+    // seconds). Absent on a fold from before the check, which reads as new.
+    headline?: string;
+    datetime?: number;
 };
 
 const toState = (doc: BrainEntityDoc | null, today: string): EntityState => doc ? {
@@ -58,12 +63,15 @@ export const foldExtractionsIntoBrain = async (
     const today = getEasternDateString();
     const nowMs = Date.now();
 
-    // Group mentions + co-mention links per entity key across the run's articles.
+    // Group mentions + co-mention links per entity key across the run's articles. A story the run
+    // already read under a near-identical headline adds attention but no tone (research log R4).
+    const repeats = repeatedMentions(articles);
     const mentionsByKey = new Map<string, {type: 'ticker' | 'sector' | 'theme'; mentions: Mention[]; coMentions: Map<string, number>}>();
-    for (const article of articles) {
+    for (const [index, article] of articles.entries()) {
         for (const entity of article.entities) {
             const entry = mentionsByKey.get(entity.key) ?? {type: entity.type, mentions: [], coMentions: new Map<string, number>()};
-            entry.mentions.push({sentiment: entity.sentiment, importance: article.importance, relevance: entity.relevance, sentimentShare: SENTIMENT_SHARE_BY_NATURE[article.nature ?? 'reported']});
+            const sentimentShare = repeats[index].has(entity.key) ? REPEAT_SENTIMENT_SHARE : SENTIMENT_SHARE_BY_NATURE[article.nature ?? 'reported'];
+            entry.mentions.push({sentiment: entity.sentiment, importance: article.importance, relevance: entity.relevance, sentimentShare});
             for (const other of article.entities) {
                 if (other.key === entity.key) continue;
                 // Symmetric link mass: min importance is shared, relevance product scales it.

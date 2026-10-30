@@ -19,6 +19,8 @@ export const BRAIN_LEGEND_COPY = {
         'An article adds importance × relevance to each name\'s weight, and its tone joins the name\'s sentiment average with that same share.',
     nature: (takeCap: string, company: string, opinion: string, rumour: string, commentary: string): string =>
         `It also labels how a piece is written: reported, a company speaking for itself, an opinion piece or a rumour. An opinion piece or a rumour counts at most ${takeCap} in importance; a company statement adds ${company} of its tone to a name's sentiment, an opinion piece ${opinion}, a rumour ${rumour}; a piece from a commentary outlet weighs ${commentary} of its importance, and one from a press-release wire is read as the company's own statement.`,
+    repeat: (similar: string, share: string): string =>
+        `A story the same day's reading already met under a near-identical headline (${similar} of its words alike) still adds its attention, but only ${share} of its tone: one story told by five outlets is one piece of evidence about tone.`,
 
     fadingHeading: 'How weight fades',
     layers: (fastDays: number, slowDays: number): string =>
