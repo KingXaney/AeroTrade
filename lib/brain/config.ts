@@ -21,6 +21,9 @@ export const MAX_EXTRACTION_CALLS_PER_DAY = 8;
 // Model choice now lives in lib/ai/models.ts, keyed by task and tier, so the free
 // tier still resolves to gemini-2.5-flash-lite for every one of these jobs.
 export const UNEXTRACTED_PICKUP_LIMIT = 20;    // yesterday's overflow retried per run
+// An article the model skipped in its answer is sent this many times in all, then counts as
+// read; one it answered with nothing to tag counts as read at once (lib/brain/ingest).
+export const MAX_EXTRACTION_TRIES = 2;
 export const NEW_TICKER_VERIFY_BUDGET = 10;    // Finnhub verifications per run
 export const THEME_REUSE_LIST_SIZE = 30;       // active themes injected into the prompt
 export const REDDIT_IMPORTANCE_CAP = 0.4;      // clamped deterministically post-parse

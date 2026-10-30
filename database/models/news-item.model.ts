@@ -29,6 +29,10 @@ export interface NewsItemDoc extends Document {
     category: string;
     related: string;
     extraction?: NewsExtraction;
+    // Set when the model read the article and nothing in it could be tagged, or skipped it in
+    // MAX_EXTRACTION_TRIES answers: it leaves the extraction queue instead of being sent again.
+    readAt?: Date;
+    extractTries?: number;
     createdAt: Date;
 }
 
@@ -68,12 +72,16 @@ const NewsItemSchema = new Schema<NewsItemDoc>({
     category: {type: String, default: ''},
     related: {type: String, default: ''},
     extraction: {type: NewsExtractionSchema},
+    readAt: {type: Date},
+    extractTries: {type: Number},
     createdAt: {type: Date, default: Date.now},
 });
 
 NewsItemSchema.index({contentHash: 1}, {unique: true});
 NewsItemSchema.index({publishedDate: -1});
 NewsItemSchema.index({'extraction.entities.key': 1, publishedDate: -1});
+// The system status counts the articles read with nothing to tag (lib/brain/store).
+NewsItemSchema.index({readAt: 1}, {partialFilterExpression: {readAt: {$exists: true}}});
 // The only unbounded-ingest collection — TTL keeps it to ~90 days of articles.
 NewsItemSchema.index({createdAt: 1}, {expireAfterSeconds: NEWS_RETENTION_SECONDS});
 
