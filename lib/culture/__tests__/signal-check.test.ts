@@ -1,7 +1,8 @@
 import {describe, expect, it} from 'vitest';
 import type {CultureFeed} from '@/lib/culture/config';
 import type {CultureScoringInput} from '@/lib/culture/scoring';
-import {SIGNAL_HORIZONS_WEEKS, bookOf, forwardReturn, measureCultureSignals, type MeasuredWeek} from '@/lib/culture/signal-check';
+import {SIGNAL_HORIZONS_WEEKS, measureCultureSignals, type MeasuredWeek} from '@/lib/culture/signal-check';
+import {bookOf, forwardReturn} from '@/lib/research/returns';
 import type {Bar} from '@/lib/prices/signals';
 
 const input = (symbol: string, patch: Partial<CultureScoringInput> = {}): CultureScoringInput => ({

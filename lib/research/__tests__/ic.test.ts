@@ -1,5 +1,5 @@
 import {describe, expect, it} from 'vitest';
-import {MIN_CROSS_SECTION, MIN_IC_WEEKS, averageRanks, neweyWestT, spearman, summarizeIc} from '@/lib/research/ic';
+import {MIN_CROSS_SECTION, MIN_IC_WEEKS, averageRanks, icTable, neweyWestT, spearman, summarizeIc, type IcRow} from '@/lib/research/ic';
 
 describe('averageRanks', () => {
     it('ranks from 1 and gives ties the mean of the ranks they span', () => {
@@ -69,5 +69,22 @@ describe('summarizeIc', () => {
         expect(summary?.meanIc).toBeCloseTo(0.023, 12);
         expect(summary?.positiveShare).toBeCloseTo(0.7, 12);
         expect(summary?.tStat).toBeCloseTo(neweyWestT(ics, 3) as number, 12);
+    });
+});
+
+describe('icTable', () => {
+    const row = (signal: string, horizonWeeks: number, meanIc: number): IcRow => ({signal, horizonWeeks, meanIc, tStat: 1, weeks: 40, positiveShare: 0.5});
+    const order = [{id: 'score', label: 'Whole score', strong: true}, {id: 'news', label: 'Slow news weight'}, {id: 'empty', label: 'No figure'}];
+
+    it("keeps the brain's order, only the horizons with a figure, and a gap where a cell has none", () => {
+        const table = icTable([row('news', 4, 0.09), row('score', 1, -0.01), row('news', 1, 0.02)], order, [1, 2, 4, 8]);
+        expect(table?.horizons).toEqual([1, 4]);
+        expect(table?.rows.map((r) => [r.id, r.strong])).toEqual([['score', true], ['news', false]]);
+        expect(table?.rows[0].cells).toEqual([{meanIc: -0.01, tStat: 1, weeks: 40, positiveShare: 0.5}, null]);
+    });
+
+    it('is null without a figure', () => {
+        expect(icTable([], order, [1, 2])).toBeNull();
+        expect(icTable([row('unlisted', 1, 0.1)], order, [1])).toBeNull();
     });
 });

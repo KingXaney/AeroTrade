@@ -13,6 +13,7 @@ import {scoreCultureUniverse, type CultureScoringInput} from "@/lib/culture/scor
 import {computeMomentumComponents} from "@/lib/navigator/scoring";
 import type {Bar} from "@/lib/prices/signals";
 import {spearman, summarizeIc, type IcSummary} from "@/lib/research/ic";
+import {bookShelf, forwardReturn} from "@/lib/research/returns";
 
 export {SIGNAL_HORIZONS_WEEKS, SIGNALS_VERSION} from "@/lib/culture/config";
 
@@ -25,31 +26,6 @@ export type MeasuredWeek = {
     index: number;
     inputs: readonly CultureScoringInput[];
     feeds: readonly CultureFeed[];
-};
-
-type PricedBar = {date: string; open?: number; close: number; dividend?: number};
-export type BarBook = {byDate: Map<string, PricedBar>; dividends: {date: string; amount: number}[]};
-
-export const bookOf = (bars: readonly Bar[]): BarBook => ({
-    byDate: new Map(bars.map((bar) => [bar.date, bar])),
-    dividends: bars.filter((bar) => typeof bar.dividend === 'number' && bar.dividend > 0).map((bar) => ({date: bar.date, amount: bar.dividend as number})),
-});
-
-const fillPrice = (bar: PricedBar | undefined): number | null => {
-    if (!bar) return null;
-    const price = typeof bar.open === 'number' && bar.open > 0 ? bar.open : bar.close;
-    return price > 0 ? price : null;
-};
-
-// From one session's open to another's, with the dividends that went ex after the first and on
-// or before the second, per share bought at the first.
-export const forwardReturn = (book: BarBook | undefined, from: string, to: string): number | null => {
-    if (!book) return null;
-    const start = fillPrice(book.byDate.get(from));
-    const end = fillPrice(book.byDate.get(to));
-    if (start === null || end === null) return null;
-    const paid = book.dividends.filter((d) => d.date > from && d.date <= to).reduce((sum, d) => sum + d.amount, 0);
-    return (end + paid) / start - 1;
 };
 
 // Each term as the scorer reads it, null where the name has none: momentum as its blended rank
@@ -77,14 +53,7 @@ export const measureCultureSignals = ({weeks, calendar, bars, profiles}: {
     bars: ReadonlyMap<string, readonly Bar[]>;
     profiles: readonly ProfileId[];
 }): SignalIcRow[] => {
-    const books = new Map<string, BarBook>();
-    const bookFor = (symbol: string): BarBook | undefined => {
-        if (!books.has(symbol)) {
-            const series = bars.get(symbol);
-            if (series) books.set(symbol, bookOf(series));
-        }
-        return books.get(symbol);
-    };
+    const bookFor = bookShelf(bars);
 
     const weekly = new Map<string, number[]>();
     const push = (signal: SignalId, horizon: number, ic: number | null) => {

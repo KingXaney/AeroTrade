@@ -37,14 +37,15 @@ describe('toSignalTable', () => {
             row('attentionTrend', 1, 0.09), row('score:quiet', 1, 0.01), row('attentionAnomaly', 1, -0.04),
             row('score:spike', 1, 0.02), row('momentumLong', 4, 0.03),
         ]);
-        expect(table?.rows.map((r) => (r.kind === 'score' ? `score:${r.profile}` : r.term))).toEqual(
-            ['score:spike', 'score:quiet', 'momentumLong', 'attentionAnomaly', 'attentionTrend']);
+        expect(table?.rows.map((r) => r.id)).toEqual(['score:spike', 'score:quiet', 'momentumLong', 'attentionAnomaly', 'attentionTrend']);
+        expect(table?.rows.map((r) => r.label)).toEqual(['Spike, whole score', 'Quiet, whole score', 'price momentum', 'attention surprise', 'attention trend']);
+        expect(table?.rows.map((r) => r.strong)).toEqual([true, true, false, false, false]);
     });
 
     it('keeps only the horizons that have a figure, with a gap where a signal has none', () => {
         const table = toSignalTable([row('attentionAnomaly', 1, -0.04), row('attentionAnomaly', 13, 0.02), row('momentumLong', 13, 0.03)]);
         expect(table?.horizons).toEqual([1, 13]);
-        const momentum = table?.rows.find((r) => r.kind === 'term' && r.term === 'momentumLong');
+        const momentum = table?.rows.find((r) => r.id === 'momentumLong');
         expect(momentum?.cells).toEqual([null, {meanIc: 0.03, tStat: expect.closeTo(1.2, 9), weeks: 200, positiveShare: 0.53}]);
     });
 

@@ -94,3 +94,36 @@ export const summarizeIc = (ics: readonly number[], horizonWeeks: number): IcSum
         positiveShare: ics.filter((ic) => ic > 0).length / ics.length,
     };
 };
+
+// One cell of a signal table: a signal at a horizon, over the weeks it could be measured.
+export type SignalCell = {meanIc: number; tStat: number | null; weeks: number; positiveShare: number};
+export type IcRow = {signal: string; horizonWeeks: number} & IcSummary;
+
+// The table a brain prints: its rows in the order it hands them (a registry's, never by figure),
+// only the horizons and the rows that have a figure (invariant 8), a gap where a cell has none.
+export type IcTable = {
+    horizons: number[];
+    rows: {id: string; label: string; strong: boolean; cells: (SignalCell | null)[]}[];
+};
+
+export const icTable = (
+    rows: readonly IcRow[],
+    order: readonly {id: string; label: string; strong?: boolean}[],
+    horizons: readonly number[],
+): IcTable | null => {
+    const at = new Map(rows.map((row) => [`${row.signal}|${row.horizonWeeks}`, row]));
+    const shown = horizons.filter((h) => rows.some((row) => row.horizonWeeks === h));
+    if (shown.length === 0) return null;
+    const table = order
+        .map(({id, label, strong = false}) => ({
+            id,
+            label,
+            strong,
+            cells: shown.map((h) => {
+                const row = at.get(`${id}|${h}`);
+                return row ? {meanIc: row.meanIc, tStat: row.tStat, weeks: row.weeks, positiveShare: row.positiveShare} : null;
+            }),
+        }))
+        .filter((row) => row.cells.some((cell) => cell !== null));
+    return table.length > 0 ? {horizons: [...shown], rows: table} : null;
+};

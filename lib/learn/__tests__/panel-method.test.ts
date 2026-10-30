@@ -12,6 +12,7 @@ import {LUCK_COPY, LUCK_TERMS} from '@/lib/learn/copy/luck';
 import {TIM_COPY, TIM_TERMS} from '@/lib/learn/copy/time-in-market';
 import {TERRAIN_COPY, TERRAIN_TERMS} from '@/lib/learn/copy/terrain';
 import {BRAND_BOARD_TERMS, CULTURE_COPY, SIGNAL_CHECK_COPY, SIGNAL_CHECK_TERMS} from '@/lib/learn/copy/culture';
+import {RESEARCH_COPY} from '@/lib/learn/copy/research';
 import {COMPANY_COPY, COMPANY_TERMS, DATA_COPY, DATA_TERMS, DECISION_TERMS, FLOOR_COPY, RECORD_COPY, RECORD_TERMS} from '@/lib/learn/copy/agent-world';
 import {DOSSIER_COPY, OFFICE_TERMS, SCOREBOARD_COPY} from '@/lib/learn/copy/agent-world-office';
 
@@ -57,7 +58,7 @@ describe('a panel lead says only what its definitions do not', () => {
     });
 
     it('The signal check: what it measured', () => {
-        expect(restatements([SIGNAL_CHECK_COPY.lead, SIGNAL_CHECK_COPY.hurdle(70)], SIGNAL_CHECK_TERMS)).toEqual([]);
+        expect(restatements([SIGNAL_CHECK_COPY.lead, RESEARCH_COPY.hurdle(70), RESEARCH_COPY.weeksNote(259)], SIGNAL_CHECK_TERMS)).toEqual([]);
     });
 
     it('The brand board: how to read it', () => {
