@@ -454,7 +454,7 @@ and friends keep none beyond Shared and the invariants).
   weights renormalise over the feeds present (price, pageviews, the replayed entities), so a
   variant and a live run score on one scale. One document, `CultureBacktest` under
   `CULTURE_BACKTEST_KEY`, rebuilt by the weekly job's last phase when `lib/culture/backtest.cultureBacktestDue`
-  says so (a new `CULTURE_ENGINE_VERSION`, a moved `catalogHash`, a resimulate, no build yet),
+  says so (a new `CULTURE_ENGINE_VERSION`, a moved `catalogHash`, a resimulate, a new `SIGNALS_VERSION`, no build yet),
   inside `lib/culture/backtest-store.cultureBacktestReady` (dividends vouched for across the
   window for every simulated owner and SPY, a T-bill rate for every day of it — the bars step
   refetches whole whatever is lacking while a rebuild is pending); a failure or a wait is a note
