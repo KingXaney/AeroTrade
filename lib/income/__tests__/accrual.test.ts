@@ -9,10 +9,13 @@ import {
     createIncomeClock,
     dailyFactor,
     dividendsByExDate,
+    distinctIncomeRows,
     holdingSpans,
     makeRateLookup,
     payDateFor,
     readyThrough,
+    readinessOf,
+    describeWaitingOn,
     reconcile,
     describeIncomeRun,
     groupIncomeActivity,
@@ -294,6 +297,25 @@ describe('readyThrough', () => {
         expect(readyThrough({...base, rateOn: fresh, spans: xle, coverage: () => ({from: '2021-01-01', through: '2026-09-23'})})).toBe('2026-09-24');
     });
 
+    it('names what it waits on: the rate, or the symbol whose dividends it cannot vouch for', () => {
+        expect(readinessOf(base)).toEqual({ready: '2026-09-17', waitingOn: {kind: 'rate', day: '2026-09-18'}});
+        expect(readinessOf({...base, rateOn: fresh, spans: xle})).toEqual({ready: null, waitingOn: {kind: 'dividends', symbol: 'XLE'}});
+        expect(readinessOf({...base, rateOn: fresh, spans: xle, coverage: () => ({from: '2021-01-01', through: '2026-09-15'})}))
+            .toEqual({ready: '2026-09-20', waitingOn: {kind: 'dividends', symbol: 'XLE'}});
+        expect(readinessOf({...base, rateOn: fresh})).toEqual({ready: '2026-09-24', waitingOn: null});
+    });
+
+    it('names the symbol that holds the account back furthest', () => {
+        const two = [{symbol: 'XLE', firstHeld: '2026-08-20', lastHeld: null}, {symbol: 'BRK.B', firstHeld: '2026-08-20', lastHeld: null}];
+        const coverage = (symbol: string) => (symbol === 'XLE' ? {from: '2021-01-01', through: '2026-09-15'} : null);
+        expect(readinessOf({...base, rateOn: fresh, spans: two, coverage}).waitingOn).toEqual({kind: 'dividends', symbol: 'BRK.B'});
+    });
+
+    it('says what it waits on in a few words', () => {
+        expect(describeWaitingOn({kind: 'rate', day: '2026-10-01'})).toBe('the T-bill rate for 2026-10-01');
+        expect(describeWaitingOn({kind: 'dividends', symbol: 'BRK.B'})).toBe("BRK.B's dividends");
+    });
+
     it('ignores symbols released after a month of failures, and positions closed before the window', () => {
         expect(readyThrough({...base, rateOn: fresh, spans: xle, released: new Set(['XLE'])})).toBe('2026-09-24');
         expect(readyThrough({...base, rateOn: fresh, spans: [{symbol: 'XLE', firstHeld: '2026-06-01', lastHeld: '2026-07-01'}]})).toBe('2026-09-24');
@@ -334,5 +356,31 @@ describe('groupIncomeActivity', () => {
 
     it('is empty for an account with no income yet', () => {
         expect(groupIncomeActivity([])).toEqual({interestByMonth: [], dividends: []});
+    });
+});
+
+describe('distinctIncomeRows', () => {
+    const at = (iso: string) => new Date(iso);
+    it('counts each key once and keeps the row written first', () => {
+        const rows = [
+            {kind: 'dividend' as const, date: '2026-09-26', symbol: 'XLE', amount: 7.22, createdAt: at('2026-09-28T04:05:02Z')},
+            {kind: 'dividend' as const, date: '2026-09-26', symbol: 'XLE', amount: 7.22, createdAt: at('2026-09-28T04:05:01Z')},
+            {kind: 'interest' as const, date: '2026-09-26', symbol: '', amount: 0.1, createdAt: at('2026-09-28T04:05:01Z')},
+            {kind: 'dividend' as const, date: '2026-09-26', symbol: 'XLK', amount: 2.43, createdAt: at('2026-09-28T04:05:01Z')},
+        ];
+        const distinct = distinctIncomeRows(rows);
+        expect(distinct.copies).toBe(1);
+        expect(distinct.rows).toHaveLength(3);
+        expect(distinct.rows.find((r) => r.symbol === 'XLE')?.createdAt).toEqual(at('2026-09-28T04:05:01Z'));
+    });
+
+    it('reads a missing symbol as interest\'s empty one', () => {
+        const distinct = distinctIncomeRows([{kind: 'interest' as const, date: '2026-08-04', amount: 0.43}, {kind: 'interest' as const, date: '2026-08-04', symbol: '', amount: 0.43}]);
+        expect(distinct).toMatchObject({copies: 1});
+    });
+
+    it('hands back a ledger with one row per key as it is', () => {
+        const rows = [{kind: 'interest' as const, date: '2026-08-04', symbol: '', amount: 0.43}, {kind: 'interest' as const, date: '2026-08-05', symbol: '', amount: 0.43}];
+        expect(distinctIncomeRows(rows)).toEqual({rows, copies: 0});
     });
 });

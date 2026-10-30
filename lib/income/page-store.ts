@@ -6,7 +6,7 @@ import {cache} from "react";
 import AccountIncome from "@/database/models/account-income.model";
 import {getEasternDateString} from "@/lib/dates";
 import {getDividendPoints, getLatestRatePoint} from "@/lib/prices/store";
-import {apyFromDiscount, groupIncomeActivity, usableRate, withReceipts, type IncomeView} from "@/lib/income/accrual";
+import {apyFromDiscount, distinctIncomeRows, groupIncomeActivity, usableRate, withReceipts, type IncomeView} from "@/lib/income/accrual";
 import {getOwnedAccount} from "@/lib/trading/accounts";
 import {getTradeLedger} from "@/lib/trading/ledger";
 import {accountEpoch} from "@/lib/trading/epoch";
@@ -50,15 +50,15 @@ export const getIncomeActivity = async (userId: string, accountId: string): Prom
         const [rows, ledger] = await Promise.all([
             AccountIncome.find(
                 {accountId: key, epoch, date: {$lte: account.incomeThrough}},
-                {_id: 0, kind: 1, date: 1, symbol: 1, amount: 1, apy: 1, exDate: 1, perShare: 1, quantity: 1},
-            ).lean<Parameters<typeof groupIncomeActivity>[0][number][]>(),
+                {_id: 0, kind: 1, date: 1, symbol: 1, amount: 1, apy: 1, exDate: 1, perShare: 1, quantity: 1, createdAt: 1},
+            ).lean<(Parameters<typeof groupIncomeActivity>[0][number] & {createdAt?: Date})[]>(),
             getTradeLedger(userId, key),
         ]);
         // The trades the income job replays: this epoch's, by timestamp (creditAccountIncome). The
         // ledger already starts at inceptionAt; an account without one starts at createdAt here.
         const fills = ledger.filter((t) => t.createdAt >= epoch);
         const points = await getDividendPoints(fills.map((t) => t.symbol), {from: getEasternDateString(inceptionAt), to: account.incomeThrough});
-        return withReceipts(groupIncomeActivity(rows), fills, points);
+        return withReceipts(groupIncomeActivity(distinctIncomeRows(rows).rows), fills, points);
     } catch (error) {
         console.error('Error reading income activity:', error);
         return null;

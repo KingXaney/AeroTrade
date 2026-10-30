@@ -203,6 +203,25 @@ export const replayIncome = ({from, to, startCash, startHoldings, trades, clock,
 const CASH_TOLERANCE = 0.01;
 const QUANTITY_TOLERANCE = 1e-9;
 
+type KeyedRow = {kind: string; date: string; symbol?: string; createdAt?: Date | string};
+
+const writtenAt = (row: KeyedRow): number => (row.createdAt === undefined ? 0 : new Date(row.createdAt).getTime());
+
+// One credit per key (kind, date, symbol within an account's epoch). The ledger's unique index
+// (scripts/migration-indexes.mjs) makes a second row for a key impossible; before it existed in
+// production, two runs at once could each write one (scripts/income-dedupe.mjs repairs those),
+// so every sum of stored rows counts a key once, as the row written first.
+export const distinctIncomeRows = <T extends KeyedRow>(rows: readonly T[]): {rows: T[]; copies: number} => {
+    const first = new Map<string, T>();
+    for (const row of rows) {
+        const key = `${row.kind}|${row.date}|${row.symbol ?? ''}`;
+        const held = first.get(key);
+        if (held === undefined || writtenAt(row) < writtenAt(held)) first.set(key, row);
+    }
+    if (first.size === rows.length) return {rows: [...rows], copies: 0};
+    return {rows: [...first.values()], copies: rows.length - first.size};
+};
+
 // An account's cash and positions must be exactly its starting balance, plus every trade,
 // plus every credit it has already received. If they are not, some history is missing — and
 // crediting interest on a reconstruction that is wrong would compound the error, so the
@@ -251,18 +270,26 @@ export const holdingSpans = (trades: readonly IncomeTrade[]): HoldingSpan[] => {
 // a T-bill rate no older than RATE_MAX_STALENESS_DAYS, and every dividend that could be paid
 // in the window needs its symbol's dividends covered on its ex-date. Missing data holds the
 // watermark back — it never turns into a permanent zero. Null when nothing is ready.
-export const readyThrough = ({start, end, rateOn, spans, coverage, released}: {
+// `waitingOn` names what set that limit — the first day without a usable rate, or the symbol
+// whose dividends hold the account back furthest — so a waiting account says why.
+export type IncomeWait = {kind: 'rate'; day: string} | {kind: 'dividends'; symbol: string};
+
+type ReadinessInput = {
     start: string;
     end: string;
     rateOn: RateLookup;
     spans: readonly HoldingSpan[];
     coverage: (symbol: string) => CoverageRange | null;
     released: ReadonlySet<string>;
-}): string | null => {
+};
+
+export const readinessOf = ({start, end, rateOn, spans, coverage, released}: ReadinessInput): {ready: string | null; waitingOn: IncomeWait | null} => {
     let ready = end;
+    let waitingOn: IncomeWait | null = null;
     for (const day of eachCalendarDay(start, end)) {
         if (usableRate(rateOn(day), day) === null) {
             ready = addCalendarDays(day, -1);
+            waitingOn = {kind: 'rate', day};
             break;
         }
     }
@@ -273,14 +300,21 @@ export const readyThrough = ({start, end, rateOn, spans, coverage, released}: {
         const lastExDate = minDate(addCalendarDays(ready, -DIVIDEND_PAY_LAG_DAYS), span.lastHeld === null ? end : addCalendarDays(span.lastHeld, 1));
         if (firstExDate > lastExDate) continue;
         const range = coverage(span.symbol);
-        if (range === null || range.from > firstExDate) {
-            ready = minDate(ready, addCalendarDays(firstExDate, DIVIDEND_PAY_LAG_DAYS - 1));
-        } else if (range.through < lastExDate) {
-            ready = minDate(ready, addCalendarDays(range.through, DIVIDEND_PAY_LAG_DAYS));
+        const limit = range === null || range.from > firstExDate
+            ? addCalendarDays(firstExDate, DIVIDEND_PAY_LAG_DAYS - 1)
+            : range.through < lastExDate ? addCalendarDays(range.through, DIVIDEND_PAY_LAG_DAYS) : null;
+        if (limit !== null && limit < ready) {
+            ready = limit;
+            waitingOn = {kind: 'dividends', symbol: span.symbol};
         }
     }
-    return ready >= start ? ready : null;
+    return {ready: ready >= start ? ready : null, waitingOn};
 };
+
+export const readyThrough = (input: ReadinessInput): string | null => readinessOf(input).ready;
+
+export const describeWaitingOn = (wait: IncomeWait): string =>
+    wait.kind === 'rate' ? `the T-bill rate for ${wait.day}` : `${wait.symbol}'s dividends`;
 
 const minDate = (a: string, b: string): string => (a < b ? a : b);
 const maxDate = (a: string, b: string): string => (a > b ? a : b);
