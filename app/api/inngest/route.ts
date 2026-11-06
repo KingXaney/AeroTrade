@@ -4,7 +4,10 @@ import {functions} from "@/lib/jobs/functions";
 
 // A 12-symbol price chunk with provider spacing, first-run bulk writes and
 // fallbacks runs 30–45 s; the default route budget would cut it off.
-export const maxDuration = 60;
+// A step's budget. Most take seconds; the culture backtest's one step (lib/culture/backtest-store)
+// reads every bar and pageview and simulates five years, about half a minute on a laptop at
+// production scale and slower here. It rebuilds only when its inputs change.
+export const maxDuration = 300;
 
 export const { GET, POST, PUT } = serve({
     client: inngest,

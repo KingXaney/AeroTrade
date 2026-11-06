@@ -26,7 +26,7 @@ import type {ActionResult} from '@/lib/actions/types';
 import type {SuggestionItem} from '@/lib/navigator/types';
 
 // One step per chunk of the universe: a single 40-symbol step with Yahoo's spacing would
-// exceed the route's 60 s budget and be retried from scratch. Steps are `${stepPrefix}-${i}`.
+// run for minutes, and one past the route's budget is retried from scratch. Steps are `${stepPrefix}-${i}`.
 export const ensureUniverseBars = async (step: JobStep, symbols: readonly string[], stepPrefix: string): Promise<void> => {
     const chunks = chunk(symbols, PRICE_CHUNK_SIZE);
     for (let i = 0; i < chunks.length; i += 1) {
